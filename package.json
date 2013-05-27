@@ -1,0 +1,16 @@
+{
+  "name": "a_sql",
+  "version": "0.0.1",
+  "main": "index.js",
+  "title": "a_sql",
+  "description": "Object Relational Mapper",
+  "keywords": ["orm","sql"],
+  "dependencies": {
+		"a_mock": "0.0.4",
+		"a_test": "0.0.4"
+  },
+  "repository" : {
+         "type" : "git",
+         "url"  : "git@github.com:alfateam/a_sql.git"
+      }
+}
