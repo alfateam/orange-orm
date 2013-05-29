@@ -13,7 +13,7 @@ function act(c) {
 	parameterizedArg.prepend.expect(firstPart).return(c.expected);
 	c.column.encode = mock();
 	c.column.encode.expect(arg).return(parameterizedArg);	
-	c.returned = c.sut.equal_number(c.column,arg);
+	c.returned = c.sut.equal(c.column,arg);
 }
 
 act.base = '../req';
