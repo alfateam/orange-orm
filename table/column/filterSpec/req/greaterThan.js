@@ -1,19 +1,16 @@
 var encoded = {};
 var arg = 5;
-var sql = '5';
-var firstPart = '_0.columnName=';
+var firstPart = '_0.columnName>';
 
 
 function act(c) {	
 	var mock = c.mock;
 	c.expected = {};
-	encoded.sql = mock();
-	encoded.sql.expect().return(sql);
 	encoded.prepend = mock();	
 	encoded.prepend.expect(firstPart).return(c.expected);
 	c.column.encode = mock();
 	c.column.encode.expect(arg).return(encoded);	
-	c.returned = c.sut.equal(c.column,arg);
+	c.returned = c.sut.greaterThan(c.column,arg);
 }
 
 act.base = '../req';

@@ -1,19 +1,16 @@
 var encoded = {};
-var arg = 5;
-var sql = '5';
-var firstPart = '_0.columnName=';
-
+var arg = 'foo';
+var argPercent = '%foo';
+var firstPart = '_0.columnName LIKE ';
 
 function act(c) {	
 	var mock = c.mock;
 	c.expected = {};
-	encoded.sql = mock();
-	encoded.sql.expect().return(sql);
 	encoded.prepend = mock();	
 	encoded.prepend.expect(firstPart).return(c.expected);
 	c.column.encode = mock();
-	c.column.encode.expect(arg).return(encoded);	
-	c.returned = c.sut.equal(c.column,arg);
+	c.column.encode.expect(argPercent).return(encoded);	
+	c.returned = c.sut.endsWith(c.column,arg);
 }
 
 act.base = '../req';
