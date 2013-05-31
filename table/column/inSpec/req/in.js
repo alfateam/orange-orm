@@ -4,17 +4,20 @@ var encoded2 = {};
 var arg = 'foo';
 var arg2 = 'baz';
 var args = [arg,arg2];
-var firstPart = '_0.columnName in ';
+var firstPart = '_2.columnName in ';
 var lastPart = ')';
 var prepended = {};
 var appended = {},
 	appended2 = {},
 	appended3 = {},
-	appended4 = {};
+	appended4 = {},
+	optionalAlias = {},
+	alias = '_2';
 
 function act(c) {	
 	var mock = c.mock;
 	c.expected = {};
+	c.extractAlias.expect(optionalAlias).return(alias);
 	c.newParameterized.expect(firstPart).return(parameterized);	
 	parameterized.append = mock();
 	parameterized.append.expect('(').return(appended);
@@ -29,7 +32,7 @@ function act(c) {
 	c.column.encode = mock();
 	c.column.encode.expect(arg).return(encoded);	
 	c.column.encode.expect(arg2).return(encoded2);
-	c.returned = c.sut.in(c.column,args);
+	c.returned = c.sut(c.column,args,optionalAlias);
 }
 
 act.base = '../req';

@@ -1,20 +1,22 @@
 var encoded = {};
 var arg = 5;
-var sql = '5';
-var firstPart = '_0.columnName=';
-
+var sql = 'null';
+var firstPart = '_2.columnName is ';
+var optionalAlias = {};
+var alias = '_2';
 
 function act(c) {	
 	var mock = c.mock;
 	c.expected = {};
+	c.extractAlias.expect(optionalAlias).return(alias);
 	encoded.sql = mock();
 	encoded.sql.expect().return(sql);
-	encoded.prepend = mock();	
+	encoded.prepend = mock();
 	encoded.prepend.expect(firstPart).return(c.expected);
 	c.column.encode = mock();
 	c.column.encode.expect(arg).return(encoded);	
-	c.returned = c.sut.equal(c.column,arg);
+	c.returned = c.sut(c.column,arg,optionalAlias);
 }
 
-act.base = '../req';
+act.base = '../../req';
 module.exports = act;

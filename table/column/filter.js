@@ -54,10 +54,6 @@ c.endsWith = function(column,arg) {
 	return encode(column,arg,' LIKE ');
 };
 
-c.contains = function(column,arg) {
-	arg =  '%' + arg + '%';
-	return encode(column,arg,' LIKE ');
-};
 
 c.in = function(column,values) {
 	if (values.length == 0)
