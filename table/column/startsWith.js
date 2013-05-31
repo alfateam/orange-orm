@@ -5,7 +5,7 @@ var operator = ' LIKE ';
 function endsWith(column,arg,optionalAlias) {
 	var alias = extractAlias(optionalAlias);
 	arg =  arg + '%';
-	var encoded = column.encode(arg);	
+	var encoded = column.convertThenEncode(arg);	
 	var firstPart = alias + '.' + column.name + operator;
 	return encoded.prepend(firstPart);		
 };

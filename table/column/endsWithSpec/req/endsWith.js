@@ -11,8 +11,8 @@ function act(c) {
 	c.extractAlias.expect(optionalAlias).return(alias);
 	encoded.prepend = mock();	
 	encoded.prepend.expect(firstPart).return(c.expected);
-	c.column.encode = mock();
-	c.column.encode.expect(argPercent).return(encoded);	
+	c.column.convertThenEncode = mock();
+	c.column.convertThenEncode.expect(argPercent).return(encoded);	
 	c.returned = c.sut(c.column,arg,optionalAlias);
 }
 

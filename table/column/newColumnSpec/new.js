@@ -1,11 +1,28 @@
 var requireMock = require('a_mock').requireMock;
-var expectRequire = require('a_mock').expectRequire;
-var filter = {};
-expectRequire('./filter').return(filter);
+var equal = requireMock('./equal');
+var notEqual = requireMock('./notEqual');
+var lessThan = requireMock('./lessThan');
+var lessThanOrEqual = requireMock('./lessThanOrEqual');
+var greaterThan = requireMock('./greaterThan');
+var greaterThanOrEqual = requireMock('./greaterThanOrEqual');
+var _in = requireMock('./in');
+var contains = requireMock('./contains');
+var startsWith = requireMock('./startsWith');
+var endsWith = requireMock('./endsWith');
 var name = {};
 
 function act(c) {
-	c.filter = filter;
+	c.equal = equal;
+	c.alias = {};
+	c.notEqual = notEqual;
+	c.lessThan = lessThan;
+	c.lessThanOrEqual = lessThanOrEqual;
+	c.greaterThan = greaterThan;
+	c.greaterThanOrEqual = greaterThanOrEqual;
+	c.in = _in;
+	c.contains = contains;
+	c.startsWith = startsWith;
+	c.endsWith = endsWith;
 	c.name = name;	
 	c.sut = require('../newColumn')(name);
 }

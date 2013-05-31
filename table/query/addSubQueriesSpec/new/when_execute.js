@@ -1,5 +1,5 @@
-var when = require('a').when;
-
+var when = require('a_test').when;
 var c = {};
+
 when('./execute',c)
-	.it('should return ');
+	.it('should fail cause TODO ').assertFail();

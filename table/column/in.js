@@ -10,7 +10,7 @@ function _in(column,values,optionalAlias) {
 	var separator = '(';
 
 	for (var i = 0; i < values.length; i++) {
-		encoded = column.encode(values[i]);		
+		encoded = column.convertThenEncode(values[i]);		
 		parameterized = parameterized.append(separator).append(encoded);
 		separator = ',';		
 	};

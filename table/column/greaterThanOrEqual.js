@@ -4,7 +4,7 @@ var extractAlias = require('./extractAlias');
 function greaterThanOrEqual(column,arg,optionalAlias) {	
 	var operator = '>=';
 	var alias = extractAlias(optionalAlias);	
-	var encoded = column.encode(arg);	
+	var encoded = column.convertThenEncode(arg);	
 	var firstPart = alias + '.' + column.name + operator;
 	return encoded.prepend(firstPart);		
 };
