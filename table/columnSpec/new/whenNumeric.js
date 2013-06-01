@@ -1,6 +1,6 @@
 var when = require('a_test').when;
 var c = {};
 
-when('./string',c).
-	it('sets type').assertEqual(c.expected,c.sut.type).
+when('./numeric',c).
+	it('sets type').assertDoesNotThrow(c.numeric.verify).
 	it('returns self').assertEqual(c.sut,c.returned);

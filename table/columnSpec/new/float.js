@@ -1,9 +1,10 @@
 var requireMock = require('a_mock').requireMock;
-var nullValue  = {};
 
 function act(c) {
-	c.nullValue = nullValue;
-	c.returned = c.sut.dbNull(nullValue);
+	var add = requireMock('./column/float');
+	add.expect(c.column);
+	c.float = add;
+	c.returned = c.sut.float();
 }
 
 act.base = '../new';

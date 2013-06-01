@@ -1,10 +1,10 @@
 var requireMock = require('a_mock').requireMock;
-var expected = {};
-var alias  = {};
 
 function act(c) {
-	c.alias = alias;
-	c.returned = c.sut.as(alias);
+	var blob = requireMock('./column/blob');
+	blob.expect(c.column);
+	c.blob = blob;
+	c.returned = c.sut.blob();
 }
 
 act.base = '../new';

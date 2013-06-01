@@ -2,6 +2,8 @@ var when = require('a_test').when;
 var c = {};
 
 when('./new',c)
+	.it('should add column to table.columns').assertEqual(c.sut,c.columns[0])
+	.it('should not add any other columns').assertEqual(1,c.columns.length)
 	.it('should set columnName').assertEqual(c.name,c.sut.columnName)
 	.it('should set name').assertEqual(c.name,c.sut.name)
 	.it('eq is alias for equal').assertDeepEqual(c.sut.equal,c.sut.eq)

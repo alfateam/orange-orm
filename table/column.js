@@ -1,9 +1,61 @@
 var newColumn = require('./column/newColumn');
 
-function addColumn(table,columnName) {
-	var column = newColumn(columnName);
-	table.columns.push(column);
-	return column;
+function defineColumn(table,columnName) {
+	var column = newColumn(table,columnName);
+	var c = {};
+
+
+	c.string = function() {
+		require('./column/string')(column);
+		return c;
+	};
+
+	c.guid = function() {
+		require('./column/guid')(column);
+		return c;
+	};
+
+	c.integer = function() {
+		c.type =  require('./column/integer')(column);
+		return c;
+	};
+
+	c.float = function() {
+		c.type = require('./column/float')(column);
+		return c;
+	};
+
+	c.numeric = function(optionalPrecision,optionalScale) {
+		require('./column/numeric')(column,optionalPrecision,optionalScale);
+		return c;
+	};
+
+	c.boolean = function() {
+		require('./column/boolean')(column);
+		return c;
+	}
+
+	c.blob = function() {
+		require('./column/blob')(column);
+		return c;
+	};
+
+	c.default = function(value) {
+		column.default = value;
+		return c;
+	};
+
+	c.as = function(alias) {
+		column.alias = alias;
+		return c;
+	};
+
+	c.dbNull = function(value) {
+		column.dbNull = value;
+		return c;
+	};
+
+	return c;
 }
 
-module.exports = addColumn;
+module.exports = defineColumn;

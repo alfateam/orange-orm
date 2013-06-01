@@ -10,8 +10,12 @@ var contains = requireMock('./contains');
 var startsWith = requireMock('./startsWith');
 var endsWith = requireMock('./endsWith');
 var name = {};
+var table = {};
+var columns = [];
+table.columns = columns;
 
 function act(c) {
+	c.columns = columns;
 	c.equal = equal;
 	c.alias = {};
 	c.notEqual = notEqual;
@@ -24,7 +28,7 @@ function act(c) {
 	c.startsWith = startsWith;
 	c.endsWith = endsWith;
 	c.name = name;	
-	c.sut = require('../newColumn')(name);
+	c.sut = require('../newColumn')(table,name);
 }
 
 module.exports = act;

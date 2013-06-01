@@ -1,6 +1,6 @@
 var when = require('a_test').when;
 var c = {};
 
-when('./guid',c).
-	it('sets type').assertEqual(c.expected,c.sut.type).
+when('./integer',c).
+	it('sets type').assertDoesNotThrow(c.integer.verify).
 	it('returns self').assertEqual(c.sut,c.returned);

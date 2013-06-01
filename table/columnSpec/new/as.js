@@ -1,10 +1,9 @@
 var requireMock = require('a_mock').requireMock;
-var expected = {};
-var defaultValue  = {};
+var alias  = {};
 
 function act(c) {
-	c.default = defaultValue;
-	c.returned = c.sut.default(defaultValue);
+	c.alias = alias;
+	c.returned = c.sut.as(alias);
 }
 
 act.base = '../new';

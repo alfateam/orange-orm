@@ -1,6 +1,6 @@
 var when = require('a_test').when;
 var c = {};
 
-when('./as',c).
-	it('should set alias on sut').assertEqual(c.alias,c.sut.alias).
+when('./dbNull',c).
+	it('should set dbNull on column').assertEqual(c.dbNull,c.column.dbNull).
 	it('should return self').assertStrictEqual(c.sut,c.returned);

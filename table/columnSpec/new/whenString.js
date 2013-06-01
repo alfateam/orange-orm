@@ -1,6 +1,6 @@
 var when = require('a_test').when;
 var c = {};
 
-when('./float',c).
-	it('sets type').assertEqual(c.expected,c.sut.type).
+when('./string',c).
+	it('sets type').assertDoesNotThrow(c.string.verify).
 	it('returns self').assertEqual(c.sut,c.returned);

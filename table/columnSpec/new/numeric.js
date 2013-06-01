@@ -1,12 +1,11 @@
 var requireMock = require('a_mock').requireMock;
-var expected = {};
 var precision = {};
 var scale = {};
 
 function act(c) {
 	var add = requireMock('./column/numeric');
-	c.expected = expected;
-	add.expect(c.sut,precision,scale).return(expected);
+	add.expect(c.column,precision,scale);
+	c.numeric = add;
 	c.returned = c.sut.numeric(precision,scale);
 }
 

@@ -1,6 +1,7 @@
 function _new(column) {
-	var c = {};
-
+	var c = 
+//todo not create c
+	//todo: convert, encode, decode, must handle dbNull and null
 	c.encode = function(value) {
 		if (value == null)
 			return '' + column.dbNull;
@@ -13,10 +14,6 @@ function _new(column) {
 
 		return '' + Math.floor(value);	
 	}
-
-	c.equal = function(value) {
-
-	};
 
 	c.decode = function(value) {
 		if (value == column.dbNull) {

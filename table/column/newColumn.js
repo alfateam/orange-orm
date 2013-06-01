@@ -9,11 +9,16 @@ var contains = require('./contains');
 var startsWith = require('./startsWith');
 var endsWith = require('./endsWith');
 
-module.exports = function(name) {
+module.exports = function(table,name) {	
 	var c = {};
 	c.columnName = name;
 	c.name = name;	
+	table.columns.push(c);
 
+	c.convertThenEncode = function(arg) {
+		var converted = c.convert(arg);
+		return c.encode(converted);
+	};
 	
 	c.equal = function(arg,optionalAlias) {
 		return equal(c,arg,optionalAlias);
