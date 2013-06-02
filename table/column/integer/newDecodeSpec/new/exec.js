@@ -1,9 +1,8 @@
 var value = 2;
-var expected = '2';
 
 function act(c) {
-	c.expected = expected;
-	c.returned = c.sut.encode(value);
+	c.expected = value;
+	c.returned = c.sut(value);
 }
 
 act.base = '../new';

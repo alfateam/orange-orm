@@ -1,16 +1,15 @@
-var value = 'foo';
+var arg = 'foo';
 var expected = '\'foo\' is not a number';
 
 function act(c) {
 	c.expected = expected;
 	try {
-		c.sut.encode(value);
+		c.sut(arg);
 	}
-	catch (err) {
-		c.thrownMsg = err.message;
+	catch(error) {
+		c.thrownMsg = error.message;
 	}
-	
-}
+};
 
-act.base = '../new';
+act.base = '../req';
 module.exports = act;
