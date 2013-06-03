@@ -1,9 +1,13 @@
+//TODO support for sending collection elements as param list
 function newCollection() {
 	var c = {};
 	var ranges = [];
 
-	c.addRange = function(range) {
-		ranges.push(range);
+//TODO c.Add = function() {};
+//TODO c.toArray = function() {};
+
+	c.addRange = function(otherCollection) {
+		ranges.push(otherCollection);
 	};
 
 	c.forEach = function(callback) {
