@@ -29,9 +29,9 @@ function act(c) {
 	appended3.append.expect(encoded2).return(appended4);
 	appended4.append = mock();
 	appended4.append.expect(')').return(c.expected);
-	c.column.convertThenEncode = mock();
-	c.column.convertThenEncode.expect(arg).return(encoded);	
-	c.column.convertThenEncode.expect(arg2).return(encoded2);
+	c.column.purifyThenEncode = mock();
+	c.column.purifyThenEncode.expect(arg).return(encoded);	
+	c.column.purifyThenEncode.expect(arg2).return(encoded2);
 	c.returned = c.sut(c.column,args,optionalAlias);
 }
 

@@ -11,8 +11,8 @@ function act(c) {
 	encoded.sql.expect().return(sql);
 	encoded.prepend = mock();
 	encoded.prepend.expect(firstPart).return(c.expected);
-	c.column.convertThenEncode = mock();
-	c.column.convertThenEncode.expect(arg).return(encoded);	
+	c.column.purifyThenEncode = mock();
+	c.column.purifyThenEncode.expect(arg).return(encoded);	
 	c.returned = c.sut(c.column,arg,c.optionalAlias);
 }
 

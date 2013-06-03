@@ -15,9 +15,9 @@ module.exports = function(table,name) {
 	c.name = name;	
 	table.columns.push(c);
 
-	c.convertThenEncode = function(arg) {
-		var converted = c.convert(arg);
-		return c.encode(converted);
+	c.purifyThenEncode = function(arg) {
+		var purifyed = c.purify(arg);
+		return c.encode(purifyed);
 	};
 	
 	c.equal = function(arg,optionalAlias) {

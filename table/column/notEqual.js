@@ -5,7 +5,7 @@ var nullOperator = ' is not ';
 function notEqual(column,arg,optionalAlias) {	
 	var operator = '<>';
 	var alias = extractAlias(optionalAlias);	
-	var encoded = column.convertThenEncode(arg);	
+	var encoded = column.purifyThenEncode(arg);	
 	if (encoded.sql() == 'null') 
 		operator = nullOperator;
 	var firstPart = alias + '.' + column.name + operator;
