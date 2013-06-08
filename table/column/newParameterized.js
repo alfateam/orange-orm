@@ -33,6 +33,26 @@ function _new(text) {
 		return newParameterized(params);
 	}
 
+	c.append = function(other) {				
+		if (other.hasOwnProperty('sql')) 
+			return appendParameterized(other);
+		else
+			return appendText(other);			
+	};
+
+	function appendParameterized(other) {		
+		var params = [text + other.sql()];
+		var otherParameters = other.parameters.toArray();			
+		params = params.concat(optionalParams).concat(otherParameters);
+		return newParameterized(params);
+	}
+
+	function appendText(other) {
+		var params = [text + other].concat(optionalParams);
+		return newParameterized(params);
+	}
+
+
 	function newParameterized(params) {
 		return require('./newParameterized').apply(null, params);		
 	}
