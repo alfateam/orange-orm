@@ -1,8 +1,8 @@
 var range2 = {};
 
 function act(c) {
-	c.range2 = range2;
-	c.sut.addRange(range2)
+	c.element5 = {};
+	c.sut.add(c.element5)
 }
 
 act.base = '../addRange';

@@ -1,16 +1,32 @@
-var callback = {};
+var mock = require('a_mock').mock,
+	callback,
+	element3 = {},
+	element4 = {};
 
 function act(c) {
-	
-	c.range1.forEach = c.mock();
-	c.range1.forEach.expect(callback).return();
-
-	c.range2.forEach = c.mock();
-	c.range2.forEach.expect(callback).return();
-	
-	c.callback = callback;
+	stubCallback();
+	var forEach = c.mock();
+	forEach.expectAnything().whenCalled(onForEach);
+	c.range1.forEach = forEach;
 	c.sut.forEach(callback);
+
+	function stubCallback() {
+		callback = mock();
+		callback.expect(c.element,0);
+		callback.expect(c.element2,1);
+		callback.expect(element3,2);
+		callback.expect(element4,3);
+		callback.expect(c.element5,4);
+		c.callback = callback;
+	}	
+
+	function onForEach(range1Callback) {
+		range1Callback(element3,0);
+		range1Callback(element4,0);
+	}
+
 }
 
-act.base = '../addRange'
+
+act.base = '../add';
 module.exports = act;
