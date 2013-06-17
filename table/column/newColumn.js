@@ -14,6 +14,7 @@ module.exports = function(table,name) {
 	c.columnName = name;
 	c.name = name;	
 	table.columns.push(c);
+	table[name] = c;
 
 	c.purifyThenEncode = function(arg) {
 		var purifyed = c.purify(arg);

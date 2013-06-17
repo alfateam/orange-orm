@@ -9,7 +9,7 @@ var _in = requireMock('./in');
 var contains = requireMock('./contains');
 var startsWith = requireMock('./startsWith');
 var endsWith = requireMock('./endsWith');
-var name = {};
+var name = 'columnName';
 var table = {};
 var columns = [];
 table.columns = columns;
@@ -28,6 +28,7 @@ function act(c) {
 	c.startsWith = startsWith;
 	c.endsWith = endsWith;
 	c.name = name;	
+	c.table = table;
 	c.sut = require('../newColumn')(table,name);
 }
 

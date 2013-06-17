@@ -17,4 +17,5 @@ when('./new',c)
 	.it('lt is alias for lessThan').assertEqual(c.sut.lessThan,c.sut.lt)
 	.it('LT is alias for lessThan').assertEqual(c.sut.lessThan,c.sut.LT)
 	.it('le is alias for lessThanOrEqual').assertEqual(c.sut.lessThanOrEqual,c.sut.le)
-	.it('LE is alias for lessThanOrEqual').assertEqual(c.sut.lessThanOrEqual,c.sut.LE);	
+	.it('LE is alias for lessThanOrEqual').assertEqual(c.sut.lessThanOrEqual,c.sut.LE)
+	.it('should set table.<columnName> to column').assertEqual(c.table['columnName'],c.sut);
