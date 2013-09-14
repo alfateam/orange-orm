@@ -1,5 +1,5 @@
 var c = {};
-var when = require('a_test').when
+var when = require('a').when
 
 when('./new', c).
 	it('should set name').assertEqual(c.name,c.sut.name).

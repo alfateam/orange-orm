@@ -1,4 +1,4 @@
-var requireMock = require('a_mock').requireMock;
+var requireMock = require('a').requireMock;
 var newPrimaryKeyFilter = requireMock('./newPrimaryKeyFilter');
 var tryGetFirstFromDb = requireMock('./tryGetFirstFromDb');
 var extractStrategy = requireMock('./tryGetFromDbById/extractStrategy');

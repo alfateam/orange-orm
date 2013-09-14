@@ -1,5 +1,5 @@
-var requireMock = require('a_mock').requireMock;
-var mock = require('a_mock').mock;
+var requireMock = require('a').requireMock;
+var mock = require('a').mock;
 
 var newCompositeSql = requireMock('./newCompositeSql');
 var newCompositeParameters = requireMock('./newCompositeParameters');

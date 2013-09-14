@@ -1,4 +1,4 @@
-var a = require('a_mock');
+var a = require('a');
 
 
 function act(c) {

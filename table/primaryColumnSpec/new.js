@@ -1,6 +1,6 @@
 var table = {};
 var columnName = 'columnName';
-var requireMock = require('a_mock').requireMock;
+var requireMock = require('a').requireMock;
 var newColumn = requireMock('./column/newColumn');
 var column = {};
 var columns = [];

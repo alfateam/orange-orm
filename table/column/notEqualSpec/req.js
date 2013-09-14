@@ -1,4 +1,4 @@
-var amock = require('a_mock');
+var amock = require('a');
 var requireMock = amock.requireMock;
 var newParameterized = requireMock('./newParameterized');
 var extractAlias = requireMock('./extractAlias');

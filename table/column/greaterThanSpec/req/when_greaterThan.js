@@ -1,4 +1,4 @@
-var when = require('a_test').when;
+var when = require('a').when;
 var c = {}
 
 when('./greaterThan',c)

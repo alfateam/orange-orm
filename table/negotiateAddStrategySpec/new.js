@@ -1,4 +1,4 @@
-var expectRequire = require('a_mock').expectRequire;
+var expectRequire = require('a').expectRequire;
 var emptyStrategy = {};
 var table = {};
 var primaryColumns = [{},{}];

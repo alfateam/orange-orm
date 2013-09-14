@@ -1,4 +1,4 @@
-var requireMock = require('a_mock').requireMock;
+var requireMock = require('a').requireMock;
 
 function act(c) {
 	var add = requireMock('./column/float');

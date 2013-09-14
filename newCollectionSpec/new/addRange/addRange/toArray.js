@@ -1,4 +1,4 @@
-var mock = require('a_mock').mock;
+var mock = require('a').mock;
 
 function act(c) {
 	c.element3 = {};

@@ -1,4 +1,4 @@
-var a = require('a_mock'),
+var a = require('a'),
 	mock = a.mock,
 	requireMock = a.requireMock,
 	expectRequire = a.expectRequire,

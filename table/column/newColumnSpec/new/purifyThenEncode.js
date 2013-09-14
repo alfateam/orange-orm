@@ -1,5 +1,5 @@
 var arg = 'arg';
-var mock = require('a_mock').mock;
+var mock = require('a').mock;
 var purifyed = {};
 
 function act(c) {

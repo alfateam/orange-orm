@@ -1,4 +1,4 @@
-var mock = require('a_mock').mock;
+var mock = require('a').mock;
 
 var query1Sql = 'select foo';
 var query2Sql = 'select bar';

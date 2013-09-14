@@ -1,4 +1,4 @@
-var requireMock = require('a_mock').requireMock;
+var requireMock = require('a').requireMock;
 var newColumnSql = requireMock('./singleQuery/newColumnSql');
 var newJoinSql = requireMock('./singleQuery/newJoinSql');
 var newWhereSql = requireMock('./singleQuery/newWhereSql');

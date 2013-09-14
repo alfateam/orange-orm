@@ -1,4 +1,4 @@
-var requireMock = require('a_mock').requireMock;
+var requireMock = require('a').requireMock;
 var negotiateDefault = requireMock('./integer/negotiateDefault');
 var purify = requireMock('./integer/purify');
 var newEncode = requireMock('./integer/newEncode');

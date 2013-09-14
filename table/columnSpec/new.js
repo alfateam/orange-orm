@@ -1,4 +1,4 @@
-var requireMock = require('a_mock').requireMock;
+var requireMock = require('a').requireMock;
 newColumn = requireMock('./column/newColumn');
 var newSut = require('../column');
 var columnName = 'columnName';

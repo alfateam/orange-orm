@@ -1,4 +1,4 @@
-var requireMock = require('a_mock').requireMock;
+var requireMock = require('a').requireMock;
 var stringToBase64 = requireMock('../../../stringToBase64');
 var column = {};
 

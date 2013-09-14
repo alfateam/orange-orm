@@ -1,4 +1,4 @@
-var requireMock = require('a_test').requireMock;
+var requireMock = require('a').requireMock;
 var table = {};
 var expected = {};
 
