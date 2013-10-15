@@ -1,7 +1,8 @@
 function newWhereSql(filter) {
-	if (filter.isEmpty())
-		return '';
-	return 'where ' + filter.sql();
+	var sql = filter.sql();
+	if (sql)
+		return 'where ' + sql;
+	return '';	
 }
 
 module.exports = newWhereSql;

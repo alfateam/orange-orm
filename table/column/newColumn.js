@@ -11,8 +11,8 @@ var endsWith = require('./endsWith');
 
 module.exports = function(table,name) {	
 	var c = {};
-	c.columnName = name;
-	c.name = name;	
+	c.dbName = name;
+	c.alias = name;	
 	table.columns.push(c);
 	table[name] = c;
 

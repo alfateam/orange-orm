@@ -8,7 +8,7 @@ function getMany(table,filter,strategy) {
 	var span = strategyToSpan(strategy);
 	var query = newQuery(table,filter,span,alias);
 	var result = executeQuery(query);
-	return resultToRows(table,strategy,result);
+	return resultToRows(table,span,result);
 }
 
 module.exports = getMany;

@@ -8,9 +8,11 @@ var getById = require('./table/getById');
 
 function _new(tableName) {
 	var table = {};
-	table.name = tableName;
+	table.dbName = tableName;
 	table.primaryColumns = [];
 	table.columns = [];
+	table.columnDiscriminators = [];
+	table.formulaDiscriminators = [];
 	
 	table.primaryColumn = function(columnName) {
 		return primaryColumn(table,columnName);
@@ -20,16 +22,16 @@ function _new(tableName) {
 		return column(table,columnName);
 	};
 
-	table.join = function(tableName) {
-		return join(table,tableName);
+	table.join = function(relatedTable) {
+		return join(table,relatedTable);
 	};
 
-	table.hasMany = function(tableName) {
-		return hasMany(table,tableName);
+	table.hasMany = function(joinRelation) {
+		return hasMany(joinRelation);
 	};
 
-	table.hasOne = function(tableName) {
-		return hasOne(table,tableName);
+	table.hasOne = function(joinRelation) {
+		return hasOne(joinRelation);
 	};
 
 	table.getMany = function() {
@@ -47,6 +49,16 @@ function _new(tableName) {
 	table.getById = function() {
 		return call(getById,arguments);
 	}
+
+	table.columnDiscriminator = function(discriminator) {
+		table.columnDiscriminators.push(discriminator);
+		return table;		
+	};
+
+	table.formulaDiscriminator = function(discriminator) {
+		table.formulaDiscriminators.push(discriminator);
+		return table;
+	};
 
 	return table;	
 }

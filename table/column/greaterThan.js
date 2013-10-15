@@ -1,4 +1,4 @@
-var newParameterized = require('./newParameterized');
+var newParameterized = require('../query/newParameterized');
 var extractAlias = require('./extractAlias');
 
 function greaterThan(column,arg,optionalAlias) {	

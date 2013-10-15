@@ -12,7 +12,7 @@ function act(c) {
 	c.strategyToSpan.expect(strategy).return(span);
 	c.newSelectQuery.expect(table,filter,span,alias).return(query)
 	c.executeQuery.expect(query).return(result);
-	c.resultToRows.expect(table,strategy,result).return(expected);
+	c.resultToRows.expect(table,span,result).return(expected);
 	c.expected = expected;
 	c.returned = c.sut(table,filter,strategy);
 }

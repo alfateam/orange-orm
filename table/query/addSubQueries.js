@@ -14,6 +14,8 @@ function addSubQueries(compositeQuery,table,filter,span,alias) {
 	function onEachLeg(leg) {
 		leg.accept(c);
 	}
+
+	return compositeQuery;
 }
 
 module.exports = addSubQueries;

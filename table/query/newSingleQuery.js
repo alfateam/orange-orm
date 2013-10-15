@@ -13,9 +13,7 @@ function _new(table,filter,span,alias) {
 		return 'select ' + columnSql + ' from ' + name + joinSql + whereSql;
 	};
 
-	c.parameters = function() {
-		return filter.parameters();
-	};
+	c.parameters = filter.parameters;	
 
 	return c;
 }

@@ -1,6 +1,8 @@
 var newCollection = require('../../newCollection');
+var extractSql = require('./extractSql');
 
 function _new(text) {
+	text = extractSql(text);
 	var optionalParams = [];
 	var c = {};
 	
@@ -8,7 +10,9 @@ function _new(text) {
 		optionalParams.push(arguments[i]);
 	};
 	
-	c.parameters = newCollection.apply(null, optionalParams);
+	c.parameters = function() {
+		return newCollection.apply(null, optionalParams);
+	};
 	
 	c.sql = function() {
 		return text;
@@ -23,7 +27,7 @@ function _new(text) {
 
 	function prependParameterized(other) {		
 		var params = [other.sql() + text];
-		var otherParameters = other.parameters.toArray();			
+		var otherParameters = other.parameters().toArray();			
 		params = params.concat(otherParameters).concat(optionalParams);
 		return newParameterized(params);
 	}
@@ -42,7 +46,7 @@ function _new(text) {
 
 	function appendParameterized(other) {		
 		var params = [text + other.sql()];
-		var otherParameters = other.parameters.toArray();			
+		var otherParameters = other.parameters().toArray();			
 		params = params.concat(optionalParams).concat(otherParameters);
 		return newParameterized(params);
 	}
@@ -54,7 +58,7 @@ function _new(text) {
 
 
 	function newParameterized(params) {
-		return require('./newParameterized').apply(null, params);		
+		return require('../query/newParameterized').apply(null, params);		
 	}
 	
 	return c;

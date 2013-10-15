@@ -1,5 +1,5 @@
 var requireMock = require('a').requireMock;
-var newParameterized = requireMock('./newParameterized');
+var newParameterized = requireMock('../query/newParameterized');
 
 function act(c) {
 	c.expected = {};

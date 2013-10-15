@@ -7,8 +7,11 @@ var table = {};
 var filter = {};
 var span = {};
 var alias = '_2';
+var parameters = {};
 
-function act(c) {
+function act(c) {	
+	filter.parameters = parameters;
+	c.parameters = parameters;
 	c.alias = alias;
 	c.table = table;
 	c.filter = filter;

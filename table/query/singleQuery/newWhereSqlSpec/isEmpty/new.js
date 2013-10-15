@@ -2,11 +2,8 @@ var mock = require('a').mock;
 var filter = {};
 
 function act(c) {
-	filter.isEmpty = mock();
-	filter.isEmpty.expect().return(false);
 	filter.sql = mock();
-	filter.sql.expect().return('some filter');
-	c.expected = 'where some filter';
+	filter.sql.expect().return('');
 	c.returned = c.sut(filter);
 }
 act.base = '../require';
