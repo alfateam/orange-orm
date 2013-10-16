@@ -2,7 +2,7 @@ var newColumn = require('./column');
 
 function addColumn(table,columnName) {	
 	var column = newColumn(table,columnName);
-	table.primaryColumns.push(column);
+	table._primaryColumns.push(column);
 	return column;
 }
 

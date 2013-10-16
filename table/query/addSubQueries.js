@@ -2,9 +2,9 @@ var manyLegToQuery = require('./addSubQueries/manyLegToQuery');
 
 function addSubQueries(compositeQuery,table,filter,span,alias) {
 	var c = {};
-	c.visitJoinLeg = function() {};
-	c.visitOneLeg = function() {};
-	c.visitManyLeg = function(leg) {
+	c.visitJoin = function() {};
+	c.visitOne = function() {};
+	c.visitMany = function(leg) {
 		var query = manyLegToQuery(alias,leg,filter);
 		compositeQuery.add(query);
 	};

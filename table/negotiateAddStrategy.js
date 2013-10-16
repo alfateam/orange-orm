@@ -11,7 +11,7 @@ function negotiate(table) {
 	return args;
 
 	function noStrategy() {
-		var columnCount = table.primaryColumns.length;
+		var columnCount = table._primaryColumns.length;
 		return (columnCount+2 != argsCount);
 
 	}

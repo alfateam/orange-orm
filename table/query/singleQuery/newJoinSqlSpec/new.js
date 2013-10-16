@@ -50,15 +50,15 @@ function act(c) {
 	}
 	
 	function onAcceptJoinLeg(visitor) {
-		visitor.visitJoinLeg(joinLeg);
+		visitor.visitJoin(joinLeg);
 	}
 
 	function onAcceptOneLeg(visitor) {
-		visitor.visitOneLeg(oneLeg);	
+		visitor.visitOne(oneLeg);	
 	}
 
 	function onAcceptManyLeg(visitor) {
-		visitor.visitManyLeg(manyLeg);
+		visitor.visitMany(manyLeg);
 	}
 }
 

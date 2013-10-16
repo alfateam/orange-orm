@@ -10,7 +10,7 @@ var leg = {};
 var span  = {};
 var leftColumns = {};
 var primaryColumns = {};
-rightTable.primaryColumns = primaryColumns;
+rightTable._primaryColumns = primaryColumns;
 
 leg.table = leftTable;
 leg.span = span;

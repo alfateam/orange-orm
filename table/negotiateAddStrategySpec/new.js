@@ -9,7 +9,7 @@ var id2 = {};
 expectRequire('./emptyStrategy').return(emptyStrategy);
 
 function act(c) {
-	table.primaryColumns = primaryColumns;
+	table._primaryColumns = primaryColumns;
 	c.table = table;
 	c.emptyStrategy = emptyStrategy;
 	c.id1 = id1;

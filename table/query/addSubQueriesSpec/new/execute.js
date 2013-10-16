@@ -22,11 +22,11 @@ function act(c) {
 
 function stubLegs() {
 	joinLeg.accept = mock();
-	joinLeg.accept.expectAnything().whenCalled(function(visitor) {visitor.visitJoinLeg(joinLeg)});
+	joinLeg.accept.expectAnything().whenCalled(function(visitor) {visitor.visitJoin(joinLeg)});
 	oneLeg.accept = mock();
-	oneLeg.accept.expectAnything().whenCalled(function(visitor) {visitor.visitOneLeg(oneLeg)});
+	oneLeg.accept.expectAnything().whenCalled(function(visitor) {visitor.visitOne(oneLeg)});
 	manyLeg.accept = mock();
-	manyLeg.accept.expectAnything().whenCalled(function(visitor) {visitor.visitManyLeg(manyLeg)});
+	manyLeg.accept.expectAnything().whenCalled(function(visitor) {visitor.visitMany(manyLeg)});
 }
 
 function stubSpan() {

@@ -9,7 +9,7 @@ var span = {};
 var alias = '_0';
 
 function act(c) {
-	c.strategyToSpan.expect(strategy).return(span);
+	c.strategyToSpan.expect(table,strategy).return(span);
 	c.newSelectQuery.expect(table,filter,span,alias).return(query)
 	c.executeQuery.expect(query).return(result);
 	c.resultToRows.expect(table,span,result).return(expected);

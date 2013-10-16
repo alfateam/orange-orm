@@ -20,12 +20,21 @@ function act(c) {
 	c.join = join;
 	c.primaryColumn = primaryColumn;		
 	c.column = column;
+	c.verifyEmptyRelations = verifyEmptyRelations;
 	newSut();
 
 
 	function newSut() {
 		c.name = tableName;
 		c.sut = require('../table')(tableName);
+	}
+
+	function verifyEmptyRelations() {
+		 if (Object.prototype.toString.call(c.sut._relations) !== '[object Object]')
+			throw "wrong type";			
+		for (name in c.sut._relations) {
+			throw "has property";
+		}
 	}
 }
 

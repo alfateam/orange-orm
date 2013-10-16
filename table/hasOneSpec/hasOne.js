@@ -1,20 +1,20 @@
 var requireMock = require('a').requireMock;
-var newManyRelation = requireMock('./newManyRelation');
+var newOneRelation = requireMock('./newOneRelation');
 var newGetRelatedTable = requireMock('./newGetRelatedTable');
 var parentTable = {},
 	joinRelation = {},
-	manyRelation = {},
+	oneRelation = {},
 	getRelatedTable = {};
 
 function act(c) {	
 	c.getRelatedTable = getRelatedTable;
-	c.manyRelation = manyRelation;
+	c.oneRelation = oneRelation;
 	c.parentTable = parentTable;
 	joinRelation.childTable = parentTable;
 	parentTable._relations = {};
-	newManyRelation.expect(joinRelation).return(manyRelation);
-	newGetRelatedTable.expect(manyRelation).return(getRelatedTable);
-	c.returned = require('../hasMany')(joinRelation).as('child');
+	newOneRelation.expect(joinRelation).return(oneRelation);
+	newGetRelatedTable.expect(oneRelation).return(getRelatedTable);
+	c.returned = require('../hasOne')(joinRelation).as('child');
 }
 
 module.exports = act;

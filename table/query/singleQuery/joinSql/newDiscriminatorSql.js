@@ -1,7 +1,7 @@
 function newDiscriminiatorSql(table, alias) {
 	var result = '';
-	var formulaDiscriminators = table.formulaDiscriminators;
-	var columnDiscriminators = table.columnDiscriminators;
+	var formulaDiscriminators = table._formulaDiscriminators;
+	var columnDiscriminators = table._columnDiscriminators;
 	addFormula();
 	addColumn();
 	return result;

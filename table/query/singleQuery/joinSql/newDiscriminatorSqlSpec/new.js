@@ -13,8 +13,8 @@ function act(c){
 	var columnDisc1 = 'columnDisc1';
 	var columnDisc2 = 'columnDisc2';
 
-	table.formulaDiscriminators = [formuladisc1, formuladisc2];
-	table.columnDiscriminators = [columnDisc1, columnDisc2];
+	table._formulaDiscriminators = [formuladisc1, formuladisc2];
+	table._columnDiscriminators = [columnDisc1, columnDisc2];
 
 	c.expected = '(aliasformulaDisc1) AND (aliasformulaDisc2) AND alias.columnDisc1 AND alias.columnDisc2';
 

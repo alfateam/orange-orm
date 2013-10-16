@@ -5,16 +5,16 @@ module.exports = function(span,alias) {
 	var c = {};
 	var sql = '';
 
-	c.visitJoinLeg = function(leg) {
+	c.visitJoin = function(leg) {
 		var joinSql = joinLegToColumnSql(leg,alias + '_' + index);
 		sql = sql + joinSql;
 	};
 
-	c.visitOneLeg = function (leg) {
-		c.visitJoinLeg(leg);
+	c.visitOne = function (leg) {
+		c.visitJoin(leg);
 	};
 
-	c.visitManyLeg = function(leg) {
+	c.visitMany = function(leg) {
 	};
 
 

@@ -10,7 +10,7 @@ var leg = {};
 var span  = {};
 var joinedColumns = {};
 var parentPrimaryColumns = {};
-parentTable.primaryColumns = parentPrimaryColumns;
+parentTable._primaryColumns = parentPrimaryColumns;
 
 leg.table = parentTable;
 leg.span = span;

@@ -2,9 +2,9 @@ var when = require('a').when;
 var c = {};
 
 when('./new',c)
-	.it('should add column to table.columns').assertEqual(c.sut,c.columns[0])
+	.it('should add column to table._columns').assertEqual(c.sut,c.columns[0])
 	.it('should not add any other columns').assertEqual(1,c.columns.length)
-	.it('should set dbName to name').assertEqual(c.name,c.sut.dbName)
+	.it('should set dbName to name').assertEqual(c.name,c.sut._dbName)
 	.it('should set alias to name').assertEqual(c.name,c.sut.alias)
 	.it('eq is alias for equal').assertDeepEqual(c.sut.equal,c.sut.eq)
 	.it('EQ is alias for equal').assertEqual(c.sut.equal,c.sut.EQ)

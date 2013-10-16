@@ -8,11 +8,11 @@ var primaryColumns = [];
 var newSut = require('../primaryColumn');
 
 function act(c) {
-	table.columns = columns;	
-	table.primaryColumns = primaryColumns;
+	table._columns = columns;	
+	table._primaryColumns = primaryColumns;
 	newColumn.expect(table,columnName).return(column);
 	c.columns = columns;
-	c.primaryColumns = primaryColumns;
+	c._primaryColumns = primaryColumns;
 	c.column = column;
 	c.table = table;
 	c.sut = newSut(table,columnName);

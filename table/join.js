@@ -14,6 +14,7 @@ function newJoin(parentTable,childTable) {
 
 	c.as = function(alias) {
 		var relation = newJoinRelation(parentTable,childTable,columnNames);
+		parentTable._relations[alias] = relation;
 		parentTable[alias] = newGetRelatedTable(relation);
 		return relation;
 	}
@@ -22,5 +23,6 @@ function newJoin(parentTable,childTable) {
 
 module.exports = newJoin;
 /* todo remove
+table.lines.fooColumn.eq()
 var orderLine_order_relation = orderLine.join('order',order).by('columna','columnb');
 order.hasMany('lines',orderLine_order_relation);*/

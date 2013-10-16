@@ -13,7 +13,7 @@ var a = require('a'),
 	filter = {},
 	strategy = {};
 
-table.primaryColumns = primaryColumns; 
+table._primaryColumns = primaryColumns; 
 expectRequire('./filter').return(filter);
 
 function act(c) {

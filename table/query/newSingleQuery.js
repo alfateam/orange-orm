@@ -6,11 +6,11 @@ function _new(table,filter,span,alias) {
 	var c = {};
 	
 	c.sql = function() {
-		var name = table.dbName;
+		var name = table._dbName;
 		var columnSql = newColumnSql(table,span,alias);
 		var joinSql = newJoinSql(span,alias);
 		var whereSql = newWhereSql(filter);
-		return 'select ' + columnSql + ' from ' + name + ' as ' + alias + joinSql + whereSql;
+		return 'select ' + columnSql + ' from ' + name + ' ' + alias + joinSql + whereSql;
 	};
 
 	c.parameters = filter.parameters;	

@@ -11,9 +11,9 @@ var endsWith = require('./endsWith');
 
 module.exports = function(table,name) {	
 	var c = {};
-	c.dbName = name;
+	c._dbName = name;
 	c.alias = name;	
-	table.columns.push(c);
+	table._columns.push(c);
 	table[name] = c;
 
 	c.purifyThenEncode = function(arg) {

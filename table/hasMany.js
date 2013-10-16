@@ -1,16 +1,18 @@
 var newManyRelation = require('./newManyRelation');
 var newGetRelatedTable = require('./newGetRelatedTable');
 
-function newJoin(joinRelation) {
+function newOne(joinRelation) {
 	var c = {};
-	var relation = newManyRelation(joinRelation);
+	var parentTable = joinRelation.childTable;
 
-	c.as = function(alias) {
-		var table = joinRelation.childTable;
-		table[alias] = newGetRelatedTable(relation);
-	}
+	c.as = function (alias) {	
+		var relation = newManyRelation(joinRelation);
+		parentTable._relations[alias] = relation;
+		parentTable[alias] = newGetRelatedTable(relation);
+		return relation;
+	};
 
 	return c;
 }
 
-module.exports = newJoin;
+module.exports = newOne;

@@ -7,15 +7,15 @@ function _new(span,alias) {
 	var childAlias;
 
 	var c = {};	
-	c.visitJoinLeg = function(leg) {
+	c.visitJoin = function(leg) {
 		sql = sql + joinLegToJoinSql(leg,alias,childAlias);
 	};
 
-	c.visitOneLeg = function(leg) {
+	c.visitOne = function(leg) {
 		sql = sql + oneLegToJoinSql(leg,alias,childAlias);
 	};
 
-	c.visitManyLeg = function(leg) {};
+	c.visitMany = function(leg) {};
 
 	function onEachLeg(leg) {
 		childAlias = alias + '_' + legNo;

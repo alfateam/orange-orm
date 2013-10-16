@@ -1,5 +1,5 @@
 var	table = {};
-table.primaryColumns = [{},{}];
+table._primaryColumns = [{},{}];
 
 function act(c) {
 	c.table = table;

@@ -12,7 +12,7 @@ var endsWith = requireMock('./endsWith');
 var name = 'columnName';
 var table = {};
 var columns = [];
-table.columns = columns;
+table._columns = columns;
 
 function act(c) {
 	c.columns = columns;

@@ -34,7 +34,7 @@ function act(c) {
 			accept.expectAnything().whenCalled(onAccept).return();
 
 			function onAccept(visitor) {
-				visitor.visitJoinLeg(joinLeg);
+				visitor.visitJoin(joinLeg);
 			}
 		}
 
@@ -44,7 +44,7 @@ function act(c) {
 			accept.expectAnything().whenCalled(onAccept).return();
 
 			function onAccept(visitor) {
-				visitor.visitOneLeg(oneLeg);
+				visitor.visitOne(oneLeg);
 			}
 		}
 
@@ -55,7 +55,7 @@ function act(c) {
 			accept.expectAnything().whenCalled(onAccept).return();
 
 			function onAccept(visitor) {
-				visitor.visitManyLeg(manyLeg);
+				visitor.visitMany(manyLeg);
 			}
 		}
 
