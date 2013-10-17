@@ -1,3 +1,5 @@
+var newLeg = require('./relation/newJoinLeg');
+
 function _newJoin(parentTable,childTable,columnNames) {
 	var c = {};
 	c.parentTable = parentTable;
@@ -8,6 +10,10 @@ function _newJoin(parentTable,childTable,columnNames) {
 
 	c.accept = function(visitor) {
 		visitor.visitJoin(c);
+	};
+
+	c.toLeg = function() {
+		return newLeg(c);
 	};
 	
 	return c;

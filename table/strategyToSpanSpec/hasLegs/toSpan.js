@@ -27,9 +27,14 @@ function act(c){
 	orderLinesRelation.childTable = orderLineTable;
 	orderLineTable._relations = { product: productRelation };	
 
-	c.newLeg.expect(orderLinesRelation).return(orderLinesLeg);
-	c.newLeg.expect(productRelation).return(productLeg);
-	c.newLeg.expect(consigneeRelation).return(consigneeLeg);
+	orderLinesRelation.toLeg = mock();
+	orderLinesRelation.toLeg.expect().return(orderLinesLeg);
+
+	productRelation.toLeg = mock();
+	productRelation.toLeg.expect().return(productLeg);
+
+	consigneeRelation.toLeg = mock();
+	consigneeRelation.toLeg.expect().return(consigneeLeg);		
 
 	orderLinesLeg.span = orderLinesSpan;
 	orderLinesSpan.legs = orderLinesSubLegs;

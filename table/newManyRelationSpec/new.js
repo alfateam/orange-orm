@@ -5,7 +5,7 @@ var expectRequire = a.expectRequire;
 
 function act(c){
 	c.joinRelation = {};
-
+	c.newManyLeg = requireMock('./relation/newManyLeg');
 	c.sut = require('../newManyRelation')(c.joinRelation);
 }
 

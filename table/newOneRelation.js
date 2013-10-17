@@ -1,3 +1,5 @@
+var newLeg = require('./relation/newOneLeg');
+
 function newOneRelation(joinRelation) {
 	var c = {};
 
@@ -5,6 +7,10 @@ function newOneRelation(joinRelation) {
 
 	c.accept = function(visitor) {
 		visitor.visitOne(c);
+	};
+
+	c.toLeg = function() {
+		return newLeg(c);
 	};
 
 	return c;

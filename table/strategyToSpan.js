@@ -1,5 +1,4 @@
 var newCollection = require('../newCollection');
-var newLeg = require('./strategyToSpan/newLeg');
 
 function toSpan(table,strategy) {
 	_relations = table._relations;
@@ -18,10 +17,10 @@ function toSpan(table,strategy) {
 	}	
 			
 	function addLeg(legs,table,strategy,name) {
-		relation = table._relations[name];			
-		leg = newLeg(relation);
+		var relation = table._relations[name];			
+		var leg = relation.toLeg();
 		legs.add(leg);		
-		subStrategy = strategy[name];
+		var subStrategy = strategy[name];
 		var childTable = relation.childTable;
 		applyStrategy(childTable,leg.span.legs,subStrategy);
 	}
