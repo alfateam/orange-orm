@@ -1,5 +1,5 @@
 function act(c) {
-	c.expected = 'select _0.id from order _0';
+	c.expected = 'select _0.id,_0.invoicedCustomerId from order _0';
 	c.newQuery();
 }
 

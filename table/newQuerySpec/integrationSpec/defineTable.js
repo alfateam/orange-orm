@@ -2,7 +2,9 @@ var a = require('a');
 var requireMock = a.requireMock;
 var newQuery;
 var alias = '_0';
-var legs = require('../../../newCollection')();
+var strategyToSpan = require('../../strategyToSpan');
+var table;
+var customerTable;
 
 function act(c) {
 	createMocks();
@@ -13,19 +15,26 @@ function act(c) {
 		requireMock('./executeQuery');
 		requireMock('./resultToRows');
 		requireMock('./tryGetFromCacheById');
-		requireMock('./strategyToSpan');
-		c.filter = undefined;
-		c.span = {};		
-		c.span.legs = legs;		
 		c.requireMock = requireMock;
 		c.mock = a.mock;
 	}
 
 	function defineTable() {
-		table = require('../../../table')('order');
+		table = newTable('order');
 		table.primaryColumn('id').integer();
-		c.table = table;
-	}
+		table.column('invoicedCustomerId').integer();
+
+		customerTable = newTable('customer');
+		customerTable.primaryColumn('customerId').integer();
+
+		var customerJoin = table.join(customerTable).by('invoicedCustomerId').as('invoicedCustomer');
+		
+		c.table = table;	
+	};
+
+	function newTable(tableName) {
+		return require('../../../table')(tableName);
+	};
 
 	function setupSut() {
 		newQuery = require('../../newQuery');
@@ -33,7 +42,8 @@ function act(c) {
 	}
 
 	function _newQuery() {
-		c.returned = newQuery(table,c.filter,c.span,alias);
+		var span = strategyToSpan(table, c.strategy);
+		c.returned = newQuery(table,c.filter,span,alias);
 	}
 
 }

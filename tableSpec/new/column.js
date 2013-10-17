@@ -1,10 +1,12 @@
 var requireMock = require('a').requireMock;
 var columnName = {};
 var expected = {};
+var columnDef = {};
 
 function act(c) {
 	c.expected = expected;
-	c.column.expect(c.sut).expect(columnName).return(c.expected);
+	c.newColumn.expect(c.sut,columnName).return(columnDef);
+	c.column.expect(columnDef).return(c.expected);
 	c.returned = c.sut.column(columnName);
 }
 

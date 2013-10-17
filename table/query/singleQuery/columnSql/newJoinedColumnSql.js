@@ -17,7 +17,6 @@ module.exports = function(span,alias) {
 	c.visitMany = function(leg) {
 	};
 
-
 	span.legs.forEach(onEach);
 
 

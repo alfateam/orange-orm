@@ -2,7 +2,7 @@ var a = require('a');
 var requireMock = a.requireMock;
 
 var newContext = requireMock('./newContext');
-var primaryColumn = requireMock('./table/primaryColumn');
+var newColumn = requireMock('./table/column/newColumn');
 var column = requireMock('./table/column');
 var join = requireMock('./table/join');
 var hasMany = requireMock('./table/hasMany');
@@ -18,7 +18,7 @@ function act(c) {
 	c.hasOne = hasOne;
 	c.hasMany = hasMany;
 	c.join = join;
-	c.primaryColumn = primaryColumn;		
+	c.newColumn = newColumn;		
 	c.column = column;
 	c.verifyEmptyRelations = verifyEmptyRelations;
 	newSut();

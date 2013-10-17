@@ -1,4 +1,4 @@
-var primaryColumn = require('./table/primaryColumn');
+var newColumn = require('./table/column/newColumn');
 var column = require('./table/column');
 var join = require('./table/join');
 var hasMany = require('./table/hasMany');
@@ -16,11 +16,14 @@ function _new(tableName) {
 	table._relations = {};	
 	
 	table.primaryColumn = function(columnName) {
-		return primaryColumn(table,columnName);
+		var columnDef = newColumn(table,columnName);
+		table._primaryColumns.push(columnDef);
+		return column(columnDef);
 	};
 
 	table.column = function(columnName) {
-		return column(table,columnName);
+		var columnDef = newColumn(table,columnName);
+		return column(columnDef);
 	};
 
 	table.join = function(relatedTable) {

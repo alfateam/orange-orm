@@ -1,5 +1,5 @@
-var newShallowColumnSql = require('./newShallowColumnSql');
-var newJoinedColumnSql = require('./newJoinedColumnSql');
+var newShallowColumnSql = require('./newShallowColumnSql');	
+var newJoinedColumnSql = _initJOinedColumnSql;
 
 function sql(leg,alias) {
 	var span = leg.span;
@@ -7,5 +7,10 @@ function sql(leg,alias) {
 	var joinedColumnSql = newJoinedColumnSql(span,alias);
 	return ',' + shallowColumnSql + joinedColumnSql;
 }
+
+function _initJOinedColumnSql(span,alias) {
+	newJoinedColumnSql = require('./newJoinedColumnSql');	
+	return newJoinedColumnSql(span,alias);
+} 
 
 module.exports = sql;

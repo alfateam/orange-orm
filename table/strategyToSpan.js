@@ -17,7 +17,7 @@ function toSpan(table,strategy) {
 	}	
 			
 	function addLeg(legs,table,strategy,name) {
-		var relation = table._relations[name];			
+		var relation = table._relations[name];
 		var leg = relation.toLeg();
 		legs.add(leg);		
 		var subStrategy = strategy[name];

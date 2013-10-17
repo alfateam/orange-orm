@@ -1,7 +1,4 @@
-var newColumn = require('./column/newColumn');
-
-function defineColumn(table,columnName) {
-	var column = newColumn(table,columnName);
+function defineColumn(column) {	
 	var c = {};
 
 
