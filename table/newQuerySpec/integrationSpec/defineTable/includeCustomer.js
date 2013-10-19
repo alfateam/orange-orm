@@ -1,5 +1,5 @@
 function act(c){
-	c.strategy = { invoicedCustomer: null};
+	c.strategy = { customer: null};
 }
 
 act.base = '../defineTable';

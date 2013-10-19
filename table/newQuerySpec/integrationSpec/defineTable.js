@@ -5,6 +5,7 @@ var alias = '_0';
 var strategyToSpan = require('../../strategyToSpan');
 var table;
 var customerTable;
+var countryTable;
 
 function act(c) {
 	createMocks();
@@ -20,17 +21,31 @@ function act(c) {
 	}
 
 	function defineTable() {
-		table = newTable('order');
-		table.primaryColumn('id').integer();
-		table.column('invoicedCustomerId').integer();
-
-		customerTable = newTable('customer');
-		customerTable.primaryColumn('customerId').integer();
-
-		var customerJoin = table.join(customerTable).by('invoicedCustomerId').as('invoicedCustomer');
-		
-		c.table = table;	
+		defineOrder();
+		defineCustomer();
+		defineCountry();
+		var customerJoin = table.join(customerTable).by('oCustomerId').as('customer');
+		var countryJoin = customerTable.join(countryTable).by('cCountryId').as('country');		
 	};
+
+	function defineOrder() {
+		table = newTable('order');
+		table.primaryColumn('oOrderId').integer().as('id');
+		table.column('oCustomerId').integer().as('customerId');		
+	}		
+
+	function defineCustomer() {
+		customerTable = newTable('customer');
+		customerTable.primaryColumn('cCustomerId').integer().as('id');
+		customerTable.column('cName').string().as('name');
+		customerTable.column('cCountryId').string().as('countryId');
+	}
+
+	function defineCountry() {
+		countryTable = newTable('country');
+		countryTable.primaryColumn('yCountryId').integer().as('id');
+		countryTable.column('yCountryName').string().as('name');
+	}
 
 	function newTable(tableName) {
 		return require('../../../table')(tableName);
