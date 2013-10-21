@@ -4,7 +4,9 @@ var requireMock = a.requireMock;
 var expectRequire = a.expectRequire;
 
 function act(c){
+	c.childTable = {};
 	c.joinRelation = {};
+	c.joinRelation.parentTable = c.childTable;
 	c.newLeg = requireMock('./relation/newOneLeg');	
 	c.sut = require('../newOneRelation')(c.joinRelation);
 }

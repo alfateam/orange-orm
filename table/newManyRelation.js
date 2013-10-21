@@ -4,6 +4,7 @@ function newManyRelation(joinRelation) {
 	var c = {};
 
 	c.joinRelation = joinRelation;
+	c.childTable = joinRelation.parentTable;
 
 	c.accept = function(visitor) {
 		visitor.visitMany(c);
