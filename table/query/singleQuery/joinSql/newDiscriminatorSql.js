@@ -1,31 +1,11 @@
-function newDiscriminiatorSql(table, alias) {
-	var result = '';
-	var formulaDiscriminators = table._formulaDiscriminators;
-	var columnDiscriminators = table._columnDiscriminators;
-	addFormula();
-	addColumn();
+var newDiscriminatorSqlCore = require('../newDiscriminatorSql');
+
+function newDiscriminatorSql(table, alias) {
+	var result = newDiscriminatorSqlCore(table,alias);
+	if (result)
+		return ' AND' + result;
 	return result;
-
-	function addFormula() {
-		for (var i = 0; i<formulaDiscriminators.length; i++) {
-			var current = formulaDiscriminators[i].replace('@this',alias);
-			and();
-			result += '(' + current + ')';
-		};	
-	}
-
-	function addColumn() {
-		for (var i = 0; i< columnDiscriminators.length; i++) {
-			var current = columnDiscriminators[i];
-			and();
-			result += alias + '.' + current;
-		};	
-	}
-
-	function and() {
-		if(result)
-			result += ' AND ';
-	}
+	
 }
 
-module.exports = newDiscriminiatorSql;
+module.exports = newDiscriminatorSql;

@@ -6,6 +6,9 @@ var strategyToSpan = require('../../strategyToSpan');
 var table;
 var customerTable;
 var countryTable;
+var lineTable;
+var packageTable;
+var emptyInnerJoin = require('../../query/newParameterized')();
 
 function act(c) {
 	createMocks();
@@ -24,14 +27,21 @@ function act(c) {
 		defineOrder();
 		defineCustomer();
 		defineCountry();
+		defineOrderLines();
+		definePackages();
 		var customerJoin = table.join(customerTable).by('oCustomerId').as('customer');
 		var countryJoin = customerTable.join(countryTable).by('cCountryId').as('country');		
+		var orderJoin = lineTable.join(table).by('lOrderId').as('order');
+		table.hasMany(orderJoin).as('lines');
+		var lineJoin = packageTable.join(lineTable).by('pLineId').as('line');
+		lineTable.hasMany(lineJoin).as('packages');		
 	};
 
 	function defineOrder() {
 		table = newTable('order');
 		table.primaryColumn('oOrderId').integer().as('id');
 		table.column('oCustomerId').integer().as('customerId');		
+		table.columnDiscriminators('discriminatorColumn=\'foo\'','discriminatorColumn2=\'baz\'');
 	}		
 
 	function defineCustomer() {
@@ -47,6 +57,20 @@ function act(c) {
 		countryTable.column('yCountryName').string().as('name');
 	}
 
+	function defineOrderLines() {
+		lineTable = newTable('orderLine');
+		lineTable.primaryColumn('lId').integer().as('id');
+		lineTable.column('lLineNo').integer().as('lineNo');
+		lineTable.column('lOrderId').integer().as('orderId');
+	}
+
+	function definePackages() {
+		packageTable = newTable('package');
+		packageTable.primaryColumn('pId').integer().as('id');
+		packageTable.column('pLineId').integer().as('lineId');
+	}
+
+
 	function newTable(tableName) {
 		return require('../../../table')(tableName);
 	};
@@ -58,7 +82,7 @@ function act(c) {
 
 	function _newQuery() {
 		var span = strategyToSpan(table, c.strategy);
-		c.returned = newQuery(table,c.filter,span,alias);
+		c.returned = newQuery(table,c.filter,span,alias,emptyInnerJoin);		
 	}
 
 }

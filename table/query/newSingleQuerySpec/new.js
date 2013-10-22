@@ -8,6 +8,7 @@ var filter = {};
 var span = {};
 var alias = '_2';
 var parameters = {};
+var innerJoin = {};
 
 function act(c) {	
 	filter.parameters = parameters;
@@ -16,10 +17,11 @@ function act(c) {
 	c.table = table;
 	c.filter = filter;
 	c.span = span;
+	c.innerJoin = innerJoin;
 	c.newColumnSql = newColumnSql;
 	c.newJoinSql = newJoinSql;
 	c.newWhereSql = newWhereSql;
-	c.sut = require('../newSingleQuery')(table,filter,span,alias);
+	c.sut = require('../newSingleQuery')(table,filter,span,alias,innerJoin);
 }
 
 module.exports = act;

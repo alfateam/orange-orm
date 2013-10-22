@@ -54,13 +54,17 @@ function _new(tableName) {
 		return call(getById,arguments);
 	}
 
-	table.columnDiscriminator = function(discriminator) {
-		table._columnDiscriminators.push(discriminator);
+	table.columnDiscriminators = function() {
+		for (var i = 0; i < arguments.length; i++) {
+			table._columnDiscriminators.push(arguments[i]);
+		};
 		return table;		
 	};
 
-	table.formulaDiscriminator = function(discriminator) {
-		table._formulaDiscriminators.push(discriminator);
+	table.formulaDiscriminators = function() {
+		for (var i = 0; i < arguments.length; i++) {
+			table._formulaDiscriminators.push(arguments[i]);
+		};
 		return table;
 	};
 

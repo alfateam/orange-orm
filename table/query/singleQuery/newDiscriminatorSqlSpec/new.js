@@ -16,7 +16,7 @@ function act(c){
 	table._formulaDiscriminators = [formuladisc1, formuladisc2];
 	table._columnDiscriminators = [columnDisc1, columnDisc2];
 
-	c.expected = '(aliasformulaDisc1) AND (aliasformulaDisc2) AND alias.columnDisc1 AND alias.columnDisc2';
+	c.expected = ' (aliasformulaDisc1) AND (aliasformulaDisc2) AND alias.columnDisc1 AND alias.columnDisc2';
 
 	c.returned = require('../newDiscriminatorSql')(table, alias);
 }

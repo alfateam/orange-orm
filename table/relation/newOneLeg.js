@@ -8,7 +8,6 @@ function newLeg(relation) {
 	span.table = joinRelation.parentTable;	
 	span.legs = newCollection();
 	c.span = span;
-	c.columns = [];
 	c.table = joinRelation.childTable;
 	c.columns = joinRelation.columns;
 

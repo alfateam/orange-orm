@@ -1,4 +1,6 @@
-var mock = require('a').mock,
+var a = require('a'),
+	mock = a.mock,
+	requireMock = a.requireMock,
 	compositeQuery = {},
 	table = {},
 	filter = {},
@@ -8,12 +10,17 @@ var mock = require('a').mock,
 	joinLeg = {},
 	manyLeg = {},
 	oneLeg = {},
-	manyLegQuery = {};
+	manyLegQuery = {},
+	joinLegNo = {},
+	manyLegNo = {},
+	oneLegNo = {};
 
-function act(c) {
+
+function act(c) {	
 	stubLegs();
 	stubSpan();
-	c.manyLegToQuery.expect(alias,manyLeg,filter).return(manyLegQuery);
+	c.manyLegToQuery = requireMock('./addSubQueries/manyLegToQuery');
+	c.manyLegToQuery.expect(alias,manyLeg,manyLegNo,filter).return(manyLegQuery);
 	compositeQuery.add = mock();
 	compositeQuery.add.expect(manyLegQuery);
 	c.compositeQuery = compositeQuery;
@@ -36,9 +43,9 @@ function stubSpan() {
 }
 
 function onEach(callback) {
-	callback(joinLeg);
-	callback(oneLeg);
-	callback(manyLeg);
+	callback(joinLeg,joinLegNo);
+	callback(oneLeg,oneLegNo);
+	callback(manyLeg,manyLegNo);
 }
 
 function onOneLeg(callback) {
