@@ -8,6 +8,7 @@ var customerTable;
 var countryTable;
 var lineTable;
 var packageTable;
+var deliveryPartyTable;
 var emptyInnerJoin = require('../../query/newParameterized')();
 
 function act(c) {
@@ -29,12 +30,7 @@ function act(c) {
 		defineCountry();
 		defineOrderLines();
 		definePackages();
-		var customerJoin = table.join(customerTable).by('oCustomerId').as('customer');
-		var countryJoin = customerTable.join(countryTable).by('cCountryId').as('country');		
-		var orderJoin = lineTable.join(table).by('lOrderId').as('order');
-		table.hasMany(orderJoin).as('lines');
-		var lineJoin = packageTable.join(lineTable).by('pLineId').as('line');
-		lineTable.hasMany(lineJoin).as('packages');		
+		defineDeliveryParty();
 	};
 
 	function defineOrder() {
@@ -49,12 +45,14 @@ function act(c) {
 		customerTable.primaryColumn('cCustomerId').integer().as('id');
 		customerTable.column('cName').string().as('name');
 		customerTable.column('cCountryId').string().as('countryId');
+		var customerJoin = table.join(customerTable).by('oCustomerId').as('customer');
 	}
 
 	function defineCountry() {
 		countryTable = newTable('country');
 		countryTable.primaryColumn('yCountryId').integer().as('id');
 		countryTable.column('yCountryName').string().as('name');
+		var countryJoin = customerTable.join(countryTable).by('cCountryId').as('country');		
 	}
 
 	function defineOrderLines() {
@@ -62,14 +60,26 @@ function act(c) {
 		lineTable.primaryColumn('lId').integer().as('id');
 		lineTable.column('lLineNo').integer().as('lineNo');
 		lineTable.column('lOrderId').integer().as('orderId');
+		var orderJoin = lineTable.join(table).by('lOrderId').as('order');
+		table.hasMany(orderJoin).as('lines');
+
 	}
 
 	function definePackages() {
 		packageTable = newTable('package');
 		packageTable.primaryColumn('pId').integer().as('id');
 		packageTable.column('pLineId').integer().as('lineId');
+		var lineJoin = packageTable.join(lineTable).by('pLineId').as('line');
+		lineTable.hasMany(lineJoin).as('packages');		
 	}
 
+	function defineDeliveryParty() {
+		deliveryPartyTable = newTable('deliveryParty');
+		deliveryPartyTable.primaryColumn('dId').integer().as('id');
+		deliveryPartyTable.column('dOrderId').integer().as('orderId');
+		var orderJoin = deliveryPartyTable.join(table).by('dOrderId').as('order');
+		table.hasOne(orderJoin).as('deliveryParty');
+	};
 
 	function newTable(tableName) {
 		return require('../../../table')(tableName);
