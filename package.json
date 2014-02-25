@@ -6,7 +6,7 @@
   "description": "Object Relational Mapper",
   "keywords": ["orm","sql"],
   "dependencies": {
-		"a": "0.3.5"
+		"a": "0.4.1"
   },
   "repository" : {
          "type" : "git",
