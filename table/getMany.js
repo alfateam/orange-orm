@@ -10,6 +10,7 @@ function getMany(table,filter,strategy) {
 	var query = newQuery(table,filter,span,alias,emptyInnerJoin);
 	var result = executeQuery(query);
 	return resultToRows(table,span,result);
+	//todo promise
 }
 
 module.exports = getMany;

@@ -1,6 +1,7 @@
 var requireMock = require('a').requireMock;
 var tryGetFromCacheById = requireMock('./tryGetFromCacheById');
 var getFromDbById = requireMock('./getFromDbById');
+var resultToPromise = requireMock('./resultToPromise');
 
 var arg1 = {};
 var arg2 = {};
@@ -8,6 +9,7 @@ var table = {};
 var strategy = {};
 
 function act(c) {
+	c.resultToPromise = resultToPromise;
 	c.table = table;
 	c.arg1 = arg1;
 	c.arg2 = arg2;

@@ -2,4 +2,4 @@ var when = require('a').when;
 var c  = {};
 
 when("./get",c)
-	.it('returns row').assertEqual(c.row,c.returned);
+	.it('returns first row').assertEqual(c.row1,c.returned);
