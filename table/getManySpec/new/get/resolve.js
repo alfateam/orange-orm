@@ -1,4 +1,3 @@
-
 function act(c){
 	c.rows = {};
 	c.result = {};	
