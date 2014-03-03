@@ -3,16 +3,25 @@ var filter = {};
 var strategy = {};
 var expected = {};
 var query = query;
-var result = {};
 var expected = {};
 var span = {};
 var alias = '_0';
+var resultPromise = {};
 
 function act(c) {
+	c.table = table;
+	c.span = span;
 	c.strategyToSpan.expect(table,strategy).return(span);
 	c.newSelectQuery.expect(table,filter,span,alias,c.emptyInnerJoin).return(query)
-	c.executeQuery.expect(query).return(result);
-	c.resultToRows.expect(table,span,result).return(expected);
+	
+	c.executeQuery.expect(query).return(resultPromise);
+	resultPromise.then = c.mock();
+	resultPromise.then.expectAnything().whenCalled(onThen).return(expected);
+
+	function onThen(callback) {
+		c.resolve = callback;
+	}
+	
 	c.expected = expected;
 	c.returned = c.sut(table,filter,strategy);
 }

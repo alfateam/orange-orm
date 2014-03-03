@@ -1,4 +1,5 @@
-var requireMock = require('a').requireMock;
+var a = require('a');
+var requireMock = a.requireMock;
 var newSelectQuery = requireMock('./newQuery');
 var executeQuery = requireMock('./executeQuery');
 var resultToRows = requireMock('./resultToRows');
@@ -7,6 +8,7 @@ var newParameterized = requireMock('./query/newParameterized');
 var emptyInnerJoin = {};
 
 function act(c) {
+	c.mock = a.mock;
 	c.emptyInnerJoin  = emptyInnerJoin;
 	newParameterized.expect().return(emptyInnerJoin);
 	c.newSelectQuery = newSelectQuery;
