@@ -6,9 +6,10 @@ function resolveExecuteQuery(query) {
 		client.query(query,onCompleted);
 		
 		function onCompleted(err,result) {
-			console.log(err);
-			console.log(result);
-			success(result);
+			if(!err)
+				success(result);
+			else
+				failed(err);
 		}		
 	}
 }
