@@ -11,7 +11,7 @@ function getMany(table,filter,strategy) {
 	return executeQueries(queries).then(onResult);
 	
 	function onResult(result) {
-		return resultToRows(table,span,result);
+		return resultToRows(span,result);
 	}
 }
 
