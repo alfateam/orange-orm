@@ -10,10 +10,23 @@ function act(c){
 	process.domain = c.domain;;	
 	c.domain.dbClient = c.dbClient;
 
-	c.dbClient.query = c.mock();
-	c.dbClient.query.expect(c.query).expectAnything().whenCalled(onQuery);
+	c.sql = {};
+	c.parameters = {};
 
-	function onQuery(query,handler) {
+	c.query.sql = mock();
+	c.query.sql.expect().return(c.sql);
+	
+	c.parameterCollection = {};
+	c.query.parameters = mock();
+	c.query.parameters.expect().return(c.parameterCollection);
+
+	c.parameterCollection.toArray = mock();
+	c.parameterCollection.toArray.expect().return(c.parameters);
+
+	c.dbClient.query = c.mock();
+	c.dbClient.query.expect(c.sql, c.parameters).expectAnything().whenCalled(onQuery);
+
+	function onQuery(sql, parameters, handler) {
 		c.queryCompleted = handler;
 	}
 

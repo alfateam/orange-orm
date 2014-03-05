@@ -17,7 +17,7 @@ function act(c) {
 	setupSut();	
 
 	function createMocks() {
-		requireMock('./executeQuery');
+		requireMock('./executeQueries');
 		requireMock('./resultToRows');
 		requireMock('./tryGetFromCacheById');
 		c.requireMock = requireMock;
@@ -92,7 +92,7 @@ function act(c) {
 
 	function _newQuery() {
 		var span = strategyToSpan(table, c.strategy);
-		c.returned = newQuery(table,c.filter,span,alias,emptyInnerJoin);		
+		c.returned = newQuery([],table,c.filter,span,alias,emptyInnerJoin);		
 	}
 
 }

@@ -1,13 +1,12 @@
 var manyLegToQuery = _manyLegToQuery;
 
-function addSubQueries(compositeQuery,table,filter,span,alias) {	
+function addSubQueries(queries,table,filter,span,alias) {	
 	var c = {};
 	var _legNo;
 	c.visitJoin = function() {};
 	c.visitOne = function() {};
 	c.visitMany = function(leg) {
-		var query = manyLegToQuery(alias,leg,_legNo,filter);
-		compositeQuery.add(query);
+		manyLegToQuery(queries, alias,leg,_legNo,filter);
 	};
 
 	span.legs.forEach(onEachLeg);	
@@ -16,8 +15,6 @@ function addSubQueries(compositeQuery,table,filter,span,alias) {
 		_legNo = legNo;
 		leg.accept(c);
 	}
-
-	return compositeQuery;
 }
 
 function _manyLegToQuery() {

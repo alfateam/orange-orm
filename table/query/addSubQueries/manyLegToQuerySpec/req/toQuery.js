@@ -11,10 +11,10 @@ var parentAlias = '_1',
 	legColumns = {},
 	shallowJoin = ' shallowJoin',
 	primaryColumns = {},
+	queries = {},
 	emptyFilter;
 
 function act(c) {
-	c.expected = {};
 	leg.columns = legColumns;
 	leg.span = span;		
 	span.table = childTable;
@@ -23,8 +23,8 @@ function act(c) {
 	innerJoin.prepend  = c.mock();
 	innerJoin.prepend.expect(' INNER shallowJoin').return(nextInnerJoin);
 	c.newShallowJoinSql.expect(table,legColumns,primaryColumns,alias,parentAlias).return(shallowJoin);
-	c.newQuery.expect(childTable,emptyFilter,span,alias,nextInnerJoin).return(c.expected);
-	c.returned = c.sut(parentAlias,leg,legNo,innerJoin);
+	c.newQuery.expect(queries, childTable,emptyFilter,span,alias,nextInnerJoin);
+	c.sut(queries, parentAlias,leg,legNo,innerJoin);
 }
 
 act.base = '../req';

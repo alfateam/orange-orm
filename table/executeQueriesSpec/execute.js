@@ -15,7 +15,7 @@ function act(c){
 	executeQuery.expect(q2).return(resultPromise2);
 
 	promise.all = mock();
-	promise.all.expect([q1,q2]).return(c.expected);
+	promise.all.expect([resultPromise1,resultPromise2]).return(c.expected);
 	c.returned = require('../executeQueries')(queries);
 }
 

@@ -1,7 +1,7 @@
 var a = require('a'),
 	mock = a.mock,
 	requireMock = a.requireMock,
-	compositeQuery = {},
+	queries = {},
 	table = {},
 	filter = {},
 	span = {},
@@ -20,11 +20,8 @@ function act(c) {
 	stubLegs();
 	stubSpan();
 	c.manyLegToQuery = requireMock('./addSubQueries/manyLegToQuery');
-	c.manyLegToQuery.expect(alias,manyLeg,manyLegNo,filter).return(manyLegQuery);
-	compositeQuery.add = mock();
-	compositeQuery.add.expect(manyLegQuery);
-	c.compositeQuery = compositeQuery;
-	c.returned = c.sut(compositeQuery,table,filter,span,alias);
+	c.manyLegToQuery.expect(queries, alias,manyLeg,manyLegNo,filter).return(manyLegQuery);
+	c.sut(queries,table,filter,span,alias);
 }
 
 function stubLegs() {

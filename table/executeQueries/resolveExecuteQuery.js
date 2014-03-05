@@ -3,11 +3,11 @@ function resolveExecuteQuery(query) {
 	
 	function resolve(success,failed) {
 		var client = process.domain.dbClient;
-		client.query(query,onCompleted);
+		client.query(query.sql(), query.parameters().toArray(), onCompleted);
 		
 		function onCompleted(err,result) {
 			if(!err)
-				success(result);
+				success(result.rows);
 			else
 				failed(err);
 		}		
