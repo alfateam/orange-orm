@@ -13,7 +13,7 @@ function act(c) {
 	c.decode = decode;
 	newDecode.expect(column).return(decode);
 	newEncode.expect(column).return(encode);
-	c.sut = newSut(column);
+	newSut(column);
 }
 
 

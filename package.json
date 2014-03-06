@@ -7,6 +7,7 @@
   "keywords": ["orm","sql"],
   "dependencies": {
 		"a": "0.4.1",
+    "pg" : "*",
     "promise" : "4.0.0"
   },
   "repository" : {

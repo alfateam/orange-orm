@@ -1,5 +1,5 @@
 var executeQuery = require('./executeQueries/executeQuery');
-var promise = require('../promise');
+var promise = require('./promise');
 
 function executeQueries(queries) {
 	var promises = [];

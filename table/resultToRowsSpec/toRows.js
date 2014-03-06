@@ -3,6 +3,7 @@ var mock = a.mock;
 var requireMock = a.requireMock;
 
 function act(c){
+	c.rows = {};
 	c.span = {};
 	c.result = {};
 	c.table = {};
@@ -20,7 +21,7 @@ function act(c){
 
 	c.dbRowsToRows  = requireMock('./resultToRows/dbRowsToRows');
 
-	c.dbRowsToRows.expect(c.span, c.result);
+	c.dbRowsToRows.expect(c.span, c.result).return(c.rows);
 
 	c.result.shift = mock();
 	c.result.shift.expect();

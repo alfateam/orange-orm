@@ -5,7 +5,7 @@ var a  = require('a');
 var mock = a.mock;
 var requireMock  = a.requireMock;
 var executeQuery = requireMock('./executeQueries/executeQuery');
-var promise = requireMock('../promise');
+var promise = requireMock('./promise');
 var resultPromise1 = {};
 var resultPromise2 = {};
 

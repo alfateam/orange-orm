@@ -2,7 +2,7 @@ var nextResultToRows = _nextResultToRows;
 var dbRowsToRows = require('./resultToRows/dbRowsToRows');
 
 function resultToRows(span,result) {
-	dbRowsToRows(span,result);
+	var rows = dbRowsToRows(span,result);
 	result.shift();
 	
 	var c2 = {};
@@ -16,6 +16,7 @@ function resultToRows(span,result) {
 		leg.accept(c2);
 	}
 	span.legs.forEach(onEachLeg);	
+	return rows;
 }
 
 function _nextResultToRows(span,result) {

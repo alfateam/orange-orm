@@ -5,7 +5,7 @@ var strategyToSpan = require('./strategyToSpan');
 var emptyInnerJoin = require('./query/newParameterized')();
 var alias = '_0';
 
-function getMany(table,filter,strategy) {	
+function getMany(table,filter,strategy) {		
 	var span = strategyToSpan(table,strategy);
 	var queries = newQuery([],table,filter,span,alias,emptyInnerJoin);
 	return executeQueries(queries).then(onResult);

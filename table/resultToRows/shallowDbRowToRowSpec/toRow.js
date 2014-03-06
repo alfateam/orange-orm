@@ -5,7 +5,6 @@ var requireMock = a.requireMock;
 function act(c){
 	c.mock = mock;
 
-	c.span = {};
 	c.table = {};
 	c.col1 = {};
 	c.alias1 = 'alias1';
@@ -14,7 +13,6 @@ function act(c){
 	c.alias2 = 'alias2';
 	c.col2.alias = c.alias2;
 	c.table._columns = [c.col1, c.col2];
-	c.span.table = c.table;
 	c.dbRow = {};
 	c.dbValue1 = {};
 	c.dbValue2 = {};
@@ -31,7 +29,7 @@ function act(c){
 	c.col2.decode = mock();
 	c.col2.decode.expect(c.dbValue2).return(c.value2);
 
-	c.returned = require('../shallowDbRowToRow')(c.span, c.dbRow);
+	c.returned = require('../shallowDbRowToRow')(c.table, c.dbRow);
 }
 
 module.exports = act;

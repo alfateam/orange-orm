@@ -1,6 +1,6 @@
-function shallowDbRowToRow(span, dbRow) {
+function shallowDbRowToRow(table, dbRow) {	
 	var row = {};
-	var columns = span.table._columns;
+	var columns = table._columns;
 	var dbValues = [];
 	var i=0;
 	for(var propertyName in dbRow) {
