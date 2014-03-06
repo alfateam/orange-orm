@@ -1,10 +1,10 @@
 var dbNull = 0;
+var expected = '0';
 
 function act(c) {
 	c.column.dbNull = dbNull;
-	c.expected = null; 
-	c.returned = c.sut(dbNull);
+	c.expected = expected; 
+	c.returned = c.sut(undefined);
 }
 
-act.base = '../new';
 module.exports = act;
