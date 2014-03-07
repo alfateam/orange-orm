@@ -1,4 +1,4 @@
-var sql = 'CREATE TABLE _order (oId varchar(40) PRIMARY KEY, oCustomerId varchar(40), oStatus integer)'
+var sql = 'CREATE TABLE _order (oId varchar(40) PRIMARY KEY, oCustomerId varchar(40), oStatus integer, oTax boolean)'
 
 var table = require('./table');
 var pg = require('pg');
@@ -27,7 +27,7 @@ function onRun() {
 }
 
 function runDbTest() {	
- 	domain.dbClient.query('DELETE FROM _order;INSERT INTO _order VALUES (\'1\',\'100\', 1);INSERT INTO _order VALUES (\'2\',\'200\', 2)', onInserted);
+ 	domain.dbClient.query('DELETE FROM _order;INSERT INTO _order VALUES (\'1\',\'100\', 1, TRUE);INSERT INTO _order VALUES (\'2\',\'200\', 2, FALSE)', onInserted);
 }
 
 function onInserted(err, result) {    
@@ -47,7 +47,8 @@ function defineOrder() {
 	order = table('_order');
 	order.primaryColumn('oId').string().as('id');
 	order.column('oCustomerId').string().as('customerId');
-	order.column('oStatus').integer().as('status');			
+	order.column('oStatus').integer().as('status');
+	order.column('oTax').boolean().as('tax');	
 }		
 
 function getOrders() {
@@ -57,7 +58,7 @@ function getOrders() {
 function onOrders (rows) {	
 	for (var i in rows) {
 		var row  = rows[i];
-		console.log('id: %s, customerId: %s, status: %s',row.id,row.customerId, row.status);
+		console.log('id: %s, customerId: %s, status: %s, tax: %s',row.id,row.customerId, row.status, row.tax);
 	};
 }
 
