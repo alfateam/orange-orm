@@ -3,13 +3,13 @@ var requireMock = a.requireMock;
 var mock = a.mock;
 var column = {};
 
-var newSut = require('../newEncode');
-
 function act(c) {
+	c.arg = {};
+	c.purify = requireMock('./purify');
 	c.mock = mock;
 	c.requireMock = requireMock;
 	c.column = column;
-	c.sut = newSut(column);
+	c.sut = require('../newEncode')(column);
 }
 
 module.exports = act;

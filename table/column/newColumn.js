@@ -15,11 +15,6 @@ module.exports = function(table,name) {
 	c.alias = name;	
 	table._columns.push(c);
 	table[name] = c;
-
-	c.purifyThenEncode = function(arg) {
-		var purifyed = c.purify(arg);
-		return c.encode(purifyed);
-	};
 	
 	c.equal = function(arg,optionalAlias) {
 		return equal(c,arg,optionalAlias);

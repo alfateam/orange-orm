@@ -10,8 +10,8 @@ function act(c) {
 	c.extractAlias.expect(optionalAlias).return(alias);
 	encoded.prepend = mock();	
 	encoded.prepend.expect(firstPart).return(c.expected);
-	c.column.purifyThenEncode = mock();
-	c.column.purifyThenEncode.expect(arg).return(encoded);	
+	c.column.encode = mock();
+	c.column.encode.expect(arg).return(encoded);	
 	c.returned = c.sut(c.column,arg,optionalAlias);
 }
 
