@@ -10,7 +10,6 @@ function equal(column,arg,optionalAlias) {
 		operator = nullOperator;
 	var firstPart = alias + '.' + column._dbName + operator;
 	return encoded.prepend(firstPart);		
-	//todo
 };
 
 module.exports = equal;
