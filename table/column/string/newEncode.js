@@ -1,12 +1,15 @@
+var newPara = require('../../query/newParameterized');
+
 function _new(column) {
 	
 	return function(value) {
 		if (value == null) {
-			return '\'' + column.dbNull + '\'';
+			return newPara('\'' + column.dbNull + '\'');
 		}
 
-		return '\'' + value + '\'';	
+		return newPara('\'' + value + '\'');	
 	}
+	//todo
 }
 
 module.exports = _new;

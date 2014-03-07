@@ -37,7 +37,7 @@ function onInserted(err, result) {
     if(err) {
       console.error('error running query', err);
       throw err;
-    }
+    }    
     getOrders();
  };
 
@@ -58,13 +58,22 @@ function defineOrder() {
 }		
 
 function getOrders() {
-	order.getMany().then(onOrders).done(onOk,onFailed);
+	order.getMany().then(onOrders).then(getById).done(onOk,onFailed);
 }
+
+
+function getById() {
+	return order.getById('58d52776-2866-4fbe-8072-cdf13370959b').then(printRow);		
+}
+
+function printRow(row) {
+	console.log('id: %s, customerId: %s, status: %s, tax: %s, units: %s, regDate: %s, sum: %s',row.id,row.customerId, row.status, row.tax, row.units,row.regDate,row.sum);
+}
+
 
 function onOrders (rows) {	
 	for (var i in rows) {
-		var row  = rows[i];
-		console.log('id: %s, customerId: %s, status: %s, tax: %s, units: %s, regDate: %s, sum: %s',row.id,row.customerId, row.status, row.tax, row.units,row.regDate,row.sum);
+		printRow(rows[i]);
 	};
 }
 
