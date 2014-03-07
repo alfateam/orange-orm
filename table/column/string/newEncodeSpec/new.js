@@ -1,11 +1,12 @@
 var requireMock = require('a').requireMock;
 var column = {};
 
-var newSut = require('../newEncode');
-
 function act(c) {
 	c.column = column;
-	c.sut = newSut(column);
+
+	c.newParam = requireMock('../../query/newParameterized');
+
+	c.sut = require('../newEncode')(column);
 }
 
 module.exports = act;

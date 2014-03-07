@@ -1,10 +1,14 @@
 var dbNull = 0;
-var expected = '0';
+var formatted = '0';
 
 function act(c) {
 	c.purify.expect(c.arg).return(null);
 	c.column.dbNull = dbNull;
-	c.expected = expected; 
+	c.formatted = formatted; 
+
+	c.expected = {};
+	c.newParam.expect(c.formatted).return(c.expected);
+
 	c.returned = c.sut(c.arg);
 }
 

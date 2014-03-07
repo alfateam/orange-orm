@@ -6,10 +6,8 @@ function _new(column) {
 		if (value == null) {
 			return newPara('\'' + column.dbNull + '\'');
 		}
-
 		return newPara('\'' + value + '\'');	
 	}
-	//todo
 }
 
 module.exports = _new;

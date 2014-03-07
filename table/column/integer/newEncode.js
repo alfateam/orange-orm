@@ -1,4 +1,5 @@
 var purify = require('./purify');
+var newParam = require('../../query/newParameterized');
 
 module.exports = function(column) {
 	return encode;
@@ -6,7 +7,7 @@ module.exports = function(column) {
 	function encode(value) {
 		value = purify(value);
 		if (value == null)
-			return column.dbNull.toString();
-		return '' + value;
+			return newParam(column.dbNull.toString());
+		return newParam('' + value);
 	}
 };

@@ -6,6 +6,9 @@ var column = {};
 function act(c) {
 	c.arg = {};
 	c.purify = requireMock('./purify');
+
+	c.newParam = requireMock('../../query/newParameterized');
+
 	c.mock = mock;
 	c.requireMock = requireMock;
 	c.column = column;

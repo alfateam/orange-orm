@@ -1,4 +1,5 @@
 var purify = require('./purify');
+var newParam = require('../../query/newParameterized');
 
 function _new(column) {
 	
@@ -8,12 +9,12 @@ function _new(column) {
 		value = purify(value);
 		if (value === null) {
 			if (column.dbNull === null)
-				return 'null';
-			return '\'' + column.dbNull + '\'';
+				return newParam('null');
+			return newParam('\'' + column.dbNull + '\'');
 		}
 		if (value)
-			return 'TRUE';	
-		return 'FALSE';				
+			return newParam('TRUE');	
+		return newParam('FALSE');				
 	}
 }
 

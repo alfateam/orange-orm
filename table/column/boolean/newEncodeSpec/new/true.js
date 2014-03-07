@@ -3,7 +3,11 @@ var value = true;
 
 function act(c) {	
 	c.purify.expect(c.arg).return(value);
-	c.expected = 'TRUE';
+	c.formatted = 'TRUE';
+	
+	c.expected = {};
+	c.newParam.expect(c.formatted).return(c.expected);
+
 	c.dbNull = dbNull;
 	c.column.dbNull = dbNull;
 	c.returned = c.sut(c.arg);
