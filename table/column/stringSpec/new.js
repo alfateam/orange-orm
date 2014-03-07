@@ -1,5 +1,5 @@
 var requireMock = require('a').requireMock;
-var newEncode = requireMock('./string/newEncode');
+var newEncode = requireMock('./newEncodeCore');
 var newDecode = requireMock('./newDecodeCore');
 
 var newSut = require('../string');
