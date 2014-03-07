@@ -1,7 +1,6 @@
 function defineColumn(column) {	
 	var c = {};
 
-
 	c.string = function() {
 		require('./column/string')(column);
 		return c;
@@ -9,6 +8,11 @@ function defineColumn(column) {
 
 	c.guid = function() {
 		require('./column/guid')(column);
+		return c;
+	};
+
+	c.date = function() {
+		require('./column/date')(column);
 		return c;
 	};
 

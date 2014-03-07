@@ -1,4 +1,4 @@
-var newEncode = require('./float/newEncode');
+var newEncode = require('./string/newEncode');
 var newDecode = require('./newDecodeCore');
 
 function _new(column) {

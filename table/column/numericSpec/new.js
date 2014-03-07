@@ -13,7 +13,7 @@ function act(c){
 	c.newDecode = requireMock('./newDecodeCore');
 	c.newDecode.expect(c.column).return(c.decode);
 
-	require('../float')(c.column);
+	require('../numeric')(c.column);
 }
 
 module.exports = act;

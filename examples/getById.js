@@ -1,9 +1,6 @@
-var createSql = 'DROP TABLE _order;CREATE TABLE _order (oId uuid PRIMARY KEY, oCustomerId varchar(40), oStatus integer, oTax boolean, oUnits float, oRegDate timestamp with time zone, oSum numeric);';
-var insertSql = 'DELETE FROM _order;' + 
-				'INSERT INTO _order VALUES (\'58d52776-2866-4fbe-8072-cdf13370959b\',\'100\', 1, TRUE, 1.21,\'Fri Mar 07 2014 10:57:07 GMT+01\',1344.23);' + 
-				'INSERT INTO _order VALUES (\'d51137de-8dd9-4520-a6e0-3a61ddc61a99\',\'200\', 2, FALSE, 2.23,\'Fri Mar 07 2015 08:25:07 GMT+02\',34.59944)';
+var sql = 'CREATE TABLE _order (oId uuid PRIMARY KEY, oCustomerId varchar(40), oStatus integer, oTax boolean, oUnits decimal)'
 
-var table = require('../table');
+var table = require('./table');
 var pg = require('pg');
 var order;
 var Domain = require('domain');
@@ -24,13 +21,13 @@ function onRun() {
         return;       	    	
     }
 	domain.dbClient = client;
-    domain.done = done;    
+    domain.done = done;
     runDbTest();
 	});
 }
 
 function runDbTest() {	
- 	domain.dbClient.query(createSql + insertSql, onInserted);
+ 	domain.dbClient.query('DELETE FROM _order;INSERT INTO _order VALUES (\'1\',\'100\', 1, TRUE, 1,1);INSERT INTO _order VALUES (\'2\',\'200\', 2, FALSE, 2,2)', onInserted);
 }
 
 function onInserted(err, result) {    
@@ -53,8 +50,6 @@ function defineOrder() {
 	order.column('oStatus').integer().as('status');
 	order.column('oTax').boolean().as('tax');
 	order.column('oUnits').float().as('units');
-	order.column('oRegdate').date().as('regDate');
-	order.column('oSum').numeric().as('sum');
 }		
 
 function getOrders() {
@@ -64,12 +59,11 @@ function getOrders() {
 function onOrders (rows) {	
 	for (var i in rows) {
 		var row  = rows[i];
-		console.log('id: %s, customerId: %s, status: %s, tax: %s, units: %s, regDate: %s, sum: %s',row.id,row.customerId, row.status, row.tax, row.units,row.regDate,row.sum);
+		console.log('id: %s, customerId: %s, status: %s, tax: %s, units: %s',row.id,row.customerId, row.status, row.tax, row.units);
 	};
 }
 
 function onOk() {
-	pg = null;	
 	domain.done();
 }
 
