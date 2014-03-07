@@ -1,7 +1,7 @@
 var requireMock = require('a').requireMock;
 var column = {};
 
-var newSut = require('../newEncodeCore');
+var newSut = require('../newEncode');
 
 function act(c) {
 	c.column = column;
