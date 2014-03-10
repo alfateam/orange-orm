@@ -6,5 +6,4 @@ function act(c) {
 	c.returned = c.sut(c.column,[]);
 }
 
-act.base = '../req';
 module.exports = act;

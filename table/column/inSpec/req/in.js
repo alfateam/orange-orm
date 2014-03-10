@@ -35,5 +35,4 @@ function act(c) {
 	c.returned = c.sut(c.column,args,optionalAlias);
 }
 
-act.base = '../req';
 module.exports = act;

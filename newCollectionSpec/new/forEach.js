@@ -8,5 +8,4 @@ function act(c) {
 	c.sut.forEach(callback);
 }
 
-act.base = '../new'
 module.exports = act;

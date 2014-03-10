@@ -5,5 +5,4 @@ function act(c) {
 	c.sut.add(c.element5)
 }
 
-act.base = '../addRange';
 module.exports = act;
