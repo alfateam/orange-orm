@@ -1,4 +1,4 @@
-var arg = 2;
+var arg = 2.23;
 
 function act(c) {
 	c.arg = arg;
@@ -6,5 +6,4 @@ function act(c) {
 	c.returned = c.sut(arg);
 };
 
-act.base = '../req';
 module.exports = act;
