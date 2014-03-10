@@ -1,15 +1,21 @@
 var fs =require('fs');
 var createSql = 'DROP TABLE _order;CREATE TABLE _order (oId uuid PRIMARY KEY, oCustomerId varchar(40), oStatus integer, oTax boolean, oUnits float, oRegDate timestamp with time zone, oSum numeric, oImage bytea);';
-fileToBuffer();
+createBuffers();
 var insertSql = 'DELETE FROM _order;' + 
-				'INSERT INTO _order VALUES (\'58d52776-2866-4fbe-8072-cdf13370959b\',\'100\', 1, TRUE, 1.21,\'Fri Mar 07 2014 10:57:07 GMT+01\',1344.23,null);' + 
-				'INSERT INTO _order VALUES (\'d51137de-8dd9-4520-a6e0-3a61ddc61a99\',\'200\', 2, FALSE, 2.23,\'Fri Mar 07 2015 08:25:07 GMT+02\',34.59944,' + imgData + ')';
+				'INSERT INTO _order VALUES (\'58d52776-2866-4fbe-8072-cdf13370959b\',\'100\', 1, TRUE, 1.21,\'Fri Mar 07 2014 10:57:07 GMT+01\',1344.23,' + buffer + ');' + 
+				'INSERT INTO _order VALUES (\'d51137de-8dd9-4520-a6e0-3a61ddc61a99\',\'200\', 2, FALSE, 2.23,\'Fri Mar 07 2015 08:25:07 GMT+02\',34.59944,' + buffer2 + ')';
 
-var imgData;
+var buffer;
+var buffer2;
 
-function fileToBuffer() {
-	var buffer = fs.readFileSync('./input.jpg');
-	imgData = "E'\\\\x" + buffer.toString('hex') + "'";
+function createBuffers() {
+	buffer = newBuffer([1,2,3]);
+	buffer2 = newBuffer([4,5]);	
+
+	function newBuffer(contents) {
+		var buffer = new Buffer(contents);
+		return "E'\\\\x" + buffer.toString('hex') + "'";	
+	}
 }
 
 var table = require('../table');
@@ -64,7 +70,7 @@ function defineOrder() {
 	order.column('oUnits').float().as('units');
 	order.column('oRegdate').date().as('regDate');
 	order.column('oSum').numeric().as('sum');
-	order.column('oImage').string().as('image');
+	order.column('oImage').binary().as('image');
 }		
 
 function getOrders() {
@@ -78,10 +84,7 @@ function getById() {
 
 function printRow(row) {
 	var image = row.image;
-	if (image) {
-		fs.writeFile('./output.jpg', image);    	
-	}
-	console.log('id: %s, customerId: %s, status: %s, tax: %s, units: %s, regDate: %s, sum: %s',row.id,row.customerId, row.status, row.tax, row.units,row.regDate,row.sum);
+	console.log('id: %s, customerId: %s, status: %s, tax: %s, units: %s, regDate: %s, sum: %s, image: %s',row.id,row.customerId, row.status, row.tax, row.units,row.regDate,row.sum,row.image.toJSON());
 }
 
 
