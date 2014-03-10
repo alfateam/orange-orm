@@ -11,5 +11,4 @@ function act(c) {
 	}
 };
 
-act.base = '../req';
 module.exports = act;

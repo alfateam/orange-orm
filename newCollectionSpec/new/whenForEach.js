@@ -1,5 +1,5 @@
 var when = require('a').when;
 var c = {};
 
-when('./forEach',c)
+when(c)
 	.it('should run callback').assertDoesNotThrow(c.callback.verify);

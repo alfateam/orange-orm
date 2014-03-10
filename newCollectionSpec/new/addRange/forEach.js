@@ -27,5 +27,4 @@ function act(c) {
 }
 
 
-act.base = '../addRange';
 module.exports = act;

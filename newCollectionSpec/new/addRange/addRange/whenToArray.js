@@ -1,7 +1,7 @@
 var when = require('a').when;
 var c = {};
 
-when('toArray',c)
+when(c)
 	.it('returns array with correct length').assertEqual(5,c.returned.length)
 	.it('contains element').assertEqual(c.element,c.returned[0])
 	.it('contains element2').assertEqual(c.element2,c.returned[1])

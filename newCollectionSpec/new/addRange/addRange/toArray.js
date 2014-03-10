@@ -15,5 +15,4 @@ function act(c) {
 }
 
 
-act.base = '../add';
 module.exports = act;
