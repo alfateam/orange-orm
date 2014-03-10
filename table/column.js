@@ -36,8 +36,8 @@ function defineColumn(column) {
 		return c;
 	}
 
-	c.blob = function() {
-		require('./column/blob')(column);
+	c.binary = function() {
+		require('./column/binary')(column);
 		return c;
 	};
 
