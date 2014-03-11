@@ -1,9 +1,11 @@
 var requireMock = require('a').requireMock;
-var alias  = {};
 
 function act(c) {
-	c.alias = alias;
-	c.returned = c.sut.as(alias);
+	c.originalName = 'originalName';
+	c.table.originalName = {};		
+	c.column.alias = c.originalName;
+	c.alias = 'newAlias';
+	c.returned = c.sut.as(c.alias);
 }
 
 act.base = '../new';

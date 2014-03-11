@@ -18,12 +18,12 @@ function _new(tableName) {
 	table.primaryColumn = function(columnName) {
 		var columnDef = newColumn(table,columnName);
 		table._primaryColumns.push(columnDef);
-		return column(columnDef);
+		return column(columnDef,table);
 	};
 
 	table.column = function(columnName) {
 		var columnDef = newColumn(table,columnName);
-		return column(columnDef);
+		return column(columnDef,table);
 	};
 
 	table.join = function(relatedTable) {

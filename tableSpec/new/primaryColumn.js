@@ -6,9 +6,8 @@ function act(c) {
 	c.expected = {};
 	c.columnDef = columnDef;
 	c.newColumn.expect(c.sut,primaryColumnName).return(columnDef);	
-	c.column.expect(columnDef).return(c.expected);
+	c.column.expect(columnDef,c.sut).return(c.expected);
 	c.returned = c.sut.primaryColumn(primaryColumnName);
 }
 
-act.base = '../new';
 module.exports = act;

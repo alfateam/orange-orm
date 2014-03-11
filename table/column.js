@@ -1,4 +1,4 @@
-function defineColumn(column) {	
+function defineColumn(column, table) {	
 	var c = {};
 
 	c.string = function() {
@@ -47,6 +47,9 @@ function defineColumn(column) {
 	};
 
 	c.as = function(alias) {
+		var oldAlias = column.alias;
+		delete table[oldAlias];
+		table[alias] = column;
 		column.alias = alias;
 		return c;
 	};

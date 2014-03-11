@@ -6,7 +6,7 @@ var columnDef = {};
 function act(c) {
 	c.expected = expected;
 	c.newColumn.expect(c.sut,columnName).return(columnDef);
-	c.column.expect(columnDef).return(c.expected);
+	c.column.expect(columnDef, c.sut).return(c.expected);
 	c.returned = c.sut.column(columnName);
 }
 
