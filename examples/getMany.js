@@ -19,7 +19,7 @@ function createBuffers() {
 }
 
 var table = require('../table');
-var pg = require('pg');
+var pg = require('pg.js');
 var order;
 var Domain = require('domain');
 var domain = Domain.create();
