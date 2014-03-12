@@ -5,7 +5,7 @@ function _in(column,values,optionalAlias) {
 	if (values.length == 0)
 		return newParameterized('1=2');
 	var alias = extractAlias(optionalAlias);	
-	var firstPart = alias + '.' + column.name + ' in '; 
+	var firstPart = alias + '.' + column._dbName + ' in '; 
 	var parameterized = newParameterized(firstPart);	
 	var separator = '(';
 

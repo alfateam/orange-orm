@@ -5,9 +5,6 @@ var lessThanOrEqual = require('./lessThanOrEqual');
 var greaterThan = require('./greaterThan');
 var greaterThanOrEqual = require('./greaterThanOrEqual');
 var _in = require('./in');
-var contains = require('./contains');
-var startsWith = require('./startsWith');
-var endsWith = require('./endsWith');
 
 module.exports = function(table,name) {	
 	var c = {};
@@ -22,18 +19,6 @@ module.exports = function(table,name) {
 
 	c.notEqual = function(arg,optionalAlias) {
 		return notEqual(c,arg,optionalAlias);
-	};
-
-	c.contains = function(arg,optionalAlias) {
-		return contains(c,arg,optionalAlias);
-	};
-
-	c.startsWith = function(arg,optionalAlias) {
-		return startsWith(c,arg,optionalAlias);
-	};
-
-	c.endsWith = function(arg,optionalAlias) {
-		return endsWith(c,arg,optionalAlias);
 	};
 
 	c.lessThan = function(arg,optionalAlias) {

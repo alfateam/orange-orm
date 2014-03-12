@@ -12,7 +12,7 @@ function act(c) {
 	c.newParameterized = newParameterized;	
 	c.mock = amock.mock;
 	c.column = {};
-	c.column.name = 'columnName';
+	c.column._dbName = 'columnName';
 	c.sut = require('../notEqual');
 }
 

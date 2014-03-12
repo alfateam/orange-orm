@@ -1,7 +1,7 @@
 var amock = require('a');
 var requireMock = amock.requireMock;
-var newParameterized = requireMock('../query/newParameterized');
-var extractAlias = requireMock('./extractAlias');
+var newParameterized = requireMock('../../query/newParameterized');
+var extractAlias = requireMock('../extractAlias');
 
 function act(c) {
 	c.newParameterized = newParameterized;
@@ -9,8 +9,7 @@ function act(c) {
 	c.mock = amock.mock;
 	c.column = {};
 	c.column._dbName = 'columnName';
-	c.sut = require('../in');
+	c.sut = require('../endsWith');
 }
-
 
 module.exports = act;

@@ -8,7 +8,7 @@ function act(c) {
 	c.extractAlias = extractAlias;
 	c.mock = amock.mock;
 	c.column = {};
-	c.column.name = 'columnName';
+	c.column._dbName = 'columnName';
 	c.sut = require('../lessThanOrEqual');
 }
 
