@@ -1,9 +1,11 @@
 var a = require('a');
-var mock = a.mock;
 
-function act(c){
-	c.mock = mock;	
+function act(c){	
+	c.requireMock = a.requireMock;
+	c.mock = a.mock;	
 	c.filter = {};
+	c.filter.sql = {};
+	c.filter.parameters = {};
 
 	c.sut = require('../newBoolean')(c.filter);
 }

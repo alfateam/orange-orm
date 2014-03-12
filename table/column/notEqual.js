@@ -1,4 +1,4 @@
-var newParameterized = require('../query/newParameterized');
+var newBoolean = require('./newBoolean');
 var extractAlias = require('./extractAlias');
 var nullOperator = ' is not ';
 
@@ -9,7 +9,8 @@ function notEqual(column,arg,optionalAlias) {
 	if (encoded.sql() == 'null') 
 		operator = nullOperator;
 	var firstPart = alias + '.' + column._dbName + operator;
-	return encoded.prepend(firstPart);		
+	var filter =  encoded.prepend(firstPart);		
+	return newBoolean(filter);
 };
 
 module.exports = notEqual;

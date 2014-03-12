@@ -1,9 +1,12 @@
 var newParameterized = require('../query/newParameterized');
+var newBoolean = require('./newBoolean');
 var extractAlias = require('./extractAlias');
 
 function _in(column,values,optionalAlias) {
-	if (values.length == 0)
-		return newParameterized('1=2');
+	if (values.length == 0) {
+		var filter =  newParameterized('1=2');
+		return newBoolean(filter);
+	}
 	var alias = extractAlias(optionalAlias);	
 	var firstPart = alias + '.' + column._dbName + ' in '; 
 	var parameterized = newParameterized(firstPart);	
@@ -14,7 +17,8 @@ function _in(column,values,optionalAlias) {
 		parameterized = parameterized.append(separator).append(encoded);
 		separator = ',';		
 	};
-	return parameterized.append(')');
+	var filter =  parameterized.append(')');
+	return newBoolean(filter);
 };
 
 module.exports = _in;

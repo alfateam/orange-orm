@@ -13,6 +13,7 @@ var appended = {},
 	appended4 = {},
 	optionalAlias = {},
 	alias = '_2';
+var filter = {};
 
 function act(c) {	
 	var mock = c.mock;
@@ -28,10 +29,13 @@ function act(c) {
 	appended3.append = mock();
 	appended3.append.expect(encoded2).return(appended4);
 	appended4.append = mock();
-	appended4.append.expect(')').return(c.expected);
+	appended4.append.expect(')').return(filter);
 	c.column.encode = mock();
 	c.column.encode.expect(arg).return(encoded);	
 	c.column.encode.expect(arg2).return(encoded2);
+
+	c.newBoolean.expect(filter).return(c.expected);
+
 	c.returned = c.sut(c.column,args,optionalAlias);
 }
 
