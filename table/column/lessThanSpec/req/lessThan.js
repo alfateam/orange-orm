@@ -1,6 +1,6 @@
 var encoded = {};
 var arg = 5;
-var firstPart = '_0.columnName<=';
+var firstPart = '_0.columnName<';
 var optionalAlias = {};
 var alias = '_0';
 
