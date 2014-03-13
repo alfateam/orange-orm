@@ -1,5 +1,5 @@
 var newJoinRelation = require('./newJoinRelation');
-var newGetRelatedTable = require('./newGetRelatedTable');
+var newRelatedTable = require('./newRelatedTable');
 
 function newJoin(parentTable,childTable) {
 	var c = {};
@@ -15,14 +15,16 @@ function newJoin(parentTable,childTable) {
 	c.as = function(alias) {
 		var relation = newJoinRelation(parentTable,childTable,columnNames);
 		parentTable._relations[alias] = relation;
-		parentTable[alias] = newGetRelatedTable(relation);
+		
+		Object.defineProperty(parentTable, alias, {
+    		get: function() {
+        		return newRelatedTable([relation]);
+    		}
+		});
+		
 		return relation;
 	}
 	return c;
 }
 
 module.exports = newJoin;
-/* todo remove
-table.lines.fooColumn.eq()
-var orderLine_order_relation = orderLine.join('order',order).by('columna','columnb');
-order.hasMany('lines',orderLine_order_relation);*/
