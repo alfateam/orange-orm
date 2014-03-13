@@ -9,6 +9,7 @@ function newOne(joinRelation) {
 		var relation = newOneRelation(joinRelation);
 		parentTable._relations[alias] = relation;
 		parentTable[alias] = newGetRelatedTable(relation);
+		//todo relatedTable
 		return relation;
 	};
 
