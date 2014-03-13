@@ -1,4 +1,4 @@
-var newParameterized = require('../../query/newParameterized');
+var newBoolean = require('../newBoolean');
 var extractAlias = require('../extractAlias');
 var operator = ' LIKE ';
 
@@ -7,7 +7,8 @@ function contains(column,arg,optionalAlias) {
 	arg =  '%' + arg + '%';
 	var encoded = column.encode(arg);	
 	var firstPart = alias + '.' + column._dbName + operator;
-	return encoded.prepend(firstPart);		
+	var filter = encoded.prepend(firstPart);		
+	return newBoolean(filter);
 };
 
 module.exports = contains;
