@@ -2,7 +2,7 @@ var newShallowJoinSql = require('../query/singleQuery/joinSql/newShallowJoinSqlC
 
 function newWhereSql(relation,shallowFilter) {
 	var c = {};
-	var sql = ' WHERE ';
+	var sql;
 
 	c.visitJoin = function(relation) {
 		var table = relation.childTable;

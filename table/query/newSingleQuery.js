@@ -11,7 +11,8 @@ function _new(table,filter,span,alias,innerJoin) {
 		var innerJoinSql = innerJoin.sql();
 		var joinSql = newJoinSql(span,alias);
 		var whereSql = newWhereSql(table,filter,alias);
-		return 'select ' + columnSql + ' from ' + name + ' ' + alias + innerJoinSql + joinSql + whereSql;
+		var select = 'select ' + columnSql + ' from ' + name + ' ' + alias + innerJoinSql + joinSql + whereSql;
+		return select.replace('  ', ' ');
 	};
 
 	c.parameters = filter.parameters;	
