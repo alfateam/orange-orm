@@ -1,7 +1,7 @@
 var mock = require('a').mock;
 
 var columnSql = '<columnSql>';
-var whereSql = ' <whereSql>';
+var whereSql = '<whereSql>';
 var joinSql = ' <joinSql> ';
 var innerJoinSql = ' <innerJoinSql>'
 var tableName = '<tableName>';

@@ -23,7 +23,7 @@ function newWhereSql(relation,shallowFilter) {
 	function where(leftColumns,rightColumns) {
 		var table = relation.childTable;
 		var joinCore = newShallowJoinSql(table,leftColumns,rightColumns,'_0','_1');
-		sql = shallowFilter.prepend(' WHERE ' + joinCore + ' AND ');		
+		sql = shallowFilter.prepend('WHERE ' + joinCore + ' AND ');		
 	}
 
 	relation.accept(c);

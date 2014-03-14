@@ -4,7 +4,7 @@ var joinSql = '<joinSql>';
 
 function act(c){	
 	c.expected = {};
-	c.shallowFilter.prepend.expect(' WHERE <joinSql> AND ').return(c.expected);
+	c.shallowFilter.prepend.expect('WHERE <joinSql> AND ').return(c.expected);
 
 	relation.accept = c.mock();
 	relation.accept.expectAnything().whenCalled(onOne);
