@@ -1,19 +1,16 @@
 var requireMock = require('a').requireMock;
 var newManyRelation = requireMock('./newManyRelation');
-var newGetRelatedTable = requireMock('./newGetRelatedTable');
+var newRelatedTable = requireMock('./newRelatedTable');
 var parentTable = {},
 	joinRelation = {},
-	manyRelation = {},
-	getRelatedTable = {};
-
+	manyRelation = {};
 function act(c) {	
-	c.getRelatedTable = getRelatedTable;
+	c.newRelatedTable = newRelatedTable;
 	c.manyRelation = manyRelation;
 	c.parentTable = parentTable;
 	joinRelation.childTable = parentTable;
 	parentTable._relations = {};
 	newManyRelation.expect(joinRelation).return(manyRelation);
-	newGetRelatedTable.expect(manyRelation).return(getRelatedTable);
 	c.returned = require('../hasMany')(joinRelation).as('child');
 }
 

@@ -1,5 +1,5 @@
 var newManyRelation = require('./newManyRelation');
-var newGetRelatedTable = require('./newGetRelatedTable');
+var newRelatedTable = require('./newRelatedTable');
 
 function newOne(joinRelation) {
 	var c = {};
@@ -8,8 +8,13 @@ function newOne(joinRelation) {
 	c.as = function (alias) {	
 		var relation = newManyRelation(joinRelation);
 		parentTable._relations[alias] = relation;
-		parentTable[alias] = newGetRelatedTable(relation);
-		//todo relatedTable
+		
+		Object.defineProperty(parentTable, alias, {
+    		get: function() {
+        		return newRelatedTable([relation]);
+    		}
+		});
+
 		return relation;
 	};
 
