@@ -22,6 +22,10 @@ function act(c){
 	c.newRelatedColumn.expect(c.col,c.relations).return(c.a);
 	c.newRelatedColumn.expect(c.col2,c.relations).return(c.b);
 
+	c.existsFilter = {};
+	c.subFilter = requireMock('./relatedTable/subFilter');
+	c.subFilter.expect(c.relations).return(c.existsFilter);
+
 
 	c._childRelations = {};
 	c.childRelation = 'c';

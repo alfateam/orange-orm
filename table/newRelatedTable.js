@@ -1,5 +1,6 @@
 var newRelatedColumn = require('./relatedTable/relatedColumn');
 var nextRelatedTable = _nextRelatedTable;
+var subFilter = require('./relatedTable/subFilter');
 
 function newRelatedTable(relations) {
 	var table = relations[relations.length-1].childTable;
@@ -30,6 +31,11 @@ function newRelatedTable(relations) {
     		}
 		});	
 	}
+
+	c.exists = function() {
+		return subFilter(relations);
+	}
+
 	return c;
 }
 

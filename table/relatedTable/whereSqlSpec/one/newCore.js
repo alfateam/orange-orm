@@ -3,14 +3,13 @@ var joinSql = '<joinSql>';
 
 
 function act(c){	
-	c.expected = {};
-	c.shallowFilter.prepend.expect(' WHERE <joinSql> AND ').return(c.expected);
+	c.relation = relation;
 
 	relation.accept = c.mock();
-	relation.accept.expectAnything().whenCalled(onMany);
+	relation.accept.expectAnything().whenCalled(onOne);
 
-	function onMany(visitor) {
-		visitor.visitMany(relation);
+	function onOne(visitor) {
+		visitor.visitOne(relation);
 	}
 
 	var rightTable = {};
@@ -25,7 +24,6 @@ function act(c){
 	parentTable._primaryColumns = leftColumns;				
 	c.newShallowJoinSql.expect(rightTable,leftColumns,rightColumns,'_0','_1').return(joinSql);		
 	
-	c.returned = c.sut(relation,c.shallowFilter);
 }
 
 module.exports = act;
