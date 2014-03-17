@@ -6,8 +6,8 @@ var joinSql = ' <joinSql>';
 var oneSql = ' <oneSql>';
 var manySql = ' <manySql>';
 
-function act(c){	
-	c.expected = ' INNER <joinSql> INNER <oneSql> INNER <manySql>'
+function act(c){
+	c.expected = ' INNER <manySql> INNER <oneSql> INNER <joinSql>'
 	stubJoin();
 	stubOne();
 	stubMany();
@@ -20,13 +20,15 @@ function act(c){
 			visitor.visitJoin(joinRelation);
 		}
 	
-		c.joinLeftColumns = {};
-		c.joinTable = {};
-		c.joinRightColumns = {};
-		c.joinTable._primaryColumns = c.joinRightColumns;
-		joinRelation.childTable = c.joinTable;
-		joinRelation.columns = c.joinLeftColumns;
-		c.newShallowJoinSql.expect(c.joinTable,c.joinLeftColumns,c.joinRightColumns,'_0','_1').return(joinSql);
+		var leftColumns = {};
+		var leftTable = {};
+		var rightTable = {}
+		var rightColumns = {};
+		rightTable._primaryColumns = rightColumns;		
+		joinRelation.parentTable = leftTable;
+		joinRelation.columns = leftColumns;
+		joinRelation.childTable = rightTable;
+		c.newShallowJoinSql.expect(leftTable,rightColumns,leftColumns,'_2','_1').return(joinSql);
 	}
 
 	function stubOne() {
@@ -46,7 +48,7 @@ function act(c){
 		joinRelation.childTable = parentTable;
 		joinRelation.columns = rightColumns;	
 		parentTable._primaryColumns = leftColumns;				
-		c.newShallowJoinSql.expect(rightTable,leftColumns,rightColumns,'_1','_2').return(oneSql);		
+		c.newShallowJoinSql.expect(parentTable,rightColumns,leftColumns,'_3','_2').return(oneSql);		
 	}
 
 	function stubMany() {
@@ -67,7 +69,7 @@ function act(c){
 		joinRelation.childTable = parentTable;
 		joinRelation.columns = rightColumns;	
 		parentTable._primaryColumns = leftColumns;				
-		c.newShallowJoinSql.expect(rightTable,leftColumns,rightColumns,'_2','_3').return(manySql);		
+		c.newShallowJoinSql.expect(parentTable,rightColumns,leftColumns,'_4','_3').return(manySql);		
 	}
 	
 	c.returned = c.sut([relation,joinRelation,oneRelation,manyRelation]);

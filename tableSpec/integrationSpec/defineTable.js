@@ -8,6 +8,7 @@ var customerTable;
 var countryTable;
 var lineTable;
 var packageTable;
+var articleTable;
 var deliveryPartyTable;
 var emptyInnerJoin = require('../../table/query/newParameterized')();
 
@@ -29,7 +30,9 @@ function act(c) {
 		defineCustomer();
 		defineCountry();
 		defineOrderLines();
+		defineArticle();		
 		definePackages();
+		defineArticle();
 		defineDeliveryParty();
 	};
 
@@ -66,12 +69,20 @@ function act(c) {
 
 	}
 
+	function defineArticle() {
+		articleTable = newTable('article');
+		articleTable.primaryColumn('aId').integer().as('id');		
+		articleTable.column('aName').string().as('name');
+	}
+
 	function definePackages() {
 		packageTable = newTable('package');
 		packageTable.primaryColumn('pId').integer().as('id');
 		packageTable.column('pLineId').integer().as('lineId');
+		packageTable.column('pArticleId').integer().as('articleId');
 		var lineJoin = packageTable.join(lineTable).by('pLineId').as('line');
 		lineTable.hasMany(lineJoin).as('packages');		
+		packageTable.join(articleTable).by('pArticleId').as('article');
 	}
 
 	function defineDeliveryParty() {

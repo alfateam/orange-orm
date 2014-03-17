@@ -3,36 +3,35 @@ var newShallowJoinSql = require('../query/singleQuery/joinSql/newShallowJoinSql'
 function newJoinSql(relations) {
 	if (relations.length == 1)
 		return  '';
+	var leftAlias,
+		rightAlias;
 	var relation;
 	var c = {};
 	var i;
 	var sql = '';
 
 	c.visitJoin = function(relation) {
-		var table = relation.childTable;
-		var leftColumns = relation.columns;
-		var rightColumns = table._primaryColumns;
-		innerJoin(leftColumns,rightColumns);
+		sql += ' INNER' + newShallowJoinSql(relation.parentTable,relation.childTable._primaryColumns,relation.columns,leftAlias,rightAlias);	
 	}
 
-	c.visitOne = function(relation) {
-		var joinRelation = relation.joinRelation;
-		var rightColumns = joinRelation.columns;		
-		var leftColumns = joinRelation.childTable._primaryColumns;
-		innerJoin(leftColumns,rightColumns);
+	c.visitOne = function(relation) {	
+		innerJoin(relation);
 	}
 
 	c.visitMany = c.visitOne;
 
-	function innerJoin(leftColumns,rightColumns) {
-		var table = relation.childTable;
-		var leftAlias = '_' + (i-1);
-		var rightAlias = '_' + i;
+	function innerJoin(relation) {
+		var joinRelation = relation.joinRelation;
+		var table = joinRelation.childTable;		
+		var rightColumns = table._primaryColumns;		
+		var leftColumns = joinRelation.columns;
 
 		sql += ' INNER' + newShallowJoinSql(table,leftColumns,rightColumns,leftAlias,rightAlias);	
 	}
 
-	for (i = 1; i < relations.length; i++) {
+	for (i = relations.length-1; i > 0; i--) {
+		leftAlias = '_' + (i+1);
+		rightAlias = '_' + i;
 		relation = relations[i];
 		relation.accept(c);
 	};
