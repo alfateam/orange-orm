@@ -2,7 +2,7 @@ var newShallowJoinSql = require('../query/singleQuery/joinSql/newShallowJoinSql'
 
 function newJoinSql(relations) {
 	if (relations.length == 1)
-		return  ' ';
+		return  '';
 	var relation;
 	var c = {};
 	var i;
