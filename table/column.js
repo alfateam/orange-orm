@@ -16,16 +16,6 @@ function defineColumn(column, table) {
 		return c;
 	};
 
-	c.integer = function() {
-		c.type =  require('./column/integer')(column);
-		return c;
-	};
-
-	c.float = function() {
-		c.type = require('./column/float')(column);
-		return c;
-	};
-
 	c.numeric = function(optionalPrecision,optionalScale) {
 		require('./column/numeric')(column,optionalPrecision,optionalScale);
 		return c;

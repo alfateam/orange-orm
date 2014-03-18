@@ -38,7 +38,7 @@ function act(c) {
 
 	function defineOrder() {
 		table = newTable('order');
-		table.primaryColumn('oOrderId').integer().as('id');
+		table.primaryColumn('oOrderId').numeric().as('id');
 		table.column('oCustomerId').string().as('customerId');		
 		table.columnDiscriminators('discriminatorColumn=\'foo\'','discriminatorColumn2=\'baz\'');
 		c.orderTable = table;
@@ -54,16 +54,16 @@ function act(c) {
 
 	function defineCountry() {
 		countryTable = newTable('country');
-		countryTable.primaryColumn('yCountryId').integer().as('id');
+		countryTable.primaryColumn('yCountryId').numeric().as('id');
 		countryTable.column('yCountryName').string().as('name');
 		var countryJoin = customerTable.join(countryTable).by('cCountryId').as('country');		
 	}
 
 	function defineOrderLines() {
 		lineTable = newTable('orderLine');
-		lineTable.primaryColumn('lId').integer().as('id');
-		lineTable.column('lLineNo').integer().as('lineNo');
-		lineTable.column('lOrderId').integer().as('orderId');
+		lineTable.primaryColumn('lId').numeric().as('id');
+		lineTable.column('lLineNo').numeric().as('lineNo');
+		lineTable.column('lOrderId').numeric().as('orderId');
 		var orderJoin = lineTable.join(table).by('lOrderId').as('order');
 		table.hasMany(orderJoin).as('lines');
 
@@ -71,15 +71,15 @@ function act(c) {
 
 	function defineArticle() {
 		articleTable = newTable('article');
-		articleTable.primaryColumn('aId').integer().as('id');		
+		articleTable.primaryColumn('aId').numeric().as('id');		
 		articleTable.column('aName').string().as('name');
 	}
 
 	function definePackages() {
 		packageTable = newTable('package');
-		packageTable.primaryColumn('pId').integer().as('id');
-		packageTable.column('pLineId').integer().as('lineId');
-		packageTable.column('pArticleId').integer().as('articleId');
+		packageTable.primaryColumn('pId').numeric().as('id');
+		packageTable.column('pLineId').numeric().as('lineId');
+		packageTable.column('pArticleId').numeric().as('articleId');
 		var lineJoin = packageTable.join(lineTable).by('pLineId').as('line');
 		lineTable.hasMany(lineJoin).as('packages');		
 		packageTable.join(articleTable).by('pArticleId').as('article');
@@ -87,8 +87,8 @@ function act(c) {
 
 	function defineDeliveryParty() {
 		deliveryPartyTable = newTable('deliveryParty');
-		deliveryPartyTable.primaryColumn('dId').integer().as('id');
-		deliveryPartyTable.column('dOrderId').integer().as('orderId');
+		deliveryPartyTable.primaryColumn('dId').numeric().as('id');
+		deliveryPartyTable.column('dOrderId').numeric().as('orderId');
 		var orderJoin = deliveryPartyTable.join(table).by('dOrderId').as('order');
 		table.hasOne(orderJoin).as('deliveryParty');
 	};
