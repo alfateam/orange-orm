@@ -5,6 +5,7 @@ function act(c) {
 	c.formatted = '\'foo\'';
 	c.expected = {};
 
+	c.stringIsSafePredicate.expect(value).return(true);
 	c.newParam.expect(c.formatted).return(c.expected);
 
 	c.dbNull = dbNull;
