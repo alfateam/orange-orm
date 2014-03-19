@@ -3,8 +3,8 @@ var dbNull = {};
 function act(c) {	
 	c.formatted = '\'' + dbNull + '\'';
 
+	c.negotiateGuidFormat.expect(null).return(null);
 	c.newParam.expect(c.formatted).return(c.expected);
-	c.negotiateGuidFormat.expect(null);
 	c.dbNull = dbNull;
 	c.column.dbNull = dbNull;
 	c.returned = c.sut(null);

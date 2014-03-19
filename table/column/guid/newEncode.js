@@ -3,8 +3,8 @@ var negotiateGuidFormat = require('./negotiateGuidFormat');
 
 function _new(column) {
 	
-	return function(value) {
-		negotiateGuidFormat(value);
+	return function(candidate) {
+		var value = negotiateGuidFormat(candidate);
 		if (value == null) {
 			return newPara('\'' + column.dbNull + '\'');
 		}
