@@ -4,7 +4,7 @@ function act(c) {
 	c.formatted = '\'' + dbNull + '\'';
 
 	c.expected = {};
-	c.stringIsSafePredicate.expect(undefined).return(true);
+	c.stringIsSafe.expect(undefined).return(true);
 	c.newParam.expect(c.formatted).return(c.expected);
 
 	c.dbNull = dbNull;

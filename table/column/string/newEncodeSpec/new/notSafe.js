@@ -4,7 +4,7 @@ function act(c) {
 	c.value = {};
 	c.param = {};
 
-	c.stringIsSafePredicate.expect(c.value).return(false);
+	c.stringIsSafe.expect(c.value).return(false);
 
 	c.newParam.expect('$?').return(c.param);
 

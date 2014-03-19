@@ -1,14 +1,13 @@
 var newPara = require('../../query/newParameterized');
-var stringIsSafePredicate = require('./stringIsSafePredicate');
+var stringIsSafe = require('./stringIsSafe');
 
 function _new(column) {
 	
 	return function(value) {
 		if (value == null)
 			return newPara('\'' + column.dbNull + '\'');
-		if(stringIsSafePredicate(value))
-			return newPara('\'' + value + '\'');
-		
+		if(stringIsSafe(value))
+			return newPara('\'' + value + '\'');	
 	}
 }
 

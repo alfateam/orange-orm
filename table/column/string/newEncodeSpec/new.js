@@ -8,7 +8,7 @@ function act(c) {
 	c.column = column;
 
 	c.newParam = requireMock('../../query/newParameterized');
-	c.stringIsSafePredicate = requireMock('./stringIsSafePredicate');
+	c.stringIsSafe = requireMock('./stringIsSafe');
 
 	c.sut = require('../newEncode')(column);
 }
