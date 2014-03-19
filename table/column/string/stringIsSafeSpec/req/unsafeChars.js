@@ -1,5 +1,5 @@
 function act(c){
-	c.unsafeChars = 'ad\'\\';	
+	c.unsafeChars = 'ad\'\\_';	
 	
 	c.returned = c.sut(c.unsafeChars);
 }
