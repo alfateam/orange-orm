@@ -7,7 +7,10 @@ function _new(column) {
 		if (value == null)
 			return newPara('\'' + column.dbNull + '\'');
 		if(stringIsSafe(value))
-			return newPara('\'' + value + '\'');	
+			return newPara('\'' + value + '\'');
+		var para = newPara('$');
+		para.parameters().add(value);
+		return para;
 	}
 }
 
