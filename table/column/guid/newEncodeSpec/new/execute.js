@@ -6,7 +6,7 @@ function act(c) {
 	c.formatted = '\'foo\'';
 	c.expected = {};
 
-	c.negotiateGuidFormat.expect(candidate).return(value);
+	c.purify.expect(candidate).return(value);
 	c.newParam.expect(c.formatted).return(c.expected);
 
 	c.dbNull = dbNull;

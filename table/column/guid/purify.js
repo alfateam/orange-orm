@@ -1,5 +1,5 @@
 function negotiateGuidFormat(candidate) {
-	if(!candidate)
+	if(candidate == null)
 		return null;
 	var pattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 	if(!pattern.test(candidate))

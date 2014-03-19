@@ -5,7 +5,7 @@ function act(c) {
 	c.column = column;
 
 	c.newParam = requireMock('../../query/newParameterized');
-	c.negotiateGuidFormat = requireMock('./negotiateGuidFormat');
+	c.purify = requireMock('./purify');
 
 	c.sut = require('../newEncode')(column);
 }

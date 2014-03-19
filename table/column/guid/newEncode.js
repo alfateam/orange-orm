@@ -1,10 +1,10 @@
 var newPara = require('../../query/newParameterized');
-var negotiateGuidFormat = require('./negotiateGuidFormat');
+var purify = require('./purify');
 
 function _new(column) {
 	
 	return function(candidate) {
-		var value = negotiateGuidFormat(candidate);
+		var value = purify(candidate);
 		if (value == null) {
 			return newPara('\'' + column.dbNull + '\'');
 		}

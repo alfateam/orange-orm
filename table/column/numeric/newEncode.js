@@ -6,8 +6,10 @@ module.exports = function(column) {
 
 	function encode(value) {
 		value = purify(value);
-		if (value == null)
-			return newParam(column.dbNull.toString());
+		if (value == null) {
+			var dbNull = column.dbNull;
+			return newParam('' + dbNull + '');
+		}
 		return newParam('' + value);
 	}
 };
