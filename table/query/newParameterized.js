@@ -10,10 +10,15 @@ function _new(text) {
 		optionalParams.push(arguments[i]);
 	};
 	
-	c.parameters = function() {
-		return newCollection.apply(null, optionalParams);
-	};
+	c.parameters = newCollection.apply(null, optionalParams);
 	
+	c.addParameter = function(parameter) {
+		var params = [text];
+		params = params.concat(optionalParams);
+		params.push(parameter);
+		return newParameterized(params);
+	};
+
 	c.sql = function() {
 		return text;
 	};
@@ -27,7 +32,7 @@ function _new(text) {
 
 	function prependParameterized(other) {		
 		var params = [other.sql() + text];
-		var otherParameters = other.parameters().toArray();			
+		var otherParameters = other.parameters.toArray();			
 		params = params.concat(otherParameters).concat(optionalParams);
 		return newParameterized(params);
 	}
@@ -44,9 +49,9 @@ function _new(text) {
 			return appendText(other);			
 	};
 
-	function appendParameterized(other) {		
+	function appendParameterized(other) {	
 		var params = [text + other.sql()];
-		var otherParameters = other.parameters().toArray();			
+		var otherParameters = other.parameters.toArray();			
 		params = params.concat(optionalParams).concat(otherParameters);
 		return newParameterized(params);
 	}

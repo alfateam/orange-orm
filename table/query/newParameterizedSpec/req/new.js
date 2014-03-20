@@ -1,5 +1,5 @@
-var param1 = {};
-var param2 = {};
+var param1 = '1';
+var param2 = '2';
 
 function act(c) {
 	c.param1 = param1;
@@ -10,5 +10,4 @@ function act(c) {
 	c.returned = c.sut(c.initialText, param1, param2);
 }
 
-act.base = '../req';
 module.exports = act;

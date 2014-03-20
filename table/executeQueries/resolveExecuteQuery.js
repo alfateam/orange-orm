@@ -4,7 +4,7 @@ function resolveExecuteQuery(query) {
 	function resolve(success,failed) {
 		var client = process.domain.dbClient;
 	
-		client.query(replaceParamChar(query.sql()), query.parameters().toArray(), onCompleted);
+		client.query(replaceParamChar(query.sql()), query.parameters.toArray(), onCompleted);
 
 		function replaceParamChar(initial) {
 			var splitted = initial.split('$');

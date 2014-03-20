@@ -19,8 +19,7 @@ function act(c){
 	c.query.sql.expect().return(c.initialSql);
 	
 	c.parameterCollection = {};
-	c.query.parameters = mock();
-	c.query.parameters.expect().return(c.parameterCollection);
+	c.query.parameters = c.parameterCollection;
 
 	c.parameterCollection.toArray = mock();
 	c.parameterCollection.toArray.expect().return(c.parameters);

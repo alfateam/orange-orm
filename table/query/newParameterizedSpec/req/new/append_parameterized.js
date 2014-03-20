@@ -7,14 +7,13 @@ var param3 = {};
 var param4 = {};
 var parameterArray = [param3,param4];
 var textToAppend = 'textToAppend';
-var getParameters = mock();
 
 function act(c) {	
 	c.expected = {};
 	parameterizedToAppend.sql = mock();
 	parameterizedToAppend.sql.expect().return(textToAppend);	
-	getParameters.expect().return(parameters);
-	parameterizedToAppend.parameters = getParameters;
+
+	parameterizedToAppend.parameters = parameters
 	parameters.toArray = mock();
 	parameters.toArray.expect().return(parameterArray);
 	newParameterized.expect(c.text + textToAppend , c.param1, c.param2, param3, param4).return(c.expected);

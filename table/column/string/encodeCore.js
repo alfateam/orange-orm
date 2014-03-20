@@ -7,8 +7,7 @@ function _new(value,column) {
 		if(stringIsSafe(value))
 			return newPara('' + value + '');
 		var para = newPara('$');
-		para.parameters().add(value);
-		return para;	
+		return para.addParameter(value);
 }
 
 module.exports = _new;
