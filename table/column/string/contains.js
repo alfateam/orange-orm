@@ -1,13 +1,13 @@
 var newBoolean = require('../newBoolean');
 var extractAlias = require('../extractAlias');
-var operator = ' LIKE ';
+var encode = require('./encodeCore');
+var operator = ' LIKE \'%';
 
 function contains(column,arg,optionalAlias) {
 	var alias = extractAlias(optionalAlias);
-	arg =  '%' + arg + '%';
-	var encoded = column.encode(arg);	
+	var encoded = encode(arg);	
 	var firstPart = alias + '.' + column._dbName + operator;
-	var filter = encoded.prepend(firstPart);		
+	var filter = encoded.prepend(firstPart).append('%\'');		
 	return newBoolean(filter);
 };
 

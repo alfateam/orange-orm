@@ -1,4 +1,4 @@
-var dbNull = {};
+var dbNull = 'nullValue';
 
 function act(c) {	
 	c.formatted = '\'' + dbNull + '\'';
