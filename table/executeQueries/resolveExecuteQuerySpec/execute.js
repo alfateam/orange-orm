@@ -10,11 +10,13 @@ function act(c){
 	process.domain = c.domain;;	
 	c.domain.dbClient = c.dbClient;
 
-	c.sql = {};
+	c.initialSql = 'SELECT ID FROM ORDER WHERE ID=$ AND NAME LIKE $ AND ADDRESS LIKE $';
+	c.sql = 'SELECT ID FROM ORDER WHERE ID=$1 AND NAME LIKE $2 AND ADDRESS LIKE $3';
+
 	c.parameters = {};
 
 	c.query.sql = mock();
-	c.query.sql.expect().return(c.sql);
+	c.query.sql.expect().return(c.initialSql);
 	
 	c.parameterCollection = {};
 	c.query.parameters = mock();
