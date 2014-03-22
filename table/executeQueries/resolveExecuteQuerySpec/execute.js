@@ -10,8 +10,8 @@ function act(c){
 	process.domain = c.domain;;	
 	c.domain.dbClient = c.dbClient;
 
-	c.initialSql = 'SELECT ID FROM ORDER WHERE ID=$ AND NAME LIKE $ AND ADDRESS LIKE $';
-	c.sql = 'SELECT ID FROM ORDER WHERE ID=$1 AND NAME LIKE $2 AND ADDRESS LIKE $3';
+	c.initialSql = 'SELECT ID FROM ORDER WHERE ID=$ AND NAME LIKE $ AND ADDRESS LIKE $ bla bla';
+	c.sql = 'SELECT ID FROM ORDER WHERE ID=$1 AND NAME LIKE $2 AND ADDRESS LIKE $3 bla bla';
 
 	c.parameters = {};
 

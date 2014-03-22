@@ -20,7 +20,7 @@ function createBuffers() {
 
 var table = require('../table');
 var pg = require('pg.js');
-var order;
+var orderTable;
 var Domain = require('domain');
 var domain = Domain.create();
 
@@ -62,24 +62,24 @@ function defineDb() {
 }
 
 function defineOrder() {
-	order = table('_order');
-	order.primaryColumn('oId').guid().as('id');
-	order.column('oCustomerId').string().as('customerId');
-	order.column('oStatus').integer().as('status');
-	order.column('oTax').boolean().as('tax');
-	order.column('oUnits').float().as('units');
-	order.column('oRegdate').date().as('regDate');
-	order.column('oSum').numeric().as('sum');
-	order.column('oImage').binary().as('image');
+	orderTable = table('_order');
+	orderTable.primaryColumn('oId').guid().as('id');
+	orderTable.column('oCustomerId').string().as('customerId');
+	orderTable.column('oStatus').numeric().as('status');
+	orderTable.column('oTax').boolean().as('tax');
+	orderTable.column('oUnits').numeric().as('units');
+	orderTable.column('oRegdate').date().as('regDate');
+	orderTable.column('oSum').numeric().as('sum');
+	orderTable.column('oImage').binary().as('image');
 }		
 
 function getOrders() {
-	order.getMany().then(onOrders).then(getById).done(onOk,onFailed);
+	orderTable.getMany().then(onOrders).done(onOk,onFailed);
 }
 
 
 function getById() {
-	return order.getById('58d52776-2866-4fbe-8072-cdf13370959b').then(printRow);		
+	return orderTable.getById('58d52776-2866-4fbe-8072-cdf13370959b').then(printRow);		
 }
 
 function printRow(row) {
@@ -89,6 +89,7 @@ function printRow(row) {
 
 
 function onOrders (rows) {	
+	console.log('Number of rows: ' + rows.length);
 	for (var i in rows) {
 		printRow(rows[i]);
 	};

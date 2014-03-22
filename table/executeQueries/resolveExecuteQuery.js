@@ -1,19 +1,12 @@
 function resolveExecuteQuery(query) {
+	var params = query.parameters.toArray();
 	return resolve;
 	
 	function resolve(success,failed) {
 		var client = process.domain.dbClient;
 	
-		client.query(replaceParamChar(query.sql()), query.parameters.toArray(), onCompleted);
+		client.query(replaceParamChar(), params, onCompleted);
 
-		function replaceParamChar(initial) {
-			var splitted = initial.split('$');
-			var sql = '';
-			for (var i = 0; i < splitted.length-1; i++) {
-				sql += splitted[i] + '$' + (i+1);
-			};
-			return sql;
-		}
 
 		function onCompleted(err,result) {
 			if(!err)
@@ -22,6 +15,20 @@ function resolveExecuteQuery(query) {
 				failed(err);
 		}		
 	}
+
+	function replaceParamChar() {
+		if (params.length == 0)
+			return query.sql();
+		var splitted = query.sql().split('$');
+		var sql = '';
+		var lastIndex = splitted.length-1;
+		for (var i = 0; i < lastIndex; i++) {
+			sql += splitted[i] + '$' + (i+1);
+		};
+		sql += splitted[lastIndex];
+		return sql;
+	}
+
 }
 
 module.exports = resolveExecuteQuery;
