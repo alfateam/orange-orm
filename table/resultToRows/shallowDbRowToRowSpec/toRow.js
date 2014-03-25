@@ -1,10 +1,12 @@
 var a = require('a');
 var mock = a.mock;
 var requireMock = a.requireMock;
+var relations = {};
+
 
 function act(c){
 	c.mock = mock;
-
+	c.getRelatedRows = requireMock('./getRelatedRows');
 	c.table = {};
 	c.col1 = {};
 	c.alias1 = 'alias1';
@@ -29,7 +31,14 @@ function act(c){
 	c.col2.decode = mock();
 	c.col2.decode.expect(c.dbValue2).return(c.value2);
 
-	c.returned = require('../shallowDbRowToRow')(c.table, c.dbRow);
+	c.lineRelation = {};
+	c.customerRelation = {};
+	relations.lines = c.lineRelation;
+	relations.customer = c.customerRelation;
+	c.table._relations = relations;	
+
+
+	c.sut = require('../shallowDbRowToRow')(c.table, c.dbRow);
 }
 
 module.exports = act;

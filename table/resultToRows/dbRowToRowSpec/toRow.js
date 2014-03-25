@@ -6,6 +6,8 @@ function act(c){
 	c.span = {};
 	c.dbRow = {};
 	c.table = {};
+	c.cache = {};
+	c.table._cache = c.cache;
 	c.oneLeg = {};
 	c.oneLegSpan = {};
 	c.oneLeg.span = c.oneLegSpan;
@@ -20,6 +22,8 @@ function act(c){
 
 	c.shallowDbRowToRow = requireMock('./shallowDbRowToRow');
 	c.shallowDbRowToRow.expect(c.table, c.dbRow).return(c.expected);
+	c.cache.tryAdd = mock();
+	c.cache.tryAdd.expect(c.expected);
 
 	c.legs.forEach = mock();
 	c.legs.forEach.expectAnything().whenCalled(onEach).return();

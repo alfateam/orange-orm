@@ -1,3 +1,5 @@
+var getRelatedRows = require('./getRelatedRows');
+
 function shallowDbRowToRow(table, dbRow) {	
 	var row = {};
 	var columns = table._columns;
@@ -13,6 +15,24 @@ function shallowDbRowToRow(table, dbRow) {
    		if(columns.length == i)
    			break;
 	}
+	setRelated();
+
+	function setRelated() {
+		var relations = table._relations;
+		for(var relationName in relations) {			
+			var relation = relations[relationName];
+			setSingleRelated(relationName,relation);
+		}	
+	}
+
+	function setSingleRelated(name, relation) {
+		Object.defineProperty(row, name, {
+    		get: function() {        			
+       			return getRelatedRows(relation, row);
+       		}
+    	});
+	}
+	
 	return row;
 }
 

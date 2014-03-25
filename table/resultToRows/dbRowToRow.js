@@ -2,7 +2,9 @@ var shallowDbRowToRow = require('./shallowDbRowToRow');
 var nextDbRowToRow = _nextDbRowToRow;
 
 function dbRowToRow(span, dbRow) {
-	var row = shallowDbRowToRow(span.table, dbRow);
+	var table = span.table;
+	var row = shallowDbRowToRow(table, dbRow);
+	table._cache.tryAdd(row);
 
 	var c = {};
 	
