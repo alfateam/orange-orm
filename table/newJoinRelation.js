@@ -15,6 +15,10 @@ function _newJoin(parentTable,childTable,columnNames) {
 	c.toLeg = function() {
 		return newLeg(c);
 	};
+
+	c.getRows = function(parentRow){
+		
+	};
 	
 	return c;
 

@@ -1,4 +1,3 @@
-var getRelatedRows = require('./getRelatedRows');
 
 function shallowDbRowToRow(table, dbRow) {	
 	var row = {};
@@ -28,7 +27,7 @@ function shallowDbRowToRow(table, dbRow) {
 	function setSingleRelated(name, relation) {
 		Object.defineProperty(row, name, {
     		get: function() {        			
-       			return getRelatedRows(relation, row);
+    			return relation.getRows(row);
        		}
     	});
 	}

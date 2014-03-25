@@ -6,7 +6,6 @@ var relations = {};
 
 function act(c){
 	c.mock = mock;
-	c.getRelatedRows = requireMock('./getRelatedRows');
 	c.table = {};
 	c.col1 = {};
 	c.alias1 = 'alias1';
