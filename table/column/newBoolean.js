@@ -33,6 +33,11 @@ function newBoolean(filter) {
 		};
 		return next;
 	}
+
+	c.not = function() {
+		var nextFilter = filter.prepend('NOT (').append(')');
+		return nextNewBoolean(nextFilter);
+	}
 	
 	return c;
 }

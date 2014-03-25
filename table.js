@@ -14,6 +14,7 @@ function _new(tableName) {
 	table._columnDiscriminators = [];
 	table._formulaDiscriminators = [];
 	table._relations = {};	
+	//todo table._table
 	
 	table.primaryColumn = function(columnName) {
 		var columnDef = newColumn(table,columnName);
