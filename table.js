@@ -43,6 +43,14 @@ function _new(tableName) {
 		return call(getMany,arguments);
 	};
 
+	table.getManySync = function() {
+		//TODO
+	};
+
+	table.tryGetFirstSync = function() {
+		//TODO
+	};
+
 	function call(func,args) {
 		var mergedArgs = [table];
 		for (var i = 0; i < args.length; i++) {

@@ -1,5 +1,5 @@
 var newLeg = require('./relation/newJoinLeg'),
-    getById = require('./getById');
+    getByIdSync = require('./getByIdSync');
 
 function _newJoin(parentTable, childTable, columnNames) {
     var c = {};
@@ -22,12 +22,12 @@ function _newJoin(parentTable, childTable, columnNames) {
             return parentRow[item];
         });
 
-        if (primaryKeys.some(isNull)) {
+        if (primaryKeys.some(isNullOrUndefined)) {
             return null;
         }
 
         var args = [childTable].concat(primaryKeys);
-        return getById.apply(null, args);
+        return getByIdSync.apply(null, args);
     };
 
     return c;
@@ -52,8 +52,8 @@ function _newJoin(parentTable, childTable, columnNames) {
         };
     }
 
-    function isNull(item) {
-        return item === null;
+    function isNullOrUndefined(item) {
+        return item == null;
     }
 }
 

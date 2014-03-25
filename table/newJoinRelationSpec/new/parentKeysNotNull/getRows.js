@@ -1,14 +1,13 @@
 function act(c){
 	var parentRow = {},
-		fooKey = {},
-		barKey = {};
+		fooKey = 'foo',
+		barKey = 'bar';
 
 	parentRow[c.fooColumnName]	= fooKey;
 	parentRow[c.barColumnName]	= barKey;
 	c.relatedRows = {};
 	
-	c.getById.apply = c.mock();
-	c.getById.apply.expect(null, [c.childTable, fooKey, barKey]).return(c.relatedRows);
+	c.getByIdSync.expect(c.childTable, fooKey, barKey).return(c.relatedRows);
 
 	c.returned = c.sut.getRows(parentRow);
 }
