@@ -17,7 +17,7 @@ function newManyRelation(joinRelation) {
 
     c.getRows = function(parentRow) {
     	var result = manyCache.tryGet(parentRow);
-    	 if(result)
+    	 if(result !== null)
     		return result;
     	var filter = newForeignKeyFilter(joinRelation, parentRow);
     	var result = c.childTable.getManySync(filter);
