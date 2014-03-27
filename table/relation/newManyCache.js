@@ -1,10 +1,10 @@
 var newCacheCore = require('./newManyCacheCore');
 var newInvalidateCache = require('./newInvalidateCache');
-var newKey = require('../../newObject');
+var newId = require('../../newId');
 
 function newManyCache(joinRelation) {
     var c = {}
-    var key = newKey();
+    var key = newId();
 
     c.tryGet = function(parentRow) {
         var cache = process.domain[key];
