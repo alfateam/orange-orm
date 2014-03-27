@@ -11,9 +11,16 @@ function act(c){
 	c.manyCache.tryGet = c.mock();
 	c.joinRelation.parentTable = c.childTable;
 	c.newForeignKeyFilter = requireMock('./relation/newForeignKeyFilter');
-	c.newManyCache = requireMock('./relation/newManyCache');
+	c.newManyCache = requireMock('./relation/newManyCache');			
 	c.newManyCache.expect(c.joinRelation).return(c.manyCache);
 	c.newManyLeg = requireMock('./relation/newManyLeg');
+	
+	c.newExpanderCache = requireMock('./relation/newExpanderCache');
+	c.expanderCache = {};
+	c.newExpanderCache.expect(c.joinRelation).return(c.expanderCache);
+	c.expanderCache.tryGet = mock();
+	c.expanderCache.add = mock();
+
 	c.sut = require('../newManyRelation')(c.joinRelation);
 }
 

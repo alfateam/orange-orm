@@ -24,6 +24,10 @@ function newOneRelation(joinRelation) {
         return result;
     };
 
+    c.expand = function(parentRow) {
+        //todo
+    }
+
 
     c.toLeg = function() {
         return newLeg(c);

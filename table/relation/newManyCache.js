@@ -1,27 +1,21 @@
 var newCacheCore = require('./newManyCacheCore');
+var newInvalidateCache = require('./newInvalidateCache');
+var newKey = require('../../newObject');
 
 function newManyCache(joinRelation) {
     var c = {}
-    var cache;
+    var key = newKey();
 
     c.tryGet = function(parentRow) {
+        var cache = process.domain[key];
         if (!cache) {
             cache = newCacheCore(joinRelation);
-            //newCacheInvalidator(...);
+            process.domain[key] = cache; 
+            newInvalidateCache(key, joinRelation);
         }
         return cache.tryGet(parentRow);
     };
-
     return c;
-};
-
-/*function() newCacheInvalidator(context, tableCache) {
-    tableCache.subscribeChangedOnce(onChanged);
-    tableCache = null;    
-    function onChanged(cache) {
-        context.cache = null;        
-    }
-    
-}*/
+}
 
 module.exports = newManyCache;

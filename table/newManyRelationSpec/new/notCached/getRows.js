@@ -9,9 +9,8 @@ function act(c){
 	c.childTable.getManySync = c.mock();
 	c.childTable.getManySync.expect(c.foreignKeyFilter).return(c.result);
 
-	c.manyCache.tryGet.expect(parentRow).return(null);
-	c.manyCache.add = c.mock();
-	c.manyCache.add.expect(parentRow, c.result);
+	c.expanderCache.tryGet.expect(parentRow).return(null);
+	c.expanderCache.add.expect(parentRow);
 	c.returned = c.sut.getRows(parentRow);
 }
 act.base = '../../new';

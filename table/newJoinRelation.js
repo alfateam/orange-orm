@@ -30,6 +30,8 @@ function _newJoin(parentTable, childTable, columnNames) {
         return getByIdSync.apply(null, args);
     };
 
+    c.expand = function() {};//todo nothing
+
     return c;
 
     function addColumns() {
