@@ -7,6 +7,7 @@ function dbRowsToRows(span, result) {
 		var row = dbRowToRow(span, dbRows[i]);
 		rows.push(row);
 	};
+	//todo relation.expand(row) for each manyLeg
 	return rows;
 }
 

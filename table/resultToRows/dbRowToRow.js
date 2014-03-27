@@ -10,6 +10,7 @@ function dbRowToRow(span, dbRow) {
 	
 	c.visitOne = function(leg) {
 		nextDbRowToRow(leg.span, dbRow);
+		//todo relation.expand(row)
 	};
 
 	c.visitJoin = c.visitOne;
