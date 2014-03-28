@@ -21,7 +21,6 @@ function newRelatedColumn(column,relations) {
 			};
 			args.push(alias);
 			var shallowFilter =  filter.apply(null,args);
-			//todo remove: (SELECT primary from _2  JOIN _0.PK = _1.pk JOIN _1.PK = _2.pk  WHERE FILTER)
 			return newSubFilter(relations,shallowFilter)
 		}
 	}

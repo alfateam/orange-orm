@@ -5,6 +5,8 @@ function newLeg(relation) {
 	c.accept = function(visitor) {
 		visitor.visitMany(c);
 	};
+
+	//TODO c.relation = relation;
 	
 	return c; 
 }
