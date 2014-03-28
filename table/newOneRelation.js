@@ -1,10 +1,12 @@
 var newLeg = require('./relation/newOneLeg');
 var newOneCache = require('./relation/newOneCache');
 var newForeignKeyFilter = require('./relation/newForeignKeyFilter');
+var newExpanderCache = require('./relation/newExpanderCache');
 
 function newOneRelation(joinRelation) {
     var c = {};
     var oneCache = newOneCache(joinRelation);
+    var expanderCache = newExpanderCache(joinRelation);
 
 
     c.joinRelation = joinRelation;
@@ -15,19 +17,15 @@ function newOneRelation(joinRelation) {
     };
 
     c.getRows = function(parentRow) {
-        var result = oneCache.tryGet(parentRow);
-        if (result)
-            return result;
+        if (expanderCache.tryGet(parentRow))
+            return oneCache.tryGet(parentRow);
         var filter = newForeignKeyFilter(joinRelation, parentRow);
         var result = c.childTable.tryGetFirstSync(filter);
-        oneCache.add(parentRow, result);
+        expanderCache.add(parentRow);
         return result;
     };
 
-    c.expand = function(parentRow) {
-        //todo
-    }
-
+    c.expand = expanderCache.add;
 
     c.toLeg = function() {
         return newLeg(c);

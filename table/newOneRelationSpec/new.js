@@ -13,6 +13,13 @@ function act(c){
 	c.newOneCache = requireMock('./relation/newOneCache');
 	c.newOneCache.expect(c.joinRelation).return(c.oneCache);
 	c.joinRelation.parentTable = c.childTable;
+	
+	c.newExpanderCache = requireMock('./relation/newExpanderCache');
+	c.expanderCache = {};
+	c.newExpanderCache.expect(c.joinRelation).return(c.expanderCache);
+	c.expanderCache.tryGet = mock();
+	c.expanderCache.add = mock();
+
 	c.newLeg = requireMock('./relation/newOneLeg');	
 	c.sut = require('../newOneRelation')(c.joinRelation);
 }

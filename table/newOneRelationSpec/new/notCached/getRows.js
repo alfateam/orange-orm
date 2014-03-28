@@ -9,9 +9,8 @@ function act(c){
 	c.childTable.tryGetFirstSync = c.mock();
 	c.childTable.tryGetFirstSync.expect(c.foreignKeyFilter).return(c.result);
 
-	c.oneCache.tryGet.expect(parentRow).return(null);
-	c.oneCache.add = c.mock();
-	c.oneCache.add.expect(parentRow, c.result);
+	c.expanderCache.tryGet.expect(parentRow).return(null);
+	c.expanderCache.add.expect(parentRow);
 	c.returned = c.sut.getRows(parentRow);
 }
 act.base = '../../new';
