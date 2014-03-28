@@ -6,7 +6,7 @@ var newExpanderCache = require('./relation/newExpanderCache');
 function newManyRelation(joinRelation) {
     var c = {};
 
-	var manyCache = newManyCache(joinRelation);
+    var manyCache = newManyCache(joinRelation);
     var expanderCache = newExpanderCache(joinRelation);
 
     c.joinRelation = joinRelation;
@@ -19,16 +19,14 @@ function newManyRelation(joinRelation) {
 
     c.getRows = function(parentRow) {
         if (expanderCache.tryGet(parentRow))
-    	   return manyCache.tryGet(parentRow);
-    	var filter = newForeignKeyFilter(joinRelation, parentRow);
-    	var result = c.childTable.getManySync(filter);
-    	expanderCache.add(parentRow);
-    	return result;
+            return manyCache.tryGet(parentRow);
+        var filter = newForeignKeyFilter(joinRelation, parentRow);
+        var result = c.childTable.getManySync(filter);
+        expanderCache.add(parentRow);
+        return result;
     };
 
-    c.expand = function(parentRow) {
-        //todo
-    }
+    c.expand = expanderCache.add;
 
     c.toLeg = function() {
         return newManyLeg(c);
