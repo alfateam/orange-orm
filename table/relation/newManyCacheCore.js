@@ -1,4 +1,4 @@
-var newCacheCore = require('./newCacheCore');
+var newCacheCore = require('../newCache');
 
 function newManyCache(joinRelation) {
     var c = {}

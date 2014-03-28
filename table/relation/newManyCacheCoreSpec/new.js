@@ -9,7 +9,7 @@ function act(c){
 	c.cacheCore.add = mock();
 	c.cacheCore.tryGet = mock();
 
-	c.newCacheCore = requireMock('./newCacheCore');
+	c.newCacheCore = requireMock('../newCache');
 	c.newCacheCore.expect().return(c.cacheCore);
 
 	c.joinRelation = {};
