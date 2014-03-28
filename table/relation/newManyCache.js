@@ -10,11 +10,33 @@ function newManyCache(joinRelation) {
         var cache = process.domain[key];
         if (!cache) {
             cache = newCacheCore(joinRelation);
-            process.domain[key] = cache; 
+            fillCache(cache);
+            process.domain[key] = cache;
             newInvalidateCache(key, joinRelation);
         }
         return cache.tryGet(parentRow);
     };
+
+    function fillCache(cache) {
+        var childTable = joinRelation.childTable;
+        var primaryColumns = childTable._primaryColumns;
+        var childCache = childTable._cache;
+        var children = childCache.getAll();
+        children.forEach(addToCache);
+
+        function addToCache(child) {
+            var parent = {};
+
+            joinRelation.columns.forEach(addKeyToParent);
+
+            function addKeyToParent(childPk, index) {
+                var primaryColumn = primaryColumns[index];
+                parent[primaryColumn.alias] = child[childPk.alias];
+            }            
+            cache.add(parent, child);
+        }
+    }
+
     return c;
 }
 

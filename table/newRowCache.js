@@ -36,6 +36,10 @@ function newRowCache(table) {
 		cache.add(key, row);
 	};
 
+	c.getAll = function() {
+		//todo
+	};
+
 	return c;
 };
 
