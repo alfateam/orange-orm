@@ -5,7 +5,7 @@ var requireMock = a.requireMock;
 function act(c){
 	c.mock = mock;	
 	
-	c.sut = require('../newCacheCore')();
+	c.sut = require('../newCache')();
 }
 
 module.exports = act;
