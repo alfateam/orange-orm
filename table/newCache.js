@@ -1,6 +1,7 @@
 function cacheCore() {
     var c = {}
     var cache = {};
+    var keyLength;
 
 
     c.tryGet = function(key) {
@@ -14,7 +15,7 @@ function cacheCore() {
             var cacheValue = cache[keyValue];
             if (typeof cacheValue === 'undefined')
                 return null;
-            if (keyLength == index)
+            if (keyLength - 1 == index)
                 return cacheValue;
             return tryGetCore(cache[keyValue], ++index);
         }
@@ -22,15 +23,15 @@ function cacheCore() {
     };
 
     c.add = function(key, result) {
-
         var index = 0;
-        var keyLength = key.length;
+        keyLength = key.length;
 
         addCore(cache, index);
 
         function addCore(cache, index) {
             var keyValue = key[index];
-            if (keyLength == index) {
+                
+            if (keyLength - 1 == index) {
                 cache[keyValue] = result;
                 return;
             }
@@ -39,6 +40,23 @@ function cacheCore() {
             addCore(cache[keyValue], ++index)
         }
 
+    };
+
+    c.getAll = function() {
+        var index = 0;
+        var result = [];
+        getAllCore(cache, index);
+
+        function getAllCore(cache, index) {
+            for (var name in cache) {
+                var value = cache[name];
+                if (index === keyLength - 1)
+                    result.push(value);
+                else
+                    getAllCore(value, ++index);
+            };
+        };
+        return result;
     };
 
 

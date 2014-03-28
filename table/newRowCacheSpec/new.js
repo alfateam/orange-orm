@@ -5,6 +5,7 @@ var requireMock = a.requireMock;
 function act(c){
 	c.mock = mock;	
 	c.domainCache = {};
+	c.domainCache.getAll = {};
 	c.newDomainCache = requireMock('./newDomainCache');
 	c.newDomainCache.expect().return(c.domainCache);
 	

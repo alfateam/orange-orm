@@ -16,6 +16,11 @@ function newDomainCache(optionalId) {
 
 	};
 
+	c.getAll = function() {
+		var cache = process.domain[id] || _newCache();		
+		return cache.getAll();	
+	};
+
 	function _newCache () {
 		var cache = newCache();
 		process.domain[id] = cache;
