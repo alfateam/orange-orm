@@ -13,8 +13,13 @@ function dbRowToRow(span, dbRow) {
 		leg.expand(row);
 	};
 
-	c.visitJoin = c.visitOne;
-	c.visitMany = function(leg) {};
+	c.visitJoin = function(leg) {
+		nextDbRowToRow(leg.span, dbRow);
+	};
+
+	c.visitMany = function(leg) {
+		leg.expand(row);		
+	};
 
 	span.legs.forEach(onEach);
 

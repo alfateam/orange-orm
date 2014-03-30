@@ -3,5 +3,4 @@ var c = {};
 
 when(c)
     .it('should return rows').assertDeepEqual(c.expected, c.returned)
-    .it('should expand manyLegs').assertDoesNotThrow(c.manyLeg.expand.verify)
     ;

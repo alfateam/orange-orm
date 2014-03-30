@@ -40,12 +40,12 @@ function act(c){
 	c.oneLeg.expand.expect(c.expected);
 	
 	c.joinLeg.accept = mock();
-	c.joinLeg.expand = mock();
 	c.joinLeg.accept.expectAnything().whenCalled(function(visitor) { visitor.visitJoin(c.joinLeg); }).return();
-	c.joinLeg.expand.expect(c.expected);
 
 	c.manyLeg.accept = mock();
 	c.manyLeg.accept.expectAnything().whenCalled(function(visitor) { visitor.visitMany(c.manyLeg); }).return();
+	c.manyLeg.expand = mock();
+	c.manyLeg.expand.expect(c.expected);
 
 	c.sut = require('../dbRowToRow');
 
