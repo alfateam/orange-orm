@@ -1,5 +1,12 @@
-function tryGet() {
-	return false;
+function tryGet(table, id, id2, optionalStrategy) {
+	var fakeRow = {};
+	var args = arguments;
+	table._primaryColumns.forEach(addPkValue);
+
+	function addPkValue(pkColumn, index){
+		fakeRow[pkColumn.alias] = args[index + 1];
+	}
+
+	return table._cache.tryGet(fakeRow);
 };
-//todo
 module.exports = tryGet;

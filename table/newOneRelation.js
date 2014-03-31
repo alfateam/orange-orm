@@ -20,9 +20,12 @@ function newOneRelation(joinRelation) {
         if (expanderCache.tryGet(parentRow))
             return oneCache.tryGet(parentRow);
         var filter = newForeignKeyFilter(joinRelation, parentRow);
-        var result = c.childTable.tryGetFirstSync(filter);
-        expanderCache.add(parentRow);
-        return result;
+        return c.childTable.tryGetFirst(filter).then(expand);
+
+        function expand(result) {
+            expanderCache.add(parentRow);    
+            return result;
+        };        
     };
 
     c.expand = expanderCache.add;
