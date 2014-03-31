@@ -1,16 +1,18 @@
 var a = require('a');
 var requireMock = a.requireMock;
-var relation = {};
+
 var leg = {};
 var newLeg;
 
 function act(c){
 	
+	c.relation = {};
 	newLeg = requireMock('./newOneLeg');
-	newLeg.expect(relation).return(leg);
+	newLeg.expect(c.relation).return(leg);
 	c.leg = leg;
 	c.mock = a.mock;
-	c.sut = require('../newManyLeg')(relation);
+	c.relation.expand = c.mock();
+	c.sut = require('../newManyLeg')(c.relation);
 }
 
 module.exports = act;

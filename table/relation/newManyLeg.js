@@ -6,7 +6,7 @@ function newLeg(relation) {
 		visitor.visitMany(c);
 	};
 
-	//TODO c.relation = relation;
+	c.expand = relation.expand;
 	
 	return c; 
 }
