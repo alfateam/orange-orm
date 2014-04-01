@@ -10,9 +10,11 @@ var hasOne = requireMock('./table/hasOne');
 var getMany = requireMock('./table/getMany');
 var getById = requireMock('./table/getById');
 
+
 var tableName = {};
 
 function act(c) {
+	c.tryGetFirstFromDb = requireMock('./table/tryGetFirstFromDb');
 	c.getById = getById;
 	c.getMany = getMany;
 	c.hasOne = hasOne;

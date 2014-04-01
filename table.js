@@ -5,6 +5,7 @@ var hasMany = require('./table/hasMany');
 var hasOne = require('./table/hasOne');
 var getMany = require('./table/getMany');
 var getById = require('./table/getById');
+var tryGetFirst = require('./table/tryGetFirstFromDb');
 
 function _new(tableName) {
 	var table = {};
@@ -43,12 +44,8 @@ function _new(tableName) {
 		return call(getMany,arguments);
 	};
 
-	table.getManySync = function() {
-		//TODO
-	};
-
-	table.tryGetFirstSync = function() {
-		//TODO
+	table.tryGetFirst = function() {
+		return call(tryGetFirst, arguments);
 	};
 
 	function call(func,args) {

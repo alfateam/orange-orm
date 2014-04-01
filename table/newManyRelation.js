@@ -21,9 +21,12 @@ function newManyRelation(joinRelation) {
         if (expanderCache.tryGet(parentRow))
             return manyCache.tryGet(parentRow);
         var filter = newForeignKeyFilter(joinRelation, parentRow);
-        var result = c.childTable.getManySync(filter);
-        expanderCache.add(parentRow);
-        return result;
+        return c.childTable.getMany(filter).then(expand);
+
+        function expand(result) {
+            expanderCache.add(parentRow);
+            return result;
+        }
     };
 
     c.expand = expanderCache.add;
