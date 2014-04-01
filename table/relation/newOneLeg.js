@@ -10,6 +10,7 @@ function newLeg(relation) {
 	c.span = span;
 	c.table = joinRelation.childTable;
 	c.columns = joinRelation.columns;
+	c.expand = relation.expand;
 
 	c.accept = function(visitor) {
 		visitor.visitOne(c);

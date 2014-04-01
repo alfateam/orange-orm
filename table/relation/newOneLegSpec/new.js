@@ -2,7 +2,6 @@ var a = require('a');
 var requireMock = a.requireMock;
 var mock = a.mock;
 var joinRelation = {};
-var relation = {};
 var parentTable = {};
 var childTable = {};
 var columns = {};
@@ -10,7 +9,8 @@ var newCollection = requireMock('../../newCollection');
 var emptyCollection = {};
 
 function act(c){	
-	relation.joinRelation = joinRelation;
+	c.relation = {};
+	c.relation.joinRelation = joinRelation;
 	joinRelation.parentTable = parentTable;
 	joinRelation.childTable = childTable;
 	joinRelation.columns = columns;
@@ -20,7 +20,9 @@ function act(c){
 	c.parentTable = parentTable;
 	c.columns = columns;
 	c.mock = mock;
-	c.sut = require('../newOneLeg')(relation);
+	c.relation.expand = {};
+
+	c.sut = require('../newOneLeg')(c.relation);
 }
 
 module.exports = act;
