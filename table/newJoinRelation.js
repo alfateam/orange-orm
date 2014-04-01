@@ -1,5 +1,5 @@
 var newLeg = require('./relation/newJoinLeg'),
-    getByIdSync = require('./getByIdSync');
+    getById = require('./getById');
 
 function _newJoin(parentTable, childTable, columnNames) {
     var c = {};
@@ -27,7 +27,7 @@ function _newJoin(parentTable, childTable, columnNames) {
         }
 
         var args = [childTable].concat(primaryKeys);
-        return getByIdSync.apply(null, args);
+        return getById.apply(null, args);
     };
 
     return c;

@@ -7,7 +7,7 @@ function act(c){
 	parentRow[c.barColumnName]	= barKey;
 	c.relatedRows = {};
 	
-	c.getByIdSync.expect(c.childTable, fooKey, barKey).return(c.relatedRows);
+	c.getById.expect(c.childTable, fooKey, barKey).return(c.relatedRows);
 
 	c.returned = c.sut.getRows(parentRow);
 }

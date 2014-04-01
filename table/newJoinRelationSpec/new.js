@@ -8,7 +8,7 @@ var idColumn = {}, fooColumn = {}, barColumn = {};
 
 function act(c) {
     c.mock = mock;
-    c.getByIdSync = requireMock('./getByIdSync');
+    c.getById = requireMock('./getById');
     
     parentTable._columns = [idColumn, fooColumn, barColumn];
         
