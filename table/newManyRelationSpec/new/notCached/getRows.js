@@ -18,7 +18,7 @@ function act(c){
 	c.childTable.getMany.expect(c.foreignKeyFilter).return(c.resultPromise);
 
 	c.expanderCache.tryGet.expect(parentRow).return(null);
-	c.expanderCache.add.expect(parentRow);
+	c.expanderCache.tryAdd.expect(parentRow);
 	c.returned = c.sut.getRows(parentRow);
 }
 act.base = '../../new';

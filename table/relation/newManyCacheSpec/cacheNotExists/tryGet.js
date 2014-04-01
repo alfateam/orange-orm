@@ -4,7 +4,7 @@ function act(c){
 	c.expected = {};
 
 	c.cacheCore = {};
-	c.cacheCore.add = c.mock();
+	c.cacheCore.tryAdd = c.mock();
 	c.cacheCore.tryGet = c.mock();
 
 	c.newCacheCore.expect(c.joinRelation).return(c.cacheCore);
@@ -68,9 +68,9 @@ function act(c){
 	c.joinRelation.childTable = c.childTable;
 
 	c.cacheCore.tryGet.expect(c.fakeParent1).return(null);
-	c.cacheCore.add.expect(c.fakeParent1, c.childRow1);
-	c.cacheCore.add.expect(c.fakeParent2, c.childRow2);
-	c.cacheCore.add.expect(c.fakeParent1, c.childRow3);
+	c.cacheCore.tryAdd.expect(c.fakeParent1, c.childRow1);
+	c.cacheCore.tryAdd.expect(c.fakeParent2, c.childRow2);
+	c.cacheCore.tryAdd.expect(c.fakeParent1, c.childRow3);
 
 	c.returned = c.sut.tryGet(parentRow);
 }

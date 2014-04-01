@@ -10,7 +10,7 @@ function act(c){
 	c.parentRow[c.alias2] = c.cachedValue2;
 
 	c.cacheCore.tryGet.expect([c.cachedValue, c.cachedValue2]).return(c.existing);
-	c.sut.add(c.parentRow, c.row);
+	c.sut.tryAdd(c.parentRow, c.row);
 }
 
 module.exports = act;

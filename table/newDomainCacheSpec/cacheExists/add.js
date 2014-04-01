@@ -8,10 +8,10 @@ function act(c){
 
 	c.key = {};
 	c.value = {};
-	c.cache.add = c.mock();
-	c.cache.add.expect(c.key, c.value);
+	c.cache.tryAdd = c.mock();
+	c.cache.tryAdd.expect(c.key, c.value);
 
-	c.returned = c.sut.add(c.key, c.value);
+	c.returned = c.sut.tryAdd(c.key, c.value);
 }
 
 module.exports = act;

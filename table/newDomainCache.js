@@ -10,9 +10,9 @@ function newDomainCache(optionalId) {
 		return cache.tryGet(key);
 	};
 
-	c.add = function(key, value) {
+	c.tryAdd = function(key, value) {
 		var cache = process.domain[id] || _newCache();		
-		return cache.add(key,value);
+		return cache.tryAdd(key,value);
 
 	};
 

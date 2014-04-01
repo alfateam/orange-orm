@@ -10,13 +10,13 @@ function newManyCache(joinRelation) {
         return cache.tryGet(key);
     };
 
-    c.add = function(parentRow, childRow) {
+    c.tryAdd = function(parentRow, childRow) {
         var key = toKey(parentRow);
         var existing = cache.tryGet(key);
         if(existing)
             existing.push(childRow)
         else
-            cache.add(key, [childRow]);
+            cache.tryAdd(key, [childRow]);
     };
 
     function toKey(row) {

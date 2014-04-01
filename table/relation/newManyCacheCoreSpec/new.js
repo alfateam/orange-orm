@@ -6,7 +6,7 @@ function act(c){
 	c.mock = mock;	
 
 	c.cacheCore = {};
-	c.cacheCore.add = mock();
+	c.cacheCore.tryAdd = mock();
 	c.cacheCore.tryGet = mock();
 
 	c.newCacheCore = requireMock('../newCache');

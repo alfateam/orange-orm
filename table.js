@@ -6,15 +6,18 @@ var hasOne = require('./table/hasOne');
 var getMany = require('./table/getMany');
 var getById = require('./table/getById');
 var tryGetFirst = require('./table/tryGetFirstFromDb');
+var newCache = require('./table/newRowCache');
+var newContext = require('./newObject');
 
 function _new(tableName) {
-	var table = {};
+	var table = newContext();
 	table._dbName = tableName;
 	table._primaryColumns = [];
 	table._columns = [];
 	table._columnDiscriminators = [];
 	table._formulaDiscriminators = [];
-	table._relations = {};	
+	table._relations = {};
+	table._cache = 	newCache(table);
 	
 	table.primaryColumn = function(columnName) {
 		var columnDef = newColumn(table,columnName);

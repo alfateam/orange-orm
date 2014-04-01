@@ -33,7 +33,7 @@ function newManyCache(joinRelation) {
                 var primaryColumn = primaryColumns[index];
                 parent[primaryColumn.alias] = child[childPk.alias];
             }            
-            cache.add(parent, child);
+            cache.tryAdd(parent, child);
         }
     }
 

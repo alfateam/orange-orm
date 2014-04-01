@@ -19,7 +19,7 @@ function act(c){
 	c.expanderCache = {};
 	c.newExpanderCache.expect(c.joinRelation).return(c.expanderCache);
 	c.expanderCache.tryGet = mock();
-	c.expanderCache.add = mock();
+	c.expanderCache.tryAdd = mock();
 
 	c.sut = require('../newManyRelation')(c.joinRelation);
 }

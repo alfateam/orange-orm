@@ -9,11 +9,16 @@ var hasMany = requireMock('./table/hasMany');
 var hasOne = requireMock('./table/hasOne');
 var getMany = requireMock('./table/getMany');
 var getById = requireMock('./table/getById');
-
+var newRowCache = requireMock('./table/newRowCache');
+var newObject = requireMock('./newObject');
 
 var tableName = {};
 
-function act(c) {
+function act(c) {	
+	c.context = {};
+	newObject.expect().return(c.context);
+	c.cache = {};
+	newRowCache.expect(c.context).return(c.cache);
 	c.tryGetFirstFromDb = requireMock('./table/tryGetFirstFromDb');
 	c.getById = getById;
 	c.getMany = getMany;

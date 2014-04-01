@@ -31,9 +31,9 @@ function newRowCache(table) {
 		return key;
 	};
 
-	c.add = function(row) {
+	c.tryAdd = function(row) {
 		var key = rowToKey(row);
-		cache.add(key, row);
+		cache.tryAdd(key, row);
 	};
 
 	c.getAll = cache.getAll;

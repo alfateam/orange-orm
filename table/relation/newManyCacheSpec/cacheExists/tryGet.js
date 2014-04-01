@@ -4,7 +4,7 @@ function act(c){
 	c.expected = {};
 
 	c.cacheCore = {};
-	c.cacheCore.add = c.mock();
+	c.cacheCore.tryAdd = c.mock();
 	c.cacheCore.tryGet = c.mock();
 	c.cacheCore.tryGet.expect(parentRow).return(c.expected);
 	

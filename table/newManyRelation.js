@@ -24,12 +24,12 @@ function newManyRelation(joinRelation) {
         return c.childTable.getMany(filter).then(expand);
 
         function expand(result) {
-            expanderCache.add(parentRow);
+            expanderCache.tryAdd(parentRow);
             return result;
         }
     };
 
-    c.expand = expanderCache.add;
+    c.expand = expanderCache.tryAdd;
 
     c.toLeg = function() {
         return newManyLeg(c);

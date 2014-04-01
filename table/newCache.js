@@ -22,7 +22,7 @@ function cacheCore() {
 
     };
 
-    c.add = function(key, result) {
+    c.tryAdd = function(key, result) {
         var index = 0;
         keyLength = key.length;
 
