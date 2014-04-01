@@ -1,9 +1,9 @@
-var newId = require('../domainCache/negotiateId');
+var newId = require('../newId');
 var newCache = require('./newCache');
 
 function newDomainCache(optionalId) {
 	var c = {};
-	var id = newId(optionalId);
+	var id = newId();
 
 	c.tryGet = function(key) {		
 		var cache = process.domain[id] || _newCache();		

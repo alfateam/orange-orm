@@ -5,13 +5,12 @@ var requireMock = a.requireMock;
 function act(c){
 	c.mock = mock;	
 	c.id = 'someId';
-	c.initialId = {};
-	c.newId = requireMock('../domainCache/negotiateId');
-	c.newId.expect(c.initialId).return(c.id);
+	c.newId = requireMock('../newId');
+	c.newId.expect().return(c.id);
 
 	c.newCache = requireMock('./newCache');	
 
-	c.sut = require('../newDomainCache')(c.initialId);
+	c.sut = require('../newDomainCache')();
 }
 
 module.exports = act;
