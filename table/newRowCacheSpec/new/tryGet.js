@@ -1,4 +1,5 @@
 function act(c){
+	c.mockTable();
 	c.row = {};
 	c.pkValue = {};
 	c.pk2Value = {};
@@ -9,7 +10,7 @@ function act(c){
 	c.domainCache.tryGet = c.mock();
 	c.expected = {};
 	c.domainCache.tryGet.expect(c.key).return(c.expected);
-
+	
 	c.returned = c.sut.tryGet(c.row);
 }
 

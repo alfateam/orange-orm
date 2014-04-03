@@ -2,9 +2,9 @@ var newDomainCache = require('./newDomainCache');
 
 function newRowCache(table) {
 	var c = {};
-	var pkNames = getPkNames();
-	table = null;
 	var cache = newDomainCache();
+	var pkNames;
+	var rowToKey = firstRowToKey;
 
 	function getPkNames() {
 		var names = {};		
@@ -23,7 +23,14 @@ function newRowCache(table) {
 
 	};
 
-	function rowToKey(row) {
+	function firstRowToKey(row) {
+		pkNames = getPkNames();
+		rowToKey = nextRowToKey;
+		table = null;
+		return rowToKey(row);
+	}
+
+	function nextRowToKey(row) {		
 		var key = [];
 		for(var pkName in pkNames) {
 			key.push(row[pkName]);

@@ -1,4 +1,5 @@
 function act(c){
+	c.mockTable();
 	c.row = {};
 	c.pkValue = {};
 	c.pk2Value = {};
