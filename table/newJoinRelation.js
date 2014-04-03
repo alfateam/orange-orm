@@ -18,7 +18,6 @@ function _newJoin(parentTable, childTable, columnNames) {
     };
 
     c.getRows = function(parentRow) {
-        //todo fix tests
         var primaryKeys = c.columns.map(function(column) {
             return parentRow[column.alias];
         });
@@ -26,7 +25,6 @@ function _newJoin(parentTable, childTable, columnNames) {
         if (primaryKeys.some(isNullOrUndefined)) {
             return null;
         }
-
         var args = [childTable].concat(primaryKeys);
         return getById.apply(null, args);
     };

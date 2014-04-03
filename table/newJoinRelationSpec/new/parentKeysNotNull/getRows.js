@@ -3,8 +3,8 @@ function act(c){
 		fooKey = 'foo',
 		barKey = 'bar';
 
-	parentRow[c.fooColumnName]	= fooKey;
-	parentRow[c.barColumnName]	= barKey;
+	parentRow[c.fooAlias]	= fooKey;
+	parentRow[c.barAlias]	= barKey;
 	c.relatedRows = {};
 	
 	c.getById.expect(c.childTable, fooKey, barKey).return(c.relatedRows);
