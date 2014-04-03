@@ -1,10 +1,15 @@
 var fs =require('fs');
-var createSql = 'DROP TABLE _order;CREATE TABLE _order (oId uuid PRIMARY KEY, oCustomerId varchar(40), oStatus integer, oTax boolean, oUnits float, oRegDate timestamp with time zone, oSum numeric, oImage bytea);';
+
+var createCustomer = 'DROP TABLE IF EXISTS _customer;CREATE TABLE _customer (cId varchar(40) PRIMARY KEY, cName varchar(40));'
+var createOrder = 'DROP TABLE IF EXISTS _order;CREATE TABLE _order (oId uuid PRIMARY KEY, oCustomerId varchar(40), oStatus integer, oTax boolean, oUnits float, oRegDate timestamp with time zone, oSum numeric, oImage bytea);'
+var createSql = createCustomer + createOrder;
+
 createBuffers();
-var insertSql = 'DELETE FROM _order;' + 
+var insertCustomer = "INSERT INTO _customer VALUES ('100','Bill');INSERT INTO _customer VALUES ('200','John');";
+var insertOrder = 
 				'INSERT INTO _order VALUES (\'58d52776-2866-4fbe-8072-cdf13370959b\',\'100\', 1, TRUE, 1.21,\'Fri Mar 07 2014 10:57:07 GMT+01\',1344.23,' + buffer + ');' + 
 				'INSERT INTO _order VALUES (\'d51137de-8dd9-4520-a6e0-3a61ddc61a99\',\'200\', 2, FALSE, 2.23,\'Fri Mar 07 2015 08:25:07 GMT+02\',34.59944,' + buffer2 + ')';
-
+var insertSql = insertCustomer + insertOrder;
 var buffer;
 var buffer2;
 
@@ -20,7 +25,10 @@ function createBuffers() {
 
 var table = require('../table');
 var pg = require('pg.js');
-var orderTable;
+var promise = require('../table/promise');
+var Order, Customer;
+var strategy = {customer: 0};
+var filter;
 var Domain = require('domain');
 var domain = Domain.create();
 
@@ -58,46 +66,64 @@ function onInserted(err, result) {
 
 
 function defineDb() {
+	defineCustomer();
 	defineOrder();
 }
 
+function defineCustomer() {
+	Customer = table('_customer');		
+	Customer.primaryColumn('cId').string().as('id');
+	Customer.column('cName').string().as('name');
+}
+
 function defineOrder() {
-	orderTable = table('_order');
-	orderTable.primaryColumn('oId').guid().as('id');
-	orderTable.column('oCustomerId').string().as('customerId');
-	orderTable.column('oStatus').numeric().as('status');
-	orderTable.column('oTax').boolean().as('tax');
-	orderTable.column('oUnits').numeric().as('units');
-	orderTable.column('oRegdate').date().as('regDate');
-	orderTable.column('oSum').numeric().as('sum');
-	orderTable.column('oImage').binary().as('image');
+	Order = table('_order');
+	Order.primaryColumn('oId').guid().as('id');
+	Order.column('oCustomerId').string().as('customerId');
+	Order.column('oStatus').numeric().as('status');
+	Order.column('oTax').boolean().as('tax');
+	Order.column('oUnits').numeric().as('units');
+	Order.column('oRegdate').date().as('regDate');
+	Order.column('oSum').numeric().as('sum');
+	Order.column('oImage').binary().as('image');
+	Order.join(Customer).by('oCustomerId').as('customer');
 }		
 
 function getOrders() {
-	orderTable.getMany().then(onOrders).done(onOk,onFailed);
+	Order.getMany(filter, strategy).then(onOrders).done(onOk,onFailed);	
 }
 
 
 function getById() {
-	return orderTable.getById('58d52776-2866-4fbe-8072-cdf13370959b').then(printRow);		
+	return Order.getById('58d52776-2866-4fbe-8072-cdf13370959b').then(printOrder);		
 }
 
-function printRow(row) {
-	var image = row.image;
-	console.log('id: %s, customerId: %s, status: %s, tax: %s, units: %s, regDate: %s, sum: %s, image: %s',row.id,row.customerId, row.status, row.tax, row.units,row.regDate,row.sum,row.image.toJSON());
+function printOrder(order) {
+	var image = order.image;	
+	console.log('id: %s, customerId: %s, status: %s, tax: %s, units: %s, regDate: %s, sum: %s, image: %s',order.id,order.customerId, order.status, order.tax, order.units,order.regDate,order.sum,order.image.toJSON());
 }
 
+function printCustomer(customer) {
+	console.log('customerId: %s, customerName: %s',customer.id,customer.name);	
+}
 
-function onOrders (rows) {	
-	console.log('Number of rows: ' + rows.length);
-	for (var i in rows) {
-		printRow(rows[i]);
+function onOrders (orders) {	
+	console.log('Number of orders: ' + orders.length);
+	var all = [];
+	for (var i in orders) {		
+		var order = orders[i]; 
+		printOrder(order);
+		var customer = order.customer.then(printCustomer);
+		all.push(customer);		
 	};
+
+	return promise.all(all);
 }
 
 function onOk() {
-	pg = null;	
+	pg = null;
 	domain.done();
+	console.log('done');
 }
 
 function onFailed(err) {
