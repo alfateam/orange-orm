@@ -3,6 +3,7 @@ var mock = a.mock;
 var requireMock = a.requireMock;
 
 function act(c){
+	c.mock = mock;
 	c.span = {};
 	c.dbRow = {};
 	c.table = {};
@@ -18,13 +19,11 @@ function act(c){
 	c.legs = {};
 	c.span.table = c.table;
 	c.span.legs = c.legs;
-	c.shallowRow = {};
 	c.row = {};
 
 	c.shallowDbRowToRow = requireMock('./shallowDbRowToRow');
-	c.shallowDbRowToRow.expect(c.table, c.dbRow).return(c.shallowRow);
+	c.shallowDbRowToRow.expect(c.table, c.dbRow).return(c.row);
 	c.cache.tryAdd = mock();
-	c.cache.tryAdd.expect(c.shallowRow).return(c.row);
 
 	c.legs.forEach = mock();
 	c.legs.forEach.expectAnything().whenCalled(onEach).return();
@@ -54,7 +53,6 @@ function act(c){
 	c.nextDbRowToRow.expect(c.oneLegSpan, c.dbRow);
 	c.nextDbRowToRow.expect(c.joinLegSpan, c.dbRow);
 
-	c.returned = c.sut(c.span, c.dbRow);
 }
 
 module.exports = act;

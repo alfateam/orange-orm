@@ -3,8 +3,12 @@ var nextDbRowToRow = _nextDbRowToRow;
 
 function dbRowToRow(span, dbRow) {
 	var table = span.table;
-	var shallowRow = shallowDbRowToRow(table, dbRow);
-	var row = table._cache.tryAdd(shallowRow);
+	var row = shallowDbRowToRow(table, dbRow);
+	var result = row;
+	
+	var cache = table._cache;
+	if (!cache.tryAdd(row))
+		result = cache.tryGet(row);
 
 	var c = {};
 	
@@ -27,7 +31,7 @@ function dbRowToRow(span, dbRow) {
 		leg.accept(c);
 	}
 
-	return row;
+	return result;
 }
 
 function _nextDbRowToRow (span, dbRow) {
