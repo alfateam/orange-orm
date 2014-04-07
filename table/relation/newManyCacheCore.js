@@ -14,7 +14,7 @@ function newManyCache(joinRelation) {
         var key = toKey(parentRow);
         var existing = cache.tryGet(key);
         if(existing)
-            existing.push(childRow)
+            existing.push(childRow);
         else
             cache.tryAdd(key, [childRow]);
     };

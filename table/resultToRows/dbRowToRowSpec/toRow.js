@@ -18,12 +18,13 @@ function act(c){
 	c.legs = {};
 	c.span.table = c.table;
 	c.span.legs = c.legs;
-	c.expected = {};
+	c.shallowRow = {};
+	c.row = {};
 
 	c.shallowDbRowToRow = requireMock('./shallowDbRowToRow');
-	c.shallowDbRowToRow.expect(c.table, c.dbRow).return(c.expected);
+	c.shallowDbRowToRow.expect(c.table, c.dbRow).return(c.shallowRow);
 	c.cache.tryAdd = mock();
-	c.cache.tryAdd.expect(c.expected);
+	c.cache.tryAdd.expect(c.shallowRow).return(c.row);
 
 	c.legs.forEach = mock();
 	c.legs.forEach.expectAnything().whenCalled(onEach).return();
@@ -37,7 +38,7 @@ function act(c){
 	c.oneLeg.accept = mock();
 	c.oneLeg.expand = mock();
 	c.oneLeg.accept.expectAnything().whenCalled(function(visitor) { visitor.visitOne(c.oneLeg); }).return();
-	c.oneLeg.expand.expect(c.expected);
+	c.oneLeg.expand.expect(c.row);
 	
 	c.joinLeg.accept = mock();
 	c.joinLeg.accept.expectAnything().whenCalled(function(visitor) { visitor.visitJoin(c.joinLeg); }).return();
@@ -45,7 +46,7 @@ function act(c){
 	c.manyLeg.accept = mock();
 	c.manyLeg.accept.expectAnything().whenCalled(function(visitor) { visitor.visitMany(c.manyLeg); }).return();
 	c.manyLeg.expand = mock();
-	c.manyLeg.expand.expect(c.expected);
+	c.manyLeg.expand.expect(c.row);
 
 	c.sut = require('../dbRowToRow');
 

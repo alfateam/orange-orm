@@ -6,5 +6,5 @@ when(c)
 .it('should try add row to cache').assertDoesNotThrow(c.cache.tryAdd.verify)
 .it('should expand oneLeg').assertDoesNotThrow(c.oneLeg.expand.verify)
 .it('should expand manyLeg').assertDoesNotThrow(c.manyLeg.expand.verify)
-.it('should return row').assertEqual(c.expected, c.returned)
+.it('should return row').assertEqual(c.row, c.returned)
 ;

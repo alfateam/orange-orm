@@ -5,11 +5,12 @@ function act(c){
 	c.domain = {};
 	process.domain = c.domain;
 	c.domain[c.id] = c.cache;
+	c.expected = {};
 
 	c.key = {};
 	c.value = {};
 	c.cache.tryAdd = c.mock();
-	c.cache.tryAdd.expect(c.key, c.value);
+	c.cache.tryAdd.expect(c.key, c.value).return(c.expected);
 
 	c.returned = c.sut.tryAdd(c.key, c.value);
 }

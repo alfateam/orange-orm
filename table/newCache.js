@@ -25,19 +25,22 @@ function cacheCore() {
     c.tryAdd = function(key, result) {
         var index = 0;
         keyLength = key.length;
-
-        addCore(cache, index);
-
+        
+        return  addCore(cache, index);
+        
         function addCore(cache, index) {
             var keyValue = key[index];
                 
             if (keyLength - 1 == index) {
+                if (keyValue in cache)
+                    return cache[keyValue];
+                
                 cache[keyValue] = result;
-                return;
+                return result;
             }
-            if (!cache.hasOwnProperty[keyValue])
-                cache[keyValue] = {};
-            addCore(cache[keyValue], ++index)
+            if (! (keyValue in cache))
+                cache[keyValue] = {};            
+            return addCore(cache[keyValue], ++index)
         }
 
     };
