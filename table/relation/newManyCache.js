@@ -1,6 +1,6 @@
 var synchronizeChanged = require('./manyCache/synchronizeChanged');
 var synchronizeAdded = require('./manyCache/synchronizeAdded');
-var synchronizeDeleted = require('./manyCache/synchronizeDeleted');
+var synchronizeRemoved = require('./manyCache/synchronizeRemoved');
 var extractParentKey = require('./manyCache/extractParentKey');
 var newCacheCore = require('./newManyCacheCore');
 var newId = require('../../newId');
@@ -27,7 +27,7 @@ function newManyCache(joinRelation) {
             fillCache(cache);
             process.domain[key] = cache;
             synchronizeAdded(c.tryAdd, joinRelation);
-            synchronizeDeleted(c.tryRemove, joinRelation);
+            synchronizeRemoved(c.tryRemove, joinRelation);
         }
         return cache.tryGet(parentRow);
     };

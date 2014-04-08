@@ -1,6 +1,7 @@
 var newParentKey = {};
 
 function act(c){
+	c.child = {};
 	c.extractParentKey.expect(c.joinRelation, c.child).return(newParentKey);
 
 	c.manyCache.tryRemove = c.mock();
@@ -13,7 +14,7 @@ function act(c){
 	c.child.unsubscribeChanged.expect(c.alias1, c.raiseChanged1);
 	c.child.unsubscribeChanged.expect(c.alias2, c.raiseChanged2);
 
-	c.raiseChanged2();
+	c.raiseChanged2(c.child);
 }
 
 module.exports = act;

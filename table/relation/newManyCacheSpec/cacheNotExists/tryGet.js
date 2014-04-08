@@ -45,7 +45,7 @@ function act(c){
 	c.sut.tryRemove = {};
 
 	c.synchronizeAdded.expect(c.sut.tryAdd, c.joinRelation);
-	c.synchronizeDeleted.expect(c.sut.tryRemove, c.joinRelation);
+	c.synchronizeRemoved.expect(c.sut.tryRemove, c.joinRelation);
 
 	c.returned = c.sut.tryGet(parentRow);
 }

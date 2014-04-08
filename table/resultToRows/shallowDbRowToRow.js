@@ -31,6 +31,10 @@ function shallowDbRowToRow(table, dbRow) {
        		}
     	});
 	}
+
+	row.subscribeChanged = function(name, onChanged) {
+		//todo
+	}
 	
 	return row;
 }

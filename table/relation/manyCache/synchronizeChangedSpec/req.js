@@ -8,7 +8,7 @@ function act(c){
 	c.manyCache = {};
 	c.joinRelation = {};
 	c.parent = {};
-	c.child	 = {};
+	c.initialChild	 = {};
 	
 	
 	c.alias1 = "alias1";
@@ -18,9 +18,9 @@ function act(c){
 	c.column1.alias = c.alias1;
 	c.column2.alias = c.alias2;
 	
-	c.child.subscribeChanged = c.mock();
-	c.child.subscribeChanged.expect(c.alias1).expectAnything().whenCalled(onSubscribe1);
-	c.child.subscribeChanged.expect(c.alias2).expectAnything().whenCalled(onSubscribe2);
+	c.initialChild.subscribeChanged = c.mock();
+	c.initialChild.subscribeChanged.expect(c.alias1).expectAnything().whenCalled(onSubscribe1);
+	c.initialChild.subscribeChanged.expect(c.alias2).expectAnything().whenCalled(onSubscribe2);
 	
 	c.raiseChanged1 = function() {};
 	function onSubscribe1(ignore,cb) {
@@ -34,7 +34,7 @@ function act(c){
 
 	c.joinRelation.columns = [c.column1, c.column2];
 
-	c.sut = require('../synchronizeChanged')(c.manyCache, c.joinRelation, c.parent, c.child);
+	c.sut = require('../synchronizeChanged')(c.manyCache, c.joinRelation, c.parent, c.initialChild);
 }
 
 module.exports = act;

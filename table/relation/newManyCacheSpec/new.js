@@ -5,7 +5,7 @@ var requireMock = a.requireMock;
 function act(c){
 	c.mock = mock;	
 	c.synchronizeAdded = requireMock('./manyCache/synchronizeAdded');
-	c.synchronizeDeleted = requireMock('./manyCache/synchronizeDeleted');
+	c.synchronizeRemoved = requireMock('./manyCache/synchronizeRemoved');
 	c.synchronizeChanged = requireMock('./manyCache/synchronizeChanged');
 	c.extractParentKey = requireMock('./manyCache/extractParentKey');
 	

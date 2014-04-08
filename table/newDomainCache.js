@@ -21,6 +21,18 @@ function newDomainCache(optionalId) {
 		return cache.getAll();	
 	};
 
+	c.subscribeAdded = function(onAdded) {
+//todo
+	};
+
+	c.subscribeRemoved = function(onRemoved) {
+//todo
+	};
+
+	c.tearDown = function() {
+//todo
+	};
+
 	function _newCache () {
 		var cache = newCache();
 		process.domain[id] = cache;

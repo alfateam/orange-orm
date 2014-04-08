@@ -43,6 +43,15 @@ function newRowCache(table) {
 		return cache.tryAdd(key, row);
 	};
 
+	//c.subscribeAdded = cache.subscribeAdded;
+	//todo
+
+	//c.unsubscribeAdded  = cache.unsubscribeAdded
+	//todo
+
+	//c.tearDown = cache.s;
+	//todo
+	
 	c.getAll = cache.getAll;
 
 	return c;

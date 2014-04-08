@@ -63,6 +63,19 @@ function cacheCore() {
     };
 
 
+    c.subscribeAdded = function(onAdded) {
+//todo
+    };
+
+    c.subscribeRemoved = function(onRemoved) {
+//todo
+    };
+
+    c.tearDown = function() {
+//todo
+    };
+
+
     return c;
 };
 

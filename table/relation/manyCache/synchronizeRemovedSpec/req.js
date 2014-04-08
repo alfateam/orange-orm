@@ -9,17 +9,17 @@ function act(c){
 	c.parentTable = {};
 	c.joinRelation.parentTable = c.parentTable;
 	c.cache = {};
-	c.cache.subscribeDeleted = c.mock();
-	c.cache.subscribeDeleted.expectAnything().whenCalled(subscribeDeleted);
+	c.cache.subscribeRemoved = c.mock();
+	c.cache.subscribeRemoved.expectAnything().whenCalled(subscribeRemoved);
 	
-	c.raiseDeleted = function() {};
+	c.raiseRemoved = function() {};
 	
-	function subscribeDeleted(cb){
-		c.raiseDeleted = cb;
+	function subscribeRemoved(cb){
+		c.raiseRemoved = cb;
 	}
 	c.parentTable._cache = c.cache;
         
-	c.sut = require('../synchronizeDeleted')(c.tryRemove, c.joinRelation);
+	c.sut = require('../synchronizeRemoved')(c.tryRemove, c.joinRelation);
 }
 
 module.exports = act;

@@ -1,13 +1,13 @@
 var extractParentKey = require('./extractParentKey');
 
-function synchronizeDeleted(action, joinRelation) {
+function synchronizeRemoved(action, joinRelation) {
 	var cache = joinRelation.parentTable._cache;
-	cache.subscribeDeleted(onDeleted);
+	cache.subscribeRemoved(onRemoved);
 	
-	function onDeleted(child) {
+	function onRemoved(child) {
 		var parent = extractParentKey(joinRelation, child);
 		action(parent, child);
 	}
 }
 
-module.exports = synchronizeDeleted;
+module.exports = synchronizeRemoved;
