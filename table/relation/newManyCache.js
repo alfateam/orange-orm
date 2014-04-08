@@ -24,8 +24,8 @@ function newManyCache(joinRelation) {
         var cache = process.domain[key];
         if (!cache) {
             cache = newCacheCore(joinRelation);
-            fillCache(cache);
             process.domain[key] = cache;
+            fillCache(cache);
             synchronizeAdded(c.tryAdd, joinRelation);
             synchronizeRemoved(c.tryRemove, joinRelation);
         }

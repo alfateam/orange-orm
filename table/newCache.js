@@ -7,7 +7,7 @@ function cacheCore() {
     var cache = {};
     var keyLength;
 
-
+    c.contents = cache;
     c.tryGet = function(key) {
         var index = 0;
         var keyLength = key.length;

@@ -20,9 +20,10 @@ function act(c){
 	c.span.table = c.table;
 	c.span.legs = c.legs;
 	c.row = {};
+	c.initialRow = {};
 
 	c.shallowDbRowToRow = requireMock('./shallowDbRowToRow');
-	c.shallowDbRowToRow.expect(c.table, c.dbRow).return(c.row);
+	c.shallowDbRowToRow.expect(c.table, c.dbRow).return(c.initialRow);
 	c.cache.tryAdd = mock();
 
 	c.legs.forEach = mock();
