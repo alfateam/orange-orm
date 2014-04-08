@@ -34,13 +34,15 @@ function newManyCache(joinRelation) {
 
 
     function fillCache(cache) {
-        var childTable = joinRelation.childTable;
+        var childTable = joinRelation.parentTable;
         var childCache = childTable._cache;
         var children = childCache.getAll();
         children.forEach(addToCache);
 
         function addToCache(child) {
             var parent = extractParentKey(joinRelation, child);  
+            console.log(child);
+            console.log(parent);
             c.tryAdd(parent, child);
         }
     }

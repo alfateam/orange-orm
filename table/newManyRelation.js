@@ -2,6 +2,7 @@ var newManyLeg = require('./relation/newManyLeg');
 var newManyCache = require('./relation/newManyCache');
 var newForeignKeyFilter = require('./relation/newForeignKeyFilter');
 var newExpanderCache = require('./relation/newExpanderCache');
+var resultToPromise = require('./resultToPromise');
 
 function newManyRelation(joinRelation) {
     var c = {};
@@ -19,7 +20,7 @@ function newManyRelation(joinRelation) {
 
     c.getRows = function(parentRow) {
         if (expanderCache.tryGet(parentRow))
-            return manyCache.tryGet(parentRow);
+            return resultToPromise(manyCache.tryGet(parentRow));
         var filter = newForeignKeyFilter(joinRelation, parentRow);
         return c.childTable.getMany(filter).then(expand);
 
