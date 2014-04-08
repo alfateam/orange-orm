@@ -1,10 +1,24 @@
+var synchronizeChanged = require('./manyCache/synchronizeChanged');
+var synchronizeAdded = require('./manyCache/synchronizeAdded');
+var synchronizeDeleted = require('./manyCache/synchronizeDeleted');
+var extractParentKey = require('./manyCache/extractParentKey');
 var newCacheCore = require('./newManyCacheCore');
-var newInvalidateCache = require('./newInvalidateCache');
 var newId = require('../../newId');
 
 function newManyCache(joinRelation) {
     var c = {}
     var key = newId();
+
+    c.tryAdd = function(parent, child) {
+        var cache = process.domain[key];
+        cache.tryAdd(parent, child);
+        synchronizeChanged(c, joinRelation, parent, child);
+    };
+
+    c.tryRemove = function(parent, child) {
+        var cache = process.domain[key];
+        cache.tryRemove(parent, child);
+    };
 
     c.tryGet = function(parentRow) {
         var cache = process.domain[key];
@@ -12,30 +26,26 @@ function newManyCache(joinRelation) {
             cache = newCacheCore(joinRelation);
             fillCache(cache);
             process.domain[key] = cache;
-            newInvalidateCache(key, joinRelation);
+            synchronizeAdded(c.tryAdd, joinRelation);
+            synchronizeDeleted(c.tryRemove, joinRelation);
         }
         return cache.tryGet(parentRow);
     };
 
+
     function fillCache(cache) {
         var childTable = joinRelation.childTable;
-        var primaryColumns = childTable._primaryColumns;
         var childCache = childTable._cache;
         var children = childCache.getAll();
         children.forEach(addToCache);
 
         function addToCache(child) {
-            var parent = {};
-
-            joinRelation.columns.forEach(addKeyToParent);
-
-            function addKeyToParent(childPk, index) {
-                var primaryColumn = primaryColumns[index];
-                parent[primaryColumn.alias] = child[childPk.alias];
-            }            
-            cache.tryAdd(parent, child);
+            var parent = extractParentKey(joinRelation, child);  
+            c.tryAdd(parent, child);
         }
     }
+
+    
 
     return c;
 }

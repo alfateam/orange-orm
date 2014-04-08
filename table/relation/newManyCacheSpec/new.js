@@ -4,8 +4,12 @@ var requireMock = a.requireMock;
 
 function act(c){
 	c.mock = mock;	
+	c.synchronizeAdded = requireMock('./manyCache/synchronizeAdded');
+	c.synchronizeDeleted = requireMock('./manyCache/synchronizeDeleted');
+	c.synchronizeChanged = requireMock('./manyCache/synchronizeChanged');
+	c.extractParentKey = requireMock('./manyCache/extractParentKey');
+	
 	c.newCacheCore = requireMock('./newManyCacheCore');
-	c.newInvalidateCache = requireMock('./newInvalidateCache');
 	c.key = {};
 	c.newId = requireMock('../../newId');
 	c.newId.expect().return(c.key);

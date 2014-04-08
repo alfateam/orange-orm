@@ -4,8 +4,6 @@ var requireMock = a.requireMock;
 
 function act(c){
 	c.mock = mock;	
-	c.synchronizeAdded = requireMock('./manyCache/synchronizeAdded');
-	c.synchronizeChanged = requireMock('./manyCache/synchronizeChanged');
 	c.cacheCore = {};
 	c.cacheCore.tryAdd = mock();
 	c.cacheCore.tryGet = mock();
@@ -16,13 +14,7 @@ function act(c){
 	c.joinRelation = {};
 	c.parentTable = {};
 	c.joinRelation.childTable = c.parentTable;
-	
-	c.synchronizeAdded.expectAnything().expect(c.joinRelation).whenCalled(onSynchronizeAdded);
-
-	function onSynchronizeAdded(fn) {
-		c.synchronizedAction = fn;
-	}
-	
+		
 	c.primaryColumn = {};
 	c.alias = 'pk1';
 	c.primaryColumn.alias = c.alias;

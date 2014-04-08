@@ -2,8 +2,9 @@ var when = require('a').when;
 var c = {};
 
 when(c)
-	.it('should fill cacheCore').assertDoesNotThrow(c.cacheCore.tryAdd.verify)	
+	.it('should fill cacheCore').assertDoesNotThrow(c.sut.tryAdd.verify)	
 	.it('should return result from cacheCore').assertEqual(c.expected, c.returned)
 	.it('should set cacheCore on domain').assertEqual(c.cacheCore, c.domain[c.key])
-	.it('should create invalidateCache').assertDoesNotThrow(c.newInvalidateCache.verify)
+	.it('should synchronizeAdded').assertDoesNotThrow(c.synchronizeAdded.verify)
+	.it('should synchronizeDeleted').assertDoesNotThrow(c.synchronizeDeleted.verify)	
 	;

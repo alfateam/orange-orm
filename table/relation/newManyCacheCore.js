@@ -1,11 +1,8 @@
-var synchronizeAdded = require('./manyCache/synchronizeAdded');
-var synchronizeChanged = require('./manyCache/synchronizeChanged');
 var newCacheCore = require('../newCache');
 
 function newManyCache(joinRelation) {
     var c = {}
     var cache = newCacheCore();
-    synchronizeAdded(tryAdd, joinRelation);
     var primaryColumns = joinRelation.childTable._primaryColumns;
 
     c.tryGet = function(parentRow) {
@@ -20,10 +17,16 @@ function newManyCache(joinRelation) {
             existing.push(childRow);
         else 
             existing = cache.tryAdd(key, [childRow]);
-        synchronizeChanged(c.tryAdd, joinRelation, existing, childRow);         
     };
 
     c.tryAdd = tryAdd;
+
+    c.tryRemove = function(parentRow, childRow) {
+        var key = toKey(parentRow);
+        var existing = cache.tryGet(key);
+        var index = existing.indexOf(childRow);
+        existing.splice(index,1);
+    };
 
     function toKey(row) {
         return primaryColumns.map(onColumn);
