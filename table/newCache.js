@@ -1,4 +1,8 @@
+var newEmitEvent = require('../emitEvent');
+
 function cacheCore() {
+    var emitAdded = newEmitEvent();
+    var emitRemoved = newEmitEvent();
     var c = {}
     var cache = {};
     var keyLength;
@@ -31,16 +35,38 @@ function cacheCore() {
         function addCore(cache, index) {
             var keyValue = key[index];
                 
-            if (keyLength - 1 == index) {
+            if (keyLength - 1 == index) {                
                 if (keyValue in cache)
                     return cache[keyValue];
                 
                 cache[keyValue] = result;
+                emitAdded(result);
                 return result;
             }
             if (! (keyValue in cache))
                 cache[keyValue] = {};            
             return addCore(cache[keyValue], ++index)
+        }
+    };
+
+    c.tryRemove = function(key) { 
+        var index = 0;
+        var keyLength = key.length;
+
+        return tryRemoveCore(cache, index)
+
+        function tryRemoveCore(cache, index) {
+            var keyValue = key[index];
+            if (!(keyValue in cache))
+                return null;
+            var cacheValue = cache[keyValue];
+            if (keyLength - 1 == index) {
+                delete cache[keyValue];
+                emitRemoved(cacheValue);
+                return cacheValue;
+            }
+                
+            return tryRemoveCore(cache[keyValue], ++index);
         }
 
     };
@@ -62,19 +88,8 @@ function cacheCore() {
         return result;
     };
 
-
-    c.subscribeAdded = function(onAdded) {
-//todo
-    };
-
-    c.subscribeRemoved = function(onRemoved) {
-//todo
-    };
-
-    c.tearDown = function() {
-//todo
-    };
-
+    c.subscribeAdded = emitAdded.add;
+    c.subscribeRemoved = emitRemoved.add;
 
     return c;
 };
