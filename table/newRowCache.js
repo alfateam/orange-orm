@@ -43,14 +43,13 @@ function newRowCache(table) {
 		return cache.tryAdd(key, row);
 	};
 
-	//c.subscribeAdded = cache.subscribeAdded;
-	//todo
+	c.tryRemove = function(row) {
+		var key = rowToKey(row);
+		cache.tryRemove(key);
+	};
 
-	//c.unsubscribeAdded  = cache.unsubscribeAdded
-	//todo
-
-	//c.tearDown = cache.s;
-	//todo
+	c.subscribeAdded = cache.subscribeAdded;	
+	c.subscribeRemoved = cache.subscribeRemoved;
 	
 	c.getAll = cache.getAll;
 

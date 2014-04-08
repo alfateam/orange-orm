@@ -8,6 +8,8 @@ function act(c){
 	c.domainCache.getAll = {};
 	c.newDomainCache = requireMock('./newDomainCache');
 	c.newDomainCache.expect().return(c.domainCache);
+	c.domainCache.subscribeAdded = {};
+	c.domainCache.subscribeRemoved = {};
 	
 	c.table = {};		
 

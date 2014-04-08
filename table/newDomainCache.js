@@ -1,42 +1,42 @@
 var newId = require('../newId');
-var newCache = require('./newCache');
+var _getCache = require('./domainCache/getCache');
 
-function newDomainCache(optionalId) {
+function newDomainCache() {
 	var c = {};
 	var id = newId();
 
 	c.tryGet = function(key) {		
-		var cache = process.domain[id] || _newCache();		
+		var cache = getCache();		
 		return cache.tryGet(key);
 	};
 
 	c.tryAdd = function(key, value) {
-		var cache = process.domain[id] || _newCache();		
+		var cache = getCache();		
 		return cache.tryAdd(key,value);
-
 	};
 
 	c.getAll = function() {
-		var cache = process.domain[id] || _newCache();		
+		var cache = getCache();		
 		return cache.getAll();	
 	};
 
+	c.tryRemove = function(key) {
+		var cache = getCache();		
+		return cache.tryRemove(key);
+	}
+
 	c.subscribeAdded = function(onAdded) {
-//todo
+		var cache = getCache();		
+		return cache.subscribeAdded(onAdded);
 	};
 
 	c.subscribeRemoved = function(onRemoved) {
-//todo
+		var cache = getCache();		
+		return cache.subscribeRemoved(onRemoved);
 	};
 
-	c.tearDown = function() {
-//todo
-	};
-
-	function _newCache () {
-		var cache = newCache();
-		process.domain[id] = cache;
-		return cache;
+	function getCache() {
+		return _getCache(id);
 	}
 	return c;
 };
