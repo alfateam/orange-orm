@@ -15,20 +15,11 @@ function act(c){
 	c.col2.alias = c.alias2;
 	c.table._columns = [c.col1, c.col2];
 	c.dbRow = {};
-	c.dbValue1 = {};
-	c.dbValue2 = {};
-	c.dbValue3 = {};
-	c.dbRow.dbValue1 = c.dbValue1;
-	c.dbRow.dbValue2 = c.dbValue2;
-	c.dbRow.dbValue3 = c.dbValue3;
-
 	c.value1 = {};
-	c.col1.decode = mock();
-	c.col1.decode.expect(c.dbValue1).return(c.value1);
-
 	c.value2 = {};
-	c.col2.decode = mock();
-	c.col2.decode.expect(c.dbValue2).return(c.value2);
+
+	c.dbRow[c.alias1] = c.value1;
+	c.dbRow[c.alias2] = c.value2;
 
 	c.lineRelation = {};
 	c.customerRelation = {};

@@ -22,8 +22,12 @@ function act(c){
 	c.row = {};
 	c.initialRow = {};
 
+	c.decodeDbRow = requireMock('./decodeDbRow');
+	c.decoded = {};
+	c.decodeDbRow.expect(c.table, c.dbRow).return(c.decoded);
+
 	c.shallowDbRowToRow = requireMock('./shallowDbRowToRow');
-	c.shallowDbRowToRow.expect(c.table, c.dbRow).return(c.initialRow);
+	c.shallowDbRowToRow.expect(c.table, c.decoded).return(c.initialRow);
 	c.cache.tryAdd = mock();
 
 	c.legs.forEach = mock();
@@ -47,6 +51,7 @@ function act(c){
 	c.manyLeg.accept.expectAnything().whenCalled(function(visitor) { visitor.visitMany(c.manyLeg); }).return();
 	c.manyLeg.expand = mock();
 	c.manyLeg.expand.expect(c.row);
+
 
 	c.sut = require('../dbRowToRow');
 

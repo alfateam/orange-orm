@@ -1,23 +1,15 @@
 var newEmitEvent = require('../../emitEvent');
 
-function shallowDbRowToRow(table, dbRow) {	
+function shallowDbRowToRow(table, values) {	
 	var row = {};
 	var columns = table._columns;
 	var emitChanged = {};
-	var values = {};
-	var dbValues = [];
-	var i=0;
-	for(var propertyName in dbRow) {
-   		var column = columns[i];
+	columns.forEach(addColumn);
+
+	function addColumn(column) {
 		var alias = column.alias;
-		var dbValue = dbRow[propertyName];
-		delete dbRow[propertyName];
-		values[alias] = column.decode(dbValue);
 		defineColumnProperty(alias);
 		emitChanged[alias] = newEmitEvent();
-   		i++;
-   		if(columns.length == i)
-   			break;
 	}
 
 	function defineColumnProperty(name) {

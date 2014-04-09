@@ -1,9 +1,11 @@
 var shallowDbRowToRow = require('./shallowDbRowToRow');
 var nextDbRowToRow = _nextDbRowToRow;
+var decodeDbRow = require('./decodeDbRow');
 
 function dbRowToRow(span, dbRow) {
 	var table = span.table;
-	var row = shallowDbRowToRow(table, dbRow);	
+	var decoded = decodeDbRow(table, dbRow);
+	var row = shallowDbRowToRow(table, decoded);	
 	var cache = table._cache;
 	row = cache.tryAdd(row);
 
