@@ -1,7 +1,10 @@
+var newEmitEvent = require('../../emitEvent');
 
 function shallowDbRowToRow(table, dbRow) {	
 	var row = {};
 	var columns = table._columns;
+	var emitChanged = {};
+	var values = {};
 	var dbValues = [];
 	var i=0;
 	for(var propertyName in dbRow) {
@@ -9,11 +12,27 @@ function shallowDbRowToRow(table, dbRow) {
 		var alias = column.alias;
 		var dbValue = dbRow[propertyName];
 		delete dbRow[propertyName];
-		row[alias] = column.decode(dbValue);
+		values[alias] = column.decode(dbValue);
+		defineColumnProperty(alias);
+		emitChanged[alias] = newEmitEvent();
    		i++;
    		if(columns.length == i)
    			break;
 	}
+
+	function defineColumnProperty(name) {
+		Object.defineProperty(row, name, {
+    		get: function() {        			
+    			return values[name];
+       		},
+       		set : function(value) {
+       			var oldValue = values[name];
+       			values[name] = value;
+       			emitChanged[name](row, value, oldValue);
+       		}
+    	});
+	}
+
 	setRelated();
 
 	function setRelated() {
@@ -33,8 +52,12 @@ function shallowDbRowToRow(table, dbRow) {
 	}
 
 	row.subscribeChanged = function(name, onChanged) {
-		//todo
+		emitChanged[name].add(onChanged);
 	}
+
+	row.unsubscribeChanged = function(name, onChanged) {
+		emitChanged[name].tryRemove(onChanged);
+	}	
 	
 	return row;
 }

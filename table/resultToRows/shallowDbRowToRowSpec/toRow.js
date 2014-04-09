@@ -36,6 +36,11 @@ function act(c){
 	relations.customer = c.customerRelation;
 	c.table._relations = relations;	
 
+	c.emitAlias1Changed = c.mock();
+	c.emitAlias2Changed = c.mock();
+	c.newEmitEvent = requireMock('../../emitEvent');
+	c.newEmitEvent.expect().return(c.emitAlias1Changed);
+	c.newEmitEvent.expect().return(c.emitAlias2Changed);
 
 	c.sut = require('../shallowDbRowToRow')(c.table, c.dbRow);
 }
