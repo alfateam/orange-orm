@@ -29,7 +29,7 @@ function act(c){
 	
 	c.childTableCache.getAll.expect().return([c.childRow1, c.childRow2, c.childRow3]);
 	c.childTable._cache = c.childTableCache;
-	c.joinRelation.childTable = c.childTable;
+	c.joinRelation.parentTable = c.childTable;
 
 	c.cacheCore.tryGet.expect(c.fakeParent1).return(null);
 

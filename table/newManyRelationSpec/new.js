@@ -15,6 +15,8 @@ function act(c){
 	c.newManyCache.expect(c.joinRelation).return(c.manyCache);
 	c.newManyLeg = requireMock('./relation/newManyLeg');
 	
+	c.resultToPromise = requireMock('./resultToPromise');
+
 	c.newExpanderCache = requireMock('./relation/newExpanderCache');
 	c.expanderCache = {};
 	c.newExpanderCache.expect(c.joinRelation).return(c.expanderCache);
