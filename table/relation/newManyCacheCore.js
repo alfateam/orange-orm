@@ -7,7 +7,6 @@ function newManyCache(joinRelation) {
 
     c.tryGet = function(parentRow) {
         var key = toKey(parentRow);
-        console.log(cache.contents);
         return cache.tryGet(key);
     };
 

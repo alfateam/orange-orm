@@ -41,8 +41,6 @@ function newManyCache(joinRelation) {
 
         function addToCache(child) {
             var parent = extractParentKey(joinRelation, child);  
-            console.log(child);
-            console.log(parent);
             c.tryAdd(parent, child);
         }
     }
