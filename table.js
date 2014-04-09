@@ -8,6 +8,7 @@ var getById = require('./table/getById');
 var tryGetFirst = require('./table/tryGetFirstFromDb');
 var newCache = require('./table/newRowCache');
 var newContext = require('./newObject');
+var insert = require('./table/insert');
 
 function _new(tableName) {
 	var table = newContext();
@@ -74,6 +75,10 @@ function _new(tableName) {
 			table._formulaDiscriminators.push(arguments[i]);
 		};
 		return table;
+	};
+
+	table.insert = function() {
+		return call(insert,arguments);
 	};
 
 	return table;	

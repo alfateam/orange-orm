@@ -11,10 +11,12 @@ var getMany = requireMock('./table/getMany');
 var getById = requireMock('./table/getById');
 var newRowCache = requireMock('./table/newRowCache');
 var newObject = requireMock('./newObject');
+var insert = requireMock('./table/insert');
 
 var tableName = {};
 
 function act(c) {	
+	c.insert = insert;
 	c.context = {};
 	newObject.expect().return(c.context);
 	c.cache = {};
