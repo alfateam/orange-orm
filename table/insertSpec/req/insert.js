@@ -11,7 +11,7 @@ function act(c){
 
 	c.newRow.expect(c.table, c.id, c.id2).return(c.initialRow);
 	c.newInsertCommand.expect(c.table, c.row).return(c.insertCommand);
-	c.pushCommand.expect(c.insertCommand);
+	c.pushCommand.expect(c.insertCommand, c.row);
 
 	c.returned = c.sut(c.table, c.id, c.id2);
 }

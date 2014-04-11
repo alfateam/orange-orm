@@ -1,15 +1,17 @@
+var updateField = require('../updateField');
 var newEmitEvent = require('../../emitEvent');
 
 function shallowDbRowToRow(table, values) {	
 	var row = {};
-	var columns = table._columns;
+	var columns  = {};
 	var emitChanged = {};
-	columns.forEach(addColumn);
+	table._columns.forEach(addColumn);
 
 	function addColumn(column) {
 		var alias = column.alias;
 		defineColumnProperty(alias);
 		emitChanged[alias] = newEmitEvent();
+		columns[alias] = column;
 	}
 
 	function defineColumnProperty(name) {
@@ -20,7 +22,8 @@ function shallowDbRowToRow(table, values) {
        		set : function(value) {
        			var oldValue = values[name];
        			values[name] = value;
-       			emitChanged[name](row, value, oldValue);
+       			updateField(table, columns[name], row);
+       			emitChanged[name](row, value, oldValue);       			
        		}
     	});
 	}
@@ -44,6 +47,8 @@ function shallowDbRowToRow(table, values) {
 	}
 
 	row.subscribeChanged = function(name, onChanged) {
+		//todo reverse input
+		//todo noName should subscribe all
 		emitChanged[name].add(onChanged);
 	}
 

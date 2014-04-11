@@ -5,6 +5,7 @@ var relations = {};
 
 
 function act(c){
+	c.updateField = requireMock('../updateField');
 	c.mock = mock;
 	c.table = {};
 	c.col1 = {};
