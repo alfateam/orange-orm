@@ -7,6 +7,12 @@ function newUpdateCommand(table, column, row) {
 	var _getCoreCommand = newImmutable(newUpdateCommandCore);
   var columnList = newColumnList();
   columnList[column.alias] = column;
+  row.subscribeChanged(onFieldChanged);
+
+  function onFieldChanged(row, column) {
+    console.log(column.alias);
+    columnList[column.alias] = column;
+  }
 
 	c.sql = function() {
 		return getCoreCommand().sql();
@@ -23,7 +29,10 @@ function newUpdateCommand(table, column, row) {
     	return _getCoreCommand(table, columnList, row);
     }
 
-    c.endEdit = c.sql;
+    c.endEdit = function() {
+      getCoreCommand();
+      row.unsubscribeChanged(onFieldChanged);
+    };
     
     c.matches = function(otherRow) {
       return row == otherRow;

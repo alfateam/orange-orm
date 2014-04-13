@@ -16,6 +16,14 @@ function act(c){
 	c.createCommand = c.mock();
 	c.newImmutable.expect(c.newUpdateCommandCore).return(c.createCommand);
 
+	c.row.subscribeChanged = mock();
+	c.row.subscribeChanged.expectAnything().whenCalled(onSubscribe);
+	c.raiseFieldChanged = function() {};
+	
+	function onSubscribe(cb) {
+		c.raiseFieldChanged = cb;
+	}
+
 	c.sql = {};
 	c.parameters = {};
 	c.updateCommand = {};
