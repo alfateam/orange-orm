@@ -5,5 +5,6 @@ function newPromise(func) {
 }
 
 newPromise.all = Promise.all;
+//newPromise.serial = Promise.serial;
 
 module.exports = newPromise;

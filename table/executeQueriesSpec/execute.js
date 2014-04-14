@@ -4,18 +4,26 @@ var queries = [q1,q2];
 var a  = require('a');
 var mock = a.mock;
 var requireMock  = a.requireMock;
-var executeQuery = requireMock('./executeQueries/executeQuery');
-var promise = requireMock('./promise');
-var resultPromise1 = {};
-var resultPromise2 = {};
+var executeQueriesCore = requireMock('./executeQueries/executeQueriesCore');
+var executeChanges = requireMock('./executeQueries/executeChanges');
+var popChanges = requireMock('./popChanges');
 
 function act(c){	
 	c.expected = {};
-	executeQuery.expect(q1).return(resultPromise1);
-	executeQuery.expect(q2).return(resultPromise2);
+	c.changes = {};
+	c.changesPromise = {};
+	c.queryResult = {};
 
-	promise.all = mock();
-	promise.all.expect([resultPromise1,resultPromise2]).return(c.expected);
+	c.changesPromise.then = mock();
+	c.changesPromise.then.expectAnything().whenCalled(onChangesPromise).return(c.expected);
+	
+	function onChangesPromise(next) {
+		c.executeQueriesCoreResult = next();
+	}
+
+	popChanges.expect().return(c.changes);
+	executeChanges.expect(c.changes).return(c.changesPromise);
+	executeQueriesCore.expect(queries).return(c.queryResult);
 	c.returned = require('../executeQueries')(queries);
 }
 

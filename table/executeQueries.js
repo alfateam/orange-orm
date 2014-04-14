@@ -1,13 +1,15 @@
-var executeQuery = require('./executeQueries/executeQuery');
-var promise = require('./promise');
+var executeChanges = require('./executeQueries/executeChanges');
+var popChanges = require('./popChanges');
+var executeQueriesCore = require('./executeQueries/executeQueriesCore');
 
 function executeQueries(queries) {
-	var promises = [];
-	for (var i = 0; i < queries.length; i++) {
-		var q = executeQuery(queries[i]);
-		promises.push(q);
-	};
-	return promise.all(promises);
+	var changes = popChanges();
+	return executeChanges(changes).then(onDoneChanges); 
+
+	function onDoneChanges() {
+		return executeQueriesCore(queries);
+	}
+
 }
 
 module.exports = executeQueries;
