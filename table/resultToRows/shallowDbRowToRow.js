@@ -22,8 +22,9 @@ function shallowDbRowToRow(table, values) {
        		set : function(value) {
        			var oldValue = values[name];
        			values[name] = value;
+       			var column = columns[name];
        			updateField(table, columns[name], row);
-       			emitChanged[name](row, value, oldValue);       			
+       			emitChanged[name](row, column, value, oldValue);       			
        		}
     	});
 	}
@@ -46,14 +47,24 @@ function shallowDbRowToRow(table, values) {
     	});
 	}
 
-	row.subscribeChanged = function(name, onChanged) {
-		//todo reverse input
-		//todo noName should subscribe all
-		emitChanged[name].add(onChanged);
+	row.subscribeChanged = function(onChanged, name) {
+		if (name) {
+			emitChanged[name].add(onChanged);
+			return;
+		}
+		for(var name in emitChanged) {
+			emitChanged[name].add(onChanged);
+		};					
 	}
 
-	row.unsubscribeChanged = function(name, onChanged) {
-		emitChanged[name].tryRemove(onChanged);
+	row.unsubscribeChanged = function(onChanged, name) {
+		if (name) {
+			emitChanged[name].tryRemove(onChanged);
+			return;
+		}
+		for(var name in emitChanged) {
+			emitChanged[name].tryRemove(onChanged);
+		};					
 	}	
 	
 	return row;

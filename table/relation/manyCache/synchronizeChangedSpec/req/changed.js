@@ -11,8 +11,8 @@ function act(c){
 	c.manyCache.tryAdd.expect(newParentKey, c.child);
 
 	c.child.unsubscribeChanged = c.mock();
-	c.child.unsubscribeChanged.expect(c.alias1, c.raiseChanged1);
-	c.child.unsubscribeChanged.expect(c.alias2, c.raiseChanged2);
+	c.child.unsubscribeChanged.expect(c.raiseChanged1, c.alias1);
+	c.child.unsubscribeChanged.expect(c.raiseChanged2, c.alias2);
 
 	c.raiseChanged2(c.child);
 }

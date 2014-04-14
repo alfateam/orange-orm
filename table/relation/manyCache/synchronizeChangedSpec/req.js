@@ -19,16 +19,16 @@ function act(c){
 	c.column2.alias = c.alias2;
 	
 	c.initialChild.subscribeChanged = c.mock();
-	c.initialChild.subscribeChanged.expect(c.alias1).expectAnything().whenCalled(onSubscribe1);
-	c.initialChild.subscribeChanged.expect(c.alias2).expectAnything().whenCalled(onSubscribe2);
+	c.initialChild.subscribeChanged.expectAnything().expect(c.alias1).whenCalled(onSubscribe1);
+	c.initialChild.subscribeChanged.expectAnything().expect(c.alias2).whenCalled(onSubscribe2);
 	
 	c.raiseChanged1 = function() {};
-	function onSubscribe1(ignore,cb) {
+	function onSubscribe1(cb, ignore) {
 		c.raiseChanged1 = cb;
 	}
 
 	c.raiseChanged2 = function() {};
-	function onSubscribe2(ignore,cb) {
+	function onSubscribe2(cb, ignore) {
 		c.raiseChanged2 = cb;
 	}
 

@@ -6,14 +6,14 @@ function synchronizeChanged(manyCache, joinRelation, parent, child) {
     child = null;
 
     function subscribeColumn(column) {
-        child.subscribeChanged(column.alias, onChanged);
+        child.subscribeChanged(onChanged, column.alias);
     }
 
     function unsubscribe(child) {
         columns.forEach(unsubscribeColumn);
 
         function unsubscribeColumn(column) {
-            child.unsubscribeChanged(column.alias, onChanged);
+            child.unsubscribeChanged(onChanged, column.alias);
         }
     }
 

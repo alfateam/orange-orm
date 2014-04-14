@@ -24,13 +24,20 @@ function act(c){
 		c.raiseFieldChanged = cb;
 	}
 
-	c.sql = {};
-	c.parameters = {};
-	c.updateCommand = {};
-	c.updateCommand.sql = c.mock();
-	c.updateCommand.sql.expect().return(c.sql);
-	c.updateCommand.parameters = c.parameters;
-	c.createCommand.expect(c.table, c.columnList, c.row).return(c.updateCommand).repeatAny();
+
+	c.stubCommand = function() {
+		c.sql = {};
+		c.parameters = {};
+		c.updateCommand = {};
+		c.updateCommand.sql = c.mock();
+		c.updateCommand.sql.expect().return(c.sql);
+		c.updateCommand.parameters = c.parameters;
+		c.createCommand.expect(c.table, c.columnList, c.row).return(c.updateCommand);
+
+		c.row.unsubscribeChanged = c.mock();
+		c.row.unsubscribeChanged.expect(c.raiseFieldChanged);
+
+	}
 
 	c.newObject = requireMock('../../newObject');
 	c.newObject.expect().return(c.columnList);

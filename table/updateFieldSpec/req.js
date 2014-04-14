@@ -6,13 +6,12 @@ function act(c){
 	c.mock = mock;	
 	c.newUpdateCommand = requireMock('./commands/newUpdateCommand');
 	c.pushCommand = requireMock('./commands/pushCommand');
+	c.lastCommandMatches = requireMock('./command/lastCommandMatches');
+	c.table = {};
+	c.column = {};
+	c.row = {}
 
-	c.updateCommand = {};
-	c.newUpdateCommand.expect(c.table, c.column, c.row).return(c.updateCommand);
-
-	c.pushCommand.expect(c.updateCommand, c.row);
-
-	require('../updateField')(c.table, c.column, c.row);
+	c.sut = require('../updateField');
 }
 
 module.exports = act;
