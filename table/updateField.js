@@ -1,6 +1,6 @@
 var newUpdateCommand = require('./commands/newUpdateCommand');
 var pushCommand = require('./commands/pushCommand');
-var lastCommandMatches = require('./command/lastCommandMatches');
+var lastCommandMatches = require('./commands/lastCommandMatches');
 
 function updateField(table, column, row) {
 	if (lastCommandMatches(row))

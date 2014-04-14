@@ -6,7 +6,7 @@ function act(c){
 	c.mock = mock;	
 	c.newUpdateCommand = requireMock('./commands/newUpdateCommand');
 	c.pushCommand = requireMock('./commands/pushCommand');
-	c.lastCommandMatches = requireMock('./command/lastCommandMatches');
+	c.lastCommandMatches = requireMock('./commands/lastCommandMatches');
 	c.table = {};
 	c.column = {};
 	c.row = {}
