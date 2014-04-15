@@ -3,7 +3,7 @@ var objectToCallback = require('./objectToCallback');
 
 function newPromise(func) {
 	if (!func)
-		return objectToCallback();
+		return new Promise(objectToCallback());
 	return new Promise(func);
 }
 

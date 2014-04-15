@@ -24,6 +24,7 @@ function createBuffers() {
 }
 
 var table = require('../table');
+var newChangeSet = require('../table/newChangeSet');
 var pg = require('pg.js');
 var promise = require('../table/promise');
 var Order, Customer;
@@ -40,6 +41,7 @@ defineDb();
 domain.run(onRun);
 
 function onRun() {
+	newChangeSet();
 	pg.connect(conString, function(err, client, done) { 
     if (err) {
         console.log('Error while connecting: ' + err);  
