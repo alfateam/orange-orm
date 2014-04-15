@@ -115,7 +115,6 @@ function onOrders (orders) {
 	var all = [];
 	for (var i in orders) {		
 		var order = orders[i]; 
-		order.units = 500;
 		printOrder(order);
 		var customer = order.customer.then(printCustomer);
 		all.push(customer);		

@@ -1,15 +1,15 @@
 var fs =require('fs');
 
-var createCustomer = 'DROP TABLE IF EXISTS _customer;CREATE TABLE _customer (cId varchar(40) PRIMARY KEY, cName varchar(40));'
-var createOrder = 'DROP TABLE IF EXISTS _order;CREATE TABLE _order (oId uuid PRIMARY KEY, oCustomerId varchar(40), oStatus integer, oTax boolean, oUnits float, oRegDate timestamp with time zone, oSum numeric, oImage bytea);'
-var createSql = createCustomer + createOrder;
+var createCustomers = 'DROP TABLE IF EXISTS _customer;CREATE TABLE _customer (cId varchar(40) PRIMARY KEY, cName varchar(40));'
+var createOrders = 'DROP TABLE IF EXISTS _order;CREATE TABLE _order (oId uuid PRIMARY KEY, oCustomerId varchar(40), oStatus integer, oTax boolean, oUnits float, oRegDate timestamp with time zone, oSum numeric, oImage bytea);'
+var createSql = createCustomers + createOrders;
 
 createBuffers();
-var insertCustomer = "INSERT INTO _customer VALUES ('100','Bill');INSERT INTO _customer VALUES ('200','John');";
-var insertOrder = 
+var insertCustomers = "INSERT INTO _customer VALUES ('100','Bill');INSERT INTO _customer VALUES ('200','John');";
+var insertOrders = 
 				'INSERT INTO _order VALUES (\'58d52776-2866-4fbe-8072-cdf13370959b\',\'100\', 1, TRUE, 1.21,\'Fri Mar 07 2014 10:57:07 GMT+01\',1344.23,' + buffer + ');' + 
 				'INSERT INTO _order VALUES (\'d51137de-8dd9-4520-a6e0-3a61ddc61a99\',\'200\', 2, FALSE, 2.23,\'Fri Mar 07 2015 08:25:07 GMT+02\',34.59944,' + buffer2 + ')';
-var insertSql = insertCustomer + insertOrder;
+var insertSql = insertCustomers + insertOrders;
 var buffer;
 var buffer2;
 
@@ -28,7 +28,8 @@ var newChangeSet = require('../table/newChangeSet');
 var pg = require('pg.js');
 var promise = require('../table/promise');
 var Order, Customer;
-var strategy = {orders: null};
+//var strategy = {orders: null};
+var strategy ;
 //var strategy;
 var filter;
 var Domain = require('domain');
@@ -63,7 +64,9 @@ function onInserted(err, result) {
     if(err) {
       console.error('error running query', err);
       throw err;
-    }    
+    }
+
+    insertOrder();
     getOrders();
  };
 
@@ -92,6 +95,12 @@ function defineOrder() {
 	var customerOrder = Order.join(Customer).by('oCustomerId').as('customer');
 	Customer.hasMany(customerOrder).as('orders');
 }		
+
+function insertOrder() {
+	var order = Order.insert('58d52776-2866-4fbe-8072-cdf13370959b');
+	// order.status = 78;
+	// order.units = 34;
+}
 
 function getOrders() {
 	//Order.getMany(filter, strategy).then(onOrders).done(onOk,onFailed);
@@ -129,6 +138,7 @@ function onOrders (orders) {
 	var all = [];
 	for (var i in orders) {		
 		var order = orders[i]; 
+		order.units = 500;
 		printOrder(order);
 		var customer = order.customer.then(printCustomer);
 		all.push(customer);		
