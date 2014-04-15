@@ -97,7 +97,7 @@ function defineOrder() {
 }		
 
 function insertOrder() {
-	var order = Order.insert('58d52776-2866-4fbe-8072-cdf13370959b');
+	var order = Order.insert('58d52776-2866-4fbe-8072-cdf13370959a');
 	// order.status = 78;
 	// order.units = 34;
 }

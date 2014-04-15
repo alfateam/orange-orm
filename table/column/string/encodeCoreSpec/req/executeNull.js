@@ -8,7 +8,10 @@ function act(c) {
 
 	c.dbNull = dbNull;
 	c.column.dbNull = dbNull;
-	c.returned = c.sut(null, c.column);
+
+	c.purify.expect(c.initArg).return(null);
+	c.returned = c.sut(c.initArg, c.column);
+
 }
 
 module.exports = act;
