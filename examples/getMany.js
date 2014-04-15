@@ -28,7 +28,8 @@ var newChangeSet = require('../table/newChangeSet');
 var pg = require('pg.js');
 var promise = require('../table/promise');
 var Order, Customer;
-var strategy = {customer: 0};
+// var strategy = {customer: 0};
+var strategy
 var filter;
 var Domain = require('domain');
 var domain = Domain.create();
@@ -114,6 +115,7 @@ function onOrders (orders) {
 	var all = [];
 	for (var i in orders) {		
 		var order = orders[i]; 
+		order.units = 500;
 		printOrder(order);
 		var customer = order.customer.then(printCustomer);
 		all.push(customer);		

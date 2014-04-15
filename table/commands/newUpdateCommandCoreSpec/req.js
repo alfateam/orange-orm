@@ -61,10 +61,6 @@ function act(c){
 
 	c.table._primaryColumns = [c.pkColumn1, c.pkColumn2];
 
-	c.colDiscriminator1 = "fooColumn='fooDiscr'";
-	c.colDiscriminator2 = "barColumn='barDiscr'";
-	c.table._columnDiscriminators = [c.colDiscriminator1, c.colDiscriminator2];
-
 	c.columnList[c.alias1] = c.column1;
 	c.columnList[c.alias2] = c.column2;
 
@@ -108,7 +104,7 @@ function act(c){
 	c.part8.append = c.mock();
 	c.part8.append.expect(" AND fooColumn='fooDiscr' AND barColumn='barDiscr'").return(c.expected);
 
-	c.returned = require('../newUpdateCommandCore')(c.table, c.columnList, c.row);
+	c.sut = require('../newUpdateCommandCore');	
 }
 
 module.exports = act;

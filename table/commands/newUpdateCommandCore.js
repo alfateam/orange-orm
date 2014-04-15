@@ -32,7 +32,10 @@ function newInsertCommandCore(table, columns, row) {
 	}
 
 	function addDiscriminators() {
-		var discriminators = separator + table._columnDiscriminators.join(" AND ");
+		discriminators = table._columnDiscriminators;
+		if (discriminators.length == 0)
+			return;
+		discriminators = separator + discriminators.join(" AND ");
 		command = command.append(discriminators);
 	}
 
