@@ -7,8 +7,8 @@ var createSql = createCustomers + createOrders;
 createBuffers();
 var insertCustomers = "INSERT INTO _customer VALUES ('100','Bill');INSERT INTO _customer VALUES ('200','John');";
 var insertOrders = 
-				'INSERT INTO _order VALUES (\'58d52776-2866-4fbe-8072-cdf13370959b\',\'100\', 1, TRUE, 1.21,\'Fri Mar 07 2014 10:57:07 GMT+01\',1344.23,' + buffer + ');' + 
-				'INSERT INTO _order VALUES (\'d51137de-8dd9-4520-a6e0-3a61ddc61a99\',\'200\', 2, FALSE, 2.23,\'Fri Mar 07 2015 08:25:07 GMT+02\',34.59944,' + buffer2 + ')';
+				'INSERT INTO _order VALUES (\'58d52776-2866-4fbe-8072-cdf13370959b\',\'100\', 1, TRUE, 1.21,\'2003-04-12 04:05:06 z\',1344.23,' + buffer + ');' + 
+				'INSERT INTO _order VALUES (\'d51137de-8dd9-4520-a6e0-3a61ddc61a99\',\'200\', 2, FALSE, 2.23,\'Fri Mar 07 2015 08:25:07 America/New_York\',34.59944,' + buffer2 + ')';
 var insertSql = insertCustomers + insertOrders;
 var buffer;
 var buffer2;
@@ -97,7 +97,8 @@ function defineOrder() {
 }		
 
 function insertOrder() {
-	var order = Order.insert('58d52776-2866-4fbe-8072-cdf13370959b');
+	var order = Order.insert('58d52776-2866-4fbe-8072-cdf13370959a');
+	order.regDate = new Date();
 	// order.status = 78;
 	// order.units = 34;
 }
@@ -138,7 +139,7 @@ function onOrders (orders) {
 	var all = [];
 	for (var i in orders) {		
 		var order = orders[i]; 
-		order.units = 500;
+		order.units = 500;		
 		printOrder(order);
 		var customer = order.customer.then(printCustomer);
 		all.push(customer);		

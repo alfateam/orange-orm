@@ -8,7 +8,9 @@ function act(c) {
 
 	c.dbNull = dbNull;
 	c.column.dbNull = dbNull;
-	c.returned = c.sut(null);
+	c.purify.expect(c.initArg).return(null);
+	c.returned = c.sut(c.initArg);
+
 }
 
 act.base = '../new';

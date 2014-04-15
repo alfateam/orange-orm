@@ -4,11 +4,13 @@ var requireMock = a.requireMock;
 var column = {};
 
 function act(c) {
+	c.initArg = {};
 	c.mock = mock;
 	c.column = column;
 
 	c.newParam = requireMock('../../query/newParameterized');
 	c.stringIsSafe = requireMock('./stringIsSafe');
+	c.purify = requireMock('./purify');
 
 	c.sut = require('../encodeCore');
 }

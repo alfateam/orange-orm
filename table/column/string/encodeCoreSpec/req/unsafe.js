@@ -10,8 +10,10 @@ function act(c) {
 
 	c.param.addParameter = c.mock();
 	c.param.addParameter.expect(c.value).return(c.expected);
+	
+	c.purify.expect(c.initArg).return(c.value);
+	c.returned = c.sut(c.initArg, c.column);
 
-	c.returned = c.sut(c.value, c.column);
 }
 
 module.exports = act;

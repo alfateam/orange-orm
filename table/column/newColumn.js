@@ -10,6 +10,7 @@ module.exports = function(table,name) {
 	var c = {};
 	c._dbName = name;
 	c.alias = name;	
+	c.dbNull = null;	
 	table._columns.push(c);
 	table[name] = c;
 	
