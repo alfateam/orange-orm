@@ -24,7 +24,7 @@ function createBuffers() {
 }
 
 var table = require('../table');
-var newChangeSet = require('../newChangeSet');
+var newChangeSet = require('../table/newChangeSet');
 var pg = require('pg.js');
 var promise = require('../table/promise');
 var Order, Customer;
