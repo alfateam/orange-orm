@@ -6,7 +6,7 @@ function act(c){
 	c.column = {};
 
 	c.encode = {};
-	c.newEncode = requireMock('./string/newEncode');
+	c.newEncode = requireMock('./date/newEncode');
 	c.newEncode.expect(c.column).return(c.encode);
 
 	c.decode = {};
