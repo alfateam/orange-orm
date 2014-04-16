@@ -3,8 +3,10 @@ var newDecode = require('./newDecodeCore');
 var startsWith = require('./string/startsWith');
 var endsWith = require('./string/endsWith');
 var contains = require('./string/contains');
+var purify = require('./string/purify');
 
 function _new(column) {
+	column.purify = purify;
 	column.encode = newEncode(column);
 	column.decode = newDecode(column);
 	
