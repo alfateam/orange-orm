@@ -5,6 +5,7 @@ var requireMock = a.requireMock;
 function act(c){
 	c.column = {};
 
+	c.purify = requireMock('./date/purify');
 	c.encode = {};
 	c.newEncode = requireMock('./date/newEncode');
 	c.newEncode.expect(c.column).return(c.encode);

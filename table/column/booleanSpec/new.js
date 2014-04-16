@@ -5,6 +5,8 @@ var requireMock = a.requireMock;
 function act(c){
 	c.column = {};
 
+	c.purify = requireMock('./boolean/purify');
+	
 	c.encode = {};
 	c.newEncode = requireMock('./boolean/newEncode');
 	c.newEncode.expect(c.column).return(c.encode);

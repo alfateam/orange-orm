@@ -21,8 +21,9 @@ function shallowDbRowToRow(table, values) {
        		},
        		set : function(value) {
        			var oldValue = values[name];
-       			values[name] = value;
        			var column = columns[name];
+       			value = column.purify(value);
+       			values[name] = value;
        			updateField(table, columns[name], row);
        			emitChanged[name](row, column, value, oldValue);       			
        		}

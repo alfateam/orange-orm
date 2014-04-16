@@ -4,6 +4,7 @@ var newDecode = requireMock('./newDecodeCore');
 var startsWith = requireMock('./string/startsWith');
 var endsWith = requireMock('./string/endsWith');
 var contains = requireMock('./string/contains');
+var purify = requireMock('./string/purify');
 
 var newSut = require('../string');
 var column = {};
@@ -11,6 +12,7 @@ var decode = {};
 var encode = {};
 
 function act(c) {
+	c.purify = purify;
 	c.startsWith = startsWith;
 	c.contains = contains;
 	c.endsWith = endsWith;
