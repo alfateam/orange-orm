@@ -3,7 +3,7 @@ function act(c){
 	c.updateCommand = {};
 	c.newUpdateCommand.expect(c.table, c.column, c.row).return(c.updateCommand);
 
-	c.pushCommand.expect(c.updateCommand, c.row);
+	c.pushCommand.expect(c.updateCommand);
 
 	c.sut(c.table, c.column, c.row);
 }

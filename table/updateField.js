@@ -6,7 +6,7 @@ function updateField(table, column, row) {
 	if (lastCommandMatches(row))
 		return;
 	var command = newUpdateCommand(table, column, row);
-	pushCommand(command, row);
+	pushCommand(command);
 }
 
 module.exports = updateField;
