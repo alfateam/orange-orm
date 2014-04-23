@@ -10,6 +10,7 @@ Promise.prototype.done = function (onFulfilled, onRejected) {
 	var rollbackFailed = rollbacked.then(null, onRollbackFailed);
 
 	function onRollbackFailed(err) {
+		//
 		throw err;
 	}
 

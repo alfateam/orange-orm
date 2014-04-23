@@ -5,9 +5,10 @@ var requireMock  = a.requireMock;
 
 
 function act(c){		
-
+	c.mock = mock;
 	c.rollbackCommand = requireMock('./commands/rollbackCommand');
 	c.executeQuery = requireMock('./executeQueries/executeQuery');
+	c.releaseDbClient = requireMock('./releaseDbClient');
 
 	c.sut = require('../rollback');
 }

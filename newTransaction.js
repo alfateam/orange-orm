@@ -12,24 +12,15 @@ function newResolveTransaction(domain, connectionString) {
             pg.connect(connectionString, onConnected);
         }
 
-        function onConnected() {
-            
+        function onConnected(err, client, done) {
+            if (err) {
+                onError(err);
+                return
+            }
+            domain.dbClient = client;
+            domain.dbClientDone = done;
+            onSuccess();
         }
-        // function onConnected(err, client, done) {
-        //     if (err) {
-        //         connectionError = err;
-        //         done();
-        //         return;
-        //     }
-        //     domain.dbClient = client;
-        //     domain.done = done;
-        // }
-
-
-        // if (connectionError)
-        //     onError(connectionError);
-        // else
-        //     onSuccess();
     };
 };
 
