@@ -10,7 +10,8 @@ function act(c){
 	c.pushCommand = requireMock('./commands/pushCommand');
 	c.executeChanges = requireMock('./executeQueries/executeChanges');
 	c.releaseDbClient = requireMock('./releaseDbClient');
-
+	c.popChanges = requireMock('./popChanges');
+	
 	c.sut = require('../commit');
 }
 
