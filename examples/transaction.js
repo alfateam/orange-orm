@@ -94,10 +94,7 @@ function insertOrder() {
 }
 
 function getOrders() {
-    //Order.getMany(filter, strategy).then(onOrders).done(onOk,onFailed);
-    //Customer.getMany(filter).then(onCustomers).done(onOk,onFailed);	
-    Customer.getMany(filter, strategy).then(onCustomers).done(onOk, onFailed);
-    //Customer.getMany(filter,strategy).then(onCustomers).done(onOk,onFailed);	
+    return Customer.getMany(filter, strategy).then(onCustomers);
 }
 
 function onCustomers(customers) {
