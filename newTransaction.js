@@ -1,5 +1,4 @@
 var pg = require('pg.js');
-var begin = require('./table/begin');
 
 function newResolveTransaction(domain, connectionString) {
 
@@ -8,7 +7,6 @@ function newResolveTransaction(domain, connectionString) {
         domain.run(onRun);
 
         function onRun() {
-            begin();
             pg.connect(connectionString, onConnected);
         }
 

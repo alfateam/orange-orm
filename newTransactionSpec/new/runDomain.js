@@ -7,8 +7,6 @@ function act(c) {
         c.raiseConnected = cb;
     }
 
-    c.begin.expect();
-
 	c.onSuccess = c.mock();
 	c.onError = c.mock();
     c.sut(c.onSuccess, c.onError);
