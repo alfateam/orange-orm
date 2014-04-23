@@ -5,7 +5,19 @@ var rollback = rollbackFirstTime;
 var oldDone = Promise.prototype.done;
 
 Promise.prototype.done = function (onFulfilled, onRejected) {
-	var self = this.then(commit);
+	var error;
+	var next = function() {
+		if (error) 
+			return rollback(error);
+	};
+
+
+	var self = this.then(commit).then(null,rollbackLocal).then(next);
+
+	function rollbackLocal(e) {
+		error = e;
+	}
+
 	oldDone.apply(self, arguments);
 	return;
 	var rollbacked = self.then(null, rollback);

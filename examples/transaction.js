@@ -144,5 +144,5 @@ function onOk() {
 
 function onFailed(err) {
     console.log('failed: ' + err);
-    console.log('stack: ' + err.stack);
+    //console.log('stack: ' + err.stack);
 }
