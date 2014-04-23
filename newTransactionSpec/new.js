@@ -3,7 +3,7 @@ var mock = a.mock;
 var requireMock = a.requireMock;
 
 function act(c){
-	c.mock = mock;	
+	c.mock = mock;
 	c.begin = requireMock('./table/begin');
 	c.pg = requireMock('pg.js');
 	c.pg.connect = mock();
