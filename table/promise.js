@@ -6,28 +6,23 @@ var oldDone = Promise.prototype.done;
 
 Promise.prototype.done = function (onFulfilled, onRejected) {
 	var error;
-	var next = function() {
+	var negotiateRollback = function() {
 		if (error) 
-			return rollback(error);
+			return rollback();
 	};
 
+	var self = this.then(commit).then(null,saveError).then(negotiateRollback).then(negotiateThrow);
 
-	var self = this.then(commit).then(null,rollbackLocal).then(next);
-
-	function rollbackLocal(e) {
+	function saveError(e) {
 		error = e;
 	}
 
-	oldDone.apply(self, arguments);
-	return;
-	var rollbacked = self.then(null, rollback);
-	var rollbackFailed = rollbacked.then(null, onRollbackFailed);
-
-	function onRollbackFailed(err) {
-		//
-		throw err;
+	function negotiateThrow() {
+		if (error)
+			throw error;
 	}
 
+	oldDone.apply(self, arguments);
 };
 
 function commitFirstTime() {

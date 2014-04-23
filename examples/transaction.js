@@ -93,7 +93,7 @@ function insertOrder() {
     var order = Order.insert('58d52776-2866-4fbe-8072-cdf13370959a');
     order.regDate = new Date();
     order.status = 78;
-    order.units = 34;
+    order.units = new Date();
 }
 
 function getOrders() {
@@ -144,5 +144,5 @@ function onOk() {
 
 function onFailed(err) {
     console.log('failed: ' + err);
-    //console.log('stack: ' + err.stack);
+    console.log('stack: ' + err.stack);
 }
