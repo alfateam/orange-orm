@@ -28,35 +28,38 @@ var conString = 'postgres://postgres:postgres@localhost/' + dbName;
 var table = require('../table');
 var db = require('../index')(conString);
 var pg = require('pg.js');
+var client = new pg.Client(conString);
 var promise = require('../table/promise');
 var Order, Customer;
 var strategy;
 var filter;
+var dbDone;
 
 
 defineDb();
 insertThenGet();
 
 function insertThenGet() {
-    pg.connect(conString, function(err, client, done) {
+    client.connect(function(err) {
         if (err) {
             console.log('Error while connecting: ' + err);
-            done();
             return;
         }
-        runDbTest(client);
+        runDbTest();
     });
 }
 
-function runDbTest(client) {
+function runDbTest() {
     client.query(createSql + insertSql, onInserted);
 }
 
 function onInserted(err, result) {
+    client.end();
     if (err) {
         console.error('error running query', err);
         throw err;
     }
+
     db.transaction().then(insertOrder).then(getOrders).done(onOk, onFailed);
 };
 
