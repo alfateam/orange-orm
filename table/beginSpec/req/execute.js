@@ -1,6 +1,7 @@
 function act(c){		
+	c.expected = {};
 	c.resetChangeSet.expect();
-	c.pushCommand.expect(c.beginCommand);
+	c.executeQuery.expect(c.beginCommand).return(c.expected);
 
 	c.returned = c.sut();
 }

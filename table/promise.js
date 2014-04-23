@@ -6,6 +6,8 @@ var oldDone = Promise.prototype.done;
 
 Promise.prototype.done = function (onFulfilled, onRejected) {
 	var self = this.then(commit);
+	oldDone.apply(self, arguments);
+	return;
 	var rollbacked = self.then(null, rollback);
 	var rollbackFailed = rollbacked.then(null, onRollbackFailed);
 
@@ -14,7 +16,6 @@ Promise.prototype.done = function (onFulfilled, onRejected) {
 		throw err;
 	}
 
-	oldDone.apply(rollbackFailed, arguments);
 };
 
 function commitFirstTime() {

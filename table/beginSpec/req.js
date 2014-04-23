@@ -6,8 +6,9 @@ var requireMock  = a.requireMock;
 
 function act(c){		
 	c.resetChangeSet = requireMock('./newChangeSet');
-	c.pushCommand = requireMock('./commands/pushCommand');
 	c.beginCommand = requireMock('./commands/beginCommand');
+	c.executeQuery = requireMock('./executeQueries/executeQuery');
+
 
 	c.sut = require('../begin');
 }

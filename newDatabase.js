@@ -1,6 +1,7 @@
 var createDomain = require('domain').create;
 var newTransaction = require('./newTransaction');
 var newPromise = require('./table/promise');
+var begin = require('./table/begin');
 
 function newDatabase(connectionString) {
 	var c = {};
@@ -8,7 +9,7 @@ function newDatabase(connectionString) {
 	c.transaction = function() {
 		var domain = createDomain();
 		var transaction = newTransaction(domain, connectionString);
-		return newPromise(transaction);
+		return newPromise(transaction).then(begin);
 	};
 
 	return c;
