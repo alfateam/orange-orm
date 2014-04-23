@@ -1,5 +1,5 @@
 var newParameterized = require('./table/query/newParameterized');
-var newBoolean = require('./colum/newBoolean');
+var newBoolean = require('./table/column/newBoolean');
 var newDatabase = require('./newDatabase');
 
 var filter = newParameterized('');

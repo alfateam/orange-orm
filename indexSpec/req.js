@@ -8,7 +8,7 @@ function act(c){
 	c.emptyFilter = {};
 	c.newParameterized = requireMock('./table/query/newParameterized');
 	c.newParameterized.expect('').return(c.parameterized);
-	c.newBoolean = requireMock('./colum/newBoolean');
+	c.newBoolean = requireMock('./table/column/newBoolean');
 	c.newBoolean.expect(c.parameterized).return(c.emptyFilter);
 
 	c.newDatabase = requireMock('./newDatabase');
