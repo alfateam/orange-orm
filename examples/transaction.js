@@ -60,12 +60,12 @@ function onInserted(err, result) {
         throw err;
     }
 
-    db.transaction(onTransaction).then(insertOrder).then(getOrders).then(commit).then(null,rollback).done(onOk, onFailed);
+    var transaction = db.transaction();
+    commit = transaction.commit;
+    rollback = transaction.rollback;
 
-    function onTransaction(c, r) {
-        commit = c;
-        rollback = r;
-    }
+    transaction.then(insertOrder).then(getOrders).then(commit).then(null,rollback).done(onOk, onFailed);
+
 };
 
 
@@ -106,7 +106,6 @@ function getOrders() {
 }
 
 function onCustomers(customers) {
-    console.log(customers.length);
     var all = [];
     for (var i = 0; i < customers.length; i++) {
         printCustomer(customers[i]);
