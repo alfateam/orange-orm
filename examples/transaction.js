@@ -34,7 +34,7 @@ var Order, Customer;
 var strategy;
 var filter;
 var dbDone;
-
+var commit, rollback;
 
 defineDb();
 insertThenGet();
@@ -60,7 +60,12 @@ function onInserted(err, result) {
         throw err;
     }
 
-    db.transaction().then(insertOrder).then(getOrders).done(onOk, onFailed);
+    db.transaction(onTransaction).then(insertOrder).then(getOrders).then(commit).then(null,rollback).done(onOk, onFailed);
+
+    function onTransaction(c, r) {
+        commit = c;
+        rollback = r;
+    }
 };
 
 

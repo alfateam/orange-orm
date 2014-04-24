@@ -8,7 +8,15 @@ function act(c){
 	c.newPromise.expect(c.resolveTransaction).return(c.transactionPromise);
 
 	c.transactionPromise.then = c.mock();
-	c.transactionPromise.then.expect(c.begin).return(c.expected);
+	c.beginPromise = {};
+	c.transactionPromise.then.expect(c.begin).return(c.beginPromise);
+
+
+	c.commitAndRollbackPromise = {};
+	c.newPromise.expect(c.commitAndRollback).return(c.commitAndRollbackPromise);
+
+	c.beginPromise.then = c.mock();
+	c.beginPromise.then.expect(c.commitAndRollbackPromise).return(c.expected);
 
 	c.returned = c.sut.transaction();
 

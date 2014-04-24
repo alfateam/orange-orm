@@ -4,7 +4,7 @@ var commit = commitFirstTime;
 var rollback = rollbackFirstTime;
 var oldDone = Promise.prototype.done;
 
-Promise.prototype.done = function (onFulfilled, onRejected) {
+/*Promise.prototype.done = function (onFulfilled, onRejected) {
 	var error;
 	var negotiateRollback = function() {
 		if (error) 
@@ -24,7 +24,7 @@ Promise.prototype.done = function (onFulfilled, onRejected) {
 
 	oldDone.apply(self, arguments);
 };
-
+*/
 function commitFirstTime() {
 	commit = require('./commit');
 	return commit();
