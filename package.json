@@ -1,10 +1,10 @@
 {
-  "name": "a_sql",
+  "name": "rdb",
   "version": "0.0.1",
   "main": "index.js",
-  "title": "a_sql",
-  "description": "Object Relational Mapper",
-  "keywords": ["orm","sql"],
+  "title": "rdb",
+  "description": "Object Relational Mapper for postgres",
+  "keywords": ["orm","sql","postgres","pg"],
   "dependencies": {
 		"a": "0.4.3",
     "pg.js" : "*",
