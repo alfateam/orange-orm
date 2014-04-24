@@ -4,19 +4,6 @@ var commit = commitFirstTime;
 var rollback = rollbackFirstTime;
 var oldDone = Promise.prototype.done;
 
-Promise.prototype.done = function (onFulfilled, onRejected) {
-	var self = this.then(commit);
-	var rollbacked = self.then(null, rollback);
-	var rollbackFailed = rollbacked.then(null, onRollbackFailed);
-
-	function onRollbackFailed(err) {
-		//
-		throw err;
-	}
-
-	oldDone.apply(rollbackFailed, arguments);
-};
-
 function commitFirstTime() {
 	commit = require('./commit');
 	return commit();

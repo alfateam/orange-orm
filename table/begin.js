@@ -1,10 +1,10 @@
 var newChangeSet = require('./newChangeSet');
 var beginCommand = require('./commands/beginCommand');
-var pushCommand = require('./commands/pushCommand');
+var executeQuery = require('./executeQueries/executeQuery');
 
 function begin() {
 	newChangeSet();
-	pushCommand(beginCommand);
+	return executeQuery(beginCommand);
 }
 
 module.exports = begin;

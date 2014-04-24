@@ -9,7 +9,9 @@ function act(c){
 	c.rollbackCommand = requireMock('./commands/rollbackCommand');
 	c.executeQuery = requireMock('./executeQueries/executeQuery');
 	c.releaseDbClient = requireMock('./releaseDbClient');
-
+	c.popChanges = requireMock('./popChanges');
+	c.newThrow = requireMock('./newThrow');
+	
 	c.sut = require('../rollback');
 }
 

@@ -10,7 +10,6 @@ function newUpdateCommand(table, column, row) {
   row.subscribeChanged(onFieldChanged);
 
   function onFieldChanged(row, column) {
-    console.log(column.alias);
     columnList[column.alias] = column;
   }
 

@@ -9,6 +9,9 @@ function act(c){
 	c.Domain.create = mock();
 	c.newTransaction = requireMock('./newTransaction');
 	c.newPromise = requireMock('./table/promise');
+	c.begin = requireMock('./table/begin');
+	c.commitAndRollback = requireMock('./commitAndRollback');
+
 
 	c.sut = require('../newDatabase')(c.connectionString);;
 }
