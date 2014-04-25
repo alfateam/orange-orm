@@ -6,8 +6,8 @@ _ORM for postgres_.
 Simple, flexible mapper.  
 Transaction with commit and rollback.  
 Persistence ignorance - no need for explicit updates or saving, everything is handled by transaction.  
-API is not documented yet.
+Eager or lazy loading.  
+Based on promises.  
+API is not documented yet, but see [examples][0] at git@github.com:alfateam/rdb-demo.git.
 
-See [examples][0] at github.
-
-[0]:https://github.com/alfateam/rdb/tree/master/examples
+[0]:https://github.com/alfateam/rdb-demo
