@@ -4,11 +4,7 @@ function newResolveTransaction(domain, connectionString) {
 
     return function(onSuccess, onError) {
         var connectionError;
-        domain.run(onRun);
-
-        function onRun() {
-            pg.connect(connectionString, onConnected);
-        }
+        pg.connect(connectionString, onConnected);
 
         function onConnected(err, client, done) {
             if (err) {

@@ -8,13 +8,6 @@ function act(c){
 	c.pg.connect = mock();
 
 	c.domain = {};
-	c.domain.run = mock();
-	c.run = function() {};
-	c.domain.run.expectAnything().whenCalled(onRun);
-
-	function onRun(run)	 {
-		c.run = run;
-	}
 
 	c.sut = require('../newTransaction')(c.domain, c.connectionString);
 }

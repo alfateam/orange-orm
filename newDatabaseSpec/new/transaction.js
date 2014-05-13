@@ -11,12 +11,14 @@ function act(c){
 	c.beginPromise = {};
 	c.transactionPromise.then.expect(c.begin).return(c.beginPromise);
 
+	c.domain.run = c.mock();
+	c.domain.run.expectAnything().whenCalled(onRun).return(c.expected);
 
-	c.commitAndRollbackPromise = {};
-	c.newPromise.expect(c.commitAndRollback).return(c.commitAndRollbackPromise);
-
-	c.beginPromise.then = c.mock();
-	c.beginPromise.then.expect(c.commitAndRollbackPromise).return(c.expected);
+	function onRun(cb) {
+		var res = cb();
+		if (res != c.beginPromise)
+			throw new Error('wrong result');
+	}
 
 	c.returned = c.sut.transaction();
 

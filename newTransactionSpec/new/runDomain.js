@@ -10,7 +10,6 @@ function act(c) {
 	c.onSuccess = c.mock();
 	c.onError = c.mock();
     c.sut(c.onSuccess, c.onError);
-    c.run();
 }
 
 module.exports = act;

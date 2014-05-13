@@ -9,7 +9,7 @@
 		"a": "0.4.3",
     "pg.js" : "*",
     "node-uuid" : "1.4.1", 
-    "promise" : "4.0.0"
+    "promise" : "*"
   },
   "repository" : {
          "type" : "git",
