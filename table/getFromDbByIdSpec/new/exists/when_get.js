@@ -1,5 +1,6 @@
 var when = require('a').when;
 var c = {};
 
-when('./get',c)
-	.it('returns row').assertEqual(c.expected,c.returned);
+when(c)
+	.it('returns row').assertEqual(c.row, c.returned)
+	.it('returns promise').assertEqual(c.expected,c.returnedPromise);

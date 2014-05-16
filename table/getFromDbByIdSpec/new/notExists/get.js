@@ -1,7 +1,20 @@
+var expected = {};
 
 function act(c) {
-	c.tryGetFromDbById.expect(c.table,c.id,c.strategy).return(null);
+	c.resultPromise.then.expectAnything().whenCalled(onResult);
+
+	function onResult(cb) {
+		try {
+			cb(null);	
+		}
+		catch (e)
+		{
+			c.thrownMsg = e.message;
+
+		}
+		
+	}	
 	c.get();
 }
-act.base = '../../new';
+
 module.exports = act;

@@ -2,8 +2,13 @@ var expected = {};
 
 function act(c) {
 	c.expected = expected;
-	c.tryGetFromDbById.expect(c.table,c.id,c.strategy).return(expected);
+	c.row = {};
+	c.resultPromise.then.expectAnything().whenCalled(onResult).return(c.expected);
+
+	function onResult(cb) {
+		c.returned = cb(c.row);
+	}	
 	c.get();
 }
-act.base = '../../new';
+
 module.exports = act;
