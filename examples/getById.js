@@ -16,7 +16,7 @@ function runDbTest() {
     commit = transaction.commit;
     rollback = transaction.rollback;
 
-    transaction.then(getById).then(null, rollback).done(onOk, onFailed);
+    transaction.then(getById).then(commit).then(null, rollback).done(onOk, onFailed);
 }
 
 function getById() {
