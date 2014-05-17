@@ -66,7 +66,11 @@ function shallowDbRowToRow(table, values) {
 		for(var name in emitChanged) {
 			emitChanged[name].tryRemove(onChanged);
 		};					
-	}	
+	}
+
+	row.toJSON = function(strategy, dto) {
+		//row.lines.then(relatedToJSON);
+	};
 	
 	return row;
 }

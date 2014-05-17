@@ -6,6 +6,10 @@ var relations = {};
 
 function act(c){
 	c.updateField = requireMock('../updateField');
+	c.fieldsToJSON = requireMock('./toJSON/fieldsToJSON');
+	c.newRelatedToJSON = requireMock('./toJSON/newRelatedToJSON');
+	c.promise = requireMock('../promise');
+	c.promise.all = mock();
 	c.mock = mock;
 	c.table = {};
 	c.col1 = {};

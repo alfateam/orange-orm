@@ -8,7 +8,4 @@ function newPromise(func) {
 }
 
 newPromise.all = Promise.all;
-newPromise.serial = function(promises) {
-	//todo;
-}
 module.exports = newPromise;
