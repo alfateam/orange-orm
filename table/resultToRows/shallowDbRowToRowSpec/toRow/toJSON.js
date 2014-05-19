@@ -1,27 +1,25 @@
 function act(c) {
+	c.expected = {};
 	c.customerStrategy = {};
 	c.linesStrategy = {};
-	c.strategy = {customer : c.customerStrategy, lines : linesStrategy};
-	c.initialDto;
+	c.initialStrategy = {};
 	c.dto = {};
+	c.strategy = {};
+	c.toJSON = {};
+	c.newToJSON.expect(c.dto).return(c.toJSON);
 
-	c.fieldsToJSON.expect(c.strategy, c.values).return(c.dto);
+	c.extractStrategy.expect(c.initialStrategy, c.table).return(c.strategy);
 
-	c.customer = {};
-	c.lines = {};
-	c.lines.then = c.mock();
-	c.lineRelation.getRows = c.mock();
-	c.lineRelation.getRows.expect(c.sut).return(c.lines);
+	c.newObject.expect().return(c.dto);
 
-	c.newRelatedtoJSON.expect("customer", c.customerStrategy, c.dto).return()
+	c.dtoPromise  = {};
+	c.dtoPromise.then = c.mock();
+	c.dtoPromise.then.expect(c.toJSON).return(c.expected);
+	c.toDto = c.mock();
+	c.newToDto.expect(c.strategy, c.table, c.dto).return(c.toDto);
+	c.toDto.expect(c.sut).return(c.dtoPromise);	
 
-
-	c.customer.then = c.mock();
-	c.customerRelation.getRows = c.mock();
-	c.customerRelation.getRows.expect(c.sut).return(c.customer);
-
-
-	c.returned = c.sut.toJSON(c.strategy, c.initialDto);
+	c.returned = c.sut.toJSON(c.initialStrategy);	
 }
 
 module.exports = act;

@@ -5,11 +5,13 @@ var relations = {};
 
 
 function act(c){
+
+
 	c.updateField = requireMock('../updateField');
-	c.fieldsToJSON = requireMock('./toJSON/fieldsToJSON');
-	c.newRelatedToJSON = requireMock('./toJSON/newRelatedToJSON');
-	c.promise = requireMock('../promise');
-	c.promise.all = mock();
+	c.extractStrategy = requireMock('./toDto/extractStrategy');
+	c.newToDto = requireMock('./toDto/newToDto');
+	c.newToJSON = requireMock('./toDto/newToJSON');
+	c.newObject = requireMock('../../newObject');
 	c.mock = mock;
 	c.table = {};
 	c.col1 = {};
