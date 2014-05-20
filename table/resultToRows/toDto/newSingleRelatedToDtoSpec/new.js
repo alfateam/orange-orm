@@ -9,7 +9,7 @@ function act(c){
 	c.relation = {};
 	c.customerTable = {};
 	c.relation.childTable = c.customerTable;
-	c.customerStrategy = {product : c.productStrategy};
+	c.customerStrategy = {};
 	c.strategy = {customer : c.customerStrategy, other: {}};
 	c.dto = {};	
 
