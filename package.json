@@ -1,15 +1,15 @@
 {
   "name": "rdb",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "main": "index.js",
   "title": "rdb",
   "description": "Object Relational Mapper for postgres",
   "keywords": ["orm","sql","postgres","pg"],
   "dependencies": {
 		"a": "0.4.3",
-    "pg.js" : "*",
+    "pg.js" : "3.1.0",
     "node-uuid" : "1.4.1", 
-    "promise" : "*"
+    "promise" : "5.0.0"
   },
   "repository" : {
          "type" : "git",

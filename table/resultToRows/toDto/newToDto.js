@@ -6,37 +6,38 @@ var extractDto = require('./newToDto/extractDto');
 var resultToPromise = require('../../resultToPromise');
 
 function newToDto(strategy, table, dto) {
-	dto = extractDto.apply(null, arguments);
-    
-    function toDto(row) {	
-    	if (!row)     {
-    		return resultToPromise(null);
-    	}
-		var dtoPromise = resultToPromise(dto);	
+    dto = extractDto.apply(null, arguments);
+
+    function toDto(row) {
+        if (!row) {
+            return resultToPromise(null);
+        }
+
         var relations = table._relations;
         mapFields(strategy, table, row, dto);
-        var visitor = {},
-        	promises = [],
-        	newRelatedToDto;
+        
+        var promises = [];
+        for (var relationName in strategy) {            
+            var relation = relations[relationName];             
+            var visitor = {};
+            visitor.visitJoin = function() {
+                var relatedToDto = newSingleRelatedToDto(relationName, relation, strategy, dto);
+                var promise = row[relationName].then(relatedToDto);
+                promises.push(promise);
+            };
 
-        visitor.visitJoin = function(relation) {
-            newRelatedToDto = newSingleRelatedToDto;
-        };
+            visitor.visitMany = function() {
+                var relatedToDto = newManyRelatedToDto(relationName, relation, strategy, dto);
+                var promise = row[relationName].then(relatedToDto);
+                promises.push(promise);
+            };
 
-        visitor.visitMany = function(relation) {
-            newRelatedToDto = newManyRelatedToDto;
-        };
-
-        visitor.visitOne = visitor.visitJoin;
-
-        for (var relationName in strategy) {
-            var relation = relations[relationName];
+            visitor.visitOne = visitor.visitJoin;
+            
             relation.accept(visitor);
-            var relatedToDto = newRelatedToDto(relationName, relation, strategy, dto);
-            var promise = row[relationName].then(relatedToDto);
-            promises.push(promise);
+            
         }
-        return all(promises).then(dtoPromise);
+        return all(promises).then(function() {return dto;});
     }
 
     return toDto;

@@ -3,8 +3,6 @@ var requireMock = require('a').requireMock;
 
 function act(c) {
     c.row = {};
-    c.dtoPromise = {};
-    c.resultToPromise.expect(c.dto).return(c.dtoPromise);
 
     stubTable();
 
@@ -71,7 +69,14 @@ function act(c) {
         c.expected = {};
         c.allPromise = {};
         c.allPromise.then = c.mock();
-        c.allPromise.then.expect(c.dtoPromise).return(c.expected);
+        c.allPromise.then.expectAnything().whenCalled(onAll).return(c.expected);
+
+        function onAll(cb) {
+            var ret = cb();
+            if (ret != c.dto)
+                throw new Error('wrong result');
+        }
+
         c.all.expect([c.customerMapper, c.linesMapper, c.barMapper]).return(c.allPromise);
     }
 

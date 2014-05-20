@@ -6,7 +6,7 @@ function _newToDto() {
 	return newToDto.apply(null,arguments);
 }
 
-function newSingleRelatedToDto(relationName, relation, strategy, dto) {
+function newManyRelatedToDto(relationName, relation, strategy, dto) {
 
 	var subStrategy = strategy[relationName];
 	var subTable = relation.childTable;
@@ -28,4 +28,4 @@ function newSingleRelatedToDto(relationName, relation, strategy, dto) {
 	}
 };
 
-module.exports = newSingleRelatedToDto;
+module.exports = newManyRelatedToDto;
