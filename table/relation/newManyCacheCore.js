@@ -1,4 +1,5 @@
 var newCacheCore = require('../newCache');
+var newRowArray = require('../rowArray');
 
 function newManyCache(joinRelation) {
     var c = {}
@@ -13,10 +14,13 @@ function newManyCache(joinRelation) {
     function tryAdd(parentRow, childRow) {
         var key = toKey(parentRow);
         var existing = cache.tryGet(key);
-        if(existing)
+        if(existing) {
             existing.push(childRow);
-        else 
-            existing = cache.tryAdd(key, [childRow]);
+            return;
+        }
+        var rows = newRowArray(joinRelation.parentTable);
+        rows.push(childRow);
+        existing = cache.tryAdd(key, rows);
     };
 
     c.tryAdd = tryAdd;

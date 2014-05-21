@@ -2,7 +2,6 @@ var updateField = require('../updateField');
 var newEmitEvent = require('../../emitEvent');
 var extractStrategy = require('./toDto/extractStrategy');
 var newToDto = require('./toDto/newToDto');
-var newDto = require('../../newObject');
 
 function shallowDbRowToRow(table, values) {	
 	var row = {};
@@ -74,9 +73,8 @@ function shallowDbRowToRow(table, values) {
 	row.toJSON = function(strategy) {			
 		var args = Array.prototype.slice.call(arguments, 0);
 		args.push(table);			
-		strategy = extractStrategy.apply(null,args);
-		var dto = newDto();
-		var toDto = newToDto(strategy, table, dto);
+		strategy = extractStrategy.apply(null,args);		
+		var toDto = newToDto(strategy, table);
 		return toDto(row).then(JSON.stringify);
 	};
 	

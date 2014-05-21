@@ -3,6 +3,7 @@ var mock = a.mock;
 var requireMock = a.requireMock;
 
 function act(c){
+	c.newRowArray = requireMock('../rowArray');
 	c.mock = mock;	
 	c.cacheCore = {};
 	c.cacheCore.tryAdd = mock();
@@ -13,7 +14,9 @@ function act(c){
 
 	c.joinRelation = {};
 	c.parentTable = {};
+	c.childTable = {};
 	c.joinRelation.childTable = c.parentTable;
+	c.joinRelation.parentTable = c.childTable;
 		
 	c.primaryColumn = {};
 	c.alias = 'pk1';
