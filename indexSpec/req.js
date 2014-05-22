@@ -11,6 +11,8 @@ function act(c){
 	c.newBoolean = requireMock('./table/column/newBoolean');
 	c.table = requireMock('./table');
 	c.newBoolean.expect(c.parameterized).return(c.emptyFilter);
+	c.commit = requireMock('./table/commit');
+	c.rollback = requireMock('./table/rollback');
 
 	c.newDatabase = requireMock('./newDatabase');
 		

@@ -1,9 +1,7 @@
 var init = require('./init'),
     db = require('./myDb'),
+    rdb = require('../index');
     Order = require('./order');
-
-var strategy, filter,
-    commit, rollback;
 
 insertDemoThenGet();
 
@@ -12,11 +10,7 @@ function insertDemoThenGet() {
 }
 
 function runDbTest() {
-    var transaction = db.transaction();
-    commit = transaction.commit;
-    rollback = transaction.rollback;
-
-    transaction.then(getById).then(commit).then(null, rollback).done(onOk, onFailed);
+    db.transaction().then(getById).then(rdb.commit).then(null, rdb.rollback).done(onOk, onFailed);
 }
 
 function getById() {
