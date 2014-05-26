@@ -8,7 +8,10 @@ function newManyCache(joinRelation) {
 
     c.tryGet = function(parentRow) {
         var key = toKey(parentRow);
-        return cache.tryGet(key);
+        var rows =  cache.tryGet(key);
+        if (!rows) 
+            return newArray();
+        return rows;
     };
 
     function tryAdd(parentRow, childRow) {
@@ -18,10 +21,14 @@ function newManyCache(joinRelation) {
             existing.push(childRow);
             return;
         }
-        var rows = newRowArray(joinRelation.parentTable);
+        var rows = newArray();
         rows.push(childRow);
         existing = cache.tryAdd(key, rows);
     };
+
+    function newArray() {
+        return newRowArray(joinRelation.parentTable);
+    }
 
     c.tryAdd = tryAdd;
 

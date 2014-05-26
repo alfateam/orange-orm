@@ -27,6 +27,7 @@ function act(c) {
     c.fooColumn = fooColumn;
     c.barColumn = barColumn;
     c.newLeg = requireMock('./relation/newJoinLeg');
+    c.nullPromise = requireMock('./nullPromise');
     c.sut = require('../newJoinRelation')(parentTable, childTable, c.columnNames);
 }
 

@@ -1,5 +1,6 @@
 var newLeg = require('./relation/newJoinLeg'),
-    getById = require('./getById');
+    getById = require('./getById'),
+    nullPromise = require('./nullPromise');
 
 function _newJoin(parentTable, childTable, columnNames) {
     var c = {};
@@ -23,7 +24,7 @@ function _newJoin(parentTable, childTable, columnNames) {
         });
 
         if (primaryKeys.some(isNullOrUndefined)) {
-            return null;
+            return nullPromise;
         }
         var args = [childTable].concat(primaryKeys);
         return getById.apply(null, args);
