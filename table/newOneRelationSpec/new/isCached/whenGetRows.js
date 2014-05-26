@@ -3,5 +3,5 @@ var when = require('a').when;
 var c = {};
 
 when(c)
-	.it('should return cached result').assertEqual(c.cachedResult, c.returned)
+	.it('should return cached result').assertEqual(c.expected, c.returned)
 	;

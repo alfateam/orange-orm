@@ -21,6 +21,7 @@ function act(c){
 	c.expanderCache.tryAdd = mock();
 
 	c.newLeg = requireMock('./relation/newOneLeg');	
+	c.resultToPromise = requireMock('./resultToPromise');
 	c.sut = require('../newOneRelation')(c.joinRelation);
 }
 
