@@ -1,7 +1,8 @@
 var requireMock = require('a').requireMock;
 var newShallowJoinSql = requireMock('./newShallowJoinSql');
 
-var expected = {};
+var shallowJoinSql = ' <shallowJoinSql>';
+var expected = ' LEFT <shallowJoinSql>';
 var alias = {};
 var childAlias = {};
 var leftTable = {};
@@ -18,7 +19,8 @@ leg.columns = leftColumns;
 span.table = rightTable;
 
 function act(c) {
-	newShallowJoinSql.expect(rightTable,leftColumns,primaryColumns,alias,childAlias).return(expected);
+
+	newShallowJoinSql.expect(rightTable,leftColumns,primaryColumns,alias,childAlias).return(shallowJoinSql);
 	c.expected = expected;
 	c.returned = require('../joinLegToShallowJoinSql')(leg,alias,childAlias);
 }
