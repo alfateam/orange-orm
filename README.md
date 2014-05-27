@@ -10,7 +10,7 @@ Eager or lazy loading.
 Based on promises.  
 All [examples][0] er found at npmjs.org/package/rdb-demo.
 
-[getById][1]
+__[getById][1]__
 ------------------
 ```
 var rdb = require('rdb');
