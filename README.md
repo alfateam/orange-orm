@@ -2185,5 +2185,5 @@ function onFailed(err) {
 [37]:https://github.com/alfateam/rdb-demo/blob/master/filtering/andAlternative.js
 [38]:https://github.com/alfateam/rdb-demo/blob/master/filtering/subFilter.js
 [39]:https://github.com/alfateam/rdb-demo/blob/master/filtering/compositeFilter.js
-[101]:https://github.com/alfateam/rdb-demo/blob/master/filtering/defaultValues.js
-[102]:https://github.com/alfateam/rdb-demo/blob/master/filtering/conventions.js
+[101]:https://github.com/alfateam/rdb-demo/blob/master/defaultValues.js
+[102]:https://github.com/alfateam/rdb-demo/blob/master/conventions.js
