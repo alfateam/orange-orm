@@ -53,8 +53,7 @@ function onFailed(err) {
 }
 ```
 
-[tryGetFirst][2]
-------------------
+__[tryGetFirst][2]__
 ```
 var rdb = require('rdb');
 
@@ -96,8 +95,7 @@ function onFailed(err) {
 }
 ```
 
-[join][3]
-------------------
+__[join][3]__
 ```
 var rdb = require('rdb');
 
@@ -151,8 +149,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-[hasMany][4]
-------------------
+__[hasMany][4]__
 ```
 var rdb = require('rdb');
 
@@ -211,8 +208,7 @@ function onFailed(err) {
 }
 ```
 
-[hasOne][5]
-------------------
+__[hasOne][5]__
 ```
 var rdb = require('rdb');
 
@@ -268,8 +264,7 @@ function onFailed(err) {
 }
 ```
 
-[composite keys][6]
-------------------
+__[composite keys][6]__
 ```
 var rdb = require('rdb');
 
@@ -329,8 +324,7 @@ function onFailed(err) {
 }
 ```
 
-[getById eagerly][7]
-------------------
+__[getById eagerly][7]__
 ```
 var rdb = require('rdb');
 
@@ -384,8 +378,7 @@ function onFailed(err) {
 }
 ```
 
-[tryGetFirst eagerly][8]
-------------------
+__[tryGetFirst eagerly][8]__
 ```
 var rdb = require('rdb');
 
@@ -445,8 +438,7 @@ function onFailed(err) {
 }
 ```
 
-[tooJSON][9]
-------------------
+__[toJSON][9]__
 ```
 var rdb = require('rdb');
 
@@ -513,8 +505,7 @@ function onFailed(err) {
 }
 ```
 
-[toJSON with strategy][10]
-------------------
+__[toJSON with strategy][10]__
 ```
 var rdb = require('rdb');
 
@@ -581,8 +572,7 @@ function onFailed(err) {
 }
 ```
 
-[getMany][11]
-------------------
+__[getMany][11]__
 ```
 var rdb = require('rdb');
 
@@ -627,8 +617,7 @@ function onFailed(err) {
 }
 ```
 
-[getMany lazily][12]
-------------------
+__[getMany lazily][12]__
 ```
 var rdb = require('rdb'),
     promise = require('promise');
@@ -693,8 +682,7 @@ function onFailed(err) {
 }
 ```
 
-[getMany eagerly][13]
-------------------
+__[getMany eagerly][13]__
 ```
 var rdb = require('rdb'),
     promise = require('promise');
@@ -761,8 +749,7 @@ function onFailed(err) {
 }
 ```
 
-[(many)ToJSON][14]
-------------------
+__[(many)ToJSON][14]__
 ```
 var rdb = require('rdb');
 
@@ -829,8 +816,7 @@ function onFailed(err) {
 }
 ```
 
-[(many)ToJSON with strategy][15]
-------------------
+__[(many)ToJSON with strategy][15]__
 ```
 var rdb = require('rdb');
 
@@ -897,8 +883,7 @@ function onFailed(err) {
 }
 ```
 
-[update][16]
-------------------
+__[update][16]__
 ```
 var rdb = require('rdb');
 
@@ -942,8 +927,7 @@ function onFailed(err) {
 }
 ```
 
-[insert][17]
-------------------
+__[insert][17]
 ```
 var rdb = require('rdb');
 
@@ -987,8 +971,7 @@ function onFailed(err) {
 }
 ```
 
-[default values][101]
-------------------
+__[default values][101]__
 ```
 var rdb = require('rdb');
 
@@ -1042,8 +1025,7 @@ function onFailed(err) {
 }
 ```
 
-[conventions][102]
-------------------
+__[conventions][102]__
 ```
 var rdb = require('rdb'),
     resetDemo = require('./db/resetDemo');
@@ -1083,8 +1065,7 @@ function onFailed(err) {
 }
 ```
 
-[update a join child][18]
-------------------
+__[update a join relation][18]__
 ```
 var rdb = require('rdb');
 
@@ -1136,8 +1117,7 @@ function onFailed(err) {
 }
 ```
 
-[update a hasOne child][19]
-------------------
+__[update a hasOne relation][19]__
 ```
 var rdb = require('rdb');
 
@@ -1192,8 +1172,7 @@ function onFailed(err) {
 }
 ```
 
-[update hasMany children][20]
-------------------
+__[update hasMany relation][20]__
 ```
 var rdb = require('rdb');
 
@@ -1255,8 +1234,7 @@ function onFailed(err) {
 }
 ```
 
-[equal filter][21]
-------------------
+__[equal filter][21]__
 ```
 var rdb = require('rdb');
 
@@ -1299,8 +1277,7 @@ function onFailed(err) {
 }
 ```
 
-[notEqual filter][22]
-------------------
+__[notEqual filter][22]__
 ```
 var rdb = require('rdb');
 
@@ -1343,8 +1320,7 @@ function onFailed(err) {
 }
 ```
 
-[not filter][23]
-------------------
+__[not filter][23]__
 ```
 var rdb = require('rdb');
 
@@ -1386,8 +1362,7 @@ function onFailed(err) {
 }
 ```
 
-[lessThan filter][24]
-------------------
+__[lessThan filter][24]__
 ```
 var rdb = require('rdb');
 
@@ -1431,8 +1406,7 @@ function onFailed(err) {
 }
 ```
 
-[lessThanOrEqual][25]
-------------------
+__[lessThanOrEqual][25]__
 ```
 var rdb = require('rdb');
 
@@ -1476,8 +1450,7 @@ function onFailed(err) {
 }
 ```
 
-[greaterThan filter][26]
-------------------
+__[greaterThan filter][26]__
 ```
 var rdb = require('rdb');
 
@@ -1521,8 +1494,7 @@ function onFailed(err) {
 }
 ```
 
-[greaterThanOrEqual filter][27]
-------------------
+__[greaterThanOrEqual filter][27]__
 ```
 var rdb = require('rdb');
 
@@ -1566,8 +1538,7 @@ function onFailed(err) {
 }
 ```
 
-[between filter][28]
-------------------
+__[between filter][28]__
 ```
 var rdb = require('rdb');
 
@@ -1610,8 +1581,7 @@ function onFailed(err) {
 }
 ```
 
-[in filter][29]
-------------------
+__[in filter][29]__
 ```
 var rdb = require('rdb');
 
@@ -1654,8 +1624,7 @@ function onFailed(err) {
 ```
 
 
-[startsWith filter][30]
-------------------
+__[startsWith filter][30]__
 ```
 var rdb = require('rdb');
 
@@ -1697,8 +1666,7 @@ function onFailed(err) {
 }
 ```
 
-[endsWith filter][31]
-------------------
+__[endsWith filter][31]__
 ```
 var rdb = require('rdb');
 
@@ -1740,8 +1708,7 @@ function onFailed(err) {
 }
 ```
 
-[contains][32]
-------------------
+__[contains][32]__
 ```
 var rdb = require('rdb');
 
@@ -1783,8 +1750,7 @@ function onFailed(err) {
 }
 ```
 
-[exists][33]
-------------------
+__[exists][33]__
 ```
 var rdb = require('rdb');
 
@@ -1836,8 +1802,7 @@ function onFailed(err) {
 }
 ```
 
-[or filter][34]
-------------------
+__[or filter][34]__
 ```
 var rdb = require('rdb');
 
@@ -1882,8 +1847,7 @@ function onFailed(err) {
 }
 ```
 
-[and filter][35]
-------------------
+__[and filter][35]__
 ```
 var rdb = require('rdb');
 
@@ -1929,8 +1893,7 @@ function onFailed(err) {
 }
 ```
 
-[or alternative filter][36]
-------------------
+__[or alternative filter][36]__
 ```
 var rdb = require('rdb'),
     resetDemo = require('../db/resetDemo');
@@ -1976,8 +1939,7 @@ function onFailed(err) {
 }
 ```
 
-[and alternative filter][37]
-------------------
+__[and alternative filter][37]__
 ```
 var rdb = require('rdb'),
     resetDemo = require('../db/resetDemo');
@@ -2025,8 +1987,7 @@ function onFailed(err) {
 }
 ```
 
-[sub filter][38]
-------------------
+__[sub filter][38]__
 ```
 var rdb = require('rdb');
 
@@ -2078,8 +2039,7 @@ function onFailed(err) {
 }
 ```
 
-[composite filter][39]
-------------------
+__[composite filter][39]__
 ```
 var rdb = require('rdb');
 
