@@ -57,8 +57,7 @@ function onFailed(err) {
 [tryGetFirst][2]
 ------------------
 ```
-var rdb = require('rdb'),
-    resetDemo = require('./db/resetDemo');
+var rdb = require('rdb');
 
 var Customer = rdb.table('_customer');
 
@@ -67,8 +66,7 @@ Customer.column('cName').string().as('name');
 
 var db = rdb('postgres://postgres:postgres@localhost/test');
 
-resetDemo() 
-    .then(db.transaction)
+db.transaction()
     .then(tryGetFirst)
     .then(printCustomer)
     .then(rdb.commit)
@@ -101,4 +99,4 @@ function onFailed(err) {
 
 [0]:https://npmjs.org/package/rdb-demo
 [1]:https://github.com/alfateam/rdb-demo/blob/master/getById.js
-[1]:https://github.com/alfateam/rdb-demo/blob/master/tryGetFirst.js
+[2]:https://github.com/alfateam/rdb-demo/blob/master/tryGetFirst.js
