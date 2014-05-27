@@ -11,7 +11,6 @@ Based on promises.
 All [examples][0] er found at npmjs.org/package/rdb-demo.
 
 __[getById][1]__
-------------------
 ```
 var rdb = require('rdb');
 
