@@ -3,14 +3,9 @@ var mock = a.mock;
 var requireMock = a.requireMock;
 
 function act(c){
-	c.parameterized = {};
+	c.emptyFilter = requireMock('./emptyFilter');
 	c.mock = mock;	
-	c.emptyFilter = {};
-	c.newParameterized = requireMock('./table/query/newParameterized');
-	c.newParameterized.expect('').return(c.parameterized);
-	c.newBoolean = requireMock('./table/column/newBoolean');
 	c.table = requireMock('./table');
-	c.newBoolean.expect(c.parameterized).return(c.emptyFilter);
 	c.commit = requireMock('./table/commit');
 	c.rollback = requireMock('./table/rollback');
 
