@@ -9,7 +9,7 @@ Persistence ignorance - no need for explicit updates or saving, everything is ha
 Eager or lazy loading.  
 Based on promises.  
 All [examples][0] er found at npmjs.org/package/rdb-demo.  
-_table of contents_
+_Table of contents_
 ---------------
 __Querying__  
 __[getById](#getById)__  
