@@ -1,10 +1,12 @@
 {
   "name": "rdb",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "main": "index.js",
   "title": "rdb",
   "description": "Object Relational Mapper for postgres",
   "keywords": ["orm","sql","postgres","pg"],
+  "author": "Lars-Erik Roald <lars.roald@gmail.com>",
+  "license": "MIT",
   "dependencies": {
 		"a": "0.4.3",
     "pg.js" : "3.1.0",
