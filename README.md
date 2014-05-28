@@ -13,53 +13,53 @@ _Table of contents_
 ---------------
 __Querying__  
 [getById][901]  
-[tryGetFirst](#tryGetFirstn)  
-[join](#joinn)  
-[hasMany](#hasManyn)  
-[hasOne](#hasOnen)  
-[composite keys](#compositeKeysn)  
-[getById eagerly](#getByIdEagern)  
-[tryGetFirst eagerly](#tryGetFirstEagern)  
-[toJSON](#toJSONn)  
-[toJSON with strategy](#toJSONWithStrategyn)  
-[getMany](#getManyn)  
-[getMany lazily](#getManyLazyn)  
-[getMany eagerly](#getManyEagern)  
-[manyToJSON](#manyToJSON)  
-[(many)ToJSON with strategy](#manyToJSONWithStrategyn)  
+[tryGetFirst][902]  
+[join][903]  
+[hasMany][904]  
+[hasOne][905]  
+[composite keys][906]  
+[getById eagerly][907]  
+[tryGetFirst eagerly][908]  
+[toJSON][909]  
+[toJSON with strategy][910]  
+[getMany][911]  
+[getMany lazily][912]  
+[getMany eagerly][913]  
+[manyToJSON][914]  
+[(many)ToJSON with strategy][915]  
 
 __Persistence__  
-[update](#updaten)  
-[insert](#insertn)  
-[default values](#defaultValuesn)  
-[conventions](#conventionsn)  
-[update a join-relation](#updateJoinn)  
-[update a hasOne-relation](#updateHasOnen)  
-[update a hasMany-relation](#updateHasManyn)  
+[update][916]  
+[insert][917]  
+[default values][918]  
+[conventions][919]  
+[update a join-relation][920]  
+[update a hasOne-relation][921]  
+[update a hasMany-relation][922]  
 
 __Filtering__  
-[equal](#equaln)  
-[notEqual](#notEqualn)  
-[not](#notn)  
-[lessThan](#lessThann)  
-[lessThanOrEqual](#lessThanOrEqualn)  
-[greaterThan](#greaterThann)  
-[greaterThanOrEqual](#greaterThanOrEqualn)  
-[between](#betweenn)  
-[in](#in)  
-[startsWith](#startsWithn)  
-[endsWith](#endsWithn)  
-[contains](#containsn)  
-[exists](#existsn)  
-[or](#orn)  
-[and](#andn)  
-[or alternative syntax](#orAlternativen)  
-[and alternative syntax](#andAlternativen)  
-[sub filter](#subFiltern)  
-[composite filter](#compositeFiltern)  
+[equal][923]  
+[notEqual][924]  
+[not][925]  
+[lessThan][926]  
+[lessThanOrEqual][927]  
+[greaterThan][928]  
+[greaterThanOrEqual][929]  
+[between][930]  
+[in][931]   
+[startsWith][932]  
+[endsWith][933]  
+[contains][934]  
+[exists][935]  
+[or][936]  
+[and][937]  
+[or alternative syntax][938]  
+[and alternative syntax][939]  
+[sub filter][940]    
+[composite filter][941]  
 _Contents_
 ---------------
-<a name="getByIdn"></a>
+<a name="getById"></a>
 __[getById][1]__
 ```
 var rdb = require('rdb');
@@ -102,7 +102,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="tryGetFirstn"></a>
+<a name="tryGetFirst"></a>
 __[tryGetFirst][2]__
 ```
 var rdb = require('rdb');
@@ -144,7 +144,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="joinn"></a>
+<a name="join"></a>
 __[join][3]__
 ```
 var rdb = require('rdb');
@@ -199,7 +199,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="hasManyn"></a>
+<a name="hasMany"></a>
 __[hasMany][4]__
 ```
 var rdb = require('rdb');
@@ -258,7 +258,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="hasOnen"></a>
+<a name="hasOne"></a>
 __[hasOne][5]__
 ```
 var rdb = require('rdb');
@@ -314,7 +314,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="compositeKeysn"></a>
+<a name="compositeKeys"></a>
 __[composite keys][6]__
 ```
 var rdb = require('rdb');
@@ -374,7 +374,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="getByIdEagern"></a>
+<a name="getByIdEager"></a>
 __[getById eagerly][7]__
 ```
 var rdb = require('rdb');
@@ -428,7 +428,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="tryGetFirstEagern"></a>
+<a name="tryGetFirstEager"></a>
 __[tryGetFirst eagerly][8]__
 ```
 var rdb = require('rdb');
@@ -488,7 +488,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-__<a name="toJSONn"></a>__
+__<a name="toJSON"></a>__
 [toJSON][9]
 ```
 var rdb = require('rdb');
@@ -555,7 +555,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="toJSONWithStrategyn"></a>
+<a name="toJSONWithStrategy"></a>
 __[toJSON with strategy][10]__
 ```
 var rdb = require('rdb');
@@ -622,7 +622,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="getManyn"></a>
+<a name="getMany"></a>
 __[getMany][11]__
 ```
 var rdb = require('rdb');
@@ -667,7 +667,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="getManyLazyn"></a>
+<a name="getManyLazy"></a>
 __[getMany lazily][12]__
 ```
 var rdb = require('rdb'),
@@ -732,7 +732,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="getManyEagern"></a>
+<a name="getManyEager"></a>
 __[getMany eagerly][13]__
 ```
 var rdb = require('rdb'),
@@ -799,7 +799,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="manyToJSONn"></a>
+<a name="manyToJSON"></a>
 __[(many)ToJSON][14]__
 ```
 var rdb = require('rdb');
@@ -866,7 +866,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="manyToJSONWithStrategyn"></a>
+<a name="manyToJSONWithStrategy"></a>
 __[(many)ToJSON with strategy][15]__
 ```
 var rdb = require('rdb');
@@ -933,7 +933,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="updaten"></a>
+<a name="update"></a>
 __[update][16]__
 ```
 var rdb = require('rdb');
@@ -977,7 +977,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="insertn"></a>
+<a name="insert"></a>
 __[insert][17]__
 ```
 var rdb = require('rdb');
@@ -1021,7 +1021,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="defaultValuesn"></a>
+<a name="defaultValues"></a>
 __[default values][101]__
 ```
 var rdb = require('rdb');
@@ -1075,7 +1075,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="conventionsn"></a>
+<a name="conventions"></a>
 __[conventions][102]__
 ```
 var rdb = require('rdb'),
@@ -1115,7 +1115,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="updateJoinn"></a>
+<a name="updateJoin"></a>
 __[update a join-relation][18]__
 ```
 var rdb = require('rdb');
@@ -1167,7 +1167,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="updateHasOnen"></a>
+<a name="updateHasOne"></a>
 __[update a hasOne-relation][19]__
 ```
 var rdb = require('rdb');
@@ -1222,7 +1222,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="updateHasManyn"></a>
+<a name="updateHasMany"></a>
 __[update a hasMany-relation][20]__
 ```
 var rdb = require('rdb');
@@ -1284,7 +1284,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="equaln"></a>
+<a name="equal"></a>
 __[equal][21]__
 ```
 var rdb = require('rdb');
@@ -1327,7 +1327,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="notEqualn"></a>
+<a name="notEqual"></a>
 __[notEqual][22]__
 ```
 var rdb = require('rdb');
@@ -1370,7 +1370,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="notn"></a>
+<a name="not"></a>
 __[not][23]__
 ```
 var rdb = require('rdb');
@@ -1412,7 +1412,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-__<a name="lessThann"></a>__
+__<a name="lessThan"></a>__
 __[lessThan][24]__
 ```
 var rdb = require('rdb');
@@ -1456,7 +1456,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="lessThanOrEqualn"></a>
+<a name="lessThanOrEqual"></a>
 __[lessThanOrEqual][25]__
 ```
 var rdb = require('rdb');
@@ -1500,7 +1500,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="greaterThann"></a>
+<a name="greaterThan"></a>
 __[greaterThan][26]__
 ```
 var rdb = require('rdb');
@@ -1544,7 +1544,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="greaterThanOrEqualn"></a>
+<a name="greaterThanOrEqual"></a>
 __[greaterThanOrEqual][27]__
 ```
 var rdb = require('rdb');
@@ -1588,7 +1588,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="betweenn"></a>
+<a name="between"></a>
 __[between][28]__
 ```
 var rdb = require('rdb');
@@ -1631,7 +1631,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="inn"></a>
+<a name="in"></a>
 __[in][29]__
 ```
 var rdb = require('rdb');
@@ -1673,7 +1673,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="startsWithn"></a>
+<a name="startsWith"></a>
 __[startsWith][30]__
 ```
 var rdb = require('rdb');
@@ -1715,7 +1715,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="endsWithn"></a>
+<a name="endsWith"></a>
 __[endsWith][31]__
 ```
 var rdb = require('rdb');
@@ -1757,7 +1757,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="containsn"></a>
+<a name="contains"></a>
 __[contains][32]__
 ```
 var rdb = require('rdb');
@@ -1799,7 +1799,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="existsn"></a>
+<a name="exists"></a>
 __[exists][33]__
 ```
 var rdb = require('rdb');
@@ -1851,7 +1851,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="orn"></a>
+<a name="or"></a>
 __[or][34]__
 ```
 var rdb = require('rdb');
@@ -1896,7 +1896,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="andn"></a>
+<a name="and"></a>
 __[and][35]__
 ```
 var rdb = require('rdb');
@@ -1942,7 +1942,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="orAlternativen"></a>
+<a name="orAlternative"></a>
 __[or alternative syntax][36]__
 ```
 var rdb = require('rdb'),
@@ -1988,7 +1988,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="andAlternativen"></a>
+<a name="andAlternative"></a>
 __[and alternative syntax][37]__
 ```
 var rdb = require('rdb'),
@@ -2036,7 +2036,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="subFiltern"></a>
+<a name="subFilter"></a>
 __[sub filter][38]__
 ```
 var rdb = require('rdb');
@@ -2088,7 +2088,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="compositeFiltern"></a>
+<a name="compositeFilter"></a>
 __[composite filter][39]__
 ```
 var rdb = require('rdb');
@@ -2196,5 +2196,44 @@ function onFailed(err) {
 [39]:https://github.com/alfateam/rdb-demo/blob/master/filtering/compositeFilter.js
 [101]:https://github.com/alfateam/rdb-demo/blob/master/defaultValues.js
 [102]:https://github.com/alfateam/rdb-demo/blob/master/conventions.js
-
-[901]:#getByIdn
+[901]:#getById
+[902]:#tryGetFirst
+[903]:#join
+[904]:#hasMany
+[905]:#hasOne
+[906]:#compositeKeys
+[907]:#getByIdEager
+[908]:#tryGetFirstEager
+[909]:#toJSON
+[910]:#toJSONWithStrategy
+[911]:#getMany
+[912]:#getManyLazy
+[913]:#getManyEager
+[914]:#manyToJSON
+[915]:#manyToJSONWithStrategy
+[916]:#update
+[917]:#insert
+[918]:#defaultValues
+[919]:#conventions
+[920]:#updateJoin
+[921]:#updateHasOne
+[922]:#updateHasMany
+[923]:#equal
+[924]:#notEqual
+[925]:#not.js
+[926]:#lessThan
+[927]:#lessThanOrEqual
+[928]:#greaterThan
+[929]:#greaterThanOrEqual
+[930]:#between
+[931]:#in.js
+[932]:#startsWith')
+[933]:#endsWith')
+[934]:#contains')
+[935]:#exists
+[936]:#or
+[937]:#and
+[938]:#orAlternative
+[939]:#andAlternative
+[940]:#subFilter
+[941]:#compositeFilter
