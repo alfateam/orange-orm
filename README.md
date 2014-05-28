@@ -487,8 +487,8 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-__<a name="toJSON"></a>__
-[toJSON][9]
+<a name="toJSON"></a>
+__[toJSON][9]__
 ```
 var rdb = require('rdb');
 
