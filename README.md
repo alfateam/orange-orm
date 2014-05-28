@@ -52,6 +52,8 @@ __[or alternative syntax](#orAlternative)__
 __[and alternative syntax](#andAlternative)__  
 __[sub filter](#subFilter)__  
 __[composite filter](#compositeFilter)__  
+_Details_
+---------------
 <a name="getById"></a>
 __[getById][1]__
 ```
@@ -1277,6 +1279,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
+__Filtering__  
 <a name="equal"></a>
 __[equal filter][21]__
 ```
