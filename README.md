@@ -33,8 +33,6 @@ __[conventions](#conventions)__
 __[update join-relation](#updateJoin)__  
 __[update hasOne-relation](#updateHasOne)__  
 __[update hasMany-relation](#updateHasMany)__  
-_Filtering_  
--------------
 __[equal](#equal)__  
 __[notEqual](#notEqual)__  
 __[not](#not)__  
