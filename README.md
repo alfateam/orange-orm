@@ -5,10 +5,10 @@ _ORM for postgres_.
 
 Simple, flexible mapper.  
 Transaction with commit and rollback.  
-Persistence ignorance - no need for explicit updates or saving, everything is handled by transaction.  
+Persistence ignorance - no need for explicit saving, everything is handled by transaction.  
 Eager or lazy loading.  
 Based on promises.  
-All [examples][0] er found at npmjs.org/package/rdb-demo.  
+All examples below are found at [npmjs.org/package/rdb-demo][0].  
 _Table of contents_
 ---------------
 __Querying__  
