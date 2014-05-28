@@ -8,10 +8,10 @@ Transaction with commit and rollback.
 Persistence ignorance - no need for explicit updates or saving, everything is handled by transaction.  
 Eager or lazy loading.  
 Based on promises.  
-All [examples][0] er found at npmjs.org/package/rdb-demo.
-__[getById][]__  
+All [examples][0] er found at npmjs.org/package/rdb-demo.  
+__[getById][#getById]__  
 
-### getById ###
+<a name="getById"></a>
 __[getById][1]__
 ```
 var rdb = require('rdb');
