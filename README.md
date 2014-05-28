@@ -12,7 +12,7 @@ All examples below are found at [npmjs.org/package/rdb-demo][0].
 _Table of contents_
 ---------------
 __Querying__  
-[getById](#getById)  
+[getById](#getByIdn)  
 [tryGetFirst](#tryGetFirst)  
 [join](#join)  
 [hasMany](#hasMany)  
@@ -59,7 +59,7 @@ __Filtering__
 [composite filter](#compositeFilter)  
 _Contents_
 ---------------
-<a name="getById"></a>
+<a name="getByIdn"></a>
 __[getById][1]__
 ```
 var rdb = require('rdb');
