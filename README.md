@@ -1,7 +1,6 @@
-    _rdb_
-===
-_ORM for postgres_. 
-
+__rdb__
+=========
+ORM for postgres. 
 
 Simple, flexible mapper.  
 Transaction with commit and rollback.  
@@ -2196,7 +2195,7 @@ function onFailed(err) {
 [39]:https://github.com/alfateam/rdb-demo/blob/master/filtering/compositeFilter.js
 [101]:https://github.com/alfateam/rdb-demo/blob/master/defaultValues.js
 [102]:https://github.com/alfateam/rdb-demo/blob/master/conventions.js
-[901]:#getById
+[901]:https:./rdb#getById
 [902]:#tryGetFirst
 [903]:#join
 [904]:#hasMany
