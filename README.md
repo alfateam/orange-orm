@@ -11,7 +11,7 @@ Based on promises.
 All [examples][0] er found at npmjs.org/package/rdb-demo.  
 _table of contents_
 ---------------
-__querying__  
+__Querying__  
 __[getById](#getById)__  
 __[tryGetFirst](#tryGetFirst)__  
 __[join](#join)__  
@@ -28,7 +28,7 @@ __[getMany eagerly](#getManyEager)__
 __[manyToJSON](#manyToJSON)__  
 __[(many)ToJSON with strategy](#manyToJSONWithStrategy)__  
 
-__persistence__  
+__Persistence__  
 __[update](#update)__  
 __[insert](#insert)__  
 __[default values](#defaultValues)__  
@@ -37,7 +37,7 @@ __[update a join-relation](#updateJoin)__
 __[update a hasOne-relation](#updateHasOne)__  
 __[update a hasMany-relation](#updateHasMany)__  
 
-__filtering__  
+__Filtering__  
 __[equal](#equal)__  
 __[notEqual](#notEqual)__  
 __[not](#not)__  
@@ -57,7 +57,7 @@ __[or alternative syntax](#orAlternative)__
 __[and alternative syntax](#andAlternative)__  
 __[sub filter](#subFilter)__  
 __[composite filter](#compositeFilter)__  
-_contents_
+_Contents_
 ---------------
 <a name="getById"></a>
 __[getById][1]__
