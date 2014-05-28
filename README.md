@@ -2197,4 +2197,4 @@ function onFailed(err) {
 [101]:https://github.com/alfateam/rdb-demo/blob/master/defaultValues.js
 [102]:https://github.com/alfateam/rdb-demo/blob/master/conventions.js
 
-[901]:#getById
+[901]:#getByIdn
