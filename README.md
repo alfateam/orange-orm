@@ -30,9 +30,9 @@ __[update](#update)__
 __[insert](#insert)__  
 __[default values](#defaultValues)__  
 __[conventions](#conventions)__  
-__[update join-relation](#updateJoin)__  
-__[update hasOne-relation](#updateHasOne)__  
-__[update hasMany-relation](#updateHasMany)__  
+__[update a join-relation](#updateJoin)__  
+__[update a hasOne-relation](#updateHasOne)__  
+__[update a hasMany-relation](#updateHasMany)__  
 __[equal](#equal)__  
 __[notEqual](#notEqual)__  
 __[not](#not)__  
@@ -1216,7 +1216,7 @@ function onFailed(err) {
 }
 ```
 <a name="updateHasMany"></a>
-__[update hasMany-relation][20]__
+__[update a hasMany-relation][20]__
 ```
 var rdb = require('rdb');
 
