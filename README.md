@@ -33,6 +33,7 @@ __[conventions](#conventions)__
 __[update a join-relation](#updateJoin)__  
 __[update a hasOne-relation](#updateHasOne)__  
 __[update a hasMany-relation](#updateHasMany)__  
+__Filtering__  
 __[equal](#equal)__  
 __[notEqual](#notEqual)__  
 __[not](#not)__  
@@ -1279,7 +1280,6 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-__Filtering__  
 <a name="equal"></a>
 __[equal filter][21]__
 ```
