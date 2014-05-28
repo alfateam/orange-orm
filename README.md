@@ -12,7 +12,7 @@ All examples below are found at [npmjs.org/package/rdb-demo][0].
 _Table of contents_
 ---------------
 __Querying__  
-__[getById](#getById)__  
+[getById](#getById)  
 __[tryGetFirst](#tryGetFirst)__  
 __[join](#join)__  
 __[hasMany](#hasMany)__  
