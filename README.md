@@ -9,7 +9,7 @@ Persistence ignorance - no need for explicit updates or saving, everything is ha
 Eager or lazy loading.  
 Based on promises.  
 All [examples][0] er found at npmjs.org/package/rdb-demo.  
-_Contents_
+_Index_
 ---------------
 __[getById](#getById)__  
 __[tryGetFirst](#tryGetFirst)__  
@@ -33,6 +33,7 @@ __[conventions](#conventions)__
 __[update a join-relation](#updateJoin)__  
 __[update a hasOne-relation](#updateHasOne)__  
 __[update a hasMany-relation](#updateHasMany)__  
+  
 __Filtering__  
 __[equal](#equal)__  
 __[notEqual](#notEqual)__  
@@ -53,7 +54,7 @@ __[or alternative syntax](#orAlternative)__
 __[and alternative syntax](#andAlternative)__  
 __[sub filter](#subFilter)__  
 __[composite filter](#compositeFilter)__  
-_Details_
+_Contents_
 ---------------
 <a name="getById"></a>
 __[getById][1]__
