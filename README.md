@@ -13,54 +13,54 @@ _Table of contents_
 ---------------
 __Querying__  
 [getById](#getById)  
-[tryGetFirst](#tryGetFirst)__  
-[join](#join)__  
-[hasMany](#hasMany)__  
-[hasOne](#hasOne)__  
-[composite keys](#compositeKeys)__  
-[getById eagerly](#getByIdEager)__  
-[tryGetFirst eagerly](#tryGetFirstEager)__  
-[toJSON](#toJSON)__  
-[toJSON with strategy](#toJSONWithStrategy)__  
-[getMany](#getMany)__  
-[getMany lazily](#getManyLazy)__  
-[getMany eagerly](#getManyEager)__  
-[manyToJSON](#manyToJSON)__  
-[(many)ToJSON with strategy](#manyToJSONWithStrategy)__  
+[tryGetFirst](#tryGetFirst)  
+[join](#join)  
+[hasMany](#hasMany)  
+[hasOne](#hasOne)  
+[composite keys](#compositeKeys)  
+[getById eagerly](#getByIdEager)  
+[tryGetFirst eagerly](#tryGetFirstEager)  
+[toJSON](#toJSON)  
+[toJSON with strategy](#toJSONWithStrategy)  
+[getMany](#getMany)  
+[getMany lazily](#getManyLazy)  
+[getMany eagerly](#getManyEager)  
+[manyToJSON](#manyToJSON)  
+[(many)ToJSON with strategy](#manyToJSONWithStrategy)  
 
 __Persistence__  
-[update](#update)__  
-[insert](#insert)__  
-[default values](#defaultValues)__  
-[conventions](#conventions)__  
-[update a join-relation](#updateJoin)__  
-[update a hasOne-relation](#updateHasOne)__  
-[update a hasMany-relation](#updateHasMany)__  
+[update](#update)  
+[insert](#insert)  
+[default values](#defaultValues)  
+[conventions](#conventions)  
+[update a join-relation](#updateJoin)  
+[update a hasOne-relation](#updateHasOne)  
+[update a hasMany-relation](#updateHasMany)  
 
 __Filtering__  
-[equal](#equal)__  
-[notEqual](#notEqual)__  
-[not](#not)__  
-[lessThan](#lessThan)__  
-[lessThanOrEqual](#lessThanOrEqual)__  
-[greaterThan](#greaterThan)__  
-[greaterThanOrEqual](#greaterThanOrEqual)__  
-[between](#between)__  
-[in](#in)__  
-[startsWith](#startsWith)__  
-[endsWith](#endsWith)__  
-[contains](#contains)__  
-[exists](#exists)__  
-[or](#or)__  
-[and](#and)__  
-[or alternative syntax](#orAlternative)__  
-[and alternative syntax](#andAlternative)__  
-[sub filter](#subFilter)__  
-[composite filter](#compositeFilter)__  
+[equal](#equal)  
+[notEqual](#notEqual)  
+[not](#not)  
+[lessThan](#lessThan)  
+[lessThanOrEqual](#lessThanOrEqual)  
+[greaterThan](#greaterThan)  
+[greaterThanOrEqual](#greaterThanOrEqual)  
+[between](#between)  
+[in](#in)  
+[startsWith](#startsWith)  
+[endsWith](#endsWith)  
+[contains](#contains)  
+[exists](#exists)  
+[or](#or)  
+[and](#and)  
+[or alternative syntax](#orAlternative)  
+[and alternative syntax](#andAlternative)  
+[sub filter](#subFilter)  
+[composite filter](#compositeFilter)  
 _Contents_
 ---------------
 <a name="getById"></a>
-[getById][1]
+__[getById][1]__
 ```
 var rdb = require('rdb');
 
@@ -103,7 +103,7 @@ function onFailed(err) {
 }
 ```
 <a name="tryGetFirst"></a>
-[tryGetFirst][2]
+__[tryGetFirst][2]__
 ```
 var rdb = require('rdb');
 
@@ -145,7 +145,7 @@ function onFailed(err) {
 }
 ```
 <a name="join"></a>
-[join][3]
+__[join][3]__
 ```
 var rdb = require('rdb');
 
@@ -200,7 +200,7 @@ function onFailed(err) {
 }
 ```
 <a name="hasMany"></a>
-[hasMany][4]
+__[hasMany][4]__
 ```
 var rdb = require('rdb');
 
@@ -259,7 +259,7 @@ function onFailed(err) {
 }
 ```
 <a name="hasOne"></a>
-[hasOne][5]
+__[hasOne][5]__
 ```
 var rdb = require('rdb');
 
@@ -315,7 +315,7 @@ function onFailed(err) {
 }
 ```
 <a name="compositeKeys"></a>
-[composite keys][6]
+__[composite keys][6]__
 ```
 var rdb = require('rdb');
 
@@ -375,7 +375,7 @@ function onFailed(err) {
 }
 ```
 <a name="getByIdEager"></a>
-[getById eagerly][7]
+__[getById eagerly][7]__
 ```
 var rdb = require('rdb');
 
@@ -429,7 +429,7 @@ function onFailed(err) {
 }
 ```
 <a name="tryGetFirstEager"></a>
-[tryGetFirst eagerly][8]
+__[tryGetFirst eagerly][8]__
 ```
 var rdb = require('rdb');
 
@@ -488,7 +488,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="toJSON"></a>
+__<a name="toJSON"></a>__
 [toJSON][9]
 ```
 var rdb = require('rdb');
@@ -556,7 +556,7 @@ function onFailed(err) {
 }
 ```
 <a name="toJSONWithStrategy"></a>
-[toJSON with strategy][10]
+__[toJSON with strategy][10]__
 ```
 var rdb = require('rdb');
 
@@ -623,7 +623,7 @@ function onFailed(err) {
 }
 ```
 <a name="getMany"></a>
-[getMany][11]
+__[getMany][11]__
 ```
 var rdb = require('rdb');
 
@@ -668,7 +668,7 @@ function onFailed(err) {
 }
 ```
 <a name="getManyLazy"></a>
-[getMany lazily][12]
+__[getMany lazily][12]__
 ```
 var rdb = require('rdb'),
     promise = require('promise');
@@ -733,7 +733,7 @@ function onFailed(err) {
 }
 ```
 <a name="getManyEager"></a>
-[getMany eagerly][13]
+__[getMany eagerly][13]__
 ```
 var rdb = require('rdb'),
     promise = require('promise');
@@ -800,7 +800,7 @@ function onFailed(err) {
 }
 ```
 <a name="manyToJSON"></a>
-[(many)ToJSON][14]
+__[(many)ToJSON][14]__
 ```
 var rdb = require('rdb');
 
@@ -867,7 +867,7 @@ function onFailed(err) {
 }
 ```
 <a name="manyToJSONWithStrategy"></a>
-[(many)ToJSON with strategy][15]
+__[(many)ToJSON with strategy][15]__
 ```
 var rdb = require('rdb');
 
@@ -934,7 +934,7 @@ function onFailed(err) {
 }
 ```
 <a name="update"></a>
-[update][16]
+__[update][16]__
 ```
 var rdb = require('rdb');
 
@@ -978,7 +978,7 @@ function onFailed(err) {
 }
 ```
 <a name="insert"></a>
-[insert][17]
+__[insert][17]__
 ```
 var rdb = require('rdb');
 
@@ -1022,7 +1022,7 @@ function onFailed(err) {
 }
 ```
 <a name="defaultValues"></a>
-[default values][101]
+__[default values][101]__
 ```
 var rdb = require('rdb');
 
@@ -1076,7 +1076,7 @@ function onFailed(err) {
 }
 ```
 <a name="conventions"></a>
-[conventions][102]
+__[conventions][102]__
 ```
 var rdb = require('rdb'),
     resetDemo = require('./db/resetDemo');
@@ -1116,7 +1116,7 @@ function onFailed(err) {
 }
 ```
 <a name="updateJoin"></a>
-[update a join-relation][18]
+__[update a join-relation][18]__
 ```
 var rdb = require('rdb');
 
@@ -1168,7 +1168,7 @@ function onFailed(err) {
 }
 ```
 <a name="updateHasOne"></a>
-[update a hasOne-relation][19]
+__[update a hasOne-relation][19]__
 ```
 var rdb = require('rdb');
 
@@ -1223,7 +1223,7 @@ function onFailed(err) {
 }
 ```
 <a name="updateHasMany"></a>
-[update a hasMany-relation][20]
+__[update a hasMany-relation][20]__
 ```
 var rdb = require('rdb');
 
@@ -1285,7 +1285,7 @@ function onFailed(err) {
 }
 ```
 <a name="equal"></a>
-[equal filter][21]
+__[equal][21]__
 ```
 var rdb = require('rdb');
 
@@ -1328,7 +1328,7 @@ function onFailed(err) {
 }
 ```
 <a name="notEqual"></a>
-[notEqual filter][22]
+__[notEqual][22]__
 ```
 var rdb = require('rdb');
 
@@ -1371,7 +1371,7 @@ function onFailed(err) {
 }
 ```
 <a name="not"></a>
-[not filter][23]
+__[not][23]__
 ```
 var rdb = require('rdb');
 
@@ -1412,8 +1412,8 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="lessThan"></a>
-[lessThan filter][24]
+__<a name="lessThan"></a>__
+[lessThan][24]
 ```
 var rdb = require('rdb');
 
@@ -1457,7 +1457,7 @@ function onFailed(err) {
 }
 ```
 <a name="lessThanOrEqual"></a>
-[lessThanOrEqual][25]
+__[lessThanOrEqual][25]__
 ```
 var rdb = require('rdb');
 
@@ -1501,7 +1501,7 @@ function onFailed(err) {
 }
 ```
 <a name="greaterThan"></a>
-[greaterThan filter][26]
+__[greaterThan][26]__
 ```
 var rdb = require('rdb');
 
@@ -1545,7 +1545,7 @@ function onFailed(err) {
 }
 ```
 <a name="greaterThanOrEqual"></a>
-[greaterThanOrEqual filter][27]
+__[greaterThanOrEqual][27]__
 ```
 var rdb = require('rdb');
 
@@ -1589,7 +1589,7 @@ function onFailed(err) {
 }
 ```
 <a name="between"></a>
-[between filter][28]
+__[between][28]__
 ```
 var rdb = require('rdb');
 
@@ -1632,7 +1632,7 @@ function onFailed(err) {
 }
 ```
 <a name="in"></a>
-[in filter][29]
+__[in][29]__
 ```
 var rdb = require('rdb');
 
@@ -1674,7 +1674,7 @@ function onFailed(err) {
 }
 ```
 <a name="startsWith"></a>
-[startsWith filter][30]
+__[startsWith][30]__
 ```
 var rdb = require('rdb');
 
@@ -1716,7 +1716,7 @@ function onFailed(err) {
 }
 ```
 <a name="endsWith"></a>
-[endsWith filter][31]
+__[endsWith][31]__
 ```
 var rdb = require('rdb');
 
@@ -1758,7 +1758,7 @@ function onFailed(err) {
 }
 ```
 <a name="contains"></a>
-[contains][32]
+__[contains][32]__
 ```
 var rdb = require('rdb');
 
@@ -1800,7 +1800,7 @@ function onFailed(err) {
 }
 ```
 <a name="exists"></a>
-[exists][33]
+__[exists][33]__
 ```
 var rdb = require('rdb');
 
@@ -1852,7 +1852,7 @@ function onFailed(err) {
 }
 ```
 <a name="or"></a>
-[or filter][34]
+__[or][34]__
 ```
 var rdb = require('rdb');
 
@@ -1897,7 +1897,7 @@ function onFailed(err) {
 }
 ```
 <a name="and"></a>
-[and filter][35]
+__[and][35]__
 ```
 var rdb = require('rdb');
 
@@ -1943,7 +1943,7 @@ function onFailed(err) {
 }
 ```
 <a name="orAlternative"></a>
-[or alternative syntax][36]
+__[or alternative syntax][36]__
 ```
 var rdb = require('rdb'),
     resetDemo = require('../db/resetDemo');
@@ -1989,7 +1989,7 @@ function onFailed(err) {
 }
 ```
 <a name="andAlternative"></a>
-[and alternative syntax][37]
+__[and alternative syntax][37]__
 ```
 var rdb = require('rdb'),
     resetDemo = require('../db/resetDemo');
@@ -2037,7 +2037,7 @@ function onFailed(err) {
 }
 ```
 <a name="subFilter"></a>
-[sub filter][38]
+__[sub filter][38]__
 ```
 var rdb = require('rdb');
 
@@ -2089,7 +2089,7 @@ function onFailed(err) {
 }
 ```
 <a name="compositeFilter"></a>
-[composite filter][39]
+__[composite filter][39]__
 ```
 var rdb = require('rdb');
 
