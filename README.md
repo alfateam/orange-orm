@@ -1413,7 +1413,7 @@ function onFailed(err) {
 }
 ```
 __<a name="lessThan"></a>__
-[lessThan][24]
+__[lessThan][24]__
 ```
 var rdb = require('rdb');
 
