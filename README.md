@@ -2225,10 +2225,10 @@ function onFailed(err) {
 [928]:https://npmjs.org/package/rdb#greaterThan
 [929]:https://npmjs.org/package/rdb#greaterThanOrEqual
 [930]:https://npmjs.org/package/rdb#between
-[931]:https://npmjs.org/package/rdb#in.js
-[932]:https://npmjs.org/package/rdb#startsWith')
-[933]:https://npmjs.org/package/rdb#endsWith')
-[934]:https://npmjs.org/package/rdb#contains')
+[931]:https://npmjs.org/package/rdb#in
+[932]:https://npmjs.org/package/rdb#startsWith
+[933]:https://npmjs.org/package/rdb#endsWith
+[934]:https://npmjs.org/package/rdb#contains
 [935]:https://npmjs.org/package/rdb#exists
 [936]:https://npmjs.org/package/rdb#or
 [937]:https://npmjs.org/package/rdb#and
