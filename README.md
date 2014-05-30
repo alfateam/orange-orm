@@ -58,7 +58,7 @@ __Filtering__
 [composite filter][941]  
 _Contents_
 ---------------
-<a id="getById"></a>
+<a name="getById"></a>
 __[getById][1]__
 ```
 var rdb = require('rdb');
