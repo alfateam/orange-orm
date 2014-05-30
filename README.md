@@ -26,7 +26,8 @@ __Basic querying__
 [getMany lazily](#getmany-lazily)  
 [getMany eagerly](#getmany-eagerly)  
 [(manyTo)JSON](#manytojson)  
-[(many)ToJSON with strategy](#manytojson-with-strategy)    
+[(many)ToJSON with strategy](#manytojson-with-strategy)  
+
 __Persistence__  
 [update](#update)  
 [insert](#insert)  
@@ -34,7 +35,8 @@ __Persistence__
 [conventions](#conventions)  
 [update a join-relation](#update-a-join-relation)  
 [update a hasOne-relation](#update-a-hasone-relation)  
-[update a hasMany-relation](#update-a-hasmany-relation)    
+[update a hasMany-relation](#update-a-hasmany-relation)  
+
 __Filters__  
 [equal](#equal)  
 [notEqual](#notequal)  
@@ -55,6 +57,7 @@ __Filters__
 [and alternative syntax](#and-alternative-syntax)  
 [sub filter](#sub-filter)  
 [composite filter](#composite-filter)  
+
 _Contents_
 ---------------
 
