@@ -20,7 +20,7 @@ __Basic querying__
 [composite keys](#compositekeys)  
 [getById eagerly](#getbyid-eagerly)  
 [tryGetFirst eagerly](#trygetfirst-eagerly)  
-[toJSON](#tjson)  
+[toJSON](#tojson)  
 [toJSON with strategy](#tojson-with-strategy)  
 [getMany](#getmany)  
 [getMany lazily](#getmany-lazily)  
