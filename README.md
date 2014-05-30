@@ -11,10 +11,10 @@ All examples below are found at [npmjs.org/package/rdb-demo][0].
 _Table of contents_
 ---------------
 __Querying__  
-<a href="#getById">getById</a>
-[tryGetFirst][902]  
-[join][903]  
-[hasMany][904]  
+<a href="#getById">getById</a>  
+<a href="#tryGetFirst">tryGetFirst</a>  
+<a href="#join">join</a>  
+<a href="#hasMany">hasMany</a>  
 [hasOne][905]  
 [composite keys][906]  
 [getById eagerly][907]  
@@ -258,7 +258,7 @@ function onFailed(err) {
 }
 ```
 <a name="hasOne"></a>
-__[hasOne][5]__
+[### hasOne][5]
 ```
 var rdb = require('rdb');
 
