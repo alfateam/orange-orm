@@ -2118,7 +2118,7 @@ function onFailed(err) {
 }
 ```
 ### Release notes
-__0.2.2__  
+__0.2.3__  
 Reformatted documentation. No code changes.  
 
 [0]:https://npmjs.org/package/rdb-demo
