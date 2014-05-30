@@ -25,7 +25,7 @@ __Basic querying__
 [getMany](#getmany)  
 [getMany lazily](#getmany-lazily)  
 [getMany eagerly](#getmany-eagerly)  
-[(manyTo)JSON](#manytojson)  
+[(many)ToJSON](#manytojson)  
 [(many)ToJSON with strategy](#manytojson-with-strategy)  
 
 __Persistence__  
