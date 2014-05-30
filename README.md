@@ -11,7 +11,7 @@ All examples below are found at [npmjs.org/package/rdb-demo][0].
 _Table of contents_
 ---------------
 __Querying__  
-[getById][901]  
+<a href="#getById">getById</a>
 [tryGetFirst][902]  
 [join][903]  
 [hasMany][904]  
@@ -58,7 +58,7 @@ __Filtering__
 [composite filter][941]  
 _Contents_
 ---------------
-<a name="getById"></a>
+<a id="getById"></a>
 __[getById][1]__
 ```
 var rdb = require('rdb');
