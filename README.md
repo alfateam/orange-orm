@@ -60,7 +60,7 @@ __Filtering__
 _Contents_
 ---------------
 
-__[getById][1]__
+### [getById][5]
 ```
 var rdb = require('rdb');
 
