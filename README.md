@@ -7,6 +7,7 @@ Transaction with commit and rollback.
 Persistence ignorance - no need for explicit saving, everything is handled by transaction.  
 Eager or lazy loading.  
 Based on promises.  
+[Release notes](#release-notes)  
 All examples below are found at [npmjs.org/package/rdb-demo][0].  
 _Table of contents_
 ---------------
@@ -24,9 +25,8 @@ __Basic querying__
 [getMany](#getmany)  
 [getMany lazily](#getmany-lazily)  
 [getMany eagerly](#getmany-eagerly)  
-[(manyTo)JSON](#(many)tojson)  
-[(many)ToJSON with strategy](#(manyto)json-with-strategy)  
-
+[(manyTo)JSON](#manytojson)  
+[(many)ToJSON with strategy](#manytojson-with-strategy)    
 __Persistence__  
 [update](#update)  
 [insert](#insert)  
@@ -34,12 +34,11 @@ __Persistence__
 [conventions](#conventions)  
 [update a join-relation](#update-a-join-relation)  
 [update a hasOne-relation](#update-a-hasone-relation)  
-[update a hasMany-relation](#update-a-hasmany-relation)  
-
+[update a hasMany-relation](#update-a-hasmany-relation)    
 __Filters__  
 [equal](#equal)  
 [notEqual](#notequal)  
-[not][925](#not)  
+[not](#not)  
 [lessThan](#lessthan)  
 [lessThanOrEqual](#lessthanorequal)  
 [greaterThan](#greaterThan)  
@@ -2115,6 +2114,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
+### Release notes
+__0.2.2__  
+Reformatted documentation. No code changes.  
 
 [0]:https://npmjs.org/package/rdb-demo
 [1]:https://github.com/alfateam/rdb-demo/blob/master/getById.js
