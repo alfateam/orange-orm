@@ -11,7 +11,7 @@ All examples below are found at [npmjs.org/package/rdb-demo][0].
 _Table of contents_
 ---------------
 __Querying__  
-[getById][]
+[getById]  
 <a href="#trygetfirst">tryGetFirst</a>  
 <a href="#join">join</a>  
 <a href="#hasmany">hasMany</a>  
