@@ -257,8 +257,8 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="hasOne"></a>
-[### hasOne][5]
+
+### [hasOne][5]
 ```
 var rdb = require('rdb');
 
