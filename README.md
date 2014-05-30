@@ -11,13 +11,14 @@ All examples below are found at [npmjs.org/package/rdb-demo][0].
 _Table of contents_
 ---------------
 __Querying__  
-<a href="#getById">getById</a>  
-<a href="#tryGetFirst">tryGetFirst</a>  
+[getById][]
+<a href="#trygetfirst">tryGetFirst</a>  
 <a href="#join">join</a>  
-<a href="#hasMany">hasMany</a>  
-[hasOne][905]  
-[composite keys][906]  
-[getById eagerly][907]  
+<a href="#hasmany">hasMany</a>  
+<a href="#hasone">hasOne</a>  
+<a href="#compositekeys">composite keys</a>  
+<a href="#compositekeys">getById eagerly</a>  
+[][907]  
 [tryGetFirst eagerly][908]  
 [toJSON][909]  
 [toJSON with strategy][910]  
@@ -58,7 +59,7 @@ __Filtering__
 [composite filter][941]  
 _Contents_
 ---------------
-<a name="getById"></a>
+
 __[getById][1]__
 ```
 var rdb = require('rdb');
