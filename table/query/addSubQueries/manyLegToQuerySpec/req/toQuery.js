@@ -12,7 +12,8 @@ var parentAlias = '_1',
 	shallowJoin = ' shallowJoin',
 	primaryColumns = {},
 	queries = {},
-	emptyFilter;
+	parameterized = {},
+	filter = {};
 
 function act(c) {
 	leg.columns = legColumns;
@@ -20,11 +21,14 @@ function act(c) {
 	span.table = childTable;
 	table._primaryColumns = primaryColumns;
 	leg.table = table			
-	innerJoin.prepend  = c.mock();
-	innerJoin.prepend.expect(' INNER shallowJoin').return(nextInnerJoin);
+
+	c.newParameterized.expect(' INNER shallowJoin').return(parameterized);
+	parameterized.append = c.mock();
+	parameterized.append.expect(innerJoin).return(nextInnerJoin);
+
 	c.newShallowJoinSql.expect(table,legColumns,primaryColumns,alias,parentAlias).return(shallowJoin);
-	c.newQuery.expect(queries, childTable,emptyFilter,span,alias,nextInnerJoin);
-	c.sut(queries, parentAlias,leg,legNo,innerJoin);
+	c.newQuery.expect(queries, childTable,filter,span,alias,nextInnerJoin);
+	c.sut(queries, parentAlias,leg,legNo,filter, innerJoin);
 }
 
 act.base = '../req';
