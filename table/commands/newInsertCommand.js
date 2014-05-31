@@ -23,7 +23,7 @@ function newInsertCommand(table, row) {
     c.endEdit = c.sql;
     
     c.matches = function(otherRow) {
-      return false;
+      return row == otherRow;
     };
 
 	return c;
