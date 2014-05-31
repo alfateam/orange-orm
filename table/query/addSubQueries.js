@@ -1,12 +1,12 @@
 var manyLegToQuery = _manyLegToQuery;
 
-function addSubQueries(queries,table,filter,span,alias) {	
+function addSubQueries(queries,table,filter,span,alias,innerJoin) {	
 	var c = {};
 	var _legNo;
 	c.visitJoin = function() {};
 	c.visitOne = function() {};
 	c.visitMany = function(leg) {
-		manyLegToQuery(queries, alias,leg,_legNo,filter);
+		manyLegToQuery(queries, alias,leg,_legNo,filter,innerJoin);
 	};
 
 	span.legs.forEach(onEachLeg);	

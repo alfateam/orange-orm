@@ -1,8 +1,9 @@
 var newShallowJoinSql = require('../singleQuery/joinSql/newShallowJoinSql');
 var newQuery = require('../../newQuery');
+var newParameterized = require('../newParameterized');
 var emptyFilter;
 
-function manyLegToQuery(queries, rightAlias,leg,legNo,innerJoin) {	
+function manyLegToQuery(queries, rightAlias,leg,legNo,filter, innerJoin) {	
 	var leftAlias = rightAlias + '_' + legNo;
 	var span = leg.span;
 	var rightTable = leg.table;
@@ -10,8 +11,8 @@ function manyLegToQuery(queries, rightAlias,leg,legNo,innerJoin) {
 	var leftColumns = leg.columns;	 
 	 
 	var shallowJoin  = newShallowJoinSql(rightTable,leftColumns,rightColumns,leftAlias,rightAlias);
-	innerJoin = innerJoin.prepend(' INNER' + shallowJoin);	
-	newQuery(queries, span.table,emptyFilter,span,leftAlias,innerJoin);
+	var innerJoin = newParameterized(' INNER' + shallowJoin).append(innerJoin);	
+	newQuery(queries, span.table,filter,span,leftAlias,innerJoin);
 }
 
 module.exports = manyLegToQuery;
