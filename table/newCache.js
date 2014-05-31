@@ -7,7 +7,6 @@ function cacheCore() {
     var cache = {};
     var keyLength;
 
-    c.contents = cache;
     c.tryGet = function(key) {
         var index = 0;
         var keyLength = key.length;
@@ -82,7 +81,7 @@ function cacheCore() {
                 if (index === keyLength - 1)
                     result.push(value);
                 else
-                    getAllCore(value, ++index);
+                    getAllCore(value, index+1);
             };
         };
         return result;
