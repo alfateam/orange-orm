@@ -6,7 +6,6 @@ function newQuery(queries,table,filter,span,alias,innerJoin) {
 	filter = extractFilter(filter);
 	var singleQuery = newSingleQuery(table,filter,span,alias,innerJoin);
 	queries.push(singleQuery);
-	//filter = filter.prepend(innerJoin);
 	addSubQueries(queries,table,filter,span,alias,innerJoin);
 	return queries;
 }

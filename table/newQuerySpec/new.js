@@ -13,8 +13,6 @@ var span = {};
 var alias = '_2;'
 var expected = {};
 var innerJoin = {};
-var filterWithInnerJoin = {};
-
 
 function act(c) {
 	c.queries = {};
@@ -23,11 +21,9 @@ function act(c) {
 	
 	c.addSubQueries = addSubQueries;
 
-	filter.prepend = mock();
-	filter.prepend.expect(innerJoin).return(filterWithInnerJoin)
 	extractFilter.expect(initialFilter).return(filter);
 	newSingleQuery.expect(table,filter,span,alias,innerJoin).return(singleQuery);
-	addSubQueries.expect(c.queries,table,filterWithInnerJoin,span,alias).return(expected);
+	addSubQueries.expect(c.queries,table,filter,span,alias,innerJoin).return(expected);
 	c.returned = require('../newQuery')(c.queries,table,initialFilter,span,alias,innerJoin);
 }
 

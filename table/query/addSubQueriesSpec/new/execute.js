@@ -10,6 +10,7 @@ var a = require('a'),
 	joinLeg = {},
 	manyLeg = {},
 	oneLeg = {},
+	innerJoin = {},
 	manyLegQuery = {},
 	joinLegNo = {},
 	manyLegNo = {},
@@ -20,8 +21,8 @@ function act(c) {
 	stubLegs();
 	stubSpan();
 	c.manyLegToQuery = requireMock('./addSubQueries/manyLegToQuery');
-	c.manyLegToQuery.expect(queries, alias,manyLeg,manyLegNo,filter).return(manyLegQuery);
-	c.sut(queries,table,filter,span,alias);
+	c.manyLegToQuery.expect(queries, alias,manyLeg,manyLegNo,filter,innerJoin).return(manyLegQuery);
+	c.sut(queries,table,filter,span,alias,innerJoin);
 }
 
 function stubLegs() {
