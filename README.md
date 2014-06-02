@@ -425,7 +425,6 @@ function onFailed(err) {
 }
 ```
 ### [tryGetFirst eagerly][8]
-getById eagerly
 ```
 var rdb = require('rdb');
 
