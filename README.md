@@ -2117,13 +2117,13 @@ function onFailed(err) {
 }
 ```
 ### Release notes
-__0.2.3__  
-Reformatted documentation. No code changes.  
-__0.2.4__  
-Bugfix: getMany with many-strategy and shallowFilter yields incorrect query #6.  
 __0.2.5__  
 Bugfix: caching on composite keys could give a crash #7. 
 Improved sql compression on insert/update.  
+__0.2.4__  
+Bugfix: getMany with many-strategy and shallowFilter yields incorrect query #6.  
+__0.2.3__  
+Reformatted documentation. No code changes.  
 
 [0]:https://npmjs.org/package/rdb-demo
 [1]:https://github.com/alfateam/rdb-demo/blob/master/getById.js
