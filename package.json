@@ -12,7 +12,7 @@
     "promise" : "5.0.0"
   },
   "devDependencies": {
-		"a": "0.4.3"
+		"a": "0.4.4"
   },
   "repository" : {
          "type" : "git",
