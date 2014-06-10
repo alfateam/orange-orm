@@ -2,13 +2,13 @@ var newLeg = require('./relation/newOneLeg');
 var newOneCache = require('./relation/newOneCache');
 var newForeignKeyFilter = require('./relation/newForeignKeyFilter');
 var newExpanderCache = require('./relation/newExpanderCache');
+var getFarRelated = require('./oneRelation/getFarRelated');
 var resultToPromise = require('./resultToPromise');
 
 function newOneRelation(joinRelation) {
     var c = {};
     var oneCache = newOneCache(joinRelation);
     var expanderCache = newExpanderCache(joinRelation);
-
 
     c.joinRelation = joinRelation;
     c.childTable = joinRelation.parentTable;
@@ -22,8 +22,14 @@ function newOneRelation(joinRelation) {
             var row = oneCache.tryGet(parentRow);
             return resultToPromise(row);
         }
-        var filter = newForeignKeyFilter(joinRelation, parentRow);
-        return c.childTable.tryGetFirst(filter).then(expand);
+        return getFarRelated(parentRow, joinRelation)
+            .then(tryGetFirst)
+            .then(expand);
+
+        function tryGetFirst() {
+            var filter = newForeignKeyFilter(joinRelation, parentRow);
+            return c.childTable.tryGetFirst(filter);
+        }
 
         function expand(result) {
             expanderCache.tryAdd(parentRow);    

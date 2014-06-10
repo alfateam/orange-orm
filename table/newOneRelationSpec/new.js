@@ -5,6 +5,7 @@ var expectRequire = a.expectRequire;
 
 function act(c){
 	c.mock = mock;
+	c.then = a.then;
 	c.childTable = {};
 	c.joinRelation = {};
 	c.oneCache = {};
@@ -20,6 +21,7 @@ function act(c){
 	c.expanderCache.tryGet = mock();
 	c.expanderCache.tryAdd = mock();
 
+	c.getFarRelated = requireMock('./oneRelation/getFarRelated');
 	c.newLeg = requireMock('./relation/newOneLeg');	
 	c.resultToPromise = requireMock('./resultToPromise');
 	c.sut = require('../newOneRelation')(c.joinRelation);
