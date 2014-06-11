@@ -2,7 +2,7 @@ var newLeg = require('./relation/newOneLeg');
 var newOneCache = require('./relation/newOneCache');
 var newForeignKeyFilter = require('./relation/newForeignKeyFilter');
 var newExpanderCache = require('./relation/newExpanderCache');
-var getFarRelated = require('./oneRelation/getFarRelated');
+var getFarRelatives = require('./oneRelation/getFarRelatives');
 var resultToPromise = require('./resultToPromise');
 
 function newOneRelation(joinRelation) {
@@ -22,7 +22,7 @@ function newOneRelation(joinRelation) {
             var row = oneCache.tryGet(parentRow);
             return resultToPromise(row);
         }
-        return getFarRelated(parentRow, joinRelation)
+        return getFarRelatives(parentRow, joinRelation)
             .then(tryGetFirst)
             .then(expand);
 

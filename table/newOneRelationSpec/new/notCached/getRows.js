@@ -9,7 +9,7 @@ function act(c){
 	c.farPromise = c.then();
 	c.farResult = {};
 	c.farPromise(c.farResult);
-	c.getFarRelated.expect(parentRow, c.joinRelation).return(c.farPromise);
+	c.getFarRelatives.expect(parentRow, c.joinRelation).return(c.farPromise);
 
 	c.resultPromise = c.then();
 	c.resultPromise(c.result);
