@@ -22,7 +22,7 @@ function newOneRelation(joinRelation) {
             var row = oneCache.tryGet(parentRow);
             return resultToPromise(row);
         }
-        return getFarRelatives(parentRow, joinRelation)
+        return getFarRelatives(parentRow, c)
             .then(tryGetFirst)
             .then(expand);
 
