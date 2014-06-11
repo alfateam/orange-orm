@@ -13,8 +13,7 @@ function getFarRelatives(parentRow, relation) {
 
 	function onRows(rows) {
 		for (var i = 0; i < rows.length; i++) {
-			var row = rows[i];
-			var parent = extractParentKey(joinRelation, row);
+			var parent = extractParentKey(joinRelation, rows[i]);
 			relation.expand(parent);
 		};
 	}
