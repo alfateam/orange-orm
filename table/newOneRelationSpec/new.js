@@ -15,15 +15,12 @@ function act(c){
 	c.newOneCache.expect(c.joinRelation).return(c.oneCache);
 	c.joinRelation.parentTable = c.childTable;
 	
-	c.newExpanderCache = requireMock('./relation/newExpanderCache');
-	c.expanderCache = {};
-	c.newExpanderCache.expect(c.joinRelation).return(c.expanderCache);
-	c.expanderCache.tryGet = mock();
-	c.expanderCache.tryAdd = mock();
-
-	c.getFarRelatives = requireMock('./oneRelation/getFarRelatives');
+	c.tryGetByHeuristic = requireMock('./oneRelation/tryGetByHeuristic');
 	c.newLeg = requireMock('./relation/newOneLeg');	
 	c.resultToPromise = requireMock('./resultToPromise');
+
+	c.newGetRelated = requireMock('../newGetRelated');
+
 	c.sut = require('../newOneRelation')(c.joinRelation);
 }
 

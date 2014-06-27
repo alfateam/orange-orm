@@ -12,7 +12,7 @@ function act(c) {
 	c.parentRow = {};
 	c.relation = {};
 
-	c.sut = require('../getFarRelatives');
+	c.sut = require('../tryGetByHeuristic');
 }
 
 module.exports = act;

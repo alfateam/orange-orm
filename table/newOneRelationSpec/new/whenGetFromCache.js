@@ -1,4 +1,3 @@
-
 var when = require('a').when;
 var c = {};
 

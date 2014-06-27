@@ -1,14 +1,13 @@
 var newLeg = require('./relation/newOneLeg');
 var newOneCache = require('./relation/newOneCache');
 var newForeignKeyFilter = require('./relation/newForeignKeyFilter');
-var newExpanderCache = require('./relation/newExpanderCache');
-var getFarRelatives = require('./oneRelation/getFarRelatives');
+var tryGetByHeuristic = require('./oneRelation/tryGetByHeuristic');
 var resultToPromise = require('./resultToPromise');
+var newGetRelated = require('../newGetRelated');
 
 function newOneRelation(joinRelation) {
     var c = {};
     var oneCache = newOneCache(joinRelation);
-    var expanderCache = newExpanderCache(joinRelation);
 
     c.joinRelation = joinRelation;
     c.childTable = joinRelation.parentTable;
@@ -17,27 +16,27 @@ function newOneRelation(joinRelation) {
         visitor.visitOne(c);
     };
 
-    c.getRows = function(parentRow) {
-        if (expanderCache.tryGet(parentRow)) {
-            var row = oneCache.tryGet(parentRow);
-            return resultToPromise(row);
-        }
-        return getFarRelatives(parentRow, c)
-            .then(tryGetFirst)
-            .then(expand);
-
-        function tryGetFirst() {
-            var filter = newForeignKeyFilter(joinRelation, parentRow);
-            return c.childTable.tryGetFirst(filter);
-        }
-
-        function expand(result) {
-            expanderCache.tryAdd(parentRow);    
-            return result;
-        };        
+    c.getFromCache = function(parent) {
+        var row = oneCache.tryGet(parent);
+        return resultToPromise(row);
     };
 
-    c.expand = expanderCache.tryAdd;
+    c.getFromDb = function(parent) {
+        var filter = newForeignKeyFilter(joinRelation, parent);
+        return c.childTable.tryGetFirst(filter);
+    };
+
+    c.tryGetByHeuristic = function(parent) {
+        return tryGetByHeuristic(parent, c);
+    };
+
+    c.toGetRelated = function(parent) {
+        return newGetRelated(parent, c);
+    };
+
+    c.expand = function(parent) {
+        return parent.expand(joinRelation.rightAlias);
+    };
 
     c.toLeg = function() {
         return newLeg(c);
