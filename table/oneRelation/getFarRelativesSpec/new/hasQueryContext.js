@@ -1,31 +1,24 @@
-var a = require('a');
-
-function act(c) {
-	c.then = a.then;
-	c.mock = a.mock;
-	c.requireMock = a.requireMock;
-
-	c.strategyToSpan = c.requireMock('../strategyToSpan');
-	c.addSubQueries = c.requireMock('../query/addSubQueries');
-	c.executeQueries = c.requireMock('../executeQueries');
-	c.resultToRows = c.requireMock('../resultToRows');
+function act (c) {
 
 	c.table = {};
-	c.relation = {};
+	c.alias = 'alias';
+	c.name = 'foo';
 	c.joinRelation = {};
+	c.joinRelation.leftAlias = c.name;
 	c.relation.joinRelation = c.joinRelation;
 	c.joinRelation.childTable = c.table;
 	c.queryContext = {};
 	c.filter = {};
 	c.innerJoin = {};
-	c.alias = 'alias';
 
 	c.queryContext.filter = c.filter;
 	c.queryContext.innerJoin = c.innerJoin;
 	c.queryContext.alias = c.alias;
+
+	c.parent.queryContext = c.queryContext;
+	
 	c.query = {};
 
-	c.name = 'foo';
 	c.strategy = {foo: null};
 
 	c.span = {};
@@ -52,15 +45,6 @@ function act(c) {
 	c.resultPromise = c.then();
 	c.resultPromise.resolve(c.result);
 	c.executeQueries.expect([c.query]).return(c.resultPromise);
-
-	c.rows = {};
-	c.resultToRows.expect(c.subSpan, c.result).return(c.rows);
-
-	require('../newFarRelativesQuery')(c.relation, c.queryContext, c.name).then(onResult);
-
-	function onResult(rows) {
-		c.returned = rows;
-	}
 }
 
 module.exports = act;

@@ -3,7 +3,7 @@ var extractParentKey = require('../relation/manyCache/extractParentKey');
 var resultToPromise = require('../resultToPromise');
 var newFarRelativesFilter = require('./newFarRelativesFilter');
 
-function getFarRelatives(parentRow, relation) {
+function tryGetByHeuristic(parentRow, relation) {
 	if (!parentRow.queryContext)
 		return empty;
 	var filter = newFarRelativesFilter(relation, parentRow.queryContext);
@@ -19,4 +19,4 @@ function getFarRelatives(parentRow, relation) {
 	}
 }
 
-module.exports = getFarRelatives;
+module.exports = tryGetByHeuristic;

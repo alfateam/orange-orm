@@ -3,10 +3,12 @@ var addSubQueries = require('../query/addSubQueries');
 var executeQueries = require('../executeQueries');
 var resultToRows = require('../resultToRows');
 
-function newFarRelativesQuery(relation, queryContext, name) {
-	var table = relation.joinRelation.childTable;
+function getFarRelatives(relation, parent) {
+	var queryContext = parent.queryContext;
+	var join = relation.joinRelation;
+	var table = join.childTable;
 	var strategy = {};
-	strategy[name] = null;
+	strategy[join.leftAlias] = null;
 	var span = strategyToSpan(table, strategy);
 	var queries = [];
 	var filter = queryContext.filter;
@@ -20,7 +22,6 @@ function newFarRelativesQuery(relation, queryContext, name) {
 		var subSpan;
 		span.legs.forEach(onLeg);
 		return resultToRows(subSpan, result);
-		//todo expand relation
 
 		function onLeg(leg) {
 			subSpan = leg.span;
@@ -28,4 +29,4 @@ function newFarRelativesQuery(relation, queryContext, name) {
 	}
 }
 
-module.exports = newFarRelativesQuery;
+module.exports = getFarRelatives;

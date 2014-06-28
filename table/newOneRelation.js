@@ -35,7 +35,7 @@ function newOneRelation(joinRelation) {
     };
 
     c.expand = function(parent) {
-        return parent.expand(joinRelation.rightAlias);
+        return parent.expand(joinRelation.leftAlias);
     };
 
     c.toLeg = function() {
