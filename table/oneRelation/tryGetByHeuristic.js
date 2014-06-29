@@ -1,22 +1,41 @@
-var empty = require('../resultToPromise')();
+var empty = require('../resultToPromise')(false);
 var extractParentKey = require('../relation/manyCache/extractParentKey');
 var resultToPromise = require('../resultToPromise');
-var newFarRelativesFilter = require('./newFarRelativesFilter');
+var getFarRelatives = require('./getFarRelatives');
 
-function tryGetByHeuristic(parentRow, relation) {
-	if (!parentRow.queryContext)
+function tryGetByHeuristic(parent, relation) {
+	if (!parent.queryContext)
 		return empty;
-	var filter = newFarRelativesFilter(relation, parentRow.queryContext);
-	var table = relation.childTable;
-	var joinRelation = relation.joinRelation;
-	return table.getMany(filter).then(onRows);
+	var join = relation.joinRelation;
+	return getFarRelatives(parent, relation).then(expand);
 
-	function onRows(rows) {
-		for (var i = 0; i < rows.length; i++) {
-			var parent = extractParentKey(joinRelation, rows[i]);
-			relation.expand(parent);
+	function expand(children) {
+		var current = empty;
+		var parentInFarRelative;
+		for (var i = 0; i < children.length; i++) {
+			var expandSingle = newExpandSingle(children[i]);
+			current = current.then(expandSingle);	
 		};
+
+		function newExpandSingle(child) {
+			return expand;
+			function expand() {
+				return join.getRows(child).then(onParent);
+			}
+		}
+
+		function onParent(row) {
+			relation.expand(row);
+			parentInFarRelative = parentInFarRelative || (row == parent);
+		}
+
+		return current.then(isParentFound);
+
+		function isParentFound() {
+			return parentInFarRelative;
+		}
 	}
+
 }
 
 module.exports = tryGetByHeuristic;

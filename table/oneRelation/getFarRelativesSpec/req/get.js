@@ -1,5 +1,4 @@
 function act (c) {
-
 	c.table = {};
 	c.alias = 'alias';
 	c.name = 'foo';
@@ -45,6 +44,15 @@ function act (c) {
 	c.resultPromise = c.then();
 	c.resultPromise.resolve(c.result);
 	c.executeQueries.expect([c.query]).return(c.resultPromise);
+
+	c.rows = {};
+	c.resultToRows.expect(c.subSpan, c.result).return(c.rows);
+	c.sut(c.relation, c.parent).then(onResult);
+
+	function onResult(returned) {
+		c.returned = returned;
+	}
+
 }
 
 module.exports = act;

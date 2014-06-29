@@ -1,5 +1,9 @@
 function act(c) {
-	c.returned = c.sut(c.parentRow, c.relation);
+	c.sut(c.parentRow, c.relation).then(onOk,c.mock());
+
+	function onOk(returned) {
+		c.returned = returned;
+	}
 }
 
 module.exports = act;

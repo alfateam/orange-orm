@@ -6,9 +6,11 @@ function act(c) {
 	c.mock = a.mock;
 	c.extractParentKey = requireMock('../relation/manyCache/extractParentKey');
 	c.resultToPromise = requireMock('../resultToPromise');
-	c.newFarRelativesFilter = requireMock('./newFarRelativesFilter');
-	c.empty = {};
-	c.resultToPromise.expect().return(c.empty);
+	c.getFarRelatives = requireMock('./getFarRelatives');
+
+	c.empty = c.then();
+	c.empty.resolve(false);
+	c.resultToPromise.expect(false).return(c.empty);
 	c.parentRow = {};
 	c.relation = {};
 
