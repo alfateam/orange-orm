@@ -23,7 +23,6 @@ function act(c){
         bar: {}
     };
 
-    c.extractDto.expect(c.strategy, c.table, c.initialDto).return(c.dto);
 
 	c.sut = require('../newToDto')(c.strategy, c.table, c.initialDto);
 }

@@ -70,14 +70,18 @@ function shallowDbRowToRow(table, values) {
 		};					
 	}
 
-	row.toJSON = function(strategy) {			
+	row.toJSON = function(strategy) {		
+		return row.toDto.apply(null,arguments).then(JSON.stringify);
+	};
+
+	row.toDto = function(strategy) {
 		var args = Array.prototype.slice.call(arguments, 0);
 		args.push(table);			
 		strategy = extractStrategy.apply(null,args);		
 		var toDto = newToDto(strategy, table);
-		return toDto(row).then(JSON.stringify);
+		return toDto(row);
 	};
-	
+
 	return row;
 }
 

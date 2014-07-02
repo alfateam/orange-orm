@@ -20,11 +20,15 @@ __Basic querying__
 [composite keys](#compositekeys)  
 [getById eagerly](#getbyid-eagerly)  
 [tryGetFirst eagerly](#trygetfirst-eagerly)  
+[toDto](#todto)  
+[toDto with strategy](#todto-with-strategy)  
 [toJSON](#tojson)  
 [toJSON with strategy](#tojson-with-strategy)  
 [getMany](#getmany)  
 [getMany lazily](#getmany-lazily)  
 [getMany eagerly](#getmany-eagerly)  
+[(many)ToDto](#manytodto)  
+[(many)ToDto with strategy](#manytodto-with-strategy)  
 [(many)ToJSON](#manytojson)  
 [(many)ToJSON with strategy](#manytojson-with-strategy)  
 
@@ -483,7 +487,141 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [toJSON][8]
+### [toDto][999]
+```
+var rdb = require('rdb');
+
+var Order = rdb.table('_order');
+var Customer = rdb.table('_customer');
+var OrderLine = rdb.table('_orderLine');
+var DeliveryAddress = rdb.table('_deliveryAddress');
+
+Order.primaryColumn('oId').guid().as('id');
+Order.column('oOrderNo').string().as('orderNo');
+Order.column('oCustomerId').string().as('customerId');
+
+Customer.primaryColumn('cId').guid().as('id');
+Customer.column('cName').string().as('name');
+
+OrderLine.primaryColumn('lId').guid().as('id');
+OrderLine.column('lOrderId').string().as('orderId');
+OrderLine.column('lProduct').string().as('product');
+
+DeliveryAddress.primaryColumn('dId').guid().as('id');
+DeliveryAddress.column('dOrderId').string().as('orderId');
+DeliveryAddress.column('dName').string().as('name');
+DeliveryAddress.column('dStreet').string().as('street');
+
+var order_customer_relation = Order.join(Customer).by('customerId').as('customer');
+
+var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+Order.hasMany(line_order_relation).as('lines');
+
+var deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
+Order.hasOne(deliveryAddress_order_relation).as('deliveryAddress');
+
+var db = rdb('postgres://postgres:postgres@localhost/test');
+
+resetDemo()
+    .then(db.transaction)
+    .then(getOrder)
+    .then(toDto)
+    .then(print)
+    .then(rdb.commit)
+    .then(null, rdb.rollback)
+    .then(onOk, onFailed);
+
+function getOrder() {
+    return Order.getById('b0000000-b000-0000-0000-000000000000');
+}
+
+function toDto(order) {
+    return order.toDto(/*strategy*/);
+    //default strategy, expand all hasOne and hasMany relations
+}
+
+function print(dto) {
+    console.log(dto);
+}
+
+function onOk() {
+    console.log('Success');
+    console.log('Waiting for connection pool to teardown....');
+}
+
+function onFailed(err) {
+    console.log('Rollback');
+    console.log(err);
+}
+```
+### [toDto with strategy][9910]
+```
+var rdb = require('rdb');
+
+var Order = rdb.table('_order');
+var Customer = rdb.table('_customer');
+var OrderLine = rdb.table('_orderLine');
+var DeliveryAddress = rdb.table('_deliveryAddress');
+
+Order.primaryColumn('oId').guid().as('id');
+Order.column('oOrderNo').string().as('orderNo');
+Order.column('oCustomerId').string().as('customerId');
+
+Customer.primaryColumn('cId').guid().as('id');
+Customer.column('cName').string().as('name');
+
+OrderLine.primaryColumn('lId').guid().as('id');
+OrderLine.column('lOrderId').guid().as('orderId');
+OrderLine.column('lProduct').string().as('product');
+
+DeliveryAddress.primaryColumn('dId').guid().as('id');
+DeliveryAddress.column('dOrderId').string().as('orderId');
+DeliveryAddress.column('dName').string().as('name');
+DeliveryAddress.column('dStreet').string().as('street');
+
+var order_customer_relation = Order.join(Customer).by('oCustomerId').as('customer');
+
+var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+Order.hasMany(line_order_relation).as('lines');
+
+var deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
+Order.hasOne(deliveryAddress_order_relation).as('deliveryAddress');
+
+var db = rdb('postgres://postgres:postgres@localhost/test');
+
+resetDemo()
+    .then(db.transaction)
+    .then(getOrder)
+    .then(toDto)
+    .then(print)
+    .then(rdb.commit)
+    .then(null, rdb.rollback)
+    .then(onOk, onFailed);
+
+function getOrder() {
+    return Order.getById('b0000000-b000-0000-0000-000000000000');
+}
+
+function toDto(order) {
+    var strategy = {customer : null, lines : null, deliveryAddress : null};
+    return order.toDto(strategy);
+}
+
+function print(dto) {
+    console.log(dto);
+}
+
+function onOk() {
+    console.log('Success');
+    console.log('Waiting for connection pool to teardown....');
+}
+
+function onFailed(err) {
+    console.log('Rollback');
+    console.log(err);
+}
+```
+### [toJSON][9]
 ```
 var rdb = require('rdb');
 
@@ -777,6 +915,141 @@ function printLines(lines) {
         var args = [format, line.id, line.orderId, line.product];
         console.log.apply(null,args);
     }    
+}
+
+function onOk() {
+    console.log('Success');
+    console.log('Waiting for connection pool to teardown....');
+}
+
+function onFailed(err) {
+    console.log('Rollback');
+    console.log(err);
+}
+```
+### [(many)ToDto][9914]
+```
+var rdb = require('rdb'),
+    inspect = require('util').inspect;
+
+var Order = rdb.table('_order');
+var Customer = rdb.table('_customer');
+var OrderLine = rdb.table('_orderLine');
+var DeliveryAddress = rdb.table('_deliveryAddress');
+
+Order.primaryColumn('oId').guid().as('id');
+Order.column('oOrderNo').string().as('orderNo');
+Order.column('oCustomerId').string().as('customerId');
+
+Customer.primaryColumn('cId').guid().as('id');
+Customer.column('cName').string().as('name');
+
+OrderLine.primaryColumn('lId').guid().as('id');
+OrderLine.column('lOrderId').guid().as('orderId');
+OrderLine.column('lProduct').string().as('product');
+
+DeliveryAddress.primaryColumn('dId').guid().as('id');
+DeliveryAddress.column('dOrderId').string().as('orderId');
+DeliveryAddress.column('dName').string().as('name');
+DeliveryAddress.column('dStreet').string().as('street');
+
+var order_customer_relation = Order.join(Customer).by('customerId').as('customer');
+
+var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+Order.hasMany(line_order_relation).as('lines');
+
+var deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
+Order.hasOne(deliveryAddress_order_relation).as('deliveryAddress');
+
+var db = rdb('postgres://postgres:postgres@localhost/test');
+
+resetDemo()
+    .then(db.transaction)
+    .then(getOrders)
+    .then(toDto)
+    .then(print)
+    .then(rdb.commit)
+    .then(null, rdb.rollback)
+    .then(onOk, onFailed);
+
+function getOrders() {
+    return Order.getMany();
+}
+
+function toDto(orders) {
+    return orders.toDto(/*strategy*/);
+    //default strategy, expand all hasOne and hasMany relations
+}
+
+function print(dto) {
+    console.log(inspect(dto,false,10));
+}
+
+function onOk() {
+    console.log('Success');
+    console.log('Waiting for connection pool to teardown....');
+}
+
+function onFailed(err) {
+    console.log('Rollback');
+    console.log(err);
+}
+```
+### [(many)ToDto with strategy][9915]
+```
+var rdb = require('rdb'),
+    inspect = require('util').inspect;
+
+var Order = rdb.table('_order');
+var Customer = rdb.table('_customer');
+var OrderLine = rdb.table('_orderLine');
+var DeliveryAddress = rdb.table('_deliveryAddress');
+
+Order.primaryColumn('oId').guid().as('id');
+Order.column('oOrderNo').string().as('orderNo');
+Order.column('oCustomerId').string().as('customerId');
+
+Customer.primaryColumn('cId').guid().as('id');
+Customer.column('cName').string().as('name');
+
+OrderLine.primaryColumn('lId').guid().as('id');
+OrderLine.column('lOrderId').guid().as('orderId');
+OrderLine.column('lProduct').string().as('product');
+
+DeliveryAddress.primaryColumn('dId').guid().as('id');
+DeliveryAddress.column('dOrderId').string().as('orderId');
+DeliveryAddress.column('dName').string().as('name');
+DeliveryAddress.column('dStreet').string().as('street');
+
+var order_customer_relation = Order.join(Customer).by('oCustomerId').as('customer');
+
+var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+Order.hasMany(line_order_relation).as('lines');
+
+var deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
+Order.hasOne(deliveryAddress_order_relation).as('deliveryAddress');
+
+var db = rdb('postgres://postgres:postgres@localhost/test');
+resetDemo()
+    .then(db.transaction)
+    .then(getOrders)
+    .then(toDto)
+    .then(print)
+    .then(rdb.commit)
+    .then(null, rdb.rollback)
+    .then(onOk, onFailed);
+
+function getOrders() {
+    return Order.getMany();
+}
+
+function toDto(orders) {
+    var strategy = {customer : null, lines : null, deliveryAddress : null};
+    return orders.toDto(strategy);
+}
+
+function print(dto) {
+    console.log(inspect(dto,false,10));
 }
 
 function onOk() {
@@ -2117,6 +2390,9 @@ function onFailed(err) {
 }
 ```
 ### Release notes
+__0.2.6__  
+New method, ToDto(), converts row to data transfer object.  
+Bugfix: toJSON returned incorrect string on hasMany relations. 
 __0.2.5__  
 Bugfix: caching on composite keys could give a crash #7. 
 Improved sql compression on insert/update.  
@@ -2134,11 +2410,15 @@ Reformatted documentation. No code changes.
 [6]:https://github.com/alfateam/rdb-demo/blob/master/compositeKeys.js
 [7]:https://github.com/alfateam/rdb-demo/blob/master/getByIdEager.js
 [8]:https://github.com/alfateam/rdb-demo/blob/master/tryGetFirstEager.js
+[999]:https://github.com/alfateam/rdb-demo/blob/master/toDto.js
+[9910]:https://github.com/alfateam/rdb-demo/blob/master/toDtoWithStrategy.js
 [9]:https://github.com/alfateam/rdb-demo/blob/master/toJSON.js
 [10]:https://github.com/alfateam/rdb-demo/blob/master/toJSONWithStrategy.js
 [11]:https://github.com/alfateam/rdb-demo/blob/master/getMany.js
 [12]:https://github.com/alfateam/rdb-demo/blob/master/getManyLazy.js
 [13]:https://github.com/alfateam/rdb-demo/blob/master/getManyEager.js
+[9914]:https://github.com/alfateam/rdb-demo/blob/master/manyToDto.js
+[9915]:https://github.com/alfateam/rdb-demo/blob/master/manyToDtoWithStrategy.js
 [14]:https://github.com/alfateam/rdb-demo/blob/master/manyToJSON.js
 [15]:https://github.com/alfateam/rdb-demo/blob/master/manyToJSONWithStrategy.js
 [16]:https://github.com/alfateam/rdb-demo/blob/master/update.js
@@ -2175,11 +2455,15 @@ Reformatted documentation. No code changes.
 [906]:https://npmjs.org/package/rdb#compositeKeys
 [907]:https://npmjs.org/package/rdb#getByIdEager
 [908]:https://npmjs.org/package/rdb#tryGetFirstEager
+[99909]:https://npmjs.org/package/rdb#toDto
+[99910]:https://npmjs.org/package/rdb#toDtoWithStrategy
 [909]:https://npmjs.org/package/rdb#toJSON
 [910]:https://npmjs.org/package/rdb#toJSONWithStrategy
 [911]:https://npmjs.org/package/rdb#getMany
 [912]:https://npmjs.org/package/rdb#getManyLazy
 [913]:https://npmjs.org/package/rdb#getManyEager
+[99914]:https://npmjs.org/package/rdb#manyToDto
+[99915]:https://npmjs.org/package/rdb#manyToDtoWithStrategy
 [914]:https://npmjs.org/package/rdb#manyToJSON
 [915]:https://npmjs.org/package/rdb#manyToJSONWithStrategy
 [916]:https://npmjs.org/package/rdb#update

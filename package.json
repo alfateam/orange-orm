@@ -1,6 +1,6 @@
 {
   "name": "rdb",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "main": "index.js",
   "title": "rdb",
   "description": "Object Relational Mapper for postgres",
@@ -12,7 +12,7 @@
     "promise" : "5.0.0"
   },
   "devDependencies": {
-		"a": "0.4.3"
+		"a": "0.4.5"
   },
   "repository" : {
          "type" : "git",

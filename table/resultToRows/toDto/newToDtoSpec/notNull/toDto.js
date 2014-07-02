@@ -4,6 +4,8 @@ var requireMock = require('a').requireMock;
 function act(c) {
     c.row = {};
 
+    c.extractDto.expect(c.strategy, c.table, c.initialDto).return(c.dto);
+
     stubTable();
 
     function stubTable() {
