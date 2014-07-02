@@ -2391,7 +2391,7 @@ function onFailed(err) {
 ```
 ### Release notes
 __0.2.7__  
-New method, ToDto(), converts row to data transfer object.  
+New method, toDto(), converts row to data transfer object.  
 Bugfix: toJSON returned incorrect string on hasMany relations.  
 __0.2.6__  
 Fixed incorrect links in README.  
