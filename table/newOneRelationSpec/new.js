@@ -19,7 +19,7 @@ function act(c){
 	c.newLeg = requireMock('./relation/newOneLeg');	
 	c.resultToPromise = requireMock('./resultToPromise');
 
-	c.newGetRelated = requireMock('../newGetRelated');
+	c.newGetRelated = requireMock('./oneRelation/newGetRelated');
 
 	c.sut = require('../newOneRelation')(c.joinRelation);
 }

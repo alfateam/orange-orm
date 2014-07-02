@@ -1,0 +1,14 @@
+var a = require('a');
+var mock = a.mock;
+var requireMock = a.requireMock;
+var expectRequire = a.expectRequire;
+
+function act(c){
+	c.mock = mock;
+	c.then = a.then;	
+	c.relation = {};
+	c.parent = {};
+	c.sut = require('../newGetRelated')(c.parent, c.relation);
+}
+
+module.exports = act;
