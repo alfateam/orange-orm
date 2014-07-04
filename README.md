@@ -2390,6 +2390,9 @@ function onFailed(err) {
 }
 ```
 ### Release notes
+__0.2.8__  
+Guid accepts uppercase letters.  
+Bugfix: null inserts on guid columns yielded wrong sql.  
 __0.2.7__  
 New method, toDto(), converts row to data transfer object.  
 Bugfix: toJSON returned incorrect string on hasMany relations.  
