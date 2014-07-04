@@ -10,5 +10,5 @@ function act(c) {
 	c.returned = c.sut(null);
 }
 
-act.base = '../new';
+act.base = '../../new';
 module.exports = act;
