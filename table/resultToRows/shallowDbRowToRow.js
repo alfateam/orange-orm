@@ -7,6 +7,7 @@ function shallowDbRowToRow(table, values) {
 	var row = {};
 	var columns  = {};
 	var emitChanged = {};
+	var getRelated = {};
 	table._columns.forEach(addColumn);
 
 	function addColumn(column) {
@@ -45,7 +46,9 @@ function shallowDbRowToRow(table, values) {
 	function setSingleRelated(name, relation) {
 		Object.defineProperty(row, name, {
     		get: function() {        			
-    			return relation.getRows(row);
+    				if (!getRelated[name])
+    					getRelated[name] = relation.toGetRelated(row);
+    				return getRelated[name]();
        		}
     	});
 	}

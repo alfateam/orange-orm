@@ -9,6 +9,7 @@ var idColumn = {}, fooColumn = {}, barColumn = {};
 function act(c) {
     c.mock = mock;
     c.getById = requireMock('./getById');
+    c.requireMock = a.requireMock;
     
     parentTable._columns = [idColumn, fooColumn, barColumn];
     c.fooAlias = '_fooAlias'
@@ -28,6 +29,9 @@ function act(c) {
     c.barColumn = barColumn;
     c.newLeg = requireMock('./relation/newJoinLeg');
     c.nullPromise = requireMock('./nullPromise');
+
+    c.newGetRelated = c.requireMock('./joinRelation/newGetRelated');
+    
     c.sut = require('../newJoinRelation')(parentTable, childTable, c.columnNames);
 }
 

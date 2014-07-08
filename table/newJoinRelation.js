@@ -1,6 +1,7 @@
 var newLeg = require('./relation/newJoinLeg'),
     getById = require('./getById'),
-    nullPromise = require('./nullPromise');
+    nullPromise = require('./nullPromise'),
+    newGetRelated = require('./joinRelation/newGetRelated');
 
 function _newJoin(parentTable, childTable, columnNames) {
     var c = {};
@@ -28,6 +29,10 @@ function _newJoin(parentTable, childTable, columnNames) {
         }
         var args = [childTable].concat(primaryKeys);
         return getById.apply(null, args);
+    };
+
+    c.toGetRelated = function(parent) {
+        return newGetRelated(parent, c);
     };
 
     return c;

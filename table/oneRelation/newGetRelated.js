@@ -1,19 +1,20 @@
 function newGetRelated(parent, relation) {
-	function getRelated() {
-		//todo
-		return relation.tryGetByHeuristic(parent).then(onResult);
+    function getRelated() {
+        if (getRelated.expanded)
+            return relation.getFromCache(parent);
+        return relation.tryGetByHeuristic(parent).then(onResult);
 
-		function onResult(row) {
-			getRelated.expanded = true;
-			if (row) {
-				return row; 
-			}
-			return relation.getFromDb(parent);
-		}
-		
-	}
+        function onResult(row) {
+            getRelated.expanded = true;
+            if (row) {
+                return row;
+            }
+            return relation.getFromDb(parent);
+        }
+    }
 
-	return getRelated;
+
+return getRelated;
 }
 
 module.exports = newGetRelated;
