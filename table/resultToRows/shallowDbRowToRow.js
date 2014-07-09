@@ -51,6 +51,16 @@ function shallowDbRowToRow(table, values) {
     	});
 	}
 
+	function createGetRelated(alias) {
+		var get = getRelated[alias];
+    	if (!get) {
+    		var relation = table._relations[alias];
+    		get = relation.toGetRelated(row);
+    		getRelated[alias] = get;
+    	}
+    	return get;
+	}
+
 	row.subscribeChanged = function(onChanged, name) {
 		if (name) {
 			emitChanged[name].add(onChanged);
@@ -82,17 +92,6 @@ function shallowDbRowToRow(table, values) {
 		var toDto = newToDto(strategy, table);
 		return toDto(row);
 	};
-
-	function createGetRelated(alias) {
-		var get = getRelated[alias];
-    	if (!get) {
-    		var relation = table._relations[alias];
-    		get = relation.toGetRelated(row);
-    		getRelated[alias] = get;
-    	}
-    	return get;
-
-	}
 
 	row.expand = function(alias) {
 		var get = createGetRelated(alias);
