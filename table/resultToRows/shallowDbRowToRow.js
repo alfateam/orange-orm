@@ -46,9 +46,7 @@ function shallowDbRowToRow(table, values) {
 	function setSingleRelated(name, relation) {
 		Object.defineProperty(row, name, {
     		get: function() {        			
-    				if (!getRelated[name])
-    					getRelated[name] = relation.toGetRelated(row);
-    				return getRelated[name]();
+    				return createGetRelated(name)();
        		}
     	});
 	}
@@ -79,6 +77,22 @@ function shallowDbRowToRow(table, values) {
 		strategy = extractStrategy.apply(null,args);		
 		var toDto = newToDto(strategy, table);
 		return toDto(row).then(JSON.stringify);
+	};
+
+	function createGetRelated(alias) {
+		var get = getRelated[alias];
+    	if (!get) {
+    		var relation = table._relations[alias];
+    		get = relation.toGetRelated(row);
+    		getRelated[alias] = get;
+    	}
+    	return get;
+
+	}
+
+	row.expand = function(alias) {
+		var get = createGetRelated(alias);
+    	get.expanded = true;
 	};
 	
 	return row;
