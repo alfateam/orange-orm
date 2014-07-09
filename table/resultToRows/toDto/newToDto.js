@@ -6,13 +6,12 @@ var extractDto = require('./newToDto/extractDto');
 var resultToPromise = require('../../resultToPromise');
 
 function newToDto(strategy, table, dto) {
-    dto = extractDto.apply(null, arguments);
-
+    var args = arguments;
     function toDto(row) {
         if (!row) {
             return resultToPromise(null);
         }
-
+        var dto = extractDto.apply(null, args);
         var relations = table._relations;
         mapFields(strategy, table, row, dto);
         

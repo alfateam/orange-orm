@@ -6,6 +6,8 @@ function _new(column) {
 	return function(candidate) {
 		var value = purify(candidate);
 		if (value == null) {
+			if(column.dbNull === null)
+				return newPara('null');
 			return newPara('\'' + column.dbNull + '\'');
 		}
 		return newPara('\'' + value + '\'');	

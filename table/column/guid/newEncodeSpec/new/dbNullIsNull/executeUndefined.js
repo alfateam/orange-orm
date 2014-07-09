@@ -1,7 +1,7 @@
-var dbNull = {};
+var dbNull = null;
 
 function act(c) {	
-	c.formatted = '\'' + dbNull + '\'';
+	c.formatted = 'null';
 
 	c.purify.expect(undefined).return(null);
 	c.newParam.expect(c.formatted).return(c.expected);
@@ -10,5 +10,5 @@ function act(c) {
 	c.returned = c.sut(undefined);
 }
 
-act.base = '../new';
+act.base = '../../new';
 module.exports = act;
