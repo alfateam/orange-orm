@@ -9,6 +9,7 @@ function act(c) {
 	c.newRelatedTable = newRelatedTable;
 	c.oneRelation = oneRelation;
 	c.parentTable = parentTable;
+	c.joinRelation = joinRelation;
 	joinRelation.childTable = parentTable;
 	parentTable._relations = {};
 	newOneRelation.expect(joinRelation).return(oneRelation);

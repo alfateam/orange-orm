@@ -14,6 +14,7 @@ function newJoin(parentTable,childTable) {
 
 	c.as = function(alias) {
 		var relation = newJoinRelation(parentTable,childTable,columnNames);
+		relation.leftAlias = alias;
 		parentTable._relations[alias] = relation;
 		
 		Object.defineProperty(parentTable, alias, {

@@ -6,6 +6,7 @@ function newOne(joinRelation) {
 	var parentTable = joinRelation.childTable;
 
 	c.as = function (alias) {	
+		joinRelation.rightAlias = alias;
 		var relation = newOneRelation(joinRelation);
 		parentTable._relations[alias] = relation;
 
