@@ -15,6 +15,7 @@ function _new(table,filter,span,alias,innerJoin) {
 	};
 
 	c.parameters = filter.parameters;	
+	c.queryContext = {filter: filter, alias: alias, innerJoin: innerJoin};
 
 	return c;
 }

@@ -21,6 +21,7 @@ function act(c) {
 	c.newColumnSql = newColumnSql;
 	c.newJoinSql = newJoinSql;
 	c.newWhereSql = newWhereSql;
+	c.queryContext = {filter: filter, alias : alias, innerJoin: innerJoin}
 	c.sut = require('../newSingleQuery')(table,filter,span,alias,innerJoin);
 }
 
