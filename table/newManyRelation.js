@@ -18,16 +18,13 @@ function newManyRelation(joinRelation) {
         visitor.visitMany(c);
     };
 
-    c.getRows = function(parentRow) {
-        if (expanderCache.tryGet(parentRow))
-            return resultToPromise(manyCache.tryGet(parentRow));
-        var filter = newForeignKeyFilter(joinRelation, parentRow);
-        return c.childTable.getMany(filter).then(expand);
+    c.getFromCache = function(parent) {
+        return resultToPromise(manyCache.tryGet(parent));
+    };
 
-        function expand(result) {
-            expanderCache.tryAdd(parentRow);
-            return result;
-        }
+    c.getFromDb = function(parent) {
+        var filter = newForeignKeyFilter(joinRelation, parent);
+        return c.childTable.getMany(filter);
     };
 
     c.expand = expanderCache.tryAdd;

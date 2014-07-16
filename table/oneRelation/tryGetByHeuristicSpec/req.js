@@ -4,7 +4,6 @@ var requireMock = a.requireMock;
 function act(c) {
 	c.then = a.then;
 	c.mock = a.mock;
-	c.extractParentKey = requireMock('../relation/manyCache/extractParentKey');
 	c.resultToPromise = requireMock('../resultToPromise');
 	c.getFarRelatives = requireMock('./getFarRelatives');
 

@@ -6,13 +6,9 @@ function newGetRelated(parent, relation) {
 
         function onResult(row) {
             getRelated.expanded = true;
-            if (row) {
-                return row;
-            }
             return relation.getFromDb(parent);
         }
     }
-
 
 return getRelated;
 }

@@ -10,18 +10,16 @@ function act(c){
 	c.manyCache = {};
 	c.manyCache.tryGet = c.mock();
 	c.joinRelation.parentTable = c.childTable;
+
 	c.newForeignKeyFilter = requireMock('./relation/newForeignKeyFilter');
 	c.newManyCache = requireMock('./relation/newManyCache');			
-	c.newManyCache.expect(c.joinRelation).return(c.manyCache);
-	c.newManyLeg = requireMock('./relation/newManyLeg');
-	
+	c.newManyLeg = requireMock('./relation/newManyLeg');	
 	c.resultToPromise = requireMock('./resultToPromise');
+	c.tryGetByHeuristic = requireMock('./oneRelation/tryGetByHeuristic');
+	c.resultToPromise = requireMock('./resultToPromise');
+	c.newGetRelated = requireMock('./oneRelation/newGetRelated');
 
-	c.newExpanderCache = requireMock('./relation/newExpanderCache');
-	c.expanderCache = {};
-	c.newExpanderCache.expect(c.joinRelation).return(c.expanderCache);
-	c.expanderCache.tryGet = mock();
-	c.expanderCache.tryAdd = mock();
+	c.newManyCache.expect(c.joinRelation).return(c.manyCache);
 
 	c.sut = require('../newManyRelation')(c.joinRelation);
 }
