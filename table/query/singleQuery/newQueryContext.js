@@ -20,6 +20,14 @@ function newQueryContext(filter, alias, innerJoin) {
 		}
 	};
 
+	c.dirty = function(row) {
+		//todo
+	};
+
+	c.add = function(row) {
+		//todo
+	};
+
 	return c;
 }
 
