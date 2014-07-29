@@ -5,7 +5,8 @@ function tryGetByHeuristic(parent, relation) {
 	var queryContext = parent.queryContext;
 	if (!queryContext)
 		return empty;
-	return queryContext.getFarRelatives(parent, relation, getFarRelatives);
+	var alias = relation.joinRelation.rightAlias;
+	return queryContext.getFarRelatives(alias, parent, relation, getFarRelatives);
 
 }
 

@@ -1,6 +1,7 @@
 var newColumnSql = require('./singleQuery/newColumnSql');
 var newJoinSql = require('./singleQuery/newJoinSql');
 var newWhereSql = require('./singleQuery/newWhereSql');
+var newQueryContext = require('./singleQuery/newQueryContext');
 
 function _new(table,filter,span,alias,innerJoin) {
 	var c = {};
@@ -15,7 +16,7 @@ function _new(table,filter,span,alias,innerJoin) {
 	};
 
 	c.parameters = filter.parameters;	
-	c.queryContext = {filter: filter, alias: alias, innerJoin: innerJoin};
+	c.queryContext = newQueryContext(filter, alias, innerJoin);
 
 	return c;
 }
