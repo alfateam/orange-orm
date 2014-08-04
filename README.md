@@ -1237,7 +1237,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [update][17]
+### [insert][17]
 ```
 var rdb = require('rdb');
 
