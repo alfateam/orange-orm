@@ -32,6 +32,10 @@ function newManyRelation(joinRelation) {
 
     c.expand = expanderCache.tryAdd;
 
+    c.isExpanded  = function() {
+        //todo
+    };
+
     c.toLeg = function() {
         return newManyLeg(c);
     };

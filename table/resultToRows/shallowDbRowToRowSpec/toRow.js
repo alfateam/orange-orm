@@ -5,12 +5,16 @@ var relations = {};
 
 
 function act(c){
-
+	c.mock = mock;
+	c.requireMock = requireMock;
 
 	c.updateField = requireMock('../updateField');
 	c.extractStrategy = requireMock('./toDto/extractStrategy');
 	c.newToDto = requireMock('./toDto/newToDto');
-	c.mock = mock;
+	c.extractDeleteStrategy = requireMock('./delete/extractDeleteStrategy');
+	c.newCascadeDeleteStrategy = requireMock('./delete/newCascadeDeleteStrategy');
+	c.delete = c.requireMock('./delete');
+	
 	c.table = {};
 	c.col1 = {};
 	c.alias1 = 'alias1';
@@ -37,8 +41,10 @@ function act(c){
 	c.newEmitEvent = requireMock('../../emitEvent');
 	c.newEmitEvent.expect().return(c.emitAlias1Changed);
 	c.newEmitEvent.expect().return(c.emitAlias2Changed);
-
+	
 	c.sut = require('../shallowDbRowToRow')(c.table, c.dbRow);
+	
+
 }
 
 module.exports = act;
