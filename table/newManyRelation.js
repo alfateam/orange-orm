@@ -30,11 +30,9 @@ function newManyRelation(joinRelation) {
         }
     };
 
+    c.getRowsSync = manyCache.tryGet;
     c.expand = expanderCache.tryAdd;
-
-    c.isExpanded  = function() {
-        //todo
-    };
+    c.isExpanded  = expanderCache.tryGet;
 
     c.toLeg = function() {
         return newManyLeg(c);

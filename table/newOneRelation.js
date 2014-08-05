@@ -31,7 +31,10 @@ function newOneRelation(joinRelation) {
         };        
     };
 
+    c.getRowsSync = oneCache.tryGet;
     c.expand = expanderCache.tryAdd;
+    c.isExpanded  = expanderCache.tryGet;
+
 
     c.toLeg = function() {
         return newLeg(c);
