@@ -14,6 +14,8 @@ function act(c){
 	c.extractDeleteStrategy = requireMock('./delete/extractDeleteStrategy');
 	c.newCascadeDeleteStrategy = requireMock('./delete/newCascadeDeleteStrategy');
 	c.delete = c.requireMock('./delete');
+
+	c.newObject = c.requireMock('../../newObject');	
 	
 	c.table = {};
 	c.col1 = {};

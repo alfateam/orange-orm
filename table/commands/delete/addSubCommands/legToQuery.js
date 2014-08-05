@@ -1,6 +1,6 @@
-var newShallowJoinSql = require('../../query/singleQuery/joinSql/newShallowJoinSql');
+var newShallowJoinSql = require('../../../query/singleQuery/joinSql/newShallowJoinSql');
 var newDeleteCommand = require('../../newDeleteCommand');
-var newParameterized = require('../../query/newParameterized');
+var newParameterized = require('../../../query/newParameterized');
 var emptyFilter;
 
 function manyLegToQuery(queries, rightAlias,leg,legNo,filter, innerJoin) {	

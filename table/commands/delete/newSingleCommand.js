@@ -1,4 +1,4 @@
-var newWhereSql = require('../query/singleQuery/newWhereSql');
+var newWhereSql = require('../../query/singleQuery/newWhereSql');
 
 function _new(table,filter,span,alias,innerJoin) {
 	var c = {};

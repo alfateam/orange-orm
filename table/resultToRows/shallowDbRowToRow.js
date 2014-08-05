@@ -5,6 +5,7 @@ var newToDto = require('./toDto/newToDto');
 var extractDeleteStrategy = require('./delete/extractDeleteStrategy');
 var newCascadeDeleteStrategy = require('./delete/newCascadeDeleteStrategy')
 var _delete = require('./delete');
+var newObject = require('../../newObject');
 
 function shallowDbRowToRow(table, values) {	
 	var row = {};
@@ -91,7 +92,7 @@ function shallowDbRowToRow(table, values) {
 	};
 
 	row.cascadeDelete = function() {
-		var strategy = newCascadeDeleteStrategy(table);
+		var strategy = newCascadeDeleteStrategy(newObject(), table);
 		_delete(row, strategy, table);
 	};
 

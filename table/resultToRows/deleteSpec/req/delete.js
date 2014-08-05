@@ -3,6 +3,9 @@ function act(c){
 	c.strategy = {};
 	c.table = {};
 	c.command = {};
+	c.command2 = {};
+	c.commands = [c.command, c.command2];
+
 	c.changeSet = {};
 	c.span = {};
 	c.filter = {};
@@ -24,11 +27,12 @@ function act(c){
 
 	c.newPrimaryKeyFilter.expect(c.table, c.id1, c.id2).return(c.filter);
 
-	c.strategyToSpan.expect(c.strategy).return(c.span);	
+	c.strategyToSpan.expect(c.table, c.strategy).return(c.span);	
 
-	c.newDeleteCommand.expect([],c.table, c.filter, c.span, c.alias, c.innerJoin).return(c.command);	
+	c.newDeleteCommand.expect([],c.table, c.filter, c.span, c.alias, c.innerJoin).return(c.commands);	
 	
 	c.pushCommand.expect(c.command);
+	c.pushCommand.expect(c.command2);
 				
 	c.sut(c.row, c.strategy, c.table);
 }

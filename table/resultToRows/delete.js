@@ -8,15 +8,17 @@ var alias = '_0';
 
 function _delete(row, strategy, table) {
 	removeFromCache(row, strategy, table);
-	var span = strategyToSpan(strategy);
+	var span = strategyToSpan(table, strategy);
 
 	var args = [table];
 	table._primaryColumns.forEach(function(primary) {
 		args.push(row[primary.alias]);
 	})
 	var filter = newPrimaryKeyFilter.apply(null, args);
-	var cmd = newDeleteCommand([], table, filter, span, alias, innerJoin);
-	pushCommand(cmd);
+	var cmds = newDeleteCommand([], table, filter, span, alias, innerJoin);
+	cmds.forEach(function(cmd) {
+		pushCommand(cmd);
+	});
 };
 
 module.exports = _delete;
