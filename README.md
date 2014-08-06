@@ -2545,7 +2545,9 @@ Reformatted documentation. No code changes.
 [38]:https://github.com/alfateam/rdb-demo/blob/master/filtering/subFilter.js
 [39]:https://github.com/alfateam/rdb-demo/blob/master/filtering/compositeFilter.js
 [101]:https://github.com/alfateam/rdb-demo/blob/master/defaultValues.js
-[102]:https://github.com/alfateam/rdb-demo/blob/master/conventions.js
+[102]:https://github.com/alfateam/rdb-demo/blob/master/delete.js
+[103]:https://github.com/alfateam/rdb-demo/blob/master/cascadeDelete.js
+[104]:https://github.com/alfateam/rdb-demo/blob/master/conventions.js
 [901]:https://npmjs.org/package/rdb#getById
 [902]:https://npmjs.org/package/rdb#tryGetFirst
 [903]:https://npmjs.org/package/rdb#join
