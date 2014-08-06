@@ -35,6 +35,8 @@ __Basic querying__
 __Persistence__  
 [update](#update)  
 [insert](#insert)  
+[delete](#delete)  
+[cascade delete](#cascade-delete)  
 [default values](#default-values)  
 [conventions](#conventions)  
 [update a join-relation](#update-a-join-relation)  
@@ -522,8 +524,7 @@ Order.hasOne(deliveryAddress_order_relation).as('deliveryAddress');
 
 var db = rdb('postgres://postgres:postgres@localhost/test');
 
-resetDemo()
-    .then(db.transaction)
+db.transaction()
     .then(getOrder)
     .then(toDto)
     .then(print)
@@ -589,8 +590,7 @@ Order.hasOne(deliveryAddress_order_relation).as('deliveryAddress');
 
 var db = rdb('postgres://postgres:postgres@localhost/test');
 
-resetDemo()
-    .then(db.transaction)
+db.transaction()
     .then(getOrder)
     .then(toDto)
     .then(print)
@@ -963,8 +963,7 @@ Order.hasOne(deliveryAddress_order_relation).as('deliveryAddress');
 
 var db = rdb('postgres://postgres:postgres@localhost/test');
 
-resetDemo()
-    .then(db.transaction)
+db.transaction()
     .then(getOrders)
     .then(toDto)
     .then(print)
@@ -1030,8 +1029,8 @@ var deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').
 Order.hasOne(deliveryAddress_order_relation).as('deliveryAddress');
 
 var db = rdb('postgres://postgres:postgres@localhost/test');
-resetDemo()
-    .then(db.transaction)
+
+db.transaction()
     .then(getOrders)
     .then(toDto)
     .then(print)
@@ -1280,6 +1279,104 @@ function onFailed(err) {
     console.log(err);
 }
 ```
+### [delete][103]
+```
+var rdb = require('rdb');
+
+var Customer = rdb.table('_customer');
+
+Customer.primaryColumn('cId').guid().as('id');
+Customer.column('cName').string().as('name');
+Customer.column('cBalance').numeric().as('balance');
+Customer.column('cRegdate').date().as('registeredDate');
+Customer.column('cIsActive').boolean().as('isActive');
+Customer.column('cPicture').binary().as('picture');
+
+var db = rdb('postgres://postgres:postgres@localhost/test');
+
+db.transaction()
+    .then(getById)
+    .then(deleteCustomer)
+    .then(rdb.commit)
+    .then(null, rdb.rollback)
+    .then(onOk, onFailed);
+
+function getById() {    
+    return Customer.getById('87654321-0000-0000-0000-000000000000');
+}
+
+function deleteCustomer(customer) {
+    customer.delete();
+}
+
+function onOk() {
+    console.log('Success');
+    console.log('Waiting for connection pool to teardown....');
+}
+
+function onFailed(err) {
+    console.log('Rollback');
+    console.log(err.stack);
+}
+```
+### [cascade delete][104]
+```
+var rdb = require('rdb');
+
+var Customer = rdb.table('_customer');
+var Order = rdb.table('_order');
+var OrderLine = rdb.table('_orderLine');
+var DeliveryAddress = rdb.table('_deliveryAddress');
+
+Customer.primaryColumn('cId').guid().as('id');
+Customer.column('cName').string().as('name');
+
+Order.primaryColumn('oId').guid().as('id');
+Order.column('oOrderNo').string().as('orderNo');
+Order.column('oCustomerId').guid().as('customerId');
+
+OrderLine.primaryColumn('lId').guid().as('id');
+OrderLine.column('lOrderId').guid().as('orderId');
+
+DeliveryAddress.primaryColumn('dId').guid().as('id');
+DeliveryAddress.column('dOrderId').string().as('orderId');
+
+var orderToCustomer = Order.join(Customer).by('oCustomerId').as('customer');
+Customer.hasMany(orderToCustomer).as('orders');
+
+var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+Order.hasMany(line_order_relation).as('lines');
+
+var deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
+Order.hasOne(deliveryAddress_order_relation).as('deliveryAddress');
+
+var db = rdb('postgres://postgres:postgres@localhost/test');
+
+db.transaction()
+    .then(getById)
+    .then(deleteCustomer)
+    .then(rdb.commit)
+    .then(null, rdb.rollback)
+    .then(onOk, onFailed);
+
+function getById() {
+    return Customer.getById('a0000000-0000-0000-0000-000000000000');
+}
+
+function deleteCustomer(customer) {
+    customer.cascadeDelete();
+}
+
+function onOk() {
+    console.log('Success');
+    console.log('Waiting for connection pool to teardown....');
+}
+
+function onFailed(err) {
+    console.log('Rollback');
+    console.log(err.stack);
+}
+```
 ### [default values][101]
 ```
 var rdb = require('rdb');
@@ -1335,8 +1432,7 @@ function onFailed(err) {
 ```
 ### [conventions][102]
 ```
-var rdb = require('rdb'),
-    resetDemo = require('./db/resetDemo');
+var rdb = require('rdb');
 
 var Customer = rdb.table('_customer');
 
@@ -2184,8 +2280,7 @@ function onFailed(err) {
 ### [or alternative syntax][36]
 
 ```
-var rdb = require('rdb'),
-    resetDemo = require('../db/resetDemo');
+var rdb = require('rdb');
 
 var Customer = rdb.table('_customer');
 
@@ -2229,8 +2324,7 @@ function onFailed(err) {
 ```
 ### [and alternative syntax][37]
 ```
-var rdb = require('rdb'),
-    resetDemo = require('../db/resetDemo');
+var rdb = require('rdb');
 
 var Customer = rdb.table('_customer');
 
