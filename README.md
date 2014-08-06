@@ -2477,6 +2477,8 @@ function onFailed(err) {
 }
 ```
 ### Release notes
+__0.3.0__  
+Fix broken links in docs.  
 __0.2.9__  
 Support for row.delete().  
 Rollback only throws when error is present.  
