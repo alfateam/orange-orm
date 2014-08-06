@@ -1,5 +1,5 @@
 var requireMock = require('a').requireMock;
-var newWhereSql = requireMock('../../query/singleQuery/newWhereSql');
+
 
 var table = {};
 var filter = {};
@@ -16,7 +16,8 @@ function act(c) {
 	c.filter = filter;
 	c.span = span;
 	c.innerJoin = innerJoin;
-	c.newWhereSql = newWhereSql;
+	c.newWhereSql = requireMock('../../query/singleQuery/newWhereSql');
+	c.newSelfJoin = requireMock('./singleCommand/newSelfJoin');
 	c.sut = require('../newSingleCommand')(table,filter,span,alias,innerJoin);
 }
 
