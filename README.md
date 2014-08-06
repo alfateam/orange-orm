@@ -2484,6 +2484,9 @@ function onFailed(err) {
 }
 ```
 ### Release notes
+__0.2.9__  
+Support for row.delete().  
+Rollback only throws when error is present.  
 __0.2.8__  
 Guid accepts uppercase letters.  
 Bugfix: null inserts on guid columns yielded wrong sql.  
