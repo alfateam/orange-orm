@@ -56,6 +56,9 @@ __Filters__
 [startsWith](#startswith)  
 [endsWith](#endswith)  
 [contains](#contains)  
+[iStartsWith](#istartswith)  
+[iEndsWith](#iendswith)  
+[iContains](#icontains)  
 [exists](#exists)  
 [or](#or)  
 [and](#and)  
@@ -2130,6 +2133,129 @@ function onFailed(err) {
     console.log(err);
 }
 ```
+### [iStartsWith][9930]
+```
+var rdb = require('rdb');
+
+var Customer = rdb.table('_customer');
+
+Customer.primaryColumn('cId').guid().as('id');
+Customer.column('cName').string().as('name');
+
+var db = rdb('postgres://postgres:postgres@localhost/test');
+
+db.transaction()
+    .then(getFilteredCustomers)
+    .then(printCustomers)
+    .then(rdb.commit)
+    .then(null, rdb.rollback)
+    .then(onOk, onFailed);
+
+function getFilteredCustomers() {
+    var filter = Customer.name.startsWith('jo');
+    return Customer.getMany(filter);
+}
+
+function printCustomers(customers) {
+    customers.forEach(printCustomer);
+
+    function printCustomer(customer) {
+        console.log('Customer Id: %s, name: %s', customer.id, customer.name);
+    }
+}
+
+function onOk() {
+    console.log('Success');
+    console.log('Waiting for connection pool to teardown....');
+}
+
+function onFailed(err) {
+    console.log('Rollback');
+    console.log(err);
+}
+```
+### [iEndsWith][9931]
+```
+var rdb = require('rdb');
+
+var Customer = rdb.table('_customer');
+
+Customer.primaryColumn('cId').guid().as('id');
+Customer.column('cName').string().as('name');
+
+var db = rdb('postgres://postgres:postgres@localhost/test');
+
+db.transaction()
+    .then(getFilteredCustomers)
+    .then(printCustomers)
+    .then(rdb.commit)
+    .then(null, rdb.rollback)
+    .then(onOk, onFailed);
+
+function getFilteredCustomers() {
+    var filter = Customer.name.endsWith('nNy');
+    return Customer.getMany(filter);
+}
+
+function printCustomers(customers) {
+    customers.forEach(printCustomer);
+
+    function printCustomer(customer) {
+        console.log('Customer Id: %s, name: %s', customer.id, customer.name);
+    }
+}
+
+function onOk() {
+    console.log('Success');
+    console.log('Waiting for connection pool to teardown....');
+}
+
+function onFailed(err) {
+    console.log('Rollback');
+    console.log(err);
+}
+```
+### [iContains][9932]
+```
+var rdb = require('rdb');
+
+var Customer = rdb.table('_customer');
+
+Customer.primaryColumn('cId').guid().as('id');
+Customer.column('cName').string().as('name');
+
+var db = rdb('postgres://postgres:postgres@localhost/test');
+
+db.transaction()
+    .then(getFilteredCustomers)
+    .then(printCustomers)
+    .then(rdb.commit)
+    .then(null, rdb.rollback)
+    .then(onOk, onFailed);
+
+function getFilteredCustomers() {
+    var filter = Customer.name.contains('oHn');
+    return Customer.getMany(filter);
+}
+
+function printCustomers(customers) {
+    customers.forEach(printCustomer);
+
+    function printCustomer(customer) {
+        console.log('Customer Id: %s, name: %s', customer.id, customer.name);
+    }
+}
+
+function onOk() {
+    console.log('Success');
+    console.log('Waiting for connection pool to teardown....');
+}
+
+function onFailed(err) {
+    console.log('Rollback');
+    console.log(err);
+}
+```
 ### [exists][33]
 ```
 var rdb = require('rdb');
@@ -2477,6 +2603,8 @@ function onFailed(err) {
 }
 ```
 ### Release notes
+__0.3.1__  
+Context insensitive filters: iStartsWith, iEndsWith and iContains.  
 __0.3.0__  
 Fix broken links in docs.  
 __0.2.9__  
@@ -2535,6 +2663,9 @@ Reformatted documentation. No code changes.
 [30]:https://github.com/alfateam/rdb-demo/blob/master/filtering/startsWith.js
 [31]:https://github.com/alfateam/rdb-demo/blob/master/filtering/endsWith.js
 [32]:https://github.com/alfateam/rdb-demo/blob/master/filtering/contains.js
+[9930]:https://github.com/alfateam/rdb-demo/blob/master/filtering/iStartsWith.js
+[9931]:https://github.com/alfateam/rdb-demo/blob/master/filtering/iEndsWith.js
+[9932]:https://github.com/alfateam/rdb-demo/blob/master/filtering/iContains.js
 [33]:https://github.com/alfateam/rdb-demo/blob/master/filtering/exists.js
 [34]:https://github.com/alfateam/rdb-demo/blob/master/filtering/or.js
 [35]:https://github.com/alfateam/rdb-demo/blob/master/filtering/and.js
