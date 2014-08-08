@@ -9,9 +9,9 @@ function act(c) {
 	c.startsWithCore = c.requireMock('./startsWithCore');	
 	
 	c.startsWithCore.bind = c.mock();	
-	c.startsWithCore.bind.expect(null, 'LIKE').return(c.expected);
+	c.startsWithCore.bind.expect(null, 'ILIKE').return(c.expected);
 	
-	c.sut = require('../startsWith');
+	c.sut = require('../iStartsWith');
 }
 
 module.exports = act;

@@ -9,9 +9,9 @@ function act(c) {
 	c.endsWithCore = c.requireMock('./endsWithCore');	
 	
 	c.endsWithCore.bind = c.mock();	
-	c.endsWithCore.bind.expect(null, 'LIKE').return(c.expected);
+	c.endsWithCore.bind.expect(null, 'ILIKE').return(c.expected);
 	
-	c.sut = require('../endsWith');
+	c.sut = require('../iEndsWith');
 }
 
 module.exports = act;

@@ -9,9 +9,9 @@ function act(c) {
 	c.containsCore = c.requireMock('./containsCore');	
 	
 	c.containsCore.bind = c.mock();	
-	c.containsCore.bind.expect(null, 'LIKE').return(c.expected);
+	c.containsCore.bind.expect(null, 'ILIKE').return(c.expected);
 	
-	c.sut = require('../contains');
+	c.sut = require('../iContains');
 }
 
 module.exports = act;
