@@ -8,7 +8,9 @@ Persistence ignorance - no need for explicit saving, everything is handled by tr
 Eager or lazy loading.  
 Based on promises.  
 [Documentation and examples](docs/docs.md)  
-### Release notes
+## Release notes
+__0.3.4__  
+Docs and examples split moved to separate file.  
 __0.3.3__  
 Fixed documentation layout again.  
 __0.3.2__  
