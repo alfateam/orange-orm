@@ -7,71 +7,73 @@ Transaction with commit and rollback.
 Persistence ignorance - no need for explicit saving, everything is handled by transaction.  
 Eager or lazy loading.  
 Based on promises.  
-[Release notes](#release-notes)  
-All examples below are found at [npmjs.org/package/rdb-demo][0].  
+[Release notes](#_releasenotes)  
+All examples below are found at [npmjs.org/package/rdb-demo](https://npmjs.org/package/rdb-demo).  
 _Table of contents_
 ---------------
+
 __Basic querying__  
-[getById](#getbyid)  
-[tryGetFirst](#trygetfirst)  
-[join](#join)  
-[hasMany](#hasmany)  
-[hasone](#hasone)  
-[composite keys](#compositekeys)  
-[getById eagerly](#getbyid-eagerly)  
-[tryGetFirst eagerly](#trygetfirst-eagerly)  
-[toDto](#todto)  
-[toDto with strategy](#todto-with-strategy)  
-[toJSON](#tojson)  
-[toJSON with strategy](#tojson-with-strategy)  
-[getMany](#getmany)  
-[getMany lazily](#getmany-lazily)  
-[getMany eagerly](#getmany-eagerly)  
-[(many)ToDto](#manytodto)  
-[(many)ToDto with strategy](#manytodto-with-strategy)  
-[(many)ToJSON](#manytojson)  
-[(many)ToJSON with strategy](#manytojson-with-strategy)  
+[getById](#_getbyid)  
+[tryGetFirst](#_trygetfirst)  
+[join](#_join)  
+[hasMany](#_hasmany)  
+[hasOne](#_hasone)  
+[composite keys](#_compositekeys)  
+[getById eagerly](#_getbyideager)    
+[tryGetFirst eagerly](#_trygetfirsteager)  
+[toDto](#_todto)  
+[toDto with strategy](#_todtowithstrategy)  
+[toJSON](#_tojson)  
+[toJSON with strategy](#_tojsonwithstrategy)  
+[getMany](#_getmany)  
+[getMany lazily](#_getmanylazy)  
+[getMany eagerly](#_getmanyeager)  
+[(many)ToDto](#_manytodto)  
+[(many)ToDto with strategy](#_manytodtowithstrategy)  
+[(many)ToJSON](#_manytojson)  
+[(many)ToJSON with strategy](#_manytojsonwithstrategy)  
 
 __Persistence__  
-[update](#update)  
-[insert](#insert)  
-[delete](#delete)  
-[cascade delete](#cascade-delete)  
-[default values](#default-values)  
-[conventions](#conventions)  
-[update a join-relation](#update-a-join-relation)  
-[update a hasOne-relation](#update-a-hasone-relation)  
-[update a hasMany-relation](#update-a-hasmany-relation)  
+[update](#_update)  
+[insert](#_insert)  
+[delete](#_delete)  
+[cascade delete](#_cascadedelete)  
+[default values](#_defaultvalues)  
+[conventions](#_conventions)  
+[update a join-relation](#_updatejoin)  
+[update a hasOne-relation](#_updatehasone)  
+[update a hasMany-relation](#_updatehasmany)  
 
 __Filters__  
-[equal](#equal)  
-[notEqual](#notequal)  
-[not](#not)  
-[lessThan](#lessthan)  
-[lessThanOrEqual](#lessthanorequal)  
-[greaterThan](#greaterThan)  
-[greaterThanOrEqual](#greaterthanorequal)  
-[between](#between)  
-[in](#in)   
-[startsWith](#startswith)  
-[endsWith](#endswith)  
-[contains](#contains)  
-[iStartsWith](#istartswith)  
-[iEndsWith](#iendswith)  
-[iContains](#icontains)  
-[exists](#exists)  
-[or](#or)  
-[and](#and)  
-[or alternative syntax](#or-alternative-syntax)  
-[and alternative syntax](#and-alternative-syntax)  
-[sub filter](#sub-filter)  
-[composite filter](#composite-filter)  
+[equal](#_equal)  
+[notEqual](#_notequal)  
+[not](#_not)  
+[lessThan](#_lessthan)  
+[lessThanOrEqual](#_lessthanorequal)  
+[greaterThan](#_greaterthan)  
+[greaterThanOrEqual](#_greaterthanorequal)  
+[between](#_between)  
+[in](#_in)   
+[startsWith](#_startswith)  
+[endsWith](#_endswith)  
+[contains](#_contains)  
+[iStartsWith](#_istartswith)  
+[iEndsWith](#_iendswith)  
+[iContains](#_icontains)  
+[exists](#_exists)  
+[or](#_or)  
+[and](#_and)  
+[or alternative syntax](#_oralternative)  
+[and alternative syntax](#_andalternative)  
+[sub filter](#_subfilter)  
+[composite filter](#_compositefilter)  
 
 _Contents_
 ---------------
 
-### [getById][1]
-```
+<a name="_getbyid"></a>
+[getById](https://github.com/alfateam/rdb-demo/blob/master/getById.js)
+```js
 var rdb = require('rdb');
 
 var Customer = rdb.table('_customer');
@@ -112,8 +114,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [tryGetFirst][2]
-```
+<a name="_trygetfirst"></a>
+[tryGetFirst](https://github.com/alfateam/rdb-demo/blob/master/tryGetFirst.js)
+```js
 var rdb = require('rdb');
 
 var Customer = rdb.table('_customer');
@@ -153,8 +156,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [join][3]
-```
+<a name="_join"></a>
+[join](https://github.com/alfateam/rdb-demo/blob/master/join.js)
+```js
 var rdb = require('rdb');
 
 var Customer = rdb.table('_customer');
@@ -207,8 +211,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [hasMany][4]
-```
+<a name="_hasmany"></a>
+[hasMany](https://github.com/alfateam/rdb-demo/blob/master/hasMany.js)
+```js
 var rdb = require('rdb');
 
 var Order = rdb.table('_order');
@@ -265,9 +270,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-
-### [hasOne][5]
-```
+<a name="_hasone"></a>
+[hasOne](https://github.com/alfateam/rdb-demo/blob/master/hasOne.js)
+```js
 var rdb = require('rdb');
 
 var Order = rdb.table('_order');
@@ -321,8 +326,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [compositeKeys][6]
-```
+<a name="_compositekeys"></a>
+[composite keys](https://github.com/alfateam/rdb-demo/blob/master/compositeKeys.js)
+```js
 var rdb = require('rdb');
 
 var Order = rdb.table('_compositeOrder');
@@ -380,8 +386,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [getById eagerly][7]
-```
+<a name="_getbyideager"></a>
+[getById eagerly](https://github.com/alfateam/rdb-demo/blob/master/getByIdEager.js)
+```js
 var rdb = require('rdb');
 
 var Customer = rdb.table('_customer');
@@ -433,8 +440,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [tryGetFirst eagerly][8]
-```
+<a name="_trygetfirsteager"></a>
+[tryGetFirst eagerly](https://github.com/alfateam/rdb-demo/blob/master/tryGetFirstEager.js)
+```js
 var rdb = require('rdb');
 
 var Customer = rdb.table('_customer');
@@ -492,8 +500,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [toDto][999]
-```
+<a name="_todto"></a>
+[toDto](https://github.com/alfateam/rdb-demo/blob/master/toDto.js)
+```js
 var rdb = require('rdb');
 
 var Order = rdb.table('_order');
@@ -558,8 +567,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [toDto with strategy][9910]
-```
+<a name="_todtowithstrategy"></a>
+[toDto with strategy](https://github.com/alfateam/rdb-demo/blob/master/toDtoWithStrategy.js)
+```js
 var rdb = require('rdb');
 
 var Order = rdb.table('_order');
@@ -624,8 +634,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [toJSON][9]
-```
+<a name="_tojson"></a>
+[toJSON](https://github.com/alfateam/rdb-demo/blob/master/toJSON.js)
+```js
 var rdb = require('rdb');
 
 var Order = rdb.table('_order');
@@ -690,8 +701,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [toJSON with strategy][10]
-```
+<a name="_tojsonwithstrategy"></a>
+[toJSON with strategy](https://github.com/alfateam/rdb-demo/blob/master/toJSONWithStrategy.js)
+```js
 var rdb = require('rdb');
 
 var Order = rdb.table('_order');
@@ -756,8 +768,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [getMany][11]
-```
+<a name="_getmany"></a>
+[getMany](https://github.com/alfateam/rdb-demo/blob/master/getMany.js)
+```js
 var rdb = require('rdb');
 
 var Customer = rdb.table('_customer');
@@ -800,8 +813,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [getMany lazily][12]
-```
+<a name="_getmanylazy"></a>
+[getMany lazily](https://github.com/alfateam/rdb-demo/blob/master/getManyLazy.js)
+```js
 var rdb = require('rdb'),
     promise = require('promise');
 
@@ -855,7 +869,7 @@ function printLines(lines) {
 }
 
 function onOk() {
-    console.log('Success');
+    console.log('success');
     console.log('Waiting for connection pool to teardown....');
 }
 
@@ -864,8 +878,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [getMany eagerly][13]
-```
+<a name="_getmanyeager"></a>
+[getMany eager](https://github.com/alfateam/rdb-demo/blob/master/getManyEager.js)
+```js
 var rdb = require('rdb'),
     promise = require('promise');
 
@@ -930,8 +945,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [(many)ToDto][9914]
-```
+<a name="_manytodto"></a>
+[(many)ToDto](https://github.com/alfateam/rdb-demo/blob/master/manyToDto.js)
+```js
 var rdb = require('rdb'),
     inspect = require('util').inspect;
 
@@ -997,8 +1013,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [(many)ToDto with strategy][9915]
-```
+<a name="_manytodtowithstrategy"></a>
+[(many)ToDto with strategy](https://github.com/alfateam/rdb-demo/blob/master/manyToDtoWithStrategy.js)
+```js
 var rdb = require('rdb'),
     inspect = require('util').inspect;
 
@@ -1064,8 +1081,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [(many)ToJSON][14]
-```
+<a name="_manytojson"></a>
+[(many)ToJSON](https://github.com/alfateam/rdb-demo/blob/master/manyToJSON.js)
+```js
 var rdb = require('rdb');
 
 var Order = rdb.table('_order');
@@ -1130,8 +1148,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [(many)ToJSON with strategy][15]
-```
+<a name="_manytojsonwithstrategy"></a>
+[(many)ToJSON with strategy](https://github.com/alfateam/rdb-demo/blob/master/manyToJSONWithStrategy.js)
+```js
 var rdb = require('rdb');
 
 var Order = rdb.table('_order');
@@ -1196,8 +1215,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [update][16]
-```
+<a name="_update"></a>
+[update](https://github.com/alfateam/rdb-demo/blob/master/update.js)
+```js
 var rdb = require('rdb');
 
 var Customer = rdb.table('_customer');
@@ -1239,8 +1259,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [insert][17]
-```
+<a name="_insert"></a>
+[insert](https://github.com/alfateam/rdb-demo/blob/master/insert.js)
+```js
 var rdb = require('rdb');
 
 var Customer = rdb.table('_customer');
@@ -1282,8 +1303,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [delete][103]
-```
+<a name="_delete"></a>
+[delete](https://github.com/alfateam/rdb-demo/blob/master/delete.js)
+```js
 var rdb = require('rdb');
 
 var Customer = rdb.table('_customer');
@@ -1322,8 +1344,9 @@ function onFailed(err) {
     console.log(err.stack);
 }
 ```
-### [cascade delete][104]
-```
+<a name="_cascadedelete"></a>
+[cascadeDelete](https://github.com/alfateam/rdb-demo/blob/master/cascadeDelete.js)
+```js
 var rdb = require('rdb');
 
 var Customer = rdb.table('_customer');
@@ -1373,8 +1396,9 @@ function onFailed(err) {
     console.log(err.stack);
 }
 ```
-### [default values][101]
-```
+<a name="_defaultvalues"></a>
+[default values](https://github.com/alfateam/rdb-demo/blob/master/defaultValues.js)
+```js
 var rdb = require('rdb');
 
 buf = new Buffer(10);
@@ -1426,8 +1450,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [conventions][102]
-```
+<a name="_conventions"></a>
+[conventions](https://github.com/alfateam/rdb-demo/blob/master/conventions.js)
+```js
 var rdb = require('rdb');
 
 var Customer = rdb.table('_customer');
@@ -1464,8 +1489,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [update a join relation][18]
-```
+<a name="_updatejoin"></a>
+[update a join-relation](https://github.com/alfateam/rdb-demo/blob/master/updateJoin.js)
+```js
 var rdb = require('rdb');
 
 var Customer = rdb.table('_customer');
@@ -1515,8 +1541,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [update a hasOne relation][19]
-```
+<a name="_updatehasone"></a>
+[update a hasOne-relation](https://github.com/alfateam/rdb-demo/blob/master/updateHasOne.js)
+```js
 var rdb = require('rdb');
 
 var Order = rdb.table('_order');
@@ -1530,7 +1557,7 @@ DeliveryAddress.column('dOrderId').string().as('orderId');
 DeliveryAddress.column('dName').string().as('name');
 DeliveryAddress.column('dStreet').string().as('street');
 
-var deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
+var deliveryAddress_order_relation = DeliveryAddress.hasone(Order).by('dOrderId').as('order');
 Order.hasOne(deliveryAddress_order_relation).as('deliveryAddress');
 
 var db = rdb('postgres://postgres:postgres@localhost/test');
@@ -1569,8 +1596,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [update a hasMany relation][20]
-```
+<a name="_updatehasmany"></a>
+[update a hasMany-relation](https://github.com/alfateam/rdb-demo/blob/master/updateHasMany.js)
+```js
 var rdb = require('rdb');
 
 var Order = rdb.table('_order');
@@ -1630,8 +1658,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [equal][21]
-```
+<a name="_equal"></a>
+[equal](https://github.com/alfateam/rdb-demo/blob/master/filtering/equal.js)
+```js
 var rdb = require('rdb');
 
 var Customer = rdb.table('_customer');
@@ -1672,8 +1701,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [notEqual][22]
-```
+<a name="_notequal"></a>
+[notEqual](https://github.com/alfateam/rdb-demo/blob/master/filtering/notEqual.js)
+```js
 var rdb = require('rdb');
 
 var Customer = rdb.table('_customer');
@@ -1714,8 +1744,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [not][23]
-```
+<a name="_not"></a>
+[not](https://github.com/alfateam/rdb-demo/blob/master/filtering/not.js)
+```js
 var rdb = require('rdb');
 
 var Customer = rdb.table('_customer');
@@ -1755,8 +1786,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [lessThan][24]
-```
+<a name="_lessthan"></a>
+[lessThan](https://github.com/alfateam/rdb-demo/blob/master/filtering/lessThan.js)
+```js
 var rdb = require('rdb');
 
 var Customer = rdb.table('_customer');
@@ -1798,8 +1830,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [lessThanOrEqual][25]
-```
+<a name="_lessthanorequal"></a>
+[lessThanOrEqual](https://github.com/alfateam/rdb-demo/blob/master/filtering/lessThanOrEqual.js)
+```js
 var rdb = require('rdb');
 
 var Customer = rdb.table('_customer');
@@ -1841,8 +1874,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [greaterThan][26]
-```
+<a name="_greaterthan"></a>
+[greaterThan](https://github.com/alfateam/rdb-demo/blob/master/filtering/greaterThan.js)
+```js
 var rdb = require('rdb');
 
 var Customer = rdb.table('_customer');
@@ -1884,8 +1918,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [greaterThanOrEqual][27]
-```
+<a name="_greaterthanorequal"></a>
+[greaterThanOrEqual](https://github.com/alfateam/rdb-demo/blob/master/filtering/greaterThanOrEqual.js)
+```js
 var rdb = require('rdb');
 
 var Customer = rdb.table('_customer');
@@ -1927,8 +1962,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [between][28]
-```
+<a name="_between"></a>
+[between](https://github.com/alfateam/rdb-demo/blob/master/filtering/between.js)
+```js
 var rdb = require('rdb');
 
 var Customer = rdb.table('_customer');
@@ -1969,8 +2005,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [in][29]
-```
+<a name="_in"></a>
+[in](https://github.com/alfateam/rdb-demo/blob/master/filtering/in.js)
+```js
 var rdb = require('rdb');
 
 var Customer = rdb.table('_customer');
@@ -2010,8 +2047,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [startsWith][30]
-```
+<a name="_startswith"></a>
+[startsWith](https://github.com/alfateam/rdb-demo/blob/master/filtering/startsWith.js)
+```js
 var rdb = require('rdb');
 
 var Customer = rdb.table('_customer');
@@ -2051,8 +2089,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [endsWith][31]
-```
+<a name="_endswith"></a>
+[endsWith](https://github.com/alfateam/rdb-demo/blob/master/filtering/endsWith.js)
+```js
 var rdb = require('rdb');
 
 var Customer = rdb.table('_customer');
@@ -2092,8 +2131,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [contains][32]
-```
+<a name="_contains"></a>
+[contains](https://github.com/alfateam/rdb-demo/blob/master/filtering/contains.js)
+```js
 var rdb = require('rdb');
 
 var Customer = rdb.table('_customer');
@@ -2133,8 +2173,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [iStartsWith][9930]
-```
+<a name="_istartswith"></a>
+[iStartsWith](https://github.com/alfateam/rdb-demo/blob/master/filtering/iStartsWith.js)
+```js
 var rdb = require('rdb');
 
 var Customer = rdb.table('_customer');
@@ -2152,7 +2193,7 @@ db.transaction()
     .then(onOk, onFailed);
 
 function getFilteredCustomers() {
-    var filter = Customer.name.startsWith('jo');
+    var filter = Customer.name.iStartsWith('jo');
     return Customer.getMany(filter);
 }
 
@@ -2174,8 +2215,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [iEndsWith][9931]
-```
+<a name="_iendswith"></a>
+[iEndsWith](https://github.com/alfateam/rdb-demo/blob/master/filtering/iEndsWith.js)
+```js
 var rdb = require('rdb');
 
 var Customer = rdb.table('_customer');
@@ -2193,7 +2235,7 @@ db.transaction()
     .then(onOk, onFailed);
 
 function getFilteredCustomers() {
-    var filter = Customer.name.endsWith('nNy');
+    var filter = Customer.name.iEndsWith('nNy');
     return Customer.getMany(filter);
 }
 
@@ -2215,8 +2257,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [iContains][9932]
-```
+<a name="_icontains"></a>
+[iContains](https://github.com/alfateam/rdb-demo/blob/master/filtering/iContains.js)
+```js
 var rdb = require('rdb');
 
 var Customer = rdb.table('_customer');
@@ -2234,7 +2277,7 @@ db.transaction()
     .then(onOk, onFailed);
 
 function getFilteredCustomers() {
-    var filter = Customer.name.contains('oHn');
+    var filter = Customer.name.iContains('oHn');
     return Customer.getMany(filter);
 }
 
@@ -2256,8 +2299,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [exists][33]
-```
+<a name="_exists"></a>
+[exists](https://github.com/alfateam/rdb-demo/blob/master/filtering/exists.js)
+```js
 var rdb = require('rdb');
 
 var Order = rdb.table('_order');
@@ -2307,8 +2351,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [or][34]
-```
+<a name="_or"></a>
+[or](https://github.com/alfateam/rdb-demo/blob/master/filtering/or.js)
+```js
 var rdb = require('rdb');
 
 var Customer = rdb.table('_customer');
@@ -2351,8 +2396,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [and][35]
-```
+<a name="_and"></a>
+[and](https://github.com/alfateam/rdb-demo/blob/master/filtering/and.js)
+```js
 var rdb = require('rdb');
 
 var Customer = rdb.table('_customer');
@@ -2396,9 +2442,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [or alternative syntax][36]
-
-```
+<a name="_oralternative"></a>
+[orAlternative](https://github.com/alfateam/rdb-demo/blob/master/filtering/orAlternative.js)
+```js
 var rdb = require('rdb');
 
 var Customer = rdb.table('_customer');
@@ -2441,8 +2487,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [and alternative syntax][37]
-```
+<a name="_andalternative"></a>
+[andAlternative](https://github.com/alfateam/rdb-demo/blob/master/filtering/andAlternative.js)
+```js
 var rdb = require('rdb');
 
 var Customer = rdb.table('_customer');
@@ -2487,8 +2534,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [sub filter][38]
-```
+<a name="_subfilter"></a>
+[subFilter](https://github.com/alfateam/rdb-demo/blob/master/filtering/subFilter.js)
+```js
 var rdb = require('rdb');
 
 var Order = rdb.table('_order');
@@ -2538,8 +2586,9 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-### [composite filter][39]
-```
+<a name="_compositefilter"></a>
+[compositeFilter](https://github.com/alfateam/rdb-demo/blob/master/filtering/compositeFilter.js)
+```js
 var rdb = require('rdb');
 
 var Order = rdb.table('_order');
@@ -2602,9 +2651,12 @@ function onFailed(err) {
     console.log(err);
 }
 ```
+<a name="_releasenotes"></a>
 ### Release notes
+__0.3.2__  
+Fixed documentation layout.  
 __0.3.1__  
-Context insensitive filters: iStartsWith, iEndsWith and iContains.  
+Case insensitive filters: iStartsWith, iEndsWith and iContains.  
 __0.3.0__  
 Fix broken links in docs.  
 __0.2.9__  
@@ -2625,100 +2677,3 @@ __0.2.4__
 Bugfix: getMany with many-strategy and shallowFilter yields incorrect query #6.  
 __0.2.3__  
 Reformatted documentation. No code changes.  
-
-[0]:https://npmjs.org/package/rdb-demo
-[1]:https://github.com/alfateam/rdb-demo/blob/master/getById.js
-[2]:https://github.com/alfateam/rdb-demo/blob/master/tryGetFirst.js
-[3]:https://github.com/alfateam/rdb-demo/blob/master/join.js
-[4]:https://github.com/alfateam/rdb-demo/blob/master/hasMany.js
-[5]:https://github.com/alfateam/rdb-demo/blob/master/hasOne.js
-[6]:https://github.com/alfateam/rdb-demo/blob/master/compositeKeys.js
-[7]:https://github.com/alfateam/rdb-demo/blob/master/getByIdEager.js
-[8]:https://github.com/alfateam/rdb-demo/blob/master/tryGetFirstEager.js
-[999]:https://github.com/alfateam/rdb-demo/blob/master/toDto.js
-[9910]:https://github.com/alfateam/rdb-demo/blob/master/toDtoWithStrategy.js
-[9]:https://github.com/alfateam/rdb-demo/blob/master/toJSON.js
-[10]:https://github.com/alfateam/rdb-demo/blob/master/toJSONWithStrategy.js
-[11]:https://github.com/alfateam/rdb-demo/blob/master/getMany.js
-[12]:https://github.com/alfateam/rdb-demo/blob/master/getManyLazy.js
-[13]:https://github.com/alfateam/rdb-demo/blob/master/getManyEager.js
-[9914]:https://github.com/alfateam/rdb-demo/blob/master/manyToDto.js
-[9915]:https://github.com/alfateam/rdb-demo/blob/master/manyToDtoWithStrategy.js
-[14]:https://github.com/alfateam/rdb-demo/blob/master/manyToJSON.js
-[15]:https://github.com/alfateam/rdb-demo/blob/master/manyToJSONWithStrategy.js
-[16]:https://github.com/alfateam/rdb-demo/blob/master/update.js
-[17]:https://github.com/alfateam/rdb-demo/blob/master/insert.js
-[18]:https://github.com/alfateam/rdb-demo/blob/master/updateJoin.js
-[19]:https://github.com/alfateam/rdb-demo/blob/master/updateHasOne.js
-[20]:https://github.com/alfateam/rdb-demo/blob/master/updateHasMany.js
-[21]:https://github.com/alfateam/rdb-demo/blob/master/filtering/equal.js
-[22]:https://github.com/alfateam/rdb-demo/blob/master/filtering/notEqual.js
-[23]:https://github.com/alfateam/rdb-demo/blob/master/filtering/not.js
-[24]:https://github.com/alfateam/rdb-demo/blob/master/filtering/lessThan.js
-[25]:https://github.com/alfateam/rdb-demo/blob/master/filtering/lessThanOrEqual.js
-[26]:https://github.com/alfateam/rdb-demo/blob/master/filtering/greaterThan.js
-[27]:https://github.com/alfateam/rdb-demo/blob/master/filtering/greaterThanOrEqual.js
-[28]:https://github.com/alfateam/rdb-demo/blob/master/filtering/between.js
-[29]:https://github.com/alfateam/rdb-demo/blob/master/filtering/in.js
-[30]:https://github.com/alfateam/rdb-demo/blob/master/filtering/startsWith.js
-[31]:https://github.com/alfateam/rdb-demo/blob/master/filtering/endsWith.js
-[32]:https://github.com/alfateam/rdb-demo/blob/master/filtering/contains.js
-[9930]:https://github.com/alfateam/rdb-demo/blob/master/filtering/iStartsWith.js
-[9931]:https://github.com/alfateam/rdb-demo/blob/master/filtering/iEndsWith.js
-[9932]:https://github.com/alfateam/rdb-demo/blob/master/filtering/iContains.js
-[33]:https://github.com/alfateam/rdb-demo/blob/master/filtering/exists.js
-[34]:https://github.com/alfateam/rdb-demo/blob/master/filtering/or.js
-[35]:https://github.com/alfateam/rdb-demo/blob/master/filtering/and.js
-[36]:https://github.com/alfateam/rdb-demo/blob/master/filtering/orAlternative.js
-[37]:https://github.com/alfateam/rdb-demo/blob/master/filtering/andAlternative.js
-[38]:https://github.com/alfateam/rdb-demo/blob/master/filtering/subFilter.js
-[39]:https://github.com/alfateam/rdb-demo/blob/master/filtering/compositeFilter.js
-[101]:https://github.com/alfateam/rdb-demo/blob/master/defaultValues.js
-[102]:https://github.com/alfateam/rdb-demo/blob/master/conventions.js
-[103]:https://github.com/alfateam/rdb-demo/blob/master/delete.js
-[104]:https://github.com/alfateam/rdb-demo/blob/master/cascadeDelete.js
-[901]:https://npmjs.org/package/rdb#getById
-[902]:https://npmjs.org/package/rdb#tryGetFirst
-[903]:https://npmjs.org/package/rdb#join
-[904]:https://npmjs.org/package/rdb#hasMany
-[905]:https://npmjs.org/package/rdb#hasOne
-[906]:https://npmjs.org/package/rdb#compositeKeys
-[907]:https://npmjs.org/package/rdb#getByIdEager
-[908]:https://npmjs.org/package/rdb#tryGetFirstEager
-[99909]:https://npmjs.org/package/rdb#toDto
-[99910]:https://npmjs.org/package/rdb#toDtoWithStrategy
-[909]:https://npmjs.org/package/rdb#toJSON
-[910]:https://npmjs.org/package/rdb#toJSONWithStrategy
-[911]:https://npmjs.org/package/rdb#getMany
-[912]:https://npmjs.org/package/rdb#getManyLazy
-[913]:https://npmjs.org/package/rdb#getManyEager
-[99914]:https://npmjs.org/package/rdb#manyToDto
-[99915]:https://npmjs.org/package/rdb#manyToDtoWithStrategy
-[914]:https://npmjs.org/package/rdb#manyToJSON
-[915]:https://npmjs.org/package/rdb#manyToJSONWithStrategy
-[916]:https://npmjs.org/package/rdb#update
-[917]:https://npmjs.org/package/rdb#insert
-[918]:https://npmjs.org/package/rdb#defaultValues
-[919]:https://npmjs.org/package/rdb#conventions
-[920]:https://npmjs.org/package/rdb#updateJoin
-[921]:https://npmjs.org/package/rdb#updateHasOne
-[922]:https://npmjs.org/package/rdb#updateHasMany
-[923]:https://npmjs.org/package/rdb#equal
-[924]:https://npmjs.org/package/rdb#notEqual
-[925]:https://npmjs.org/package/rdb#not.js
-[926]:https://npmjs.org/package/rdb#lessThan
-[927]:https://npmjs.org/package/rdb#lessThanOrEqual
-[928]:https://npmjs.org/package/rdb#greaterThan
-[929]:https://npmjs.org/package/rdb#greaterThanOrEqual
-[930]:https://npmjs.org/package/rdb#between
-[931]:https://npmjs.org/package/rdb#in
-[932]:https://npmjs.org/package/rdb#startsWith
-[933]:https://npmjs.org/package/rdb#endsWith
-[934]:https://npmjs.org/package/rdb#contains
-[935]:https://npmjs.org/package/rdb#exists
-[936]:https://npmjs.org/package/rdb#or
-[937]:https://npmjs.org/package/rdb#and
-[938]:https://npmjs.org/package/rdb#orAlternative
-[939]:https://npmjs.org/package/rdb#andAlternative
-[940]:https://npmjs.org/package/rdb#subFilter
-[941]:https://npmjs.org/package/rdb#compositeFilter
