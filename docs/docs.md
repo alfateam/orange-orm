@@ -1,8 +1,5 @@
-__Documentation and examples__
-=========
-
 All examples below are found at [npmjs.org/package/rdb-demo](https://npmjs.org/package/rdb-demo).  
-_Table of contents_
+_Documentation and examples_
 ---------------
 
 __Basic querying__  

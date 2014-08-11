@@ -7,9 +7,7 @@ Transaction with commit and rollback.
 Persistence ignorance - no need for explicit saving, everything is handled by transaction.  
 Eager or lazy loading.  
 Based on promises.  
-[Docs and examples](docs/docs.md)  
-[Release notes](#_releasenotes)  
-<a name="_releasenotes"></a>
+[Documentation and examples](docs/docs.md)  
 ### Release notes
 __0.3.3__  
 Fixed documentation layout again.  
