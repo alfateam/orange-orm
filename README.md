@@ -2443,7 +2443,7 @@ function onFailed(err) {
 }
 ```
 <a name="_oralternative"></a>
-[orAlternative](https://github.com/alfateam/rdb-demo/blob/master/filtering/orAlternative.js)
+[or alternative syntax](https://github.com/alfateam/rdb-demo/blob/master/filtering/orAlternative.js)
 ```js
 var rdb = require('rdb');
 
@@ -2488,7 +2488,7 @@ function onFailed(err) {
 }
 ```
 <a name="_andalternative"></a>
-[andAlternative](https://github.com/alfateam/rdb-demo/blob/master/filtering/andAlternative.js)
+[and alternative syntax](https://github.com/alfateam/rdb-demo/blob/master/filtering/andAlternative.js)
 ```js
 var rdb = require('rdb');
 
@@ -2535,7 +2535,7 @@ function onFailed(err) {
 }
 ```
 <a name="_subfilter"></a>
-[subFilter](https://github.com/alfateam/rdb-demo/blob/master/filtering/subFilter.js)
+[sub filter](https://github.com/alfateam/rdb-demo/blob/master/filtering/subFilter.js)
 ```js
 var rdb = require('rdb');
 
@@ -2587,7 +2587,7 @@ function onFailed(err) {
 }
 ```
 <a name="_compositefilter"></a>
-[compositeFilter](https://github.com/alfateam/rdb-demo/blob/master/filtering/compositeFilter.js)
+[composite filter](https://github.com/alfateam/rdb-demo/blob/master/filtering/compositeFilter.js)
 ```js
 var rdb = require('rdb');
 
