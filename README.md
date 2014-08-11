@@ -2653,6 +2653,8 @@ function onFailed(err) {
 ```
 <a name="_releasenotes"></a>
 ### Release notes
+__0.3.3__  
+Fixed documentation layout again.  
 __0.3.2__  
 Fixed documentation layout.  
 __0.3.1__  
