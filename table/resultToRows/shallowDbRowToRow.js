@@ -2,7 +2,7 @@ var updateField = require('../updateField');
 var newEmitEvent = require('../../emitEvent');
 var extractStrategy = require('./toDto/extractStrategy');
 var newToDto = require('./toDto/newToDto');
-var notifyDirty = require('./notifyDirty');
+var notifyDirty = require('../notifyDirty');
 
 function shallowDbRowToRow(table, values) {	
 	var row = {};

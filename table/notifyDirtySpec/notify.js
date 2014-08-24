@@ -6,9 +6,9 @@ function act(c){
 	c.expectRequire = a.expectRequire;
 	c.then = a.then;
 	
-	c.row = {};
-	
-	c.sut = require('../notifyDirty');
+	c.setSessionSingleton = c.requireMock('./setSessionSingleton');
+	c.setSessionSingleton.expect('isDirty', true);		
+	require('../notifyDirty')();
 }
 
 module.exports = act;
