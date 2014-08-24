@@ -11,6 +11,10 @@ function act(c) {
     c.newemitEvent = c.requireMock('../../../emitEvent');
     c.newemitEvent.expect().return(c.expandRows);
 
+    c.newCollection = c.requireMock('../../../newCollection');
+    c.rows = {};
+    c.newCollection.expect().return(c.rows);
+
     c.sut = require('../newQueryContext')(c.filter, c.alias, c.innerJoin);
 }
 

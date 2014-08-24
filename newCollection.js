@@ -36,6 +36,11 @@ function newCollection() {
 		}
 
 	};
+
+	c.remove = function() {
+		//todo
+	};
+
 	return c;
 }
 

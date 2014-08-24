@@ -13,6 +13,7 @@ function newResolveTransaction(domain, connectionString) {
             }
             domain.dbClient = client;
             domain.dbClientDone = done;
+            domain.rdb = {};    
             onSuccess();
         }
     };

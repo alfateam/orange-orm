@@ -3,7 +3,7 @@ var addSubQueries = require('../query/addSubQueries');
 var executeQueries = require('../executeQueries');
 var resultToRows = require('../resultToRows');
 
-function getFarRelatives(relation, parent) {
+function getRelatives(relation, parent) {
 	var queryContext = parent.queryContext;
 	var join = relation.joinRelation;
 	var table = join.childTable;
@@ -29,4 +29,4 @@ function getFarRelatives(relation, parent) {
 	}
 }
 
-module.exports = getFarRelatives;
+module.exports = getRelatives;

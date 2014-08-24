@@ -1,7 +1,7 @@
 var newLeg = require('./relation/newOneLeg');
 var newOneCache = require('./relation/newOneCache');
 var newForeignKeyFilter = require('./relation/newForeignKeyFilter');
-var tryGetByHeuristic = require('./oneRelation/tryGetByHeuristic');
+var getRelatives = require('./oneRelation/getRelatives');
 var resultToPromise = require('./resultToPromise');
 var newGetRelated = require('./oneRelation/newGetRelated');
 
@@ -26,8 +26,8 @@ function newOneRelation(joinRelation) {
         return c.childTable.tryGetFirst(filter);
     };
 
-    c.tryGetByHeuristic = function(parent) {
-        return tryGetByHeuristic(parent, c);
+    c.getRelatives = function(parent) {
+        return getRelatives(parent, c);
     };
 
     c.toGetRelated = function(parent) {

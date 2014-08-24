@@ -15,7 +15,7 @@ function act(c){
 	c.newOneCache.expect(c.joinRelation).return(c.oneCache);
 	c.joinRelation.parentTable = c.childTable;
 	
-	c.tryGetByHeuristic = requireMock('./oneRelation/tryGetByHeuristic');
+	c.getRelatives = requireMock('./oneRelation/getRelatives');
 	c.newLeg = requireMock('./relation/newOneLeg');	
 	c.resultToPromise = requireMock('./resultToPromise');
 

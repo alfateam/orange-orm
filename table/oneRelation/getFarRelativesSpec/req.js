@@ -13,7 +13,7 @@ function act(c) {
 	c.parent = {};
 	c.relation = {};
 
-	c.sut = require('../getFarRelatives');
+	c.sut = require('../getRelatives');
 }
 
 module.exports = act;

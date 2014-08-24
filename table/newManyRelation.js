@@ -3,6 +3,7 @@ var newManyCache = require('./relation/newManyCache');
 var newForeignKeyFilter = require('./relation/newForeignKeyFilter');
 var newExpanderCache = require('./relation/newExpanderCache');
 var resultToPromise = require('./resultToPromise');
+var newGetRelated = require('../joinRelation/newGetRelated');
 
 function newManyRelation(joinRelation) {
     var c = {};
@@ -26,6 +27,12 @@ function newManyRelation(joinRelation) {
         var filter = newForeignKeyFilter(joinRelation, parent);
         return c.childTable.getMany(filter);
     };
+
+    c.toGetRelated = function(parent) {
+    //todo temporary
+        return newGetRelated(parent, c);
+    };
+
 
     c.expand = expanderCache.tryAdd;
 

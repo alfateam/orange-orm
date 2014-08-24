@@ -3,15 +3,15 @@ function act(c){
 	c.relationName = 'child';
 	c.parent = {};
 	c.relation = {};
-	c.getFarRelatives = c.mock();
+	c.getRelatives = c.mock();
 
-	c.getFarRelativesPromise = c.then();
-	c.getFarRelativesPromise.resolve(true);
-	c.getFarRelatives.expect(c.parent, c.relation).return(c.getFarRelativesPromise);
+	c.getRelativesPromise = c.then();
+	c.getRelativesPromise.resolve(true);
+	c.getRelatives.expect(c.parent, c.relation).return(c.getRelativesPromise);
 
 	c.expandRows.expect(c.relationName);
 	
-	c.returned = c.sut.getFarRelatives(c.relationName, c.parent, c.relation, c.getFarRelatives).then(onOk,c.mock());
+	c.returned = c.sut.getRelatives(c.relationName, c.parent, c.relation, c.getRelatives).then(onOk,c.mock());
 
 	function onOk() {		
 	}

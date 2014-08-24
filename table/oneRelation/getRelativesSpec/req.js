@@ -5,7 +5,7 @@ function act(c) {
 	c.then = a.then;
 	c.mock = a.mock;
 	c.resultToPromise = requireMock('../resultToPromise');
-	c.getFarRelatives = requireMock('./getFarRelatives');
+	c.getRelatives = requireMock('./getRelatives');
 
 	c.empty = c.then();
 	c.empty.resolve(false);
@@ -13,7 +13,7 @@ function act(c) {
 	c.parentRow = {};
 	c.relation = {};
 
-	c.sut = require('../tryGetByHeuristic');
+	c.sut = require('../getRelatives');
 }
 
 module.exports = act;

@@ -15,7 +15,7 @@ function act(c){
 	c.newManyCache = requireMock('./relation/newManyCache');			
 	c.newManyLeg = requireMock('./relation/newManyLeg');	
 	c.resultToPromise = requireMock('./resultToPromise');
-	c.tryGetByHeuristic = requireMock('./oneRelation/tryGetByHeuristic');
+	c.getRelatives = requireMock('./oneRelation/getRelatives');
 	c.resultToPromise = requireMock('./resultToPromise');
 	c.newGetRelated = requireMock('./oneRelation/newGetRelated');
 

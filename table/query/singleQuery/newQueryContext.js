@@ -1,18 +1,21 @@
 var newemitEvent = require('../../../emitEvent');
+var newCollection = require('../../../newCollection');
 
 function newQueryContext(filter, alias, innerJoin) {
 	var expanders = [];
 	var expandRows = newemitEvent();
+	var rows = newCollection();
+
 	var c = {};
 	var count = 0;
 	c.filter = filter;
 	c.alias = alias;
 	c.innerJoin = innerJoin;
 
-	c.getFarRelatives = function(relationName, parent, relation, getFarRelatives) {
+	c.getRelatives = function(relationName, parent, relation, getRelatives) {
 		if (count == 0) {
 			count++;	
-			return getFarRelatives(parent, relation).then(onGetFar);
+			return getRelatives(parent, relation).then(onGetFar);
 		}
 
 		function onGetFar() {
@@ -21,7 +24,7 @@ function newQueryContext(filter, alias, innerJoin) {
 	};
 
 	c.dirty = function(row) {
-		//todo
+		rows.remove(row);
 	};
 
 	c.add = function(row) {

@@ -6,12 +6,11 @@ function act(c){
 	c.expectRequire = a.expectRequire;
 	c.then = a.then;
 	
-	c.parent = {};
-	c.relation = {};
+	process.domain = {};
+	c.expected = {};
+	process.domain.rdb = c.expected;
 
-	c.isDirty = c.requireMock('../isDirty');
-			
-	c.sut = require('../newGetRelated')(c.parent, c.relation);
+	c.returned = require('../getSessionContext')();
 }
 
 module.exports = act;

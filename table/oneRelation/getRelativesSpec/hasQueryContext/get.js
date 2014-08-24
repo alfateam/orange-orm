@@ -9,8 +9,8 @@ function act(c) {
 	
 	c.relation.joinRelation = c.joinRelation;
 	
-	c.queryContext.getFarRelatives = c.mock();
-	c.queryContext.getFarRelatives.expect(c.rightAlias, c.parentRow, c.relation, c.getFarRelatives).return(c.expected);
+	c.queryContext.getRelatives = c.mock();
+	c.queryContext.getRelatives.expect(c.rightAlias, c.parentRow, c.relation, c.getRelatives).return(c.expected);
 
 	c.returned = c.sut(c.parentRow, c.relation);
 
