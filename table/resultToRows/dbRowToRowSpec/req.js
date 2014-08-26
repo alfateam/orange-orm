@@ -4,6 +4,7 @@ var requireMock = a.requireMock;
 
 function act(c){
 	c.mock = mock;
+	c.requireMock = a.requireMock;
 	c.span = {};
 	c.dbRow = {};
 	c.table = {};
@@ -21,6 +22,10 @@ function act(c){
 	c.span.legs = c.legs;
 	c.row = {};
 	c.initialRow = {};
+	c.queryContext = {};
+
+	c.negotiateQueryContext = c.requireMock('./negotiateQueryContext');
+	c.negotiateQueryContext.expect(c.queryContext, c.initialRow);
 
 	c.decodeDbRow = requireMock('./decodeDbRow');
 	c.decoded = {};
@@ -56,8 +61,8 @@ function act(c){
 	c.sut = require('../dbRowToRow');
 
 	c.nextDbRowToRow = requireMock('./dbRowToRow');
-	c.nextDbRowToRow.expect(c.oneLegSpan, c.dbRow);
-	c.nextDbRowToRow.expect(c.joinLegSpan, c.dbRow);
+	c.nextDbRowToRow.expect(c.oneLegSpan, c.dbRow, c.queryContext);
+	c.nextDbRowToRow.expect(c.joinLegSpan, c.dbRow, c.queryContext);
 
 }
 

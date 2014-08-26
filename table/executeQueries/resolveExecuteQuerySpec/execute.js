@@ -14,12 +14,14 @@ function act(c){
 	c.sql = 'SELECT ID FROM ORDER WHERE ID=$1 AND NAME LIKE $2 AND ADDRESS LIKE $3 bla bla';
 
 	c.parameters = {};
-
+	
 	c.query.sql = mock();
 	c.query.sql.expect().return(c.initialSql);
 	
 	c.parameterCollection = {};
 	c.query.parameters = c.parameterCollection;
+	c.queryContext = {};
+	c.query.queryContext = c.queryContext;
 
 	c.parameterCollection.toArray = mock();
 	c.parameterCollection.toArray.expect().return(c.parameters);

@@ -9,8 +9,10 @@ function resolveExecuteQuery(query) {
 
 
 		function onCompleted(err,result) {
-			if(!err)
+			if(!err) {
+				result.queryContext = query.queryContext;
 				success(result.rows);
+			}
 			else
 				failed(err);
 		}		

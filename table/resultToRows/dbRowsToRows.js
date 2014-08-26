@@ -5,7 +5,7 @@ function dbRowsToRows(span, result) {
     var rows = newRowArray(span.table);
     var dbRows = result[0];
     for (var i = 0; i < dbRows.length; i++) {
-        var row = dbRowToRow(span, dbRows[i]);
+        var row = dbRowToRow(span, dbRows[i], result.queryContext);
         rows.push(row);
     }
     return rows;
