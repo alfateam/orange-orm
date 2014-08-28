@@ -1,16 +1,22 @@
 var a = require('a');
-var requireMock = a.requireMock;
 
 function act(c) {
 	c.then = a.then;
 	c.mock = a.mock;
-	c.resultToPromise = requireMock('../resultToPromise');
-	c.getRelatives = requireMock('./getRelatives');
+	c.requireMock = a.requireMock;
 
-	c.empty = c.then();
-	c.empty.resolve(false);
-	c.resultToPromise.expect(false).return(c.empty);
-	c.parentRow = {};
+	c.strategyToSpan = c.requireMock('../strategyToSpan');
+	c.addSubQueries = c.requireMock('../query/addSubQueries');
+	c.executeQueries = c.requireMock('../executeQueries');
+	c.resultToRows = c.requireMock('../resultToRows');
+
+	c.resultToPromise = c.requireMock('../resultToPromise');
+
+	c.emptyPromise = c.then();
+	c.emptyPromise.resolve();
+	c.resultToPromise.expect(false).return(c.emptyPromise);
+
+	c.parent = {};
 	c.relation = {};
 
 	c.sut = require('../getRelatives');
