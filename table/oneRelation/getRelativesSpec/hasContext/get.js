@@ -22,11 +22,7 @@ function act (c) {
 
 	c.span = {};
 	c.strategyToSpan.expect(c.table, c.strategy).return(c.span);
-	c.addSubQueries.expect([],c.table,c.filter,c.span,c.alias,c.innerJoin).whenCalled(onAdd);
-
-	function onAdd(subQueries) {
-		subQueries.push(c.query);
-	}
+	c.newRelativeQuery.expect(c.table,c.filter,c.span,c.alias,c.innerJoin).return(c.query);
 
 	c.subSpan = {};
 	c.leg = {};
@@ -43,7 +39,7 @@ function act (c) {
 	c.result = {};
 	c.resultPromise = c.then();
 	c.resultPromise.resolve(c.result);
-	c.executeQueries.expect([c.query]).return(c.resultPromise);
+	c.executeQueries.expect(c.query).return(c.resultPromise);
 
 	c.resultToRows.expect(c.subSpan, c.result);
 

@@ -1,5 +1,5 @@
 var strategyToSpan = require('../strategyToSpan');
-var addSubQueries = require('../query/addSubQueries');
+var newRelativeQuery = require('./newRelativeQuery');
 var executeQueries = require('../executeQueries');
 var resultToRows = require('../resultToRows');
 var empty = require('../resultToPromise')(false);
@@ -14,13 +14,12 @@ function getRelatives(parent, relation) {
 	var strategy = {};
 	strategy[join.leftAlias] = null;
 	var span = strategyToSpan(table, strategy);
-	var queries = [];
 	var filter = queryContext.filter;
 	var alias = queryContext.alias;
 	var innerJoin = queryContext.innerJoin;
-	addSubQueries(queries,table,filter,span,alias,innerJoin);
+	var query = newRelativeQuery(table,filter,span,alias,innerJoin);
 
-	return executeQueries(queries).then(onResult);
+	return executeQueries(query).then(onResult);
 
 	function onResult(result) {
 		queryContext.expand(relation);
