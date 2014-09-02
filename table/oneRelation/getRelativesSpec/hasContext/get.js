@@ -50,7 +50,7 @@ function act (c) {
 	c.queryContext.expand = c.mock();
 	c.queryContext.expand.expect(c.relation);
 
-	c.sut(c.relation, c.parent);
+	c.sut(c.parent, c.relation);
 
 
 }

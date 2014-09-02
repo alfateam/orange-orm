@@ -5,7 +5,7 @@ var resultToRows = require('../resultToRows');
 var empty = require('../resultToPromise')(false);
 
 
-function getRelatives(relation, parent) {
+function getRelatives(parent, relation) {
 	var queryContext = parent.queryContext;
 	if (!queryContext)
 		return empty;

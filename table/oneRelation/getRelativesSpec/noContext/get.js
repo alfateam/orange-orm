@@ -1,5 +1,5 @@
 function act (c) {
-	c.sut(c.relation, c.parent).then(onResult);
+	c.sut(c.parent, c.relation).then(onResult);
 
 	function onResult(returned) {
 		c.didNotCrash = true;
