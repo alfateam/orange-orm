@@ -15,28 +15,32 @@ function newToDto(strategy, table, dto) {
         var relations = table._relations;
         mapFields(strategy, table, row, dto);
         
-        var promises = [];
-        for (var relationName in strategy) {            
+        var promise = resultToPromise(null);
+        for (var relationName in strategy) {
+            var map = mapRelation.bind(null,relationName);
+            promise = promise.then(map);              
+        }
+
+        function mapRelation(relationName) {
             var relation = relations[relationName];             
             var visitor = {};
+            var promise;
             visitor.visitJoin = function() {
                 var relatedToDto = newSingleRelatedToDto(relationName, relation, strategy, dto);
-                var promise = row[relationName].then(relatedToDto);
-                promises.push(promise);
+                promise = row[relationName].then(relatedToDto);
             };
 
             visitor.visitMany = function() {
                 var relatedToDto = newManyRelatedToDto(relationName, relation, strategy, dto);
-                var promise = row[relationName].then(relatedToDto);
-                promises.push(promise);
+                promise = row[relationName].then(relatedToDto);
             };
 
-            visitor.visitOne = visitor.visitJoin;
-            
-            relation.accept(visitor);
-            
+            visitor.visitOne = visitor.visitJoin;            
+            relation.accept(visitor);           
+            return promise;
         }
-        return all(promises).then(function() {return dto;});
+
+        return promise.then(function() {return dto;});
     }
 
     return toDto;

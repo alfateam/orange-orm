@@ -2,8 +2,12 @@ function act(c){
 	c.expected = {};
 	c.row = {};
 	c.row2 = {};
-	c.dtoPromise = {};
-	c.dtoPromise2 = {};
+	c.dto = {};
+	c.dto2 = {};
+	c.dtoPromise = c.then();
+	c.dtoPromise.resolve(c.dto);
+	c.dtoPromise2 = c.then();
+	c.dtoPromise2.resolve(c.dto2);
 	c.strategy = {};	
 	c.optionalStrategy = {};
 	c.extractStrategy.expect(c.optionalStrategy, c.table).return(c.strategy);
@@ -21,7 +25,11 @@ function act(c){
 	c.sut[0] = c.row;
 	c.sut[1] = c.row2;
 
-	c.returned = c.sut.toDto(c.optionalStrategy);
+	c.sut.toDto(c.optionalStrategy).then(onResult);
+	
+	function onResult(dtos) {
+		c.returned = dtos;
+	}
 }
 
 module.exports = act;

@@ -2,5 +2,5 @@ var when = require('a').when;
 var c = {};
 
 when(c)
-	.it('should return dtos').assertEqual(c.expected, c.returned)
+	.it('should return dtos').assertDeepEqual([c.dto, c.dto2], c.returned)
 	;

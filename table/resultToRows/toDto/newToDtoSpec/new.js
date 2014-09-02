@@ -1,18 +1,19 @@
 var a = require('a');
 var mock = a.mock;
-var requireMock = a.requireMock;
 
 function act(c){
-	c.mock = mock;	
+	c.mock = mock;
+    c.requireMock = a.requireMock;
+    c.then = a.then;
 	c.table = {};
 	c.initialDto = {};
     c.dto = {};
-    c.mapFields = requireMock('./mapFields');
-    c.newSingleRelatedToDto = requireMock('./newSingleRelatedToDto');
-    c.newManyRelatedToDto = requireMock('./newManyRelatedToDto');
-    c.promise = requireMock('../../promise');
-    c.extractDto = requireMock('./newToDto/extractDto');
-    c.resultToPromise = requireMock('../../resultToPromise');
+    c.mapFields = c.requireMock('./mapFields');
+    c.newSingleRelatedToDto = c.requireMock('./newSingleRelatedToDto');
+    c.newManyRelatedToDto = c.requireMock('./newManyRelatedToDto');
+    c.promise = c.requireMock('../../promise');
+    c.extractDto = c.requireMock('./newToDto/extractDto');
+    c.resultToPromise = c.requireMock('../../resultToPromise');
     c.all = mock();
     c.promise.all = c.all;
 
