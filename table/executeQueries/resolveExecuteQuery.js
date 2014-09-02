@@ -7,10 +7,9 @@ function resolveExecuteQuery(query) {
 	
 		client.query(replaceParamChar(), params, onCompleted);
 
-
 		function onCompleted(err,result) {
 			if(!err) {
-				result.queryContext = query.queryContext;
+				result.rows.queryContext = query.queryContext;				
 				success(result.rows);
 			}
 			else
