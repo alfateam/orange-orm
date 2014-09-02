@@ -7,7 +7,8 @@ function dbRowToRow(span, dbRow, queryContext) {
 	var table = span.table;
 	var decoded = decodeDbRow(table, dbRow);
 	var row = shallowDbRowToRow(table, decoded);
-	negotiateQueryContext(queryContext, row);	
+	negotiateQueryContext(queryContext, row);
+	row.queryContext = queryContext;	
 	var cache = table._cache;
 	row = cache.tryAdd(row);
 
