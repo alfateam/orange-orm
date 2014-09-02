@@ -16,6 +16,7 @@ var parentAlias = '_1',
 	filter = {};
 
 function act(c) {
+	c.query = {};
 	leg.columns = legColumns;
 	leg.span = span;		
 	span.table = childTable;
@@ -27,9 +28,8 @@ function act(c) {
 	parameterized.append.expect(innerJoin).return(nextInnerJoin);
 
 	c.newShallowJoinSql.expect(table,legColumns,primaryColumns,alias,parentAlias).return(shallowJoin);
-	c.newQuery.expect(queries, childTable,filter,span,alias,nextInnerJoin);
-	c.sut(queries, parentAlias,leg,legNo,filter, innerJoin);
+	c.newQuery.expect(queries, childTable,filter,span,alias,nextInnerJoin).return(c.query);
+	c.returned = c.sut(queries, parentAlias,leg,legNo,filter, innerJoin);
 }
 
-act.base = '../req';
 module.exports = act;

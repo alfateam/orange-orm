@@ -12,7 +12,7 @@ function manyLegToQuery(queries, rightAlias,leg,legNo,filter, innerJoin) {
 	 
 	var shallowJoin  = newShallowJoinSql(rightTable,leftColumns,rightColumns,leftAlias,rightAlias);
 	var innerJoin = newParameterized(' INNER' + shallowJoin).append(innerJoin);	
-	newQuery(queries, span.table,filter,span,leftAlias,innerJoin);
+	return newQuery(queries, span.table,filter,span,leftAlias,innerJoin);
 }
 
 module.exports = manyLegToQuery;

@@ -1,11 +1,11 @@
 function act (c) {
-	c.table = {};
+	c.legNo = 0;
+	c.leg = {};
+	c.span = {};
+	c.leg.span = c.span;
 	c.alias = 'alias';
 	c.name = 'foo';
-	c.joinRelation = {};
-	c.joinRelation.leftAlias = c.name;
-	c.relation.joinRelation = c.joinRelation;
-	c.joinRelation.childTable = c.table;
+
 	c.queryContext = {};
 	c.filter = {};
 	c.innerJoin = {};
@@ -15,36 +15,24 @@ function act (c) {
 	c.queryContext.alias = c.alias;
 
 	c.parent.queryContext = c.queryContext;
-	
 	c.query = {};
 
-	c.strategy = {foo: null};
-
-	c.span = {};
-	c.strategyToSpan.expect(c.table, c.strategy).return(c.span);
-	c.newRelativeQuery.expect(c.table,c.filter,c.span,c.alias,c.innerJoin).return(c.query);
+	c.manyLegToQuery.expect([], c.alias, c.leg, c.legNo, c.filter, c.innerJoin).return(c.query);
 
 	c.subSpan = {};
-	c.leg = {};
-	c.leg.span = c.subSpan;
-	c.legs = {};
-	c.span.legs = c.legs;
-	c.legs.forEach = c.mock();
-	c.legs.forEach.expectAnything().whenCalled(onEachLeg);
-
-	function onEachLeg(cb) {
-		cb(c.leg);
-	}
 
 	c.result = {};
 	c.resultPromise = c.then();
 	c.resultPromise.resolve(c.result);
 	c.executeQueries.expect(c.query).return(c.resultPromise);
 
-	c.resultToRows.expect(c.subSpan, c.result);
+	c.resultToRows.expect(c.span, c.result);
 
 	c.queryContext.expand = c.mock();
 	c.queryContext.expand.expect(c.relation);
+
+	c.relation.toLeg = c.mock();
+	c.relation.toLeg.expect().return(c.leg);	
 
 	c.sut(c.parent, c.relation);
 

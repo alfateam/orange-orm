@@ -5,8 +5,7 @@ function act(c) {
 	c.mock = a.mock;
 	c.requireMock = a.requireMock;
 
-	c.strategyToSpan = c.requireMock('../strategyToSpan');
-	c.newRelativeQuery = c.requireMock('./newRelativeQuery');
+	c.manyLegToQuery = c.requireMock('../query/addSubQueries/manyLegToQuery');
 	c.executeQueries = c.requireMock('../executeQueries');
 	c.resultToRows = c.requireMock('../resultToRows');
 

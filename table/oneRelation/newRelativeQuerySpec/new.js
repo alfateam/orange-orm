@@ -6,7 +6,7 @@ function act(c) {
 	c.expectRequire = a.expectRequire;
 	c.then = a.then;
 
-	c.manyLegToQuery = c.requireMock('./query/addSubQueries/manyLegToQuery');
+	c.manyLegToQuery = c.requireMock('../query/addSubQueries/manyLegToQuery');
 
 	c.sut = require('../newRelativeQuery');
 }

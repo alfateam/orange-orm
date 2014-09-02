@@ -1,4 +1,4 @@
-var manyLegToQuery = require('./query/addSubQueries/manyLegToQuery');
+var manyLegToQuery = require('../query/addSubQueries/manyLegToQuery');
 
 function newRelativeQuery(table,filter,span,alias,innerJoin) {	
 	var c = {};
