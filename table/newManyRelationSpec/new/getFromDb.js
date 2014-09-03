@@ -7,8 +7,8 @@ function act(c){
 	c.newForeignKeyFilter.expect(c.joinRelation, parentRow).return(c.foreignKeyFilter);
 
 	c.expected = {};
-	c.childTable.tryGetFirst = c.mock();
-	c.childTable.tryGetFirst.expect(c.foreignKeyFilter).return(c.expected);
+	c.childTable.getMany = c.mock();
+	c.childTable.getMany.expect(c.foreignKeyFilter).return(c.expected);
 
 	c.returned = c.sut.getFromDb(parentRow);
 }

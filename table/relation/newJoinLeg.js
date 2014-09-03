@@ -8,6 +8,7 @@ function newLeg(relation) {
 	c.span = span;
 	c.table = relation.parentTable;
 	c.columns = relation.columns;
+	c.expand = relation.expand;
 
 	c.accept = function(visitor) {
 		visitor.visitJoin(c);

@@ -12,8 +12,10 @@ function act(c){
 	relation.parentTable = parentTable;
 	relation.childTable = childTable;
 	relation.columns = columns;
+	relation.expand = {};
 	newCollection.expect().return(emptyCollection);
 	c.emptyCollection = emptyCollection;
+	c.relation = relation;
 	c.childTable = childTable;
 	c.parentTable = parentTable;
 	c.columns = columns;
