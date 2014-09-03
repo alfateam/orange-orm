@@ -8,7 +8,6 @@ function act(c){
 	c.updateField = requireMock('../updateField');
 	c.extractStrategy = requireMock('./toDto/extractStrategy');
 	c.newToDto = requireMock('./toDto/newToDto');
-	c.notifyDirty = requireMock('../notifyDirty');
 
 	c.mock = mock;
 	c.table = {};

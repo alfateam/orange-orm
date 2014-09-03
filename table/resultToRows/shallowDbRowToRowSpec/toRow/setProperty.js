@@ -8,8 +8,6 @@ function act(c){
 	c.emitAlias1Changed.expect(c.sut, c.col1, c.newValue1, c.value1);	
 	c.updateField.expect(c.table, c.col1, c.sut);
 
-	c.notifyDirty.expect(c.sut);
-	
 	c.sut.alias1 = c.newInitValue1;
 }
 

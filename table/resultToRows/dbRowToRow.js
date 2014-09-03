@@ -15,12 +15,13 @@ function dbRowToRow(span, dbRow, queryContext) {
 	var c = {};
 	
 	c.visitOne = function(leg) {
-		nextDbRowToRow(leg.span, dbRow, queryContext);
+		nextDbRowToRow(leg.span, dbRow);
 		leg.expand(row);
 	};
 
 	c.visitJoin = function(leg) {
-		nextDbRowToRow(leg.span, dbRow, queryContext);
+		nextDbRowToRow(leg.span, dbRow);
+		leg.expand(row);		
 	};
 
 	c.visitMany = function(leg) {
@@ -36,9 +37,9 @@ function dbRowToRow(span, dbRow, queryContext) {
 	return row;
 }
 
-function _nextDbRowToRow (span, dbRow, queryContext) {
+function _nextDbRowToRow (span, dbRow) {
 	nextDbRowToRow = require('./dbRowToRow');
-	nextDbRowToRow(span, dbRow,queryContext);
+	nextDbRowToRow(span, dbRow);
 }
 
 module.exports = dbRowToRow;

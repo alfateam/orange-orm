@@ -2,7 +2,6 @@ var updateField = require('../updateField');
 var newEmitEvent = require('../../emitEvent');
 var extractStrategy = require('./toDto/extractStrategy');
 var newToDto = require('./toDto/newToDto');
-var notifyDirty = require('../notifyDirty');
 
 function shallowDbRowToRow(table, values) {	
 	var row = {};
@@ -30,7 +29,6 @@ function shallowDbRowToRow(table, values) {
        			values[name] = value;
        			updateField(table, columns[name], row);
        			emitChanged[name](row, column, value, oldValue);       			
-       			notifyDirty(row);
        		}
     	});
 	}

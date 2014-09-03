@@ -45,12 +45,15 @@ function act(c){
 	}
 
 	c.oneLeg.accept = mock();
-	c.oneLeg.expand = mock();
 	c.oneLeg.accept.expectAnything().whenCalled(function(visitor) { visitor.visitOne(c.oneLeg); }).return();
+	c.oneLeg.expand = mock();
 	c.oneLeg.expand.expect(c.row);
 	
 	c.joinLeg.accept = mock();
 	c.joinLeg.accept.expectAnything().whenCalled(function(visitor) { visitor.visitJoin(c.joinLeg); }).return();
+	c.joinLeg.expand = mock();
+	c.joinLeg.expand.expect(c.row);
+
 
 	c.manyLeg.accept = mock();
 	c.manyLeg.accept.expectAnything().whenCalled(function(visitor) { visitor.visitMany(c.manyLeg); }).return();
@@ -61,8 +64,8 @@ function act(c){
 	c.sut = require('../dbRowToRow');
 
 	c.nextDbRowToRow = requireMock('./dbRowToRow');
-	c.nextDbRowToRow.expect(c.oneLegSpan, c.dbRow, c.queryContext);
-	c.nextDbRowToRow.expect(c.joinLegSpan, c.dbRow, c.queryContext);
+	c.nextDbRowToRow.expect(c.oneLegSpan, c.dbRow);
+	c.nextDbRowToRow.expect(c.joinLegSpan, c.dbRow);
 
 }
 
