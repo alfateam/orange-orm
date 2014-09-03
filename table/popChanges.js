@@ -5,7 +5,8 @@ function popChanges() {
 	changeSet = getChangeSet();
 	var length = changeSet.length;
 	if (length > 0) {
-		changeSet[length-1].endEdit();
+		var lastCmd = changeSet[length-1]
+		lastCmd.endEdit && lastCmd.endEdit();
 		var compressed = compressChanges(changeSet);
 		changeSet.length = 0;
 		return compressed;

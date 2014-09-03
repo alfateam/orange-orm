@@ -7,7 +7,9 @@ var newThrow = require('./newThrow');
 function rollback(e) {	
 	popChanges();
 	var executeQueryPromise =  executeQuery(rollbackCommand).then(releaseDbClient);
-	return newThrow(e, executeQueryPromise);
+	if (e)
+		return newThrow(e, executeQueryPromise);
+	return executeQueryPromise;
 
 	function reThrow() {
 		throw e;

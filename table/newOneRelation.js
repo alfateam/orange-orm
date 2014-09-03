@@ -38,6 +38,12 @@ function newOneRelation(joinRelation) {
         return parent.expand(joinRelation.rightAlias);
     };
 
+    c.getRowsSync = oneCache.tryGet;
+    
+    c.isExpanded  = function(parent) {
+        return parent.isExpanded(joinRelation.rightAlias);
+    }
+
     c.toLeg = function() {
         return newLeg(c);
     };

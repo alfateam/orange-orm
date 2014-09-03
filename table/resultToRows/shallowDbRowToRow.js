@@ -2,6 +2,10 @@ var updateField = require('../updateField');
 var newEmitEvent = require('../../emitEvent');
 var extractStrategy = require('./toDto/extractStrategy');
 var newToDto = require('./toDto/newToDto');
+var extractDeleteStrategy = require('./delete/extractDeleteStrategy');
+var newCascadeDeleteStrategy = require('./delete/newCascadeDeleteStrategy')
+var _delete = require('./delete');
+var newObject = require('../../newObject');
 
 function shallowDbRowToRow(table, values) {	
 	var row = {};
@@ -29,7 +33,7 @@ function shallowDbRowToRow(table, values) {
        			values[name] = value;
        			updateField(table, columns[name], row);
        			emitChanged[name](row, column, value, oldValue);       			
-       		}
+       			}
     	});
 	}
 
@@ -97,7 +101,22 @@ function shallowDbRowToRow(table, values) {
 		var get = createGetRelated(alias);
     	get.expanded = true;
 	};
+
+	row.isExpanded = function(alias) {
+		var get = createGetRelated(alias);
+    	return get.expanded;
+	};
 	
+	row.delete = function(strategy) {
+		var strategy = extractDeleteStrategy(strategy, table);
+		_delete(row, strategy, table);
+	};
+
+	row.cascadeDelete = function() {
+		var strategy = newCascadeDeleteStrategy(newObject(), table);
+		_delete(row, strategy, table);
+	};
+
 	return row;
 }
 
