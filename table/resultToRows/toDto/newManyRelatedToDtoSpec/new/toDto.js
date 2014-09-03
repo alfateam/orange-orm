@@ -1,25 +1,18 @@
 function act(c){
-	c.expected;
-	c.lineRow = {};
-	c.lineRow2 = {};
-	c.lineDto = {};
-	c.lineDto2 = {};
+	c.rows = {};
+	c.dtos = {};
 
-	c.dtoPromise = 'dtoPromise';	
-	c.toDto.expect(c.lineRow).return(c.dtoPromise)
-	c.dtoPromise2 = 'dtoPromise2';
-	c.toDto.expect(c.lineRow2).return(c.dtoPromise2)
+	c.dtosPromise = c.then();
+	c.dtosPromise.resolve(c.dtos);
 
-	c.allPromise = {};
-	c.allPromise.then = c.mock();
-	c.allPromise.then.expectAnything().whenCalled(onAll).return(c.expected);
-	c.promise.all.expect([c.dtoPromise, c.dtoPromise2]).return(c.allPromise);
+	c.rows.toDto = c.mock();
+	c.rows.toDto.expect(c.lineStrategy).return(c.dtosPromise);
 
-	function onAll(cb) {
-		cb([c.lineDto, c.lineDto2]);
+	c.sut(c.rows).then(onResult);
+
+	function onResult() {
+		c.didSuccess = true;
 	}
-
-	c.returned = c.sut([c.lineRow, c.lineRow2])
 }
 
 module.exports = act;

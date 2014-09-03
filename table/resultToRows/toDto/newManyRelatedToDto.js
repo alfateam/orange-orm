@@ -1,27 +1,11 @@
-var newToDto = _newToDto;
-var all = require('../../promise').all;
-
-function _newToDto() {
-	newToDto = require('./newToDto');
-	return newToDto.apply(null,arguments);
-}
-
-function newManyRelatedToDto(relationName, relation, strategy, dto) {
-
+function newManyRelatedToDto(relationName, relation, strategy, dto) {	
 	var subStrategy = strategy[relationName];
 	var subTable = relation.childTable;
-	var toDto = newToDto(subStrategy, subTable);
+	return relatedToDto;	
 
 	function relatedToDto(rows) {
-		var promises = [];
-		for (var i = 0; i < rows.length; i++) {			
-			var promise = toDto(rows[i]);
-			promises.push(promise);
-		};
-		return all(promises).then(onDtos);
+		return rows.toDto(subStrategy).then(onDtos);
 	}
-
-	return relatedToDto;
 
 	function onDtos(dtos) {
 		dto[relationName] = dtos;
