@@ -1,4 +1,4 @@
-var isDirty = require('../isDirty');
+var isDirty = require('./isDirty');
 
 function newGetRelated(parent, relation) {
     function getRelated() {
@@ -15,7 +15,6 @@ function newGetRelated(parent, relation) {
         }
 
         function onRelatives() {
-            getRelated.expanded = true;
             return relation.getFromCache(parent);
         }
     }
