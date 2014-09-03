@@ -30,7 +30,8 @@ function act(c) {
     c.newLeg = requireMock('./relation/newJoinLeg');
     c.nullPromise = requireMock('./nullPromise');
 
-    c.newGetRelated = c.requireMock('./joinRelation/newGetRelated');
+    c.newGetRelated = c.requireMock('./newGetRelated');
+    c.getRelatives = requireMock('./joinRelation/getRelatives');
     
     c.sut = require('../newJoinRelation')(parentTable, childTable, c.columnNames);
 }

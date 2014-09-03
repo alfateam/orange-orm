@@ -1,7 +1,8 @@
 var newLeg = require('./relation/newJoinLeg'),
     getById = require('./getById'),
     nullPromise = require('./nullPromise'),
-    newGetRelated = require('./joinRelation/newGetRelated');
+    newGetRelated = require('./newGetRelated'),
+    getRelatives = require('./joinRelation/getRelatives');
 
 function _newJoin(parentTable, childTable, columnNames) {
     var c = {};
@@ -19,7 +20,7 @@ function _newJoin(parentTable, childTable, columnNames) {
         return newLeg(c);
     };
 
-    c.getRows = function(parentRow) {
+    c.getFromDb = function(parentRow) {
         var primaryKeys = c.columns.map(function(column) {
             return parentRow[column.alias];
         });
@@ -31,8 +32,18 @@ function _newJoin(parentTable, childTable, columnNames) {
         return getById.apply(null, args);
     };
 
+    c.getFromCache = c.getFromDb;
+
     c.toGetRelated = function(parent) {
         return newGetRelated(parent, c);
+    };
+
+    c.getRelatives = function(parent) {
+        return getRelatives(parent, c);
+    };
+
+    c.expand = function(parent) {
+        parent.expand(c.leftAlias);
     };
 
     return c;

@@ -3,7 +3,7 @@ var newOneCache = require('./relation/newOneCache');
 var newForeignKeyFilter = require('./relation/newForeignKeyFilter');
 var getRelatives = require('./oneRelation/getRelatives');
 var resultToPromise = require('./resultToPromise');
-var newGetRelated = require('./oneRelation/newGetRelated');
+var newGetRelated = require('./newGetRelated');
 
 function newOneRelation(joinRelation) {
     var c = {};

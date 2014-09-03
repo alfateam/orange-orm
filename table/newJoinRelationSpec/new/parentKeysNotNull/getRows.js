@@ -9,7 +9,7 @@ function act(c){
 	
 	c.getById.expect(c.childTable, fooKey, barKey).return(c.relatedRows);
 
-	c.returned = c.sut.getRows(parentRow);
+	c.returned = c.sut.getFromDb(parentRow);
 }
 act.base = '../../new.js';
 module.exports = act;
