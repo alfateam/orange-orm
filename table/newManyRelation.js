@@ -1,46 +1,48 @@
-var newManyLeg = require('./relation/newManyLeg');
+var newLeg = require('./relation/newManyLeg');
 var newManyCache = require('./relation/newManyCache');
 var newForeignKeyFilter = require('./relation/newForeignKeyFilter');
-var newExpanderCache = require('./relation/newExpanderCache');
+var getRelatives = require('./oneRelation/getRelatives');
 var resultToPromise = require('./resultToPromise');
-var newGetRelated = require('./joinRelation/newGetRelated');
+var newGetRelated = require('./oneRelation/newGetRelated');
 
 function newManyRelation(joinRelation) {
     var c = {};
-
     var manyCache = newManyCache(joinRelation);
-    var expanderCache = newExpanderCache(joinRelation);
 
     c.joinRelation = joinRelation;
     c.childTable = joinRelation.parentTable;
-    var parentTable = joinRelation.childTable;
 
     c.accept = function(visitor) {
         visitor.visitMany(c);
     };
 
     c.getFromCache = function(parent) {
-        return resultToPromise(manyCache.tryGet(parent));
+        var row = manyCache.tryGet(parent);
+        return resultToPromise(row);
     };
 
     c.getFromDb = function(parent) {
         var filter = newForeignKeyFilter(joinRelation, parent);
-        return c.childTable.getMany(filter);
+        return c.childTable.tryGetFirst(filter);
+    };
+
+    c.getRelatives = function(parent) {
+        return getRelatives(parent, c);
     };
 
     c.toGetRelated = function(parent) {
-    //todo temporary
         return newGetRelated(parent, c);
     };
 
-
-    c.expand = expanderCache.tryAdd;
+    c.expand = function(parent) {
+        return parent.expand(joinRelation.rightAlias);
+    };
 
     c.toLeg = function() {
-        return newManyLeg(c);
+        return newLeg(c);
     };
 
     return c;
-};
+}
 
 module.exports = newManyRelation;

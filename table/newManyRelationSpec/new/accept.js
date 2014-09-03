@@ -11,5 +11,4 @@ function act(c){
 	c.sut.accept(c.visitor);
 }
 
-act.base = '../new'
 module.exports = act;

@@ -5,21 +5,21 @@ var expectRequire = a.expectRequire;
 
 function act(c){
 	c.mock = mock;
-	c.joinRelation = {};
+	c.then = a.then;
 	c.childTable = {};
-	c.manyCache = {};
-	c.manyCache.tryGet = c.mock();
-	c.joinRelation.parentTable = c.childTable;
-
+	c.joinRelation = {};
+	c.cache = {};
+	c.cache.tryGet = c.mock();
 	c.newForeignKeyFilter = requireMock('./relation/newForeignKeyFilter');
-	c.newManyCache = requireMock('./relation/newManyCache');			
-	c.newManyLeg = requireMock('./relation/newManyLeg');	
-	c.resultToPromise = requireMock('./resultToPromise');
+	c.newCache = requireMock('./relation/newManyCache');
+	c.newCache.expect(c.joinRelation).return(c.cache);
+	c.joinRelation.parentTable = c.childTable;
+	
 	c.getRelatives = requireMock('./oneRelation/getRelatives');
+	c.newLeg = requireMock('./relation/newManyLeg');	
 	c.resultToPromise = requireMock('./resultToPromise');
-	c.newGetRelated = requireMock('./oneRelation/newGetRelated');
 
-	c.newManyCache.expect(c.joinRelation).return(c.manyCache);
+	c.newGetRelated = requireMock('./oneRelation/newGetRelated');
 
 	c.sut = require('../newManyRelation')(c.joinRelation);
 }

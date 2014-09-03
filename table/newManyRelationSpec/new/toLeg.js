@@ -1,12 +1,13 @@
-var newManyLeg;
+var newLeg;
 var leg = {};
 var sut;
+
 function act(c){
-	newManyLeg = c.newManyLeg;
+	newLeg = c.newLeg;
 	sut = c.sut;	
-	newManyLeg.expect(sut).return(leg);
+	newLeg.expect(sut).return(leg);
 	c.leg = leg;
-	c.returned = c.sut.toLeg();
+	c.returned = sut.toLeg();
 }
 
 act.base = '../new'
