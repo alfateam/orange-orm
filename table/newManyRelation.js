@@ -39,10 +39,6 @@ function newManyRelation(joinRelation) {
     };
 
     c.getRowsSync = manyCache.tryGet;
-    
-    c.isExpanded  = function(parent) {
-        return parent.isExpanded(joinRelation.rightAlias);
-    };
 
     c.toLeg = function() {
         return newLeg(c);

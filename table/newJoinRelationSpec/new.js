@@ -32,6 +32,8 @@ function act(c) {
 
     c.newGetRelated = c.requireMock('./newGetRelated');
     c.getRelatives = requireMock('./joinRelation/getRelatives');
+    c.tryGetFromCacheById = c.requireMock('./tryGetFromCacheById');
+    
     
     c.sut = require('../newJoinRelation')(parentTable, childTable, c.columnNames);
 }

@@ -3,18 +3,17 @@ function act(c){
 	c.barStrategy = {};
 	c.strategy = {foo: c.fooStrategy, bar: c.barStrategy};	
 	c.fooRows = {};
-
-	c.fooRelation.isExpanded = c.mock();
-	c.fooRelation.isExpanded.expect(c.row).return(true);
-
-	c.barRelation.isExpanded = c.mock();
-	c.barRelation.isExpanded.expect(c.row).return(false);
+	c.barRows = {};
 	
 	c.nextRemoveFromCache = c.requireMock('./removeFromCache');
 	c.nextRemoveFromCache.expect(c.fooRows, c.fooStrategy, c.fooTable);	
+	c.nextRemoveFromCache.expect(c.barRows, c.barStrategy, c.barTable);	
 
 	c.fooRelation.getRowsSync = c.mock();
 	c.fooRelation.getRowsSync.expect(c.row).return(c.fooRows);
+
+	c.barRelation.getRowsSync = c.mock();
+	c.barRelation.getRowsSync.expect(c.row).return(c.barRows);
 	
 	c.cache = {};
 	c.table._cache = c.cache;

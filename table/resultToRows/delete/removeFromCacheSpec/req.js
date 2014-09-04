@@ -13,6 +13,9 @@ function act(c){
 	c.fooTable = {};
 	c.fooRelation.childTable = c.fooTable;
 
+	c.barTable = {};
+	c.barRelation.childTable = c.barTable;
+
 	c.table = {};
 	c.relations = {foo: c.fooRelation, bar: c.barRelation, baz: c.bazRelation};
 	c.table._relations = c.relations;
