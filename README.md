@@ -9,6 +9,8 @@ Eager or lazy loading.
 Based on promises.  
 [Documentation and examples](docs/docs.md)  
 ## Release notes
+__0.3.5__  
+Built-in fetching strategies for lazy loading. Works best in readonly scenarios.  
 __0.3.4__  
 Docs and examples split moved to separate file.  
 __0.3.3__  
