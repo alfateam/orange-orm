@@ -35,6 +35,8 @@ function act (c) {
 	c.relation.toLeg = c.mock();
 	c.relation.toLeg.expect().return(c.leg);	
 
+	c.negotiateExpandInverse.expect(c.parent, c.relation, c.rows);
+
 	c.sut(c.legToQuery, c.parent, c.relation).then(onResult);
 
 	function onResult(rows) {

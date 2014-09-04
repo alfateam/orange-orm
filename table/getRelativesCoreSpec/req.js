@@ -11,6 +11,8 @@ function act(c) {
 
 	c.resultToPromise = c.requireMock('./resultToPromise');
 
+	c.negotiateExpandInverse = c.requireMock('./negotiateExpandInverse');
+
 	c.emptyPromise = c.then();
 	c.emptyPromise.resolve();
 	c.resultToPromise.expect(false).return(c.emptyPromise);

@@ -1,6 +1,7 @@
 var executeQueries = require('./executeQueries');
 var resultToRows = require('./resultToRows');
 var empty = require('./resultToPromise')(false);
+var negotiateExpandInverse = require('./negotiateExpandInverse');
 var legNo = 0;
 
 function getRelativesCore(legToQuery, parent, relation) {
@@ -17,7 +18,9 @@ function getRelativesCore(legToQuery, parent, relation) {
 
 	function onResult(result) {
 		queryContext.expand(relation);
-		return resultToRows(leg.span, result);
+		var rows =  resultToRows(leg.span, result);
+		negotiateExpandInverse(parent, relation, rows);
+		return rows;
 	}
 }
 
