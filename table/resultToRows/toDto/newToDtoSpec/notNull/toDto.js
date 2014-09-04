@@ -6,10 +6,6 @@ function act(c) {
 
     c.extractDto.expect(c.strategy, c.table, c.initialDto).return(c.dto);
 
-    c.nullPromise = c.then();
-    c.nullPromise.resolve();
-    c.resultToPromise.expect(null).return(c.nullPromise);
-
     stubTable();
 
     function stubTable() {
@@ -53,17 +49,15 @@ function act(c) {
         c.lines.then = mock();        
         c.linesToDto = {};          
         c.newManyRelatedToDto.expect("lines", c.linesRelation, c.strategy, c.dto).return (c.linesToDto);
-        c.linesMapper = c.then();
-        c.linesMapper.resolve();
-        c.lines.then.expect(c.linesToDto).return(c.linesMapper);
+        c.linesMapper = {};
+        c.lines.then.expect(c.linesToDto).return (c.linesMapper);
 
         c.customer = {};
         c.row.customer = c.customer;
         c.customer.then = mock();
         c.customerToDto = {};
         c.newSingleRelatedToDto.expect("customer", c.customerRelation, c.strategy, c.dto).return (c.customerToDto);
-        c.customerMapper = c.then();
-        c.customerMapper.resolve();
+        c.customerMapper = {};
         c.customer.then.expect(c.customerToDto).return (c.customerMapper);
 
         c.bar = {};
@@ -71,16 +65,26 @@ function act(c) {
         c.bar.then = mock();
         c.barToDto = {};
         c.newSingleRelatedToDto.expect("bar", c.barRelation, c.strategy, c.dto).return (c.barToDto);
-        c.barMapper = c.then();
-        c.barMapper.resolve();
+        c.barMapper = {};
         c.bar.then.expect(c.barToDto).return (c.barMapper);
+        
+        c.expected = {};
+        c.allPromise = {};
+        c.allPromise.then = c.mock();
+        c.allPromise.then.expectAnything().whenCalled(onAll).return(c.expected);
+
+        function onAll(cb) {
+            var ret = cb();
+            if (ret != c.dto)
+                throw new Error('wrong result');
+        }
+
+        c.all.expect([c.customerMapper, c.linesMapper, c.barMapper]).return(c.allPromise);
     }
 
     c.mapFields.expect(c.strategy, c.table, c.row, c.dto);
 
-    c.sut(c.row).then(function(dto){
-        c.returned = dto;
-    });
+    c.returned = c.sut(c.row);
 }
 
 module.exports = act;
