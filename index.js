@@ -1,13 +1,17 @@
 var filter = require('./emptyFilter');
 var newBoolean = require('./table/column/newBoolean');
-var newDatabase = require('./newDatabase');
+var newPg = require('./pg/newDatabase');
+var newMysql = require('./mySql/newDatabase');
 var table = require('./table');
 var commit = require('./table/commit');
 var rollback = require('./table/rollback');
 
 var connectViaPool = function(connectionString) {
-	return newDatabase(connectionString);
+	return newPg(connectionString);
 };
+
+connectViaPool.pg = newPg;
+connectViaPool.mySql = newMysql;
 connectViaPool.table = table;
 connectViaPool.filter = filter;
 connectViaPool.commit = commit;

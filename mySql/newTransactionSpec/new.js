@@ -8,8 +8,9 @@ function act(c){
 	c.pg.connect = mock();
 
 	c.domain = {};
+	c.pool = {};
 
-	c.sut = require('../newTransaction')(c.domain, c.connectionString);
+	c.sut = require('../newTransaction')(c.domain, c.pool);
 }
 
 module.exports = act;
