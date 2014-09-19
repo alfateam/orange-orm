@@ -1,14 +1,13 @@
 var a = require('a');
-var mock = a.mock;
-var requireMock = a.requireMock;
 
 function act(c){
-	c.mock = mock;
-	c.pg = requireMock('pg.js');
-	c.pg.connect = mock();
-
+	c.mock = a.mock;
+	c.requireMock = a.requireMock;
+	
 	c.domain = {};
 	c.pool = {};
+
+	c.wrapQuery = c.requireMock('./wrapQuery');
 
 	c.sut = require('../newTransaction')(c.domain, c.pool);
 }

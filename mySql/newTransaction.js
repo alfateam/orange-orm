@@ -1,3 +1,5 @@
+var wrapQuery = require('./wrapQuery');
+
 function newResolveTransaction(domain, pool) {
 
     return function(onSuccess, onError) {
@@ -8,6 +10,7 @@ function newResolveTransaction(domain, pool) {
                 onError(err);
                 return
             }
+            connection.query = wrapQuery(connection);
             domain.dbClient = connection;
             domain.dbClientDone = connection.release;
             domain.rdb = {};    

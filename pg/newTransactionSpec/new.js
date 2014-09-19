@@ -10,6 +10,8 @@ function act(c){
 	c.connectionString = {};
 	c.domain = {};
 
+	c.wrapQuery = requireMock('./wrapQuery');
+
 	c.sut = require('../newTransaction')(c.domain, c.connectionString);
 }
 

@@ -13,5 +13,4 @@ function act(c) {
 
 }
 
-act.base = '../new';
 module.exports = act;

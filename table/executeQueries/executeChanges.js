@@ -10,7 +10,6 @@ function executeChanges(queries) {
 
 	function execute() {
 		i++;
-		//console.log(queries[i].sql());
 		if (i+1 == queries.length )
 			return executeQuery(queries[i]);
 		else {

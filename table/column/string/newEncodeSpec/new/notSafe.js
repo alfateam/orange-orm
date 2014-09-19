@@ -6,7 +6,7 @@ function act(c) {
 	c.expected = {};
 	c.stringIsSafe.expect(c.value).return(false);
 
-	c.newParam.expect('$').return(c.param);
+	c.newParam.expect('?').return(c.param);
 
 	c.param.addParameter = c.mock();
 	c.param.addParameter.expect(c.value).return(c.expected);
@@ -16,5 +16,4 @@ function act(c) {
 
 }
 
-act.base = '../new';
 module.exports = act;

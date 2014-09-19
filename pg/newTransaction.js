@@ -1,4 +1,5 @@
 var pg = require('pg.js');
+var wrapQuery = require('./wrapQuery');
 
 function newResolveTransaction(domain, connectionString) {
 
@@ -11,6 +12,7 @@ function newResolveTransaction(domain, connectionString) {
                 onError(err);
                 return
             }
+            client.query = wrapQuery(client);
             domain.dbClient = client;
             domain.dbClientDone = done;
             domain.rdb = {};    
