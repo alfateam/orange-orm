@@ -6,5 +6,5 @@ when(c)
     .it('should attach release callback to domain').assertStrictEqual(c.release, c.domain.dbClientDone)
     .it('should attach rdb to domain').assertOk(c.domain.rdb)
     .it('should invoke success callback').assertDoesNotThrow(c.onSuccess.verify)
-    .it('should set wrappedQuery').assertEqual(c.wrappedQuery, c.connection.query)
+    .it('should set wrappedQuery').assertEqual(c.wrappedQuery, c.connection.executeQuery)
     

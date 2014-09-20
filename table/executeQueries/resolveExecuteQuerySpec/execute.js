@@ -13,8 +13,8 @@ function act(c){
 	c.queryContext = {};
 	c.query.queryContext = c.queryContext;
 
-	c.dbClient.query = c.mock();
-	c.dbClient.query.expect(c.query).expectAnything().whenCalled(onQuery);
+	c.dbClient.executeQuery = c.mock();
+	c.dbClient.executeQuery.expect(c.query).expectAnything().whenCalled(onQuery);
 
 	function onQuery(query, handler) {
 		c.queryCompleted = handler;

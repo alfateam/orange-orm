@@ -12,7 +12,7 @@ function newResolveTransaction(domain, connectionString) {
                 onError(err);
                 return
             }
-            client.query = wrapQuery(client);
+            client.executeQuery = wrapQuery(client);
             domain.dbClient = client;
             domain.dbClientDone = done;
             domain.rdb = {};    

@@ -4,7 +4,7 @@ function resolveExecuteQuery(query) {
 	function resolve(success,failed) {
 		var client = process.domain.dbClient;
 	
-		client.query(query, onCompleted);
+		client.executeQuery(query, onCompleted);
 
 		function onCompleted(err,rows) {
 			if(!err) {

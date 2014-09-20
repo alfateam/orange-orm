@@ -10,7 +10,7 @@ function newResolveTransaction(domain, pool) {
                 onError(err);
                 return
             }
-            connection.query = wrapQuery(connection);
+            connection.executeQuery = wrapQuery(connection);
             domain.dbClient = connection;
             domain.dbClientDone = connection.release;
             domain.rdb = {};    
