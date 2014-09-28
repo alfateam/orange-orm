@@ -3,7 +3,7 @@ var value = false;
 
 function act(c) {	
 	c.purify.expect(c.arg).return(value);
-	c.formatted = 'FALSE';
+	c.formatted = 'false';
 
 	c.expected = {};
 	c.newParam.expect(c.formatted).return(c.expected);

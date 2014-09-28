@@ -13,8 +13,8 @@ function _new(column) {
 			return newParam('\'' + column.dbNull + '\'');
 		}
 		if (value)
-			return newParam('TRUE');	
-		return newParam('FALSE');				
+			return newParam('true');	
+		return newParam('false');				
 	}
 }
 
