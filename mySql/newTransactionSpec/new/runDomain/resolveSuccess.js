@@ -3,6 +3,7 @@ function act(c){
 	c.connection = {};	
 	c.release = {};
 	c.connection.release = c.release;
+	c.connection.escape = {};
 
 	c.wrappedQuery = {};
 	c.wrapQuery.expect(c.connection).return(c.wrappedQuery);

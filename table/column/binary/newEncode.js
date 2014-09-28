@@ -1,5 +1,6 @@
 var purify = require('./purify');
 var newParam = require('../../query/newParameterized');
+var getEncodeBuffer = require('../../getSessionSingleton').bind(null,'encodeBuffer');
 
 function _new(column) {
 	
@@ -9,7 +10,8 @@ function _new(column) {
 		value = purify(value);
 		if (value === null)
 		 	return newParam('null');
-		return newParam("E'\\\\x" + value.toString('hex') + "'");				
+		var encodeBuffer = getEncodeBuffer();
+		return newParam(encodeBuffer(value));				
 	}
 }
 

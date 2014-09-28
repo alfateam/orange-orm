@@ -4,6 +4,7 @@ var requireMock = a.requireMock;
 
 function act(c){
 	c.mock = mock;
+	c.requireMock = requireMock;
 	c.pg = requireMock('pg.js');
 	c.pg.connect = mock();
 
@@ -11,6 +12,7 @@ function act(c){
 	c.domain = {};
 
 	c.wrapQuery = requireMock('./wrapQuery');
+	c.encodeBuffer = c.requireMock('./encodeBuffer');
 
 	c.sut = require('../newTransaction')(c.domain, c.connectionString);
 }

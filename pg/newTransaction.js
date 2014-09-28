@@ -1,5 +1,6 @@
 var pg = require('pg.js');
 var wrapQuery = require('./wrapQuery');
+var encodeBuffer = require('./encodeBuffer');
 
 function newResolveTransaction(domain, connectionString) {
 
@@ -16,6 +17,7 @@ function newResolveTransaction(domain, connectionString) {
             domain.dbClient = client;
             domain.dbClientDone = done;
             domain.rdb = {};    
+            domain.rdb.encodeBuffer = encodeBuffer;
             onSuccess();
         }
     };
