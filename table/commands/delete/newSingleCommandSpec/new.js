@@ -17,7 +17,6 @@ function act(c) {
 	c.span = span;
 	c.innerJoin = innerJoin;
 	c.newWhereSql = requireMock('../../query/singleQuery/newWhereSql');
-	c.newSelfJoin = requireMock('./singleCommand/newSelfJoin');
 	c.sut = require('../newSingleCommand')(table,filter,span,alias,innerJoin);
 }
 
