@@ -27,9 +27,9 @@ function act(c){
 
 	c.newPrimaryKeyFilter.expect(c.table, c.id1, c.id2).return(c.filter);
 
-	c.strategyToSpan.expect(c.table, c.strategy).return(c.span);	
+	c.relations = [];
 
-	c.newDeleteCommand.expect([],c.table, c.filter, c.span, c.alias, c.innerJoin).return(c.commands);	
+	c.newDeleteCommand.expect([],c.table, c.filter, c.strategy, c.alias, c.relations).return(c.commands);	
 	
 	c.pushCommand.expect(c.command);
 	c.pushCommand.expect(c.command2);
