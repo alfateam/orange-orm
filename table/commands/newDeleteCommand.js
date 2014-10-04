@@ -1,9 +1,19 @@
 var newSingleCommand = require('./delete/newSingleCommand');
 var addSubCommands = require('./delete/addSubCommands');
 
-function newCommand(queries,table,filter,span,alias,innerJoin) {	
-	addSubCommands(queries,table,filter,span,alias,innerJoin);
-	var singleCommand = newSingleCommand(table,filter,span,alias,innerJoin);
+var nextCommand = function() {
+	nextCommand = require('./newDeleteCommand');
+	nextCommand.apply(null, arguments);
+}
+
+function newCommand(queries,table,filter,strategy,relations) {	
+	var singleCommand = newSingleCommand(table,filter,strategy,relations);
+	for(var name in strategy) {
+		var childStrategy = strategy[name],
+			childRelation = table[name],
+			childRelations = [childRelation].concat(relations);
+		nextCommand(queries,childRelation.childTable,filter,childStrategy,childRelations);
+	}
 	queries.push(singleCommand);
 	return queries;
 }

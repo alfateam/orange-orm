@@ -16,8 +16,12 @@ function act(c) {
 	c.filter = filter;
 	c.span = span;
 	c.innerJoin = innerJoin;
+	c.relations = {};
+	c.relations.length = 3;
+	c.alias = '_0_0_0_0';
+	//todo
 	c.newWhereSql = requireMock('../../query/singleQuery/newWhereSql');
-	c.sut = require('../newSingleCommand')(table,filter,span,alias,innerJoin);
+	c.sut = require('../newSingleCommand')(table,filter,strategy,relations);
 }
 
 module.exports = act;

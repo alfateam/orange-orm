@@ -12,8 +12,6 @@ function act(c){
 
 	c.newPrimaryKeyFilter = c.requireMock('../newPrimaryKeyFilter');
 	
-	c.alias = '_0';
-
 	c.sut = require('../delete')
 }
 

@@ -29,7 +29,7 @@ function act(c){
 
 	c.relations = [];
 
-	c.newDeleteCommand.expect([],c.table, c.filter, c.strategy, c.alias, c.relations).return(c.commands);	
+	c.newDeleteCommand.expect([],c.table, c.filter, c.strategy, c.relations).return(c.commands);	
 	
 	c.pushCommand.expect(c.command);
 	c.pushCommand.expect(c.command2);

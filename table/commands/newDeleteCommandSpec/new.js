@@ -6,22 +6,40 @@ var addSubCommands = requireMock('./delete/addSubCommands');
 var table = {};
 var filter = {};
 var singleCommand = {};
-var subCommand = {};
-var span = {};
+var childStrategy1 = {},
+	childStrategy2 = {};
+var strategy = {child1: childStrategy1, child2 : childStrategy2};
 var alias = '_2;'
 var expected = {};
-var innerJoin = {};
+var fooRelation = {},
+	barRelation = {};
+var relations = [fooRelation, barRelation];
+var childRelation1 = {};
+var childRelation2 = {};
+
+var childTable1 = {};
+var childTable2 = {};
+
+childRelation1.childTable = childTable1;
+childRelation2.childTable = childTable2;
+
+table['child1'] = childRelation1;
+table['child2'] = childRelation2;
+
 
 function act(c) {
+	c.queries2 = {};
 	c.queries = {};
 	c.queries.push = mock();
 	c.queries.push.expect(singleCommand);
 	
-	c.addSubCommands = addSubCommands;
+	newSingleCommand.expect(table,filter,strategy,relations).return(singleCommand);
 
-	addSubCommands.expect(c.queries,table,filter,span,alias,innerJoin).return(expected);
-	newSingleCommand.expect(table,filter,span,alias,innerJoin).return(singleCommand);
-	c.returned = require('../newDeleteCommand')(c.queries,table,filter,span,alias,innerJoin);
+	c.nextDeleteCommand = requireMock('./newDeleteCommand');
+	c.nextDeleteCommand.expect(c.queries, childTable1, filter, childStrategy1, [childRelation1, fooRelation, barRelation]);
+	c.nextDeleteCommand.expect(c.queries, childTable2, filter, childStrategy2, [childRelation2, fooRelation, barRelation]);
+
+	c.returned = require('../newDeleteCommand')(c.queries,table,filter,strategy,relations);
 }
 
 module.exports = act;

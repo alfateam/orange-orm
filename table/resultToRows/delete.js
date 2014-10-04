@@ -2,7 +2,6 @@ var removeFromCache = require('./delete/removeFromCache');
 var pushCommand = require('../commands/pushCommand');
 var newDeleteCommand = require('../commands/newDeleteCommand');
 var newPrimaryKeyFilter = require('../newPrimaryKeyFilter');
-var alias = '_0';
 
 function _delete(row, strategy, table) {
 	var relations = [];
@@ -13,7 +12,7 @@ function _delete(row, strategy, table) {
 		args.push(row[primary.alias]);
 	})
 	var filter = newPrimaryKeyFilter.apply(null, args);
-	var cmds = newDeleteCommand([], table, filter, strategy, alias, relations	);
+	var cmds = newDeleteCommand([], table, filter, strategy, relations);
 	cmds.forEach(function(cmd) {
 		pushCommand(cmd);
 	});

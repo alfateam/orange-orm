@@ -1,6 +1,6 @@
 var newWhereSql = require('../../query/singleQuery/newWhereSql');
-
-function _new(table,filter,span,alias,innerJoin) {
+//newSingleCommand(table,filter,strategy,relations);
+function _new(table,filter,strategy,relations) {
 	var c = {};
 
 	c.sql = function() {
