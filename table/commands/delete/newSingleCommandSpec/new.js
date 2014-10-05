@@ -1,5 +1,5 @@
-var requireMock = require('a').requireMock;
-
+var a = require('a');
+var requireMock = a.requireMock;
 
 var table = {};
 var filter = {};
@@ -9,17 +9,16 @@ var parameters = {};
 var innerJoin = {};
 
 function act(c) {	
+	c.mock = a.mock;
+	c.parameters = parameters;
 	filter.parameters = parameters;
 	c.table = table;
 	c.filter = filter;
 	c.relations = {};
-	c.relations.length = 3;
-	c.alias = '_0_0_0_0';
-	//todo
-	// c.newWhereSql = requireMock('../../query/singleQuery/newWhereSql');
 
-	c.newSubFilter = c.requireMock('../../relatedTable/subFilter');
-	
+	c.newSubFilter = requireMock('../../relatedTable/subFilter');
+
+	c.sut = require('../newSingleCommand')(c.table, c.filter, c.relations);
 
 }
 

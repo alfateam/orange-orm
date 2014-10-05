@@ -23,8 +23,10 @@ var childTable2 = {};
 childRelation1.childTable = childTable1;
 childRelation2.childTable = childTable2;
 
-table['child1'] = childRelation1;
-table['child2'] = childRelation2;
+table._relations = {};
+
+table._relations['child1'] = childRelation1;
+table._relations['child2'] = childRelation2;
 
 
 function act(c) {
@@ -33,7 +35,7 @@ function act(c) {
 	c.queries.push = mock();
 	c.queries.push.expect(singleCommand);
 	
-	newSingleCommand.expect(table,filter,strategy,relations).return(singleCommand);
+	newSingleCommand.expect(table,filter,relations).return(singleCommand);
 
 	c.nextDeleteCommand = requireMock('./newDeleteCommand');
 	c.nextDeleteCommand.expect(c.queries, childTable1, filter, childStrategy1, [childRelation1, fooRelation, barRelation]);

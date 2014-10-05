@@ -7,11 +7,11 @@ var nextCommand = function() {
 }
 
 function newCommand(queries,table,filter,strategy,relations) {	
-	var singleCommand = newSingleCommand(table,filter,strategy,relations);
+	var singleCommand = newSingleCommand(table,filter,relations);
 	for(var name in strategy) {
-		var childStrategy = strategy[name],
-			childRelation = table[name],
-			childRelations = [childRelation].concat(relations);
+		var childStrategy = strategy[name];
+		var childRelation = table._relations[name];
+		var	childRelations = [childRelation].concat(relations);
 		nextCommand(queries,childRelation.childTable,filter,childStrategy,childRelations);
 	}
 	queries.push(singleCommand);

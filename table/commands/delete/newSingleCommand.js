@@ -1,13 +1,16 @@
-var newWhereSql = require('../../query/singleQuery/newWhereSql');
-//newSingleCommand(table,filter,strategy,relations);
-function _new(table,filter,strategy,relations) {
+var newSubFilter = require('../../relatedTable/subFilter');
+
+function _new(table,filter,relations) {
 	var c = {};
 
 	c.sql = function() {
 		var name = table._dbName;
-		var innerJoinSql = innerJoin.sql();
-		var whereSql = newWhereSql(table,filter,alias);
-		return 'delete from ' + name + ' ' + alias + innerJoinSql + whereSql;
+		var alias = '_' + relations.length;
+		if (relations.length !== 0)
+			filter = newSubFilter(relations, filter);
+		var sql =  'delete from ' + name + ' ' + alias  + ' where ' + filter.sql();
+		console.log(sql);
+		return sql;
 	};
 
 	c.parameters = filter.parameters;	
