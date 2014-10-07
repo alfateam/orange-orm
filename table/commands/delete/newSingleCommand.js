@@ -1,4 +1,4 @@
-var newSubFilter = require('../../relatedTable/subFilter');
+var newSubFilter = require('./subFilter');
 
 function _new(table,filter,relations) {
 	var c = {};

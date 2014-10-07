@@ -16,7 +16,7 @@ function act(c) {
 	c.filter = filter;
 	c.relations = {};
 
-	c.newSubFilter = requireMock('../../relatedTable/subFilter');
+	c.newSubFilter = requireMock('./subFilter');
 
 	c.sut = require('../newSingleCommand')(c.table, c.filter, c.relations);
 
