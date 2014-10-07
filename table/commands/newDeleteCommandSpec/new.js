@@ -15,13 +15,17 @@ var fooRelation = {},
 	barRelation = {};
 var relations = [fooRelation, barRelation];
 var childRelation1 = {};
+var joinRelation1 = {};
 var childRelation2 = {};
+var joinRelation2 = {};
 
 var childTable1 = {};
 var childTable2 = {};
 
 childRelation1.childTable = childTable1;
+childRelation1.joinRelation = joinRelation1;
 childRelation2.childTable = childTable2;
+childRelation2.joinRelation = joinRelation2;
 
 table._relations = {};
 
@@ -38,8 +42,8 @@ function act(c) {
 	newSingleCommand.expect(table,filter,relations).return(singleCommand);
 
 	c.nextDeleteCommand = requireMock('./newDeleteCommand');
-	c.nextDeleteCommand.expect(c.queries, childTable1, filter, childStrategy1, [childRelation1, fooRelation, barRelation]);
-	c.nextDeleteCommand.expect(c.queries, childTable2, filter, childStrategy2, [childRelation2, fooRelation, barRelation]);
+	c.nextDeleteCommand.expect(c.queries, childTable1, filter, childStrategy1, [joinRelation1, fooRelation, barRelation]);
+	c.nextDeleteCommand.expect(c.queries, childTable2, filter, childStrategy2, [joinRelation2, fooRelation, barRelation]);
 
 	c.returned = require('../newDeleteCommand')(c.queries,table,filter,strategy,relations);
 }

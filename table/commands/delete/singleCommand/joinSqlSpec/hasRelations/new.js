@@ -1,78 +1,38 @@
-var relation = {},
-	joinRelation = {},
-	oneRelation = {},
-	manyRelation = {};
+var relation1 = {};
+var relation2 = {};
 var joinSql = ' <joinSql>';
-var oneSql = ' <oneSql>';
-var manySql = ' <manySql>';
+var joinSql2 = ' <joinSql2>';
 
 function act(c){
-	c.expected = ' INNER <manySql> INNER <oneSql> INNER <joinSql>'
-	stubJoin();
-	stubOne();
-	stubMany();
+	c.expected = ' INNER <joinSql> INNER <joinSql2>'
+	stubJoin1();
+	stubJoin2();
 
-	function stubJoin() {
-		joinRelation.accept = c.mock();
-		joinRelation.accept.expectAnything().whenCalled(onJoin);
-	
-		function onJoin(visitor) {
-			visitor.visitJoin(joinRelation);
-		}
-	
+	function stubJoin1() {
 		var leftColumns = {};
 		var leftTable = {};
 		var rightTable = {}
 		var rightColumns = {};
 		rightTable._primaryColumns = rightColumns;		
-		joinRelation.parentTable = leftTable;
-		joinRelation.columns = leftColumns;
-		joinRelation.childTable = rightTable;
+		relation1.parentTable = leftTable;
+		relation1.columns = leftColumns;
+		relation1.childTable = rightTable;
 		c.newShallowJoinSql.expect(leftTable,rightColumns,leftColumns,'_2','_1').return(joinSql);
 	}
-
-	function stubOne() {
-		oneRelation.accept = c.mock();
-		oneRelation.accept.expectAnything().whenCalled(onOne);
-
-		function onOne(visitor) {
-			visitor.visitOne(oneRelation);
-		}
-		var rightTable = {};
+	
+	function stubJoin2() {
 		var leftColumns = {};
+		var leftTable = {};
+		var rightTable = {}
 		var rightColumns = {};
-		var joinRelation = {};
-		var parentTable = {};
-		oneRelation.joinRelation = joinRelation;
-		oneRelation.childTable = rightTable;
-		joinRelation.childTable = parentTable;
-		joinRelation.columns = rightColumns;	
-		parentTable._primaryColumns = leftColumns;				
-		c.newShallowJoinSql.expect(parentTable,rightColumns,leftColumns,'_3','_2').return(oneSql);		
-	}
-
-	function stubMany() {
-		manyRelation.accept = c.mock();
-		manyRelation.accept.expectAnything().whenCalled(onMany);
-
-		function onMany(visitor) {
-			visitor.visitMany(manyRelation);
-		}
-
-		var rightTable = {};
-		var leftColumns = {};
-		var rightColumns = {};
-		var joinRelation = {};
-		var parentTable = {};
-		manyRelation.joinRelation = joinRelation;
-		manyRelation.childTable = rightTable;
-		joinRelation.childTable = parentTable;
-		joinRelation.columns = rightColumns;	
-		parentTable._primaryColumns = leftColumns;				
-		c.newShallowJoinSql.expect(parentTable,rightColumns,leftColumns,'_4','_3').return(manySql);		
+		rightTable._primaryColumns = rightColumns;		
+		relation2.parentTable = leftTable;
+		relation2.columns = leftColumns;
+		relation2.childTable = rightTable;
+		c.newShallowJoinSql.expect(leftTable,rightColumns,leftColumns,'_1','_0').return(joinSql2);
 	}
 	
-	c.returned = c.sut([relation,joinRelation,oneRelation,manyRelation]);
+	c.returned = c.sut([relation1,relation2]);
 }
 
 module.exports = act;
