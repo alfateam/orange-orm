@@ -16,9 +16,10 @@ function act(c) {
 	c.filter = filter;
 	c.relations = {};
 
-	c.newSubFilter = requireMock('./subFilter');
-
-	c.sut = require('../newSingleCommand')(c.table, c.filter, c.relations);
+	c.newSubFilter = requireMock('./singleCommand/subFilter');
+	c.newDiscriminatorSql  = requireMock('../../query/singleQuery/newDiscriminatorSql');
+	
+	c.newSut = require('../newSingleCommand');
 
 }
 

@@ -17,7 +17,7 @@ function act(c){
 		relation1.parentTable = leftTable;
 		relation1.columns = leftColumns;
 		relation1.childTable = rightTable;
-		c.newShallowJoinSql.expect(leftTable,rightColumns,leftColumns,'_2','_1').return(joinSql);
+		c.newShallowJoinSql.expect(rightTable,leftColumns,rightColumns,'_2','_1').return(joinSql);
 	}
 	
 	function stubJoin2() {
@@ -29,7 +29,7 @@ function act(c){
 		relation2.parentTable = leftTable;
 		relation2.columns = leftColumns;
 		relation2.childTable = rightTable;
-		c.newShallowJoinSql.expect(leftTable,rightColumns,leftColumns,'_1','_0').return(joinSql2);
+		c.newShallowJoinSql.expect(rightTable,leftColumns,rightColumns,'_1','_0').return(joinSql2);
 	}
 	
 	c.returned = c.sut([relation1,relation2]);

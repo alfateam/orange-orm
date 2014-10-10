@@ -3,7 +3,7 @@ function act(c) {
 
     c.whereSql = ' <whereSql>';
     c.tableName = '<tableName>';
-    c.expected = 'delete from <tableName> _length where <subFilter>';
+    c.sql = 'delete from <tableName> _length where <subFilter>';
     c.subFilter = {};
 
     c.table._dbName = c.tableName;
@@ -12,8 +12,7 @@ function act(c) {
     c.sql = '<subFilter>';
     c.subFilter.sql.expect().return(c.sql);
 
-    c.returned = c.sut.sql();
+    c.sut = c.newSut(c.table, c.filter, c.relations);      
 }
 
-act.base = '../new';
 module.exports = act;

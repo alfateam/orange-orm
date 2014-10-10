@@ -6,8 +6,8 @@ var alias = 'alias';
 var primary = {},
 	primary2 = {};
 var sql = 'SELECT alias.pk FROM theTable AS alias';
-var newParameterized = requireMock('../query/newParameterized');
-var newBoolean = requireMock('../column/newBoolean');
+var newParameterized = requireMock('../../../query/newParameterized');
+var newBoolean = requireMock('../../../column/newBoolean');
 var parameterized = {};
 
 function act(c){

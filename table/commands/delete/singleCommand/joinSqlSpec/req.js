@@ -3,7 +3,7 @@ var mock = a.mock;
 var requireMock = a.requireMock;
 
 function act(c){
-	c.newShallowJoinSql = requireMock('../query/singleQuery/joinSql/newShallowJoinSql');
+	c.newShallowJoinSql = requireMock('../../../query/singleQuery/joinSql/newShallowJoinSql');
 	c.mock = mock;		
 	c.sut = require('../joinSql');
 }

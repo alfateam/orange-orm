@@ -4,11 +4,11 @@ var newWhere = require('./whereSql');
 
 function newSubFilter(relations, shallowFilter) {
 	var relationCount = relations.length;
-	var alias = '_' + relationCount;
+	var alias = '_' + (relationCount -1);
 	var table = relations[0].childTable;
 	var filter = newSelect(table,alias).prepend('EXISTS (');
-	var join = newJoin(relations);
-	var where = newWhere(relations[relationCount-1],shallowFilter);
+	var join = newJoin(relations.slice(1));
+	var where = newWhere(relations,shallowFilter);
 	return filter.append(join).append(where).append(')');
 
 }

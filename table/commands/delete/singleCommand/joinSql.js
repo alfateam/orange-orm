@@ -1,9 +1,7 @@
-var newShallowJoinSql = require('../query/singleQuery/joinSql/newShallowJoinSql');
+var newShallowJoinSql = require('../../../query/singleQuery/joinSql/newShallowJoinSql');
 
 function newJoinSql(relations) {
 	var length = relations.length;
-	if (relations.length == 1)
-		return  '';
 	var leftAlias,
 		rightAlias;
 	var c = {};
@@ -11,7 +9,9 @@ function newJoinSql(relations) {
 	var sql = '';
 
 	function addSql(relation) {
-		sql += ' INNER' + newShallowJoinSql(relation.parentTable,relation.childTable._primaryColumns,relation.columns,leftAlias,rightAlias);	
+		var rightColumns = relation.childTable._primaryColumns;
+		var leftColumns = relation.columns;
+		sql += ' INNER' + newShallowJoinSql(relation.childTable,leftColumns,rightColumns,leftAlias,rightAlias);	
 	}	
 	
 	relations.forEach(function(relation, i){

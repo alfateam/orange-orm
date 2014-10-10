@@ -1,5 +1,5 @@
-var newParameterized = require('../query/newParameterized');
-var newBoolean = require('../column/newBoolean');
+var newParameterized = require('../../../query/newParameterized');
+var newBoolean = require('../../../column/newBoolean');
 
 function newSelectSql(table, alias) {
 	var colName = table._primaryColumns[0]._dbName;

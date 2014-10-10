@@ -3,16 +3,17 @@ var mock = a.mock;
 var requireMock = a.requireMock;
 var relation = {},
 	relation2 = {};
-var relations = [relation,relation2];
+	relation3 = {};
+var relations = [relation,relation2,relation3];
 var shallowFilter = {};
 var selectSql = {},
 	joinSql = {},
 	whereSql = {};
+var alias = '_' + (relations.length -1);
 var newSelectSql = requireMock('./selectSql');
 var newJoinSql = requireMock('./joinSql');
 var newWhereSql = requireMock('./whereSql');
 var childTable = {};
-var alias = '_2';
 var tempFilter = {};
 var tempFilter2 = {};
 var tempFilter3 = {};
@@ -23,9 +24,9 @@ function act(c){
 	relation.childTable = childTable;
 	newSelectSql.expect(childTable,alias).return(selectSql);
 
-	newJoinSql.expect(relations).return(joinSql);
+	newJoinSql.expect([relation2, relation3]).return(joinSql);
 
-	newWhereSql.expect(relation2,shallowFilter).return(whereSql);
+	newWhereSql.expect(relations,shallowFilter).return(whereSql);
 
 	selectSql.prepend = mock();
 	selectSql.prepend.expect('EXISTS (').return(tempFilter);

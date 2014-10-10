@@ -1,7 +1,7 @@
 var relation = {};
 
 function act(c){	
-	c.returned = c.sut([relation]);
+	c.returned = c.sut([]);
 }
 
 module.exports = act;
