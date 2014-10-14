@@ -1,9 +1,7 @@
-var filter = {};
 
 function act(c){	
-	c.filter  = filter;
-	c.returned = c.sut(filter);
+	c.filter  = {};
+	c.returned = c.sut(c.filter);
 }
 
-act.base = '../req';
 module.exports = act;

@@ -1,9 +1,9 @@
-var newEmptyFilter = require('./newParameterized');
+var emptyFilter = require('../../emptyFilter');
 
 function extract(filter) {
 	if (filter)
 		return filter;
-	return newEmptyFilter();
+	return emptyFilter;
 }
 
 module.exports = extract;

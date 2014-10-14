@@ -1,7 +1,7 @@
 var requireMock = require('a').requireMock;
 
 function act(c){	
-	c.newEmptyFilter = requireMock('./newParameterized');;
+	c.emptyFilter = requireMock('../../emptyFilter');
 	c.sut = require('../extractFilter');
 }
 
