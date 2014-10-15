@@ -1,5 +1,4 @@
 var newSingleCommand = require('./delete/newSingleCommand');
-var addSubCommands = require('./delete/addSubCommands');
 
 var nextCommand = function() {
 	nextCommand = require('./newDeleteCommand');

@@ -1,7 +1,6 @@
 var requireMock = require('a').requireMock;
 var mock = require('a').mock;
 var newSingleCommand = requireMock('./delete/newSingleCommand');
-var addSubCommands = requireMock('./delete/addSubCommands');
 
 var table = {};
 var filter = {};
