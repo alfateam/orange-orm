@@ -8,7 +8,8 @@ function _new(table,filter,relations) {
 	filter = extractFilter(filter);
 	filter = newSubFilter(relations, filter);
 	var discriminator = newDiscriminatorSql(table, alias);
-	filter = filter.and(discriminator);
+	if (discriminator !== '')
+		filter = filter.and(discriminator);
 	return newSingleCommandCore(table, filter, alias);
 }
 

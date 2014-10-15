@@ -1,6 +1,3 @@
-var a = require('a');
-var mock = a.mock;
-var requireMock = a.requireMock;
 var relation = {},
 	relation2 = {};
 	relation3 = {};
@@ -10,23 +7,21 @@ var selectSql = {},
 	joinSql = {},
 	whereSql = {};
 var alias = '_' + (relations.length -1);
-var newSelectSql = requireMock('./selectSql');
-var newJoinSql = requireMock('./joinSql');
-var newWhereSql = requireMock('./whereSql');
 var childTable = {};
 var tempFilter = {};
 var tempFilter2 = {};
 var tempFilter3 = {};
 
 function act(c){
+	var mock = c.mock;
 	c.expected = {};
 
 	relation.childTable = childTable;
-	newSelectSql.expect(childTable,alias).return(selectSql);
+	c.newSelectSql.expect(childTable,alias).return(selectSql);
 
-	newJoinSql.expect([relation2, relation3]).return(joinSql);
+	c.newJoinSql.expect([relation2, relation3]).return(joinSql);
 
-	newWhereSql.expect(relations,shallowFilter).return(whereSql);
+	c.newWhereSql.expect(relations,shallowFilter).return(whereSql);
 
 	selectSql.prepend = mock();
 	selectSql.prepend.expect('EXISTS (').return(tempFilter);
@@ -40,7 +35,7 @@ function act(c){
 	tempFilter3.append = mock();
 	tempFilter3.append.expect(')').return(c.expected);
 
-	c.returned = require('../subFilter')(relations,shallowFilter);
+	c.returned = c.sut(relations,shallowFilter);
 }
 
 module.exports = act;
