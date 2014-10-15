@@ -1,9 +1,8 @@
 var a = require('a');
-var requireMock = a.requireMock;
 
 function act(c) {	
 	c.mock = a.mock;
-
+	c.requireMock = a.requireMock;
 	c.parameters = {};
 	c.filter = {};
 	c.filter.parameters = c.parameters;
@@ -14,6 +13,13 @@ function act(c) {
 	c.tableName = 'theTable';
 	c.table._dbName = c.tableName;
 
+	c.getSessionSingleton = c.requireMock('../../../getSessionSingleton');
+
+	c.deleteFromSqlFunc = c.mock();
+	c.deleteSql = '<deleteSql>';
+	c.deleteFromSqlFunc.expect(c.tableName, c.alias).return(c.deleteSql);
+	c.getSessionSingleton.expect('deleteFromSql').return(c.deleteFromSqlFunc);
+	
 	
 	c.sut = require('../newSingleCommandCore')(c.table, c.filter, c.alias);
 

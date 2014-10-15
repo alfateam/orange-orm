@@ -1,5 +1,5 @@
 function act(c) {
-    c.expected = 'delete from ' + c.tableName + ' ' + c.alias;
+    c.expected = c.deleteSql;
     c.filter.sql.expect().return('');
 
     c.returned = c.sut.sql();

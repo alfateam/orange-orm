@@ -1,6 +1,7 @@
 var pg = require('pg.js');
 var wrapQuery = require('./wrapQuery');
 var encodeBuffer = require('./encodeBuffer');
+var deleteFromSql = require('./deleteFromSql');
 
 function newResolveTransaction(domain, connectionString) {
 
@@ -18,6 +19,7 @@ function newResolveTransaction(domain, connectionString) {
             domain.dbClientDone = done;
             domain.rdb = {};    
             domain.rdb.encodeBuffer = encodeBuffer;
+            domain.rdb.deleteFromSql = deleteFromSql;
             onSuccess();
         }
     };

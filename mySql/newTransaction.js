@@ -1,4 +1,5 @@
 var wrapQuery = require('./wrapQuery');
+var deleteFromSql = require('./deleteFromSql');
 
 function newResolveTransaction(domain, pool) {
 
@@ -15,6 +16,7 @@ function newResolveTransaction(domain, pool) {
             domain.dbClientDone = connection.release;
             domain.rdb = {};    
             domain.rdb.encodeBuffer = connection.escape;
+            domain.rdb.deleteFromSql = deleteFromSql;
             onSuccess();
         }
     };
