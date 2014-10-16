@@ -14,6 +14,8 @@ function act(c){
 	c.wrapQuery = requireMock('./wrapQuery');
 	c.encodeBuffer = c.requireMock('./encodeBuffer');
 
+	c.deleteFromSql = c.requireMock('./deleteFromSql');
+
 	c.sut = require('../newTransaction')(c.domain, c.connectionString);
 }
 

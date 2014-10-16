@@ -8,7 +8,8 @@ function act(c){
 	c.pool = {};
 
 	c.wrapQuery = c.requireMock('./wrapQuery');
-
+	c.deleteFromSql = c.requireMock('./deleteFromSql');
+	
 	c.sut = require('../newTransaction')(c.domain, c.pool);
 }
 
