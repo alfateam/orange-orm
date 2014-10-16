@@ -1,6 +1,6 @@
 
 function newThrow(e, previousPromise) {
-	return previousPromise.then(throwError);
+	return previousPromise.then(throwError, throwError);
 	function throwError() {
 		throw e;
 	}

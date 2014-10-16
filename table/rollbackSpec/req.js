@@ -11,6 +11,7 @@ function act(c){
 	c.releaseDbClient = requireMock('./releaseDbClient');
 	c.popChanges = requireMock('./popChanges');
 	c.newThrow = requireMock('./newThrow');
+	c.resultToPromise = requireMock('./resultToPromise');
 	
 	c.sut = require('../rollback');
 }

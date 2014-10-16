@@ -9,11 +9,12 @@ function act(c) {
     c.previousPromise.then = mock();
 
     c.expected = {};
-    c.previousPromise.then.expectAnything().whenCalled(interceptCallback).return (c.expected);
+    c.previousPromise.then.expectAnything().expectAnything().whenCalled(interceptCallback).return (c.expected);
 
     c.throwFunc = function() {};
-    function interceptCallback(cb) {
+    function interceptCallback(cb,cb2) {
         c.throwFunc = cb;
+        c.throwFunc2 = cb2;
     }
 
     c.returned = require('../newThrow')(c.error, c.previousPromise);

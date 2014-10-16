@@ -1,19 +1,20 @@
 var rollbackCommand = require('./commands/rollbackCommand');
 var executeQuery = require('./executeQueries/executeQuery');
 var releaseDbClient = require('./releaseDbClient');
-var popChanges = require('./popChanges'); 
+var popChanges = require('./popChanges');
 var newThrow = require('./newThrow');
+var resultToPromise = require('./resultToPromise');
 
-function rollback(e) {	
-	popChanges();
-	var executeQueryPromise =  executeQuery(rollbackCommand).then(releaseDbClient);
-	if (e)
-		return newThrow(e, executeQueryPromise);
-	return executeQueryPromise;
+function rollback(e) {
+    var executeRollback = executeQuery.bind(null, rollbackCommand);
+    var chain = resultToPromise()
+        			.then(popChanges)
+        			.then(executeRollback)
+        			.then(releaseDbClient);
 
-	function reThrow() {
-		throw e;
-	}
+    if (e)
+        return newThrow(e, chain);
+    return chain;
 }
 
 module.exports = rollback;
