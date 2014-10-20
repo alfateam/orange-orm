@@ -11,8 +11,8 @@ function act(c){
 	c.updateField = requireMock('../updateField');
 	c.extractStrategy = requireMock('./toDto/extractStrategy');
 	c.newToDto = requireMock('./toDto/newToDto');
-	c.extractDeleteStrategy = requireMock('./delete/extractDeleteStrategy');
-	c.newCascadeDeleteStrategy = requireMock('./delete/newCascadeDeleteStrategy');
+	c.extractDeleteStrategy = requireMock('../extractDeleteStrategy');
+	c.newCascadeDeleteStrategy = requireMock('../newCascadeDeleteStrategy');
 	c.delete = c.requireMock('./delete');
 
 	c.newObject = c.requireMock('../../newObject');	

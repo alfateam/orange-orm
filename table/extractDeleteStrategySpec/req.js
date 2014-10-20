@@ -7,7 +7,7 @@ function act(c){
 	c.then = a.then;
 
 	c.emptyStrategy = {};
-	c.newObject = c.requireMock('../../../newObject');
+	c.newObject = c.requireMock('../newObject');
 	c.newObject.expect().return(c.emptyStrategy);
 		
 	c.sut = require('../extractDeleteStrategy');

@@ -9,6 +9,8 @@ var tryGetFirst = require('./table/tryGetFirstFromDb');
 var newCache = require('./table/newRowCache');
 var newContext = require('./newObject');
 var insert = require('./table/insert');
+var _delete = require('./table/delete');
+var cascadeDelete = require('./table/cascadeDelete');
 
 function _new(tableName) {
 	var table = newContext();
@@ -80,6 +82,9 @@ function _new(tableName) {
 	table.insert = function() {
 		return call(insert,arguments);
 	};
+
+	table.delete = _delete.bind(null,table);
+	table.cascadeDelete = cascadeDelete.bind(null,table);
 
 	return table;	
 }

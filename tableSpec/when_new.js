@@ -10,4 +10,6 @@ when('./new', c)
 	.it('should set _relations to empty object').assertDoesNotThrow(c.verifyEmptyRelations)
 	.it('should set _cache').assertEqual(c.cache, c.sut._cache)
 	.it('should set context equal sut').assertEqual(c.context, c.sut)
-	;
+	.it('should set delete').assertEqual(c.delete, c.sut.delete)
+	.it('should set cascadeDelete').assertEqual(c.cascadeDelete, c.sut.cascadeDelete)
+	

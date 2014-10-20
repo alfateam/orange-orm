@@ -1,5 +1,5 @@
 var addSubStrategies = _addSubStrategies;
-var newObject = require('../../../newObject');
+var newObject = require('../newObject');
 
 function newCascadeDeleteStrategy(strategy, table) {
 	var relations = table._relations;

@@ -6,7 +6,7 @@ function act(c){
 	c.expectRequire = a.expectRequire;
 	c.then = a.then;
 
-	c.newObject = c.requireMock('../../../newObject');	
+	c.newObject = c.requireMock('../newObject');	
 	
 	c.sut = require('../newCascadeDeleteStrategy');
 }

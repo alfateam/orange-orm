@@ -1,5 +1,6 @@
 var a = require('a');
 var requireMock = a.requireMock;
+var mock = a.mock;
 
 var newContext = requireMock('./newContext');
 var newColumn = requireMock('./table/column/newColumn');
@@ -12,7 +13,8 @@ var getById = requireMock('./table/getById');
 var newRowCache = requireMock('./table/newRowCache');
 var newObject = requireMock('./newObject');
 var insert = requireMock('./table/insert');
-
+var _delete = requireMock('./table/delete');
+var cascadeDelete = requireMock('./table/cascadeDelete');
 var tableName = {};
 
 function act(c) {	
@@ -30,6 +32,16 @@ function act(c) {
 	c.newColumn = newColumn;		
 	c.column = column;
 	c.verifyEmptyRelations = verifyEmptyRelations;
+
+	
+	c.delete = {};
+	_delete.bind = mock();
+	_delete.bind.expect(null, c.context).return(c.delete);
+
+	c.cascadeDelete = {};
+	cascadeDelete.bind = mock();
+	cascadeDelete.bind.expect(null, c.context).return(c.cascadeDelete);
+	
 	newSut();
 
 

@@ -2,8 +2,8 @@ var updateField = require('../updateField');
 var newEmitEvent = require('../../emitEvent');
 var extractStrategy = require('./toDto/extractStrategy');
 var newToDto = require('./toDto/newToDto');
-var extractDeleteStrategy = require('./delete/extractDeleteStrategy');
-var newCascadeDeleteStrategy = require('./delete/newCascadeDeleteStrategy')
+var extractDeleteStrategy = require('../extractDeleteStrategy');
+var newCascadeDeleteStrategy = require('../newCascadeDeleteStrategy')
 var _delete = require('./delete');
 var newObject = require('../../newObject');
 

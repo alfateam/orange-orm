@@ -1,4 +1,4 @@
-var emptyStrategy = require('../../../newObject')();
+var emptyStrategy = require('../newObject')();
 
 function extractDeleteStrategy(strategy) {
 	if (strategy)
