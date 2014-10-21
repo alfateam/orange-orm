@@ -1,27 +1,16 @@
-var nextResultToRows = _nextResultToRows;
+var subResultToRows = _subResultToRows;
 var dbRowsToRows = require('./resultToRows/dbRowsToRows');
 
 function resultToRows(span,result) {
 	var rows = dbRowsToRows(span,result);
 	result.shift();
-	
-	var c2 = {};
-	c2.visitJoin = function() {};
-	c2.visitOne = function() {};
-	c2.visitMany = function(leg) {		
-		nextResultToRows(leg.span,result);
-	};
-	
-	function onEachLeg(leg) {			
-		leg.accept(c2);
-	}
-	span.legs.forEach(onEachLeg);	
+	_subResultToRows(span, result);
 	return rows;
 }
 
-function _nextResultToRows(span,result) {
-	nextResultToRows = require('./resultToRows');
-	nextResultToRows(span,result);
+function _subResultToRows(span,result) {
+	subResultToRows = require('./resultToRows/subResultToRows');
+	subResultToRows(span,result);
 }
 
 module.exports = resultToRows;

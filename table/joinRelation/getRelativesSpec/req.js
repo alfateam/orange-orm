@@ -8,7 +8,7 @@ function act(c){
 	
 	c.expected = {};
 
-	c.legToQuery = c.requireMock('../query/addSubQueries/joinLegToQuery');	
+	c.legToQuery = c.requireMock('./joinLegToQuery');	
 	c.getRelativesCore = c.requireMock('../getRelativesCore');
 
 	c.getRelativesCore.bind = c.mock();

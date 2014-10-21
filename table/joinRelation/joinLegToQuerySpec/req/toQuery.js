@@ -28,7 +28,7 @@ function act(c) {
 	parameterized.append.expect(innerJoin).return(nextInnerJoin);
 
 	c.newShallowJoinSql.expect(table,primaryColumns,legColumns,alias,parentAlias).return(shallowJoin);
-	c.addSubQueries.expect(queries, childTable,filter,span,alias,nextInnerJoin).return(c.query);
+	c.newQuery.expect(queries, childTable,filter,span,alias,nextInnerJoin).return(c.query);
 	c.returned = c.sut(queries, parentAlias,leg,legNo,filter, innerJoin);
 }
 

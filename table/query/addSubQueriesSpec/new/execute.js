@@ -12,6 +12,8 @@ var a = require('a'),
 	oneLeg = {},
 	innerJoin = {},
 	manyLegQuery = {},
+	oneLegQuery = {},
+	joinLegQuery = {},
 	joinLegNo = {},
 	manyLegNo = {},
 	oneLegNo = {};
@@ -22,6 +24,14 @@ function act(c) {
 	stubSpan();
 	c.manyLegToQuery = requireMock('./addSubQueries/manyLegToQuery');
 	c.manyLegToQuery.expect(queries, alias,manyLeg,manyLegNo,filter,innerJoin).return(manyLegQuery);
+
+	c.oneLegToQuery = requireMock('./addSubQueries/oneLegToQuery');
+	c.oneLegToQuery.expect(queries, alias,oneLeg,oneLegNo,filter,innerJoin).return(oneLegQuery);
+
+	c.joinLegToQuery = requireMock('./addSubQueries/joinLegToQuery');
+	c.joinLegToQuery.expect(queries, alias,joinLeg,joinLegNo,filter,innerJoin).return(joinLegQuery);
+
+
 	c.sut(queries,table,filter,span,alias,innerJoin);
 }
 
@@ -46,20 +56,4 @@ function onEach(callback) {
 	callback(manyLeg,manyLegNo);
 }
 
-function onOneLeg(callback) {
-	callback(oneLeg);
-}
-
-function onManyLeg(callback) {
-	callback(manyLeg);
-}
-
-function onJoinLeg(callback) {
-	callback(joinLeg);
-}
-
-
-
-
-act.base = '../new';
 module.exports = act;
