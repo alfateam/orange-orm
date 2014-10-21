@@ -9,6 +9,8 @@ Eager or lazy loading.
 Based on promises.  
 [Documentation and examples](docs/docs.md)  
 ## Release notes
+__0.3.7__  
+Bugfix: eager loading manyRelation on a join/hasOne returned empty array #11  
 __0.3.6__  
 Fixed sql injection vulnerability.  
 __0.3.5__  
