@@ -94,7 +94,6 @@ function onFailed(err) {
 var rdb = require('rdb');
 var db = rdb.mySql('mysql://root@localhost/rdbDemo?multipleStatements=true');
 
-
 db.transaction()
     .then(rdb.commit)
     .then(null, rdb.rollback)
