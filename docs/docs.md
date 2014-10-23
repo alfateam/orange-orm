@@ -4,6 +4,7 @@ _Documentation and examples_
 __Connecting__  
 [connect to postgres](#_connecttopostgres)  
 [connect to mySql](#_connecttomysql)  
+
 __Basic querying__  
 [getById](#_getbyid)  
 [tryGetFirst](#_trygetfirst)  
