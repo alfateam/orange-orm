@@ -1,7 +1,9 @@
 All examples below are found at [npmjs.org/package/rdb-demo](https://npmjs.org/package/rdb-demo).  
 _Documentation and examples_
 ---------------
-
+__Connecting__  
+[connect to postgres](#_connecttopostgres)  
+[connect to mySql](#_connecttomysql)  
 __Basic querying__  
 [getById](#_getbyid)  
 [tryGetFirst](#_trygetfirst)  
@@ -63,6 +65,49 @@ __Filters__
 _Contents_
 ---------------
 
+<a name="_connecttopostgres"></a>
+[connect to postgres](https://github.com/alfateam/rdb-demo/blob/master/connect.js)
+```js
+var rdb = require('rdb');
+var db = rdb('postgres://postgres:postgres@localhost/test');
+
+db.transaction()
+    .then(rdb.commit)
+    .then(null, rdb.rollback)
+    .then(onOk, onFailed);
+
+function onOk() {
+    console.log('Success');
+    console.log('Waiting for connection pool to teardown....');
+}
+
+function onFailed(err) {
+    console.log('Rollback');
+    console.log(err);
+}
+```
+<a name="_connecttomysql"></a>
+[connect to mySql](https://github.com/alfateam/rdb-demo/blob/master/mySql/connect.js)
+```js
+var rdb = require('rdb');
+var db = rdb.mySql('mysql://root@localhost/rdbDemo?multipleStatements=true');
+
+
+db.transaction()
+    .then(rdb.commit)
+    .then(null, rdb.rollback)
+    .then(onOk, onFailed);
+
+function onOk() {
+    console.log('Success');
+    console.log('Waiting for connection pool to teardown....');
+}
+
+function onFailed(err) {
+    console.log('Rollback');
+    console.log(err);
+}
+```
 <a name="_getbyid"></a>
 [getById](https://github.com/alfateam/rdb-demo/blob/master/getById.js)
 ```js

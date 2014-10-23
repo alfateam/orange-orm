@@ -1,6 +1,6 @@
 __rdb__
 =========
-ORM for postgres. 
+ORM for postgres and mySql.  
 
 Simple, flexible mapper.  
 Transaction with commit and rollback.  
