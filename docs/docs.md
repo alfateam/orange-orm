@@ -1389,7 +1389,7 @@ function onFailed(err) {
 }
 ```
 <a name="_bulkdelete"></a>
-[bulkDelete](https://github.com/alfateam/rdb-demo/blob/master/bulkDelete.js)
+[bulk Delete](https://github.com/alfateam/rdb-demo/blob/master/bulkDelete.js)
 ```js
 var rdb = require('rdb');
 
@@ -1426,7 +1426,7 @@ function onFailed(err) {
 }
 ```
 <a name="_cascadedelete"></a>
-[bulkCascadeDelete](https://github.com/alfateam/rdb-demo/blob/master/bulkCascadeDelete.js)
+[bulk CascadeDelete](https://github.com/alfateam/rdb-demo/blob/master/bulkCascadeDelete.js)
 ```js
 var rdb = require('rdb');
 
@@ -2251,7 +2251,7 @@ function onFailed(err) {
 }
 ```
 <a name="_istartswith"></a>
-[iStartsWith](https://github.com/alfateam/rdb-demo/blob/master/filtering/iStartsWith.js)
+[iStartsWith (postgres only)](https://github.com/alfateam/rdb-demo/blob/master/filtering/iStartsWith.js)
 ```js
 var rdb = require('rdb');
 
@@ -2293,7 +2293,7 @@ function onFailed(err) {
 }
 ```
 <a name="_iendswith"></a>
-[iEndsWith](https://github.com/alfateam/rdb-demo/blob/master/filtering/iEndsWith.js)
+[iEndsWith (postgres only)](https://github.com/alfateam/rdb-demo/blob/master/filtering/iEndsWith.js)
 ```js
 var rdb = require('rdb');
 
@@ -2335,7 +2335,7 @@ function onFailed(err) {
 }
 ```
 <a name="_icontains"></a>
-[iContains](https://github.com/alfateam/rdb-demo/blob/master/filtering/iContains.js)
+[iContains (postgres only)](https://github.com/alfateam/rdb-demo/blob/master/filtering/iContains.js)
 ```js
 var rdb = require('rdb');
 
