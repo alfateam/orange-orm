@@ -28,6 +28,8 @@ __Persistence__
 [insert](#_insert)  
 [delete](#_delete)  
 [cascade delete](#_cascadedelete)  
+[bulk delete](#_bulkdelete)  
+[bulk cascade delete](#_bulkcascadedelete)  
 [default values](#_defaultvalues)  
 [conventions](#_conventions)  
 [update a join-relation](#_updatejoin)  
@@ -1374,6 +1376,91 @@ function getById() {
 
 function deleteCustomer(customer) {
     customer.cascadeDelete();
+}
+
+function onOk() {
+    console.log('Success');
+    console.log('Waiting for connection pool to teardown....');
+}
+
+function onFailed(err) {
+    console.log('Rollback');
+    console.log(err.stack);
+}
+```
+<a name="_bulkdelete"></a>
+[bulkDelete](https://github.com/alfateam/rdb-demo/blob/master/bulkDelete.js)
+```js
+var rdb = require('rdb');
+
+var Customer = rdb.table('_customer');
+
+Customer.primaryColumn('cId').guid().as('id');
+Customer.column('cName').string().as('name');
+Customer.column('cBalance').numeric().as('balance');
+Customer.column('cRegdate').date().as('registeredDate');
+Customer.column('cIsActive').boolean().as('isActive');
+Customer.column('cPicture').binary().as('picture');
+
+var db = rdb('postgres://postgres:postgres@localhost/test');
+
+db.transaction()
+    .then(deleteCustomer)
+    .then(rdb.commit)
+    .then(null, rdb.rollback)
+    .then(onOk, onFailed);
+
+function deleteCustomer() {    
+    var filter = Customer.id.eq('87654321-0000-0000-0000-000000000000');
+    return Customer.delete(filter);
+}
+
+function onOk() {
+    console.log('Success');
+    console.log('Waiting for connection pool to teardown....');
+}
+
+function onFailed(err) {
+    console.log('Rollback');
+    console.log(err.stack);
+}
+```
+<a name="_cascadedelete"></a>
+[bulkCascadeDelete](https://github.com/alfateam/rdb-demo/blob/master/bulkCascadeDelete.js)
+```js
+var rdb = require('rdb');
+
+var Customer = rdb.table('_customer');
+var Order = rdb.table('_order');
+var OrderLine = rdb.table('_orderLine');
+
+Customer.primaryColumn('cId').guid().as('id');
+Customer.column('cName').string().as('name');
+
+Order.primaryColumn('oId').guid().as('id');
+Order.column('oOrderNo').string().as('orderNo');
+Order.column('oCustomerId').guid().as('customerId');
+
+OrderLine.primaryColumn('lId').guid().as('id');
+OrderLine.column('lOrderId').guid().as('orderId');
+
+var orderToCustomer = Order.join(Customer).by('oCustomerId').as('customer');
+Customer.hasMany(orderToCustomer).as('orders');
+
+var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+Order.hasMany(line_order_relation).as('lines');
+
+var db = rdb('postgres://postgres:postgres@localhost/test');
+
+db.transaction()
+    .then(deleteCustomer)
+    .then(rdb.commit)
+    .then(null, rdb.rollback)
+    .then(onOk, onFailed);
+
+function deleteCustomer() {
+    filter =  Customer.id.eq('87654399-0000-0000-0000-000000000000');
+    Customer.cascadeDelete(filter);
 }
 
 function onOk() {
