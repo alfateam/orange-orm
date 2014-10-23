@@ -1,9 +1,9 @@
 {
   "name": "rdb",
-  "version": "0.3.8",
+  "version": "0.3.9",
   "main": "index.js",
   "title": "rdb",
-  "description": "Object Relational Mapper for postgres",
+  "description": "Object Relational Mapper",
   "keywords": ["orm","sql","mySql","mysql","postgres","pg"],
   "license": "MIT",
   "dependencies": {  
