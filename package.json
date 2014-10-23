@@ -4,7 +4,7 @@
   "main": "index.js",
   "title": "rdb",
   "description": "Object Relational Mapper for postgres",
-  "keywords": ["orm","sql","postgres","pg"],
+  "keywords": ["orm","sql","mySql","mysql","postgres","pg"],
   "license": "MIT",
   "dependencies": {  
     "pg.js" : "3.1.0",
