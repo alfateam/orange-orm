@@ -71,6 +71,7 @@ _Contents_
 ```js
 var rdb = require('rdb');
 var db = rdb('postgres://postgres:postgres@localhost/test');
+//alternatively: var db = rdb.pg('postgres://postgres:postgres@localhost/test');
 
 db.transaction()
     .then(rdb.commit)
