@@ -20,14 +20,14 @@ function act(c) {
 	leg.columns = legColumns;
 	leg.span = span;		
 	span.table = childTable;
-	childTable._primaryColumns = primaryColumns;
+	table._primaryColumns = primaryColumns;
 	leg.table = table			
 
 	c.newParameterized.expect(' INNER shallowJoin').return(parameterized);
 	parameterized.append = c.mock();
 	parameterized.append.expect(innerJoin).return(nextInnerJoin);
 
-	c.newShallowJoinSql.expect(table,primaryColumns,legColumns,alias,parentAlias).return(shallowJoin);
+	c.newShallowJoinSql.expect(table,legColumns,primaryColumns,alias,parentAlias).return(shallowJoin);
 	c.addSubQueries.expect(queries, childTable,filter,span,alias,nextInnerJoin).return(c.query);
 	c.returned = c.sut(queries, parentAlias,leg,legNo,filter, innerJoin);
 }
