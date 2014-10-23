@@ -1389,7 +1389,7 @@ function onFailed(err) {
 }
 ```
 <a name="_bulkdelete"></a>
-[bulk Delete](https://github.com/alfateam/rdb-demo/blob/master/bulkDelete.js)
+[bulk delete](https://github.com/alfateam/rdb-demo/blob/master/bulkDelete.js)
 ```js
 var rdb = require('rdb');
 
@@ -1426,7 +1426,7 @@ function onFailed(err) {
 }
 ```
 <a name="_cascadedelete"></a>
-[bulk CascadeDelete](https://github.com/alfateam/rdb-demo/blob/master/bulkCascadeDelete.js)
+[bulk cascadeDelete](https://github.com/alfateam/rdb-demo/blob/master/bulkCascadeDelete.js)
 ```js
 var rdb = require('rdb');
 
