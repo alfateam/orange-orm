@@ -9,6 +9,9 @@ Eager or lazy loading.
 Based on promises.  
 [Documentation and examples](docs/docs.md)  
 ## Release notes
+__0.3.8__  
+Supports mySql.  
+Bulk deletes.  
 __0.3.7__  
 Bugfix: eager loading manyRelation on a join/hasOne returned empty array #11  
 __0.3.6__  
