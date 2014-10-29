@@ -13,7 +13,7 @@ var alias = '_0';
 
 function act(c) {
 	c.returned = require('../newShallowColumnSql')(table,alias);
-	c.expected = '_0.a,_0.b';
+	c.expected = '_0.a as s_00,_0.b as s_01';
 }
 
 module.exports = act;
