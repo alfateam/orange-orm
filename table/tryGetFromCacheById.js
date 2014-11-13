@@ -8,5 +8,5 @@ function tryGet(table, id, id2, optionalStrategy) {
 	}
 
 	return table._cache.tryGet(fakeRow);
-};
+}
 module.exports = tryGet;

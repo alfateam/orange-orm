@@ -53,7 +53,7 @@ function act(c) {
 	function verifyEmptyRelations() {
 		 if (Object.prototype.toString.call(c.sut._relations) !== '[object Object]')
 			throw "wrong type";			
-		for (name in c.sut._relations) {
+		for (var name in c.sut._relations) {
 			throw "has property";
 		}
 	}

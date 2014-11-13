@@ -27,15 +27,15 @@ function newRowArray(table) {
         args.push(table);
         var strategy = extractStrategy.apply(null, args);
         for (var i = 0; i < c.length; i++) {
-            var map = mapSingleDto.bind(null,i)            
+            var map = mapSingleDto.bind(null,i);
             promise = promise.then(map);
-        };
+        }
 
         function mapSingleDto(i) {
             var row = c[i];
             return newToDto(strategy, table)(row).then(function(dto) {
                 result[i] = dto;
-            })            
+            });
         }
         return promise.then(function() {
             return result;
@@ -44,6 +44,6 @@ function newRowArray(table) {
 
 
     return c;
-};
+}
 
 module.exports = newRowArray;

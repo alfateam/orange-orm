@@ -57,25 +57,25 @@ function _new(tableName) {
 		var mergedArgs = [table];
 		for (var i = 0; i < args.length; i++) {
 			mergedArgs.push(args[i]);
-		};
+		}
 		return func.apply(null,mergedArgs);
 	}
 	
 	table.getById = function() {
 		return call(getById,arguments);
-	}
+	};
 
 	table.columnDiscriminators = function() {
 		for (var i = 0; i < arguments.length; i++) {
 			table._columnDiscriminators.push(arguments[i]);
-		};
+		}
 		return table;		
 	};
 
 	table.formulaDiscriminators = function() {
 		for (var i = 0; i < arguments.length; i++) {
 			table._formulaDiscriminators.push(arguments[i]);
-		};
+		}
 		return table;
 	};
 
