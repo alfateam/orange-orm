@@ -16,7 +16,7 @@ function newRow(table, id, id2, etc) {
 		var pkValue = arguments[i];
 		var column = table._primaryColumns[i-1];
 		dto[column.alias] = pkValue;
-	};
+	}
 
 	return shallowDbRowToRow(table, dto);
 }

@@ -4,6 +4,6 @@ function newThrow(e, previousPromise) {
 	function throwError() {
 		throw e;
 	}
-};
+}
 
 module.exports = newThrow;

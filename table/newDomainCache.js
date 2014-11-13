@@ -23,7 +23,7 @@ function newDomainCache() {
 	c.tryRemove = function(key) {
 		var cache = getCache();		
 		return cache.tryRemove(key);
-	}
+	};
 
 	c.subscribeAdded = function(onAdded) {
 		var cache = getCache();		
@@ -39,6 +39,6 @@ function newDomainCache() {
 		return _getCache(id);
 	}
 	return c;
-};
+}
 
 module.exports = newDomainCache;

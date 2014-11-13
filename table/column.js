@@ -24,7 +24,7 @@ function defineColumn(column, table) {
 	c.boolean = function() {
 		require('./column/boolean')(column);
 		return c;
-	}
+	};
 
 	c.binary = function() {
 		require('./column/binary')(column);

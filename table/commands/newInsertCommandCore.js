@@ -18,7 +18,7 @@ function newInsertCommandCore(table, row) {
 			var encoded = column.encode(row[alias]);
 			columnNames.push(column._dbName);
 			values.push(encoded);
-		};
+		}
 	}
 
 	function parseDiscriminators() {
@@ -27,7 +27,7 @@ function newInsertCommandCore(table, row) {
 			var parts = discriminators[i].split("=");
 			columnNames.push(parts[0]);
 			values.push(parts[1]);
-		};					
+		}
 	}
 
 	function addColumnNames() {
@@ -38,7 +38,7 @@ function newInsertCommandCore(table, row) {
 		var add = addFirst;
 		for (var i = 0; i < values.length; i++) {
 			add(i);			
-		};
+		}
 
 		function addFirst() {
 			addCore(i,"(");

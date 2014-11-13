@@ -20,7 +20,7 @@ function newCascadeDeleteStrategy(strategy, table) {
 		relation.accept(c);
 	}
 	return strategy;
-};
+}
 
 function _addSubStrategies(strategy, table) {	
 	addSubStrategies = require('./newCascadeDeleteStrategy');

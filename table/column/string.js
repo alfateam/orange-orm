@@ -15,22 +15,22 @@ function _new(column) {
 
     column.startsWith = function(arg, optionalAlias) {
         return startsWith(column, arg, optionalAlias);
-    }
+    };
     column.endsWith = function(arg, optionalAlias) {
         return endsWith(column, arg, optionalAlias);
-    }
+    };
     column.contains = function(arg, optionalAlias) {
         return contains(column, arg, optionalAlias);
-    }
+    };
     column.iStartsWith = function(arg, optionalAlias) {
         return iStartsWith(column, arg, optionalAlias);
-    }
+    };
     column.iEndsWith = function(arg, optionalAlias) {
         return iEndsWith(column, arg, optionalAlias);
-    }
+    };
     column.iContains = function(arg, optionalAlias) {
         return iContains(column, arg, optionalAlias);
-    }
+    };
 }
 
 module.exports = _new;

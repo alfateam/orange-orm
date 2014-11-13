@@ -3,7 +3,7 @@ var newSingleCommand = require('./delete/newSingleCommand');
 var nextCommand = function() {
 	nextCommand = require('./newDeleteCommand');
 	nextCommand.apply(null, arguments);
-}
+};
 
 function newCommand(queries,table,filter,strategy,relations) {	
 	var singleCommand = newSingleCommand(table,filter,relations);

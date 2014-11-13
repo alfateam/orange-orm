@@ -10,7 +10,7 @@ function joinLegToQuery(queries, parentAlias,leg,legNo,filter, innerJoin) {
 	var parentColumns = leg.columns;	 
 
 	var shallowJoin  = newShallowJoinSql(parentTable,childColumns,parentColumns,childAlias,parentAlias);
-	var innerJoin = newParameterized(' INNER' + shallowJoin).append(innerJoin);	
+	innerJoin = newParameterized(' INNER' + shallowJoin).append(innerJoin);	
 	return addSubQueries(queries, span.table,filter,span,childAlias,innerJoin);
 }
 

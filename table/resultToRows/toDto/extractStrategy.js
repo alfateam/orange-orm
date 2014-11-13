@@ -14,11 +14,11 @@ function extractStrategy() {
     var relationName;
 
     var visitor = {};
-    visitor.visitJoin = function() {}
+    visitor.visitJoin = function() {};
 
     visitor.visitMany = function(relation) {
         strategy[relationName] = extractSubStrategy(relation.childTable);
-    }
+    };
 
     visitor.visitOne = visitor.visitMany;
 
@@ -27,6 +27,6 @@ function extractStrategy() {
         relation.accept(visitor);
     }
     return strategy;
-};
+}
 
 module.exports = extractStrategy;

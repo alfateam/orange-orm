@@ -11,7 +11,7 @@ function newDiscriminatorSql(table, alias) {
 			var current = formulaDiscriminators[i].replace('@this',alias);
 			and();
 			result += '(' + current + ')';
-		};	
+		}
 	}
 
 	function addColumn() {
@@ -19,7 +19,7 @@ function newDiscriminatorSql(table, alias) {
 			var current = columnDiscriminators[i];
 			and();
 			result += alias + '.' + current;
-		};	
+		}
 	}
 
 	function and() {

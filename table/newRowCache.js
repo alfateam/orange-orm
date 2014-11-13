@@ -13,9 +13,9 @@ function newRowCache(table) {
 		for (var i = 0; i < keyLength; i++) {
 			column = primaryColumns[i];
 			names[column.alias] = null;
-		};
+		}
 		return names;
-	};
+	}
 
 	c.tryGet = function(row) {
 		var key = rowToKey(row);
@@ -34,9 +34,9 @@ function newRowCache(table) {
 		var key = [];
 		for(var pkName in pkNames) {
 			key.push(row[pkName]);
-		};
+		}
 		return key;
-	};
+	}
 
 	c.tryAdd = function(row) {
 		var key = rowToKey(row);
@@ -54,6 +54,6 @@ function newRowCache(table) {
 	c.getAll = cache.getAll;
 
 	return c;
-};
+}
 
 module.exports = newRowCache;

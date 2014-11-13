@@ -19,6 +19,6 @@ function newDatabase(connectionString) {
     };
 
     return c;
-};
+}
 
 module.exports = newDatabase;

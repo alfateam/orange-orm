@@ -1,7 +1,7 @@
 var _newCache = require('../newCache');
 
 function getCache(id) {
-	domain = process.domain;
+	var domain = process.domain;
 	return domain[id] || newCache();	
 
 	function newCache() {

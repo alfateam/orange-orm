@@ -3,7 +3,7 @@ var newEmitEvent = require('../../emitEvent');
 var extractStrategy = require('./toDto/extractStrategy');
 var newToDto = require('./toDto/newToDto');
 var extractDeleteStrategy = require('../extractDeleteStrategy');
-var newCascadeDeleteStrategy = require('../newCascadeDeleteStrategy')
+var newCascadeDeleteStrategy = require('../newCascadeDeleteStrategy');
 var _delete = require('./delete');
 var newObject = require('../../newObject');
 
@@ -70,20 +70,20 @@ function shallowDbRowToRow(table, values) {
 			emitChanged[name].add(onChanged);
 			return;
 		}
-		for(var name in emitChanged) {
+		for(name in emitChanged) {
 			emitChanged[name].add(onChanged);
-		};					
-	}
+		}
+	};
 
 	row.unsubscribeChanged = function(onChanged, name) {
 		if (name) {
 			emitChanged[name].tryRemove(onChanged);
 			return;
 		}
-		for(var name in emitChanged) {
+		for(name in emitChanged) {
 			emitChanged[name].tryRemove(onChanged);
-		};					
-	}
+		}				
+	};
 
 	row.toJSON = function(strategy) {		
 		return row.toDto.apply(null,arguments).then(JSON.stringify);
@@ -108,7 +108,7 @@ function shallowDbRowToRow(table, values) {
 	};
 	
 	row.delete = function(strategy) {
-		var strategy = extractDeleteStrategy(strategy, table);
+		strategy = extractDeleteStrategy(strategy, table);
 		_delete(row, strategy, table);
 	};
 

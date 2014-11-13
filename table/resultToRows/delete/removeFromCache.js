@@ -23,7 +23,7 @@ function removeFromCache(row, strategy, table) {
         }
         table._cache.tryRemove(row);
     }
-};
+}
 
 function _nextRemoveFromCache(row, strategy, table) {
     nextRemoveFromCache = require('./removeFromCache');

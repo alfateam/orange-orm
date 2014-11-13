@@ -16,7 +16,7 @@ function act(c){
 
 	c.onInnerCompleted = function() {};
 
-	function onRun(_,_,cb) {
+	function onRun(_,__,cb) {
 		c.onInnerCompleted = cb;
 	}
 

@@ -9,7 +9,7 @@ function newSingleCommandCore(table,filter,alias) {
 		var sql =  deleteFromSql(name, alias);
 		var filterSql = filter.sql();
 		if (filterSql)
-			sql += ' where ' + filterSql
+			sql += ' where ' + filterSql;
 		return sql;
 	};
 

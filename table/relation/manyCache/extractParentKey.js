@@ -12,6 +12,6 @@ function extractParentKey(joinRelation, child) {
     }
 
     return parent;
-};
+}
 
 module.exports = extractParentKey;

@@ -17,7 +17,7 @@ function act(c){
 	c.mysql.createPool = c.mock();
 	c.mysql.createPool.expect(c.connectionString).return(c.pool);
 
-	c.sut = require('../newDatabase')(c.connectionString);;
+	c.sut = require('../newDatabase')(c.connectionString);
 }
 
 module.exports = act;

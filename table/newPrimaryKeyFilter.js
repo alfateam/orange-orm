@@ -6,7 +6,7 @@ function primaryKeyFilter(table,id,id2) {
 		key = arguments[i+1];
 		var colFilter = primaryColumns[i].equal(key);
 		filter = filter.and(colFilter);
-	};	
+	}	
 	return filter;
 }
 

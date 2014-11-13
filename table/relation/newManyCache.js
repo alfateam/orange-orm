@@ -6,7 +6,7 @@ var newCacheCore = require('./newManyCacheCore');
 var newId = require('../../newId');
 
 function newManyCache(joinRelation) {
-    var c = {}
+    var c = {};
     var key = newId();
 
     c.tryAdd = function(parent, child) {

@@ -13,6 +13,6 @@ function _delete(table, filter, strategy) {
 		pushCommand(cmd);
 	});
 	return emptyPromise;
-};
+}
 
 module.exports = _delete;

@@ -12,7 +12,7 @@ function newResolveTransaction(domain, connectionString) {
         function onConnected(err, client, done) {
             if (err) {
                 onError(err);
-                return
+                return;
             }
             client.executeQuery = wrapQuery(client);
             domain.dbClient = client;
@@ -23,6 +23,6 @@ function newResolveTransaction(domain, connectionString) {
             onSuccess();
         }
     };
-};
+}
 
 module.exports = newResolveTransaction;

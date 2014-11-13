@@ -4,7 +4,7 @@ function mapFields(strategy, table, row, dto) {
 		var col = columns[i];
 		var alias = col.alias;
 		dto[alias] = row[alias];
-	};
+	}
 	return  dto;
 }
 

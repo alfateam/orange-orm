@@ -6,7 +6,7 @@ function newOneCache(joinRelation) {
 
 	c.tryGet = function(parent) {
 		var res = cache.tryGet(parent);
-		if (res.length == 0)
+		if (res.length === 0)
 			return null;
 		return res[0];
 	};

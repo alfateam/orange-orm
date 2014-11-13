@@ -9,7 +9,7 @@ function newResolveTransaction(domain, pool) {
         function onConnected(err, connection) {
             if (err) {
                 onError(err);
-                return
+                return;
             }
             connection.executeQuery = wrapQuery(connection);
             domain.dbClient = connection;
@@ -20,6 +20,6 @@ function newResolveTransaction(domain, pool) {
             onSuccess();
         }
     };
-};
+}
 
 module.exports = newResolveTransaction;

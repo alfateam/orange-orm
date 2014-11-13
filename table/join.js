@@ -8,9 +8,9 @@ function newJoin(parentTable,childTable) {
 	c.by = function() {
 		for (var i = 0; i < arguments.length; i++) {
 			columnNames.push(arguments[i]);
-		};
+		}
 		return c;
-	}
+	};
 
 	c.as = function(alias) {
 		var relation = newJoinRelation(parentTable,childTable,columnNames);
@@ -24,7 +24,7 @@ function newJoin(parentTable,childTable) {
 		});
 		
 		return relation;
-	}
+	};
 	return c;
 }
 

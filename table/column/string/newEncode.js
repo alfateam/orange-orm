@@ -15,7 +15,7 @@ function _new(column) {
 			return newPara('\'' + value + '\'');
 		var para = newPara('?');
 		return para.addParameter(value);
-	}
+	};
 }
 
 module.exports = _new;

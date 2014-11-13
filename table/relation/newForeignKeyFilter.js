@@ -15,6 +15,6 @@ function newForeignKeyFilter(joinRelation, parentRow) {
         return column.eq(parentRow[pk.alias]);
     }
     return filter;
-};
+}
 
 module.exports = newForeignKeyFilter;

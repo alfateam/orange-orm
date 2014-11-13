@@ -5,7 +5,7 @@ function _new(table,alias) {
 	var sql = aliasDot + encodeColumn(0);
 	for (var i = 1; i < columns.length; i++) {
 		sql = sql + commaAliasDot + encodeColumn(i);
-	};
+	}
 	return sql;
 
 	function encodeColumn(i) {

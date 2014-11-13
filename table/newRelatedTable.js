@@ -1,4 +1,4 @@
-var newRelatedColumn = require('./relatedTable/relatedColumn');
+	var newRelatedColumn = require('./relatedTable/relatedColumn');
 var nextRelatedTable = _nextRelatedTable;
 var subFilter = require('./relatedTable/subFilter');
 
@@ -10,14 +10,14 @@ function newRelatedTable(relations) {
 	for (var i = 0; i < columns.length; i++) {
 		var col = columns[i];
 		c[col.alias] = newRelatedColumn(col,relations);
-	};
+	}
 	defineChildren();
 
 	function defineChildren() {
 		var childRelations = table._relations;
 		for(var alias in childRelations) {	
 			defineChild(alias);
-		};		
+		}
 	}
 
 	function defineChild(alias) {		
@@ -34,7 +34,7 @@ function newRelatedTable(relations) {
 
 	c.exists = function() {
 		return subFilter(relations);
-	}
+	};
 
 	return c;
 }
@@ -42,6 +42,6 @@ function newRelatedTable(relations) {
 function _nextRelatedTable(relations) {
 	nextRelatedTable = require('./newRelatedTable');
 	return nextRelatedTable(relations);
-};
+}
 
-module.exports = newRelatedTable
+module.exports = newRelatedTable;

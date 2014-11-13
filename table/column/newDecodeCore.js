@@ -4,7 +4,7 @@ function _new(column) {
 		if (value == column.dbNull)
 			return null;
 		return value;
-	}
+	};
 }
 
 module.exports = _new;

@@ -19,6 +19,6 @@ function newSingleRelatedToDto(relationName, relation, strategy, dto) {
 	function onDto(subDto) {
 		dto[relationName] = subDto;
 	}
-};
+}
 
 module.exports = newSingleRelatedToDto;

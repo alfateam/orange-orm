@@ -6,7 +6,7 @@ function _new(column) {
 		if (value == column.dbNull)
 			return null;
 		return purify(value);
-	}
+	};
 }
 
 module.exports = _new;

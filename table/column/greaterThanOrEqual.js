@@ -8,6 +8,6 @@ function greaterThanOrEqual(column,arg,optionalAlias) {
 	var firstPart = alias + '.' + column._dbName + operator;
 	var filter =  encoded.prepend(firstPart);		
 	return newBoolean(filter);
-};
+}
 
 module.exports = greaterThanOrEqual;

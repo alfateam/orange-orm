@@ -39,8 +39,8 @@ module.exports = function(table,name) {
 	};
 
 	c.between = function(from,to,optionalAlias) {
-		var from = c.greaterThanOrEqual(from,optionalAlias);
-		var to = c.lessThanOrEqual(to,optionalAlias);
+		from = c.greaterThanOrEqual(from,optionalAlias);
+		to = c.lessThanOrEqual(to,optionalAlias);
 		return from.and(to);
 	};
 

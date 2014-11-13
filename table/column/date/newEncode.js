@@ -12,7 +12,7 @@ function _new(column) {
 			return newPara('\'' + column.dbNull + '\'');
 		}
 		return newPara("'" + value.toISOString() + "'");
-	}
+	};
 
 }
 

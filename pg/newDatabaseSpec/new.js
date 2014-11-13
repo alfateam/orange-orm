@@ -11,7 +11,7 @@ function act(c){
 	c.newPromise = requireMock('../table/promise');
 	c.begin = requireMock('../table/begin');
 
-	c.sut = require('../newDatabase')(c.connectionString);;
+	c.sut = require('../newDatabase')(c.connectionString);
 }
 
 module.exports = act;

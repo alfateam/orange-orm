@@ -10,6 +10,6 @@ function newManyRelatedToDto(relationName, relation, strategy, dto) {
 	function onDtos(dtos) {
 		dto[relationName] = dtos;
 	}
-};
+}
 
 module.exports = newManyRelatedToDto;

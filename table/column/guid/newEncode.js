@@ -11,7 +11,7 @@ function _new(column) {
 			return newPara('\'' + column.dbNull + '\'');
 		}
 		return newPara('\'' + value + '\'');	
-	}
+	};
 }
 
 module.exports = _new;

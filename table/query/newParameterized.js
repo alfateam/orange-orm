@@ -8,7 +8,7 @@ function _new(text) {
 	
 	for (var i = 1; i < arguments.length; i++) {
 		optionalParams.push(arguments[i]);
-	};
+	}
 	
 	c.parameters = newCollection.apply(null, optionalParams);
 	

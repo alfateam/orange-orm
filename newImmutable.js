@@ -5,7 +5,7 @@ function newImmutable(fn) {
 
 	function run() {	
 		var args = [].slice.call(arguments);	
-		return _run(args)
+		return _run(args);
 	}
 
 	function runFirst(args) {

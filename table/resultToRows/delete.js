@@ -10,12 +10,12 @@ function _delete(row, strategy, table) {
 	var args = [table];
 	table._primaryColumns.forEach(function(primary) {
 		args.push(row[primary.alias]);
-	})
+	});
 	var filter = newPrimaryKeyFilter.apply(null, args);
 	var cmds = newDeleteCommand([], table, filter, strategy, relations);
 	cmds.forEach(function(cmd) {
 		pushCommand(cmd);
 	});
-};
+}
 
 module.exports = _delete;

@@ -2,7 +2,7 @@ var newCacheCore = require('../newCache');
 var newRowArray = require('../rowArray');
 
 function newManyCache(joinRelation) {
-    var c = {}
+    var c = {};
     var cache = newCacheCore();
     var primaryColumns = joinRelation.childTable._primaryColumns;
 
@@ -24,7 +24,7 @@ function newManyCache(joinRelation) {
         var rows = newArray();
         rows.push(childRow);
         existing = cache.tryAdd(key, rows);
-    };
+    }
 
     function newArray() {
         return newRowArray(joinRelation.parentTable);
@@ -48,6 +48,6 @@ function newManyCache(joinRelation) {
     }
 
     return c;
-};
+}
 
 module.exports = newManyCache;

@@ -10,7 +10,7 @@ function _new(column) {
 		if (typeof(value) != 'number')
 			return parseFloat(value);
 		return value;
-	}
+	};
 }
 
 module.exports = _new;

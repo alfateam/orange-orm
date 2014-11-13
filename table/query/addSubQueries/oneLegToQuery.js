@@ -11,7 +11,7 @@ function manyLegToQuery(queries, rightAlias,leg,legNo,filter, innerJoin) {
 	var leftColumns = leg.columns;	 
 	 
 	var shallowJoin  = newShallowJoinSql(rightTable,leftColumns,rightColumns,leftAlias,rightAlias);
-	var innerJoin = newParameterized(' INNER' + shallowJoin).append(innerJoin);	
+	innerJoin = newParameterized(' INNER' + shallowJoin).append(innerJoin);	
 	return addSubQueries(queries, span.table,filter,span,leftAlias,innerJoin);
 }
 

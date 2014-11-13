@@ -63,8 +63,8 @@ function _newJoin(parentTable, childTable, columnNames) {
             tryAdd(curColumn);
             if (numberOfColumns === c.columns.length)
                 return;
-        };
-    };
+        }
+    }
 
     function tryAdd(column) {
         for (var i = 0; i < columnNames.length; i++) {
@@ -73,11 +73,11 @@ function _newJoin(parentTable, childTable, columnNames) {
                 c.columns.push(column);
                 return;
             }
-        };
+        }
     }
 
     function isNullOrUndefined(item) {
-        return item == null;
+        return item === null || item === undefined;
     }
 
     function parentToKey(parent) {

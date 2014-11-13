@@ -8,7 +8,7 @@ function newRelatedColumn(column,relations) {
 		if (prop instanceof Function)			
 
 			c[propName] = wrapFilter(prop);
-	};
+	}
 	return c;
 
 	function wrapFilter(filter) {
@@ -18,10 +18,10 @@ function newRelatedColumn(column,relations) {
 			var args = [];
 			for (var i = 0; i < arguments.length; i++) {
 				args.push(arguments[i]);
-			};
+			}
 			args.push(alias);
 			var shallowFilter =  filter.apply(null,args);
-			return newSubFilter(relations,shallowFilter)
+			return newSubFilter(relations,shallowFilter);
 		}
 	}
 

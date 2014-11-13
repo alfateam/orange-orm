@@ -7,8 +7,8 @@ function newInsertCommandCore(table, columns, row) {
 	var separator = " ";
 
 	addColumns();
-	addWhereId()
-	addDiscriminators()
+	addWhereId();
+	addDiscriminators();
 
 	function addColumns() {		
 		for (var alias in columns) {
@@ -16,7 +16,7 @@ function newInsertCommandCore(table, columns, row) {
 			var encoded = column.encode(row[alias]);
 			command = command.append(separator + column._dbName + "=").append(encoded);
 			separator = ",";
-		};
+		}
 	}
 
 	function addWhereId() {
@@ -28,12 +28,12 @@ function newInsertCommandCore(table, columns, row) {
 			var encoded = column.encode(value);
 			command = command.append(separator + column._dbName + "=").append(encoded);
 			separator = " AND ";
-		};
+		}
 	}
 
 	function addDiscriminators() {
 		discriminators = table._columnDiscriminators;
-		if (discriminators.length == 0)
+		if (discriminators.length === 0)
 			return;
 		discriminators = separator + discriminators.join(" AND ");
 		command = command.append(discriminators);

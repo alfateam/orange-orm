@@ -12,11 +12,11 @@ function newJoinSql(relations) {
 
 	c.visitJoin = function(relation) {
 		sql += ' INNER' + newShallowJoinSql(relation.parentTable,relation.childTable._primaryColumns,relation.columns,leftAlias,rightAlias);	
-	}
+	};
 
 	c.visitOne = function(relation) {	
 		innerJoin(relation);
-	}
+	};
 
 	c.visitMany = c.visitOne;
 
@@ -34,8 +34,8 @@ function newJoinSql(relations) {
 		rightAlias = '_' + i;
 		relation = relations[i];
 		relation.accept(c);
-	};
+	}
 	return sql;
-};
+}
 
 module.exports = newJoinSql;

@@ -22,6 +22,6 @@ function newJoinSql(relations) {
 	});
 
 	return sql;
-};
+}
 
 module.exports = newJoinSql;

@@ -1,11 +1,11 @@
-var Promise = require('promise');
+var promise = require('promise');
 var objectToCallback = require('./objectToCallback');
 
 function newPromise(func) {
 	if (!func)
-		return new Promise(objectToCallback());
-	return new Promise(func);
+		return new promise(objectToCallback());
+	return new promise(func);
 }
 
-newPromise.all = Promise.all;
+newPromise.all = promise.all;
 module.exports = newPromise;
