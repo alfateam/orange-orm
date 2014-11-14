@@ -1,8 +1,7 @@
 function act(c){
-	c.domain = {};
 	c.manyCache = {};
-	c.domain[c.key] = c.manyCache;
-	process.domain = c.domain;
+
+	c.setSessionSingleton.expect(c.key);
 	c.cacheChanged(c.cache);
 }
 

@@ -19,6 +19,9 @@ function act(c){
 		c.cacheChanged = cb;
 	}
 
+	c.setSessionSingleton = requireMock('../setSessionSingleton');
+	
+
 	c.sut = require('../newInvalidateCache')(c.key, c.joinRelation);
 }
 
