@@ -1,5 +1,7 @@
+var getSessionSingleton = require('./getSessionSingleton');
+
 function release() {
-	var done = process.domain.dbClientDone;
+	var done = getSessionSingleton('dbClientDone');
 	if (done)
 		done();
 }

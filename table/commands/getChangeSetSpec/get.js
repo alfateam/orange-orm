@@ -3,12 +3,8 @@ var expectRequire = a.expectRequire;
 
 function act(c){
 	c.changeSet = {};
-	c.changeSetId = 'someId';	
-	c.domain = {};
-	c.domain[c.changeSetId] = c.changeSet;
-	process.domain = c.domain;
-
-	expectRequire('./changeSetId').return(c.changeSetId);
+	c.getSessionSingleton = a.requireMock('../getSessionSingleton');
+	c.getSessionSingleton.expect('changes').return(c.changeSet);
 
 	c.returned = require('../getChangeSet')();
 }

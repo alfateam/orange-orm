@@ -11,8 +11,8 @@ function act(c){
 
 	c.cacheCore.tryGet.expect(parentRow).return(c.expected);
 	
-	c.domain = {};
-	process.domain = c.domain;
+	c.getSessionSingleton.expect(c.key).return();
+	c.setSessionSingleton.expect(c.key, c.cacheCore);
 	
 	c.childTable = {};
 	c.childTableCache = {};

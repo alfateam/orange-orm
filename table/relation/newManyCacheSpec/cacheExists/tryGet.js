@@ -8,9 +8,7 @@ function act(c){
 	c.cacheCore.tryGet = c.mock();
 	c.cacheCore.tryGet.expect(parentRow).return(c.expected);
 	
-	c.domain = {};
-	c.domain[c.key] = c.cacheCore;
-	process.domain = c.domain;
+	c.getSessionSingleton.expect(c.key).return(c.cacheCore);
 
 	c.returned = c.sut.tryGet(parentRow);
 }

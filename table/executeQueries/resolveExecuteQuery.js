@@ -1,8 +1,10 @@
+var getSessionSingleton = require('../getSessionSingleton');
+
 function resolveExecuteQuery(query) {
 	return resolve;
 	
 	function resolve(success,failed) {
-		var client = process.domain.dbClient;
+		var client = getSessionSingleton('dbClient');
 	
 		client.executeQuery(query, onCompleted);
 

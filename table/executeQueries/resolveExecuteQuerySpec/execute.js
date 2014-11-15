@@ -6,9 +6,9 @@ function act(c){
 	c.mock = mock;	
 	c.query = {};
 	c.dbClient = {};
-	c.domain = {};
-	process.domain = c.domain;;	
-	c.domain.dbClient = c.dbClient;
+
+	c.getSessionSingleton = requireMock('../getSessionSingleton');
+	c.getSessionSingleton.expect('dbClient').return(c.dbClient);	
 
 	c.queryContext = {};
 	c.query.queryContext = c.queryContext;

@@ -1,7 +1,7 @@
 function act(c){
-	
-	c.domain.dbClientDone = c.mock();
-	c.domain.dbClientDone.expect();
+	c.dbClientDone = c.mock();
+	c.dbClientDone.expect();
+	c.getSessionSingleton.expect('dbClientDone').return(c.dbClientDone);
 	c.sut();
 }
 

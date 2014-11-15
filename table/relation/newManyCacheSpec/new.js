@@ -1,18 +1,20 @@
 var a = require('a');
-var mock = a.mock;
-var requireMock = a.requireMock;
 
 function act(c){
-	c.mock = mock;	
-	c.synchronizeAdded = requireMock('./manyCache/synchronizeAdded');
-	c.synchronizeRemoved = requireMock('./manyCache/synchronizeRemoved');
-	c.synchronizeChanged = requireMock('./manyCache/synchronizeChanged');
-	c.extractParentKey = requireMock('./manyCache/extractParentKey');
+	c.requireMock = a.requireMock;
+	c.mock = a.mock;	
+	c.synchronizeAdded = c.requireMock('./manyCache/synchronizeAdded');
+	c.synchronizeRemoved = c.requireMock('./manyCache/synchronizeRemoved');
+	c.synchronizeChanged = c.requireMock('./manyCache/synchronizeChanged');
+	c.extractParentKey = c.requireMock('./manyCache/extractParentKey');
 	
-	c.newCacheCore = requireMock('./newManyCacheCore');
+	c.newCacheCore = c.requireMock('./newManyCacheCore');
 	c.key = {};
-	c.newId = requireMock('../../newId');
+	c.newId = c.requireMock('../../newId');
 	c.newId.expect().return(c.key);
+
+	c.setSessionSingleton = c.requireMock('../setSessionSingleton');
+	c.getSessionSingleton = c.requireMock('../getSessionSingleton');	
 
 	c.joinRelation = {};
 	c.sut = require('../newManyCache')(c.joinRelation);

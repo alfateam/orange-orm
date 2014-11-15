@@ -2,6 +2,6 @@ var when = require('a').when;
 var c = {};
 
 when(c)
-	.it('should reset changeSet').assertDoesNotThrow(c.resetChangeSet.verify)
+	.it('should set changeSet on session').assertDoesNotThrow(c.setSessionSingleton.verify)
 	.it('should return executeQuery begin promise').assertEqual(c.expected, c.returned)
 ;

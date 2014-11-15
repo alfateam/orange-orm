@@ -1,14 +1,14 @@
-var _newCache = require('../newCache');
+var newCache = require('../newCache');
+var getSessionSingleton = require('../getSessionSingleton');
+var setSessionSingleton = require('../setSessionSingleton');
 
 function getCache(id) {
-	var domain = process.domain;
-	return domain[id] || newCache();	
-
-	function newCache() {
-		var cache = _newCache();
-		domain[id] = cache;
+	var cache = getSessionSingleton(id);
+	if (cache)
 		return cache;
-	}
+	cache = newCache();
+	setSessionSingleton(id, cache);
+	return cache;
 }
 
 

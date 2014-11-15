@@ -4,8 +4,7 @@ var requireMock = a.requireMock;
 
 function act(c){
 	c.mock = mock;	
-	c.domain = {};
-	process.domain = c.domain;
+	c.getSessionSingleton = requireMock('./getSessionSingleton');
 
 	c.sut = require('../releaseDbClient');
 }

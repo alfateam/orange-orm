@@ -1,7 +1,6 @@
-var changeSetId = require('./changeSetId');
-
+var getSessionSingleton = require('../getSessionSingleton');
 function getChangeSet() {
-	return process.domain[changeSetId];
+	return getSessionSingleton('changes');
 }
 
 module.exports = getChangeSet;

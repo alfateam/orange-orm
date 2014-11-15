@@ -5,11 +5,10 @@ var requireMock  = a.requireMock;
 
 
 function act(c){		
-	c.resetChangeSet = requireMock('./newChangeSet');
 	c.beginCommand = requireMock('./commands/beginCommand');
 	c.executeQuery = requireMock('./executeQueries/executeQuery');
-
-
+	c.setSessionSingleton = requireMock('./setSessionSingleton');
+	
 	c.sut = require('../begin');
 }
 

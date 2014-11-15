@@ -1,9 +1,9 @@
-var newChangeSet = require('./newChangeSet');
 var beginCommand = require('./commands/beginCommand');
 var executeQuery = require('./executeQueries/executeQuery');
+var setSessionSingleton = require('./setSessionSingleton');
 
 function begin() {
-	newChangeSet();
+	setSessionSingleton('changes', []);
 	return executeQuery(beginCommand);
 }
 

@@ -14,12 +14,13 @@ function newResolveTransaction(domain, connectionString) {
                 onError(err);
                 return;
             }
+            var rdb = {};
             client.executeQuery = wrapQuery(client);
-            domain.dbClient = client;
-            domain.dbClientDone = done;
-            domain.rdb = {};    
-            domain.rdb.encodeBuffer = encodeBuffer;
-            domain.rdb.deleteFromSql = deleteFromSql;
+            rdb.dbClient = client;
+            rdb.dbClientDone = done;
+            rdb.encodeBuffer = encodeBuffer;
+            rdb.deleteFromSql = deleteFromSql;
+            domain.rdb = rdb;    
             onSuccess();
         }
     };

@@ -4,27 +4,29 @@ var synchronizeRemoved = require('./manyCache/synchronizeRemoved');
 var extractParentKey = require('./manyCache/extractParentKey');
 var newCacheCore = require('./newManyCacheCore');
 var newId = require('../../newId');
+var getSessionSingleton = require('../getSessionSingleton');
+var setSessionSingleton = require('../setSessionSingleton');
 
 function newManyCache(joinRelation) {
     var c = {};
     var key = newId();
 
     c.tryAdd = function(parent, child) {
-        var cache = process.domain[key];
+        var cache = getSessionSingleton(key);
         cache.tryAdd(parent, child);
         synchronizeChanged(c, joinRelation, parent, child);
     };
 
     c.tryRemove = function(parent, child) {
-        var cache = process.domain[key];
+        var cache = getSessionSingleton(key);
         cache.tryRemove(parent, child);
     };
 
     c.tryGet = function(parentRow) {
-        var cache = process.domain[key];
+        var cache = getSessionSingleton(key);
         if (!cache) {
             cache = newCacheCore(joinRelation);
-            process.domain[key] = cache;
+            setSessionSingleton(key, cache);
             fillCache(cache);
             synchronizeAdded(c.tryAdd, joinRelation);
             synchronizeRemoved(c.tryRemove, joinRelation);

@@ -11,12 +11,13 @@ function newResolveTransaction(domain, pool) {
                 onError(err);
                 return;
             }
+            var rdb = {};
             connection.executeQuery = wrapQuery(connection);
-            domain.dbClient = connection;
-            domain.dbClientDone = connection.release;
-            domain.rdb = {};    
-            domain.rdb.encodeBuffer = connection.escape.bind(connection);
-            domain.rdb.deleteFromSql = deleteFromSql;
+            rdb.dbClient = connection;
+            rdb.dbClientDone = connection.release;
+            rdb.encodeBuffer = connection.escape.bind(connection);
+            rdb.deleteFromSql = deleteFromSql;
+            domain.rdb = rdb;    
             onSuccess();
         }
     };
