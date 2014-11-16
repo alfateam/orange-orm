@@ -4,6 +4,10 @@ var requireMock = a.requireMock;
 
 function act(c) {
     c.mock = mock;
+
+    c.tryReleaseDbClient = requireMock('./tryReleaseDbClient');
+    c.tryReleaseDbClient.expect();
+    
     c.error = {};
     c.previousPromise = {};
     c.previousPromise.then = mock();
