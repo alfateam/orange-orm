@@ -1505,7 +1505,7 @@ db.transaction()
     .then(onOk, onFailed);
 
 function deleteCustomer() {
-    filter =  Customer.id.eq('87654399-0000-0000-0000-000000000000');
+    var filter =  Customer.id.eq('87654399-0000-0000-0000-000000000000');
     Customer.cascadeDelete(filter);
 }
 
@@ -1524,7 +1524,7 @@ function onFailed(err) {
 ```js
 var rdb = require('rdb');
 
-buf = new Buffer(10);
+var buf = new Buffer(10);
 buf.write('\u00bd + \u00bc = \u00be', 0);
 
 var Customer = rdb.table('_customer');

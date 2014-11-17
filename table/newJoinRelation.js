@@ -59,7 +59,7 @@ function _newJoin(parentTable, childTable, columnNames) {
     function addColumns() {
         var numberOfColumns = columnNames.length;
         for (var i = 0; i < columns.length; i++) {
-            curColumn = columns[i];
+            var curColumn = columns[i];
             tryAdd(curColumn);
             if (numberOfColumns === c.columns.length)
                 return;

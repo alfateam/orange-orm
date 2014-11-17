@@ -11,7 +11,7 @@ function newRowCache(table) {
 		var primaryColumns = table._primaryColumns;		
 		var keyLength = primaryColumns.length;
 		for (var i = 0; i < keyLength; i++) {
-			column = primaryColumns[i];
+			var column = primaryColumns[i];
 			names[column.alias] = null;
 		}
 		return names;

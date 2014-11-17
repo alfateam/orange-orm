@@ -10,7 +10,7 @@ function toSpan(table,strategy) {
 	function applyStrategy(table,legs,strategy) {
 		if(!strategy) 
 			return;		
-		for (name in strategy) {				
+		for (var name in strategy) {				
 			addLeg(legs,table,strategy,name);			
 		}					
 	}	
