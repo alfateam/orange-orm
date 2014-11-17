@@ -2,7 +2,7 @@ var getChangeSet = require('./commands/getChangeSet');
 var compressChanges = require('./commands/compressChanges');
 
 function popChanges() {	
-	changeSet = getChangeSet();
+	var changeSet = getChangeSet();
 	var length = changeSet.length;
 	if (length > 0) {
 		var lastCmd = changeSet[length-1];
