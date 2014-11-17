@@ -18,5 +18,9 @@
   "repository" : {
          "type" : "git",
          "url"  : "git@github.com:alfateam/rdb.git"
-      }
+      },
+  "jshintConfig" : {
+    "asi" : true,
+    "eqnull" : true
+  }
 }
