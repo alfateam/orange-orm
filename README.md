@@ -9,6 +9,8 @@ Eager or lazy loading.
 Based on promises.  
 [Documentation and examples](docs/docs.md)  
 ## Release notes
+__0.4.1__  
+Bugfix: more global leaks.  
 __0.4.0__  
 Bugfix: global leak.  
 __0.3.9__  
