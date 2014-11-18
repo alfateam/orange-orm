@@ -18,7 +18,7 @@ function act(c) {
     c.childValue2 = {};
     child[c.joinAlias1] = c.childValue1;
     child[c.joinAlias2] = c.childValue2;
-    child["foo"] = {};
+    child.foo = {};
 
     c.primaryColumn1 = {};
     c.primaryColumn2 = {};

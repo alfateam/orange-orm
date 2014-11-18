@@ -1,5 +1,5 @@
 function act(c){
-	c.expected;
+	c.expected = {};
 	c.customerRow = {};
 	c.customerDto = {};
 	c.thenPromise = {};	

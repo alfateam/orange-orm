@@ -34,7 +34,7 @@ function act(c) {
 		definePackages();
 		defineArticle();
 		defineDeliveryParty();
-	};
+	}
 
 	function defineOrder() {
 		table = newTable('order');
@@ -91,11 +91,11 @@ function act(c) {
 		deliveryPartyTable.column('dOrderId').numeric().as('orderId');
 		var orderJoin = deliveryPartyTable.join(table).by('dOrderId').as('order');
 		table.hasOne(orderJoin).as('deliveryParty');
-	};
+	}
 
 	function newTable(tableName) {
 		return require('../../table')(tableName);
-	};
+	}
 
 	function setupSut() {
 		newQuery = require('../../table/newQuery');

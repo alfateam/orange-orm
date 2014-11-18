@@ -28,8 +28,8 @@ childRelation2.joinRelation = joinRelation2;
 
 table._relations = {};
 
-table._relations['child1'] = childRelation1;
-table._relations['child2'] = childRelation2;
+table._relations.child1 = childRelation1;
+table._relations.child2 = childRelation2;
 
 
 function act(c) {

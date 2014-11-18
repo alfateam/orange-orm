@@ -29,7 +29,7 @@ function act(c){
 		callback(c.oneLeg);
 		callback(c.joinLeg);
 		callback(c.manyLeg);		
-	};
+	}
 
 	function stubLegs() {
 		c.legs.forEach = mock();

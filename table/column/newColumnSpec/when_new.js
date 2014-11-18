@@ -1,7 +1,7 @@
 var when = require('a').when;
 var c = {};
 
-when('./new',c)
+when(c)
 	.it('should add column to table._columns').assertEqual(c.sut,c.columns[0])
 	.it('should not add any other columns').assertEqual(1,c.columns.length)
 	.it('should set dbName to name').assertEqual(c.name,c.sut._dbName)
@@ -19,4 +19,4 @@ when('./new',c)
 	.it('LT is alias for lessThan').assertEqual(c.sut.lessThan,c.sut.LT)
 	.it('le is alias for lessThanOrEqual').assertEqual(c.sut.lessThanOrEqual,c.sut.le)
 	.it('LE is alias for lessThanOrEqual').assertEqual(c.sut.lessThanOrEqual,c.sut.LE)
-	.it('should set table.<columnName> to column').assertEqual(c.table['columnName'],c.sut);
+	.it('should set table.<columnName> to column').assertEqual(c.table.columnName,c.sut);

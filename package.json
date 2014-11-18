@@ -1,26 +1,28 @@
 {
-  "name": "rdb",
-  "version": "0.4.1",
-  "main": "index.js",
-  "title": "rdb",
-  "description": "Object Relational Mapper",
-  "keywords": ["orm","sql","mySql","mysql","postgres","pg"],
-  "license": "MIT",
-  "dependencies": {  
-    "pg.js" : "3.1.0",
-    "node-uuid" : "1.4.1", 
-    "promise" : "5.0.0",
-    "mysql" : "2.5.0"
-  },
-  "devDependencies": {
-		"a": "0.4.5"
-  },
-  "repository" : {
-         "type" : "git",
-         "url"  : "git@github.com:alfateam/rdb.git"
-      },
-  "jshintConfig" : {
-    "asi" : true,
-    "eqnull" : true
-  }
+    "name": "rdb",
+    "version": "0.4.1",
+    "main": "index.js",
+    "title": "rdb",
+    "description": "Object Relational Mapper",
+    "keywords": ["orm", "sql", "mySql", "mysql", "postgres", "pg"],
+    "license": "MIT",
+    "dependencies": {
+        "pg.js": "3.1.0",
+        "node-uuid": "1.4.1",
+        "promise": "5.0.0",
+        "mysql": "2.5.0"
+    },
+    "devDependencies": {
+        "a": "0.4.5"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git@github.com:alfateam/rdb.git"
+    },
+    "jshintConfig": {
+        "asi": true,
+        "eqnull": true,
+        "undef": true,
+        "node": true
+    }
 }

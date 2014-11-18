@@ -2,7 +2,7 @@ var executeQuery = require('./executeQuery');
 var newPromise = require('../promise');
 
 function executeChanges(queries) {
-	if (queries.length == 0)
+	if (queries.length === 0)
 		return newPromise();
 	var i = -1;
 	return execute();

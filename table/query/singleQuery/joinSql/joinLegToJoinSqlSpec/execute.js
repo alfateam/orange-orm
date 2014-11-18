@@ -1,6 +1,6 @@
 var requireMock = require('a').requireMock;
 
-var joinLegToShallowJoinSql = requireMock('./joinLegToShallowJoinSql');;
+var joinLegToShallowJoinSql = requireMock('./joinLegToShallowJoinSql');
 var newJoinSql;
 
 var shallowJoinSql = '<shallowJoinSql>';

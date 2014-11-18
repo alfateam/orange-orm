@@ -30,8 +30,8 @@ function act(c){
 	c._childRelations = {};
 	c.childRelation = 'c';
 	c.childRelation2 = 'c2';
-	c._childRelations['child'] = c.childRelation;
-	c._childRelations['child2'] = c.childRelation2;
+	c._childRelations.child = c.childRelation;
+	c._childRelations.child2 = c.childRelation2;
 	c.table._relations = c._childRelations; 
 
 

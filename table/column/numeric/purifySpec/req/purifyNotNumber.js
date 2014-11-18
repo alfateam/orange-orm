@@ -9,6 +9,6 @@ function act(c) {
 	catch(error) {
 		c.thrownMsg = error.message;
 	}
-};
+}
 
 module.exports = act;

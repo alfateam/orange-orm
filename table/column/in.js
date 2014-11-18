@@ -4,7 +4,7 @@ var extractAlias = require('./extractAlias');
 
 function _in(column,values,optionalAlias) {
 	var filter;
-	if (values.length == 0) {
+	if (values.length === 0) {
 		filter =  newParameterized('1=2');
 		return newBoolean(filter);
 	}

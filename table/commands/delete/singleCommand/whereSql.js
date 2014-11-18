@@ -21,6 +21,6 @@ function newWhereSql(relations, shallowFilter) {
             sql = ' WHERE ' + joinCore;
     }
     return sql;
-};
+}
 
 module.exports = newWhereSql;

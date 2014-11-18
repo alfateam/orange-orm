@@ -3,7 +3,7 @@ var newJoin = require('./joinSql');
 var newWhere = require('./whereSql');
 
 function newSubFilter(relations, shallowFilter) {
-	if (relations.length == 0)
+	if (relations.length === 0)
 		return shallowFilter;
 	var relationCount = relations.length;
 	var alias = '_' + (relationCount -1);

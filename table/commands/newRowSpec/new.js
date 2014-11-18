@@ -32,10 +32,10 @@ function act(c){
 	c.table._columns = c.columns;
 
 	c.rowDto = {};
-	c.rowDto['alias'] = c.defaultValue;
-	c.rowDto['alias2'] = null;
-	c.rowDto['pkAlias'] = c.id;
-	c.rowDto['pkAlias2'] = c.id2;
+	c.rowDto.alias = c.defaultValue;
+	c.rowDto.alias2 = null;
+	c.rowDto.pkAlias = c.id;
+	c.rowDto.pkAlias2 = c.id2;
 
 	c.shallowDbRowToRow.expect(c.table, c.rowDto).return(c.row);
 
