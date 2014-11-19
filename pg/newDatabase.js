@@ -2,6 +2,8 @@ var createDomain = require('domain').create;
 var newTransaction = require('./newTransaction');
 var newPromise = require('../table/promise');
 var begin = require('../table/begin');
+var commit = require('../table/commit');
+var rollback = require('../table/rollback');
 
 function newDatabase(connectionString) {
     var c = {};
@@ -17,6 +19,9 @@ function newDatabase(connectionString) {
             return p;
         }
     };
+
+    c.rollback = rollback;
+    c.commit = commit;
 
     return c;
 }

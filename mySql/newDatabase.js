@@ -3,6 +3,9 @@ var newTransaction = require('./newTransaction');
 var newPromise = require('../table/promise');
 var begin = require('../table/begin');
 var mysql = require('mysql');
+var commit = require('../table/commit');
+var rollback = require('../table/rollback');
+
 
 function newDatabase(connectionString) {
     var c = {};
@@ -17,6 +20,9 @@ function newDatabase(connectionString) {
             return newPromise(transaction).then(begin);
         }
     };
+
+    c.commit = commit;
+    c.rollback = rollback;
 
     return c;
 }

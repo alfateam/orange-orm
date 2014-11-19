@@ -1,15 +1,17 @@
 var a = require('a');
 var mock = a.mock;
-var requireMock = a.requireMock;
 
 function act(c){
 	c.mock = mock;	
+	c.requireMock = a.requireMock;
 	c.connectionString = {};
 	c.Domain = require('domain');
 	c.Domain.create = mock();
-	c.newTransaction = requireMock('./newTransaction');
-	c.newPromise = requireMock('../table/promise');
-	c.begin = requireMock('../table/begin');
+	c.newTransaction = c.requireMock('./newTransaction');
+	c.newPromise = c.requireMock('../table/promise');
+	c.begin = c.requireMock('../table/begin');
+	c.rollback = c.requireMock('../table/rollback');
+	c.commit = c.requireMock('../table/commit');	
 
 	c.sut = require('../newDatabase')(c.connectionString);
 }

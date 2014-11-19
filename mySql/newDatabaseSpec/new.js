@@ -11,6 +11,8 @@ function act(c){
 	c.newPromise = requireMock('../table/promise');
 	c.begin = requireMock('../table/begin');
 	c.mysql = requireMock('mysql');
+	c.rollback = requireMock('../table/rollback');
+	c.commit = requireMock('../table/commit');	
 
 	c.pool = {};
 
