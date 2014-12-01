@@ -9,6 +9,8 @@ Eager or lazy loading.
 Based on promises.  
 [Documentation and examples](docs/docs.md)  
 ## Release notes
+__0.4.2__  
+Bugfix: [update on a row crashes when a delete occurs earlier in same transaction](https://github.com/alfateam/rdb/issues/12).  
 __0.4.1__  
 Bugfix: more global leaks.  
 __0.4.0__  
