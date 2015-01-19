@@ -49,6 +49,11 @@ function defineColumn(column, table) {
 		return c;
 	};
 
+	c.serializable = function(value) {
+		column.serializable = value;
+		return c;		
+	};
+
 	return c;
 }
 
