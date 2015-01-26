@@ -672,7 +672,7 @@ function onFailed(err) {
     console.log('Rollback');
     console.log(err);
 }
-``````
+```
 <a name="_serializable"></a>
 [toDto ignoring columns](https://github.com/alfateam/rdb-demo/blob/master/serializable.js)
 ```js
@@ -711,7 +711,8 @@ function onOk() {
 function onFailed(err) {
     console.log('Rollback');
     console.log(err);
-}```
+}
+```
 <a name="_tojson"></a>
 [toJSON](https://github.com/alfateam/rdb-demo/blob/master/toJSON.js)
 ```js
