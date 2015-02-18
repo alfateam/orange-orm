@@ -9,6 +9,8 @@ Eager or lazy loading.
 Based on promises.  
 [Documentation and examples](docs/docs.md)  
 ## Release notes
+__0.4.5__  
+Oops. Forgot to use pg.js instead of pg.  
 __0.4.4__  
 Upgraded all dependencies to latest. Using pg.js instead of pg.  
 __0.4.3__  
