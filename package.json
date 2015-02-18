@@ -1,19 +1,19 @@
 {
     "name": "rdb",
-    "version": "0.4.3",
+    "version": "0.4.4",
     "main": "index.js",
     "title": "rdb",
     "description": "Object Relational Mapper",
     "keywords": ["orm", "sql", "mySql", "mysql", "postgres", "pg"],
     "license": "MIT",
     "dependencies": {
-        "pg.js": "3.6.2",
-        "node-uuid": "1.4.1",
-        "promise": "5.0.0",
-        "mysql": "2.5.0"
+        "pg": "4.1.1",
+        "node-uuid": "1.4.2",
+        "promise": "6.1.0",
+        "mysql": "2.5.4"
     },
     "devDependencies": {
-        "a": "0.4.5"
+        "a": "0.4.6"
     },
     "repository": {
         "type": "git",

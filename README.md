@@ -9,6 +9,8 @@ Eager or lazy loading.
 Based on promises.  
 [Documentation and examples](docs/docs.md)  
 ## Release notes
+__0.4.4__  
+Upgraded all dependencies to latest. Using pg.js instead of pg.  
 __0.4.3__  
 [Can ignore columns when serializing to dto](https://github.com/alfateam/rdb-demo/blob/master/serializable.js).  
 __0.4.2__  
