@@ -5,7 +5,7 @@ var requireMock = a.requireMock;
 function act(c){
 	c.mock = mock;
 	c.requireMock = requireMock;
-	c.pg = requireMock('pg.js');
+	c.pg = requireMock('pg');
 	c.pg.connect = mock();
 
 	c.connectionString = {};

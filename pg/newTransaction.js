@@ -1,4 +1,4 @@
-var pg = require('pg.js');
+var pg = require('pg');
 var wrapQuery = require('./wrapQuery');
 var encodeBuffer = require('./encodeBuffer');
 var deleteFromSql = require('./deleteFromSql');
