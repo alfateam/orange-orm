@@ -8,4 +8,5 @@ function newPromise(func) {
 }
 
 newPromise.all = promise.all;
+newPromise.denodeify = promise.denodeify;
 module.exports = newPromise;
