@@ -1,7 +1,9 @@
 var newId = require('../newId');
 
 function negotiate(connection) {
-	var id = newId();
+	var id = newId();	
+	if (typeof connection === 'string') 
+		return id + connection;	
 	
 	var c = {};
 	for (var prop in connection) {

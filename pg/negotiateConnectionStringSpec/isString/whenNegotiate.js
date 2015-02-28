@@ -2,4 +2,4 @@ var when = require('a').when;
 var c = {};
 
 when(c)
-    .it('should stringify to id').assertEqual(c.expected, JSON.stringify(c.returned))
+    .it('should merge id and connectionString').assertDeepEqual(c.expected, c.returned)
