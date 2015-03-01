@@ -17,16 +17,7 @@ function act(c){
 	function onDrain(drainCompleted) {
 		c.drainCompleted = drainCompleted;	
 	}
-
-	c.key = 'someKey';
-	c.connectionString.toJSON = function() {
-		return c.key;
-	};
 	
-	c.pg.pools = {};
-	c.pg.pools.all = {};	
-	c.pg.pools.all[JSON.stringify(c.key)] = c.pgPool;
-
 	require('../end')(c.connectionString, c.pgPool, c.pg, c.endCompleted);
 }
 

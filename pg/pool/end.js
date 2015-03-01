@@ -3,8 +3,6 @@ function endPool(connectionString, pgPool, pg, done) {
 
     function onDrained() {
         pgPool.destroyAllNow();
-        var key = JSON.stringify(connectionString);
-        delete pg.pools.all[key];
         done();
     }
 }

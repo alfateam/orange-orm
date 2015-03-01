@@ -1,13 +1,11 @@
-var pg = require('pg');
 var pools = require('../pools');
-var negotiateConnectionString = require('./negotiateConnectionString');
 var promise = require('../table/promise');
 var end = require('./pool/end');
+var newPgPool = require('./pool/newPgPool');
 
-function newPool(connectionString) {
-	connectionString = negotiateConnectionString(connectionString);
-	var pool = pg.pools.getOrCreate(connectionString);
-	var boundEnd = end.bind(null, connectionString, pool, pg);
+function newPool(connectionString, poolOptions) {
+	var pool = newPgPool(connectionString, poolOptions);
+	var boundEnd = end.bind(null, connectionString, pool);
 	var c = {};
 
 	c.end = promise.denodeify(boundEnd);

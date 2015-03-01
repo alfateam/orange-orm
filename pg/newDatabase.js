@@ -6,8 +6,8 @@ var commit = require('../table/commit');
 var rollback = require('../table/rollback');
 var newPool = require('./newPool');
 
-function newDatabase(connectionString) {
-    var pool = newPool(connectionString);
+function newDatabase(connectionString, poolOptions) {
+    var pool = newPool(connectionString, poolOptions);
     var c = {};
 
     c.transaction = function() {

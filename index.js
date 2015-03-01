@@ -6,8 +6,8 @@ var table = require('./table');
 var commit = require('./table/commit');
 var rollback = require('./table/rollback');
 
-var connectViaPool = function(connectionString) {
-	return newPg(connectionString);
+var connectViaPool = function(connectionString, poolOptions) {
+	return newPg(connectionString, poolOptions);
 };
 
 connectViaPool.pg = newPg;
