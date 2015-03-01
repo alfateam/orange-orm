@@ -3,4 +3,5 @@ var c = {};
 
 when(c)
 	.it('should set end').assertEqual(c.denodeifiedEndPool, c.sut.end)
+	.it('should set connect').assertEqual(c.pgPool.connect, c.sut.connect)
 	.it('should add pool to pools singleton').assertDeepEqual([c.sut], c.pools)

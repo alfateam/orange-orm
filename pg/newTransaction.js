@@ -1,13 +1,11 @@
-var pg = require('pg');
 var wrapQuery = require('./wrapQuery');
 var encodeBuffer = require('./encodeBuffer');
 var deleteFromSql = require('./deleteFromSql');
 
-function newResolveTransaction(domain, connectionString) {
+function newResolveTransaction(domain, pool) {
 
     return function(onSuccess, onError) {
-        var connectionError;
-        pg.connect(connectionString, onConnected);
+        pool.connect(onConnected);
 
         function onConnected(err, client, done) {
             if (err) {

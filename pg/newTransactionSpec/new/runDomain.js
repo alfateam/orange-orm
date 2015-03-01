@@ -1,9 +1,9 @@
 function act(c) {
-
-    c.pg.connect.expect(c.connectionString).expectAnything().whenCalled(onConnect);
+	c.pool.connect = c.mock();
+    c.pool.connect.expectAnything().whenCalled(onConnect);
     c.raiseConnected = function() {};
 
-    function onConnect(_, cb) {
+    function onConnect(cb) {
         c.raiseConnected = cb;
     }
 

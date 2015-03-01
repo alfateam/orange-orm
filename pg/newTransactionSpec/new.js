@@ -5,10 +5,8 @@ var requireMock = a.requireMock;
 function act(c){
 	c.mock = mock;
 	c.requireMock = requireMock;
-	c.pg = requireMock('pg');
-	c.pg.connect = mock();
 
-	c.connectionString = {};
+	c.pool = {};
 	c.domain = {};
 
 	c.wrapQuery = requireMock('./wrapQuery');
@@ -16,7 +14,7 @@ function act(c){
 
 	c.deleteFromSql = c.requireMock('./deleteFromSql');
 
-	c.sut = require('../newTransaction')(c.domain, c.connectionString);
+	c.sut = require('../newTransaction')(c.domain, c.pool);
 }
 
 module.exports = act;

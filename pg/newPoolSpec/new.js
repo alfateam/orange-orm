@@ -16,6 +16,7 @@ function act(c){
 	c.poolOptions = {};
 
 	c.pgPool = {};
+	c.pgPool.connect = {};
 	c.newPgPool.expect(c.connectionString, c.poolOptions).return(c.pgPool);		
 
 	c.boundEndPool = {};

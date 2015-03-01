@@ -8,6 +8,7 @@ function newPool(connectionString, poolOptions) {
 	var boundEnd = end.bind(null, connectionString, pool);
 	var c = {};
 
+	c.connect = pool.connect;
 	c.end = promise.denodeify(boundEnd);
 	pools.push(c);
 
