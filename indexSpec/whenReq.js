@@ -8,3 +8,5 @@ when(c)
     .it('should expose rollback').assertEqual(c.rollback, c.sut.rollback)
     .it('should set mySql').assertEqual(c.newMySqlDatabase, c.sut.mySql)
     .it('should set pg').assertEqual(c.newDatabase, c.sut.pg)
+    .it('should set end').assertEqual(c.pools.end, c.sut.end)
+    

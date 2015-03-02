@@ -24,6 +24,7 @@ function newDatabase(connectionString, poolOptions) {
 
     c.rollback = rollback;
     c.commit = commit;
+    c.end = pool.end;
 
     return c;
 }

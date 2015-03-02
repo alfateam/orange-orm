@@ -3,14 +3,19 @@ var a = require('a');
 function act(c){
 	c.mock = a.mock;
 	c.requireMock = a.requireMock;
+	c.expectRequire = a.expectRequire;
+
+	c.id = 'someId';
+	c.pools = {};
+	c.pools[c.id] = {};
+	c.expectRequire('../../pools').return(c.pools);
 	
-	c.connectionString = {};
 	c.pgPool = {};
-	c.pg = {};
 	c.endCompleted = c.mock();
 	
 	c.pgPool.drain = c.mock();
 	c.pgPool.drain.expectAnything().whenCalled(onDrain);
+
 
 	c.drainCompleted = function() {};
 
@@ -18,7 +23,7 @@ function act(c){
 		c.drainCompleted = drainCompleted;	
 	}
 	
-	require('../end')(c.connectionString, c.pgPool, c.pg, c.endCompleted);
+	require('../end')(c.pgPool, c.id, c.endCompleted);
 }
 
 module.exports = act;

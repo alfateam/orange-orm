@@ -1,8 +1,11 @@
-function endPool(connectionString, pgPool, pg, done) {
+var pools = require('../../pools');
+
+function endPool(pgPool, id, done) {	
     pgPool.drain(onDrained);
 
     function onDrained() {
         pgPool.destroyAllNow();
+        delete pools[id];
         done();
     }
 }
