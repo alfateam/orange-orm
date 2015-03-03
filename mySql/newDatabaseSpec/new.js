@@ -10,16 +10,16 @@ function act(c){
 	c.newTransaction = requireMock('./newTransaction');
 	c.newPromise = requireMock('../table/promise');
 	c.begin = requireMock('../table/begin');
-	c.mysql = requireMock('mysql');
 	c.rollback = requireMock('../table/rollback');
-	c.commit = requireMock('../table/commit');	
+	c.commit = requireMock('../table/commit');
+	c.newPool = requireMock('./newPool');
 
 	c.pool = {};
+	c.poolOptions = {};
 
-	c.mysql.createPool = c.mock();
-	c.mysql.createPool.expect(c.connectionString).return(c.pool);
+	c.newPool.expect(c.connectionString, c.poolOptions).return(c.pool);
 
-	c.sut = require('../newDatabase')(c.connectionString);
+	c.sut = require('../newDatabase')(c.connectionString, c.poolOptions);
 }
 
 module.exports = act;

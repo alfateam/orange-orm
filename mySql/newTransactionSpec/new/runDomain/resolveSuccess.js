@@ -1,8 +1,12 @@
 function act(c){
 	c.onSuccess.expect();
 	c.connection = {};	
-	c.release = {};
-	c.connection.release = c.release;
+	
+	c.connection.release = {};
+	c.connection.release.bind = c.mock();
+	c.boundRelease = {};
+	c.connection.release.bind.expect(c.connection).return(c.boundRelease);	
+	
 	c.connection.escape = {};
 	c.connection.escape.bind = c.mock();
 	c.boundEscape = {};

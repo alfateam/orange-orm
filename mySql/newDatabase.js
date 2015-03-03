@@ -2,14 +2,14 @@ var createDomain = require('domain').create;
 var newTransaction = require('./newTransaction');
 var newPromise = require('../table/promise');
 var begin = require('../table/begin');
-var mysql = require('mysql');
+var newPool = require('./newPool');
 var commit = require('../table/commit');
 var rollback = require('../table/rollback');
 
 
-function newDatabase(connectionString) {
+function newDatabase(connectionString, poolOptions) {
     var c = {};
-    var pool = mysql.createPool(connectionString);
+    var pool = newPool(connectionString, poolOptions);
 
     c.transaction = function() {
         var domain = createDomain();
@@ -23,6 +23,10 @@ function newDatabase(connectionString) {
 
     c.commit = commit;
     c.rollback = rollback;
+    
+    c.end = function() {
+        return pool.end();
+    };
 
     return c;
 }

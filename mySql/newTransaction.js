@@ -14,7 +14,7 @@ function newResolveTransaction(domain, pool) {
             var rdb = {};
             connection.executeQuery = wrapQuery(connection);
             rdb.dbClient = connection;
-            rdb.dbClientDone = connection.release;
+            rdb.dbClientDone = connection.release.bind(connection);
             rdb.encodeBuffer = connection.escape.bind(connection);
             rdb.deleteFromSql = deleteFromSql;
             domain.rdb = rdb;    
