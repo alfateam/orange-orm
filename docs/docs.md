@@ -135,7 +135,8 @@ function onFailed(err) {
     console.log('Rollback');
     console.log(err);
 }
-```<a name="_endpool"></a>
+```
+<a name="_endpool"></a>
 [end pool](https://github.com/alfateam/rdb-demo/blob/master/endPool.js)
 ```js
 var rdb = require('rdb');
@@ -156,7 +157,8 @@ function onFailed(err) {
     console.log('Rollback');
     console.log(err);
 }
-```<a name="_endallpools"></a>
+```
+<a name="_endallpools"></a>
 [end all pools](https://github.com/alfateam/rdb-demo/blob/master/endAllPools.js)
 ```js
 var rdb = require('rdb');
