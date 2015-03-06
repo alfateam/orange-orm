@@ -9,6 +9,12 @@ Eager or lazy loading.
 Based on promises.  
 [Documentation and examples](docs/docs.md)  
 ## Release notes
+__0.4.8__  
+Explicit pooling with size and end().  
+Bugfix: mySql did not release client to pool.  
+__0.4.7__  
+Upgraded to pg 4.3.0  
+Upgraded to mysql 2.5.5  
 __0.4.6__  
 Upgraded pg 4.2.0.  
 __0.4.5__  

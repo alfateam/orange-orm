@@ -75,6 +75,7 @@ _Contents_
 ```js
 var rdb = require('rdb');
 var db = rdb('postgres://postgres:postgres@localhost/test');
+//will use pool with 10 connections by default
 //alternatively: var db = rdb.pg('postgres://postgres:postgres@localhost/test');
 
 db.transaction()
@@ -97,6 +98,7 @@ function onFailed(err) {
 ```js
 var rdb = require('rdb');
 var db = rdb.mySql('mysql://root@localhost/rdbDemo?multipleStatements=true');
+//will use pool with 10 connections by default
 
 db.transaction()
     .then(rdb.commit)
