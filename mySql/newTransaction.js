@@ -4,7 +4,7 @@ var deleteFromSql = require('./deleteFromSql');
 function newResolveTransaction(domain, pool) {
 
     return function(onSuccess, onError) {
-        pool.getConnection(onConnected);
+        pool.connect(onConnected);
 
         function onConnected(err, connection) {
             if (err) {

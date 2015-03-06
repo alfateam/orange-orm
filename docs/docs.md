@@ -4,6 +4,9 @@ _Documentation and examples_
 __Connecting__  
 [connect to postgres](#_connecttopostgres)  
 [connect to mySql](#_connecttomysql)  
+[pool size](#_poolsize)  
+[end pool](#_endpool)  
+[end all pools](#_endallpools)  
 
 __Basic querying__  
 [getById](#_getbyid)  
@@ -109,6 +112,84 @@ function onFailed(err) {
     console.log('Rollback');
     console.log(err);
 }
+```
+<a name="_poolsize"></a>
+[pool size](https://github.com/alfateam/rdb-demo/blob/master/poolOptions.js)
+```js
+var rdb = require('rdb');
+
+var poolOptions = {size: 20};
+var db = rdb('postgres://postgres:postgres@localhost/test', poolOptions);
+
+db.transaction()
+    .then(rdb.commit)
+    .then(null, rdb.rollback)
+    .then(onOk, onFailed);
+
+function onOk() {
+    console.log('Success. Created pool with max 20 connections.');
+    console.log('Waiting for connection pool to teardown....');
+}
+
+function onFailed(err) {
+    console.log('Rollback');
+    console.log(err);
+}
+```<a name="_endpool"></a>
+[end pool](https://github.com/alfateam/rdb-demo/blob/master/endPool.js)
+```js
+var rdb = require('rdb');
+
+var db = rdb('postgres://postgres:postgres@localhost/test');
+
+db.transaction()
+    .then(rdb.commit)
+    .then(null, rdb.rollback)
+    .then(db.end)
+    .then(onOk, onFailed);
+
+function onOk() {
+    console.log('Pool ended.');
+}
+
+function onFailed(err) {
+    console.log('Rollback');
+    console.log(err);
+}
+```<a name="_endallpools"></a>
+[end all pools](https://github.com/alfateam/rdb-demo/blob/master/endAllPools.js)
+```js
+var rdb = require('rdb');
+
+var dbPg = rdb('postgres://postgres:postgres@localhost/test');
+var dbMySql = rdb.mySql('mysql://root@localhost/rdbDemo?multipleStatements=true');
+
+connectPg()
+    .then(connectMySql)
+    .then(rdb.end)
+    .then(onOk, onFailed);
+
+
+function connectPg() {
+    return dbPg.transaction()
+        .then(rdb.commit)
+        .then(null, rdb.rollback);
+}
+
+function connectMySql() {
+    return dbMySql.transaction()
+        .then(rdb.commit)
+        .then(null, rdb.rollback);
+}
+
+function onOk() {
+    console.log('Pools ended.');
+}
+
+function onFailed(err) {
+    console.log(err.stack);
+}
+
 ```
 <a name="_getbyid"></a>
 [getById](https://github.com/alfateam/rdb-demo/blob/master/getById.js)

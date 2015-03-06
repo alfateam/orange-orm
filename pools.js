@@ -13,6 +13,6 @@ function end() {
     	all.push(endPool);
     }
     return promise.all(all);
-};
+}
 
 module.exports = pools;

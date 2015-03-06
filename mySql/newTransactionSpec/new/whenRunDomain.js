@@ -2,4 +2,4 @@ var when = require('a').when;
 var c = {};
 
 when(c)
-	.it('should connect').assertDoesNotThrow(c.pool.getConnection.verify)
+	.it('should connect').assertDoesNotThrow(c.pool.connect.verify)

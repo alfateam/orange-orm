@@ -1,11 +1,11 @@
 function act(c) {
 
-	c.pool.getConnection = c.mock();
-	c.pool.getConnection.expectAnything().whenCalled(onGetConnection);
+	c.pool.connect = c.mock();
+	c.pool.connect.expectAnything().whenCalled(onConnected);
 
     c.raiseConnected = function() {};
 
-	function onGetConnection(cb) {
+	function onConnected(cb) {
 		c.raiseConnected = cb;
 	}
 
