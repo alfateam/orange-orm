@@ -1,3 +1,4 @@
+var log = require('../table/log');
 var replaceParamChar = require('./replaceParamChar');
 
 function wrapQuery(connection) {
@@ -7,6 +8,9 @@ function wrapQuery(connection) {
 	function runQuery(query, onCompleted) {
 		var params = query.parameters.toArray();
 		var sql = replaceParamChar(query, params);
+		log(sql);
+		log('parameters: ' + params);
+
 		runOriginalQuery.call(connection, sql, params, onInnerCompleted);
 
 		function onInnerCompleted(err, result) {

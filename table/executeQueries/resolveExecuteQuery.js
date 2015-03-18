@@ -1,8 +1,6 @@
-var log = require('../log');
 var getSessionSingleton = require('../getSessionSingleton');
 
 function resolveExecuteQuery(query) {
-	log(query);
 	return resolve;
 	
 	function resolve(success,failed) {

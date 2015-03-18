@@ -8,6 +8,8 @@ function act(c){
 	
 	c.connection = {};
 
+	c.log = c.requireMock('../table/log');
+
 	c.runQuery = c.mock();
 	c.connection.query = c.runQuery;
 	

@@ -5,6 +5,8 @@ function act(c){
 	c.requireMock = a.requireMock;
 	c.expectRequire = a.expectRequire;
 	c.then = a.then;
+
+	c.log = c.requireMock('../table/log');
 	
 	c.connection = {};
 	c.replaceParamChar = c.requireMock('./replaceParamChar');
