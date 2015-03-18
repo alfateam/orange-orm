@@ -17,7 +17,7 @@ function newRowArray(table) {
     });
 
     function toJSON(optionalStrategy) {
-        return toDto(optionalStrategy).then(JSON.stringify);
+        return toDto.apply(null,arguments).then(JSON.stringify);
     }
 
     function toDto(optionalStrategy) {

@@ -16,6 +16,7 @@ function act(c) {
 	c.iStartsWith = requireMock('./string/iStartsWith');
 	c.iEndsWith = requireMock('./string/iEndsWith');
 	c.iContains = requireMock('./string/iContains');
+	c.iEqual = requireMock('./string/iEqual');
 
 	var newSut = require('../string');
 

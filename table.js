@@ -5,6 +5,7 @@ var hasMany = require('./table/hasMany');
 var hasOne = require('./table/hasOne');
 var getMany = require('./table/getMany');
 var getById = require('./table/getById');
+var tryGetById = require('./table/tryGetById');
 var tryGetFirst = require('./table/tryGetFirstFromDb');
 var newCache = require('./table/newRowCache');
 var newContext = require('./newObject');
@@ -63,6 +64,10 @@ function _new(tableName) {
 	
 	table.getById = function() {
 		return call(getById,arguments);
+	};
+
+	table.tryGetById = function() {
+		return call(tryGetById,arguments);
 	};
 
 	table.columnDiscriminators = function() {

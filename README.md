@@ -9,6 +9,10 @@ Eager or lazy loading.
 Based on promises.  
 [Documentation and examples](docs/docs.md)  
 ## Release notes
+__0.4.9__  
+New method: tryGetById.  
+New filter: iEqual, postgres only.  
+Bugfix: rows.toJSON() without strategy did not include any children.  
 __0.4.8__  
 Explicit pooling with size and end().  
 Bugfix: mySql did not release client to pool.  

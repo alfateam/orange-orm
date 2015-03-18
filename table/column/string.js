@@ -6,6 +6,7 @@ var contains = require('./string/contains');
 var iStartsWith = require('./string/iStartsWith');
 var iEndsWith = require('./string/iEndsWith');
 var iContains = require('./string/iContains');
+var iEqual = require('./string/iEqual');
 var purify = require('./string/purify');
 
 function _new(column) {
@@ -31,6 +32,12 @@ function _new(column) {
     column.iContains = function(arg, optionalAlias) {
         return iContains(column, arg, optionalAlias);
     };
+
+    column.iEqual = function(arg, optionalAlias) {
+        return iEqual(column, arg, optionalAlias);
+    };
+
+    column.iEq = column.iEqual;
 }
 
 module.exports = _new;

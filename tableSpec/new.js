@@ -10,6 +10,7 @@ var hasMany = requireMock('./table/hasMany');
 var hasOne = requireMock('./table/hasOne');
 var getMany = requireMock('./table/getMany');
 var getById = requireMock('./table/getById');
+var tryGetById = requireMock('./table/tryGetById');
 var newRowCache = requireMock('./table/newRowCache');
 var newObject = requireMock('./newObject');
 var insert = requireMock('./table/insert');
@@ -25,6 +26,7 @@ function act(c) {
 	newRowCache.expect(c.context).return(c.cache);
 	c.tryGetFirstFromDb = requireMock('./table/tryGetFirstFromDb');
 	c.getById = getById;
+	c.tryGetById = tryGetById;
 	c.getMany = getMany;
 	c.hasOne = hasOne;
 	c.hasMany = hasMany;
