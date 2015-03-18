@@ -10,7 +10,7 @@ __Connecting__
 
 __Basic querying__  
 [getById](#_getbyid)  
-[trygetById](#_trygetbyid)  
+[tryGetById](#_trygetbyid)  
 [tryGetFirst](#_trygetfirst)  
 [join](#_join)  
 [hasMany](#_hasmany)  
@@ -57,6 +57,7 @@ __Filters__
 [startsWith](#_startswith)  
 [endsWith](#_endswith)  
 [contains](#_contains)  
+[iEqual](#_iequal)  
 [iStartsWith](#_istartswith)  
 [iEndsWith](#_iendswith)  
 [iContains](#_icontains)  
@@ -2447,6 +2448,90 @@ db.transaction()
 
 function getFilteredCustomers() {
     var filter = Customer.name.contains('ohn');
+    return Customer.getMany(filter);
+}
+
+function printCustomers(customers) {
+    customers.forEach(printCustomer);
+
+    function printCustomer(customer) {
+        console.log('Customer Id: %s, name: %s', customer.id, customer.name);
+    }
+}
+
+function onOk() {
+    console.log('Success');
+    console.log('Waiting for connection pool to teardown....');
+}
+
+function onFailed(err) {
+    console.log('Rollback');
+    console.log(err);
+}
+```
+<a name="_contains"></a>
+[contains](https://github.com/alfateam/rdb-demo/blob/master/filtering/contains.js)
+```js
+var rdb = require('rdb');
+
+var Customer = rdb.table('_customer');
+
+Customer.primaryColumn('cId').guid().as('id');
+Customer.column('cName').string().as('name');
+
+var db = rdb('postgres://postgres:postgres@localhost/test');
+
+db.transaction()
+    .then(getFilteredCustomers)
+    .then(printCustomers)
+    .then(rdb.commit)
+    .then(null, rdb.rollback)
+    .then(onOk, onFailed);
+
+function getFilteredCustomers() {
+    var filter = Customer.name.contains('ohn');
+    return Customer.getMany(filter);
+}
+
+function printCustomers(customers) {
+    customers.forEach(printCustomer);
+
+    function printCustomer(customer) {
+        console.log('Customer Id: %s, name: %s', customer.id, customer.name);
+    }
+}
+
+function onOk() {
+    console.log('Success');
+    console.log('Waiting for connection pool to teardown....');
+}
+
+function onFailed(err) {
+    console.log('Rollback');
+    console.log(err);
+}
+```
+<a name="_iequal"></a>
+[iEqual (postgres only)](https://github.com/alfateam/rdb-demo/blob/master/filtering/iEqual.js)
+```js
+var rdb = require('rdb');
+
+var Customer = rdb.table('_customer');
+
+Customer.primaryColumn('cId').guid().as('id');
+Customer.column('cName').string().as('name');
+
+var db = rdb('postgres://postgres:postgres@localhost/test');
+
+db.transaction()
+    .then(getFilteredCustomers)
+    .then(printCustomers)
+    .then(rdb.commit)
+    .then(null, rdb.rollback)
+    .then(onOk, onFailed);
+
+function getFilteredCustomers() {
+    var filter = Customer.name.iEqual('jOhN');
     return Customer.getMany(filter);
 }
 
