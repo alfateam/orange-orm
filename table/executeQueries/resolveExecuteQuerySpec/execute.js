@@ -7,6 +7,9 @@ function act(c){
 	c.query = {};
 	c.dbClient = {};
 
+	c.log = requireMock('../log');
+	c.log.expect(c.query);
+	
 	c.getSessionSingleton = requireMock('../getSessionSingleton');
 	c.getSessionSingleton.expect('dbClient').return(c.dbClient);	
 

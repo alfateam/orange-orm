@@ -9,6 +9,8 @@ function act(c) {
     c.commit = requireMock('./table/commit');
     c.rollback = requireMock('./table/rollback');
     c.pools = requireMock('./pools');
+    c.log = requireMock('./table/log');
+    c.log.registerLogger = {};
 
     c.newDatabase = requireMock('./pg/newDatabase');
     c.newMySqlDatabase = requireMock('./mySql/newDatabase');

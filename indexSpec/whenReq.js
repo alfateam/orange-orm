@@ -9,4 +9,6 @@ when(c)
     .it('should set mySql').assertEqual(c.newMySqlDatabase, c.sut.mySql)
     .it('should set pg').assertEqual(c.newDatabase, c.sut.pg)
     .it('should set end').assertEqual(c.pools.end, c.sut.end)
+    .it('should set log to registerLogger').assertEqual(c.log.registerLogger, c.sut.log)
+    
     
