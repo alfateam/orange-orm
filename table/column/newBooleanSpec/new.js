@@ -6,6 +6,7 @@ function act(c){
 	c.filter = {};
 	c.filter.sql = {};
 	c.filter.parameters = {};
+	c.negotiateRawSqlFilter = c.requireMock('./negotiateRawSqlFilter');
 
 	c.sut = require('../newBoolean')(c.filter);
 }

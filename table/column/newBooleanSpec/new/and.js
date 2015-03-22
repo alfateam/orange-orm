@@ -1,6 +1,7 @@
 var anded = {};
 var tempFilter = {};
 var filter2 = {};
+var rawFilter2 = {};
 var filter3 = {};
 var nextBoolean = {};
 
@@ -18,7 +19,9 @@ function act(c){
 	nextBoolean.and = c.mock();
 	nextBoolean.and.expect(filter3).return(c.expected);
 
-	c.returned = c.sut.and(filter2,filter3);
+	c.negotiateRawSqlFilter.expect(rawFilter2).return(filter2);
+
+	c.returned = c.sut.and(rawFilter2,filter3);
 }
 
 module.exports = act;

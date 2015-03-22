@@ -4,6 +4,7 @@ var tempFilter3 = {};
 var tempFilter4 = {};
 var nextBoolean = {};
 var filter2 = {};
+var rawFilter2 = {};
 var filter3 = {};
 
 function act(c){
@@ -26,8 +27,9 @@ function act(c){
 	nextBoolean.or = c.mock();
 	nextBoolean.or.expect(filter3).return(c.expected);
 
+	c.negotiateRawSqlFilter.expect(rawFilter2).return(filter2);
 
-	c.returned = c.sut.or(filter2,filter3);
+	c.returned = c.sut.or(rawFilter2,filter3);
 }
 
 module.exports = act;

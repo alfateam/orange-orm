@@ -14,7 +14,7 @@
         "generic-pool": "2.1.1"
     },
     "devDependencies": {
-        "a": "0.4.6"
+        "a": "0.4.8"
     },
     "repository": {
         "type": "git",
