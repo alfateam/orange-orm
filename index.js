@@ -1,7 +1,9 @@
 var newPg = require('./pg/newDatabase');
 
 var connectViaPool = function(connectionString, poolOptions) {
-	return newPg(connectionString, poolOptions);
+	if (connectionString.indexOf && connectionString.indexOf('mysql') === 0)
+		return connectViaPool.mySql.apply(null, arguments);
+	return newPg.apply(null, arguments);
 };
 
 connectViaPool.pg = newPg;
