@@ -8,6 +8,10 @@ function act(c){
 	
 
 	c.sut = require('../negotiateRawSqlFilter');
+
+	c.newParameterized = c.requireMock('../query/newParameterized');
+	c.newBoolean = c.requireMock('./newBoolean');
+	
 }
 
 module.exports = act;

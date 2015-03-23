@@ -1,17 +1,30 @@
+var negotiateRawSqlFilter = require('./table/column/negotiateRawSqlFilter');
 var parameterized = require('./table/query/newParameterized')('');
-var c = {};
+function emptyFilter() {
+    return emptyFilter.and.apply(null, arguments);
+}
 
-c.sql = parameterized.sql;
-c.parameters = parameterized.parameters;
+emptyFilter.sql = parameterized.sql;
+emptyFilter.parameters = parameterized.parameters;
 
-c.and = function(other) {
-	return other;
+emptyFilter.and = function(other) {
+    other = negotiateRawSqlFilter(other);
+    for (var i = 1; i < arguments.length; i++) {
+        other = other.and(arguments[i]);
+    }
+    return other;
 };
 
-c.or = c.and;
-
-c.not = function() {
-	return c;
+emptyFilter.or = function(other) {
+    other = negotiateRawSqlFilter(other);
+    for (var i = 1; i < arguments.length; i++) {
+        other = other.or(arguments[i]);
+    }
+    return other;
 };
 
-module.exports = c;
+emptyFilter.not = function() {
+    return emptyFilter;
+};
+
+module.exports = emptyFilter;

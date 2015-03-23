@@ -7,7 +7,7 @@ __Connecting__
 [pool size](#_poolsize)  
 [end pool](#_endpool)  
 [end all pools](#_endallpools)  
-
+[logging](#_logging)  
 __Basic querying__  
 [getById](#_getbyid)  
 [tryGetById](#_trygetbyid)  
@@ -30,7 +30,6 @@ __Basic querying__
 [(many)ToDto with strategy](#_manytodtowithstrategy)  
 [(many)ToJSON](#_manytojson)  
 [(many)ToJSON with strategy](#_manytojsonwithstrategy)  
-
 __Persistence__  
 [update](#_update)  
 [insert](#_insert)  
@@ -68,6 +67,7 @@ __Filters__
 [and alternative syntax](#_andalternative)  
 [sub filter](#_subfilter)  
 [composite filter](#_compositefilter)  
+[raw sql filter](#_rawsqlfilter)  
 
 _Contents_
 ---------------
@@ -196,6 +196,43 @@ function onFailed(err) {
     console.log(err.stack);
 }
 
+```
+<a name="_endallpools"></a>
+[logging](https://github.com/alfateam/rdb-demo/blob/master/logging.js)
+```js
+var rdb = require('rdb');
+rdb.log(console.log); //will log sql and parameters
+
+var Customer = rdb.table('_customer');
+Customer.primaryColumn('cId').guid().as('id');
+Customer.column('cName').string().as('name');
+
+var db = rdb('postgres://postgres:postgres@localhost/test');
+
+db.transaction()
+    .then(getById)
+    .then(update)
+    .then(rdb.commit)
+    .then(null, rdb.rollback)
+    .then(onOk, onFailed);
+
+function getById() {
+    return Customer.getById('a0000000-0000-0000-0000-000000000000');
+}
+
+function update(customer) {
+    customer.name = 'Ringo'; 
+}
+
+function onOk() {
+    console.log('Success');
+    console.log('Waiting for connection pool to teardown....');
+}
+
+function onFailed(err) {
+    console.log('Rollback');
+    console.log(err);
+}
 ```
 <a name="_getbyid"></a>
 [getById](https://github.com/alfateam/rdb-demo/blob/master/getById.js)
@@ -3029,5 +3066,55 @@ function onOk() {
 function onFailed(err) {
     console.log('Rollback');
     console.log(err);
+}
+```
+<a name="_compositefilter"></a>
+[raw sql filter](https://github.com/alfateam/rdb-demo/blob/master/filtering/rawSqlFilter.js)
+```js
+var inspect = require('util').inspect;
+var rdb = require('rdb');
+
+var Order = rdb.table('_order');
+Order.primaryColumn('oId').guid().as('id');
+Order.column('oOrderNo').string().as('orderNo');
+Order.column('oCustomerId').guid().as('customerId');
+
+var Customer = rdb.table('_customer');
+Customer.primaryColumn('cid').guid().as('id');
+Customer.column('cName').string().as('name');
+Customer.column('cBalance').string().as('balance');
+Customer.column('cIsActive').boolean().as('isActive');
+
+var orderCustomerJoin = Order.join(Customer).by('oCustomerId').as('customer');
+Customer.hasMany(orderCustomerJoin).as('orders');
+
+var db = rdb('postgres://postgres:postgres@localhost/test');
+
+db.transaction()
+    .then(getOrders)
+    .then(printOrders)
+    .then(db.commit)
+    .then(null, db.rollback)
+    .then(onOk, console.log);
+
+function getOrders() {
+    var filter = {
+        sql: 'exists (select 1 from _customer where _customer.cId = oCustomerId and _customer.cBalance > 3000 and _customer.cName LIKE ?)',
+        parameters: ['%o%']
+    };
+    return Order.getMany(filter);
+}
+
+function printOrders(orders) {
+    var strategy = {customer: null}
+    return orders.toDto(strategy).then(printDtos);
+}
+
+function printDtos(dtos) {
+    console.log(inspect(dtos,false,10));
+}
+
+function onOk() {
+    console.log('Done');
 }
 ```

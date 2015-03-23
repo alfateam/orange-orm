@@ -5,6 +5,7 @@ var executeQuery = requireMock('./executeQueries');
 var resultToRows = requireMock('./resultToRows');
 var strategyToSpan = requireMock('./strategyToSpan');
 var newParameterized = requireMock('./query/newParameterized');
+var negotiateRawSqlFilter = requireMock('./column/negotiateRawSqlFilter');
 var emptyInnerJoin = {};
 
 function act(c) {
@@ -15,6 +16,7 @@ function act(c) {
 	c.executeQuery = executeQuery;
 	c.resultToRows = resultToRows;
 	c.strategyToSpan = strategyToSpan;
+	c.negotiateRawSqlFilter = negotiateRawSqlFilter;
 	c.sut = require('../getMany');
 }
 

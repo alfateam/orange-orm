@@ -1,4 +1,5 @@
 var table = {};
+var initialFilter = {};
 var filter = {};
 var strategy = {};
 var expected = {};
@@ -21,10 +22,11 @@ function act(c) {
 	function onThen(callback) {
 		c.resolve = callback;
 	}
+
+	c.negotiateRawSqlFilter.expect(initialFilter).return(filter);
 	
 	c.expected = expected;
-	c.returned = c.sut(table,filter,strategy);
+	c.returned = c.sut(table, initialFilter, strategy);
 }
 
-act.base = "../new";
 module.exports = act;

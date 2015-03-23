@@ -2,7 +2,10 @@ var a = require('a');
 var requireMock = a.requireMock;
 var mock = a.mock;
 
-function act(c) {
+function act(c) {	
+	c.mock = mock;
+	c.negotiateRawSqlFilter = requireMock('./table/column/negotiateRawSqlFilter');
+	
 	c.newParameterized =  requireMock('./table/query/newParameterized');
 	c.parameterized = {};
 	c.newParameterized.expect('').return(c.parameterized);

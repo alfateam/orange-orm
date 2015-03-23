@@ -9,6 +9,9 @@ Eager or lazy loading.
 Based on promises.  
 [Documentation and examples](docs/docs.md)  
 ## Release notes
+__0.5.0__  
+[Logging](https://github.com/alfateam/rdb-demo/blob/master/logging.js): rdb.log(someFunc) logs sql and parameters.  
+[Raw sql filters.](https://github.com/alfateam/rdb-demo/blob/master/filtering/rawSqlFilter.js)  
 __0.4.9__  
 New method: tryGetById.  
 New filter: iEqual, postgres only.  
