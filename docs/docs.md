@@ -197,7 +197,7 @@ function onFailed(err) {
 }
 
 ```
-<a name="_endallpools"></a>
+<a name="_logging"></a>
 [logging](https://github.com/alfateam/rdb-demo/blob/master/logging.js)
 ```js
 var rdb = require('rdb');
@@ -3068,7 +3068,7 @@ function onFailed(err) {
     console.log(err);
 }
 ```
-<a name="_compositefilter"></a>
+<a name="_rawsqlfilter"></a>
 [raw sql filter](https://github.com/alfateam/rdb-demo/blob/master/filtering/rawSqlFilter.js)
 ```js
 var inspect = require('util').inspect;
