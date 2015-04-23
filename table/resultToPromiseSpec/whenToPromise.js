@@ -2,5 +2,4 @@ var when = require('a').when;
 var c = {};
 
 when(c).
-	it('should return promise').assertEqual(c.promise,c.returned)
-	;
+	it('should return result').assertEqual(c.result, c.returned)
