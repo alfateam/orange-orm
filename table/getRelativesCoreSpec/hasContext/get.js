@@ -27,7 +27,9 @@ function act (c) {
 	c.resultPromise.resolve(c.result);
 	c.executeQueries.expect(c.query).return(c.resultPromise);
 
-	c.resultToRows.expect(c.span, c.result).return(c.rows);
+	c.rowsPromise = c.then();
+	c.rowsPromise.resolve(c.rows);
+	c.resultToRows.expect(c.span, c.result).return(c.rowsPromise);
 
 	c.queryContext.expand = c.mock();
 	c.queryContext.expand.expect(c.relation);

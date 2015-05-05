@@ -10,6 +10,7 @@ var span = {};
 var alias = '_2';
 var parameters = {};
 var innerJoin = {};
+var orderBy = ' <orderBy>';
 
 function act(c) {
 	c.requireMock = a.requireMock;
@@ -29,7 +30,7 @@ function act(c) {
     c.newqueryContext = c.requireMock('./singleQuery/newQueryContext');
     c.newqueryContext.expect(filter, alias, innerJoin).return(c.queryContext);
 
-    c.sut = require('../newSingleQuery')(table, filter, span, alias, innerJoin);
+    c.sut = require('../newSingleQuery')(table, filter, span, alias, innerJoin, orderBy);
 }
 
 module.exports = act;

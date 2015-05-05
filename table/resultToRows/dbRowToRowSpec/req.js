@@ -27,12 +27,9 @@ function act(c){
 	c.negotiateQueryContext = c.requireMock('./negotiateQueryContext');
 	c.negotiateQueryContext.expect(c.queryContext, c.initialRow);
 
-	c.decodeDbRow = requireMock('./decodeDbRow');
-	c.decoded = {};
-	c.decodeDbRow.expect(c.table, c.dbRow).return(c.decoded);
+	c.decodeDbRow = c.requireMock('./decodeDbRow');
+	c.decodeDbRow.expect(c.span, c.table, c.dbRow).return(c.initialRow);
 
-	c.shallowDbRowToRow = requireMock('./shallowDbRowToRow');
-	c.shallowDbRowToRow.expect(c.table, c.decoded).return(c.initialRow);
 	c.cache.tryAdd = mock();
 
 	c.legs.forEach = mock();
@@ -60,7 +57,7 @@ function act(c){
 	c.manyLeg.expand = mock();
 	c.manyLeg.expand.expect(c.row);
 
-
+	
 	c.sut = require('../dbRowToRow');
 
 	c.nextDbRowToRow = requireMock('./dbRowToRow');

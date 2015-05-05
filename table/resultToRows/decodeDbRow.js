@@ -1,20 +1,17 @@
+var newDecodeDbRow = require('./newDecodeDbRow');
 
-function decodeDbRow(table, dbRow) {	
-	var values = {};
-	var columns = table._columns;
-	var i=0;
-	for(var propertyName in dbRow) {
-   		var column = columns[i];
-		var alias = column.alias;
-		var dbValue = dbRow[propertyName];
-		delete dbRow[propertyName];
-		values[alias] = column.decode(dbValue);
-   		i++;
-   		if(columns.length == i)
-   			break;
-	}
-	return values;
-
+function decodeDbRow(context, table, dbRow) {
+    var decode = context._decodeDbRow;
+    if (!decode) {
+        decode = newDecodeDbRow(table, dbRow);
+        Object.defineProperty(context, '_decodeDbRow', {
+            enumerable: false,
+            get: function() {
+                return decode;
+            },
+        });
+    }
+    return decode(dbRow);
 }
 
 module.exports = decodeDbRow;

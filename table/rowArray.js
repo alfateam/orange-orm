@@ -1,7 +1,6 @@
 var extractStrategy = require('./resultToRows/toDto/extractStrategy');
-var newToDto = require('./resultToRows/toDto/newToDto');
-var promise = require('./promise');
-var empty = require('./nullPromise');
+var resultToPromise = require('./resultToPromise')
+var newArray = require('../newArray');
 
 function newRowArray(table) {
     var c = [];
@@ -13,35 +12,41 @@ function newRowArray(table) {
 
     Object.defineProperty(c, "toDto", {
         enumerable: false,
+        writable: true,
         value: toDto
     });
 
     function toJSON(optionalStrategy) {
-        return toDto.apply(null,arguments).then(JSON.stringify);
+        return c.toDto.apply(null, arguments).then(JSON.stringify);
     }
 
     function toDto(optionalStrategy) {
-        var promise = empty;
-        var result = [];
-        var args = [].slice.call(arguments);
-        args.push(table);
-        var strategy = extractStrategy.apply(null, args);
-        for (var i = 0; i < c.length; i++) {
-            var map = mapSingleDto.bind(null,i);
-            promise = promise.then(map);
+        var args = arguments;
+        var result = newArray();
+        var promise = resultToPromise(result);
+
+        var length = c.length;
+        for (var i = 0; i < length; i++) {
+            toDtoAtIndex(i);
+        };
+
+        function toDtoAtIndex(i) {
+            var row = c[i];
+            promise = promise.then(getDto).then(onDto);
+
+            function getDto() {
+                return row.toDto.apply(row,args);
+            }            
+
+            function onDto(dto) {
+                result.push(dto);
+            }
         }
 
-        function mapSingleDto(i) {
-            var row = c[i];
-            return newToDto(strategy, table)(row).then(function(dto) {
-                result[i] = dto;
-            });
-        }
         return promise.then(function() {
             return result;
-        });
+        })
     }
-
 
     return c;
 }

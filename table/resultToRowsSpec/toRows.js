@@ -2,25 +2,41 @@ var a = require('a');
 var mock = a.mock;
 var requireMock = a.requireMock;
 
-function act(c){
-	c.rows = {};
-	c.span = {};
-	c.result = {};
-	c.table = {};
-	c.span.table = c.table;
+function act(c) {
+    c.then = a.then;
+    c.mock = a.mock;
+    c.requireMock = a.requireMock;
+    c.rows = {};
+    c.span = {};    
+    c.x = 'x';
+    c.y = 'y';
+    c.z = 'z';
+    c.xPromise = c.then();
+    c.result = [c.xPromise, c.y, c.z];
+    c.xPromise.resolve(c.x);
+    c.nextResult = [c.y, c.z];
+    c.table = {};
+    c.span.table = c.table;
 
-	c.dbRowsToRows  = requireMock('./resultToRows/dbRowsToRows');
+    c.promise = requireMock('./promise');
+    c.promise.all = mock();
+    c.dbRowsToRows = requireMock('./resultToRows/dbRowsToRows');
 
-	c.dbRowsToRows.expect(c.span, c.result).return(c.rows);
+    c.sut = require('../resultToRows');
 
-	c.result.shift = mock();
-	c.result.shift.expect();
+    c.dbRowsToRows.expect(c.span, c.x).return(c.rows);
 
-	c.sut = require('../resultToRows');
-	c.subResultToRows = requireMock('./resultToRows/subResultToRows');
-	c.subResultToRows.expect(c.span, c.result);
+    c.subResultToRows = requireMock('./resultToRows/subResultToRows');
+    c.subRows = {};
+    c.subRowsPromise = c.then();
+    c.subRowsPromise.resolve(c.subRows);
+    c.subResultToRows.expect(c.span, c.nextResult).return(c.subRowsPromise);
 
-	c.returned = c.sut(c.span, c.result);
+    c.sut(c.span, c.result).then(onOk, console.log);
+
+    function onOk(returned) {
+        c.returned = returned;
+    }
 }
 
 module.exports = act;

@@ -1,10 +1,12 @@
+// var objectToCallback = require('./objectToCallback');
+// var newPromise = require('./promise');
+
+var deferred = require('deferred');
+
 function resultToPromise(result) {
-	var c = {
-		then: function(success) {
-			success(result);
-		}
-	};
-	return c;
+	return deferred.resolve(result);
+	// var callback = objectToCallback(result);
+	// return newPromise(callback);
 }
 
 module.exports = resultToPromise;

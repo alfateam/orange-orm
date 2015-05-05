@@ -5,20 +5,19 @@ function newGetRelated(parent, relation) {
         if (getRelated.expanded)
             return relation.getFromCache(parent);
         if (isDirty()) {
-        	return relation.getFromDb(parent).then(onFromDb);
+            return relation.getFromDb(parent).then(onFromDb);
         }
         return relation.getRelatives(parent).then(onRelatives);
 
         function onFromDb(rows) {
-        	getRelated.expanded = true;
-        	return rows;
+            getRelated.expanded = true;
+            return rows;
         }
 
         function onRelatives() {
             return relation.getFromCache(parent);
         }
     }
-
 	return getRelated;
 }
 

@@ -7,5 +7,7 @@ module.exports = function(c) {
 	c.newShallowJoinSql = requireMock('../singleQuery/joinSql/newShallowJoinSql');
 	c.newQuery = requireMock('../../newQuery');
 	c.newParameterized = requireMock('../newParameterized');
+	c.extractOrderBy = requireMock('../extractOrderBy');
+	
 	c.sut = require('../manyLegToQuery');
 }

@@ -1,12 +1,11 @@
 var negotiateQueryContext = require('./negotiateQueryContext');
-var shallowDbRowToRow = require('./shallowDbRowToRow');
-var nextDbRowToRow = _nextDbRowToRow;
 var decodeDbRow = require('./decodeDbRow');
+var nextDbRowToRow = _nextDbRowToRow;
+
 
 function dbRowToRow(span, dbRow, queryContext) {
 	var table = span.table;
-	var decoded = decodeDbRow(table, dbRow);
-	var row = shallowDbRowToRow(table, decoded);
+	var row = decodeDbRow(span, table, dbRow);
 	negotiateQueryContext(queryContext, row);
 	row.queryContext = queryContext;		
 	var cache = table._cache;

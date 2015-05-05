@@ -3,10 +3,13 @@ var mock = require('a').mock;
 var newSingleQuery = requireMock('./query/newSingleQuery');
 var addSubQueries = requireMock('./query/addSubQueries');
 var extractFilter = requireMock('./query/extractFilter');
+var extractOrderBy = requireMock('./query/extractOrderBy');
 
 var table = {};
 var filter = {};
 var initialFilter = {};
+var orderBy = {};
+var initialOrderBy = {};
 var singleQuery = {};
 var subQuery = {};
 var span = {};
@@ -22,9 +25,10 @@ function act(c) {
 	c.addSubQueries = addSubQueries;
 
 	extractFilter.expect(initialFilter).return(filter);
-	newSingleQuery.expect(table,filter,span,alias,innerJoin).return(singleQuery);
+	extractOrderBy.expect(table, alias, initialOrderBy).return(orderBy);
+	newSingleQuery.expect(table,filter,span,alias,innerJoin,orderBy).return(singleQuery);
 	addSubQueries.expect(c.queries,table,filter,span,alias,innerJoin).return(expected);
-	c.returned = require('../newQuery')(c.queries,table,initialFilter,span,alias,innerJoin);
+	c.returned = require('../newQuery')(c.queries,table,initialFilter,span,alias,innerJoin,initialOrderBy);
 }
 
 module.exports = act;

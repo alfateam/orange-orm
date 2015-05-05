@@ -5,14 +5,14 @@ var requireMock = a.requireMock;
 function act(c){
 	c.mock = mock;		
 	c.then = a.then;
+	c.requireMock = requireMock;
 	c.expectRequire = a.expectRequire;
-	c.extractStrategy = requireMock('./resultToRows/toDto/extractStrategy');
-	c.newToDto = requireMock('./resultToRows/toDto/newToDto');
-	c.promise = requireMock('./promise');
-	c.empty = c.then();
-	c.empty.resolve();
-	c.expectRequire('./nullPromise').return(c.empty);
 	
+	c.newArray = c.requireMock('../newArray');
+	
+	c.resultToPromise = c.requireMock('./resultToPromise');	
+	c.promise = requireMock('./promise');
+
 	c.table = {};
 
 	c.sut = require('../rowArray')(c.table);

@@ -12,10 +12,8 @@ function act(c) {
     c.span.table = c.table;
     c.dbRow1 = {};
     c.dbRow2 = {};
-    c.res1 = [c.dbRow1, c.dbRow2];
-    c.res2 = {};
-    c.result = [c.res1, c.res2];
-    c.res1.queryContext = c.queryContext;
+    c.result = [c.dbRow1, c.dbRow2];
+    c.result.queryContext = c.queryContext;
 
     c.row1 = {};
     c.row2 = {};

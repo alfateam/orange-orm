@@ -1,9 +1,10 @@
 var promise = require('promise');
+var deferred = require('deferred');
 var objectToCallback = require('./objectToCallback');
 
 function newPromise(func) {
 	if (!func)
-		return new promise(objectToCallback());
+		return deferred.resolve();
 	return new promise(func);
 }
 

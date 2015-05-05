@@ -14,11 +14,14 @@ function getRelativesCore(legToQuery, parent, relation) {
 	var innerJoin = queryContext.innerJoin;
 	var query = legToQuery([], alias, leg, legNo, filter, innerJoin);
 
-	return executeQueries(query).then(onResult);
+	return executeQueries(query).then(onResult).then(onRows);
 
 	function onResult(result) {
+		return  resultToRows(leg.span, result);
+	}
+
+	function onRows(rows) {
 		queryContext.expand(relation);
-		var rows =  resultToRows(leg.span, result);
 		negotiateExpandInverse(parent, relation, rows);
 		return rows;
 	}

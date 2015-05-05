@@ -3,6 +3,7 @@ var mock = a.mock;
 var requireMock = a.requireMock;
 
 function act(c){
+	c.mock = a.mock;
 	c.rows = {};
 	c.span = {};
 	c.result = {};
@@ -19,6 +20,9 @@ function act(c){
 	c.manyLeg.span = c.manySubSpan;
 	c.joinLeg.span = c.joinSubSpan;
 	c.oneLeg.span = c.oneSubSpan;
+
+	c.promise = requireMock('../promise');
+	c.promise.all = c.mock();	
 
 	c.resultToRows  = requireMock('../resultToRows');
 	c.resultToRows.expect(c.manySubSpan, c.result).return(c.rows);
@@ -45,8 +49,13 @@ function act(c){
 
 	c.sut = require('../subResultToRows');
 	c.subResultToRows = requireMock('./subResultToRows');
-	c.subResultToRows.expect(c.oneSubSpan, c.result);
-	c.subResultToRows.expect(c.joinSubSpan, c.result);
+	c.oneRows = {};
+	c.subResultToRows.expect(c.oneSubSpan, c.result).return(c.oneRows);
+	c.joinRows = {};
+	c.subResultToRows.expect(c.joinSubSpan, c.result).return(c.joinRows);
+
+	c.expected = {};
+	c.promise.all.expect([c.oneRows, c.joinRows, c.rows]).return(c.expected);
 
 	c.returned = c.sut(c.span, c.result);
 }

@@ -48,7 +48,7 @@ function _newJoin(parentTable, childTable, columnNames) {
         var key = parentToKey(parent);
 
         if (key.some(isNullOrUndefined)) {
-            return nullPromise;
+            return null;
         }
         var args = [childTable].concat(key);
         return tryGetFromCacheById.apply(null, args);

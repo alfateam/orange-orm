@@ -7,11 +7,12 @@
     "keywords": ["orm", "sql", "mySql", "mysql", "postgres", "pg"],
     "license": "MIT",
     "dependencies": {
-        "pg": "4.3.0",
-        "node-uuid": "1.4.2",
+        "pg": "4.3.0"
+ ,       "node-uuid": "1.4.2",
         "promise": "6.1.0",
         "mysql": "2.5.5",
-        "generic-pool": "2.1.1"
+        "generic-pool": "2.1.1",
+        "deferred": "0.7.2"
     },
     "devDependencies": {
         "a": "0.4.8"

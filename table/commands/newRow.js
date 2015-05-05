@@ -1,24 +1,24 @@
-var shallowDbRowToRow = require('../resultToRows/shallowDbRowToRow');                                
+var decodeDbRow = require('../resultToRows/decodeDbRow');
 
 function newRow(table, id, id2, etc) {
-	var dto = {};
-	table._columns.forEach(addColumn);
-	
-	function addColumn(column) {
-		var alias = column.alias;
-		if ('default' in column) 
-			dto[alias] = column.default;
-		else
-			dto[alias] = null;
-	}
+    var dto = {};
+    table._columns.forEach(addColumn);
 
-	for (var i = 1; i < arguments.length; i++) {
-		var pkValue = arguments[i];
-		var column = table._primaryColumns[i-1];
-		dto[column.alias] = pkValue;
-	}
+    function addColumn(column) {
+        var alias = column.alias;
+        if ('default' in column)
+            dto[alias] = column.default;
+        else
+            dto[alias] = null;
+    }
 
-	return shallowDbRowToRow(table, dto);
+    for (var i = 1; i < arguments.length; i++) {
+        var pkValue = arguments[i];
+        var column = table._primaryColumns[i - 1];
+        dto[column.alias] = pkValue;
+    }
+
+    return decodeDbRow(table, table, dto);
 }
 
 module.exports = newRow;

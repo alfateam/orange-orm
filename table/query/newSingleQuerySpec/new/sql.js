@@ -5,7 +5,7 @@ var whereSql = ' <whereSql>';
 var joinSql = ' <joinSql>';
 var innerJoinSql = ' <innerJoinSql>'
 var tableName = '<tableName>';
-var expected = 'select <columnSql> from <tableName> _2 <innerJoinSql> <joinSql> <whereSql>';
+var expected = 'select <columnSql> from <tableName> _2 <innerJoinSql> <joinSql> <whereSql> <orderBy>';
 
 function act(c) {
 	c.innerJoin.sql = mock();
