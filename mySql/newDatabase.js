@@ -1,4 +1,4 @@
-var createDomain = require('domain').create;
+var createDomain = require('../createDomain');
 var newTransaction = require('./newTransaction');
 var newPromise = require('../table/promise');
 var begin = require('../table/begin');
