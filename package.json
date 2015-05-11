@@ -1,6 +1,6 @@
 {
     "name": "rdb",
-    "version": "0.5.1",
+    "version": "1.0.0",
     "main": "index.js",
     "title": "rdb",
     "description": "Object Relational Mapper",
@@ -10,8 +10,8 @@
         "pg": "4.3.0"
  ,       "node-uuid": "1.4.2",
         "promise": "6.1.0",
-        "mysql": "2.5.5",
-        "generic-pool": "2.1.1",
+        "mysql": "2.6.2",
+        "generic-pool": "2.2.0",
         "deferred": "0.7.2"
     },
     "devDependencies": {

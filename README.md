@@ -9,6 +9,9 @@ Eager or lazy loading.
 Based on promises.  
 [Documentation and examples](docs/docs.md)  
 ## Release notes
+__1.0.0__  
+Transaction domain forwards properties from old domain.  
+Semantic versioning from now on.  
 __0.5.1__  
 Improved performance  
 __0.5.0__  
