@@ -3,7 +3,7 @@ function act(c){
 	c.resolveTransaction = {};
 	c.transactionPromise = {};
 	c.domain = {};
-	c.Domain.create.expect().return(c.domain);
+	c.createDomain.expect().return(c.domain);
 	c.newTransaction.expect(c.domain, c.pool).return(c.resolveTransaction);
 	c.newPromise.expect(c.resolveTransaction).return(c.transactionPromise);
 
