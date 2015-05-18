@@ -1,6 +1,7 @@
 __rdb__
 =========
-ORM for postgres and mySql.  
+ORM for nodejs / iojs.  
+Supports postgres and mySql.  
 
 Simple, flexible mapper.  
 Transaction with commit and rollback.  
