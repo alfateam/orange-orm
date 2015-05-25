@@ -8,6 +8,7 @@ var connectViaPool = function(connectionString, poolOptions) {
 
 connectViaPool.pg = newPg;
 connectViaPool.mySql = require('./mySql/newDatabase');
+connectViaPool.sqlite = require('./sqlite/newDatabase');
 connectViaPool.table = require('./table');
 connectViaPool.filter = require('./emptyFilter');
 connectViaPool.commit = require('./table/commit');
