@@ -10,6 +10,8 @@ Eager or lazy loading.
 Based on promises.  
 [Documentation and examples](docs/docs.md)  
 ## Release notes
+__1.0.1__  
+Bugfix: Incorrect insert/updates on timestamp without timezone. The time was converted utc instead of stripping the timezone.  
 __1.0.0__  
 Transaction domain forwards properties from old domain.  
 Semantic versioning from now on.  

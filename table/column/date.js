@@ -1,5 +1,5 @@
 var newEncode = require('./date/newEncode');
-var newDecode = require('./newDecodeCore');
+var newDecode = require('./date/newDecode');
 var purify = require('./date/purify');
 
 function _new(column) {

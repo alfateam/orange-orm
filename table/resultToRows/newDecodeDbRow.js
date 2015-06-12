@@ -35,7 +35,7 @@ function newDecodeDbRow(table, dbRow) {
         Object.defineProperty(Row.prototype, name, {
 
             get: function() {
-                return decode(this._dbRow[key]);
+                return this._dbRow[key];
             },
             set: function(value) {
                 var oldValue = this[name];
@@ -128,8 +128,13 @@ function newDecodeDbRow(table, dbRow) {
         _delete(this, strategy, table);
     };
 
-    function decodeDbRow(dbRow) {
-        return new Row(dbRow);
+    function decodeDbRow(row) {
+        for (var i = 0; i < numberOfColumns; i++) {
+            var index = offset + i;
+            var key = keys[index];            
+            row[key] = columns[i].decode(row[key]);
+        };
+        return new Row(row);
     }
 
     function Row(dbRow) {

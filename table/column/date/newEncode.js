@@ -11,7 +11,9 @@ function _new(column) {
 				return newPara('null');
 			return newPara('\'' + column.dbNull + '\'');
 		}
-		return newPara("'" + value.toISOString() + "'");
+		if (value.toISOString)
+			value = value.toISOString();		
+		return newPara("'" + value + "'");
 	};
 
 }

@@ -2,4 +2,4 @@ var when = require('a').when;
 var c = {};
 
 when(c)
-	.it('should return arg unchanged').assertStrictEqual(c.arg,c.returned);
+	.it('should return cloned date').assertStrictEqual(c.expected, c.returned);

@@ -11,7 +11,7 @@ function act(c){
 	c.newEncode.expect(c.column).return(c.encode);
 
 	c.decode = {};
-	c.newDecode = requireMock('./newDecodeCore');
+	c.newDecode = requireMock('./date/newDecode');
 	c.newDecode.expect(c.column).return(c.decode);
 
 	require('../date')(c.column);
