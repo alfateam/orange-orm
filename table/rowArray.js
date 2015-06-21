@@ -23,16 +23,18 @@ function newRowArray(table) {
     function toDto(optionalStrategy) {
         var args = arguments;
         var result = newArray();
-        var promise = resultToPromise(result);
-
         var length = c.length;
-        for (var i = 0; i < length; i++) {
-            toDtoAtIndex(i);
-        };
+        var i = -1;
+        return resultToPromise().then(toDtoAtIndex);
 
-        function toDtoAtIndex(i) {
+        function toDtoAtIndex() {
+            i++;
+            if (i === length)
+                return result;
             var row = c[i];
-            promise = promise.then(getDto).then(onDto);
+            return getDto()
+                    .then(onDto)
+                    .then(toDtoAtIndex)
 
             function getDto() {
                 return row.toDto.apply(row,args);
@@ -42,10 +44,6 @@ function newRowArray(table) {
                 result.push(dto);
             }
         }
-
-        return promise.then(function() {
-            return result;
-        })
     }
 
     return c;

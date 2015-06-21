@@ -3,7 +3,7 @@ function act(c){
 	c.newArray.expect().return(c.dtoArray);
 	c.dtoArrayPromise = c.then();
 	c.dtoArrayPromise.resolve(c.dtoArray);
-	c.resultToPromise.expect(c.dtoArray).return(c.dtoArrayPromise);
+	c.resultToPromise.expect().return(c.dtoArrayPromise);
 
 	c.row = {};
 	c.row2 = {};
