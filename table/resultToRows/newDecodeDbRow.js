@@ -133,7 +133,7 @@ function newDecodeDbRow(table, dbRow) {
             var index = offset + i;
             var key = keys[index];            
             row[key] = columns[i].decode(row[key]);
-        };
+        }
         return new Row(row);
     }
 

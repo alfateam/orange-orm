@@ -1,7 +1,7 @@
 var operator = 'is';
 var encoded = {};
 var arg = 'foo';
-var optionalAlias = {};
+var alias = '_2';
 
 function act(c) {	
 	var mock = c.mock;
@@ -11,8 +11,8 @@ function act(c) {
 	encoded.sql = c.mock();
 	encoded.sql.expect().return('null');	
 
-	c.equal.expect(c.column, arg, optionalAlias).return(c.expected);
-	c.returned = c.sut(c.column,arg,optionalAlias);
+	c.equal.expect(c.column, arg, alias).return(c.expected);
+	c.returned = c.sut(c.column,arg,alias);
 }
 
 module.exports = act;

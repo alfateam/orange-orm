@@ -8,10 +8,10 @@ function act(c){
 	c.requireMock = requireMock;
 	c.expectRequire = a.expectRequire;
 	
-	c.newArray = c.requireMock('../newArray');
-	
+	// c.newArray = c.requireMock('../newArray');	
 	c.resultToPromise = c.requireMock('./resultToPromise');	
 	c.promise = requireMock('./promise');
+	c.orderBy = c.requireMock('./rowArray/orderBy');	
 
 	c.table = {};
 

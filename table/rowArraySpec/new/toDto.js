@@ -1,8 +1,6 @@
 function act(c){
-	c.dtoArray = [];
-	c.newArray.expect().return(c.dtoArray);
 	c.dtoArrayPromise = c.then();
-	c.dtoArrayPromise.resolve(c.dtoArray);
+	c.dtoArrayPromise.resolve();
 	c.resultToPromise.expect().return(c.dtoArrayPromise);
 
 	c.row = {};
@@ -23,10 +21,12 @@ function act(c){
 	c.dto2 = {};
 	c.dtoPromise2.resolve(c.dto2);	
 	c.row2.toDto.expect(c.strategy).return(c.dtoPromise2);
+
+	c.expected = {};
+	c.orderBy.expect(c.strategy, [c.dto, c.dto2]).return(c.expected);
 	 
 	c.sut.toDto(c.strategy).then(onOk, console.log);
 
-	c.expected = [c.dto, c.dto2];
 
 	function onOk(returned) {
 		c.returned = returned;

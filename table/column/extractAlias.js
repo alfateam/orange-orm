@@ -1,7 +1,7 @@
-function extract(optionalAlias) {
+function extract(table, optionalAlias) {
 	if (optionalAlias)
 		return optionalAlias;
-	return '_0';
+	return table._dbName;
 }
 
 module.exports = extract;

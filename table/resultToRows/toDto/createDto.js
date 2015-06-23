@@ -8,7 +8,7 @@ function _createDto(context, table, row) {
             var alias = column.alias;
             dto[alias] = row[alias];
         }
-    };
+    }
     return dto;
 }
 

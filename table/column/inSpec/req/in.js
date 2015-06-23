@@ -11,14 +11,12 @@ var appended = {},
 	appended2 = {},
 	appended3 = {},
 	appended4 = {},
-	optionalAlias = {},
 	alias = '_2';
 var filter = {};
 
 function act(c) {	
 	var mock = c.mock;
 	c.expected = {};
-	c.extractAlias.expect(optionalAlias).return(alias);
 	c.newParameterized.expect(firstPart).return(parameterized);	
 	parameterized.append = mock();
 	parameterized.append.expect('(').return(appended);
@@ -36,7 +34,7 @@ function act(c) {
 
 	c.newBoolean.expect(filter).return(c.expected);
 
-	c.returned = c.sut(c.column,args,optionalAlias);
+	c.returned = c.sut(c.column,args,alias);
 }
 
 module.exports = act;

@@ -2,7 +2,8 @@ function act(c) {
     c.strategy = {
         foo: {},
         bar: {},
-        baz: {}
+        baz: {},
+        orderBy: ['foo']
     };
 
     c.table = {};

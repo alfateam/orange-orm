@@ -2,14 +2,12 @@ var encoded = {};
 var firstEncoded = {};
 var arg = 5;
 var sql = '5';
-var optionalAlias = {};
 var alias = '_2';
 
 function act(c) {		
 	var mock = c.mock;
 	c.filter = {};
 	c.expected = {};
-	c.extractAlias.expect(optionalAlias).return(alias);
 	c.firstPart = '_2.columnName ' + c.operator + ' ';
 	encoded.sql = mock();
 	encoded.sql.expect().return(sql);
@@ -24,7 +22,7 @@ function act(c) {
 	c.column.encode.expect(arg + '%').return(encoded);	
 
 	c.newBoolean.expect(c.filter).return(c.expected);
-	c.returned = c.sut(c.operator, c.column,arg,optionalAlias);
+	c.returned = c.sut(c.operator, c.column,arg,alias);
 }
 
 module.exports = act;

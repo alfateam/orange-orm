@@ -16,7 +16,7 @@ function act(c) {
 
 	c.newBoolean.expect(filter).return(c.expected);
 
-	c.returned = c.sut(c.column,arg,c.optionalAlias);
+	c.returned = c.sut(c.column,arg,c.alias);
 }
 
 act.base = '../../req';

@@ -1,10 +1,8 @@
 var newBoolean = require('../newBoolean');
-var extractAlias = require('../extractAlias');
 var nullOperator = ' is ';
 
-function endsWithCore(operator, column,arg,optionalAlias) {	
+function endsWithCore(operator, column,arg,alias) {	
 	operator = ' ' + operator + ' ';
-	var alias = extractAlias(optionalAlias);	
 	var encoded = column.encode(arg);
 	if (encoded.sql() == 'null') 
 		operator = nullOperator;

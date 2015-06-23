@@ -1,10 +1,8 @@
 var newBoolean = require('./newBoolean');
-var extractAlias = require('./extractAlias');
 var nullOperator = ' is not ';
 
-function notEqual(column,arg,optionalAlias) {	
+function notEqual(column,arg,alias) {	
 	var operator = '<>';
-	var alias = extractAlias(optionalAlias);	
 	var encoded = column.encode(arg);	
 	if (encoded.sql() == 'null') 
 		operator = nullOperator;

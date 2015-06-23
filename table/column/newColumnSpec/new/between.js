@@ -8,9 +8,14 @@ function act(c) {
 	c.expected = {};	
 	fromFilter.and = mock();
 	fromFilter.and.expect(toFilter).return(c.expected);
-	c.lessThanOrEqual.expect(c.sut,to,c.alias).return(toFilter);
-	c.greaterThanOrEqual.expect(c.sut,from,c.alias).return(fromFilter);	
-	c.returned = c.sut.between(from,to,c.alias);
+
+	c.sut.lessThanOrEqual = mock();
+	c.sut.lessThanOrEqual.expect(to, c.alias).return(toFilter);
+
+	c.sut.greaterThanOrEqual = mock();
+	c.sut.greaterThanOrEqual.expect(from, c.alias).return(fromFilter);
+	
+	c.returned = c.sut.between(from,to,c.optionalAlias);
 }
 
 act.base = '../new';
