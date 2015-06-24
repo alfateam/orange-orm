@@ -8,33 +8,42 @@ var iEndsWith = require('./string/iEndsWith');
 var iContains = require('./string/iContains');
 var iEqual = require('./string/iEqual');
 var purify = require('./string/purify');
+var _extractAlias = require('./extractAlias');
 
-function _new(column) {
+function _new(table, column) {
     column.purify = purify;
     column.encode = newEncode(column);
     column.decode = newDecode(column);
+    var extractAlias = _extractAlias.bind(null, table);
 
-    column.startsWith = function(arg, optionalAlias) {
-        return startsWith(column, arg, optionalAlias);
+    column.startsWith = function(arg, alias) {
+        alias = extractAlias(alias);
+        return startsWith(column, arg, alias);
     };
-    column.endsWith = function(arg, optionalAlias) {
-        return endsWith(column, arg, optionalAlias);
+    column.endsWith = function(arg, alias) {
+        alias = extractAlias(alias);
+        return endsWith(column, arg, alias);
     };
-    column.contains = function(arg, optionalAlias) {
-        return contains(column, arg, optionalAlias);
+    column.contains = function(arg, alias) {
+        alias = extractAlias(alias);
+        return contains(column, arg, alias);
     };
-    column.iStartsWith = function(arg, optionalAlias) {
-        return iStartsWith(column, arg, optionalAlias);
+    column.iStartsWith = function(arg, alias) {
+        alias = extractAlias(alias);
+        return iStartsWith(column, arg, alias);
     };
-    column.iEndsWith = function(arg, optionalAlias) {
-        return iEndsWith(column, arg, optionalAlias);
+    column.iEndsWith = function(arg, alias) {
+        alias = extractAlias(alias);
+        return iEndsWith(column, arg, alias);
     };
-    column.iContains = function(arg, optionalAlias) {
-        return iContains(column, arg, optionalAlias);
+    column.iContains = function(arg, alias) {
+        alias = extractAlias(alias);
+        return iContains(column, arg, alias);
     };
 
-    column.iEqual = function(arg, optionalAlias) {
-        return iEqual(column, arg, optionalAlias);
+    column.iEqual = function(arg, alias) {
+        alias = extractAlias(alias);
+        return iEqual(column, arg, alias);
     };
 
     column.iEq = column.iEqual;

@@ -1,7 +1,6 @@
 var a = require('a');
 var requireMock = a.requireMock;
 var newQuery;
-var alias = '_0';
 var strategyToSpan = require('../../table/strategyToSpan');
 var table;
 var customerTable;
@@ -104,7 +103,7 @@ function act(c) {
 
 	function _newQuery() {
 		var span = strategyToSpan(table, c.strategy);
-		c.returned = newQuery([],table,c.filter,span,alias,emptyInnerJoin);		
+		c.returned = newQuery([],table,c.filter,span,c.orderTable._dbName,emptyInnerJoin);		
 	}
 
 }

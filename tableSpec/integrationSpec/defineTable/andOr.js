@@ -1,6 +1,6 @@
 function act(c) {
-	c.expected = "select _0.oOrderId as s_00,_0.oCustomerId as s_01 from order _0 where _0.oOrderId=2 AND (_0.oOrderId=3 OR _0.oOrderId=4) AND _0.discriminatorColumn='foo' AND _0.discriminatorColumn2='baz'";
-	c.expected = "select _0.oOrderId as s_00,_0.oCustomerId as s_01 from order _0 where _0.oOrderId=2 AND (_0.oOrderId=3 OR _0.oOrderId=4) AND _0.discriminatorColumn='foo' AND _0.discriminatorColumn2='baz' order by _0.oOrderId";
+	c.expected = "select order.oOrderId as sorder0,order.oCustomerId as sorder1 from order order where order.oOrderId=2 AND (order.oOrderId=3 OR order.oOrderId=4) AND order.discriminatorColumn='foo' AND order.discriminatorColumn2='baz'";
+	c.expected = "select order.oOrderId as sorder0,order.oCustomerId as sorder1 from order order where order.oOrderId=2 AND (order.oOrderId=3 OR order.oOrderId=4) AND order.discriminatorColumn='foo' AND order.discriminatorColumn2='baz' order by order.oOrderId";
 	var filter = c.orderTable.id.eq(2);
 	var filter2 = c.orderTable.id.eq(3);
 	var filter3 = c.orderTable.id.eq(4);

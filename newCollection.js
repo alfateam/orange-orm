@@ -43,7 +43,7 @@ function newCollection() {
         	var result = 0;
         	for (var i = 0; i < ranges.length; i++) {
         		result += ranges[i].length;
-        	};
+        	}
             return result;
         },
     });

@@ -7,6 +7,7 @@ var purify = requireMock('./string/purify');
 var column = {};
 var decode = {};
 var encode = {};
+var table = {};
 
 function act(c) {
 	c.purify = purify;
@@ -17,6 +18,11 @@ function act(c) {
 	c.iEndsWith = requireMock('./string/iEndsWith');
 	c.iContains = requireMock('./string/iContains');
 	c.iEqual = requireMock('./string/iEqual');
+	c.extractAlias = requireMock('./extractAlias');	
+
+	c.optionalAlias = {};
+	c.alias = {};
+	c.extractAlias.expect(table, c.optionalAlias).return(c.alias);
 
 	var newSut = require('../string');
 
@@ -25,7 +31,7 @@ function act(c) {
 	c.decode = decode;
 	newDecode.expect(column).return(decode);
 	newEncode.expect(column).return(encode);
-	newSut(column);
+	newSut(table, column);
 
 }
 
