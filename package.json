@@ -7,8 +7,8 @@
     "keywords": ["orm", "sql", "mySql", "mysql", "postgres", "pg"],
     "license": "MIT",
     "dependencies": {
-        "pg": "4.3.0"
- ,       "node-uuid": "1.4.2",
+        "pg": "4.3.0",
+        "node-uuid": "1.4.2",
         "promise": "6.1.0",
         "mysql": "2.6.2",
         "generic-pool": "2.2.0",
