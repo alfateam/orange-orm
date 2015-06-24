@@ -6,7 +6,7 @@ var shallowFilter = {};
 var selectSql = {},
 	joinSql = {},
 	whereSql = {};
-var alias = '_' + (relations.length -1);
+var alias = {};
 var childTable = {};
 var tempFilter = {};
 var tempFilter2 = {};
@@ -16,12 +16,13 @@ function act(c){
 	var mock = c.mock;
 	c.expected = {};
 
+	c.createAlias.expect(childTable,relations.length -1).return(alias);
 	relation.childTable = childTable;
 	c.newSelectSql.expect(childTable,alias).return(selectSql);
 
 	c.newJoinSql.expect([relation2, relation3]).return(joinSql);
 
-	c.newWhereSql.expect(relations,shallowFilter).return(whereSql);
+	c.newWhereSql.expect(relations,shallowFilter,alias).return(whereSql);
 
 	selectSql.prepend = mock();
 	selectSql.prepend.expect('EXISTS (').return(tempFilter);
