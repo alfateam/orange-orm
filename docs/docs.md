@@ -20,6 +20,8 @@ __Basic querying__
 [tryGetFirst eagerly](#_trygetfirsteager)  
 [toDto](#_todto)  
 [toDto with strategy](#_todtowithstrategy)  
+[toDto with orderBy](#_todtowithorderby)  
+[toDto with orderBy descending](#_todtowithorderbydesc)  
 [toDto ignoring columns](#_serializable)  
 [toJSON](#_tojson)  
 [toJSON with strategy](#_tojsonwithstrategy)  
@@ -825,6 +827,117 @@ function getOrder() {
 
 function toDto(order) {
     var strategy = {customer : null, lines : null, deliveryAddress : null};
+    return order.toDto(strategy);
+}
+
+function print(dto) {
+    console.log(dto);
+}
+
+function onOk() {
+    console.log('Success');
+    console.log('Waiting for connection pool to teardown....');
+}
+
+function onFailed(err) {
+    console.log('Rollback');
+    console.log(err);
+}
+```
+<a name="_todtowithorderby"></a>
+[toDto with orderBy](https://github.com/alfateam/rdb-demo/blob/master/toDtoWithOrderBy.js)
+```js
+var rdb = require('rdb');
+
+var Order = rdb.table('_order');
+var OrderLine = rdb.table('_orderLine');
+
+Order.primaryColumn('oId').guid().as('id');
+Order.column('oOrderNo').string().as('orderNo');
+
+OrderLine.primaryColumn('lId').guid().as('id');
+OrderLine.column('lOrderId').string().as('orderId');
+OrderLine.column('lProduct').string().as('product');
+
+var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+Order.hasMany(line_order_relation).as('lines');
+
+var db = rdb('postgres://postgres:postgres@localhost/test');
+
+db.transaction()
+    .then(getOrder)
+    .then(toDto)
+    .then(print)
+    .then(rdb.commit)
+    .then(null, rdb.rollback)
+    .then(onOk, onFailed);
+
+function getOrder() {
+    return Order.getById('b0000000-b000-0000-0000-000000000000');
+}
+
+function toDto(order) {
+    var strategy = {
+        lines: {
+            orderBy: ['product'] 
+            //alternative: orderBy: ['product asc']
+        }
+    };
+    return order.toDto(strategy);
+}
+
+function print(dto) {
+    console.log(dto);
+}
+
+function onOk() {
+    console.log('Success');
+    console.log('Waiting for connection pool to teardown....');
+}
+
+function onFailed(err) {
+    console.log('Rollback');
+    console.log(err);
+}
+```
+<a name="_todtowithorderbydesc"></a>
+[toDto with orderBy descending](https://github.com/alfateam/rdb-demo/blob/master/toDtoWithOrderByDesc.js)
+```js
+var rdb = require('rdb');
+
+var Order = rdb.table('_order');
+var OrderLine = rdb.table('_orderLine');
+
+Order.primaryColumn('oId').guid().as('id');
+Order.column('oOrderNo').string().as('orderNo');
+
+OrderLine.primaryColumn('lId').guid().as('id');
+OrderLine.column('lOrderId').string().as('orderId');
+OrderLine.column('lProduct').string().as('product');
+
+var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+Order.hasMany(line_order_relation).as('lines');
+
+var db = rdb('postgres://postgres:postgres@localhost/test');
+
+db.transaction()
+    .then(getOrder)
+    .then(toDto)
+    .then(print)
+    .then(rdb.commit)
+    .then(null, rdb.rollback)
+    .then(onOk, onFailed);
+
+function getOrder() {
+    return Order.getById('b0000000-b000-0000-0000-000000000000');
+}
+
+function toDto(order) {
+    var strategy = {
+        lines: {
+            orderBy: ['product desc'] 
+        }
+    };
     return order.toDto(strategy);
 }
 
