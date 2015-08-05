@@ -6,6 +6,7 @@
     "description": "Object Relational Mapper",
     "keywords": ["orm", "sql", "mySql", "mysql", "postgres", "pg"],
     "license": "MIT",
+    "scripts": { "test" : "jshint ./ && a" } ,
     "dependencies": {
         "pg": "4.3.0",
         "node-uuid": "1.4.2",
