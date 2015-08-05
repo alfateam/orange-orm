@@ -10,6 +10,8 @@ Eager or lazy loading.
 Based on promises.  
 [Documentation and examples](docs/docs.md)  
 ## Release notes
+__1.0.3__  
+toDto() using next tick on every thousandth row to avoid maximum call stack size exceeded.  
 __1.0.2__  
 Reduced number of simultaneous promises in order to avoid maximum call stack size exceeded.  
 __1.0.1__  

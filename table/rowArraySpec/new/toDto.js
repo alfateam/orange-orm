@@ -24,6 +24,9 @@ function act(c){
 
 	c.expected = {};
 	c.orderBy.expect(c.strategy, [c.dto, c.dto2]).return(c.expected);
+
+	c.negotiateNextTick.expect(0);
+	c.negotiateNextTick.expect(1);
 	 
 	c.sut.toDto(c.strategy).then(onOk, console.log);
 
