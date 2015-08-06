@@ -10,7 +10,9 @@ Eager or lazy loading.
 Based on promises.  
 [Documentation and examples](docs/docs.md)  
 ## Release notes
-__1.0.3__  
+__1.0.5__  
+Documentation cleanup.  
+__1.0.4__  
 [orderBy](https://github.com/alfateam/rdb/blob/master/docs/docs.md#_todtowithorderby) in toDto().  
 __1.0.3__  
 toDto() using next tick on every thousandth row to avoid maximum call stack size exceeded.  
