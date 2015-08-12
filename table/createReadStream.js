@@ -1,11 +1,12 @@
-var newQuery = require('./newQuery');
-var executeQueries = require('./executeQueries');
-var resultToRows = require('./resultToRows');
+var newSelectQuery = require('./readStream/newQuery');
+var executeQueries = require('./readStream/executeQuery');
+var resultToRows = require('./readStream/resultToRows');
 var strategyToSpan = require('./strategyToSpan');
-var emptyInnerJoin = require('./query/newParameterized')();
+var emptyInnerJoin = require('./query/newParameterized');
 var negotiateRawSqlFilter = require('./column/negotiateRawSqlFilter');
 
-function getMany(table,filter,strategy) {
+
+function createReadStream(table,filter,strategy) {
 	var alias = table._dbName;
 	filter = negotiateRawSqlFilter(filter);
 	var span = strategyToSpan(table,strategy);
