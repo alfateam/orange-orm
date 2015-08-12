@@ -16,6 +16,7 @@ var newObject = requireMock('./newObject');
 var insert = requireMock('./table/insert');
 var _delete = requireMock('./table/delete');
 var cascadeDelete = requireMock('./table/cascadeDelete');
+var createReadStream = requireMock('./table/createReadStream');
 var tableName = {};
 
 function act(c) {	
@@ -43,6 +44,10 @@ function act(c) {
 	c.cascadeDelete = {};
 	cascadeDelete.bind = mock();
 	cascadeDelete.bind.expect(null, c.context).return(c.cascadeDelete);
+
+	c.createReadStream = {};
+	createReadStream.bind = mock();
+	createReadStream.bind.expect(null, c.context).return(c.createReadStream);	
 	
 	newSut();
 

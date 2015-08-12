@@ -12,4 +12,6 @@ when('./new', c)
 	.it('should set context equal sut').assertEqual(c.context, c.sut)
 	.it('should set delete').assertEqual(c.delete, c.sut.delete)
 	.it('should set cascadeDelete').assertEqual(c.cascadeDelete, c.sut.cascadeDelete)
+	.it('should set createReadStream').assertEqual(c.createReadStream, c.sut.createReadStream)
+	
 	

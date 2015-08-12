@@ -12,6 +12,7 @@ var newContext = require('./newObject');
 var insert = require('./table/insert');
 var _delete = require('./table/delete');
 var cascadeDelete = require('./table/cascadeDelete');
+var createReadStream = require('./table/createReadStream');
 
 function _new(tableName) {
 	var table = newContext();
@@ -90,6 +91,8 @@ function _new(tableName) {
 
 	table.delete = _delete.bind(null,table);
 	table.cascadeDelete = cascadeDelete.bind(null,table);
+
+	table.createReadStream = createReadStream.bind(null, table);
 
 	return table;	
 }
