@@ -1,5 +1,6 @@
 function negotiateForwardProperty(oldDomain, newDomain, propertyName) {
 	if(newDomain[propertyName]) return;
+	if (propertyName === 'rdb') return;
 	Object.defineProperty(newDomain, propertyName, {
 		enumerable: true,
 		get: createGetter(oldDomain, propertyName),
