@@ -1,73 +1,38 @@
-var newCollection = require('../../newCollection');
 var extractSql = require('./extractSql');
+var extractParameters = require('./extractParameters');
 
-function _new(text) {
-	text = extractSql(text);
-	var optionalParams = [];
-	var c = {};
-	
-	for (var i = 1; i < arguments.length; i++) {
-		optionalParams.push(arguments[i]);
-	}
-	
-	c.parameters = newCollection.apply(null, optionalParams);
-	
-	c.addParameter = function(parameter) {
-		var params = [text];
-		params = params.concat(optionalParams);
-		params.push(parameter);
-		return newParameterized(params);
-	};
-
-	c.sql = function() {
-		return text;
-	};
-
-	c.prepend = function(other) {				
-		if (other.hasOwnProperty('sql')) 
-			return prependParameterized(other);
-		else
-			return prependText(other);			
-	};
-
-	function prependParameterized(other) {		
-		var params = [other.sql() + text];
-		var otherParameters = other.parameters.toArray();			
-		params = params.concat(otherParameters).concat(optionalParams);
-		return newParameterized(params);
-	}
-
-	function prependText(other) {
-		var params = [other + text].concat(optionalParams);
-		return newParameterized(params);
-	}
-
-	c.append = function(other) {				
-		if (other.hasOwnProperty('sql')) 
-			return appendParameterized(other);
-		else
-			return appendText(other);			
-	};
-
-	function appendParameterized(other) {	
-		var params = [text + other.sql()];
-		var otherParameters = other.parameters.toArray();			
-		params = params.concat(optionalParams).concat(otherParameters);
-		return newParameterized(params);
-	}
-
-	function appendText(other) {
-		var params = [text + other].concat(optionalParams);
-		return newParameterized(params);
-	}
-
-
-	function newParameterized(params) {
-		return require('../query/newParameterized').apply(null, params);		
-	}
-	
-	return c;
+var nextParameterized = function(text, params) {
+    nextParameterized = require('../query/newParameterized');
+    return nextParameterized(text, params);
 }
 
+function Parameterized(text, parameters) {
+    this._text = text;
+    this.parameters = parameters;
+}
 
-module.exports = _new;
+Parameterized.prototype.sql = function() {
+    return this._text;
+};
+
+Parameterized.prototype.prepend = function(other) {
+    if (other.hasOwnProperty('sql')) {
+        var params = other.parameters.concat(this.parameters);
+        return nextParameterized(other.sql() + this._text, params);
+    } else
+        return nextParameterized(other + this._text, this.parameters);
+};
+
+Parameterized.prototype.append = function(other) {
+	if (other.hasOwnProperty('sql')) {
+        var params = this.parameters.concat(other.parameters);
+        return nextParameterized(this._text + other.sql(), params);
+    } else
+        return nextParameterized(this._text + other, this.parameters.slice(0));
+};
+
+module.exports = function(text, parameters) {
+    text = extractSql(text);
+    parameters = extractParameters(parameters);
+    return new Parameterized(text, parameters);
+};
