@@ -1,5 +1,5 @@
 var extractSql = require('./extractSql');
-var extractParameters = require('./extractParameters');
+var extractParameters = require('./parameterized/extractParameters');
 
 var nextParameterized = function(text, params) {
     nextParameterized = require('../query/newParameterized');

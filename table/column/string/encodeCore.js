@@ -8,8 +8,7 @@ function _new(value,column) {
 			return newPara('' + column.dbNull + '');
 		if(stringIsSafe(value))
 			return newPara('' + value + '');
-		var para = newPara('?');
-		return para.addParameter(value);
+		return newPara('?', value);
 }
 
 module.exports = _new;
