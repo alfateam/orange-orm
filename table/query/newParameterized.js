@@ -16,7 +16,7 @@ Parameterized.prototype.sql = function() {
 };
 
 Parameterized.prototype.prepend = function(other) {
-    if (other.hasOwnProperty('sql')) {
+    if (other.sql) {
         var params = other.parameters.concat(this.parameters);
         return nextParameterized(other.sql() + this._text, params);
     } else
@@ -24,11 +24,11 @@ Parameterized.prototype.prepend = function(other) {
 };
 
 Parameterized.prototype.append = function(other) {
-	if (other.hasOwnProperty('sql')) {
+    if (other.sql) {        
         var params = this.parameters.concat(other.parameters);
         return nextParameterized(this._text + other.sql(), params);
     } else
-        return nextParameterized(this._text + other, this.parameters.slice(0));
+        return nextParameterized(this._text + other, this.parameters);
 };
 
 module.exports = function(text, parameters) {

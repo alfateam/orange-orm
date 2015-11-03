@@ -13,7 +13,7 @@ function _new(column) {
 		}
 		if(stringIsSafe(value))
 			return newPara('\'' + value + '\'');
-		return newPara('?', value);
+		return newPara('?', [value]);
 	};
 }
 

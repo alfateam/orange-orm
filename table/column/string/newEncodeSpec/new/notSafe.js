@@ -6,7 +6,7 @@ function act(c) {
 	c.expected = {};
 	c.stringIsSafe.expect(c.value).return(false);
 	c.purify.expect(c.initArg).return(c.value);
-	c.newParam.expect('?', c.value).return(c.expected);
+	c.newParam.expect('?', [c.value]).return(c.expected);
 
 	c.returned = c.sut(c.initArg);
 
