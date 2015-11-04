@@ -2,3 +2,4 @@ node_modules
 rdb.sublime-workspace
 README.html
 docs.html
+npm-debug.log
