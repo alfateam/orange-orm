@@ -1,0 +1,76 @@
+0 info it worked if it ends with ok
+1 verbose cli [ '/usr/bin/node', '/usr/bin/npm', 'publish' ]
+2 info using npm@1.4.28
+3 info using node@v0.10.40
+4 verbose node symlink /usr/bin/node
+5 verbose publish [ '.' ]
+6 verbose cache add [ '.', null ]
+7 verbose cache add name=undefined spec="." args=[".",null]
+8 verbose parsed url { protocol: null,
+8 verbose parsed url   slashes: null,
+8 verbose parsed url   auth: null,
+8 verbose parsed url   host: null,
+8 verbose parsed url   port: null,
+8 verbose parsed url   hostname: null,
+8 verbose parsed url   hash: null,
+8 verbose parsed url   search: null,
+8 verbose parsed url   query: null,
+8 verbose parsed url   pathname: '.',
+8 verbose parsed url   path: '.',
+8 verbose parsed url   href: '.' }
+9 silly lockFile 3a52ce78- .
+10 verbose lock . /home/larsroald/.npm/3a52ce78-.lock
+11 verbose tar pack [ '/home/larsroald/.npm/rdb/1.0.7/package.tgz', '.' ]
+12 verbose tarball /home/larsroald/.npm/rdb/1.0.7/package.tgz
+13 verbose folder .
+14 info prepublish rdb@1.0.7
+15 silly lockFile 1f1177db-tar tar://.
+16 verbose lock tar://. /home/larsroald/.npm/1f1177db-tar.lock
+17 silly lockFile 1e818d2f-sroald-npm-rdb-1-0-7-package-tgz tar:///home/larsroald/.npm/rdb/1.0.7/package.tgz
+18 verbose lock tar:///home/larsroald/.npm/rdb/1.0.7/package.tgz /home/larsroald/.npm/1e818d2f-sroald-npm-rdb-1-0-7-package-tgz.lock
+19 silly lockFile 1f1177db-tar tar://.
+20 silly lockFile 1f1177db-tar tar://.
+21 silly lockFile 1e818d2f-sroald-npm-rdb-1-0-7-package-tgz tar:///home/larsroald/.npm/rdb/1.0.7/package.tgz
+22 silly lockFile 1e818d2f-sroald-npm-rdb-1-0-7-package-tgz tar:///home/larsroald/.npm/rdb/1.0.7/package.tgz
+23 silly lockFile 6f4e8563--larsroald-npm-rdb-1-0-7-package /home/larsroald/.npm/rdb/1.0.7/package
+24 verbose lock /home/larsroald/.npm/rdb/1.0.7/package /home/larsroald/.npm/6f4e8563--larsroald-npm-rdb-1-0-7-package.lock
+25 silly lockFile 6f4e8563--larsroald-npm-rdb-1-0-7-package /home/larsroald/.npm/rdb/1.0.7/package
+26 silly lockFile 6f4e8563--larsroald-npm-rdb-1-0-7-package /home/larsroald/.npm/rdb/1.0.7/package
+27 silly lockFile 3a52ce78- .
+28 silly lockFile 3a52ce78- .
+29 silly publish { name: 'rdb',
+29 silly publish   version: '1.0.7',
+29 silly publish   main: 'index.js',
+29 silly publish   title: 'rdb',
+29 silly publish   description: 'Object Relational Mapper',
+29 silly publish   keywords: [ 'orm', 'sql', 'mySql', 'mysql', 'postgres', 'pg' ],
+29 silly publish   license: 'MIT',
+29 silly publish   scripts: { test: 'jshint ./ && a' },
+29 silly publish   dependencies:
+29 silly publish    { pg: '4.3.0',
+29 silly publish      'node-uuid': '1.4.2',
+29 silly publish      promise: '6.1.0',
+29 silly publish      mysql: '2.6.2',
+29 silly publish      'generic-pool': '2.2.0',
+29 silly publish      deferred: '0.7.2' },
+29 silly publish   devDependencies: { a: '0.4.8' },
+29 silly publish   repository: { type: 'git', url: 'git@github.com:alfateam/rdb.git' },
+29 silly publish   jshintConfig: { asi: true, eqnull: true, undef: true, node: true },
+29 silly publish   contributors: [ { name: 'Lars-Erik Roald', email: 'lars.roald@gmail.com' } ],
+29 silly publish   readme: '__rdb__\n=========\nORM for nodejs / iojs.  \nSupports postgres and mySql.  \n\nSimple, flexible mapper.  \nTransaction with commit and rollback.  \nPersistence ignorance - no need for explicit saving, everything is handled by transaction.  \nEager or lazy loading.  \nBased on promises.  \n[Documentation and examples](docs/docs.md)  \n## Release notes\n__1.0.6__  \nBetter performance on insert and update.  \n__1.0.6__  \nBugfix: Transaction domain should not forward rdb singleton from old domain.  \n__1.0.5__  \nDocumentation cleanup.  \n__1.0.4__  \n[orderBy](https://github.com/alfateam/rdb/blob/master/docs/docs.md#_todtowithorderby) in toDto().  \n__1.0.3__  \ntoDto() using next tick on every thousandth row to avoid maximum call stack size exceeded.  \n__1.0.2__  \nReduced number of simultaneous promises in order to avoid maximum call stack size exceeded.  \n__1.0.1__  \nBugfix: Incorrect insert/updates on timestamp without timezone. The time was converted utc instead of stripping the timezone.  \n__1.0.0__  \nTransaction domain forwards properties from old domain.  \nSemantic versioning from now on.  \n__0.5.1__  \nImproved performance  \n__0.5.0__  \n[Logging](https://github.com/alfateam/rdb-demo/blob/master/logging.js): rdb.log(someFunc) logs sql and parameters.  \n[Raw sql filters.](https://github.com/alfateam/rdb-demo/blob/master/filtering/rawSqlFilter.js)  \n__0.4.9__  \nNew method: tryGetById.  \nNew filter: iEqual, postgres only.  \nBugfix: rows.toJSON() without strategy did not include any children.  \n__0.4.8__  \nExplicit pooling with size and end().  \nBugfix: mySql did not release client to pool.  \n__0.4.7__  \nUpgraded to pg 4.3.0  \nUpgraded to mysql 2.5.5  \n__0.4.6__  \nUpgraded pg 4.2.0.  \n__0.4.5__  \nOops. Forgot to use pg.js instead of pg.  \n__0.4.4__  \nUpgraded all dependencies to latest. Using pg.js instead of pg.  \n__0.4.3__  \n[Can ignore columns when serializing to dto](https://github.com/alfateam/rdb-demo/blob/master/serializable.js).  \n__0.4.2__  \nBugfix: [update on a row crashes when a delete occurs earlier in same transaction](https://github.com/alfateam/rdb/issues/12).  \n__0.4.1__  \nBugfix: more global leaks.  \n__0.4.0__  \nBugfix: global leak.  \n__0.3.9__  \nBugfix: eager loading joins/hasOne with non unique column names was not handled correctly.  \n__0.3.8__  \nSupports mySql.  \nBulk deletes.  \n__0.3.7__  \nBugfix: eager loading manyRelation on a join/hasOne returned empty array #11  \n__0.3.6__  \nFixed sql injection vulnerability.  \n__0.3.5__  \nBuilt-in fetching strategies for lazy loading. Works best in readonly scenarios.  \n__0.3.4__  \nDocs and examples split moved to separate file.  \n__0.3.3__  \nFixed documentation layout again.  \n__0.3.2__  \nFixed documentation layout.  \n__0.3.1__  \nCase insensitive filters: iStartsWith, iEndsWith and iContains.  \n__0.3.0__  \nFix broken links in docs.  \n__0.2.9__  \nSupport for row.delete().  \nRollback only throws when error is present.  \n__0.2.8__  \nGuid accepts uppercase letters.  \nBugfix: null inserts on guid columns yielded wrong sql.  \n__0.2.7__  \nNew method, toDto(), converts row to data transfer object.  \nBugfix: toJSON returned incorrect string on hasMany relations.  \n__0.2.6__  \nFixed incorrect links in README.  \n__0.2.5__  \nBugfix: caching on composite keys could give a crash #7. \nImproved sql compression on insert/update.  \n__0.2.4__  \nBugfix: getMany with many-strategy and shallowFilter yields incorrect query #6.  \n__0.2.3__  \nReformatted documentation. No code changes.  ',
+29 silly publish   readmeFilename: 'README.md',
+29 silly publish   gitHead: 'ca3e047a3ddda8c2e1a1bfe43f407310014f3401',
+29 silly publish   bugs: { url: 'https://github.com/alfateam/rdb/issues' },
+29 silly publish   homepage: 'https://github.com/alfateam/rdb',
+29 silly publish   _id: 'rdb@1.0.7',
+29 silly publish   _shasum: '304d871570360b624950781b59f9b270479873f9',
+29 silly publish   _from: '.' }
+30 error need auth auth and email required for publishing
+30 error need auth You need to authorize this machine using `npm adduser`
+31 error System Linux 3.13.0-65-generic
+32 error command "/usr/bin/node" "/usr/bin/npm" "publish"
+33 error cwd /home/larsroald/devel/rdb
+34 error node -v v0.10.40
+35 error npm -v 1.4.28
+36 error code ENEEDAUTH
+37 verbose exit [ 1, true ]

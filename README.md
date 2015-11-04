@@ -10,7 +10,7 @@ Eager or lazy loading.
 Based on promises.  
 [Documentation and examples](docs/docs.md)  
 ## Release notes
-__1.0.6__  
+__1.0.7__  
 Better performance on insert and update.  
 __1.0.6__  
 Bugfix: Transaction domain should not forward rdb singleton from old domain.  
