@@ -1,15 +1,14 @@
 function act(c){
 	c.sql = 'orderNo between ? and ?';
-	c.param1 = 3;
-	c.param2 = 5;
+	c.parameters = [1,2,3];
 
 	c.arg = {
 		sql: c.sql,
-		parameters: [c.param1, c.param2]
+		parameters: c.parameters
 	};
 
 	c.parameterized = {};
-	c.newParameterized.expect(c.sql, c.param1, c.param2).return(c.parameterized);
+	c.newParameterized.expect(c.sql, c.parameters).return(c.parameterized);
 
 	c.filter = {};
 	c.newBoolean.expect(c.parameterized).return(c.filter);

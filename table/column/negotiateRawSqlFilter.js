@@ -14,8 +14,7 @@ function negotiateRawSqlFilter(filter) {
         if (filter.and)
             return filter;
         if (filter.sql) {
-            params.push(filter.sql);
-            params = params.concat(filter.parameters || []);
+            params.push(filter.sql, filter.parameters);
         }
         else
             params = [filter];

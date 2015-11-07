@@ -1,6 +1,6 @@
 var requireMock = require('a').requireMock;
-var newCollection = requireMock('../../newCollection');
 var extractSql = requireMock('./extractSql');
+var extractParameters = requireMock('./parameterized/extractParameters');
 var newSut = require('../newParameterized');
 
 module.exports = function(c) {
@@ -8,6 +8,6 @@ module.exports = function(c) {
 	c.extractSql = extractSql;
 	c.text = 'text';
 	c.initialText = {};
-	c.newCollection = newCollection;
+	c.extractParameters = extractParameters;
 }
 

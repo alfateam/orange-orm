@@ -6,8 +6,7 @@ function act(c) {
 	var query = c.returned[0];
 	c.returnedSql = query.sql();
 
-	c.returnedParameters = query.parameters.toArray();
-	
+	c.returnedParameters = query.parameters;
 }
 
 module.exports = act;

@@ -3,8 +3,7 @@ var negotiateRawSqlFilter = require('./negotiateRawSqlFilter');
 
 function newBoolean(filter) {
     var c = {};
-
-    c.sql = filter.sql;
+    c.sql = filter.sql.bind(filter);
     c.parameters = filter.parameters;
 
     c.append = function(other) {

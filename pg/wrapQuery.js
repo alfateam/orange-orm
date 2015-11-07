@@ -6,7 +6,7 @@ function wrapQuery(connection) {
 	return runQuery;
 
 	function runQuery(query, onCompleted) {
-		var params = query.parameters.toArray();
+		var params = query.parameters;
 		var sql = replaceParamChar(query, params);
 		log(sql);
 		log('parameters: ' + params);
