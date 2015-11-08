@@ -1,11 +1,13 @@
 var newSingleQuery = require('./query/newSingleQuery');
+var newSubQueries = require('./query/newSubQueries');
 var extractFilter = require('./query/extractFilter');
 var extractOrderBy = require('./query/extractOrderBy');
 
-function newQuery(table,filter,span,alias,innerJoin,orderBy) {	
+function newQuery(table,filter,span,alias,orderBy) {	
 	filter = extractFilter(filter);
 	orderBy = extractOrderBy(table,alias,orderBy);
-	return newSingleQuery(table,filter,span,alias,innerJoin,orderBy);
+	var subQueries = newSubQueries(table,span,alias);
+	return newSingleQuery(table,filter,span,alias,subQueries,orderBy);
 }
 
 module.exports = newQuery;
