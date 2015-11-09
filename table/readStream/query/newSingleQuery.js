@@ -1,6 +1,5 @@
-var newColumnSql = require('./singleQuery/newColumnSql');
-var newJoinSql = require('./singleQuery/newJoinSql');
-var newWhereSql = require('./singleQuery/newWhereSql');
+var newColumnSql = require('../../query/singleQuery/columnSql/newShallowColumnSql');
+var newWhereSql = require('../../query/singleQuery/newWhereSql');
 
 function _new(table,filter,span,alias,subQueries,orderBy) {
 	var c = {};
@@ -8,10 +7,9 @@ function _new(table,filter,span,alias,subQueries,orderBy) {
 	c.sql = function() {
 		var name = table._dbName;
 		var columnSql = newColumnSql(table,alias);
-		var joinSql = newJoinSql(span,alias);
-		filter = filter.and(joinSql);
 		var whereSql = newWhereSql(table,filter,alias);
-		return 'select ' + columnSql + ' from ' + name + ' ' + alias  + whereSql + orderBy;
+		return 'select ' + columnSql + subQueries 
+			+ ' from ' + name + ' ' + alias  + whereSql + orderBy;
 	};
 
 	c.parameters = filter.parameters;	

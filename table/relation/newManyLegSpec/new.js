@@ -5,8 +5,10 @@ var leg = {};
 var newLeg;
 
 function act(c){
-	
 	c.relation = {};
+	c.joinRelation = {};
+	c.relation.joinRelation = c.joinRelation;
+	c.joinRelation.rightAlias = {};	
 	newLeg = requireMock('./newOneLeg');
 	newLeg.expect(c.relation).return(leg);
 	c.leg = leg;

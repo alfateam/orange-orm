@@ -1,7 +1,7 @@
 var newSingleQuery = require('./query/newSingleQuery');
 var newSubQueries = require('./query/newSubQueries');
-var extractFilter = require('./query/extractFilter');
-var extractOrderBy = require('./query/extractOrderBy');
+var extractFilter = require('../query/extractFilter');
+var extractOrderBy = require('../query/extractOrderBy');
 
 function newQuery(table,filter,span,alias,orderBy) {	
 	filter = extractFilter(filter);

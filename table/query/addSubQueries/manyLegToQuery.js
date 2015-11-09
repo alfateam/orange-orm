@@ -2,7 +2,6 @@ var newShallowJoinSql = require('../singleQuery/joinSql/newShallowJoinSql');
 var newQuery = require('../../newQuery');
 var newParameterized = require('../newParameterized');
 var extractOrderBy = require('../extractOrderBy');
-var emptyFilter;
 
 function manyLegToQuery(queries, rightAlias,leg,legNo,filter,innerJoin) {	
 	var leftAlias = rightAlias + '_' + legNo;

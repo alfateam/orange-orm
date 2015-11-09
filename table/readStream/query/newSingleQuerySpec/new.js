@@ -1,15 +1,14 @@
 var a = require('a');
 var requireMock = a.requireMock;	
-var newColumnSql = requireMock('./singleQuery/newColumnSql');
-var newJoinSql = requireMock('./singleQuery/newJoinSql');
-var newWhereSql = requireMock('./singleQuery/newWhereSql');
+var newColumnSql = requireMock('../../query/singleQuery/columnSql/newShallowColumnSql');
+var newWhereSql = requireMock('../../query/singleQuery/newWhereSql');
 
 var table = {};
 var filter = {};
 var span = {};
 var alias = '_2';
 var parameters = {};
-var subQueries = {};
+var subQueries = ' <subQueries>';
 var orderBy = ' <orderBy>';
 
 function act(c) {
@@ -23,7 +22,6 @@ function act(c) {
     c.span = span;
     c.subQueries = subQueries;
     c.newColumnSql = newColumnSql;
-    c.newJoinSql = newJoinSql;
     c.newWhereSql = newWhereSql;
 
     c.sut = require('../newSingleQuery')(table, filter, span, alias, subQueries, orderBy);

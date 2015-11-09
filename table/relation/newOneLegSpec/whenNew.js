@@ -7,3 +7,5 @@ when(c)
 	.it('should set columns').assertEqual(c.columns,c.sut.columns)
 	.it('span.legs should should be empty collection').assertEqual(c.emptyCollection,c.sut.span.legs)
 	.it('should set expand method').assertEqual(c.relation.expand, c.sut.expand)
+	.it('should set name').assertEqual(c.joinRelation.rightAlias, c.sut.name)
+	

@@ -4,6 +4,7 @@ function newLeg(relation) {
 
 	var joinRelation = relation.joinRelation;
 	var c = {};
+	c.name = joinRelation.rightAlias;
 	var span = {};		
 	span.table = joinRelation.parentTable;	
 	span.legs = newCollection();

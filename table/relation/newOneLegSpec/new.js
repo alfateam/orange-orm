@@ -10,6 +10,8 @@ var emptyCollection = {};
 
 function act(c){	
 	c.relation = {};
+	c.joinRelation = joinRelation;
+	joinRelation.rightAlias = {};
 	c.relation.joinRelation = joinRelation;
 	joinRelation.parentTable = parentTable;
 	joinRelation.childTable = childTable;
