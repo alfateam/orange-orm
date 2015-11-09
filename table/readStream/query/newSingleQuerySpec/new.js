@@ -1,11 +1,10 @@
 var a = require('a');
 var requireMock = a.requireMock;	
-var newColumnSql = requireMock('../../query/singleQuery/columnSql/newShallowColumnSql');
+var newColumnSql = requireMock('./singleQuery/newShallowColumnSql');
 var newWhereSql = requireMock('../../query/singleQuery/newWhereSql');
 
 var table = {};
 var filter = {};
-var span = {};
 var alias = '_2';
 var parameters = {};
 var subQueries = ' <subQueries>';
@@ -19,12 +18,11 @@ function act(c) {
     c.alias = alias;
     c.table = table;
     c.filter = filter;
-    c.span = span;
     c.subQueries = subQueries;
     c.newColumnSql = newColumnSql;
     c.newWhereSql = newWhereSql;
 
-    c.sut = require('../newSingleQuery')(table, filter, span, alias, subQueries, orderBy);
+    c.sut = require('../newSingleQuery')(table, filter, alias, subQueries, orderBy);
 }
 
 module.exports = act;

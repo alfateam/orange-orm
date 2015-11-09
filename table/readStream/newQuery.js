@@ -7,7 +7,7 @@ function newQuery(table,filter,span,alias,orderBy) {
 	filter = extractFilter(filter);
 	orderBy = extractOrderBy(table,alias,orderBy);
 	var subQueries = newSubQueries(table,span,alias);
-	return newSingleQuery(table,filter,span,alias,subQueries,orderBy);
+	return newSingleQuery(table,filter,alias,subQueries,orderBy);
 }
 
 module.exports = newQuery;

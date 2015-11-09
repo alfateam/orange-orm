@@ -24,7 +24,7 @@ function act(c) {
 	newSubQueries.expect(table,span,alias).return(subQueries);
 
 	c.expected = {};
-	newSingleQuery.expect(table,filter,span,alias,subQueries,orderBy).return(c.expected);
+	newSingleQuery.expect(table,filter,alias,subQueries,orderBy).return(c.expected);
 	c.returned = require('../newQuery')(table,initialFilter,span,alias,initialOrderBy);
 }
 

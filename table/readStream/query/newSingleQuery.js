@@ -1,7 +1,7 @@
-var newColumnSql = require('../../query/singleQuery/columnSql/newShallowColumnSql');
+var newColumnSql = require('./singleQuery/newShallowColumnSql');
 var newWhereSql = require('../../query/singleQuery/newWhereSql');
 
-function _new(table,filter,span,alias,subQueries,orderBy) {
+function _new(table,filter,alias,subQueries,orderBy) {
 	var c = {};
 
 	c.sql = function() {
