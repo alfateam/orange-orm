@@ -10,9 +10,9 @@ var a = require('a'),
 	manyLeg = {},
 	oneLeg = {},
 	innerJoin = {},
-	manyLegQuery = {},
-	oneLegQuery = {},
-	joinLegQuery = {},
+	manyLegQuery = '<manyLegQuery>',
+	oneLegQuery = '<oneLegQuery>',
+	joinLegQuery = '<joinLegQuery>',
 	joinLegNo = {},
 	manyLegNo = {},
 	oneLegNo = {};
@@ -21,25 +21,22 @@ var a = require('a'),
 function act(c) {	
 	stubLegs();
 	stubSpan();
-	c.manyLegToQuery = requireMock('./newSubQueries/manyLegToQuery');
-	c.manyLegToQuery.expect(alias,manyLeg,manyLegNo).return(manyLegQuery);
-	c.manyLegQuery.sql = c.mock();
-	c.manyLegSql = '<manyLegSql>';
-	c.manyLegQuery.sql.expect().return(c.manyLegSql);
-	
-	c.oneLegToQuery = requireMock('./newSubQueries/oneLegToQuery');
-	c.oneLegToQuery.expect(alias,oneLeg,oneLegNo).return(oneLegQuery);
-	c.oneLegSql = '<oneLegSql>';
-	c.oneLegQuery.sql.expect().return(c.oneLegSql);
-
-
 	c.joinLegToQuery = requireMock('./newSubQueries/joinLegToQuery');
 	c.joinLegToQuery.expect(alias,joinLeg,joinLegNo).return(joinLegQuery);
 	c.joinLegSql = '<joinLegSql>';
-	c.joinLegQuery.sql.expect().return(c.joinLegSql);
+
+	c.oneLegToQuery = requireMock('./newSubQueries/oneLegToQuery');
+	c.oneLegToQuery.expect(alias,oneLeg,oneLegNo).return(oneLegQuery);
+	c.oneLegSql = '<oneLegSql>';
+
+	c.manyLegToQuery = requireMock('./newSubQueries/manyLegToQuery');
+	c.manyLegToQuery.expect(alias,manyLeg,manyLegNo).return(manyLegQuery);
+	c.manyLegSql = '<manyLegSql>';
+	
 
 
-	c.sut(table,span,alias);
+	c.expected = joinLegQuery + oneLegQuery + manyLegQuery;
+	c.returned = c.sut(table,span,alias);
 }
 
 function stubLegs() {

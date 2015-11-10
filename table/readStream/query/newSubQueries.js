@@ -2,18 +2,19 @@ var joinLegToQuery = _joinLegToQuery;
 var oneLegToQuery = _oneLegToQuery;
 var manyLegToQuery = _manyLegToQuery;
 
-function newSubQueries(table,span,alias) {	
+function newSubQueries(table,span,alias) {
+	var result = [];
 	var c = {};
 	var _legNo;
 
 	c.visitJoin = function(leg) {
-		joinLegToQuery( alias,leg,_legNo);
+		result.push(joinLegToQuery( alias,leg,_legNo));
 	};
 	c.visitOne = function(leg) {
-		oneLegToQuery( alias,leg,_legNo);
+		result.push(oneLegToQuery( alias,leg,_legNo));
 	};
 	c.visitMany = function(leg) {
-		manyLegToQuery( alias,leg,_legNo);
+		result.push(manyLegToQuery( alias,leg,_legNo));
 	};
 
 	span.legs.forEach(onEachLeg);	
@@ -22,6 +23,8 @@ function newSubQueries(table,span,alias) {
 		_legNo = legNo;
 		leg.accept(c);
 	}
+
+	return result.join('');
 }
 
 function _joinLegToQuery() {
