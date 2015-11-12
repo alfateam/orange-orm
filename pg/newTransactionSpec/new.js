@@ -9,6 +9,7 @@ function act(c){
 	c.pool = {};
 	c.domain = {};
 
+	c.wrapQueryStream = c.requireMock('./wrapQueryStream');
 	c.wrapQuery = requireMock('./wrapQuery');
 	c.encodeBuffer = c.requireMock('./encodeBuffer');
 

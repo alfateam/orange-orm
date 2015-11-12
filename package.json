@@ -9,6 +9,7 @@
     "scripts": { "test" : "jshint ./ && a" } ,
     "dependencies": {
         "pg": "4.3.0",
+        "pg-query-stream": "*",
         "node-uuid": "1.4.2",
         "promise": "6.1.0",
         "mysql": "2.6.2",
