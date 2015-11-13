@@ -13,6 +13,7 @@ var insert = require('./table/insert');
 var _delete = require('./table/delete');
 var cascadeDelete = require('./table/cascadeDelete');
 var createReadStream = require('./table/createReadStream');
+var createJSONReadStream = require('./table/createJSONReadStream');
 
 function _new(tableName) {
 	var table = newContext();
@@ -93,6 +94,7 @@ function _new(tableName) {
 	table.cascadeDelete = cascadeDelete.bind(null,table);
 
 	table.createReadStream = createReadStream.bind(null, table);
+	table.createJSONReadStream = createJSONReadStream.bind(null, table);
 
 	return table;	
 }

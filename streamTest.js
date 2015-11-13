@@ -21,9 +21,13 @@ var strategy = {
     transporter: null
 };
 
-var start = new Date();
-Order.createReadStream(db, null, strategy).on('end', onEnd).pipe(process.stdout);
+Order.createReadStream(db, null, strategy).on('end', onEnd).on('data', onData);
+Order.createJSONReadStream(db, null, strategy).pipe(process.stdout);
 
 function onEnd() {
-    console.log(new Date() - start);
+    console.log('end');
+}
+
+function onData (data) {
+	console.log(data);
 }

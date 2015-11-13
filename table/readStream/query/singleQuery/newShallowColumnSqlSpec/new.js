@@ -8,7 +8,14 @@ var column2 = {};
 column2._dbName = columnName2;
 column2.alias = 'barProp';
 
-var columns = [column,column2];
+var columnName3 = 'c';
+var column3 = {};
+column3._dbName = columnName3;
+column3.serializable = false;
+column3.serializable = false;
+column3.alias = 'ignoreProp';
+
+var columns = [column,column2,column3];
 var table = {};
 table._columns = columns;
 var alias = '_0';

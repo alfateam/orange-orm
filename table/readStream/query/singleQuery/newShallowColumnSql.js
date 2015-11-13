@@ -2,19 +2,16 @@ var util = require('util');
 
 function _new(table,alias) {
 	var columnFormat = '%s as "%s"';
-	var aliasDot = alias + '.';
-	var commaAliasDot = ',' + aliasDot;
 	var columns = table._columns;
-	var sql = aliasDot + encodeColumn(0);
-	for (var i = 1; i < columns.length; i++) {
-		sql = sql + commaAliasDot + encodeColumn(i);
+	var sql = '';
+	var separator = alias + '.';
+	for (var i = 0; i < columns.length; i++) {
+		var column = columns[i];
+		if (!('serializable' in column && !column.serializable))
+			sql = sql + separator + util.format(columnFormat, column._dbName, column.alias);
+		separator = ',' + alias + '.';
 	}
 	return sql;
-
-	function encodeColumn(i) {
-		var column = columns[i];
-		return util.format(columnFormat, column._dbName, column.alias);
-	}
 }
 
 module.exports = _new;
