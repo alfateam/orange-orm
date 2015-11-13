@@ -36,7 +36,6 @@ function createReadStream(table, db, filter, strategy) {
         queryStream.on('error', onError);
 
         function onError (e) {
-            console.log(e);
             def.reject(e);
             transformer.emit('error', e);
         }
