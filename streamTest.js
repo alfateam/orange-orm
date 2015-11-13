@@ -1,5 +1,4 @@
 var rdb = require('./index');
- rdb.log(console.log);
 var table = rdb.table;
 var db = rdb('postgres://test:test@localhost:5432/test');
 
@@ -18,7 +17,13 @@ Order.column('senders_reference').string().as('sendersReference');
 var orderTransporterRelation = Transporter.join(Order).by('order_id').as('order');
 Order.hasOne(orderTransporterRelation).as('transporter');
 
-var strategy = {transporter: null};
+var strategy = {
+    transporter: null
+};
 
-Order.createReadStream(db, null, strategy).pipe(process.stdout);
+var start = new Date();
+Order.createReadStream(db, null, strategy).on('end', onEnd).pipe(process.stdout);
 
+function onEnd() {
+    console.log(new Date() - start);
+}
