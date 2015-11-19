@@ -9,7 +9,7 @@ function wrapQuery(connection) {
 		var sql = query.sql();
 		log(sql);
 		log('parameters: ' + params);
-		runOriginalQuery.call(connection, sql, params, onCompleted);
+		return runOriginalQuery.call(connection, sql, params, onCompleted);
 	}
 
 }

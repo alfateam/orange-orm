@@ -1,7 +1,7 @@
 var a = require('a');
 var requireMock = a.requireMock;	
 var newColumnSql = requireMock('./singleQuery/newShallowColumnSql');
-var newWhereSql = requireMock('../../query/singleQuery/newWhereSql');
+var newWhereSql = requireMock('../../../query/singleQuery/newWhereSql');
 
 var table = {};
 var filter = {};

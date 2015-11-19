@@ -2,16 +2,17 @@ var parentAlias = '_1',
     leg = {},
     legNo = 2,
     table = {},
-    childTable = {},
+    childTable = {
+        _dbName: '<tableName>'
+    },
     span = {},
     alias = '_1_2',
     spanColumns = {},
     legColumns = {},
-    shallowJoin = {},
+    shallowJoin = '<shallowJoin>',
     primaryColumns = {},
     parameterized = {},
-    name = 'fooProp',
-    filter = {};
+    name = 'fooProp';
 
 function act(c) {
     c.query = {};
@@ -23,16 +24,15 @@ function act(c) {
     leg.table = table
 
     c.newShallowJoinSql.expect(table, primaryColumns, legColumns, alias, parentAlias).return(shallowJoin);
-    c.newParameterized.expect(shallowJoin).return(filter);
-    c.newQuery.expect(childTable, filter, span, alias).return(c.query);
+    c.newQuery.expect(childTable, span, alias).return(c.query);
 
     c.query.sql = c.mock();
     c.sql = '<selectSql>';
     c.query.sql.expect().return(c.sql);
 
-    c.expected = ',(select row_to_json(r) from (<selectSql>) r ) "fooProp"';
+    c.expected = ",'fooProp',(select <selectSql> from <tableName> _1_2 where <shallowJoin>)";
 
-    c.returned = c.sut(parentAlias, leg, legNo, filter);
+    c.returned = c.sut(parentAlias, leg, legNo);
 }
 
 module.exports = act;

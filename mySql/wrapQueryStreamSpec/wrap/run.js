@@ -12,7 +12,7 @@ function act(c){
 	c.log.expect('parameters: ' + c.parameters);
 
 	c.connection.query = 'other';
-	c.runQuery.expect(c.sql, c.parameters).expect(c.onCompleted).return(c.expected);
+	c.runQuery.expect(c.sql, c.parameters).expect(c.onCompleted);
 
 	c.sut(c.query, c.onCompleted);
 }

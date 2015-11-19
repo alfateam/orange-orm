@@ -1,4 +1,5 @@
 var wrapQuery = require('./wrapQuery');
+var wrapQueryStream = require('./wrapQueryStream');
 var deleteFromSql = require('./deleteFromSql');
 
 function newResolveTransaction(domain, pool) {
@@ -13,6 +14,8 @@ function newResolveTransaction(domain, pool) {
             }
             var rdb = {};
             connection.executeQuery = wrapQuery(connection);
+            connection.streamQuery = wrapQueryStream(connection);
+
             rdb.dbClient = connection;
             rdb.dbClientDone = connection.release.bind(connection);
             rdb.encodeBuffer = connection.escape.bind(connection);

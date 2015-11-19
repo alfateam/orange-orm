@@ -10,4 +10,4 @@ function newQuery(table,filter,span,alias,orderBy) {
 	return newSingleQuery(table,filter,alias,subQueries,orderBy);
 }
 
-module.exports = newQuery;
+module.exports = require('./mySql/newQuery');

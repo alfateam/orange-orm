@@ -1,6 +1,6 @@
 var newColumnSql = require('./singleQuery/newShallowColumnSql');
-var newWhereSql = require('../../query/singleQuery/newWhereSql');
-var template = 'select json_object(%s%s) from %s %s%s%s';
+var newWhereSql = require('../../../query/singleQuery/newWhereSql');
+var template = 'select json_object(%s%s) as result from %s %s%s%s';
 var util = require('util');
 
 function _new(table,filter,alias,subQueries,orderBy) {

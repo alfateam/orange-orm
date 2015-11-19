@@ -2,8 +2,8 @@ var requireMock = require('a').requireMock;
 var mock = require('a').mock;
 var newSingleQuery = requireMock('./query/newSingleQuery');
 var newSubQueries = requireMock('./query/newSubQueries');
-var extractFilter = requireMock('../query/extractFilter');
-var extractOrderBy = requireMock('../query/extractOrderBy');
+var extractFilter = requireMock('../../query/extractFilter');
+var extractOrderBy = requireMock('../../query/extractOrderBy');
 
 var table = {};
 var filter = {};

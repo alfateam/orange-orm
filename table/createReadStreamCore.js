@@ -18,7 +18,12 @@ function createReadStreamCore(table, db, filter, strategy, transformer) {
     db.transaction()
         .then(start)
         .then(db.commit)
-        .then(null, db.rollback)
+        .then(null, onError)
+
+        function onError (e) {
+            console.log(e.stack);
+            return db.rollback();
+        }
 
     function start() {
         try {
@@ -26,7 +31,7 @@ function createReadStreamCore(table, db, filter, strategy, transformer) {
         var query = newQuery(table, filter, span, alias);
         }
         catch (e) {
-            console.log(e.stack);
+            console.log('hei' + e.stack);
         }
         var queryStream = newQueryStream(query);
         queryStream.pipe(transformer);
