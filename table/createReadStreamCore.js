@@ -18,29 +18,17 @@ function createReadStreamCore(table, db, filter, strategy, transformer) {
     db.transaction()
         .then(start)
         .then(db.commit)
-        .then(null, onError)
-
-        function onError (e) {
-            console.log(e.stack);
-            return db.rollback();
-        }
+        .then(null, db.rollback)
 
     function start() {
-        try {
-
         var query = newQuery(table, filter, span, alias);
-        }
-        catch (e) {
-            console.log('hei' + e.stack);
-        }
         var queryStream = newQueryStream(query);
         queryStream.pipe(transformer);
-        queryStream.on('end', def.resolve);
-        queryStream.on('error', onError);
+        queryStream.on('end', onEnd);
+        queryStream.on('error', def.reject);
 
-        function onError (e) {
-            def.reject(e);
-            transformer.emit('error', e);
+        function onEnd() {
+            def.resolve();
         }
 
         return def.promise;
