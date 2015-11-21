@@ -29,6 +29,10 @@ function newDatabase(connectionString, poolOptions) {
         return pool.end();
     };
 
+    c.accept = function(caller) {
+        caller.visitPg();
+    };
+
     return c;
 }
 

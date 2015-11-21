@@ -21,7 +21,7 @@ function createReadStreamCore(table, db, filter, strategy, transformer) {
         .then(null, db.rollback)
 
     function start() {
-        var query = newQuery(table, filter, span, alias);
+        var query = newQuery(db, table, filter, span, alias);
         var queryStream = newQueryStream(query);
         queryStream.pipe(transformer);
         queryStream.on('end', onEnd);

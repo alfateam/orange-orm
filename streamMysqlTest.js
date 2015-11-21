@@ -1,7 +1,7 @@
 var rdb = require('./index');
 var table = rdb.table;
 // rdb.log(console.log);
-var db = rdb.mySql('mysql:guest:guest@localhost/rdbDemo?multipleStatements=true');
+var db = rdb.mySql('mysql://root@localhost/rdbDemo?multipleStatements=true');
 
 
 var Order = rdb.table('_order');
@@ -24,16 +24,33 @@ var strategy = {
 
 // Order.createReadStream(db, null, strategy).on('end', onEnd).on('data', onData);
 // Order.createReadStream(db, null, strategy).on('end', onEnd).on('data', onData);
-Order.createJSONReadStream(db, null, strategy).on('error', onError).pipe(process.stdout);
+var json = '';
+// var stream = Order.createJSONReadStream(db, null, strategy).on('error', onError).on('data', onData).on('end', onEnd);
+var stream = Order.createJSONReadStream(db, null, strategy);
+
+var oboe = require('oboe');
+oboe(stream)
+.node('!.*', function( row ){
+
+      // This callback will be called everytime a new object is
+      // found in the foods array.
+
+      console.log( 'Go eat some', row);
+   })
+.fail(onError);
 
 function onError (e) {
-	console.log(e.stack);
+	console.log(e);
 }
 
 function onEnd() {
-    console.log('end');
+    console.log( json);
+		var obj = JSON.parse(json); 
+
 }
 
 function onData (data) {
-	console.log(data);
+	json += data;
+	// var obj = JSON.parse(data);
+	// console.log(data);
 }

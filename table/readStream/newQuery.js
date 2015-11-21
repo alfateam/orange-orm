@@ -1,13 +1,23 @@
-var newSingleQuery = require('./query/newSingleQuery');
-var newSubQueries = require('./query/newSubQueries');
-var extractFilter = require('../query/extractFilter');
-var extractOrderBy = require('../query/extractOrderBy');
+var newMySqlQuery = require('./mySql/newQuery');
+var newPgQuery = require('./pg/newQuery');
 
-function newQuery(table,filter,span,alias,orderBy) {	
-	filter = extractFilter(filter);
-	orderBy = extractOrderBy(table,alias,orderBy);
-	var subQueries = newSubQueries(table,span,alias);
-	return newSingleQuery(table,filter,alias,subQueries,orderBy);
+function newQuery(db,table,filter,span,alias,orderBy) {	
+	c = {};
+	var _newQuery;
+
+	c.visitPg = function() {
+		_newQuery = newPgQuery;
+	};
+	c.visitMySql = function() {};
+		_newQuery = newMySqlQuery;
+
+	db.accept(c);
+
+	var args = [];
+	for (var i = 1; i < arguments.length; i++) {
+		args.push(arguments[i]);
+	};
+	return _newQuery.apply(null, args);
 }
 
-module.exports = require('./mySql/newQuery');
+module.exports = newQuery

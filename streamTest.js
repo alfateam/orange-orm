@@ -21,7 +21,7 @@ var strategy = {
     transporter: null
 };
 
-Order.createReadStream(db, null, strategy).on('end', onEnd).on('data', onData);
+// Order.createReadStream(db, null, strategy).on('end', onEnd).on('data', onData);
 Order.createJSONReadStream(db, null, strategy).pipe(process.stdout);
 
 function onEnd() {

@@ -1,7 +1,7 @@
-var newShallowJoinSql = require('../../../query/singleQuery/joinSql/newShallowJoinSqlCore');
+var newShallowJoinSql = require('../../../../query/singleQuery/joinSql/newShallowJoinSqlCore');
 var newQuery = require('../../newQuery');
-var newParameterized = require('../../../query/newParameterized');
-var extractOrderBy = require('../../../query/extractOrderBy');
+var newParameterized = require('../../../../query/newParameterized');
+var extractOrderBy = require('../../../../query/extractOrderBy');
 var util = require('util');
 
 function manyLegToQuery(rightAlias,leg,legNo,filter) {	

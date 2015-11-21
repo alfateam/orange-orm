@@ -14,10 +14,11 @@
         "promise": "6.1.0",
         "mysql": "2.6.2",
         "generic-pool": "2.2.0",
-        "deferred": "0.7.2"
+        "deferred": "0.7.2",
+        "oboe": "*"
     },
     "devDependencies": {
-        "a": "0.4.8"
+        "a": "1.0.2"
     },
     "repository": {
         "type": "git",
