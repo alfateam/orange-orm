@@ -1,13 +1,8 @@
-var newSingleQuery = require('./query/newSingleQuery');
-var newSubQueries = require('./query/newSubQueries');
-var extractFilter = require('../../query/extractFilter');
-var extractOrderBy = require('../../query/extractOrderBy');
+var newQueryCore = require('./newQueryCore');
 
 function newQuery(table,filter,span,alias,orderBy) {	
-	filter = extractFilter(filter);
-	orderBy = extractOrderBy(table,alias,orderBy);
-	var subQueries = newSubQueries(table,span,alias);
-	return newSingleQuery(table,filter,alias,subQueries,orderBy);
+	var query = newQueryCore.apply(null, arguments);
+	return query.prepend('select row_to_json(r)::text as result from (').append(') r');
 }
 
 module.exports = newQuery;

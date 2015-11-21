@@ -1,31 +1,30 @@
-var requireMock = require('a').requireMock;
-var mock = require('a').mock;
-var newSingleQuery = requireMock('./query/newSingleQuery');
-var newSubQueries = requireMock('./query/newSubQueries');
-var extractFilter = requireMock('../../query/extractFilter');
-var extractOrderBy = requireMock('../../query/extractOrderBy');
-
+var a = require('a');
 var table = {};
 var filter = {};
-var initialFilter = {};
 var orderBy = {};
-var initialOrderBy = {};
-var singleQuery = {};
-var subQueries = {};
-
 var span = {};
-var alias = '_2;'
+var alias = '_2';
 var expected = {};
 
 function act(c) {
-	extractFilter.expect(initialFilter).return(filter);
-	extractOrderBy.expect(table, alias, initialOrderBy).return(orderBy);
+	c.mock = a.mock;
+	c.requireMock = a.requireMock;
 
-	newSubQueries.expect(table,span,alias).return(subQueries);
+	c.newQueryCore = c.requireMock('./newQueryCore');
 
 	c.expected = {};
-	newSingleQuery.expect(table,filter,alias,subQueries,orderBy).return(c.expected);
-	c.returned = require('../newQuery')(table,initialFilter,span,alias,initialOrderBy);
+
+	c.queryCore = {};
+	c.newQueryCore.expect(table,filter,span,alias,orderBy).return(c.queryCore);
+
+	c.queryCore.prepend = c.mock();
+	c.prepended = {};
+	c.queryCore.prepend.expect('select row_to_json(r)::text as result from (').return(c.prepended);
+
+	c.prepended.append = c.mock();
+	c.prepended.append.expect(') r').return(c.expected);
+	
+	c.returned = require('../newQuery')(table,filter,span,alias,orderBy);
 }
 
 module.exports = act;

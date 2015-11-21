@@ -1,5 +1,5 @@
 var newShallowJoinSql = require('../../../../query/singleQuery/joinSql/newShallowJoinSqlCore');
-var newQuery = require('../../newQuery');
+var newQuery = require('../../newQueryCore');
 var newParameterized = require('../../../../query/newParameterized');
 var util = require('util');
 

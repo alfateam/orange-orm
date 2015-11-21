@@ -1,5 +1,6 @@
 var rdb = require('./index');
 var table = rdb.table;
+rdb.log(console.log);
 var db = rdb('postgres://test:test@localhost:5432/test');
 
 var Transporter = rdb.table('_order_transporter');
@@ -17,11 +18,14 @@ Order.column('senders_reference').string().as('sendersReference');
 var orderTransporterRelation = Transporter.join(Order).by('order_id').as('order');
 Order.hasOne(orderTransporterRelation).as('transporter');
 
+// Order.createReadStream(db, null, strategy).on('end', onEnd).on('data', onData);
+
 var strategy = {
     transporter: null
 };
 
-// Order.createReadStream(db, null, strategy).on('end', onEnd).on('data', onData);
+// Order.createJSONReadStream(db, null, strategy);
+
 Order.createJSONReadStream(db, null, strategy).pipe(process.stdout);
 
 function onEnd() {
