@@ -8,7 +8,6 @@ function createJSONReadStream(table, db, filter, strategy) {
     	if (started)
         	transformer.push(',' + chunk['result']);
         else {
-            console.log(chunk);
         	transformer.push('[');
         	transformer.push(chunk['result']);
         	started = true;

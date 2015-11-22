@@ -18,10 +18,24 @@ Order.column('senders_reference').string().as('sendersReference');
 var orderTransporterRelation = Transporter.join(Order).by('order_id').as('order');
 Order.hasOne(orderTransporterRelation).as('transporter');
 
+var FreightLine = rdb.table('_order_freight_line');
+
+FreightLine.primaryColumn('id').guid();
+FreightLine.column('order_id').guid().as('orderId');
+FreightLine.column('line_no').numeric().as('lineNo');
+FreightLine.column('description').string();
+
+var orderFreightLinesRelation = FreightLine.join(Order).by('order_id').as('order');
+Order.hasMany(orderFreightLinesRelation).as('lines');
+
 // Order.createReadStream(db, null, strategy).on('end', onEnd).on('data', onData);
 
 var strategy = {
-    transporter: null
+    transporter: null,
+    orderBy: ['poReference'],
+    lines: {
+    	orderBy: ['lineNo']
+    }
 };
 
 // Order.createJSONReadStream(db, null, strategy);

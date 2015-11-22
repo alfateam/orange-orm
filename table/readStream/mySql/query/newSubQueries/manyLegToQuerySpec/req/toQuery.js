@@ -24,7 +24,7 @@ function act(c) {
     table._primaryColumns = primaryColumns;
     leg.table = table
 
-    c.extractOrderBy.expect(table, parentAlias).return(orderBy);
+    c.extractOrderBy.expect(alias, span).return(orderBy);
     c.newShallowJoinSql.expect(table, legColumns, primaryColumns, alias, parentAlias).return(shallowJoin);
     c.newQuery.expect(childTable, span, alias).return(c.query);
 
@@ -32,7 +32,7 @@ function act(c) {
     c.sql = '<selectSql>';
     c.query.sql.expect().return(c.sql);
 
-    c.expected = ",'fooProp',(select cast(concat('[',ifnull(group_concat(<selectSql>),''),']') as json) from <tableName> _1_2 where <shallowJoin><orderBy>)";
+    c.expected = ",'fooProp',(select cast(concat('[',ifnull(group_concat(<selectSql><orderBy>),''),']') as json) from <tableName> _1_2 where <shallowJoin>)";
 
     c.returned = c.sut(parentAlias, leg, legNo);
 }

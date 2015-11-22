@@ -10,7 +10,6 @@ function act(c) {
     c.initialFilter = {};
     c.span = {};
     c.alias = {};
-    c.initialOrderBy = {};
 
     c.db.accept = c.mock();
     

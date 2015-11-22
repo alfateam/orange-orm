@@ -1,6 +1,6 @@
 var rdb = require('./index');
 var table = rdb.table;
-// rdb.log(console.log);
+rdb.log(console.log);
 var db = rdb.mySql('mysql://root@localhost/rdbDemo?multipleStatements=true');
 
 
@@ -19,7 +19,10 @@ Order.hasMany(line_order_relation).as('lines');
 
 
 var strategy = {
-    lines: null
+    lines: {
+      orderBy: ['product']
+    },
+    orderBy: ['orderNo']
 };
 
 // Order.createReadStream(db, null, strategy).on('end', onEnd).on('data', onData);

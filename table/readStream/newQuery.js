@@ -1,7 +1,7 @@
 var newMySqlQuery = require('./mySql/newQuery');
 var newPgQuery = require('./pg/newQuery');
 
-function newQuery(db,table,filter,span,alias,orderBy) {	
+function newQuery(db,table,filter,span,alias) {	
 	c = {};
 	var _newQuery;
 
