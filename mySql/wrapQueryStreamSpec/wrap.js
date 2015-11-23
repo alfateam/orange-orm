@@ -7,13 +7,10 @@ function act(c){
 	c.then = a.then;
 	
 	c.connection = {};
-
-	c.log = c.requireMock('../table/log');
-
-	c.runQuery = c.mock();
-	c.connection.query = c.runQuery;
+	c.executeQuery = c.mock();
+	c.connection.executeQuery = c.executeQuery;
 	
-	c.sut = require('../wrapQuery')(c.connection);
+	c.sut = require('../wrapQueryStream')(c.connection);
 }
 
 module.exports = act;

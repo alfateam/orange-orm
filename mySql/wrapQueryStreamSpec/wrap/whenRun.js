@@ -2,5 +2,4 @@ var when = require('a').when;
 var c = {};
 
 when(c)
-	.it('should log query').assertDoesNotThrow(c.log.verify)
-	.it('should execute query').assertDoesNotThrow(c.runQuery.verify)
+	.it('should execute query and return value').assertEqual(c.expected, c.returned)
