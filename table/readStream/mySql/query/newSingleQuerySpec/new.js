@@ -9,6 +9,7 @@ var alias = '_2';
 var parameters = {};
 var subQueries = ' <subQueries>';
 var orderBy = ' <orderBy>';
+var limit = ' <limit>';
 
 function act(c) {
 	c.requireMock = a.requireMock;
@@ -22,7 +23,7 @@ function act(c) {
     c.newColumnSql = newColumnSql;
     c.newWhereSql = newWhereSql;
 
-    c.sut = require('../newSingleQuery')(table, filter, alias, subQueries, orderBy);
+    c.sut = require('../newSingleQuery')(table, filter, alias, subQueries, orderBy, limit);
 }
 
 module.exports = act;

@@ -34,8 +34,9 @@ var strategy = {
     transporter: null,
     orderBy: ['poReference'],
     lines: {
-    	orderBy: ['lineNo']
-    }
+    	orderBy: ['lineNo']    	
+    },
+    limit: 1
 };
 
 // Order.createJSONReadStream(db, null, strategy);

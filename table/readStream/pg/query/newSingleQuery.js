@@ -1,7 +1,7 @@
 var newColumnSql = require('./singleQuery/newShallowColumnSql');
 var newWhereSql = require('../../../query/singleQuery/newWhereSql');
 
-function _new(table,filter,alias,subQueries,orderBy) {
+function _new(table,filter,alias,subQueries,orderBy,limit) {
 	var c = {};
 
 	c.sql = function() {
@@ -9,7 +9,7 @@ function _new(table,filter,alias,subQueries,orderBy) {
 		var columnSql = newColumnSql(table,alias);
 		var whereSql = newWhereSql(table,filter,alias);
 		return 'select ' + columnSql + subQueries 
-			+ ' from ' + name + ' ' + alias  + whereSql + orderBy;
+			+ ' from ' + name + ' ' + alias  + whereSql + orderBy + limit;
 	};
 
 	c.parameters = filter.parameters;	

@@ -20,9 +20,10 @@ Order.hasMany(line_order_relation).as('lines');
 
 var strategy = {
     lines: {
-      orderBy: ['product']
+      orderBy: ['product'],
     },
-    orderBy: ['orderNo']
+    orderBy: ['orderNo'],
+    limit: 2
 };
 
 // Order.createReadStream(db, null, strategy).on('end', onEnd).on('data', onData);
