@@ -13,15 +13,14 @@ function act(c){
 	c.createReadStreamCore = c.requireMock('./createReadStreamCore');
 	c.Stream = c.requireMock('stream');
 
-	c.Stream.PassThrough = c.mock();
+	c.Stream.Transform = c.mock();
 	c.transformer = {};
-	c.Stream.PassThrough.expect({objectMode: true}).return(c.transformer);
+	c.Stream.Transform.expect({objectMode: true}).return(c.transformer);
 	
 	c.expected = {};
 	c.createReadStreamCore.expect(c.table, c.db, c.filter, c.strategy, c.transformer).return(c.expected);
 
 	c.returned = require('../createReadStream')(c.table, c.db, c.filter, c.strategy);
-
 }
 
 module.exports = act;

@@ -7,26 +7,29 @@ function act(c) {
     c.then = a.then;
 
     c.transformer.push = c.mock();
+    c.expectedObject1 = {
+        a: 1,
+        b: 2
+    };
+    c.expectedObject2 = {
+        a: 11,
+        b: 22
+    };
     c.chunk = {
-        result: {
-        }
+        result: JSON.stringify(c.expectedObject1)
     };
     c.chunk2 = {
-        result: {
-        }
+        result: JSON.stringify(c.expectedObject2)
     };
     c.enc = {};
     c.cb = c.mock();
-    c.cb.expect().repeat(3);
+    c.cb.expect().repeat(2);
 
-    c.transformer.push.expect('[');
-    c.transformer.push.expect(c.chunk.result);
-    c.transformer.push.expect(',' + c.chunk2.result);
-    c.transformer.push.expect(']');
+    c.transformer.push.expect(c.expectedObject1);
+    c.transformer.push.expect(c.expectedObject2);
 
     c.transformer._transform(c.chunk, c.enc, c.cb);
     c.transformer._transform(c.chunk2, c.enc, c.cb);
-    c.transformer._flush(c.cb);
 }
 
 module.exports = act;
