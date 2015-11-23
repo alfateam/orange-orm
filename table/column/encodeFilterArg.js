@@ -1,8 +1,8 @@
 function encodeFilterArg (column, arg) {
 	if (column.encode.safe)
-		return column.encode.safe(column, arg);
+		return column.encode.safe(arg);
 	else
-		return column.encode(column, arg);
+		return column.encode(arg);
 }
 
 module.exports = encodeFilterArg;
