@@ -1,7 +1,7 @@
 var rdb = require('./index');
 var table = rdb.table;
 rdb.log(console.log);
-var db = rdb.mySql('mysql://root@localhost/rdbDemo?multipleStatements=true');
+var db = rdb.mySql('mysql://guest:guest@localhost/rdbDemo?multipleStatements=true');
 
 
 var Order = rdb.table('_order');
@@ -33,12 +33,8 @@ var stream = Order.createJSONReadStream(db, null, strategy);
 
 var oboe = require('oboe');
 oboe(stream)
-.node('!.*', function( row ){
-
-      // This callback will be called everytime a new object is
-      // found in the foods array.
-
-      console.log( 'Go eat some', row);
+.node('![*]', function( row ){
+      console.log(row);
    })
 .fail(onError);
 
@@ -47,8 +43,8 @@ function onError (e) {
 }
 
 function onEnd() {
-    console.log( json);
-		var obj = JSON.parse(json); 
+    console.log( 'done...........');
+		// var obj = JSON.parse(json); 
 
 }
 
