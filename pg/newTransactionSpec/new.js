@@ -12,6 +12,8 @@ function act(c){
 	c.wrapQueryStream = c.requireMock('./wrapQueryStream');
 	c.wrapQuery = requireMock('./wrapQuery');
 	c.encodeBuffer = c.requireMock('./encodeBuffer');
+	c.encodeDate = c.requireMock('./encodeDate');
+
 
 	c.deleteFromSql = c.requireMock('./deleteFromSql');
 

@@ -1,5 +1,6 @@
 var newParameterized = require('../query/newParameterized');
 var newBoolean = require('./newBoolean');
+var encodeFilterArg = require('./encodeFilterArg');
 
 function _in(column,values,alias) {
 	var filter;
@@ -12,7 +13,7 @@ function _in(column,values,alias) {
 	var separator = '(';
 
 	for (var i = 0; i < values.length; i++) {
-		var encoded = column.encode(values[i]);		
+		var encoded = encodeFilterArg(column, values[i]);
 		parameterized = parameterized.append(separator).append(encoded);
 		separator = ',';		
 	}

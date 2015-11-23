@@ -1,20 +1,27 @@
 var newPara = require('../../query/newParameterized');
 var purify = require('./purify');
+var newEncodeSafe = require('../newEncodeSafe');
+var getSessionSingleton = require('../../getSessionSingleton');
 
 function _new(column) {
 
-	return function(value) {
 
+	var encode = function(value) {
 		value = purify(value);
 		if (value == null) {
 			if (column.dbNull === null)
 				return newPara('null');
 			return newPara('\'' + column.dbNull + '\'');
 		}
-		if (value.toISOString)
-			value = value.toISOString();		
+		if (value.toISOString) {
+			var encodeCore = getSessionSingleton('encodeDate');
+			return newPara(encodeCore(value));
+		}
 		return newPara("'" + value + "'");
 	};
+
+	encode.safe = newEncodeSafe(column, purify);
+	return encode;
 
 }
 

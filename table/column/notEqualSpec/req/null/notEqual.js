@@ -11,8 +11,8 @@ function act(c) {
 	encoded.sql.expect().return(sql);
 	encoded.prepend = mock();
 	encoded.prepend.expect(firstPart).return(filter);
-	c.column.encode = mock();
-	c.column.encode.expect(arg).return(encoded);	
+
+	c.encodeFilterArg.expect(c.column, arg).return(encoded);
 
 	c.newBoolean.expect(filter).return(c.expected);
 
