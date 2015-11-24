@@ -8,14 +8,13 @@
     "license": "MIT",
     "scripts": { "test" : "jshint ./ && a" } ,
     "dependencies": {
-        "pg": "4.3.0",
+        "pg": "4.4.3",
         "pg-query-stream": "*",
         "node-uuid": "1.4.2",
         "promise": "6.1.0",
-        "mysql": "2.6.2",
+        "mysql": "2.9.0",
         "generic-pool": "2.2.0",
-        "deferred": "0.7.2",
-        "oboe": "*"
+        "deferred": "0.7.2"
     },
     "devDependencies": {
         "a": "1.0.2"

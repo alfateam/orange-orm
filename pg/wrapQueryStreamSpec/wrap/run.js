@@ -1,5 +1,5 @@
 function act(c){
-	c.onCompleted = c.mock();
+	c.options = {};
 	c.parameters = {};
 	c.query = {};
 	c.sql = {};
@@ -8,14 +8,14 @@ function act(c){
 	c.replaceParamChar.expect(c.query, c.parameters).return(c.sql);
 
 	c.streamableQuery = {};
-	c.newQueryStreamCore.expect(c.sql, c.parameters).return(c.streamableQuery);
+	c.newQueryStreamCore.expect(c.sql, c.parameters, c.options).return(c.streamableQuery);
 	c.stream = {};
 	c.runQuery.expect(c.streamableQuery).return(c.stream);
 
 	c.log.expect(c.sql);
 	c.log.expect('parameters: ' + c.parameters);
 
-	c.returned = c.sut(c.query, c.onCompleted);
+	c.returned = c.sut(c.query, c.options);
 }
 
 module.exports = act;

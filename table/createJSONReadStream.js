@@ -1,7 +1,7 @@
 var createReadStreamCore = require('./createReadStreamCore');
 var Stream = require('stream');
 
-function createJSONReadStream(table, db, filter, strategy) {
+function createJSONReadStream(table, db, filter, strategy, streamOptions) {
     var transformer = Stream.Transform({ objectMode: true });
     var started;
     transformer._transform = function(chunk, enc, cb) {
@@ -21,7 +21,7 @@ function createJSONReadStream(table, db, filter, strategy) {
     	cb();
     };
 
-    return createReadStreamCore(table, db, filter, strategy, transformer);
+    return createReadStreamCore(table, db, filter, strategy, transformer, streamOptions);
 }
 
 module.exports = createJSONReadStream;

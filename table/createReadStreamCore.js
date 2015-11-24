@@ -5,7 +5,7 @@ var newQueryStream = require('./readStream/newQueryStream');
 var deferred = require('deferred');
 var domain = require('domain');
 
-function createReadStreamCore(table, db, filter, strategy, transformer) {
+function createReadStreamCore(table, db, filter, strategy, transformer, streamOptions) {
     var alias = table._dbName;
     filter = negotiateRawSqlFilter(filter);
     var span = strategyToSpan(table, strategy);
@@ -17,25 +17,25 @@ function createReadStreamCore(table, db, filter, strategy, transformer) {
 
     db.transaction()
         .then(start)
-        .then(null, onError)
         .then(db.commit)
-        .then(null, db.rollback)
+        .then(null, onError)
 
-function onError(e) {
-    console.log(e.stack);
-}
     function start() {
         var query = newQuery(db, table, filter, span, alias);
-        var queryStream = newQueryStream(query);
+        var queryStream = newQueryStream(query, streamOptions);
+        queryStream.on('end', def.resolve);
+        queryStream.on('error', onStreamError);
         queryStream.pipe(transformer);
-        queryStream.on('end', onEnd);
-        queryStream.on('error', def.reject);
-
-        function onEnd() {
-            def.resolve();
-        }
-
         return def.promise;
+    }
+
+    function onStreamError(e) {
+        def.reject(e);
+    }
+
+    function onError(e) {
+        db.rollback();
+        transformer.emit('error', e);
     }
 
     return transformer;

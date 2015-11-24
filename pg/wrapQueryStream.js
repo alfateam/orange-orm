@@ -6,12 +6,12 @@ function wrapQueryStream(connection) {
 	var runOriginalQuery = connection.query;
 	return runQuery;
 
-	function runQuery(query) {
+	function runQuery(query, options) {
 		var params = query.parameters;
 		var sql = replaceParamChar(query, params);
 		log(sql);
 		log('parameters: ' + params);
-		query = newStreamableQuery(sql, params);
+		query = newStreamableQuery(sql, params, options);
 
 		return runOriginalQuery.call(connection, query);
 	}
