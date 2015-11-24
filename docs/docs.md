@@ -1620,7 +1620,8 @@ function printLine(line) {
     var format = 'Line Id: %s, Order Id: %s, Product: %s';
     console.log(format, line.id, line.orderId, line.product);
 }
-```<a name="_streamjsoneager"></a>
+```
+<a name="_streamjsoneager"></a>
 [streaming json](https://github.com/alfateam/rdb-demo/blob/master/streamJSONEager.js)
 ```js
 var rdb = require('rdb');
