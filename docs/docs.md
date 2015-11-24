@@ -32,6 +32,9 @@ __Basic querying__
 [(many)ToDto with strategy](#_manytodtowithstrategy)  
 [(many)ToJSON](#_manytojson)  
 [(many)ToJSON with strategy](#_manytojsonwithstrategy)  
+__Streaming__  
+[streaming rows](#_streameager)  
+[streaming json](#_streamjsoneager)  
 __Persistence__  
 [update](#_update)  
 [insert](#_insert)  
@@ -1575,6 +1578,78 @@ function onFailed(err) {
     console.log('Rollback');
     console.log(err);
 }
+```
+<a name="_streameager"></a>
+[streaming rows](https://github.com/alfateam/rdb-demo/blob/master/streamEager.js)
+```js
+var rdb = require('rdb');
+
+var Order = rdb.table('_order');
+var OrderLine = rdb.table('_orderLine');
+
+Order.primaryColumn('oId').guid().as('id');
+Order.column('oOrderNo').string().as('orderNo');
+
+OrderLine.primaryColumn('lId').guid().as('id');
+OrderLine.column('lOrderId').guid().as('orderId');
+OrderLine.column('lProduct').string().as('product');
+
+var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+Order.hasMany(line_order_relation).as('lines');
+
+var db = rdb('postgres://postgres:postgres@localhost/test');
+
+var emptyFilter;
+var strategy = {
+    lines: {
+        orderBy: ['product']
+    },
+    orderBy: ['orderNo'],
+    limit: 5,
+};
+
+Order.createReadStream(db, emptyFilter, strategy).on('data', printOrder);
+
+function printOrder(order) {
+    var format = 'Order Id: %s, Order No: %s';
+    console.log(format, order.id, order.orderNo);
+    order.lines.forEach(printLine);
+}
+
+function printLine(line) {
+    var format = 'Line Id: %s, Order Id: %s, Product: %s';
+    console.log(format, line.id, line.orderId, line.product);
+}
+```<a name="_streamjsoneager"></a>
+[streaming json](https://github.com/alfateam/rdb-demo/blob/master/streamJSONEager.js)
+```js
+var rdb = require('rdb');
+
+var Order = rdb.table('_order');
+var OrderLine = rdb.table('_orderLine');
+
+Order.primaryColumn('oId').guid().as('id');
+Order.column('oOrderNo').string().as('orderNo');
+
+OrderLine.primaryColumn('lId').guid().as('id');
+OrderLine.column('lOrderId').guid().as('orderId');
+OrderLine.column('lProduct').string().as('product');
+
+var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+Order.hasMany(line_order_relation).as('lines');
+
+var db = rdb('postgres://postgres:postgres@localhost/test');
+
+var emptyFilter;
+var strategy = {
+    lines: {
+        orderBy: ['product']
+    },
+    orderBy: ['orderNo'],
+    limit: 5,
+};
+
+Order.createJSONReadStream(db, emptyFilter, strategy).pipe(process.stdout);
 ```
 <a name="_update"></a>
 [update](https://github.com/alfateam/rdb-demo/blob/master/update.js)
