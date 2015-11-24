@@ -8,8 +8,7 @@ function _new(table,filter,alias,subQueries,orderBy,limit) {
 		var name = table._dbName;
 		var columnSql = newColumnSql(table,alias);
 		var whereSql = newWhereSql(table,filter,alias);
-		return 'select ' + columnSql + subQueries 
-			+ ' from ' + name + ' ' + alias  + whereSql + orderBy + limit;
+		return 'select ' + columnSql + subQueries + ' from ' + name + ' ' + alias  + whereSql + orderBy + limit;
 	};
 
 	c.parameters = filter.parameters;	

@@ -10,7 +10,7 @@ var parentAlias = '_1',
 	shallowJoin = {},
 	primaryColumns = {},
 	parameterized = {},
-	name = 'fooProp';
+	name = 'fooProp',
 	filter = {};
 
 function act(c) {

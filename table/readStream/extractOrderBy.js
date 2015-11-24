@@ -2,15 +2,16 @@ function extractOrderBy(alias, span) {
     var table = span.table;
     var dbNames = [];
     var orderBy = span.orderBy;
+    var i;
     if (span.orderBy) {
         if (typeof orderBy === 'string')
             orderBy = [orderBy];
-        for (var i = 0; i < orderBy.length; i++) {
+        for (i = 0; i < orderBy.length; i++) {
             var nameAndDirection = extractNameAndDirection(orderBy[i]);
             pushColumn(nameAndDirection.name, nameAndDirection.direction);
         }
     } else
-        for (var i = 0; i < table._primaryColumns.length; i++) {
+        for (i = 0; i < table._primaryColumns.length; i++) {
             pushColumn(table._primaryColumns[i].alias);
         }
 

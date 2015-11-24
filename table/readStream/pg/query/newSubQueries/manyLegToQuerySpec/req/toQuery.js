@@ -11,7 +11,7 @@ var parentAlias = '_1',
 	primaryColumns = {},
 	parameterized = {},
 	filter = {},
-	name = 'fooProp';
+	name = 'fooProp',
 	orderBy = {};
 
 function act(c) {
@@ -32,7 +32,7 @@ function act(c) {
 	c.sql = '<selectSql>';
 	c.query.sql.expect().return(c.sql);
 
-	c.expected = ',(select array_to_json(array_agg(row_to_json(r))) from (<selectSql>) r ) "fooProp"' ;
+	c.expected = ',(select coalesce(array_to_json(array_agg(row_to_json(r))),\'[]\') from (<selectSql>) r ) "fooProp"' ;
 
 	c.returned = c.sut(parentAlias,leg,legNo,filter);
 }

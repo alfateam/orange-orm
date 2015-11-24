@@ -2,7 +2,7 @@ var newMySqlQuery = require('./mySql/newQuery');
 var newPgQuery = require('./pg/newQuery');
 
 function newQuery(db,table,filter,span,alias) {	
-	c = {};
+	var c = {};
 	var _newQuery;
 
 	c.visitPg = function() {
@@ -16,7 +16,7 @@ function newQuery(db,table,filter,span,alias) {
 	var args = [];
 	for (var i = 1; i < arguments.length; i++) {
 		args.push(arguments[i]);
-	};
+	}
 	return _newQuery.apply(null, args);
 }
 

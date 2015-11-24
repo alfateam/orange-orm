@@ -2,7 +2,7 @@ var a = require('a');
 var requireMock = a.requireMock;
 
 function act(c) {
-    c.newBoolean = requireMock('./newBoolean');;
+    c.newBoolean = requireMock('./newBoolean');
     c.encodeFilterArg = requireMock('./encodeFilterArg');
 
     c.mock = a.mock;
