@@ -18,9 +18,11 @@ var _delete = requireMock('./table/delete');
 var cascadeDelete = requireMock('./table/cascadeDelete');
 var createReadStream = requireMock('./table/createReadStream');
 var createJSONReadStream = requireMock('./table/createJSONReadStream');
+
 var tableName = {};
 
 function act(c) {	
+
 	c.insert = insert;
 	c.context = {};
 	newObject.expect().return(c.context);

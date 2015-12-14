@@ -16,87 +16,96 @@ var createReadStream = require('./table/createReadStream');
 var createJSONReadStream = require('./table/createJSONReadStream');
 
 function _new(tableName) {
-	var table = newContext();
-	table._dbName = tableName;
-	table._primaryColumns = [];
-	table._columns = [];
-	table._columnDiscriminators = [];
-	table._formulaDiscriminators = [];
-	table._relations = {};
-	table._cache = 	newCache(table);
-	
-	table.primaryColumn = function(columnName) {
-		var columnDef = newColumn(table,columnName);
-		table._primaryColumns.push(columnDef);
-		return column(columnDef,table);
-	};
+    var table = newContext();
+    table._dbName = tableName;
+    table._primaryColumns = [];
+    table._columns = [];
+    table._columnDiscriminators = [];
+    table._formulaDiscriminators = [];
+    table._relations = {};
+    table._cache = newCache(table);
 
-	table.column = function(columnName) {
-		var columnDef = newColumn(table,columnName);
-		return column(columnDef,table);
-	};
+    table.primaryColumn = function(columnName) {
+        var columnDef = newColumn(table, columnName);
+        table._primaryColumns.push(columnDef);
+        return column(columnDef, table);
+    };
 
-	table.join = function(relatedTable) {
-		return join(table,relatedTable);
-	};
+    table.column = function(columnName) {
+        var columnDef = newColumn(table, columnName);
+        return column(columnDef, table);
+    };
 
-	table.hasMany = function(joinRelation) {
-		return hasMany(joinRelation);
-	};
+    table.join = function(relatedTable) {
+        return join(table, relatedTable);
+    };
 
-	table.hasOne = function(joinRelation) {
-		return hasOne(joinRelation);		
-	};
+    table.hasMany = function(joinRelation) {
+        return hasMany(joinRelation);
+    };
 
-	table.getMany = function() {
-		return call(getMany,arguments);
-	};
+    table.hasOne = function(joinRelation) {
+        return hasOne(joinRelation);
+    };
 
-	table.tryGetFirst = function() {
-		return call(tryGetFirst, arguments);
-	};
+    table.getMany = function() {
+        return call(getMany, arguments);
+    };
 
-	function call(func,args) {
-		var mergedArgs = [table];
-		for (var i = 0; i < args.length; i++) {
-			mergedArgs.push(args[i]);
-		}
-		return func.apply(null,mergedArgs);
-	}
-	
-	table.getById = function() {
-		return call(getById,arguments);
-	};
+    table.tryGetFirst = function() {
+        return call(tryGetFirst, arguments);
+    };
 
-	table.tryGetById = function() {
-		return call(tryGetById,arguments);
-	};
+    function call(func, args) {
+        var mergedArgs = [table];
+        for (var i = 0; i < args.length; i++) {
+            mergedArgs.push(args[i]);
+        }
+        return func.apply(null, mergedArgs);
+    }
 
-	table.columnDiscriminators = function() {
-		for (var i = 0; i < arguments.length; i++) {
-			table._columnDiscriminators.push(arguments[i]);
-		}
-		return table;		
-	};
+    table.getById = function() {
+        return call(getById, arguments);
+    };
 
-	table.formulaDiscriminators = function() {
-		for (var i = 0; i < arguments.length; i++) {
-			table._formulaDiscriminators.push(arguments[i]);
-		}
-		return table;
-	};
+    table.tryGetById = function() {
+        return call(tryGetById, arguments);
+    };
 
-	table.insert = function() {
-		return call(insert,arguments);
-	};
+    table.columnDiscriminators = function() {
+        for (var i = 0; i < arguments.length; i++) {
+            table._columnDiscriminators.push(arguments[i]);
+        }
+        return table;
+    };
 
-	table.delete = _delete.bind(null,table);
-	table.cascadeDelete = cascadeDelete.bind(null,table);
+    table.formulaDiscriminators = function() {
+        for (var i = 0; i < arguments.length; i++) {
+            table._formulaDiscriminators.push(arguments[i]);
+        }
+        return table;
+    };
 
-	table.createReadStream = createReadStream.bind(null, table);
-	table.createJSONReadStream = createJSONReadStream.bind(null, table);
+    table.insert = function() {
+        return call(insert, arguments);
+    };
 
-	return table;	
+    table.delete = _delete.bind(null, table);
+    table.cascadeDelete = cascadeDelete.bind(null, table);
+
+    table.createReadStream = createReadStream.bind(null, table);
+    table.createJSONReadStream = createJSONReadStream.bind(null, table);
+    table.exclusive = function() {
+        var c = require('util')._extend({}, table);
+        Object.defineProperty(c, "_exclusive", {
+            enumerable: false,
+            value: true
+        });
+        return c;
+    };
+
+
+    return table;
 }
 
 module.exports = _new;
