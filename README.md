@@ -14,7 +14,7 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 ## Release notes
 __1.2.0__  
-Exclusive row locks  
+Exclusive row locks for updates  
 __1.1.0__  
 Now supporting streaming.  Requires postgres or MySQL >=5.7.7  
 __1.0.8__  
