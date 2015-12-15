@@ -47,7 +47,7 @@ __Persistence__
 [update a join-relation](#_updatejoin)  
 [update a hasOne-relation](#_updatehasone)  
 [update a hasMany-relation](#_updatehasmany)  
-[locking](#_exclusive) 
+[locking](#_locking) 
 
 __Filters__  
 [equal](#_equal)  
