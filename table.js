@@ -96,11 +96,17 @@ function _new(tableName) {
     table.createReadStream = createReadStream.bind(null, table);
     table.createJSONReadStream = createJSONReadStream.bind(null, table);
     table.exclusive = function() {
-        var c = require('util')._extend({}, table);
-        Object.defineProperty(c, "_exclusive", {
-            enumerable: false,
-            value: true
-        });
+        var c = {};
+        for (var i in table) {
+            c[i] = table[i];
+        }
+        c._exclusive = true;
+
+        // var c = require('util')._extend({}, table);
+        // Object.defineProperty(c, "_exclusive", {
+        //     enumerable: false,
+        //     value: true
+        // });
         return c;
     };
 

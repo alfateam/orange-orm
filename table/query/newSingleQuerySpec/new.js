@@ -29,6 +29,7 @@ function act(c) {
     c.queryContext = c.mock();
     c.newqueryContext = c.requireMock('./singleQuery/newQueryContext');
     c.newqueryContext.expect(filter, alias, innerJoin).return(c.queryContext);
+    c.negotiateExclusive = c.requireMock('./singleQuery/negotiateExclusive');    
 
     c.sut = require('../newSingleQuery')(table, filter, span, alias, innerJoin, orderBy);
 }
