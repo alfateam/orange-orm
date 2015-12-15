@@ -2180,7 +2180,8 @@ function onFailed(err) {
     console.log('Rollback');
     console.log(err);
 }
-```<a name="_locking"></a>
+```
+<a name="_locking"></a>
 [locking](https://github.com/alfateam/rdb-demo/blob/master/exclusive.js)
 ```js
 var rdb = require('rdb');
