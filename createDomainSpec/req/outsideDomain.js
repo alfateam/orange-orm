@@ -6,6 +6,8 @@ function act(c) {
 	c.newDomain = {};
 	c.Domain.create.expect().return(c.newDomain);
 
+	c.stubDomainExit();
+
 	c.returned = c.sut();
 }
 

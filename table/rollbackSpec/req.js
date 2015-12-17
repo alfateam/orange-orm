@@ -1,17 +1,16 @@
-
 var a  = require('a');
-var mock = a.mock;
-var requireMock  = a.requireMock;
-
 
 function act(c){		
-	c.mock = mock;
-	c.rollbackCommand = requireMock('./commands/rollbackCommand');
-	c.executeQuery = requireMock('./executeQueries/executeQuery');
-	c.releaseDbClient = requireMock('./releaseDbClient');
-	c.popChanges = requireMock('./popChanges');
-	c.newThrow = requireMock('./newThrow');
-	c.resultToPromise = requireMock('./resultToPromise');
+	c.mock = a.mock;
+	c.requireMock = a.requireMock;
+	
+	c.rollbackCommand = c.requireMock('./commands/rollbackCommand');
+	c.executeQuery = c.requireMock('./executeQueries/executeQuery');
+	c.releaseDbClient = c.requireMock('./releaseDbClient');
+	c.popChanges = c.requireMock('./popChanges');
+	c.newThrow = c.requireMock('./newThrow');
+	c.resultToPromise = c.requireMock('./resultToPromise');
+	c.getSessionSingleton = c.requireMock('./getSessionSingleton');	
 	
 	c.sut = require('../rollback');
 }

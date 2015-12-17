@@ -2,5 +2,5 @@ var when = require('a').when;
 var c = {};
 
 when(c)
-	.it('should return releasePromise without throwing').assertEqual(c.expected, c.returned)
-;
+    .it('should return domainExit promise').assertEqual(c.domainExit.promise, c.returned)
+    .it('should release client').assertDoesNotThrow(c.releasePromise.then.verify)      

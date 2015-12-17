@@ -1,5 +1,10 @@
 function act(c){		
-	c.expected = {};
+	c.domainExit = {
+		promise: {},
+		reject: {}
+	};
+
+	c.getSessionSingleton.expect('domainExit').return(c.domainExit);
 
 	c.emptyPromise = {};
 	c.resultToPromise.expect().return(c.emptyPromise);
@@ -21,7 +26,11 @@ function act(c){
 	c.rollbackPromise.then.expect(c.releaseDbClient).return(c.releasePromise);
 
 	c.error = {};
-	c.newThrow.expect(c.error, c.releasePromise).return(c.expected);
+	c.throwPromise = {};
+	c.newThrow.expect(c.error, c.releasePromise).return(c.throwPromise);
+
+	c.throwPromise.then = c.mock();
+	c.throwPromise.then.expect(null, c.domainExit.reject);	
 	
 	c.returned = c.sut(c.error);
 }

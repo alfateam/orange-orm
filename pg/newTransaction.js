@@ -22,7 +22,9 @@ function newResolveTransaction(domain, pool) {
             rdb.encodeBuffer = encodeBuffer;
             rdb.encodeDate = encodeDate;
             rdb.deleteFromSql = deleteFromSql;
-            domain.rdb = rdb;    
+            domain.rdb = rdb;
+            domain.rdb.domainExit = domain.domainExit;
+            domain.domainExit = undefined;
             onSuccess();
         }
     };

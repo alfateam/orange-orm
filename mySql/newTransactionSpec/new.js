@@ -11,7 +11,9 @@ function act(c){
 	c.deleteFromSql = c.requireMock('./deleteFromSql');
 	c.encodeDate = c.requireMock('./encodeDate');
 	
-	
+	c.domainExit = {};
+	c.domain.domainExit = c.domainExit;
+
 	c.sut = require('../newTransaction')(c.domain, c.pool);
 }
 

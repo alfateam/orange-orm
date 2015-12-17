@@ -1,4 +1,12 @@
-function act(c){		
+function act(c){
+	c.domainExit = {
+		promise: {},
+		resolve: {},
+		reject: {}
+	};
+	
+	c.getSessionSingleton.expect('domainExit').return(c.domainExit);
+
 	c.emptyPromise = {};
 	c.resultToPromise.expect().return(c.emptyPromise);
 
@@ -17,6 +25,10 @@ function act(c){
 	c.rollbackPromise.then = c.mock();
 	c.releasePromise = {};
 	c.rollbackPromise.then.expect(c.releaseDbClient).return(c.releasePromise);
+
+	c.releasePromise.then = c.mock();
+	c.releasePromise.then.expect(c.domainExit.resolve, c.domainExit.reject);
+	
 
 	c.expected = c.releasePromise;
 	

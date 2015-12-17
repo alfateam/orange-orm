@@ -11,3 +11,7 @@ when(c)
     .it('should invoke success callback').assertDoesNotThrow(c.onSuccess.verify)
     .it('should set executeQuery').assertEqual(c.wrappedQuery, c.client.executeQuery)
     .it('should set streamQuery').assertEqual(c.wrappedQueryStream, c.client.streamQuery)
+    .it('should set rdb.domainExit').assertEqual(c.domainExit, c.domain.rdb.domainExit)
+    .it('should clear domain.domainExit').assertEqual(undefined, c.domain.domainExit)
+    
+    
