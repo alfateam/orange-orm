@@ -13,6 +13,8 @@ Eager or lazy loading.
 Based on promises.  
 [Documentation and examples](docs/docs.md)  
 ## Release notes
+__1.2.2__  
+Exlusive no longer returns a clone of table. It has changes current table to exclusive locking.  
 __1.2.1__  
 Bugfix: Exclusive row locks  
 __1.2.0__  

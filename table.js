@@ -96,13 +96,8 @@ function _new(tableName) {
     table.createReadStream = createReadStream.bind(null, table);
     table.createJSONReadStream = createJSONReadStream.bind(null, table);
     table.exclusive = function() {
-        var c = require('./table')();
-        for (var i in table) {
-            if (i.substring(0,1) === '_')
-                c[i] = table[i];
-        }
-        c._exclusive = true;
-        return c;
+        table._exclusive = true;
+        return table;
     };
     return table;
 }
