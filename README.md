@@ -13,8 +13,10 @@ Eager or lazy loading.
 Based on promises.  
 [Documentation and examples](docs/docs.md)  
 ## Release notes
+__1.2.1__  
+Bugfix: Exclusive row locks  
 __1.2.0__  
-Exclusive row locks for updates  
+Exclusive row locks  
 __1.1.0__  
 Now supporting streaming.  Requires postgres or MySQL >=5.7.7  
 __1.0.8__  

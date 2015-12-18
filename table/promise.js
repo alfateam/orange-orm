@@ -1,4 +1,4 @@
-var promise = require('promise/domains');
+var promise = require('promise');
 var deferred = require('deferred');
 var objectToCallback = require('./objectToCallback');
 

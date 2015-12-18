@@ -1,6 +1,6 @@
 {
     "name": "rdb",
-    "version": "1.2.0",
+    "version": "1.2.1",
     "main": "index.js",
     "title": "rdb",
     "description": "Object Relational Mapper",
@@ -11,7 +11,7 @@
         "pg": "4.4.3",
         "pg-query-stream": "^1.0.0",
         "node-uuid": "^1.4.7",
-        "promise": "^7.0.4",
+        "promise": "^6.1.0",
         "mysql": "^2.10.0",
         "generic-pool": "^2.2.2",
         "deferred": "^0.7.4"

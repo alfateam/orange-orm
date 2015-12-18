@@ -23,6 +23,7 @@ var tableName = {};
 
 function act(c) {	
 
+	c.requireMock = requireMock;
 	c.insert = insert;
 	c.context = {};
 	newObject.expect().return(c.context);

@@ -740,7 +740,7 @@ DeliveryAddress.column('dOrderId').string().as('orderId');
 DeliveryAddress.column('dName').string().as('name');
 DeliveryAddress.column('dStreet').string().as('street');
 
-var order_customer_relation = Order.join(Customer).by('customerId').as('customer');
+var order_customer_relation = Order.join(Customer).by('oCustomerId').as('customer');
 
 var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
@@ -1025,7 +1025,7 @@ DeliveryAddress.column('dOrderId').string().as('orderId');
 DeliveryAddress.column('dName').string().as('name');
 DeliveryAddress.column('dStreet').string().as('street');
 
-var order_customer_relation = Order.join(Customer).by('customerId').as('customer');
+var order_customer_relation = Order.join(Customer).by('oCustomerId').as('customer');
 
 var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
@@ -1337,7 +1337,7 @@ DeliveryAddress.column('dOrderId').string().as('orderId');
 DeliveryAddress.column('dName').string().as('name');
 DeliveryAddress.column('dStreet').string().as('street');
 
-var order_customer_relation = Order.join(Customer).by('customerId').as('customer');
+var order_customer_relation = Order.join(Customer).by('oCustomerId').as('customer');
 
 var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
@@ -1472,7 +1472,7 @@ DeliveryAddress.column('dOrderId').string().as('orderId');
 DeliveryAddress.column('dName').string().as('name');
 DeliveryAddress.column('dStreet').string().as('street');
 
-var order_customer_relation = Order.join(Customer).by('customerId').as('customer');
+var order_customer_relation = Order.join(Customer).by('oCustomerId').as('customer');
 
 var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
