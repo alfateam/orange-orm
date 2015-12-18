@@ -2190,7 +2190,7 @@ var promise = require('promise');
 var Customer = rdb.table('_customer');
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cBalance').numeric().as('balance');
-Customer = Customer.exclusive();
+Customer.exclusive();
 
 var db = rdb('postgres://postgres:postgres@localhost/test');
 
