@@ -13,6 +13,8 @@ Eager or lazy loading.
 Based on promises.  
 [Documentation and examples](docs/docs.md)  
 ## Release notes
+__1.2.3__  
+Bugfix: [iEqual gave incorrect sql when parameterized.](https://github.com/alfateam/rdb/issues/17)  
 __1.2.2__  
 Exlusive no longer returns a clone of table. It has changes current table to exclusive locking.  
 __1.2.1__  
