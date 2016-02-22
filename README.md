@@ -13,6 +13,8 @@ Eager or lazy loading.
 Based on promises.  
 [Documentation and examples](docs/docs.md)  
 ## Release notes
+__1.3.0__  
+getMany() now supports limit and orderBy - same syntax as in streaming.  
 __1.2.3__  
 Bugfix: [iEqual gave incorrect sql when parameterized.](https://github.com/alfateam/rdb/issues/17)  
 __1.2.2__  
