@@ -9,7 +9,7 @@ function manyLegToQuery(queries, rightAlias,leg,legNo,filter,innerJoin) {
 	var rightTable = leg.table;
 	var rightColumns = rightTable._primaryColumns;
 	var leftColumns = leg.columns;
-	var orderBy = extractOrderBy(rightTable,rightAlias);
+	var orderBy = extractOrderBy(rightTable, rightAlias, span.orderBy);
 	 
 	var shallowJoin  = newShallowJoinSql(rightTable,leftColumns,rightColumns,leftAlias,rightAlias);
 	innerJoin = newParameterized(' INNER' + shallowJoin).append(innerJoin);	

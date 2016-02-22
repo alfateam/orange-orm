@@ -1,15 +1,11 @@
 function act(c) {
-    c.orderBy = ['prop1', 'prop2 desc'];
+    c.orderBy = 'prop1 direction';
 
 	c.column1 = {};
 	c.column1._dbName = 'colName1';
 	c.table.prop1 = c.column1;
 
-	c.column2 = {};
-	c.column2._dbName = 'colName2';
-	c.table.prop2 = c.column2;
-
-	c.expected = ' order by alias.colName1,alias.colName2 desc'
+	c.expected = ' order by alias.colName1 direction'
 	c.returned = c.sut(c.table, c.alias, c.orderBy, c.originalOrderBy);
 }
 

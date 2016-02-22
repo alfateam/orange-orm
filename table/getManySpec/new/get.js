@@ -13,8 +13,9 @@ function act(c) {
 	c.table = table;
 	c.table._dbName = dbName;
 	c.span = span;
+
 	c.strategyToSpan.expect(table,strategy).return(span);
-	c.newSelectQuery.expect([],table,filter,span,dbName,c.emptyInnerJoin).return(queries)
+	c.newSelectQuery.expect([],table,filter,span,dbName,c.emptyInnerJoin).return(queries);
 	
 	c.executeQuery.expect(queries).return(resultPromise);
 	resultPromise.then = c.mock();

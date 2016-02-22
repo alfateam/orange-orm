@@ -6,6 +6,7 @@ var parentAlias = '_1',
 	table = {},
 	childTable = {},
 	span = {},
+	orderByOverride = {},
 	alias = '_1_2',
 	spanColumns = {},
 	legColumns = {},
@@ -20,11 +21,12 @@ function act(c) {
 	c.query = {};
 	leg.columns = legColumns;
 	leg.span = span;		
+	span.orderBy = orderByOverride;
 	span.table = childTable;
 	table._primaryColumns = primaryColumns;
 	leg.table = table			
 
-	c.extractOrderBy.expect(table,parentAlias).return(orderBy);
+	c.extractOrderBy.expect(table,parentAlias,orderByOverride).return(orderBy);
 
 	c.newParameterized.expect(' INNER shallowJoin').return(parameterized);
 	parameterized.append = c.mock();
