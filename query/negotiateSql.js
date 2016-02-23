@@ -1,4 +1,8 @@
-function negotiateSql(sql) {
+function negotiateSql(query) {
+	if(typeof(query) === 'string')
+		return function() { return query; };
+
+	var sql = query.sql;
 	if(typeof(sql) === 'function')
 		return sql;
 	else if(typeof(sql) === 'string')

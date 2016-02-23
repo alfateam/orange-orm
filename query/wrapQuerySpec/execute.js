@@ -15,7 +15,7 @@ function act(c){
 	c.negotiateParameters = c.requireMock('./negotiateParameters');
 	
 	c.safeSql = {};
-	c.negotiateSql.expect(c.query.sql).return(c.safeSql);
+	c.negotiateSql.expect(c.query).return(c.safeSql);
 
 	c.safeParameters = {};
 	c.negotiateParameters.expect(c.query.parameters).return(c.safeParameters);

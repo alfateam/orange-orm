@@ -1,10 +1,4 @@
 function act(c){
-	c.parameters = 'parameters';
-	
-	c.query = {
-		parameters: c.parameters
-	};
-
 	try {	
 		c.returned = c.sut(c.query);
 	} catch(e) {
@@ -12,5 +6,5 @@ function act(c){
 	}
 }
 
-act.base = '../req';
+act.base = '../object';
 module.exports = act;

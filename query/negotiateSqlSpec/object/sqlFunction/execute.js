@@ -1,9 +1,9 @@
 function act(c){
 	c.sql = 'sql';
-	
 	c.sqlFunction = function() { return c.sql; };
-	c.returned = c.sut(c.sqlFunction);
+	c.query.sql = c.sqlFunction;
+	c.returned = c.sut(c.query);
 }
 
-act.base = '../req';
+act.base = '../object';
 module.exports = act;
