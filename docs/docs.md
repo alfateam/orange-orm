@@ -32,6 +32,7 @@ __Basic querying__
 [(many)ToDto with strategy](#_manytodtowithstrategy)  
 [(many)ToJSON](#_manytojson)  
 [(many)ToJSON with strategy](#_manytojsonwithstrategy)  
+[Raw SQL query](#_rawsqlquery)
 __Streaming__  
 [streaming rows](#_streameager)  
 [streaming json](#_streamjsoneager)  
@@ -1568,6 +1569,38 @@ function toJSON(orders) {
 
 function print(json) {
     console.log(json);
+}
+
+function onOk() {
+    console.log('Success');
+    console.log('Waiting for connection pool to teardown....');
+}
+
+function onFailed(err) {
+    console.log('Rollback');
+    console.log(err);
+}
+```
+<a name="_rawsqlquery"></a>
+[Raw SQL Query](https://github.com/alfateam/rdb-demo/blob/master/rawSqlQuery.js)
+```js
+var rdb = require('rdb');
+
+var db = rdb('postgres://postgres:postgres@localhost/test');
+
+db.transaction()
+    .then(getUniqueCustomerIds)
+    .then(print)
+    .then(rdb.commit)
+    .then(null, rdb.rollback)
+    .then(onOk, onFailed);
+
+function getUniqueCustomerIds() {
+    return rdb.query('SELECT DISTINCT oCustomerId AS "customerId" FROM _order');
+}
+
+function print(rows) {
+    console.log(rows);
 }
 
 function onOk() {
