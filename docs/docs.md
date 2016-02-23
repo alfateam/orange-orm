@@ -32,8 +32,8 @@ __Basic querying__
 [(many)ToDto with strategy](#_manytodtowithstrategy)  
 [(many)ToJSON](#_manytojson)  
 [(many)ToJSON with strategy](#_manytojsonwithstrategy)  
-[Raw SQL query](#_rawsqlquery)
-[Raw SQL Query With Parameters](#_rawsqlquerywithparameters)
+[Raw SQL query](#_rawsqlquery)  
+[Raw SQL Query With Parameters](#_rawsqlquerywithparameters)  
 __Streaming__  
 [streaming rows](#_streameager)  
 [streaming json](#_streamjsoneager)  
@@ -1617,8 +1617,7 @@ function onFailed(err) {
 <a name="_rawsqlquerywithparameters"></a>
 [Raw SQL Query With Parameters](https://github.com/alfateam/rdb-demo/blob/master/rawSqlQueryWithParameters.js)
 ```js
-var rdb = require('rdb'),
-    resetDemo = require('./db/resetDemo');
+var rdb = require('rdb');
 
 var db = rdb('postgres://postgres:postgres@localhost/test');
 
