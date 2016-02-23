@@ -10,7 +10,10 @@ function resolveExecuteQuery(query) {
 
 		function onCompleted(err,rows) {
 			if(!err) {
-				rows.queryContext = query.queryContext;				
+				Object.defineProperty(rows, 'queryContext', {
+					value: query.queryContext,
+					enumerable: false
+				});
 				success(rows);
 			}
 			else
