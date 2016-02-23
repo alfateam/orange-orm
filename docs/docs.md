@@ -33,6 +33,7 @@ __Basic querying__
 [(many)ToJSON](#_manytojson)  
 [(many)ToJSON with strategy](#_manytojsonwithstrategy)  
 [Raw SQL query](#_rawsqlquery)
+[Raw SQL Query With Parameters](#_rawsqlquerywithparameters)
 __Streaming__  
 [streaming rows](#_streameager)  
 [streaming json](#_streamjsoneager)  
@@ -1597,6 +1598,42 @@ db.transaction()
 
 function getUniqueCustomerIds() {
     return rdb.query('SELECT DISTINCT oCustomerId AS "customerId" FROM _order');
+}
+
+function print(rows) {
+    console.log(rows);
+}
+
+function onOk() {
+    console.log('Success');
+    console.log('Waiting for connection pool to teardown....');
+}
+
+function onFailed(err) {
+    console.log('Rollback');
+    console.log(err);
+}
+```
+<a name="_rawsqlquerywithparameters"></a>
+[Raw SQL Query With Parameters](https://github.com/alfateam/rdb-demo/blob/master/rawSqlQueryWithParameters.js)
+```js
+var rdb = require('rdb'),
+    resetDemo = require('./db/resetDemo');
+
+var db = rdb('postgres://postgres:postgres@localhost/test');
+
+db.transaction()
+    .then(getOrderNos)
+    .then(print)
+    .then(rdb.commit)
+    .then(null, rdb.rollback)
+    .then(onOk, onFailed);
+
+function getOrderNos() {
+    return rdb.query({
+        sql: 'SELECT oOrderNo AS "orderNo" FROM _order WHERE oOrderNo LIKE ?',
+        parameters: ['%04']
+    });
 }
 
 function print(rows) {

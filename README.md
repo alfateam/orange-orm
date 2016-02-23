@@ -13,6 +13,8 @@ Eager or lazy loading.
 Based on promises.  
 [Documentation and examples](docs/docs.md)  
 ## Release notes
+__1.4.0__  
+Raw SQL query
 __1.3.0__  
 getMany() now supports limit and orderBy - same syntax as in streaming.  
 __1.2.3__  
