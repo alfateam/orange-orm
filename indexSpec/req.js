@@ -15,6 +15,8 @@ function act(c) {
     c.newDatabase = requireMock('./pg/newDatabase');
     c.newMySqlDatabase = requireMock('./mySql/newDatabase');
 
+    c.query = requireMock('./query');
+
     c.pools.end = {};
 
     c.sut = require('../index');

@@ -10,5 +10,6 @@ when(c)
     .it('should set pg').assertEqual(c.newDatabase, c.sut.pg)
     .it('should set end').assertEqual(c.pools.end, c.sut.end)
     .it('should set log to registerLogger').assertEqual(c.log.registerLogger, c.sut.log)
+    .it('should expose query').assertEqual(c.query, c.sut.query)
     
     

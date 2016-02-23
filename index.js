@@ -14,4 +14,5 @@ connectViaPool.commit = require('./table/commit');
 connectViaPool.rollback = require('./table/rollback');
 connectViaPool.end = require('./pools').end;
 connectViaPool.log = require('./table/log').registerLogger;
+connectViaPool.query = require('./query');
 module.exports = connectViaPool;
