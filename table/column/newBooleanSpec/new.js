@@ -9,6 +9,8 @@ function act(c){
 	c.filter.sql.expect().return(c.sql);
 	c.filter.parameters = {};
 	c.negotiateRawSqlFilter = c.requireMock('./negotiateRawSqlFilter');
+	c.negotiateNextAndFilter = c.requireMock('./negotiateNextAndFilter');	
+	c.negotiateNextOrFilter = c.requireMock('./negotiateNextOrFilter');	
 
 	c.sut = require('../newBoolean')(c.filter);
 }
