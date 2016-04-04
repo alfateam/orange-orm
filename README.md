@@ -13,6 +13,8 @@ Eager or lazy loading.
 Based on promises.  
 [Documentation and examples](docs/docs.md)  
 ## Release notes
+__1.4.1__  
+[Empty filter would in sometimes cause invalid filter.](https://github.com/alfateam/rdb/issues/18)  
 __1.4.0__  
 Raw SQL query.  
 __1.3.0__  
