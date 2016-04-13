@@ -13,6 +13,8 @@ Eager or lazy loading.
 Based on promises.  
 [Documentation and examples](docs/docs.md)  
 ## Release notes
+__1.5.0__  
+JSON column type. Postgres json type does not support rdb filters.  
 __1.4.1__  
 [Empty filter would sometimes cause invalid filter.](https://github.com/alfateam/rdb/issues/18)  
 __1.4.0__  

@@ -6,6 +6,11 @@ function defineColumn(column, table) {
 		return c;
 	};
 
+	c.json = function() {
+		require('./column/json')(column);
+		return c;
+	};
+
 	c.guid = function() {
 		require('./column/guid')(column);
 		return c;
