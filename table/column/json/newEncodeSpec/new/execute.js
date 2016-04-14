@@ -1,12 +1,12 @@
 var dbNull = {};
 var candidate = {};
-var value = 'foo';
+var value = {foo: 1};
 
 function act(c) {	
 	c.expected = {};
 
 	c.purify.expect(candidate).return(value);
-	c.newParam.expect('?', [value]).return(c.expected);
+	c.newParam.expect('?', [JSON.stringify(value)]).return(c.expected);
 
 	c.dbNull = dbNull;
 	c.column.dbNull = dbNull;

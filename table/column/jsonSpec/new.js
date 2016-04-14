@@ -12,7 +12,7 @@ function act(c){
 	c.newEncode.expect(c.column).return(c.encode);
 
 	c.decode = {};
-	c.newDecode = requireMock('./json/newDecode');
+	c.newDecode = requireMock('./newDecode');
 	c.newDecode.expect(c.column).return(c.decode);
 
 	require('../json')(c.column);

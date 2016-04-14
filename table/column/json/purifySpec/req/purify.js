@@ -2,7 +2,7 @@ var arg = {a: 'foo', b: 'bar'};
 
 function act(c) {
 	c.arg = arg;
-	c.expected = '{"a":"foo","b":"bar"}';
+	c.expected = arg;
 	c.returned = c.sut(arg);
 }
 

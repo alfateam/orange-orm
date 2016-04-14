@@ -1,5 +1,5 @@
 var newEncode = require('./json/newEncode');
-var newDecode = require('./json/newDecode');
+var newDecode = require('./newDecode');
 var purify = require('./json/purify');
 
 function _new(column) {
