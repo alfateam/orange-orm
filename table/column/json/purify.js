@@ -1,7 +1,7 @@
 function purify(value) {
 	if(value == null)
 		return null;
-	return JSON.stringify(value);
+	return value;
 }
 
 module.exports = purify;
