@@ -255,6 +255,7 @@ Customer.column('cBalance').numeric().as('balance');
 Customer.column('cRegdate').date().as('registeredDate');
 Customer.column('cIsActive').boolean().as('isActive');
 Customer.column('cPicture').binary().as('picture');
+Customer.column('cDocument').json().as('document');
 
 var db = rdb('postgres://postgres:postgres@localhost/test');
 
@@ -270,8 +271,8 @@ function getById() {
 }
 
 function printCustomer(customer) {
-    var format = 'Customer Id: %s, name: %s, Balance: %s, Registered Date: %s, Is Active: %s, Picture: %s'; 
-    var args = [format, customer.id, customer.name, customer.balance, customer.registeredDate, customer.isActive, customer.picture];
+    var format = 'Customer Id: %s, name: %s, Balance: %s, Registered Date: %s, Is Active: %s, Picture: %s, , Document: %s'; 
+    var args = [format, customer.id, customer.name, customer.balance, customer.registeredDate, customer.isActive, customer.picture, JSON.stringify(customer.document)];
     console.log.apply(null,args);
 }
 
@@ -298,6 +299,7 @@ Customer.column('cBalance').numeric().as('balance');
 Customer.column('cRegdate').date().as('registeredDate');
 Customer.column('cIsActive').boolean().as('isActive');
 Customer.column('cPicture').binary().as('picture');
+Customer.column('cDocument').json().as('document');
 
 var db = rdb('postgres://postgres:postgres@localhost/test');
 
@@ -314,8 +316,8 @@ function tryGetById() {
 
 function printCustomer(customer) {
     if (customer) {
-        var format = 'Customer Id: %s, name: %s, Balance: %s, Registered Date: %s, Is Active: %s, Picture: %s'; 
-        var args = [format, customer.id, customer.name, customer.balance, customer.registeredDate, customer.isActive, customer.picture];
+        var format = 'Customer Id: %s, name: %s, Balance: %s, Registered Date: %s, Is Active: %s, Picture: %s, , Document: %s'; 
+        var args = [format, customer.id, customer.name, customer.balance, customer.registeredDate, customer.isActive, customer.picture, JSON.stringify(customer.document)];
         console.log.apply(null,args);
     }
 }
@@ -2002,8 +2004,9 @@ var Customer = rdb.table('_customer');
 string is default null, 
 guid is default null,
 date is default null,
-binary is default null
-booean is default false
+binary is default null,
+boolean is default false,
+json is default null
 */                    
 
 Customer.primaryColumn('cId').guid().as('id').default(null);
@@ -2012,7 +2015,7 @@ Customer.column('cBalance').numeric().as('balance').default(2000);
 Customer.column('cRegdate').date().as('registeredDate').default(new Date());
 Customer.column('cIsActive').boolean().as('isActive').default(true);
 Customer.column('cPicture').binary().as('picture').default(buf);
-
+Customer.column('cDocument').json().as('document').default({foo: true});
 
 var db = rdb('postgres://postgres:postgres@localhost/test');
 

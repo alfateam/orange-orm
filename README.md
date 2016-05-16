@@ -13,6 +13,8 @@ Eager or lazy loading.
 Based on promises.  
 [Documentation and examples](docs/docs.md)  
 ## Release notes
+__1.5.1__  
+Documented JSON column type. [Bug fix: Insert and foreign key violation.](https://github.com/alfateam/rdb/issues/19).  
 __1.5.0__  
 JSON column type. Postgres json type does not support rdb filters.  
 __1.4.1__  
