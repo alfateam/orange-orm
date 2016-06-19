@@ -1,4 +1,6 @@
-function act(c){	
+function act(c){
+	c.queryCount = 22;
+	c.changeSet.queryCount = c.queryCount;
 	c.error = {};
 	c.onFailed.expect(c.error);
 	if (c.queryCompleted)

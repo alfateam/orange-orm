@@ -7,9 +7,14 @@ function act(c){
 	c.query = {};
 	c.dbClient = {};
 
-	c.log = requireMock('../log');
-	c.log.expect(c.query);
-	
+	c.getChangeSet = requireMock('../commands/getChangeSet');
+	c.prevQueryCount = 2;
+	c.queryCount = 10;
+	c.changeSet = {
+		queryCount: c.queryCount
+	};
+	c.getChangeSet.expect().return(c.changeSet);
+		
 	c.getSessionSingleton = requireMock('../getSessionSingleton');
 	c.getSessionSingleton.expect('dbClient').return(c.dbClient);	
 

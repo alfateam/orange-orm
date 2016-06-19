@@ -1,10 +1,9 @@
 var executeChanges = require('./executeQueries/executeChanges');
-var popChanges = require('./popChanges');
+var flush = require('./commands/flush');
 var executeQueriesCore = require('./executeQueries/executeQueriesCore');
 
 function executeQueries(queries) {
-	var changes = popChanges();
-	return executeChanges(changes).then(onDoneChanges); 
+	return flush().then(onDoneChanges); 
 
 	function onDoneChanges() {
 		return executeQueriesCore(queries);

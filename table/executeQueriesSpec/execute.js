@@ -5,12 +5,10 @@ var a  = require('a');
 var mock = a.mock;
 var requireMock  = a.requireMock;
 var executeQueriesCore = requireMock('./executeQueries/executeQueriesCore');
-var executeChanges = requireMock('./executeQueries/executeChanges');
-var popChanges = requireMock('./popChanges');
+var flush = requireMock('./commands/flush');
 
 function act(c){	
 	c.expected = {};
-	c.changes = {};
 	c.changesPromise = {};
 	c.queryResult = {};
 
@@ -21,8 +19,7 @@ function act(c){
 		c.executeQueriesCoreResult = next();
 	}
 
-	popChanges.expect().return(c.changes);
-	executeChanges.expect(c.changes).return(c.changesPromise);
+	flush.expect().return(c.changesPromise);
 	executeQueriesCore.expect(queries).return(c.queryResult);
 	c.returned = require('../executeQueries')(queries);
 }

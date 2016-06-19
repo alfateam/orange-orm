@@ -3,7 +3,11 @@ var executeQuery = require('./executeQueries/executeQuery');
 var setSessionSingleton = require('./setSessionSingleton');
 
 function begin() {
-	setSessionSingleton('changes', []);
+	var changeSet = [];
+	changeSet.batchSize = 1;
+	changeSet.queryCount = 0;
+	changeSet.prevQueryCount = -1;
+	setSessionSingleton('changes', changeSet);
 	return executeQuery(beginCommand);
 }
 

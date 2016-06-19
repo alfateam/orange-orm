@@ -1,13 +1,11 @@
 var commitCommand = require('./commands/commitCommand');
 var pushCommand = require('./commands/pushCommand');
-var executeChanges = require('./executeQueries/executeChanges');
 var releaseDbClient = require('./releaseDbClient');
-var popChanges = require('./popChanges');
+var flush = require('./commands/flush');
 
 function commit() {
 	pushCommand(commitCommand);
-	var changes = popChanges();
-	return executeChanges(changes).then(releaseDbClient);
+	return flush().then(releaseDbClient);
 }
 
 module.exports = commit;

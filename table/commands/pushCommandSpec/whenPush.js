@@ -4,3 +4,5 @@ var c = {};
 when(c)
 	.it('should notify dirty').assertDoesNotThrow(c.notifyDirty.verify)
 	.it('should push command to changeSet').assertDoesNotThrow(c.changeSet.push.verify)
+	.it('should negotiate flush').assertDoesNotThrow(c.negotiateFlush.verify)
+	
