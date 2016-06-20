@@ -6,15 +6,19 @@ function act(c) {
     c.expectRequire = a.expectRequire;
     c.then = a.then;
 
+    c.getSessionContext = c.requireMock('../getSessionContext');    
+    c.popChanges = c.requireMock('../popChanges')
     c.executeChanges = c.requireMock('../executeQueries/executeChanges');
-    c.popChanges = c.requireMock('../popChanges');
+
+    c.context = {};
+    c.getSessionContext.expect().return(c.context);
 
     c.changes = {};
     c.popChanges.expect().return(c.changes);
     c.expected = {};
     c.executeChanges.expect(c.changes).return(c.expected);
 
-    c.returned = require('../flush')();
+    c.sut = require('../flush');
 }
 
 module.exports = act;

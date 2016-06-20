@@ -4,7 +4,7 @@ var setSessionSingleton = require('./setSessionSingleton');
 
 function begin() {
 	var changeSet = [];
-	changeSet.batchSize = 1;
+	changeSet.batchSize = 500;
 	changeSet.queryCount = 0;
 	changeSet.prevQueryCount = -1;
 	setSessionSingleton('changes', changeSet);

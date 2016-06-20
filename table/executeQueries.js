@@ -1,4 +1,3 @@
-var executeChanges = require('./executeQueries/executeChanges');
 var flush = require('./commands/flush');
 var executeQueriesCore = require('./executeQueries/executeQueriesCore');
 
