@@ -13,6 +13,8 @@ Eager or lazy loading.
 Based on promises.  
 [Documentation and examples](docs/docs.md)  
 ## Release notes
+__1.5.2__  
+Improved performance on insert and update.  
 __1.5.1__  
 Documented JSON column type. [Bug fix: Insert and foreign key violation](https://github.com/alfateam/rdb/issues/19).  
 __1.5.0__  
