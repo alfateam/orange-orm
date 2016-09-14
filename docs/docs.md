@@ -49,8 +49,8 @@ __Persistence__
 [update a join-relation](#_updatejoin)  
 [update a hasOne-relation](#_updatehasone)  
 [update a hasMany-relation](#_updatehasmany)  
-[row lock](#_rowlock) 
-[transaction lock](#_transactionlock) 
+[row lock](#_rowlock)  
+[transaction lock](#_transactionlock)  
 
 __Filters__  
 [equal](#_equal)  
@@ -2364,7 +2364,7 @@ function updateConcurrently() {
 
 function getById() {
     //pg_advisory_xact_lock(12345)
-    //will be release on commit/rollback 
+    //will be released on commit/rollback 
     return rdb.lock("12345").then(function() {
         return Customer.getById('a0000000-0000-0000-0000-000000000000');    
     });    
