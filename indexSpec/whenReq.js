@@ -11,5 +11,6 @@ when(c)
     .it('should set end').assertEqual(c.pools.end, c.sut.end)
     .it('should set log to registerLogger').assertEqual(c.log.registerLogger, c.sut.log)
     .it('should expose query').assertEqual(c.query, c.sut.query)
+    .it('should expose lock').assertEqual(c.lock, c.sut.lock)
     
     

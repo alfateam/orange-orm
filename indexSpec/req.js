@@ -16,6 +16,7 @@ function act(c) {
     c.newMySqlDatabase = requireMock('./mySql/newDatabase');
 
     c.query = requireMock('./query');
+    c.lock = requireMock('./lock');
 
     c.pools.end = {};
 

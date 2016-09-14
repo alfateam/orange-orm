@@ -1,32 +1,42 @@
 {
-    "name": "rdb",
-    "version": "1.5.3",
-    "main": "index.js",
-    "title": "rdb",
-    "description": "Object Relational Mapper",
-    "keywords": ["orm", "sql", "mySql", "mysql", "postgres", "pg"],
-    "license": "MIT",
-    "scripts": { "test" : "jshint ./ && a" } ,
-    "dependencies": {
-        "pg": "^6.0.3",
-        "pg-query-stream": "^1.0.0",
-        "node-uuid": "^1.4.7",
-        "promise": "^6.1.0",
-        "mysql": "^2.10.0",
-        "generic-pool": "^2.2.2",
-        "deferred": "^0.7.4"
-    },
-    "devDependencies": {
-        "a": "^1.0.2"
-    },
-    "repository": {
-        "type": "git",
-        "url": "git@github.com:alfateam/rdb.git"
-    },
-    "jshintConfig": {
-        "asi": true,
-        "eqnull": true,
-        "undef": true,
-        "node": true
-    }
+  "name": "rdb",
+  "version": "1.5.4",
+  "main": "index.js",
+  "title": "rdb",
+  "description": "Object Relational Mapper",
+  "keywords": [
+    "orm",
+    "sql",
+    "mySql",
+    "mysql",
+    "postgres",
+    "pg"
+  ],
+  "license": "MIT",
+  "scripts": {
+    "test": "jshint ./ && a"
+  },
+  "dependencies": {
+    "deferred": "^0.7.4",
+    "generic-pool": "^2.2.2",
+    "int-encoder": "^1.1.0",
+    "mysql": "^2.10.0",
+    "node-uuid": "^1.4.7",
+    "pg": "6.0.3",
+    "pg-query-stream": "^1.0.0",
+    "promise": "^6.1.0"
+  },
+  "devDependencies": {
+    "a": "^1.0.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:alfateam/rdb.git"
+  },
+  "jshintConfig": {
+    "asi": true,
+    "eqnull": true,
+    "undef": true,
+    "node": true
+  }
 }

@@ -7,7 +7,7 @@ function executeQueries(queries) {
 	var changes = popChanges();
 	var lastChange = changes[changes.length-1];
 	var query = queries[0];
-	if (lastChange && lastChange.parameters.length==0  && query.parameters.length==0) {
+	if (lastChange && lastChange.parameters.length===0  && query.parameters.length===0) {
 		changes.pop();
 		queries[0] = newParameterized( lastChange.sql() +  ';' + query.sql(), []);
 	}

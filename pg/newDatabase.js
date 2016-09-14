@@ -5,6 +5,7 @@ var begin = require('../table/begin');
 var commit = require('../table/commit');
 var rollback = require('../table/rollback');
 var newPool = require('./newPool');
+var lock = require('../lock');
 
 function newDatabase(connectionString, poolOptions) {
     var pool = newPool(connectionString, poolOptions);
@@ -24,6 +25,7 @@ function newDatabase(connectionString, poolOptions) {
 
     c.rollback = rollback;
     c.commit = commit;
+    c.lock = lock;
 
     c.end = function() {
         return pool.end();

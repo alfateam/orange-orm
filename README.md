@@ -13,8 +13,10 @@ Eager or lazy loading.
 Based on promises.  
 [Documentation and examples](docs/docs.md)  
 ## Release notes
+__1.5.4__  
+Transaction locks. Postgres only.  
 __1.5.3__  
-Upgraded to pg@6.0.3 in order to make it work on node 6.  
+Upgraded to pg 6.0.3  
 __1.5.2__  
 Improved performance and reduced memory footprint.  
 __1.5.1__  
