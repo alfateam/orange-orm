@@ -9,6 +9,7 @@ function act(c){
 
 	c.wrapQuery = c.requireMock('./wrapQuery');
 	c.deleteFromSql = c.requireMock('./deleteFromSql');
+	c.selectForUpdateSql = c.requireMock('./selectForUpdateSql');
 	c.encodeDate = c.requireMock('./encodeDate');
 	
 	

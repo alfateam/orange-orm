@@ -6,7 +6,7 @@ var joinSql = ' <joinSql>';
 var innerJoinSql = ' <innerJoinSql>'
 var tableName = '<tableName>';
 var safeLimit = ' <limit>';
-var exclusive = ' <exclusive>';
+var exclusiveClause = ' <exclusive>';
 var expected = 'select <columnSql> from <tableName> _2 <innerJoinSql> <joinSql> <whereSql> <orderBy> <limit> <exclusive>';
 
 function act(c) {
@@ -17,7 +17,7 @@ function act(c) {
 	c.newJoinSql.expect(c.span,c.alias).return(joinSql);
 	c.newColumnSql.expect(c.table,c.span,c.alias).return(columnSql);
 	c.negotiateLimit.expect(c.limit).return(safeLimit);
-	c.negotiateExclusive.expect(c.table).return(exclusive);
+	c.negotiateExclusive.expect(c.table, c.alias, c.exclusive).return(exclusiveClause);
 	c.expected = expected;
 	c.returned = c.sut.sql();
 }

@@ -1,34 +1,10 @@
-var table = {};
-var initialFilter = {};
-var filter = {};
-var strategy = {};
-var expected = {};
-var queries = {};
-var expected = {};
-var span = {};
-var dbName = '_theTable';
-var resultPromise = {};
-
 function act(c) {
-	c.table = table;
-	c.table._dbName = dbName;
-	c.span = span;
+    c.newSelectQuery.expect([], c.table, c.filter, c.span, c.dbName, c.emptyInnerJoin, undefined, undefined).return(c.queries);
 
-	c.strategyToSpan.expect(table,strategy).return(span);
-	c.newSelectQuery.expect([],table,filter,span,dbName,c.emptyInnerJoin).return(queries);
-	
-	c.executeQuery.expect(queries).return(resultPromise);
-	resultPromise.then = c.mock();
-	resultPromise.then.expectAnything().whenCalled(onThen).return(expected);
+    return c.sut(c.table, c.initialFilter, c.strategy).then(function(ret) {
+        c.returned = ret;
+    });
 
-	function onThen(callback) {
-		c.resolve = callback;
-	}
-
-	c.negotiateRawSqlFilter.expect(initialFilter).return(filter);
-	
-	c.expected = expected;
-	c.returned = c.sut(table, initialFilter, strategy);
 }
 
 module.exports = act;

@@ -1,13 +1,14 @@
-var requireMock = require('a').requireMock;
-var newPrimaryKeyFilter = requireMock('./newPrimaryKeyFilter');
-var tryGetFirstFromDb = requireMock('./tryGetFirstFromDb');
-var extractStrategy = requireMock('./tryGetFromDbById/extractStrategy');
+var a = require('a');
 
 function act(c) {
+	c.mock = a.mock;
+	c.requireMock = a.requireMock;
+	c.tryGetFirstFromDb = c.requireMock('./tryGetFirstFromDb');
+	c.tryGetFirstFromDb.exclusive = c.mock();
+	c.newPrimaryKeyFilter = c.requireMock('./newPrimaryKeyFilter');
+	c.extractStrategy = c.requireMock('./tryGetFromDbById/extractStrategy');
+	
 	c.sut = require('../tryGetFromDbById');
-	c.tryGetFirstFromDb = tryGetFirstFromDb;
-	c.newPrimaryKeyFilter = newPrimaryKeyFilter;
-	c.extractStrategy = extractStrategy;
 }
 
 

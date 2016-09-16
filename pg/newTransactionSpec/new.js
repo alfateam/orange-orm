@@ -16,6 +16,7 @@ function act(c){
 
 
 	c.deleteFromSql = c.requireMock('./deleteFromSql');
+	c.selectForUpdateSql = c.requireMock('./selectForUpdateSql');
 
 	c.sut = require('../newTransaction')(c.domain, c.pool);
 }

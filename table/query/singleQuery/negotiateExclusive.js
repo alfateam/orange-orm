@@ -1,6 +1,10 @@
-function negotiateExclusive(table) {
-	if (table._exclusive)
-		return ' FOR UPDATE';
+var getSessionSingleton = require('../../getSessionSingleton');
+
+function negotiateExclusive(table, alias, _exclusive) {
+	if (table._exclusive || _exclusive) {
+		var encode =  getSessionSingleton('selectForUpdateSql');
+		return encode(alias);
+	}
 	return '';
 }
 

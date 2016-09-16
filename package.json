@@ -27,7 +27,7 @@
     "promise": "^6.1.0"
   },
   "devDependencies": {
-    "a": "^1.0.2"
+    "a": "^2.1.0"
   },
   "repository": {
     "type": "git",

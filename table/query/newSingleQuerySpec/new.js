@@ -13,6 +13,7 @@ var parameters = {};
 var innerJoin = {};
 var orderBy = ' <orderBy>';
 var limit = ' <limit>';
+var exclusive = {};
 
 function act(c) {
 	c.requireMock = a.requireMock;
@@ -29,13 +30,14 @@ function act(c) {
     c.newJoinSql = newJoinSql;
     c.newWhereSql = newWhereSql;
     c.negotiateLimit = negotiateLimit;
+    c.exclusive = exclusive;
 
     c.queryContext = c.mock();
     c.newqueryContext = c.requireMock('./singleQuery/newQueryContext');
     c.newqueryContext.expect(filter, alias, innerJoin).return(c.queryContext);
     c.negotiateExclusive = c.requireMock('./singleQuery/negotiateExclusive');    
 
-    c.sut = require('../newSingleQuery')(table, filter, span, alias, innerJoin, orderBy, limit);
+    c.sut = require('../newSingleQuery')(table, filter, span, alias, innerJoin, orderBy, limit, exclusive);
 }
 
 module.exports = act;

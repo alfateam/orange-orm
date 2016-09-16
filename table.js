@@ -52,8 +52,15 @@ function _new(tableName) {
         return call(getMany, arguments);
     };
 
+    table.getMany.exclusive = function() {
+        return call(getMany.exclusive, arguments);        
+    };
+
     table.tryGetFirst = function() {
         return call(tryGetFirst, arguments);
+    };
+    table.tryGetFirst.exclusive = function() {
+        return call(tryGetFirst.exclusive, arguments);
     };
 
     function call(func, args) {
@@ -67,9 +74,17 @@ function _new(tableName) {
     table.getById = function() {
         return call(getById, arguments);
     };
+    table.getById.exclusive = function() {
+        return call(getById.exclusive, arguments);
+    };
+
 
     table.tryGetById = function() {
         return call(tryGetById, arguments);
+    };
+
+    table.tryGetById.exclusive = function() {
+        return call(tryGetById.exclusive, arguments);
     };
 
     table.columnDiscriminators = function() {

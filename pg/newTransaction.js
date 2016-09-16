@@ -3,6 +3,7 @@ var wrapQueryStream = require('./wrapQueryStream');
 var encodeBuffer = require('./encodeBuffer');
 var encodeDate = require('./encodeDate');
 var deleteFromSql = require('./deleteFromSql');
+var selectForUpdateSql = require('./selectForUpdateSql');
 
 function newResolveTransaction(domain, pool) {
 
@@ -22,6 +23,7 @@ function newResolveTransaction(domain, pool) {
             rdb.encodeBuffer = encodeBuffer;
             rdb.encodeDate = encodeDate;
             rdb.deleteFromSql = deleteFromSql;
+            rdb.selectForUpdateSql = selectForUpdateSql;
             domain.rdb = rdb;    
             onSuccess();
         }

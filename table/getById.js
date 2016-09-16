@@ -2,11 +2,18 @@
  var getFromDbById = require('./getFromDbById');
  var resultToPromise = require('./resultToPromise');
 
-function get() {
+function getById() {
 	var cached =  tryGetFromCacheById.apply(null,arguments);
 	if (cached)
 		return resultToPromise(cached);
 	return getFromDbById.apply(null,arguments);
 }
 
-module.exports = get;
+getById.exclusive = function() {
+	var cached =  tryGetFromCacheById.apply(null,arguments);
+	if (cached)
+		return resultToPromise(cached);
+	return getFromDbById.exclusive.apply(null,arguments);
+}
+
+module.exports = getById;

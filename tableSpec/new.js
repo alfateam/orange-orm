@@ -30,9 +30,13 @@ function act(c) {
 	c.cache = {};
 	newRowCache.expect(c.context).return(c.cache);
 	c.tryGetFirstFromDb = requireMock('./table/tryGetFirstFromDb');
+	c.tryGetFirstFromDb.exclusive = mock();	
 	c.getById = getById;
+	c.getById.exclusive = mock();
 	c.tryGetById = tryGetById;
+	c.tryGetById.exclusive = mock();
 	c.getMany = getMany;
+	c.getMany.exclusive = mock();
 	c.hasOne = hasOne;
 	c.hasMany = hasMany;
 	c.join = join;

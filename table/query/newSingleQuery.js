@@ -5,7 +5,7 @@ var newQueryContext = require('./singleQuery/newQueryContext');
 var negotiateLimit = require('./singleQuery/negotiateLimit');
 var negotiateExclusive = require('./singleQuery/negotiateExclusive');
 
-function _new(table,filter,span,alias,innerJoin,orderBy,limit) {
+function _new(table,filter,span,alias,innerJoin,orderBy,limit,exclusive) {
 	var c = {};
 
 	c.sql = function() {
@@ -15,8 +15,8 @@ function _new(table,filter,span,alias,innerJoin,orderBy,limit) {
 		var joinSql = newJoinSql(span,alias);
 		var whereSql = newWhereSql(table,filter,alias);
 		var safeLimit = negotiateLimit(limit);
-		var exclusive = negotiateExclusive(table);
-		return 'select ' + columnSql + ' from ' + name + ' ' + alias + innerJoinSql + joinSql + whereSql + orderBy + safeLimit + exclusive;
+		var exclusiveClause = negotiateExclusive(table,alias,exclusive);
+		return 'select ' + columnSql + ' from ' + name + ' ' + alias + innerJoinSql + joinSql + whereSql + orderBy + safeLimit + exclusiveClause;
 	};
 
 	c.parameters = filter.parameters;	
