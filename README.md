@@ -13,6 +13,8 @@ Eager or lazy loading.
 Based on promises.  
 [Documentation and examples](docs/docs.md)  
 ## Release notes
+__1.5.6__  
+Raw sql filters can accept sql both as string and as function.  E.g. var filter = {sql: function() {return 'foo > 1';}}.  
 __1.5.5__  
 Optional locks for getMany, tryGetFirst and tryGetById. Instead of calling getMany(params) just call getMany.exclusive(params). Same syntax goes for tryGetFirst and tryGetById. This will result in  SELECT FOR UPDATE.  
 Bugfix: bulk deletes now accepts raw sql filters too.  
