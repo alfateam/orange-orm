@@ -6,7 +6,6 @@ function act(c){
 	c.expectRequire = a.expectRequire;
 	c.then = a.then;
 	
-
 	c.sut = require('../negotiateRawSqlFilter');
 
 	c.newParameterized = c.requireMock('../query/newParameterized');

@@ -5,7 +5,7 @@ var negotiateRawSqlFilter = require('./column/negotiateRawSqlFilter');
 var emptyPromise = require('./resultToPromise')();
 
 function _delete(table, filter, strategy) {
-	var filter = negotiateRawSqlFilter(filter);
+	filter = negotiateRawSqlFilter(filter);
 	strategy = extractDeleteStrategy(strategy);
 	var relations = [];
 	var cmds = [];
