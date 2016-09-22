@@ -18,16 +18,13 @@ function act(c) {
 	c.strategy = strategy;
 	c.tryGetFromCacheById = tryGetFromCacheById;
 	c.tryGetFromDbById = tryGetFromDbById;
+	c.tryGetFromDbById.exclusive = c.mock();
+
 	c.sut = require('../tryGetById');
 	c.get = get;
-	c.getExclusive = getExclusive;
 	
 	function get() {
 		c.returned = c.sut(table,arg1,arg2,strategy);
-	}
-
-	function getExclusive() {
-		c.returned = c.sut.exclusive(table,arg1,arg2,strategy);
 	}
 
 }

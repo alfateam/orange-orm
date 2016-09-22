@@ -22,14 +22,9 @@ function act(c) {
 	
 	c.sut = require('../getById');
 	c.get = get;
-	c.getExclusive = getExclusive;
 	
 	function get() {
 		c.returned = c.sut(table,arg1,arg2,strategy);
-	}
-
-	function getExclusive() {
-		c.returned = c.sut.exclusive(table,arg1,arg2,strategy);
 	}
 
 }

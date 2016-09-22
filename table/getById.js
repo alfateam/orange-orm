@@ -9,11 +9,6 @@ function getById() {
 	return getFromDbById.apply(null,arguments);
 }
 
-getById.exclusive = function() {
-	var cached =  tryGetFromCacheById.apply(null,arguments);
-	if (cached)
-		return resultToPromise(cached);
-	return getFromDbById.exclusive.apply(null,arguments);
-}
+getById.exclusive = getFromDbById.exclusive;
 
 module.exports = getById;

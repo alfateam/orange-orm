@@ -11,10 +11,10 @@ function getMany(table,filter,strategy) {
 
 function getManyCore(table,filter,strategy,exclusive) {
 	var alias = table._dbName;
-	var noLimit;
+	var noOrderBy;
 	filter = negotiateRawSqlFilter(filter);
 	var span = strategyToSpan(table,strategy);
-	var queries = newQuery([],table,filter,span,alias,emptyInnerJoin,noLimit,exclusive);
+	var queries = newQuery([],table,filter,span,alias,emptyInnerJoin,noOrderBy,exclusive);
 	return executeQueries(queries).then(onResult);
 	
 	function onResult(result) {

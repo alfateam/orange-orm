@@ -48,12 +48,12 @@ function _new(tableName) {
         return hasOne(joinRelation);
     };
 
-    table.getMany = function() {
-        return call(getMany, arguments);
+    table.getMany = function(filter, strategy) {
+        return getMany(table, filter, strategy);
     };
 
-    table.getMany.exclusive = function() {
-        return call(getMany.exclusive, arguments);        
+    table.getMany.exclusive = function(filter, strategy) {
+        return getMany.exclusive(table, filter, strategy);
     };
 
     table.tryGetFirst = function() {
