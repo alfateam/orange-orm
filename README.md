@@ -13,6 +13,9 @@ Eager or lazy loading.
 Based on promises.  
 [Documentation and examples](docs/docs.md)  
 ## Release notes
+__1.5.7__  
+Bugfix: getById.exclusive and tryGetById.exclusive did not lock if row was cached.  
+Improved performance on tryGetFirst.  
 __1.5.6__  
 Raw sql filters can accept sql both as string and as function.  E.g. var filter = {sql: function() {return 'foo > 1';}}.  
 __1.5.5__  
