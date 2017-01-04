@@ -3,6 +3,7 @@ var joinSql = '<joinSql>';
 
 
 function act(c){	
+	c.rightAlias = {};
 	c.relation = relation;	
 	relation.accept = c.mock();
 	relation.accept.expectAnything().whenCalled(onJoin);
@@ -19,7 +20,7 @@ function act(c){
 	c.joinTable._primaryColumns = c.joinRightColumns;
 	relation.childTable = c.joinTable;
 	relation.columns = c.joinLeftColumns;
-	c.newShallowJoinSql.expect(c.joinTable,c.joinLeftColumns,c.joinRightColumns,'_3','_2').return(joinSql);		
+	c.newShallowJoinSql.expect(c.joinTable,c.joinLeftColumns,c.joinRightColumns,'_3',c.rightAlias).return(joinSql);		
 	
 
 }

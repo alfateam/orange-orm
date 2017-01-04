@@ -1,10 +1,11 @@
- var newSubFilter = require('./singleCommand/subFilter');
- var newDiscriminatorSql = require('../../query/singleQuery/newDiscriminatorSql');
- var extractFilter = require('../../query/extractFilter');
- var newSingleCommandCore = require('./singleCommand/newSingleCommandCore');
+var newSubFilter = require('./singleCommand/subFilter');
+var newDiscriminatorSql = require('../../query/singleQuery/newDiscriminatorSql');
+var extractFilter = require('../../query/extractFilter');
+var newSingleCommandCore = require('./singleCommand/newSingleCommandCore');
+var createAlias = require('./createAlias');
 
 function _new(table,filter,relations) {
-	var alias = '_' + relations.length;
+	var alias = createAlias(table, relations.length);
 	filter = extractFilter(filter);
 	filter = newSubFilter(relations, filter);
 	var discriminator = newDiscriminatorSql(table, alias);

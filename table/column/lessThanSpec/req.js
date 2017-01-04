@@ -1,12 +1,12 @@
-var amock = require('a');
-var requireMock = amock.requireMock;
+var a = require('a');
+var requireMock = a.requireMock;
 var newBoolean = requireMock('./newBoolean');
-var extractAlias = requireMock('./extractAlias');
+var encodeFilterArg = requireMock('./encodeFilterArg');
 
 function act(c) {
 	c.newBoolean = newBoolean;
-	c.extractAlias = extractAlias;
-	c.mock = amock.mock;
+	c.encodeFilterArg = encodeFilterArg;
+	c.mock = a.mock;
 	c.column = {};
 	c.column._dbName = 'columnName';
 	c.sut = require('../lessThan');

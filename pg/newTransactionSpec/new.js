@@ -9,10 +9,14 @@ function act(c){
 	c.pool = {};
 	c.domain = {};
 
+	c.wrapQueryStream = c.requireMock('./wrapQueryStream');
 	c.wrapQuery = requireMock('./wrapQuery');
 	c.encodeBuffer = c.requireMock('./encodeBuffer');
+	c.encodeDate = c.requireMock('./encodeDate');
+
 
 	c.deleteFromSql = c.requireMock('./deleteFromSql');
+	c.selectForUpdateSql = c.requireMock('./selectForUpdateSql');
 
 	c.sut = require('../newTransaction')(c.domain, c.pool);
 }

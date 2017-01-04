@@ -8,10 +8,12 @@ var nextBoolean = {};
 function act(c){	
 	c.expected = {};
 		
-	c.filter.append = c.mock();
-	c.filter.append.expect(' AND ').return(anded)
-	anded.append = c.mock();
-	anded.append.expect(filter2).return(tempFilter);
+	c.negotiateNextAndFilter.expect(c.filter, filter2).return(tempFilter)
+
+	// c.filter.append = c.mock();
+	// c.filter.append.expect(' AND ').return(anded)
+	// anded.append = c.mock();
+	// anded.append.expect(filter2).return(tempFilter);
 	
 	c.nextNewBoolean = c.requireMock('./newBoolean');
 	c.nextNewBoolean.expect(tempFilter).return(nextBoolean);

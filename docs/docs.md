@@ -20,6 +20,8 @@ __Basic querying__
 [tryGetFirst eagerly](#_trygetfirsteager)  
 [toDto](#_todto)  
 [toDto with strategy](#_todtowithstrategy)  
+[toDto with orderBy](#_todtowithorderby)  
+[toDto with orderBy descending](#_todtowithorderbydesc)  
 [toDto ignoring columns](#_serializable)  
 [toJSON](#_tojson)  
 [toJSON with strategy](#_tojsonwithstrategy)  
@@ -30,10 +32,15 @@ __Basic querying__
 [(many)ToDto with strategy](#_manytodtowithstrategy)  
 [(many)ToJSON](#_manytojson)  
 [(many)ToJSON with strategy](#_manytojsonwithstrategy)  
+[Raw SQL query](#_rawsqlquery)  
+[Raw SQL Query With Parameters](#_rawsqlquerywithparameters)  
+__Streaming__  
+[streaming rows](#_streameager)  
+[streaming json](#_streamjsoneager)  
 __Persistence__  
 [update](#_update)  
 [insert](#_insert)  
-[delete](#_delete)  
+[delete](#_delete) 
 [cascade delete](#_cascadedelete)  
 [bulk delete](#_bulkdelete)  
 [bulk cascade delete](#_bulkcascadedelete)  
@@ -42,6 +49,8 @@ __Persistence__
 [update a join-relation](#_updatejoin)  
 [update a hasOne-relation](#_updatehasone)  
 [update a hasMany-relation](#_updatehasmany)  
+[row lock](#_rowlock)  
+[transaction lock](#_transactionlock)  
 
 __Filters__  
 [equal](#_equal)  
@@ -247,6 +256,7 @@ Customer.column('cBalance').numeric().as('balance');
 Customer.column('cRegdate').date().as('registeredDate');
 Customer.column('cIsActive').boolean().as('isActive');
 Customer.column('cPicture').binary().as('picture');
+Customer.column('cDocument').json().as('document');
 
 var db = rdb('postgres://postgres:postgres@localhost/test');
 
@@ -262,8 +272,8 @@ function getById() {
 }
 
 function printCustomer(customer) {
-    var format = 'Customer Id: %s, name: %s, Balance: %s, Registered Date: %s, Is Active: %s, Picture: %s'; 
-    var args = [format, customer.id, customer.name, customer.balance, customer.registeredDate, customer.isActive, customer.picture];
+    var format = 'Customer Id: %s, name: %s, Balance: %s, Registered Date: %s, Is Active: %s, Picture: %s, , Document: %s'; 
+    var args = [format, customer.id, customer.name, customer.balance, customer.registeredDate, customer.isActive, customer.picture, JSON.stringify(customer.document)];
     console.log.apply(null,args);
 }
 
@@ -290,6 +300,7 @@ Customer.column('cBalance').numeric().as('balance');
 Customer.column('cRegdate').date().as('registeredDate');
 Customer.column('cIsActive').boolean().as('isActive');
 Customer.column('cPicture').binary().as('picture');
+Customer.column('cDocument').json().as('document');
 
 var db = rdb('postgres://postgres:postgres@localhost/test');
 
@@ -306,8 +317,8 @@ function tryGetById() {
 
 function printCustomer(customer) {
     if (customer) {
-        var format = 'Customer Id: %s, name: %s, Balance: %s, Registered Date: %s, Is Active: %s, Picture: %s'; 
-        var args = [format, customer.id, customer.name, customer.balance, customer.registeredDate, customer.isActive, customer.picture];
+        var format = 'Customer Id: %s, name: %s, Balance: %s, Registered Date: %s, Is Active: %s, Picture: %s, , Document: %s'; 
+        var args = [format, customer.id, customer.name, customer.balance, customer.registeredDate, customer.isActive, customer.picture, JSON.stringify(customer.document)];
         console.log.apply(null,args);
     }
 }
@@ -734,7 +745,7 @@ DeliveryAddress.column('dOrderId').string().as('orderId');
 DeliveryAddress.column('dName').string().as('name');
 DeliveryAddress.column('dStreet').string().as('street');
 
-var order_customer_relation = Order.join(Customer).by('customerId').as('customer');
+var order_customer_relation = Order.join(Customer).by('oCustomerId').as('customer');
 
 var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
@@ -842,6 +853,117 @@ function onFailed(err) {
     console.log(err);
 }
 ```
+<a name="_todtowithorderby"></a>
+[toDto with orderBy](https://github.com/alfateam/rdb-demo/blob/master/toDtoWithOrderBy.js)
+```js
+var rdb = require('rdb');
+
+var Order = rdb.table('_order');
+var OrderLine = rdb.table('_orderLine');
+
+Order.primaryColumn('oId').guid().as('id');
+Order.column('oOrderNo').string().as('orderNo');
+
+OrderLine.primaryColumn('lId').guid().as('id');
+OrderLine.column('lOrderId').string().as('orderId');
+OrderLine.column('lProduct').string().as('product');
+
+var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+Order.hasMany(line_order_relation).as('lines');
+
+var db = rdb('postgres://postgres:postgres@localhost/test');
+
+db.transaction()
+    .then(getOrder)
+    .then(toDto)
+    .then(print)
+    .then(rdb.commit)
+    .then(null, rdb.rollback)
+    .then(onOk, onFailed);
+
+function getOrder() {
+    return Order.getById('b0000000-b000-0000-0000-000000000000');
+}
+
+function toDto(order) {
+    var strategy = {
+        lines: {
+            orderBy: ['product'] 
+            //alternative: orderBy: ['product asc']
+        }
+    };
+    return order.toDto(strategy);
+}
+
+function print(dto) {
+    console.log(dto);
+}
+
+function onOk() {
+    console.log('Success');
+    console.log('Waiting for connection pool to teardown....');
+}
+
+function onFailed(err) {
+    console.log('Rollback');
+    console.log(err);
+}
+```
+<a name="_todtowithorderbydesc"></a>
+[toDto with orderBy descending](https://github.com/alfateam/rdb-demo/blob/master/toDtoWithOrderByDesc.js)
+```js
+var rdb = require('rdb');
+
+var Order = rdb.table('_order');
+var OrderLine = rdb.table('_orderLine');
+
+Order.primaryColumn('oId').guid().as('id');
+Order.column('oOrderNo').string().as('orderNo');
+
+OrderLine.primaryColumn('lId').guid().as('id');
+OrderLine.column('lOrderId').string().as('orderId');
+OrderLine.column('lProduct').string().as('product');
+
+var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+Order.hasMany(line_order_relation).as('lines');
+
+var db = rdb('postgres://postgres:postgres@localhost/test');
+
+db.transaction()
+    .then(getOrder)
+    .then(toDto)
+    .then(print)
+    .then(rdb.commit)
+    .then(null, rdb.rollback)
+    .then(onOk, onFailed);
+
+function getOrder() {
+    return Order.getById('b0000000-b000-0000-0000-000000000000');
+}
+
+function toDto(order) {
+    var strategy = {
+        lines: {
+            orderBy: ['product desc'] 
+        }
+    };
+    return order.toDto(strategy);
+}
+
+function print(dto) {
+    console.log(dto);
+}
+
+function onOk() {
+    console.log('Success');
+    console.log('Waiting for connection pool to teardown....');
+}
+
+function onFailed(err) {
+    console.log('Rollback');
+    console.log(err);
+}
+```
 <a name="_serializable"></a>
 [toDto ignoring columns](https://github.com/alfateam/rdb-demo/blob/master/serializable.js)
 ```js
@@ -908,7 +1030,7 @@ DeliveryAddress.column('dOrderId').string().as('orderId');
 DeliveryAddress.column('dName').string().as('name');
 DeliveryAddress.column('dStreet').string().as('street');
 
-var order_customer_relation = Order.join(Customer).by('customerId').as('customer');
+var order_customer_relation = Order.join(Customer).by('oCustomerId').as('customer');
 
 var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
@@ -1220,7 +1342,7 @@ DeliveryAddress.column('dOrderId').string().as('orderId');
 DeliveryAddress.column('dName').string().as('name');
 DeliveryAddress.column('dStreet').string().as('street');
 
-var order_customer_relation = Order.join(Customer).by('customerId').as('customer');
+var order_customer_relation = Order.join(Customer).by('oCustomerId').as('customer');
 
 var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
@@ -1355,7 +1477,7 @@ DeliveryAddress.column('dOrderId').string().as('orderId');
 DeliveryAddress.column('dName').string().as('name');
 DeliveryAddress.column('dStreet').string().as('street');
 
-var order_customer_relation = Order.join(Customer).by('customerId').as('customer');
+var order_customer_relation = Order.join(Customer).by('oCustomerId').as('customer');
 
 var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
@@ -1462,6 +1584,146 @@ function onFailed(err) {
     console.log('Rollback');
     console.log(err);
 }
+```
+<a name="_rawsqlquery"></a>
+[Raw SQL Query](https://github.com/alfateam/rdb-demo/blob/master/rawSqlQuery.js)
+```js
+var rdb = require('rdb');
+
+var db = rdb('postgres://postgres:postgres@localhost/test');
+
+db.transaction()
+    .then(getUniqueCustomerIds)
+    .then(print)
+    .then(rdb.commit)
+    .then(null, rdb.rollback)
+    .then(onOk, onFailed);
+
+function getUniqueCustomerIds() {
+    return rdb.query('SELECT DISTINCT oCustomerId AS "customerId" FROM _order');
+}
+
+function print(rows) {
+    console.log(rows);
+}
+
+function onOk() {
+    console.log('Success');
+    console.log('Waiting for connection pool to teardown....');
+}
+
+function onFailed(err) {
+    console.log('Rollback');
+    console.log(err);
+}
+```
+<a name="_rawsqlquerywithparameters"></a>
+[Raw SQL Query With Parameters](https://github.com/alfateam/rdb-demo/blob/master/rawSqlQueryWithParameters.js)
+```js
+var rdb = require('rdb');
+
+var db = rdb('postgres://postgres:postgres@localhost/test');
+
+db.transaction()
+    .then(getOrderNos)
+    .then(print)
+    .then(rdb.commit)
+    .then(null, rdb.rollback)
+    .then(onOk, onFailed);
+
+function getOrderNos() {
+    return rdb.query({
+        sql: 'SELECT oOrderNo AS "orderNo" FROM _order WHERE oOrderNo LIKE ?',
+        parameters: ['%04']
+    });
+}
+
+function print(rows) {
+    console.log(rows);
+}
+
+function onOk() {
+    console.log('Success');
+    console.log('Waiting for connection pool to teardown....');
+}
+
+function onFailed(err) {
+    console.log('Rollback');
+    console.log(err);
+}
+```
+<a name="_streameager"></a>
+[streaming rows](https://github.com/alfateam/rdb-demo/blob/master/streamEager.js)
+```js
+var rdb = require('rdb');
+
+var Order = rdb.table('_order');
+var OrderLine = rdb.table('_orderLine');
+
+Order.primaryColumn('oId').guid().as('id');
+Order.column('oOrderNo').string().as('orderNo');
+
+OrderLine.primaryColumn('lId').guid().as('id');
+OrderLine.column('lOrderId').guid().as('orderId');
+OrderLine.column('lProduct').string().as('product');
+
+var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+Order.hasMany(line_order_relation).as('lines');
+
+var db = rdb('postgres://postgres:postgres@localhost/test');
+
+var emptyFilter;
+var strategy = {
+    lines: {
+        orderBy: ['product']
+    },
+    orderBy: ['orderNo'],
+    limit: 5,
+};
+
+Order.createReadStream(db, emptyFilter, strategy).on('data', printOrder);
+
+function printOrder(order) {
+    var format = 'Order Id: %s, Order No: %s';
+    console.log(format, order.id, order.orderNo);
+    order.lines.forEach(printLine);
+}
+
+function printLine(line) {
+    var format = 'Line Id: %s, Order Id: %s, Product: %s';
+    console.log(format, line.id, line.orderId, line.product);
+}
+```
+<a name="_streamjsoneager"></a>
+[streaming json](https://github.com/alfateam/rdb-demo/blob/master/streamJSONEager.js)
+```js
+var rdb = require('rdb');
+
+var Order = rdb.table('_order');
+var OrderLine = rdb.table('_orderLine');
+
+Order.primaryColumn('oId').guid().as('id');
+Order.column('oOrderNo').string().as('orderNo');
+
+OrderLine.primaryColumn('lId').guid().as('id');
+OrderLine.column('lOrderId').guid().as('orderId');
+OrderLine.column('lProduct').string().as('product');
+
+var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+Order.hasMany(line_order_relation).as('lines');
+
+var db = rdb('postgres://postgres:postgres@localhost/test');
+
+var emptyFilter;
+var strategy = {
+    lines: {
+        orderBy: ['product']
+    },
+    orderBy: ['orderNo'],
+    limit: 5,
+};
+
+Order.createJSONReadStream(db, emptyFilter, strategy).pipe(process.stdout);
 ```
 <a name="_update"></a>
 [update](https://github.com/alfateam/rdb-demo/blob/master/update.js)
@@ -1743,8 +2005,9 @@ var Customer = rdb.table('_customer');
 string is default null, 
 guid is default null,
 date is default null,
-binary is default null
-booean is default false
+binary is default null,
+boolean is default false,
+json is default null
 */                    
 
 Customer.primaryColumn('cId').guid().as('id').default(null);
@@ -1753,7 +2016,7 @@ Customer.column('cBalance').numeric().as('balance').default(2000);
 Customer.column('cRegdate').date().as('registeredDate').default(new Date());
 Customer.column('cIsActive').boolean().as('isActive').default(true);
 Customer.column('cPicture').binary().as('picture').default(buf);
-
+Customer.column('cDocument').json().as('document').default({foo: true});
 
 var db = rdb('postgres://postgres:postgres@localhost/test');
 
@@ -1979,6 +2242,136 @@ function verifyUpdated(order) {
 function verifyUpdatedLines(lines) {
     if (lines.length !== 2)
         throw new Error('this will not happen');
+}
+
+function onOk() {
+    console.log('Success');
+    console.log('Waiting for connection pool to teardown....');
+}
+
+function onFailed(err) {
+    console.log('Rollback');
+    console.log(err);
+}
+```
+<a name="_rowlock"></a>
+[row lock](https://github.com/alfateam/rdb-demo/blob/master/exclusive.js)
+```js
+var rdb = require('rdb');
+var promise = require('promise');
+
+var Customer = rdb.table('_customer');
+Customer.primaryColumn('cId').guid().as('id');
+Customer.column('cBalance').numeric().as('balance');
+Customer.exclusive();
+
+var db = rdb('postgres://postgres:postgres@localhost/test');
+
+showBalance()
+    .then(updateConcurrently)
+    .then(showBalance)
+    .then(onOk, onFailed);
+
+function showBalance() {
+    return db.transaction()
+        .then(getById)
+        .then(printBalance)
+        .then(rdb.commit)
+        .then(null, rdb.rollback);
+
+    function printBalance(customer) {
+        console.log('Balance: ' + customer.balance)
+    }
+}
+
+function updateConcurrently() {
+    var concurrent1 = db.transaction()
+        .then(getById)
+        .then(increaseBalance)
+        .then(rdb.commit)
+        .then(null, rdb.rollback);
+
+    var concurrent2 = db.transaction()
+        .then(getById)
+        .then(increaseBalance)
+        .then(rdb.commit)
+        .then(null, rdb.rollback);
+    return promise.all([concurrent1, concurrent2]);
+}
+
+function getById() {
+    console.log('....................');
+    return Customer.getById('a0000000-0000-0000-0000-000000000000');
+}
+
+function increaseBalance(customer) {
+    customer.balance += 100;
+}
+
+function onOk() {
+    console.log('Success');
+    console.log('Waiting for connection pool to teardown....');
+}
+
+function onFailed(err) {
+    console.log('Rollback');
+    console.log(err);
+}
+```
+<a name="_transactionlock"></a>
+[transaction lock (postgres only)](https://github.com/alfateam/rdb-demo/blob/master/lock.js)
+```js
+var rdb = require('rdb');
+var promise = require('promise');
+
+var Customer = rdb.table('_customer');
+Customer.primaryColumn('cId').guid().as('id');
+Customer.column('cBalance').numeric().as('balance');
+
+var db = rdb('postgres://postgres:postgres@localhost/test');
+
+showBalance()
+    .then(updateConcurrently)
+    .then(showBalance)
+    .then(onOk, onFailed);
+
+function showBalance() {
+    return db.transaction()
+        .then(getById)
+        .then(printBalance)
+        .then(rdb.commit)
+        .then(null, rdb.rollback);
+
+    function printBalance(customer) {
+        console.log('Balance: ' + customer.balance)
+    }
+}
+
+function updateConcurrently() {
+    var concurrent1 = db.transaction()
+        .then(getById)
+        .then(increaseBalance)
+        .then(rdb.commit)
+        .then(null, rdb.rollback);
+
+    var concurrent2 = db.transaction()
+        .then(getById)
+        .then(increaseBalance)
+        .then(rdb.commit)
+        .then(null, rdb.rollback);
+    return promise.all([concurrent1, concurrent2]);
+}
+
+function getById() {
+    //pg_advisory_xact_lock(12345)
+    //will be released on commit/rollback 
+    return rdb.lock("12345").then(function() {
+        return Customer.getById('a0000000-0000-0000-0000-000000000000');    
+    });    
+}
+
+function increaseBalance(customer) {
+    customer.balance += 100;
 }
 
 function onOk() {

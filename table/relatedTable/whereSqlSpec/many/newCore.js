@@ -17,12 +17,13 @@ function act(c){
 	var rightColumns = {};
 	var joinRelation = {};
 	var parentTable = {};
+	parentTable._dbName = {};
 	relation.joinRelation = joinRelation;
-	relation.childTable = rightTable;
+	relation.childTable = rightTable;	
 	joinRelation.childTable = parentTable;
 	joinRelation.columns = rightColumns;	
 	parentTable._primaryColumns = leftColumns;				
-	c.newShallowJoinSql.expect(rightTable,leftColumns,rightColumns,'_0','_1').return(joinSql);		
+	c.newShallowJoinSql.expect(rightTable,leftColumns,rightColumns,parentTable._dbName,'_1').return(joinSql);		
 	
 }
 

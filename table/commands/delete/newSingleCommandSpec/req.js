@@ -8,8 +8,8 @@ function act(c) {
     c.filter = {};
     c.subFilter = 
     c.relations = {};
-    c.alias = '_length';
-    c.relations.length = 'length';
+    c.alias = '_theAlias';
+    c.relations.length = {};
     c.initialFilter = {};
 
     c.newSubFilter = c.requireMock('./singleCommand/subFilter');
@@ -19,7 +19,9 @@ function act(c) {
 
     c.extractFilter.expect(c.initialFilter).return(c.filter);
     c.newSubFilter.expect(c.relations, c.filter).return(c.subFilter);
-
+    c.createAlias = c.requireMock('./createAlias');
+    c.createAlias.expect(c.table, c.relations.length).return(c.alias);
+    
     c.newSut = require('../newSingleCommand');
     
 

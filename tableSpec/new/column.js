@@ -10,5 +10,4 @@ function act(c) {
 	c.returned = c.sut.column(columnName);
 }
 
-act.base = '../new';
 module.exports = act;

@@ -1,11 +1,10 @@
 var newBoolean = require('./newBoolean');
-var extractAlias = require('./extractAlias');
+var encodeFilterArg = require('./encodeFilterArg');
 var nullOperator = ' is not ';
 
-function notEqual(column,arg,optionalAlias) {	
+function notEqual(column,arg,alias) {	
 	var operator = '<>';
-	var alias = extractAlias(optionalAlias);	
-	var encoded = column.encode(arg);	
+	var encoded = encodeFilterArg(column, arg);
 	if (encoded.sql() == 'null') 
 		operator = nullOperator;
 	var firstPart = alias + '.' + column._dbName + operator;

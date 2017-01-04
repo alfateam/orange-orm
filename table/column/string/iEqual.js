@@ -1,15 +1,14 @@
 var newBoolean = require('../newBoolean');
-var extractAlias = require('../extractAlias');
-var encode = require('./encodeCore');
-var equal = require('../equal')
+var nullOperator = ' is ';
+var encodeFilterArg = require('../encodeFilterArg');
 
-function iEqual(column,arg,optionalAlias) {
-	var encoded = encode(arg);		
-	if (encoded.sql() === 'null')
-		return equal(column, arg, optionalAlias);
-	var alias = extractAlias(optionalAlias);	
-	var firstPart = alias + '.' + column._dbName + ' ILIKE \'';
-	var filter =  encoded.prepend(firstPart).append('\'');	
+function iEqual(column,arg,alias) {	
+	var operator = ' ILIKE ';
+	var encoded = encodeFilterArg(column, arg);
+	if (encoded.sql() == 'null') 
+		operator = nullOperator;
+	var firstPart = alias + '.' + column._dbName + operator;
+	var filter =  encoded.prepend(firstPart);		
 	return newBoolean(filter);
 }
 

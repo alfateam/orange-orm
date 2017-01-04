@@ -11,6 +11,7 @@ function act(c){
 	c.commit = c.requireMock('../table/commit');
 	c.negotiateConnectionString = c.requireMock('./negotiateConnectionString');
 	c.newPool = c.requireMock('./newPool');
+	c.lock = c.requireMock('../lock');	
 
 	c.newSut = require('../newDatabase');
 }

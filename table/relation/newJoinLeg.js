@@ -6,6 +6,7 @@ function newLeg(relation) {
 	span.table = relation.childTable;
 	span.legs = newCollection();
 	c.span = span;
+	c.name = relation.leftAlias;
 	c.table = relation.parentTable;
 	c.columns = relation.columns;
 	c.expand = relation.expand;

@@ -5,47 +5,57 @@ var lessThanOrEqual = require('./lessThanOrEqual');
 var greaterThan = require('./greaterThan');
 var greaterThanOrEqual = require('./greaterThanOrEqual');
 var _in = require('./in');
+var _extractAlias = require('./extractAlias');
 
 module.exports = function(table,name) {	
 	var c = {};
+	var extractAlias = _extractAlias.bind(null,table);
 	c._dbName = name;
 	c.alias = name;	
 	c.dbNull = null;	
 	table._columns.push(c);
 	table[name] = c;
 	
-	c.equal = function(arg,optionalAlias) {
-		return equal(c,arg,optionalAlias);
+	c.equal = function(arg,alias) {
+		alias = extractAlias(alias);
+		return equal(c,arg, alias);
 	};
 
-	c.notEqual = function(arg,optionalAlias) {
-		return notEqual(c,arg,optionalAlias);
+	c.notEqual = function(arg,alias) {
+		alias = extractAlias(alias);
+		return notEqual(c,arg,alias);
 	};
 
-	c.lessThan = function(arg,optionalAlias) {
-		return lessThan(c,arg,optionalAlias);
+	c.lessThan = function(arg,alias) {
+		alias = extractAlias(alias);
+		return lessThan(c,arg,alias);
 	};
 
-	c.lessThanOrEqual = function(arg,optionalAlias) {
-		return lessThanOrEqual(c,arg,optionalAlias);
+	c.lessThanOrEqual = function(arg,alias) {
+		alias = extractAlias(alias);
+		return lessThanOrEqual(c,arg,alias);
 	};
 
-	c.greaterThan = function(arg,optionalAlias) {
-		return greaterThan(c,arg,optionalAlias);
+	c.greaterThan = function(arg,alias) {
+		alias = extractAlias(alias);
+		return greaterThan(c,arg,alias);
 	};
 
-	c.greaterThanOrEqual = function(arg,optionalAlias) {
-		return greaterThanOrEqual(c,arg,optionalAlias);
+	c.greaterThanOrEqual = function(arg,alias) {
+		alias = extractAlias(alias);
+		return greaterThanOrEqual(c,arg,alias);
 	};
 
-	c.between = function(from,to,optionalAlias) {
-		from = c.greaterThanOrEqual(from,optionalAlias);
-		to = c.lessThanOrEqual(to,optionalAlias);
+	c.between = function(from,to,alias) {
+		alias = extractAlias(alias);
+		from = c.greaterThanOrEqual(from,alias);
+		to = c.lessThanOrEqual(to,alias);
 		return from.and(to);
 	};
 
-	c.in = function(arg,optionalAlias) {
-		return _in(c,arg,optionalAlias);
+	c.in = function(arg,alias) {
+		alias = extractAlias(alias);
+		return _in(c,arg,alias);
 	};
 
 	c.eq = c.equal;

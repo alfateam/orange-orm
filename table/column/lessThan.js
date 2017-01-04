@@ -1,10 +1,9 @@
 var newBoolean = require('./newBoolean');
-var extractAlias = require('./extractAlias');
+var encodeFilterArg = require('./encodeFilterArg');
 
-function lessThanOrEqual(column,arg,optionalAlias) {	
+function lessThanOrEqual(column,arg,alias) {	
 	var operator = '<';
-	var alias = extractAlias(optionalAlias);	
-	var encoded = column.encode(arg);	
+	var encoded = encodeFilterArg(column, arg);
 	var firstPart = alias + '.' + column._dbName + operator;
 	var filter = encoded.prepend(firstPart);		
 	return newBoolean(filter);

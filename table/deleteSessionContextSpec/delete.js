@@ -6,10 +6,12 @@ function act(c){
 	c.expectRequire = a.expectRequire;
 	c.then = a.then;
 	
-	process.domain = {};
+	var oldDomain = process.domain;
+	c.domain = {};
+	process.domain = c.domain;
 	process.domain.rdb = {};
-
 	c.sut = require('../deleteSessionContext')();
+	process.domain = oldDomain;
 }
 
 module.exports = act;

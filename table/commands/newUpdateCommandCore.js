@@ -1,6 +1,6 @@
 var newParameterized = require('../query/newParameterized');
 
-function newInsertCommandCore(table, columns, row) {	
+function newUpdateCommandCore(table, columns, row) {	
 	var columnNames = [];
 	var values = [];
 	var command = newParameterized("UPDATE " + table._dbName + " SET");
@@ -44,4 +44,4 @@ function newInsertCommandCore(table, columns, row) {
 
 }
 
-module.exports = newInsertCommandCore;
+module.exports = newUpdateCommandCore;

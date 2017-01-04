@@ -9,20 +9,22 @@ var filter3 = {};
 
 function act(c){
 	c.expected = {};	
-	c.filter.prepend = c.mock();
-	c.filter.prepend.expect('(').return(tempFilter)
+	// c.filter.prepend = c.mock();
+	// c.filter.prepend.expect('(').return(tempFilter)
 	
-	tempFilter.append = c.mock();
-	tempFilter.append.expect(' OR ').return(tempFilter2);
+	// tempFilter.append = c.mock();
+	// tempFilter.append.expect(' OR ').return(tempFilter2);
 
-	tempFilter2.append = c.mock();
-	tempFilter2.append.expect(filter2).return(tempFilter3);	
+	// tempFilter2.append = c.mock();
+	// tempFilter2.append.expect(filter2).return(tempFilter3);	
 
-	tempFilter3.append = c.mock();
-	tempFilter3.append.expect(')').return(tempFilter4);	
+	// tempFilter3.append = c.mock();
+	// tempFilter3.append.expect(')').return(tempFilter4);	
+
+	c.negotiateNextOrFilter.expect(c.filter, filter2).return(tempFilter)
 
 	c.nextNewBoolean = c.requireMock('./newBoolean');
-	c.nextNewBoolean.expect(tempFilter4).return(nextBoolean);
+	c.nextNewBoolean.expect(tempFilter).return(nextBoolean);
 
 	nextBoolean.or = c.mock();
 	nextBoolean.or.expect(filter3).return(c.expected);

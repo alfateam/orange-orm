@@ -1,6 +1,6 @@
 function act(c) {
-	c.expected = "select _0.oOrderId as s_00,_0.oCustomerId as s_01 from order _0 where _0.discriminatorColumn='foo' AND _0.discriminatorColumn2='baz' order by _0.oOrderId";
-	c.expected2 = "select _0_0.lId as s_0_00,_0_0.lLineNo as s_0_01,_0_0.lOrderId as s_0_02 from orderLine _0_0 INNER JOIN order _0 ON (_0_0.lOrderId=_0.oOrderId AND _0.discriminatorColumn='foo' AND _0.discriminatorColumn2='baz') order by _0.oOrderId";
+	c.expected = "select order.oOrderId as sorder0,order.oCustomerId as sorder1 from order order where order.discriminatorColumn='foo' AND order.discriminatorColumn2='baz' order by order.oOrderId";
+	c.expected2 = "select order_0.lId as sorder_00,order_0.lLineNo as sorder_01,order_0.lOrderId as sorder_02 from orderLine order_0 INNER JOIN order order ON (order_0.lOrderId=order.oOrderId AND order.discriminatorColumn='foo' AND order.discriminatorColumn2='baz') order by order.oOrderId";
 
 	c.newQuery();	
 }

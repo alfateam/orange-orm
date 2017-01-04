@@ -16,18 +16,27 @@ var newObject = requireMock('./newObject');
 var insert = requireMock('./table/insert');
 var _delete = requireMock('./table/delete');
 var cascadeDelete = requireMock('./table/cascadeDelete');
+var createReadStream = requireMock('./table/createReadStream');
+var createJSONReadStream = requireMock('./table/createJSONReadStream');
+
 var tableName = {};
 
 function act(c) {	
+
+	c.requireMock = requireMock;
 	c.insert = insert;
 	c.context = {};
 	newObject.expect().return(c.context);
 	c.cache = {};
 	newRowCache.expect(c.context).return(c.cache);
 	c.tryGetFirstFromDb = requireMock('./table/tryGetFirstFromDb');
+	c.tryGetFirstFromDb.exclusive = mock();	
 	c.getById = getById;
+	c.getById.exclusive = mock();
 	c.tryGetById = tryGetById;
+	c.tryGetById.exclusive = mock();
 	c.getMany = getMany;
+	c.getMany.exclusive = mock();
 	c.hasOne = hasOne;
 	c.hasMany = hasMany;
 	c.join = join;
@@ -43,6 +52,14 @@ function act(c) {
 	c.cascadeDelete = {};
 	cascadeDelete.bind = mock();
 	cascadeDelete.bind.expect(null, c.context).return(c.cascadeDelete);
+
+	c.createReadStream = {};
+	createReadStream.bind = mock();
+	createReadStream.bind.expect(null, c.context).return(c.createReadStream);	
+
+	c.createJSONReadStream = {};
+	createJSONReadStream.bind = mock();
+	createJSONReadStream.bind.expect(null, c.context).return(c.createJSONReadStream);	
 	
 	newSut();
 

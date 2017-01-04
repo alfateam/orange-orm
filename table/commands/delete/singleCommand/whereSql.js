@@ -1,12 +1,11 @@
 var newShallowJoinSql = require('../../../query/singleQuery/joinSql/newShallowJoinSqlCore');
 
-function newWhereSql(relations, shallowFilter) {
+function newWhereSql(relations, shallowFilter, rightAlias) {
     var c = {};
     var sql;
     var relationCount = relations.length;
     var relation = relations[0];
     var leftAlias = '_' + relationCount;
-    var rightAlias = '_' + (relationCount-1);
     var table = relation.childTable;
     var leftColumns = relation.columns;
     var rightColumns = table._primaryColumns;

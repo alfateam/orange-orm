@@ -1,6 +1,7 @@
 function act(c){
 	c.table = {};
 	c.initialStrategy = {};
+	c.initialFilter = {};
 	c.filter = {};
 	c.strategy = {};
 	c.command = {};
@@ -10,6 +11,8 @@ function act(c){
 	c.relations = [];
 	c.initialCmds = [];
 
+	c.negotiateRawSqlFilter.expect(c.initialFilter).return(c.filter);
+
 	c.newDeleteCommand.expect(c.initialCmds, c.table, c.filter, c.strategy, c.relations).return(c.commands);	
 
 	c.extractDeleteStrategy.expect(c.initialStrategy).return(c.strategy);
@@ -17,7 +20,7 @@ function act(c){
 	c.pushCommand.expect(c.command);
 	c.pushCommand.expect(c.command2);
 				
-	c.returned = c.sut(c.table, c.filter, c.initialStrategy);
+	c.returned = c.sut(c.table, c.initialFilter, c.initialStrategy);
 }
 
 module.exports = act;

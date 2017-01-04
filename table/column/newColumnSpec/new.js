@@ -14,6 +14,7 @@ table._columns = columns;
 function act(c) {
 	c.columns = columns;
 	c.equal = equal;
+	c.optionalAlias = {};
 	c.alias = {};
 	c.notEqual = notEqual;
 	c.lessThan = lessThan;
@@ -23,7 +24,12 @@ function act(c) {
 	c.in = _in;
 	c.name = name;	
 	c.table = table;
+
+	c.extractAlias = requireMock('./extractAlias');
+	
 	c.sut = require('../newColumn')(table,name);
+
+	c.extractAlias.expect(table, c.optionalAlias).return(c.alias);
 }
 
 module.exports = act;

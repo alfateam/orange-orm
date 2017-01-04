@@ -1,10 +1,11 @@
 var nextNewBoolean = _nextNewBoolean;
 var negotiateRawSqlFilter = require('./negotiateRawSqlFilter');
+var negotiateNextAndFilter = require('./negotiateNextAndFilter');
+var negotiateNextOrFilter = require('./negotiateNextOrFilter');
 
 function newBoolean(filter) {
     var c = {};
-
-    c.sql = filter.sql;
+    c.sql = filter.sql.bind(filter);
     c.parameters = filter.parameters;
 
     c.append = function(other) {
@@ -19,7 +20,7 @@ function newBoolean(filter) {
 
     c.and = function(other) {
         other = negotiateRawSqlFilter(other);
-        var nextFilter = filter.append(' AND ').append(other);
+        var nextFilter = negotiateNextAndFilter(filter, other);
         var next = nextNewBoolean(nextFilter);
         for (var i = 1; i < arguments.length; i++) {
             next = next.and(arguments[i]);
@@ -29,7 +30,7 @@ function newBoolean(filter) {
 
     c.or = function(other) {
         other = negotiateRawSqlFilter(other);
-        var nextFilter = filter.prepend('(').append(' OR ').append(other).append(')');
+        var nextFilter = negotiateNextOrFilter(filter, other);
         var next = nextNewBoolean(nextFilter);
         for (var i = 1; i < arguments.length; i++) {
             next = next.or(arguments[i]);

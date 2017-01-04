@@ -3,9 +3,13 @@ var mock = a.mock;
 var requireMock = a.requireMock;
 var strategy = {
 					orderLines: {
-						product: null
+						product: null,
+						limit: {},
+						orderBy: {}
 					},
-					consignee : null
+					consignee : null,
+					limit: {},
+					orderBy: {}
 				};
 var legs = {};
 var productRelation = {};
@@ -22,6 +26,7 @@ var productTable = {};
 var addProductLeg = mock();
 
 function act(c){
+	c.strategy = strategy;
 	c.table._relations = { orderLines: orderLinesRelation, consignee: consigneeRelation };
 
 	orderLinesRelation.childTable = orderLineTable;
@@ -49,6 +54,7 @@ function act(c){
 	legs.add = mock();
 	legs.add.expect(orderLinesLeg);
 	legs.add.expect(consigneeLeg);
+	c.orderLinesSpan = orderLinesLeg.span;
 	c.newCollection.expect().return(legs);
 	c.legs = legs;
 	c.returned = c.sut(c.table,strategy);

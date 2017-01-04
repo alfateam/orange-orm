@@ -7,7 +7,6 @@ function act(c){
 	c.then = a.then;
 	c.table = {};
 	c.alias = 'alias';
-
 	c.sut = require('../extractOrderBy');
 }
 

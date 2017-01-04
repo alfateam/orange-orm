@@ -8,5 +8,6 @@ function get() {
 		return resultToPromise(cached);
 	return tryGetFromDbById.apply(null,arguments);
 }
+get.exclusive = tryGetFromDbById.exclusive;
 
 module.exports = get;

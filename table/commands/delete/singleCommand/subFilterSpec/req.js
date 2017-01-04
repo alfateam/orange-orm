@@ -9,6 +9,7 @@ function act(c){
 	c.newSelectSql = c.requireMock('./selectSql');
 	c.newJoinSql = c.requireMock('./joinSql');
 	c.newWhereSql = c.requireMock('./whereSql');
+	c.createAlias = c.requireMock('../createAlias');
 
 	c.sut = require('../subFilter')
 }

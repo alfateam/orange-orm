@@ -2,7 +2,12 @@ function defineColumn(column, table) {
 	var c = {};
 
 	c.string = function() {
-		require('./column/string')(column);
+		require('./column/string')(table, column);
+		return c;
+	};
+
+	c.json = function() {
+		require('./column/json')(column);
 		return c;
 	};
 

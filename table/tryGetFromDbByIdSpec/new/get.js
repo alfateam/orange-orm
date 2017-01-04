@@ -14,5 +14,4 @@ function act(c) {
 	c.returned = c.sut(table,arg1,arg2,optionalStrategy);
 }
 
-act.base = "../new";
 module.exports = act;

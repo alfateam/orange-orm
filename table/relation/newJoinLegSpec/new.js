@@ -8,7 +8,8 @@ var columns = {};
 var newCollection = requireMock('../../newCollection');
 var emptyCollection = {};
 
-function act(c){	
+function act(c){
+	relation.leftAlias = {};
 	relation.parentTable = parentTable;
 	relation.childTable = childTable;
 	relation.columns = columns;

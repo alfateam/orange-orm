@@ -10,6 +10,8 @@ function act(c){
 	c.newDeleteCommand = c.requireMock('./commands/newDeleteCommand');
 	c.extractDeleteStrategy = c.requireMock('./extractDeleteStrategy');
 	c.resultToPromise = c.requireMock('./resultToPromise');
+	c.negotiateRawSqlFilter = c.requireMock('./column/negotiateRawSqlFilter');
+	
 	c.emptyPromise = {};
 	c.resultToPromise.expect().return(c.emptyPromise);
 

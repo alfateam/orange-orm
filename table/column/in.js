@@ -1,20 +1,19 @@
 var newParameterized = require('../query/newParameterized');
 var newBoolean = require('./newBoolean');
-var extractAlias = require('./extractAlias');
+var encodeFilterArg = require('./encodeFilterArg');
 
-function _in(column,values,optionalAlias) {
+function _in(column,values,alias) {
 	var filter;
 	if (values.length === 0) {
 		filter =  newParameterized('1=2');
 		return newBoolean(filter);
 	}
-	var alias = extractAlias(optionalAlias);	
 	var firstPart = alias + '.' + column._dbName + ' in '; 
 	var parameterized = newParameterized(firstPart);	
 	var separator = '(';
 
 	for (var i = 0; i < values.length; i++) {
-		var encoded = column.encode(values[i]);		
+		var encoded = encodeFilterArg(column, values[i]);
 		parameterized = parameterized.append(separator).append(encoded);
 		separator = ',';		
 	}

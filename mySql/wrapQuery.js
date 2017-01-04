@@ -5,11 +5,11 @@ function wrapQuery(connection) {
 	return runQuery;
 
 	function runQuery(query, onCompleted) {
-		var params = query.parameters.toArray();
+		var params = query.parameters;
 		var sql = query.sql();
 		log(sql);
 		log('parameters: ' + params);
-		runOriginalQuery.call(connection, sql, params, onCompleted);
+		return runOriginalQuery.call(connection, sql, params, onCompleted);
 	}
 
 }

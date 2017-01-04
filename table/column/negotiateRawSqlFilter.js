@@ -14,14 +14,18 @@ function negotiateRawSqlFilter(filter) {
         if (filter.and)
             return filter;
         if (filter.sql) {
-            params.push(filter.sql);
-            params = params.concat(filter.parameters || []);
+            var sql = filter.sql;
+            if (typeof filter.sql == 'function') {                
+                sql = filter.sql();
+            }
+            params.push(sql, filter.parameters);
         }
         else
             params = [filter];
     } else {
         params = [filter];
     }
+
     var parameterized = newParameterized.apply(null, params);
     return newBoolean(parameterized);
 }

@@ -1,5 +1,5 @@
 function act(c) {
-	c.expected = "select _0.oOrderId as s_00,_0.oCustomerId as s_01,_0_0.dId as s_0_00,_0_0.dOrderId as s_0_01 from order _0 LEFT JOIN deliveryParty _0_0 ON (_0.oOrderId=_0_0.dOrderId) where _0.discriminatorColumn='foo' AND _0.discriminatorColumn2='baz' order by _0.oOrderId";
+	c.expected = "select order.oOrderId as sorder0,order.oCustomerId as sorder1,order_0.dId as sorder_00,order_0.dOrderId as sorder_01 from order order LEFT JOIN deliveryParty order_0 ON (order.oOrderId=order_0.dOrderId) where order.discriminatorColumn='foo' AND order.discriminatorColumn2='baz' order by order.oOrderId";
 	c.newQuery();	
 }
 

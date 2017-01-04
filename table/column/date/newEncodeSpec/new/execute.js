@@ -4,7 +4,10 @@ var value = new Date(valueAsText);
 var zulu = value.toISOString();
 
 function act(c) {	
-	c.formatted = "'" + zulu + "'";
+	c.encodeDate = c.mock();
+	c.getSessionSingleton.expect('encodeDate').return(c.encodeDate);	
+	c.encodeDate.expect(value).return(c.formatted);
+
 	c.expected = {};
 
 	c.newParam.expect(c.formatted).return(c.expected);

@@ -16,6 +16,9 @@ function act(c) {
     c.newMySqlDatabase = requireMock('./mySql/newDatabase');
     c.newSqliteDatabase = requireMock('./sqlite/newDatabase');
 
+    c.query = requireMock('./query');
+    c.lock = requireMock('./lock');
+
     c.pools.end = {};
 
     c.sut = require('../index');

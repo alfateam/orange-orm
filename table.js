@@ -12,86 +12,109 @@ var newContext = require('./newObject');
 var insert = require('./table/insert');
 var _delete = require('./table/delete');
 var cascadeDelete = require('./table/cascadeDelete');
+var createReadStream = require('./table/createReadStream');
+var createJSONReadStream = require('./table/createJSONReadStream');
 
 function _new(tableName) {
-	var table = newContext();
-	table._dbName = tableName;
-	table._primaryColumns = [];
-	table._columns = [];
-	table._columnDiscriminators = [];
-	table._formulaDiscriminators = [];
-	table._relations = {};
-	table._cache = 	newCache(table);
-	
-	table.primaryColumn = function(columnName) {
-		var columnDef = newColumn(table,columnName);
-		table._primaryColumns.push(columnDef);
-		return column(columnDef,table);
-	};
+    var table = newContext();
+    table._dbName = tableName;
+    table._primaryColumns = [];
+    table._columns = [];
+    table._columnDiscriminators = [];
+    table._formulaDiscriminators = [];
+    table._relations = {};
+    table._cache = newCache(table);
 
-	table.column = function(columnName) {
-		var columnDef = newColumn(table,columnName);
-		return column(columnDef,table);
-	};
+    table.primaryColumn = function(columnName) {
+        var columnDef = newColumn(table, columnName);
+        table._primaryColumns.push(columnDef);
+        return column(columnDef, table);
+    };
 
-	table.join = function(relatedTable) {
-		return join(table,relatedTable);
-	};
+    table.column = function(columnName) {
+        var columnDef = newColumn(table, columnName);
+        return column(columnDef, table);
+    };
 
-	table.hasMany = function(joinRelation) {
-		return hasMany(joinRelation);
-	};
+    table.join = function(relatedTable) {
+        return join(table, relatedTable);
+    };
 
-	table.hasOne = function(joinRelation) {
-		return hasOne(joinRelation);		
-	};
+    table.hasMany = function(joinRelation) {
+        return hasMany(joinRelation);
+    };
 
-	table.getMany = function() {
-		return call(getMany,arguments);
-	};
+    table.hasOne = function(joinRelation) {
+        return hasOne(joinRelation);
+    };
 
-	table.tryGetFirst = function() {
-		return call(tryGetFirst, arguments);
-	};
+    table.getMany = function(filter, strategy) {
+        return getMany(table, filter, strategy);
+    };
 
-	function call(func,args) {
-		var mergedArgs = [table];
-		for (var i = 0; i < args.length; i++) {
-			mergedArgs.push(args[i]);
-		}
-		return func.apply(null,mergedArgs);
-	}
-	
-	table.getById = function() {
-		return call(getById,arguments);
-	};
+    table.getMany.exclusive = function(filter, strategy) {
+        return getMany.exclusive(table, filter, strategy);
+    };
 
-	table.tryGetById = function() {
-		return call(tryGetById,arguments);
-	};
+    table.tryGetFirst = function() {
+        return call(tryGetFirst, arguments);
+    };
+    table.tryGetFirst.exclusive = function() {
+        return call(tryGetFirst.exclusive, arguments);
+    };
 
-	table.columnDiscriminators = function() {
-		for (var i = 0; i < arguments.length; i++) {
-			table._columnDiscriminators.push(arguments[i]);
-		}
-		return table;		
-	};
+    function call(func, args) {
+        var mergedArgs = [table];
+        for (var i = 0; i < args.length; i++) {
+            mergedArgs.push(args[i]);
+        }
+        return func.apply(null, mergedArgs);
+    }
 
-	table.formulaDiscriminators = function() {
-		for (var i = 0; i < arguments.length; i++) {
-			table._formulaDiscriminators.push(arguments[i]);
-		}
-		return table;
-	};
+    table.getById = function() {
+        return call(getById, arguments);
+    };
+    table.getById.exclusive = function() {
+        return call(getById.exclusive, arguments);
+    };
 
-	table.insert = function() {
-		return call(insert,arguments);
-	};
 
-	table.delete = _delete.bind(null,table);
-	table.cascadeDelete = cascadeDelete.bind(null,table);
+    table.tryGetById = function() {
+        return call(tryGetById, arguments);
+    };
 
-	return table;	
+    table.tryGetById.exclusive = function() {
+        return call(tryGetById.exclusive, arguments);
+    };
+
+    table.columnDiscriminators = function() {
+        for (var i = 0; i < arguments.length; i++) {
+            table._columnDiscriminators.push(arguments[i]);
+        }
+        return table;
+    };
+
+    table.formulaDiscriminators = function() {
+        for (var i = 0; i < arguments.length; i++) {
+            table._formulaDiscriminators.push(arguments[i]);
+        }
+        return table;
+    };
+
+    table.insert = function() {
+        return call(insert, arguments);
+    };
+
+    table.delete = _delete.bind(null, table);
+    table.cascadeDelete = cascadeDelete.bind(null, table);
+
+    table.createReadStream = createReadStream.bind(null, table);
+    table.createJSONReadStream = createJSONReadStream.bind(null, table);
+    table.exclusive = function() {
+        table._exclusive = true;
+        return table;
+    };
+    return table;
 }
 
 module.exports = _new;

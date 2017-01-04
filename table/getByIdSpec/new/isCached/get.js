@@ -8,5 +8,4 @@ function act(c) {
 	c.get();
 }
 
-act.base = '../../new';
 module.exports = act;

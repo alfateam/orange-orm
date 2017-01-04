@@ -1,4 +1,5 @@
 var newShallowJoinSql = require('../../../query/singleQuery/joinSql/newShallowJoinSql');
+var createAlias = require('../createAlias');
 
 function newJoinSql(relations) {
 	var length = relations.length;
@@ -16,7 +17,7 @@ function newJoinSql(relations) {
 	
 	relations.forEach(function(relation, i){
 		leftAlias = '_' + (length-i);
-		rightAlias = '_' + (length-i-1);
+		rightAlias = createAlias(relation.childTable, length-i-1);
 		addSql(relation);
 
 	});
