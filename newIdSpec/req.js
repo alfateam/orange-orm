@@ -1,7 +1,7 @@
 var requireMock = require('a').requireMock;
 
 function act(c){
-	c.nodeUid = requireMock('node-uuid');
+	c.nodeUid = requireMock('uuid');
 	c.v4 = {};
 	c.nodeUid.v4 = c.v4;
 	
