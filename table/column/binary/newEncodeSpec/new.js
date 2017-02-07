@@ -10,7 +10,6 @@ function act(c){
 
 	c.purify = requireMock('./purify');
 	c.param = requireMock('../../query/newParameterized');
-	c.getSessionSingleton = c.requireMock('../../getSessionSingleton');
 
 	c.sut = require('../newEncode')(c.column);
 }

@@ -1,7 +1,7 @@
 var wrapQuery = require('./wrapQuery');
 var wrapQueryStream = require('./wrapQueryStream');
-var encodeBuffer = require('./encodeBuffer');
 var encodeDate = require('./encodeDate');
+var encodeBoolean = require('./encodeBoolean');
 var deleteFromSql = require('./deleteFromSql');
 var selectForUpdateSql = require('./selectForUpdateSql');
 
@@ -20,10 +20,11 @@ function newResolveTransaction(domain, pool) {
             client.streamQuery = wrapQueryStream(client);            
             rdb.dbClient = client;
             rdb.dbClientDone = done;
-            rdb.encodeBuffer = encodeBuffer;
+            rdb.encodeBoolean = encodeBoolean;
             rdb.encodeDate = encodeDate;
             rdb.deleteFromSql = deleteFromSql;
             rdb.selectForUpdateSql = selectForUpdateSql;
+            rdb.multipleStatements = true;
             domain.rdb = rdb;    
             onSuccess();
         }

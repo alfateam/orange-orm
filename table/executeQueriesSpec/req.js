@@ -10,6 +10,7 @@ function act(c){
 	c.executeChanges = requireMock('./executeQueries/executeChanges');
 	c.popChanges = requireMock('./popChanges');
 	c.newParameterized = requireMock('./query/newParameterized');
+	c.getSessionSingleton = requireMock('./getSessionSingleton');	
 
 	c.sut = require('../executeQueries');
 }

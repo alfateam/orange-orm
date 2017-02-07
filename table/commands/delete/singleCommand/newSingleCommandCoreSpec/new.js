@@ -17,7 +17,6 @@ function act(c) {
 
 	c.deleteFromSqlFunc = c.mock();
 	c.deleteSql = '<deleteSql>';
-	c.deleteFromSqlFunc.expect(c.tableName, c.alias).return(c.deleteSql);
 	c.getSessionSingleton.expect('deleteFromSql').return(c.deleteFromSqlFunc);
 	
 	

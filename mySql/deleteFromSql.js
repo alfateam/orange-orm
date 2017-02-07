@@ -1,7 +1,8 @@
-var format = 'delete %s from %s as %s';
+var format = 'delete %s from %s as %s%s';
 var util = require('util');
 
-function deleteFromSql(name, alias) {
-	return util.format(format, alias, name, alias);
+function deleteFromSql(table, alias, whereSql) {
+    var name = table._dbName;
+    return util.format(format, alias, name, alias, whereSql);
 }
 module.exports = deleteFromSql;

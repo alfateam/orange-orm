@@ -1,9 +1,14 @@
 var dbNull = {};
 var value = false;
 
-function act(c) {	
+function act(c) {
+	c.arg = {}
 	c.purify.expect(c.arg).return(value);
-	c.formatted = 'false';
+	c.formatted = {};
+
+	c.encodeBoolean = c.mock();
+	c.encodeBoolean.expect(value).return(c.formatted);
+	c.getSessionSingleton.expect('encodeBoolean').return(c.encodeBoolean);
 
 	c.expected = {};
 	c.newParam.expect(c.formatted).return(c.expected);

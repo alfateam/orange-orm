@@ -1,10 +1,11 @@
-
 var a  = require('a');
 var mock = a.mock;
-var requireMock  = a.requireMock;
 
 function act(c){		
-	c.newParameterized = requireMock('../query/newParameterized');
+	c.requireMock = a.requireMock;
+	c.newParameterized = c.requireMock('../query/newParameterized');
+	c.getSessionSingleton = c.requireMock('../getSessionSingleton');
+	c.getSessionSingleton.expect('multipleStatements').return(true);
 	
 	c.queries = [];
 	

@@ -20,10 +20,11 @@ function newResolveTransaction(domain, pool) {
 
             rdb.dbClient = connection;
             rdb.dbClientDone = connection.release.bind(connection);
-            rdb.encodeBuffer = connection.escape.bind(connection);
+            rdb.encodeBoolean = connection.escape.bind(connection);
             rdb.encodeDate = encodeDate;
             rdb.deleteFromSql = deleteFromSql;
             rdb.selectForUpdateSql = selectForUpdateSql;
+            rdb.multipleStatements = true;
             domain.rdb = rdb;    
             onSuccess();
         }

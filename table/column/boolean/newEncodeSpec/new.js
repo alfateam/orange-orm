@@ -8,6 +8,7 @@ function act(c) {
 	c.purify = requireMock('./purify');
 
 	c.newParam = requireMock('../../query/newParameterized');
+	c.getSessionSingleton = requireMock('../../getSessionSingleton');
 
 	c.mock = mock;
 	c.requireMock = requireMock;
