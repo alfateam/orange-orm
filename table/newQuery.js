@@ -3,6 +3,7 @@ var addSubQueries = require('./query/addSubQueries');
 var extractFilter = require('./query/extractFilter');
 var extractOrderBy = require('./query/extractOrderBy');
 var extractLimit = require('./query/extractLimit');
+var extractLimitQuery = require('./query/extractLimitQuery');
 
 function newQuery(queries,table,filter,span,alias,innerJoin,orderBy,exclusive) {	
 	filter = extractFilter(filter);
@@ -10,7 +11,8 @@ function newQuery(queries,table,filter,span,alias,innerJoin,orderBy,exclusive) {
 	var limit = extractLimit(span);
 	var singleQuery = newSingleQuery(table,filter,span,alias,innerJoin,orderBy,limit,exclusive);
 	queries.push(singleQuery);
-	addSubQueries(queries,table,filter,span,alias,innerJoin);
+	var limitQuery = extractLimitQuery(singleQuery, limit);
+	addSubQueries(queries,table,filter,span,alias,innerJoin, limitQuery);
 	return queries;
 }
 
