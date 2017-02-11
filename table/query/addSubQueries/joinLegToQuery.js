@@ -1,6 +1,5 @@
 var newShallowJoinSql = require('./newShallowJoinSql');
 var addSubQueries = require('../addSubQueries');
-var newParameterized = require('../newParameterized');
 
 function joinLegToQuery(queries, parentAlias,leg,legNo,filter, innerJoin,limitQuery) {	
 	var childAlias = parentAlias + '_' + legNo;

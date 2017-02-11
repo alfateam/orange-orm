@@ -10,11 +10,12 @@ var parentAlias = '_1',
 	alias = '_1_2',
 	spanColumns = {},
 	legColumns = {},
-	shallowJoin = ' shallowJoin',
+	shallowJoin = {},
 	primaryColumns = {},
 	queries = {},
 	parameterized = {},
 	filter = {},
+	limitQuery = {},
 	orderBy = {};
 
 function act(c) {
@@ -28,13 +29,12 @@ function act(c) {
 
 	c.extractOrderBy.expect(table,parentAlias,orderByOverride).return(orderBy);
 
-	c.newParameterized.expect(' INNER shallowJoin').return(parameterized);
-	parameterized.append = c.mock();
-	parameterized.append.expect(innerJoin).return(nextInnerJoin);
+	shallowJoin.append = c.mock();
+	shallowJoin.append.expect(innerJoin).return(nextInnerJoin);
 
-	c.newShallowJoinSql.expect(table,legColumns,primaryColumns,alias,parentAlias).return(shallowJoin);
+	c.newShallowJoinSql.expect(table,legColumns,primaryColumns,alias,parentAlias,limitQuery).return(shallowJoin);
 	c.newQuery.expect(queries, childTable,filter,span,alias,nextInnerJoin,orderBy).return(c.query);
-	c.returned = c.sut(queries, parentAlias,leg,legNo,filter,innerJoin);
+	c.returned = c.sut(queries, parentAlias,leg,legNo,filter,innerJoin,limitQuery);
 }
 
 module.exports = act;

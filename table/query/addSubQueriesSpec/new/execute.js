@@ -16,23 +16,24 @@ var a = require('a'),
 	joinLegQuery = {},
 	joinLegNo = {},
 	manyLegNo = {},
-	oneLegNo = {};
+	oneLegNo = {},
+	limitQuery = {};
 
 
 function act(c) {	
 	stubLegs();
 	stubSpan();
 	c.manyLegToQuery = requireMock('./addSubQueries/manyLegToQuery');
-	c.manyLegToQuery.expect(queries, alias,manyLeg,manyLegNo,filter,innerJoin).return(manyLegQuery);
+	c.manyLegToQuery.expect(queries, alias,manyLeg,manyLegNo,filter,innerJoin,limitQuery).return(manyLegQuery);
 
 	c.oneLegToQuery = requireMock('./addSubQueries/oneLegToQuery');
-	c.oneLegToQuery.expect(queries, alias,oneLeg,oneLegNo,filter,innerJoin).return(oneLegQuery);
+	c.oneLegToQuery.expect(queries, alias,oneLeg,oneLegNo,filter,innerJoin,limitQuery).return(oneLegQuery);
 
 	c.joinLegToQuery = requireMock('./addSubQueries/joinLegToQuery');
-	c.joinLegToQuery.expect(queries, alias,joinLeg,joinLegNo,filter,innerJoin).return(joinLegQuery);
+	c.joinLegToQuery.expect(queries, alias,joinLeg,joinLegNo,filter,innerJoin,limitQuery).return(joinLegQuery);
 
 
-	c.sut(queries,table,filter,span,alias,innerJoin);
+	c.sut(queries,table,filter,span,alias,innerJoin,limitQuery);
 }
 
 function stubLegs() {

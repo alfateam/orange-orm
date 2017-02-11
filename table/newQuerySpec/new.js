@@ -6,6 +6,8 @@ var extractFilter = requireMock('./query/extractFilter');
 var extractOrderBy = requireMock('./query/extractOrderBy');
 var extractLimit = requireMock('./query/extractLimit');
 var extractExclusive = requireMock('./query/extractExclusive');
+var extractLimitQuery = requireMock('./query/extractLimitQuery');
+
 
 var table = {};
 var filter = {};
@@ -23,6 +25,7 @@ var innerJoin = {};
 var limit = {};
 var originalOrderBy = {};
 var exclusive = {};
+var limitQuery = {};
 
 function act(c) {
 	c.queries = {};
@@ -35,8 +38,9 @@ function act(c) {
 	extractFilter.expect(initialFilter).return(filter);
 	extractOrderBy.expect(table,alias,spanOrderBy,originalOrderBy).return(orderBy);
 	extractLimit.expect(span).return(limit);
+	extractLimitQuery.expect(singleQuery,limit).return(limitQuery);
 	newSingleQuery.expect(table,filter,span,alias,innerJoin,orderBy,limit,exclusive).return(singleQuery);
-	addSubQueries.expect(c.queries,table,filter,span,alias,innerJoin).return(expected);	
+	addSubQueries.expect(c.queries,table,filter,span,alias,innerJoin,limitQuery).return(expected);	
 	c.returned = require('../newQuery')(c.queries,table,initialFilter,span,alias,innerJoin,originalOrderBy,exclusive);
 }
 
