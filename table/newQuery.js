@@ -11,7 +11,7 @@ function newQuery(queries,table,filter,span,alias,innerJoin,orderBy,exclusive) {
 	var limit = extractLimit(span);
 	var singleQuery = newSingleQuery(table,filter,span,alias,innerJoin,orderBy,limit,exclusive);
 	queries.push(singleQuery);
-	var limitQuery = extractLimitQuery(singleQuery, limit);
+	var limitQuery = extractLimitQuery(singleQuery, limit, table);
 	addSubQueries(queries,table,filter,span,alias,innerJoin, limitQuery);
 	return queries;
 }
