@@ -7,7 +7,10 @@ function act (c) {
 	c.name = 'foo';
 	c.rows = {};
 
-	c.queryContext = {};
+	c.limitQuery = {};
+	c.queryContext = {
+		limitQuery: c.limitQuery
+	};
 	c.filter = {};
 	c.innerJoin = {};
 
@@ -18,7 +21,7 @@ function act (c) {
 	c.parent.queryContext = c.queryContext;
 	c.query = {};
 
-	c.legToQuery.expect([], c.alias, c.leg, c.legNo, c.filter, c.innerJoin).return(c.query);
+	c.legToQuery.expect([], c.alias, c.leg, c.legNo, c.filter, c.innerJoin, c.limitQuery).return(c.query);
 
 	c.subSpan = {};
 

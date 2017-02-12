@@ -5,15 +5,16 @@ var manyLegToQuery = _manyLegToQuery;
 function addSubQueries(queries,table,filter,span,alias,innerJoin) {	
 	var c = {};
 	var _legNo;
+	var limitQuery = queries[queries.length-1].queryContext.limitQuery;
 
 	c.visitJoin = function(leg) {
-		joinLegToQuery(queries, alias,leg,_legNo,filter,innerJoin);
+		joinLegToQuery(queries, alias,leg,_legNo,filter,innerJoin, limitQuery);
 	};
 	c.visitOne = function(leg) {
-		oneLegToQuery(queries, alias,leg,_legNo,filter,innerJoin);
+		oneLegToQuery(queries, alias,leg,_legNo,filter,innerJoin, limitQuery);
 	};
 	c.visitMany = function(leg) {
-		manyLegToQuery(queries, alias,leg,_legNo,filter,innerJoin);
+		manyLegToQuery(queries, alias,leg,_legNo,filter,innerJoin, limitQuery);
 	};
 
 	span.legs.forEach(onEachLeg);	
