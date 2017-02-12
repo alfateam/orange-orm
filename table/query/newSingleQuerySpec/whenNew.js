@@ -3,4 +3,4 @@ var c = {};
 
 when(c)
     .it('should set queryContext').assertEqual(c.queryContext, c.sut.queryContext)
-    .it('should set parameters to filter.parameters').assertEqual(c.parameters, c.sut.parameters);
+    .it('should set parameters to concated parameters').assertDeepEqual(c.parameters, c.sut.parameters);

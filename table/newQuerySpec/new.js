@@ -15,7 +15,9 @@ var initialFilter = {};
 var orderBy = {};
 var limit = {};
 var initialOrderBy = {};
-var singleQuery = {};
+var singleQuery = {
+	queryContext: {}
+};
 var subQuery = {};
 var span = {};
 var spanOrderBy = {};
@@ -31,16 +33,17 @@ function act(c) {
 	c.queries = {};
 	c.queries.push = mock();
 	c.queries.push.expect(singleQuery);
-	
+	c.singleQuery = singleQuery;
+	c.limitQuery = limitQuery;
 	span.orderBy = spanOrderBy;
 	c.addSubQueries = addSubQueries;
 
 	extractFilter.expect(initialFilter).return(filter);
 	extractOrderBy.expect(table,alias,spanOrderBy,originalOrderBy).return(orderBy);
 	extractLimit.expect(span).return(limit);
-	extractLimitQuery.expect(singleQuery,limit,table).return(limitQuery);
+	extractLimitQuery.expect(singleQuery,limit).return(limitQuery);
 	newSingleQuery.expect(table,filter,span,alias,innerJoin,orderBy,limit,exclusive).return(singleQuery);
-	addSubQueries.expect(c.queries,table,filter,span,alias,innerJoin,limitQuery).return(expected);	
+	addSubQueries.expect(c.queries,table,filter,span,alias,innerJoin).return(expected);	
 	c.returned = require('../newQuery')(c.queries,table,initialFilter,span,alias,innerJoin,originalOrderBy,exclusive);
 }
 

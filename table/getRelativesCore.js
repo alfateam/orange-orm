@@ -12,7 +12,8 @@ function getRelativesCore(legToQuery, parent, relation) {
 	var filter = queryContext.filter;
 	var alias = queryContext.alias;
 	var innerJoin = queryContext.innerJoin;
-	var query = legToQuery([], alias, leg, legNo, filter, innerJoin);
+	var limitQuery = queryContext.limitQuery;
+	var query = legToQuery([], alias, leg, legNo, filter, innerJoin, limitQuery);
 
 	return executeQueries(query).then(onResult).then(onRows);
 

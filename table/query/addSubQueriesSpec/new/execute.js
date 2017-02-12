@@ -1,7 +1,13 @@
 var a = require('a'),
 	mock = a.mock,
 	requireMock = a.requireMock,
-	queries = {},
+	limitQuery = {},
+	lastQuery = {
+		queryContext: {
+			limitQuery: limitQuery
+		}
+	},
+	queries = [{}, lastQuery],
 	table = {},
 	filter = {},
 	span = {},
@@ -16,8 +22,7 @@ var a = require('a'),
 	joinLegQuery = {},
 	joinLegNo = {},
 	manyLegNo = {},
-	oneLegNo = {},
-	limitQuery = {};
+	oneLegNo = {};
 
 
 function act(c) {	
@@ -33,7 +38,7 @@ function act(c) {
 	c.joinLegToQuery.expect(queries, alias,joinLeg,joinLegNo,filter,innerJoin,limitQuery).return(joinLegQuery);
 
 
-	c.sut(queries,table,filter,span,alias,innerJoin,limitQuery);
+	c.sut(queries,table,filter,span,alias,innerJoin);
 }
 
 function stubLegs() {

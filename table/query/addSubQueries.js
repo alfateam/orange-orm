@@ -2,9 +2,10 @@ var joinLegToQuery = _joinLegToQuery;
 var oneLegToQuery = _oneLegToQuery;
 var manyLegToQuery = _manyLegToQuery;
 
-function addSubQueries(queries,table,filter,span,alias,innerJoin,limitQuery) {	
+function addSubQueries(queries,table,filter,span,alias,innerJoin) {	
 	var c = {};
 	var _legNo;
+	var limitQuery = queries[queries.length-1].queryContext.limitQuery;
 
 	c.visitJoin = function(leg) {
 		joinLegToQuery(queries, alias,leg,_legNo,filter,innerJoin, limitQuery);
