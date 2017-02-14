@@ -4,8 +4,8 @@ ORM for nodejs / iojs.
 Supports postgres and mySql.  
 
 ## Installation
-`npm install rdb`
-## Features
+`npm install rdb`  
+## Features  
 Simple, flexible mapper.  
 Transaction with commit and rollback.  
 Persistence ignorance - no need for explicit saving, everything is handled by transaction.  
