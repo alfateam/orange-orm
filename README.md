@@ -13,6 +13,11 @@ Eager or lazy loading.
 Based on promises.  
 [Documentation and examples](docs/docs.md)  
 ## Release notes
+__1.5.8__  
+Bugfix: using multipleStatements in mySql could sometimes cause an error when updates are run right before a select.  
+Improved performance on limit when relating to other tables.  
+Using uuid instead of node-uuid  
+Updated all dependencies but generic-pool to latest. (Generic-pool has some breaking changes in latest. I will update it in next release.)  
 __1.5.7__  
 Bugfix: getById.exclusive and tryGetById.exclusive did not lock if row was cached.  
 Improved performance on tryGetFirst.  
