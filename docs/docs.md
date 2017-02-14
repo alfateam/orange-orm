@@ -40,7 +40,7 @@ __Streaming__
 __Persistence__  
 [update](#_update)  
 [insert](#_insert)  
-[delete](#_delete) 
+[delete](#_delete)  
 [cascade delete](#_cascadedelete)  
 [bulk delete](#_bulkdelete)  
 [bulk cascade delete](#_bulkcascadedelete)  

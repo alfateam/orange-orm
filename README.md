@@ -12,7 +12,7 @@ Persistence ignorance - no need for explicit saving, everything is handled by tr
 Eager or lazy loading.  
 Based on promises.  
 [Documentation and examples](docs/docs.md)  
-## Release notes
+## Release notes  
 __1.5.8__  
 Bugfix: using multipleStatements in mySql could sometimes cause an error when updates are run right before a select.  
 Improved performance on limit when relating to other tables.  
