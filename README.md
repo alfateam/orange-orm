@@ -5,14 +5,16 @@ Supports postgres and mySql.
 
 ## Installation
 `npm install rdb`  
-## Features  
+
+## Features
 Simple, flexible mapper.  
 Transaction with commit and rollback.  
 Persistence ignorance - no need for explicit saving, everything is handled by transaction.  
 Eager or lazy loading.  
 Based on promises.  
 [Documentation and examples](docs/docs.md)  
-## Release notes  
+
+## Release notes
 __1.5.9__  
 Bugfix: using multipleStatements in mySql could sometimes cause an error when updates are run right before a select.  
 Improved performance on limit when relating to other tables.  
