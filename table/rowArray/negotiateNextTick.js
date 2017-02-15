@@ -1,4 +1,4 @@
-var promise = require('promise');
+var promise = require('promise/domains');
 
 function negotiateNextTick(i) {	
 	if (i === 0)

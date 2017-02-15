@@ -1,13 +1,15 @@
+var newWhereSql = require('./singleQuery/newWhereSql');
+var negotiateLimit = require('./singleQuery/negotiateLimit');
 var newParameterized = require('./newParameterized');
 
-function extractLimitQuery(query, limit) {
-    if (limit) {
-        var sql = query.sql();
-        var index = sql.indexOf(' from ');
-        var sql = 'select *' + sql.slice(index);
-        return newParameterized(sql, query.parameters);
-    }
+function _new(table, filter, span, alias, orderBy, limit) {
+    if (!limit)
+        return;
+    var whereSql = newWhereSql(table, filter, alias);
+    var safeLimit = negotiateLimit(limit);
+    var sql = 'select * from ' + table._dbName + ' ' + alias + whereSql + orderBy + safeLimit;
 
+    return newParameterized(sql, filter.parameters);
 }
 
-module.exports = extractLimitQuery;
+module.exports = _new;

@@ -40,7 +40,7 @@ __Streaming__
 __Persistence__  
 [update](#_update)  
 [insert](#_insert)  
-[delete](#_delete) 
+[delete](#_delete)  
 [cascade delete](#_cascadedelete)  
 [bulk delete](#_bulkdelete)  
 [bulk cascade delete](#_bulkcascadedelete)  
@@ -1187,7 +1187,7 @@ function onFailed(err) {
 [getMany lazily](https://github.com/alfateam/rdb-demo/blob/master/getManyLazy.js)
 ```js
 var rdb = require('rdb'),
-    promise = require('promise');
+    promise = require('promise/domains');
 
 var Order = rdb.table('_order');
 var OrderLine = rdb.table('_orderLine');
@@ -1252,7 +1252,7 @@ function onFailed(err) {
 [getMany eager](https://github.com/alfateam/rdb-demo/blob/master/getManyEager.js)
 ```js
 var rdb = require('rdb'),
-    promise = require('promise');
+    promise = require('promise/domains');
 
 var Order = rdb.table('_order');
 var OrderLine = rdb.table('_orderLine');
@@ -2258,7 +2258,7 @@ function onFailed(err) {
 [row lock](https://github.com/alfateam/rdb-demo/blob/master/exclusive.js)
 ```js
 var rdb = require('rdb');
-var promise = require('promise');
+var promise = require('promise/domains');
 
 var Customer = rdb.table('_customer');
 Customer.primaryColumn('cId').guid().as('id');
@@ -2322,7 +2322,7 @@ function onFailed(err) {
 [transaction lock (postgres only)](https://github.com/alfateam/rdb-demo/blob/master/lock.js)
 ```js
 var rdb = require('rdb');
-var promise = require('promise');
+var promise = require('promise/domains');
 
 var Customer = rdb.table('_customer');
 Customer.primaryColumn('cId').guid().as('id');

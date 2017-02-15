@@ -6,7 +6,7 @@ function act(c){
 	c.expectRequire = a.expectRequire;
 	c.then = a.then;
 	
-	c.promise = c.requireMock('promise');
+	c.promise = c.requireMock('promise/domains');
 	c.promise.resolve = c.mock();
 	
 

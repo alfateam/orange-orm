@@ -4,7 +4,8 @@ ORM for nodejs / iojs.
 Supports postgres and mySql.  
 
 ## Installation
-`npm install rdb`
+`npm install rdb`  
+
 ## Features
 Simple, flexible mapper.  
 Transaction with commit and rollback.  
@@ -12,7 +13,17 @@ Persistence ignorance - no need for explicit saving, everything is handled by tr
 Eager or lazy loading.  
 Based on promises.  
 [Documentation and examples](docs/docs.md)  
+
 ## Release notes
+__1.6.0__  
+Bugfix: potential ambigous column error when using limit and relating to other tables.  
+__1.5.9__  
+Bugfix: using multipleStatements in mySql could sometimes cause an error when updates are run right before a select.  
+Improved performance on limit when relating to other tables.  
+Using uuid instead of node-uuid  
+Updated all dependencies but generic-pool to latest. (Generic-pool has some breaking changes in latest. I will update it in next release.)  
+__1.5.8__  
+Cleanup line breaks in documentation.  
 __1.5.7__  
 Bugfix: getById.exclusive and tryGetById.exclusive did not lock if row was cached.  
 Improved performance on tryGetFirst.  

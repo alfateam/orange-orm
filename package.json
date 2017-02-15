@@ -1,6 +1,6 @@
 {
   "name": "rdb",
-  "version": "1.5.7",
+  "version": "1.6.0",
   "main": "index.js",
   "title": "rdb",
   "description": "Object Relational Mapper",
@@ -17,14 +17,14 @@
     "test": "jshint ./ && a"
   },
   "dependencies": {
-    "deferred": "^0.7.4",
+    "deferred": "^0.7.5",
     "generic-pool": "^2.2.2",
-    "mysql": "^2.10.0",
-    "pg": "6.0.3",
+    "mysql": "^2.13.0",
+    "pg": "^6.1.2",
     "pg-query-stream": "^1.0.0",
-    "promise": "^6.1.0",
-    "sqlite3": "^3.1.8",
-    "uuid": "^3.0.0"
+    "promise": "^7.1.1",
+    "uuid": "^3.0.1",
+    "sqlite3": "^3.1.8"
   },
   "devDependencies": {
     "a": "^2.1.0"
