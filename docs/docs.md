@@ -2289,7 +2289,8 @@ function onFailed(err) {
 }
 ```
 <a name="_rowlock"></a>
-[row lock](https://github.com/alfateam/rdb-demo/blob/master/exclusive.js)
+[row lock](https://github.com/alfateam/rdb-demo/blob/master/exclusive.js)  
+(not in sqlite)
 ```js
 var rdb = require('rdb');
 var promise = require('promise/domains');
@@ -2353,7 +2354,8 @@ function onFailed(err) {
 }
 ```
 <a name="_transactionlock"></a>
-[transaction lock (postgres only)](https://github.com/alfateam/rdb-demo/blob/master/lock.js)
+[transaction lock](https://github.com/alfateam/rdb-demo/blob/master/lock.js)  
+(postgres only)
 ```js
 var rdb = require('rdb');
 var promise = require('promise/domains');
