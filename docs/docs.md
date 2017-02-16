@@ -131,7 +131,7 @@ function onFailed(err) {
 }
 ```
 <a name="_connecttosqlite"></a>
-[connect to mySql](https://github.com/alfateam/rdb-demo/blob/master/sqlite/connect.js)
+[connect to sqlite](https://github.com/alfateam/rdb-demo/blob/master/sqlite/connect.js)
 ```js
 var rdb = require('rdb');
 var db = rdb.sqlite(__dirname + '/db/rdbDemo');
