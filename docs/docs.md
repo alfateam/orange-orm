@@ -8,6 +8,7 @@ __Connecting__
 [end pool](#_endpool)  
 [end all pools](#_endallpools)  
 [logging](#_logging)  
+
 __Basic querying__  
 [getById](#_getbyid)  
 [tryGetById](#_trygetbyid)  
@@ -34,9 +35,11 @@ __Basic querying__
 [(many)ToJSON with strategy](#_manytojsonwithstrategy)  
 [Raw SQL query](#_rawsqlquery)  
 [Raw SQL Query With Parameters](#_rawsqlquerywithparameters)  
+
 __Streaming__  
 [streaming rows](#_streameager)  
 [streaming json](#_streamjsoneager)  
+
 __Persistence__  
 [update](#_update)  
 [insert](#_insert)  
