@@ -4,6 +4,7 @@ _Documentation and examples_
 __Connecting__  
 [connect to postgres](#_connecttopostgres)  
 [connect to mySql](#_connecttomysql)  
+[connect to sqlite](#_connecttosqlite)  
 [pool size](#_poolsize)  
 [end pool](#_endpool)  
 [end all pools](#_endallpools)  
@@ -129,6 +130,28 @@ function onFailed(err) {
     console.log(err);
 }
 ```
+<a name="_connecttosqlite"></a>
+[connect to mySql](https://github.com/alfateam/rdb-demo/blob/master/sqlite/connect.js)
+```js
+var rdb = require('rdb');
+var db = rdb.sqlite(__dirname + '/db/rdbDemo');
+//will use pool with 10 connections by default
+
+db.transaction()
+    .then(rdb.commit)
+    .then(null, rdb.rollback)
+    .then(onOk, onFailed);
+
+function onOk() {
+    console.log('Success');
+    console.log('Waiting for connection pool to teardown....');
+}
+
+function onFailed(err) {
+    console.log('Rollback');
+    console.log(err);
+}
+```
 <a name="_poolsize"></a>
 [pool size](https://github.com/alfateam/rdb-demo/blob/master/poolOptions.js)
 ```js
@@ -181,9 +204,11 @@ var rdb = require('rdb');
 
 var dbPg = rdb('postgres://postgres:postgres@localhost/test');
 var dbMySql = rdb.mySql('mysql://root@localhost/rdbDemo?multipleStatements=true');
+var dbSqlite = rdb.sqlite(__dirname + '/db/rdbDemo');
 
 connectPg()
     .then(connectMySql)
+    .then(connectSqlite)
     .then(rdb.end)
     .then(onOk, onFailed);
 
@@ -196,6 +221,12 @@ function connectPg() {
 
 function connectMySql() {
     return dbMySql.transaction()
+        .then(rdb.commit)
+        .then(null, rdb.rollback);
+}
+
+function connectSqlite() {
+    return dbSqlite.transaction()
         .then(rdb.commit)
         .then(null, rdb.rollback);
 }
