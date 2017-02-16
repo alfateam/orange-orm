@@ -2978,7 +2978,8 @@ function onFailed(err) {
 }
 ```
 <a name="_iequal"></a>
-[iEqual (postgres only)](https://github.com/alfateam/rdb-demo/blob/master/filtering/iEqual.js)
+[iEqual](https://github.com/alfateam/rdb-demo/blob/master/filtering/iEqual.js)  
+(postgres only)
 ```js
 var rdb = require('rdb');
 
@@ -3020,7 +3021,8 @@ function onFailed(err) {
 }
 ```
 <a name="_istartswith"></a>
-[iStartsWith (postgres only)](https://github.com/alfateam/rdb-demo/blob/master/filtering/iStartsWith.js)
+[iStartsWith](https://github.com/alfateam/rdb-demo/blob/master/filtering/iStartsWith.js)  
+(postgres only)
 ```js
 var rdb = require('rdb');
 
@@ -3062,7 +3064,8 @@ function onFailed(err) {
 }
 ```
 <a name="_iendswith"></a>
-[iEndsWith (postgres only)](https://github.com/alfateam/rdb-demo/blob/master/filtering/iEndsWith.js)
+[iEndsWith](https://github.com/alfateam/rdb-demo/blob/master/filtering/iEndsWith.js)  
+(postgres only)
 ```js
 var rdb = require('rdb');
 
@@ -3104,7 +3107,8 @@ function onFailed(err) {
 }
 ```
 <a name="_icontains"></a>
-[iContains (postgres only)](https://github.com/alfateam/rdb-demo/blob/master/filtering/iContains.js)
+[iContains](https://github.com/alfateam/rdb-demo/blob/master/filtering/iContains.js)  
+(postgres only)
 ```js
 var rdb = require('rdb');
 
@@ -3458,8 +3462,6 @@ Order.join(Customer).by('oCustomerId').as('customer');
 
 var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
-
-
 
 var db = rdb('postgres://postgres:postgres@localhost/test');
 
