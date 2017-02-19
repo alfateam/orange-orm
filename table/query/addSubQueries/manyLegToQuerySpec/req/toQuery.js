@@ -27,7 +27,7 @@ function act(c) {
 	table._primaryColumns = primaryColumns;
 	leg.table = table			
 
-	c.extractOrderBy.expect(table,parentAlias,orderByOverride).return(orderBy);
+	c.extractOrderBy.expect(childTable,alias,orderByOverride).return(orderBy);
 
 	shallowJoin.append = c.mock();
 	shallowJoin.append.expect(innerJoin).return(nextInnerJoin);

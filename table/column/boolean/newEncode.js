@@ -1,10 +1,10 @@
 var purify = require('./purify');
 var newParam = require('../../query/newParameterized');
 var getSessionSingleton = require('../../getSessionSingleton');
+var newEncodeSafe = require('../newEncodeSafe');
 
 function _new(column) {
 	
-	return encode;
 
 	function encode(value) {
 		value = purify(value);
@@ -19,6 +19,9 @@ function _new(column) {
 			return newParam(encodeCore(true));	
 		return newParam(encodeCore(false));	
 	}
+
+	encode.safe = newEncodeSafe(column, purify);
+	return encode;
 }
 
 module.exports = _new;

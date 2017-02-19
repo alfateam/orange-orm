@@ -11,7 +11,7 @@ function act(c){
 	c.strategy = {};
 	c.streamOptions = {};
 	
-	c.createReadStreamCore = c.requireMock('./createReadStreamCore');
+	c.createReadStreamCore = c.requireMock('./createReadStreamCoreNative');
 	c.Stream = c.requireMock('stream');
 
 	c.Stream.Transform = c.mock();
@@ -21,7 +21,7 @@ function act(c){
 	c.expected = {};
 	c.createReadStreamCore.expect(c.table, c.db, c.filter, c.strategy, c.transformer, c.streamOptions).return(c.expected);
 
-	c.returned = require('../createJSONReadStream')(c.table, c.db, c.filter, c.strategy, c.streamOptions);
+	c.returned = require('../createJSONReadStreamNative')(c.table, c.db, c.filter, c.strategy, c.streamOptions);
 }
 
 module.exports = act;

@@ -1,27 +1,23 @@
-var createReadStreamCore = require('./createReadStreamCore');
-var Stream = require('stream');
+var createJSONReadStreamNative = require('./createJSONReadStreamNative');
+var createJSONReadStreamDefault = require('./createJSONReadStreamDefault');
 
 function createJSONReadStream(table, db, filter, strategy, streamOptions) {
-    var transformer = Stream.Transform({ objectMode: true });
-    var started;
-    transformer._transform = function(chunk, enc, cb) {
-    	if (started)
-        	transformer.push(',' + chunk.result);
-        else {
-        	transformer.push('[');
-        	transformer.push(chunk.result);
-        	started = true;
-        } 
-        cb();
+    var create;
+    var c = {};
+
+    c.visitPg = function() {
+        create = createJSONReadStreamNative;
     };
 
-    transformer._flush = function(cb)
-    {
-    	transformer.push(']');
-    	cb();
+    c.visitMySql = c.visitPg;
+
+    c.visitSqlite = function() {
+        create = createJSONReadStreamDefault;
     };
 
-    return createReadStreamCore(table, db, filter, strategy, transformer, streamOptions);
+    db.accept(c);
+
+    return create(table, db, filter, strategy, streamOptions);
 }
 
 module.exports = createJSONReadStream;

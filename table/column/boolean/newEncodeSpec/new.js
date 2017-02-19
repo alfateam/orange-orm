@@ -9,6 +9,11 @@ function act(c) {
 
 	c.newParam = requireMock('../../query/newParameterized');
 	c.getSessionSingleton = requireMock('../../getSessionSingleton');
+	c.newEncodeSafe = requireMock('../newEncodeSafe');
+	
+	c.encodeSafe = {};
+	c.newEncodeSafe.expect(column, c.purify).return(c.encodeSafe);
+
 
 	c.mock = mock;
 	c.requireMock = requireMock;
