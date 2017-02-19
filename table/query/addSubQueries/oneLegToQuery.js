@@ -4,7 +4,7 @@ var newParameterized = require('../newParameterized');
 
 var emptyFilter;
 
-function manyLegToQuery(queries, rightAlias,leg,legNo,filter, innerJoin, limitQuery) {	
+function oneLegToQuery(queries, rightAlias,leg,legNo,filter, innerJoin, limitQuery) {	
 	var leftAlias = rightAlias + '_' + legNo;
 	var span = leg.span;
 	var rightTable = leg.table;
@@ -16,4 +16,4 @@ function manyLegToQuery(queries, rightAlias,leg,legNo,filter, innerJoin, limitQu
 	return addSubQueries(queries, span.table,filter,span,leftAlias,innerJoin);
 }
 
-module.exports = manyLegToQuery;
+module.exports = oneLegToQuery;

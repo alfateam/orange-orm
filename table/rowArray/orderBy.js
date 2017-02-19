@@ -1,16 +1,16 @@
 function orderBy(strategy, rows) {
     if (strategy && strategy.orderBy) {
-        var comparer = createComparer(strategy);
+        var comparer = createComparer(strategy.orderBy);
         return rows.sort(comparer);
     }
     return rows;
 }
 
-function createComparer(strategy) {
-
+function createComparer(orderBy) {
     var comparers = [];
-
-    strategy.orderBy.forEach(function(order) {
+    if (typeof orderBy === 'string')
+        orderBy = [orderBy];
+    orderBy.forEach(function(order) {
         var elements = order.split(' ');
         var name = elements[0];
         var direction = elements[1] || 'asc';
