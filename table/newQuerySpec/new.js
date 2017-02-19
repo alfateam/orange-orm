@@ -41,7 +41,7 @@ function act(c) {
 	extractFilter.expect(initialFilter).return(filter);
 	extractOrderBy.expect(table,alias,spanOrderBy,originalOrderBy).return(orderBy);
 	extractLimit.expect(span).return(limit);
-	extractLimitQuery.expect(singleQuery,limit).return(limitQuery);
+	extractLimitQuery.expect(table, filter, span, alias, orderBy, limit).return(limitQuery);
 	newSingleQuery.expect(table,filter,span,alias,innerJoin,orderBy,limit,exclusive).return(singleQuery);
 	addSubQueries.expect(c.queries,table,filter,span,alias,innerJoin).return(expected);	
 	c.returned = require('../newQuery')(c.queries,table,initialFilter,span,alias,innerJoin,originalOrderBy,exclusive);
