@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__1.6.1__  
+Now supporting sqlite.  
 __1.6.0__  
 Bugfix: potential ambigous column error when using limit and relating to other tables.  
 __1.5.9__  
