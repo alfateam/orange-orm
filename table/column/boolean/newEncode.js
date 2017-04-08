@@ -13,7 +13,7 @@ function _new(column) {
 				return newParam('null');
 			return newParam('\'' + column.dbNull + '\'');
 		}
-		encodeCore =  getSessionSingleton('encodeBoolean');
+		var encodeCore =  getSessionSingleton('encodeBoolean');
 
 		if (value)
 			return newParam(encodeCore(true));	

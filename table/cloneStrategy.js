@@ -1,4 +1,5 @@
-function cloneStrategy(strategy, target = {}) {
+function cloneStrategy(strategy, target) {
+	target = target || {};
     for (var name in strategy) {
         target[name] = mapChild(strategy[name]);            
     }

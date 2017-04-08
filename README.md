@@ -15,6 +15,9 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__1.6.2__  
+Removed es6 syntax to ensure backwards compatability.  
+Fixed global var leak.  
 __1.6.1__  
 Now supporting sqlite.  
 __1.6.0__  
