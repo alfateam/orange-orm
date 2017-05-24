@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__1.6.3__  
+Bugfix: potential incorrect timeZoneOffset when serializing date to JSON. Got timeZoneOffset from now() instead of on actual date.  
 __1.6.2__  
 Removed es6 syntax to ensure backwards compatability.  
 Fixed global var leak.  

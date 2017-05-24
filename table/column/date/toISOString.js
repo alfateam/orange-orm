@@ -8,7 +8,7 @@ function toISOString(date) {
          ':' + pad(date.getMinutes()) +
          ':' + pad(date.getSeconds()) +
          '.' + pad(date.getMilliseconds()) +
-         getISOTimezone();
+         getISOTimezone(date);
 }
 
 function pad(num) {

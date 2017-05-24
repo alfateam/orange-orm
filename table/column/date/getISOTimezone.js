@@ -1,8 +1,7 @@
-function getISOTimezone() {
-    var now = new Date(),
-        tzo = -now.getTimezoneOffset(),
-        dif = tzo >= 0 ? '+' : '-';
-    	return dif + pad(tzo / 60) + ':' + pad(tzo % 60);
+function getISOTimezone(date) {
+    var tzo = -date.getTimezoneOffset(),
+    var dif = tzo >= 0 ? '+' : '-';
+    return dif + pad(tzo / 60) + ':' + pad(tzo % 60);
 }
 
 function pad(num) {
