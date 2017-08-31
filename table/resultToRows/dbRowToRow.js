@@ -24,7 +24,6 @@ function dbRowToRow(span, dbRow, queryContext) {
 	};
 
 	c.visitMany = function(leg) {
-		leg.expand(row);		
 	};
 
 	span.legs.forEach(onEach);

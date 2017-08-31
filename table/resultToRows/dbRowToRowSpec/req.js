@@ -55,7 +55,6 @@ function act(c){
 	c.manyLeg.accept = mock();
 	c.manyLeg.accept.expectAnything().whenCalled(function(visitor) { visitor.visitMany(c.manyLeg); }).return();
 	c.manyLeg.expand = mock();
-	c.manyLeg.expand.expect(c.row);
 
 	
 	c.sut = require('../dbRowToRow');
