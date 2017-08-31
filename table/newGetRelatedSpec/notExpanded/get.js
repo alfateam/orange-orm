@@ -2,8 +2,6 @@ function act(c){
 	
 	c.expected = {};
 
-	c.isDirty.expect().return(false);
-	
 	c.relativesPromise = c.then();
 	c.relativesPromise.resolve();
 	c.getRelatives = c.mock();

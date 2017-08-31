@@ -1,5 +1,4 @@
 var newSingleQuery = require('./query/newSingleQuery');
-var addSubQueries = require('./query/addSubQueries');
 var extractFilter = require('./query/extractFilter');
 var extractOrderBy = require('./query/extractOrderBy');
 var extractLimit = require('./query/extractLimit');
@@ -13,7 +12,6 @@ function newQuery(queries,table,filter,span,alias,innerJoin,orderBy,exclusive) {
 	queries.push(singleQuery);
 	singleQuery.queryContext.limitQuery  = extractLimitQuery(table, filter, span, alias, orderBy, limit);
 
-	addSubQueries(queries,table,filter,span,alias,innerJoin);
 	return queries;
 }
 

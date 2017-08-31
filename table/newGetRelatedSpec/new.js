@@ -10,7 +10,6 @@ function act(c){
 	
 	c.relation = {};
 	c.parent = {};
-	c.isDirty = c.requireMock('./isDirty');
 	
 	c.sut = require('../newGetRelated')(c.parent, c.relation);
 }
