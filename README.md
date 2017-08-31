@@ -15,6 +15,13 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+Bugfix.  
+__1.6.6__  
+Bugfix.  
+__1.6.5__  
+Improved performance on relations.  
+__1.6.4__  
+Bugfix.  
 __1.6.3__  
 Bugfix: potential incorrect timeZoneOffset when serializing date to JSON. Got timeZoneOffset from now() instead of on actual date.  
 __1.6.2__  
