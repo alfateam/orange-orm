@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__1.6.7__  
+Bugfix in relations.  
 __1.6.6__  
 Bugfix.  
 __1.6.5__  
