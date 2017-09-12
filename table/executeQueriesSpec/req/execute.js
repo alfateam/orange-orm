@@ -26,8 +26,6 @@ function act(c){
 	c.executeChanges.expect(c.changes).return(c.changesPromise);
 	c.executeQueriesCore.expect(queries).return(c.queryResult);
 
-	c.getSessionSingleton.expect('multipleStatements').return(true);
-
 	c.returned = c.sut(queries);
 }
 
