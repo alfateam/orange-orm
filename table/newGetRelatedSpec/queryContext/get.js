@@ -1,15 +1,15 @@
 function act(c){
 	
 	c.expected = {};
-
+	c.parent.queryContext = {};
 	c.relativesPromise = c.then();
 	c.relativesPromise.resolve();
 	c.getRelatives = c.mock();
 	c.getRelatives.expect(c.parent).return(c.relativesPromise);
 	c.relation.getRelatives = c.getRelatives;
 
-	c.relation.getFromDb = c.mock();
-	c.relation.getFromDb.expect(c.parent).resolve(c.expected);
+	c.relation.getFromCache = c.mock();
+	c.relation.getFromCache.expect(c.parent).return(c.expected);
 
 	c.sut().then(onResult);
 

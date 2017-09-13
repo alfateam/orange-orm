@@ -7,18 +7,16 @@ function act(c) {
     c.newRowArray = requireMock('../rowArray');
     c.rowArray = [];
     c.table = {};    
-    c.queryContext = {};
     c.span = {};
     c.span.table = c.table;
     c.dbRow1 = {};
     c.dbRow2 = {};
     c.result = [c.dbRow1, c.dbRow2];
-    c.result.queryContext = c.queryContext;
 
     c.row1 = {};
     c.row2 = {};
-    c.dbRowToRow.expect(c.span, c.dbRow1, c.queryContext).return(c.row1);
-    c.dbRowToRow.expect(c.span, c.dbRow2, c.queryContext).return(c.row2);
+    c.dbRowToRow.expect(c.span, c.dbRow1).return(c.row1);
+    c.dbRowToRow.expect(c.span, c.dbRow2).return(c.row2);
 
     c.newRowArray.expect(c.table).return(c.rowArray);
 

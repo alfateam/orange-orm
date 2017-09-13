@@ -15,7 +15,6 @@ var orderBy = {};
 var limit = {};
 var initialOrderBy = {};
 var singleQuery = {
-	queryContext: {}
 };
 var subQuery = {};
 var span = {};

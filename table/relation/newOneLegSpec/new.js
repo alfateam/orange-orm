@@ -6,6 +6,7 @@ var parentTable = {};
 var childTable = {};
 var columns = {};
 var newCollection = requireMock('../../newCollection');
+var newQueryContext = requireMock('../query/singleQuery/newQueryContext');
 var emptyCollection = {};
 
 function act(c){	
@@ -23,6 +24,8 @@ function act(c){
 	c.columns = columns;
 	c.mock = mock;
 	c.relation.expand = {};
+	c.queryContext = {};
+	newQueryContext.expect().return(c.queryContext);
 
 	c.sut = require('../newOneLeg')(c.relation);
 }

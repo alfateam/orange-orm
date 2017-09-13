@@ -5,7 +5,10 @@ var requireMock = a.requireMock;
 function act(c){
 	c.mock = mock;
 	c.requireMock = a.requireMock;
-	c.span = {};
+	c.queryContext = {};
+	c.span = {
+		queryContext: c.queryContext
+	};
 	c.dbRow = {};
 	c.table = {};
 	c.cache = {};
@@ -22,7 +25,6 @@ function act(c){
 	c.span.legs = c.legs;
 	c.row = {};
 	c.initialRow = {};
-	c.queryContext = {};
 
 	c.negotiateQueryContext = c.requireMock('./negotiateQueryContext');
 	c.negotiateQueryContext.expect(c.queryContext, c.initialRow);

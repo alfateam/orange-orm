@@ -3,9 +3,10 @@ var decodeDbRow = require('./decodeDbRow');
 var nextDbRowToRow = _nextDbRowToRow;
 
 
-function dbRowToRow(span, dbRow, queryContext) {
+function dbRowToRow(span, dbRow) {
 	var table = span.table;
 	var row = decodeDbRow(span, table, dbRow);
+	var queryContext = span.queryContext;
 	negotiateQueryContext(queryContext, row);
 	row.queryContext = queryContext;		
 	var cache = table._cache;

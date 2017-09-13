@@ -1,7 +1,10 @@
 var newCollection = require('../newCollection');
+var newQueryContext = require('./query/singleQuery/newQueryContext');
 
-function toSpan(table,strategy) {
+
+function toSpan(table,strategy) {	
 	var span = {};
+	span.queryContext = newQueryContext();
 	span.legs = newCollection();
 	span.table = table;
 	applyStrategy(table,span,strategy);

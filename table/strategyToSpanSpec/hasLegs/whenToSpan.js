@@ -9,4 +9,6 @@ when(c)
 	.it('should set orderBy').assertEqual(c.strategy.orderBy, c.returned.orderBy)
 	.it('should set limit on lines').assertEqual(c.strategy.orderLines.limit, c.orderLinesSpan.limit)
 	.it('should set orderBy on lines').assertEqual(c.strategy.orderLines.orderBy, c.orderLinesSpan.orderBy)
+	.it('should set queryContext on span').assertEqual(c.queryContext, c.returned.queryContext)
+	
 	

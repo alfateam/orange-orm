@@ -8,4 +8,6 @@ when(c)
 	.it('span.legs should should be empty collection').assertEqual(c.emptyCollection,c.sut.span.legs)
 	.it('should set expand method').assertEqual(c.relation.expand, c.sut.expand)
 	.it('should set name').assertEqual(c.joinRelation.rightAlias, c.sut.name)
+	.it('should set queryContext on span').assertEqual(c.queryContext, c.sut.span.queryContext)
+	
 	

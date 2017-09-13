@@ -5,8 +5,6 @@ var negotiateExpandInverse = require('../negotiateExpandInverse');
 
 function getRelatives(parent, relation) {
     var queryContext = parent.queryContext;
-    if (!queryContext)
-        return empty;
     var filter = emptyFilter;
     if (relation.columns.length === 1)
         createInFilter();

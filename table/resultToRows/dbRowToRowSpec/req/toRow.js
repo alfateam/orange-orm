@@ -1,6 +1,6 @@
 function act(c){
 	c.cache.tryAdd.expect(c.initialRow).return(c.row);
-	c.returned = c.sut(c.span, c.dbRow, c.queryContext);
+	c.returned = c.sut(c.span, c.dbRow);
 }
 
 module.exports = act;

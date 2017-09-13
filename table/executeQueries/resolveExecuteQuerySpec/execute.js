@@ -13,9 +13,6 @@ function act(c){
 	c.getSessionSingleton = requireMock('../getSessionSingleton');
 	c.getSessionSingleton.expect('dbClient').return(c.dbClient);	
 
-	c.queryContext = {};
-	c.query.queryContext = c.queryContext;
-
 	c.dbClient.executeQuery = c.mock();
 	c.dbClient.executeQuery.expect(c.query).expectAnything().whenCalled(onQuery);
 

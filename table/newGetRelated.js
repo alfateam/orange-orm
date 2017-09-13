@@ -1,8 +1,10 @@
 function newGetRelated(parent, relation) {
     function getRelated() {
         if (getRelated.expanded)
-            return relation.getFromCache(parent);
-        return relation.getRelatives(parent).then(onRelatives);
+            return relation.getFromCache(parent);        
+        if (parent.queryContext)
+            return relation.getRelatives(parent).then(onRelatives);        
+        return relation.getFromDb(parent).then(onFromDb);
 
         function onFromDb(rows) {
             getRelated.expanded = true;
@@ -13,7 +15,7 @@ function newGetRelated(parent, relation) {
             return relation.getFromCache(parent);
         }
     }
-	return getRelated;
+    return getRelated;
 }
 
 module.exports = newGetRelated;

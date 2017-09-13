@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__1.6.9__  
+Bugfix: [one-to-many relation returns empty if strategy is included](https://github.com/alfateam/rdb/issues/22).  
 __1.6.8__  
 Bugfix: [one-to-many relation returns empty if insert/update is done earlier in transaction](https://github.com/alfateam/rdb/issues/21).  
 __1.6.7__  

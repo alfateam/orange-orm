@@ -1,7 +1,6 @@
 var newColumnSql = require('./singleQuery/newColumnSql');
 var newJoinSql = require('./singleQuery/newJoinSql');
 var newWhereSql = require('./singleQuery/newWhereSql');
-var newQueryContext = require('./singleQuery/newQueryContext');
 var negotiateLimit = require('./singleQuery/negotiateLimit');
 var negotiateExclusive = require('./singleQuery/negotiateExclusive');
 var extractLimitQuery = require('./extractLimitQuery');
@@ -21,7 +20,6 @@ function _new(table,filter,span,alias,innerJoin,orderBy,limit,exclusive) {
 	};
 
 	c.parameters = innerJoin.parameters.concat(filter.parameters);
-	c.queryContext = newQueryContext(filter, alias, innerJoin);
 
 	return c;
 }

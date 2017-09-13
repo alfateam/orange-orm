@@ -4,10 +4,13 @@ var requireMock = a.requireMock;
 var strategy;
 var legs = {};
 
-function act(c){	
-	c.newCollection.expect().return(legs);
-	c.legs = legs;
-	c.returned = c.sut(c.table,strategy);
+function act(c) {
+    c.queryContext = {};
+    c.newQueryContext.expect().return(c.queryContext);
+
+    c.newCollection.expect().return(legs);
+    c.legs = legs;
+    c.returned = c.sut(c.table, strategy);
 }
 
 act.base = '../req';

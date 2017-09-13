@@ -5,13 +5,9 @@ function act(c) {
     c.requireMock = a.requireMock;
     c.expectRequire = a.expectRequire;
     c.then = a.then;
-    c.alias = 'foo';
-    c.filter = {};
     c.expandRows = c.mock();
-    c.newemitEvent = c.requireMock('../../../emitEvent');
-    c.newemitEvent.expect().return(c.expandRows);
 
-    c.sut = require('../newQueryContext')(c.filter, c.alias, c.innerJoin);
+    c.sut = require('../newQueryContext')();
 }
 
 module.exports = act;

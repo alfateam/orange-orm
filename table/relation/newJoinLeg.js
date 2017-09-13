@@ -1,10 +1,12 @@
 var newCollection = require('../../newCollection');
+var newQueryContext = require('../query/singleQuery/newQueryContext');
 
 function newLeg(relation) {
 	var c = {};
 	var span = {};	
 	span.table = relation.childTable;
 	span.legs = newCollection();
+	span.queryContext = newQueryContext();
 	c.span = span;
 	c.name = relation.leftAlias;
 	c.table = relation.parentTable;

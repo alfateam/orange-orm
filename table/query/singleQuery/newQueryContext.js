@@ -1,10 +1,7 @@
-function newQueryContext(filter, alias, innerJoin) {
+function newQueryContext() {
 	var rows = [];
 
 	var c = {};
-	c.filter = filter;
-	c.alias = alias;
-	c.innerJoin = innerJoin;
 	c.rows = rows;
 
 	c.expand = function(relation) {

@@ -10,7 +10,6 @@ function newQuery(queries,table,filter,span,alias,innerJoin,orderBy,exclusive) {
 	var limit = extractLimit(span);
 	var singleQuery = newSingleQuery(table,filter,span,alias,innerJoin,orderBy,limit,exclusive);
 	queries.push(singleQuery);
-	singleQuery.queryContext.limitQuery  = extractLimitQuery(table, filter, span, alias, orderBy, limit);
 
 	return queries;
 }

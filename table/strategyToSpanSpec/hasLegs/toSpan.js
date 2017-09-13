@@ -26,6 +26,8 @@ var productTable = {};
 var addProductLeg = mock();
 
 function act(c){
+	c.queryContext = {};
+	c.newQueryContext.expect().return(c.queryContext);
 	c.strategy = strategy;
 	c.table._relations = { orderLines: orderLinesRelation, consignee: consigneeRelation };
 

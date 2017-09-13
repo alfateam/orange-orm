@@ -1,10 +1,5 @@
 function act(c){
-	c.row = {};
-	c.row2 = {};
-
-	c.alias = {};
 	c.relation = {};
-	c.relation.leftAlias = c.alias;
 
 	c.relation.expand = c.mock();
 	c.relation.expand.expect(c.row);

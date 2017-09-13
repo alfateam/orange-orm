@@ -19,10 +19,6 @@ function resolveExecuteQuery(query) {
                 var lastIndex = rows.length - 1;
                 if (!Array.isArray(rows[0]) && Array.isArray(rows[lastIndex]))
                     rows = rows[lastIndex];
-                Object.defineProperty(rows, 'queryContext', {
-                    value: query.queryContext,
-                    enumerable: false
-                });
                 success(rows);
             } else
                 failed(err);

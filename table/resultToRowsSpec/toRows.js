@@ -26,12 +26,6 @@ function act(c) {
 
     c.dbRowsToRows.expect(c.span, c.x).return(c.rows);
 
-    c.subResultToRows = requireMock('./resultToRows/subResultToRows');
-    c.subRows = {};
-    c.subRowsPromise = c.then();
-    c.subRowsPromise.resolve(c.subRows);
-    c.subResultToRows.expect(c.span, c.nextResult).return(c.subRowsPromise);
-
     c.sut(c.span, c.result).then(onOk, console.log);
 
     function onOk(returned) {
