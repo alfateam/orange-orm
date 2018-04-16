@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__1.7.0__  
+sqlite3 is now a peer dependency. Add it to your own package.json if you intend to use it.  
 __1.6.9__  
 Bugfix: [one-to-many relation returns empty if strategy is included](https://github.com/alfateam/rdb/issues/22).  
 __1.6.8__  

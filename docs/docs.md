@@ -132,6 +132,7 @@ function onFailed(err) {
 ```
 <a name="_connecttosqlite"></a>
 [connect to sqlite](https://github.com/alfateam/rdb-demo/blob/master/sqlite/connect.js)
+Requires sqlite3 as a dependency in your own package.json
 ```js
 var rdb = require('rdb');
 var db = rdb.sqlite(__dirname + '/db/rdbDemo');
