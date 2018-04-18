@@ -17,7 +17,7 @@ connectViaPool.end = require('./pools').end;
 connectViaPool.log = require('./table/log').registerLogger;
 connectViaPool.query = require('./query');
 connectViaPool.lock = require('./lock');
-
+connectViaPool.schema = require('./pg/schema');
 
 Object.defineProperty(connectViaPool, 'sqlite', {
   get: function () {

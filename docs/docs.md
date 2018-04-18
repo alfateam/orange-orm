@@ -6,6 +6,8 @@ __Connecting__
 [connect to mySql](#_connecttomysql)  
 [connect to sqlite](#_connecttosqlite)  
 [pool size](#_poolsize)  
+[schema](#_schema)  
+[schema alternative 2](#_schema2)  
 [end pool](#_endpool)  
 [end all pools](#_endallpools)  
 [logging](#_logging)  
@@ -168,6 +170,53 @@ db.transaction()
 
 function onOk() {
     console.log('Success. Created pool with max 20 connections.');
+    console.log('Waiting for connection pool to teardown....');
+}
+
+function onFailed(err) {
+    console.log('Rollback');
+    console.log(err);
+}
+```
+<a name="_schema"></a>
+[schema](https://github.com/alfateam/rdb-demo/blob/master/schema.js)
+(postgres only)
+```js
+var rdb = require('rdb');
+
+var db = rdb('postgres://postgres:postgres@localhost/test');
+
+db.transaction({schema: ['mySchema', 'otherSchema']}) //or use string for single schema 
+    .then(rdb.commit)
+    .then(null, rdb.rollback)
+    .then(onOk, onFailed);
+
+function onOk() {
+    console.log('Success.');
+    console.log('Waiting for connection pool to teardown....');
+}
+
+function onFailed(err) {
+    console.log('Rollback');
+    console.log(err);
+}
+```
+<a name="_schema2"></a>
+[schema alternative 2](https://github.com/alfateam/rdb-demo/blob/master/schema.js)
+(postgres only)
+```js
+var rdb = require('rdb');
+
+var db = rdb('postgres://postgres:postgres@localhost/test');
+
+db.transaction()
+    .then(() => db.schema(['mySchema', 'otherSchema'])) //or use string for single schema 
+    .then(rdb.commit)
+    .then(null, rdb.rollback)
+    .then(onOk, onFailed);
+
+function onOk() {
+    console.log('Success.');
     console.log('Waiting for connection pool to teardown....');
 }
 
