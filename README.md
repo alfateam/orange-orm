@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__1.7.1__  
+Support for schemas (postgres only).  
 __1.7.0__  
 sqlite3 is now a peer dependency. Add it to your own package.json if you intend to use it.  
 __1.6.9__  
