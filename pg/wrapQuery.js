@@ -16,8 +16,11 @@ function wrapQuery(connection) {
 		function onInnerCompleted(err, result) {
 			if (err) 
 				onCompleted(err);
-			else
+			else {
+				if (Array.isArray(result))
+					result = result[result.length-1];
 				onCompleted(null, result.rows);
+			}
 		}
 	}
 
