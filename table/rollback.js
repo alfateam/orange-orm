@@ -10,7 +10,13 @@ function rollback(e) {
     var chain = resultToPromise()
         			.then(popChanges)
         			.then(executeRollback)
-        			.then(releaseDbClient);
+        			.then(releaseDbClient)
+        			.then(exitDomain);
+
+     function exitDomain() {
+     	if (process.domain)
+     		process.domain.exit();
+     }
 
     if (e)
         return newThrow(e, chain);
