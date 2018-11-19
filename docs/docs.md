@@ -90,249 +90,216 @@ _Contents_
 <a name="_connecttopostgres"></a>
 [connect to postgres](https://github.com/alfateam/rdb-demo/blob/master/connect.js)
 ```js
-var rdb = require('rdb');
-var db = rdb('postgres://postgres:postgres@localhost/test');
-//will use pool with 10 connections by default
+const rdb = require('rdb');
+
+const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 //alternatively: var db = rdb.pg('postgres://postgres:postgres@localhost/test');
+//will use pool with 10 connections by default
 
-db.transaction()
-    .then(rdb.commit)
-    .then(null, rdb.rollback)
-    .then(onOk, onFailed);
-
-function onOk() {
-    console.log('Success');
-    console.log('Waiting for connection pool to teardown....');
-}
-
-function onFailed(err) {
-    console.log('Rollback');
-    console.log(err);
-}
+module.exports = async function() {
+    try {
+        await db.transaction();
+        await rdb.commit();
+        console.log('Waiting for connection pool to teardown....');
+    } catch (e) {
+        console.log(e.stack);
+        rdb.rollback();
+    }
+}();
 ```
 <a name="_connecttomysql"></a>
 [connect to mySql](https://github.com/alfateam/rdb-demo/blob/master/mySql/connect.js)
 ```js
-var rdb = require('rdb');
-var db = rdb.mySql('mysql://root@localhost/rdbDemo?multipleStatements=true');
+const rdb = require('rdb');
+
+const db = rdb('mysql://root@localhost/rdbDemo?multipleStatements=true');
+//alternatively: var db = rdb.mySql('mysql://root@localhost/rdbDemo?multipleStatements=true');
 //will use pool with 10 connections by default
 
-db.transaction()
-    .then(rdb.commit)
-    .then(null, rdb.rollback)
-    .then(onOk, onFailed);
-
-function onOk() {
-    console.log('Success');
-    console.log('Waiting for connection pool to teardown....');
-}
-
-function onFailed(err) {
-    console.log('Rollback');
-    console.log(err);
-}
+module.exports = async function() {
+    try {
+        await db.transaction();
+        await rdb.commit();
+        console.log('Waiting for connection pool to teardown....');
+    } catch (e) {
+        console.log(e.stack);
+        rdb.rollback();
+    }
+}();
 ```
 <a name="_connecttosqlite"></a>
 [connect to sqlite](https://github.com/alfateam/rdb-demo/blob/master/sqlite/connect.js)  
 Requires sqlite3 as a dependency in your own package.json
 ```js
-var rdb = require('rdb');
-var db = rdb.sqlite(__dirname + '/db/rdbDemo');
+const rdb = require('rdb');
+
+const db = rdb.sqlite(__dirname + '/db/rdbDemo');
 //will use pool with 10 connections by default
 
-db.transaction()
-    .then(rdb.commit)
-    .then(null, rdb.rollback)
-    .then(onOk, onFailed);
-
-function onOk() {
-    console.log('Success');
-    console.log('Waiting for connection pool to teardown....');
-}
-
-function onFailed(err) {
-    console.log('Rollback');
-    console.log(err);
-}
+module.exports = async function() {
+    try {
+        await db.transaction();
+        await rdb.commit();
+        console.log('Waiting for connection pool to teardown....');
+    } catch (e) {
+        console.log(e.stack);
+        rdb.rollback();
+    }
+}();
 ```
 <a name="_poolsize"></a>
 [pool size](https://github.com/alfateam/rdb-demo/blob/master/poolOptions.js)
 ```js
-var rdb = require('rdb');
+const rdb = require('rdb');
+const poolOptions = {size: 20};
 
-var poolOptions = {size: 20};
-var db = rdb('postgres://postgres:postgres@localhost/test', poolOptions);
+const db = rdb('postgres://rdb:rdb@localhost/rdbdemo', poolOptions);
 
-db.transaction()
-    .then(rdb.commit)
-    .then(null, rdb.rollback)
-    .then(onOk, onFailed);
-
-function onOk() {
-    console.log('Success. Created pool with max 20 connections.');
-    console.log('Waiting for connection pool to teardown....');
-}
-
-function onFailed(err) {
-    console.log('Rollback');
-    console.log(err);
-}
+module.exports = async function() {
+    try {
+        await db.transaction();
+        await rdb.commit();
+        console.log('Waiting for connection pool to teardown....');
+    } catch (e) {
+        console.log(e.stack);
+        rdb.rollback();
+    }
+}();
 ```
 <a name="_schema"></a>
 [schema](https://github.com/alfateam/rdb-demo/blob/master/schema.js)
 (postgres only)
 ```js
-var rdb = require('rdb');
+const rdb = require('rdb');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+//alternatively: var db = rdb.pg('postgres://postgres:postgres@localhost/test');
 
-db.transaction({schema: ['mySchema', 'otherSchema']}) //or use string for single schema 
-    .then(rdb.commit)
-    .then(null, rdb.rollback)
-    .then(onOk, onFailed);
-
-function onOk() {
-    console.log('Success.');
-    console.log('Waiting for connection pool to teardown....');
-}
-
-function onFailed(err) {
-    console.log('Rollback');
-    console.log(err);
-}
+module.exports = async function() {
+    try {
+        await db.transaction({schema: ['mySchema', 'otherSchema']}); 
+        //or use string for single schema );
+        await rdb.commit();
+        console.log('Waiting for connection pool to teardown....');
+    } catch (e) {
+        console.log(e.stack);
+        rdb.rollback();
+    }
+}();
 ```
 <a name="_schema2"></a>
-[schema alternative 2](https://github.com/alfateam/rdb-demo/blob/master/schema.js)
+[schema alternative 2](https://github.com/alfateam/rdb-demo/blob/master/schema2.js)
 (postgres only)
 ```js
-var rdb = require('rdb');
+const rdb = require('rdb');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+//alternatively: var db = rdb.pg('postgres://postgres:postgres@localhost/test');
 
-db.transaction()
-    .then(() => db.schema(['mySchema', 'otherSchema'])) //or use string for single schema 
-    .then(rdb.commit)
-    .then(null, rdb.rollback)
-    .then(onOk, onFailed);
-
-function onOk() {
-    console.log('Success.');
-    console.log('Waiting for connection pool to teardown....');
-}
-
-function onFailed(err) {
-    console.log('Rollback');
-    console.log(err);
-}
+module.exports = async function() {
+    try {
+        await db.transaction();
+        await db.schema({schema: ['mySchema', 'otherSchema']});
+        //or use string for single schema );
+        await rdb.commit();
+        console.log('Waiting for connection pool to teardown....');
+    } catch (e) {
+        console.log(e.stack);
+        rdb.rollback();
+    }
+}();
 ```
 <a name="_endpool"></a>
 [end pool](https://github.com/alfateam/rdb-demo/blob/master/endPool.js)
 ```js
-var rdb = require('rdb');
+const rdb = require('rdb');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
-db.transaction()
-    .then(rdb.commit)
-    .then(null, rdb.rollback)
-    .then(db.end)
-    .then(onOk, onFailed);
-
-function onOk() {
-    console.log('Pool ended.');
-}
-
-function onFailed(err) {
-    console.log('Rollback');
-    console.log(err);
-}
+module.exports = async function() {
+    try {
+        await db.transaction();
+        await rdb.commit();
+        await db.end();
+        console.log('Pool ended.');
+    } catch (e) {
+        console.log(e.stack);
+        rdb.rollback();
+    }
+}();
 ```
 <a name="_endallpools"></a>
 [end all pools](https://github.com/alfateam/rdb-demo/blob/master/endAllPools.js)
 ```js
-var rdb = require('rdb');
+const rdb = require('rdb');
 
-var dbPg = rdb('postgres://postgres:postgres@localhost/test');
-var dbMySql = rdb.mySql('mysql://root@localhost/rdbDemo?multipleStatements=true');
-var dbSqlite = rdb.sqlite(__dirname + '/db/rdbDemo');
+const dbPg = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+const dbMySql = rdb('mysql://root@localhost/rdbDemo?multipleStatements=true');
 
-connectPg()
-    .then(connectMySql)
-    .then(connectSqlite)
-    .then(rdb.end)
-    .then(onOk, onFailed);
+module.exports = async function() {
+    try {
+        await connectPg();
+        await connectMySql();
+        await rdb.end();
+        console.log('Pools ended.');
+    } catch (e) {
+        console.log(e.stack);
+    }
+}();
 
+async function connectPg() {
+    try {
+        await dbPg.transaction();
+        await rdb.commit();
+    } catch (e) {
+        console.log(e.stack);
+        rdb.rollback();
+    }
+};
 
-function connectPg() {
-    return dbPg.transaction()
-        .then(rdb.commit)
-        .then(null, rdb.rollback);
-}
-
-function connectMySql() {
-    return dbMySql.transaction()
-        .then(rdb.commit)
-        .then(null, rdb.rollback);
-}
-
-function connectSqlite() {
-    return dbSqlite.transaction()
-        .then(rdb.commit)
-        .then(null, rdb.rollback);
-}
-
-function onOk() {
-    console.log('Pools ended.');
-}
-
-function onFailed(err) {
-    console.log(err.stack);
-}
-
+async function connectMySql() {
+    try {
+        await dbMySql.transaction();
+        await rdb.commit();
+    } catch (e) {
+        console.log(e.stack);
+        rdb.rollback();
+    }
+};
 ```
 <a name="_logging"></a>
 [logging](https://github.com/alfateam/rdb-demo/blob/master/logging.js)
 ```js
-var rdb = require('rdb');
-rdb.log(console.log); //will log sql and parameters
+const rdb = require('rdb');
 
-var Customer = rdb.table('_customer');
+const Customer = rdb.table('_customer');
+
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cName').string().as('name');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+rdb.log(console.log); //will log sql and parameters
 
-db.transaction()
-    .then(getById)
-    .then(update)
-    .then(rdb.commit)
-    .then(null, rdb.rollback)
-    .then(onOk, onFailed);
+const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
-function getById() {
-    return Customer.getById('a0000000-0000-0000-0000-000000000000');
-}
+module.exports = async function() {
+    try {
+        await db.transaction();
+        let customer = await Customer.getById('a0000000-0000-0000-0000-000000000000');
+        customer.name = 'Ringo'; 
+        rdb.commit();
+        console.log('Waiting for connection pool to teardown....');
+    } catch (e) {
+        console.log(e.stack);
+        rdb.rollback();
+    }
+}();
 
-function update(customer) {
-    customer.name = 'Ringo'; 
-}
-
-function onOk() {
-    console.log('Success');
-    console.log('Waiting for connection pool to teardown....');
-}
-
-function onFailed(err) {
-    console.log('Rollback');
-    console.log(err);
-}
 ```
 <a name="_getbyid"></a>
 [getById](https://github.com/alfateam/rdb-demo/blob/master/getById.js)
 ```js
-var rdb = require('rdb');
-
-var Customer = rdb.table('_customer');
+const rdb = require('rdb');
+const Customer = rdb.table('_customer');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cName').string().as('name');
@@ -342,41 +309,27 @@ Customer.column('cIsActive').boolean().as('isActive');
 Customer.column('cPicture').binary().as('picture');
 Customer.column('cDocument').json().as('document');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
-db.transaction()
-    .then(getById)
-    .then(printCustomer)
-    .then(rdb.commit)
-    .then(null, rdb.rollback)
-    .then(onOk, onFailed);
-
-function getById() {
-    return Customer.getById('a0000000-0000-0000-0000-000000000000');
-}
-
-function printCustomer(customer) {
-    var format = 'Customer Id: %s, name: %s, Balance: %s, Registered Date: %s, Is Active: %s, Picture: %s, , Document: %s'; 
-    var args = [format, customer.id, customer.name, customer.balance, customer.registeredDate, customer.isActive, customer.picture, JSON.stringify(customer.document)];
-    console.log.apply(null,args);
-}
-
-function onOk() {
-    console.log('Success');
-    console.log('Waiting for connection pool to teardown....');
-}
-
-function onFailed(err) {
-    console.log('Rollback');
-    console.log(err);
-}
+module.exports = async function() {
+    try {
+        await db.transaction();
+        let customer = await Customer.getById('a0000000-0000-0000-0000-000000000000');
+        console.log(await customer.toDto());
+        await rdb.commit();
+        console.log('Waiting for connection pool to teardown....');
+    } catch (e) {
+        console.log(e.stack);
+        rdb.rollback();
+    }
+}();
 ```
 <a name="_trygetbyid"></a>
 [tryGetById](https://github.com/alfateam/rdb-demo/blob/master/tryGetById.js)
 ```js
-var rdb = require('rdb');
+const rdb = require('rdb');
 
-var Customer = rdb.table('_customer');
+const Customer = rdb.table('_customer');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cName').string().as('name');
@@ -384,88 +337,55 @@ Customer.column('cBalance').numeric().as('balance');
 Customer.column('cRegdate').date().as('registeredDate');
 Customer.column('cIsActive').boolean().as('isActive');
 Customer.column('cPicture').binary().as('picture');
-Customer.column('cDocument').json().as('document');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
-db.transaction()
-    .then(tryGetById)
-    .then(printCustomer)
-    .then(rdb.commit)
-    .then(null, rdb.rollback)
-    .then(onOk, onFailed);
-
-function tryGetById() {
-    return Customer.tryGetById('a0000000-0000-0000-0000-000000000000');
-}
-
-function printCustomer(customer) {
-    if (customer) {
-        var format = 'Customer Id: %s, name: %s, Balance: %s, Registered Date: %s, Is Active: %s, Picture: %s, , Document: %s'; 
-        var args = [format, customer.id, customer.name, customer.balance, customer.registeredDate, customer.isActive, customer.picture, JSON.stringify(customer.document)];
-        console.log.apply(null,args);
+module.exports = async function() {
+    try {
+        await db.transaction();
+        let customer = await Customer.tryGetById('a0000000-0000-0000-0000-000000000000');
+        console.log(await customer.toDto());
+        await rdb.commit();
+        console.log('Waiting for connection pool to teardown....');
+    } catch (e) {
+        console.log(e.stack);
+        rdb.rollback();
     }
-}
-
-function onOk() {
-    console.log('Success');
-    console.log('Waiting for connection pool to teardown....');
-}
-
-function onFailed(err) {
-    console.log('Rollback');
-    console.log(err);
-}
+}();
 ```
 <a name="_trygetfirst"></a>
 [tryGetFirst](https://github.com/alfateam/rdb-demo/blob/master/tryGetFirst.js)
 ```js
-var rdb = require('rdb');
+const rdb = require('rdb');
 
-var Customer = rdb.table('_customer');
+const Customer = rdb.table('_customer');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cName').string().as('name');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
-db.transaction()
-    .then(tryGetFirst)
-    .then(printCustomer)
-    .then(rdb.commit)
-    .then(null, rdb.rollback)
-    .then(onOk, onFailed);
-
-function tryGetFirst() {
-    var filter = Customer.name.equal('John');
-    return Customer.tryGetFirst(filter);
-}
-
-function printCustomer(customer) {
-    if (customer) {
-        console.log('Customer Id: %s, name: %s', customer.id, customer.name);;
+module.exports = async function() {
+    try {
+        await db.transaction();
+        let filter = Customer.name.equal('John');
+        let customer = await Customer.tryGetFirst(filter);
+        console.log(await customer.toDto());
+        await rdb.commit();
+        console.log('Waiting for connection pool to teardown....');
+    } catch (e) {
+        console.log(e.stack);
+        rdb.rollback();
     }
-    else
-        console.log('customer not found');
-}
-
-function onOk() {
-    console.log('Success');
-    console.log('Waiting for connection pool to teardown....');
-}
-
-function onFailed(err) {
-    console.log('Rollback');
-    console.log(err);
-}
+}();
 ```
 <a name="_join"></a>
 [join](https://github.com/alfateam/rdb-demo/blob/master/join.js)
 ```js
-var rdb = require('rdb');
+const rdb = require('rdb');
 
-var Customer = rdb.table('_customer');
-var Order = rdb.table('_order');
+const Customer = rdb.table('_customer');
+const Order = rdb.table('_order');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cName').string().as('name');
@@ -475,52 +395,31 @@ Order.column('oOrderNo').string().as('orderNo');
 Order.column('oCustomerId').guid().as('customerId');
 Order.join(Customer).by('oCustomerId').as('customer');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
-db.transaction()
-    .then(getOrder)
-    .then(printOrder)
-    .then(printCustomer)
-    .then(rdb.commit)
-    .then(null, rdb.rollback)
-    .then(onOk, onFailed);
-
-function getOrder() {
-    return Order.getById('a0000000-a000-0000-0000-000000000000');
-}
-
-function printOrder(order) {
-    var format = 'Order Id: %s, Order No: %s, Customer Id: %s'; 
-    var args = [format, order.id, order.orderNo, order.customerId];
-    console.log.apply(null,args);
-    return order.customer; //this is a promise
-}
-
-function printCustomer(customer) {
-    if (!customer)
-        return;
-    var format = 'Customer Id: %s, name: %s'; 
-    var args = [format, customer.id, customer.name];
-    console.log.apply(null,args);
-}
-
-function onOk() {
-    console.log('Success');
-    console.log('Waiting for connection pool to teardown....');
-}
-
-function onFailed(err) {
-    console.log('Rollback');
-    console.log(err);
-}
+module.exports = async function() {
+    try {
+        await db.transaction();
+        let order = await Order.getById('a0000000-a000-0000-0000-000000000000');
+        let customer = await order.customer;
+        console.log(await order.toJSON({customer: null}));
+        await rdb.commit();
+        console.log('Waiting for connection pool to teardown....');
+    } catch (e) {
+        console.log(e.stack);
+        rdb.rollback();
+    }
+}();
 ```
 <a name="_hasmany"></a>
 [hasMany](https://github.com/alfateam/rdb-demo/blob/master/hasMany.js)
 ```js
-var rdb = require('rdb');
+const rdb = require('rdb');
+const resetDemo = require('./db/resetDemo');
+const inspect = require('util').inspect;
 
-var Order = rdb.table('_order');
-var OrderLine = rdb.table('_orderLine');
+const Order = rdb.table('_order');
+const OrderLine = rdb.table('_orderLine');
 
 Order.primaryColumn('oId').guid().as('id');
 Order.column('oOrderNo').string().as('orderNo');
@@ -529,57 +428,34 @@ OrderLine.primaryColumn('lId').guid().as('id');
 OrderLine.column('lOrderId').guid().as('orderId');
 OrderLine.column('lProduct').string().as('product');
 
-var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+const line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
-db.transaction()
-    .then(getOrder)
-    .then(printOrder)
-    .then(printLines)
-    .then(rdb.commit)
-    .then(null, rdb.rollback)
-    .then(onOk, onFailed);
-
-function getOrder() {
-    return Order.getById('b0000000-b000-0000-0000-000000000000');
-}
-
-function printOrder(order) {
-    var format = 'Order Id: %s, Order No: %s'; 
-    var args = [format, order.id, order.orderNo];
-    console.log.apply(null,args);
-    return order.lines; //this is a promise
-}
-
-function printLines(lines) {
-    lines.forEach(printLine);
-
-    function printLine(line) {
-        var format = 'Line Id: %s, Order Id: %s, Product: %s'; 
-        var args = [format, line.id, line.orderId, line.product];
-        console.log.apply(null,args);
-    }    
-}
-
-function onOk() {
-    console.log('Success');
-    console.log('Waiting for connection pool to teardown....');
-}
-
-function onFailed(err) {
-    console.log('Rollback');
-    console.log(err);
-}
+module.exports = async function() {
+    try {
+        await resetDemo();
+        await db.transaction();
+        let order = await Order.getById('b0000000-b000-0000-0000-000000000000');
+        let dtos = await order.toDto();
+        console.log(inspect(dtos, false, 10));
+        await rdb.commit();
+        console.log('Waiting for connection pool to teardown....');
+    } catch (e) {
+        console.log(e.stack);
+        rdb.rollback();
+    }
+}();
 ```
 <a name="_hasone"></a>
 [hasOne](https://github.com/alfateam/rdb-demo/blob/master/hasOne.js)
 ```js
-var rdb = require('rdb');
+const rdb = require('rdb');
+const {inspect} = require('util');
 
-var Order = rdb.table('_order');
-var DeliveryAddress = rdb.table('_deliveryAddress');
+const Order = rdb.table('_order');
+const DeliveryAddress = rdb.table('_deliveryAddress');
 
 Order.primaryColumn('oId').guid().as('id');
 Order.column('oOrderNo').string().as('orderNo');
@@ -589,53 +465,32 @@ DeliveryAddress.column('dOrderId').string().as('orderId');
 DeliveryAddress.column('dName').string().as('name');
 DeliveryAddress.column('dStreet').string().as('street');
 
-var deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
+const deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
 Order.hasOne(deliveryAddress_order_relation).as('deliveryAddress');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
-db.transaction()
-    .then(getOrder)
-    .then(printOrder)
-    .then(printDeliveryAddress)
-    .then(rdb.commit)
-    .then(null, rdb.rollback)
-    .then(onOk, onFailed);
-
-function getOrder() {
-    return Order.getById('b0000000-b000-0000-0000-000000000000');
-}
-
-function printOrder(order) {
-    var format = 'Order Id: %s, Order No: %s'; 
-    var args = [format, order.id, order.orderNo];
-    console.log.apply(null,args);
-    return order.deliveryAddress; //this is a promise
-}
-
-function printDeliveryAddress(address) {
-    var format = 'DeliveryAddress Id: %s, Order Id: %s, %s'; 
-    var args = [format, address.id, address.orderId, address.name, address.street];
-    console.log.apply(null,args);
-}
-
-function onOk() {
-    console.log('Success');
-    console.log('Waiting for connection pool to teardown....');
-}
-
-function onFailed(err) {
-    console.log('Rollback');
-    console.log(err);
-}
+module.exports = async function() {
+    try {
+        await db.transaction();
+        let order = await Order.getById('b0000000-b000-0000-0000-000000000000');
+        let dtos = await order.toDto();
+        console.log(inspect(dtos, false, 10));
+        await rdb.commit();
+        console.log('Waiting for connection pool to teardown....');
+    } catch (e) {
+        console.log(e.stack);
+        rdb.rollback();
+    }
+}();
 ```
 <a name="_compositekeys"></a>
 [composite keys](https://github.com/alfateam/rdb-demo/blob/master/compositeKeys.js)
 ```js
-var rdb = require('rdb');
+const rdb = require('rdb');
 
-var Order = rdb.table('_compositeOrder');
-var OrderLine = rdb.table('_compositeOrderLine');
+const Order = rdb.table('_compositeOrder');
+const OrderLine = rdb.table('_compositeOrderLine');
 
 Order.primaryColumn('oCompanyId').numeric().as('companyId');
 Order.primaryColumn('oOrderNo').numeric().as('orderNo');
@@ -645,57 +500,34 @@ OrderLine.primaryColumn('lOrderNo').numeric().as('orderNo');
 OrderLine.primaryColumn('lLineNo').numeric().as('lineNo');
 OrderLine.column('lProduct').string().as('product');
 
-var line_order_relation = OrderLine.join(Order).by('lCompanyId', 'lOrderNo').as('order');
+const line_order_relation = OrderLine.join(Order).by('lCompanyId', 'lOrderNo').as('order');
 Order.hasMany(line_order_relation).as('lines');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
-db.transaction()
-    .then(getOrder)
-    .then(printOrder)
-    .then(printLines)
-    .then(rdb.commit)
-    .then(null, rdb.rollback)
-    .then(onOk, onFailed);
-
-function getOrder() {
-    var companyId = 1,
-        orderId = 1001;
-    return Order.getById(companyId, orderId);
-}
-
-function printOrder(order) {
-    console.log('Company Id: %s, Order No: %s', order.companyId, order.orderNo)
-    return order.lines; //this is a promise
-}
-
-function printLines(lines) {
-    lines.forEach(printLine);
-
-    function printLine(line) {
-        var format = 'Company Id: %s, Order No: %s, Line No: %s, Product: %s'; 
-        var args = [format, line.companyId, line.orderNo, line.lineNo, line.product];
-        console.log.apply(null,args);
-    }    
-}
-
-function onOk() {
-    console.log('Success');
-    console.log('Waiting for connection pool to teardown....');
-}
-
-function onFailed(err) {
-    console.log('Rollback');
-    console.log(err);
-}
+module.exports = async function() {
+    try {
+        await db.transaction();
+        let companyId = 1;
+        let orderId = 1001;
+        let order = await Order.getById(companyId, orderId);
+        console.log(await order.toDto());
+        await rdb.commit();
+        console.log('Waiting for connection pool to teardown....');
+    } catch (e) {
+        console.log(e.stack);
+        rdb.rollback();
+    }
+}();
 ```
 <a name="_getbyideager"></a>
 [getById eagerly](https://github.com/alfateam/rdb-demo/blob/master/getByIdEager.js)
 ```js
-var rdb = require('rdb');
+const rdb = require('rdb');
+const inspect = require('util').inspect;
 
-var Customer = rdb.table('_customer');
-var Order = rdb.table('_order');
+const Customer = rdb.table('_customer');
+const Order = rdb.table('_order');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cName').string().as('name');
@@ -705,51 +537,31 @@ Order.column('oOrderNo').string().as('orderNo');
 Order.column('oCustomerId').guid().as('customerId');
 Order.join(Customer).by('oCustomerId').as('customer');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
-db.transaction()
-    .then(getOrderWithCustomer)
-    .then(printOrder)
-    .then(printCustomer)
-    .then(rdb.commit)
-    .then(null, rdb.rollback)
-    .then(onOk, onFailed);
-
-function getOrderWithCustomer() {
-    var fetchingStrategy = {customer : null}; //alternatively: {customer : {}} 
-    return Order.getById('a0000000-a000-0000-0000-000000000000', fetchingStrategy);
-}
-
-function printOrder(order) {
-    var format = 'Order Id: %s, Order No: %s, Customer Id: %s'; 
-    var args = [format, order.id, order.orderNo, order.customerId];
-    console.log.apply(null,args);
-    return order.customer; //this is a promise
-}
-
-function printCustomer(customer) {
-    if (!customer)
-        return;
-    console.log('Customer Id: %s, name: %s', customer.id, customer.name);
-}
-
-function onOk() {
-    console.log('Success');
-    console.log('Waiting for connection pool to teardown....');
-}
-
-function onFailed(err) {
-    console.log('Rollback');
-    console.log(err);
-}
+module.exports = async function() {
+    try {
+        await db.transaction();
+        let fetchingStrategy = { customer: null }; //alternatively: {customer : {}} 
+        let order = await Order.getById('a0000000-a000-0000-0000-000000000000', fetchingStrategy);
+        console.log(await order.toDto());
+        let customer = await order.customer;
+        console.log(await customer.toDto());
+        await rdb.commit();
+        console.log('Waiting for connection pool to teardown....');
+    } catch (e) {
+        console.log(e.stack);
+        rdb.rollback();
+    }
+}();
 ```
 <a name="_trygetfirsteager"></a>
 [tryGetFirst eagerly](https://github.com/alfateam/rdb-demo/blob/master/tryGetFirstEager.js)
 ```js
-var rdb = require('rdb');
+const rdb = require('rdb');
 
-var Customer = rdb.table('_customer');
-var Order = rdb.table('_order');
+const Customer = rdb.table('_customer');
+const Order = rdb.table('_order');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cName').string().as('name');
@@ -760,58 +572,33 @@ Order.column('oCustomerId').guid().as('customerId');
 
 Order.join(Customer).by('oCustomerId').as('customer');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
-db.transaction()
-    .then(tryGetFirstOrderWithCustomer)
-    .then(printOrder)
-    .then(printCustomer)
-    .then(rdb.commit)
-    .then(null, rdb.rollback)
-    .then(onOk, onFailed);
-
-function tryGetFirstOrderWithCustomer() {
-    var filter = Order.customer.name.equal('John');
-    var strategy = {customer : null};
-    return Order.tryGetFirst(filter, strategy);
-}
-
-function printOrder(order) {
-    if (!order) {
-        console.log('order not found');
-        return;
+module.exports = async function() {
+    try {
+        await db.transaction();
+        let filter = Order.customer.name.equal('John');
+        let strategy = { customer: null };
+        let order = await Order.tryGetFirst(filter, strategy);
+        if (order)
+            console.log(await order.toDto());
+        await rdb.commit();
+        console.log('Waiting for connection pool to teardown....');
+    } catch (e) {
+        console.log(e.stack);
+        rdb.rollback();
     }
-    var format = 'Order Id: %s, Order No: %s, Customer Id: %s'; 
-    var args = [format, order.id, order.orderNo, order.customerId];
-    console.log.apply(null,args);
-    return order.customer;
-}
-
-function printCustomer(customer) {
-    if (!customer) 
-        return;
-    console.log('Customer Id: %s, name: %s', customer.id, customer.name);
-}
-
-function onOk() {
-    console.log('Success');
-    console.log('Waiting for connection pool to teardown....');
-}
-
-function onFailed(err) {
-    console.log('Rollback');
-    console.log(err);
-}
+}();
 ```
 <a name="_todto"></a>
 [toDto](https://github.com/alfateam/rdb-demo/blob/master/toDto.js)
 ```js
-var rdb = require('rdb');
+const rdb = require('rdb');
 
-var Order = rdb.table('_order');
-var Customer = rdb.table('_customer');
-var OrderLine = rdb.table('_orderLine');
-var DeliveryAddress = rdb.table('_deliveryAddress');
+const Order = rdb.table('_order');
+const Customer = rdb.table('_customer');
+const OrderLine = rdb.table('_orderLine');
+const DeliveryAddress = rdb.table('_deliveryAddress');
 
 Order.primaryColumn('oId').guid().as('id');
 Order.column('oOrderNo').string().as('orderNo');
@@ -829,56 +616,40 @@ DeliveryAddress.column('dOrderId').string().as('orderId');
 DeliveryAddress.column('dName').string().as('name');
 DeliveryAddress.column('dStreet').string().as('street');
 
-var order_customer_relation = Order.join(Customer).by('oCustomerId').as('customer');
+const order_customer_relation = Order.join(Customer).by('oCustomerId').as('customer');
 
-var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+const line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
 
-var deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
+const deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
 Order.hasOne(deliveryAddress_order_relation).as('deliveryAddress');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
 
-db.transaction()
-    .then(getOrder)
-    .then(toDto)
-    .then(print)
-    .then(rdb.commit)
-    .then(null, rdb.rollback)
-    .then(onOk, onFailed);
+const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
-function getOrder() {
-    return Order.getById('b0000000-b000-0000-0000-000000000000');
-}
-
-function toDto(order) {
-    return order.toDto(/*strategy*/);
-    //default strategy, expand all hasOne and hasMany relations
-}
-
-function print(dto) {
-    console.log(dto);
-}
-
-function onOk() {
-    console.log('Success');
-    console.log('Waiting for connection pool to teardown....');
-}
-
-function onFailed(err) {
-    console.log('Rollback');
-    console.log(err);
-}
+module.exports = async function() {
+    try {
+        let order = await Order.getById('b0000000-b000-0000-0000-000000000000');
+        let dto = await order.toDto( /*strategy*/ );
+        //default strategy, expand all hasOne and hasMany relations
+        console.log(dto);
+        await rdb.commit();
+        console.log('Waiting for connection pool to teardown....');
+    } catch (e) {
+        console.log(e.stack);
+        rdb.rollback();
+    }
+}();
 ```
 <a name="_todtowithstrategy"></a>
 [toDto with strategy](https://github.com/alfateam/rdb-demo/blob/master/toDtoWithStrategy.js)
 ```js
-var rdb = require('rdb');
+const rdb = require('rdb');
 
-var Order = rdb.table('_order');
-var Customer = rdb.table('_customer');
-var OrderLine = rdb.table('_orderLine');
-var DeliveryAddress = rdb.table('_deliveryAddress');
+const Order = rdb.table('_order');
+const Customer = rdb.table('_customer');
+const OrderLine = rdb.table('_orderLine');
+const DeliveryAddress = rdb.table('_deliveryAddress');
 
 Order.primaryColumn('oId').guid().as('id');
 Order.column('oOrderNo').string().as('orderNo');
@@ -888,7 +659,7 @@ Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cName').string().as('name');
 
 OrderLine.primaryColumn('lId').guid().as('id');
-OrderLine.column('lOrderId').guid().as('orderId');
+OrderLine.column('lOrderId').string().as('orderId');
 OrderLine.column('lProduct').string().as('product');
 
 DeliveryAddress.primaryColumn('dId').guid().as('id');
@@ -896,207 +667,180 @@ DeliveryAddress.column('dOrderId').string().as('orderId');
 DeliveryAddress.column('dName').string().as('name');
 DeliveryAddress.column('dStreet').string().as('street');
 
-var order_customer_relation = Order.join(Customer).by('oCustomerId').as('customer');
+const order_customer_relation = Order.join(Customer).by('oCustomerId').as('customer');
 
-var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+const line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
 
-var deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
+const deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
 Order.hasOne(deliveryAddress_order_relation).as('deliveryAddress');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
 
-db.transaction()
-    .then(getOrder)
-    .then(toDto)
-    .then(print)
-    .then(rdb.commit)
-    .then(null, rdb.rollback)
-    .then(onOk, onFailed);
+const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
-function getOrder() {
-    return Order.getById('b0000000-b000-0000-0000-000000000000');
-}
-
-function toDto(order) {
-    var strategy = {customer : null, lines : null, deliveryAddress : null};
-    return order.toDto(strategy);
-}
-
-function print(dto) {
-    console.log(dto);
-}
-
-function onOk() {
-    console.log('Success');
-    console.log('Waiting for connection pool to teardown....');
-}
-
-function onFailed(err) {
-    console.log('Rollback');
-    console.log(err);
-}
+module.exports = async function() {
+    try {
+        await db.transaction();
+        let order = await Order.getById('b0000000-b000-0000-0000-000000000000');
+        let strategy = {customer : null, lines : null, deliveryAddress : null};
+        let dto = await order.toDto(strategy);
+        console.log(dto);
+        await rdb.commit();
+        console.log('Waiting for connection pool to teardown....');
+    } catch (e) {
+        console.log(e.stack);
+        rdb.rollback();
+    }
+}();
 ```
 <a name="_todtowithorderby"></a>
 [toDto with orderBy](https://github.com/alfateam/rdb-demo/blob/master/toDtoWithOrderBy.js)
 ```js
-var rdb = require('rdb');
+const rdb = require('rdb');
 
-var Order = rdb.table('_order');
-var OrderLine = rdb.table('_orderLine');
+const Order = rdb.table('_order');
+const Customer = rdb.table('_customer');
+const OrderLine = rdb.table('_orderLine');
+const DeliveryAddress = rdb.table('_deliveryAddress');
 
 Order.primaryColumn('oId').guid().as('id');
 Order.column('oOrderNo').string().as('orderNo');
+Order.column('oCustomerId').string().as('customerId');
+
+Customer.primaryColumn('cId').guid().as('id');
+Customer.column('cName').string().as('name');
 
 OrderLine.primaryColumn('lId').guid().as('id');
 OrderLine.column('lOrderId').string().as('orderId');
 OrderLine.column('lProduct').string().as('product');
 
-var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+DeliveryAddress.primaryColumn('dId').guid().as('id');
+DeliveryAddress.column('dOrderId').string().as('orderId');
+DeliveryAddress.column('dName').string().as('name');
+DeliveryAddress.column('dStreet').string().as('street');
+
+const order_customer_relation = Order.join(Customer).by('oCustomerId').as('customer');
+
+const line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+const deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
+Order.hasOne(deliveryAddress_order_relation).as('deliveryAddress');
 
-db.transaction()
-    .then(getOrder)
-    .then(toDto)
-    .then(print)
-    .then(rdb.commit)
-    .then(null, rdb.rollback)
-    .then(onOk, onFailed);
+const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
-function getOrder() {
-    return Order.getById('b0000000-b000-0000-0000-000000000000');
-}
-
-function toDto(order) {
-    var strategy = {
-        lines: {
-            orderBy: ['product'] 
-            //alternative: orderBy: ['product asc']
-        }
-    };
-    return order.toDto(strategy);
-}
-
-function print(dto) {
-    console.log(dto);
-}
-
-function onOk() {
-    console.log('Success');
-    console.log('Waiting for connection pool to teardown....');
-}
-
-function onFailed(err) {
-    console.log('Rollback');
-    console.log(err);
-}
+module.exports = async function() {
+    try {
+        await db.transaction();
+        let order = await Order.getById('b0000000-b000-0000-0000-000000000000');
+        let strategy = {
+            lines: {
+                orderBy: ['product']
+                //alternative: orderBy: ['product asc']
+            }
+        };
+        let dto = await order.toDto(strategy);
+        console.log(dto);
+        await rdb.commit();
+        console.log('Waiting for connection pool to teardown....');
+    } catch (e) {
+        console.log(e.stack);
+        rdb.rollback();
+    }
+}();
 ```
 <a name="_todtowithorderbydesc"></a>
 [toDto with orderBy descending](https://github.com/alfateam/rdb-demo/blob/master/toDtoWithOrderByDesc.js)
 ```js
-var rdb = require('rdb');
+const rdb = require('rdb');
 
-var Order = rdb.table('_order');
-var OrderLine = rdb.table('_orderLine');
+const Order = rdb.table('_order');
+const Customer = rdb.table('_customer');
+const OrderLine = rdb.table('_orderLine');
+const DeliveryAddress = rdb.table('_deliveryAddress');
 
 Order.primaryColumn('oId').guid().as('id');
 Order.column('oOrderNo').string().as('orderNo');
+Order.column('oCustomerId').string().as('customerId');
+
+Customer.primaryColumn('cId').guid().as('id');
+Customer.column('cName').string().as('name');
 
 OrderLine.primaryColumn('lId').guid().as('id');
 OrderLine.column('lOrderId').string().as('orderId');
 OrderLine.column('lProduct').string().as('product');
 
-var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+DeliveryAddress.primaryColumn('dId').guid().as('id');
+DeliveryAddress.column('dOrderId').string().as('orderId');
+DeliveryAddress.column('dName').string().as('name');
+DeliveryAddress.column('dStreet').string().as('street');
+
+const order_customer_relation = Order.join(Customer).by('oCustomerId').as('customer');
+
+const line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+const deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
+Order.hasOne(deliveryAddress_order_relation).as('deliveryAddress');
 
-db.transaction()
-    .then(getOrder)
-    .then(toDto)
-    .then(print)
-    .then(rdb.commit)
-    .then(null, rdb.rollback)
-    .then(onOk, onFailed);
+const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
-function getOrder() {
-    return Order.getById('b0000000-b000-0000-0000-000000000000');
-}
-
-function toDto(order) {
-    var strategy = {
-        lines: {
-            orderBy: ['product desc'] 
-        }
-    };
-    return order.toDto(strategy);
-}
-
-function print(dto) {
-    console.log(dto);
-}
-
-function onOk() {
-    console.log('Success');
-    console.log('Waiting for connection pool to teardown....');
-}
-
-function onFailed(err) {
-    console.log('Rollback');
-    console.log(err);
-}
+module.exports = async function() {
+    try {
+        await db.transaction();
+        let order = await Order.getById('b0000000-b000-0000-0000-000000000000');
+        let strategy = {
+            lines: {
+                orderBy: ['product desc']
+            }
+        };
+        let dto = await order.toDto(strategy);
+        console.log(dto);
+        await rdb.commit();
+        console.log('Waiting for connection pool to teardown....');
+    } catch (e) {
+        console.log(e.stack);
+        rdb.rollback();
+    }
+}();
 ```
 <a name="_serializable"></a>
 [toDto ignoring columns](https://github.com/alfateam/rdb-demo/blob/master/serializable.js)
 ```js
-var rdb = require('rdb');
+const rdb = require('rdb');
 
-var User = rdb.table('_User');
+const User = rdb.table('_user');
 User.primaryColumn('uId').guid().as('id');
 User.column('uUserId').string().as('userId');
 User.column('uPassword').string().as('password').serializable(false);
 User.column('uEmail').string().as('email');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
-db.transaction()
-    .then(getUser)
-    .then(toDto)
-    .then(rdb.commit)
-    .then(null, rdb.rollback)
-    .then(onOk, onFailed);
-
-function getUser() {
-    return User.getById('87654400-0000-0000-0000-000000000000');
-}
-
-function toDto(user) {
-    return user.toDto().then(console.log);
-    //will print all properties except password
-    //because it is not serializable
-}
-
-function onOk() {
-    console.log('Success');
-    console.log('Waiting for connection pool to teardown....');
-}
-
-function onFailed(err) {
-    console.log('Rollback');
-    console.log(err);
-}
+module.exports = async function() {
+    try {
+        await db.transaction();
+        let user = await User.getById('87654400-0000-0000-0000-000000000000');
+        console.log(await user.toDto());
+        //will print all properties except password
+        //because it is not serializable
+        await rdb.commit();
+        console.log('Waiting for connection pool to teardown....');
+    } catch (e) {
+        console.log(e.stack);
+        rdb.rollback();
+    }
+}();
 ```
 <a name="_tojson"></a>
 [toJSON](https://github.com/alfateam/rdb-demo/blob/master/toJSON.js)
 ```js
-var rdb = require('rdb');
+const rdb = require('rdb');
 
-var Order = rdb.table('_order');
-var Customer = rdb.table('_customer');
-var OrderLine = rdb.table('_orderLine');
-var DeliveryAddress = rdb.table('_deliveryAddress');
+const Order = rdb.table('_order');
+const Customer = rdb.table('_customer');
+const OrderLine = rdb.table('_orderLine');
+const DeliveryAddress = rdb.table('_deliveryAddress');
 
 Order.primaryColumn('oId').guid().as('id');
 Order.column('oOrderNo').string().as('orderNo');
@@ -1114,56 +858,40 @@ DeliveryAddress.column('dOrderId').string().as('orderId');
 DeliveryAddress.column('dName').string().as('name');
 DeliveryAddress.column('dStreet').string().as('street');
 
-var order_customer_relation = Order.join(Customer).by('oCustomerId').as('customer');
+const order_customer_relation = Order.join(Customer).by('oCustomerId').as('customer');
 
-var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+const line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
 
-var deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
+const deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
 Order.hasOne(deliveryAddress_order_relation).as('deliveryAddress');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
-db.transaction()
-    .then(getOrder)
-    .then(toJSON)
-    .then(print)
-    .then(rdb.commit)
-    .then(null, rdb.rollback)
-    .then(onOk, onFailed);
-
-function getOrder() {
-    return Order.getById('b0000000-b000-0000-0000-000000000000');
-}
-
-function toJSON(order) {
-    return order.toJSON(/*strategy*/);
-    //default strategy, expand all hasOne and hasMany relations
-}
-
-function print(json) {
-    console.log(json);
-}
-
-function onOk() {
-    console.log('Success');
-    console.log('Waiting for connection pool to teardown....');
-}
-
-function onFailed(err) {
-    console.log('Rollback');
-    console.log(err);
-}
+module.exports = async function() {
+    try {
+        await db.transaction();
+        let order = await Order.getById('b0000000-b000-0000-0000-000000000000');
+        let json = await order.toJSON( /*strategy*/ );
+        //default strategy, expand all hasOne and hasMany relations
+        console.log(json);
+        await rdb.commit();
+        console.log('Waiting for connection pool to teardown....');
+    } catch (e) {
+        console.log(e.stack);
+        rdb.rollback();
+    }
+}();
 ```
 <a name="_tojsonwithstrategy"></a>
 [toJSON with strategy](https://github.com/alfateam/rdb-demo/blob/master/toJSONWithStrategy.js)
 ```js
-var rdb = require('rdb');
+const rdb = require('rdb');
 
-var Order = rdb.table('_order');
-var Customer = rdb.table('_customer');
-var OrderLine = rdb.table('_orderLine');
-var DeliveryAddress = rdb.table('_deliveryAddress');
+const Order = rdb.table('_order');
+const Customer = rdb.table('_customer');
+const OrderLine = rdb.table('_orderLine');
+const DeliveryAddress = rdb.table('_deliveryAddress');
 
 Order.primaryColumn('oId').guid().as('id');
 Order.column('oOrderNo').string().as('orderNo');
@@ -1173,7 +901,7 @@ Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cName').string().as('name');
 
 OrderLine.primaryColumn('lId').guid().as('id');
-OrderLine.column('lOrderId').guid().as('orderId');
+OrderLine.column('lOrderId').string().as('orderId');
 OrderLine.column('lProduct').string().as('product');
 
 DeliveryAddress.primaryColumn('dId').guid().as('id');
@@ -1181,100 +909,65 @@ DeliveryAddress.column('dOrderId').string().as('orderId');
 DeliveryAddress.column('dName').string().as('name');
 DeliveryAddress.column('dStreet').string().as('street');
 
-var order_customer_relation = Order.join(Customer).by('oCustomerId').as('customer');
+const order_customer_relation = Order.join(Customer).by('oCustomerId').as('customer');
 
-var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+const line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
 
-var deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
+const deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
 Order.hasOne(deliveryAddress_order_relation).as('deliveryAddress');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
-db.transaction()
-    .then(getOrder)
-    .then(toJSON)
-    .then(print)
-    .then(rdb.commit)
-    .then(null, rdb.rollback)
-    .then(onOk, onFailed);
-
-function getOrder() {
-    return Order.getById('b0000000-b000-0000-0000-000000000000');
-}
-
-function toJSON(order) {
-    var strategy = {customer : null, lines : null, deliveryAddress : null};
-    return order.toJSON(strategy);
-}
-
-function print(json) {
-    console.log(json);
-}
-
-function onOk() {
-    console.log('Success');
-    console.log('Waiting for connection pool to teardown....');
-}
-
-function onFailed(err) {
-    console.log('Rollback');
-    console.log(err);
-}
+module.exports = async function() {
+    try {
+        await db.transaction();
+        let order = await Order.getById('b0000000-b000-0000-0000-000000000000');
+        let strategy = {customer : null, lines : null, deliveryAddress : null};
+        console.log(await order.toJSON(strategy));
+        await rdb.commit();
+        console.log('Waiting for connection pool to teardown....');
+    } catch (e) {
+        console.log(e.stack);
+        rdb.rollback();
+    }
+}();
 ```
 <a name="_getmany"></a>
 [getMany](https://github.com/alfateam/rdb-demo/blob/master/getMany.js)
 ```js
-var rdb = require('rdb');
+const rdb = require('rdb');
 
-var Customer = rdb.table('_customer');
+const Customer = rdb.table('_customer');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cName').string().as('name');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
-db.transaction()
-    .then(getAllCustomers)
-    .then(printCustomers)
-    .then(rdb.commit)
-    .then(null, rdb.rollback)
-    .then(onOk, onFailed);
-
-function getAllCustomers() {
-    return Customer.getMany();
-}
-
-function printCustomers(customers) {
-    customers.forEach(printCustomer);
-
-    function printCustomer(customer) {
-        console.log('Customer Id: %s, name: %s', customer.id, customer.name);
+module.exports = async function() {
+    try {
+        await db.transaction();
+        let customers = await Customer.getMany();
+        let dtos = await customers.toDto();
+        console.log(dtos);
+        await rdb.commit();
+        console.log('Waiting for connection pool to teardown....');
+    } catch (e) {
+        console.log(e.stack);
+        rdb.rollback();
     }
-}
-
-function print(json) {
-    console.log(json);
-}
-
-function onOk() {
-    console.log('Success');
-    console.log('Waiting for connection pool to teardown....');
-}
-
-function onFailed(err) {
-    console.log('Rollback');
-    console.log(err);
-}
+}();
 ```
 <a name="_getmanylazy"></a>
 [getMany lazily](https://github.com/alfateam/rdb-demo/blob/master/getManyLazy.js)
 ```js
-var rdb = require('rdb'),
-    promise = require('promise/domains');
+const rdb = require('rdb');
+const promise = require('promise/domains');
+const inspect = require('util').inspect;
 
-var Order = rdb.table('_order');
-var OrderLine = rdb.table('_orderLine');
+const Order = rdb.table('_order');
+const OrderLine = rdb.table('_orderLine');
 
 Order.primaryColumn('oId').guid().as('id');
 Order.column('oOrderNo').string().as('orderNo');
@@ -1283,63 +976,33 @@ OrderLine.primaryColumn('lId').guid().as('id');
 OrderLine.column('lOrderId').guid().as('orderId');
 OrderLine.column('lProduct').string().as('product');
 
-var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+const line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
-db.transaction()
-    .then(getAllOrders)
-    .then(printOrders)
-    .then(rdb.commit)
-    .then(null, rdb.rollback)
-    .then(onOk, onFailed);
-
-function getAllOrders() {
-    return Order.getMany();
-}
-
-function printOrders(orders) {
-    var printAllLines = [];
-    orders.forEach(printOrder);
-
-    function printOrder(order) {
-        var format = 'Order Id: %s, Order No: %s'; 
-        var args = [format, order.id, order.orderNo];
-        console.log.apply(null,args);
-        printAllLines.push(order.lines.then(printLines));
+module.exports = async function() {
+    try {
+        await db.transaction();
+        let orders = await Order.getMany();
+        let dtos = await orders.toDto();
+        console.log(inspect(dtos, false, 10));
+        await rdb.commit();
+        console.log('Waiting for connection pool to teardown....');
+    } catch (e) {
+        console.log(e.stack);
+        rdb.rollback();
     }
-    return promise.all(printAllLines);
-}
-
-function printLines(lines) {
-    lines.forEach(printLine);
-
-    function printLine(line) {
-        var format = 'Line Id: %s, Order Id: %s, Product: %s'; 
-        var args = [format, line.id, line.orderId, line.product];
-        console.log.apply(null,args);
-    }    
-}
-
-function onOk() {
-    console.log('success');
-    console.log('Waiting for connection pool to teardown....');
-}
-
-function onFailed(err) {
-    console.log('Rollback');
-    console.log(err);
-}
+}();
 ```
 <a name="_getmanyeager"></a>
 [getMany eager](https://github.com/alfateam/rdb-demo/blob/master/getManyEager.js)
 ```js
-var rdb = require('rdb'),
-    promise = require('promise/domains');
+const inspect = require('util').inspect;
+const rdb = require('rdb');
 
-var Order = rdb.table('_order');
-var OrderLine = rdb.table('_orderLine');
+const Order = rdb.table('_order');
+const OrderLine = rdb.table('_orderLine');
 
 Order.primaryColumn('oId').guid().as('id');
 Order.column('oOrderNo').string().as('orderNo');
@@ -1348,67 +1011,37 @@ OrderLine.primaryColumn('lId').guid().as('id');
 OrderLine.column('lOrderId').guid().as('orderId');
 OrderLine.column('lProduct').string().as('product');
 
-var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+const line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
-db.transaction()
-    .then(getAllOrders)
-    .then(printOrders)
-    .then(rdb.commit)
-    .then(null, rdb.rollback)
-    .then(onOk, onFailed);
-
-function getAllOrders() {
-    var emptyFilter;
-    var strategy = {lines : null};
-    return Order.getMany(emptyFilter, strategy);
-}
-
-function printOrders(orders) {
-    var printAllLines = [];
-    orders.forEach(printOrder);
-
-    function printOrder(order) {
-        var format = 'Order Id: %s, Order No: %s'; 
-        var args = [format, order.id, order.orderNo];
-        console.log.apply(null,args);
-        printAllLines.push(order.lines.then(printLines));
+module.exports = async function() {
+    try {
+        await db.transaction();
+        let emptyFilter;
+        let strategy = {lines : null};
+        let orders = await Order.getMany(emptyFilter, strategy);
+        let dtos = await orders.toDto();
+        console.log(inspect(dtos, false, 10));
+        await rdb.commit();
+        console.log('Waiting for connection pool to teardown....');
+    } catch (e) {
+        console.log(e.stack);
+        rdb.rollback();
     }
-    return promise.all(printAllLines);
-}
-
-function printLines(lines) {
-    lines.forEach(printLine);
-
-    function printLine(line) {
-        var format = 'Line Id: %s, Order Id: %s, Product: %s'; 
-        var args = [format, line.id, line.orderId, line.product];
-        console.log.apply(null,args);
-    }    
-}
-
-function onOk() {
-    console.log('Success');
-    console.log('Waiting for connection pool to teardown....');
-}
-
-function onFailed(err) {
-    console.log('Rollback');
-    console.log(err);
-}
+}();
 ```
 <a name="_manytodto"></a>
 [(many)ToDto](https://github.com/alfateam/rdb-demo/blob/master/manyToDto.js)
 ```js
-var rdb = require('rdb'),
-    inspect = require('util').inspect;
+const rdb = require('rdb');
+const inspect = require('util').inspect;
 
-var Order = rdb.table('_order');
-var Customer = rdb.table('_customer');
-var OrderLine = rdb.table('_orderLine');
-var DeliveryAddress = rdb.table('_deliveryAddress');
+const Order = rdb.table('_order');
+const Customer = rdb.table('_customer');
+const OrderLine = rdb.table('_orderLine');
+const DeliveryAddress = rdb.table('_deliveryAddress');
 
 Order.primaryColumn('oId').guid().as('id');
 Order.column('oOrderNo').string().as('orderNo');
@@ -1426,57 +1059,42 @@ DeliveryAddress.column('dOrderId').string().as('orderId');
 DeliveryAddress.column('dName').string().as('name');
 DeliveryAddress.column('dStreet').string().as('street');
 
-var order_customer_relation = Order.join(Customer).by('oCustomerId').as('customer');
+const order_customer_relation = Order.join(Customer).by('oCustomerId').as('customer');
 
-var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+const line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
 
-var deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
+const deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
 Order.hasOne(deliveryAddress_order_relation).as('deliveryAddress');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
-db.transaction()
-    .then(getOrders)
-    .then(toDto)
-    .then(print)
-    .then(rdb.commit)
-    .then(null, rdb.rollback)
-    .then(onOk, onFailed);
+module.exports = async function() {
+    try {
+        await db.transaction();
+        let orders = await Order.getMany();
+        let dtos = await orders.toDto( /*strategy*/ );
+        //default strategy, expand all hasOne and hasMany relations
+        console.log(inspect(dtos, false, 10));
+        rdb.commit();
+        console.log('Waiting for connection pool to teardown....');
+    } catch (e) {
+        console.log(e.stack);
+        rdb.rollback();
+    }
+}();
 
-function getOrders() {
-    return Order.getMany();
-}
-
-function toDto(orders) {
-    return orders.toDto(/*strategy*/);
-    //default strategy, expand all hasOne and hasMany relations
-}
-
-function print(dto) {
-    console.log(inspect(dto,false,10));
-}
-
-function onOk() {
-    console.log('Success');
-    console.log('Waiting for connection pool to teardown....');
-}
-
-function onFailed(err) {
-    console.log('Rollback');
-    console.log(err);
-}
 ```
 <a name="_manytodtowithstrategy"></a>
 [(many)ToDto with strategy](https://github.com/alfateam/rdb-demo/blob/master/manyToDtoWithStrategy.js)
 ```js
-var rdb = require('rdb'),
-    inspect = require('util').inspect;
+const inspect = require('util').inspect;
+const rdb = require('rdb');
 
-var Order = rdb.table('_order');
-var Customer = rdb.table('_customer');
-var OrderLine = rdb.table('_orderLine');
-var DeliveryAddress = rdb.table('_deliveryAddress');
+const Order = rdb.table('_order');
+const Customer = rdb.table('_customer');
+const OrderLine = rdb.table('_orderLine');
+const DeliveryAddress = rdb.table('_deliveryAddress');
 
 Order.primaryColumn('oId').guid().as('id');
 Order.column('oOrderNo').string().as('orderNo');
@@ -1494,56 +1112,42 @@ DeliveryAddress.column('dOrderId').string().as('orderId');
 DeliveryAddress.column('dName').string().as('name');
 DeliveryAddress.column('dStreet').string().as('street');
 
-var order_customer_relation = Order.join(Customer).by('oCustomerId').as('customer');
+const order_customer_relation = Order.join(Customer).by('oCustomerId').as('customer');
 
-var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+const line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
 
-var deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
+const deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
 Order.hasOne(deliveryAddress_order_relation).as('deliveryAddress');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
-db.transaction()
-    .then(getOrders)
-    .then(toDto)
-    .then(print)
-    .then(rdb.commit)
-    .then(null, rdb.rollback)
-    .then(onOk, onFailed);
+module.exports = async function() {
+    try {
+        await db.transaction();
 
-function getOrders() {
-    return Order.getMany();
-}
+        let orders = await Order.getMany();
+        let strategy = { customer: null, lines: null, deliveryAddress: null };
+        let dtos = await orders.toDto(strategy);
+        console.log(inspect(dtos, false, 10));
 
-function toDto(orders) {
-    var strategy = {customer : null, lines : null, deliveryAddress : null};
-    return orders.toDto(strategy);
-}
-
-function print(dto) {
-    console.log(inspect(dto,false,10));
-}
-
-function onOk() {
-    console.log('Success');
-    console.log('Waiting for connection pool to teardown....');
-}
-
-function onFailed(err) {
-    console.log('Rollback');
-    console.log(err);
-}
+        await rdb.commit();
+        console.log('Waiting for connection pool to teardown....');
+    } catch (e) {
+        console.log(e.stack);
+        rdb.rollback();
+    }
+}();
 ```
 <a name="_manytojson"></a>
 [(many)ToJSON](https://github.com/alfateam/rdb-demo/blob/master/manyToJSON.js)
 ```js
-var rdb = require('rdb');
+const rdb = require('rdb');
 
-var Order = rdb.table('_order');
-var Customer = rdb.table('_customer');
-var OrderLine = rdb.table('_orderLine');
-var DeliveryAddress = rdb.table('_deliveryAddress');
+const Order = rdb.table('_order');
+const Customer = rdb.table('_customer');
+const OrderLine = rdb.table('_orderLine');
+const DeliveryAddress = rdb.table('_deliveryAddress');
 
 Order.primaryColumn('oId').guid().as('id');
 Order.column('oOrderNo').string().as('orderNo');
@@ -1561,56 +1165,39 @@ DeliveryAddress.column('dOrderId').string().as('orderId');
 DeliveryAddress.column('dName').string().as('name');
 DeliveryAddress.column('dStreet').string().as('street');
 
-var order_customer_relation = Order.join(Customer).by('oCustomerId').as('customer');
+const order_customer_relation = Order.join(Customer).by('oCustomerId').as('customer');
 
-var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+const line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
 
-var deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
+const deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
 Order.hasOne(deliveryAddress_order_relation).as('deliveryAddress');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
-db.transaction()
-    .then(getOrders)
-    .then(toJSON)
-    .then(print)
-    .then(rdb.commit)
-    .then(null, rdb.rollback)
-    .then(onOk, onFailed);
-
-function getOrders() {
-    return Order.getMany();
-}
-
-function toJSON(orders) {
-    return orders.toJSON(/*strategy*/);
-    //default strategy, expand all hasOne and hasMany relations
-}
-
-function print(json) {
-    console.log(json);
-}
-
-function onOk() {
-    console.log('Success');
-    console.log('Waiting for connection pool to teardown....');
-}
-
-function onFailed(err) {
-    console.log('Rollback');
-    console.log(err);
-}
+module.exports = async function() {
+    try {
+        await db.transaction();
+        let orders = await Order.getMany();
+        console.log(await orders.toJSON( /*strategy*/ ));
+        //default strategy, expand all hasOne and hasMany relations
+        await rdb.commit();
+        console.log('Waiting for connection pool to teardown....');
+    } catch (e) {
+        console.log(e.stack);
+        rdb.rollback();
+    }
+}();
 ```
 <a name="_manytojsonwithstrategy"></a>
 [(many)ToJSON with strategy](https://github.com/alfateam/rdb-demo/blob/master/manyToJSONWithStrategy.js)
 ```js
-var rdb = require('rdb');
+const rdb = require('rdb');
 
-var Order = rdb.table('_order');
-var Customer = rdb.table('_customer');
-var OrderLine = rdb.table('_orderLine');
-var DeliveryAddress = rdb.table('_deliveryAddress');
+const Order = rdb.table('_order');
+const Customer = rdb.table('_customer');
+const OrderLine = rdb.table('_orderLine');
+const DeliveryAddress = rdb.table('_deliveryAddress');
 
 Order.primaryColumn('oId').guid().as('id');
 Order.column('oOrderNo').string().as('orderNo');
@@ -1628,46 +1215,29 @@ DeliveryAddress.column('dOrderId').string().as('orderId');
 DeliveryAddress.column('dName').string().as('name');
 DeliveryAddress.column('dStreet').string().as('street');
 
-var order_customer_relation = Order.join(Customer).by('oCustomerId').as('customer');
+const order_customer_relation = Order.join(Customer).by('oCustomerId').as('customer');
 
-var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+const line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
 
-var deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
+const deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
 Order.hasOne(deliveryAddress_order_relation).as('deliveryAddress');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
-db.transaction()
-    .then(getOrders)
-    .then(toJSON)
-    .then(print)
-    .then(rdb.commit)
-    .then(null, rdb.rollback)
-    .then(onOk, onFailed);
-
-function getOrders() {
-    return Order.getMany();
-}
-
-function toJSON(orders) {
-    var strategy = {customer : null, lines : null, deliveryAddress : null};
-    return orders.toJSON(strategy);
-}
-
-function print(json) {
-    console.log(json);
-}
-
-function onOk() {
-    console.log('Success');
-    console.log('Waiting for connection pool to teardown....');
-}
-
-function onFailed(err) {
-    console.log('Rollback');
-    console.log(err);
-}
+module.exports = async function() {
+    try {
+        await db.transaction();
+        let orders = await Order.getMany();
+        let strategy = {customer : null, lines : null, deliveryAddress : null};
+        console.log(await orders.toJSON(strategy));
+        await rdb.commit();
+        console.log('Waiting for connection pool to teardown....');
+    } catch (e) {
+        console.log(e.stack);
+        rdb.rollback();
+    }
+}();
 ```
 <a name="_rawsqlquery"></a>
 [Raw SQL Query](https://github.com/alfateam/rdb-demo/blob/master/rawSqlQuery.js)
