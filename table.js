@@ -53,6 +53,10 @@ function _new(tableName) {
         return getMany(table, filter, strategy);
     };
 
+    table.getManyDto = function(filter, strategy) {
+        return getManyDto(table, filter, strategy);
+    };
+    
     table.getMany.exclusive = function(filter, strategy) {
         return getMany.exclusive(table, filter, strategy);
     };

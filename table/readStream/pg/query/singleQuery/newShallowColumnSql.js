@@ -16,7 +16,7 @@ function _new(table,alias,span) {
 
 	function newJoinedColumnSql(span) {
 		let c = {};
-		const result = [];
+		var result = [];
 	
 		c.visitJoin = function(leg) {
 			result.push(util.format('("%s".coalesce->0) as "%s"', leg.name, leg.name));

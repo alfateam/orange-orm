@@ -1,7 +1,8 @@
 // var newMySqlQuery = require('./mySql/newQuery');
 var newPgQuery = require('./pg/newQuery');
+var getSessionContext = require('../getSessionContext');
 
-function newQuery(db,table,filter,span,alias) {	
+function newQuery(table,filter,span,alias) {	
 	var c = {};
 	var _newQuery;
 
@@ -10,20 +11,15 @@ function newQuery(db,table,filter,span,alias) {
 	};
 	c.visitMySql = function() {
         throw new Error('MySql not supported');
-		// _newQuery = newMySqlQuery;
 	};
 
 	c.visitSqlite = function() {
 		throw new Error('Sqlite not supported');
 	};
 
-	db.accept(c);
+	getSessionContext().accept(c);
 
-	var args = [];
-	for (var i = 1; i < arguments.length; i++) {
-		args.push(arguments[i]);
-	}
-	return _newQuery.apply(null, args);
+	return _newQuery.apply(null, arguments);
 }
 
 module.exports = newQuery
