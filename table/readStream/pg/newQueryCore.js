@@ -10,7 +10,7 @@ function newQuery(table,filter,span,alias) {
 	var orderBy = extractOrderBy(alias,span);
 	var limit = extractLimit(span);
 	var subQueries = newSubQueries(table,span,alias);
-	var query = newSingleQuery(table,filter,alias,subQueries,orderBy,limit);
+	var query = newSingleQuery(table,filter,span,alias,subQueries,orderBy,limit);
 	return newParameterized(query.sql(), query.parameters);
 }
 

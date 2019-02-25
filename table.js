@@ -4,6 +4,7 @@ var join = require('./table/join');
 var hasMany = require('./table/hasMany');
 var hasOne = require('./table/hasOne');
 var getMany = require('./table/getMany');
+var getManyDto = require('./table/getManyDto');
 var getById = require('./table/getById');
 var tryGetById = require('./table/tryGetById');
 var tryGetFirst = require('./table/tryGetFirstFromDb');
