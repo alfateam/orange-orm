@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__1.7.3__  
+GetManyDto. For read-only scenario. A lot faster than getMany.  
 __1.7.2__  
 Upgraded to pg@7.4.3 and pg-query-stream@1.1.1    
 __1.7.1__  

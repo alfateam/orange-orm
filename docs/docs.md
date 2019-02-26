@@ -1270,7 +1270,7 @@ function onFailed(err) {
 }
 ```
 <a name="_getmanydto"></a>
-[getMany](https://github.com/alfateam/rdb-demo/blob/master/getManyDto.js)
+[getManyDto](https://github.com/alfateam/rdb-demo/blob/master/getManyDto.js)
 ```js
 var rdb = require('rdb');
 
@@ -1439,7 +1439,7 @@ function onFailed(err) {
 }
 ```
 <a name="_getmanydtoeager"></a>
-[getMany eager](https://github.com/alfateam/rdb-demo/blob/master/getManyDtoEager.js)
+[getManyDto eager](https://github.com/alfateam/rdb-demo/blob/master/getManyDtoEager.js)
 ```js
 var rdb = require('rdb'),
     promise = require('promise/domains');
