@@ -30,8 +30,10 @@ __Basic querying__
 [toJSON](#_tojson)  
 [toJSON with strategy](#_tojsonwithstrategy)  
 [getMany](#_getmany)  
+[getManyDto](#_getmanydto)  
 [getMany lazily](#_getmanylazy)  
 [getMany eagerly](#_getmanyeager)  
+[getManyDto eagerly](#_getmanydtoeager)  
 [(many)ToDto](#_manytodto)  
 [(many)ToDto with strategy](#_manytodtowithstrategy)  
 [(many)ToJSON](#_manytojson)  
@@ -1267,6 +1269,43 @@ function onFailed(err) {
     console.log(err);
 }
 ```
+<a name="_getmanydto"></a>
+[getMany](https://github.com/alfateam/rdb-demo/blob/master/getManyDto.js)
+```js
+var rdb = require('rdb');
+
+var Customer = rdb.table('_customer');
+
+Customer.primaryColumn('cId').guid().as('id');
+Customer.column('cName').string().as('name');
+
+var db = rdb('postgres://postgres:postgres@localhost/test');
+
+db.transaction()
+    .then(getAllCustomers)
+    .then(printCustomers)
+    .then(rdb.commit)
+    .then(null, rdb.rollback)
+    .then(onOk, onFailed);
+
+function getAllCustomers() {
+    return Customer.getManyDto();
+}
+
+function printCustomers(customers) {
+    console.log(customers);
+}
+
+function onOk() {
+    console.log('Success');
+    console.log('Waiting for connection pool to teardown....');
+}
+
+function onFailed(err) {
+    console.log('Rollback');
+    console.log(err);
+}
+```
 <a name="_getmanylazy"></a>
 [getMany lazily](https://github.com/alfateam/rdb-demo/blob/master/getManyLazy.js)
 ```js
@@ -1387,6 +1426,54 @@ function printLines(lines) {
         var args = [format, line.id, line.orderId, line.product];
         console.log.apply(null,args);
     }    
+}
+
+function onOk() {
+    console.log('Success');
+    console.log('Waiting for connection pool to teardown....');
+}
+
+function onFailed(err) {
+    console.log('Rollback');
+    console.log(err);
+}
+```
+<a name="_getmanydtoeager"></a>
+[getMany eager](https://github.com/alfateam/rdb-demo/blob/master/getManyDtoEager.js)
+```js
+var rdb = require('rdb'),
+    promise = require('promise/domains');
+
+var Order = rdb.table('_order');
+var OrderLine = rdb.table('_orderLine');
+
+Order.primaryColumn('oId').guid().as('id');
+Order.column('oOrderNo').string().as('orderNo');
+
+OrderLine.primaryColumn('lId').guid().as('id');
+OrderLine.column('lOrderId').guid().as('orderId');
+OrderLine.column('lProduct').string().as('product');
+
+var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+Order.hasMany(line_order_relation).as('lines');
+
+var db = rdb('postgres://postgres:postgres@localhost/test');
+
+db.transaction()
+    .then(getAllOrders)
+    .then(printOrders)
+    .then(rdb.commit)
+    .then(null, rdb.rollback)
+    .then(onOk, onFailed);
+
+function getAllOrders() {
+    var emptyFilter;
+    var strategy = {lines : null};
+    return Order.getManyDto(emptyFilter, strategy);
+}
+
+function printOrders(orders) {
+    console.log(inspect(orders, false, 10));    
 }
 
 function onOk() {
