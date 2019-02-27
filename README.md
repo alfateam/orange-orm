@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__1.7.4__  
+GetManyDto strips nulls.  
 __1.7.3__  
 GetManyDto. For read-only scenario. A lot faster than getMany.  
 __1.7.2__  
