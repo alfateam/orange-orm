@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__1.7.5__  
+GetManyDto bugfix: crashing on empty result.  
 __1.7.4__  
 GetManyDto strips nulls.  
 __1.7.3__  
