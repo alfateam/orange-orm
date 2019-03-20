@@ -37,7 +37,7 @@ function extractOrderBy(alias, span) {
     function getTableColumn(property) {
         var column = table[property] || table[property.split(/(-|#)>+/g)[0]];
         if(!column){
-            throw new Error(`Unable to get column on orderBy '${property}'. If jsonb query, only #>, #>>, -> and ->> allowed. Only use ' ' to seperate between query and direction.`);
+            throw new Error(`Unable to get column on orderBy '${property}'. If jsonb query, only #>, #>>, -> and ->> allowed. Only use ' ' to seperate between query and direction. Does currently not support casting.`);
         }
         return column;
     }
