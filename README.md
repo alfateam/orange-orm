@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__1.7.6__  
+Order By now supports jsonb-fields.  
 __1.7.5__  
 GetManyDto bugfix: crashing on empty result.  
 __1.7.4__  

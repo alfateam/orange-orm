@@ -26,10 +26,27 @@ function extractOrderBy(alias, span) {
             direction: direction
         };
     }
+    
     function pushColumn(property, direction) {
         direction = direction || '';
-        var column = table[property];
-        dbNames.push(alias + '.' + column._dbName + direction);
+        var column = getTableColumn(property);
+        var jsonQuery = getJsonQuery(property, column.alias);
+
+        dbNames.push(alias + '.' + column._dbName + jsonQuery + direction);
+    }
+    function getTableColumn(property) {
+        var column = table[property] || table[property.split(/(-|#)>+/g)[0]];
+        if(!column){
+            throw new Error(`Unable to get column on orderBy '${property}'. If jsonb query, only #>, #>>, -> and ->> allowed. Only use ' ' to seperate between query and direction.`);
+        }
+        return column;
+    }
+    function getJsonQuery(property, column) {
+        let containsJson = (/(-|#)>+/g).test(property);
+        if(!containsJson){
+            return '';
+        }
+        return property.replace(column, '');
     }
 
     return ' order by ' + dbNames.join(',');

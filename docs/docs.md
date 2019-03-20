@@ -34,6 +34,8 @@ __Basic querying__
 [getMany lazily](#_getmanylazy)  
 [getMany eagerly](#_getmanyeager)  
 [getManyDto eagerly](#_getmanydtoeager)  
+[getMany with orderBy jsonb](#_getmanywithorderbyjsonb)  
+[getMany with orderBy jsonb descending](#_getmanywithorderbyjsonbdesc)  
 [(many)ToDto](#_manytodto)  
 [(many)ToDto with strategy](#_manytodtowithstrategy)  
 [(many)ToJSON](#_manytojson)  
@@ -1474,6 +1476,99 @@ function getAllOrders() {
 
 function printOrders(orders) {
     console.log(inspect(orders, false, 10));    
+}
+
+function onOk() {
+    console.log('Success');
+    console.log('Waiting for connection pool to teardown....');
+}
+
+function onFailed(err) {
+    console.log('Rollback');
+    console.log(err);
+}
+```
+<a name="_getmanywithorderbyjsonb"></a>
+[getMany with orderBy jsonb](https://github.com/alfateam/rdb-demo/blob/master/getManyWithOrderBy.js)
+```js
+var rdb = require('rdb');
+
+var Order = rdb.table('_jOrder');
+
+Order.primaryColumn('oId').guid().as('id');
+Order.column('oData').string().as('data'); // Contains JSON data
+
+var db = rdb('postgres://postgres:postgres@localhost/test');
+
+db.transaction()
+    .then(getOrder)
+    .then(printOrders)
+    .then(rdb.commit)
+    .then(null, rdb.rollback)
+    .then(onOk, onFailed);
+
+function getOrder() {
+    var strategy = {
+        orderBy: ["data->'orderNo'"] 
+        //alternatively: orderBy: ["data->'orderId' asc"]
+    };
+    return Order.getMany(null, strategy);
+}
+
+function printOrders(orders) {
+    orders.forEach(printOrder);
+
+    function printOrder(order) {
+        var format = 'Order Id: %s, Order Data: %s'; 
+        var args = [format, order.id, JSON.stringify(order.data)];
+        console.log.apply(null,args);
+    }
+}
+
+function onOk() {
+    console.log('Success');
+    console.log('Waiting for connection pool to teardown....');
+}
+
+function onFailed(err) {
+    console.log('Rollback');
+    console.log(err);
+}
+```
+<a name="_getmanywithorderbyjsonbdesc"></a>
+[getMany with orderBy jsonb descending](https://github.com/alfateam/rdb-demo/blob/master/getManyWithOrderByDesc.js)
+```js
+var rdb = require('rdb');
+
+var Order = rdb.table('_jOrder');
+
+Order.primaryColumn('oId').guid().as('id');
+Order.column('oData').string().as('data'); // Contains JSON data
+
+var db = rdb('postgres://postgres:postgres@localhost/test');
+
+db.transaction()
+    .then(getOrder)
+    .then(printOrders)
+    .then(rdb.commit)
+    .then(null, rdb.rollback)
+    .then(onOk, onFailed);
+
+function getOrder() {
+    var strategy = {
+        orderBy: ["data->'orderNo' desc"]
+    };
+    return Order.getMany(null, strategy);
+}
+
+function printOrders(orders) {
+    orders.forEach(printOrder);
+
+    function printOrder(order) {
+        var format = 'Order Id: %s, Order Data: %s'; 
+        var args = [format, order.id, JSON.stringify(order.data)];
+        console.log.apply(null,args);
+    }
 }
 
 function onOk() {
