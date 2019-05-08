@@ -2,91 +2,95 @@ async function applyPatch(row, table, changes, options) {
     for (var index = 0; index < changes.length; index++) {
         var change = changes[index];
         if (change.op === 'replace') {
-            var path = change.path.split('/');
-            await replace(row, table, path, change);
+            await remove(row, table, change.path.split('/'), change);
+            await add(row, table, change.path.split('/'), change);
         }
-        if (change.op === 'add') {
-            var path = change.path.split('/');
-            await add(row, table, path, change);
-        }
-        if (change.op === 'remove') {
-            var path = change.path.split('/');
-            await remove(row, table, path, change);
-        }
-
+        else if (change.op === 'add')
+            await add(row, table, change.path.split('/'), change);
+        else if (change.op === 'remove')
+            await remove(row, table, change.path.split('/'), change);
     }
 
-    async function replace(row, table, path, change) {
-        path.shift();
-        let prop = path[0];
+    async function add(row, table, path, change, relation, isProperty) {
         if (path.length === 1) {
+            let prop = path[0];
             let value = change.value;
-            let childTable = table._relations[prop] && table._relations[prop].childTable;
-            if (childTable) {
-                let primaryValues = childTable._primaryColumns.map(function (column) {
-                    return value[column.alias];
-                });
-                let child = childTable.insert.apply(null, primaryValues);
-                for (var colName in value) {
-                    child[colName] = value[colName];
-                }
+            if (isProperty)
+                return row[prop] = value;
+            if (Array.isArray(row)) {
+                for (let id in change.value)
+                    insert(table, change.value[id], relation);
             } else {
-                row[prop] = value;
+                insert(table, value, relation);
             }
         } else {
+            path.shift();
+            let prop = path[0];
             let relation = table._relations[prop];
+            if (!relation) {
+                return add(row, table, path, change, undefined, true);
+            }
             if (relation && relation.joinRelation) {
-                return replace(await row[prop], relation.childTable, path, change);
+                return add(await row[prop], relation.childTable, path, change, getJoinValues(row, relation));
             }
         }
     }
 
-    async function add(row, table, path, change) {
-        path.shift();
-        let prop = path[0];
-        console.log(prop)
+    function insert(table, value, joinValues) {
+        let primaryNames = table._primaryColumns.map(function(column) {
+            return column.alias;
+        } )
+        let primaryValues = table._primaryColumns.map(function (column) {
+            return value[column.alias];
+        });
+        let child = table.insert.apply(null, primaryValues);
+        for(var name in joinValues) {
+            child[name] = joinValues[name];
+        }
+
+        for (var colName in value) {
+            if (primaryNames.indexOf(colName) === -1){
+                child[colName] = value[colName];
+            }
+        }
+    }
+
+    function getJoinValues(parentRow, relation) {
+        var columns = relation.joinRelation.columns;
+        var parentKey = table._primaryColumns.map(function(column) {
+            return parentRow[column.alias];
+        })
+        var obj = {};
+        for (var index = 0; index < columns.length; index++) {
+            var column = columns[index];
+            obj[column.alias] = parentKey[index];
+        }
+        return obj;
+    }
+
+    async function remove(row, table, path, change, isProperty) {
         if (path.length === 1) {
-            let value = change.value;
-            let childTable = table._relations[prop] && table._relations[prop].childTable;
-            if (childTable) {
-                let primaryValues = childTable._primaryColumns.map(function (column) {
-                    return value[column.alias];
-                });
-                let child = childTable.insert.apply(null, primaryValues);
-                for (var colName in value) {
-                    child[colName] = value[colName];
+            let prop = path[0];
+            if (isProperty)
+                return row[prop] = undefined;
+            if (Array.isArray(row)) {
+                for (let index = 0; index < row.length; index++) {
+                    await row[index].cascadeDelete();
                 }
-            }
-            else {
-                row[prop] = value;
-            }
-        }
-        else {
-            let relation = table._relations[prop];
-            if (relation && relation.joinRelation) {
-                return add(await row[prop], relation.childTable, path, change);
-            }
-        }
-    }
-
-    async function remove(row, table, path, change) {
-        path.shift();
-        let prop = path[0];
-        if (path.length === 1) {
-            let childTable = table._relations[prop] && table._relations[prop].childTable;
-            if (childTable) {
-                (await row[prop]).cascadeDelete();
-            } else {
-                row[prop] = undefined;
-            }
+            } else
+                await row.cascadeDelete();
         } else {
+            path.shift();
+            let prop = path[0];
             let relation = table._relations[prop];
+            if (!relation) {
+                return remove(row, table, path, change, true);
+            }
             if (relation && relation.joinRelation) {
                 return remove(await row[prop], relation.childTable, path, change);
             }
         }
     }
-
 
 }
 

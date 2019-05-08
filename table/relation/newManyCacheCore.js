@@ -9,9 +9,9 @@ function newManyCache(joinRelation) {
     c.tryGet = function(parentRow) {
         var key = toKey(parentRow);
         var rows =  cache.tryGet(key);
-        if (!rows) 
-            return newArray();
-        return rows;
+        if (!rows)
+            return newRowArray();
+        return newRowArray(rows);
     };
 
     function tryAdd(parentRow, childRow) {
@@ -21,13 +21,9 @@ function newManyCache(joinRelation) {
             existing.push(childRow);
             return;
         }
-        var rows = newArray();
+        var rows = newRowArray();
         rows.push(childRow);
         existing = cache.tryAdd(key, rows);
-    }
-
-    function newArray() {
-        return newRowArray(joinRelation.parentTable);
     }
 
     c.tryAdd = tryAdd;
