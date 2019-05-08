@@ -6,7 +6,7 @@ function act(c) {
     c.dbRowToRow = requireMock('./dbRowToRow');
     c.newRowArray = requireMock('../rowArray');
     c.rowArray = [];
-    c.table = {};    
+    c.table = {};
     c.span = {};
     c.span.table = c.table;
     c.dbRow1 = {};
@@ -18,7 +18,7 @@ function act(c) {
     c.dbRowToRow.expect(c.span, c.dbRow1).return(c.row1);
     c.dbRowToRow.expect(c.span, c.dbRow2).return(c.row2);
 
-    c.newRowArray.expect(c.table).return(c.rowArray);
+    c.newRowArray.expect().return(c.rowArray);
 
     c.expected = [c.row1, c.row2];
 
