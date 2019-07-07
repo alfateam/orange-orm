@@ -11,24 +11,24 @@ async function applyPatch(row, table, changes, options) {
             await remove(row, table, change.path.split('/'), change);
     }
 
-    async function add(row, table, path, change, relation, isProperty) {
-        if (path.length === 1) {
+    async function add(row, table, path, change, joinValues) {
+        if (path.length < 2) {
             let prop = path[0];
             let value = change.value;
-            if (isProperty)
+            if (table._columns.find((col) => col.alias === prop))
                 return row[prop] = value;
             if (Array.isArray(row)) {
                 for (let id in change.value)
-                    insert(table, change.value[id], relation);
+                    insert(table, change.value[id], joinValues);
             } else {
-                insert(table, value, relation);
+                insert(table, value, joinValues);
             }
         } else {
             path.shift();
             let prop = path[0];
             let relation = table._relations[prop];
             if (!relation) {
-                return add(row, table, path, change, undefined, true);
+                return add(row, table, path, change);
             }
             if (relation && relation.joinRelation) {
                 return add(await row[prop], relation.childTable, path, change, getJoinValues(row, relation));
@@ -68,10 +68,10 @@ async function applyPatch(row, table, changes, options) {
         return obj;
     }
 
-    async function remove(row, table, path, change, isProperty) {
-        if (path.length === 1) {
+    async function remove(row, table, path, change) {
+        if (path.length < 2) {
             let prop = path[0];
-            if (isProperty)
+            if (table._columns.find((col) => col.alias === prop))
                 return row[prop] = undefined;
             if (Array.isArray(row)) {
                 for (let index = 0; index < row.length; index++) {
@@ -84,7 +84,7 @@ async function applyPatch(row, table, changes, options) {
             let prop = path[0];
             let relation = table._relations[prop];
             if (!relation) {
-                return remove(row, table, path, change, true);
+                return remove(row, table, path, change);
             }
             if (relation && relation.joinRelation) {
                 return remove(await row[prop], relation.childTable, path, change);
