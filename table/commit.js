@@ -12,8 +12,6 @@ function commit(result) {
 		.then(onReleased)
 
 	function onReleased() {
-		if (process.domain)
-			process.domain.exit();
 		return result;
 	}
 }
