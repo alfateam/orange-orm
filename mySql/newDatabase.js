@@ -13,17 +13,18 @@ function newDatabase(connectionString, poolOptions) {
 
     c.transaction = function() {
         var domain = createDomain();
-        domain.enter();
-        return newPromise().then(function() {
+        return domain.run(onRun);
+
+        function onRun() {
             var transaction = newTransaction(domain, pool);
             return newPromise(transaction).then(begin);
-        });
+        }
     };
 
     c.commit = commit;
     c.rollback = rollback;
     c.lock = lock;
-
+    
     c.end = function() {
         return pool.end();
     };

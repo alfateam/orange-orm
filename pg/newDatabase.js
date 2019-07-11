@@ -14,19 +14,21 @@ function newDatabase(connectionString, poolOptions) {
 
     c.transaction = function(options) {
         var domain = createDomain();
-        domain.enter();
-        return promise().then(function() {
+
+        return domain.run(onRun);
+
+        function onRun() {
             var transaction = newTransaction(domain, pool);
             var p = promise(transaction).then(begin).then(negotiateSchema);
             return p;
+        }
 
-            function negotiateSchema(previous) {
-                var schema = options && options.schema;
-                if (!schema)
-                    return previous;
-                return executeSchema(schema);
-            }
-        });
+        function negotiateSchema(previous) {
+            var schema = options && options.schema;
+            if (!schema)
+                return previous;
+            return executeSchema(schema);
+        }
     };
 
     c.rollback = rollback;

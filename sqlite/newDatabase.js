@@ -12,12 +12,14 @@ function newDatabase(connectionString, poolOptions) {
 
     c.transaction = function() {
         var domain = createDomain();
-        domain.enter();
-        return promise().then(function() {
+
+        return domain.run(onRun);
+
+        function onRun() {
             var transaction = newTransaction(domain, pool);
             var p = promise(transaction).then(begin);
             return p;
-        });
+        }
     };
 
     c.rollback = rollback;
