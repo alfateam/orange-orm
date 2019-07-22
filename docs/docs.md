@@ -1,88 +1,88 @@
-All examples below are found at [npmjs.org/package/rdb-demo](https://npmjs.org/package/rdb-demo).  
+All examples below are found at [npmjs.org/package/rdb-demo](https://npmjs.org/package/rdb-demo).
 _Documentation and examples_
 ---------------
-__Connecting__  
-[connect to postgres](#_connecttopostgres)  
-[connect to mySql](#_connecttomysql)  
-[connect to sqlite](#_connecttosqlite)  
-[pool size](#_poolsize)  
-[schema](#_schema)  
-[schema alternative 2](#_schema2)  
-[end pool](#_endpool)  
-[end all pools](#_endallpools)  
-[logging](#_logging)  
+__Connecting__
+[connect to postgres](#_connecttopostgres)
+[connect to mySql](#_connecttomysql)
+[connect to sqlite](#_connecttosqlite)
+[pool size](#_poolsize)
+[schema](#_schema)
+[schema alternative 2](#_schema2)
+[end pool](#_endpool)
+[end all pools](#_endallpools)
+[logging](#_logging)
 
-__Basic querying__  
-[getById](#_getbyid)  
-[tryGetById](#_trygetbyid)  
-[tryGetFirst](#_trygetfirst)  
-[join](#_join)  
-[hasMany](#_hasmany)  
-[hasOne](#_hasone)  
-[composite keys](#_compositekeys)  
-[getById eagerly](#_getbyideager)    
-[tryGetFirst eagerly](#_trygetfirsteager)  
-[toDto](#_todto)  
-[toDto with strategy](#_todtowithstrategy)  
-[toDto with orderBy](#_todtowithorderby)  
-[toDto with orderBy descending](#_todtowithorderbydesc)  
-[toDto ignoring columns](#_serializable)  
-[toJSON](#_tojson)  
-[toJSON with strategy](#_tojsonwithstrategy)  
-[getMany](#_getmany)  
-[getMany lazily](#_getmanylazy)  
-[getMany eagerly](#_getmanyeager)  
-[(many)ToDto](#_manytodto)  
-[(many)ToDto with strategy](#_manytodtowithstrategy)  
-[(many)ToJSON](#_manytojson)  
-[(many)ToJSON with strategy](#_manytojsonwithstrategy)  
-[Raw SQL query](#_rawsqlquery)  
-[Raw SQL Query With Parameters](#_rawsqlquerywithparameters)  
+__Basic querying__
+[getById](#_getbyid)
+[tryGetById](#_trygetbyid)
+[tryGetFirst](#_trygetfirst)
+[join](#_join)
+[hasMany](#_hasmany)
+[hasOne](#_hasone)
+[composite keys](#_compositekeys)
+[getById eagerly](#_getbyideager)
+[tryGetFirst eagerly](#_trygetfirsteager)
+[toDto](#_todto)
+[toDto with strategy](#_todtowithstrategy)
+[toDto with orderBy](#_todtowithorderby)
+[toDto with orderBy descending](#_todtowithorderbydesc)
+[toDto ignoring columns](#_serializable)
+[toJSON](#_tojson)
+[toJSON with strategy](#_tojsonwithstrategy)
+[getMany](#_getmany)
+[getMany lazily](#_getmanylazy)
+[getMany eagerly](#_getmanyeager)
+[(many)ToDto](#_manytodto)
+[(many)ToDto with strategy](#_manytodtowithstrategy)
+[(many)ToJSON](#_manytojson)
+[(many)ToJSON with strategy](#_manytojsonwithstrategy)
+[Raw SQL query](#_rawsqlquery)
+[Raw SQL Query With Parameters](#_rawsqlquerywithparameters)
 
-__Streaming__  
-[streaming rows](#_streameager)  
-[streaming json](#_streamjsoneager)  
+__Streaming__
+[streaming rows](#_streameager)
+[streaming json](#_streamjsoneager)
 
-__Persistence__  
-[update](#_update)  
-[insert](#_insert)  
-[delete](#_delete)  
-[cascade delete](#_cascadedelete)  
-[bulk delete](#_bulkdelete)  
-[bulk cascade delete](#_bulkcascadedelete)  
-[default values](#_defaultvalues)  
-[conventions](#_conventions)  
-[update a join-relation](#_updatejoin)  
-[update a hasOne-relation](#_updatehasone)  
-[update a hasMany-relation](#_updatehasmany)  
-[row lock](#_rowlock)  
-[transaction lock](#_transactionlock)  
+__Persistence__
+[update](#_update)
+[insert](#_insert)
+[delete](#_delete)
+[cascade delete](#_cascadedelete)
+[bulk delete](#_bulkdelete)
+[bulk cascade delete](#_bulkcascadedelete)
+[default values](#_defaultvalues)
+[conventions](#_conventions)
+[update a join-relation](#_updatejoin)
+[update a hasOne-relation](#_updatehasone)
+[update a hasMany-relation](#_updatehasmany)
+[row lock](#_rowlock)
+[transaction lock](#_transactionlock)
 
-__Filters__  
-[equal](#_equal)  
-[notEqual](#_notequal)  
-[not](#_not)  
-[lessThan](#_lessthan)  
-[lessThanOrEqual](#_lessthanorequal)  
-[greaterThan](#_greaterthan)  
-[greaterThanOrEqual](#_greaterthanorequal)  
-[between](#_between)  
-[in](#_in)   
-[startsWith](#_startswith)  
-[endsWith](#_endswith)  
-[contains](#_contains)  
-[iEqual](#_iequal)  
-[iStartsWith](#_istartswith)  
-[iEndsWith](#_iendswith)  
-[iContains](#_icontains)  
-[exists](#_exists)  
-[or](#_or)  
-[and](#_and)  
-[or alternative syntax](#_oralternative)  
-[and alternative syntax](#_andalternative)  
-[sub filter](#_subfilter)  
-[composite filter](#_compositefilter)  
-[raw sql filter](#_rawsqlfilter)  
+__Filters__
+[equal](#_equal)
+[notEqual](#_notequal)
+[not](#_not)
+[lessThan](#_lessthan)
+[lessThanOrEqual](#_lessthanorequal)
+[greaterThan](#_greaterthan)
+[greaterThanOrEqual](#_greaterthanorequal)
+[between](#_between)
+[in](#_in)
+[startsWith](#_startswith)
+[endsWith](#_endswith)
+[contains](#_contains)
+[iEqual](#_iequal)
+[iStartsWith](#_istartswith)
+[iEndsWith](#_iendswith)
+[iContains](#_icontains)
+[exists](#_exists)
+[or](#_or)
+[and](#_and)
+[or alternative syntax](#_oralternative)
+[and alternative syntax](#_andalternative)
+[sub filter](#_subfilter)
+[composite filter](#_compositefilter)
+[raw sql filter](#_rawsqlfilter)
 
 _Contents_
 ---------------
@@ -128,7 +128,7 @@ module.exports = async function() {
 }();
 ```
 <a name="_connecttosqlite"></a>
-[connect to sqlite](https://github.com/alfateam/rdb-demo/blob/master/sqlite/connect.js)  
+[connect to sqlite](https://github.com/alfateam/rdb-demo/blob/master/sqlite/connect.js)
 Requires sqlite3 as a dependency in your own package.json
 ```js
 const rdb = require('rdb');
@@ -177,7 +177,7 @@ const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
 module.exports = async function() {
     try {
-        await db.transaction({schema: ['mySchema', 'otherSchema']}); 
+        await db.transaction({schema: ['mySchema', 'otherSchema']});
         //or use string for single schema );
         await rdb.commit();
         console.log('Waiting for connection pool to teardown....');
@@ -285,7 +285,7 @@ module.exports = async function() {
     try {
         await db.transaction();
         let customer = await Customer.getById('a0000000-0000-0000-0000-000000000000');
-        customer.name = 'Ringo'; 
+        customer.name = 'Ringo';
         rdb.commit();
         console.log('Waiting for connection pool to teardown....');
     } catch (e) {
@@ -542,7 +542,7 @@ const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 module.exports = async function() {
     try {
         await db.transaction();
-        let fetchingStrategy = { customer: null }; //alternatively: {customer : {}} 
+        let fetchingStrategy = { customer: null }; //alternatively: {customer : {}}
         let order = await Order.getById('a0000000-a000-0000-0000-000000000000', fetchingStrategy);
         console.log(await order.toDto());
         let customer = await order.customer;
@@ -1405,7 +1405,7 @@ function getById() {
 }
 
 function update(customer) {
-    customer.name = 'Ringo'; 
+    customer.name = 'Ringo';
 }
 
 function verifyUpdated(customer) {
@@ -1490,7 +1490,7 @@ db.transaction()
     .then(null, rdb.rollback)
     .then(onOk, onFailed);
 
-function getById() {    
+function getById() {
     return Customer.getById('87654321-0000-0000-0000-000000000000');
 }
 
@@ -1582,7 +1582,7 @@ db.transaction()
     .then(null, rdb.rollback)
     .then(onOk, onFailed);
 
-function deleteCustomer() {    
+function deleteCustomer() {
     var filter = Customer.id.eq('87654321-0000-0000-0000-000000000000');
     return Customer.delete(filter);
 }
@@ -1650,19 +1650,19 @@ function onFailed(err) {
 ```js
 var rdb = require('rdb');
 
-var buf = new Buffer(10);
+var buf = Buffer.from(10);
 buf.write('\u00bd + \u00bc = \u00be', 0);
 
 var Customer = rdb.table('_customer');
 
-/*unless overridden, numeric is default 0, 
-string is default null, 
+/*unless overridden, numeric is default 0,
+string is default null,
 guid is default null,
 date is default null,
 binary is default null,
 boolean is default false,
 json is default null
-*/                    
+*/
 
 Customer.primaryColumn('cId').guid().as('id').default(null);
 Customer.column('cName').string().as('name').default('default name');
@@ -1676,7 +1676,7 @@ var db = rdb('postgres://postgres:postgres@localhost/test');
 
 db.transaction()
     .then(insert)
-    .then(print) 
+    .then(print)
     .then(rdb.commit)
     .then(null, rdb.rollback)
     .then(onOk, onFailed);
@@ -1714,7 +1714,7 @@ var db = rdb('postgres://postgres:postgres@localhost/test');
 
 db.transaction()
     .then(insert)
-    .then(print) 
+    .then(print)
     .then(rdb.commit)
     .then(null, rdb.rollback)
     .then(onOk, onFailed);
@@ -1773,7 +1773,7 @@ function getById() {
 function update(order) {
     var yokoId = '12345678-0000-0000-0000-000000000000';
     order.customerId = yokoId;
-    return order.customer; 
+    return order.customer;
 }
 
 function verifyUpdated(customer) {
@@ -1909,7 +1909,7 @@ function onFailed(err) {
 }
 ```
 <a name="_rowlock"></a>
-[row lock](https://github.com/alfateam/rdb-demo/blob/master/exclusive.js)  
+[row lock](https://github.com/alfateam/rdb-demo/blob/master/exclusive.js)
 (not in sqlite)
 ```js
 var rdb = require('rdb');
@@ -1974,7 +1974,7 @@ function onFailed(err) {
 }
 ```
 <a name="_transactionlock"></a>
-[transaction lock](https://github.com/alfateam/rdb-demo/blob/master/lock.js)  
+[transaction lock](https://github.com/alfateam/rdb-demo/blob/master/lock.js)
 (postgres only)
 ```js
 var rdb = require('rdb');
@@ -2020,10 +2020,10 @@ function updateConcurrently() {
 
 function getById() {
     //pg_advisory_xact_lock(12345)
-    //will be released on commit/rollback 
+    //will be released on commit/rollback
     return rdb.lock("12345").then(function() {
-        return Customer.getById('a0000000-0000-0000-0000-000000000000');    
-    });    
+        return Customer.getById('a0000000-0000-0000-0000-000000000000');
+    });
 }
 
 function increaseBalance(customer) {
@@ -2061,7 +2061,7 @@ db.transaction()
 
 function getFilteredCustomers() {
     var filter = Customer.name.equal('John');
-    //same as Customer.name.eq('John');   
+    //same as Customer.name.eq('John');
     return Customer.getMany(filter);
 }
 
@@ -2104,7 +2104,7 @@ db.transaction()
 
 function getFilteredCustomers() {
     var filter = Customer.name.notEqual('John');
-    //same as Customer.name.ne('John');   
+    //same as Customer.name.ne('John');
     return Customer.getMany(filter);
 }
 
@@ -2190,7 +2190,7 @@ db.transaction()
 
 function getFilteredCustomers() {
     var filter = Customer.balance.lessThan(5000);
-    //same as Customer.balance.lt(5000);   
+    //same as Customer.balance.lt(5000);
     return Customer.getMany(filter);
 }
 
@@ -2234,7 +2234,7 @@ db.transaction()
 
 function getFilteredCustomers() {
     var filter = Customer.balance.lessThanOrEqual(8123);
-    //same as Customer.balance.le(8123);   
+    //same as Customer.balance.le(8123);
     return Customer.getMany(filter);
 }
 
@@ -2278,7 +2278,7 @@ db.transaction()
 
 function getFilteredCustomers() {
     var filter = Customer.balance.greaterThan(5000);
-    //same as Customer.balance.gt(5000);   
+    //same as Customer.balance.gt(5000);
     return Customer.getMany(filter);
 }
 
@@ -2322,7 +2322,7 @@ db.transaction()
 
 function getFilteredCustomers() {
     var filter = Customer.balance.greaterThanOrEqual(8123);
-    //same as Customer.balance.ge(8123);   
+    //same as Customer.balance.ge(8123);
     return Customer.getMany(filter);
 }
 
@@ -2598,7 +2598,7 @@ function onFailed(err) {
 }
 ```
 <a name="_iequal"></a>
-[iEqual](https://github.com/alfateam/rdb-demo/blob/master/filtering/iEqual.js)  
+[iEqual](https://github.com/alfateam/rdb-demo/blob/master/filtering/iEqual.js)
 (postgres only)
 ```js
 var rdb = require('rdb');
@@ -2641,7 +2641,7 @@ function onFailed(err) {
 }
 ```
 <a name="_istartswith"></a>
-[iStartsWith](https://github.com/alfateam/rdb-demo/blob/master/filtering/iStartsWith.js)  
+[iStartsWith](https://github.com/alfateam/rdb-demo/blob/master/filtering/iStartsWith.js)
 (postgres only)
 ```js
 var rdb = require('rdb');
@@ -2684,7 +2684,7 @@ function onFailed(err) {
 }
 ```
 <a name="_iendswith"></a>
-[iEndsWith](https://github.com/alfateam/rdb-demo/blob/master/filtering/iEndsWith.js)  
+[iEndsWith](https://github.com/alfateam/rdb-demo/blob/master/filtering/iEndsWith.js)
 (postgres only)
 ```js
 var rdb = require('rdb');
@@ -2727,7 +2727,7 @@ function onFailed(err) {
 }
 ```
 <a name="_icontains"></a>
-[iContains](https://github.com/alfateam/rdb-demo/blob/master/filtering/iContains.js)  
+[iContains](https://github.com/alfateam/rdb-demo/blob/master/filtering/iContains.js)
 (postgres only)
 ```js
 var rdb = require('rdb');

@@ -1,4 +1,4 @@
-var arg = new Buffer([1,2]);
+var arg = Buffer.from([1,2]);
 
 function act(c) {
 	c.arg = arg;
