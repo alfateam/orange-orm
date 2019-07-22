@@ -139,7 +139,7 @@ return db.transaction(async () => {
 });
 ```
 <a name="_schema"></a>
-[schema](https://github.com/alfateam/rdb-demo/blob/master/schema.js)
+[schema](https://github.com/alfateam/rdb-demo/blob/master/schema.js)  
 (postgres only)
 ```js
 const rdb = require('rdb');
@@ -154,7 +154,7 @@ await db.transaction({schema: ['mySchema', 'otherSchema']}, async () => {
 
 ```
 <a name="_schema2"></a>
-[schema alternative 2](https://github.com/alfateam/rdb-demo/blob/master/schema2.js)
+[schema alternative 2](https://github.com/alfateam/rdb-demo/blob/master/schema2.js)  
 (postgres only)
 ```js
 const rdb = require('rdb');
@@ -1368,7 +1368,7 @@ await db.transaction(async () => {
 });
 ```
 <a name="_rowlock"></a>
-[row lock](https://github.com/alfateam/rdb-demo/blob/master/exclusive.js)
+[row lock](https://github.com/alfateam/rdb-demo/blob/master/exclusive.js)  
 (not in sqlite)
 ```js
 let rdb = require('rdb');
@@ -1405,7 +1405,7 @@ function updateConcurrently() {
     return Promise.all([concurrent1, concurrent2]);
 }```
 <a name="_transactionlock"></a>
-[transaction lock](https://github.com/alfateam/rdb-demo/blob/master/lock.js)
+[transaction lock](https://github.com/alfateam/rdb-demo/blob/master/lock.js)  
 (postgres only)
 ```js
 let rdb = require('rdb');
@@ -1671,7 +1671,7 @@ await db.transaction(async () => {
 });
 ```
 <a name="_iequal"></a>
-[iEqual](https://github.com/alfateam/rdb-demo/blob/master/filtering/iEqual.js)
+[iEqual](https://github.com/alfateam/rdb-demo/blob/master/filtering/iEqual.js)  
 (postgres only)
 ```js
 var rdb = require('rdb');
@@ -1691,7 +1691,7 @@ await db.transaction(async () => {
 });
 ```
 <a name="_istartswith"></a>
-[iStartsWith](https://github.com/alfateam/rdb-demo/blob/master/filtering/iStartsWith.js)
+[iStartsWith](https://github.com/alfateam/rdb-demo/blob/master/filtering/iStartsWith.js)  
 (postgres only)
 ```js
 var rdb = require('rdb');
@@ -1710,7 +1710,7 @@ await db.transaction(async () => {
 });
 ```
 <a name="_iendswith"></a>
-[iEndsWith](https://github.com/alfateam/rdb-demo/blob/master/filtering/iEndsWith.js)
+[iEndsWith](https://github.com/alfateam/rdb-demo/blob/master/filtering/iEndsWith.js)  
 (postgres only)
 ```js
 var rdb = require('rdb');
@@ -1729,7 +1729,7 @@ await db.transaction(async () => {
 });
 ```
 <a name="_icontains"></a>
-[iContains](https://github.com/alfateam/rdb-demo/blob/master/filtering/iContains.js)
+[iContains](https://github.com/alfateam/rdb-demo/blob/master/filtering/iContains.js)  
 (postgres only)
 ```js
 var rdb = require('rdb');
