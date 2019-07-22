@@ -764,7 +764,6 @@ let db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 await db.transaction(async () => {
     console.log(await Customer.getManyDto());
 });
-
 ```
 <a name="_getmanylazy"></a>
 [getMany lazily](https://github.com/alfateam/rdb-demo/blob/master/getManyLazy.js)
@@ -853,7 +852,7 @@ await db.transaction(async () => {
 });
 ```
 <a name="_getmanywithorderbyjsonb"></a>
-[getMany with orderBy jsonb](https://github.com/alfateam/rdb-demo/blob/master/getManyWithOrderBy.js)
+[getMany with orderBy jsonb](https://github.com/alfateam/rdb-demo/blob/master/getManyWithOrderByJsonb.js)
 ```js
 let rdb = require('rdb');
 
@@ -875,7 +874,7 @@ await db.transaction(async () => {
 });
 ```
 <a name="_getmanywithorderbyjsonbdesc"></a>
-[getMany with orderBy jsonb descending](https://github.com/alfateam/rdb-demo/blob/master/getManyWithOrderByDesc.js)
+[getMany with orderBy jsonb descending](https://github.com/alfateam/rdb-demo/blob/master/getManyWithOrderByJsonb.js)
 ```js
 let rdb = require('rdb');
 
