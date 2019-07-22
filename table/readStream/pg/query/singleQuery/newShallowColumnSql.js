@@ -1,6 +1,6 @@
 var util = require('util');
 
-function _new(table,alias) {
+function _new(table,alias,span) {
 	var columnFormat = '%s as "%s"';
 	var columns = table._columns;
 	var sql = '';
@@ -11,7 +11,7 @@ function _new(table,alias) {
 			sql = sql + separator + util.format(columnFormat, column._dbName, column.alias);
 		separator = ',' + alias + '.';
 	}
-	return sql;
+	return sql;	
 }
 
 module.exports = _new;

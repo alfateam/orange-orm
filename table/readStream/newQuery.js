@@ -8,8 +8,13 @@ function newQuery(db,table,filter,span,alias) {
 	c.visitPg = function() {
 		_newQuery = newPgQuery;
 	};
-	c.visitMySql = function() {};
+	c.visitMySql = function() {
 		_newQuery = newMySqlQuery;
+	};
+
+	c.visitSqlite = function() {
+		throw new Error('Sqlite not supported');
+	};
 
 	db.accept(c);
 

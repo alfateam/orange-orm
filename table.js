@@ -4,6 +4,7 @@ var join = require('./table/join');
 var hasMany = require('./table/hasMany');
 var hasOne = require('./table/hasOne');
 var getMany = require('./table/getMany');
+var getManyDto = require('./table/getManyDto');
 var getById = require('./table/getById');
 var tryGetById = require('./table/tryGetById');
 var tryGetFirst = require('./table/tryGetFirstFromDb');
@@ -52,6 +53,10 @@ function _new(tableName) {
         return getMany(table, filter, strategy);
     };
 
+    table.getManyDto = function(filter, strategy) {
+        return getManyDto(table, filter, strategy);
+    };
+    
     table.getMany.exclusive = function(filter, strategy) {
         return getMany.exclusive(table, filter, strategy);
     };

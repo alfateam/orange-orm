@@ -25,6 +25,9 @@ function newResolveTransaction(domain, pool) {
             rdb.deleteFromSql = deleteFromSql;
             rdb.selectForUpdateSql = selectForUpdateSql;
             rdb.multipleStatements = true;
+            rdb.accept = function(caller) {
+                caller.visitMysql();
+            };
             domain.rdb = rdb;    
             onSuccess();
         }

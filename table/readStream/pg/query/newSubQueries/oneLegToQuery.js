@@ -13,8 +13,7 @@ function oneLegToQuery(rightAlias,leg,legNo) {
 	var shallowJoin  = newShallowJoinSql(rightTable,leftColumns,rightColumns,leftAlias,rightAlias);
 	var filter = newParameterized(shallowJoin);
 	var query = newQuery(span.table,filter,span,leftAlias);
-	return util.format(',(select row_to_json(r) from (%s) r ) "%s"', query.sql(), leg.name );
-
+	return util.format(',(select row_to_json(r) from (%s limit 1) r) "%s"', query.sql(), leg.name );
 }
 
 module.exports = oneLegToQuery;

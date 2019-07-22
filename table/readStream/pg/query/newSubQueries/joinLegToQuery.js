@@ -12,9 +12,8 @@ function joinLegToQuery(parentAlias,leg,legNo) {
 
 	var shallowJoin  = newShallowJoinSql(parentTable,childColumns,parentColumns,childAlias,parentAlias);
 	var filter = newParameterized(shallowJoin);
-	var query = newQuery(span.table,filter,span,childAlias);
-	return util.format(',(select row_to_json(r) from (%s) r ) "%s"', query.sql(), leg.name );
-
+	var query = newQuery(span.table,filter,span,childAlias);	
+	return util.format(',(select row_to_json(r) from (%s limit 1) r) "%s"', query.sql(), leg.name );
 }
 
 module.exports = joinLegToQuery;
