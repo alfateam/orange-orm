@@ -30,8 +30,12 @@ __Basic querying__
 [toJSON](#_tojson)  
 [toJSON with strategy](#_tojsonwithstrategy)  
 [getMany](#_getmany)  
+[getManyDto](#_getmanydto)  
 [getMany lazily](#_getmanylazy)  
 [getMany eagerly](#_getmanyeager)  
+[getManyDto eagerly](#_getmanydtoeager)  
+[getMany with orderBy jsonb](#_getmanywithorderbyjsonb)  
+[getMany with orderBy jsonb descending](#_getmanywithorderbyjsonbdesc)  
 [(many)ToDto](#_manytodto)  
 [(many)ToDto with strategy](#_manytodtowithstrategy)  
 [(many)ToJSON](#_manytojson)  
@@ -745,11 +749,27 @@ await db.transaction(async () => {
     console.log(dtos);
 });
 ```
+<a name="_getmanydto"></a>
+[getManyDto](https://github.com/alfateam/rdb-demo/blob/master/getManyDto.js)
+```js
+let rdb = require('rdb');
+
+let Customer = rdb.table('_customer');
+
+Customer.primaryColumn('cId').guid().as('id');
+Customer.column('cName').string().as('name');
+
+let db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+
+await db.transaction(async () => {
+    console.log(await Customer.getManyDto());
+});
+
+```
 <a name="_getmanylazy"></a>
 [getMany lazily](https://github.com/alfateam/rdb-demo/blob/master/getManyLazy.js)
 ```js
 let rdb = require('rdb');
-let promise = require('promise/domains');
 let inspect = require('util').inspect;
 
 let Order = rdb.table('_order');
@@ -802,6 +822,77 @@ await db.transaction(async () => {
     let orders = await Order.getMany(emptyFilter, strategy);
     let dtos = await orders.toDto();
     console.log(inspect(dtos, false, 10));
+});
+```
+<a name="_getmanydtoeager"></a>
+[getManyDto eager](https://github.com/alfateam/rdb-demo/blob/master/getManyDtoEager.js)
+```js
+let rdb = require('rdb');
+let inspect = require('util').inspect;
+
+let Order = rdb.table('_order');
+let OrderLine = rdb.table('_orderLine');
+
+Order.primaryColumn('oId').guid().as('id');
+Order.column('oOrderNo').string().as('orderNo');
+
+OrderLine.primaryColumn('lId').guid().as('id');
+OrderLine.column('lOrderId').guid().as('orderId');
+OrderLine.column('lProduct').string().as('product');
+
+let line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+Order.hasMany(line_order_relation).as('lines');
+
+let db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+
+await db.transaction(async () => {
+    let emptyFilter;
+    let strategy = {lines : null};
+    let orders = await Order.getManyDto(emptyFilter, strategy);
+    console.log(inspect(orders, false, 10));
+});
+```
+<a name="_getmanywithorderbyjsonb"></a>
+[getMany with orderBy jsonb](https://github.com/alfateam/rdb-demo/blob/master/getManyWithOrderBy.js)
+```js
+let rdb = require('rdb');
+
+let Order = rdb.table('_jOrder');
+
+Order.primaryColumn('oId').guid().as('id');
+Order.column('oData').json().as('data');
+
+let db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+
+await db.transaction(async () => {
+    let strategy = {
+        orderBy: ['data->\'orderNo\'']
+        //alternative: orderBy: ['data->>\'orderId\' asc']
+    };
+    let orders = await Order.getMany(null, strategy);
+    let dtos = await orders.toDto();
+    console.log(dtos);
+});
+```
+<a name="_getmanywithorderbyjsonbdesc"></a>
+[getMany with orderBy jsonb descending](https://github.com/alfateam/rdb-demo/blob/master/getManyWithOrderByDesc.js)
+```js
+let rdb = require('rdb');
+
+let Order = rdb.table('_jOrder');
+
+Order.primaryColumn('oId').guid().as('id');
+Order.column('oData').json().as('data');
+
+let db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+
+await db.transaction(async () => {
+    let strategy = {
+        orderBy: ['data->\'orderNo\' desc']
+    };
+    let orders = await Order.getMany(null, strategy);
+    let dtos = await orders.toDto();
+    console.log(dtos);
 });
 ```
 <a name="_manytodto"></a>
