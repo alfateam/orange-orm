@@ -1403,7 +1403,8 @@ function updateConcurrently() {
     });
 
     return Promise.all([concurrent1, concurrent2]);
-}```
+}
+```
 <a name="_transactionlock"></a>
 [transaction lock](https://github.com/alfateam/rdb-demo/blob/master/lock.js)  
 (postgres only)
@@ -1442,7 +1443,8 @@ function updateConcurrently() {
     });
 
     return Promise.all([concurrent1, concurrent2]);
-}```
+}
+```
 <a name="_equal"></a>
 [equal](https://github.com/alfateam/rdb-demo/blob/master/filtering/equal.js)
 ```js
