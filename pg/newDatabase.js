@@ -7,12 +7,19 @@ var rollback = require('../table/rollback');
 var newPool = require('./newPool');
 var lock = require('../lock');
 var executeSchema = require('./schema');
+var runInTransaction = require('../runInTransaction');
 
 function newDatabase(connectionString, poolOptions) {
     var pool = newPool(connectionString, poolOptions);
     var c = {};
 
-    c.transaction = function(options) {
+    c.transaction = function(options, fn) {
+        if ((arguments.length === 1) && (typeof options === 'function')) {
+            return runInTransaction({db: c, fn: options});
+        }
+        if ((arguments.length > 1)) {
+            return runInTransaction({db: c, options: options, fn: fn});
+        }
         var domain = createDomain();
 
         return domain.run(onRun);
