@@ -90,10 +90,10 @@ _Contents_
 <a name="_connecttopostgres"></a>
 [connect to postgres](https://github.com/alfateam/rdb-demo/blob/master/connect.js)
 ```js
-const rdb = require('rdb');
+let rdb = require('rdb');
 
-const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
-//alternatively: var db = rdb.pg('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+//alternatively: let db = rdb.pg('postgres://postgres:postgres@localhost/test');
 //will use pool with 10 connections by default
 
 return db.transaction(async () => {
@@ -103,10 +103,10 @@ return db.transaction(async () => {
 <a name="_connecttomysql"></a>
 [connect to mySql](https://github.com/alfateam/rdb-demo/blob/master/mySql/connect.js)
 ```js
-const rdb = require('rdb');
+let rdb = require('rdb');
 
-const db = rdb('mysql://root@localhost/rdbDemo?multipleStatements=true');
-//alternatively: var db = rdb.mySql('mysql://root@localhost/rdbDemo?multipleStatements=true');
+let db = rdb('mysql://root@localhost/rdbDemo?multipleStatements=true');
+//alternatively: let db = rdb.mySql('mysql://root@localhost/rdbDemo?multipleStatements=true');
 //will use pool with 10 connections by default
 
 return db.transaction(async () => {
@@ -117,9 +117,9 @@ return db.transaction(async () => {
 [connect to sqlite](https://github.com/alfateam/rdb-demo/blob/master/sqlite/connect.js)
 Requires sqlite3 as a dependency in your own package.json
 ```js
-const rdb = require('rdb');
+let rdb = require('rdb');
 
-const db = rdb.sqlite(__dirname + '/db/rdbDemo');
+let db = rdb.sqlite(__dirname + '/db/rdbDemo');
 //will use pool with 10 connections by default
 
 return db.transaction(async () => {
@@ -129,10 +129,10 @@ return db.transaction(async () => {
 <a name="_poolsize"></a>
 [pool size](https://github.com/alfateam/rdb-demo/blob/master/poolOptions.js)
 ```js
-const rdb = require('rdb');
-const poolOptions = {size: 20};
+let rdb = require('rdb');
+let poolOptions = {size: 20};
 
-const db = rdb('postgres://rdb:rdb@localhost/rdbdemo', poolOptions);
+let db = rdb('postgres://rdb:rdb@localhost/rdbdemo', poolOptions);
 
 return db.transaction(async () => {
     //transaction will commit after this function
@@ -142,10 +142,10 @@ return db.transaction(async () => {
 [schema](https://github.com/alfateam/rdb-demo/blob/master/schema.js)  
 (postgres only)
 ```js
-const rdb = require('rdb');
+let rdb = require('rdb');
 
-const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
-//alternatively: var db = rdb.pg('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+//alternatively: let db = rdb.pg('postgres://postgres:postgres@localhost/test');
 
 await db.transaction({schema: ['mySchema', 'otherSchema']}, async () => {
     //or use string for single schema );
@@ -157,10 +157,10 @@ await db.transaction({schema: ['mySchema', 'otherSchema']}, async () => {
 [schema alternative 2](https://github.com/alfateam/rdb-demo/blob/master/schema2.js)  
 (postgres only)
 ```js
-const rdb = require('rdb');
+let rdb = require('rdb');
 
-const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
-//alternatively: var db = rdb.pg('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+//alternatively: let db = rdb.pg('postgres://postgres:postgres@localhost/test');
 
 return db.transaction(async () => {
     await db.schema({schema: ['mySchema', 'otherSchema']});
@@ -170,9 +170,9 @@ return db.transaction(async () => {
 <a name="_endpool"></a>
 [end pool](https://github.com/alfateam/rdb-demo/blob/master/endPool.js)
 ```js
-const rdb = require('rdb');
+let rdb = require('rdb');
 
-const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+let db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
 await db.transaction(async () => {
     //transaction will commit after this function
@@ -184,10 +184,10 @@ console.log('Pool ended.');
 <a name="_endallpools"></a>
 [end all pools](https://github.com/alfateam/rdb-demo/blob/master/endAllPools.js)
 ```js
-const rdb = require('rdb');
+let rdb = require('rdb');
 
-const dbPg = rdb('postgres://rdb:rdb@localhost/rdbdemo');
-const dbMySql = rdb('mysql://root@localhost/rdbDemo?multipleStatements=true');
+let dbPg = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+let dbMySql = rdb('mysql://root@localhost/rdbDemo?multipleStatements=true');
 
 await dbPg.transaction(async () => {
     //do pg stuff here
@@ -201,16 +201,16 @@ console.log('Pools ended.');
 <a name="_logging"></a>
 [logging](https://github.com/alfateam/rdb-demo/blob/master/logging.js)
 ```js
-const rdb = require('rdb');
+let rdb = require('rdb');
 
-const Customer = rdb.table('_customer');
+let Customer = rdb.table('_customer');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cName').string().as('name');
 
 rdb.log(console.log); //will log sql and parameters
 
-const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+let db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
 await db.transaction(async () => {
     let customer = await Customer.getById('a0000000-0000-0000-0000-000000000000');
@@ -220,8 +220,8 @@ await db.transaction(async () => {
 <a name="_getbyid"></a>
 [getById](https://github.com/alfateam/rdb-demo/blob/master/getById.js)
 ```js
-const rdb = require('rdb');
-const Customer = rdb.table('_customer');
+let rdb = require('rdb');
+let Customer = rdb.table('_customer');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cName').string().as('name');
@@ -231,7 +231,7 @@ Customer.column('cIsActive').boolean().as('isActive');
 Customer.column('cPicture').binary().as('picture');
 Customer.column('cDocument').json().as('document');
 
-const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+let db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
 await db.transaction(async () => {
     let customer = await Customer.getById('a0000000-0000-0000-0000-000000000000');
@@ -241,9 +241,9 @@ await db.transaction(async () => {
 <a name="_trygetbyid"></a>
 [tryGetById](https://github.com/alfateam/rdb-demo/blob/master/tryGetById.js)
 ```js
-const rdb = require('rdb');
+let rdb = require('rdb');
 
-const Customer = rdb.table('_customer');
+let Customer = rdb.table('_customer');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cName').string().as('name');
@@ -252,7 +252,7 @@ Customer.column('cRegdate').date().as('registeredDate');
 Customer.column('cIsActive').boolean().as('isActive');
 Customer.column('cPicture').binary().as('picture');
 
-const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+let db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
 await db.transaction(async () => {
     let customer = await Customer.tryGetById('a0000000-0000-0000-0000-000000000000');
@@ -262,14 +262,14 @@ await db.transaction(async () => {
 <a name="_trygetfirst"></a>
 [tryGetFirst](https://github.com/alfateam/rdb-demo/blob/master/tryGetFirst.js)
 ```js
-const rdb = require('rdb');
+let rdb = require('rdb');
 
-const Customer = rdb.table('_customer');
+let Customer = rdb.table('_customer');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cName').string().as('name');
 
-const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+let db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
 await db.transaction(async () => {
     let filter = Customer.name.equal('John');
@@ -280,10 +280,10 @@ await db.transaction(async () => {
 <a name="_join"></a>
 [join](https://github.com/alfateam/rdb-demo/blob/master/join.js)
 ```js
-const rdb = require('rdb');
+let rdb = require('rdb');
 
-const Customer = rdb.table('_customer');
-const Order = rdb.table('_order');
+let Customer = rdb.table('_customer');
+let Order = rdb.table('_order');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cName').string().as('name');
@@ -293,7 +293,7 @@ Order.column('oOrderNo').string().as('orderNo');
 Order.column('oCustomerId').guid().as('customerId');
 Order.join(Customer).by('oCustomerId').as('customer');
 
-const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+let db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
 await db.transaction(async () => {
     let order = await Order.getById('a0000000-a000-0000-0000-000000000000');
@@ -304,12 +304,12 @@ await db.transaction(async () => {
 <a name="_hasmany"></a>
 [hasMany](https://github.com/alfateam/rdb-demo/blob/master/hasMany.js)
 ```js
-const rdb = require('rdb');
-const resetDemo = require('./db/resetDemo');
-const inspect = require('util').inspect;
+let rdb = require('rdb');
+let resetDemo = require('./db/resetDemo');
+let inspect = require('util').inspect;
 
-const Order = rdb.table('_order');
-const OrderLine = rdb.table('_orderLine');
+let Order = rdb.table('_order');
+let OrderLine = rdb.table('_orderLine');
 
 Order.primaryColumn('oId').guid().as('id');
 Order.column('oOrderNo').string().as('orderNo');
@@ -318,10 +318,10 @@ OrderLine.primaryColumn('lId').guid().as('id');
 OrderLine.column('lOrderId').guid().as('orderId');
 OrderLine.column('lProduct').string().as('product');
 
-const line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+let line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
 
-const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+let db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
 await db.transaction(async () => {
     let order = await Order.getById('b0000000-b000-0000-0000-000000000000');
@@ -332,11 +332,11 @@ await db.transaction(async () => {
 <a name="_hasone"></a>
 [hasOne](https://github.com/alfateam/rdb-demo/blob/master/hasOne.js)
 ```js
-const rdb = require('rdb');
-const {inspect} = require('util');
+let rdb = require('rdb');
+let {inspect} = require('util');
 
-const Order = rdb.table('_order');
-const DeliveryAddress = rdb.table('_deliveryAddress');
+let Order = rdb.table('_order');
+let DeliveryAddress = rdb.table('_deliveryAddress');
 
 Order.primaryColumn('oId').guid().as('id');
 Order.column('oOrderNo').string().as('orderNo');
@@ -346,10 +346,10 @@ DeliveryAddress.column('dOrderId').string().as('orderId');
 DeliveryAddress.column('dName').string().as('name');
 DeliveryAddress.column('dStreet').string().as('street');
 
-const deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
+let deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
 Order.hasOne(deliveryAddress_order_relation).as('deliveryAddress');
 
-const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+let db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
 await db.transaction(async () => {
     let order = await Order.getById('b0000000-b000-0000-0000-000000000000');
@@ -360,10 +360,10 @@ await db.transaction(async () => {
 <a name="_compositekeys"></a>
 [composite keys](https://github.com/alfateam/rdb-demo/blob/master/compositeKeys.js)
 ```js
-const rdb = require('rdb');
+let rdb = require('rdb');
 
-const Order = rdb.table('_compositeOrder');
-const OrderLine = rdb.table('_compositeOrderLine');
+let Order = rdb.table('_compositeOrder');
+let OrderLine = rdb.table('_compositeOrderLine');
 
 Order.primaryColumn('oCompanyId').numeric().as('companyId');
 Order.primaryColumn('oOrderNo').numeric().as('orderNo');
@@ -373,10 +373,10 @@ OrderLine.primaryColumn('lOrderNo').numeric().as('orderNo');
 OrderLine.primaryColumn('lLineNo').numeric().as('lineNo');
 OrderLine.column('lProduct').string().as('product');
 
-const line_order_relation = OrderLine.join(Order).by('lCompanyId', 'lOrderNo').as('order');
+let line_order_relation = OrderLine.join(Order).by('lCompanyId', 'lOrderNo').as('order');
 Order.hasMany(line_order_relation).as('lines');
 
-const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+let db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
 await db.transaction(async () => {
     let companyId = 1;
@@ -388,11 +388,11 @@ await db.transaction(async () => {
 <a name="_getbyideager"></a>
 [getById eagerly](https://github.com/alfateam/rdb-demo/blob/master/getByIdEager.js)
 ```js
-const rdb = require('rdb');
-const inspect = require('util').inspect;
+let rdb = require('rdb');
+let inspect = require('util').inspect;
 
-const Customer = rdb.table('_customer');
-const Order = rdb.table('_order');
+let Customer = rdb.table('_customer');
+let Order = rdb.table('_order');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cName').string().as('name');
@@ -402,7 +402,7 @@ Order.column('oOrderNo').string().as('orderNo');
 Order.column('oCustomerId').guid().as('customerId');
 Order.join(Customer).by('oCustomerId').as('customer');
 
-const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+let db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
 await db.transaction(async () => {
     let fetchingStrategy = { customer: null }; //alternatively: {customer : {}}
@@ -415,10 +415,10 @@ await db.transaction(async () => {
 <a name="_trygetfirsteager"></a>
 [tryGetFirst eagerly](https://github.com/alfateam/rdb-demo/blob/master/tryGetFirstEager.js)
 ```js
-const rdb = require('rdb');
+let rdb = require('rdb');
 
-const Customer = rdb.table('_customer');
-const Order = rdb.table('_order');
+let Customer = rdb.table('_customer');
+let Order = rdb.table('_order');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cName').string().as('name');
@@ -429,7 +429,7 @@ Order.column('oCustomerId').guid().as('customerId');
 
 Order.join(Customer).by('oCustomerId').as('customer');
 
-const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+let db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
 await db.transaction(async () => {
     let filter = Order.customer.name.equal('John');
@@ -442,12 +442,12 @@ await db.transaction(async () => {
 <a name="_todto"></a>
 [toDto](https://github.com/alfateam/rdb-demo/blob/master/toDto.js)
 ```js
-const rdb = require('rdb');
+let rdb = require('rdb');
 
-const Order = rdb.table('_order');
-const Customer = rdb.table('_customer');
-const OrderLine = rdb.table('_orderLine');
-const DeliveryAddress = rdb.table('_deliveryAddress');
+let Order = rdb.table('_order');
+let Customer = rdb.table('_customer');
+let OrderLine = rdb.table('_orderLine');
+let DeliveryAddress = rdb.table('_deliveryAddress');
 
 Order.primaryColumn('oId').guid().as('id');
 Order.column('oOrderNo').string().as('orderNo');
@@ -467,14 +467,14 @@ DeliveryAddress.column('dStreet').string().as('street');
 
 Order.join(Customer).by('oCustomerId').as('customer');
 
-const line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+let line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
 
-const deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
+let deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
 Order.hasOne(deliveryAddress_order_relation).as('deliveryAddress');
 
 
-const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+let db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
 await db.transaction(async () => {
     let order = await Order.getById('b0000000-b000-0000-0000-000000000000');
@@ -486,12 +486,12 @@ await db.transaction(async () => {
 <a name="_todtowithstrategy"></a>
 [toDto with strategy](https://github.com/alfateam/rdb-demo/blob/master/toDtoWithStrategy.js)
 ```js
-const rdb = require('rdb');
+let rdb = require('rdb');
 
-const Order = rdb.table('_order');
-const Customer = rdb.table('_customer');
-const OrderLine = rdb.table('_orderLine');
-const DeliveryAddress = rdb.table('_deliveryAddress');
+let Order = rdb.table('_order');
+let Customer = rdb.table('_customer');
+let OrderLine = rdb.table('_orderLine');
+let DeliveryAddress = rdb.table('_deliveryAddress');
 
 Order.primaryColumn('oId').guid().as('id');
 Order.column('oOrderNo').string().as('orderNo');
@@ -511,14 +511,14 @@ DeliveryAddress.column('dStreet').string().as('street');
 
 Order.join(Customer).by('oCustomerId').as('customer');
 
-const line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+let line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
 
-const deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
+let deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
 Order.hasOne(deliveryAddress_order_relation).as('deliveryAddress');
 
 
-const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+let db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
 await db.transaction(async () => {
     let order = await Order.getById('b0000000-b000-0000-0000-000000000000');
@@ -530,12 +530,12 @@ await db.transaction(async () => {
 <a name="_todtowithorderby"></a>
 [toDto with orderBy](https://github.com/alfateam/rdb-demo/blob/master/toDtoWithOrderBy.js)
 ```js
-const rdb = require('rdb');
+let rdb = require('rdb');
 
-const Order = rdb.table('_order');
-const Customer = rdb.table('_customer');
-const OrderLine = rdb.table('_orderLine');
-const DeliveryAddress = rdb.table('_deliveryAddress');
+let Order = rdb.table('_order');
+let Customer = rdb.table('_customer');
+let OrderLine = rdb.table('_orderLine');
+let DeliveryAddress = rdb.table('_deliveryAddress');
 
 Order.primaryColumn('oId').guid().as('id');
 Order.column('oOrderNo').string().as('orderNo');
@@ -555,13 +555,13 @@ DeliveryAddress.column('dStreet').string().as('street');
 
 Order.join(Customer).by('oCustomerId').as('customer');
 
-const line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+let line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
 
-const deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
+let deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
 Order.hasOne(deliveryAddress_order_relation).as('deliveryAddress');
 
-const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+let db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
 await db.transaction(async () => {
     let order = await Order.getById('b0000000-b000-0000-0000-000000000000');
@@ -578,12 +578,12 @@ await db.transaction(async () => {
 <a name="_todtowithorderbydesc"></a>
 [toDto with orderBy descending](https://github.com/alfateam/rdb-demo/blob/master/toDtoWithOrderByDesc.js)
 ```js
-const rdb = require('rdb');
+let rdb = require('rdb');
 
-const Order = rdb.table('_order');
-const Customer = rdb.table('_customer');
-const OrderLine = rdb.table('_orderLine');
-const DeliveryAddress = rdb.table('_deliveryAddress');
+let Order = rdb.table('_order');
+let Customer = rdb.table('_customer');
+let OrderLine = rdb.table('_orderLine');
+let DeliveryAddress = rdb.table('_deliveryAddress');
 
 Order.primaryColumn('oId').guid().as('id');
 Order.column('oOrderNo').string().as('orderNo');
@@ -603,13 +603,13 @@ DeliveryAddress.column('dStreet').string().as('street');
 
 Order.join(Customer).by('oCustomerId').as('customer');
 
-const line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+let line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
 
-const deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
+let deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
 Order.hasOne(deliveryAddress_order_relation).as('deliveryAddress');
 
-const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+let db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
 await db.transaction(async () => {
     let order = await Order.getById('b0000000-b000-0000-0000-000000000000');
@@ -625,15 +625,15 @@ await db.transaction(async () => {
 <a name="_serializable"></a>
 [toDto ignoring columns](https://github.com/alfateam/rdb-demo/blob/master/serializable.js)
 ```js
-const rdb = require('rdb');
+let rdb = require('rdb');
 
-const User = rdb.table('_user');
+let User = rdb.table('_user');
 User.primaryColumn('uId').guid().as('id');
 User.column('uUserId').string().as('userId');
 User.column('uPassword').string().as('password').serializable(false);
 User.column('uEmail').string().as('email');
 
-const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+let db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
 await db.transaction(async () => {
     let user = await User.getById('87654400-0000-0000-0000-000000000000');
@@ -645,12 +645,12 @@ await db.transaction(async () => {
 <a name="_tojson"></a>
 [toJSON](https://github.com/alfateam/rdb-demo/blob/master/toJSON.js)
 ```js
-const rdb = require('rdb');
+let rdb = require('rdb');
 
-const Order = rdb.table('_order');
-const Customer = rdb.table('_customer');
-const OrderLine = rdb.table('_orderLine');
-const DeliveryAddress = rdb.table('_deliveryAddress');
+let Order = rdb.table('_order');
+let Customer = rdb.table('_customer');
+let OrderLine = rdb.table('_orderLine');
+let DeliveryAddress = rdb.table('_deliveryAddress');
 
 Order.primaryColumn('oId').guid().as('id');
 Order.column('oOrderNo').string().as('orderNo');
@@ -670,13 +670,13 @@ DeliveryAddress.column('dStreet').string().as('street');
 
 Order.join(Customer).by('oCustomerId').as('customer');
 
-const line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+let line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
 
-const deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
+let deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
 Order.hasOne(deliveryAddress_order_relation).as('deliveryAddress');
 
-const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+let db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
 await db.transaction(async () => {
     let order = await Order.getById('b0000000-b000-0000-0000-000000000000');
@@ -688,12 +688,12 @@ await db.transaction(async () => {
 <a name="_tojsonwithstrategy"></a>
 [toJSON with strategy](https://github.com/alfateam/rdb-demo/blob/master/toJSONWithStrategy.js)
 ```js
-const rdb = require('rdb');
+let rdb = require('rdb');
 
-const Order = rdb.table('_order');
-const Customer = rdb.table('_customer');
-const OrderLine = rdb.table('_orderLine');
-const DeliveryAddress = rdb.table('_deliveryAddress');
+let Order = rdb.table('_order');
+let Customer = rdb.table('_customer');
+let OrderLine = rdb.table('_orderLine');
+let DeliveryAddress = rdb.table('_deliveryAddress');
 
 Order.primaryColumn('oId').guid().as('id');
 Order.column('oOrderNo').string().as('orderNo');
@@ -713,13 +713,13 @@ DeliveryAddress.column('dStreet').string().as('street');
 
 Order.join(Customer).by('oCustomerId').as('customer');
 
-const line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+let line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
 
-const deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
+let deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
 Order.hasOne(deliveryAddress_order_relation).as('deliveryAddress');
 
-const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+let db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
 await db.transaction(async () => {
     let order = await Order.getById('b0000000-b000-0000-0000-000000000000');
@@ -730,14 +730,14 @@ await db.transaction(async () => {
 <a name="_getmany"></a>
 [getMany](https://github.com/alfateam/rdb-demo/blob/master/getMany.js)
 ```js
-const rdb = require('rdb');
+let rdb = require('rdb');
 
-const Customer = rdb.table('_customer');
+let Customer = rdb.table('_customer');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cName').string().as('name');
 
-const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+let db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
 await db.transaction(async () => {
     let customers = await Customer.getMany();
@@ -748,12 +748,12 @@ await db.transaction(async () => {
 <a name="_getmanylazy"></a>
 [getMany lazily](https://github.com/alfateam/rdb-demo/blob/master/getManyLazy.js)
 ```js
-const rdb = require('rdb');
-const promise = require('promise/domains');
-const inspect = require('util').inspect;
+let rdb = require('rdb');
+let promise = require('promise/domains');
+let inspect = require('util').inspect;
 
-const Order = rdb.table('_order');
-const OrderLine = rdb.table('_orderLine');
+let Order = rdb.table('_order');
+let OrderLine = rdb.table('_orderLine');
 
 Order.primaryColumn('oId').guid().as('id');
 Order.column('oOrderNo').string().as('orderNo');
@@ -762,10 +762,10 @@ OrderLine.primaryColumn('lId').guid().as('id');
 OrderLine.column('lOrderId').guid().as('orderId');
 OrderLine.column('lProduct').string().as('product');
 
-const line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+let line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
 
-const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+let db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
 await db.transaction(async () => {
     let orders = await Order.getMany();
@@ -776,11 +776,11 @@ await db.transaction(async () => {
 <a name="_getmanyeager"></a>
 [getMany eager](https://github.com/alfateam/rdb-demo/blob/master/getManyEager.js)
 ```js
-const inspect = require('util').inspect;
-const rdb = require('rdb');
+let inspect = require('util').inspect;
+let rdb = require('rdb');
 
-const Order = rdb.table('_order');
-const OrderLine = rdb.table('_orderLine');
+let Order = rdb.table('_order');
+let OrderLine = rdb.table('_orderLine');
 
 Order.primaryColumn('oId').guid().as('id');
 Order.column('oOrderNo').string().as('orderNo');
@@ -789,10 +789,10 @@ OrderLine.primaryColumn('lId').guid().as('id');
 OrderLine.column('lOrderId').guid().as('orderId');
 OrderLine.column('lProduct').string().as('product');
 
-const line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+let line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
 
-const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+let db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
 await db.transaction(async () => {
     let emptyFilter;
@@ -807,13 +807,13 @@ await db.transaction(async () => {
 <a name="_manytodto"></a>
 [(many)ToDto](https://github.com/alfateam/rdb-demo/blob/master/manyToDto.js)
 ```js
-const rdb = require('rdb');
-const inspect = require('util').inspect;
+let rdb = require('rdb');
+let inspect = require('util').inspect;
 
-const Order = rdb.table('_order');
-const Customer = rdb.table('_customer');
-const OrderLine = rdb.table('_orderLine');
-const DeliveryAddress = rdb.table('_deliveryAddress');
+let Order = rdb.table('_order');
+let Customer = rdb.table('_customer');
+let OrderLine = rdb.table('_orderLine');
+let DeliveryAddress = rdb.table('_deliveryAddress');
 
 Order.primaryColumn('oId').guid().as('id');
 Order.column('oOrderNo').string().as('orderNo');
@@ -833,13 +833,13 @@ DeliveryAddress.column('dStreet').string().as('street');
 
 Order.join(Customer).by('oCustomerId').as('customer');
 
-const line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+let line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
 
-const deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
+let deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
 Order.hasOne(deliveryAddress_order_relation).as('deliveryAddress');
 
-const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+let db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
 await db.transaction(async () => {
     let orders = await Order.getMany();
@@ -851,13 +851,13 @@ await db.transaction(async () => {
 <a name="_manytodtowithstrategy"></a>
 [(many)ToDto with strategy](https://github.com/alfateam/rdb-demo/blob/master/manyToDtoWithStrategy.js)
 ```js
-const inspect = require('util').inspect;
-const rdb = require('rdb');
+let inspect = require('util').inspect;
+let rdb = require('rdb');
 
-const Order = rdb.table('_order');
-const Customer = rdb.table('_customer');
-const OrderLine = rdb.table('_orderLine');
-const DeliveryAddress = rdb.table('_deliveryAddress');
+let Order = rdb.table('_order');
+let Customer = rdb.table('_customer');
+let OrderLine = rdb.table('_orderLine');
+let DeliveryAddress = rdb.table('_deliveryAddress');
 
 Order.primaryColumn('oId').guid().as('id');
 Order.column('oOrderNo').string().as('orderNo');
@@ -877,13 +877,13 @@ DeliveryAddress.column('dStreet').string().as('street');
 
 Order.join(Customer).by('oCustomerId').as('customer');
 
-const line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+let line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
 
-const deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
+let deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
 Order.hasOne(deliveryAddress_order_relation).as('deliveryAddress');
 
-const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+let db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
 await db.transaction(async () => {
     let orders = await Order.getMany();
@@ -895,12 +895,12 @@ await db.transaction(async () => {
 <a name="_manytojson"></a>
 [(many)ToJSON](https://github.com/alfateam/rdb-demo/blob/master/manyToJSON.js)
 ```js
-const rdb = require('rdb');
+let rdb = require('rdb');
 
-const Order = rdb.table('_order');
-const Customer = rdb.table('_customer');
-const OrderLine = rdb.table('_orderLine');
-const DeliveryAddress = rdb.table('_deliveryAddress');
+let Order = rdb.table('_order');
+let Customer = rdb.table('_customer');
+let OrderLine = rdb.table('_orderLine');
+let DeliveryAddress = rdb.table('_deliveryAddress');
 
 Order.primaryColumn('oId').guid().as('id');
 Order.column('oOrderNo').string().as('orderNo');
@@ -920,13 +920,13 @@ DeliveryAddress.column('dStreet').string().as('street');
 
 Order.join(Customer).by('oCustomerId').as('customer');
 
-const line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+let line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
 
-const deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
+let deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
 Order.hasOne(deliveryAddress_order_relation).as('deliveryAddress');
 
-const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+let db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
 await db.transaction(async () => {
     let orders = await Order.getMany();
@@ -937,12 +937,12 @@ await db.transaction(async () => {
 <a name="_manytojsonwithstrategy"></a>
 [(many)ToJSON with strategy](https://github.com/alfateam/rdb-demo/blob/master/manyToJSONWithStrategy.js)
 ```js
-const rdb = require('rdb');
+let rdb = require('rdb');
 
-const Order = rdb.table('_order');
-const Customer = rdb.table('_customer');
-const OrderLine = rdb.table('_orderLine');
-const DeliveryAddress = rdb.table('_deliveryAddress');
+let Order = rdb.table('_order');
+let Customer = rdb.table('_customer');
+let OrderLine = rdb.table('_orderLine');
+let DeliveryAddress = rdb.table('_deliveryAddress');
 
 Order.primaryColumn('oId').guid().as('id');
 Order.column('oOrderNo').string().as('orderNo');
@@ -962,13 +962,13 @@ DeliveryAddress.column('dStreet').string().as('street');
 
 Order.join(Customer).by('oCustomerId').as('customer');
 
-const line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+let line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
 
-const deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
+let deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
 Order.hasOne(deliveryAddress_order_relation).as('deliveryAddress');
 
-const db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+let db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 
 await db.transaction(async () => {
     let orders = await Order.getMany();
@@ -979,9 +979,9 @@ await db.transaction(async () => {
 <a name="_rawsqlquery"></a>
 [Raw SQL Query](https://github.com/alfateam/rdb-demo/blob/master/rawSqlQuery.js)
 ```js
-var rdb = require('rdb');
+let rdb = require('rdb');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://postgres:postgres@localhost/test');
 
 await db.transaction(async () => {
     let result = await rdb.query('SELECT DISTINCT oCustomerId AS "customerId" FROM _order');
@@ -991,9 +991,9 @@ await db.transaction(async () => {
 <a name="_rawsqlquerywithparameters"></a>
 [Raw SQL Query With Parameters](https://github.com/alfateam/rdb-demo/blob/master/rawSqlQueryWithParameters.js)
 ```js
-var rdb = require('rdb');
+let rdb = require('rdb');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://postgres:postgres@localhost/test');
 
 await db.transaction(async () => {
     let result = await rdb.query({
@@ -1006,10 +1006,10 @@ await db.transaction(async () => {
 <a name="_streameager"></a>
 [streaming rows](https://github.com/alfateam/rdb-demo/blob/master/streamEager.js)
 ```js
-var rdb = require('rdb');
+let rdb = require('rdb');
 
-var Order = rdb.table('_order');
-var OrderLine = rdb.table('_orderLine');
+let Order = rdb.table('_order');
+let OrderLine = rdb.table('_orderLine');
 
 Order.primaryColumn('oId').guid().as('id');
 Order.column('oOrderNo').string().as('orderNo');
@@ -1018,13 +1018,13 @@ OrderLine.primaryColumn('lId').guid().as('id');
 OrderLine.column('lOrderId').guid().as('orderId');
 OrderLine.column('lProduct').string().as('product');
 
-var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+let line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://postgres:postgres@localhost/test');
 
-var emptyFilter;
-var strategy = {
+let emptyFilter;
+let strategy = {
     lines: {
         orderBy: ['product']
     },
@@ -1035,23 +1035,23 @@ var strategy = {
 await Order.createReadStream(db, emptyFilter, strategy).on('data', printOrder);
 
 function printOrder(order) {
-    var format = 'Order Id: %s, Order No: %s';
+    let format = 'Order Id: %s, Order No: %s';
     console.log(format, order.id, order.orderNo);
     order.lines.forEach(printLine);
 }
 
 function printLine(line) {
-    var format = 'Line Id: %s, Order Id: %s, Product: %s';
+    let format = 'Line Id: %s, Order Id: %s, Product: %s';
     console.log(format, line.id, line.orderId, line.product);
 }
 ```
 <a name="_streamjsoneager"></a>
 [streaming json](https://github.com/alfateam/rdb-demo/blob/master/streamJSONEager.js)
 ```js
-var rdb = require('rdb');
+let rdb = require('rdb');
 
-var Order = rdb.table('_order');
-var OrderLine = rdb.table('_orderLine');
+let Order = rdb.table('_order');
+let OrderLine = rdb.table('_orderLine');
 
 Order.primaryColumn('oId').guid().as('id');
 Order.column('oOrderNo').string().as('orderNo');
@@ -1060,13 +1060,13 @@ OrderLine.primaryColumn('lId').guid().as('id');
 OrderLine.column('lOrderId').guid().as('orderId');
 OrderLine.column('lProduct').string().as('product');
 
-var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+let line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://postgres:postgres@localhost/test');
 
-var emptyFilter;
-var strategy = {
+let emptyFilter;
+let strategy = {
     lines: {
         orderBy: ['product']
     },
@@ -1079,14 +1079,14 @@ await Order.createJSONReadStream(db, emptyFilter, strategy).pipe(process.stdout)
 <a name="_update"></a>
 [update](https://github.com/alfateam/rdb-demo/blob/master/update.js)
 ```js
-var rdb = require('rdb');
+let rdb = require('rdb');
 
-var Customer = rdb.table('_customer');
+let Customer = rdb.table('_customer');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cName').string().as('name');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://postgres:postgres@localhost/test');
 
 await db.transaction(async () => {
     let customer = await Customer.getById('a0000000-0000-0000-0000-000000000000');
@@ -1098,17 +1098,17 @@ await db.transaction(async () => {
 <a name="_insert"></a>
 [insert](https://github.com/alfateam/rdb-demo/blob/master/insert.js)
 ```js
-var rdb = require('rdb');
+let rdb = require('rdb');
 
-var Customer = rdb.table('_customer');
+let Customer = rdb.table('_customer');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cName').string().as('name');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://postgres:postgres@localhost/test');
 
 await db.transaction(async () => {
-    const id = 'abcdef00-0000-0000-0000-000000000000'
+    let id = 'abcdef00-0000-0000-0000-000000000000'
     let customer = Customer.insert(id)
     customer.name = 'Paul';
     customer = await Customer.getById(id);
@@ -1118,9 +1118,9 @@ await db.transaction(async () => {
 <a name="_delete"></a>
 [delete](https://github.com/alfateam/rdb-demo/blob/master/delete.js)
 ```js
-var rdb = require('rdb');
+let rdb = require('rdb');
 
-var Customer = rdb.table('_customer');
+let Customer = rdb.table('_customer');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cName').string().as('name');
@@ -1129,7 +1129,7 @@ Customer.column('cRegdate').date().as('registeredDate');
 Customer.column('cIsActive').boolean().as('isActive');
 Customer.column('cPicture').binary().as('picture');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://postgres:postgres@localhost/test');
 
 await db.transaction(async () => {
     let customer = await Customer.getById('87654321-0000-0000-0000-000000000000');
@@ -1139,11 +1139,11 @@ await db.transaction(async () => {
 <a name="_cascadedelete"></a>
 [cascadeDelete](https://github.com/alfateam/rdb-demo/blob/master/cascadeDelete.js)
 ```js
-var rdb = require('rdb');
+let rdb = require('rdb');
 
-var Customer = rdb.table('_customer');
-var Order = rdb.table('_order');
-var OrderLine = rdb.table('_orderLine');
+let Customer = rdb.table('_customer');
+let Order = rdb.table('_order');
+let OrderLine = rdb.table('_orderLine');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cName').string().as('name');
@@ -1155,13 +1155,13 @@ Order.column('oCustomerId').guid().as('customerId');
 OrderLine.primaryColumn('lId').guid().as('id');
 OrderLine.column('lOrderId').guid().as('orderId');
 
-var orderToCustomer = Order.join(Customer).by('oCustomerId').as('customer');
+let orderToCustomer = Order.join(Customer).by('oCustomerId').as('customer');
 Customer.hasMany(orderToCustomer).as('orders');
 
-var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+let line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://postgres:postgres@localhost/test');
 
 await db.transaction(async () => {
     let customer = await Customer.getById('87654399-0000-0000-0000-000000000000');
@@ -1171,9 +1171,9 @@ await db.transaction(async () => {
 <a name="_bulkdelete"></a>
 [bulk delete](https://github.com/alfateam/rdb-demo/blob/master/bulkDelete.js)
 ```js
-var rdb = require('rdb');
+let rdb = require('rdb');
 
-var Customer = rdb.table('_customer');
+let Customer = rdb.table('_customer');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cName').string().as('name');
@@ -1182,7 +1182,7 @@ Customer.column('cRegdate').date().as('registeredDate');
 Customer.column('cIsActive').boolean().as('isActive');
 Customer.column('cPicture').binary().as('picture');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://postgres:postgres@localhost/test');
 
 await db.transaction(async () => {
     let filter = Customer.id.eq('87654321-0000-0000-0000-000000000000');
@@ -1192,11 +1192,11 @@ await db.transaction(async () => {
 <a name="_cascadedelete"></a>
 [bulk cascadeDelete](https://github.com/alfateam/rdb-demo/blob/master/bulkCascadeDelete.js)
 ```js
-var rdb = require('rdb');
+let rdb = require('rdb');
 
-var Customer = rdb.table('_customer');
-var Order = rdb.table('_order');
-var OrderLine = rdb.table('_orderLine');
+let Customer = rdb.table('_customer');
+let Order = rdb.table('_order');
+let OrderLine = rdb.table('_orderLine');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cName').string().as('name');
@@ -1208,13 +1208,13 @@ Order.column('oCustomerId').guid().as('customerId');
 OrderLine.primaryColumn('lId').guid().as('id');
 OrderLine.column('lOrderId').guid().as('orderId');
 
-var orderToCustomer = Order.join(Customer).by('oCustomerId').as('customer');
+let orderToCustomer = Order.join(Customer).by('oCustomerId').as('customer');
 Customer.hasMany(orderToCustomer).as('orders');
 
-var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+let line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://postgres:postgres@localhost/test');
 
 await db.transaction(async () => {
     let filter = Customer.id.eq('87654399-0000-0000-0000-000000000000');
@@ -1224,12 +1224,12 @@ await db.transaction(async () => {
 <a name="_defaultvalues"></a>
 [default values](https://github.com/alfateam/rdb-demo/blob/master/defaultValues.js)
 ```js
-var rdb = require('rdb');
+let rdb = require('rdb');
 
-var buf = Buffer.alloc(10);
+let buf = Buffer.alloc(10);
 buf.write('\u00bd + \u00bc = \u00be', 0);
 
-var Customer = rdb.table('_customer');
+let Customer = rdb.table('_customer');
 
 /*unless overridden, numeric is default 0,
 string is default null,
@@ -1248,7 +1248,7 @@ Customer.column('cIsActive').boolean().as('isActive').default(true);
 Customer.column('cPicture').binary().as('picture').default(buf);
 Customer.column('cDocument').json().as('document').default({foo: true});
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://postgres:postgres@localhost/test');
 
 await db.transaction(async () => {
     let customer = Customer.insert('abcdef02-0000-0000-0000-000000000000')
@@ -1258,17 +1258,17 @@ await db.transaction(async () => {
 <a name="_conventions"></a>
 [conventions](https://github.com/alfateam/rdb-demo/blob/master/conventions.js)
 ```js
-var rdb = require('rdb');
+let rdb = require('rdb');
 
-var Customer = rdb.table('_customer');
+let Customer = rdb.table('_customer');
 
 Customer.primaryColumn('cId').guid(); //property name will also be cId
 Customer.column('cName').string(); //property name will also be cName
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://postgres:postgres@localhost/test');
 
 await db.transaction(async () => {
-    const customer = Customer.insert('abcdef01-0000-0000-0000-000000000000')
+    let customer = Customer.insert('abcdef01-0000-0000-0000-000000000000')
     customer.cName = 'Paul';
     console.log(await customer.toDto());
 });
@@ -1276,10 +1276,10 @@ await db.transaction(async () => {
 <a name="_updatejoin"></a>
 [update a join-relation](https://github.com/alfateam/rdb-demo/blob/master/updateJoin.js)
 ```js
-var rdb = require('rdb');
+let rdb = require('rdb');
 
-var Customer = rdb.table('_customer');
-var Order = rdb.table('_order');
+let Customer = rdb.table('_customer');
+let Order = rdb.table('_order');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cName').string().as('name');
@@ -1290,7 +1290,7 @@ Order.column('oCustomerId').guid().as('customerId');
 
 Order.join(Customer).by('oCustomerId').as('customer');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://postgres:postgres@localhost/test');
 
 await db.transaction(async () => {
     let order = await Order.getById('b0000000-b000-0000-0000-000000000000');
@@ -1303,10 +1303,10 @@ await db.transaction(async () => {
 <a name="_updatehasone"></a>
 [update a hasOne-relation](https://github.com/alfateam/rdb-demo/blob/master/updateHasOne.js)
 ```js
-var rdb = require('rdb');
+let rdb = require('rdb');
 
-var Order = rdb.table('_order');
-var DeliveryAddress = rdb.table('_deliveryAddress');
+let Order = rdb.table('_order');
+let DeliveryAddress = rdb.table('_deliveryAddress');
 
 Order.primaryColumn('oId').guid().as('id');
 Order.column('oOrderNo').string().as('orderNo');
@@ -1316,10 +1316,10 @@ DeliveryAddress.column('dOrderId').string().as('orderId');
 DeliveryAddress.column('dName').string().as('name');
 DeliveryAddress.column('dStreet').string().as('street');
 
-var deliveryAddress_order_relation = DeliveryAddress.hasone(Order).by('dOrderId').as('order');
+let deliveryAddress_order_relation = DeliveryAddress.hasone(Order).by('dOrderId').as('order');
 Order.hasOne(deliveryAddress_order_relation).as('deliveryAddress');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://postgres:postgres@localhost/test');
 
 await db.transaction(async () => {
     let address = DeliveryAddress.insert('eeeeeeee-0000-0000-0000-000000000000');
@@ -1333,10 +1333,10 @@ await db.transaction(async () => {
 <a name="_updatehasmany"></a>
 [update a hasMany-relation](https://github.com/alfateam/rdb-demo/blob/master/updateHasMany.js)
 ```js
-var rdb = require('rdb');
+let rdb = require('rdb');
 
-var Order = rdb.table('_order');
-var OrderLine = rdb.table('_orderLine');
+let Order = rdb.table('_order');
+let OrderLine = rdb.table('_orderLine');
 
 Order.primaryColumn('oId').guid().as('id');
 Order.column('oOrderNo').string().as('orderNo');
@@ -1345,11 +1345,11 @@ OrderLine.primaryColumn('lId').guid().as('id');
 OrderLine.column('lOrderId').guid().as('orderId');
 OrderLine.column('lProduct').string().as('product');
 
-var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+let line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
-var orderIdWithNoLines = 'c0000000-c000-0000-0000-000000000000';
+let db = rdb('postgres://postgres:postgres@localhost/test');
+let orderIdWithNoLines = 'c0000000-c000-0000-0000-000000000000';
 
 await db.transaction(async () => {
     let orderIdWithNoLines = 'c0000000-c000-0000-0000-000000000000';
@@ -1358,7 +1358,7 @@ await db.transaction(async () => {
     line.orderId = orderIdWithNoLines;
     line.product = 'Roller blades';
 
-    const line2 = OrderLine.insert('eeeeeeee-0002-0000-0000-000000000000');
+    let line2 = OrderLine.insert('eeeeeeee-0002-0000-0000-000000000000');
     line2.orderId = orderIdWithNoLines;
     line2.product = 'Helmet';
 
@@ -1448,14 +1448,14 @@ function updateConcurrently() {
 <a name="_equal"></a>
 [equal](https://github.com/alfateam/rdb-demo/blob/master/filtering/equal.js)
 ```js
-var rdb = require('rdb');
+let rdb = require('rdb');
 
-var Customer = rdb.table('_customer');
+let Customer = rdb.table('_customer');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cName').string().as('name');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://postgres:postgres@localhost/test');
 
 await db.transaction(async () => {
     let filter = Customer.name.equal('John');
@@ -1467,14 +1467,14 @@ await db.transaction(async () => {
 <a name="_notequal"></a>
 [notEqual](https://github.com/alfateam/rdb-demo/blob/master/filtering/notEqual.js)
 ```js
-var rdb = require('rdb');
+let rdb = require('rdb');
 
-var Customer = rdb.table('_customer');
+let Customer = rdb.table('_customer');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cName').string().as('name');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://postgres:postgres@localhost/test');
 
 await db.transaction(async () => {
     let filter = Customer.name.notEqual('John');
@@ -1486,14 +1486,14 @@ await db.transaction(async () => {
 <a name="_not"></a>
 [not](https://github.com/alfateam/rdb-demo/blob/master/filtering/not.js)
 ```js
-var rdb = require('rdb');
+let rdb = require('rdb');
 
-var Customer = rdb.table('_customer');
+let Customer = rdb.table('_customer');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cName').string().as('name');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://postgres:postgres@localhost/test');
 
 await db.transaction(async () => {
     let filter = Customer.name.equal('John').not();
@@ -1504,15 +1504,15 @@ await db.transaction(async () => {
 <a name="_lessthan"></a>
 [lessThan](https://github.com/alfateam/rdb-demo/blob/master/filtering/lessThan.js)
 ```js
-var rdb = require('rdb');
+let rdb = require('rdb');
 
-var Customer = rdb.table('_customer');
+let Customer = rdb.table('_customer');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cBalance').numeric().as('balance');
 Customer.column('cName').string().as('name');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://postgres:postgres@localhost/test');
 
 await db.transaction(async () => {
     let filter = Customer.balance.lessThan(5000);
@@ -1524,18 +1524,18 @@ await db.transaction(async () => {
 <a name="_lessthanorequal"></a>
 [lessThanOrEqual](https://github.com/alfateam/rdb-demo/blob/master/filtering/lessThanOrEqual.js)
 ```js
-var rdb = require('rdb');
+let rdb = require('rdb');
 
-var Customer = rdb.table('_customer');
+let Customer = rdb.table('_customer');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cBalance').numeric().as('balance');
 Customer.column('cName').string().as('name');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://postgres:postgres@localhost/test');
 
 await db.transaction(async () => {
-    var filter = Customer.balance.lessThanOrEqual(8123);
+    let filter = Customer.balance.lessThanOrEqual(8123);
     //same as Customer.balance.le(8123);
     let customers = await Customer.getMany(filter);
     console.log(await customers.toDto());
@@ -1544,15 +1544,15 @@ await db.transaction(async () => {
 <a name="_greaterthan"></a>
 [greaterThan](https://github.com/alfateam/rdb-demo/blob/master/filtering/greaterThan.js)
 ```js
-var rdb = require('rdb');
+let rdb = require('rdb');
 
-var Customer = rdb.table('_customer');
+let Customer = rdb.table('_customer');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cBalance').numeric().as('balance');
 Customer.column('cName').string().as('name');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://postgres:postgres@localhost/test');
 
 await db.transaction(async () => {
     let filter = Customer.balance.greaterThan(5000);
@@ -1564,18 +1564,18 @@ await db.transaction(async () => {
 <a name="_greaterthanorequal"></a>
 [greaterThanOrEqual](https://github.com/alfateam/rdb-demo/blob/master/filtering/greaterThanOrEqual.js)
 ```js
-var rdb = require('rdb');
+let rdb = require('rdb');
 
-var Customer = rdb.table('_customer');
+let Customer = rdb.table('_customer');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cBalance').numeric().as('balance');
 Customer.column('cName').string().as('name');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://postgres:postgres@localhost/test');
 
 await db.transaction(async () => {
-    const filter = Customer.balance.greaterThanOrEqual(8123);
+    let filter = Customer.balance.greaterThanOrEqual(8123);
     //same as Customer.balance.ge(8123);
     let customers = await Customer.getMany(filter);
     console.log(await customers.toDto());
@@ -1584,15 +1584,15 @@ await db.transaction(async () => {
 <a name="_between"></a>
 [between](https://github.com/alfateam/rdb-demo/blob/master/filtering/between.js)
 ```js
-var rdb = require('rdb');
+let rdb = require('rdb');
 
-var Customer = rdb.table('_customer');
+let Customer = rdb.table('_customer');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cBalance').numeric().as('balance');
 Customer.column('cName').string().as('name');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://postgres:postgres@localhost/test');
 
 await db.transaction(async () => {
     let filter = Customer.balance.between(3000, 8123);
@@ -1603,14 +1603,14 @@ await db.transaction(async () => {
 <a name="_in"></a>
 [in](https://github.com/alfateam/rdb-demo/blob/master/filtering/in.js)
 ```js
-var rdb = require('rdb');
+let rdb = require('rdb');
 
-var Customer = rdb.table('_customer');
+let Customer = rdb.table('_customer');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cName').string().as('name');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://postgres:postgres@localhost/test');
 
 await db.transaction(async () => {
     let filter = Customer.name.in(['John', 'Yoko']);
@@ -1621,14 +1621,14 @@ await db.transaction(async () => {
 <a name="_startswith"></a>
 [startsWith](https://github.com/alfateam/rdb-demo/blob/master/filtering/startsWith.js)
 ```js
-var rdb = require('rdb');
+let rdb = require('rdb');
 
-var Customer = rdb.table('_customer');
+let Customer = rdb.table('_customer');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cName').string().as('name');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://postgres:postgres@localhost/test');
 
 await db.transaction(async () => {
     let filter = Customer.name.startsWith('Jo');
@@ -1639,14 +1639,14 @@ await db.transaction(async () => {
 <a name="_endswith"></a>
 [endsWith](https://github.com/alfateam/rdb-demo/blob/master/filtering/endsWith.js)
 ```js
-var rdb = require('rdb');
+let rdb = require('rdb');
 
-var Customer = rdb.table('_customer');
+let Customer = rdb.table('_customer');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cName').string().as('name');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://postgres:postgres@localhost/test');
 
 await db.transaction(async () => {
     let filter = Customer.name.endsWith('nny');
@@ -1657,14 +1657,14 @@ await db.transaction(async () => {
 <a name="_contains"></a>
 [contains](https://github.com/alfateam/rdb-demo/blob/master/filtering/contains.js)
 ```js
-var rdb = require('rdb');
+let rdb = require('rdb');
 
-var Customer = rdb.table('_customer');
+let Customer = rdb.table('_customer');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cName').string().as('name');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://postgres:postgres@localhost/test');
 
 await db.transaction(async () => {
     let filter = Customer.name.contains('ohn');
@@ -1676,14 +1676,14 @@ await db.transaction(async () => {
 [iEqual](https://github.com/alfateam/rdb-demo/blob/master/filtering/iEqual.js)  
 (postgres only)
 ```js
-var rdb = require('rdb');
+let rdb = require('rdb');
 
-var Customer = rdb.table('_customer');
+let Customer = rdb.table('_customer');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cName').string().as('name');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://postgres:postgres@localhost/test');
 
 await db.transaction(async () => {
     let filter = Customer.name.iEqual('jOhN');
@@ -1696,14 +1696,14 @@ await db.transaction(async () => {
 [iStartsWith](https://github.com/alfateam/rdb-demo/blob/master/filtering/iStartsWith.js)  
 (postgres only)
 ```js
-var rdb = require('rdb');
+let rdb = require('rdb');
 
-var Customer = rdb.table('_customer');
+let Customer = rdb.table('_customer');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cName').string().as('name');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://postgres:postgres@localhost/test');
 
 await db.transaction(async () => {
     let filter = Customer.name.iStartsWith('jo');
@@ -1715,14 +1715,14 @@ await db.transaction(async () => {
 [iEndsWith](https://github.com/alfateam/rdb-demo/blob/master/filtering/iEndsWith.js)  
 (postgres only)
 ```js
-var rdb = require('rdb');
+let rdb = require('rdb');
 
-var Customer = rdb.table('_customer');
+let Customer = rdb.table('_customer');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cName').string().as('name');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://postgres:postgres@localhost/test');
 
 await db.transaction(async () => {
     let filter = Customer.name.iEndsWith('nNy');
@@ -1734,14 +1734,14 @@ await db.transaction(async () => {
 [iContains](https://github.com/alfateam/rdb-demo/blob/master/filtering/iContains.js)  
 (postgres only)
 ```js
-var rdb = require('rdb');
+let rdb = require('rdb');
 
-var Customer = rdb.table('_customer');
+let Customer = rdb.table('_customer');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cName').string().as('name');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://postgres:postgres@localhost/test');
 
 await db.transaction(async () => {
     let filter = Customer.name.iContains('oHn');
@@ -1752,10 +1752,10 @@ await db.transaction(async () => {
 <a name="_exists"></a>
 [exists](https://github.com/alfateam/rdb-demo/blob/master/filtering/exists.js)
 ```js
-var rdb = require('rdb');
+let rdb = require('rdb');
 
-var Order = rdb.table('_order');
-var DeliveryAddress = rdb.table('_deliveryAddress');
+let Order = rdb.table('_order');
+let DeliveryAddress = rdb.table('_deliveryAddress');
 
 Order.primaryColumn('oId').guid().as('id');
 Order.column('oOrderNo').string().as('orderNo');
@@ -1765,10 +1765,10 @@ DeliveryAddress.column('dOrderId').string().as('orderId');
 DeliveryAddress.column('dName').string().as('name');
 DeliveryAddress.column('dStreet').string().as('street');
 
-var deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
+let deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
 Order.hasOne(deliveryAddress_order_relation).as('deliveryAddress');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://postgres:postgres@localhost/test');
 
 await db.transaction(async () => {
     let filter = Order.deliveryAddress.exists();
@@ -1779,14 +1779,14 @@ await db.transaction(async () => {
 <a name="_or"></a>
 [or](https://github.com/alfateam/rdb-demo/blob/master/filtering/or.js)
 ```js
-var rdb = require('rdb');
+let rdb = require('rdb');
 
-var Customer = rdb.table('_customer');
+let Customer = rdb.table('_customer');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cName').string().as('name');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://postgres:postgres@localhost/test');
 
 await db.transaction(async () => {
     let john = Customer.name.equal('John');
@@ -1799,16 +1799,16 @@ await db.transaction(async () => {
 <a name="_and"></a>
 [and](https://github.com/alfateam/rdb-demo/blob/master/filtering/and.js)
 ```js
-var rdb = require('rdb');
+let rdb = require('rdb');
 
-var Customer = rdb.table('_customer');
+let Customer = rdb.table('_customer');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cIsActive').boolean().as('isActive');
 Customer.column('cBalance').numeric().as('balance');
 Customer.column('cName').string().as('name');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://postgres:postgres@localhost/test');
 
 await db.transaction(async () => {
     let isActive = Customer.isActive.equal(true);
@@ -1821,14 +1821,14 @@ await db.transaction(async () => {
 <a name="_oralternative"></a>
 [or alternative syntax](https://github.com/alfateam/rdb-demo/blob/master/filtering/orAlternative.js)
 ```js
-var rdb = require('rdb');
+let rdb = require('rdb');
 
-var Customer = rdb.table('_customer');
+let Customer = rdb.table('_customer');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cName').string().as('name');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://postgres:postgres@localhost/test');
 
 await db.transaction(async () => {
     let john = Customer.name.equal('John');
@@ -1842,16 +1842,16 @@ await db.transaction(async () => {
 <a name="_andalternative"></a>
 [and alternative syntax](https://github.com/alfateam/rdb-demo/blob/master/filtering/andAlternative.js)
 ```js
-var rdb = require('rdb');
+let rdb = require('rdb');
 
-var Customer = rdb.table('_customer');
+let Customer = rdb.table('_customer');
 
 Customer.primaryColumn('cId').guid().as('id');
 Customer.column('cIsActive').boolean().as('isActive');
 Customer.column('cBalance').numeric().as('balance');
 Customer.column('cName').string().as('name');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://postgres:postgres@localhost/test');
 
 await db.transaction(async () => {
     let isActive = Customer.isActive.equal(true);
@@ -1865,10 +1865,10 @@ await db.transaction(async () => {
 <a name="_subfilter"></a>
 [sub filter](https://github.com/alfateam/rdb-demo/blob/master/filtering/subFilter.js)
 ```js
-var rdb = require('rdb');
+let rdb = require('rdb');
 
-var Order = rdb.table('_order');
-var DeliveryAddress = rdb.table('_deliveryAddress');
+let Order = rdb.table('_order');
+let DeliveryAddress = rdb.table('_deliveryAddress');
 
 Order.primaryColumn('oId').guid().as('id');
 Order.column('oOrderNo').string().as('orderNo');
@@ -1878,10 +1878,10 @@ DeliveryAddress.column('dOrderId').string().as('orderId');
 DeliveryAddress.column('dName').string().as('name');
 DeliveryAddress.column('dStreet').string().as('street');
 
-var deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
+let deliveryAddress_order_relation = DeliveryAddress.join(Order).by('dOrderId').as('order');
 Order.hasOne(deliveryAddress_order_relation).as('deliveryAddress');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://postgres:postgres@localhost/test');
 
 await db.transaction(async () => {
     let filter = Order.deliveryAddress.street.startsWith('Node');
@@ -1892,11 +1892,11 @@ await db.transaction(async () => {
 <a name="_compositefilter"></a>
 [composite filter](https://github.com/alfateam/rdb-demo/blob/master/filtering/compositeFilter.js)
 ```js
-var rdb = require('rdb');
+let rdb = require('rdb');
 
-var Order = rdb.table('_order');
-var Customer = rdb.table('_customer');
-var OrderLine = rdb.table('_orderLine');
+let Order = rdb.table('_order');
+let Customer = rdb.table('_customer');
+let OrderLine = rdb.table('_orderLine');
 
 Order.primaryColumn('oId').guid().as('id');
 Order.column('oCustomerId').guid().as('customerId');
@@ -1913,10 +1913,10 @@ OrderLine.column('lProduct').string().as('product');
 
 Order.join(Customer).by('oCustomerId').as('customer');
 
-var line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+let line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
 Order.hasMany(line_order_relation).as('lines');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://postgres:postgres@localhost/test');
 
 await db.transaction(async () => {
     let isActive = Order.customer.isActive.eq(true);
@@ -1930,24 +1930,24 @@ await db.transaction(async () => {
 <a name="_rawsqlfilter"></a>
 [raw sql filter](https://github.com/alfateam/rdb-demo/blob/master/filtering/rawSqlFilter.js)
 ```js
-var inspect = require('util').inspect;
-var rdb = require('rdb');
+let inspect = require('util').inspect;
+let rdb = require('rdb');
 
-var Order = rdb.table('_order');
+let Order = rdb.table('_order');
 Order.primaryColumn('oId').guid().as('id');
 Order.column('oOrderNo').string().as('orderNo');
 Order.column('oCustomerId').guid().as('customerId');
 
-var Customer = rdb.table('_customer');
+let Customer = rdb.table('_customer');
 Customer.primaryColumn('cid').guid().as('id');
 Customer.column('cName').string().as('name');
 Customer.column('cBalance').string().as('balance');
 Customer.column('cIsActive').boolean().as('isActive');
 
-var orderCustomerJoin = Order.join(Customer).by('oCustomerId').as('customer');
+let orderCustomerJoin = Order.join(Customer).by('oCustomerId').as('customer');
 Customer.hasMany(orderCustomerJoin).as('orders');
 
-var db = rdb('postgres://postgres:postgres@localhost/test');
+let db = rdb('postgres://postgres:postgres@localhost/test');
 
 await db.transaction(async () => {
     let filter = {
