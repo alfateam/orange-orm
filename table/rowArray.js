@@ -1,4 +1,3 @@
-var extractStrategy = require('./resultToRows/toDto/extractStrategy');
 var resultToPromise = require('./resultToPromise')
 var orderBy = require('./rowArray/orderBy');
 var negotiateNextTick = require('./rowArray/negotiateNextTick');
@@ -41,7 +40,7 @@ function newRowArray(table) {
 
             function getDto() {
                 return row.toDto.apply(row,args);
-            }            
+            }
 
             function onDto(dto) {
                 result.push(dto);
