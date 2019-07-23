@@ -12,7 +12,7 @@
     "postgres",
     "pg"
   ],
-  "license": "MIT",
+  "license": "ISC",
   "scripts": {
     "test": "jshint ./ && a"
   },
