@@ -35,6 +35,7 @@
     "type": "git",
     "url": "git@github.com:alfateam/rdb.git"
   },
+  "homepage": "https://github.com/alfateam/rdb/blob/master/docs/docs.md",
   "jshintConfig": {
     "asi": true,
     "eqnull": true,
