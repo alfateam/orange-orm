@@ -15,6 +15,9 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__1.7.7__  
+Commit/rollback are implicit if sending a callback to the transaction function. [See example](https://github.com/alfateam/rdb/blob/await/docs/docs.md#_getbyid)  
+The callback must return a promise or be an async function.  
 __1.7.6__  
 Order By now supports jsonb-fields.  
 __1.7.5__  
