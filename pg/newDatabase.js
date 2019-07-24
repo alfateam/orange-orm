@@ -8,6 +8,7 @@ var newPool = require('./newPool');
 var lock = require('../lock');
 var executeSchema = require('./schema');
 var runInTransaction = require('../runInTransaction');
+var useHook = require('../useHook');
 
 function newDatabase(connectionString, poolOptions) {
     var pool = newPool(connectionString, poolOptions);
@@ -20,9 +21,12 @@ function newDatabase(connectionString, poolOptions) {
         if ((arguments.length > 1)) {
             return runInTransaction({db: c, options: options, fn: fn});
         }
-        var domain = createDomain();
 
-        return domain.run(onRun);
+        var domain = createDomain();
+        if (useHook)
+            return domain.start().then(onRun);
+        else
+            return domain.run(onRun);
 
         function onRun() {
             var transaction = newTransaction(domain, pool);
