@@ -51,25 +51,37 @@ function _new(tableName) {
     };
 
     table.getMany = function(filter, strategy) {
-        return getMany(table, filter, strategy);
+        return new Promise((resolve, reject) => {
+            getMany(table, filter, strategy).then(resolve, reject);
+        });
     };
 
     table.getManyDto = function(filter, strategy) {
         if (arguments.length < 2)
             strategy = extractStrategy(table);
-        return getManyDto(table, filter, strategy);
+        return new Promise((resolve, reject) => {
+            getManyDto(table, filter, strategy).then(resolve, reject);
+        });
     };
 
     table.getMany.exclusive = function(filter, strategy) {
-        return getMany.exclusive(table, filter, strategy);
+        return new Promise((resolve, reject) => {
+            getMany.exclusive(table, filter, strategy).then(resolve, reject);
+        });
     };
 
     table.tryGetFirst = function() {
-        return call(tryGetFirst, arguments);
+        return callAsync(tryGetFirst, arguments);
     };
     table.tryGetFirst.exclusive = function() {
-        return call(tryGetFirst.exclusive, arguments);
+        return callAsync(tryGetFirst.exclusive, arguments);
     };
+
+    function callAsync(func, args) {
+        return new Promise((resolve, reject) => {
+            call(func, args).then(resolve, reject);
+        });
+    }
 
     function call(func, args) {
         var mergedArgs = [table];
@@ -80,19 +92,19 @@ function _new(tableName) {
     }
 
     table.getById = function() {
-        return call(getById, arguments);
-    };
-    table.getById.exclusive = function() {
-        return call(getById.exclusive, arguments);
+        return callAsync(getById, arguments);
     };
 
+    table.getById.exclusive = function() {
+        return callAsync(getById.exclusive, arguments);
+    };
 
     table.tryGetById = function() {
-        return call(tryGetById, arguments);
+        return callAsync(tryGetById, arguments);
     };
 
     table.tryGetById.exclusive = function() {
-        return call(tryGetById.exclusive, arguments);
+        return callAsync(tryGetById.exclusive, arguments);
     };
 
     table.columnDiscriminators = function() {
@@ -115,7 +127,6 @@ function _new(tableName) {
 
     table.delete = _delete.bind(null, table);
     table.cascadeDelete = cascadeDelete.bind(null, table);
-
     table.createReadStream = createReadStream.bind(null, table);
     table.createJSONReadStream = createJSONReadStream.bind(null, table);
     table.exclusive = function() {

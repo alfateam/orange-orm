@@ -78,7 +78,6 @@ function newDecodeDbRow(table, dbRow) {
         return get;
     }
 
-
     Row.prototype.subscribeChanged = function(onChanged, name) {
         var emit;
         if (name) {
@@ -102,6 +101,14 @@ function newDecodeDbRow(table, dbRow) {
     };
 
     Row.prototype.toDto = function(strategy) {
+        var args = Array.prototype.slice.call(arguments, 0);
+        args.push(table);
+        strategy = extractStrategy.apply(null, args);
+        let p =  toDto(strategy, table, this);
+        return Promise.resolve().then(() => p);
+    };
+
+    Row.prototype.__toDto = function(strategy) {
         var args = Array.prototype.slice.call(arguments, 0);
         args.push(table);
         strategy = extractStrategy.apply(null, args);
@@ -131,7 +138,7 @@ function newDecodeDbRow(table, dbRow) {
     function decodeDbRow(row) {
         for (var i = 0; i < numberOfColumns; i++) {
             var index = offset + i;
-            var key = keys[index];            
+            var key = keys[index];
             row[key] = columns[i].decode(row[key]);
         }
         return new Row(row);

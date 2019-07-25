@@ -7,19 +7,19 @@ function toDto(strategy, table, row) {
     var promise = resultToPromise(dto);
 
     for (var property in strategy) {
-        mapChild(property);            
+        mapChild(property);
     }
 
     function mapChild(name) {
         promise = promise.then(getRelated).then(onChild);
-        
+
         function getRelated() {
             return row[name];
         }
 
         function onChild(child) {
-            if (child) 
-                return child.toDto(strategy[name]).then(onChildDto);                
+            if (child)
+                return child.__toDto(strategy[name]).then(onChildDto);
         }
 
         function onChildDto(childDto) {

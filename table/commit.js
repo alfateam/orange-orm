@@ -16,4 +16,8 @@ function commit(result) {
 	}
 }
 
-module.exports = commit;
+module.exports = function(result) {
+    return new Promise((resolve, reject) =>  {
+        commit(result).then(resolve, reject);
+    })
+};

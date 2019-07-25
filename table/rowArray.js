@@ -13,11 +13,24 @@ function newRowArray(table) {
     Object.defineProperty(c, "toDto", {
         enumerable: false,
         writable: true,
+        value: toDtoNativePromise
+    });
+
+    Object.defineProperty(c, "__toDto", {
+        enumerable: false,
+        writable: true,
         value: toDto
     });
 
     function toJSON(optionalStrategy) {
         return c.toDto.apply(null, arguments).then(JSON.stringify);
+    }
+
+    function toDtoNativePromise() {
+        let args = arguments;
+        return new Promise((resolve, reject) => {
+            toDto.apply(null, args).then(resolve, reject);
+        });
     }
 
     function toDto(optionalStrategy) {
@@ -39,7 +52,7 @@ function newRowArray(table) {
                     .then(toDtoAtIndex)
 
             function getDto() {
-                return row.toDto.apply(row,args);
+                return row.__toDto.apply(row,args);
             }
 
             function onDto(dto) {

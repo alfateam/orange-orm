@@ -17,4 +17,8 @@ function rollback(e) {
     return chain;
 }
 
-module.exports = rollback;
+module.exports = function(e) {
+    return new Promise((resolve, reject) =>  {
+        rollback(e).then(resolve, reject);
+    })
+};
