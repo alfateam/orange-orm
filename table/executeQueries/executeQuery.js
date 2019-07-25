@@ -1,9 +1,8 @@
 var newResolver = require('./resolveExecuteQuery');
-var newPromise = require('../promise');
 
 function executeQuery(query) {
 	var resolver = newResolver(query);
-	return newPromise(resolver);
+	return new Promise(resolver);
 }
 
 module.exports = executeQuery;

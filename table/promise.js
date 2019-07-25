@@ -1,6 +1,7 @@
 var promise = require('promise/domains');
 var deferred = require('deferred');
-var objectToCallback = require('./objectToCallback');
+let promisify = require('util').promisify;
+
 
 function newPromise(func) {
 	if (!func)
@@ -8,6 +9,6 @@ function newPromise(func) {
 	return new promise(func);
 }
 
-newPromise.all = promise.all;
-newPromise.denodeify = promise.denodeify;
+newPromise.all = Promise.all;
+newPromise.denodeify = promisify || promise.denodeify;
 module.exports = newPromise;

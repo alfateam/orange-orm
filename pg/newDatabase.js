@@ -1,6 +1,5 @@
 var createDomain = require('../createDomain');
 var newTransaction = require('./newTransaction');
-var promise = require('../table/promise');
 var begin = require('../table/begin');
 var commit = require('../table/commit');
 var rollback = require('../table/rollback');
@@ -30,8 +29,7 @@ function newDatabase(connectionString, poolOptions) {
 
         function onRun() {
             var transaction = newTransaction(domain, pool);
-            var p = promise(transaction).then(begin).then(negotiateSchema);
-            return p;
+            return new Promise(transaction).then(begin).then(negotiateSchema);
         }
 
         function negotiateSchema(previous) {
