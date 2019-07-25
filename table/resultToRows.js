@@ -1,4 +1,3 @@
-var all = require('./promise').all;
 var dbRowsToRows = require('./resultToRows/dbRowsToRows');
 
 function resultToRows(span,result) {

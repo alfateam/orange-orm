@@ -1,4 +1,3 @@
-var promise = require('./table/promise');
 var pools = require('./newObject')();
 
 Object.defineProperty(pools, 'end', {
@@ -12,7 +11,7 @@ function end() {
     	var endPool = pools[poolId].end();
     	all.push(endPool);
     }
-    return promise.all(all);
+    return Promise.all(all);
 }
 
 module.exports = pools;
