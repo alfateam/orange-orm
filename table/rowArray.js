@@ -28,9 +28,7 @@ function newRowArray(table) {
 
     function toDtoNativePromise() {
         let args = arguments;
-        return new Promise((resolve, reject) => {
-            toDto.apply(null, args).then(resolve, reject);
-        });
+        return Promise.resolve().then( () => toDto.apply(null, args));
     }
 
     function toDto(optionalStrategy) {

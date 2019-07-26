@@ -51,23 +51,17 @@ function _new(tableName) {
     };
 
     table.getMany = function(filter, strategy) {
-        return new Promise((resolve, reject) => {
-            getMany(table, filter, strategy).then(resolve, reject);
-        });
+        return Promise.resolve().then(() => getMany(table, filter, strategy))
     };
 
     table.getManyDto = function(filter, strategy) {
         if (arguments.length < 2)
             strategy = extractStrategy(table);
-        return new Promise((resolve, reject) => {
-            getManyDto(table, filter, strategy).then(resolve, reject);
-        });
+        return Promise.resolve().then(() => getManyDto(table, filter, strategy));
     };
 
     table.getMany.exclusive = function(filter, strategy) {
-        return new Promise((resolve, reject) => {
-            getMany.exclusive(table, filter, strategy).then(resolve, reject);
-        });
+        return Promise.resolve().then(() => getMany.exclusive(table, filter, strategy));
     };
 
     table.tryGetFirst = function() {
@@ -78,9 +72,7 @@ function _new(tableName) {
     };
 
     function callAsync(func, args) {
-        return new Promise((resolve, reject) => {
-            call(func, args).then(resolve, reject);
-        });
+        return Promise.resolve().then(() => call(func, args));
     }
 
     function call(func, args) {

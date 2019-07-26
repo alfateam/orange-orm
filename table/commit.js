@@ -17,7 +17,6 @@ function commit(result) {
 }
 
 module.exports = function(result) {
-    return new Promise((resolve, reject) =>  {
-        commit(result).then(resolve, reject);
-    })
+	return Promise.resolve()
+		.then(() => commit(result));
 };
