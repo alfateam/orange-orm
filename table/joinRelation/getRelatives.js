@@ -12,7 +12,6 @@ function getRelatives(parent, relation) {
         createCompositeFilter();
 
     function createInFilter() {
-        var keyFilter;
         var ids = [];
         var row;
         var id;
@@ -28,7 +27,7 @@ function getRelatives(parent, relation) {
         	filter = relation.childTable._primaryColumns[0].in(ids);
     }
 
-    function createCompositeFilter() {    	
+    function createCompositeFilter() {
         var keyFilter;
         for (var i = 0; i < queryContext.rows.length; i++) {
             keyFilter = rowToPrimaryKeyFilter(queryContext.rows[i], relation);
