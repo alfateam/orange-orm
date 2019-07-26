@@ -33,7 +33,7 @@ function newDatabase(connectionString, poolOptions) {
                 return domain.start().then(onRun);
         }
         else
-            return domain.onRun(onRun);
+            return domain.run(onRun);
 
         function onRun() {
             var transaction = newTransaction(domain, pool);
