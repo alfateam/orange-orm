@@ -6,14 +6,16 @@ var nextDbRowToRow = _nextDbRowToRow;
 function dbRowToRow(span, dbRow) {
 	var table = span.table;
 	var row = decodeDbRow(span, table, dbRow);
-	var queryContext = span.queryContext;
-	negotiateQueryContext(queryContext, row);
-	row.queryContext = queryContext;		
 	var cache = table._cache;
+	if (!cache.tryGet(row)) {
+		var queryContext = span.queryContext;
+		negotiateQueryContext(queryContext, row);
+		row.queryContext = queryContext;
+	}
 	row = cache.tryAdd(row);
 
 	var c = {};
-	
+
 	c.visitOne = function(leg) {
 		nextDbRowToRow(leg.span, dbRow);
 		leg.expand(row);
@@ -21,7 +23,7 @@ function dbRowToRow(span, dbRow) {
 
 	c.visitJoin = function(leg) {
 		nextDbRowToRow(leg.span, dbRow);
-		leg.expand(row);		
+		leg.expand(row);
 	};
 
 	c.visitMany = function(leg) {
