@@ -9,6 +9,10 @@ var executeSchema = require('./schema');
 var runInTransaction = require('../runInTransaction');
 var useHook = require('../useHook');
 
+let versionArray = process.version.replace('v', '').split('.');
+let major = parseInt(versionArray[0]);
+
+
 function newDatabase(connectionString, poolOptions) {
     var pool = newPool(connectionString, poolOptions);
     var c = {};
@@ -22,10 +26,14 @@ function newDatabase(connectionString, poolOptions) {
         }
 
         var domain = createDomain();
-        if (useHook)
-            return domain.start().then(onRun);
+        if (useHook) {
+            if (major < 12)
+                return domain.run(onRun)
+            else
+                return domain.start().then(onRun);
+        }
         else
-            return domain.run(onRun);
+            return domain.onRun(onRun);
 
         function onRun() {
             var transaction = newTransaction(domain, pool);

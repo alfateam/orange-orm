@@ -1,7 +1,10 @@
-var EventEmitter = require('events');
-let inspect = require('util').inspect;
+const fs = require('fs');
+const log = (str) => fs.writeSync(1, `${str}\n`);
+
+
 let versionArray = process.version.replace('v', '').split('.');
 let major = parseInt(versionArray[0]);
+
 if (major < 8)
     return;
 
@@ -22,11 +25,15 @@ function init(asyncId, type, triggerId) {
 
 function destroy(asyncId) {
     // delete stack[asyncId];
+    // log('destroy ' + asyncId);
 }
 
 let cls = {};
+cls._stack = stack;
 cls.createContext = createContext;
 cls.getContext = getContext;
+cls.exitContext = exitContext;
+process.cls = cls;
 
 function createContext(ns) {
     let c = {};
@@ -45,15 +52,15 @@ function createContext(ns) {
 
     return c
 
-    async function run(cb) {
-        return Promise.resolve(1).then(async () => {
-            stack[ah.executionAsyncId()][ns] = c;
-            let res = await cb();
-            return res;
-        });
+    function run(cb) {
+        return Promise.resolve(1)
+            .then(() => stack[ah.executionAsyncId()][ns] = c)
+            .then(cb);
     }
 
     function start() {
+        if (major < 12)
+            throw new Error("start() is not supported in nodejs < v12.0.0")
         return Promise.resolve(1).then(() => {
             stack[ah.executionAsyncId()][ns] = c;
         });
@@ -70,6 +77,19 @@ function getContext(ns, asyncId, cur = []) {
     if (current.parent) {
         cur.push(current.parent);
         return getContext(ns, current.parent, cur);
+    }
+    throw new Error('Context \'' + ns + '\' not found');
+}
+
+function exitContext(ns, asyncId) {
+    asyncId = asyncId || ah.executionAsyncId();
+    let current = stack[asyncId];
+    if (!current)
+        throw new Error('Context \'' + ns + '\' not found ');
+    if (current[ns])
+        return delete current[ns];
+    if (current.parent) {
+        return exitContext(ns, current.parent);
     }
     throw new Error('Context \'' + ns + '\' not found');
 }
