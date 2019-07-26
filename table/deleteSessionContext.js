@@ -4,6 +4,7 @@ let cls = require('../node-cls');
 if (useHook)
 	module.exports = function () {
 		delete cls.getContext('rdb').rdb;
+		cls.exitContext('rdb');
 	}
 else
 	module.exports = function () {
