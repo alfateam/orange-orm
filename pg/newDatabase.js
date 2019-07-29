@@ -8,6 +8,7 @@ var lock = require('../lock');
 var executeSchema = require('./schema');
 var runInTransaction = require('../runInTransaction');
 var useHook = require('../useHook');
+var legacyPromise = require('promise/domains');
 
 let versionArray = process.version.replace('v', '').split('.');
 let major = parseInt(versionArray[0]);
@@ -33,11 +34,16 @@ function newDatabase(connectionString, poolOptions) {
                 return domain.start().then(onRun);
         }
         else
-            return domain.run(onRun);
+            return domain.run(onRunLegacyDomain);
 
         function onRun() {
             var transaction = newTransaction(domain, pool);
             return new Promise(transaction).then(begin).then(negotiateSchema);
+        }
+
+        function onRunLegacyDomain() {
+            var transaction = newTransaction(domain, pool);
+            return new legacyPromise(transaction).then(begin).then(negotiateSchema);
         }
 
         function negotiateSchema(previous) {
