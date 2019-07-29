@@ -143,7 +143,6 @@ function destroy(asyncId) {
         }
     }
 
-
     delete stack[asyncId];
 }
 
