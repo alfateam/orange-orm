@@ -36,7 +36,7 @@ function createContext(ns) {
         return Promise.resolve(1)
             .then(() => {
                 log('start context ' + ah.executionAsyncId());
-                stack[ah.executionAsyncId()][ns] = c;
+                stack[ah.executionAsyncId()].contexts[ns] = c;
                 return cb();
             })
     }
@@ -45,20 +45,21 @@ function createContext(ns) {
         if (major < 12)
             throw new Error("start() is not supported in nodejs < v12.0.0")
         return Promise.resolve(1).then(() => {
-            stack[ah.executionAsyncId()][ns] = c;
+            stack[ah.executionAsyncId()].contexts[ns] = c;
         });
     }
 }
 
 function getAllContexts(asyncId, obj) {
     obj = obj || {};
-    for (var ns in stack[asyncId]) {
-        if (ns !== 'parent' && ns !== 'children' && ns !== 'id' && !obj[ns]) {
-            obj[ns] = stack[asyncId][ns];
+    if (!stack[asyncId])
+        return;
+    for (var ns in stack[asyncId].contexts) {
+        if (!obj[ns]) {
+            obj[ns] = stack[asyncId].contexts[ns];
         }
     }
-    if (stack[asyncId] && stack[asyncId].parent)
-        getAllContexts(stack[asyncId].parent, obj);
+    getAllContexts(stack[asyncId].parent, obj);
     return obj;
 }
 
@@ -74,8 +75,8 @@ function getContext(ns, asyncId, cur = []) {
         }
         throw new Error('Context \'' + ns + '\' not found ' + cur + ' ' + out.join(', '));
     }
-    if (current[ns])
-        return current[ns];
+    if (current.contexts[ns])
+        return current.contexts[ns];
     if (current.parent) {
         cur.push(current.parent);
         return getContext(ns, current.parent, cur);
@@ -88,8 +89,8 @@ function exitContext(ns, asyncId) {
     let current = stack[asyncId];
     if (!current)
         throw new Error('Context \'' + ns + '\' not found ');
-    if (current[ns])
-        return delete current[ns];
+    if (current.contexts[ns])
+        return delete current.contexts[ns];
     if (current.parent) {
         return exitContext(ns, current.parent);
     }
@@ -103,7 +104,9 @@ let hook = ah.createHook({
 hook.enable();
 
 function init(asyncId, type, triggerId) {
-    let node = {};
+    let node = {
+        contexts: {}
+    };
     Object.defineProperty(node, 'id', {
         enumerable: false,
         value: asyncId
@@ -121,7 +124,7 @@ function init(asyncId, type, triggerId) {
         let contexts = getAllContexts(triggerId)
         stack[triggerId].children[asyncId] = node;
         for (let ns in contexts) {
-            node[ns] = contexts[ns];
+            node.contexts[ns] = contexts[ns];
         }
     }
 }
@@ -138,7 +141,7 @@ function destroy(asyncId) {
         for(let childId in stack[asyncId].children) {
             let child = stack[asyncId].children[childId];
             for(let ns in contexts) {
-                child[ns] = child[ns] || contexts[ns];
+                child.contexts[ns] = child.contexts[ns] || contexts[ns];
             }
         }
     }
