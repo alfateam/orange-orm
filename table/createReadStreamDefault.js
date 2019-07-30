@@ -1,6 +1,5 @@
 var extractFilter = require('./query/extractFilter');
 var cloneStrategy = require('./cloneStrategy');
-var domain = require('domain');
 var defaultBatchSize = 200;
 var Readable = require('stream').Readable;
 var createBatchFilter = require('./readStreamDefault/createBatchFilter');
@@ -9,7 +8,6 @@ function createReadStream(table, db, filter, strategy, streamOptions) {
     filter = extractFilter(filter);
     var batchFilter;
     strategy = cloneStrategy(strategy);
-    var originalOrderBy = strategy.orderBy || [];
     calculateOrderBy();
     streamOptions = streamOptions || {};
     var batchSize = streamOptions.batchSize || defaultBatchSize;
@@ -32,17 +30,17 @@ function createReadStream(table, db, filter, strategy, streamOptions) {
                 getDtos();
         }
     }
-    var originalDomain = process.domain || domain.create();
-    originalDomain.add(stream);
+    if (process.domain)
+        process.domain.add(stream);
 
     function getDtos() {
         busy = true;
-        return db.transaction()
-            .then(getBatch)
+        return db.transaction(async () => {
+            await getBatch()
             .then(onRows)
             .then(onDtos)
-            .then(db.commit)
-            .then(negotiatePushStream, onError)
+        })
+        .then(negotiatePushStream, onError)
     }
 
     function onRows(rows) {
@@ -102,7 +100,6 @@ function createReadStream(table, db, filter, strategy, streamOptions) {
 
     function onError(e) {
         stream.emit('error', e);
-        db.rollback();
     }
 
     return stream;
