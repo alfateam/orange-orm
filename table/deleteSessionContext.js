@@ -3,8 +3,10 @@ let cls = require('../node-cls');
 
 if (useHook)
 	module.exports = function () {
-		delete cls.getContext('rdb').rdb;
-		cls.exitContext('rdb');
+		let context = cls.getContext('rdb');
+		delete context.rdb;
+		if (context.exitContext)
+			cls.exitContext('rdb');
 	}
 else
 	module.exports = function () {

@@ -84,17 +84,29 @@ function getContext(ns, asyncId, cur = []) {
     throw new Error('Context \'' + ns + '\' not found');
 }
 
-function exitContext(ns, asyncId) {
-    asyncId = asyncId || ah.executionAsyncId();
-    let current = stack[asyncId];
-    if (!current)
-        throw new Error('Context \'' + ns + '\' not found ');
-    if (current.contexts[ns])
-        return delete current.contexts[ns];
-    if (current.parent) {
-        return exitContext(ns, current.parent);
+function exitContext(ns) {
+    log('exit Context')
+    let asyncId = ah.executionAsyncId();
+    let context = getContext(ns);
+    let node = stack[asyncId];
+    if (node && node.contexts[ns] === context)
+        delete node.contexts[ns];
+    exitContextUp(context, ns, asyncId);
+}
+
+function exitContextUp(context, ns, asyncId) {
+    if (!stack[asyncId])
+        return;
+    log('exit ' + asyncId);
+    let parentId = stack[asyncId].parent;
+    let parent = stack[parentId];
+    if (parent) {
+        if (parent.contexts[ns] === context)
+            delete parent.contexts[ns];
+        else if (parent.contexts[ns])
+            return;
+        exitContextUp(context, ns, parentId);
     }
-    throw new Error('Context \'' + ns + '\' not found');
 }
 
 let hook = ah.createHook({
@@ -121,11 +133,7 @@ function init(asyncId, type, triggerId) {
     });
     stack[asyncId] = node;
     if (stack[triggerId]) {
-        let contexts = getAllContexts(triggerId)
         stack[triggerId].children[asyncId] = node;
-        for (let ns in contexts) {
-            node.contexts[ns] = contexts[ns];
-        }
     }
 }
 
@@ -150,5 +158,8 @@ function destroy(asyncId) {
 }
 
 cls.debug = false;
+cls.printStack = function() {
+    log(inspect(stack, true, 3));
+}
 
 module.exports = cls;

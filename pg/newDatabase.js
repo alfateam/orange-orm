@@ -1,53 +1,57 @@
-var createDomain = require('../createDomain');
-var newTransaction = require('./newTransaction');
-var begin = require('../table/begin');
-var commit = require('../table/commit');
-var rollback = require('../table/rollback');
-var newPool = require('./newPool');
-var lock = require('../lock');
-var executeSchema = require('./schema');
-var runInTransaction = require('../runInTransaction');
-var useHook = require('../useHook');
-var legacyPromise = require('promise/domains');
-
+let createDomain = require('../createDomain');
+let newTransaction = require('./newTransaction');
+let begin = require('../table/begin');
+let commit = require('../table/commit');
+let rollback = require('../table/rollback');
+let newPool = require('./newPool');
+let lock = require('../lock');
+let executeSchema = require('./schema');
+let useHook = require('../useHook');
 let versionArray = process.version.replace('v', '').split('.');
 let major = parseInt(versionArray[0]);
 
-
 function newDatabase(connectionString, poolOptions) {
-    var pool = newPool(connectionString, poolOptions);
-    var c = {};
+    let pool = newPool(connectionString, poolOptions);
+    let c = {};
 
-    c.transaction = function(options, fn) {
+    c.transaction = function (options, fn) {
         if ((arguments.length === 1) && (typeof options === 'function')) {
-            return runInTransaction({db: c, fn: options});
+            fn = options;
+            options = undefined;
         }
-        if ((arguments.length > 1)) {
-            return runInTransaction({db: c, options: options, fn: fn});
-        }
+        let domain = createDomain();
 
-        var domain = createDomain();
-        if (useHook) {
-            if (major < 12)
-                return domain.run(onRun)
-            else
-                return domain.start().then(onRun);
+        if (fn)
+            return domain.run(runInTransaction);
+        else if ((major >= 12) && useHook) {
+            domain.exitContext = true;
+            return domain.start().then(run);
         }
         else
-            return domain.run(onRunLegacyDomain);
+            return domain.run(run);
 
-        function onRun() {
-            var transaction = newTransaction(domain, pool);
-            return new Promise(transaction).then(begin).then(negotiateSchema);
+        async function runInTransaction() {
+            let result;
+            let transaction = newTransaction(domain, pool);
+            await new Promise(transaction)
+                .then(begin)
+                .then(negotiateSchema)
+                .then(fn)
+                .then((res) => result = res)
+                .then(c.commit)
+                .then(null, c.rollback);
+            return result;
         }
 
-        function onRunLegacyDomain() {
-            var transaction = newTransaction(domain, pool);
-            return new legacyPromise(transaction).then(begin).then(negotiateSchema);
+        function run() {
+            let transaction = newTransaction(domain, pool);
+            return new Promise(transaction)
+                .then(begin)
+                .then(negotiateSchema);
         }
 
         function negotiateSchema(previous) {
-            var schema = options && options.schema;
+            let schema = options && options.schema;
             if (!schema)
                 return previous;
             return executeSchema(schema);
@@ -59,11 +63,11 @@ function newDatabase(connectionString, poolOptions) {
     c.lock = lock;
     c.schema = executeSchema;
 
-    c.end = function() {
+    c.end = function () {
         return pool.end();
     };
 
-    c.accept = function(caller) {
+    c.accept = function (caller) {
         caller.visitPg();
     };
 

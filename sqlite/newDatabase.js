@@ -1,46 +1,63 @@
-var createDomain = require('../createDomain');
-var newTransaction = require('./newTransaction');
-var promise = require('../table/promise');
-var begin = require('../table/begin');
-var commit = require('../table/commit');
-var rollback = require('../table/rollback');
-var newPool = require('./newPool');
-var runInTransaction = require('../runInTransaction');
+let createDomain = require('../createDomain');
+let newTransaction = require('./newTransaction');
+let begin = require('../table/begin');
+let commit = require('../table/commit');
+let rollback = require('../table/rollback');
+let newPool = require('./newPool');
+let useHook = require('../useHook');
+let versionArray = process.version.replace('v', '').split('.');
+let major = parseInt(versionArray[0]);
 
 function newDatabase(connectionString, poolOptions) {
-    var pool = newPool(connectionString, poolOptions);
-    var c = {};
+    let pool = newPool(connectionString, poolOptions);
+    let c = {};
 
-    c.transaction = function(options, fn) {
+    c.transaction = function (options, fn) {
         if ((arguments.length === 1) && (typeof options === 'function')) {
-            return runInTransaction({db: c, fn: options});
+            fn = options;
+            options = undefined;
         }
-        if ((arguments.length > 1)) {
-            return runInTransaction({db: c, options: options, fn: fn});
+        let domain = createDomain();
+
+        if (fn)
+            return domain.run(runInTransaction);
+        else if ((major >= 12) && useHook) {
+            domain.exitContext = true;
+            return domain.start().then(run);
+        }
+        else
+            return domain.run(run);
+
+        async function runInTransaction() {
+            let result;
+            let transaction = newTransaction(domain, pool);
+            await new Promise(transaction)
+                .then(begin)
+                .then(fn)
+                .then((res) => result = res)
+                .then(c.commit)
+                .then(null, c.rollback);
+            return result;
         }
 
-        var domain = createDomain();
-
-        return domain.run(onRun);
-
-        function onRun() {
-            var transaction = newTransaction(domain, pool);
-            var p = promise(transaction).then(begin);
-            return p;
+        function run() {
+            let transaction = newTransaction(domain, pool);
+            return new Promise(transaction)
+                .then(begin);
         }
+
     };
 
     c.rollback = rollback;
     c.commit = commit;
 
-    c.end = function() {
+    c.end = function () {
         return pool.end();
     };
 
-    c.accept = function(caller) {
+    c.accept = function (caller) {
         caller.visitSqlite();
     };
-
 
     return c;
 }
