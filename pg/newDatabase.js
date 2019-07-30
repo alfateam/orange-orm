@@ -7,6 +7,7 @@ let newPool = require('./newPool');
 let lock = require('../lock');
 let executeSchema = require('./schema');
 let useHook = require('../useHook');
+let promise = require('promise/domains');
 let versionArray = process.version.replace('v', '').split('.');
 let major = parseInt(versionArray[0]);
 
@@ -44,9 +45,14 @@ function newDatabase(connectionString, poolOptions) {
         }
 
         function run() {
+            let p;
             let transaction = newTransaction(domain, pool);
-            return new Promise(transaction)
-                .then(begin)
+            if (useHook)
+                p = new Promise(transaction);
+            else
+                p = new promise(transaction);
+
+            return p.then(begin)
                 .then(negotiateSchema);
         }
 
