@@ -9,11 +9,27 @@ if (major < 8)
     return;
 
 let stack = {};
-let cls = {};
+let cls = function(ns) {
+    if (arguments.length === 0)
+        throw new Error("Missing namespace");
+
+    let wrapper = {
+        run: (fn) => {
+            let c = cls.createContext(ns);
+            return c.run(fn);
+        }
+    };
+    return wrapper;
+};
+
 cls._stack = stack;
 cls.createContext = createContext;
 cls.getContext = getContext;
 cls.exitContext = exitContext;
+cls.debug = false;
+cls.printStack = function() {
+    log(inspect(stack, true, 3));
+}
 
 function createContext(ns) {
     let c = {};
@@ -155,11 +171,6 @@ function destroy(asyncId) {
     }
 
     delete stack[asyncId];
-}
-
-cls.debug = false;
-cls.printStack = function() {
-    log(inspect(stack, true, 3));
 }
 
 module.exports = cls;
