@@ -27,12 +27,17 @@ let cls = function(ns) {
 
 cls._stack = stack;
 cls.createContext = createContext;
+cls.create = createContext;
 cls.getContext = getContext;
 cls.exitContext = exitContext;
 cls.debug = false;
 cls.printStack = function() {
 	log(inspect(stack, true, 3));
 };
+Object.defineProperty(cls, 'active', {
+	enumerable: true,
+	get: getContext
+});
 
 function createContext(ns) {
 	let c = {};
