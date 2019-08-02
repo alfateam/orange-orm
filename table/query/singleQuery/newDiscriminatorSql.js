@@ -26,7 +26,7 @@ function newDiscriminatorSql(table, alias) {
 		if(result)
 			result += ' AND ';
 		else
-			result = ' ';	
+			result = ' ';
 	}
 }
 

@@ -16,7 +16,7 @@ function getManyCore(table,filter,strategy,exclusive) {
 	var span = strategyToSpan(table,strategy);
 	var queries = newQuery([],table,filter,span,alias,emptyInnerJoin,noOrderBy,exclusive);
 	return executeQueries(queries).then(onResult);
-	
+
 	function onResult(result) {
 		return resultToRows(span,result);
 	}

@@ -1,5 +1,5 @@
 
 module.exports = function(column) {
-	if(!column.hasOwnProperty('default'))
+	if(!column.hasOwnProperty.call(column,'default'))
 		column.default = 0;
 };

@@ -3,7 +3,7 @@ var newQueryContext = require('../query/singleQuery/newQueryContext');
 
 function newLeg(relation) {
 	var c = {};
-	var span = {};	
+	var span = {};
 	span.table = relation.childTable;
 	span.legs = newCollection();
 	span.queryContext = newQueryContext();
@@ -17,7 +17,7 @@ function newLeg(relation) {
 		visitor.visitJoin(c);
 	};
 
-	return c;	
+	return c;
 }
 
 module.exports = newLeg;

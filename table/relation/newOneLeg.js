@@ -6,9 +6,9 @@ function newLeg(relation) {
 	var joinRelation = relation.joinRelation;
 	var c = {};
 	c.name = joinRelation.rightAlias;
-	var span = {};		
+	var span = {};
 	span.queryContext = newQueryContext();
-	span.table = joinRelation.parentTable;	
+	span.table = joinRelation.parentTable;
 	span.legs = newCollection();
 	c.span = span;
 	c.table = joinRelation.childTable;
@@ -19,7 +19,7 @@ function newLeg(relation) {
 		visitor.visitOne(c);
 	};
 
-	return c;	
+	return c;
 }
 
 module.exports = newLeg;

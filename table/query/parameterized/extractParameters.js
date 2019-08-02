@@ -1,6 +1,6 @@
-function extract(parameters) {	
+function extract(parameters) {
 	if (parameters) {
-		return parameters.slice(0);	
+		return parameters.slice(0);
 	}
 	return [];
 }

@@ -1,4 +1,4 @@
-function purify(value) {		
+function purify(value) {
 	if(value == null)
 		return null;
 	if (!Buffer.isBuffer(value))

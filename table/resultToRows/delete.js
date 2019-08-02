@@ -1,4 +1,4 @@
-var removeFromCache = require('./delete/removeFromCache');	
+var removeFromCache = require('./delete/removeFromCache');
 var pushCommand = require('../commands/pushCommand');
 var newDeleteCommand = require('../commands/newDeleteCommand');
 var newPrimaryKeyFilter = require('../newPrimaryKeyFilter');

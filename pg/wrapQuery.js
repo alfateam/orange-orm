@@ -14,7 +14,7 @@ function wrapQuery(connection) {
 		runOriginalQuery.call(connection, sql, params, onInnerCompleted);
 
 		function onInnerCompleted(err, result) {
-			if (err) 
+			if (err)
 				onCompleted(err);
 			else {
 				if (Array.isArray(result))

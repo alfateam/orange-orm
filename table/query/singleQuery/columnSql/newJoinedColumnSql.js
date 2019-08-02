@@ -10,11 +10,11 @@ module.exports = function(span,alias) {
 		sql = sql + joinSql;
 	};
 
-	c.visitOne = function (leg) {
+	c.visitOne = function(leg) {
 		c.visitJoin(leg);
 	};
 
-	c.visitMany = function(leg) {
+	c.visitMany = function() {
 	};
 
 	span.legs.forEach(onEach);

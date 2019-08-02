@@ -5,7 +5,7 @@ function newRelatedColumn(column,relations) {
 	var alias = '_' + relations.length;
 	for (var propName in column) {
 		var prop = column[propName];
-		if (prop instanceof Function)			
+		if (prop instanceof Function)
 
 			c[propName] = wrapFilter(prop);
 	}
@@ -13,7 +13,7 @@ function newRelatedColumn(column,relations) {
 
 	function wrapFilter(filter) {
 		return runFilter;
-		
+
 		function runFilter() {
 			var args = [];
 			for (var i = 0; i < arguments.length; i++) {

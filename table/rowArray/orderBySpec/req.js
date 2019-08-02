@@ -5,7 +5,7 @@ function act(c){
 	c.requireMock = a.requireMock;
 	c.expectRequire = a.expectRequire;
 	c.then = a.then;
-	
+
 
 	c.sut = require('../orderBy');
 }

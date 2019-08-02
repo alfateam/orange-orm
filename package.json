@@ -14,7 +14,8 @@
   ],
   "license": "ISC",
   "scripts": {
-    "test": "jshint ./ && a"
+    "test": "a",
+    "lint": "eslint ./"
   },
   "dependencies": {
     "deferred": "^0.7.5",
@@ -29,7 +30,8 @@
     "sqlite3": "^3.1.9"
   },
   "devDependencies": {
-    "a": "^2.1.0"
+    "a": "^2.1.0",
+    "eslint": "^6.1.0"
   },
   "repository": {
     "type": "git",

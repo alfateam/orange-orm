@@ -18,114 +18,114 @@ var createJSONReadStream = require('./table/createJSONReadStream');
 var extractStrategy = require('./table/resultToRows/toDto/extractStrategy');
 
 function _new(tableName) {
-    var table = newContext();
-    table._dbName = tableName;
-    table._primaryColumns = [];
-    table._columns = [];
-    table._columnDiscriminators = [];
-    table._formulaDiscriminators = [];
-    table._relations = {};
-    table._cache = newCache(table);
+	var table = newContext();
+	table._dbName = tableName;
+	table._primaryColumns = [];
+	table._columns = [];
+	table._columnDiscriminators = [];
+	table._formulaDiscriminators = [];
+	table._relations = {};
+	table._cache = newCache(table);
 
-    table.primaryColumn = function(columnName) {
-        var columnDef = newColumn(table, columnName);
-        table._primaryColumns.push(columnDef);
-        return column(columnDef, table);
-    };
+	table.primaryColumn = function(columnName) {
+		var columnDef = newColumn(table, columnName);
+		table._primaryColumns.push(columnDef);
+		return column(columnDef, table);
+	};
 
-    table.column = function(columnName) {
-        var columnDef = newColumn(table, columnName);
-        return column(columnDef, table);
-    };
+	table.column = function(columnName) {
+		var columnDef = newColumn(table, columnName);
+		return column(columnDef, table);
+	};
 
-    table.join = function(relatedTable) {
-        return join(table, relatedTable);
-    };
+	table.join = function(relatedTable) {
+		return join(table, relatedTable);
+	};
 
-    table.hasMany = function(joinRelation) {
-        return hasMany(joinRelation);
-    };
+	table.hasMany = function(joinRelation) {
+		return hasMany(joinRelation);
+	};
 
-    table.hasOne = function(joinRelation) {
-        return hasOne(joinRelation);
-    };
+	table.hasOne = function(joinRelation) {
+		return hasOne(joinRelation);
+	};
 
-    table.getMany = function(filter, strategy) {
-        return Promise.resolve().then(() => getMany(table, filter, strategy))
-    };
+	table.getMany = function(filter, strategy) {
+		return Promise.resolve().then(() => getMany(table, filter, strategy));
+	};
 
-    table.getManyDto = function(filter, strategy) {
-        if (arguments.length < 2)
-            strategy = extractStrategy(table);
-        return Promise.resolve().then(() => getManyDto(table, filter, strategy));
-    };
+	table.getManyDto = function(filter, strategy) {
+		if (arguments.length < 2)
+			strategy = extractStrategy(table);
+		return Promise.resolve().then(() => getManyDto(table, filter, strategy));
+	};
 
-    table.getMany.exclusive = function(filter, strategy) {
-        return Promise.resolve().then(() => getMany.exclusive(table, filter, strategy));
-    };
+	table.getMany.exclusive = function(filter, strategy) {
+		return Promise.resolve().then(() => getMany.exclusive(table, filter, strategy));
+	};
 
-    table.tryGetFirst = function() {
-        return callAsync(tryGetFirst, arguments);
-    };
-    table.tryGetFirst.exclusive = function() {
-        return callAsync(tryGetFirst.exclusive, arguments);
-    };
+	table.tryGetFirst = function() {
+		return callAsync(tryGetFirst, arguments);
+	};
+	table.tryGetFirst.exclusive = function() {
+		return callAsync(tryGetFirst.exclusive, arguments);
+	};
 
-    function callAsync(func, args) {
-        return Promise.resolve().then(() => call(func, args));
-    }
+	function callAsync(func, args) {
+		return Promise.resolve().then(() => call(func, args));
+	}
 
-    function call(func, args) {
-        var mergedArgs = [table];
-        for (var i = 0; i < args.length; i++) {
-            mergedArgs.push(args[i]);
-        }
-        return func.apply(null, mergedArgs);
-    }
+	function call(func, args) {
+		var mergedArgs = [table];
+		for (var i = 0; i < args.length; i++) {
+			mergedArgs.push(args[i]);
+		}
+		return func.apply(null, mergedArgs);
+	}
 
-    table.getById = function() {
-        return callAsync(getById, arguments);
-    };
+	table.getById = function() {
+		return callAsync(getById, arguments);
+	};
 
-    table.getById.exclusive = function() {
-        return callAsync(getById.exclusive, arguments);
-    };
+	table.getById.exclusive = function() {
+		return callAsync(getById.exclusive, arguments);
+	};
 
-    table.tryGetById = function() {
-        return callAsync(tryGetById, arguments);
-    };
+	table.tryGetById = function() {
+		return callAsync(tryGetById, arguments);
+	};
 
-    table.tryGetById.exclusive = function() {
-        return callAsync(tryGetById.exclusive, arguments);
-    };
+	table.tryGetById.exclusive = function() {
+		return callAsync(tryGetById.exclusive, arguments);
+	};
 
-    table.columnDiscriminators = function() {
-        for (var i = 0; i < arguments.length; i++) {
-            table._columnDiscriminators.push(arguments[i]);
-        }
-        return table;
-    };
+	table.columnDiscriminators = function() {
+		for (var i = 0; i < arguments.length; i++) {
+			table._columnDiscriminators.push(arguments[i]);
+		}
+		return table;
+	};
 
-    table.formulaDiscriminators = function() {
-        for (var i = 0; i < arguments.length; i++) {
-            table._formulaDiscriminators.push(arguments[i]);
-        }
-        return table;
-    };
+	table.formulaDiscriminators = function() {
+		for (var i = 0; i < arguments.length; i++) {
+			table._formulaDiscriminators.push(arguments[i]);
+		}
+		return table;
+	};
 
-    table.insert = function() {
-        return call(insert, arguments);
-    };
+	table.insert = function() {
+		return call(insert, arguments);
+	};
 
-    table.delete = _delete.bind(null, table);
-    table.cascadeDelete = cascadeDelete.bind(null, table);
-    table.createReadStream = createReadStream.bind(null, table);
-    table.createJSONReadStream = createJSONReadStream.bind(null, table);
-    table.exclusive = function() {
-        table._exclusive = true;
-        return table;
-    };
-    return table;
+	table.delete = _delete.bind(null, table);
+	table.cascadeDelete = cascadeDelete.bind(null, table);
+	table.createReadStream = createReadStream.bind(null, table);
+	table.createJSONReadStream = createJSONReadStream.bind(null, table);
+	table.exclusive = function() {
+		table._exclusive = true;
+		return table;
+	};
+	return table;
 }
 
 module.exports = _new;

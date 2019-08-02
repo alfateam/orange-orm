@@ -5,7 +5,7 @@ var nextCommand = function() {
 	nextCommand.apply(null, arguments);
 };
 
-function newCommand(queries,table,filter,strategy,relations) {	
+function newCommand(queries,table,filter,strategy,relations) {
 	var singleCommand = newSingleCommand(table,filter,relations);
 	for(var name in strategy) {
 		var childStrategy = strategy[name];

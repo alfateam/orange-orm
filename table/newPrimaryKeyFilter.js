@@ -1,4 +1,4 @@
-function primaryKeyFilter(table,id,id2,etc) {
+function primaryKeyFilter(table) {
 	var primaryColumns = table._primaryColumns;
 	var key = arguments[1];
 	var filter = primaryColumns[0].equal(key);
@@ -6,7 +6,7 @@ function primaryKeyFilter(table,id,id2,etc) {
 		key = arguments[i+1];
 		var colFilter = primaryColumns[i].equal(key);
 		filter = filter.and(colFilter);
-	}	
+	}
 	return filter;
 }
 

@@ -22,7 +22,7 @@ function newCascadeDeleteStrategy(strategy, table) {
 	return strategy;
 }
 
-function _addSubStrategies(strategy, table) {	
+function _addSubStrategies(strategy, table) {
 	addSubStrategies = require('./newCascadeDeleteStrategy');
 	addSubStrategies(strategy, table);
 }

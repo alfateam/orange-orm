@@ -6,45 +6,45 @@ var resultToPromise = require('./resultToPromise');
 var newGetRelated = require('./newGetRelated');
 
 function newManyRelation(joinRelation) {
-    var c = {};
-    var manyCache = newManyCache(joinRelation);
+	var c = {};
+	var manyCache = newManyCache(joinRelation);
 
-    c.joinRelation = joinRelation;
-    c.childTable = joinRelation.parentTable;
+	c.joinRelation = joinRelation;
+	c.childTable = joinRelation.parentTable;
 
-    c.accept = function(visitor) {
-        visitor.visitMany(c);
-    };
+	c.accept = function(visitor) {
+		visitor.visitMany(c);
+	};
 
-    c.getFromCache = function(parent) {
-        var row = manyCache.tryGet(parent);
-        return resultToPromise(row);
-    };
+	c.getFromCache = function(parent) {
+		var row = manyCache.tryGet(parent);
+		return resultToPromise(row);
+	};
 
-    c.getFromDb = function(parent) {
-        var filter = newForeignKeyFilter(joinRelation, parent);
-        return c.childTable.getMany(filter);
-    };
+	c.getFromDb = function(parent) {
+		var filter = newForeignKeyFilter(joinRelation, parent);
+		return c.childTable.getMany(filter);
+	};
 
-    c.getRelatives = function(parent) {
-        return getRelatives(parent, c);
-    };
+	c.getRelatives = function(parent) {
+		return getRelatives(parent, c);
+	};
 
-    c.toGetRelated = function(parent) {
-        return newGetRelated(parent, c);
-    };
+	c.toGetRelated = function(parent) {
+		return newGetRelated(parent, c);
+	};
 
-    c.expand = function(parent) {
-        return parent.expand(joinRelation.rightAlias);
-    };
+	c.expand = function(parent) {
+		return parent.expand(joinRelation.rightAlias);
+	};
 
-    c.getRowsSync = manyCache.tryGet;
+	c.getRowsSync = manyCache.tryGet;
 
-    c.toLeg = function() {
-        return newLeg(c);
-    };
+	c.toLeg = function() {
+		return newLeg(c);
+	};
 
-    return c;
+	return c;
 }
 
 module.exports = newManyRelation;

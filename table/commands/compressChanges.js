@@ -5,8 +5,7 @@ function compress(queries) {
 	var multipleStatements = getSessionSingleton('multipleStatements');
 	var compressed = [];
 	var queryCount = queries.length;
-	var lastIndex = queryCount-1;
-	
+
 	for (var i = 0; i < queryCount; i++) {
 		var current = queries[i];
 		if (multipleStatements && current.parameters.length === 0) {

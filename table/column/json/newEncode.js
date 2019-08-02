@@ -2,7 +2,7 @@ var newPara = require('../../query/newParameterized');
 var purify = require('./purify');
 
 function _new(column) {
-	
+
 	return function(candidate) {
 		var value = purify(candidate);
 		if (value == null) {
@@ -10,7 +10,7 @@ function _new(column) {
 				return newPara('null');
 			return newPara('\'' + column.dbNull + '\'');
 		}
-		return newPara('?', [JSON.stringify(value)]);	
+		return newPara('?', [JSON.stringify(value)]);
 	};
 }
 

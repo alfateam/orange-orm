@@ -6,12 +6,11 @@ function _new(table,alias,subQueries) {
 	var c = {};
 
 	c.sql = function() {
-		var name = table._dbName;
 		var columnSql = newColumnSql(table,alias);
 		return util.format(template, columnSql, subQueries);
 	};
-	
-	c.parameters = [];	
+
+	c.parameters = [];
 
 	return c;
 }

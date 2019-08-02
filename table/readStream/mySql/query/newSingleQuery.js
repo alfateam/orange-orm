@@ -12,8 +12,8 @@ function _new(table,filter,alias,subQueries,orderBy,limit) {
 		var whereSql = newWhereSql(table,filter,alias);
 		return util.format(template, columnSql, subQueries, name, alias, whereSql, orderBy, limit);
 	};
-	
-	c.parameters = filter.parameters;	
+
+	c.parameters = filter.parameters;
 
 	return c;
 }

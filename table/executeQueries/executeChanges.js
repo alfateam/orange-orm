@@ -10,14 +10,14 @@ function executeChanges(queries) {
 
 	function execute() {
 		i++;
-		if (i+1 == queries.length )
+		if (i+1 === queries.length )
 			return executeQuery(queries[i]);
 		else {
 			return executeQuery(queries[i]).then(execute);
 		}
-			
+
 	}
-	
+
 }
 
 module.exports = executeChanges;

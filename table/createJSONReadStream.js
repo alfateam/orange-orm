@@ -2,22 +2,22 @@ var createJSONReadStreamNative = require('./createJSONReadStreamNative');
 var createJSONReadStreamDefault = require('./createJSONReadStreamDefault');
 
 function createJSONReadStream(table, db, filter, strategy, streamOptions) {
-    var create;
-    var c = {};
+	var create;
+	var c = {};
 
-    c.visitPg = function() {
-        create = createJSONReadStreamNative;
-    };
+	c.visitPg = function() {
+		create = createJSONReadStreamNative;
+	};
 
-    c.visitMySql = c.visitPg;
+	c.visitMySql = c.visitPg;
 
-    c.visitSqlite = function() {
-        create = createJSONReadStreamDefault;
-    };
+	c.visitSqlite = function() {
+		create = createJSONReadStreamDefault;
+	};
 
-    db.accept(c);
+	db.accept(c);
 
-    return create(table, db, filter, strategy, streamOptions);
+	return create(table, db, filter, strategy, streamOptions);
 }
 
 module.exports = createJSONReadStream;

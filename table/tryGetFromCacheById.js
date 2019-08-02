@@ -1,4 +1,4 @@
-function tryGet(table, id, id2, optionalStrategy) {
+function tryGet(table) {
 	var fakeRow = {};
 	var args = arguments;
 	table._primaryColumns.forEach(addPkValue);

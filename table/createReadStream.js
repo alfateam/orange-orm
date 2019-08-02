@@ -8,12 +8,12 @@ function createReadStream(table, db, filter, strategy, streamOptions) {
 	c.visitPg = function() {
 		create =  createReadStreamNative;
 	};
-	
+
 	c.visitMySql = c.visitPg;
 
 	c.visitSqlite = function() {
 		create =  createReadStreamDefault;
-	}
+	};
 
 	db.accept(c);
 

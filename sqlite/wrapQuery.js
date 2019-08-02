@@ -13,7 +13,7 @@ function wrapQuery(connection) {
 		runOriginalQuery.call(connection, sql, params, onInnerCompleted);
 
 		function onInnerCompleted(err, rows) {
-			if (err) 
+			if (err)
 				onCompleted(err);
 			else
 				onCompleted(null, rows);

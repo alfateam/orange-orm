@@ -1,5 +1,5 @@
 var getSessionSingleton = require('./getSessionSingleton');
-var deleteSessionContext = require('./deleteSessionContext')
+var deleteSessionContext = require('./deleteSessionContext');
 
 function release() {
 	var done = getSessionSingleton('dbClientDone');

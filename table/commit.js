@@ -9,7 +9,7 @@ function commit(result) {
 	var changes = popChanges();
 	return executeChanges(changes)
 		.then(releaseDbClient)
-		.then(onReleased)
+		.then(onReleased);
 
 	function onReleased() {
 		return result;

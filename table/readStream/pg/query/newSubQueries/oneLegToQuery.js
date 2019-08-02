@@ -3,13 +3,13 @@ var newQuery = require('../../newQueryCore');
 var newParameterized = require('../../../../query/newParameterized');
 var util = require('util');
 
-function oneLegToQuery(rightAlias,leg,legNo) {	
+function oneLegToQuery(rightAlias,leg,legNo) {
 	var leftAlias = rightAlias + '_' + legNo;
 	var span = leg.span;
 	var rightTable = leg.table;
 	var rightColumns = rightTable._primaryColumns;
-	var leftColumns = leg.columns;	 
-	 
+	var leftColumns = leg.columns;
+
 	var shallowJoin  = newShallowJoinSql(rightTable,leftColumns,rightColumns,leftAlias,rightAlias);
 	var filter = newParameterized(shallowJoin);
 	var query = newQuery(span.table,filter,span,leftAlias);

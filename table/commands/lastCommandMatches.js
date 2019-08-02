@@ -5,7 +5,7 @@ function lastCommandMatches(row) {
 	var lastIndex = changeSet.length-1;
 	if (lastIndex >= 0 && changeSet[lastIndex].matches)
 		return changeSet[lastIndex].matches(row);
-	return false;	
+	return false;
 }
 
 module.exports = lastCommandMatches;

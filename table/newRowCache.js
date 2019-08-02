@@ -7,8 +7,8 @@ function newRowCache(table) {
 	var rowToKey = firstRowToKey;
 
 	function getPkNames() {
-		var names = {};		
-		var primaryColumns = table._primaryColumns;		
+		var names = {};
+		var primaryColumns = table._primaryColumns;
 		var keyLength = primaryColumns.length;
 		for (var i = 0; i < keyLength; i++) {
 			var column = primaryColumns[i];
@@ -30,7 +30,7 @@ function newRowCache(table) {
 		return rowToKey(row);
 	}
 
-	function nextRowToKey(row) {		
+	function nextRowToKey(row) {
 		var key = [];
 		for(var pkName in pkNames) {
 			key.push(row[pkName]);
@@ -48,9 +48,9 @@ function newRowCache(table) {
 		cache.tryRemove(key);
 	};
 
-	c.subscribeAdded = cache.subscribeAdded;	
+	c.subscribeAdded = cache.subscribeAdded;
 	c.subscribeRemoved = cache.subscribeRemoved;
-	
+
 	c.getAll = cache.getAll;
 
 	return c;

@@ -1,9 +1,9 @@
 function cloneStrategy(strategy, target) {
 	target = target || {};
-    for (var name in strategy) {
-        target[name] = mapChild(strategy[name]);            
-    }
-    return target;
+	for (var name in strategy) {
+		target[name] = mapChild(strategy[name]);
+	}
+	return target;
 }
 
 function mapChild(strategy) {

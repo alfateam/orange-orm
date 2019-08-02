@@ -1,6 +1,6 @@
 var newOneLeg = require('./newOneLeg');
 
-function newLeg(relation) {	
+function newLeg(relation) {
 	var c = newOneLeg(relation);
 	c.name = relation.joinRelation.rightAlias;
 	c.accept = function(visitor) {
@@ -8,8 +8,8 @@ function newLeg(relation) {
 	};
 
 	c.expand = relation.expand;
-	
-	return c; 
+
+	return c;
 }
 
 module.exports = newLeg;

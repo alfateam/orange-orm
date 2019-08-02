@@ -5,7 +5,7 @@ var extractOrderBy = require('../extractOrderBy');
 var extractLimit = require('../extractLimit');
 var newParameterized = require('../../query/newParameterized');
 
-function newQuery(table,filter,span,alias) {	
+function newQuery(table,filter,span,alias) {
 	filter = extractFilter(filter);
 	var orderBy = extractOrderBy(alias,span);
 	var limit = extractLimit(span);

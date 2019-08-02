@@ -11,7 +11,7 @@ function newWhereSql(table,filter,alias) {
 	}
 	if(discriminator)
 		result += separator + discriminator;
-	return result;	
+	return result;
 }
 
 module.exports = newWhereSql;

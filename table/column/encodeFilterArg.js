@@ -1,4 +1,4 @@
-function encodeFilterArg (column, arg) {
+function encodeFilterArg(column, arg) {
 	if (column.encode.safe)
 		return column.encode.safe(arg);
 	else

@@ -1,5 +1,5 @@
 var joinLegToShallowJoinSql = require('./joinLegToShallowJoinSql');
-var newJoinSql = _newJoinSql; 
+var newJoinSql = _newJoinSql;
 
 function toJoinSql(leg,alias,childAlias) {
 	return joinLegToShallowJoinSql(leg,alias,childAlias) +

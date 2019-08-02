@@ -1,4 +1,4 @@
-function defineColumn(column, table) {	
+function defineColumn(column, table) {
 	var c = {};
 
 	c.string = function() {
@@ -56,7 +56,7 @@ function defineColumn(column, table) {
 
 	c.serializable = function(value) {
 		column.serializable = value;
-		return c;		
+		return c;
 	};
 
 	return c;

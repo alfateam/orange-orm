@@ -1,6 +1,6 @@
- var tryGetFromCacheById = require('./tryGetFromCacheById');
- var getFromDbById = require('./getFromDbById');
- var resultToPromise = require('./resultToPromise');
+var tryGetFromCacheById = require('./tryGetFromCacheById');
+var getFromDbById = require('./getFromDbById');
+var resultToPromise = require('./resultToPromise');
 
 function getById() {
 	var cached =  tryGetFromCacheById.apply(null,arguments);

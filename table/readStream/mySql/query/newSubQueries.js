@@ -17,7 +17,7 @@ function newSubQueries(table,span,alias) {
 		result.push(manyLegToQuery( alias,leg,_legNo));
 	};
 
-	span.legs.forEach(onEachLeg);	
+	span.legs.forEach(onEachLeg);
 
 	function onEachLeg(leg,legNo) {
 		_legNo = legNo;
@@ -28,17 +28,17 @@ function newSubQueries(table,span,alias) {
 }
 
 function _joinLegToQuery() {
-	joinLegToQuery = require('./newSubQueries/joinLegToQuery');	
+	joinLegToQuery = require('./newSubQueries/joinLegToQuery');
 	return joinLegToQuery.apply(null,arguments);
 }
 
 function _oneLegToQuery() {
-	oneLegToQuery = require('./newSubQueries/oneLegToQuery');	
+	oneLegToQuery = require('./newSubQueries/oneLegToQuery');
 	return oneLegToQuery.apply(null,arguments);
 }
 
 function _manyLegToQuery() {
-	manyLegToQuery = require('./newSubQueries/manyLegToQuery');	
+	manyLegToQuery = require('./newSubQueries/manyLegToQuery');
 	return manyLegToQuery.apply(null,arguments);
 }
 

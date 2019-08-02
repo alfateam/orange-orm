@@ -12,72 +12,72 @@ let versionArray = process.version.replace('v', '').split('.');
 let major = parseInt(versionArray[0]);
 
 function newDatabase(connectionString, poolOptions) {
-    let pool = newPool(connectionString, poolOptions);
-    let c = {};
+	let pool = newPool(connectionString, poolOptions);
+	let c = {};
 
-    c.transaction = function (options, fn) {
-        if ((arguments.length === 1) && (typeof options === 'function')) {
-            fn = options;
-            options = undefined;
-        }
-        let domain = createDomain();
+	c.transaction = function(options, fn) {
+		if ((arguments.length === 1) && (typeof options === 'function')) {
+			fn = options;
+			options = undefined;
+		}
+		let domain = createDomain();
 
-        if (fn)
-            return domain.run(runInTransaction);
-        else if ((major >= 12) && useHook) {
-            domain.exitContext = true;
-            return domain.start().then(run);
-        }
-        else
-            return domain.run(run);
+		if (fn)
+			return domain.run(runInTransaction);
+		else if ((major >= 12) && useHook) {
+			domain.exitContext = true;
+			return domain.start().then(run);
+		}
+		else
+			return domain.run(run);
 
-        async function runInTransaction() {
-            let result;
-            let transaction = newTransaction(domain, pool);
-            await new Promise(transaction)
-                .then(begin)
-                .then(negotiateSchema)
-                .then(fn)
-                .then((res) => result = res)
-                .then(c.commit)
-                .then(null, c.rollback);
-            return result;
-        }
+		async function runInTransaction() {
+			let result;
+			let transaction = newTransaction(domain, pool);
+			await new Promise(transaction)
+				.then(begin)
+				.then(negotiateSchema)
+				.then(fn)
+				.then((res) => result = res)
+				.then(c.commit)
+				.then(null, c.rollback);
+			return result;
+		}
 
-        function run() {
-            let p;
-            let transaction = newTransaction(domain, pool);
-            if (useHook)
-                p = new Promise(transaction);
-            else
-                p = new promise(transaction);
+		function run() {
+			let p;
+			let transaction = newTransaction(domain, pool);
+			if (useHook)
+				p = new Promise(transaction);
+			else
+				p = new promise(transaction);
 
-            return p.then(begin)
-                .then(negotiateSchema);
-        }
+			return p.then(begin)
+				.then(negotiateSchema);
+		}
 
-        function negotiateSchema(previous) {
-            let schema = options && options.schema;
-            if (!schema)
-                return previous;
-            return executeSchema(schema);
-        }
-    };
+		function negotiateSchema(previous) {
+			let schema = options && options.schema;
+			if (!schema)
+				return previous;
+			return executeSchema(schema);
+		}
+	};
 
-    c.rollback = rollback;
-    c.commit = commit;
-    c.lock = lock;
-    c.schema = executeSchema;
+	c.rollback = rollback;
+	c.commit = commit;
+	c.lock = lock;
+	c.schema = executeSchema;
 
-    c.end = function () {
-        return pool.end();
-    };
+	c.end = function() {
+		return pool.end();
+	};
 
-    c.accept = function (caller) {
-        caller.visitPg();
-    };
+	c.accept = function(caller) {
+		caller.visitPg();
+	};
 
-    return c;
+	return c;
 }
 
 module.exports = newDatabase;

@@ -1,7 +1,7 @@
 var newRowCache = require('../newRowCache');
 
 function newExpanderCache(joinRelation) {
-	return newRowCache(joinRelation.childTable);	
+	return newRowCache(joinRelation.childTable);
 }
 
 module.exports = newExpanderCache;

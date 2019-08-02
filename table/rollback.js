@@ -6,17 +6,17 @@ var newThrow = require('./newThrow');
 var resultToPromise = require('./resultToPromise');
 
 function rollback(e) {
-    var executeRollback = executeQuery.bind(null, rollbackCommand);
-    var chain = resultToPromise()
-        			.then(popChanges)
-        			.then(executeRollback)
-        			.then(releaseDbClient);
+	var executeRollback = executeQuery.bind(null, rollbackCommand);
+	var chain = resultToPromise()
+		.then(popChanges)
+		.then(executeRollback)
+		.then(releaseDbClient);
 
-    if (e)
-        return newThrow(e, chain);
-    return chain;
+	if (e)
+		return newThrow(e, chain);
+	return chain;
 }
 
 module.exports = function(e) {
-    return Promise.resolve().then(() => rollback(e));
+	return Promise.resolve().then(() => rollback(e));
 };

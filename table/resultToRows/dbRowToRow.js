@@ -26,19 +26,19 @@ function dbRowToRow(span, dbRow) {
 		leg.expand(row);
 	};
 
-	c.visitMany = function(leg) {
+	c.visitMany = function() {
 	};
 
 	span.legs.forEach(onEach);
 
-	function onEach (leg) {
+	function onEach(leg) {
 		leg.accept(c);
 	}
 
 	return row;
 }
 
-function _nextDbRowToRow (span, dbRow) {
+function _nextDbRowToRow(span, dbRow) {
 	nextDbRowToRow = require('./dbRowToRow');
 	nextDbRowToRow(span, dbRow);
 }

@@ -1,35 +1,35 @@
-	var newRelatedColumn = require('./relatedTable/relatedColumn');
+var newRelatedColumn = require('./relatedTable/relatedColumn');
 var nextRelatedTable = _nextRelatedTable;
 var subFilter = require('./relatedTable/subFilter');
 
 function newRelatedTable(relations) {
-	var table = relations[relations.length-1].childTable;
-	var columns = table._columns;	
+	var table = relations[relations.length - 1].childTable;
+	var columns = table._columns;
 	var c = {};
 
 	for (var i = 0; i < columns.length; i++) {
 		var col = columns[i];
-		c[col.alias] = newRelatedColumn(col,relations);
+		c[col.alias] = newRelatedColumn(col, relations);
 	}
 	defineChildren();
 
 	function defineChildren() {
 		var childRelations = table._relations;
-		for(var alias in childRelations) {	
+		for (var alias in childRelations) {
 			defineChild(alias);
 		}
 	}
 
-	function defineChild(alias) {		
-		var relation = table._relations[alias];    	
-    	var children = relations.slice(0);    				    				
-    	children.push(relation);
+	function defineChild(alias) {
+		var relation = table._relations[alias];
+		var children = relations.slice(0);
+		children.push(relation);
 
 		Object.defineProperty(c, alias, {
-    		get: function() {        			
-    	   		return nextRelatedTable(children);
-    		}
-		});	
+			get: function() {
+				return nextRelatedTable(children);
+			}
+		});
 	}
 
 	c.exists = function() {

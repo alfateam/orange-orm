@@ -1,13 +1,13 @@
 var newDiscriminatorSql = require('./newDiscriminatorSql');
 
-function _new(rightTable,leftColumns,rightColumns,leftAlias,rightAlias) {	
+function _new(rightTable,leftColumns,rightColumns,leftAlias,rightAlias) {
 	var sql = '';
 	var delimiter = '';
 	for (var i = 0; i < leftColumns.length; i++) {
 		addColumn(i);
 		delimiter = ' AND ';
 	}
-	
+
 	function addColumn(index) {
 		var leftColumn = leftColumns[index];
 		var rightColumn = rightColumns[index];

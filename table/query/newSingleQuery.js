@@ -3,7 +3,6 @@ var newJoinSql = require('./singleQuery/newJoinSql');
 var newWhereSql = require('./singleQuery/newWhereSql');
 var negotiateLimit = require('./singleQuery/negotiateLimit');
 var negotiateExclusive = require('./singleQuery/negotiateExclusive');
-var extractLimitQuery = require('./extractLimitQuery');
 
 function _new(table,filter,span,alias,innerJoin,orderBy,limit,exclusive) {
 	var c = {};

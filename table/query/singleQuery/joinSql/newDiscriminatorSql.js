@@ -5,7 +5,7 @@ function newDiscriminatorSql(table, alias) {
 	if (result)
 		return ' AND' + result;
 	return result;
-	
+
 }
 
 module.exports = newDiscriminatorSql;

@@ -3,8 +3,8 @@ function newImmutable(fn) {
 	var _run = runFirst;
 	return run;
 
-	function run() {	
-		var args = [].slice.call(arguments);	
+	function run() {
+		var args = [].slice.call(arguments);
 		return _run(args);
 	}
 

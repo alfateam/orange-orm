@@ -1,4 +1,4 @@
-function negotiateNextAndFilter(filter, other) {		
+function negotiateNextAndFilter(filter, other) {
 	if (!other.sql())
 		return filter;
 	return filter.append(' AND ').append(other);

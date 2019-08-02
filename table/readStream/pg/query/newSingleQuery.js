@@ -11,7 +11,7 @@ function _new(table,filter,span, alias,subQueries,orderBy,limit) {
 		return 'select ' + columnSql + subQueries + ' from ' + name + ' ' + alias + whereSql + orderBy + limit;
 	};
 
-	c.parameters = filter.parameters;	
+	c.parameters = filter.parameters;
 
 	return c;
 }

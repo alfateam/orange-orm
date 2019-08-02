@@ -1,55 +1,55 @@
 function newCollection() {
-    var c = {};
-    var initialArgs = [];
-    for (var i = 0; i < arguments.length; i++) {
-        initialArgs.push(arguments[i]);
-    }
-    var ranges = [initialArgs];
+	var c = {};
+	var initialArgs = [];
+	for (var i = 0; i < arguments.length; i++) {
+		initialArgs.push(arguments[i]);
+	}
+	var ranges = [initialArgs];
 
-    c.addRange = function(otherCollection) {
-        ranges.push(otherCollection);
-    };
+	c.addRange = function(otherCollection) {
+		ranges.push(otherCollection);
+	};
 
-    c.add = function(element) {
-        c.addRange([element]);
-    };
+	c.add = function(element) {
+		c.addRange([element]);
+	};
 
-    c.toArray = function(element) {
-        var result = [];
-        c.forEach(onEach);
-        return result;
+	c.toArray = function() {
+		var result = [];
+		c.forEach(onEach);
+		return result;
 
-        function onEach(element) {
-            result.push(element);
-        }
-    };
+		function onEach(element) {
+			result.push(element);
+		}
+	};
 
-    c.forEach = function(callback) {
-        var index = 0;
-        for (var i = 0; i < ranges.length; i++) {
-            ranges[i].forEach(onEach);
-        }
+	c.forEach = function(callback) {
+		var index = 0;
+		for (var i = 0; i < ranges.length; i++) {
+			ranges[i].forEach(onEach);
+		}
 
-        function onEach(element) {
-            callback(element, index);
-            index++;
-        }
+		function onEach(element) {
+			callback(element, index);
+			index++;
+		}
 
-    };
+	};
 
-    Object.defineProperty(c, 'length', {
-        enumerable: false,
-        get: function() {
-        	var result = 0;
-        	for (var i = 0; i < ranges.length; i++) {
-        		result += ranges[i].length;
-        	}
-            return result;
-        },
-    });
+	Object.defineProperty(c, 'length', {
+		enumerable: false,
+		get: function() {
+			var result = 0;
+			for (var i = 0; i < ranges.length; i++) {
+				result += ranges[i].length;
+			}
+			return result;
+		},
+	});
 
 
-    return c;
+	return c;
 }
 
 module.exports = newCollection;

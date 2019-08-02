@@ -11,7 +11,7 @@ function newSingleCommandCore(table,filter,alias) {
 		return deleteFromSql(table, alias, whereSql);
 	};
 
-	c.parameters = filter.parameters;	
+	c.parameters = filter.parameters;
 
 	return c;
 }

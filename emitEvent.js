@@ -1,7 +1,7 @@
 function emitEvent() {
 	var callbacks = [];
 	var emit = function() {
-		
+
 		var copy = callbacks.slice(0, callbacks.length);
 		for (var i = 0; i < copy.length; i++) {
 			var callback = copy[i];
@@ -16,11 +16,11 @@ function emitEvent() {
 	emit.tryAdd = function(callback) {
 		if (callback)
 			emit.add(callback);
-	};	
+	};
 
 	emit.remove = function(callback) {
-		for (var i = 0; i < callbacks.length; i++) {			
-			if(callbacks[i] == callback){
+		for (var i = 0; i < callbacks.length; i++) {
+			if(callbacks[i] === callback){
 				callbacks.splice(i,1);
 				return;
 			}

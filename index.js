@@ -1,7 +1,7 @@
 var newPg = require('./pg/newDatabase');
 var _sqlite;
 
-var connectViaPool = function(connectionString, poolOptions) {
+var connectViaPool = function(connectionString) {
 	if (connectionString.indexOf && connectionString.indexOf('mysql') === 0)
 		return connectViaPool.mySql.apply(null, arguments);
 	return newPg.apply(null, arguments);
@@ -20,11 +20,11 @@ connectViaPool.lock = require('./lock');
 connectViaPool.schema = require('./pg/schema');
 
 Object.defineProperty(connectViaPool, 'sqlite', {
-  get: function () {
-  	if (!_sqlite)
-  		_sqlite = require('./sqlite/newDatabase');
-	return _sqlite; 	 
-  }
+	get: function() {
+		if (!_sqlite)
+			_sqlite = require('./sqlite/newDatabase');
+		return _sqlite;
+	}
 });
 
 module.exports = connectViaPool;

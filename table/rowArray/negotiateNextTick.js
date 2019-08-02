@@ -1,6 +1,6 @@
 var promise = require('promise/domains');
 
-function negotiateNextTick(i) {	
+function negotiateNextTick(i) {
 	if (i === 0)
 		return;
 	if (i % 1000 === 0)

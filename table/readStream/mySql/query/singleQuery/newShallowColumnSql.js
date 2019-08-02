@@ -1,7 +1,7 @@
 var util = require('util');
 
 function _new(table,alias) {
-	var columnFormat = "'%s',%s.%s";
+	var columnFormat = '\'%s\',%s.%s';
 	var columns = table._columns;
 	var sql = '';
 	var separator = '';

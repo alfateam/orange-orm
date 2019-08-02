@@ -1,5 +1,5 @@
-function act(c){	
-	c.buffer = new Buffer( [1,2,3] );
+function act(c){
+	c.buffer = Buffer.from([1,2,3] );
 	c.purify.expect(c.value).return(c.buffer);
 
 	c.expected = {};

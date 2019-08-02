@@ -1,13 +1,13 @@
 var pools = require('../../pools');
 
-function endPool(pgPool, id, done) {	
-    pgPool.drain(onDrained);
+function endPool(pgPool, id, done) {
+	pgPool.drain(onDrained);
 
-    function onDrained() {
-        pgPool.destroyAllNow();
-        delete pools[id];
-        done();
-    }
+	function onDrained() {
+		pgPool.destroyAllNow();
+		delete pools[id];
+		done();
+	}
 }
 
 module.exports = endPool;

@@ -14,7 +14,7 @@ function newWhereSql(relation,shallowFilter) {
 
 	c.visitOne = function(relation) {
 		var joinRelation = relation.joinRelation;
-		var rightColumns = joinRelation.columns;		
+		var rightColumns = joinRelation.columns;
 		var childTable = joinRelation.childTable;
 		var leftColumns = childTable._primaryColumns;
 		var alias = childTable._dbName;
@@ -27,7 +27,7 @@ function newWhereSql(relation,shallowFilter) {
 		var table = relation.childTable;
 		var joinCore = newShallowJoinSql(table,leftColumns,rightColumns,alias,'_1');
 		if (shallowFilter)
-			sql = shallowFilter.prepend(' WHERE ' + joinCore + ' AND ');		
+			sql = shallowFilter.prepend(' WHERE ' + joinCore + ' AND ');
 		else
 			sql = ' WHERE ' + joinCore;
 	}

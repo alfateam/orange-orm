@@ -7,15 +7,15 @@ var greaterThanOrEqual = require('./greaterThanOrEqual');
 var _in = require('./in');
 var _extractAlias = require('./extractAlias');
 
-module.exports = function(table,name) {	
+module.exports = function(table,name) {
 	var c = {};
 	var extractAlias = _extractAlias.bind(null,table);
 	c._dbName = name;
-	c.alias = name;	
-	c.dbNull = null;	
+	c.alias = name;
+	c.dbNull = null;
 	table._columns.push(c);
 	table[name] = c;
-	
+
 	c.equal = function(arg,alias) {
 		alias = extractAlias(alias);
 		return equal(c,arg, alias);

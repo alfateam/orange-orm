@@ -1,7 +1,7 @@
 var newMySqlQuery = require('./mySql/newQuery');
 var newPgQuery = require('./pg/newQuery');
 
-function newQuery(db,table,filter,span,alias) {	
+function newQuery(db) {
 	var c = {};
 	var _newQuery;
 
@@ -25,4 +25,4 @@ function newQuery(db,table,filter,span,alias) {
 	return _newQuery.apply(null, args);
 }
 
-module.exports = newQuery
+module.exports = newQuery;

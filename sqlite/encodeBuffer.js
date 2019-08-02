@@ -1,5 +1,5 @@
 function encodeBuffer(buffer) {
-	return "E'\\\\x" + buffer.toString('hex') + "'";
+	return 'E\'\\\\x' + buffer.toString('hex') + '\'';
 }
 
 module.exports = encodeBuffer;
