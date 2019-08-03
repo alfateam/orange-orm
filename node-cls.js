@@ -90,28 +90,22 @@ function getAllContexts(asyncId, obj) {
 function getContext(ns, asyncId, cur = []) {
 	asyncId = asyncId || ah.executionAsyncId();
 	let current = stack[asyncId];
-	if (!current) {
-
-		let out = [];
-		for (var i in cur) {
-			let id = cur[i];
-			out.push(inspect(stack[id], false, 1));
-		}
-		throw new Error('Context \'' + ns + '\' not found ' + cur + ' ' + out.join(', '));
-	}
+	if (!current)
+		return;
 	if (current.contexts[ns])
 		return current.contexts[ns];
 	if (current.parent) {
 		cur.push(current.parent);
 		return getContext(ns, current.parent, cur);
 	}
-	throw new Error('Context \'' + ns + '\' not found');
 }
 
 function exitContext(ns) {
 	log('exit Context');
 	let asyncId = ah.executionAsyncId();
 	let context = getContext(ns);
+	if (!context)
+		return;
 	let node = stack[asyncId];
 	if (node && node.contexts[ns] === context)
 		delete node.contexts[ns];
@@ -177,7 +171,6 @@ function destroy(asyncId) {
 			}
 		}
 	}
-
 	delete stack[asyncId];
 }
 
