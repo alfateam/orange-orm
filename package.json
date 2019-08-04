@@ -23,8 +23,8 @@
     "mysql": "^2.13.0",
     "node-cls": "^1.0.0",
     "pg": "^7.4.3",
-    "pg-query-stream": "^1.1.1",
-    "promise": "^7.1.1",
+    "pg-query-stream": "^2.0.0",
+    "promise": "^8.0.3",
     "uuid": "^3.0.1"
   },
   "peerDependencies": {
