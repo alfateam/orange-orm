@@ -21,6 +21,7 @@
     "deferred": "^0.7.5",
     "generic-pool": "^2.2.2",
     "mysql": "^2.13.0",
+    "node-cls": "^1.0.0",
     "pg": "^7.4.3",
     "pg-query-stream": "^1.1.1",
     "promise": "^7.1.1",

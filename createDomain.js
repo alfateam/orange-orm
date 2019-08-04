@@ -1,5 +1,5 @@
 let useHook = require('./useHook');
-let cls = require('./node-cls');
+let cls = require('node-cls');
 var Domain = require('domain');
 var negotiateForwardProperty = require('./createDomain/negotiateForwardProperty');
 
@@ -14,7 +14,7 @@ function createDomain() {
 }
 
 function createOnContext() {
-	return cls.createContext('rdb');
+	return cls.create('rdb');
 }
 
 if (useHook)

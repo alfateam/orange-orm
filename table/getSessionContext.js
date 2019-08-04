@@ -1,5 +1,5 @@
 let useHook = require('../useHook');
-let cls = require('../node-cls');
+let cls = require('node-cls');
 
 if (useHook)
 	module.exports = function() {
