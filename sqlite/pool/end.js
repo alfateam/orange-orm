@@ -1,10 +1,10 @@
 var pools = require('../../pools');
 
 function endPool(genericPool, id, done) {
-	genericPool.drain(onDrained);
+	genericPool.drain().then(onDrained);
 
 	function onDrained() {
-		genericPool.destroyAllNow();
+		genericPool.clear();
 		delete pools[id];
 		done();
 	}

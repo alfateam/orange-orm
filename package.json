@@ -1,6 +1,6 @@
 {
   "name": "rdb",
-  "version": "2.0.0-beta.1",
+  "version": "2.0.0-beta.2",
   "main": "index.js",
   "title": "rdb",
   "description": "Object Relational Mapper",
@@ -10,8 +10,11 @@
     "mySql",
     "mysql",
     "postgres",
-    "pg"
+    "pg",
+    "sqlite",
+    "database"
   ],
+  "author": "Lars-Erik Roald <lars.roald@gmail.com>",
   "license": "ISC",
   "scripts": {
     "test": "a",
