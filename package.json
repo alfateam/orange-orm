@@ -22,7 +22,6 @@
   },
   "dependencies": {
     "deferred": "^0.7.5",
-    "generic-pool": "^3.7.1",
     "mysql": "^2.13.0",
     "node-cls": "^1.0.0",
     "pg": "^7.4.3",
