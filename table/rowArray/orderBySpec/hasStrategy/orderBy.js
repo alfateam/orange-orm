@@ -25,7 +25,7 @@ function act(c){
 
 	c.rows = [c.row, c.row2, c.row3, c.row4];
 
-	c.expected = [c.row2, c.row, c.row3, c.row4, ];
+	c.expected = [c.row2, c.row, c.row4, c.row3];
 	c.strategy = {
 		orderBy: ['a', 'b desc', 'c asc']
 	};
