@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__2.0.1__  
+Ignoring tests when packing for npm  
 __2.0.0__  
 Domains are replaced by [node-cls](https://www.npmjs.com/package/node-cls) which is based upon [async_hooks](https://nodejs.org/api/async_hooks.html#async_hooks_async_hooks). Beware that async_hooks are still experimental. Requires node >= 8.  
 __1.7.7__  
