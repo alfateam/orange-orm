@@ -24,7 +24,7 @@ module.exports = {
 	//Connection pool options - see https://github.com/coopernurse/node-pool
 	//number of connections to use in connection pool
 	//0 will disable connection pooling
-	poolSize: 10,
+	poolSize: 0,
 
 	//max milliseconds a client can go unused before it is removed
 	//from the pool and destroyed

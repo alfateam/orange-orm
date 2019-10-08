@@ -54,8 +54,29 @@ function newDatabase(connectionString, poolOptions) {
 
 	};
 
-	c.rollback = rollback;
-	c.commit = commit;
+	c.rollback = async function() {
+		let error;
+		let result;
+		try {
+			result = await rollback.apply(null, arguments);
+		}
+		catch(e)
+		{
+			error = e;
+		}
+		if (!poolOptions)
+			await pool.end();
+		if (error)
+			throw error;
+		return result;
+	};
+
+	c.commit = async function() {
+		let result = await commit.apply(null, arguments);
+		if (!poolOptions)
+			await pool.end();
+		return result;
+	};
 
 	c.end = function() {
 		return pool.end();

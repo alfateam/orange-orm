@@ -1,7 +1,7 @@
 var pools = require('../../pools');
 
 function endPool(genericPool, id, done) {
-	genericPool.drain().then(onDrained);
+	genericPool.drain(onDrained);
 
 	function onDrained() {
 		genericPool.clear();
