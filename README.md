@@ -15,7 +15,7 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
-__2.10.0__  
+__2.1.0__  
 Pooling is disabled when there is no pool option object sent in. Previously, a pool with default size 10 was always created.  
 __2.0.1__  
 Ignoring tests when packing for npm  
