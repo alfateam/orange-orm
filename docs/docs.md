@@ -98,7 +98,6 @@ let rdb = require('rdb');
 
 let db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
 //alternatively: let db = rdb.pg('postgres://postgres:postgres@localhost/test');
-//will use pool with 10 connections by default
 
 return db.transaction(async () => {
     //transaction will commit after this function
@@ -111,7 +110,6 @@ let rdb = require('rdb');
 
 let db = rdb('mysql://root@localhost/rdbDemo?multipleStatements=true');
 //alternatively: let db = rdb.mySql('mysql://root@localhost/rdbDemo?multipleStatements=true');
-//will use pool with 10 connections by default
 
 return db.transaction(async () => {
     //transaction will commit after this function
@@ -124,7 +122,6 @@ Requires sqlite3 as a dependency in your own package.json
 let rdb = require('rdb');
 
 let db = rdb.sqlite(__dirname + '/db/rdbDemo');
-//will use pool with 10 connections by default
 
 return db.transaction(async () => {
     //transaction will commit after this function
