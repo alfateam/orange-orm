@@ -10,7 +10,12 @@ let versionArray = process.version.replace('v', '').split('.');
 let major = parseInt(versionArray[0]);
 
 function newDatabase(connectionString, poolOptions) {
-	let pool = newPool(connectionString, poolOptions);
+	var pool;
+	if (!poolOptions)
+		pool = newPool.bind(null,connectionString, poolOptions);
+	else
+		pool = newPool(connectionString, poolOptions);
+
 	let c = {};
 
 	c.transaction = function(options, fn) {
@@ -53,32 +58,14 @@ function newDatabase(connectionString, poolOptions) {
 
 	};
 
-	c.rollback = async function() {
-		let error;
-		let result;
-		try {
-			result = await rollback.apply(null, arguments);
-		}
-		catch(e)
-		{
-			error = e;
-		}
-		if (!poolOptions)
-			await pool.end();
-		if (error)
-			throw error;
-		return result;
-	};
-
-	c.commit = async function() {
-		let result = await commit.apply(null, arguments);
-		if (!poolOptions)
-			await pool.end();
-		return result;
-	};
+	c.rollback = rollback;
+	c.commit = commit;
 
 	c.end = function() {
-		return pool.end();
+		if (poolOptions)
+			return pool.end();
+		else
+			return promise();
 	};
 
 	c.accept = function(caller) {

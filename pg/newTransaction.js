@@ -6,6 +6,11 @@ var deleteFromSql = require('./deleteFromSql');
 var selectForUpdateSql = require('./selectForUpdateSql');
 
 function newResolveTransaction(domain, pool) {
+    var rdb = {};
+    if (!pool.connect) {
+        pool = pool();
+        rdb.pool = pool;
+    }
 
 	return function(onSuccess, onError) {
 		pool.connect(onConnected);
@@ -16,7 +21,6 @@ function newResolveTransaction(domain, pool) {
 					onError(err);
 					return;
 				}
-				var rdb = {};
 				client.executeQuery = wrapQuery(client);
 				client.streamQuery = wrapQueryStream(client);
 				rdb.dbClient = client;

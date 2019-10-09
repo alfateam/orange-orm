@@ -5,6 +5,11 @@ var selectForUpdateSql = require('./selectForUpdateSql');
 var encodeDate = require('./encodeDate');
 
 function newResolveTransaction(domain, pool) {
+    var rdb = {};
+    if (!pool.connect) {
+        pool = pool();
+        rdb.pool = pool;
+    }
 
 	return function(onSuccess, onError) {
 		pool.connect(onConnected);
@@ -15,7 +20,6 @@ function newResolveTransaction(domain, pool) {
 					onError(err);
 					return;
 				}
-				var rdb = {};
 				connection.executeQuery = wrapQuery(connection);
 				connection.streamQuery = wrapQueryStream(connection);
 				rdb.dbClient = connection;
