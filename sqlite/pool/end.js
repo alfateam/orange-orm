@@ -4,7 +4,7 @@ function endPool(genericPool, id, done) {
 	genericPool.drain(onDrained);
 
 	function onDrained() {
-		genericPool.clear();
+		genericPool.destroyAllNow();
 		delete pools[id];
 		done();
 	}
