@@ -8,7 +8,12 @@ var newPool = require('./newPool');
 var runInTransaction = require('../runInTransaction');
 
 function newDatabase(connectionString, poolOptions) {
-    var pool = newPool(connectionString, poolOptions);
+    var pool;
+	if (!poolOptions)
+		pool = newPool.bind(null,connectionString, poolOptions);
+	else
+		pool = newPool(connectionString, poolOptions);
+
     var c = {};
 
     c.transaction = function(options, fn) {
@@ -34,7 +39,10 @@ function newDatabase(connectionString, poolOptions) {
     c.commit = commit;
 
     c.end = function() {
-        return pool.end();
+		if (poolOptions)
+			return pool.end();
+		else
+			return promise();
     };
 
     c.accept = function(caller) {

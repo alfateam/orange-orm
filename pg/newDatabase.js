@@ -10,7 +10,12 @@ var executeSchema = require('./schema');
 var runInTransaction = require('../runInTransaction');
 
 function newDatabase(connectionString, poolOptions) {
-    var pool = newPool(connectionString, poolOptions);
+	var pool;
+	if (!poolOptions)
+		pool = newPool.bind(null,connectionString, poolOptions);
+	else
+		pool = newPool(connectionString, poolOptions);
+
     var c = {};
 
     c.transaction = function(options, fn) {
@@ -39,12 +44,16 @@ function newDatabase(connectionString, poolOptions) {
     };
 
     c.rollback = rollback;
-    c.commit = commit;
+	c.commit = commit;
+
     c.lock = lock;
     c.schema = executeSchema;
 
     c.end = function() {
-        return pool.end();
+		if (poolOptions)
+			return pool.end();
+		else
+			return promise();
     };
 
     c.accept = function(caller) {
