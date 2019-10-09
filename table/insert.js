@@ -21,6 +21,10 @@ function expand(table, row) {
 		row.expand(relationName);
 	};
 
+	visitor.visitOne = function() {
+		row.expand(relationName);
+	};
+
 	for (relationName in table._relations) {
 		var relation = table._relations[relationName];
 		relation.accept(visitor);
