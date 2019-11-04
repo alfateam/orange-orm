@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__2.2.0__  
+Throw meaningful error when getById gives no match.  
 __2.1.1__  
 Bugfix with insert and hasOne relation.  
 __2.1.0__  
