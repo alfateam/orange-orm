@@ -1,23 +1,17 @@
-var tryGetFromDbById = require('./tryGetFromDbById');
+let tryGetFromDbById = require('./tryGetFromDbById');
 
-function get() {
-	return tryGetFromDbById.apply(null, arguments).then(onResult);
-
-	function onResult(row) {
-		if (row === null)
-			throw new Error('Row not found.');
-		return row;
-	}
+function get(table, ...ids) {
+	return tryGetFromDbById.apply(null, arguments).then((row) => onResult(table, row, ids));
 }
 
-get.exclusive = function() {
-	return tryGetFromDbById.exclusive.apply(null, arguments).then(onResult);
-
-	function onResult(row) {
-		if (row === null)
-			throw new Error('Row not found.');
-		return row;
-	}
+get.exclusive = function(table, ...ids) {
+	return tryGetFromDbById.exclusive.apply(null, arguments).then((row) => onResult(table, row, ids));
 };
+
+function onResult(table, row, id) {
+	if (row === null)
+		throw new Error(`${table._dbName  }: Row with id ${id} not found.`);
+	return row;
+}
 
 module.exports = get;
