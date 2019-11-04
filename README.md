@@ -25,6 +25,8 @@ __2.0.1__
 Ignoring tests when packing for npm  
 __2.0.0__  
 Domains are replaced by [node-cls](https://www.npmjs.com/package/node-cls) which is based upon [async_hooks](https://nodejs.org/api/async_hooks.html#async_hooks_async_hooks). Beware that async_hooks are still experimental. Requires node >= 8.  
+__1.9.0__  
+Throw meaningful error when getById gives no match.  
 __1.8.1__  
 Bugfix with insert and hasOne relation.  
 __1.8.0__  
