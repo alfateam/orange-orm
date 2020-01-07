@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__2.3.0__  
+Added column validation with JSON Schema or plain validator.  
 __2.2.0__  
 Throw meaningful error when getById gives no match.  
 __2.1.1__  
