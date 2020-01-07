@@ -43,10 +43,6 @@ __Basic querying__
 [Raw SQL query](#_rawsqlquery)  
 [Raw SQL Query With Parameters](#_rawsqlquerywithparameters)  
   
-__Validation__  
-[plain validator](#_validate)  
-[JSON Schema](#_jsonschema)  
-  
 __Streaming__  
 [streaming rows](#_streameager)  
 [streaming json](#_streamjsoneager)  
@@ -65,6 +61,10 @@ __Persistence__
 [update a hasMany-relation](#_updatehasmany)  
 [row lock](#_rowlock)  
 [transaction lock](#_transactionlock)  
+  
+__Validation__  
+[plain validator](#_validate)  
+[JSON Schema](#_jsonschema)  
   
 __Filters__  
 [equal](#_equal)  
@@ -1122,7 +1122,7 @@ try {
 }
 ```
 <a name="_jsonschema"></a>
-[JSON Schema](https://github.com/alfateam/rdb-demo/blob/master/jsonSchema.js)
+[JSON Schema](https://github.com/alfateam/rdb-demo/blob/master/jsonSchema.js)  
 Using [ajv](https://www.npmjs.com/package/ajv)
 ```js
 let rdb = require('rdb');
