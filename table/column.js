@@ -1,3 +1,6 @@
+let Ajv = require('ajv');
+let inspect = require('util').inspect;
+
 function defineColumn(column, table) {
 	var c = {};
 
@@ -56,6 +59,27 @@ function defineColumn(column, table) {
 
 	c.serializable = function(value) {
 		column.serializable = value;
+		return c;
+	};
+
+	c.validate = function(value) {
+		column.validate = value;
+		return c;
+	};
+
+	c.JSONSchema = function(schema, options) {
+		let ajv = new Ajv(options);
+		let validate = ajv.compile(schema);
+		column.validate = _validate;
+
+		function _validate(value) {
+			let valid = validate(value);
+			if (!valid) {
+				let e = new Error(`Column ${table._dbName}.${column._dbName} violates JSON Schema: ${inspect(validate.errors, false, 10)}`);
+				e.errors = validate.errors;
+				throw e;
+			}
+		}
 		return c;
 	};
 

@@ -40,6 +40,8 @@ function newDecodeDbRow(table, dbRow) {
 				var oldValue = this[name];
 				value = purify(value);
 				this._dbRow[key] = value;
+				if (column.validate)
+					column.validate(value, this._dbRow);
 				updateField(table, column, this);
 				var emit = this._emitColumnChanged[name];
 				if (emit)
