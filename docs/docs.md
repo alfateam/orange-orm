@@ -43,6 +43,10 @@ __Basic querying__
 [Raw SQL query](#_rawsqlquery)  
 [Raw SQL Query With Parameters](#_rawsqlquerywithparameters)  
   
+__Validation__  
+[plain validator](#_validate)  
+[JSON Schema](#_jsonschema)  
+  
 __Streaming__  
 [streaming rows](#_streameager)  
 [streaming json](#_streamjsoneager)  
@@ -1089,6 +1093,81 @@ await db.transaction(async () => {
     });
     console.log(result);
 });
+```
+<a name="_validate"></a>
+[Plain validator](https://github.com/alfateam/rdb-demo/blob/master/validate.js)
+```js
+let rdb = require('rdb');
+
+let Customer = rdb.table('_customer');
+
+Customer.primaryColumn('cId').guid().as('id');
+Customer.column('cName').string().as('name').validate(validateName);
+
+function validateName(value, row) {
+    if (value && value.length > 10)
+        throw new Error("Length cannot exceed 10 characters");
+}
+
+let db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+try {
+    await resetDemo();
+    await db.transaction(async () => {
+        let customer = await Customer.getById('a0000000-0000-0000-0000-000000000000');
+        customer.name = 'Ringo Starr' //11 Chars. Will throw
+    });
+} catch (e) {
+    console.log(e.message);
+    //Length cannot exceed 10 characters
+}
+```
+<a name="_jsonschema"></a>
+[JSON Schema](https://github.com/alfateam/rdb-demo/blob/master/jsonSchema.js)
+Using [ajv](https://www.npmjs.com/package/ajv)
+```js
+let rdb = require('rdb');
+
+let documentSchema = {
+    "properties": {
+        "foo": { "type": "number" },
+        "bar": { "type": "number" }
+    }
+};
+
+let nameSchema = {
+    type: "string",
+    "maxLength": 20
+};
+
+let Customer = rdb.table('_customer');
+
+Customer.primaryColumn('cId').guid().as('id');
+Customer.column('cName').string().as('name').JSONSchema(nameSchema);
+Customer.column('cBalance').numeric().as('balance');
+Customer.column('cDocument').json().as('document').JSONSchema(documentSchema, {allErrors: true});
+
+let db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+try {
+    await resetDemo();
+    await db.transaction(async () => {
+        let customer = await Customer.getById('a0000000-0000-0000-0000-000000000000');
+        customer.name = 'Ringo Starr' //OK
+        customer.document = {foo: 'not a number', bar: 'invalid'}; //violates schema
+    });
+} catch (e) {
+    console.log(e.stack);
+    console.log(e.errors);
+// [ {  keyword: 'type',
+//      dataPath: '.foo',
+//      schemaPath: '#/properties/foo/type',
+//      params: { type: 'number' },
+//      message: 'should be number' },
+//  {   keyword: 'type',
+//      dataPath: '.bar',
+//      schemaPath: '#/properties/bar/type',
+//      params: { type: 'number' },
+//      message: 'should be number' } ]
+}
 ```
 <a name="_streameager"></a>
 [streaming rows](https://github.com/alfateam/rdb-demo/blob/master/streamEager.js)
