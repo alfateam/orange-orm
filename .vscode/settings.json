@@ -30,7 +30,9 @@
         "**/deploy/**": true,
         "tplify": true
     },
-    "eslint.autoFixOnSave": true,
     "eslint.alwaysShowStatus": true,
-    "eslint.run": "onType"
+    "eslint.run": "onType",
+    "editor.codeActionsOnSave": {
+        "source.fixAll.eslint": true
+    }
 }
