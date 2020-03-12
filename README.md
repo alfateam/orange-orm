@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__2.4.0__  
+Supporting native bindings for postgres. The package [pg-native](https://www.npmjs.com/package/node-cls) must be installed as a peer dependency  
 __2.3.0__  
 Added column validation with JSON Schema or plain validator.  
 __2.2.0__  

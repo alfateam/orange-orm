@@ -3,10 +3,11 @@ var EventEmitter = require('events').EventEmitter;
 
 var defaults = require('./defaults');
 var genericPool = require('../../generic-pool');
-var pg = require('pg');
+var _pg = require('pg');
 
 function newPgPool(connectionString, poolOptions) {
 	poolOptions = poolOptions || {};
+	let pg = poolOptions.native ? _pg.native : _pg;
 	var pool = genericPool.Pool({
 		max: poolOptions.size || poolOptions.poolSize || defaults.poolSize,
 		idleTimeoutMillis: poolOptions.idleTimeout || defaults.poolIdleTimeout,

@@ -1,6 +1,6 @@
 {
   "name": "rdb",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "main": "index.js",
   "title": "rdb",
   "description": "Object Relational Mapper",
@@ -31,7 +31,8 @@
     "uuid": "^3.0.1"
   },
   "peerDependencies": {
-    "sqlite3": "^4.0.9"
+    "sqlite3": "^4.0.9",
+    "pg-native": "^3.0.0"
   },
   "devDependencies": {
     "a": "^2.1.0",

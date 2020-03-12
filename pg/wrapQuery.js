@@ -11,7 +11,10 @@ function wrapQuery(connection) {
 		log(sql);
 		log('parameters: ' + params);
 
-		runOriginalQuery.call(connection, sql, params, onInnerCompleted);
+		if (params.length === 0)
+			runOriginalQuery.call(connection, sql, onInnerCompleted);
+		else
+			runOriginalQuery.call(connection, sql, params, onInnerCompleted);
 
 		function onInnerCompleted(err, result) {
 			if (err)

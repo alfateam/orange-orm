@@ -6,6 +6,7 @@ __Connecting__
 [connect to mySql](#_connecttomysql)  
 [connect to sqlite](#_connecttosqlite)  
 [pool size](#_poolsize)  
+[native bindings](#_native)  
 [schema](#_schema)  
 [schema alternative 2](#_schema2)  
 [end pool](#_endpool)  
@@ -136,6 +137,20 @@ return db.transaction(async () => {
 ```js
 let rdb = require('rdb');
 let poolOptions = {size: 20};
+
+let db = rdb('postgres://rdb:rdb@localhost/rdbdemo', poolOptions);
+
+return db.transaction(async () => {
+    //transaction will commit after this function
+});
+```
+<a name="_native"></a>
+pool size
+(postgres only)  
+Requires the peer dependency pg-native  
+```js
+let rdb = require('rdb');
+let poolOptions = {native: true};
 
 let db = rdb('postgres://rdb:rdb@localhost/rdbdemo', poolOptions);
 
