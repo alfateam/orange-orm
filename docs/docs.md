@@ -145,7 +145,7 @@ return db.transaction(async () => {
 });
 ```
 <a name="_native"></a>
-native bindings
+__native bindings__  
 (postgres only)  
 Requires the peer dependency pg-native  
 ```js
