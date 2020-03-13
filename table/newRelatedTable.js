@@ -7,6 +7,11 @@ function newRelatedTable(relations) {
 	var columns = table._columns;
 	var c = {};
 
+	Object.defineProperty(c, '_relation', {
+		value: relations[relations.length - 1],
+		writable: false
+	});
+
 	for (var i = 0; i < columns.length; i++) {
 		var col = columns[i];
 		c[col.alias] = newRelatedColumn(col, relations);

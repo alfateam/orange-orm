@@ -16,6 +16,7 @@ var cascadeDelete = require('./table/cascadeDelete');
 var createReadStream = require('./table/createReadStream');
 var createJSONReadStream = require('./table/createJSONReadStream');
 var extractStrategy = require('./table/resultToRows/toDto/extractStrategy');
+var applyPatch = require('./applyPatch');
 
 function _new(tableName) {
 	var table = newContext();
@@ -125,6 +126,7 @@ function _new(tableName) {
 		table._exclusive = true;
 		return table;
 	};
+	table.patch = applyPatch.bind(null, table);
 	return table;
 }
 
