@@ -11,6 +11,7 @@ function newManyRelation(joinRelation) {
 
 	c.joinRelation = joinRelation;
 	c.childTable = joinRelation.parentTable;
+	c.isMany = true;
 
 	c.accept = function(visitor) {
 		visitor.visitMany(c);

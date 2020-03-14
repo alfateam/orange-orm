@@ -1,32 +1,76 @@
+/* eslint-disable require-atomic-updates */
 let applyPatchToColumn = require('./applyPatchToColumn');
 
-async function applyPatch(table, patch) {
-	for (let i = 0; i < patch.length; i++) {
-		await applySingle(patch[i]);
+async function applyPatch(table, patches) {
+	for (let i = 0; i < patches.length; i++) {
+		let patch = {};
+		Object.assign(patch, patches[i]);
+		patch.path = patches[i].path.split('/').slice(1);
+		if (patch.op === 'add' || patch.op === 'replace')
+			await add(patch, table);
+		else if (patch.op === 'remove')
+			await remove(patch, table);
 	}
 
-	async function applySingle({path, value, op}) {
-		let splitPath = path.split('/').slice(1);
-		let id = splitPath.shift();
-		let row = await table.getById(id);
-		if (splitPath.length === 1) {
-			let propertyName = splitPath[0];
-			if (isColumn(propertyName))
-				return row[propertyName] = value;
-			if (isHasRelation(propertyName)) {
-				if (op === 'remove')
-					await deleteChild({row, propertyName});
-				else
-					addChild({propertyName, value});
+
+	async function add({path, value, op}, table, row, parentRow) {
+		let property = path[0];
+		path = path.slice(1);
+		row = row || await table.getById(property);
+		if (path.length === 0)
+			return;//insert
+			// return row.cascadeDelete();
+		property = path[0];
+		console.log(property);
+		if (isColumn(property, table)) {
+			dto = {};
+			dto[property] = row[property];
+			row[property] = applyPatchToColumn({}, dto, [{path: '/' + path.join('/'), op, value}]);
+		}
+		else if (isOneRelation(property, table)) {
+			let child = await row[property];
+			if (!child)
+				throw new Error(property + ' does not exist');
+			await add({path, value, op}, table[property], child);
+		}
+		else if (isManyRelation(property, table)) {
+			let children = (await row[property]).slice(0);
+			for (let i = 0; i < children.length; i++) {
+				let child = children[i];
+				await add({path, value, op}, table[property], child);
 			}
 		}
-		let propertyName = splitPath.shift();
-		let options = {};
-		let result  = applyPatchToColumn(options, row[propertyName], [{path: '/' + splitPath.join('/'), op, value}]);
-		row[propertyName] = result;
 	}
 
-	function isColumn(name) {
+	async function remove({path, value, op}, table, row) {
+		let property = path[0];
+		path = path.slice(1);
+		row = row || await table.getById(property);
+		if (path.length === 0)
+			return row.cascadeDelete();
+		property = path[0];
+		if (isColumn(property, table)) {
+			let dto = {};
+			dto[property] = row[property];
+			let result  = applyPatchToColumn({}, dto, [{path: '/' + path.join('/'), op}]);
+			row[property] = result[property];
+		}
+		else if (isOneRelation(property, table)) {
+			let child = await row[property];
+			if (!child)
+				throw new Error(property + ' does not exist');
+			await remove({path, value, op}, table[property], child);
+		}
+		else if (isManyRelation(property, table)) {
+			let children = (await row[property]).slice(0);
+			for (let i = 0; i < children.length; i++) {
+				let child = children[i];
+				await remove({path, value, op}, table[property], child);
+			}
+		}
+	}
+
+	function isColumn(name, table) {
 		//only column have the equal function
 		return table[name] && table[name].equal;
 	}
@@ -35,8 +79,16 @@ async function applyPatch(table, patch) {
 		return !isHasRelation(name);
 	}
 
-	function isHasRelation(name) {
-		return table[name] && table[name]._relation.joinRelation;
+	function isRelation(name, table) {
+		return table[name] && table[name]._relation;
+	}
+
+	function isManyRelation(name) {
+		return table[name] && table[name]._relation.isMany;
+	}
+
+	function isOneRelation(name) {
+		return table[name] && table[name]._relation.isOne;
 	}
 
 	async function deleteChild({row, propertyName}) {
@@ -44,7 +96,6 @@ async function applyPatch(table, patch) {
 	}
 
 	function addChild({propertyName, value}) {
-		console.log(propertyName);
 		let childTable = table[propertyName]._relation.childTable;
 		let child = childTable.insert(value.id);
 		for(let column in value) {
