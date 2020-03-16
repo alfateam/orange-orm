@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__2.5.0__  
+Experimental JSON patching and express adapter.  
 __2.4.0__  
 Supporting native bindings for postgres. The package [pg-native](https://www.npmjs.com/package/node-cls) must be installed as a peer dependency  
 __2.3.0__  
