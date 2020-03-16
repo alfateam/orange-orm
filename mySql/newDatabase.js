@@ -8,6 +8,7 @@ let useHook = require('../useHook');
 let promise = require('promise/domains');
 let versionArray = process.version.replace('v', '').split('.');
 let major = parseInt(versionArray[0]);
+let hostExpress = require('../hostExpress');
 
 function newDatabase(connectionString, poolOptions) {
 	var pool;
@@ -71,6 +72,8 @@ function newDatabase(connectionString, poolOptions) {
 	c.accept = function(caller) {
 		caller.visitMySql();
 	};
+
+	c.express = hostExpress.bind(null,c);
 
 	return c;
 }
