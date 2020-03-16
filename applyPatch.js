@@ -17,36 +17,43 @@ async function applyPatch(table, patches) {
 		path = path.slice(1);
 		if (!relation)
 			row = row || await table.tryGetById(property);
-		// if ((path.length === 0) && !relation) {
-
-		// }
+		console.log(path);
 		if (path.length === 0) {
 			let pkName = table._primaryColumns[0].alias;
 			row = table.insert(property[pkName]);
 			for(let name in value) {
 				row[name] = value[name];
 			}
+			if (relation && relation.joinRelation) {
+				let fkName = relation.joinRelation.columns[0].alias;
+				let parentPk = relation.joinRelation.childTable._primaryColumns[0].alias;
+				if (!row[fkName])
+					row[fkName] = parentRow[parentPk];
+			}
 			return;
 		}
 		property = path[0];
 		if (isColumn(property, table)) {
-			console.log('isColumn');
+			console.log(property);
+			console.log(value);
+			console.log({path: '/' + path.join('/')});
 			dto = {};
 			dto[property] = row[property];
-			row[property] = applyPatchToColumn({}, dto, [{path: '/' + path.join('/'), op, value}]);
+			let result = applyPatchToColumn({}, dto, [{path: '/' + path.join('/'), op, value}]);
+			row[property] = result[property];
 		}
 		else if (isOneRelation(property, table)) {
-			console.log('isOne');
 			let relation = table[property]._relation;
 			await add({path, value, op}, relation.childTable, await row[property], row, relation);
 		}
 		else if (isManyRelation(property, table)) {
-			console.log('isMany');
-			let children = (await row[property]).slice(0);
-			for (let i = 0; i < children.length; i++) {
-				let relation = table[property]._relation;
-				await add({path, value, op}, relation.childTable, await row[property], row, relation);
-			}
+			let relation = table[property]._relation;
+			if (path.length === 1)
+				for(let id in value) {
+					await add({path: [id], value: value[id], op}, relation.childTable, {}, row, relation);
+				}
+			else
+				await add({path: path.slice(1), value, op}, relation.childTable, await row[property], row, relation);
 		}
 	}
 
@@ -79,16 +86,7 @@ async function applyPatch(table, patches) {
 	}
 
 	function isColumn(name, table) {
-		//only column have the equal function
 		return table[name] && table[name].equal;
-	}
-
-	function isJoinRelation(name) {
-		return !isHasRelation(name);
-	}
-
-	function isRelation(name, table) {
-		return table[name] && table[name]._relation;
 	}
 
 	function isManyRelation(name) {
@@ -97,18 +95,6 @@ async function applyPatch(table, patches) {
 
 	function isOneRelation(name) {
 		return table[name] && table[name]._relation.isOne;
-	}
-
-	async function deleteChild({row, propertyName}) {
-		return (await row[propertyName]).cascadeDelete();
-	}
-
-	function addChild({propertyName, value}) {
-		let childTable = table[propertyName]._relation.childTable;
-		let child = childTable.insert(value.id);
-		for(let column in value) {
-			child[column] = value[column];
-		}
 	}
 }
 

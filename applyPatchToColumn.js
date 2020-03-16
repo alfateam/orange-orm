@@ -21,6 +21,7 @@ function applyPatch(options = {}, dto, changes) {
 	return dto;
 
 	function validateConflict(object, changes) {
+		const set = [];
 		for (let i = 0; i < changes.length; i++) {
 			let change = changes[i];
 			let expectedOldValue = change.oldValue;
