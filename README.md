@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+1.10.0
+Experimental JSON patching  
 1.9.0
 Throw meaningful error when getById gives no match.  
 1.8.1
