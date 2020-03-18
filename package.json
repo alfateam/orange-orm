@@ -23,6 +23,7 @@
     "pg": "^7.4.3",
     "pg-query-stream": "^1.1.1",
     "promise": "^7.1.1",
+    "rfc6902": "^3.0.4",
     "uuid": "^3.0.1"
   },
   "peerDependencies": {

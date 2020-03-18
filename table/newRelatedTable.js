@@ -4,8 +4,13 @@ var subFilter = require('./relatedTable/subFilter');
 
 function newRelatedTable(relations) {
 	var table = relations[relations.length-1].childTable;
-	var columns = table._columns;	
+	var columns = table._columns;
 	var c = {};
+
+	Object.defineProperty(c, '_relation', {
+		value: relations[relations.length - 1],
+		writable: false
+	});
 
 	for (var i = 0; i < columns.length; i++) {
 		var col = columns[i];
@@ -15,21 +20,21 @@ function newRelatedTable(relations) {
 
 	function defineChildren() {
 		var childRelations = table._relations;
-		for(var alias in childRelations) {	
+		for(var alias in childRelations) {
 			defineChild(alias);
 		}
 	}
 
-	function defineChild(alias) {		
-		var relation = table._relations[alias];    	
-    	var children = relations.slice(0);    				    				
+	function defineChild(alias) {
+		var relation = table._relations[alias];
+    	var children = relations.slice(0);
     	children.push(relation);
 
 		Object.defineProperty(c, alias, {
-    		get: function() {        			
+    		get: function() {
     	   		return nextRelatedTable(children);
     		}
-		});	
+		});
 	}
 
 	c.exists = function() {
