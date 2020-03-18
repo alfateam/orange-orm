@@ -15,13 +15,13 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
-1.10.0
+__1.10.0__  
 Experimental JSON patching  
-1.9.0
+__1.9.0__  
 Throw meaningful error when getById gives no match.  
-1.8.1
+__1.8.1__  
 Bugfix with insert and hasOne relation.  
-1.8.0
+__1.8.0__  
 Pooling is disabled when there is no pool option object sent in. Previously, a pool with default size 10 was always created.  
 __1.7.7__  
 Commit/rollback are implicit if sending a callback to the transaction function. [See example](https://github.com/alfateam/rdb/blob/await/docs/docs.md#_connecttopostgres)  
