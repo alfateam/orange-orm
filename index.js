@@ -1,4 +1,5 @@
 var newPg = require('./pg/newDatabase');
+var hostExpress = require('./hostExpress');
 var _sqlite;
 
 var connectViaPool = function(connectionString) {
@@ -26,5 +27,9 @@ Object.defineProperty(connectViaPool, 'sqlite', {
 		return _sqlite;
 	}
 });
+
+connectViaPool.express = function({table, db, concurrency}) {
+	return hostExpress(db, table, concurrency);
+};
 
 module.exports = connectViaPool;

@@ -1,12 +1,19 @@
 let express;
 
-function hostExpress(db, table) {
+function hostExpress(db, table, concurrency) {
 	let router = express.Router();
 	router.patch('/', async function(req, res){
 		try {
+			if (typeof db === 'function') {
+				let dbPromise = db();
+				if (dbPromise.then)
+					db = await dbPromise;
+				else
+					db = dbPromise;
+			}
 			await db.transaction(async() => {
 				let patch = req.body;
-				await table.patch(patch);
+				await table.patch(patch, concurrency);
 			});
 			res.sendStatus(204);
 		}
