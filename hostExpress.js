@@ -1,6 +1,6 @@
 let express;
 
-function hostExpress(db, table, concurrency) {
+function hostExpress({db, table, defaultConcurrency, concurrency}) {
 	let router = express.Router();
 	router.patch('/', async function(req, res){
 		try {
@@ -13,7 +13,7 @@ function hostExpress(db, table, concurrency) {
 			}
 			await db.transaction(async() => {
 				let patch = req.body;
-				await table.patch(patch, concurrency);
+				await table.patch(patch, {defaultConcurrency, concurrency});
 			});
 			res.sendStatus(204);
 		}
@@ -24,8 +24,8 @@ function hostExpress(db, table, concurrency) {
 	return router;
 }
 
-module.exports = function hostExpressLazy(db, table, options) {
+module.exports = function hostExpressLazy() {
 	if (!express)
 		express = require('express');
-	return hostExpress(db, table, options);
+	return hostExpress.apply(null, arguments);
 };

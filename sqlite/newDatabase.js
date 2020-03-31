@@ -71,7 +71,10 @@ function newDatabase(connectionString, poolOptions) {
 		caller.visitSqlite();
 	};
 
-	c.express = hostExpress.bind(null,c);
+	c.express = function(options) {
+		options = {...options, db: c};
+		return hostExpress({db: c, table: options.table});
+	};
 
 	return c;
 }

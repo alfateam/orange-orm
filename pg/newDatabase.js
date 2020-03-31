@@ -85,7 +85,11 @@ function newDatabase(connectionString, poolOptions) {
 	c.accept = function(caller) {
 		caller.visitPg();
 	};
-	c.express = hostExpress.bind(null,c);
+
+	c.express = function(options) {
+		options = {...options, db: c};
+		return hostExpress({db: c, table: options.table});
+	};
 
 	return c;
 }

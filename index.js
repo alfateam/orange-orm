@@ -28,8 +28,6 @@ Object.defineProperty(connectViaPool, 'sqlite', {
 	}
 });
 
-connectViaPool.express = function({table, db, concurrency}) {
-	return hostExpress(db, table, concurrency);
-};
+connectViaPool.express = hostExpress;
 
 module.exports = connectViaPool;
