@@ -1,11 +1,11 @@
 let rfc = require('rfc6902');
 
-function applyPatch(options = {}, dto, changes) {
-	const hasSchema = options.schema;
+function applyPatch({defaultConcurrency, concurrency}, dto, changes) {
 	let dtoCompare = toCompareObject(dto);
 	validateConflict(dtoCompare, changes);
 	rfc.applyPatch(dtoCompare, changes);
-	let result = fromCompareObject(dtoCompare, options.schema, dto);
+
+	let result = fromCompareObject(dtoCompare, concurrency, dto);
 
 	if(Array.isArray(dto))
 		dto.length = 0;
@@ -24,39 +24,47 @@ function applyPatch(options = {}, dto, changes) {
 		for (let i = 0; i < changes.length; i++) {
 			let change = changes[i];
 			let expectedOldValue = change.oldValue;
-			if (! isConcurrent(change.path))
+			if (! isOptimistic(change.path)) {
 				continue;
+			}
 			let oldValue = getOldValue(object, change.path);
 			if (oldValue !== expectedOldValue)
 				throw new Error(`The field ${change.path} was changed by another user. Expected ${expectedOldValue}, but was ${oldValue}.`);
 		}
 
 		function getOldValue(obj, path) {
-			function extract(obj, element) {
-				if (obj === Object(obj))
-					return obj[element];
-				return;
-			}
 			let splitPath = path.split('/');
 			splitPath.shift();
 			return splitPath.reduce(extract, obj);
+
+			function extract(obj, name) {
+				if (obj === Object(obj))
+					return obj[name];
+				return;
+			}
 		}
 
 	}
 
-	function isConcurrent(path) {
+	function isOptimistic(path) {
+		let strategy = getStrategy(path);
+		return strategy === 'optimistic';
+	}
+
+	function getStrategy(path) {
 		let splitPath = path.split('/');
 		splitPath.shift();
-		return splitPath.reduce(extract, options.concurrency);
+		return splitPath.reduce(extract, concurrency);
 
-		function extract(obj, element) {
+		function extract(obj, name) {
 			if (Array.isArray(obj))
-				return obj[0];
+				return obj[0] || defaultConcurrency;
 			if (obj === Object(obj))
-				return obj[element];
-			return;
+				return obj[name] || defaultConcurrency;
+			return obj;
 		}
 	}
+
 
 	function fromCompareObject(object, schema = {}, dto = {}) {
 		if (Array.isArray(schema) || Array.isArray(dto)) {
@@ -70,8 +78,7 @@ function applyPatch(options = {}, dto, changes) {
 		} else if (object === Object(object)) {
 			let copy = {};
 			for (let name in object) {
-				if (name in schema || !hasSchema)
-					copy[name] = fromCompareObject(object[name], schema[name], dto[name]);
+				copy[name] = fromCompareObject(object[name], schema[name], dto[name]);
 			}
 			return copy;
 		}

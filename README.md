@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__1.10.1__  
+Experimental JSON patching with concurrency  
 __1.10.0__  
 Experimental JSON patching  
 __1.9.0__  

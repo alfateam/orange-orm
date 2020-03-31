@@ -6,6 +6,7 @@ var commit = require('../table/commit');
 var rollback = require('../table/rollback');
 var newPool = require('./newPool');
 var runInTransaction = require('../runInTransaction');
+var hostExpress = require('../hostExpress');
 
 function newDatabase(connectionString, poolOptions) {
     var pool;
@@ -49,7 +50,10 @@ function newDatabase(connectionString, poolOptions) {
         caller.visitSqlite();
     };
 
-
+    c.express = function(options) {
+		options = {...options, db: c};
+		return hostExpress({db: c, table: options.table});
+	};
     return c;
 }
 

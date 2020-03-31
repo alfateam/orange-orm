@@ -7,6 +7,7 @@ var commit = require('../table/commit');
 var rollback = require('../table/rollback');
 var lock = require('../lock');
 var runInTransaction = require('../runInTransaction');
+var hostExpress = require('../hostExpress');
 
 function newDatabase(connectionString, poolOptions) {
     var c = {};
@@ -48,6 +49,11 @@ function newDatabase(connectionString, poolOptions) {
     c.accept = function(caller) {
         caller.visitMySql();
     };
+
+    c.express = function(options) {
+		options = {...options, db: c};
+		return hostExpress({db: c, table: options.table});
+	};
 
     return c;
 }

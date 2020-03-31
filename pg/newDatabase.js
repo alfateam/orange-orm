@@ -8,6 +8,7 @@ var newPool = require('./newPool');
 var lock = require('../lock');
 var executeSchema = require('./schema');
 var runInTransaction = require('../runInTransaction');
+var hostExpress = require('../hostExpress');
 
 function newDatabase(connectionString, poolOptions) {
 	var pool;
@@ -59,6 +60,11 @@ function newDatabase(connectionString, poolOptions) {
     c.accept = function(caller) {
         caller.visitPg();
     };
+
+    c.express = function(options) {
+		options = {...options, db: c};
+		return hostExpress({db: c, table: options.table});
+	};
 
     return c;
 }
