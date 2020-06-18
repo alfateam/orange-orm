@@ -6,6 +6,7 @@ var newCascadeDeleteStrategy = require('../newCascadeDeleteStrategy');
 var _delete = require('./delete');
 var newObject = require('../../newObject');
 var toDto = require('./toDto');
+var patchRow = require('../../patchRow');
 
 function newDecodeDbRow(table, dbRow) {
     var columns = table._columns;
@@ -27,7 +28,6 @@ function newDecodeDbRow(table, dbRow) {
     function defineColumnProperty(i) {
         var column = columns[i];
         var purify = column.purify;
-        var decode = column.decode
         var name = column.alias;
         i = offset + i;
         var key = keys[i];
@@ -128,10 +128,15 @@ function newDecodeDbRow(table, dbRow) {
         _delete(this, strategy, table);
     };
 
+    Row.prototype.patch = async function(patches, options) {
+        await patchRow(table, this, patches, options);
+        return this;
+    };
+
     function decodeDbRow(row) {
         for (var i = 0; i < numberOfColumns; i++) {
             var index = offset + i;
-            var key = keys[index];            
+            var key = keys[index];
             row[key] = columns[i].decode(row[key]);
         }
         return new Row(row);

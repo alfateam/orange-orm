@@ -1,11 +1,13 @@
 let rfc = require('rfc6902');
+let {inspect} = require('util');
+let assert = require('assert');
 
 function applyPatch({defaultConcurrency, concurrency}, dto, changes) {
 	let dtoCompare = toCompareObject(dto);
 	validateConflict(dtoCompare, changes);
 	rfc.applyPatch(dtoCompare, changes);
 
-	let result = fromCompareObject(dtoCompare, concurrency, dto);
+	let result = fromCompareObject(dtoCompare);
 
 	if(Array.isArray(dto))
 		dto.length = 0;
@@ -28,8 +30,12 @@ function applyPatch({defaultConcurrency, concurrency}, dto, changes) {
 				continue;
 			}
 			let oldValue = getOldValue(object, change.path);
-			if (oldValue !== expectedOldValue)
-				throw new Error(`The field ${change.path} was changed by another user. Expected ${expectedOldValue}, but was ${oldValue}.`);
+			try {
+				assert.deepEqual(oldValue, expectedOldValue);
+			}
+			catch(e) {
+				throw new Error(`The field ${change.path} was changed by another user. Expected ${inspect(fromCompareObject(expectedOldValue), false, 10)}, but was ${inspect(fromCompareObject(oldValue), false, 10)}.`);
+			}
 		}
 
 		function getOldValue(obj, path) {
@@ -66,19 +72,19 @@ function applyPatch({defaultConcurrency, concurrency}, dto, changes) {
 	}
 
 
-	function fromCompareObject(object, schema = {}, dto = {}) {
-		if (Array.isArray(schema) || Array.isArray(dto)) {
+	function fromCompareObject(object) {
+		if (object.__patchType === 'Array') {
 			let copy = [];
 			let i = 0;
 			for (let id in object) {
-				copy[i] = fromCompareObject(object[id], schema[0], dto[id]);
+				copy[i] = fromCompareObject(object[id]);
 				i++;
 			}
 			return copy;
 		} else if (object === Object(object)) {
 			let copy = {};
 			for (let name in object) {
-				copy[name] = fromCompareObject(object[name], schema[name], dto[name]);
+				copy[name] = fromCompareObject(object[name]);
 			}
 			return copy;
 		}
@@ -90,6 +96,12 @@ function applyPatch({defaultConcurrency, concurrency}, dto, changes) {
 function toCompareObject(object) {
 	if (Array.isArray(object)) {
 		let copy = {};
+		Object.defineProperty(copy, '__patchType', {
+			value: 'Array',
+			writable: true,
+			enumerable: false
+		  });
+
 		for (var i = 0; i < object.length; i++) {
 			let element = toCompareObject(object[i]);
 			if (element === Object(element) && 'id' in element)
@@ -107,6 +119,5 @@ function toCompareObject(object) {
 	}
 	return object;
 }
-
 
 module.exports = applyPatch;
