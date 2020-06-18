@@ -6,6 +6,7 @@ var newCascadeDeleteStrategy = require('../newCascadeDeleteStrategy');
 var _delete = require('./delete');
 var newObject = require('../../newObject');
 var toDto = require('./toDto');
+var patchRow = require('../../patchRow');
 
 function newDecodeDbRow(table, dbRow) {
 	var columns = table._columns;
@@ -134,6 +135,11 @@ function newDecodeDbRow(table, dbRow) {
 	Row.prototype.cascadeDelete = function() {
 		var strategy = newCascadeDeleteStrategy(newObject(), table);
 		_delete(this, strategy, table);
+	};
+
+	Row.prototype.patch = async function(patches, options) {
+		await patchRow(table, this, patches, options);
+		return this;
 	};
 
 	function decodeDbRow(row) {
