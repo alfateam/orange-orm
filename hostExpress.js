@@ -4,6 +4,7 @@ function hostExpress({db, table, defaultConcurrency, concurrency}) {
 	let router = express.Router();
 	router.patch('/', async function(req, res){
 		try {
+			let result;
 			if (typeof db === 'function') {
 				let dbPromise = db();
 				if (dbPromise.then)
@@ -13,9 +14,9 @@ function hostExpress({db, table, defaultConcurrency, concurrency}) {
 			}
 			await db.transaction(async() => {
 				let patch = req.body;
-				await table.patch(patch, {defaultConcurrency, concurrency});
+				result = await table.patch(patch, {defaultConcurrency, concurrency});
 			});
-			res.sendStatus(204);
+			res.status(200).json(result);
 		}
 		catch(e) {
 			res.status(500).send(e && e.message);

@@ -2,16 +2,19 @@
 let applyPatch = require('./applyPatch');
 
 async function patchTable(table, patches, { defaultConcurrency = 'optimistic', concurrency = {} } = {}) {
+	let lastResult;
 	for (let i = 0; i < patches.length; i++) {
 		let patch = {};
 		Object.assign(patch, patches[i]);
 		hideMetaData(patch);
 		patch.path = patches[i].path.split('/').slice(1);
 		if (patch.op === 'add' || patch.op === 'replace')
-			await add({ path: patch.path, value: patch.value, op: patch.op, oldValue: patch.oldValue, concurrency: concurrency }, table);
+			lastResult = await add({ path: patch.path, value: patch.value, op: patch.op, oldValue: patch.oldValue, concurrency: concurrency }, table);
 		else if (patch.op === 'remove')
-			await remove(patch, table);
+			lastResult = await remove(patch, table);
 	}
+	if (lastResult.toDto)
+		return lastResult.toDto();
 
 	async function add({ path, value, op, oldValue, concurrency = {} }, table, row, parentRow, relation) {
 		let property = path[0];
@@ -30,7 +33,7 @@ async function patchTable(table, patches, { defaultConcurrency = 'optimistic', c
 				if (!row[fkName])
 					row[fkName] = parentRow[parentPk];
 			}
-			return;
+			return row;
 		}
 		property = path[0];
 		if (isColumn(property, table)) {
@@ -52,14 +55,17 @@ async function patchTable(table, patches, { defaultConcurrency = 'optimistic', c
 			else
 				await add({ path: path.slice(1), value, oldValue, op, concurrency: concurrency[property] }, relation.childTable, await row[property], row, relation);
 		}
+		return row;
 	}
 
 	async function remove({ path, value, op }, table, row) {
 		let property = path[0];
 		path = path.slice(1);
 		row = row || await table.getById(property);
-		if (path.length === 0)
-			return row.cascadeDelete();
+		if (path.length === 0) {
+			await row.cascadeDelete();
+			return;
+		}
 		property = path[0];
 		if (isColumn(property, table)) {
 			let dto = {};
@@ -80,6 +86,7 @@ async function patchTable(table, patches, { defaultConcurrency = 'optimistic', c
 				await remove({ path, value, op }, table[property], child);
 			}
 		}
+		return row;
 	}
 
 	function isColumn(name, table) {
