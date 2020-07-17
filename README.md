@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__2.6.2__  
+Bugfix in JSON patching with many relations.  
 __2.6.1__  
 Experimental JSON patching: patch returns dto of last operation.  
 __2.6.0__  
