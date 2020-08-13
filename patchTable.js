@@ -2,24 +2,21 @@
 let applyPatch = require('./applyPatch');
 
 async function patchTable(table, patches, { defaultConcurrency = 'optimistic', concurrency = {} } = {}) {
-	let lastResult;
 	for (let i = 0; i < patches.length; i++) {
 		let patch = {};
 		Object.assign(patch, patches[i]);
 		hideMetaData(patch);
 		patch.path = patches[i].path.split('/').slice(1);
 		if (patch.op === 'add' || patch.op === 'replace')
-			lastResult = await add({ path: patch.path, value: patch.value, op: patch.op, oldValue: patch.oldValue, concurrency: concurrency }, table);
+			await add({ path: patch.path, value: patch.value, op: patch.op, oldValue: patch.oldValue, concurrency: concurrency }, table);
 		else if (patch.op === 'remove')
-			lastResult = await remove(patch, table);
+			await remove(patch, table);
 	}
-	if (lastResult.toDto)
-		return lastResult.toDto();
 
 	async function add({ path, value, op, oldValue, concurrency = {} }, table, row, parentRow, relation) {
 		let property = path[0];
 		path = path.slice(1);
-		if (!relation)
+		if (!row && path.length > 0)
 			row = row || await table.tryGetById(property);
 		if (path.length === 0) {
 			let pkName = table._primaryColumns[0].alias;
@@ -33,7 +30,7 @@ async function patchTable(table, patches, { defaultConcurrency = 'optimistic', c
 				if (!row[fkName])
 					row[fkName] = parentRow[parentPk];
 			}
-			return row;
+			return;
 		}
 		property = path[0];
 		if (isColumn(property, table)) {
@@ -48,24 +45,22 @@ async function patchTable(table, patches, { defaultConcurrency = 'optimistic', c
 		}
 		else if (isManyRelation(property, table)) {
 			let relation = table[property]._relation;
-			if (path.length === 1)
+			if (path.length === 1) {
 				for (let id in value) {
 					await add({ path: [id], value: value[id], op, oldValue, concurrency: concurrency[property] }, relation.childTable, {}, row, relation);
 				}
+			}
 			else
-				await add({ path: path.slice(1), value, oldValue, op, concurrency: concurrency[property] }, relation.childTable, await row[property], row, relation);
+				await add({ path: path.slice(1), value, oldValue, op, concurrency: concurrency[property] }, relation.childTable, undefined, row, relation);
 		}
-		return row;
 	}
 
 	async function remove({ path, value, op }, table, row) {
 		let property = path[0];
 		path = path.slice(1);
 		row = row || await table.getById(property);
-		if (path.length === 0) {
-			await row.cascadeDelete();
-			return;
-		}
+		if (path.length === 0)
+			return row.cascadeDelete();
 		property = path[0];
 		if (isColumn(property, table)) {
 			let dto = {};
@@ -86,7 +81,6 @@ async function patchTable(table, patches, { defaultConcurrency = 'optimistic', c
 				await remove({ path, value, op }, table[property], child);
 			}
 		}
-		return row;
 	}
 
 	function isColumn(name, table) {
