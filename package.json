@@ -16,6 +16,7 @@
   "scripts": {
     "test": "jshint ./ && a"
   },
+  "publishConfig": { "tag": "1.x" },
   "dependencies": {
     "deferred": "^0.7.5",
     "generic-pool": "^2.2.2",
