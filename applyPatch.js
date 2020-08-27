@@ -73,6 +73,7 @@ function applyPatch({defaultConcurrency, concurrency}, dto, changes) {
 
 
 	function fromCompareObject(object) {
+		if (object === null || object === undefined) return object;
 		if (object.__patchType === 'Array') {
 			let copy = [];
 			let i = 0;
