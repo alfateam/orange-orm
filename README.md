@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__2.6.5__  
+Make this version the latest in npm.  
 __2.6.4__  
 Patching on row no longer modifies patch, but uses a clone instead.  
 __2.6.3__  
