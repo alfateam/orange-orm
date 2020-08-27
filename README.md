@@ -15,6 +15,11 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__1.11.2__  
+Patching on row no longer modifies patch, but uses a clone instead.  
+Bugfix in JSON patching when null on object.  
+__1.11.1__  
+Bugfix in JSON patching with many relations.  
 __1.11.0__  
 More experimental JSON patching on single row. Now with metadata in JSON patch.  
 __1.10.1__  
