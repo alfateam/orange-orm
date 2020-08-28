@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__2.6.6__  
+Return status 204 instead of 200  when json patching.  
 __2.6.5__  
 Make this version the latest in npm.  
 __2.6.4__  
