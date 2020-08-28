@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__1.11.3__  
+Patch table return status 204 instead of 200.  
 __1.11.2__  
 Patching on row no longer modifies patch, but uses a clone instead.  
 Bugfix in JSON patching when null on object.  
