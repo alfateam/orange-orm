@@ -27,10 +27,10 @@ InsertCommand.prototype.matches = function(otherRow) {
 
 
 InsertCommand.prototype.endEdit = function() {
+	this.sql();
 	var dto = createDto(this._table, this._row);
 	if (this._table._emitChanged.callbacks.length > 0)
 		this._patch = createPatch([], [dto]);
-	return this.sql();
 };
 
 InsertCommand.prototype.emitChanged = function() {

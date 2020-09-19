@@ -43,7 +43,7 @@ function newDecodeDbRow(table, dbRow) {
 				this._dbRow[key] = value;
 				if (column.validate)
 					column.validate(value, this._dbRow);
-				updateField(table, column, this);
+				updateField(table, column, this, oldValue);
 				var emit = this._emitColumnChanged[name];
 				if (emit)
 					emit(this, column, value, oldValue);
