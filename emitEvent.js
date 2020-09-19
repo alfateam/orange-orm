@@ -3,10 +3,12 @@ function emitEvent() {
 	var emit = function() {
 
 		var copy = callbacks.slice(0, callbacks.length);
+		var result = [];
 		for (var i = 0; i < copy.length; i++) {
 			var callback = copy[i];
-			callback.apply(null,arguments);
+			result.push(callback.apply(null,arguments));
 		}
+		return result;
 	};
 
 	emit.add = function(callback) {
@@ -33,8 +35,10 @@ function emitEvent() {
 	};
 
 	emit.clear = function() {
-		callbacks = [];
+		callbacks.splice(0, callbacks.length);
 	};
+
+	emit.callbacks = callbacks;
 
 	return emit;
 }

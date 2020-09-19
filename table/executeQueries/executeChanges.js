@@ -5,7 +5,7 @@ function executeChanges(queries) {
 	if (queries.length === 0)
 		return newPromise();
 	var i = -1;
-	return execute();
+	return execute().then(emitChanged);
 
 
 	function execute() {
@@ -15,8 +15,15 @@ function executeChanges(queries) {
 		else {
 			return executeQuery(queries[i]).then(execute);
 		}
-
 	}
+
+	async function emitChanged() {
+		for (let i = 0; i < queries.length; i++) {
+			if (queries[i].emitChanged)
+				await Promise.all(queries[i].emitChanged());
+		}
+	}
+
 
 }
 

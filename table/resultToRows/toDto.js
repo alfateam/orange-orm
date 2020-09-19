@@ -2,7 +2,7 @@ var resultToPromise = require('../resultToPromise');
 var createDto = require('./toDto/createDto');
 
 function toDto(strategy, table, row) {
-	var dto = createDto(strategy, table, row);
+	var dto = createDto(table, row);
 	strategy = strategy || {};
 	var promise = resultToPromise(dto);
 

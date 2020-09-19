@@ -1,4 +1,4 @@
-function _createDto(context, table, row) {
+function _createDto(table, row) {
 	var dto = {};
 	var columns = table._columns;
 	var length = columns.length;

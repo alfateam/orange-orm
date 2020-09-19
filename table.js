@@ -17,6 +17,7 @@ var createReadStream = require('./table/createReadStream');
 var createJSONReadStream = require('./table/createJSONReadStream');
 var extractStrategy = require('./table/resultToRows/toDto/extractStrategy');
 var patchTable = require('./patchTable');
+var newEmitEvent = require('./emitEvent');
 
 function _new(tableName) {
 	var table = newContext();
@@ -27,6 +28,7 @@ function _new(tableName) {
 	table._formulaDiscriminators = [];
 	table._relations = {};
 	table._cache = newCache(table);
+	table._emitChanged = newEmitEvent();
 
 	table.primaryColumn = function(columnName) {
 		var columnDef = newColumn(table, columnName);
@@ -127,6 +129,9 @@ function _new(tableName) {
 		return table;
 	};
 	table.patch = patchTable.bind(null, table);
+	table.subscribeChanged = table._emitChanged.add;
+	table.unsubscribeChanged = table._emitChanged.remove;
+
 	return table;
 }
 

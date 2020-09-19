@@ -8,10 +8,10 @@ function compress(queries) {
 
 	for (var i = 0; i < queryCount; i++) {
 		var current = queries[i];
-		if (multipleStatements && current.parameters.length === 0) {
+		if (multipleStatements && current.parameters.length === 0 && !current.disallowCompress) {
 			for (var i2 = i+1; i2 < queryCount; i2++) {
 				var next = queries[i2];
-				if (next.parameters.length > 0)
+				if (next.parameters.length > 0 || ! next.disallowCompress)
 					break;
 				current = newParameterized(current.sql() + ';' + next.sql());
 				i++;

@@ -1,5 +1,7 @@
 var newInsertCommandCore = require('./newInsertCommandCore');
 var newImmutable = require('../../newImmutable');
+var createPatch = require('rdb-client').createPatch;
+var createDto = require('../resultToRows/toDto/createDto');
 
 function newInsertCommand(table, row) {
 	return new InsertCommand(table, row);
@@ -23,12 +25,31 @@ InsertCommand.prototype.matches = function(otherRow) {
 	return this._row === otherRow;
 };
 
-InsertCommand.prototype.endEdit = InsertCommand.prototype.sql;
+
+InsertCommand.prototype.endEdit = function() {
+	var dto = createDto(this._table, this._row);
+	if (this._table._emitChanged.callbacks.length > 0)
+		this._patch = createPatch([], [dto]);
+	return this.sql();
+};
+
+InsertCommand.prototype.emitChanged = function() {
+	return this._table._emitChanged({row: this._row, patch: this._patch});
+};
 
 Object.defineProperty(InsertCommand.prototype, 'parameters', {
 	get: function() {
 		return this._getCoreCommand().parameters;
+
 	}
 });
+
+Object.defineProperty(InsertCommand.prototype, 'disallowCompress', {
+	get: function() {
+		return this._table._emitChanged.callbacks.length > 0;
+
+	}
+});
+
 
 module.exports = newInsertCommand;
