@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__2.6.7__  
+Hooks on insert, update and delete.  
 __2.6.6__  
 Return status 204 instead of 200  when json patching.  
 __2.6.5__  
