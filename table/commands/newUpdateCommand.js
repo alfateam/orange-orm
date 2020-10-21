@@ -1,23 +1,19 @@
-var newUpdateCommandCore = require('./newUpdateCommandCore');
-var newImmutable = require('../../newImmutable');
-var newColumnList = require('../../newObject');
-var createPatch = require('rdb-client').createPatch;
-var createDto = require('../resultToRows/toDto/createDto');
+let newUpdateCommandCore = require('./newUpdateCommandCore');
+let newImmutable = require('../../newImmutable');
+let newColumnList = require('../../newObject');
+let createPatch = require('rdb-client').createPatch;
+let createDto = require('../resultToRows/toDto/createDto');
 
-function newUpdateCommand(table, column, row, oldValue) {
-	return new UpdateCommand(table, column, row, oldValue);
+function newUpdateCommand(table, column, row) {
+	return new UpdateCommand(table, column, row);
 }
 
-function UpdateCommand(table, column, row, oldValue) {
+function UpdateCommand(table, column, row) {
 	this._table = table;
 	this._row = row;
 	this.__getCoreCommand = newImmutable(newUpdateCommandCore);
 	this._columnList = newColumnList();
 	this._columnList[column.alias] = column;
-	if (this._table._emitChanged.callbacks.length > 0)  {
-		this._oldValues = createDto(table, row);
-		this._oldValues[column.alias] = oldValue;
-	}
 	this.onFieldChanged = this.onFieldChanged.bind(this);
 	row.subscribeChanged(this.onFieldChanged);
 }
@@ -43,10 +39,9 @@ UpdateCommand.prototype._getCoreCommand = function() {
 UpdateCommand.prototype.endEdit = function() {
 	this._getCoreCommand();
 	this._row.unsubscribeChanged(this.onFieldChanged);
-	if (this._oldValues) {
-		var dto = createDto(this._table, this._row);
-		this._patch = createPatch([this._oldValues],[dto]);
-	}
+	let dto = JSON.parse(JSON.stringify(createDto(this._table, this._row)));
+	this._patch = createPatch([JSON.parse(this._row._oldValues)],[dto]);
+	this._row._oldValues = JSON.stringify(dto);
 };
 
 UpdateCommand.prototype.emitChanged = function() {

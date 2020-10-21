@@ -1,36 +1,37 @@
-var updateField = require('../updateField');
-var newEmitEvent = require('../../emitEvent');
-var extractStrategy = require('./toDto/extractStrategy');
-var extractDeleteStrategy = require('../extractDeleteStrategy');
-var newCascadeDeleteStrategy = require('../newCascadeDeleteStrategy');
-var _delete = require('./delete');
-var newObject = require('../../newObject');
-var toDto = require('./toDto');
-var patchRow = require('../../patchRow');
+let updateField = require('../updateField');
+let newEmitEvent = require('../../emitEvent');
+let extractStrategy = require('./toDto/extractStrategy');
+let extractDeleteStrategy = require('../extractDeleteStrategy');
+let newCascadeDeleteStrategy = require('../newCascadeDeleteStrategy');
+let _delete = require('./delete');
+let newObject = require('../../newObject');
+let toDto = require('./toDto');
+let createDto = require('./toDto/createDto');
+let patchRow = require('../../patchRow');
 
 function newDecodeDbRow(table, dbRow) {
-	var columns = table._columns;
-	var numberOfColumns = columns.length;
+	let columns = table._columns;
+	let numberOfColumns = columns.length;
 	if (dbRow.offset === undefined) {
 		dbRow.offset = 0;
 	}
 
-	var offset = dbRow.offset;
+	let offset = dbRow.offset;
 
-	var keys = Object.keys(dbRow);
+	let keys = Object.keys(dbRow);
 
-	for (var i = 0; i < numberOfColumns; i++) {
+	for (let i = 0; i < numberOfColumns; i++) {
 		defineColumnProperty(i);
 	}
 
 	dbRow.offset += numberOfColumns;
 
 	function defineColumnProperty(i) {
-		var column = columns[i];
-		var purify = column.purify;
-		var name = column.alias;
+		let column = columns[i];
+		let purify = column.purify;
+		let name = column.alias;
 		i = offset + i;
-		var key = keys[i];
+		let key = keys[i];
 
 		Object.defineProperty(Row.prototype, name, {
 
@@ -38,13 +39,13 @@ function newDecodeDbRow(table, dbRow) {
 				return this._dbRow[key];
 			},
 			set: function(value) {
-				var oldValue = this[name];
+				let oldValue = this[name];
 				value = purify(value);
 				this._dbRow[key] = value;
 				if (column.validate)
 					column.validate(value, this._dbRow);
-				updateField(table, column, this, oldValue);
-				var emit = this._emitColumnChanged[name];
+				updateField(table, column, this);
+				let emit = this._emitColumnChanged[name];
 				if (emit)
 					emit(this, column, value, oldValue);
 				this._emitChanged(this, column, value, oldValue);
@@ -55,9 +56,9 @@ function newDecodeDbRow(table, dbRow) {
 	setRelated();
 
 	function setRelated() {
-		var relations = table._relations;
-		for (var relationName in relations) {
-			var relation = relations[relationName];
+		let relations = table._relations;
+		for (let relationName in relations) {
+			let relation = relations[relationName];
 			setSingleRelated(relationName, relation);
 		}
 	}
@@ -71,9 +72,9 @@ function newDecodeDbRow(table, dbRow) {
 	}
 
 	function createGetRelated(row, alias) {
-		var get = row._related[alias];
+		let get = row._related[alias];
 		if (!get) {
-			var relation = table._relations[alias];
+			let relation = table._relations[alias];
 			get = relation.toGetRelated(row);
 			row._related[alias] = get;
 		}
@@ -81,7 +82,7 @@ function newDecodeDbRow(table, dbRow) {
 	}
 
 	Row.prototype.subscribeChanged = function(onChanged, name) {
-		var emit;
+		let emit;
 		if (name) {
 			emit = this._emitColumnChanged[name] || (this._emitColumnChanged[name] = newEmitEvent());
 			emit.add(onChanged);
@@ -103,7 +104,7 @@ function newDecodeDbRow(table, dbRow) {
 	};
 
 	Row.prototype.toDto = function(strategy) {
-		var args = Array.prototype.slice.call(arguments, 0);
+		let args = Array.prototype.slice.call(arguments, 0);
 		args.push(table);
 		strategy = extractStrategy.apply(null, args);
 		let p =  toDto(strategy, table, this);
@@ -111,19 +112,19 @@ function newDecodeDbRow(table, dbRow) {
 	};
 
 	Row.prototype.__toDto = function(strategy) {
-		var args = Array.prototype.slice.call(arguments, 0);
+		let args = Array.prototype.slice.call(arguments, 0);
 		args.push(table);
 		strategy = extractStrategy.apply(null, args);
 		return toDto(strategy, table, this);
 	};
 
 	Row.prototype.expand = function(alias) {
-		var get = createGetRelated(this, alias);
+		let get = createGetRelated(this, alias);
 		get.expanded = true;
 	};
 
 	Row.prototype.isExpanded = function(alias) {
-		var get = createGetRelated(this, alias);
+		let get = createGetRelated(this, alias);
 		return get.expanded;
 	};
 
@@ -133,7 +134,7 @@ function newDecodeDbRow(table, dbRow) {
 	};
 
 	Row.prototype.cascadeDelete = function() {
-		var strategy = newCascadeDeleteStrategy(newObject(), table);
+		let strategy = newCascadeDeleteStrategy(newObject(), table);
 		_delete(this, strategy, table);
 	};
 
@@ -143,9 +144,9 @@ function newDecodeDbRow(table, dbRow) {
 	};
 
 	function decodeDbRow(row) {
-		for (var i = 0; i < numberOfColumns; i++) {
-			var index = offset + i;
-			var key = keys[index];
+		for (let i = 0; i < numberOfColumns; i++) {
+			let index = offset + i;
+			let key = keys[index];
 			row[key] = columns[i].decode(row[key]);
 		}
 		return new Row(row);
@@ -153,6 +154,7 @@ function newDecodeDbRow(table, dbRow) {
 
 	function Row(dbRow) {
 		this._dbRow = dbRow;
+		this._oldValues =  JSON.stringify(createDto(table, this));
 		this._related = {};
 		this._emitColumnChanged = {};
 		this._emitChanged = newEmitEvent();
