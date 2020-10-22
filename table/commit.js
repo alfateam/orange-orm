@@ -1,18 +1,26 @@
-var commitCommand = require('./commands/commitCommand');
-var pushCommand = require('./commands/pushCommand');
-var executeChanges = require('./executeQueries/executeChanges');
-var releaseDbClient = require('./releaseDbClient');
-var popChanges = require('./popChanges');
+let commitCommand = require('./commands/commitCommand');
+let pushCommand = require('./commands/pushCommand');
+let executeChanges = require('./executeQueries/executeChanges');
+let releaseDbClient = require('./releaseDbClient');
+let popChanges = require('./popChanges');
 
 function commit(result) {
-	pushCommand(commitCommand);
-	var changes = popChanges();
-	return executeChanges(changes)
+	return popAndPushChanges()
 		.then(releaseDbClient)
 		.then(onReleased);
 
 	function onReleased() {
 		return result;
+	}
+
+	async function popAndPushChanges() {
+		let changes = popChanges();
+		while (changes.length > 0) {
+			await executeChanges(changes);
+			changes = popChanges();
+		}
+		pushCommand(commitCommand);
+		return executeChanges(popChanges());
 	}
 }
 
