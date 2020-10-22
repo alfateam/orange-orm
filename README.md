@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__2.6.9__  
+Bugfix. Inserts inside update hooks did not execute when last command in transaction.  
 __2.6.8__  
 Bugfix. Update hooks were sometimes incomplete.  
 __2.6.7__  
