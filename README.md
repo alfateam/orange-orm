@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__2.6.10__  
+Bugfix. Did not apply patch properly on arrays inside json.  
 __2.6.9__  
 Bugfix. Inserts inside update hooks did not execute when last command in transaction.  
 __2.6.8__  
