@@ -1,5 +1,6 @@
 /* eslint-disable require-atomic-updates */
 let applyPatch = require('./applyPatch');
+let fromCompareObject = require('./fromCompareObject');
 
 async function patchTable(table, patches, { defaultConcurrency = 'optimistic', concurrency = {} } = {}) {
 	for (let i = 0; i < patches.length; i++) {
@@ -22,7 +23,7 @@ async function patchTable(table, patches, { defaultConcurrency = 'optimistic', c
 			let pkName = table._primaryColumns[0].alias;
 			row = table.insert(property[pkName]);
 			for (let name in value) {
-				row[name] = value[name];
+				row[name] = fromCompareObject(value[name]);
 			}
 			if (relation && relation.joinRelation) {
 				let fkName = relation.joinRelation.columns[0].alias;
