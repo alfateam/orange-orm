@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__2.6.11__  
+Bugfix. Delete related row in JSON patch.  
 __2.6.10__  
 Bugfix. Did not apply patch properly on arrays inside json.  
 __2.6.9__  
