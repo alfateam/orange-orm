@@ -76,13 +76,16 @@ async function patchTable(table, patches, { defaultConcurrency = 'optimistic', c
 			await remove({ path, value, op }, table[property], child);
 		}
 		else if (isManyRelation(property, table)) {
-			let children = (await row[property]).slice(0);
-			if (path.length !== 1)
-				path = path.slice(1);
-			for (let i = 0; i < children.length; i++) {
-				let child = children[i];
-				await remove({ path: path.slice(1), value, op }, table[property], child);
+			let relation = table[property]._relation;
+			if (path.length === 1) {
+				let children = (await row[property]).slice(0);
+				for (let i = 0; i < children.length; i++) {
+					let child = children[i];
+					await remove({ path: path.slice(1), value, op }, table[property], child);
+				}
 			}
+			else
+				await remove({ path: path.slice(1), value, op, concurrency: concurrency[property] }, relation.childTable, undefined, row, relation);
 		}
 	}
 
