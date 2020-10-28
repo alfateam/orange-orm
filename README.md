@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__2.6.12__  
+Bugfix. Delete many relations in JSON patch did delete all.  
 __2.6.11__  
 Bugfix. Delete related row in JSON patch.  
 __2.6.10__  
