@@ -64,7 +64,10 @@ function newDatabase(connectionString, poolOptions) {
 	c.commit = commit;
 
 	c.end = function() {
-		return pool.end();
+		if (poolOptions)
+			return pool.end();
+		else
+			return Promise.resolve();
 	};
 
 	c.accept = function(caller) {

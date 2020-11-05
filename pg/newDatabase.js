@@ -79,7 +79,7 @@ function newDatabase(connectionString, poolOptions) {
 		if (poolOptions)
 			return pool.end();
 		else
-			return promise();
+			return Promise.resolve();
 	};
 
 	c.accept = function(caller) {

@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__2.6.13__  
+Upgraded to pg@8.  
 __2.6.12__  
 Bugfix. Delete many relations in JSON patch did delete all.  
 __2.6.11__  
