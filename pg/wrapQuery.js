@@ -8,13 +8,18 @@ function wrapQuery(connection) {
 	function runQuery(query, onCompleted) {
 		var params = query.parameters;
 		var sql = replaceParamChar(query, params);
+		query = {
+			text: sql,
+			values: params,
+			types: query.types
+		};
 		log(sql);
 		log('parameters: ' + params);
 
 		if (params.length === 0)
-			runOriginalQuery.call(connection, sql, onInnerCompleted);
+			runOriginalQuery.call(connection, query, onInnerCompleted);
 		else
-			runOriginalQuery.call(connection, sql, params, onInnerCompleted);
+			runOriginalQuery.call(connection, query, onInnerCompleted);
 
 		function onInnerCompleted(err, result) {
 			if (err)
