@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__2.6.14__  
+Possible to send in types for custom parsing  
 __2.6.13__  
 Upgraded to pg@8.  
 __2.6.12__  
