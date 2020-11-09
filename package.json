@@ -1,6 +1,6 @@
 {
   "name": "rdb",
-  "version": "2.6.14",
+  "version": "2.6.15",
   "main": "index.js",
   "title": "rdb",
   "description": "Object Relational Mapper",
@@ -25,7 +25,7 @@
     "deferred": "^0.7.5",
     "mysql": "^2.13.0",
     "node-cls": "^1.0.5",
-    "pg": "^8.4.2",
+    "pg": "^7.18.2",
     "pg-query-stream": "^3.3.2",
     "promise": "^8.0.3",
     "rdb-client": "^1.1.0",

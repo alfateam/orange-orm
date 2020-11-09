@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__2.6.15__  
+Downgraded to pg@7 because pg@8 messes up async hooks  
 __2.6.14__  
 Possible to send in types for custom parsing  
 __2.6.13__  
