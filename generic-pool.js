@@ -1,3 +1,4 @@
+let bindToDomain = require('./bindToDomain');
 
 //Taken from https://raw.githubusercontent.com/coopernurse/node-pool/6c98fa9163bbe35b683ffc2b55ac741d02956096/lib/generic-pool.js
 //Version 3 of generic-pool has lots og bugs and node program will never finish.
@@ -436,9 +437,7 @@ Pool.prototype.acquire = function acquire(callback, priority) {
 	if (this._draining) {
 		throw new Error('pool is draining and cannot accept work');
 	}
-	if (process.domain) {
-		callback = process.domain.bind(callback);
-	}
+	callback = bindToDomain(callback);
 	this._waitingClients.enqueue(callback, priority);
 	this._dispense();
 	return (this._count < this._factory.max);

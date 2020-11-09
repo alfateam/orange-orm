@@ -4,6 +4,7 @@ var EventEmitter = require('events').EventEmitter;
 var defaults = require('./defaults');
 var genericPool = require('../../generic-pool');
 var _pg = require('pg');
+var bindToDomain = require('../../bindToDomain');
 
 function newPgPool(connectionString, poolOptions) {
 	poolOptions = poolOptions || {};
@@ -58,11 +59,8 @@ function newPgPool(connectionString, poolOptions) {
 	}
 	//monkey-patch with connect method
 	pool.connect = function(cb) {
-		var domain = process.domain;
 		pool.acquire(function(err, client) {
-			if (domain) {
-				cb = domain.bind(cb);
-			}
+			cb = bindToDomain(cb);
 			if (err) return cb(err, null, function() {
 				/*NOOP*/ });
 			client.poolCount++;

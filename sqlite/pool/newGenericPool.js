@@ -3,6 +3,7 @@ var EventEmitter = require('events').EventEmitter;
 var defaults = require('./defaults');
 var genericPool = require('../../generic-pool');
 var sqlite = require('sqlite3');
+var bindToDomain = require('../../bindToDomain');
 
 function newGenericPool(connectionString, poolOptions) {
 	poolOptions = poolOptions || {};
@@ -36,11 +37,8 @@ function newGenericPool(connectionString, poolOptions) {
 	}
 	//monkey-patch with connect method
 	pool.connect = function(cb) {
-		var domain = process.domain;
 		pool.acquire(function(err, client) {
-			if(domain) {
-				cb = domain.bind(cb);
-			}
+			cb = bindToDomain(cb);
 			if(err)  return cb(err, null, function() {/*NOOP*/});
 			client.poolCount++;
 			cb(null, client, function(err) {

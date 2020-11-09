@@ -1,4 +1,5 @@
 var getSessionSingleton = require('../getSessionSingleton');
+let bindToDomain = require('../../bindToDomain');
 
 function resolveExecuteQuery(query) {
 	return resolve;
@@ -6,11 +7,8 @@ function resolveExecuteQuery(query) {
 	function resolve(success, failed) {
 		try {
 
-			var domain = process.domain;
-			if (domain) {
-				success = process.domain.bind(success);
-				failed = process.domain.bind(failed);
-			}
+			success = bindToDomain(success);
+			failed = bindToDomain(failed);
 
 			var client = getSessionSingleton('dbClient');
 			client.executeQuery(query, onCompleted);
