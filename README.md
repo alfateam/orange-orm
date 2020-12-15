@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__2.6.17__  
+More bugfixes with array patching.  
 __2.6.16__  
 Bugfix. Did not properly apply json patch with new arrays.  
 __2.6.15__  

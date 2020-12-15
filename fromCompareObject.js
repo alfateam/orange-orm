@@ -4,9 +4,10 @@ function fromCompareObject(object) {
 		let copy = [];
 		let i = 0;
 		for (let id in object) {
-			if (id !== '__patchType')
+			if (id !== '__patchType') {
 				copy[i] = fromCompareObject(object[id]);
-			i++;
+				i++;
+			}
 		}
 		return copy;
 	} else if (object === Object(object)) {
