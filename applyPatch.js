@@ -1,16 +1,16 @@
 let rfc = require('rfc6902');
-let {inspect} = require('util');
+let { inspect } = require('util');
 let assert = require('assert');
 let fromCompareObject = require('./fromCompareObject');
 
-function applyPatch({defaultConcurrency, concurrency}, dto, changes) {
+function applyPatch({ defaultConcurrency, concurrency }, dto, changes) {
 	let dtoCompare = toCompareObject(dto);
 	validateConflict(dtoCompare, changes);
 	rfc.applyPatch(dtoCompare, changes);
 
 	let result = fromCompareObject(dtoCompare);
 
-	if(Array.isArray(dto))
+	if (Array.isArray(dto))
 		dto.length = 0;
 	else
 		for (let name in dto) {
@@ -27,14 +27,14 @@ function applyPatch({defaultConcurrency, concurrency}, dto, changes) {
 		for (let i = 0; i < changes.length; i++) {
 			let change = changes[i];
 			let expectedOldValue = change.oldValue;
-			if (! isOptimistic(change.path)) {
+			if (!isOptimistic(change.path)) {
 				continue;
 			}
 			let oldValue = getOldValue(object, change.path);
 			try {
 				assert.deepEqual(oldValue, expectedOldValue);
 			}
-			catch(e) {
+			catch (e) {
 				throw new Error(`The field ${change.path} was changed by another user. Expected ${inspect(fromCompareObject(expectedOldValue), false, 10)}, but was ${inspect(fromCompareObject(oldValue), false, 10)}.`);
 			}
 		}
@@ -79,8 +79,8 @@ function toCompareObject(object) {
 		Object.defineProperty(copy, '__patchType', {
 			value: 'Array',
 			writable: true,
-			enumerable: false
-		  });
+			enumerable: true
+		});
 
 		for (var i = 0; i < object.length; i++) {
 			let element = toCompareObject(object[i]);

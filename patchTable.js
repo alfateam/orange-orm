@@ -6,7 +6,6 @@ async function patchTable(table, patches, { defaultConcurrency = 'optimistic', c
 	for (let i = 0; i < patches.length; i++) {
 		let patch = {};
 		Object.assign(patch, patches[i]);
-		hideMetaData(patch);
 		patch.path = patches[i].path.split('/').slice(1);
 		if (patch.op === 'add' || patch.op === 'replace')
 			await add({ path: patch.path, value: patch.value, op: patch.op, oldValue: patch.oldValue, concurrency: concurrency }, table);
@@ -99,21 +98,6 @@ async function patchTable(table, patches, { defaultConcurrency = 'optimistic', c
 
 	function isOneRelation(name) {
 		return table[name] && table[name]._relation.isOne;
-	}
-}
-
-
-function hideMetaData(object) {
-	if (object === Object(object)) {
-		if ('__patchType' in object)
-			Object.defineProperty(object, '__patchType', {
-				value: object.__patchType,
-				writable: true,
-				enumerable: false
-			});
-		for (let name in object) {
-			hideMetaData(object[name]);
-		}
 	}
 }
 
