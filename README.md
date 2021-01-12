@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__2.6.18__  
+Using domains instead of async_hooks for continution local context because async_hooks is unstable and experimental.  
 __2.6.17__  
 More bugfixes with array patching.  
 __2.6.16__  
