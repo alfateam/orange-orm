@@ -28,7 +28,7 @@ function newDatabase(connectionString, poolOptions) {
 
 		if (fn)
 			return domain.run(runInTransaction);
-		else if ((major >= 12) && useHook) {
+		else if ((major >= 12) && useHook()) {
 			domain.exitContext = true;
 			return domain.start().then(run);
 		}
@@ -50,7 +50,7 @@ function newDatabase(connectionString, poolOptions) {
 		function run() {
 			let p;
 			let transaction = newTransaction(domain, pool);
-			if (useHook)
+			if (useHook())
 				p = new Promise(transaction);
 			else
 				p = new promise(transaction);

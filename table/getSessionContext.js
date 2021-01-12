@@ -1,11 +1,12 @@
 let useHook = require('../useHook');
 let cls = require('node-cls');
 
-if (useHook)
-	module.exports = function() {
+
+function getSessionContext() {
+	if (useHook())
 		return cls.getContext('rdb').rdb;
-	};
-else
-	module.exports =  function() {
+	else
 		return process.domain.rdb;
-	};
+}
+
+module.exports = getSessionContext;

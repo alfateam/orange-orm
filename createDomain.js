@@ -17,7 +17,13 @@ function createOnContext() {
 	return cls.create('rdb');
 }
 
-if (useHook)
-	module.exports = createOnContext;
-else
-	module.exports = createDomain;
+
+function _createDomain() {
+	if (useHook())
+		return createOnContext();
+	else
+		return createDomain();
+
+}
+
+module.exports = _createDomain;

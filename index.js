@@ -1,6 +1,7 @@
 var newPg = require('./pg/newDatabase');
 var hostExpress = require('./hostExpress');
 var _sqlite;
+var flags = require('./flags');
 
 var connectViaPool = function(connectionString) {
 	if (connectionString.indexOf && connectionString.indexOf('mysql') === 0)
@@ -29,5 +30,8 @@ Object.defineProperty(connectViaPool, 'sqlite', {
 });
 
 connectViaPool.express = hostExpress;
+connectViaPool.useHook = function(bool) {
+	flags.useHook = bool;
+};
 
 module.exports = connectViaPool;
