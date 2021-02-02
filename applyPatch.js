@@ -38,8 +38,7 @@ function applyPatch({ defaultConcurrency, concurrency }, dto, changes) {
 					throw new Error(`The field ${change.path} was changed by another user. Expected ${inspect(fromCompareObject(expectedOldValue), false, 10)}, but was ${inspect(fromCompareObject(oldValue), false, 10)}.`);
 				}
 			}
-			else
-				return true;
+			return true;
 		});
 
 		function getOldValue(obj, path) {
