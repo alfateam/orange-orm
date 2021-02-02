@@ -5,7 +5,7 @@ let fromCompareObject = require('./fromCompareObject');
 
 function applyPatch({ defaultConcurrency, concurrency }, dto, changes) {
 	let dtoCompare = toCompareObject(dto);
-	validateConflict(dtoCompare, changes);
+	changes = validateConflict(dtoCompare, changes);
 	rfc.applyPatch(dtoCompare, changes);
 
 	let result = fromCompareObject(dtoCompare);
@@ -24,20 +24,23 @@ function applyPatch({ defaultConcurrency, concurrency }, dto, changes) {
 	return dto;
 
 	function validateConflict(object, changes) {
-		for (let i = 0; i < changes.length; i++) {
-			let change = changes[i];
+		return changes.filter(change => {
 			let expectedOldValue = change.oldValue;
-			if (!isOptimistic(change.path)) {
-				continue;
+			let strategy = getStrategy(change.path);
+			if ((strategy === 'optimistic') || (strategy === 'skipOnConflict')) {
+				let oldValue = getOldValue(object, change.path);
+				try {
+					assert.deepEqual(oldValue, expectedOldValue);
+				}
+				catch (e) {
+					if (strategy === 'skipOnConflict')
+						return false;
+					throw new Error(`The field ${change.path} was changed by another user. Expected ${inspect(fromCompareObject(expectedOldValue), false, 10)}, but was ${inspect(fromCompareObject(oldValue), false, 10)}.`);
+				}
 			}
-			let oldValue = getOldValue(object, change.path);
-			try {
-				assert.deepEqual(oldValue, expectedOldValue);
-			}
-			catch (e) {
-				throw new Error(`The field ${change.path} was changed by another user. Expected ${inspect(fromCompareObject(expectedOldValue), false, 10)}, but was ${inspect(fromCompareObject(oldValue), false, 10)}.`);
-			}
-		}
+			else
+				return true;
+		});
 
 		function getOldValue(obj, path) {
 			let splitPath = path.split('/');
@@ -51,11 +54,6 @@ function applyPatch({ defaultConcurrency, concurrency }, dto, changes) {
 			}
 		}
 
-	}
-
-	function isOptimistic(path) {
-		let strategy = getStrategy(path);
-		return strategy === 'optimistic';
 	}
 
 	function getStrategy(path) {
