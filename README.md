@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__2.6.21__  
+Added JSON patch strategy 'skipOnConflict' to skip update if conflict.  
 __2.6.20__  
 Upgraded to pg@8.  
 __2.6.19__  
