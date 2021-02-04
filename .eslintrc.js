@@ -20,6 +20,6 @@ module.exports = {
 		"no-debugger": "off",
 		"no-trailing-spaces": "error",
 		"no-underscore-dangle": 0,
-		"no-unused-vars": [2, { "args": "after-used", "ignoreRestSiblings": true }]
+		"no-unused-vars": [2, { "args": "after-used", "ignoreRestSiblings": true,"argsIgnorePattern": "^_"}]
 	},
 }
