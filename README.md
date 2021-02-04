@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__2.6.23__  
+Bugfix when JSON patching nested relations.  
 __2.6.22__  
 Bugfix JSON patch.  
 __2.6.21__  
