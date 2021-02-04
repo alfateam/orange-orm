@@ -1,3 +1,3 @@
-module.exports = function() {
+module.exports = function(_alias) {
 	return ' FOR UPDATE';
 };
