@@ -4,7 +4,7 @@ let fromCompareObject = require('./fromCompareObject');
 
 async function patchTable(table, patches, { defaultConcurrency = 'optimistic', concurrency = {} } = {}) {
 	for (let i = 0; i < patches.length; i++) {
-		let patch = {};
+		let patch = {path: undefined, value: undefined, op: undefined};
 		Object.assign(patch, patches[i]);
 		patch.path = patches[i].path.split('/').slice(1);
 		if (patch.op === 'add' || patch.op === 'replace')
@@ -65,7 +65,7 @@ async function patchTable(table, patches, { defaultConcurrency = 'optimistic', c
 		if (isColumn(property, table)) {
 			let dto = {};
 			dto[property] = row[property];
-			let result = applyPatch({}, dto, [{ path: '/' + path.join('/'), op }]);
+			let result = applyPatch({defaultConcurrency: 'overwrite', concurrency: undefined}, dto, [{ path: '/' + path.join('/'), op }]);
 			row[property] = result[property];
 		}
 		else if (isOneRelation(property, table)) {
@@ -84,7 +84,7 @@ async function patchTable(table, patches, { defaultConcurrency = 'optimistic', c
 				}
 			}
 			else
-				await remove({ path: path.slice(1), value, op, concurrency: concurrency[property] }, relation.childTable, undefined, row, relation);
+				await remove({ path: path.slice(1), value, op }, relation.childTable);
 		}
 	}
 
@@ -92,11 +92,11 @@ async function patchTable(table, patches, { defaultConcurrency = 'optimistic', c
 		return table[name] && table[name].equal;
 	}
 
-	function isManyRelation(name) {
+	function isManyRelation(name, table) {
 		return table[name] && table[name]._relation.isMany;
 	}
 
-	function isOneRelation(name) {
+	function isOneRelation(name, table) {
 		return table[name] && table[name]._relation.isOne;
 	}
 }
