@@ -1653,13 +1653,13 @@ function updateConcurrently() {
     let concurrent1 = db.transaction(async () => {
         await db.lock("12345", runInLock);
         //lock released
-        //to other stuff..
+        //do other stuff..
     });
 
     let concurrent2 = db.transaction(async () => {
         await db.lock("12345", runInLock);
         //lock released
-        //to other stuff..
+        //do other stuff..
     });
 
     async function runInLock() {
