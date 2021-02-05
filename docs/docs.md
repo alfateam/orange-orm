@@ -1662,7 +1662,7 @@ function updateConcurrently() {
         //to other stuff..
     });
 
-    function runInLock() {
+    async function runInLock() {
         let customer = await Customer.getById('a0000000-0000-0000-0000-000000000000');
         customer.balance += 100;
     }
