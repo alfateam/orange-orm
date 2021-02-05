@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__2.6.24__
+Temporary lock with func as an alternative to transaction locks (pg only)  
 __2.6.23__  
 Bugfix when JSON patching nested relations.  
 __2.6.22__  

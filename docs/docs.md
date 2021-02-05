@@ -62,6 +62,7 @@ __Persistence__
 [update a hasMany-relation](#_updatehasmany)  
 [row lock](#_rowlock)  
 [transaction lock](#_transactionlock)  
+[session lock](#_sessionlock)  
   
 __Validation__  
 [plain validator](#_validate)  
@@ -1620,6 +1621,51 @@ function updateConcurrently() {
         let customer = await Customer.getById('a0000000-0000-0000-0000-000000000000');
         customer.balance += 100;
     });
+
+    return Promise.all([concurrent1, concurrent2]);
+}
+```
+<a name="_sessionlock"></a>
+[session lock](https://github.com/alfateam/rdb-demo/blob/master/sessionLock.js)  
+(postgres only)
+The function will only be run when a lock has been acquired. The function is awaited for any return value, then lock is released. The function will then forward the return value from the supplied function.
+```js
+let rdb = require('rdb');
+
+let Customer = rdb.table('_customer');
+Customer.primaryColumn('cId').guid().as('id');
+Customer.column('cBalance').numeric().as('balance');
+
+let db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+
+await showBalance();
+await updateConcurrently();
+await showBalance();
+
+function showBalance() {
+    return db.transaction(async () => {
+        let customer = await Customer.getById('a0000000-0000-0000-0000-000000000000');
+        console.log('Balance: ' + customer.balance);
+    });
+}
+
+function updateConcurrently() {
+    let concurrent1 = db.transaction(async () => {
+        await db.lock("12345", runInLock);
+        //lock released
+        //to other stuff..
+    });
+
+    let concurrent2 = db.transaction(async () => {
+        await db.lock("12345", runInLock);
+        //lock released
+        //to other stuff..
+    });
+
+    function runInLock() {
+        let customer = await Customer.getById('a0000000-0000-0000-0000-000000000000');
+        customer.balance += 100;
+    }
 
     return Promise.all([concurrent1, concurrent2]);
 }
