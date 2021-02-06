@@ -1,7 +1,10 @@
+let flags = require('../../../flags');
+
 function _createDto(table, row) {
 	var dto = {};
 	var columns = table._columns;
 	var length = columns.length;
+	flags.useProxy = false;
 	for (var i = 0; i < length; i++) {
 		var column = columns[i];
 		if (!('serializable' in column && !column.serializable)) {
@@ -9,6 +12,7 @@ function _createDto(table, row) {
 			dto[alias] = row[alias];
 		}
 	}
+	flags.useProxy = true;
 	return dto;
 }
 

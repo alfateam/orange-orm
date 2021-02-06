@@ -8,6 +8,8 @@ let newObject = require('../../newObject');
 let toDto = require('./toDto');
 let createDto = require('./toDto/createDto');
 let patchRow = require('../../patchRow');
+let onChange = require('on-change');
+let flags = require('../../flags');
 
 function newDecodeDbRow(table, dbRow) {
 	let columns = table._columns;
@@ -30,14 +32,16 @@ function newDecodeDbRow(table, dbRow) {
 		let column = columns[i];
 		let purify = column.purify;
 		let name = column.alias;
+		let intName = '__' + name;
 		i = offset + i;
 		let key = keys[i];
 
-		Object.defineProperty(Row.prototype, name, {
-
+		Object.defineProperty(Row.prototype, intName, {
+			enumerable: false,
 			get: function() {
 				return this._dbRow[key];
 			},
+
 			set: function(value) {
 				let oldValue = this[name];
 				value = purify(value);
@@ -51,6 +55,36 @@ function newDecodeDbRow(table, dbRow) {
 				this._emitChanged(this, column, value, oldValue);
 			}
 		});
+
+		Object.defineProperty(Row.prototype, name, {
+			get: function() {
+				if (column.onChange && flags.useProxy && this[intName] !== null && typeof this[intName] === 'object') {
+					if (!(name in this._proxies)) {
+						let value = this[intName];
+						this._proxies[name] = column.onChange(this._dbRow[key], () => {
+							if(this[intName] !== onChange.target(value)) {
+								return;
+							}
+							this[intName] = this._dbRow[key];
+						});
+					}
+					return this._proxies[name];
+				}
+				return this[intName];
+			},
+			set: function(value) {
+				if (column.onChange && value !== null && typeof value === 'object') {
+					if(this[intName] === onChange.target(value))
+						return;
+					this._proxies[name] = column.onChange(value, () => {
+						if(this[intName] !== onChange.target(value))
+							return;
+						this[intName] = this._dbRow[key];
+					});
+				}
+				this[intName] = value;
+			}
+		});
 	}
 
 	setRelated();
@@ -58,8 +92,7 @@ function newDecodeDbRow(table, dbRow) {
 	function setRelated() {
 		let relations = table._relations;
 		for (let relationName in relations) {
-			let relation = relations[relationName];
-			setSingleRelated(relationName, relation);
+			setSingleRelated(relationName);
 		}
 	}
 
@@ -129,7 +162,7 @@ function newDecodeDbRow(table, dbRow) {
 	};
 
 	Row.prototype.delete = function(strategy) {
-		strategy = extractDeleteStrategy(strategy, table);
+		strategy = extractDeleteStrategy(strategy);
 		_delete(this, strategy, table);
 	};
 
@@ -154,10 +187,11 @@ function newDecodeDbRow(table, dbRow) {
 
 	function Row(dbRow) {
 		this._dbRow = dbRow;
-		this._oldValues =  JSON.stringify(createDto(table, this));
 		this._related = {};
 		this._emitColumnChanged = {};
 		this._emitChanged = newEmitEvent();
+		this._proxies = {};
+		this._oldValues =  JSON.stringify(createDto(table, this));
 	}
 
 	return decodeDbRow;

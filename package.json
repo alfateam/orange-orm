@@ -25,6 +25,7 @@
     "deferred": "^0.7.5",
     "mysql": "^2.13.0",
     "node-cls": "^1.0.5",
+    "on-change": "^2.2.3",
     "pg": "^8.5.1",
     "pg-query-stream": "^3.3.2",
     "promise": "^8.0.3",
