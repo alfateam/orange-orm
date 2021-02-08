@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__2.6.25__  
+Possible to indirectly update JSONB column by setting a nested property  
 __2.6.24__  
 Temporary lock with func as an alternative to transaction locks (pg only)  
 __2.6.23__  

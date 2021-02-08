@@ -47,6 +47,8 @@ function _new(table, column) {
 	};
 
 	column.iEq = column.iEqual;
+	column.IEQ = column.iEqual;
+	column.ieq = column.iEqual;
 }
 
 module.exports = _new;
