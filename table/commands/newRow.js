@@ -6,8 +6,14 @@ function newRow(table) {
 
 	function addColumn(column) {
 		var alias = column.alias;
-		if ('default' in column)
-			dto[alias] = column.default;
+		if ('default' in column) {
+			if (typeof column.default === 'function')
+				dto[alias] = column.default();
+			else if (column.toDto)
+				dto[alias] = column.toDto(column.default);
+			else
+				dto[alias] = column.default;
+		}
 		else
 			dto[alias] = null;
 	}

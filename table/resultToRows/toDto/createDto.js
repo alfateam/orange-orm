@@ -9,7 +9,10 @@ function _createDto(table, row) {
 		var column = columns[i];
 		if (!('serializable' in column && !column.serializable)) {
 			var alias = column.alias;
-			dto[alias] = row[alias];
+			if (column.toDto)
+				dto[alias] = column.toDto(row[alias]);
+			else
+				dto[alias] = row[alias];
 		}
 	}
 	flags.useProxy = true;

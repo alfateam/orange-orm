@@ -1425,7 +1425,7 @@ json is default null
 Customer.primaryColumn('cId').guid().as('id').default(null);
 Customer.column('cName').string().as('name').default('default name');
 Customer.column('cBalance').numeric().as('balance').default(2000);
-Customer.column('cRegdate').date().as('registeredDate').default(new Date());
+Customer.column('cRegdate').date().as('registeredDate').default(() => new Date());
 Customer.column('cIsActive').boolean().as('isActive').default(true);
 Customer.column('cPicture').binary().as('picture').default(buf);
 Customer.column('cDocument').json().as('document').default({foo: true});

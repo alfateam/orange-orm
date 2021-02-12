@@ -15,6 +15,9 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__2.6.26__  
+Bugfix: changing a dto on nested property would also change the jsonb column.  
+Default value accepts function  
 __2.6.25__  
 Possible to indirectly update JSONB column by setting a nested property  
 __2.6.24__  

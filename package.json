@@ -1,6 +1,6 @@
 {
   "name": "rdb",
-  "version": "2.6.25",
+  "version": "2.6.26",
   "main": "index.js",
   "title": "rdb",
   "description": "Object Relational Mapper",
@@ -31,6 +31,7 @@
     "promise": "^8.0.3",
     "rdb-client": "^1.1.0",
     "rfc6902": "^3.0.4",
+    "rfdc": "^1.2.0",
     "uuid": "^3.0.1"
   },
   "peerDependencies": {
