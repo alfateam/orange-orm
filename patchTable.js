@@ -20,7 +20,7 @@ async function patchTable(table, patches, { defaultConcurrency = 'optimistic', c
 			row = row || await table.tryGetById(property);
 		if (path.length === 0) {
 			let pkName = table._primaryColumns[0].alias;
-			row = table.insert(property[pkName]);
+			row = table.insert(value[pkName]);
 			for (let name in value) {
 				row[name] = fromCompareObject(value[name]);
 			}
