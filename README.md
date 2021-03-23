@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](docs/docs.md)  
 
 ## Release notes
+__2.6.27__  
+Bugfix: JSON patching could result in duplicate DTO when run in same transaction.  
 __2.6.26__  
 Bugfix: changing a dto on nested property would also change the jsonb column.  
 Default value accepts function  
