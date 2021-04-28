@@ -7,6 +7,7 @@ var getSessionContext = require('./getSessionContext');
 function getManyDto(table, filter, strategy) {
 	let isPg;
 	let c = {};
+
 	c.visitPg = function() {
 		isPg = true;
 	};

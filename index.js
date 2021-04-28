@@ -3,14 +3,20 @@ var hostExpress = require('./hostExpress');
 var _sqlite;
 var flags = require('./flags');
 
+console.log('hello rdb');
+
 var connectViaPool = function(connectionString) {
 	if (connectionString.indexOf && connectionString.indexOf('mysql') === 0)
 		return connectViaPool.mySql.apply(null, arguments);
-	return newPg.apply(null, arguments);
+	if (connectionString.indexOf && connectionString.indexOf('postgres') === 0)
+		return newPg.apply(null, arguments);
+	else
+		return connectViaPool.http.apply(null, arguments);
 };
 
 connectViaPool.pg = newPg;
 connectViaPool.mySql = require('./mySql/newDatabase');
+connectViaPool.http = require('./http/newDatabase');
 connectViaPool.table = require('./table');
 connectViaPool.filter = require('./emptyFilter');
 connectViaPool.commit = require('./table/commit');

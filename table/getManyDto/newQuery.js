@@ -5,6 +5,7 @@ function newQuery() {
 	var c = {};
 	var _newQuery;
 
+	//todo
 	c.visitPg = function() {
 		_newQuery = newPgQuery;
 	};

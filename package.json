@@ -17,8 +17,27 @@
   "author": "Lars-Erik Roald <lars.roald@gmail.com>",
   "license": "ISC",
   "scripts": {
+    "build": "esbuild index.js --bundle --outfile=dist/rdb.js",
     "test": "a",
     "lint": "eslint ./"
+  },
+  "browser": {
+    "async_hooks": false,
+    "fs": false,
+    "stream": false,
+    "generic-pool": false,
+    "domain": false,
+    "pg": false,
+    "pg-query-stream": false,
+    "mysql": false,
+    "express": false,
+    "sqlite3": false,
+    "./mySql/newDatabase": false,
+    "./pg/newDatabase": false,
+    "./sqlite/newDatabase": false,
+    "./hostExpress": false,
+    "./useHook": false,
+    "node-cls": false
   },
   "dependencies": {
     "ajv": "^6.10.2",
@@ -41,6 +60,7 @@
   },
   "devDependencies": {
     "a": "^2.1.0",
+    "esbuild": "^0.11.14",
     "eslint": "^6.1.0"
   },
   "engines": {
