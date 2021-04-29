@@ -10,7 +10,7 @@ let browserContext = {
 	selectForUpdateSql: require('../pg/selectForUpdateSql'),
 	multipleStatements: true,
 	accept: (caller) => caller.visitPg(),
-	client: {
+	dbClient: {
 		executeQuery
 	}
 };
