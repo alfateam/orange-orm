@@ -1,7 +1,7 @@
 let useHook = require('../useHook');
 let cls = require('node-cls');
 
-const { default: flags } = require('../flags');
+let flags = require('../flags');
 let browserContext = {
 	changes: [],
 	encodeBoolean: require('../pg/encodeBoolean'),
