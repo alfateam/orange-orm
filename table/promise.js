@@ -1,11 +1,10 @@
 var promise = require('promise/domains');
-var deferred = require('deferred');
 let promisify = require('util').promisify;
 
 
 function newPromise(func) {
 	if (!func)
-		return deferred.resolve();
+		return Promise.resolve();
 	return new promise(func);
 }
 

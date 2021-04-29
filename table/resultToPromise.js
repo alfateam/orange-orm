@@ -1,8 +1,5 @@
-
-var deferred = require('deferred');
-
 function resultToPromise(result) {
-	return deferred.resolve(result);
+	return Promise.resolve(result);
 }
 
 module.exports = resultToPromise;

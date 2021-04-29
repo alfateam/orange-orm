@@ -41,7 +41,6 @@
   },
   "dependencies": {
     "ajv": "^6.10.2",
-    "deferred": "^0.7.5",
     "mysql": "^2.13.0",
     "node-cls": "^1.0.5",
     "on-change": "^2.2.3",
