@@ -3,8 +3,6 @@ var hostExpress = require('./hostExpress');
 var _sqlite;
 var flags = require('./flags');
 
-console.log('hello rdb');
-
 var connectViaPool = function(connectionString) {
 	if (connectionString.indexOf && connectionString.indexOf('mysql') === 0)
 		return connectViaPool.mySql.apply(null, arguments);
