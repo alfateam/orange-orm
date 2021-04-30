@@ -21,786 +21,15 @@
   var require_newDatabase2 = __commonJS(() => {
   });
 
-  // (disabled):useHook
-  var require_useHook = __commonJS(() => {
-  });
-
-  // (disabled):node_modules/node-cls/index.js
-  var require_node_cls = __commonJS(() => {
-  });
-
-  // (disabled):domain
-  var require_domain = __commonJS(() => {
-  });
-
-  // createDomain/negotiateForwardProperty.js
-  var require_negotiateForwardProperty = __commonJS((exports, module) => {
-    function negotiateForwardProperty(oldDomain, newDomain, propertyName) {
-      if (newDomain[propertyName])
-        return;
-      if (propertyName === "rdb")
-        return;
-      Object.defineProperty(newDomain, propertyName, {
-        enumerable: true,
-        get: createGetter(oldDomain, propertyName),
-        set: createSetter(oldDomain, propertyName)
-      });
+  // http/newDatabase.js
+  var require_newDatabase3 = __commonJS((exports, module) => {
+    var flags = require_flags();
+    function newDatabase(connectionString) {
+      flags.url = connectionString;
+      let c = {};
+      return c;
     }
-    function createGetter(oldDomain, propName) {
-      return function() {
-        return oldDomain[propName];
-      };
-    }
-    function createSetter(oldDomain, propName) {
-      return function(value) {
-        oldDomain[propName] = value;
-      };
-    }
-    module.exports = negotiateForwardProperty;
-  });
-
-  // createDomain.js
-  var require_createDomain = __commonJS((exports, module) => {
-    var useHook = require_useHook();
-    var cls = require_node_cls();
-    var Domain = require_domain();
-    var negotiateForwardProperty = require_negotiateForwardProperty();
-    function createDomain() {
-      var oldDomain = Domain.active || {};
-      var domain = Domain.create();
-      var ownProperties = Object.getOwnPropertyNames(oldDomain);
-      ownProperties.forEach(function(propName) {
-        negotiateForwardProperty(oldDomain, domain, propName);
-      });
-      return domain;
-    }
-    function createOnContext() {
-      return cls.create("rdb");
-    }
-    function _createDomain() {
-      if (useHook())
-        return createOnContext();
-      else
-        return createDomain();
-    }
-    module.exports = _createDomain;
-  });
-
-  // table/log.js
-  var require_log = __commonJS((exports, module) => {
-    var logger = function() {
-    };
-    function log() {
-      logger.apply(null, arguments);
-    }
-    log.registerLogger = function(cb) {
-      logger = cb;
-    };
-    module.exports = log;
-  });
-
-  // http/wrapQuery.js
-  var require_wrapQuery = __commonJS((exports, module) => {
-    var log = require_log();
-    function wrapQuery(connection) {
-      var runOriginalQuery = connection.all;
-      return runQuery;
-      function runQuery(query, onCompleted) {
-        var params = query.parameters;
-        var sql = query.sql();
-        log(sql);
-        log("parameters: " + params);
-        runOriginalQuery.call(connection, sql, params, onInnerCompleted);
-        function onInnerCompleted(err, rows) {
-          if (err)
-            onCompleted(err);
-          else
-            onCompleted(null, rows);
-        }
-      }
-    }
-    module.exports = wrapQuery;
-  });
-
-  // (disabled):node_modules/pg-query-stream/dist/index.js
-  var require_dist = __commonJS(() => {
-  });
-
-  // http/newStreamableQuery.js
-  var require_newStreamableQuery = __commonJS((exports, module) => {
-    var QueryStream = require_dist();
-    module.exports = function(sql, params) {
-      return new QueryStream(sql, params);
-    };
-  });
-
-  // http/wrapQueryStream.js
-  var require_wrapQueryStream = __commonJS((exports, module) => {
-    var log = require_log();
-    var newStreamableQuery = require_newStreamableQuery();
-    function wrapQueryStream(connection) {
-      var runOriginalQuery = connection.query;
-      return runQuery;
-      function runQuery(query, options) {
-        var params = query.parameters;
-        var sql = query.sql();
-        log(sql);
-        log("parameters: " + params);
-        query = newStreamableQuery(sql, params, options);
-        return runOriginalQuery.call(connection, query);
-      }
-    }
-    module.exports = wrapQueryStream;
-  });
-
-  // http/encodeBoolean.js
-  var require_encodeBoolean = __commonJS((exports, module) => {
-    function encodeBoolean(bool) {
-      if (bool)
-        return 1;
-      return 0;
-    }
-    module.exports = encodeBoolean;
-  });
-
-  // http/encodeDate.js
-  var require_encodeDate = __commonJS((exports, module) => {
-    function encodeDate(date) {
-      if (date.toISOString)
-        return "'" + date.toISOString() + "'";
-      return "'" + date + "'";
-    }
-    module.exports = encodeDate;
-  });
-
-  // ../node_modules/util/support/isBufferBrowser.js
-  var require_isBufferBrowser = __commonJS((exports, module) => {
-    module.exports = function isBuffer(arg) {
-      return arg && typeof arg === "object" && typeof arg.copy === "function" && typeof arg.fill === "function" && typeof arg.readUInt8 === "function";
-    };
-  });
-
-  // ../node_modules/util/node_modules/inherits/inherits_browser.js
-  var require_inherits_browser = __commonJS((exports, module) => {
-    if (typeof Object.create === "function") {
-      module.exports = function inherits(ctor, superCtor) {
-        ctor.super_ = superCtor;
-        ctor.prototype = Object.create(superCtor.prototype, {
-          constructor: {
-            value: ctor,
-            enumerable: false,
-            writable: true,
-            configurable: true
-          }
-        });
-      };
-    } else {
-      module.exports = function inherits(ctor, superCtor) {
-        ctor.super_ = superCtor;
-        var TempCtor = function() {
-        };
-        TempCtor.prototype = superCtor.prototype;
-        ctor.prototype = new TempCtor();
-        ctor.prototype.constructor = ctor;
-      };
-    }
-  });
-
-  // ../node_modules/util/util.js
-  var require_util = __commonJS((exports) => {
-    var getOwnPropertyDescriptors = Object.getOwnPropertyDescriptors || function getOwnPropertyDescriptors2(obj) {
-      var keys = Object.keys(obj);
-      var descriptors = {};
-      for (var i = 0; i < keys.length; i++) {
-        descriptors[keys[i]] = Object.getOwnPropertyDescriptor(obj, keys[i]);
-      }
-      return descriptors;
-    };
-    var formatRegExp = /%[sdj%]/g;
-    exports.format = function(f) {
-      if (!isString(f)) {
-        var objects = [];
-        for (var i = 0; i < arguments.length; i++) {
-          objects.push(inspect(arguments[i]));
-        }
-        return objects.join(" ");
-      }
-      var i = 1;
-      var args = arguments;
-      var len = args.length;
-      var str = String(f).replace(formatRegExp, function(x2) {
-        if (x2 === "%%")
-          return "%";
-        if (i >= len)
-          return x2;
-        switch (x2) {
-          case "%s":
-            return String(args[i++]);
-          case "%d":
-            return Number(args[i++]);
-          case "%j":
-            try {
-              return JSON.stringify(args[i++]);
-            } catch (_) {
-              return "[Circular]";
-            }
-          default:
-            return x2;
-        }
-      });
-      for (var x = args[i]; i < len; x = args[++i]) {
-        if (isNull(x) || !isObject(x)) {
-          str += " " + x;
-        } else {
-          str += " " + inspect(x);
-        }
-      }
-      return str;
-    };
-    exports.deprecate = function(fn, msg) {
-      if (typeof process !== "undefined" && process.noDeprecation === true) {
-        return fn;
-      }
-      if (typeof process === "undefined") {
-        return function() {
-          return exports.deprecate(fn, msg).apply(this, arguments);
-        };
-      }
-      var warned = false;
-      function deprecated() {
-        if (!warned) {
-          if (process.throwDeprecation) {
-            throw new Error(msg);
-          } else if (process.traceDeprecation) {
-            console.trace(msg);
-          } else {
-            console.error(msg);
-          }
-          warned = true;
-        }
-        return fn.apply(this, arguments);
-      }
-      return deprecated;
-    };
-    var debugs = {};
-    var debugEnviron;
-    exports.debuglog = function(set) {
-      if (isUndefined(debugEnviron))
-        debugEnviron = process.env.NODE_DEBUG || "";
-      set = set.toUpperCase();
-      if (!debugs[set]) {
-        if (new RegExp("\\b" + set + "\\b", "i").test(debugEnviron)) {
-          var pid = process.pid;
-          debugs[set] = function() {
-            var msg = exports.format.apply(exports, arguments);
-            console.error("%s %d: %s", set, pid, msg);
-          };
-        } else {
-          debugs[set] = function() {
-          };
-        }
-      }
-      return debugs[set];
-    };
-    function inspect(obj, opts) {
-      var ctx = {
-        seen: [],
-        stylize: stylizeNoColor
-      };
-      if (arguments.length >= 3)
-        ctx.depth = arguments[2];
-      if (arguments.length >= 4)
-        ctx.colors = arguments[3];
-      if (isBoolean(opts)) {
-        ctx.showHidden = opts;
-      } else if (opts) {
-        exports._extend(ctx, opts);
-      }
-      if (isUndefined(ctx.showHidden))
-        ctx.showHidden = false;
-      if (isUndefined(ctx.depth))
-        ctx.depth = 2;
-      if (isUndefined(ctx.colors))
-        ctx.colors = false;
-      if (isUndefined(ctx.customInspect))
-        ctx.customInspect = true;
-      if (ctx.colors)
-        ctx.stylize = stylizeWithColor;
-      return formatValue(ctx, obj, ctx.depth);
-    }
-    exports.inspect = inspect;
-    inspect.colors = {
-      bold: [1, 22],
-      italic: [3, 23],
-      underline: [4, 24],
-      inverse: [7, 27],
-      white: [37, 39],
-      grey: [90, 39],
-      black: [30, 39],
-      blue: [34, 39],
-      cyan: [36, 39],
-      green: [32, 39],
-      magenta: [35, 39],
-      red: [31, 39],
-      yellow: [33, 39]
-    };
-    inspect.styles = {
-      special: "cyan",
-      number: "yellow",
-      boolean: "yellow",
-      undefined: "grey",
-      null: "bold",
-      string: "green",
-      date: "magenta",
-      regexp: "red"
-    };
-    function stylizeWithColor(str, styleType) {
-      var style = inspect.styles[styleType];
-      if (style) {
-        return "[" + inspect.colors[style][0] + "m" + str + "[" + inspect.colors[style][1] + "m";
-      } else {
-        return str;
-      }
-    }
-    function stylizeNoColor(str, styleType) {
-      return str;
-    }
-    function arrayToHash(array) {
-      var hash = {};
-      array.forEach(function(val, idx) {
-        hash[val] = true;
-      });
-      return hash;
-    }
-    function formatValue(ctx, value, recurseTimes) {
-      if (ctx.customInspect && value && isFunction(value.inspect) && value.inspect !== exports.inspect && !(value.constructor && value.constructor.prototype === value)) {
-        var ret = value.inspect(recurseTimes, ctx);
-        if (!isString(ret)) {
-          ret = formatValue(ctx, ret, recurseTimes);
-        }
-        return ret;
-      }
-      var primitive = formatPrimitive(ctx, value);
-      if (primitive) {
-        return primitive;
-      }
-      var keys = Object.keys(value);
-      var visibleKeys = arrayToHash(keys);
-      if (ctx.showHidden) {
-        keys = Object.getOwnPropertyNames(value);
-      }
-      if (isError(value) && (keys.indexOf("message") >= 0 || keys.indexOf("description") >= 0)) {
-        return formatError(value);
-      }
-      if (keys.length === 0) {
-        if (isFunction(value)) {
-          var name = value.name ? ": " + value.name : "";
-          return ctx.stylize("[Function" + name + "]", "special");
-        }
-        if (isRegExp(value)) {
-          return ctx.stylize(RegExp.prototype.toString.call(value), "regexp");
-        }
-        if (isDate(value)) {
-          return ctx.stylize(Date.prototype.toString.call(value), "date");
-        }
-        if (isError(value)) {
-          return formatError(value);
-        }
-      }
-      var base = "", array = false, braces = ["{", "}"];
-      if (isArray(value)) {
-        array = true;
-        braces = ["[", "]"];
-      }
-      if (isFunction(value)) {
-        var n = value.name ? ": " + value.name : "";
-        base = " [Function" + n + "]";
-      }
-      if (isRegExp(value)) {
-        base = " " + RegExp.prototype.toString.call(value);
-      }
-      if (isDate(value)) {
-        base = " " + Date.prototype.toUTCString.call(value);
-      }
-      if (isError(value)) {
-        base = " " + formatError(value);
-      }
-      if (keys.length === 0 && (!array || value.length == 0)) {
-        return braces[0] + base + braces[1];
-      }
-      if (recurseTimes < 0) {
-        if (isRegExp(value)) {
-          return ctx.stylize(RegExp.prototype.toString.call(value), "regexp");
-        } else {
-          return ctx.stylize("[Object]", "special");
-        }
-      }
-      ctx.seen.push(value);
-      var output;
-      if (array) {
-        output = formatArray(ctx, value, recurseTimes, visibleKeys, keys);
-      } else {
-        output = keys.map(function(key) {
-          return formatProperty(ctx, value, recurseTimes, visibleKeys, key, array);
-        });
-      }
-      ctx.seen.pop();
-      return reduceToSingleString(output, base, braces);
-    }
-    function formatPrimitive(ctx, value) {
-      if (isUndefined(value))
-        return ctx.stylize("undefined", "undefined");
-      if (isString(value)) {
-        var simple = "'" + JSON.stringify(value).replace(/^"|"$/g, "").replace(/'/g, "\\'").replace(/\\"/g, '"') + "'";
-        return ctx.stylize(simple, "string");
-      }
-      if (isNumber(value))
-        return ctx.stylize("" + value, "number");
-      if (isBoolean(value))
-        return ctx.stylize("" + value, "boolean");
-      if (isNull(value))
-        return ctx.stylize("null", "null");
-    }
-    function formatError(value) {
-      return "[" + Error.prototype.toString.call(value) + "]";
-    }
-    function formatArray(ctx, value, recurseTimes, visibleKeys, keys) {
-      var output = [];
-      for (var i = 0, l = value.length; i < l; ++i) {
-        if (hasOwnProperty(value, String(i))) {
-          output.push(formatProperty(ctx, value, recurseTimes, visibleKeys, String(i), true));
-        } else {
-          output.push("");
-        }
-      }
-      keys.forEach(function(key) {
-        if (!key.match(/^\d+$/)) {
-          output.push(formatProperty(ctx, value, recurseTimes, visibleKeys, key, true));
-        }
-      });
-      return output;
-    }
-    function formatProperty(ctx, value, recurseTimes, visibleKeys, key, array) {
-      var name, str, desc;
-      desc = Object.getOwnPropertyDescriptor(value, key) || {value: value[key]};
-      if (desc.get) {
-        if (desc.set) {
-          str = ctx.stylize("[Getter/Setter]", "special");
-        } else {
-          str = ctx.stylize("[Getter]", "special");
-        }
-      } else {
-        if (desc.set) {
-          str = ctx.stylize("[Setter]", "special");
-        }
-      }
-      if (!hasOwnProperty(visibleKeys, key)) {
-        name = "[" + key + "]";
-      }
-      if (!str) {
-        if (ctx.seen.indexOf(desc.value) < 0) {
-          if (isNull(recurseTimes)) {
-            str = formatValue(ctx, desc.value, null);
-          } else {
-            str = formatValue(ctx, desc.value, recurseTimes - 1);
-          }
-          if (str.indexOf("\n") > -1) {
-            if (array) {
-              str = str.split("\n").map(function(line) {
-                return "  " + line;
-              }).join("\n").substr(2);
-            } else {
-              str = "\n" + str.split("\n").map(function(line) {
-                return "   " + line;
-              }).join("\n");
-            }
-          }
-        } else {
-          str = ctx.stylize("[Circular]", "special");
-        }
-      }
-      if (isUndefined(name)) {
-        if (array && key.match(/^\d+$/)) {
-          return str;
-        }
-        name = JSON.stringify("" + key);
-        if (name.match(/^"([a-zA-Z_][a-zA-Z_0-9]*)"$/)) {
-          name = name.substr(1, name.length - 2);
-          name = ctx.stylize(name, "name");
-        } else {
-          name = name.replace(/'/g, "\\'").replace(/\\"/g, '"').replace(/(^"|"$)/g, "'");
-          name = ctx.stylize(name, "string");
-        }
-      }
-      return name + ": " + str;
-    }
-    function reduceToSingleString(output, base, braces) {
-      var numLinesEst = 0;
-      var length = output.reduce(function(prev, cur) {
-        numLinesEst++;
-        if (cur.indexOf("\n") >= 0)
-          numLinesEst++;
-        return prev + cur.replace(/\u001b\[\d\d?m/g, "").length + 1;
-      }, 0);
-      if (length > 60) {
-        return braces[0] + (base === "" ? "" : base + "\n ") + " " + output.join(",\n  ") + " " + braces[1];
-      }
-      return braces[0] + base + " " + output.join(", ") + " " + braces[1];
-    }
-    function isArray(ar) {
-      return Array.isArray(ar);
-    }
-    exports.isArray = isArray;
-    function isBoolean(arg) {
-      return typeof arg === "boolean";
-    }
-    exports.isBoolean = isBoolean;
-    function isNull(arg) {
-      return arg === null;
-    }
-    exports.isNull = isNull;
-    function isNullOrUndefined(arg) {
-      return arg == null;
-    }
-    exports.isNullOrUndefined = isNullOrUndefined;
-    function isNumber(arg) {
-      return typeof arg === "number";
-    }
-    exports.isNumber = isNumber;
-    function isString(arg) {
-      return typeof arg === "string";
-    }
-    exports.isString = isString;
-    function isSymbol(arg) {
-      return typeof arg === "symbol";
-    }
-    exports.isSymbol = isSymbol;
-    function isUndefined(arg) {
-      return arg === void 0;
-    }
-    exports.isUndefined = isUndefined;
-    function isRegExp(re) {
-      return isObject(re) && objectToString(re) === "[object RegExp]";
-    }
-    exports.isRegExp = isRegExp;
-    function isObject(arg) {
-      return typeof arg === "object" && arg !== null;
-    }
-    exports.isObject = isObject;
-    function isDate(d) {
-      return isObject(d) && objectToString(d) === "[object Date]";
-    }
-    exports.isDate = isDate;
-    function isError(e) {
-      return isObject(e) && (objectToString(e) === "[object Error]" || e instanceof Error);
-    }
-    exports.isError = isError;
-    function isFunction(arg) {
-      return typeof arg === "function";
-    }
-    exports.isFunction = isFunction;
-    function isPrimitive(arg) {
-      return arg === null || typeof arg === "boolean" || typeof arg === "number" || typeof arg === "string" || typeof arg === "symbol" || typeof arg === "undefined";
-    }
-    exports.isPrimitive = isPrimitive;
-    exports.isBuffer = require_isBufferBrowser();
-    function objectToString(o) {
-      return Object.prototype.toString.call(o);
-    }
-    function pad(n) {
-      return n < 10 ? "0" + n.toString(10) : n.toString(10);
-    }
-    var months = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec"
-    ];
-    function timestamp() {
-      var d = new Date();
-      var time = [
-        pad(d.getHours()),
-        pad(d.getMinutes()),
-        pad(d.getSeconds())
-      ].join(":");
-      return [d.getDate(), months[d.getMonth()], time].join(" ");
-    }
-    exports.log = function() {
-      console.log("%s - %s", timestamp(), exports.format.apply(exports, arguments));
-    };
-    exports.inherits = require_inherits_browser();
-    exports._extend = function(origin, add) {
-      if (!add || !isObject(add))
-        return origin;
-      var keys = Object.keys(add);
-      var i = keys.length;
-      while (i--) {
-        origin[keys[i]] = add[keys[i]];
-      }
-      return origin;
-    };
-    function hasOwnProperty(obj, prop) {
-      return Object.prototype.hasOwnProperty.call(obj, prop);
-    }
-    var kCustomPromisifiedSymbol = typeof Symbol !== "undefined" ? Symbol("util.promisify.custom") : void 0;
-    exports.promisify = function promisify(original) {
-      if (typeof original !== "function")
-        throw new TypeError('The "original" argument must be of type Function');
-      if (kCustomPromisifiedSymbol && original[kCustomPromisifiedSymbol]) {
-        var fn = original[kCustomPromisifiedSymbol];
-        if (typeof fn !== "function") {
-          throw new TypeError('The "util.promisify.custom" argument must be of type Function');
-        }
-        Object.defineProperty(fn, kCustomPromisifiedSymbol, {
-          value: fn,
-          enumerable: false,
-          writable: false,
-          configurable: true
-        });
-        return fn;
-      }
-      function fn() {
-        var promiseResolve, promiseReject;
-        var promise = new Promise(function(resolve, reject) {
-          promiseResolve = resolve;
-          promiseReject = reject;
-        });
-        var args = [];
-        for (var i = 0; i < arguments.length; i++) {
-          args.push(arguments[i]);
-        }
-        args.push(function(err, value) {
-          if (err) {
-            promiseReject(err);
-          } else {
-            promiseResolve(value);
-          }
-        });
-        try {
-          original.apply(this, args);
-        } catch (err) {
-          promiseReject(err);
-        }
-        return promise;
-      }
-      Object.setPrototypeOf(fn, Object.getPrototypeOf(original));
-      if (kCustomPromisifiedSymbol)
-        Object.defineProperty(fn, kCustomPromisifiedSymbol, {
-          value: fn,
-          enumerable: false,
-          writable: false,
-          configurable: true
-        });
-      return Object.defineProperties(fn, getOwnPropertyDescriptors(original));
-    };
-    exports.promisify.custom = kCustomPromisifiedSymbol;
-    function callbackifyOnRejected(reason, cb) {
-      if (!reason) {
-        var newReason = new Error("Promise was rejected with a falsy value");
-        newReason.reason = reason;
-        reason = newReason;
-      }
-      return cb(reason);
-    }
-    function callbackify(original) {
-      if (typeof original !== "function") {
-        throw new TypeError('The "original" argument must be of type Function');
-      }
-      function callbackified() {
-        var args = [];
-        for (var i = 0; i < arguments.length; i++) {
-          args.push(arguments[i]);
-        }
-        var maybeCb = args.pop();
-        if (typeof maybeCb !== "function") {
-          throw new TypeError("The last argument must be of type Function");
-        }
-        var self2 = this;
-        var cb = function() {
-          return maybeCb.apply(self2, arguments);
-        };
-        original.apply(this, args).then(function(ret) {
-          process.nextTick(cb, null, ret);
-        }, function(rej) {
-          process.nextTick(callbackifyOnRejected, rej, cb);
-        });
-      }
-      Object.setPrototypeOf(callbackified, Object.getPrototypeOf(original));
-      Object.defineProperties(callbackified, getOwnPropertyDescriptors(original));
-      return callbackified;
-    }
-    exports.callbackify = callbackify;
-  });
-
-  // http/deleteFromSql.js
-  var require_deleteFromSql = __commonJS((exports, module) => {
-    var format = "delete from %s where %s.rowId in (SELECT %s.rowId FROM %s %s%s)";
-    var util = require_util();
-    function deleteFromSql(table, alias, whereSql) {
-      var name = table._dbName;
-      return util.format(format, name, name, alias, name, alias, whereSql);
-    }
-    module.exports = deleteFromSql;
-  });
-
-  // http/selectForUpdateSql.js
-  var require_selectForUpdateSql = __commonJS((exports, module) => {
-    module.exports = function(alias) {
-      return " FOR UPDATE OF " + alias;
-    };
-  });
-
-  // http/newTransaction.js
-  var require_newTransaction = __commonJS((exports, module) => {
-    var wrapQuery = require_wrapQuery();
-    var wrapQueryStream = require_wrapQueryStream();
-    var encodeBoolean = require_encodeBoolean();
-    var encodeDate = require_encodeDate();
-    var deleteFromSql = require_deleteFromSql();
-    var selectForUpdateSql = require_selectForUpdateSql();
-    function newResolveTransaction(domain, pool) {
-      var rdb = {};
-      if (!pool.connect) {
-        pool = pool();
-        rdb.pool = pool;
-      }
-      return function(onSuccess, onError) {
-        pool.connect(onConnected);
-        function onConnected(err, client, done) {
-          try {
-            if (err) {
-              onError(err);
-              return;
-            }
-            client.executeQuery = wrapQuery(client);
-            client.streamQuery = wrapQueryStream(client);
-            rdb.dbClient = client;
-            rdb.dbClientDone = done;
-            rdb.encodeBoolean = encodeBoolean;
-            rdb.encodeDate = encodeDate;
-            rdb.deleteFromSql = deleteFromSql;
-            rdb.selectForUpdateSql = selectForUpdateSql;
-            rdb.multipleStatements = false;
-            rdb.accept = function(caller) {
-              caller.visitSqlite();
-            };
-            domain.rdb = rdb;
-            onSuccess();
-          } catch (e) {
-            onError(e);
-          }
-        }
-      };
-    }
-    module.exports = newResolveTransaction;
+    module.exports = newDatabase;
   });
 
   // table/query/extractSql.js
@@ -858,1738 +87,6 @@
       parameters = extractParameters(parameters);
       return new Parameterized(text, parameters);
     };
-  });
-
-  // table/commands/beginCommand.js
-  var require_beginCommand = __commonJS((exports, module) => {
-    var newParameterized = require_newParameterized();
-    var command = newParameterized("BEGIN");
-    function empty() {
-    }
-    command.endEdit = empty;
-    command.matches = empty;
-    module.exports = command;
-  });
-
-  // pg/encodeBoolean.js
-  var require_encodeBoolean2 = __commonJS((exports, module) => {
-    function encodeBoolean(bool) {
-      return bool.toString();
-    }
-    module.exports = encodeBoolean;
-  });
-
-  // pg/encodeDate.js
-  var require_encodeDate2 = __commonJS((exports, module) => {
-    function encodeDate(date) {
-      if (date.toISOString)
-        return "'" + date.toISOString() + "'";
-      return "'" + date + "'";
-    }
-    module.exports = encodeDate;
-  });
-
-  // pg/deleteFromSql.js
-  var require_deleteFromSql2 = __commonJS((exports, module) => {
-    var format = "delete from %s %s%s";
-    var util = require_util();
-    function deleteFromSql(table, alias, whereSql) {
-      var name = table._dbName;
-      return util.format(format, name, alias, whereSql);
-    }
-    module.exports = deleteFromSql;
-  });
-
-  // pg/selectForUpdateSql.js
-  var require_selectForUpdateSql2 = __commonJS((exports, module) => {
-    module.exports = function(alias) {
-      return " FOR UPDATE OF " + alias;
-    };
-  });
-
-  // table/getSessionContext.js
-  var require_getSessionContext = __commonJS((exports, module) => {
-    var useHook = require_useHook();
-    var cls = require_node_cls();
-    var flags = require_flags();
-    var browserContext = {
-      changes: [],
-      encodeBoolean: require_encodeBoolean2(),
-      encodeDate: require_encodeDate2(),
-      deleteFromSql: require_deleteFromSql2(),
-      selectForUpdateSql: require_selectForUpdateSql2(),
-      multipleStatements: true,
-      accept: (caller) => caller.visitPg(),
-      dbClient: {
-        executeQuery
-      }
-    };
-    async function executeQuery(query, onCompleted) {
-      let body = JSON.stringify({sql: query.sql(), parameters: query.parameters});
-      let request = new Request(`${flags.url}`, {method: "POST", body});
-      try {
-        let response = await fetch(request);
-        if (response.status === 200) {
-          onCompleted(void 0, await response.json());
-        } else {
-          let msg = response.json && await response.json() || `Status ${response.status} from server`;
-          let e = new Error(msg);
-          e.status = response.status;
-          onCompleted(e);
-        }
-      } catch (error) {
-        onCompleted(error);
-      }
-    }
-    function getSessionContext() {
-      if (flags.url) {
-        return browserContext;
-      }
-      if (useHook())
-        return cls.getContext("rdb").rdb;
-      else
-        return process.domain.rdb;
-    }
-    module.exports = getSessionContext;
-  });
-
-  // table/getSessionSingleton.js
-  var require_getSessionSingleton = __commonJS((exports, module) => {
-    var getSessionContext = require_getSessionContext();
-    module.exports = function(name) {
-      return getSessionContext()[name];
-    };
-  });
-
-  // table/executeQueries/resolveExecuteQuery.js
-  var require_resolveExecuteQuery = __commonJS((exports, module) => {
-    var getSessionSingleton = require_getSessionSingleton();
-    function resolveExecuteQuery(query) {
-      return resolve;
-      function resolve(success, failed) {
-        try {
-          var domain = process.domain;
-          if (domain) {
-            success = process.domain.bind(success);
-            failed = process.domain.bind(failed);
-          }
-          var client = getSessionSingleton("dbClient");
-          client.executeQuery(query, onCompleted);
-        } catch (e) {
-          failed(e);
-        }
-        function onCompleted(err, rows) {
-          if (!err) {
-            var lastIndex = rows.length - 1;
-            if (!Array.isArray(rows[0]) && Array.isArray(rows[lastIndex]))
-              rows = rows[lastIndex];
-            success(rows);
-          } else
-            failed(err);
-        }
-      }
-    }
-    module.exports = resolveExecuteQuery;
-  });
-
-  // table/executeQueries/executeQuery.js
-  var require_executeQuery = __commonJS((exports, module) => {
-    var newResolver = require_resolveExecuteQuery();
-    function executeQuery(query) {
-      var resolver = newResolver(query);
-      return new Promise(resolver);
-    }
-    module.exports = executeQuery;
-  });
-
-  // table/setSessionSingleton.js
-  var require_setSessionSingleton = __commonJS((exports, module) => {
-    var getSessionContext = require_getSessionContext();
-    module.exports = function(name, value) {
-      getSessionContext()[name] = value;
-    };
-  });
-
-  // table/begin.js
-  var require_begin = __commonJS((exports, module) => {
-    var beginCommand = require_beginCommand();
-    var executeQuery = require_executeQuery();
-    var setSessionSingleton = require_setSessionSingleton();
-    function begin() {
-      setSessionSingleton("changes", []);
-      return executeQuery(beginCommand);
-    }
-    module.exports = begin;
-  });
-
-  // table/commands/commitCommand.js
-  var require_commitCommand = __commonJS((exports, module) => {
-    var newParameterized = require_newParameterized();
-    var command = newParameterized("COMMIT");
-    function empty() {
-    }
-    command.endEdit = empty;
-    command.matches = empty;
-    module.exports = command;
-  });
-
-  // table/commands/getChangeSet.js
-  var require_getChangeSet = __commonJS((exports, module) => {
-    var getSessionSingleton = require_getSessionSingleton();
-    function getChangeSet() {
-      return getSessionSingleton("changes");
-    }
-    module.exports = getChangeSet;
-  });
-
-  // table/commands/negotiateEndEdit.js
-  var require_negotiateEndEdit = __commonJS((exports, module) => {
-    function negotiateEndEdit(changes) {
-      var last = changes[changes.length - 1];
-      if (last && last.endEdit)
-        last.endEdit();
-    }
-    module.exports = negotiateEndEdit;
-  });
-
-  // table/commands/pushCommand.js
-  var require_pushCommand = __commonJS((exports, module) => {
-    var getChangeSet = require_getChangeSet();
-    var negotiateEndEdit = require_negotiateEndEdit();
-    function pushCommand(command) {
-      var changes = getChangeSet();
-      negotiateEndEdit(changes);
-      changes.push(command);
-    }
-    module.exports = pushCommand;
-  });
-
-  // node_modules/asap/browser-raw.js
-  var require_browser_raw = __commonJS((exports, module) => {
-    "use strict";
-    module.exports = rawAsap;
-    function rawAsap(task) {
-      if (!queue.length) {
-        requestFlush();
-        flushing = true;
-      }
-      queue[queue.length] = task;
-    }
-    var queue = [];
-    var flushing = false;
-    var requestFlush;
-    var index = 0;
-    var capacity = 1024;
-    function flush() {
-      while (index < queue.length) {
-        var currentIndex = index;
-        index = index + 1;
-        queue[currentIndex].call();
-        if (index > capacity) {
-          for (var scan = 0, newLength = queue.length - index; scan < newLength; scan++) {
-            queue[scan] = queue[scan + index];
-          }
-          queue.length -= index;
-          index = 0;
-        }
-      }
-      queue.length = 0;
-      index = 0;
-      flushing = false;
-    }
-    var scope = typeof global !== "undefined" ? global : self;
-    var BrowserMutationObserver = scope.MutationObserver || scope.WebKitMutationObserver;
-    if (typeof BrowserMutationObserver === "function") {
-      requestFlush = makeRequestCallFromMutationObserver(flush);
-    } else {
-      requestFlush = makeRequestCallFromTimer(flush);
-    }
-    rawAsap.requestFlush = requestFlush;
-    function makeRequestCallFromMutationObserver(callback) {
-      var toggle = 1;
-      var observer = new BrowserMutationObserver(callback);
-      var node = document.createTextNode("");
-      observer.observe(node, {characterData: true});
-      return function requestCall() {
-        toggle = -toggle;
-        node.data = toggle;
-      };
-    }
-    function makeRequestCallFromTimer(callback) {
-      return function requestCall() {
-        var timeoutHandle = setTimeout(handleTimer, 0);
-        var intervalHandle = setInterval(handleTimer, 50);
-        function handleTimer() {
-          clearTimeout(timeoutHandle);
-          clearInterval(intervalHandle);
-          callback();
-        }
-      };
-    }
-    rawAsap.makeRequestCallFromTimer = makeRequestCallFromTimer;
-  });
-
-  // node_modules/asap/browser-asap.js
-  var require_browser_asap = __commonJS((exports, module) => {
-    "use strict";
-    var rawAsap = require_browser_raw();
-    var freeTasks = [];
-    var pendingErrors = [];
-    var requestErrorThrow = rawAsap.makeRequestCallFromTimer(throwFirstError);
-    function throwFirstError() {
-      if (pendingErrors.length) {
-        throw pendingErrors.shift();
-      }
-    }
-    module.exports = asap;
-    function asap(task) {
-      var rawTask;
-      if (freeTasks.length) {
-        rawTask = freeTasks.pop();
-      } else {
-        rawTask = new RawTask();
-      }
-      rawTask.task = task;
-      rawAsap(rawTask);
-    }
-    function RawTask() {
-      this.task = null;
-    }
-    RawTask.prototype.call = function() {
-      try {
-        this.task.call();
-      } catch (error) {
-        if (asap.onerror) {
-          asap.onerror(error);
-        } else {
-          pendingErrors.push(error);
-          requestErrorThrow();
-        }
-      } finally {
-        this.task = null;
-        freeTasks[freeTasks.length] = this;
-      }
-    };
-  });
-
-  // node_modules/promise/domains/core.js
-  var require_core = __commonJS((exports, module) => {
-    "use strict";
-    var asap = require_browser_asap();
-    function noop() {
-    }
-    var LAST_ERROR = null;
-    var IS_ERROR = {};
-    function getThen(obj) {
-      try {
-        return obj.then;
-      } catch (ex) {
-        LAST_ERROR = ex;
-        return IS_ERROR;
-      }
-    }
-    function tryCallOne(fn, a) {
-      try {
-        return fn(a);
-      } catch (ex) {
-        LAST_ERROR = ex;
-        return IS_ERROR;
-      }
-    }
-    function tryCallTwo(fn, a, b) {
-      try {
-        fn(a, b);
-      } catch (ex) {
-        LAST_ERROR = ex;
-        return IS_ERROR;
-      }
-    }
-    module.exports = Promise2;
-    function Promise2(fn) {
-      if (typeof this !== "object") {
-        throw new TypeError("Promises must be constructed via new");
-      }
-      if (typeof fn !== "function") {
-        throw new TypeError("Promise constructor's argument is not a function");
-      }
-      this._U = 0;
-      this._V = 0;
-      this._W = null;
-      this._X = null;
-      if (fn === noop)
-        return;
-      doResolve(fn, this);
-    }
-    Promise2._Y = null;
-    Promise2._Z = null;
-    Promise2._0 = noop;
-    Promise2.prototype.then = function(onFulfilled, onRejected) {
-      if (this.constructor !== Promise2) {
-        return safeThen(this, onFulfilled, onRejected);
-      }
-      var res = new Promise2(noop);
-      handle(this, new Handler(onFulfilled, onRejected, res));
-      return res;
-    };
-    function safeThen(self2, onFulfilled, onRejected) {
-      return new self2.constructor(function(resolve2, reject2) {
-        var res = new Promise2(noop);
-        res.then(resolve2, reject2);
-        handle(self2, new Handler(onFulfilled, onRejected, res));
-      });
-    }
-    function handle(self2, deferred) {
-      while (self2._V === 3) {
-        self2 = self2._W;
-      }
-      if (Promise2._Y) {
-        Promise2._Y(self2);
-      }
-      if (self2._V === 0) {
-        if (self2._U === 0) {
-          self2._U = 1;
-          self2._X = deferred;
-          return;
-        }
-        if (self2._U === 1) {
-          self2._U = 2;
-          self2._X = [self2._X, deferred];
-          return;
-        }
-        self2._X.push(deferred);
-        return;
-      }
-      handleResolved(self2, deferred);
-    }
-    function handleResolved(self2, deferred) {
-      asap(function() {
-        var cb = self2._V === 1 ? deferred.onFulfilled : deferred.onRejected;
-        if (cb === null) {
-          if (self2._V === 1) {
-            resolve(deferred.promise, self2._W);
-          } else {
-            reject(deferred.promise, self2._W);
-          }
-          return;
-        }
-        var ret = tryCallOne(cb, self2._W);
-        if (ret === IS_ERROR) {
-          reject(deferred.promise, LAST_ERROR);
-        } else {
-          resolve(deferred.promise, ret);
-        }
-      });
-    }
-    function resolve(self2, newValue) {
-      if (newValue === self2) {
-        return reject(self2, new TypeError("A promise cannot be resolved with itself."));
-      }
-      if (newValue && (typeof newValue === "object" || typeof newValue === "function")) {
-        var then = getThen(newValue);
-        if (then === IS_ERROR) {
-          return reject(self2, LAST_ERROR);
-        }
-        if (then === self2.then && newValue instanceof Promise2) {
-          self2._V = 3;
-          self2._W = newValue;
-          finale(self2);
-          return;
-        } else if (typeof then === "function") {
-          doResolve(then.bind(newValue), self2);
-          return;
-        }
-      }
-      self2._V = 1;
-      self2._W = newValue;
-      finale(self2);
-    }
-    function reject(self2, newValue) {
-      self2._V = 2;
-      self2._W = newValue;
-      if (Promise2._Z) {
-        Promise2._Z(self2, newValue);
-      }
-      finale(self2);
-    }
-    function finale(self2) {
-      if (self2._U === 1) {
-        handle(self2, self2._X);
-        self2._X = null;
-      }
-      if (self2._U === 2) {
-        for (var i = 0; i < self2._X.length; i++) {
-          handle(self2, self2._X[i]);
-        }
-        self2._X = null;
-      }
-    }
-    function Handler(onFulfilled, onRejected, promise) {
-      this.onFulfilled = typeof onFulfilled === "function" ? onFulfilled : null;
-      this.onRejected = typeof onRejected === "function" ? onRejected : null;
-      this.promise = promise;
-    }
-    function doResolve(fn, promise) {
-      var done = false;
-      var res = tryCallTwo(fn, function(value) {
-        if (done)
-          return;
-        done = true;
-        resolve(promise, value);
-      }, function(reason) {
-        if (done)
-          return;
-        done = true;
-        reject(promise, reason);
-      });
-      if (!done && res === IS_ERROR) {
-        done = true;
-        reject(promise, LAST_ERROR);
-      }
-    }
-  });
-
-  // node_modules/promise/domains/done.js
-  var require_done = __commonJS((exports, module) => {
-    "use strict";
-    var Promise2 = require_core();
-    module.exports = Promise2;
-    Promise2.prototype.done = function(onFulfilled, onRejected) {
-      var self2 = arguments.length ? this.then.apply(this, arguments) : this;
-      self2.then(null, function(err) {
-        setTimeout(function() {
-          throw err;
-        }, 0);
-      });
-    };
-  });
-
-  // node_modules/promise/domains/finally.js
-  var require_finally = __commonJS((exports, module) => {
-    "use strict";
-    var Promise2 = require_core();
-    module.exports = Promise2;
-    Promise2.prototype.finally = function(f) {
-      return this.then(function(value) {
-        return Promise2.resolve(f()).then(function() {
-          return value;
-        });
-      }, function(err) {
-        return Promise2.resolve(f()).then(function() {
-          throw err;
-        });
-      });
-    };
-  });
-
-  // node_modules/promise/domains/es6-extensions.js
-  var require_es6_extensions = __commonJS((exports, module) => {
-    "use strict";
-    var Promise2 = require_core();
-    module.exports = Promise2;
-    var TRUE = valuePromise(true);
-    var FALSE = valuePromise(false);
-    var NULL = valuePromise(null);
-    var UNDEFINED = valuePromise(void 0);
-    var ZERO = valuePromise(0);
-    var EMPTYSTRING = valuePromise("");
-    function valuePromise(value) {
-      var p = new Promise2(Promise2._0);
-      p._V = 1;
-      p._W = value;
-      return p;
-    }
-    Promise2.resolve = function(value) {
-      if (value instanceof Promise2)
-        return value;
-      if (value === null)
-        return NULL;
-      if (value === void 0)
-        return UNDEFINED;
-      if (value === true)
-        return TRUE;
-      if (value === false)
-        return FALSE;
-      if (value === 0)
-        return ZERO;
-      if (value === "")
-        return EMPTYSTRING;
-      if (typeof value === "object" || typeof value === "function") {
-        try {
-          var then = value.then;
-          if (typeof then === "function") {
-            return new Promise2(then.bind(value));
-          }
-        } catch (ex) {
-          return new Promise2(function(resolve, reject) {
-            reject(ex);
-          });
-        }
-      }
-      return valuePromise(value);
-    };
-    var iterableToArray = function(iterable) {
-      if (typeof Array.from === "function") {
-        iterableToArray = Array.from;
-        return Array.from(iterable);
-      }
-      iterableToArray = function(x) {
-        return Array.prototype.slice.call(x);
-      };
-      return Array.prototype.slice.call(iterable);
-    };
-    Promise2.all = function(arr) {
-      var args = iterableToArray(arr);
-      return new Promise2(function(resolve, reject) {
-        if (args.length === 0)
-          return resolve([]);
-        var remaining = args.length;
-        function res(i2, val) {
-          if (val && (typeof val === "object" || typeof val === "function")) {
-            if (val instanceof Promise2 && val.then === Promise2.prototype.then) {
-              while (val._V === 3) {
-                val = val._W;
-              }
-              if (val._V === 1)
-                return res(i2, val._W);
-              if (val._V === 2)
-                reject(val._W);
-              val.then(function(val2) {
-                res(i2, val2);
-              }, reject);
-              return;
-            } else {
-              var then = val.then;
-              if (typeof then === "function") {
-                var p = new Promise2(then.bind(val));
-                p.then(function(val2) {
-                  res(i2, val2);
-                }, reject);
-                return;
-              }
-            }
-          }
-          args[i2] = val;
-          if (--remaining === 0) {
-            resolve(args);
-          }
-        }
-        for (var i = 0; i < args.length; i++) {
-          res(i, args[i]);
-        }
-      });
-    };
-    Promise2.reject = function(value) {
-      return new Promise2(function(resolve, reject) {
-        reject(value);
-      });
-    };
-    Promise2.race = function(values) {
-      return new Promise2(function(resolve, reject) {
-        iterableToArray(values).forEach(function(value) {
-          Promise2.resolve(value).then(resolve, reject);
-        });
-      });
-    };
-    Promise2.prototype["catch"] = function(onRejected) {
-      return this.then(null, onRejected);
-    };
-  });
-
-  // node_modules/promise/domains/node-extensions.js
-  var require_node_extensions = __commonJS((exports, module) => {
-    "use strict";
-    var Promise2 = require_core();
-    var asap = require_browser_asap();
-    module.exports = Promise2;
-    Promise2.denodeify = function(fn, argumentCount) {
-      if (typeof argumentCount === "number" && argumentCount !== Infinity) {
-        return denodeifyWithCount(fn, argumentCount);
-      } else {
-        return denodeifyWithoutCount(fn);
-      }
-    };
-    var callbackFn = "function (err, res) {if (err) { rj(err); } else { rs(res); }}";
-    function denodeifyWithCount(fn, argumentCount) {
-      var args = [];
-      for (var i = 0; i < argumentCount; i++) {
-        args.push("a" + i);
-      }
-      var body = [
-        "return function (" + args.join(",") + ") {",
-        "var self = this;",
-        "return new Promise(function (rs, rj) {",
-        "var res = fn.call(",
-        ["self"].concat(args).concat([callbackFn]).join(","),
-        ");",
-        "if (res &&",
-        '(typeof res === "object" || typeof res === "function") &&',
-        'typeof res.then === "function"',
-        ") {rs(res);}",
-        "});",
-        "};"
-      ].join("");
-      return Function(["Promise", "fn"], body)(Promise2, fn);
-    }
-    function denodeifyWithoutCount(fn) {
-      var fnLength = Math.max(fn.length - 1, 3);
-      var args = [];
-      for (var i = 0; i < fnLength; i++) {
-        args.push("a" + i);
-      }
-      var body = [
-        "return function (" + args.join(",") + ") {",
-        "var self = this;",
-        "var args;",
-        "var argLength = arguments.length;",
-        "if (arguments.length > " + fnLength + ") {",
-        "args = new Array(arguments.length + 1);",
-        "for (var i = 0; i < arguments.length; i++) {",
-        "args[i] = arguments[i];",
-        "}",
-        "}",
-        "return new Promise(function (rs, rj) {",
-        "var cb = " + callbackFn + ";",
-        "var res;",
-        "switch (argLength) {",
-        args.concat(["extra"]).map(function(_, index) {
-          return "case " + index + ":res = fn.call(" + ["self"].concat(args.slice(0, index)).concat("cb").join(",") + ");break;";
-        }).join(""),
-        "default:",
-        "args[argLength] = cb;",
-        "res = fn.apply(self, args);",
-        "}",
-        "if (res &&",
-        '(typeof res === "object" || typeof res === "function") &&',
-        'typeof res.then === "function"',
-        ") {rs(res);}",
-        "});",
-        "};"
-      ].join("");
-      return Function(["Promise", "fn"], body)(Promise2, fn);
-    }
-    Promise2.nodeify = function(fn) {
-      return function() {
-        var args = Array.prototype.slice.call(arguments);
-        var callback = typeof args[args.length - 1] === "function" ? args.pop() : null;
-        var ctx = this;
-        try {
-          return fn.apply(this, arguments).nodeify(callback, ctx);
-        } catch (ex) {
-          if (callback === null || typeof callback == "undefined") {
-            return new Promise2(function(resolve, reject) {
-              reject(ex);
-            });
-          } else {
-            asap(function() {
-              callback.call(ctx, ex);
-            });
-          }
-        }
-      };
-    };
-    Promise2.prototype.nodeify = function(callback, ctx) {
-      if (typeof callback != "function")
-        return this;
-      this.then(function(value) {
-        asap(function() {
-          callback.call(ctx, null, value);
-        });
-      }, function(err) {
-        asap(function() {
-          callback.call(ctx, err);
-        });
-      });
-    };
-  });
-
-  // node_modules/promise/domains/synchronous.js
-  var require_synchronous = __commonJS((exports, module) => {
-    "use strict";
-    var Promise2 = require_core();
-    module.exports = Promise2;
-    Promise2.enableSynchronous = function() {
-      Promise2.prototype.isPending = function() {
-        return this.getState() == 0;
-      };
-      Promise2.prototype.isFulfilled = function() {
-        return this.getState() == 1;
-      };
-      Promise2.prototype.isRejected = function() {
-        return this.getState() == 2;
-      };
-      Promise2.prototype.getValue = function() {
-        if (this._V === 3) {
-          return this._W.getValue();
-        }
-        if (!this.isFulfilled()) {
-          throw new Error("Cannot get a value of an unfulfilled promise.");
-        }
-        return this._W;
-      };
-      Promise2.prototype.getReason = function() {
-        if (this._V === 3) {
-          return this._W.getReason();
-        }
-        if (!this.isRejected()) {
-          throw new Error("Cannot get a rejection reason of a non-rejected promise.");
-        }
-        return this._W;
-      };
-      Promise2.prototype.getState = function() {
-        if (this._V === 3) {
-          return this._W.getState();
-        }
-        if (this._V === -1 || this._V === -2) {
-          return 0;
-        }
-        return this._V;
-      };
-    };
-    Promise2.disableSynchronous = function() {
-      Promise2.prototype.isPending = void 0;
-      Promise2.prototype.isFulfilled = void 0;
-      Promise2.prototype.isRejected = void 0;
-      Promise2.prototype.getValue = void 0;
-      Promise2.prototype.getReason = void 0;
-      Promise2.prototype.getState = void 0;
-    };
-  });
-
-  // node_modules/promise/domains/index.js
-  var require_domains = __commonJS((exports, module) => {
-    "use strict";
-    module.exports = require_core();
-    require_done();
-    require_finally();
-    require_es6_extensions();
-    require_node_extensions();
-    require_synchronous();
-  });
-
-  // table/promise.js
-  var require_promise = __commonJS((exports, module) => {
-    var promise = require_domains();
-    var promisify = require_util().promisify;
-    function newPromise(func) {
-      if (!func)
-        return Promise.resolve();
-      return new promise(func);
-    }
-    newPromise.all = Promise.all;
-    newPromise.denodeify = promisify || promise.denodeify;
-    module.exports = newPromise;
-  });
-
-  // table/executeQueries/executeChanges.js
-  var require_executeChanges = __commonJS((exports, module) => {
-    var executeQuery = require_executeQuery();
-    var newPromise = require_promise();
-    function executeChanges(queries) {
-      if (queries.length === 0)
-        return newPromise();
-      var i = -1;
-      return execute().then(emitChanged);
-      function execute() {
-        i++;
-        if (i + 1 === queries.length)
-          return executeQuery(queries[i]);
-        else {
-          return executeQuery(queries[i]).then(execute);
-        }
-      }
-      async function emitChanged() {
-        for (let i2 = 0; i2 < queries.length; i2++) {
-          if (queries[i2].emitChanged)
-            await Promise.all(queries[i2].emitChanged());
-        }
-      }
-    }
-    module.exports = executeChanges;
-  });
-
-  // table/deleteSessionContext.js
-  var require_deleteSessionContext = __commonJS((exports, module) => {
-    var useHook = require_useHook();
-    var cls = require_node_cls();
-    function deleteSessionContext() {
-      if (useHook()) {
-        let context = cls.get("rdb");
-        delete context.rdb;
-        if (context.exit)
-          cls.exit("rdb");
-      } else
-        delete process.domain.rdb;
-    }
-    module.exports = deleteSessionContext;
-  });
-
-  // table/releaseDbClient.js
-  var require_releaseDbClient = __commonJS((exports, module) => {
-    var getSessionSingleton = require_getSessionSingleton();
-    var deleteSessionContext = require_deleteSessionContext();
-    function release() {
-      var done = getSessionSingleton("dbClientDone");
-      var pool = getSessionSingleton("pool");
-      deleteSessionContext();
-      if (done)
-        done();
-      if (pool)
-        return pool.end();
-    }
-    module.exports = release;
-  });
-
-  // table/commands/compressChanges.js
-  var require_compressChanges = __commonJS((exports, module) => {
-    var newParameterized = require_newParameterized();
-    var getSessionSingleton = require_getSessionSingleton();
-    function compress(queries) {
-      var multipleStatements = getSessionSingleton("multipleStatements");
-      var compressed = [];
-      var queryCount = queries.length;
-      for (var i = 0; i < queryCount; i++) {
-        var current = queries[i];
-        if (multipleStatements && current.parameters.length === 0 && !current.disallowCompress) {
-          for (var i2 = i + 1; i2 < queryCount; i2++) {
-            var next = queries[i2];
-            if (next.parameters.length > 0 || !next.disallowCompress)
-              break;
-            current = newParameterized(current.sql() + ";" + next.sql());
-            i++;
-          }
-        }
-        compressed.push(current);
-      }
-      return compressed;
-    }
-    module.exports = compress;
-  });
-
-  // table/popChanges.js
-  var require_popChanges = __commonJS((exports, module) => {
-    var getChangeSet = require_getChangeSet();
-    var compressChanges = require_compressChanges();
-    function popChanges() {
-      var changeSet = getChangeSet();
-      var length = changeSet.length;
-      if (length > 0) {
-        var lastCmd = changeSet[length - 1];
-        if (lastCmd.endEdit)
-          lastCmd.endEdit();
-        var compressed = compressChanges(changeSet);
-        changeSet.length = 0;
-        return compressed;
-      }
-      return changeSet;
-    }
-    module.exports = popChanges;
-  });
-
-  // table/commit.js
-  var require_commit = __commonJS((exports, module) => {
-    var commitCommand = require_commitCommand();
-    var pushCommand = require_pushCommand();
-    var executeChanges = require_executeChanges();
-    var releaseDbClient = require_releaseDbClient();
-    var popChanges = require_popChanges();
-    function commit(result) {
-      return popAndPushChanges().then(releaseDbClient).then(onReleased);
-      function onReleased() {
-        return result;
-      }
-      async function popAndPushChanges() {
-        let changes = popChanges();
-        while (changes.length > 0) {
-          await executeChanges(changes);
-          changes = popChanges();
-        }
-        pushCommand(commitCommand);
-        return executeChanges(popChanges());
-      }
-    }
-    module.exports = function(result) {
-      return Promise.resolve().then(() => commit(result));
-    };
-  });
-
-  // table/commands/rollbackCommand.js
-  var require_rollbackCommand = __commonJS((exports, module) => {
-    var newParameterized = require_newParameterized();
-    var command = newParameterized("ROLLBACK");
-    function empty() {
-    }
-    command.endEdit = empty;
-    command.matches = empty;
-    module.exports = command;
-  });
-
-  // table/tryReleaseDbClient.js
-  var require_tryReleaseDbClient = __commonJS((exports, module) => {
-    var release = require_releaseDbClient();
-    function tryReleaseDbClient() {
-      try {
-        release();
-      } catch (e) {
-      }
-    }
-    module.exports = tryReleaseDbClient;
-  });
-
-  // table/newThrow.js
-  var require_newThrow = __commonJS((exports, module) => {
-    var tryReleaseDbClient = require_tryReleaseDbClient();
-    function newThrow(e, previousPromise) {
-      return previousPromise.then(throwError, throwError);
-      function throwError() {
-        tryReleaseDbClient();
-        throw e;
-      }
-    }
-    module.exports = newThrow;
-  });
-
-  // table/resultToPromise.js
-  var require_resultToPromise = __commonJS((exports, module) => {
-    function resultToPromise(result) {
-      return Promise.resolve(result);
-    }
-    module.exports = resultToPromise;
-  });
-
-  // table/rollback.js
-  var require_rollback = __commonJS((exports, module) => {
-    var rollbackCommand = require_rollbackCommand();
-    var executeQuery = require_executeQuery();
-    var releaseDbClient = require_releaseDbClient();
-    var popChanges = require_popChanges();
-    var newThrow = require_newThrow();
-    var resultToPromise = require_resultToPromise();
-    function rollback(e) {
-      var executeRollback = executeQuery.bind(null, rollbackCommand);
-      var chain = resultToPromise().then(popChanges).then(executeRollback).then(releaseDbClient);
-      if (e)
-        return newThrow(e, chain);
-      return chain;
-    }
-    module.exports = function(e) {
-      return Promise.resolve().then(() => rollback(e));
-    };
-  });
-
-  // newObject.js
-  var require_newObject = __commonJS((exports, module) => {
-    function newObject() {
-      return {};
-    }
-    module.exports = newObject;
-  });
-
-  // pools.js
-  var require_pools = __commonJS((exports, module) => {
-    var pools = require_newObject()();
-    Object.defineProperty(pools, "end", {
-      enumerable: false,
-      value: end
-    });
-    function end() {
-      var all = [];
-      for (var poolId in pools) {
-        var endPool = pools[poolId].end();
-        all.push(endPool);
-      }
-      return Promise.all(all);
-    }
-    module.exports = pools;
-  });
-
-  // http/pool/end.js
-  var require_end = __commonJS((exports, module) => {
-    var pools = require_pools();
-    function endPool(genericPool, id, done) {
-      genericPool.drain(onDrained);
-      function onDrained() {
-        genericPool.destroyAllNow();
-        delete pools[id];
-        done();
-      }
-    }
-    module.exports = endPool;
-  });
-
-  // ../node_modules/events/events.js
-  var require_events = __commonJS((exports, module) => {
-    "use strict";
-    var R = typeof Reflect === "object" ? Reflect : null;
-    var ReflectApply = R && typeof R.apply === "function" ? R.apply : function ReflectApply2(target, receiver, args) {
-      return Function.prototype.apply.call(target, receiver, args);
-    };
-    var ReflectOwnKeys;
-    if (R && typeof R.ownKeys === "function") {
-      ReflectOwnKeys = R.ownKeys;
-    } else if (Object.getOwnPropertySymbols) {
-      ReflectOwnKeys = function ReflectOwnKeys2(target) {
-        return Object.getOwnPropertyNames(target).concat(Object.getOwnPropertySymbols(target));
-      };
-    } else {
-      ReflectOwnKeys = function ReflectOwnKeys2(target) {
-        return Object.getOwnPropertyNames(target);
-      };
-    }
-    function ProcessEmitWarning(warning) {
-      if (console && console.warn)
-        console.warn(warning);
-    }
-    var NumberIsNaN = Number.isNaN || function NumberIsNaN2(value) {
-      return value !== value;
-    };
-    function EventEmitter() {
-      EventEmitter.init.call(this);
-    }
-    module.exports = EventEmitter;
-    module.exports.once = once;
-    EventEmitter.EventEmitter = EventEmitter;
-    EventEmitter.prototype._events = void 0;
-    EventEmitter.prototype._eventsCount = 0;
-    EventEmitter.prototype._maxListeners = void 0;
-    var defaultMaxListeners = 10;
-    function checkListener(listener) {
-      if (typeof listener !== "function") {
-        throw new TypeError('The "listener" argument must be of type Function. Received type ' + typeof listener);
-      }
-    }
-    Object.defineProperty(EventEmitter, "defaultMaxListeners", {
-      enumerable: true,
-      get: function() {
-        return defaultMaxListeners;
-      },
-      set: function(arg) {
-        if (typeof arg !== "number" || arg < 0 || NumberIsNaN(arg)) {
-          throw new RangeError('The value of "defaultMaxListeners" is out of range. It must be a non-negative number. Received ' + arg + ".");
-        }
-        defaultMaxListeners = arg;
-      }
-    });
-    EventEmitter.init = function() {
-      if (this._events === void 0 || this._events === Object.getPrototypeOf(this)._events) {
-        this._events = Object.create(null);
-        this._eventsCount = 0;
-      }
-      this._maxListeners = this._maxListeners || void 0;
-    };
-    EventEmitter.prototype.setMaxListeners = function setMaxListeners(n) {
-      if (typeof n !== "number" || n < 0 || NumberIsNaN(n)) {
-        throw new RangeError('The value of "n" is out of range. It must be a non-negative number. Received ' + n + ".");
-      }
-      this._maxListeners = n;
-      return this;
-    };
-    function _getMaxListeners(that) {
-      if (that._maxListeners === void 0)
-        return EventEmitter.defaultMaxListeners;
-      return that._maxListeners;
-    }
-    EventEmitter.prototype.getMaxListeners = function getMaxListeners() {
-      return _getMaxListeners(this);
-    };
-    EventEmitter.prototype.emit = function emit(type) {
-      var args = [];
-      for (var i = 1; i < arguments.length; i++)
-        args.push(arguments[i]);
-      var doError = type === "error";
-      var events = this._events;
-      if (events !== void 0)
-        doError = doError && events.error === void 0;
-      else if (!doError)
-        return false;
-      if (doError) {
-        var er;
-        if (args.length > 0)
-          er = args[0];
-        if (er instanceof Error) {
-          throw er;
-        }
-        var err = new Error("Unhandled error." + (er ? " (" + er.message + ")" : ""));
-        err.context = er;
-        throw err;
-      }
-      var handler = events[type];
-      if (handler === void 0)
-        return false;
-      if (typeof handler === "function") {
-        ReflectApply(handler, this, args);
-      } else {
-        var len = handler.length;
-        var listeners = arrayClone(handler, len);
-        for (var i = 0; i < len; ++i)
-          ReflectApply(listeners[i], this, args);
-      }
-      return true;
-    };
-    function _addListener(target, type, listener, prepend) {
-      var m;
-      var events;
-      var existing;
-      checkListener(listener);
-      events = target._events;
-      if (events === void 0) {
-        events = target._events = Object.create(null);
-        target._eventsCount = 0;
-      } else {
-        if (events.newListener !== void 0) {
-          target.emit("newListener", type, listener.listener ? listener.listener : listener);
-          events = target._events;
-        }
-        existing = events[type];
-      }
-      if (existing === void 0) {
-        existing = events[type] = listener;
-        ++target._eventsCount;
-      } else {
-        if (typeof existing === "function") {
-          existing = events[type] = prepend ? [listener, existing] : [existing, listener];
-        } else if (prepend) {
-          existing.unshift(listener);
-        } else {
-          existing.push(listener);
-        }
-        m = _getMaxListeners(target);
-        if (m > 0 && existing.length > m && !existing.warned) {
-          existing.warned = true;
-          var w = new Error("Possible EventEmitter memory leak detected. " + existing.length + " " + String(type) + " listeners added. Use emitter.setMaxListeners() to increase limit");
-          w.name = "MaxListenersExceededWarning";
-          w.emitter = target;
-          w.type = type;
-          w.count = existing.length;
-          ProcessEmitWarning(w);
-        }
-      }
-      return target;
-    }
-    EventEmitter.prototype.addListener = function addListener(type, listener) {
-      return _addListener(this, type, listener, false);
-    };
-    EventEmitter.prototype.on = EventEmitter.prototype.addListener;
-    EventEmitter.prototype.prependListener = function prependListener(type, listener) {
-      return _addListener(this, type, listener, true);
-    };
-    function onceWrapper() {
-      if (!this.fired) {
-        this.target.removeListener(this.type, this.wrapFn);
-        this.fired = true;
-        if (arguments.length === 0)
-          return this.listener.call(this.target);
-        return this.listener.apply(this.target, arguments);
-      }
-    }
-    function _onceWrap(target, type, listener) {
-      var state = {fired: false, wrapFn: void 0, target, type, listener};
-      var wrapped = onceWrapper.bind(state);
-      wrapped.listener = listener;
-      state.wrapFn = wrapped;
-      return wrapped;
-    }
-    EventEmitter.prototype.once = function once2(type, listener) {
-      checkListener(listener);
-      this.on(type, _onceWrap(this, type, listener));
-      return this;
-    };
-    EventEmitter.prototype.prependOnceListener = function prependOnceListener(type, listener) {
-      checkListener(listener);
-      this.prependListener(type, _onceWrap(this, type, listener));
-      return this;
-    };
-    EventEmitter.prototype.removeListener = function removeListener(type, listener) {
-      var list, events, position, i, originalListener;
-      checkListener(listener);
-      events = this._events;
-      if (events === void 0)
-        return this;
-      list = events[type];
-      if (list === void 0)
-        return this;
-      if (list === listener || list.listener === listener) {
-        if (--this._eventsCount === 0)
-          this._events = Object.create(null);
-        else {
-          delete events[type];
-          if (events.removeListener)
-            this.emit("removeListener", type, list.listener || listener);
-        }
-      } else if (typeof list !== "function") {
-        position = -1;
-        for (i = list.length - 1; i >= 0; i--) {
-          if (list[i] === listener || list[i].listener === listener) {
-            originalListener = list[i].listener;
-            position = i;
-            break;
-          }
-        }
-        if (position < 0)
-          return this;
-        if (position === 0)
-          list.shift();
-        else {
-          spliceOne(list, position);
-        }
-        if (list.length === 1)
-          events[type] = list[0];
-        if (events.removeListener !== void 0)
-          this.emit("removeListener", type, originalListener || listener);
-      }
-      return this;
-    };
-    EventEmitter.prototype.off = EventEmitter.prototype.removeListener;
-    EventEmitter.prototype.removeAllListeners = function removeAllListeners(type) {
-      var listeners, events, i;
-      events = this._events;
-      if (events === void 0)
-        return this;
-      if (events.removeListener === void 0) {
-        if (arguments.length === 0) {
-          this._events = Object.create(null);
-          this._eventsCount = 0;
-        } else if (events[type] !== void 0) {
-          if (--this._eventsCount === 0)
-            this._events = Object.create(null);
-          else
-            delete events[type];
-        }
-        return this;
-      }
-      if (arguments.length === 0) {
-        var keys = Object.keys(events);
-        var key;
-        for (i = 0; i < keys.length; ++i) {
-          key = keys[i];
-          if (key === "removeListener")
-            continue;
-          this.removeAllListeners(key);
-        }
-        this.removeAllListeners("removeListener");
-        this._events = Object.create(null);
-        this._eventsCount = 0;
-        return this;
-      }
-      listeners = events[type];
-      if (typeof listeners === "function") {
-        this.removeListener(type, listeners);
-      } else if (listeners !== void 0) {
-        for (i = listeners.length - 1; i >= 0; i--) {
-          this.removeListener(type, listeners[i]);
-        }
-      }
-      return this;
-    };
-    function _listeners(target, type, unwrap) {
-      var events = target._events;
-      if (events === void 0)
-        return [];
-      var evlistener = events[type];
-      if (evlistener === void 0)
-        return [];
-      if (typeof evlistener === "function")
-        return unwrap ? [evlistener.listener || evlistener] : [evlistener];
-      return unwrap ? unwrapListeners(evlistener) : arrayClone(evlistener, evlistener.length);
-    }
-    EventEmitter.prototype.listeners = function listeners(type) {
-      return _listeners(this, type, true);
-    };
-    EventEmitter.prototype.rawListeners = function rawListeners(type) {
-      return _listeners(this, type, false);
-    };
-    EventEmitter.listenerCount = function(emitter, type) {
-      if (typeof emitter.listenerCount === "function") {
-        return emitter.listenerCount(type);
-      } else {
-        return listenerCount.call(emitter, type);
-      }
-    };
-    EventEmitter.prototype.listenerCount = listenerCount;
-    function listenerCount(type) {
-      var events = this._events;
-      if (events !== void 0) {
-        var evlistener = events[type];
-        if (typeof evlistener === "function") {
-          return 1;
-        } else if (evlistener !== void 0) {
-          return evlistener.length;
-        }
-      }
-      return 0;
-    }
-    EventEmitter.prototype.eventNames = function eventNames() {
-      return this._eventsCount > 0 ? ReflectOwnKeys(this._events) : [];
-    };
-    function arrayClone(arr, n) {
-      var copy = new Array(n);
-      for (var i = 0; i < n; ++i)
-        copy[i] = arr[i];
-      return copy;
-    }
-    function spliceOne(list, index) {
-      for (; index + 1 < list.length; index++)
-        list[index] = list[index + 1];
-      list.pop();
-    }
-    function unwrapListeners(arr) {
-      var ret = new Array(arr.length);
-      for (var i = 0; i < ret.length; ++i) {
-        ret[i] = arr[i].listener || arr[i];
-      }
-      return ret;
-    }
-    function once(emitter, name) {
-      return new Promise(function(resolve, reject) {
-        function eventListener() {
-          if (errorListener !== void 0) {
-            emitter.removeListener("error", errorListener);
-          }
-          resolve([].slice.call(arguments));
-        }
-        ;
-        var errorListener;
-        if (name !== "error") {
-          errorListener = function errorListener2(err) {
-            emitter.removeListener(name, eventListener);
-            reject(err);
-          };
-          emitter.once("error", errorListener);
-        }
-        emitter.once(name, eventListener);
-      });
-    }
-  });
-
-  // http/pool/defaults.js
-  var require_defaults = __commonJS((exports, module) => {
-    module.exports = {
-      host: "localhost",
-      user: process.platform === "win32" ? process.env.USERNAME : process.env.USER,
-      database: process.platform === "win32" ? process.env.USERNAME : process.env.USER,
-      password: null,
-      port: 5432,
-      rows: 0,
-      binary: false,
-      poolSize: 0,
-      poolIdleTimeout: 3e4,
-      reapIntervalMillis: 1e3,
-      poolLog: false,
-      client_encoding: "",
-      ssl: false,
-      application_name: void 0,
-      fallback_application_name: void 0
-    };
-  });
-
-  // (disabled):generic-pool
-  var require_generic_pool = __commonJS(() => {
-  });
-
-  // (disabled):sqlite3
-  var require_sqlite3 = __commonJS(() => {
-  });
-
-  // http/pool/newGenericPool.js
-  var require_newGenericPool = __commonJS((exports, module) => {
-    var EventEmitter = require_events().EventEmitter;
-    var defaults = require_defaults();
-    var genericPool = require_generic_pool();
-    var sqlite = require_sqlite3();
-    function newGenericPool(connectionString, poolOptions) {
-      poolOptions = poolOptions || {};
-      var pool = genericPool.Pool({
-        max: poolOptions.size || poolOptions.poolSize || defaults.poolSize,
-        idleTimeoutMillis: poolOptions.idleTimeout || defaults.poolIdleTimeout,
-        reapIntervalMillis: poolOptions.reapIntervalMillis || defaults.reapIntervalMillis,
-        log: poolOptions.log || defaults.poolLog,
-        create: function(cb) {
-          var client = new sqlite.Database(connectionString, onConnected);
-          function onConnected(err) {
-            if (err)
-              return cb(err, null);
-            client.poolCount = 0;
-            return cb(null, client);
-          }
-        },
-        destroy: function(client) {
-          client.poolCount = void 0;
-          client.close();
-        }
-      });
-      EventEmitter.call(pool);
-      for (var key in EventEmitter.prototype) {
-        if (EventEmitter.prototype.hasOwnProperty(key)) {
-          pool[key] = EventEmitter.prototype[key];
-        }
-      }
-      pool.connect = function(cb) {
-        var domain = process.domain;
-        pool.acquire(function(err, client) {
-          if (domain) {
-            cb = domain.bind(cb);
-          }
-          if (err)
-            return cb(err, null, function() {
-            });
-          client.poolCount++;
-          cb(null, client, function(err2) {
-            if (err2) {
-              pool.destroy(client);
-            } else {
-              pool.release(client);
-            }
-          });
-        });
-      };
-      return pool;
-    }
-    module.exports = newGenericPool;
-  });
-
-  // node_modules/uuid/lib/rng-browser.js
-  var require_rng_browser = __commonJS((exports, module) => {
-    var getRandomValues = typeof crypto != "undefined" && crypto.getRandomValues && crypto.getRandomValues.bind(crypto) || typeof msCrypto != "undefined" && typeof window.msCrypto.getRandomValues == "function" && msCrypto.getRandomValues.bind(msCrypto);
-    if (getRandomValues) {
-      rnds8 = new Uint8Array(16);
-      module.exports = function whatwgRNG() {
-        getRandomValues(rnds8);
-        return rnds8;
-      };
-    } else {
-      rnds = new Array(16);
-      module.exports = function mathRNG() {
-        for (var i = 0, r; i < 16; i++) {
-          if ((i & 3) === 0)
-            r = Math.random() * 4294967296;
-          rnds[i] = r >>> ((i & 3) << 3) & 255;
-        }
-        return rnds;
-      };
-    }
-    var rnds8;
-    var rnds;
-  });
-
-  // node_modules/uuid/lib/bytesToUuid.js
-  var require_bytesToUuid = __commonJS((exports, module) => {
-    var byteToHex = [];
-    for (var i = 0; i < 256; ++i) {
-      byteToHex[i] = (i + 256).toString(16).substr(1);
-    }
-    function bytesToUuid(buf, offset) {
-      var i2 = offset || 0;
-      var bth = byteToHex;
-      return [
-        bth[buf[i2++]],
-        bth[buf[i2++]],
-        bth[buf[i2++]],
-        bth[buf[i2++]],
-        "-",
-        bth[buf[i2++]],
-        bth[buf[i2++]],
-        "-",
-        bth[buf[i2++]],
-        bth[buf[i2++]],
-        "-",
-        bth[buf[i2++]],
-        bth[buf[i2++]],
-        "-",
-        bth[buf[i2++]],
-        bth[buf[i2++]],
-        bth[buf[i2++]],
-        bth[buf[i2++]],
-        bth[buf[i2++]],
-        bth[buf[i2++]]
-      ].join("");
-    }
-    module.exports = bytesToUuid;
-  });
-
-  // node_modules/uuid/v1.js
-  var require_v1 = __commonJS((exports, module) => {
-    var rng = require_rng_browser();
-    var bytesToUuid = require_bytesToUuid();
-    var _nodeId;
-    var _clockseq;
-    var _lastMSecs = 0;
-    var _lastNSecs = 0;
-    function v1(options, buf, offset) {
-      var i = buf && offset || 0;
-      var b = buf || [];
-      options = options || {};
-      var node = options.node || _nodeId;
-      var clockseq = options.clockseq !== void 0 ? options.clockseq : _clockseq;
-      if (node == null || clockseq == null) {
-        var seedBytes = rng();
-        if (node == null) {
-          node = _nodeId = [
-            seedBytes[0] | 1,
-            seedBytes[1],
-            seedBytes[2],
-            seedBytes[3],
-            seedBytes[4],
-            seedBytes[5]
-          ];
-        }
-        if (clockseq == null) {
-          clockseq = _clockseq = (seedBytes[6] << 8 | seedBytes[7]) & 16383;
-        }
-      }
-      var msecs = options.msecs !== void 0 ? options.msecs : new Date().getTime();
-      var nsecs = options.nsecs !== void 0 ? options.nsecs : _lastNSecs + 1;
-      var dt = msecs - _lastMSecs + (nsecs - _lastNSecs) / 1e4;
-      if (dt < 0 && options.clockseq === void 0) {
-        clockseq = clockseq + 1 & 16383;
-      }
-      if ((dt < 0 || msecs > _lastMSecs) && options.nsecs === void 0) {
-        nsecs = 0;
-      }
-      if (nsecs >= 1e4) {
-        throw new Error("uuid.v1(): Can't create more than 10M uuids/sec");
-      }
-      _lastMSecs = msecs;
-      _lastNSecs = nsecs;
-      _clockseq = clockseq;
-      msecs += 122192928e5;
-      var tl = ((msecs & 268435455) * 1e4 + nsecs) % 4294967296;
-      b[i++] = tl >>> 24 & 255;
-      b[i++] = tl >>> 16 & 255;
-      b[i++] = tl >>> 8 & 255;
-      b[i++] = tl & 255;
-      var tmh = msecs / 4294967296 * 1e4 & 268435455;
-      b[i++] = tmh >>> 8 & 255;
-      b[i++] = tmh & 255;
-      b[i++] = tmh >>> 24 & 15 | 16;
-      b[i++] = tmh >>> 16 & 255;
-      b[i++] = clockseq >>> 8 | 128;
-      b[i++] = clockseq & 255;
-      for (var n = 0; n < 6; ++n) {
-        b[i + n] = node[n];
-      }
-      return buf ? buf : bytesToUuid(b);
-    }
-    module.exports = v1;
-  });
-
-  // node_modules/uuid/v4.js
-  var require_v4 = __commonJS((exports, module) => {
-    var rng = require_rng_browser();
-    var bytesToUuid = require_bytesToUuid();
-    function v4(options, buf, offset) {
-      var i = buf && offset || 0;
-      if (typeof options == "string") {
-        buf = options === "binary" ? new Array(16) : null;
-        options = null;
-      }
-      options = options || {};
-      var rnds = options.random || (options.rng || rng)();
-      rnds[6] = rnds[6] & 15 | 64;
-      rnds[8] = rnds[8] & 63 | 128;
-      if (buf) {
-        for (var ii = 0; ii < 16; ++ii) {
-          buf[i + ii] = rnds[ii];
-        }
-      }
-      return buf || bytesToUuid(rnds);
-    }
-    module.exports = v4;
-  });
-
-  // node_modules/uuid/index.js
-  var require_uuid = __commonJS((exports, module) => {
-    var v1 = require_v1();
-    var v4 = require_v4();
-    var uuid = v4;
-    uuid.v1 = v1;
-    uuid.v4 = v4;
-    module.exports = uuid;
-  });
-
-  // newId.js
-  var require_newId = __commonJS((exports, module) => {
-    module.exports = require_uuid().v4;
-  });
-
-  // http/newPool.js
-  var require_newPool = __commonJS((exports, module) => {
-    var pools = require_pools();
-    var promise = require_promise();
-    var end = require_end();
-    var newGenericPool = require_newGenericPool();
-    var newId = require_newId();
-    function newPool(connectionString, poolOptions) {
-      var pool = newGenericPool(connectionString, poolOptions);
-      var id = newId();
-      var boundEnd = end.bind(null, pool, id);
-      var c = {};
-      c.connect = pool.connect;
-      c.end = promise.denodeify(boundEnd);
-      pools[id] = c;
-      return c;
-    }
-    module.exports = newPool;
-  });
-
-  // http/newDatabase.js
-  var require_newDatabase3 = __commonJS((exports, module) => {
-    var createDomain = require_createDomain();
-    var newTransaction = require_newTransaction();
-    var begin = require_begin();
-    var commit = require_commit();
-    var rollback = require_rollback();
-    var newPool = require_newPool();
-    var promise = require_domains();
-    var hostExpress = require_hostExpress();
-    var flags = require_flags();
-    function newDatabase(connectionString, poolOptions) {
-      flags.url = connectionString;
-      var pool;
-      if (!poolOptions)
-        pool = newPool.bind(null, connectionString, poolOptions);
-      else
-        pool = newPool(connectionString, poolOptions);
-      let c = {};
-      c.transaction = function(options, fn) {
-        if (arguments.length === 1 && typeof options === "function") {
-          fn = options;
-          options = void 0;
-        }
-        let domain = createDomain();
-        if (fn)
-          return domain.run(runInTransaction);
-        else
-          return domain.run(run);
-        async function runInTransaction() {
-          let result;
-          let transaction = newTransaction(domain, pool);
-          await new Promise(transaction).then(begin).then(fn).then((res) => result = res).then(c.commit).then(null, c.rollback);
-          return result;
-        }
-        function run() {
-          let p;
-          let transaction = newTransaction(domain, pool);
-          p = new promise(transaction);
-          return p.then(begin);
-        }
-      };
-      c.rollback = rollback;
-      c.commit = commit;
-      c.end = function() {
-        if (poolOptions)
-          return pool.end();
-        else
-          return Promise.resolve();
-      };
-      c.accept = function(caller) {
-        caller.visitSqlite();
-      };
-      c.express = function(options) {
-        options = {...options, db: c};
-        return hostExpress({db: c, table: options.table});
-      };
-      return c;
-    }
-    module.exports = newDatabase;
   });
 
   // table/column/negotiateRawSqlFilter.js
@@ -3966,7 +1463,7 @@
   });
 
   // node_modules/ajv/lib/compile/util.js
-  var require_util2 = __commonJS((exports, module) => {
+  var require_util = __commonJS((exports, module) => {
     "use strict";
     module.exports = {
       copy,
@@ -4172,7 +1669,7 @@
   // node_modules/ajv/lib/compile/schema_obj.js
   var require_schema_obj = __commonJS((exports, module) => {
     "use strict";
-    var util = require_util2();
+    var util = require_util();
     module.exports = SchemaObject;
     function SchemaObject(obj) {
       util.copy(obj, this);
@@ -4266,7 +1763,7 @@
     "use strict";
     var URI = require_uri_all();
     var equal = require_fast_deep_equal();
-    var util = require_util2();
+    var util = require_util();
     var SchemaObject = require_schema_obj();
     var traverse = require_json_schema_traverse();
     module.exports = resolve;
@@ -5068,7 +2565,7 @@
   var require_compile = __commonJS((exports, module) => {
     "use strict";
     var resolve = require_resolve();
-    var util = require_util2();
+    var util = require_util();
     var errorClasses = require_error_classes();
     var stableStringify = require_fast_json_stable_stringify();
     var validateGenerator = require_validate();
@@ -5354,7 +2851,7 @@
   // node_modules/ajv/lib/compile/formats.js
   var require_formats = __commonJS((exports, module) => {
     "use strict";
-    var util = require_util2();
+    var util = require_util();
     var DATE = /^(\d\d\d\d)-(\d\d)-(\d\d)$/;
     var DAYS = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
     var TIME = /^(\d\d):(\d\d):(\d\d)(\.\d+)?(z|[+-]\d\d(?::?\d\d)?)?$/i;
@@ -7975,7 +5472,7 @@
   var require_rules = __commonJS((exports, module) => {
     "use strict";
     var ruleModules = require_dotjs();
-    var toHash = require_util2().toHash;
+    var toHash = require_util().toHash;
     module.exports = function rules() {
       var RULES = [
         {
@@ -8744,7 +6241,7 @@
     var formats = require_formats();
     var rules = require_rules();
     var $dataMetaSchema = require_data();
-    var util = require_util2();
+    var util = require_util();
     module.exports = Ajv;
     Ajv.prototype.validate = validate;
     Ajv.prototype.compile = compile;
@@ -9113,6 +6610,573 @@
     }
   });
 
+  // ../node_modules/util/support/isBufferBrowser.js
+  var require_isBufferBrowser = __commonJS((exports, module) => {
+    module.exports = function isBuffer(arg) {
+      return arg && typeof arg === "object" && typeof arg.copy === "function" && typeof arg.fill === "function" && typeof arg.readUInt8 === "function";
+    };
+  });
+
+  // ../node_modules/util/node_modules/inherits/inherits_browser.js
+  var require_inherits_browser = __commonJS((exports, module) => {
+    if (typeof Object.create === "function") {
+      module.exports = function inherits(ctor, superCtor) {
+        ctor.super_ = superCtor;
+        ctor.prototype = Object.create(superCtor.prototype, {
+          constructor: {
+            value: ctor,
+            enumerable: false,
+            writable: true,
+            configurable: true
+          }
+        });
+      };
+    } else {
+      module.exports = function inherits(ctor, superCtor) {
+        ctor.super_ = superCtor;
+        var TempCtor = function() {
+        };
+        TempCtor.prototype = superCtor.prototype;
+        ctor.prototype = new TempCtor();
+        ctor.prototype.constructor = ctor;
+      };
+    }
+  });
+
+  // ../node_modules/util/util.js
+  var require_util2 = __commonJS((exports) => {
+    var getOwnPropertyDescriptors = Object.getOwnPropertyDescriptors || function getOwnPropertyDescriptors2(obj) {
+      var keys = Object.keys(obj);
+      var descriptors = {};
+      for (var i = 0; i < keys.length; i++) {
+        descriptors[keys[i]] = Object.getOwnPropertyDescriptor(obj, keys[i]);
+      }
+      return descriptors;
+    };
+    var formatRegExp = /%[sdj%]/g;
+    exports.format = function(f) {
+      if (!isString(f)) {
+        var objects = [];
+        for (var i = 0; i < arguments.length; i++) {
+          objects.push(inspect(arguments[i]));
+        }
+        return objects.join(" ");
+      }
+      var i = 1;
+      var args = arguments;
+      var len = args.length;
+      var str = String(f).replace(formatRegExp, function(x2) {
+        if (x2 === "%%")
+          return "%";
+        if (i >= len)
+          return x2;
+        switch (x2) {
+          case "%s":
+            return String(args[i++]);
+          case "%d":
+            return Number(args[i++]);
+          case "%j":
+            try {
+              return JSON.stringify(args[i++]);
+            } catch (_) {
+              return "[Circular]";
+            }
+          default:
+            return x2;
+        }
+      });
+      for (var x = args[i]; i < len; x = args[++i]) {
+        if (isNull(x) || !isObject(x)) {
+          str += " " + x;
+        } else {
+          str += " " + inspect(x);
+        }
+      }
+      return str;
+    };
+    exports.deprecate = function(fn, msg) {
+      if (typeof process !== "undefined" && process.noDeprecation === true) {
+        return fn;
+      }
+      if (typeof process === "undefined") {
+        return function() {
+          return exports.deprecate(fn, msg).apply(this, arguments);
+        };
+      }
+      var warned = false;
+      function deprecated() {
+        if (!warned) {
+          if (process.throwDeprecation) {
+            throw new Error(msg);
+          } else if (process.traceDeprecation) {
+            console.trace(msg);
+          } else {
+            console.error(msg);
+          }
+          warned = true;
+        }
+        return fn.apply(this, arguments);
+      }
+      return deprecated;
+    };
+    var debugs = {};
+    var debugEnviron;
+    exports.debuglog = function(set) {
+      if (isUndefined(debugEnviron))
+        debugEnviron = process.env.NODE_DEBUG || "";
+      set = set.toUpperCase();
+      if (!debugs[set]) {
+        if (new RegExp("\\b" + set + "\\b", "i").test(debugEnviron)) {
+          var pid = process.pid;
+          debugs[set] = function() {
+            var msg = exports.format.apply(exports, arguments);
+            console.error("%s %d: %s", set, pid, msg);
+          };
+        } else {
+          debugs[set] = function() {
+          };
+        }
+      }
+      return debugs[set];
+    };
+    function inspect(obj, opts) {
+      var ctx = {
+        seen: [],
+        stylize: stylizeNoColor
+      };
+      if (arguments.length >= 3)
+        ctx.depth = arguments[2];
+      if (arguments.length >= 4)
+        ctx.colors = arguments[3];
+      if (isBoolean(opts)) {
+        ctx.showHidden = opts;
+      } else if (opts) {
+        exports._extend(ctx, opts);
+      }
+      if (isUndefined(ctx.showHidden))
+        ctx.showHidden = false;
+      if (isUndefined(ctx.depth))
+        ctx.depth = 2;
+      if (isUndefined(ctx.colors))
+        ctx.colors = false;
+      if (isUndefined(ctx.customInspect))
+        ctx.customInspect = true;
+      if (ctx.colors)
+        ctx.stylize = stylizeWithColor;
+      return formatValue(ctx, obj, ctx.depth);
+    }
+    exports.inspect = inspect;
+    inspect.colors = {
+      bold: [1, 22],
+      italic: [3, 23],
+      underline: [4, 24],
+      inverse: [7, 27],
+      white: [37, 39],
+      grey: [90, 39],
+      black: [30, 39],
+      blue: [34, 39],
+      cyan: [36, 39],
+      green: [32, 39],
+      magenta: [35, 39],
+      red: [31, 39],
+      yellow: [33, 39]
+    };
+    inspect.styles = {
+      special: "cyan",
+      number: "yellow",
+      boolean: "yellow",
+      undefined: "grey",
+      null: "bold",
+      string: "green",
+      date: "magenta",
+      regexp: "red"
+    };
+    function stylizeWithColor(str, styleType) {
+      var style = inspect.styles[styleType];
+      if (style) {
+        return "[" + inspect.colors[style][0] + "m" + str + "[" + inspect.colors[style][1] + "m";
+      } else {
+        return str;
+      }
+    }
+    function stylizeNoColor(str, styleType) {
+      return str;
+    }
+    function arrayToHash(array) {
+      var hash = {};
+      array.forEach(function(val, idx) {
+        hash[val] = true;
+      });
+      return hash;
+    }
+    function formatValue(ctx, value, recurseTimes) {
+      if (ctx.customInspect && value && isFunction(value.inspect) && value.inspect !== exports.inspect && !(value.constructor && value.constructor.prototype === value)) {
+        var ret = value.inspect(recurseTimes, ctx);
+        if (!isString(ret)) {
+          ret = formatValue(ctx, ret, recurseTimes);
+        }
+        return ret;
+      }
+      var primitive = formatPrimitive(ctx, value);
+      if (primitive) {
+        return primitive;
+      }
+      var keys = Object.keys(value);
+      var visibleKeys = arrayToHash(keys);
+      if (ctx.showHidden) {
+        keys = Object.getOwnPropertyNames(value);
+      }
+      if (isError(value) && (keys.indexOf("message") >= 0 || keys.indexOf("description") >= 0)) {
+        return formatError(value);
+      }
+      if (keys.length === 0) {
+        if (isFunction(value)) {
+          var name = value.name ? ": " + value.name : "";
+          return ctx.stylize("[Function" + name + "]", "special");
+        }
+        if (isRegExp(value)) {
+          return ctx.stylize(RegExp.prototype.toString.call(value), "regexp");
+        }
+        if (isDate(value)) {
+          return ctx.stylize(Date.prototype.toString.call(value), "date");
+        }
+        if (isError(value)) {
+          return formatError(value);
+        }
+      }
+      var base = "", array = false, braces = ["{", "}"];
+      if (isArray(value)) {
+        array = true;
+        braces = ["[", "]"];
+      }
+      if (isFunction(value)) {
+        var n = value.name ? ": " + value.name : "";
+        base = " [Function" + n + "]";
+      }
+      if (isRegExp(value)) {
+        base = " " + RegExp.prototype.toString.call(value);
+      }
+      if (isDate(value)) {
+        base = " " + Date.prototype.toUTCString.call(value);
+      }
+      if (isError(value)) {
+        base = " " + formatError(value);
+      }
+      if (keys.length === 0 && (!array || value.length == 0)) {
+        return braces[0] + base + braces[1];
+      }
+      if (recurseTimes < 0) {
+        if (isRegExp(value)) {
+          return ctx.stylize(RegExp.prototype.toString.call(value), "regexp");
+        } else {
+          return ctx.stylize("[Object]", "special");
+        }
+      }
+      ctx.seen.push(value);
+      var output;
+      if (array) {
+        output = formatArray(ctx, value, recurseTimes, visibleKeys, keys);
+      } else {
+        output = keys.map(function(key) {
+          return formatProperty(ctx, value, recurseTimes, visibleKeys, key, array);
+        });
+      }
+      ctx.seen.pop();
+      return reduceToSingleString(output, base, braces);
+    }
+    function formatPrimitive(ctx, value) {
+      if (isUndefined(value))
+        return ctx.stylize("undefined", "undefined");
+      if (isString(value)) {
+        var simple = "'" + JSON.stringify(value).replace(/^"|"$/g, "").replace(/'/g, "\\'").replace(/\\"/g, '"') + "'";
+        return ctx.stylize(simple, "string");
+      }
+      if (isNumber(value))
+        return ctx.stylize("" + value, "number");
+      if (isBoolean(value))
+        return ctx.stylize("" + value, "boolean");
+      if (isNull(value))
+        return ctx.stylize("null", "null");
+    }
+    function formatError(value) {
+      return "[" + Error.prototype.toString.call(value) + "]";
+    }
+    function formatArray(ctx, value, recurseTimes, visibleKeys, keys) {
+      var output = [];
+      for (var i = 0, l = value.length; i < l; ++i) {
+        if (hasOwnProperty(value, String(i))) {
+          output.push(formatProperty(ctx, value, recurseTimes, visibleKeys, String(i), true));
+        } else {
+          output.push("");
+        }
+      }
+      keys.forEach(function(key) {
+        if (!key.match(/^\d+$/)) {
+          output.push(formatProperty(ctx, value, recurseTimes, visibleKeys, key, true));
+        }
+      });
+      return output;
+    }
+    function formatProperty(ctx, value, recurseTimes, visibleKeys, key, array) {
+      var name, str, desc;
+      desc = Object.getOwnPropertyDescriptor(value, key) || {value: value[key]};
+      if (desc.get) {
+        if (desc.set) {
+          str = ctx.stylize("[Getter/Setter]", "special");
+        } else {
+          str = ctx.stylize("[Getter]", "special");
+        }
+      } else {
+        if (desc.set) {
+          str = ctx.stylize("[Setter]", "special");
+        }
+      }
+      if (!hasOwnProperty(visibleKeys, key)) {
+        name = "[" + key + "]";
+      }
+      if (!str) {
+        if (ctx.seen.indexOf(desc.value) < 0) {
+          if (isNull(recurseTimes)) {
+            str = formatValue(ctx, desc.value, null);
+          } else {
+            str = formatValue(ctx, desc.value, recurseTimes - 1);
+          }
+          if (str.indexOf("\n") > -1) {
+            if (array) {
+              str = str.split("\n").map(function(line) {
+                return "  " + line;
+              }).join("\n").substr(2);
+            } else {
+              str = "\n" + str.split("\n").map(function(line) {
+                return "   " + line;
+              }).join("\n");
+            }
+          }
+        } else {
+          str = ctx.stylize("[Circular]", "special");
+        }
+      }
+      if (isUndefined(name)) {
+        if (array && key.match(/^\d+$/)) {
+          return str;
+        }
+        name = JSON.stringify("" + key);
+        if (name.match(/^"([a-zA-Z_][a-zA-Z_0-9]*)"$/)) {
+          name = name.substr(1, name.length - 2);
+          name = ctx.stylize(name, "name");
+        } else {
+          name = name.replace(/'/g, "\\'").replace(/\\"/g, '"').replace(/(^"|"$)/g, "'");
+          name = ctx.stylize(name, "string");
+        }
+      }
+      return name + ": " + str;
+    }
+    function reduceToSingleString(output, base, braces) {
+      var numLinesEst = 0;
+      var length = output.reduce(function(prev, cur) {
+        numLinesEst++;
+        if (cur.indexOf("\n") >= 0)
+          numLinesEst++;
+        return prev + cur.replace(/\u001b\[\d\d?m/g, "").length + 1;
+      }, 0);
+      if (length > 60) {
+        return braces[0] + (base === "" ? "" : base + "\n ") + " " + output.join(",\n  ") + " " + braces[1];
+      }
+      return braces[0] + base + " " + output.join(", ") + " " + braces[1];
+    }
+    function isArray(ar) {
+      return Array.isArray(ar);
+    }
+    exports.isArray = isArray;
+    function isBoolean(arg) {
+      return typeof arg === "boolean";
+    }
+    exports.isBoolean = isBoolean;
+    function isNull(arg) {
+      return arg === null;
+    }
+    exports.isNull = isNull;
+    function isNullOrUndefined(arg) {
+      return arg == null;
+    }
+    exports.isNullOrUndefined = isNullOrUndefined;
+    function isNumber(arg) {
+      return typeof arg === "number";
+    }
+    exports.isNumber = isNumber;
+    function isString(arg) {
+      return typeof arg === "string";
+    }
+    exports.isString = isString;
+    function isSymbol(arg) {
+      return typeof arg === "symbol";
+    }
+    exports.isSymbol = isSymbol;
+    function isUndefined(arg) {
+      return arg === void 0;
+    }
+    exports.isUndefined = isUndefined;
+    function isRegExp(re) {
+      return isObject(re) && objectToString(re) === "[object RegExp]";
+    }
+    exports.isRegExp = isRegExp;
+    function isObject(arg) {
+      return typeof arg === "object" && arg !== null;
+    }
+    exports.isObject = isObject;
+    function isDate(d) {
+      return isObject(d) && objectToString(d) === "[object Date]";
+    }
+    exports.isDate = isDate;
+    function isError(e) {
+      return isObject(e) && (objectToString(e) === "[object Error]" || e instanceof Error);
+    }
+    exports.isError = isError;
+    function isFunction(arg) {
+      return typeof arg === "function";
+    }
+    exports.isFunction = isFunction;
+    function isPrimitive(arg) {
+      return arg === null || typeof arg === "boolean" || typeof arg === "number" || typeof arg === "string" || typeof arg === "symbol" || typeof arg === "undefined";
+    }
+    exports.isPrimitive = isPrimitive;
+    exports.isBuffer = require_isBufferBrowser();
+    function objectToString(o) {
+      return Object.prototype.toString.call(o);
+    }
+    function pad(n) {
+      return n < 10 ? "0" + n.toString(10) : n.toString(10);
+    }
+    var months = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec"
+    ];
+    function timestamp() {
+      var d = new Date();
+      var time = [
+        pad(d.getHours()),
+        pad(d.getMinutes()),
+        pad(d.getSeconds())
+      ].join(":");
+      return [d.getDate(), months[d.getMonth()], time].join(" ");
+    }
+    exports.log = function() {
+      console.log("%s - %s", timestamp(), exports.format.apply(exports, arguments));
+    };
+    exports.inherits = require_inherits_browser();
+    exports._extend = function(origin, add) {
+      if (!add || !isObject(add))
+        return origin;
+      var keys = Object.keys(add);
+      var i = keys.length;
+      while (i--) {
+        origin[keys[i]] = add[keys[i]];
+      }
+      return origin;
+    };
+    function hasOwnProperty(obj, prop) {
+      return Object.prototype.hasOwnProperty.call(obj, prop);
+    }
+    var kCustomPromisifiedSymbol = typeof Symbol !== "undefined" ? Symbol("util.promisify.custom") : void 0;
+    exports.promisify = function promisify(original) {
+      if (typeof original !== "function")
+        throw new TypeError('The "original" argument must be of type Function');
+      if (kCustomPromisifiedSymbol && original[kCustomPromisifiedSymbol]) {
+        var fn = original[kCustomPromisifiedSymbol];
+        if (typeof fn !== "function") {
+          throw new TypeError('The "util.promisify.custom" argument must be of type Function');
+        }
+        Object.defineProperty(fn, kCustomPromisifiedSymbol, {
+          value: fn,
+          enumerable: false,
+          writable: false,
+          configurable: true
+        });
+        return fn;
+      }
+      function fn() {
+        var promiseResolve, promiseReject;
+        var promise = new Promise(function(resolve, reject) {
+          promiseResolve = resolve;
+          promiseReject = reject;
+        });
+        var args = [];
+        for (var i = 0; i < arguments.length; i++) {
+          args.push(arguments[i]);
+        }
+        args.push(function(err, value) {
+          if (err) {
+            promiseReject(err);
+          } else {
+            promiseResolve(value);
+          }
+        });
+        try {
+          original.apply(this, args);
+        } catch (err) {
+          promiseReject(err);
+        }
+        return promise;
+      }
+      Object.setPrototypeOf(fn, Object.getPrototypeOf(original));
+      if (kCustomPromisifiedSymbol)
+        Object.defineProperty(fn, kCustomPromisifiedSymbol, {
+          value: fn,
+          enumerable: false,
+          writable: false,
+          configurable: true
+        });
+      return Object.defineProperties(fn, getOwnPropertyDescriptors(original));
+    };
+    exports.promisify.custom = kCustomPromisifiedSymbol;
+    function callbackifyOnRejected(reason, cb) {
+      if (!reason) {
+        var newReason = new Error("Promise was rejected with a falsy value");
+        newReason.reason = reason;
+        reason = newReason;
+      }
+      return cb(reason);
+    }
+    function callbackify(original) {
+      if (typeof original !== "function") {
+        throw new TypeError('The "original" argument must be of type Function');
+      }
+      function callbackified() {
+        var args = [];
+        for (var i = 0; i < arguments.length; i++) {
+          args.push(arguments[i]);
+        }
+        var maybeCb = args.pop();
+        if (typeof maybeCb !== "function") {
+          throw new TypeError("The last argument must be of type Function");
+        }
+        var self2 = this;
+        var cb = function() {
+          return maybeCb.apply(self2, arguments);
+        };
+        original.apply(this, args).then(function(ret) {
+          process.nextTick(cb, null, ret);
+        }, function(rej) {
+          process.nextTick(callbackifyOnRejected, rej, cb);
+        });
+      }
+      Object.setPrototypeOf(callbackified, Object.getPrototypeOf(original));
+      Object.defineProperties(callbackified, getOwnPropertyDescriptors(original));
+      return callbackified;
+    }
+    exports.callbackify = callbackify;
+  });
+
   // table/column/string/stringIsSafe.js
   var require_stringIsSafe = __commonJS((exports, module) => {
     var ascii = " (->@-Z`-z";
@@ -9121,7 +7185,7 @@
     var latinExtB = "\u0180-\u024F";
     var cyrillic = "\u0400-\u04FF";
     var cjk = "\u4E00-\u9FC3";
-    var util = require_util();
+    var util = require_util2();
     var patternString = util.format("^[%s%s%s%s%s%s]+$", ascii, latin1, latinExtA, latinExtB, cyrillic, cjk);
     var pattern = new RegExp(patternString);
     function stringIsSafe(value) {
@@ -10350,6 +8414,104 @@
     module.exports = _newSafe;
   });
 
+  // (disabled):useHook
+  var require_useHook = __commonJS(() => {
+  });
+
+  // (disabled):node_modules/node-cls/index.js
+  var require_node_cls = __commonJS(() => {
+  });
+
+  // pg/encodeBoolean.js
+  var require_encodeBoolean = __commonJS((exports, module) => {
+    function encodeBoolean(bool) {
+      return bool.toString();
+    }
+    module.exports = encodeBoolean;
+  });
+
+  // pg/encodeDate.js
+  var require_encodeDate = __commonJS((exports, module) => {
+    function encodeDate(date) {
+      if (date.toISOString)
+        return "'" + date.toISOString() + "'";
+      return "'" + date + "'";
+    }
+    module.exports = encodeDate;
+  });
+
+  // pg/deleteFromSql.js
+  var require_deleteFromSql = __commonJS((exports, module) => {
+    var format = "delete from %s %s%s";
+    var util = require_util2();
+    function deleteFromSql(table, alias, whereSql) {
+      var name = table._dbName;
+      return util.format(format, name, alias, whereSql);
+    }
+    module.exports = deleteFromSql;
+  });
+
+  // pg/selectForUpdateSql.js
+  var require_selectForUpdateSql = __commonJS((exports, module) => {
+    module.exports = function(alias) {
+      return " FOR UPDATE OF " + alias;
+    };
+  });
+
+  // table/getSessionContext.js
+  var require_getSessionContext = __commonJS((exports, module) => {
+    var useHook = require_useHook();
+    var cls = require_node_cls();
+    var flags = require_flags();
+    var browserContext = {
+      changes: [],
+      encodeBoolean: require_encodeBoolean(),
+      encodeDate: require_encodeDate(),
+      deleteFromSql: require_deleteFromSql(),
+      selectForUpdateSql: require_selectForUpdateSql(),
+      multipleStatements: true,
+      accept: (caller) => caller.visitPg(),
+      dbClient: {
+        executeQuery
+      }
+    };
+    async function executeQuery(query, onCompleted) {
+      let body = JSON.stringify({sql: query.sql(), parameters: query.parameters});
+      let request = new Request(`${flags.url}`, {method: "POST", body});
+      try {
+        let response = await fetch(request);
+        if (response.status === 200) {
+          onCompleted(void 0, await response.json());
+        } else {
+          let msg = response.json && await response.json() || `Status ${response.status} from server`;
+          let e = new Error(msg);
+          e.status = response.status;
+          onCompleted(e);
+        }
+      } catch (error) {
+        onCompleted(error);
+      }
+    }
+    function getSessionContext() {
+      if (flags.url) {
+        return browserContext;
+      }
+      if (useHook())
+        return cls.getContext("rdb").rdb;
+      else
+        return process.domain.rdb;
+    }
+    module.exports = getSessionContext;
+  });
+
+  // table/getSessionSingleton.js
+  var require_getSessionSingleton = __commonJS((exports, module) => {
+    var getSessionContext = require_getSessionContext();
+    module.exports = function(name) {
+      return getSessionContext()[name];
+    };
+  });
+
   // table/column/date/newEncode.js
   var require_newEncode4 = __commonJS((exports, module) => {
     var newPara = require_newParameterized();
@@ -10568,7 +8730,7 @@
   // table/column.js
   var require_column = __commonJS((exports, module) => {
     var Ajv = require_ajv();
-    var inspect = require_util().inspect;
+    var inspect = require_util2().inspect;
     function defineColumn(column, table) {
       var c = {};
       c.string = function() {
@@ -11180,6 +9342,745 @@
     module.exports = newQuery;
   });
 
+  // table/executeQueries/resolveExecuteQuery.js
+  var require_resolveExecuteQuery = __commonJS((exports, module) => {
+    var getSessionSingleton = require_getSessionSingleton();
+    function resolveExecuteQuery(query) {
+      return resolve;
+      function resolve(success, failed) {
+        try {
+          var domain = process.domain;
+          if (domain) {
+            success = process.domain.bind(success);
+            failed = process.domain.bind(failed);
+          }
+          var client = getSessionSingleton("dbClient");
+          client.executeQuery(query, onCompleted);
+        } catch (e) {
+          failed(e);
+        }
+        function onCompleted(err, rows) {
+          if (!err) {
+            var lastIndex = rows.length - 1;
+            if (!Array.isArray(rows[0]) && Array.isArray(rows[lastIndex]))
+              rows = rows[lastIndex];
+            success(rows);
+          } else
+            failed(err);
+        }
+      }
+    }
+    module.exports = resolveExecuteQuery;
+  });
+
+  // table/executeQueries/executeQuery.js
+  var require_executeQuery = __commonJS((exports, module) => {
+    var newResolver = require_resolveExecuteQuery();
+    function executeQuery(query) {
+      var resolver = newResolver(query);
+      return new Promise(resolver);
+    }
+    module.exports = executeQuery;
+  });
+
+  // node_modules/asap/browser-raw.js
+  var require_browser_raw = __commonJS((exports, module) => {
+    "use strict";
+    module.exports = rawAsap;
+    function rawAsap(task) {
+      if (!queue.length) {
+        requestFlush();
+        flushing = true;
+      }
+      queue[queue.length] = task;
+    }
+    var queue = [];
+    var flushing = false;
+    var requestFlush;
+    var index = 0;
+    var capacity = 1024;
+    function flush() {
+      while (index < queue.length) {
+        var currentIndex = index;
+        index = index + 1;
+        queue[currentIndex].call();
+        if (index > capacity) {
+          for (var scan = 0, newLength = queue.length - index; scan < newLength; scan++) {
+            queue[scan] = queue[scan + index];
+          }
+          queue.length -= index;
+          index = 0;
+        }
+      }
+      queue.length = 0;
+      index = 0;
+      flushing = false;
+    }
+    var scope = typeof global !== "undefined" ? global : self;
+    var BrowserMutationObserver = scope.MutationObserver || scope.WebKitMutationObserver;
+    if (typeof BrowserMutationObserver === "function") {
+      requestFlush = makeRequestCallFromMutationObserver(flush);
+    } else {
+      requestFlush = makeRequestCallFromTimer(flush);
+    }
+    rawAsap.requestFlush = requestFlush;
+    function makeRequestCallFromMutationObserver(callback) {
+      var toggle = 1;
+      var observer = new BrowserMutationObserver(callback);
+      var node = document.createTextNode("");
+      observer.observe(node, {characterData: true});
+      return function requestCall() {
+        toggle = -toggle;
+        node.data = toggle;
+      };
+    }
+    function makeRequestCallFromTimer(callback) {
+      return function requestCall() {
+        var timeoutHandle = setTimeout(handleTimer, 0);
+        var intervalHandle = setInterval(handleTimer, 50);
+        function handleTimer() {
+          clearTimeout(timeoutHandle);
+          clearInterval(intervalHandle);
+          callback();
+        }
+      };
+    }
+    rawAsap.makeRequestCallFromTimer = makeRequestCallFromTimer;
+  });
+
+  // node_modules/asap/browser-asap.js
+  var require_browser_asap = __commonJS((exports, module) => {
+    "use strict";
+    var rawAsap = require_browser_raw();
+    var freeTasks = [];
+    var pendingErrors = [];
+    var requestErrorThrow = rawAsap.makeRequestCallFromTimer(throwFirstError);
+    function throwFirstError() {
+      if (pendingErrors.length) {
+        throw pendingErrors.shift();
+      }
+    }
+    module.exports = asap;
+    function asap(task) {
+      var rawTask;
+      if (freeTasks.length) {
+        rawTask = freeTasks.pop();
+      } else {
+        rawTask = new RawTask();
+      }
+      rawTask.task = task;
+      rawAsap(rawTask);
+    }
+    function RawTask() {
+      this.task = null;
+    }
+    RawTask.prototype.call = function() {
+      try {
+        this.task.call();
+      } catch (error) {
+        if (asap.onerror) {
+          asap.onerror(error);
+        } else {
+          pendingErrors.push(error);
+          requestErrorThrow();
+        }
+      } finally {
+        this.task = null;
+        freeTasks[freeTasks.length] = this;
+      }
+    };
+  });
+
+  // node_modules/promise/domains/core.js
+  var require_core = __commonJS((exports, module) => {
+    "use strict";
+    var asap = require_browser_asap();
+    function noop() {
+    }
+    var LAST_ERROR = null;
+    var IS_ERROR = {};
+    function getThen(obj) {
+      try {
+        return obj.then;
+      } catch (ex) {
+        LAST_ERROR = ex;
+        return IS_ERROR;
+      }
+    }
+    function tryCallOne(fn, a) {
+      try {
+        return fn(a);
+      } catch (ex) {
+        LAST_ERROR = ex;
+        return IS_ERROR;
+      }
+    }
+    function tryCallTwo(fn, a, b) {
+      try {
+        fn(a, b);
+      } catch (ex) {
+        LAST_ERROR = ex;
+        return IS_ERROR;
+      }
+    }
+    module.exports = Promise2;
+    function Promise2(fn) {
+      if (typeof this !== "object") {
+        throw new TypeError("Promises must be constructed via new");
+      }
+      if (typeof fn !== "function") {
+        throw new TypeError("Promise constructor's argument is not a function");
+      }
+      this._U = 0;
+      this._V = 0;
+      this._W = null;
+      this._X = null;
+      if (fn === noop)
+        return;
+      doResolve(fn, this);
+    }
+    Promise2._Y = null;
+    Promise2._Z = null;
+    Promise2._0 = noop;
+    Promise2.prototype.then = function(onFulfilled, onRejected) {
+      if (this.constructor !== Promise2) {
+        return safeThen(this, onFulfilled, onRejected);
+      }
+      var res = new Promise2(noop);
+      handle(this, new Handler(onFulfilled, onRejected, res));
+      return res;
+    };
+    function safeThen(self2, onFulfilled, onRejected) {
+      return new self2.constructor(function(resolve2, reject2) {
+        var res = new Promise2(noop);
+        res.then(resolve2, reject2);
+        handle(self2, new Handler(onFulfilled, onRejected, res));
+      });
+    }
+    function handle(self2, deferred) {
+      while (self2._V === 3) {
+        self2 = self2._W;
+      }
+      if (Promise2._Y) {
+        Promise2._Y(self2);
+      }
+      if (self2._V === 0) {
+        if (self2._U === 0) {
+          self2._U = 1;
+          self2._X = deferred;
+          return;
+        }
+        if (self2._U === 1) {
+          self2._U = 2;
+          self2._X = [self2._X, deferred];
+          return;
+        }
+        self2._X.push(deferred);
+        return;
+      }
+      handleResolved(self2, deferred);
+    }
+    function handleResolved(self2, deferred) {
+      asap(function() {
+        var cb = self2._V === 1 ? deferred.onFulfilled : deferred.onRejected;
+        if (cb === null) {
+          if (self2._V === 1) {
+            resolve(deferred.promise, self2._W);
+          } else {
+            reject(deferred.promise, self2._W);
+          }
+          return;
+        }
+        var ret = tryCallOne(cb, self2._W);
+        if (ret === IS_ERROR) {
+          reject(deferred.promise, LAST_ERROR);
+        } else {
+          resolve(deferred.promise, ret);
+        }
+      });
+    }
+    function resolve(self2, newValue) {
+      if (newValue === self2) {
+        return reject(self2, new TypeError("A promise cannot be resolved with itself."));
+      }
+      if (newValue && (typeof newValue === "object" || typeof newValue === "function")) {
+        var then = getThen(newValue);
+        if (then === IS_ERROR) {
+          return reject(self2, LAST_ERROR);
+        }
+        if (then === self2.then && newValue instanceof Promise2) {
+          self2._V = 3;
+          self2._W = newValue;
+          finale(self2);
+          return;
+        } else if (typeof then === "function") {
+          doResolve(then.bind(newValue), self2);
+          return;
+        }
+      }
+      self2._V = 1;
+      self2._W = newValue;
+      finale(self2);
+    }
+    function reject(self2, newValue) {
+      self2._V = 2;
+      self2._W = newValue;
+      if (Promise2._Z) {
+        Promise2._Z(self2, newValue);
+      }
+      finale(self2);
+    }
+    function finale(self2) {
+      if (self2._U === 1) {
+        handle(self2, self2._X);
+        self2._X = null;
+      }
+      if (self2._U === 2) {
+        for (var i = 0; i < self2._X.length; i++) {
+          handle(self2, self2._X[i]);
+        }
+        self2._X = null;
+      }
+    }
+    function Handler(onFulfilled, onRejected, promise) {
+      this.onFulfilled = typeof onFulfilled === "function" ? onFulfilled : null;
+      this.onRejected = typeof onRejected === "function" ? onRejected : null;
+      this.promise = promise;
+    }
+    function doResolve(fn, promise) {
+      var done = false;
+      var res = tryCallTwo(fn, function(value) {
+        if (done)
+          return;
+        done = true;
+        resolve(promise, value);
+      }, function(reason) {
+        if (done)
+          return;
+        done = true;
+        reject(promise, reason);
+      });
+      if (!done && res === IS_ERROR) {
+        done = true;
+        reject(promise, LAST_ERROR);
+      }
+    }
+  });
+
+  // node_modules/promise/domains/done.js
+  var require_done = __commonJS((exports, module) => {
+    "use strict";
+    var Promise2 = require_core();
+    module.exports = Promise2;
+    Promise2.prototype.done = function(onFulfilled, onRejected) {
+      var self2 = arguments.length ? this.then.apply(this, arguments) : this;
+      self2.then(null, function(err) {
+        setTimeout(function() {
+          throw err;
+        }, 0);
+      });
+    };
+  });
+
+  // node_modules/promise/domains/finally.js
+  var require_finally = __commonJS((exports, module) => {
+    "use strict";
+    var Promise2 = require_core();
+    module.exports = Promise2;
+    Promise2.prototype.finally = function(f) {
+      return this.then(function(value) {
+        return Promise2.resolve(f()).then(function() {
+          return value;
+        });
+      }, function(err) {
+        return Promise2.resolve(f()).then(function() {
+          throw err;
+        });
+      });
+    };
+  });
+
+  // node_modules/promise/domains/es6-extensions.js
+  var require_es6_extensions = __commonJS((exports, module) => {
+    "use strict";
+    var Promise2 = require_core();
+    module.exports = Promise2;
+    var TRUE = valuePromise(true);
+    var FALSE = valuePromise(false);
+    var NULL = valuePromise(null);
+    var UNDEFINED = valuePromise(void 0);
+    var ZERO = valuePromise(0);
+    var EMPTYSTRING = valuePromise("");
+    function valuePromise(value) {
+      var p = new Promise2(Promise2._0);
+      p._V = 1;
+      p._W = value;
+      return p;
+    }
+    Promise2.resolve = function(value) {
+      if (value instanceof Promise2)
+        return value;
+      if (value === null)
+        return NULL;
+      if (value === void 0)
+        return UNDEFINED;
+      if (value === true)
+        return TRUE;
+      if (value === false)
+        return FALSE;
+      if (value === 0)
+        return ZERO;
+      if (value === "")
+        return EMPTYSTRING;
+      if (typeof value === "object" || typeof value === "function") {
+        try {
+          var then = value.then;
+          if (typeof then === "function") {
+            return new Promise2(then.bind(value));
+          }
+        } catch (ex) {
+          return new Promise2(function(resolve, reject) {
+            reject(ex);
+          });
+        }
+      }
+      return valuePromise(value);
+    };
+    var iterableToArray = function(iterable) {
+      if (typeof Array.from === "function") {
+        iterableToArray = Array.from;
+        return Array.from(iterable);
+      }
+      iterableToArray = function(x) {
+        return Array.prototype.slice.call(x);
+      };
+      return Array.prototype.slice.call(iterable);
+    };
+    Promise2.all = function(arr) {
+      var args = iterableToArray(arr);
+      return new Promise2(function(resolve, reject) {
+        if (args.length === 0)
+          return resolve([]);
+        var remaining = args.length;
+        function res(i2, val) {
+          if (val && (typeof val === "object" || typeof val === "function")) {
+            if (val instanceof Promise2 && val.then === Promise2.prototype.then) {
+              while (val._V === 3) {
+                val = val._W;
+              }
+              if (val._V === 1)
+                return res(i2, val._W);
+              if (val._V === 2)
+                reject(val._W);
+              val.then(function(val2) {
+                res(i2, val2);
+              }, reject);
+              return;
+            } else {
+              var then = val.then;
+              if (typeof then === "function") {
+                var p = new Promise2(then.bind(val));
+                p.then(function(val2) {
+                  res(i2, val2);
+                }, reject);
+                return;
+              }
+            }
+          }
+          args[i2] = val;
+          if (--remaining === 0) {
+            resolve(args);
+          }
+        }
+        for (var i = 0; i < args.length; i++) {
+          res(i, args[i]);
+        }
+      });
+    };
+    Promise2.reject = function(value) {
+      return new Promise2(function(resolve, reject) {
+        reject(value);
+      });
+    };
+    Promise2.race = function(values) {
+      return new Promise2(function(resolve, reject) {
+        iterableToArray(values).forEach(function(value) {
+          Promise2.resolve(value).then(resolve, reject);
+        });
+      });
+    };
+    Promise2.prototype["catch"] = function(onRejected) {
+      return this.then(null, onRejected);
+    };
+  });
+
+  // node_modules/promise/domains/node-extensions.js
+  var require_node_extensions = __commonJS((exports, module) => {
+    "use strict";
+    var Promise2 = require_core();
+    var asap = require_browser_asap();
+    module.exports = Promise2;
+    Promise2.denodeify = function(fn, argumentCount) {
+      if (typeof argumentCount === "number" && argumentCount !== Infinity) {
+        return denodeifyWithCount(fn, argumentCount);
+      } else {
+        return denodeifyWithoutCount(fn);
+      }
+    };
+    var callbackFn = "function (err, res) {if (err) { rj(err); } else { rs(res); }}";
+    function denodeifyWithCount(fn, argumentCount) {
+      var args = [];
+      for (var i = 0; i < argumentCount; i++) {
+        args.push("a" + i);
+      }
+      var body = [
+        "return function (" + args.join(",") + ") {",
+        "var self = this;",
+        "return new Promise(function (rs, rj) {",
+        "var res = fn.call(",
+        ["self"].concat(args).concat([callbackFn]).join(","),
+        ");",
+        "if (res &&",
+        '(typeof res === "object" || typeof res === "function") &&',
+        'typeof res.then === "function"',
+        ") {rs(res);}",
+        "});",
+        "};"
+      ].join("");
+      return Function(["Promise", "fn"], body)(Promise2, fn);
+    }
+    function denodeifyWithoutCount(fn) {
+      var fnLength = Math.max(fn.length - 1, 3);
+      var args = [];
+      for (var i = 0; i < fnLength; i++) {
+        args.push("a" + i);
+      }
+      var body = [
+        "return function (" + args.join(",") + ") {",
+        "var self = this;",
+        "var args;",
+        "var argLength = arguments.length;",
+        "if (arguments.length > " + fnLength + ") {",
+        "args = new Array(arguments.length + 1);",
+        "for (var i = 0; i < arguments.length; i++) {",
+        "args[i] = arguments[i];",
+        "}",
+        "}",
+        "return new Promise(function (rs, rj) {",
+        "var cb = " + callbackFn + ";",
+        "var res;",
+        "switch (argLength) {",
+        args.concat(["extra"]).map(function(_, index) {
+          return "case " + index + ":res = fn.call(" + ["self"].concat(args.slice(0, index)).concat("cb").join(",") + ");break;";
+        }).join(""),
+        "default:",
+        "args[argLength] = cb;",
+        "res = fn.apply(self, args);",
+        "}",
+        "if (res &&",
+        '(typeof res === "object" || typeof res === "function") &&',
+        'typeof res.then === "function"',
+        ") {rs(res);}",
+        "});",
+        "};"
+      ].join("");
+      return Function(["Promise", "fn"], body)(Promise2, fn);
+    }
+    Promise2.nodeify = function(fn) {
+      return function() {
+        var args = Array.prototype.slice.call(arguments);
+        var callback = typeof args[args.length - 1] === "function" ? args.pop() : null;
+        var ctx = this;
+        try {
+          return fn.apply(this, arguments).nodeify(callback, ctx);
+        } catch (ex) {
+          if (callback === null || typeof callback == "undefined") {
+            return new Promise2(function(resolve, reject) {
+              reject(ex);
+            });
+          } else {
+            asap(function() {
+              callback.call(ctx, ex);
+            });
+          }
+        }
+      };
+    };
+    Promise2.prototype.nodeify = function(callback, ctx) {
+      if (typeof callback != "function")
+        return this;
+      this.then(function(value) {
+        asap(function() {
+          callback.call(ctx, null, value);
+        });
+      }, function(err) {
+        asap(function() {
+          callback.call(ctx, err);
+        });
+      });
+    };
+  });
+
+  // node_modules/promise/domains/synchronous.js
+  var require_synchronous = __commonJS((exports, module) => {
+    "use strict";
+    var Promise2 = require_core();
+    module.exports = Promise2;
+    Promise2.enableSynchronous = function() {
+      Promise2.prototype.isPending = function() {
+        return this.getState() == 0;
+      };
+      Promise2.prototype.isFulfilled = function() {
+        return this.getState() == 1;
+      };
+      Promise2.prototype.isRejected = function() {
+        return this.getState() == 2;
+      };
+      Promise2.prototype.getValue = function() {
+        if (this._V === 3) {
+          return this._W.getValue();
+        }
+        if (!this.isFulfilled()) {
+          throw new Error("Cannot get a value of an unfulfilled promise.");
+        }
+        return this._W;
+      };
+      Promise2.prototype.getReason = function() {
+        if (this._V === 3) {
+          return this._W.getReason();
+        }
+        if (!this.isRejected()) {
+          throw new Error("Cannot get a rejection reason of a non-rejected promise.");
+        }
+        return this._W;
+      };
+      Promise2.prototype.getState = function() {
+        if (this._V === 3) {
+          return this._W.getState();
+        }
+        if (this._V === -1 || this._V === -2) {
+          return 0;
+        }
+        return this._V;
+      };
+    };
+    Promise2.disableSynchronous = function() {
+      Promise2.prototype.isPending = void 0;
+      Promise2.prototype.isFulfilled = void 0;
+      Promise2.prototype.isRejected = void 0;
+      Promise2.prototype.getValue = void 0;
+      Promise2.prototype.getReason = void 0;
+      Promise2.prototype.getState = void 0;
+    };
+  });
+
+  // node_modules/promise/domains/index.js
+  var require_domains = __commonJS((exports, module) => {
+    "use strict";
+    module.exports = require_core();
+    require_done();
+    require_finally();
+    require_es6_extensions();
+    require_node_extensions();
+    require_synchronous();
+  });
+
+  // table/promise.js
+  var require_promise = __commonJS((exports, module) => {
+    var promise = require_domains();
+    var promisify = require_util2().promisify;
+    function newPromise(func) {
+      if (!func)
+        return Promise.resolve();
+      return new promise(func);
+    }
+    newPromise.all = Promise.all;
+    newPromise.denodeify = promisify || promise.denodeify;
+    module.exports = newPromise;
+  });
+
+  // table/executeQueries/executeChanges.js
+  var require_executeChanges = __commonJS((exports, module) => {
+    var executeQuery = require_executeQuery();
+    var newPromise = require_promise();
+    function executeChanges(queries) {
+      if (queries.length === 0)
+        return newPromise();
+      var i = -1;
+      return execute().then(emitChanged);
+      function execute() {
+        i++;
+        if (i + 1 === queries.length)
+          return executeQuery(queries[i]);
+        else {
+          return executeQuery(queries[i]).then(execute);
+        }
+      }
+      async function emitChanged() {
+        for (let i2 = 0; i2 < queries.length; i2++) {
+          if (queries[i2].emitChanged)
+            await Promise.all(queries[i2].emitChanged());
+        }
+      }
+    }
+    module.exports = executeChanges;
+  });
+
+  // table/commands/getChangeSet.js
+  var require_getChangeSet = __commonJS((exports, module) => {
+    var getSessionSingleton = require_getSessionSingleton();
+    function getChangeSet() {
+      return getSessionSingleton("changes");
+    }
+    module.exports = getChangeSet;
+  });
+
+  // table/commands/compressChanges.js
+  var require_compressChanges = __commonJS((exports, module) => {
+    var newParameterized = require_newParameterized();
+    var getSessionSingleton = require_getSessionSingleton();
+    function compress(queries) {
+      var multipleStatements = getSessionSingleton("multipleStatements");
+      var compressed = [];
+      var queryCount = queries.length;
+      for (var i = 0; i < queryCount; i++) {
+        var current = queries[i];
+        if (multipleStatements && current.parameters.length === 0 && !current.disallowCompress) {
+          for (var i2 = i + 1; i2 < queryCount; i2++) {
+            var next = queries[i2];
+            if (next.parameters.length > 0 || !next.disallowCompress)
+              break;
+            current = newParameterized(current.sql() + ";" + next.sql());
+            i++;
+          }
+        }
+        compressed.push(current);
+      }
+      return compressed;
+    }
+    module.exports = compress;
+  });
+
+  // table/popChanges.js
+  var require_popChanges = __commonJS((exports, module) => {
+    var getChangeSet = require_getChangeSet();
+    var compressChanges = require_compressChanges();
+    function popChanges() {
+      var changeSet = getChangeSet();
+      var length = changeSet.length;
+      if (length > 0) {
+        var lastCmd = changeSet[length - 1];
+        if (lastCmd.endEdit)
+          lastCmd.endEdit();
+        var compressed = compressChanges(changeSet);
+        changeSet.length = 0;
+        return compressed;
+      }
+      return changeSet;
+    }
+    module.exports = popChanges;
+  });
+
   // table/executeQueries/executeQueriesCore.js
   var require_executeQueriesCore = __commonJS((exports, module) => {
     var executeQuery = require_executeQuery();
@@ -11278,6 +10179,14 @@
       }
     }
     module.exports = newImmutable;
+  });
+
+  // newObject.js
+  var require_newObject = __commonJS((exports, module) => {
+    function newObject() {
+      return {};
+    }
+    module.exports = newObject;
   });
 
   // node_modules/rfc6902/pointer.js
@@ -12087,6 +10996,28 @@
     module.exports = newUpdateCommand;
   });
 
+  // table/commands/negotiateEndEdit.js
+  var require_negotiateEndEdit = __commonJS((exports, module) => {
+    function negotiateEndEdit(changes) {
+      var last = changes[changes.length - 1];
+      if (last && last.endEdit)
+        last.endEdit();
+    }
+    module.exports = negotiateEndEdit;
+  });
+
+  // table/commands/pushCommand.js
+  var require_pushCommand = __commonJS((exports, module) => {
+    var getChangeSet = require_getChangeSet();
+    var negotiateEndEdit = require_negotiateEndEdit();
+    function pushCommand(command) {
+      var changes = getChangeSet();
+      negotiateEndEdit(changes);
+      changes.push(command);
+    }
+    module.exports = pushCommand;
+  });
+
   // table/commands/lastCommandMatches.js
   var require_lastCommandMatches = __commonJS((exports, module) => {
     var getChangeSet = require_getChangeSet();
@@ -12436,6 +11367,14 @@
       }
     }
     module.exports = _delete;
+  });
+
+  // table/resultToPromise.js
+  var require_resultToPromise = __commonJS((exports, module) => {
+    function resultToPromise(result) {
+      return Promise.resolve(result);
+    }
+    module.exports = resultToPromise;
   });
 
   // table/resultToRows/toDto.js
@@ -13375,7 +12314,7 @@
   // applyPatch.js
   var require_applyPatch = __commonJS((exports, module) => {
     var rfc = require_rfc6902();
-    var {inspect} = require_util();
+    var {inspect} = require_util2();
     var assert = require_assert();
     var fromCompareObject = require_fromCompareObject();
     function applyPatch({defaultConcurrency, concurrency}, dto, changes) {
@@ -14012,7 +12951,7 @@
   // table/tryGetFirstFromDb.js
   var require_tryGetFirstFromDb = __commonJS((exports, module) => {
     var getMany = require_getMany();
-    var util = require_util();
+    var util = require_util2();
     function tryGet(table, filter, strategy) {
       strategy = setLimit(strategy);
       return getMany(table, filter, strategy).then(filterRows);
@@ -14725,6 +13664,178 @@
     module.exports = newManyCache;
   });
 
+  // node_modules/uuid/lib/rng-browser.js
+  var require_rng_browser = __commonJS((exports, module) => {
+    var getRandomValues = typeof crypto != "undefined" && crypto.getRandomValues && crypto.getRandomValues.bind(crypto) || typeof msCrypto != "undefined" && typeof window.msCrypto.getRandomValues == "function" && msCrypto.getRandomValues.bind(msCrypto);
+    if (getRandomValues) {
+      rnds8 = new Uint8Array(16);
+      module.exports = function whatwgRNG() {
+        getRandomValues(rnds8);
+        return rnds8;
+      };
+    } else {
+      rnds = new Array(16);
+      module.exports = function mathRNG() {
+        for (var i = 0, r; i < 16; i++) {
+          if ((i & 3) === 0)
+            r = Math.random() * 4294967296;
+          rnds[i] = r >>> ((i & 3) << 3) & 255;
+        }
+        return rnds;
+      };
+    }
+    var rnds8;
+    var rnds;
+  });
+
+  // node_modules/uuid/lib/bytesToUuid.js
+  var require_bytesToUuid = __commonJS((exports, module) => {
+    var byteToHex = [];
+    for (var i = 0; i < 256; ++i) {
+      byteToHex[i] = (i + 256).toString(16).substr(1);
+    }
+    function bytesToUuid(buf, offset) {
+      var i2 = offset || 0;
+      var bth = byteToHex;
+      return [
+        bth[buf[i2++]],
+        bth[buf[i2++]],
+        bth[buf[i2++]],
+        bth[buf[i2++]],
+        "-",
+        bth[buf[i2++]],
+        bth[buf[i2++]],
+        "-",
+        bth[buf[i2++]],
+        bth[buf[i2++]],
+        "-",
+        bth[buf[i2++]],
+        bth[buf[i2++]],
+        "-",
+        bth[buf[i2++]],
+        bth[buf[i2++]],
+        bth[buf[i2++]],
+        bth[buf[i2++]],
+        bth[buf[i2++]],
+        bth[buf[i2++]]
+      ].join("");
+    }
+    module.exports = bytesToUuid;
+  });
+
+  // node_modules/uuid/v1.js
+  var require_v1 = __commonJS((exports, module) => {
+    var rng = require_rng_browser();
+    var bytesToUuid = require_bytesToUuid();
+    var _nodeId;
+    var _clockseq;
+    var _lastMSecs = 0;
+    var _lastNSecs = 0;
+    function v1(options, buf, offset) {
+      var i = buf && offset || 0;
+      var b = buf || [];
+      options = options || {};
+      var node = options.node || _nodeId;
+      var clockseq = options.clockseq !== void 0 ? options.clockseq : _clockseq;
+      if (node == null || clockseq == null) {
+        var seedBytes = rng();
+        if (node == null) {
+          node = _nodeId = [
+            seedBytes[0] | 1,
+            seedBytes[1],
+            seedBytes[2],
+            seedBytes[3],
+            seedBytes[4],
+            seedBytes[5]
+          ];
+        }
+        if (clockseq == null) {
+          clockseq = _clockseq = (seedBytes[6] << 8 | seedBytes[7]) & 16383;
+        }
+      }
+      var msecs = options.msecs !== void 0 ? options.msecs : new Date().getTime();
+      var nsecs = options.nsecs !== void 0 ? options.nsecs : _lastNSecs + 1;
+      var dt = msecs - _lastMSecs + (nsecs - _lastNSecs) / 1e4;
+      if (dt < 0 && options.clockseq === void 0) {
+        clockseq = clockseq + 1 & 16383;
+      }
+      if ((dt < 0 || msecs > _lastMSecs) && options.nsecs === void 0) {
+        nsecs = 0;
+      }
+      if (nsecs >= 1e4) {
+        throw new Error("uuid.v1(): Can't create more than 10M uuids/sec");
+      }
+      _lastMSecs = msecs;
+      _lastNSecs = nsecs;
+      _clockseq = clockseq;
+      msecs += 122192928e5;
+      var tl = ((msecs & 268435455) * 1e4 + nsecs) % 4294967296;
+      b[i++] = tl >>> 24 & 255;
+      b[i++] = tl >>> 16 & 255;
+      b[i++] = tl >>> 8 & 255;
+      b[i++] = tl & 255;
+      var tmh = msecs / 4294967296 * 1e4 & 268435455;
+      b[i++] = tmh >>> 8 & 255;
+      b[i++] = tmh & 255;
+      b[i++] = tmh >>> 24 & 15 | 16;
+      b[i++] = tmh >>> 16 & 255;
+      b[i++] = clockseq >>> 8 | 128;
+      b[i++] = clockseq & 255;
+      for (var n = 0; n < 6; ++n) {
+        b[i + n] = node[n];
+      }
+      return buf ? buf : bytesToUuid(b);
+    }
+    module.exports = v1;
+  });
+
+  // node_modules/uuid/v4.js
+  var require_v4 = __commonJS((exports, module) => {
+    var rng = require_rng_browser();
+    var bytesToUuid = require_bytesToUuid();
+    function v4(options, buf, offset) {
+      var i = buf && offset || 0;
+      if (typeof options == "string") {
+        buf = options === "binary" ? new Array(16) : null;
+        options = null;
+      }
+      options = options || {};
+      var rnds = options.random || (options.rng || rng)();
+      rnds[6] = rnds[6] & 15 | 64;
+      rnds[8] = rnds[8] & 63 | 128;
+      if (buf) {
+        for (var ii = 0; ii < 16; ++ii) {
+          buf[i + ii] = rnds[ii];
+        }
+      }
+      return buf || bytesToUuid(rnds);
+    }
+    module.exports = v4;
+  });
+
+  // node_modules/uuid/index.js
+  var require_uuid = __commonJS((exports, module) => {
+    var v1 = require_v1();
+    var v4 = require_v4();
+    var uuid = v4;
+    uuid.v1 = v1;
+    uuid.v4 = v4;
+    module.exports = uuid;
+  });
+
+  // newId.js
+  var require_newId = __commonJS((exports, module) => {
+    module.exports = require_uuid().v4;
+  });
+
+  // table/setSessionSingleton.js
+  var require_setSessionSingleton = __commonJS((exports, module) => {
+    var getSessionContext = require_getSessionContext();
+    module.exports = function(name, value) {
+      getSessionContext()[name] = value;
+    };
+  });
+
   // table/relation/newManyCache.js
   var require_newManyCache = __commonJS((exports, module) => {
     var synchronizeChanged = require_synchronizeChanged();
@@ -14980,7 +14091,7 @@
 
   // table/readStream/pg/query/singleQuery/newShallowColumnSql.js
   var require_newShallowColumnSql2 = __commonJS((exports, module) => {
-    var util = require_util();
+    var util = require_util2();
     function _new(table, alias) {
       var columnFormat = '%s as "%s"';
       var columns = table._columns;
@@ -15020,7 +14131,7 @@
     var newShallowJoinSql = require_newShallowJoinSqlCore();
     var newQuery = require_newQueryCore();
     var newParameterized = require_newParameterized();
-    var util = require_util();
+    var util = require_util2();
     function joinLegToQuery(parentAlias, leg, legNo) {
       var childAlias = parentAlias + "_" + legNo;
       var span = leg.span;
@@ -15040,7 +14151,7 @@
     var newShallowJoinSql = require_newShallowJoinSqlCore();
     var newQuery = require_newQueryCore();
     var newParameterized = require_newParameterized();
-    var util = require_util();
+    var util = require_util2();
     function oneLegToQuery(rightAlias, leg, legNo) {
       var leftAlias = rightAlias + "_" + legNo;
       var span = leg.span;
@@ -15061,7 +14172,7 @@
     var newQuery = require_newQueryCore();
     var newParameterized = require_newParameterized();
     var extractOrderBy = require_extractOrderBy();
-    var util = require_util();
+    var util = require_util2();
     function manyLegToQuery(rightAlias, leg, legNo) {
       var leftAlias = rightAlias + "_" + legNo;
       var span = leg.span;
@@ -15464,7 +14575,7 @@
   var require_newInsertCommandCore = __commonJS((exports, module) => {
     var newParameterized = require_newParameterized();
     var getSqlTemplate = require_getSqlTemplate();
-    var util = require_util();
+    var util = require_util2();
     function newInsertCommandCore(table, row) {
       var parameters = [];
       var values = [getSqlTemplate(table)];
@@ -15599,7 +14710,7 @@
 
   // table/readStream/mySql/query/singleQuery/newShallowColumnSql.js
   var require_newShallowColumnSql3 = __commonJS((exports, module) => {
-    var util = require_util();
+    var util = require_util2();
     function _new(table, alias) {
       var columnFormat = "'%s',%s.%s";
       var columns = table._columns;
@@ -15621,7 +14732,7 @@
     var newColumnSql = require_newShallowColumnSql3();
     var newWhereSql = require_newWhereSql();
     var template = "select json_object(%s%s) as result from %s %s%s%s%s";
-    var util = require_util();
+    var util = require_util2();
     function _new(table, filter, alias, subQueries, orderBy, limit) {
       var c = {};
       c.sql = function() {
@@ -15640,7 +14751,7 @@
   var require_newSingleQueryCore = __commonJS((exports, module) => {
     var newColumnSql = require_newShallowColumnSql3();
     var template = "json_object(%s%s)";
-    var util = require_util();
+    var util = require_util2();
     function _new(table, alias, subQueries) {
       var c = {};
       c.sql = function() {
@@ -15668,7 +14779,7 @@
   var require_joinLegToQuery2 = __commonJS((exports, module) => {
     var newShallowJoinSql = require_newShallowJoinSqlCore();
     var newQuery = require_newQueryCore2();
-    var util = require_util();
+    var util = require_util2();
     function joinLegToQuery(parentAlias, leg, legNo) {
       var childAlias = parentAlias + "_" + legNo;
       var span = leg.span;
@@ -15688,7 +14799,7 @@
     var newShallowJoinSql = require_newShallowJoinSqlCore();
     var newQuery = require_newQueryCore2();
     var extractOrderBy = require_extractOrderBy();
-    var util = require_util();
+    var util = require_util2();
     function manyLegToQuery(rightAlias, leg, legNo) {
       var leftAlias = rightAlias + "_" + legNo;
       var span = leg.span;
@@ -15708,7 +14819,7 @@
     var newShallowJoinSql = require_newShallowJoinSqlCore();
     var extractOrderBy = require_extractOrderBy2();
     var newQuery = require_newQueryCore2();
-    var util = require_util();
+    var util = require_util2();
     function manyLegToQuery(rightAlias, leg, legNo) {
       var leftAlias = rightAlias + "_" + legNo;
       var span = leg.span;
@@ -16251,6 +15362,163 @@
     module.exports = _new;
   });
 
+  // table/commands/commitCommand.js
+  var require_commitCommand = __commonJS((exports, module) => {
+    var newParameterized = require_newParameterized();
+    var command = newParameterized("COMMIT");
+    function empty() {
+    }
+    command.endEdit = empty;
+    command.matches = empty;
+    module.exports = command;
+  });
+
+  // table/deleteSessionContext.js
+  var require_deleteSessionContext = __commonJS((exports, module) => {
+    var useHook = require_useHook();
+    var cls = require_node_cls();
+    function deleteSessionContext() {
+      if (useHook()) {
+        let context = cls.get("rdb");
+        delete context.rdb;
+        if (context.exit)
+          cls.exit("rdb");
+      } else
+        delete process.domain.rdb;
+    }
+    module.exports = deleteSessionContext;
+  });
+
+  // table/releaseDbClient.js
+  var require_releaseDbClient = __commonJS((exports, module) => {
+    var getSessionSingleton = require_getSessionSingleton();
+    var deleteSessionContext = require_deleteSessionContext();
+    function release() {
+      var done = getSessionSingleton("dbClientDone");
+      var pool = getSessionSingleton("pool");
+      deleteSessionContext();
+      if (done)
+        done();
+      if (pool)
+        return pool.end();
+    }
+    module.exports = release;
+  });
+
+  // table/commit.js
+  var require_commit = __commonJS((exports, module) => {
+    var commitCommand = require_commitCommand();
+    var pushCommand = require_pushCommand();
+    var executeChanges = require_executeChanges();
+    var releaseDbClient = require_releaseDbClient();
+    var popChanges = require_popChanges();
+    function commit(result) {
+      return popAndPushChanges().then(releaseDbClient).then(onReleased);
+      function onReleased() {
+        return result;
+      }
+      async function popAndPushChanges() {
+        let changes = popChanges();
+        while (changes.length > 0) {
+          await executeChanges(changes);
+          changes = popChanges();
+        }
+        pushCommand(commitCommand);
+        return executeChanges(popChanges());
+      }
+    }
+    module.exports = function(result) {
+      return Promise.resolve().then(() => commit(result));
+    };
+  });
+
+  // table/commands/rollbackCommand.js
+  var require_rollbackCommand = __commonJS((exports, module) => {
+    var newParameterized = require_newParameterized();
+    var command = newParameterized("ROLLBACK");
+    function empty() {
+    }
+    command.endEdit = empty;
+    command.matches = empty;
+    module.exports = command;
+  });
+
+  // table/tryReleaseDbClient.js
+  var require_tryReleaseDbClient = __commonJS((exports, module) => {
+    var release = require_releaseDbClient();
+    function tryReleaseDbClient() {
+      try {
+        release();
+      } catch (e) {
+      }
+    }
+    module.exports = tryReleaseDbClient;
+  });
+
+  // table/newThrow.js
+  var require_newThrow = __commonJS((exports, module) => {
+    var tryReleaseDbClient = require_tryReleaseDbClient();
+    function newThrow(e, previousPromise) {
+      return previousPromise.then(throwError, throwError);
+      function throwError() {
+        tryReleaseDbClient();
+        throw e;
+      }
+    }
+    module.exports = newThrow;
+  });
+
+  // table/rollback.js
+  var require_rollback = __commonJS((exports, module) => {
+    var rollbackCommand = require_rollbackCommand();
+    var executeQuery = require_executeQuery();
+    var releaseDbClient = require_releaseDbClient();
+    var popChanges = require_popChanges();
+    var newThrow = require_newThrow();
+    var resultToPromise = require_resultToPromise();
+    function rollback(e) {
+      var executeRollback = executeQuery.bind(null, rollbackCommand);
+      var chain = resultToPromise().then(popChanges).then(executeRollback).then(releaseDbClient);
+      if (e)
+        return newThrow(e, chain);
+      return chain;
+    }
+    module.exports = function(e) {
+      return Promise.resolve().then(() => rollback(e));
+    };
+  });
+
+  // pools.js
+  var require_pools = __commonJS((exports, module) => {
+    var pools = require_newObject()();
+    Object.defineProperty(pools, "end", {
+      enumerable: false,
+      value: end
+    });
+    function end() {
+      var all = [];
+      for (var poolId in pools) {
+        var endPool = pools[poolId].end();
+        all.push(endPool);
+      }
+      return Promise.all(all);
+    }
+    module.exports = pools;
+  });
+
+  // table/log.js
+  var require_log = __commonJS((exports, module) => {
+    var logger = function() {
+    };
+    function log() {
+      logger.apply(null, arguments);
+    }
+    log.registerLogger = function(cb) {
+      logger = cb;
+    };
+    module.exports = log;
+  });
+
   // query/negotiateSql.js
   var require_negotiateSql = __commonJS((exports, module) => {
     function negotiateSql(query) {
@@ -16285,7 +15553,7 @@
   });
 
   // query/wrapQuery.js
-  var require_wrapQuery2 = __commonJS((exports, module) => {
+  var require_wrapQuery = __commonJS((exports, module) => {
     var negotiateSql = require_negotiateSql();
     var negotiateParameters = require_negotiateParameters();
     function wrapQuery(query) {
@@ -16305,7 +15573,7 @@
   // query.js
   var require_query = __commonJS((exports, module) => {
     var executeQueries = require_executeQueries();
-    var wrapQuery = require_wrapQuery2();
+    var wrapQuery = require_wrapQuery();
     function doQuery(query) {
       var wrappedQuery = wrapQuery(query);
       return executeQueries([wrappedQuery]).then(unwrapResult);
@@ -16400,7 +15668,6 @@
     var hostExpress = require_hostExpress();
     var _sqlite;
     var flags = require_flags();
-    console.log("hello rdb");
     var connectViaPool = function(connectionString) {
       if (connectionString.indexOf && connectionString.indexOf("mysql") === 0)
         return connectViaPool.mySql.apply(null, arguments);
