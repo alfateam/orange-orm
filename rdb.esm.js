@@ -9666,7 +9666,7 @@ function resolveExecuteQuery(query) {
 	function resolve(success, failed) {
 		try {
 
-			var domain = process.domain;
+			var domain = process && process.domain;
 			if (domain) {
 				success = process.domain.bind(success);
 				failed = process.domain.bind(failed);
@@ -15342,13 +15342,12 @@ var commitCommand = command$1;
 
 function deleteSessionContext() {
 	if (hostExpress()) {
-
 		let context = hostExpress.get('rdb');
 		delete context.rdb;
 		if (context.exit)
 			hostExpress.exit('rdb');
 	}
-	else
+	else if (process)
 		delete process.domain.rdb;
 }
 
