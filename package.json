@@ -18,7 +18,7 @@
   "author": "Lars-Erik Roald <lars.roald@gmail.com>",
   "license": "ISC",
   "scripts": {
-    "build": "esbuild index.js --bundle --outfile=rdb.esm.js",
+    "build": "rollup -c rollup.config.js",
     "test": "a",
     "lint": "eslint ./"
   },
@@ -59,9 +59,13 @@
     "express": ">=4.0.0"
   },
   "devDependencies": {
+    "@rollup/plugin-commonjs": "^18.0.0",
+    "@rollup/plugin-json": "^4.1.0",
+    "@rollup/plugin-node-resolve": "^11.2.1",
     "a": "^2.1.0",
     "esbuild": "^0.11.14",
-    "eslint": "^6.1.0"
+    "eslint": "^6.1.0",
+    "rollup": "^2.46.0"
   },
   "engines": {
     "node": ">= 8.0.0"

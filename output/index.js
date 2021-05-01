@@ -39,11 +39,6 @@ function extract$3(parameters) {
 
 var extractParameters = extract$3;
 
-var nextParameterized = function(text, params) {
-	nextParameterized = newParameterized$1;
-	return nextParameterized(text, params);
-};
-
 function Parameterized(text, parameters) {
 	this._text = text;
 	this.parameters = parameters;
@@ -69,11 +64,14 @@ Parameterized.prototype.append = function(other) {
 		return nextParameterized(this._text + other, this.parameters);
 };
 
-var newParameterized$1 = function(text, parameters) {
+
+function nextParameterized(text, parameters) {
 	text = extractSql(text);
 	parameters = extractParameters(parameters);
 	return new Parameterized(text, parameters);
-};
+}
+
+var newParameterized$1 = nextParameterized;
 
 var newParameterized = function() {
 	newParameterized = newParameterized$1;
