@@ -8852,7 +8852,10 @@ let browserContext = {
 async function executeQuery$1(query, onCompleted) {
 	let body = JSON.stringify({sql: query.sql(), parameters: query.parameters});
 	// eslint-disable-next-line no-undef
-	let request = new Request(`${flags_1.url}`, {method: 'POST', body});
+	var headers = new Headers();
+	headers.append('Content-Type', 'application/json');
+	// eslint-disable-next-line no-undef
+	let request = new Request(`${flags_1.url}`, {method: 'POST', headers, body});
 	try {
 		// eslint-disable-next-line no-undef
 		let response = await fetch(request);
