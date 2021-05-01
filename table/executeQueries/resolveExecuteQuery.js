@@ -6,7 +6,7 @@ function resolveExecuteQuery(query) {
 	function resolve(success, failed) {
 		try {
 
-			var domain = process.domain;
+			var domain = process && process.domain;
 			if (domain) {
 				success = process.domain.bind(success);
 				failed = process.domain.bind(failed);
