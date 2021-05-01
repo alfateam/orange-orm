@@ -8880,7 +8880,7 @@ function getSessionContext() {
 	if (hostExpress())
 		return hostExpress.getContext('rdb').rdb;
 	else
-		return process.domain.rdb;
+		return hostExpress.domain.rdb;
 }
 
 var getSessionContext_1 = getSessionContext;
@@ -9666,10 +9666,10 @@ function resolveExecuteQuery(query) {
 	function resolve(success, failed) {
 		try {
 
-			var domain = process && process.domain;
+			var domain = hostExpress && hostExpress.domain;
 			if (domain) {
-				success = process.domain.bind(success);
-				failed = process.domain.bind(failed);
+				success = hostExpress.domain.bind(success);
+				failed = hostExpress.domain.bind(failed);
 			}
 
 			var client = getSessionSingleton('dbClient');

@@ -1,4 +1,5 @@
 var getSessionSingleton = require('../getSessionSingleton');
+let process = require('process');
 
 function resolveExecuteQuery(query) {
 	return resolve;

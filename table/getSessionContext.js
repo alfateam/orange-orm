@@ -1,5 +1,6 @@
 let useHook = require('../useHook');
 let cls = require('node-cls');
+let process = require('process');
 
 let flags = require('../flags');
 let browserContext = {

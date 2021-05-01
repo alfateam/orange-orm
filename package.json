@@ -38,7 +38,8 @@
     "./sqlite/newDatabase": false,
     "./hostExpress": false,
     "./useHook": false,
-    "node-cls": false
+    "node-cls": false,
+    "process": false
   },
   "dependencies": {
     "ajv": "^6.10.2",
