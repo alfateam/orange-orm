@@ -14373,7 +14373,7 @@ function getManyDto(table, filter, strategy) {
 	c.visitSqlite = function() {};
 
 	let context = getSessionContext_1();
-	c.accept(c);
+	context.accept(c);
 
 	if(context.getManyDto) {
 		return getManyDto(table, filter, strategy);

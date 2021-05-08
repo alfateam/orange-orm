@@ -15,8 +15,7 @@ function getManyDto(table, filter, strategy) {
 	c.visitSqlite = function() {};
 
 	let context = getSessionContext();
-	let {isHttp} = context;
-	c.accept(c);
+	context.accept(c);
 
 	if(context.getManyDto) {
 		return getManyDto(table, filter, strategy);
