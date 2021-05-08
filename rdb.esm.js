@@ -14,47 +14,6 @@ let flags = {
 
 var flags_1 = flags;
 
-function encodeBoolean(bool) {
-	return bool.toString();
-}
-
-var encodeBoolean_1 = encodeBoolean;
-
-function encodeDate(date) {
-	if (date.toISOString)
-		return  '\'' + date.toISOString() + '\'';
-	return '\'' + date + '\'';
-}
-
-var encodeDate_1 = encodeDate;
-
-var format$1 = 'delete from %s %s%s';
-
-
-function deleteFromSql(table, alias, whereSql) {
-	var name = table._dbName;
-	return util$2.format(format$1, name, alias, whereSql);
-}
-var deleteFromSql_1 = deleteFromSql;
-
-var selectForUpdateSql = function(alias) {
-	return ' FOR UPDATE OF ' + alias;
-};
-
-({
-	changes: [],
-	encodeBoolean: encodeBoolean_1,
-	encodeDate: encodeDate_1,
-	deleteFromSql: deleteFromSql_1,
-	selectForUpdateSql: selectForUpdateSql,
-	multipleStatements: true,
-	accept: (caller) => caller.visitPg(),
-	dbClient: {
-		executeQuery
-	},
-	id: undefined,
-});
-
 function newDatabase(connectionString) {
 	flags_1.url = connectionString;
 	let c = {};
@@ -4216,7 +4175,7 @@ var _enum = function generate_enum(it, $keyword, $ruleType) {
   return out;
 };
 
-var format = function generate_format(it, $keyword, $ruleType) {
+var format$1 = function generate_format(it, $keyword, $ruleType) {
   var out = ' ';
   var $lvl = it.level;
   var $dataLvl = it.dataLevel;
@@ -6107,7 +6066,7 @@ var dotjs = {
   contains: contains$1,
   dependencies: dependencies,
   'enum': _enum,
-  format: format,
+  format: format$1,
   'if': _if,
   items: items,
   maximum: _limit,
@@ -8898,6 +8857,33 @@ function newWhereSql$2(table,filter,alias) {
 
 var newWhereSql_1 = newWhereSql$2;
 
+function encodeBoolean(bool) {
+	return bool.toString();
+}
+
+var encodeBoolean_1 = encodeBoolean;
+
+function encodeDate(date) {
+	if (date.toISOString)
+		return  '\'' + date.toISOString() + '\'';
+	return '\'' + date + '\'';
+}
+
+var encodeDate_1 = encodeDate;
+
+var format = 'delete from %s %s%s';
+
+
+function deleteFromSql(table, alias, whereSql) {
+	var name = table._dbName;
+	return util$2.format(format, name, alias, whereSql);
+}
+var deleteFromSql_1 = deleteFromSql;
+
+var selectForUpdateSql = function(alias) {
+	return ' FOR UPDATE OF ' + alias;
+};
+
 var hostExpress = /*@__PURE__*/getAugmentedNamespace(_nodeResolve_empty$1);
 
 let browserContext = {
@@ -8910,7 +8896,7 @@ let browserContext = {
 	accept: (caller) => caller.visitPg(),
 	getManyDto: getManyDto$1,
 	dbClient: {
-		executeQuery: executeQuery$2
+		executeQuery: executeQuery$1
 	},
 	id: undefined,
 };
@@ -8943,7 +8929,7 @@ async function getManyDto$1(table, filter, strategy) {
 	}
 }
 
-async function executeQuery$2(query, onCompleted) {
+async function executeQuery$1(query, onCompleted) {
 	let body = JSON.stringify({sql: query.sql(), parameters: query.parameters});
 	// eslint-disable-next-line no-undef
 	var headers = new Headers();
@@ -9741,12 +9727,12 @@ function resolveExecuteQuery(query) {
 
 var resolveExecuteQuery_1 = resolveExecuteQuery;
 
-function executeQuery$1(query) {
+function executeQuery(query) {
 	var resolver = resolveExecuteQuery_1(query);
 	return new Promise(resolver);
 }
 
-var executeQuery_1 = executeQuery$1;
+var executeQuery_1 = executeQuery;
 
 // Use the fastest means possible to execute a task in its own turn, with
 // priority over other events including IO, animation, reflow, and redraw
