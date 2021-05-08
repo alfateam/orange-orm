@@ -1,6 +1,7 @@
 let useHook = require('../useHook');
 let cls = require('node-cls');
 let process = require('process');
+let newWhereSql = require('./query/singleQuery/newWhereSql');
 
 let flags = require('../flags');
 let browserContext = {
@@ -11,10 +12,40 @@ let browserContext = {
 	selectForUpdateSql: require('../pg/selectForUpdateSql'),
 	multipleStatements: true,
 	accept: (caller) => caller.visitPg(),
+	getManyDto,
 	dbClient: {
 		executeQuery
-	}
+	},
+	id: undefined,
 };
+
+async function getManyDto(table, filter, strategy) {
+	let body = JSON.stringify(
+		{
+			table: table._dbName,
+			columnDiscriminators: table._columnDiscriminators,
+			formulaDiscriminators: table._formulaDiscriminators,
+			sqlWhere: newWhereSql(table, filter, table._dbName).replace(' where ','') ,
+			parameters: filter && filter.parameters,
+			strategy});
+	// eslint-disable-next-line no-undef
+	var headers = new Headers();
+	headers.append('Content-Type', 'application/json');
+	// eslint-disable-next-line no-undef
+	let request = new Request(`${flags.url}`, {method: 'POST', headers, body});
+	// eslint-disable-next-line no-undef
+	let response = await fetch(request);
+	if (response.status === 200) {
+		return response.json();
+	}
+	else {
+		let msg = response.json && await response.json() || `Status ${response.status} from server`;
+		let e = new Error(msg);
+		// @ts-ignore
+		e.status = response.status;
+		throw e;
+	}
+}
 
 async function executeQuery(query, onCompleted) {
 	let body = JSON.stringify({sql: query.sql(), parameters: query.parameters});
@@ -22,7 +53,7 @@ async function executeQuery(query, onCompleted) {
 	var headers = new Headers();
 	headers.append('Content-Type', 'application/json');
 	// eslint-disable-next-line no-undef
-	let request = new Request(`${flags.url}`, {method: 'POST', headers, body});
+	let request = new Request(`${flags.url}`, {method: 'PUT', headers, body});
 	try {
 		// eslint-disable-next-line no-undef
 		let response = await fetch(request);

@@ -14,7 +14,13 @@ function getManyDto(table, filter, strategy) {
 	c.visitMySql = function() {};
 	c.visitSqlite = function() {};
 
-	getSessionContext().accept(c);
+	let context = getSessionContext();
+	let {isHttp} = context;
+	c.accept(c);
+
+	if(context.getManyDto) {
+		return getManyDto(table, filter, strategy);
+	}
 
 	if (!isPg) {
 		let args = [];
@@ -43,6 +49,10 @@ function getManyDto(table, filter, strategy) {
 			return res;
 		}
 	}
+
+}
+
+function getViaHttp() {
 
 }
 
