@@ -18,7 +18,7 @@ function getManyDto(table, filter, strategy) {
 	context.accept(c);
 
 	if(context.getManyDto) {
-		return getManyDto(table, filter, strategy);
+		return context.getManyDto(table, filter, strategy);
 	}
 
 	if (!isPg) {
