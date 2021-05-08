@@ -8807,56 +8807,6 @@ function _newSafe(column, purify) {
 
 var newEncodeSafe = _newSafe;
 
-function newDiscriminatorSql$1(table, alias) {
-	var result = '';
-	var formulaDiscriminators = table._formulaDiscriminators;
-	var columnDiscriminators = table._columnDiscriminators;
-	addFormula();
-	addColumn();
-	return result;
-
-	function addFormula() {
-		for (var i = 0; i<formulaDiscriminators.length; i++) {
-			var current = formulaDiscriminators[i].replace('@this',alias);
-			and();
-			result += '(' + current + ')';
-		}
-	}
-
-	function addColumn() {
-		for (var i = 0; i< columnDiscriminators.length; i++) {
-			var current = columnDiscriminators[i];
-			and();
-			result += alias + '.' + current;
-		}
-	}
-
-	function and() {
-		if(result)
-			result += ' AND ';
-		else
-			result = ' ';
-	}
-}
-
-var newDiscriminatorSql_1$1 = newDiscriminatorSql$1;
-
-function newWhereSql$2(table,filter,alias) {
-	var separator = ' where';
-	var result = '';
-	var sql = filter.sql();
-	var discriminator = newDiscriminatorSql_1$1(table, alias);
-	if (sql) {
-		result = separator + ' ' + sql;
-		separator = ' AND';
-	}
-	if(discriminator)
-		result += separator + discriminator;
-	return result;
-}
-
-var newWhereSql_1 = newWhereSql$2;
-
 function encodeBoolean(bool) {
 	return bool.toString();
 }
@@ -8886,6 +8836,9 @@ var selectForUpdateSql = function(alias) {
 
 var hostExpress = /*@__PURE__*/getAugmentedNamespace(_nodeResolve_empty$1);
 
+// let newWhereSql = require('./query/singleQuery/newWhereSql');
+
+
 let browserContext = {
 	changes: [],
 	encodeBoolean: encodeBoolean_1,
@@ -8907,7 +8860,7 @@ async function getManyDto$1(table, filter, strategy) {
 			table: table._dbName,
 			columnDiscriminators: table._columnDiscriminators,
 			formulaDiscriminators: table._formulaDiscriminators,
-			sqlWhere: newWhereSql_1(table, filter, table._dbName).replace(' where ','') ,
+			sqlWhere: filter && filter.sql() ,
 			parameters: filter && filter.parameters,
 			strategy});
 	// eslint-disable-next-line no-undef
@@ -9423,6 +9376,40 @@ var newColumnSql = function(table,span,alias) {
 	return shallowColumnSql + joinedColumnSql;
 };
 
+function newDiscriminatorSql$1(table, alias) {
+	var result = '';
+	var formulaDiscriminators = table._formulaDiscriminators;
+	var columnDiscriminators = table._columnDiscriminators;
+	addFormula();
+	addColumn();
+	return result;
+
+	function addFormula() {
+		for (var i = 0; i<formulaDiscriminators.length; i++) {
+			var current = formulaDiscriminators[i].replace('@this',alias);
+			and();
+			result += '(' + current + ')';
+		}
+	}
+
+	function addColumn() {
+		for (var i = 0; i< columnDiscriminators.length; i++) {
+			var current = columnDiscriminators[i];
+			and();
+			result += alias + '.' + current;
+		}
+	}
+
+	function and() {
+		if(result)
+			result += ' AND ';
+		else
+			result = ' ';
+	}
+}
+
+var newDiscriminatorSql_1$1 = newDiscriminatorSql$1;
+
 function newDiscriminatorSql(table, alias) {
 	var result = newDiscriminatorSql_1$1(table,alias);
 	if (result)
@@ -9533,6 +9520,22 @@ function _new$8(span,alias) {
 }
 
 var newJoinSql$2 = _new$8;
+
+function newWhereSql$2(table,filter,alias) {
+	var separator = ' where';
+	var result = '';
+	var sql = filter.sql();
+	var discriminator = newDiscriminatorSql_1$1(table, alias);
+	if (sql) {
+		result = separator + ' ' + sql;
+		separator = ' AND';
+	}
+	if(discriminator)
+		result += separator + discriminator;
+	return result;
+}
+
+var newWhereSql_1 = newWhereSql$2;
 
 function negotiateLimit(limit) {
 	if(!limit)

@@ -1,7 +1,7 @@
 let useHook = require('../useHook');
 let cls = require('node-cls');
 let process = require('process');
-let newWhereSql = require('./query/singleQuery/newWhereSql');
+// let newWhereSql = require('./query/singleQuery/newWhereSql');
 
 let flags = require('../flags');
 let browserContext = {
@@ -25,7 +25,7 @@ async function getManyDto(table, filter, strategy) {
 			table: table._dbName,
 			columnDiscriminators: table._columnDiscriminators,
 			formulaDiscriminators: table._formulaDiscriminators,
-			sqlWhere: newWhereSql(table, filter, table._dbName).replace(' where ','') ,
+			sqlWhere: filter && filter.sql() ,
 			parameters: filter && filter.parameters,
 			strategy});
 	// eslint-disable-next-line no-undef
