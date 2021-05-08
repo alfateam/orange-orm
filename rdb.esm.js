@@ -14,6 +14,47 @@ let flags = {
 
 var flags_1 = flags;
 
+function encodeBoolean(bool) {
+	return bool.toString();
+}
+
+var encodeBoolean_1 = encodeBoolean;
+
+function encodeDate(date) {
+	if (date.toISOString)
+		return  '\'' + date.toISOString() + '\'';
+	return '\'' + date + '\'';
+}
+
+var encodeDate_1 = encodeDate;
+
+var format$1 = 'delete from %s %s%s';
+
+
+function deleteFromSql(table, alias, whereSql) {
+	var name = table._dbName;
+	return util$2.format(format$1, name, alias, whereSql);
+}
+var deleteFromSql_1 = deleteFromSql;
+
+var selectForUpdateSql = function(alias) {
+	return ' FOR UPDATE OF ' + alias;
+};
+
+({
+	changes: [],
+	encodeBoolean: encodeBoolean_1,
+	encodeDate: encodeDate_1,
+	deleteFromSql: deleteFromSql_1,
+	selectForUpdateSql: selectForUpdateSql,
+	multipleStatements: true,
+	accept: (caller) => caller.visitPg(),
+	dbClient: {
+		executeQuery
+	},
+	id: undefined,
+});
+
 function newDatabase(connectionString) {
 	flags_1.url = connectionString;
 	let c = {};
@@ -4175,7 +4216,7 @@ var _enum = function generate_enum(it, $keyword, $ruleType) {
   return out;
 };
 
-var format$1 = function generate_format(it, $keyword, $ruleType) {
+var format = function generate_format(it, $keyword, $ruleType) {
   var out = ' ';
   var $lvl = it.level;
   var $dataLvl = it.dataLevel;
@@ -6066,7 +6107,7 @@ var dotjs = {
   contains: contains$1,
   dependencies: dependencies,
   'enum': _enum,
-  format: format$1,
+  format: format,
   'if': _if,
   items: items,
   maximum: _limit,
@@ -8807,32 +8848,55 @@ function _newSafe(column, purify) {
 
 var newEncodeSafe = _newSafe;
 
-function encodeBoolean(bool) {
-	return bool.toString();
+function newDiscriminatorSql$1(table, alias) {
+	var result = '';
+	var formulaDiscriminators = table._formulaDiscriminators;
+	var columnDiscriminators = table._columnDiscriminators;
+	addFormula();
+	addColumn();
+	return result;
+
+	function addFormula() {
+		for (var i = 0; i<formulaDiscriminators.length; i++) {
+			var current = formulaDiscriminators[i].replace('@this',alias);
+			and();
+			result += '(' + current + ')';
+		}
+	}
+
+	function addColumn() {
+		for (var i = 0; i< columnDiscriminators.length; i++) {
+			var current = columnDiscriminators[i];
+			and();
+			result += alias + '.' + current;
+		}
+	}
+
+	function and() {
+		if(result)
+			result += ' AND ';
+		else
+			result = ' ';
+	}
 }
 
-var encodeBoolean_1 = encodeBoolean;
+var newDiscriminatorSql_1$1 = newDiscriminatorSql$1;
 
-function encodeDate(date) {
-	if (date.toISOString)
-		return  '\'' + date.toISOString() + '\'';
-	return '\'' + date + '\'';
+function newWhereSql$2(table,filter,alias) {
+	var separator = ' where';
+	var result = '';
+	var sql = filter.sql();
+	var discriminator = newDiscriminatorSql_1$1(table, alias);
+	if (sql) {
+		result = separator + ' ' + sql;
+		separator = ' AND';
+	}
+	if(discriminator)
+		result += separator + discriminator;
+	return result;
 }
 
-var encodeDate_1 = encodeDate;
-
-var format = 'delete from %s %s%s';
-
-
-function deleteFromSql(table, alias, whereSql) {
-	var name = table._dbName;
-	return util$2.format(format, name, alias, whereSql);
-}
-var deleteFromSql_1 = deleteFromSql;
-
-var selectForUpdateSql = function(alias) {
-	return ' FOR UPDATE OF ' + alias;
-};
+var newWhereSql_1 = newWhereSql$2;
 
 var hostExpress = /*@__PURE__*/getAugmentedNamespace(_nodeResolve_empty$1);
 
@@ -8844,18 +8908,48 @@ let browserContext = {
 	selectForUpdateSql: selectForUpdateSql,
 	multipleStatements: true,
 	accept: (caller) => caller.visitPg(),
+	getManyDto: getManyDto$1,
 	dbClient: {
-		executeQuery: executeQuery$1
-	}
+		executeQuery: executeQuery$2
+	},
+	id: undefined,
 };
 
-async function executeQuery$1(query, onCompleted) {
-	let body = JSON.stringify({sql: query.sql(), parameters: query.parameters});
+async function getManyDto$1(table, filter, strategy) {
+	let body = JSON.stringify(
+		{
+			table: table._dbName,
+			columnDiscriminators: table._columnDiscriminators,
+			formulaDiscriminators: table._formulaDiscriminators,
+			sqlWhere: newWhereSql_1(table, filter, table._dbName).replace(' where ','') ,
+			parameters: filter && filter.parameters,
+			strategy});
 	// eslint-disable-next-line no-undef
 	var headers = new Headers();
 	headers.append('Content-Type', 'application/json');
 	// eslint-disable-next-line no-undef
 	let request = new Request(`${flags_1.url}`, {method: 'POST', headers, body});
+	// eslint-disable-next-line no-undef
+	let response = await fetch(request);
+	if (response.status === 200) {
+		return response.json();
+	}
+	else {
+		let msg = response.json && await response.json() || `Status ${response.status} from server`;
+		let e = new Error(msg);
+		// @ts-ignore
+		e.status = response.status;
+		throw e;
+	}
+}
+
+async function executeQuery$2(query, onCompleted) {
+	let body = JSON.stringify({sql: query.sql(), parameters: query.parameters});
+	// eslint-disable-next-line no-undef
+	var headers = new Headers();
+	headers.append('Content-Type', 'application/json');
+	// eslint-disable-next-line no-undef
+	let request = new Request(`${flags_1.url}`, {method: 'PUT', headers, body});
 	try {
 		// eslint-disable-next-line no-undef
 		let response = await fetch(request);
@@ -9343,40 +9437,6 @@ var newColumnSql = function(table,span,alias) {
 	return shallowColumnSql + joinedColumnSql;
 };
 
-function newDiscriminatorSql$1(table, alias) {
-	var result = '';
-	var formulaDiscriminators = table._formulaDiscriminators;
-	var columnDiscriminators = table._columnDiscriminators;
-	addFormula();
-	addColumn();
-	return result;
-
-	function addFormula() {
-		for (var i = 0; i<formulaDiscriminators.length; i++) {
-			var current = formulaDiscriminators[i].replace('@this',alias);
-			and();
-			result += '(' + current + ')';
-		}
-	}
-
-	function addColumn() {
-		for (var i = 0; i< columnDiscriminators.length; i++) {
-			var current = columnDiscriminators[i];
-			and();
-			result += alias + '.' + current;
-		}
-	}
-
-	function and() {
-		if(result)
-			result += ' AND ';
-		else
-			result = ' ';
-	}
-}
-
-var newDiscriminatorSql_1$1 = newDiscriminatorSql$1;
-
 function newDiscriminatorSql(table, alias) {
 	var result = newDiscriminatorSql_1$1(table,alias);
 	if (result)
@@ -9487,22 +9547,6 @@ function _new$8(span,alias) {
 }
 
 var newJoinSql$2 = _new$8;
-
-function newWhereSql$2(table,filter,alias) {
-	var separator = ' where';
-	var result = '';
-	var sql = filter.sql();
-	var discriminator = newDiscriminatorSql_1$1(table, alias);
-	if (sql) {
-		result = separator + ' ' + sql;
-		separator = ' AND';
-	}
-	if(discriminator)
-		result += separator + discriminator;
-	return result;
-}
-
-var newWhereSql_1 = newWhereSql$2;
 
 function negotiateLimit(limit) {
 	if(!limit)
@@ -9697,12 +9741,12 @@ function resolveExecuteQuery(query) {
 
 var resolveExecuteQuery_1 = resolveExecuteQuery;
 
-function executeQuery(query) {
+function executeQuery$1(query) {
 	var resolver = resolveExecuteQuery_1(query);
 	return new Promise(resolver);
 }
 
-var executeQuery_1 = executeQuery;
+var executeQuery_1 = executeQuery$1;
 
 // Use the fastest means possible to execute a task in its own turn, with
 // priority over other events including IO, animation, reflow, and redraw
@@ -14342,7 +14386,12 @@ function getManyDto(table, filter, strategy) {
 	c.visitMySql = function() {};
 	c.visitSqlite = function() {};
 
-	getSessionContext_1().accept(c);
+	let context = getSessionContext_1();
+	c.accept(c);
+
+	if(context.getManyDto) {
+		return getManyDto(table, filter, strategy);
+	}
 
 	if (!isPg) {
 		let args = [];
