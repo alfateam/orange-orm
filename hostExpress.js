@@ -1,5 +1,5 @@
 let express;
-let createFilter = require('./hostExpress/createFilter');
+let executePath = require('./hostExpress/executePath');
 
 function hostExpress({db, table, defaultConcurrency, concurrency}) {
 	let router = express.Router();
@@ -39,11 +39,8 @@ function hostExpress({db, table, defaultConcurrency, concurrency}) {
 			}
 			let result;
 			let body = req.body;
-			// let filter = createFilter(table, body.filter);
-			let strategy = body.strategy;
-
 			await db.transaction(async() => {
-				result = await createFilter(req.filter, body.strategy);
+				result = await executePath(req.filter, body.strategy);
 			});
 			res.json(result);
 		}

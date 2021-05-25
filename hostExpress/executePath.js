@@ -49,8 +49,8 @@ let allowedOps = {
 	exists: true
 };
 
-function createFilter(table, JSONFilter) {
-	let ops = {..._ops, getManyDto: table.getManyDto, getById: table.getById};
+function executePath(table, JSONFilter) {
+	let ops = {..._ops, ...{getManyDto: table.getManyDto, getMany: table.getManyDto}};
 	return parseFilter(JSONFilter);
 
 	function parseFilter(json) {
@@ -62,20 +62,20 @@ function createFilter(table, JSONFilter) {
 			return executePath(json.path, subFilters);
 		}
 		return json;
-	}
 
-	function executePath(path, args) {
-		if (path in ops)
-			return ops[path].apply(null, args);
-		let target = table;
-		let pathArray = path.split('.');
-		let op = pathArray[pathArray.length - 1];
-		if (!allowedOps[op])
-			throw new Error('Disallowed operator ' + op);
-		for (let i = 0; i < pathArray.length; i++) {
-			target = target[pathArray[i]];
+		function executePath(path, args) {
+			if (path in ops)
+				return ops[path].apply(null, args);
+			let target = table;
+			let pathArray = path.split('.');
+			let op = pathArray[pathArray.length - 1];
+			if (!allowedOps[op])
+				throw new Error('Disallowed operator ' + op);
+			for (let i = 0; i < pathArray.length; i++) {
+				target = target[pathArray[i]];
+			}
+			return target.apply(null, args);
 		}
-		return target.apply(null, args);
 	}
 
 }
@@ -83,4 +83,4 @@ function createFilter(table, JSONFilter) {
 function isFilter(json) {
 	return json instanceof Object && 'path' in json && 'args' in json;
 }
-module.exports = createFilter;
+module.exports = executePath;
