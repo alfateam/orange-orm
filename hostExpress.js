@@ -39,11 +39,11 @@ function hostExpress({db, table, defaultConcurrency, concurrency}) {
 			}
 			let result;
 			let body = req.body;
-			let filter = createFilter(table, body.filter);
+			// let filter = createFilter(table, body.filter);
 			let strategy = body.strategy;
 
 			await db.transaction(async() => {
-				result = await table.getManyDto(filter, strategy);
+				result = await createFilter(req.filter, body.strategy);
 			});
 			res.json(result);
 		}

@@ -1,12 +1,12 @@
 let emptyFilter = require('../emptyFilter');
 
-let ops = {
+let _ops = {
 	and: emptyFilter.and,
 	or: emptyFilter.or,
 	not: emptyFilter.not,
 	AND: emptyFilter.and,
 	OR: emptyFilter.or,
-	NOT: emptyFilter.not
+	NOT: emptyFilter.not,
 };
 
 let allowedOps = {
@@ -46,10 +46,11 @@ let allowedOps = {
 	iEq: true,
 	ieq: true,
 	IEQ: true,
-	exists: true,
+	exists: true
 };
 
 function createFilter(table, JSONFilter) {
+	let ops = {..._ops, getManyDto: table.getManyDto, getById: table.getById};
 	return parseFilter(JSONFilter);
 
 	function parseFilter(json) {
