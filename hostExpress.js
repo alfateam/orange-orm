@@ -38,9 +38,8 @@ function hostExpress({db, table, defaultConcurrency, concurrency}) {
 					db = dbPromise;
 			}
 			let result;
-			let body = req.body;
 			await db.transaction(async() => {
-				result = await executePath(req.filter, body.strategy);
+				result = await executePath(table, req.body);
 			});
 			res.json(result);
 		}
