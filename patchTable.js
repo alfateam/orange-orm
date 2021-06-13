@@ -13,11 +13,18 @@ async function patchTable(table, patches, { defaultConcurrency = 'optimistic', c
 			await remove(patch, table);
 	}
 
+	function toKey(property) {
+		if (typeof property === 'string' && property.charAt(0) === '[')
+			return JSON.parse(property);
+		else
+			return [property];
+	}
+
 	async function add({ path, value, op, oldValue, concurrency = {} }, table, row, parentRow, relation) {
 		let property = path[0];
 		path = path.slice(1);
 		if (!row && path.length > 0)
-			row = row || await table.tryGetById(property);
+			row = row || await table.tryGetById.apply(null, toKey(property));
 		if (path.length === 0) {
 			let pkName = table._primaryColumns[0].alias;
 			row = table.insert(value[pkName]);
@@ -58,7 +65,7 @@ async function patchTable(table, patches, { defaultConcurrency = 'optimistic', c
 	async function remove({ path, value, op }, table, row) {
 		let property = path[0];
 		path = path.slice(1);
-		row = row || await table.getById(property);
+		row = row || await table.getById.apply(null, toKey(property));
 		if (path.length === 0)
 			return row.cascadeDelete();
 		property = path[0];
