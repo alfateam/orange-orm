@@ -4,7 +4,7 @@ let getMeta = require('./hostExpress/getMeta');
 
 function hostExpress({db, table, defaultConcurrency, concurrency}) {
 	let router = express.Router();
-	router.get('/', function(res){
+	router.get('/', function(_req, res){
 		try {
 			if (!table)
 				throw new Error('Table is not exposed');
