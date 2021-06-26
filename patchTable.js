@@ -28,14 +28,33 @@ async function patchTable(table, patches, { defaultConcurrency = 'optimistic', c
 		if (path.length === 0) {
 			let pkName = table._primaryColumns[0].alias;
 			row = table.insert(value[pkName]);
+			let childInserts = [];
 			for (let name in value) {
-				row[name] = fromCompareObject(value[name]);
+				if (isColumn(name, table))
+					row[name] = fromCompareObject(value[name]);
+				else if (isManyRelation(name, table)) {
+					let relation = table[name]._relation;
+					for(let childKey in value[name]) {
+						if (childKey != '__patchType') {
+							let child = value[name][childKey];
+							childInserts.push(add.bind(null, { path: [childKey], value: child, op, oldValue, concurrency: concurrency[name] }, relation.childTable, {}, row, relation));
+						}
+					}
+				}
+				else if (isOneRelation(name, table)) {
+					let relation = table[name]._relation;
+					let child = value[name];
+					childInserts.push(add.bind(null, { path: [name], value: child, op, oldValue, concurrency: concurrency[name] }, relation.childTable, {}, row, relation));
+				}
 			}
 			if (relation && relation.joinRelation) {
 				let fkName = relation.joinRelation.columns[0].alias;
 				let parentPk = relation.joinRelation.childTable._primaryColumns[0].alias;
 				if (!row[fkName])
 					row[fkName] = parentRow[parentPk];
+			}
+			for (let i = 0; i < childInserts.length; i++) {
+				await childInserts[i]();
 			}
 			return;
 		}
