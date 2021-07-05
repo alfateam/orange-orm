@@ -53,7 +53,6 @@ function hostExpress({db, table, defaultConcurrency, concurrency}) {
 			res.json(result);
 		}
 		catch (e) {
-			console.log(e.stack);
 			res.status(500).send(e && e.message);
 		}
 	});
