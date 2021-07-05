@@ -12,7 +12,7 @@ function getMany(table,filter,strategy) {
 function getManyCore(table,filter,strategy,exclusive) {
 	var alias = table._dbName;
 	var noOrderBy;
-	filter = negotiateRawSqlFilter(filter);
+	filter = negotiateRawSqlFilter(filter, table);
 	var span = strategyToSpan(table,strategy);
 	var queries = newQuery([],table,filter,span,alias,emptyInnerJoin,noOrderBy,exclusive);
 	return executeQueries(queries).then(onResult);

@@ -27,7 +27,7 @@ function getManyDto(table, filter, strategy) {
 			});
 	}
 	var alias = table._dbName;
-	filter = negotiateRawSqlFilter(filter);
+	filter = negotiateRawSqlFilter(filter, table);
 	var span = strategyToSpan(table, strategy);
 	var query = newQuery(table, filter, span, alias);
 	return executeQueries([query]).then(onResults).then(onSingleResult);

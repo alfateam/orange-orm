@@ -5,7 +5,7 @@ var newQueryStream = require('./readStream/newQueryStream');
 
 function createReadStreamCoreNative(table, db, filter, strategy, transformer, streamOptions) {
 	var alias = table._dbName;
-	filter = negotiateRawSqlFilter(filter);
+	filter = negotiateRawSqlFilter(filter, table);
 	var span = strategyToSpan(table, strategy);
 
 	if (process.domain)
