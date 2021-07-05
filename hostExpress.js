@@ -21,7 +21,6 @@ function hostExpress({db, table, defaultConcurrency, concurrency}) {
 			if (typeof db === 'function') {
 				let dbPromise = db();
 				if (dbPromise.then)
-					// eslint-disable-next-line require-atomic-updates
 					db = await dbPromise;
 				else
 					db = dbPromise;
@@ -43,7 +42,6 @@ function hostExpress({db, table, defaultConcurrency, concurrency}) {
 			if (typeof db === 'function') {
 				let dbPromise = db();
 				if (dbPromise.then)
-					// eslint-disable-next-line require-atomic-updates
 					db = await dbPromise;
 				else
 					db = dbPromise;
