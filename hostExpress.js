@@ -27,8 +27,10 @@ function hostExpress({db, table, defaultConcurrency, concurrency}) {
 			}
 			await db.transaction(async() => {
 				let patch = req.body.patch || req.body;
-				let _concurrency = req.body.concurrency || concurrency;
-				await table.patch(patch, {defaultConcurrency, _concurrency});
+				let options = req.body.options || {};
+				let _concurrency = options.concurrency || concurrency;
+				let _defaultConcurrency = options.defaultConcurrency || defaultConcurrency;
+				await table.patch(patch, {_defaultConcurrency, _concurrency});
 			});
 			res.status(204).send();
 		}
