@@ -2,19 +2,19 @@ let express;
 let executePath = require('./hostExpress/executePath');
 let getMeta = require('./hostExpress/getMeta');
 
-function hostExpress({db, table, defaultConcurrency, concurrency}) {
+function hostExpress({db, table, defaultConcurrency, concurrency, customFilters, baseFilter}) {
 	let router = express.Router();
-	router.get('/', function(_req, res){
+	router.get('/', function(_req, response){
 		try {
 			if (!table)
 				throw new Error('Table is not exposed');
-			res.status(200).send(getMeta(table));
+			response.status(200).send(getMeta(table));
 		}
 		catch(e) {
-			res.status(500).send(e && e.message);
+			response.status(500).send(e && e.message);
 		}
 	});
-	router.patch('/', async function(req, res){
+	router.patch('/', async function(request, response){
 		try {
 			if (!table)
 				throw new Error('Table is not exposed');
@@ -26,19 +26,19 @@ function hostExpress({db, table, defaultConcurrency, concurrency}) {
 					db = dbPromise;
 			}
 			await db.transaction(async() => {
-				let patch = req.body.patch || req.body;
-				let options = req.body.options || {};
+				let patch = request.body.patch || request.body;
+				let options = request.body.options || {};
 				let _concurrency = options.concurrency || concurrency;
 				let _defaultConcurrency = options.defaultConcurrency || defaultConcurrency;
 				await table.patch(patch, {_defaultConcurrency, _concurrency});
 			});
-			res.status(204).send();
+			response.status(204).send();
 		}
 		catch(e) {
-			res.status(500).send(e && e.message);
+			response.status(500).send(e && e.message);
 		}
 	});
-	router.post('/', async function(req, res) {
+	router.post('/', async function(request, response) {
 		try {
 			if (!table)
 				throw new Error('Table is not exposed');
@@ -51,12 +51,12 @@ function hostExpress({db, table, defaultConcurrency, concurrency}) {
 			}
 			let result;
 			await db.transaction(async() => {
-				result = await executePath(table, req.body);
+				result = await executePath({table, JSONFilter: request.body, customFilters, baseFilter, request, response});
 			});
-			res.json(result);
+			response.json(result);
 		}
 		catch (e) {
-			res.status(500).send(e && e.message);
+			response.status(500).send(e && e.message);
 		}
 	});
 	return router;

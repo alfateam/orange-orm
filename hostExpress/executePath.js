@@ -1,4 +1,5 @@
 let emptyFilter = require('../emptyFilter');
+const { default: orderBy } = require('../table/rowArray/orderBy');
 
 let _ops = {
 	and: emptyFilter.and,
@@ -49,15 +50,15 @@ let allowedOps = {
 	exists: true
 };
 
-function executePath(table, JSONFilter) {
-	let ops = {..._ops, ...{getManyDto: table.getManyDto, getMany: table.getManyDto}};
+function executePath({table, JSONFilter, baseFilter, customFilters = {}, request, response}) {
+	let ops = {..._ops, customFilters: customFilters, ...{getManyDto, getMany: getManyDto}};
 	return parseFilter(JSONFilter);
 
-	function parseFilter(json) {
+	async function parseFilter(json) {
 		if (isFilter(json)) {
 			let subFilters = [];
 			for (let i = 0; i < json.args.length; i++) {
-				subFilters.push(parseFilter(json.args[i]));
+				subFilters.push(await parseFilter(json.args[i]));
 			}
 			return executePath(json.path, subFilters);
 		}
@@ -76,6 +77,17 @@ function executePath(table, JSONFilter) {
 			}
 			return target.apply(null, args);
 		}
+	}
+
+	async function getManyDto(filter) {
+		if (typeof baseFilter === 'function') {
+			baseFilter = await baseFilter(request, response);
+		}
+		if (baseFilter)	{
+			filter = filter ?  filter.and(baseFilter) : baseFilter;
+		}
+		let args = [filter].concat(Array.prototype.slice.call(arguments).slice(1));
+		return table.getManyDto.apply(null, args);
 	}
 
 }
