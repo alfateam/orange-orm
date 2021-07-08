@@ -9,7 +9,7 @@ let _ops = {
 	NOT: emptyFilter.not,
 };
 
-let _allowedOps = {
+let allowedOps = {
 	and: true,
 	or: true,
 	not: true,
@@ -50,8 +50,7 @@ let _allowedOps = {
 };
 
 function executePath({table, JSONFilter, baseFilter, customFilters = {}, request, response}) {
-	let ops = {..._ops, customFilters: customFilters, ...{getManyDto, getMany: getManyDto}};
-	let allowedOps = getAllowedOps(customFilters);
+	let ops = {..._ops, ...getCustomFilterPaths(customFilters), ...{getManyDto, getMany: getManyDto}};
 	return parseFilter(JSONFilter);
 
 	async function parseFilter(json) {
@@ -67,8 +66,8 @@ function executePath({table, JSONFilter, baseFilter, customFilters = {}, request
 		function executePath(path, args) {
 			if (path in ops)
 				return ops[path].apply(null, args);
-			let target = table;
 			let pathArray = path.split('.');
+			let target = table;
 			let op = pathArray[pathArray.length - 1];
 			if (!allowedOps[op])
 				throw new Error('Disallowed operator ' + op);
@@ -92,15 +91,15 @@ function executePath({table, JSONFilter, baseFilter, customFilters = {}, request
 
 }
 
-function getAllowedOps(customFilters) {
-	return {..._allowedOps,...getLeafNames(customFilters)};
+function getCustomFilterPaths(customFilters) {
+	return getLeafNames(customFilters);
 
-	function getLeafNames(obj, result = {}){
+	function getLeafNames(obj, result = {}, current = 'customFilters.') {
 		for(let p in obj) {
 			if (typeof obj[p] === 'object' && obj[p] !== null)
-				getLeafNames(obj[p], result);
+				getLeafNames(obj[p], result, current + p + '.');
 			else
-				result[p] = true;
+				result[current + p] = obj[p];
 		}
 		return result;
 	}

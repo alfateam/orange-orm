@@ -75,7 +75,7 @@ function newDatabase(connectionString, poolOptions) {
 
 	c.express = function(options) {
 		options = {...options, db: c};
-		return hostExpress({db: c, table: options.table});
+		return hostExpress(options);
 	};
 
 	return c;
