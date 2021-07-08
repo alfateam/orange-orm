@@ -1,5 +1,4 @@
 let emptyFilter = require('../emptyFilter');
-const { default: orderBy } = require('../table/rowArray/orderBy');
 
 let _ops = {
 	and: emptyFilter.and,
@@ -10,7 +9,7 @@ let _ops = {
 	NOT: emptyFilter.not,
 };
 
-let allowedOps = {
+let _allowedOps = {
 	and: true,
 	or: true,
 	not: true,
@@ -52,6 +51,7 @@ let allowedOps = {
 
 function executePath({table, JSONFilter, baseFilter, customFilters = {}, request, response}) {
 	let ops = {..._ops, customFilters: customFilters, ...{getManyDto, getMany: getManyDto}};
+	let allowedOps = getAllowedOps(customFilters);
 	return parseFilter(JSONFilter);
 
 	async function parseFilter(json) {
@@ -90,6 +90,20 @@ function executePath({table, JSONFilter, baseFilter, customFilters = {}, request
 		return table.getManyDto.apply(null, args);
 	}
 
+}
+
+function getAllowedOps(customFilters) {
+	return {..._allowedOps,...getLeafNames(customFilters)};
+
+	function getLeafNames(obj, result = {}){
+		for(let p in obj) {
+			if (typeof obj[p] === 'object' && obj[p] !== null)
+				getLeafNames(obj[p], result);
+			else
+				result[p] = true;
+		}
+		return result;
+	}
 }
 
 function isFilter(json) {
