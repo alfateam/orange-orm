@@ -19,7 +19,7 @@ function hostExpress({db, table, defaultConcurrency, concurrency, customFilters,
 			if (!table)
 				throw new Error('Table is not exposed');
 			if (typeof db === 'function') {
-				let dbPromise = db();
+				let dbPromise = db(request, response);
 				if (dbPromise.then)
 					db = await dbPromise;
 				else
@@ -43,7 +43,7 @@ function hostExpress({db, table, defaultConcurrency, concurrency, customFilters,
 			if (!table)
 				throw new Error('Table is not exposed');
 			if (typeof db === 'function') {
-				let dbPromise = db();
+				let dbPromise = db(request, response);
 				if (dbPromise.then)
 					db = await dbPromise;
 				else
