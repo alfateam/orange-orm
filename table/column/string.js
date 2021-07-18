@@ -11,6 +11,7 @@ var purify = require('./string/purify');
 var _extractAlias = require('./extractAlias');
 
 function _new(table, column) {
+	column.tsType = 'StringColumn';
 	column.purify = purify;
 	column.encode = newEncode(column);
 	column.decode = newDecode(column);

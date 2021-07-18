@@ -3,6 +3,7 @@ var newDecode = require('./newDecodeCore');
 var purify = require('./binary/purify');
 
 function _new(column) {
+	column.tsType = 'BinaryColumn';
 	column.purify = purify;
 	column.encode = newEncode(column);
 	column.decode = newDecode(column);

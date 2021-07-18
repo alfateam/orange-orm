@@ -3,6 +3,7 @@ var newDecode = require('./boolean/newDecode');
 var purify = require('./boolean/purify');
 
 function _new(column) {
+	column.tsType = 'BooleanColumn';
 	column.purify = purify;
 	column.default = false;
 	column.encode = newEncode(column);

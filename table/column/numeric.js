@@ -3,6 +3,7 @@ var newDecode = require('./numeric/newDecode');
 var purify = require('./numeric/purify');
 
 function _new(column) {
+	column.tsType = 'NumericColumn';
 	column.default = 0;
 	column.purify = purify;
 	column.encode = newEncode(column);

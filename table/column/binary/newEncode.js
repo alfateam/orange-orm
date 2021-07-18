@@ -1,7 +1,7 @@
 var purify = require('./purify');
 var newParam = require('../../query/newParameterized');
 
-function _new() {
+function _new(_column) {
 
 	return encode;
 
