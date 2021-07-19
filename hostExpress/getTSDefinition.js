@@ -1,12 +1,12 @@
-function getTSDefinition(table, customFilters, request) {
+function getTSDefinition(table, customFilters = {}, request) {
 	let url = request.originalUrl[request.originalUrl.length - 1] === '/' ? request.originalUrl[request.originalUrl.length - 1].slice(0, -2) : request.originalUrl;
 	let Name = url.split('/').pop()[0].toUpperCase() + url.split('/').pop().slice(1);
 	let name = Name[0].toLowerCase() + Name.substr(1);
-
-	return getTable(table, Name, name);
+	let result = '' + getTable(table, Name, name, customFilters).replace(/\n\s*\n/g, '\n');
+	return result.replace(/^..../gm, '').replace(/interface/g, '\ninterface').replace(/^ {4}/gm, '\t').substr(1);
 }
 
-function getTable(table, Name, name) {
+function getTable(table, Name, name, customFilters) {
 	return `
     interface ${Name}Table {
         getManyDto(filter?: import('rdb-client').RawFilter, strategy?: ${Name}Strategy): Promise<${Name}Array>;
@@ -19,12 +19,11 @@ function getTable(table, Name, name) {
         tryGetById(gid: string, strategy?: ${Name}Strategy): Promise<${Name}Row>;
         proxify(${name}s: ${Name}[]): ${Name}Array;
         ${columns(table)}
-
-        //customFilters: OrderCustomFilters;
+        customFilters: OrderCustomFilters;
     }
 
-    interface OrderCustomFilters {
-        //todo
+    interface ${Name}CustomFilters {
+        ${getCustomFilters(customFilters)}
     }
 
     interface ${Name}Array extends Array<${Name}> {
@@ -79,15 +78,15 @@ function concurrencies(table, name, tablesAdded) {
 	let visitor = {};
 	visitor.visitJoin = function(relation) {
 		otherConcurrencies += `${concurrencies(relation.childTable, relationName, tablesAdded)}`;
-		concurrencyRelations += `${relationName}?: ${pascalCase(relationName)}Concurrency;`;
-		strategyRelations += `${relationName}?: ${pascalCase(relationName)}Strategy | null;`;
+		concurrencyRelations += `${relationName}?: ${pascalCase(relationName)}Concurrency;${separator}`;
+		strategyRelations += `${relationName}?: ${pascalCase(relationName)}Strategy | null;${separator}`;
 		regularRelations += `${relationName}?: ${pascalCase(relationName)} | null;${separator}`;
 	};
 	visitor.visitOne = visitor.visitJoin;
 	visitor.visitMany = function(relation) {
 		otherConcurrencies += `${concurrencies(relation.childTable, relationName, tablesAdded)}`;
 		concurrencyRelations += `${relationName}?: ${pascalCase(relationName)}Concurrency;${separator}`;
-		strategyRelations += `${relationName}?: ${pascalCase(relationName)}Strategy  | null;`;
+		strategyRelations += `${relationName}?: ${pascalCase(relationName)}Strategy  | null;${separator}`;
 		regularRelations += `${relationName}?: ${pascalCase(relationName)}[];${separator}`;
 	};
 
@@ -112,6 +111,7 @@ function concurrencies(table, name, tablesAdded) {
         ${concurrencyColumns(table)}
         ${concurrencyRelations}
     }
+
     ${otherConcurrencies}
 
     interface ${name} {
@@ -124,7 +124,6 @@ function concurrencies(table, name, tablesAdded) {
         ${strategyRelations}
         limit?: number;
         orderBy?: string | Array<string>;
-
     }
 
     ${row}
@@ -187,5 +186,35 @@ function strategyColumns(table) {
 	}
 	return result;
 }
+
+function getCustomFilters(filters) {
+	return getLeafNames(filters);
+
+	function getLeafNames(obj, tabs = '\t\t\t\t\t') {
+		let result = '';
+		for (let p in obj) {
+			if (typeof obj[p] === 'object' && obj[p] !== null) {
+				result +=  '\n' + tabs + p + ': {' + tabs + getLeafNames(obj[p],  tabs + '\t');
+				result += '\n' + tabs + '}';
+			}
+			else if (typeof obj[p] === 'function')
+				result +=   '\n' + tabs + p + ': (' + getParamNames(obj[p]) + ') => import(\'rdb-client\').Filter;';
+		}
+		return result;
+	}
+}
+
+function getParamNames(func) {
+	let STRIP_COMMENTS = /((\/\/.*$)|(\/\*[\s\S]*?\*\/))/mg;
+	let ARGUMENT_NAMES = /([^\s,]+)/g;
+
+	let fnStr = func.toString().replace(STRIP_COMMENTS, '');
+	let result = fnStr.slice(fnStr.indexOf('(') + 1, fnStr.indexOf(')')).match(ARGUMENT_NAMES);
+	if (result === null)
+		return '';
+	return result.join(': any, ') + ': any';
+}
+
+
 
 module.exports = getTSDefinition;
