@@ -1,9 +1,8 @@
 /* eslint-disable require-atomic-updates */
 let applyPatch = require('./applyPatch');
 let fromCompareObject = require('./fromCompareObject');
-let noStrategy = Symbol();
 
-async function patchTable(table, patches, { defaultConcurrency = 'optimistic', concurrency = {}, strategy = noStrategy}  = {},) {
+async function patchTable(table, patches, { defaultConcurrency = 'optimistic', concurrency = {}, strategy = undefined}  = {},) {
 	let updated = new Set();
 	let inserted = new Set();
 	for (let i = 0; i < patches.length; i++) {
@@ -23,7 +22,7 @@ async function patchTable(table, patches, { defaultConcurrency = 'optimistic', c
 	}
 
 	let objToFetch  = [...updated, ...inserted];
-	let dtos =  (strategy === noStrategy)? await table.getManyDto(objToFetch): await table.getManyDto(objToFetch, strategy);
+	let dtos =  await table.getManyDto(objToFetch, strategy);
 	return {updated: dtos.slice(0, updated.size), inserted: dtos.slice(updated.size)};
 
 	function toKey(property) {
