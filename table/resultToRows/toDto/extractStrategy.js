@@ -1,10 +1,5 @@
 var extractSubStrategy = _extractSubStrategy;
 
-function _extractSubStrategy(table) {
-	extractSubStrategy = require('./extractStrategy');
-	return extractSubStrategy(table);
-}
-
 function extractStrategy() {
 	if (arguments.length === 2)
 		return arguments[0];
@@ -14,7 +9,7 @@ function extractStrategy() {
 	var relationName;
 
 	var visitor = {};
-	visitor.visitJoin = function() {};
+	visitor.visitJoin = function() { };
 
 	visitor.visitMany = function(relation) {
 		strategy[relationName] = extractSubStrategy(relation.childTable);
@@ -27,6 +22,11 @@ function extractStrategy() {
 		relation.accept(visitor);
 	}
 	return strategy;
+}
+
+function _extractSubStrategy(table) {
+	extractSubStrategy = require('./extractStrategy');
+	return extractSubStrategy(table);
 }
 
 module.exports = extractStrategy;
