@@ -1,6 +1,10 @@
 var extractSubStrategy = _extractSubStrategy;
 
-function extractStrategy() {
+//either..
+//strategy, table
+//or..
+//table
+function extractStrategy(_strategyOrTable, _optinonalTable) {
 	if (arguments.length === 2)
 		return arguments[0];
 	var table = arguments[0];

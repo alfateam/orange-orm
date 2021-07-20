@@ -24,7 +24,7 @@ function newManyRelation(joinRelation) {
 
 	c.getFromDb = function(parent) {
 		var filter = newForeignKeyFilter(joinRelation, parent);
-		return c.childTable.getMany(filter);
+		return c.childTable.getMany(filter, null);
 	};
 
 	c.getRelatives = function(parent) {

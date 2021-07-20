@@ -26,7 +26,7 @@ function _newJoin(parentTable, childTable, columnNames) {
 		if (key.some(isNullOrUndefined)) {
 			return nullPromise;
 		}
-		var args = [childTable].concat(key);
+		var args = [childTable].concat(key).push(null);
 		return getById.apply(null, args);
 	};
 

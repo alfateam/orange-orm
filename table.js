@@ -16,6 +16,7 @@ var cascadeDelete = require('./table/cascadeDelete');
 var createReadStream = require('./table/createReadStream');
 var createJSONReadStream = require('./table/createJSONReadStream');
 var extractStrategy = require('./table/resultToRows/toDto/extractStrategy');
+var getIdArgs = require('./table/getIdArgs');
 var patchTable = require('./patchTable');
 var newEmitEvent = require('./emitEvent');
 
@@ -54,24 +55,32 @@ function _new(tableName) {
 	};
 
 	table.getMany = function(filter, strategy) {
+		if (strategy === undefined)
+			strategy = extractStrategy(table);
 		return Promise.resolve().then(() => getMany(table, filter, strategy));
 	};
 
 	table.getManyDto = function(filter, strategy) {
-		if (arguments.length < 2)
+		if (strategy === undefined)
 			strategy = extractStrategy(table);
 		return Promise.resolve().then(() => getManyDto(table, filter, strategy));
 	};
 
 	table.getMany.exclusive = function(filter, strategy) {
+		if (strategy === undefined)
+			strategy = extractStrategy(table);
 		return Promise.resolve().then(() => getMany.exclusive(table, filter, strategy));
 	};
 
-	table.tryGetFirst = function() {
-		return callAsync(tryGetFirst, arguments);
+	table.tryGetFirst = function(filter, strategy) {
+		if (strategy === undefined)
+			strategy = extractStrategy(table);
+		return Promise.resolve().then(() => tryGetFirst(table, filter, strategy));
 	};
-	table.tryGetFirst.exclusive = function() {
-		return callAsync(tryGetFirst.exclusive, arguments);
+	table.tryGetFirst.exclusive = function(filter, strategy) {
+		if (strategy === undefined)
+			strategy = extractStrategy(table);
+		return Promise.resolve().then(() => tryGetFirst.exclusive(table, filter, strategy));
 	};
 
 	function callAsync(func, args) {
@@ -87,19 +96,20 @@ function _new(tableName) {
 	}
 
 	table.getById = function() {
-		return callAsync(getById, arguments);
+		return callAsync(getById, getIdArgs(table, arguments));
 	};
 
 	table.getById.exclusive = function() {
-		return callAsync(getById.exclusive, arguments);
+
+		return callAsync(getById.exclusive, getIdArgs(table, arguments));
 	};
 
 	table.tryGetById = function() {
-		return callAsync(tryGetById, arguments);
+		return callAsync(tryGetById, getIdArgs(table, arguments));
 	};
 
 	table.tryGetById.exclusive = function() {
-		return callAsync(tryGetById.exclusive, arguments);
+		return callAsync(tryGetById.exclusive, getIdArgs(table, arguments));
 	};
 
 	table.columnDiscriminators = function() {
