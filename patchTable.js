@@ -1,17 +1,30 @@
 /* eslint-disable require-atomic-updates */
 let applyPatch = require('./applyPatch');
 let fromCompareObject = require('./fromCompareObject');
+let noStrategy = Symbol();
 
-async function patchTable(table, patches, { defaultConcurrency = 'optimistic', concurrency = {} } = {}) {
+async function patchTable(table, patches, { defaultConcurrency = 'optimistic', concurrency = {}, strategy = noStrategy}  = {},) {
+	let updated = new Set();
+	let inserted = new Set();
 	for (let i = 0; i < patches.length; i++) {
 		let patch = {path: undefined, value: undefined, op: undefined};
 		Object.assign(patch, patches[i]);
 		patch.path = patches[i].path.split('/').slice(1);
-		if (patch.op === 'add' || patch.op === 'replace')
-			await add({ path: patch.path, value: patch.value, op: patch.op, oldValue: patch.oldValue, concurrency: concurrency }, table);
+		if (patch.op === 'add' || patch.op === 'replace') {
+			let result = await add({ path: patch.path, value: patch.value, op: patch.op, oldValue: patch.oldValue, concurrency: concurrency }, table);
+			if (result.inserted) {
+				inserted.add(result.inserted);
+			}
+			else
+				updated.add(result.updated);
+		}
 		else if (patch.op === 'remove')
 			await remove(patch, table);
 	}
+
+	let objToFetch  = [...updated, ...inserted];
+	let dtos =  (strategy === noStrategy)? await table.getManyDto(objToFetch): await table.getManyDto(objToFetch, strategy);
+	return {updated: dtos.slice(0, updated.size), inserted: dtos.slice(updated.size)};
 
 	function toKey(property) {
 		if (typeof property === 'string' && property.charAt(0) === '[')
@@ -56,7 +69,7 @@ async function patchTable(table, patches, { defaultConcurrency = 'optimistic', c
 			for (let i = 0; i < childInserts.length; i++) {
 				await childInserts[i]();
 			}
-			return;
+			return {inserted: row};
 		}
 		property = path[0];
 		if (isColumn(property, table)) {
@@ -64,10 +77,12 @@ async function patchTable(table, patches, { defaultConcurrency = 'optimistic', c
 			dto[property] = row[property];
 			let result = applyPatch({ defaultConcurrency, concurrency }, dto, [{ path: '/' + path.join('/'), op, value, oldValue }]);
 			row[property] = result[property];
+			return {updated: row};
 		}
 		else if (isOneRelation(property, table)) {
 			let relation = table[property]._relation;
 			await add({ path, value, op, oldValue, concurrency: concurrency[property] }, relation.childTable, await row[property], row, relation);
+			return {updated: row};
 		}
 		else if (isManyRelation(property, table)) {
 			let relation = table[property]._relation;
@@ -78,7 +93,9 @@ async function patchTable(table, patches, { defaultConcurrency = 'optimistic', c
 			}
 			else
 				await add({ path: path.slice(1), value, oldValue, op, concurrency: concurrency[property] }, relation.childTable, undefined, row, relation);
+			return {updated: row};
 		}
+		return {};
 	}
 
 	async function remove({ path, value, op }, table, row) {

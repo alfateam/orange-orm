@@ -32,15 +32,16 @@ function hostExpress({ db, table, defaultConcurrency, concurrency, customFilters
 				else
 					db = dbPromise;
 			}
+			let result;
 			await db.transaction(async() => {
 				let patch = request.body.patch || request.body;
 				let options = request.body.options || {};
 				let _concurrency = options.concurrency || concurrency;
 				let _defaultConcurrency = options.defaultConcurrency || defaultConcurrency;
-				await table.patch(patch, { _defaultConcurrency, _concurrency });
+				result = await table.patch(patch, { _defaultConcurrency, _concurrency });
 			});
 
-			response.status(204).send();
+			response.status(200).send(result);
 		}
 		catch (e) {
 			response.status(500).send(e && e.stack);
