@@ -1,4 +1,4 @@
-var extractSubStrategy = _extractSubStrategy;
+let extractSubStrategy = _extractSubStrategy;
 
 function _extractSubStrategy(table) {
 	extractSubStrategy = require('./getMeta');
@@ -8,12 +8,12 @@ function _extractSubStrategy(table) {
 function getMeta() {
 	if (arguments.length === 2)
 		return arguments[0];
-	var table = arguments[0];
-	var strategy = {keys: table._primaryColumns.map(x => x.alias)};
-	var relations = table._relations;
-	var relationName;
+	let table = arguments[0];
+	let strategy = {keys: table._primaryColumns.map(x => ({name: x.alias, type: x.tsType}))};
+	let relations = table._relations;
+	let relationName;
 
-	var visitor = {};
+	let visitor = {};
 	visitor.visitJoin = function() {};
 
 	visitor.visitMany = function(relation) {
@@ -23,7 +23,7 @@ function getMeta() {
 	visitor.visitOne = visitor.visitMany;
 
 	for (relationName in relations) {
-		var relation = relations[relationName];
+		let relation = relations[relationName];
 		relation.accept(visitor);
 	}
 	return strategy;
