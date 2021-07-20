@@ -10,6 +10,9 @@ function getMeta() {
 		return arguments[0];
 	let table = arguments[0];
 	let strategy = {keys: table._primaryColumns.map(x => ({name: x.alias, type: x.tsType}))};
+	strategy.relations = {
+
+	};
 	let relations = table._relations;
 	let relationName;
 
@@ -17,7 +20,7 @@ function getMeta() {
 	visitor.visitJoin = function() {};
 
 	visitor.visitMany = function(relation) {
-		strategy[relationName] = extractSubStrategy(relation.childTable);
+		strategy.relations[relationName] = extractSubStrategy(relation.childTable);
 	};
 
 	visitor.visitOne = visitor.visitMany;
