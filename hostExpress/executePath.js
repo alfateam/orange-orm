@@ -93,7 +93,6 @@ async function executePath({table, JSONFilter, baseFilter, customFilters = {}, r
 				target = target[pathArray[i]];
 			}
 			let res =  target.apply(null, args);
-			console.log(target);
 			res.isSafe = isSafe;
 			return res;
 		}
@@ -114,7 +113,6 @@ async function executePath({table, JSONFilter, baseFilter, customFilters = {}, r
 }
 
 function validateArgs() {
-	console.log(arguments);
 	for (let i = 0; i < arguments.length; i++) {
 		const filter = arguments[i];
 		if (!filter)
