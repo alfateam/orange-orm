@@ -30,7 +30,7 @@ function getTable(table, Name, name, customFilters) {
         save(options?: Save${Name}Options): Promise<void>;
         acceptChanges(): void;
         clearChanges(): void;
-        refresh(strategy?: ${Name}Strategy | undefined): Promise<void>;
+        refresh(strategy?: ${Name}Strategy | undefined | null): Promise<void>;
         insert(): Promise<void>;
         delete(): Promise<void>;
     }
@@ -99,7 +99,7 @@ function concurrencies(table, name, tablesAdded) {
 	if (isRoot) {
 		row = `interface ${name}Row extends ${name} {
         save(): Promise<void>;
-        refresh(strategy: ${name}Strategy): Promise<void>;
+        refresh(strategy?: ${name}Strategy | undefined | null): Promise<void>;
         acceptChanges(): void;
         clearChanges(): void;
         insert(): Promise<void>
