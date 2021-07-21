@@ -1,4 +1,3 @@
-const { validate } = require('uuid');
 let emptyFilter = require('../emptyFilter');
 let negotiateRawSqlFilter = require('../table/column/negotiateRawSqlFilter');
 let isSafe = Symbol();
@@ -53,15 +52,8 @@ let allowedOps = {
 
 async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, request, response }) {
 	let ops = { ..._ops, ...getCustomFilterPaths(customFilters), ...{ getManyDto, getMany: getManyDto } };
-	try {
-		let res = await parseFilter(JSONFilter);
-		return res;
-
-	}
-	catch (e) {
-		console.log(e.stack);
-		throw e;
-	}
+	let res = await parseFilter(JSONFilter);
+	return res;
 
 	async function parseFilter(json) {
 		if (isFilter(json)) {
@@ -132,7 +124,7 @@ function validateLimit(strategy) {
 }
 
 function validateOrderBy(table, strategy) {
-	if (!('orderBy' in strategy))
+	if (!('orderBy' in strategy) || !table)
 		return;
 	let orderBy = strategy.orderBy;
 	if (!Array.isArray(orderBy))
@@ -144,9 +136,9 @@ function validateOrderBy(table, strategy) {
 			x = x.toLowerCase();
 			return (!(x === '' || x === 'asc' || x === 'desc'));
 		});
-		for (let p in parts) {
-			let col = table._columns.find(col => col.alias === p);
-			if (!col)
+		for (let p of parts) {
+			let col = table[p];
+			if (!(col && col.equal))
 				throw new Error('Unknown column: ' + p);
 		}
 	}
