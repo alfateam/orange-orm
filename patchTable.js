@@ -21,9 +21,16 @@ async function patchTable(table, patches, { defaultConcurrency = 'optimistic', c
 			await remove(patch, table);
 	}
 
-	let objToFetch  = [...updated, ...inserted];
-	let dtos =  await table.getManyDto(objToFetch, strategy);
-	return {updated: dtos.slice(0, updated.size), inserted: dtos.slice(updated.size)};
+	return { updated: await toDtos(updated), inserted: await toDtos(inserted)};
+
+	async function toDtos(set) {
+		set = [...set];
+		let result = [];
+		for (let i = 0; i < set.length; i++) {
+			result.push(await set[i].toDto(strategy));
+		}
+		return result;
+	}
 
 	function toKey(property) {
 		if (typeof property === 'string' && property.charAt(0) === '[')
@@ -36,7 +43,7 @@ async function patchTable(table, patches, { defaultConcurrency = 'optimistic', c
 		let property = path[0];
 		path = path.slice(1);
 		if (!row && path.length > 0)
-			row = row || await table.tryGetById.apply(null, toKey(property));
+			row = row || await table.tryGetById.apply(null, toKey(property), strategy);
 		if (path.length === 0) {
 			let pkName = table._primaryColumns[0].alias;
 			row = table.insert(value[pkName]);

@@ -1,18 +1,23 @@
-var extractSubStrategy = _extractSubStrategy;
+let extractSubStrategy = _extractSubStrategy;
 
 //either..
 //strategy, table
 //or..
 //table
 function extractStrategy(_strategyOrTable, _optinonalTable) {
-	if (arguments.length === 2)
+	let table;
+	if (arguments.length === 2 && _strategyOrTable != undefined)
 		return arguments[0];
-	var table = arguments[0];
-	var strategy = {};
-	var relations = table._relations;
-	var relationName;
+	else if (arguments.length === 2 && _strategyOrTable === undefined)
+		table = arguments[1];
+	else
+		table = arguments[0];
 
-	var visitor = {};
+	let strategy = {};
+	let relations = table._relations;
+	let relationName;
+
+	let visitor = {};
 	visitor.visitJoin = function() { };
 
 	visitor.visitMany = function(relation) {
@@ -22,7 +27,7 @@ function extractStrategy(_strategyOrTable, _optinonalTable) {
 	visitor.visitOne = visitor.visitMany;
 
 	for (relationName in relations) {
-		var relation = relations[relationName];
+		let relation = relations[relationName];
 		relation.accept(visitor);
 	}
 	return strategy;
