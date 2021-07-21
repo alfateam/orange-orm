@@ -1,5 +1,4 @@
 var newPara = require('../../query/newParameterized');
-var stringIsSafe = require('./stringIsSafe');
 var purify = require('./purify');
 
 function _new(column) {
@@ -11,8 +10,6 @@ function _new(column) {
 				return newPara('null');
 			return newPara('\'' + column.dbNull + '\'');
 		}
-		if(stringIsSafe(value))
-			return newPara('\'' + value + '\'');
 		return newPara('?', [value]);
 	};
 }
