@@ -2,8 +2,10 @@ function getTSDefinition(table, customFilters = {}, request) {
 	let url = request.originalUrl[request.originalUrl.length - 1] === '/' ? request.originalUrl[request.originalUrl.length - 1].slice(0, -2) : request.originalUrl;
 	let Name = url.split('/').pop()[0].toUpperCase() + url.split('/').pop().slice(1);
 	let name = Name[0].toLowerCase() + Name.substr(1);
-	let result = '' + getTable(table, Name, name, customFilters).replace(/\n\s*\n/g, '\n');
-	return result.replace(/^..../gm, '').replace(/interface/g, '\ninterface').replace(/^ {4}/gm, '\t').substr(1);
+	let result = '' + getTable(table, Name, name, customFilters);
+	// return result;
+	result = result.replace(/\n\s*\n/g, '\n');
+	return result.replace(/^..../gm, '').replace(/interface/g, '\ninterface').replace(/type/g, '\ntype').replace(/^ {4}/gm, '\t').substr(1) + '\n';
 }
 
 function getTable(table, Name, name, customFilters) {
@@ -19,7 +21,7 @@ function getTable(table, Name, name, customFilters) {
         tryGetById(gid: string, strategy?: ${Name}Strategy): Promise<${Name}Row>;
         proxify(${name}s: ${Name}[]): ${Name}Array;
         ${columns(table)}
-        customFilters: OrderCustomFilters;
+        customFilters: ${Name}CustomFilters;
     }
 
     interface ${Name}CustomFilters {
@@ -61,11 +63,12 @@ function concurrencies(table, name, tablesAdded) {
 	let isRoot;
 	if (!tablesAdded) {
 		isRoot = true;
-		tablesAdded = new Set();
+		tablesAdded = new Map();
 	}
 	else if (tablesAdded.has(table))
 		return '';
-	tablesAdded.add(table);
+	else
+		tablesAdded.set(table, name);
 	let otherConcurrencies = '';
 	let concurrencyRelations = '';
 	let strategyRelations = '';
@@ -78,12 +81,13 @@ function concurrencies(table, name, tablesAdded) {
 	let visitor = {};
 	visitor.visitJoin = function(relation) {
 		otherConcurrencies += `${concurrencies(relation.childTable, relationName, tablesAdded)}`;
-		concurrencyRelations += `${relationName}?: ${pascalCase(relationName)}Concurrency;${separator}`;
+		concurrencyRelations += `${relationName}?: ${pascalCase(getName(relationName))}Concurrency;${separator}`;
 		strategyRelations += `${relationName}?: ${pascalCase(relationName)}Strategy | null;${separator}`;
 		regularRelations += `${relationName}?: ${pascalCase(relationName)} | null;${separator}`;
 	};
 	visitor.visitOne = visitor.visitJoin;
 	visitor.visitMany = function(relation) {
+
 		otherConcurrencies += `${concurrencies(relation.childTable, relationName, tablesAdded)}`;
 		concurrencyRelations += `${relationName}?: ${pascalCase(relationName)}Concurrency;${separator}`;
 		strategyRelations += `${relationName}?: ${pascalCase(relationName)}Strategy  | null;${separator}`;
@@ -107,12 +111,11 @@ function concurrencies(table, name, tablesAdded) {
     }`;
 	}
 
-	return `interface ${name}Concurrency {
+	return `
+    interface ${name}Concurrency {
         ${concurrencyColumns(table)}
         ${concurrencyRelations}
     }
-
-    ${otherConcurrencies}
 
     interface ${name} {
         ${regularColumns(table)}
@@ -123,11 +126,16 @@ function concurrencies(table, name, tablesAdded) {
         ${strategyColumns(table)}
         ${strategyRelations}
         limit?: number;
-        orderBy?: string | Array<string>;
+        orderBy?: Array<${orderByColumns(table)}> | ${orderByColumns(table)};
     }
 
-    ${row}
-    `;
+    ${otherConcurrencies}
+
+    ${row}`;
+
+	function getName(name) {
+		return tablesAdded.get(name) || name;
+	}
 }
 
 function regularColumns(table){
@@ -138,7 +146,7 @@ function regularColumns(table){
 		BinaryColumn: 'Buffer',
 		JSONColumn: 'object',
 		DateColumn: 'Date | string',
-		NumericColumn: 'number',
+		NumberColumn: 'number',
 	};
 
 	let result = '';
@@ -148,6 +156,17 @@ function regularColumns(table){
 		result += `${separator}${column.alias}? : ${typeMap[column.tsType]};`;
 		separator = `
         `;
+	}
+	return result;
+}
+
+function orderByColumns(table){
+	let result = '';
+	let separator = '';
+	for (let i = 0; i < table._columns.length; i++) {
+		let column = table._columns[i];
+		result += `${separator}"${column.alias}" | "${column.alias} desc"`;
+		separator = '| ';
 	}
 	return result;
 }
