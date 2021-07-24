@@ -1,25 +1,22 @@
-var newQuery = require('./newQuery');
-var executeQueries = require('./executeQueries');
-var resultToRows = require('./resultToRows');
-var strategyToSpan = require('./strategyToSpan');
-var emptyInnerJoin = require('./query/newParameterized')();
-var negotiateRawSqlFilter = require('./column/negotiateRawSqlFilter');
+let newQuery = require('./newQuery');
+let executeQueries = require('./executeQueries');
+let resultToRows = require('./resultToRows');
+let strategyToSpan = require('./strategyToSpan');
+let emptyInnerJoin = require('./query/newParameterized')();
+let negotiateRawSqlFilter = require('./column/negotiateRawSqlFilter');
 
 function getMany(table,filter,strategy) {
 	return getManyCore(table,filter,strategy);
 }
 
-function getManyCore(table,filter,strategy,exclusive) {
-	var alias = table._dbName;
-	var noOrderBy;
+async function getManyCore(table,filter,strategy,exclusive) {
+	let alias = table._dbName;
+	let noOrderBy;
 	filter = negotiateRawSqlFilter(filter, table);
-	var span = strategyToSpan(table,strategy);
-	var queries = newQuery([],table,filter,span,alias,emptyInnerJoin,noOrderBy,exclusive);
-	return executeQueries(queries).then(onResult);
-
-	function onResult(result) {
-		return resultToRows(span,result);
-	}
+	let span = strategyToSpan(table,strategy);
+	let queries = newQuery([],table,filter,span,alias,emptyInnerJoin,noOrderBy,exclusive);
+	let result = await executeQueries(queries);
+	return resultToRows(span,result);
 }
 
 getMany.exclusive = function(table,filter,strategy) {

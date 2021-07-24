@@ -1,11 +1,34 @@
 var dbRowsToRows = require('./resultToRows/dbRowsToRows');
 
-function resultToRows(span,result) {
-	return result[0].then(onResult);
+async function resultToRows(span,result) {
+	let rows = await result[0].then(onResult);
+	await expand(spanToStrategy(span), rows);
+	return rows;
 
 	function onResult(result) {
 		return dbRowsToRows(span,result);
 	}
+}
+
+async function expand(strategy, rows) {
+	if (!rows)
+		return;
+	if (!Array.isArray(rows))
+		rows = [rows];
+	for(let p in strategy) {
+		for (let i = 0; i < rows.length; i++) {
+			await expand(strategy[p], await rows[i][p]);
+		}
+	}
+}
+
+function spanToStrategy(span) {
+	let strategy = {};
+
+	span.legs.forEach((leg) => {
+		strategy[leg.name] = spanToStrategy(leg.span);
+	});
+	return strategy;
 
 }
 

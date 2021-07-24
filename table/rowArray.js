@@ -5,11 +5,6 @@ var negotiateNextTick = require('./rowArray/negotiateNextTick');
 function newRowArray() {
 	var c = [];
 
-	Object.defineProperty(c, 'toJSON', {
-		enumerable: false,
-		value: toJSON
-	});
-
 	Object.defineProperty(c, 'toDto', {
 		enumerable: false,
 		writable: true,
@@ -21,10 +16,6 @@ function newRowArray() {
 		writable: true,
 		value: toDto
 	});
-
-	function toJSON() {
-		return c.toDto.apply(null, arguments).then(JSON.stringify);
-	}
 
 	function toDtoNativePromise() {
 		let args = arguments;

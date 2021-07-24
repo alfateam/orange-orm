@@ -1,3 +1,4 @@
+let util = require('util');
 let updateField = require('../updateField');
 let newEmitEvent = require('../../emitEvent');
 let extractStrategy = require('./toDto/extractStrategy');
@@ -37,7 +38,6 @@ function newDecodeDbRow(table, dbRow) {
 		let key = keys[i];
 
 		Object.defineProperty(Row.prototype, intName, {
-			enumerable: false,
 			get: function() {
 				return this._dbRow[key];
 			},
@@ -57,6 +57,9 @@ function newDecodeDbRow(table, dbRow) {
 		});
 
 		Object.defineProperty(Row.prototype, name, {
+			enumerable: true,
+			configurable: false,
+
 			get: function() {
 				if (column.onChange && flags.useProxy && this[intName] !== null && typeof this[intName] === 'object') {
 					if (!(name in this._proxies)) {
@@ -133,7 +136,7 @@ function newDecodeDbRow(table, dbRow) {
 	};
 
 	Row.prototype.toJSON = function() {
-		return this.toDto.apply(this, arguments).then(JSON.stringify);
+		return toDto(undefined, table, this, new Set());
 	};
 
 	Row.prototype.toDto = function(strategy) {
@@ -176,13 +179,20 @@ function newDecodeDbRow(table, dbRow) {
 		return this;
 	};
 
+
+	Row.prototype[util.inspect.custom] =  function() {
+		let dtos = toDto(undefined, table, this, new Set());
+		return util.inspect(dtos, {compact: false, colors: true});
+	};
+
 	function decodeDbRow(row) {
 		for (let i = 0; i < numberOfColumns; i++) {
 			let index = offset + i;
 			let key = keys[index];
 			row[key] = columns[i].decode(row[key]);
 		}
-		return new Row(row);
+		let r = new Row(row);
+		return r;
 	}
 
 	function Row(dbRow) {
