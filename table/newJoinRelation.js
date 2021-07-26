@@ -3,6 +3,7 @@ var newLeg = require('./relation/newJoinLeg'),
 	nullPromise = require('./nullPromise'),
 	newGetRelated = require('./newGetRelated'),
 	getRelatives = require('./joinRelation/getRelatives'),
+	resultToPromise = require('./resultToPromise'),
 	tryGetFromCacheById = require('./tryGetFromCacheById');
 
 function _newJoin(parentTable, childTable, columnNames) {
@@ -23,15 +24,17 @@ function _newJoin(parentTable, childTable, columnNames) {
 
 	c.getFromDb = function(parent) {
 		var key = parentToKey(parent);
-		if (key.some(isNullOrUndefined)) {
+		if (!key)
 			return nullPromise;
-		}
-
 		var args = [childTable].concat(key);
 		return getById.apply(null, args);
 	};
 
-	c.getFromCache = c.getFromDb;
+	c.getFromCache = function(parent) {
+		var key = parentToKey(parent);
+		let cache = parent._relationCacheMap.get(c);
+		return resultToPromise(cache._tryGet(key));
+	};
 
 	c.toGetRelated = function(parent) {
 		return newGetRelated(parent, c);
@@ -45,13 +48,9 @@ function _newJoin(parentTable, childTable, columnNames) {
 		parent.expand(c.leftAlias);
 	};
 
-	c.getRowsSync = function(parent) {
+	c.getRowsSync = function(parent, cache) {
 		var key = parentToKey(parent);
-
-		if (key.some(isNullOrUndefined)) {
-			return null;
-		}
-		var args = [childTable].concat(key);
+		var args = [childTable, cache].concat(key);
 		return tryGetFromCacheById.apply(null, args);
 	};
 
@@ -77,15 +76,15 @@ function _newJoin(parentTable, childTable, columnNames) {
 		}
 	}
 
-	function isNullOrUndefined(item) {
-		return item === null || item === undefined;
-	}
-
 	function parentToKey(parent) {
-		var primaryKeys = c.columns.map(function(column) {
-			return parent[column.alias];
-		});
-		return primaryKeys;
+		let key = {};
+		for (let i = 0; i < c.columns.length; i++) {
+			let value = parent[c.columns[i].alias];
+			if (value === null || value === undefined)
+				return;
+			key[childTable._primaryColumns[i].alias] = value;
+		}
+		return key;
 	}
 }
 

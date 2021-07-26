@@ -12,26 +12,28 @@ function newManyCache(joinRelation) {
 	var key = newId();
 
 	c.tryAdd = function(parent, child) {
-		var cache = getSessionSingleton(key);
-		cache.tryAdd(parent, child);
+		c.getInnerCache().tryAdd(parent, child);
 		synchronizeChanged(c, joinRelation, parent, child);
 	};
 
 	c.tryRemove = function(parent, child) {
-		var cache = getSessionSingleton(key);
-		cache.tryRemove(parent, child);
+		c.getInnerCache().tryRemove(parent, child);
 	};
 
 	c.tryGet = function(parentRow) {
+		return c.getInnerCache().tryGet(parentRow);
+	};
+
+	c.getInnerCache = function() {
 		var cache = getSessionSingleton(key);
 		if (!cache) {
 			cache = newCacheCore(joinRelation);
 			setSessionSingleton(key, cache);
-			fillCache(cache);
+			fillCache();
 			synchronizeAdded(c.tryAdd, joinRelation);
 			synchronizeRemoved(c.tryRemove, joinRelation);
 		}
-		return cache.tryGet(parentRow);
+		return cache;
 	};
 
 

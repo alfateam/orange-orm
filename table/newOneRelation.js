@@ -18,7 +18,8 @@ function newOneRelation(joinRelation) {
 	};
 
 	c.getFromCache = function(parent) {
-		var row = oneCache.tryGet(parent);
+		let cache = parent.getRelationCache(c) || oneCache;
+		var row = cache.tryGet(parent);
 		return resultToPromise(row);
 	};
 
@@ -43,6 +44,10 @@ function newOneRelation(joinRelation) {
 
 	c.toLeg = function() {
 		return newLeg(c);
+	};
+
+	c.getInnerCache = function() {
+		return oneCache.getInnerCache();
 	};
 
 	return c;

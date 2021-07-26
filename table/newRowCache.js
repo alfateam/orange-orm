@@ -1,24 +1,67 @@
-var newDomainCache = require('./newDomainCache');
+let newCache = require('./newCache');
+let getSessionSingleton = require('./getSessionSingleton');
+let setSessionSingleton = require('./setSessionSingleton');
 
 function newRowCache(table) {
-	var c = {};
-	var cache = newDomainCache();
-	var pkNames;
-	var rowToKey = firstRowToKey;
+	let id = Symbol();
+	setSessionSingleton(id, _newRowCache(table));
+	let c = {};
+
+	c.tryGet = function(row) {
+		let cache = getSessionSingleton(id);
+		return cache.tryGet(row);
+	};
+
+	c.tryAdd = function(row) {
+		let cache = getSessionSingleton(id);
+		return cache.tryAdd(row);
+	};
+
+	c.tryRemove = function(row) {
+		let cache = getSessionSingleton(id);
+		return cache.tryRemove(row);
+	};
+
+	c.subscribeAdded = function() {
+		let cache = getSessionSingleton(id);
+		return cache.subscribeAdded.apply(null, arguments);
+	};
+
+	c.subscribeRemoved = function() {
+		let cache = getSessionSingleton(id);
+		return cache.subscribeRemoved.apply(null, arguments);
+	};
+
+	c.getAll = function() {
+		let cache = getSessionSingleton(id);
+		return cache.getAll.apply(null, arguments);
+	};
+
+	c.getInnerCache = function() {
+		return getSessionSingleton(id);
+	};
+	return c;
+}
+
+function _newRowCache(table) {
+	let c = {};
+	let cache = newCache();
+	let pkNames;
+	let rowToKey = firstRowToKey;
 
 	function getPkNames() {
-		var names = {};
-		var primaryColumns = table._primaryColumns;
-		var keyLength = primaryColumns.length;
-		for (var i = 0; i < keyLength; i++) {
-			var column = primaryColumns[i];
+		let names = {};
+		let primaryColumns = table._primaryColumns;
+		let keyLength = primaryColumns.length;
+		for (let i = 0; i < keyLength; i++) {
+			let column = primaryColumns[i];
 			names[column.alias] = null;
 		}
 		return names;
 	}
 
 	c.tryGet = function(row) {
-		var key = rowToKey(row);
+		let key = rowToKey(row);
 		return cache.tryGet(key);
 
 	};
@@ -31,20 +74,20 @@ function newRowCache(table) {
 	}
 
 	function nextRowToKey(row) {
-		var key = [];
-		for(var pkName in pkNames) {
+		let key = [];
+		for(let pkName in pkNames) {
 			key.push(row[pkName]);
 		}
 		return key;
 	}
 
 	c.tryAdd = function(row) {
-		var key = rowToKey(row);
+		let key = rowToKey(row);
 		return cache.tryAdd(key, row);
 	};
 
 	c.tryRemove = function(row) {
-		var key = rowToKey(row);
+		let key = rowToKey(row);
 		cache.tryRemove(key);
 	};
 

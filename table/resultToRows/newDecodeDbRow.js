@@ -112,6 +112,7 @@ function newDecodeDbRow(table, dbRow) {
 		if (!get) {
 			let relation = table._relations[alias];
 			get = relation.toGetRelated(row);
+			this._relationCacheMap.set(relation, relation.getInnerCache());
 			row._related[alias] = get;
 		}
 		return get;
@@ -196,6 +197,8 @@ function newDecodeDbRow(table, dbRow) {
 	}
 
 	function Row(dbRow) {
+		this._relationCacheMap = new Set();
+		this._cache = table._cache.getInnerCache();
 		this._dbRow = dbRow;
 		this._related = {};
 		this._emitColumnChanged = {};
