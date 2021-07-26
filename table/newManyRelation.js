@@ -2,7 +2,7 @@ var newLeg = require('./relation/newManyLeg');
 var newManyCache = require('./relation/newManyCache');
 var newForeignKeyFilter = require('./relation/newForeignKeyFilter');
 var getRelatives = require('./oneRelation/getRelatives');
-var resultToPromise = require('./resultToPromise');
+var fuzzyPromise = require('./fuzzyPromise');
 var newGetRelated = require('./newGetRelated');
 
 function newManyRelation(joinRelation) {
@@ -18,9 +18,8 @@ function newManyRelation(joinRelation) {
 	};
 
 	c.getFromCache = function(parent) {
-		let cache = parent._relationCacheMap.get(c);
-		var row = cache.tryGet(parent);
-		return resultToPromise(row);
+		var result = c.getRowsSync(parent);
+		return fuzzyPromise(result);
 	};
 
 	c.getFromDb = function(parent) {
@@ -40,7 +39,10 @@ function newManyRelation(joinRelation) {
 		return parent.expand(joinRelation.rightAlias);
 	};
 
-	c.getRowsSync = manyCache.tryGet;
+	c.getRowsSync = function(parent) {
+		let cache = parent._relationCacheMap.get(c);
+		return cache.tryGet(parent);
+	};
 
 	c.toLeg = function() {
 		return newLeg(c);

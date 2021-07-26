@@ -46,6 +46,8 @@ function defineColumn(column, table) {
 
 	c.as = function(alias) {
 		var oldAlias = column.alias;
+		table._aliases.delete(oldAlias);
+		table._aliases.add(alias);
 		delete table[oldAlias];
 		table[alias] = column;
 		column.alias = alias;

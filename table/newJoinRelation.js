@@ -3,9 +3,7 @@ var newLeg = require('./relation/newJoinLeg'),
 	nullPromise = require('./nullPromise'),
 	newGetRelated = require('./newGetRelated'),
 	getRelatives = require('./joinRelation/getRelatives'),
-	resultToPromise = require('./resultToPromise'),
-	tryGetFromCacheById = require('./tryGetFromCacheById');
-
+	fuzzyPromise = require('./fuzzyPromise');
 function _newJoin(parentTable, childTable, columnNames) {
 	var c = {};
 	c.parentTable = parentTable;
@@ -31,9 +29,8 @@ function _newJoin(parentTable, childTable, columnNames) {
 	};
 
 	c.getFromCache = function(parent) {
-		var key = parentToKey(parent);
-		let cache = parent._relationCacheMap.get(c);
-		return resultToPromise(cache._tryGet(key));
+		var result = c.getRowsSync(parent);
+		return fuzzyPromise(result);
 	};
 
 	c.toGetRelated = function(parent) {
@@ -48,10 +45,14 @@ function _newJoin(parentTable, childTable, columnNames) {
 		parent.expand(c.leftAlias);
 	};
 
-	c.getRowsSync = function(parent, cache) {
+	c.getRowsSync = function(parent) {
 		var key = parentToKey(parent);
-		var args = [childTable, cache].concat(key);
-		return tryGetFromCacheById.apply(null, args);
+		let cache = parent._relationCacheMap.get(c);
+		return cache.tryGet(key);
+	};
+
+	c.getInnerCache = function() {
+		return childTable._cache;
 	};
 
 	return c;

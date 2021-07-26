@@ -1,5 +1,4 @@
 var getMany = require('./getMany');
-var util = require('util');
 
 function tryGet(table, filter, strategy) {
 	strategy = setLimit(strategy);
@@ -18,7 +17,7 @@ tryGet.exclusive = function(table, filter, strategy) {
 };
 
 function setLimit(strategy) {
-	return util._extend({ limit: 1 }, strategy);
+	return {...strategy, ...{limit: 1}};
 }
 
 module.exports = tryGet;

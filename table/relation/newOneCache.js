@@ -11,10 +11,10 @@ function newOneCache(joinRelation) {
 		return res[0];
 	};
 
-	c.getInnerCache = function(parent) {
+	c.getInnerCache = function() {
 		let _cache = cache.getInnerCache();
 		let _c = {};
-		_c.tryGet = function() {
+		_c.tryGet = function(parent) {
 			let res = _cache.tryGet(parent);
 			if (res.length === 0)
 				return null;

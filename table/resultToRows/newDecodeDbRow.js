@@ -112,11 +112,13 @@ function newDecodeDbRow(table, dbRow) {
 		if (!get) {
 			let relation = table._relations[alias];
 			get = relation.toGetRelated(row);
-			this._relationCacheMap.set(relation, relation.getInnerCache());
+			row._relationCacheMap.set(relation, relation.getInnerCache());
 			row._related[alias] = get;
 		}
 		return get;
 	}
+
+	Object.defineProperty(Row.prototype, 'queryContext', {});
 
 	Row.prototype.subscribeChanged = function(onChanged, name) {
 		let emit;
@@ -161,8 +163,7 @@ function newDecodeDbRow(table, dbRow) {
 	};
 
 	Row.prototype.isExpanded = function(alias) {
-		let get = createGetRelated(this, alias);
-		return get.expanded;
+		return this._related[alias] && this._related[alias].expanded;
 	};
 
 	Row.prototype.delete = function(strategy) {
@@ -192,12 +193,30 @@ function newDecodeDbRow(table, dbRow) {
 			let key = keys[index];
 			row[key] = columns[i].decode(row[key]);
 		}
-		let r = new Row(row);
-		return r;
+		let target = new Row(row);
+
+		const p = new Proxy(target, {
+			ownKeys: function() {
+				let keys =
+					Array.from(table._aliases).concat( Object.keys(target._related).filter(alias => {
+						return target._related[alias] && target._related[alias].expanded;
+					}));
+				return keys;
+			},
+			getOwnPropertyDescriptor(target, prop) {
+				return {
+					enumerable: table._aliases.has(prop) || (target._related[prop] && target._related[prop].expanded),
+					configurable: true,
+					writable: true
+				};
+			}
+		});
+
+		return p;
 	}
 
 	function Row(dbRow) {
-		this._relationCacheMap = new Set();
+		this._relationCacheMap = new Map();
 		this._cache = table._cache.getInnerCache();
 		this._dbRow = dbRow;
 		this._related = {};

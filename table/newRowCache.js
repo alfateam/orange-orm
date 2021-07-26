@@ -4,44 +4,47 @@ let setSessionSingleton = require('./setSessionSingleton');
 
 function newRowCache(table) {
 	let id = Symbol();
-	setSessionSingleton(id, _newRowCache(table));
 	let c = {};
 
 	c.tryGet = function(row) {
-		let cache = getSessionSingleton(id);
-		return cache.tryGet(row);
+		return getCache(table, id).tryGet(row);
 	};
 
 	c.tryAdd = function(row) {
-		let cache = getSessionSingleton(id);
-		return cache.tryAdd(row);
+		return getCache(table, id).tryAdd(row);
 	};
 
 	c.tryRemove = function(row) {
-		let cache = getSessionSingleton(id);
-		return cache.tryRemove(row);
+		return getCache(table, id).tryRemove(row);
 	};
 
 	c.subscribeAdded = function() {
-		let cache = getSessionSingleton(id);
-		return cache.subscribeAdded.apply(null, arguments);
+		return getCache(table, id).subscribeAdded.apply(null, arguments);
 	};
 
 	c.subscribeRemoved = function() {
-		let cache = getSessionSingleton(id);
-		return cache.subscribeRemoved.apply(null, arguments);
+		return getCache(table, id).subscribeRemoved.apply(null, arguments);
 	};
 
 	c.getAll = function() {
-		let cache = getSessionSingleton(id);
-		return cache.getAll.apply(null, arguments);
+		return getCache(table, id).getAll.apply(null, arguments);
 	};
 
 	c.getInnerCache = function() {
-		return getSessionSingleton(id);
 	};
 	return c;
 }
+
+
+function getCache(table, id) {
+	let cache = getSessionSingleton(id);
+	if (cache)
+		return cache;
+	cache = _newRowCache(table);
+	setSessionSingleton(id, cache);
+	return cache;
+}
+
 
 function _newRowCache(table) {
 	let c = {};

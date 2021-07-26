@@ -23,6 +23,7 @@ function _new(tableName) {
 	var table = newContext();
 	table._dbName = tableName;
 	table._primaryColumns = [];
+	table._aliases = new Set();
 	table._columns = [];
 	table._columnDiscriminators = [];
 	table._formulaDiscriminators = [];

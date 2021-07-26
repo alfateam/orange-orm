@@ -12,6 +12,8 @@ module.exports = function(table,name) {
 	var extractAlias = _extractAlias.bind(null,table);
 	c._dbName = name;
 	c.alias = name;
+	table._aliases.add(name);
+
 	c.dbNull = null;
 	table._columns.push(c);
 	table[name] = c;
