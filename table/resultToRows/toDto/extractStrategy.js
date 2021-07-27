@@ -6,9 +6,9 @@ let extractSubStrategy = _extractSubStrategy;
 //table
 function extractStrategy(_strategyOrTable, _optinonalTable) {
 	let table;
-	if (arguments.length === 2 && _strategyOrTable != undefined)
+	if (arguments.length === 2 && _strategyOrTable !== undefined)
 		return arguments[0];
-	else if (arguments.length === 2 && _strategyOrTable === undefined)
+	else if (arguments.length === 2)
 		table = arguments[1];
 	else
 		table = arguments[0];

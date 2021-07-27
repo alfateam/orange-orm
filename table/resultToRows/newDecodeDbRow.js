@@ -118,7 +118,11 @@ function newDecodeDbRow(table, dbRow) {
 		return get;
 	}
 
-	Object.defineProperty(Row.prototype, 'queryContext', {});
+	Object.defineProperty(Row.prototype, 'queryContext', {
+		writable: true,
+		configurable: true,
+		enumerable: false
+	});
 
 	Row.prototype.subscribeChanged = function(onChanged, name) {
 		let emit;
@@ -194,7 +198,6 @@ function newDecodeDbRow(table, dbRow) {
 			row[key] = columns[i].decode(row[key]);
 		}
 		let target = new Row(row);
-
 		const p = new Proxy(target, {
 			ownKeys: function() {
 				let keys =
