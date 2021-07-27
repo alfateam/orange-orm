@@ -52,7 +52,7 @@ function _newJoin(parentTable, childTable, columnNames) {
 	};
 
 	c.getInnerCache = function() {
-		return childTable._cache;
+		return childTable._cache.getInnerCache();
 	};
 
 	return c;
