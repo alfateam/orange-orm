@@ -31,6 +31,7 @@ function newRowCache(table) {
 	};
 
 	c.getInnerCache = function() {
+		return getCache(table, id);
 	};
 	return c;
 }
