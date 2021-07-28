@@ -1,12 +1,10 @@
-let useHook = require('../useHook');
-let cls = require('node-cls');
-
+let tryGetSessionContext = require('./tryGetSessionContext');
 
 function getSessionContext() {
-	if (useHook())
-		return cls.getContext('rdb').rdb;
-	else
-		return process.domain.rdb;
+	let context = tryGetSessionContext();
+	if (!context)
+		throw new Error('Rdb transaction is no longer available. Is promise chain broken ?');
+	return context;
 }
 
 module.exports = getSessionContext;

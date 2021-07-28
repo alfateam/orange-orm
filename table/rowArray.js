@@ -19,23 +19,23 @@ function newRowArray() {
 	});
 
 	function toDtoNativePromise() {
-		let args = [c].concat(Array.prototype.slice.call(arguments));
 		if (c.length === 0)
 			return fuzzyPromise([]);
-		let first = c[0].toDto.apply(c[0],args);
+		let first = c[0].toDto.apply(this[0], arguments);
 		if (first.then)
-			return Promise.resolve().then( () => toDto.apply(null, args));
+			return Promise.resolve().then( () => toDto.apply(this, arguments));
 		else
-			return toDtoSync.apply(null, args);
+			return toDtoSync.apply(this, arguments);
 	}
 
 	return c;
 }
 
-function toDto(rows, optionalStrategy) {
-	var args = Array.prototype.slice.call(arguments).slice(1);
+function toDto(optionalStrategy) {
+	var args = arguments;
 	var result = [];
-	var length = rows.length;
+	var length = this.length;
+	var rows = this;
 	var i = -1;
 
 	return resultToPromise().then(toDtoAtIndex);
@@ -61,7 +61,8 @@ function toDto(rows, optionalStrategy) {
 	}
 }
 
-function toDtoSync(rows, optionalStrategy) {
+function toDtoSync(optionalStrategy) {
+	let rows = this;
 	var args = Array.prototype.slice.call(arguments).slice(1);
 	var result = [];
 	for (let i = 0; i < rows.length; i++) {

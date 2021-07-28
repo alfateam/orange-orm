@@ -11,8 +11,10 @@ let createDto = require('./toDto/createDto');
 let patchRow = require('../../patchRow');
 let onChange = require('on-change');
 let flags = require('../../flags');
+let tryGetSessionContext = require('../tryGetSessionContext')
 
 function newDecodeDbRow(table, dbRow) {
+	let sessionContext = tryGetSessionContext();
 	let columns = table._columns;
 	let numberOfColumns = columns.length;
 	if (dbRow.offset === undefined) {
@@ -147,6 +149,8 @@ function newDecodeDbRow(table, dbRow) {
 	};
 
 	Row.prototype.toDto = function(strategy) {
+		if (sessionContext !== tryGetSessionContext())
+			return toDto(strategy, table, this, new Set());
 		let args = Array.prototype.slice.call(arguments, 0);
 		args.push(table);
 		strategy = extractStrategy.apply(null, args);

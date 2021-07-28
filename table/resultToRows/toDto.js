@@ -3,7 +3,7 @@ let createDto = require('./toDto/createDto');
 
 function toDto(strategy, table, row, joinRelationSet) {
 	if (joinRelationSet)
-		return toDtoSync(table, row, joinRelationSet);
+		return toDtoSync(table, row, joinRelationSet, strategy);
 	let dto = createDto(table, row);
 	strategy = strategy || {};
 	let promise = resultToPromise(dto);
@@ -34,14 +34,14 @@ function toDto(strategy, table, row, joinRelationSet) {
 	});
 }
 
-function toDtoSync(table, row, joinRelationSet) {
+function toDtoSync(table, row, joinRelationSet, strategy) {
 	if (!row)
 		return;
 	let dto = createDto(table, row);
 	for(let name in table._relations) {
 		let relation = table._relations[name];
 		let join = relation.joinRelation || relation;
-		if (!row.isExpanded(name) || joinRelationSet.has(join))
+		if (!row.isExpanded(name) || joinRelationSet.has(join) || (strategy === null || strategy && !strategy[name]))
 			continue;
 		let child = relation.getRowsSync(row);
 		if (!child)

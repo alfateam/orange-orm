@@ -23,7 +23,7 @@ function getManyDto(table, filter, strategy) {
 		return table.getMany.apply(null, args)
 			.then((rows) => {
 				args.shift();
-				return rows.toDto.apply(null, args);
+				return rows.toDto.apply(rows, args);
 			});
 	}
 	var alias = table._dbName;
