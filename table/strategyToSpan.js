@@ -15,6 +15,8 @@ function toSpan(table,strategy) {
 		if(!strategy)
 			return;
 		for (var name in strategy) {
+			if (!(strategy[name] === null || strategy[name]))				
+				continue;
 			if (table._relations[name])
 				addLeg(legs,table,strategy,name);
 			else

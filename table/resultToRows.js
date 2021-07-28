@@ -16,6 +16,8 @@ async function expand(strategy, rows) {
 	if (!Array.isArray(rows))
 		rows = [rows];
 	for(let p in strategy) {
+		if (!(strategy[p] === null || strategy[p]))
+			continue;
 		for (let i = 0; i < rows.length; i++) {
 			await expand(strategy[p], await rows[i][p]);
 		}

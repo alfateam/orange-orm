@@ -9,6 +9,9 @@ function toDto(strategy, table, row, joinRelationSet) {
 	let promise = resultToPromise(dto);
 
 	for (let property in strategy) {
+		if (!(strategy[property] === null || strategy[property]))				
+			continue;
+
 		mapChild(property);
 	}
 
