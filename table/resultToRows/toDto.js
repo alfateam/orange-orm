@@ -41,19 +41,19 @@ function toDtoSync(table, row, joinRelationSet, strategy) {
 	for(let name in table._relations) {
 		let relation = table._relations[name];
 		let join = relation.joinRelation || relation;
-		if (!row.isExpanded(name) || joinRelationSet.has(join) || (strategy === null || strategy && !strategy[name]))
+		if (!row.isExpanded(name) || joinRelationSet.has(join) || (strategy && !(strategy[name] || strategy[name] === null)))
 			continue;
 		let child = relation.getRowsSync(row);
 		if (!child)
 			dto[name] = child;
-		else if (Array.isArray(child)) {
+		else if (Array.isArray(child)) {			
 			dto[name] = [];
 			for (let i = 0; i < child.length; i++) {
-				dto[name].push(toDtoSync(relation.childTable, child[i], new Set([...joinRelationSet, join])));
+				dto[name].push(toDtoSync(relation.childTable, child[i], new Set([...joinRelationSet, join]), strategy && strategy[name]));
 			}
 		}
 		else
-			dto[name] = toDtoSync(relation.childTable, child, new Set([...joinRelationSet, join]));
+			dto[name] = toDtoSync(relation.childTable, child, new Set([...joinRelationSet, join]), strategy && strategy[name]);
 	}
 	return dto;
 }
