@@ -1,7 +1,6 @@
 var newCollection = require('../newCollection');
 var newQueryContext = require('./query/singleQuery/newQueryContext');
 
-
 function toSpan(table,strategy) {
 	var span = {};
 	span.queryContext = newQueryContext();
@@ -18,13 +17,15 @@ function toSpan(table,strategy) {
 		if(!strategy)
 			return;
 		for (var name in strategy) {
-			if (table._relations[name] && !(strategy[name] === null || strategy[name]))				
+			if (strategy[name] === null)
+				strategy[name] = true;
+			if (table._relations[name] && !strategy[name])				
 				continue;
 			if (table._relations[name])
 				addLeg(legs,table,strategy,name, columns);
 			else if (table[name] && table[name].eq)  {
-				columns.set(table[name], strategy[name])
-				hasIncludedColumns = hasIncludedColumns  || strategy[name] || strategy[name] === null;
+				columns.set(table[name], strategy[name]);
+				hasIncludedColumns = hasIncludedColumns  || strategy[name];
 			}
 			else 
 				span[name] = strategy[name];

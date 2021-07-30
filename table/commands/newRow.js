@@ -15,7 +15,7 @@ function newRow(table) {
 				dto[alias] = column.default;
 		}
 		else
-			dto[alias] = null;
+			dto[alias] = undefined;
 	}
 
 	for (var i = 1; i < arguments.length; i++) {

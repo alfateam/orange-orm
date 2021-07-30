@@ -121,15 +121,11 @@ function newDecodeDbRow(table, dbRow, filteredAliases) {
 		return get;
 	}
 
-	Object.defineProperty(Row.prototype, 'queryContext', {
-		writable: true,
-		configurable: true,
-		enumerable: false
-	});
-
-	Row.prototype.subscribeChanged = function(onChanged, name) {
-
-	}
+	// Object.defineProperty(Row.prototype, 'queryContext', {
+	// 	writable: true,
+	// 	configurable: true,
+	// 	enumerable: false
+	// });
 
 	Row.prototype.subscribeChanged = function(onChanged, name) {
 		let emit;
@@ -225,10 +221,19 @@ function newDecodeDbRow(table, dbRow, filteredAliases) {
 					Array.from(aliases).concat( Object.keys(target._related).filter(alias => {
 						return target._related[alias] && target._related[alias].expanded;
 					}));
+				
+					console.log(keys)
 				return keys;
 			},
 			getOwnPropertyDescriptor(target, prop) {
+				
+				if (prop === 'foo') {
+					console.log('foo...')
+					console.log(aliases.has(prop))
+					console.log(target._related[prop] && target._related[prop].expanded)
+				}
 				return {
+					
 					enumerable: aliases.has(prop) || (target._related[prop] && target._related[prop].expanded),
 					configurable: true,
 					writable: true

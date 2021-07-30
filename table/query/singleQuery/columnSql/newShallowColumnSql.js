@@ -1,15 +1,20 @@
-function _new(table,alias) {
-	var aliasDot = alias + '.';
-	var commaAliasDot = ',' + aliasDot;
+function _new(table,alias, span) {
+	let columnsMap = span.columns;
 	var columns = table._columns;
-	var sql = aliasDot + encodeColumn(0);
-	for (var i = 1; i < columns.length; i++) {
-		sql = sql + commaAliasDot + encodeColumn(i);
+	let sql = '';
+	let prefix = '';
+	for (var i = 0; i < columns.length; i++) {
+		sql = sql + encodeColumn(i);
+		prefix = ',' ;
 	}
 	return sql;
 
 	function encodeColumn(i) {
-		return columns[i]._dbName + ' as s' + alias + i;
+		let column = columns[i];
+		if (!columnsMap || (columnsMap.get(column)))
+			return  prefix + alias + '.' + column._dbName + ' as s' + alias + i;
+		else
+			return prefix + 'null as s' + alias + i;
 	}
 }
 

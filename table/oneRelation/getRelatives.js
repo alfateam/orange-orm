@@ -44,14 +44,15 @@ function getRelatives(parent, relation) {
 			return;
 		let strategy = queryContext.strategy[relation.joinRelation.rightAlias];
 		for (let name in strategy) {
-			if (table[name] && table[name].eq && (strategy[name] || strategy[name] === null)) {
+			if (strategy[name] === null)
+				strategy[name] = true;
+			if (table[name] && table[name].eq && strategy[name]) {
 				relation.joinRelation.columns.forEach(column => {
 					strategy[column.alias] = true;
 				});
 				break;
 			}
 		}
-console.log(strategy)
 		return strategy;
 	}
 

@@ -10,6 +10,11 @@ function dbRowToRow(span, dbRow) {
 	if (!cache.tryGet(row)) {
 		var queryContext = span.queryContext;
 		negotiateQueryContext(queryContext, row);
+		Object.defineProperty(row, 'queryContext', {
+			writable: true,
+			configurable: true,
+			enumerable: false
+		});
 		row.queryContext = queryContext;
 	}
 	row = cache.tryAdd(row);
