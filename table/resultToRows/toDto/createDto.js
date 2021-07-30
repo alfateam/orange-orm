@@ -3,19 +3,17 @@ let flags = require('../../../flags');
 function _createDto(table, row) {
 	var dto = {};
 	var columns = table._columns;
-	var length = columns.length;
 	flags.useProxy = false;
-	for (var i = 0; i < length; i++) {
-		var column = columns[i];
-		
-		if (!('serializable' in column && !column.serializable)) {
-			var alias = column.alias;
+	for (let name in row) {
+		let column = table[name];
+		if (table._aliases.has(name) && !('serializable' in column && !column.serializable)) {
 			if (column.toDto)
-				dto[alias] = column.toDto(row[alias]);
+				dto[name] = column.toDto(row[name]);
 			else
-				dto[alias] = row[alias];
+				dto[name] = row[name];
 		}
 	}
+
 	flags.useProxy = true;
 	return dto;
 }
