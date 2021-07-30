@@ -12,6 +12,8 @@ let patchRow = require('../../patchRow');
 let onChange = require('on-change');
 let flags = require('../../flags');
 let tryGetSessionContext = require('../tryGetSessionContext')
+let negotiateColumnStrategy = require('./negotiateColumnStrategy');
+
 
 function newDecodeDbRow(table, dbRow, filteredAliases) {
 	let aliases = filteredAliases || table._aliases;
@@ -120,13 +122,7 @@ function newDecodeDbRow(table, dbRow, filteredAliases) {
 		}
 		return get;
 	}
-
-	// Object.defineProperty(Row.prototype, 'queryContext', {
-	// 	writable: true,
-	// 	configurable: true,
-	// 	enumerable: false
-	// });
-
+	
 	Row.prototype.subscribeChanged = function(onChanged, name) {
 		let emit;
 		if (name) {
@@ -161,6 +157,8 @@ function newDecodeDbRow(table, dbRow, filteredAliases) {
 	};
 
 	Row.prototype.toDto = function(strategy) {
+		if (strategy)
+			strategy = negotiateColumnStrategy(table, strategy);
 		if (sessionContext !== tryGetSessionContext())
 			return toDto(strategy, table, this, new Set());
 		let args = Array.prototype.slice.call(arguments, 0);
