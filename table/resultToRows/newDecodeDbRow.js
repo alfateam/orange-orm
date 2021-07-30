@@ -217,27 +217,18 @@ function newDecodeDbRow(table, dbRow, filteredAliases) {
 		let target = new Row(row);
 		const p = new Proxy(target, {
 			ownKeys: function() {
-				let keys =
-					Array.from(aliases).concat( Object.keys(target._related).filter(alias => {
+				return Array.from(aliases).concat( Object.keys(target._related).filter(alias => {
 						return target._related[alias] && target._related[alias].expanded;
 					}));
-				
-					console.log(keys)
-				return keys;
 			},
 			getOwnPropertyDescriptor(target, prop) {
 				
-				if (prop === 'foo') {
-					console.log('foo...')
-					console.log(aliases.has(prop))
-					console.log(target._related[prop] && target._related[prop].expanded)
-				}
-				return {
-					
+				let result =  {					
 					enumerable: aliases.has(prop) || (target._related[prop] && target._related[prop].expanded),
 					configurable: true,
 					writable: true
 				};
+				return result;
 			}
 		});
 
