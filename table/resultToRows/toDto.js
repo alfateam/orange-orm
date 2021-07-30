@@ -16,8 +16,8 @@ function toDto(strategy, table, row, joinRelationSet) {
 	for (let property in strategy) {
 		if (!(strategy[property] === null || strategy[property]))
 			continue;
-
-		mapChild(property);
+		if (table._relations[property])
+			mapChild(property);
 	}
 
 	function mapChild(name) {
@@ -27,9 +27,10 @@ function toDto(strategy, table, row, joinRelationSet) {
 			return row[name];
 		}
 
-		function onChild(child) {
-			if (child)
+		function onChild(child) {			
+			if (child) {
 				return child.__toDto(strategy[name]).then(onChildDto);
+			}
 		}
 
 		function onChildDto(childDto) {
