@@ -72,7 +72,7 @@ function _newJoin(parentTable, childTable, columnNames) {
 		for (var i = 0; i < columnNames.length; i++) {
 			var name = columnNames[i];
 			if (column._dbName === name) {
-				column.default(undefined);
+				column.default = undefined;
 				c.columns.push(column);
 				return;
 			}
