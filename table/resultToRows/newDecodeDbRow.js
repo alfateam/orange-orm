@@ -13,7 +13,8 @@ let onChange = require('on-change');
 let flags = require('../../flags');
 let tryGetSessionContext = require('../tryGetSessionContext')
 
-function newDecodeDbRow(table, dbRow) {
+function newDecodeDbRow(table, dbRow, filteredAliases) {
+	let aliases = filteredAliases || table._aliases;
 	let sessionContext = tryGetSessionContext();
 	let columns = table._columns;
 	let numberOfColumns = columns.length;
@@ -63,7 +64,7 @@ function newDecodeDbRow(table, dbRow) {
 			configurable: false,
 
 			get: function() {
-				if (column.onChange && flags.useProxy && this[intName] !== null && typeof this[intName] === 'object') {
+				if (column.onChange && flags.useProxy && (this[intName] !== null || this[intName] !== undefined) && typeof this[intName] === 'object') {
 					if (!(name in this._proxies)) {
 						let value = this[intName];
 						this._proxies[name] = column.onChange(this._dbRow[key], () => {
@@ -73,12 +74,12 @@ function newDecodeDbRow(table, dbRow) {
 							this[intName] = this._dbRow[key];
 						});
 					}
-					return this._proxies[name];
+					return this._proxies[name] === undefined;
 				}
-				return this[intName];
+				return  negotiateNull(this[intName]);
 			},
 			set: function(value) {
-				if (column.onChange && value !== null && typeof value === 'object') {
+				if (column.onChange && (this[intName] !== null || this[intName] !== undefined) && typeof value === 'object') {
 					if(this[intName] === onChange.target(value))
 						return;
 					this._proxies[name] = column.onChange(value, () => {
@@ -127,6 +128,10 @@ function newDecodeDbRow(table, dbRow) {
 	});
 
 	Row.prototype.subscribeChanged = function(onChanged, name) {
+
+	}
+
+	Row.prototype.subscribeChanged = function(onChanged, name) {
 		let emit;
 		if (name) {
 			emit = this._emitColumnChanged[name] || (this._emitColumnChanged[name] = newEmitEvent());
@@ -146,6 +151,17 @@ function newDecodeDbRow(table, dbRow) {
 
 	Row.prototype.toJSON = function() {
 		return toDto(undefined, table, this, new Set());
+	};
+
+
+	Row.prototype.hydrate = function(dbRow) {
+		let i = offset;
+		for(let p in dbRow) {
+			let key = keys[i];
+			if (this._dbRow[key] === undefined)
+				this._dbRow[key] = columns[i].decode(dbRow[p]);
+			i++;
+		}
 	};
 
 	Row.prototype.toDto = function(strategy) {
@@ -199,20 +215,21 @@ function newDecodeDbRow(table, dbRow) {
 		for (let i = 0; i < numberOfColumns; i++) {
 			let index = offset + i;
 			let key = keys[index];
-			row[key] = columns[i].decode(row[key]);
+			if (row[key] !== undefined)
+				row[key] = columns[i].decode(row[key]);
 		}
 		let target = new Row(row);
 		const p = new Proxy(target, {
 			ownKeys: function() {
 				let keys =
-					Array.from(table._aliases).concat( Object.keys(target._related).filter(alias => {
+					Array.from(aliases).concat( Object.keys(target._related).filter(alias => {
 						return target._related[alias] && target._related[alias].expanded;
 					}));
 				return keys;
 			},
 			getOwnPropertyDescriptor(target, prop) {
 				return {
-					enumerable: table._aliases.has(prop) || (target._related[prop] && target._related[prop].expanded),
+					enumerable: aliases.has(prop) || (target._related[prop] && target._related[prop].expanded),
 					configurable: true,
 					writable: true
 				};
@@ -220,6 +237,12 @@ function newDecodeDbRow(table, dbRow) {
 		});
 
 		return p;
+	}
+
+	function negotiateNull(value) {
+		if (value === undefined)
+			return null;
+		return value;
 	}
 
 	function Row(dbRow) {

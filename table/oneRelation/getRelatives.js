@@ -16,7 +16,7 @@ function getRelatives(parent, relation) {
 
 	function createInFilter() {
 		var parentAlias = parentTable._primaryColumns[0].alias;
-		var ids = queryContext.rows.map(function(row) {
+		var ids = queryContext.rows.map(function (row) {
 			return row[parentAlias];
 		});
 		var column = relation.joinRelation.columns[0];
@@ -24,18 +24,35 @@ function getRelatives(parent, relation) {
 	}
 
 	function createCompositeFilter() {
-		var filters = queryContext.rows.map(function(row) {
+		var filters = queryContext.rows.map(function (row) {
 			return newForeignKeyFilter(relation.joinRelation, row);
 		});
 		return emptyFilter.or.apply(emptyFilter, filters);
 	}
 
-	return relation.childTable.getMany(filter).then(onRows);
+	return relation.childTable.getMany(filter, getStrategy()).then(onRows);
 
 	function onRows(rows) {
 		queryContext.expand(relation);
 		negotiateExpandInverse(parent, relation, rows);
 		return rows;
+	}
+
+	function getStrategy() {
+		let table = relation.childTable;
+		if (!queryContext.strategy)
+			return;
+		let strategy = queryContext.strategy[relation.joinRelation.rightAlias];
+		for (let name in strategy) {
+			if (table[name] && table[name].eq && (strategy[name] || strategy[name] === null)) {
+				relation.joinRelation.columns.forEach(column => {
+					strategy[column.alias] = true;
+				});
+				break;
+			}
+		}
+console.log(strategy)
+		return strategy;
 	}
 
 }

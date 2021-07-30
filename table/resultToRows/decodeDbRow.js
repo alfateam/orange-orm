@@ -1,12 +1,18 @@
 var newDecodeDbRow = require('./newDecodeDbRow');
 
-function decodeDbRow(context, table, dbRow) {
-	var decode = context._decodeDbRow;
+function decodeDbRow(span, table, dbRow) {
+	var decode = span._decodeDbRow;
 	if (!decode) {
-		decode = newDecodeDbRow(table, dbRow);
-		Object.defineProperty(context, '_decodeDbRow', {
+		let aliases = new Set();
+		if (span.columns)
+			span.columns.forEach((value, key) => {
+				if (value)
+					aliases.add(key.alias);
+			});
+		decode = newDecodeDbRow(table, dbRow, aliases);
+		Object.defineProperty(span, '_decodeDbRow', {
 			enumerable: false,
-			get: function() {
+			get: function () {
 				return decode;
 			},
 		});

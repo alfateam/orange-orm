@@ -4,18 +4,20 @@ var util = require('util');
 
 function newInsertCommandCore(table, row) {
 	var parameters = [];
-	var values = [getSqlTemplate(table)];
+	var values = [getSqlTemplate(table, row)];
 
 	var columns = table._columns;
 	for (var i = 0; i < columns.length; i++) {
 		var column = columns[i];
 		var alias = column.alias;
-		var encoded = column.encode(row[alias]);
-		if (encoded.parameters.length > 0) {
-			values.push('?');
-			parameters.push(encoded.parameters[0]);
-		} else
-			values.push(encoded.sql());
+		if (row['__' + column.alias] !== undefined) {
+			var encoded = column.encode(row[alias]);
+			if (encoded.parameters.length > 0) {
+				values.push('?');
+				parameters.push(encoded.parameters[0]);
+			} else
+				values.push(encoded.sql());
+		}
 	}
 
 	var sql = util.format.apply(null, values);

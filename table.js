@@ -116,8 +116,9 @@ function _new(tableName) {
 		return table;
 	};
 
-	table.insert = function() {
-		return call(insert, arguments);
+	table.insert = function() {		
+		let args = [table].concat([].slice.call(arguments));
+		return insert.apply(null, args);
 	};
 
 	table.delete = _delete.bind(null, table);

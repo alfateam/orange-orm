@@ -35,13 +35,20 @@ function getRelatives(parent, relation) {
 		}
 	}
 
-	return relation.childTable.getMany(filter).then(onRows);
+	return relation.childTable.getMany(filter, getStrategy()).then(onRows);
 
 	function onRows(rows) {
 		queryContext.expand(relation);
 		negotiateExpandInverse(parent, relation, rows);
 		return rows;
 	}
+
+	function getStrategy() {
+		if (!queryContext.strategy)
+			return;
+		return queryContext.strategy[relation.leftAlias];
+	}
+
 }
 
 function rowToPrimaryKeyFilter(row, relation) {
