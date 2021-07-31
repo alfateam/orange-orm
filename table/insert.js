@@ -1,5 +1,5 @@
 let getSessionContext = require('./getSessionContext');
-let executeQueries = require('./executeQueries')
+let executeQueries = require('./executeQueries');
 let newRow = require('./commands/newRow');
 let newInsertCommand = require('./commands/newInsertCommand');
 let newGetLastInsertedCommand = require('./commands/newGetLastInsertedCommand');
@@ -12,14 +12,14 @@ function insert(table) {
 	let cmd = newInsertCommand(table, row);
 
 	pushCommand(cmd);
-	expand(table, row);	
+	expand(table, row);
 	Object.defineProperty(row, 'then', {
 		value: then,
 		writable: true,
 		enumerable: false,
 		configurable: true
 	});
-	
+
 	let selectCmd;
 	if (getSessionContext().lastInsertedIsSeparate) {
 		selectCmd = newGetLastInsertedCommand(table, row, cmd);
@@ -47,13 +47,13 @@ function insert(table) {
 function expand(table, row) {
 	let relationName;
 	let visitor = {};
-	visitor.visitJoin = function () { };
+	visitor.visitJoin = function() { };
 
-	visitor.visitMany = function () {
+	visitor.visitMany = function() {
 		row.expand(relationName);
 	};
 
-	visitor.visitOne = function () {
+	visitor.visitOne = function() {
 		row.expand(relationName);
 	};
 

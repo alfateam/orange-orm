@@ -1,17 +1,18 @@
-let getSessionSingleton = require('../../getSessionSingleton')
+// let getSessionSingleton = require('../../getSessionSingleton');
 
 function getSqlTemplate(table, row) {
 	if (table._insertTemplate)
 		return table._insertTemplate;
 	let columnNames = [];
 	let regularColumnNames = [];
-	let returnNames;
+	// let returnNames;
 	let values = [];
 	let sql = 'INSERT INTO ' + table._dbName + ' (';
 	addDiscriminators();
 	addColumns();
 	sql = sql + columnNames.join(',') + ') VALUES (' + values.join(',') + ')' ;
 	table._insertTemplate = sql;
+	console.log(sql);
 	return sql;
 
 	function addDiscriminators() {
@@ -33,7 +34,7 @@ function getSqlTemplate(table, row) {
 				values.push('%s');
 			}
 		}
-		returnNames += ')';
+		// returnNames += ')';
 	}
 }
 

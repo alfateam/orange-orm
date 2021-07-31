@@ -12,7 +12,7 @@ function decodeDbRow(span, table, dbRow) {
 		decode = newDecodeDbRow(table, dbRow, aliases);
 		Object.defineProperty(span, '_decodeDbRow', {
 			enumerable: false,
-			get: function () {
+			get: function() {
 				return decode;
 			},
 		});

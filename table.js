@@ -116,7 +116,7 @@ function _new(tableName) {
 		return table;
 	};
 
-	table.insert = function() {		
+	table.insert = function() {
 		let args = [table].concat([].slice.call(arguments));
 		return insert.apply(null, args);
 	};

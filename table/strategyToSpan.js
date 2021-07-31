@@ -1,10 +1,11 @@
 var newCollection = require('../newCollection');
 var newQueryContext = require('./query/singleQuery/newQueryContext');
+var purifyStrategy = require('./purifyStrategy');
 
 function toSpan(table,strategy) {
 	var span = {};
 	span.queryContext = newQueryContext();
-	span.queryContext.strategy = strategy;
+	span.queryContext.strategy = purifyStrategy(table, strategy);
 	span.legs = newCollection();
 	span.table = table;
 	applyStrategy(table,span,strategy);
@@ -19,7 +20,7 @@ function toSpan(table,strategy) {
 		for (var name in strategy) {
 			if (strategy[name] === null)
 				strategy[name] = true;
-			if (table._relations[name] && !strategy[name])				
+			if (table._relations[name] && !strategy[name])
 				continue;
 			if (table._relations[name])
 				addLeg(legs,table,strategy,name, columns);
@@ -27,7 +28,7 @@ function toSpan(table,strategy) {
 				columns.set(table[name], strategy[name]);
 				hasIncludedColumns = hasIncludedColumns  || strategy[name];
 			}
-			else 
+			else
 				span[name] = strategy[name];
 		}
 		if (!hasIncludedColumns)

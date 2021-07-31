@@ -11,8 +11,8 @@ let createDto = require('./toDto/createDto');
 let patchRow = require('../../patchRow');
 let onChange = require('on-change');
 let flags = require('../../flags');
-let tryGetSessionContext = require('../tryGetSessionContext')
-let negotiateColumnStrategy = require('./negotiateColumnStrategy');
+let tryGetSessionContext = require('../tryGetSessionContext');
+let purifyStrategy = require('../purifyStrategy');
 
 
 function newDecodeDbRow(table, dbRow, filteredAliases) {
@@ -25,7 +25,6 @@ function newDecodeDbRow(table, dbRow, filteredAliases) {
 	}
 
 	let offset = dbRow.offset;
-
 	let keys = Object.keys(dbRow);
 
 	for (let i = 0; i < numberOfColumns; i++) {
@@ -122,7 +121,7 @@ function newDecodeDbRow(table, dbRow, filteredAliases) {
 		}
 		return get;
 	}
-	
+
 	Row.prototype.subscribeChanged = function(onChanged, name) {
 		let emit;
 		if (name) {
@@ -158,7 +157,7 @@ function newDecodeDbRow(table, dbRow, filteredAliases) {
 
 	Row.prototype.toDto = function(strategy) {
 		if (strategy)
-			strategy = negotiateColumnStrategy(table, strategy);
+			strategy = purifyStrategy(table, strategy);
 		if (sessionContext !== tryGetSessionContext())
 			return toDto(strategy, table, this, new Set());
 		let args = Array.prototype.slice.call(arguments, 0);
@@ -216,12 +215,12 @@ function newDecodeDbRow(table, dbRow, filteredAliases) {
 		const p = new Proxy(target, {
 			ownKeys: function() {
 				return Array.from(aliases).concat( Object.keys(target._related).filter(alias => {
-						return target._related[alias] && target._related[alias].expanded;
-					}));
+					return target._related[alias] && target._related[alias].expanded;
+				}));
 			},
 			getOwnPropertyDescriptor(target, prop) {
-				
-				let result =  {					
+
+				let result =  {
 					enumerable: aliases.has(prop) || (target._related[prop] && target._related[prop].expanded),
 					configurable: true,
 					writable: true

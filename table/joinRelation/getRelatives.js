@@ -4,6 +4,7 @@ var negotiateExpandInverse = require('../negotiateExpandInverse');
 
 function getRelatives(parent, relation) {
 	var queryContext = parent.queryContext;
+	let strategy = queryContext && queryContext.strategy[relation.leftAlias];
 	var filter = emptyFilter;
 	if (relation.columns.length === 1)
 		createInFilter();
@@ -35,18 +36,12 @@ function getRelatives(parent, relation) {
 		}
 	}
 
-	return relation.childTable.getMany(filter, getStrategy()).then(onRows);
+	return relation.childTable.getMany(filter, strategy).then(onRows);
 
 	function onRows(rows) {
 		queryContext.expand(relation);
 		negotiateExpandInverse(parent, relation, rows);
 		return rows;
-	}
-
-	function getStrategy() {
-		if (!queryContext.strategy)
-			return;
-		return queryContext.strategy[relation.leftAlias];
 	}
 
 }
