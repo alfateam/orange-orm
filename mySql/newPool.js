@@ -1,7 +1,7 @@
 var pools = require('../pools');
 var promise = require('../table/promise');
 var end = require('./pool/end');
-var mysql = require('mysql');
+var mysql = require('mysql2');
 var newId = require('../newId');
 var negotiatePoolOptions = require('./pool/negotiatePoolOptions');
 

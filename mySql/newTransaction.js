@@ -1,11 +1,13 @@
-var wrapQuery = require('./wrapQuery');
-var wrapQueryStream = require('./wrapQueryStream');
-var deleteFromSql = require('./deleteFromSql');
-var selectForUpdateSql = require('./selectForUpdateSql');
-var encodeDate = require('./encodeDate');
+let wrapQuery = require('./wrapQuery');
+let wrapQueryStream = require('./wrapQueryStream');
+let deleteFromSql = require('./deleteFromSql');
+let selectForUpdateSql = require('./selectForUpdateSql');
+let encodeDate = require('./encodeDate');
+let lastInsertedSql = require('./lastInsertedSql');
+
 
 function newResolveTransaction(domain, pool) {
-	var rdb = {};
+	let rdb = {};
 	if (!pool.connect) {
 		pool = pool();
 		rdb.pool = pool;
@@ -27,7 +29,10 @@ function newResolveTransaction(domain, pool) {
 				rdb.encodeBoolean = connection.escape.bind(connection);
 				rdb.encodeDate = encodeDate;
 				rdb.deleteFromSql = deleteFromSql;
+				rdb.insertDefault = insertDefault;
 				rdb.selectForUpdateSql = selectForUpdateSql;
+				rdb.lastInsertedIsSeparate = true;
+
 				rdb.multipleStatements = true;
 				rdb.accept = function(caller) {
 					caller.visitMysql();
@@ -39,6 +44,10 @@ function newResolveTransaction(domain, pool) {
 			}
 		}
 	};
+}
+
+function insertDefault(table) {
+	return `INSERT INTO ${table._dbName} VALUES ()`;
 }
 
 module.exports = newResolveTransaction;

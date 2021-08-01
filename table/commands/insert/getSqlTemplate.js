@@ -8,7 +8,7 @@ function getSqlTemplate(table, row) {
 	addDiscriminators();
 	addColumns();
 	if (columnNames.length === 0)
-		sql += ` DEFAULT VALUES${lastInserted()}`;
+		sql += `${defaultValues()}`;
 	else
 		sql = sql + '('+ columnNames.join(',') + ') VALUES (' + values.join(',') + ')' + lastInserted() ;
 	return sql;
@@ -39,6 +39,13 @@ function getSqlTemplate(table, row) {
 		if (!context.lastInsertedIsSeparate)
 			return ' ' + context.lastInsertedSql(table);
 		return '';
+	}
+
+	function defaultValues() {
+		let context = getSessionContext();
+		let _default = context.insertDefault || 'DEFAULT VALUES';
+		return `${_default}${lastInserted()}`;
+
 	}
 }
 
