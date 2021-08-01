@@ -33,6 +33,7 @@
     "rdb-client": "^1.1.0",
     "rfc6902": "^3.0.4",
     "rfdc": "^1.2.0",
+    "sqlite3": "^5.0.2",
     "uuid": "^3.0.1"
   },
   "peerDependencies": {
