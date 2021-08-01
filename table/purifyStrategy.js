@@ -23,18 +23,14 @@ function purifyStrategy(table, strategy, columns = new Map()) {
 			hasIncludedColumns = hasIncludedColumns || strategy[name];
 		}
 	}
-
-	if (!hasIncludedColumns)
-		table._columns.forEach(column => {
-			if (!columns.has(column))
-				columns.set(column, true);
-		});
-	if (columns.size > 0) {
-		table._primaryColumns.forEach(col => {
-			columns.set(col, true);
-		});
-		columns.forEach((value, key) => strategy[key.alias] = value);
+	for (let i = 0; i < table._columns.length; i++) {
+		let column = table._columns[i];
+		strategy[column.alias] = !hasIncludedColumns;
 	}
+	table._primaryColumns.forEach(column => {
+		strategy[column.alias] = true;
+	});
+	columns.forEach((value, key) => strategy[key.alias] = value);
 
 	return strategy;
 
@@ -46,10 +42,11 @@ function addLeg(relation, strategy, columns) {
 		for (let i = 0; i < relation.columns.length; i++) {
 			columns.set(relation.columns[i], true);
 		}
-	else
+	else {
 		relation.joinRelation.columns.forEach(column => {
 			nextColumns.set(column, true);
 		});
+	}
 	let childTable = relation.childTable;
 	return purifyStrategy(childTable, strategy, nextColumns);
 }

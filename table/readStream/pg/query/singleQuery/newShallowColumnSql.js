@@ -8,9 +8,10 @@ function _new(table,alias,span) {
 	var separator = alias + '.';
 	for (var i = 0; i < columns.length; i++) {
 		var column = columns[i];
-		if (!('serializable' in column && !column.serializable) && (!columnsMap || (columnsMap.get(column))))
+		if (!('serializable' in column && !column.serializable) && (!columnsMap || (columnsMap.get(column)))) {
 			sql = sql + separator + util.format(columnFormat, column._dbName, column.alias);
-		separator = ',' + alias + '.';
+			separator = ',' + alias + '.';
+		}
 	}
 	return sql;
 }
