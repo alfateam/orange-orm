@@ -1,5 +1,7 @@
-function selectLastInsertedSql(tableName, columnNames, keyValues) {
-    return `rowid IN (select last_insert_rowid())`;
+let sql = 'rowid IN (select last_insert_rowid())';
+
+function lastInsertedSql() {
+	return sql;
 }
 
-module.exports = selectLastInsertedSql;
+module.exports = lastInsertedSql;

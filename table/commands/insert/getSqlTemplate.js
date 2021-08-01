@@ -1,18 +1,16 @@
-// let getSessionSingleton = require('../../getSessionSingleton');
+let getSessionContext = require('../../getSessionContext');
 
 function getSqlTemplate(table, row) {
-	if (table._insertTemplate)
-		return table._insertTemplate;
 	let columnNames = [];
 	let regularColumnNames = [];
-	// let returnNames;
 	let values = [];
-	let sql = 'INSERT INTO ' + table._dbName + ' (';
+	let sql = 'INSERT INTO ' + table._dbName + ' ';
 	addDiscriminators();
 	addColumns();
-	sql = sql + columnNames.join(',') + ') VALUES (' + values.join(',') + ')' ;
-	table._insertTemplate = sql;
-	console.log(sql);
+	if (columnNames.length === 0)
+		sql += ` DEFAULT VALUES${lastInserted()}`;
+	else
+		sql = sql + '('+ columnNames.join(',') + ') VALUES (' + values.join(',') + ')' + lastInserted() ;
 	return sql;
 
 	function addDiscriminators() {
@@ -34,7 +32,13 @@ function getSqlTemplate(table, row) {
 				values.push('%s');
 			}
 		}
-		// returnNames += ')';
+	}
+
+	function lastInserted() {
+		let context = getSessionContext();
+		if (!context.lastInsertedIsSeparate)
+			return ' ' + context.lastInsertedSql(table);
+		return '';
 	}
 }
 

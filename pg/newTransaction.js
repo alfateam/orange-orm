@@ -4,6 +4,8 @@ var encodeDate = require('./encodeDate');
 var encodeBoolean = require('./encodeBoolean');
 var deleteFromSql = require('./deleteFromSql');
 var selectForUpdateSql = require('./selectForUpdateSql');
+var lastInsertedSql = require('./lastInsertedSql');
+
 
 function newResolveTransaction(domain, pool) {
 	var rdb = {};
@@ -29,6 +31,8 @@ function newResolveTransaction(domain, pool) {
 				rdb.encodeDate = encodeDate;
 				rdb.deleteFromSql = deleteFromSql;
 				rdb.selectForUpdateSql = selectForUpdateSql;
+				rdb.lastInsertedSql = lastInsertedSql;
+				rdb.lastInsertedIsSeparate = false;
 				rdb.multipleStatements = true;
 				rdb.accept = function(caller) {
 					caller.visitPg();
