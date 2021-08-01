@@ -32,7 +32,7 @@ function newResolveTransaction(domain, pool) {
 				rdb.insertDefault = insertDefault;
 				rdb.selectForUpdateSql = selectForUpdateSql;
 				rdb.lastInsertedIsSeparate = true;
-
+				rdb.lastInsertedSql = lastInsertedSql;
 				rdb.multipleStatements = true;
 				rdb.accept = function(caller) {
 					caller.visitMysql();
