@@ -6,7 +6,7 @@ var newLeg = require('./relation/newJoinLeg'),
 	fuzzyPromise = require('./fuzzyPromise');
 function _newJoin(parentTable, childTable, columnNames) {
 	var c = {};
-	
+
 	c.parentTable = parentTable;
 	c.childTable = childTable;
 	c.columns = [];
@@ -22,7 +22,7 @@ function _newJoin(parentTable, childTable, columnNames) {
 	};
 
 	c.getFromDb = function(parent) {
-		var key = parentToKey(parent);
+		var key = parentToArrayKey(parent);
 		if (!key)
 			return nullPromise;
 		var args = [childTable].concat(key);
@@ -84,8 +84,19 @@ function _newJoin(parentTable, childTable, columnNames) {
 		for (let i = 0; i < c.columns.length; i++) {
 			let value = parent[c.columns[i].alias];
 			if (value === null || value === undefined)
-				return;
+				return {};
 			key[childTable._primaryColumns[i].alias] = value;
+		}
+		return key;
+	}
+
+	function parentToArrayKey(parent) {
+		let key = [];
+		for (let i = 0; i < c.columns.length; i++) {
+			let value = parent[c.columns[i].alias];
+			if (value === null || value === undefined)
+				return [];
+			key.push(value);
 		}
 		return key;
 	}

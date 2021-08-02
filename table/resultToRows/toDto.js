@@ -17,15 +17,16 @@ async function _toDto(table, row, strategy) {
 	if (!row)
 		return;
 	for (let name in strategy) {
+		if (!strategy[name])
+			continue;
 		let column = table[name];
-		if (table._aliases.has(name) && !('serializable' in column && !column.serializable)) {
+		if (table._aliases.has(name) && !('serializable' in column && !column.serializable) && row.propertyIsEnumerable(name)) {
 			if (column.toDto)
 				dto[name] = column.toDto(row[name]);
 			else
 				dto[name] = row[name];
 		}
 		else if (table._relations[name] && strategy[name]) {
-			console.log(name);
 			let child;
 			let relation = table._relations[name];
 			if ((strategy && !(strategy[name] || strategy[name] === null)))

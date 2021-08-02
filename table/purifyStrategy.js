@@ -1,7 +1,4 @@
 function purifyStrategy(table, strategy, columns = new Map()) {
-	if ((strategy !== null) && !strategy)
-		return;
-
 	strategy = { ...strategy };
 	for (let p in strategy) {
 		if (strategy[p] === null)

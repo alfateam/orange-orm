@@ -9,6 +9,8 @@ function decodeDbRow(span, table, dbRow) {
 				if (value)
 					aliases.add(key.alias);
 			});
+		if (aliases.size === 0)
+			aliases = undefined;
 		decode = newDecodeDbRow(table, dbRow, aliases);
 		Object.defineProperty(span, '_decodeDbRow', {
 			enumerable: false,

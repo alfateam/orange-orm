@@ -41,6 +41,8 @@ function newOneRelation(joinRelation) {
 
 	c.getRowsSync = function(parent) {
 		let cache = parent._relationCacheMap.get(c);
+		if (!cache)
+			return null;
 		return cache.tryGet(parent);
 	};
 

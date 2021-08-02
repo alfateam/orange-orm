@@ -160,7 +160,6 @@ function newDecodeDbRow(table, dbRow, filteredAliases) {
 			strategy = extractStrategy(table);
 		}
 		strategy = purifyStrategy(table, strategy);
-		console.log(strategy);
 		if (sessionContext !== tryGetSessionContext()) {
 			return toDto(strategy, table, this, new Set());
 		}

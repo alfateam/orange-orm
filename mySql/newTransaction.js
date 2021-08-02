@@ -29,13 +29,13 @@ function newResolveTransaction(domain, pool) {
 				rdb.encodeBoolean = connection.escape.bind(connection);
 				rdb.encodeDate = encodeDate;
 				rdb.deleteFromSql = deleteFromSql;
-				rdb.insertDefault = insertDefault;
+				rdb.insertDefault = 'VALUES ()';
 				rdb.selectForUpdateSql = selectForUpdateSql;
 				rdb.lastInsertedIsSeparate = true;
 				rdb.lastInsertedSql = lastInsertedSql;
 				rdb.multipleStatements = true;
 				rdb.accept = function(caller) {
-					caller.visitMysql();
+					caller.visitMySql();
 				};
 				domain.rdb = rdb;
 				onSuccess();
@@ -44,10 +44,6 @@ function newResolveTransaction(domain, pool) {
 			}
 		}
 	};
-}
-
-function insertDefault(table) {
-	return `INSERT INTO ${table._dbName} VALUES ()`;
 }
 
 module.exports = newResolveTransaction;

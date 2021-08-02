@@ -37,14 +37,9 @@ function createReadStream(table, db, filter, strategy, streamOptions) {
 		busy = true;
 		return db.transaction(async() => {
 			await getBatch()
-				.then(onRows)
 				.then(onDtos);
 		})
 			.then(negotiatePushStream, onError);
-	}
-
-	function onRows(rows) {
-		return rows.toDto(strategy);
 	}
 
 	function onDtos(result) {
