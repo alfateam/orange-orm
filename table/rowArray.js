@@ -1,7 +1,6 @@
 var resultToPromise = require('./resultToPromise');
 var orderBy = require('./rowArray/orderBy');
 var negotiateNextTick = require('./rowArray/negotiateNextTick');
-let fuzzyPromise = require('./fuzzyPromise');
 
 function newRowArray() {
 	var c = [];
@@ -18,14 +17,12 @@ function newRowArray() {
 		value: toDto
 	});
 
-	function toDtoNativePromise() {
-		if (c.length === 0)
-			return fuzzyPromise([]);
-		let first = c[0].toDto.apply(this[0], arguments);
-		if (first.then)
-			return Promise.resolve().then( () => toDto.apply(this, arguments));
-		else
-			return toDtoSync.apply(this, arguments);
+	async function toDtoNativePromise() {
+		let result = [];
+		for (let i = 0; i < c.length; i++) {
+			result.push(await c[i].dtoDto.apply(c[i], arguments));
+		}
+		return result;
 	}
 
 	return c;
@@ -59,16 +56,6 @@ function toDto(optionalStrategy) {
 			return negotiateNextTick(i);
 		}
 	}
-}
-
-function toDtoSync(optionalStrategy) {
-	let rows = this;
-	var args = Array.prototype.slice.call(arguments).slice(1);
-	var result = [];
-	for (let i = 0; i < rows.length; i++) {
-		result[i] = rows[i].toDto.apply(rows[i], args);
-	}
-	return orderBy(optionalStrategy, result);
 }
 
 module.exports = newRowArray;

@@ -156,22 +156,16 @@ function newDecodeDbRow(table, dbRow, filteredAliases) {
 	};
 
 	Row.prototype.toDto = function(strategy) {
-		if (!strategy)
-			strategy = extractStrategy(undefined, table);
+		if (strategy === undefined) {
+			strategy = extractStrategy(table);
+		}
 		strategy = purifyStrategy(table, strategy);
-
+		console.log(strategy);
 		if (sessionContext !== tryGetSessionContext()) {
 			return toDto(strategy, table, this, new Set());
 		}
 		let p =  toDto(strategy, table, this);
 		return Promise.resolve().then(() => p);
-	};
-
-	Row.prototype.__toDto = function(strategy) {
-		let args = Array.prototype.slice.call(arguments, 0);
-		args.push(table);
-		strategy = extractStrategy.apply(null, args);
-		return toDto(strategy, table, this);
 	};
 
 	Row.prototype.expand = function(alias) {
