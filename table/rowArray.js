@@ -20,7 +20,7 @@ function newRowArray() {
 	async function toDtoNativePromise() {
 		let result = [];
 		for (let i = 0; i < c.length; i++) {
-			result.push(await c[i].dtoDto.apply(c[i], arguments));
+			result.push(await c[i].toDto.apply(c[i], arguments));
 		}
 		return result;
 	}
