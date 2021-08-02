@@ -156,13 +156,13 @@ function newDecodeDbRow(table, dbRow, filteredAliases) {
 	};
 
 	Row.prototype.toDto = function(strategy) {
-		if (strategy)
-			strategy = purifyStrategy(table, strategy);
-		if (sessionContext !== tryGetSessionContext())
+		if (!strategy)
+			strategy = extractStrategy(undefined, table);
+		strategy = purifyStrategy(table, strategy);
+
+		if (sessionContext !== tryGetSessionContext()) {
 			return toDto(strategy, table, this, new Set());
-		let args = Array.prototype.slice.call(arguments, 0);
-		args.push(table);
-		strategy = extractStrategy.apply(null, args);
+		}
 		let p =  toDto(strategy, table, this);
 		return Promise.resolve().then(() => p);
 	};

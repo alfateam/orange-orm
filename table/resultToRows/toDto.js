@@ -1,47 +1,54 @@
 let flags = require('../../flags');
-let resultToPromise = require('../resultToPromise');
-let createDto = require('./toDto/createDto');
 
 function toDto(strategy, table, row, joinRelationSet) {
+	let result;
+	flags.useProxy = false;
 	if (joinRelationSet) {
-		flags.useProxy = false;
-		let dtos = toDtoSync(table, row, joinRelationSet, strategy);
-		flags.useProxy = true;
-		return dtos;
+		result = toDtoSync(table, row, joinRelationSet, strategy);
 	}
-	let dto = createDto(table, row);
-	strategy = strategy || {};
-	let promise = resultToPromise(dto);
-
-	for (let property in strategy) {
-		if (!(strategy[property] === null || strategy[property]))
-			continue;
-		if (table._relations[property])
-			mapChild(property);
-	}
-
-	function mapChild(name) {
-		promise = promise.then(getRelated).then(onChild);
-
-		function getRelated() {
-			return row[name];
-		}
-
-		function onChild(child) {			
-			if (child) {
-				return child.__toDto(strategy[name]).then(onChildDto);
-			}
-		}
-
-		function onChildDto(childDto) {
-			dto[name] = childDto;
-		}
-	}
-
-	return promise.then(function () {
-		return dto;
-	});
+	else
+		result =  _toDto(table, row, strategy);
+	flags.useProxy = true;
+	return result;
 }
+
+async function _toDto(table, row, strategy) {
+	let dto = {};
+	if (!row)
+		return;
+	for (let name in strategy) {
+		let column = table[name];
+		if (table._aliases.has(name) && !('serializable' in column && !column.serializable)) {
+			if (column.toDto)
+				dto[name] = column.toDto(row[name]);
+			else
+				dto[name] = row[name];
+		}
+		else if (table._relations[name] && strategy[name]) {
+			console.log(name);
+			let child;
+			let relation = table._relations[name];
+			if ((strategy && !(strategy[name] || strategy[name] === null)))
+				continue;
+			else if (!row.isExpanded(name))
+				child = await row[name];
+			else
+				child = relation.getRowsSync(row);
+			if (!child)
+				dto[name] = child;
+			else if (Array.isArray(child)) {
+				dto[name] = [];
+				for (let i = 0; i < child.length; i++) {
+					dto[name].push(await _toDto(relation.childTable, child[i], strategy && strategy[name]));
+				}
+			}
+			else
+				dto[name] = await _toDto(relation.childTable, child, strategy && strategy[name]);
+		}
+	}
+	return dto;
+}
+
 
 function toDtoSync(table, row, joinRelationSet, strategy) {
 	let dto = {};

@@ -2,7 +2,6 @@ let flags = require('../../../flags');
 
 function _createDto(table, row) {
 	var dto = {};
-	var columns = table._columns;
 	flags.useProxy = false;
 	for (let name in row) {
 		let column = table[name];

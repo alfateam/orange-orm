@@ -3,7 +3,7 @@ var newJoinedColumnSql = _initJOinedColumnSql;
 
 function sql(leg,alias) {
 	var span = leg.span;
-	var shallowColumnSql = newShallowColumnSql(span.table,alias);
+	var shallowColumnSql = newShallowColumnSql(span.table,alias, span);
 	var joinedColumnSql = newJoinedColumnSql(span,alias);
 	return ',' + shallowColumnSql + joinedColumnSql;
 }
