@@ -11,7 +11,10 @@ function createJSONReadStream(table, db, filter, strategy, streamOptions) {
 			transformer.push(',' + chunk.result);
 		else {
 			transformer.push('[');
-			transformer.push(chunk.result);
+			let result = chunk.result;
+			if (typeof result === 'object')
+				result = JSON.stringify(result);
+			transformer.push(result);
 			started = true;
 		}
 		cb();
