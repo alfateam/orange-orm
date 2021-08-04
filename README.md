@@ -16,7 +16,7 @@ Based on promises.
 
 ## Release notes
 __2.6.28__  
-Support for rdb in the browser. Docs will come later. 
+Support for rdb in the browser. Docs will come later.  
 __2.6.27__  
 Bugfix: JSON patching could result in duplicate DTO when run in same transaction.  
 __2.6.26__  
