@@ -4,8 +4,10 @@ var Stream = require('stream');
 function createReadStreamNative(table, db, filter, strategy, streamOptions) {
 	var transformer = Stream.Transform({ objectMode: true });
 	transformer._transform = function(chunk, _enc, cb) {
-		var row = JSON.parse(chunk.result);
-		transformer.push(row);
+		let result = chunk.result;
+		if (typeof result === 'string')
+			result = JSON.parse(result);
+		transformer.push(result);
 		cb();
 	};
 

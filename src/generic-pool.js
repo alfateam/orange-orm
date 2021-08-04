@@ -54,7 +54,7 @@ PriorityQueue.prototype.enqueue = function enqueue(obj, priority) {
 	this._slots[priority].push(obj);
 };
 
-PriorityQueue.prototype.dequeue = function dequeue(callback) {
+PriorityQueue.prototype.dequeue = function dequeue(_callback) {
 	var obj = null;
 	// Clear cache for total.
 	this._total = null;

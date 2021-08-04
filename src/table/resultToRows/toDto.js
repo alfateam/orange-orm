@@ -20,6 +20,7 @@ async function _toDto(table, row, strategy) {
 		if (!strategy[name])
 			continue;
 		let column = table[name];
+		// eslint-disable-next-line no-prototype-builtins
 		if (table._aliases.has(name) && !('serializable' in column && !column.serializable) && row.propertyIsEnumerable(name)) {
 			if (column.toDto)
 				dto[name] = column.toDto(row[name]);

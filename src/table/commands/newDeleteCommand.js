@@ -8,7 +8,7 @@ var nextCommand = function() {
 function newCommand(queries,table,filter,strategy,relations) {
 	var singleCommand = newSingleCommand(table,filter,relations);
 	for(var name in strategy) {
-		if (!(strategy[name] === null || strategy[name]))				
+		if (!(strategy[name] === null || strategy[name]))
 			continue;
 		var childStrategy = strategy[name];
 		var childRelation = table._relations[name];

@@ -1,3 +1,4 @@
+/* eslint-disable no-prototype-builtins */
 //slightly modified code from github.com/brianc/node-postgres
 var EventEmitter = require('events').EventEmitter;
 
@@ -32,7 +33,7 @@ function newPgPool(connectionString, poolOptions) {
 				});
 
 				// Remove connection from pool on disconnect
-				client.on('end', function(e) {
+				client.on('end', function(_e) {
 					// Do not enter infinite loop between pool.destroy
 					// and client 'end' event...
 					if (!client._destroying) {
