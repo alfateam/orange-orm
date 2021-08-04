@@ -1,3 +1,4 @@
+/* eslint-disable no-prototype-builtins */
 var EventEmitter = require('events').EventEmitter;
 
 var defaults = require('./defaults');
