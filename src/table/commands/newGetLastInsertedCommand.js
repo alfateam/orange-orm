@@ -3,12 +3,12 @@ var newImmutable = require('../../newImmutable');
 
 function newGetLastInsertedCommand(table, row, insertCommand) {
 	let cmd =  new InsertCommand(table, row, insertCommand);
-    insertCommand.endEdit = () => {};
-    return cmd;
+	insertCommand.endEdit = () => {};
+	return cmd;
 }
 
 function InsertCommand(table, row, insertCommand) {
-    this._insertCommand = insertCommand;
+	this._insertCommand = insertCommand;
 	this.__getCoreCommand = newImmutable(newGetLastInsertedCommandCore);
 	this._table = table;
 	this._row = row;
@@ -28,7 +28,7 @@ InsertCommand.prototype.matches = function(otherRow) {
 
 
 InsertCommand.prototype.endEdit = function() {
-    this._insertCommand.endEdit();
+	this._insertCommand.endEdit();
 	this.sql();
 };
 

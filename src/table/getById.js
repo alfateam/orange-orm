@@ -25,7 +25,7 @@ async function expand(rows, strategy) {
 		if(!(strategy[p] === null || strategy[p]))
 			continue;
 		for (let i = 0; i < rows.length; i++) {
-			await expand(await rows[i][p], strategy[p]);			
+			await expand(await rows[i][p], strategy[p]);
 		}
 	}
 }

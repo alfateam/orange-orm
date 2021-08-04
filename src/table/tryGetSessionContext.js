@@ -5,11 +5,11 @@ let cls = require('node-cls');
 function tryGetSessionContext() {
 	if (useHook()) {
 
-        let context = cls.getContext('rdb');
-        return context && context.rdb;
-    }
+		let context = cls.getContext('rdb');
+		return context && context.rdb;
+	}
 	else
-        return process.domain && process.domain.rdb;
+		return process.domain && process.domain.rdb;
 }
 
 module.exports = tryGetSessionContext;
