@@ -12,7 +12,7 @@ Transaction with commit and rollback.
 Persistence ignorance - no need for explicit saving, everything is handled by transaction.  
 Eager or lazy loading.  
 Based on promises.  
-[Documentation and examples](docs/docs.md)  
+[Documentation and examples](src/docs/docs.md)  
 
 ## Release notes
 __2.6.28__  
@@ -99,7 +99,7 @@ Bugfix with insert and hasOne relation.
 __1.8.0__  
 Pooling is disabled when there is no pool option object sent in. Previously, a pool with default size 10 was always created.  
 __1.7.7__  
-Commit/rollback are implicit if sending a callback to the transaction function. [See example](https://github.com/alfateam/rdb/blob/await/docs/docs.md#_connecttopostgres)  
+Commit/rollback are implicit if sending a callback to the transaction function. [See example](https://github.com/alfateam/rdb/blob/await/src/docs/docs.md#_connecttopostgres)  
 The callback must return a promise or be an async function.  
 __1.7.6__  
 Order By now supports jsonb-fields.  
@@ -186,7 +186,7 @@ Bugfix: Transaction domain should not forward rdb singleton from old domain.
 __1.0.5__  
 Documentation cleanup.  
 __1.0.4__  
-[orderBy](https://github.com/alfateam/rdb/blob/master/docs/docs.md#_todtowithorderby) in toDto().  
+[orderBy](https://github.com/alfateam/rdb/blob/master/src/docs/docs.md#_todtowithorderby) in toDto().  
 __1.0.3__  
 toDto() using next tick on every thousandth row to avoid maximum call stack size exceeded.  
 __1.0.2__  
