@@ -7,18 +7,16 @@ function newJoin(parentTable, childTable) {
 
 	c.by = function() {
 		for (var i = 0; i < arguments.length; i++) {
-			verifyColumnExists(arguments[i]);
-			columnNames.push(arguments[i]);
+			columnNames.push(getColumnName(arguments[i]));
 		}
 		return c;
 	};
 
-	function verifyColumnExists(columnName) {
+	function getColumnName(columnName) {
 		var columns = parentTable._columns;
 		for (var i = 0; i < columns.length; i++) {
-			if (columns[i]._dbName === columnName)
-				return;
-
+			if (columns[i]._dbName === columnName || columns[i].alias === columnName)
+				return columns[i]._dbName;
 		}
 		throw new Error('Unknown column: ' + columnName);
 	}
