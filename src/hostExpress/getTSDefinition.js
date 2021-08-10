@@ -3,14 +3,14 @@ function getTSDefinition(table, customFilters = {}, request) {
 	let Name = url.split('/').pop()[0].toUpperCase() + url.split('/').pop().slice(1);
 	let name = Name[0].toLowerCase() + Name.substr(1);
 	let result = '' + getTable(table, Name, name, customFilters);
-	// return result;
+	return result;
 	result = result.replace(/\n\s*\n/g, '\n');
-	return result.replace(/^..../gm, '').replace(/interface/g, '\ninterface').replace(/type/g, '\ntype').replace(/^ {4}/gm, '\t').substr(1) + '\n';
+	return result.replace(/^..../gm, '').replace(/export interface/g, '\nexport interface').replace(/type/g, '\ntype').replace(/^ {4}/gm, '\t').substr(1) + '\n';
 }
 
 function getTable(table, Name, name, customFilters) {
 	return `
-    interface ${Name}Table {
+    export interface ${Name}Table {
         getManyDto(filter?: import('rdb-client').RawFilter, strategy?: ${Name}Strategy): Promise<${Name}Array>;
         getManyDto(${name}s: Array<${Name}>, strategy?: ${Name}Strategy): Promise<${Name}Array>;
         getMany(filter?: import('rdb-client').RawFilter, strategy?: ${Name}Strategy): Promise<${Name}Array>;
@@ -20,15 +20,14 @@ function getTable(table, Name, name, customFilters) {
         getById(gid: string, strategy?: ${Name}Strategy): Promise<${Name}Row>;
         tryGetById(gid: string, strategy?: ${Name}Strategy): Promise<${Name}Row>;
         proxify(${name}s: ${Name}[]): ${Name}Array;
-        ${columns(table)}
         customFilters: ${Name}CustomFilters;
     }
 
-    interface ${Name}CustomFilters {
+    export interface ${Name}CustomFilters {
         ${getCustomFilters(customFilters)}
     }
 
-    interface ${Name}Array extends Array<${Name}> {
+    export interface ${Name}Array extends Array<${Name}> {
         save(options?: Save${Name}Options): Promise<void>;
         acceptChanges(): void;
         clearChanges(): void;
@@ -37,7 +36,7 @@ function getTable(table, Name, name, customFilters) {
         delete(): Promise<void>;
     }
 
-    interface Save${Name}Options {
+    export interface Save${Name}Options {
         defaultConcurrency?: import('rdb-client').Concurrencies
         concurrency?: ${Name}Concurrency;
     }
@@ -45,6 +44,16 @@ function getTable(table, Name, name, customFilters) {
     ${concurrencies(table, Name)}
     `;
 }
+
+function tableRelations(table) {
+	let relations = table._relations;
+	let result = '';
+	for (let relationName in relations) {
+		result += `${relationName}: ${pascalCase(relationName)}Table;`;
+	}
+	return result;
+}
+
 
 function columns(table) {
 	let result = '';
@@ -101,7 +110,7 @@ function concurrencies(table, name, tablesAdded) {
 
 	let row = '';
 	if (isRoot) {
-		row = `interface ${name}Row extends ${name} {
+		row = `export interface ${name}Row extends ${name} {
         save(): Promise<void>;
         refresh(strategy?: ${name}Strategy | undefined | null): Promise<void>;
         acceptChanges(): void;
@@ -110,19 +119,25 @@ function concurrencies(table, name, tablesAdded) {
         delete(): Promise<void>;
     }`;
 	}
+	else {
+		row = `export interface ${name}Table {
+			${columns(table)}
+			${tableRelations(table)}
+		}`;
+	}
 
 	return `
-    interface ${name}Concurrency {
+    export interface ${name}Concurrency {
         ${concurrencyColumns(table)}
         ${concurrencyRelations}
     }
 
-    interface ${name} {
+    export interface ${name} {
         ${regularColumns(table)}
         ${regularRelations}
     }
 
-    interface ${name}Strategy {
+    export interface ${name}Strategy {
         ${strategyColumns(table)}
         ${strategyRelations}
         limit?: number;
