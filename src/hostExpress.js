@@ -10,12 +10,12 @@ function hostExpress({ db, table, defaultConcurrency, concurrency, customFilters
 			if (!table)
 				throw new Error('Table is not exposed');
 
-			if ((_req.headers.accept || '').indexOf('application/json') === -1) {
+			if ((_req.headers.accept || '').indexOf('application/json') > -1)
+				response.status(200).send(getMeta(table));
+			else {
 				response.setHeader('content-type', 'text/plain');
 				response.status(200).send(getTSDefinition(table, customFilters, _req));
 			}
-			else
-				response.status(200).send(getMeta(table));
 		}
 		catch (e) {
 			response.status(500).send(e && e.stack);

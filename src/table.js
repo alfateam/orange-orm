@@ -18,6 +18,7 @@ var createJSONReadStream = require('./table/createJSONReadStream');
 var getIdArgs = require('./table/getIdArgs');
 var patchTable = require('./patchTable');
 var newEmitEvent = require('./emitEvent');
+var hostLocal = require('./hostLocal');
 
 function _new(tableName) {
 	var table = newContext();
@@ -132,6 +133,10 @@ function _new(tableName) {
 	table.patch = patchTable.bind(null, table);
 	table.subscribeChanged = table._emitChanged.add;
 	table.unsubscribeChanged = table._emitChanged.remove;
+
+	table.hostLocal = function(options) {
+		return hostLocal({table, ...options});
+	};
 
 	return table;
 }

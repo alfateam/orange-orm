@@ -50,8 +50,9 @@ let allowedOps = {
 	exists: true
 };
 
-async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, request, response }) {
-	let ops = { ..._ops, ...getCustomFilterPaths(customFilters), ...{ getManyDto, getMany: getManyDto } };
+async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, request, response, allowEverything }) {
+	//todo if (allowEverything)...
+	let ops = { ..._ops, ...getCustomFilterPaths(customFilters), ...{ getManyDto, getMany } };
 	let res = await parseFilter(JSONFilter);
 	return res;
 
@@ -67,26 +68,27 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 
 		function executePath(path, args) {
 			if (path in ops) {
-				validateArgs(args);
+				if (!allowEverything)
+					validateArgs(args);
 				let op = ops[path].apply(null, args);
 				if (op.then)
 					return op.then((o) => {
-						o.isSafe = isSafe;
+						setSafe(o);
 						return o;
 					});
-				op.isSafe = isSafe;
+				setSafe(op);
 				return op;
 			}
 			let pathArray = path.split('.');
 			let target = table;
 			let op = pathArray[pathArray.length - 1];
-			if (!allowedOps[op])
+			if (!allowedOps[op] && !allowEverything)
 				throw new Error('Disallowed operator ' + op);
 			for (let i = 0; i < pathArray.length; i++) {
 				target = target[pathArray[i]];
 			}
 			let res = target.apply(null, args);
-			res.isSafe = isSafe;
+			setSafe(res);
 			return res;
 		}
 	}
@@ -102,6 +104,19 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 		}
 		let args = [filter].concat(Array.prototype.slice.call(arguments).slice(1));
 		return table.getManyDto.apply(null, args);
+	}
+
+	async function getMany(filter, strategy) {
+		validateStrategy(table, strategy);
+		filter = negotiateRawSqlFilter(filter, table);
+		if (typeof baseFilter === 'function') {
+			baseFilter = await baseFilter(request, response);
+		}
+		if (baseFilter) {
+			filter = filter.and(baseFilter);
+		}
+		let args = [filter].concat(Array.prototype.slice.call(arguments).slice(1));
+		return table.getMany.apply(null, args);
 	}
 
 }
@@ -178,5 +193,15 @@ function getCustomFilterPaths(customFilters) {
 
 function isFilter(json) {
 	return json instanceof Object && 'path' in json && 'args' in json;
+}
+
+function setSafe(o) {
+	Object.defineProperty(o, 'isSafe', {
+		value: isSafe,
+		enumerable: false
+	});
+
+
+
 }
 module.exports = executePath;
