@@ -45,8 +45,25 @@ async function patchTable(table, patches, { defaultConcurrency = 'optimistic', c
 		if (!row && path.length > 0)
 			row = row || await table.tryGetById.apply(null, toKey(property), strategy);
 		if (path.length === 0) {
-			let pkName = table._primaryColumns[0].alias;
-			row = table.insert(value[pkName]);
+			let keyValues = [];
+			for (let i = 0; i < table._primaryColumns.length; i++) {
+				let pkName = table._primaryColumns[i].alias;
+				let keyValue = value[pkName];
+				if (keyValue && typeof(keyValue) === 'string' && keyValue.indexOf('~') === 0)
+					keyValue = undefined;
+				keyValues.push(keyValue);
+			}
+			let row = table.insert.apply(null, keyValues);
+
+			if (relation && relation.joinRelation) {
+				let fkName = relation.joinRelation.columns[0].alias;
+				let parentPk = relation.joinRelation.childTable._primaryColumns[0].alias;
+				if (!row[fkName]) {
+					row[fkName] = parentRow[parentPk];
+				}
+			}
+			row = await row;
+
 			let childInserts = [];
 			for (let name in value) {
 				if (isColumn(name, table))
@@ -65,12 +82,6 @@ async function patchTable(table, patches, { defaultConcurrency = 'optimistic', c
 					let child = value[name];
 					childInserts.push(add.bind(null, { path: [name], value: child, op, oldValue, concurrency: concurrency[name] }, relation.childTable, {}, row, relation));
 				}
-			}
-			if (relation && relation.joinRelation) {
-				let fkName = relation.joinRelation.columns[0].alias;
-				let parentPk = relation.joinRelation.childTable._primaryColumns[0].alias;
-				if (!row[fkName])
-					row[fkName] = parentRow[parentPk];
 			}
 			for (let i = 0; i < childInserts.length; i++) {
 				await childInserts[i]();
