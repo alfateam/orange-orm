@@ -8,7 +8,9 @@ let pushCommand = require('./commands/pushCommand');
 function insert(table) {
 	let args = [].slice.call(arguments);
 	let row = newRow.apply(null, args);
-	row = table._cache.tryAdd(row);
+	let hasPrimary = getHasPrimary(table, row);
+	if (hasPrimary)
+		row = table._cache.tryAdd(row);
 	let cmd = newInsertCommand(table, row);
 
 	pushCommand(cmd);
@@ -38,8 +40,9 @@ function insert(table) {
 	}
 
 	function onResult([result]) {
-		table._cache.tryRemove(row);
 		row.hydrate(result);
+		if (!hasPrimary)
+			row = table._cache.tryAdd(row);
 		table._cache.tryAdd(row);
 	}
 }
@@ -61,6 +64,16 @@ function expand(table, row) {
 		let relation = table._relations[relationName];
 		relation.accept(visitor);
 	}
+
+}
+
+function getHasPrimary(table, row) {
+	for (let i = 0; i < table._primaryColumns.length; i++) {
+		let column = table._primaryColumns[i];
+		if (row[column.alias] === null)
+			return;
+	}
+	return true;
 
 }
 

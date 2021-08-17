@@ -34,6 +34,7 @@ function _new(tableName) {
 
 	table.primaryColumn = function(columnName) {
 		var columnDef = newColumn(table, columnName);
+		columnDef.isPrimary = true;
 		table._primaryColumns.push(columnDef);
 		return column(columnDef, table);
 	};
