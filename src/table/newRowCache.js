@@ -92,7 +92,7 @@ function _newRowCache(table) {
 
 	c.tryRemove = function(row) {
 		let key = rowToKey(row);
-		cache.tryRemove(key);
+		return cache.tryRemove(key);
 	};
 
 	c.subscribeAdded = cache.subscribeAdded;
