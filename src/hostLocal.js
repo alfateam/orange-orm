@@ -1,7 +1,7 @@
 let executePath = require('./hostExpress/executePath');
 let getMeta = require('./hostExpress/getMeta');
 
-function hostLocal({ db, table, defaultConcurrency, concurrency, customFilters, baseFilter }) {
+function hostLocal({ db, table, defaultConcurrency, concurrency, customFilters, baseFilter, strategy }) {
 	let c = {get, post, patch};
 
 	function get() {
@@ -23,7 +23,8 @@ function hostLocal({ db, table, defaultConcurrency, concurrency, customFilters, 
 			let options = body.options || {};
 			let _concurrency = options.concurrency || concurrency;
 			let _defaultConcurrency = options.defaultConcurrency || defaultConcurrency;
-			result = await table.patch(patch, { _defaultConcurrency, _concurrency });
+			let _strategy = options.strategy || strategy;
+			result = await table.patch(patch, { defaultConcurrencey:_defaultConcurrency, concurrency: _concurrency, strategy: _strategy });
 		});
 		return result;
 	}

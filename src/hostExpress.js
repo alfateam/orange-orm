@@ -3,7 +3,7 @@ let executePath = require('./hostExpress/executePath');
 let getMeta = require('./hostExpress/getMeta');
 let getTSDefinition = require('./hostExpress/getTSDefinition');
 
-function hostExpress({ db, table, defaultConcurrency, concurrency, customFilters, baseFilter }) {
+function hostExpress({ db, table, defaultConcurrency, concurrency, customFilters, baseFilter, strategy }) {
 	let router = express.Router();
 	router.get('/', function(_req, response) {
 		try {
@@ -38,7 +38,8 @@ function hostExpress({ db, table, defaultConcurrency, concurrency, customFilters
 				let options = request.body.options || {};
 				let _concurrency = options.concurrency || concurrency;
 				let _defaultConcurrency = options.defaultConcurrency || defaultConcurrency;
-				result = await table.patch(patch, { _defaultConcurrency, _concurrency });
+				let _strategy = options.strategy || strategy;
+				result = await table.patch(patch, { defaultConcurrencey: _defaultConcurrency, concurrency: _concurrency, strategy: _strategy });
 			});
 
 			response.status(200).send(result);
