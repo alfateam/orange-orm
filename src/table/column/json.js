@@ -1,5 +1,5 @@
 var newEncode = require('./json/newEncode');
-var newDecode = require('./newDecodeCore');
+var newDecode = require('./json/newDecode');
 var purify = require('./json/purify');
 var onChange = require('on-change');
 let clone = require('rfdc/default');

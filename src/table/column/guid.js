@@ -1,5 +1,5 @@
 var newEncode = require('./guid/newEncode');
-var newDecode = require('./newDecodeCore');
+var newDecode = require('./guid/newDecode');
 var purify = require('./guid/purify');
 
 function _new(column) {

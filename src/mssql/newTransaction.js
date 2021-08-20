@@ -3,7 +3,7 @@ var encodeBoolean = require('./encodeBoolean');
 var encodeDate = require('./encodeDate');
 var deleteFromSql = require('./deleteFromSql');
 var selectForUpdateSql = require('./selectForUpdateSql');
-var lastInsertedSql = require('./lastInsertedSql');
+var outputInsertedSql = require('./outputInsertedSql');
 
 function newResolveTransaction(domain, pool) {
 	var rdb = {};
@@ -21,6 +21,7 @@ function newResolveTransaction(domain, pool) {
 					onError(err);
 					return;
 				}
+				client.setUseUTC(false);
 				client.executeQuery = wrapQuery(client);
 				rdb.dbClient = client;
 				rdb.dbClientDone = done;
@@ -29,9 +30,11 @@ function newResolveTransaction(domain, pool) {
 				rdb.decodeJSON = JSON.parse.bind(JSON);
 				rdb.deleteFromSql = deleteFromSql;
 				rdb.selectForUpdateSql = selectForUpdateSql;
-				rdb.lastInsertedSql = lastInsertedSql;
-				rdb.lastInsertedIsSeparate = true;
-				rdb.multipleStatements = false;
+				rdb.outputInsertedSql = outputInsertedSql;
+				rdb.lastInsertedIsSeparate = false;
+				rdb.multipleStatements = true;
+				rdb.begin = 'BEGIN TRANSACTION';
+				rdb.limit = 'TOP';
 				rdb.accept = function(caller) {
 					caller.visitSqlite();
 				};

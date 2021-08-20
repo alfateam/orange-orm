@@ -8,9 +8,9 @@ function getSqlTemplate(table, row) {
 	addDiscriminators();
 	addColumns();
 	if (columnNames.length === 0)
-		sql += `${defaultValues()}`;
+		sql += `${outputInserted()}${defaultValues()}${lastInserted()}`;
 	else
-		sql = sql + '('+ columnNames.join(',') + ') VALUES (' + values.join(',') + ')' + lastInserted() ;
+		sql = sql + '('+ columnNames.join(',') + ') ' + outputInserted() +  'VALUES (' + values.join(',') + ')' + lastInserted() ;
 	return sql;
 
 	function addDiscriminators() {
@@ -36,8 +36,15 @@ function getSqlTemplate(table, row) {
 
 	function lastInserted() {
 		let context = getSessionContext();
-		if (!context.lastInsertedIsSeparate)
+		if (!context.lastInsertedIsSeparate && context.lastInsertedSql)
 			return ' ' + context.lastInsertedSql(table);
+		return '';
+	}
+
+	function outputInserted() {
+		let context = getSessionContext();
+		if (!context.lastInsertedIsSeparate && context.outputInsertedSql)
+			return ' ' + context.outputInsertedSql(table) + ' ';
 		return '';
 	}
 

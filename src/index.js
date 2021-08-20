@@ -1,6 +1,7 @@
 var newPg = require('./pg/newDatabase');
 var hostExpress = require('./hostExpress');
 var _sqlite;
+var _mssql;
 var flags = require('./flags');
 
 var connectViaPool = function(connectionString) {
@@ -26,6 +27,14 @@ Object.defineProperty(connectViaPool, 'sqlite', {
 		if (!_sqlite)
 			_sqlite = require('./sqlite/newDatabase');
 		return _sqlite;
+	}
+});
+
+Object.defineProperty(connectViaPool, 'mssql', {
+	get: function() {
+		if (!_mssql)
+			_mssql = require('./mssql/newDatabase');
+		return _mssql;
 	}
 });
 
