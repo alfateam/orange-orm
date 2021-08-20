@@ -8,10 +8,11 @@ function _new(column) {
 		value = decodeCore(value);
 		if (value === null)
 			return value;
-
-		let decode = getSessionContext().decodeJSON;
-		if (decode) {
-			return decode(value);
+		if (typeof value !== 'object') {
+			let decode = getSessionContext().decodeJSON;
+			if (decode) {
+				return decode(value);
+			}
 		}
 		return value;
 	};
