@@ -26,7 +26,7 @@ function newResolveTransaction(domain, pool) {
 				rdb.dbClientDone = done;
 				rdb.encodeBoolean = encodeBoolean;
 				rdb.encodeDate = encodeDate;
-				rdb.decodeJSON = JSON.parse.bind(JSON);
+				rdb.decodeJSON = decodeJSON;
 				rdb.deleteFromSql = deleteFromSql;
 				rdb.selectForUpdateSql = selectForUpdateSql;
 				rdb.lastInsertedSql = lastInsertedSql;
@@ -42,6 +42,10 @@ function newResolveTransaction(domain, pool) {
 			}
 		}
 	};
+}
+
+function decodeJSON(value) {
+	return JSON.parse(value);
 }
 
 module.exports = newResolveTransaction;

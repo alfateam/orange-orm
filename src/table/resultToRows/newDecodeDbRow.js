@@ -75,7 +75,7 @@ function newDecodeDbRow(table, dbRow, filteredAliases) {
 							this[intName] = this._dbRow[key];
 						});
 					}
-					return this._proxies[name] === undefined;
+					return this._proxies[name];
 				}
 				return  negotiateNull(this[intName]);
 			},

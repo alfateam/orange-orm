@@ -8,11 +8,13 @@
     "orm",
     "sql",
     "mySql",
+    "sqlite",
     "mysql",
+    "mssql",
+    "Microsoft Sql Server",
     "postgres",
     "pg",
-    "sqlite",
-    "database"
+    "rdb"
   ],
   "author": "Lars-Erik Roald <lars.roald@gmail.com>",
   "license": "ISC",
@@ -23,6 +25,7 @@
   "dependencies": {
     "ajv": "^6.10.2",
     "deferred": "^0.7.5",
+    "msnodesqlv8": "^2.2.0",
     "mysql2": "^2.2.5",
     "node-cls": "^1.0.5",
     "on-change": "^2.2.3",
@@ -31,13 +34,13 @@
     "promise": "^8.0.3",
     "rdb-client": "^1.1.0",
     "rfc6902": "^3.0.4",
-    "rfdc": "^1.2.0",
-    "sqlite3": "^5.0.2",
+    "rfdc": "^1.2.0",    
     "uuid": "^3.0.1"
   },
   "peerDependencies": {
-    "sqlite3": "^4.0.9",
+    "sqlite3": "^5.0.2",
     "pg-native": "^3.0.0",
+    "msnodesqlv8": "^2.2.0",
     "express": ">=4.0.0"
   },
   "devDependencies": {

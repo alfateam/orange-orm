@@ -14,7 +14,6 @@ function wrapQuery(connection) {
 		
 		function onInnerCompleted(err, rows) {
 			if (err) {
-				console.log(err)
 				onCompleted(err);
 			}
 			else
