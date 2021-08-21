@@ -56,10 +56,13 @@ async function patchTable(table, patches, { defaultConcurrency = 'optimistic', c
 			let row = table.insert.apply(null, keyValues);
 
 			if (relation && relation.joinRelation) {
-				let fkName = relation.joinRelation.columns[0].alias;
-				let parentPk = relation.joinRelation.childTable._primaryColumns[0].alias;
-				if (!row[fkName]) {
-					row[fkName] = parentRow[parentPk];
+				for (let i = 0; i < relation.joinRelation.columns.length; i++) {
+					let column = relation.joinRelation.columns[i];
+					let fkName = column.alias;
+					let parentPk = relation.joinRelation.childTable._primaryColumns[i].alias;
+					if (!row[fkName]) {
+						row[fkName] = parentRow[parentPk];
+					}
 				}
 			}
 			row = await row;
