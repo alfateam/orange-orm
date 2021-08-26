@@ -19,6 +19,7 @@ var getIdArgs = require('./table/getIdArgs');
 var patchTable = require('./patchTable');
 var newEmitEvent = require('./emitEvent');
 var hostLocal = require('./hostLocal');
+var getTSDefinition = require('./getTSDefinition');
 
 function _new(tableName) {
 	var table = newContext();
@@ -139,6 +140,10 @@ function _new(tableName) {
 
 	table.hostLocal = function(options) {
 		return hostLocal({table, ...options});
+	};
+
+	table.ts = function(name) {
+		return getTSDefinition(table, {name});
 	};
 
 	return table;
