@@ -3,7 +3,8 @@
   "version": "2.7.0",
   "main": "./src/index.js",
   "title": "rdb",
-  "description": "Object Relational Mapper",
+  "description": "Object Relational Mapper", 
+  "types": "./typings/index.d.ts",
   "keywords": [
     "orm",
     "sql",
