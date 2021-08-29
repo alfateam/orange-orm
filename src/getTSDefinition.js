@@ -21,6 +21,8 @@ function getTable(table, Name, name, customFilters) {
         tryGetById(gid: string, strategy?: ${Name}Strategy): Promise<${Name}Row>;
         proxify(${name}s: ${Name}[]): ${Name}Array;
         customFilters: ${Name}CustomFilters;
+		${columns(table)}
+		${tableRelations(table)}
     }
 
     export interface ${Name}CustomFilters {
@@ -60,7 +62,7 @@ function columns(table) {
 	let separator = '';
 	for (let i = 0; i < table._columns.length; i++) {
 		let column = table._columns[i];
-		result += `${separator}${column.alias} : ${column.tsType};`;
+		result += `${separator}${column.alias} : import('rdb-client').${column.tsType};`;
 		separator = `
         `;
 	}
