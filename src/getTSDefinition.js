@@ -1,10 +1,8 @@
 function getTSDefinition(table, options) {
 	let {customFilters, name} = options;
 	let Name = name.substr(0,1).toUpperCase() + name.substr(1);
-	console.log(Name);
 	name = name.substr(0,1).toLowerCase() + name.substr(1);
 	let result = '' + getTable(table, Name, name, customFilters);
-	console.log(result);
 	return result;
 }
 
