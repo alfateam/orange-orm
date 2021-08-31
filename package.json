@@ -3,7 +3,7 @@
   "version": "2.7.0",
   "main": "./src/index.js",
   "title": "rdb",
-  "description": "Object Relational Mapper", 
+  "description": "Object Relational Mapper",
   "types": "./typings/index.d.ts",
   "keywords": [
     "orm",
@@ -26,7 +26,6 @@
   "dependencies": {
     "ajv": "^6.10.2",
     "deferred": "^0.7.5",
-    "msnodesqlv8": "^2.2.0",
     "mysql2": "^2.2.5",
     "node-cls": "^1.0.5",
     "on-change": "^2.2.3",
@@ -35,7 +34,8 @@
     "promise": "^8.0.3",
     "rdb-client": "^1.1.0",
     "rfc6902": "^3.0.4",
-    "rfdc": "^1.2.0",    
+    "rfdc": "^1.2.0",
+    "tedious": "^12.0.0",
     "uuid": "^3.0.1"
   },
   "peerDependencies": {

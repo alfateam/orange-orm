@@ -12,6 +12,7 @@ var connectViaPool = function(connectionString) {
 
 connectViaPool.pg = newPg;
 connectViaPool.mySql = require('./mySql/newDatabase');
+connectViaPool.tedious = require('./tedious/newDatabase');
 connectViaPool.table = require('./table');
 connectViaPool.filter = require('./emptyFilter');
 connectViaPool.commit = require('./table/commit');
