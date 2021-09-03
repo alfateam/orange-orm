@@ -35,7 +35,6 @@
     "rdb-client": "^1.1.0",
     "rfc6902": "^3.0.4",
     "rfdc": "^1.2.0",
-    "tedious": "^12.0.0",
     "uuid": "^3.0.1"
   },
   "peerDependencies": {
