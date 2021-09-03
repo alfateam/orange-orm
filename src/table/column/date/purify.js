@@ -7,7 +7,8 @@ function purify(value) {
 
 	if (value.toISOString)
 		return cloneDate(value);
-
+	if (value.indexOf('Z'))
+		return cloneDate(value);
 	var iso = tryParseISO(value);
 	if (iso)
 		return iso;

@@ -1,6 +1,5 @@
 var newPara = require('../../query/newParameterized');
 var purify = require('./purify');
-var newEncodeSafe = require('../newEncodeSafe');
 var getSessionSingleton = require('../../getSessionSingleton');
 
 function _new(column) {
@@ -15,7 +14,6 @@ function _new(column) {
 		return newPara(encodeCore(value));
 	};
 
-	encode.safe = newEncodeSafe(column, purify);
 	return encode;
 
 }
