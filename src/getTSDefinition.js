@@ -1,3 +1,13 @@
+const typeMap = {
+	StringColumn: 'string',
+	BooleanColumn: 'boolean',
+	UUIDColumn: 'string',
+	BinaryColumn: 'Buffer',
+	JSONColumn: 'object',
+	DateColumn: 'Date | string',
+	NumberColumn: 'number',
+};
+
 function getTSDefinition(table, options) {
 	let {customFilters, name} = options;
 	let Name = name.substr(0,1).toUpperCase() + name.substr(1);
@@ -13,10 +23,10 @@ function getTable(table, Name, name, customFilters) {
         getManyDto(${name}s: Array<${Name}>, strategy?: ${Name}Strategy): Promise<${Name}Array>;
         getMany(filter?: RawFilter, strategy?: ${Name}Strategy): Promise<${Name}Array>;
         getMany(${name}s: Array<${Name}>, strategy?: ${Name}Strategy): Promise<${Name}Array>;
-        tryGetFirst(filter?: RawFilter, strategy?: ${Name}Strategy): Promise<${Name}Row>;
-        tryGetFirst(${name}s: Array<${Name}>, strategy?: ${Name}Strategy): Promise<${Name}Row>;
-        getById(gid: string, strategy?: ${Name}Strategy): Promise<${Name}Row>;
-        tryGetById(gid: string, strategy?: ${Name}Strategy): Promise<${Name}Row>;
+        getOne(filter?: RawFilter, strategy?: ${Name}Strategy): Promise<${Name}Row>;
+        getOne(${name}s: Array<${Name}>, strategy?: ${Name}Strategy): Promise<${Name}Row>;
+        getById(${getIdArgs(table)}, strategy?: ${Name}Strategy): Promise<${Name}Row>;
+        tryGetById(${getIdArgs(table)}, strategy?: ${Name}Strategy): Promise<${Name}Row>;
         proxify(${name}s: ${Name}[]): ${Name}Array;
         customFilters: ${Name}CustomFilters;
 		${columns(table)}
@@ -44,6 +54,16 @@ function getTable(table, Name, name, customFilters) {
     ${concurrencies(table, Name)}
     `;
 }
+
+function getIdArgs(table){
+	let result = [];
+	for (let i = 0; i < table._primaryColumns.length; i++) {
+		let column = table._primaryColumns[i];
+		result.push(`${column.alias}: ${typeMap[column.tsType]}`);
+	}
+	return result.join(', ');
+}
+
 
 function tableRelations(table) {
 	let relations = table._relations;
@@ -154,16 +174,6 @@ function concurrencies(table, name, tablesAdded) {
 }
 
 function regularColumns(table){
-	const typeMap = {
-		StringColumn: 'string',
-		BooleanColumn: 'boolean',
-		UUIDColumn: 'string',
-		BinaryColumn: 'Buffer',
-		JSONColumn: 'object',
-		DateColumn: 'Date | string',
-		NumberColumn: 'number',
-	};
-
 	let result = '';
 	let separator = '';
 	for (let i = 0; i < table._columns.length; i++) {
