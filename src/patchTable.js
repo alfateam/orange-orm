@@ -1,6 +1,5 @@
 /* eslint-disable require-atomic-updates */
 let applyPatch = require('./applyPatch');
-let fromCompareObject = require('./fromCompareObject');
 
 async function patchTable(table, patches, { defaultConcurrency = 'optimistic', concurrency = {}, strategy = undefined}  = {},) {
 	let updated = new Set();
@@ -45,15 +44,13 @@ async function patchTable(table, patches, { defaultConcurrency = 'optimistic', c
 		if (!row && path.length > 0)
 			row = row || await table.tryGetById.apply(null, toKey(property), strategy);
 		if (path.length === 0) {
-			let keyValues = [];
 			for (let i = 0; i < table._primaryColumns.length; i++) {
 				let pkName = table._primaryColumns[i].alias;
 				let keyValue = value[pkName];
 				if (keyValue && typeof(keyValue) === 'string' && keyValue.indexOf('~') === 0)
-					keyValue = undefined;
-				keyValues.push(keyValue);
+					value[pkName] = undefined;
 			}
-			let row = table.insert.apply(null, keyValues);
+			let row = table.insert.apply(null, [value]);
 
 			if (relation && relation.joinRelation) {
 				for (let i = 0; i < relation.joinRelation.columns.length; i++) {
@@ -70,7 +67,7 @@ async function patchTable(table, patches, { defaultConcurrency = 'optimistic', c
 			let childInserts = [];
 			for (let name in value) {
 				if (isColumn(name, table))
-					row[name] = fromCompareObject(value[name]);
+					continue;
 				else if (isManyRelation(name, table)) {
 					let relation = table[name]._relation;
 					for(let childKey in value[name]) {

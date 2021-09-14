@@ -17,14 +17,23 @@ function newRow(table) {
 		else
 			dto[alias] = undefined;
 	}
-
-	for (var i = 1; i < arguments.length; i++) {
-		var pkValue = arguments[i];
-		var column = table._primaryColumns[i - 1];
-		dto[column.alias] = pkValue;
-	}
-
+	const arg = arguments[1];
+	if (isObject(arg))
+		for(let name in arg) {
+			if (table[name] && table[name].equal)
+				dto[name] = arg[name];
+		}
+	else
+		for (var i = 1; i < arguments.length; i++) {
+			var pkValue = arguments[i];
+			var column = table._primaryColumns[i - 1];
+			dto[column.alias] = pkValue;
+		}
 	return decodeDbRow(table, table, dto);
+}
+
+function isObject(object) {
+	return (object === Object(object) && !Array.isArray(object) && !(object instanceof Date));
 }
 
 module.exports = newRow;
