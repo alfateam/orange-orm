@@ -23,8 +23,13 @@ emptyFilter.or = function(other) {
 	return other;
 };
 
-emptyFilter.not = function() {
-	return emptyFilter;
+emptyFilter.not = function(other) {
+	other = negotiateRawSqlFilter(other).not();
+	for (var i = 1; i < arguments.length; i++) {
+		other = other.and(arguments[i]);
+	}
+	return other;
+
 };
 
 module.exports = emptyFilter;
