@@ -14,6 +14,7 @@ function createJSONReadStream(table, db, filter, strategy, streamOptions) {
 	c.visitSqlite = function() {
 		create = createJSONReadStreamDefault;
 	};
+	c.visitSap = c.visitSqlite;
 
 	db.accept(c);
 

@@ -11,7 +11,8 @@ function getManyDto(table, filter, strategy) {
 		isPg = true;
 	};
 	c.visitMySql = function() {};
-	c.visitSqlite = function() {};
+	c.visitSqlite = c.visitMySql;
+	c.visitSap = c.visitSqlite;
 
 	getSessionContext().accept(c);
 

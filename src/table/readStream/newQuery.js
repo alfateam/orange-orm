@@ -16,6 +16,10 @@ function newQuery(db) {
 		throw new Error('Sqlite not supported');
 	};
 
+	c.visitSap = function() {
+		throw new Error('Sap not supported');
+	};
+
 	db.accept(c);
 
 	var args = [];

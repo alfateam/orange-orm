@@ -14,6 +14,7 @@ function createReadStream(table, db, filter, strategy, streamOptions) {
 	c.visitSqlite = function() {
 		create =  createReadStreamDefault;
 	};
+	c.visitSap = c.visitSqlite;
 
 	db.accept(c);
 

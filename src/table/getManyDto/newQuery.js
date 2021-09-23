@@ -16,6 +16,10 @@ function newQuery() {
 		throw new Error('Sqlite not supported');
 	};
 
+	c.visitSap = function() {
+		throw new Error('Sap not supported');
+	};
+
 	getSessionContext().accept(c);
 
 	return _newQuery.apply(null, arguments);

@@ -1,5 +1,6 @@
 var newPara = require('../../query/newParameterized');
 var purify = require('./purify');
+var getSessionSingleton = require('../../getSessionSingleton');
 
 function _new(column) {
 
@@ -10,8 +11,13 @@ function _new(column) {
 				return newPara('null');
 			return newPara('\'' + column.dbNull + '\'');
 		}
+		var encodeCore = getSessionSingleton('encodeJSON');
+
+		if (encodeCore) {
+			value = encodeCore(value);
+		}
 		return newPara('?', [value]);
-		// return newPara('?', [JSON.stringify(value)]);
+
 	};
 }
 
