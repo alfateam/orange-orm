@@ -1,4 +1,4 @@
-var wrapQuery = require('./wrapQuery');
+var wrapQuery = require('../mssql/wrapQuery');
 var encodeBoolean = require('./encodeBoolean');
 var encodeDate = require('./encodeDate');
 var deleteFromSql = require('./deleteFromSql');

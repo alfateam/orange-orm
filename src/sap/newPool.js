@@ -1,7 +1,7 @@
 var pools = require('../pools');
 var promise = require('../table/promise');
 var end = require('./pool/end');
-var newGenericPool = require('./pool/newGenericPool');
+var newGenericPool = require('../mssql/pool/newGenericPool');
 var newId = require('../newId');
 
 function newPool(connectionString, poolOptions) {
