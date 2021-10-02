@@ -212,13 +212,12 @@ function newDecodeDbRow(table, dbRow, filteredAliases) {
 				}));
 			},
 			getOwnPropertyDescriptor(target, prop) {
-
-				let result =  {
-					enumerable: aliases.has(prop) || (target._related[prop] && target._related[prop].expanded),
-					configurable: true,
-					writable: true
-				};
-				return result;
+				if (table._aliases.has(prop) || (target._related[prop]))
+					return {
+						enumerable: aliases.has(prop) || (target._related[prop] && target._related[prop].expanded),
+						configurable: true,
+						writable: true
+					};
 			}
 		});
 
