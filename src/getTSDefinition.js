@@ -65,11 +65,12 @@ function getIdArgs(table){
 }
 
 
-function tableRelations(table) {
+function tableRelations(table, tablesAdded = new Map()) {
 	let relations = table._relations;
 	let result = '';
 	for (let relationName in relations) {
-		result += `${relationName}: ${pascalCase(relationName)}Table;`;
+		const tableName = getTableName(relations[relationName], relationName, tablesAdded);
+		result += `${relationName}: ${tableName}Table;`;
 	}
 	return result;
 }
@@ -104,27 +105,28 @@ function concurrencies(table, name, tablesAdded) {
 	let regularRelations = '';
 	let relations = table._relations;
 	let relationName;
+	let tableName;
 
 	let separator = `
         `;
 	let visitor = {};
 	visitor.visitJoin = function(relation) {
 		otherConcurrencies += `${concurrencies(relation.childTable, relationName, tablesAdded)}`;
-		concurrencyRelations += `${relationName}?: ${pascalCase(getName(relationName))}Concurrency;${separator}`;
-		strategyRelations += `${relationName}?: ${pascalCase(relationName)}Strategy | null;${separator}`;
-		regularRelations += `${relationName}?: ${pascalCase(relationName)} | null;${separator}`;
+		concurrencyRelations += `${relationName}?: ${tableName}Concurrency;${separator}`;
+		strategyRelations += `${relationName}?: ${tableName}Strategy | null;${separator}`;
+		regularRelations += `${relationName}?: ${tableName} | null;${separator}`;
 	};
 	visitor.visitOne = visitor.visitJoin;
 	visitor.visitMany = function(relation) {
-
 		otherConcurrencies += `${concurrencies(relation.childTable, relationName, tablesAdded)}`;
-		concurrencyRelations += `${relationName}?: ${pascalCase(relationName)}Concurrency;${separator}`;
-		strategyRelations += `${relationName}?: ${pascalCase(relationName)}Strategy  | null;${separator}`;
-		regularRelations += `${relationName}?: ${pascalCase(relationName)}[];${separator}`;
+		concurrencyRelations += `${relationName}?: ${tableName}Concurrency;${separator}`;
+		strategyRelations += `${relationName}?: ${tableName}Strategy  | null;${separator}`;
+		regularRelations += `${relationName}?: ${tableName}[];${separator}`;
 	};
 
 	for (relationName in relations) {
 		var relation = relations[relationName];
+		tableName = getTableName(relation, relationName, tablesAdded);
 		relation.accept(visitor);
 	}
 
@@ -142,7 +144,7 @@ function concurrencies(table, name, tablesAdded) {
 	else {
 		row = `export interface ${name}Table {
 			${columns(table)}
-			${tableRelations(table)}
+			${tableRelations(table, tablesAdded)}
 		}`;
 	}
 
@@ -168,9 +170,10 @@ function concurrencies(table, name, tablesAdded) {
 
     ${row}`;
 
-	function getName(name) {
-		return tablesAdded.get(name) || name;
-	}
+}
+
+function getTableName(relation, relationName, tablesAdded) {
+	return tablesAdded.get(relation.childTable) || pascalCase(relationName);
 }
 
 function regularColumns(table){
