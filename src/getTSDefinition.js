@@ -145,6 +145,7 @@ function concurrencies(table, name, tablesAdded) {
 		row = `export interface ${name}Table {
 			${columns(table)}
 			${tableRelations(table, tablesAdded)}
+			exists: () => import('rdb-client').Filter;
 		}`;
 	}
 
