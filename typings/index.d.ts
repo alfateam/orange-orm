@@ -68,7 +68,7 @@ export interface ColumnOf<T> {
     serializable(value: boolean): ColumnOf<T>;
     default(value: T | (() => T)): ColumnOf<T>;
     dbNull(value: T | null) : ColumnOf<T>;
-
+    as(dbName: string) : ColumnOf<T>;
 }
 
 declare const rdb: Rdb;
