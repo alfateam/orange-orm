@@ -1,3 +1,5 @@
+const tablesAdded = new Map();
+
 const typeMap = {
 	StringColumn: 'string',
 	BooleanColumn: 'boolean',
@@ -65,7 +67,7 @@ function getIdArgs(table){
 }
 
 
-function tableRelations(table, tablesAdded = new Map()) {
+function tableRelations(table) {
 	let relations = table._relations;
 	let result = '';
 	for (let relationName in relations) {
@@ -144,7 +146,7 @@ function concurrencies(table, name, tablesAdded) {
 	else {
 		row = `export interface ${name}Table {
 			${columns(table)}
-			${tableRelations(table, tablesAdded)}
+			${tableRelations(table)}
 			exists: () => import('rdb-client').Filter;
 		}`;
 	}
