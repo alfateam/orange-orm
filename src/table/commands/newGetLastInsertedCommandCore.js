@@ -27,7 +27,7 @@ function newGetLastInsertedCommandCore(table, row) {
 		}
 		else
 			parameterized = newParameterized(filter);
-		parameters.concat(parameterized.parameters);
+		parameters = parameters.concat(parameterized.parameters);
 		return [discriminators(), parameterized.sql()].filter(x => x).join(',');
 	}
 
