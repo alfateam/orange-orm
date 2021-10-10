@@ -34,9 +34,9 @@ function insert(table) {
 	}
 
 	return row;
-	function then(fn) {
+	function then(fn,efn) {
 		delete row.then;
-		return executeQueries([]).then(() => fn(row));
+		return executeQueries([]).then(() => fn(row), efn);
 	}
 
 	function onResult([result]) {
