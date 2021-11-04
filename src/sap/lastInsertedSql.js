@@ -7,8 +7,6 @@ function lastInsertedSql(table, keyValues) {
 			return column.eq(value);
 	});
 
-	//todo
-	// select @@identity
 }
 
 module.exports = lastInsertedSql;

@@ -4,7 +4,7 @@ function encodeDate(date) {
 	return truncate(date);
 }
 function truncate(date) {
-	return '\'' + date.substring(0,23) + '\'';
+	return '\'' + date.substring(0,22) + '\'';
 }
 
 module.exports = encodeDate;
