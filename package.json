@@ -32,7 +32,7 @@
     "pg": "^8.5.1",
     "pg-query-stream": "^3.3.2",
     "promise": "^8.0.3",
-    "rdb-client": "^1.1.0",
+    "rdb-client": "github:alfateam/rdb-client#_next",
     "rfc6902": "^3.0.4",
     "rfdc": "^1.2.0",
     "uuid": "^3.0.1"
