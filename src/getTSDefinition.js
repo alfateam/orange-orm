@@ -83,7 +83,7 @@ function columns(table) {
 	let separator = '';
 	for (let i = 0; i < table._columns.length; i++) {
 		let column = table._columns[i];
-		result += `${separator}${column.alias} : import('rdb-client').${column.tsType};`;
+		result += `${separator}${column.alias} : ${column.tsType};`;
 		separator = `
         `;
 	}
@@ -147,7 +147,7 @@ function concurrencies(table, name, tablesAdded) {
 		row = `export interface ${name}Table {
 			${columns(table)}
 			${tableRelations(table)}
-			exists: () => import('rdb-client').Filter;
+			exists: () => Filter;
 		}`;
 	}
 
