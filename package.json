@@ -1,6 +1,6 @@
 {
   "name": "rdb",
-  "version": "2.7.0",
+  "version": "3.0.0",
   "main": "./src/index.js",
   "title": "rdb",
   "description": "Object Relational Mapper",
@@ -24,15 +24,15 @@
     "lint": "eslint ./"
   },
   "dependencies": {
+    "@lroal/on-change": "^4.0.0",
     "ajv": "^6.10.2",
     "deferred": "^0.7.5",
     "mysql2": "^2.2.5",
     "node-cls": "^1.0.5",
-    "on-change": "^3.0.2",
     "pg": "^8.5.1",
     "pg-query-stream": "^3.3.2",
     "promise": "^8.0.3",
-    "rdb-client": "github:alfateam/rdb-client#_next",
+    "rdb-client": "^1.2.4",
     "rfc6902": "^3.0.4",
     "rfdc": "^1.2.0",
     "uuid": "^3.0.1"

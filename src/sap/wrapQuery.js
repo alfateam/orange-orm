@@ -9,7 +9,6 @@ function wrapQuery(connection) {
 		var sql = query.sql();
 		log(sql);
 		log('parameters: ' + params);
-		console.log(Array.isArray(params))
 
 		runOriginalQuery.call(connection, sql, params, onInnerCompleted);
 		// runOriginalQuery.call(connection, sql, params, onInnerCompleted);

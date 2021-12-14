@@ -1,7 +1,7 @@
 var newEncode = require('./json/newEncode');
 var newDecode = require('./json/newDecode');
 var purify = require('./json/purify');
-var onChange = require('on-change');
+var onChange = require('@lroal/on-change');
 let clone = require('rfdc/default');
 
 function _new(column) {
