@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](src/docs/docs.md)  
 
 ## Release notes
+__3.0.0__  
+Support for Sybase SAP and MsSql.  
 __2.6.28__  
 Support for rdb in the browser. Docs will come later.  
 __2.6.27__  
