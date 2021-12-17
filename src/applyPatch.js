@@ -87,7 +87,10 @@ function toCompareObject(object) {
 				copy[i] = element;
 		}
 		return copy;
-	} else if (object === Object(object)) {
+	}
+	else if (object instanceof Date && object.toISOString)
+		return object.toISOString();
+	else if (object === Object(object)) {
 		let copy = {};
 		for (let name in object) {
 			copy[name] = toCompareObject(object[name]);
