@@ -137,18 +137,6 @@ return db.transaction(async () => {
     //transaction will commit after this function
 });
 ``` 
-<a name="_connecttosqlite"></a>
-[connect to sqlite](https://github.com/alfateam/rdb-demo/blob/master/sqlite/connect.js)  
-Requires sqlite3 as a dependency in your own package.json
-```js
-let rdb = require('rdb');
-
-let db = rdb.sqlite(__dirname + '/db/rdbDemo');
-
-return db.transaction(async () => {
-    //transaction will commit after this function
-});
-```
 <a name="_connecttosap"></a>
 [connect to Sybase SAP](https://github.com/alfateam/rdb-demo/blob/master/sap/connect.js)  
 Pre-requisitites:
@@ -162,6 +150,18 @@ return db.transaction(async () => {
     //transaction will commit after this function
 });
 ``` 
+<a name="_connecttosqlite"></a>
+[connect to sqlite](https://github.com/alfateam/rdb-demo/blob/master/sqlite/connect.js)  
+Requires sqlite3 as a dependency in your own package.json
+```js
+let rdb = require('rdb');
+
+let db = rdb.sqlite(__dirname + '/db/rdbDemo');
+
+return db.transaction(async () => {
+    //transaction will commit after this function
+});
+```
 <a name="_poolsize"></a>
 [pool size](https://github.com/alfateam/rdb-demo/blob/master/poolOptions.js)
 ```js
