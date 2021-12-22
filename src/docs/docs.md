@@ -4,6 +4,8 @@ _Documentation and examples_
 __Connecting__  
 [connect to postgres](#_connecttopostgres)  
 [connect to mySql](#_connecttomysql)  
+[connect to Ms Sql](#_connecttomssql)  
+[connect to Sybase SAP](#_connecttomsap)  
 [connect to sqlite](#_connecttosqlite)  
 [pool size](#_poolsize)  
 [native bindings](#_native)  
@@ -120,7 +122,21 @@ let db = rdb('mysql://root@localhost/rdbDemo?multipleStatements=true');
 return db.transaction(async () => {
     //transaction will commit after this function
 });
-```
+``` 
+<a name="_connecttomssql"></a>
+[connect to Ms Sql](https://github.com/alfateam/rdb-demo/blob/master/msSql/connect.js)  
+Pre-requisitites:
+- [ODBC 17](https://docs.microsoft.com/en-us/sql/connect/odbc/download-odbc-driver-for-sql-server?view=sql-server-ver15)
+- npm install [mssqlnodev8](https://www.npmjs.com/package/msnodesqlv8)  
+```js
+let rdb = require('rdb');
+
+let db = rdb.mssql('server=.;Database=rdbDemo;Trusted_Connection=Yes;Driver={ODBC Driver 17 for SQL Server}');
+
+return db.transaction(async () => {
+    //transaction will commit after this function
+});
+``` 
 <a name="_connecttosqlite"></a>
 [connect to sqlite](https://github.com/alfateam/rdb-demo/blob/master/sqlite/connect.js)  
 Requires sqlite3 as a dependency in your own package.json
@@ -133,6 +149,19 @@ return db.transaction(async () => {
     //transaction will commit after this function
 });
 ```
+<a name="_connecttosap"></a>
+[connect to Sybase SAP](https://github.com/alfateam/rdb-demo/blob/master/sap/connect.js)  
+Pre-requisitites:
+- Peer dependency [mssqlnodev8](https://www.npmjs.com/package/msnodesqlv8) (yes, even though we are not using ms sql here)  
+```js
+let rdb = require('rdb');
+
+let db = rdb.sap('DRIVER=Adaptive Server Enterprise;server=.;Port=5000;Database=rdbDemo;UID=test;PWD=test');
+
+return db.transaction(async () => {
+    //transaction will commit after this function
+});
+``` 
 <a name="_poolsize"></a>
 [pool size](https://github.com/alfateam/rdb-demo/blob/master/poolOptions.js)
 ```js
@@ -148,7 +177,8 @@ return db.transaction(async () => {
 <a name="_native"></a>
 __native bindings__  
 (postgres only)  
-Requires the peer dependency pg-native  
+Pre-requisities:
+- npm install [pg-native](https://npmjs.org/package/pg-native)  
 ```js
 let rdb = require('rdb');
 let poolOptions = {native: true};
@@ -172,7 +202,6 @@ await db.transaction({schema: ['mySchema', 'otherSchema']}, async () => {
     //or use string for single schema );
     //transaction will commit after this function
 });
-
 ```
 <a name="_schema2"></a>
 [schema alternative 2](https://github.com/alfateam/rdb-demo/blob/master/schema2.js)  

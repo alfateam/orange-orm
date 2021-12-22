@@ -41,8 +41,7 @@
     "sqlite3": "^5.0.2",
     "pg-native": "^3.0.0",
     "msnodesqlv8": "^2.2.0",
-    "express": ">=4.0.0",
-    "sapase": "^1.0.4"
+    "express": ">=4.0.0"
   },
   "devDependencies": {
     "a": "^2.1.0",
