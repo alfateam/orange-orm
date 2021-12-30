@@ -9,7 +9,7 @@ function _new(_column) {
 		value = purify(value);
 		if (value === null)
 			return newParam('null');
-		return newParam('?', [value]);
+		return newParam('?', [Buffer.from(value, 'base64')]);
 	}
 }
 

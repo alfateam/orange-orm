@@ -2,11 +2,11 @@ function purify(value) {
 	if(value == null)
 		return null;
 	if (Buffer.isBuffer(value))
-		return value;
+		return value.toString('base64');
 	else if (typeof value === 'string')
-		return Buffer.from(value, 'base64');
+		return value;
 	else
-		throw new Error('\'' + value + '\'' + ' is not a buffer');
+		throw new Error('\'' + value + '\'' + ' is not a base64');
 }
 
 module.exports = purify;
