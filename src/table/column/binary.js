@@ -1,5 +1,5 @@
 var newEncode = require('./binary/newEncode');
-var newDecode = require('./newDecodeCore');
+var newDecode = require('./binary/newDecode');
 var purify = require('./binary/purify');
 
 function _new(column) {
