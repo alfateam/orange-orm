@@ -10,9 +10,8 @@ async function patchTable(table, patches, { defaultConcurrency = 'optimistic', c
 		patch.path = patches[i].path.split('/').slice(1);
 		if (patch.op === 'add' || patch.op === 'replace') {
 			let result = await add({ path: patch.path, value: patch.value, op: patch.op, oldValue: patch.oldValue, concurrency: concurrency }, table);
-			if (result.inserted) {
+			if (result.inserted)
 				inserted.add(result.inserted);
-			}
 			else if (result.updated)
 				updated.add(result.updated);
 		}
