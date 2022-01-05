@@ -1,18 +1,20 @@
 let flags = require('../../flags');
+let getSessionSingleton = require('../getSessionSingleton')
 
 function toDto(strategy, table, row, joinRelationSet) {
 	let result;
 	flags.useProxy = false;
+	let ignoreSerializable = getSessionSingleton('ignoreSerializable');
 	if (joinRelationSet) {
-		result = toDtoSync(table, row, joinRelationSet, strategy);
+		result = toDtoSync(table, row, joinRelationSet, strategy, ignoreSerializable);
 	}
 	else
-		result =  _toDto(table, row, strategy);
+		result =  _toDto(table, row, strategy, ignoreSerializable);
 	flags.useProxy = true;
 	return result;
 }
 
-async function _toDto(table, row, strategy) {
+async function _toDto(table, row, strategy, ignoreSerializable) {
 	let dto = {};
 	if (!row)
 		return;
@@ -21,7 +23,7 @@ async function _toDto(table, row, strategy) {
 			continue;
 		let column = table[name];
 		// eslint-disable-next-line no-prototype-builtins
-		if (table._aliases.has(name) && !('serializable' in column && !column.serializable) && row.propertyIsEnumerable(name)) {
+		if (table._aliases.has(name) && (ignoreSerializable || !('serializable' in column && !column.serializable) && row.propertyIsEnumerable(name))) {
 			if (column.toDto)
 				dto[name] = column.toDto(row[name]);
 			else
@@ -41,24 +43,24 @@ async function _toDto(table, row, strategy) {
 			else if (Array.isArray(child)) {
 				dto[name] = [];
 				for (let i = 0; i < child.length; i++) {
-					dto[name].push(await _toDto(relation.childTable, child[i], strategy && strategy[name]));
+					dto[name].push(await _toDto(relation.childTable, child[i], strategy && strategy[name], ignoreSerializable));
 				}
 			}
 			else
-				dto[name] = await _toDto(relation.childTable, child, strategy && strategy[name]);
+				dto[name] = await _toDto(relation.childTable, child, strategy && strategy[name], ignoreSerializable);
 		}
 	}
 	return dto;
 }
 
 
-function toDtoSync(table, row, joinRelationSet, strategy) {
+function toDtoSync(table, row, joinRelationSet, strategy, ignoreSerializable) {
 	let dto = {};
 	if (!row)
 		return;
 	for (let name in row) {
 		let column = table[name];
-		if (table._aliases.has(name) && !('serializable' in column && !column.serializable)) {
+		if (table._aliases.has(name) && (ignoreSerializable || !('serializable' in column && !column.serializable))) {
 			if (column.toDto)
 				dto[name] = column.toDto(row[name]);
 			else
@@ -75,11 +77,11 @@ function toDtoSync(table, row, joinRelationSet, strategy) {
 			else if (Array.isArray(child)) {
 				dto[name] = [];
 				for (let i = 0; i < child.length; i++) {
-					dto[name].push(toDtoSync(relation.childTable, child[i], new Set([...joinRelationSet, join]), strategy && strategy[name]));
+					dto[name].push(toDtoSync(relation.childTable, child[i], new Set([...joinRelationSet, join]), strategy && strategy[name], ignoreSerializable));
 				}
 			}
 			else
-				dto[name] = toDtoSync(relation.childTable, child, new Set([...joinRelationSet, join]), strategy && strategy[name]);
+				dto[name] = toDtoSync(relation.childTable, child, new Set([...joinRelationSet, join]), strategy && strategy[name], ignoreSerializable);
 
 		}
 	}

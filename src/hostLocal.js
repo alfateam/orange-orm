@@ -1,8 +1,9 @@
 let executePath = require('./hostExpress/executePath');
 let getMeta = require('./hostExpress/getMeta');
+let setSessionSingleton = require('./table/setSessionSingleton');
 
 function hostLocal({ db, table, defaultConcurrency, concurrency, customFilters, baseFilter, strategy }) {
-	let c = {get, post, patch};
+	let c = { get, post, patch };
 
 	function get() {
 		return getMeta(table);
@@ -19,12 +20,13 @@ function hostLocal({ db, table, defaultConcurrency, concurrency, customFilters, 
 		body = JSON.parse(body);
 		let result;
 		await db.transaction(async() => {
+			setSessionSingleton('ignoreSerializable', true);
 			let patch = body.patch || body;
 			let options = body.options || {};
 			let _concurrency = options.concurrency || concurrency;
 			let _defaultConcurrency = options.defaultConcurrency || defaultConcurrency;
 			let _strategy = options.strategy || strategy;
-			result = await table.patch(patch, { defaultConcurrencey:_defaultConcurrency, concurrency: _concurrency, strategy: _strategy });
+			result = await table.patch(patch, { defaultConcurrencey: _defaultConcurrency, concurrency: _concurrency, strategy: _strategy });
 		});
 		return result;
 	}
@@ -40,6 +42,7 @@ function hostLocal({ db, table, defaultConcurrency, concurrency, customFilters, 
 		body = JSON.parse(body);
 		let result;
 		await db.transaction(async() => {
+			setSessionSingleton('ignoreSerializable', true);
 			result = await executePath({ table, JSONFilter: body, customFilters, baseFilter, allowEverything: true });
 		});
 		return result;
