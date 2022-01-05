@@ -13,7 +13,7 @@ async function patchTable(table, patches, { defaultConcurrency = 'optimistic', c
 			if (result.inserted) {
 				inserted.add(result.inserted);
 			}
-			else
+			else if (result.updated)
 				updated.add(result.updated);
 		}
 		else if (patch.op === 'remove')
