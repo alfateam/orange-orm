@@ -15,6 +15,10 @@ Based on promises.
 [Documentation and examples](src/docs/docs.md)  
 
 ## Release notes
+__3.0.2__  
+Binary as base64.  
+__3.0.1__  
+Small fixes.  
 __3.0.0__  
 Support for Sybase SAP and MsSql.  
 __2.6.28__  
