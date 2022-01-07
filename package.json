@@ -21,7 +21,8 @@
   "license": "ISC",
   "scripts": {
     "test": "a",
-    "lint": "eslint ./"
+    "lint": "eslint ./",
+    "fix": "eslint ./ --fix"
   },
   "dependencies": {
     "@lroal/on-change": "^4.0.0",

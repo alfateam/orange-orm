@@ -20,7 +20,7 @@ function wrapQuery(connection) {
 			runOriginalQuery.call(connection, query, onInnerCompleted);
 		else
 			runOriginalQuery.call(connection, query, onInnerCompleted);
-						
+
 
 		function onInnerCompleted(err, result) {
 			if (err)

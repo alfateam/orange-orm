@@ -1,5 +1,5 @@
 let flags = require('../../flags');
-let getSessionSingleton = require('../getSessionSingleton')
+let getSessionSingleton = require('../getSessionSingleton');
 
 function toDto(strategy, table, row, joinRelationSet) {
 	let result;

@@ -2,12 +2,12 @@ let newParameterized = require('../query/newParameterized');
 let getSessionContext = require('../getSessionContext');
 
 module.exports = function() {
-    let command = newParameterized(getSessionContext().begin || 'BEGIN');    
-    command.endEdit = empty;
-    command.matches = empty;
+	let command = newParameterized(getSessionContext().begin || 'BEGIN');
+	command.endEdit = empty;
+	command.matches = empty;
 
-    function empty() {}
+	function empty() {}
 
-    return command;
-        
+	return command;
+
 };

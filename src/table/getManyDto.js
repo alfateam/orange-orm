@@ -1,6 +1,4 @@
 function getManyDto(table, _filter, _strategy) {
-	let c = {};
-
 	let args = [];
 	for (var i = 1; i < arguments.length; i++) {
 		args.push(arguments[i]);
