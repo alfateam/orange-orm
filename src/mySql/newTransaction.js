@@ -7,7 +7,7 @@ let lastInsertedSql = require('./lastInsertedSql');
 
 
 function newResolveTransaction(domain, pool) {
-	let rdb = {};
+	var rdb = {poolFactory: pool};
 	if (!pool.connect) {
 		pool = pool();
 		rdb.pool = pool;

@@ -4,7 +4,7 @@ const typeMap = {
 	StringColumn: 'string',
 	BooleanColumn: 'boolean',
 	UUIDColumn: 'string',
-	BinaryColumn: 'Buffer',
+	BinaryColumn: 'string',
 	JSONColumn: 'object',
 	DateColumn: 'Date | string',
 	NumberColumn: 'number',
@@ -26,10 +26,15 @@ function getTable(table, Name, name, customFilters) {
         getMany(filter?: RawFilter, strategy?: ${Name}Strategy): Promise<${Name}Array>;
         getMany(${name}s: Array<${Name}>, strategy?: ${Name}Strategy): Promise<${Name}Array>;
         getOne(filter?: RawFilter, strategy?: ${Name}Strategy): Promise<${Name}Row>;
-        getOne(${name}s: Array<${Name}>, strategy?: ${Name}Strategy): Promise<${Name}Row>;
+        getOne(${name}: ${Name}, strategy?: ${Name}Strategy): Promise<${Name}Row>;
         getById(${getIdArgs(table)}, strategy?: ${Name}Strategy): Promise<${Name}Row>;
         tryGetById(${getIdArgs(table)}, strategy?: ${Name}Strategy): Promise<${Name}Row>;
+        insert(${name}s: ${Name}[]): ${Name}Array;
+        insert(${name}: ${Name}): ${Name}Row;
+        delete(filter?: RawFilter): Promise<void>;
+        cascadeDelete(filter?: RawFilter): Promise<void>;
         proxify(${name}s: ${Name}[]): ${Name}Array;
+        proxify(${name}: ${Name}): ${Name}Row;
         customFilters: ${Name}CustomFilters;
 		${columns(table)}
 		${tableRelations(table)}

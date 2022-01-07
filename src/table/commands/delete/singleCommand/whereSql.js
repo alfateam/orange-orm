@@ -8,12 +8,12 @@ function newWhereSql(relations, shallowFilter, rightAlias) {
 	var table = relation.childTable;
 	var leftColumns = relation.columns;
 	var rightColumns = table._primaryColumns;
-	where(leftColumns, rightColumns);
+	where();
 
 	function where() {
 		var table = relation.childTable;
 		var joinCore = newShallowJoinSql(table, leftColumns, rightColumns, leftAlias, rightAlias);
-		if (shallowFilter)
+		if (shallowFilter.sql())
 			sql = shallowFilter.prepend(' WHERE ' + joinCore + ' AND ');
 		else
 			sql = ' WHERE ' + joinCore;

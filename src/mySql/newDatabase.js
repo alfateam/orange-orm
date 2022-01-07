@@ -9,6 +9,7 @@ let promise = require('promise/domains');
 let versionArray = process.version.replace('v', '').split('.');
 let major = parseInt(versionArray[0]);
 let hostExpress = require('../hostExpress');
+let hostLocal = require('../hostLocal');
 
 function newDatabase(connectionString, poolOptions) {
 	var pool;
@@ -17,7 +18,7 @@ function newDatabase(connectionString, poolOptions) {
 	else
 		pool = newPool(connectionString, poolOptions);
 
-	let c = {};
+	let c = {poolFactory: pool, hostLocal};
 
 	c.transaction = function(options, fn) {
 		if ((arguments.length === 1) && (typeof options === 'function')) {
