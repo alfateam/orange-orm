@@ -899,7 +899,7 @@ await db.transaction(async () => {
 });
 ```
 <a name="_limit"></a>
-[getManyDto eager](https://github.com/alfateam/rdb-demo/blob/master/limit.js)
+[limit and offset](https://github.com/alfateam/rdb-demo/blob/master/limit.js)
 ```js
 let rdb = require('rdb');
 let Customer = rdb.table('_customer');
