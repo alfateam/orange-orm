@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](src/docs/docs.md)  
 
 ## Release notes
+__3.0.4__  
+Support for offset  
 __3.0.3__  
 Exposed typescript methods for [rdb-client](https://npmjs.com/package/rdb-client): query, insert and bulk deletes.  
 __3.0.2__  
