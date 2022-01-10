@@ -1,6 +1,6 @@
 function negotiateLimit(limit) {
 	if(!limit)
-		return '';
+		return ' ';
 
 	if(limit.charAt(0) !== ' ')
 		return ' ' + limit;

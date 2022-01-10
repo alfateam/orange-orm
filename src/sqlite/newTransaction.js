@@ -4,6 +4,7 @@ var encodeDate = require('./encodeDate');
 var deleteFromSql = require('./deleteFromSql');
 var selectForUpdateSql = require('./selectForUpdateSql');
 var lastInsertedSql = require('./lastInsertedSql');
+var limitAndOffset = require('./limitAndOffset');
 
 function newResolveTransaction(domain, pool) {
 	var rdb = {poolFactory: pool};
@@ -32,6 +33,7 @@ function newResolveTransaction(domain, pool) {
 				rdb.lastInsertedSql = lastInsertedSql;
 				rdb.lastInsertedIsSeparate = true;
 				rdb.multipleStatements = false;
+				rdb.limitAndOffset = limitAndOffset;
 				rdb.accept = function(caller) {
 					caller.visitSqlite();
 				};

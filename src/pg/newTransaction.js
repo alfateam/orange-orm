@@ -5,6 +5,7 @@ var encodeBoolean = require('./encodeBoolean');
 var deleteFromSql = require('./deleteFromSql');
 var selectForUpdateSql = require('./selectForUpdateSql');
 var lastInsertedSql = require('./lastInsertedSql');
+var limitAndOffset = require('./limitAndOffset');
 
 
 function newResolveTransaction(domain, pool) {
@@ -34,6 +35,7 @@ function newResolveTransaction(domain, pool) {
 				rdb.lastInsertedSql = lastInsertedSql;
 				rdb.lastInsertedIsSeparate = false;
 				rdb.multipleStatements = true;
+				rdb.limitAndOffset = limitAndOffset;
 				rdb.accept = function(caller) {
 					caller.visitPg();
 				};

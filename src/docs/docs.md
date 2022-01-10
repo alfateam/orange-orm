@@ -37,6 +37,7 @@ __Basic querying__
 [getMany lazily](#_getmanylazy)  
 [getMany eagerly](#_getmanyeager)  
 [getManyDto eagerly](#_getmanydtoeager)  
+[limit and offset](#_limit)  
 [getMany with orderBy jsonb](#_getmanywithorderbyjsonb)  
 [getMany with orderBy jsonb descending](#_getmanywithorderbyjsonbdesc)  
 [(many)ToDto](#_manytodto)  
@@ -895,6 +896,23 @@ await db.transaction(async () => {
     let strategy = {lines : null};
     let orders = await Order.getManyDto(emptyFilter, strategy);
     console.log(inspect(orders, false, 10));
+});
+```
+<a name="_limit"></a>
+[getManyDto eager](https://github.com/alfateam/rdb-demo/blob/master/limit.js)
+```js
+let rdb = require('rdb');
+let Customer = rdb.table('_customer');
+
+Customer.primaryColumn('cId').guid().as('id');
+Customer.column('cName').string().as('name');
+
+let db = rdb('postgres://rdb:rdb@localhost/rdbdemo');
+
+await db.transaction(async () => {
+    let customers = await Customer.getMany(null, {limit: 2, offset: 1});
+    let dtos = await customers.toDto();
+    console.log(dtos);
 });
 ```
 <a name="_getmanywithorderbyjsonb"></a>

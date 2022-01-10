@@ -34,7 +34,12 @@ function newResolveTransaction(domain, pool) {
 				rdb.lastInsertedIsSeparate = true;
 				rdb.multipleStatements = false;
 				rdb.begin = 'BEGIN TRANSACTION';
-				rdb.limit = 'TOP';
+				rdb.limit = (span) => {
+					if (span.limit || span.limit == 0)
+						return 'TOP ' + span.limit;
+					else
+						return '';
+				};
 				rdb.accept = function(caller) {
 					caller.visitSap();
 				};

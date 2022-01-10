@@ -126,6 +126,7 @@ function validateStrategy(table, strategy) {
 		return;
 
 	for (let p in strategy) {
+		validateOffset(strategy);
 		validateLimit(strategy);
 		validateOrderBy(table, strategy);
 		validateStrategy(table[p], strategy[p]);
@@ -136,6 +137,12 @@ function validateLimit(strategy) {
 	if (!('limit' in strategy) || Number.isInteger(strategy.limit))
 		return;
 	throw new Error('Invalid limit: ' + strategy.limit);
+}
+
+function validateOffset(strategy) {
+	if (!('offset' in strategy) || Number.isInteger(strategy.offset))
+		return;
+	throw new Error('Invalid offset: ' + strategy.offset);
 }
 
 function validateOrderBy(table, strategy) {

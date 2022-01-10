@@ -4,7 +4,7 @@ let deleteFromSql = require('./deleteFromSql');
 let selectForUpdateSql = require('./selectForUpdateSql');
 let encodeDate = require('./encodeDate');
 let lastInsertedSql = require('./lastInsertedSql');
-
+let limitAndOffset = require('./limitAndOffset');
 
 function newResolveTransaction(domain, pool) {
 	var rdb = {poolFactory: pool};
@@ -34,6 +34,7 @@ function newResolveTransaction(domain, pool) {
 				rdb.lastInsertedIsSeparate = true;
 				rdb.lastInsertedSql = lastInsertedSql;
 				rdb.multipleStatements = true;
+				rdb.limitAndOffset = limitAndOffset;
 				rdb.accept = function(caller) {
 					caller.visitMySql();
 				};

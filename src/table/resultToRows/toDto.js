@@ -1,10 +1,11 @@
 let flags = require('../../flags');
-let getSessionSingleton = require('../getSessionSingleton');
+let tryGetSessionContext = require('../tryGetSessionContext');
 
 function toDto(strategy, table, row, joinRelationSet) {
 	let result;
 	flags.useProxy = false;
-	let ignoreSerializable = getSessionSingleton('ignoreSerializable');
+	let context = tryGetSessionContext();
+	let ignoreSerializable = context && 'ignoreSerializable';
 	if (joinRelationSet) {
 		result = toDtoSync(table, row, joinRelationSet, strategy, ignoreSerializable);
 	}
