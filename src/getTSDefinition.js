@@ -171,6 +171,7 @@ function concurrencies(table, name, tablesAdded) {
         ${strategyColumns(table)}
         ${strategyRelations}
         limit?: number;
+        offset?: number;
         orderBy?: Array<${orderByColumns(table)}> | ${orderByColumns(table)};
     }
 
