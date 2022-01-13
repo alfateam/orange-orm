@@ -29,8 +29,8 @@ function getTable(table, Name, name, customFilters) {
         getOne(${name}: ${Name}, strategy?: ${Name}Strategy): Promise<${Name}Row>;
         getById(${getIdArgs(table)}, strategy?: ${Name}Strategy): Promise<${Name}Row>;
         tryGetById(${getIdArgs(table)}, strategy?: ${Name}Strategy): Promise<${Name}Row>;
-        insert(${name}s: ${Name}[]): ${Name}Array;
-        insert(${name}: ${Name}): ${Name}Row;
+        insert(${name}s: ${Name}[]): Promise<${Name}Array>;
+        insert(${name}: ${Name}): Promise<${Name}Row>;
         delete(filter?: RawFilter): Promise<void>;
         cascadeDelete(filter?: RawFilter): Promise<void>;
         proxify(${name}s: ${Name}[]): ${Name}Array;

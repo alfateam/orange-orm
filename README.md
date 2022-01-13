@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](src/docs/docs.md)  
 
 ## Release notes
+__3.0.5__  
+Fixed typescript methods: insert-methods should be async and return Promise<..>  
 __3.0.4__  
 Support for offset  
 __3.0.3__  
