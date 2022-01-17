@@ -37,6 +37,7 @@ let allowedOps = {
 	GE: true,
 	between: true,
 	in: true,
+	IN: true,
 	startsWith: true,
 	iStartsWith: true,
 	endsWith: true,
@@ -47,7 +48,9 @@ let allowedOps = {
 	iEq: true,
 	ieq: true,
 	IEQ: true,
-	exists: true
+	exists: true,
+	insert: true,
+	insertAndForget: true
 };
 
 async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, request, response, allowEverything }) {

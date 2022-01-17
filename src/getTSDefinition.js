@@ -31,6 +31,8 @@ function getTable(table, Name, name, customFilters) {
         tryGetById(${getIdArgs(table)}, strategy?: ${Name}Strategy): Promise<${Name}Row>;
         insert(${name}s: ${Name}[]): Promise<${Name}Array>;
         insert(${name}: ${Name}): Promise<${Name}Row>;
+        insertAndForget(${name}s: ${Name}[]): Promise<void>;
+        insertAndForget(${name}: ${Name}): Promise<void>;
         delete(filter?: RawFilter): Promise<void>;
         cascadeDelete(filter?: RawFilter): Promise<void>;
         proxify(${name}s: ${Name}[]): ${Name}Array;

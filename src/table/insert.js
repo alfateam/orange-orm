@@ -5,7 +5,14 @@ let newInsertCommand = require('./commands/newInsertCommand');
 let newGetLastInsertedCommand = require('./commands/newGetLastInsertedCommand');
 let pushCommand = require('./commands/pushCommand');
 
-function insert(table) {
+function insert(table, arg) {
+	if (Array.isArray(arg)) {
+		let all = [];
+		for (let i = 0; i < arg.length; i++) {
+			all.push(insert(table, arg[i]));
+		}
+		return Promise.all(all);
+	}
 	let args = [].slice.call(arguments);
 	let row = newRow.apply(null, args);
 	let hasPrimary = getHasPrimary(table, row);

@@ -72,5 +72,6 @@ module.exports = function(table,name) {
 	c.LT = c.lt;
 	c.le = c.lessThanOrEqual;
 	c.LE = c.le;
+	c.IN = c.in;
 	return c;
 };

@@ -54,6 +54,7 @@ __Streaming__
 __Persistence__  
 [update](#_update)  
 [insert](#_insert)  
+[insertAndForget](#_insertAndForget)  
 [delete](#_delete)  
 [cascade delete](#_cascadedelete)  
 [bulk delete](#_bulkdelete)  
@@ -1342,6 +1343,24 @@ await db.transaction(async () => {
     customer.name = 'Paul';
     customer = await Customer.getById(id);
     console.log(customer.name)
+});
+```
+<a name="_insertAndForget"></a>  
+[insertAndForget](https://github.com/alfateam/rdb-demo/blob/master/insertAndForget.js)  
+If you don't have SELECT access, you want this instead of regular insert.  
+```js
+let rdb = require('rdb');
+
+let Customer = rdb.table('_customer');
+
+Customer.primaryColumn('cId').guid().as('id');
+Customer.column('cName').string().as('name');
+
+let db = rdb('postgres://postgres:postgres@localhost/test');
+
+await db.transaction(async () => {
+    let id = 'abcdef00-0000-0000-0000-000000000000'
+    await Customer.insertAndForget({id, name: 'Paul'}); //returns empty promise
 });
 ```
 <a name="_delete"></a>

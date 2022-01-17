@@ -4,18 +4,17 @@ var createPatch = require('rdb-client').createPatch;
 var createDto = require('../resultToRows/toDto/createDto');
 
 function newInsertCommand(table, row, options) {
-	return new InsertCommand(table, row,  options);
+	return new InsertCommand(table, row, options);
 }
 
-function InsertCommand(table, row, options) {
+function InsertCommand(table, row) {
 	this.__getCoreCommand = newImmutable(newInsertCommandCore);
 	this._table = table;
 	this._row = row;
-	this._options = options;
 }
 
 InsertCommand.prototype._getCoreCommand = function() {
-	return this.__getCoreCommand(this._table, this._row, this._options);
+	return this.__getCoreCommand(this._table, this._row);
 };
 
 InsertCommand.prototype.sql = function() {

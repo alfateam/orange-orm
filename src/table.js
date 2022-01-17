@@ -11,6 +11,7 @@ var tryGetFirst = require('./table/tryGetFirstFromDb');
 var newCache = require('./table/newRowCache');
 var newContext = require('./newObject');
 var insert = require('./table/insert');
+var insertAndForget = require('./table/insertAndForget');
 var _delete = require('./table/delete');
 var cascadeDelete = require('./table/cascadeDelete');
 var createReadStream = require('./table/createReadStream');
@@ -124,6 +125,11 @@ function _new(tableName) {
 	table.insert = function() {
 		let args = [table].concat([].slice.call(arguments));
 		return insert.apply(null, args);
+	};
+
+	table.insertAndForget = function() {
+		let args = [table].concat([].slice.call(arguments));
+		return insertAndForget.apply(null, args);
 	};
 
 	table.delete = _delete.bind(null, table);
