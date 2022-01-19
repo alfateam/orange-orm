@@ -5,7 +5,7 @@ function toDto(strategy, table, row, joinRelationSet) {
 	let result;
 	flags.useProxy = false;
 	let context = tryGetSessionContext();
-	let ignoreSerializable = context && 'ignoreSerializable';
+	let ignoreSerializable = context && context.ignoreSerializable;
 	if (joinRelationSet) {
 		result = toDtoSync(table, row, joinRelationSet, strategy, ignoreSerializable);
 	}

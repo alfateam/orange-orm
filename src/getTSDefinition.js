@@ -37,6 +37,7 @@ function getTable(table, Name, name, customFilters) {
         cascadeDelete(filter?: RawFilter): Promise<void>;
         proxify(${name}s: ${Name}[]): ${Name}Array;
         proxify(${name}: ${Name}): ${Name}Row;
+		express(config: ExpressConfig<${Name}Strategy,${Name}Concurrency>): RequestHandler;
         customFilters: ${Name}CustomFilters;
 		${columns(table)}
 		${tableRelations(table)}

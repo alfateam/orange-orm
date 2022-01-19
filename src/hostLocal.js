@@ -3,9 +3,10 @@ let getMeta = require('./hostExpress/getMeta');
 let setSessionSingleton = require('./table/setSessionSingleton');
 let tryGetSessionContext = require('./table/tryGetSessionContext');
 let executeQuery = require('./query');
+let hostExpress = require('./hostExpress');
 
 function hostLocal({ db, table, defaultConcurrency, concurrency, customFilters, baseFilter, strategy }) {
-	let c = { get, post, patch, query};
+	let c = { get, post, patch, query, express};
 
 	function get() {
 		return getMeta(table);
@@ -83,6 +84,11 @@ function hostLocal({ db, table, defaultConcurrency, concurrency, customFilters, 
 			result = await executeQuery.apply(null, args);
 		}
 
+	}
+
+	function express(options) {
+		let _options  = { db, table, defaultConcurrency, concurrency, customFilters, baseFilter, strategy };
+		return hostExpress({..._options, ...options});
 	}
 
 	return c;

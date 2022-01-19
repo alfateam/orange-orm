@@ -72,7 +72,9 @@ function hostExpress({ db, table, defaultConcurrency, concurrency, customFilters
 	return router;
 }
 
-module.exports = function hostExpressLazy() {
+module.exports = function hostExpressLazy(options) {
+	if (!(options && options.db))
+		throw new Error('Missing db property');
 	if (!express)
 		express = require('express');
 	return hostExpress.apply(null, arguments);
