@@ -54,8 +54,8 @@ let allowedOps = {
 };
 
 async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, request, response, allowEverything }) {
-	//todo if (allowEverything)...
-	let ops = { ..._ops, ...getCustomFilterPaths(customFilters), ...{ getManyDto, getMany } };
+	customFilters = getCustomFilterPaths(customFilters);
+	let ops = { ..._ops, ...customFilters, ...{ getManyDto, getMany } };
 	let res = await parseFilter(JSONFilter);
 	return res;
 
@@ -71,7 +71,7 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 
 		function executePath(path, args) {
 			if (path in ops) {
-				if (!allowEverything)
+				if (!allowEverything && !customFilters[path])
 					validateArgs(args);
 				let op = ops[path].apply(null, args);
 				if (op.then)
