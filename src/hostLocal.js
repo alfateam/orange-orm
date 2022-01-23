@@ -60,7 +60,7 @@ function hostLocal({ db, table, defaultConcurrency, concurrency, customFilters, 
 
 		async function fn() {
 			setSessionSingleton('ignoreSerializable', true);
-			result = await executePath({ table, JSONFilter: body, customFilters, baseFilter, allowEverything: true });
+			result = await executePath({ table, JSONFilter: body, customFilters, baseFilter, isServerSide: true });
 		}
 	}
 	async function query() {

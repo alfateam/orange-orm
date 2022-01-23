@@ -10,7 +10,7 @@ let _ops = {
 	NOT: emptyFilter.not,
 };
 
-let allowedOps = {
+let _allowedOps = {
 	and: true,
 	or: true,
 	not: true,
@@ -48,14 +48,13 @@ let allowedOps = {
 	iEq: true,
 	ieq: true,
 	IEQ: true,
-	exists: true,
-	insert: true,
-	insertAndForget: true
+	exists: true
 };
 
-async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, request, response, allowEverything }) {
-	customFilters = getCustomFilterPaths(customFilters);
-	let ops = { ..._ops, ...customFilters, ...{ getManyDto, getMany } };
+async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, request, response, readOnly, allowBulkDelete, isServerSide }) {
+	let allowedOps = {..._allowedOps, insert: !readOnly, insertAndForget: !readOnly};	
+	allowBulkDelete = isServerSide || allowBulkDelete;
+	let ops = { ..._ops, ...getCustomFilterPaths(customFilters), getManyDto, getMany, delete: _delete, cascadeDelete   };
 	let res = await parseFilter(JSONFilter);
 	return res;
 
@@ -71,7 +70,7 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 
 		function executePath(path, args) {
 			if (path in ops) {
-				if (!allowEverything && !customFilters[path])
+				if (!isServerSide)
 					validateArgs(args);
 				let op = ops[path].apply(null, args);
 				if (op.then)
@@ -85,7 +84,7 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 			let pathArray = path.split('.');
 			let target = table;
 			let op = pathArray[pathArray.length - 1];
-			if (!allowedOps[op] && !allowEverything)
+			if (!allowedOps[op] && !isServerSide)
 				throw new Error('Disallowed operator ' + op);
 			for (let i = 0; i < pathArray.length; i++) {
 				target = target[pathArray[i]];
@@ -94,6 +93,34 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 			setSafe(res);
 			return res;
 		}
+	}
+
+	async function _delete(filter) {
+		if (readOnly || !allowBulkDelete)
+			throw new Error('Bulk deletes are not allowed. Parameter "allowBulkDelete" must be true.')
+		filter = negotiateRawSqlFilter(filter, table);
+		if (typeof baseFilter === 'function') {
+			baseFilter = await baseFilter(request, response);
+		}
+		if (baseFilter) {
+			filter = filter.and(baseFilter);
+		}
+		let args = [filter].concat(Array.prototype.slice.call(arguments).slice(1));
+		return table.delete.apply(null, args);
+	}
+
+	async function cascadeDelete(filter) {
+		if (readOnly || !allowBulkDelete)
+			throw new Error('Bulk deletes are not allowed. Parameter "allowBulkDelete" must be true.')
+		filter = negotiateRawSqlFilter(filter, table);
+		if (typeof baseFilter === 'function') {
+			baseFilter = await baseFilter(request, response);
+		}
+		if (baseFilter) {
+			filter = filter.and(baseFilter);
+		}
+		let args = [filter].concat(Array.prototype.slice.call(arguments).slice(1));
+		return table.cascadeDelete.apply(null, args);
 	}
 
 	async function getManyDto(filter, strategy) {
@@ -206,12 +233,10 @@ function isFilter(json) {
 }
 
 function setSafe(o) {
-	Object.defineProperty(o, 'isSafe', {
-		value: isSafe,
-		enumerable: false
-	});
-
-
-
+	if (o instanceof Object)
+		Object.defineProperty(o, 'isSafe', {
+			value: isSafe,
+			enumerable: false
+		});
 }
 module.exports = executePath;

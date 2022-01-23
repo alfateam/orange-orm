@@ -3,7 +3,7 @@ let executePath = require('./hostExpress/executePath');
 let getMeta = require('./hostExpress/getMeta');
 let getTSDefinition = require('./hostExpress/getTSDefinition');
 
-function hostExpress({ db, table, defaultConcurrency, concurrency, customFilters, baseFilter, strategy }) {
+function hostExpress({ db, table, defaultConcurrency, concurrency, customFilters, baseFilter, strategy, readOnly, allowBulkDelete }) {
 	let router = express.Router();
 	router.get('/', function(_req, response) {
 		try {
@@ -23,7 +23,9 @@ function hostExpress({ db, table, defaultConcurrency, concurrency, customFilters
 	});
 	router.patch('/', async function(request, response) {
 		try {
-			if (!table)
+			if (readOnly)
+				throw new Error('Table is readOnly');
+			else if (!table)
 				throw new Error('Table is not exposed');
 			if (typeof db === 'function') {
 				let dbPromise = db(request, response);
@@ -61,7 +63,7 @@ function hostExpress({ db, table, defaultConcurrency, concurrency, customFilters
 			}
 			let result;
 			await db.transaction(async() => {
-				result = await executePath({ table, JSONFilter: request.body, customFilters, baseFilter, request, response });
+				result = await executePath({ table, JSONFilter: request.body, customFilters, baseFilter, request, response, readOnly, allowBulkDelete });
 			});
 			response.json(result);
 		}
