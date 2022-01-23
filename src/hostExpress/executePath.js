@@ -52,10 +52,10 @@ let _allowedOps = {
 };
 
 async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, request, response, readOnly, allowBulkDelete, isServerSide }) {
-	let allowedOps = {..._allowedOps, insert: !readOnly, insertAndForget: !readOnly};	
+	let allowedOps = {..._allowedOps, insert: !readOnly, insertAndForget: !readOnly};
 	allowBulkDelete = isServerSide || allowBulkDelete;
 	let ops = { ..._ops, ...getCustomFilterPaths(customFilters), getManyDto, getMany, delete: _delete, cascadeDelete   };
-	let res = await parseFilter(JSONFilter);
+	let res = await parseFilter(JSONFilter) || {};
 	return res;
 
 	async function parseFilter(json) {
@@ -97,7 +97,7 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 
 	async function _delete(filter) {
 		if (readOnly || !allowBulkDelete)
-			throw new Error('Bulk deletes are not allowed. Parameter "allowBulkDelete" must be true.')
+			throw new Error('Bulk deletes are not allowed. Parameter "allowBulkDelete" must be true.');
 		filter = negotiateRawSqlFilter(filter, table);
 		if (typeof baseFilter === 'function') {
 			baseFilter = await baseFilter(request, response);
@@ -111,7 +111,7 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 
 	async function cascadeDelete(filter) {
 		if (readOnly || !allowBulkDelete)
-			throw new Error('Bulk deletes are not allowed. Parameter "allowBulkDelete" must be true.')
+			throw new Error('Bulk deletes are not allowed. Parameter "allowBulkDelete" must be true.');
 		filter = negotiateRawSqlFilter(filter, table);
 		if (typeof baseFilter === 'function') {
 			baseFilter = await baseFilter(request, response);
