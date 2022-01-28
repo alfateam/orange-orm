@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](src/docs/docs.md)  
 
 ## Release notes
+__3.0.7__  
+Hosting in express with typescript support.  
 __3.0.6__  
 insertAndForget() for situations where you INSERT privileges, but no SELECT privileges.  
 __3.0.5__  
