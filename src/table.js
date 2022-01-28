@@ -76,7 +76,7 @@ function _new(tableName) {
 	table.tryGetFirst.exclusive = function(filter, strategy) {
 		return Promise.resolve().then(() => tryGetFirst.exclusive(table, filter, strategy));
 	};
-	table.getOne = tryGetFirst;
+	table.getOne = table.tryGetFirst;
 	table.getOne.exclusive = table.tryGetFirst.exclusive;
 
 	function callAsync(func, args) {
