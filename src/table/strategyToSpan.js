@@ -33,6 +33,7 @@ function toSpan(table,strategy) {
 	function addLeg(legs,table,strategy,name) {
 		var relation = table._relations[name];
 		var leg = relation.toLeg();
+		leg.span.queryContext.strategy = strategy;
 		legs.add(leg);
 		var subStrategy = strategy[name];
 		var childTable = relation.childTable;
