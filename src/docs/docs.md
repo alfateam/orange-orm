@@ -94,7 +94,9 @@ __Filters__
 [and](#_and)  
 [or alternative syntax](#_oralternative)  
 [and alternative syntax](#_andalternative)  
-[sub filter](#_subfilter)  
+[any filter](#_any)  
+[all filter](#_all)  
+[none filter](#_none)  
 [composite filter](#_compositefilter)  
 [raw sql filter](#_rawsqlfilter)  
 
@@ -2151,6 +2153,120 @@ await db.transaction(async () => {
     //alternatively rdb.filter.or(isActive).and(highBalance);
     let customers = await Customer.getMany(filter);
     console.log(await customers.toDto());
+});
+```
+<a name="_any"></a>
+[any filter](https://github.com/alfateam/rdb-demo/blob/master/filtering/any.js)
+```js
+let rdb = require('rdb');
+
+let Order = rdb.table('_order');
+let Customer = rdb.table('_customer');
+let OrderLine = rdb.table('_orderLine');
+
+Order.primaryColumn('id').guid();
+Order.column('customerId').guid();
+Order.column('orderNo').string();
+
+Customer.primaryColumn('id').guid();
+Customer.column('isActive').boolean();
+Customer.column('balance').numeric();
+Customer.column('name').string();
+
+OrderLine.primaryColumn('id').guid();
+OrderLine.column('orderId').guid();
+OrderLine.column('product').string();
+
+Order.join(Customer).by('customerId').as('customer');
+
+let line_order_relation = OrderLine.join(Order).by('orderId').as('order');
+Order.hasMany(line_order_relation).as('lines');
+
+let db = rdb.sqlite(__dirname + '/../db/rdbDemo');
+
+await db.transaction(async () => {
+    let filter = Order.lines.any( line => {
+        let aFilter = line.product.contains('a');
+        let cFilter = line.product.startsWith('c');
+        return aFilter.and(cFilter);
+    });
+    let orders = await Order.getMany(filter);
+    console.log(inspect(await orders.toDto(), false, 10));
+});
+```
+<a name="_all"></a>
+[all filter](https://github.com/alfateam/rdb-demo/blob/master/filtering/all.js)
+```js
+let rdb = require('rdb');
+
+let Order = rdb.table('_order');
+let Customer = rdb.table('_customer');
+let OrderLine = rdb.table('_orderLine');
+
+Order.primaryColumn('id').guid();
+Order.column('customerId').guid();
+Order.column('orderNo').string();
+
+Customer.primaryColumn('id').guid();
+Customer.column('isActive').boolean();
+Customer.column('balance').numeric();
+Customer.column('name').string();
+
+OrderLine.primaryColumn('id').guid();
+OrderLine.column('orderId').guid();
+OrderLine.column('product').string();
+
+Order.join(Customer).by('customerId').as('customer');
+
+let line_order_relation = OrderLine.join(Order).by('orderId').as('order');
+Order.hasMany(line_order_relation).as('lines');
+
+let db = rdb.sqlite(__dirname + '/../db/rdbDemo');
+
+await db.transaction(async () => {
+    let filter = Order.lines.all( line => {
+        return line.product.contains('sub');
+    });
+    let orders = await Order.getMany(filter);
+    console.log(inspect(await orders.toDto(), false, 10));
+});
+```
+<a name="_none"></a>
+[none filter](https://github.com/alfateam/rdb-demo/blob/master/filtering/none.js)
+```js
+let rdb = require('rdb');
+
+let Order = rdb.table('_order');
+let Customer = rdb.table('_customer');
+let OrderLine = rdb.table('_orderLine');
+
+Order.primaryColumn('id').guid();
+Order.column('customerId').guid();
+Order.column('orderNo').string();
+
+Customer.primaryColumn('id').guid();
+Customer.column('isActive').boolean();
+Customer.column('balance').numeric();
+Customer.column('name').string();
+
+OrderLine.primaryColumn('id').guid();
+OrderLine.column('orderId').guid();
+OrderLine.column('product').string();
+
+Order.join(Customer).by('customerId').as('customer');
+
+let line_order_relation = OrderLine.join(Order).by('orderId').as('order');
+Order.hasMany(line_order_relation).as('lines');
+
+let db = rdb.sqlite(__dirname + '/../db/rdbDemo');
+
+await db.transaction(async () => {
+    let filter = Order.lines.none( line => {
+        return line.product.contains('sub');
+    });
+    //alternatively: Order.lines.product.contains('sub').not();
+    let orders = await Order.getMany(filter);
+    console.log(inspect(await orders.toDto(), false, 10));
 });
 ```
 <a name="_subfilter"></a>
