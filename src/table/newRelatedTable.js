@@ -1,11 +1,18 @@
 var newRelatedColumn = require('./relatedTable/relatedColumn');
 var nextRelatedTable = _nextRelatedTable;
 var subFilter = require('./relatedTable/subFilter');
+var any = require('./relatedTable/any');
+var all = require('./relatedTable/all');
+var none = require('./relatedTable/none');
 
-function newRelatedTable(relations) {
+function newRelatedTable(relations, isShallow) {
 	var table = relations[relations.length - 1].childTable;
 	var columns = table._columns;
 	var c = {};
+
+	c.any = any(relations);
+	c.all = all(relations);
+	c.none = none(relations);
 
 	Object.defineProperty(c, '_relation', {
 		value: relations[relations.length - 1],
@@ -14,7 +21,7 @@ function newRelatedTable(relations) {
 
 	for (var i = 0; i < columns.length; i++) {
 		var col = columns[i];
-		c[col.alias] = newRelatedColumn(col, relations);
+		c[col.alias] = newRelatedColumn(col, relations, isShallow);
 	}
 	defineChildren();
 
@@ -32,21 +39,23 @@ function newRelatedTable(relations) {
 
 		Object.defineProperty(c, alias, {
 			get: function() {
-				return nextRelatedTable(children);
+				return nextRelatedTable(children, isShallow) ;
 			}
 		});
 	}
 
 	c.exists = function() {
-		return subFilter(relations);
+		if (isShallow)
+			return '';
+		return subFilter(relations, isShallow);
 	};
 
 	return c;
 }
 
-function _nextRelatedTable(relations) {
+function _nextRelatedTable(relations, isShallow) {
 	nextRelatedTable = require('./newRelatedTable');
-	return nextRelatedTable(relations);
+	return nextRelatedTable(relations, isShallow);
 }
 
 module.exports = newRelatedTable;
