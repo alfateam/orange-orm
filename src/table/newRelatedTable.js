@@ -14,6 +14,12 @@ function newRelatedTable(relations, isShallow) {
 	c.all = all(relations);
 	c.none = none(relations);
 
+	Object.defineProperty(c, '_shallow', {
+		get: function() {
+			return newRelatedTable(relations, true) ;
+		}
+	});
+
 	Object.defineProperty(c, '_relation', {
 		value: relations[relations.length - 1],
 		writable: false

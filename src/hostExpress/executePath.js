@@ -48,21 +48,24 @@ let _allowedOps = {
 	iEq: true,
 	ieq: true,
 	IEQ: true,
-	exists: true
+	exists: true,
+	all: true,
+	any: true,
+	none: true
 };
 
 async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, request, response, readOnly, allowBulkDelete, isServerSide }) {
 	let allowedOps = {..._allowedOps, insert: !readOnly, insertAndForget: !readOnly};
 	allowBulkDelete = isServerSide || allowBulkDelete;
 	let ops = { ..._ops, ...getCustomFilterPaths(customFilters), getManyDto, getMany, delete: _delete, cascadeDelete   };
-	let res = await parseFilter(JSONFilter) || {};
+	let res = await parseFilter(JSONFilter, table) || {};
 	return res;
 
-	async function parseFilter(json) {
+	async function parseFilter(json, table) {
 		if (isFilter(json)) {
 			let subFilters = [];
 			for (let i = 0; i < json.args.length; i++) {
-				subFilters.push(await parseFilter(json.args[i]));
+				subFilters.push(await parseFilter(json.args[i], nextTable(json.path, table)));
 			}
 			return executePath(json.path, subFilters);
 		}
@@ -93,6 +96,20 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 			setSafe(res);
 			return res;
 		}
+	}
+
+	function nextTable(path, table) {
+		path = path.split('.');
+		let ops = new Set(['all', 'any', 'none']);
+		let last = path.slice(-1)[0];
+		if (ops.has(last)) {
+			for (let i = 0; i < path.length-1; i++) {
+				table = table[path[i]];
+			}
+			return table._shallow;
+		}
+		else
+			return table;
 	}
 
 	async function _delete(filter) {

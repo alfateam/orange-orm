@@ -39,7 +39,7 @@ function getTable(table, Name, name, customFilters) {
         cascadeDelete(${name}s: Array<${Name}>): Promise<void>;
         proxify(${name}s: ${Name}[]): ${Name}Array;
         proxify(${name}: ${Name}): ${Name}Row;
-		express(config: ExpressConfig<${Name}Strategy,${Name}Concurrency>): RequestHandler;
+		express(config: ExpressConfig<${Name}Strategy,${Name}Concurrency>): Express & RequestHandler;
         customFilters: ${Name}CustomFilters;
 		${columns(table)}
 		${tableRelations(table)}
@@ -82,7 +82,7 @@ function tableRelations(table) {
 	let result = '';
 	for (let relationName in relations) {
 		const tableName = getTableName(relations[relationName], relationName, tablesAdded);
-		result += `${relationName}: ${tableName}Table;`;
+		result += `${relationName}: ${tableName}RelatedTable;`;
 	}
 	return result;
 }
@@ -154,10 +154,13 @@ function concurrencies(table, name, tablesAdded) {
     }`;
 	}
 	else {
-		row = `export interface ${name}Table {
+		row = `export interface ${name}RelatedTable {
 			${columns(table)}
 			${tableRelations(table)}
-			exists: () => Filter;
+			all: (selector: (table: ${name}RelatedTable) => RawFilter) => Filter;
+			any: (selector: (table: ${name}RelatedTable) => RawFilter) => Filter;
+			none: (selector: (table: ${name}RelatedTable) => RawFilter) => Filter;
+			exists: () => Filter;	
 		}`;
 	}
 

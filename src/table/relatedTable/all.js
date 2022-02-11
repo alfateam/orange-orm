@@ -7,7 +7,8 @@ function newAll(relations) {
 
 	function all(fn) {
 		let relatedTable = newRelatedTable(relations, isShallow);
-		let anyFilter = negotiateRawSqlFilter(fn(relatedTable));
+		let arg = typeof fn === 'function' ? fn(relatedTable) : fn;
+		let anyFilter = negotiateRawSqlFilter(arg);
 		let anySubFilter = subFilter(relations, anyFilter);
 		let notFilter = subFilter(relations, anyFilter.not()).not();
 		return anySubFilter.and(notFilter);

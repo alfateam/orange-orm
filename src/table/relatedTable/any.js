@@ -7,7 +7,8 @@ function newAny(relations) {
 
 	function any(fn) {
 		let relatedTable = newRelatedTable(relations, isShallow);
-		let filter = negotiateRawSqlFilter(fn(relatedTable));
+		let arg = typeof fn === 'function' ? fn(relatedTable) : fn;
+		let filter = negotiateRawSqlFilter(arg);
 		return subFilter(relations, filter);
 	}
 	return any;
