@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](src/docs/docs.md)  
 
 ## Release notes
+__3.0.9__  
+Support for query without transaction.  
 __3.0.8__  
 Support for all, any and none filters.  
 __3.0.7__  
