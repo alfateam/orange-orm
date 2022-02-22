@@ -12,6 +12,10 @@ let versionArray = process.version.replace('v', '').split('.');
 let major = parseInt(versionArray[0]);
 let hostExpress = require('../hostExpress');
 let hostLocal = require('../hostLocal');
+let doQuery = require('../query');
+let releaseDbClient = require('../table/releaseDbClient');
+let setSessionSingleton = require('../table/setSessionSingleton');
+
 
 function newDatabase(connectionString, poolOptions) {
 	var pool;
@@ -68,6 +72,23 @@ function newDatabase(connectionString, poolOptions) {
 			if (!schema)
 				return previous;
 			return executeSchema(schema);
+		}
+	};
+
+	c.query = function(query) {
+		let domain = createDomain();
+		let fn = doQuery.bind(null, query);
+		return domain.run(runInTransaction);
+
+		async function runInTransaction() {
+			let result;
+			let transaction = newTransaction(domain, pool);
+			await new Promise(transaction)
+				.then(() => setSessionSingleton('changes', []))
+				.then(fn)
+				.then((res) => result = res)
+				.then(releaseDbClient);
+			return result;
 		}
 	};
 
