@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](src/docs/docs.md)  
 
 ## Release notes
+__3.0.10__  
+PeerDependencies as optional with npm 7 and above - using peerDependenciesMeta.  
 __3.0.9__  
 Support for query without transaction.  
 __3.0.8__  
