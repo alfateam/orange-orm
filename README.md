@@ -12,7 +12,7 @@ Transaction with commit and rollback.
 Persistence ignorance - no need for explicit saving, everything is handled by transaction.  
 Eager or lazy loading.  
 Based on promises.  
-[Documentation and examples](src/docs/docs.md)  
+[Documentation and examples](docs/docs.md)  
 
 ## Release notes
 __3.0.11__  
