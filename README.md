@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](src/docs/docs.md)  
 
 ## Release notes
+__3.0.11__  
+Null parameters are replaced with sql 'null' value. This is practical when calling stored procedures with raw sql.    
 __3.0.10__  
 PeerDependencies as optional with npm 7 and above - using peerDependenciesMeta.  
 __3.0.9__  

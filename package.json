@@ -1,6 +1,6 @@
 {
   "name": "rdb",
-  "version": "3.0.10",
+  "version": "3.0.11",
   "main": "./src/index.js",
   "title": "rdb",
   "description": "Object Relational Mapper",
