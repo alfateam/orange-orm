@@ -1,7 +1,16 @@
 /* eslint-disable require-atomic-updates */
 let applyPatch = require('./applyPatch');
 
-async function patchTable(table, patches, { defaultConcurrency = 'optimistic', concurrency = {}, strategy = undefined}  = {},) {
+
+async function patchTable() {
+	const dryrun = true;
+	//traverse all rows you want to update before updatinng or inserting anything.
+	//this is to avoid page locks in ms sql
+	await patchTableCore.apply(null, [...arguments, dryrun]);
+	return patchTableCore.apply(null, arguments);
+}
+
+async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic', concurrency = {}, strategy = undefined}  = {}, dryrun) {
 	let updated = new Set();
 	let inserted = new Set();
 	for (let i = 0; i < patches.length; i++) {
@@ -9,16 +18,15 @@ async function patchTable(table, patches, { defaultConcurrency = 'optimistic', c
 		Object.assign(patch, patches[i]);
 		patch.path = patches[i].path.split('/').slice(1);
 		if (patch.op === 'add' || patch.op === 'replace') {
-			let result = await add({ path: patch.path, value: patch.value, op: patch.op, oldValue: patch.oldValue, concurrency: concurrency }, table);
+			let result = await add({ path: patch.path, value: patch.value, op: patch.op, oldValue: patch.oldValue, concurrency: concurrency, dryrun }, table);
 			if (result.inserted)
 				inserted.add(result.inserted);
 			else if (result.updated)
 				updated.add(result.updated);
 		}
 		else if (patch.op === 'remove')
-			await remove(patch, table);
+			await remove(patch, table, dryrun);
 	}
-
 	return { updated: await toDtos(updated), inserted: await toDtos(inserted)};
 
 	async function toDtos(set) {
@@ -37,12 +45,15 @@ async function patchTable(table, patches, { defaultConcurrency = 'optimistic', c
 			return [property];
 	}
 
-	async function add({ path, value, op, oldValue, concurrency = {} }, table, row, parentRow, relation) {
+	async function add({ path, value, op, oldValue, concurrency = {}, dryrun }, table, row, parentRow, relation) {
 		let property = path[0];
 		path = path.slice(1);
 		if (!row && path.length > 0)
 			row = row || await table.tryGetById.apply(null, toKey(property), strategy);
 		if (path.length === 0) {
+			if (dryrun) {
+				return {};
+			}
 			for (let i = 0; i < table._primaryColumns.length; i++) {
 				let pkName = table._primaryColumns[i].alias;
 				let keyValue = value[pkName];
@@ -89,6 +100,8 @@ async function patchTable(table, patches, { defaultConcurrency = 'optimistic', c
 		}
 		property = path[0];
 		if (isColumn(property, table)) {
+			if (dryrun)
+				return {updated: row};
 			let dto = {};
 			dto[property] = row[property];
 			let result = applyPatch({ defaultConcurrency, concurrency }, dto, [{ path: '/' + path.join('/'), op, value, oldValue }]);
@@ -97,18 +110,18 @@ async function patchTable(table, patches, { defaultConcurrency = 'optimistic', c
 		}
 		else if (isOneRelation(property, table)) {
 			let relation = table[property]._relation;
-			await add({ path, value, op, oldValue, concurrency: concurrency[property] }, relation.childTable, await row[property], row, relation);
+			await add({ path, value, op, oldValue, concurrency: concurrency[property], dryrun }, relation.childTable, await row[property], row, relation);
 			return {updated: row};
 		}
 		else if (isManyRelation(property, table)) {
 			let relation = table[property]._relation;
 			if (path.length === 1) {
 				for (let id in value) {
-					await add({ path: [id], value: value[id], op, oldValue, concurrency: concurrency[property] }, relation.childTable, {}, row, relation);
+					await add({ path: [id], value: value[id], op, oldValue, concurrency: concurrency[property], dryrun }, relation.childTable, {}, row, relation);
 				}
 			}
 			else
-				await add({ path: path.slice(1), value, oldValue, op, concurrency: concurrency[property] }, relation.childTable, undefined, row, relation);
+				await add({ path: path.slice(1), value, oldValue, op, concurrency: concurrency[property], dryrun }, relation.childTable, undefined, row, relation);
 			return {updated: row};
 		}
 		return {};
