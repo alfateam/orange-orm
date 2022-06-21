@@ -12,9 +12,11 @@ Transaction with commit and rollback.
 Persistence ignorance - no need for explicit saving, everything is handled by transaction.  
 Eager or lazy loading.  
 Based on promises.  
-[Documentation and examples](docs/docs.md)  
+[Documentation and examples](https://github.com/alfateam/rdb/blob/master/docs/docs.md)  
 
 ## Release notes
+__3.0.12__  
+Avoid page locking in ms sql in extreme concurrency situations when using patchTable  
 __3.0.11__  
 Null parameters are replaced with sql 'null' value. This is practical when calling stored procedures with raw sql.    
 __3.0.10__  
