@@ -210,7 +210,7 @@ function orderByColumns(table){
 	let separator = '';
 	for (let i = 0; i < table._columns.length; i++) {
 		let column = table._columns[i];
-		result += `${separator}"${column.alias}" | "${column.alias} desc"`;
+		result += `${separator}'${column.alias}' | '${column.alias} desc'`;
 		separator = '| ';
 	}
 	return result;
