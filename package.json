@@ -1,6 +1,6 @@
 {
   "name": "rdb",
-  "version": "3.0.12",
+  "version": "3.0.13",
   "main": "./src/index.js",
   "title": "rdb",
   "description": "Object Relational Mapper",
@@ -36,14 +36,14 @@
     "rdb-client": "^1.2.4",
     "rfc6902": "^3.0.4",
     "rfdc": "^1.2.0",
-    "uuid": "^3.0.1"
+    "uuid": "^8.3.2"
   },
   "peerDependencies": {
-    "sqlite3": "^5.0.2",
-    "pg-native": "^3.0.0",
+    "express": ">=4.0.0",
     "msnodesqlv8": "^2.2.0",
-    "express": ">=4.0.0"
-  },  
+    "pg-native": "^3.0.0",
+    "sqlite3": "^5.0.2"
+  },
   "peerDependenciesMeta": {
     "sqlite3": {
       "optional": true
@@ -57,7 +57,7 @@
     "express": {
       "optional": true
     }
-  },  
+  },
   "devDependencies": {
     "a": "^2.1.0",
     "eslint": "^8.6.0"
