@@ -39,11 +39,20 @@ function getTable(table, Name, name, customFilters) {
         cascadeDelete(${name}s: Array<${Name}>): Promise<void>;
         proxify(${name}s: ${Name}[]): ${Name}Array;
         proxify(${name}: ${Name}): ${Name}Row;
-		express(config: ExpressConfig<${Name}Strategy,${Name}Concurrency>): Express & RequestHandler;
+		express(config: ${Name}ExpressConfig): Express & RequestHandler;
         customFilters: ${Name}CustomFilters;
 		${columns(table)}
 		${tableRelations(table)}
     }
+
+	export interface ${Name}ExpressConfig {
+        db?: unknown | string | (() => unknown | string);
+        customFilters?: SystemTypesCustomFilters;
+        baseFilter?: RawFilter | ((request?: import('express').Request, response?: import('express').Response) => RawFilter | Promise<RawFilter>);
+        strategy? : ${Name}Strategy;
+        defaultConcurrency?: Concurrencies;
+        concurrency?: ${Name}Concurrency;
+	}
 
     export interface ${Name}CustomFilters {
         ${getCustomFilters(customFilters)}
