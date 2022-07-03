@@ -47,7 +47,7 @@ function getTable(table, Name, name, customFilters) {
 
 	export interface ${Name}ExpressConfig {
         db?: unknown | string | (() => unknown | string);
-        customFilters?: SystemTypesCustomFilters;
+        customFilters?: ${Name}CustomFilters;
         baseFilter?: RawFilter | ((request?: import('express').Request, response?: import('express').Response) => RawFilter | Promise<RawFilter>);
         strategy? : ${Name}Strategy;
         defaultConcurrency?: Concurrencies;
