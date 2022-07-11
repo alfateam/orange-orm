@@ -1,11 +1,10 @@
 let executePath = require('./hostExpress/executePath');
 let getMeta = require('./hostExpress/getMeta');
 let setSessionSingleton = require('./table/setSessionSingleton');
-let tryGetSessionContext = require('./table/tryGetSessionContext');
 let executeQuery = require('./query');
 let hostExpress = require('./hostExpress');
 
-function hostLocal({ db, table, defaultConcurrency, concurrency, customFilters, baseFilter, strategy }) {
+function hostLocal({ db, table, defaultConcurrency, concurrency, customFilters, baseFilter, strategy, transaction }) {
 	let c = { get, post, patch, query, express};
 
 	function get() {
@@ -13,21 +12,21 @@ function hostLocal({ db, table, defaultConcurrency, concurrency, customFilters, 
 
 	}
 	async function patch(body) {
-		if (typeof db === 'function') {
-			let dbPromise = db();
-			if (dbPromise.then)
-				db = await dbPromise;
-			else
-				db = dbPromise;
-		}
 		body = JSON.parse(body);
 		let result;
-		let c = tryGetSessionContext();
 
-		if (c && c.poolFactory === db.poolFactory)
-			await fn();
-		else
+		if (transaction)
+			await transaction(fn);
+		else {
+			if (typeof db === 'function') {
+				let dbPromise = db();
+				if (dbPromise.then)
+					db = await dbPromise;
+				else
+					db = dbPromise;
+			}
 			await db.transaction(fn);
+		}
 		return result;
 
 		async function fn() {
@@ -42,20 +41,21 @@ function hostLocal({ db, table, defaultConcurrency, concurrency, customFilters, 
 	}
 
 	async function post(body) {
-		if (typeof db === 'function') {
-			let dbPromise = db();
-			if (dbPromise.then)
-				db = await dbPromise;
-			else
-				db = dbPromise;
-		}
 		body = JSON.parse(body);
 		let result;
-		let c = tryGetSessionContext();
-		if (c && c.poolFactory === db.poolFactory)
-			await fn();
-		else
+
+		if (transaction)
+			await transaction(fn);
+		else {
+			if (typeof db === 'function') {
+				let dbPromise = db();
+				if (dbPromise.then)
+					db = await dbPromise;
+				else
+					db = dbPromise;
+			}
 			await db.transaction(fn);
+		}
 		return result;
 
 		async function fn() {
@@ -65,19 +65,21 @@ function hostLocal({ db, table, defaultConcurrency, concurrency, customFilters, 
 	}
 	async function query() {
 		let args = arguments;
-		if (typeof db === 'function') {
-			let dbPromise = db();
-			if (dbPromise.then)
-				db = await dbPromise;
-			else
-				db = dbPromise;
-		}
 		let result;
-		let c = tryGetSessionContext();
-		if (c && c.poolFactory === db.poolFactory)
-			await fn();
-		else
+
+		if (transaction)
+			await transaction(fn);
+		else {
+			if (typeof db === 'function') {
+				let dbPromise = db();
+				if (dbPromise.then)
+					db = await dbPromise;
+				else
+					db = dbPromise;
+			}
 			await db.transaction(fn);
+		}
+
 		return result;
 
 		async function fn() {
