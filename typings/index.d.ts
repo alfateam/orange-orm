@@ -1,4 +1,4 @@
-declare module r {
+declare namespace r {
     function table(name: string): Table;
     function end(): Promise<void>;
     function pg(connectionString: string, options?: PoolOptions): Pool;
@@ -19,6 +19,7 @@ declare module r {
 
     export interface Pool {
         end(): Promise<void>;
+        transaction(fn: () => Promise<unknown>): Promise<void>;
     }
 
     export interface PoolOptions {
@@ -36,7 +37,6 @@ declare module r {
     export interface JoinRelation {
 
     }
-
 
     export interface Table {
         primaryColumn(column: string): Column;
