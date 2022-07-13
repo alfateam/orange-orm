@@ -117,6 +117,8 @@ async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic
 			let relation = table[property]._relation;
 			if (path.length === 1) {
 				for (let id in value) {
+					if (id === '__patchType')
+						continue;
 					await add({ path: [id], value: value[id], op, oldValue, concurrency: concurrency[property], dryrun }, relation.childTable, {}, row, relation);
 				}
 			}

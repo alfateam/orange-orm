@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](https://github.com/alfateam/rdb/blob/master/docs/docs.md)  
 
 ## Release notes
+__3.0.19__  
+Bugfix when patching many-relationship from rdb-client  
 __3.0.17__  
 Upgraded dependency uuid  
 __3.0.13__  
