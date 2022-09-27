@@ -45,7 +45,7 @@ function getTable(table, Name, name, customFilters) {
 		${tableRelations(table)}
     }
 
-	export interface ${Name}ExpressConfig extends DbConfig {
+	export interface ${Name}ExpressConfig extends TablesConfig {
         db?: unknown | string | (() => unknown | string);
         customFilters?: ${Name}CustomFilters;
         baseFilter?: RawFilter | ((request?: import('express').Request, response?: import('express').Response) => RawFilter | Promise<RawFilter>);

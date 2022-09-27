@@ -15,6 +15,11 @@ Based on promises.
 [Documentation and examples](https://github.com/alfateam/rdb/blob/master/docs/docs.md)  
 
 ## Release notes
+__3.0.21__  
+Fix typescript generation for Express.  
+__3.0.20__  
+Throw if empty connection string.
+Lazy load dependency node-cls to improve performance and memory usage  
 __3.0.19__  
 Bugfix when patching many-relationship from rdb-client  
 __3.0.17__  
