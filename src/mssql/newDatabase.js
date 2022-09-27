@@ -15,6 +15,8 @@ let releaseDbClient = require('../table/releaseDbClient');
 let setSessionSingleton = require('../table/setSessionSingleton');
 
 function newDatabase(connectionString, poolOptions) {
+	if (!connectionString)
+		throw new Error('Connection string cannot be empty');
 	var pool;
 	if (!poolOptions)
 		pool = newPool.bind(null,connectionString, poolOptions);
