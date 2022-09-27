@@ -1,10 +1,11 @@
 let useHook = require('../useHook');
-let cls = require('node-cls');
+let cls;
 
 
 function tryGetSessionContext() {
 	if (useHook()) {
-
+		if (!cls)
+			cls = require('node-cls');
 		let context = cls.getContext('rdb');
 		return context && context.rdb;
 	}
