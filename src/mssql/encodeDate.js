@@ -14,12 +14,16 @@ function toISOString(date) {
          'T' + pad(date.getHours()) +
          ':' + pad(date.getMinutes()) +
          ':' + pad(date.getSeconds()) +
-         '.' + pad(date.getMilliseconds());
+         '.' + padMilli(date);
 }
 
 function pad(num) {
 	var norm = Math.abs(Math.floor(num));
 	return (norm < 10 ? '0' : '') + norm;
+}
+
+function padMilli(d) {
+	return (d.getMilliseconds() + '').padStart(3, '0');
 }
 
 module.exports = encodeDate;
