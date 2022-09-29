@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](https://github.com/alfateam/rdb/blob/master/docs/docs.md)  
 
 ## Release notes
+__3.0.22__  
+Bugfix: [Converting date to ISO sometimes gives incorrect milliseconds part](https://github.com/alfateam/rdb/issues/22).  
 __3.0.21__  
 Fix typescript generation for Express.  
 __3.0.20__  
