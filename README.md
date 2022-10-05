@@ -16,9 +16,9 @@ Based on promises.
 
 ## Release notes
 __3.0.23__  
-Still some bugfix related to: [Converting date to ISO sometimes gives incorrect milliseconds part](https://github.com/alfateam/rdb/issues/22).  
+Still some bugfix related to: [Converting date to ISO sometimes gives incorrect milliseconds part](https://github.com/alfateam/rdb/issues/29).  
 __3.0.22__  
-Bugfix: [Converting date to ISO sometimes gives incorrect milliseconds part](https://github.com/alfateam/rdb/issues/22).  
+Bugfix: [Converting date to ISO sometimes gives incorrect milliseconds part](https://github.com/alfateam/rdb/issues/29).  
 __3.0.21__  
 Fix typescript generation for Express.  
 __3.0.20__  
