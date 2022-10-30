@@ -15,6 +15,10 @@ Based on promises.
 [Documentation and examples](https://github.com/alfateam/rdb/blob/master/docs/docs.md)  
 
 ## Release notes
+__3.0.26__  
+Improve typescript code generation.  
+__3.0.25__  
+Improve typescript code generation.  
 __3.0.24__  
 Bugfixed related to wathcing JSON column when value is null.  
 __3.0.23__  
