@@ -65,7 +65,7 @@ function newDecodeDbRow(table, dbRow, filteredAliases) {
 			configurable: false,
 
 			get: function() {
-				if (column.onChange && flags.useProxy && (this[intName] !== null || this[intName] !== undefined) && typeof this[intName] === 'object') {
+				if (column.onChange && flags.useProxy && (this[intName] !== null && this[intName] !== undefined) && typeof this[intName] === 'object') {
 					if (!(name in this._proxies)) {
 						let value = this[intName];
 						this._proxies[name] = column.onChange(this._dbRow[key], () => {
@@ -80,7 +80,7 @@ function newDecodeDbRow(table, dbRow, filteredAliases) {
 				return  negotiateNull(this[intName]);
 			},
 			set: function(value) {
-				if (column.onChange && (this[intName] !== null || this[intName] !== undefined) && typeof value === 'object') {
+				if (column.onChange && (this[intName] !== null && this[intName] !== undefined) && typeof value === 'object') {
 					if(this[intName] === onChange.target(value))
 						return;
 					this._proxies[name] = column.onChange(value, () => {

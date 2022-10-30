@@ -15,6 +15,8 @@ Based on promises.
 [Documentation and examples](https://github.com/alfateam/rdb/blob/master/docs/docs.md)  
 
 ## Release notes
+__3.0.24__  
+Bugfixed related to wathcing JSON column when value is null.  
 __3.0.23__  
 Still some bugfix related to: [Converting date to ISO sometimes gives incorrect milliseconds part](https://github.com/alfateam/rdb/issues/29).  
 __3.0.22__  
