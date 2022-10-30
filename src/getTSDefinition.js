@@ -1,5 +1,3 @@
-const tablesAdded = new Map();
-
 const typeMap = {
 	StringColumn: 'string',
 	BooleanColumn: 'boolean',
@@ -19,6 +17,8 @@ function getTSDefinition(table, options) {
 }
 
 function getTable(table, Name, name, customFilters) {
+	const tablesAdded = new Map();
+	const _concurrencies = concurrencies(table, Name, tablesAdded);
 	return `
     export interface ${Name}Table {
         getManyDto(filter?: RawFilter, strategy?: ${Name}Strategy): Promise<${Name}Array>;
@@ -72,7 +72,7 @@ function getTable(table, Name, name, customFilters) {
         concurrency?: ${Name}Concurrency;
     }
 
-    ${concurrencies(table, Name)}
+    ${_concurrencies}
     `;
 }
 
@@ -86,7 +86,7 @@ function getIdArgs(table){
 }
 
 
-function tableRelations(table) {
+function tableRelations(table, tablesAdded) {
 	let relations = table._relations;
 	let result = '';
 	for (let relationName in relations) {
@@ -165,7 +165,7 @@ function concurrencies(table, name, tablesAdded) {
 	else {
 		row = `export interface ${name}RelatedTable {
 			${columns(table)}
-			${tableRelations(table)}
+			${tableRelations(table, tablesAdded)}
 			all: (selector: (table: ${name}RelatedTable) => RawFilter) => Filter;
 			any: (selector: (table: ${name}RelatedTable) => RawFilter) => Filter;
 			none: (selector: (table: ${name}RelatedTable) => RawFilter) => Filter;
