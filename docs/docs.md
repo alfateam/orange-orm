@@ -5,7 +5,7 @@ __Connecting__
 [connect to postgres](#_connecttopostgres)  
 [connect to mySql](#_connecttomysql)  
 [connect to Ms Sql](#_connecttomssql)  
-[connect to Sybase SAP](#_connecttomsap)  
+[connect to Sybase SAP](#_connecttosap)  
 [connect to sqlite](#_connecttosqlite)  
 [pool size](#_poolsize)  
 [native bindings](#_native)  

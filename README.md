@@ -1,7 +1,7 @@
 __rdb__
 =========
 ORM for nodejs.  
-Supports postgres, mySql and sqlite.  
+Supports postgres, msSql, mySql, Sybase SAP and sqlite.  
 
 ## Installation
 `npm install rdb`  
