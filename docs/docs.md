@@ -725,46 +725,84 @@ await db.transaction(async () => {
         let orders = await Order.getMany(filter);
         console.log(inspect(await orders.toDto(), false, 10));
     });
-    ```
+```
 
-    </details>  
-    <details><summary>Dynamic connection string</summary>
+</details>
 
-    ```javascript
-    let rdb = require('rdb');
+<details><summary>Dynamic connection string</summary>
 
-    let Order = rdb.table('_order');
-    let Customer = rdb.table('_customer');
-    let OrderLine = rdb.table('_orderLine');
+```javascript
+let rdb = require('rdb');
 
-    Order.primaryColumn('oId').guid().as('id');
-    Order.column('oCustomerId').guid().as('customerId');
-    Order.column('oOrderNo').string().as('orderNo');
+let Order = rdb.table('_order');
+let Customer = rdb.table('_customer');
+let OrderLine = rdb.table('_orderLine');
 
-    Customer.primaryColumn('cId').guid().as('id');
-    Customer.column('cIsActive').boolean().as('isActive');
-    Customer.column('cBalance').numeric().as('balance');
-    Customer.column('cName').string().as('name');
+Order.primaryColumn('oId').guid().as('id');
+Order.column('oCustomerId').guid().as('customerId');
+Order.column('oOrderNo').string().as('orderNo');
 
-    OrderLine.primaryColumn('lId').guid().as('id');
-    OrderLine.column('lOrderId').guid().as('orderId');
-    OrderLine.column('lProduct').string().as('product');
+Customer.primaryColumn('cId').guid().as('id');
+Customer.column('cIsActive').boolean().as('isActive');
+Customer.column('cBalance').numeric().as('balance');
+Customer.column('cName').string().as('name');
 
-    Order.join(Customer).by('oCustomerId').as('customer');
+OrderLine.primaryColumn('lId').guid().as('id');
+OrderLine.column('lOrderId').guid().as('orderId');
+OrderLine.column('lProduct').string().as('product');
 
-    let line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
-    Order.hasMany(line_order_relation).as('lines');
+Order.join(Customer).by('oCustomerId').as('customer');
 
-    let db = rdb('postgres://postgres:postgres@localhost/test');
+let line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+Order.hasMany(line_order_relation).as('lines');
 
-    await db.transaction(async () => {
-        let isActive = Order.customer.isActive.eq(true);
-        let didOrderCar = Order.lines.product.contains('car');
-        let filter = isActive.and(didOrderCar);
-        //alternatively rdb.filter.and(isActive).and(didOrderCar);
+let db = rdb('postgres://postgres:postgres@localhost/test');
+
+await db.transaction(async () => {
+    let isActive = Order.customer.isActive.eq(true);
+    let didOrderCar = Order.lines.product.contains('car');
+    let filter = isActive.and(didOrderCar);
+    //alternatively rdb.filter.and(isActive).and(didOrderCar);
         let orders = await Order.getMany(filter);
         console.log(inspect(await orders.toDto(), false, 10));
     });
-    ```
+```
+
+</details>
+ 
+    
+## On the server
+    
+<details><summary>Pooling</summary>
+
+```javascript
+```
+
+</details>
+<details><summary>Transactions</summary>
+
+```javascript
+```
+
+</details>
+    
+<details><summary>Locks</summary>
+
+```javascript
+```
+
+</details>
+    
+<details><summary>Unload / restore to file</summary>
+
+```javascript
+```
+
+</details>
+    
+<details><summary>Dynamic connection string</summary>
+
+```javascript
+```
 
 </details>
