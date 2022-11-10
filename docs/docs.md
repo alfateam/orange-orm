@@ -7,12 +7,12 @@ Link to classic style documentation
 
 ## Getting started 
 
-<details><summary>Schema file</summary><blockquote style="background: transparent">
+<details><summary>Mapping tables</summary><blockquote style="background: transparent">
 <details><summary>Nested</summary><blockquote style="background: transparent">
 
 In order to make changes  
 __Hello__
-```javascript
+```#0d1117
 let rdb = require('rdb');
 
 let Order = rdb.table('_order');
@@ -769,6 +769,48 @@ await db.transaction(async () => {
 ```
 
 </details>
+    
+<details><summary>Vue reactivity</summary>
+
+```javascript
+let rdb = require('rdb');
+
+let Order = rdb.table('_order');
+let Customer = rdb.table('_customer');
+let OrderLine = rdb.table('_orderLine');
+
+Order.primaryColumn('oId').guid().as('id');
+Order.column('oCustomerId').guid().as('customerId');
+Order.column('oOrderNo').string().as('orderNo');
+
+Customer.primaryColumn('cId').guid().as('id');
+Customer.column('cIsActive').boolean().as('isActive');
+Customer.column('cBalance').numeric().as('balance');
+Customer.column('cName').string().as('name');
+
+OrderLine.primaryColumn('lId').guid().as('id');
+OrderLine.column('lOrderId').guid().as('orderId');
+OrderLine.column('lProduct').string().as('product');
+
+Order.join(Customer).by('oCustomerId').as('customer');
+
+let line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+Order.hasMany(line_order_relation).as('lines');
+
+let db = rdb('postgres://postgres:postgres@localhost/test');
+
+await db.transaction(async () => {
+    let isActive = Order.customer.isActive.eq(true);
+    let didOrderCar = Order.lines.product.contains('car');
+    let filter = isActive.and(didOrderCar);
+    //alternatively rdb.filter.and(isActive).and(didOrderCar);
+        let orders = await Order.getMany(filter);
+        console.log(inspect(await orders.toDto(), false, 10));
+    });
+```
+
+</details>
+
  
     
 ## On the server
