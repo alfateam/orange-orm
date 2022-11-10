@@ -53,8 +53,8 @@ console.log(inspect(await orders.toDto(), false, 10));
 
 </blockquote>
 </details>  
-<details><summary><strong>Fetching rows</strong></summary><br>
-    
+    <details><summary><strong>Fetching rows</strong></summary><br>
+
 __Fetching a single row__  
 It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.    
     
