@@ -5,7 +5,7 @@ bullet points/Features ?  Databases: .., Browser enabled, full typescript suppor
 Someicons ?
 Link to classic style documentation
 
-<details open><summary><h2>Getting started<h2></summary>
+## Getting started
     
 <details><summary><strong>Mapping tables</strong></summary><blockquote style="background: transparent">
 <details><summary><strong>Nested</strong></summary><blockquote style="background: transparent">
@@ -399,9 +399,8 @@ console.log(inspect(await orders.toDto(), false, 10));
 
 </details>
     
-</details>
 
-<details open><summary><h2>In the browser<h2></summary>
+## In the browser
     
 <details><summary><strong>Hosting in express</strong></summary>
 
@@ -806,10 +805,8 @@ await db.transaction(async () => {
 ```
 
 </details>
-
-</details> 
     
-<details open><summary><h2>On the server<h2></summary>
+## On the server
     
 <details><summary><strong>Pooling</strong></summary>
 
@@ -845,4 +842,3 @@ await db.transaction(async () => {
 
 </details>
 
-</details>
