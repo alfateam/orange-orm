@@ -5,14 +5,14 @@ bullet points/Features ?  Databases: .., Browser enabled, full typescript suppor
 Someicons ?
 Link to classic style documentation
 
-## Getting started 
-
-<details><summary>Mapping tables</summary><blockquote style="background: transparent">
-<details><summary>Nested</summary><blockquote style="background: transparent">
+<details open><summary><h3>Getting started<h3></summary>
+    
+<details><summary><strong>Mapping tables</strong></summary><blockquote style="background: transparent">
+<details><summary><strong>Nested</strong></summary><blockquote style="background: transparent">
 
 In order to make changes  
 __Hello__
-```#0d1117
+```js
 let rdb = require('rdb');
 
 let Order = rdb.table('_order');
@@ -53,7 +53,39 @@ console.log(inspect(await orders.toDto(), false, 10));
 
 </blockquote>
 </details>  
-<details><summary>Fetching rows</summary>
+<details><summary><strong>Fetching rows</strong></summary><br>
+    
+__Fetching a single row__  
+It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.    
+    
+```javascript
+ await db.transaction(async () => {
+let isActive = Order.customer.isActive.eq(true);
+let didOrderCar = Order.lines.product.contains('car');
+let filter = isActive.and(didOrderCar);
+//alternatively rdb.filter.and(isActive).and(didOrderCar);
+let orders = await Order.getMany(filter);
+console.log(inspect(await orders.toDto(), false, 10));
+});
+```
+     
+__Fetching many rows__  
+It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.    
+    
+```javascript
+await db.transaction(async () => {
+let isActive = Order.customer.isActive.eq(true);
+let didOrderCar = Order.lines.product.contains('car');
+let filter = isActive.and(didOrderCar);
+//alternatively rdb.filter.and(isActive).and(didOrderCar);
+let orders = await Order.getMany(filter);
+console.log(inspect(await orders.toDto(), false, 10));
+});
+```    
+        
+</details>  
+    
+<details><summary><strong>Fetching related tables</strong></summary>
 
 ```javascript
 let rdb = require('rdb');
@@ -92,7 +124,7 @@ console.log(inspect(await orders.toDto(), false, 10));
 });
 ```
 </details>  
-<details><summary>Fetching related tables</summary>
+<details><summary><strong>Updating rows</strong></summary>
 
 ```javascript
 let rdb = require('rdb');
@@ -131,7 +163,7 @@ console.log(inspect(await orders.toDto(), false, 10));
 });
 ```
 </details>  
-<details><summary>Updating rows</summary>
+<details><summary><strong>Inserting rows</strong></summary>
 
 ```javascript
 let rdb = require('rdb');
@@ -170,7 +202,7 @@ console.log(inspect(await orders.toDto(), false, 10));
 });
 ```
 </details>  
-<details><summary>Inserting rows</summary>
+<details><summary><strong>Auto-generated keys</strong></summary>
 
 ```javascript
 let rdb = require('rdb');
@@ -209,7 +241,7 @@ console.log(inspect(await orders.toDto(), false, 10));
 });
 ```
 </details>  
-<details><summary>Auto-generated keys</summary>
+<details><summary><strong>Deleting rows</strong></summary>
 
 ```javascript
 let rdb = require('rdb');
@@ -248,7 +280,7 @@ console.log(inspect(await orders.toDto(), false, 10));
 });
 ```
 </details>  
-<details><summary>Deleting rows</summary>
+<details><summary><strong>Filtering</strong></summary>
 
 ```javascript
 let rdb = require('rdb');
@@ -287,7 +319,7 @@ console.log(inspect(await orders.toDto(), false, 10));
 });
 ```
 </details>  
-<details><summary>Filtering</summary>
+<details><summary><strong>Limit and order by</strong></summary>
 
 ```javascript
 let rdb = require('rdb');
@@ -326,46 +358,7 @@ console.log(inspect(await orders.toDto(), false, 10));
 });
 ```
 </details>  
-<details><summary>Limit and order by</summary>
-
-```javascript
-let rdb = require('rdb');
-
-let Order = rdb.table('_order');
-let Customer = rdb.table('_customer');
-let OrderLine = rdb.table('_orderLine');
-
-Order.primaryColumn('oId').guid().as('id');
-Order.column('oCustomerId').guid().as('customerId');
-Order.column('oOrderNo').string().as('orderNo');
-
-Customer.primaryColumn('cId').guid().as('id');
-Customer.column('cIsActive').boolean().as('isActive');
-Customer.column('cBalance').numeric().as('balance');
-Customer.column('cName').string().as('name');
-
-OrderLine.primaryColumn('lId').guid().as('id');
-OrderLine.column('lOrderId').guid().as('orderId');
-OrderLine.column('lProduct').string().as('product');
-
-Order.join(Customer).by('oCustomerId').as('customer');
-
-let line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
-Order.hasMany(line_order_relation).as('lines');
-
-let db = rdb('postgres://postgres:postgres@localhost/test');
-
-await db.transaction(async () => {
-let isActive = Order.customer.isActive.eq(true);
-let didOrderCar = Order.lines.product.contains('car');
-let filter = isActive.and(didOrderCar);
-//alternatively rdb.filter.and(isActive).and(didOrderCar);
-let orders = await Order.getMany(filter);
-console.log(inspect(await orders.toDto(), false, 10));
-});
-```
-</details>  
-<details><summary>Batch deletes</summary>
+<details><summary><strong>Batch deletes</strong></summary>
 
 ```javascript
 let rdb = require('rdb');
@@ -405,49 +398,12 @@ console.log(inspect(await orders.toDto(), false, 10));
 ```
 
 </details>
+    
+</details>
 
-## In the browser    
-<details><summary>Hosting in express</summary>
-
-```javascript
-let rdb = require('rdb');
-
-let Order = rdb.table('_order');
-let Customer = rdb.table('_customer');
-let OrderLine = rdb.table('_orderLine');
-
-Order.primaryColumn('oId').guid().as('id');
-Order.column('oCustomerId').guid().as('customerId');
-Order.column('oOrderNo').string().as('orderNo');
-
-Customer.primaryColumn('cId').guid().as('id');
-Customer.column('cIsActive').boolean().as('isActive');
-Customer.column('cBalance').numeric().as('balance');
-Customer.column('cName').string().as('name');
-
-OrderLine.primaryColumn('lId').guid().as('id');
-OrderLine.column('lOrderId').guid().as('orderId');
-OrderLine.column('lProduct').string().as('product');
-
-Order.join(Customer).by('oCustomerId').as('customer');
-
-let line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
-Order.hasMany(line_order_relation).as('lines');
-
-let db = rdb('postgres://postgres:postgres@localhost/test');
-
-await db.transaction(async () => {
-    let isActive = Order.customer.isActive.eq(true);
-    let didOrderCar = Order.lines.product.contains('car');
-    let filter = isActive.and(didOrderCar);
-    //alternatively rdb.filter.and(isActive).and(didOrderCar);
-    let orders = await Order.getMany(filter);
-    console.log(inspect(await orders.toDto(), false, 10));
-});
-```
-
-</details>  
-<details><summary>Custom filters</summary>
+<details open><summary><h3>In the browser<h3></summary>
+    
+<details><summary><strong>Hosting in express</strong></summary>
 
 ```javascript
 let rdb = require('rdb');
@@ -487,48 +443,7 @@ await db.transaction(async () => {
 ```
 
 </details>  
-
-<details><summary>Base filters</summary>
-
-```javascript
-let rdb = require('rdb');
-
-let Order = rdb.table('_order');
-let Customer = rdb.table('_customer');
-let OrderLine = rdb.table('_orderLine');
-
-Order.primaryColumn('oId').guid().as('id');
-Order.column('oCustomerId').guid().as('customerId');
-Order.column('oOrderNo').string().as('orderNo');
-
-Customer.primaryColumn('cId').guid().as('id');
-Customer.column('cIsActive').boolean().as('isActive');
-Customer.column('cBalance').numeric().as('balance');
-Customer.column('cName').string().as('name');
-
-OrderLine.primaryColumn('lId').guid().as('id');
-OrderLine.column('lOrderId').guid().as('orderId');
-OrderLine.column('lProduct').string().as('product');
-
-Order.join(Customer).by('oCustomerId').as('customer');
-
-let line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
-Order.hasMany(line_order_relation).as('lines');
-
-let db = rdb('postgres://postgres:postgres@localhost/test');
-
-await db.transaction(async () => {
-    let isActive = Order.customer.isActive.eq(true);
-    let didOrderCar = Order.lines.product.contains('car');
-    let filter = isActive.and(didOrderCar);
-    //alternatively rdb.filter.and(isActive).and(didOrderCar);
-    let orders = await Order.getMany(filter);
-    console.log(inspect(await orders.toDto(), false, 10));
-});
-```
-
-</details>  
-<details><summary>Access rights</summary>
+<details><summary><strong>Custom filters</strong></summary>
 
 ```javascript
 let rdb = require('rdb');
@@ -568,7 +483,8 @@ await db.transaction(async () => {
 ```
 
 </details>  
-<details><summary>Concurrency</summary>
+
+<details><summary><strong>Base filters</strong></summary>
 
 ```javascript
 let rdb = require('rdb');
@@ -608,7 +524,7 @@ await db.transaction(async () => {
 ```
 
 </details>  
-<details><summary>Unload / Restore to local storage</summary>
+<details><summary><strong>Access rights</strong></summary>
 
 ```javascript
 let rdb = require('rdb');
@@ -648,7 +564,7 @@ await db.transaction(async () => {
 ```
 
 </details>  
-<details><summary>Exposing a subset of columns</summary>
+<details><summary><strong>Concurrency</strong></summary>
 
 ```javascript
 let rdb = require('rdb');
@@ -688,7 +604,87 @@ await db.transaction(async () => {
 ```
 
 </details>  
-<details><summary>Authentication and interception</summary>
+<details><summary><strong>Unload / Restore to local storage</strong></summary>
+
+```javascript
+let rdb = require('rdb');
+
+let Order = rdb.table('_order');
+let Customer = rdb.table('_customer');
+let OrderLine = rdb.table('_orderLine');
+
+Order.primaryColumn('oId').guid().as('id');
+Order.column('oCustomerId').guid().as('customerId');
+Order.column('oOrderNo').string().as('orderNo');
+
+Customer.primaryColumn('cId').guid().as('id');
+Customer.column('cIsActive').boolean().as('isActive');
+Customer.column('cBalance').numeric().as('balance');
+Customer.column('cName').string().as('name');
+
+OrderLine.primaryColumn('lId').guid().as('id');
+OrderLine.column('lOrderId').guid().as('orderId');
+OrderLine.column('lProduct').string().as('product');
+
+Order.join(Customer).by('oCustomerId').as('customer');
+
+let line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+Order.hasMany(line_order_relation).as('lines');
+
+let db = rdb('postgres://postgres:postgres@localhost/test');
+
+await db.transaction(async () => {
+    let isActive = Order.customer.isActive.eq(true);
+    let didOrderCar = Order.lines.product.contains('car');
+    let filter = isActive.and(didOrderCar);
+    //alternatively rdb.filter.and(isActive).and(didOrderCar);
+    let orders = await Order.getMany(filter);
+    console.log(inspect(await orders.toDto(), false, 10));
+});
+```
+
+</details>  
+<details><summary><strong>Exposing a subset of columns</strong></summary>
+
+```javascript
+let rdb = require('rdb');
+
+let Order = rdb.table('_order');
+let Customer = rdb.table('_customer');
+let OrderLine = rdb.table('_orderLine');
+
+Order.primaryColumn('oId').guid().as('id');
+Order.column('oCustomerId').guid().as('customerId');
+Order.column('oOrderNo').string().as('orderNo');
+
+Customer.primaryColumn('cId').guid().as('id');
+Customer.column('cIsActive').boolean().as('isActive');
+Customer.column('cBalance').numeric().as('balance');
+Customer.column('cName').string().as('name');
+
+OrderLine.primaryColumn('lId').guid().as('id');
+OrderLine.column('lOrderId').guid().as('orderId');
+OrderLine.column('lProduct').string().as('product');
+
+Order.join(Customer).by('oCustomerId').as('customer');
+
+let line_order_relation = OrderLine.join(Order).by('lOrderId').as('order');
+Order.hasMany(line_order_relation).as('lines');
+
+let db = rdb('postgres://postgres:postgres@localhost/test');
+
+await db.transaction(async () => {
+    let isActive = Order.customer.isActive.eq(true);
+    let didOrderCar = Order.lines.product.contains('car');
+    let filter = isActive.and(didOrderCar);
+    //alternatively rdb.filter.and(isActive).and(didOrderCar);
+    let orders = await Order.getMany(filter);
+    console.log(inspect(await orders.toDto(), false, 10));
+});
+```
+
+</details>  
+<details><summary><strong>Authentication and interception</strong></summary>
 
 ```javascript
 let rdb = require('rdb');
@@ -729,7 +725,7 @@ await db.transaction(async () => {
 
 </details>
 
-<details><summary>Dynamic connection string</summary>
+<details><summary><strong>Dynamic connection string</strong></summary>
 
 ```javascript
 let rdb = require('rdb');
@@ -770,7 +766,7 @@ await db.transaction(async () => {
 
 </details>
     
-<details><summary>Vue reactivity</summary>
+<details><summary><strong>Vue reactivity</strong></summary>
 
 ```javascript
 let rdb = require('rdb');
@@ -811,40 +807,42 @@ await db.transaction(async () => {
 
 </details>
 
- 
+</details> 
     
-## On the server
+<details open><summary><h3>On the server<h3></summary>
     
-<details><summary>Pooling</summary>
+<details><summary><strong>Pooling</strong></summary>
 
 ```javascript
 ```
 
 </details>
-<details><summary>Transactions</summary>
-
-```javascript
-```
-
-</details>
-    
-<details><summary>Locks</summary>
+<details><summary><strong>Transactions</strong></summary>
 
 ```javascript
 ```
 
 </details>
     
-<details><summary>Unload / restore to file</summary>
+<details><summary><strong>Locks</strong></summary>
 
 ```javascript
 ```
 
 </details>
     
-<details><summary>Dynamic connection string</summary>
+<details><summary><strong>Unload / restore to file</strong></summary>
 
 ```javascript
 ```
+
+</details>
+    
+<details><summary><strong>Dynamic connection string</strong></summary>
+
+```javascript
+```
+
+</details>
 
 </details>
