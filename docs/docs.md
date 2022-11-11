@@ -5,7 +5,9 @@ bullet points/Features ?  Databases: .., Browser enabled, full typescript suppor
 Someicons ?
 Link to classic style documentation
 
-## Getting started
+[Expand all sections](https://foo.com)
+
+## [Getting started](https://github.com)
     
 <details><summary><strong>Mapping tables</strong></summary><blockquote style="background: transparent">
 <details><summary><strong>Nested</strong></summary><blockquote style="background: transparent">
