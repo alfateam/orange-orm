@@ -1,6 +1,5 @@
-__rdb__
-=========
-ORM for nodejs.  
+![RDB](./docs/logo-sm.jpg)  
+RDB is an Object Relational Mapper for nodejs.  
 Supports postgres, msSql, mySql, Sybase SAP and sqlite.  
 
 ## Installation
