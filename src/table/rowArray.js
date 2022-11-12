@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-this-alias */
 var resultToPromise = require('./resultToPromise');
 var orderBy = require('./rowArray/orderBy');
 var negotiateNextTick = require('./rowArray/negotiateNextTick');

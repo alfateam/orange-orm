@@ -35,7 +35,7 @@ function hostExpress({ db, table, defaultConcurrency, concurrency, customFilters
 					db = dbPromise;
 			}
 			let result;
-			await db.transaction(async() => {
+			await db.transaction(async () => {
 				let patch = request.body.patch || request.body;
 				let options = request.body.options || {};
 				let _concurrency = options.concurrency || concurrency;
@@ -62,7 +62,7 @@ function hostExpress({ db, table, defaultConcurrency, concurrency, customFilters
 					db = dbPromise;
 			}
 			let result;
-			await db.transaction(async() => {
+			await db.transaction(async () => {
 				result = await executePath({ table, JSONFilter: request.body, customFilters, baseFilter, request, response, readOnly, allowBulkDelete });
 			});
 			response.json(result);

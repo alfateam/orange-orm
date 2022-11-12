@@ -11,7 +11,7 @@ function createReadStreamCoreNative(table, db, filter, strategy, transformer, st
 	if (process.domain)
 		process.domain.add(transformer);
 
-	db.transaction(async() => {
+	db.transaction(async () => {
 		await start();
 	}).then(null, onError);
 

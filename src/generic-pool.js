@@ -1,4 +1,6 @@
+/* eslint-disable @typescript-eslint/no-this-alias */
 
+// @ts-nocheck
 //Taken from https://raw.githubusercontent.com/coopernurse/node-pool/6c98fa9163bbe35b683ffc2b55ac741d02956096/lib/generic-pool.js
 //Version 3 of generic-pool has lots og bugs and node program will never finish.
 //So I copied version 2.5.4 below

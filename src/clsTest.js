@@ -45,7 +45,7 @@ async function getFromDb() {
 
 function getFromDb2() {
 	return new Promise((resolve) => {
-		setTimeout(async() => {
+		setTimeout(async () => {
 			let c2 = cls.create();
 			await c2.start();
 			await begin(2);

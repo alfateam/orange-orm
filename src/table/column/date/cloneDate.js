@@ -1,4 +1,4 @@
-var toISOString = require('./toISOString');
+var toISOString = require('../../../dateToISOString');
 
 function cloneDate(date) {
 	date = new Date(date);
