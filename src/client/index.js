@@ -67,7 +67,7 @@ function rdbClient(options = {}) {
 				db = dbPromise;
 		}
 		if (!db.createTransaction)
-			throw new Error("Transaction not supported through http");
+			throw new Error('Transaction not supported through http');
 		const transaction =  db.createTransaction(_options);
 		try {
 			const nextClient = client({transaction});
