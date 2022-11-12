@@ -1,5 +1,6 @@
 var newPg = require('./pg/newDatabase');
 var hostExpress = require('./hostExpress');
+var client = require('./client/index.js');
 var _sqlite;
 var _mssql;
 var _sap;
@@ -8,7 +9,10 @@ var flags = require('./flags');
 var connectViaPool = function(connectionString) {
 	if (connectionString.indexOf && connectionString.indexOf('mysql') === 0)
 		return connectViaPool.mySql.apply(null, arguments);
-	return newPg.apply(null, arguments);
+	else if (connectionString.indexOf && connectionString.indexOf('http') === 0)
+		return client.apply(null, arguments);
+	else
+		return newPg.apply(null, arguments);
 };
 
 connectViaPool.pg = newPg;

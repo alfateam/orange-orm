@@ -3273,11 +3273,11 @@ function httpAdapter(url, {beforeRequest : _beforeRequest, beforeResponse: _befo
 	}
 
 	function query() {
-		throw new Error("Queries are not supported through http");
+		throw new Error('Queries are not supported through http');
 	}
 
 	function express() {
-		throw new Error("Hosting in express is not supported on the client side");
+		throw new Error('Hosting in express is not supported on the client side');
 	}
 }
 
