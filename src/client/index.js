@@ -31,7 +31,6 @@ function rdbClient(options = {}) {
 		SkipOnConflict: 'skipOnConflict',
 		Overwrite: 'overwrite'
 	};
-	client.createPatch = createPatch; //keep for legacy reasons
 	client.beforeResponse = (cb => beforeResponse = cb);
 	client.beforeRequest = (cb => beforeRequest = cb);
 	client.reactive = (cb => _reactive = cb);
