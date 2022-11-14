@@ -1,16 +1,20 @@
-let rfc = require('rfc6902');
+const jsonpatch  = require('fast-json-patch');
 let dateToIsoString = require('../dateToIsoString');
 let stringify = require('./stringify');
 let {v4: uuid} = require('uuid');
 
 module.exports = function createPatch(original, dto, options) {
+	let subject = toCompareObject({d: original}, options, true);
+	let clonedDto = toCompareObject({d: dto}, options, true);
+	let observer = jsonpatch.observe(subject);
+	subject.d = clonedDto.d;
+	let changes = jsonpatch.generate(observer);
 	let clonedOriginal = toCompareObject(original, options);
-	let clonedDto = toCompareObject(dto, options);
-	let changes = rfc.createPatch(clonedOriginal, clonedDto);
 	changes = changes.map(addOldValue);
 	return changes;
 
 	function addOldValue(change) {
+		change.path = change.path.substring(2);
 		if (change.op === 'remove' || change.op === 'replace') {
 			let splitPath = change.path.split('/');
 			splitPath.shift();
@@ -26,7 +30,7 @@ module.exports = function createPatch(original, dto, options) {
 		return change;
 	}
 
-	function toCompareObject(object, options) {
+	function toCompareObject(object, options, isRoot) {
 		if (Array.isArray(object)) {
 			let copy = { __patchType: 'Array' };
 			for (let i = 0; i < object.length; i++) {
@@ -51,7 +55,7 @@ module.exports = function createPatch(original, dto, options) {
 		else if (object === Object(object)) {
 			let copy = {};
 			for (let name in object) {
-				copy[name] = toCompareObject(object[name], options && options.relations && options.relations[name]);
+				copy[name] = toCompareObject(object[name], isRoot ? options : options && options.relations && options.relations[name]);
 			}
 			return copy;
 		}

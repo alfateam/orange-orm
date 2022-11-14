@@ -1,4 +1,4 @@
-let onChange = require('@lroal/on-change');
+const jsonpatch  = require('fast-json-patch');
 let createPatch = require('./createPatch');
 let stringify = require('./stringify');
 let netAdapter = require('./netAdapter');
@@ -215,7 +215,7 @@ function rdbClient(options = {}) {
 			let _array = array;
 			if (_reactive)
 				array = _reactive(array);
-			let enabled = false;
+			// let enabled = false;
 			let handler = {
 				get(_target, property) {
 					if (property === 'toJSON')
@@ -225,7 +225,7 @@ function rdbClient(options = {}) {
 					else if (property === 'save')
 						return saveArray.bind(null, array);
 					else if (property === 'insert')
-						return insertArray.bind(null, array, arrayProxy);
+						return insertArray.bind(null, array);
 					else if (property === 'delete')
 						return deleteArray.bind(null, array);
 					else if (property === 'refresh')
@@ -242,32 +242,34 @@ function rdbClient(options = {}) {
 
 			};
 			let innerProxy = new Proxy(array, handler);
-			let arrayProxy = onChange(innerProxy, () => { return;}, { pathAsArray: true, ignoreDetached: true, details: true, onValidate });
-			rootMap.set(array, { jsonMap: new Map(), original: new Set(array), strategy });
-			enabled = true;
-			return arrayProxy;
+			let observer = jsonpatch.observe(array);
+			// let arrayProxy = onChange(innerProxy, () => { return;}, { pathAsArray: true, ignoreDetached: true, details: true, onValidate });
+			// rootMap.set(array, { jsonMap: new Map(), original: new Set(array), strategy });
+			rootMap.set(array, { observer, strategy });
+			// enabled = true;
+			return innerProxy;
 
-			function onValidate(path) {
-				if (!enabled)
-					return true;
-				if (enabled && path.length > 0) {
-					let { jsonMap } = rootMap.get(array);
-					if (!jsonMap.has(array[path[0]]))
-						jsonMap.set(array[path[0]], stringify(array[path[0]]));
-				}
-				return true;
-			}
+			// function onValidate(path) {
+			// 	if (!enabled)
+			// 		return true;
+			// 	if (enabled && path.length > 0) {
+			// 		let { jsonMap } = rootMap.get(array);
+			// 		if (!jsonMap.has(array[path[0]]))
+			// 			jsonMap.set(array[path[0]], stringify(array[path[0]]));
+			// 	}
+			// 	return true;
+			// }
 
 		}
 
 		function proxifyRow(row, strategy) {
-			let enabled = false;
+			// let enabled = false;
 			let handler = {
 				get(_target, property,) {
 					if (property === 'save') //call server then acceptChanges
 						return saveRow.bind(null, row);
 					else if (property === 'insert') //call server then remove from jsonMap and add to original
-						return insertRow.bind(null, row, rowProxy);
+						return insertRow.bind(null, row, innerProxy);
 					else if (property === 'delete') //call server then remove from jsonMap and original
 						return deleteRow.bind(null, row);
 					else if (property === 'refresh') //refresh from server then acceptChanges
@@ -288,19 +290,19 @@ function rdbClient(options = {}) {
 
 			};
 			let innerProxy = new Proxy(row, handler);
-			let rowProxy = onChange(innerProxy, () => { return;}, { pathAsArray: true, ignoreDetached: true, details: true, onValidate });
+			// let rowProxy = onChange(innerProxy, () => { return;}, { pathAsArray: true, ignoreDetached: true, details: true, onValidate });
 			rootMap.set(row, { json: stringify(row), strategy });
-			enabled = true;
-			return rowProxy;
+			// enabled = true;
+			return innerProxy;
 
-			function onValidate() {
-				if (!enabled)
-					return false;
-				let root = rootMap.get(row);
-				if (!root.json)
-					root.json = stringify(row);
-				return true;
-			}
+			// function onValidate() {
+			// 	if (!enabled)
+			// 		return false;
+			// 	let root = rootMap.get(row);
+			// 	if (!root.json)
+			// 		root.json = stringify(row);
+			// 	return true;
+			// }
 		}
 
 		function toJSON(row, _meta = meta) {
@@ -441,11 +443,17 @@ function rdbClient(options = {}) {
 			rootMap.set(array, { jsonMap: new Map(), original: new Set(array) });
 		}
 
-		async function insertArray(array, proxy, options) {
+		async function insertArray(array, options) {
 			if (array.length === 0)
 				return;
 			let strategy = extractStrategy(options);
 			let meta = await getMeta();
+			let newArray = [];
+			let observer = jsonpatch.observe(newArray);
+			for (let i = 0; i < array.length; i++) {
+				newArray[i] = array[i];
+			}
+			// let patch = createPatch([], array, meta);
 			let patch = createPatch([], array, meta);
 
 			let body = stringify({ patch, options: { strategy, ...options}  });
@@ -530,22 +538,23 @@ function rdbClient(options = {}) {
 			rootMap.set(array, { jsonMap: new Map(), original: new Set(array), strategy });
 		}
 
-		async function insertRow(row, proxy, options) {
+		async function insertRow(row, innerProxy, options) {
 			let strategy = extractStrategy(options, row);
-			let meta = await getMeta(url);
+			let meta = await getMeta();
 			let patch = createPatch([], [row], meta);
 			let body = stringify({ patch, options: { strategy, ...options} });
 
 			let adapter = netAdapter(url, {beforeRequest, beforeResponse, tableOptions});
 			let { inserted } = await adapter.patch(body);
 			copyInto(inserted, [row]);
-			rootMap.set(row, { strategy });
-			return proxy;
+			rootMap.set(row, { json: stringify(row), strategy });
+
+			return innerProxy;
 		}
 
 		async function deleteRow(row, options) {
 			let strategy = extractStrategy(options, row);
-			let meta = await getMeta(url);
+			let meta = await getMeta();
 			let patch = createPatch([row], [], meta);
 			let body = stringify({ patch, options });
 
@@ -559,7 +568,7 @@ function rdbClient(options = {}) {
 			let { json } = rootMap.get(row);
 			if (!json)
 				return;
-			let meta = await getMeta(url);
+			let meta = await getMeta();
 
 			let patch = createPatch([JSON.parse(json)], [row], meta);
 			if (patch.length === 0)

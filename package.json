@@ -34,6 +34,7 @@
     "ajv": "^6.10.2",
     "deferred": "^0.7.5",
     "eslint": "^8.4.1",
+    "fast-json-patch": "^3.1.1",
     "findup-sync": "^5.0.0",
     "isomorphic-fetch": "^3.0.0",
     "module-definition": "^4.0.0",
@@ -69,10 +70,10 @@
     }
   },
   "devDependencies": {
-    "@typescript-eslint/eslint-plugin": "^5.42.1",
-    "@typescript-eslint/parser": "^5.42.1",
     "@rollup/plugin-commonjs": "^21.0.1",
     "@rollup/plugin-node-resolve": "^13.0.0",
+    "@typescript-eslint/eslint-plugin": "^5.42.1",
+    "@typescript-eslint/parser": "^5.42.1",
     "a": "^2.1.0",
     "eslint": "^8.6.0",
     "glob": "^7.1.7",
