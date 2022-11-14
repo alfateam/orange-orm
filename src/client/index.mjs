@@ -3327,7 +3327,6 @@ function rdbClient(options = {}) {
 		SkipOnConflict: 'skipOnConflict',
 		Overwrite: 'overwrite'
 	};
-	client.createPatch = createPatch; //keep for legacy reasons
 	client.beforeResponse = (cb => beforeResponse = cb);
 	client.beforeRequest = (cb => beforeRequest = cb);
 	client.reactive = (cb => _reactive = cb);
@@ -3363,7 +3362,7 @@ function rdbClient(options = {}) {
 				db = dbPromise;
 		}
 		if (!db.createTransaction)
-			throw new Error("Transaction not supported through http");
+			throw new Error('Transaction not supported through http');
 		const transaction =  db.createTransaction(_options);
 		try {
 			const nextClient = client({transaction});

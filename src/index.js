@@ -9,10 +9,10 @@ var flags = require('./flags');
 var connectViaPool = function(connectionString) {
 	if (connectionString.indexOf && connectionString.indexOf('mysql') === 0)
 		return connectViaPool.mySql.apply(null, arguments);
-	else if (connectionString.indexOf && connectionString.indexOf('http') === 0)
-		return client.apply(null, arguments);
+	else if (connectionString.indexOf && connectionString.indexOf('postgres') === 0)
+		newPg.apply(null, arguments);
 	else
-		return newPg.apply(null, arguments);
+		return client.apply(null, arguments);
 };
 
 connectViaPool.pg = newPg;
