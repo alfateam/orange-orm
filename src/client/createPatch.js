@@ -1,16 +1,18 @@
-const jsonpatch  = require('fast-json-patch');
+const jsonpatch = require('fast-json-patch');
 let dateToIsoString = require('../dateToIsoString');
 let stringify = require('./stringify');
-let {v4: uuid} = require('uuid');
+let { v4: uuid } = require('uuid');
 
 module.exports = function createPatch(original, dto, options) {
-	let subject = toCompareObject({d: original}, options, true);
-	let clonedDto = toCompareObject({d: dto}, options, true);
+	let subject = toCompareObject({ d: original }, options, true);
+	let clonedDto = toCompareObject({ d: dto }, options, true);
+	let keyPositionMap = toKeyPositionMap(dto);
 	let observer = jsonpatch.observe(subject);
 	subject.d = clonedDto.d;
 	let changes = jsonpatch.generate(observer);
 	let clonedOriginal = toCompareObject(original, options);
 	changes = changes.map(addOldValue);
+	changes.sort(comparePatch);
 	return changes;
 
 	function addOldValue(change) {
@@ -28,6 +30,25 @@ module.exports = function createPatch(original, dto, options) {
 		}
 
 		return change;
+	}
+
+	function toKeyPositionMap(rows) {
+		return rows.reduce((map, element, i) => {
+			if (options && options.keys && element === Object(element)) {
+				let key = [];
+				for (let i = 0; i < options.keys.length; i++) {
+					let keyName = options.keys[i].name;
+					key.push(negotiateTempKey(element[keyName]));
+				}
+				map[stringify(key)] = i;
+			}
+			else if ('id' in element)
+				map[stringify(element.id)] = i;
+			else
+				map[i] = i;
+			return map;
+		}, {});
+
 	}
 
 	function toCompareObject(object, options, isRoot) {
@@ -71,6 +92,12 @@ module.exports = function createPatch(original, dto, options) {
 			return `~${uuid()}`;
 		else
 			return value;
+	}
+
+	function comparePatch(a, b) {
+		const aPathArray = a.path.split('/');
+		const bPathArray = b.path.split('/');
+		return (aPathArray.length - bPathArray.length) || (keyPositionMap[aPathArray[1]] ?? Infinity - keyPositionMap[bPathArray[1]] ?? Infinity) || a.path.localeCompare(b.path);
 	}
 
 };

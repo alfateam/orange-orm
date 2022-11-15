@@ -1,13 +1,13 @@
-const jsonpatch  = require('fast-json-patch');
-let createPatch = require('./createPatch');
-let stringify = require('./stringify');
-let netAdapter = require('./netAdapter');
-let rootMap = new WeakMap();
-let targetKey  = Symbol();
+const createPatch = require('./createPatch');
+const stringify = require('./stringify');
+const netAdapter = require('./netAdapter');
+const toKeyPositionMap = require('./toKeyPositionMap');
+const rootMap = new WeakMap();
+const targetKey = Symbol();
 
 function rdbClient(options = {}) {
 	if (options.pg)
-		options = {db: options};
+		options = { db: options };
 	let beforeResponse = options.beforeResponse;
 	let beforeRequest = options.beforeRequest;
 	let transaction = options.transaction;
@@ -15,12 +15,12 @@ function rdbClient(options = {}) {
 	let baseUrl = options.db;
 	function client(_options = {}) {
 		if (_options.pg)
-			_options = {db: _options};
-		return rdbClient({...options,..._options});
+			_options = { db: _options };
+		return rdbClient({ ...options, ..._options });
 	}
 
 	if (options.tables) {
-		for(let name in options.tables) {
+		for (let name in options.tables) {
 			client[name] = table(options.tables[name]);
 		}
 		client.tables = options.tables;
@@ -53,7 +53,7 @@ function rdbClient(options = {}) {
 	return client;
 
 	async function query() {
-		return netAdapter(baseUrl,{tableOptions: {db: baseUrl}} ).query.apply(null, arguments);
+		return netAdapter(baseUrl, { tableOptions: { db: baseUrl } }).query.apply(null, arguments);
 	}
 
 	async function runInTransaction(fn, _options) {
@@ -67,13 +67,13 @@ function rdbClient(options = {}) {
 		}
 		if (!db.createTransaction)
 			throw new Error('Transaction not supported through http');
-		const transaction =  db.createTransaction(_options);
+		const transaction = db.createTransaction(_options);
 		try {
-			const nextClient = client({transaction});
+			const nextClient = client({ transaction });
 			await fn(nextClient);
 			await transaction(db.commit);
 		}
-		catch(e) {
+		catch (e) {
 			await transaction(db.rollback.bind(null, e));
 		}
 	}
@@ -83,7 +83,7 @@ function rdbClient(options = {}) {
 			url = baseUrl + url;
 		else if (baseUrl) {
 			tableOptions = tableOptions || {};
-			tableOptions = {db: baseUrl, ...tableOptions, transaction};
+			tableOptions = { db: baseUrl, ...tableOptions, transaction };
 		}
 		let meta;
 		let c = {
@@ -115,7 +115,7 @@ function rdbClient(options = {}) {
 
 		async function getMany(_, strategy) {
 			let metaPromise = getMeta();
-			strategy = extractStrategy({strategy});
+			strategy = extractStrategy({ strategy });
 			let args = [_, strategy].concat(Array.prototype.slice.call(arguments).slice(2));
 			let rows = await getManyCore.apply(null, args);
 			await metaPromise;
@@ -124,7 +124,7 @@ function rdbClient(options = {}) {
 
 		async function tryGetFirst(filter, strategy) {
 			let metaPromise = getMeta();
-			strategy = extractStrategy({strategy});
+			strategy = extractStrategy({ strategy });
 			let _strategy = { ...strategy, ...{ limit: 1 } };
 			let args = [filter, _strategy].concat(Array.prototype.slice.call(arguments).slice(2));
 			let rows = await getManyCore.apply(null, args);
@@ -149,7 +149,7 @@ function rdbClient(options = {}) {
 		}
 
 		function express() {
-			return netAdapter(url, {beforeRequest, beforeResponse, tableOptions}).express.apply(null, arguments);
+			return netAdapter(url, { beforeRequest, beforeResponse, tableOptions }).express.apply(null, arguments);
 		}
 
 		async function getById() {
@@ -165,7 +165,7 @@ function rdbClient(options = {}) {
 				path: 'getManyDto',
 				args
 			});
-			let adapter = netAdapter(url, {beforeRequest, beforeResponse, tableOptions});
+			let adapter = netAdapter(url, { beforeRequest, beforeResponse, tableOptions });
 			return adapter.post(body);
 		}
 
@@ -175,7 +175,7 @@ function rdbClient(options = {}) {
 				path: 'insertAndForget',
 				args
 			});
-			let adapter = netAdapter(url, {beforeRequest, beforeResponse, tableOptions});
+			let adapter = netAdapter(url, { beforeRequest, beforeResponse, tableOptions });
 			return adapter.post(body);
 		}
 
@@ -185,7 +185,7 @@ function rdbClient(options = {}) {
 				path: 'delete',
 				args
 			});
-			let adapter = netAdapter(url, {beforeRequest, beforeResponse, tableOptions});
+			let adapter = netAdapter(url, { beforeRequest, beforeResponse, tableOptions });
 			return adapter.post(body);
 		}
 
@@ -195,7 +195,7 @@ function rdbClient(options = {}) {
 				path: 'cascadeDelete',
 				args
 			});
-			let adapter = netAdapter(url, {beforeRequest, beforeResponse, tableOptions});
+			let adapter = netAdapter(url, { beforeRequest, beforeResponse, tableOptions });
 			return adapter.post(body);
 		}
 
@@ -215,7 +215,6 @@ function rdbClient(options = {}) {
 			let _array = array;
 			if (_reactive)
 				array = _reactive(array);
-			// let enabled = false;
 			let handler = {
 				get(_target, property) {
 					if (property === 'toJSON')
@@ -225,7 +224,7 @@ function rdbClient(options = {}) {
 					else if (property === 'save')
 						return saveArray.bind(null, array);
 					else if (property === 'insert')
-						return insertArray.bind(null, array);
+						return insertArray.bind(null, array, innerProxy);
 					else if (property === 'delete')
 						return deleteArray.bind(null, array);
 					else if (property === 'refresh')
@@ -242,24 +241,8 @@ function rdbClient(options = {}) {
 
 			};
 			let innerProxy = new Proxy(array, handler);
-			let observer = jsonpatch.observe(array);
-			// let arrayProxy = onChange(innerProxy, () => { return;}, { pathAsArray: true, ignoreDetached: true, details: true, onValidate });
-			// rootMap.set(array, { jsonMap: new Map(), original: new Set(array), strategy });
-			rootMap.set(array, { observer, strategy });
-			// enabled = true;
+			rootMap.set(array, { json: stringify(array), strategy });
 			return innerProxy;
-
-			// function onValidate(path) {
-			// 	if (!enabled)
-			// 		return true;
-			// 	if (enabled && path.length > 0) {
-			// 		let { jsonMap } = rootMap.get(array);
-			// 		if (!jsonMap.has(array[path[0]]))
-			// 			jsonMap.set(array[path[0]], stringify(array[path[0]]));
-			// 	}
-			// 	return true;
-			// }
-
 		}
 
 		function proxifyRow(row, strategy) {
@@ -290,19 +273,8 @@ function rdbClient(options = {}) {
 
 			};
 			let innerProxy = new Proxy(row, handler);
-			// let rowProxy = onChange(innerProxy, () => { return;}, { pathAsArray: true, ignoreDetached: true, details: true, onValidate });
 			rootMap.set(row, { json: stringify(row), strategy });
-			// enabled = true;
 			return innerProxy;
-
-			// function onValidate() {
-			// 	if (!enabled)
-			// 		return false;
-			// 	let root = rootMap.get(row);
-			// 	if (!root.json)
-			// 		root.json = stringify(row);
-			// 	return true;
-			// }
 		}
 
 		function toJSON(row, _meta = meta) {
@@ -312,11 +284,11 @@ function rdbClient(options = {}) {
 				return row.map(x => toJSON(x, _meta));
 			}
 			let result = {};
-			for(let name in row) {
+			for (let name in row) {
 				if (name in _meta.relations)
 					result[name] = toJSON(row[name], _meta.relations[name]);
 				else if (name in _meta.columns) {
-					if(_meta.columns[name].serializable)
+					if (_meta.columns[name].serializable)
 						result[name] = row[name];
 				}
 				else
@@ -328,10 +300,10 @@ function rdbClient(options = {}) {
 		async function getMeta() {
 			if (meta)
 				return meta;
-			let adapter = netAdapter(url, {beforeRequest, beforeResponse, tableOptions});
+			let adapter = netAdapter(url, { beforeRequest, beforeResponse, tableOptions });
 			meta = await adapter.get();
 
-			while(hasUnresolved(meta)) {
+			while (hasUnresolved(meta)) {
 				meta = parseMeta(meta);
 			}
 			return meta;
@@ -341,7 +313,7 @@ function rdbClient(options = {}) {
 					return map.get(meta) || meta;
 				}
 				map.set(meta.id, meta);
-				for(let p in meta.relations) {
+				for (let p in meta.relations) {
 					meta.relations[p] = parseMeta(meta.relations[p], map);
 				}
 				return meta;
@@ -363,27 +335,34 @@ function rdbClient(options = {}) {
 
 		}
 
-
-
 		async function saveArray(array, options) {
-			let { original, jsonMap } = rootMap.get(array);
+			let { json } = rootMap.get(array);
 			let strategy = extractStrategy(options, array);
 			let meta = await getMeta();
-			let { added, removed, changed } = difference(original, new Set(array), jsonMap);
-			let insertPatch = createPatch([], added, meta);
-			let deletePatch = createPatch(removed, [], meta);
-			let updatePatch = createPatch(changed.map(x => JSON.parse(jsonMap.get(x))), changed, meta);
-			let patch = [...insertPatch, ...updatePatch, ...deletePatch];
+			const patch = createPatch(JSON.parse(json), array, meta);
 			if (patch.length === 0)
 				return;
-			let body = stringify({ patch, options: { strategy, ...options} });
-			let adapter = netAdapter(url, {beforeRequest, beforeResponse, tableOptions});
-			let { updated, inserted } = await adapter.patch(body);
-			copyInto(updated, changed);
-			copyInto(inserted, added);
-			rootMap.set(array, { jsonMap: new Map(), original: new Set(array), strategy });
+			let body = stringify({ patch, options: { strategy, ...options } });
+			let adapter = netAdapter(url, { beforeRequest, beforeResponse, tableOptions });
+			let p = adapter.patch(body);
+			let affectedRows = extractChangedRows(array, patch, meta);
+			let { changed } = await p;
+			copyInto(changed, affectedRows);
+			rootMap.set(array, { json: stringify(array), strategy });
 		}
 
+		function extractChangedRows(rows, patch, meta) {
+			const keyPositionMap = toKeyPositionMap(rows, meta);
+			const affectedRowsSet = new Set();
+			for (let i = 0; i < patch.length; i++) {
+				const element = patch[i];
+				const pathArray = element.path.split('/');
+				const position = keyPositionMap[pathArray[1]];
+				if (position > 0)
+					affectedRowsSet.add(rows[position]);
+			}
+			return [...affectedRowsSet];
+		}
 		function copyInto(from, to) {
 			for (let i = 0; i < from.length; i++) {
 				for (let p in from[i]) {
@@ -399,7 +378,7 @@ function rdbClient(options = {}) {
 				let context = rootMap.get(obj);
 				if (context.strategy !== undefined) {
 					// eslint-disable-next-line @typescript-eslint/no-unused-vars
-					let {limit, ...strategy} = context.strategy;
+					let { limit, ...strategy } = context.strategy;
 					return strategy;
 				}
 			}
@@ -410,57 +389,26 @@ function rdbClient(options = {}) {
 
 
 		function clearChangesArray(array) {
-			let { original, jsonMap, strategy } = rootMap.get(array);
-			let { added, removed, changed } = difference(original, new Set(array), jsonMap);
-			added = new Set(added);
-			removed = new Set(removed);
-			changed = new Set(changed);
-			for (let i = 0; i < array.length; i++) {
-				let row = array[i];
-				if (added.has(row)) {
-					array.splice(i, 1);
-					i--;
-				}
-				else if (changed.has(row)) {
-					array[i] = JSON.parse(jsonMap.get(row));
-				}
-			}
-			if (removed.size > 0) {
-				let i = 0;
-				for (let row of original) {
-					if (removed.has(row)) {
-						if (jsonMap.has(row))
-							row = JSON.parse(jsonMap.get(row));
-						array.splice(i, 0, row);
-					}
-					i++;
-				}
-			}
-			rootMap.set(array, { jsonMap: new Map(), original: new Set(array), strategy });
+			let { json } = rootMap.get(array);
+			array.splice(0, array.length, JSON.parse(json));
 		}
 
 		function acceptChangesArray(array) {
 			rootMap.set(array, { jsonMap: new Map(), original: new Set(array) });
 		}
 
-		async function insertArray(array, options) {
+		async function insertArray(array, proxy, options) {
 			if (array.length === 0)
 				return;
 			let strategy = extractStrategy(options);
 			let meta = await getMeta();
-			let newArray = [];
-			let observer = jsonpatch.observe(newArray);
-			for (let i = 0; i < array.length; i++) {
-				newArray[i] = array[i];
-			}
-			// let patch = createPatch([], array, meta);
 			let patch = createPatch([], array, meta);
 
-			let body = stringify({ patch, options: { strategy, ...options}  });
-			let adapter = netAdapter(url, {beforeRequest, beforeResponse, tableOptions});
-			let { inserted } = await adapter.patch(body);
-			copyInto(inserted, array);
-			rootMap.set(array, { jsonMap: new Map(), original: new Set(array), strategy });
+			let body = stringify({ patch, options: { strategy, ...options } });
+			let adapter = netAdapter(url, { beforeRequest, beforeResponse, tableOptions });
+			let { changed } = await adapter.patch(body);
+			copyInto(changed, array);
+			rootMap.set(array, { json: stringify(array), strategy });
 			return proxy;
 		}
 
@@ -470,11 +418,11 @@ function rdbClient(options = {}) {
 			let meta = await getMeta();
 			let patch = createPatch(array, [], meta);
 			let body = stringify({ patch, options });
-			let adapter = netAdapter(url, {beforeRequest, beforeResponse, tableOptions});
+			let adapter = netAdapter(url, { beforeRequest, beforeResponse, tableOptions });
 			await adapter.patch(body);
 			let strategy = rootMap.get(array).strategy;
 			array.length = 0;
-			rootMap.set(array, { jsonMap: new Map(), original: new Set(array), strategy });
+			rootMap.set(array, { jsonMap: stringify(array), strategy });
 		}
 
 		function setMapValue(rowsMap, keys, row, index) {
@@ -535,18 +483,18 @@ function rdbClient(options = {}) {
 				array.splice(i + offset, 1);
 				offset--;
 			}
-			rootMap.set(array, { jsonMap: new Map(), original: new Set(array), strategy });
+			rootMap.set(array, { json: stringify(array), strategy });
 		}
 
 		async function insertRow(row, innerProxy, options) {
 			let strategy = extractStrategy(options, row);
 			let meta = await getMeta();
 			let patch = createPatch([], [row], meta);
-			let body = stringify({ patch, options: { strategy, ...options} });
+			let body = stringify({ patch, options: { strategy, ...options } });
 
-			let adapter = netAdapter(url, {beforeRequest, beforeResponse, tableOptions});
-			let { inserted } = await adapter.patch(body);
-			copyInto(inserted, [row]);
+			let adapter = netAdapter(url, { beforeRequest, beforeResponse, tableOptions });
+			let { changed } = await adapter.patch(body);
+			copyInto(changed, [row]);
 			rootMap.set(row, { json: stringify(row), strategy });
 
 			return innerProxy;
@@ -558,7 +506,7 @@ function rdbClient(options = {}) {
 			let patch = createPatch([row], [], meta);
 			let body = stringify({ patch, options });
 
-			let adapter = netAdapter(url, {beforeRequest, beforeResponse, tableOptions});
+			let adapter = netAdapter(url, { beforeRequest, beforeResponse, tableOptions });
 			await adapter.patch(body);
 			rootMap.set(row, { strategy });
 		}
@@ -576,10 +524,10 @@ function rdbClient(options = {}) {
 
 			let body = stringify({ patch, options: { ...options, strategy } });
 
-			let adapter = netAdapter(url, {beforeRequest, beforeResponse, tableOptions});
-			let { updated } = await adapter.patch(body);
-			copyInto(updated, [row]);
-			rootMap.set(row, { strategy });
+			let adapter = netAdapter(url, { beforeRequest, beforeResponse, tableOptions });
+			let { changed } = await adapter.patch(body);
+			copyInto(changed, [row]);
+			rootMap.set(row, { json: stringify(row), strategy });
 		}
 
 		async function refreshRow(row, options) {
@@ -600,7 +548,7 @@ function rdbClient(options = {}) {
 			for (let p in rows[0]) {
 				row[p] = rows[0][p];
 			}
-			rootMap.set(row, { strategy });
+			rootMap.set(row, { json: stringify(row), strategy });
 		}
 
 		function acceptChangesRow(row) {
@@ -624,23 +572,6 @@ function rdbClient(options = {}) {
 	}
 }
 
-function difference(setA, setB, jsonMap) {
-	let removed = new Set(setA);
-	let added = [];
-	let changed = [];
-	for (let elem of setB) {
-		if (!setA.has(elem))
-			added.push(elem);
-		else {
-			removed.delete(elem);
-			if (jsonMap.get(elem))
-				changed.push(elem);
-		}
-	}
-
-	return { added, removed: Array.from(removed), changed };
-}
-
 function tableProxy() {
 	let handler = {
 		get(_target, property,) {
@@ -657,7 +588,7 @@ function column(path, ...previous) {
 		let args = [];
 		for (let i = 0; i < arguments.length; i++) {
 			if (typeof arguments[i] === 'function')
-				args[i] = arguments[i](tableProxy(path.split('.').slice(0,-1).join('.')));
+				args[i] = arguments[i](tableProxy(path.split('.').slice(0, -1).join('.')));
 			else
 				args[i] = arguments[i];
 		}

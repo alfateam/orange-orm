@@ -43,7 +43,6 @@
     "pg": "^8.5.1",
     "pg-query-stream": "^3.3.2",
     "promise": "^8.0.3",
-    "rdb-client": "^1.2.4",
     "rfc6902": "^3.0.4",
     "rfdc": "^1.2.0",
     "typescript": "^4.8.4",

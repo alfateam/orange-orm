@@ -11,8 +11,7 @@ async function patchTable() {
 }
 
 async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic', concurrency = {}, strategy = undefined}  = {}, dryrun) {
-	let updated = new Set();
-	let inserted = new Set();
+	let changed = new Set();
 	for (let i = 0; i < patches.length; i++) {
 		let patch = {path: undefined, value: undefined, op: undefined};
 		Object.assign(patch, patches[i]);
@@ -20,14 +19,14 @@ async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic
 		if (patch.op === 'add' || patch.op === 'replace') {
 			let result = await add({ path: patch.path, value: patch.value, op: patch.op, oldValue: patch.oldValue, concurrency: concurrency, dryrun }, table);
 			if (result.inserted)
-				inserted.add(result.inserted);
+				changed.add(result.inserted);
 			else if (result.updated)
-				updated.add(result.updated);
+				changed.add(result.updated);
 		}
 		else if (patch.op === 'remove')
 			await remove(patch, table, dryrun);
 	}
-	return { updated: await toDtos(updated), inserted: await toDtos(inserted)};
+	return {changed: await toDtos(changed)};
 
 	async function toDtos(set) {
 		set = [...set];

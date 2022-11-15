@@ -2,7 +2,7 @@ var removeFromCache = require('./delete/removeFromCache');
 var pushCommand = require('../commands/pushCommand');
 var newDeleteCommand = require('../commands/newDeleteCommand');
 var newPrimaryKeyFilter = require('../newPrimaryKeyFilter');
-var createPatch = require('rdb-client').createPatch;
+var createPatch = require('../../client/createPatch');
 var createDto = require('./toDto/createDto');
 
 function _delete(row, strategy, table) {

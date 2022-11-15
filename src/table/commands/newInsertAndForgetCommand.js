@@ -1,6 +1,6 @@
 var newInsertCommandCore = require('./newInsertCommandCore');
 var newImmutable = require('../../newImmutable');
-var createPatch = require('rdb-client').createPatch;
+var createPatch = require('../../client/createPatch');
 var createDto = require('../resultToRows/toDto/createDto');
 
 function newInsertCommand(table, row, options) {

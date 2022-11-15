@@ -1,7 +1,7 @@
 let newUpdateCommandCore = require('./newUpdateCommandCore');
 let newImmutable = require('../../newImmutable');
 let newColumnList = require('../../newObject');
-let createPatch = require('rdb-client').createPatch;
+var createPatch = require('../../client/createPatch');
 let createDto = require('../resultToRows/toDto/createDto');
 
 function newUpdateCommand(table, column, row) {

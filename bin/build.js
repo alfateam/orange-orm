@@ -34,8 +34,9 @@ async function runSingle(schemaTs) {
 	console.log(`Rdb: found schema ${schemaTs}`);
 	if (!schemaJsPath) {
 		let nodeModules = findNodeModules('node_modules', { cwd: schemaTs});
-		let outDir = path.join(nodeModules, '/.rdb-client');
+		let outDir = path.join(nodeModules, '/.rdb');
 		schemaJsPath = compile(schemaTs, { outDir });
+		//todo delete outDir
 	}
 	let schemaJs;
 	try {
