@@ -343,10 +343,10 @@ function rdbClient(options = {}) {
 			if (patch.length === 0)
 				return;
 			let body = stringify({ patch, options: { strategy, ...options } });
-			let adapter = netAdapter(url, { beforeRequest, beforeResponse, tableOptions });
+			let adapter = netAdapter(url, { beforeRequest, beforeResponse, tableOptions });			
 			let p = adapter.patch(body);
 			let affectedRows = extractChangedRows(array, patch, meta);
-			let { changed } = await p;
+			let { changed } = await p;			
 			copyInto(changed, affectedRows);
 			rootMap.set(array, { json: stringify(array), strategy });
 		}
@@ -358,7 +358,7 @@ function rdbClient(options = {}) {
 				const element = patch[i];
 				const pathArray = element.path.split('/');
 				const position = keyPositionMap[pathArray[1]];
-				if (position > 0)
+				if (position >= 0)
 					affectedRowsSet.add(rows[position]);
 			}
 			return [...affectedRowsSet];

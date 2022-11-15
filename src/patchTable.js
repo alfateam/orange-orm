@@ -1,6 +1,6 @@
 /* eslint-disable require-atomic-updates */
 let applyPatch = require('./applyPatch');
-
+let fromCompareObject = require('./fromCompareObject');
 
 async function patchTable() {
 	const dryrun = true;
@@ -17,14 +17,14 @@ async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic
 		Object.assign(patch, patches[i]);
 		patch.path = patches[i].path.split('/').slice(1);
 		if (patch.op === 'add' || patch.op === 'replace') {
-			let result = await add({ path: patch.path, value: patch.value, op: patch.op, oldValue: patch.oldValue, concurrency: concurrency, dryrun }, table);
+			let result = await add({ path: patch.path, value: patch.value, op: patch.op, oldValue: patch.oldValue, concurrency: concurrency }, table);
 			if (result.inserted)
 				changed.add(result.inserted);
 			else if (result.updated)
 				changed.add(result.updated);
 		}
 		else if (patch.op === 'remove')
-			await remove(patch, table, dryrun);
+			await remove(patch, table);
 	}
 	return {changed: await toDtos(changed)};
 
@@ -44,7 +44,7 @@ async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic
 			return [property];
 	}
 
-	async function add({ path, value, op, oldValue, concurrency = {}, dryrun }, table, row, parentRow, relation) {
+	async function add({ path, value, op, oldValue, concurrency = {} }, table, row, parentRow, relation) {
 		let property = path[0];
 		path = path.slice(1);
 		if (!row && path.length > 0)
@@ -52,6 +52,15 @@ async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic
 		if (path.length === 0) {
 			if (dryrun) {
 				return {};
+			}
+			let childInserts = [];
+			for(let name in value) {
+				if (isColumn(name, table))
+					value[name] = fromCompareObject(value[name]);
+				else if (isManyRelation(name, table))
+					childInserts.push( insertManyRelation.bind(null, name, value, op, oldValue, table, concurrency));
+				else if (isOneRelation(name, table))
+					childInserts.push( insertOneRelation.bind(null, name, value, op, oldValue, table, concurrency));
 			}
 			for (let i = 0; i < table._primaryColumns.length; i++) {
 				let pkName = table._primaryColumns[i].alias;
@@ -72,28 +81,8 @@ async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic
 				}
 			}
 			row = await row;
-
-			let childInserts = [];
-			for (let name in value) {
-				if (isColumn(name, table))
-					continue;
-				else if (isManyRelation(name, table)) {
-					let relation = table[name]._relation;
-					for(let childKey in value[name]) {
-						if (childKey != '__patchType') {
-							let child = value[name][childKey];
-							childInserts.push(add.bind(null, { path: [childKey], value: child, op, oldValue, concurrency: concurrency[name] }, relation.childTable, {}, row, relation));
-						}
-					}
-				}
-				else if (isOneRelation(name, table)) {
-					let relation = table[name]._relation;
-					let child = value[name];
-					childInserts.push(add.bind(null, { path: [name], value: child, op, oldValue, concurrency: concurrency[name] }, relation.childTable, {}, row, relation));
-				}
-			}
 			for (let i = 0; i < childInserts.length; i++) {
-				await childInserts[i]();
+				await childInserts[i](row);
 			}
 			return {inserted: row};
 		}
@@ -109,7 +98,7 @@ async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic
 		}
 		else if (isOneRelation(property, table)) {
 			let relation = table[property]._relation;
-			await add({ path, value, op, oldValue, concurrency: concurrency[property], dryrun }, relation.childTable, await row[property], row, relation);
+			await add({ path, value, op, oldValue, concurrency: concurrency[property] }, relation.childTable, await row[property], row, relation);
 			return {updated: row};
 		}
 		else if (isManyRelation(property, table)) {
@@ -118,14 +107,30 @@ async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic
 				for (let id in value) {
 					if (id === '__patchType')
 						continue;
-					await add({ path: [id], value: value[id], op, oldValue, concurrency: concurrency[property], dryrun }, relation.childTable, {}, row, relation);
+					await add({ path: [id], value: value[id], op, oldValue, concurrency: concurrency[property] }, relation.childTable, {}, row, relation);
 				}
 			}
 			else
-				await add({ path: path.slice(1), value, oldValue, op, concurrency: concurrency[property], dryrun }, relation.childTable, undefined, row, relation);
+				await add({ path: path.slice(1), value, oldValue, op, concurrency: concurrency[property] }, relation.childTable, undefined, row, relation);
 			return {updated: row};
 		}
 		return {};
+	}
+
+	async function insertManyRelation(name, value, op, oldValue, table, concurrency, row) {
+		let relation = table[name]._relation;
+		for(let childKey in value[name]) {
+			if (childKey != '__patchType') {
+				let child = value[name][childKey];
+				await add({ path: [childKey], value: child, op, oldValue, concurrency: concurrency[name] }, relation.childTable, {}, row, relation);
+			}
+		}
+	}
+
+	async function insertOneRelation(name, value, op, oldValue, table, concurrency, row) {
+		let relation = table[name]._relation;
+		let child = value[name];
+		await add({ path: [name], value: child, op, oldValue, concurrency: concurrency[name] }, relation.childTable, {}, row, relation);
 	}
 
 	async function remove({ path, value, op }, table, row) {
