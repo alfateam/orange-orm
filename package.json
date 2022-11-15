@@ -38,7 +38,10 @@
     "findup-sync": "^5.0.0",
     "isomorphic-fetch": "^3.0.0",
     "module-definition": "^4.0.0",
+    "mysql2": "^2.2.5",
     "node-cls": "^1.0.5",
+    "pg": "^8.5.1",
+    "pg-query-stream": "^3.3.2",
     "promise": "^8.0.3",
     "rfc6902": "^3.0.4",
     "rfdc": "^1.2.0",
@@ -46,24 +49,12 @@
     "uuid": "^8.3.2"
   },
   "peerDependencies": {
-    "mysql2": "^2.2.5",
-    "pg": "^8.5.1",
-    "pg-query-stream": "^3.3.2",
     "express": ">=4.0.0",
     "msnodesqlv8": "^2.2.0",
     "pg-native": "^3.0.0",
-    "sqlite3": "^5.1.2"
+    "sqlite3": "^5.0.2"
   },
   "peerDependenciesMeta": {
-    "mysql2": {
-      "optional": true
-    },
-    "pg": {
-      "optional": true
-    },
-    "pg-query-stream": {
-      "optional": true
-    },
     "sqlite3": {
       "optional": true
     },
