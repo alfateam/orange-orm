@@ -3,6 +3,9 @@
   "version": "3.0.26",
   "main": "./src/index.js",
   "browser": "./src/client/rdb-client.esm.js",
+  "bin": {
+    "rdb": "bin/rdb.js"
+  },
   "title": "rdb",
   "description": "Object Relational Mapper",
   "types": "./typings/index.d.ts",
