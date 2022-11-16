@@ -21,8 +21,6 @@ function getTSDefinition(table, options) {
 function getTable(table, Name, name, customFilters) {
 	return `
     export interface ${Name}Table {
-        getManyDto(filter?: RawFilter, strategy?: ${Name}Strategy): Promise<${Name}Array>;
-        getManyDto(${name}s: Array<${Name}>, strategy?: ${Name}Strategy): Promise<${Name}Array>;
         getMany(filter?: RawFilter, strategy?: ${Name}Strategy): Promise<${Name}Array>;
         getMany(${name}s: Array<${Name}>, strategy?: ${Name}Strategy): Promise<${Name}Array>;
         getOne(filter?: RawFilter, strategy?: ${Name}Strategy): Promise<${Name}Row>;
@@ -59,7 +57,7 @@ function getTable(table, Name, name, customFilters) {
     }
 
     export interface ${Name}Array extends Array<${Name}> {
-        save(options?: Save${Name}Options): Promise<void>;
+        saveChanges(options?: Save${Name}Options): Promise<void>;
         acceptChanges(): void;
         clearChanges(): void;
         refresh(strategy?: ${Name}Strategy | undefined | null): Promise<void>;
@@ -271,7 +269,7 @@ function getCustomFilters(filters) {
 				result += '\n' + tabs + '}';
 			}
 			else if (typeof obj[p] === 'function')
-				result +=   '\n' + tabs + p + ': (' + getParamNames(obj[p]) + ') => import(\'rdb-client\').Filter;';
+				result +=   '\n' + tabs + p + ': (' + getParamNames(obj[p]) + ') => import(\'rdb\').Filter;';
 		}
 		return result;
 	}

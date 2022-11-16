@@ -3,10 +3,10 @@ let applyPatch = require('./applyPatch');
 let fromCompareObject = require('./fromCompareObject');
 
 async function patchTable() {
-	const dryrun = true;
+	// const dryrun = true;
 	//traverse all rows you want to update before updatinng or inserting anything.
 	//this is to avoid page locks in ms sql
-	await patchTableCore.apply(null, [...arguments, dryrun]);
+	// await patchTableCore.apply(null, [...arguments, dryrun]);
 	return patchTableCore.apply(null, arguments);
 }
 

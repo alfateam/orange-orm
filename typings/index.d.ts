@@ -10,28 +10,27 @@ declare namespace r {
     function mssql(connectionString: string, options?: PoolOptions): Pool;
     function mySql(connectionString: string, options?: PoolOptions): Pool;
 
-    export interface Pool {
+    export abstract class Pool {
         end(): Promise<void>;
-        transaction(fn: () => Promise<unknown>): Promise<void>;
     }
 
     export interface PoolOptions {
         size?: number;
     }
 
-    export interface Join {
+    export abstract class Join {
         by(...columns: string[]): JoinBy;
     }
 
-    export interface JoinBy {
+    export abstract class JoinBy {
         as(propertyName: string): JoinRelation;
     }
 
-    export interface JoinRelation {
+    export abstract class JoinRelation {
 
     }
 
-    export interface Table {
+    export abstract class Table {
         primaryColumn(column: string): ColumnDef;
         column(column: string): ColumnDef;
         join(table: Table): Join;
@@ -39,16 +38,16 @@ declare namespace r {
         hasOne(join: JoinRelation): HasOne;
     }
 
-    interface HasMany {
+    export abstract class HasMany {
         as(propertyName: string): void;
     }
 
 
-    interface HasOne {
+    export abstract class HasOne {
         as(propertyName: string): void;
     }
 
-    export interface ColumnDef {
+    export abstract class ColumnDef {
         serializable(value: boolean): ColumnDef;
         string(): ColumnOf<string>;
         numeric(): ColumnOf<number>;
@@ -56,16 +55,16 @@ declare namespace r {
         binary(): ColumnOf<Buffer>;
         boolean(): ColumnOf<boolean>;
         json(): ColumnOf<Record<string, unknown>>;
-        date(): DateColumn;
+        date(): DateColumnDef;
     }
-    export interface DateColumn {
-        serializable(value: boolean): DateColumn;
-        as(dbName: string): DateColumn;
-        default(value: Date | string | (() => Date | string)): DateColumn
-        dbNull(value: Date | string | null): DateColumn;
+    export abstract class DateColumnDef {
+        serializable(value: boolean): DateColumnDef;
+        as(dbName: string): DateColumnDef;
+        default(value: Date | string | (() => Date | string)): DateColumnDef
+        dbNull(value: Date | string | null): DateColumnDef;
     }
 
-    export interface ColumnOf<T> {
+    export abstract class ColumnOf<T> {
         serializable(value: boolean): ColumnOf<T>;
         default(value: T | (() => T)): ColumnOf<T>;
         dbNull(value: T | null): ColumnOf<T>;
@@ -126,7 +125,7 @@ declare namespace r {
     export interface UUIDColumn extends ColumnBase<string> {
     }
 
-    export interface DateColumn extends ColumnBase2<Date, string> {
+    export interface DateColumnDef extends ColumnBase2<Date, string> {
     }
 
     export interface NumberColumn extends ColumnBase<number> {
