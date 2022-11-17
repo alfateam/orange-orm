@@ -14,6 +14,8 @@ Based on promises.
 [Documentation and examples](https://github.com/alfateam/rdb/blob/master/docs/docs.md)  
 
 ## Release notes
+__3.0.27__  
+Query without transaction did not release connection on error.  
 __3.0.26__  
 Improve typescript code generation.  
 __3.0.25__  

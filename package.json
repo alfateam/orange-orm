@@ -1,6 +1,6 @@
 {
   "name": "rdb",
-  "version": "3.0.26",
+  "version": "3.0.27",
   "main": "./src/index.js",
   "browser": "./src/client/rdb-client.esm.js",
   "bin": {

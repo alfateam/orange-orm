@@ -79,18 +79,20 @@ function newDatabase(connectionString, poolOptions) {
 
 	c.query = function(query) {
 		let domain = createDomain();
-		let fn = doQuery.bind(null, query);
-		return domain.run(runInTransaction);
+		let transaction = newTransaction(domain, pool);
+		let p = domain.run(() => new promise(transaction)
+			.then(() => setSessionSingleton('changes', []))
+			.then().then(() => doQuery(query)));
+		return p.then(onResult, onError);
 
-		async function runInTransaction() {
-			let result;
-			let transaction = newTransaction(domain, pool);
-			await new Promise(transaction)
-				.then(() => setSessionSingleton('changes', []))
-				.then(fn)
-				.then((res) => result = res)
-				.then(releaseDbClient);
+		function onResult(result) {
+			releaseDbClient();
 			return result;
+		}
+
+		function onError(e) {
+			releaseDbClient();
+			throw e;
 		}
 	};
 
