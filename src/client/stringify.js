@@ -5,7 +5,7 @@ function stringify(value) {
 	return JSON.stringify(value, replacer);
 }
 
-function replacer(value) {
+function replacer(key, value) {
 	if (Buffer.isBuffer(value))
 		return value.toString('base64');
 	// @ts-ignore
