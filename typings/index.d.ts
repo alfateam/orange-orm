@@ -4,13 +4,27 @@ declare namespace r {
 
     function table(name: string): Table;
     function end(): Promise<void>;
-    function pg(connectionString: string, options?: PoolOptions): Pool;
+    function postgres(connectionString: string, options?: PoolOptions): Pool;
     function sqlite(connectionString: string, options?: PoolOptions): Pool;
     function sap(connectionString: string, options?: PoolOptions): Pool;
     function mssql(connectionString: string, options?: PoolOptions): Pool;
-    function mySql(connectionString: string, options?: PoolOptions): Pool;
+    function mysql(connectionString: string, options?: PoolOptions): Pool;
+    function on(type: 'query', cb: (e: QueryEvent) => void): void;
+    function off(type: 'query', cb: (e: QueryEvent) => void): void;
 
-    export abstract class Pool {
+    export interface QueryEvent {
+        sql: string,
+        parameters: []
+    }    
+
+    export interface QueryResult {
+        sql: string,
+        parameters: [],
+        result: []
+    }
+
+
+    export interface Pool {
         end(): Promise<void>;
     }
 
@@ -18,19 +32,19 @@ declare namespace r {
         size?: number;
     }
 
-    export abstract class Join {
+    export interface Join {
         by(...columns: string[]): JoinBy;
     }
 
-    export abstract class JoinBy {
+    export interface JoinBy {
         as(propertyName: string): JoinRelation;
     }
 
-    export abstract class JoinRelation {
-
+    export interface JoinRelation {
+        columns: ColumnDef[];
     }
 
-    export abstract class Table {
+    export interface Table {
         primaryColumn(column: string): ColumnDef;
         column(column: string): ColumnDef;
         join(table: Table): Join;
@@ -38,33 +52,40 @@ declare namespace r {
         hasOne(join: JoinRelation): HasOne;
     }
 
-    export abstract class HasMany {
+    export interface HasMany {
         as(propertyName: string): void;
     }
 
 
-    export abstract class HasOne {
+    export interface HasOne {
         as(propertyName: string): void;
     }
 
-    export abstract class ColumnDef {
+    export interface ColumnDef {
         serializable(value: boolean): ColumnDef;
         string(): ColumnOf<string>;
         numeric(): ColumnOf<number>;
         guid(): ColumnOf<string>;
-        binary(): ColumnOf<Buffer>;
+        binary(): BinaryColumnDef;
         boolean(): ColumnOf<boolean>;
         json(): ColumnOf<Record<string, unknown>>;
         date(): DateColumnDef;
     }
-    export abstract class DateColumnDef {
+    export interface DateColumnDef {
         serializable(value: boolean): DateColumnDef;
         as(dbName: string): DateColumnDef;
         default(value: Date | string | (() => Date | string)): DateColumnDef
         dbNull(value: Date | string | null): DateColumnDef;
     }
 
-    export abstract class ColumnOf<T> {
+    export interface BinaryColumnDef {
+        serializable(value: boolean): BinaryColumnDef;
+        as(dbName: string): BinaryColumnDef;
+        default(value: Buffer | string | (() => Buffer | string)): BinaryColumnDef
+        dbNull(value: Buffer | string | null): BinaryColumnDef;
+    }
+
+    export interface ColumnOf<T> {
         serializable(value: boolean): ColumnOf<T>;
         default(value: T | (() => T)): ColumnOf<T>;
         dbNull(value: T | null): ColumnOf<T>;
@@ -131,24 +152,24 @@ declare namespace r {
     export interface NumberColumn extends ColumnBase<number> {
     }
 
-    export interface BinaryColumn extends ColumnBase<any> {
+    export interface BinaryColumn extends ColumnBase2<Buffer, string> {
 
     }
 
     export interface StringColumn extends ColumnBase<string> {
         startsWith(value: string | null): Filter;
         /**
-         * ignore case
+        * ignore case, postgres only
          */
         iStartsWith(value: string | null): Filter;
         endsWith(value: string | null): Filter;
         /**
-         * ignore case
+         * ignore case, postgres only
          */
         iEndsWith(value: string | null): Filter;
         contains(value: string | null): Filter;
         /**
-         * ignore case
+         * ignore case, postgres only
          */
         iContains(value: string | null): Filter;
         /**
@@ -156,15 +177,11 @@ declare namespace r {
          */
         iEqual(value: string | null): Filter;
         /**
-         * equal, ignore case
-         */
+        * ignore case, postgres only         
+        * */
         iEq(value: string | null): Filter;
         /**
-         * equal, ignore case
-         */
-        EQ(value: string | null): Filter;
-        /**
-         * equal, ignore case
+         * ignore case, postgres only         
          */
         iEq(value: string | null): Filter;
     }
@@ -206,48 +223,36 @@ declare namespace r {
     }
 
     interface ColumnBase2<TType, TType2> {
-        equal(value: TType2 | null): Filter;
-        equal(value: TType | null): Filter;
+        equal(value: TType | TType2 | null): Filter;
         /**
          * equal
          */
-        eq(value: TType2 | null): Filter;
-        eq(value: TType | null): Filter;
-        notEqual(value: TType2 | null): Filter;
-        notEqual(value: TType | null): Filter;
+        eq(value: TType | TType2  | null): Filter;        
+        notEqual(value: TType | TType2 | null): Filter;
         /**
          * not equal
          */
-        ne(value: TType2 | null): Filter;
-        ne(value: TType | null): Filter;
-        lessThan(value: TType2 | null): Filter;
-        lessThan(value: TType | null): Filter;
+        ne(value: TType | TType2 | null): Filter;
+        lessThan(value: TType | TType2 | null): Filter;
         /**
          * less than
          */
-        lt(value: TType2 | null): Filter;
-        lt(value: TType | null): Filter;
-        lessThanOrEqual(value: TType2 | null): Filter;
-        lessThanOrEqual(value: TType | null): Filter;
+        lt(value: TType | TType2 | null): Filter;
+        lessThanOrEqual(value: TType | TType2 | null): Filter;
         /**
          * less than or equal
          */
-        le(value: TType2 | null): Filter;
-        le(value: TType | null): Filter;
-        greaterThan(value: TType2 | null): Filter;
-        greaterThan(value: TType | null): Filter;
+        le(value: TType | TType2 | null): Filter;
+        greaterThan(value: TType | TType2 | null): Filter;
         /**
          * greater than
          */
-        gt(value: TType2 | null): Filter;
-        gt(value: TType | null): Filter;
-        greaterThanOrEqual(value: TType2 | null): Filter;
-        greaterThanOrEqual(value: TType | null): Filter;
+        gt(value: TType | TType2 | null): Filter;
+        greaterThanOrEqual(value: TType | TType2 | null): Filter;
         /**
          * greater than or equal
          */
-        ge(value: TType2 | null): Filter;
-        ge(value: TType | null): Filter;
+        ge(value: TType | TType2 | null): Filter;
         between(from: TType | TType2, to: TType | TType2): Filter;
         in(values: Array<TType | TType2>[] | null): Filter;
     }
@@ -272,8 +277,10 @@ declare namespace r {
         db: Pool | (() => Pool);
     }
 
+    type Url =`${'http://'|'https://'}${string}`;
+
     export interface TablesConfig {
-        tables: unknown
+        tables: Record<string, Url | Table>
     }
 
     export interface TransactionOptions {

@@ -9,8 +9,7 @@ function wrapQueryStream(connection) {
 	function runQuery(query, options) {
 		var params = query.parameters;
 		var sql = replaceParamChar(query, params);
-		log(sql);
-		log('parameters: ' + params);
+		log.emitQuery({sql, parameters: params});
 		query = newStreamableQuery(sql, params, options);
 
 		return runOriginalQuery.call(connection, query);

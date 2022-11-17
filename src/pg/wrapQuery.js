@@ -13,8 +13,7 @@ function wrapQuery(connection) {
 			values: params,
 			types: query.types
 		};
-		log(sql);
-		log('parameters: ' + params);
+		log.emitQuery({sql, parameters: params});
 
 		if (params.length === 0)
 			runOriginalQuery.call(connection, query, onInnerCompleted);

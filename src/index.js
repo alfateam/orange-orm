@@ -16,13 +16,17 @@ var connectViaPool = function(connectionString) {
 };
 
 connectViaPool.pg = newPg;
-connectViaPool.mySql = require('./mySql/newDatabase');
+connectViaPool.postgres = newPg;
+connectViaPool.mysql = require('./mySql/newDatabase');
+connectViaPool.mySql = connectViaPool.mysql;
 connectViaPool.table = require('./table');
 connectViaPool.filter = require('./emptyFilter');
 connectViaPool.commit = require('./table/commit');
 connectViaPool.rollback = require('./table/rollback');
 connectViaPool.end = require('./pools').end;
 connectViaPool.log = require('./table/log').registerLogger;
+connectViaPool.on = require('./table/log').on;
+connectViaPool.off = require('./table/log').off;
 connectViaPool.query = require('./query');
 connectViaPool.lock = require('./lock');
 connectViaPool.schema = require('./pg/schema');
