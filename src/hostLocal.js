@@ -77,7 +77,7 @@ function hostLocal({ db, table, defaultConcurrency, concurrency, customFilters, 
 				else
 					db = dbPromise;
 			}
-			await db.transaction(fn);
+			result = await db.query.apply(null, arguments);
 		}
 
 		return result;
