@@ -146,7 +146,7 @@ declare namespace r {
     export interface UUIDColumn extends ColumnBase<string> {
     }
 
-    export interface DateColumnDef extends ColumnBase2<Date, string> {
+    export interface DateColumn extends ColumnBase2<Date, string> {
     }
 
     export interface NumberColumn extends ColumnBase<number> {

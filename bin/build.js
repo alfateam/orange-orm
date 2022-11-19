@@ -86,7 +86,7 @@ async function writeIndexJs(schemaJsPath) {
 	if (moduleDefinition.sync(schemaJsPath) === 'commonjs')
 		await writeFile(indexJs, `module.exports = require('./${schema}');`);
 	else
-		await writeFile(indexJs, `export {default} from './${schema}'`);
+		await writeFile(indexJs, `export {default} from './${schema}';`);
 }
 
 async function findSchemaJs(cwd) {
