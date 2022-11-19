@@ -73,6 +73,9 @@ module.exports = function createPatch(original, dto, options) {
 		}
 		else if (isValidDate(object))
 			return dateToIsoString(object);
+		else if (Buffer?.isBuffer(object)) {
+			return object.toString('base64');
+		}
 		else if (object === Object(object)) {
 			let copy = {};
 			for (let name in object) {
