@@ -152,7 +152,7 @@ function concurrencies(table, name, tablesAdded) {
 	let row = '';
 	if (isRoot) {
 		row = `export interface ${name}Row extends ${name} {
-        save(): Promise<void>;
+        saveChanges(): Promise<void>;
         refresh(strategy?: ${name}Strategy | undefined | null): Promise<void>;
         acceptChanges(): void;
         clearChanges(): void;
