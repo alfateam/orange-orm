@@ -1,5 +1,5 @@
 const jsonpatch = require('fast-json-patch');
-let dateToIsoString = require('../dateToIsoString');
+let dateToISOString = require('../dateToISOString');
 let stringify = require('./stringify');
 let { v4: uuid } = require('uuid');
 
@@ -72,7 +72,7 @@ module.exports = function createPatch(original, dto, options) {
 			return copy;
 		}
 		else if (isValidDate(object))
-			return dateToIsoString(object);
+			return dateToISOString(object);
 		else if (Buffer?.isBuffer(object)) {
 			return object.toString('base64');
 		}
