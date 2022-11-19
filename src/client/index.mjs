@@ -846,7 +846,7 @@ function stringify$4(value) {
 	return JSON.stringify(value, replacer);
 }
 
-function replacer(value) {
+function replacer(key, value) {
 	if (Buffer.isBuffer(value))
 		return value.toString('base64');
 	// @ts-ignore
@@ -1533,6 +1533,9 @@ var createPatch$1 = function createPatch(original, dto, options) {
 		}
 		else if (isValidDate(object))
 			return dateToIsoString(object);
+		else if (Buffer?.isBuffer(object)) {
+			return object.toString('base64');
+		}
 		else if (object === Object(object)) {
 			let copy = {};
 			for (let name in object) {
@@ -2527,7 +2530,7 @@ function rdbClient(options = {}) {
 						return () => {
 							return toJSON(array);
 						};
-					else if (property === 'save')
+					else if (property === 'save' || property === 'saveChanges')
 						return saveArray.bind(null, array);
 					else if (property === 'insert')
 						return insertArray.bind(null, array, innerProxy);
@@ -2555,7 +2558,7 @@ function rdbClient(options = {}) {
 			// let enabled = false;
 			let handler = {
 				get(_target, property,) {
-					if (property === 'save') //call server then acceptChanges
+					if (property === 'save' || property === 'saveChanges') //call server then acceptChanges
 						return saveRow.bind(null, row);
 					else if (property === 'insert') //call server then remove from jsonMap and add to original
 						return insertRow.bind(null, row, innerProxy);

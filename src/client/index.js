@@ -221,7 +221,7 @@ function rdbClient(options = {}) {
 						return () => {
 							return toJSON(array);
 						};
-					else if (property === 'save')
+					else if (property === 'save' || property === 'saveChanges')
 						return saveArray.bind(null, array);
 					else if (property === 'insert')
 						return insertArray.bind(null, array, innerProxy);
@@ -249,7 +249,7 @@ function rdbClient(options = {}) {
 			// let enabled = false;
 			let handler = {
 				get(_target, property,) {
-					if (property === 'save') //call server then acceptChanges
+					if (property === 'save' || property === 'saveChanges') //call server then acceptChanges
 						return saveRow.bind(null, row);
 					else if (property === 'insert') //call server then remove from jsonMap and add to original
 						return insertRow.bind(null, row, innerProxy);
