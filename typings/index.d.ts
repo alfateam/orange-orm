@@ -114,10 +114,7 @@ declare namespace r {
         body: any;
     }
 
-    export enum Concurrencies {
-        Optimistic = 'optimistic',
-        SkipOnConflict = 'skipOnConflict',
-        Overwrite = 'overwrite'
+    export type Concurrency = 'optimistic' | 'skipOnConflict' | 'overwrite';
     }
 
     export interface ExpressConfig<TStrategy, TConcurrency> {

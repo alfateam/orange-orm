@@ -48,7 +48,7 @@ function getTable(table, Name, name, customFilters) {
         customFilters?: ${Name}CustomFilters;
         baseFilter?: RawFilter | ((request?: import('express').Request, response?: import('express').Response) => RawFilter | Promise<RawFilter>);
         strategy? : ${Name}Strategy;
-        defaultConcurrency?: Concurrencies;
+        defaultConcurrency?: Concurrency;
         concurrency?: ${Name}Concurrency;
 	}
 
@@ -66,11 +66,12 @@ function getTable(table, Name, name, customFilters) {
     }
 
     export interface Save${Name}Options {
-        defaultConcurrency?: Concurrencies
+        defaultConcurrency?: Concurrency
         concurrency?: ${Name}Concurrency;
+		strategy?: ${Name}Strategy;
     }
 
-    ${concurrencies(table, Name)}
+    ${Concurrency(table, Name)}
     `;
 }
 
@@ -107,7 +108,7 @@ function columns(table) {
 	return result;
 }
 
-function concurrencies(table, name, tablesAdded) {
+function Concurrency(table, name, tablesAdded) {
 	name = pascalCase(name);
 	let isRoot;
 	if (!tablesAdded) {
@@ -118,7 +119,7 @@ function concurrencies(table, name, tablesAdded) {
 		return '';
 	else
 		tablesAdded.set(table, name);
-	let otherConcurrencies = '';
+	let otherConcurrency = '';
 	let concurrencyRelations = '';
 	let strategyRelations = '';
 	let regularRelations = '';
@@ -130,14 +131,14 @@ function concurrencies(table, name, tablesAdded) {
         `;
 	let visitor = {};
 	visitor.visitJoin = function(relation) {
-		otherConcurrencies += `${concurrencies(relation.childTable, relationName, tablesAdded)}`;
+		otherConcurrency += `${Concurrency(relation.childTable, relationName, tablesAdded)}`;
 		concurrencyRelations += `${relationName}?: ${tableName}Concurrency;${separator}`;
 		strategyRelations += `${relationName}?: ${tableName}Strategy | null;${separator}`;
 		regularRelations += `${relationName}?: ${tableName} | null;${separator}`;
 	};
 	visitor.visitOne = visitor.visitJoin;
 	visitor.visitMany = function(relation) {
-		otherConcurrencies += `${concurrencies(relation.childTable, relationName, tablesAdded)}`;
+		otherConcurrency += `${Concurrency(relation.childTable, relationName, tablesAdded)}`;
 		concurrencyRelations += `${relationName}?: ${tableName}Concurrency;${separator}`;
 		strategyRelations += `${relationName}?: ${tableName}Strategy  | null;${separator}`;
 		regularRelations += `${relationName}?: ${tableName}[];${separator}`;
@@ -152,7 +153,7 @@ function concurrencies(table, name, tablesAdded) {
 	let row = '';
 	if (isRoot) {
 		row = `export interface ${name}Row extends ${name} {
-        saveChanges(): Promise<void>;
+		saveChanges(options?: Save${name}Options): Promise<void>;
         refresh(strategy?: ${name}Strategy | undefined | null): Promise<void>;
         acceptChanges(): void;
         clearChanges(): void;
@@ -190,7 +191,7 @@ function concurrencies(table, name, tablesAdded) {
         orderBy?: Array<${orderByColumns(table)}> | ${orderByColumns(table)};
     }
 
-    ${otherConcurrencies}
+    ${otherConcurrency}
 
     ${row}`;
 
@@ -236,7 +237,7 @@ function concurrencyColumns(table) {
 		let column = table._columns[i];
 		if (primarySet.has(column))
 			continue;
-		result += `${separator}${column.alias}? : Concurrencies;`;
+		result += `${separator}${column.alias}? : Concurrency;`;
 		separator = `
         `;
 	}

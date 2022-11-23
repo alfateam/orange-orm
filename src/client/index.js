@@ -26,11 +26,6 @@ function rdbClient(options = {}) {
 		client.tables = options.tables;
 	}
 
-	client.Concurrencies = {
-		Optimistic: 'optimistic',
-		SkipOnConflict: 'skipOnConflict',
-		Overwrite: 'overwrite'
-	};
 	client.beforeResponse = (cb => beforeResponse = cb);
 	client.beforeRequest = (cb => beforeRequest = cb);
 	client.reactive = (cb => _reactive = cb);
