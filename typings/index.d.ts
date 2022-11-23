@@ -42,6 +42,7 @@ declare namespace r {
 
     export interface JoinRelation {
         columns: ColumnDef[];
+	    childTable: Table;
     }
 
     export interface Table {
@@ -55,7 +56,6 @@ declare namespace r {
     export interface HasMany {
         as(propertyName: string): void;
     }
-
 
     export interface HasOne {
         as(propertyName: string): void;
