@@ -46,10 +46,11 @@ async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic
 	}
 
 	async function add({ path, value, op, oldValue, concurrency = {}, strategy }, table, row, parentRow, relation) {
-		let property = path[0]; 'dummy'
+		let property = path[0];
 		path = path.slice(1);
-		if (!row && path.length > 0)
+		if (!row && path.length > 0) {
 			row = row || await table.tryGetById.apply(null, toKey(property), strategy);
+		}
 		if (path.length === 0) {
 			if (dryrun) {
 				return {};
@@ -116,12 +117,13 @@ async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic
 			if (path.length === 1) {
 				for (let id in value) {
 					if (id === '__patchType')
-					continue;
-					await add({ path: [id], value: value[id], op, oldValue, concurrency: concurrency[property], strategy: strategy[property] }, relation.childTable, {}, row, relation);
+						continue;
+					await add({ path: [id], value: value[id], op, oldValue, concurrency: concurrency[property], strategy: strategy[property] }, relation.childTable, undefined, row, relation);
 				}
 			}
-			else
-				await add({ path: path.slice(1), value, oldValue, op, concurrency: concurrency[property], strategy: strategy[property] }, relation.childTable, row, parentRow, relation);
+			else {
+				await add({ path: path.slice(1), value, oldValue, op, concurrency: concurrency[property], strategy: strategy[property] }, relation.childTable, undefined, row, relation);
+			}
 			return { updated: row };
 		}
 		else if (isJoinRelation(property, table) && path.length === 1) {
@@ -155,7 +157,7 @@ async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic
 			}
 		}
 	}
-	
+
 	async function insertOneRelation(name, value, op, oldValue, table, concurrency, strategy, row) {
 		let relation = table[name]._relation;
 		let child = value[name];
@@ -203,7 +205,7 @@ async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic
 			let relation = table[property]._relation;
 			for (let i = 0; i < relation.columns.length; i++) {
 				let parentKey = relation.columns[i].alias;
-				let dto = {};				
+				let dto = {};
 				dto[parentKey] = row[parentKey];
 				let result = applyPatch({ defaultConcurrency: 'overwrite', concurrency: undefined }, dto, [{ path: '/' + parentKey, op }]);
 				row[parentKey] = result[parentKey];
@@ -211,7 +213,7 @@ async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic
 		}
 		else if (isJoinRelation(property, table) && path.length === 2) {
 			let relation = table[property]._relation;
-			for (let i = 0; i < relation.columns.length; i++) {				
+			for (let i = 0; i < relation.columns.length; i++) {
 				let parentKey = relation.columns[i].alias;
 				let childKey = relation.childTable._primaryColumns[i].alias;
 				if (path[1] === childKey) {
