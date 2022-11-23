@@ -813,7 +813,7 @@ var fastJsonPatch = /*#__PURE__*/Object.freeze({
 
 var require$$0 = /*@__PURE__*/getAugmentedNamespace(fastJsonPatch);
 
-function dateToIsoString$2(date) {
+function dateToIsoString(date) {
 	let tzo = -date.getTimezoneOffset();
 	let dif = tzo >= 0 ? '+' : '-';
 
@@ -837,9 +837,9 @@ function dateToIsoString$2(date) {
 		':' + pad(tzo % 60);
 }
 
-var dateToIsoString_1 = dateToIsoString$2;
+var dateToISOString$2 = dateToIsoString;
 
-let dateToIsoString$1 = dateToIsoString_1;
+let dateToISOString$1 = dateToISOString$2;
 
 
 function stringify$4(value) {
@@ -851,7 +851,7 @@ function replacer(key, value) {
 		return value.toString('base64');
 	// @ts-ignore
 	else if (value instanceof Date  && !isNaN(value))
-		return dateToIsoString$1(value);
+		return dateToISOString$1(value);
 	else
 		return value;
 }
@@ -1459,7 +1459,7 @@ var esmBrowser = /*#__PURE__*/Object.freeze({
 var require$$1 = /*@__PURE__*/getAugmentedNamespace(esmBrowser);
 
 const jsonpatch = require$$0;
-let dateToIsoString = dateToIsoString_1;
+let dateToISOString = dateToISOString$2;
 let stringify$2 = stringify_1;
 let { v4: uuid$1 } = require$$1;
 
@@ -1532,7 +1532,7 @@ var createPatch$1 = function createPatch(original, dto, options) {
 			return copy;
 		}
 		else if (isValidDate(object))
-			return dateToIsoString(object);
+			return dateToISOString(object);
 		else if (Buffer?.isBuffer(object)) {
 			return object.toString('base64');
 		}
@@ -2335,11 +2335,6 @@ function rdbClient(options = {}) {
 		client.tables = options.tables;
 	}
 
-	client.Concurrencies = {
-		Optimistic: 'optimistic',
-		SkipOnConflict: 'skipOnConflict',
-		Overwrite: 'overwrite'
-	};
 	client.beforeResponse = (cb => beforeResponse = cb);
 	client.beforeRequest = (cb => beforeRequest = cb);
 	client.reactive = (cb => _reactive = cb);
@@ -2655,9 +2650,9 @@ function rdbClient(options = {}) {
 			let adapter = netAdapter(url, { beforeRequest, beforeResponse, tableOptions });
 			let p = adapter.patch(body);
 			let affectedRows = extractChangedRows(array, patch, meta);
-			let { changed } = await p;
+			let { changed, strategy: newStrategy } = await p;
 			copyInto(changed, affectedRows);
-			rootMap.set(array, { json: stringify(array), strategy });
+			rootMap.set(array, { json: stringify(array), strategy: newStrategy });
 		}
 
 		function extractChangedRows(rows, patch, meta) {
@@ -2703,7 +2698,7 @@ function rdbClient(options = {}) {
 		}
 
 		function acceptChangesArray(array) {
-			rootMap.set(array, { jsonMap: new Map(), original: new Set(array) });
+			rootMap.get(array).json = stringify(array);
 		}
 
 		async function insertArray(array, proxy, options) {
@@ -2715,9 +2710,9 @@ function rdbClient(options = {}) {
 
 			let body = stringify({ patch, options: { strategy, ...options } });
 			let adapter = netAdapter(url, { beforeRequest, beforeResponse, tableOptions });
-			let { changed } = await adapter.patch(body);
+			let { changed, strategy: newStrategy} = await adapter.patch(body);
 			copyInto(changed, array);
-			rootMap.set(array, { json: stringify(array), strategy });
+			rootMap.set(array, { json: stringify(array), strategy: newStrategy });
 			return proxy;
 		}
 
@@ -2728,10 +2723,9 @@ function rdbClient(options = {}) {
 			let patch = createPatch(array, [], meta);
 			let body = stringify({ patch, options });
 			let adapter = netAdapter(url, { beforeRequest, beforeResponse, tableOptions });
-			await adapter.patch(body);
-			let strategy = rootMap.get(array).strategy;
+			let {strategy} = await adapter.patch(body);
 			array.length = 0;
-			rootMap.set(array, { jsonMap: stringify(array), strategy });
+			rootMap.set(array, { jsonMap: stringify(array), strategy});
 		}
 
 		function setMapValue(rowsMap, keys, row, index) {
@@ -2802,9 +2796,9 @@ function rdbClient(options = {}) {
 			let body = stringify({ patch, options: { strategy, ...options } });
 
 			let adapter = netAdapter(url, { beforeRequest, beforeResponse, tableOptions });
-			let { changed } = await adapter.patch(body);
+			let { changed, strategy: newStrategy } = await adapter.patch(body);
 			copyInto(changed, [row]);
-			rootMap.set(row, { json: stringify(row), strategy });
+			rootMap.set(row, { json: stringify(row), strategy: newStrategy });
 
 			return innerProxy;
 		}
@@ -2834,13 +2828,13 @@ function rdbClient(options = {}) {
 			let body = stringify({ patch, options: { ...options, strategy } });
 
 			let adapter = netAdapter(url, { beforeRequest, beforeResponse, tableOptions });
-			let { changed } = await adapter.patch(body);
+			let { changed, strategy: newStrategy } = await adapter.patch(body);
 			copyInto(changed, [row]);
-			rootMap.set(row, { json: stringify(row), strategy });
+			rootMap.set(row, { json: stringify(row), strategy: newStrategy });
 		}
 
-		async function refreshRow(row, options) {
-			let strategy = extractStrategy(options, row);
+		async function refreshRow(row, strategy) {
+			strategy = extractStrategy({strategy}, row);
 			let meta = await getMeta();
 			let keyFilter = client.filter;
 			for (let i = 0; i < meta.keys.length; i++) {
@@ -2848,7 +2842,7 @@ function rdbClient(options = {}) {
 				let keyValue = row[keyName];
 				keyFilter = keyFilter.and(_table[keyName].eq(keyValue));
 			}
-			let rows = await getManyCore.apply(keyFilter, strategy);
+			let rows = await getManyCore(keyFilter, strategy);
 			for (let p in row) {
 				delete row[p];
 			}
@@ -2861,7 +2855,8 @@ function rdbClient(options = {}) {
 		}
 
 		function acceptChangesRow(row) {
-			rootMap.set(row, {});
+			const { strategy } = rootMap.get(row);
+			rootMap.set(row, {json: stringify(row), strategy});
 		}
 
 		function clearChangesRow(row) {
@@ -2875,9 +2870,9 @@ function rdbClient(options = {}) {
 			for (let p in old) {
 				row[p] = old[p];
 			}
-			rootMap.set(row, {});
+			const { strategy } = rootMap.get(row);
+			rootMap.set(row, {json: stringify(row), strategy});
 		}
-
 	}
 }
 
@@ -2890,7 +2885,6 @@ function tableProxy() {
 	};
 	return new Proxy({}, handler);
 }
-
 
 function column(path, ...previous) {
 	function c() {
