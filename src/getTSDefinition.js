@@ -172,6 +172,8 @@ function Concurrency(table, name, tablesAdded) {
         clearChanges(): void;
         insert(): Promise<void>
         delete(): Promise<void>;
+		delete(options: Delete${name}Options): Promise<void>;
+
     }`;
 	}
 	else {
