@@ -85,9 +85,7 @@ function rdbClient(options = {}) {
 			getManyDto: getMany,
 			getMany,
 			express,
-			getOne: tryGetFirst,
-			tryGetFirst,
-			tryGetById,
+			getOne,
 			getById,
 			proxify,
 			insert,
@@ -117,7 +115,7 @@ function rdbClient(options = {}) {
 			return proxify(rows, strategy);
 		}
 
-		async function tryGetFirst(filter, strategy) {
+		async function getOne(filter, strategy) {
 			let metaPromise = getMeta();
 			strategy = extractStrategy({ strategy });
 			let _strategy = { ...strategy, ...{ limit: 1 } };
@@ -129,7 +127,7 @@ function rdbClient(options = {}) {
 			return proxify(rows[0], strategy);
 		}
 
-		async function tryGetById() {
+		async function getById() {
 			if (arguments.length === 0)
 				return;
 			let meta = await getMeta();
@@ -140,18 +138,11 @@ function rdbClient(options = {}) {
 				keyFilter = keyFilter.and(_table[keyName].eq(keyValue));
 			}
 			let args = [keyFilter].concat(Array.prototype.slice.call(arguments).slice(meta.keys.length));
-			return tryGetFirst.apply(null, args);
+			return getOne.apply(null, args);
 		}
 
 		function express() {
 			return netAdapter(url, { beforeRequest, beforeResponse, tableOptions }).express.apply(null, arguments);
-		}
-
-		async function getById() {
-			let row = await tryGetById.apply(null, arguments);
-			if (!row)
-				throw new Error('Row not found : ' + arguments);
-			return row;
 		}
 
 		async function getManyCore() {

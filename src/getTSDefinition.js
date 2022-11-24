@@ -30,7 +30,6 @@ function getTable(table, Name, name, customFilters) {
         getOne(${name}: ${Name}): Promise<${Name}Row>;
         getOne(${name}: ${Name}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
         getById(${getIdArgs(table)}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
-        tryGetById(${getIdArgs(table)}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
         insert(${name}s: ${Name}[]): Promise<${Name}Array>;
         insert(${name}: ${Name}): Promise<${Name}Row>;
         insertAndForget(${name}s: ${Name}[]): Promise<void>;
@@ -69,12 +68,18 @@ function getTable(table, Name, name, customFilters) {
         refresh(fetchingStrategy: ${Name}Strategy): Promise<void>;
         insert(): Promise<void>;
         delete(): Promise<void>;
+        delete(options: Delete${Name}Options): Promise<void>;
     }
 
     export interface Save${Name}Options {
         defaultConcurrency?: Concurrency
         concurrency?: ${Name}Concurrency;
 		fetchingStrategy: ${Name}Strategy;
+    }
+
+    export interface Delete${Name}Options {
+        defaultConcurrency?: Concurrency
+        concurrency?: ${Name}Concurrency;
     }
 
     ${Concurrency(table, Name)}
