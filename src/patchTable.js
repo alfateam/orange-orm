@@ -106,7 +106,7 @@ async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic
 			let relation = table[property]._relation;
 			let subRow = await row[property];
 			if (!subRow)
-				throw new Error(`${property} was not found`)
+				throw new Error(`${property} was not found`);
 			strategy[property] = strategy[property] || {};
 			await add({ path, value, op, oldValue, concurrency: concurrency[property], strategy: strategy[property] }, relation.childTable, subRow, row, relation);
 			return { updated: row };

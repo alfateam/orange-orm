@@ -21,12 +21,16 @@ function getTSDefinition(table, options) {
 function getTable(table, Name, name, customFilters) {
 	return `
     export interface ${Name}Table {
-        getMany(filter?: RawFilter, strategy?: ${Name}Strategy): Promise<${Name}Array>;
-        getMany(${name}s: Array<${Name}>, strategy?: ${Name}Strategy): Promise<${Name}Array>;
-        getOne(filter?: RawFilter, strategy?: ${Name}Strategy): Promise<${Name}Row>;
-        getOne(${name}: ${Name}, strategy?: ${Name}Strategy): Promise<${Name}Row>;
-        getById(${getIdArgs(table)}, strategy?: ${Name}Strategy): Promise<${Name}Row>;
-        tryGetById(${getIdArgs(table)}, strategy?: ${Name}Strategy): Promise<${Name}Row>;
+        getMany(filter?: RawFilter): Promise<${Name}Array>;
+        getMany(filter: RawFilter, fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
+        getMany(${name}s: Array<${Name}>): Promise<${Name}Array>;
+        getMany(${name}s: Array<${Name}>, fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
+        getOne(filter?: RawFilter): Promise<${Name}Row>;
+        getOne(filter: RawFilter, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
+        getOne(${name}: ${Name}): Promise<${Name}Row>;
+        getOne(${name}: ${Name}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
+        getById(${getIdArgs(table)}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
+        tryGetById(${getIdArgs(table)}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
         insert(${name}s: ${Name}[]): Promise<${Name}Array>;
         insert(${name}: ${Name}): Promise<${Name}Row>;
         insertAndForget(${name}s: ${Name}[]): Promise<void>;
@@ -47,7 +51,7 @@ function getTable(table, Name, name, customFilters) {
         db?: unknown | string | (() => unknown | string);
         customFilters?: ${Name}CustomFilters;
         baseFilter?: RawFilter | ((request?: import('express').Request, response?: import('express').Response) => RawFilter | Promise<RawFilter>);
-        strategy? : ${Name}Strategy;
+        fetchingStrategy: ${Name}Strategy;
         defaultConcurrency?: Concurrency;
         concurrency?: ${Name}Concurrency;
 	}
@@ -57,10 +61,12 @@ function getTable(table, Name, name, customFilters) {
     }
 
     export interface ${Name}Array extends Array<${Name}> {
-        saveChanges(options?: Save${Name}Options): Promise<void>;
+        saveChanges(): Promise<void>;
+        saveChanges(options: Save${Name}Options): Promise<void>;
         acceptChanges(): void;
         clearChanges(): void;
-        refresh(strategy?: ${Name}Strategy | undefined | null): Promise<void>;
+        refresh(): Promise<void>;
+        refresh(fetchingStrategy: ${Name}Strategy): Promise<void>;
         insert(): Promise<void>;
         delete(): Promise<void>;
     }
@@ -68,7 +74,7 @@ function getTable(table, Name, name, customFilters) {
     export interface Save${Name}Options {
         defaultConcurrency?: Concurrency
         concurrency?: ${Name}Concurrency;
-		strategy?: ${Name}Strategy;
+		fetchingStrategy: ${Name}Strategy;
     }
 
     ${Concurrency(table, Name)}
@@ -133,14 +139,14 @@ function Concurrency(table, name, tablesAdded) {
 	visitor.visitJoin = function(relation) {
 		otherConcurrency += `${Concurrency(relation.childTable, relationName, tablesAdded)}`;
 		concurrencyRelations += `${relationName}?: ${tableName}Concurrency;${separator}`;
-		strategyRelations += `${relationName}?: ${tableName}Strategy | null;${separator}`;
-		regularRelations += `${relationName}?: ${tableName} | null;${separator}`;
+		strategyRelations += `${relationName}?: ${tableName}Strategy;${separator}`;
+		regularRelations += `${relationName}?: ${tableName};${separator}`;
 	};
 	visitor.visitOne = visitor.visitJoin;
 	visitor.visitMany = function(relation) {
 		otherConcurrency += `${Concurrency(relation.childTable, relationName, tablesAdded)}`;
 		concurrencyRelations += `${relationName}?: ${tableName}Concurrency;${separator}`;
-		strategyRelations += `${relationName}?: ${tableName}Strategy  | null;${separator}`;
+		strategyRelations += `${relationName}?: ${tableName}Strategy ;${separator}`;
 		regularRelations += `${relationName}?: ${tableName}[];${separator}`;
 	};
 
@@ -153,8 +159,10 @@ function Concurrency(table, name, tablesAdded) {
 	let row = '';
 	if (isRoot) {
 		row = `export interface ${name}Row extends ${name} {
-		saveChanges(options?: Save${name}Options): Promise<void>;
-        refresh(strategy?: ${name}Strategy | undefined | null): Promise<void>;
+		saveChanges(): Promise<void>;
+		saveChanges(options: Save${name}Options): Promise<void>;
+        refresh(): Promise<void>;
+        refresh(fetchingStrategy: ${name}Strategy): Promise<void>;
         acceptChanges(): void;
         clearChanges(): void;
         insert(): Promise<void>
@@ -252,7 +260,7 @@ function strategyColumns(table) {
 		let column = table._columns[i];
 		if (primarySet.has(column))
 			continue;
-		result += `${separator}${column.alias}? : boolean | null;`;
+		result += `${separator}${column.alias}? : boolean;`;
 		separator = `
         `;
 	}

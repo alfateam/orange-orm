@@ -385,7 +385,8 @@ function rdbClient(options = {}) {
 
 		function clearChangesArray(array) {
 			let { json } = rootMap.get(array);
-			array.splice(0, array.length, JSON.parse(json));
+			let old = JSON.parse(json);
+			array.splice(0, old.length, ...old);
 		}
 
 		function acceptChangesArray(array) {
@@ -442,6 +443,7 @@ function rdbClient(options = {}) {
 		}
 
 		async function refreshArray(array, options) {
+			clearChangesArray(array);
 			let strategy = extractStrategy(options);
 			if (array.length === 0)
 				return;
@@ -525,6 +527,7 @@ function rdbClient(options = {}) {
 		}
 
 		async function refreshRow(row, strategy) {
+			clearChangesRow(row);
 			strategy = extractStrategy({strategy}, row);
 			let meta = await getMeta();
 			let keyFilter = client.filter;
@@ -561,8 +564,6 @@ function rdbClient(options = {}) {
 			for (let p in old) {
 				row[p] = old[p];
 			}
-			const { strategy } = rootMap.get(row);
-			rootMap.set(row, {json: stringify(row), strategy});
 		}
 	}
 }
