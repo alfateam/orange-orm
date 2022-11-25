@@ -91,7 +91,7 @@ function rdbClient(options = {}) {
 			insert,
 			insertAndForget,
 			delete: _delete,
-			cascadeDelete
+			deleteCascade
 		};
 
 		let handler = {
@@ -175,10 +175,10 @@ function rdbClient(options = {}) {
 			return adapter.post(body);
 		}
 
-		async function cascadeDelete() {
+		async function deleteCascade() {
 			let args = Array.prototype.slice.call(arguments);
 			let body = stringify({
-				path: 'cascadeDelete',
+				path: 'deleteCascade',
 				args
 			});
 			let adapter = netAdapter(url, { beforeRequest, beforeResponse, tableOptions });

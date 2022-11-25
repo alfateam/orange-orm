@@ -134,6 +134,7 @@ function _new(tableName) {
 
 	table.delete = _delete.bind(null, table);
 	table.cascadeDelete = cascadeDelete.bind(null, table);
+	table.deleteCascade = cascadeDelete.bind(null, table);
 	table.createReadStream = createReadStream.bind(null, table);
 	table.createJSONReadStream = createJSONReadStream.bind(null, table);
 	table.exclusive = function() {

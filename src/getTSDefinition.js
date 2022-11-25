@@ -36,8 +36,8 @@ function getTable(table, Name, name, customFilters) {
         insertAndForget(${name}: ${Name}): Promise<void>;
         delete(filter?: RawFilter): Promise<void>;
         delete(${name}s: Array<${Name}>): Promise<void>;
-        cascadeDelete(filter?: RawFilter): Promise<void>;
-        cascadeDelete(${name}s: Array<${Name}>): Promise<void>;
+        deleteCascade(filter?: RawFilter): Promise<void>;
+        deleteCascade(${name}s: Array<${Name}>): Promise<void>;
         proxify(${name}s: ${Name}[]): ${Name}Array;
         proxify(${name}: ${Name}): ${Name}Row;
 		express(config: ${Name}ExpressConfig): Express & RequestHandler;

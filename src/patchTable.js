@@ -193,7 +193,7 @@ async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic
 		path = path.slice(1);
 		row = row || await table.getById.apply(null, toKey(property));
 		if (path.length === 0)
-			return row.cascadeDelete();
+			return row.deleteCascade();
 		property = path[0];
 		if (isColumn(property, table)) {
 			let dto = {};
