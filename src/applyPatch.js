@@ -2,6 +2,7 @@ let rfc = require('rfc6902');
 let { inspect } = require('util');
 let assert = require('assert');
 let fromCompareObject = require('./fromCompareObject');
+let toCompareObject = require('./toCompareObject');
 
 function applyPatch({ defaultConcurrency, concurrency }, dto, changes) {
 	let dtoCompare = toCompareObject(dto);
@@ -68,36 +69,6 @@ function applyPatch({ defaultConcurrency, concurrency }, dto, changes) {
 			return obj;
 		}
 	}
-}
-
-function toCompareObject(object) {
-	if (Array.isArray(object)) {
-		let copy = {};
-		Object.defineProperty(copy, '__patchType', {
-			value: 'Array',
-			writable: true,
-			enumerable: true
-		});
-
-		for (var i = 0; i < object.length; i++) {
-			let element = toCompareObject(object[i]);
-			if (element === Object(element) && 'id' in element)
-				copy[element.id] = element;
-			else
-				copy[i] = element;
-		}
-		return copy;
-	}
-	else if (object instanceof Date && object.toISOString)
-		return object.toISOString();
-	else if (object === Object(object)) {
-		let copy = {};
-		for (let name in object) {
-			copy[name] = toCompareObject(object[name]);
-		}
-		return copy;
-	}
-	return object;
 }
 
 module.exports = applyPatch;

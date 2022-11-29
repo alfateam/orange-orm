@@ -1,6 +1,7 @@
 /* eslint-disable require-atomic-updates */
 let applyPatch = require('./applyPatch');
 let fromCompareObject = require('./fromCompareObject');
+let validateDeleteConflict = require('./validateDeleteConflict');
 
 async function patchTable() {
 	// const dryrun = true;
@@ -17,15 +18,17 @@ async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic
 		let patch = { path: undefined, value: undefined, op: undefined };
 		Object.assign(patch, patches[i]);
 		patch.path = patches[i].path.split('/').slice(1);
+		let result;
 		if (patch.op === 'add' || patch.op === 'replace') {
-			let result = await add({ path: patch.path, value: patch.value, op: patch.op, oldValue: patch.oldValue, concurrency: concurrency, strategy }, table);
-			if (result.inserted)
-				changed.add(result.inserted);
-			else if (result.updated)
-				changed.add(result.updated);
+			result = await add({ path: patch.path, value: patch.value, op: patch.op, oldValue: patch.oldValue, concurrency: concurrency, strategy }, table);
 		}
-		else if (patch.op === 'remove') //todo add to changed
-			await remove(patch, table);
+		else if (patch.op === 'remove')
+			result = await remove({ path: patch.path, op: patch.op, oldValue: patch.oldValue, concurrency }, table);
+
+		if (result.inserted)
+			changed.add(result.inserted);
+		else if (result.updated)
+			changed.add(result.updated);
 	}
 	return { changed: await toDtos(changed), strategy };
 
@@ -188,18 +191,21 @@ async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic
 		return dto;
 	}
 
-	async function remove({ path, value, op }, table, row) {
+	async function remove({ path, op, oldValue, concurrency = {} }, table, row) {
 		let property = path[0];
 		path = path.slice(1);
 		row = row || await table.getById.apply(null, toKey(property));
-		if (path.length === 0)
-			return row.deleteCascade();
+		if (path.length === 0) {
+			if (await validateDeleteConflict({ row, oldValue, defaultConcurrency, concurrency, table }))
+				row.delete();
+		}
 		property = path[0];
 		if (isColumn(property, table)) {
 			let dto = {};
 			dto[property] = row[property];
 			let result = applyPatch({ defaultConcurrency: 'overwrite', concurrency: undefined }, dto, [{ path: '/' + path.join('/'), op }]);
 			row[property] = result[property];
+			return { updated: row };
 		}
 		else if (isJoinRelation(property, table) && path.length === 1) {
 			let relation = table[property]._relation;
@@ -210,6 +216,7 @@ async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic
 				let result = applyPatch({ defaultConcurrency: 'overwrite', concurrency: undefined }, dto, [{ path: '/' + parentKey, op }]);
 				row[parentKey] = result[parentKey];
 			}
+			return { updated: row };
 		}
 		else if (isJoinRelation(property, table) && path.length === 2) {
 			let relation = table[property]._relation;
@@ -224,12 +231,14 @@ async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic
 					break;
 				}
 			}
+			return { updated: row };
 		}
 		else if (isOneRelation(property, table)) {
 			let child = await row[property];
 			if (!child)
 				throw new Error(property + ' does not exist');
-			await remove({ path, value, op }, table[property], child);
+			await remove({ path, op, oldValue, concurrency: concurrency[property] }, table[property], child);
+			return { updated: row };
 		}
 		else if (isManyRelation(property, table)) {
 			let relation = table[property]._relation;
@@ -237,12 +246,15 @@ async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic
 				let children = (await row[property]).slice(0);
 				for (let i = 0; i < children.length; i++) {
 					let child = children[i];
-					await remove({ path: path.slice(1), value, op }, table[property], child);
+					await remove({ path: path.slice(1), op, oldValue, concurrency: concurrency[property] }, table[property], child);
 				}
 			}
-			else
-				await remove({ path: path.slice(1), value, op }, relation.childTable);
+			else {
+				await remove({ path: path.slice(1), op, oldValue, concurrency: concurrency[property] }, relation.childTable);
+			}
+			return { updated: row };
 		}
+		return {};
 	}
 
 	function isColumn(name, table) {

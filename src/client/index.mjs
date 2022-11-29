@@ -2394,15 +2394,13 @@ function rdbClient(options = {}) {
 			getManyDto: getMany,
 			getMany,
 			express,
-			getOne: tryGetFirst,
-			tryGetFirst,
-			tryGetById,
+			getOne,
 			getById,
 			proxify,
 			insert,
 			insertAndForget,
 			delete: _delete,
-			cascadeDelete
+			deleteCascade
 		};
 
 		let handler = {
@@ -2426,7 +2424,7 @@ function rdbClient(options = {}) {
 			return proxify(rows, strategy);
 		}
 
-		async function tryGetFirst(filter, strategy) {
+		async function getOne(filter, strategy) {
 			let metaPromise = getMeta();
 			strategy = extractStrategy({ strategy });
 			let _strategy = { ...strategy, ...{ limit: 1 } };
@@ -2438,7 +2436,7 @@ function rdbClient(options = {}) {
 			return proxify(rows[0], strategy);
 		}
 
-		async function tryGetById() {
+		async function getById() {
 			if (arguments.length === 0)
 				return;
 			let meta = await getMeta();
@@ -2449,18 +2447,11 @@ function rdbClient(options = {}) {
 				keyFilter = keyFilter.and(_table[keyName].eq(keyValue));
 			}
 			let args = [keyFilter].concat(Array.prototype.slice.call(arguments).slice(meta.keys.length));
-			return tryGetFirst.apply(null, args);
+			return getOne.apply(null, args);
 		}
 
 		function express() {
 			return netAdapter(url, { beforeRequest, beforeResponse, tableOptions }).express.apply(null, arguments);
-		}
-
-		async function getById() {
-			let row = await tryGetById.apply(null, arguments);
-			if (!row)
-				throw new Error('Row not found : ' + arguments);
-			return row;
 		}
 
 		async function getManyCore() {
@@ -2493,10 +2484,10 @@ function rdbClient(options = {}) {
 			return adapter.post(body);
 		}
 
-		async function cascadeDelete() {
+		async function deleteCascade() {
 			let args = Array.prototype.slice.call(arguments);
 			let body = stringify({
-				path: 'cascadeDelete',
+				path: 'deleteCascade',
 				args
 			});
 			let adapter = netAdapter(url, { beforeRequest, beforeResponse, tableOptions });
@@ -2694,7 +2685,8 @@ function rdbClient(options = {}) {
 
 		function clearChangesArray(array) {
 			let { json } = rootMap.get(array);
-			array.splice(0, array.length, JSON.parse(json));
+			let old = JSON.parse(json);
+			array.splice(0, old.length, ...old);
 		}
 
 		function acceptChangesArray(array) {
@@ -2751,6 +2743,7 @@ function rdbClient(options = {}) {
 		}
 
 		async function refreshArray(array, options) {
+			clearChangesArray(array);
 			let strategy = extractStrategy(options);
 			if (array.length === 0)
 				return;
@@ -2834,6 +2827,7 @@ function rdbClient(options = {}) {
 		}
 
 		async function refreshRow(row, strategy) {
+			clearChangesRow(row);
 			strategy = extractStrategy({strategy}, row);
 			let meta = await getMeta();
 			let keyFilter = client.filter;
@@ -2870,8 +2864,6 @@ function rdbClient(options = {}) {
 			for (let p in old) {
 				row[p] = old[p];
 			}
-			const { strategy } = rootMap.get(row);
-			rootMap.set(row, {json: stringify(row), strategy});
 		}
 	}
 }
