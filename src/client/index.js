@@ -37,7 +37,7 @@ function rdbClient(options = {}) {
 		or: client.or,
 		and: client.and,
 		not: client.not,
-		toJSON: function() {
+		toJSON: function () {
 			return;
 		}
 	};
@@ -393,7 +393,7 @@ function rdbClient(options = {}) {
 
 			let body = stringify({ patch, options: { strategy, ...options } });
 			let adapter = netAdapter(url, { beforeRequest, beforeResponse, tableOptions });
-			let { changed, strategy: newStrategy} = await adapter.patch(body);
+			let { changed, strategy: newStrategy } = await adapter.patch(body);
 			copyInto(changed, array);
 			rootMap.set(array, { json: stringify(array), strategy: newStrategy });
 			return proxy;
@@ -406,9 +406,9 @@ function rdbClient(options = {}) {
 			let patch = createPatch(array, [], meta);
 			let body = stringify({ patch, options });
 			let adapter = netAdapter(url, { beforeRequest, beforeResponse, tableOptions });
-			let {strategy} = await adapter.patch(body);
+			let { strategy } = await adapter.patch(body);
 			array.length = 0;
-			rootMap.set(array, { jsonMap: stringify(array), strategy});
+			rootMap.set(array, { jsonMap: stringify(array), strategy });
 		}
 
 		function setMapValue(rowsMap, keys, row, index) {
@@ -492,7 +492,6 @@ function rdbClient(options = {}) {
 			let meta = await getMeta();
 			let patch = createPatch([row], [], meta);
 			let body = stringify({ patch, options });
-
 			let adapter = netAdapter(url, { beforeRequest, beforeResponse, tableOptions });
 			await adapter.patch(body);
 			rootMap.set(row, { strategy });
@@ -519,7 +518,7 @@ function rdbClient(options = {}) {
 
 		async function refreshRow(row, strategy) {
 			clearChangesRow(row);
-			strategy = extractStrategy({strategy}, row);
+			strategy = extractStrategy({ strategy }, row);
 			let meta = await getMeta();
 			let keyFilter = client.filter;
 			for (let i = 0; i < meta.keys.length; i++) {
@@ -541,7 +540,7 @@ function rdbClient(options = {}) {
 
 		function acceptChangesRow(row) {
 			const { strategy } = rootMap.get(row);
-			rootMap.set(row, {json: stringify(row), strategy});
+			rootMap.set(row, { json: stringify(row), strategy });
 		}
 
 		function clearChangesRow(row) {

@@ -197,7 +197,7 @@ async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic
 		row = row || await table.getById.apply(null, toKey(property));
 		if (path.length === 0) {
 			if (await validateDeleteConflict({ row, oldValue, defaultConcurrency, concurrency, table }))
-				row.delete();
+				await row.deleteCascade();
 		}
 		property = path[0];
 		if (isColumn(property, table)) {

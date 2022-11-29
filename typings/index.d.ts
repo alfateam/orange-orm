@@ -65,7 +65,7 @@ declare namespace r {
         serializable(value: boolean): ColumnDef;
         string(): ColumnOf<string>;
         numeric(): ColumnOf<number>;
-        guid(): ColumnOf<string>;
+        uuid(): ColumnOf<string>;
         binary(): BinaryColumnDef;
         boolean(): ColumnOf<boolean>;
         json(): ColumnOf<Record<string, unknown>>;
