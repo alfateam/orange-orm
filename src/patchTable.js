@@ -64,12 +64,12 @@ async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic
 					value[name] = fromCompareObject(value[name]);
 				else if (isJoinRelation(name, table)) {
 					strategy[name] = strategy[name] || {};
-					updateJoinedColumns(name, value, table, value);
+					value[name] && updateJoinedColumns(name, value, table, value);
 				}
 				else if (isManyRelation(name, table))
-					childInserts.push(insertManyRelation.bind(null, name, value, op, oldValue, table, concurrency, strategy));
-				else if (isOneRelation(name, table))
-					childInserts.push(insertOneRelation.bind(null, name, value, op, oldValue, table, concurrency, strategy));
+					value[name] && childInserts.push(insertManyRelation.bind(null, name, value, op, oldValue, table, concurrency, strategy));
+				else if (isOneRelation(name, table) && value)
+					value[name] && childInserts.push(insertOneRelation.bind(null, name, value, op, oldValue, table, concurrency, strategy));
 			}
 			for (let i = 0; i < table._primaryColumns.length; i++) {
 				let pkName = table._primaryColumns[i].alias;
