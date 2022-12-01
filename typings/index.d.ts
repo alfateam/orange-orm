@@ -116,22 +116,22 @@ declare namespace r {
 
     export type Concurrency = 'optimistic' | 'skipOnConflict' | 'overwrite';
 
-    // export interface ExpressConfig<TStrategy, TConcurrency> {
-    //     db?: unknown | string | (() => unknown | string);
-    //     customFilters?: CustomFilters;
-    //     baseFilter?: RawFilter | ((request?: import('express').Request, response?: import('express').Response) => RawFilter | Promise<RawFilter>);
-    //     strategy?: TStrategy;
-    //     defaultConcurrency?: Concurrencies;
-    //     concurrency?: TConcurrency;
-    // }
+    export interface ExpressConfig<TStrategy, TConcurrency> {
+        db?: unknown | string | (() => unknown | string);
+        customFilters?: CustomFilters;
+        baseFilter?: RawFilter | ((request?: import('express').Request, response?: import('express').Response) => RawFilter | Promise<RawFilter>);
+        strategy?: TStrategy;
+        // defaultConcurrency?: Concurrencies;
+        concurrency?: TConcurrency;
+    }
 
-    // export interface Express {
-    //     dts: import('express').RequestHandler
-    // }
+    export interface Express {
+        dts: import('express').RequestHandler
+    }
 
-    // export interface CustomFilters {
-    //     [key: string]: (...args: any[]) => RawFilter | CustomFilters
-    // }
+    export interface CustomFilters {
+        [key: string]: (...args: any[]) => RawFilter | CustomFilters
+    }
 
     export interface BooleanColumn extends ColumnBase<boolean> {
     }
@@ -153,13 +153,104 @@ declare namespace r {
     }
 
     export interface StringColumn extends ColumnBase<string> {
+        startsWith(value: string | null): Filter;
+        /**
+        * ignore case, postgres only
+         */
+        iStartsWith(value: string | null): Filter;
+        endsWith(value: string | null): Filter;
+        /**
+         * ignore case, postgres only
+         */
+        iEndsWith(value: string | null): Filter;
+        contains(value: string | null): Filter;
+        /**
+         * ignore case, postgres only
+         */
+        iContains(value: string | null): Filter;
+        /**
+         * ignore case
+         */
+        iEqual(value: string | null): Filter;
+        /**
+        * ignore case, postgres only         
+        * */
+        iEq(value: string | null): Filter;
+        /**
+         * ignore case, postgres only         
+         */
+        iEq(value: string | null): Filter;
     }
 
 
     interface ColumnBase<TType> {
+        equal(value: TType | null): Filter;
+        /**
+         * equal
+         */
+        eq(value: TType | null): Filter;
+        notEqual(value: TType | null): Filter;
+        /**
+         * not equal
+         */
+        ne(value: TType | null): Filter;
+        lessThan(value: TType | null): Filter;
+        /**
+         * less than
+         */
+        lt(value: TType | null): Filter;
+        lessThanOrEqual(value: TType | null): Filter;
+        /**
+         * less than or equal
+         */
+        le(value: TType | null): Filter;
+        greaterThan(value: TType | null): Filter;
+        /**
+         * greater than
+         */
+        gt(value: TType | null): Filter;
+        greaterThanOrEqual(value: TType | null): Filter;
+        /**
+         * greater than or equal
+         */
+        ge(value: TType | null): Filter;
+        between(from: TType, to: TType | null): Filter;
+        in(values: TType[] | null): Filter;
     }
 
     interface ColumnBase2<TType, TType2> {
+        equal(value: TType | TType2 | null): Filter;
+        /**
+         * equal
+         */
+        eq(value: TType | TType2  | null): Filter;        
+        notEqual(value: TType | TType2 | null): Filter;
+        /**
+         * not equal
+         */
+        ne(value: TType | TType2 | null): Filter;
+        lessThan(value: TType | TType2 | null): Filter;
+        /**
+         * less than
+         */
+        lt(value: TType | TType2 | null): Filter;
+        lessThanOrEqual(value: TType | TType2 | null): Filter;
+        /**
+         * less than or equal
+         */
+        le(value: TType | TType2 | null): Filter;
+        greaterThan(value: TType | TType2 | null): Filter;
+        /**
+         * greater than
+         */
+        gt(value: TType | TType2 | null): Filter;
+        greaterThanOrEqual(value: TType | TType2 | null): Filter;
+        /**
+         * greater than or equal
+         */
+        ge(value: TType | TType2 | null): Filter;
+        between(from: TType | TType2, to: TType | TType2): Filter;
+        in(values: Array<TType | TType2>[] | null): Filter;
     }
 
     export interface ResponseOptions {
