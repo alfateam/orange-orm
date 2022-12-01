@@ -1,7 +1,7 @@
 const jsonpatch = require('fast-json-patch');
-let dateToISOString = require('../dateToISOString');
+let dateToIsoString = require('../dateToISOString');
 let stringify = require('./stringify');
-let { v1: uuid } = require('uuid');
+let { v4: uuid } = require('uuid');
 
 module.exports = function createPatch(original, dto, options) {
 	let subject = toCompareObject({ d: original }, options, true);
@@ -11,12 +11,31 @@ module.exports = function createPatch(original, dto, options) {
 	subject.d = clonedDto.d;
 	let changes = jsonpatch.generate(observer);
 	let clonedOriginal = toCompareObject(original, options);
-	changes = changes.map(addOldValue);
-	changes.sort(comparePatch);
-	return changes;
+	let {inserted, deleted, updated}  = splitChanges(changes);
+	updated.sort(comparePatch);
+	return [...inserted, ...updated, ...deleted];
+
+	function splitChanges(changes) {
+		let inserted = [];
+		let deleted = [];
+		let updated = [];
+		for (let change of changes) {
+			change.path = change.path.substring(2);
+			if (change.op === 'add' && change.path.split('/').length === 2) {
+				inserted.push(change);
+			}
+			else if (change.op === 'remove' && change.path.split('/').length === 2) {
+				addOldValue(change);
+				deleted.push(change);
+			} else {
+				addOldValue(change);
+				updated.push(change);
+			}
+		}
+		return { inserted, updated, deleted};
+	}
 
 	function addOldValue(change) {
-		change.path = change.path.substring(2);
 		if (change.op === 'remove' || change.op === 'replace') {
 			let splitPath = change.path.split('/');
 			splitPath.shift();
@@ -72,10 +91,7 @@ module.exports = function createPatch(original, dto, options) {
 			return copy;
 		}
 		else if (isValidDate(object))
-			return dateToISOString(object);
-		else if (Buffer?.isBuffer(object)) {
-			return object.toString('base64');
-		}
+			return dateToIsoString(object);
 		else if (object === Object(object)) {
 			let copy = {};
 			for (let name in object) {

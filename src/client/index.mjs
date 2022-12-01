@@ -813,7 +813,7 @@ var fastJsonPatch = /*#__PURE__*/Object.freeze({
 
 var require$$0 = /*@__PURE__*/getAugmentedNamespace(fastJsonPatch);
 
-function dateToIsoString(date) {
+function dateToISOString$1(date) {
 	let tzo = -date.getTimezoneOffset();
 	let dif = tzo >= 0 ? '+' : '-';
 
@@ -837,9 +837,9 @@ function dateToIsoString(date) {
 		':' + pad(tzo % 60);
 }
 
-var dateToISOString$2 = dateToIsoString;
+var dateToISOString_1 = dateToISOString$1;
 
-let dateToISOString$1 = dateToISOString$2;
+let dateToISOString = dateToISOString_1;
 
 
 function stringify$4(value) {
@@ -851,7 +851,7 @@ function replacer(key, value) {
 		return value.toString('base64');
 	// @ts-ignore
 	else if (value instanceof Date  && !isNaN(value))
-		return dateToISOString$1(value);
+		return dateToISOString(value);
 	else
 		return value;
 }
@@ -1459,7 +1459,7 @@ var esmBrowser = /*#__PURE__*/Object.freeze({
 var require$$1 = /*@__PURE__*/getAugmentedNamespace(esmBrowser);
 
 const jsonpatch = require$$0;
-let dateToISOString = dateToISOString$2;
+let dateToIsoString = dateToISOString_1;
 let stringify$2 = stringify_1;
 let { v4: uuid$1 } = require$$1;
 
@@ -1471,12 +1471,31 @@ var createPatch$1 = function createPatch(original, dto, options) {
 	subject.d = clonedDto.d;
 	let changes = jsonpatch.generate(observer);
 	let clonedOriginal = toCompareObject(original, options);
-	changes = changes.map(addOldValue);
-	changes.sort(comparePatch);
-	return changes;
+	let {inserted, deleted, updated}  = splitChanges(changes);
+	updated.sort(comparePatch);
+	return [...inserted, ...updated, ...deleted];
+
+	function splitChanges(changes) {
+		let inserted = [];
+		let deleted = [];
+		let updated = [];
+		for (let change of changes) {
+			change.path = change.path.substring(2);
+			if (change.op === 'add' && change.path.split('/').length === 2) {
+				inserted.push(change);
+			}
+			else if (change.op === 'remove' && change.path.split('/').length === 2) {
+				addOldValue(change);
+				deleted.push(change);
+			} else {
+				addOldValue(change);
+				updated.push(change);
+			}
+		}
+		return { inserted, updated, deleted};
+	}
 
 	function addOldValue(change) {
-		change.path = change.path.substring(2);
 		if (change.op === 'remove' || change.op === 'replace') {
 			let splitPath = change.path.split('/');
 			splitPath.shift();
@@ -1532,10 +1551,7 @@ var createPatch$1 = function createPatch(original, dto, options) {
 			return copy;
 		}
 		else if (isValidDate(object))
-			return dateToISOString(object);
-		else if (Buffer?.isBuffer(object)) {
-			return object.toString('base64');
-		}
+			return dateToIsoString(object);
 		else if (object === Object(object)) {
 			let copy = {};
 			for (let name in object) {
