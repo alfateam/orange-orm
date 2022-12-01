@@ -1,7 +1,7 @@
 const jsonpatch = require('fast-json-patch');
 let dateToISOString = require('../dateToISOString');
 let stringify = require('./stringify');
-let { v4: uuid } = require('uuid');
+let { v1: uuid } = require('uuid');
 
 module.exports = function createPatch(original, dto, options) {
 	let subject = toCompareObject({ d: original }, options, true);
