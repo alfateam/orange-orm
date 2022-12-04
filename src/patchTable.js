@@ -11,8 +11,8 @@ async function patchTable() {
 	return patchTableCore.apply(null, arguments);
 }
 
-async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic', concurrency = {}, strategy = undefined } = {}, dryrun) {
-	strategy = JSON.parse(JSON.stringify(strategy || {}));
+async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic', concurrency = {}, strategy = undefined, deduceStrategy = false} = {}, dryrun) {
+	strategy  = JSON.parse(JSON.stringify(strategy || {}));
 	let changed = new Set();
 	for (let i = 0; i < patches.length; i++) {
 		let patch = { path: undefined, value: undefined, op: undefined };
@@ -20,7 +20,7 @@ async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic
 		patch.path = patches[i].path.split('/').slice(1);
 		let result;
 		if (patch.op === 'add' || patch.op === 'replace') {
-			result = await add({ path: patch.path, value: patch.value, op: patch.op, oldValue: patch.oldValue, concurrency: concurrency, strategy }, table);
+			result = await add({ path: patch.path, value: patch.value, op: patch.op, oldValue: patch.oldValue, concurrency: concurrency, strategy: deduceStrategy ? strategy: {} }, table);
 		}
 		else if (patch.op === 'remove')
 			result = await remove({ path: patch.path, op: patch.op, oldValue: patch.oldValue, concurrency }, table);

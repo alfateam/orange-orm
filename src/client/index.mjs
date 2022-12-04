@@ -2328,6 +2328,7 @@ const stringify = stringify_1;
 const netAdapter = netAdapter$1;
 const toKeyPositionMap = toKeyPositionMap_1;
 const rootMap = new WeakMap();
+const fetchingStrategyMap = new WeakMap();
 const targetKey = Symbol();
 
 function rdbClient(options = {}) {
@@ -2362,7 +2363,7 @@ function rdbClient(options = {}) {
 		or: client.or,
 		and: client.and,
 		not: client.not,
-		toJSON: function () {
+		toJSON: function() {
 			return;
 		}
 	};
@@ -2407,7 +2408,6 @@ function rdbClient(options = {}) {
 		}
 		let meta;
 		let c = {
-			getManyDto: getMany,
 			getMany,
 			express,
 			getOne,
@@ -2433,7 +2433,7 @@ function rdbClient(options = {}) {
 
 		async function getMany(_, strategy) {
 			let metaPromise = getMeta();
-			strategy = extractStrategy({ strategy });
+			strategy = extractFetchingStrategy({}, strategy);
 			let args = [_, strategy].concat(Array.prototype.slice.call(arguments).slice(2));
 			let rows = await getManyCore.apply(null, args);
 			await metaPromise;
@@ -2442,7 +2442,7 @@ function rdbClient(options = {}) {
 
 		async function getOne(filter, strategy) {
 			let metaPromise = getMeta();
-			strategy = extractStrategy({ strategy });
+			strategy = extractFetchingStrategy({}, strategy);
 			let _strategy = { ...strategy, ...{ limit: 1 } };
 			let args = [filter, _strategy].concat(Array.prototype.slice.call(arguments).slice(2));
 			let rows = await getManyCore.apply(null, args);
@@ -2510,9 +2510,9 @@ function rdbClient(options = {}) {
 			return adapter.post(body);
 		}
 
-		async function insert(rows, ...options) {
-			let proxy = proxify(rows);
-			return proxy.insert.apply(proxy, options);
+		async function insert(rows, ...args) {
+			let proxy = proxify(rows, args[0]);
+			return proxy.insert.apply(proxy, args);
 		}
 
 		function proxify(itemOrArray, strategy) {
@@ -2552,7 +2552,9 @@ function rdbClient(options = {}) {
 
 			};
 			let innerProxy = new Proxy(array, handler);
-			rootMap.set(array, { json: stringify(array), strategy });
+			rootMap.set(array, { json: stringify(array), strategy, originalArray: [...array]});
+			const { limit, ...cleanStrategy } = {...strategy};
+			fetchingStrategyMap.set(array, cleanStrategy);
 			return innerProxy;
 		}
 
@@ -2585,6 +2587,7 @@ function rdbClient(options = {}) {
 			};
 			let innerProxy = new Proxy(row, handler);
 			rootMap.set(row, { json: stringify(row), strategy });
+			fetchingStrategyMap.set(row, strategy);
 			return innerProxy;
 		}
 
@@ -2646,20 +2649,24 @@ function rdbClient(options = {}) {
 
 		}
 
-		async function saveArray(array, options) {
+		async function saveArray(array, concurrencyOptions, strategy) {
 			let { json } = rootMap.get(array);
-			let strategy = extractStrategy(options, array);
+			let deduceStrategy = arguments.length < 2;
+			strategy = extractStrategy({strategy}, array);
+			strategy = extractFetchingStrategy(array, strategy);
+
 			let meta = await getMeta();
 			const patch = createPatch(JSON.parse(json), array, meta);
 			if (patch.length === 0)
 				return;
-			let body = stringify({ patch, options: { strategy, ...options } });
+			let body = stringify({ patch, options: { strategy, ...concurrencyOptions, deduceStrategy } });
 			let adapter = netAdapter(url, { beforeRequest, beforeResponse, tableOptions });
 			let p = adapter.patch(body);
-			let affectedRows = extractChangedRows(array, patch, meta);
+			let updatedRows = extractChangedRows(array, patch, meta);
+			let insertedRows = getInsertedRows(array);
 			let { changed, strategy: newStrategy } = await p;
-			copyInto(changed, affectedRows);
-			rootMap.set(array, { json: stringify(array), strategy: newStrategy });
+			copyInto(changed, [...insertedRows, ...updatedRows]);
+			rootMap.set(array, { json: stringify(array), strategy: newStrategy, originalArray: [...array] });
 		}
 
 		function extractChangedRows(rows, patch, meta) {
@@ -2674,6 +2681,17 @@ function rdbClient(options = {}) {
 			}
 			return [...affectedRowsSet];
 		}
+
+		function getInsertedRows(array) {
+			const inserted = [];
+			const originalSet = new Set(rootMap.get(array).originalArray);
+			for(let i = 0; i < array.length; i++) {
+				if(!originalSet.has(array[i]))
+					inserted.push(array[i]);
+			}
+			return inserted;
+		}
+
 		function copyInto(from, to) {
 			for (let i = 0; i < from.length; i++) {
 				for (let p in from[i]) {
@@ -2689,7 +2707,7 @@ function rdbClient(options = {}) {
 				let context = rootMap.get(obj);
 				if (context.strategy !== undefined) {
 					// eslint-disable-next-line @typescript-eslint/no-unused-vars
-					let { limit, ...strategy } = context.strategy;
+					let { limit, ...strategy } = {...context.strategy};
 					return strategy;
 				}
 			}
@@ -2697,7 +2715,16 @@ function rdbClient(options = {}) {
 				return tableOptions.strategy;
 		}
 
-
+		function extractFetchingStrategy(obj, strategy) {
+			if (strategy !== undefined)
+				return strategy;
+			else if (fetchingStrategyMap.get(obj) !== undefined) {
+				const { limit, ...strategy } = {...fetchingStrategyMap.get(obj)};
+				return strategy;
+			}
+			else if (tableOptions)
+				return tableOptions.strategy;
+		}
 
 		function clearChangesArray(array) {
 			let { json } = rootMap.get(array);
@@ -2706,21 +2733,24 @@ function rdbClient(options = {}) {
 		}
 
 		function acceptChangesArray(array) {
-			rootMap.get(array).json = stringify(array);
+			const map = rootMap.get(array);
+			map.json = stringify(array);
+			map.originalArray = [...array];
 		}
 
-		async function insertArray(array, proxy, options) {
+		async function insertArray(array, proxy, strategy) {
 			if (array.length === 0)
 				return;
-			let strategy = extractStrategy(options);
+			strategy = extractStrategy({strategy});
+			strategy = extractFetchingStrategy({}, strategy);
+			let deduceStrategy = arguments.length < 2;
 			let meta = await getMeta();
 			let patch = createPatch([], array, meta);
-
-			let body = stringify({ patch, options: { strategy, ...options } });
+			let body = stringify({ patch, options: { strategy, deduceStrategy} });
 			let adapter = netAdapter(url, { beforeRequest, beforeResponse, tableOptions });
 			let { changed, strategy: newStrategy } = await adapter.patch(body);
 			copyInto(changed, array);
-			rootMap.set(array, { json: stringify(array), strategy: newStrategy });
+			rootMap.set(array, { json: stringify(array), strategy: newStrategy, originalArray: [...array] });
 			return proxy;
 		}
 
@@ -2760,10 +2790,7 @@ function rdbClient(options = {}) {
 
 		async function refreshArray(array, strategy) {
 			clearChangesArray(array);
-			let options = {};
-			if (arguments.length > 1)
-				options.strategy = strategy;
-			strategy = extractStrategy(options, array);
+			strategy = extractFetchingStrategy(array, strategy);
 			if (array.length === 0)
 				return;
 			let meta = await getMeta();
@@ -2798,11 +2825,12 @@ function rdbClient(options = {}) {
 				array.splice(i + offset, 1);
 				offset--;
 			}
-			rootMap.set(array, { json: stringify(array), strategy });
+			rootMap.set(array, { json: stringify(array), strategy, originalArray: [...array] });
+			fetchingStrategyMap.set(array, strategy);
 		}
 
 		async function insertRow(row, innerProxy, options) {
-			let strategy = extractStrategy(options, row);
+			let strategy = extractStrategy(options);
 			let meta = await getMeta();
 			let patch = createPatch([], [row], meta);
 			let body = stringify({ patch, options: { strategy, ...options } });
@@ -2825,8 +2853,12 @@ function rdbClient(options = {}) {
 			rootMap.set(row, { strategy });
 		}
 
-		async function saveRow(row, options) {
-			let strategy = extractStrategy(options, row);
+		async function saveRow(row, concurrencyOptions, strategy) {
+			let deduceStrategy = arguments.length < 2;
+			strategy = extractStrategy({strategy}, row);
+			strategy = extractFetchingStrategy(row, strategy);
+
+
 			let { json } = rootMap.get(row);
 			if (!json)
 				return;
@@ -2836,7 +2868,7 @@ function rdbClient(options = {}) {
 			if (patch.length === 0)
 				return;
 
-			let body = stringify({ patch, options: { ...options, strategy } });
+			let body = stringify({ patch, options: { ...concurrencyOptions, strategy, deduceStrategy } });
 
 			let adapter = netAdapter(url, { beforeRequest, beforeResponse, tableOptions });
 			let { changed, strategy: newStrategy } = await adapter.patch(body);
@@ -2846,10 +2878,8 @@ function rdbClient(options = {}) {
 
 		async function refreshRow(row, strategy) {
 			clearChangesRow(row);
-			let options = {};
-			if (arguments.length > 1)
-				options.strategy = strategy;
-			strategy = extractStrategy(options, row);
+			strategy = extractFetchingStrategy(row, strategy);
+
 			let meta = await getMeta();
 			let keyFilter = client.filter;
 			for (let i = 0; i < meta.keys.length; i++) {
@@ -2867,6 +2897,7 @@ function rdbClient(options = {}) {
 				row[p] = rows[0][p];
 			}
 			rootMap.set(row, { json: stringify(row), strategy });
+			fetchingStrategyMap.set(row, strategy);
 		}
 
 		function acceptChangesRow(row) {

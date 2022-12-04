@@ -103,8 +103,5 @@ function _newJoin(parentTable, childTable, columnNames) {
 	}
 }
 
-function isNullOrUndefined(item) {
-	return item === null || item === undefined;
-}
 
 module.exports = _newJoin;

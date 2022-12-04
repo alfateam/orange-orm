@@ -31,7 +31,9 @@ function getTable(table, Name, name, customFilters) {
         getOne(${name}: ${Name}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
         getById(${getIdArgs(table)}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
         insert(${name}s: ${Name}[]): Promise<${Name}Array>;
+        insert(${name}s: ${Name}[], fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
         insert(${name}: ${Name}): Promise<${Name}Row>;
+        insert(${name}: ${Name}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
         insertAndForget(${name}s: ${Name}[]): Promise<void>;
         insertAndForget(${name}: ${Name}): Promise<void>;
         delete(filter?: RawFilter): Promise<void>;
@@ -62,6 +64,7 @@ function getTable(table, Name, name, customFilters) {
     export interface ${Name}Array extends Array<${Name}> {
         saveChanges(): Promise<void>;
         saveChanges(options: Save${Name}Options): Promise<void>;
+        saveChanges(options: Save${Name}Options, fetchingStrategy: ${Name}Strategy): Promise<void>;
         acceptChanges(): void;
         clearChanges(): void;
         refresh(): Promise<void>;
@@ -74,7 +77,6 @@ function getTable(table, Name, name, customFilters) {
     export interface Save${Name}Options {
         defaultConcurrency?: Concurrency
         concurrency?: ${Name}Concurrency;
-		fetchingStrategy: ${Name}Strategy;
     }
 
     export interface Delete${Name}Options {
@@ -171,6 +173,7 @@ function Concurrency(table, name, tablesAdded) {
         acceptChanges(): void;
         clearChanges(): void;
         insert(): Promise<void>
+        insert(fetchingStrategy: ${name}Strategy): Promise<void>
         delete(): Promise<void>;
 		delete(options: Delete${name}Options): Promise<void>;
 
