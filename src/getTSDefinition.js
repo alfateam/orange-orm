@@ -67,9 +67,9 @@ function getTable(table, Name, name, customFilters) {
 
     export interface ${Name}Array extends Array<${Name}> {
         saveChanges(): Promise<void>;
-        saveChanges(options: ${Name}ConcurrencyOptions): Promise<void>;
+        saveChanges(concurrency: ${Name}ConcurrencyOptions): Promise<void>;
         saveChanges(fetchingStrategy: ${Name}Strategy): Promise<void>;
-        saveChanges(options: ${Name}ConcurrencyOptions, fetchingStrategy: ${Name}Strategy): Promise<void>;
+        saveChanges(concurrency: ${Name}ConcurrencyOptions, fetchingStrategy: ${Name}Strategy): Promise<void>;
         acceptChanges(): void;
         clearChanges(): void;
         refresh(): Promise<void>;
@@ -80,9 +80,9 @@ function getTable(table, Name, name, customFilters) {
 
     export interface ${Name}Row extends ${Name} {
         saveChanges(): Promise<void>;
-        saveChanges(options: ${Name}ConcurrencyOptions): Promise<void>;
+        saveChanges(concurrency: ${Name}ConcurrencyOptions): Promise<void>;
         saveChanges(fetchingStrategy: ${Name}Strategy): Promise<void>;
-        saveChanges(options: ${Name}ConcurrencyOptions, fetchingStrategy: ${Name}Strategy): Promise<void>;
+        saveChanges(concurrency: ${Name}ConcurrencyOptions, fetchingStrategy: ${Name}Strategy): Promise<void>;
         acceptChanges(): void;
         clearChanges(): void;
         refresh(): Promise<void>;
