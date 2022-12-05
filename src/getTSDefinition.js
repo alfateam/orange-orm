@@ -21,6 +21,8 @@ function getTSDefinition(table, options) {
 function getTable(table, Name, name, customFilters) {
 	return `
     export interface ${Name}Table {
+        getAll(): Promise<${Name}Array>;
+        getAll(fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
         getMany(filter?: RawFilter): Promise<${Name}Array>;
         getMany(filter: RawFilter, fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
         getMany(${name}s: Array<${Name}>): Promise<${Name}Array>;
@@ -65,23 +67,18 @@ function getTable(table, Name, name, customFilters) {
 
     export interface ${Name}Array extends Array<${Name}> {
         saveChanges(): Promise<void>;
-        saveChanges(options: Save${Name}Options): Promise<void>;
-        saveChanges(options: Save${Name}Options, fetchingStrategy: ${Name}Strategy): Promise<void>;
+        saveChanges(options: ${Name}ConcurrencyOptions): Promise<void>;
+        saveChanges(options: ${Name}ConcurrencyOptions, fetchingStrategy: ${Name}Strategy): Promise<void>;
         acceptChanges(): void;
         clearChanges(): void;
         refresh(): Promise<void>;
         refresh(fetchingStrategy: ${Name}Strategy): Promise<void>;
         insert(): Promise<void>;
         delete(): Promise<void>;
-        delete(options: Delete${Name}Options): Promise<void>;
+        delete(options: ${Name}ConcurrencyOptions): Promise<void>;
     }
 
-    export interface Save${Name}Options {
-        defaultConcurrency?: Concurrency
-        concurrency?: ${Name}Concurrency;
-    }
-
-    export interface Delete${Name}Options {
+    export interface ${Name}ConcurrencyOptions {
         defaultConcurrency?: Concurrency
         concurrency?: ${Name}Concurrency;
     }
@@ -169,7 +166,7 @@ function Concurrency(table, name, tablesAdded) {
 	if (isRoot) {
 		row = `export interface ${name}Row extends ${name} {
 		saveChanges(): Promise<void>;
-		saveChanges(options: Save${name}Options): Promise<void>;
+		saveChanges(options: ${name}ConcurrencyOptions): Promise<void>;
         refresh(): Promise<void>;
         refresh(fetchingStrategy: ${name}Strategy): Promise<void>;
         acceptChanges(): void;
@@ -177,7 +174,7 @@ function Concurrency(table, name, tablesAdded) {
         insert(): Promise<void>
         insert(fetchingStrategy: ${name}Strategy): Promise<void>
         delete(): Promise<void>;
-		delete(options: Delete${name}Options): Promise<void>;
+		delete(options: ${name}ConcurrencyOptions): Promise<void>;
 
     }`;
 	}

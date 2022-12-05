@@ -84,6 +84,7 @@ function rdbClient(options = {}) {
 		let meta;
 		let c = {
 			getMany,
+			getAll,
 			express,
 			getOne,
 			getById,
@@ -105,6 +106,11 @@ function rdbClient(options = {}) {
 		};
 		let _table = new Proxy(c, handler);
 		return _table;
+
+		async function getAll() {
+			let _getMany = getMany.bind(null, undefined);
+			return _getMany.apply(null, arguments);
+		}
 
 		async function getMany(_, strategy) {
 			let metaPromise = getMeta();
