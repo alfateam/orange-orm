@@ -331,8 +331,12 @@ function rdbClient(options = {}) {
 		}
 
 		async function saveArray(array, concurrencyOptions, strategy) {
+			let deduceStrategy;
+			if (arguments.length === 2 && typeof concurrencyOptions == 'object' && !('concurrency' in concurrencyOptions || 'defaultConcurrency' in concurrencyOptions ))
+				strategy = concurrencyOptions;
+			else if (arguments.length < 3)
+				deduceStrategy = true;
 			let { json } = rootMap.get(array);
-			let deduceStrategy = arguments.length < 2;
 			strategy = extractStrategy({strategy}, array);
 			strategy = extractFetchingStrategy(array, strategy);
 
@@ -535,7 +539,11 @@ function rdbClient(options = {}) {
 		}
 
 		async function saveRow(row, concurrencyOptions, strategy) {
-			let deduceStrategy = arguments.length < 2;
+			let deduceStrategy;
+			if (arguments.length === 2 && typeof concurrencyOptions == 'object' && !('concurrency' in concurrencyOptions || 'defaultConcurrency' in concurrencyOptions ))
+				strategy = concurrencyOptions;
+			else if (arguments.length < 3)
+				deduceStrategy = true;
 			strategy = extractStrategy({strategy}, row);
 			strategy = extractFetchingStrategy(row, strategy);
 

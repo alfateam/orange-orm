@@ -68,15 +68,28 @@ function getTable(table, Name, name, customFilters) {
     export interface ${Name}Array extends Array<${Name}> {
         saveChanges(): Promise<void>;
         saveChanges(options: ${Name}ConcurrencyOptions): Promise<void>;
+        saveChanges(fetchingStrategy: ${Name}Strategy): Promise<void>;
         saveChanges(options: ${Name}ConcurrencyOptions, fetchingStrategy: ${Name}Strategy): Promise<void>;
         acceptChanges(): void;
         clearChanges(): void;
         refresh(): Promise<void>;
         refresh(fetchingStrategy: ${Name}Strategy): Promise<void>;
-        insert(): Promise<void>;
         delete(): Promise<void>;
         delete(options: ${Name}ConcurrencyOptions): Promise<void>;
     }
+
+    export interface ${Name}Row extends Name {
+        saveChanges(): Promise<void>;
+        saveChanges(options: ${Name}ConcurrencyOptions): Promise<void>;
+        saveChanges(fetchingStrategy: ${Name}Strategy): Promise<void>;
+        saveChanges(options: ${Name}ConcurrencyOptions, fetchingStrategy: ${Name}Strategy): Promise<void>;
+        acceptChanges(): void;
+        clearChanges(): void;
+        refresh(): Promise<void>;
+        refresh(fetchingStrategy: ${Name}Strategy): Promise<void>;
+        delete(): Promise<void>;
+        delete(options: ${Name}ConcurrencyOptions): Promise<void>;
+	}
 
     export interface ${Name}ConcurrencyOptions {
         defaultConcurrency?: Concurrency
@@ -163,22 +176,7 @@ function Concurrency(table, name, tablesAdded) {
 	}
 
 	let row = '';
-	if (isRoot) {
-		row = `export interface ${name}Row extends ${name} {
-		saveChanges(): Promise<void>;
-		saveChanges(options: ${name}ConcurrencyOptions): Promise<void>;
-        refresh(): Promise<void>;
-        refresh(fetchingStrategy: ${name}Strategy): Promise<void>;
-        acceptChanges(): void;
-        clearChanges(): void;
-        insert(): Promise<void>
-        insert(fetchingStrategy: ${name}Strategy): Promise<void>
-        delete(): Promise<void>;
-		delete(options: ${name}ConcurrencyOptions): Promise<void>;
-
-    }`;
-	}
-	else {
+	if (!isRoot) {
 		row = `export interface ${name}RelatedTable {
 			${columns(table)}
 			${tableRelations(table)}
