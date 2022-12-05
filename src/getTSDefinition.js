@@ -46,7 +46,6 @@ function getTable(table, Name, name, customFilters) {
         proxify(${name}s: ${Name}[], fetchingStrategy: ${Name}Strategy): ${Name}Array;
         proxify(${name}: ${Name}): ${Name}Row;
         proxify(${name}: ${Name}, fetchingStrategy: ${Name}Strategy): ${Name}Row;
-		express(config: ${Name}ExpressConfig): Express & RequestHandler;
         customFilters: ${Name}CustomFilters;
 		${columns(table)}
 		${tableRelations(table)}

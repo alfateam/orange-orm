@@ -22,8 +22,7 @@ declare namespace r {
         parameters: [],
         result: []
     }
-
-
+  
     export interface Pool {
         end(): Promise<void>;
     }
@@ -115,15 +114,6 @@ declare namespace r {
     }
 
     export type Concurrency = 'optimistic' | 'skipOnConflict' | 'overwrite';
-
-    export interface ExpressConfig<TStrategy, TConcurrency> {
-        db?: unknown | string | (() => unknown | string);
-        customFilters?: CustomFilters;
-        baseFilter?: RawFilter | ((request?: import('express').Request, response?: import('express').Response) => RawFilter | Promise<RawFilter>);
-        strategy?: TStrategy;
-        // defaultConcurrency?: Concurrencies;
-        concurrency?: TConcurrency;
-    }
 
     export interface Express {
         dts: import('express').RequestHandler

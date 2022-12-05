@@ -126,7 +126,7 @@ function getPrefixTs(isPureJs) {
 	/* tslint:disable */
 	/* eslint-disable */
 	import { RequestHandler} from 'express'; 
-	import { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Express, Filter, RawFilter, Config, TablesConfig ResponseOptions, TransactionOptions } from 'rdb';
+	import { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Express, Filter, RawFilter, Config, TablesConfig ResponseOptions, TransactionOptions, Pool } from 'rdb';
 	export = r;
 	declare function r(config: Config): r.RdbClient;
 
@@ -137,7 +137,7 @@ function getPrefixTs(isPureJs) {
 /* eslint-disable */
 	import schema from './schema';
 import { RequestHandler} from 'express'; 
-import { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Express, Filter, RawFilter, Config, TablesConfig, ResponseOptions, TransactionOptions } from 'rdb';
+import { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Express, Filter, RawFilter, Config, TablesConfig, ResponseOptions, TransactionOptions, Pool } from 'rdb';
 export default schema as RdbClient;`;
 }
 
@@ -165,7 +165,10 @@ function startNamespace(tables) {
         function query(filter: RawFilter | string): Promise<unknown[]>;
         function query<T>(filter: RawFilter | string): Promise<T[]>;
 		function transaction(fn: (transaction: RdbClient) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
-        const filter: Filter;`;
+        const filter: Filter;
+		function express(): Express & RequestHandler;
+		function express(config: ExpressConfig): Express & RequestHandler;
+`;
 		return result;
 	}
 }
@@ -174,6 +177,32 @@ function getRdbClientTs(tables) {
 	return `
 	export interface RdbClient  {${getTables()}
 	}
+
+	export interface ExpressConfig {
+        database?: Pool | (() => Pool);
+        tables?: ExpressTables;
+		defaultConcurrency?: Concurrency;
+		readonly?: boolean;
+		disableBulkDelete: boolean;
+    }
+
+	export interface ExpressTableConfig<TConcurrency>  {
+        baseFilter?: RawFilter | ((context: ExpressContext) => RawFilter | Promise<RawFilter>);
+        customFilters?: Record<string, (...args: any[]) => RawFilter | Promise<RawFilter>>;
+        defaultConcurrency?: Concurrency;
+        concurrency?: TConcurrency;
+		readonly?: boolean;
+		disableBulkDelete: boolean;
+    }
+    
+    export interface ExpressContext {
+        request: import('express').Request;
+        response: import('express').Response;
+        client: RdbClient;
+    }		
+
+    export interface ExpressTables {${getExpressTables()}
+    }
 `;
 
 	function getTables() {
@@ -195,7 +224,19 @@ function getRdbClientTs(tables) {
         query(filter: RawFilter | string): Promise<unknown[]>;
         query<T>(filter: RawFilter | string): Promise<T[]>;
 		transaction(fn: (transaction: RdbClient) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
-        filter: Filter;`;
+        filter: Filter;
+		express(): Express & RequestHandler;
+		express(config: ExpressConfig): Express & RequestHandler;`;
+		return result;
+	}
+	function getExpressTables() {
+		let result = '';
+		for (let name in tables) {
+			let Name = name.substring(0, 1).toUpperCase() + name.substring(1);
+			result +=
+				`
+    	${name}?: boolean | ExpressTableConfig<${Name}Concurrency>;`;
+		}
 		return result;
 	}
 }
