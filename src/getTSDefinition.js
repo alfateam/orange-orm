@@ -78,7 +78,7 @@ function getTable(table, Name, name, customFilters) {
         delete(options: ${Name}ConcurrencyOptions): Promise<void>;
     }
 
-    export interface ${Name}Row extends Name {
+    export interface ${Name}Row extends ${Name} {
         saveChanges(): Promise<void>;
         saveChanges(options: ${Name}ConcurrencyOptions): Promise<void>;
         saveChanges(fetchingStrategy: ${Name}Strategy): Promise<void>;
