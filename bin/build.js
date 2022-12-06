@@ -125,7 +125,7 @@ function getPrefixTs(isPureJs) {
 		return `
 	/* tslint:disable */
 	/* eslint-disable */
-	import { RequestHandler} from 'express'; 
+	import { RequestHandler } from 'express'; 
 	import { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Express, Filter, RawFilter, Config, TablesConfig ResponseOptions, TransactionOptions, Pool } from 'rdb';
 	export { RequestHandler } from 'express';
 	export { Concurrency, Express, Filter, RawFilter, Config, TablesConfig, ResponseOptions, TransactionOptions, Pool } from 'rdb';
@@ -158,8 +158,8 @@ function startNamespace(tables) {
 		}
 		result += `
 
-        function beforeRequest(callback: (response: Response, options: ResponseOptions) => Promise<void> | void): void;
-        function beforeResponse(callback: (response: Response, options: ResponseOptions) => Promise<void> | void): void;
+        function beforeRequest(callback: (response: import('express').Response, options: ResponseOptions) => Promise<void> | void): void;
+        function beforeResponse(callback: (response: import('express').Response, options: ResponseOptions) => Promise<void> | void): void;
         function reactive(proxyMethod: (obj: unknown) => unknown): void;
         function and(filter: Filter, ...filters: Filter[]): Filter;
         function or(filter: Filter, ...filters: Filter[]): Filter;
