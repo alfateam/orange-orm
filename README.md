@@ -15,6 +15,8 @@ Based on promises.
 
 ## Release notes
 __3.0.27__  
+Removed dependency rdb-client.  
+__3.0.27__  
 Query without transaction did not release connection on error.  
 __3.0.26__  
 Improve typescript code generation.  
