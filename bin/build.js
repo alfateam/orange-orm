@@ -182,17 +182,17 @@ function getRdbClientTs(tables) {
         database?: Pool | (() => Pool);
         tables?: ExpressTables;
 		defaultConcurrency?: Concurrency;
-		readonly?: boolean;
-		disableBulkDelete: boolean;
+		readonly: boolean;
+		allowBulkDeletes: boolean;
     }
 
 	export interface ExpressTableConfig<TConcurrency>  {
         baseFilter?: RawFilter | ((context: ExpressContext) => RawFilter | Promise<RawFilter>);
         customFilters?: Record<string, (...args: any[]) => RawFilter | Promise<RawFilter>>;
-        defaultConcurrency?: Concurrency;
         concurrency?: TConcurrency;
+        defaultConcurrency?: Concurrency;
 		readonly?: boolean;
-		disableBulkDelete: boolean;
+		allowBulkDeletes: boolean;
     }
     
     export interface ExpressContext {

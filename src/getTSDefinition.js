@@ -55,9 +55,10 @@ function getTable(table, Name, name, customFilters) {
         db?: unknown | string | (() => unknown | string);
         customFilters?: ${Name}CustomFilters;
         baseFilter?: RawFilter | ((request?: import('express').Request, response?: import('express').Response) => RawFilter | Promise<RawFilter>);
-        fetchingStrategy: ${Name}Strategy;
-        defaultConcurrency?: Concurrency;
         concurrency?: ${Name}Concurrency;
+		defaultConcurrency?: Concurrency;
+		readonly: boolean;
+		allowBulkDeletes: boolean;	
 	}
 
     export interface ${Name}CustomFilters {
