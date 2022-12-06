@@ -158,7 +158,7 @@ function startNamespace(tables) {
 		}
 		result += `
 
-        function beforeRequest(callback: (response: import('express').Response, options: ResponseOptions) => Promise<void> | void): void;
+        function beforeRequest(callback: (response: import('express').Request, options: ResponseOptions) => Promise<void> | void): void;
         function beforeResponse(callback: (response: import('express').Response, options: ResponseOptions) => Promise<void> | void): void;
         function reactive(proxyMethod: (obj: unknown) => unknown): void;
         function and(filter: Filter, ...filters: Filter[]): Filter;
@@ -217,8 +217,8 @@ function getRdbClientTs(tables) {
 		}
 		result += `
 		(config: Config): RdbClient;
-        beforeRequest(callback: (response: Response, options: ResponseOptions) => Promise<void> | void): void;
-        beforeResponse(callback: (response: Response, options: ResponseOptions) => Promise<void> | void): void;
+		beforeRequest(callback: (response: import('express').Request, options: ResponseOptions) => Promise<void> | void): void;
+        beforeResponse(callback: (response: import('express').Response, options: ResponseOptions) => Promise<void> | void): void;
         reactive(proxyMethod: (obj: unknown) => unknown): void;
         and(filter: Filter, ...filters: Filter[]): Filter;
         or(filter: Filter, ...filters: Filter[]): Filter;
