@@ -23,8 +23,9 @@ function _newJoin(parentTable, childTable, columnNames) {
 
 	c.getFromDb = function(parent) {
 		var key = parentToArrayKey(parent);
-		if (!key)
+		if (key.length === 0) {
 			return nullPromise;
+		}
 		var args = [childTable].concat(key);
 		return getById.apply(null, args);
 	};
@@ -101,5 +102,6 @@ function _newJoin(parentTable, childTable, columnNames) {
 		return key;
 	}
 }
+
 
 module.exports = _newJoin;

@@ -10,17 +10,23 @@ let newBoolean = function() {
 
 function negotiateRawSqlFilter(filter, optionalTable) {
 	if (Array.isArray(filter) && filter.length === 0)
-		return newBoolean(newParameterized());
+		return newBoolean(newParameterized('1 = 2'));
 	else if (Array.isArray(filter)) {
 		let curFilter;
+		let curObjectFilter;
 		for (let i = 0; i < filter.length; i++) {
 			let nextFilter = negotiateRawSqlFilter(filter[i], optionalTable);
 			if (nextFilter.isObjectFilter)
-				curFilter = curFilter ? curFilter.or(nextFilter) : nextFilter;
+				curObjectFilter = curObjectFilter ? curObjectFilter.or(nextFilter) : nextFilter;
 			else
 				curFilter = curFilter ? curFilter.and(nextFilter) : nextFilter;
 		}
-		return curFilter;
+		if (curFilter && curObjectFilter)
+			return curFilter.and(curObjectFilter);
+		else if (curFilter)
+			return curFilter;
+		else
+			return curObjectFilter;
 	}
 	else {
 		let params = [];

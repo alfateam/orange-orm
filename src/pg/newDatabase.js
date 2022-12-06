@@ -99,10 +99,10 @@ function newDatabase(connectionString, poolOptions) {
 	c.query = function(query) {
 		let domain = createDomain();
 		let transaction = newTransaction(domain, pool);
-		let p = domain.run(() => new promise(transaction)
+		let p = domain.run(() => new Promise(transaction)
 			.then(() => setSessionSingleton('changes', []))
-			.then().then(() => doQuery(query)));
-		return p.then(onResult, onError);
+			.then(() => doQuery(query).then(onResult, onError)));
+		return p;
 
 		function onResult(result) {
 			releaseDbClient();
@@ -114,6 +114,7 @@ function newDatabase(connectionString, poolOptions) {
 			throw e;
 		}
 	};
+
 
 	c.rollback = rollback;
 	c.commit = commit;

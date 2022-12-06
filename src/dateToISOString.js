@@ -1,4 +1,4 @@
-function dateToIsoString(date) {
+function dateToISOString(date) {
 	let tzo = -date.getTimezoneOffset();
 	let dif = tzo >= 0 ? '+' : '-';
 
@@ -22,4 +22,4 @@ function dateToIsoString(date) {
 		':' + pad(tzo % 60);
 }
 
-module.exports = dateToIsoString;
+module.exports = dateToISOString;

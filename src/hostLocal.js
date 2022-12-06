@@ -36,7 +36,8 @@ function hostLocal({ db, table, defaultConcurrency, concurrency, customFilters, 
 			let _concurrency = options.concurrency || concurrency;
 			let _defaultConcurrency = options.defaultConcurrency || defaultConcurrency;
 			let _strategy = options.strategy || strategy;
-			result = await table.patch(patch, { defaultConcurrencey: _defaultConcurrency, concurrency: _concurrency, strategy: _strategy });
+			let {deduceStrategy} = options;
+			result = await table.patch(patch, { defaultConcurrency: _defaultConcurrency, concurrency: _concurrency, strategy: _strategy, deduceStrategy });
 		}
 	}
 

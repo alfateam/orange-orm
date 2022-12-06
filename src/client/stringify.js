@@ -1,0 +1,18 @@
+let dateToISOString = require('../dateToISOString');
+
+
+function stringify(value) {
+	return JSON.stringify(value, replacer);
+}
+
+function replacer(key, value) {
+	if (Buffer.isBuffer(value))
+		return value.toString('base64');
+	// @ts-ignore
+	else if (value instanceof Date  && !isNaN(value))
+		return dateToISOString(value);
+	else
+		return value;
+}
+
+module.exports = stringify;

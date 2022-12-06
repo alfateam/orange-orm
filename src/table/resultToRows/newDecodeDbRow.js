@@ -186,6 +186,8 @@ function newDecodeDbRow(table, dbRow, filteredAliases) {
 		_delete(this, strategy, table);
 	};
 
+	Row.prototype.deleteCascade = Row.prototype.cascadeDelete;
+
 	Row.prototype.patch = async function(patches, options) {
 		await patchRow(table, this, patches, options);
 		return this;

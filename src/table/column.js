@@ -18,6 +18,7 @@ function defineColumn(column, table) {
 		require('./column/guid')(column);
 		return c;
 	};
+	c.uuid = c.guid;
 
 	c.date = function() {
 		require('./column/date')(column);

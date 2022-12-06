@@ -21,25 +21,31 @@ function getTSDefinition(table, options) {
 function getTable(table, Name, name, customFilters) {
 	return `
     export interface ${Name}Table {
-        getManyDto(filter?: RawFilter, strategy?: ${Name}Strategy): Promise<${Name}Array>;
-        getManyDto(${name}s: Array<${Name}>, strategy?: ${Name}Strategy): Promise<${Name}Array>;
-        getMany(filter?: RawFilter, strategy?: ${Name}Strategy): Promise<${Name}Array>;
-        getMany(${name}s: Array<${Name}>, strategy?: ${Name}Strategy): Promise<${Name}Array>;
-        getOne(filter?: RawFilter, strategy?: ${Name}Strategy): Promise<${Name}Row>;
-        getOne(${name}: ${Name}, strategy?: ${Name}Strategy): Promise<${Name}Row>;
-        getById(${getIdArgs(table)}, strategy?: ${Name}Strategy): Promise<${Name}Row>;
-        tryGetById(${getIdArgs(table)}, strategy?: ${Name}Strategy): Promise<${Name}Row>;
+        getAll(): Promise<${Name}Array>;
+        getAll(fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
+        getMany(filter?: RawFilter): Promise<${Name}Array>;
+        getMany(filter: RawFilter, fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
+        getMany(${name}s: Array<${Name}>): Promise<${Name}Array>;
+        getMany(${name}s: Array<${Name}>, fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
+        getOne(filter?: RawFilter): Promise<${Name}Row>;
+        getOne(filter: RawFilter, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
+        getOne(${name}: ${Name}): Promise<${Name}Row>;
+        getOne(${name}: ${Name}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
+        getById(${getIdArgs(table)}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
         insert(${name}s: ${Name}[]): Promise<${Name}Array>;
+        insert(${name}s: ${Name}[], fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
         insert(${name}: ${Name}): Promise<${Name}Row>;
+        insert(${name}: ${Name}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
         insertAndForget(${name}s: ${Name}[]): Promise<void>;
         insertAndForget(${name}: ${Name}): Promise<void>;
         delete(filter?: RawFilter): Promise<void>;
         delete(${name}s: Array<${Name}>): Promise<void>;
-        cascadeDelete(filter?: RawFilter): Promise<void>;
-        cascadeDelete(${name}s: Array<${Name}>): Promise<void>;
+        deleteCascade(filter?: RawFilter): Promise<void>;
+        deleteCascade(${name}s: Array<${Name}>): Promise<void>;
         proxify(${name}s: ${Name}[]): ${Name}Array;
+        proxify(${name}s: ${Name}[], fetchingStrategy: ${Name}Strategy): ${Name}Array;
         proxify(${name}: ${Name}): ${Name}Row;
-		express(config: ${Name}ExpressConfig): Express & RequestHandler;
+        proxify(${name}: ${Name}, fetchingStrategy: ${Name}Strategy): ${Name}Row;
         customFilters: ${Name}CustomFilters;
 		${columns(table)}
 		${tableRelations(table)}
@@ -49,8 +55,8 @@ function getTable(table, Name, name, customFilters) {
         db?: unknown | string | (() => unknown | string);
         customFilters?: ${Name}CustomFilters;
         baseFilter?: RawFilter | ((request?: import('express').Request, response?: import('express').Response) => RawFilter | Promise<RawFilter>);
-        strategy? : ${Name}Strategy;
-        defaultConcurrency?: Concurrencies;
+        fetchingStrategy: ${Name}Strategy;
+        defaultConcurrency?: Concurrency;
         concurrency?: ${Name}Concurrency;
 	}
 
@@ -59,20 +65,37 @@ function getTable(table, Name, name, customFilters) {
     }
 
     export interface ${Name}Array extends Array<${Name}> {
-        save(options?: Save${Name}Options): Promise<void>;
+        saveChanges(): Promise<void>;
+        saveChanges(concurrency: ${Name}ConcurrencyOptions): Promise<void>;
+        saveChanges(fetchingStrategy: ${Name}Strategy): Promise<void>;
+        saveChanges(concurrency: ${Name}ConcurrencyOptions, fetchingStrategy: ${Name}Strategy): Promise<void>;
         acceptChanges(): void;
         clearChanges(): void;
-        refresh(strategy?: ${Name}Strategy | undefined | null): Promise<void>;
-        insert(): Promise<void>;
+        refresh(): Promise<void>;
+        refresh(fetchingStrategy: ${Name}Strategy): Promise<void>;
         delete(): Promise<void>;
+        delete(options: ${Name}ConcurrencyOptions): Promise<void>;
     }
 
-    export interface Save${Name}Options {
-        defaultConcurrency?: Concurrencies
+    export interface ${Name}Row extends ${Name} {
+        saveChanges(): Promise<void>;
+        saveChanges(concurrency: ${Name}ConcurrencyOptions): Promise<void>;
+        saveChanges(fetchingStrategy: ${Name}Strategy): Promise<void>;
+        saveChanges(concurrency: ${Name}ConcurrencyOptions, fetchingStrategy: ${Name}Strategy): Promise<void>;
+        acceptChanges(): void;
+        clearChanges(): void;
+        refresh(): Promise<void>;
+        refresh(fetchingStrategy: ${Name}Strategy): Promise<void>;
+        delete(): Promise<void>;
+        delete(options: ${Name}ConcurrencyOptions): Promise<void>;
+	}
+
+    export interface ${Name}ConcurrencyOptions {
+        defaultConcurrency?: Concurrency
         concurrency?: ${Name}Concurrency;
     }
 
-    ${concurrencies(table, Name)}
+    ${Concurrency(table, Name)}
     `;
 }
 
@@ -109,7 +132,7 @@ function columns(table) {
 	return result;
 }
 
-function concurrencies(table, name, tablesAdded) {
+function Concurrency(table, name, tablesAdded) {
 	name = pascalCase(name);
 	let isRoot;
 	if (!tablesAdded) {
@@ -120,7 +143,7 @@ function concurrencies(table, name, tablesAdded) {
 		return '';
 	else
 		tablesAdded.set(table, name);
-	let otherConcurrencies = '';
+	let otherConcurrency = '';
 	let concurrencyRelations = '';
 	let strategyRelations = '';
 	let regularRelations = '';
@@ -132,16 +155,16 @@ function concurrencies(table, name, tablesAdded) {
         `;
 	let visitor = {};
 	visitor.visitJoin = function(relation) {
-		otherConcurrencies += `${concurrencies(relation.childTable, relationName, tablesAdded)}`;
+		otherConcurrency += `${Concurrency(relation.childTable, relationName, tablesAdded)}`;
 		concurrencyRelations += `${relationName}?: ${tableName}Concurrency;${separator}`;
-		strategyRelations += `${relationName}?: ${tableName}Strategy | null;${separator}`;
-		regularRelations += `${relationName}?: ${tableName} | null;${separator}`;
+		strategyRelations += `${relationName}?: ${tableName}Strategy;${separator}`;
+		regularRelations += `${relationName}?: ${tableName};${separator}`;
 	};
 	visitor.visitOne = visitor.visitJoin;
 	visitor.visitMany = function(relation) {
-		otherConcurrencies += `${concurrencies(relation.childTable, relationName, tablesAdded)}`;
+		otherConcurrency += `${Concurrency(relation.childTable, relationName, tablesAdded)}`;
 		concurrencyRelations += `${relationName}?: ${tableName}Concurrency;${separator}`;
-		strategyRelations += `${relationName}?: ${tableName}Strategy  | null;${separator}`;
+		strategyRelations += `${relationName}?: ${tableName}Strategy ;${separator}`;
 		regularRelations += `${relationName}?: ${tableName}[];${separator}`;
 	};
 
@@ -152,17 +175,7 @@ function concurrencies(table, name, tablesAdded) {
 	}
 
 	let row = '';
-	if (isRoot) {
-		row = `export interface ${name}Row extends ${name} {
-        save(): Promise<void>;
-        refresh(strategy?: ${name}Strategy | undefined | null): Promise<void>;
-        acceptChanges(): void;
-        clearChanges(): void;
-        insert(): Promise<void>
-        delete(): Promise<void>;
-    }`;
-	}
-	else {
+	if (!isRoot) {
 		row = `export interface ${name}RelatedTable {
 			${columns(table)}
 			${tableRelations(table)}
@@ -192,7 +205,7 @@ function concurrencies(table, name, tablesAdded) {
         orderBy?: Array<${orderByColumns(table)}> | ${orderByColumns(table)};
     }
 
-    ${otherConcurrencies}
+    ${otherConcurrency}
 
     ${row}`;
 
@@ -238,7 +251,7 @@ function concurrencyColumns(table) {
 		let column = table._columns[i];
 		if (primarySet.has(column))
 			continue;
-		result += `${separator}${column.alias}? : Concurrencies;`;
+		result += `${separator}${column.alias}? : Concurrency;`;
 		separator = `
         `;
 	}
@@ -253,7 +266,7 @@ function strategyColumns(table) {
 		let column = table._columns[i];
 		if (primarySet.has(column))
 			continue;
-		result += `${separator}${column.alias}? : boolean | null;`;
+		result += `${separator}${column.alias}? : boolean;`;
 		separator = `
         `;
 	}
@@ -271,7 +284,7 @@ function getCustomFilters(filters) {
 				result += '\n' + tabs + '}';
 			}
 			else if (typeof obj[p] === 'function')
-				result +=   '\n' + tabs + p + ': (' + getParamNames(obj[p]) + ') => import(\'rdb-client\').Filter;';
+				result +=   '\n' + tabs + p + ': (' + getParamNames(obj[p]) + ') => import(\'rdb\').Filter;';
 		}
 		return result;
 	}

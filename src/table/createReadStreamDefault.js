@@ -35,7 +35,7 @@ function createReadStream(table, db, filter, strategy, streamOptions) {
 
 	function getDtos() {
 		busy = true;
-		return db.transaction(async() => {
+		return db.transaction(async () => {
 			await getBatch()
 				.then(onDtos);
 		})

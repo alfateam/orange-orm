@@ -2,6 +2,10 @@
   "name": "rdb",
   "version": "3.0.27",
   "main": "./src/index.js",
+  "browser": "./src/client/index.mjs",
+  "bin": {
+    "rdb": "bin/rdb.js"
+  },
   "title": "rdb",
   "description": "Object Relational Mapper",
   "types": "./typings/index.d.ts",
@@ -21,21 +25,30 @@
   "license": "ISC",
   "scripts": {
     "test": "a",
+    "concat": "node ./src/client/merge.js",
+    "build": "rollup -c ./src/client/rollup.config.js && npm run concat",
     "lint": "eslint ./",
-    "fix": "eslint ./ --fix"
+    "fix": "eslint ./ --fix",
+    "owasp": "owasp-dependency-check --project \"MY_PROJECT\" --scan \"package-lock.json\" --exclude \"dependency-check-bin\" --out \"owasp\" --format HTML"
   },
   "dependencies": {
-    "@lroal/on-change": "^4.0.0",
+    "@lroal/on-change": "^4.0.2",
+    "@types/express": "^4.17.13",
     "ajv": "^6.10.2",
     "deferred": "^0.7.5",
+    "eslint": "^8.4.1",
+    "fast-json-patch": "^3.1.1",
+    "findup-sync": "^5.0.0",
+    "isomorphic-fetch": "^3.0.0",
+    "module-definition": "^4.0.0",
     "mysql2": "^2.2.5",
     "node-cls": "^1.0.5",
     "pg": "^8.5.1",
     "pg-query-stream": "^3.3.2",
     "promise": "^8.0.3",
-    "rdb-client": "^1.2.4",
     "rfc6902": "^3.0.4",
     "rfdc": "^1.2.0",
+    "typescript": "^4.8.4",
     "uuid": "^8.3.2"
   },
   "peerDependencies": {
@@ -59,8 +72,15 @@
     }
   },
   "devDependencies": {
+    "@rollup/plugin-commonjs": "^21.0.1",
+    "@rollup/plugin-node-resolve": "^13.0.0",
+    "@typescript-eslint/eslint-plugin": "^5.42.1",
+    "@typescript-eslint/parser": "^5.42.1",
     "a": "^2.1.0",
-    "eslint": "^8.6.0"
+    "eslint": "^8.6.0",
+    "glob": "^7.1.7",
+    "owasp-dependency-check": "^0.0.21",
+    "rollup": "^2.52.7"
   },
   "engines": {
     "node": ">= 8.0.0"
