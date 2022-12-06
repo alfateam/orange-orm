@@ -182,8 +182,8 @@ function getRdbClientTs(tables) {
         database?: Pool | (() => Pool);
         tables?: ExpressTables;
 		defaultConcurrency?: Concurrency;
-		readonly: boolean;
-		allowBulkDeletes: boolean;
+		readonly?: boolean;
+		allowBulkDeletes?: boolean;
     }
 
 	export interface ExpressTableConfig<TConcurrency>  {
@@ -192,7 +192,7 @@ function getRdbClientTs(tables) {
         concurrency?: TConcurrency;
         defaultConcurrency?: Concurrency;
 		readonly?: boolean;
-		allowBulkDeletes: boolean;
+		allowBulkDeletes?: boolean;
     }
     
     export interface ExpressContext {

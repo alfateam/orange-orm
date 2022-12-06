@@ -57,8 +57,8 @@ function getTable(table, Name, name, customFilters) {
         baseFilter?: RawFilter | ((request?: import('express').Request, response?: import('express').Response) => RawFilter | Promise<RawFilter>);
         concurrency?: ${Name}Concurrency;
 		defaultConcurrency?: Concurrency;
-		readonly: boolean;
-		allowBulkDeletes: boolean;	
+		readonly?: boolean;
+		allowBulkDeletes?: boolean;	
 	}
 
     export interface ${Name}CustomFilters {
