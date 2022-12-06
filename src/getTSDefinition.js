@@ -58,7 +58,7 @@ function getTable(table, Name, name, customFilters) {
         concurrency?: ${Name}Concurrency;
 		defaultConcurrency?: Concurrency;
 		readonly?: boolean;
-		allowBulkDeletes?: boolean;	
+		disableBulkDeletes?: boolean;	
 	}
 
     export interface ${Name}CustomFilters {

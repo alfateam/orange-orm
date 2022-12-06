@@ -127,6 +127,8 @@ function getPrefixTs(isPureJs) {
 	/* eslint-disable */
 	import { RequestHandler} from 'express'; 
 	import { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Express, Filter, RawFilter, Config, TablesConfig ResponseOptions, TransactionOptions, Pool } from 'rdb';
+	export { RequestHandler } from 'express';
+	export { Concurrency, Express, Filter, RawFilter, Config, TablesConfig, ResponseOptions, TransactionOptions, Pool } from 'rdb';
 	export = r;
 	declare function r(config: Config): r.RdbClient;
 
@@ -183,7 +185,7 @@ function getRdbClientTs(tables) {
         tables?: ExpressTables;
 		defaultConcurrency?: Concurrency;
 		readonly?: boolean;
-		allowBulkDeletes?: boolean;
+		disableBulkDeletes?: boolean;
     }
 
 	export interface ExpressTableConfig<TConcurrency>  {
@@ -192,7 +194,7 @@ function getRdbClientTs(tables) {
         concurrency?: TConcurrency;
         defaultConcurrency?: Concurrency;
 		readonly?: boolean;
-		allowBulkDeletes?: boolean;
+		disableBulkDeletes?: boolean;
     }
     
     export interface ExpressContext {
