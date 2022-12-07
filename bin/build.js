@@ -125,8 +125,10 @@ function getPrefixTs(isPureJs) {
 		return `
 	/* tslint:disable */
 	/* eslint-disable */
-	import { RequestHandler} from 'express'; 
+	import { RequestHandler } from 'express'; 
 	import { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Express, Filter, RawFilter, Config, TablesConfig ResponseOptions, TransactionOptions, Pool } from 'rdb';
+	export { RequestHandler } from 'express';
+	export { Concurrency, Express, Filter, RawFilter, Config, TablesConfig, ResponseOptions, TransactionOptions, Pool } from 'rdb';
 	export = r;
 	declare function r(config: Config): r.RdbClient;
 
@@ -156,8 +158,8 @@ function startNamespace(tables) {
 		}
 		result += `
 
-        function beforeRequest(callback: (response: Response, options: ResponseOptions) => Promise<void> | void): void;
-        function beforeResponse(callback: (response: Response, options: ResponseOptions) => Promise<void> | void): void;
+        function beforeRequest(callback: (response: import('express').Request, options: ResponseOptions) => Promise<void> | void): void;
+        function beforeResponse(callback: (response: import('express').Response, options: ResponseOptions) => Promise<void> | void): void;
         function reactive(proxyMethod: (obj: unknown) => unknown): void;
         function and(filter: Filter, ...filters: Filter[]): Filter;
         function or(filter: Filter, ...filters: Filter[]): Filter;
@@ -183,16 +185,16 @@ function getRdbClientTs(tables) {
         tables?: ExpressTables;
 		defaultConcurrency?: Concurrency;
 		readonly?: boolean;
-		disableBulkDelete: boolean;
+		disableBulkDeletes?: boolean;
     }
 
 	export interface ExpressTableConfig<TConcurrency>  {
         baseFilter?: RawFilter | ((context: ExpressContext) => RawFilter | Promise<RawFilter>);
         customFilters?: Record<string, (...args: any[]) => RawFilter | Promise<RawFilter>>;
-        defaultConcurrency?: Concurrency;
         concurrency?: TConcurrency;
+        defaultConcurrency?: Concurrency;
 		readonly?: boolean;
-		disableBulkDelete: boolean;
+		disableBulkDeletes?: boolean;
     }
     
     export interface ExpressContext {
@@ -215,8 +217,8 @@ function getRdbClientTs(tables) {
 		}
 		result += `
 		(config: Config): RdbClient;
-        beforeRequest(callback: (response: Response, options: ResponseOptions) => Promise<void> | void): void;
-        beforeResponse(callback: (response: Response, options: ResponseOptions) => Promise<void> | void): void;
+		beforeRequest(callback: (response: import('express').Request, options: ResponseOptions) => Promise<void> | void): void;
+        beforeResponse(callback: (response: import('express').Response, options: ResponseOptions) => Promise<void> | void): void;
         reactive(proxyMethod: (obj: unknown) => unknown): void;
         and(filter: Filter, ...filters: Filter[]): Filter;
         or(filter: Filter, ...filters: Filter[]): Filter;

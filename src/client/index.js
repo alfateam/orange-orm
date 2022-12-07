@@ -191,9 +191,23 @@ function rdbClient(options = {}) {
 			return adapter.post(body);
 		}
 
+		// async function insert(rows, ...args) {
+		// 	let proxy = proxify(rows, args[0]);
+		// 	return proxy.insert.apply(proxy, args);
+		// }
 		async function insert(rows, ...args) {
-			let proxy = proxify(rows, args[0]);
-			return proxy.insert.apply(proxy, args);
+			if (Array.isArray(rows)) {
+				let proxy = proxify([], args[0]);
+				proxy.splice.apply(proxy, [0, 0 ,...rows]);
+				await proxy.saveChanges.apply(proxy, args);
+				return proxy;
+			}
+			else {
+				let proxy = proxify([], args[0]);
+				proxy.splice.apply(proxy, [0, 0 , rows]);
+				await proxy.saveChanges.apply(proxy, args);
+				return proxify(proxy[0], args[0]);
+			}
 		}
 
 		function proxify(itemOrArray, strategy) {
@@ -215,8 +229,6 @@ function rdbClient(options = {}) {
 						};
 					else if (property === 'save' || property === 'saveChanges')
 						return saveArray.bind(null, array);
-					else if (property === 'insert')
-						return insertArray.bind(null, array, innerProxy);
 					else if (property === 'delete')
 						return deleteArray.bind(null, array);
 					else if (property === 'refresh')
@@ -234,19 +246,18 @@ function rdbClient(options = {}) {
 			};
 			let innerProxy = new Proxy(array, handler);
 			rootMap.set(array, { json: stringify(array), strategy, originalArray: [...array]});
-			const { limit, ...cleanStrategy } = {...strategy};
-			fetchingStrategyMap.set(array, cleanStrategy);
+			if (strategy !== undefined) {
+				const { limit, ...cleanStrategy } = {...strategy};
+				fetchingStrategyMap.set(array, cleanStrategy);
+			}
 			return innerProxy;
 		}
 
 		function proxifyRow(row, strategy) {
-			// let enabled = false;
 			let handler = {
 				get(_target, property,) {
 					if (property === 'save' || property === 'saveChanges') //call server then acceptChanges
 						return saveRow.bind(null, row);
-					else if (property === 'insert') //call server then remove from jsonMap and add to original
-						return insertRow.bind(null, row, innerProxy);
 					else if (property === 'delete') //call server then remove from jsonMap and original
 						return deleteRow.bind(null, row);
 					else if (property === 'refresh') //refresh from server then acceptChanges
@@ -347,34 +358,34 @@ function rdbClient(options = {}) {
 			let body = stringify({ patch, options: { strategy, ...concurrencyOptions, deduceStrategy } });
 			let adapter = netAdapter(url, { beforeRequest, beforeResponse, tableOptions });
 			let p = adapter.patch(body);
-			let updatedRows = extractChangedRows(array, patch, meta);
-			let insertedRows = getInsertedRows(array);
+			let updatedPositions = extractChangedRowsPositions(array, patch, meta);
+			let insertedPositions = getInsertedRowsPosition(array);
 			let { changed, strategy: newStrategy } = await p;
-			copyInto(changed, [...insertedRows, ...updatedRows]);
+			copyIntoArray(changed, array, [...insertedPositions, ...updatedPositions]);
 			rootMap.set(array, { json: stringify(array), strategy: newStrategy, originalArray: [...array] });
 		}
 
-		function extractChangedRows(rows, patch, meta) {
+		function extractChangedRowsPositions(rows, patch, meta) {
+			const positions = [];
 			const keyPositionMap = toKeyPositionMap(rows, meta);
-			const affectedRowsSet = new Set();
 			for (let i = 0; i < patch.length; i++) {
 				const element = patch[i];
 				const pathArray = element.path.split('/');
 				const position = keyPositionMap[pathArray[1]];
 				if (position >= 0)
-					affectedRowsSet.add(rows[position]);
+					positions.push(position);
 			}
-			return [...affectedRowsSet];
+			return positions;
 		}
 
-		function getInsertedRows(array) {
-			const inserted = [];
+		function getInsertedRowsPosition(array) {
+			const positions = [];
 			const originalSet = new Set(rootMap.get(array).originalArray);
 			for(let i = 0; i < array.length; i++) {
 				if(!originalSet.has(array[i]))
-					inserted.push(array[i]);
+					positions.push(i);
 			}
-			return inserted;
+			return positions;
 		}
 
 		function copyInto(from, to) {
@@ -385,8 +396,15 @@ function rdbClient(options = {}) {
 			}
 		}
 
+		function copyIntoArray(from, to, positions) {
+			for (let i = 0; i < from.length; i++) {
+				to[positions[i]] = from[i];
+			}
+		}
+
+
 		function extractStrategy(options, obj) {
-			if (options && 'strategy' in options)
+			if (options?.strategy !== undefined)
 				return options.strategy;
 			if (obj) {
 				let context = rootMap.get(obj);
@@ -396,8 +414,6 @@ function rdbClient(options = {}) {
 					return strategy;
 				}
 			}
-			if (tableOptions)
-				return tableOptions.strategy;
 		}
 
 		function extractFetchingStrategy(obj, strategy) {
@@ -407,8 +423,6 @@ function rdbClient(options = {}) {
 				const { limit, ...strategy } = {...fetchingStrategyMap.get(obj)};
 				return strategy;
 			}
-			else if (tableOptions)
-				return tableOptions.strategy;
 		}
 
 		function clearChangesArray(array) {
@@ -423,21 +437,21 @@ function rdbClient(options = {}) {
 			map.originalArray = [...array];
 		}
 
-		async function insertArray(array, proxy, strategy) {
-			if (array.length === 0)
-				return;
-			strategy = extractStrategy({strategy});
-			strategy = extractFetchingStrategy({}, strategy);
-			let deduceStrategy = arguments.length < 2;
-			let meta = await getMeta();
-			let patch = createPatch([], array, meta);
-			let body = stringify({ patch, options: { strategy, deduceStrategy} });
-			let adapter = netAdapter(url, { beforeRequest, beforeResponse, tableOptions });
-			let { changed, strategy: newStrategy } = await adapter.patch(body);
-			copyInto(changed, array);
-			rootMap.set(array, { json: stringify(array), strategy: newStrategy, originalArray: [...array] });
-			return proxy;
-		}
+		// async function insertArray(array, proxy, strategy) {
+		// 	if (array.length === 0)
+		// 		return;
+		// 	strategy = extractStrategy({strategy});
+		// 	strategy = extractFetchingStrategy({}, strategy);
+		// 	let deduceStrategy = arguments.length < 2;
+		// 	let meta = await getMeta();
+		// 	let patch = createPatch([], array, meta);
+		// 	let body = stringify({ patch, options: { strategy, deduceStrategy} });
+		// 	let adapter = netAdapter(url, { beforeRequest, beforeResponse, tableOptions });
+		// 	let { changed, strategy: newStrategy } = await adapter.patch(body);
+		// 	copyInto(changed, array);
+		// 	rootMap.set(array, { json: stringify(array), strategy: newStrategy, originalArray: [...array] });
+		// 	return proxy;
+		// }
 
 		async function deleteArray(array, options) {
 			if (array.length === 0)
@@ -474,7 +488,8 @@ function rdbClient(options = {}) {
 		}
 
 		async function refreshArray(array, strategy) {
-			clearChangesArray(array);
+			clearChangesArray(array);			
+			strategy = extractStrategy({strategy}, array);
 			strategy = extractFetchingStrategy(array, strategy);
 			if (array.length === 0)
 				return;
@@ -514,20 +529,6 @@ function rdbClient(options = {}) {
 			fetchingStrategyMap.set(array, strategy);
 		}
 
-		async function insertRow(row, innerProxy, options) {
-			let strategy = extractStrategy(options);
-			let meta = await getMeta();
-			let patch = createPatch([], [row], meta);
-			let body = stringify({ patch, options: { strategy, ...options } });
-
-			let adapter = netAdapter(url, { beforeRequest, beforeResponse, tableOptions });
-			let { changed, strategy: newStrategy } = await adapter.patch(body);
-			copyInto(changed, [row]);
-			rootMap.set(row, { json: stringify(row), strategy: newStrategy });
-
-			return innerProxy;
-		}
-
 		async function deleteRow(row, options) {
 			let strategy = extractStrategy(options, row);
 			let meta = await getMeta();
@@ -546,7 +547,6 @@ function rdbClient(options = {}) {
 				deduceStrategy = true;
 			strategy = extractStrategy({strategy}, row);
 			strategy = extractFetchingStrategy(row, strategy);
-
 
 			let { json } = rootMap.get(row);
 			if (!json)
@@ -567,6 +567,7 @@ function rdbClient(options = {}) {
 
 		async function refreshRow(row, strategy) {
 			clearChangesRow(row);
+			strategy = extractStrategy({strategy}, row);
 			strategy = extractFetchingStrategy(row, strategy);
 
 			let meta = await getMeta();
