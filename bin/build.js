@@ -25,6 +25,7 @@ async function run(cwd) {
 async function runSingle(schemaTs) {
 	let schemaJsPath;
 	let isPureJs = false;
+	let outDir;
 	if (!schemaTs)
 		return;
 	if (schemaTs.substring(schemaTs.length - 2) === 'js') {
@@ -34,7 +35,7 @@ async function runSingle(schemaTs) {
 	console.log(`Rdb: found schema ${schemaTs}`);
 	if (!schemaJsPath) {
 		let nodeModules = findNodeModules('node_modules', { cwd: schemaTs});
-		let outDir = path.join(nodeModules, '/.rdb');
+		outDir = path.join(nodeModules, '/.rdb');
 		schemaJsPath = compile(schemaTs, { outDir });
 		//todo delete outDir
 	}
@@ -76,8 +77,10 @@ async function runSingle(schemaTs) {
 	await writeFile(indexDts, printer.printFile(sourceFile));
 	if (isPureJs)
 		await writeIndexJs(schemaJsPath);
+	
 	console.log('Rdb: created ts typings successfully.');
-
+	if (outDir)
+		fs.rmSync(outDir, { recursive: true, force: true });
 }
 
 async function writeIndexJs(schemaJsPath) {
