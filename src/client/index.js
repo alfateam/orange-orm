@@ -414,8 +414,6 @@ function rdbClient(options = {}) {
 					return strategy;
 				}
 			}
-			if (tableOptions)
-				return tableOptions.strategy;
 		}
 
 		function extractFetchingStrategy(obj, strategy) {
@@ -425,8 +423,6 @@ function rdbClient(options = {}) {
 				const { limit, ...strategy } = {...fetchingStrategyMap.get(obj)};
 				return strategy;
 			}
-			else if (tableOptions)
-				return tableOptions.strategy;
 		}
 
 		function clearChangesArray(array) {
@@ -571,6 +567,7 @@ function rdbClient(options = {}) {
 
 		async function refreshRow(row, strategy) {
 			clearChangesRow(row);
+			strategy = extractStrategy({strategy}, row);
 			strategy = extractFetchingStrategy(row, strategy);
 
 			let meta = await getMeta();
