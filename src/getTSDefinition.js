@@ -1,4 +1,5 @@
-const tablesAdded = new Map();
+const rootTablesAdded = new Map();
+const tableNames = new Set();
 
 const typeMap = {
 	StringColumn: 'string',
@@ -11,9 +12,9 @@ const typeMap = {
 };
 
 function getTSDefinition(table, options) {
-	let {customFilters, name} = options;
-	let Name = name.substr(0,1).toUpperCase() + name.substr(1);
-	name = name.substr(0,1).toLowerCase() + name.substr(1);
+	let { customFilters, name } = options;
+	let Name = name.substr(0, 1).toUpperCase() + name.substr(1);
+	name = name.substr(0, 1).toLowerCase() + name.substr(1);
 	let result = '' + getTable(table, Name, name, customFilters);
 	return result;
 }
@@ -100,7 +101,7 @@ function getTable(table, Name, name, customFilters) {
     `;
 }
 
-function getIdArgs(table){
+function getIdArgs(table) {
 	let result = [];
 	for (let i = 0; i < table._primaryColumns.length; i++) {
 		let column = table._primaryColumns[i];
@@ -114,7 +115,7 @@ function tableRelations(table) {
 	let relations = table._relations;
 	let result = '';
 	for (let relationName in relations) {
-		const tableName = getTableName(relations[relationName], relationName, tablesAdded);
+		const tableName = getTableName(relations[relationName], relationName);
 		result += `${relationName}: ${tableName}RelatedTable;`;
 	}
 	return result;
@@ -142,36 +143,38 @@ function Concurrency(table, name, tablesAdded) {
 	}
 	else if (tablesAdded.has(table))
 		return '';
-	else
+	else {
 		tablesAdded.set(table, name);
+	}
 	let otherConcurrency = '';
 	let concurrencyRelations = '';
 	let strategyRelations = '';
 	let regularRelations = '';
 	let relations = table._relations;
 	let relationName;
-	let tableName;
 
 	let separator = `
         `;
 	let visitor = {};
-	visitor.visitJoin = function(relation) {
-		otherConcurrency += `${Concurrency(relation.childTable, relationName, tablesAdded)}`;
-		concurrencyRelations += `${relationName}?: ${tableName}Concurrency;${separator}`;
-		strategyRelations += `${relationName}?: ${tableName}Strategy;${separator}`;
-		regularRelations += `${relationName}?: ${tableName};${separator}`;
+	visitor.visitJoin = function (relation) {
+		const tableTypeName = getTableName(relation, relationName);
+
+		otherConcurrency += `${Concurrency(relation.childTable, tableTypeName, tablesAdded)}`;
+		concurrencyRelations += `${relationName}?: ${tableTypeName}Concurrency;${separator}`;
+		strategyRelations += `${relationName}?: ${tableTypeName}Strategy;${separator}`;
+		regularRelations += `${relationName}?: ${tableTypeName} | null;${separator}`;
 	};
 	visitor.visitOne = visitor.visitJoin;
-	visitor.visitMany = function(relation) {
-		otherConcurrency += `${Concurrency(relation.childTable, relationName, tablesAdded)}`;
-		concurrencyRelations += `${relationName}?: ${tableName}Concurrency;${separator}`;
-		strategyRelations += `${relationName}?: ${tableName}Strategy ;${separator}`;
-		regularRelations += `${relationName}?: ${tableName}[];${separator}`;
+	visitor.visitMany = function (relation) {
+		const tableTypeName = getTableName(relation, relationName);
+		otherConcurrency += `${Concurrency(relation.childTable, tableTypeName, tablesAdded)}`;
+		concurrencyRelations += `${relationName}?: ${tableTypeName}Concurrency;${separator}`;
+		strategyRelations += `${relationName}?: ${tableTypeName}Strategy ;${separator}`;
+		regularRelations += `${relationName}?: ${tableTypeName}[] | null;${separator}`;
 	};
 
 	for (relationName in relations) {
 		var relation = relations[relationName];
-		tableName = getTableName(relation, relationName, tablesAdded);
 		relation.accept(visitor);
 	}
 
@@ -212,23 +215,36 @@ function Concurrency(table, name, tablesAdded) {
 
 }
 
-function getTableName(relation, relationName, tablesAdded) {
-	return tablesAdded.get(relation.childTable) || pascalCase(relationName);
+function getTableName(relation, relationName) {
+	let name =  rootTablesAdded.get(relation.childTable);
+	if (name)
+		return name;	
+	else {
+		let name = pascalCase(relationName);
+		let count = 2;
+		while (tableNames.has(name)) {
+			name = name + '_' + count;
+			count++;
+		}
+		rootTablesAdded.set(relation.childTable, name);
+		tableNames.add(name);
+		return name;
+	}
 }
 
-function regularColumns(table){
+function regularColumns(table) {
 	let result = '';
 	let separator = '';
 	for (let i = 0; i < table._columns.length; i++) {
 		let column = table._columns[i];
-		result += `${separator}${column.alias}? : ${typeMap[column.tsType]};`;
+		result += `${separator}${column.alias}? : ${typeMap[column.tsType]} | null;`;
 		separator = `
         `;
 	}
 	return result;
 }
 
-function orderByColumns(table){
+function orderByColumns(table) {
 	let result = '';
 	let separator = '';
 	for (let i = 0; i < table._columns.length; i++) {
@@ -281,11 +297,11 @@ function getCustomFilters(filters) {
 		let result = '';
 		for (let p in obj) {
 			if (typeof obj[p] === 'object' && obj[p] !== null) {
-				result +=  '\n' + tabs + p + ': {' + tabs + getLeafNames(obj[p],  tabs + '\t');
+				result += '\n' + tabs + p + ': {' + tabs + getLeafNames(obj[p], tabs + '\t');
 				result += '\n' + tabs + '}';
 			}
 			else if (typeof obj[p] === 'function')
-				result +=   '\n' + tabs + p + ': (' + getParamNames(obj[p]) + ') => import(\'rdb\').Filter;';
+				result += '\n' + tabs + p + ': (' + getParamNames(obj[p]) + ') => import(\'rdb\').Filter;';
 		}
 		return result;
 	}
