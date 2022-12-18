@@ -4,15 +4,36 @@ let setSessionSingleton = require('./table/setSessionSingleton');
 let executeQuery = require('./query');
 let hostExpress = require('./hostExpress');
 
-function hostLocal({ db, table, defaultConcurrency, concurrency, customFilters, baseFilter, strategy, transaction }) {
-	let c = { get, post, patch, query, express};
+// { db, table, defaultConcurrency, 
+// 	concurrency,
+// 	customFilters,
+// 	baseFilter, strategy, transaction, 
+// 	readonly,
+// 	disableBulkDeletes, isBrowser }
+function hostLocal() {
+	const _options = arguments[0];
+	let { readonly, table, transaction, db } = _options;
+
+	let c = { get, post, patch, query, express };
 
 	function get() {
 		return getMeta(table);
 
 	}
 	async function patch(body) {
-		body = JSON.parse(body);
+		if (readonly) {
+			const error = new Error('Table is readonly');
+			// @ts-ignore
+			error.status = 405;
+			throw error;
+		}
+		else if (!table) {
+			const error = new Error('Table is not exposed');
+			// @ts-ignore
+			error.status = 400;
+			throw error;
+		}
+		body = typeof body === 'string' ? JSON.parse(body) : body;
 		let result;
 
 		if (transaction)
@@ -31,18 +52,13 @@ function hostLocal({ db, table, defaultConcurrency, concurrency, customFilters, 
 
 		async function fn() {
 			setSessionSingleton('ignoreSerializable', true);
-			let patch = body.patch || body;
-			let options = body.options || {};
-			let _concurrency = options.concurrency || concurrency;
-			let _defaultConcurrency = options.defaultConcurrency || defaultConcurrency;
-			let _strategy = options.strategy || strategy;
-			let {deduceStrategy} = options;
-			result = await table.patch(patch, { defaultConcurrency: _defaultConcurrency, concurrency: _concurrency, strategy: _strategy, deduceStrategy });
+			let patch = body.patch;
+			result = await table.patch(patch, { ...body.options, ..._options });
 		}
 	}
 
 	async function post(body) {
-		body = JSON.parse(body);
+		body = typeof body === 'string' ? JSON.parse(body) : body;
 		let result;
 
 		if (transaction)
@@ -61,7 +77,8 @@ function hostLocal({ db, table, defaultConcurrency, concurrency, customFilters, 
 
 		async function fn() {
 			setSessionSingleton('ignoreSerializable', true);
-			result = await executePath({ table, JSONFilter: body, customFilters, baseFilter, isServerSide: true });
+			const options = { ...body.options, ..._options, JSONFilter: body };
+			result = await executePath(options);
 		}
 	}
 	async function query() {
@@ -90,8 +107,7 @@ function hostLocal({ db, table, defaultConcurrency, concurrency, customFilters, 
 	}
 
 	function express(options) {
-		let _options  = { db, table, defaultConcurrency, concurrency, customFilters, baseFilter, strategy };
-		return hostExpress({..._options, ...options});
+		return hostExpress({ ..._options, ...options });
 	}
 
 	return c;

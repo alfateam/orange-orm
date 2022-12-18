@@ -1,6 +1,3 @@
-const rootTablesAdded = new Map();
-const tableNames = new Set();
-
 const typeMap = {
 	StringColumn: 'string',
 	BooleanColumn: 'boolean',
@@ -11,224 +8,243 @@ const typeMap = {
 	NumberColumn: 'number',
 };
 
-function getTSDefinition(table, options) {
-	let { customFilters, name } = options;
-	let Name = name.substr(0, 1).toUpperCase() + name.substr(1);
-	name = name.substr(0, 1).toLowerCase() + name.substr(1);
-	let result = '' + getTable(table, Name, name, customFilters);
-	return result;
+function getTSDefinition(tableConfigs, {isNamespace = false, isHttp = false} = {}) {
+	const rootTablesAdded = new Map();
+	const tableNames = new Set();
+	let src = '';
+	const defs = tableConfigs.map(getTSDefinitionTable).join('');
+	const tables = tableConfigs.reduce((tables, x) => {
+		tables[x.name] = x.table;
+		return tables;
+	}, {});
+	src += getPrefixTs(isNamespace);
+	if (isNamespace)
+		src += startNamespace(tables, isHttp);
+	src += defs;
+	src += getRdbClientTs(tables, isHttp);
+	if (isNamespace)
+		src += '}';
+	return src;
+
+
+	function getTSDefinitionTable({table, customFilters, name}) {
+		let Name = name.substr(0, 1).toUpperCase() + name.substr(1);
+		name = name.substr(0, 1).toLowerCase() + name.substr(1);
+		let result = '' + getTable(table, Name, name, customFilters);
+		return result;
+	}
+
+	function getTable(table, Name, name, customFilters) {
+		return `
+export interface ${Name}Table {
+	getAll(): Promise<${Name}Array>;
+	getAll(fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
+	getMany(filter?: RawFilter): Promise<${Name}Array>;
+	getMany(filter: RawFilter, fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
+	getMany(${name}s: Array<${Name}>): Promise<${Name}Array>;
+	getMany(${name}s: Array<${Name}>, fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
+	getOne(filter?: RawFilter): Promise<${Name}Row>;
+	getOne(filter: RawFilter, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
+	getOne(${name}: ${Name}): Promise<${Name}Row>;
+	getOne(${name}: ${Name}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
+	getById(${getIdArgs(table)}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
+	insert(${name}s: ${Name}[]): Promise<${Name}Array>;
+	insert(${name}s: ${Name}[], fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
+	insert(${name}: ${Name}): Promise<${Name}Row>;
+	insert(${name}: ${Name}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
+	insertAndForget(${name}s: ${Name}[]): Promise<void>;
+	insertAndForget(${name}: ${Name}): Promise<void>;
+	delete(filter?: RawFilter): Promise<void>;
+	delete(${name}s: Array<${Name}>): Promise<void>;
+	deleteCascade(filter?: RawFilter): Promise<void>;
+	deleteCascade(${name}s: Array<${Name}>): Promise<void>;
+	proxify(${name}s: ${Name}[]): ${Name}Array;
+	proxify(${name}s: ${Name}[], fetchingStrategy: ${Name}Strategy): ${Name}Array;
+	proxify(${name}: ${Name}): ${Name}Row;
+	proxify(${name}: ${Name}, fetchingStrategy: ${Name}Strategy): ${Name}Row;
+	customFilters: ${Name}CustomFilters;
+	${columns(table)}
+	${tableRelations(table)}
 }
 
-function getTable(table, Name, name, customFilters) {
-	return `
-    export interface ${Name}Table {
-        getAll(): Promise<${Name}Array>;
-        getAll(fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
-        getMany(filter?: RawFilter): Promise<${Name}Array>;
-        getMany(filter: RawFilter, fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
-        getMany(${name}s: Array<${Name}>): Promise<${Name}Array>;
-        getMany(${name}s: Array<${Name}>, fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
-        getOne(filter?: RawFilter): Promise<${Name}Row>;
-        getOne(filter: RawFilter, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
-        getOne(${name}: ${Name}): Promise<${Name}Row>;
-        getOne(${name}: ${Name}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
-        getById(${getIdArgs(table)}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
-        insert(${name}s: ${Name}[]): Promise<${Name}Array>;
-        insert(${name}s: ${Name}[], fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
-        insert(${name}: ${Name}): Promise<${Name}Row>;
-        insert(${name}: ${Name}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
-        insertAndForget(${name}s: ${Name}[]): Promise<void>;
-        insertAndForget(${name}: ${Name}): Promise<void>;
-        delete(filter?: RawFilter): Promise<void>;
-        delete(${name}s: Array<${Name}>): Promise<void>;
-        deleteCascade(filter?: RawFilter): Promise<void>;
-        deleteCascade(${name}s: Array<${Name}>): Promise<void>;
-        proxify(${name}s: ${Name}[]): ${Name}Array;
-        proxify(${name}s: ${Name}[], fetchingStrategy: ${Name}Strategy): ${Name}Array;
-        proxify(${name}: ${Name}): ${Name}Row;
-        proxify(${name}: ${Name}, fetchingStrategy: ${Name}Strategy): ${Name}Row;
-        customFilters: ${Name}CustomFilters;
-		${columns(table)}
-		${tableRelations(table)}
-    }
-
-	export interface ${Name}ExpressConfig extends TablesConfig {
-        db?: unknown | string | (() => unknown | string);
-        customFilters?: ${Name}CustomFilters;
-        baseFilter?: RawFilter | ((request?: import('express').Request, response?: import('express').Response) => RawFilter | Promise<RawFilter>);
-        concurrency?: ${Name}Concurrency;
-		defaultConcurrency?: Concurrency;
-		readonly?: boolean;
-		disableBulkDeletes?: boolean;	
-	}
-
-    export interface ${Name}CustomFilters {
-        ${getCustomFilters(customFilters)}
-    }
-
-    export interface ${Name}Array extends Array<${Name}> {
-        saveChanges(): Promise<void>;
-        saveChanges(concurrency: ${Name}ConcurrencyOptions): Promise<void>;
-        saveChanges(fetchingStrategy: ${Name}Strategy): Promise<void>;
-        saveChanges(concurrency: ${Name}ConcurrencyOptions, fetchingStrategy: ${Name}Strategy): Promise<void>;
-        acceptChanges(): void;
-        clearChanges(): void;
-        refresh(): Promise<void>;
-        refresh(fetchingStrategy: ${Name}Strategy): Promise<void>;
-        delete(): Promise<void>;
-        delete(options: ${Name}ConcurrencyOptions): Promise<void>;
-    }
-
-    export interface ${Name}Row extends ${Name} {
-        saveChanges(): Promise<void>;
-        saveChanges(concurrency: ${Name}ConcurrencyOptions): Promise<void>;
-        saveChanges(fetchingStrategy: ${Name}Strategy): Promise<void>;
-        saveChanges(concurrency: ${Name}ConcurrencyOptions, fetchingStrategy: ${Name}Strategy): Promise<void>;
-        acceptChanges(): void;
-        clearChanges(): void;
-        refresh(): Promise<void>;
-        refresh(fetchingStrategy: ${Name}Strategy): Promise<void>;
-        delete(): Promise<void>;
-        delete(options: ${Name}ConcurrencyOptions): Promise<void>;
-	}
-
-    export interface ${Name}ConcurrencyOptions {
-        defaultConcurrency?: Concurrency
-        concurrency?: ${Name}Concurrency;
-    }
-
-    ${Concurrency(table, Name)}
-    `;
+export interface ${Name}ExpressConfig extends TablesConfig {
+	db?: unknown | string | (() => unknown | string);
+	customFilters?: ${Name}CustomFilters;
+	baseFilter?: RawFilter | ((request?: import('express').Request, response?: import('express').Response) => RawFilter | Promise<RawFilter>);
+	concurrency?: ${Name}Concurrency;
+	defaultConcurrency?: Concurrency;
+	readonly?: boolean;
+	disableBulkDeletes?: boolean;	
 }
 
-function getIdArgs(table) {
-	let result = [];
-	for (let i = 0; i < table._primaryColumns.length; i++) {
-		let column = table._primaryColumns[i];
-		result.push(`${column.alias}: ${typeMap[column.tsType]}`);
-	}
-	return result.join(', ');
+export interface ${Name}CustomFilters {
+	${getCustomFilters(customFilters)}
 }
 
-
-function tableRelations(table) {
-	let relations = table._relations;
-	let result = '';
-	for (let relationName in relations) {
-		const tableName = getTableName(relations[relationName], relationName);
-		result += `${relationName}: ${tableName}RelatedTable;`;
-	}
-	return result;
+export interface ${Name}Array extends Array<${Name}> {
+	saveChanges(): Promise<void>;
+	saveChanges(concurrency: ${Name}ConcurrencyOptions): Promise<void>;
+	saveChanges(fetchingStrategy: ${Name}Strategy): Promise<void>;
+	saveChanges(concurrency: ${Name}ConcurrencyOptions, fetchingStrategy: ${Name}Strategy): Promise<void>;
+	acceptChanges(): void;
+	clearChanges(): void;
+	refresh(): Promise<void>;
+	refresh(fetchingStrategy: ${Name}Strategy): Promise<void>;
+	delete(): Promise<void>;
+	delete(options: ${Name}ConcurrencyOptions): Promise<void>;
 }
 
-
-function columns(table) {
-	let result = '';
-	let separator = '';
-	for (let i = 0; i < table._columns.length; i++) {
-		let column = table._columns[i];
-		result += `${separator}${column.alias} : ${column.tsType};`;
-		separator = `
-        `;
-	}
-	return result;
+export interface ${Name}Row extends ${Name} {
+	saveChanges(): Promise<void>;
+	saveChanges(concurrency: ${Name}ConcurrencyOptions): Promise<void>;
+	saveChanges(fetchingStrategy: ${Name}Strategy): Promise<void>;
+	saveChanges(concurrency: ${Name}ConcurrencyOptions, fetchingStrategy: ${Name}Strategy): Promise<void>;
+	acceptChanges(): void;
+	clearChanges(): void;
+	refresh(): Promise<void>;
+	refresh(fetchingStrategy: ${Name}Strategy): Promise<void>;
+	delete(): Promise<void>;
+	delete(options: ${Name}ConcurrencyOptions): Promise<void>;
 }
 
-function Concurrency(table, name, tablesAdded) {
-	name = pascalCase(name);
-	let isRoot;
-	if (!tablesAdded) {
-		isRoot = true;
-		tablesAdded = new Map();
-	}
-	else if (tablesAdded.has(table))
-		return '';
-	else {
-		tablesAdded.set(table, name);
-	}
-	let otherConcurrency = '';
-	let concurrencyRelations = '';
-	let strategyRelations = '';
-	let regularRelations = '';
-	let relations = table._relations;
-	let relationName;
-
-	let separator = `
-        `;
-	let visitor = {};
-	visitor.visitJoin = function (relation) {
-		const tableTypeName = getTableName(relation, relationName);
-
-		otherConcurrency += `${Concurrency(relation.childTable, tableTypeName, tablesAdded)}`;
-		concurrencyRelations += `${relationName}?: ${tableTypeName}Concurrency;${separator}`;
-		strategyRelations += `${relationName}?: ${tableTypeName}Strategy;${separator}`;
-		regularRelations += `${relationName}?: ${tableTypeName} | null;${separator}`;
-	};
-	visitor.visitOne = visitor.visitJoin;
-	visitor.visitMany = function (relation) {
-		const tableTypeName = getTableName(relation, relationName);
-		otherConcurrency += `${Concurrency(relation.childTable, tableTypeName, tablesAdded)}`;
-		concurrencyRelations += `${relationName}?: ${tableTypeName}Concurrency;${separator}`;
-		strategyRelations += `${relationName}?: ${tableTypeName}Strategy ;${separator}`;
-		regularRelations += `${relationName}?: ${tableTypeName}[] | null;${separator}`;
-	};
-
-	for (relationName in relations) {
-		var relation = relations[relationName];
-		relation.accept(visitor);
-	}
-
-	let row = '';
-	if (!isRoot) {
-		row = `export interface ${name}RelatedTable {
-			${columns(table)}
-			${tableRelations(table)}
-			all: (selector: (table: ${name}RelatedTable) => RawFilter) => Filter;
-			any: (selector: (table: ${name}RelatedTable) => RawFilter) => Filter;
-			none: (selector: (table: ${name}RelatedTable) => RawFilter) => Filter;
-			exists: () => Filter;	
-		}`;
-	}
-
-	return `
-    export interface ${name}Concurrency {
-        ${concurrencyColumns(table)}
-        ${concurrencyRelations}
-    }
-
-    export interface ${name} {
-        ${regularColumns(table)}
-        ${regularRelations}
-    }
-
-    export interface ${name}Strategy {
-        ${strategyColumns(table)}
-        ${strategyRelations}
-        limit?: number;
-        offset?: number;
-        orderBy?: Array<${orderByColumns(table)}> | ${orderByColumns(table)};
-    }
-
-    ${otherConcurrency}
-
-    ${row}`;
-
+export interface ${Name}ConcurrencyOptions {
+	defaultConcurrency?: Concurrency
+	concurrency?: ${Name}Concurrency;
 }
 
-function getTableName(relation, relationName) {
-	let name =  rootTablesAdded.get(relation.childTable);
-	if (name)
-		return name;	
-	else {
-		let name = pascalCase(relationName);
-		let count = 2;
-		while (tableNames.has(name)) {
-			name = name + '_' + count;
-			count++;
+${Concurrency(table, Name)}
+`;
+}
+
+	function getIdArgs(table) {
+		let result = [];
+		for (let i = 0; i < table._primaryColumns.length; i++) {
+			let column = table._primaryColumns[i];
+			result.push(`${column.alias}: ${typeMap[column.tsType]}`);
 		}
-		rootTablesAdded.set(relation.childTable, name);
-		tableNames.add(name);
-		return name;
+		return result.join(', ');
+	}
+
+
+	function tableRelations(table) {
+		let relations = table._relations;
+		let result = '';
+		for (let relationName in relations) {
+			const tableName = getTableName(relations[relationName], relationName);
+			result += `${relationName}: ${tableName}RelatedTable;`;
+		}
+		return result;
+	}
+
+
+	function columns(table) {
+		let result = '';
+		let separator = '';
+		for (let i = 0; i < table._columns.length; i++) {
+			let column = table._columns[i];
+			result += `${separator}${column.alias} : ${column.tsType};`;
+			separator = `
+	`;
+		}
+		return result;
+	}
+
+	function Concurrency(table, name, tablesAdded) {
+		name = pascalCase(name);
+		let isRoot;
+		if (!tablesAdded) {
+			isRoot = true;
+			tablesAdded = new Map();
+		}
+		else if (tablesAdded.has(table))
+			return '';
+		else {
+			tablesAdded.set(table, name);
+		}
+		let otherConcurrency = '';
+		let concurrencyRelations = '';
+		let strategyRelations = '';
+		let regularRelations = '';
+		let relations = table._relations;
+		let relationName;
+
+		let separator = `
+	`;
+		let visitor = {};
+		visitor.visitJoin = function (relation) {
+			const tableTypeName = getTableName(relation, relationName);
+
+			otherConcurrency += `${Concurrency(relation.childTable, tableTypeName, tablesAdded)}`;
+			concurrencyRelations += `${relationName}?: ${tableTypeName}Concurrency;${separator}`;
+			strategyRelations += `${relationName}?: ${tableTypeName}Strategy;${separator}`;
+			regularRelations += `${relationName}?: ${tableTypeName} | null;${separator}`;
+		};
+		visitor.visitOne = visitor.visitJoin;
+		visitor.visitMany = function (relation) {
+			const tableTypeName = getTableName(relation, relationName);
+			otherConcurrency += `${Concurrency(relation.childTable, tableTypeName, tablesAdded)}`;
+			concurrencyRelations += `${relationName}?: ${tableTypeName}Concurrency;${separator}`;
+			strategyRelations += `${relationName}?: ${tableTypeName}Strategy ;${separator}`;
+			regularRelations += `${relationName}?: ${tableTypeName}[] | null;${separator}`;
+		};
+
+		for (relationName in relations) {
+			var relation = relations[relationName];
+			relation.accept(visitor);
+		}
+
+		let row = '';
+		if (!isRoot) {
+			row = `export interface ${name}RelatedTable {
+	${columns(table)}
+	${tableRelations(table)}
+	all: (selector: (table: ${name}RelatedTable) => RawFilter) => Filter;
+	any: (selector: (table: ${name}RelatedTable) => RawFilter) => Filter;
+	none: (selector: (table: ${name}RelatedTable) => RawFilter) => Filter;
+	exists: () => Filter;	
+}`;
+		}
+
+		return `
+export interface ${name}Concurrency {
+	${concurrencyColumns(table)}
+	${concurrencyRelations}
+}
+
+export interface ${name} {
+	${regularColumns(table)}
+	${regularRelations}
+}
+
+export interface ${name}Strategy {
+	${strategyColumns(table)}
+	${strategyRelations}
+	limit?: number;
+	offset?: number;
+	orderBy?: Array<${orderByColumns(table)}> | ${orderByColumns(table)};
+}
+
+${otherConcurrency}
+
+${row}`;
+
+	}
+
+	function getTableName(relation, relationName) {
+		let name = rootTablesAdded.get(relation.childTable);
+		if (name)
+			return name;
+		else {
+			let name = pascalCase(relationName);
+			let count = 2;
+			while (tableNames.has(name)) {
+				name = name + '_' + count;
+				count++;
+			}
+			rootTablesAdded.set(relation.childTable, name);
+			tableNames.add(name);
+			return name;
+		}
 	}
 }
 
@@ -239,7 +255,7 @@ function regularColumns(table) {
 		let column = table._columns[i];
 		result += `${separator}${column.alias}? : ${typeMap[column.tsType]} | null;`;
 		separator = `
-        `;
+	`;
 	}
 	return result;
 }
@@ -270,7 +286,7 @@ function concurrencyColumns(table) {
 			continue;
 		result += `${separator}${column.alias}? : Concurrency;`;
 		separator = `
-        `;
+	`;
 	}
 	return result;
 }
@@ -285,7 +301,7 @@ function strategyColumns(table) {
 			continue;
 		result += `${separator}${column.alias}? : boolean;`;
 		separator = `
-        `;
+	`;
 	}
 	return result;
 }
@@ -316,6 +332,151 @@ function getParamNames(func) {
 	if (result === null)
 		return '';
 	return result.join(': any, ') + ': any';
+}
+
+function getPrefixTs(isNamespace) {
+	if (isNamespace)
+		return `
+/* tslint:disable */
+/* eslint-disable */
+import { AxiosInterceptorManager, AxiosRequestConfig, AxiosResponse } from 'axios';
+import { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, Config, TablesConfig, TransactionOptions, Pool, Express, Url } from 'rdb';
+export { RequestHandler } from 'express';
+export { Concurrency, Filter, RawFilter, Config, TablesConfig, TransactionOptions, Pool } from 'rdb';
+export = r;
+declare function r(config: Config): r.RdbClient;
+`;
+
+	return `
+/* tslint:disable */
+/* eslint-disable */
+	import schema from './schema';
+import { AxiosInterceptorManager, AxiosRequestConfig, AxiosResponse } from 'axios';
+import { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, Config, TablesConfig, TransactionOptions, Pool, Express, Url } from 'rdb';
+export default schema as RdbClient;`;
+}
+
+function startNamespace(tables, isHttp) {
+	return `
+declare namespace r {${getTables(isHttp)}
+`;
+
+	function getTables(isHttp) {
+		let result = '';
+		for (let name in tables) {
+			let Name = name.substring(0, 1).toUpperCase() + name.substring(1);
+			result +=
+				`
+	const ${name}: ${Name}Table;`;
+		}
+		if (!isHttp)
+			result += `
+
+	function and(filter: Filter, ...filters: Filter[]): Filter;
+	function or(filter: Filter, ...filters: Filter[]): Filter;
+	function not(): Filter;
+	function transaction(fn: (transaction: RdbClient) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
+	function query(filter: RawFilter | string): Promise<unknown[]>;
+	function query<T>(filter: RawFilter | string): Promise<T[]>;
+	function transaction(fn: (transaction: RdbClient) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
+	const filter: Filter;
+	function express(): Express;
+	function express(config: ExpressConfig): Express;
+`;
+		else
+			result += `
+
+	const interceptors: {
+		request: AxiosInterceptorManager<AxiosRequestConfig>;
+		response: AxiosInterceptorManager<AxiosResponse>;
+	};
+	function reactive(proxyMethod: (obj: unknown) => unknown): void;	
+	function and(filter: Filter, ...filters: Filter[]): Filter;
+	function or(filter: Filter, ...filters: Filter[]): Filter;
+	function not(): Filter;
+	const filter: Filter;
+`;
+		return result;
+	}
+}
+
+function getRdbClientTs(tables, isHttp) {
+	return `
+export interface RdbClient  {${getTables(isHttp)}
+}
+
+export interface ExpressConfig {
+	database?: Pool | (() => Pool);
+	tables?: ExpressTables;
+	defaultConcurrency?: Concurrency;
+	readonly?: boolean;
+	disableBulkDeletes?: boolean;
+}
+
+export interface ExpressTableConfig<TConcurrency>  {
+	baseFilter?: RawFilter | ((context: ExpressContext) => RawFilter | Promise<RawFilter>);
+	customFilters?: Record<string, (...args: any[]) => RawFilter | Promise<RawFilter>>;
+	concurrency?: TConcurrency;
+	defaultConcurrency?: Concurrency;
+	readonly?: boolean;
+	disableBulkDeletes?: boolean;
+}
+
+export interface ExpressContext {
+	request: import('express').Request;
+	response: import('express').Response;
+	client: RdbClient;
+}		
+
+export interface ExpressTables {${getExpressTables()}
+}
+`;
+
+	function getTables(isHttp) {
+		let result = '';
+		for (let name in tables) {
+			let Name = name.substring(0, 1).toUpperCase() + name.substring(1);
+			result +=
+			`
+	${name}: ${Name}Table;`;
+		}
+		if (isHttp)
+			result += `
+	(config: {db: Url}): RdbClient;
+	interceptors: {
+        request: AxiosInterceptorManager<AxiosRequestConfig>;
+        response: AxiosInterceptorManager<AxiosResponse>;
+    };
+	reactive(proxyMethod: (obj: unknown) => unknown): void;
+	and(filter: Filter, ...filters: Filter[]): Filter;
+	or(filter: Filter, ...filters: Filter[]): Filter;
+	not(): Filter;
+	transaction(fn: (transaction: RdbClient) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
+	filter: Filter;`;
+		else
+			result += `
+	(config: {db: Pool | (() => Pool)}): RdbClient;
+	and(filter: Filter, ...filters: Filter[]): Filter;
+	or(filter: Filter, ...filters: Filter[]): Filter;
+	not(): Filter;
+	query(filter: RawFilter | string): Promise<unknown[]>;
+	query<T>(filter: RawFilter | string): Promise<T[]>;
+	transaction(fn: (transaction: RdbClient) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
+	filter: Filter;
+	express(): Express;
+	express(config: ExpressConfig): Express;`;
+		return result;
+	}
+	function getExpressTables() {
+		let result = '';
+		for (let name in tables) {
+			let Name = name.substring(0, 1).toUpperCase() + name.substring(1);
+			result +=
+				`
+	${name}?: boolean | ExpressTableConfig<${Name}Concurrency>;`;
+		}
+		return result;
+	}
 }
 
 

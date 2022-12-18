@@ -8,77 +8,64 @@ let util = require('util');
 let writeFile = util.promisify(fs.writeFile);
 let ts = require('typescript');
 let moduleDefinition = require('module-definition');
+let getTSDefinition = require('../src/getTSDefinition');
 require('isomorphic-fetch');
 
 
 async function run(cwd) {
 	for (let schemaTs of await findSchemaJs(cwd)) {
-		try {
-			await runSingle(schemaTs);
-		}
-		catch (e) {
-			//ignore
-		}
+		await runSingle(schemaTs);
 	}
 }
 
 async function runSingle(schemaTs) {
-	let schemaJsPath;
-	let isPureJs = false;
 	let outDir;
-	if (!schemaTs)
-		return;
-	if (schemaTs.substring(schemaTs.length - 2) === 'js') {
-		schemaJsPath = schemaTs;
-		isPureJs = true;
-	}
-	console.log(`Rdb: found schema ${schemaTs}`);
-	if (!schemaJsPath) {
-		let nodeModules = findNodeModules('node_modules', { cwd: schemaTs});
-		outDir = path.join(nodeModules, '/.rdb');
-		schemaJsPath = compile(schemaTs, { outDir });
-		//todo delete outDir
-	}
-	let schemaJs;
 	try {
-		schemaJs = isPureJs ? await import(url.pathToFileURL(schemaJsPath)) : require(schemaJsPath);
+
+		let schemaJsPath;
+		let isPureJs = false;
+		if (!schemaTs)
+			return;
+		if (schemaTs.substring(schemaTs.length - 2) === 'js') {
+			schemaJsPath = schemaTs;
+			isPureJs = true;
+		}
+		console.log(`Rdb: found schema ${schemaTs}`);
+		if (!schemaJsPath) {
+			let nodeModules = findNodeModules('node_modules', { cwd: schemaTs });
+			outDir = path.join(nodeModules, '/.rdb', '/' + new Date().getUTCMilliseconds());
+			schemaJsPath = compile(schemaTs, { outDir });
+		}
+		let schemaJs = isPureJs ? await import(url.pathToFileURL(schemaJsPath)) : require(schemaJsPath);
+		if ('default' in schemaJs)
+			schemaJs = schemaJs.default;
+		if (!schemaJs.tables) {
+			console.log('Rdb: no tables found.');
+			return;
+		}
+		let src = '';
+		if (typeof schemaJs.db === 'string') {
+			src = ((await tryDownload(schemaJs.db + '.d.ts', isPureJs) || await download(schemaJs.db, isPureJs)));
+		}
+		else {
+			let tsArg = Object.keys(schemaJs.tables).map(x => {
+				return { table: schemaJs.tables[x], name: x };
+			});
+			src = getTSDefinition(tsArg);
+		}
+		let indexDts = path.join(path.dirname(schemaTs), isPureJs ? '/index.d.ts' : '/index.ts');
+		let sourceFile = ts.createSourceFile(indexDts, src, ts.ScriptTarget.ES2015, true, ts.ScriptKind.TS);
+		const printer = ts.createPrinter();
+		await writeFile(indexDts, printer.printFile(sourceFile));
+		if (isPureJs)
+			await writeIndexJs(schemaJsPath);
+
+		console.log('Rdb: created ts typings successfully.');
 	}
-	catch (e) {
-		console.log(e.stack);
+	catch(e) {
+		console.dir(e);
 	}
-	if ('default' in schemaJs)
-		schemaJs = schemaJs.default;
-	if (!schemaJs.tables) {
-		console.log('Rdb: no tables found.');
-		return;
-	}
-	let defs = '';
-	for (let name in schemaJs.tables) {
-		let db = schemaJs.db || '';
-		let table = schemaJs.tables[name];
-		if (typeof table === 'string' && typeof db === 'string')
-			defs += (await download(db + table)) || (await download(db + table + '.d.ts'));
-		else if (table.ts)
-			defs += table.ts(name);
-	}
-	let src = '';
-	src += getPrefixTs(isPureJs, schemaJs.tables);
-	if (isPureJs)
-		src += startNamespace(schemaJs.tables);
-	src += defs;
-	src += getRdbClientTs(schemaJs.tables);
-	if (isPureJs)
-		src += '}}'; //with namespace
-	else
-		src += '}';
-	let indexDts = path.join(path.dirname(schemaTs), isPureJs ? '/index.d.ts' : '/index.ts');
-	let sourceFile = ts.createSourceFile(indexDts, src, ts.ScriptTarget.ES2015, true, ts.ScriptKind.TS);
-	const printer = ts.createPrinter();
-	await writeFile(indexDts, printer.printFile(sourceFile));
-	if (isPureJs)
-		await writeIndexJs(schemaJsPath);
-	
-	console.log('Rdb: created ts typings successfully.');
+
 	if (outDir)
 		fs.rmSync(outDir, { recursive: true, force: true });
 }
@@ -94,11 +81,12 @@ async function writeIndexJs(schemaJsPath) {
 
 async function findSchemaJs(cwd) {
 	let options = {
-		ignore: ['**/node_modules/**', '**/dist/**', '**/dev/**'],
+		ignore: ['**/node_modules/**', '**/dist/**', '**/dev/**', '**/deploy/**', '**/build/**'],
 		cwd
 	};
-	return new Promise(function(resolve, reject) {
-		glob('**/*(rdb|db)*/**/schema.*(js|mjs|ts)', options, async function(err, files) {
+	return new Promise(function (resolve, reject) {
+		glob('**/schema.*(js|mjs|ts)', options, async function (err, files) {
+			// glob('**/*(rdb|db)*/**/schema.*(js|mjs|ts)', options, async function(err, files) {
 			if (err)
 				reject(err);
 			else if (files.length === 0)
@@ -146,107 +134,18 @@ import { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, Binary
 export default schema as RdbClient;`;
 }
 
-function startNamespace(tables) {
-	return `
-	declare namespace r {${getTables()}
-`;
-
-	function getTables() {
-		let result = '';
-		for (let name in tables) {
-			let Name = name.substring(0, 1).toUpperCase() + name.substring(1);
-			result +=
-				`
-    	const ${name}: ${Name}Table;`;
-		}
-		result += `
-
-        function beforeRequest(callback: (response: import('express').Request, options: ResponseOptions) => Promise<void> | void): void;
-        function beforeResponse(callback: (response: import('express').Response, options: ResponseOptions) => Promise<void> | void): void;
-        function reactive(proxyMethod: (obj: unknown) => unknown): void;
-        function and(filter: Filter, ...filters: Filter[]): Filter;
-        function or(filter: Filter, ...filters: Filter[]): Filter;
-        function not(): Filter;
-        function query(filter: RawFilter | string): Promise<unknown[]>;
-        function query<T>(filter: RawFilter | string): Promise<T[]>;
-		function transaction(fn: (transaction: RdbClient) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
-        const filter: Filter;
-		function express(): Express & RequestHandler;
-		function express(config: ExpressConfig): Express & RequestHandler;
-`;
-		return result;
+function tryDownload(_url, _isNamespace) {
+	try {
+		return download.apply(null, arguments).then((res) => res, () => '');
+	}
+	// eslint-disable-next-line no-empty
+	catch (e) {
 	}
 }
 
-function getRdbClientTs(tables) {
-	return `
-	export interface RdbClient  {${getTables()}
-	}
-
-	export interface ExpressConfig {
-        database?: Pool | (() => Pool);
-        tables?: ExpressTables;
-		defaultConcurrency?: Concurrency;
-		readonly?: boolean;
-		disableBulkDeletes?: boolean;
-    }
-
-	export interface ExpressTableConfig<TConcurrency>  {
-        baseFilter?: RawFilter | ((context: ExpressContext) => RawFilter | Promise<RawFilter>);
-        customFilters?: Record<string, (...args: any[]) => RawFilter | Promise<RawFilter>>;
-        concurrency?: TConcurrency;
-        defaultConcurrency?: Concurrency;
-		readonly?: boolean;
-		disableBulkDeletes?: boolean;
-    }
-    
-    export interface ExpressContext {
-        request: import('express').Request;
-        response: import('express').Response;
-        client: RdbClient;
-    }		
-
-    export interface ExpressTables {${getExpressTables()}
-    }
-`;
-
-	function getTables() {
-		let result = '';
-		for (let name in tables) {
-			let Name = name.substring(0, 1).toUpperCase() + name.substring(1);
-			result +=
-				`
-    	${name}: ${Name}Table;`;
-		}
-		result += `
-		(config: Config): RdbClient;
-		beforeRequest(callback: (response: import('express').Request, options: ResponseOptions) => Promise<void> | void): void;
-        beforeResponse(callback: (response: import('express').Response, options: ResponseOptions) => Promise<void> | void): void;
-        reactive(proxyMethod: (obj: unknown) => unknown): void;
-        and(filter: Filter, ...filters: Filter[]): Filter;
-        or(filter: Filter, ...filters: Filter[]): Filter;
-        not(): Filter;
-        query(filter: RawFilter | string): Promise<unknown[]>;
-        query<T>(filter: RawFilter | string): Promise<T[]>;
-		transaction(fn: (transaction: RdbClient) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
-        filter: Filter;
-		express(): Express & RequestHandler;
-		express(config: ExpressConfig): Express & RequestHandler;`;
-		return result;
-	}
-	function getExpressTables() {
-		let result = '';
-		for (let name in tables) {
-			let Name = name.substring(0, 1).toUpperCase() + name.substring(1);
-			result +=
-				`
-    	${name}?: boolean | ExpressTableConfig<${Name}Concurrency>;`;
-		}
-		return result;
-	}
-}
-
-async function download(url) {
+async function download(url, isNamespace) {
+	url = `${url}?isNamespace=${isNamespace}`;
+	console.log(`Rdb: downloading from  ${url}`);
 	// eslint-disable-next-line no-undef
 	let request = new Request(url, { method: 'GET' });
 	// eslint-disable-next-line no-undef
@@ -254,9 +153,10 @@ async function download(url) {
 
 	if (response.status >= 200 && response.status < 300)
 		return response.text && await response.text();
-	return '';
+	else
+		throw new Error('No config found at ' + url);
 }
 
-module.exports = function(cwd) {
+module.exports = function (cwd) {
 	run(cwd).then(null, console.log);
 };
