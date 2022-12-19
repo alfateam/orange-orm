@@ -8,7 +8,7 @@ let useHook = require('../useHook');
 let promise = require('promise/domains');
 let versionArray = process.version.replace('v', '').split('.');
 let major = parseInt(versionArray[0]);
-let hostExpress = require('../hostExpress');
+let express = require('../hostExpress');
 let hostLocal = require('../hostLocal');
 let doQuery = require('../query');
 let releaseDbClient = require('../table/releaseDbClient');
@@ -23,7 +23,7 @@ function newDatabase(connectionString, poolOptions) {
 	else
 		pool = newPool(connectionString, poolOptions);
 
-	let c = {poolFactory: pool, hostLocal};
+	let c = {poolFactory: pool, hostLocal, express};
 
 	c.transaction = function(options, fn) {
 		if ((arguments.length === 1) && (typeof options === 'function')) {
@@ -111,10 +111,6 @@ function newDatabase(connectionString, poolOptions) {
 		caller.visitSqlite();
 	};
 
-	c.express = function(options) {
-		options = {...options, db: c};
-		return hostExpress(options);
-	};
 
 	return c;
 }

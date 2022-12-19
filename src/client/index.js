@@ -2,7 +2,6 @@ const createPatch = require('./createPatch');
 const stringify = require('./stringify');
 const netAdapter = require('./netAdapter');
 const toKeyPositionMap = require('./toKeyPositionMap');
-const hostExpress = require('../hostExpress');
 const rootMap = new WeakMap();
 const fetchingStrategyMap = new WeakMap();
 const targetKey = Symbol();
@@ -68,7 +67,9 @@ function rdbClient(options = {}) {
 	}
 
 	function express(options) {
-		return hostExpress(client, options);
+		if (!baseUrl?.express)
+			throw new Error('Express hosting is not supported on the client');
+		return baseUrl(client, options);
 	}
 
 	async function runInTransaction(fn, _options) {
@@ -449,22 +450,6 @@ function rdbClient(options = {}) {
 			map.json = stringify(array);
 			map.originalArray = [...array];
 		}
-
-		// async function insertArray(array, proxy, strategy) {
-		// 	if (array.length === 0)
-		// 		return;
-		// 	strategy = extractStrategy({strategy});
-		// 	strategy = extractFetchingStrategy({}, strategy);
-		// 	let deduceStrategy = arguments.length < 2;
-		// 	let meta = await getMeta();
-		// 	let patch = createPatch([], array, meta);
-		// 	let body = stringify({ patch, options: { strategy, deduceStrategy} });
-		// 	let adapter = netAdapter(url, { beforeRequest, beforeResponse, tableOptions });
-		// 	let { changed, strategy: newStrategy } = await adapter.patch(body);
-		// 	copyInto(changed, array);
-		// 	rootMap.set(array, { json: stringify(array), strategy: newStrategy, originalArray: [...array] });
-		// 	return proxy;
-		// }
 
 		async function deleteArray(array, options) {
 			if (array.length === 0)
