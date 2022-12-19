@@ -2394,7 +2394,7 @@ function rdbClient(options = {}) {
 	function express(options) {
 		if (!baseUrl?.express)
 			throw new Error('Express hosting is not supported on the client');
-		return baseUrl(client, options);
+		return baseUrl.express(client, options);
 	}
 
 	async function runInTransaction(fn, _options) {
