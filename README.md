@@ -14,7 +14,7 @@ Based on promises.
 [Documentation and examples](https://github.com/alfateam/rdb/blob/master/docs/docs.md)  
 
 ## Release notes
-__3.0.27__  
+__3.0.28__  
 Removed dependency rdb-client.  
 __3.0.27__  
 Query without transaction did not release connection on error.  

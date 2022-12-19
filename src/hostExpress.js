@@ -1,83 +1,102 @@
-let express;
-let executePath = require('./hostExpress/executePath');
-let getMeta = require('./hostExpress/getMeta');
-let getTSDefinition = require('./hostExpress/getTSDefinition');
+const getTSDefinition = require('./getTSDefinition');
+const hostLocal = require('./hostLocal');
+const getMeta = require('./hostExpress/getMeta');
 
-function hostExpress({ db, table, defaultConcurrency, concurrency, customFilters, baseFilter, strategy, readOnly, allowBulkDelete }) {
-	let router = express.Router();
-	router.get('/', function(_req, response) {
+function hostExpress(client, options = {}) {
+	if ('database' in options && (options.database ?? undefined) === undefined || !client.db)
+		throw new Error('No database specified');
+	const dbOptions = {db: options.db || client.db};
+	let c = {};
+	if (options.tables)
+		for (let tableName in options.tables) {
+			const tableOptions = {...dbOptions,...options, ...options.tables[tableName]};
+			c[tableName] = hostLocal({...tableOptions, ...{ table: client.tables[tableName], isHttp: true }});
+		}
+	else
+		for (let tableName in client.tables) {
+			c[tableName] = hostLocal({...dbOptions,...options, ...{ table: client.tables[tableName], isHttp: true }});
+		}
+
+	async function handler(req) {
+		if (req.method === 'POST')
+			return post.apply(null, arguments);
+		if (req.method === 'PATCH')
+			return patch.apply(null, arguments);
+		if (req.method === 'GET')
+			return get.apply(null, arguments);
+		else {
+			const e = new Error('Unhandled method ' + req.method);
+			// @ts-ignore
+			e.status = 400;
+			throw e;
+		}
+	}
+
+	handler.db = handler;
+	handler.dts = get;
+
+	function get(request, response) {
 		try {
-			if (!table)
-				throw new Error('Table is not exposed');
+			if (request.query.table) {
+				if (!(request.query.table in c)) {
+					let e = new Error('Table is not exposed or does not exist');
+					// @ts-ignore
+					e.status = 400;
+					throw e;
+				}
 
-			if ((_req.headers.accept || '').indexOf('application/json') > -1)
-				response.status(200).send(getMeta(table));
-			else {
+				const result = getMeta(client.tables[request.query.table]);
 				response.setHeader('content-type', 'text/plain');
-				response.status(200).send(getTSDefinition(table, customFilters, _req));
+				response.status(200).send(result);
+			}
+			else {
+				const isNamespace = request.query.isNamespace === 'true';
+				let tsArg = Object.keys(c).map(x => {
+					return {table: client.tables[x], customFilters: options?.tables?.[x].customFilters, name: x};
+				});
+				response.setHeader('content-type', 'text/plain');
+				response.status(200).send(getTSDefinition(tsArg, {isNamespace, isHttp: true}));
 			}
 		}
 		catch (e) {
-			response.status(500).send(e && e.stack);
+			response.status(e.status || 500).send(e && e.stack);
 		}
-	});
-	router.patch('/', async function(request, response) {
-		try {
-			if (readOnly)
-				throw new Error('Table is readOnly');
-			else if (!table)
-				throw new Error('Table is not exposed');
-			if (typeof db === 'function') {
-				let dbPromise = db(request, response);
-				if (dbPromise.then)
-					db = await dbPromise;
-				else
-					db = dbPromise;
-			}
-			let result;
-			await db.transaction(async () => {
-				let patch = request.body.patch || request.body;
-				let options = request.body.options || {};
-				let _concurrency = options.concurrency || concurrency;
-				let _defaultConcurrency = options.defaultConcurrency || defaultConcurrency;
-				let _strategy = options.strategy || strategy;
-				result = await table.patch(patch, { defaultConcurrencey: _defaultConcurrency, concurrency: _concurrency, strategy: _strategy });
-			});
+	}
 
-			response.status(200).send(result);
-		}
-		catch (e) {
-			response.status(500).send(e && e.stack);
-		}
-	});
-	router.post('/', async function(request, response) {
+	async function patch(request, response) {
 		try {
-			if (!table)
-				throw new Error('Table is not exposed');
-			if (typeof db === 'function') {
-				let dbPromise = db(request, response);
-				if (dbPromise.then)
-					db = await dbPromise;
-				else
-					db = dbPromise;
-			}
-			let result;
-			await db.transaction(async () => {
-				result = await executePath({ table, JSONFilter: request.body, customFilters, baseFilter, request, response, readOnly, allowBulkDelete });
-			});
-			response.json(result);
+			response.json(await c[request.query.table].patch(request.body));
 		}
 		catch (e) {
-			response.status(500).send(e && e.stack);
+			response.status(e.status || 500).send(e && e.stack);
 		}
-	});
-	return router;
+	};
+
+	async function post(request, response) {
+		try {
+
+			if (!request.query.table) {
+				let e = new Error('Table not defined');
+				// @ts-ignore
+				e.status = 400;
+				throw e;
+			}
+			else if (!(request.query.table in c)) {
+				let e = new Error('Table is not exposed or does not exist');
+				// @ts-ignore
+				e.status = 400;
+				throw e;
+			}
+
+			response.json(await c[request.query.table].post(request.body));
+		}
+		catch(e) {
+			response.status(e.status || 500).send(e && e.stack);
+		}
+
+	};
+
+	return handler;
 }
 
-module.exports = function hostExpressLazy(options) {
-	if (!(options && options.db))
-		throw new Error('Missing db property');
-	if (!express)
-		express = require('express');
-	return hostExpress.apply(null, arguments);
-};
+module.exports = hostExpress;

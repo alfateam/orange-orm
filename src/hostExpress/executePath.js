@@ -54,9 +54,8 @@ let _allowedOps = {
 	none: true
 };
 
-async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, request, response, readOnly, allowBulkDelete, isServerSide }) {
-	let allowedOps = {..._allowedOps, insert: !readOnly, insertAndForget: !readOnly};
-	allowBulkDelete = isServerSide || allowBulkDelete;
+async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, request, response, readonly, disableBulkDeletes, isBrowser }) {
+	let allowedOps = {..._allowedOps, insert: !readonly, insertAndForget: !readonly};
 	let ops = { ..._ops, ...getCustomFilterPaths(customFilters), getManyDto, getMany, delete: _delete, cascadeDelete   };
 	let res = await parseFilter(JSONFilter, table) || {};
 	return res;
@@ -73,7 +72,7 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 
 		function executePath(path, args) {
 			if (path in ops) {
-				if (!isServerSide)
+				if (isBrowser)
 					validateArgs(args);
 				let op = ops[path].apply(null, args);
 				if (op.then)
@@ -87,7 +86,7 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 			let pathArray = path.split('.');
 			let target = table;
 			let op = pathArray[pathArray.length - 1];
-			if (!allowedOps[op] && !isServerSide)
+			if (!allowedOps[op] && isBrowser)
 				throw new Error('Disallowed operator ' + op);
 			for (let i = 0; i < pathArray.length; i++) {
 				target = target[pathArray[i]];
@@ -113,8 +112,8 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 	}
 
 	async function _delete(filter) {
-		if (readOnly || !allowBulkDelete)
-			throw new Error('Bulk deletes are not allowed. Parameter "allowBulkDelete" must be true.');
+		if (readonly || disableBulkDeletes)
+			throw new Error('Bulk deletes are not allowed. Parameter "disableBulkDeletes" must be true.');
 		filter = negotiateRawSqlFilter(filter, table);
 		if (typeof baseFilter === 'function') {
 			baseFilter = await baseFilter(request, response);
@@ -127,8 +126,8 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 	}
 
 	async function cascadeDelete(filter) {
-		if (readOnly || !allowBulkDelete)
-			throw new Error('Bulk deletes are not allowed. Parameter "allowBulkDelete" must be true.');
+		if (readonly || disableBulkDeletes)
+			throw new Error('Bulk deletes are not allowed. Parameter "disableBulkDeletes" must be true.');
 		filter = negotiateRawSqlFilter(filter, table);
 		if (typeof baseFilter === 'function') {
 			baseFilter = await baseFilter(request, response);

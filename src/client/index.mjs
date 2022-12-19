@@ -2339,18 +2339,13 @@ function rdbClient(options = {}) {
 	let transaction = options.transaction;
 	let _reactive = options.reactive;
 	let baseUrl = options.db;
+
 	function client(_options = {}) {
 		if (_options.pg)
 			_options = { db: _options };
 		return rdbClient({ ...options, ..._options });
 	}
 
-	if (options.tables) {
-		for (let name in options.tables) {
-			client[name] = table(options.tables[name]);
-		}
-		client.tables = options.tables;
-	}
 
 	client.beforeResponse = (cb => beforeResponse = cb);
 	client.beforeRequest = (cb => beforeRequest = cb);
@@ -2370,11 +2365,36 @@ function rdbClient(options = {}) {
 	client.query = query;
 	client.transaction = runInTransaction;
 	client.db = baseUrl;
+	client.express = express;
 
-	return client;
+	if (options.tables) {
+		for (let name in options.tables) {
+			client[name] = table(options.tables[name]);
+		}
+		client.tables = options.tables;
+		return client;
+	}
+	else {
+		let handler = {
+			get(_target, property,) {
+				if (property in client)
+					return Reflect.get(...arguments);
+				else
+					return table(`${baseUrl}?table=${property}`,);
+			}
+
+		};
+		return new Proxy(client, handler);
+	}
 
 	async function query() {
 		return netAdapter(baseUrl, { tableOptions: { db: baseUrl } }).query.apply(null, arguments);
+	}
+
+	function express(options) {
+		if (!baseUrl?.express)
+			throw new Error('Express hosting is not supported on the client');
+		return baseUrl.express(client, options);
 	}
 
 	async function runInTransaction(fn, _options) {
@@ -2400,9 +2420,7 @@ function rdbClient(options = {}) {
 	}
 
 	function table(url, tableOptions) {
-		if (baseUrl && typeof url === 'string')
-			url = baseUrl + url;
-		else if (baseUrl) {
+		if (!(typeof url === 'string')) {
 			tableOptions = tableOptions || {};
 			tableOptions = { db: baseUrl, ...tableOptions, transaction };
 		}
@@ -2472,10 +2490,6 @@ function rdbClient(options = {}) {
 			return getOne.apply(null, args);
 		}
 
-		function express() {
-			return netAdapter(url, { beforeRequest, beforeResponse, tableOptions }).express.apply(null, arguments);
-		}
-
 		async function getManyCore() {
 			let args = Array.prototype.slice.call(arguments);
 			let body = stringify({
@@ -2523,13 +2537,13 @@ function rdbClient(options = {}) {
 		async function insert(rows, ...args) {
 			if (Array.isArray(rows)) {
 				let proxy = proxify([], args[0]);
-				proxy.splice.apply(proxy, [0, 0 ,...rows]);
+				proxy.splice.apply(proxy, [0, 0, ...rows]);
 				await proxy.saveChanges.apply(proxy, args);
 				return proxy;
 			}
 			else {
 				let proxy = proxify([], args[0]);
-				proxy.splice.apply(proxy, [0, 0 , rows]);
+				proxy.splice.apply(proxy, [0, 0, rows]);
 				await proxy.saveChanges.apply(proxy, args);
 				return proxify(proxy[0], args[0]);
 			}
@@ -2570,9 +2584,9 @@ function rdbClient(options = {}) {
 
 			};
 			let innerProxy = new Proxy(array, handler);
-			rootMap.set(array, { json: stringify(array), strategy, originalArray: [...array]});
+			rootMap.set(array, { json: stringify(array), strategy, originalArray: [...array] });
 			if (strategy !== undefined) {
-				const { limit, ...cleanStrategy } = {...strategy};
+				const { limit, ...cleanStrategy } = { ...strategy };
 				fetchingStrategyMap.set(array, cleanStrategy);
 			}
 			return innerProxy;
@@ -2628,6 +2642,9 @@ function rdbClient(options = {}) {
 			return result;
 		}
 
+
+
+
 		async function getMeta() {
 			if (meta)
 				return meta;
@@ -2668,12 +2685,12 @@ function rdbClient(options = {}) {
 
 		async function saveArray(array, concurrencyOptions, strategy) {
 			let deduceStrategy;
-			if (arguments.length === 2 && typeof concurrencyOptions == 'object' && !('concurrency' in concurrencyOptions || 'defaultConcurrency' in concurrencyOptions ))
+			if (arguments.length === 2 && typeof concurrencyOptions == 'object' && !('concurrency' in concurrencyOptions || 'defaultConcurrency' in concurrencyOptions))
 				strategy = concurrencyOptions;
 			else if (arguments.length < 3)
 				deduceStrategy = true;
 			let { json } = rootMap.get(array);
-			strategy = extractStrategy({strategy}, array);
+			strategy = extractStrategy({ strategy }, array);
 			strategy = extractFetchingStrategy(array, strategy);
 
 			let meta = await getMeta();
@@ -2692,13 +2709,17 @@ function rdbClient(options = {}) {
 
 		function extractChangedRowsPositions(rows, patch, meta) {
 			const positions = [];
+			const originalSet = new Set(rootMap.get(rows).originalArray);
+			const positionsAdded = {};
 			const keyPositionMap = toKeyPositionMap(rows, meta);
 			for (let i = 0; i < patch.length; i++) {
 				const element = patch[i];
 				const pathArray = element.path.split('/');
 				const position = keyPositionMap[pathArray[1]];
-				if (position >= 0)
+				if (position >= 0 && originalSet.has(rows[position]) && !positionsAdded[position]) {
 					positions.push(position);
+					positionsAdded[position] = true;
+				}
 			}
 			return positions;
 		}
@@ -2706,8 +2727,8 @@ function rdbClient(options = {}) {
 		function getInsertedRowsPosition(array) {
 			const positions = [];
 			const originalSet = new Set(rootMap.get(array).originalArray);
-			for(let i = 0; i < array.length; i++) {
-				if(!originalSet.has(array[i]))
+			for (let i = 0; i < array.length; i++) {
+				if (!originalSet.has(array[i]))
 					positions.push(i);
 			}
 			return positions;
@@ -2734,24 +2755,21 @@ function rdbClient(options = {}) {
 			if (obj) {
 				let context = rootMap.get(obj);
 				if (context.strategy !== undefined) {
-					// eslint-disable-next-line @typescript-eslint/no-unused-vars
-					let { limit, ...strategy } = {...context.strategy};
+					// @ts-ignore
+					let { limit, ...strategy } = { ...context.strategy };
 					return strategy;
 				}
 			}
-			if (tableOptions)
-				return tableOptions.strategy;
 		}
 
 		function extractFetchingStrategy(obj, strategy) {
 			if (strategy !== undefined)
 				return strategy;
 			else if (fetchingStrategyMap.get(obj) !== undefined) {
-				const { limit, ...strategy } = {...fetchingStrategyMap.get(obj)};
+				// @ts-ignore
+				const { limit, ...strategy } = { ...fetchingStrategyMap.get(obj) };
 				return strategy;
 			}
-			else if (tableOptions)
-				return tableOptions.strategy;
 		}
 
 		function clearChangesArray(array) {
@@ -2765,22 +2783,6 @@ function rdbClient(options = {}) {
 			map.json = stringify(array);
 			map.originalArray = [...array];
 		}
-
-		// async function insertArray(array, proxy, strategy) {
-		// 	if (array.length === 0)
-		// 		return;
-		// 	strategy = extractStrategy({strategy});
-		// 	strategy = extractFetchingStrategy({}, strategy);
-		// 	let deduceStrategy = arguments.length < 2;
-		// 	let meta = await getMeta();
-		// 	let patch = createPatch([], array, meta);
-		// 	let body = stringify({ patch, options: { strategy, deduceStrategy} });
-		// 	let adapter = netAdapter(url, { beforeRequest, beforeResponse, tableOptions });
-		// 	let { changed, strategy: newStrategy } = await adapter.patch(body);
-		// 	copyInto(changed, array);
-		// 	rootMap.set(array, { json: stringify(array), strategy: newStrategy, originalArray: [...array] });
-		// 	return proxy;
-		// }
 
 		async function deleteArray(array, options) {
 			if (array.length === 0)
@@ -2817,8 +2819,8 @@ function rdbClient(options = {}) {
 		}
 
 		async function refreshArray(array, strategy) {
-			clearChangesArray(array);			
-			strategy = extractStrategy({strategy}, array);
+			clearChangesArray(array);
+			strategy = extractStrategy({ strategy }, array);
 			strategy = extractFetchingStrategy(array, strategy);
 			if (array.length === 0)
 				return;
@@ -2870,11 +2872,11 @@ function rdbClient(options = {}) {
 
 		async function saveRow(row, concurrencyOptions, strategy) {
 			let deduceStrategy;
-			if (arguments.length === 2 && typeof concurrencyOptions == 'object' && !('concurrency' in concurrencyOptions || 'defaultConcurrency' in concurrencyOptions ))
+			if (arguments.length === 2 && typeof concurrencyOptions == 'object' && !('concurrency' in concurrencyOptions || 'defaultConcurrency' in concurrencyOptions))
 				strategy = concurrencyOptions;
 			else if (arguments.length < 3)
 				deduceStrategy = true;
-			strategy = extractStrategy({strategy}, row);
+			strategy = extractStrategy({ strategy }, row);
 			strategy = extractFetchingStrategy(row, strategy);
 
 			let { json } = rootMap.get(row);
@@ -2896,6 +2898,7 @@ function rdbClient(options = {}) {
 
 		async function refreshRow(row, strategy) {
 			clearChangesRow(row);
+			strategy = extractStrategy({ strategy }, row);
 			strategy = extractFetchingStrategy(row, strategy);
 
 			let meta = await getMeta();

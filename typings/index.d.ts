@@ -1,4 +1,6 @@
-declare function r(config: r.Config): r.Rdb;
+import { RequestHandler } from 'express';
+
+declare function r(config: r.Config): unknown;
 
 declare namespace r {
 
@@ -91,9 +93,9 @@ declare namespace r {
         as(dbName: string): ColumnOf<T>;
     }
 
-    export interface Rdb {
-        (config: Config): Rdb;
-    }
+    // export interface Rdb {
+    //     (config: Config): Rdb;
+    // }
 
     var filter: Filter;
     export interface RawFilter {
@@ -107,15 +109,10 @@ declare namespace r {
         not(): Filter;
     }
 
-    export type RdbRequest = {
-        method: string;
-        headers: Headers;
-        body: any;
-    }
-
     export type Concurrency = 'optimistic' | 'skipOnConflict' | 'overwrite';
 
-    export interface Express {
+    export interface Express extends RequestHandler {
+        db: import('express').RequestHandler
         dts: import('express').RequestHandler
     }
 
@@ -243,16 +240,6 @@ declare namespace r {
         in(values: Array<TType | TType2>[] | null): Filter;
     }
 
-    export interface ResponseOptions {
-        retry(): void;
-        attempts: number;
-    }
-
-    export interface ResponseOptions {
-        retry(): void;
-        attempts: number;
-    }
-
     export interface TransactionOptions {
         schema?: string[] | string;
     }
@@ -260,13 +247,14 @@ declare namespace r {
     export type Config = DbConfig | TablesConfig;
 
     export interface DbConfig {
-        db: Pool | (() => Pool);
+        db: Pool | Url | (() => Pool);
     }
+    
 
-    type Url =`${'http://'|'https://'}${string}`;
+    export type Url =`${'http://'|'https://'}${string}`;    
 
     export interface TablesConfig {
-        tables: Record<string, Url | Table>
+        tables: Record<string, Table>
     }
 
     export interface TransactionOptions {
