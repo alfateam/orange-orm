@@ -380,13 +380,17 @@ function rdbClient(options = {}) {
 
 		function extractChangedRowsPositions(rows, patch, meta) {
 			const positions = [];
+			const originalSet = new Set(rootMap.get(rows).originalArray);
+			const positionsAdded = {};
 			const keyPositionMap = toKeyPositionMap(rows, meta);
 			for (let i = 0; i < patch.length; i++) {
 				const element = patch[i];
 				const pathArray = element.path.split('/');
 				const position = keyPositionMap[pathArray[1]];
-				if (position >= 0)
+				if (position >= 0 && originalSet.has(rows[position]) && !positionsAdded[position]) {
 					positions.push(position);
+					positionsAdded[position] = true;
+				}
 			}
 			return positions;
 		}
