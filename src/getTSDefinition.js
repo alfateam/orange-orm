@@ -47,6 +47,7 @@ export interface ${Name}Table {
 	getOne(filter: RawFilter, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
 	getOne(${name}: ${Name}): Promise<${Name}Row>;
 	getOne(${name}: ${Name}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
+	getById(${getIdArgs(table)}): Promise<${Name}Row>;
 	getById(${getIdArgs(table)}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
 	insert(${name}s: ${Name}[]): Promise<${Name}Array>;
 	insert(${name}s: ${Name}[], fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
