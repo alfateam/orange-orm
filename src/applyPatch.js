@@ -1,4 +1,4 @@
-let rfc = require('rfc6902');
+const { applyOperation } = require('fast-json-patch');
 let { inspect } = require('util');
 let assert = require('assert');
 let fromCompareObject = require('./fromCompareObject');
@@ -7,7 +7,7 @@ let toCompareObject = require('./toCompareObject');
 function applyPatch({ defaultConcurrency, concurrency }, dto, changes) {
 	let dtoCompare = toCompareObject(dto);
 	changes = validateConflict(dtoCompare, changes);
-	rfc.applyPatch(dtoCompare, changes);
+	applyOperation(dtoCompare, changes);
 
 	let result = fromCompareObject(dtoCompare);
 
