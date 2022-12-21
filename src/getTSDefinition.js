@@ -11,6 +11,7 @@ const typeMap = {
 function getTSDefinition(tableConfigs, {isNamespace = false, isHttp = false} = {}) {
 	const rootTablesAdded = new Map();
 	const tableNames = new Set();
+	const tablesAdded = new Map();
 	let src = '';
 	const defs = tableConfigs.map(getTSDefinitionTable).join('');
 	const tables = tableConfigs.reduce((tables, x) => {
@@ -68,14 +69,13 @@ export interface ${Name}Table {
 	${tableRelations(table)}
 }
 
-export interface ${Name}ExpressConfig extends TablesConfig {
-	db?: unknown | string | (() => unknown | string);
-	customFilters?: ${Name}CustomFilters;
-	baseFilter?: RawFilter | ((request?: import('express').Request, response?: import('express').Response) => RawFilter | Promise<RawFilter>);
-	concurrency?: ${Name}Concurrency;
-	defaultConcurrency?: Concurrency;
-	readonly?: boolean;
-	disableBulkDeletes?: boolean;	
+export interface ${Name}ExpressConfig {
+	baseFilter?: RawFilter | ((context: ExpressContext) => RawFilter | Promise<RawFilter>);
+    customFilters?: Record<string, (...args: unknown[]) => RawFilter | Promise<RawFilter>>;
+    concurrency?: ${Name}Concurrency;
+    defaultConcurrency?: Concurrency;
+    readonly?: boolean;
+    disableBulkDeletes?: boolean;
 }
 
 export interface ${Name}CustomFilters {
@@ -113,7 +113,7 @@ export interface ${Name}ConcurrencyOptions {
 	concurrency?: ${Name}Concurrency;
 }
 
-${Concurrency(table, Name)}
+${Concurrency(table, Name, true)}
 `;
 }
 
@@ -150,17 +150,14 @@ ${Concurrency(table, Name)}
 		return result;
 	}
 
-	function Concurrency(table, name, tablesAdded) {
+	function Concurrency(table, name, isRoot) {
 		name = pascalCase(name);
-		let isRoot;
-		if (!tablesAdded) {
-			isRoot = true;
-			tablesAdded = new Map();
-		}
-		else if (tablesAdded.has(table))
-			return '';
-		else {
-			tablesAdded.set(table, name);
+		if (!isRoot) {
+			if (tablesAdded.has(table))
+				return '';
+			else {
+				tablesAdded.set(table, name);
+			}
 		}
 		let otherConcurrency = '';
 		let concurrencyRelations = '';
@@ -175,7 +172,7 @@ ${Concurrency(table, Name)}
 		visitor.visitJoin = function (relation) {
 			const tableTypeName = getTableName(relation, relationName);
 
-			otherConcurrency += `${Concurrency(relation.childTable, tableTypeName, tablesAdded)}`;
+			otherConcurrency += `${Concurrency(relation.childTable, tableTypeName)}`;
 			concurrencyRelations += `${relationName}?: ${tableTypeName}Concurrency;${separator}`;
 			strategyRelations += `${relationName}?: ${tableTypeName}Strategy;${separator}`;
 			regularRelations += `${relationName}?: ${tableTypeName} | null;${separator}`;
@@ -183,7 +180,7 @@ ${Concurrency(table, Name)}
 		visitor.visitOne = visitor.visitJoin;
 		visitor.visitMany = function (relation) {
 			const tableTypeName = getTableName(relation, relationName);
-			otherConcurrency += `${Concurrency(relation.childTable, tableTypeName, tablesAdded)}`;
+			otherConcurrency += `${Concurrency(relation.childTable, tableTypeName)}`;
 			concurrencyRelations += `${relationName}?: ${tableTypeName}Concurrency;${separator}`;
 			strategyRelations += `${relationName}?: ${tableTypeName}Strategy ;${separator}`;
 			regularRelations += `${relationName}?: ${tableTypeName}[] | null;${separator}`;
@@ -332,28 +329,28 @@ function getParamNames(func) {
 	let result = fnStr.slice(fnStr.indexOf('(') + 1, fnStr.indexOf(')')).match(ARGUMENT_NAMES);
 	if (result === null)
 		return '';
-	return result.join(': any, ') + ': any';
+	return result.join(': unknown, ') + ': unknown';
 }
 
 function getPrefixTs(isNamespace) {
 	if (isNamespace)
 		return `
-/* tslint:disable */
-/* eslint-disable */
+/* eslint-disable @typescript-eslint/no-empty-interface */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { AxiosInterceptorManager, AxiosRequestConfig, AxiosResponse } from 'axios';
-import { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, Config, TablesConfig, TransactionOptions, Pool, Express, Url } from 'rdb';
+import { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Url } from 'rdb';
 export { RequestHandler } from 'express';
-export { Concurrency, Filter, RawFilter, Config, TablesConfig, TransactionOptions, Pool } from 'rdb';
+export { Concurrency, Filter, RawFilter, Config, TransactionOptions, Pool } from 'rdb';
 export = r;
 declare function r(config: Config): r.RdbClient;
 `;
 
 	return `
-/* tslint:disable */
-/* eslint-disable */
-	import schema from './schema';
+/* eslint-disable @typescript-eslint/no-empty-interface */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import schema from './schema';
 import { AxiosInterceptorManager, AxiosRequestConfig, AxiosResponse } from 'axios';
-import { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, Config, TablesConfig, TransactionOptions, Pool, Express, Url } from 'rdb';
+import { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Url } from 'rdb';
 export default schema as RdbClient;`;
 }
 
@@ -407,7 +404,7 @@ export interface RdbClient  {${getTables(isHttp)}
 }
 
 export interface ExpressConfig {
-	database?: Pool | (() => Pool);
+	db?: Pool | (() => Pool);
 	tables?: ExpressTables;
 	defaultConcurrency?: Concurrency;
 	readonly?: boolean;
@@ -416,7 +413,7 @@ export interface ExpressConfig {
 
 export interface ExpressTableConfig<TConcurrency>  {
 	baseFilter?: RawFilter | ((context: ExpressContext) => RawFilter | Promise<RawFilter>);
-	customFilters?: Record<string, (...args: any[]) => RawFilter | Promise<RawFilter>>;
+	customFilters?: Record<string, (...args: unknown[]) => RawFilter | Promise<RawFilter>>;
 	concurrency?: TConcurrency;
 	defaultConcurrency?: Concurrency;
 	readonly?: boolean;
@@ -474,7 +471,7 @@ export interface ExpressTables {${getExpressTables()}
 			let Name = name.substring(0, 1).toUpperCase() + name.substring(1);
 			result +=
 				`
-	${name}?: boolean | ExpressTableConfig<${Name}Concurrency>;`;
+	${name}?: boolean | ${Name}ExpressConfig;`;
 		}
 		return result;
 	}

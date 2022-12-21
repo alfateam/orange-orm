@@ -3,8 +3,8 @@ const hostLocal = require('./hostLocal');
 const getMeta = require('./hostExpress/getMeta');
 
 function hostExpress(client, options = {}) {
-	if ('database' in options && (options.database ?? undefined) === undefined || !client.db)
-		throw new Error('No database specified');
+	if ('db' in options && (options.db ?? undefined) === undefined || !client.db)
+		throw new Error('No db specified');
 	const dbOptions = {db: options.db || client.db};
 	let c = {};
 	if (options.tables)
