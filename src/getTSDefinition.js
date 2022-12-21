@@ -337,6 +337,7 @@ function getPrefixTs(isNamespace) {
 		return `
 /* eslint-disable @typescript-eslint/no-empty-interface */
 /* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { AxiosInterceptorManager, AxiosRequestConfig, AxiosResponse } from 'axios';
 import { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Url } from 'rdb';
 export { RequestHandler } from 'express';
@@ -348,6 +349,7 @@ declare function r(config: Config): r.RdbClient;
 	return `
 /* eslint-disable @typescript-eslint/no-empty-interface */
 /* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import schema from './schema';
 import { AxiosInterceptorManager, AxiosRequestConfig, AxiosResponse } from 'axios';
 import { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Url } from 'rdb';
