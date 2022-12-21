@@ -14,6 +14,8 @@ Based on promises.
 [Documentation and examples](https://github.com/alfateam/rdb/blob/master/docs/docs.md)  
 
 ## Release notes
+__3.0.32__  
+More compact typescript generation.  
 __3.0.31__  
 Bugfix json patching.  
 __3.0.30__  
