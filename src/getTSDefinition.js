@@ -71,7 +71,7 @@ export interface ${Name}Table {
 
 export interface ${Name}ExpressConfig {
 	baseFilter?: RawFilter | ((context: ExpressContext) => RawFilter | Promise<RawFilter>);
-    customFilters?: Record<string, (...args: unknown[]) => RawFilter | Promise<RawFilter>>;
+    customFilters?: Record<string, (...args: any[]) => RawFilter | Promise<RawFilter>>;
     concurrency?: ${Name}Concurrency;
     defaultConcurrency?: Concurrency;
     readonly?: boolean;
@@ -406,15 +406,6 @@ export interface RdbClient  {${getTables(isHttp)}
 export interface ExpressConfig {
 	db?: Pool | (() => Pool);
 	tables?: ExpressTables;
-	defaultConcurrency?: Concurrency;
-	readonly?: boolean;
-	disableBulkDeletes?: boolean;
-}
-
-export interface ExpressTableConfig<TConcurrency>  {
-	baseFilter?: RawFilter | ((context: ExpressContext) => RawFilter | Promise<RawFilter>);
-	customFilters?: Record<string, (...args: unknown[]) => RawFilter | Promise<RawFilter>>;
-	concurrency?: TConcurrency;
 	defaultConcurrency?: Concurrency;
 	readonly?: boolean;
 	disableBulkDeletes?: boolean;
