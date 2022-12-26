@@ -1,5 +1,5 @@
 const getTSDefinition = require('./getTSDefinition');
-const hostLocal = require('./hostLocal');
+let hostLocal = _hostLocal;
 const getMeta = require('./hostExpress/getMeta');
 
 function hostExpress(client, options = {}) {
@@ -10,11 +10,11 @@ function hostExpress(client, options = {}) {
 	if (options.tables)
 		for (let tableName in options.tables) {
 			const tableOptions = {...dbOptions,...options, ...options.tables[tableName]};
-			c[tableName] = hostLocal({...tableOptions, ...{ table: client.tables[tableName], isHttp: true }});
+			c[tableName] = hostLocal({...tableOptions, ...{ table: client.tables[tableName], isHttp: true, client }});
 		}
 	else
 		for (let tableName in client.tables) {
-			c[tableName] = hostLocal({...dbOptions,...options, ...{ table: client.tables[tableName], isHttp: true }});
+			c[tableName] = hostLocal({...dbOptions,...options, ...{ table: client.tables[tableName], isHttp: true, client }});
 		}
 
 	async function handler(req) {
@@ -97,6 +97,11 @@ function hostExpress(client, options = {}) {
 	};
 
 	return handler;
+}
+
+function _hostLocal() {
+	hostLocal = require('./hostLocal');
+	return hostLocal.apply(null, arguments);
 }
 
 module.exports = hostExpress;

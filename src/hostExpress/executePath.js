@@ -7,7 +7,7 @@ let _ops = {
 	not: emptyFilter.not,
 	AND: emptyFilter.and,
 	OR: emptyFilter.or,
-	NOT: emptyFilter.not,
+	NOT: emptyFilter.not
 };
 
 let _allowedOps = {
@@ -54,9 +54,9 @@ let _allowedOps = {
 	none: true
 };
 
-async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, request, response, readonly, disableBulkDeletes, isBrowser }) {
+async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, request, response, readonly, disableBulkDeletes, isBrowser, client }) {
 	let allowedOps = {..._allowedOps, insert: !readonly, insertAndForget: !readonly};
-	let ops = { ..._ops, ...getCustomFilterPaths(customFilters), getManyDto, getMany, delete: _delete, cascadeDelete   };
+	let ops = { ..._ops, ...getCustomFilterPaths(customFilters), getManyDto, getMany, delete: _delete, cascadeDelete };
 	let res = await parseFilter(JSONFilter, table) || {};
 	return res;
 
@@ -97,6 +97,44 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 		}
 	}
 
+	
+
+	async function invokeBaseFilter() {
+		if (typeof baseFilter === 'function') {
+			const context = {client: client.bindTransaction(), request, response};
+			const res = await baseFilter.apply(null, [context]);
+			const JSONFilter = JSON.parse(JSON.stringify(res));
+			//@ts-ignore
+			return executePath({ table, JSONFilter, request, response});
+		}
+		else 
+			return baseFilter;
+	}
+
+	function getCustomFilterPaths(customFilters) {
+		return getLeafNames(customFilters);
+
+		function getLeafNames(obj, result = {}, current = 'customFilters.') {
+			for (let p in obj) {
+				if (typeof obj[p] === 'object' && obj[p] !== null)
+					getLeafNames(obj[p], result, current + p + '.');
+				else
+					result[current + p] = resolveFilter.bind(null, obj[p]);
+			}
+			return result;
+		}
+
+		async function resolveFilter(fn, ...args) {
+			const context = {client: client.bindTransaction(), request, response};
+			let res =  fn.apply(null, [context, ...args]);
+			if (res.then) 
+				res = await res;
+			const JSONFilter = JSON.parse(JSON.stringify(res));
+			//@ts-ignore
+			return executePath({ table, JSONFilter, request, response});
+		}
+	}
+
 	function nextTable(path, table) {
 		path = path.split('.');
 		let ops = new Set(['all', 'any', 'none']);
@@ -115,10 +153,8 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 		if (readonly || disableBulkDeletes)
 			throw new Error('Bulk deletes are not allowed. Parameter "disableBulkDeletes" must be true.');
 		filter = negotiateRawSqlFilter(filter, table);
-		if (typeof baseFilter === 'function') {
-			baseFilter = await baseFilter(request, response);
-		}
-		if (baseFilter) {
+		const _baseFilter = await invokeBaseFilter();
+		if (_baseFilter) {
 			filter = filter.and(baseFilter);
 		}
 		let args = [filter].concat(Array.prototype.slice.call(arguments).slice(1));
@@ -227,21 +263,6 @@ function validateArgs() {
 			}
 	}
 
-}
-
-function getCustomFilterPaths(customFilters) {
-	return getLeafNames(customFilters);
-
-	function getLeafNames(obj, result = {}, current = 'customFilters.') {
-		for (let p in obj) {
-			if (typeof obj[p] === 'object' && obj[p] !== null)
-				getLeafNames(obj[p], result, current + p + '.');
-			else
-				result[current + p] = obj[p];
-
-		}
-		return result;
-	}
 }
 
 function isFilter(json) {

@@ -38,6 +38,7 @@ function rdbClient(options = {}) {
 		}
 	};
 	client.query = query;
+	client.bindTransaction = bindTransaction;
 	client.transaction = runInTransaction;
 	client.db = baseUrl;
 	client.express = express;
@@ -70,6 +71,14 @@ function rdbClient(options = {}) {
 		if (!baseUrl?.express)
 			throw new Error('Express hosting is not supported on the client');
 		return baseUrl.express(client, options);
+	}
+
+	function bindTransaction() {
+		let db = baseUrl;
+		if (!db.bindTransaction)
+			throw new Error('Transaction not supported through http');
+		const transaction = db.bindTransaction();
+		return client({ transaction });
 	}
 
 	async function runInTransaction(fn, _options) {
@@ -641,6 +650,8 @@ function column(path, ...previous) {
 			get(_target, property) {
 				if (property === 'toJSON')
 					return result.toJSON;
+				else if (property === 'then')
+					return;
 				if (property in result)
 					return Reflect.get(...arguments);
 				else
@@ -654,6 +665,8 @@ function column(path, ...previous) {
 		get(_target, property) {
 			if (property === 'toJSON')
 				return Reflect.get(...arguments);
+			else if (property === 'then')
+				return;
 			else
 				return column(path + '.' + property);
 		}

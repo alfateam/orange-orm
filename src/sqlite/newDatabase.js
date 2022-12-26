@@ -77,6 +77,17 @@ function newDatabase(connectionString, poolOptions) {
 		return run;
 	};
 
+	c.bindTransaction = function() {
+		// @ts-ignore
+		var domain = process.domain;
+		let p = domain.run(() => true);
+
+		function run(fn) {
+			return p.then(domain.run.bind(domain, fn));
+		}
+		return run;
+	};
+
 	c.query = function(query) {
 		let domain = createDomain();
 		let transaction = newTransaction(domain, pool);

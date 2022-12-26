@@ -71,7 +71,7 @@ export interface ${Name}Table {
 
 export interface ${Name}ExpressConfig {
 	baseFilter?: RawFilter | ((context: ExpressContext) => RawFilter | Promise<RawFilter>);
-    customFilters?: Record<string, (...args: any[]) => RawFilter | Promise<RawFilter>>;
+    customFilters?: Record<string, (context: ExpressContext,...args: any[]) => RawFilter | Promise<RawFilter>>;
     concurrency?: ${Name}Concurrency;
     defaultConcurrency?: Concurrency;
     readonly?: boolean;
@@ -329,7 +329,7 @@ function getParamNames(func) {
 	let result = fnStr.slice(fnStr.indexOf('(') + 1, fnStr.indexOf(')')).match(ARGUMENT_NAMES);
 	if (result === null)
 		return '';
-	return result.join(': unknown, ') + ': unknown';
+	return result.slice(1).join(': unknown, ') + ': unknown';
 }
 
 function getPrefixTs(isNamespace) {
@@ -337,7 +337,6 @@ function getPrefixTs(isNamespace) {
 		return `
 /* eslint-disable @typescript-eslint/no-empty-interface */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { AxiosInterceptorManager, AxiosRequestConfig, AxiosResponse } from 'axios';
 import { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Url } from 'rdb';
 export { RequestHandler } from 'express';
@@ -349,7 +348,6 @@ declare function r(config: Config): r.RdbClient;
 	return `
 /* eslint-disable @typescript-eslint/no-empty-interface */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import schema from './schema';
 import { AxiosInterceptorManager, AxiosRequestConfig, AxiosResponse } from 'axios';
 import { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Url } from 'rdb';
