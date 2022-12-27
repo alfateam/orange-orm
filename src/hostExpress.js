@@ -70,7 +70,7 @@ function hostExpress(client, options = {}) {
 		catch (e) {
 			response.status(e.status || 500).send(e && e.stack);
 		}
-	};
+	}
 
 	async function post(request, response) {
 		try {
@@ -94,7 +94,7 @@ function hostExpress(client, options = {}) {
 			response.status(e.status || 500).send(e && e.stack);
 		}
 
-	};
+	}
 
 	return handler;
 }
