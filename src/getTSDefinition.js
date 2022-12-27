@@ -468,6 +468,4 @@ export interface ExpressTables {${getExpressTables()}
 	}
 }
 
-
-
 module.exports = getTSDefinition;

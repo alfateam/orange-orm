@@ -9,8 +9,8 @@ let writeFile = util.promisify(fs.writeFile);
 let ts = require('typescript');
 let moduleDefinition = require('module-definition');
 let getTSDefinition = require('../src/getTSDefinition');
-require('isomorphic-fetch');
-
+const _axios = require('axios');
+const axios = _axios.default ? _axios.default.create() : _axios.create();
 
 async function run(cwd) {
 	for (let schemaTs of await findSchemaJs(cwd)) {
@@ -124,14 +124,13 @@ async function download(url, isNamespace) {
 	url = `${url}?isNamespace=${isNamespace}`;
 	console.log(`Rdb: downloading from  ${url}`);
 	// eslint-disable-next-line no-undef
-	let request = new Request(url, { method: 'GET' });
-	// eslint-disable-next-line no-undef
-	let response = await fetch(request);
-
-	if (response.status >= 200 && response.status < 300)
-		return response.text && await response.text();
-	else
+	try {
+		let response = await axios.get(url);
+		return response.data;
+	}
+	catch(e) {
 		throw new Error('No config found at ' + url);
+	}
 }
 
 module.exports = function(cwd) {

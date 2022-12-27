@@ -40,7 +40,6 @@
     "eslint": "^8.4.1",
     "fast-json-patch": "^3.1.1",
     "findup-sync": "^5.0.0",
-    "isomorphic-fetch": "^3.0.0",
     "module-definition": "^4.0.0",
     "mysql2": "^2.2.5",
     "node-cls": "^1.0.5",
