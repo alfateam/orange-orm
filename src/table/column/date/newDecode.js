@@ -1,5 +1,5 @@
 var newDecodeCore = require('../newDecodeCore');
-var cloneDate = require('./cloneDate');
+var dateToISOString = require('../../../dateToISOString');
 
 function _new(column) {
 	var decodeCore = newDecodeCore(column);
@@ -8,7 +8,9 @@ function _new(column) {
 		value = decodeCore(value);
 		if (value === null)
 			return value;
-		return cloneDate(value);
+		else if (typeof value === 'string')
+			return value;
+		return dateToISOString(value);
 	};
 }
 
