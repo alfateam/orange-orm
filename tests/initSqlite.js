@@ -35,4 +35,4 @@ module.exports = async function(db) {
 	for (let i = 0; i < statements.length; i++) {
 		await db.query(statements[i]);
 	}
-}
+};
