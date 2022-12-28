@@ -1,0 +1,12 @@
+{
+  "name": "tests",
+  "version": "1.0.0",
+  "description": "",
+  "devDependencies": {
+    "rdb": "file:../src"
+  },
+  "scripts": {
+    "test": "jest"
+  }
+
+}
