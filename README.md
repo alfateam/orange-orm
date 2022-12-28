@@ -14,6 +14,8 @@ Based on promises.
 [Documentation and examples](https://github.com/alfateam/rdb/blob/master/docs/docs.md)  
 
 ## Release notes
+__3.1.1__  
+Typescript as peer dependency  
 __3.1.0__  
 Date is mapped to ISO string. Any date input will map 'casted' to ISO string on save.  
 __3.0.33__  
