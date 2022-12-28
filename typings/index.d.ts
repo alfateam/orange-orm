@@ -41,7 +41,7 @@ declare namespace r {
         as(propertyName: string): JoinRelation;
     }
 
-    export interface JoinRelation {
+    export abstract class JoinRelation {
         columns: ColumnDef[];
 	    childTable: Table;
     }
@@ -52,6 +52,8 @@ declare namespace r {
         join(table: Table): Join;
         hasMany(join: JoinRelation): HasMany;
         hasOne(join: JoinRelation): HasOne;
+        formulaDiscriminators(...discriminators: string[]) : Table;
+        columnDiscriminators(...discriminators: string[]) : Table;
     }
 
     export interface HasMany {
