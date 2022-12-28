@@ -5,3 +5,4 @@ docs.html
 npm-debug.log
 package-lock.json
 .vscode
+demo.db
