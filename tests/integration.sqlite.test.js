@@ -3,9 +3,31 @@ const _db = require('./db');
 const initDb = require('./initSqlite');
 const dateToISOString = require('../src/dateToISOString');
 
+test('insert autoincremental', async () => {
+	const db = _db({
+		db: rdb.sqlite(__dirname + `/demo${new Date().getUTCMilliseconds()}.db`)
+	});
+	await initDb(db);
+
+	const george = await db.customer.insert({
+		name: 'George',
+		balance: 177,
+		isActive: true
+	});
+
+	const expected = {
+		id: 1,
+		name: 'George',
+		balance: 177,
+		isActive: true
+	};
+
+	expect(george).toEqual(expected);
+});
+
 test('insert autoincremental with relations', async () => {
 	const db = _db({
-		db: rdb.sqlite(__dirname + '/demo.db')
+		db: rdb.sqlite(__dirname + `/demo${new Date().getUTCMilliseconds()}.db`)
 	});
 	await initDb(db);
 
