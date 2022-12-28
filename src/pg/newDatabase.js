@@ -143,11 +143,6 @@ function newDatabase(connectionString, poolOptions) {
 		caller.visitPg();
 	};
 
-	c.express = function(options) {
-		options = {...options, db: c};
-		return hostExpress(options);
-	};
-
 	return c;
 }
 

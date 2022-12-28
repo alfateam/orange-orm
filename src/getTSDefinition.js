@@ -115,7 +115,7 @@ export interface ${Name}ConcurrencyOptions {
 
 ${Concurrency(table, Name, true)}
 `;
-}
+	}
 
 	function getIdArgs(table) {
 		let result = [];
@@ -169,7 +169,7 @@ ${Concurrency(table, Name, true)}
 		let separator = `
 	`;
 		let visitor = {};
-		visitor.visitJoin = function (relation) {
+		visitor.visitJoin = function(relation) {
 			const tableTypeName = getTableName(relation, relationName);
 
 			otherConcurrency += `${Concurrency(relation.childTable, tableTypeName)}`;
@@ -178,7 +178,7 @@ ${Concurrency(table, Name, true)}
 			regularRelations += `${relationName}?: ${tableTypeName} | null;${separator}`;
 		};
 		visitor.visitOne = visitor.visitJoin;
-		visitor.visitMany = function (relation) {
+		visitor.visitMany = function(relation) {
 			const tableTypeName = getTableName(relation, relationName);
 			otherConcurrency += `${Concurrency(relation.childTable, tableTypeName)}`;
 			concurrencyRelations += `${relationName}?: ${tableTypeName}Concurrency;${separator}`;

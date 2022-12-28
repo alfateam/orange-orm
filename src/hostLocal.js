@@ -4,10 +4,10 @@ let setSessionSingleton = require('./table/setSessionSingleton');
 let executeQuery = require('./query');
 let hostExpress = require('./hostExpress');
 
-// { db, table, defaultConcurrency, 
+// { db, table, defaultConcurrency,
 // 	concurrency,
 // 	customFilters,
-// 	baseFilter, strategy, transaction, 
+// 	baseFilter, strategy, transaction,
 // 	readonly,
 // 	disableBulkDeletes, isBrowser }
 function hostLocal() {

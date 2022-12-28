@@ -97,7 +97,7 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 		}
 	}
 
-	
+
 
 	async function invokeBaseFilter() {
 		if (typeof baseFilter === 'function') {
@@ -107,7 +107,7 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 			//@ts-ignore
 			return executePath({ table, JSONFilter, request, response});
 		}
-		else 
+		else
 			return baseFilter;
 	}
 
@@ -127,7 +127,7 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 		async function resolveFilter(fn, ...args) {
 			const context = {client: client.bindTransaction(), request, response};
 			let res =  fn.apply(null, [context, ...args]);
-			if (res.then) 
+			if (res.then)
 				res = await res;
 			const JSONFilter = JSON.parse(JSON.stringify(res));
 			//@ts-ignore

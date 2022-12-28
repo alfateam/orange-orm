@@ -1,6 +1,0 @@
-var when = require('a').when;
-var c = {};
-
-when(c)
-	.it('should return insertCommand').assertEqual(c.expected, c.returned)
-	;

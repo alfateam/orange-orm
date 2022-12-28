@@ -7,7 +7,7 @@ module.exports = {
 		'eslint:recommended',
 		'plugin:@typescript-eslint/eslint-recommended',
 		'plugin:@typescript-eslint/recommended',
-
+		'plugin:jest/recommended'
 	],
 	'parserOptions': {
 		'sourceType': 'module',
@@ -33,7 +33,12 @@ module.exports = {
 			'named': 'never',
 			'asyncArrow': 'always'
 		}],
+		'jest/no-disabled-tests': 'warn',
+		'jest/no-focused-tests': 'error',
+		'jest/no-identical-title': 'error',
+		'jest/prefer-to-have-length': 'warn',
+		'jest/valid-expect': 'error'
 	},
-	'plugins': ['@typescript-eslint']
+	'plugins': ['jest', '@typescript-eslint']
 };
 
