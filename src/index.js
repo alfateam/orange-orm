@@ -1,6 +1,7 @@
-var newPg = require('./pg/newDatabase');
 var hostExpress = require('./hostExpress');
 var client = require('./client/index.js');
+var _mySql;
+var _pg;
 var _sqlite;
 var _mssql;
 var _sap;
@@ -10,15 +11,11 @@ var connectViaPool = function(connectionString) {
 	if (connectionString.indexOf && connectionString.indexOf('mysql') === 0)
 		return connectViaPool.mySql.apply(null, arguments);
 	else if (connectionString.indexOf && connectionString.indexOf('postgres') === 0)
-		newPg.apply(null, arguments);
+		connectViaPool.pg.apply(null, arguments);
 	else
 		return client.apply(null, arguments);
 };
 
-connectViaPool.pg = newPg;
-connectViaPool.postgres = newPg;
-connectViaPool.mysql = require('./mySql/newDatabase');
-connectViaPool.mySql = connectViaPool.mysql;
 connectViaPool.table = require('./table');
 connectViaPool.filter = require('./emptyFilter');
 connectViaPool.commit = require('./table/commit');
@@ -30,6 +27,38 @@ connectViaPool.off = require('./table/log').off;
 connectViaPool.query = require('./query');
 connectViaPool.lock = require('./lock');
 connectViaPool.schema = require('./pg/schema');
+
+Object.defineProperty(connectViaPool, 'mysql', {
+	get: function() {
+		if (!_mySql)
+			_mySql = require('./mySql/newDatabase');
+		return _mySql;
+	}
+});
+
+Object.defineProperty(connectViaPool, 'mySql', {
+	get: function() {
+		if (!_mySql)
+			_mySql = require('./mySql/newDatabase');
+		return _mySql;
+	}
+});
+
+Object.defineProperty(connectViaPool, 'postgres', {
+	get: function() {
+		if (!_pg)
+			_pg = require('./pg/newDatabase');
+		return _pg;
+	}
+});
+
+Object.defineProperty(connectViaPool, 'pg', {
+	get: function() {
+		if (!_pg)
+			_pg = require('./pg/newDatabase');
+		return _pg;
+	}
+});
 
 Object.defineProperty(connectViaPool, 'sqlite', {
 	get: function() {
