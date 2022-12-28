@@ -15,7 +15,7 @@ Based on promises.
 
 ## Release notes
 __3.1.1__  
-Typescript as peer dependency  
+Typescript as dev dependency  
 __3.1.0__  
 Date is mapped to ISO string. Any date input will map 'casted' to ISO string on save.  
 __3.0.33__  

@@ -50,7 +50,6 @@
     "uuid": "^8.3.2"
   },
   "peerDependencies": {
-    "typescript": "^4.8.4",
     "msnodesqlv8": "^2.2.0",
     "pg-native": "^3.0.0",
     "sqlite3": "^5.0.2"
