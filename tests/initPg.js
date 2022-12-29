@@ -1,4 +1,7 @@
 const sql = `
+drop schema public cascade;
+create schema public;
+
 CREATE TABLE customer (
     id SERIAL	 PRIMARY KEY,
     name TEXT,
