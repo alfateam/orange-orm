@@ -10,8 +10,8 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
-    container:
-      image:  node:18-alpine
+    # container:
+    #   image:  node:18-alpine
 
     services:
       postgres:
@@ -28,9 +28,9 @@ jobs:
         ports:
           - 5432:5432
 
-    # strategy:
-    #   matrix:
-    #     node-version: [14.x, 16.x, 18.x]
+    strategy:
+      matrix:
+        node-version: [14.x, 16.x, 18.x]
 
     steps:
       - uses: actions/checkout@v3
