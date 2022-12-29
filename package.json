@@ -89,7 +89,8 @@
     "mysql2": "^2.2.5",
     "pg": "^8.5.1",
     "pg-query-stream": "^3.3.2",
-    "sqlite3": "^5.0.2"
+    "sqlite3": "^5.0.2",
+    "msnodesqlv8": "^2.2.0"
   },
   "engines": {
     "node": ">= 8.0.0"
