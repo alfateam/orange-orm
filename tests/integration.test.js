@@ -7,16 +7,46 @@ const initMysql = require('./initMysql');
 const initSqlite = require('./initSqlite');
 const dateToISOString = require('../src/dateToISOString');
 
-rdb.on('query', (e) => {
-	console.dir(e.sql);
+function pg() {
+	return rdb.pg('postgres://postgres:postgres@postgres/postgres');
+}
+
+function mssql() {
+	return rdb.mssql('server=mssql;Database=master;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes');
+}
+
+function mysql() {
+	return rdb.mySql('mysql://test:test@mysql/test');
+}
+
+function sqlite() {
+	return rdb.sqlite(`demo${new Date().getUTCMilliseconds()}.db`);
+}
+
+describe('transaction', () => {
+
+	test('pg', async () => await verify(pg(), initPg));
+	test('mssql', async () => await verify(mssql(), initMs));
+	test('mysql', async () => await verify(mysql(), initMysql));
+	test('sqlite', async () => await verify(sqlite(), initSqlite));
+
+	async function verify(pool, _initDb) {
+		const db = _db({ db: pool });
+		let result;
+		await db.transaction(async (db) => {
+			result = await db.query('select 1 as foo');
+		});
+		expect(result).toEqual([{foo: 1}]);
+	}
 });
+
 
 describe('insert autoincremental foo bar', () => {
 
-	test('pg', async () => await verify(rdb.pg('postgres://postgres:postgres@postgres/postgres'), initPg));
-	test('mssql', async () => await verify(rdb.mssql('server=mssql;Database=master;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes'), initMs));
-	test('mysql', async () => await verify(rdb.mySql('mysql://test:test@mysql/test'), initMysql));
-	test('sqlite', async () => await verify(rdb.sqlite(`demo${new Date().getUTCMilliseconds()}.db`), initSqlite));
+	test('pg', async () => await verify(pg(), initPg));
+	test('mssql', async () => await verify(mssql(), initMs));
+	test('mysql', async () => await verify(mysql(), initMysql));
+	test('sqlite', async () => await verify(sqlite(), initSqlite));
 
 	async function verify(pool, initDb) {
 		const db = _db({ db: pool });
@@ -40,10 +70,10 @@ describe('insert autoincremental foo bar', () => {
 });
 
 describe('insert autoincremental with relations', () => {
-	test('pg', async () => await verify(rdb.pg('postgres://postgres:postgres@postgres/postgres'), initPg));
-	test('mssql', async () => await verify(rdb.mssql('server=mssql;Database=master;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes'), initMs), 1000000);
-	test('mysql', async () => await verify(rdb.mySql('mysql://test:test@mysql/test'), initMysql));
-	test('sqlite', async () => await verify(rdb.sqlite(`demo${new Date().getUTCMilliseconds()}.db`), initSqlite), 1000000);
+	test('pg', async () => await verify(pg(), initPg));
+	test('mssql', async () => await verify(mssql(), initMs));
+	test('mysql', async () => await verify(mysql(), initMysql));
+	test('sqlite', async () => await verify(sqlite(), initSqlite));
 
 	async function verify(pool, initDb) {
 		const db = _db({ db: pool });

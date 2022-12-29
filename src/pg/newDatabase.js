@@ -80,7 +80,7 @@ function newDatabase(connectionString, poolOptions) {
 	c.createTransaction = function(options) {
 		let domain = createDomain();
 		let transaction = newTransaction(domain, pool);
-		let p = domain.run(() => new promise(transaction).then(begin).then(negotiateSchema));
+		let p = domain.run(() => new Promise(transaction).then(begin).then(negotiateSchema));
 
 		function run(fn) {
 			return p.then(domain.run.bind(domain, fn));
