@@ -13,7 +13,7 @@ CREATE TABLE customer (
 
 CREATE TABLE _order (
     id int IDENTITY(1,1) PRIMARY KEY,
-    orderDate TIMESTAMP,
+    orderDate DATETIME,
     customerId INTEGER REFERENCES customer
 );
 

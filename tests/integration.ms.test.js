@@ -5,7 +5,7 @@ const dateToISOString = require('../src/dateToISOString');
 
 test('insert autoincremental', async () => {
 	const db = _db({
-		db: rdb.mssql('server=database;Database=master;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes')
+		db: rdb.mssql('server=mssql;Database=master;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes')
 	});
 	await initDb(db);
 
@@ -27,7 +27,7 @@ test('insert autoincremental', async () => {
 
 test('insert autoincremental with relations', async () => {
 	const db = _db({
-		db: rdb.mssql('server=database;Database=master;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes')
+		db: rdb.mssql('server=mssql;Database=master;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes')
 	});
 	await initDb(db);
 
