@@ -9,7 +9,7 @@ on:
 jobs:
   build:
 
-    run:s-on: ubuntu-latest
+    runs-on: ubuntu-latest
     # container:
     #   image:  node:18-alpine
     container: node:18-alpine
