@@ -9,7 +9,7 @@ on:
 jobs:
   build:
 
-    runs-on: ubuntu-latest
+    run:s-on: ubuntu-latest
     # container:
     #   image:  node:18-alpine
     container: node:18-alpine
@@ -28,7 +28,13 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
-
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2019-latest
+        env:
+          SA_PASSWORD: P@assword123
+          ACCEPT_EULA: 'Y'
+        ports:
+          - 1433:1433
     strategy:
       matrix:
         node-version: [14.x, 16.x, 18.x]
@@ -39,6 +45,15 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node-version }}
+      - run: apk update
+      - run: apk --no-cache add curl
+      - run: apk add sudo
+      - # odbc alpine
+      - # https://docs.microsoft.com/en-us/sql/connect/odbc/linux-mac/installing-the-microsoft-odbc-driver-for-sql-server?view=sql-server-ver16
+      - run: curl -O https://download.microsoft.com/download/b/9/f/b9f3cce4-3925-46d4-9f46-da08869c6486/msodbcsql18_18.1.1.1-1_amd64.apk
+      - run: curl -O https://download.microsoft.com/download/b/9/f/b9f3cce4-3925-46d4-9f46-da08869c6486/mssql-tools18_18.1.1.1-1_amd64.apk
+      - run: sudo apk add --allow-untrusted msodbcsql18_18.1.1.1-1_amd64.apk
+      - run: sudo apk add --allow-untrusted mssql-tools18_18.1.1.1-1_amd64.apk
       - run: npm install
       - run: npm run lint
       - run: npm test

@@ -6,7 +6,6 @@ const dateToISOString = require('../src/dateToISOString');
 test('insert autoincremental', async () => {
 	const db = _db({
 		db: rdb.sqlite(`demo${new Date().getUTCMilliseconds()}.db`)
-		// db: rdb.sqlite(__dirname + `/demo${new Date().getUTCMilliseconds()}.db`)
 	});
 	await initDb(db);
 
