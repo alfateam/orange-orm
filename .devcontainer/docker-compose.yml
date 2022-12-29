@@ -7,8 +7,8 @@ services:
       dockerfile: Dockerfile
     command: sleep infinity
     # working_dir: /app
-    # volumes:
-    #   - ..:/workspace:cached
+    volumes:
+      - ..:/workspace:cached
     # environment:
       # - ACCEPT_EULA=Y
       # - SA_PASSWORD=P@assword123

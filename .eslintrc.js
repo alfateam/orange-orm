@@ -21,7 +21,7 @@ module.exports = {
 		'no-unused-vars': 'off',
 		'@typescript-eslint/no-unused-vars': [2, { 'args': 'after-used', 'ignoreRestSiblings': true, 'argsIgnorePattern': '^_' }],
 		'indent': ['error', 'tab'],
-		'linebreak-style': ['error', 'unix'],
+		// 'linebreak-style': ['error', 'unix'],
 		'quotes': ['error', 'single'],
 		'semi': ['error', 'always'],
 		'no-console': 'off',
