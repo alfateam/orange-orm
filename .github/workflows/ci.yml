@@ -35,6 +35,21 @@ jobs:
           ACCEPT_EULA: 'Y'
         ports:
           - 1433:1433
+
+      mysql:
+        image: mysql:8.0.31
+        env:
+          MYSQL_DATABASE: test
+          MYSQL_USER: test
+          MYSQL_PASSWORD: test
+          MYSQL_ROOT_PASSWORD: test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping" 
+          --health-interval=10s 
+          --health-timeout=5s 
+          --health-retries=3
     strategy:
       matrix:
         node-version: [14.x, 16.x, 18.x]
