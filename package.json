@@ -47,7 +47,6 @@
     "uuid": "^8.3.2"
   },
   "peerDependencies": {
-    "msnodesqlv8": "^2.2.0",
     "mysql2": "^2.2.5",
     "pg": "^8.5.1",
     "pg-native": "^3.0.0",
