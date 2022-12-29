@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     # container:
     #   image:  node:18-alpine
+    container: node:18-alpine
 
     services:
       postgres:
@@ -19,7 +20,6 @@ jobs:
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: postgres
-          POSTGRES_USER: postgres
         # Set health checks to wait until postgres has started
         options: >-
           --health-cmd pg_isready
