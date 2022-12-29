@@ -5,7 +5,7 @@ const dateToISOString = require('../src/dateToISOString');
 
 test('insert autoincremental', async () => {
 	const db = _db({
-		db: rdb.pg('postgres://postgres:postgres@postgres/postgres')
+		db: rdb.pg('postgres://postgres:postgres@localhost/postgres')
 	});
 	await initDb(db);
 
@@ -27,7 +27,7 @@ test('insert autoincremental', async () => {
 
 test('insert autoincremental with relations', async () => {
 	const db = _db({
-		db: rdb.pg('postgres://postgres:postgres@postgres/postgres')
+		db: rdb.pg('postgres://postgres:postgres@localhost/postgres')
 	});
 	await initDb(db);
 
