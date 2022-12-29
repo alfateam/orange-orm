@@ -17,7 +17,6 @@ let purifyStrategy = require('../purifyStrategy');
 
 function newDecodeDbRow(table, dbRow, filteredAliases) {
 	let aliases = filteredAliases || table._aliases;
-	let sessionContext = tryGetSessionContext();
 	let columns = table._columns;
 	let numberOfColumns = columns.length;
 	if (dbRow.offset === undefined) {
@@ -160,7 +159,7 @@ function newDecodeDbRow(table, dbRow, filteredAliases) {
 			strategy = extractStrategy(table);
 		}
 		strategy = purifyStrategy(table, strategy);
-		if (sessionContext !== tryGetSessionContext()) {
+		if (!tryGetSessionContext()) {
 			return toDto(strategy, table, this, new Set());
 		}
 		let p =  toDto(strategy, table, this);
