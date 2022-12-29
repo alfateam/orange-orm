@@ -13,7 +13,9 @@ services:
       # - ACCEPT_EULA=Y
       # - SA_PASSWORD=P@assword123
     depends_on: 
-      - postgres      
+      - postgres
+      - mssql
+      - mysql
   postgres:
     image: postgres
     environment:
@@ -22,3 +24,21 @@ services:
     ports:
       - 54320:5432
     restart: always
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=P@assword123
+    ports:
+      - 14330:1433
+    restart: always
+  mysql:
+    image: mysql:8.0.31
+    environment:
+      - MYSQL_ROOT_PASSWORD=test
+      - MYSQL_DATABASE=test
+      - MYSQL_USER=test
+      - MYSQL_PASSWORD=test
+    ports:
+      - 3306:3306
+    restart: always    

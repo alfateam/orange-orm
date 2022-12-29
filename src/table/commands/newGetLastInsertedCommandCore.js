@@ -17,8 +17,10 @@ function newGetLastInsertedCommandCore(table, row) {
 		if (Array.isArray(filter)) {
 			for (let i = 0; i < filter.length; i++) {
 				const sep = i === 0 ? '' : ' AND ';
-				if (!filter[i].sql)
-					filter[i] = {sql : () => filter[i]};
+				if (!filter[i].sql) {
+					const sql = filter[i];
+					filter[i] = {sql : () => sql};
+				}
 				let next = newParameterized(sep + filter[i].sql(), filter[i].parameters);
 				if (parameterized)
 					parameterized = parameterized.append(next);

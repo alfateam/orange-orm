@@ -2,20 +2,24 @@ name: Node.js CI
 
 on:
   push:
-    branches: [ _pgAction ]
+    branches: [ master ]
   pull_request:
-    branches: [ _pgAction ]
+    branches: [ master ]
 
 jobs:
   build:
 
     runs-on: ubuntu-latest
+    # container:
+    #   image:  node:18-alpine
+    container: node:18-alpine
 
     services:
       postgres:
         image: postgres
         env:
           POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
         # Set health checks to wait until postgres has started
         options: >-
           --health-cmd pg_isready
@@ -24,7 +28,28 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2019-latest
+        env:
+          SA_PASSWORD: P@assword123
+          ACCEPT_EULA: 'Y'
+        ports:
+          - 1433:1433
 
+      mysql:
+        image: mysql:8.0.31
+        env:
+          MYSQL_DATABASE: test
+          MYSQL_USER: test
+          MYSQL_PASSWORD: test
+          MYSQL_ROOT_PASSWORD: test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping" 
+          --health-interval=10s 
+          --health-timeout=5s 
+          --health-retries=3
     strategy:
       matrix:
         node-version: [14.x, 16.x, 18.x]
@@ -35,6 +60,13 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node-version }}
+      - run: apk update
+      - run: apk --no-cache add curl
+      - run: apk add sudo
+      - run: curl -O https://download.microsoft.com/download/b/9/f/b9f3cce4-3925-46d4-9f46-da08869c6486/msodbcsql18_18.1.1.1-1_amd64.apk
+      - run: curl -O https://download.microsoft.com/download/b/9/f/b9f3cce4-3925-46d4-9f46-da08869c6486/mssql-tools18_18.1.1.1-1_amd64.apk
+      - run: sudo apk add --allow-untrusted msodbcsql18_18.1.1.1-1_amd64.apk
+      - run: sudo apk add --allow-untrusted mssql-tools18_18.1.1.1-1_amd64.apk
       - run: npm install
       - run: npm run lint
       - run: npm test
