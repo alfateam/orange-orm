@@ -49,4 +49,5 @@ services:
     ports:
       - 50000:5000
     tty: true
+    entrypoint: "/home/sybase/bin/entrypoint.sh"
     restart: always

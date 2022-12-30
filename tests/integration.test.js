@@ -5,33 +5,20 @@ const initPg = require('./initPg');
 const initMs = require('./initMs');
 const initMysql = require('./initMysql');
 const initSqlite = require('./initSqlite');
+const initSap = require('./initSap');
 const dateToISOString = require('../src/dateToISOString');
-
-function pg() {
-	return rdb.pg('postgres://postgres:postgres@postgres/postgres');
-}
-
-function mssql() {
-	return rdb.mssql('server=mssql;Database=master;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes');
-}
-
-function mysql() {
-	return rdb.mySql('mysql://test:test@mysql/test');
-}
-
-function sqlite() {
-	return rdb.sqlite(`demo${new Date().getUTCMilliseconds()}.db`);
-}
 
 describe('transaction', () => {
 
-	test('pg', async () => await verify(pg(), initPg));
-	test('mssql', async () => await verify(mssql(), initMs));
-	test('mysql', async () => await verify(mysql(), initMysql));
-	test('sqlite', async () => await verify(sqlite(), initSqlite));
+	test('pg', async () => await verify(pg()));
+	test('mssql', async () => await verify(mssql()));
+	test('mysql', async () => await verify(mysql()));
+	test('sqlite', async () => await verify(sqlite()));
+	test('sap', async () => await verify(sap()));
 
-	async function verify(pool, _initDb) {
-		const db = _db({ db: pool });
+
+	async function verify({pool}) {
+		const db = _db({db: pool});
 		let result;
 		await db.transaction(async (db) => {
 			result = await db.query('select 1 as foo');
@@ -41,16 +28,17 @@ describe('transaction', () => {
 });
 
 
-describe('insert autoincremental foo bar', () => {
+describe('insert autoincremental', () => {
 
-	test('pg', async () => await verify(pg(), initPg));
-	test('mssql', async () => await verify(mssql(), initMs));
-	test('mysql', async () => await verify(mysql(), initMysql));
-	test('sqlite', async () => await verify(sqlite(), initSqlite));
+	test('pg', async () => await verify(pg()));
+	test('mssql', async () => await verify(mssql()));
+	test('mysql', async () => await verify(mysql()));
+	test('sqlite', async () => await verify(sqlite()));
+	test('sap', async () => await verify(sap()));
 
-	async function verify(pool, initDb) {
-		const db = _db({ db: pool });
-		await initDb(db);
+	async function verify({pool, init}) {
+		const db = _db({db: pool});
+		await init(db);
 
 		const george = await db.customer.insert({
 			name: 'George',
@@ -70,14 +58,15 @@ describe('insert autoincremental foo bar', () => {
 });
 
 describe('insert autoincremental with relations', () => {
-	test('pg', async () => await verify(pg(), initPg));
-	test('mssql', async () => await verify(mssql(), initMs));
-	test('mysql', async () => await verify(mysql(), initMysql));
-	test('sqlite', async () => await verify(sqlite(), initSqlite));
+	test('pg', async () => await verify(pg()));
+	test('mssql', async () => await verify(mssql()));
+	test('mysql', async () => await verify(mysql()));
+	test('sqlite', async () => await verify(sqlite()));
+	test('sap', async () => await verify(sap()));
 
-	async function verify(pool, initDb) {
+	async function verify({pool, init}) {
 		const db = _db({ db: pool });
-		await initDb(db);
+		await init(db);
 
 		const date1 = new Date(2022, 0, 11, 9, 24, 47);
 		const date2 = new Date(2021, 0, 11, 12, 22, 45);
@@ -179,3 +168,23 @@ describe('insert autoincremental with relations', () => {
 	}
 
 });
+
+function pg() {
+	return {pool: rdb.pg('postgres://postgres:postgres@postgres/postgres'), init: initPg};
+}
+
+function mssql() {
+	return {pool: rdb.mssql('server=mssql;Database=master;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes'), init: initMs};
+}
+
+function sap() {
+	return {pool: rdb.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master`), init: initSap};
+}
+
+function mysql() {
+	return {pool: rdb.mySql('mysql://test:test@mysql/test'), init: initMysql};
+}
+
+function sqlite() {
+	return {pool: rdb.sqlite(`demo${new Date().getUTCMilliseconds()}.db`), init: initSqlite};
+}

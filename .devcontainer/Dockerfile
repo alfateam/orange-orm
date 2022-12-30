@@ -11,6 +11,9 @@ FROM node:18-alpine
 #alpine
 RUN apk update
 RUN apk add git
+RUN apk add libnsl
+RUN apk add gcompat
+RUN ln -s /usr/lib/libnsl.so.3 /usr/lib/libnsl.so.1
 RUN apk --no-cache add curl
 RUN apk add sudo
 # odbc alpine
