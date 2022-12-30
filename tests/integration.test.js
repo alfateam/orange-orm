@@ -1,3 +1,4 @@
+/* eslint-disable jest/no-commented-out-tests */
 /* eslint-disable jest/expect-expect */
 const rdb = require('rdb');
 const _db = require('./db');
@@ -5,7 +6,7 @@ const initPg = require('./initPg');
 const initMs = require('./initMs');
 const initMysql = require('./initMysql');
 const initSqlite = require('./initSqlite');
-const initSap = require('./initSap');
+// const initSap = require('./initSap');
 const dateToISOString = require('../src/dateToISOString');
 
 describe('transaction', () => {
@@ -14,7 +15,7 @@ describe('transaction', () => {
 	test('mssql', async () => await verify(mssql()));
 	test('mysql', async () => await verify(mysql()));
 	test('sqlite', async () => await verify(sqlite()));
-	test('sap', async () => await verify(sap()));
+	// test('sap', async () => await verify(sap()));
 
 
 	async function verify({pool}) {
@@ -34,7 +35,7 @@ describe('insert autoincremental', () => {
 	test('mssql', async () => await verify(mssql()));
 	test('mysql', async () => await verify(mysql()));
 	test('sqlite', async () => await verify(sqlite()));
-	test('sap', async () => await verify(sap()));
+	// test('sap', async () => await verify(sap()));
 
 	async function verify({pool, init}) {
 		const db = _db({db: pool});
@@ -62,7 +63,7 @@ describe('insert autoincremental with relations', () => {
 	test('mssql', async () => await verify(mssql()));
 	test('mysql', async () => await verify(mysql()));
 	test('sqlite', async () => await verify(sqlite()));
-	test('sap', async () => await verify(sap()));
+	// test('sap', async () => await verify(sap()));
 
 	async function verify({pool, init}) {
 		const db = _db({ db: pool });
@@ -173,13 +174,14 @@ function pg() {
 	return {pool: rdb.pg('postgres://postgres:postgres@postgres/postgres'), init: initPg};
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function mssql() {
 	return {pool: rdb.mssql('server=mssql;Database=master;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes'), init: initMs};
 }
 
-function sap() {
-	return {pool: rdb.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master`), init: initSap};
-}
+// function sap() {
+// 	return {pool: rdb.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master`), init: initSap};
+// }
 
 function mysql() {
 	return {pool: rdb.mySql('mysql://test:test@mysql/test'), init: initMysql};
