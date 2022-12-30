@@ -61,7 +61,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - run: apk update
-      - run: apk --no-cache add curl
+      - run: apk --no-cache add curl unzip
       - run: apk add sudo
       - run: curl -O https://download.microsoft.com/download/b/9/f/b9f3cce4-3925-46d4-9f46-da08869c6486/msodbcsql18_18.1.1.1-1_amd64.apk
       - run: curl -O https://download.microsoft.com/download/b/9/f/b9f3cce4-3925-46d4-9f46-da08869c6486/mssql-tools18_18.1.1.1-1_amd64.apk
@@ -78,5 +78,6 @@ jobs:
             apk --no-cache add libaio && cd /lib && \
             ln -s libnsl.so.2 /usr/lib/libnsl.so.1 && \
             ln -s libc.so /usr/lib/libresolv.so.2
+      - run: npm install
       - run: npm run lint
       - run: npm test
