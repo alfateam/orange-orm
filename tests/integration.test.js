@@ -12,10 +12,10 @@ const dateToISOString = require('../src/dateToISOString');
 describe('transaction', () => {
 
 	test('pg', async () => await verify(pg()));
-	// test('mssql', async () => await verify(mssql()));
+	test('mssql', async () => await verify(mssql()));
 	test('mysql', async () => await verify(mysql()));
 	test('sqlite', async () => await verify(sqlite()));
-	// test('sap', async () => await verify(sap()));
+	test('sap', async () => await verify(sap()));
 
 
 	async function verify({pool}) {
@@ -32,7 +32,7 @@ describe('transaction', () => {
 describe('insert autoincremental', () => {
 
 	test('pg', async () => await verify(pg()));
-	// test('mssql', async () => await verify(mssql()));
+	test('mssql', async () => await verify(mssql()));
 	test('mysql', async () => await verify(mysql()));
 	test('sqlite', async () => await verify(sqlite()));
 	test('sap', async () => await verify(sap()));
@@ -60,10 +60,10 @@ describe('insert autoincremental', () => {
 
 describe('insert autoincremental with relations', () => {
 	test('pg', async () => await verify(pg()));
-	// test('mssql', async () => await verify(mssql()));
+	test('mssql', async () => await verify(mssql()));
 	test('mysql', async () => await verify(mysql()));
 	test('sqlite', async () => await verify(sqlite()));
-	// test('sap', async () => await verify(sap()));
+	test('sap', async () => await verify(sap()));
 
 	async function verify({pool, init}) {
 		const db = _db({ db: pool });
