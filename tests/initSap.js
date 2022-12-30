@@ -78,7 +78,7 @@ CREATE TABLE deliveryAddress (
 `;
 
 module.exports = async function(db) {
-	const statements = sql.split('GO')
+	const statements = sql.split('GO');
 	for (let i = 0; i < statements.length; i++) {
 		await db.query(statements[i]);
 	}
