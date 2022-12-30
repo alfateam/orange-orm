@@ -74,11 +74,7 @@ jobs:
       # - run: ln -s /usr/lib/libnsl.so.3 /usr/lib/libnsl.so.1
       - run: wget https://download.oracle.com/otn_software/linux/instantclient/193000/instantclient-basic-linux.x64-19.3.0.0.0dbru.zip
       - run: unzip instantclient-basic-linux.x64-19.3.0.0.0dbru.zip
-      - run: cp -r instantclient_19_3/* /lib && \
-            rm -rf instantclient-basic-linux.x64-19.3.0.0.0dbru.zip && \
-            apk --no-cache add libaio && cd /lib && \
-            ln -s libnsl.so.2 /usr/lib/libnsl.so.1 && \
-            ln -s libc.so /usr/lib/libresolv.so.2
+      - run: cp -r instantclient_19_3/* /lib && rm -rf instantclient-basic-linux.x64-19.3.0.0.0dbru.zip && apk --no-cache add libaio && cd /lib && ln -s libnsl.so.2 /usr/lib/libnsl.so.1 && ln -s libc.so /usr/lib/libresolv.so.2
       - run: npm install
       - run: npm run lint
       - run: npm test
