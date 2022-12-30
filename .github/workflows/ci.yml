@@ -71,5 +71,6 @@ jobs:
       - run: apk add libnsl
       - run: apk add gcompat
       - run: ln -s /usr/lib/libnsl.so.3 /usr/lib/libnsl.so.1
+      - run: npm rebuild sqlite3 msnodesqlv8
       - run: npm run lint
       - run: npm test
