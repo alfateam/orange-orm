@@ -61,8 +61,9 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - run: apk update
-      - run: apk --no-cache add curl unzip
+      - run: apk --no-cache add curl
       - run: apk add sudo
+      - run: apk no-cache add unzip
       - run: curl -O https://download.microsoft.com/download/b/9/f/b9f3cce4-3925-46d4-9f46-da08869c6486/msodbcsql18_18.1.1.1-1_amd64.apk
       - run: curl -O https://download.microsoft.com/download/b/9/f/b9f3cce4-3925-46d4-9f46-da08869c6486/mssql-tools18_18.1.1.1-1_amd64.apk
       - run: sudo apk add --allow-untrusted msodbcsql18_18.1.1.1-1_amd64.apk
