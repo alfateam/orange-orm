@@ -6,7 +6,7 @@ const initPg = require('./initPg');
 const initMs = require('./initMs');
 const initMysql = require('./initMysql');
 const initSqlite = require('./initSqlite');
-const initSap = require('./initSap');
+// const initSap = require('./initSap');
 const dateToISOString = require('../src/dateToISOString');
 
 describe('transaction', () => {
