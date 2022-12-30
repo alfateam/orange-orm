@@ -174,6 +174,7 @@ function pg() {
 	return {pool: rdb.pg('postgres://postgres:postgres@postgres/postgres'), init: initPg};
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function mssql() {
 	return {pool: rdb.mssql('server=mssql;Database=master;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes'), init: initMs};
 }
