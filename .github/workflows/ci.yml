@@ -75,5 +75,6 @@ jobs:
       - run: sudo apk add --allow-untrusted msodbcsql18_18.1.1.1-1_amd64.apk
       - run: sudo apk add --allow-untrusted mssql-tools18_18.1.1.1-1_amd64.apk
       - run: npm install
+      - run: npm rebuild
       - run: npm run lint
       - run: npm test
