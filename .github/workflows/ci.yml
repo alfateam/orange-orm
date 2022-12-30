@@ -54,8 +54,6 @@ jobs:
         image: larsroald/ase-server    
         ports:
           - 5000:5000
-        tty: true
-        entrypoint: "/home/sybase/bin/entrypoint.sh"
     strategy:
       matrix:
         node-version: [14.x, 16.x, 18.x]
