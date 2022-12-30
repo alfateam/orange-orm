@@ -52,7 +52,6 @@ jobs:
           --health-retries=3
       sapase:
         image: larsroald/ase-server    
-        hostname: sapase
         ports:
           - 5000:5000
         tty: true
