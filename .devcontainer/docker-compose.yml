@@ -16,6 +16,7 @@ services:
       - postgres
       - mssql
       - mysql
+      - sapase
   postgres:
     image: postgres
     environment:
@@ -41,4 +42,11 @@ services:
       - MYSQL_PASSWORD=test
     ports:
       - 3306:3306
-    restart: always    
+    restart: always
+  sapase:
+    image: larsroald/ase-server    
+    hostname: sapase
+    ports:
+      - 50000:5000
+    tty: true
+    restart: always
