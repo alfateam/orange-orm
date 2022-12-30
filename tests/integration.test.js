@@ -1,3 +1,4 @@
+/* eslint-disable jest/no-commented-out-tests */
 /* eslint-disable jest/expect-expect */
 const rdb = require('rdb');
 const _db = require('./db');
@@ -14,7 +15,7 @@ describe('transaction', () => {
 	test('mssql', async () => await verify(mssql()));
 	test('mysql', async () => await verify(mysql()));
 	test('sqlite', async () => await verify(sqlite()));
-	test('sap', async () => await verify(sap()));
+	// test('sap', async () => await verify(sap()));
 
 
 	async function verify({pool}) {
@@ -62,7 +63,7 @@ describe('insert autoincremental with relations', () => {
 	test('mssql', async () => await verify(mssql()));
 	test('mysql', async () => await verify(mysql()));
 	test('sqlite', async () => await verify(sqlite()));
-	test('sap', async () => await verify(sap()));
+	// test('sap', async () => await verify(sap()));
 
 	async function verify({pool, init}) {
 		const db = _db({ db: pool });
