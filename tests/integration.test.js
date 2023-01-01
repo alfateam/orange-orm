@@ -12,6 +12,7 @@ const dateToISOString = require('../src/dateToISOString');
 describe('transaction', () => {
 
 	test('pg', async () => await verify(pg()));
+	test('tedious', async () => await verify(tedious()));
 	test('mssql', async () => await verify(mssql()));
 	test('mysql', async () => await verify(mysql()));
 	test('sqlite', async () => await verify(sqlite()));
@@ -32,6 +33,7 @@ describe('transaction', () => {
 describe('insert autoincremental', () => {
 
 	test('pg', async () => await verify(pg()));
+	test('tedious', async () => await verify(tedious()));
 	test('mssql', async () => await verify(mssql()));
 	test('mysql', async () => await verify(mysql()));
 	test('sqlite', async () => await verify(sqlite()));
@@ -71,6 +73,7 @@ describe('insert autoincremental with relations', () => {
 
 		const date1 = new Date(2022, 0, 11, 9, 24, 47);
 		const date2 = new Date(2021, 0, 11, 12, 22, 45);
+
 		const george = await db.customer.insert({
 			name: 'George',
 			balance: 177,
@@ -81,7 +84,6 @@ describe('insert autoincremental with relations', () => {
 			balance: 200,
 			isActive: true
 		});
-
 		let orders = await db.order.insert([
 			{
 				orderDate: date1,
@@ -177,6 +179,24 @@ function pg() {
 //eslint-disable-next-line @typescript-eslint/no-unused-vars
 function mssql() {
 	return {pool: rdb.mssql('server=mssql;Database=master;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes'), init: initMs};
+}
+
+function tedious() {
+	return {pool: rdb.tedious(
+		{
+			server: 'mssql', // or 'localhost'
+			options: {
+				encrypt: false,
+				useColumnNames: true
+			},
+			authentication: {
+				type: 'default',
+				options: {
+					userName: 'sa',
+					password: 'P@assword123',
+				}
+			}}), 
+	init: initMs};
 }
 
 function sap() {

@@ -5,6 +5,7 @@ var _pg;
 var _sqlite;
 var _mssql;
 var _sap;
+var _tedious;
 var flags = require('./flags');
 
 var connectViaPool = function(connectionString) {
@@ -73,6 +74,14 @@ Object.defineProperty(connectViaPool, 'mssql', {
 		if (!_mssql)
 			_mssql = require('./mssql/newDatabase');
 		return _mssql;
+	}
+});
+
+Object.defineProperty(connectViaPool, 'tedious', {
+	get: function() {
+		if (!_tedious)
+			_tedious = require('./tedious/newDatabase');
+		return _tedious;
 	}
 });
 
