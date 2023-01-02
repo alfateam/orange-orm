@@ -195,7 +195,7 @@ function tedious() {
 					userName: 'sa',
 					password: 'P@assword123',
 				}
-			}}), 
+			}}),
 	init: initMs};
 }
 
