@@ -10,7 +10,6 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
-    container: alpine
     strategy:
       matrix:
         container: ["node:14-alpine", "node:16-alpine", "node:18-alpine"]
