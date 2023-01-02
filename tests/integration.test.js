@@ -205,10 +205,9 @@ function mssql() {
 function tedious() {
 	return {pool: rdb.tedious(
 		{
-			server: 'mssql', // or 'localhost'
+			server: 'mssql',
 			options: {
 				encrypt: false,
-				useColumnNames: true,
 				database: 'master'
 			},
 			authentication: {

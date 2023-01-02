@@ -7,6 +7,8 @@ var genericPool = require('../../generic-pool');
 var tedious = require('tedious');
 
 function newGenericPool(connectionString, poolOptions) {
+	if (typeof connectionString === 'object')
+		connectionString.options = {...connectionString.options, ...{useColumnNames: true}};
 	poolOptions = poolOptions || {};
 	var pool = genericPool.Pool({
 		max: poolOptions.size || poolOptions.poolSize || defaults.poolSize,
