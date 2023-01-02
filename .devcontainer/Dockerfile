@@ -15,6 +15,7 @@ RUN apk add libnsl
 RUN apk add gcompat
 RUN ln -s /usr/lib/libnsl.so.3 /usr/lib/libnsl.so.1
 RUN apk --no-cache add curl
+RUN apk --no-cache add unixodbc
 RUN apk add sudo
 # odbc alpine
 # https://docs.microsoft.com/en-us/sql/connect/odbc/linux-mac/installing-the-microsoft-odbc-driver-for-sql-server?view=sql-server-ver16
