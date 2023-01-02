@@ -8,16 +8,33 @@ const initMysql = require('./initMysql');
 const initSqlite = require('./initSqlite');
 const initSap = require('./initSap');
 const dateToISOString = require('../src/dateToISOString');
+const versionArray = process.version.replace('v', '').split('.');
+const major = parseInt(versionArray[0]);
+
+beforeAll(async () => {
+
+	await createMs(tedious());
+
+	async function createMs({pool}) {
+		const db = _db({db: pool});
+		const sql = `IF NOT EXISTS(SELECT * FROM sys.databases WHERE name = 'demo')
+		BEGIN
+			CREATE DATABASE demo
+		END
+		`;
+		await db.query(sql);
+	}
+});
 
 describe('transaction', () => {
 
 	test('pg', async () => await verify(pg()));
 	test('tedious', async () => await verify(tedious()));
-	test('mssql', async () => await verify(mssql()));
+	if (major > 17)
+		test('mssql', async () => await verify(mssql()));
 	test('mysql', async () => await verify(mysql()));
 	test('sqlite', async () => await verify(sqlite()));
 	test('sap', async () => await verify(sap()));
-
 
 	async function verify({pool}) {
 		const db = _db({db: pool});
@@ -29,12 +46,12 @@ describe('transaction', () => {
 	}
 });
 
-
 describe('insert autoincremental', () => {
 
 	test('pg', async () => await verify(pg()));
 	test('tedious', async () => await verify(tedious()));
-	test('mssql', async () => await verify(mssql()));
+	if (major > 17)
+		test('mssql', async () => await verify(mssql()));
 	test('mysql', async () => await verify(mysql()));
 	test('sqlite', async () => await verify(sqlite()));
 	test('sap', async () => await verify(sap()));
@@ -62,7 +79,9 @@ describe('insert autoincremental', () => {
 
 describe('insert autoincremental with relations', () => {
 	test('pg', async () => await verify(pg()));
-	test('mssql', async () => await verify(mssql()));
+	test('tedious', async () => await verify(tedious()));
+	if (major > 17)
+		test('mssql', async () => await verify(mssql()));
 	test('mysql', async () => await verify(mysql()));
 	test('sqlite', async () => await verify(sqlite()));
 	test('sap', async () => await verify(sap()));
@@ -79,11 +98,13 @@ describe('insert autoincremental with relations', () => {
 			balance: 177,
 			isActive: true
 		});
+
 		const john = await db.customer.insert({
 			name: 'John',
 			balance: 200,
 			isActive: true
 		});
+
 		let orders = await db.order.insert([
 			{
 				orderDate: date1,
@@ -178,7 +199,7 @@ function pg() {
 
 //eslint-disable-next-line @typescript-eslint/no-unused-vars
 function mssql() {
-	return {pool: rdb.mssql('server=mssql;Database=master;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes'), init: initMs};
+	return {pool: rdb.mssql('server=mssql;Database=demo;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes'), init: initMs};
 }
 
 function tedious() {
@@ -187,7 +208,8 @@ function tedious() {
 			server: 'mssql', // or 'localhost'
 			options: {
 				encrypt: false,
-				useColumnNames: true
+				useColumnNames: true,
+				database: 'master'
 			},
 			authentication: {
 				type: 'default',

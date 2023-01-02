@@ -10,12 +10,10 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
+    container: ["node:18-alpine"]
     strategy:
       matrix:
-        container: ["node:18-alpine"]
-    container:
-      image: ${{ matrix.container }}
-
+        node-version: [14.x, 16.x, 18.x]
     services:
       postgres:
         image: postgres

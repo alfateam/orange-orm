@@ -16,7 +16,7 @@ function wrapQuery(connection) {
 				return;
 			}
 			else if (sql === 'COMMIT') {
-				connection.beginTransaction((err) => {
+				connection.commitTransaction((err) => {
 					onCompleted(err, []);
 				});
 				return;
