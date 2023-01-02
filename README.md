@@ -14,6 +14,8 @@ Based on promises.
 [Documentation and examples](https://github.com/alfateam/rdb/blob/master/docs/docs.md)  
 
 ## Release notes
+__3.1.2__  
+Tedious as default driver for msSql.    
 __3.1.1__  
 Typescript as dev dependency  
 __3.1.0__  
