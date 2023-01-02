@@ -5,8 +5,11 @@ var EventEmitter = require('events').EventEmitter;
 var defaults = require('./defaults');
 var genericPool = require('../../generic-pool');
 var tedious = require('tedious');
+var parseConnectionString = require('./parseConnectionString');
 
 function newGenericPool(connectionString, poolOptions) {
+	if (typeof connectionString === 'string')
+		connectionString = parseConnectionString(connectionString);
 	if (typeof connectionString === 'object')
 		connectionString.options = {...connectionString.options, ...{useColumnNames: true}};
 	poolOptions = poolOptions || {};

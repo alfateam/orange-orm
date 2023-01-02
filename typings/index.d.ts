@@ -1,4 +1,5 @@
 import { RequestHandler } from 'express';
+import { ConnectionConfig } from 'tedious';
 
 declare function r(config: r.Config): unknown;
 
@@ -9,7 +10,9 @@ declare namespace r {
     function postgres(connectionString: string, options?: PoolOptions): Pool;
     function sqlite(connectionString: string, options?: PoolOptions): Pool;
     function sap(connectionString: string, options?: PoolOptions): Pool;
+    function mssql(connectionConfig: ConnectionConfig, options?: PoolOptions): Pool;
     function mssql(connectionString: string, options?: PoolOptions): Pool;
+    function mssqlNative(connectionString: string, options?: PoolOptions): Pool;
     function mysql(connectionString: string, options?: PoolOptions): Pool;
     function on(type: 'query', cb: (e: QueryEvent) => void): void;
     function off(type: 'query', cb: (e: QueryEvent) => void): void;

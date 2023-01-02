@@ -13,7 +13,7 @@ const major = parseInt(versionArray[0]);
 
 beforeAll(async () => {
 
-	await createMs(tedious());
+	await createMs(mssql());
 
 	async function createMs({pool}) {
 		const db = _db({db: pool});
@@ -29,9 +29,9 @@ beforeAll(async () => {
 describe('transaction', () => {
 
 	test('pg', async () => await verify(pg()));
-	test('tedious', async () => await verify(tedious()));
+	test('mssql', async () => await verify(mssql()));
 	if (major > 17)
-		test('mssql', async () => await verify(mssql()));
+		test('mssqlNative', async () => await verify(mssqlNative()));
 	test('mysql', async () => await verify(mysql()));
 	test('sqlite', async () => await verify(sqlite()));
 	test('sap', async () => await verify(sap()));
@@ -49,9 +49,9 @@ describe('transaction', () => {
 describe('insert autoincremental', () => {
 
 	test('pg', async () => await verify(pg()));
-	test('tedious', async () => await verify(tedious()));
+	test('mssql', async () => await verify(mssql()));
 	if (major > 17)
-		test('mssql', async () => await verify(mssql()));
+		test('mssqlNative', async () => await verify(mssqlNative()));
 	test('mysql', async () => await verify(mysql()));
 	test('sqlite', async () => await verify(sqlite()));
 	test('sap', async () => await verify(sap()));
@@ -79,9 +79,9 @@ describe('insert autoincremental', () => {
 
 describe('insert autoincremental with relations', () => {
 	test('pg', async () => await verify(pg()));
-	test('tedious', async () => await verify(tedious()));
+	test('mssql', async () => await verify(mssql()));
 	if (major > 17)
-		test('mssql', async () => await verify(mssql()));
+		test('mssqlNative', async () => await verify(mssqlNative()));
 	test('mysql', async () => await verify(mysql()));
 	test('sqlite', async () => await verify(sqlite()));
 	test('sap', async () => await verify(sap()));
@@ -198,12 +198,12 @@ function pg() {
 }
 
 //eslint-disable-next-line @typescript-eslint/no-unused-vars
-function mssql() {
-	return {pool: rdb.mssql('server=mssql;Database=demo;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes'), init: initMs};
+function mssqlNative() {
+	return {pool: rdb.mssqlNative('server=mssql;Database=demo;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes'), init: initMs};
 }
 
-function tedious() {
-	return {pool: rdb.tedious(
+function mssql() {
+	return {pool: rdb.mssql(
 		{
 			server: 'mssql',
 			options: {

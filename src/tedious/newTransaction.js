@@ -22,7 +22,6 @@ function newResolveTransaction(domain, pool) {
 					onError(err);
 					return;
 				}
-				// client.setUseUTC(false);
 				client.executeQuery = wrapQuery(client);
 				rdb.dbClient = client;
 				rdb.dbClientDone = done;

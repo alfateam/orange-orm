@@ -3,9 +3,9 @@ var client = require('./client/index.js');
 var _mySql;
 var _pg;
 var _sqlite;
-var _mssql;
+var _mssqlNative;
 var _sap;
-var _tedious;
+var _mssql;
 var flags = require('./flags');
 
 var connectViaPool = function(connectionString) {
@@ -69,19 +69,19 @@ Object.defineProperty(connectViaPool, 'sqlite', {
 	}
 });
 
-Object.defineProperty(connectViaPool, 'mssql', {
+Object.defineProperty(connectViaPool, 'mssqlNative', {
 	get: function() {
-		if (!_mssql)
-			_mssql = require('./mssql/newDatabase');
-		return _mssql;
+		if (!_mssqlNative)
+			_mssqlNative = require('./mssql/newDatabase');
+		return _mssqlNative;
 	}
 });
 
-Object.defineProperty(connectViaPool, 'tedious', {
+Object.defineProperty(connectViaPool, 'mssql', {
 	get: function() {
-		if (!_tedious)
-			_tedious = require('./tedious/newDatabase');
-		return _tedious;
+		if (!_mssql)
+			_mssql = require('./tedious/newDatabase');
+		return _mssql;
 	}
 });
 
