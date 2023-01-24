@@ -15,6 +15,8 @@ Based on promises.
 
 ## Release notes
 __3.1.2__  
+Added eslint-disable no-explicit-any in generated typescript  
+__3.1.2__  
 Tedious as default driver for msSql.    
 __3.1.1__  
 Typescript as dev dependency  
