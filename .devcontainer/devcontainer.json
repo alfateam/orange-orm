@@ -24,4 +24,5 @@
 	"remoteUser": "node",
 	"postStartCommand": "git config --global --add safe.directory ${containerWorkspaceFolder}",
 	"postCreateCommand": "sudo chown node node_modules"
+	// "initializeCommand": "ssh-add -A"
 }
