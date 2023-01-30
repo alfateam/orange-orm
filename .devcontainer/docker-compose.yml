@@ -9,6 +9,9 @@ services:
     # working_dir: /app
     volumes:
       - ..:/workspace:cached
+      - try-node-node_modules:/workspace/node_modules
+      # - ..:/usr/config
+      # - /usr/config/node_modules
     # environment:
       # - ACCEPT_EULA=Y
       # - SA_PASSWORD=P@assword123
@@ -49,3 +52,5 @@ services:
     ports:
       - 50000:5000
     restart: always
+volumes:
+  try-node-node_modules:
