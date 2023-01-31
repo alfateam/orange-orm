@@ -23,6 +23,9 @@
 	// Comment out to connect as root instead. More info: https://aka.ms/vscode-remote/containers/non-root.	
 	"remoteUser": "node",
 	"postStartCommand": "git config --global --add safe.directory ${containerWorkspaceFolder}",
-	"postCreateCommand": "sudo chown node node_modules"
+	"postCreateCommand": "sudo chown node node_modules",
+	"features": {
+		"git": "latest"
+	}
 	// "initializeCommand": "ssh-add -A"
 }
