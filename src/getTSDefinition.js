@@ -338,8 +338,8 @@ function getPrefixTs(isNamespace) {
 /* eslint-disable @typescript-eslint/no-empty-interface */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { AxiosInterceptorManager, AxiosRequestConfig, AxiosResponse } from 'axios';
-import { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Url } from 'rdb';
+import type { AxiosInterceptorManager, AxiosRequestConfig, AxiosResponse } from 'axios';
+import type { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Url } from 'rdb';
 export { RequestHandler } from 'express';
 export { Concurrency, Filter, RawFilter, Config, TransactionOptions, Pool } from 'rdb';
 export = r;
@@ -351,8 +351,8 @@ declare function r(config: Config): r.RdbClient;
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import schema from './schema';
-import { AxiosInterceptorManager, AxiosRequestConfig, AxiosResponse } from 'axios';
-import { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Url } from 'rdb';
+import type { AxiosInterceptorManager, AxiosRequestConfig, AxiosResponse } from 'axios';
+import type { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Url } from 'rdb';
 export default schema as RdbClient;`;
 }
 

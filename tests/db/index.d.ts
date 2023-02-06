@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-empty-interface */
 /* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import schema from './schema';
-import { AxiosInterceptorManager, AxiosRequestConfig, AxiosResponse } from 'axios';
-import { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Url } from 'rdb';
+import type { AxiosInterceptorManager, AxiosRequestConfig, AxiosResponse } from 'axios';
+import type { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Url } from 'rdb';
 export default schema as RdbClient;
 export interface CustomerTable {
     getAll(): Promise<CustomerArray>;

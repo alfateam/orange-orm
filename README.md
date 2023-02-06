@@ -14,7 +14,9 @@ Based on promises.
 [Documentation and examples](https://github.com/alfateam/rdb/blob/master/docs/docs.md)  
 
 ## Release notes
-__3.1.2__  
+__3.1.4__  
+import type to satisfy Type-Only imports/exports  in compilers  
+__3.1.3__  
 Added eslint-disable no-explicit-any in generated typescript  
 __3.1.2__  
 Tedious as default driver for msSql.    
