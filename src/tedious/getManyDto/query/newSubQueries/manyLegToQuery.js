@@ -1,7 +1,6 @@
 var newShallowJoinSql = require('../../../../table/query/singleQuery/joinSql/newShallowJoinSqlCore');
 var newQuery = require('../../newQueryCore');
 var newParameterized = require('../../../../table/query/newParameterized');
-var extractOrderBy = require('../../../../table/query/extractOrderBy');
 var util = require('util');
 
 function manyLegToQuery(rightAlias, leg, legNo) {
@@ -10,12 +9,11 @@ function manyLegToQuery(rightAlias, leg, legNo) {
 	var rightTable = leg.table;
 	var rightColumns = rightTable._primaryColumns;
 	var leftColumns = leg.columns;
-	var orderBy = extractOrderBy(rightTable, rightAlias);
 
 	var shallowJoin = newShallowJoinSql(rightTable, leftColumns, rightColumns, leftAlias, rightAlias);
 	var filter = newParameterized(shallowJoin);
-	var query = newQuery(span.table, filter, span, leftAlias, orderBy);
-	return util.format(',(select coalesce(json_agg(row_to_json(r)),\'[]\') from (%s) r ) "%s"', query.sql(), leg.name);
+	var query = newQuery(span.table, filter, span, leftAlias);
+	return util.format(',JSON_QUERY( coalesce((%s FOR JSON PATH, INCLUDE_NULL_VALUES),\'[]\')) "%s"', query.sql(), leg.name);
 
 }
 

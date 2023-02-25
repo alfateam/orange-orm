@@ -1,6 +1,6 @@
-var newShallowJoinSql = require('../../../../query/singleQuery/joinSql/newShallowJoinSqlCore');
+var newShallowJoinSql = require('../../../../table/query/singleQuery/joinSql/newShallowJoinSqlCore');
 var newQuery = require('../../newQueryCore');
-var newParameterized = require('../../../../query/newParameterized');
+var newParameterized = require('../../../../table/query/newParameterized');
 var util = require('util');
 
 function joinLegToQuery(parentAlias,leg,legNo) {
