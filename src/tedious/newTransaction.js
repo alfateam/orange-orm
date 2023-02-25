@@ -5,6 +5,7 @@ var deleteFromSql = require('./deleteFromSql');
 var selectForUpdateSql = require('./selectForUpdateSql');
 var outputInsertedSql = require('./outputInsertedSql');
 const limitAndOffset = require('./limitAndOffset');
+const getManyDto = require('./getManyDto');
 
 function newResolveTransaction(domain, pool) {
 	var rdb = {poolFactory: pool};
@@ -23,6 +24,7 @@ function newResolveTransaction(domain, pool) {
 					return;
 				}
 				client.executeQuery = wrapQuery(client);
+				rdb.getManyDto = getManyDto;
 				rdb.dbClient = client;
 				rdb.dbClientDone = done;
 				rdb.encodeBoolean = encodeBoolean;

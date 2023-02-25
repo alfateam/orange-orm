@@ -13,6 +13,7 @@ let hostLocal = require('../hostLocal');
 let doQuery = require('../query');
 let releaseDbClient = require('../table/releaseDbClient');
 let setSessionSingleton = require('../table/setSessionSingleton');
+let getManyDto = require('./getManyDto');
 
 function newDatabase(connectionString, poolOptions) {
 	if (!connectionString)

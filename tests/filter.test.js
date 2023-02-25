@@ -1,3 +1,5 @@
+import { test, expect } from 'vitest'
+
 test('filter column.eq', () => {
 	let client = require('../src/client/index.js');
 	let table = client.table('order');
