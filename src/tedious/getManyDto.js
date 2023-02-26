@@ -11,6 +11,8 @@ async function getManyDto(table, filter, strategy) {
 	const query = newQuery(table, filter, span, alias);
 	const res =  await executeQueries([query]);
 	const rows = await res[0];
+	if (rows.length === 0)
+		return [];
 	let json = '';
 	for (let i = 0; i < rows.length; i++) {
 		json += rows[i]['JSON_F52E2B61-18A1-11d1-B105-00805F49916B'];
