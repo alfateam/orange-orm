@@ -1,6 +1,6 @@
 /* eslint-disable jest/no-commented-out-tests */
 /* eslint-disable jest/expect-expect */
-import { describe, it, test, beforeAll, expect } from 'vitest'
+import { describe, test, beforeAll, expect } from 'vitest';
 const rdb = require('rdb');
 const _db = require('./db');
 const initPg = require('./initPg');
@@ -94,7 +94,7 @@ describe('getMany', () => {
 	test('mssql', async () => await verify(mssql()));
 	// if (major > 17)
 	// 	test('mssqlNative', async () => await verify(mssqlNative()));
-	// test('mysql', async () => await verify(mysql()));	
+	// test('mysql', async () => await verify(mysql()));
 	// test('sqlite', async () => await verify(sqlite()));
 	// test('sap', async () => await verify(sap()));
 
@@ -126,7 +126,7 @@ describe('getMany with column strategy', () => {
 	test('mssql', async () => await verify(mssql()));
 	// if (major > 17)
 	// 	test('mssqlNative', async () => await verify(mssqlNative()));
-	// test('mysql', async () => await verify(mysql()));	
+	// test('mysql', async () => await verify(mysql()));
 	// test('sqlite', async () => await verify(sqlite()));
 	// test('sap', async () => await verify(sap()));
 
@@ -137,10 +137,10 @@ describe('getMany with column strategy', () => {
 
 		const expected = [{
 			id: 1,
-			name: 'George'			
+			name: 'George'
 		}, {
 			id: 2,
-			name: 'John'			
+			name: 'John'
 		}
 		];
 
@@ -153,7 +153,7 @@ describe('getMany with relations', () => {
 	test('mssql', async () => await verify(mssql()));
 	// if (major > 17)
 	// 	test('mssqlNative', async () => await verify(mssqlNative()));
-	// test('mysql', async () => await verify(mysql()));	
+	// test('mysql', async () => await verify(mysql()));
 	// test('sqlite', async () => await verify(sqlite()));
 	// test('sap', async () => await verify(sap()));
 
@@ -163,8 +163,8 @@ describe('getMany with relations', () => {
 		const rows = await db.order.getAll({ lines: {}, customer: {}, deliveryAddress: {}});
 		//mssql workaround because datetime has no time offset
 		for (let i = 0; i < rows.length; i++) {
-			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate))
-		}		
+			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate));
+		}
 
 		const date1 = new Date(2022, 0, 11, 9, 24, 47);
 		const date2 = new Date(2021, 0, 11, 12, 22, 45);

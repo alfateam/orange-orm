@@ -13,7 +13,7 @@ function oneLegToQuery(rightAlias,leg,legNo) {
 	var shallowJoin  = newShallowJoinSql(rightTable,leftColumns,rightColumns,leftAlias,rightAlias);
 	var filter = newParameterized(shallowJoin);
 	var query = newQuery(span.table,filter,span,leftAlias);
-	var sql = 'SELECT TOP 1' + query.sql().substring(6)
+	var sql = 'SELECT TOP 1' + query.sql().substring(6);
 	return util.format(',JSON_QUERY((%s FOR JSON PATH, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER)) "%s"',sql, leg.name );
 
 }

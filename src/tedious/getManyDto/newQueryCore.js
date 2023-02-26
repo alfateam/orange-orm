@@ -8,7 +8,6 @@ var newParameterized = require('../../table/query/newParameterized');
 function newQuery(table,filter,span,alias) {
 	filter = extractFilter(filter);
 	var orderBy = extractOrderBy(table,alias,span.orderBy);
-	
 	var limit = extractLimit(span);
 	var subQueries = newSubQueries(table,span,alias);
 	var query = newSingleQuery(table,filter,span,alias,subQueries,orderBy,limit);
