@@ -75,6 +75,7 @@ beforeAll(async () => {
 		]);
 	}
 
+
 	async function createMsDemo({ pool }) {
 		const db = _db({ db: pool });
 		const sql = `IF NOT EXISTS(SELECT * FROM sys.databases WHERE name = 'demo')
@@ -87,7 +88,7 @@ beforeAll(async () => {
 });
 
 
-describe('getManyDto', () => {
+describe('getMany', () => {
 
 	// test('pg', async () => await verify(pg()));
 	test('mssql', async () => await verify(mssql()));
@@ -119,7 +120,7 @@ describe('getManyDto', () => {
 		expect([...george]).toEqual(expected);
 	}
 });
-describe('getManyDto with relations', () => {
+describe('getMany with relations', () => {
 
 	// test('pg', async () => await verify(pg()));
 	test('mssql', async () => await verify(mssql()));
@@ -132,7 +133,7 @@ describe('getManyDto with relations', () => {
 	async function verify({ pool }) {
 		const db = _db({ db: pool });
 
-		const rows = await db.order.getAll({ lines: {}, customer: {} });
+		const rows = await db.order.getAll({ lines: {}, customer: {}, deliveryAddress: {}});
 		//mssql workaround because datetime has no time offset
 		for (let i = 0; i < rows.length; i++) {
 			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate))
@@ -151,15 +152,15 @@ describe('getManyDto with relations', () => {
 					balance: 177,
 					isActive: true
 				},
-				// deliveryAddress: {
-				// 	id: 1,
-				// 	orderId: 1,
-				// 	name: 'George',
-				// 	street: 'Node street 1',
-				// 	postalCode: '7059',
-				// 	postalPlace: 'Jakobsli',
-				// 	countryCode: 'NO'
-				// },
+				deliveryAddress: {
+					id: 1,
+					orderId: 1,
+					name: 'George',
+					street: 'Node street 1',
+					postalCode: '7059',
+					postalPlace: 'Jakobsli',
+					countryCode: 'NO'
+				},
 				lines: [
 					{ product: 'Bicycle', id: 1, orderId: 1 },
 					{ product: 'Small guitar', id: 2, orderId: 1 }
@@ -175,15 +176,15 @@ describe('getManyDto with relations', () => {
 					isActive: true
 				},
 				orderDate: dateToISOString(date2),
-				// deliveryAddress: {
-				// 	id: 2,
-				// 	orderId: 2,
-				// 	name: 'Harry Potter',
-				// 	street: '4 Privet Drive, Little Whinging',
-				// 	postalCode: 'GU4',
-				// 	postalPlace: 'Surrey',
-				// 	countryCode: 'UK'
-				// },
+				deliveryAddress: {
+					id: 2,
+					orderId: 2,
+					name: 'Harry Potter',
+					street: '4 Privet Drive, Little Whinging',
+					postalCode: 'GU4',
+					postalPlace: 'Surrey',
+					countryCode: 'UK'
+				},
 				lines: [
 					{ product: 'Piano', id: 3, orderId: 2 }
 				]

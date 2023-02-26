@@ -1,6 +1,6 @@
-var newShallowJoinSql = require('../../../../query/singleQuery/joinSql/newShallowJoinSqlCore');
+var newShallowJoinSql = require('../../../../table/query/singleQuery/joinSql/newShallowJoinSqlCore');
 var newQuery = require('../../newQueryCore');
-var newParameterized = require('../../../../query/newParameterized');
+var newParameterized = require('../../../../table/query/newParameterized');
 var util = require('util');
 
 function oneLegToQuery(rightAlias,leg,legNo) {
@@ -13,7 +13,9 @@ function oneLegToQuery(rightAlias,leg,legNo) {
 	var shallowJoin  = newShallowJoinSql(rightTable,leftColumns,rightColumns,leftAlias,rightAlias);
 	var filter = newParameterized(shallowJoin);
 	var query = newQuery(span.table,filter,span,leftAlias);
-	return util.format(',(select row_to_json(r) from (%s limit 1) r) "%s"', query.sql(), leg.name );
+	var sql = 'SELECT TOP 1' + query.sql().substring(6)
+	return util.format(',JSON_QUERY((%s FOR JSON PATH, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER)) "%s"',sql, leg.name );
+
 }
 
 module.exports = oneLegToQuery;
