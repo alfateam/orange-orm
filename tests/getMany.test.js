@@ -101,8 +101,7 @@ describe('getMany', () => {
 	async function verify({ pool }) {
 		const db = _db({ db: pool });
 
-		const george = await db.customer.getAll();
-		console.dir(george)
+		const rows = await db.customer.getAll();
 
 		const expected = [{
 			id: 1,
@@ -117,7 +116,35 @@ describe('getMany', () => {
 		}
 		];
 
-		expect([...george]).toEqual(expected);
+		expect(rows).toEqual(expected);
+	}
+});
+
+describe('getMany with column strategy', () => {
+
+	// test('pg', async () => await verify(pg()));
+	test('mssql', async () => await verify(mssql()));
+	// if (major > 17)
+	// 	test('mssqlNative', async () => await verify(mssqlNative()));
+	// test('mysql', async () => await verify(mysql()));	
+	// test('sqlite', async () => await verify(sqlite()));
+	// test('sap', async () => await verify(sap()));
+
+	async function verify({ pool }) {
+		const db = _db({ db: pool });
+
+		const rows = await db.customer.getAll({name: true});
+
+		const expected = [{
+			id: 1,
+			name: 'George'			
+		}, {
+			id: 2,
+			name: 'John'			
+		}
+		];
+
+		expect(rows).toEqual(expected);
 	}
 });
 describe('getMany with relations', () => {
