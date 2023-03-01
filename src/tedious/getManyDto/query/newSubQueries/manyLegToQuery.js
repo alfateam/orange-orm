@@ -13,7 +13,7 @@ function manyLegToQuery(rightAlias, leg, legNo) {
 	var shallowJoin = newShallowJoinSql(rightTable, leftColumns, rightColumns, leftAlias, rightAlias);
 	var filter = newParameterized(shallowJoin);
 	var query = newQuery(span.table, filter, span, leftAlias);
-	return util.format(',JSON_QUERY( coalesce((%s FOR JSON PATH, INCLUDE_NULL_VALUES),\'[]\')) "%s"', query.sql(), leg.name);
+	return util.format('JSON_QUERY( coalesce((%s FOR JSON PATH, INCLUDE_NULL_VALUES),\'[]\')) "%s"', query.sql(), leg.name);
 
 }
 

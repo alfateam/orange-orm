@@ -28,11 +28,14 @@ function wrapQuery(connection) {
 				return;
 			}
 		}
+		let keys;
 		var request = new Request(sql, onInnerCompleted);
 		const params = addParameters(request, query.parameters);
 		request.on('row', rows => {
 			const tmp = {};
-			const keys = Object.keys(rows);
+			if (!keys) {
+				keys = Object.keys(rows);
+			}
 			keys.forEach((cols) => {
 				tmp[cols] = rows[cols].value;
 			});
@@ -58,7 +61,7 @@ function replaceParamChar(sql, params) {
 	sql = '';
 	var lastIndex = splitted.length - 1;
 	for (var i = 0; i < lastIndex; i++) {
-		sql += splitted[i] + '@' + i ;
+		sql += splitted[i] + '@' + i;
 	}
 	sql += splitted[lastIndex];
 	return sql;

@@ -1,5 +1,3 @@
-/* eslint-disable jest/no-commented-out-tests */
-/* eslint-disable jest/expect-expect */
 import { describe, test, beforeAll, expect } from 'vitest';
 const rdb = require('rdb');
 const _db = require('./db');
@@ -12,17 +10,15 @@ const dateToISOString = require('../src/dateToISOString');
 const versionArray = process.version.replace('v', '').split('.');
 const major = parseInt(versionArray[0]);
 
-rdb.log(console.log);
-
 beforeAll(async () => {
 	await createMsDemo(mssql());
-	// await insertData(pg());
+	await insertData(pg());
 	await insertData(mssql());
-	// if (major > 17)
-	// 	await insertData(mssqlNative());
-	// await insertData(mysql());
-	// await insertData(sqlite());
-	// await insertData(sap());
+	if (major > 17)
+		await insertData(mssqlNative());
+	await insertData(mysql());
+	await insertData(sqlite());
+	await insertData(sap());
 
 	async function insertData({ pool, init }) {
 		const db = _db({ db: pool });
@@ -90,13 +86,13 @@ beforeAll(async () => {
 
 describe('getMany', () => {
 
-	// test('pg', async () => await verify(pg()));
+	test('pg', async () => await verify(pg()));
 	test('mssql', async () => await verify(mssql()));
-	// if (major > 17)
-	// 	test('mssqlNative', async () => await verify(mssqlNative()));
-	// test('mysql', async () => await verify(mysql()));
-	// test('sqlite', async () => await verify(sqlite()));
-	// test('sap', async () => await verify(sap()));
+	if (major > 17)
+		test('mssqlNative', async () => await verify(mssqlNative()));
+	test('mysql', async () => await verify(mysql()));
+	test('sqlite', async () => await verify(sqlite()));
+	test('sap', async () => await verify(sap()));
 
 	async function verify({ pool }) {
 		const db = _db({ db: pool });
@@ -122,13 +118,13 @@ describe('getMany', () => {
 
 describe('getMany with column strategy', () => {
 
-	// test('pg', async () => await verify(pg()));
+	test('pg', async () => await verify(pg()));
 	test('mssql', async () => await verify(mssql()));
-	// if (major > 17)
-	// 	test('mssqlNative', async () => await verify(mssqlNative()));
-	// test('mysql', async () => await verify(mysql()));
-	// test('sqlite', async () => await verify(sqlite()));
-	// test('sap', async () => await verify(sap()));
+	if (major > 17)
+		test('mssqlNative', async () => await verify(mssqlNative()));
+	test('mysql', async () => await verify(mysql()));
+	test('sqlite', async () => await verify(sqlite()));
+	test('sap', async () => await verify(sap()));
 
 	async function verify({ pool }) {
 		const db = _db({ db: pool });
@@ -149,18 +145,18 @@ describe('getMany with column strategy', () => {
 });
 describe('getMany with relations', () => {
 
-	// test('pg', async () => await verify(pg()));
+	test('pg', async () => await verify(pg()));
 	test('mssql', async () => await verify(mssql()));
-	// if (major > 17)
-	// 	test('mssqlNative', async () => await verify(mssqlNative()));
-	// test('mysql', async () => await verify(mysql()));
-	// test('sqlite', async () => await verify(sqlite()));
-	// test('sap', async () => await verify(sap()));
+	if (major > 17)
+		test('mssqlNative', async () => await verify(mssqlNative()));
+	test('mysql', async () => await verify(mysql()));
+	test('sqlite', async () => await verify(sqlite()));
+	test('sap', async () => await verify(sap()));
 
 	async function verify({ pool }) {
 		const db = _db({ db: pool });
 
-		const rows = await db.order.getAll({ lines: {}, customer: {}, deliveryAddress: {}});
+		const rows = await db.order.getAll({ lines: {}, customer: { order: {lines: {order: {}}}}, deliveryAddress: { }});
 		//mssql workaround because datetime has no time offset
 		for (let i = 0; i < rows.length; i++) {
 			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate));
@@ -223,122 +219,6 @@ describe('getMany with relations', () => {
 	}
 });
 
-// describe('insert autoincremental with relations', () => {
-// 	test('pg', async () => await verify(pg()));
-// 	test('mssql', async () => await verify(mssql()));
-// 	if (major > 17)
-// 		test('mssqlNative', async () => await verify(mssqlNative()));
-// 	test('mysql', async () => await verify(mysql()));
-// 	test('sqlite', async () => await verify(sqlite()));
-// 	test('sap', async () => await verify(sap()));
-
-// 	async function verify({pool, init}) {
-// 		const db = _db({ db: pool });
-// 		await init(db);
-
-// 		const date1 = new Date(2022, 0, 11, 9, 24, 47);
-// 		const date2 = new Date(2021, 0, 11, 12, 22, 45);
-
-// 		const george = await db.customer.insert({
-// 			name: 'George',
-// 			balance: 177,
-// 			isActive: true
-// 		});
-
-// 		const john = await db.customer.insert({
-// 			name: 'John',
-// 			balance: 200,
-// 			isActive: true
-// 		});
-
-// 		let orders = await db.order.insert([
-// 			{
-// 				orderDate: date1,
-// 				customer: george,
-// 				deliveryAddress: {
-// 					name: 'George',
-// 					street: 'Node street 1',
-// 					postalCode: '7059',
-// 					postalPlace: 'Jakobsli',
-// 					countryCode: 'NO'
-// 				},
-// 				lines: [
-// 					{ product: 'Bicycle' },
-// 					{ product: 'Small guitar' }
-// 				]
-// 			},
-// 			{
-// 				customer: john,
-// 				orderDate: date2,
-// 				deliveryAddress: {
-// 					name: 'Harry Potter',
-// 					street: '4 Privet Drive, Little Whinging',
-// 					postalCode: 'GU4',
-// 					postalPlace: 'Surrey',
-// 					countryCode: 'UK'
-// 				},
-// 				lines: [
-// 					{ product: 'Piano' }
-// 				]
-// 			}
-// 		]);
-
-// 		const expected = [
-// 			{
-// 				id: 1,
-// 				orderDate: dateToISOString(date1),
-// 				customerId: 1,
-// 				customer: {
-// 					id: 1,
-// 					name: 'George',
-// 					balance: 177,
-// 					isActive: true
-// 				},
-// 				deliveryAddress: {
-// 					id: 1,
-// 					orderId: 1,
-// 					name: 'George',
-// 					street: 'Node street 1',
-// 					postalCode: '7059',
-// 					postalPlace: 'Jakobsli',
-// 					countryCode: 'NO'
-// 				},
-// 				lines: [
-// 					{ product: 'Bicycle', id: 1, orderId: 1 },
-// 					{ product: 'Small guitar', id: 2, orderId: 1 }
-// 				]
-// 			},
-// 			{
-// 				id: 2,
-// 				customerId: 2,
-// 				customer: {
-// 					id: 2,
-// 					name: 'John',
-// 					balance: 200,
-// 					isActive: true
-// 				},
-// 				orderDate: dateToISOString(date2),
-// 				deliveryAddress: {
-// 					id: 2,
-// 					orderId: 2,
-// 					name: 'Harry Potter',
-// 					street: '4 Privet Drive, Little Whinging',
-// 					postalCode: 'GU4',
-// 					postalPlace: 'Surrey',
-// 					countryCode: 'UK'
-// 				},
-// 				lines: [
-// 					{ product: 'Piano', id: 3, orderId: 2 }
-// 				]
-// 			}
-// 		];
-
-// 		expect(orders).toEqual(expected);
-
-// 	}
-
-// });
-
 function pg() {
 	return { pool: rdb.pg('postgres://postgres:postgres@postgres/postgres'), init: initPg };
 }
@@ -377,6 +257,7 @@ function mysql() {
 	return { pool: rdb.mySql('mysql://test:test@mysql/test'), init: initMysql };
 }
 
+const sqliteName = `demo${new Date().getUTCMilliseconds()}.db`;
 function sqlite() {
-	return { pool: rdb.sqlite(`demo${new Date().getUTCMilliseconds()}.db`), init: initSqlite };
+	return { pool: rdb.sqlite(sqliteName), init: initSqlite };
 }

@@ -24,7 +24,7 @@ function newSubQueries(table,span,alias) {
 		leg.accept(c);
 	}
 
-	return result.join('');
+	return result.join(',');
 }
 
 function _joinLegToQuery() {

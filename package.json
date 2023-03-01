@@ -1,6 +1,6 @@
 {
   "name": "rdb",
-  "version": "3.1.4",
+  "version": "3.1.5",
   "main": "./src/index.js",
   "browser": "./src/client/index.mjs",
   "bin": {
@@ -24,8 +24,8 @@
   "author": "Lars-Erik Roald <lars.roald@gmail.com>",
   "license": "ISC",
   "scripts": {
-    "test": "vitest run",
-    "testw": "vitest -t getMany",
+    "test": "vitest run --threads=false",
+    "testw": "vitest --threads=false -t getMany ",
     "concat": "node ./src/client/merge.js",
     "build": "rollup -c ./src/client/rollup.config.js && npm run concat",
     "lint": "eslint ./",

@@ -5,8 +5,8 @@ var deleteFromSql = require('./deleteFromSql');
 var selectForUpdateSql = require('./selectForUpdateSql');
 var outputInsertedSql = require('./outputInsertedSql');
 const limitAndOffset = require('./limitAndOffset');
-// const getManyDto = require('./getManyDto');
-const getManyDto = require('../table/getManyDtoFast');
+const getManyDto = require('./getManyDto');
+// const getManyDto = require('../table/getManyDtoFast');
 
 function newResolveTransaction(domain, pool) {
 	var rdb = {poolFactory: pool};

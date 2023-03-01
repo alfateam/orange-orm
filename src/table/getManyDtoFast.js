@@ -17,9 +17,9 @@ async function getManyDtoFast(table, filter, strategy) {
 	const res = await executeQueries([query]);
 	const rows = await res[0];
 	const idFilter = createIdFilter(table, rows);
-	const orderBy = extractOrderBy(table,alias,span.orderBy);
+	const orderBy = extractOrderBy(table, alias, span.orderBy);
 	await getSubRows(rows, idFilter, span, alias, emptyInnerJoin, orderBy);
-	return rows;	
+	return rows;
 }
 
 function createIdFilter(table, rows) {
@@ -32,14 +32,14 @@ function createIdFilter(table, rows) {
 		let alias = table._primaryColumns[0].alias;
 		let ids = [];
 		for (let i = 0; i < rows.length; i++) {
-			ids.push(rows[i][alias]);			
+			ids.push(rows[i][alias]);
 		}
 		return table._primaryColumns[0].in(ids);
 	}
 
 	function createCompositeFilter() {
 		let filter = emptyFilter;
-		for (let i = 0; i < rows.length; i++) {			
+		for (let i = 0; i < rows.length; i++) {
 			filter = filter.or(primaryFilter(rows[i]));
 		}
 		return filter;

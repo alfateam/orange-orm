@@ -1,5 +1,3 @@
-/* eslint-disable jest/no-commented-out-tests */
-/* eslint-disable jest/expect-expect */
 import { describe, test, beforeAll, expect } from 'vitest';
 
 
