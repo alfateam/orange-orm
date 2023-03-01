@@ -1,3 +1,5 @@
+import { test, expect } from 'vitest';
+
 let createPatch = require('../src/client/createPatch');
 
 test('updateAndInsertArray should order patches by insert, update with position, delete', () => {

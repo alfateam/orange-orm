@@ -1,5 +1,6 @@
-/* eslint-disable jest/no-commented-out-tests */
-/* eslint-disable jest/expect-expect */
+import { describe, test, beforeAll, expect } from 'vitest';
+
+
 const rdb = require('rdb');
 const _db = require('./db');
 const initPg = require('./initPg');

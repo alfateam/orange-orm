@@ -5127,6 +5127,8 @@ function rdbClient(options = {}) {
 		}
 
 		function toJSON(row, _meta = meta) {
+			if (!row)
+				return null;
 			if (!_meta)
 				return row;
 			if (Array.isArray(row)) {

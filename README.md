@@ -14,6 +14,8 @@ Based on promises.
 [Documentation and examples](https://github.com/alfateam/rdb/blob/master/docs/docs.md)  
 
 ## Release notes
+__3.1.5__  
+Improved performance for ms sql  
 __3.1.4__  
 import type to satisfy Type-Only imports/exports  in compilers  
 __3.1.3__  
