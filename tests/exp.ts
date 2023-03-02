@@ -42,25 +42,21 @@ type TableMapOf<T> = {
 
 
 type Table<T, TTableMap extends TableMapOf<T>> = {
-	[key in keyof T]-?: TTableMap[key] extends StringColumnMap ? StringColumn : (TTableMap[key] extends infer U extends Table<infer C, infer TTableMap> ? Foo : Date);
-	// [key in keyof T]-?: TTableMap[key] extends StringColumnMap ? StringColumn: (TTableMap[key] extends infer U extends TableMapOf<isnfer Child> ? ChildTable<U> : never) ;
-	// (TTableMap[key]  extends infer Map  ? TableMapOf<Map> : never);
-	// [key in keyof T as TTableMap[key]]: T[k];
-
+	[key in keyof T]-?: TTableMap[key] extends StringColumnMap ? StringColumn : (TTableMap[key] extends Table<infer C, infer CTableMap> ? ChildTableOf<C, CTableMap> : Date);
+}  & {
+	getAll(): Promise<[T]>;
 }
 
-interface Foo {
+
+type ChildTableOf<T, TTableMap extends TableMapOf<T>> = {
+	[key in keyof T]-?: TTableMap[key] extends StringColumnMap ? StringColumn : (TTableMap[key] extends Table<infer C, infer CTableMap> ? ChildTableOf<C, CTableMap> : Date);
+}
+& ChildTable;
+
+
+type ChildTable = {
 	exists: Filter;
 }
-
-type ChildTableMapOf<T> = {
-	[key in keyof T]-?: T[key] extends string ? StringColumnMap : any;
-	//  [key in keyof T]-?: StringColumnMap | NumberColumnMap | DateColumnMap | UuidColumnMap | BinaryColumnMap | BooleanColumnMap | any 
-	//  (T[key]  extends Table<infer RTable, infer TTableMap> & TableMapOf<infer RTable> ?  Table<infer RTable, infer TTableMap> & TableMapOf<infer RTable> : never)
-	//  (T[key]  extends TableMapOf<infer Related> ? TableMapOf<infer Related>: never)
-	//  T[key] extends infer U extends TableMapOf<U> ? ReferenceMap<U> : never
-};
-// type TableMapOf<T> = { [key in keyof T]-?: NColumnMap<ColumnTypes>};
 
 
 //@ts-ignore
@@ -83,16 +79,16 @@ const user = bar.table2<User>('user').map({
 	email: { columnType: 'string' },
 	customer: customer
 });
-user.customer
+user.getAll
 
 
 
-type ChildTable<TTableMap> = {
-	// [key in keyof TTableMap]-?: TTableMap[key] extends StringColumnMap ? StringColumn: (TTableMap[key] extends infer U extends TableMapOf<infer Child> ? ChildTable<U> : never) ;
-}
-// & {
-// 	exists() : Filter;
+// type ChildTable<TTableMap> = {
+// 	// [key in keyof TTableMap]-?: TTableMap[key] extends StringColumnMap ? StringColumn: (TTableMap[key] extends infer U extends TableMapOf<infer Child> ? ChildTable<U> : never) ;
 // }
+// // & {
+// // 	exists() : Filter;
+// // }
 
 type StringColumn = {
 	equals(string: string): Filter;
