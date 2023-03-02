@@ -1,7 +1,7 @@
 import { describe, test, beforeAll, expect } from 'vitest';
 
 
-const rdb = require('rdb');
+const rdb = require('../src/index');
 const _db = require('./db');
 const initPg = require('./initPg');
 const initMs = require('./initMs');

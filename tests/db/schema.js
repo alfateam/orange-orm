@@ -1,4 +1,4 @@
-const rdb = require('rdb');
+const rdb = require('../../src/index');
 
 //customer
 const customer = rdb.table('customer');
