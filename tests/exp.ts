@@ -14,9 +14,24 @@ type Mapper<T> = {
 	column() : Column
 	// references<OtherTable extends Table<infer U, infer TTableMap>>(table: OtherTable) : Table<infer U, infer TTableMap>;
 	// references<U extends Table<infer U, infer TTableMap extends Table<U, TTableMap>>>(table: U) : Table<infer U, infer TTableMap>;
-	references<U>(table: U) : U;
+	references<U>(table: U) : Reference<T,U>;
 }
 
+// type Columns<T> = {
+// 	[key in keyof T]: T[key] extends StringColumn? T[key] : never;
+// };
+
+type KeysOf<T, Key extends keyof T = keyof T> = Key extends string
+    ? `${Key}, ${KeysOf<Omit<T, Key>>}` | Key
+    : never;
+
+// type PickTypeKeys<Obj, Type, T extends keyof Obj = keyof Obj> = ({ [P in keyof Obj]: Obj[P] extends Type ? P : never })[T];
+// type PickType<T, Type> = Pick<T, PickTypeKeys<T, Type>>
+
+type Reference<From, To> = {
+	by(keys: KeysOf<From>[]) : To
+	// by<K extends keyof From>(...keys: K[]) : To
+};
 
 
 
@@ -44,41 +59,43 @@ type ChildTable<T, TTableMap extends Table<T,TTableMap>> = {
 const bar: Rdb2 = {};
 
 
-const user = bar.table<User>('user').map((mapper) => {
-	return {
-		id: mapper.column().string(),
-		email: mapper.column().string(),	
-	}
-});
-
-const line = bar.table<Line>('line').map((table) => {
-	return {
-		lineId: table.column().string()
-	}
-});
-
-const customerCore = bar.table<Customer>('customer').map((table) => {
-	return {
-		customerId: table.column().string(),
-		name: table.column().string(),		
-	};
-});
-
-
-const lineCore = bar.table<Line>('line').map((mapper) => {
-	return {
-		lineId: mapper.column().string(),
-		user: mapper.references(user)
-	};
-});
-
 const customer = bar.table<Customer>('customer').map((table) => {
 	return {
-		customerId: table.column().string(),
-		line: table.references(line),
-		user: table.references(user)
+		customerId: table.column().string()
 	}
 });
+
+const deliveryAddress = bar.table<DeliveryAddress>('deliveryAddress').map((table) => {
+	return {
+		addressId: table.column().string()	
+	}
+});
+
+const order0 = bar.table<Order>('order').map((mapper) => {
+	return {
+		id: mapper.column().string(),
+		customerId: mapper.column().string()
+	}
+});
+
+
+const order = bar.table<Order>('order').map((mapper) => {
+	return {
+		id: mapper.column().string(),
+		customer: customer,
+		deliveryAddress: mapper.references(order0).by()
+	}
+});
+
+const deliveryAddress2 = bar.table<DeliveryAddress>('deliveryAddress').map((table) => {
+	return {
+		addressId: table.column().string(),
+		order: table.references(order)
+	}
+});
+
+
+
 
 type StringColumn = {
 	equals(string: string): Filter;
@@ -148,20 +165,25 @@ type NColumnMap<TColumnType extends ColumnTypes> = {
 	columnType: TColumnType
 }
 
-class User {
+class Order {
 	id: string;
-	email: string;
 	customer?: Customer;
+	customerId?: string;
+	deliveryAddress?: DeliveryAddress;
+	OrderLines?: OrderLine;
 }
 
 class Customer {
 	customerId: string;
 	name: string;
-	user: User;
-	line: Line;
 }
 
-class Line {
+class OrderLine {
 	lineId: string;
+}
+
+class DeliveryAddress {
+	addressId: string;
+	order: Order
 }
 ;
