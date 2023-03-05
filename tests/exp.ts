@@ -16,7 +16,7 @@ type Table<W, U, UMap>  = W & {
 
 type Strategy<T> = {
 	[key in keyof T]: Required<T>[key] extends StringColumn ? 
-	boolean : Required<T>[key] extends TableDefAll<infer Sub, infer SubMap> ? Strategy<Required<T>[key]> : never;
+	boolean : Required<T>[key] extends TableDef<infer Sub, infer SubMap> ? Strategy<Required<T>[key]> : never;
 }
 // type Strategy<T> = {
 // 	[key in keyof T]: Required<T>[key] extends StringColumn ? 
@@ -59,12 +59,13 @@ const order = bar.table<Order>('order').map((mapper) => {
 });
 
 
+
 const db  = bar.define({
 	customer: customer,
 	order: order
 });
 
-db.order.getAll({customer:)
+db.order.getAll({deliveryAddress:{}})
 
 type TableBuilder<T> = {
 	map<TMap extends TableDef<T, TMap>>(fn:  (mapper: Mapper<T>) => TMap): TableDef<T, TMap>
@@ -104,8 +105,8 @@ type TableDef<T, TTableMap extends TableDef<T,TTableMap>> = {
 }
 
 type TableDefAll<T, TTableMap extends TableDef<T,TTableMap>> = {
-	[key in keyof Required<T>]: TTableMap[key] extends string | StringColumnMap | StringColumn ? StringColumn : 
-	(TTableMap[key] extends TableDefAll<infer C, infer CTableMap> ? TableDef<C, CTableMap> : never);
+	[key in keyof Required<T>]: Required<TTableMap>[key] extends string | StringColumnMap | StringColumn ? StringColumn : 
+	(Required<TTableMap>[key] extends TableDefAll<infer C, infer CTableMap> ? TableDef<C, CTableMap> : never);
 }
 
 
