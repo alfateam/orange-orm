@@ -2,57 +2,26 @@ import { Filter } from "../typings"
 
 interface Rdb2 {
 	table<T>(dbName: string): TableBuilder<T>;
+	define<T>(defs: T): Extend<T>
 }
 
-
-type TableBuilder<T> = {
-	map<TMap extends Table<T, TMap>>(fn:  (mapper: Mapper<T>) => TMap): Table<T, TMap>
-	// map<TMap extends Table<T, TMap>>(map: TMap): Table<T, TMap>
+type Extend<T> = {
+	[key in keyof T]: T[key] extends  TableDef<infer U, infer VMap> ? Table<T[key], U, VMap> : T[key]	
 }
 
-type Mapper<T> = {
-	column() : Column
-	// references<OtherTable extends Table<infer U, infer TTableMap>>(table: OtherTable) : Table<infer U, infer TTableMap>;
-	// references<U extends Table<infer U, infer TTableMap extends Table<U, TTableMap>>>(table: U) : Table<infer U, infer TTableMap>;
-	references<U>(table: U) : Reference<T,U>;
+type Table<W, U, UMap>  = W & {
+	getAll(strategy: Strategy<W>): Promise<U[]>
+	getAll2(): Promise<U[]>
 }
 
-// type Columns<T> = {
-// 	[key in keyof T]: T[key] extends StringColumn? T[key] : never;
-// };
-
-type KeysOf<T, Key extends keyof T = keyof T> = Key extends string
-    ? `${Key}, ${KeysOf<Omit<T, Key>>}` | Key
-    : never;
-
-// type PickTypeKeys<Obj, Type, T extends keyof Obj = keyof Obj> = ({ [P in keyof Obj]: Obj[P] extends Type ? P : never })[T];
-// type PickType<T, Type> = Pick<T, PickTypeKeys<T, Type>>
-
-type Reference<From, To> = {
-	by(keys: KeysOf<From>[]) : To
-	// by<K extends keyof From>(...keys: K[]) : To
-};
-
-
-
-type Column = {
-	string() : StringColumn
+type Strategy<T> = {
+	[key in keyof T]: Required<T>[key] extends StringColumn ? 
+	boolean : Required<T>[key] extends TableDefAll<infer Sub, infer SubMap> ? Strategy<Required<T>[key]> : never;
 }
-
-type Table<T, TTableMap extends Table<T,TTableMap>> = {
-	[key in keyof Partial<T>]: TTableMap[key] extends string | StringColumnMap | StringColumn ? StringColumn : 
-	(TTableMap[key] extends Table<infer C, infer CTableMap> ? Table<C, CTableMap> : T[key]);
-}
-
-
-type ChildTable<T, TTableMap extends Table<T,TTableMap>> = {
-	[key in keyof Partial<T>]: TTableMap[key] extends string | StringColumnMap | StringColumn ? StringColumn : 
-	(TTableMap[key] extends Table<infer C, infer CTableMap> ? Table<C, CTableMap> : TTableMap[key]);
-}
-& 
-{
-	exists: Filter;
-}
+// type Strategy<T> = {
+// 	[key in keyof T]: Required<T>[key] extends StringColumn ? 
+// 	boolean : Required<T>[key] extends TableDefAll<infer Sub, infer SubMap> ? Strategy<Required<T>[key]> : never;
+// }
 
 
 //@ts-ignore
@@ -61,7 +30,8 @@ const bar: Rdb2 = {};
 
 const customer = bar.table<Customer>('customer').map((table) => {
 	return {
-		customerId: table.column().string()
+		customerId: table.column().string(),
+		name: table.column().string()
 	}
 });
 
@@ -82,10 +52,77 @@ const order0 = bar.table<Order>('order').map((mapper) => {
 const order = bar.table<Order>('order').map((mapper) => {
 	return {
 		id: mapper.column().string(),
+		customerId: mapper.column().string(),
 		customer: customer,
-		deliveryAddress: mapper.references(order0).by()
+		deliveryAddress: mapper.references(deliveryAddress).by('customerId')
 	}
 });
+
+
+const db  = bar.define({
+	customer: customer,
+	order: order
+});
+
+db.order.getAll({customer:)
+
+type TableBuilder<T> = {
+	map<TMap extends TableDef<T, TMap>>(fn:  (mapper: Mapper<T>) => TMap): TableDef<T, TMap>
+	// map<TMap extends Table<T, TMap>>(map: TMap): Table<T, TMap>
+}
+
+type Mapper<T> = {
+	column() : ColumnDef
+	primaryColumn() : PrimaryColumnDef
+	// references<OtherTable extends Table<infer U, infer TTableMap>>(table: OtherTable) : Table<infer U, infer TTableMap>;
+	// references<U extends Table<infer U, infer TTableMap extends Table<U, TTableMap>>>(table: U) : Table<infer U, infer TTableMap>;
+	references<U>(table: U) : Reference<T,U>;
+}
+
+type KeysOf<T, Key extends keyof T = keyof T> = Key extends string
+    ? T[Key] extends string ? `${Key}` | Key : never
+    : never;
+
+type Reference<From, To> = {
+	by(...keys: Array<KeysOf<From>>) : To
+	// by<K extends keyof From>(...keys: K[]) : To
+};
+
+
+
+type ColumnDef = {
+	string() : StringColumn
+}
+
+type PrimaryColumnDef = {
+	string() : PrimaryStringColumn
+}
+
+type TableDef<T, TTableMap extends TableDef<T,TTableMap>> = {
+	[key in keyof Partial<T>]: TTableMap[key] extends string | StringColumnMap | StringColumn ? StringColumn : 
+	(TTableMap[key] extends TableDef<infer C, infer CTableMap> ? TableDef<C, CTableMap> : T[key]);
+}
+
+type TableDefAll<T, TTableMap extends TableDef<T,TTableMap>> = {
+	[key in keyof Required<T>]: TTableMap[key] extends string | StringColumnMap | StringColumn ? StringColumn : 
+	(TTableMap[key] extends TableDefAll<infer C, infer CTableMap> ? TableDef<C, CTableMap> : never);
+}
+
+
+// type ChildTable<T, TTableMap extends Table<T,TTableMap>> = {
+// 	[key in keyof Partial<T>]: TTableMap[key] extends string | StringColumnMap | StringColumn ? StringColumn : 
+// 	(TTableMap[key] extends Table<infer C, infer CTableMap> ? Table<C, CTableMap> : TTableMap[key]);
+// }
+// & 
+// {
+// 	exists: Filter;
+// }
+
+
+
+
+
+
 
 const deliveryAddress2 = bar.table<DeliveryAddress>('deliveryAddress').map((table) => {
 	return {
@@ -97,8 +134,20 @@ const deliveryAddress2 = bar.table<DeliveryAddress>('deliveryAddress').map((tabl
 
 
 
-type StringColumn = {
+type StringColumn =  {
 	equals(string: string): Filter;
+}
+
+type PrimaryStringColumn = PrimaryColumn & {
+	equals(string: string): Filter;
+}
+
+type Column = {
+
+}
+
+type PrimaryColumn = {
+
 }
 
 interface ColumnMap {
@@ -168,9 +217,9 @@ type NColumnMap<TColumnType extends ColumnTypes> = {
 class Order {
 	id: string;
 	customer?: Customer;
-	customerId?: string;
+	customerId: string;
 	deliveryAddress?: DeliveryAddress;
-	OrderLines?: OrderLine;
+	orderLines?: OrderLine;
 }
 
 class Customer {
