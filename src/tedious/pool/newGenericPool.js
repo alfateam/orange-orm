@@ -18,7 +18,7 @@ function newGenericPool(connectionString, poolOptions) {
 		idleTimeoutMillis: poolOptions.idleTimeout || defaults.poolIdleTimeout,
 		reapIntervalMillis: poolOptions.reapIntervalMillis || defaults.reapIntervalMillis,
 		log: poolOptions.log || defaults.poolLog,
-		create: function (cb) {
+		create: function(cb) {
 			var client = new tedious.Connection(connectionString);
 			client.on('connect', onConnected);
 			client.connect();
@@ -35,7 +35,7 @@ function newGenericPool(connectionString, poolOptions) {
 			}
 		},
 
-		destroy: function (client) {
+		destroy: function(client) {
 			client.poolCount = undefined;
 			client.close();
 		}
@@ -48,15 +48,15 @@ function newGenericPool(connectionString, poolOptions) {
 		}
 	}
 	//monkey-patch with connect method
-	pool.connect = function (cb) {
+	pool.connect = function(cb) {
 		var domain = process.domain;
-		pool.acquire(function (err, client) {
+		pool.acquire(function(err, client) {
 			if (domain) {
 				cb = domain.bind(cb);
 			}
-			if (err) return cb(err, null, function () {/*NOOP*/ });
+			if (err) return cb(err, null, function() {/*NOOP*/ });
 			client.poolCount++;
-			cb(null, client, function (err) {
+			cb(null, client, function(err) {
 				if (err) {
 					pool.destroy(client);
 				} else {
