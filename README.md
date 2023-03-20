@@ -14,6 +14,8 @@ Based on promises.
 [Documentation and examples](https://github.com/alfateam/rdb/blob/master/docs/docs.md)  
 
 ## Release notes
+__3.1.6__  
+Tedious: return first error if AggregatError    
 __3.1.5__  
 Improved performance for ms sql  
 __3.1.4__  
