@@ -1,20 +1,78 @@
-import { Filter } from "../typings"
+import { Filter, RawFilter } from "../typings"
 
-interface Rdb2 {
-	table<T>(dbName: string): TableBuilder<T>;
-	define<T>(defs: T): Extend<T>
+declare function r<T, TTableMap extends TableDef<infer V, infer VMap>>(defs: T): Extend<T>;
+
+declare namespace r {
+	function table<T>(dbName: string): TableBuilder<T>;
+	// function foo<T>(dbName: Array<Pick<): any;
+    // function table(name: string): Table;
+    // function end(): Promise<void>;
+    // function postgres(connectionString: string, options?: PoolOptions): Pool;
+    // function sqlite(connectionString: string, options?: PoolOptions): Pool;
+    // function sap(connectionString: string, options?: PoolOptions): Pool;
+    // function mssql(connectionConfig: ConnectionConfig, options?: PoolOptions): Pool;
+    // function mssql(connectionString: string, options?: PoolOptions): Pool;
+    // function mssqlNative(connectionString: string, options?: PoolOptions): Pool;
+    // function mysql(connectionString: string, o
 }
+
+export = r;
+
+// type StringKeyOf<T> = Extract<keyof T, string>;
+
+// type PickKeys<T, K extends StringKeyOf<T>> = {
+//   <Keys extends (K | `asc ${K}`)[]>(): (obj: T) => Pick<T, Extract<Keys[number], K>>;
+// }
+// interface Bar {
+// 	id: string;
+// 	bar: string;
+// }
+
+// function blabla(arg: StringKeyOf<Bar>) : any {
+// 	return 1;
+// }
+
+
+// const f = blabla(['a']);
+
+// interface Rdb2 {
+// 	table<T>(dbName: string): TableBuilder<T>;
+// 	// define<T extends TableDef<infer V, infer VMap>>(defs: T): Extend<T>
+// 	define<T, TTableMap extends TableDef<infer V, infer VMap>>(defs: T): Extend<T>
+// 	// TableDef<T, TTableMap extends TableDef<T, TTableMap>>
+// }
 
 type Extend<T> = {
 	[key in keyof T]: T[key] extends TableDef<infer U, infer VMap> ? Table<T[key], U, VMap> : T[key]
 }
 
-type Table<W, U, UMap> = W & {
-	getAll(strategy:  Partial<Pick<MappedStrategy<Required<W>>, AllowedStrategies<Required<W>>>>): Promise<U[]>
-	// getAll(strategy: MappedStrategy<Required<W>>): Promise<U[]>
-	// getAll(strategy: Pick<W, AllowedStrategies<Required<W>>>): Promise<U[]>
-	getAll2(): Promise<U[]>
+type Table<W, U, UMap> = W &  {
+	getAll(strategy:  Strategy<W>): Promise<U[]>
+	getMany(strategy:  Strategy<W>): Promise<U[]>
+	getMany(filter:  RawFilter): Promise<U[]>
+	getMany(filter:  RawFilter, strategy: Strategy<W>): Promise<U[]>
+	getMany(rows: Partial<U>[] , strategy: Strategy<W>): Promise<U[]>
+	getOne(strategy:  Strategy<W>): Promise<U[]>
+	getOne(filter:  RawFilter): Promise<U[]>
+	getOne(filter:  RawFilter, strategy: Strategy<W>): Promise<U[]>
+	getOne(row: Partial<U>): Promise<U[]>
+	getOne(row: Partial<U>, strategy: Strategy<W>): Promise<U[]>
 }
+
+
+// type KeysOf<T, Key extends keyof T = keyof T> = Key extends string
+// ? T[Key] extends string ? `${Key}` | Key : never
+// : never;
+
+// type PrimaryKeys<T> = {
+// 	[key in keyof T]: T[key] extends PrimaryColumn ? key : never
+// }[keyof T]
+
+// type GetById<T> = MapGetById<Pick<T, PrimaryKeys<T>>>;
+
+
+
+// [key in keyof TMap as TMap[key] extends StringColumn ? 'valid': (TMap[key] extends TableDef<infer C, infer CTableMap> ? (TMap[key] extends C?  'valid' : 'invalid') : 'invalid')]
 
 
 interface Person {
@@ -54,11 +112,15 @@ type f = SubType2<Person, string, boolean>;
 type AllowedStrategies<T> = {
 	[key in keyof T]: Required<T>[key] extends StringColumn ? 
 	key : T[key] extends TableDef<infer Sub, infer SubMap> ? (T[key] extends Sub?  never: key) : never;
-}[keyof T]
+}[keyof T] & { limit?: number, orderBy: OrderBy<T>}
 
-type Strategy2<T> = Pick<T, AllowedStrategies<Required<T>>>;
 
-// type Lars<T> = Pick<T, AllowedStrategies<Required<T>>>;
+type Strategy<W> = Partial<Pick<MappedStrategy<Required<W>>, AllowedStrategies<Required<W>>>>
+
+// type MappedStrategy<T> = {
+// 	[key in keyof T]: Required<T>[key] extends StringColumn ? 
+// 	boolean : Required<T[key]> extends infer W extends TableDef<infer Sub, infer SubMap> ?  Strategy<W> : number;	
+// } 
 
 type MappedStrategy<T> = {
 	[key in keyof T]: Required<T>[key] extends StringColumn ? 
@@ -66,32 +128,16 @@ type MappedStrategy<T> = {
 }
 
 
+//this works
+// type staffKeys<T> = {
+// 	[K in keyof T]: `asc ${(string & keyof T)}` | `desc ${(string & keyof T)}` | K;
+//   }[keyof T];
+  
 
+type OrderBy<T> = {
+	[K in keyof T]: `asc ${(string & keyof T)}` | `desc ${(string & keyof T)}` | K;
+  }[keyof T];
 
-// type Strat<T> = Pick<T, AllowedStrategies<T>>
-
-// type Strategy<T> = Pick<T,StrategyHelper<Required<T>>[keyof T]>;
-// type Strategy<T> = Omit<StrategyHelper<Required<T>>[keyof T];
-
-
-
-
-type FilteredKeys<T, U> = { [P in keyof T]: T[P] extends U ? P : never }[keyof T];
-
-type FooMap<T> = T extends infer TT
-	? {
-		[key in FilteredKeys<T, StringColumn>]: FooItem<T[key]>
-	}
-	: never
-
-type FooItem<T> = T extends StringColumn ? { value: T } : undefined;
-
-
-
-// type Strategy<T> = {
-// 	[key in keyof KeysMatching<T, StringColumn>]: Required<KeysMatching<T, StringColumn>>[key] extends StringColumn ? 
-// 	boolean : Required<KeysMatching<T, StringColumn>>[key] extends TableDef<infer Sub, infer SubMap> ? Strategy<Required<KeysMatching<T, StringColumn>>[key]> : never;
-// }
 
 type TableBuilder<T> = {
 	map<TMap extends TableDef<T, TMap>>(fn: (mapper: Mapper<T>) => TMap): TableDef<T, TMap>
@@ -99,8 +145,8 @@ type TableBuilder<T> = {
 }
 
 type Mapper<T> = {
-	column(): ColumnDef
-	primaryColumn(): PrimaryColumnDef
+	column(name: string): ColumnDef
+	primaryColumn(name: string): PrimaryColumnDef
 	// references<OtherTable extends Table<infer U, infer TTableMap>>(table: OtherTable) : Table<infer U, infer TTableMap>;
 	// references<U extends Table<infer U, infer TTableMap extends Table<U, TTableMap>>>(table: U) : Table<infer U, infer TTableMap>;
 	references<U>(table: U): Reference<T, U>;
@@ -111,7 +157,7 @@ type KeysOf<T, Key extends keyof T = keyof T> = Key extends string
 	: never;
 
 type Reference<From, To> = {
-	by(...keys: Array<KeysOf<From>>): To
+	by(...keys: Array<KeysOf<Required<From>>>): To
 	// by<K extends keyof From>(...keys: K[]) : To
 };
 
@@ -124,6 +170,14 @@ type ColumnDef = {
 type PrimaryColumnDef = {
 	string(): PrimaryStringColumn
 }
+
+
+type NegotiateTableDefHelper<T, TMap> = {
+	[key in keyof TMap as TMap[key] extends StringColumn ? 'valid': (TMap[key] extends TableDef<infer C, infer CTableMap> ? (TMap[key] extends C?  'valid' : 'invalid') : 'invalid')]
+}
+
+
+
 
 type TableDef<T, TTableMap extends TableDef<T, TTableMap>> = {
 	[key in keyof Partial<T>]: TTableMap[key] extends string | StringColumnMap | StringColumn ? StringColumn :
@@ -155,16 +209,7 @@ type TableDefAll<T, TTableMap extends TableDef<T, TTableMap>> = {
 //@ts-ignore
 const bar: Rdb2 = {};
 
-
-
-const deliveryAddress2 = bar.table<DeliveryAddress>('deliveryAddress').map((table) => {
-	return {
-		addressId: table.column().string(),
-		order: table.references(order)
-	}
-});
-
-
+// export default bar;
 
 
 type StringColumn = {
@@ -247,65 +292,35 @@ type NColumnMap<TColumnType extends ColumnTypes> = {
 	columnType: TColumnType
 }
 
-class Order {
-	id: string;
-	customer?: Customer;
-	customerId?: string;
-	deliveryAddress?: DeliveryAddress;
-	orderLines?: OrderLine;
+type Params = Record<string, any>
+
+type ReqParams<A, K extends keyof A> = A[K] extends (p: infer P) => Promise<any>
+  ? P extends Params
+    ? P
+    : never
+  : never
+
+type a = {
+	foo: '1',
+	bar: 2
 }
 
-class Customer {
-	customerId: string;
-	name: string;
+type fn =  (...args: [number, string, boolean]) => void;
+
+
+
+type Keys<T, Key extends keyof T = keyof T> = Key extends string
+? T[Key] extends string ? `${Key}` | Key : never
+: never;
+
+
+type Fn2<A,K extends keyof A> =  (...args: Keys<A,K>[]) => void;
+// type Fn2<A,K extends keyof A> =  (...args: [number, string, boolean]) => void;
+
+type Foo = {
+	a: '1',
+	b: 2
 }
 
-class OrderLine {
-	lineId: string;
-}
-
-class DeliveryAddress {
-	addressId: string;
-	order: Order
-}
-;
-
-
-const customer = bar.table<Customer>('customer').map((table) => {
-	return {
-		customerId: table.column().string(),
-		name: table.column().string()
-	}
-});
-
-const deliveryAddress = bar.table<DeliveryAddress>('deliveryAddress').map((table) => {
-	return {
-		addressId: table.column().string()
-	}
-});
-
-const order0 = bar.table<Order>('order').map((mapper) => {
-	return {
-		id: mapper.column().string(),
-		customerId: mapper.column().string()
-	}
-});
-
-
-const order = bar.table<Order>('order').map((mapper) => {
-	return {
-		id: mapper.column().string(),
-		customerId: mapper.column().string(),
-		customer: customer,
-		// deliveryAddress: mapper.references(deliveryAddress).by('customerId')
-	}
-});
-
-
-order.deliveryAddress
-const db = bar.define({
-	customer: customer,
-	order: order
-});
-
-
+// const b : Fn2<Foo>;
+// b()
