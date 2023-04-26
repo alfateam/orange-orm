@@ -67,7 +67,6 @@ const db = rdb({
 
 const filter = db.order.customerId.equals('fo');
 const row = await db.order.getOne(filter);
-row
 
 
 

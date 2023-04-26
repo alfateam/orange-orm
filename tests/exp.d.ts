@@ -1,19 +1,19 @@
 import { Filter, RawFilter } from "../typings"
 
-declare function r<T, TTableMap extends TableDef<infer V, infer VMap>>(defs: T): Extend<T>;
+declare function r<T>(defs: T): Extend<T>;
 
 declare namespace r {
 	function table<T>(dbName: string): TableBuilder<T>;
 	// function foo<T>(dbName: Array<Pick<): any;
-    // function table(name: string): Table;
-    // function end(): Promise<void>;
-    // function postgres(connectionString: string, options?: PoolOptions): Pool;
-    // function sqlite(connectionString: string, options?: PoolOptions): Pool;
-    // function sap(connectionString: string, options?: PoolOptions): Pool;
-    // function mssql(connectionConfig: ConnectionConfig, options?: PoolOptions): Pool;
-    // function mssql(connectionString: string, options?: PoolOptions): Pool;
-    // function mssqlNative(connectionString: string, options?: PoolOptions): Pool;
-    // function mysql(connectionString: string, o
+	// function table(name: string): Table;
+	// function end(): Promise<void>;
+	// function postgres(connectionString: string, options?: PoolOptions): Pool;
+	// function sqlite(connectionString: string, options?: PoolOptions): Pool;
+	// function sap(connectionString: string, options?: PoolOptions): Pool;
+	// function mssql(connectionConfig: ConnectionConfig, options?: PoolOptions): Pool;
+	// function mssql(connectionString: string, options?: PoolOptions): Pool;
+	// function mssqlNative(connectionString: string, options?: PoolOptions): Pool;
+	// function mysql(connectionString: string, o
 }
 
 export = r;
@@ -46,24 +46,21 @@ type Extend<T> = {
 	[key in keyof T]: T[key] extends TableDef<infer U, infer VMap> ? Table<T[key], U, VMap> : T[key]
 }
 
-type Table<TTableDef, T, UMap> = TableFinal<Required<UMap>> &  {
-	getAll(strategy:  Strategy<TTableDef>): Promise<T[]>
-	getMany(filter:  RawFilter): Promise<T[]>
-	getMany(filter:  RawFilter, strategy: Strategy<TTableDef>): Promise<T[]>
-	getMany(rows: Partial<T>[] , strategy: Strategy<TTableDef>): Promise<T[]>
-	getOne(filter:  RawFilter): Promise<T>
-	getOne(filter:  RawFilter, strategy: Strategy<TTableDef>): Promise<T>
+type Table<TTableDef, T, TTableMap> = {
+	getAll(strategy: Strategy<TTableDef>): Promise<T[]>
+	getMany(filter: RawFilter): Promise<T[]>
+	getMany(filter: RawFilter, strategy: Strategy<TTableDef>): Promise<T[]>
+	getMany(rows: Partial<T>[], strategy: Strategy<TTableDef>): Promise<T[]>
+	getOne(filter: RawFilter): Promise<T>
+	getOne(filter: RawFilter, strategy: Strategy<TTableDef>): Promise<T>
 	getOne(row: Partial<T>): Promise<T>
 	getOne(row: Partial<T>, strategy: Strategy<TTableDef>): Promise<T>
-}
-
-type TableFinal<TTableMap> = {
-	[key in keyof TTableMap]: TTableMap[key] extends StringColumnDef ? StringColumn : (
-		TTableMap[key] extends JSONColumnDef ? JSONColumn :
-	TTableMap[key]);
+} &
+	{
+		[key in keyof TTableMap]: TTableMap[key] extends StringColumnDef ? StringColumn : (
+			TTableMap[key] extends JSONColumnDef ? JSONColumn :
+			TTableMap[key]);
 	}
-
-
 
 // type KeysOf<T, Key extends keyof T = keyof T> = Key extends string
 // ? T[Key] extends string ? `${Key}` | Key : never
@@ -115,12 +112,12 @@ type SubType2<Base, Condition, Condition2> =
 
 
 type AllowedStrategies<T> = {
-	[key in keyof T]: Required<T>[key] extends StringColumnDef | JSONColumnDef ? 
-	key : T[key] extends TableDef<infer Sub, infer SubMap> ? (T[key] extends Sub?  never: key) : never;
+	[key in keyof T]: Required<T>[key] extends StringColumnDef | JSONColumnDef ?
+	key : T[key] extends TableDef<infer Sub, infer SubMap> ? (T[key] extends Sub ? never : key) : never;
 }[keyof T]
 
 
-type Strategy<TTableDef> = Partial<Pick<MappedStrategy<Required<TTableDef>>, AllowedStrategies<Required<TTableDef>>>> &  {limit?: number, orderBy: OrderBy<TTableDef>[]}
+type Strategy<TTableDef> = Partial<Pick<MappedStrategy<Required<TTableDef>>, AllowedStrategies<Required<TTableDef>>>> & { limit?: number, orderBy: OrderBy<TTableDef>[] }
 
 
 // type MappedStrategy<T> = {
@@ -129,8 +126,8 @@ type Strategy<TTableDef> = Partial<Pick<MappedStrategy<Required<TTableDef>>, All
 // } 
 
 type MappedStrategy<T> = {
-	[key in keyof T]: Required<T>[key] extends StringColumnDef | JSONColumnDef? 
-	boolean : Required<T[key]> extends infer W extends TableDef<infer Sub, infer SubMap> ?  Partial<MappedStrategy<Pick<W, AllowedStrategies<Required<W>>>>> : number;
+	[key in keyof T]: Required<T>[key] extends StringColumnDef | JSONColumnDef ?
+	boolean : Required<T[key]> extends infer W extends TableDef<infer Sub, infer SubMap> ? Partial<MappedStrategy<Pick<W, AllowedStrategies<Required<W>>>>> : number;
 }
 
 
@@ -138,9 +135,9 @@ type MappedStrategy<T> = {
 // type staffKeys<T> = {
 // 	[K in keyof T]: `asc ${(string & keyof T)}` | `desc ${(string & keyof T)}` | K;
 //   }[keyof T];
-  
+
 type ColumnKeys<T> = {
-	[key in keyof T]: Required<T>[key] extends StringColumnDef | string | JSONColumnDef ? 
+	[key in keyof T]: Required<T>[key] extends StringColumnDef | string | JSONColumnDef ?
 	key : never;
 }[keyof T]
 
@@ -195,7 +192,7 @@ type PrimaryColumnDef = {
 
 
 type NegotiateTableDefHelper<T, TMap> = {
-	[key in keyof TMap as TMap[key] extends StringColumnDef ? 'valid': (TMap[key] extends TableDef<infer C, infer CTableMap> ? (TMap[key] extends C?  'valid' : 'invalid') : 'invalid')]
+	[key in keyof TMap as TMap[key] extends StringColumnDef ? 'valid' : (TMap[key] extends TableDef<infer C, infer CTableMap> ? (TMap[key] extends C ? 'valid' : 'invalid') : 'invalid')]
 }
 
 
@@ -334,26 +331,26 @@ type NColumnMap<TColumnType extends ColumnTypes> = {
 type Params = Record<string, any>
 
 type ReqParams<A, K extends keyof A> = A[K] extends (p: infer P) => Promise<any>
-  ? P extends Params
-    ? P
-    : never
-  : never
+	? P extends Params
+	? P
+	: never
+	: never
 
 type a = {
 	foo: '1',
 	bar: 2
 }
 
-type fn =  (...args: [number, string, boolean]) => void;
+type fn = (...args: [number, string, boolean]) => void;
 
 
 
 type Keys<T, Key extends keyof T = keyof T> = Key extends string
-? T[Key] extends string ? `${Key}` | Key : never
-: never;
+	? T[Key] extends string ? `${Key}` | Key : never
+	: never;
 
 
-type Fn2<A,K extends keyof A> =  (...args: Keys<A,K>[]) => void;
+type Fn2<A, K extends keyof A> = (...args: Keys<A, K>[]) => void;
 // type Fn2<A,K extends keyof A> =  (...args: [number, string, boolean]) => void;
 
 type Foo = {
