@@ -46,18 +46,23 @@ type Extend<T> = {
 	[key in keyof T]: T[key] extends TableDef<infer U, infer VMap> ? Table<T[key], U, VMap> : T[key]
 }
 
-type Table<TTableDef, T, UMap> = TTableDef &  {
+type Table<TTableDef, T, UMap> = TableFinal<Required<UMap>> &  {
 	getAll(strategy:  Strategy<TTableDef>): Promise<T[]>
-	getMany(strategy:  Strategy<TTableDef>): Promise<T[]>
 	getMany(filter:  RawFilter): Promise<T[]>
 	getMany(filter:  RawFilter, strategy: Strategy<TTableDef>): Promise<T[]>
 	getMany(rows: Partial<T>[] , strategy: Strategy<TTableDef>): Promise<T[]>
-	getOne(strategy:  Strategy<TTableDef>): Promise<T[]>
-	getOne(filter:  RawFilter): Promise<T[]>
-	getOne(filter:  RawFilter, strategy: Strategy<TTableDef>): Promise<T[]>
-	getOne(row: Partial<T>): Promise<T[]>
-	getOne(row: Partial<T>, strategy: Strategy<TTableDef>): Promise<T[]>
+	getOne(filter:  RawFilter): Promise<T>
+	getOne(filter:  RawFilter, strategy: Strategy<TTableDef>): Promise<T>
+	getOne(row: Partial<T>): Promise<T>
+	getOne(row: Partial<T>, strategy: Strategy<TTableDef>): Promise<T>
 }
+
+type TableFinal<TTableMap> = {
+	[key in keyof TTableMap]: TTableMap[key] extends StringColumnDef ? StringColumn : (
+		TTableMap[key] extends JSONColumnDef ? JSONColumn :
+	TTableMap[key]);
+	}
+
 
 
 // type KeysOf<T, Key extends keyof T = keyof T> = Key extends string
@@ -72,16 +77,16 @@ type Table<TTableDef, T, UMap> = TTableDef &  {
 
 
 
-// [key in keyof TMap as TMap[key] extends StringColumn ? 'valid': (TMap[key] extends TableDef<infer C, infer CTableMap> ? (TMap[key] extends C?  'valid' : 'invalid') : 'invalid')]
+// [key in keyof TMap as TMap[key] extends StringColumnDef ? 'valid': (TMap[key] extends TableDef<infer C, infer CTableMap> ? (TMap[key] extends C?  'valid' : 'invalid') : 'invalid')]
 
 
-interface Person {
-	id: number;
-	name: string;
-	lastName: string;
-	foo: boolean;
-	load: () => Promise<Person>;
-}
+// interface Person {
+// 	id: number;
+// 	name: string;
+// 	lastName: string;
+// 	foo: boolean;
+// 	load: () => Promise<Person>;
+// }
 
 type FilterFlags<Base, Condition> = {
 	[Key in keyof Base]:
@@ -106,11 +111,11 @@ type AllowedNames2<Base, Condition, Condition2> =
 type SubType2<Base, Condition, Condition2> =
 	Pick<Base, AllowedNames2<Base, Condition, Condition2>>
 
-type f = SubType2<Person, string, boolean>;
+// type f = SubType2<Person, string, boolean>;
 
 
 type AllowedStrategies<T> = {
-	[key in keyof T]: Required<T>[key] extends StringColumn ? 
+	[key in keyof T]: Required<T>[key] extends StringColumnDef | JSONColumnDef ? 
 	key : T[key] extends TableDef<infer Sub, infer SubMap> ? (T[key] extends Sub?  never: key) : never;
 }[keyof T]
 
@@ -119,12 +124,12 @@ type Strategy<TTableDef> = Partial<Pick<MappedStrategy<Required<TTableDef>>, All
 
 
 // type MappedStrategy<T> = {
-// 	[key in keyof T]: Required<T>[key] extends StringColumn ? 
+// 	[key in keyof T]: Required<T>[key] extends StringColumnDef ? 
 // 	boolean : Required<T[key]> extends infer W extends TableDef<infer Sub, infer SubMap> ?  Strategy<W> : number;	
 // } 
 
 type MappedStrategy<T> = {
-	[key in keyof T]: Required<T>[key] extends StringColumn ? 
+	[key in keyof T]: Required<T>[key] extends StringColumnDef | JSONColumnDef? 
 	boolean : Required<T[key]> extends infer W extends TableDef<infer Sub, infer SubMap> ?  Partial<MappedStrategy<Pick<W, AllowedStrategies<Required<W>>>>> : number;
 }
 
@@ -135,7 +140,7 @@ type MappedStrategy<T> = {
 //   }[keyof T];
   
 type ColumnKeys<T> = {
-	[key in keyof T]: Required<T>[key] extends StringColumn | string | JSONColumn ? 
+	[key in keyof T]: Required<T>[key] extends StringColumnDef | string | JSONColumnDef ? 
 	key : never;
 }[keyof T]
 
@@ -161,7 +166,7 @@ type TableBuilder<T> = {
 }
 
 type Mapper<T> = {
-	column(name: string): ColumnDef
+	column(name: string): ColumnMapper
 	primaryColumn(name: string): PrimaryColumnDef
 	// references<OtherTable extends Table<infer U, infer TTableMap>>(table: OtherTable) : Table<infer U, infer TTableMap>;
 	// references<U extends Table<infer U, infer TTableMap extends Table<U, TTableMap>>>(table: U) : Table<infer U, infer TTableMap>;
@@ -179,40 +184,40 @@ type Reference<From, To> = {
 
 
 
-type ColumnDef = {
-	string(): StringColumn
-	json(): JSONColumn;
+type ColumnMapper = {
+	string(): StringColumnDef
+	json(): JSONColumnDef;
 }
 
 type PrimaryColumnDef = {
-	string(): PrimaryStringColumn
+	string(): PrimaryStringColumnDef
 }
 
 
 type NegotiateTableDefHelper<T, TMap> = {
-	[key in keyof TMap as TMap[key] extends StringColumn ? 'valid': (TMap[key] extends TableDef<infer C, infer CTableMap> ? (TMap[key] extends C?  'valid' : 'invalid') : 'invalid')]
+	[key in keyof TMap as TMap[key] extends StringColumnDef ? 'valid': (TMap[key] extends TableDef<infer C, infer CTableMap> ? (TMap[key] extends C?  'valid' : 'invalid') : 'invalid')]
 }
 
 
 
 
 type TableDef<T, TTableMap extends TableDef<T, TTableMap>> = {
-	[key in keyof Partial<T>]: TTableMap[key] extends string | StringColumnMap | StringColumn ? StringColumn :
+	[key in keyof Partial<T>]: TTableMap[key] extends string | StringColumnDef ? StringColumnDef :
 	(TTableMap[key] extends TableDef<infer C, infer CTableMap> ? TableDef<C, CTableMap> : T[key]);
 }
 type TableDefAll<T, TTableMap extends TableDef<T, TTableMap>> = {
-	[key in keyof Partial<T>]: TTableMap[key] extends string | StringColumnMap | StringColumn ? StringColumn :
+	[key in keyof Partial<T>]: TTableMap[key] extends string | StringColumnDefMap | StringColumnDef ? StringColumnDef :
 	(TTableMap[key] extends TableDefAll<infer C, infer CTableMap> ? TableDefAll<C, CTableMap> : never);
 }
 
 // type TableDefAll<T, TTableMap extends TableDef<T,TTableMap>> = {
-// 	[key in keyof Required<T>]: Required<TTableMap>[key] extends string | StringColumnMap | StringColumn ? StringColumn : 
+// 	[key in keyof Required<T>]: Required<TTableMap>[key] extends string | StringColumnDefMap | StringColumnDef ? StringColumnDef : 
 // 	(Required<TTableMap>[key] extends TableDefAll<infer C, infer CTableMap> ? TableDef<C, CTableMap> : never);
 // }
 
 
 // type ChildTable<T, TTableMap extends Table<T,TTableMap>> = {
-// 	[key in keyof Partial<T>]: TTableMap[key] extends string | StringColumnMap | StringColumn ? StringColumn : 
+// 	[key in keyof Partial<T>]: TTableMap[key] extends string | StringColumnDefMap | StringColumnDef ? StringColumnDef : 
 // 	(TTableMap[key] extends Table<infer C, infer CTableMap> ? Table<C, CTableMap> : TTableMap[key]);
 // }
 // & 
@@ -229,14 +234,28 @@ const bar: Rdb2 = {};
 // export default bar;
 
 
+type StringColumnDef = {
+	isColumn: true;
+	// equals(string: string): Filter;
+}
+
 type StringColumn = {
 	equals(string: string): Filter;
 }
 
-type JSONColumn = {
+type ColumnDef = {
+	isColumn: true;
 }
 
-type PrimaryStringColumn = PrimaryColumn & {
+type JSONColumnDef = {
+	isColumn: true;
+}
+
+type JSONColumn = {
+	equals(string: string): Filter;
+}
+
+type PrimaryStringColumnDef = PrimaryColumn & {
 	equals(string: string): Filter;
 }
 
@@ -249,7 +268,7 @@ type PrimaryColumn = {
 }
 
 interface ColumnMap {
-	string(): StringColumnMap,
+	string(): StringColumnDefMap,
 	number(): NumberColumnMap,
 	date(): DateColumnMap,
 	uuid(): UuidColumnMap,
@@ -259,7 +278,7 @@ interface ColumnMap {
 }
 
 
-interface StringColumnMap extends NColumnMap<'string'> {
+interface StringColumnDefMap extends NColumnMap<'string'> {
 
 }
 
@@ -282,7 +301,7 @@ interface BooleanColumnMap extends NColumnMap<'boolean'> {
 
 interface JSONColumnMap extends NColumnMap<'json'> {
 }
-interface StringColumnMap extends NColumnMap<'string'> {
+interface StringColumnDefMap extends NColumnMap<'string'> {
 
 }
 

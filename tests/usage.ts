@@ -64,9 +64,12 @@ const db = rdb({
 	// foo: {id: 1}
 });
 
-const row  = {customerId: '1'};
 
-db.order.getAll({orderBy: [] }
+const filter = db.order.customerId.equals('fo');
+const row = await db.order.getOne(filter);
+row
+
+
 
 
 // type Person = {
