@@ -58,15 +58,15 @@ const order = rdb.table<Order>('order').map(({column, references}) => {
 	}
 });
 
+
 const db = rdb({
 	customer: customer,
 	order: order,
 	// foo: {id: 1}
 });
 
-
 const filter = db.order.customerId.equals('fo');
-const row = await db.order.getOne(filter);
+const row = await db.order.getOne(filter, {orderBy: []});
 
 
 

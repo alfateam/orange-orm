@@ -18,30 +18,6 @@ declare namespace r {
 
 export = r;
 
-// type StringKeyOf<T> = Extract<keyof T, string>;
-
-// type PickKeys<T, K extends StringKeyOf<T>> = {
-//   <Keys extends (K | `asc ${K}`)[]>(): (obj: T) => Pick<T, Extract<Keys[number], K>>;
-// }
-// interface Bar {
-// 	id: string;
-// 	bar: string;
-// }
-
-// function blabla(arg: StringKeyOf<Bar>) : any {
-// 	return 1;
-// }
-
-
-// const f = blabla(['a']);
-
-// interface Rdb2 {
-// 	table<T>(dbName: string): TableBuilder<T>;
-// 	// define<T extends TableDef<infer V, infer VMap>>(defs: T): Extend<T>
-// 	define<T, TTableMap extends TableDef<infer V, infer VMap>>(defs: T): Extend<T>
-// 	// TableDef<T, TTableMap extends TableDef<T, TTableMap>>
-// }
-
 type Extend<T> = {
 	[key in keyof T]: T[key] extends TableDef<infer U, infer VMap> ? Table<T[key], U, VMap> : T[key]
 }
@@ -62,55 +38,6 @@ type Table<TTableDef, T, TTableMap> = {
 			TTableMap[key]);
 	}
 
-// type KeysOf<T, Key extends keyof T = keyof T> = Key extends string
-// ? T[Key] extends string ? `${Key}` | Key : never
-// : never;
-
-// type PrimaryKeys<T> = {
-// 	[key in keyof T]: T[key] extends PrimaryColumn ? key : never
-// }[keyof T]
-
-// type GetById<T> = MapGetById<Pick<T, PrimaryKeys<T>>>;
-
-
-
-// [key in keyof TMap as TMap[key] extends StringColumnDef ? 'valid': (TMap[key] extends TableDef<infer C, infer CTableMap> ? (TMap[key] extends C?  'valid' : 'invalid') : 'invalid')]
-
-
-// interface Person {
-// 	id: number;
-// 	name: string;
-// 	lastName: string;
-// 	foo: boolean;
-// 	load: () => Promise<Person>;
-// }
-
-type FilterFlags<Base, Condition> = {
-	[Key in keyof Base]:
-	Base[Key] extends Condition ? Key : never
-};
-
-type AllowedNames<Base, Condition> =
-	FilterFlags<Base, Condition>[keyof Base]
-
-type SubType<Base, Condition> =
-	Pick<Base, AllowedNames<Base, Condition>>
-
-
-type FilterFlags2<Base, Condition, Condition2> = {
-	[Key in keyof Base]:
-	Base[Key] extends Condition | Condition2 ? Key : never
-};
-
-type AllowedNames2<Base, Condition, Condition2> =
-	FilterFlags2<Base, Condition, Condition2>[keyof Base]
-
-type SubType2<Base, Condition, Condition2> =
-	Pick<Base, AllowedNames2<Base, Condition, Condition2>>
-
-// type f = SubType2<Person, string, boolean>;
-
-
 type AllowedStrategies<T> = {
 	[key in keyof T]: Required<T>[key] extends StringColumnDef | JSONColumnDef ?
 	key : T[key] extends TableDef<infer Sub, infer SubMap> ? (T[key] extends Sub ? never : key) : never;
@@ -120,21 +47,10 @@ type AllowedStrategies<T> = {
 type Strategy<TTableDef> = Partial<Pick<MappedStrategy<Required<TTableDef>>, AllowedStrategies<Required<TTableDef>>>> & { limit?: number, orderBy: OrderBy<TTableDef>[] }
 
 
-// type MappedStrategy<T> = {
-// 	[key in keyof T]: Required<T>[key] extends StringColumnDef ? 
-// 	boolean : Required<T[key]> extends infer W extends TableDef<infer Sub, infer SubMap> ?  Strategy<W> : number;	
-// } 
-
 type MappedStrategy<T> = {
 	[key in keyof T]: Required<T>[key] extends StringColumnDef | JSONColumnDef ?
 	boolean : Required<T[key]> extends infer W extends TableDef<infer Sub, infer SubMap> ? Partial<MappedStrategy<Pick<W, AllowedStrategies<Required<W>>>>> : number;
 }
-
-
-//this works
-// type staffKeys<T> = {
-// 	[K in keyof T]: `asc ${(string & keyof T)}` | `desc ${(string & keyof T)}` | K;
-//   }[keyof T];
 
 type ColumnKeys<T> = {
 	[key in keyof T]: Required<T>[key] extends StringColumnDef | string | JSONColumnDef ?
@@ -147,15 +63,6 @@ type OrderBy<T> = AscDesc<Pick<T, ColumnKeys<Required<T>>>>;
 type AscDesc<T> = {
 	[K in keyof T]: `asc ${(string & keyof T)}` | `desc ${(string & keyof T)}` | K;
 }[keyof T];
-
-// type OrderBy<T> = {
-// 	[K in keyof T]: `asc ${(string & keyof T)}` | `desc ${(string & keyof T)}` | K;
-//   }[keyof T];
-
-// type OrderBy<T> = {
-// 	[K in keyof T]: `asc ${(string & keyof T)}` | `desc ${(string & keyof T)}` | K;
-//   }[keyof T];
-
 
 type TableBuilder<T> = {
 	map<TMap extends TableDef<T, TMap>>(fn: (mapper: Mapper<T>) => TMap): TableDef<T, TMap>
@@ -191,39 +98,12 @@ type PrimaryColumnDef = {
 }
 
 
-type NegotiateTableDefHelper<T, TMap> = {
-	[key in keyof TMap as TMap[key] extends StringColumnDef ? 'valid' : (TMap[key] extends TableDef<infer C, infer CTableMap> ? (TMap[key] extends C ? 'valid' : 'invalid') : 'invalid')]
-}
-
-
-
-
 type TableDef<T, TTableMap extends TableDef<T, TTableMap>> = {
-	[key in keyof Partial<T>]: TTableMap[key] extends string | StringColumnDef ? StringColumnDef :
+	[key in keyof Partial<T>]: 
+	TTableMap[key] extends  StringColumnDef ? StringColumnDef :
+	 TTableMap[key] extends JSONColumnDef ? JSONColumnDef :
 	(TTableMap[key] extends TableDef<infer C, infer CTableMap> ? TableDef<C, CTableMap> : T[key]);
 }
-type TableDefAll<T, TTableMap extends TableDef<T, TTableMap>> = {
-	[key in keyof Partial<T>]: TTableMap[key] extends string | StringColumnDefMap | StringColumnDef ? StringColumnDef :
-	(TTableMap[key] extends TableDefAll<infer C, infer CTableMap> ? TableDefAll<C, CTableMap> : never);
-}
-
-// type TableDefAll<T, TTableMap extends TableDef<T,TTableMap>> = {
-// 	[key in keyof Required<T>]: Required<TTableMap>[key] extends string | StringColumnDefMap | StringColumnDef ? StringColumnDef : 
-// 	(Required<TTableMap>[key] extends TableDefAll<infer C, infer CTableMap> ? TableDef<C, CTableMap> : never);
-// }
-
-
-// type ChildTable<T, TTableMap extends Table<T,TTableMap>> = {
-// 	[key in keyof Partial<T>]: TTableMap[key] extends string | StringColumnDefMap | StringColumnDef ? StringColumnDef : 
-// 	(TTableMap[key] extends Table<infer C, infer CTableMap> ? Table<C, CTableMap> : TTableMap[key]);
-// }
-// & 
-// {
-// 	exists: Filter;
-// }
-
-
-
 
 //@ts-ignore
 const bar: Rdb2 = {};
@@ -232,7 +112,7 @@ const bar: Rdb2 = {};
 
 
 type StringColumnDef = {
-	isColumn: true;
+	isColumn: 'string';
 	// equals(string: string): Filter;
 }
 
@@ -245,7 +125,7 @@ type ColumnDef = {
 }
 
 type JSONColumnDef = {
-	isColumn: true;
+	isColumn: 'json';
 }
 
 type JSONColumn = {
@@ -264,69 +144,69 @@ type PrimaryColumn = {
 
 }
 
-interface ColumnMap {
-	string(): StringColumnDefMap,
-	number(): NumberColumnMap,
-	date(): DateColumnMap,
-	uuid(): UuidColumnMap,
-	binary(): BinaryColumnMap,
-	json(): JSONColumnMap,
-	boolean(): BooleanColumnMap,
-}
+// interface ColumnMap {
+// 	string(): StringColumnDefMap,
+// 	number(): NumberColumnMap,
+// 	date(): DateColumnMap,
+// 	uuid(): UuidColumnMap,
+// 	binary(): BinaryColumnMap,
+// 	json(): JSONColumnMap,
+// 	boolean(): BooleanColumnMap,
+// }
 
 
-interface StringColumnDefMap extends NColumnMap<'string'> {
+// interface StringColumnDefMap extends NColumnMap<'string'> {
 
-}
+// }
 
-interface NumberColumnMap extends NColumnMap<'number'> {
+// interface NumberColumnMap extends NColumnMap<'number'> {
 
-}
+// }
 
-interface DateColumnMap extends NColumnMap<'date'> {
+// interface DateColumnMap extends NColumnMap<'date'> {
 
-}
-interface UuidColumnMap extends NColumnMap<'uuid'> {
+// }
+// interface UuidColumnMap extends NColumnMap<'uuid'> {
 
-}
+// }
 
-interface BinaryColumnMap extends NColumnMap<'binary'> {
-}
+// interface BinaryColumnMap extends NColumnMap<'binary'> {
+// }
 
-interface BooleanColumnMap extends NColumnMap<'boolean'> {
-}
+// interface BooleanColumnMap extends NColumnMap<'boolean'> {
+// }
 
-interface JSONColumnMap extends NColumnMap<'json'> {
-}
-interface StringColumnDefMap extends NColumnMap<'string'> {
+// interface JSONColumnMap extends NColumnMap<'json'> {
+// }
+// interface StringColumnDefMap extends NColumnMap<'string'> {
 
-}
+// }
 
-interface NumberColumnMap extends NColumnMap<'number'> {
+// interface NumberColumnMap extends NColumnMap<'number'> {
 
-}
+// }
 
-interface DateColumnMap extends NColumnMap<'date'> {
+// interface DateColumnMap extends NColumnMap<'date'> {
 
-}
-interface UuidColumnMap extends NColumnMap<'uuid'> {
+// }
+// interface UuidColumnMap extends NColumnMap<'uuid'> {
 
-}
+// }
 
-interface BinaryColumnMap extends NColumnMap<'binary'> {
-}
+// interface BinaryColumnMap extends NColumnMap<'binary'> {
+// }
 
-interface BooleanColumnMap extends NColumnMap<'boolean'> {
-}
+// interface BooleanColumnMap extends NColumnMap<'boolean'> {
+// }
 
-interface JSONColumnMap extends NColumnMap<'json'> {
-}
+// interface JSONColumnMap extends NColumnMap<'json'> {
+// }
 
-type ColumnTypes = 'string' | 'boolean' | 'number' | 'date' | 'uuid' | 'binary' | 'json';
+// type ColumnTypes = 'string' | 'boolean' | 'number' | 'date' | 'uuid' | 'binary' | 'json';
 
-type NColumnMap<TColumnType extends ColumnTypes> = {
-	columnType: TColumnType
-}
+// type NColumnMap<TColumnType extends ColumnTypes> = {
+// 	columnType: TColumnType
+// }
 
 type Params = Record<string, any>
 
