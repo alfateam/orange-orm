@@ -46,17 +46,17 @@ type Extend<T> = {
 	[key in keyof T]: T[key] extends TableDef<infer U, infer VMap> ? Table<T[key], U, VMap> : T[key]
 }
 
-type Table<W, U, UMap> = W &  {
-	getAll(strategy:  Strategy<W>): Promise<U[]>
-	getMany(strategy:  Strategy<W>): Promise<U[]>
-	getMany(filter:  RawFilter): Promise<U[]>
-	getMany(filter:  RawFilter, strategy: Strategy<W>): Promise<U[]>
-	getMany(rows: Partial<U>[] , strategy: Strategy<W>): Promise<U[]>
-	getOne(strategy:  Strategy<W>): Promise<U[]>
-	getOne(filter:  RawFilter): Promise<U[]>
-	getOne(filter:  RawFilter, strategy: Strategy<W>): Promise<U[]>
-	getOne(row: Partial<U>): Promise<U[]>
-	getOne(row: Partial<U>, strategy: Strategy<W>): Promise<U[]>
+type Table<TTableDef, T, UMap> = TTableDef &  {
+	getAll(strategy:  Strategy<TTableDef>): Promise<T[]>
+	getMany(strategy:  Strategy<TTableDef>): Promise<T[]>
+	getMany(filter:  RawFilter): Promise<T[]>
+	getMany(filter:  RawFilter, strategy: Strategy<TTableDef>): Promise<T[]>
+	getMany(rows: Partial<T>[] , strategy: Strategy<TTableDef>): Promise<T[]>
+	getOne(strategy:  Strategy<TTableDef>): Promise<T[]>
+	getOne(filter:  RawFilter): Promise<T[]>
+	getOne(filter:  RawFilter, strategy: Strategy<TTableDef>): Promise<T[]>
+	getOne(row: Partial<T>): Promise<T[]>
+	getOne(row: Partial<T>, strategy: Strategy<TTableDef>): Promise<T[]>
 }
 
 
@@ -112,10 +112,11 @@ type f = SubType2<Person, string, boolean>;
 type AllowedStrategies<T> = {
 	[key in keyof T]: Required<T>[key] extends StringColumn ? 
 	key : T[key] extends TableDef<infer Sub, infer SubMap> ? (T[key] extends Sub?  never: key) : never;
-}[keyof T] & { limit?: number, orderBy: OrderBy<T>}
+}[keyof T]
 
 
-type Strategy<W> = Partial<Pick<MappedStrategy<Required<W>>, AllowedStrategies<Required<W>>>>
+type Strategy<TTableDef> = Partial<Pick<MappedStrategy<Required<TTableDef>>, AllowedStrategies<Required<TTableDef>>>> &  {limit?: number, orderBy: OrderBy<TTableDef>[]}
+
 
 // type MappedStrategy<T> = {
 // 	[key in keyof T]: Required<T>[key] extends StringColumn ? 
@@ -133,10 +134,25 @@ type MappedStrategy<T> = {
 // 	[K in keyof T]: `asc ${(string & keyof T)}` | `desc ${(string & keyof T)}` | K;
 //   }[keyof T];
   
+type ColumnKeys<T> = {
+	[key in keyof T]: Required<T>[key] extends StringColumn | string | JSONColumn ? 
+	key : never;
+}[keyof T]
 
-type OrderBy<T> = {
+
+type OrderBy<T> = AscDesc<Pick<T, ColumnKeys<Required<T>>>>;
+
+type AscDesc<T> = {
 	[K in keyof T]: `asc ${(string & keyof T)}` | `desc ${(string & keyof T)}` | K;
-  }[keyof T];
+}[keyof T];
+
+// type OrderBy<T> = {
+// 	[K in keyof T]: `asc ${(string & keyof T)}` | `desc ${(string & keyof T)}` | K;
+//   }[keyof T];
+
+// type OrderBy<T> = {
+// 	[K in keyof T]: `asc ${(string & keyof T)}` | `desc ${(string & keyof T)}` | K;
+//   }[keyof T];
 
 
 type TableBuilder<T> = {
@@ -165,6 +181,7 @@ type Reference<From, To> = {
 
 type ColumnDef = {
 	string(): StringColumn
+	json(): JSONColumn;
 }
 
 type PrimaryColumnDef = {
@@ -214,6 +231,9 @@ const bar: Rdb2 = {};
 
 type StringColumn = {
 	equals(string: string): Filter;
+}
+
+type JSONColumn = {
 }
 
 type PrimaryStringColumn = PrimaryColumn & {

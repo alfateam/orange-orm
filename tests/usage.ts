@@ -6,6 +6,11 @@ class Order {
 	customerId?: string;
 	deliveryAddress?: DeliveryAddress;
 	orderLines?: OrderLine;
+	someJSON: SomeJSON;
+}
+
+class SomeJSON {
+	foo: string;
 }
 
 class Customer {
@@ -47,6 +52,7 @@ const order = rdb.table<Order>('order').map(({column, references}) => {
 	return {
 		id: column('id').string(),
 		customerId: column('customerId').string(),
+		someJSON: column('someJSON').json(),
 		customer: references(customer).by('customerId')
 		// deliveryAddress: references(deliveryAddress).by('customerId')
 	}
@@ -60,8 +66,7 @@ const db = rdb({
 
 const row  = {customerId: '1'};
 
-db.order.getAll({customer: true})
-db.order.getMany({})
+db.order.getAll({orderBy: [] }
 
 
 // type Person = {
