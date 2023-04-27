@@ -35,13 +35,24 @@ type Table<TTableDef, T, TTableMap> = {
 	{
 		[key in keyof TTableMap]: TTableMap[key] extends StringColumnDef ? StringColumn : (
 			TTableMap[key] extends JSONColumnDef ? JSONColumn :
-			TTableMap[key]);
+			(TTableMap[key] extends TableDef<infer U, infer V> ? RelatedTable<TTableMap[key],U,V> :
+			TTableMap[key]));
+	}
+type RelatedTable<TTableDef, T, TTableMap> = {
+	exists(): Filter
+} &
+	{
+		[key in keyof TTableMap]: TTableMap[key] extends StringColumnDef ? StringColumn : (
+			TTableMap[key] extends JSONColumnDef ? JSONColumn :
+			(TTableMap[key] extends TableDef<infer U, infer V> ? RelatedTable<TTableMap[key],U,V> :
+			TTableMap[key]));
 	}
 
 type AllowedStrategies<T> = {
 	[key in keyof T]: Required<T>[key] extends StringColumnDef | JSONColumnDef ?
 	key : T[key] extends TableDef<infer Sub, infer SubMap> ? (T[key] extends Sub ? never : key) : never;
 }[keyof T]
+
 
 
 type Strategy<TTableDef> = Partial<Pick<MappedStrategy<Required<TTableDef>>, AllowedStrategies<Required<TTableDef>>>> & { limit?: number, orderBy: OrderBy<TTableDef>[] }
@@ -65,9 +76,18 @@ type AscDesc<T> = {
 }[keyof T];
 
 type TableBuilder<T> = {
-	map<TMap extends TableDef<T, TMap>>(fn: (mapper: Mapper<T>) => TMap): TableDef<T, TMap>
-	// map<TMap extends Table<T, TMap>>(map: TMap): Table<T, TMap>
-}
+	map<TMap extends TableDef<T, TMap>>(fn: (mapper: Mapper<T>) => TMap): TableDef<T, TMap>;
+};
+
+type TableDef<T, TTableMap extends TableDef<T, TTableMap>> = {
+	[key in keyof Partial<T>]: 
+		TTableMap[key] extends  StringColumnDef ? StringColumnDef :
+		TTableMap[key] extends JSONColumnDef ? JSONColumnDef :
+		(TTableMap[key] extends TableDef<infer C, infer CTableMap> ? TableDef<C, CTableMap> : T[key]);
+};
+
+
+
 
 type Mapper<T> = {
 	column(name: string): ColumnMapper
@@ -98,12 +118,6 @@ type PrimaryColumnDef = {
 }
 
 
-type TableDef<T, TTableMap extends TableDef<T, TTableMap>> = {
-	[key in keyof Partial<T>]: 
-	TTableMap[key] extends  StringColumnDef ? StringColumnDef :
-	 TTableMap[key] extends JSONColumnDef ? JSONColumnDef :
-	(TTableMap[key] extends TableDef<infer C, infer CTableMap> ? TableDef<C, CTableMap> : T[key]);
-}
 
 //@ts-ignore
 const bar: Rdb2 = {};

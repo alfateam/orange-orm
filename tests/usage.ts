@@ -13,10 +13,6 @@ class SomeJSON {
 	foo: string;
 }
 
-class Customer {
-	customerId: string;
-	name: string;
-}
 
 class OrderLine {
 	lineId: string;
@@ -27,10 +23,16 @@ class DeliveryAddress {
 	order: Order
 }
 
-const customer = rdb.table<Customer>('customer').map((table) => {
+class Customer {
+	customerId: string;
+	name: string;
+}
+
+
+const customer = rdb.table<Customer>('customer').map(({column}) => {
 	return {
-		customerId: table.column('customerId').string(),
-		name: table.column('name').string()
+		customerId: column('customerId').string(),
+		name: column('name').string()
 	}
 });
 
@@ -43,7 +45,8 @@ const deliveryAddress = rdb.table<DeliveryAddress>('deliveryAddress').map((table
 const order0 = rdb.table<Order>('order').map((mapper) => {
 	return {
 		id: mapper.column('id').string(),
-		customerId: mapper.column('customerId').string()
+		customerId: mapper.column('customerId').string(),
+		fofo: 'sring'
 	}
 });
 
@@ -53,7 +56,8 @@ const order = rdb.table<Order>('order').map(({column, references}) => {
 		id: column('id').string(),
 		customerId: column('customerId').string(),
 		someJSON: column('someJSON').json(),
-		customer: references(customer).by('customerId')
+		customer: references(customer).by('customerId'),
+		foo: column('foo')
 		// deliveryAddress: references(deliveryAddress).by('customerId')
 	}
 });
@@ -66,7 +70,12 @@ const db = rdb({
 });
 
 const filter = db.order.customerId.equals('fo');
-const row = await db.order.getOne(filter, {orderBy: []});
+const f2 = db.order.customer.name.equals('foo');
+const f = f2.and(filter);
+const row = await db.order.getOne(f, {orderBy: []});
+
+await db.customer.getAll({orderBy: ['asc customerId']});
+
 
 
 
