@@ -1,3 +1,4 @@
+import { Options } from 'ajv';
 import { RequestHandler } from 'express';
 import { ConnectionConfig } from 'tedious';
 
@@ -92,6 +93,8 @@ declare namespace r {
     }
 
     export interface ColumnOf<T> {
+        validate(validator: (value: unknown, row?: unknown) => void): ColumnOf<T>;
+        JSONSchema(schema: object, options: Options): ColumnOf<T>;
         serializable(value: boolean): ColumnOf<T>;
         default(value: T | (() => T)): ColumnOf<T>;
         dbNull(value: T | null): ColumnOf<T>;
@@ -255,7 +258,6 @@ declare namespace r {
         db: Pool | Url | (() => Pool);
     }
     
-
     export type Url =`${'http://'|'https://'}${string}`;    
 
     export interface TablesConfig {
