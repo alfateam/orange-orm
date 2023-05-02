@@ -66,17 +66,29 @@ function defineColumn(column, table) {
 	};
 
 	c.validate = function(value) {
-		column.validate = value;
+		let previousValue = column.validate;
+		if (previousValue)
+			column.validate = nestedValidate;
+		else
+			column.validate = value;
+
+		function nestedValidate() {
+			previousValue.apply(null, arguments);
+			value.apply(null, arguments);
+		}
 		return c;
 	};
 
 	c.JSONSchema = function(schema, options) {
+		let previousValidate = column.validate;
 		let ajv = new Ajv(options);
 		let validate = ajv.compile(schema);
 		column.validate = _validate;
 
-		function _validate(value) {
-			let valid = validate(value);
+		function _validate() {
+			if (previousValidate)
+				previousValidate.apply(null, arguments);
+			let valid = validate.apply(null, arguments);
 			if (!valid) {
 				let e = new Error(`Column ${table._dbName}.${column._dbName} violates JSON Schema: ${inspect(validate.errors, false, 10)}`);
 				e.errors = validate.errors;

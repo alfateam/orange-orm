@@ -1,16 +1,27 @@
 const rdb = require('../../src/index');
 
+const nameSchema = {
+	type: 'string',
+	// 'maxLength': 20
+};
+
 //customer
 const customer = rdb.table('customer');
 customer.primaryColumn('id').numeric();
-customer.column('name').string().validate(validateName);
+customer.column('name').string().validate(validateName).validate(truthy).JSONSchema(nameSchema);
 customer.column('balance').numeric();
 customer.column('isActive').boolean();
 
-function validateName(value, _row) {
+function validateName(value) {
 	if (value && value.length > 10)
 		throw new Error('Length cannot exceed 10 characters');
 }
+
+function truthy(value) {
+	if (!value)
+		throw new Error('Name must be set');
+}
+
 
 //order
 const order = rdb.table('_order');

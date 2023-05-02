@@ -72,6 +72,52 @@ describe('validate', () => {
 	}
 });
 
+describe('validate chained', () => {
+	test('pg', async () => await verify(pg()));
+
+	async function verify({pool, init}) {
+		const db = _db({db: pool});
+		let error;
+		await init(db);
+
+		try {
+			await db.customer.insert({
+				balance: 177,
+				// isActive: true
+			});
+
+		}
+		catch(e) {
+			error = e;
+		}
+
+		expect(error?.message).toEqual('Name must be set');
+	}
+});
+
+describe('validate JSONSchema', () => {
+	test('pg', async () => await verify(pg()));
+
+	async function verify({pool, init}) {
+		const db = _db({db: pool});
+		let error;
+		await init(db);
+
+		try {
+			await db.customer.insert({
+				balance: 177,
+				name: 1
+				// isActive: true
+			});
+
+		}
+		catch(e) {
+			error = e;
+		}
+		expect(error?.message?.startsWith('Column customer.name violates JSON Schema')).toBe(true);
+	}
+});
+
 
 describe('insert autoincremental', () => {
 
