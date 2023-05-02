@@ -47,6 +47,32 @@ describe('transaction', () => {
 	}
 });
 
+describe('validate', () => {
+	test('pg', async () => await verify(pg()));
+
+	async function verify({pool, init}) {
+		const db = _db({db: pool});
+		let error;
+		await init(db);
+
+		try {
+			await db.customer.insert({
+				name: 'A name longer than 10 chars',
+				balance: 177,
+				// isActive: true
+			});
+
+		}
+		catch(e) {
+			error = e;
+		}
+
+
+		expect(error?.message).toEqual('Length cannot exceed 10 characters');
+	}
+});
+
+
 describe('insert autoincremental', () => {
 
 	test('pg', async () => await verify(pg()));

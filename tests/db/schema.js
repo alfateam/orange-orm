@@ -3,9 +3,14 @@ const rdb = require('../../src/index');
 //customer
 const customer = rdb.table('customer');
 customer.primaryColumn('id').numeric();
-customer.column('name').string();
+customer.column('name').string().validate(validateName);
 customer.column('balance').numeric();
 customer.column('isActive').boolean();
+
+function validateName(value, _row) {
+	if (value && value.length > 10)
+		throw new Error('Length cannot exceed 10 characters');
+}
 
 //order
 const order = rdb.table('_order');

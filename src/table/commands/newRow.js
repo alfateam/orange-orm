@@ -29,7 +29,8 @@ function newRow(table) {
 			var column = table._primaryColumns[i - 1];
 			dto[column.alias] = pkValue;
 		}
-	return decodeDbRow(table, table, dto);
+
+	return decodeDbRow(table, table, dto, true);
 }
 
 function isObject(object) {
