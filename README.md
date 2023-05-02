@@ -14,6 +14,9 @@ Based on promises.
 [Documentation and examples](https://github.com/alfateam/rdb/blob/master/docs/docs.md)  
 
 ## Release notes
+__3.1.7__  
+Chainable column.validate() and column.JSONSchema().  
+column.notNull().  
 __3.1.6__  
 Tedious: return first error if AggregatError    
 __3.1.5__  

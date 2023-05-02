@@ -94,6 +94,7 @@ declare namespace r {
 
     export interface ColumnOf<T> {
         validate(validator: (value: unknown, row?: unknown) => void): ColumnOf<T>;
+        notNull(): ColumnOf<T>;
         JSONSchema(schema: object, options: Options): ColumnOf<T>;
         serializable(value: boolean): ColumnOf<T>;
         default(value: T | (() => T)): ColumnOf<T>;

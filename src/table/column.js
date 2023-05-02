@@ -65,6 +65,16 @@ function defineColumn(column, table) {
 		return c;
 	};
 
+	c.notNull = function() {
+
+		function validate(value) {
+			if (value === undefined || value === null)
+				throw new Error(`Column ${column.alias} cannot be null or undefined`);
+		}
+
+		return c.validate(validate);
+	};
+
 	c.validate = function(value) {
 		let previousValue = column.validate;
 		if (previousValue)

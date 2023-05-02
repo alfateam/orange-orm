@@ -26,7 +26,7 @@ function truthy(value) {
 //order
 const order = rdb.table('_order');
 order.primaryColumn('id').numeric();
-order.column('orderDate').date();
+order.column('orderDate').date().notNull();
 order.column('customerId').numeric();
 
 //orderLine

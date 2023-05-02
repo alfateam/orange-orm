@@ -118,6 +118,24 @@ describe('validate JSONSchema', () => {
 	}
 });
 
+describe('validate notNull', () => {
+	test('pg', async () => await verify(pg()));
+
+	async function verify({pool, init}) {
+		const db = _db({db: pool});
+		let error;
+		await init(db);
+
+		try {
+			await db.order.insert({});
+
+		}
+		catch(e) {
+			error = e;
+		}
+		expect(error?.message?.substring(0, 45)).toBe('Column orderDate cannot be null or undefined');
+	}
+});
 
 describe('insert autoincremental', () => {
 
