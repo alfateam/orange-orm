@@ -108,7 +108,7 @@ declare namespace r {
     }
 
     export interface BinaryColumnNotNullDef {
-        validate(validator: (value?: Buffer | string, row?: object) => void): BinaryColumnNotNullDef;
+        validate(validator: (value: Buffer | string, row?: object) => void): BinaryColumnNotNullDef;
         JSONSchema(schema: object, options?: Options): BinaryColumnNotNullDef;
         serializable(value: boolean): BinaryColumnNotNullDef;
         as(dbName: string): BinaryColumnNotNullDef;
