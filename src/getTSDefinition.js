@@ -251,7 +251,10 @@ function regularColumns(table) {
 	let separator = '';
 	for (let i = 0; i < table._columns.length; i++) {
 		let column = table._columns[i];
-		result += `${separator}${column.alias}? : ${typeMap[column.tsType]} | null;`;
+		if (column._notNull)
+			result += `${separator}${column.alias} : ${typeMap[column.tsType]};`;
+		else
+			result += `${separator}${column.alias}? : ${typeMap[column.tsType]} | null;`;
 		separator = `
 	`;
 	}

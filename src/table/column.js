@@ -66,7 +66,7 @@ function defineColumn(column, table) {
 	};
 
 	c.notNull = function() {
-
+		column._notNull = true;
 		function validate(value) {
 			if (value === undefined || value === null)
 				throw new Error(`Column ${column.alias} cannot be null or undefined`);
