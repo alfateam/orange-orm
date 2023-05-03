@@ -14,6 +14,8 @@ Based on promises.
 [Documentation and examples](https://github.com/alfateam/rdb/blob/master/docs/docs.md)  
 
 ## Release notes
+__3.1.8__  
+Improved typescript definitions for notNull() and validate().  
 __3.1.7__  
 Chainable column.validate() and column.JSONSchema().  
 column.notNull().  

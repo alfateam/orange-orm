@@ -79,27 +79,61 @@ declare namespace r {
         date(): DateColumnDef;
     }
     export interface DateColumnDef {
+        validate(validator: (value?: Date | string, row?: object) => void): DateColumnDef;
+        notNull(): DateColumnNotNullDef;
+        JSONSchema(schema: object, options?: Options): DateColumnDef;
         serializable(value: boolean): DateColumnDef;
         as(dbName: string): DateColumnDef;
         default(value: Date | string | (() => Date | string)): DateColumnDef
         dbNull(value: Date | string | null): DateColumnDef;
     }
 
+    export interface DateColumnNotNullDef {
+        validate(validator: (value: Date | string, row?: object) => void): DateColumnNotNullDef;
+        JSONSchema(schema: object, options?: Options): DateColumnNotNullDef;
+        serializable(value: boolean): DateColumnNotNullDef;
+        as(dbName: string): DateColumnNotNullDef;
+        default(value: Date | string | (() => Date | string)): DateColumnNotNullDef
+        dbNull(value: Date | string | null): DateColumnNotNullDef;
+    }
+
     export interface BinaryColumnDef {
+        validate(validator: (value?: Buffer | string, row?: object) => void): BinaryColumnDef;
+        notNull(): BinaryColumnNotNullDef;
+        JSONSchema(schema: object, options?: Options): BinaryColumnDef;
         serializable(value: boolean): BinaryColumnDef;
         as(dbName: string): BinaryColumnDef;
         default(value: Buffer | string | (() => Buffer | string)): BinaryColumnDef
         dbNull(value: Buffer | string | null): BinaryColumnDef;
     }
 
+    export interface BinaryColumnNotNullDef {
+        validate(validator: (value?: Buffer | string, row?: object) => void): BinaryColumnNotNullDef;
+        JSONSchema(schema: object, options?: Options): BinaryColumnNotNullDef;
+        serializable(value: boolean): BinaryColumnNotNullDef;
+        as(dbName: string): BinaryColumnNotNullDef;
+        default(value: Buffer | string | (() => Buffer | string)): BinaryColumnNotNullDef
+        dbNull(value: Buffer | string | null): BinaryColumnNotNullDef;
+    }
+
     export interface ColumnOf<T> {
-        validate(validator: (value: unknown, row?: unknown) => void): ColumnOf<T>;
-        notNull(): ColumnOf<T>;
-        JSONSchema(schema: object, options: Options): ColumnOf<T>;
+        validate(validator: (value?: T, row?: object) => void): ColumnOf<T>;
+        notNull(): ColumnNotNullOf<T>;
+        JSONSchema(schema: object, options?: Options): ColumnOf<T>;
         serializable(value: boolean): ColumnOf<T>;
         default(value: T | (() => T)): ColumnOf<T>;
         dbNull(value: T | null): ColumnOf<T>;
         as(dbName: string): ColumnOf<T>;
+    }
+
+    export interface ColumnNotNullOf<T> {
+        validate(validator: (value: T, row?: object) => void): ColumnNotNullOf<T>;
+        notNull(): ColumnNotNullOf<T>;
+        JSONSchema(schema: object, options?: Options): ColumnNotNullOf<T>;
+        serializable(value: boolean): ColumnNotNullOf<T>;
+        default(value: T | (() => T)): ColumnNotNullOf<T>;
+        dbNull(value: T | null): ColumnNotNullOf<T>;
+        as(dbName: string): ColumnNotNullOf<T>;
     }
 
     // export interface Rdb {
