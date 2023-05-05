@@ -1,3 +1,4 @@
+// foo.ts
 import orm from './orm';
 
 interface Order {
@@ -18,24 +19,26 @@ interface Customer {
 
 const order = orm.table<Order>('order');
 const customer = orm.table<Customer>('customer');
-const orderMapped = order.map(mapper => ({
-  id: mapper.column('id').string(),
-  name: mapper.column('name').string(),
-  balance: mapper.column('balance').number(),
-  createdAt: mapper.column('created_at').date(),
-  updatedAt: mapper.column('updated_at').date(),
-  customerId: mapper.column('customer_id').string(),
-  customer: mapper.references(customer).by('customerId'),
-}));
 
-const customerMapped = customer.map(mapper => ({
-  id: mapper.column('id').string(),
-  name: mapper.column('name').string(),
-  orders: mapper.hasMany(order).by('customerId'),
-}));
+const orderMapped = order.map(mapper => {
+  return {
+    id: mapper.column('id').uuid(),
+    name: mapper.column('name').string(),
+    balance: mapper.column('balance').number(),
+    createdAt: mapper.column('created_at').date(),
+    updatedAt: mapper.column('updated_at').date(),
+    customerId: mapper.column('customer_id').string(),
+    customer: mapper.references(customer).by('customerId'),
+  };
+});
 
-
-
+const customerMapped = customer.map(mapper => {
+  return {
+    id: mapper.column('id').string(),
+    name: mapper.column('name').string(),
+    orders: mapper.hasMany(order).by('customerId'),
+  };
+});
 
 
 (async () => {

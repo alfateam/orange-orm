@@ -5,13 +5,18 @@ declare namespace ORM {
 	  hasMany: (targetTable: Table<any>) => HasManyMapper;
 	};
   
-	export interface ColumnType {
-	  string: () => StringColumnType;
-	  number: () => NumberColumnType;
-	  date: () => DateColumnType;	  
+	export interface DateColumnType {
+	  greaterThan(value: Date): Filter;
+	  between(from: Date, to: Date): Filter;
 	}
   
 	export interface StringColumnType {
+	  greaterThan(value: string): Filter;
+	  startsWith(value: string): Filter;
+	  endsWith(value: string): Filter;
+	}
+  
+	export interface UuidColumnType {
 	  greaterThan(value: string): Filter;
 	  startsWith(value: string): Filter;
 	  endsWith(value: string): Filter;
@@ -22,10 +27,12 @@ declare namespace ORM {
 	  between(from: number, to: number): Filter;
 	}
   
-	export interface DateColumnType {
-	  greaterThan(value: Date): Filter;
-	  between(from: Date, to: Date): Filter;
-	}
+	export type ColumnType = {
+	  string: () => StringColumnType;
+	  uuid: () => UuidColumnType;
+	  number: () => NumberColumnType;
+	  date: () => DateColumnType;
+	};
   
 	export interface Filter {
 	  and(otherFilter: Filter): Filter;
@@ -39,40 +46,27 @@ declare namespace ORM {
 	  by(foreignKey: string): any[];
 	}
   
-	export type Table<T> = {
-		map: (callback: (mapper: ColumnMapper) => Partial<MappedType<T>>) => MappedTable<T>;
-	  };
+	type MappedProperty<T> =
+	  T extends string ? StringColumnType | UuidColumnType | T :
+	  T extends number ? NumberColumnType | T :
+	  T extends Date ? DateColumnType | T :
+	  T;
   
-	  export type MappedProperties<T> = {
-		[P in keyof T]: T[P] extends string
-		  ? StringColumnType
-		  : T[P] extends number
-		  ? NumberColumnType
-		  : T[P] extends Date
-		  ? DateColumnType
-		  : MappedTable<T[P]>;
-	  };
-	
-	  export type MappedTable<T> = MappedProperties<T> & {
-		getMany: (filter?: Filter) => Promise<T[]>;
-	  };
+	type MappedProperties<T> = {
+	  [K in keyof T]: MappedProperty<T[K]>;
+	};
+  
+	export type Table<T> = {
+	  map: <TMap extends MappedProperties<T>>(callback: (mapper: ColumnMapper) => TMap) => MappedTable<TMap>;
+	};
+  
+	export type MappedTable<T> = {
+	  getMany: (filter?: Filter) => Promise<T[]>;
+	} & T;
   
 	export interface ORM {
 	  table: <T>(tableName: string) => Table<T>;
 	}
-
-	type MappedType<T> = {
-		[K in keyof T]: T[K] extends string
-		  ? StringColumnType
-		  : T[K] extends number
-		  ? NumberColumnType
-		  : T[K] extends Date
-		  ? DateColumnType
-		  : T[K] extends Array<infer U>
-		  ? MappedType<U>[]
-		  : MappedType<T[K]>;
-	  };
-	  
   }
   
   declare const orm: ORM.ORM;
