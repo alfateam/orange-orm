@@ -75,7 +75,7 @@ declare namespace ORM {
 
 
 	type MappedTable<TFrom, T> = {
-		getMany: (filter?: Filter, fetchingStrategy?: FetchingStrategy<T>) => Promise<TFrom>[];
+		getMany: (filter?: Filter, fetchingStrategy?: FetchingStrategy<T>) => Promise<TFrom[]>;
 	} & MappedColumnType<T>;
 
 
