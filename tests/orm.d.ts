@@ -35,15 +35,14 @@ declare namespace ORM {
 	export interface Filter extends RawFilter {
 		and<T extends RawFilter>(otherFilter: T): Filter;
 	}
-	export interface ReferenceMapper<T> {
-		references<U>(table: MappedTable<U>): ReferenceMapper<T> & U;
-		by(foreignKey: keyof T): T;
+	export interface ReferenceMapper<TFrom,T> {
+		references<U>(table: MappedTable<U>): ReferenceMapper<TFrom,T> & U;
+		by(foreignKey: keyof TFrom): T;
 	  }
 	  
-	  // Update the ColumnMapper interface to include the new ReferenceMapper
-	  export type ColumnMapper = {
+	  export type ColumnMapper<U> = {
 		column: (columnName: string) => ColumnType;
-		references: <T>(targetTable: MappedTable<T>) => ReferenceMapper<T>;
+		references: <T>(targetTable: MappedTable<T>) => ReferenceMapper<U,T>;
 		hasMany: <T>(targetTable: MappedTable<T>) => HasManyMapper<T>;
 	  };
 	  export interface HasManyMapper<T> {
@@ -51,7 +50,7 @@ declare namespace ORM {
 	  }
   
 	export type Table<T> = {
-	  map: <U>(callback: (mapper: ColumnMapper) => U) => MappedTable<U>;
+	  map: <U>(callback: (mapper: ColumnMapper<T>) => U) => MappedTable<U>;
 	};
   
 	type MappedColumnType<T> = {
