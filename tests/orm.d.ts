@@ -56,8 +56,9 @@ declare namespace ORM {
 	type FetchingStrategy<T> = {
 		[K in keyof T]?: boolean | FetchingStrategy<T[K]>;
 	} & {
-		orderBy?: OrderBy<Extract<keyof T, string>> | OrderBy<Extract<keyof T, string>>[]; // Modify this line
-
+		orderBy?: OrderBy<Extract<keyof T, string>> | OrderBy<Extract<keyof T, string>>[]; 
+		limit?: number;
+    	offset?: number;
 	}
 
 	type OrderBy<T extends string> = `${T} ${'asc' | 'desc'}` | T;
