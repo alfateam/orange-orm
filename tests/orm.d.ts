@@ -1,9 +1,8 @@
 declare namespace ORM {
-	export type ColumnMapper = {
-	  column: (columnName: string) => ColumnType;
-	  references: (targetTable: Table<any>) => ReferenceMapper;
-	  hasMany: (targetTable: Table<any>) => HasManyMapper;
-	};
+	
+	export interface UuidColumnType {
+	  equalTo(value: string): Filter;
+	}
   
 	export interface DateColumnType {
 	  greaterThan(value: Date): Filter;
@@ -16,53 +15,56 @@ declare namespace ORM {
 	  endsWith(value: string): Filter;
 	}
   
-	export interface UuidColumnType {
-	  greaterThan(value: string): Filter;
-	  startsWith(value: string): Filter;
-	  endsWith(value: string): Filter;
-	}
-  
 	export interface NumberColumnType {
 	  greaterThan(value: number): Filter;
 	  between(from: number, to: number): Filter;
 	}
   
-	export type ColumnType = {
+	export interface ColumnType {
 	  string: () => StringColumnType;
 	  uuid: () => UuidColumnType;
 	  number: () => NumberColumnType;
 	  date: () => DateColumnType;
-	};
-  
-	export interface Filter {
-	  and(otherFilter: Filter): Filter;
 	}
-  
-	export interface ReferenceMapper {
-	  by(foreignKey: string): any;
+
+	export interface RawFilter {
+		sql: string | (() => string);
+		parameters?: any[];
 	}
-  
-	export interface HasManyMapper {
-	  by(foreignKey: string): any[];
+	
+	export interface Filter extends RawFilter {
+		and<T extends RawFilter>(otherFilter: T): Filter;
 	}
-  
-	type MappedProperty<T> =
-	  T extends string ? StringColumnType | UuidColumnType | T :
-	  T extends number ? NumberColumnType | T :
-	  T extends Date ? DateColumnType | T :
-	  T;
-  
-	type MappedProperties<T> = {
-	  [K in keyof T]: MappedProperty<T[K]>;
-	};
+	export interface ReferenceMapper<T> {
+		references<U>(table: MappedTable<U>): ReferenceMapper<T> & U;
+		by(foreignKey: keyof T): T;
+	  }
+	  
+	  // Update the ColumnMapper interface to include the new ReferenceMapper
+	  export type ColumnMapper = {
+		column: (columnName: string) => ColumnType;
+		references: <T>(targetTable: MappedTable<T>) => ReferenceMapper<T>;
+		hasMany: <T>(targetTable: MappedTable<T>) => HasManyMapper<T>;
+	  };
+	  export interface HasManyMapper<T> {
+		by(foreignKey: string): T[];
+	  }
   
 	export type Table<T> = {
-	  map: <TMap extends MappedProperties<T>>(callback: (mapper: ColumnMapper) => TMap) => MappedTable<TMap>;
+	  map: <U>(callback: (mapper: ColumnMapper) => U) => MappedTable<U>;
 	};
   
-	export type MappedTable<T> = {
-	  getMany: (filter?: Filter) => Promise<T[]>;
-	} & T;
+	type MappedColumnType<T> = {
+		[K in keyof T]: T[K] extends string ? (StringColumnType | T[K]) :
+						  T[K] extends Date ? (DateColumnType | T[K]) :
+						  T[K] extends number ? (NumberColumnType | T[K]) :
+						  T[K];
+	  };
+	  
+	  type MappedTable<T> = {
+		getMany: (filter?: Filter) => Promise<T[]>;
+	  } & MappedColumnType<T>;
+	  
   
 	export interface ORM {
 	  table: <T>(tableName: string) => Table<T>;
