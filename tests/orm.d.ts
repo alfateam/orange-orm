@@ -52,8 +52,15 @@ declare namespace ORM {
 
 
 	type ExtractProperties<TFrom, T, K extends keyof T> = {
-		[P in keyof T]: T[P] extends true ? (P extends keyof TFrom ? TFrom[P] : never) : T[P] extends object ? ExtractProperties<TFrom[P], T[P], keyof T[P]> : never;
-	}[K];
+		[P in keyof T]:
+		  T[P] extends true
+			? (P extends keyof TFrom ? TFrom[P] : never)
+			: T[P] extends object
+			  ? ExtractProperties<TFrom, T[P], keyof T[P]>
+			  : P extends keyof TFrom
+				? TFrom[P]
+				: never;
+	  }[K];
 
 	type FetchingStrategy<T> = {
 		[K in keyof T]?: boolean | FetchingStrategy<T[K]>;
