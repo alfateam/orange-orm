@@ -64,6 +64,7 @@ declare namespace ORM {
 
 	type FetchingStrategy<T> = {
 		[K in keyof T]?: boolean | FetchingStrategy<T[K]>;
+		
 	} & {
 		orderBy?: OrderBy<Extract<keyof T, string>> | OrderBy<Extract<keyof T, string>>[]; 
 		limit?: number;
@@ -83,11 +84,26 @@ declare namespace ORM {
 	
 	type MappedTable<T, U> = {
 		map: <V>(callback: (mapper: ColumnMapper<U>) => V) => MappedTable<T, U & V>;
-		getMany: (filter?: Filter, fetchingStrategy?: FetchingStrategy<U>) => Promise<T[]>;
+		getMany: <F>(filter?: Filter, fetchingStrategy?: F) => Promise<RemoveNever<PickFromStrategy<F, T>>[]>;
 	  } & MappedColumnType<U>;
 	export interface ORM {
 		table: <T>(tableName: string) => Table<T>;
 	}
+
+	type PickFromStrategy<F, T> = {
+		[K in keyof T]:
+		  K extends keyof F ?
+			F[K] extends true ? T[K] :
+			F[K] extends FetchingStrategy<infer U> ? PickFromStrategy<F[K], T[K]> :
+			never :
+		  never;
+	  };
+
+	  type RemoveNever<T> = {
+		[K in keyof T as T[K] extends never ? never : K]: T[K] extends object ? RemoveNever<T[K]> : T[K]
+	  };
+		  
+	
 }
 
 declare const orm: ORM.ORM;

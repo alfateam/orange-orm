@@ -48,8 +48,8 @@ const orderMapped = order.map(mapper => {
   
   const filter = orderMapped.customer.name.equalTo('lars');
   const orderRows = await orderMapped.getMany(filter, { orderBy: ['name', 'createdAt desc', 'updatedAt'], balance: true, customer: {id: true} });  
+  orderRows[0].
 
-  console.log(orderRows);
 
 
 
