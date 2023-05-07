@@ -36,9 +36,6 @@ declare namespace ORM {
 		and<T extends RawFilter>(otherFilter: T): Filter;
 	}
 
-
-
-
 	export type Table<T> = {
 		map: <U>(callback: (mapper: ColumnMapper<T>) => U) => MappedTable<T, U>;
 	};
@@ -53,6 +50,11 @@ declare namespace ORM {
 		: T[K];
 	};
 
+
+	type ExtractProperties<TFrom, T, K extends keyof T> = {
+		[P in keyof T]: T[P] extends true ? (P extends keyof TFrom ? TFrom[P] : never) : T[P] extends object ? ExtractProperties<TFrom[P], T[P], keyof T[P]> : never;
+	}[K];
+
 	type FetchingStrategy<T> = {
 		[K in keyof T]?: boolean | FetchingStrategy<T[K]>;
 	} & {
@@ -60,9 +62,7 @@ declare namespace ORM {
 		limit?: number;
     	offset?: number;
 	}
-
 	type OrderBy<T extends string> = `${T} ${'asc' | 'desc'}` | T;
-
 
 	export type ReferenceMapper<TFrom, TTo> = {
 		by(foreignKey: keyof TFrom): MappedTable<any, TTo>;
@@ -73,13 +73,11 @@ declare namespace ORM {
 		references: <TTo>(mappedTable: MappedTable<any, TTo>) => ReferenceMapper<T, TTo>;
 	};
 
-
-	type MappedTable<TFrom, T> = {
-		getMany: (filter?: Filter, fetchingStrategy?: FetchingStrategy<T>) => Promise<TFrom[]>;
-	} & MappedColumnType<T>;
-
-
-
+	
+	type MappedTable<T, U> = {
+		map: <V>(callback: (mapper: ColumnMapper<U>) => V) => MappedTable<T, U & V>;
+		getMany: (filter?: Filter, fetchingStrategy?: FetchingStrategy<U>) => Promise<T[]>;
+	  } & MappedColumnType<U>;
 	export interface ORM {
 		table: <T>(tableName: string) => Table<T>;
 	}
