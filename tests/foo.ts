@@ -14,16 +14,31 @@ interface Order {
 interface Customer {
   id: string;
   name: string;
+  partyId: string;
+  party: Party;
+}
+
+interface Party {
+  partyId: string;
+  location: string;
 }
 
 const order = orm.table<Order>('order');
 const customer = orm.table<Customer>('customer');
+const party = orm.table<Party>('party').map(mapper => {
+  return {
+    partyId: mapper.column('foo').string(),
+    location: mapper.column('bar').string();
+  }
+});
 
 
 const customerMapped = customer.map(mapper => {
   return {
     id: mapper.column('id').string(),
     name: mapper.column('name').string(),
+    partyId: mapper.column('partyId').string(),
+    party: mapper.references(party).by('partyId')
   };
 });
 const orderMapped = order.map(mapper => {
@@ -31,7 +46,7 @@ const orderMapped = order.map(mapper => {
     id: mapper.column('id').uuid(),
     name: mapper.column('name').string(),
     balance: mapper.column('balance').number(),
-    // createdAt: mapper.column('created_at').date(),
+    createdAt: mapper.column('created_at').date(),
     updatedAt: mapper.column('updated_at').date(),
     customerId: mapper.column('customer_id').string(),
     customer: mapper.references(customerMapped).by('customerId')
@@ -39,15 +54,11 @@ const orderMapped = order.map(mapper => {
 });
 
 
+
 (async () => {  
   
+
   const filter = orderMapped.customer.name.equalTo('lars');
-  const orderRows = await orderMapped.getMany(filter, { orderBy: ['balance asc' ], balance: true, customer: {id: true} });  
-  orderRows[0]
-
-
-
-
-  const customerRows = await customerMapped.getMany();
-  console.log(customerRows);
-})();
+  const orderRows = await orderMapped.getMany(filter, {createdAt: false, id: true, customer: true});
+  orderRows.customer.
+});

@@ -100,7 +100,7 @@ type FetchedProperties<T, TStrategy> = AtLeastOneTrue<RemoveNever<ExtractColumns
 		? TStrategy[K] extends boolean ? (TStrategy[K] extends true
 			? T[K]
 			: never)
-		: FetchedProperties<T[K], TStrategy[K]>
+		: FetchedProperties<Required<T[K]>, Required<TStrategy[K]>>
 		: never
 	}
 	: {
@@ -108,7 +108,7 @@ type FetchedProperties<T, TStrategy> = AtLeastOneTrue<RemoveNever<ExtractColumns
 		? TStrategy[K] extends boolean ? (TStrategy[K] extends true
 			? T[K]
 			: never)
-		: FetchedProperties<T[K], TStrategy[K]>
+		: FetchedProperties<Required<T[K]>, Required<TStrategy[K]>>
 		: NegotiateDefaultStrategy<T[K]>
 	};
 
