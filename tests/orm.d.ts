@@ -84,14 +84,27 @@ type MappedTable<T, U> = {
 	getMany: <FS extends FetchingStrategy<U>>(filter: Filter, fetchingStrategy: FS) => FetchedProperties<Required<U>, Required<FS>>
 } & U;
 
-type FetchedProperties<T, TStrategy> = {
-	[K in keyof T]: K extends keyof TStrategy
-	? TStrategy[K] extends boolean ? (TStrategy[K] extends true
-		? T[K]
-		: never)
-	: FetchedProperties<T[K] , TStrategy[K]>
-	: NegotiateDefaultStrategy<T[K]>
-};
+type AtLeastOneTrue<T> = {
+	[K in keyof T]: T[K] extends true ? true : never;
+}[keyof T] extends never ? false : true;
+
+type FetchedProperties<T, TStrategy> = AtLeastOneTrue<TStrategy> extends true
+	? {
+		[K in keyof T]: K extends keyof TStrategy
+		? TStrategy[K] extends boolean ? (TStrategy[K] extends true
+			? T[K]
+			: never)
+		: FetchedProperties<T[K], TStrategy[K]>
+		: never
+	}
+	: {
+		[K in keyof T]: K extends keyof TStrategy
+		? TStrategy[K] extends boolean ? (TStrategy[K] extends true
+			? T[K]
+			: never)
+		: FetchedProperties<T[K], TStrategy[K]>
+		: NegotiateDefaultStrategy<T[K]>
+	};
 
 type NegotiateDefaultStrategy<T> = T extends StringColumnType | UuidColumnType | NumberColumnType | DateColumnType ? T : never
 
