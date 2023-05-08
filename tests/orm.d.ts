@@ -62,14 +62,14 @@ declare namespace ORM {
 				: never;
 	  }[K];
 
-	type FetchingStrategy<T> = {
+	  type FetchingStrategy<T> = {
 		[K in keyof T]?: boolean | FetchingStrategy<T[K]>;
-		
-	} & {
-		orderBy?: OrderBy<Extract<keyof T, string>> | OrderBy<Extract<keyof T, string>>[]; 
+	  } & {
+		orderBy?: Array<OrderBy<Extract<keyof T, string>>>;
 		limit?: number;
-    	offset?: number;
-	}
+		offset?: number;
+	  };
+
 	type OrderBy<T extends string> = `${T} ${'asc' | 'desc'}` | T;
 
 	export type ReferenceMapper<TFrom, TTo> = {
@@ -84,8 +84,9 @@ declare namespace ORM {
 	
 	type MappedTable<T, U> = {
 		map: <V>(callback: (mapper: ColumnMapper<U>) => V) => MappedTable<T, U & V>;
-		getMany: <F>(filter?: Filter, fetchingStrategy?: F) => Promise<RemoveNever<PickFromStrategy<F, T>>[]>;
+		getMany: <F>(filter?: Filter, fetchingStrategy?: FetchingStrategy<U & F>) => Promise<RemoveNever<PickFromStrategy<F, T>>[]>;
 	  } & MappedColumnType<U>;
+
 	export interface ORM {
 		table: <T>(tableName: string) => Table<T>;
 	}
