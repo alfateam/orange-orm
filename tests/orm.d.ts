@@ -88,7 +88,13 @@ type AtLeastOneTrue<T> = {
 	[K in keyof T]: T[K] extends true ? true : never;
 }[keyof T] extends never ? false : true;
 
-type FetchedProperties<T, TStrategy> = AtLeastOneTrue<TStrategy> extends true
+type ExtractColumns<T,TStrategy> = {
+	[K in keyof TStrategy]: K extends keyof T 
+	? T[K] extends StringColumnType | UuidColumnType | NumberColumnType | DateColumnType ? TStrategy[K] : never 
+	: never
+}
+
+type FetchedProperties<T, TStrategy> = AtLeastOneTrue<RemoveNever<ExtractColumns<T,TStrategy>>> extends true
 	? {
 		[K in keyof T]: K extends keyof TStrategy
 		? TStrategy[K] extends boolean ? (TStrategy[K] extends true
@@ -108,6 +114,9 @@ type FetchedProperties<T, TStrategy> = AtLeastOneTrue<TStrategy> extends true
 
 type NegotiateDefaultStrategy<T> = T extends StringColumnType | UuidColumnType | NumberColumnType | DateColumnType ? T : never
 
+type RemoveNever<T> = {
+	[K in keyof T as T[K] extends never ? never : K]: T[K] extends object ? RemoveNever<T[K]> : T[K]
+  };
 
 declare const orm: ORM.ORM;
 export default orm;
