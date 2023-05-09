@@ -97,24 +97,24 @@ type ExtractColumns<T, TStrategy> = {
 type FetchedProperties<T, TStrategy> = AtLeastOneTrue<RemoveNever<ExtractColumns<T, TStrategy>>> extends true
 	? {
 		[K in keyof T]: K extends keyof TStrategy
-		? TStrategy[K] extends boolean
-			? TStrategy[K] extends true
-				? T[K] extends StringColumnType | UuidColumnType | NumberColumnType | DateColumnType			
-					? T[K]
-					: FetchedProperties<Required<T[K]>, {}>		
+		? TStrategy[K] extends true 
+			? T[K] extends StringColumnType | UuidColumnType | NumberColumnType | DateColumnType			
+				? T[K]
+				: FetchedProperties<Required<T[K]>, {}>		
+			: TStrategy[K] extends false
+				? never
 				: FetchedProperties<Required<T[K]>, Required<TStrategy[K]>>			
-			: FetchedProperties<Required<T[K]>, Required<TStrategy[K]>>			
 		: never
 	}
 	: {
 		[K in keyof T]: K extends keyof TStrategy
-		? TStrategy[K] extends boolean 
-			? TStrategy[K] extends true
-				? T[K] extends StringColumnType | UuidColumnType | NumberColumnType | DateColumnType			
-					? T[K]
-					: FetchedProperties<Required<T[K]>, {}>		
+		? TStrategy[K] extends true 
+			? T[K] extends StringColumnType | UuidColumnType | NumberColumnType | DateColumnType			
+				? T[K]
+				: FetchedProperties<Required<T[K]>, {}>		
+			: TStrategy[K] extends false
+				? never
 				: FetchedProperties<Required<T[K]>, Required<TStrategy[K]>>			
-			: FetchedProperties<Required<T[K]>, Required<TStrategy[K]>>
 		: NegotiateDefaultStrategy<T[K]>
 	};
 
