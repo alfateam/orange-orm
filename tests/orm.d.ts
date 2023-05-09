@@ -2,7 +2,6 @@ declare namespace ORM {
 
 	interface ORM {		
 		table: (tableName: string) => Table<{}>;
-		tableOf: <T>(tableName: string) => Table<T>;
 	}
 
 
@@ -45,9 +44,8 @@ interface Filter extends RawFilter {
 	and<T extends RawFilter>(otherFilter: T): Filter;
 }
 
-type Table<T> = {
-	map: <U>(callback: (mapper: ColumnMapper<T>) => U) => MappedTable<T, U>;
-};
+type Table<T> = ((<U>(callback: (mapper: ColumnMapper<T>) => U) => MappedTable<T, U>) & MappedTable<T, T>);
+
 
 type ExtractProperties<TFrom, T, K extends keyof T> = {
 	[P in keyof T]:
@@ -80,10 +78,14 @@ type ColumnMapper<T> = {
 };
 
 
-type MappedTable<T, U> = {
-	map: <V>(callback: (mapper: ColumnMapper<U>) => V) => MappedTable<T, U & V>;
-	getMany: <FS extends FetchingStrategy<U>>(filter: Filter, fetchingStrategy: FS) => FetchedProperties<Required<U>, Required<FS>>
-} & U;
+// type MappedTable<T, U> = {
+// 	map: <V>(callback: (mapper: ColumnMapper<U>) => V) => MappedTable<T, U & V>;
+// 	getMany: <FS extends FetchingStrategy<U>>(filter: Filter, fetchingStrategy: FS) => FetchedProperties<Required<U>, Required<FS>>
+// } & U;
+
+type MappedTable<T, U> = ((<V>(callback: (mapper: ColumnMapper<U>) => V) => MappedTable<T, U & V>) & {
+    getMany: <FS extends FetchingStrategy<U>>(filter: Filter, fetchingStrategy: FS) => FetchedProperties<Required<U>, Required<FS>>;
+} & U);
 
 type AtLeastOneTrue<T> = {
 	[K in keyof T]: T[K] extends true ? true : never;

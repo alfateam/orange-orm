@@ -23,25 +23,27 @@ interface Party {
   location: string;
 }
 
-const order = orm.table<Order>('order');
-const customer = orm.table<Customer>('customer');
-const party = orm.table<Party>('party').map(mapper => {
+const party = orm.table('party')(mapper => {
   return {
     partyId: mapper.column('foo').string(),
-    location: mapper.column('bar').string();
+    location: mapper.column('bar').string()
   }
 });
 
-
-const customerMapped = customer.map(mapper => {
+const customerMapped = orm.table('customer')(mapper => {
   return {
     id: mapper.column('id').string(),
     name: mapper.column('name').string(),
     partyId: mapper.column('partyId').string(),
-    party: mapper.references(party).by('partyId')
   };
+})(mapper => {
+  return {
+    party: mapper.references(party).by('partyId')
+  }
 });
-const orderMapped = order.map(mapper => {
+
+
+const orderMapped = orm.table('order')(mapper => {
   return {
     id: mapper.column('id').uuid(),
     name: mapper.column('name').string(),
@@ -49,16 +51,15 @@ const orderMapped = order.map(mapper => {
     createdAt: mapper.column('created_at').date(),
     updatedAt: mapper.column('updated_at').date(),
     customerId: mapper.column('customer_id').string(),
-    customer: mapper.references(customerMapped).by('customerId')
   };
+})(mapper => {
+  return {
+    customer: mapper.references(customerMapped).by('customerId')
+  }
 });
 
-
-
-(async () => {  
-  
-
+(async () => {    
   const filter = orderMapped.customer.name.equalTo('lars');
-  const orderRows = await orderMapped.getMany(filter, {createdAt: false, id: true, customer: true});
-  orderRows.customer.
+  const orderRows = await orderMapped.getMany(filter, {id: true});
+  orderRows.
 });
