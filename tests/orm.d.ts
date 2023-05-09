@@ -1,7 +1,8 @@
 declare namespace ORM {
 
-	interface ORM {
-		table: <T>(tableName: string) => Table<T>;
+	interface ORM {		
+		table: (tableName: string) => Table<{}>;
+		tableOf: <T>(tableName: string) => Table<T>;
 	}
 
 
