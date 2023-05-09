@@ -88,27 +88,33 @@ type AtLeastOneTrue<T> = {
 	[K in keyof T]: T[K] extends true ? true : never;
 }[keyof T] extends never ? false : true;
 
-type ExtractColumns<T,TStrategy> = {
-	[K in keyof TStrategy]: K extends keyof T 
-	? T[K] extends StringColumnType | UuidColumnType | NumberColumnType | DateColumnType ? TStrategy[K] : never 
+type ExtractColumns<T, TStrategy> = {
+	[K in keyof TStrategy]: K extends keyof T
+	? T[K] extends StringColumnType | UuidColumnType | NumberColumnType | DateColumnType ? TStrategy[K] : never
 	: never
 }
 
-type FetchedProperties<T, TStrategy> = AtLeastOneTrue<RemoveNever<ExtractColumns<T,TStrategy>>> extends true
+type FetchedProperties<T, TStrategy> = AtLeastOneTrue<RemoveNever<ExtractColumns<T, TStrategy>>> extends true
 	? {
 		[K in keyof T]: K extends keyof TStrategy
-		? TStrategy[K] extends boolean ? (TStrategy[K] extends true
-			? T[K]
-			: never)
-		: FetchedProperties<Required<T[K]>, Required<TStrategy[K]>>
+		? TStrategy[K] extends boolean
+			? TStrategy[K] extends true
+				? T[K] extends StringColumnType | UuidColumnType | NumberColumnType | DateColumnType			
+					? T[K]
+					: FetchedProperties<Required<T[K]>, {}>		
+				: FetchedProperties<Required<T[K]>, Required<TStrategy[K]>>			
+			: FetchedProperties<Required<T[K]>, Required<TStrategy[K]>>			
 		: never
 	}
 	: {
 		[K in keyof T]: K extends keyof TStrategy
-		? TStrategy[K] extends boolean ? (TStrategy[K] extends true
-			? T[K]
-			: never)
-		: FetchedProperties<Required<T[K]>, Required<TStrategy[K]>>
+		? TStrategy[K] extends boolean 
+			? TStrategy[K] extends true
+				? T[K] extends StringColumnType | UuidColumnType | NumberColumnType | DateColumnType			
+					? T[K]
+					: FetchedProperties<Required<T[K]>, {}>		
+				: FetchedProperties<Required<T[K]>, Required<TStrategy[K]>>			
+			: FetchedProperties<Required<T[K]>, Required<TStrategy[K]>>
 		: NegotiateDefaultStrategy<T[K]>
 	};
 
@@ -116,7 +122,7 @@ type NegotiateDefaultStrategy<T> = T extends StringColumnType | UuidColumnType |
 
 type RemoveNever<T> = {
 	[K in keyof T as T[K] extends never ? never : K]: T[K] extends object ? RemoveNever<T[K]> : T[K]
-  };
+};
 
 declare const orm: ORM.ORM;
 export default orm;
