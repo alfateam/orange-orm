@@ -162,7 +162,7 @@ interface Filter extends RawFilter {
 
 
 type FetchingStrategy<T> = {
-	[K in keyof T]?: boolean | FetchingStrategy<T[K]>;
+	[K in keyof T & keyof RemoveNever<AllowedColumnsAndTables<T>>]?: boolean | FetchingStrategy<T[K]>
 } & {
 	orderBy?: Array<OrderBy<Extract<keyof AllowedColumns<T>, string>>>;	
 	limit?: number;
@@ -172,16 +172,7 @@ type FetchingStrategy<T> = {
 
  type OrderBy<T extends string> = `${T} ${'asc' | 'desc'}` | T;
 
-// [P in keyof T as `${string & P}` | `${string & P} desc`]
-
-// orderBy?: Array< keyof  {
-// 	[P in keyof T as `${string & P}` | `${string & P} desc`]
-
-
-type RelatedTable = {
-	isRelatedTable: () => boolean;
-//   ['__RelatedTableMarker__']: 'exclude';
-};
+type RelatedTable = {};
 
 type ReferenceMapper<TFrom, TTo> = {
 	by(foreignKey: keyof TFrom): MappedTable<any, TTo> & RelatedTable;

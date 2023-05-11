@@ -1,28 +1,7 @@
 // foo.ts
 import orm from './orm';
 
-interface Order {
-  id: string;
-  name: string;
-  balance: number;
-  createdAt: string;
-  updatedAt: Date;
-  customerId: string;
-  customer: Customer;
-}
-
-interface Customer {
-  id: string;
-  name: string;
-  partyId: string;
-  party: Party;
-}
-
-interface Party {
-  partyId: string;
-  location: string;
-}
-
+orm.foo([])
 const party = orm.table('party')(mapper => {
   return {
     partyId: mapper.column('foo').string(),
@@ -30,8 +9,10 @@ const party = orm.table('party')(mapper => {
   }
 });
 
+
+
 const customerMapped = orm.table('customer')(mapper => {
-  return {
+  return {    
     id: mapper.column('id').string(),
     name: mapper.column('name').string(),
     partyId: mapper.column('partyId').string(),
@@ -41,7 +22,6 @@ const customerMapped = orm.table('customer')(mapper => {
     party: mapper.references(party).by('partyId')
   }
 });
-
 
 const orderMapped = orm.table('order')(mapper => {
   return {
@@ -60,6 +40,7 @@ const orderMapped = orm.table('order')(mapper => {
 
 (async () => {    
   const filter = orderMapped.customer.name.equalTo('lars');
-  const orderRows = await orderMapped.getMany(filter, {id: true});
-  orderRows.
+  const orderRows = await orderMapped.getMany(filter, {orderBy: ['balance'],customer: {orderBy: ['partyId asc'], party: {location: false}}});
+  orderRows.customer.party.
 });
+
