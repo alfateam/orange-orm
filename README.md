@@ -14,6 +14,8 @@ Based on promises.
 [Documentation and examples](https://github.com/alfateam/rdb/blob/master/docs/docs.md)  
 
 ## Release notes
+__3.1.10__  
+Bugfix when parsing port number in connection string for tedious.  
 __3.1.9__  
 Improved typescript support for notNullable props on row.  
 __3.1.8__  

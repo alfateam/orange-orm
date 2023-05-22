@@ -13,7 +13,8 @@ function parse(connectionString) {
 			config.authentication.options.password = value;
 			break;
 		case 'server':
-			config.server = value;
+			config.server = value.split(',')[0];
+			config.options.port = Number.parseInt(value.split(',')[1] || '1433');
 			break;
 		case 'database':
 			config.options.database = value;
