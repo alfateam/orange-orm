@@ -14,7 +14,8 @@ function parse(connectionString) {
 			break;
 		case 'server':
 			config.server = value.split(',')[0];
-			config.options.port = Number.parseInt(value.split(',')[1] || '1433');
+			if (value.split(',')[1] !== undefined)
+				config.options.port = Number.parseInt(value.split(',')[1]);
 			break;
 		case 'database':
 			config.options.database = value;
