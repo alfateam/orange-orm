@@ -2,3 +2,5 @@
 tests
 .vscode
 .devcontainer
+demo.db
+demo*.db*
