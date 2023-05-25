@@ -11,19 +11,19 @@ function wrapQuery(connection) {
 			log.emitQuery({ sql, parameters: query.parameters });
 			if (sql === 'BEGIN TRANSACTION') {
 				connection.beginTransaction((err) => {
-					onCompleted(err, []);
+					onCompleted(extractError(err), []);
 				});
 				return;
 			}
 			else if (sql === 'COMMIT') {
 				connection.commitTransaction((err) => {
-					onCompleted(err, []);
+					onCompleted(extractError(err), []);
 				});
 				return;
 			}
 			else if (sql === 'ROLLBACK') {
 				connection.rollbackTransaction((err) => {
-					onCompleted(err, []);
+					onCompleted(extractError(err), []);
 				});
 				return;
 			}
@@ -45,11 +45,19 @@ function wrapQuery(connection) {
 		connection.execSql(request);
 
 		function onInnerCompleted(err) {
-			if (err)
-				onCompleted(err);
+			if (err) {
+				onCompleted(extractError(err));
+			}
 			else
 				onCompleted(null, result);
 		}
+	}
+
+	function extractError(e) {
+		if (e && e.errors)
+			return e.errors[0];
+		else
+			return e;
 	}
 
 }
