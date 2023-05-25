@@ -14,6 +14,8 @@ Based on promises.
 [Documentation and examples](https://github.com/alfateam/rdb/blob/master/docs/docs.md)  
 
 ## Release notes
+__3.1.12__  
+Tedious: return first error when aggregate error    
 __3.1.11__  
 Do not set default port for mssql  
 __3.1.10__  
