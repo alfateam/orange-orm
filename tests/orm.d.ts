@@ -188,7 +188,15 @@ type MappedTable<T, U> = (<V extends AllowedColumnsAndTables<V>>(callback: (mapp
 	getMany: <FS extends FetchingStrategy<U>>(filter: Filter, fetchingStrategy: FS) => StrategyToRow<FetchedProperties<Required<U>, Required<FS>>>;
   } & U;
   
-  type Table<T> = (<U extends AllowedColumnsAndTables<U>>(callback: (mapper: ColumnMapper<T>) => U) => MappedTable<T, U>) & MappedTable<T,T>;
+//   type Table<T> = (<U extends AllowedColumnsAndTables<U>>(callback: (mapper: ColumnMapper<T>) => U) => MappedTable<T, U>) & MappedTable<T,T> & {
+// 	map:  (<U extends AllowedColumnsAndTables<U>>(callback: (mapper: ColumnMapper<T>) => U) => MappedTable<T, U>) & MappedTable<T,T>;
+//   };
+
+
+  type Table<T> = {
+	map:  (<U extends AllowedColumnsAndTables<U>>(callback: (mapper: ColumnMapper<T>) => U) => MappedTable<T, U>) & MappedTable<T,T>;
+  };
+
 
 
 type ColumnTypes = StringColumnType | UuidColumnType | NumberColumnType | DateColumnType;
