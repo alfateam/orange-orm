@@ -2,7 +2,7 @@ let { inspect } = require('util');
 let assert = require('assert');
 const toCompareObject = require('./toCompareObject');
 
-async function validateDeleteConflict({ row, oldValue, defaultConcurrency, concurrency = {}, table }) {
+async function validateDeleteConflict({ row, oldValue, defaultConcurrency, concurrency = {}, options, table }) {
 	for (let p in oldValue) {
 		if (isColumn(p, table)) {
 			let strategy = concurrency[p] || defaultConcurrency;

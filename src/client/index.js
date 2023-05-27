@@ -6,6 +6,8 @@ const rootMap = new WeakMap();
 const fetchingStrategyMap = new WeakMap();
 const targetKey = Symbol();
 const _axios = require('axios');
+const clone = require('rfdc/default');
+
 
 function rdbClient(options = {}) {
 	if (options.pg)
@@ -43,8 +45,9 @@ function rdbClient(options = {}) {
 	client.express = express;
 
 	if (options.tables) {
+		const readonly = {readonly: options.readonly};
 		for (let name in options.tables) {
-			client[name] = table(options.tables[name]);
+			client[name] = table(options.tables[name], {...readonly, ...clone(options[name])});
 		}
 		client.tables = options.tables;
 		return client;
@@ -102,8 +105,7 @@ function rdbClient(options = {}) {
 		}
 	}
 
-	function table(url) {
-		let tableOptions;
+	function table(url, tableOptions) {
 		if (!(typeof url === 'string')) {
 			tableOptions = tableOptions || {};
 			tableOptions = { db: baseUrl, ...tableOptions, transaction };

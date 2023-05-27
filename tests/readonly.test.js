@@ -1,4 +1,4 @@
-import { describe, test, beforeAll, expect } from 'vitest';
+import { describe, test, beforeEach, expect } from 'vitest';
 const rdb = require('../src/index');
 const _db = require('./db');
 const initPg = require('./initPg');
@@ -10,7 +10,7 @@ const dateToISOString = require('../src/dateToISOString');
 const versionArray = process.version.replace('v', '').split('.');
 const major = parseInt(versionArray[0]);
 
-beforeAll(async () => {
+beforeEach(async () => {
 	// await createMsDemo(mssql());
 	await insertData(pg());
 	// await insertData(mssql());
@@ -123,7 +123,7 @@ describe('readonly everything', () => {
 		catch (e) {
 			error = e;
 		}
-		expect(error?.message).toEqual('Table customer is readonly');
+		expect(error?.message).toEqual('Cannot update column name because it is readonly');
 	}
 });
 
@@ -141,7 +141,7 @@ describe('readonly table', () => {
 
 		const db = _db({
 			db: pool,
-			customer: {readonly: true}
+			customer: { readonly: true }
 		});
 
 		const rows = await db.customer.getAll();
@@ -169,7 +169,99 @@ describe('readonly table', () => {
 		catch (e) {
 			error = e;
 		}
-		expect(error?.message).toEqual('Table customer is readonly');
+		expect(error?.message).toEqual('Cannot update column name because it is readonly');
+	}
+});
+describe('readonly column no change', () => {
+
+	test('pg', async () => await verify(pg()));
+	// test('mssql', async () => await verify(mssql()));
+	// if (major > 17)
+	// 	test('mssqlNative', async () => await verify(mssqlNative()));
+	// test('mysql', async () => await verify(mysql()));
+	// test('sqlite', async () => await verify(sqlite()));
+	// test('sap', async () => await verify(sap()));
+
+	async function verify({ pool }) {
+
+		const db = _db({
+			db: pool,
+			customer: {
+				balance: {
+					readonly: true
+				}
+			}
+		});
+
+		const rows = await db.customer.getAll();
+		const name = 'Oscar';
+
+		const expected = [{
+			id: 1,
+			name: name,
+			balance: 177,
+			isActive: true
+		}, {
+			id: 2,
+			name: 'John',
+			balance: 200,
+			isActive: true
+		}
+		];
+
+		rows[0].name = name;
+		await rows.saveChanges();
+		expect(rows).toEqual(expected);
+	}
+});
+describe('readonly column', () => {
+
+	test('pg', async () => await verify(pg()));
+	// test('mssql', async () => await verify(mssql()));
+	// if (major > 17)
+	// 	test('mssqlNative', async () => await verify(mssqlNative()));
+	// test('mysql', async () => await verify(mysql()));
+	// test('sqlite', async () => await verify(sqlite()));
+	// test('sap', async () => await verify(sap()));
+
+	async function verify({ pool }) {
+
+		const db = _db({
+			db: pool,
+			customer: {
+				name: {
+					readonly: true
+				}
+			}
+		});
+
+		const rows = await db.customer.getAll();
+		const name = 'Oscar';
+		let error;
+
+		const expected = [{
+			id: 1,
+			name: 'George',
+			balance: 177,
+			isActive: true
+		}, {
+			id: 2,
+			name: 'John',
+			balance: 200,
+			isActive: true
+		}
+		];
+
+		expect(rows).toEqual(expected);
+		try {
+			rows[0].name = name;
+			await rows.saveChanges();
+		}
+		catch (e) {
+			error = e;
+		}
+
+		expect(error?.message).toEqual('Cannot update column name because it is readonly');
 	}
 });
 

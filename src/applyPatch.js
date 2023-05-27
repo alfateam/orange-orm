@@ -4,7 +4,7 @@ let assert = require('assert');
 let fromCompareObject = require('./fromCompareObject');
 let toCompareObject = require('./toCompareObject');
 
-function applyPatch({ defaultConcurrency, concurrency }, dto, changes) {
+function applyPatch({ defaultConcurrency, concurrency, options = {}, defaults = {} }, dto, changes) {
 	let dtoCompare = toCompareObject(dto);
 	changes = validateConflict(dtoCompare, changes);
 	fastjson.applyPatch(dtoCompare, changes, true, true);
@@ -28,6 +28,13 @@ function applyPatch({ defaultConcurrency, concurrency }, dto, changes) {
 		return changes.filter(change => {
 			let expectedOldValue = change.oldValue;
 			let strategy = getStrategy(change.path);
+			let readonly = getOption(change.path).readonly;
+			if (readonly) {
+				const e = new Error(`Cannot update column ${change.path.replace('/','')} because it is readonly`);
+				// @ts-ignore
+				e.status = 405;
+				throw e;
+			}
 			if ((strategy === 'optimistic') || (strategy === 'skipOnConflict')) {
 				let oldValue = getOldValue(object, change.path);
 				try {
@@ -52,6 +59,21 @@ function applyPatch({ defaultConcurrency, concurrency }, dto, changes) {
 					return obj[name];
 				return;
 			}
+		}
+
+	}
+
+	function getOption(path) {
+		let splitPath = path.split('/');
+		splitPath.shift();
+		return splitPath.reduce(extract, options);
+
+		function extract(obj, name) {
+			if (Array.isArray(obj))
+				return obj[0] || defaults;
+			if (obj === Object(obj))
+				return obj[name] || defaults;
+			return obj.readonly;
 		}
 
 	}
