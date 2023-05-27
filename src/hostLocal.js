@@ -21,8 +21,12 @@ function hostLocal() {
 
 	}
 	async function patch(body) {
+		console.dir('patch');
+		for(let p in _options) {
+			console.dir(p);
+		}
 		if (readonly) {
-			const error = new Error('Table is readonly');
+			const error = new Error(`Table ${table._dbName} is readonly`);
 			// @ts-ignore
 			error.status = 405;
 			throw error;
