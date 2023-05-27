@@ -4,7 +4,7 @@ let assert = require('assert');
 let fromCompareObject = require('./fromCompareObject');
 let toCompareObject = require('./toCompareObject');
 
-function applyPatch({ defaultConcurrency, concurrency, options = {}, defaults = {} }, dto, changes) {
+function applyPatch({ defaultConcurrency, concurrency, options = {} }, dto, changes) {
 	let dtoCompare = toCompareObject(dto);
 	changes = validateConflict(dtoCompare, changes);
 	fastjson.applyPatch(dtoCompare, changes, true, true);
@@ -70,10 +70,10 @@ function applyPatch({ defaultConcurrency, concurrency, options = {}, defaults = 
 
 		function extract(obj, name) {
 			if (Array.isArray(obj))
-				return obj[0] || defaults;
+				return obj[0] || options;
 			if (obj === Object(obj))
-				return obj[name] || defaults;
-			return obj.readonly;
+				return obj[name] || options;
+			return obj;
 		}
 
 	}
