@@ -1,5 +1,4 @@
 async function validateDeleteAllowed({ row, options, table }) {
-	console.dir(options);
 	if (options.readonly) {
 		const e = new Error(`Cannot delete ${table._dbName} because it is readonly`);
 		// @ts-ignore
