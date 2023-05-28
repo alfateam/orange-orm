@@ -2,8 +2,6 @@ import { describe, test, beforeEach, expect } from 'vitest';
 const rdb = require('../src/index');
 const _db = require('./db');
 const initPg = require('./initPg');
-const dateToISOString = require('../src/dateToISOString');
-const versionArray = process.version.replace('v', '').split('.');
 
 beforeEach(async () => {
 	await insertData(pg());
@@ -137,6 +135,156 @@ describe('readonly table', () => {
 		expect(error?.message).toEqual('Cannot update column name because it is readonly');
 	}
 });
+
+describe('readonly table delete', () => {
+
+	test('pg', async () => await verify(pg()));
+
+	async function verify({ pool }) {
+
+		const db = _db({
+			db: pool,
+			order: { readonly: true }
+		});
+
+		const rows = await db.order.getAll();
+		let error;
+
+		try {
+			rows.pop();
+			await rows.saveChanges();
+		}
+		catch (e) {
+			error = e;
+		}
+		expect(error?.message).toEqual('Cannot delete _order because it is readonly');
+	}
+});
+
+describe('readonly nested table delete', () => {
+
+	test('pg', async () => await verify(pg()));
+
+	async function verify({ pool }) {
+
+		const db = _db({
+			db: pool,
+			order: { readonly: true }
+		});
+
+		const rows = await db.order.getAll({ lines: true });
+		let error;
+
+		try {
+			rows[0].lines.pop();
+			await rows.saveChanges();
+		}
+		catch (e) {
+			error = e;
+		}
+		expect(error?.message).toEqual('Cannot delete orderLine because it is readonly');
+	}
+});
+describe('readonly on grandChildren table delete', () => {
+
+	test('pg', async () => await verify(pg()));
+
+	async function verify({ pool }) {
+
+		const db = _db({
+			db: pool,
+			order: {
+				lines: {
+					readonly: true
+				}
+			}
+		});
+
+		const rows = await db.order.getAll({ lines: true });
+		let error;
+
+		try {
+			rows.pop();
+			await rows.saveChanges();
+		}
+		catch (e) {
+			error = e;
+		}
+		expect(error?.message).toEqual('Cannot delete orderLine because it is readonly');
+	}
+});
+
+describe('readonly nested table delete override', () => {
+
+	test('pg', async () => await verify(pg()));
+
+	async function verify({ pool }) {
+
+		const db = _db({
+			db: pool,
+			order: {
+				readonly: true,
+				lines: {
+					readonly: false
+				}
+			}
+		});
+
+		const rows = await db.order.getAll({ lines: true });
+
+		const length = rows[0].lines.length;
+		rows[0].lines.pop();
+		expect(rows[0].lines.length).toEqual(length - 1);
+
+	}
+});
+describe('readonly delete should not throw when only column is readonly', () => {
+
+	test('pg', async () => await verify(pg()));
+
+	async function verify({ pool }) {
+
+		const db = _db({
+			db: pool,
+			order: {
+				lines: {
+					readonly: true
+				}
+			}
+		});
+
+		const rows = await db.order.getAll({ lines: true });
+
+		const length = rows[0].lines.length;
+		rows[0].lines.pop();
+		expect(rows[0].lines.length).toEqual(length - 1);
+
+	}
+});
+
+describe('readonly column delete', () => {
+
+	test('pg', async () => await verify(pg()));
+
+	async function verify({ pool }) {
+
+		const db = _db({
+			db: pool,
+			order: {
+				orderDate: {
+					readonly: true
+				}
+			}
+		});
+
+		const rows = await db.order.getAll();
+		const length = rows.length;
+		rows.pop();
+		await rows.saveChanges();
+		expect(rows.length).toEqual(length - 1);
+	}
+});
+
 describe('readonly column no change', () => {
 
 	test('pg', async () => await verify(pg()));

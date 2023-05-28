@@ -1,3 +1,5 @@
+// @ts-nocheck
+/* eslint-disable */
 let { inspect } = require('util');
 let assert = require('assert');
 const toCompareObject = require('./toCompareObject');

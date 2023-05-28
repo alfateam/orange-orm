@@ -47,8 +47,6 @@ function hostLocal() {
 		async function fn() {
 			setSessionSingleton('ignoreSerializable', true);
 			let patch = body.patch;
-			// const defaults = { readonly };
-
 			result = await table.patch(patch, { ...body.options, ..._options });
 		}
 	}

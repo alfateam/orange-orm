@@ -2,6 +2,7 @@
 let applyPatch = require('./applyPatch');
 let fromCompareObject = require('./fromCompareObject');
 let validateDeleteConflict = require('./validateDeleteConflict');
+let validateDeleteAllowed = require('./validateDeleteAllowed');
 
 async function patchTable() {
 	// const dryrun = true;
@@ -12,6 +13,7 @@ async function patchTable() {
 }
 
 async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic', concurrency = {}, strategy = undefined, deduceStrategy = false, ...options } = {}, dryrun) {
+	options = cleanOptions(options);
 	strategy  = JSON.parse(JSON.stringify(strategy || {}));
 	let changed = new Set();
 	for (let i = 0; i < patches.length; i++) {
@@ -111,7 +113,7 @@ async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic
 			if (!subRow)
 				throw new Error(`${property} was not found`);
 			strategy[property] = strategy[property] || {};
-			options[property] = inferDefaults(options, property) ;
+			options[property] = inferOptions(options, property) ;
 
 			await add({ path, value, op, oldValue, concurrency: concurrency[property], strategy: strategy[property], options: options[property] }, relation.childTable, subRow, row, relation);
 			return { updated: row };
@@ -120,7 +122,7 @@ async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic
 			let relation = table[property]._relation;
 			strategy[property] = strategy[property] || {};
 			options[property] = options[property] || {};
-			options[property] = inferDefaults(options, property);
+			options[property] = inferOptions(options, property);
 
 
 			if (path.length === 1) {
@@ -140,7 +142,7 @@ async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic
 			let result;
 			strategy[property] = strategy[property] || {};
 			options[property] = options[property] || {};
-			options[property] = inferDefaults(options, property);
+			options[property] = inferOptions(options, property);
 
 			for (let p in dto) {
 				result = await add({ path: ['dummy', p], value: dto[p], oldValue: (oldValue || {})[p], op, concurrency: concurrency[p], strategy: strategy[property], options: options[property] }, table, row, parentRow, relation) || result;
@@ -152,7 +154,7 @@ async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic
 			let result;
 			strategy[property] = strategy[property] || {};
 			options[property] = options[property] || {};
-			options[property] = inferDefaults(options, property);
+			options[property] = inferOptions(options, property);
 
 			for (let p in dto) {
 				result = await add({ path: ['dummy', p], value: dto[p], oldValue: oldValue, op, concurrency: concurrency[p], strategy: strategy[property], options: options[property] }, table, row, parentRow, relation) || result;
@@ -168,7 +170,7 @@ async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic
 			if (childKey != '__patchType') {
 				let child = value[name][childKey];
 				strategy[name] = strategy[name] || {};
-				options[name] = inferDefaults(options, name);
+				options[name] = inferOptions(options, name);
 
 				await add({ path: [childKey], value: child, op, oldValue, concurrency: concurrency[name], strategy: strategy[name], options: options[name] }, relation.childTable, {}, row, relation);
 			}
@@ -179,7 +181,7 @@ async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic
 		let relation = table[name]._relation;
 		let child = value[name];
 		strategy[name] = strategy[name] || {};
-		options[name] = inferDefaults(options, name);
+		options[name] = inferOptions(options, name);
 
 		await add({ path: [name], value: child, op, oldValue, concurrency: concurrency[name], strategy: strategy[name], options: options[name] }, relation.childTable, {}, row, relation);
 	}
@@ -212,6 +214,7 @@ async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic
 		path = path.slice(1);
 		row = row || await table.getById.apply(null, toKey(property));
 		if (path.length === 0) {
+			await validateDeleteAllowed({row, options, table});
 			if (await validateDeleteConflict({ row, oldValue, defaultConcurrency, concurrency, options, table }))
 				await row.deleteCascade();
 		}
@@ -219,7 +222,7 @@ async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic
 		if (isColumn(property, table)) {
 			let dto = {};
 			dto[property] = row[property];
-			let result = applyPatch({ defaultConcurrency: 'overwrite', concurrency: undefined }, dto, [{ path: '/' + path.join('/'), op }]);
+			let result = applyPatch({ defaultConcurrency: 'overwrite', concurrency: undefined, options }, dto, [{ path: '/' + path.join('/'), op }]);
 			row[property] = result[property];
 			return { updated: row };
 		}
@@ -229,7 +232,7 @@ async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic
 				let parentKey = relation.columns[i].alias;
 				let dto = {};
 				dto[parentKey] = row[parentKey];
-				let result = applyPatch({ defaultConcurrency: 'overwrite', concurrency: undefined }, dto, [{ path: '/' + parentKey, op }]);
+				let result = applyPatch({ defaultConcurrency: 'overwrite', concurrency: undefined, options }, dto, [{ path: '/' + parentKey, op }]);
 				row[parentKey] = result[parentKey];
 			}
 			return { updated: row };
@@ -242,7 +245,7 @@ async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic
 				if (path[1] === childKey) {
 					let dto = {};
 					dto[parentKey] = row[parentKey];
-					let result = applyPatch({ defaultConcurrency: 'overwrite', concurrency: undefined }, dto, [{ path: '/' + parentKey, op }]);
+					let result = applyPatch({ defaultConcurrency: 'overwrite', concurrency: undefined, options }, dto, [{ path: '/' + parentKey, op }]);
 					row[parentKey] = result[parentKey];
 					break;
 				}
@@ -253,20 +256,23 @@ async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic
 			let child = await row[property];
 			if (!child)
 				throw new Error(property + ' does not exist');
-			await remove({ path, op, oldValue, concurrency: concurrency[property] }, table[property], child);
+			options[property] = inferOptions(options, property);
+
+			await remove({ path, op, oldValue, concurrency: concurrency[property], options: options[property] }, table[property], child);
 			return { updated: row };
 		}
 		else if (isManyRelation(property, table)) {
 			let relation = table[property]._relation;
+			options[property] = inferOptions(options, property);
 			if (path.length === 1) {
 				let children = (await row[property]).slice(0);
 				for (let i = 0; i < children.length; i++) {
 					let child = children[i];
-					await remove({ path: path.slice(1), op, oldValue, concurrency: concurrency[property] }, table[property], child);
+					await remove({ path: path.slice(1), op, oldValue, concurrency: concurrency[property], options: options[property] }, table[property], child);
 				}
 			}
 			else {
-				await remove({ path: path.slice(1), op, oldValue, concurrency: concurrency[property] }, relation.childTable);
+				await remove({ path: path.slice(1), op, oldValue, concurrency: concurrency[property], options: options[property] }, relation.childTable);
 			}
 			return { updated: row };
 		}
@@ -290,10 +296,18 @@ async function patchTableCore(table, patches, { defaultConcurrency = 'optimistic
 		return table[name] && table[name]._relation.columns;
 	}
 
-	function inferDefaults(defaults, property) {
-		const  {readonly, concurrency} = defaults;
-		const parent = {readonly, concurrency};
+	function inferOptions(defaults, property) {
+		const parent = {};
+		if ('readonly' in defaults)
+			parent.readonly = defaults.readonly;
+		if ('concurrency' in defaults)
+			parent.readonly = defaults.readonly;
 		return {...parent,  ...(defaults[property] || {})};
+	}
+
+	function cleanOptions(options) {
+		const {table, transaction, db, ..._options} = options;
+		return _options;
 	}
 
 }
