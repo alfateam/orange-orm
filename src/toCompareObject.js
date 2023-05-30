@@ -1,4 +1,5 @@
 const dateToISOString = require('./dateToISOString');
+const isNode = (typeof window === 'undefined');
 
 function toCompareObject(object) {
 	if (Array.isArray(object)) {
@@ -18,8 +19,7 @@ function toCompareObject(object) {
 		}
 		return copy;
 	}
-
-	if (Buffer && Buffer.isBuffer(object))
+	if (isNode && isNodeBuffer(object))
 		return object.toString('base64');
 	// @ts-ignore
 	else if (object instanceof Date && !isNaN(object))
@@ -32,6 +32,10 @@ function toCompareObject(object) {
 		return copy;
 	}
 	return object;
+}
+
+function isNodeBuffer(object) {
+	return Buffer.isBuffer(object);
 }
 
 module.exports = toCompareObject;

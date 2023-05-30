@@ -14,6 +14,8 @@ Based on promises.
 [Documentation and examples](https://github.com/alfateam/rdb/blob/master/docs/docs.md)  
 
 ## Release notes
+__3.1.16__  
+Buffer workaround in browser        
 __3.1.15__  
 Fixed concurrency misspelling type generation      
 __3.1.14__  

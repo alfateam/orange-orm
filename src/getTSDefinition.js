@@ -198,7 +198,7 @@ ${Concurrency(table, Name, true)}
 		return `
 export interface ${name}Concurrency {
 	readonly?: boolean;
-	concurrency: Concurrency;
+	concurrency?: Concurrency;
 	${concurrencyColumns(table)}
 	${concurrencyRelations}
 }
@@ -272,13 +272,10 @@ function pascalCase(name) {
 }
 
 function concurrencyColumns(table) {
-	let primarySet = new Set(table._primaryColumns);
 	let result = '';
 	let separator = '';
 	for (let i = 0; i < table._columns.length; i++) {
 		let column = table._columns[i];
-		if (primarySet.has(column))
-			continue;
 		result += `${separator}${column.alias}? : ColumnConcurrency;`;
 		separator = `
 	`;
