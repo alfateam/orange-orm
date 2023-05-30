@@ -140,8 +140,6 @@ async function patchTableCore(table, patches, { strategy = undefined, deduceStra
 			let dto = toJoinedColumns(property, { [property]: value }, table);
 			oldValue = toJoinedColumns(property, { [property]: oldValue }, table);
 			let result;
-			strategy[property] = strategy[property] || {};
-			options[property] = inferOptions(options, property);
 			for (let p in dto) {
 				result = await add({ path: ['dummy', p], value: dto[p], oldValue: (oldValue || {})[p], op, strategy: strategy, options: options }, table, row, parentRow, relation) || result;
 			}
@@ -217,39 +215,37 @@ async function patchTableCore(table, patches, { strategy = undefined, deduceStra
 		if (isColumn(property, table)) {
 			let dto = {};
 			dto[property] = row[property];
-
-			//overwrite cause we dont have old value
-			let result = applyPatch({ options }, dto, [{ path: '/' + path.join('/'), op }]);
+			let result = applyPatch({ options }, dto, [{ path: '/' + path.join('/'), op, oldValue }]);
 			row[property] = result[property];
 			return { updated: row };
 		}
 		else if (isJoinRelation(property, table) && path.length === 1) {
+			oldValue = toJoinedColumns(property, { [property]: oldValue }, table);
 			let relation = table[property]._relation;
+			let result;
 			for (let i = 0; i < relation.columns.length; i++) {
-				let parentKey = relation.columns[i].alias;
+				let p = relation.columns[i].alias;
 				let dto = {};
-				dto[parentKey] = row[parentKey];
-				//overwrite cause columns could be changed by relation ????
-				let result = applyPatch({ options }, dto, [{ path: '/' + parentKey, op }]);
-				row[parentKey] = result[parentKey];
+				dto[p] = row[p];
+				result = await remove({ path: ['dummy', p], oldValue: (oldValue || {})[p], op, options: options }, table, row) || result;
 			}
-			return { updated: row };
+			return result || {};
 		}
-		else if (isJoinRelation(property, table)) {
+		else if (isJoinRelation(property, table) && path.length === 2) {
 			let relation = table[property]._relation;
+			oldValue = toJoinedColumns(property, { [property]: { [path[1]]: oldValue } }, table);
+			let result;
 			for (let i = 0; i < relation.columns.length; i++) {
-				let parentKey = relation.columns[i].alias;
+				let p = relation.columns[i].alias;
 				let childKey = relation.childTable._primaryColumns[i].alias;
 				if (path[1] === childKey) {
 					let dto = {};
-					dto[parentKey] = row[parentKey];
-					//overwrite cause columns could be changed by relation ????
-					let result = applyPatch({ options }, dto, [{ path: '/' + parentKey, op }]);
-					row[parentKey] = result[parentKey];
+					dto[p] = row[p];
+					result = await remove({ path: ['dummy', p], oldValue: (oldValue || {})[p], op, options: options }, table, row) || result;
 					break;
 				}
 			}
-			return { updated: row };
+			return result || {};
 		}
 		else if (isOneRelation(property, table)) {
 			let child = await row[property];

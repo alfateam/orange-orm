@@ -356,6 +356,76 @@ describe('concurrency join, conflict skipOnConflict', () => {
 });
 
 
+describe('concurrency join, conflict undefined syntax', () => {
+
+	test('pg', async () => await verify(pg()));
+
+	async function verify({ pool }) {
+		const db = _db({ db: pool});
+		let row = await db.order.getOne(null, {customer: true});
+
+		let changedRow = await db.order.getOne(null, {customer: true});
+		delete changedRow.customerId;
+		await changedRow.saveChanges();
+
+		let error;
+		row.customer.id = customer2Id;
+		try {
+			await row.saveChanges();
+		}
+		catch(e) {
+			error = e;
+		}
+		expect(error?.message).toEqual('The field customerId was changed by another user. Expected 1, but was null.');
+	}
+});
+
+describe('concurrency delete join', () => {
+
+	test('pg', async () => await verify(pg()));
+
+	async function verify({ pool }) {
+		const db = _db({ db: pool});
+		let row = await db.order.getOne(null, {customer: true});
+		let changedRow = await db.order.getOne(null, {customer: true});
+		delete changedRow.customer;
+		await changedRow.saveChanges();
+
+		let error;
+		delete row.customer;
+		try {
+			await row.saveChanges();
+		}
+		catch(e) {
+			error = e;
+		}
+		expect(error?.message).toEqual('The field customerId was changed by another user. Expected 1, but was null.');
+	}
+});
+
+describe('concurrency delete join, alternative syntax', () => {
+
+	test('pg', async () => await verify(pg()));
+
+	async function verify({ pool }) {
+		const db = _db({ db: pool});
+		let row = await db.order.getOne(null, {customer: true});
+		let changedRow = await db.order.getOne(null, {customer: true});
+		delete changedRow.customer;
+		await changedRow.saveChanges();
+
+		let error;
+		delete row.customer.id;
+		try {
+			await row.saveChanges();
+		}
+		catch(e) {
+			error = e;
+		}
+		expect(error?.message).toEqual('The field customerId was changed by another user. Expected 1, but was null.');
+	}
+});
+
 
 function pg() {
 	return { pool: rdb.pg('postgres://postgres:postgres@postgres/postgres'), init: initPg };
