@@ -19,7 +19,7 @@ function toCompareObject(object) {
 		return copy;
 	}
 
-	if (Buffer.isBuffer(object))
+	if (Buffer && Buffer.isBuffer(object))
 		return object.toString('base64');
 	// @ts-ignore
 	else if (object instanceof Date && !isNaN(object))
