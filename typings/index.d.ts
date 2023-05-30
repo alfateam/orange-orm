@@ -17,6 +17,8 @@ declare namespace r {
     function mysql(connectionString: string, options?: PoolOptions): Pool;
     function on(type: 'query', cb: (e: QueryEvent) => void): void;
     function off(type: 'query', cb: (e: QueryEvent) => void): void;
+    function createPatch(original: any[], modified: any[]): JsonPatch;
+    function createPatch(original: any, modified: any): JsonPatch;
 
     type JsonPatch = Array<{
         op: "add" | "remove" | "replace" | "copy" | "move" | "test";

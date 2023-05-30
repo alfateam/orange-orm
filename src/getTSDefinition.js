@@ -75,7 +75,6 @@ export interface ${Name}ExpressConfig {
 	baseFilter?: RawFilter | ((context: ExpressContext) => RawFilter | Promise<RawFilter>);
     customFilters?: Record<string, (context: ExpressContext,...args: any[]) => RawFilter | Promise<RawFilter>>;
     concurrency?: ${Name}Concurrency;
-    concurrency?: Concurrency;
     readonly?: boolean;
     disableBulkDeletes?: boolean;
 }
