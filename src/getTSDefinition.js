@@ -431,7 +431,7 @@ export interface ExpressTables {${getExpressTables()}
 			let Name = name.substring(0, 1).toUpperCase() + name.substring(1);
 			result +=
 			`
-	${name}?: ${Name}Concurrecy;`;
+	${name}?: ${Name}Concurrency;`;
 		}
 		return result;
 	}
