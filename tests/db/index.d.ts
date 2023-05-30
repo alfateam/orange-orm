@@ -3,7 +3,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import schema from './schema';
 import type { AxiosInterceptorManager, AxiosRequestConfig, AxiosResponse } from 'axios';
-import type { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Url } from 'rdb';
+import type { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Url, ColumnConcurrency, JsonPatch } from 'rdb';
 export default schema as RdbClient;
 export interface CustomerTable {
     getAll(): Promise<CustomerArray>;
@@ -32,6 +32,8 @@ export interface CustomerTable {
     proxify(customers: Customer[], fetchingStrategy: CustomerStrategy): CustomerArray;
     proxify(customer: Customer): CustomerRow;
     proxify(customer: Customer, fetchingStrategy: CustomerStrategy): CustomerRow;
+    patch(patch: JsonPatch): Promise<void>;
+    patch(patch: JsonPatch, concurrency: CustomerConcurrency, fetchingStrategy?: CustomerStrategy): Promise<void>;
     customFilters: CustomerCustomFilters;
     id: NumberColumn;
     name: StringColumn;
@@ -42,7 +44,7 @@ export interface CustomerExpressConfig {
     baseFilter?: RawFilter | ((context: ExpressContext) => RawFilter | Promise<RawFilter>);
     customFilters?: Record<string, (context: ExpressContext, ...args: any[]) => RawFilter | Promise<RawFilter>>;
     concurrency?: CustomerConcurrency;
-    defaultConcurrency?: Concurrency;
+    concurrency?: Concurrency;
     readonly?: boolean;
     disableBulkDeletes?: boolean;
 }
@@ -50,36 +52,30 @@ export interface CustomerCustomFilters {
 }
 export interface CustomerArray extends Array<Customer> {
     saveChanges(): Promise<void>;
-    saveChanges(concurrency: CustomerConcurrencyOptions): Promise<void>;
-    saveChanges(fetchingStrategy: CustomerStrategy): Promise<void>;
-    saveChanges(concurrency: CustomerConcurrencyOptions, fetchingStrategy: CustomerStrategy): Promise<void>;
+    saveChanges(concurrency: CustomerConcurrency, fetchingStrategy?: CustomerStrategy): Promise<void>;
     acceptChanges(): void;
     clearChanges(): void;
     refresh(): Promise<void>;
     refresh(fetchingStrategy: CustomerStrategy): Promise<void>;
     delete(): Promise<void>;
-    delete(options: CustomerConcurrencyOptions): Promise<void>;
+    delete(options: CustomerConcurrency): Promise<void>;
 }
 export interface CustomerRow extends Customer {
     saveChanges(): Promise<void>;
-    saveChanges(concurrency: CustomerConcurrencyOptions): Promise<void>;
-    saveChanges(fetchingStrategy: CustomerStrategy): Promise<void>;
-    saveChanges(concurrency: CustomerConcurrencyOptions, fetchingStrategy: CustomerStrategy): Promise<void>;
+    saveChanges(concurrency: CustomerConcurrency, fetchingStrategy?: CustomerStrategy): Promise<void>;
     acceptChanges(): void;
     clearChanges(): void;
     refresh(): Promise<void>;
     refresh(fetchingStrategy: CustomerStrategy): Promise<void>;
     delete(): Promise<void>;
-    delete(options: CustomerConcurrencyOptions): Promise<void>;
-}
-export interface CustomerConcurrencyOptions {
-    defaultConcurrency?: Concurrency;
-    concurrency?: CustomerConcurrency;
+    delete(options: CustomerConcurrency): Promise<void>;
 }
 export interface CustomerConcurrency {
-    name?: Concurrency;
-    balance?: Concurrency;
-    isActive?: Concurrency;
+    readonly?: boolean;
+    concurrency: Concurrency;
+    name?: ColumnConcurrency;
+    balance?: ColumnConcurrency;
+    isActive?: ColumnConcurrency;
 }
 export interface Customer {
     id?: number | null;
@@ -122,6 +118,8 @@ export interface OrderTable {
     proxify(orders: Order[], fetchingStrategy: OrderStrategy): OrderArray;
     proxify(order: Order): OrderRow;
     proxify(order: Order, fetchingStrategy: OrderStrategy): OrderRow;
+    patch(patch: JsonPatch): Promise<void>;
+    patch(patch: JsonPatch, concurrency: OrderConcurrency, fetchingStrategy?: OrderStrategy): Promise<void>;
     customFilters: OrderCustomFilters;
     id: NumberColumn;
     orderDate: DateColumn;
@@ -134,7 +132,7 @@ export interface OrderExpressConfig {
     baseFilter?: RawFilter | ((context: ExpressContext) => RawFilter | Promise<RawFilter>);
     customFilters?: Record<string, (context: ExpressContext, ...args: any[]) => RawFilter | Promise<RawFilter>>;
     concurrency?: OrderConcurrency;
-    defaultConcurrency?: Concurrency;
+    concurrency?: Concurrency;
     readonly?: boolean;
     disableBulkDeletes?: boolean;
 }
@@ -142,42 +140,36 @@ export interface OrderCustomFilters {
 }
 export interface OrderArray extends Array<Order> {
     saveChanges(): Promise<void>;
-    saveChanges(concurrency: OrderConcurrencyOptions): Promise<void>;
-    saveChanges(fetchingStrategy: OrderStrategy): Promise<void>;
-    saveChanges(concurrency: OrderConcurrencyOptions, fetchingStrategy: OrderStrategy): Promise<void>;
+    saveChanges(concurrency: OrderConcurrency, fetchingStrategy?: OrderStrategy): Promise<void>;
     acceptChanges(): void;
     clearChanges(): void;
     refresh(): Promise<void>;
     refresh(fetchingStrategy: OrderStrategy): Promise<void>;
     delete(): Promise<void>;
-    delete(options: OrderConcurrencyOptions): Promise<void>;
+    delete(options: OrderConcurrency): Promise<void>;
 }
 export interface OrderRow extends Order {
     saveChanges(): Promise<void>;
-    saveChanges(concurrency: OrderConcurrencyOptions): Promise<void>;
-    saveChanges(fetchingStrategy: OrderStrategy): Promise<void>;
-    saveChanges(concurrency: OrderConcurrencyOptions, fetchingStrategy: OrderStrategy): Promise<void>;
+    saveChanges(concurrency: OrderConcurrency, fetchingStrategy?: OrderStrategy): Promise<void>;
     acceptChanges(): void;
     clearChanges(): void;
     refresh(): Promise<void>;
     refresh(fetchingStrategy: OrderStrategy): Promise<void>;
     delete(): Promise<void>;
-    delete(options: OrderConcurrencyOptions): Promise<void>;
-}
-export interface OrderConcurrencyOptions {
-    defaultConcurrency?: Concurrency;
-    concurrency?: OrderConcurrency;
+    delete(options: OrderConcurrency): Promise<void>;
 }
 export interface OrderConcurrency {
-    orderDate?: Concurrency;
-    customerId?: Concurrency;
+    readonly?: boolean;
+    concurrency: Concurrency;
+    orderDate?: ColumnConcurrency;
+    customerId?: ColumnConcurrency;
     customer?: CustomerConcurrency;
     lines?: LinesConcurrency;
     deliveryAddress?: DeliveryAddressConcurrency;
 }
 export interface Order {
     id?: number | null;
-    orderDate?: Date | string | null;
+    orderDate: Date | string;
     customerId?: number | null;
     customer?: Customer | null;
     lines?: Lines[] | null;
@@ -187,16 +179,18 @@ export interface OrderStrategy {
     orderDate?: boolean;
     customerId?: boolean;
     customer?: CustomerStrategy;
-    lines?: LinesStrategy;
+    lines?: LinesStrategy | boolean;
     deliveryAddress?: DeliveryAddressStrategy;
     limit?: number;
     offset?: number;
     orderBy?: Array<'id' | 'id desc' | 'orderDate' | 'orderDate desc' | 'customerId' | 'customerId desc'> | 'id' | 'id desc' | 'orderDate' | 'orderDate desc' | 'customerId' | 'customerId desc';
 }
 export interface CustomerConcurrency {
-    name?: Concurrency;
-    balance?: Concurrency;
-    isActive?: Concurrency;
+    readonly?: boolean;
+    concurrency: Concurrency;
+    name?: ColumnConcurrency;
+    balance?: ColumnConcurrency;
+    isActive?: ColumnConcurrency;
 }
 export interface Customer {
     id?: number | null;
@@ -223,8 +217,10 @@ export interface CustomerRelatedTable {
     exists: () => Filter;
 }
 export interface LinesConcurrency {
-    orderId?: Concurrency;
-    product?: Concurrency;
+    readonly?: boolean;
+    concurrency: Concurrency;
+    orderId?: ColumnConcurrency;
+    product?: ColumnConcurrency;
     order?: OrderConcurrency;
 }
 export interface Lines {
@@ -242,15 +238,17 @@ export interface LinesStrategy {
     orderBy?: Array<'id' | 'id desc' | 'orderId' | 'orderId desc' | 'product' | 'product desc'> | 'id' | 'id desc' | 'orderId' | 'orderId desc' | 'product' | 'product desc';
 }
 export interface OrderConcurrency {
-    orderDate?: Concurrency;
-    customerId?: Concurrency;
+    readonly?: boolean;
+    concurrency: Concurrency;
+    orderDate?: ColumnConcurrency;
+    customerId?: ColumnConcurrency;
     customer?: CustomerConcurrency;
     lines?: LinesConcurrency;
     deliveryAddress?: DeliveryAddressConcurrency;
 }
 export interface Order {
     id?: number | null;
-    orderDate?: Date | string | null;
+    orderDate: Date | string;
     customerId?: number | null;
     customer?: Customer | null;
     lines?: Lines[] | null;
@@ -260,19 +258,21 @@ export interface OrderStrategy {
     orderDate?: boolean;
     customerId?: boolean;
     customer?: CustomerStrategy;
-    lines?: LinesStrategy;
+    lines?: LinesStrategy | boolean;
     deliveryAddress?: DeliveryAddressStrategy;
     limit?: number;
     offset?: number;
     orderBy?: Array<'id' | 'id desc' | 'orderDate' | 'orderDate desc' | 'customerId' | 'customerId desc'> | 'id' | 'id desc' | 'orderDate' | 'orderDate desc' | 'customerId' | 'customerId desc';
 }
 export interface DeliveryAddressConcurrency {
-    orderId?: Concurrency;
-    name?: Concurrency;
-    street?: Concurrency;
-    postalCode?: Concurrency;
-    postalPlace?: Concurrency;
-    countryCode?: Concurrency;
+    readonly?: boolean;
+    concurrency: Concurrency;
+    orderId?: ColumnConcurrency;
+    name?: ColumnConcurrency;
+    street?: ColumnConcurrency;
+    postalCode?: ColumnConcurrency;
+    postalPlace?: ColumnConcurrency;
+    countryCode?: ColumnConcurrency;
     order?: OrderConcurrency;
 }
 export interface DeliveryAddress {
@@ -360,6 +360,8 @@ export interface LinesTable {
     proxify(liness: Lines[], fetchingStrategy: LinesStrategy): LinesArray;
     proxify(lines: Lines): LinesRow;
     proxify(lines: Lines, fetchingStrategy: LinesStrategy): LinesRow;
+    patch(patch: JsonPatch): Promise<void>;
+    patch(patch: JsonPatch, concurrency: LinesConcurrency, fetchingStrategy?: LinesStrategy): Promise<void>;
     customFilters: LinesCustomFilters;
     id: NumberColumn;
     orderId: NumberColumn;
@@ -370,7 +372,7 @@ export interface LinesExpressConfig {
     baseFilter?: RawFilter | ((context: ExpressContext) => RawFilter | Promise<RawFilter>);
     customFilters?: Record<string, (context: ExpressContext, ...args: any[]) => RawFilter | Promise<RawFilter>>;
     concurrency?: LinesConcurrency;
-    defaultConcurrency?: Concurrency;
+    concurrency?: Concurrency;
     readonly?: boolean;
     disableBulkDeletes?: boolean;
 }
@@ -378,35 +380,29 @@ export interface LinesCustomFilters {
 }
 export interface LinesArray extends Array<Lines> {
     saveChanges(): Promise<void>;
-    saveChanges(concurrency: LinesConcurrencyOptions): Promise<void>;
-    saveChanges(fetchingStrategy: LinesStrategy): Promise<void>;
-    saveChanges(concurrency: LinesConcurrencyOptions, fetchingStrategy: LinesStrategy): Promise<void>;
+    saveChanges(concurrency: LinesConcurrency, fetchingStrategy?: LinesStrategy): Promise<void>;
     acceptChanges(): void;
     clearChanges(): void;
     refresh(): Promise<void>;
     refresh(fetchingStrategy: LinesStrategy): Promise<void>;
     delete(): Promise<void>;
-    delete(options: LinesConcurrencyOptions): Promise<void>;
+    delete(options: LinesConcurrency): Promise<void>;
 }
 export interface LinesRow extends Lines {
     saveChanges(): Promise<void>;
-    saveChanges(concurrency: LinesConcurrencyOptions): Promise<void>;
-    saveChanges(fetchingStrategy: LinesStrategy): Promise<void>;
-    saveChanges(concurrency: LinesConcurrencyOptions, fetchingStrategy: LinesStrategy): Promise<void>;
+    saveChanges(concurrency: LinesConcurrency, fetchingStrategy?: LinesStrategy): Promise<void>;
     acceptChanges(): void;
     clearChanges(): void;
     refresh(): Promise<void>;
     refresh(fetchingStrategy: LinesStrategy): Promise<void>;
     delete(): Promise<void>;
-    delete(options: LinesConcurrencyOptions): Promise<void>;
-}
-export interface LinesConcurrencyOptions {
-    defaultConcurrency?: Concurrency;
-    concurrency?: LinesConcurrency;
+    delete(options: LinesConcurrency): Promise<void>;
 }
 export interface LinesConcurrency {
-    orderId?: Concurrency;
-    product?: Concurrency;
+    readonly?: boolean;
+    concurrency: Concurrency;
+    orderId?: ColumnConcurrency;
+    product?: ColumnConcurrency;
     order?: OrderConcurrency;
 }
 export interface Lines {
@@ -427,9 +423,7 @@ export interface RdbClient {
     customer: CustomerTable;
     order: OrderTable;
     lines: LinesTable;
-    (config: {
-        db: Pool | (() => Pool);
-    }): RdbClient;
+    (config: RdbConfig): RdbClient;
     and(filter: Filter, ...filters: Filter[]): Filter;
     or(filter: Filter, ...filters: Filter[]): Filter;
     not(): Filter;
@@ -437,13 +431,23 @@ export interface RdbClient {
     query<T>(filter: RawFilter | string): Promise<T[]>;
     transaction(fn: (transaction: RdbClient) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
     filter: Filter;
+    createPatch(original: any[], modified: any[]): JsonPatch;
+    createPatch(original: any, modified: any): JsonPatch;
     express(): Express;
     express(config: ExpressConfig): Express;
+}
+export interface RdbConfig {
+    db: Pool | (() => Pool);
+    readonly?: boolean;
+    concurrency?: Concurrency;
+    customer?: CustomerConcurrecy;
+    order?: OrderConcurrecy;
+    lines?: LinesConcurrecy;
 }
 export interface ExpressConfig {
     db?: Pool | (() => Pool);
     tables?: ExpressTables;
-    defaultConcurrency?: Concurrency;
+    concurrency?: Concurrency;
     readonly?: boolean;
     disableBulkDeletes?: boolean;
 }
