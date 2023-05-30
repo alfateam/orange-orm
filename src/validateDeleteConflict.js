@@ -1,11 +1,14 @@
+// @ts-nocheck
+/* eslint-disable */
 let { inspect } = require('util');
 let assert = require('assert');
 const toCompareObject = require('./toCompareObject');
 
-async function validateDeleteConflict({ row, oldValue, defaultConcurrency, concurrency = {}, table }) {
+async function validateDeleteConflict({ row, oldValue, options, table }) {
 	for (let p in oldValue) {
 		if (isColumn(p, table)) {
-			let strategy = concurrency[p] || defaultConcurrency;
+			const option = inferOptions(options, p);
+			let strategy = option.concurrency || 'optimistic';
 			if ((strategy === 'optimistic')) {
 				try {
 					assert.deepEqual(oldValue[p], toCompareObject(row[p]));
@@ -52,5 +55,15 @@ function isOneRelation(name, table) {
 	return table[name] && table[name]._relation.isOne;
 
 }
+
+function inferOptions(defaults, property) {
+	const parent = {};
+	if ('readonly' in defaults)
+		parent.readonly = defaults.readonly;
+	if ('concurrency' in defaults)
+		parent.concurrency = defaults.concurrency;
+	return {...parent,  ...(defaults[property] || {})};
+}
+
 
 module.exports = validateDeleteConflict;

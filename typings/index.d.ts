@@ -18,17 +18,24 @@ declare namespace r {
     function on(type: 'query', cb: (e: QueryEvent) => void): void;
     function off(type: 'query', cb: (e: QueryEvent) => void): void;
 
+    type JsonPatch = Array<{
+        op: "add" | "remove" | "replace" | "copy" | "move" | "test";
+        path: string;
+        value?: any;
+        from?: string;
+    }>;
+
     export interface QueryEvent {
         sql: string,
         parameters: []
-    }    
+    }
 
     export interface QueryResult {
         sql: string,
         parameters: [],
         result: []
     }
-  
+
     export interface Pool {
         end(): Promise<void>;
     }
@@ -47,7 +54,7 @@ declare namespace r {
 
     export abstract class JoinRelation {
         columns: ColumnDef[];
-	    childTable: Table;
+        childTable: Table;
     }
 
     export interface Table {
@@ -56,8 +63,8 @@ declare namespace r {
         join(table: Table): Join;
         hasMany(join: JoinRelation): HasMany;
         hasOne(join: JoinRelation): HasOne;
-        formulaDiscriminators(...discriminators: string[]) : Table;
-        columnDiscriminators(...discriminators: string[]) : Table;
+        formulaDiscriminators(...discriminators: string[]): Table;
+        columnDiscriminators(...discriminators: string[]): Table;
     }
 
     export interface HasMany {
@@ -153,6 +160,11 @@ declare namespace r {
     }
 
     export type Concurrency = 'optimistic' | 'skipOnConflict' | 'overwrite';
+
+    export interface ColumnConcurrency {
+        readonly?: boolean;
+        concurrency?: Concurrency;
+    }
 
     export interface Express extends RequestHandler {
         db: import('express').RequestHandler
@@ -253,7 +265,7 @@ declare namespace r {
         /**
          * equal
          */
-        eq(value: TType | TType2  | null): Filter;        
+        eq(value: TType | TType2 | null): Filter;
         notEqual(value: TType | TType2 | null): Filter;
         /**
          * not equal
@@ -292,8 +304,8 @@ declare namespace r {
     export interface DbConfig {
         db: Pool | Url | (() => Pool);
     }
-    
-    export type Url =`${'http://'|'https://'}${string}`;    
+
+    export type Url = `${'http://' | 'https://'}${string}`;
 
     export interface TablesConfig {
         tables: Record<string, Table>

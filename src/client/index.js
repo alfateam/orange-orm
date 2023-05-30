@@ -6,6 +6,8 @@ const rootMap = new WeakMap();
 const fetchingStrategyMap = new WeakMap();
 const targetKey = Symbol();
 const _axios = require('axios');
+const clone = require('rfdc/default');
+
 
 function rdbClient(options = {}) {
 	if (options.pg)
@@ -23,6 +25,7 @@ function rdbClient(options = {}) {
 	}
 
 	client.reactive = (cb => _reactive = cb);
+	client.createPatch = _createPatch;
 	client.table = table;
 	client.or = column('or');
 	client.and = column('and');
@@ -43,8 +46,9 @@ function rdbClient(options = {}) {
 	client.express = express;
 
 	if (options.tables) {
+		const readonly = {readonly: options.readonly, concurrency: options.concurrency};
 		for (let name in options.tables) {
-			client[name] = table(options.tables[name]);
+			client[name] = table(options.tables[name], {...readonly, ...clone(options[name])});
 		}
 		client.tables = options.tables;
 		return client;
@@ -70,6 +74,15 @@ function rdbClient(options = {}) {
 		if (!baseUrl?.express)
 			throw new Error('Express hosting is not supported on the client');
 		return baseUrl.express(client, options);
+	}
+
+	function _createPatch(original, modified, ...restArgs) {
+		if (!Array.isArray(original)) {
+			original = [original];
+			modified = [modified];
+		}
+		let args = [original, modified, ...restArgs];
+		return createPatch(...args);
 	}
 
 	function bindTransaction() {
@@ -102,8 +115,7 @@ function rdbClient(options = {}) {
 		}
 	}
 
-	function table(url) {
-		let tableOptions;
+	function table(url, tableOptions) {
 		if (!(typeof url === 'string')) {
 			tableOptions = tableOptions || {};
 			tableOptions = { db: baseUrl, ...tableOptions, transaction };
@@ -119,7 +131,8 @@ function rdbClient(options = {}) {
 			insert,
 			insertAndForget,
 			delete: _delete,
-			deleteCascade
+			deleteCascade,
+			patch
 		};
 
 		let handler = {
@@ -371,9 +384,7 @@ function rdbClient(options = {}) {
 
 		async function saveArray(array, concurrencyOptions, strategy) {
 			let deduceStrategy;
-			if (arguments.length === 2 && typeof concurrencyOptions == 'object' && !('concurrency' in concurrencyOptions || 'defaultConcurrency' in concurrencyOptions))
-				strategy = concurrencyOptions;
-			else if (arguments.length < 3)
+			if (arguments.length < 3)
 				deduceStrategy = true;
 			let { json } = rootMap.get(array);
 			strategy = extractStrategy({ strategy }, array);
@@ -391,6 +402,18 @@ function rdbClient(options = {}) {
 			let { changed, strategy: newStrategy } = await p;
 			copyIntoArray(changed, array, [...insertedPositions, ...updatedPositions]);
 			rootMap.set(array, { json: stringify(array), strategy: newStrategy, originalArray: [...array] });
+		}
+
+		async function patch(patch, concurrencyOptions, strategy) {
+			let deduceStrategy;
+			if (arguments.length < 3)
+				deduceStrategy = true;
+			if (patch.length === 0)
+				return;
+			let body = stringify({ patch, options: { strategy, ...concurrencyOptions, deduceStrategy } });
+			let adapter = netAdapter(url, { axios, tableOptions });
+			await adapter.patch(body);
+			return;
 		}
 
 		function extractChangedRowsPositions(rows, patch, meta) {
@@ -558,9 +581,7 @@ function rdbClient(options = {}) {
 
 		async function saveRow(row, concurrencyOptions, strategy) {
 			let deduceStrategy;
-			if (arguments.length === 2 && typeof concurrencyOptions == 'object' && !('concurrency' in concurrencyOptions || 'defaultConcurrency' in concurrencyOptions))
-				strategy = concurrencyOptions;
-			else if (arguments.length < 3)
+			if (arguments.length < 3)
 				deduceStrategy = true;
 			strategy = extractStrategy({ strategy }, row);
 			strategy = extractFetchingStrategy(row, strategy);

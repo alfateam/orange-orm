@@ -1,5 +1,5 @@
 const sql = `
-drop schema public cascade;
+drop schema if exists public cascade;
 create schema public;
 
 CREATE TABLE customer (
