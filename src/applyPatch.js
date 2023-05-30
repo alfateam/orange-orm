@@ -4,7 +4,7 @@ let assert = require('assert');
 let fromCompareObject = require('./fromCompareObject');
 let toCompareObject = require('./toCompareObject');
 
-function applyPatch({ defaultConcurrency, concurrency, options = {} }, dto, changes) {
+function applyPatch({ options = {} }, dto, changes) {
 	let dtoCompare = toCompareObject(dto);
 	changes = validateConflict(dtoCompare, changes);
 	fastjson.applyPatch(dtoCompare, changes, true, true);
@@ -27,23 +27,24 @@ function applyPatch({ defaultConcurrency, concurrency, options = {} }, dto, chan
 	function validateConflict(object, changes) {
 		return changes.filter(change => {
 			let expectedOldValue = change.oldValue;
-			let strategy = getStrategy(change.path);
-			let readonly = getOption(change.path).readonly;
+			const option = getOption(change.path);
+			let readonly = option.readonly;
 			if (readonly) {
 				const e = new Error(`Cannot update column ${change.path.replace('/','')} because it is readonly`);
 				// @ts-ignore
 				e.status = 405;
 				throw e;
 			}
-			if ((strategy === 'optimistic') || (strategy === 'skipOnConflict')) {
+			let concurrency = option.concurrency || 'optimistic';
+			if ((concurrency === 'optimistic') || (concurrency === 'skipOnConflict')) {
 				let oldValue = getOldValue(object, change.path);
 				try {
 					assert.deepEqual(oldValue, expectedOldValue);
 				}
 				catch (e) {
-					if (strategy === 'skipOnConflict')
+					if (concurrency === 'skipOnConflict')
 						return false;
-					throw new Error(`The field ${change.path} was changed by another user. Expected ${inspect(fromCompareObject(expectedOldValue), false, 10)}, but was ${inspect(fromCompareObject(oldValue), false, 10)}.`);
+					throw new Error(`The field ${change.path.replace('/','')} was changed by another user. Expected ${inspect(fromCompareObject(expectedOldValue), false, 10)}, but was ${inspect(fromCompareObject(oldValue), false, 10)}.`);
 				}
 			}
 			return true;
@@ -76,20 +77,6 @@ function applyPatch({ defaultConcurrency, concurrency, options = {} }, dto, chan
 			return obj;
 		}
 
-	}
-
-	function getStrategy(path) {
-		let splitPath = path.split('/');
-		splitPath.shift();
-		return splitPath.reduce(extract, concurrency);
-
-		function extract(obj, name) {
-			if (Array.isArray(obj))
-				return obj[0] || defaultConcurrency;
-			if (obj === Object(obj))
-				return obj[name] || defaultConcurrency;
-			return obj;
-		}
 	}
 }
 

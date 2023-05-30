@@ -46,7 +46,7 @@ function rdbClient(options = {}) {
 	client.express = express;
 
 	if (options.tables) {
-		const readonly = {readonly: options.readonly};
+		const readonly = {readonly: options.readonly, concurrency: options.concurrency};
 		for (let name in options.tables) {
 			client[name] = table(options.tables[name], {...readonly, ...clone(options[name])});
 		}

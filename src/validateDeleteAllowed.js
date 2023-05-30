@@ -42,7 +42,7 @@ function inferOptions(defaults, property) {
 	if ('readonly' in defaults)
 		parent.readonly = defaults.readonly;
 	if ('concurrency' in defaults)
-		parent.readonly = defaults.readonly;
+		parent.concurrency = defaults.concurrency;
 	return {...parent,  ...(defaults[property] || {})};
 }
 
