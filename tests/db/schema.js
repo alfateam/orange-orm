@@ -54,8 +54,13 @@ order.hasMany(line_order_relation).as('lines');
 const deliveryAddress_order_relation = deliveryAddress.join(order).by('orderId').as('order');
 order.hasOne(deliveryAddress_order_relation).as('deliveryAddress');
 
+const hus = rdb.table('hus');
+hus.primaryColumn('hus_id').string().as('id');
+hus.column('husnummer').numeric();
+
 module.exports = rdb({
 	tables: {
+		hus,
 		customer,
 		order,
 		lines: orderLine

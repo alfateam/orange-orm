@@ -54,7 +54,10 @@ async function patchTableCore(table, patches, { strategy = undefined, deduceStra
 		let property = path[0];
 		path = path.slice(1);
 		if (!row && path.length > 0) {
-			row = row || await table.tryGetById.apply(null, toKey(property), strategy);
+			const key = toKey(property);
+			row =  await table.tryGetById.apply(null, toKey(property), strategy);
+			if (!row)
+				throw new Error(`Row ${table._dbName} with id ${key} was not found.`);
 		}
 		if (path.length === 0) {
 			if (dryrun) {

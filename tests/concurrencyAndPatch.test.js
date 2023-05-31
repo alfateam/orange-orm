@@ -68,7 +68,7 @@ describe('patch single row', () => {
 
 	async function verify({ pool }) {
 
-		const db = _db({ db: pool});
+		const db = _db({ db: pool });
 
 		let row = await db.customer.getOne();
 		const original = JSON.parse(JSON.stringify(row));
@@ -96,9 +96,9 @@ describe('patch array', () => {
 
 	async function verify({ pool }) {
 
-		const db = _db({ db: pool});
+		const db = _db({ db: pool });
 
-		const strategy = {deliveryAddress: true, lines: true, customer: true};
+		const strategy = { deliveryAddress: true, lines: true, customer: true };
 		let rows = await db.order.getAll(strategy);
 		const original = JSON.parse(JSON.stringify(rows));
 
@@ -171,7 +171,7 @@ describe('concurrency default', () => {
 
 	async function verify({ pool }) {
 
-		const db = _db({ db: pool});
+		const db = _db({ db: pool });
 
 		let row = await db.customer.getOne();
 
@@ -185,7 +185,7 @@ describe('concurrency default', () => {
 			row.name = name;
 			await row.saveChanges();
 		}
-		catch(e) {
+		catch (e) {
 			error = e;
 		}
 
@@ -199,7 +199,7 @@ describe('concurrency skipOnConflict', () => {
 
 	async function verify({ pool }) {
 
-		const db = _db({ db: pool, concurrency: 'skipOnConflict'});
+		const db = _db({ db: pool, concurrency: 'skipOnConflict' });
 
 		let row = await db.customer.getOne();
 		let changedRow = await db.customer.getOne();
@@ -219,7 +219,7 @@ describe('concurrency overwrite', () => {
 
 	async function verify({ pool }) {
 
-		const db = _db({ db: pool, concurrency: 'overwrite'});
+		const db = _db({ db: pool, concurrency: 'overwrite' });
 
 		let row = await db.customer.getOne();
 		let changedRow = await db.customer.getOne();
@@ -238,8 +238,8 @@ describe('concurrency join, no conflict', () => {
 	test('pg', async () => await verify(pg()));
 
 	async function verify({ pool }) {
-		const db = _db({ db: pool});
-		let row = await db.order.getOne(null, {customer: true});
+		const db = _db({ db: pool });
+		let row = await db.order.getOne(null, { customer: true });
 		row.customer = null;
 		await row.saveChanges();
 		expect(row.customerId).toEqual(null);
@@ -252,10 +252,10 @@ describe('concurrency join, null conflict', () => {
 	test('pg', async () => await verify(pg()));
 
 	async function verify({ pool }) {
-		const db = _db({ db: pool});
-		let row = await db.order.getOne(null, {customer: true});
+		const db = _db({ db: pool });
+		let row = await db.order.getOne(null, { customer: true });
 
-		let changedRow = await db.order.getOne(null, {customer: true});
+		let changedRow = await db.order.getOne(null, { customer: true });
 		changedRow.customer = null;
 		await changedRow.saveChanges();
 
@@ -264,7 +264,7 @@ describe('concurrency join, null conflict', () => {
 		try {
 			await row.saveChanges();
 		}
-		catch(e) {
+		catch (e) {
 			error = e;
 		}
 		expect(error?.message).toEqual('The field customerId was changed by another user. Expected 1, but was null.');
@@ -276,10 +276,10 @@ describe('concurrency join, conflict', () => {
 	test('pg', async () => await verify(pg()));
 
 	async function verify({ pool }) {
-		const db = _db({ db: pool});
-		let row = await db.order.getOne(null, {customer: true});
+		const db = _db({ db: pool });
+		let row = await db.order.getOne(null, { customer: true });
 
-		let changedRow = await db.order.getOne(null, {customer: true});
+		let changedRow = await db.order.getOne(null, { customer: true });
 		changedRow.customerId = customer2Id;
 		await changedRow.saveChanges();
 
@@ -288,7 +288,7 @@ describe('concurrency join, conflict', () => {
 		try {
 			await row.saveChanges();
 		}
-		catch(e) {
+		catch (e) {
 			error = e;
 		}
 		expect(error?.message).toEqual('The field customerId was changed by another user. Expected 1, but was 2.');
@@ -300,10 +300,10 @@ describe('concurrency join, conflict alternative syntax', () => {
 	test('pg', async () => await verify(pg()));
 
 	async function verify({ pool }) {
-		const db = _db({ db: pool});
-		let row = await db.order.getOne(null, {customer: true});
+		const db = _db({ db: pool });
+		let row = await db.order.getOne(null, { customer: true });
 
-		let changedRow = await db.order.getOne(null, {customer: true});
+		let changedRow = await db.order.getOne(null, { customer: true });
 		changedRow.customerId = customer2Id;
 		await changedRow.saveChanges();
 
@@ -312,7 +312,7 @@ describe('concurrency join, conflict alternative syntax', () => {
 		try {
 			await row.saveChanges();
 		}
-		catch(e) {
+		catch (e) {
 			error = e;
 		}
 		expect(error?.message).toEqual('The field customerId was changed by another user. Expected 1, but was 2.');
@@ -324,10 +324,10 @@ describe('concurrency join, conflict overwrite', () => {
 	test('pg', async () => await verify(pg()));
 
 	async function verify({ pool }) {
-		const db = _db({ db: pool, order: {customerId: {concurrency: 'overwrite'}}});
-		let row = await db.order.getOne(null, {customer: true});
+		const db = _db({ db: pool, order: { customerId: { concurrency: 'overwrite' } } });
+		let row = await db.order.getOne(null, { customer: true });
 
-		let changedRow = await db.order.getOne(null, {customer: true});
+		let changedRow = await db.order.getOne(null, { customer: true });
 		changedRow.customerId = null;
 		await changedRow.saveChanges();
 
@@ -342,10 +342,10 @@ describe('concurrency join, conflict skipOnConflict', () => {
 	test('pg', async () => await verify(pg()));
 
 	async function verify({ pool }) {
-		const db = _db({ db: pool, order: {customerId: {concurrency: 'skipOnConflict'}}});
-		let row = await db.order.getOne(null, {customer: true});
+		const db = _db({ db: pool, order: { customerId: { concurrency: 'skipOnConflict' } } });
+		let row = await db.order.getOne(null, { customer: true });
 
-		let changedRow = await db.order.getOne(null, {customer: true});
+		let changedRow = await db.order.getOne(null, { customer: true });
 		changedRow.customerId = null;
 		await changedRow.saveChanges();
 
@@ -361,10 +361,10 @@ describe('concurrency join, conflict undefined syntax', () => {
 	test('pg', async () => await verify(pg()));
 
 	async function verify({ pool }) {
-		const db = _db({ db: pool});
-		let row = await db.order.getOne(null, {customer: true});
+		const db = _db({ db: pool });
+		let row = await db.order.getOne(null, { customer: true });
 
-		let changedRow = await db.order.getOne(null, {customer: true});
+		let changedRow = await db.order.getOne(null, { customer: true });
 		delete changedRow.customerId;
 		await changedRow.saveChanges();
 
@@ -373,7 +373,7 @@ describe('concurrency join, conflict undefined syntax', () => {
 		try {
 			await row.saveChanges();
 		}
-		catch(e) {
+		catch (e) {
 			error = e;
 		}
 		expect(error?.message).toEqual('The field customerId was changed by another user. Expected 1, but was null.');
@@ -385,9 +385,9 @@ describe('concurrency delete join', () => {
 	test('pg', async () => await verify(pg()));
 
 	async function verify({ pool }) {
-		const db = _db({ db: pool});
-		let row = await db.order.getOne(null, {customer: true});
-		let changedRow = await db.order.getOne(null, {customer: true});
+		const db = _db({ db: pool });
+		let row = await db.order.getOne(null, { customer: true });
+		let changedRow = await db.order.getOne(null, { customer: true });
 		delete changedRow.customer;
 		await changedRow.saveChanges();
 
@@ -396,7 +396,7 @@ describe('concurrency delete join', () => {
 		try {
 			await row.saveChanges();
 		}
-		catch(e) {
+		catch (e) {
 			error = e;
 		}
 		expect(error?.message).toEqual('The field customerId was changed by another user. Expected 1, but was null.');
@@ -408,9 +408,9 @@ describe('concurrency delete join, alternative syntax', () => {
 	test('pg', async () => await verify(pg()));
 
 	async function verify({ pool }) {
-		const db = _db({ db: pool});
-		let row = await db.order.getOne(null, {customer: true});
-		let changedRow = await db.order.getOne(null, {customer: true});
+		const db = _db({ db: pool });
+		let row = await db.order.getOne(null, { customer: true });
+		let changedRow = await db.order.getOne(null, { customer: true });
 		delete changedRow.customer;
 		await changedRow.saveChanges();
 
@@ -419,12 +419,28 @@ describe('concurrency delete join, alternative syntax', () => {
 		try {
 			await row.saveChanges();
 		}
-		catch(e) {
+		catch (e) {
 			error = e;
 		}
 		expect(error?.message).toEqual('The field customerId was changed by another user. Expected 1, but was null.');
 	}
 });
+
+
+describe('createPatch', () => {
+
+	test('pg', async () => await verify(pg()));
+
+	async function verify({ pool }) {
+		const db = _db({ db: pool });
+		const original = {id:'12a2f0e4-d657-47ea-a96a-0b2fff0090b2', husNummer: 2};
+		const modified = {id:'12a2f0e4-d657-47ea-a96a-0b2fff0090b2', husNummer: 4};
+		const patch = db.createPatch(original, modified);
+		const expected =  [{ 'op': 'replace', 'path': '/["12a2f0e4-d657-47ea-a96a-0b2fff0090b2"]/husNummer', 'value': 4, 'oldValue': 2 }];
+		expect(patch).toEqual(expected);
+	}
+});
+
 
 
 function pg() {
