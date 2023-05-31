@@ -844,7 +844,6 @@ var dateToISOString_1 = dateToISOString$1;
 let dateToISOString = dateToISOString_1;
 const isNode = (typeof window === 'undefined');
 
-
 function stringify$4(value) {
 	return JSON.stringify(value, replacer);
 }
@@ -1529,7 +1528,7 @@ var createPatch$1 = function createPatch(original, dto, options) {
 				map[stringify$2(key)] = i;
 			}
 			else if ('id' in element)
-				map[stringify$2(element.id)] = i;
+				map[stringify$2([element.id])] = i;
 			else
 				map[i] = i;
 			return map;
@@ -1551,7 +1550,7 @@ var createPatch$1 = function createPatch(original, dto, options) {
 					copy[stringify$2(key)] = element;
 				}
 				else if (element === Object(element) && 'id' in element)
-					copy[stringify$2(element.id)] = element;
+					copy[stringify$2([element.id])] = element;
 				else
 					copy[i] = element;
 			}
