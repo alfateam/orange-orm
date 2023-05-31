@@ -842,6 +842,7 @@ function dateToISOString$1(date) {
 var dateToISOString_1 = dateToISOString$1;
 
 let dateToISOString = dateToISOString_1;
+const isNode = (typeof window === 'undefined');
 
 
 function stringify$4(value) {
@@ -849,13 +850,17 @@ function stringify$4(value) {
 }
 
 function replacer(key, value) {
-	if (Buffer.isBuffer(value))
+	if (isNode && isNodeBuffer(value))
 		return value.toString('base64');
 	// @ts-ignore
 	else if (value instanceof Date  && !isNaN(value))
 		return dateToISOString(value);
 	else
 		return value;
+}
+
+function isNodeBuffer(object) {
+	return Buffer.isBuffer(object);
 }
 
 var stringify_1 = stringify$4;
