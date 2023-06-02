@@ -4,7 +4,7 @@ let assert = require('assert');
 let fromCompareObject = require('./fromCompareObject');
 let toCompareObject = require('./toCompareObject');
 
-function applyPatch({ options = {} }, dto, changes) {
+function applyPatch({ options = {} }, dto, changes, column) {
 	let dtoCompare = toCompareObject(dto);
 	changes = validateConflict(dtoCompare, changes);
 	fastjson.applyPatch(dtoCompare, changes, true, true);
@@ -39,7 +39,11 @@ function applyPatch({ options = {} }, dto, changes) {
 			if ((concurrency === 'optimistic') || (concurrency === 'skipOnConflict')) {
 				let oldValue = getOldValue(object, change.path);
 				try {
-					assert.deepEqual(oldValue, expectedOldValue);
+					if (column?.tsType === 'DateColumn') {
+						assertDatesEqual(oldValue, expectedOldValue);
+					}
+					else
+						assert.deepEqual(oldValue, expectedOldValue);
 				}
 				catch (e) {
 					if (concurrency === 'skipOnConflict')
@@ -78,6 +82,16 @@ function applyPatch({ options = {} }, dto, changes) {
 		}
 
 	}
+}
+
+function assertDatesEqual(date1, date2) {
+	if (date1 && date2 ) {
+		date1 = new Date(date1);
+		date2 = new Date(date2);
+		assert.deepEqual(date1.getTime(), date2.getTime());
+	}
+	else
+		assert.deepEqual(date1, date2);
 }
 
 module.exports = applyPatch;

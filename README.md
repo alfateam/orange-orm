@@ -14,6 +14,8 @@ Based on promises.
 [Documentation and examples](https://github.com/alfateam/rdb/blob/master/docs/docs.md)  
 
 ## Release notes
+__3.1.19__  
+Bugfix patching ms sql date 
 __3.1.18__  
 Bugfix patching without metadata 
 __3.1.17__  

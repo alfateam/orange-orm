@@ -106,7 +106,7 @@ async function patchTableCore(table, patches, { strategy = undefined, deduceStra
 				return { updated: row };
 			let dto = {};
 			dto[property] = row[property];
-			let result = applyPatch({ options }, dto, [{ path: '/' + path.join('/'), op, value, oldValue }]);
+			let result = applyPatch({ options }, dto, [{ path: '/' + path.join('/'), op, value, oldValue }], table[property]);
 			row[property] = result[property];
 			return { updated: row };
 		}
@@ -218,7 +218,8 @@ async function patchTableCore(table, patches, { strategy = undefined, deduceStra
 		if (isColumn(property, table)) {
 			let dto = {};
 			dto[property] = row[property];
-			let result = applyPatch({ options }, dto, [{ path: '/' + path.join('/'), op, oldValue }]);
+			let result = applyPatch({ options }, dto, [{ path: '/' + path.join('/'), op, oldValue }], table[property]);
+
 			row[property] = result[property];
 			return { updated: row };
 		}
@@ -306,6 +307,13 @@ async function patchTableCore(table, patches, { strategy = undefined, deduceStra
 	function cleanOptions(options) {
 		const { table, transaction, db, ..._options } = options;
 		return _options;
+	}
+
+	function normalizeDateString(value) {
+		if (typeof value === 'string')
+			value.split;
+		else
+			return value;
 	}
 
 }

@@ -11,7 +11,12 @@ async function validateDeleteConflict({ row, oldValue, options, table }) {
 			let strategy = option.concurrency || 'optimistic';
 			if ((strategy === 'optimistic')) {
 				try {
-					assert.deepEqual(oldValue[p], toCompareObject(row[p]));
+					const column = table[p];
+					if (column?.tsType === 'DateColumn') {
+						assertDatesEqual(oldValue[p], toCompareObject(row[p]));
+					}
+					else
+						assert.deepEqual(oldValue[p], toCompareObject(row[p]));						
 				}
 				catch (e) {
 					throw new Error(`The field ${p} was changed by another user. Expected ${inspect(oldValue[p], false, 10)}, but was ${inspect(row[p], false, 10)}.`);
@@ -65,5 +70,14 @@ function inferOptions(defaults, property) {
 	return {...parent,  ...(defaults[property] || {})};
 }
 
+function assertDatesEqual(date1, date2) {
+	if (date1 && date2 ) {
+		date1 = new Date(date1);
+		date2 = new Date(date2);
+		assert.deepEqual(date1.getTime(), date2.getTime());
+	}
+	else
+		assert.deepEqual(date1, date2);
+}
 
 module.exports = validateDeleteConflict;
