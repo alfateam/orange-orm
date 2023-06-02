@@ -30,7 +30,7 @@ function applyPatch({ options = {} }, dto, changes, column) {
 			const option = getOption(change.path);
 			let readonly = option.readonly;
 			if (readonly) {
-				const e = new Error(`Cannot update column ${change.path.replace('/','')} because it is readonly`);
+				const e = new Error(`Cannot update column ${change.path.replace('/', '')} because it is readonly`);
 				// @ts-ignore
 				e.status = 405;
 				throw e;
@@ -48,7 +48,7 @@ function applyPatch({ options = {} }, dto, changes, column) {
 				catch (e) {
 					if (concurrency === 'skipOnConflict')
 						return false;
-					throw new Error(`The field ${change.path.replace('/','')} was changed by another user. Expected ${inspect(fromCompareObject(expectedOldValue), false, 10)}, but was ${inspect(fromCompareObject(oldValue), false, 10)}.`);
+					throw new Error(`The field ${change.path.replace('/', '')} was changed by another user. Expected ${inspect(fromCompareObject(expectedOldValue), false, 10)}, but was ${inspect(fromCompareObject(oldValue), false, 10)}.`);
 				}
 			}
 			return true;
@@ -85,13 +85,21 @@ function applyPatch({ options = {} }, dto, changes, column) {
 }
 
 function assertDatesEqual(date1, date2) {
-	if (date1 && date2 ) {
-		date1 = new Date(date1);
-		date2 = new Date(date2);
-		assert.deepEqual(date1.getTime(), date2.getTime());
+	if (date1 && date2) {
+		const parts1 = date1.split('T');
+		const time1parts = (parts1[1] || '').split(/[-+.]/);
+		const parts2 = date2.split('T');
+		const time2parts = (parts2[1] || '').split(/[-+.]/);
+		while (time1parts.length !== time2parts.length) {
+			if (time1parts.length > time2parts.length)
+				time1parts.pop();
+			else if (time1parts.length < time2parts.length)
+				time2parts.pop();
+		}
+		date1 = `${parts1[0]}T${time1parts[0]}`;
+		date2 = `${parts2[0]}T${time2parts[0]}`;
 	}
-	else
-		assert.deepEqual(date1, date2);
+	assert.deepEqual(date1, date2);
 }
 
 module.exports = applyPatch;

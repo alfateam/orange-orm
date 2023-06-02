@@ -72,11 +72,29 @@ describe('update date', () => {
 
 		const db = _db({ db: pool });
 		let row = await db.order.getOne();
-		const date = new Date(2022, 0, 11, 9, 24, 47);
+		const date = new Date(2021, 0, 11, 9, 11, 47);
 		row.orderDate = date;
 		await row.saveChanges();
 		await row.refresh();
 		expect(row.orderDate).toEqual(dateToISOString(date).substring(0, row.orderDate.length));
+	}
+});
+
+describe('update date in array', () => {
+
+	test('pg', async () => await verify(pg()));
+	test('mssql', async () => await verify(mssql()));
+
+	async function verify({ pool }) {
+
+		const db = _db({ db: pool });
+		let rows = await db.order.getMany();
+		const date = new Date(2021, 0, 11, 9, 11, 47);
+
+		rows[0].orderDate = date;
+		await rows.saveChanges();
+		await rows.refresh();
+		expect(rows[0].orderDate).toEqual(dateToISOString(date).substring(0, rows[0].orderDate.length));
 	}
 });
 

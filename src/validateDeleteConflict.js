@@ -71,13 +71,22 @@ function inferOptions(defaults, property) {
 }
 
 function assertDatesEqual(date1, date2) {
-	if (date1 && date2 ) {
-		date1 = new Date(date1);
-		date2 = new Date(date2);
-		assert.deepEqual(date1.getTime(), date2.getTime());
+	if (date1 && date2) {
+		const parts1 = date1.split('T');
+		const time1parts = (parts1[1] || '').split(/[-+.]/);
+		const parts2 = date2.split('T');
+		const time2parts = (parts2[1] || '').split(/[-+.]/);
+		while (time1parts.length !== time2parts.length) {
+			if (time1parts.length > time2parts.length)
+				time1parts.pop();
+			else if (time1parts.length < time2parts.length)
+				time2parts.pop();
+		}
+		date1 = `${parts1[0]}T${time1parts[0]}`;
+		date2 = `${parts2[0]}T${time2parts[0]}`;
 	}
-	else
-		assert.deepEqual(date1, date2);
+	assert.deepEqual(date1, date2);
 }
+
 
 module.exports = validateDeleteConflict;

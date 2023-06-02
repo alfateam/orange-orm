@@ -308,14 +308,6 @@ async function patchTableCore(table, patches, { strategy = undefined, deduceStra
 		const { table, transaction, db, ..._options } = options;
 		return _options;
 	}
-
-	function normalizeDateString(value) {
-		if (typeof value === 'string')
-			value.split;
-		else
-			return value;
-	}
-
 }
 
 module.exports = patchTable;
