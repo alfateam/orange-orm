@@ -400,7 +400,7 @@ export interface RdbClient  {${getTables(isHttp)}
 }
 
 export interface RdbConfig {
-	db: Pool | (() => Pool);
+	db?: Pool | (() => Pool);
     readonly?: boolean;
     concurrency?: Concurrency;${getConcurrencyTables()}    
 }
