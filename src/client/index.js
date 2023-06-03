@@ -25,6 +25,11 @@ function rdbClient(options = {}) {
 	}
 
 	client.reactive = (cb => _reactive = cb);
+	Object.defineProperty(client, 'metaData', {
+		get: getMetaData,
+		enumerable: true,
+		configurable: false
+	});
 	client.createPatch = _createPatch;
 	client.table = table;
 	client.or = column('or');
@@ -46,9 +51,9 @@ function rdbClient(options = {}) {
 	client.express = express;
 
 	if (options.tables) {
-		const readonly = {readonly: options.readonly, concurrency: options.concurrency};
+		const readonly = { readonly: options.readonly, concurrency: options.concurrency };
 		for (let name in options.tables) {
-			client[name] = table(options.tables[name], {...readonly, ...clone(options[name])});
+			client[name] = table(options.tables[name], { ...readonly, ...clone(options[name]) });
 		}
 		client.tables = options.tables;
 		return client;
@@ -64,6 +69,42 @@ function rdbClient(options = {}) {
 
 		};
 		return new Proxy(client, handler);
+	}
+
+	function getMetaData() {
+		const result = {readonly: options.readonly, concurrency: options.concurrency};
+		for (let name in options.tables) {
+			result[name] = getMetaDataTable(options.tables[name], inferOptions(options, name));
+		}
+		return result;
+	}
+
+	function inferOptions(defaults, property) {
+		const parent = {};
+		if ('readonly' in defaults)
+			parent.readonly = defaults.readonly;
+		if ('concurrency' in defaults)
+			parent.concurrency = defaults.concurrency;
+		return { ...parent, ...(defaults[property] || {}) };
+	}
+
+
+	function getMetaDataTable(table, options) {
+		const result = {};
+		for (let i = 0; i < table._columns.length; i++) {
+			const name = table._columns[i].alias;
+			result[name] = inferOptions(options, name);
+		}
+		for(let name in table._relations) {
+			if (!isJoinRelation(name, table))
+				result[name] = getMetaDataTable(table._relations[name].childTable, inferOptions(options, name));
+		}
+
+		return result;
+
+		function isJoinRelation(name, table) {
+			return table[name] && table[name]._relation.columns;
+		}
 	}
 
 	async function query() {

@@ -92,7 +92,43 @@ describe('readonly everything', () => {
 		catch (e) {
 			error = e;
 		}
+		const expectedMeta = {
+			readonly: true,
+			concurrency: undefined,
+			hus: { id: { readonly: true }, husnummer: { readonly: true } },
+			customer: {
+				id: { readonly: true },
+				name: { readonly: true },
+				balance: { readonly: true },
+				isActive: { readonly: true }
+			},
+			order: {
+				id: { readonly: true },
+				orderDate: { readonly: true },
+				customerId: { readonly: true },
+				lines: {
+					id: { readonly: true },
+					orderId: { readonly: true },
+					product: { readonly: true }
+				},
+				deliveryAddress: {
+					id: { readonly: true },
+					orderId: { readonly: true },
+					name: { readonly: true },
+					street: { readonly: true },
+					postalCode: { readonly: true },
+					postalPlace: { readonly: true },
+					countryCode: { readonly: true }
+				}
+			},
+			lines: {
+				id: { readonly: true },
+				orderId: { readonly: true },
+				product: { readonly: true }
+			}
+		};
 		expect(error?.message).toEqual('Cannot update column name because it is readonly');
+		expect(db.metaData).toEqual(expectedMeta);
 	}
 });
 

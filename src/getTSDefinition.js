@@ -405,6 +405,11 @@ export interface RdbConfig {
     concurrency?: Concurrency;${getConcurrencyTables()}    
 }
 
+export interface MetaData {
+    readonly?: boolean;
+    concurrency?: Concurrency;${getConcurrencyTables()}
+}
+
 export interface ExpressConfig {
 	db?: Pool | (() => Pool);
 	tables?: ExpressTables;
@@ -469,7 +474,8 @@ export interface ExpressTables {${getExpressTables()}
 	createPatch(original: any[], modified: any[]): JsonPatch;
 	createPatch(original: any, modified: any): JsonPatch;
 	express(): Express;
-	express(config: ExpressConfig): Express;`;
+	express(config: ExpressConfig): Express;
+	readonly metaData: MetaData;`;
 		return result;
 	}
 	function getExpressTables() {
