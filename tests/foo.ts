@@ -8,15 +8,13 @@ const party = orm.table('party').map(mapper => {
   }
 });
 
-
-
 const customerMapped = orm.table('customer').map(mapper => {
   return {
     id: mapper.column('id').string(),
     name: mapper.column('name').string(),
     partyId: mapper.column('partyId').string(),
   };
-})(mapper => {
+}).map(mapper => {
   return {
     party: mapper.references(party).by('partyId')
   }
@@ -32,17 +30,16 @@ const orderMapped = orm.table('order').map(mapper => {
     updatedAt: mapper.column('updated_at').date(),
     customerId: mapper.column('customer_id').string(),
   };
-})(mapper => {
+}).map(mapper => {
   return {
     customer: mapper.references(customerMapped).by('customerId')
   }
 });
 
+orderMapped.
 (async () => {
   const filter = orderMapped.customer.name.equalTo('lars');
-  const orderRows = await orderMapped.getMany(filter, { orderBy: ['balance'], customer: { orderBy: ['partyId asc'], party: { location: false } } });
-  const bar = foo(orderRows);
-  orderRows
+  const row = await orderMapped.getOne(filter, { orderBy: ['balance'], customer: { orderBy: ['partyId asc'], party: { location: false } } });
 });
 
 

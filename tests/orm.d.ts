@@ -67,7 +67,7 @@
 // };
 
 // type MappedTable<T, U> = ((<V>(callback: (mapper: ColumnMapper<U>) => V) => MappedTable<T, U & V>) & {
-//     getMany: <FS extends FetchingStrategy<U>>(filter: Filter, fetchingStrategy: FS) => FetchedProperties<Required<U>, Required<FS>>;
+//     getOne: <FS extends FetchingStrategy<U>>(filter: Filter, fetchingStrategy: FS) => FetchedProperties<Required<U>, Required<FS>>;
 // } & U);
 
 // type AtLeastOneTrue<T> = {
@@ -184,12 +184,13 @@ type ColumnMapper<T> = {
 };
 
 
-type MappedTable<T, U> = (<V extends AllowedColumnsAndTables<V>>(callback: (mapper: ColumnMapper<U>) => V) => MappedTable<T, U & V>) & {
-	getMany: <FS extends FetchingStrategy<U>>(filter: Filter, fetchingStrategy: FS) => StrategyToRow<FetchedProperties<Required<U>, Required<FS>>>;
+type MappedTable<T, U> =  {
+	// map:  (<U extends AllowedColumnsAndTables<U>>(callback: (mapper: ColumnMapper<T>) => U) => MappedTable<T, U>) & MappedTable<T,T>;
+	getOne: <FS extends FetchingStrategy<U>>(filter: Filter, fetchingStrategy: FS) => StrategyToRow<FetchedProperties<Required<U>, Required<FS>>>;
+	map: <V extends AllowedColumnsAndTables<V>>(callback: (mapper: ColumnMapper<U>) => V) => MappedTable<T, U & V>;
   } & U;
   
 //   type Table<T> = (<U extends AllowedColumnsAndTables<U>>(callback: (mapper: ColumnMapper<T>) => U) => MappedTable<T, U>) & MappedTable<T,T> & {
-// 	map:  (<U extends AllowedColumnsAndTables<U>>(callback: (mapper: ColumnMapper<T>) => U) => MappedTable<T, U>) & MappedTable<T,T>;
 //   };
 
 
