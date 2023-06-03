@@ -1,7 +1,7 @@
 var { parseConnectionString } = require('@tediousjs/connection-string');
 
 function parse(connectionString) {
-	const config = { options: {}, authentication: { type: 'default', options: {} } };
+	const config = { options: {useUTC: false}, authentication: { type: 'default', options: {} } };
 	const elements = parseConnectionString(connectionString);
 	for (const key in elements) {
 		const value = elements[key];
