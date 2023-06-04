@@ -25,10 +25,11 @@ const orderMapped = orm.table('order').map(mapper => {
   return {
     id: mapper.column('id').uuid(),
     name: mapper.column('name').string(),
-    balance: mapper.column('balance').number(),
+    balance: mapper.column('balance').numeric(),
     createdAt: mapper.column('created_at').date(),
     updatedAt: mapper.column('updated_at').date(),
     customerId: mapper.column('customer_id').string(),
+    picture: mapper.column('picture').json()
   };
 }).map(mapper => {
   return {
@@ -36,11 +37,17 @@ const orderMapped = orm.table('order').map(mapper => {
   }
 });
 
-orderMapped.
-(async () => {
-  const filter = orderMapped.customer.name.equalTo('lars');
-  const row = await orderMapped.getOne(filter, { orderBy: ['balance'], customer: { orderBy: ['partyId asc'], party: { location: false } } });
+const filter = orderMapped.customer.name.equal('lars');
+
+const row = await orderMapped.getOne(filter, {
+  orderBy: ['balance'], customer: {
+    orderBy: ['partyId asc'],
+    party: { location: false },
+
+
+  }
 });
+row.picture = [{bar: 'es'}];
 
 
 

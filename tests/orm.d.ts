@@ -1,133 +1,132 @@
-// declare namespace ORM {
-
-import { JSONColumn } from "../typings";
-
-// 	interface ORM {		
-// 		table: (tableName: string) => Table<{}>;
-// 		tableOf: <T>(tableName: string) => Table<T>;
-// 	}
-
-
-// }
-
-// interface UuidColumnType {
-// 	equal(value: string | null): Filter;
-// }
-
-// interface DateColumnType {
-// 	greaterThan(value: Date): Filter;
-// 	between(from: Date, to: Date): Filter;
-// }
-
-// interface StringColumnType {
-// 	equal(value: string | null): Filter;
-// 	greaterThan(value: string): Filter;
-// 	startsWith(value: string): Filter;
-// 	endsWith(value: string): Filter;
-// }
-
-// interface NumericColumnType {
-// 	greaterThan(value: number): Filter;
-// 	between(from: number, to: number): Filter;
-// }
-
-// interface ColumnType {
-// 	string: () => StringColumnType;
-// 	uuid: () => UuidColumnType;
-// 	number: () => NumericColumnType;
-// 	date: () => DateColumnType;
-// }
-
-// interface RawFilter {
-// 	sql: string | (() => string);
-// 	parameters?: any[];
-// }
-
-// interface Filter extends RawFilter {
-// 	and<T extends RawFilter>(otherFilter: T): Filter;
-// }
-
-// type Table<T> = ((<U>(callback: (mapper: ColumnMapper<T>) => U) => MappedTable<T, U>) & MappedTable<T, T>);
-
-// type FetchingStrategy<T> = {
-// 	[K in keyof T]?: boolean | FetchingStrategy<T[K]>;
-// } & {
-// 	orderBy?: Array<OrderBy<Extract<keyof T, string>>>;
-// 	limit?: number;
-// 	offset?: number;
-// };
-
-// type OrderBy<T extends string> = `${T} ${'asc' | 'desc'}` | T;
-
-// type ReferenceMapper<TFrom, TTo> = {
-// 	by(foreignKey: keyof TFrom): MappedTable<any, TTo>;
-// };
-
-// type ColumnMapper<T> = {
-// 	column: (columnName: string) => ColumnType;
-// 	references: <TTo>(mappedTable: MappedTable<any, TTo>) => ReferenceMapper<T, TTo>;
-// };
-
-// type MappedTable<T, U> = ((<V>(callback: (mapper: ColumnMapper<U>) => V) => MappedTable<T, U & V>) & {
-//     getOne: <FS extends FetchingStrategy<U>>(filter: Filter, fetchingStrategy: FS) => FetchedProperties<Required<U>, Required<FS>>;
-// } & U);
-
-// type AtLeastOneTrue<T> = {
-// 	[K in keyof T]: T[K] extends true ? true : never;
-// }[keyof T] extends never ? false : true;
-
-// type ExtractColumns<T, TStrategy> = {
-// 	[K in keyof TStrategy]: K extends keyof T
-// 	? T[K] extends StringColumnType | UuidColumnType | NumericColumnType | DateColumnType ? TStrategy[K] : never
-// 	: never
-// }
-
-// type FetchedProperties<T, TStrategy> = AtLeastOneTrue<RemoveNever<ExtractColumns<T, TStrategy>>> extends true
-// 	? {
-// 		[K in keyof T]: K extends keyof TStrategy
-// 		? TStrategy[K] extends true 
-// 			? T[K] extends StringColumnType | UuidColumnType | NumericColumnType | DateColumnType			
-// 				? T[K]
-// 				: FetchedProperties<Required<T[K]>, {}>		
-// 			: TStrategy[K] extends false
-// 				? never
-// 				: FetchedProperties<Required<T[K]>, Required<TStrategy[K]>>			
-// 		: never
-// 	}
-// 	: {
-// 		[K in keyof T]: K extends keyof TStrategy
-// 		? TStrategy[K] extends true 
-// 			? T[K] extends StringColumnType | UuidColumnType | NumericColumnType | DateColumnType			
-// 				? T[K]
-// 				: FetchedProperties<Required<T[K]>, {}>		
-// 			: TStrategy[K] extends false
-// 				? never
-// 				: FetchedProperties<Required<T[K]>, Required<TStrategy[K]>>			
-// 		: NegotiateDefaultStrategy<T[K]>
-// 	};
-
-// type NegotiateDefaultStrategy<T> = T extends StringColumnType | UuidColumnType | NumericColumnType | DateColumnType ? T : never
-
-// type RemoveNever<T> = {
-// 	[K in keyof T as T[K] extends never ? never : K]: T[K] extends object ? RemoveNever<T[K]> : T[K]
-// };
-
-// declare const orm: ORM.ORM;
-// export default orm;
-//todo
 declare namespace ORM {
 
-	interface ORM {		
+	interface ORM {
 		table: (tableName: string) => Table<{}>;
 		tableOf: <T>(tableName: string) => Table<T>;
 	}
 }
 
+
+type FetchingStrategy<T> = Omit<{
+	[K in keyof T & keyof RemoveNever<AllowedColumnsAndTables<T>>]?: boolean | FetchingStrategy<T[K]>
+}, 'getOne' | 'getMany'> & {
+	orderBy?: Array<OrderBy<Extract<keyof AllowedColumns<T>, string>>>;
+	limit?: number;
+	offset?: number;
+};
+
+type OrderBy<T extends string> = `${T} ${'asc' | 'desc'}` | T;
+
+type RelatedTable = {};
+
+type ReferenceMapper<TFrom, TTo> = {
+	by(foreignKey: keyof TFrom): MappedTable<any, TTo> & RelatedTable;
+};
+
+type ColumnMapper<T> = {
+	column: (columnName: string) => ColumnType;
+	references: <TTo>(mappedTable: MappedTable<any, TTo>) => ReferenceMapper<T, TTo>;
+};
+
+
+type MappedTable<T, U> = {
+	getOne: <FS extends FetchingStrategy<U>>(filter: Filter, fetchingStrategy: FS) => StrategyToRow<FetchedProperties<Required<U>, Required<FS>>>;
+	map: <V extends AllowedColumnsAndTables<V>>(callback: (mapper: ColumnMapper<U>) => V) => MappedTable<T, U & V>;
+} & U;
+
+type Table<T> = {
+	map: (<U extends AllowedColumnsAndTables<U>>(callback: (mapper: ColumnMapper<T>) => U) => MappedTable<T, U>) & MappedTable<T, T>;
+};
+
+
+
+type ColumnTypes = StringColumnType | UuidColumnType | NumericColumnType | DateColumnType | BinaryColumnType | BooleanColumnType | JSONColumnType;
+type ColumnAndTableTypes = ColumnTypes | RelatedTable;
+
+
+type StrategyToRow<T> = {
+	[K in keyof T as T[K] extends never ? never : K]: T[K] extends StringColumnType
+	? string
+	: T[K] extends UuidColumnType
+	? string
+	: T[K] extends NumericColumnType
+	? number
+	: T[K] extends DateColumnType
+	? string
+	: T[K] extends BinaryColumnType
+	? string
+	: T[K] extends BooleanColumnType
+	? boolean
+	: T[K] extends JSONColumnType
+	? JsonType
+	: StrategyToRow<T[K]>
+};
+
+type JsonValue = null | boolean | number | string | JsonArray | JsonObject;
+
+interface JsonArray extends Array<JsonValue> { }
+
+interface JsonObject { [key: string]: JsonValue; }
+
+type JsonType = JsonArray | JsonObject;
+
+type AllowedColumnsAndTables<T> = {
+	[P in keyof T]: T[P] extends ColumnAndTableTypes
+	? T[P]
+	: never;
+};
+
+type AllowedColumns<T> = RemoveNever<{
+	[P in keyof T]: T[P] extends ColumnTypes
+	? T[P]
+	: never;
+}>;
+
+type AtLeastOneTrue<T> = {
+	[K in keyof T]: T[K] extends true ? true : never;
+}[keyof T] extends never ? false : true;
+
+type ExtractColumns<T, TStrategy> = {
+	[K in keyof TStrategy]: K extends keyof T
+	? T[K] extends StringColumnType | UuidColumnType | NumericColumnType | DateColumnType | | BinaryColumnType | BooleanColumnType | JSONColumnType? TStrategy[K] : never
+	: never
+}
+type FetchedProperties<T, TStrategy> = AtLeastOneTrue<RemoveNever<ExtractColumns<T, TStrategy>>> extends true
+	? {
+		[K in keyof T]: K extends keyof TStrategy
+		? TStrategy[K] extends true
+		? T[K] extends StringColumnType | UuidColumnType | NumericColumnType | DateColumnType | BinaryColumnType | BooleanColumnType | JSONColumnType
+		? T[K]
+		: FetchedProperties<Required<T[K]>, {}>
+		: TStrategy[K] extends false
+		? never
+		: FetchedProperties<Required<T[K]>, Required<TStrategy[K]>>
+		: never
+	}
+	: {
+		[K in keyof T]: K extends keyof TStrategy
+		? TStrategy[K] extends true
+		? T[K] extends StringColumnType | UuidColumnType | NumericColumnType | DateColumnType | BinaryColumnType | BooleanColumnType | JSONColumnType
+		? T[K]
+		: FetchedProperties<Required<T[K]>, {}>
+		: TStrategy[K] extends false
+		? never
+		: FetchedProperties<Required<T[K]>, Required<TStrategy[K]>>
+		: NegotiateDefaultStrategy<T[K]>
+	};
+
+
+type NegotiateDefaultStrategy<T> = T extends StringColumnType | UuidColumnType | NumericColumnType | DateColumnType | BinaryColumnType | BooleanColumnType | JSONColumnType ? T : never
+
+type RemoveNever<T> = {
+	[K in keyof T as T[K] extends never ? never : K]: T[K] extends object ? RemoveNever<T[K]> : T[K]
+};
+
 interface UuidColumnType {
 	equal(value: string | null): Filter;
 	eq(value: string): Filter;
-	notEqual(value: string | null): Filter	
-	ne(value: string): Filter	
+	notEqual(value: string | null): Filter
+	ne(value: string): Filter
 	lessThan(value: string): Filter;
 	lt(value: string): Filter;
 	lessThanOrEqual(value: string): Filter;
@@ -143,8 +142,8 @@ interface UuidColumnType {
 interface BinaryColumnType {
 	equal(value: string | null): Filter;
 	eq(value: string): Filter;
-	notEqual(value: string | null): Filter	
-	ne(value: string): Filter	
+	notEqual(value: string | null): Filter
+	ne(value: string): Filter
 	lessThan(value: string): Filter;
 	lt(value: string): Filter;
 	lessThanOrEqual(value: string): Filter;
@@ -160,8 +159,8 @@ interface BinaryColumnType {
 interface BooleanColumnType {
 	equal(value: boolean | null): Filter;
 	eq(value: boolean): Filter;
-	notEqual(value: boolean | null): Filter	
-	ne(value: boolean): Filter	
+	notEqual(value: boolean | null): Filter
+	ne(value: boolean): Filter
 	lessThan(value: boolean): Filter;
 	lt(value: boolean): Filter;
 	lessThanOrEqual(value: boolean): Filter;
@@ -177,8 +176,8 @@ interface BooleanColumnType {
 interface DateColumnType {
 	equal(value: string | Date | null): Filter;
 	eq(value: string | Date): Filter;
-	notEqual(value: string | Date | null): Filter	
-	ne(value: string | Date): Filter	
+	notEqual(value: string | Date | null): Filter
+	ne(value: string | Date): Filter
 	lessThan(value: string | Date): Filter;
 	lt(value: string | Date): Filter;
 	lessThanOrEqual(value: string | Date): Filter;
@@ -194,8 +193,8 @@ interface DateColumnType {
 interface StringColumnType {
 	equal(value: string | null): Filter;
 	eq(value: string): Filter;
-	notEqual(value: string | null): Filter	
-	ne(value: string): Filter	
+	notEqual(value: string | null): Filter
+	ne(value: string): Filter
 	lessThan(value: string): Filter;
 	lt(value: string): Filter;
 	lessThanOrEqual(value: string): Filter;
@@ -206,7 +205,7 @@ interface StringColumnType {
 	ge(value: string): Filter;
 	between(from: string, to: string): Filter;
 	in(values: Array<string | null>): Filter;
-	
+
 	startsWith(value: string): Filter;
 	endsWith(value: string): Filter;
 	contains(value: string): Filter;
@@ -220,8 +219,8 @@ interface StringColumnType {
 interface NumericColumnType {
 	equal(value: number | null): Filter;
 	eq(value: number): Filter;
-	notEqual(value: number | null): Filter	
-	ne(value: number): Filter	
+	notEqual(value: number | null): Filter
+	ne(value: number): Filter
 	lessThan(value: number): Filter;
 	lt(value: number): Filter;
 	lessThanOrEqual(value: number): Filter;
@@ -235,20 +234,20 @@ interface NumericColumnType {
 }
 
 interface JSONColumnType {
-	equal(value: object | null): Filter;
-	eq(value: object): Filter;
-	notEqual(value: object | null): Filter	
-	ne(value: object): Filter	
-	lessThan(value: object): Filter;
-	lt(value: object): Filter;
-	lessThanOrEqual(value: object): Filter;
-	le(value: object): Filter;
-	greaterThan(value: object): Filter;
-	gt(value: object): Filter;
-	greaterThanOrEqual(value: object): Filter;
-	ge(value: object): Filter;
-	between(from: object, to: object): Filter;
-	in(values: Array<object | null>): Filter;
+	equal(value: JsonType | null): Filter;
+	eq(value: JsonType): Filter;
+	notEqual(value: JsonType | null): Filter
+	ne(value: JsonType): Filter
+	lessThan(value: JsonType): Filter;
+	lt(value: JsonType): Filter;
+	lessThanOrEqual(value: JsonType): Filter;
+	le(value: JsonType): Filter;
+	greaterThan(value: JsonType): Filter;
+	gt(value: JsonType): Filter;
+	greaterThanOrEqual(value: JsonType): Filter;
+	ge(value: JsonType): Filter;
+	between(from: JsonType, to: JsonType): Filter;
+	in(values: Array<JsonType | null>): Filter;
 }
 
 interface ColumnType {
@@ -269,114 +268,6 @@ interface RawFilter {
 interface Filter extends RawFilter {
 	and<T extends RawFilter>(otherFilter: T): Filter;
 }
-
-
-type FetchingStrategy<T> = {
-	[K in keyof T & keyof RemoveNever<AllowedColumnsAndTables<T>>]?: boolean | FetchingStrategy<T[K]>
-} & {
-	orderBy?: Array<OrderBy<Extract<keyof AllowedColumns<T>, string>>>;	
-	limit?: number;
-	offset?: number;
-};
-
-
- type OrderBy<T extends string> = `${T} ${'asc' | 'desc'}` | T;
-
-type RelatedTable = {};
-
-type ReferenceMapper<TFrom, TTo> = {
-	by(foreignKey: keyof TFrom): MappedTable<any, TTo> & RelatedTable;
-};
-
-type ColumnMapper<T> = {
-	column: (columnName: string) => ColumnType;
-	references: <TTo>(mappedTable: MappedTable<any, TTo>) => ReferenceMapper<T, TTo>;
-};
-
-
-type MappedTable<T, U> =  {
-	// map:  (<U extends AllowedColumnsAndTables<U>>(callback: (mapper: ColumnMapper<T>) => U) => MappedTable<T, U>) & MappedTable<T,T>;
-	getOne: <FS extends FetchingStrategy<U>>(filter: Filter, fetchingStrategy: FS) => StrategyToRow<FetchedProperties<Required<U>, Required<FS>>>;
-	map: <V extends AllowedColumnsAndTables<V>>(callback: (mapper: ColumnMapper<U>) => V) => MappedTable<T, U & V>;
-  } & U;
-  
-//   type Table<T> = (<U extends AllowedColumnsAndTables<U>>(callback: (mapper: ColumnMapper<T>) => U) => MappedTable<T, U>) & MappedTable<T,T> & {
-//   };
-
-
-  type Table<T> = {
-	map:  (<U extends AllowedColumnsAndTables<U>>(callback: (mapper: ColumnMapper<T>) => U) => MappedTable<T, U>) & MappedTable<T,T>;
-  };
-
-
-
-type ColumnTypes = StringColumnType | UuidColumnType | NumericColumnType | DateColumnType;
-type ColumnAndTableTypes = ColumnTypes | RelatedTable  ;
-
-
-type StrategyToRow<T> = {
-	[K in keyof T as T[K] extends never ? never : K]: T[K] extends StringColumnType
-	? string
-		:T[K] extends NumericColumnType
-		? number
-		:T[K] extends UuidColumnType
-		? string
-		:T[K] extends DateColumnType
-		? string
-	: StrategyToRow<T[K]>
-  };
-
-  type AllowedColumnsAndTables<T> = {
-  [P in keyof T]: T[P] extends ColumnAndTableTypes
-  	? T[P] 
-	:  never;
-};
-
-  type AllowedColumns<T> = RemoveNever<{
-  [P in keyof T]: T[P] extends ColumnTypes
-  	? T[P] 
-	:  never;
-}>;
-
-type AtLeastOneTrue<T> = {
-	[K in keyof T]: T[K] extends true ? true : never;
-}[keyof T] extends never ? false : true;
-
-type ExtractColumns<T, TStrategy> = {
-	[K in keyof TStrategy]: K extends keyof T
-	? T[K] extends StringColumnType | UuidColumnType | NumericColumnType | DateColumnType ? TStrategy[K] : never
-	: never
-}
-	type FetchedProperties<T, TStrategy> = AtLeastOneTrue<RemoveNever<ExtractColumns<T, TStrategy>>> extends true
-	? {
-		[K in keyof T]: K extends keyof TStrategy
-		? TStrategy[K] extends true 
-			? T[K] extends StringColumnType | UuidColumnType | NumericColumnType | DateColumnType			
-				? T[K]
-				: FetchedProperties<Required<T[K]>, {}>		
-			: TStrategy[K] extends false
-				? never
-				: FetchedProperties<Required<T[K]>, Required<TStrategy[K]>>			
-		: never
-	}
-	: {
-		[K in keyof T]: K extends keyof TStrategy
-		? TStrategy[K] extends true 
-			? T[K] extends StringColumnType | UuidColumnType | NumericColumnType | DateColumnType			
-				? T[K]
-				: FetchedProperties<Required<T[K]>, {}>		
-			: TStrategy[K] extends false
-				? never
-				: FetchedProperties<Required<T[K]>, Required<TStrategy[K]>>			
-		: NegotiateDefaultStrategy<T[K]>
-	};
-
-
-type NegotiateDefaultStrategy<T> = T extends StringColumnType | UuidColumnType | NumericColumnType | DateColumnType ? T : never
-
-type RemoveNever<T> = {
-	[K in keyof T as T[K] extends never ? never : K]: T[K] extends object ? RemoveNever<T[K]> : T[K]
-};
 
 declare const orm: ORM.ORM;
 export default orm;
