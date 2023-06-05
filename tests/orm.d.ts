@@ -57,13 +57,21 @@ type FinalTable<T> = {
 					T[K] extends ColumnTypeOf<JSONColumnType> ? JSONColumnType:
 					T[K] extends ColumnTypeOf<BinaryColumnType> ? BinaryColumnType:
 					T[K];
-  } & {
-	getOne: <FS extends FetchingStrategy<T>>(
-	  filter: Filter,
-	  fetchingStrategy: FS
-	) => StrategyToRow<FetchedProperties<Required<T>, Required<FS>>>;
-  };
+  } & Tablemethods<T>
+//   & {
+// 	getOne: <FS extends FetchingStrategy<T>>(
+// 	  filter: Filter,
+// 	  fetchingStrategy: FS
+// 	) => StrategyToRow<FetchedProperties<Required<T>, Required<FS>>>;
+//   };
+
+interface Tablemethods<T> {
+	getOne<FS extends FetchingStrategy<T>>(
+		filter: Filter,
+		fetchingStrategy: FS
+	  ) : StrategyToRow<FetchedProperties<Required<T>, Required<FS>>>;
   
+}
 
 type ColumnTypes = StringColumnType | UuidColumnType | NumericColumnType | DateColumnType | BinaryColumnType | BooleanColumnType | JSONColumnType;
 type ColumnAndTableTypes = ColumnTypes | RelatedTable;
@@ -323,7 +331,11 @@ interface NotNull {
 
 interface ColumnTypeOf<T> {
 	_type: T;
-	notNull: () => ColumnTypeOf<T> & NotNull;
+	notNull: () => NotNullOf<T>;
+}
+
+interface NotNullOf<T>  extends NotNull {
+	_type: T;
 }
 
 interface ColumnType {
