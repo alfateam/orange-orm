@@ -4,16 +4,16 @@ import orm from './orm';
 const party = orm.table('party').map(mapper => {
   return {
     partyId: mapper.column('foo').string(),
-    location: mapper.column('bar').numeric(),
+    location: mapper.column('bar').string()
   }
 });
 
-party.
+
 const customerMapped = orm.table('customer').map(mapper => {
   return {
     id: mapper.column('id').string(),
     name: mapper.column('name').string(),
-    partyId: mapper.column('partyId').string(),
+    partyId: mapper.column('partyId').string()
   };
 }).map(mapper => {
   return {
@@ -40,7 +40,6 @@ const orderMapped = orm.table('order').map(mapper => {
 
 
 const filter = orderMapped.customer.name.equal('lars');
-
 const row = await orderMapped.getOne(filter, {
   orderBy: ['balance'], customer: {
     orderBy: ['partyId asc'],
@@ -50,6 +49,7 @@ const row = await orderMapped.getOne(filter, {
 
   }
 });
+row.id = null;
 // row.picture = [{bar: 'es'}];
 
 
@@ -75,5 +75,3 @@ interface Order {
     };
   };
 }
-
-
