@@ -49,7 +49,7 @@ const row = await orderMapped.getOne(filter, {
 
   }
 });
-row.id = null;
+
 // row.picture = [{bar: 'es'}];
 
 

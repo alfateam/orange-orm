@@ -59,7 +59,7 @@ type ColumnAndTableTypes = ColumnTypes | RelatedTable;
 
 
 type StrategyToRow<T> = {
-    [K in keyof T as T[K] extends never ? never : K]: 
+    [K in keyof T as T[K] extends never ? never : K]?: 
     T[K] extends StringColumnType
     ? string | null
     : T[K] extends UuidColumnType
