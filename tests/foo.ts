@@ -4,10 +4,11 @@ import orm from './orm';
 const party = orm.table('party').map(mapper => {
   return {
     partyId: mapper.column('foo').string(),
-    location: mapper.column('bar').string(),
+    location: mapper.column('bar').numeric(),
   }
 });
 
+party.
 const customerMapped = orm.table('customer').map(mapper => {
   return {
     id: mapper.column('id').string(),
@@ -37,6 +38,7 @@ const orderMapped = orm.table('order').map(mapper => {
   }
 });
 
+
 const filter = orderMapped.customer.name.equal('lars');
 
 const row = await orderMapped.getOne(filter, {
@@ -45,9 +47,10 @@ const row = await orderMapped.getOne(filter, {
     party: { location: false },
 
 
+
   }
 });
-row.picture = [{bar: 'es'}];
+// row.picture = [{bar: 'es'}];
 
 
 

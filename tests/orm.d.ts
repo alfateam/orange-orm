@@ -30,36 +30,70 @@ type ColumnMapper<T> = {
 
 
 type MappedTable<T, U> = {
-	getOne: <FS extends FetchingStrategy<U>>(filter: Filter, fetchingStrategy: FS) => StrategyToRow<FetchedProperties<Required<U>, Required<FS>>>;
-	map: <V extends AllowedColumnsAndTables<V>>(callback: (mapper: ColumnMapper<U>) => V) => MappedTable<T, U & V>;
+	// getOne: <FS extends FetchingStrategy<U>>(filter: Filter, fetchingStrategy: FS) => StrategyToRow<FetchedProperties<Required<U>, Required<FS>>>;
+
+	// map: <V extends AllowedColumnsAndTables<V>>(callback: (mapper: ColumnMapper<U>) => V) => MappedTable<T, U & V>;
+	map: <V extends AllowedColumnsAndTables<V>>(callback: (mapper: ColumnMapper<U>) => V) => MappedTable<T, FinalTable<U & V>>;
 } & U;
 
 type Table<T> = {
-	map: (<U extends AllowedColumnsAndTables<U>>(callback: (mapper: ColumnMapper<T>) => U) => MappedTable<T, U>) & MappedTable<T, T>;
+	// map: (<U extends AllowedColumnsAndTables<U>>(callback: (mapper: ColumnMapper<T>) => U) => MappedTable<T, U>) 
+	map: (<U extends AllowedColumnsAndTables<U>>(callback: (mapper: ColumnMapper<T>) => U) => MappedTable<T, FinalTable<U>>) 
 };
 
-
+type FinalTable<T> = {
+	[K in keyof T]: T[K] extends ColumnTypeOf<StringColumnType> ? StringColumnType :
+					T[K] extends ColumnTypeOf<NumericColumnType>  ? NumericColumnType :
+					T[K] extends ColumnTypeOf<UuidColumnType> ? UuidColumnType :
+					T[K] extends ColumnTypeOf<BooleanColumnType> ? BooleanColumnType :
+					T[K] extends ColumnTypeOf<DateColumnType> ? DateColumnType :
+					T[K] extends ColumnTypeOf<JSONColumnType> ? JSONColumnType :
+					T[K] extends ColumnTypeOf<BinaryColumnType> ? BinaryColumnType :
+					T[K];
+  } & {
+	getOne: <FS extends FetchingStrategy<T>>(
+	  filter: Filter,
+	  fetchingStrategy: FS
+	) => StrategyToRow<FetchedProperties<Required<T>, Required<FS>>>;
+  };
+  
 
 type ColumnTypes = StringColumnType | UuidColumnType | NumericColumnType | DateColumnType | BinaryColumnType | BooleanColumnType | JSONColumnType;
 type ColumnAndTableTypes = ColumnTypes | RelatedTable;
 
 
 type StrategyToRow<T> = {
-	[K in keyof T as T[K] extends never ? never : K]: T[K] extends StringColumnType
-	? string
-	: T[K] extends UuidColumnType
-	? string
-	: T[K] extends NumericColumnType
-	? number
-	: T[K] extends DateColumnType
-	? string
-	: T[K] extends BinaryColumnType
-	? string
-	: T[K] extends BooleanColumnType
-	? boolean
-	: T[K] extends JSONColumnType
-	? JsonType
-	: StrategyToRow<T[K]>
+    [K in keyof T as T[K] extends never ? never : K]: T[K] extends NotNullColumnType<any>
+    ? T[K] extends StringColumnType
+    ? string
+    : T[K] extends UuidColumnType
+    ? string
+    : T[K] extends NumericColumnType
+    ? number
+    : T[K] extends DateColumnType
+    ? string
+    : T[K] extends BinaryColumnType
+    ? string
+    : T[K] extends BooleanColumnType
+    ? boolean
+    : T[K] extends JSONColumnType
+    ? JsonType
+    : StrategyToRow<T[K]>
+    : T[K] extends StringColumnType
+    ? string | null
+    : T[K] extends UuidColumnType
+    ? string | null
+    : T[K] extends NumericColumnType
+    ? number | null
+    : T[K] extends DateColumnType
+    ? string | null
+    : T[K] extends BinaryColumnType
+    ? string | null
+    : T[K] extends BooleanColumnType
+    ? boolean | null
+    : T[K] extends JSONColumnType
+    ? JsonType | null
+    : StrategyToRow<T[K]> | null;
 };
 
 type JsonValue = null | boolean | number | string | JsonArray | JsonObject;
@@ -88,7 +122,7 @@ type AtLeastOneTrue<T> = {
 
 type ExtractColumns<T, TStrategy> = {
 	[K in keyof TStrategy]: K extends keyof T
-	? T[K] extends StringColumnType | UuidColumnType | NumericColumnType | DateColumnType | | BinaryColumnType | BooleanColumnType | JSONColumnType? TStrategy[K] : never
+	? T[K] extends StringColumnType | UuidColumnType | NumericColumnType | DateColumnType | BinaryColumnType | BooleanColumnType | JSONColumnType? TStrategy[K] : never
 	: never
 }
 type FetchedProperties<T, TStrategy> = AtLeastOneTrue<RemoveNever<ExtractColumns<T, TStrategy>>> extends true
@@ -190,6 +224,34 @@ interface DateColumnType {
 	in(values: Array<string | Date | null>): Filter;
 }
 
+type StringColumnTypeDef = {
+	notNull(): StringColumnTypeDef;
+} & ColumnTypeOf<StringColumnType>
+
+type NumericColumnTypeDef = {
+	notNull(): NumericColumnTypeDef;
+} & ColumnTypeOf<NumericColumnType>;
+
+type UuidColumnTypeDef = {
+	notNull(): UuidColumnTypeDef;
+} & ColumnTypeOf<UuidColumnType>;
+
+type JSONColumnTypeDef = {
+	notNull(): JSONColumnType;
+} & ColumnTypeOf<JSONColumnType>;
+
+type BinaryColumnTypeDef = {
+	notNull(): BinaryColumnTypeDef;
+} & ColumnTypeOf<BinaryColumnType>;
+
+type BooleanColumnTypeDef = {
+	notNull(): BooleanColumnTypeDef;
+} & ColumnTypeOf<BooleanColumnType>;
+
+type DateColumnTypeDef = {
+	notNull(): DateColumnTypeDef;
+} & ColumnTypeOf<DateColumnType>;
+
 interface StringColumnType {
 	equal(value: string | null): Filter;
 	eq(value: string): Filter;
@@ -250,14 +312,30 @@ interface JSONColumnType {
 	in(values: Array<JsonType | null>): Filter;
 }
 
+// interface ColumnType {
+// 	string: () => StringColumnType;
+// 	uuid: () => UuidColumnType;
+// 	numeric: () => NumericColumnType;
+// 	date: () => DateColumnType;
+// 	binary(): BinaryColumnType;
+// 	boolean(): BooleanColumnType;
+// 	json(): JSONColumnType;
+// }
+
+type NotNullColumnType<T> = T & {};
+
+interface ColumnTypeOf<T> {
+	kind: T;
+}
+
 interface ColumnType {
-	string: () => StringColumnType;
-	uuid: () => UuidColumnType;
-	numeric: () => NumericColumnType;
-	date: () => DateColumnType;
-	binary(): BinaryColumnType;
-	boolean(): BooleanColumnType;
-	json(): JSONColumnType;
+    string: () => StringColumnTypeDef;
+    uuid: () => UuidColumnTypeDef;
+    numeric: () => NumericColumnTypeDef;
+    date: () => DateColumnTypeDef;
+    binary: () => BinaryColumnTypeDef;
+    boolean: () => BooleanColumnTypeDef;
+    json: () => JSONColumnTypeDef;
 }
 
 interface RawFilter {
