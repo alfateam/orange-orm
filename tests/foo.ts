@@ -47,9 +47,10 @@ const row = await orderMapped.getOne(filter, {
 
 
 
-  }
+  },
+  balance: false
 });
-
+row.balance = 2;
 // row.picture = [{bar: 'es'}];
 
 

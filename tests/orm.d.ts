@@ -47,10 +47,10 @@ type FinalTable<T> = {
 					T[K] extends ColumnTypeOf<BinaryColumnType> ? BinaryColumnType :
 					T[K];
   } & {
-	getOne: <FS extends FetchingStrategy<T>>(
+	getOne<FS extends FetchingStrategy<T>>(
 	  filter: Filter,
 	  fetchingStrategy: FS
-	) => StrategyToRow<FetchedProperties<Required<T>, Required<FS>>>;
+	) : StrategyToRow<FetchedProperties<Required<T>, Required<FS>>>;
   };
   
 
