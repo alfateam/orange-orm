@@ -205,25 +205,35 @@ interface DateColumnType {
 	in(values: Array<string | Date | null>): Filter;
 }
 
+type NotNull = {
+	_notNull: boolean;
+}
 type StringColumnTypeDef = {
+	notNull() : StringColumnTypeDef & NotNull;
 } & ColumnTypeOf<StringColumnType>
 
 type NumericColumnTypeDef = {
+	notNull() : StringColumnTypeDef  & NotNull;
 } & ColumnTypeOf<NumericColumnType>;
 
 type UuidColumnTypeDef = {
+	notNull() : StringColumnTypeDef  & NotNull;
 } & ColumnTypeOf<UuidColumnType>;
 
 type JSONColumnTypeDef = {
+	notNull() : StringColumnTypeDef  & NotNull;
 } & ColumnTypeOf<JSONColumnType>;
 
 type BinaryColumnTypeDef = {
+	notNull() : StringColumnTypeDef  & NotNull;
 } & ColumnTypeOf<BinaryColumnType>;
 
 type BooleanColumnTypeDef = {
+	notNull() : StringColumnTypeDef  & NotNull;
 } & ColumnTypeOf<BooleanColumnType>;
 
 type DateColumnTypeDef = {
+	notNull() : StringColumnTypeDef  & NotNull;
 } & ColumnTypeOf<DateColumnType>;
 
 interface StringColumnType {
