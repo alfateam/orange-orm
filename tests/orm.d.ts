@@ -30,11 +30,11 @@ type ColumnMapper<T> = {
 
 
 type MappedTable<T, U> = {
-	map: <V extends AllowedColumnsAndTables<V>>(callback: (mapper: ColumnMapper<U>) => V) => MappedTable<T, FinalTable<U & V>>;
+	map<V extends AllowedColumnsAndTables<V>>(callback: (mapper: ColumnMapper<U>) => V) : MappedTable<T, FinalTable<U & V>>;
 } & U;
 
 type Table<T> = {
-	map: (<U extends AllowedColumnsAndTables<U>>(callback: (mapper: ColumnMapper<T>) => U) => MappedTable<T, FinalTable<U>>) 
+	map<U extends AllowedColumnsAndTables<U>>(callback: (mapper: ColumnMapper<T>) => U) : MappedTable<T, FinalTable<U>>
 };
 
 type FinalTable<T> = {
@@ -50,7 +50,7 @@ type FinalTable<T> = {
 	getOne<FS extends FetchingStrategy<T>>(
 	  filter: Filter,
 	  fetchingStrategy: FS
-	) : StrategyToRow<FetchedProperties<Required<T>, Required<FS>>>;
+	) : StrategyToRow<FetchedProperties<T, FS>>;
   };
   
 
@@ -112,10 +112,10 @@ type FetchedProperties<T, TStrategy> = AtLeastOneTrue<RemoveNever<ExtractColumns
 		? TStrategy[K] extends true
 		? T[K] extends StringColumnType | UuidColumnType | NumericColumnType | DateColumnType | BinaryColumnType | BooleanColumnType | JSONColumnType
 		? T[K]
-		: FetchedProperties<Required<T[K]>, {}>
+		: FetchedProperties<T[K], {}>
 		: TStrategy[K] extends false
 		? never
-		: FetchedProperties<Required<T[K]>, Required<TStrategy[K]>>
+		: FetchedProperties<T[K], TStrategy[K]>
 		: never
 	}
 	: {
@@ -123,10 +123,10 @@ type FetchedProperties<T, TStrategy> = AtLeastOneTrue<RemoveNever<ExtractColumns
 		? TStrategy[K] extends true
 		? T[K] extends StringColumnType | UuidColumnType | NumericColumnType | DateColumnType | BinaryColumnType | BooleanColumnType | JSONColumnType
 		? T[K]
-		: FetchedProperties<Required<T[K]>, {}>
+		: FetchedProperties<T[K], {}>
 		: TStrategy[K] extends false
 		? never
-		: FetchedProperties<Required<T[K]>, Required<TStrategy[K]>>
+		: FetchedProperties<T[K], TStrategy[K]>
 		: NegotiateDefaultStrategy<T[K]>
 	};
 
