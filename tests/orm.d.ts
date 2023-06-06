@@ -38,12 +38,21 @@ type Table<T> = {
 };
 
 type FinalTable<T> = {
-	[K in keyof T]: T[K] extends ColumnTypeOf<StringColumnType> ? StringColumnType :
+	[K in keyof T]: 
+					T[K] extends ColumnTypeOf<StringColumnType> & NotNull ? StringColumnType & NotNull:
+					T[K] extends ColumnTypeOf<StringColumnType>? StringColumnType:
+					T[K] extends ColumnTypeOf<NumericColumnType> & NotNull  ? NumericColumnType & NotNull:
+					T[K] extends ColumnTypeOf<NumericColumnType> & NotNull ? NumericColumnType & NotNull:
 					T[K] extends ColumnTypeOf<NumericColumnType>  ? NumericColumnType :
+					T[K] extends ColumnTypeOf<UuidColumnType> & NotNull ? UuidColumnType & NotNull:
 					T[K] extends ColumnTypeOf<UuidColumnType> ? UuidColumnType :
+					T[K] extends ColumnTypeOf<BooleanColumnType> & NotNull ? BooleanColumnType & NotNull:
 					T[K] extends ColumnTypeOf<BooleanColumnType> ? BooleanColumnType :
+					T[K] extends ColumnTypeOf<DateColumnType> & NotNull ? DateColumnType & NotNull:
 					T[K] extends ColumnTypeOf<DateColumnType> ? DateColumnType :
+					T[K] extends ColumnTypeOf<JSONColumnType> & NotNull? JSONColumnType & NotNull:
 					T[K] extends ColumnTypeOf<JSONColumnType> ? JSONColumnType :
+					T[K] extends ColumnTypeOf<BinaryColumnType> & NotNull? BinaryColumnType & NotNull:
 					T[K] extends ColumnTypeOf<BinaryColumnType> ? BinaryColumnType :
 					T[K];
   } & {
@@ -58,8 +67,28 @@ type ColumnTypes = StringColumnType | UuidColumnType | NumericColumnType | DateC
 type ColumnAndTableTypes = ColumnTypes | RelatedTable;
 
 
-type StrategyToRow<T> = {
-    [K in keyof T as T[K] extends never ? never : K]?: 
+type NotNullProperties<T> = Pick<T, { [K in keyof T]: T[K] extends NotNull ? K : never }[keyof T]>;
+type NullProperties<T> = Pick<T, { [K in keyof T]: T[K] extends NotNull ? never : K }[keyof T]>;
+
+type StrategyToRow<T> = {	
+    [K in keyof RemoveNever<NotNullProperties<T>> ]: 
+    T[K] extends StringColumnType
+    ? string
+    : T[K] extends UuidColumnType
+    ? string
+    : T[K] extends NumericColumnType
+    ? number
+    : T[K] extends DateColumnType
+    ? string
+    : T[K] extends BinaryColumnType
+    ? string
+    : T[K] extends BooleanColumnType
+    ? boolean
+    : T[K] extends JSONColumnType
+    ? JsonType
+    : StrategyToRow<T[K]>;
+} & {
+    [K in keyof RemoveNever<NullProperties<T>>]?: 
     T[K] extends StringColumnType
     ? string | null
     : T[K] extends UuidColumnType
@@ -76,6 +105,26 @@ type StrategyToRow<T> = {
     ? JsonType | null
     : StrategyToRow<T[K]> | null;
 };
+
+
+// type StrategyToRow<T> = {
+//     [K in keyof T as T[K] extends never ? never : K]?: 
+//     T[K] extends StringColumnType
+//     ? string | null
+//     : T[K] extends UuidColumnType
+//     ? string | null
+//     : T[K] extends NumericColumnType
+//     ? number | null
+//     : T[K] extends DateColumnType
+//     ? string | null
+//     : T[K] extends BinaryColumnType
+//     ? string | null
+//     : T[K] extends BooleanColumnType
+//     ? boolean | null
+//     : T[K] extends JSONColumnType
+//     ? JsonType | null
+//     : StrategyToRow<T[K]> | null;
+// };
 
 type JsonValue = null | boolean | number | string | JsonArray | JsonObject;
 

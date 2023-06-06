@@ -21,7 +21,6 @@ const customerMapped = orm.table('customer').map(mapper => {
   }
 });
 
-
 const orderMapped = orm.table('order').map(mapper => {
   return {
     id: mapper.column('id').uuid(),
@@ -38,8 +37,6 @@ const orderMapped = orm.table('order').map(mapper => {
   }
 });
 
-
-orderMapped.
 const filter = orderMapped.customer.name.equal('lars');
 const row = await orderMapped.getOne(filter, {
   orderBy: ['balance'], customer: {
@@ -51,7 +48,6 @@ const row = await orderMapped.getOne(filter, {
   },
   balance: false
 });
-row.customer.
 // row.picture = [{bar: 'es'}];
 
 
