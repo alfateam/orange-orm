@@ -206,7 +206,7 @@ interface DateColumnType {
 }
 
 type NotNull = {
-	_notNull: boolean;
+	[' notNull']: boolean;
 }
 type StringColumnTypeDef = {
 	notNull() : StringColumnTypeDef & NotNull;
@@ -298,7 +298,7 @@ interface JSONColumnType {
 
 
 interface ColumnTypeOf<T> {
-	_type: T;
+	[' type']: T;
 }
 
 interface ColumnType {
