@@ -30,7 +30,7 @@ type ColumnMapper<T> = {
 
 
 type MappedTable<T, U> = {
-	getOne: <FS extends FetchingStrategy<U>>(filter: Filter, fetchingStrategy: FS) => StrategyToRow<FetchedProperties<Required<U>, Required<FS>>>;
+	getOne<FS extends FetchingStrategy<U>>(filter: Filter, fetchingStrategy: FS) : StrategyToRow<FetchedProperties<Required<U>, Required<FS>>>;
 	map: <V extends AllowedColumnsAndTables<V>>(callback: (mapper: ColumnMapper<U>) => V) => MappedTable<T, U & V>;
 } & U;
 
@@ -87,39 +87,53 @@ type AtLeastOneTrue<T> = {
 }[keyof T] extends never ? false : true;
 
 type ExtractColumns<T, TStrategy> = {
-	[K in keyof TStrategy]: K extends keyof T
-	? T[K] extends StringColumnType | UuidColumnType | NumericColumnType | DateColumnType | | BinaryColumnType | BooleanColumnType | JSONColumnType? TStrategy[K] : never
+	[K in keyof TStrategy]: K extends keyof T ? 
+	T[K] extends ColumnTypes ? TStrategy[K] : never
 	: never
 }
-type FetchedProperties<T, TStrategy> = AtLeastOneTrue<RemoveNever<ExtractColumns<T, TStrategy>>> extends true
-	? {
-		[K in keyof T]: K extends keyof TStrategy
-		? TStrategy[K] extends true
-		? T[K] extends StringColumnType | UuidColumnType | NumericColumnType | DateColumnType | BinaryColumnType | BooleanColumnType | JSONColumnType
-		? T[K]
-		: FetchedProperties<Required<T[K]>, {}>
-		: TStrategy[K] extends false
-		? never
-		: FetchedProperties<Required<T[K]>, Required<TStrategy[K]>>
+
+type FetchedProperties<T, TStrategy> = FetchedColumnProperties<T, TStrategy> & FetchedRelationProperties<T, TStrategy>;
+
+type FetchedRelationProperties<T, TStrategy> = RemoveNeverFlat<{
+	[K in keyof T]: K extends keyof TStrategy ? TStrategy[K] extends true ? 
+		T[K] extends ColumnTypes ?
+			never
+			: FetchedProperties<Required<T[K]>, {}>
+		: TStrategy[K] extends false ?
+			never
+			: FetchedProperties<Required<T[K]>, Required<TStrategy[K]>>
+		: never
+}>;
+
+type FetchedColumnProperties<T, TStrategy> = RemoveNeverFlat<AtLeastOneTrue<RemoveNever<ExtractColumns<T, TStrategy>>> extends true ? 	
+	{
+		[K in keyof T]: K extends keyof TStrategy ? 
+			TStrategy[K] extends true ? 
+				T[K] extends ColumnTypes ? 
+					T[K]
+					: never
+				: never
 		: never
 	}
 	: {
-		[K in keyof T]: K extends keyof TStrategy
-		? TStrategy[K] extends true
-		? T[K] extends StringColumnType | UuidColumnType | NumericColumnType | DateColumnType | BinaryColumnType | BooleanColumnType | JSONColumnType
-		? T[K]
-		: FetchedProperties<Required<T[K]>, {}>
-		: TStrategy[K] extends false
-		? never
-		: FetchedProperties<Required<T[K]>, Required<TStrategy[K]>>
+		[K in keyof T]: K extends keyof TStrategy ? 
+			TStrategy[K] extends true ? 
+				T[K] extends ColumnTypes ? 
+					T[K]
+					: never
+				: never
 		: NegotiateDefaultStrategy<T[K]>
-	};
+	}>;
 
 
-type NegotiateDefaultStrategy<T> = T extends StringColumnType | UuidColumnType | NumericColumnType | DateColumnType | BinaryColumnType | BooleanColumnType | JSONColumnType ? T : never
+type NegotiateDefaultStrategy<T> = T extends ColumnTypes ? T : never
 
 type RemoveNever<T> = {
 	[K in keyof T as T[K] extends never ? never : K]: T[K] extends object ? RemoveNever<T[K]> : T[K]
+};
+
+type RemoveNeverFlat<T> = {
+	[K in keyof T as T[K] extends never ? never : K]: T[K]
 };
 
 interface UuidColumnType {
