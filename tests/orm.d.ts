@@ -8,7 +8,7 @@ declare namespace ORM {
 
 
 type FetchingStrategy<T> = Omit<{
-	[K in keyof T & keyof RemoveNever<AllowedColumnsAndTables<T>>]?: boolean | FetchingStrategy<T[K]>
+	[K in keyof T & keyof RemoveNever<AllowedColumnsAndTablesStrategy<T>>]?: boolean | FetchingStrategy<T[K]>
 }, 'getOne' | 'getMany'> & {
 	orderBy?: Array<OrderBy<Extract<keyof AllowedColumns<T>, string>>>;
 	limit?: number;
@@ -139,7 +139,7 @@ type AllowedColumnsAndTablesMap<T> = {
 
 
 
-type AllowedColumnsAndTables<T> = {
+type AllowedColumnsAndTablesStrategy<T> = {
 	[P in keyof T]: T[P] extends ColumnAndTableTypes
 	? T[P]
 	: never;
