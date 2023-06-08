@@ -18,7 +18,7 @@ type FetchingStrategy<T> = Omit<{
 type OrderBy<T extends string> = `${T} ${'asc' | 'desc'}` | T;
 
 type RelatedTable = {
-	// [' relatedTable']: boolean;
+	[' relatedTable']: boolean;
 };
 
 type ReferenceMapper<TFrom, TTo> = {
@@ -32,11 +32,11 @@ type ColumnMapper<T> = {
 
 type MappedTable<T> = {
 	getOne<FS extends FetchingStrategy<T>>(filter?: Filter | null, fetchingStrategy?: FS | null) : StrategyToRow<FetchedProperties<T, FS>>;
-	map<V extends AllowedColumnsAndTables<V>>(callback: (mapper: ColumnMapper<T>) => V) : MappedTable<T & MapColumnDefs<V>>;
+	map<V extends AllowedColumnsAndTablesMap<V>>(callback: (mapper: ColumnMapper<T>) => V) : MappedTable<T & MapColumnDefs<V>>;
 } & T;
 
 type Table<T> = {
-	map<U extends AllowedColumnsAndTables<U>>(callback: (mapper: ColumnMapper<T>) => U) : MappedTable<T & MapColumnDefs<U>>;
+	map<U extends AllowedColumnsAndTablesMap<U>>(callback: (mapper: ColumnMapper<T>) => U) : MappedTable<T & MapColumnDefs<U>>;
 };
 
 
@@ -131,8 +131,16 @@ interface JsonObject { [key: string]: JsonValue; }
 
 type JsonType = JsonArray | JsonObject;
 
+type AllowedColumnsAndTablesMap<T> = {
+	[P in keyof T]: T[P] extends ColumnTypeOf<infer U> | RelatedTable
+	? T[P]
+	: never;
+};
+
+
+
 type AllowedColumnsAndTables<T> = {
-	[P in keyof T]: T[P] extends ColumnTypeOf<infer V> | RelatedTable
+	[P in keyof T]: T[P] extends ColumnAndTableTypes
 	? T[P]
 	: never;
 };
