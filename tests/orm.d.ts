@@ -20,25 +20,40 @@ type OrderBy<T extends string> = `${T} ${'asc' | 'desc'}` | T;
 type RelatedTable = {};
 
 type ReferenceMapper<TFrom, TTo> = {
-	by(foreignKey: keyof TFrom): MappedTable<any, TTo> & RelatedTable;
+	by(foreignKey: keyof TFrom): MappedTable<TTo> & RelatedTable;
 };
 
 type ColumnMapper<T> = {
 	column: (columnName: string) => ColumnType;
-	references: <TTo>(mappedTable: MappedTable<any, TTo>) => ReferenceMapper<T, TTo>;
+	references: <TTo>(mappedTable: MappedTable<TTo>) => ReferenceMapper<T, TTo>;
 };
 
-
-type MappedTable<T, U> = {
-	getOne<FS extends FetchingStrategy<U>>(filter: Filter, fetchingStrategy: FS) : StrategyToRow<FetchedProperties<Required<U>, Required<FS>>>;
-	map: <V extends AllowedColumnsAndTables<V>>(callback: (mapper: ColumnMapper<U>) => V) => MappedTable<T, U & V>;
-} & U;
+type MappedTable<T> = {
+	getOne<FS extends FetchingStrategy<T>>(filter: Filter, fetchingStrategy: FS) : StrategyToRow<FetchedProperties<Required<T>, Required<FS>>>;
+	map<V extends AllowedColumnsAndTables<V>>(callback: (mapper: ColumnMapper<T>) => V) : MappedTable<T & MapColumnDefs<V>>;
+} & T;
 
 type Table<T> = {
-	map: (<U extends AllowedColumnsAndTables<U>>(callback: (mapper: ColumnMapper<T>) => U) => MappedTable<T, U>) & MappedTable<T, T>;
+	map<U extends AllowedColumnsAndTables<U>>(callback: (mapper: ColumnMapper<T>) => U) : MappedTable<T & MapColumnDefs<U>>;
 };
 
-
+type MapColumnDefs<T> = {
+	[K in keyof T as T[K] extends never ? never : K]: T[K] extends StringColumnTypeDef
+	? StringColumnType
+	: T[K] extends UuidColumnTypeDef
+	? UuidColumnType
+	: T[K] extends NumericColumnTypeDef
+	? NumericColumnType
+	: T[K] extends DateColumnTypeDef
+	? DateColumnType
+	: T[K] extends BinaryColumnTypeDef
+	? BinaryColumnType
+	: T[K] extends BooleanColumnTypeDef
+	? BooleanColumnType
+	: T[K] extends JSONColumnTypeDef
+	? JSONColumnType
+	: T[K]
+}
 
 type ColumnTypes = StringColumnType | UuidColumnType | NumericColumnType | DateColumnType | BinaryColumnType | BooleanColumnType | JSONColumnType;
 type ColumnAndTableTypes = ColumnTypes | RelatedTable;
@@ -265,14 +280,40 @@ interface JSONColumnType {
 }
 
 interface ColumnType {
-	string: () => StringColumnType;
-	uuid: () => UuidColumnType;
-	numeric: () => NumericColumnType;
-	date: () => DateColumnType;
-	binary(): BinaryColumnType;
-	boolean(): BooleanColumnType;
-	json(): JSONColumnType;
+	string: () => StringColumnTypeDef;
+	uuid: () => UuidColumnTypeDef;
+	numeric: () => NumericColumnTypeDef;
+	date: () => DateColumnTypeDef;
+	binary(): BinaryColumnTypeDef;
+	boolean(): BooleanColumnTypeDef;
+	json(): JSONColumnTypeDef;
 }
+
+type StringColumnTypeDef = {
+} & ColumnTypeOf<StringColumnType>
+
+type NumericColumnTypeDef = {
+} & ColumnTypeOf<NumericColumnType>;
+
+type UuidColumnTypeDef = {
+} & ColumnTypeOf<UuidColumnType>;
+
+type JSONColumnTypeDef = {
+} & ColumnTypeOf<JSONColumnType>;
+
+type BinaryColumnTypeDef = {
+} & ColumnTypeOf<BinaryColumnType>;
+
+type BooleanColumnTypeDef = {
+} & ColumnTypeOf<BooleanColumnType>;
+
+type DateColumnTypeDef = {
+} & ColumnTypeOf<DateColumnType>;
+
+interface ColumnTypeOf<T> {
+	[' type']: T;
+}
+
 
 interface RawFilter {
 	sql: string | (() => string);
