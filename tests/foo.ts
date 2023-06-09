@@ -8,9 +8,10 @@ const party = orm.table('party').map(mapper => {
   }
 });
 
+
 const customerMapped = orm.table('customer').map(mapper => {
   return {
-    id: mapper.column('id').string(),
+    id: mapper.column('id').string().notNull(),
     name: mapper.column('name').string(),
     partyId: mapper.column('partyId').string(),
   };
@@ -21,15 +22,17 @@ const customerMapped = orm.table('customer').map(mapper => {
 });
 
 
+
+
 const orderMapped = orm.table('order').map(mapper => {
   return {
-    id: mapper.column('id').uuid(),
-    name: mapper.column('name').string(),
+    id: mapper.primaryColumn('id').uuid().notNull(),
+    name: mapper.column('name').string().notNull(),
     balance: mapper.column('balance').numeric(),
     createdAt: mapper.column('created_at').date(),
     updatedAt: mapper.column('updated_at').date(),
     customerId: mapper.column('customer_id').string(),
-    picture: mapper.column('picture').json()
+    picture: mapper.column('picture').json(),
   };
 }).map(mapper => {
   return {
@@ -39,38 +42,33 @@ const orderMapped = orm.table('order').map(mapper => {
 
 const filter = orderMapped.customer.name.equal('lars');
 
+
 const row = await orderMapped.getOne(filter, {
-  orderBy: ['balance'], customer: {
-    orderBy: ['partyId asc'],
-    party: { location: false },
+  orderBy: ['balance']
+  // createdAt: true
+  // balance: false,
+  , customer: { name: true }
+  // customer: {
 
 
-  }
+  // }
+  // customer: {
+  //   id: true
+  // }
+  // customer: {id: true}
+  // customer: {
+  // //   orderBy: ['partyId asc'],    
+  // //   orders: {
+
+  // //   }
+
+  // }
 });
-row.picture = [{bar: 'es'}];
+row.customer.
+// row.customer.
 
-
-
-function foo(orderRows: Order) {
-  throw new Error('Function not implemented.');
-}
-
-interface Order {
-  id: string;
-  name: string;
-  balance: number;
-  createdAt: string;
-  updatedAt: string;
-  customerId: string;
-
-  customer: {
-    id: string;
-    name: string;
-    partyId: string;
-    party: {
-      partyId: string;
-    };
-  };
-}
-
+// interface Order {
+//   id: string;
+//   balance?: number | null;
+// }
 
