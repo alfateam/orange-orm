@@ -111,25 +111,35 @@ interface JsonObject { [key: string]: JsonValue; }
 
 type JsonType = JsonArray | JsonObject;
 
-type AllowedColumnsAndTablesMap<T> = {
+
+type AllowedColumnsAndTablesMap<T> = HasPrimary<T> extends true ? 
+{	
 	[P in keyof T]: T[P] extends ColumnTypeOf<infer U> | RelatedTable
 	? T[P]
 	: never;
-};
-
-
+	}
+	: never
 
 type AllowedColumnsAndTablesStrategy<T> = {
 	[P in keyof T]: T[P] extends ColumnAndTableTypes<infer M>
 	? T[P]
 	: never;
-};
+}  ;
+
+
 
 type AllowedColumns<T> = RemoveNever<{
 	[P in keyof T]: T[P] extends ColumnTypes<infer M>
 	? T[P]
 	: never;
 }>;
+
+type HasPrimary<T> = AtLeastOneOf<T, IsPrimary>;
+
+type AtLeastOneOf<T,U> = {
+	[K in keyof T]: T[K] extends U ? true : never;
+}[keyof T] extends never ? false : true;
+
 
 type AtLeastOneTrue<T> = {
 	[K in keyof T]: T[K] extends true ? true : never;
