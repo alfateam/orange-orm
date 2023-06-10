@@ -33,8 +33,9 @@ type ColumnMapper<T> = {
 
 type MappedTable<T> = {
 	getOne<FS extends FetchingStrategy<T>>(filter?: Filter | null, fetchingStrategy?: FS | null) : StrategyToRow<FetchedProperties<T, FS>>;
-	map<V extends AllowedColumnsAndTablesMap<V>>(callback: (mapper: ColumnMapper<T>) => V) : MappedTable<T & MapColumnDefs<V>>;
+	map<V extends AllowedColumnsAndTablesMap2<V>>(callback: (mapper: ColumnMapper<T>) => V) : MappedTable<T & MapColumnDefs<V>>;
 } & T;
+
 
 type Table<T> = {
 	map<U extends AllowedColumnsAndTablesMap<U>>(callback: (mapper: ColumnMapper<T>) => U) : MappedTable<T & MapColumnDefs<U>>;
@@ -119,6 +120,11 @@ type AllowedColumnsAndTablesMap<T> = HasPrimary<T> extends true ?
 	: never;
 	}
 	: never
+type AllowedColumnsAndTablesMap2<T> = {	
+	[P in keyof T]: T[P] extends ColumnTypeOf<infer U> | RelatedTable
+	? T[P]
+	: never;
+	}
 
 type AllowedColumnsAndTablesStrategy<T> = {
 	[P in keyof T]: T[P] extends ColumnAndTableTypes<infer M>
