@@ -3,7 +3,7 @@ import orm from './orm';
 
 const party = orm.table('party').map(mapper => {
   return {
-    partyId: mapper.column('foo').string(),
+    partyId: mapper.primaryColumn('foo').string(),
     location: mapper.column('bar').string(),
   }
 });
@@ -11,17 +11,16 @@ const party = orm.table('party').map(mapper => {
 
 const customerMapped = orm.table('customer').map(mapper => {
   return {
-    id: mapper.column('id').string().notNull(),
+    id: mapper.primaryColumn('id').string().notNull(),
     name: mapper.column('name').string(),
     partyId: mapper.column('partyId').string(),
   };
-}).map(mapper => {
+})
+.map(mapper => {
   return {
     party: mapper.references(party).by('partyId')
   }
 });
-
-
 
 
 const orderMapped = orm.table('order').map(mapper => {
@@ -36,7 +35,7 @@ const orderMapped = orm.table('order').map(mapper => {
   };
 }).map(mapper => {
   return {
-    customer: mapper.references(customerMapped).by('customerId')
+    customer: mapper.references(customerMapped).by('createdAt')
   }
 });
 
@@ -47,7 +46,7 @@ const row = await orderMapped.getOne(filter, {
   orderBy: ['balance']
   // createdAt: true
   // balance: false,
-  , customer: { name: true }
+  // , customer: { name: true }
   // customer: {
 
 
@@ -64,7 +63,7 @@ const row = await orderMapped.getOne(filter, {
 
   // }
 });
-row.customer.
+row.
 // row.customer.
 
 // interface Order {

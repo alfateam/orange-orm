@@ -21,9 +21,35 @@ type RelatedTable = {
 	[' relatedTable']: boolean;
 };
 
-type ReferenceMapper<TFrom, TTo> = {
-	by(foreignKey: keyof TFrom): MappedTable<TTo> & RelatedTable;
-};
+
+type ReferenceMapper<TFrom, TTo> = ReferenceMapperHelper<TFrom, TTo, CountProperties<RemoveNever<ExtractPrimary<TTo>>>;
+
+type ReferenceMapperHelper<TFrom, TTo, TPrimaryCount> =	
+1 extends TPrimaryCount ?
+{
+	by(column: keyof TFrom): MappedTable<TTo> & RelatedTable;
+} : 
+2 extends TPrimaryCount ?
+{
+	by(column: keyof TFrom, column2: keyof TFrom): MappedTable<TTo> & RelatedTable;
+} : 
+3 extends TPrimaryCount ?
+{
+	by(column: keyof TFrom, column2: keyof TFrom, column3: keyof TFrom): MappedTable<TTo> & RelatedTable;
+} : 
+4 extends TPrimaryCount ?
+{
+	by(column: keyof TFrom, column2: keyof TFrom, column3: keyof TFrom, column4: keyof TFrom): MappedTable<TTo> & RelatedTable;
+} : 
+5 extends TPrimaryCount ?
+{
+	by(column: keyof TFrom, column2: keyof TFrom, column3: keyof TFrom, column4: keyof TFrom, column5: keyof TFrom): MappedTable<TTo> & RelatedTable;
+} : 
+6 extends TPrimaryCount ?
+{
+	by(column: keyof TFrom, column2: keyof TFrom, column3: keyof TFrom, column4: keyof TFrom, column5: keyof TFrom,column6: keyof TFrom): MappedTable<TTo> & RelatedTable;
+} : 
+{}
 
 type ColumnMapper<T> = {
 	column(columnName: string) : ColumnType<{}>;
@@ -40,8 +66,6 @@ type MappedTable<T> = {
 type Table<T> = {
 	map<U extends AllowedColumnsAndTablesMap<U>>(callback: (mapper: ColumnMapper<T>) => U) : MappedTable<T & MapColumnDefs<U>>;
 };
-
-
 
 type NotNullProperties<T> = Pick<T, { [K in keyof T]: T[K] extends NotNull ? K : never }[keyof T]>;
 type NullProperties<T> = Pick<T, { [K in keyof T]: T[K] extends NotNull ? never : K }[keyof T]>;
@@ -113,13 +137,8 @@ interface JsonObject { [key: string]: JsonValue; }
 type JsonType = JsonArray | JsonObject;
 
 
-type AllowedColumnsAndTablesMap<T> = HasPrimary<T> extends true ? 
-{	
-	[P in keyof T]: T[P] extends ColumnTypeOf<infer U> | RelatedTable
-	? T[P]
-	: never;
-	}
-	: never
+type AllowedColumnsAndTablesMap<T> = HasPrimary<T> extends true ? AllowedColumnsAndTablesMap2<T> : never;
+
 type AllowedColumnsAndTablesMap2<T> = {	
 	[P in keyof T]: T[P] extends ColumnTypeOf<infer U> | RelatedTable
 	? T[P]
@@ -156,6 +175,12 @@ type ExtractColumns<T, TStrategy> = {
 	T[K] extends ColumnTypes<infer M> ? TStrategy[K] : never
 	: never
 }
+
+type TypeMapper<T, U> = {
+	[K in keyof T as T[K] extends U ? K : never]: T[K];
+  };
+
+type ExtractPrimary<T> = TypeMapper<T, IsPrimary>;
 
 type FetchedProperties<T, TStrategy> = FetchedColumnProperties<T, TStrategy> & FetchedRelationProperties<T, TStrategy>;
 
@@ -380,6 +405,14 @@ interface ColumnTypeOf<T> {
 	[' type']: T;
 }
 
+type MapPropertiesTo1<T, V extends number = 1> = { [K in keyof T]: V }
+type MapPropertiesTo2<T,  V extends number = 2> = RemoveNever<{ [K in keyof T]: UnionOfTypes<MapPropertiesTo1<Omit<T, K>, V>> }>
+type MapPropertiesTo3<T,  V extends number = 3> = RemoveNever<{ [K in keyof T]: UnionOfTypes<MapPropertiesTo2<Omit<T, K>, V>> }>
+type MapPropertiesTo4<T,  V extends number = 4> = RemoveNever<{ [K in keyof T]: UnionOfTypes<MapPropertiesTo3<Omit<T, K>, V>> }>
+type MapPropertiesTo5<T,  V extends number = 5> = RemoveNever<{ [K in keyof T]: UnionOfTypes<MapPropertiesTo4<Omit<T, K>, V>> }>
+type MapPropertiesTo6<T,  V extends number = 6> = RemoveNever<{ [K in keyof T]: UnionOfTypes<MapPropertiesTo5<Omit<T, K>, V>> }>
+type UnionOfTypes<T> = T[keyof T];
+type CountProperties<T> = MapPropertiesTo6<T>;
 
 interface RawFilter {
 	sql: string | (() => string);
