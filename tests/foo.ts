@@ -18,6 +18,7 @@ const customerMapped = orm.table('customer').map(mapper => {
 })
 .map(mapper => {
   return {
+
     party: mapper.references(party).by('partyId')
   }
 });
@@ -35,7 +36,7 @@ const orderMapped = orm.table('order').map(mapper => {
   };
 }).map(mapper => {
   return {
-    customer: mapper.references(customerMapped).by('createdAt')
+    customer: mapper.references(customerMapped)
   }
 });
 
@@ -43,7 +44,7 @@ const filter = orderMapped.customer.name.equal('lars');
 
 
 const row = await orderMapped.getOne(filter, {
-  orderBy: ['balance']
+  orderBy: ['balance'],
   // createdAt: true
   // balance: false,
   // , customer: { name: true }

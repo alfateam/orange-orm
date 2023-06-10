@@ -22,32 +22,32 @@ type RelatedTable = {
 };
 
 
-type ReferenceMapper<TFrom, TTo> = ReferenceMapperHelper<TFrom, TTo, CountProperties<RemoveNever<ExtractPrimary<TTo>>>;
+type ReferenceMapper<TFrom, TTo> = ReferenceMapperHelper<TFrom, TTo, CountProperties<ExtractPrimary<TTo>>>;
 
 type ReferenceMapperHelper<TFrom, TTo, TPrimaryCount> =	
-1 extends TPrimaryCount ?
+6 extends TPrimaryCount ?
 {
-	by(column: keyof TFrom): MappedTable<TTo> & RelatedTable;
-} : 
-2 extends TPrimaryCount ?
-{
-	by(column: keyof TFrom, column2: keyof TFrom): MappedTable<TTo> & RelatedTable;
-} : 
-3 extends TPrimaryCount ?
-{
-	by(column: keyof TFrom, column2: keyof TFrom, column3: keyof TFrom): MappedTable<TTo> & RelatedTable;
-} : 
-4 extends TPrimaryCount ?
-{
-	by(column: keyof TFrom, column2: keyof TFrom, column3: keyof TFrom, column4: keyof TFrom): MappedTable<TTo> & RelatedTable;
+	by(column: keyof TFrom, column2: keyof TFrom, column3: keyof TFrom, column4: keyof TFrom, column5: keyof TFrom,column6: keyof TFrom): MappedTable<TTo> & RelatedTable;
 } : 
 5 extends TPrimaryCount ?
 {
 	by(column: keyof TFrom, column2: keyof TFrom, column3: keyof TFrom, column4: keyof TFrom, column5: keyof TFrom): MappedTable<TTo> & RelatedTable;
 } : 
-6 extends TPrimaryCount ?
+4 extends TPrimaryCount ?
 {
-	by(column: keyof TFrom, column2: keyof TFrom, column3: keyof TFrom, column4: keyof TFrom, column5: keyof TFrom,column6: keyof TFrom): MappedTable<TTo> & RelatedTable;
+	by(column: keyof TFrom, column2: keyof TFrom, column3: keyof TFrom, column4: keyof TFrom): MappedTable<TTo> & RelatedTable;
+} : 
+3 extends TPrimaryCount ?
+{
+	by(column: keyof TFrom, column2: keyof TFrom, column3: keyof TFrom): MappedTable<TTo> & RelatedTable;
+} : 
+2 extends TPrimaryCount ?
+{
+	by(column: keyof TFrom, column2: keyof TFrom): MappedTable<TTo> & RelatedTable;
+} : 
+1 extends TPrimaryCount ?
+{
+	by(column: keyof TFrom): MappedTable<TTo> & RelatedTable;
 } : 
 {}
 
@@ -356,7 +356,7 @@ type JSONColumnType<M> = {
 } & M
 
 interface IsPrimary {
-	[' isPrimary'] : true;
+	[' isPrimary'] : boolean;
 }
 
 type NotNull = {
@@ -406,13 +406,13 @@ interface ColumnTypeOf<T> {
 }
 
 type MapPropertiesTo1<T, V extends number = 1> = { [K in keyof T]: V }
-type MapPropertiesTo2<T,  V extends number = 2> = RemoveNever<{ [K in keyof T]: UnionOfTypes<MapPropertiesTo1<Omit<T, K>, V>> }>
-type MapPropertiesTo3<T,  V extends number = 3> = RemoveNever<{ [K in keyof T]: UnionOfTypes<MapPropertiesTo2<Omit<T, K>, V>> }>
-type MapPropertiesTo4<T,  V extends number = 4> = RemoveNever<{ [K in keyof T]: UnionOfTypes<MapPropertiesTo3<Omit<T, K>, V>> }>
-type MapPropertiesTo5<T,  V extends number = 5> = RemoveNever<{ [K in keyof T]: UnionOfTypes<MapPropertiesTo4<Omit<T, K>, V>> }>
-type MapPropertiesTo6<T,  V extends number = 6> = RemoveNever<{ [K in keyof T]: UnionOfTypes<MapPropertiesTo5<Omit<T, K>, V>> }>
+type MapPropertiesTo2<T,  V extends number = 2> = { [K in keyof T]: UnionOfTypes<MapPropertiesTo1<Omit<T, K>, V>> }
+type MapPropertiesTo3<T,  V extends number = 3> = { [K in keyof T]: UnionOfTypes<MapPropertiesTo2<Omit<T, K>, V>> }
+type MapPropertiesTo4<T,  V extends number = 4> = { [K in keyof T]: UnionOfTypes<MapPropertiesTo3<Omit<T, K>, V>> }
+type MapPropertiesTo5<T,  V extends number = 5> = { [K in keyof T]: UnionOfTypes<MapPropertiesTo4<Omit<T, K>, V>> }
+type MapPropertiesTo6<T,  V extends number = 6> = { [K in keyof T]: UnionOfTypes<MapPropertiesTo5<Omit<T, K>, V>> }
 type UnionOfTypes<T> = T[keyof T];
-type CountProperties<T> = MapPropertiesTo6<T>;
+type CountProperties<T> = UnionOfTypes<MapPropertiesTo6<T>> | UnionOfTypes<MapPropertiesTo5<T>> | UnionOfTypes<MapPropertiesTo4<T>> | UnionOfTypes<MapPropertiesTo3<T>> | UnionOfTypes<MapPropertiesTo2<T>> | UnionOfTypes<MapPropertiesTo1<T>>;
 
 interface RawFilter {
 	sql: string | (() => string);
