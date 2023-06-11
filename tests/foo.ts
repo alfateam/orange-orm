@@ -23,22 +23,27 @@ const customerMapped = orm.table('customer').map(mapper => {
   }
 });
 
-const orderMapped = orm.table('order').map(mapper => {
+const orderMapped = orm.table('order').map(({column, primaryColumn}) => {
   return {
-    id: mapper.primaryColumn('id').uuid().notNull(),
-    name: mapper.column('name').string().notNull(),
-    balance: mapper.column('balance').numeric(),
-    createdAt: mapper.column('created_at').date(),
-    updatedAt: mapper.column('updated_at').date(),
-    customerId: mapper.column('customer_id').uuid(),
-    picture: mapper.column('picture').json()
+    id: primaryColumn('id').uuid().notNull(),
+    name: column('name').string().notNull(),
+    balance: column('balance').numeric(),
+    createdAt: column('created_at').date(),
+    updatedAt: column('updated_at').date(),
+    customerId: column('customer_id').uuid(),
+    picture: column('picture').json()
   };
 }).map(mapper => {
   return {
     customer: mapper.references(customerMapped).by('customerId')
   }
 });
-
+const customer2 = customerMapped.map(x => {
+  return {
+    orders: x.hasOne(orderMapped).by('customerId')
+  }
+})
+customer2.
 const filter = orderMapped.customer.name.equal('lars');
 
 
