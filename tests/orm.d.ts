@@ -8,7 +8,10 @@ declare namespace ORM {
 
 
 type FetchingStrategy<T> = Omit<{
-	[K in keyof T & keyof RemoveNever<AllowedColumnsAndTablesStrategy<T>>]?: boolean | FetchingStrategy<T[K]>
+	[K in keyof T & keyof RemoveNever<AllowedColumnsAndTablesStrategy<T>>]?: 
+	T[K] extends ColumnTypes<infer M>
+		? boolean
+		: boolean | FetchingStrategy<T[K]>
 }, 'getOne' | 'getMany'> & {
 	orderBy?: Array<OrderBy<Extract<keyof AllowedColumns<T>, string>>>;
 	limit?: number;
@@ -30,10 +33,10 @@ type ExtractPrimary<T> = PickTypesOf<T, IsPrimary>;
 
 type ToColumnTypes<T> = {
 	[K in keyof T]:
-	 T[K] extends UuidColumnSymbol
+	T[K] extends UuidColumnSymbol
 	? UuidColumnSymbol
 	: T[K] extends StringColumnSymbol
-	? StringColumnSymbol	
+	? StringColumnSymbol
 	: T[K] extends NumericColumnSymbol
 	? NumericColumnSymbol
 	: T[K] extends DateColumnSymbol
@@ -48,32 +51,61 @@ type ToColumnTypes<T> = {
 }[keyof T];
 
 type KeyCandidates<TFrom, TTo> = PickTypesOf<TFrom, ToColumnTypes<ExtractPrimary<TTo>>>;
-type ReferenceMapper<TFrom, TTo, TExtra = {}> = ReferenceMapperHelper<TFrom, TTo, CountProperties<ExtractPrimary<TTo>>>;
+type ReferenceMapper<TFrom, TTo> = ReferenceMapperHelper<TFrom, TTo, CountProperties<ExtractPrimary<TTo>>>;
+type OneMapper<TFrom, TTo> = HasMapperHelper<TFrom, TTo, CountProperties<ExtractPrimary<TFrom>>>;
+type ManyMapper<TFrom, TTo> = HasMapperHelper<TFrom, TTo, CountProperties<ExtractPrimary<TFrom>>, ManyRelation>;
 
-type ReferenceMapperHelper<TFrom, TTo, TPrimaryCount, TExtra = {}> =
+type ReferenceMapperHelper<TFrom, TTo, TPrimaryCount> =
 	6 extends TPrimaryCount ?
 	{
 		by(column: keyof KeyCandidates<TFrom, TTo>, column2: KeyCandidates<TFrom, TTo>, column3: KeyCandidates<TFrom, TTo>, column4: KeyCandidates<TFrom, TTo>, column5: KeyCandidates<TFrom, TTo>, column6: KeyCandidates<TFrom, TTo>): MappedTable<TTo> & RelatedTable & TExtra;
 	} :
 	5 extends TPrimaryCount ?
 	{
-		by(column: KeyCandidates<TFrom, TTo>, column2: KeyCandidates<TFrom, TTo>, column3: KeyCandidates<TFrom, TTo>, column4: KeyCandidates<TFrom, TTo>, column5: KeyCandidates<TFrom, TTo>): MappedTable<TTo> & RelatedTable & TExtra;
+		by(column: KeyCandidates<TFrom, TTo>, column2: KeyCandidates<TFrom, TTo>, column3: KeyCandidates<TFrom, TTo>, column4: KeyCandidates<TFrom, TTo>, column5: KeyCandidates<TFrom, TTo>): MappedTable<TTo> & RelatedTable;
 	} :
 	4 extends TPrimaryCount ?
 	{
-		by(column: KeyCandidates<TFrom, TTo>, column2: KeyCandidates<TFrom, TTo>, column3: KeyCandidates<TFrom, TTo>, column4: KeyCandidates<TFrom, TTo>): MappedTable<TTo> & RelatedTable & TExtra;
+		by(column: KeyCandidates<TFrom, TTo>, column2: KeyCandidates<TFrom, TTo>, column3: KeyCandidates<TFrom, TTo>, column4: KeyCandidates<TFrom, TTo>): MappedTable<TTo> & RelatedTable;
 	} :
 	3 extends TPrimaryCount ?
 	{
-		by(column: keyof KeyCandidates<TFrom, TTo>, column2: keyof KeyCandidates<TFrom, TTo>, column3: keyof KeyCandidates<TFrom, TTo>): MappedTable<TTo> & RelatedTable & TExtra;
+		by(column: keyof KeyCandidates<TFrom, TTo>, column2: keyof KeyCandidates<TFrom, TTo>, column3: keyof KeyCandidates<TFrom, TTo>): MappedTable<TTo> & RelatedTable;
 	} :
 	2 extends TPrimaryCount ?
 	{
-		by(column: keyof KeyCandidates<TFrom, TTo>, column2: keyof KeyCandidates<TFrom, TTo>): MappedTable<TTo> & RelatedTable & TExtra;
+		by(column: keyof KeyCandidates<TFrom, TTo>, column2: keyof KeyCandidates<TFrom, TTo>): MappedTable<TTo> & RelatedTable;
 	} :
 	1 extends TPrimaryCount ?
 	{
-		by(column:  keyof KeyCandidates<TFrom, TTo>): MappedTable<TTo> & RelatedTable & TExtra;
+		by(column: keyof KeyCandidates<TFrom, TTo>): MappedTable<TTo> & RelatedTable;
+	} :
+	{}
+
+type HasMapperHelper<TFrom, TTo, TPrimaryCount, TExtra = {}> =
+	6 extends TPrimaryCount ?
+	{
+		by(column: keyof KeyCandidates<TTo, TFrom>, column2: KeyCandidates<TTo, TFrom>, column3: KeyCandidates<TTo, TFrom>, column4: KeyCandidates<TTo, TFrom>, column5: KeyCandidates<TTo, TFrom>, column6: KeyCandidates<TTo, TFrom>): MappedTable<TTo> & RelatedTable & TExtra;
+	} :
+	5 extends TPrimaryCount ?
+	{
+		by(column: KeyCandidates<TTo, TFrom>, column2: KeyCandidates<TTo, TFrom>, column3: KeyCandidates<TTo, TFrom>, column4: KeyCandidates<TTo, TFrom>, column5: KeyCandidates<TTo, TFrom>): MappedTable<TTo> & RelatedTable & TExtra;
+	} :
+	4 extends TPrimaryCount ?
+	{
+		by(column: KeyCandidates<TTo, TFrom>, column2: KeyCandidates<TTo, TFrom>, column3: KeyCandidates<TTo, TFrom>, column4: KeyCandidates<TTo, TFrom>): MappedTable<TTo> & RelatedTable & TExtra;
+	} :
+	3 extends TPrimaryCount ?
+	{
+		by(column: keyof KeyCandidates<TTo, TFrom>, column2: keyof KeyCandidates<TTo, TFrom>, column3: keyof KeyCandidates<TTo, TFrom>): MappedTable<TTo> & RelatedTable & TExtra;
+	} :
+	2 extends TPrimaryCount ?
+	{
+		by(column: keyof KeyCandidates<TTo, TFrom>, column2: keyof KeyCandidates<TTo, TFrom>): MappedTable<TTo> & RelatedTable & TExtra;
+	} :
+	1 extends TPrimaryCount ?
+	{
+		by(column: keyof KeyCandidates<TTo, TFrom>): MappedTable<TTo> & RelatedTable & TExtra;
 	} :
 	{}
 
@@ -81,8 +113,8 @@ type ColumnMapper<T> = {
 	column(columnName: string): ColumnType<{}>;
 	primaryColumn(columnName: string): ColumnType<IsPrimary>;
 	references<TTo>(mappedTable: MappedTable<TTo>): ReferenceMapper<T, TTo>;
-	hasOne<TTo>(mappedTable: MappedTable<TTo>): ReferenceMapper<TTo, T>;
-	hasMany<TTo>(mappedTable: MappedTable<TTo>): ReferenceMapper<TTo, T, ManyRelation>;
+	hasOne<TTo>(mappedTable: MappedTable<TTo>): OneMapper<T, TTo>;
+	hasMany<TTo>(mappedTable: MappedTable<TTo>): ManyMapper<T, TTo>;
 };
 
 type ManyRelation = {
@@ -90,7 +122,7 @@ type ManyRelation = {
 };
 
 type MappedTable<T> = {
-	getOne<FS extends FetchingStrategy<T>>(filter?: Filter , fetchingStrategy?: FS | null): StrategyToRow<FetchedProperties<T, FS>>;
+	getOne<FS extends FetchingStrategy<T>>(filter?: Filter, fetchingStrategy?: FS | null): StrategyToRow<FetchedProperties<T, FS>>;
 	map<V extends AllowedColumnsAndTablesMap2<V>>(callback: (mapper: ColumnMapper<T>) => V): MappedTable<T & MapColumnDefs<V>>;
 } & T;
 
@@ -140,7 +172,9 @@ type StrategyToRow<T> = {
 	? boolean
 	: T[K] extends JSONColumnType<infer M>
 	? JsonType
-	: StrategyToRow<T[K]>;
+	: T[K] extends Array<infer V>
+	? StrategyToRow<T[K]>[]
+	: StrategyToRow<T[K]>
 } & {
 		[K in keyof RemoveNever<NullProperties<T>>]?:
 		T[K] extends StringColumnType<infer M>
@@ -157,7 +191,9 @@ type StrategyToRow<T> = {
 		? boolean | null
 		: T[K] extends JSONColumnType<infer M>
 		? JsonType | null
-		: StrategyToRow<T[K]> | null;
+		: T[K] extends ManyRelation
+		? StrategyToRow<T[K]>[]
+		: StrategyToRow<T[K]>
 	};
 
 type JsonValue = null | boolean | number | string | JsonArray | JsonObject;
@@ -213,34 +249,40 @@ type ExtractColumns<T, TStrategy> = {
 type FetchedProperties<T, TStrategy> = FetchedColumnProperties<T, TStrategy> & FetchedRelationProperties<T, TStrategy>;
 
 type FetchedRelationProperties<T, TStrategy> = RemoveNeverFlat<{
-	[K in keyof T]: K extends keyof TStrategy ? TStrategy[K] extends true ?
-	T[K] extends ColumnTypes<infer M> ?
-	never
-	: FetchedProperties<T[K], {}>
-	: TStrategy[K] extends false ?
-	never
-	: FetchedProperties<T[K], TStrategy[K]>
-	: never
+	[K in keyof T]: 
+	K extends keyof TStrategy 
+		? TStrategy[K] extends true
+			? T[K] extends ColumnTypes<infer M>
+				? never
+				: T[K] extends ManyRelation
+					? FetchedProperties<T[K], {}> & ManyRelation
+					: FetchedProperties<T[K], {}>
+			: TStrategy[K] extends false 
+				? never
+				: T[K] extends ManyRelation
+				? FetchedProperties<T[K], TStrategy[K]> & ManyRelation
+				: FetchedProperties<T[K], TStrategy[K]>
+		: never
 }>;
 
 type FetchedColumnProperties<T, TStrategy> = RemoveNeverFlat<AtLeastOneTrue<RemoveNever<ExtractColumns<T, TStrategy>>> extends true ?
 	{
-		[K in keyof T]: K extends keyof TStrategy ?
-		TStrategy[K] extends true ?
-		T[K] extends ColumnTypes<infer M> ?
-		T[K]
-		: never
-		: never
-		: never
+		[K in keyof T]: K extends keyof TStrategy 
+			? TStrategy[K] extends true 
+				? T[K] extends ColumnTypes<infer M> 
+					? T[K]
+					: never
+				: never
+			: never
 	}
 	: {
-		[K in keyof T]: K extends keyof TStrategy ?
-		TStrategy[K] extends true ?
-		T[K] extends ColumnTypes<infer M> ?
-		T[K]
-		: never
-		: never
-		: NegotiateDefaultStrategy<T[K]>
+		[K in keyof T]: K extends keyof TStrategy 
+			? TStrategy[K] extends true
+				? T[K] extends ColumnTypes<infer M> 
+					? T[K]
+					: never
+				: never
+			: NegotiateDefaultStrategy<T[K]>
 	}>;
 
 
@@ -343,7 +385,7 @@ type StringColumnSymbol = {
 }
 
 type StringColumnType<M> = {
-	
+
 	equal(value: string | null): Filter;
 	eq(value: string): Filter;
 	notEqual(value: string | null): Filter
@@ -390,7 +432,7 @@ type NumericColumnType<M> = {
 } & M & NumericColumnSymbol
 
 type JSONColumnSymbol = {
-	[' isJSON'] : true
+	[' isJSON']: true
 }
 
 type JSONColumnType<M> = {
@@ -419,10 +461,10 @@ type NotNull = {
 }
 
 interface ColumnType<M> {
-	string() : StringColumnTypeDef<M>;
-	uuid() : UuidColumnTypeDef<M>;
-	numeric() : NumericColumnTypeDef<M>;
-	date() : DateColumnTypeDef<M>;
+	string(): StringColumnTypeDef<M>;
+	uuid(): UuidColumnTypeDef<M>;
+	numeric(): NumericColumnTypeDef<M>;
+	date(): DateColumnTypeDef<M>;
 	binary(): BinaryColumnTypeDef<M>;
 	boolean(): BooleanColumnTypeDef<M>;
 	json(): JSONColumnTypeDef<M>;

@@ -25,7 +25,7 @@ const customerMapped = orm.table('customer').map(mapper => {
 
 const orderMapped = orm.table('order').map(({column, primaryColumn}) => {
   return {
-    id: primaryColumn('id').uuid().notNull(),
+    orderId: primaryColumn('id').uuid().notNull(),
     name: column('name').string().notNull(),
     balance: column('balance').numeric(),
     createdAt: column('created_at').date(),
@@ -43,15 +43,24 @@ const customer2 = customerMapped.map(x => {
     orders: x.hasMany(orderMapped).by('customerId')
   }
 })
-customer2.
+
 const filter = orderMapped.customer.name.equal('lars');
+const orderMapped2 = orderMapped.map(mapper => {
+  return {
+    customer: mapper.references(customer2).by('customerId')
+  }
+});
+// customer2.orders.
+const customerRow = await customer2.getOne(undefined, {orders: true});
+// customerRow.orders[0].
 
+const row = await orderMapped2.getOne(filter, {
+  // orderBy: ['balance'],
+  // customer: true
+  // createdAt: true,
+  customer: {orders: {}},
 
-const row = await orderMapped.getOne(filter, {
-  orderBy: ['balance'],
-  customer: true,
-  createdAt: true
-  // balance: false,
+  balance: true,
   // , customer: { name: true }
   // customer: {
 
@@ -69,3 +78,6 @@ const row = await orderMapped.getOne(filter, {
 
   // }
 });
+
+row.customer?.orders[0].
+
