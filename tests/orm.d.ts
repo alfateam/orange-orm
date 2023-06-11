@@ -28,27 +28,22 @@ type PickTypesOf<T, U> = {
 
 type ExtractPrimary<T> = PickTypesOf<T, IsPrimary>;
 
-
-
 type ToColumnTypes<T> = {
 	[K in keyof T]:
 	 T[K] extends UuidColumnSymbol
 	? UuidColumnSymbol
-
 	: T[K] extends StringColumnSymbol
-	? StringColumnSymbol
-
-	
-	: T[K] extends NumericColumnType<infer M>
-	? NumericColumnType<M>
-	: T[K] extends DateColumnType<infer M>
-	? DateColumnType<M>
-	: T[K] extends BinaryColumnType<infer M>
-	? BinaryColumnType<M>
-	: T[K] extends BooleanColumnType<infer M>
-	? BooleanColumnType<M>
-	: T[K] extends JSONColumnType<infer M>
-	? JSONColumnType<M>
+	? StringColumnSymbol	
+	: T[K] extends NumericColumnSymbol
+	? NumericColumnSymbol
+	: T[K] extends DateColumnSymbol
+	? DateColumnSymbol
+	: T[K] extends BinaryColumnSymbol
+	? BinaryColumnSymbol
+	: T[K] extends BooleanColumnSymbol
+	? BooleanColumnSymbol
+	: T[K] extends JSONColumnSymbol
+	? JSONColumnSymbol
 	: never
 }[keyof T];
 
