@@ -52,32 +52,29 @@ type ToColumnTypes<T> = {
 	: never
 }[keyof T];
 
-// type KeyCandidates<TFrom, TTo> = ToColumnTypes<TTo>;
-// type KeyCandidates<TFrom, TTo> = ExtractPrimary<TTo>;
-//  type KeyCandidates<TFrom, TTo> = ToColumnTypes<ExtractPrimary<TTo>>;
 type KeyCandidates<TFrom, TTo> = PickTypesOf<TFrom, ToColumnTypes<ExtractPrimary<TTo>>>;
 type ReferenceMapper<TFrom, TTo> = ReferenceMapperHelper<TFrom, TTo, CountProperties<ExtractPrimary<TTo>>>;
 
 type ReferenceMapperHelper<TFrom, TTo, TPrimaryCount> =
 	6 extends TPrimaryCount ?
 	{
-		by(column: keyof KeyCandidates<TFrom, TTo>, column2: keyof TFrom, column3: keyof TFrom, column4: keyof TFrom, column5: keyof TFrom, column6: keyof TFrom): MappedTable<TTo> & RelatedTable;
+		by(column: keyof KeyCandidates<TFrom, TTo>, column2: KeyCandidates<TFrom, TTo>, column3: KeyCandidates<TFrom, TTo>, column4: KeyCandidates<TFrom, TTo>, column5: KeyCandidates<TFrom, TTo>, column6: KeyCandidates<TFrom, TTo>): MappedTable<TTo> & RelatedTable;
 	} :
 	5 extends TPrimaryCount ?
 	{
-		by(column: keyof TFrom, column2: keyof TFrom, column3: keyof TFrom, column4: keyof TFrom, column5: keyof TFrom): MappedTable<TTo> & RelatedTable;
+		by(column: KeyCandidates<TFrom, TTo>, column2: KeyCandidates<TFrom, TTo>, column3: KeyCandidates<TFrom, TTo>, column4: KeyCandidates<TFrom, TTo>, column5: KeyCandidates<TFrom, TTo>): MappedTable<TTo> & RelatedTable;
 	} :
 	4 extends TPrimaryCount ?
 	{
-		by(column: keyof TFrom, column2: keyof TFrom, column3: keyof TFrom, column4: keyof TFrom): MappedTable<TTo> & RelatedTable;
+		by(column: KeyCandidates<TFrom, TTo>, column2: KeyCandidates<TFrom, TTo>, column3: KeyCandidates<TFrom, TTo>, column4: KeyCandidates<TFrom, TTo>): MappedTable<TTo> & RelatedTable;
 	} :
 	3 extends TPrimaryCount ?
 	{
-		by(column: keyof TFrom, column2: keyof TFrom, column3: keyof TFrom): MappedTable<TTo> & RelatedTable;
+		by(column: keyof KeyCandidates<TFrom, TTo>, column2: keyof KeyCandidates<TFrom, TTo>, column3: keyof KeyCandidates<TFrom, TTo>): MappedTable<TTo> & RelatedTable;
 	} :
 	2 extends TPrimaryCount ?
 	{
-		by(column: keyof TFrom, column2: keyof TFrom): MappedTable<TTo> & RelatedTable;
+		by(column: keyof KeyCandidates<TFrom, TTo>, column2: keyof KeyCandidates<TFrom, TTo>): MappedTable<TTo> & RelatedTable;
 	} :
 	1 extends TPrimaryCount ?
 	{
