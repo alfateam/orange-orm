@@ -40,7 +40,7 @@ const orderMapped = orm.table('order').map(({column, primaryColumn}) => {
 });
 const customer2 = customerMapped.map(x => {
   return {
-    orders: x.hasOne(orderMapped).by('customerId')
+    orders: x.hasMany(orderMapped).by('customerId')
   }
 })
 customer2.
