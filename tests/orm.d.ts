@@ -1,3 +1,5 @@
+import { isLabeledStatement } from "typescript";
+
 declare namespace ORM {
 
 	interface ORM {
@@ -523,3 +525,45 @@ interface Filter extends RawFilter {
 
 declare const orm: ORM.ORM;
 export default orm;
+
+
+type UnionToIntersection<U> = 
+  (U extends any ? (k: U) => void : never) extends ((k: infer I) => void) ? I : never;
+
+  type LastOf<U> = 
+  UnionToIntersection<U extends any ? () => U : never> extends () => (infer L) ? L : never;
+
+  type PopFront<T extends any[]> = 
+  ((...t: T) => void) extends ((_: any, ...rest: infer R) => void) ? R : never;
+
+  type TupleToUnion<T extends any[]> = 
+  T extends (infer First)[] ? First : T extends [] ? never : T extends [infer First, ...infer Rest] ? First | TupleToUnion<Rest> : never;
+
+type First<T extends any[]> = 
+  T extends [infer Target, ...any[]] ? Target : never;
+
+type Second<T extends any[]> = 
+  T extends [infer First, infer Target,...any[]] ? Target : never;
+
+type UnionToTuple<T> = 
+  UnionToIntersection<T extends any ? (t: T) => void : never> extends ((t: infer T1) => void) ? [...UnionToTuple<Exclude<T, T1>>, T1] : [];
+
+type FirstOfUnion<T> = First<UnionToTuple<T>>;
+type SecondOfUnion<T> = Second<UnionToTuple<T>>;
+type LastOfUnion<T> = LastOf<UnionToTuple<T>>;
+
+interface Foo {
+	bfirst: string;
+	a: number;
+	c: boolean;
+	d: Date
+}
+
+type GetKeys<T> = {
+	[K in keyof T]: K
+}[keyof T]
+
+type All = GetKeys<Foo>;
+type One = FirstOfUnion<All>;
+type Two = SecondOfUnion<All>;
+type Third = FirstOfUnion<TupleToUnion<PopFront<PopFront<UnionToTuple<All>>>>>
