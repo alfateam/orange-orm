@@ -58,7 +58,7 @@ type ManyMapper<TFrom, TTo> = HasMapperHelper<TFrom, TTo, CountProperties<Extrac
 type ReferenceMapperHelper<TFrom, TTo, TPrimaryCount> =
 	6 extends TPrimaryCount ?
 	{
-		by(column: keyof KeyCandidates<TFrom, TTo>, column2: KeyCandidates<TFrom, TTo>, column3: KeyCandidates<TFrom, TTo>, column4: KeyCandidates<TFrom, TTo>, column5: KeyCandidates<TFrom, TTo>, column6: KeyCandidates<TFrom, TTo>): MappedTable<TTo> & RelatedTable & TExtra;
+		by(column: keyof KeyCandidates<TFrom, TTo>, column2: KeyCandidates<TFrom, TTo>, column3: KeyCandidates<TFrom, TTo>, column4: KeyCandidates<TFrom, TTo>, column5: KeyCandidates<TFrom, TTo>, column6: KeyCandidates<TFrom, TTo>): MappedTable<TTo> & RelatedTable;
 	} :
 	5 extends TPrimaryCount ?
 	{
@@ -123,6 +123,7 @@ type ManyRelation = {
 
 type MappedTable<T> = {
 	getOne<FS extends FetchingStrategy<T>>(filter?: Filter, fetchingStrategy?: FS | null): StrategyToRow<FetchedProperties<T, FS>>;
+	getOne<FS extends FetchingStrategy<T>>(filter?: Filter | ((table: MappedTable<T>) => Filter), fetchingStrategy?: FS | null): StrategyToRow<FetchedProperties<T, FS>>;
 	map<V extends AllowedColumnsAndTablesMap2<V>>(callback: (mapper: ColumnMapper<T>) => V): MappedTable<T & MapColumnDefs<V>>;
 } & T;
 
