@@ -31,7 +31,9 @@ type PickTypesOf<T, U> = {
 	[K in keyof T as T[K] extends U ? K : never]: T[K];
 };
 
+
 type ExtractPrimary<T> = PickTypesOf<T, IsPrimary>;
+type ExtractPrimary1<T> = PickTypesOf<T, IsPrimary>;
 
 type ToColumnTypes<T> = {
 	[K in keyof T]:
@@ -53,6 +55,7 @@ type ToColumnTypes<T> = {
 }[keyof T];
 
 type KeyCandidates<TFrom, TTo> = PickTypesOf<TFrom, ToColumnTypes<ExtractPrimary<TTo>>>;
+type KeyCandidates1<TFrom, TTo> = PickTypesOf<TFrom, ToColumnTypes<ExtractPrimary1<TTo>>>;
 type ReferenceMapper<TFrom, TTo> = ReferenceMapperHelper<TFrom, TTo, CountProperties<ExtractPrimary<TTo>>>;
 type OneMapper<TFrom, TTo> = HasMapperHelper<TFrom, TTo, CountProperties<ExtractPrimary<TFrom>>>;
 type ManyMapper<TFrom, TTo> = HasMapperHelper<TFrom, TTo, CountProperties<ExtractPrimary<TFrom>>, ManyRelation>;
@@ -76,7 +79,7 @@ type ReferenceMapperHelper<TFrom, TTo, TPrimaryCount> =
 	} :
 	2 extends TPrimaryCount ?
 	{
-		by(column: keyof KeyCandidates<TFrom, TTo>, column2: keyof KeyCandidates<TFrom, TTo>): MappedTable<TTo> & RelatedTable;
+		by(column: keyof KeyCandidates1<TFrom, TTo>, column2: keyof KeyCandidates<TFrom, TTo>): MappedTable<TTo> & RelatedTable;
 	} :
 	1 extends TPrimaryCount ?
 	{
@@ -549,21 +552,36 @@ type UnionToTuple<T> =
   UnionToIntersection<T extends any ? (t: T) => void : never> extends ((t: infer T1) => void) ? [...UnionToTuple<Exclude<T, T1>>, T1] : [];
 
 type FirstOfUnion<T> = First<UnionToTuple<T>>;
-type SecondOfUnion<T> = Second<UnionToTuple<T>>;
-type LastOfUnion<T> = LastOf<UnionToTuple<T>>;
 
-interface Foo {
-	bfirst: string;
-	a: number;
-	c: boolean;
-	d: Date
-}
-
-type GetKeys<T> = {
-	[K in keyof T]: K
+type ToKeyObjects<T> = {
+	[K in keyof T]: {name: K, value: T[K]}
 }[keyof T]
 
-type All = GetKeys<Foo>;
-type One = FirstOfUnion<All>;
-type Two = SecondOfUnion<All>;
-type Third = FirstOfUnion<TupleToUnion<PopFront<PopFront<UnionToTuple<All>>>>>
+type GetKeys<T> = {
+	[K in keyof T]: T[K]
+}[keyof T]
+
+type ToUnionTuple<T> = UnionToTuple<ToKeyObjects<T>>
+type PropertyToTuple<T> = FirstOfUnion<ToKeyObjects<T>>
+
+
+type PickProperty<T> = PropertyToTuple<T>; 
+type PickProperty2<T> = FirstOfUnion<TupleToUnion<PopFront<ToUnionTuple<T>>>>
+type PickProperty3<T> = FirstOfUnion<TupleToUnion<PopFront<PopFront<ToUnionTuple<T>>>>>
+type PickProperty4<T> = FirstOfUnion<TupleToUnion<PopFront<PopFront<PopFront<ToUnionTuple<T>>>>>>
+type PickProperty5<T> = FirstOfUnion<TupleToUnion<PopFront<PopFront<PopFront<PopFront<ToUnionTuple<T>>>>>>>
+type PickProperty6<T> = FirstOfUnion<TupleToUnion<PopFront<PopFront<PopFront<PopFront<PopFront<ToUnionTuple<T>>>>>>>>
+
+type PickPropertyName1<T> = GetKeys<Omit<PickProperty<T>,'value'>>;
+type PickPropertyName2<T> = GetKeys<Omit<PickProperty2<T>, 'value'>>
+type PickPropertyName3<T> = GetKeys<Omit<PickProperty3<T>, 'value'>>
+type PickPropertyName4<T> = GetKeys<Omit<PickProperty4<T>, 'value'>>
+type PickPropertyName5<T> = GetKeys<Omit<PickProperty5<T>, 'value'>>
+type PickPropertyName6<T> = GetKeys<Omit<PickProperty6<T>, 'value'>>
+
+type PickPropertyValue1<T> = GetKeys<Omit<PickProperty<T>,'name'>>;
+type PickPropertyValue2<T> = GetKeys<Omit<PickProperty2<T>, 'name'>>
+type PickPropertyValue3<T> = GetKeys<Omit<PickProperty3<T>, 'name'>>
+type PickPropertyValue4<T> = GetKeys<Omit<PickProperty4<T>, 'name'>>
+type PickPropertyValue5<T> = GetKeys<Omit<PickProperty5<T>, 'name'>>
+type PickPropertyValue6<T> = GetKeys<Omit<PickProperty6<T>, 'name'>>
