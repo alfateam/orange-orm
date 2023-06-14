@@ -31,9 +31,20 @@ type PickTypesOf<T, U> = {
 	[K in keyof T as T[K] extends U ? K : never]: T[K];
 };
 
+type PickTypesOfTuple<T, U, V> = {
+	[K in keyof T as T[K] extends U ? T[K] extends V ? K : never: never]: T[K];
+};
+
 
 type ExtractPrimary<T> = PickTypesOf<T, IsPrimary>;
-type ExtractPrimary1<T> = PickTypesOf<T, IsPrimary>;
+type ExtractPrimary1<T> = PickTypesOf<T, PickPropertyValue1<PickTypesOf<T, IsPrimary>>>;
+type ExtractPrimary2<T> = PickTypesOf<T, PickPropertyValue2<PickTypesOf<T, IsPrimary>>>;
+
+
+type ExtractPrimary3<T> = PickTypesOf<T, IsPrimary & PickPropertyValue3<T>>;
+type ExtractPrimary4<T> = PickTypesOf<T, IsPrimary & PickPropertyValue4<T>>;
+type ExtractPrimary5<T> = PickTypesOf<T, IsPrimary & PickPropertyValue5<T>>;
+type ExtractPrimary6<T> = PickTypesOf<T, IsPrimary & PickPropertyValue6<T>>;
 
 type ToColumnTypes<T> = {
 	[K in keyof T]:
@@ -49,13 +60,18 @@ type ToColumnTypes<T> = {
 	? BinaryColumnSymbol
 	: T[K] extends BooleanColumnSymbol
 	? BooleanColumnSymbol
-	: T[K] extends JSONColumnSymbol
+: T[K] extends JSONColumnSymbol
 	? JSONColumnSymbol
 	: never
 }[keyof T];
 
 type KeyCandidates<TFrom, TTo> = PickTypesOf<TFrom, ToColumnTypes<ExtractPrimary<TTo>>>;
 type KeyCandidates1<TFrom, TTo> = PickTypesOf<TFrom, ToColumnTypes<ExtractPrimary1<TTo>>>;
+type KeyCandidates2<TFrom, TTo> = PickTypesOf<TFrom, ToColumnTypes<ExtractPrimary2<TTo>>>;
+type KeyCandidates3<TFrom, TTo> = PickTypesOf<TFrom, ToColumnTypes<ExtractPrimary3<TTo>>>;
+type KeyCandidates4<TFrom, TTo> = PickTypesOf<TFrom, ToColumnTypes<ExtractPrimary4<TTo>>>;
+type KeyCandidates5<TFrom, TTo> = PickTypesOf<TFrom, ToColumnTypes<ExtractPrimary5<TTo>>>;
+type KeyCandidates6<TFrom, TTo> = PickTypesOf<TFrom, ToColumnTypes<ExtractPrimary6<TTo>>>;
 type ReferenceMapper<TFrom, TTo> = ReferenceMapperHelper<TFrom, TTo, CountProperties<ExtractPrimary<TTo>>>;
 type OneMapper<TFrom, TTo> = HasMapperHelper<TFrom, TTo, CountProperties<ExtractPrimary<TFrom>>>;
 type ManyMapper<TFrom, TTo> = HasMapperHelper<TFrom, TTo, CountProperties<ExtractPrimary<TFrom>>, ManyRelation>;
@@ -63,27 +79,27 @@ type ManyMapper<TFrom, TTo> = HasMapperHelper<TFrom, TTo, CountProperties<Extrac
 type ReferenceMapperHelper<TFrom, TTo, TPrimaryCount> =
 	6 extends TPrimaryCount ?
 	{
-		by(column: keyof KeyCandidates<TFrom, TTo>, column2: KeyCandidates<TFrom, TTo>, column3: KeyCandidates<TFrom, TTo>, column4: KeyCandidates<TFrom, TTo>, column5: KeyCandidates<TFrom, TTo>, column6: KeyCandidates<TFrom, TTo>): MappedTable<TTo> & RelatedTable;
+		by(column: keyof KeyCandidates1<TFrom, TTo>, column2: KeyCandidates2<TFrom, TTo>, column3: KeyCandidates3<TFrom, TTo>, column4: KeyCandidates4<TFrom, TTo>, column5: KeyCandidates5<TFrom, TTo>, column6: KeyCandidates6<TFrom, TTo>): MappedTable<TTo> & RelatedTable;
 	} :
 	5 extends TPrimaryCount ?
 	{
-		by(column: KeyCandidates<TFrom, TTo>, column2: KeyCandidates<TFrom, TTo>, column3: KeyCandidates<TFrom, TTo>, column4: KeyCandidates<TFrom, TTo>, column5: KeyCandidates<TFrom, TTo>): MappedTable<TTo> & RelatedTable;
+		by(column: keyof KeyCandidates1<TFrom, TTo>, column2: KeyCandidates2<TFrom, TTo>, column3: KeyCandidates3<TFrom, TTo>, column4: KeyCandidates4<TFrom, TTo>, column5: KeyCandidates5<TFrom, TTo>): MappedTable<TTo> & RelatedTable;
 	} :
 	4 extends TPrimaryCount ?
 	{
-		by(column: KeyCandidates<TFrom, TTo>, column2: KeyCandidates<TFrom, TTo>, column3: KeyCandidates<TFrom, TTo>, column4: KeyCandidates<TFrom, TTo>): MappedTable<TTo> & RelatedTable;
+		by(column: keyof KeyCandidates1<TFrom, TTo>, column2: KeyCandidates2<TFrom, TTo>, column3: KeyCandidates3<TFrom, TTo>, column4: KeyCandidates4<TFrom, TTo>): MappedTable<TTo> & RelatedTable;
 	} :
 	3 extends TPrimaryCount ?
 	{
-		by(column: keyof KeyCandidates<TFrom, TTo>, column2: keyof KeyCandidates<TFrom, TTo>, column3: keyof KeyCandidates<TFrom, TTo>): MappedTable<TTo> & RelatedTable;
+		by(column: keyof KeyCandidates1<TFrom, TTo>, column2: KeyCandidates2<TFrom, TTo>, column3: KeyCandidates3<TFrom, TTo>): MappedTable<TTo> & RelatedTable;
 	} :
 	2 extends TPrimaryCount ?
 	{
-		by(column: keyof KeyCandidates1<TFrom, TTo>, column2: keyof KeyCandidates<TFrom, TTo>): MappedTable<TTo> & RelatedTable;
+		by(column: keyof KeyCandidates1<TFrom, TTo>, column2: keyof KeyCandidates2<TFrom, TTo>): MappedTable<TTo> & RelatedTable;
 	} :
 	1 extends TPrimaryCount ?
 	{
-		by(column: keyof KeyCandidates<TFrom, TTo>): MappedTable<TTo> & RelatedTable;
+		by(column: keyof KeyCandidates1<TFrom, TTo>): MappedTable<TTo> & RelatedTable;
 	} :
 	{}
 
@@ -571,6 +587,7 @@ type PickProperty3<T> = FirstOfUnion<TupleToUnion<PopFront<PopFront<ToUnionTuple
 type PickProperty4<T> = FirstOfUnion<TupleToUnion<PopFront<PopFront<PopFront<ToUnionTuple<T>>>>>>
 type PickProperty5<T> = FirstOfUnion<TupleToUnion<PopFront<PopFront<PopFront<PopFront<ToUnionTuple<T>>>>>>>
 type PickProperty6<T> = FirstOfUnion<TupleToUnion<PopFront<PopFront<PopFront<PopFront<PopFront<ToUnionTuple<T>>>>>>>>
+
 
 type PickPropertyName1<T> = GetKeys<Omit<PickProperty<T>,'value'>>;
 type PickPropertyName2<T> = GetKeys<Omit<PickProperty2<T>, 'value'>>
