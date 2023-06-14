@@ -106,27 +106,27 @@ type ReferenceMapperHelper<TFrom, TTo, TPrimaryCount> =
 type HasMapperHelper<TFrom, TTo, TPrimaryCount, TExtra = {}> =
 	6 extends TPrimaryCount ?
 	{
-		by(column: keyof KeyCandidates<TTo, TFrom>, column2: KeyCandidates<TTo, TFrom>, column3: KeyCandidates<TTo, TFrom>, column4: KeyCandidates<TTo, TFrom>, column5: KeyCandidates<TTo, TFrom>, column6: KeyCandidates<TTo, TFrom>): MappedTable<TTo> & RelatedTable & TExtra;
+		by(column: keyof KeyCandidates1<TTo, TFrom>, column2: KeyCandidates2<TTo, TFrom>, column3: KeyCandidates3<TTo, TFrom>, column4: KeyCandidates4<TTo, TFrom>, column5: KeyCandidates5<TTo, TFrom>, column6: KeyCandidates6<TTo, TFrom>): MappedTable<TTo> & RelatedTable & TExtra;
 	} :
 	5 extends TPrimaryCount ?
 	{
-		by(column: KeyCandidates<TTo, TFrom>, column2: KeyCandidates<TTo, TFrom>, column3: KeyCandidates<TTo, TFrom>, column4: KeyCandidates<TTo, TFrom>, column5: KeyCandidates<TTo, TFrom>): MappedTable<TTo> & RelatedTable & TExtra;
+		by(column: keyof KeyCandidates1<TTo, TFrom>, column2: KeyCandidates2<TTo, TFrom>, column3: KeyCandidates3<TTo, TFrom>, column4: KeyCandidates4<TTo, TFrom>, column5: KeyCandidates5<TTo, TFrom>): MappedTable<TTo> & RelatedTable & TExtra;
 	} :
 	4 extends TPrimaryCount ?
 	{
-		by(column: KeyCandidates<TTo, TFrom>, column2: KeyCandidates<TTo, TFrom>, column3: KeyCandidates<TTo, TFrom>, column4: KeyCandidates<TTo, TFrom>): MappedTable<TTo> & RelatedTable & TExtra;
+		by(column: keyof KeyCandidates1<TTo, TFrom>, column2: KeyCandidates2<TTo, TFrom>, column3: KeyCandidates3<TTo, TFrom>, column4: KeyCandidates4<TTo, TFrom>): MappedTable<TTo> & RelatedTable & TExtra;
 	} :
 	3 extends TPrimaryCount ?
 	{
-		by(column: keyof KeyCandidates<TTo, TFrom>, column2: keyof KeyCandidates<TTo, TFrom>, column3: keyof KeyCandidates<TTo, TFrom>): MappedTable<TTo> & RelatedTable & TExtra;
+		by(column: keyof KeyCandidates1<TTo, TFrom>, column2: KeyCandidates2<TTo, TFrom>, column3: KeyCandidates3<TTo, TFrom>): MappedTable<TTo> & RelatedTable & TExtra;
 	} :
 	2 extends TPrimaryCount ?
 	{
-		by(column: keyof KeyCandidates<TTo, TFrom>, column2: keyof KeyCandidates<TTo, TFrom>): MappedTable<TTo> & RelatedTable & TExtra;
+		by(column: keyof KeyCandidates1<TTo, TFrom>, column2: KeyCandidates2<TTo, TFrom>): MappedTable<TTo> & RelatedTable & TExtra;
 	} :
 	1 extends TPrimaryCount ?
 	{
-		by(column: keyof KeyCandidates<TTo, TFrom>): MappedTable<TTo> & RelatedTable & TExtra;
+		by(column: keyof KeyCandidates1<TTo, TFrom>): MappedTable<TTo> & RelatedTable & TExtra;
 	} :
 	{}
 
