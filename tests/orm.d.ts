@@ -1,7 +1,7 @@
 declare namespace ORM {
 
 	interface ORM {
-		table(tableName: string) : MappedTableDef<{}>;
+		table(tableName: string) : MappedTableDefInit<{}>;
 		<T>(config : AllowedDbMap<T>) : MappedDb<T>;
 	}
 }
@@ -11,6 +11,8 @@ type MappedDb<T> = {
 	? MappedTable<T[K]>
 	: never;
 }
+
+
 
 type MappedTable<T> = {
 	getOne<FS extends FetchingStrategy<T>>(filter?: Filter, fetchingStrategy?: FS | null): StrategyToRow<FetchedProperties<T, FS>>;
@@ -51,10 +53,6 @@ type ManyTable<T> = {
     exists() : Filter;
 } & T;
 
-
-type DbMapper = {
-	table(tableName: string) : MappedTableDef<{}>;
-}
 
 type AllowedDbMap<T> = {
 	[P in keyof T]: T[P] extends MappedTableDef<infer U> 
@@ -192,9 +190,15 @@ type OneRelation = {
 	[' isOneRelation']: true
 };
 
+
+type MappedTableDefInit<T> = {
+	map<V extends AllowedColumnsAndTablesWithPrimaryMap<V>>(callback: (mapper: ColumnMapper<T>) => V): MappedTableDef<T & V>;
+} & T;
+
 type MappedTableDef<T> = {
 	map<V extends AllowedColumnsAndTablesMap<V>>(callback: (mapper: ColumnMapper<T>) => V): MappedTableDef<T & V>;
 } & T;
+
 
 type NotNullProperties<T> = Pick<T, { [K in keyof T]: T[K] extends NotNull ? K : never }[keyof T]>;
 type NullProperties<T> = Pick<T, { [K in keyof T]: T[K] extends NotNull ? never : K }[keyof T]>;
@@ -202,8 +206,6 @@ type NullProperties<T> = Pick<T, { [K in keyof T]: T[K] extends NotNull ? never 
 
 type ColumnTypes<M> = StringColumnSymbol | UuidColumnSymbol | NumericColumnSymbol | DateColumnSymbol | BinaryColumnSymbol | BooleanColumnSymbol | JSONColumnSymbol
 type ColumnAndTableTypes<M> = ColumnTypes<M> | RelatedTable;
-// type ColumnTypes<M> = StringColumnType<M> | UuidColumnType<M> | NumericColumnType<M> | DateColumnType<M> | BinaryColumnType<M> | BooleanColumnType<M> | JSONColumnType<M>;
-// type ColumnAndTableTypes<M> = ColumnTypes<M> | RelatedTable;
 
 
 type StrategyToRow<T> = {
@@ -254,11 +256,21 @@ interface JsonObject { [key: string]: JsonValue; }
 
 type JsonType = JsonArray | JsonObject;
 
+
 type AllowedColumnsAndTablesMap<T> = {
-	[P in keyof T]: T[P] extends ColumnTypeOf<infer U> | RelatedTable
-	? T[P]
-	: never;
+    [P in keyof T]: T[P] extends ColumnTypeOf<infer U> | RelatedTable ? T[P] : never;
+};
+
+type AllowedColumnsAndTablesWithPrimaryMap<T> = 1 extends CountFirstPrimary<ExtractPrimary<T>> ? {
+    [P in keyof T]: T[P] extends ColumnTypeOf<infer U> | RelatedTable ? T[P] : never;
+} : NeedsPrimaryKey;
+
+type NeedsPrimaryKey = {
+	['Primary column']: void
 }
+
+type CountFirstPrimary<T> =  UnionOfTypes<MapPropertiesTo1<T>>
+
 
 type AllowedColumnsAndTablesStrategy<T> = {
 	[P in keyof T]: T[P] extends ColumnAndTableTypes<infer M>
@@ -274,7 +286,6 @@ type AllowedColumns<T> = RemoveNever<{
 	: never;
 }>;
 
-type HasPrimary<T> = AtLeastOneOf<T, IsPrimary>;
 
 type AtLeastOneOf<T, U> = {
 	[K in keyof T]: T[K] extends U ? true : never;

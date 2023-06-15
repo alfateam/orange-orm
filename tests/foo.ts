@@ -32,6 +32,7 @@ const orderLines = orm.table('orderLines')
     }
   ));
 
+
 const order = orm.table('order')
   .map(({ column, primaryColumn }) => (
     {
@@ -52,7 +53,6 @@ const order = orm.table('order')
   ));
 
 const db = orm({ order });
-
 
 const filter = db.order.lines.all(x => {
   return x.orderId.eq('2');
@@ -80,4 +80,3 @@ const row = await db.order.getOne(filter, {
   // balance: true,
   // customerId: false
 });
-row.
