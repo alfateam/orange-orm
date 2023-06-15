@@ -1,83 +1,77 @@
 // foo.ts
 import orm from './orm';
 
-const party = orm.table('party').map(mapper => {
-  return {
-    pid: mapper.primaryColumn('foo').uuid(),
-    plocation: mapper.column('bar').string(),
-    plocation2: mapper.column('dbar').string(),
+const party = orm.table('party').map(mapper => (
+  {
+    id: mapper.primaryColumn('id').uuid(),
+    location: mapper.column('location').string(),
   }
-});
+));
 
-
-const customerMapped = orm.table('customer').map(mapper => {
-  return {
+const customer = orm.table('customer').map(mapper => (
+  {
     id: mapper.primaryColumn('id').uuid().notNull(),
     name: mapper.column('name').string(),
     partyId: mapper.column('partyId').uuid(),
-  };
-})
-.map(mapper => {
-  return {
+  }
+)).map(mapper => (
+  {
     party: mapper.references(party).by('partyId')
   }
-});
+));
 
-const orderMapped = orm.table('order').map(({column, primaryColumn}) => {
-  return {
-    orderId: primaryColumn('id').uuid().notNull(),
-    name: column('name').string().notNull(),
+const orderLines = orm.table('orderLines').map(({ column, primaryColumn }) => (
+  {
+    id: primaryColumn('id').uuid(),
+    orderId: column('orderId').uuid().notNull(),
+    product: column('product').string()
+  }
+));
+
+const order = orm.table('order').map(({ column, primaryColumn }) => (
+  {
+    id: primaryColumn('id').uuid().notNull(),
+    title: column('name').string().notNull(),
     balance: column('balance').numeric(),
     createdAt: column('created_at').date(),
     updatedAt: column('updated_at').date(),
     customerId: column('customer_id').uuid(),
     picture: column('picture').json()
-  };
-}).map(mapper => {
-  return {
-    customer: mapper.references(customerMapped).by('customerId')
   }
-});
-const customer2 = customerMapped.map(x => {
-  return {
-    orders: x.hasMany(orderMapped).by('customerId')
+)).map((mapper) => (
+  {
+    customer: mapper.references(customer).by('customerId'),
+    lines: mapper.hasMany(orderLines).by('orderId')
   }
+));
+
+const db = orm({ order });
+
+
+const filter = db.order.lines.all(x => {
+  return x.orderId.eq('2');
 })
 
-const filter = orderMapped.customer.name.equal('lars');
-const orderMapped2 = orderMapped.map(mapper => {
-  return {
-    customer: mapper.references(customer2).by('customerId')
-  }
+const row = await db.order.getOne(filter, {
+  customer: {
+
+  },
+  limit: 3,
+  createdAt: true,
+  orderBy: ['createdAt'],
+  lines: true
+
+  // }  // customer: {
+  //   limit: 3,
+  //   orderBy: ['name']
+  // },
+  // lines: {
+  //   id: true,
+  //   product: true,
+  //   limit: 1
+  // }
+  // customer: true,
+  // balance: true,
+  // customerId: false
 });
-// customer2.orders.
-const customerRow = await customer2.getOne(undefined, {orders: true});
-// customerRow.orders[0].
-
-const row = await orderMapped2.getOne(filter, {
-  // orderBy: ['balance'],
-  // customer: true
-  // createdAt: true,
-  customer: {orders: {}},
-
-  balance: true,
-  // , customer: { name: true }
-  // customer: {
-
-
-  // }
-  // customer: {
-  //   id: true
-  // }
-  // customer: {id: true}
-  // customer: {
-  // //   orderBy: ['partyId asc'],    
-  // //   orders: {
-
-  // //   }
-
-  // }
-});
-
-row.customer?.orders[0].
-
+row.

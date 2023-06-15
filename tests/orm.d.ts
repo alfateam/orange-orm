@@ -1,20 +1,73 @@
-import { isLabeledStatement } from "typescript";
-
 declare namespace ORM {
 
 	interface ORM {
-		table: (tableName: string) => Table<{}>;
-		tableOf: <T>(tableName: string) => Table<T>;
+		table(tableName: string) : MappedTableDef<{}>;
+		<T>(config : AllowedDbMap<T>) : MappedDb<T>;
 	}
 }
 
+type MappedDb<T> = {
+	[K in keyof T]: T[K] extends MappedTableDef<infer U> 
+	? MappedTable<T[K]>
+	: never;
+}
 
-type FetchingStrategy<T> = Omit<{
+type MappedTable<T> = {
+	getOne<FS extends FetchingStrategy<T>>(filter?: Filter, fetchingStrategy?: FS | null): StrategyToRow<FetchedProperties<T, FS>>;
+	getOne<FS extends FetchingStrategy<T>>(filter?: Filter | ((table: MappedTableDef<T>) => Filter), fetchingStrategy?: FS | null): StrategyToRow<FetchedProperties<T, FS>>;
+
+} & MappedColumnsAndRelations<T>
+
+type MappedColumnsAndRelations<T> = RemoveNeverFlat<{
+	[K in keyof T]: T[K] extends StringColumnTypeDef<infer M>
+	? StringColumnType<M>
+	: T[K] extends UuidColumnTypeDef<infer M>
+	? UuidColumnType<M>
+	: T[K] extends NumericColumnTypeDef<infer M>
+	? NumericColumnType<M>
+	: T[K] extends DateColumnTypeDef<infer M>
+	? DateColumnType<M>
+	: T[K] extends BinaryColumnTypeDef<infer M>
+	? BinaryColumnType<M>
+	: T[K] extends BooleanColumnTypeDef<infer M>
+	? BooleanColumnType<M>
+	: T[K] extends JSONColumnTypeDef<infer M>
+	? JSONColumnType<M>
+	: T[K] extends ManyRelation
+	? MappedColumnsAndRelations<T[K]> & ManyTable<T[K]>
+	: T[K] extends RelatedTable
+	? MappedColumnsAndRelations<T[K]> & OneOrJoinTable<T[K]>
+	: never
+}>
+
+type OneOrJoinTable<T> = {
+    exists() : Filter;
+} & T;
+
+type ManyTable<T> = {
+	all(selector: (table: MappedColumnsAndRelations<T>) => RawFilter) : Filter;
+    any(selector: (table: MappedColumnsAndRelations<T>) => RawFilter) : Filter;
+    none(selector: (table: MappedColumnsAndRelations<T>) => RawFilter) : Filter;
+    exists() : Filter;
+} & T;
+
+
+type DbMapper = {
+	table(tableName: string) : MappedTableDef<{}>;
+}
+
+type AllowedDbMap<T> = {
+	[P in keyof T]: T[P] extends MappedTableDef<infer U> 
+	? T[P]
+	: never;
+}
+
+type FetchingStrategy<T> = {
 	[K in keyof T & keyof RemoveNever<AllowedColumnsAndTablesStrategy<T>>]?: 
-	T[K] extends ColumnTypes<infer M>
+	T[K] extends StringColumnSymbol | UuidColumnSymbol
 		? boolean
 		: boolean | FetchingStrategy<T[K]>
-}, 'getOne' | 'getMany'> & {
+} & {
 	orderBy?: Array<OrderBy<Extract<keyof AllowedColumns<T>, string>>>;
 	limit?: number;
 	offset?: number;
@@ -26,15 +79,9 @@ type RelatedTable = {
 	[' relatedTable']: boolean;
 };
 
-
 type PickTypesOf<T, U> = {
 	[K in keyof T as T[K] extends U ? K : never]: T[K];
 };
-
-type PickTypesOfTuple<T, U, V> = {
-	[K in keyof T as T[K] extends U ? T[K] extends V ? K : never: never]: T[K];
-};
-
 
 type ExtractPrimary<T> = PickTypesOf<T, IsPrimary>;
 type ExtractPrimary1<T> = PickTypesOf<T, PickPropertyValue1<PickTypesOf<T, IsPrimary>>>;
@@ -60,12 +107,11 @@ type ToColumnTypes<T> = {
 	? BinaryColumnSymbol
 	: T[K] extends BooleanColumnSymbol
 	? BooleanColumnSymbol
-: T[K] extends JSONColumnSymbol
+	: T[K] extends JSONColumnSymbol
 	? JSONColumnSymbol
 	: never
 }[keyof T];
 
-type KeyCandidates<TFrom, TTo> = PickTypesOf<TFrom, ToColumnTypes<ExtractPrimary<TTo>>>;
 type KeyCandidates1<TFrom, TTo> = PickTypesOf<TFrom, ToColumnTypes<ExtractPrimary1<TTo>>>;
 type KeyCandidates2<TFrom, TTo> = PickTypesOf<TFrom, ToColumnTypes<ExtractPrimary2<TTo>>>;
 type KeyCandidates3<TFrom, TTo> = PickTypesOf<TFrom, ToColumnTypes<ExtractPrimary3<TTo>>>;
@@ -73,109 +119,91 @@ type KeyCandidates4<TFrom, TTo> = PickTypesOf<TFrom, ToColumnTypes<ExtractPrimar
 type KeyCandidates5<TFrom, TTo> = PickTypesOf<TFrom, ToColumnTypes<ExtractPrimary5<TTo>>>;
 type KeyCandidates6<TFrom, TTo> = PickTypesOf<TFrom, ToColumnTypes<ExtractPrimary6<TTo>>>;
 type ReferenceMapper<TFrom, TTo> = ReferenceMapperHelper<TFrom, TTo, CountProperties<ExtractPrimary<TTo>>>;
-type OneMapper<TFrom, TTo> = HasMapperHelper<TFrom, TTo, CountProperties<ExtractPrimary<TFrom>>>;
+type OneMapper<TFrom, TTo> = HasMapperHelper<TFrom, TTo, CountProperties<ExtractPrimary<TFrom>>, OneRelation>;
 type ManyMapper<TFrom, TTo> = HasMapperHelper<TFrom, TTo, CountProperties<ExtractPrimary<TFrom>>, ManyRelation>;
 
 type ReferenceMapperHelper<TFrom, TTo, TPrimaryCount> =
 	6 extends TPrimaryCount ?
 	{
-		by(column: keyof KeyCandidates1<TFrom, TTo>, column2: KeyCandidates2<TFrom, TTo>, column3: KeyCandidates3<TFrom, TTo>, column4: KeyCandidates4<TFrom, TTo>, column5: KeyCandidates5<TFrom, TTo>, column6: KeyCandidates6<TFrom, TTo>): MappedTable<TTo> & RelatedTable;
+		by(column: keyof KeyCandidates1<TFrom, TTo>, column2: KeyCandidates2<TFrom, TTo>, column3: KeyCandidates3<TFrom, TTo>, column4: KeyCandidates4<TFrom, TTo>, column5: KeyCandidates5<TFrom, TTo>, column6: KeyCandidates6<TFrom, TTo>): MappedTableDef<TTo> & RelatedTable;
 	} :
 	5 extends TPrimaryCount ?
 	{
-		by(column: keyof KeyCandidates1<TFrom, TTo>, column2: KeyCandidates2<TFrom, TTo>, column3: KeyCandidates3<TFrom, TTo>, column4: KeyCandidates4<TFrom, TTo>, column5: KeyCandidates5<TFrom, TTo>): MappedTable<TTo> & RelatedTable;
+		by(column: keyof KeyCandidates1<TFrom, TTo>, column2: KeyCandidates2<TFrom, TTo>, column3: KeyCandidates3<TFrom, TTo>, column4: KeyCandidates4<TFrom, TTo>, column5: KeyCandidates5<TFrom, TTo>): MappedTableDef<TTo> & RelatedTable;
 	} :
 	4 extends TPrimaryCount ?
 	{
-		by(column: keyof KeyCandidates1<TFrom, TTo>, column2: KeyCandidates2<TFrom, TTo>, column3: KeyCandidates3<TFrom, TTo>, column4: KeyCandidates4<TFrom, TTo>): MappedTable<TTo> & RelatedTable;
+		by(column: keyof KeyCandidates1<TFrom, TTo>, column2: KeyCandidates2<TFrom, TTo>, column3: KeyCandidates3<TFrom, TTo>, column4: KeyCandidates4<TFrom, TTo>): MappedTableDef<TTo> & RelatedTable;
 	} :
 	3 extends TPrimaryCount ?
 	{
-		by(column: keyof KeyCandidates1<TFrom, TTo>, column2: KeyCandidates2<TFrom, TTo>, column3: KeyCandidates3<TFrom, TTo>): MappedTable<TTo> & RelatedTable;
+		by(column: keyof KeyCandidates1<TFrom, TTo>, column2: KeyCandidates2<TFrom, TTo>, column3: KeyCandidates3<TFrom, TTo>): MappedTableDef<TTo> & RelatedTable;
 	} :
 	2 extends TPrimaryCount ?
 	{
-		by(column: keyof KeyCandidates1<TFrom, TTo>, column2: keyof KeyCandidates2<TFrom, TTo>): MappedTable<TTo> & RelatedTable;
+		by(column: keyof KeyCandidates1<TFrom, TTo>, column2: keyof KeyCandidates2<TFrom, TTo>): MappedTableDef<TTo> & RelatedTable;
 	} :
 	1 extends TPrimaryCount ?
 	{
-		by(column: keyof KeyCandidates1<TFrom, TTo>): MappedTable<TTo> & RelatedTable;
+		by(column: keyof KeyCandidates1<TFrom, TTo>): MappedTableDef<TTo> & RelatedTable;
 	} :
 	{}
 
 type HasMapperHelper<TFrom, TTo, TPrimaryCount, TExtra = {}> =
 	6 extends TPrimaryCount ?
 	{
-		by(column: keyof KeyCandidates1<TTo, TFrom>, column2: KeyCandidates2<TTo, TFrom>, column3: KeyCandidates3<TTo, TFrom>, column4: KeyCandidates4<TTo, TFrom>, column5: KeyCandidates5<TTo, TFrom>, column6: KeyCandidates6<TTo, TFrom>): MappedTable<TTo> & RelatedTable & TExtra;
+		by(column: keyof KeyCandidates1<TTo, TFrom>, column2: KeyCandidates2<TTo, TFrom>, column3: KeyCandidates3<TTo, TFrom>, column4: KeyCandidates4<TTo, TFrom>, column5: KeyCandidates5<TTo, TFrom>, column6: KeyCandidates6<TTo, TFrom>): MappedTableDef<TTo> & RelatedTable & TExtra;
 	} :
 	5 extends TPrimaryCount ?
 	{
-		by(column: keyof KeyCandidates1<TTo, TFrom>, column2: KeyCandidates2<TTo, TFrom>, column3: KeyCandidates3<TTo, TFrom>, column4: KeyCandidates4<TTo, TFrom>, column5: KeyCandidates5<TTo, TFrom>): MappedTable<TTo> & RelatedTable & TExtra;
+		by(column: keyof KeyCandidates1<TTo, TFrom>, column2: KeyCandidates2<TTo, TFrom>, column3: KeyCandidates3<TTo, TFrom>, column4: KeyCandidates4<TTo, TFrom>, column5: KeyCandidates5<TTo, TFrom>): MappedTableDef<TTo> & RelatedTable & TExtra;
 	} :
 	4 extends TPrimaryCount ?
 	{
-		by(column: keyof KeyCandidates1<TTo, TFrom>, column2: KeyCandidates2<TTo, TFrom>, column3: KeyCandidates3<TTo, TFrom>, column4: KeyCandidates4<TTo, TFrom>): MappedTable<TTo> & RelatedTable & TExtra;
+		by(column: keyof KeyCandidates1<TTo, TFrom>, column2: KeyCandidates2<TTo, TFrom>, column3: KeyCandidates3<TTo, TFrom>, column4: KeyCandidates4<TTo, TFrom>): MappedTableDef<TTo> & RelatedTable & TExtra;
 	} :
 	3 extends TPrimaryCount ?
 	{
-		by(column: keyof KeyCandidates1<TTo, TFrom>, column2: KeyCandidates2<TTo, TFrom>, column3: KeyCandidates3<TTo, TFrom>): MappedTable<TTo> & RelatedTable & TExtra;
+		by(column: keyof KeyCandidates1<TTo, TFrom>, column2: KeyCandidates2<TTo, TFrom>, column3: KeyCandidates3<TTo, TFrom>): MappedTableDef<TTo> & RelatedTable & TExtra;
 	} :
 	2 extends TPrimaryCount ?
 	{
-		by(column: keyof KeyCandidates1<TTo, TFrom>, column2: KeyCandidates2<TTo, TFrom>): MappedTable<TTo> & RelatedTable & TExtra;
+		by(column: keyof KeyCandidates1<TTo, TFrom>, column2: KeyCandidates2<TTo, TFrom>): MappedTableDef<TTo> & RelatedTable & TExtra;
 	} :
 	1 extends TPrimaryCount ?
 	{
-		by(column: keyof KeyCandidates1<TTo, TFrom>): MappedTable<TTo> & RelatedTable & TExtra;
+		by(column: keyof KeyCandidates1<TTo, TFrom>): MappedTableDef<TTo> & RelatedTable & TExtra;
 	} :
 	{}
 
 type ColumnMapper<T> = {
 	column(columnName: string): ColumnType<{}>;
 	primaryColumn(columnName: string): ColumnType<IsPrimary>;
-	references<TTo>(mappedTable: MappedTable<TTo>): ReferenceMapper<T, TTo>;
-	hasOne<TTo>(mappedTable: MappedTable<TTo>): OneMapper<T, TTo>;
-	hasMany<TTo>(mappedTable: MappedTable<TTo>): ManyMapper<T, TTo>;
+	references<TTo>(mappedTable: MappedTableDef<TTo>): ReferenceMapper<T, TTo>;
+	hasOne<TTo>(mappedTable: MappedTableDef<TTo>): OneMapper<T, TTo>;
+	hasMany<TTo>(mappedTable: MappedTableDef<TTo>): ManyMapper<T, TTo>;
 };
 
 type ManyRelation = {
 	[' isManyRelation']: true
 };
 
-type MappedTable<T> = {
-	getOne<FS extends FetchingStrategy<T>>(filter?: Filter, fetchingStrategy?: FS | null): StrategyToRow<FetchedProperties<T, FS>>;
-	getOne<FS extends FetchingStrategy<T>>(filter?: Filter | ((table: MappedTable<T>) => Filter), fetchingStrategy?: FS | null): StrategyToRow<FetchedProperties<T, FS>>;
-	map<V extends AllowedColumnsAndTablesMap2<V>>(callback: (mapper: ColumnMapper<T>) => V): MappedTable<T & MapColumnDefs<V>>;
-} & T;
-
-
-type Table<T> = {
-	map<U extends AllowedColumnsAndTablesMap<U>>(callback: (mapper: ColumnMapper<T>) => U): MappedTable<T & MapColumnDefs<U>>;
+type OneRelation = {
+	[' isOneRelation']: true
 };
+
+type MappedTableDef<T> = {
+	map<V extends AllowedColumnsAndTablesMap<V>>(callback: (mapper: ColumnMapper<T>) => V): MappedTableDef<T & V>;
+} & T;
 
 type NotNullProperties<T> = Pick<T, { [K in keyof T]: T[K] extends NotNull ? K : never }[keyof T]>;
 type NullProperties<T> = Pick<T, { [K in keyof T]: T[K] extends NotNull ? never : K }[keyof T]>;
 
-type MapColumnDefs<T> = {
-	[K in keyof T as T[K] extends never ? never : K]: T[K] extends StringColumnTypeDef<infer M>
-	? StringColumnType<M>
-	: T[K] extends UuidColumnTypeDef<infer M>
-	? UuidColumnType<M>
-	: T[K] extends NumericColumnTypeDef<infer M>
-	? NumericColumnType<M>
-	: T[K] extends DateColumnTypeDef<infer M>
-	? DateColumnType<M>
-	: T[K] extends BinaryColumnTypeDef<infer M>
-	? BinaryColumnType<M>
-	: T[K] extends BooleanColumnTypeDef<infer M>
-	? BooleanColumnType<M>
-	: T[K] extends JSONColumnTypeDef<infer M>
-	? JSONColumnType<M>
-	: T[K]
-}
 
-type ColumnTypes<M> = StringColumnType<M> | UuidColumnType<M> | NumericColumnType<M> | DateColumnType<M> | BinaryColumnType<M> | BooleanColumnType<M> | JSONColumnType<M>;
+type ColumnTypes<M> = StringColumnSymbol | UuidColumnSymbol | NumericColumnSymbol | DateColumnSymbol | BinaryColumnSymbol | BooleanColumnSymbol | JSONColumnSymbol
 type ColumnAndTableTypes<M> = ColumnTypes<M> | RelatedTable;
+// type ColumnTypes<M> = StringColumnType<M> | UuidColumnType<M> | NumericColumnType<M> | DateColumnType<M> | BinaryColumnType<M> | BooleanColumnType<M> | JSONColumnType<M>;
+// type ColumnAndTableTypes<M> = ColumnTypes<M> | RelatedTable;
 
 
 type StrategyToRow<T> = {
@@ -226,10 +254,7 @@ interface JsonObject { [key: string]: JsonValue; }
 
 type JsonType = JsonArray | JsonObject;
 
-
-type AllowedColumnsAndTablesMap<T> = HasPrimary<T> extends true ? AllowedColumnsAndTablesMap2<T> : never;
-
-type AllowedColumnsAndTablesMap2<T> = {
+type AllowedColumnsAndTablesMap<T> = {
 	[P in keyof T]: T[P] extends ColumnTypeOf<infer U> | RelatedTable
 	? T[P]
 	: never;
@@ -265,8 +290,6 @@ type ExtractColumns<T, TStrategy> = {
 	T[K] extends ColumnTypes<infer M> ? TStrategy[K] : never
 	: never
 }
-
-
 
 type FetchedProperties<T, TStrategy> = FetchedColumnProperties<T, TStrategy> & FetchedRelationProperties<T, TStrategy>;
 
@@ -483,13 +506,13 @@ type NotNull = {
 }
 
 interface ColumnType<M> {
-	string(): StringColumnTypeDef<M>;
-	uuid(): UuidColumnTypeDef<M>;
-	numeric(): NumericColumnTypeDef<M>;
-	date(): DateColumnTypeDef<M>;
-	binary(): BinaryColumnTypeDef<M>;
-	boolean(): BooleanColumnTypeDef<M>;
-	json(): JSONColumnTypeDef<M>;
+	string(): StringColumnTypeDef<M & StringColumnSymbol> ;
+	uuid(): UuidColumnTypeDef<M & UuidColumnSymbol>;
+	numeric(): NumericColumnTypeDef<M & NumericColumnSymbol>;
+	date(): DateColumnTypeDef<M & DateColumnSymbol>;
+	binary(): BinaryColumnTypeDef<M & BinaryColumnSymbol>;
+	boolean(): BooleanColumnTypeDef<M & BooleanColumnSymbol>;
+	json(): JSONColumnTypeDef<M & JSONColumnSymbol>;
 }
 
 type StringColumnTypeDef<M> = {
@@ -540,17 +563,12 @@ interface RawFilter {
 
 interface Filter extends RawFilter {
 	and<T extends RawFilter>(otherFilter: T): Filter;
+	or<T extends RawFilter>(otherFilter: T): Filter;
+	not(): Filter;
 }
-
-declare const orm: ORM.ORM;
-export default orm;
-
 
 type UnionToIntersection<U> = 
   (U extends any ? (k: U) => void : never) extends ((k: infer I) => void) ? I : never;
-
-  type LastOf<U> = 
-  UnionToIntersection<U extends any ? () => U : never> extends () => (infer L) ? L : never;
 
   type PopFront<T extends any[]> = 
   ((...t: T) => void) extends ((_: any, ...rest: infer R) => void) ? R : never;
@@ -560,9 +578,6 @@ type UnionToIntersection<U> =
 
 type First<T extends any[]> = 
   T extends [infer Target, ...any[]] ? Target : never;
-
-type Second<T extends any[]> = 
-  T extends [infer First, infer Target,...any[]] ? Target : never;
 
 type UnionToTuple<T> = 
   UnionToIntersection<T extends any ? (t: T) => void : never> extends ((t: infer T1) => void) ? [...UnionToTuple<Exclude<T, T1>>, T1] : [];
@@ -580,14 +595,12 @@ type GetKeys<T> = {
 type ToUnionTuple<T> = UnionToTuple<ToKeyObjects<T>>
 type PropertyToTuple<T> = FirstOfUnion<ToKeyObjects<T>>
 
-
 type PickProperty<T> = PropertyToTuple<T>; 
 type PickProperty2<T> = FirstOfUnion<TupleToUnion<PopFront<ToUnionTuple<T>>>>
 type PickProperty3<T> = FirstOfUnion<TupleToUnion<PopFront<PopFront<ToUnionTuple<T>>>>>
 type PickProperty4<T> = FirstOfUnion<TupleToUnion<PopFront<PopFront<PopFront<ToUnionTuple<T>>>>>>
 type PickProperty5<T> = FirstOfUnion<TupleToUnion<PopFront<PopFront<PopFront<PopFront<ToUnionTuple<T>>>>>>>
 type PickProperty6<T> = FirstOfUnion<TupleToUnion<PopFront<PopFront<PopFront<PopFront<PopFront<ToUnionTuple<T>>>>>>>>
-
 
 type PickPropertyName1<T> = GetKeys<Omit<PickProperty<T>,'value'>>;
 type PickPropertyName2<T> = GetKeys<Omit<PickProperty2<T>, 'value'>>
@@ -602,3 +615,6 @@ type PickPropertyValue3<T> = GetKeys<Omit<PickProperty3<T>, 'name'>>
 type PickPropertyValue4<T> = GetKeys<Omit<PickProperty4<T>, 'name'>>
 type PickPropertyValue5<T> = GetKeys<Omit<PickProperty5<T>, 'name'>>
 type PickPropertyValue6<T> = GetKeys<Omit<PickProperty6<T>, 'name'>>
+
+declare const orm: ORM.ORM;
+export default orm;
