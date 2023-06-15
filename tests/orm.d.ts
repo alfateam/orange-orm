@@ -1,3 +1,4 @@
+//orm.d.ts
 declare namespace ORM {
 
 	interface ORM {
@@ -528,30 +529,37 @@ interface ColumnType<M> {
 
 type StringColumnTypeDef<M> = {
 	notNull(): StringColumnTypeDef<M & NotNull> & NotNull;
+	primary(): StringColumnTypeDef<M & IsPrimary> & IsPrimary;
 } & ColumnTypeOf<StringColumnType<M>> & M
 
 type NumericColumnTypeDef<M> = {
 	notNull(): NumericColumnTypeDef<M & NotNull> & NotNull;
+	primary(): NumericColumnTypeDef<M & IsPrimary> & IsPrimary;
 } & ColumnTypeOf<NumericColumnType<M>>;
 
 type UuidColumnTypeDef<M> = {
 	notNull(): UuidColumnTypeDef<M & NotNull> & NotNull;
+	primary(): UuidColumnTypeDef<M & IsPrimary> & IsPrimary;
 } & ColumnTypeOf<UuidColumnType<M>> & M;
 
 type JSONColumnTypeDef<M> = {
 	notNull(): JSONColumnTypeDef<M & NotNull> & NotNull;
+	primary(): JSONColumnTypeDef<M & IsPrimary> & IsPrimary;
 } & ColumnTypeOf<JSONColumnType<M>> & M;
 
 type BinaryColumnTypeDef<M> = {
 	notNull(): BinaryColumnTypeDef<M & NotNull> & NotNull;
+	primary(): BinaryColumnTypeDef<M & IsPrimary> & IsPrimary;
 } & ColumnTypeOf<BinaryColumnType<M>> & M;
 
 type BooleanColumnTypeDef<M> = {
 	notNull(): BooleanColumnTypeDef<M & NotNull> & NotNull;
+	primary(): BooleanColumnTypeDef<M & IsPrimary> & IsPrimary;
 } & ColumnTypeOf<BooleanColumnType<M>> & M;
 
 type DateColumnTypeDef<M> = {
 	notNull(): DateColumnTypeDef<M & NotNull> & NotNull;
+	primary(): DateColumnTypeDef<M & IsPrimary> & IsPrimary;
 } & ColumnTypeOf<DateColumnType<M>> & M;
 
 interface ColumnTypeOf<T> {

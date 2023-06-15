@@ -45,6 +45,12 @@ function defineColumn(column, table) {
 		return c;
 	};
 
+	c.primary = function() {
+		column.isPrimary = true;
+		table._primaryColumns.push(column);
+		return c;
+	};
+
 	c.as = function(alias) {
 		var oldAlias = column.alias;
 		table._aliases.delete(oldAlias);

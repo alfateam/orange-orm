@@ -2,41 +2,40 @@
 import orm from './orm';
 
 const party = orm.table('party')
-  .map(mapper => (
+  .map(x => (
     {
-      id: mapper.primaryColumn('id').uuid(),
-      location: mapper.column('location').string(),
+      id: x.column('id').uuid().primary(),      
+      location: x.column('location').string(),
     }
   ));
 
 const customer = orm.table('customer')
-  .map(mapper => (
+  .map(x => (
     {
-      id: mapper.primaryColumn('id').uuid().notNull(),
-      name: mapper.column('name').string(),
-      partyId: mapper.column('partyId').uuid(),
+      id: x.column('id').uuid().notNull().primary(),
+      name: x.column('name').string(),
+      partyId: x.column('partyId').uuid(),
     }
   ))
-  .map(mapper => (
+  .map(x => (
     {
-      party: mapper.references(party).by('partyId')
+      party: x.references(party).by('partyId')
     }
   ));
 
 const orderLines = orm.table('orderLines')
   .map(({ column, primaryColumn }) => (
     {
-      id: primaryColumn('id').uuid(),
+      id: column('id').uuid().primary(),
       orderId: column('orderId').uuid().notNull(),
       product: column('product').string()
     }
   ));
 
-
 const order = orm.table('order')
-  .map(({ column, primaryColumn }) => (
+  .map(({ column }) => (
     {
-      id: primaryColumn('id').uuid().notNull(),
+      id: column('id').uuid().notNull().primary(),
       title: column('name').string().notNull(),
       balance: column('balance').numeric(),
       createdAt: column('created_at').date(),
@@ -45,10 +44,10 @@ const order = orm.table('order')
       picture: column('picture').json()
     }
   ))
-  .map((mapper) => (
+  .map((x) => (
     {
-      customer: mapper.references(customer).by('customerId'),
-      lines: mapper.hasMany(orderLines).by('orderId')
+      customer: x.references(customer).by('customerId'),
+      lines: x.hasMany(orderLines).by('orderId')
     }
   ));
 
@@ -59,24 +58,11 @@ const filter = db.order.lines.all(x => {
 })
 
 const row = await db.order.getOne(filter, {
-  customer: {
-
-  },
+  customer: true,
+  lines: true,
   limit: 3,
   createdAt: true,
   orderBy: ['createdAt'],
-  lines: true
-
-  // }  // customer: {
-  //   limit: 3,
-  //   orderBy: ['name']
-  // },
-  // lines: {
-  //   id: true,
-  //   product: true,
-  //   limit: 1
-  // }
-  // customer: true,
-  // balance: true,
-  // customerId: false
 });
+
+console.dir(row);
