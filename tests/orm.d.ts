@@ -16,8 +16,7 @@ type MappedDb<T> = {
 
 
 type MappedTable<T> = {
-	getOne<FS extends FetchingStrategy<T>>(filter?: Filter, fetchingStrategy?: FS | null): StrategyToRow<FetchedProperties<T, FS>>;
-	getOne<FS extends FetchingStrategy<T>>(filter?: Filter | ((table: MappedTableDef<T>) => Filter), fetchingStrategy?: FS | null): StrategyToRow<FetchedProperties<T, FS>>;
+	getOne<FS extends FetchingStrategy<T>>(filter?: Filter, fetchingStrategy?: FS | null): StrategyToRow<FetchedProperties<T, FS>,T>;
 
 } & MappedColumnsAndRelations<T>
 
@@ -37,14 +36,16 @@ type MappedColumnsAndRelations<T> = RemoveNeverFlat<{
 	: T[K] extends JSONColumnTypeDef<infer M>
 	? JSONColumnType<M>
 	: T[K] extends ManyRelation
-	? MappedColumnsAndRelations<T[K]> & ManyTable<T[K]>
+	? MappedColumnsAndRelations<T[K]> & ManyTable<Omit<T[K], 'map'>>
 	: T[K] extends RelatedTable
-	? MappedColumnsAndRelations<T[K]> & OneOrJoinTable<T[K]>
+	? MappedColumnsAndRelations<T[K]> & OneOrJoinTable<Omit<T[K], 'map'>>
 	: never
 }>
 
 type OneOrJoinTable<T> = {
     exists() : Filter;
+	any(selector: (table: MappedColumnsAndRelations<T>) => RawFilter) : Filter;
+    none(selector: (table: MappedColumnsAndRelations<T>) => RawFilter) : Filter;
 } & T;
 
 type ManyTable<T> = {
@@ -208,8 +209,18 @@ type NullProperties<T> = Pick<T, { [K in keyof T]: T[K] extends NotNull ? never 
 type ColumnTypes<M> = StringColumnSymbol | UuidColumnSymbol | NumericColumnSymbol | DateColumnSymbol | BinaryColumnSymbol | BooleanColumnSymbol | JSONColumnSymbol
 type ColumnAndTableTypes<M> = ColumnTypes<M> | RelatedTable;
 
+type StrategyToRow<T,U> = StrategyToRowData<T> & {
+	saveChanges(): Promise<void>;
+    saveChanges<FS extends FetchingStrategy<U>>(concurrency?: object, fetchingStrategy?: FS ): Promise<StrategyToRow<FetchedProperties<U, FS>,U>>;
+	acceptChanges(): void;
+	clearChanges(): void;
+	refresh(): Promise<void>;
+	refresh<FS extends FetchingStrategy<U>>(fetchingStrategy?: FS ): Promise<StrategyToRow<FetchedProperties<U, FS>,U>>;
+	delete(): Promise<void>;
+	delete(options: object): Promise<void>;
+};
 
-type StrategyToRow<T> = {
+type StrategyToRowData<T> = {
 	[K in keyof RemoveNever<NotNullProperties<T>>]:
 	T[K] extends StringColumnType<infer M>
 	? string
@@ -226,8 +237,8 @@ type StrategyToRow<T> = {
 	: T[K] extends JSONColumnType<infer M>
 	? JsonType
 	: T[K] extends Array<infer V>
-	? StrategyToRow<T[K]>[]
-	: StrategyToRow<T[K]>
+	? StrategyToRowData<T[K]>[]
+	: StrategyToRowData<T[K]>
 } & {
 		[K in keyof RemoveNever<NullProperties<T>>]?:
 		T[K] extends StringColumnType<infer M>
@@ -245,8 +256,8 @@ type StrategyToRow<T> = {
 		: T[K] extends JSONColumnType<infer M>
 		? JsonType | null
 		: T[K] extends ManyRelation
-		? StrategyToRow<T[K]>[]
-		: StrategyToRow<T[K]>
+		? StrategyToRowData<T[K]>[]
+		: StrategyToRowData<T[K]>
 	};
 
 type JsonValue = null | boolean | number | string | JsonArray | JsonObject;
