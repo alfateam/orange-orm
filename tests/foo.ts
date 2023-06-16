@@ -4,7 +4,7 @@ import orm from './orm';
 const party = orm.table('party')
   .map(x => (
     {
-      id: x.column('id').uuid().primary(),      
+      id: x.column('id').uuid().primary(),
       location: x.column('location').string(),
     }
   ));
@@ -51,18 +51,13 @@ const order = orm.table('order')
     }
   ));
 
-const db = orm({ order });
+const db = orm({ order, customer });
 
-const filter = db.order.lines.all(x => {
-  return x.orderId.eq('2');
-})
+const filter = db.order.customer.name.eq("John");
+let rows = await  db.order.getMany();
 
-const row = await db.order.getOne(filter, {
-  customer: true,
-  lines: true,
-  limit: 3,
-  createdAt: true,
-  orderBy: ['createdAt'],
-});
+let rows2 = await db.order.getMany(rows);
+
+
 
 console.dir(row);

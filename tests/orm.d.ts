@@ -2,21 +2,74 @@
 declare namespace ORM {
 
 	interface ORM {
-		table(tableName: string) : MappedTableDefInit<{}>;
-		<T>(config : AllowedDbMap<T>) : MappedDb<T>;
+		table(tableName: string): MappedTableDefInit<{}>;
+		<T>(config: AllowedDbMap<T>): MappedDb<T>;
 	}
 }
 
 type MappedDb<T> = {
-	[K in keyof T]: T[K] extends MappedTableDef<infer U> 
+	[K in keyof T]: T[K] extends MappedTableDef<infer U>
 	? MappedTable<T[K]>
 	: never;
+} & {
+	and(filter: Filter, ...filters: Filter[]): Filter;
+	or(filter: Filter, ...filters: Filter[]): Filter;
+	not(): Filter;
+	query(filter: RawFilter | string): Promise<unknown[]>;
+	query<T>(filter: RawFilter | string): Promise<T[]>;
+	createPatch(original: any[], modified: any[]): JsonPatch;
+	createPatch(original: any, modified: any): JsonPatch;
+};
+
+type JsonPatch = Array<{
+	op: "add" | "remove" | "replace" | "copy" | "move" | "test";
+	path: string;
+	value?: any;
+	from?: string;
+}>;
+
+
+type PrimaryRowFilter<T> = StrategyToRowData2<ExtractPrimary<T>>
+type StrategyToRowData2<T> = {
+	[K in keyof T]:
+	T[K] extends StringColumnSymbol
+	? string
+	: T[K] extends UuidColumnSymbol
+	? string
+	: T[K] extends NumericColumnType<infer M>
+	? number
+	: T[K] extends DateColumnType<infer M>
+	? string
+	: T[K] extends BinaryColumnType<infer M>
+	? string
+	: T[K] extends BooleanColumnType<infer M>
+	? boolean
+	: T[K] extends JSONColumnType<infer M>
+	? JsonType
+	: never
 }
 
 
 
+
+
 type MappedTable<T> = {
-	getOne<FS extends FetchingStrategy<T>>(filter?: Filter, fetchingStrategy?: FS | null): StrategyToRow<FetchedProperties<T, FS>,T>;
+	getOne<FS extends FetchingStrategy<T>>(filter?: Filter, fetchingStrategy?: FS): StrategyToRow<FetchedProperties<T, FS>, T>;
+	getOne(filter: Filter): StrategyToRow<FetchedProperties<T, {}>, T>;
+	getOne<V extends any>(row: PrimaryRowFilter<T> | StrategyToRow<FetchedProperties<T, V>,T>): StrategyToRow<FetchedProperties<T, {}>, T>;
+	getOne<V extends any, FS extends FetchingStrategy<T>>(row: PrimaryRowFilter<T> | StrategyToRow<FetchedProperties<T, V>,T>, fetchingStrategy?: FS): StrategyToRow<FetchedProperties<T, {}>, T>;
+
+
+	getMany<FS extends FetchingStrategy<T>>(filter?: Filter, fetchingStrategy?: FS): StrategyToRowArray<FetchedProperties<T, FS>, T>;
+	getMany<FS extends FetchingStrategy<T>>(filter?: Filter): StrategyToRowArray<FetchedProperties<T, FS>, T>;
+	getMany<V extends any>(rows: PrimaryRowFilter<T>[] | StrategyToRowArray<FetchedProperties<T, V>,T>): StrategyToRowArray<FetchedProperties<T, {}>, T>;
+	getMany<V extends any, FS extends FetchingStrategy<T>>(rows: PrimaryRowFilter<T>[] | StrategyToRowArray<FetchedProperties<T, V>,T>, fetchingStrategy?: FS): StrategyToRowArray<FetchedProperties<T, {}>, T>;
+
+	getAll<FS extends FetchingStrategy<T>>(fetchingStrategy: FS): StrategyToRowArray<FetchedProperties<T, FS>, T>;
+	getAll<FS extends FetchingStrategy<T>>(): StrategyToRowArray<FetchedProperties<T, FS>, T>;
+
+
+	readonly metaData: Concurrency<T>;
 
 } & MappedColumnsAndRelations<T>
 
@@ -36,41 +89,74 @@ type MappedColumnsAndRelations<T> = RemoveNeverFlat<{
 	: T[K] extends JSONColumnTypeDef<infer M>
 	? JSONColumnType<M>
 	: T[K] extends ManyRelation
-	? MappedColumnsAndRelations<T[K]> & ManyTable<Omit<T[K], 'map'>>
+	? MappedColumnsAndRelations<PickTypesOf<T[K], RelatedTable>> & ManyTable<T[K]>
 	: T[K] extends RelatedTable
-	? MappedColumnsAndRelations<T[K]> & OneOrJoinTable<Omit<T[K], 'map'>>
+	? MappedColumnsAndRelations<T[K]> & OneOrJoinTable<T[K]>
 	: never
 }>
 
 type OneOrJoinTable<T> = {
-    exists() : Filter;
-	any(selector: (table: MappedColumnsAndRelations<T>) => RawFilter) : Filter;
-    none(selector: (table: MappedColumnsAndRelations<T>) => RawFilter) : Filter;
-} & T;
+	exists(): Filter;
+	any(selector: (table: MappedColumnsAndRelations<T>) => RawFilter): Filter;
+	none(selector: (table: MappedColumnsAndRelations<T>) => RawFilter): Filter;
+}
+//  & T;
 
 type ManyTable<T> = {
-	all(selector: (table: MappedColumnsAndRelations<T>) => RawFilter) : Filter;
-    any(selector: (table: MappedColumnsAndRelations<T>) => RawFilter) : Filter;
-    none(selector: (table: MappedColumnsAndRelations<T>) => RawFilter) : Filter;
-    exists() : Filter;
-} & T;
+	all(selector: (table: MappedColumnsAndRelations<T>) => RawFilter): Filter;
+	any(selector: (table: MappedColumnsAndRelations<T>) => RawFilter): Filter;
+	none(selector: (table: MappedColumnsAndRelations<T>) => RawFilter): Filter;
+	exists(): Filter;
+}
+// & T;
 
 
 type AllowedDbMap<T> = {
-	[P in keyof T]: T[P] extends MappedTableDef<infer U> 
+	[P in keyof T]: T[P] extends MappedTableDef<infer U>
 	? T[P]
 	: never;
 }
 
+type AllowedColumnsAndTablesStrategy<T> = {
+	[P in keyof T]: T[P] extends ColumnAndTableTypes<infer M>
+	? T[P]
+	: never;
+};
+type AllowedColumnsAndTablesConcurrency<T> = {
+	[P in keyof T]: T[P] extends ColumnAndTableTypes<infer M>
+	? T[P]
+	: never;
+};
+
+
 type FetchingStrategy<T> = {
-	[K in keyof T & keyof RemoveNever<AllowedColumnsAndTablesStrategy<T>>]?: 
-	T[K] extends StringColumnSymbol | UuidColumnSymbol
-		? boolean
-		: boolean | FetchingStrategy<T[K]>
+	[K in keyof T & keyof RemoveNever<AllowedColumnsAndTablesStrategy<T>>]?:
+	T[K] extends ColumnSymbols
+	? boolean
+	: boolean | FetchingStrategy<T[K]>
 } & {
 	orderBy?: Array<OrderBy<Extract<keyof AllowedColumns<T>, string>>>;
 	limit?: number;
 	offset?: number;
+};
+
+type ConcurrencyValues = 'optimistic' | 'skipOnConflict' | 'overwrite';
+
+type ColumnConcurrency = {
+	readonly?: boolean;
+	concurrency: ConcurrencyValues
+}
+
+type ColumnSymbols = StringColumnSymbol | UuidColumnSymbol | NumericColumnSymbol | DateColumnSymbol | BooleanColumnSymbol | BinaryColumnSymbol | JSONColumnSymbol;
+
+type Concurrency<T> = {
+	[K in keyof T & keyof RemoveNever<AllowedColumnsAndTablesConcurrency<T>>]?:
+	T[K] extends ColumnSymbols
+	? ColumnConcurrency
+	: Concurrency<T[K]>
+} & {
+	readonly?: boolean;
+	concurrency?: number;
 };
 
 type OrderBy<T extends string> = `${T} ${'asc' | 'desc'}` | T;
@@ -206,18 +292,29 @@ type NotNullProperties<T> = Pick<T, { [K in keyof T]: T[K] extends NotNull ? K :
 type NullProperties<T> = Pick<T, { [K in keyof T]: T[K] extends NotNull ? never : K }[keyof T]>;
 
 
-type ColumnTypes<M> = StringColumnSymbol | UuidColumnSymbol | NumericColumnSymbol | DateColumnSymbol | BinaryColumnSymbol | BooleanColumnSymbol | JSONColumnSymbol
-type ColumnAndTableTypes<M> = ColumnTypes<M> | RelatedTable;
+type ColumnTypes<M> = ColumnSymbols;
+type ColumnAndTableTypes<M> = ColumnSymbols | RelatedTable;
 
-type StrategyToRow<T,U> = StrategyToRowData<T> & {
+type StrategyToRow<T, U> = StrategyToRowData<T> & {
 	saveChanges(): Promise<void>;
-    saveChanges<FS extends FetchingStrategy<U>>(concurrency?: object, fetchingStrategy?: FS ): Promise<StrategyToRow<FetchedProperties<U, FS>,U>>;
+	saveChanges<FS extends FetchingStrategy<U>, C extends Concurrency<U>>(concurrency?: C, fetchingStrategy?: FS): Promise<StrategyToRow<FetchedProperties<U, FS>, U>>;
 	acceptChanges(): void;
 	clearChanges(): void;
 	refresh(): Promise<void>;
-	refresh<FS extends FetchingStrategy<U>>(fetchingStrategy?: FS ): Promise<StrategyToRow<FetchedProperties<U, FS>,U>>;
+	refresh<FS extends FetchingStrategy<U>>(fetchingStrategy?: FS): Promise<StrategyToRow<FetchedProperties<U, FS>, U>>;
 	delete(): Promise<void>;
-	delete(options: object): Promise<void>;
+	delete(concurrency: Concurrency<U>): Promise<void>;
+};
+
+type StrategyToRowArray<T, U> = StrategyToRowData<T>[] & {
+	saveChanges(): Promise<void>;
+	saveChanges<FS extends FetchingStrategy<U>, C extends Concurrency<U>>(concurrency?: C, fetchingStrategy?: FS): Promise<StrategyToRowArray<FetchedProperties<U, FS>, U>>;
+	acceptChanges(): void;
+	clearChanges(): void;
+	refresh(): Promise<void>;
+	refresh<FS extends FetchingStrategy<U>>(fetchingStrategy?: FS): Promise<StrategyToRowArray<FetchedProperties<U, FS>, U>>;
+	delete(): Promise<void>;
+	delete(concurrency: Concurrency<U>): Promise<void>;
 };
 
 type StrategyToRowData<T> = {
@@ -270,26 +367,18 @@ type JsonType = JsonArray | JsonObject;
 
 
 type AllowedColumnsAndTablesMap<T> = {
-    [P in keyof T]: T[P] extends ColumnTypeOf<infer U> | RelatedTable ? T[P] : never;
+	[P in keyof T]: T[P] extends ColumnTypeOf<infer U> | RelatedTable ? T[P] : never;
 };
 
 type AllowedColumnsAndTablesWithPrimaryMap<T> = 1 extends CountFirstPrimary<ExtractPrimary<T>> ? {
-    [P in keyof T]: T[P] extends ColumnTypeOf<infer U> | RelatedTable ? T[P] : never;
+	[P in keyof T]: T[P] extends ColumnTypeOf<infer U> | RelatedTable ? T[P] : never;
 } : NeedsPrimaryKey;
 
 type NeedsPrimaryKey = {
 	['Primary column']: void
 }
 
-type CountFirstPrimary<T> =  UnionOfTypes<MapPropertiesTo1<T>>
-
-
-type AllowedColumnsAndTablesStrategy<T> = {
-	[P in keyof T]: T[P] extends ColumnAndTableTypes<infer M>
-	? T[P]
-	: never;
-};
-
+type CountFirstPrimary<T> = UnionOfTypes<MapPropertiesTo1<T>>
 
 
 type AllowedColumns<T> = RemoveNever<{
@@ -317,40 +406,40 @@ type ExtractColumns<T, TStrategy> = {
 type FetchedProperties<T, TStrategy> = FetchedColumnProperties<T, TStrategy> & FetchedRelationProperties<T, TStrategy>;
 
 type FetchedRelationProperties<T, TStrategy> = RemoveNeverFlat<{
-	[K in keyof T]: 
-	K extends keyof TStrategy 
-		? TStrategy[K] extends true
-			? T[K] extends ColumnTypes<infer M>
-				? never
-				: T[K] extends ManyRelation
-					? FetchedProperties<T[K], {}> & ManyRelation
-					: FetchedProperties<T[K], {}>
-			: TStrategy[K] extends false 
-				? never
-				: T[K] extends ManyRelation
-				? FetchedProperties<T[K], TStrategy[K]> & ManyRelation
-				: FetchedProperties<T[K], TStrategy[K]>
-		: never
+	[K in keyof T]:
+	K extends keyof TStrategy
+	? TStrategy[K] extends true
+	? T[K] extends ColumnTypes<infer M>
+	? never
+	: T[K] extends ManyRelation
+	? FetchedProperties<T[K], {}> & ManyRelation
+	: FetchedProperties<T[K], {}>
+	: TStrategy[K] extends false
+	? never
+	: T[K] extends ManyRelation
+	? FetchedProperties<T[K], TStrategy[K]> & ManyRelation
+	: FetchedProperties<T[K], TStrategy[K]>
+	: never
 }>;
 
 type FetchedColumnProperties<T, TStrategy> = RemoveNeverFlat<AtLeastOneTrue<RemoveNever<ExtractColumns<T, TStrategy>>> extends true ?
 	{
-		[K in keyof T]: K extends keyof TStrategy 
-			? TStrategy[K] extends true 
-				? T[K] extends ColumnTypes<infer M> 
-					? T[K]
-					: never
-				: never
-			: never
+		[K in keyof T]: K extends keyof TStrategy
+		? TStrategy[K] extends true
+		? T[K] extends ColumnTypes<infer M>
+		? T[K]
+		: never
+		: never
+		: never
 	}
 	: {
-		[K in keyof T]: K extends keyof TStrategy 
-			? TStrategy[K] extends true
-				? T[K] extends ColumnTypes<infer M> 
-					? T[K]
-					: never
-				: never
-			: NegotiateDefaultStrategy<T[K]>
+		[K in keyof T]: K extends keyof TStrategy
+		? TStrategy[K] extends true
+		? T[K] extends ColumnTypes<infer M>
+		? T[K]
+		: never
+		: never
+		: NegotiateDefaultStrategy<T[K]>
 	}>;
 
 
@@ -529,7 +618,7 @@ type NotNull = {
 }
 
 interface ColumnType<M> {
-	string(): StringColumnTypeDef<M & StringColumnSymbol> ;
+	string(): StringColumnTypeDef<M & StringColumnSymbol>;
 	uuid(): UuidColumnTypeDef<M & UuidColumnSymbol>;
 	numeric(): NumericColumnTypeDef<M & NumericColumnSymbol>;
 	date(): DateColumnTypeDef<M & DateColumnSymbol>;
@@ -597,25 +686,25 @@ interface Filter extends RawFilter {
 	not(): Filter;
 }
 
-type UnionToIntersection<U> = 
-  (U extends any ? (k: U) => void : never) extends ((k: infer I) => void) ? I : never;
+type UnionToIntersection<U> =
+	(U extends any ? (k: U) => void : never) extends ((k: infer I) => void) ? I : never;
 
-  type PopFront<T extends any[]> = 
-  ((...t: T) => void) extends ((_: any, ...rest: infer R) => void) ? R : never;
+type PopFront<T extends any[]> =
+	((...t: T) => void) extends ((_: any, ...rest: infer R) => void) ? R : never;
 
-  type TupleToUnion<T extends any[]> = 
-  T extends (infer First)[] ? First : T extends [] ? never : T extends [infer First, ...infer Rest] ? First | TupleToUnion<Rest> : never;
+type TupleToUnion<T extends any[]> =
+	T extends (infer First)[] ? First : T extends [] ? never : T extends [infer First, ...infer Rest] ? First | TupleToUnion<Rest> : never;
 
-type First<T extends any[]> = 
-  T extends [infer Target, ...any[]] ? Target : never;
+type First<T extends any[]> =
+	T extends [infer Target, ...any[]] ? Target : never;
 
-type UnionToTuple<T> = 
-  UnionToIntersection<T extends any ? (t: T) => void : never> extends ((t: infer T1) => void) ? [...UnionToTuple<Exclude<T, T1>>, T1] : [];
+type UnionToTuple<T> =
+	UnionToIntersection<T extends any ? (t: T) => void : never> extends ((t: infer T1) => void) ? [...UnionToTuple<Exclude<T, T1>>, T1] : [];
 
 type FirstOfUnion<T> = First<UnionToTuple<T>>;
 
 type ToKeyObjects<T> = {
-	[K in keyof T]: {name: K, value: T[K]}
+	[K in keyof T]: { name: K, value: T[K] }
 }[keyof T]
 
 type GetKeys<T> = {
@@ -625,21 +714,21 @@ type GetKeys<T> = {
 type ToUnionTuple<T> = UnionToTuple<ToKeyObjects<T>>
 type PropertyToTuple<T> = FirstOfUnion<ToKeyObjects<T>>
 
-type PickProperty<T> = PropertyToTuple<T>; 
+type PickProperty<T> = PropertyToTuple<T>;
 type PickProperty2<T> = FirstOfUnion<TupleToUnion<PopFront<ToUnionTuple<T>>>>
 type PickProperty3<T> = FirstOfUnion<TupleToUnion<PopFront<PopFront<ToUnionTuple<T>>>>>
 type PickProperty4<T> = FirstOfUnion<TupleToUnion<PopFront<PopFront<PopFront<ToUnionTuple<T>>>>>>
 type PickProperty5<T> = FirstOfUnion<TupleToUnion<PopFront<PopFront<PopFront<PopFront<ToUnionTuple<T>>>>>>>
 type PickProperty6<T> = FirstOfUnion<TupleToUnion<PopFront<PopFront<PopFront<PopFront<PopFront<ToUnionTuple<T>>>>>>>>
 
-type PickPropertyName1<T> = GetKeys<Omit<PickProperty<T>,'value'>>;
+type PickPropertyName1<T> = GetKeys<Omit<PickProperty<T>, 'value'>>;
 type PickPropertyName2<T> = GetKeys<Omit<PickProperty2<T>, 'value'>>
 type PickPropertyName3<T> = GetKeys<Omit<PickProperty3<T>, 'value'>>
 type PickPropertyName4<T> = GetKeys<Omit<PickProperty4<T>, 'value'>>
 type PickPropertyName5<T> = GetKeys<Omit<PickProperty5<T>, 'value'>>
 type PickPropertyName6<T> = GetKeys<Omit<PickProperty6<T>, 'value'>>
 
-type PickPropertyValue1<T> = GetKeys<Omit<PickProperty<T>,'name'>>;
+type PickPropertyValue1<T> = GetKeys<Omit<PickProperty<T>, 'name'>>;
 type PickPropertyValue2<T> = GetKeys<Omit<PickProperty2<T>, 'name'>>
 type PickPropertyValue3<T> = GetKeys<Omit<PickProperty3<T>, 'name'>>
 type PickPropertyValue4<T> = GetKeys<Omit<PickProperty4<T>, 'name'>>
