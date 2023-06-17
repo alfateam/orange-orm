@@ -68,6 +68,18 @@ type MappedTable<T> = {
 	getAll<FS extends FetchingStrategy<T>>(fetchingStrategy: FS): StrategyToRowArray<FetchedProperties<T, FS>, T>;
 	getAll<FS extends FetchingStrategy<T>>(): StrategyToRowArray<FetchedProperties<T, FS>, T>;
 
+	// insert(epostHistorikks: EpostHistorikk[]): Promise<EpostHistorikkArray>;
+    // insert(epostHistorikks: EpostHistorikk[], fetchingStrategy: EpostHistorikkStrategy): Promise<EpostHistorikkArray>;
+    // insert(epostHistorikk: EpostHistorikk): Promise<EpostHistorikkRow>;
+    // insert(epostHistorikk: EpostHistorikk, fetchingStrategy: EpostHistorikkStrategy): Promise<EpostHistorikkRow>;
+    // insertAndForget(epostHistorikks: EpostHistorikk[]): Promise<void>;
+    // insertAndForget(epostHistorikk: EpostHistorikk): Promise<void>;
+    // delete(filter?: RawFilter): Promise<void>;
+    // delete(epostHistorikks: Array<EpostHistorikk>): Promise<void>;
+    // deleteCascade(filter?: RawFilter): Promise<void>;
+    // deleteCascade(epostHistorikks: Array<EpostHistorikk>): Promise<void>;
+
+
 
 	readonly metaData: Concurrency<T>;
 
@@ -95,21 +107,16 @@ type MappedColumnsAndRelations<T> = RemoveNeverFlat<{
 	: never
 }>
 
-type OneOrJoinTable<T> = {
-	exists(): Filter;
-	any(selector: (table: MappedColumnsAndRelations<T>) => RawFilter): Filter;
-	none(selector: (table: MappedColumnsAndRelations<T>) => RawFilter): Filter;
+type OneOrJoinTable<T> = ((fn: (table: MappedColumnsAndRelations<T>) => RawFilter) =>  Filter) & {
+	exists: () => Filter;
 }
-//  & T;
 
-type ManyTable<T> = {
+type ManyTable<T> = ((fn: (table: MappedColumnsAndRelations<T>) => RawFilter) =>  Filter) & {
 	all(selector: (table: MappedColumnsAndRelations<T>) => RawFilter): Filter;
 	any(selector: (table: MappedColumnsAndRelations<T>) => RawFilter): Filter;
 	none(selector: (table: MappedColumnsAndRelations<T>) => RawFilter): Filter;
 	exists(): Filter;
 }
-// & T;
-
 
 type AllowedDbMap<T> = {
 	[P in keyof T]: T[P] extends MappedTableDef<infer U>
@@ -297,7 +304,7 @@ type ColumnAndTableTypes<M> = ColumnSymbols | RelatedTable;
 
 type StrategyToRow<T, U> = StrategyToRowData<T> & {
 	saveChanges(): Promise<void>;
-	saveChanges<FS extends FetchingStrategy<U>, C extends Concurrency<U>>(concurrency?: C, fetchingStrategy?: FS): Promise<StrategyToRow<FetchedProperties<U, FS>, U>>;
+	saveChanges<C extends Concurrency<U>>(concurrency?: C): Promise<void>;
 	acceptChanges(): void;
 	clearChanges(): void;
 	refresh(): Promise<void>;
@@ -308,7 +315,8 @@ type StrategyToRow<T, U> = StrategyToRowData<T> & {
 
 type StrategyToRowArray<T, U> = StrategyToRowData<T>[] & {
 	saveChanges(): Promise<void>;
-	saveChanges<FS extends FetchingStrategy<U>, C extends Concurrency<U>>(concurrency?: C, fetchingStrategy?: FS): Promise<StrategyToRowArray<FetchedProperties<U, FS>, U>>;
+	saveChanges<C extends Concurrency<U>>(concurrency?: C): Promise<void>;
+	// saveChanges<FS extends FetchingStrategy<U>, C extends Concurrency<U>>(concurrency?: C): Promise<void>;
 	acceptChanges(): void;
 	clearChanges(): void;
 	refresh(): Promise<void>;
@@ -404,6 +412,8 @@ type ExtractColumns<T, TStrategy> = {
 }
 
 type FetchedProperties<T, TStrategy> = FetchedColumnProperties<T, TStrategy> & FetchedRelationProperties<T, TStrategy>;
+// type FetchedProperties<T, TStrategy> = FetchedRelationProperties<T, TStrategy>;
+// type FetchedProperties<T, TStrategy> = FetchedColumnProperties<T, TStrategy> ;
 
 type FetchedRelationProperties<T, TStrategy> = RemoveNeverFlat<{
 	[K in keyof T]:
