@@ -1,5 +1,6 @@
 var newJoinRelation = require('./newJoinRelation');
 var newRelatedTable = require('./newRelatedTable');
+const isMany = false;
 
 function newJoin(parentTable, childTable) {
 	var c = {};
@@ -28,7 +29,7 @@ function newJoin(parentTable, childTable) {
 
 		Object.defineProperty(parentTable, alias, {
 			get: function() {
-				return newRelatedTable([relation]);
+				return newRelatedTable([relation], undefined, isMany);
 			}
 		});
 

@@ -5,18 +5,28 @@ var any = require('./relatedTable/any');
 var all = require('./relatedTable/all');
 var none = require('./relatedTable/none');
 
-function newRelatedTable(relations, isShallow) {
+function newRelatedTable(relations, isShallow, isMany) {
 	var table = relations[relations.length - 1].childTable;
 	var columns = table._columns;
-	var c = {};
+	
+	let c;
+	if (isMany) {
+		c = all(relations);
+		// @ts-ignore
+		c.any = any(relations);
+	}
+	else {
+		c = any(relations);
+		// @ts-ignore
+		c.all = all(relations);
+	}
 
-	c.any = any(relations);
-	c.all = all(relations);
+	// @ts-ignore
 	c.none = none(relations);
 
 	Object.defineProperty(c, '_shallow', {
 		get: function() {
-			return newRelatedTable(relations, true) ;
+			return newRelatedTable(relations, true, isMany) ;
 		}
 	});
 
@@ -50,6 +60,7 @@ function newRelatedTable(relations, isShallow) {
 		});
 	}
 
+	// @ts-ignore
 	c.exists = function() {
 		if (isShallow)
 			return '';
