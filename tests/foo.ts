@@ -56,8 +56,4 @@ const db = orm({ order, customer });
 const filter = db.order.customer.name.eq("John");
 let rows = await  db.order.getMany();
 
-let rows2 = await db.order.getMany(rows);
 
-
-
-console.dir(row);

@@ -1,4 +1,3 @@
-//orm.d.ts
 declare namespace ORM {
 
 	interface ORM {
@@ -54,30 +53,25 @@ type StrategyToRowData2<T> = {
 
 
 type MappedTable<T> = {
-	getOne<FS extends FetchingStrategy<T>>(filter?: Filter, fetchingStrategy?: FS): StrategyToRow<FetchedProperties<T, FS>, T>;
-	getOne(filter: Filter): StrategyToRow<FetchedProperties<T, {}>, T>;
-	getOne<V extends any>(row: PrimaryRowFilter<T> | StrategyToRow<FetchedProperties<T, V>,T>): StrategyToRow<FetchedProperties<T, {}>, T>;
-	getOne<V extends any, FS extends FetchingStrategy<T>>(row: PrimaryRowFilter<T> | StrategyToRow<FetchedProperties<T, V>,T>, fetchingStrategy?: FS): StrategyToRow<FetchedProperties<T, {}>, T>;
+	getOne(filter?: Filter | PrimaryRowFilter<T>): StrategyToRow<FetchedProperties<T, {}>, T>;
+	getOne<FS extends FetchingStrategy<T>>(filter?: Filter | PrimaryRowFilter<T>, fetchingStrategy?: FS ): StrategyToRow<FetchedProperties<T, FS>, T>;
 
+	getMany(filter?: Filter | PrimaryRowFilter<T>[]): StrategyToRowArray<FetchedProperties<T, {}>, T>;
+	getMany<FS extends FetchingStrategy<T>>(filter?: Filter | PrimaryRowFilter<T>[], fetchingStrategy?: FS ): StrategyToRowArray<FetchedProperties<T, FS>, T>;
+	getAll(): StrategyToRowArray<FetchedProperties<T, {}>, T>;
+	getAll<FS extends FetchingStrategy<T>>(fetchingStrategy?: FS ): StrategyToRowArray<FetchedProperties<T, FS>, T>;
 
-	getMany<FS extends FetchingStrategy<T>>(filter?: Filter, fetchingStrategy?: FS): StrategyToRowArray<FetchedProperties<T, FS>, T>;
-	getMany<FS extends FetchingStrategy<T>>(filter?: Filter): StrategyToRowArray<FetchedProperties<T, FS>, T>;
-	getMany<V extends any>(rows: PrimaryRowFilter<T>[] | StrategyToRowArray<FetchedProperties<T, V>,T>): StrategyToRowArray<FetchedProperties<T, {}>, T>;
-	getMany<V extends any, FS extends FetchingStrategy<T>>(rows: PrimaryRowFilter<T>[] | StrategyToRowArray<FetchedProperties<T, V>,T>, fetchingStrategy?: FS): StrategyToRowArray<FetchedProperties<T, {}>, T>;
-
-	getAll<FS extends FetchingStrategy<T>>(fetchingStrategy: FS): StrategyToRowArray<FetchedProperties<T, FS>, T>;
-	getAll<FS extends FetchingStrategy<T>>(): StrategyToRowArray<FetchedProperties<T, FS>, T>;
 
 	// insert(epostHistorikks: EpostHistorikk[]): Promise<EpostHistorikkArray>;
-    // insert(epostHistorikks: EpostHistorikk[], fetchingStrategy: EpostHistorikkStrategy): Promise<EpostHistorikkArray>;
-    // insert(epostHistorikk: EpostHistorikk): Promise<EpostHistorikkRow>;
-    // insert(epostHistorikk: EpostHistorikk, fetchingStrategy: EpostHistorikkStrategy): Promise<EpostHistorikkRow>;
-    // insertAndForget(epostHistorikks: EpostHistorikk[]): Promise<void>;
-    // insertAndForget(epostHistorikk: EpostHistorikk): Promise<void>;
-    // delete(filter?: RawFilter): Promise<void>;
-    // delete(epostHistorikks: Array<EpostHistorikk>): Promise<void>;
-    // deleteCascade(filter?: RawFilter): Promise<void>;
-    // deleteCascade(epostHistorikks: Array<EpostHistorikk>): Promise<void>;
+	// insert(epostHistorikks: EpostHistorikk[], fetchingStrategy: EpostHistorikkStrategy): Promise<EpostHistorikkArray>;
+	// insert(epostHistorikk: EpostHistorikk): Promise<EpostHistorikkRow>;
+	// insert(epostHistorikk: EpostHistorikk, fetchingStrategy: EpostHistorikkStrategy): Promise<EpostHistorikkRow>;
+	// insertAndForget(epostHistorikks: EpostHistorikk[]): Promise<void>;
+	// insertAndForget(epostHistorikk: EpostHistorikk): Promise<void>;
+	// delete(filter?: RawFilter): Promise<void>;
+	// delete(epostHistorikks: Array<EpostHistorikk>): Promise<void>;
+	// deleteCascade(filter?: RawFilter): Promise<void>;
+	// deleteCascade(epostHistorikks: Array<EpostHistorikk>): Promise<void>;
 
 
 
@@ -107,11 +101,11 @@ type MappedColumnsAndRelations<T> = RemoveNeverFlat<{
 	: never
 }>
 
-type OneOrJoinTable<T> = ((fn: (table: MappedColumnsAndRelations<T>) => RawFilter) =>  Filter) & {
+type OneOrJoinTable<T> = ((fn: (table: MappedColumnsAndRelations<T>) => RawFilter) => Filter) & {
 	exists: () => Filter;
 }
 
-type ManyTable<T> = ((fn: (table: MappedColumnsAndRelations<T>) => RawFilter) =>  Filter) & {
+type ManyTable<T> = ((fn: (table: MappedColumnsAndRelations<T>) => RawFilter) => Filter) & {
 	all(selector: (table: MappedColumnsAndRelations<T>) => RawFilter): Filter;
 	any(selector: (table: MappedColumnsAndRelations<T>) => RawFilter): Filter;
 	none(selector: (table: MappedColumnsAndRelations<T>) => RawFilter): Filter;
@@ -142,7 +136,7 @@ type FetchingStrategy<T> = {
 	? boolean
 	: boolean | FetchingStrategy<T[K]>
 } & {
-	orderBy?: Array<OrderBy<Extract<keyof AllowedColumns<T>, string>>>;
+	orderBy?: OrderBy<Extract<keyof AllowedColumns<T>, string>>[] | OrderBy<Extract<keyof AllowedColumns<T>, string>>;
 	limit?: number;
 	offset?: number;
 };
@@ -316,7 +310,6 @@ type StrategyToRow<T, U> = StrategyToRowData<T> & {
 type StrategyToRowArray<T, U> = StrategyToRowData<T>[] & {
 	saveChanges(): Promise<void>;
 	saveChanges<C extends Concurrency<U>>(concurrency?: C): Promise<void>;
-	// saveChanges<FS extends FetchingStrategy<U>, C extends Concurrency<U>>(concurrency?: C): Promise<void>;
 	acceptChanges(): void;
 	clearChanges(): void;
 	refresh(): Promise<void>;
@@ -324,46 +317,6 @@ type StrategyToRowArray<T, U> = StrategyToRowData<T>[] & {
 	delete(): Promise<void>;
 	delete(concurrency: Concurrency<U>): Promise<void>;
 };
-
-type StrategyToRowData<T> = {
-	[K in keyof RemoveNever<NotNullProperties<T>>]:
-	T[K] extends StringColumnType<infer M>
-	? string
-	: T[K] extends UuidColumnType<infer M>
-	? string
-	: T[K] extends NumericColumnType<infer M>
-	? number
-	: T[K] extends DateColumnType<infer M>
-	? string
-	: T[K] extends BinaryColumnType<infer M>
-	? string
-	: T[K] extends BooleanColumnType<infer M>
-	? boolean
-	: T[K] extends JSONColumnType<infer M>
-	? JsonType
-	: T[K] extends Array<infer V>
-	? StrategyToRowData<T[K]>[]
-	: StrategyToRowData<T[K]>
-} & {
-		[K in keyof RemoveNever<NullProperties<T>>]?:
-		T[K] extends StringColumnType<infer M>
-		? string | null
-		: T[K] extends UuidColumnType<infer M>
-		? string | null
-		: T[K] extends NumericColumnType<infer M>
-		? number | null
-		: T[K] extends DateColumnType<infer M>
-		? string | null
-		: T[K] extends BinaryColumnType<infer M>
-		? string | null
-		: T[K] extends BooleanColumnType<infer M>
-		? boolean | null
-		: T[K] extends JSONColumnType<infer M>
-		? JsonType | null
-		: T[K] extends ManyRelation
-		? StrategyToRowData<T[K]>[]
-		: StrategyToRowData<T[K]>
-	};
 
 type JsonValue = null | boolean | number | string | JsonArray | JsonObject;
 
@@ -405,21 +358,19 @@ type AtLeastOneTrue<T> = {
 	[K in keyof T]: T[K] extends true ? true : never;
 }[keyof T] extends never ? false : true;
 
-type ExtractColumns<T, TStrategy> = {
+type ExtractColumnBools<T, TStrategy> = RemoveNever<{
 	[K in keyof TStrategy]: K extends keyof T ?
-	T[K] extends ColumnTypes<infer M> ? TStrategy[K] : never
+	T[K] extends ColumnSymbols ? TStrategy[K] : never
 	: never
-}
+}>
 
-type FetchedProperties<T, TStrategy> = FetchedColumnProperties<T, TStrategy> & FetchedRelationProperties<T, TStrategy>;
-// type FetchedProperties<T, TStrategy> = FetchedRelationProperties<T, TStrategy>;
-// type FetchedProperties<T, TStrategy> = FetchedColumnProperties<T, TStrategy> ;
+type FetchedProperties<T, TStrategy> = FetchedColumnProperties<T, TStrategy> & FetchedRelationProperties<T, TStrategy >;
 
 type FetchedRelationProperties<T, TStrategy> = RemoveNeverFlat<{
 	[K in keyof T]:
 	K extends keyof TStrategy
 	? TStrategy[K] extends true
-	? T[K] extends ColumnTypes<infer M>
+	? T[K] extends ColumnSymbols
 	? never
 	: T[K] extends ManyRelation
 	? FetchedProperties<T[K], {}> & ManyRelation
@@ -432,11 +383,12 @@ type FetchedRelationProperties<T, TStrategy> = RemoveNeverFlat<{
 	: never
 }>;
 
-type FetchedColumnProperties<T, TStrategy> = RemoveNeverFlat<AtLeastOneTrue<RemoveNever<ExtractColumns<T, TStrategy>>> extends true ?
+ type FetchedColumnProperties<T, TStrategy> = RemoveNeverFlat<AtLeastOneTrue<ExtractColumnBools<T, TStrategy>> extends true ?
+ 	
 	{
 		[K in keyof T]: K extends keyof TStrategy
 		? TStrategy[K] extends true
-		? T[K] extends ColumnTypes<infer M>
+		? T[K] extends ColumnSymbols
 		? T[K]
 		: never
 		: never
@@ -445,7 +397,7 @@ type FetchedColumnProperties<T, TStrategy> = RemoveNeverFlat<AtLeastOneTrue<Remo
 	: {
 		[K in keyof T]: K extends keyof TStrategy
 		? TStrategy[K] extends true
-		? T[K] extends ColumnTypes<infer M>
+		? T[K] extends ColumnSymbols
 		? T[K]
 		: never
 		: never
@@ -453,7 +405,50 @@ type FetchedColumnProperties<T, TStrategy> = RemoveNeverFlat<AtLeastOneTrue<Remo
 	}>;
 
 
-type NegotiateDefaultStrategy<T> = T extends ColumnTypes<infer M> ? T : never
+type StrategyToRowData<T> = {
+	[K in keyof RemoveNever<NotNullProperties<T>>]:
+	T[K] extends StringColumnSymbol
+	? string
+	: T[K] extends UuidColumnSymbol
+	? string
+	: T[K] extends NumericColumnSymbol
+	? number
+	: T[K] extends DateColumnSymbol
+	? string
+	: T[K] extends BinaryColumnSymbol
+	? string
+	: T[K] extends BooleanColumnSymbol
+	? boolean
+	: T[K] extends JSONColumnSymbol
+	? JsonType
+	// : never;
+	: T[K] extends ManyRelation
+	? StrategyToRowData<T[K]>[]
+	: StrategyToRowData<T[K]>
+}
+ & {
+		[K in keyof RemoveNever<NullProperties<T>>]?:
+		T[K] extends StringColumnSymbol
+		? string | null
+		: T[K] extends UuidColumnSymbol
+		? string | null
+		: T[K] extends NumericColumnSymbol
+		? number | null
+		: T[K] extends DateColumnSymbol
+		? string | null
+		: T[K] extends BinaryColumnSymbol
+		? string | null
+		: T[K] extends BooleanColumnSymbol
+		? boolean | null
+		: T[K] extends JSONColumnSymbol
+		? JsonType | null
+		// : never
+		: T[K] extends ManyRelation
+		? StrategyToRowData<T[K]>[]
+		: StrategyToRowData<T[K]>
+	};
+
+type NegotiateDefaultStrategy<T> = T extends ColumnSymbols ? T : never
 
 type RemoveNever<T> = {
 	[K in keyof T as T[K] extends never ? never : K]: T[K] extends object ? RemoveNever<T[K]> : T[K]
