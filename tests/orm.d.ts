@@ -29,6 +29,7 @@ type JsonPatch = Array<{
 	from?: string;
 }>;
 
+type ToJsonType<M> = M extends JsonOf<infer N> ? N : JsonType
 
 type PrimaryRowFilter<T> = StrategyToRowData2<ExtractPrimary<T>>
 type StrategyToRowData2<T> = {
@@ -46,7 +47,7 @@ type StrategyToRowData2<T> = {
 	: T[K] extends BooleanColumnType<infer M>
 	? boolean
 	: T[K] extends JSONColumnType<infer M>
-	? JsonType
+	? ToJsonType<M>	
 	: never
 }
 
@@ -128,6 +129,8 @@ T extends UuidColumnSymbol
 ? string
 : T extends BooleanColumnSymbol
 ? boolean
+: T extends JsonOf<infer M>
+? M
 : T extends JSONColumnSymbol
 ? JsonType
 : never
@@ -470,9 +473,10 @@ type StrategyToRowData<T> = {
 	? string
 	: T[K] extends BooleanColumnSymbol
 	? boolean
+	: T[K] extends JsonOf<infer M>
+	? M
 	: T[K] extends JSONColumnSymbol
 	? JsonType
-	// : never;
 	: T[K] extends ManyRelation
 	? StrategyToRowData<T[K]>[]
 	: StrategyToRowData<T[K]>
@@ -491,8 +495,10 @@ type StrategyToRowData<T> = {
 		? string | null
 		: T[K] extends BooleanColumnSymbol
 		? boolean | null
+		: T[K] extends JsonOf<infer M>
+		? M | null
 		: T[K] extends JSONColumnSymbol
-		? JsonType | null
+		? JsonType | null	
 		// : never
 		: T[K] extends ManyRelation
 		? StrategyToRowData<T[K]>[]
@@ -650,20 +656,20 @@ type JSONColumnSymbol = {
 }
 
 type JSONColumnType<M> = {
-	equal(value: JsonType | null): Filter;
-	eq(value: JsonType): Filter;
-	notEqual(value: JsonType | null): Filter
-	ne(value: JsonType): Filter
-	lessThan(value: JsonType): Filter;
-	lt(value: JsonType): Filter;
-	lessThanOrEqual(value: JsonType): Filter;
-	le(value: JsonType): Filter;
-	greaterThan(value: JsonType): Filter;
-	gt(value: JsonType): Filter;
-	greaterThanOrEqual(value: JsonType): Filter;
-	ge(value: JsonType): Filter;
-	between(from: JsonType, to: JsonType): Filter;
-	in(values: Array<JsonType | null>): Filter;
+	equal(value: ToJsonType<M> | null): Filter;
+	eq(value: ToJsonType<M>): Filter;
+	notEqual(value: ToJsonType<M> | null): Filter
+	ne(value: ToJsonType<M>): Filter
+	lessThan(value: ToJsonType<M>): Filter;
+	lt(value: ToJsonType<M>): Filter;
+	lessThanOrEqual(value: ToJsonType<M>): Filter;
+	le(value: ToJsonType<M>): Filter;
+	greaterThan(value: ToJsonType<M>): Filter;
+	gt(value: ToJsonType<M>): Filter;
+	greaterThanOrEqual(value: ToJsonType<M>): Filter;
+	ge(value: ToJsonType<M>): Filter;
+	between(from: ToJsonType<M>, to: ToJsonType<M>): Filter;
+	in(values: Array<ToJsonType<M> | null>): Filter;
 } & M & JSONColumnSymbol
 
 interface IsPrimary {
@@ -674,6 +680,11 @@ type NotNull = {
 	[' notNull']: boolean;
 }
 
+type JsonOf<T> = {
+	[' isjsonOf']: boolean;
+	type: T
+}
+
 interface ColumnType<M> {
 	string(): StringColumnTypeDef<M & StringColumnSymbol>;
 	uuid(): UuidColumnTypeDef<M & UuidColumnSymbol>;
@@ -682,6 +693,7 @@ interface ColumnType<M> {
 	binary(): BinaryColumnTypeDef<M & BinaryColumnSymbol>;
 	boolean(): BooleanColumnTypeDef<M & BooleanColumnSymbol>;
 	json(): JSONColumnTypeDef<M & JSONColumnSymbol>;
+	jsonOf<T>(): JSONColumnTypeDef<M & JSONColumnSymbol & JsonOf<T>>;
 }
 
 
@@ -696,9 +708,9 @@ type StringValidator<M> = M extends NotNull ? {
     validate(validator: (value?: string | null) => void):  StringColumnTypeDef<M> 
 };
 type NumericValidator<M> = M extends NotNull ? {
-    validate(validator: (value: string) => void):  NumericColumnTypeDef<M> 
+    validate(validator: (value: number) => void):  NumericColumnTypeDef<M> 
 } : {
-    validate(validator: (value?: string | null) => void):  NumericColumnTypeDef<M> 
+    validate(validator: (value?: number | null) => void):  NumericColumnTypeDef<M> 
 };
 type BinaryValidator<M> = M extends NotNull ? {
     validate(validator: (value: string) => void):  BinaryColumnTypeDef<M> 
@@ -706,14 +718,14 @@ type BinaryValidator<M> = M extends NotNull ? {
     validate(validator: (value?: string | null) => void):  BinaryColumnTypeDef<M> 
 };
 type BooleanValidator<M> = M extends NotNull ? {
-    validate(validator: (value: string) => void):  BooleanColumnTypeDef<M> 
+    validate(validator: (value: boolean) => void):  BooleanColumnTypeDef<M> 
 } : {
-    validate(validator: (value?: string | null) => void):  BooleanColumnTypeDef<M> 
+    validate(validator: (value?: boolean | null) => void):  BooleanColumnTypeDef<M> 
 };
 type JSONValidator<M> = M extends NotNull ? {
-    validate(validator: (value: JsonType) => void):  NumericColumnTypeDef<M> 
+    validate(validator: (value: ToJsonType<M>) => void):  JSONColumnTypeDef<M> 
 } : {
-    validate(validator: (value?: string | null) => void):  NumericColumnTypeDef<M> 
+    validate(validator: (value?: ToJsonType<M> | null) => void):  JSONColumnTypeDef<M> 
 };
 type DateValidator<M> = M extends NotNull ? {
     validate(validator: (value: string | Date) => void):  DateColumnTypeDef<M> 
@@ -769,8 +781,8 @@ JSONValidator<M>
 	notNull(): JSONColumnTypeDef<M & NotNull> & NotNull;
 	serializable(value: boolean): JSONColumnTypeDef<M>;
 	JSONSchema(schema: object, options?: Options): JSONColumnTypeDef<M>;
-	default(value: JsonType | (() => string)): JSONColumnTypeDef<M>
-	dbNull(value: JsonType): JSONColumnTypeDef<M>
+	default(value: ToJsonType<M> | (() => string)): JSONColumnTypeDef<M>
+	dbNull(value: ToJsonType<M>): JSONColumnTypeDef<M>
 } & ColumnTypeOf<JSONColumnType<M>> & M;
 
 type BinaryColumnTypeDef<M> = 

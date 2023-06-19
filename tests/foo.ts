@@ -41,7 +41,7 @@ const order = orm.table('order')
       createdAt: column('created_at').date(),
       updatedAt: column('updated_at').date(),
       customerId: column('customer_id').uuid(),
-      picture: column('picture').json()
+      picture: column('picture').jsonOf<Foo>()
     }
   ))
   .map((x) => (
@@ -51,9 +51,21 @@ const order = orm.table('order')
     }
   ));
 
-const db = orm({ order, customer });
+
+
+interface Foo {
+    hello: string;
+    world: number;
+    sub: {
+      a: boolean
+      b: boolean
+    }
+}
+
+const db = orm({ order, customer,  });
 
 const filter = db.order.customer.name.eq("John");
+
 let rows = await  db.order.getOne(filter, {lines: true, customer: true});
 
 const data = {id: '7', title: 'title', customer: {id: '22',name: 'jp'}};
@@ -61,8 +73,11 @@ const data = {id: '7', title: 'title', customer: {id: '22',name: 'jp'}};
 let inserted = await db.order.insert(data, {});
 
 let rowById = await db.order.getById('id');
+
+
 rowById.customerId = '12345';
 await rowById.saveChanges();
+
 const patch : any = [{foo: 1}];
 
 
