@@ -725,6 +725,7 @@ StringValidator<M>
 {
 	primary(): StringColumnTypeDef<M & IsPrimary> & IsPrimary;
 	notNull(): StringColumnTypeDef<M & NotNull> & NotNull;
+	default(value: string | (() => string)): StringColumnTypeDef<M>
 	dbNull(value: string): StringColumnTypeDef<M>
 } 
 & 
@@ -737,6 +738,7 @@ NumericValidator<M>
 {
 	primary(): NumericColumnTypeDef<M & IsPrimary> & IsPrimary;
 	notNull(): NumericColumnTypeDef<M & NotNull> & NotNull;
+	default(value: number | (() => string)): NumericColumnTypeDef<M>
 	dbNull(value: number): NumericColumnTypeDef<M>
 } & ColumnTypeOf<NumericColumnType<M>> & M;
 
@@ -747,6 +749,7 @@ type UuidColumnTypeDef<M> =
 {
 	primary(): UuidColumnTypeDef<M & IsPrimary> & IsPrimary;
 	notNull(): UuidColumnTypeDef<M & NotNull> & NotNull;
+	default(value: string | (() => string)): UuidColumnTypeDef<M>
 	dbNull(value: string): UuidColumnTypeDef<M>
 } & ColumnTypeOf<UuidColumnType<M>> & M;
 
@@ -756,6 +759,7 @@ JSONValidator<M>
 {
 	primary(): JSONColumnTypeDef<M & IsPrimary> & IsPrimary;
 	notNull(): JSONColumnTypeDef<M & NotNull> & NotNull;
+	default(value: JsonType | (() => string)): JSONColumnTypeDef<M>
 	dbNull(value: JsonType): JSONColumnTypeDef<M>
 } & ColumnTypeOf<JSONColumnType<M>> & M;
 
@@ -765,6 +769,7 @@ BinaryValidator<M>
 {
 	primary(): BinaryColumnTypeDef<M & IsPrimary> & IsPrimary;
 	notNull(): BinaryColumnTypeDef<M & NotNull> & NotNull;	
+	default(value: string | (() => string)): BinaryColumnTypeDef<M>
 	dbNull(value: string): BinaryColumnTypeDef<M>
 } & ColumnTypeOf<BinaryColumnType<M>> & M;
 
@@ -775,6 +780,7 @@ BooleanValidator <M>
 {
 	primary(): BooleanColumnTypeDef<M & IsPrimary> & IsPrimary;
 	notNull(): BooleanColumnTypeDef<M & NotNull> & NotNull;
+	default(value: boolean | (() => string)): BooleanColumnTypeDef<M>
 	dbNull(value: boolean): BooleanColumnTypeDef<M>
 } & ColumnTypeOf<BooleanColumnType<M>> & M;
 
@@ -784,7 +790,8 @@ DateValidator<M>
 {
 	primary(): DateColumnTypeDef<M & IsPrimary> & IsPrimary;
 	notNull(): DateColumnTypeDef<M & NotNull> & NotNull;
-	dbNull(value: String | Date): DateColumnTypeDef<M>
+	dbNull(value: string | Date | (() => string | Date)): DateColumnTypeDef<M>
+	dbNull(value: string | Date): DateColumnTypeDef<M>
 } & ColumnTypeOf<DateColumnType<M>> & M;
 
 interface ColumnTypeOf<T> {
