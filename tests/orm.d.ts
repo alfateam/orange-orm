@@ -48,36 +48,74 @@ type StrategyToRowData2<T> = {
 	: never
 }
 
-
-
+type NonLeafNodes<T> = {
+	[K in keyof T]: T[K] extends object ? NonLeafNodes<T[K]> : never;
+};
 
 
 type MappedTable<T> = {
-	getOne(filter?: Filter | PrimaryRowFilter<T>): StrategyToRow<FetchedProperties<T, {}>, T>;
-	getOne<FS extends FetchingStrategy<T>>(filter?: Filter | PrimaryRowFilter<T>, fetchingStrategy?: FS ): StrategyToRow<FetchedProperties<T, FS>, T>;
+	getOne(filter?: Filter | PrimaryRowFilter<T>): Promise<StrategyToRow<FetchedProperties<T, {}>, T>>;
+	getOne<FS extends FetchingStrategy<T>>(filter?: Filter | PrimaryRowFilter<T>, fetchingStrategy?: FS): Promise<StrategyToRow<FetchedProperties<T, FS>, T>>;
 
-	getMany(filter?: Filter | PrimaryRowFilter<T>[]): StrategyToRowArray<FetchedProperties<T, {}>, T>;
-	getMany<FS extends FetchingStrategy<T>>(filter?: Filter | PrimaryRowFilter<T>[], fetchingStrategy?: FS ): StrategyToRowArray<FetchedProperties<T, FS>, T>;
+	insert<TRow extends StrategyToRowData<T>>(row: TRow): Promise<StrategyToRow<FetchedProperties<T, NonLeafNodes<TRow>>, T>>;
+	insertAndForget<TRow extends StrategyToRowData<T>>(row: TRow): Promise<void>;
+	insert<TRow extends StrategyToRowData<T>, FS extends FetchingStrategy<T>>(row: TRow, strategy: FS): Promise<StrategyToRow<FetchedProperties<T, FS>, T>>;
+
+	getMany(filter?: Filter | PrimaryRowFilter<T>[]): Promise<StrategyToRowArray<FetchedProperties<T, {}>, T>>;
+	getMany<FS extends FetchingStrategy<T>>(filter?: Filter | PrimaryRowFilter<T>[], fetchingStrategy?: FS): Promise<StrategyToRowArray<FetchedProperties<T, FS>, T>>;
 	getAll(): StrategyToRowArray<FetchedProperties<T, {}>, T>;
-	getAll<FS extends FetchingStrategy<T>>(fetchingStrategy?: FS ): StrategyToRowArray<FetchedProperties<T, FS>, T>;
+	getAll<FS extends FetchingStrategy<T>>(fetchingStrategy?: FS): Promise<StrategyToRowArray<FetchedProperties<T, FS>, T>>;
 
-
-	// insert(epostHistorikks: EpostHistorikk[]): Promise<EpostHistorikkArray>;
-	// insert(epostHistorikks: EpostHistorikk[], fetchingStrategy: EpostHistorikkStrategy): Promise<EpostHistorikkArray>;
-	// insert(epostHistorikk: EpostHistorikk): Promise<EpostHistorikkRow>;
-	// insert(epostHistorikk: EpostHistorikk, fetchingStrategy: EpostHistorikkStrategy): Promise<EpostHistorikkRow>;
-	// insertAndForget(epostHistorikks: EpostHistorikk[]): Promise<void>;
-	// insertAndForget(epostHistorikk: EpostHistorikk): Promise<void>;
-	// delete(filter?: RawFilter): Promise<void>;
-	// delete(epostHistorikks: Array<EpostHistorikk>): Promise<void>;
-	// deleteCascade(filter?: RawFilter): Promise<void>;
-	// deleteCascade(epostHistorikks: Array<EpostHistorikk>): Promise<void>;
-
-
+	delete(filter?: Filter | PrimaryRowFilter<T>[]): Promise<void>;
+	deleteCascade(filter?: Filter | PrimaryRowFilter<T>[]): Promise<void>;
 
 	readonly metaData: Concurrency<T>;
 
-} & MappedColumnsAndRelations<T>
+} & MappedColumnsAndRelations<T> & GetById<T, CountProperties<ExtractPrimary<T>>>;
+
+type GetById<T, Count extends number> = Count extends 1 
+	? {
+		getById(id: ColumnToType<PickPropertyValue1<PickTypesOf<T, IsPrimary>>>) : Promise<StrategyToRow<FetchedProperties<T, {}>, T>>;
+	}
+	: Count extends 2 
+	? {
+		getById(id: ColumnToType<PickPropertyValue1<PickTypesOf<T, IsPrimary>>>, id2: ColumnToType<PickPropertyValue2<PickTypesOf<T, IsPrimary>>>) : Promise<StrategyToRow<FetchedProperties<T, {}>, T>>;
+	}
+	: Count extends 3 
+	? {
+		getById(id: ColumnToType<PickPropertyValue1<PickTypesOf<T, IsPrimary>>>, id2: ColumnToType<PickPropertyValue2<PickTypesOf<T, IsPrimary>>>, id3: ColumnToType<PickPropertyValue3<PickTypesOf<T, IsPrimary>>>) : Promise<StrategyToRow<FetchedProperties<T, {}>, T>>;
+	}
+	: Count extends 4 
+	? {
+		getById(id: ColumnToType<PickPropertyValue1<PickTypesOf<T, IsPrimary>>>, id2: ColumnToType<PickPropertyValue2<PickTypesOf<T, IsPrimary>>>, id3: ColumnToType<PickPropertyValue3<PickTypesOf<T, IsPrimary>>>, id4: ColumnToType<PickPropertyValue4<PickTypesOf<T, IsPrimary>>>) : Promise<StrategyToRow<FetchedProperties<T, {}>, T>>;
+	}
+	: Count extends 5 
+	? {
+		getById(id: ColumnToType<PickPropertyValue1<PickTypesOf<T, IsPrimary>>>, id2: ColumnToType<PickPropertyValue2<PickTypesOf<T, IsPrimary>>>, id3: ColumnToType<PickPropertyValue3<PickTypesOf<T, IsPrimary>>>, id4: ColumnToType<PickPropertyValue4<PickTypesOf<T, IsPrimary>>>,id5: ColumnToType<PickPropertyValue5<PickTypesOf<T, IsPrimary>>>) : Promise<StrategyToRow<FetchedProperties<T, {}>, T>>;
+	}
+	: Count extends 6 
+	? {		
+		getById(id: ColumnToType<PickPropertyValue1<PickTypesOf<T, IsPrimary>>>, id2: ColumnToType<PickPropertyValue2<PickTypesOf<T, IsPrimary>>>, id3: ColumnToType<PickPropertyValue3<PickTypesOf<T, IsPrimary>>>, id4: ColumnToType<PickPropertyValue4<PickTypesOf<T, IsPrimary>>>,id5: ColumnToType<PickPropertyValue5<PickTypesOf<T, IsPrimary>>>,id6: ColumnToType<PickPropertyValue6<PickTypesOf<T, IsPrimary>>>) : Promise<StrategyToRow<FetchedProperties<T, {}>, T>>;
+	}
+	: never
+
+
+type ColumnToType<T> = 
+T extends UuidColumnSymbol
+? string
+: T extends StringColumnSymbol
+? string
+: T extends NumericColumnSymbol
+? number
+: T extends DateColumnSymbol
+? string
+: T extends BinaryColumnSymbol
+? string
+: T extends BooleanColumnSymbol
+? boolean
+: T extends JSONColumnSymbol
+? JsonType
+: never
 
 type MappedColumnsAndRelations<T> = RemoveNeverFlat<{
 	[K in keyof T]: T[K] extends StringColumnTypeDef<infer M>
@@ -129,7 +167,6 @@ type AllowedColumnsAndTablesConcurrency<T> = {
 	: never;
 };
 
-
 type FetchingStrategy<T> = {
 	[K in keyof T & keyof RemoveNever<AllowedColumnsAndTablesStrategy<T>>]?:
 	T[K] extends ColumnSymbols
@@ -172,13 +209,12 @@ type PickTypesOf<T, U> = {
 
 type ExtractPrimary<T> = PickTypesOf<T, IsPrimary>;
 type ExtractPrimary1<T> = PickTypesOf<T, PickPropertyValue1<PickTypesOf<T, IsPrimary>>>;
+
 type ExtractPrimary2<T> = PickTypesOf<T, PickPropertyValue2<PickTypesOf<T, IsPrimary>>>;
-
-
-type ExtractPrimary3<T> = PickTypesOf<T, IsPrimary & PickPropertyValue3<T>>;
-type ExtractPrimary4<T> = PickTypesOf<T, IsPrimary & PickPropertyValue4<T>>;
-type ExtractPrimary5<T> = PickTypesOf<T, IsPrimary & PickPropertyValue5<T>>;
-type ExtractPrimary6<T> = PickTypesOf<T, IsPrimary & PickPropertyValue6<T>>;
+type ExtractPrimary3<T> = PickTypesOf<T, PickPropertyValue3<PickTypesOf<T, IsPrimary>>>;
+type ExtractPrimary4<T> = PickTypesOf<T, PickPropertyValue4<PickTypesOf<T, IsPrimary>>>;
+type ExtractPrimary5<T> = PickTypesOf<T, PickPropertyValue5<PickTypesOf<T, IsPrimary>>>;
+type ExtractPrimary6<T> = PickTypesOf<T, PickPropertyValue6<PickTypesOf<T, IsPrimary>>>;
 
 type ToColumnTypes<T> = {
 	[K in keyof T]:
@@ -364,7 +400,7 @@ type ExtractColumnBools<T, TStrategy> = RemoveNever<{
 	: never
 }>
 
-type FetchedProperties<T, TStrategy> = FetchedColumnProperties<T, TStrategy> & FetchedRelationProperties<T, TStrategy >;
+type FetchedProperties<T, TStrategy> = FetchedColumnProperties<T, TStrategy> & FetchedRelationProperties<T, TStrategy>;
 
 type FetchedRelationProperties<T, TStrategy> = RemoveNeverFlat<{
 	[K in keyof T]:
@@ -383,8 +419,8 @@ type FetchedRelationProperties<T, TStrategy> = RemoveNeverFlat<{
 	: never
 }>;
 
- type FetchedColumnProperties<T, TStrategy> = RemoveNeverFlat<AtLeastOneTrue<ExtractColumnBools<T, TStrategy>> extends true ?
- 	
+type FetchedColumnProperties<T, TStrategy> = RemoveNeverFlat<AtLeastOneTrue<ExtractColumnBools<T, TStrategy>> extends true ?
+
 	{
 		[K in keyof T]: K extends keyof TStrategy
 		? TStrategy[K] extends true
@@ -426,7 +462,7 @@ type StrategyToRowData<T> = {
 	? StrategyToRowData<T[K]>[]
 	: StrategyToRowData<T[K]>
 }
- & {
+	& {
 		[K in keyof RemoveNever<NullProperties<T>>]?:
 		T[K] extends StringColumnSymbol
 		? string | null
@@ -640,7 +676,7 @@ type StringColumnTypeDef<M> = {
 type NumericColumnTypeDef<M> = {
 	notNull(): NumericColumnTypeDef<M & NotNull> & NotNull;
 	primary(): NumericColumnTypeDef<M & IsPrimary> & IsPrimary;
-} & ColumnTypeOf<NumericColumnType<M>>;
+} & ColumnTypeOf<NumericColumnType<M>> & M;
 
 type UuidColumnTypeDef<M> = {
 	notNull(): UuidColumnTypeDef<M & NotNull> & NotNull;

@@ -28,7 +28,7 @@ const orderLines = orm.table('orderLines')
     {
       id: column('id').uuid().primary(),
       orderId: column('orderId').uuid().notNull(),
-      product: column('product').string()
+      product: column('product').string(),
     }
   ));
 
@@ -36,8 +36,8 @@ const order = orm.table('order')
   .map(({ column }) => (
     {
       id: column('id').uuid().notNull().primary(),
-      title: column('name').string().notNull(),
       balance: column('balance').numeric(),
+      title: column('name').string(),
       createdAt: column('created_at').date(),
       updatedAt: column('updated_at').date(),
       customerId: column('customer_id').uuid(),
@@ -47,13 +47,20 @@ const order = orm.table('order')
   .map((x) => (
     {
       customer: x.references(customer).by('customerId'),
-      lines: x.hasMany(orderLines).by('orderId')
+      // lines: x.hasMany(orderLines).by('orderId')
     }
   ));
 
 const db = orm({ order, customer });
 
 const filter = db.order.customer.name.eq("John");
-let rows = await  db.order.getMany();
+let rows = await  db.order.getOne(undefined, undefined);
+
+const ins = {id: '7', title: 'title', customer: {id: '22',name: 'jp'}};
+
+let inserted = db.order.insert(ins, {});
+
+
+let rowById = await db.order.getById('33')
 
 
