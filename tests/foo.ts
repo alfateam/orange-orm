@@ -1,5 +1,5 @@
 // foo.ts
-import orm from './orm';
+import orm, { JsonPatch } from './orm';
 
 const party = orm.table('party')
   .map(x => (
@@ -56,10 +56,14 @@ const db = orm({ order, customer });
 const filter = db.order.customer.name.eq("John");
 let rows = await  db.order.getOne(filter, {lines: true, customer: true});
 
-const ins = {id: '7', title: 'title', customer: {id: '22',name: 'jp'}};
+const data = {id: '7', title: 'title', customer: {id: '22',name: 'jp'}};
 
-let inserted = db.order.insert(ins, {});
+let inserted = await db.order.insert(data, {});
 
-let rowById = await db.order.getById('id', {createdAt: true});
+let rowById = await db.order.getById('id');
+rowById.customerId = '12345';
+await rowById.saveChanges();
+const patch : any = [{foo: 1}];
 
 
+rowById.createdAt

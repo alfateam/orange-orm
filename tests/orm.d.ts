@@ -38,7 +38,7 @@ type StrategyToRowData2<T> = {
 	: T[K] extends NumericColumnType<infer M>
 	? number
 	: T[K] extends DateColumnType<infer M>
-	? string
+	? string | Date
 	: T[K] extends BinaryColumnType<infer M>
 	? string
 	: T[K] extends BooleanColumnType<infer M>
@@ -73,6 +73,8 @@ type MappedTable<T> = {
 	proxify<TRow extends StrategyToRowData<T>,FS extends FetchingStrategy<T>>(row: TRow, strategy: FS): StrategyToRow<FetchedProperties<T, NonLeafNodes<TRow>>, T>;
 	proxify<TRow extends StrategyToRowData<T>[]>(rows: TRow[]): StrategyToRowArray<FetchedProperties<T, NonLeafNodes<TRow>>, T>;
 	proxify<TRow extends StrategyToRowData<T>[],FS extends FetchingStrategy<T>>(rows: TRow[], strategy: FS): StrategyToRowArray<FetchedProperties<T, NonLeafNodes<TRow>>, T>;
+
+    patch<C extends Concurrency<T>>(patch: JsonPatch, concurrency: C): Promise<void>;
 
 	readonly metaData: Concurrency<T>;
 
@@ -482,7 +484,7 @@ type StrategyToRowData<T> = {
 		: T[K] extends NumericColumnSymbol
 		? number | null
 		: T[K] extends DateColumnSymbol
-		? string | null
+		? string | Date | null
 		: T[K] extends BinaryColumnSymbol
 		? string | null
 		: T[K] extends BooleanColumnSymbol
@@ -494,6 +496,7 @@ type StrategyToRowData<T> = {
 		? StrategyToRowData<T[K]>[]
 		: StrategyToRowData<T[K]>
 	};
+
 
 type NegotiateDefaultStrategy<T> = T extends ColumnSymbols ? T : never
 
@@ -680,38 +683,45 @@ interface ColumnType<M> {
 }
 
 type StringColumnTypeDef<M> = {
-	notNull(): StringColumnTypeDef<M & NotNull> & NotNull;
 	primary(): StringColumnTypeDef<M & IsPrimary> & IsPrimary;
+	notNull(): StringColumnTypeDef<M & NotNull> & NotNull;
+	validate(validator: (value?: string) => void): StringColumnTypeDef<M>
 } & ColumnTypeOf<StringColumnType<M>> & M
 
 type NumericColumnTypeDef<M> = {
-	notNull(): NumericColumnTypeDef<M & NotNull> & NotNull;
 	primary(): NumericColumnTypeDef<M & IsPrimary> & IsPrimary;
+	notNull(): NumericColumnTypeDef<M & NotNull> & NotNull;
+	validate(validator: (value?: number) => void): NumericColumnTypeDef<M>
 } & ColumnTypeOf<NumericColumnType<M>> & M;
 
 type UuidColumnTypeDef<M> = {
-	notNull(): UuidColumnTypeDef<M & NotNull> & NotNull;
 	primary(): UuidColumnTypeDef<M & IsPrimary> & IsPrimary;
+	notNull(): UuidColumnTypeDef<M & NotNull> & NotNull;
+	validate(validator: (value?: string) => void): UuidColumnTypeDef<M>
 } & ColumnTypeOf<UuidColumnType<M>> & M;
 
 type JSONColumnTypeDef<M> = {
-	notNull(): JSONColumnTypeDef<M & NotNull> & NotNull;
 	primary(): JSONColumnTypeDef<M & IsPrimary> & IsPrimary;
+	notNull(): JSONColumnTypeDef<M & NotNull> & NotNull;
+	validate(validator: (value?: JsonType) => void): JSONColumnTypeDef<M>
 } & ColumnTypeOf<JSONColumnType<M>> & M;
 
 type BinaryColumnTypeDef<M> = {
-	notNull(): BinaryColumnTypeDef<M & NotNull> & NotNull;
 	primary(): BinaryColumnTypeDef<M & IsPrimary> & IsPrimary;
+	notNull(): BinaryColumnTypeDef<M & NotNull> & NotNull;	
+	validate(validator: (value?: string) => void): BinaryColumnTypeDef<M>
 } & ColumnTypeOf<BinaryColumnType<M>> & M;
 
 type BooleanColumnTypeDef<M> = {
-	notNull(): BooleanColumnTypeDef<M & NotNull> & NotNull;
 	primary(): BooleanColumnTypeDef<M & IsPrimary> & IsPrimary;
+	notNull(): BooleanColumnTypeDef<M & NotNull> & NotNull;
+	validate(validator: (value?: boolean) => void): BooleanColumnTypeDef<M>
 } & ColumnTypeOf<BooleanColumnType<M>> & M;
 
 type DateColumnTypeDef<M> = {
-	notNull(): DateColumnTypeDef<M & NotNull> & NotNull;
 	primary(): DateColumnTypeDef<M & IsPrimary> & IsPrimary;
+	notNull(): DateColumnTypeDef<M & NotNull> & NotNull;
+	validate(validator: (value?: string) => void): DateColumnTypeDef<M>
 } & ColumnTypeOf<DateColumnType<M>> & M;
 
 interface ColumnTypeOf<T> {
