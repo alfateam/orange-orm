@@ -76,26 +76,32 @@ type MappedTable<T> = {
 type GetById<T, Count extends number> = Count extends 1 
 	? {
 		getById(id: ColumnToType<PickPropertyValue1<PickTypesOf<T, IsPrimary>>>) : Promise<StrategyToRow<FetchedProperties<T, {}>, T>>;
+		getById<FS extends FetchingStrategy<T>>(id: ColumnToType<PickPropertyValue1<PickTypesOf<T, IsPrimary>>>, fetchingStrategy: FS) : Promise<StrategyToRow<FetchedProperties<T, FS>, T>>;
 	}
 	: Count extends 2 
 	? {
 		getById(id: ColumnToType<PickPropertyValue1<PickTypesOf<T, IsPrimary>>>, id2: ColumnToType<PickPropertyValue2<PickTypesOf<T, IsPrimary>>>) : Promise<StrategyToRow<FetchedProperties<T, {}>, T>>;
+		getById<FS extends FetchingStrategy<T>>(id: ColumnToType<PickPropertyValue1<PickTypesOf<T, IsPrimary>>>, id2: ColumnToType<PickPropertyValue2<PickTypesOf<T, IsPrimary>>>, fetchingStrategy: FS) : Promise<StrategyToRow<FetchedProperties<T, FS>, T>>;
 	}
 	: Count extends 3 
 	? {
 		getById(id: ColumnToType<PickPropertyValue1<PickTypesOf<T, IsPrimary>>>, id2: ColumnToType<PickPropertyValue2<PickTypesOf<T, IsPrimary>>>, id3: ColumnToType<PickPropertyValue3<PickTypesOf<T, IsPrimary>>>) : Promise<StrategyToRow<FetchedProperties<T, {}>, T>>;
+		getById<FS extends FetchingStrategy<T>>(id: ColumnToType<PickPropertyValue1<PickTypesOf<T, IsPrimary>>>, id2: ColumnToType<PickPropertyValue2<PickTypesOf<T, IsPrimary>>>, id3: ColumnToType<PickPropertyValue3<PickTypesOf<T, IsPrimary>>>, fetchingStrategy: FS) : Promise<StrategyToRow<FetchedProperties<T, FS>, T>>;
 	}
 	: Count extends 4 
 	? {
 		getById(id: ColumnToType<PickPropertyValue1<PickTypesOf<T, IsPrimary>>>, id2: ColumnToType<PickPropertyValue2<PickTypesOf<T, IsPrimary>>>, id3: ColumnToType<PickPropertyValue3<PickTypesOf<T, IsPrimary>>>, id4: ColumnToType<PickPropertyValue4<PickTypesOf<T, IsPrimary>>>) : Promise<StrategyToRow<FetchedProperties<T, {}>, T>>;
+		getById<FS extends FetchingStrategy<T>>(id: ColumnToType<PickPropertyValue1<PickTypesOf<T, IsPrimary>>>, id2: ColumnToType<PickPropertyValue2<PickTypesOf<T, IsPrimary>>>, id3: ColumnToType<PickPropertyValue3<PickTypesOf<T, IsPrimary>>>, id4: ColumnToType<PickPropertyValue4<PickTypesOf<T, IsPrimary>>>, fetchingStrategy: FS) : Promise<StrategyToRow<FetchedProperties<T, FS>, T>>;
 	}
 	: Count extends 5 
 	? {
 		getById(id: ColumnToType<PickPropertyValue1<PickTypesOf<T, IsPrimary>>>, id2: ColumnToType<PickPropertyValue2<PickTypesOf<T, IsPrimary>>>, id3: ColumnToType<PickPropertyValue3<PickTypesOf<T, IsPrimary>>>, id4: ColumnToType<PickPropertyValue4<PickTypesOf<T, IsPrimary>>>,id5: ColumnToType<PickPropertyValue5<PickTypesOf<T, IsPrimary>>>) : Promise<StrategyToRow<FetchedProperties<T, {}>, T>>;
+		getById<FS extends FetchingStrategy<T>>(id: ColumnToType<PickPropertyValue1<PickTypesOf<T, IsPrimary>>>, id2: ColumnToType<PickPropertyValue2<PickTypesOf<T, IsPrimary>>>, id3: ColumnToType<PickPropertyValue3<PickTypesOf<T, IsPrimary>>>, id4: ColumnToType<PickPropertyValue4<PickTypesOf<T, IsPrimary>>>,id5: ColumnToType<PickPropertyValue5<PickTypesOf<T, IsPrimary>>>, fetchingStrategy: FS) : Promise<StrategyToRow<FetchedProperties<T, FS>, T>>;
 	}
 	: Count extends 6 
 	? {		
 		getById(id: ColumnToType<PickPropertyValue1<PickTypesOf<T, IsPrimary>>>, id2: ColumnToType<PickPropertyValue2<PickTypesOf<T, IsPrimary>>>, id3: ColumnToType<PickPropertyValue3<PickTypesOf<T, IsPrimary>>>, id4: ColumnToType<PickPropertyValue4<PickTypesOf<T, IsPrimary>>>,id5: ColumnToType<PickPropertyValue5<PickTypesOf<T, IsPrimary>>>,id6: ColumnToType<PickPropertyValue6<PickTypesOf<T, IsPrimary>>>) : Promise<StrategyToRow<FetchedProperties<T, {}>, T>>;
+		getById<FS extends FetchingStrategy<T>>(id: ColumnToType<PickPropertyValue1<PickTypesOf<T, IsPrimary>>>, id2: ColumnToType<PickPropertyValue2<PickTypesOf<T, IsPrimary>>>, id3: ColumnToType<PickPropertyValue3<PickTypesOf<T, IsPrimary>>>, id4: ColumnToType<PickPropertyValue4<PickTypesOf<T, IsPrimary>>>,id5: ColumnToType<PickPropertyValue5<PickTypesOf<T, IsPrimary>>>,id6: ColumnToType<PickPropertyValue6<PickTypesOf<T, IsPrimary>>>, fetchingStrategy: FS) : Promise<StrategyToRow<FetchedProperties<T, FS>, T>>;
 	}
 	: never
 
