@@ -62,7 +62,9 @@ interface Foo {
     }
 }
 
-const db = orm({ order, customer,  });
+const def = orm({ order, customer });
+const db = def({db: connectors => connectors.mssql('dd')});
+
 
 const filter = db.order.customer.name.eq("John");
 

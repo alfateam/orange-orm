@@ -1,4 +1,5 @@
 import { Options } from 'ajv';
+import { ConnectionConfig } from 'tedious';
 
 declare namespace ORM {
 
@@ -9,6 +10,44 @@ declare namespace ORM {
 }
 
 type MappedDb<T> = {
+	<O extends DbOptions<T>>(concurrency: O): NegotiateDbInstance<T,O>;	
+};
+
+type NegotiateDbInstance<T, C> = C extends WithDb ?
+	MappedDbInstance<T>
+	: MappedDb<T>;
+
+
+type WithDb =  {db: (connectors: Connectors) => Pool};
+
+type DbOptions<T> = {
+	[K in keyof T]?: T[K] extends MappedTableDef<infer U>
+	? Concurrency<U>
+	: never;
+} & {
+	concurrency?: ConcurrencyValues;
+	readonly?: boolean;
+	db?: (connectors: Connectors) => Pool;
+};
+
+interface Connectors {
+	postgres(connectionString: string, options?: PoolOptions): Pool;
+    sqlite(connectionString: string, options?: PoolOptions): Pool;
+    sap(connectionString: string, options?: PoolOptions): Pool;
+    mssql(connectionConfig: ConnectionConfig, options?: PoolOptions): Pool;
+    mssql(connectionString: string, options?: PoolOptions): Pool;
+    mysql(connectionString: string, options?: PoolOptions): Pool;
+}
+
+export interface Pool {
+	end(): Promise<void>;
+}
+
+export interface PoolOptions {
+	size?: number;
+}
+
+type MappedDbInstance<T> = {
 	[K in keyof T]: T[K] extends MappedTableDef<infer U>
 	? MappedTable<T[K]>
 	: never;
@@ -19,7 +58,8 @@ type MappedDb<T> = {
 	query(filter: RawFilter | string): Promise<unknown[]>;
 	query<T>(filter: RawFilter | string): Promise<T[]>;
 	createPatch(original: any[], modified: any[]): JsonPatch;
-	createPatch(original: any, modified: any): JsonPatch;
+	createPatch(original: any, modified: any): JsonPatch;	
+	<O extends DbOptions<T>>(concurrency: O): MappedDbInstance<void>;	
 };
 
 type JsonPatch = Array<{
@@ -200,7 +240,7 @@ type ConcurrencyValues = 'optimistic' | 'skipOnConflict' | 'overwrite';
 
 type ColumnConcurrency = {
 	readonly?: boolean;
-	concurrency: ConcurrencyValues
+	concurrency?: ConcurrencyValues
 }
 
 type ColumnSymbols = StringColumnSymbol | UuidColumnSymbol | NumericColumnSymbol | DateColumnSymbol | BooleanColumnSymbol | BinaryColumnSymbol | JSONColumnSymbol;
