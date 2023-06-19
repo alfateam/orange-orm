@@ -682,46 +682,102 @@ interface ColumnType<M> {
 	json(): JSONColumnTypeDef<M & JSONColumnSymbol>;
 }
 
-type StringColumnTypeDef<M> = {
+
+type UuidValidator<M> = M extends NotNull ? {
+    validate(validator: (value: string) => void):  UuidColumnTypeDef<M> 
+} : {
+    validate(validator: (value?: string | null) => void):  UuidColumnTypeDef<M> 
+};
+type StringValidator<M> = M extends NotNull ? {
+    validate(validator: (value: string) => void):  StringColumnTypeDef<M> 
+} : {
+    validate(validator: (value?: string | null) => void):  StringColumnTypeDef<M> 
+};
+type NumericValidator<M> = M extends NotNull ? {
+    validate(validator: (value: string) => void):  NumericColumnTypeDef<M> 
+} : {
+    validate(validator: (value?: string | null) => void):  NumericColumnTypeDef<M> 
+};
+type BinaryValidator<M> = M extends NotNull ? {
+    validate(validator: (value: string) => void):  BinaryColumnTypeDef<M> 
+} : {
+    validate(validator: (value?: string | null) => void):  BinaryColumnTypeDef<M> 
+};
+type BooleanValidator<M> = M extends NotNull ? {
+    validate(validator: (value: string) => void):  BooleanColumnTypeDef<M> 
+} : {
+    validate(validator: (value?: string | null) => void):  BooleanColumnTypeDef<M> 
+};
+type JSONValidator<M> = M extends NotNull ? {
+    validate(validator: (value: JsonType) => void):  NumericColumnTypeDef<M> 
+} : {
+    validate(validator: (value?: string | null) => void):  NumericColumnTypeDef<M> 
+};
+type DateValidator<M> = M extends NotNull ? {
+    validate(validator: (value: string | Date) => void):  DateColumnTypeDef<M> 
+} : {
+    validate(validator: (value?: string | Date | null) => void):  DateColumnTypeDef<M> 
+};
+
+type StringColumnTypeDef<M> = 
+StringValidator<M>
+&
+{
 	primary(): StringColumnTypeDef<M & IsPrimary> & IsPrimary;
 	notNull(): StringColumnTypeDef<M & NotNull> & NotNull;
-	validate(validator: (value?: string) => void): StringColumnTypeDef<M>
-} & ColumnTypeOf<StringColumnType<M>> & M
+} 
+& 
+ColumnTypeOf<StringColumnType<M>> 
+&  M
 
-type NumericColumnTypeDef<M> = {
+type NumericColumnTypeDef<M> = 
+NumericValidator<M>
+&
+{
 	primary(): NumericColumnTypeDef<M & IsPrimary> & IsPrimary;
 	notNull(): NumericColumnTypeDef<M & NotNull> & NotNull;
-	validate(validator: (value?: number) => void): NumericColumnTypeDef<M>
 } & ColumnTypeOf<NumericColumnType<M>> & M;
 
-type UuidColumnTypeDef<M> = {
+
+type UuidColumnTypeDef<M> = 
+ UuidValidator<M>
+&
+{
 	primary(): UuidColumnTypeDef<M & IsPrimary> & IsPrimary;
 	notNull(): UuidColumnTypeDef<M & NotNull> & NotNull;
-	validate(validator: (value?: string) => void): UuidColumnTypeDef<M>
 } & ColumnTypeOf<UuidColumnType<M>> & M;
 
-type JSONColumnTypeDef<M> = {
+type JSONColumnTypeDef<M> = 
+JSONValidator<M>
+&
+{
 	primary(): JSONColumnTypeDef<M & IsPrimary> & IsPrimary;
 	notNull(): JSONColumnTypeDef<M & NotNull> & NotNull;
-	validate(validator: (value?: JsonType) => void): JSONColumnTypeDef<M>
 } & ColumnTypeOf<JSONColumnType<M>> & M;
 
-type BinaryColumnTypeDef<M> = {
+type BinaryColumnTypeDef<M> = 
+BinaryValidator<M>
+&
+{
 	primary(): BinaryColumnTypeDef<M & IsPrimary> & IsPrimary;
 	notNull(): BinaryColumnTypeDef<M & NotNull> & NotNull;	
-	validate(validator: (value?: string) => void): BinaryColumnTypeDef<M>
 } & ColumnTypeOf<BinaryColumnType<M>> & M;
 
-type BooleanColumnTypeDef<M> = {
+type BooleanColumnTypeDef<M> = 
+BooleanValidator <M>
+&
+
+{
 	primary(): BooleanColumnTypeDef<M & IsPrimary> & IsPrimary;
 	notNull(): BooleanColumnTypeDef<M & NotNull> & NotNull;
-	validate(validator: (value?: boolean) => void): BooleanColumnTypeDef<M>
 } & ColumnTypeOf<BooleanColumnType<M>> & M;
 
-type DateColumnTypeDef<M> = {
+type DateColumnTypeDef<M> = 
+DateValidator<M>
+&
+{
 	primary(): DateColumnTypeDef<M & IsPrimary> & IsPrimary;
 	notNull(): DateColumnTypeDef<M & NotNull> & NotNull;
-	validate(validator: (value?: string) => void): DateColumnTypeDef<M>
 } & ColumnTypeOf<DateColumnType<M>> & M;
 
 interface ColumnTypeOf<T> {

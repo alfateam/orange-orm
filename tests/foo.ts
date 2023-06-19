@@ -1,18 +1,18 @@
 // foo.ts
-import orm, { JsonPatch } from './orm';
+import orm from './orm';
 
 const party = orm.table('party')
   .map(x => (
     {
-      id: x.column('id').uuid().primary(),
-      location: x.column('location').string(),
+      id: x.column('id').uuid().notNull().primary(),
+      location: x.column('location').string()
     }
   ));
 
 const customer = orm.table('customer')
   .map(x => (
     {
-      id: x.column('id').uuid().notNull().primary(),
+      id: x.column('id').uuid().notNull().validate((e) => !!e).primary(),
       name: x.column('name').string(),
       partyId: x.column('partyId').uuid(),
     }
@@ -26,7 +26,7 @@ const customer = orm.table('customer')
 const orderLines = orm.table('orderLines')
   .map(({ column }) => (
     {
-      id: column('id').uuid().primary(),
+      id: column('id').uuid().notNull().primary().validate(e => !!e),
       orderId: column('orderId').uuid().notNull(),
       product: column('product').string(),
     }
