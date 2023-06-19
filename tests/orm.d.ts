@@ -725,6 +725,7 @@ StringValidator<M>
 {
 	primary(): StringColumnTypeDef<M & IsPrimary> & IsPrimary;
 	notNull(): StringColumnTypeDef<M & NotNull> & NotNull;
+	dbNull(value: string): StringColumnTypeDef<M>
 } 
 & 
 ColumnTypeOf<StringColumnType<M>> 
@@ -736,6 +737,7 @@ NumericValidator<M>
 {
 	primary(): NumericColumnTypeDef<M & IsPrimary> & IsPrimary;
 	notNull(): NumericColumnTypeDef<M & NotNull> & NotNull;
+	dbNull(value: number): NumericColumnTypeDef<M>
 } & ColumnTypeOf<NumericColumnType<M>> & M;
 
 
@@ -745,6 +747,7 @@ type UuidColumnTypeDef<M> =
 {
 	primary(): UuidColumnTypeDef<M & IsPrimary> & IsPrimary;
 	notNull(): UuidColumnTypeDef<M & NotNull> & NotNull;
+	dbNull(value: string): UuidColumnTypeDef<M>
 } & ColumnTypeOf<UuidColumnType<M>> & M;
 
 type JSONColumnTypeDef<M> = 
@@ -753,6 +756,7 @@ JSONValidator<M>
 {
 	primary(): JSONColumnTypeDef<M & IsPrimary> & IsPrimary;
 	notNull(): JSONColumnTypeDef<M & NotNull> & NotNull;
+	dbNull(value: JsonType): JSONColumnTypeDef<M>
 } & ColumnTypeOf<JSONColumnType<M>> & M;
 
 type BinaryColumnTypeDef<M> = 
@@ -761,6 +765,7 @@ BinaryValidator<M>
 {
 	primary(): BinaryColumnTypeDef<M & IsPrimary> & IsPrimary;
 	notNull(): BinaryColumnTypeDef<M & NotNull> & NotNull;	
+	dbNull(value: string): BinaryColumnTypeDef<M>
 } & ColumnTypeOf<BinaryColumnType<M>> & M;
 
 type BooleanColumnTypeDef<M> = 
@@ -770,6 +775,7 @@ BooleanValidator <M>
 {
 	primary(): BooleanColumnTypeDef<M & IsPrimary> & IsPrimary;
 	notNull(): BooleanColumnTypeDef<M & NotNull> & NotNull;
+	dbNull(value: boolean): BooleanColumnTypeDef<M>
 } & ColumnTypeOf<BooleanColumnType<M>> & M;
 
 type DateColumnTypeDef<M> = 
@@ -778,6 +784,7 @@ DateValidator<M>
 {
 	primary(): DateColumnTypeDef<M & IsPrimary> & IsPrimary;
 	notNull(): DateColumnTypeDef<M & NotNull> & NotNull;
+	dbNull(value: String | Date): DateColumnTypeDef<M>
 } & ColumnTypeOf<DateColumnType<M>> & M;
 
 interface ColumnTypeOf<T> {
