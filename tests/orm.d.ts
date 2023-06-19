@@ -69,6 +69,11 @@ type MappedTable<T> = {
 	delete(filter?: Filter | PrimaryRowFilter<T>[]): Promise<void>;
 	deleteCascade(filter?: Filter | PrimaryRowFilter<T>[]): Promise<void>;
 
+	proxify<TRow extends StrategyToRowData<T>>(row: TRow): StrategyToRow<FetchedProperties<T, NonLeafNodes<TRow>>, T>;
+	proxify<TRow extends StrategyToRowData<T>,FS extends FetchingStrategy<T>>(row: TRow, strategy: FS): StrategyToRow<FetchedProperties<T, NonLeafNodes<TRow>>, T>;
+	proxify<TRow extends StrategyToRowData<T>[]>(rows: TRow[]): StrategyToRowArray<FetchedProperties<T, NonLeafNodes<TRow>>, T>;
+	proxify<TRow extends StrategyToRowData<T>[],FS extends FetchingStrategy<T>>(rows: TRow[], strategy: FS): StrategyToRowArray<FetchedProperties<T, NonLeafNodes<TRow>>, T>;
+
 	readonly metaData: Concurrency<T>;
 
 } & MappedColumnsAndRelations<T> & GetById<T, CountProperties<ExtractPrimary<T>>>;

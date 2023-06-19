@@ -24,7 +24,7 @@ const customer = orm.table('customer')
   ));
 
 const orderLines = orm.table('orderLines')
-  .map(({ column, primaryColumn }) => (
+  .map(({ column }) => (
     {
       id: column('id').uuid().primary(),
       orderId: column('orderId').uuid().notNull(),
@@ -47,20 +47,19 @@ const order = orm.table('order')
   .map((x) => (
     {
       customer: x.references(customer).by('customerId'),
-      // lines: x.hasMany(orderLines).by('orderId')
+      lines: x.hasMany(orderLines).by('orderId')
     }
   ));
 
 const db = orm({ order, customer });
 
 const filter = db.order.customer.name.eq("John");
-let rows = await  db.order.getOne(undefined, undefined);
+let rows = await  db.order.getOne(filter, {lines: true, customer: true});
 
 const ins = {id: '7', title: 'title', customer: {id: '22',name: 'jp'}};
 
 let inserted = db.order.insert(ins, {});
 
-
-let rowById = await db.order.getById('33')
+let rowById = await db.order.getById('id', {createdAt: true});
 
 
