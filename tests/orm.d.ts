@@ -875,7 +875,7 @@ declare namespace ORM {
 	type MapPropertiesTo5<T, V extends number = 5> = { [K in keyof T]: UnionOfTypes<MapPropertiesTo4<Omit<T, K>, V>> }
 	type MapPropertiesTo6<T, V extends number = 6> = { [K in keyof T]: UnionOfTypes<MapPropertiesTo5<Omit<T, K>, V>> }
 	type UnionOfTypes<T> = T[keyof T];
-	type CountProperties<T> = UnionOfTypes<MapPropertiesTo6<T>> | UnionOfTypes<MapPropertiesTo5<T>> | UnionOfTypes<MapPropertiesTo4<T>> | UnionOfTypes<MapPropertiesTo3<T>> | UnionOfTypes<MapPropertiesTo2<T>> | UnionOfTypes<MapPropertiesTo1<T>>;
+	// type CountProperties<T> = UnionOfTypes<MapPropertiesTo6<T>> | UnionOfTypes<MapPropertiesTo5<T>> | UnionOfTypes<MapPropertiesTo4<T>> | UnionOfTypes<MapPropertiesTo3<T>> | UnionOfTypes<MapPropertiesTo2<T>> | UnionOfTypes<MapPropertiesTo1<T>>;
 
 	interface RawFilter {
 		sql: string | (() => string);
@@ -944,7 +944,7 @@ declare namespace ORM {
 	type PickPropertyValue6<T> = GetKeys<Omit<PickProperty6<T>, 'name'>>
 
 
-	type CountProperties2<T> = CountPropertiesHelper<UnionToTuple<ToKeys<T>>>;
+	type CountProperties<T> = CountPropertiesHelper<UnionToTuple<ToKeys<T>>>;
 	type CountPropertiesHelper<T extends any[], C extends number = 0> = T extends [] 
 		? C 
 		: CountPropertiesHelper<PopFront<T>, Increment<C>>
