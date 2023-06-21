@@ -50,6 +50,7 @@ declare namespace ORM {
 		? MappedTable<T[K]>
 		: never;
 	} & {
+		filter: Filter;
 		and(filter: Filter, ...filters: Filter[]): Filter;
 		or(filter: Filter, ...filters: Filter[]): Filter;
 		not(): Filter;
@@ -58,6 +59,7 @@ declare namespace ORM {
 		createPatch(original: any[], modified: any[]): JsonPatch;
 		createPatch(original: any, modified: any): JsonPatch;
 		<O extends DbOptions<T>>(concurrency: O): MappedDbInstance<T>;
+		transaction(fn: (db: MappedDbInstance<T>) => Promise<unknown>): Promise<void>
 	};
 
 	type JsonPatch = Array<{
@@ -98,9 +100,9 @@ declare namespace ORM {
 		getOne(filter?: Filter | PrimaryRowFilter<T>): Promise<StrategyToRow<FetchedProperties<T, {}>, T>>;
 		getOne<FS extends FetchingStrategy<T>>(filter?: Filter | PrimaryRowFilter<T>, fetchingStrategy?: FS): Promise<StrategyToRow<FetchedProperties<T, FS>, T>>;
 
-		insert<TRow extends StrategyToRowData<T>>(row: TRow): Promise<StrategyToRow<FetchedProperties<T, NonLeafNodes<TRow>>, T>>;
+		insert<TRow extends StrategyToRowData<T>>(row: TRow): Promise<StrategyToRow<FetchedProperties<T, {}>, T>>
 		insertAndForget<TRow extends StrategyToRowData<T>>(row: TRow): Promise<void>;
-		insert<TRow extends StrategyToRowData<T>, FS extends FetchingStrategy<T>>(row: TRow, strategy: FS): Promise<StrategyToRow<FetchedProperties<T, FS>, T>>;
+		insert<TRow extends StrategyToRowData<T>, FS extends FetchingStrategy<T>>(row: TRow, strategy: FS): Promise<StrategyToRow<FetchedProperties<T, FS>, T>>
 
 		getMany(filter?: Filter | PrimaryRowFilter<T>[]): Promise<StrategyToRowArray<FetchedProperties<T, {}>, T>>;
 		getMany<FS extends FetchingStrategy<T>>(filter?: Filter | PrimaryRowFilter<T>[], fetchingStrategy?: FS): Promise<StrategyToRowArray<FetchedProperties<T, FS>, T>>;
@@ -115,7 +117,10 @@ declare namespace ORM {
 		proxify<TRow extends StrategyToRowData<T>[]>(rows: TRow[]): StrategyToRowArray<FetchedProperties<T, NonLeafNodes<TRow>>, T>;
 		proxify<TRow extends StrategyToRowData<T>[], FS extends FetchingStrategy<T>>(rows: TRow[], strategy: FS): StrategyToRowArray<FetchedProperties<T, NonLeafNodes<TRow>>, T>;
 
-		patch<C extends Concurrency<T>>(patch: JsonPatch, concurrency: C): Promise<void>;
+		patch<C extends Concurrency<T>>(patch: JsonPatch, concurrency?: C): Promise<void>;
+
+		tsType<FS extends FetchingStrategy<T>>(strategy?: FS): StrategyToRowData<FetchedProperties<T, FS>>
+		tsTypeMany<FS extends FetchingStrategy<T>>(strategy?: FS): StrategyToRowData<FetchedProperties<T, FS>>[];
 
 		readonly metaData: Concurrency<T>;
 
@@ -162,7 +167,7 @@ declare namespace ORM {
 		: T extends NumericColumnSymbol
 		? number
 		: T extends DateColumnSymbol
-		? string
+		? string | Date
 		: T extends BinaryColumnSymbol
 		? string
 		: T extends BooleanColumnSymbol
@@ -506,7 +511,7 @@ declare namespace ORM {
 		: T[K] extends NumericColumnSymbol
 		? number
 		: T[K] extends DateColumnSymbol
-		? string
+		? string | Date
 		: T[K] extends BinaryColumnSymbol
 		? string
 		: T[K] extends BooleanColumnSymbol
@@ -559,18 +564,18 @@ declare namespace ORM {
 	}
 	type UuidColumnType<M> = {
 		equal(value: string | null): Filter;
-		eq(value: string): Filter;
+		eq(value: string | null): Filter;
 		notEqual(value: string | null): Filter
-		ne(value: string): Filter
-		lessThan(value: string): Filter;
-		lt(value: string): Filter;
-		lessThanOrEqual(value: string): Filter;
-		le(value: string): Filter;
-		greaterThan(value: string): Filter;
-		gt(value: string): Filter;
-		greaterThanOrEqual(value: string): Filter;
-		ge(value: string): Filter;
-		between(from: string, to: string): Filter;
+		ne(value: string | null): Filter
+		lessThan(value: string | null): Filter;
+		lt(value: string | null): Filter;
+		lessThanOrEqual(value: string | null): Filter;
+		le(value: string | null): Filter;
+		greaterThan(value: string | null): Filter;
+		gt(value: string | null): Filter;
+		greaterThanOrEqual(value: string | null): Filter;
+		ge(value: string | null): Filter;
+		between(from: string | null, to: string | null): Filter;
 		in(values: Array<string | null>): Filter;
 	} & M & UuidColumnSymbol
 
@@ -579,18 +584,18 @@ declare namespace ORM {
 	}
 	type BinaryColumnType<M> = {
 		equal(value: string | null): Filter;
-		eq(value: string): Filter;
+		eq(value: string | null): Filter;
 		notEqual(value: string | null): Filter
-		ne(value: string): Filter
-		lessThan(value: string): Filter;
-		lt(value: string): Filter;
-		lessThanOrEqual(value: string): Filter;
-		le(value: string): Filter;
-		greaterThan(value: string): Filter;
-		gt(value: string): Filter;
-		greaterThanOrEqual(value: string): Filter;
-		ge(value: string): Filter;
-		between(from: string, to: string): Filter;
+		ne(value: string | null): Filter
+		lessThan(value: string | null): Filter;
+		lt(value: string | null): Filter;
+		lessThanOrEqual(value: string | null): Filter;
+		le(value: string | null): Filter;
+		greaterThan(value: string | null): Filter;
+		gt(value: string | null): Filter;
+		greaterThanOrEqual(value: string | null): Filter;
+		ge(value: string | null): Filter;
+		between(from: string | null, to: string | null): Filter;
 		in(values: Array<string | null>): Filter;
 	} & M & BinaryColumnSymbol
 
@@ -602,18 +607,18 @@ declare namespace ORM {
 	type BooleanColumnType<M> = {
 		isBoolean: boolean;
 		equal(value: boolean | null): Filter;
-		eq(value: boolean): Filter;
+		eq(value: boolean | null): Filter;
 		notEqual(value: boolean | null): Filter
-		ne(value: boolean): Filter
-		lessThan(value: boolean): Filter;
-		lt(value: boolean): Filter;
-		lessThanOrEqual(value: boolean): Filter;
-		le(value: boolean): Filter;
-		greaterThan(value: boolean): Filter;
-		gt(value: boolean): Filter;
-		greaterThanOrEqual(value: boolean): Filter;
-		ge(value: boolean): Filter;
-		between(from: boolean, to: boolean): Filter;
+		ne(value: boolean | null): Filter
+		lessThan(value: boolean | null): Filter;
+		lt(value: boolean | null): Filter;
+		lessThanOrEqual(value: boolean | null): Filter;
+		le(value: boolean | null): Filter;
+		greaterThan(value: boolean | null): Filter;
+		gt(value: boolean | null): Filter;
+		greaterThanOrEqual(value: boolean | null): Filter;
+		ge(value: boolean | null): Filter;
+		between(from: boolean | null, to: boolean | null): Filter;
 		in(values: Array<boolean | null>): Filter;
 	} & M & BooleanColumnSymbol
 
@@ -623,18 +628,18 @@ declare namespace ORM {
 
 	type DateColumnType<M> = {
 		equal(value: string | Date | null): Filter;
-		eq(value: string | Date): Filter;
+		eq(value: string | Date | null): Filter;
 		notEqual(value: string | Date | null): Filter
-		ne(value: string | Date): Filter
-		lessThan(value: string | Date): Filter;
-		lt(value: string | Date): Filter;
-		lessThanOrEqual(value: string | Date): Filter;
-		le(value: string | Date): Filter;
-		greaterThan(value: string | Date): Filter;
-		gt(value: string | Date): Filter;
-		greaterThanOrEqual(value: string | Date): Filter;
-		ge(value: string | Date): Filter;
-		between(from: string | Date, to: string | Date): Filter;
+		ne(value: string | Date | null): Filter
+		lessThan(value: string | Date | null): Filter;
+		lt(value: string | Date | null): Filter;
+		lessThanOrEqual(value: string | Date | null): Filter;
+		le(value: string | Date | null): Filter;
+		greaterThan(value: string | Date | null): Filter;
+		gt(value: string | Date | null): Filter;
+		greaterThanOrEqual(value: string | Date | null): Filter;
+		ge(value: string | Date | null): Filter;
+		between(from: string | Date, to: string | Date | null): Filter;
 		in(values: Array<string | Date | null>): Filter;
 	} & M & DateColumnSymbol
 
@@ -643,28 +648,27 @@ declare namespace ORM {
 	}
 
 	type StringColumnType<M> = {
-
 		equal(value: string | null): Filter;
-		eq(value: string): Filter;
+		eq(value: string | null): Filter;
 		notEqual(value: string | null): Filter
-		ne(value: string): Filter
-		lessThan(value: string): Filter;
-		lt(value: string): Filter;
-		lessThanOrEqual(value: string): Filter;
-		le(value: string): Filter;
-		greaterThan(value: string): Filter;
-		gt(value: string): Filter;
-		greaterThanOrEqual(value: string): Filter;
-		ge(value: string): Filter;
-		between(from: string, to: string): Filter;
+		ne(value: string | null): Filter
+		lessThan(value: string | null): Filter;
+		lt(value: string | null): Filter;
+		lessThanOrEqual(value: string | null): Filter;
+		le(value: string | null): Filter;
+		greaterThan(value: string | null): Filter;
+		gt(value: string | null): Filter;
+		greaterThanOrEqual(value: string | null): Filter;
+		ge(value: string | null): Filter;
+		between(from: string | null, to: string | null): Filter;
 		in(values: Array<string | null>): Filter;
 
-		startsWith(value: string): Filter;
-		endsWith(value: string): Filter;
-		contains(value: string): Filter;
-		iStartsWith(value: string): Filter;
-		iEndsWith(value: string): Filter;
-		iContains(value: string): Filter;
+		startsWith(value: string | null): Filter;
+		endsWith(value: string | null): Filter;
+		contains(value: string | null): Filter;
+		iStartsWith(value: string | null): Filter;
+		iEndsWith(value: string | null): Filter;
+		iContains(value: string | null): Filter;
 		iEqual(value: string | null): Filter;
 		ieq(value: string | null): Filter;
 	} & M & StringColumnSymbol
@@ -674,18 +678,18 @@ declare namespace ORM {
 	}
 	type NumericColumnType<M> = {
 		equal(value: number | null): Filter;
-		eq(value: number): Filter;
+		eq(value: number | null): Filter;
 		notEqual(value: number | null): Filter
-		ne(value: number): Filter
-		lessThan(value: number): Filter;
-		lt(value: number): Filter;
-		lessThanOrEqual(value: number): Filter;
-		le(value: number): Filter;
-		greaterThan(value: number): Filter;
-		gt(value: number): Filter;
-		greaterThanOrEqual(value: number): Filter;
-		ge(value: number): Filter;
-		between(from: number, to: number): Filter;
+		ne(value: number | null): Filter
+		lessThan(value: number | null): Filter;
+		lt(value: number | null): Filter;
+		lessThanOrEqual(value: number | null): Filter;
+		le(value: number | null): Filter;
+		greaterThan(value: number | null): Filter;
+		gt(value: number | null): Filter;
+		greaterThanOrEqual(value: number | null): Filter;
+		ge(value: number | null): Filter;
+		between(from: number, to: number | null): Filter;
 		in(values: Array<number | null>): Filter;
 	} & M & NumericColumnSymbol
 
@@ -695,18 +699,18 @@ declare namespace ORM {
 
 	type JSONColumnType<M> = {
 		equal(value: ToJsonType<M> | null): Filter;
-		eq(value: ToJsonType<M>): Filter;
+		eq(value: ToJsonType<M> | null): Filter;
 		notEqual(value: ToJsonType<M> | null): Filter
-		ne(value: ToJsonType<M>): Filter
-		lessThan(value: ToJsonType<M>): Filter;
-		lt(value: ToJsonType<M>): Filter;
-		lessThanOrEqual(value: ToJsonType<M>): Filter;
-		le(value: ToJsonType<M>): Filter;
-		greaterThan(value: ToJsonType<M>): Filter;
-		gt(value: ToJsonType<M>): Filter;
-		greaterThanOrEqual(value: ToJsonType<M>): Filter;
-		ge(value: ToJsonType<M>): Filter;
-		between(from: ToJsonType<M>, to: ToJsonType<M>): Filter;
+		ne(value: ToJsonType<M> | null): Filter
+		lessThan(value: ToJsonType<M> | null): Filter;
+		lt(value: ToJsonType<M> | null): Filter;
+		lessThanOrEqual(value: ToJsonType<M> | null): Filter;
+		le(value: ToJsonType<M> | null): Filter;
+		greaterThan(value: ToJsonType<M> | null): Filter;
+		gt(value: ToJsonType<M> | null): Filter;
+		greaterThanOrEqual(value: ToJsonType<M> | null): Filter;
+		ge(value: ToJsonType<M> | null): Filter;
+		between(from: ToJsonType<M>, to: ToJsonType<M> | null): Filter;
 		in(values: Array<ToJsonType<M> | null>): Filter;
 	} & M & JSONColumnSymbol
 
@@ -856,7 +860,7 @@ declare namespace ORM {
 			notNull(): DateColumnTypeDef<M & NotNull> & NotNull;
 			serializable(value: boolean): DateColumnTypeDef<M>;
 			JSONSchema(schema: object, options?: Options): DateColumnTypeDef<M>;
-			dbNull(value: string | Date | (() => string | Date)): DateColumnTypeDef<M>
+			default(value: string | Date | (() => string | Date)): DateColumnTypeDef<M>
 			dbNull(value: String | Date): DateColumnTypeDef<M>
 		} & ColumnTypeOf<DateColumnType<M>> & M;
 
@@ -879,10 +883,11 @@ declare namespace ORM {
 	}
 
 	interface Filter extends RawFilter {
-		and<T extends RawFilter>(otherFilter: T): Filter;
-		or<T extends RawFilter>(otherFilter: T): Filter;
+		and(filter: Filter, ...filters: Filter[]): Filter;
+		or(filter: Filter, ...filters: Filter[]): Filter;
 		not(): Filter;
 	}
+
 
 	type UnionToIntersection<U> =
 		(U extends any ? (k: U) => void : never) extends ((k: infer I) => void) ? I : never;
