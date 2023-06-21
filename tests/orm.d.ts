@@ -910,6 +910,11 @@ declare namespace ORM {
 		[K in keyof T]: { name: K, value: T[K] }
 	}[keyof T]
 
+	type ToKeys<T> = {
+		[K in keyof T]: K
+	}[keyof T]
+
+
 	type GetKeys<T> = {
 		[K in keyof T]: T[K]
 	}[keyof T]
@@ -937,6 +942,24 @@ declare namespace ORM {
 	type PickPropertyValue4<T> = GetKeys<Omit<PickProperty4<T>, 'name'>>
 	type PickPropertyValue5<T> = GetKeys<Omit<PickProperty5<T>, 'name'>>
 	type PickPropertyValue6<T> = GetKeys<Omit<PickProperty6<T>, 'name'>>
+
+
+	type CountProperties2<T> = CountPropertiesHelper<UnionToTuple<ToKeys<T>>>;
+	type CountPropertiesHelper<T extends any[], C extends number = 0> = T extends [] 
+		? C 
+		: CountPropertiesHelper<PopFront<T>, Increment<C>>
+
+	type Increment<C extends number> = C extends 0
+		? 1
+		: C extends 1
+			? 2
+			: C extends 2
+				? 3
+				: C extends 3
+					? 4
+					: C extends 4
+						? 5
+						: 0;					
 }
 
 export = ORM;
