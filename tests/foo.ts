@@ -1,86 +1,61 @@
-// foo.ts
 import orm from './orm';
 
-const party = orm.table('party')
-  .map(x => (
-    {
-      id: x.column('id').uuid().notNull().primary(),
-      location: x.column('location').string()
-    }
-  ));
+interface Document {
+  hello: string;
+  world: number;
+  sub: {
+    a: boolean;
+    b: boolean;
+  };
+}
 
-const customer = orm.table('customer')
-  .map(x => (
-    {
-      id: x.column('id').uuid().notNull().validate((e) => !!e).primary(),
-      name: x.column('name').string(),
-      partyId: x.column('partyId').uuid(),
-    }
-  ))
-  .map(x => (
-    {
-      party: x.references(party).by('partyId')
-    }
-  ));
+const map = orm
+  .map((x) => ({
+    deliveryParty: x.table('deliveryParty').map(({ column }) => ({
+      id: column('id').uuid().notNull().primary(),
+      orderId: column('order_id').uuid().notNull(),
+      street: column('street').string(),
+      postalCode: column('postal_code').string(),
+      postalPlace: column('postal_place').string(),
+    })),
 
-const orderLines = orm.table('orderLines')
-  .map(({ column }) => (
-    {
-      id: column('id').uuid().notNull().primary().validate(e => !!e),
-      orderId: column('orderId').uuid().notNull(),
-      product: column('product').string(),
-    }
-  ));
+    customer: x.table('customer').map(({ column }) => ({
+      id: column('id').uuid().notNull().primary(),
+      name: column('name').string(),
+      customerNo: column('customer_no').numeric(),
+    })),
 
-const order = orm.table('order')
-  .map(({ column }) => (
-    {
+    order: orm.table('order').map(({ column }) => ({
       id: column('id').uuid().notNull().primary(),
       balance: column('balance').numeric(),
       title: column('name').string(),
       createdAt: column('created_at').date(),
       updatedAt: column('updated_at').date(),
       customerId: column('customer_id').uuid(),
-      picture: column('picture').jsonOf<Foo>()
-    }
-  ))
-  .map((x) => (
-    {
-      customer: x.references(customer).by('customerId'),
-      lines: x.hasMany(orderLines).by('orderId')
-    }
-  ));
+      document: column('document').jsonOf<Document>(),
+    })),
 
+    orderLines: orm.table('orderLines').map(({ column }) => ({
+      id: column('id').uuid().notNull().primary()        
+      orderId: column('order_id').uuid().notNull(),
+      product: column('product').string(),
+    })),
+  }))
+  .map((x) => ({
+    order: x.order.map(({ hasMany, hasOne, references }) => ({
+      lines: hasMany(x.orderLines).by('orderId'),
+      deliveryParty: hasOne(x.deliveryParty).by('orderId'),
+      customer: references(x.customer).by('customerId'),
+    })),
+  }));
 
+const db = map({ db: (providers) => providers.mssql('foo') });
 
-interface Foo {
-    hello: string;
-    world: number;
-    sub: {
-      a: boolean
-      b: boolean
-    }
-}
+const filter = db.order.lines.any((line) => line.product.contains('bike'));
+let row = await db.order.getOne(filter, {
+  lines: true,
+  customer: true,
+  deliveryParty: true,
+});
 
-const def = orm({ order, customer });
-const db = def({db: connectors => connectors.mssql('dd')});
-
-
-const filter = db.order.customer.name.eq("John");
-
-let rows = await  db.order.getOne(filter, {lines: true, customer: true});
-
-const data = {id: '7', title: 'title', customer: {id: '22',name: 'jp'}};
-
-let inserted = await db.order.insert(data, {});
-
-let rowById = await db.order.getById('id');
-
-
-rowById.customerId = '12345';
-await rowById.saveChanges();
-
-const patch : any = [{foo: 1}];
-
-
-rowById.createdAt
+console.dir(row);
