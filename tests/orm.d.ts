@@ -992,6 +992,7 @@ declare namespace ORM {
     boolean(): BooleanColumnTypeDef<M & BooleanColumnSymbol>;
     json(): JSONColumnTypeDef<M & JSONColumnSymbol>;
     jsonOf<T>(): JSONColumnTypeDef<M & JSONColumnSymbol & JsonOf<T>>;
+    jsonOf<T>(helper: T): JSONColumnTypeDef<M & JSONColumnSymbol & JsonOf<T>>;
   }
 
   type UuidValidator<M> = M extends NotNull
