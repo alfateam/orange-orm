@@ -92,27 +92,23 @@ declare namespace ORM {
 
 	type ToJsonType<M> = M extends JsonOf<infer N> ? N : JsonType;
 
-	type PrimaryRowFilter<T> = StrategyToRowData2<ExtractPrimary<T>>;
-	type StrategyToRowData2<T> = {
+	type PrimaryRowFilter<T> = StrategyToRowDataPrimary<ExtractPrimary<T>>;
+	type StrategyToRowDataPrimary<T> = {
 		[K in keyof T]: T[K] extends StringColumnSymbol
 		? string
 		: T[K] extends UuidColumnSymbol
 		? string
-		: T[K] extends NumericColumnType<infer M>
+		: T[K] extends NumericColumnSymbol
 		? number
-		: T[K] extends DateColumnType<infer M>
+		: T[K] extends DateColumnSymbol
 		? string | Date
-		: T[K] extends BinaryColumnType<infer M>
+		: T[K] extends BinaryColumnSymbol
 		? string
-		: T[K] extends BooleanColumnType<infer M>
+		: T[K] extends BooleanColumnSymbol
 		? boolean
 		: T[K] extends JSONColumnType<infer M>
 		? ToJsonType<M>
 		: never;
-	};
-
-	type NonLeafNodes<T> = {
-		[K in keyof T]: T[K] extends object ? NonLeafNodes<T[K]> : never;
 	};
 
 	type MappedTable<T> = {
@@ -124,13 +120,13 @@ declare namespace ORM {
 			fetchingStrategy?: FS
 		): Promise<StrategyToRow<FetchedProperties<T, FS>, T>>;
 
-		insert<TRow extends StrategyToRowData<T>>(
+		insert<TRow extends StrategyToInsertRowData<T>>(
 			row: TRow
 		): Promise<StrategyToRow<FetchedProperties<T, {}>, T>>;
 		insertAndForget<TRow extends StrategyToRowData<T>>(
 			row: TRow
 		): Promise<void>;
-		insert<TRow extends StrategyToRowData<T>, FS extends FetchingStrategy<T>>(
+		insert<TRow extends StrategyToInsertRowData<T>, FS extends FetchingStrategy<T>>(
 			row: TRow,
 			strategy: FS
 		): Promise<StrategyToRow<FetchedProperties<T, FS>, T>>;
@@ -152,21 +148,21 @@ declare namespace ORM {
 
 		proxify<TRow extends StrategyToRowData<T>>(
 			row: TRow
-		): StrategyToRow<FetchedProperties<T, NonLeafNodes<TRow>>, T>;
+		): StrategyToRow<FetchedProperties<T, {}>, T>;
 		proxify<TRow extends StrategyToRowData<T>, FS extends FetchingStrategy<T>>(
 			row: TRow,
 			strategy: FS
-		): StrategyToRow<FetchedProperties<T, NonLeafNodes<TRow>>, T>;
+		): StrategyToRow<FetchedProperties<T, FS>, T>;
 		proxify<TRow extends StrategyToRowData<T>[]>(
 			rows: TRow[]
-		): StrategyToRowArray<FetchedProperties<T, NonLeafNodes<TRow>>, T>;
+		): StrategyToRowArray<FetchedProperties<T, {}>, T>;
 		proxify<
 			TRow extends StrategyToRowData<T>[],
 			FS extends FetchingStrategy<T>
 		>(
 			rows: TRow[],
 			strategy: FS
-		): StrategyToRowArray<FetchedProperties<T, NonLeafNodes<TRow>>, T>;
+		): StrategyToRowArray<FetchedProperties<T, FS>, T>;
 
 		patch<C extends Concurrency<T>>(
 			patch: JsonPatch,
@@ -336,10 +332,10 @@ declare namespace ORM {
 	};
 
 	type AllowedColumnsAndTablesStrategy<T> = {
-		[P in keyof T]: T[P] extends ColumnAndTableTypes<infer M> ? T[P] : never;
+		[P in keyof T]: T[P] extends ColumnAndTableTypes ? T[P] : never;
 	};
 	type AllowedColumnsAndTablesConcurrency<T> = {
-		[P in keyof T]: T[P] extends ColumnAndTableTypes<infer M> ? T[P] : never;
+		[P in keyof T]: T[P] extends ColumnAndTableTypes ? T[P] : never;
 	};
 
 	type FetchingStrategy<T> = {
@@ -483,55 +479,62 @@ declare namespace ORM {
 	type ReferenceMapperHelper<TFrom, TTo, TPrimaryCount> =
 		6 extends TPrimaryCount
 		? {
-			by(
-				column: keyof KeyCandidates1<TFrom, TTo>,
-				column2: KeyCandidates2<TFrom, TTo>,
-				column3: KeyCandidates3<TFrom, TTo>,
-				column4: KeyCandidates4<TFrom, TTo>,
-				column5: KeyCandidates5<TFrom, TTo>,
-				column6: KeyCandidates6<TFrom, TTo>
-			): MappedTableDef<TTo> & RelatedTable;
+			by<C1 extends keyof KeyCandidates1<TFrom, TTo>, C2 extends keyof KeyCandidates2<TFrom, TTo>, C3 extends keyof KeyCandidates2<TFrom, TTo>, C4 extends keyof KeyCandidates2<TFrom, TTo>, C5 extends keyof KeyCandidates2<TFrom, TTo>, C6 extends keyof KeyCandidates2<TFrom, TTo>>(
+				column: C1,
+				column2: C2,
+				column3: C3,
+				column4: C4,
+				column5: C5,
+				column6: C6
+			): MappedTableDef<TTo> & RelatedTable & NegotiateNotNullRef<Pick<TFrom, C1 | C2 | C3 | C4 | C5 | C6>>;
 		}
 		: 5 extends TPrimaryCount
 		? {
-			by(
-				column: keyof KeyCandidates1<TFrom, TTo>,
-				column2: KeyCandidates2<TFrom, TTo>,
-				column3: KeyCandidates3<TFrom, TTo>,
-				column4: KeyCandidates4<TFrom, TTo>,
-				column5: KeyCandidates5<TFrom, TTo>
-			): MappedTableDef<TTo> & RelatedTable;
+			by<C1 extends keyof KeyCandidates1<TFrom, TTo>, C2 extends keyof KeyCandidates2<TFrom, TTo>, C3 extends keyof KeyCandidates2<TFrom, TTo>, C4 extends keyof KeyCandidates2<TFrom, TTo>, C5 extends keyof KeyCandidates2<TFrom, TTo>>(
+				column: C1,
+				column2: C2,
+				column3: C3,
+				column4: C4,
+				column5: C5
+			): MappedTableDef<TTo> & RelatedTable & NegotiateNotNullRef<Pick<TFrom, C1 | C2 | C3 | C4 | C5>>;
 		}
 		: 4 extends TPrimaryCount
 		? {
-			by(
-				column: keyof KeyCandidates1<TFrom, TTo>,
-				column2: KeyCandidates2<TFrom, TTo>,
-				column3: KeyCandidates3<TFrom, TTo>,
-				column4: KeyCandidates4<TFrom, TTo>
-			): MappedTableDef<TTo> & RelatedTable;
+			by<C1 extends keyof KeyCandidates1<TFrom, TTo>, C2 extends keyof KeyCandidates2<TFrom, TTo>, C3 extends keyof KeyCandidates2<TFrom, TTo>, C4 extends keyof KeyCandidates2<TFrom, TTo>>(
+				column: C1,
+				column2: C2,
+				column3: C3,
+				column4: C4
+			): MappedTableDef<TTo> & RelatedTable & NegotiateNotNullRef<Pick<TFrom, C1 | C2 | C3 | C4>>;
 		}
 		: 3 extends TPrimaryCount
 		? {
-			by(
-				column: keyof KeyCandidates1<TFrom, TTo>,
-				column2: KeyCandidates2<TFrom, TTo>,
-				column3: KeyCandidates3<TFrom, TTo>
-			): MappedTableDef<TTo> & RelatedTable;
+			by<C1 extends keyof KeyCandidates1<TFrom, TTo>, C2 extends keyof KeyCandidates2<TFrom, TTo>, C3 extends keyof KeyCandidates2<TFrom, TTo>>(
+				column: C1,
+				column2: C2,
+				column3: C3
+			): MappedTableDef<TTo> & RelatedTable & NegotiateNotNullRef<Pick<TFrom, C1 | C2 | C3>>;
 		}
 		: 2 extends TPrimaryCount
 		? {
-			by(
-				column: keyof KeyCandidates1<TFrom, TTo>,
-				column2: keyof KeyCandidates2<TFrom, TTo>
-			): MappedTableDef<TTo> & RelatedTable;
+			by<C1 extends keyof KeyCandidates1<TFrom, TTo>, C2 extends keyof KeyCandidates2<TFrom, TTo>>(
+				column: C1,
+				column2: C2
+			): MappedTableDef<TTo> & RelatedTable  & NegotiateNotNullRef<Pick<TFrom, C1 | C2>>;
 		}
 		: 1 extends TPrimaryCount
 		? {
-			by(
-				column: keyof KeyCandidates1<TFrom, TTo>
-			): MappedTableDef<TTo> & RelatedTable;
+			by<C1 extends keyof KeyCandidates1<TFrom, TTo>>(
+				column: C1
+			): MappedTableDef<TTo> & RelatedTable & NegotiateNotNullRef<Pick<TFrom, C1>>;
 		}
+		: {};
+
+	
+	type NegotiateNotNullRef<T> = keyof T extends never
+		? {}
+		: T extends Record<keyof T, NotNull>
+		? NotNull
 		: {};
 
 	type HasMapperHelper<
@@ -543,45 +546,45 @@ declare namespace ORM {
 		? {
 			by(
 				column: keyof KeyCandidates1<TTo, TFrom>,
-				column2: KeyCandidates2<TTo, TFrom>,
-				column3: KeyCandidates3<TTo, TFrom>,
-				column4: KeyCandidates4<TTo, TFrom>,
-				column5: KeyCandidates5<TTo, TFrom>,
-				column6: KeyCandidates6<TTo, TFrom>
+				column2: keyof KeyCandidates2<TTo, TFrom>,
+				column3: keyof KeyCandidates3<TTo, TFrom>,
+				column4: keyof KeyCandidates4<TTo, TFrom>,
+				column5: keyof KeyCandidates5<TTo, TFrom>,
+				column6: keyof KeyCandidates6<TTo, TFrom>
 			): MappedTableDef<TTo> & RelatedTable & TExtra;
 		}
 		: 5 extends TPrimaryCount
 		? {
 			by(
 				column: keyof KeyCandidates1<TTo, TFrom>,
-				column2: KeyCandidates2<TTo, TFrom>,
-				column3: KeyCandidates3<TTo, TFrom>,
-				column4: KeyCandidates4<TTo, TFrom>,
-				column5: KeyCandidates5<TTo, TFrom>
+				column2: keyof KeyCandidates2<TTo, TFrom>,
+				column3: keyof KeyCandidates3<TTo, TFrom>,
+				column4: keyof KeyCandidates4<TTo, TFrom>,
+				column5: keyof KeyCandidates5<TTo, TFrom>
 			): MappedTableDef<TTo> & RelatedTable & TExtra;
 		}
 		: 4 extends TPrimaryCount
 		? {
 			by(
 				column: keyof KeyCandidates1<TTo, TFrom>,
-				column2: KeyCandidates2<TTo, TFrom>,
-				column3: KeyCandidates3<TTo, TFrom>,
-				column4: KeyCandidates4<TTo, TFrom>
+				column2: keyof KeyCandidates2<TTo, TFrom>,
+				column3: keyof KeyCandidates3<TTo, TFrom>,
+				column4: keyof KeyCandidates4<TTo, TFrom>
 			): MappedTableDef<TTo> & RelatedTable & TExtra;
 		}
 		: 3 extends TPrimaryCount
 		? {
 			by(
 				column: keyof KeyCandidates1<TTo, TFrom>,
-				column2: KeyCandidates2<TTo, TFrom>,
-				column3: KeyCandidates3<TTo, TFrom>
+				column2: keyof KeyCandidates2<TTo, TFrom>,
+				column3: keyof KeyCandidates3<TTo, TFrom>
 			): MappedTableDef<TTo> & RelatedTable & TExtra;
 		}
 		: 2 extends TPrimaryCount
 		? {
 			by(
 				column: keyof KeyCandidates1<TTo, TFrom>,
-				column2: KeyCandidates2<TTo, TFrom>
+				column2: keyof KeyCandidates2<TTo, TFrom>
 			): MappedTableDef<TTo> & RelatedTable & TExtra;
 		}
 		: 1 extends TPrimaryCount
@@ -632,8 +635,23 @@ declare namespace ORM {
 		{ [K in keyof T]: T[K] extends NotNull ? never : K }[keyof T]
 	>;
 
+	type NotNullInsertProperties<T> = Pick<
+		T,
+		{ [K in keyof T]: T[K] extends NotNullExceptInsert
+			? never
+			: T[K] extends NotNull ? K : never
+		}[keyof T]
+	>;
+	type NullInsertProperties<T> = Pick<
+		T,
+		{ [K in keyof T]: T[K] extends NotNullExceptInsert
+			? K
+			: T[K] extends NotNull ? never : K
+		}[keyof T]
+	>;
+
 	type ColumnTypes = ColumnSymbols;
-	type ColumnAndTableTypes<M> = ColumnSymbols | RelatedTable;
+	type ColumnAndTableTypes = ColumnSymbols | RelatedTable;
 
 	type StrategyToRow<T, U> = StrategyToRowData<T> & {
 		saveChanges(): Promise<void>;
@@ -717,6 +735,8 @@ declare namespace ORM {
 		: never;
 	}>;
 
+	type NegotiateNotNull<T> = T extends NotNull ? NotNull : {};
+
 	type FetchedProperties<T, TStrategy> = FetchedColumnProperties<T, TStrategy> &
 		FetchedRelationProperties<T, TStrategy>;
 
@@ -727,12 +747,12 @@ declare namespace ORM {
 		? never
 		: T[K] extends ManyRelation
 		? FetchedProperties<T[K], {}> & ManyRelation
-		: FetchedProperties<T[K], {}>
+		: FetchedProperties<T[K], {}> & NegotiateNotNull<T[K]>
 		: TStrategy[K] extends false
 		? never
 		: T[K] extends ManyRelation
 		? FetchedProperties<T[K], TStrategy[K]> & ManyRelation
-		: FetchedProperties<T[K], TStrategy[K]>
+		: FetchedProperties<T[K], TStrategy[K]> & NegotiateNotNull<T[K]>
 		: never;
 	}>;
 
@@ -783,6 +803,52 @@ declare namespace ORM {
 	} & {
 			[K in keyof RemoveNever<
 				NullProperties<T>
+			>]?: T[K] extends StringColumnSymbol
+			? string | null
+			: T[K] extends UuidColumnSymbol
+			? string | null
+			: T[K] extends NumericColumnSymbol
+			? number | null
+			: T[K] extends DateColumnSymbol
+			? string | Date | null
+			: T[K] extends BinaryColumnSymbol
+			? string | null
+			: T[K] extends BooleanColumnSymbol
+			? boolean | null
+			: T[K] extends JsonOf<infer M>
+			? M | null
+			: T[K] extends JSONColumnSymbol
+			? JsonType | null
+			: T[K] extends ManyRelation
+			? StrategyToRowData<T[K]>[]
+			: StrategyToRowData<T[K]>;
+		};
+
+	type StrategyToInsertRowData<T> = {
+		[K in keyof RemoveNever<
+			NotNullInsertProperties<T>
+		>]: T[K] extends StringColumnSymbol
+		? string
+		: T[K] extends UuidColumnSymbol
+		? string
+		: T[K] extends NumericColumnSymbol
+		? number
+		: T[K] extends DateColumnSymbol
+		? string | Date
+		: T[K] extends BinaryColumnSymbol
+		? string
+		: T[K] extends BooleanColumnSymbol
+		? boolean
+		: T[K] extends JsonOf<infer M>
+		? M
+		: T[K] extends JSONColumnSymbol
+		? JsonType
+		: T[K] extends ManyRelation
+		? StrategyToRowData<T[K]>[]
+		: StrategyToRowData<T[K]>;
+	} & {
+			[K in keyof RemoveNever<
+				NullInsertProperties<T>
 			>]?: T[K] extends StringColumnSymbol
 			? string | null
 			: T[K] extends UuidColumnSymbol
@@ -985,6 +1051,10 @@ declare namespace ORM {
 		[' notNull']: boolean;
 	};
 
+	type NotNullExceptInsert = {
+		[' notNullExceptInsert']: boolean;
+	};
+
 	type JsonOf<T> = {
 		[' isjsonOf']: boolean;
 		type: T;
@@ -1073,6 +1143,7 @@ declare namespace ORM {
 	type StringColumnTypeDef<M> = StringValidator<M> & {
 		primary(): StringColumnTypeDef<M & IsPrimary> & IsPrimary;
 		notNull(): StringColumnTypeDef<M & NotNull> & NotNull;
+		notNullExceptInsert(): StringColumnTypeDef<M & NotNull & NotNullExceptInsert> & NotNull & NotNullExceptInsert;
 		serializable(value: boolean): StringColumnTypeDef<M>;
 		JSONSchema(schema: object, options?: Options): StringColumnTypeDef<M>;
 		default(value: string | (() => string)): StringColumnTypeDef<M>;
@@ -1083,6 +1154,7 @@ declare namespace ORM {
 	type NumericColumnTypeDef<M> = NumericValidator<M> & {
 		primary(): NumericColumnTypeDef<M & IsPrimary> & IsPrimary;
 		notNull(): NumericColumnTypeDef<M & NotNull> & NotNull;
+		notNullExceptInsert(): NumericColumnTypeDef<M & NotNull & NotNullExceptInsert> & NotNull & NotNullExceptInsert;
 		serializable(value: boolean): NumericColumnTypeDef<M>;
 		JSONSchema(schema: object, options?: Options): NumericColumnTypeDef<M>;
 		default(value: number | (() => string)): NumericColumnTypeDef<M>;
@@ -1093,6 +1165,7 @@ declare namespace ORM {
 	type UuidColumnTypeDef<M> = UuidValidator<M> & {
 		primary(): UuidColumnTypeDef<M & IsPrimary> & IsPrimary;
 		notNull(): UuidColumnTypeDef<M & NotNull> & NotNull;
+		notNullExceptInsert(): UuidColumnTypeDef<M & NotNull & NotNullExceptInsert> & NotNull & NotNullExceptInsert;
 		serializable(value: boolean): UuidColumnTypeDef<M>;
 		JSONSchema(schema: object, options?: Options): UuidColumnTypeDef<M>;
 		default(value: string | (() => string)): UuidColumnTypeDef<M>;
@@ -1103,6 +1176,7 @@ declare namespace ORM {
 	type JSONColumnTypeDef<M> = JSONValidator<M> & {
 		primary(): JSONColumnTypeDef<M & IsPrimary> & IsPrimary;
 		notNull(): JSONColumnTypeDef<M & NotNull> & NotNull;
+		notNullExceptInsert(): JSONColumnTypeDef<M & NotNull & NotNullExceptInsert> & NotNull & NotNullExceptInsert;
 		serializable(value: boolean): JSONColumnTypeDef<M>;
 		JSONSchema(schema: object, options?: Options): JSONColumnTypeDef<M>;
 		default(value: ToJsonType<M> | (() => string)): JSONColumnTypeDef<M>;
@@ -1113,6 +1187,7 @@ declare namespace ORM {
 	type BinaryColumnTypeDef<M> = BinaryValidator<M> & {
 		primary(): BinaryColumnTypeDef<M & IsPrimary> & IsPrimary;
 		notNull(): BinaryColumnTypeDef<M & NotNull> & NotNull;
+		notNullExceptInsert(): BinaryColumnTypeDef<M & NotNull & NotNullExceptInsert> & NotNull & NotNullExceptInsert;
 		serializable(value: boolean): BinaryColumnTypeDef<M>;
 		JSONSchema(schema: object, options?: Options): BinaryColumnTypeDef<M>;
 		default(value: string | (() => string)): BinaryColumnTypeDef<M>;
@@ -1123,6 +1198,7 @@ declare namespace ORM {
 	type BooleanColumnTypeDef<M> = BooleanValidator<M> & {
 		primary(): BooleanColumnTypeDef<M & IsPrimary> & IsPrimary;
 		notNull(): BooleanColumnTypeDef<M & NotNull> & NotNull;
+		notNullExceptInsert(): BooleanColumnTypeDef<M & NotNull & NotNullExceptInsert> & NotNull & NotNullExceptInsert;
 		serializable(value: boolean): BooleanColumnTypeDef<M>;
 		JSONSchema(schema: object, options?: Options): BooleanColumnTypeDef<M>;
 		default(value: boolean | (() => string)): BooleanColumnTypeDef<M>;
@@ -1133,6 +1209,7 @@ declare namespace ORM {
 	type DateColumnTypeDef<M> = DateValidator<M> & {
 		primary(): DateColumnTypeDef<M & IsPrimary> & IsPrimary;
 		notNull(): DateColumnTypeDef<M & NotNull> & NotNull;
+		notNullExceptInsert(): DateColumnTypeDef<M & NotNull & NotNullExceptInsert> & NotNull & NotNullExceptInsert;
 		serializable(value: boolean): DateColumnTypeDef<M>;
 		JSONSchema(schema: object, options?: Options): DateColumnTypeDef<M>;
 		default(value: string | Date | (() => string | Date)): DateColumnTypeDef<M>;
