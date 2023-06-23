@@ -25,7 +25,7 @@ const map = orm
       customerNo: column('customer_no').numeric(),
     })),
 
-    order: orm.table('order').map(({ column }) => ({
+    order: x.table('order').map(({ column }) => ({
       id: column('id').uuid().notNull().primary(),
       balance: column('balance').numeric(),
       title: column('name').string(),
@@ -35,8 +35,8 @@ const map = orm
       document: column('document').jsonOf<Document>(),
     })),
 
-    orderLines: orm.table('orderLines').map(({ column }) => ({
-      id: column('id').uuid().notNull().primary()        
+    orderLines: x.table('orderLines').map(({ column }) => ({
+      id: column('id').uuid().notNull().primary(),
       orderId: column('order_id').uuid().notNull(),
       product: column('product').string(),
     })),
