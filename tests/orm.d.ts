@@ -821,20 +821,20 @@ declare namespace ORM {
 		[' isUuid']: true;
 	};
 	type UuidColumnType<M> = {
-		equal(value: string | null): Filter;
-		eq(value: string | null): Filter;
-		notEqual(value: string | null): Filter;
-		ne(value: string | null): Filter;
-		lessThan(value: string | null): Filter;
-		lt(value: string | null): Filter;
-		lessThanOrEqual(value: string | null): Filter;
-		le(value: string | null): Filter;
-		greaterThan(value: string | null): Filter;
-		gt(value: string | null): Filter;
-		greaterThanOrEqual(value: string | null): Filter;
-		ge(value: string | null): Filter;
-		between(from: string | null, to: string | null): Filter;
-		in(values: Array<string | null>): Filter;
+		equal(value: string | null | undefined): Filter;
+		eq(value: string | null | undefined): Filter;
+		notEqual(value: string | null | undefined): Filter;
+		ne(value: string | null | undefined): Filter;
+		lessThan(value: string | null | undefined): Filter;
+		lt(value: string | null | undefined): Filter;
+		lessThanOrEqual(value: string | null | undefined): Filter;
+		le(value: string | null | undefined): Filter;
+		greaterThan(value: string | null | undefined): Filter;
+		gt(value: string | null | undefined): Filter;
+		greaterThanOrEqual(value: string | null | undefined): Filter;
+		ge(value: string | null | undefined): Filter;
+		between(from: string | null | undefined, to: string | null | undefined): Filter;
+		in(values: Array<string | null | undefined>): Filter;
 	} & M &
 		UuidColumnSymbol;
 
@@ -842,20 +842,20 @@ declare namespace ORM {
 		[' isBinary']: true;
 	};
 	type BinaryColumnType<M> = {
-		equal(value: string | null): Filter;
-		eq(value: string | null): Filter;
-		notEqual(value: string | null): Filter;
-		ne(value: string | null): Filter;
-		lessThan(value: string | null): Filter;
-		lt(value: string | null): Filter;
-		lessThanOrEqual(value: string | null): Filter;
-		le(value: string | null): Filter;
-		greaterThan(value: string | null): Filter;
-		gt(value: string | null): Filter;
-		greaterThanOrEqual(value: string | null): Filter;
-		ge(value: string | null): Filter;
-		between(from: string | null, to: string | null): Filter;
-		in(values: Array<string | null>): Filter;
+		equal(value: string | null | undefined): Filter;
+		eq(value: string | null | undefined): Filter;
+		notEqual(value: string | null | undefined): Filter;
+		ne(value: string | null | undefined): Filter;
+		lessThan(value: string | null | undefined): Filter;
+		lt(value: string | null | undefined): Filter;
+		lessThanOrEqual(value: string | null | undefined): Filter;
+		le(value: string | null | undefined): Filter;
+		greaterThan(value: string | null | undefined): Filter;
+		gt(value: string | null | undefined): Filter;
+		greaterThanOrEqual(value: string | null | undefined): Filter;
+		ge(value: string | null | undefined): Filter;
+		between(from: string | null | undefined, to: string | null | undefined): Filter;
+		in(values: Array<string | null | undefined>): Filter;
 	} & M &
 		BinaryColumnSymbol;
 
@@ -864,21 +864,20 @@ declare namespace ORM {
 	};
 
 	type BooleanColumnType<M> = {
-		isBoolean: boolean;
-		equal(value: boolean | null): Filter;
-		eq(value: boolean | null): Filter;
-		notEqual(value: boolean | null): Filter;
-		ne(value: boolean | null): Filter;
-		lessThan(value: boolean | null): Filter;
-		lt(value: boolean | null): Filter;
-		lessThanOrEqual(value: boolean | null): Filter;
-		le(value: boolean | null): Filter;
-		greaterThan(value: boolean | null): Filter;
-		gt(value: boolean | null): Filter;
-		greaterThanOrEqual(value: boolean | null): Filter;
-		ge(value: boolean | null): Filter;
-		between(from: boolean | null, to: boolean | null): Filter;
-		in(values: Array<boolean | null>): Filter;
+		equal(value: boolean | null | undefined): Filter;
+		eq(value: boolean | null | undefined): Filter;
+		notEqual(value: boolean | null | undefined): Filter;
+		ne(value: boolean | null | undefined): Filter;
+		lessThan(value: boolean | null | undefined): Filter;
+		lt(value: boolean | null | undefined): Filter;
+		lessThanOrEqual(value: boolean | null | undefined): Filter;
+		le(value: boolean | null | undefined): Filter;
+		greaterThan(value: boolean | null | undefined): Filter;
+		gt(value: boolean | null | undefined): Filter;
+		greaterThanOrEqual(value: boolean | null | undefined): Filter;
+		ge(value: boolean | null | undefined): Filter;
+		between(from: boolean | null | undefined, to: boolean | null | undefined): Filter;
+		in(values: Array<boolean | null | undefined>): Filter;
 	} & M &
 		BooleanColumnSymbol;
 
@@ -887,20 +886,20 @@ declare namespace ORM {
 	};
 
 	type DateColumnType<M> = {
-		equal(value: string | Date | null): Filter;
-		eq(value: string | Date | null): Filter;
-		notEqual(value: string | Date | null): Filter;
-		ne(value: string | Date | null): Filter;
-		lessThan(value: string | Date | null): Filter;
-		lt(value: string | Date | null): Filter;
-		lessThanOrEqual(value: string | Date | null): Filter;
-		le(value: string | Date | null): Filter;
-		greaterThan(value: string | Date | null): Filter;
-		gt(value: string | Date | null): Filter;
-		greaterThanOrEqual(value: string | Date | null): Filter;
-		ge(value: string | Date | null): Filter;
-		between(from: string | Date, to: string | Date | null): Filter;
-		in(values: Array<string | Date | null>): Filter;
+		equal(value: string | Date | null | undefined): Filter;
+		eq(value: string | Date | null | undefined): Filter;
+		notEqual(value: string | Date | null | undefined): Filter;
+		ne(value: string | Date | null | undefined): Filter;
+		lessThan(value: string | Date | null | undefined): Filter;
+		lt(value: string | Date | null | undefined): Filter;
+		lessThanOrEqual(value: string | Date | null | undefined): Filter;
+		le(value: string | Date | null | undefined): Filter;
+		greaterThan(value: string | Date | null | undefined): Filter;
+		gt(value: string | Date | null | undefined): Filter;
+		greaterThanOrEqual(value: string | Date | null | undefined): Filter;
+		ge(value: string | Date | null | undefined): Filter;
+		between(from: string | Date, to: string | Date | null | undefined): Filter;
+		in(values: Array<string | Date | null | undefined>): Filter;
 	} & M &
 		DateColumnSymbol;
 
@@ -909,29 +908,29 @@ declare namespace ORM {
 	};
 
 	type StringColumnType<M> = {
-		equal(value: string | null): Filter;
-		eq(value: string | null): Filter;
-		notEqual(value: string | null): Filter;
-		ne(value: string | null): Filter;
-		lessThan(value: string | null): Filter;
-		lt(value: string | null): Filter;
-		lessThanOrEqual(value: string | null): Filter;
-		le(value: string | null): Filter;
-		greaterThan(value: string | null): Filter;
-		gt(value: string | null): Filter;
-		greaterThanOrEqual(value: string | null): Filter;
-		ge(value: string | null): Filter;
-		between(from: string | null, to: string | null): Filter;
-		in(values: Array<string | null>): Filter;
+		equal(value: string | null | undefined): Filter;
+		eq(value: string | null | undefined): Filter;
+		notEqual(value: string | null | undefined): Filter;
+		ne(value: string | null | undefined): Filter;
+		lessThan(value: string | null | undefined): Filter;
+		lt(value: string | null | undefined): Filter;
+		lessThanOrEqual(value: string | null | undefined): Filter;
+		le(value: string | null | undefined): Filter;
+		greaterThan(value: string | null | undefined): Filter;
+		gt(value: string | null | undefined): Filter;
+		greaterThanOrEqual(value: string | null | undefined): Filter;
+		ge(value: string | null | undefined): Filter;
+		between(from: string | null | undefined, to: string | null | undefined): Filter;
+		in(values: Array<string | null | undefined>): Filter;
 
-		startsWith(value: string | null): Filter;
-		endsWith(value: string | null): Filter;
-		contains(value: string | null): Filter;
-		iStartsWith(value: string | null): Filter;
-		iEndsWith(value: string | null): Filter;
-		iContains(value: string | null): Filter;
-		iEqual(value: string | null): Filter;
-		ieq(value: string | null): Filter;
+		startsWith(value: string | null | undefined): Filter;
+		endsWith(value: string | null | undefined): Filter;
+		contains(value: string | null | undefined): Filter;
+		iStartsWith(value: string | null | undefined): Filter;
+		iEndsWith(value: string | null | undefined): Filter;
+		iContains(value: string | null | undefined): Filter;
+		iEqual(value: string | null | undefined): Filter;
+		ieq(value: string | null | undefined): Filter;
 	} & M &
 		StringColumnSymbol;
 
@@ -939,20 +938,20 @@ declare namespace ORM {
 		[' isNumeric']: true;
 	};
 	type NumericColumnType<M> = {
-		equal(value: number | null): Filter;
-		eq(value: number | null): Filter;
-		notEqual(value: number | null): Filter;
-		ne(value: number | null): Filter;
-		lessThan(value: number | null): Filter;
-		lt(value: number | null): Filter;
-		lessThanOrEqual(value: number | null): Filter;
-		le(value: number | null): Filter;
-		greaterThan(value: number | null): Filter;
-		gt(value: number | null): Filter;
-		greaterThanOrEqual(value: number | null): Filter;
-		ge(value: number | null): Filter;
-		between(from: number, to: number | null): Filter;
-		in(values: Array<number | null>): Filter;
+		equal(value: number | null | undefined): Filter;
+		eq(value: number | null | undefined): Filter;
+		notEqual(value: number | null | undefined): Filter;
+		ne(value: number | null | undefined): Filter;
+		lessThan(value: number | null | undefined): Filter;
+		lt(value: number | null | undefined): Filter;
+		lessThanOrEqual(value: number | null | undefined): Filter;
+		le(value: number | null | undefined): Filter;
+		greaterThan(value: number | null | undefined): Filter;
+		gt(value: number | null | undefined): Filter;
+		greaterThanOrEqual(value: number | null | undefined): Filter;
+		ge(value: number | null | undefined): Filter;
+		between(from: number, to: number | null | undefined): Filter;
+		in(values: Array<number | null | undefined>): Filter;
 	} & M &
 		NumericColumnSymbol;
 
@@ -961,20 +960,20 @@ declare namespace ORM {
 	};
 
 	type JSONColumnType<M> = {
-		equal(value: ToJsonType<M> | null): Filter;
-		eq(value: ToJsonType<M> | null): Filter;
-		notEqual(value: ToJsonType<M> | null): Filter;
-		ne(value: ToJsonType<M> | null): Filter;
-		lessThan(value: ToJsonType<M> | null): Filter;
-		lt(value: ToJsonType<M> | null): Filter;
-		lessThanOrEqual(value: ToJsonType<M> | null): Filter;
-		le(value: ToJsonType<M> | null): Filter;
-		greaterThan(value: ToJsonType<M> | null): Filter;
-		gt(value: ToJsonType<M> | null): Filter;
-		greaterThanOrEqual(value: ToJsonType<M> | null): Filter;
-		ge(value: ToJsonType<M> | null): Filter;
-		between(from: ToJsonType<M>, to: ToJsonType<M> | null): Filter;
-		in(values: Array<ToJsonType<M> | null>): Filter;
+		equal(value: ToJsonType<M> | null | undefined): Filter;
+		eq(value: ToJsonType<M> | null | undefined): Filter;
+		notEqual(value: ToJsonType<M> | null | undefined): Filter;
+		ne(value: ToJsonType<M> | null | undefined): Filter;
+		lessThan(value: ToJsonType<M> | null | undefined): Filter;
+		lt(value: ToJsonType<M> | null | undefined): Filter;
+		lessThanOrEqual(value: ToJsonType<M> | null | undefined): Filter;
+		le(value: ToJsonType<M> | null | undefined): Filter;
+		greaterThan(value: ToJsonType<M> | null | undefined): Filter;
+		gt(value: ToJsonType<M> | null | undefined): Filter;
+		greaterThanOrEqual(value: ToJsonType<M> | null | undefined): Filter;
+		ge(value: ToJsonType<M> | null | undefined): Filter;
+		between(from: ToJsonType<M>, to: ToJsonType<M> | null | undefined): Filter;
+		in(values: Array<ToJsonType<M> | null | undefined>): Filter;
 	} & M &
 		JSONColumnSymbol;
 
