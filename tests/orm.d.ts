@@ -624,6 +624,8 @@ declare namespace ORM {
 		map<V extends AllowedColumnsAndTablesMap<V>>(
 			callback: (mapper: ColumnMapper<T>) => V
 		): MappedTableDef<T & V>;
+		formulaDiscriminators(...discriminators: string[]) : MappedTableDef<T>;
+        columnDiscriminators(...discriminators: string[]) : MappedTableDef<T>;
 	} & T;
 
 	type NotNullProperties<T> = Pick<
