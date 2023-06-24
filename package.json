@@ -8,7 +8,7 @@
   },
   "title": "rdb",
   "description": "Object Relational Mapper",
-  "types": "./typings/index.d.ts",
+  "types": "./src/index.d.ts",
   "keywords": [
     "orm",
     "sql",

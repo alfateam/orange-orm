@@ -1,4 +1,4 @@
-import orm from './orm';
+import orm from '../src/index';
 
 interface Document {
   hello: string;
@@ -10,7 +10,7 @@ interface Document {
 }
 
 const map = orm
-  .map((x) => ({
+  .map((x) => ({        
     deliveryParty: x.table('deliveryParty').map(({ column }) => ({
       id: column('id').uuid().notNull().primary(),
       orderId: column('order_id').uuid().notNull(),
@@ -20,9 +20,9 @@ const map = orm
     })),
 
     customer: x.table('customer').map(({ column }) => ({
-      id: column('id').uuid().notNull().primary(),
+      id: column('id').uuid().notNull().primary().notNullExceptInsert(),
       name: column('name').string(),
-      customerNo: column('customer_no').numeric(),
+      customerNo: column('customer_no').numeric().notNull(),
     })),
 
     order: x.table('order').map(({ column }) => ({
@@ -44,12 +44,14 @@ const map = orm
   .map((x) => ({
     order: x.order.map(({ hasMany, hasOne, references }) => ({
       lines: hasMany(x.orderLines).by('orderId'),
-      deliveryParty: hasOne(x.deliveryParty).by('orderId'),
-      customer: references(x.customer).by('customerId'),
+      deliveryParty: hasOne(x.deliveryParty).by('orderId'),      
+      customer: references(x.customer).by('customerId')
     })),
   }));
 
+  
 const db = map({ db: (providers) => providers.mssql('foo') });
+
 
 const filter = db.order.lines.any((line) => line.product.contains('bike'));
 let row = await db.order.getOne(filter, {
