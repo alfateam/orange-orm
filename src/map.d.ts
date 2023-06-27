@@ -43,6 +43,7 @@ type DbOptions<T> = {
 };
 
 interface Connectors {
+	http(url: string): Pool;
 	postgres(connectionString: string, options?: PoolOptions): Pool;
 	sqlite(connectionString: string, options?: PoolOptions): Pool;
 	sap(connectionString: string, options?: PoolOptions): Pool;

@@ -6,6 +6,7 @@ const rootMap = new WeakMap();
 const fetchingStrategyMap = new WeakMap();
 const targetKey = Symbol();
 const _axios = require('axios');
+const map = require('./clientMap');
 
 function rdbClient(options = {}) {
 	if (options.pg)
@@ -23,6 +24,7 @@ function rdbClient(options = {}) {
 	}
 
 	client.reactive = (cb => _reactive = cb);
+	client.map = map.bind(null, client);
 	client.table = table;
 	client.or = column('or');
 	client.and = column('and');

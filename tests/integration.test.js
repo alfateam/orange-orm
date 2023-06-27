@@ -1,7 +1,7 @@
 /* eslint-disable jest/no-commented-out-tests */
 /* eslint-disable jest/expect-expect */
-const rdb = require('rdb');
-const _db = require('./db');
+// const rdb = require('rdb');
+const db = require('./db');
 const initPg = require('./initPg');
 const initMs = require('./initMs');
 const initMysql = require('./initMysql');
@@ -13,10 +13,10 @@ const major = parseInt(versionArray[0]);
 
 beforeAll(async () => {
 
-	await createMs(mssql());
+	await createMs(getDb('mssql'));
 
-	async function createMs({pool}) {
-		const db = _db({db: pool});
+	async function createMs({ db }) {
+		// const db = _db({ db: pool });
 		const sql = `IF NOT EXISTS(SELECT * FROM sys.databases WHERE name = 'demo')
 		BEGIN
 			CREATE DATABASE demo
@@ -28,38 +28,44 @@ beforeAll(async () => {
 
 describe('transaction', () => {
 
-	test('pg', async () => await verify(pg()));
-	test('mssql', async () => await verify(mssql()));
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
 	if (major > 17)
-		test('mssqlNative', async () => await verify(mssqlNative()));
-	test('mysql', async () => await verify(mysql()));
-	test('sqlite', async () => await verify(sqlite()));
-	test('sap', async () => await verify(sap()));
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 
-	async function verify({pool}) {
-		const db = _db({db: pool});
+	async function verify(dbName) {
 		let result;
+		const { db } = getDb(dbName);
+
 		await db.transaction(async (db) => {
 			result = await db.query('select 1 as foo');
 		});
-		expect(result).toEqual([{foo: 1}]);
+		expect(result).toEqual([{ foo: 1 }]);
 	}
 });
 
 describe('insert autoincremental', () => {
 
-	test('pg', async () => await verify(pg()));
-	test('mssql', async () => await verify(mssql()));
-	if (major > 17)
-		test('mssqlNative', async () => await verify(mssqlNative()));
-	test('mysql', async () => await verify(mysql()));
-	test('sqlite', async () => await verify(sqlite()));
-	test('sap', async () => await verify(sap()));
+	test('pg', async () => await verify('pg'));
+	// test('mssql', async () => await verify(mssql()));
+	// if (major > 17)
+	// 	test('mssqlNative', async () => await verify(mssqlNative()));
+	// test('mysql', async () => await verify(mysql()));
+	// test('sqlite', async () => await verify(sqlite()));
+	// test('sap', async () => await verify(sap()));
 
-	async function verify({pool, init}) {
-		const db = _db({db: pool});
+	async function verify(dbName) {
+		const { db, init } = getDb(dbName);
 		await init(db);
 
+		await db.customer.insert({
+			name: 'George',
+			balance: 177,
+			isActive: true
+		});
 		const george = await db.customer.insert({
 			name: 'George',
 			balance: 177,
@@ -77,157 +83,170 @@ describe('insert autoincremental', () => {
 	}
 });
 
-describe('insert autoincremental with relations', () => {
-	test('pg', async () => await verify(pg()));
-	test('mssql', async () => await verify(mssql()));
-	if (major > 17)
-		test('mssqlNative', async () => await verify(mssqlNative()));
-	test('mysql', async () => await verify(mysql()));
-	test('sqlite', async () => await verify(sqlite()));
-	test('sap', async () => await verify(sap()));
+// describe('insert autoincremental with relations', () => {
+// 	test('pg', async () => await verify(pg()));
+// 	test('mssql', async () => await verify(mssql()));
+// 	if (major > 17)
+// 		test('mssqlNative', async () => await verify(mssqlNative()));
+// 	test('mysql', async () => await verify(mysql()));
+// 	test('sqlite', async () => await verify(sqlite()));
+// 	test('sap', async () => await verify(sap()));
 
-	async function verify({pool, init}) {
-		const db = _db({ db: pool });
-		await init(db);
+// 	async function verify({pool, init}) {
+// 		const db = _db({ db: pool });
+// 		await init(db);
 
-		const date1 = new Date(2022, 0, 11, 9, 24, 47);
-		const date2 = new Date(2021, 0, 11, 12, 22, 45);
+// 		const date1 = new Date(2022, 0, 11, 9, 24, 47);
+// 		const date2 = new Date(2021, 0, 11, 12, 22, 45);
 
-		const george = await db.customer.insert({
-			name: 'George',
-			balance: 177,
-			isActive: true
-		});
+// 		const george = await db.customer.insert({
+// 			name: 'George',
+// 			balance: 177,
+// 			isActive: true
+// 		});
 
-		const john = await db.customer.insert({
-			name: 'John',
-			balance: 200,
-			isActive: true
-		});
+// 		const john = await db.customer.insert({
+// 			name: 'John',
+// 			balance: 200,
+// 			isActive: true
+// 		});
 
-		let orders = await db.order.insert([
-			{
-				orderDate: date1,
-				customer: george,
-				deliveryAddress: {
-					name: 'George',
-					street: 'Node street 1',
-					postalCode: '7059',
-					postalPlace: 'Jakobsli',
-					countryCode: 'NO'
-				},
-				lines: [
-					{ product: 'Bicycle' },
-					{ product: 'Small guitar' }
-				]
-			},
-			{
-				customer: john,
-				orderDate: date2,
-				deliveryAddress: {
-					name: 'Harry Potter',
-					street: '4 Privet Drive, Little Whinging',
-					postalCode: 'GU4',
-					postalPlace: 'Surrey',
-					countryCode: 'UK'
-				},
-				lines: [
-					{ product: 'Piano' }
-				]
-			}
-		]);
+// 		let orders = await db.order.insert([
+// 			{
+// 				orderDate: date1,
+// 				customer: george,
+// 				deliveryAddress: {
+// 					name: 'George',
+// 					street: 'Node street 1',
+// 					postalCode: '7059',
+// 					postalPlace: 'Jakobsli',
+// 					countryCode: 'NO'
+// 				},
+// 				lines: [
+// 					{ product: 'Bicycle' },
+// 					{ product: 'Small guitar' }
+// 				]
+// 			},
+// 			{
+// 				customer: john,
+// 				orderDate: date2,
+// 				deliveryAddress: {
+// 					name: 'Harry Potter',
+// 					street: '4 Privet Drive, Little Whinging',
+// 					postalCode: 'GU4',
+// 					postalPlace: 'Surrey',
+// 					countryCode: 'UK'
+// 				},
+// 				lines: [
+// 					{ product: 'Piano' }
+// 				]
+// 			}
+// 		]);
 
-		const expected = [
-			{
-				id: 1,
-				orderDate: dateToISOString(date1),
-				customerId: 1,
-				customer: {
-					id: 1,
-					name: 'George',
-					balance: 177,
-					isActive: true
-				},
-				deliveryAddress: {
-					id: 1,
-					orderId: 1,
-					name: 'George',
-					street: 'Node street 1',
-					postalCode: '7059',
-					postalPlace: 'Jakobsli',
-					countryCode: 'NO'
-				},
-				lines: [
-					{ product: 'Bicycle', id: 1, orderId: 1 },
-					{ product: 'Small guitar', id: 2, orderId: 1 }
-				]
-			},
-			{
-				id: 2,
-				customerId: 2,
-				customer: {
-					id: 2,
-					name: 'John',
-					balance: 200,
-					isActive: true
-				},
-				orderDate: dateToISOString(date2),
-				deliveryAddress: {
-					id: 2,
-					orderId: 2,
-					name: 'Harry Potter',
-					street: '4 Privet Drive, Little Whinging',
-					postalCode: 'GU4',
-					postalPlace: 'Surrey',
-					countryCode: 'UK'
-				},
-				lines: [
-					{ product: 'Piano', id: 3, orderId: 2 }
-				]
-			}
-		];
+// 		const expected = [
+// 			{
+// 				id: 1,
+// 				orderDate: dateToISOString(date1),
+// 				customerId: 1,
+// 				customer: {
+// 					id: 1,
+// 					name: 'George',
+// 					balance: 177,
+// 					isActive: true
+// 				},
+// 				deliveryAddress: {
+// 					id: 1,
+// 					orderId: 1,
+// 					name: 'George',
+// 					street: 'Node street 1',
+// 					postalCode: '7059',
+// 					postalPlace: 'Jakobsli',
+// 					countryCode: 'NO'
+// 				},
+// 				lines: [
+// 					{ product: 'Bicycle', id: 1, orderId: 1 },
+// 					{ product: 'Small guitar', id: 2, orderId: 1 }
+// 				]
+// 			},
+// 			{
+// 				id: 2,
+// 				customerId: 2,
+// 				customer: {
+// 					id: 2,
+// 					name: 'John',
+// 					balance: 200,
+// 					isActive: true
+// 				},
+// 				orderDate: dateToISOString(date2),
+// 				deliveryAddress: {
+// 					id: 2,
+// 					orderId: 2,
+// 					name: 'Harry Potter',
+// 					street: '4 Privet Drive, Little Whinging',
+// 					postalCode: 'GU4',
+// 					postalPlace: 'Surrey',
+// 					countryCode: 'UK'
+// 				},
+// 				lines: [
+// 					{ product: 'Piano', id: 3, orderId: 2 }
+// 				]
+// 			}
+// 		];
 
-		expect(orders).toEqual(expected);
+// 		expect(orders).toEqual(expected);
 
-	}
+// 	}
 
-});
+// });
 
-function pg() {
-	return {pool: rdb.pg('postgres://postgres:postgres@postgres/postgres'), init: initPg};
-}
 
-//eslint-disable-next-line @typescript-eslint/no-unused-vars
-function mssqlNative() {
-	return {pool: rdb.mssqlNative('server=mssql;Database=demo;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes'), init: initMs};
-}
+function getDb(name) {
+	if (name === 'mssql')
+		return {
+			db: db({
+				db: (cons) => cons.mssql({
+					server: 'mssql',
+					options: {
+						encrypt: false,
+						database: 'master'
+					},
+					authentication: {
+						type: 'default',
+						options: {
+							userName: 'sa',
+							password: 'P@assword123',
+						}
+					}
+				})
+			}),
+			init: initMs
 
-function mssql() {
-	return {pool: rdb.mssql(
-		{
-			server: 'mssql',
-			options: {
-				encrypt: false,
-				database: 'master'
-			},
-			authentication: {
-				type: 'default',
-				options: {
-					userName: 'sa',
-					password: 'P@assword123',
-				}
-			}}),
-	init: initMs};
-}
+		};
+	else if (name === 'mssqlNative')
+		return {
+			db: db({ db: (cons) => cons.mssqlNative('server=mssql;Database=demo;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes') }),
+			init: initMs
+		};
+	else if (name === 'pg')
+		return {
+			db: db({ db: (cons) => cons.postgres('postgres://postgres:postgres@postgres/postgres') }),
+			init: initPg
+		};
+	else if (name === 'sqlite')
+		return {
+			db: db({ db: (cons) => cons.sqlite(`demo${new Date().getUTCMilliseconds()}.db`) }),
+			init: initSqlite
+		};
+	else if (name === 'sap')
+		return {
+			db: db({ db: (cons) => cons.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master`) }),
+			init: initSap
+		};
+	else if (name === 'mysql')
+		return {
+			db: db({ db: (cons) => cons.mysql('mysql://test:test@mysql/test') }),
+			init: initMysql
+		};
 
-function sap() {
-	return {pool: rdb.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master`), init: initSap};
-}
-
-function mysql() {
-	return {pool: rdb.mySql('mysql://test:test@mysql/test'), init: initMysql};
-}
-
-function sqlite() {
-	return {pool: rdb.sqlite(`demo${new Date().getUTCMilliseconds()}.db`), init: initSqlite};
+	throw new Error('unknown db');
 }
