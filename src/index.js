@@ -17,7 +17,7 @@ var connectViaPool = function(connectionString) {
 	else
 		return client.apply(null, arguments);
 };
-
+connectViaPool.createPatch = client.createPatch;
 connectViaPool.table = require('./table');
 connectViaPool.filter = require('./emptyFilter');
 connectViaPool.commit = require('./table/commit');

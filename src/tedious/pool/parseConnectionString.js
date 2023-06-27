@@ -1,7 +1,7 @@
 var { parseConnectionString } = require('@tediousjs/connection-string');
 
 function parse(connectionString) {
-	const config = { options: {}, authentication: { type: 'default', options: {} } };
+	const config = { options: {useUTC: false}, authentication: { type: 'default', options: {} } };
 	const elements = parseConnectionString(connectionString);
 	for (const key in elements) {
 		const value = elements[key];
@@ -13,7 +13,9 @@ function parse(connectionString) {
 			config.authentication.options.password = value;
 			break;
 		case 'server':
-			config.server = value;
+			config.server = value.split(',')[0];
+			if (value.split(',')[1] !== undefined)
+				config.options.port = Number.parseInt(value.split(',')[1]);
 			break;
 		case 'database':
 			config.options.database = value;

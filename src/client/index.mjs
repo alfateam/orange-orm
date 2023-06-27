@@ -842,20 +842,24 @@ function dateToISOString$1(date) {
 var dateToISOString_1 = dateToISOString$1;
 
 let dateToISOString = dateToISOString_1;
-
+const isNode = (typeof window === 'undefined');
 
 function stringify$4(value) {
 	return JSON.stringify(value, replacer);
 }
 
 function replacer(key, value) {
-	if (Buffer.isBuffer(value))
+	if (isNode && isNodeBuffer(value))
 		return value.toString('base64');
 	// @ts-ignore
 	else if (value instanceof Date  && !isNaN(value))
 		return dateToISOString(value);
 	else
 		return value;
+}
+
+function isNodeBuffer(object) {
+	return Buffer.isBuffer(object);
 }
 
 var stringify_1 = stringify$4;
@@ -1524,7 +1528,7 @@ var createPatch$1 = function createPatch(original, dto, options) {
 				map[stringify$2(key)] = i;
 			}
 			else if ('id' in element)
-				map[stringify$2(element.id)] = i;
+				map[stringify$2([element.id])] = i;
 			else
 				map[i] = i;
 			return map;
@@ -1546,7 +1550,7 @@ var createPatch$1 = function createPatch(original, dto, options) {
 					copy[stringify$2(key)] = element;
 				}
 				else if (element === Object(element) && 'id' in element)
-					copy[stringify$2(element.id)] = element;
+					copy[stringify$2([element.id])] = element;
 				else
 					copy[i] = element;
 			}
@@ -4818,6 +4822,199 @@ axios.default = axios;
 
 var axios_1 = axios;
 
+var rfdc_1 = rfdc;
+
+function copyBuffer (cur) {
+  if (cur instanceof Buffer) {
+    return Buffer.from(cur)
+  }
+
+  return new cur.constructor(cur.buffer.slice(), cur.byteOffset, cur.length)
+}
+
+function rfdc (opts) {
+  opts = opts || {};
+
+  if (opts.circles) return rfdcCircles(opts)
+  return opts.proto ? cloneProto : clone
+
+  function cloneArray (a, fn) {
+    var keys = Object.keys(a);
+    var a2 = new Array(keys.length);
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      var cur = a[k];
+      if (typeof cur !== 'object' || cur === null) {
+        a2[k] = cur;
+      } else if (cur instanceof Date) {
+        a2[k] = new Date(cur);
+      } else if (ArrayBuffer.isView(cur)) {
+        a2[k] = copyBuffer(cur);
+      } else {
+        a2[k] = fn(cur);
+      }
+    }
+    return a2
+  }
+
+  function clone (o) {
+    if (typeof o !== 'object' || o === null) return o
+    if (o instanceof Date) return new Date(o)
+    if (Array.isArray(o)) return cloneArray(o, clone)
+    if (o instanceof Map) return new Map(cloneArray(Array.from(o), clone))
+    if (o instanceof Set) return new Set(cloneArray(Array.from(o), clone))
+    var o2 = {};
+    for (var k in o) {
+      if (Object.hasOwnProperty.call(o, k) === false) continue
+      var cur = o[k];
+      if (typeof cur !== 'object' || cur === null) {
+        o2[k] = cur;
+      } else if (cur instanceof Date) {
+        o2[k] = new Date(cur);
+      } else if (cur instanceof Map) {
+        o2[k] = new Map(cloneArray(Array.from(cur), clone));
+      } else if (cur instanceof Set) {
+        o2[k] = new Set(cloneArray(Array.from(cur), clone));
+      } else if (ArrayBuffer.isView(cur)) {
+        o2[k] = copyBuffer(cur);
+      } else {
+        o2[k] = clone(cur);
+      }
+    }
+    return o2
+  }
+
+  function cloneProto (o) {
+    if (typeof o !== 'object' || o === null) return o
+    if (o instanceof Date) return new Date(o)
+    if (Array.isArray(o)) return cloneArray(o, cloneProto)
+    if (o instanceof Map) return new Map(cloneArray(Array.from(o), cloneProto))
+    if (o instanceof Set) return new Set(cloneArray(Array.from(o), cloneProto))
+    var o2 = {};
+    for (var k in o) {
+      var cur = o[k];
+      if (typeof cur !== 'object' || cur === null) {
+        o2[k] = cur;
+      } else if (cur instanceof Date) {
+        o2[k] = new Date(cur);
+      } else if (cur instanceof Map) {
+        o2[k] = new Map(cloneArray(Array.from(cur), cloneProto));
+      } else if (cur instanceof Set) {
+        o2[k] = new Set(cloneArray(Array.from(cur), cloneProto));
+      } else if (ArrayBuffer.isView(cur)) {
+        o2[k] = copyBuffer(cur);
+      } else {
+        o2[k] = cloneProto(cur);
+      }
+    }
+    return o2
+  }
+}
+
+function rfdcCircles (opts) {
+  var refs = [];
+  var refsNew = [];
+
+  return opts.proto ? cloneProto : clone
+
+  function cloneArray (a, fn) {
+    var keys = Object.keys(a);
+    var a2 = new Array(keys.length);
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      var cur = a[k];
+      if (typeof cur !== 'object' || cur === null) {
+        a2[k] = cur;
+      } else if (cur instanceof Date) {
+        a2[k] = new Date(cur);
+      } else if (ArrayBuffer.isView(cur)) {
+        a2[k] = copyBuffer(cur);
+      } else {
+        var index = refs.indexOf(cur);
+        if (index !== -1) {
+          a2[k] = refsNew[index];
+        } else {
+          a2[k] = fn(cur);
+        }
+      }
+    }
+    return a2
+  }
+
+  function clone (o) {
+    if (typeof o !== 'object' || o === null) return o
+    if (o instanceof Date) return new Date(o)
+    if (Array.isArray(o)) return cloneArray(o, clone)
+    if (o instanceof Map) return new Map(cloneArray(Array.from(o), clone))
+    if (o instanceof Set) return new Set(cloneArray(Array.from(o), clone))
+    var o2 = {};
+    refs.push(o);
+    refsNew.push(o2);
+    for (var k in o) {
+      if (Object.hasOwnProperty.call(o, k) === false) continue
+      var cur = o[k];
+      if (typeof cur !== 'object' || cur === null) {
+        o2[k] = cur;
+      } else if (cur instanceof Date) {
+        o2[k] = new Date(cur);
+      } else if (cur instanceof Map) {
+        o2[k] = new Map(cloneArray(Array.from(cur), clone));
+      } else if (cur instanceof Set) {
+        o2[k] = new Set(cloneArray(Array.from(cur), clone));
+      } else if (ArrayBuffer.isView(cur)) {
+        o2[k] = copyBuffer(cur);
+      } else {
+        var i = refs.indexOf(cur);
+        if (i !== -1) {
+          o2[k] = refsNew[i];
+        } else {
+          o2[k] = clone(cur);
+        }
+      }
+    }
+    refs.pop();
+    refsNew.pop();
+    return o2
+  }
+
+  function cloneProto (o) {
+    if (typeof o !== 'object' || o === null) return o
+    if (o instanceof Date) return new Date(o)
+    if (Array.isArray(o)) return cloneArray(o, cloneProto)
+    if (o instanceof Map) return new Map(cloneArray(Array.from(o), cloneProto))
+    if (o instanceof Set) return new Set(cloneArray(Array.from(o), cloneProto))
+    var o2 = {};
+    refs.push(o);
+    refsNew.push(o2);
+    for (var k in o) {
+      var cur = o[k];
+      if (typeof cur !== 'object' || cur === null) {
+        o2[k] = cur;
+      } else if (cur instanceof Date) {
+        o2[k] = new Date(cur);
+      } else if (cur instanceof Map) {
+        o2[k] = new Map(cloneArray(Array.from(cur), cloneProto));
+      } else if (cur instanceof Set) {
+        o2[k] = new Set(cloneArray(Array.from(cur), cloneProto));
+      } else if (ArrayBuffer.isView(cur)) {
+        o2[k] = copyBuffer(cur);
+      } else {
+        var i = refs.indexOf(cur);
+        if (i !== -1) {
+          o2[k] = refsNew[i];
+        } else {
+          o2[k] = cloneProto(cur);
+        }
+      }
+    }
+    refs.pop();
+    refsNew.pop();
+    return o2
+  }
+}
+
+var _default = rfdc_1();
+
 const createPatch = createPatch$1;
 const stringify = stringify_1;
 const netAdapter = netAdapter$1;
@@ -4826,6 +5023,8 @@ const rootMap = new WeakMap();
 const fetchingStrategyMap = new WeakMap();
 const targetKey = Symbol();
 const _axios = axios_1;
+const clone = _default;
+
 
 function rdbClient(options = {}) {
 	if (options.pg)
@@ -4843,6 +5042,12 @@ function rdbClient(options = {}) {
 	}
 
 	client.reactive = (cb => _reactive = cb);
+	Object.defineProperty(client, 'metaData', {
+		get: getMetaData,
+		enumerable: true,
+		configurable: false
+	});
+	client.createPatch = _createPatch;
 	client.table = table;
 	client.or = column('or');
 	client.and = column('and');
@@ -4863,8 +5068,9 @@ function rdbClient(options = {}) {
 	client.express = express;
 
 	if (options.tables) {
+		const readonly = { readonly: options.readonly, concurrency: options.concurrency };
 		for (let name in options.tables) {
-			client[name] = table(options.tables[name]);
+			client[name] = table(options.tables[name], { ...readonly, ...clone(options[name]) });
 		}
 		client.tables = options.tables;
 		return client;
@@ -4882,6 +5088,42 @@ function rdbClient(options = {}) {
 		return new Proxy(client, handler);
 	}
 
+	function getMetaData() {
+		const result = {readonly: options.readonly, concurrency: options.concurrency};
+		for (let name in options.tables) {
+			result[name] = getMetaDataTable(options.tables[name], inferOptions(options, name));
+		}
+		return result;
+	}
+
+	function inferOptions(defaults, property) {
+		const parent = {};
+		if ('readonly' in defaults)
+			parent.readonly = defaults.readonly;
+		if ('concurrency' in defaults)
+			parent.concurrency = defaults.concurrency;
+		return { ...parent, ...(defaults[property] || {}) };
+	}
+
+
+	function getMetaDataTable(table, options) {
+		const result = {};
+		for (let i = 0; i < table._columns.length; i++) {
+			const name = table._columns[i].alias;
+			result[name] = inferOptions(options, name);
+		}
+		for(let name in table._relations) {
+			if (!isJoinRelation(name, table))
+				result[name] = getMetaDataTable(table._relations[name].childTable, inferOptions(options, name));
+		}
+
+		return result;
+
+		function isJoinRelation(name, table) {
+			return table[name] && table[name]._relation.columns;
+		}
+	}
+
 	async function query() {
 		return netAdapter(baseUrl, { tableOptions: { db: baseUrl }, axios }).query.apply(null, arguments);
 	}
@@ -4890,6 +5132,15 @@ function rdbClient(options = {}) {
 		if (!baseUrl?.express)
 			throw new Error('Express hosting is not supported on the client');
 		return baseUrl.express(client, options);
+	}
+
+	function _createPatch(original, modified, ...restArgs) {
+		if (!Array.isArray(original)) {
+			original = [original];
+			modified = [modified];
+		}
+		let args = [original, modified, ...restArgs];
+		return createPatch(...args);
 	}
 
 	function bindTransaction() {
@@ -4922,8 +5173,7 @@ function rdbClient(options = {}) {
 		}
 	}
 
-	function table(url) {
-		let tableOptions;
+	function table(url, tableOptions) {
 		if (!(typeof url === 'string')) {
 			tableOptions = tableOptions || {};
 			tableOptions = { db: baseUrl, ...tableOptions, transaction };
@@ -4939,7 +5189,8 @@ function rdbClient(options = {}) {
 			insert,
 			insertAndForget,
 			delete: _delete,
-			deleteCascade
+			deleteCascade,
+			patch
 		};
 
 		let handler = {
@@ -5127,6 +5378,8 @@ function rdbClient(options = {}) {
 		}
 
 		function toJSON(row, _meta = meta) {
+			if (!row)
+				return null;
 			if (!_meta)
 				return row;
 			if (Array.isArray(row)) {
@@ -5189,9 +5442,7 @@ function rdbClient(options = {}) {
 
 		async function saveArray(array, concurrencyOptions, strategy) {
 			let deduceStrategy;
-			if (arguments.length === 2 && typeof concurrencyOptions == 'object' && !('concurrency' in concurrencyOptions || 'defaultConcurrency' in concurrencyOptions))
-				strategy = concurrencyOptions;
-			else if (arguments.length < 3)
+			if (arguments.length < 3)
 				deduceStrategy = true;
 			let { json } = rootMap.get(array);
 			strategy = extractStrategy({ strategy }, array);
@@ -5209,6 +5460,18 @@ function rdbClient(options = {}) {
 			let { changed, strategy: newStrategy } = await p;
 			copyIntoArray(changed, array, [...insertedPositions, ...updatedPositions]);
 			rootMap.set(array, { json: stringify(array), strategy: newStrategy, originalArray: [...array] });
+		}
+
+		async function patch(patch, concurrencyOptions, strategy) {
+			let deduceStrategy;
+			if (arguments.length < 3)
+				deduceStrategy = true;
+			if (patch.length === 0)
+				return;
+			let body = stringify({ patch, options: { strategy, ...concurrencyOptions, deduceStrategy } });
+			let adapter = netAdapter(url, { axios, tableOptions });
+			await adapter.patch(body);
+			return;
 		}
 
 		function extractChangedRowsPositions(rows, patch, meta) {
@@ -5376,9 +5639,7 @@ function rdbClient(options = {}) {
 
 		async function saveRow(row, concurrencyOptions, strategy) {
 			let deduceStrategy;
-			if (arguments.length === 2 && typeof concurrencyOptions == 'object' && !('concurrency' in concurrencyOptions || 'defaultConcurrency' in concurrencyOptions))
-				strategy = concurrencyOptions;
-			else if (arguments.length < 3)
+			if (arguments.length < 3)
 				deduceStrategy = true;
 			strategy = extractStrategy({ strategy }, row);
 			strategy = extractFetchingStrategy(row, strategy);

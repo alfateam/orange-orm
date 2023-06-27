@@ -11,28 +11,31 @@ function wrapQuery(connection) {
 			log.emitQuery({ sql, parameters: query.parameters });
 			if (sql === 'BEGIN TRANSACTION') {
 				connection.beginTransaction((err) => {
-					onCompleted(err, []);
+					onCompleted(extractError(err), []);
 				});
 				return;
 			}
 			else if (sql === 'COMMIT') {
 				connection.commitTransaction((err) => {
-					onCompleted(err, []);
+					onCompleted(extractError(err), []);
 				});
 				return;
 			}
 			else if (sql === 'ROLLBACK') {
 				connection.rollbackTransaction((err) => {
-					onCompleted(err, []);
+					onCompleted(extractError(err), []);
 				});
 				return;
 			}
 		}
+		let keys;
 		var request = new Request(sql, onInnerCompleted);
 		const params = addParameters(request, query.parameters);
 		request.on('row', rows => {
 			const tmp = {};
-			const keys = Object.keys(rows);
+			if (!keys) {
+				keys = Object.keys(rows);
+			}
 			keys.forEach((cols) => {
 				tmp[cols] = rows[cols].value;
 			});
@@ -42,11 +45,19 @@ function wrapQuery(connection) {
 		connection.execSql(request);
 
 		function onInnerCompleted(err) {
-			if (err)
-				onCompleted(err);
+			if (err) {
+				onCompleted(extractError(err));
+			}
 			else
 				onCompleted(null, result);
 		}
+	}
+
+	function extractError(e) {
+		if (e && e.errors)
+			return e.errors[0];
+		else
+			return e;
 	}
 
 }
@@ -58,7 +69,7 @@ function replaceParamChar(sql, params) {
 	sql = '';
 	var lastIndex = splitted.length - 1;
 	for (var i = 0; i < lastIndex; i++) {
-		sql += splitted[i] + '@' + i ;
+		sql += splitted[i] + '@' + i;
 	}
 	sql += splitted[lastIndex];
 	return sql;

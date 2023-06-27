@@ -7,6 +7,8 @@ const fetchingStrategyMap = new WeakMap();
 const targetKey = Symbol();
 const _axios = require('axios');
 const map = require('./clientMap');
+const clone = require('rfdc/default');
+
 
 function rdbClient(options = {}) {
 	if (options.pg)
@@ -25,6 +27,12 @@ function rdbClient(options = {}) {
 
 	client.reactive = (cb => _reactive = cb);
 	client.map = map.bind(null, client);
+	Object.defineProperty(client, 'metaData', {
+		get: getMetaData,
+		enumerable: true,
+		configurable: false
+	});
+	client.createPatch = _createPatch;
 	client.table = table;
 	client.or = column('or');
 	client.and = column('and');
@@ -45,8 +53,9 @@ function rdbClient(options = {}) {
 	client.express = express;
 
 	if (options.tables) {
+		const readonly = { readonly: options.readonly, concurrency: options.concurrency };
 		for (let name in options.tables) {
-			client[name] = table(options.tables[name]);
+			client[name] = table(options.tables[name], { ...readonly, ...clone(options[name]) });
 		}
 		client.tables = options.tables;
 		return client;
@@ -64,6 +73,42 @@ function rdbClient(options = {}) {
 		return new Proxy(client, handler);
 	}
 
+	function getMetaData() {
+		const result = {readonly: options.readonly, concurrency: options.concurrency};
+		for (let name in options.tables) {
+			result[name] = getMetaDataTable(options.tables[name], inferOptions(options, name));
+		}
+		return result;
+	}
+
+	function inferOptions(defaults, property) {
+		const parent = {};
+		if ('readonly' in defaults)
+			parent.readonly = defaults.readonly;
+		if ('concurrency' in defaults)
+			parent.concurrency = defaults.concurrency;
+		return { ...parent, ...(defaults[property] || {}) };
+	}
+
+
+	function getMetaDataTable(table, options) {
+		const result = {};
+		for (let i = 0; i < table._columns.length; i++) {
+			const name = table._columns[i].alias;
+			result[name] = inferOptions(options, name);
+		}
+		for(let name in table._relations) {
+			if (!isJoinRelation(name, table))
+				result[name] = getMetaDataTable(table._relations[name].childTable, inferOptions(options, name));
+		}
+
+		return result;
+
+		function isJoinRelation(name, table) {
+			return table[name] && table[name]._relation.columns;
+		}
+	}
+
 	async function query() {
 		return netAdapter(baseUrl, { tableOptions: { db: baseUrl }, axios }).query.apply(null, arguments);
 	}
@@ -72,6 +117,15 @@ function rdbClient(options = {}) {
 		if (!baseUrl?.express)
 			throw new Error('Express hosting is not supported on the client');
 		return baseUrl.express(client, options);
+	}
+
+	function _createPatch(original, modified, ...restArgs) {
+		if (!Array.isArray(original)) {
+			original = [original];
+			modified = [modified];
+		}
+		let args = [original, modified, ...restArgs];
+		return createPatch(...args);
 	}
 
 	function bindTransaction() {
@@ -104,8 +158,7 @@ function rdbClient(options = {}) {
 		}
 	}
 
-	function table(url) {
-		let tableOptions;
+	function table(url, tableOptions) {
 		if (!(typeof url === 'string')) {
 			tableOptions = tableOptions || {};
 			tableOptions = { db: baseUrl, ...tableOptions, transaction };
@@ -121,7 +174,8 @@ function rdbClient(options = {}) {
 			insert,
 			insertAndForget,
 			delete: _delete,
-			deleteCascade
+			deleteCascade,
+			patch
 		};
 
 		let handler = {
@@ -309,6 +363,8 @@ function rdbClient(options = {}) {
 		}
 
 		function toJSON(row, _meta = meta) {
+			if (!row)
+				return null;
 			if (!_meta)
 				return row;
 			if (Array.isArray(row)) {
@@ -371,9 +427,7 @@ function rdbClient(options = {}) {
 
 		async function saveArray(array, concurrencyOptions, strategy) {
 			let deduceStrategy;
-			if (arguments.length === 2 && typeof concurrencyOptions == 'object' && !('concurrency' in concurrencyOptions || 'defaultConcurrency' in concurrencyOptions))
-				strategy = concurrencyOptions;
-			else if (arguments.length < 3)
+			if (arguments.length < 3)
 				deduceStrategy = true;
 			let { json } = rootMap.get(array);
 			strategy = extractStrategy({ strategy }, array);
@@ -391,6 +445,18 @@ function rdbClient(options = {}) {
 			let { changed, strategy: newStrategy } = await p;
 			copyIntoArray(changed, array, [...insertedPositions, ...updatedPositions]);
 			rootMap.set(array, { json: stringify(array), strategy: newStrategy, originalArray: [...array] });
+		}
+
+		async function patch(patch, concurrencyOptions, strategy) {
+			let deduceStrategy;
+			if (arguments.length < 3)
+				deduceStrategy = true;
+			if (patch.length === 0)
+				return;
+			let body = stringify({ patch, options: { strategy, ...concurrencyOptions, deduceStrategy } });
+			let adapter = netAdapter(url, { axios, tableOptions });
+			await adapter.patch(body);
+			return;
 		}
 
 		function extractChangedRowsPositions(rows, patch, meta) {
@@ -558,9 +624,7 @@ function rdbClient(options = {}) {
 
 		async function saveRow(row, concurrencyOptions, strategy) {
 			let deduceStrategy;
-			if (arguments.length === 2 && typeof concurrencyOptions == 'object' && !('concurrency' in concurrencyOptions || 'defaultConcurrency' in concurrencyOptions))
-				strategy = concurrencyOptions;
-			else if (arguments.length < 3)
+			if (arguments.length < 3)
 				deduceStrategy = true;
 			strategy = extractStrategy({ strategy }, row);
 			strategy = extractFetchingStrategy(row, strategy);

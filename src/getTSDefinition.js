@@ -64,6 +64,8 @@ export interface ${Name}Table {
 	proxify(${name}s: ${Name}[], fetchingStrategy: ${Name}Strategy): ${Name}Array;
 	proxify(${name}: ${Name}): ${Name}Row;
 	proxify(${name}: ${Name}, fetchingStrategy: ${Name}Strategy): ${Name}Row;
+	patch(patch: JsonPatch): Promise<void>;
+	patch(patch: JsonPatch, concurrency: ${Name}Concurrency, fetchingStrategy?: ${Name}Strategy): Promise<void>;	
 	customFilters: ${Name}CustomFilters;
 	${columns(table)}
 	${tableRelations(table)}
@@ -73,7 +75,6 @@ export interface ${Name}ExpressConfig {
 	baseFilter?: RawFilter | ((context: ExpressContext) => RawFilter | Promise<RawFilter>);
     customFilters?: Record<string, (context: ExpressContext,...args: any[]) => RawFilter | Promise<RawFilter>>;
     concurrency?: ${Name}Concurrency;
-    defaultConcurrency?: Concurrency;
     readonly?: boolean;
     disableBulkDeletes?: boolean;
 }
@@ -84,33 +85,24 @@ export interface ${Name}CustomFilters {
 
 export interface ${Name}Array extends Array<${Name}> {
 	saveChanges(): Promise<void>;
-	saveChanges(concurrency: ${Name}ConcurrencyOptions): Promise<void>;
-	saveChanges(fetchingStrategy: ${Name}Strategy): Promise<void>;
-	saveChanges(concurrency: ${Name}ConcurrencyOptions, fetchingStrategy: ${Name}Strategy): Promise<void>;
+	saveChanges(concurrency: ${Name}Concurrency, fetchingStrategy?: ${Name}Strategy): Promise<void>;
 	acceptChanges(): void;
 	clearChanges(): void;
 	refresh(): Promise<void>;
 	refresh(fetchingStrategy: ${Name}Strategy): Promise<void>;
 	delete(): Promise<void>;
-	delete(options: ${Name}ConcurrencyOptions): Promise<void>;
+	delete(options: ${Name}Concurrency): Promise<void>;
 }
 
 export interface ${Name}Row extends ${Name} {
 	saveChanges(): Promise<void>;
-	saveChanges(concurrency: ${Name}ConcurrencyOptions): Promise<void>;
-	saveChanges(fetchingStrategy: ${Name}Strategy): Promise<void>;
-	saveChanges(concurrency: ${Name}ConcurrencyOptions, fetchingStrategy: ${Name}Strategy): Promise<void>;
+	saveChanges(concurrency: ${Name}Concurrency, fetchingStrategy?: ${Name}Strategy): Promise<void>;
 	acceptChanges(): void;
 	clearChanges(): void;
 	refresh(): Promise<void>;
 	refresh(fetchingStrategy: ${Name}Strategy): Promise<void>;
 	delete(): Promise<void>;
-	delete(options: ${Name}ConcurrencyOptions): Promise<void>;
-}
-
-export interface ${Name}ConcurrencyOptions {
-	defaultConcurrency?: Concurrency
-	concurrency?: ${Name}Concurrency;
+	delete(options: ${Name}Concurrency): Promise<void>;
 }
 
 ${Concurrency(table, Name, true)}
@@ -182,7 +174,7 @@ ${Concurrency(table, Name, true)}
 			const tableTypeName = getTableName(relation, relationName);
 			otherConcurrency += `${Concurrency(relation.childTable, tableTypeName)}`;
 			concurrencyRelations += `${relationName}?: ${tableTypeName}Concurrency;${separator}`;
-			strategyRelations += `${relationName}?: ${tableTypeName}Strategy ;${separator}`;
+			strategyRelations += `${relationName}?: ${tableTypeName}Strategy | boolean;${separator}`;
 			regularRelations += `${relationName}?: ${tableTypeName}[] | null;${separator}`;
 		};
 
@@ -205,6 +197,8 @@ ${Concurrency(table, Name, true)}
 
 		return `
 export interface ${name}Concurrency {
+	readonly?: boolean;
+	concurrency?: Concurrency;
 	${concurrencyColumns(table)}
 	${concurrencyRelations}
 }
@@ -251,7 +245,10 @@ function regularColumns(table) {
 	let separator = '';
 	for (let i = 0; i < table._columns.length; i++) {
 		let column = table._columns[i];
-		result += `${separator}${column.alias}? : ${typeMap[column.tsType]} | null;`;
+		if (column._notNull)
+			result += `${separator}${column.alias} : ${typeMap[column.tsType]};`;
+		else
+			result += `${separator}${column.alias}? : ${typeMap[column.tsType]} | null;`;
 		separator = `
 	`;
 	}
@@ -275,14 +272,11 @@ function pascalCase(name) {
 }
 
 function concurrencyColumns(table) {
-	let primarySet = new Set(table._primaryColumns);
 	let result = '';
 	let separator = '';
 	for (let i = 0; i < table._columns.length; i++) {
 		let column = table._columns[i];
-		if (primarySet.has(column))
-			continue;
-		result += `${separator}${column.alias}? : Concurrency;`;
+		result += `${separator}${column.alias}? : ColumnConcurrency;`;
 		separator = `
 	`;
 	}
@@ -339,7 +333,7 @@ function getPrefixTs(isNamespace) {
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { AxiosInterceptorManager, AxiosRequestConfig, AxiosResponse } from 'axios';
-import type { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Url } from 'rdb';
+import type { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Url, ColumnConcurrency, JsonPatch } from 'rdb';
 export { RequestHandler } from 'express';
 export { Concurrency, Filter, RawFilter, Config, TransactionOptions, Pool } from 'rdb';
 export = r;
@@ -352,7 +346,7 @@ declare function r(config: Config): r.RdbClient;
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import schema from './schema';
 import type { AxiosInterceptorManager, AxiosRequestConfig, AxiosResponse } from 'axios';
-import type { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Url } from 'rdb';
+import type { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Url, ColumnConcurrency, JsonPatch } from 'rdb';
 export default schema as RdbClient;`;
 }
 
@@ -405,10 +399,21 @@ function getRdbClientTs(tables, isHttp) {
 export interface RdbClient  {${getTables(isHttp)}
 }
 
+export interface RdbConfig {
+	db?: Pool | (() => Pool);
+    readonly?: boolean;
+    concurrency?: Concurrency;${getConcurrencyTables()}    
+}
+
+export interface MetaData {
+    readonly?: boolean;
+    concurrency?: Concurrency;${getConcurrencyTables()}
+}
+
 export interface ExpressConfig {
 	db?: Pool | (() => Pool);
 	tables?: ExpressTables;
-	defaultConcurrency?: Concurrency;
+	concurrency?: Concurrency;
 	readonly?: boolean;
 	disableBulkDeletes?: boolean;
 }
@@ -422,6 +427,16 @@ export interface ExpressContext {
 export interface ExpressTables {${getExpressTables()}
 }
 `;
+	function getConcurrencyTables() {
+		let result = '';
+		for (let name in tables) {
+			let Name = name.substring(0, 1).toUpperCase() + name.substring(1);
+			result +=
+			`
+	${name}?: ${Name}Concurrency;`;
+		}
+		return result;
+	}
 
 	function getTables(isHttp) {
 		let result = '';
@@ -443,10 +458,12 @@ export interface ExpressTables {${getExpressTables()}
 	or(filter: Filter, ...filters: Filter[]): Filter;
 	not(): Filter;
 	transaction(fn: (transaction: RdbClient) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
-	filter: Filter;`;
+	filter: Filter;
+    createPatch(original: any[], modified: any[]): JsonPatch;
+    createPatch(original: any, modified: any): JsonPatch;`;
 		else
 			result += `
-	(config: {db: Pool | (() => Pool)}): RdbClient;
+	(config: RdbConfig): RdbClient;
 	and(filter: Filter, ...filters: Filter[]): Filter;
 	or(filter: Filter, ...filters: Filter[]): Filter;
 	not(): Filter;
@@ -454,8 +471,11 @@ export interface ExpressTables {${getExpressTables()}
 	query<T>(filter: RawFilter | string): Promise<T[]>;
 	transaction(fn: (transaction: RdbClient) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
 	filter: Filter;
+	createPatch(original: any[], modified: any[]): JsonPatch;
+	createPatch(original: any, modified: any): JsonPatch;
 	express(): Express;
-	express(config: ExpressConfig): Express;`;
+	express(config: ExpressConfig): Express;
+	readonly metaData: MetaData;`;
 		return result;
 	}
 	function getExpressTables() {

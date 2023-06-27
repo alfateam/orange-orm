@@ -105,6 +105,8 @@ _Contents_
 
 <a name="_connecttopostgres"></a>
 [connect to postgres](https://github.com/alfateam/rdb-demo/blob/master/connect.js)
+Prerequisites:
+- npm install [pg](https://www.npmjs.com/package/pg)  
 ```js
 let rdb = require('rdb');
 
@@ -116,7 +118,9 @@ return db.transaction(async () => {
 });
 ```
 <a name="_connecttomysql"></a>
-[connect to mySql](https://github.com/alfateam/rdb-demo/blob/master/mySql/connect.js)
+[connect to mySql](https://github.com/alfateam/rdb-demo/blob/master/mySql/connect.js)  
+Prerequisites:
+- npm install [mysql2](https://www.npmjs.com/package/mysql2)  
 ```js
 let rdb = require('rdb');
 
@@ -129,9 +133,8 @@ return db.transaction(async () => {
 ``` 
 <a name="_connecttomssql"></a>
 [connect to Ms Sql](https://github.com/alfateam/rdb-demo/blob/master/msSql/connect.js)  
-Pre-requisitites:
-- [ODBC 17](https://docs.microsoft.com/en-us/sql/connect/odbc/download-odbc-driver-for-sql-server?view=sql-server-ver15)
-- npm install [mssqlnodev8](https://www.npmjs.com/package/msnodesqlv8)  
+Prerequisites:
+- npm install [tedious](https://www.npmjs.com/package/tedious)  
 ```js
 let rdb = require('rdb');
 
@@ -143,8 +146,9 @@ return db.transaction(async () => {
 ``` 
 <a name="_connecttosap"></a>
 [connect to Sybase SAP](https://github.com/alfateam/rdb-demo/blob/master/sap/connect.js)  
-Pre-requisitites:
-- Peer dependency [mssqlnodev8](https://www.npmjs.com/package/msnodesqlv8) (yes, even though we are not using ms sql here)  
+Prerequisites:
+- The adaptive server driver
+- npm install [mssqlnodev8](https://www.npmjs.com/package/msnodesqlv8) (yes, even though we are not using ms sql here)  
 ```js
 let rdb = require('rdb');
 
@@ -156,7 +160,8 @@ return db.transaction(async () => {
 ``` 
 <a name="_connecttosqlite"></a>
 [connect to sqlite](https://github.com/alfateam/rdb-demo/blob/master/sqlite/connect.js)  
-Requires sqlite3 as a dependency in your own package.json
+Prerequisites:
+- npm install [sqlite3](https://www.npmjs.com/package/sqlite3)  
 ```js
 let rdb = require('rdb');
 
@@ -181,7 +186,7 @@ return db.transaction(async () => {
 <a name="_native"></a>
 __native bindings__  
 (postgres only)  
-Pre-requisities:
+Prerequisites:
 - npm install [pg-native](https://npmjs.org/package/pg-native)  
 ```js
 let rdb = require('rdb');

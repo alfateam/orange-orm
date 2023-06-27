@@ -4,7 +4,7 @@ let assert = require('assert');
 let fromCompareObject = require('./fromCompareObject');
 let toCompareObject = require('./toCompareObject');
 
-function applyPatch({ defaultConcurrency, concurrency }, dto, changes) {
+function applyPatch({ options = {} }, dto, changes, column) {
 	let dtoCompare = toCompareObject(dto);
 	changes = validateConflict(dtoCompare, changes);
 	fastjson.applyPatch(dtoCompare, changes, true, true);
@@ -27,16 +27,28 @@ function applyPatch({ defaultConcurrency, concurrency }, dto, changes) {
 	function validateConflict(object, changes) {
 		return changes.filter(change => {
 			let expectedOldValue = change.oldValue;
-			let strategy = getStrategy(change.path);
-			if ((strategy === 'optimistic') || (strategy === 'skipOnConflict')) {
+			const option = getOption(change.path);
+			let readonly = option.readonly;
+			if (readonly) {
+				const e = new Error(`Cannot update column ${change.path.replace('/', '')} because it is readonly`);
+				// @ts-ignore
+				e.status = 405;
+				throw e;
+			}
+			let concurrency = option.concurrency || 'optimistic';
+			if ((concurrency === 'optimistic') || (concurrency === 'skipOnConflict')) {
 				let oldValue = getOldValue(object, change.path);
 				try {
-					assert.deepEqual(oldValue, expectedOldValue);
+					if (column?.tsType === 'DateColumn') {
+						assertDatesEqual(oldValue, expectedOldValue);
+					}
+					else
+						assert.deepEqual(oldValue, expectedOldValue);
 				}
 				catch (e) {
-					if (strategy === 'skipOnConflict')
+					if (concurrency === 'skipOnConflict')
 						return false;
-					throw new Error(`The field ${change.path} was changed by another user. Expected ${inspect(fromCompareObject(expectedOldValue), false, 10)}, but was ${inspect(fromCompareObject(oldValue), false, 10)}.`);
+					throw new Error(`The field ${change.path.replace('/', '')} was changed by another user. Expected ${inspect(fromCompareObject(expectedOldValue), false, 10)}, but was ${inspect(fromCompareObject(oldValue), false, 10)}.`);
 				}
 			}
 			return true;
@@ -56,19 +68,38 @@ function applyPatch({ defaultConcurrency, concurrency }, dto, changes) {
 
 	}
 
-	function getStrategy(path) {
+	function getOption(path) {
 		let splitPath = path.split('/');
 		splitPath.shift();
-		return splitPath.reduce(extract, concurrency);
+		return splitPath.reduce(extract, options);
 
 		function extract(obj, name) {
 			if (Array.isArray(obj))
-				return obj[0] || defaultConcurrency;
+				return obj[0] || options;
 			if (obj === Object(obj))
-				return obj[name] || defaultConcurrency;
+				return obj[name] || options;
 			return obj;
 		}
+
 	}
+}
+
+function assertDatesEqual(date1, date2) {
+	if (date1 && date2) {
+		const parts1 = date1.split('T');
+		const time1parts = (parts1[1] || '').split(/[-+.]/);
+		const parts2 = date2.split('T');
+		const time2parts = (parts2[1] || '').split(/[-+.]/);
+		while (time1parts.length !== time2parts.length) {
+			if (time1parts.length > time2parts.length)
+				time1parts.pop();
+			else if (time1parts.length < time2parts.length)
+				time2parts.pop();
+		}
+		date1 = `${parts1[0]}T${time1parts[0]}`;
+		date2 = `${parts2[0]}T${time2parts[0]}`;
+	}
+	assert.deepEqual(date1, date2);
 }
 
 module.exports = applyPatch;

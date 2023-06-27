@@ -1,3 +1,4 @@
+import { Options } from 'ajv';
 import { RequestHandler } from 'express';
 import { ConnectionConfig } from 'tedious';
 import { AllowedDbMap, DbMapper, MappedDbDef } from './map';
@@ -20,18 +21,27 @@ declare namespace r {
     function map<V extends AllowedDbMap<V>>(
 		fn: (mapper: DbMapper<{}>) => V
 	): MappedDbDef<V>;
+    function createPatch(original: any[], modified: any[]): JsonPatch;
+    function createPatch(original: any, modified: any): JsonPatch;
+
+    type JsonPatch = Array<{
+        op: "add" | "remove" | "replace" | "copy" | "move" | "test";
+        path: string;
+        value?: any;
+        from?: string;
+    }>;
 
     export interface QueryEvent {
         sql: string,
         parameters: []
-    }    
+    }
 
     export interface QueryResult {
         sql: string,
         parameters: [],
         result: []
     }
-  
+
     export interface Pool {
         end(): Promise<void>;
     }
@@ -50,7 +60,7 @@ declare namespace r {
 
     export abstract class JoinRelation {
         columns: ColumnDef[];
-	    childTable: Table;
+        childTable: Table;
     }
 
     export interface Table {
@@ -59,8 +69,8 @@ declare namespace r {
         join(table: Table): Join;
         hasMany(join: JoinRelation): HasMany;
         hasOne(join: JoinRelation): HasOne;
-        formulaDiscriminators(...discriminators: string[]) : Table;
-        columnDiscriminators(...discriminators: string[]) : Table;
+        formulaDiscriminators(...discriminators: string[]): Table;
+        columnDiscriminators(...discriminators: string[]): Table;
     }
 
     export interface HasMany {
@@ -82,24 +92,61 @@ declare namespace r {
         date(): DateColumnDef;
     }
     export interface DateColumnDef {
+        validate(validator: (value?: Date | string, row?: object) => void): DateColumnDef;
+        notNull(): DateColumnNotNullDef;
+        JSONSchema(schema: object, options?: Options): DateColumnDef;
         serializable(value: boolean): DateColumnDef;
         as(dbName: string): DateColumnDef;
         default(value: Date | string | (() => Date | string)): DateColumnDef
         dbNull(value: Date | string | null): DateColumnDef;
     }
 
+    export interface DateColumnNotNullDef {
+        validate(validator: (value: Date | string, row?: object) => void): DateColumnNotNullDef;
+        JSONSchema(schema: object, options?: Options): DateColumnNotNullDef;
+        serializable(value: boolean): DateColumnNotNullDef;
+        as(dbName: string): DateColumnNotNullDef;
+        default(value: Date | string | (() => Date | string)): DateColumnNotNullDef
+        dbNull(value: Date | string | null): DateColumnNotNullDef;
+    }
+
     export interface BinaryColumnDef {
+        validate(validator: (value?: Buffer | string, row?: object) => void): BinaryColumnDef;
+        notNull(): BinaryColumnNotNullDef;
+        JSONSchema(schema: object, options?: Options): BinaryColumnDef;
         serializable(value: boolean): BinaryColumnDef;
         as(dbName: string): BinaryColumnDef;
         default(value: Buffer | string | (() => Buffer | string)): BinaryColumnDef
         dbNull(value: Buffer | string | null): BinaryColumnDef;
     }
 
+    export interface BinaryColumnNotNullDef {
+        validate(validator: (value: Buffer | string, row?: object) => void): BinaryColumnNotNullDef;
+        JSONSchema(schema: object, options?: Options): BinaryColumnNotNullDef;
+        serializable(value: boolean): BinaryColumnNotNullDef;
+        as(dbName: string): BinaryColumnNotNullDef;
+        default(value: Buffer | string | (() => Buffer | string)): BinaryColumnNotNullDef
+        dbNull(value: Buffer | string | null): BinaryColumnNotNullDef;
+    }
+
     export interface ColumnOf<T> {
+        validate(validator: (value?: T, row?: object) => void): ColumnOf<T>;
+        notNull(): ColumnNotNullOf<T>;
+        JSONSchema(schema: object, options?: Options): ColumnOf<T>;
         serializable(value: boolean): ColumnOf<T>;
         default(value: T | (() => T)): ColumnOf<T>;
         dbNull(value: T | null): ColumnOf<T>;
         as(dbName: string): ColumnOf<T>;
+    }
+
+    export interface ColumnNotNullOf<T> {
+        validate(validator: (value: T, row?: object) => void): ColumnNotNullOf<T>;
+        notNull(): ColumnNotNullOf<T>;
+        JSONSchema(schema: object, options?: Options): ColumnNotNullOf<T>;
+        serializable(value: boolean): ColumnNotNullOf<T>;
+        default(value: T | (() => T)): ColumnNotNullOf<T>;
+        dbNull(value: T | null): ColumnNotNullOf<T>;
+        as(dbName: string): ColumnNotNullOf<T>;
     }
 
     // export interface Rdb {
@@ -119,6 +166,11 @@ declare namespace r {
     }
 
     export type Concurrency = 'optimistic' | 'skipOnConflict' | 'overwrite';
+
+    export interface ColumnConcurrency {
+        readonly?: boolean;
+        concurrency?: Concurrency;
+    }
 
     export interface Express extends RequestHandler {
         db: import('express').RequestHandler
@@ -219,7 +271,7 @@ declare namespace r {
         /**
          * equal
          */
-        eq(value: TType | TType2  | null): Filter;        
+        eq(value: TType | TType2 | null): Filter;
         notEqual(value: TType | TType2 | null): Filter;
         /**
          * not equal
@@ -258,9 +310,8 @@ declare namespace r {
     export interface DbConfig {
         db: Pool | Url | (() => Pool);
     }
-    
 
-    export type Url =`${'http://'|'https://'}${string}`;    
+    export type Url = `${'http://' | 'https://'}${string}`;
 
     export interface TablesConfig {
         tables: Record<string, Table>

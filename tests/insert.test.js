@@ -2,6 +2,13 @@
 /* eslint-disable jest/expect-expect */
 // const rdb = require('rdb');
 const db = require('./db');
+import { describe, test, beforeAll, expect } from 'vitest';
+
+
+const rdb = require('../src/index');
+rdb.log(console.log);
+const _db = require('./db');
+
 const initPg = require('./initPg');
 const initMs = require('./initMs');
 const initMysql = require('./initMysql');
@@ -44,6 +51,96 @@ describe('transaction', () => {
 			result = await db.query('select 1 as foo');
 		});
 		expect(result).toEqual([{ foo: 1 }]);
+	}
+});
+
+describe('validate', () => {
+	test('pg', async () => await verify(pg()));
+
+	async function verify({pool, init}) {
+		const db = _db({db: pool});
+		let error;
+		await init(db);
+
+		try {
+			await db.customer.insert({
+				name: 'A name longer than 10 chars',
+				balance: 177,
+				// isActive: true
+			});
+
+		}
+		catch(e) {
+			error = e;
+		}
+
+
+		expect(error?.message).toEqual('Length cannot exceed 10 characters');
+	}
+});
+
+describe('validate chained', () => {
+	test('pg', async () => await verify(pg()));
+
+	async function verify({pool, init}) {
+		const db = _db({db: pool});
+		let error;
+		await init(db);
+
+		try {
+			await db.customer.insert({
+				balance: 177,
+				// isActive: true
+			});
+
+		}
+		catch(e) {
+			error = e;
+		}
+
+		expect(error?.message).toEqual('Name must be set');
+	}
+});
+
+describe('validate JSONSchema', () => {
+	test('pg', async () => await verify(pg()));
+
+	async function verify({pool, init}) {
+		const db = _db({db: pool});
+		let error;
+		await init(db);
+
+		try {
+			await db.customer.insert({
+				balance: 177,
+				name: 1
+				// isActive: true
+			});
+
+		}
+		catch(e) {
+			error = e;
+		}
+		expect(error?.message?.startsWith('Column customer.name violates JSON Schema')).toBe(true);
+	}
+});
+
+describe('validate notNull', () => {
+	test('pg', async () => await verify(pg()));
+
+	async function verify({pool, init}) {
+		const db = _db({db: pool});
+		let error;
+		await init(db);
+
+		try {
+			await db.order.insert({});
+
+		}
+		catch(e) {
+			error = e;
+		}
+		expect(error?.message?.substring(0, 45)).toBe('Column orderDate cannot be null or undefined');
 	}
 });
 

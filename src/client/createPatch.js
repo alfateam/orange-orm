@@ -62,7 +62,7 @@ module.exports = function createPatch(original, dto, options) {
 				map[stringify(key)] = i;
 			}
 			else if ('id' in element)
-				map[stringify(element.id)] = i;
+				map[stringify([element.id])] = i;
 			else
 				map[i] = i;
 			return map;
@@ -84,7 +84,7 @@ module.exports = function createPatch(original, dto, options) {
 					copy[stringify(key)] = element;
 				}
 				else if (element === Object(element) && 'id' in element)
-					copy[stringify(element.id)] = element;
+					copy[stringify([element.id])] = element;
 				else
 					copy[i] = element;
 			}

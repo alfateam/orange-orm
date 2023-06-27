@@ -14,6 +14,43 @@ Based on promises.
 [Documentation and examples](https://github.com/alfateam/rdb/blob/master/docs/docs.md)  
 
 ## Release notes
+__3.1.22__  
+Use local time instead of UTC on tedious     
+__3.1.21__  
+Metadata with concurrency and readonly   
+__3.1.20__  
+Bugfix patching ms sql date 
+__3.1.19__  
+Make db optional in RdbConfig  
+__3.1.18__  
+Bugfix patching without metadata 
+__3.1.17__  
+Another Buffer workaround in browser  
+__3.1.16__  
+Buffer workaround in browser        
+__3.1.15__  
+Fixed concurrency misspelling type generation      
+__3.1.14__  
+Bugfix patch in browser    
+__3.1.13__  
+Readonly and concurrency  
+__3.1.12__  
+Tedious: return first error when aggregate error    
+__3.1.11__  
+Do not set default port for mssql  
+__3.1.10__  
+Bugfix when parsing port number in connection string for tedious.  
+__3.1.9__  
+Improved typescript support for notNullable props on row.  
+__3.1.8__  
+Improved typescript definitions for notNull() and validate().  
+__3.1.7__  
+Chainable column.validate() and column.JSONSchema().  
+column.notNull().  
+__3.1.6__  
+Tedious: return first error if AggregatError    
+__3.1.5__  
+Improved performance for ms sql  
 __3.1.4__  
 import type to satisfy Type-Only imports/exports  in compilers  
 __3.1.3__  

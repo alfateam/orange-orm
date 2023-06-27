@@ -12,7 +12,7 @@ let hostExpress = require('./hostExpress');
 // 	disableBulkDeletes, isBrowser }
 function hostLocal() {
 	const _options = arguments[0];
-	let { readonly, table, transaction, db } = _options;
+	let { table, transaction, db  } = _options;
 
 	let c = { get, post, patch, query, express };
 
@@ -21,13 +21,7 @@ function hostLocal() {
 
 	}
 	async function patch(body) {
-		if (readonly) {
-			const error = new Error('Table is readonly');
-			// @ts-ignore
-			error.status = 405;
-			throw error;
-		}
-		else if (!table) {
+		if (!table) {
 			const error = new Error('Table is not exposed');
 			// @ts-ignore
 			error.status = 400;
