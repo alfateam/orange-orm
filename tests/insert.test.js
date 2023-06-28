@@ -13,10 +13,10 @@ const major = parseInt(versionArray[0]);
 
 beforeAll(async () => {
 
-	await createMs(getDb('mssql'));
+	await createMs('mssql');
 
-	async function createMs({ db }) {
-		// const db = _db({ db: pool });
+	async function createMs(dbName) {
+		const { db } = getDb(dbName);
 		const sql = `IF NOT EXISTS(SELECT * FROM sys.databases WHERE name = 'demo')
 		BEGIN
 			CREATE DATABASE demo
