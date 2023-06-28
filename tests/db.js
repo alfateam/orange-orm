@@ -1,5 +1,4 @@
 const rdb = require('../src/index');
-const client = require('../src/client/index');
 
 const nameSchema = {
 	type: 'string',
@@ -31,7 +30,7 @@ const map = rdb.map(x => ({
 	})),
 
 	orderLine: x.table('orderLine').map(({ column }) => ({
-		id: column('id').string().primary(),
+		id: column('id').numeric().primary(),
 		orderId: column('orderId').numeric(),
 		product: column('product').string(),
 	})),
@@ -54,45 +53,4 @@ const map = rdb.map(x => ({
 	}))
 }));
 
-
-const customer = rdb.table('customer');
-customer.primaryColumn('id').numeric();
-customer.column('name').string().validate(validateName).validate(truthy).JSONSchema(nameSchema);
-customer.column('balance').numeric();
-customer.column('isActive').boolean();
-
-const order = rdb.table('_order');
-order.primaryColumn('id').numeric().primary();
-order.column('orderDate').date().notNull();
-order.column('customerId').numeric();
-
-
-const orderLine = rdb.table('orderLine');
-orderLine.primaryColumn('id').string();
-orderLine.column('orderId').numeric();
-orderLine.column('product').string();
-
-const deliveryAddress = rdb.table('deliveryAddress');
-deliveryAddress.primaryColumn('id').numeric();
-deliveryAddress.column('orderId').numeric();
-deliveryAddress.column('name').string();
-deliveryAddress.column('street').string();
-deliveryAddress.column('postalCode').string();
-deliveryAddress.column('postalPlace').string();
-deliveryAddress.column('countryCode').string();
-
-
-order.join(customer).by('customerId').as('customer');
-const lineJoin = orderLine.join(order).by('orderId');
-order.hasMany(lineJoin).as('lines');
-const deliveryAddressJoin = deliveryAddress.join(order).by('orderId');
-order.hasOne(deliveryAddressJoin).as('deliveryAddress');
-
-module.exports = client({tables: {order, customer, orderLine, deliveryAddress}});
-
-
-
-
-
-
-// module.exports = map;
+module.exports = map;

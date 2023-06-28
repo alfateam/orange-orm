@@ -1,13 +1,6 @@
-/* eslint-disable jest/no-commented-out-tests */
-/* eslint-disable jest/expect-expect */
 // const rdb = require('rdb');
 const db = require('./db');
 import { describe, test, beforeAll, expect } from 'vitest';
-
-
-const rdb = require('../src/index');
-rdb.log(console.log);
-const _db = require('./db');
 
 const initPg = require('./initPg');
 const initMs = require('./initMs');
@@ -55,10 +48,11 @@ describe('transaction', () => {
 });
 
 describe('validate', () => {
-	test('pg', async () => await verify(pg()));
+	test('pg', async () => await verify('pg'));
 
-	async function verify({pool, init}) {
-		const db = _db({db: pool});
+	async function verify(dbName) {
+		const { db, init } = getDb(dbName);
+
 		let error;
 		await init(db);
 
@@ -70,7 +64,7 @@ describe('validate', () => {
 			});
 
 		}
-		catch(e) {
+		catch (e) {
 			error = e;
 		}
 
@@ -80,10 +74,10 @@ describe('validate', () => {
 });
 
 describe('validate chained', () => {
-	test('pg', async () => await verify(pg()));
+	test('pg', async () => await verify('pg'));
 
-	async function verify({pool, init}) {
-		const db = _db({db: pool});
+	async function verify(dbName) {
+		const { db, init } = getDb(dbName);
 		let error;
 		await init(db);
 
@@ -94,7 +88,7 @@ describe('validate chained', () => {
 			});
 
 		}
-		catch(e) {
+		catch (e) {
 			error = e;
 		}
 
@@ -103,10 +97,10 @@ describe('validate chained', () => {
 });
 
 describe('validate JSONSchema', () => {
-	test('pg', async () => await verify(pg()));
+	test('pg', async () => await verify('pg'));
 
-	async function verify({pool, init}) {
-		const db = _db({db: pool});
+	async function verify(dbName) {
+		const { db, init } = getDb(dbName);
 		let error;
 		await init(db);
 
@@ -118,7 +112,7 @@ describe('validate JSONSchema', () => {
 			});
 
 		}
-		catch(e) {
+		catch (e) {
 			error = e;
 		}
 		expect(error?.message?.startsWith('Column customer.name violates JSON Schema')).toBe(true);
@@ -126,10 +120,10 @@ describe('validate JSONSchema', () => {
 });
 
 describe('validate notNull', () => {
-	test('pg', async () => await verify(pg()));
+	test('pg', async () => await verify('pg'));
 
-	async function verify({pool, init}) {
-		const db = _db({db: pool});
+	async function verify(dbName) {
+		const { db, init } = getDb(dbName);
 		let error;
 		await init(db);
 
@@ -137,7 +131,7 @@ describe('validate notNull', () => {
 			await db.order.insert({});
 
 		}
-		catch(e) {
+		catch (e) {
 			error = e;
 		}
 		expect(error?.message?.substring(0, 45)).toBe('Column orderDate cannot be null or undefined');
@@ -147,22 +141,17 @@ describe('validate notNull', () => {
 describe('insert autoincremental', () => {
 
 	test('pg', async () => await verify('pg'));
-	// test('mssql', async () => await verify(mssql()));
-	// if (major > 17)
-	// 	test('mssqlNative', async () => await verify(mssqlNative()));
-	// test('mysql', async () => await verify(mysql()));
-	// test('sqlite', async () => await verify(sqlite()));
-	// test('sap', async () => await verify(sap()));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
 		await init(db);
 
-		await db.customer.insert({
-			name: 'George',
-			balance: 177,
-			isActive: true
-		});
 		const george = await db.customer.insert({
 			name: 'George',
 			balance: 177,
@@ -180,121 +169,121 @@ describe('insert autoincremental', () => {
 	}
 });
 
-// describe('insert autoincremental with relations', () => {
-// 	test('pg', async () => await verify(pg()));
-// 	test('mssql', async () => await verify(mssql()));
-// 	if (major > 17)
-// 		test('mssqlNative', async () => await verify(mssqlNative()));
-// 	test('mysql', async () => await verify(mysql()));
-// 	test('sqlite', async () => await verify(sqlite()));
-// 	test('sap', async () => await verify(sap()));
+describe('insert autoincremental with relations', () => {
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 
-// 	async function verify({pool, init}) {
-// 		const db = _db({ db: pool });
-// 		await init(db);
+	async function verify(dbName) {
+		const { db, init } = getDb(dbName);
+		await init(db);
 
-// 		const date1 = new Date(2022, 0, 11, 9, 24, 47);
-// 		const date2 = new Date(2021, 0, 11, 12, 22, 45);
+		const date1 = new Date(2022, 0, 11, 9, 24, 47);
+		const date2 = new Date(2021, 0, 11, 12, 22, 45);
 
-// 		const george = await db.customer.insert({
-// 			name: 'George',
-// 			balance: 177,
-// 			isActive: true
-// 		});
+		const george = await db.customer.insert({
+			name: 'George',
+			balance: 177,
+			isActive: true
+		});
 
-// 		const john = await db.customer.insert({
-// 			name: 'John',
-// 			balance: 200,
-// 			isActive: true
-// 		});
+		const john = await db.customer.insert({
+			name: 'John',
+			balance: 200,
+			isActive: true
+		});
 
-// 		let orders = await db.order.insert([
-// 			{
-// 				orderDate: date1,
-// 				customer: george,
-// 				deliveryAddress: {
-// 					name: 'George',
-// 					street: 'Node street 1',
-// 					postalCode: '7059',
-// 					postalPlace: 'Jakobsli',
-// 					countryCode: 'NO'
-// 				},
-// 				lines: [
-// 					{ product: 'Bicycle' },
-// 					{ product: 'Small guitar' }
-// 				]
-// 			},
-// 			{
-// 				customer: john,
-// 				orderDate: date2,
-// 				deliveryAddress: {
-// 					name: 'Harry Potter',
-// 					street: '4 Privet Drive, Little Whinging',
-// 					postalCode: 'GU4',
-// 					postalPlace: 'Surrey',
-// 					countryCode: 'UK'
-// 				},
-// 				lines: [
-// 					{ product: 'Piano' }
-// 				]
-// 			}
-// 		]);
+		let orders = await db.order.insert([
+			{
+				orderDate: date1,
+				customer: george,
+				deliveryAddress: {
+					name: 'George',
+					street: 'Node street 1',
+					postalCode: '7059',
+					postalPlace: 'Jakobsli',
+					countryCode: 'NO'
+				},
+				lines: [
+					{ product: 'Bicycle' },
+					{ product: 'Small guitar' }
+				]
+			},
+			{
+				customer: john,
+				orderDate: date2,
+				deliveryAddress: {
+					name: 'Harry Potter',
+					street: '4 Privet Drive, Little Whinging',
+					postalCode: 'GU4',
+					postalPlace: 'Surrey',
+					countryCode: 'UK'
+				},
+				lines: [
+					{ product: 'Piano' }
+				]
+			}
+		]);
 
-// 		const expected = [
-// 			{
-// 				id: 1,
-// 				orderDate: dateToISOString(date1),
-// 				customerId: 1,
-// 				customer: {
-// 					id: 1,
-// 					name: 'George',
-// 					balance: 177,
-// 					isActive: true
-// 				},
-// 				deliveryAddress: {
-// 					id: 1,
-// 					orderId: 1,
-// 					name: 'George',
-// 					street: 'Node street 1',
-// 					postalCode: '7059',
-// 					postalPlace: 'Jakobsli',
-// 					countryCode: 'NO'
-// 				},
-// 				lines: [
-// 					{ product: 'Bicycle', id: 1, orderId: 1 },
-// 					{ product: 'Small guitar', id: 2, orderId: 1 }
-// 				]
-// 			},
-// 			{
-// 				id: 2,
-// 				customerId: 2,
-// 				customer: {
-// 					id: 2,
-// 					name: 'John',
-// 					balance: 200,
-// 					isActive: true
-// 				},
-// 				orderDate: dateToISOString(date2),
-// 				deliveryAddress: {
-// 					id: 2,
-// 					orderId: 2,
-// 					name: 'Harry Potter',
-// 					street: '4 Privet Drive, Little Whinging',
-// 					postalCode: 'GU4',
-// 					postalPlace: 'Surrey',
-// 					countryCode: 'UK'
-// 				},
-// 				lines: [
-// 					{ product: 'Piano', id: 3, orderId: 2 }
-// 				]
-// 			}
-// 		];
+		const expected = [
+			{
+				id: 1,
+				orderDate: dateToISOString(date1),
+				customerId: 1,
+				customer: {
+					id: 1,
+					name: 'George',
+					balance: 177,
+					isActive: true
+				},
+				deliveryAddress: {
+					id: 1,
+					orderId: 1,
+					name: 'George',
+					street: 'Node street 1',
+					postalCode: '7059',
+					postalPlace: 'Jakobsli',
+					countryCode: 'NO'
+				},
+				lines: [
+					{ product: 'Bicycle', id: 1, orderId: 1 },
+					{ product: 'Small guitar', id: 2, orderId: 1 }
+				]
+			},
+			{
+				id: 2,
+				customerId: 2,
+				customer: {
+					id: 2,
+					name: 'John',
+					balance: 200,
+					isActive: true
+				},
+				orderDate: dateToISOString(date2),
+				deliveryAddress: {
+					id: 2,
+					orderId: 2,
+					name: 'Harry Potter',
+					street: '4 Privet Drive, Little Whinging',
+					postalCode: 'GU4',
+					postalPlace: 'Surrey',
+					countryCode: 'UK'
+				},
+				lines: [
+					{ product: 'Piano', id: 3, orderId: 2 }
+				]
+			}
+		];
 
-// 		expect(orders).toEqual(expected);
+		expect(orders).toEqual(expected);
 
-// 	}
+	}
 
-// });
+});
 
 
 function getDb(name) {
