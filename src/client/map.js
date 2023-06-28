@@ -37,8 +37,8 @@ function map(index, context, fn) {
 
 	for (let name in next) {
 		if (next[name] && next[name]._dbName) {
-			context[name] = { ...context[name], ...next[name] };
-			context[name].map = mapTable.bind(null, context, context[name]);
+			context[name] = next[name];
+			context[name].map = mapTable.bind(null, context[name]);
 		}
 	}
 	context.map = map.bind(null, index, context);
@@ -46,12 +46,12 @@ function map(index, context, fn) {
 
 	function newTable() {
 		let table = _newTable.apply(null, arguments);
-		table.map = mapTable.bind(null, index, table);
+		table.map = mapTable.bind(null, table);
 		return table;
 	}
 }
 
-function mapTable(index, table, fn) {
+function mapTable(table, fn) {
 	let next = fn({ column: table.column, primaryColumn: table.primaryColumn, references: table.join, hasMany, hasOne });
 	for (let name in next) {
 		if (next[name].as)
