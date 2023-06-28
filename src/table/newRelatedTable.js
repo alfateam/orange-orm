@@ -8,18 +8,20 @@ var none = require('./relatedTable/none');
 function newRelatedTable(relations, isShallow, isMany) {
 	var table = relations[relations.length - 1].childTable;
 	var columns = table._columns;
-	
-	let c;
-	if (isMany) {
-		c = all(relations);
-		// @ts-ignore
-		c.any = any(relations);
-	}
-	else {
-		c = any(relations);
-		// @ts-ignore
-		c.all = all(relations);
-	}
+
+	let c = {};
+	c.any = any(relations);
+	c.all = all(relations);
+	// if (isMany) {
+	// 	c = all(relations);
+	// 	// @ts-ignore
+	// 	c.any = any(relations);
+	// }
+	// else {
+	// 	c = any(relations);
+	// 	// @ts-ignore
+	// 	c.all = all(relations);
+	// }
 
 	// @ts-ignore
 	c.none = none(relations);

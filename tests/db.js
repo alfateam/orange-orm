@@ -62,7 +62,7 @@ customer.column('balance').numeric();
 customer.column('isActive').boolean();
 
 const order = rdb.table('_order');
-order.column('id').numeric().primary();
+order.primaryColumn('id').numeric().primary();
 order.column('orderDate').date().notNull();
 order.column('customerId').numeric();
 

@@ -17,7 +17,7 @@ function mapRoot(index, fn) {
 		function createPool(provider, ...args) {
 			const pool = provider.apply(null, args);
 			const tables = {};
-			for(let name in context) {
+			for (let name in context) {
 				if (context[name] && context[name]._dbName)
 					tables[name] = context[name];
 			}
@@ -52,19 +52,19 @@ function map(index, context, fn) {
 }
 
 function mapTable(index, table, fn) {
-	let next = fn({ column: table.column, references: table.join, hasMany, hasOne });
+	let next = fn({ column: table.column, primaryColumn: table.primaryColumn, references: table.join, hasMany, hasOne });
 	for (let name in next) {
 		if (next[name].as)
-			next[name].as(name);
+			next[name] = next[name].as(name);
 	}
 
 	function hasMany(to) {
 		if (!to)
 			throw new Error('Missing \'to\' table');
-		return {by};
+		return { by };
 
 		function by() {
-			const join = to.join(table).by.apply(null, arguments);
+			const join = to.join(table).by.apply(null, arguments).as('bar');
 			return table.hasMany(join);
 		}
 	}
@@ -72,10 +72,10 @@ function mapTable(index, table, fn) {
 	function hasOne(to) {
 		if (!to)
 			throw new Error('Missing \'to\' table');
-		return {by};
+		return { by };
 
 		function by() {
-			const join = to.join(table).by.apply(null, arguments);
+			const join = to.join(table).by.apply(null, arguments).as('foo');
 			return table.hasOne(join);
 		}
 	}
