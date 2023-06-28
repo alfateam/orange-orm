@@ -70,7 +70,6 @@ beforeAll(async () => {
 		]);
 	}
 
-
 	async function createMs(dbName) {
 		const { db } = getDb(dbName);
 		const sql = `IF NOT EXISTS(SELECT * FROM sys.databases WHERE name = 'demo')
@@ -82,6 +81,41 @@ beforeAll(async () => {
 	}
 });
 
+describe('getMany all sub filter', () => {
+
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+
+
+		const filter = db.order.lines.all(x => x.product.contains('l'));
+		// const filter = db.order.lines(x => x.product.contains('l'));
+		const rows = await db.order.getMany(filter);
+
+		//mssql workaround because datetime has no time offset
+		for (let i = 0; i < rows.length; i++) {
+			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate));
+		}
+
+		const date1 = new Date(2022, 0, 11, 9, 24, 47);
+		const expected = [
+			{
+				id: 1,
+				orderDate: dateToISOString(date1),
+				customerId: 1,
+			}
+		];
+
+		expect(rows).toEqual(expected);
+	}
+});
 
 describe('getMany', () => {
 
@@ -128,7 +162,7 @@ describe('getMany with column strategy', () => {
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
 
-		const rows = await db.customer.getAll({name: true});
+		const rows = await db.customer.getAll({ name: true });
 
 		const expected = [{
 			id: 1,
@@ -155,7 +189,7 @@ describe('getMany with relations', () => {
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
 
-		const rows = await db.order.getAll({ lines: {}, customer: { order: {lines: {order: {}}}}, deliveryAddress: { }});
+		const rows = await db.order.getAll({ lines: {}, customer: { order: { lines: { order: {} } } }, deliveryAddress: {} });
 		//mssql workaround because datetime has no time offset
 		for (let i = 0; i < rows.length; i++) {
 			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate));

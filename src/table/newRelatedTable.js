@@ -9,19 +9,21 @@ function newRelatedTable(relations, isShallow, isMany) {
 	var table = relations[relations.length - 1].childTable;
 	var columns = table._columns;
 
-	let c = {};
-	c.any = any(relations);
-	c.all = all(relations);
-	// if (isMany) {
-	// 	c = all(relations);
-	// 	// @ts-ignore
-	// 	c.any = any(relations);
-	// }
-	// else {
-	// 	c = any(relations);
-	// 	// @ts-ignore
-	// 	c.all = all(relations);
-	// }
+	let c;
+	if (isMany) {
+		c = all(relations);
+		// @ts-ignore
+		c.all = c;
+		// @ts-ignore
+		c.any = any(relations);
+	}
+	else {
+		c = any(relations);
+		// @ts-ignore
+		c.all = all(relations);
+		// @ts-ignore
+		c.any = c;
+	}
 
 	// @ts-ignore
 	c.none = none(relations);
@@ -57,7 +59,7 @@ function newRelatedTable(relations, isShallow, isMany) {
 
 		Object.defineProperty(c, alias, {
 			get: function() {
-				return nextRelatedTable(children, isShallow) ;
+				return nextRelatedTable(children, isShallow, relation.isMany) ;
 			}
 		});
 	}
@@ -72,9 +74,9 @@ function newRelatedTable(relations, isShallow, isMany) {
 	return c;
 }
 
-function _nextRelatedTable(relations, isShallow) {
+function _nextRelatedTable(relations, isShallow, isMany) {
 	nextRelatedTable = require('./newRelatedTable');
-	return nextRelatedTable(relations, isShallow);
+	return nextRelatedTable(relations, isShallow, isMany);
 }
 
 module.exports = newRelatedTable;

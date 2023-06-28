@@ -1,5 +1,6 @@
 let emptyFilter = require('../emptyFilter');
 let negotiateRawSqlFilter = require('../table/column/negotiateRawSqlFilter');
+let getMeta = require('./getMeta');
 let isSafe = Symbol();
 let _ops = {
 	and: emptyFilter.and,
@@ -55,7 +56,7 @@ let _allowedOps = {
 };
 
 async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, request, response, readonly, disableBulkDeletes, isBrowser, client }) {
-	let allowedOps = {..._allowedOps, insert: !readonly, insertAndForget: !readonly};
+	let allowedOps = { ..._allowedOps, insert: !readonly, insertAndForget: !readonly, ...extractRelations(getMeta(table)) };
 	let ops = { ..._ops, ...getCustomFilterPaths(customFilters), getManyDto, getMany, delete: _delete, cascadeDelete };
 	let res = await parseFilter(JSONFilter, table) || {};
 	return res;
@@ -101,11 +102,11 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 
 	async function invokeBaseFilter() {
 		if (typeof baseFilter === 'function') {
-			const context = {client: client.bindTransaction(), request, response};
+			const context = { client: client.bindTransaction(), request, response };
 			const res = await baseFilter.apply(null, [context]);
 			const JSONFilter = JSON.parse(JSON.stringify(res));
 			//@ts-ignore
-			return executePath({ table, JSONFilter, request, response});
+			return executePath({ table, JSONFilter, request, response });
 		}
 		else
 			return baseFilter;
@@ -125,13 +126,13 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 		}
 
 		async function resolveFilter(fn, ...args) {
-			const context = {client: client.bindTransaction(), request, response};
-			let res =  fn.apply(null, [context, ...args]);
+			const context = { client: client.bindTransaction(), request, response };
+			let res = fn.apply(null, [context, ...args]);
 			if (res.then)
 				res = await res;
 			const JSONFilter = JSON.parse(JSON.stringify(res));
 			//@ts-ignore
-			return executePath({ table, JSONFilter, request, response});
+			return executePath({ table, JSONFilter, request, response });
 		}
 	}
 
@@ -140,7 +141,7 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 		let ops = new Set(['all', 'any', 'none']);
 		let last = path.slice(-1)[0];
 		if (ops.has(last)) {
-			for (let i = 0; i < path.length-1; i++) {
+			for (let i = 0; i < path.length - 1; i++) {
 				table = table[path[i]];
 			}
 			return table._shallow;
@@ -275,5 +276,24 @@ function setSafe(o) {
 			value: isSafe,
 			enumerable: false
 		});
+}
+
+function extractRelations(obj) {
+	let flattened = {};
+
+	function helper(relations) {
+		Object.keys(relations).forEach(key => {
+
+			flattened[key] = true;
+
+			if (typeof relations[key] === 'object' && Object.keys(relations[key]?.relations)?.length > 0) {
+				helper(relations[key].relations);
+			}
+		});
+	}
+
+	helper(obj.relations);
+
+	return flattened;
 }
 module.exports = executePath;
