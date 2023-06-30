@@ -64,7 +64,7 @@ function mapTable(table, fn) {
 		return { by };
 
 		function by() {
-			const join = to.join(table).by.apply(null, arguments).as('bar');
+			const join = to.join(table).by.apply(null, arguments);
 			return table.hasMany(join);
 		}
 	}
@@ -75,7 +75,7 @@ function mapTable(table, fn) {
 		return { by };
 
 		function by() {
-			const join = to.join(table).by.apply(null, arguments).as('foo');
+			const join = to.join(table).by.apply(null, arguments);
 			return table.hasOne(join);
 		}
 	}

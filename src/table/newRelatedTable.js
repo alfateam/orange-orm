@@ -30,7 +30,7 @@ function newRelatedTable(relations, isShallow, isMany) {
 
 	Object.defineProperty(c, '_shallow', {
 		get: function() {
-			return newRelatedTable(relations, true, isMany) ;
+			return newRelatedTable(relations, true, isMany);
 		}
 	});
 
@@ -41,7 +41,10 @@ function newRelatedTable(relations, isShallow, isMany) {
 
 	for (var i = 0; i < columns.length; i++) {
 		var col = columns[i];
-		c[col.alias] = newRelatedColumn(col, relations, isShallow);
+		if (col.alias === 'name')
+			c._name = newRelatedColumn(col, relations, isShallow);
+		else
+			c[col.alias] = newRelatedColumn(col, relations, isShallow);
 	}
 	defineChildren();
 
@@ -59,7 +62,7 @@ function newRelatedTable(relations, isShallow, isMany) {
 
 		Object.defineProperty(c, alias, {
 			get: function() {
-				return nextRelatedTable(children, isShallow, relation.isMany) ;
+				return nextRelatedTable(children, isShallow, relation.isMany);
 			}
 		});
 	}
@@ -71,7 +74,24 @@ function newRelatedTable(relations, isShallow, isMany) {
 		return subFilter(relations, isShallow);
 	};
 
-	return c;
+	let cProxy = new Proxy(c, {
+		get: function(target, prop) {
+			if (prop === 'name') {
+				return target._name !== undefined ? target._name : target.name;
+			}
+			return target[prop];
+		},
+		set: function(target, prop, value) {
+			if (prop === 'name') {
+				target._name = value;
+			} else {
+				target[prop] = value;
+			}
+			return true;
+		}
+	});
+
+	return cProxy;
 }
 
 function _nextRelatedTable(relations, isShallow, isMany) {

@@ -146,8 +146,16 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 			}
 			return table._shallow;
 		}
-		else
-			return table;
+		else {
+			let lastObj = table;
+			for (let i = 0; i < path.length; i++) {
+				if (lastObj)
+					lastObj = lastObj[path[i]];
+			}
+			if (lastObj?._shallow)
+				return lastObj._shallow;
+			else return table;
+		}
 	}
 
 	async function _delete(filter) {

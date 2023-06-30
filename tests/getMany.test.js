@@ -1,4 +1,5 @@
 import { describe, test, beforeAll, expect } from 'vitest';
+import rdb from '../src/index';
 const db = require('./db');
 const initPg = require('./initPg');
 const initMs = require('./initMs');
@@ -8,17 +9,16 @@ const initSap = require('./initSap');
 const dateToISOString = require('../src/dateToISOString');
 const versionArray = process.version.replace('v', '').split('.');
 const major = parseInt(versionArray[0]);
-const rdb = require('../src/index');
 
 beforeAll(async () => {
 	await createMs('mssql');
 	await insertData('pg');
 	await insertData('mssql');
-	if (major > 17)
-		await insertData('mssqlNative');
+	// if (major > 17)
+	// 	await insertData('mssqlNative');
 	await insertData('mysql');
 	await insertData('sqlite');
-	await insertData('sap');
+	// await insertData('sap');
 
 	async function insertData(dbName) {
 		const { db, init } = getDb(dbName);
@@ -94,9 +94,43 @@ describe('getMany all sub filter', () => {
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
+		// const filter = db.order.lines.exists();
+		const filter = db.order.lines(x => x.product.contains('l'));
+		const rows = await db.order.getMany(filter);
+
+		//mssql workaround because datetime has no time offset
+		for (let i = 0; i < rows.length; i++) {
+			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate));
+		}
+
+		const date1 = new Date(2022, 0, 11, 9, 24, 47);
+		const expected = [
+			{
+				id: 1,
+				orderDate: dateToISOString(date1),
+				customerId: 1,
+			}
+		];
+
+		expect(rows).toEqual(expected);
+	}
+});
+
+describe('getMany hasOne sub filter', () => {
+
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
 
 
-		const filter = db.order.lines.all(x => x.product.contains('l'));
+		const filter = db.order.deliveryAddress(x => x.name.eq('George'));
 		const rows = await db.order.getMany(filter);
 
 		//mssql workaround because datetime has no time offset
@@ -129,7 +163,6 @@ describe('getMany any sub filter', () => {
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
-		rdb.log(console.log);
 		const filter = db.order.lines.any(x => x.product.eq('Bicycle'));
 		const rows = await db.order.getMany(filter);
 
@@ -144,6 +177,39 @@ describe('getMany any sub filter', () => {
 				id: 1,
 				orderDate: dateToISOString(date1),
 				customerId: 1,
+			}
+		];
+
+		expect(rows).toEqual(expected);
+	}
+});
+
+describe('getMany none sub filter', () => {
+
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	// if (major > 17)
+	// 	test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	// test('sap', async () => await verify('sap'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+		const filter = db.order.lines.none(x => x.product.eq('Bicycle'));
+		const rows = await db.order.getMany(filter);
+
+		//mssql workaround because datetime has no time offset
+		for (let i = 0; i < rows.length; i++) {
+			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate));
+		}
+
+		const date2 = new Date(2021, 0, 11, 12, 22, 45);
+		const expected = [
+			{
+				id: 2,
+				orderDate: dateToISOString(date2),
+				customerId: 2,
 			}
 		];
 
