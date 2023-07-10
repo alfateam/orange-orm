@@ -1,13 +1,24 @@
 import { describe, test, beforeEach, expect } from 'vitest';
-const rdb = require('../src/index');
-const _db = require('./db');
+const db = require('./db');
 const initPg = require('./initPg');
+const initMs = require('./initMs');
+const initMysql = require('./initMysql');
+const initSqlite = require('./initSqlite');
+const initSap = require('./initSap');
+const versionArray = process.version.replace('v', '').split('.');
+const major = parseInt(versionArray[0]);
 
 beforeEach(async () => {
-	await insertData(pg());
+	await insertData('pg');
+	await insertData('mssql');
+	if (major > 17)
+		await insertData('mssqlNative');
+	await insertData('mysql');
+	await insertData('sap');
+	await insertData('sqlite');
 
-	async function insertData({ pool, init }) {
-		const db = _db({ db: pool });
+	async function insertData(dbName) {
+		const { db, init } = getDb(dbName);
 		await init(db);
 
 		const george = await db.customer.insert({
@@ -61,11 +72,18 @@ beforeEach(async () => {
 
 describe('readonly everything', () => {
 
-	test('pg', async () => await verify(pg()));
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 
-	async function verify({ pool }) {
 
-		const db = _db({ db: pool, readonly: true });
+	async function verify(dbName) {
+
+		const db = getDb(dbName).db({ readonly: true });
 
 		const rows = await db.customer.getAll();
 		const name = 'Oscar';
@@ -95,7 +113,6 @@ describe('readonly everything', () => {
 		const expectedMeta = {
 			readonly: true,
 			concurrency: undefined,
-			hus: { id: { readonly: true }, husnummer: { readonly: true } },
 			customer: {
 				id: { readonly: true },
 				name: { readonly: true },
@@ -121,27 +138,40 @@ describe('readonly everything', () => {
 					countryCode: { readonly: true }
 				}
 			},
-			lines: {
+			deliveryAddress: {
+				id: { readonly: true },
+				orderId: { readonly: true },
+				name: { readonly: true },
+				street: { readonly: true },
+				postalCode: { readonly: true },
+				postalPlace: { readonly: true },
+				countryCode: { readonly: true }
+			},
+			orderLine: {
 				id: { readonly: true },
 				orderId: { readonly: true },
 				product: { readonly: true }
 			}
 		};
 		expect(error?.message).toEqual('Cannot update column name because it is readonly');
+		console.dir(db.metaData, { depth: Infinity });
 		expect(db.metaData).toEqual(expectedMeta);
 	}
 });
 
 describe('readonly table', () => {
 
-	test('pg', async () => await verify(pg()));
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 
-	async function verify({ pool }) {
 
-		const db = _db({
-			db: pool,
-			customer: { readonly: true }
-		});
+	async function verify(dbName) {
+		const db = getDb(dbName).db({ customer: { readonly: true } });
 
 		const rows = await db.customer.getAll();
 		const name = 'Oscar';
@@ -174,14 +204,17 @@ describe('readonly table', () => {
 
 describe('readonly table delete', () => {
 
-	test('pg', async () => await verify(pg()));
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 
-	async function verify({ pool }) {
 
-		const db = _db({
-			db: pool,
-			order: { readonly: true }
-		});
+	async function verify(dbName) {
+		const db = getDb(dbName).db({ order: { readonly: true } });
 
 		const rows = await db.order.getAll();
 		let error;
@@ -199,14 +232,17 @@ describe('readonly table delete', () => {
 
 describe('readonly nested table delete', () => {
 
-	test('pg', async () => await verify(pg()));
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 
-	async function verify({ pool }) {
 
-		const db = _db({
-			db: pool,
-			order: { readonly: true }
-		});
+	async function verify(dbName) {
+		const db = getDb(dbName).db({ order: { readonly: true } });
 
 		const rows = await db.order.getAll({ lines: true });
 		let error;
@@ -223,18 +259,17 @@ describe('readonly nested table delete', () => {
 });
 describe('readonly on grandChildren table delete', () => {
 
-	test('pg', async () => await verify(pg()));
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 
-	async function verify({ pool }) {
 
-		const db = _db({
-			db: pool,
-			order: {
-				lines: {
-					readonly: true
-				}
-			}
-		});
+	async function verify(dbName) {
+		const db = getDb(dbName).db({ order: { lines: { readonly: true } } });
 
 		const rows = await db.order.getAll({ lines: true });
 		let error;
@@ -252,42 +287,17 @@ describe('readonly on grandChildren table delete', () => {
 
 describe('readonly nested table delete override', () => {
 
-	test('pg', async () => await verify(pg()));
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 
-	async function verify({ pool }) {
 
-		const db = _db({
-			db: pool,
-			order: {
-				readonly: true,
-				lines: {
-					readonly: false
-				}
-			}
-		});
-
-		const rows = await db.order.getAll({ lines: true });
-
-		const length = rows[0].lines.length;
-		rows[0].lines.pop();
-		expect(rows[0].lines.length).toEqual(length - 1);
-
-	}
-});
-describe('readonly delete should not throw when only column is readonly', () => {
-
-	test('pg', async () => await verify(pg()));
-
-	async function verify({ pool }) {
-
-		const db = _db({
-			db: pool,
-			order: {
-				lines: {
-					readonly: true
-				}
-			}
-		});
+	async function verify(dbName) {
+		const db = getDb(dbName).db({ order: { readonly: true, lines: { readonly: false } } });
 
 		const rows = await db.order.getAll({ lines: true });
 
@@ -300,18 +310,17 @@ describe('readonly delete should not throw when only column is readonly', () => 
 
 describe('readonly column delete', () => {
 
-	test('pg', async () => await verify(pg()));
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 
-	async function verify({ pool }) {
 
-		const db = _db({
-			db: pool,
-			order: {
-				orderDate: {
-					readonly: true
-				}
-			}
-		});
+	async function verify(dbName) {
+		const db = getDb(dbName).db({ order: { orderDate: { readonly: true } } });
 
 		const rows = await db.order.getAll();
 		const length = rows.length;
@@ -323,18 +332,17 @@ describe('readonly column delete', () => {
 
 describe('readonly column no change', () => {
 
-	test('pg', async () => await verify(pg()));
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 
-	async function verify({ pool }) {
 
-		const db = _db({
-			db: pool,
-			customer: {
-				balance: {
-					readonly: true
-				}
-			}
-		});
+	async function verify(dbName) {
+		const db = getDb(dbName).db({ customer: { balance: { readonly: true } } });
 
 		const rows = await db.customer.getAll();
 		const name = 'Oscar';
@@ -360,18 +368,17 @@ describe('readonly column no change', () => {
 
 describe('readonly column', () => {
 
-	test('pg', async () => await verify(pg()));
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 
-	async function verify({ pool }) {
 
-		const db = _db({
-			db: pool,
-			customer: {
-				name: {
-					readonly: true
-				}
-			}
-		});
+	async function verify(dbName) {
+		const db = getDb(dbName).db({ customer: { name: { readonly: true } } });
 
 		const rows = await db.customer.getAll();
 		const name = 'Oscar';
@@ -405,20 +412,17 @@ describe('readonly column', () => {
 
 describe('readonly nested column', () => {
 
-	test('pg', async () => await verify(pg()));
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 
-	async function verify({ pool }) {
 
-		const db = _db({
-			db: pool,
-			order: {
-				lines: {
-					product: {
-						readonly: true
-					}
-				}
-			}
-		});
+	async function verify(dbName) {
+		const db = getDb(dbName).db({ order: { lines: { product: { readonly: true } } } });
 
 		const rows = await db.order.getAll({ lines: true });
 		let error;
@@ -436,18 +440,17 @@ describe('readonly nested column', () => {
 
 describe('readonly nested table', () => {
 
-	test('pg', async () => await verify(pg()));
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 
-	async function verify({ pool }) {
 
-		const db = _db({
-			db: pool,
-			order: {
-				lines: {
-					readonly: true
-				}
-			}
-		});
+	async function verify(dbName) {
+		const db = getDb(dbName).db({ order: { lines: { readonly: true } } });
 
 		const rows = await db.order.getAll({ lines: true });
 		let error;
@@ -465,19 +468,17 @@ describe('readonly nested table', () => {
 
 describe('readonly table with column override', () => {
 
-	test('pg', async () => await verify(pg()));
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 
-	async function verify({ pool }) {
 
-		const db = _db({
-			db: pool,
-			customer: {
-				readonly: true,
-				name: {
-					readonly: false
-				}
-			}
-		});
+	async function verify(dbName) {
+		const db = getDb(dbName).db({ customer: { readonly: true, name: { readonly: false } } });
 
 		const rows = await db.customer.getAll();
 		const name = 'Oscar';
@@ -502,7 +503,55 @@ describe('readonly table with column override', () => {
 	}
 });
 
+function getDb(name) {
+	if (name === 'mssql')
+		return {
+			db: db({
+				db: (cons) => cons.mssql({
+					server: 'mssql',
+					options: {
+						encrypt: false,
+						database: 'master'
+					},
+					authentication: {
+						type: 'default',
+						options: {
+							userName: 'sa',
+							password: 'P@assword123',
+						}
+					}
+				})
+			}),
+			init: initMs
 
-function pg() {
-	return { pool: rdb.pg('postgres://postgres:postgres@postgres/postgres'), init: initPg };
+		};
+	else if (name === 'mssqlNative')
+		return {
+			db: db({ db: (cons) => cons.mssqlNative('server=mssql;Database=demo;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes') }),
+			init: initMs
+		};
+	else if (name === 'pg')
+		return {
+			db: db({ db: (cons) => cons.postgres('postgres://postgres:postgres@postgres/postgres') }),
+			init: initPg
+		};
+	else if (name === 'sqlite')
+		return {
+			db: db({ db: (cons) => cons.sqlite(sqliteName) }),
+			init: initSqlite
+		};
+	else if (name === 'sap')
+		return {
+			db: db({ db: (cons) => cons.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master`) }),
+			init: initSap
+		};
+	else if (name === 'mysql')
+		return {
+			db: db({ db: (cons) => cons.mysql('mysql://test:test@mysql/test') }),
+			init: initMysql
+		};
+
+	throw new Error('unknown db');
 }
+const sqliteName = `demo${new Date().getUTCMilliseconds()}.db`;
+

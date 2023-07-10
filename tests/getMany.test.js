@@ -1,5 +1,4 @@
 import { describe, test, beforeAll, expect } from 'vitest';
-import rdb from '../src/index';
 const db = require('./db');
 const initPg = require('./initPg');
 const initMs = require('./initMs');
@@ -14,11 +13,11 @@ beforeAll(async () => {
 	await createMs('mssql');
 	await insertData('pg');
 	await insertData('mssql');
-	// if (major > 17)
-	// 	await insertData('mssqlNative');
+	if (major > 17)
+		await insertData('mssqlNative');
 	await insertData('mysql');
 	await insertData('sqlite');
-	// await insertData('sap');
+	await insertData('sap');
 
 	async function insertData(dbName) {
 		const { db, init } = getDb(dbName);
