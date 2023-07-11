@@ -52,7 +52,7 @@ GO
 CREATE TABLE _order (
     id int IDENTITY PRIMARY KEY,
     orderDate DATETIME,
-    customerId INTEGER REFERENCES customer
+    customerId INTEGER NULL REFERENCES customer
 )
 
 GO

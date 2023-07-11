@@ -48,6 +48,12 @@ describe('transaction', () => {
 
 describe('validate', () => {
 	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
@@ -74,6 +80,12 @@ describe('validate', () => {
 
 describe('validate chained', () => {
 	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
@@ -97,6 +109,12 @@ describe('validate chained', () => {
 
 describe('validate JSONSchema', () => {
 	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
@@ -120,6 +138,12 @@ describe('validate JSONSchema', () => {
 
 describe('validate notNull', () => {
 	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
@@ -139,6 +163,12 @@ describe('validate notNull', () => {
 
 describe('validate notNullExceptInsert', () => {
 	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
