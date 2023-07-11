@@ -38,7 +38,7 @@ function newRow(table) {
 			dto[column.alias] = pkValue;
 		}
 
-	return decodeDbRow(table, table, dto, true);
+	return decodeDbRow(table, table, dto, true, true);
 }
 
 function isObject(object) {

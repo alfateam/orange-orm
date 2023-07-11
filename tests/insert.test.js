@@ -138,6 +138,35 @@ describe('validate notNull', () => {
 	}
 });
 
+describe('validate notNullExceptInsert', () => {
+	test('pg', async () => await verify('pg'));
+
+	async function verify(dbName) {
+		const { db, init } = getDb(dbName);
+		let error;
+		await init(db);
+
+		const george = await db.customer.insert({
+			name: 'George',
+			balance: 177,
+			isActive: true
+		});
+
+		const order = await db.order.insert({orderDate: new Date()});
+		order.customer = george;
+		await order.saveChanges();
+
+		try {
+			order.customer = null;
+			await order.saveChanges();
+		}
+		catch (e) {
+			error = e;
+		}
+		expect(error?.message?.substring(0, 45)).toBe('Column customerId cannot be null or undefined');
+	}
+});
+
 describe('insert autoincremental', () => {
 
 	test('pg', async () => await verify('pg'));

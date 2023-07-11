@@ -26,7 +26,7 @@ const map = rdb.map(x => ({
 	order: x.table('_order').map(({ column }) => ({
 		id: column('id').numeric().primary(),
 		orderDate: column('orderDate').date().notNull(),
-		customerId: column('customerId').numeric(),
+		customerId: column('customerId').numeric().notNullExceptInsert(),
 	})),
 
 	orderLine: x.table('orderLine').map(({ column }) => ({

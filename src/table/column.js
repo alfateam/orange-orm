@@ -81,6 +81,18 @@ function defineColumn(column, table) {
 		return c.validate(validate);
 	};
 
+	c.notNullExceptInsert = function() {
+		column._notNullExceptInsert = true;
+		function validate(value, _row, isInsert) {
+			if (isInsert)
+				return;
+			if (value === undefined || value === null)
+				throw new Error(`Column ${column.alias} cannot be null or undefined`);
+		}
+
+		return c.validate(validate);
+	};
+
 	c.validate = function(value) {
 		let previousValue = column.validate;
 		if (previousValue)

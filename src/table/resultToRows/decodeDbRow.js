@@ -1,6 +1,6 @@
 var newDecodeDbRow = require('./newDecodeDbRow');
 
-function decodeDbRow(span, table, dbRow, shouldValidate) {
+function decodeDbRow(span, table, dbRow, shouldValidate, isInsert) {
 	var decode = span._decodeDbRow;
 	if (!decode) {
 		let aliases = new Set();
@@ -11,7 +11,7 @@ function decodeDbRow(span, table, dbRow, shouldValidate) {
 			});
 		if (aliases.size === 0)
 			aliases = undefined;
-		decode = newDecodeDbRow(table, dbRow, aliases, shouldValidate);
+		decode = newDecodeDbRow(table, dbRow, aliases, shouldValidate, isInsert);
 		Object.defineProperty(span, '_decodeDbRow', {
 			enumerable: false,
 			get: function() {
