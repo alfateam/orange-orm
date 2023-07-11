@@ -5,14 +5,10 @@ const initMs = require('./initMs');
 const initMysql = require('./initMysql');
 const initSqlite = require('./initSqlite');
 const initSap = require('./initSap');
-const versionArray = process.version.replace('v', '').split('.');
-const major = parseInt(versionArray[0]);
 
 beforeEach(async () => {
 	await insertData('pg');
 	await insertData('mssql');
-	if (major > 17)
-		await insertData('mssqlNative');
 	await insertData('mysql');
 	await insertData('sap');
 	await insertData('sqlite');
@@ -74,8 +70,6 @@ describe('readonly everything', () => {
 
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
-	if (major > 17)
-		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
@@ -163,8 +157,6 @@ describe('readonly table', () => {
 
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
-	if (major > 17)
-		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
@@ -206,8 +198,6 @@ describe('readonly table delete', () => {
 
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
-	if (major > 17)
-		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
@@ -234,8 +224,6 @@ describe('readonly nested table delete', () => {
 
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
-	if (major > 17)
-		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
@@ -261,8 +249,6 @@ describe('readonly on grandChildren table delete', () => {
 
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
-	if (major > 17)
-		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
@@ -289,8 +275,6 @@ describe('readonly nested table delete override', () => {
 
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
-	if (major > 17)
-		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
@@ -312,8 +296,6 @@ describe('readonly column delete', () => {
 
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
-	if (major > 17)
-		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
@@ -334,8 +316,6 @@ describe('readonly column no change', () => {
 
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
-	if (major > 17)
-		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
@@ -370,8 +350,6 @@ describe('readonly column', () => {
 
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
-	if (major > 17)
-		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
@@ -414,8 +392,6 @@ describe('readonly nested column', () => {
 
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
-	if (major > 17)
-		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
@@ -442,8 +418,6 @@ describe('readonly nested table', () => {
 
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
-	if (major > 17)
-		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
@@ -470,8 +444,6 @@ describe('readonly table with column override', () => {
 
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
-	if (major > 17)
-		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
