@@ -1,4 +1,3 @@
-// const rdb = require('rdb');
 const db = require('./db');
 import { describe, test, beforeAll, expect } from 'vitest';
 
