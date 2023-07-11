@@ -14,6 +14,8 @@ Based on promises.
 [Documentation and examples](https://github.com/alfateam/rdb/blob/master/docs/docs.md)  
 
 ## Release notes
+__3.1.23__  
+No need for code generation  
 __3.1.22__  
 Use local time instead of UTC on tedious     
 __3.1.21__  
