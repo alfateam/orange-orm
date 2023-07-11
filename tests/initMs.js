@@ -6,7 +6,7 @@ DROP TABLE if exists customer;
 
 CREATE TABLE customer (
     id int IDENTITY(1,1) PRIMARY KEY,   
-    name TEXT,
+    name VARCHAR(100),
     balance NUMERIC,
     isActive BIT
 );
@@ -20,17 +20,17 @@ CREATE TABLE _order (
 CREATE TABLE orderLine (
     id int IDENTITY(1,1) PRIMARY KEY,
     orderId INTEGER REFERENCES _order,
-    product TEXT
+    product VARCHAR(100)
 );
 
 CREATE TABLE deliveryAddress (
     id int IDENTITY(1,1) PRIMARY KEY,
     orderId INTEGER REFERENCES _order,
-    name TEXT, 
-    street TEXT,
-    postalCode TEXT,
-    postalPlace TEXT,
-    countryCode TEXT
+    name VARCHAR(100), 
+    street VARCHAR(100),
+    postalCode VARCHAR(100),
+    postalPlace VARCHAR(100),
+    countryCode VARCHAR(100)
 )
 
 `;

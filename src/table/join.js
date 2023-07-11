@@ -1,15 +1,19 @@
 var newJoinRelation = require('./newJoinRelation');
 var newRelatedTable = require('./newRelatedTable');
+const isMany = false;
 
 function newJoin(parentTable, childTable) {
 	var c = {};
 	var columnNames = [];
+	var relation;
 
 	c.by = function() {
 		for (var i = 0; i < arguments.length; i++) {
 			columnNames.push(getColumnName(arguments[i]));
 		}
-		return c;
+		relation = newJoinRelation(parentTable, childTable, columnNames);
+		relation.as = c.as;
+		return relation;
 	};
 
 	function getColumnName(columnName) {
@@ -22,13 +26,12 @@ function newJoin(parentTable, childTable) {
 	}
 
 	c.as = function(alias) {
-		var relation = newJoinRelation(parentTable, childTable, columnNames);
 		relation.leftAlias = alias;
 		parentTable._relations[alias] = relation;
 
 		Object.defineProperty(parentTable, alias, {
 			get: function() {
-				return newRelatedTable([relation]);
+				return newRelatedTable([relation], undefined, isMany);
 			}
 		});
 

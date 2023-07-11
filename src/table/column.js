@@ -45,6 +45,12 @@ function defineColumn(column, table) {
 		return c;
 	};
 
+	c.primary = function() {
+		column.isPrimary = true;
+		table._primaryColumns.push(column);
+		return c;
+	};
+
 	c.as = function(alias) {
 		var oldAlias = column.alias;
 		table._aliases.delete(oldAlias);
@@ -68,6 +74,18 @@ function defineColumn(column, table) {
 	c.notNull = function() {
 		column._notNull = true;
 		function validate(value) {
+			if (value === undefined || value === null)
+				throw new Error(`Column ${column.alias} cannot be null or undefined`);
+		}
+
+		return c.validate(validate);
+	};
+
+	c.notNullExceptInsert = function() {
+		column._notNullExceptInsert = true;
+		function validate(value, _row, isInsert) {
+			if (isInsert)
+				return;
 			if (value === undefined || value === null)
 				throw new Error(`Column ${column.alias} cannot be null or undefined`);
 		}

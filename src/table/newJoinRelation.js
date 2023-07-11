@@ -74,6 +74,7 @@ function _newJoin(parentTable, childTable, columnNames) {
 			var name = columnNames[i];
 			if (column._dbName === name) {
 				column.default = undefined;
+				// delete column.lazyDefault;
 				c.columns.push(column);
 				return;
 			}

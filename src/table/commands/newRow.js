@@ -14,12 +14,20 @@ function newRow(table) {
 			else
 				dto[alias] = column.default;
 		}
+		else if ('lazyDefault' in column && !column.isPrimary) {
+			if (typeof column.lazyDefault === 'function')
+				dto[alias] = column.lazyDefault();
+			else if (column.toDto)
+				dto[alias] = column.toDto(column.lazyDefault);
+			else
+				dto[alias] = column.lazyDefault;
+		}
 		else
 			dto[alias] = undefined;
 	}
 	const arg = arguments[1];
 	if (isObject(arg))
-		for(let name in arg) {
+		for (let name in arg) {
 			if (table[name] && table[name].equal)
 				dto[name] = arg[name];
 		}
@@ -30,7 +38,7 @@ function newRow(table) {
 			dto[column.alias] = pkValue;
 		}
 
-	return decodeDbRow(table, table, dto, true);
+	return decodeDbRow(table, table, dto, true, true);
 }
 
 function isObject(object) {

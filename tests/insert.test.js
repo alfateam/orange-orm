@@ -1,8 +1,6 @@
+const db = require('./db');
 import { describe, test, beforeAll, expect } from 'vitest';
 
-
-const rdb = require('../src/index');
-const _db = require('./db');
 const initPg = require('./initPg');
 const initMs = require('./initMs');
 const initMysql = require('./initMysql');
@@ -14,10 +12,10 @@ const major = parseInt(versionArray[0]);
 
 beforeAll(async () => {
 
-	await createMs(mssql());
+	await createMs('mssql');
 
-	async function createMs({pool}) {
-		const db = _db({db: pool});
+	async function createMs(dbName) {
+		const { db } = getDb(dbName);
 		const sql = `IF NOT EXISTS(SELECT * FROM sys.databases WHERE name = 'demo')
 		BEGIN
 			CREATE DATABASE demo
@@ -29,29 +27,37 @@ beforeAll(async () => {
 
 describe('transaction', () => {
 
-	test('pg', async () => await verify(pg()));
-	test('mssql', async () => await verify(mssql()));
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
 	if (major > 17)
-		test('mssqlNative', async () => await verify(mssqlNative()));
-	test('mysql', async () => await verify(mysql()));
-	test('sqlite', async () => await verify(sqlite()));
-	test('sap', async () => await verify(sap()));
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 
-	async function verify({pool}) {
-		const db = _db({db: pool});
+	async function verify(dbName) {
 		let result;
+		const { db } = getDb(dbName);
+
 		await db.transaction(async (db) => {
 			result = await db.query('select 1 as foo');
 		});
-		expect(result).toEqual([{foo: 1}]);
+		expect(result).toEqual([{ foo: 1 }]);
 	}
 });
 
 describe('validate', () => {
-	test('pg', async () => await verify(pg()));
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 
-	async function verify({pool, init}) {
-		const db = _db({db: pool});
+	async function verify(dbName) {
+		const { db, init } = getDb(dbName);
+
 		let error;
 		await init(db);
 
@@ -63,7 +69,7 @@ describe('validate', () => {
 			});
 
 		}
-		catch(e) {
+		catch (e) {
 			error = e;
 		}
 
@@ -73,10 +79,16 @@ describe('validate', () => {
 });
 
 describe('validate chained', () => {
-	test('pg', async () => await verify(pg()));
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 
-	async function verify({pool, init}) {
-		const db = _db({db: pool});
+	async function verify(dbName) {
+		const { db, init } = getDb(dbName);
 		let error;
 		await init(db);
 
@@ -87,7 +99,7 @@ describe('validate chained', () => {
 			});
 
 		}
-		catch(e) {
+		catch (e) {
 			error = e;
 		}
 
@@ -96,10 +108,16 @@ describe('validate chained', () => {
 });
 
 describe('validate JSONSchema', () => {
-	test('pg', async () => await verify(pg()));
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 
-	async function verify({pool, init}) {
-		const db = _db({db: pool});
+	async function verify(dbName) {
+		const { db, init } = getDb(dbName);
 		let error;
 		await init(db);
 
@@ -111,7 +129,7 @@ describe('validate JSONSchema', () => {
 			});
 
 		}
-		catch(e) {
+		catch (e) {
 			error = e;
 		}
 		expect(error?.message?.startsWith('Column customer.name violates JSON Schema')).toBe(true);
@@ -119,10 +137,16 @@ describe('validate JSONSchema', () => {
 });
 
 describe('validate notNull', () => {
-	test('pg', async () => await verify(pg()));
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 
-	async function verify({pool, init}) {
-		const db = _db({db: pool});
+	async function verify(dbName) {
+		const { db, init } = getDb(dbName);
 		let error;
 		await init(db);
 
@@ -130,25 +154,60 @@ describe('validate notNull', () => {
 			await db.order.insert({});
 
 		}
-		catch(e) {
+		catch (e) {
 			error = e;
 		}
 		expect(error?.message?.substring(0, 45)).toBe('Column orderDate cannot be null or undefined');
 	}
 });
 
+describe('validate notNullExceptInsert', () => {
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+
+	async function verify(dbName) {
+		const { db, init } = getDb(dbName);
+		let error;
+		await init(db);
+
+		const george = await db.customer.insert({
+			name: 'George',
+			balance: 177,
+			isActive: true
+		});
+
+		const order = await db.order.insert({orderDate: new Date()});
+		order.customer = george;
+		await order.saveChanges();
+
+		try {
+			order.customer = null;
+			await order.saveChanges();
+		}
+		catch (e) {
+			error = e;
+		}
+		expect(error?.message?.substring(0, 45)).toBe('Column customerId cannot be null or undefined');
+	}
+});
+
 describe('insert autoincremental', () => {
 
-	test('pg', async () => await verify(pg()));
-	test('mssql', async () => await verify(mssql()));
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
 	if (major > 17)
-		test('mssqlNative', async () => await verify(mssqlNative()));
-	test('mysql', async () => await verify(mysql()));
-	test('sqlite', async () => await verify(sqlite()));
-	test('sap', async () => await verify(sap()));
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 
-	async function verify({pool, init}) {
-		const db = _db({db: pool});
+	async function verify(dbName) {
+		const { db, init } = getDb(dbName);
 		await init(db);
 
 		const george = await db.customer.insert({
@@ -169,16 +228,16 @@ describe('insert autoincremental', () => {
 });
 
 describe('insert autoincremental with relations', () => {
-	test('pg', async () => await verify(pg()));
-	test('mssql', async () => await verify(mssql()));
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
 	if (major > 17)
-		test('mssqlNative', async () => await verify(mssqlNative()));
-	test('mysql', async () => await verify(mysql()));
-	test('sqlite', async () => await verify(sqlite()));
-	test('sap', async () => await verify(sap()));
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 
-	async function verify({pool, init}) {
-		const db = _db({ db: pool });
+	async function verify(dbName) {
+		const { db, init } = getDb(dbName);
 		await init(db);
 
 		const date1 = new Date(2022, 0, 11, 9, 24, 47);
@@ -284,41 +343,54 @@ describe('insert autoincremental with relations', () => {
 
 });
 
-function pg() {
-	return {pool: rdb.pg('postgres://postgres:postgres@postgres/postgres'), init: initPg};
-}
 
-//eslint-disable-next-line @typescript-eslint/no-unused-vars
-function mssqlNative() {
-	return {pool: rdb.mssqlNative('server=mssql;Database=demo;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes'), init: initMs};
-}
+function getDb(name) {
+	if (name === 'mssql')
+		return {
+			db: db({
+				db: (cons) => cons.mssql({
+					server: 'mssql',
+					options: {
+						encrypt: false,
+						database: 'master'
+					},
+					authentication: {
+						type: 'default',
+						options: {
+							userName: 'sa',
+							password: 'P@assword123',
+						}
+					}
+				})
+			}),
+			init: initMs
 
-function mssql() {
-	return {pool: rdb.mssql(
-		{
-			server: 'mssql',
-			options: {
-				encrypt: false,
-				database: 'master'
-			},
-			authentication: {
-				type: 'default',
-				options: {
-					userName: 'sa',
-					password: 'P@assword123',
-				}
-			}}),
-	init: initMs};
-}
+		};
+	else if (name === 'mssqlNative')
+		return {
+			db: db({ db: (cons) => cons.mssqlNative('server=mssql;Database=demo;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes') }),
+			init: initMs
+		};
+	else if (name === 'pg')
+		return {
+			db: db({ db: (cons) => cons.postgres('postgres://postgres:postgres@postgres/postgres') }),
+			init: initPg
+		};
+	else if (name === 'sqlite')
+		return {
+			db: db({ db: (cons) => cons.sqlite(`demo${new Date().getUTCMilliseconds()}.db`) }),
+			init: initSqlite
+		};
+	else if (name === 'sap')
+		return {
+			db: db({ db: (cons) => cons.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master`) }),
+			init: initSap
+		};
+	else if (name === 'mysql')
+		return {
+			db: db({ db: (cons) => cons.mysql('mysql://test:test@mysql/test') }),
+			init: initMysql
+		};
 
-function sap() {
-	return {pool: rdb.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master`), init: initSap};
-}
-
-function mysql() {
-	return {pool: rdb.mySql('mysql://test:test@mysql/test'), init: initMysql};
-}
-
-function sqlite() {
-	return {pool: rdb.sqlite(`demo${new Date().getUTCMilliseconds()}.db`), init: initSqlite};
+	throw new Error('unknown db');
 }

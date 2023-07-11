@@ -42,7 +42,7 @@ GO
 
 CREATE TABLE customer (
     id int IDENTITY PRIMARY KEY,   
-    name TEXT,
+    name VARCHAR(100),
     balance NUMERIC,
     isActive BIT
 )
@@ -52,7 +52,7 @@ GO
 CREATE TABLE _order (
     id int IDENTITY PRIMARY KEY,
     orderDate DATETIME,
-    customerId INTEGER REFERENCES customer
+    customerId INTEGER NULL REFERENCES customer
 )
 
 GO
@@ -60,7 +60,7 @@ GO
 CREATE TABLE orderLine (
     id int IDENTITY PRIMARY KEY,
     orderId INTEGER REFERENCES _order,
-    product TEXT
+    product VARCHAR(100)
 )
 
 GO
@@ -68,11 +68,11 @@ GO
 CREATE TABLE deliveryAddress (
     id int IDENTITY PRIMARY KEY,
     orderId INTEGER REFERENCES _order,
-    name TEXT, 
-    street TEXT,
-    postalCode TEXT,
-    postalPlace TEXT,
-    countryCode TEXT
+    name VARCHAR(100), 
+    street VARCHAR(100),
+    postalCode VARCHAR(100),
+    postalPlace VARCHAR(100),
+    countryCode VARCHAR(100)
 )
 
 `;

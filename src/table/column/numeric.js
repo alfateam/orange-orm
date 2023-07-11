@@ -4,8 +4,9 @@ var purify = require('./numeric/purify');
 
 function _new(column) {
 	column.tsType = 'NumberColumn';
-	if (!column.isPrimary)
-		column.default = 0;
+	// if (!column.isPrimary)
+	// 	column.default = 0;
+	column.lazyDefault = 0;
 	column.purify = purify;
 	column.encode = newEncode(column);
 	column.decode = newDecode(column);

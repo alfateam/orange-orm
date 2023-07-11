@@ -15,7 +15,7 @@ let tryGetSessionContext = require('../tryGetSessionContext');
 let purifyStrategy = require('../purifyStrategy');
 
 
-function newDecodeDbRow(table, dbRow, filteredAliases, shouldValidate) {
+function newDecodeDbRow(table, dbRow, filteredAliases, shouldValidate, isInsert) {
 	let aliases = filteredAliases || table._aliases;
 	let columns = table._columns;
 	let numberOfColumns = columns.length;
@@ -49,7 +49,6 @@ function newDecodeDbRow(table, dbRow, filteredAliases, shouldValidate) {
 				let oldValue = this[name];
 				value = purify(value);
 				this._dbRow[key] = value;
-				//todo
 				if (column.validate)
 					column.validate(value, this._dbRow);
 				updateField(table, column, this);
@@ -206,7 +205,7 @@ function newDecodeDbRow(table, dbRow, filteredAliases, shouldValidate) {
 			if (row[key] !== undefined)
 				row[key] = columns[i].decode(row[key]);
 			if (shouldValidate && columns[i].validate)
-				columns[i].validate(row[key], row);
+				columns[i].validate(row[key], row, isInsert);
 		}
 		let target = new Row(row);
 		const p = new Proxy(target, {

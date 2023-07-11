@@ -7,6 +7,7 @@ var _mssqlNative;
 var _sap;
 var _mssql;
 var flags = require('./flags');
+var map = require('./client/map');
 
 var connectViaPool = function(connectionString) {
 	if (connectionString.indexOf && connectionString.indexOf('mysql') === 0)
@@ -28,6 +29,7 @@ connectViaPool.off = require('./table/log').off;
 connectViaPool.query = require('./query');
 connectViaPool.lock = require('./lock');
 connectViaPool.schema = require('./pg/schema');
+connectViaPool.map = map.bind(null, connectViaPool);
 
 Object.defineProperty(connectViaPool, 'mysql', {
 	get: function() {

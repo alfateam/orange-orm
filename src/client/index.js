@@ -6,6 +6,7 @@ const rootMap = new WeakMap();
 const fetchingStrategyMap = new WeakMap();
 const targetKey = Symbol();
 const _axios = require('axios');
+const map = require('./clientMap');
 const clone = require('rfdc/default');
 
 
@@ -25,6 +26,7 @@ function rdbClient(options = {}) {
 	}
 
 	client.reactive = (cb => _reactive = cb);
+	client.map = map.bind(null, client);
 	Object.defineProperty(client, 'metaData', {
 		get: getMetaData,
 		enumerable: true,

@@ -1,6 +1,7 @@
 import { Options } from 'ajv';
 import { RequestHandler } from 'express';
 import { ConnectionConfig } from 'tedious';
+import { AllowedDbMap, DbMapper, MappedDbDef } from './map';
 
 declare function r(config: r.Config): unknown;
 
@@ -17,6 +18,9 @@ declare namespace r {
     function mysql(connectionString: string, options?: PoolOptions): Pool;
     function on(type: 'query', cb: (e: QueryEvent) => void): void;
     function off(type: 'query', cb: (e: QueryEvent) => void): void;
+    function map<V extends AllowedDbMap<V>>(
+		fn: (mapper: DbMapper<{}>) => V
+	): MappedDbDef<V>;
     function createPatch(original: any[], modified: any[]): JsonPatch;
     function createPatch(original: any, modified: any): JsonPatch;
 
