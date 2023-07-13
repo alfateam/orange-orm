@@ -107,7 +107,87 @@ type StrategyToRowDataPrimary<T> = {
 	: never;
 };
 
+
+type ExpandedFetchingStrategy<T> = {
+	[K in keyof T &
+	keyof RemoveNever<
+		AllowedColumnsAndTablesStrategy<T>
+	>]?: T[K] extends ColumnSymbols
+	? true
+	: ExpandedFetchingStrategy<T[K]>;
+};
+
+type ExpandedMappedTable<T, FL = ExpandedFetchingStrategy<T>> = {
+	getOne(
+		filter?: Filter | PrimaryRowFilter<T>
+	): Promise<StrategyToRow<FetchedProperties<T, FL>, T>>;
+	getOne<FS extends FetchingStrategy<T>>(
+		filter?: Filter | PrimaryRowFilter<T>,
+		fetchingStrategy?: FS
+	): Promise<StrategyToRow<FetchedProperties<T, FL>, T>>;
+
+	insert<TRow extends StrategyToInsertRowData<T>>(
+		row: TRow
+	): Promise<StrategyToRow<FetchedProperties<T, FL>, T>>;
+	insertAndForget<TRow extends StrategyToRowData<T>>(
+		row: TRow
+	): Promise<void>;
+	insert<TRow extends StrategyToInsertRowData<T>, FS extends FetchingStrategy<T>>(
+		row: TRow,
+		strategy: FS
+	): Promise<StrategyToRow<FetchedProperties<T, FL>, T>>;
+
+	getMany(
+		filter?: Filter | PrimaryRowFilter<T>[]
+	): Promise<StrategyToRowArray<FetchedProperties<T, FL>, T>>;
+	getMany<FS extends FetchingStrategy<T>>(
+		filter?: Filter | PrimaryRowFilter<T>[],
+		fetchingStrategy?: FS
+	): Promise<StrategyToRowArray<FetchedProperties<T, FL>, T>>;
+	getAll(): StrategyToRowArray<FetchedProperties<T, FL>, T>;
+	getAll<FS extends FetchingStrategy<T>>(
+		fetchingStrategy?: FS
+	): Promise<StrategyToRowArray<FetchedProperties<T, FL>, T>>;
+
+	delete(filter?: Filter | PrimaryRowFilter<T>[]): Promise<void>;
+	deleteCascade(filter?: Filter | PrimaryRowFilter<T>[]): Promise<void>;
+
+	proxify<TRow extends StrategyToRowData<T>>(
+		row: TRow
+	): StrategyToRow<FetchedProperties<T, FL>, T>;
+	proxify<TRow extends StrategyToRowData<T>, FS extends FetchingStrategy<T>>(
+		row: TRow,
+		strategy: FS
+	): StrategyToRow<FetchedProperties<T, FL>, T>;
+	proxify<TRow extends StrategyToRowData<T>[]>(
+		rows: TRow[]
+	): StrategyToRowArray<FetchedProperties<T, FL>, T>;
+	proxify<
+		TRow extends StrategyToRowData<T>[],
+		FS extends FetchingStrategy<T>
+	>(
+		rows: TRow[],
+		strategy: FS
+	): StrategyToRowArray<FetchedProperties<T, FL>, T>;
+
+	patch<C extends Concurrency<T>>(
+		patch: JsonPatch,
+		concurrency?: C
+	): Promise<void>;
+
+	tsType<FS extends FetchingStrategy<T>>(
+		strategy: FS
+	): StrategyToRowData<FetchedProperties<T, FS>>;
+	tsType(
+	): StrategyToRowData<FetchedProperties<T, FL>>;
+
+	readonly metaData: Concurrency<T>;
+} & MappedColumnsAndRelations<T> &
+	GetById<T, CountProperties<ExtractPrimary<T>>>;
+
+
 type MappedTable<T> = {
+	expand(): ExpandedMappedTable<T>
 	getOne(
 		filter?: Filter | PrimaryRowFilter<T>
 	): Promise<StrategyToRow<FetchedProperties<T, {}>, T>>;
@@ -166,7 +246,7 @@ type MappedTable<T> = {
 	): Promise<void>;
 
 	tsType<FS extends FetchingStrategy<T>>(
-		strategy?: FS
+		strategy: FS
 	): StrategyToRowData<FetchedProperties<T, FS>>;
 	tsType(
 	): StrategyToRowData<FetchedProperties<T, {}>>;

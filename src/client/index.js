@@ -175,8 +175,10 @@ function rdbClient(options = {}) {
 			insertAndForget,
 			delete: _delete,
 			deleteCascade,
-			patch
+			patch,
+			expand,
 		};
+
 
 		let handler = {
 			get(_target, property,) {
@@ -189,6 +191,10 @@ function rdbClient(options = {}) {
 		};
 		let _table = new Proxy(c, handler);
 		return _table;
+
+		function expand() {
+			return c;
+		}
 
 		async function getAll() {
 			let _getMany = getMany.bind(null, undefined);
