@@ -9,7 +9,7 @@ function _new(column) {
 		if (value === null)
 			return value;
 		else if (typeof value === 'string')
-			return value;
+			return value.replace(' ', 'T');
 		return dateToISOString(value);
 	};
 }

@@ -3,6 +3,16 @@ DROP TABLE if exists orderLine;
 DROP TABLE if exists deliveryAddress;
 DROP TABLE if exists _order;
 DROP TABLE if exists customer;
+DROP TABLE if exists datetest;
+
+CREATE TABLE datetest (
+    _date DATE,
+    _datetime DATETIME,
+    _datetime_tz DATETIMEOFFSET
+);
+
+INSERT INTO datetest (_date, _datetime, _datetime_tz)
+VALUES ('2023-07-14 12:00:00', '2023-07-14 12:00:00', '2023-07-14T12:00:00-08:00');
 
 CREATE TABLE customer (
     id int IDENTITY(1,1) PRIMARY KEY,   

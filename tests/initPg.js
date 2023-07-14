@@ -2,6 +2,15 @@ const sql = `
 drop schema if exists public cascade;
 create schema public;
 
+CREATE TABLE datetest (
+    _date DATE,
+    _datetime TIMESTAMP,
+    _datetime_tz TIMESTAMP WITH TIME ZONE
+);
+
+INSERT INTO datetest (_date, _datetime, _datetime_tz)
+VALUES ('2023-07-14 12:00:00+09:00', '2023-07-14 12:00:00+09:00', '2023-07-14 12:00:00-08:00');
+
 CREATE TABLE customer (
     id SERIAL	 PRIMARY KEY,
     name TEXT,

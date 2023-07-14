@@ -6,6 +6,7 @@ var deleteFromSql = require('./deleteFromSql');
 var selectForUpdateSql = require('./selectForUpdateSql');
 var lastInsertedSql = require('./lastInsertedSql');
 var limitAndOffset = require('./limitAndOffset');
+var formatDateColumn = require('./formatDateColumn');
 
 
 function newResolveTransaction(domain, pool) {
@@ -30,6 +31,7 @@ function newResolveTransaction(domain, pool) {
 				rdb.dbClientDone = done;
 				rdb.encodeBoolean = encodeBoolean;
 				rdb.encodeDate = encodeDate;
+				rdb.formatDateColumn = formatDateColumn;
 				rdb.deleteFromSql = deleteFromSql;
 				rdb.selectForUpdateSql = selectForUpdateSql;
 				rdb.lastInsertedSql = lastInsertedSql;

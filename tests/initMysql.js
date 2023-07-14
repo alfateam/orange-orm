@@ -1,4 +1,14 @@
-const sql = `DROP TABLE IF EXISTS deliveryAddress; DROP TABLE IF EXISTS orderLine; DROP TABLE IF EXISTS _order; DROP TABLE IF EXISTS customer;
+const sql = `DROP TABLE IF EXISTS deliveryAddress; DROP TABLE IF EXISTS orderLine; DROP TABLE IF EXISTS _order; DROP TABLE IF EXISTS customer;DROP TABLE IF EXISTS datetest;
+
+CREATE TABLE datetest (
+    _date DATE,
+    _datetime DATETIME,
+    _datetime_tz TIMESTAMP
+);
+
+INSERT INTO datetest (_date, _datetime, _datetime_tz)
+VALUES ('2023-07-14 12:00:00+09:00', '2023-07-14 12:00:00+09:00', '2023-07-14 12:00:00-08:00');
+
 CREATE TABLE customer (
     id INTEGER AUTO_INCREMENT PRIMARY KEY,
     name TEXT,

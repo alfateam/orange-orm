@@ -25,7 +25,7 @@
   "license": "ISC",
   "scripts": {
     "test": "vitest run --threads=false",
-    "testw": "vitest --threads=false",
+    "testw": "vitest --threads=false dateformat",
     "concat": "node ./src/client/merge.js",
     "build": "rollup -c ./src/client/rollup.config.js && npm run concat",
     "lint": "eslint ./",

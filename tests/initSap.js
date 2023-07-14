@@ -1,6 +1,15 @@
 const sql = `
 IF
 EXISTS (SELECT 1 FROM
+sysobjects WHERE type = 'U' and name = 'datetest')
+
+BEGIN
+	DROP TABLE datetest
+END
+
+GO
+IF
+EXISTS (SELECT 1 FROM
 sysobjects WHERE type = 'U' and name = 'orderLine')
 
 BEGIN
@@ -37,6 +46,19 @@ sysobjects WHERE type = 'U' and name = 'customer')
 BEGIN
 	DROP TABLE customer
 END
+
+GO
+
+CREATE TABLE datetest (
+    _date DATE,
+    _datetime DATETIME,
+    _datetime_tz DATETIME
+    );
+    
+GO
+
+INSERT INTO datetest (_date, _datetime, _datetime_tz)
+VALUES ('2023-07-14 12:00:00', '2023-07-14T12:00:00', '2023-07-14 12:00:00');
 
 GO
 

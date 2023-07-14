@@ -45,6 +45,12 @@ const map = rdb.map(x => ({
 		countryCode: column('countryCode').string(),
 	})),
 
+	datetest: x.table('datetest').map(({column}) => ({
+		date: column('_date').date().primary(),
+		datetime: column('_datetime').date(),
+		datetime_tz: column('_datetime_tz').date(),
+	}))
+
 })).map(x => ({
 	order: x.order.map(({ hasOne, hasMany, references }) => ({
 		customer: references(x.customer).by('customerId'),
