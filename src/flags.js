@@ -1,5 +1,6 @@
 let flags = {
-	useProxy: true
+	useProxy: true,
+	useHook: true
 };
 
 module.exports = flags;

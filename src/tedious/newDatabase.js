@@ -1,4 +1,5 @@
 let createDomain = require('../createDomain');
+let getDomain = require('../getDomain');
 let newTransaction = require('./newTransaction');
 let begin = require('../table/begin');
 let commit = require('../table/commit');
@@ -6,8 +7,6 @@ let rollback = require('../table/rollback');
 let newPool = require('./newPool');
 let useHook = require('../useHook');
 let promise = require('promise/domains');
-let versionArray = process.version.replace('v', '').split('.');
-let major = parseInt(versionArray[0]);
 let express = require('../hostExpress');
 let hostLocal = require('../hostLocal');
 let doQuery = require('../query');
@@ -34,10 +33,6 @@ function newDatabase(connectionString, poolOptions) {
 
 		if (fn)
 			return domain.run(runInTransaction);
-		else if ((major >= 12) && useHook()) {
-			domain.exitContext = true;
-			return domain.start().then(run);
-		}
 		else
 			return domain.run(run);
 
@@ -78,8 +73,7 @@ function newDatabase(connectionString, poolOptions) {
 	};
 
 	c.bindTransaction = function() {
-		// @ts-ignore
-		var domain = process.domain;
+		var domain = getDomain();
 		let p = domain.run(() => true);
 
 		function run(fn) {

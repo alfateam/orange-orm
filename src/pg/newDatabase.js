@@ -1,4 +1,5 @@
 let createDomain = require('../createDomain');
+let getDomain = require('../getDomain');
 let newTransaction = require('./newTransaction');
 let begin = require('../table/begin');
 let commit = require('../table/commit');
@@ -6,10 +7,7 @@ let rollback = require('../table/rollback');
 let newPool = require('./newPool');
 let lock = require('../lock');
 let executeSchema = require('./schema');
-let useHook = require('../useHook');
 let promise = require('promise/domains');
-let versionArray = process.version.replace('v', '').split('.');
-let major = parseInt(versionArray[0]);
 let express = require('../hostExpress');
 let hostLocal = require('../hostLocal');
 let doQuery = require('../query');
@@ -22,11 +20,11 @@ function newDatabase(connectionString, poolOptions) {
 		throw new Error('Connection string cannot be empty');
 	var pool;
 	if (!poolOptions)
-		pool = newPool.bind(null,connectionString, poolOptions);
+		pool = newPool.bind(null, connectionString, poolOptions);
 	else
 		pool = newPool(connectionString, poolOptions);
 
-	let c = {poolFactory: pool, hostLocal, express};
+	let c = { poolFactory: pool, hostLocal, express };
 
 	c.transaction = function(options, fn) {
 		if ((arguments.length === 1) && (typeof options === 'function')) {
@@ -37,10 +35,6 @@ function newDatabase(connectionString, poolOptions) {
 
 		if (fn)
 			return domain.run(runInTransaction);
-		else if ((major >= 12) && useHook()) {
-			domain.exitContext = true;
-			return domain.start().then(run);
-		}
 		else
 			return domain.run(run);
 
@@ -60,10 +54,7 @@ function newDatabase(connectionString, poolOptions) {
 		function run() {
 			let p;
 			let transaction = newTransaction(domain, pool);
-			if (useHook())
-				p = new Promise(transaction);
-			else
-				p = new promise(transaction);
+			p = new promise(transaction);
 
 			return p.then(begin)
 				.then(negotiateSchema);
@@ -98,7 +89,7 @@ function newDatabase(connectionString, poolOptions) {
 
 	c.bindTransaction = function() {
 		// @ts-ignore
-		var domain = process.domain;
+		var domain = getDomain();
 		let p = domain.run(() => true);
 
 		function run(fn) {

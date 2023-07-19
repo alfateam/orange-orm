@@ -15,7 +15,7 @@ function createDomain() {
 
 function createOnContext() {
 	if (!cls)
-		cls = require('node-cls');
+		cls = require('./node-cls');
 	return cls.create('rdb');
 }
 

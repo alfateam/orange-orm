@@ -13,7 +13,7 @@ var connectViaPool = function(connectionString) {
 	if (connectionString.indexOf && connectionString.indexOf('mysql') === 0)
 		return connectViaPool.mySql.apply(null, arguments);
 	else if (connectionString.indexOf && connectionString.indexOf('postgres') === 0)
-		connectViaPool.pg.apply(null, arguments);
+		return connectViaPool.pg.apply(null, arguments);
 	else
 		return client.apply(null, arguments);
 };

@@ -1,16 +1,16 @@
-let useHook = require('../useHook');
+let useHook = require('./useHook');
 let cls;
 
 
 function tryGetSessionContext() {
 	if (useHook()) {
 		if (!cls)
-			cls = require('../node-cls');
+			cls = require('./node-cls');
 		let context = cls.getContext('rdb');
-		return context && context.rdb;
+		return context;
 	}
 	else
-		return process.domain && process.domain.rdb;
+		return process.domain;
 }
 
 module.exports = tryGetSessionContext;

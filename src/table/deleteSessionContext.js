@@ -4,7 +4,7 @@ let cls;
 function deleteSessionContext() {
 	if (useHook()) {
 		if (!cls)
-			cls = require('node-cls');
+			cls = require('../node-cls');
 		let context = cls.get('rdb');
 		delete context.rdb;
 		if (context.exit)

@@ -10,6 +10,8 @@ const versionArray = process.version.replace('v', '').split('.');
 const major = parseInt(versionArray[0]);
 
 beforeAll(async () => {
+
+
 	await createMs('mssql');
 	await insertData('pg');
 	await insertData('mssql');
