@@ -1,7 +1,6 @@
 let wrapQuery = require('./wrapQuery');
 let deleteFromSql = require('./deleteFromSql');
 let selectForUpdateSql = require('./selectForUpdateSql');
-let encodeDate = require('./encodeDate');
 let lastInsertedSql = require('./lastInsertedSql');
 let limitAndOffset = require('./limitAndOffset');
 
@@ -26,7 +25,6 @@ function newResolveTransaction(domain, pool) {
 				rdb.dbClient = connection;
 				rdb.dbClientDone = done;
 				rdb.encodeBoolean = connection.escape.bind(connection);
-				rdb.encodeDate = encodeDate;
 				rdb.deleteFromSql = deleteFromSql;
 				rdb.insertDefault = 'VALUES ()';
 				rdb.selectForUpdateSql = selectForUpdateSql;

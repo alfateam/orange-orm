@@ -3,6 +3,7 @@ drop schema if exists public cascade;
 create schema public;
 
 CREATE TABLE datetest (
+    id SERIAL	 PRIMARY KEY,
     _date DATE,
     _datetime TIMESTAMP,
     _datetime_tz TIMESTAMP WITH TIME ZONE

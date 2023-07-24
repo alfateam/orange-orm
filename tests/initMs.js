@@ -6,6 +6,7 @@ DROP TABLE if exists customer;
 DROP TABLE if exists datetest;
 
 CREATE TABLE datetest (
+    id int IDENTITY(1,1) PRIMARY KEY,
     _date DATE,
     _datetime DATETIME,
     _datetime_tz DATETIMEOFFSET

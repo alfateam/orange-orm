@@ -46,9 +46,16 @@ const map = rdb.map(x => ({
 	})),
 
 	datetest: x.table('datetest').map(({column}) => ({
-		date: column('_date').date().primary(),
+		id: column('id').numeric().primary(),
+		date: column('_date').date(),
 		datetime: column('_datetime').date(),
-		datetime_tz: column('_datetime_tz').date(),
+	})),
+
+	datetestWithTz: x.table('datetest').map(({column}) => ({
+		id: column('id').numeric().primary(),
+		date: column('_date').date(),
+		datetime: column('_datetime').date(),
+		datetime_tz: column('_datetime_tz').dateWithTimeZone()
 	}))
 
 })).map(x => ({

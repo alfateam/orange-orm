@@ -12,7 +12,10 @@ function _new(table,alias, span) {
 	function encodeColumn(i) {
 		let column = columns[i];
 		if (!columnsMap || (columnsMap.get(column)))
-			return  prefix + alias + '.' + ((column.format && column.format()) || column._dbName) + ' as s' + alias + i;
+			if (column.format)
+				return  prefix  + column.format(alias) + ' as s' + alias + i;
+			else
+				return  prefix + alias + '.' + column._dbName + ' as s' + alias + i;
 		else
 			return prefix + 'null as s' + alias + i;
 	}

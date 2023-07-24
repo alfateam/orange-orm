@@ -1,6 +1,5 @@
 var wrapQuery = require('./wrapQuery');
 var encodeBoolean = require('./encodeBoolean');
-var encodeDate = require('./encodeDate');
 var deleteFromSql = require('./deleteFromSql');
 var selectForUpdateSql = require('./selectForUpdateSql');
 var lastInsertedSql = require('./lastInsertedSql');
@@ -26,7 +25,6 @@ function newResolveTransaction(domain, pool) {
 				rdb.dbClient = client;
 				rdb.dbClientDone = done;
 				rdb.encodeBoolean = encodeBoolean;
-				rdb.encodeDate = encodeDate;
 				rdb.decodeJSON = decodeJSON;
 				rdb.encodeJSON = JSON.stringify;
 				rdb.deleteFromSql = deleteFromSql;

@@ -1,11 +1,11 @@
 var getSessionSingleton = require('../../getSessionSingleton');
 
-function format(column) {
+function format(column, alias) {
 	var formatColumn = getSessionSingleton('formatDateColumn');
 	if (formatColumn)
-		return formatColumn(column);
+		return formatColumn(column, alias);
 	else
-		return column._dbName;
+		return `${alias}.${column._dbName}`;
 }
 
 module.exports = format;

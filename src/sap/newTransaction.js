@@ -1,9 +1,9 @@
 var wrapQuery = require('../mssql/wrapQuery');
 var encodeBoolean = require('./encodeBoolean');
-var encodeDate = require('./encodeDate');
 var deleteFromSql = require('./deleteFromSql');
 var selectForUpdateSql = require('./selectForUpdateSql');
 var lastInsertedSql = require('./lastInsertedSql');
+var formatDateColumn = require('./formatDateColumn');
 
 function newResolveTransaction(domain, pool) {
 	var rdb = {poolFactory: pool};
@@ -25,11 +25,11 @@ function newResolveTransaction(domain, pool) {
 				rdb.dbClient = client;
 				rdb.dbClientDone = done;
 				rdb.encodeBoolean = encodeBoolean;
-				rdb.encodeDate = encodeDate;
 				rdb.decodeJSON = decodeJSON;
 				rdb.encodeJSON = JSON.stringify;
 				rdb.deleteFromSql = deleteFromSql;
 				rdb.selectForUpdateSql = selectForUpdateSql;
+				rdb.formatDateColumn = formatDateColumn;
 				rdb.lastInsertedSql = lastInsertedSql;
 				rdb.lastInsertedIsSeparate = true;
 				rdb.multipleStatements = false;

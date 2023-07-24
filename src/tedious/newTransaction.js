@@ -1,11 +1,11 @@
 var wrapQuery = require('./wrapQuery');
 var encodeBoolean = require('./encodeBoolean');
-var encodeDate = require('./encodeDate');
 var deleteFromSql = require('./deleteFromSql');
 var selectForUpdateSql = require('./selectForUpdateSql');
 var outputInsertedSql = require('./outputInsertedSql');
 const limitAndOffset = require('./limitAndOffset');
 const getManyDto = require('./getManyDto');
+const formatDateColumn = require('../mssql/formatDateColumn');
 // const getManyDto = require('../table/getManyDtoFast');
 
 function newResolveTransaction(domain, pool) {
@@ -29,13 +29,13 @@ function newResolveTransaction(domain, pool) {
 				rdb.dbClient = client;
 				rdb.dbClientDone = done;
 				rdb.encodeBoolean = encodeBoolean;
-				rdb.encodeDate = encodeDate;
 				rdb.decodeJSON = decodeJSON;
 				rdb.encodeJSON = JSON.stringify;
 				rdb.deleteFromSql = deleteFromSql;
 				rdb.selectForUpdateSql = selectForUpdateSql;
 				rdb.outputInsertedSql = outputInsertedSql;
 				rdb.lastInsertedIsSeparate = false;
+				rdb.formatDateColumn = formatDateColumn;
 				rdb.multipleStatements = true;
 				rdb.begin = 'BEGIN TRANSACTION';
 				rdb.limit = (span) => {

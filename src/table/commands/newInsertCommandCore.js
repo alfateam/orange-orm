@@ -26,3 +26,7 @@ function newInsertCommandCore(table, row, {insertAndForget = false} = {}) {
 }
 
 module.exports = newInsertCommandCore;
+
+// INSERT INTO _order (orderDate,customerId)  OUTPUT INSERTED.id,INSERTED.orderDate,INSERTED.customerId VALUES (@0,1)
+// parameters: 0,[object Object],'2022-01-11T09:24:47.000'
+

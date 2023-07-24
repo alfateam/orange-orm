@@ -145,6 +145,17 @@ describe('readonly everything', () => {
 				id: { readonly: true },
 				orderId: { readonly: true },
 				product: { readonly: true }
+			},
+			datetest: {
+				id: {readonly: true},
+				date: {readonly: true},
+				datetime: {readonly: true},
+			},
+			datetestWithTz: {
+				id: {readonly: true},
+				date: {readonly: true},
+				datetime: {readonly: true},
+				datetime_tz: {readonly: true},
 			}
 		};
 		expect(error?.message).toEqual('Cannot update column name because it is readonly');

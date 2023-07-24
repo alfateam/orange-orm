@@ -6,12 +6,11 @@ function purify(value) {
 		return null;
 	if (value.toISOString)
 		return dateToISOString(value);
-	if (value.indexOf('Z'))
+	if (value.indexOf('Z') > -1)
 		return 	dateToISOString(new Date(value));
 	var iso = tryParseISO(value);
 	if (iso)
 		return iso;
-
 	return value;
 }
 

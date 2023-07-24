@@ -29,14 +29,14 @@ CREATE TABLE deliveryAddress (
 );
 
 CREATE TABLE datetest (
+    id INTEGER PRIMARY KEY,
     _date TEXT,
     _datetime TEXT,
     _datetime_tz TEXT
-    );
+);
     
 
-INSERT INTO datetest (_date, _datetime, _datetime_tz)
-VALUES ('2023-07-14 12:00:00', '2023-07-14T12:00:00', '2023-07-14 12:00:00')
+INSERT INTO datetest (id, _date, _datetime, _datetime_tz) VALUES (1, '2023-07-14T12:00:00', '2023-07-14T12:00:00', '2023-07-14T12:00:00-08:00')
 
 
 `;

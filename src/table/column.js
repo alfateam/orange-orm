@@ -25,6 +25,16 @@ function defineColumn(column, table) {
 		return c;
 	};
 
+	c.date = function() {
+		require('./column/date')(column);
+		return c;
+	};
+
+	c.dateWithTimeZone = function() {
+		require('./column/dateWithTimeZone')(column);
+		return c;
+	};
+
 	c.numeric = function(optionalPrecision,optionalScale) {
 		require('./column/numeric')(column,optionalPrecision,optionalScale);
 		return c;

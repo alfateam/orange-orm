@@ -98,6 +98,8 @@ type StrategyToRowDataPrimary<T> = {
 	? number
 	: T[K] extends DateColumnSymbol
 	? string | Date
+	: T[K] extends DateWithTimeZoneColumnSymbol
+	? string | Date
 	: T[K] extends BinaryColumnSymbol
 	? string
 	: T[K] extends BooleanColumnSymbol
@@ -355,6 +357,8 @@ type ColumnToType<T> = T extends UuidColumnSymbol
 	? number
 	: T extends DateColumnSymbol
 	? string | Date
+	: T extends DateWithTimeZoneSymbol
+	? string | Date
 	: T extends BinaryColumnSymbol
 	? string
 	: T extends BooleanColumnSymbol
@@ -374,6 +378,8 @@ type MappedColumnsAndRelations<T> = RemoveNeverFlat<{
 	? NumericColumnType<M>
 	: T[K] extends DateColumnTypeDef<infer M>
 	? DateColumnType<M>
+	: T[K] extends DateWithTimeZoneColumnTypeDef<infer M>
+	? DateWithTimeZoneColumnType<M>
 	: T[K] extends BinaryColumnTypeDef<infer M>
 	? BinaryColumnType<M>
 	: T[K] extends BooleanColumnTypeDef<infer M>
@@ -441,6 +447,7 @@ type ColumnSymbols =
 	| UuidColumnSymbol
 	| NumericColumnSymbol
 	| DateColumnSymbol
+	| DateWithTimeZoneColumnSymbol
 	| BooleanColumnSymbol
 	| BinaryColumnSymbol
 	| JSONColumnSymbol;
@@ -501,6 +508,8 @@ type ToColumnTypes<T> = {
 	? NumericColumnSymbol
 	: T[K] extends DateColumnSymbol
 	? DateColumnSymbol
+	: T[K] extends DateWithTimeZoneColumnSymbol
+	? DateWithTimeZoneColumnSymbol
 	: T[K] extends BinaryColumnSymbol
 	? BinaryColumnSymbol
 	: T[K] extends BooleanColumnSymbol
@@ -867,6 +876,8 @@ type StrategyToRowData<T> = {
 	? number
 	: T[K] extends DateColumnSymbol
 	? string | Date
+	: T[K] extends DateWithTimeZoneColumnSymbol
+	? string | Date
 	: T[K] extends BinaryColumnSymbol
 	? string
 	: T[K] extends BooleanColumnSymbol
@@ -888,6 +899,8 @@ type StrategyToRowData<T> = {
 		: T[K] extends NumericColumnSymbol
 		? number | null
 		: T[K] extends DateColumnSymbol
+		? string | Date | null
+		: T[K] extends DateWithTimeZoneColumnSymbol
 		? string | Date | null
 		: T[K] extends BinaryColumnSymbol
 		? string | null
@@ -913,6 +926,8 @@ type StrategyToInsertRowData<T> = {
 	? number
 	: T[K] extends DateColumnSymbol
 	? string | Date
+	: T[K] extends DateWithTimeZoneColumnSymbol
+	? string | Date
 	: T[K] extends BinaryColumnSymbol
 	? string
 	: T[K] extends BooleanColumnSymbol
@@ -934,6 +949,8 @@ type StrategyToInsertRowData<T> = {
 		: T[K] extends NumericColumnSymbol
 		? number | null
 		: T[K] extends DateColumnSymbol
+		? string | Date | null
+		: T[K] extends DateWithTimeZoneColumnSymbol
 		? string | Date | null
 		: T[K] extends BinaryColumnSymbol
 		? string | null
@@ -1045,7 +1062,29 @@ type DateColumnType<M> = {
 	between(from: string | Date, to: string | Date | null | undefined): Filter;
 	in(values: Array<string | Date | null | undefined>): Filter;
 } & M &
-	DateColumnSymbol;
+DateColumnSymbol;
+
+type DateWithTimeZoneColumnSymbol = {
+	[' isDateTimeZone']: true;
+};
+
+type DateWithTimeZoneColumnType<M> = {
+	equal(value: string | Date | null | undefined): Filter;
+	eq(value: string | Date | null | undefined): Filter;
+	notEqual(value: string | Date | null | undefined): Filter;
+	ne(value: string | Date | null | undefined): Filter;
+	lessThan(value: string | Date | null | undefined): Filter;
+	lt(value: string | Date | null | undefined): Filter;
+	lessThanOrEqual(value: string | Date | null | undefined): Filter;
+	le(value: string | Date | null | undefined): Filter;
+	greaterThan(value: string | Date | null | undefined): Filter;
+	gt(value: string | Date | null | undefined): Filter;
+	greaterThanOrEqual(value: string | Date | null | undefined): Filter;
+	ge(value: string | Date | null | undefined): Filter;
+	between(from: string | Date, to: string | Date | null | undefined): Filter;
+	in(values: Array<string | Date | null | undefined>): Filter;
+} & M &
+	DateWithTimeZoneColumnSymbol;
 
 type StringColumnSymbol = {
 	[' isString']: true;
@@ -1143,6 +1182,7 @@ interface ColumnType<M> {
 	uuid(): UuidColumnTypeDef<M & UuidColumnSymbol>;
 	numeric(): NumericColumnTypeDef<M & NumericColumnSymbol>;
 	date(): DateColumnTypeDef<M & DateColumnSymbol>;
+	dateWithTimeZone(): DateWithTimeZoneColumnTypeDef<M & DateWithTimeZoneColumnSymbol>;
 	binary(): BinaryColumnTypeDef<M & BinaryColumnSymbol>;
 	boolean(): BooleanColumnTypeDef<M & BooleanColumnSymbol>;
 	json(): JSONColumnTypeDef<M & JSONColumnSymbol>;
@@ -1216,6 +1256,18 @@ type DateValidator<M> = M extends NotNull
 		validate(
 			validator: (value?: string | Date | null) => void
 		): DateColumnTypeDef<M>;
+	};
+
+type DateWithTimeZoneValidator<M> = M extends NotNull
+	? {
+		validate(
+			validator: (value: string | Date) => void
+		): DateWithTimeZoneColumnTypeDef<M>;
+	}
+	: {
+		validate(
+			validator: (value?: string | Date | null) => void
+		): DateWithTimeZoneColumnTypeDef<M>;
 	};
 
 type StringColumnTypeDef<M> = StringValidator<M> & {
@@ -1293,6 +1345,17 @@ type DateColumnTypeDef<M> = DateValidator<M> & {
 	default(value: string | Date | (() => string | Date)): DateColumnTypeDef<M>;
 	dbNull(value: String | Date): DateColumnTypeDef<M>;
 } & ColumnTypeOf<DateColumnType<M>> &
+	M;
+
+type DateWithTimeZoneColumnTypeDef<M> = DateValidator<M> & {
+	primary(): DateWithTimeZoneColumnTypeDef<M & IsPrimary> & IsPrimary;
+	notNull(): DateWithTimeZoneColumnTypeDef<M & NotNull> & NotNull;
+	notNullExceptInsert(): DateWithTimeZoneColumnTypeDef<M & NotNull & NotNullExceptInsert> & NotNull & NotNullExceptInsert;
+	serializable(value: boolean): DateWithTimeZoneColumnTypeDef<M>;
+	JSONSchema(schema: object, options?: Options): DateWithTimeZoneColumnTypeDef<M>;
+	default(value: string | Date | (() => string | Date)): DateWithTimeZoneColumnTypeDef<M>;
+	dbNull(value: String | Date): DateWithTimeZoneColumnTypeDef<M>;
+} & ColumnTypeOf<DateWithTimeZoneColumnType<M>> &
 	M;
 
 interface ColumnTypeOf<T> {

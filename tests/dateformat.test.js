@@ -1,21 +1,18 @@
 const db = require('./db');
 import { describe, test, beforeAll, expect } from 'vitest';
-import rdb from '../src/index';
-// rdb.log(console.log);
 
 const initPg = require('./initPg');
 const initMs = require('./initMs');
 const initMysql = require('./initMysql');
 const initSqlite = require('./initSqlite');
 const initSap = require('./initSap');
-// const dateToISOString = require('../src/dateToISOString');
 
 beforeAll(async () => {
 
 	await insertData('pg');
 	await insertData('mssql');
 	await insertData('mysql');
-	// await insertData('sap');
+	await insertData('sap');
 	await insertData('sqlite');
 
 	async function insertData(dbName) {
@@ -70,86 +67,108 @@ beforeAll(async () => {
 	}
 });
 
-describe('dateformat raw', () => {
+// describe('dateformat raw', () => {
+
+// 	test('pg', async () => {
+// 		const { db } = getDb('pg');
+// 		const result = await db.query('SELECT _date::text, _datetime::text, _datetime_tz::text FROM datetest');
+// 		expect(result).toEqual([
+// 			{_date: '2023-07-14', _datetime: '2023-07-14 12:00:00', _datetime_tz: '2023-07-14 20:00:00+00'}
+// 		]);
+// 	});
+
+
+
+// 	test('mssql', async () => {
+// 		const { db } = getDb('mssql');
+// 		const result = await db.query('SELECT CONVERT(VARCHAR, _date, 120) AS _date, CONVERT(VARCHAR, _datetime, 120) AS _datetime, CONVERT(VARCHAR, _datetime_tz, 120) AS _datetime_tz FROM datetest;');
+// 		expect(result).toEqual([
+// 			{_date: '2023-07-14', _datetime: '2023-07-14 12:00:00', _datetime_tz: '2023-07-14 12:00:00 -08:00'}
+// 		]);
+// 	});
+
+// 	test('sap', async () => {
+// 		const { db } = getDb('sap');
+// 		const result = await db.query('SELECT CONVERT(VARCHAR, _date, 23) AS _date, CONVERT(VARCHAR, _datetime, 23) AS _datetime, CONVERT(VARCHAR,_datetime_tz,23) AS _datetime_tz FROM datetest;');
+// 		expect(result).toEqual([
+// 			{_date: '2023-07-14T00:00:00', _datetime: '2023-07-14T12:00:00', _datetime_tz: '2023-07-14T12:00:00'}
+// 		]);
+// 	});
+
+// 	test('mysql', async () => {
+// 		const { db } = getDb('mysql');
+// 		const result = await db.query('SELECT _date AS _date, _datetime AS _datetime, _datetime_tz AS _datetime_tz FROM datetest;');
+// 		expect(result).toEqual([
+// 			{_date: '2023-07-14', _datetime: '2023-07-14 03:00:00', _datetime_tz: '2023-07-14 20:00:00'}
+// 		]);
+// 	});
+
+
+// });
+
+describe('dateformat get', () => {
+	const newValue = '2023-08-05T12:00:00-03:00';
 
 	test('pg', async () => {
 		const { db } = getDb('pg');
-		const result = await db.query('SELECT _date::text, _datetime::text, _datetime_tz::text FROM datetest');
-		expect(result).toEqual([
-			{_date: '2023-07-14', _datetime: '2023-07-14 12:00:00', _datetime_tz: '2023-07-14 20:00:00+00'}
-		]);
+		const result = await db.datetestWithTz.getOne();
+		expect(result).toEqual({id:1, date: '2023-07-14', datetime: '2023-07-14T12:00:00', datetime_tz: '2023-07-14T20:00:00+00'});
+		result.date = newValue;
+		result.datetime = newValue;
+		result.datetime_tz = newValue;
+		await result.saveChanges();
+		await result.refresh();
+		expect(result).toEqual({id:1, date: '2023-08-05', datetime: '2023-08-05T12:00:00', datetime_tz: '2023-08-05T15:00:00+00'});
 	});
 
 	test('mssql', async () => {
 		const { db } = getDb('mssql');
-		const result = await db.query('SELECT CONVERT(VARCHAR, _date, 120) AS _date, CONVERT(VARCHAR, _datetime, 120) AS _datetime, CONVERT(VARCHAR, _datetime_tz, 120) AS _datetime_tz FROM datetest;');
-		expect(result).toEqual([
-			{_date: '2023-07-14', _datetime: '2023-07-14 12:00:00', _datetime_tz: '2023-07-14 12:00:00 -08:00'}
-		]);
+		const result = await db.datetestWithTz.getOne();
+		expect(result).toEqual({id: 1, date: '2023-07-14', datetime: '2023-07-14T12:00:00', datetime_tz: '2023-07-14T12:00:00-08:00' });
+		result.date = newValue;
+		result.datetime = newValue;
+		result.datetime_tz = newValue;
+		await result.saveChanges();
+		await result.refresh();
+		expect(result).toEqual({id:1, date: '2023-08-05', datetime: '2023-08-05T12:00:00', datetime_tz: newValue});
 	});
 
 	test('sap', async () => {
 		const { db } = getDb('sap');
-		const result = await db.query('SELECT CONVERT(VARCHAR, _date, 23) AS _date, CONVERT(VARCHAR, _datetime, 23) AS _datetime, CONVERT(VARCHAR,_datetime_tz,23) AS _datetime_tz FROM datetest;');
-		expect(result).toEqual([
-			{_date: '2023-07-14T00:00:00', _datetime: '2023-07-14T12:00:00', _datetime_tz: '2023-07-14T12:00:00'}
-		]);
+		const result = await db.datetest.getOne();
+		expect(result).toEqual({id: 1, date: '2023-07-14T00:00:00', datetime: '2023-07-14T12:00:00'});
+		result.date = newValue;
+		result.datetime = newValue;
+		result.datetime_tz = newValue;
+		await result.saveChanges();
+		await result.refresh();
+		expect(result).toEqual({id:1, date: '2023-08-05T00:00:00', datetime: '2023-08-05T12:00:00'});
 	});
 
 	test('mysql', async () => {
 		const { db } = getDb('mysql');
-		const result = await db.query('SELECT _date AS _date, _datetime AS _datetime, _datetime_tz AS _datetime_tz FROM datetest;');
-		expect(result).toEqual([
-			{_date: '2023-07-14', _datetime: '2023-07-14 03:00:00', _datetime_tz: '2023-07-14 20:00:00'}
-		]);
+		const result = await db.datetestWithTz.getOne();
+		expect(result).toEqual({id: 1, date: '2023-07-14', datetime: '2023-07-14T03:00:00', datetime_tz: '2023-07-14T20:00:00'});
+		result.date = newValue;
+		result.datetime = newValue;
+		result.datetime_tz = newValue;
+		await result.saveChanges();
+		await result.refresh();
+		expect(result).toEqual({id:1, date: '2023-08-05', datetime: '2023-08-05T12:00:00', datetime_tz: '2023-08-05T15:00:00'});
+
 	});
 
-
-});
-
-describe('dateformat get', () => {
-
-	test('pg', async () => {
-		const { db } = getDb('pg');
-		const result = await db.datetest.getOne();
-		expect(result).toEqual({date: '2023-07-14', datetime: '2023-07-14T12:00:00', datetime_tz: '2023-07-14T20:00:00+00'});
+	test('sqlite', async () => {
+		const { db } = getDb('sqlite');
+		const result = await db.datetestWithTz.getOne();
+		expect(result).toEqual({ id: 1, date: '2023-07-14T12:00:00', datetime: '2023-07-14T12:00:00', datetime_tz: '2023-07-14T12:00:00-08:00'  });
+		result.date = newValue;
+		result.datetime = newValue;
+		result.datetime_tz = newValue;
+		await result.saveChanges();
+		await result.refresh();
+		expect(result).toEqual({ id: 1, date: '2023-08-05T12:00:00', datetime: '2023-08-05T12:00:00' , datetime_tz: '2023-08-05T12:00:00-03:00'});
 	});
-
-	test('mssql', async () => {
-		const { db } = getDb('mssql');
-		const result = await db.datetest.getOne();
-		expect(result).toEqual({date: '2023-07-14', datetime: '2023-07-14T12:00:00', datetime_tz: '2023-07-14T12:00:00-08:00'});
-	});
-
-	test('mysql', async () => {
-		const { db } = getDb('mysql');
-		const result = await db.datetest.getOne();
-		expect(result).toEqual({date: '2023-07-14', datetime: '2023-07-14T03:00:00', datetime_tz: '2023-07-14T20:00:00'});
-	});
-
-	// test('mssql', async () => {
-	// 	const { db } = getDb('mssql');
-	// 	const result = await db.query('SELECT CONVERT(VARCHAR, _date, 120) AS _date, CONVERT(VARCHAR, _datetime, 120) AS _datetime, CONVERT(VARCHAR, _datetime_tz, 120) AS _datetime_tz FROM datetest;');
-	// 	expect(result).toEqual([
-	// 		{_date: '2023-07-14', _datetime: '2023-07-14 12:00:00', _datetime_tz: '2023-07-14 12:00:00 -08:00'}
-	// 	]);
-	// });
-
-	// test('sap', async () => {
-	// 	const { db } = getDb('sap');
-	// 	const result = await db.query('SELECT CONVERT(VARCHAR, _date, 23) AS _date, CONVERT(VARCHAR, _datetime, 23) AS _datetime, CONVERT(VARCHAR,_datetime_tz,23) AS _datetime_tz FROM datetest;');
-	// 	expect(result).toEqual([
-	// 		{_date: '2023-07-14T00:00:00', _datetime: '2023-07-14T12:00:00', _datetime_tz: '2023-07-14T12:00:00'}
-	// 	]);
-	// });
-
-	// test('mysql', async () => {
-	// 	const { db } = getDb('mysql');
-	// 	const result = await db.query('SELECT _date AS _date, _datetime AS _datetime, _datetime_tz AS _datetime_tz FROM datetest;');
-	// 	expect(result).toEqual([
-	// 		{_date: '2023-07-14', _datetime: '2023-07-14 03:00:00', _datetime_tz: '2023-07-14 20:00:00'}
-	// 	]);
-	// });
 
 
 });
@@ -188,9 +207,10 @@ function getDb(name) {
 		};
 	else if (name === 'sqlite')
 		return {
-			db: db({ db: (cons) => cons.sqlite(`demo${new Date().getUTCMilliseconds()}.db`) }),
+			db: db({ db: (cons) => cons.sqlite(sqliteName) }),
 			init: initSqlite
 		};
+
 	else if (name === 'sap')
 		return {
 			db: db({ db: (cons) => cons.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master`) }),
@@ -204,3 +224,5 @@ function getDb(name) {
 
 	throw new Error('unknown db');
 }
+
+const sqliteName = `demo${new Date().getUTCMilliseconds()}.db`;

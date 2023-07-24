@@ -10,12 +10,24 @@ function _new(column) {
 				return newPara('null');
 			return newPara('\'' + column.dbNull + '\'');
 		}
-		var encodeCore = getSessionSingleton('encodeDate');
-		return newPara(encodeCore(value));
+		var encodeCore = getSessionSingleton('encodeDate') || encodeDate;
+		return newPara('?', [encodeCore(value)]);
 	};
 
 	return encode;
 
+
 }
+function encodeDate(date) {
+	date = date.toISOString ? removeTimezone(date.toISOString(date)) : removeTimezone(date);
+	return date;
+}
+
+function removeTimezone(isoString) {
+	let dateTimePattern = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?/;
+	let match = isoString.match(dateTimePattern);
+	return match ? match[0] : isoString;
+}
+
 
 module.exports = _new;
