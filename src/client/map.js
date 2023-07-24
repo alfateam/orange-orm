@@ -5,13 +5,27 @@ function mapRoot(index, fn) {
 
 	function context(arg) {
 		const dbMap = {
-			pg: createPool.bind(null, index.pg),
-			postgres: createPool.bind(null, index.pg),
-			mssql: createPool.bind(null, index.mssql),
-			mssqlNative: createPool.bind(null, index.mssqlNative),
-			mysql: createPool.bind(null, index.mysql),
-			sap: createPool.bind(null, index.sap),
-			sqlite: createPool.bind(null, index.sqlite),
+			get pg() {
+				return createPool.bind(null, index.pg);
+			},
+			get postgres() {
+				return createPool.bind(null, index.pg);
+			},
+			get mssql() {
+				return createPool.bind(null, index.mssql);
+			},
+			get mssqlNative() {
+				return createPool.bind(null, index.mssqlNative);
+			},
+			get mysql() {
+				return createPool.bind(null, index.mysql);
+			},
+			get sap() {
+				return createPool.bind(null, index.sap);
+			},
+			get sqlite() {
+				return createPool.bind(null, index.sqlite);
+			},
 		};
 
 		function createPool(provider, ...args) {
