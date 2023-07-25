@@ -74,7 +74,6 @@ function hostExpress(client, options = {}) {
 
 	async function post(request, response) {
 		try {
-
 			if (!request.query.table) {
 				let e = new Error('Table not defined');
 				// @ts-ignore

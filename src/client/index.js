@@ -74,7 +74,7 @@ function rdbClient(options = {}) {
 	}
 
 	function getMetaData() {
-		const result = {readonly: options.readonly, concurrency: options.concurrency};
+		const result = { readonly: options.readonly, concurrency: options.concurrency };
 		for (let name in options.tables) {
 			result[name] = getMetaDataTable(options.tables[name], inferOptions(options, name));
 		}
@@ -97,7 +97,7 @@ function rdbClient(options = {}) {
 			const name = table._columns[i].alias;
 			result[name] = inferOptions(options, name);
 		}
-		for(let name in table._relations) {
+		for (let name in table._relations) {
 			if (!isJoinRelation(name, table))
 				result[name] = getMetaDataTable(table._relations[name].childTable, inferOptions(options, name));
 		}
@@ -114,9 +114,7 @@ function rdbClient(options = {}) {
 	}
 
 	function express(options) {
-		if (!baseUrl?.express)
-			throw new Error('Express hosting is not supported on the client');
-		return baseUrl.express(client, options);
+		return netAdapter(baseUrl, { tableOptions: { db: baseUrl } }).express(client, options);
 	}
 
 	function _createPatch(original, modified, ...restArgs) {

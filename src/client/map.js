@@ -1,6 +1,7 @@
 const _newTable = require('../table');
 
 function mapRoot(index, fn) {
+
 	return map(index, context, fn);
 
 	function context(arg) {
@@ -26,6 +27,10 @@ function mapRoot(index, fn) {
 			get sqlite() {
 				return createPool.bind(null, index.sqlite);
 			},
+			http(url) {
+				return index({db: url});
+			}
+
 		};
 
 		function createPool(provider, ...args) {
