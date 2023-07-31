@@ -1,7 +1,6 @@
 import type { Options } from 'ajv';
 import type { ConnectionConfig } from 'tedious';
 
-
 export type MappedDbDef<T> = {
 	map<V extends AllowedDbMap<V>>(
 		callback: (mapper: DbMapper<T>) => V
@@ -23,14 +22,24 @@ export type DbMapper<T> = {
 } & T;
 
 type MappedDb<T> = {
-	<O extends DbOptions<T>>(concurrency: O): NegotiateDbInstance<T, O>;
+	<O extends DbOptions<T>>(concurrency: O): NegotiateDbInstance<T, O>;	
+} & DbConnectable<T>;
+
+type DbConnectable<T> = {
+	http(url: string): MappedDbInstance<T>;
+	postgres(connectionString: string, options?: PoolOptions): MappedDbInstance<T>;
+	sqlite(connectionString: string, options?: PoolOptions): MappedDbInstance<T>;
+	sap(connectionString: string, options?: PoolOptions): MappedDbInstance<T>;
+	mssql(connectionConfig: ConnectionConfig, options?: PoolOptions): MappedDbInstance<T>;
+	mssql(connectionString: string, options?: PoolOptions): MappedDbInstance<T>;
+	mysql(connectionString: string, options?: PoolOptions): MappedDbInstance<T>;
 };
 
 type NegotiateDbInstance<T, C> = C extends WithDb
 	? MappedDbInstance<T>
 	: MappedDb<T>;
 
-type WithDb = { db: (connectors: Connectors) => Pool };
+type WithDb = { db: Pool | ((connectors: Connectors) => Pool | Promise<Pool>) };
 
 type DbOptions<T> = {
 	[K in keyof T]?: T[K] extends MappedTableDef<infer U>
@@ -39,7 +48,7 @@ type DbOptions<T> = {
 } & {
 	concurrency?: ConcurrencyValues;
 	readonly?: boolean;
-	db?: (connectors: Connectors) => Pool;
+	db?: Pool | ((connectors: Connectors) => Pool | Promise<Pool>);
 };
 
 interface Connectors {
@@ -77,7 +86,23 @@ type MappedDbInstance<T> = {
 	transaction(
 		fn: (db: MappedDbInstance<T>) => Promise<unknown>
 	): Promise<void>;
-};
+	express(): Express.RequestHandler;
+	express(config:  ExpressConfig<T>): Express.RequestHandler;
+} & DbConnectable<T>;
+
+
+type ExpressConfig<T> = {
+	[K in keyof T]?: T[K] extends MappedTableDef<infer U>
+	? ExpressTableConfig<T>
+	: never;
+} & {
+	db?: Pool | ((connectors: Connectors) => Pool | Promise<Pool>);
+}
+
+type ExpressTableConfig<T> = {
+	baseFilter?: RawFilter | ((db: MappedDbInstance<T>, req: Express.Request, res: Express.Response) => RawFilter);
+}
+
 
 type JsonPatch = Array<{
 	op: 'add' | 'remove' | 'replace' | 'copy' | 'move' | 'test';
@@ -435,8 +460,6 @@ type FetchingStrategy<T> = {
 	offset?: number;
 };
 
-type ConcurrencyValues = 'optimistic' | 'skipOnConflict' | 'overwrite';
-
 type ColumnConcurrency = {
 	readonly?: boolean;
 	concurrency?: ConcurrencyValues;
@@ -459,8 +482,11 @@ type Concurrency<T> = {
 	>]?: T[K] extends ColumnSymbols ? ColumnConcurrency : Concurrency<T[K]>;
 } & {
 	readonly?: boolean;
-	concurrency?: number;
+	concurrency?: ConcurrencyValues;
 };
+
+type ConcurrencyValues = 'optimistic' | 'skipOnConflict' | 'overwrite';
+
 
 type OrderBy<T extends string> = `${T} ${'asc' | 'desc'}` | T;
 

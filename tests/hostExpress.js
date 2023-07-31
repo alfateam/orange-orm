@@ -1,7 +1,10 @@
 const initPg = require('./initPg');
 const rdb = require('./db');
+const Rdb = require('../src/index');
+Rdb.log(console.dir);
 const express = require('express');
 const { json } = require('body-parser');
+
 
 run();
 
@@ -11,13 +14,19 @@ async function run() {
 }
 
 
+function baseFilter({db, _request, _response}) {
+	const filter =  db.order.lines.exists();
+	return filter;
+}
+
 async function server() {
 	const db = rdb({ db: (cons) => cons.postgres('postgres://postgres:postgres@postgres/postgres') });
+	db({});
 	await insertData(db);
 	let app = express();
 	app.disable('x-powered-by')
 		.use(json({ limit: '100mb' }))
-		.use('/rdb', db.express());
+		.use('/rdb', db.express({order: {baseFilter}}));
 	app.listen(3000, () => console.log('Example app listening on port 3000!'));
 
 	async function insertData() {
@@ -76,7 +85,8 @@ async function server() {
 
 async function client() {
 	const remote = rdb({ db: (c) => c.http('http://localhost:3000/rdb') });
-	const result = await remote.customer.getMany();
+	// const result = await remote.order.getMany(remote.filter.and(remote.order.id.eq('2323')));
+	const result = await remote.order.getMany();
 	console.dir(result);
 }
 

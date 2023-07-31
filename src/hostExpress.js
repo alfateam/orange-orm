@@ -14,7 +14,7 @@ function hostExpress(client, options = {}) {
 		}
 	else
 		for (let tableName in client.tables) {
-			c[tableName] = hostLocal({...dbOptions,...options, ...{ table: client.tables[tableName], isHttp: true, client }});
+			c[tableName] = hostLocal({...dbOptions,...options, ...{ table: client.tables[tableName], ...{baseFilter: options?.[tableName]?.baseFilter}, isHttp: true, client }});
 		}
 
 	async function handler(req) {
@@ -65,7 +65,7 @@ function hostExpress(client, options = {}) {
 
 	async function patch(request, response) {
 		try {
-			response.json(await c[request.query.table].patch(request.body));
+			response.json(await c[request.query.table].patch(request.body, request, response));
 		}
 		catch (e) {
 			response.status(e.status || 500).send(e && e.stack);
@@ -87,7 +87,7 @@ function hostExpress(client, options = {}) {
 				throw e;
 			}
 
-			response.json(await c[request.query.table].post(request.body));
+			response.json(await c[request.query.table].post(request.body, request, response));
 		}
 		catch(e) {
 			response.status(e.status || 500).send(e && e.stack);

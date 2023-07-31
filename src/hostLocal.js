@@ -20,7 +20,7 @@ function hostLocal() {
 		return getMeta(table);
 
 	}
-	async function patch(body) {
+	async function patch(body,req, res) {
 		if (!table) {
 			const error = new Error('Table is not exposed');
 			// @ts-ignore
@@ -51,7 +51,7 @@ function hostLocal() {
 		}
 	}
 
-	async function post(body) {
+	async function post(body, request, response) {
 		body = typeof body === 'string' ? JSON.parse(body) : body;
 		let result;
 
@@ -71,7 +71,7 @@ function hostLocal() {
 
 		async function fn() {
 			setSessionSingleton('ignoreSerializable', true);
-			const options = { ...body.options, ..._options, JSONFilter: body };
+			const options = { ...body.options, ..._options, JSONFilter: body, request, response };
 			result = await executePath(options);
 		}
 	}
@@ -100,8 +100,8 @@ function hostLocal() {
 
 	}
 
-	function express(options) {
-		return hostExpress({ ..._options, ...options });
+	function express(client, options) {
+		return hostExpress(client, options );
 	}
 
 	return c;

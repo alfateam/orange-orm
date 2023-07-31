@@ -47,7 +47,6 @@ function rdbClient(options = {}) {
 	};
 	client.interceptors = axios.interceptors;
 	client.query = query;
-	client.bindTransaction = bindTransaction;
 	client.transaction = runInTransaction;
 	client.db = baseUrl;
 	client.express = express;
@@ -110,7 +109,8 @@ function rdbClient(options = {}) {
 	}
 
 	async function query() {
-		return netAdapter(baseUrl, { tableOptions: { db: baseUrl }, axios }).query.apply(null, arguments);
+		let db = await getDb();
+		return netAdapter(baseUrl, { tableOptions: { db }, axios }).query.apply(null, arguments);
 	}
 
 	function express(options) {
@@ -126,15 +126,7 @@ function rdbClient(options = {}) {
 		return createPatch(...args);
 	}
 
-	function bindTransaction() {
-		let db = baseUrl;
-		if (!db.bindTransaction)
-			throw new Error('Transaction not supported through http');
-		const transaction = db.bindTransaction();
-		return client({ transaction });
-	}
-
-	async function runInTransaction(fn, _options) {
+	async function getDb() {
 		let db = baseUrl;
 		if (typeof db === 'function') {
 			let dbPromise = db();
@@ -143,6 +135,12 @@ function rdbClient(options = {}) {
 			else
 				db = dbPromise;
 		}
+
+		return db;
+	}
+
+	async function runInTransaction(fn, _options) {
+		let db = await getDb();
 		if (!db.createTransaction)
 			throw new Error('Transaction not supported through http');
 		const transaction = db.createTransaction(_options);
@@ -274,10 +272,6 @@ function rdbClient(options = {}) {
 			return adapter.post(body);
 		}
 
-		// async function insert(rows, ...args) {
-		// 	let proxy = proxify(rows, args[0]);
-		// 	return proxy.insert.apply(proxy, args);
-		// }
 		async function insert(rows, ...args) {
 			if (Array.isArray(rows)) {
 				let proxy = proxify([], args[0]);

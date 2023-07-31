@@ -159,7 +159,6 @@ describe('readonly everything', () => {
 			}
 		};
 		expect(error?.message).toEqual('Cannot update column name because it is readonly');
-		console.dir(db.metaData, { depth: Infinity });
 		expect(db.metaData).toEqual(expectedMeta);
 	}
 });
