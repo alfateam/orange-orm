@@ -5069,7 +5069,6 @@ function rdbClient(options = {}) {
 	};
 	client.interceptors = axios.interceptors;
 	client.query = query;
-	client.bindTransaction = bindTransaction;
 	client.transaction = runInTransaction;
 	client.db = baseUrl;
 	client.express = express;
@@ -5096,7 +5095,7 @@ function rdbClient(options = {}) {
 	}
 
 	function getMetaData() {
-		const result = {readonly: options.readonly, concurrency: options.concurrency};
+		const result = { readonly: options.readonly, concurrency: options.concurrency };
 		for (let name in options.tables) {
 			result[name] = getMetaDataTable(options.tables[name], inferOptions(options, name));
 		}
@@ -5119,7 +5118,7 @@ function rdbClient(options = {}) {
 			const name = table._columns[i].alias;
 			result[name] = inferOptions(options, name);
 		}
-		for(let name in table._relations) {
+		for (let name in table._relations) {
 			if (!isJoinRelation(name, table))
 				result[name] = getMetaDataTable(table._relations[name].childTable, inferOptions(options, name));
 		}
@@ -5132,13 +5131,12 @@ function rdbClient(options = {}) {
 	}
 
 	async function query() {
-		return netAdapter(baseUrl, { tableOptions: { db: baseUrl }, axios }).query.apply(null, arguments);
+		let db = await getDb();
+		return netAdapter(baseUrl, { tableOptions: { db }, axios }).query.apply(null, arguments);
 	}
 
 	function express(options) {
-		if (!baseUrl?.express)
-			throw new Error('Express hosting is not supported on the client');
-		return baseUrl.express(client, options);
+		return netAdapter(baseUrl, { tableOptions: { db: baseUrl } }).express(client, options);
 	}
 
 	function _createPatch(original, modified, ...restArgs) {
@@ -5150,15 +5148,7 @@ function rdbClient(options = {}) {
 		return createPatch(...args);
 	}
 
-	function bindTransaction() {
-		let db = baseUrl;
-		if (!db.bindTransaction)
-			throw new Error('Transaction not supported through http');
-		const transaction = db.bindTransaction();
-		return client({ transaction });
-	}
-
-	async function runInTransaction(fn, _options) {
+	async function getDb() {
 		let db = baseUrl;
 		if (typeof db === 'function') {
 			let dbPromise = db();
@@ -5167,6 +5157,12 @@ function rdbClient(options = {}) {
 			else
 				db = dbPromise;
 		}
+
+		return db;
+	}
+
+	async function runInTransaction(fn, _options) {
+		let db = await getDb();
 		if (!db.createTransaction)
 			throw new Error('Transaction not supported through http');
 		const transaction = db.createTransaction(_options);
@@ -5298,10 +5294,6 @@ function rdbClient(options = {}) {
 			return adapter.post(body);
 		}
 
-		// async function insert(rows, ...args) {
-		// 	let proxy = proxify(rows, args[0]);
-		// 	return proxy.insert.apply(proxy, args);
-		// }
 		async function insert(rows, ...args) {
 			if (Array.isArray(rows)) {
 				let proxy = proxify([], args[0]);
