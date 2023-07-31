@@ -14,9 +14,10 @@ Based on promises.
 [Documentation and examples](https://github.com/alfateam/rdb/blob/master/docs/docs.md)  
 
 ## Release notes
+__3.1.27__  
+Types for express hosting.  
 __3.1.26__  
 Read dates directly from database without parsing the through js date.  
-Types for express hosting.  
 __3.1.25__  
 Lazily invoke db connectors.    
 __3.1.24__  
