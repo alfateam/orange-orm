@@ -20,7 +20,7 @@ function hostLocal() {
 		return getMeta(table);
 
 	}
-	async function patch(body,req, res) {
+	async function patch(body,_req, _res) {
 		if (!table) {
 			const error = new Error('Table is not exposed');
 			// @ts-ignore
