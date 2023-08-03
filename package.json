@@ -21,7 +21,7 @@
     "pg",
     "rdb"
   ],
-  "author": "Lars-Erik Roald <lars.roald@gmail.com>",
+  "authors": ["Lars-Erik Roald <lars.roald@gmail.com>"],
   "license": "ISC",
   "scripts": {
     "test": "vitest run --threads=false",
