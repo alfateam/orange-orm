@@ -32,7 +32,7 @@ beforeEach(async () => {
 		});
 
 		const john = await db.customer.insert({
-			name: 'John',
+			name: 'Harry',
 			balance: 200,
 			isActive: true
 		});
@@ -64,7 +64,7 @@ beforeEach(async () => {
 					countryCode: 'UK'
 				},
 				lines: [
-					{ product: 'Piano' }
+					{ product: 'Magic wand' }
 				]
 			}
 		]);

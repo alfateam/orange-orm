@@ -11,18 +11,19 @@ RDB is the ultimate Object Relational Mapper for Node.js, offering seamless inte
 
 ## Installation
 `npm install rdb`  
-To ensure RDB works properly with your database, you'll also need to install the appropriate driver:
+<details><summary><strong>Drivers</strong></summary><blockquote style="background: transparent">  
 
+To ensure RDB works properly with your database, you'll also need to install the appropriate driver:
 - **SQLite**: `npm install sqlite3`
 - **MySQL**: `npm install mysql2`
 - **MS SQL**: `npm install tedious`
 - **PostgreSQL (pg)**: `npm install pg`
 - **SAP**: `npm install msnodesqlv8`
-  
+</details>  
 
 
 
-## Documentation    
+## Fundamentals 
 <details open><summary><strong>Mapping tables</strong></summary><blockquote style="background: transparent">
 To define a mapping, you employ the <strong><i>map()</i></strong> method, linking your tables and columns to corresponding object properties. You provide a callback function that engages with a parameter representing a database table.
 
@@ -34,7 +35,7 @@ Relationships between tables can also be outlined. By using methods like <strong
 //db.js
 import rdb from 'rdb';
 
-const map = rdb.map(x => ({
+const db = rdb.map(x => ({
 	customer: x.table('customer').map(({ column }) => ({
 		id: column('id').numeric().primary(),
 		name: column('name').string(),
@@ -74,7 +75,7 @@ const map = rdb.map(x => ({
 
 export default map.sqlite('demo.db');
 ```
-The initSql.js script resets our SQLite database. It's worth noting that SQLite databases are represented as single files, which makes them wonderfully straightforward to manage.
+The init.js script resets our SQLite database. It's worth noting that SQLite databases are represented as single files, which makes them wonderfully straightforward to manage.
 
 At the start of the script, we import our database mapping from the db.js file. This gives us access to the db object, which we'll use to interact with our SQLite database.
 
@@ -82,8 +83,9 @@ Then, we define a SQL string. This string outlines the structure of our SQLite d
 
 Because of a peculiarity in SQLite, which only allows one statement execution at a time, we split this SQL string into separate statements. We do this using the split() method, which breaks up the string at every semicolon.
 ```javascript
-//initSql.js
+//init.js
 import db from './db';
+import init
 
 const sql = `DROP TABLE IF EXISTS deliveryAddress; DROP TABLE IF EXISTS orderLine; DROP TABLE IF EXISTS _order; DROP TABLE IF EXISTS customer;
 CREATE TABLE customer (
@@ -116,10 +118,74 @@ CREATE TABLE deliveryAddress (
 )
 `;
 
-const statements = sql.split(';');
-for (let i = 0; i < statements.length; i++) {
-	await db.query(statements[i]);
+
+async function init() {
+	const statements = sql.split(';');
+	for (let i = 0; i < statements.length; i++) {
+		await db.query(statements[i]);
+	}
 }
+export default init;
 ```
 In SQLite, columns with the INTEGER PRIMARY KEY attribute are designed to autoincrement by default. This means that each time a new record is inserted into the table, SQLite automatically produces a numeric key for the id column that is one greater than the largest existing key. This mechanism is particularly handy when you want to create unique identifiers for your table rows without manually entering each id.
+</details>
+
+<details><summary><strong>Inserting rows</strong></summary><blockquote style="background: transparent">
+
+```javascript
+//insert.js
+import db from './db';
+import init from './init';
+
+insertRows();
+
+async function insertRows() {
+	await init();
+
+	const george = await db.customer.insert({
+		name: 'George',
+		balance: 177,
+		isActive: true
+	});
+
+	const john = await db.customer.insert({
+		name: 'Harry',
+		balance: 200,
+		isActive: true
+	});
+
+	await db.order.insert([
+		{
+			orderDate: new Date(2022, 0, 11, 9, 24, 47),
+			customer: george,
+			deliveryAddress: {
+				name: 'George',
+				street: 'Node street 1',
+				postalCode: '7059',
+				postalPlace: 'Jakobsli',
+				countryCode: 'NO'
+			},
+			lines: [
+				{ product: 'Bicycle' },
+				{ product: 'Small guitar' }
+			]
+		},
+		{
+			customer: john,
+			orderDate: new Date(2021, 0, 11, 12, 22, 45),
+			deliveryAddress: {
+				name: 'Harry Potter',
+				street: '4 Privet Drive, Little Whinging',
+				postalCode: 'GU4',
+				postalPlace: 'Surrey',
+				countryCode: 'UK'
+			},
+			lines: [
+				{ product: 'Magic wand' }
+			]
+		}
+	]);
+}
+```
+
 </details>
