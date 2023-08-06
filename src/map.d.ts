@@ -39,8 +39,8 @@ type NegotiateDbInstance<T, C> = C extends WithDb
 	? MappedDbInstance<T>
 	: MappedDb<T>;
 
-type WithDb = { 
-	db: Pool | ((connectors: Connectors) => Pool | Promise<Pool>) 
+type WithDb = {
+	db: Pool | ((connectors: Connectors) => Pool | Promise<Pool>)
 };
 
 type DbOptions<T> = {
@@ -214,6 +214,9 @@ type ExpandedMappedTable<T, FL = ExpandedFetchingStrategy<T>> = {
 } & MappedColumnsAndRelations<T> &
 	GetById<T, CountProperties<ExtractPrimary<T>>>;
 
+type ReturnArrayOrObj<W, V1, V2> =
+	W extends any[] ? V2 :
+	V1;
 
 type MappedTable<T> = {
 	expand(): ExpandedMappedTable<T>
@@ -225,19 +228,17 @@ type MappedTable<T> = {
 		fetchingStrategy?: FS
 	): Promise<StrategyToRow<FetchedProperties<T, FS>, T>>;
 
-	insert<TRow extends StrategyToInsertRowData<T>>(
+	insert<TRow extends StrategyToInsertRowData<T> | StrategyToInsertRowData<T>[]>(
 		row: TRow
-	): Promise<StrategyToRow<FetchedProperties<T, {}>, T>>;
-	
-	insert<TRows extends StrategyToInsertRowData<T>[]>(
-		rows: TRows
-	): Promise<StrategyToRowArray<FetchedProperties<T, {}>, T>>;
+	): ReturnArrayOrObj<TRow, Promise<StrategyToRow<FetchedProperties<T, {}>, T>>, Promise<StrategyToRowArray<FetchedProperties<T, {}>, T>>>;
 
-	insertAndForget<TRow extends StrategyToRowData<T>>(
+	insert<TRow extends StrategyToInsertRowData<T> | StrategyToInsertRowData<T>[], FS extends FetchingStrategy<T>>(
+		row: TRow,
+		strategy: FS
+	): ReturnArrayOrObj<TRow, Promise<StrategyToRow<FetchedProperties<T, FS>, T>>, Promise<StrategyToRowArray<FetchedProperties<T, FS>, T>>>;
+
+	insertAndForget<TRow extends StrategyToInsertRowData<T> | StrategyToInsertRowData<T>[]>(
 		row: TRow
-	): Promise<void>;
-	insertAndForget<TRows extends StrategyToRowData<T>[]>(
-		rows: TRows
 	): Promise<void>;
 	getMany(
 		filter?: Filter | PrimaryRowFilter<T>[]
