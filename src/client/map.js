@@ -61,6 +61,15 @@ function map(index, context, fn) {
 		}
 	}
 	context.map = map.bind(null, index, context);
+	context.pg = index.pg;
+	context.postgres = index.pg;
+	context.mssql = index.mssql;
+	context.mssqlNative = index.mssqlNative;
+	context.mysql = index.mysql;
+	context.sap = index.sap;
+	context.sqlite = index.sqlite;
+	context.http = index.http;
+
 	return context;
 
 	function newTable() {

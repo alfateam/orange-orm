@@ -37,26 +37,26 @@ import rdb from 'rdb';
 
 const db = rdb.map(x => ({
 	customer: x.table('customer').map(({ column }) => ({
-		id: column('id').numeric().primary(),
+		id: column('id').numeric().primary().notNullExceptInsert(),
 		name: column('name').string(),
 		balance: column('balance').numeric(),
 		isActive: column('isActive').boolean(),
 	})),
 
 	order: x.table('_order').map(({ column }) => ({
-		id: column('id').numeric().primary(),
+		id: column('id').numeric().primary().notNullExceptInsert(),
 		orderDate: column('orderDate').date().notNull(),
 		customerId: column('customerId').numeric().notNullExceptInsert(),
 	})),
 
 	orderLine: x.table('orderLine').map(({ column }) => ({
-		id: column('id').numeric().primary(),
+		id: column('id').numeric().primary().notNullExceptInsert(),
 		orderId: column('orderId').numeric(),
 		product: column('product').string(),
 	})),
 
 	deliveryAddress: x.table('deliveryAddress').map(({ column }) => ({
-		id: column('id').numeric().primary(),
+		id: column('id').numeric().primary().notNullExceptInsert(),
 		orderId: column('orderId').numeric(),
 		name: column('name').string(),
 		street: column('street').string(),
@@ -85,7 +85,6 @@ Because of a peculiarity in SQLite, which only allows one statement execution at
 ```javascript
 //init.js
 import db from './db';
-import init
 
 const sql = `DROP TABLE IF EXISTS deliveryAddress; DROP TABLE IF EXISTS orderLine; DROP TABLE IF EXISTS _order; DROP TABLE IF EXISTS customer;
 CREATE TABLE customer (
@@ -154,7 +153,7 @@ async function insertRows() {
 		isActive: true
 	});
 
-	await db.order.insert([
+	const orders = await db.order.insert([
 		{
 			orderDate: new Date(2022, 0, 11, 9, 24, 47),
 			customer: george,
@@ -185,6 +184,7 @@ async function insertRows() {
 			]
 		}
 	]);
+	console.dir(orders, {depth: Infinity});
 }
 ```
 

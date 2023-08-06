@@ -6,7 +6,7 @@ export type MappedDbDef<T> = {
 		callback: (mapper: DbMapper<T>) => V
 	): MappedDbDef<MergeProperties<T, V>>;
 	<O extends DbOptions<T>>(concurrency: O): NegotiateDbInstance<T, O>;
-} & T;
+} & T & DbConnectable<T>;
 
 type MergeProperties<T, V> = {
 	[K in keyof T | keyof V]:
@@ -22,7 +22,7 @@ export type DbMapper<T> = {
 } & T;
 
 type MappedDb<T> = {
-	<O extends DbOptions<T>>(concurrency: O): NegotiateDbInstance<T, O>;	
+	<O extends DbOptions<T>>(concurrency: O): NegotiateDbInstance<T, O>;
 } & DbConnectable<T>;
 
 type DbConnectable<T> = {
@@ -39,7 +39,9 @@ type NegotiateDbInstance<T, C> = C extends WithDb
 	? MappedDbInstance<T>
 	: MappedDb<T>;
 
-type WithDb = { db: Pool | ((connectors: Connectors) => Pool | Promise<Pool>) };
+type WithDb = { 
+	db: Pool | ((connectors: Connectors) => Pool | Promise<Pool>) 
+};
 
 type DbOptions<T> = {
 	[K in keyof T]?: T[K] extends MappedTableDef<infer U>
@@ -87,7 +89,7 @@ type MappedDbInstance<T> = {
 		fn: (db: MappedDbInstance<T>) => Promise<unknown>
 	): Promise<void>;
 	express(): Express.RequestHandler;
-	express(config:  ExpressConfig<T>): Express.RequestHandler;
+	express(config: ExpressConfig<T>): Express.RequestHandler;
 } & DbConnectable<T>;
 
 
@@ -226,14 +228,17 @@ type MappedTable<T> = {
 	insert<TRow extends StrategyToInsertRowData<T>>(
 		row: TRow
 	): Promise<StrategyToRow<FetchedProperties<T, {}>, T>>;
+	
+	insert<TRows extends StrategyToInsertRowData<T>[]>(
+		rows: TRows
+	): Promise<StrategyToRowArray<FetchedProperties<T, {}>, T>>;
+
 	insertAndForget<TRow extends StrategyToRowData<T>>(
 		row: TRow
 	): Promise<void>;
-	insert<TRow extends StrategyToInsertRowData<T>, FS extends FetchingStrategy<T>>(
-		row: TRow,
-		strategy: FS
-	): Promise<StrategyToRow<FetchedProperties<T, FS>, T>>;
-
+	insertAndForget<TRows extends StrategyToRowData<T>[]>(
+		rows: TRows
+	): Promise<void>;
 	getMany(
 		filter?: Filter | PrimaryRowFilter<T>[]
 	): Promise<StrategyToRowArray<FetchedProperties<T, {}>, T>>;
@@ -963,8 +968,8 @@ type StrategyToInsertRowData<T> = {
 	: T[K] extends JSONColumnSymbol
 	? JsonType
 	: T[K] extends ManyRelation
-	? StrategyToRowData<T[K]>[]
-	: StrategyToRowData<T[K]>;
+	? StrategyToInsertRowData<T[K]>[]
+	: StrategyToInsertRowData<T[K]>;
 } & {
 		[K in keyof RemoveNever<
 			NullInsertProperties<T>
@@ -988,8 +993,8 @@ type StrategyToInsertRowData<T> = {
 		? JsonType | null
 		: // : never
 		T[K] extends ManyRelation
-		? StrategyToRowData<T[K]>[]
-		: StrategyToRowData<T[K]>;
+		? StrategyToInsertRowData<T[K]>[]
+		: StrategyToInsertRowData<T[K]>;
 	};
 
 type NegotiateDefaultStrategy<T> = T extends ColumnSymbols ? T : never;
@@ -1088,7 +1093,7 @@ type DateColumnType<M> = {
 	between(from: string | Date, to: string | Date | null | undefined): Filter;
 	in(values: Array<string | Date | null | undefined>): Filter;
 } & M &
-DateColumnSymbol;
+	DateColumnSymbol;
 
 type DateWithTimeZoneColumnSymbol = {
 	[' isDateTimeZone']: true;
