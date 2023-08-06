@@ -384,7 +384,7 @@ function getDb(name) {
 		};
 	else if (name === 'sqlite')
 		return {
-			db: db({ db: (cons) => cons.sqlite(sqliteName) }),
+			db: db.sqlite(sqliteName),
 			init: initSqlite
 		};
 	else if (name === 'sap')
