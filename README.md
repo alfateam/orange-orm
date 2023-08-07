@@ -37,7 +37,7 @@ Relationships between tables can also be outlined. By using methods like <strong
 //db.js
 import rdb from 'rdb';
 
-const db = rdb.map(x => ({
+const map = rdb.map(x => ({
 	customer: x.table('customer').map(({ column }) => ({
 		id: column('id').numeric().primary().notNullExceptInsert(),
 		name: column('name').string(),
