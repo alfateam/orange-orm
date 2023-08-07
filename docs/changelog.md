@@ -1,7 +1,7 @@
 
 ## Release notes
 __3.1.28__  
-Started documenting typescript without code generation.  
+Started with _Modern Typescript Documentation_.  
 __3.1.27__  
 Types for express hosting.  
 __3.1.26__  
