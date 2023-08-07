@@ -40,7 +40,7 @@ function mapRoot(index, fn) {
 				if (context[name] && context[name]._dbName)
 					tables[name] = context[name];
 			}
-			return index({ db: () => pool, tables });
+			return index({ db: () => pool, tables, providers: index });
 		}
 
 		if (arg && arg.db && typeof arg.db === 'function') {
@@ -81,7 +81,7 @@ function map(index, context, fn) {
 		}
 
 
-		return index({db: pool, tables});
+		return index({db: pool, tables, providers: index});
 	}
 
 	return context;

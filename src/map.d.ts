@@ -32,6 +32,7 @@ type DbConnectable<T> = {
 	sap(connectionString: string, options?: PoolOptions): MappedDbInstance<T>;
 	mssql(connectionConfig: ConnectionConfig, options?: PoolOptions): MappedDbInstance<T>;
 	mssql(connectionString: string, options?: PoolOptions): MappedDbInstance<T>;
+	mssqlNative(connectionString: string, options?: PoolOptions): MappedDbInstance<T>;
 	mysql(connectionString: string, options?: PoolOptions): MappedDbInstance<T>;
 };
 

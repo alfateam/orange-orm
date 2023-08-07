@@ -16,6 +16,7 @@ function rdbClient(options = {}) {
 	let transaction = options.transaction;
 	let _reactive = options.reactive;
 	let baseUrl = options.db;
+	let providers = options.providers || {};
 	// @ts-ignore
 	const axios = _axios.default ? _axios.default.create() : _axios.create();
 
@@ -50,6 +51,20 @@ function rdbClient(options = {}) {
 	client.transaction = runInTransaction;
 	client.db = baseUrl;
 	client.express = express;
+
+	client.mssql = onProvider.bind(null, 'mssql');
+	client.mssqlNative = onProvider.bind(null, 'mssqlNative');
+	client.pg = onProvider.bind(null, 'pg');
+	client.postgres = onProvider.bind(null, 'postgres');
+	client.sqlite = onProvider.bind(null, 'sqlite');
+	client.sap = onProvider.bind(null, 'sap');
+	client.http = onProvider.bind(null, 'http');
+	client.mysql = onProvider.bind(null, 'mysql');
+
+	function onProvider(name, ...args) {
+		let db = providers[name].apply(null, args);
+		return client({db});
+	}
 
 	if (options.tables) {
 		const readonly = { readonly: options.readonly, concurrency: options.concurrency };

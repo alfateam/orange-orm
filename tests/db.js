@@ -66,6 +66,4 @@ const map = rdb.map(x => ({
 	}))
 }));
 
-
-
 module.exports = map;
