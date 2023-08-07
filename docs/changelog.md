@@ -1,5 +1,7 @@
 
 ## Release notes
+__3.1.29__  
+Small improvements in docs.  
 __3.1.28__  
 Started with _Modern Typescript Documentation_.  
 __3.1.27__  
