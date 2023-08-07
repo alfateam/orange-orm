@@ -27,7 +27,7 @@ To ensure RDB works properly with your database, you'll also need to install the
 
 
 ## Fundamentals 
-<details open><summary><strong>Mapping tables</strong></summary><blockquote style="background: white">
+<details open><summary><strong>Mapping tables</strong></summary><blockquote style="background: yellow">
 To define a mapping, you employ the <strong><i>map()</i></strong> method, linking your tables and columns to corresponding object properties. You provide a callback function that engages with a parameter representing a database table.
 
 Each column within your database table is designated by using the <strong><i>column()</i></strong> method, in which you specify its name. This action generates a reference to a column object that enables you to articulate further column properties like its data type or if it serves as a primary key.
@@ -79,6 +79,7 @@ const map = rdb.map(x => ({
 
 export default map.sqlite('demo.db');
 ```
+<blockquote style="background: yellow">
 The init.js script resets our SQLite database. It's worth noting that SQLite databases are represented as single files, which makes them wonderfully straightforward to manage.
 
 At the start of the script, we import our database mapping from the db.js file. This gives us access to the db object, which we'll use to interact with our SQLite database.
@@ -86,6 +87,8 @@ At the start of the script, we import our database mapping from the db.js file. 
 Then, we define a SQL string. This string outlines the structure of our SQLite database. It first specifies to drop existing tables named 'deliveryAddress', 'orderLine', '_order', and 'customer' if they exist. This ensures we have a clean slate. Then, it dictates how to create these tables anew with the necessary columns and constraints.
 
 Because of a peculiarity in SQLite, which only allows one statement execution at a time, we split this SQL string into separate statements. We do this using the split() method, which breaks up the string at every semicolon.
+</blockquote>
+
 ```javascript
 //init.js
 import db from './db';
@@ -130,6 +133,7 @@ async function init() {
 }
 export default init;
 ```
+<blockquote style="background: yellow">
 In SQLite, columns with the INTEGER PRIMARY KEY attribute are designed to autoincrement by default. This means that each time a new record is inserted into the table, SQLite automatically produces a numeric key for the id column that is one greater than the largest existing key. This mechanism is particularly handy when you want to create unique identifiers for your table rows without manually entering each id.
 </details>
 
@@ -140,6 +144,8 @@ In the code below, we initially import the table-mapping feature "db.js" and the
 Next, we insert and array array of two orders in the order table. Each order contains an orderDate, customer information, deliveryAddress, and lines for the order items. We use the customer constants "george" and "harry" from previous inserts. The second argument to "db.order.insert" specifies a fetching strategy. This fetching strategy plays a critical role in determining the depth of the data retrieved from the database after insertion. The fetching strategy specifies which associated data should be retrieved and included in the resulting orders object. In this case, the fetching strategy instructs the database to retrieve the customer, deliveryAddress, and lines for each order.
 
 Without a fetching strategy, "db.order.insert" would only return the root level of each order. In that case you would only get the id, orderDate, and customerId for each order.
+</blockquote>
+
 ```javascript
 //insert.js
 import db from './db';
