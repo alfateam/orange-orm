@@ -1,5 +1,5 @@
-All examples below are found at [npmjs.org/package/rdb-demo](https://npmjs.org/package/rdb-demo).
-_Documentation and examples_
+All examples below are found at [npmjs.org/package/rdb-demo](https://npmjs.org/package/rdb-demo).  
+This is the _Classic Documentation_.  Are you looking for the [_Modern Typescript Documentation_](https://github.com/alfateam/rdb/blob/master/README.md) ?
 ---------------
 __Connecting__  
 [connect to postgres](#_connecttopostgres)  

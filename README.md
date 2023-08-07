@@ -9,7 +9,7 @@ RDB is the ultimate Object Relational Mapper for Node.js, offering seamless inte
 - **TypeScript and JavaScript Support**: RDB fully supports both TypeScript and JavaScript, allowing you to leverage the benefits of static typing and modern ECMAScript features.
 - **Works in the Browser**: RDB even works in the browser through hosting in Express, giving you the flexibility to build web applications with ease.  
 
-Are you looking for the [classic documentation](https://github.com/alfateam/rdb/blob/master/docs/docs.md) ?
+This is the _Modern Typescript Documentation_. Are you looking for the [_Classic Documentation_](https://github.com/alfateam/rdb/blob/master/docs/docs.md) ?
 
 ## Installation
 `npm install rdb`  
@@ -133,7 +133,7 @@ In SQLite, columns with the INTEGER PRIMARY KEY attribute are designed to autoin
 
 <details><summary><strong>Inserting rows</strong></summary><blockquote style="background: transparent">
 
-In the code example given below, we initially import the table-mapping feature "db.js" and the setup script "init.js", both of which were defined in the preceding step. The setup script executes a raw query that creates the necessary tables. Subsequently, we insert two customers, named "George" and "Harry", into the customer table, and this is achieved through calling "db.customer.insert".
+In the code below, we initially import the table-mapping feature "db.js" and the setup script "init.js", both of which were defined in the preceding step. The setup script executes a raw query that creates the necessary tables. Subsequently, we insert two customers, named "George" and "Harry", into the customer table, and this is achieved through calling "db.customer.insert".
 
 Next, we insert and array array of two orders in the order table. Each order contains an orderDate, customer information, deliveryAddress, and lines for the order items. We use the customer constants "george" and "harry" from previous inserts. The second argument to "db.order.insert" specifies a fetching strategy. This fetching strategy plays a critical role in determining the depth of the data retrieved from the database after insertion. The fetching strategy specifies which associated data should be retrieved and included in the resulting orders object. In this case, the fetching strategy instructs the database to retrieve the customer, deliveryAddress, and lines for each order.
 
