@@ -1,5 +1,7 @@
 
 ## Release notes
+__3.1.30__  
+Removed blockquotes in docs.  
 __3.1.29__  
 Small improvements in docs.  
 __3.1.28__  
