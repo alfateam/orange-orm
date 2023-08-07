@@ -13,7 +13,7 @@ This is the _Modern Typescript Documentation_. Are you looking for the [_Classic
 
 ## Installation
 `npm install rdb`  
-<details><summary><strong>Drivers</strong></summary><blockquote style="background: white">  
+<details><summary><strong>Drivers</strong></summary>
 
 To ensure RDB works properly with your database, you'll also need to install the appropriate driver:
 - **SQLite**: `npm install sqlite3`
@@ -21,19 +21,19 @@ To ensure RDB works properly with your database, you'll also need to install the
 - **MS SQL**: `npm install tedious`
 - **PostgreSQL (pg)**: `npm install pg`
 - **SAP**: `npm install msnodesqlv8`
-</blockquote>  
+
 </details>  
 
 
 
 ## Fundamentals 
-<details open><summary><strong>Mapping tables</strong></summary><blockquote style="background: white">
+<details open><summary><strong>Mapping tables</strong></summary>
 To define a mapping, you employ the <strong><i>map()</i></strong> method, linking your tables and columns to corresponding object properties. You provide a callback function that engages with a parameter representing a database table.
 
 Each column within your database table is designated by using the <strong><i>column()</i></strong> method, in which you specify its name. This action generates a reference to a column object that enables you to articulate further column properties like its data type or if it serves as a primary key.
 
 Relationships between tables can also be outlined. By using methods like <strong><i>hasOne</i></strong>, <strong><i>hasMany</i></strong>, and <strong><i>references</i></strong>, you can establish connections that reflect the relationships in your data schema. In the example below, an 'order' is linked to a 'customer' reference, a 'deliveryAddress', and multiple 'lines'. The hasMany and hasOne relations represents ownership - the tables 'deliveryAddress' and 'orderLine' are owned by the 'order' table, and therefore, they contain the 'orderId' column referring to their parent table, which is 'order'. Conversely, the customer table is independent and can exist without any knowledge of the 'order' table. Therefore we say that the order table <i>references</i> the customer table - necessitating the existence of a 'customerId' column in the 'order' table.  
-</blockquote>
+
 
 ```javascript
 //db.js
@@ -133,7 +133,7 @@ export default init;
 In SQLite, columns with the INTEGER PRIMARY KEY attribute are designed to autoincrement by default. This means that each time a new record is inserted into the table, SQLite automatically produces a numeric key for the id column that is one greater than the largest existing key. This mechanism is particularly handy when you want to create unique identifiers for your table rows without manually entering each id.
 </details>
 
-<details><summary><strong>Inserting rows</strong></summary><blockquote style="background: transparent">
+<details><summary><strong>Inserting rows</strong></summary>
 
 In the code below, we initially import the table-mapping feature "db.js" and the setup script "init.js", both of which were defined in the preceding step. The setup script executes a raw query that creates the necessary tables. Subsequently, we insert two customers, named "George" and "Harry", into the customer table, and this is achieved through calling "db.customer.insert".
 
