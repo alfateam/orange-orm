@@ -24,7 +24,7 @@ beforeEach(async () => {
 		});
 
 		const john = await db.customer.insert({
-			name: 'John',
+			name: 'Harry',
 			balance: 200,
 			isActive: true
 		});
@@ -58,7 +58,7 @@ beforeEach(async () => {
 					countryCode: 'UK'
 				},
 				lines: [
-					{ product: 'Piano' }
+					{ product: 'Magic wand' }
 				]
 			}
 		]);
@@ -90,7 +90,7 @@ describe('readonly everything', () => {
 			isActive: true
 		}, {
 			id: 2,
-			name: 'John',
+			name: 'Harry',
 			balance: 200,
 			isActive: true
 		}
@@ -186,7 +186,7 @@ describe('readonly table', () => {
 			isActive: true
 		}, {
 			id: 2,
-			name: 'John',
+			name: 'Harry',
 			balance: 200,
 			isActive: true
 		}
@@ -344,7 +344,7 @@ describe('readonly column no change', () => {
 			isActive: true
 		}, {
 			id: 2,
-			name: 'John',
+			name: 'Harry',
 			balance: 200,
 			isActive: true
 		}
@@ -379,7 +379,7 @@ describe('readonly column', () => {
 			isActive: true
 		}, {
 			id: 2,
-			name: 'John',
+			name: 'Harry',
 			balance: 200,
 			isActive: true
 		}
@@ -472,7 +472,7 @@ describe('readonly table with column override', () => {
 			isActive: true
 		}, {
 			id: 2,
-			name: 'John',
+			name: 'Harry',
 			balance: 200,
 			isActive: true
 		}

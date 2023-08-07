@@ -30,7 +30,7 @@ beforeAll(async () => {
 		});
 
 		const john = await db.customer.insert({
-			name: 'John',
+			name: 'Harry',
 			balance: 200,
 			isActive: true
 		});
@@ -64,7 +64,7 @@ beforeAll(async () => {
 					countryCode: 'UK'
 				},
 				lines: [
-					{ product: 'Piano' }
+					{ product: 'Magic wand' }
 				]
 			}
 		]);
@@ -187,11 +187,11 @@ describe('getMany none sub filter', () => {
 
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
-	// if (major > 17)
-	// 	test('mssqlNative', async () => await verify('mssqlNative'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
-	// test('sap', async () => await verify('sap'));
+	test('sap', async () => await verify('sap'));
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
@@ -238,7 +238,7 @@ describe('getMany', () => {
 			isActive: true
 		}, {
 			id: 2,
-			name: 'John',
+			name: 'Harry',
 			balance: 200,
 			isActive: true
 		}
@@ -268,7 +268,7 @@ describe('getMany with column strategy', () => {
 			name: 'George'
 		}, {
 			id: 2,
-			name: 'John'
+			name: 'Harry'
 		}
 		];
 
@@ -326,7 +326,7 @@ describe('getMany with relations', () => {
 				customerId: 2,
 				customer: {
 					id: 2,
-					name: 'John',
+					name: 'Harry',
 					balance: 200,
 					isActive: true
 				},
@@ -341,7 +341,7 @@ describe('getMany with relations', () => {
 					countryCode: 'UK'
 				},
 				lines: [
-					{ product: 'Piano', id: 3, orderId: 2 }
+					{ product: 'Magic wand', id: 3, orderId: 2 }
 				]
 			}
 		];
@@ -354,48 +354,47 @@ describe('getMany with relations', () => {
 function getDb(name) {
 	if (name === 'mssql')
 		return {
-			db: db({
-				db: (cons) => cons.mssql({
-					server: 'mssql',
+			db:
+			db.mssql({
+				server: 'mssql',
+				options: {
+					encrypt: false,
+					database: 'master'
+				},
+				authentication: {
+					type: 'default',
 					options: {
-						encrypt: false,
-						database: 'master'
-					},
-					authentication: {
-						type: 'default',
-						options: {
-							userName: 'sa',
-							password: 'P@assword123',
-						}
+						userName: 'sa',
+						password: 'P@assword123',
 					}
-				})
+				}
 			}),
 			init: initMs
 
 		};
 	else if (name === 'mssqlNative')
 		return {
-			db: db({ db: (cons) => cons.mssqlNative('server=mssql;Database=demo;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes') }),
+			db: db.mssqlNative('server=mssql;Database=demo;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes'),
 			init: initMs
 		};
 	else if (name === 'pg')
 		return {
-			db: db({ db: (cons) => cons.postgres('postgres://postgres:postgres@postgres/postgres') }),
+			db: db.postgres('postgres://postgres:postgres@postgres/postgres'),
 			init: initPg
 		};
 	else if (name === 'sqlite')
 		return {
-			db: db({ db: (cons) => cons.sqlite(sqliteName) }),
+			db: db.sqlite(sqliteName),
 			init: initSqlite
 		};
 	else if (name === 'sap')
 		return {
-			db: db({ db: (cons) => cons.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master`) }),
+			db: db.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master`),
 			init: initSap
 		};
 	else if (name === 'mysql')
 		return {
-			db: db({ db: (cons) => cons.mysql('mysql://test:test@mysql/test') }),
+			db: db.mysql('mysql://test:test@mysql/test'),
 			init: initMysql
 		};
 

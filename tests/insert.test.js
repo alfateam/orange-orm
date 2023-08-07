@@ -250,7 +250,7 @@ describe('insert autoincremental with relations', () => {
 		});
 
 		const john = await db.customer.insert({
-			name: 'John',
+			name: 'Harry',
 			balance: 200,
 			isActive: true
 		});
@@ -282,7 +282,7 @@ describe('insert autoincremental with relations', () => {
 					countryCode: 'UK'
 				},
 				lines: [
-					{ product: 'Piano' }
+					{ product: 'Magic wand' }
 				]
 			}
 		]);
@@ -317,7 +317,7 @@ describe('insert autoincremental with relations', () => {
 				customerId: 2,
 				customer: {
 					id: 2,
-					name: 'John',
+					name: 'Harry',
 					balance: 200,
 					isActive: true
 				},
@@ -332,7 +332,7 @@ describe('insert autoincremental with relations', () => {
 					countryCode: 'UK'
 				},
 				lines: [
-					{ product: 'Piano', id: 3, orderId: 2 }
+					{ product: 'Magic wand', id: 3, orderId: 2 }
 				]
 			}
 		];

@@ -17,26 +17,26 @@ function truthy(value) {
 
 const map = rdb.map(x => ({
 	customer: x.table('customer').map(({ column }) => ({
-		id: column('id').numeric().primary(),
+		id: column('id').numeric().primary().notNullExceptInsert(),
 		name: column('name').string().validate(validateName).validate(truthy).JSONSchema(nameSchema),
 		balance: column('balance').numeric(),
 		isActive: column('isActive').boolean(),
 	})),
 
 	order: x.table('_order').map(({ column }) => ({
-		id: column('id').numeric().primary(),
+		id: column('id').numeric().primary().notNullExceptInsert(),
 		orderDate: column('orderDate').date().notNull(),
 		customerId: column('customerId').numeric().notNullExceptInsert(),
 	})),
 
 	orderLine: x.table('orderLine').map(({ column }) => ({
-		id: column('id').numeric().primary(),
+		id: column('id').numeric().primary().notNullExceptInsert(),
 		orderId: column('orderId').numeric(),
 		product: column('product').string(),
 	})),
 
 	deliveryAddress: x.table('deliveryAddress').map(({ column }) => ({
-		id: column('id').numeric().primary(),
+		id: column('id').numeric().primary().notNullExceptInsert(),
 		orderId: column('orderId').numeric(),
 		name: column('name').string(),
 		street: column('street').string(),
@@ -46,13 +46,13 @@ const map = rdb.map(x => ({
 	})),
 
 	datetest: x.table('datetest').map(({column}) => ({
-		id: column('id').numeric().primary(),
+		id: column('id').numeric().primary().notNullExceptInsert(),
 		date: column('_date').date(),
 		datetime: column('_datetime').date(),
 	})),
 
 	datetestWithTz: x.table('datetest').map(({column}) => ({
-		id: column('id').numeric().primary(),
+		id: column('id').numeric().primary().notNullExceptInsert(),
 		date: column('_date').date(),
 		datetime: column('_datetime').date(),
 		datetime_tz: column('_datetime_tz').dateWithTimeZone()

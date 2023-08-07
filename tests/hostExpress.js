@@ -39,7 +39,7 @@ async function server() {
 		});
 
 		const john = await db.customer.insert({
-			name: 'John',
+			name: 'Harry',
 			balance: 200,
 			isActive: true
 		});
@@ -73,7 +73,7 @@ async function server() {
 					countryCode: 'UK'
 				},
 				lines: [
-					{ product: 'Piano' }
+					{ product: 'Magic wand' }
 				]
 			}
 		]);

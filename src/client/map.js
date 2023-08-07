@@ -40,7 +40,7 @@ function mapRoot(index, fn) {
 				if (context[name] && context[name]._dbName)
 					tables[name] = context[name];
 			}
-			return index({ db: () => pool, tables });
+			return index({ db: () => pool, tables, providers: index });
 		}
 
 		if (arg && arg.db && typeof arg.db === 'function') {
@@ -61,6 +61,29 @@ function map(index, context, fn) {
 		}
 	}
 	context.map = map.bind(null, index, context);
+	context.pg = connect.bind(null, 'pg');
+	context.postgres = connect.bind(null, 'pg');
+	context.mssql = connect.bind(null, 'mssql');
+	context.mssqlNative = connect.bind(null, 'mssqlNative');
+	context.mysql = connect.bind(null, 'mysql');
+	context.sap = connect.bind(null, 'sap');
+	context.sqlite = connect.bind(null, 'sqlite');
+	context.http = connect.bind(null, 'http');
+
+	function connect(name, ...args) {
+		const provider = index[name];
+		const pool = provider.apply(null, args);
+
+		const tables = {};
+		for (let name in context) {
+			if (context[name] && context[name]._dbName)
+				tables[name] = context[name];
+		}
+
+
+		return index({db: pool, tables, providers: index});
+	}
+
 	return context;
 
 	function newTable() {
