@@ -223,7 +223,7 @@ async function getRows() {
 }
 ```
 __Limit, offset and order by__  
-This script demonstrates how to fetch orders, limiting the results to 10, skipping the first row, and sorting the data based on the orderDate in descending order followed by id. The lines are sorted by product.
+This script demonstrates how to fetch orders with customer, lines and deliveryAddress, limiting the results to 10, skipping the first row, and sorting the data based on the orderDate in descending order followed by id. The lines are sorted by product.
 ```javascript
 //limit.js
 import db from './db';
@@ -234,7 +234,7 @@ async function getRows() {
 	const orders = await db.order.getAll({
 		offset: 1,
 		orderBy: ['orderDate desc', 'id'],
-		limit: 10
+		limit: 10,
 		customer: true, 
 		deliveryAddress: true, 
 		lines: {
