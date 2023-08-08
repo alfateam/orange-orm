@@ -13,7 +13,7 @@ This is the _Modern Typescript Documentation_. Are you looking for the [_Classic
 
 ## Installation
 `npm install rdb`  
-<details><summary><strong>Drivers</strong></summary>
+<details><summary><strong>Installing drivers</strong></summary>
 
 To ensure RDB works properly with your database, you'll also need to install the appropriate driver:
 - **SQLite**: `npm install sqlite3`
@@ -197,6 +197,77 @@ async function insertRows() {
 }
 ```
 
+</details>
+
+<details><summary><strong>Fetching rows</strong></summary>
+<div style="margin-left: 20px;">
+<details open><summary><strong>All rows</strong></summary>
+
+```javascript
+//allRows.js
+import db from './db';
+
+getRows();
+
+async function getRows() {
+	const orders = await db.order.getAll({
+		customer: true, 
+		deliveryAddress: true, 
+		lines: true
+	});
+	console.dir(orders, {depth: Infinity});
+}
+```
+
+</details>
+<details><summary><strong>Many rows filtered</strong></summary>
+
+```javascript
+//manyRowsFiltered.js
+import db from './db';
+
+getRows();
+
+async function getRows() {
+	const filter = db.order.lines.any(line => line.product.contains('i'))
+				.and(db.order.customer.balance.greaterThan(180));
+	const orders = await db.order.getMany(filter, {
+		customer: true, 
+		deliveryAddress: true, 
+		lines: true
+	});
+	console.dir(orders, {depth: Infinity});
+}
+```
+
+</details>
+<details><summary><strong>Single row filtered</strong></summary>
+
+```javascript
+//singleRowFiltered.js
+import db from './db';
+
+getRows();
+
+async function getRows() {
+	const filter = db.order.customer(customer => customer.isActive.eq(true).and(customer.startsWith('Harr')));
+	//equivalent, but creates slighly different sql:
+	// const filter = db.order.customer.isActive.eq(true).and(db.order.customer.startsWith('Harr'));
+	const order = await db.order.getOne(filter, {
+		customer: true, 
+		deliveryAddress: true, 
+		lines: true
+	});
+	console.dir(order, {depth: Infinity});
+}
+```
+
+</details>
+<details><summary><strong>Single row by id</strong></summary>
+</details>
+<details><summary><strong>Many rows by ids</strong></summary>
+</details>
+</div>
 </details>
 
 ### [Changelog](https://github.com/alfateam/rdb/blob/master/docs/changelog.md)
