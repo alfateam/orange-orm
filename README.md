@@ -238,7 +238,7 @@ async function getRows() {
 		customer: true, 
 		deliveryAddress: true, 
 		lines: {
-			orderBy: 'product asc'
+			orderBy: 'product'
 		},
 	});
 	console.dir(orders, {depth: Infinity});
