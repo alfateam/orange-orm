@@ -200,8 +200,13 @@ async function insertRows() {
 </details>
 
 <details><summary><strong>Fetching rows</strong></summary>
-<div style="margin-left: 20px;">
-<details open><summary><strong>All rows</strong></summary>
+
+ RDB has a rich querying model. As you navigate through, you'll learn about the various methods available to retrieve data from your tables, whether you want to fetch all rows, many rows with specific criteria, or a single row based on a primary key. If you want do dig even deeper into filtering possibilities, there is a whole section about it further down the page.
+
+The fetching strategy in RDB is optional, and its use is influenced by your specific needs. You can define the fetching strategy either on the table level or the column level. This granularity gives you the freedom to decide how much related data you want to pull along with your primary request.
+
+__All rows__
+
 
 ```javascript
 //allRows.js
@@ -219,8 +224,7 @@ async function getRows() {
 }
 ```
 
-</details>
-<details><summary><strong>Many rows filtered</strong></summary>
+__Many rows filtered__
 
 ```javascript
 //manyRowsFiltered.js
@@ -240,8 +244,7 @@ async function getRows() {
 }
 ```
 
-</details>
-<details><summary><strong>Single row filtered</strong></summary>
+__Single row filtered__
 
 ```javascript
 //singleRowFiltered.js
@@ -262,12 +265,46 @@ async function getRows() {
 }
 ```
 
-</details>
-<details><summary><strong>Single row by id</strong></summary>
-</details>
-<details><summary><strong>Many rows by ids</strong></summary>
-</details>
-</div>
+__Single row by primary key__
+
+
+```javascript
+//singleRowByPrimary.js
+import db from './db';
+
+getRows();
+
+async function getRows() {
+	const order = await db.order.getById(1, {
+		customer: true, 
+		deliveryAddress: true, 
+		lines: true
+	});
+	console.dir(order, {depth: Infinity});
+}
+```
+
+__Many rows by primary key__
+
+```javascript
+//manyRowsByPrimary.js
+import db from './db';
+
+getRows();
+
+async function getRows() {
+	const order = await db.order.getMany([
+			{id: 1},
+			{id: 2}
+		], 
+		{
+			customer: true, 
+			deliveryAddress: true, 
+			lines: true
+	});
+	console.dir(order, {depth: Infinity});
+}
+```
 </details>
 
 ### [Changelog](https://github.com/alfateam/rdb/blob/master/docs/changelog.md)
