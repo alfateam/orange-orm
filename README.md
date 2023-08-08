@@ -207,7 +207,6 @@ The fetching strategy in RDB is optional, and its use is influenced by your spec
 
 __All rows__
 
-
 ```javascript
 //allRows.js
 import db from './db';
@@ -219,6 +218,28 @@ async function getRows() {
 		customer: true, 
 		deliveryAddress: true, 
 		lines: true
+	});
+	console.dir(orders, {depth: Infinity});
+}
+```
+__Limit, offset and order by__  
+This script demonstrates how to fetch orders, limiting the results to 10, skipping the first row, and sorting the data based on the orderDate in descending order followed by id. The lines are sorted by product.
+```javascript
+//limit.js
+import db from './db';
+
+getRows();
+
+async function getRows() {
+	const orders = await db.order.getAll({
+		offset: 1,
+		orderBy: ['orderDate desc', 'id'],
+		limit: 10
+		customer: true, 
+		deliveryAddress: true, 
+		lines: {
+			orderBy: 'product asc'
+		},
 	});
 	console.dir(orders, {depth: Infinity});
 }
