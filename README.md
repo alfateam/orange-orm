@@ -27,7 +27,7 @@ To ensure RDB works properly with your database, you'll also need to install the
 
 
 ## Fundamentals 
-<details open><summary><strong>Mapping tables</strong></summary>
+<details><summary><strong>Mapping tables</strong></summary>
 To define a mapping, you employ the <strong><i>map()</i></strong> method, linking your tables and columns to corresponding object properties. You provide a callback function that engages with a parameter representing a database table.
 
 Each column within your database table is designated by using the <strong><i>column()</i></strong> method, in which you specify its name. This action generates a reference to a column object that enables you to articulate further column properties like its data type or if it serves as a primary key.
