@@ -26,6 +26,7 @@
   ],
   "license": "ISC",
   "codeOfConduct": "https://github.com/alfateam/rdb/blob/master/docs/CODE_OF_CONDUCT.md",
+  "contributing": "https://github.com/alfateam/rdb/blob/master/CONTRIBUTING.md",
   "scripts": {
     "test": "vitest run --threads=false",
     "testw": "vitest --threads=false dateformat",
