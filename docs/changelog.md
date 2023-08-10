@@ -1,5 +1,7 @@
 
 ## Release notes
+__3.1.31__  
+Documented updating rows in _Modern Typescript Documentation_.  
 __3.1.30__  
 Removed blockquotes in docs.  
 __3.1.29__  

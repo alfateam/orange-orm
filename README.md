@@ -340,9 +340,6 @@ Currently, there are three concurrency strategies:
 - <strong>overwrite:</strong> Overwrites the property, regardless of changes by others.
 - <strong>skipOnConflict:</strong> Silently avoids updating the property if another user has modified it in the interim.
 
-The overwrite will simply ignore if the column was changed by another - and then overwrite the property.  
-The skipOnConflict will silently skip updating the column if it has changed in the meantime. 
-
 __Updating a single row__
 
 <sub>📄 updateSingleRow.js</sub>
