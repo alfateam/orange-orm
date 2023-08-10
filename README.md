@@ -274,7 +274,8 @@ import db from './db';
 getRows();
 
 async function getRows() {
-	const filter = db.order.customer(customer => customer.isActive.eq(true).and(customer.startsWith('Harr')));
+	const filter = db.order.customer(customer => customer.isActive.eq(true)
+					.and(customer.startsWith('Harr')));
 	//equivalent, but creates slighly different sql:
 	// const filter = db.order.customer.isActive.eq(true).and(db.order.customer.startsWith('Harr'));
 	const order = await db.order.getOne(filter, {
