@@ -59,6 +59,10 @@ async function patchTableCore(table, patches, { strategy = undefined, deduceStra
 			if (!row)
 				throw new Error(`Row ${table._dbName} with id ${key} was not found.`);
 		}
+
+		if (path.length === 0 && value === null) {
+			return remove({ path, op, oldValue, options }, table, row);
+		}
 		if (path.length === 0) {
 			if (dryrun) {
 				return {};

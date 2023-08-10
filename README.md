@@ -32,7 +32,7 @@ Each column within your database table is designated by using the <strong><i>col
 
 Relationships between tables can also be outlined. By using methods like <strong><i>hasOne</i></strong>, <strong><i>hasMany</i></strong>, and <strong><i>references</i></strong>, you can establish connections that reflect the relationships in your data schema. In the example below, an 'order' is linked to a 'customer' reference, a 'deliveryAddress', and multiple 'lines'. The hasMany and hasOne relations represents ownership - the tables 'deliveryAddress' and 'orderLine' are owned by the 'order' table, and therefore, they contain the 'orderId' column referring to their parent table, which is 'order'. Conversely, the customer table is independent and can exist without any knowledge of the 'order' table. Therefore we say that the order table <i>references</i> the customer table - necessitating the existence of a 'customerId' column in the 'order' table.  
 
- <sub>📄 db.js</sub>
+<sub>📄 db.js</sub>
 ```javascript
 import rdb from 'rdb';
 
@@ -315,7 +315,7 @@ import db from './db';
 getRows();
 
 async function getRows() {
-	const order = await db.order.getMany([
+	const orders = await db.order.getMany([
 			{id: 1},
 			{id: 2}
 		], 
@@ -324,10 +324,103 @@ async function getRows() {
 			deliveryAddress: true, 
 			lines: true
 	});
-	console.dir(order, {depth: Infinity});
+	console.dir(orders, {depth: Infinity});
 }
 ```
 </details>  
+
+<details><summary><strong>Updating rows</strong></summary>
+To update rows, you can simply modify the property values and invoke the method <strong><i>saveChanges()</i></strong>. The function updates only the modified columns, not the entire row. Rows in child relations can also be updated as long as the parent order <i>owns</i> the child tables. In our illustration, the <strong>order</strong> table owns both the <strong>deliveryAddress</strong> and the <strong>lines</strong> tables because they're part of a <i>hasOne/hasMany relationship</i>. Contrastingly, the <strong>customer</strong> is part of a <i>reference relationship</i> and thus can't be updated here. But you can detach the reference to the customer by assigning it to null or undefined. (Setting order.customerId to null or undefined achieves the same result.)
+
+Rows get updated using an <i>optimistic</i> concurrency approach by default. This means if a property being edited was meanwhile altered, an exception is raised, indicating the row was modified by a different user. You can change the concurrency strategy either at the table or column level.
+
+Currently, there are three concurrency strategies:
+- <strong>optimistic:</strong> Raises an exception if another user changes the property during an update.
+- <strong>overwrite:</strong> Overwrites the property, regardless of changes by others.
+- <strong>skipOnConflict:</strong> Silently avoids updating the property if another user has modified it in the interim.
+
+The overwrite will simply ignore if the column was changed by another - and then overwrite the property.  
+The skipOnConflict will silently skip updating the column if it has changed in the meantime. 
+
+__Updating a single row__
+
+<sub>📄 updateSingleRow.js</sub>
+```javascript
+import db from './db';
+
+update();
+
+async function update() {
+	const order = await db.order.getById(1, {
+		customer: true, 
+		deliveryAddress: true, 
+		lines: true
+	});
+
+	order.orderDate = new Date();
+	order.deliveryAddress = null;
+	order.lines.push({product: 'Cloak of invisibility'});
+
+	await order.saveChanges();
+	console.dir(order, {depth: Infinity});
+}
+```
+__Updating many rows__
+
+<sub>📄 updateManyRows.js</sub>
+```javascript
+import db from './db';
+
+update();
+
+async function update() {
+	let orders = await db.order.getAll({
+		orderBy: 'id',
+		lines: true, 
+		deliveryAddress: true, 
+		customer: true
+	});
+
+	orders[0].orderDate = new Date();
+	orders[0].deliveryAddress.street = 'Node street 2';
+	orders[0].lines[1].product = 'Big guitar';
+
+	orders[1].orderDate = '2023-07-14T12:00:00'; //iso-string is allowed
+	orders[1].deliveryAddress = null;
+	orders[1].customer = null;
+	orders[1].lines.push({product: 'Cloak of invisibility'});
+
+	await orders.saveChanges();
+	console.dir(orders, {depth: Infinity});
+}
+```
+
+__Updating with concurrency__  
+We've set the concurrency strategy for orderDate to 'overwrite'. This implies that if other users modify orderDate while you're making changes, their updates will be overwritten.
+<sub>📄 updateWithConcurrency.js</sub>
+```javascript
+import db from './db';
+
+update();
+
+async function update() {
+	const order = await db.order.getById(1, {
+		customer: true, 
+		deliveryAddress: true, 
+		lines: true
+	});
+
+	order.orderDate = new Date();
+	order.deliveryAddress = null;
+	order.lines.push({product: 'Cloak of invisibility'});
+
+	await order.saveChanges( {
+		orderDate: {
+			concurrency: 'overwrite'
+	}});
+	console.dir(order, {depth: Infinity});
+}
+```
   
 ### [Changelog](https://github.com/alfateam/rdb/blob/master/docs/changelog.md)
 ### [Code of Conduct](https://github.com/alfateam/rdb/blob/master/docs/CODE_OF_CONDUCT.md)

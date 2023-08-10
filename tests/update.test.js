@@ -1,4 +1,4 @@
-import { describe, test, beforeEach, expect } from 'vitest';
+import { describe, test, beforeAll, expect } from 'vitest';
 const dateToISOString = require('../src/dateToISOString');
 const db = require('./db');
 const initPg = require('./initPg');
@@ -12,7 +12,7 @@ const major = parseInt(versionArray[0]);
 const date1 = new Date(2022, 0, 11, 9, 24, 47);
 const date2 = new Date(2021, 0, 11, 12, 22, 45);
 
-beforeEach(async () => {
+beforeAll(async () => {
 	await insertData('pg');
 	await insertData('mssql');
 	if (major > 17)
@@ -117,7 +117,88 @@ describe('update date in array', () => {
 	}
 });
 
-describe('delete date', () => {
+describe('update multiple in array', () => {
+
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sap', async () => await verify('sap'));
+	test('sqlite', async () => await verify('sqlite'));
+
+	async function verify(dbName) {
+
+
+		const { db } = getDb(dbName);
+		let rows = await db.order.getAll({lines: true, deliveryAddress: true, customer: true, orderBy: 'id'});
+		const date1 = new Date(2021, 0, 11, 9, 11, 47);
+		const date2 = new Date(2022, 0, 12, 8, 22, 46);
+
+		rows[0].orderDate = date1;
+		rows[0].deliveryAddress.street = 'Node street 2';
+		rows[0].lines[1].product = 'Big guitar';
+
+		rows[1].orderDate = date2;
+		rows[1].deliveryAddress = null;
+		rows[1].lines.push({product: 'Cloak of invisibility'});
+
+		await rows.saveChanges();
+		await rows.refresh();
+
+		for (let i = 0; i < rows.length; i++) {
+			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate));
+		}
+
+		const expected = [
+			{
+				id: 1,
+				orderDate: dateToISOString(date1),
+				customerId: 1,
+				customer: {
+					id: 1,
+					name: 'George',
+					balance: 177,
+					isActive: true
+				},
+				deliveryAddress: {
+					id: 1,
+					orderId: 1,
+					name: 'George',
+					street: 'Node street 2',
+					postalCode: '7059',
+					postalPlace: 'Jakobsli',
+					countryCode: 'NO'
+				},
+				lines: [
+					{ product: 'Bicycle', id: 1, orderId: 1 },
+					{ product: 'Big guitar', id: 2, orderId: 1 }
+				]
+			},
+			{
+				id: 2,
+				customerId: 2,
+				customer: {
+					id: 2,
+					name: 'Harry',
+					balance: 200,
+					isActive: true
+				},
+				orderDate: dateToISOString(date2),
+				deliveryAddress: null,
+				lines: [
+					{ product: 'Magic wand', id: 3, orderId: 2 },
+					{ product: 'Cloak of invisibility', id: 4, orderId: 2 }
+				]
+			}
+		];
+
+
+		expect(rows).toEqual(expected);
+	}
+});
+
+describe('delete row', () => {
 
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
