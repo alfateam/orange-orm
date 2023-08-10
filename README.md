@@ -24,8 +24,6 @@ To ensure RDB works properly with your database, you'll also need to install the
 
 </details>  
 
-
-
 ## Fundamentals 
 <details><summary><strong>Mapping tables</strong></summary>
 To define a mapping, you employ the <strong><i>map()</i></strong> method, linking your tables and columns to corresponding object properties. You provide a callback function that engages with a parameter representing a database table.
@@ -34,9 +32,8 @@ Each column within your database table is designated by using the <strong><i>col
 
 Relationships between tables can also be outlined. By using methods like <strong><i>hasOne</i></strong>, <strong><i>hasMany</i></strong>, and <strong><i>references</i></strong>, you can establish connections that reflect the relationships in your data schema. In the example below, an 'order' is linked to a 'customer' reference, a 'deliveryAddress', and multiple 'lines'. The hasMany and hasOne relations represents ownership - the tables 'deliveryAddress' and 'orderLine' are owned by the 'order' table, and therefore, they contain the 'orderId' column referring to their parent table, which is 'order'. Conversely, the customer table is independent and can exist without any knowledge of the 'order' table. Therefore we say that the order table <i>references</i> the customer table - necessitating the existence of a 'customerId' column in the 'order' table.  
 
-
+ <sub>📄 db.js</sub>
 ```javascript
-//db.js
 import rdb from 'rdb';
 
 const map = rdb.map(x => ({
@@ -85,9 +82,10 @@ At the start of the script, we import our database mapping from the db.js file. 
 
 Then, we define a SQL string. This string outlines the structure of our SQLite database. It first specifies to drop existing tables named 'deliveryAddress', 'orderLine', '_order', and 'customer' if they exist. This ensures we have a clean slate. Then, it dictates how to create these tables anew with the necessary columns and constraints.
 
-Because of a peculiarity in SQLite, which only allows one statement execution at a time, we split this SQL string into separate statements. We do this using the split() method, which breaks up the string at every semicolon.
+Because of a peculiarity in SQLite, which only allows one statement execution at a time, we split this SQL string into separate statements. We do this using the split() method, which breaks up the string at every semicolon.  
+
+<sub>📄 init.js</sub>
 ```javascript
-//init.js
 import db from './db';
 
 const sql = `DROP TABLE IF EXISTS deliveryAddress; DROP TABLE IF EXISTS orderLine; DROP TABLE IF EXISTS _order; DROP TABLE IF EXISTS customer;
@@ -139,9 +137,10 @@ In the code below, we initially import the table-mapping feature "db.js" and the
 
 Next, we insert and array array of two orders in the order table. Each order contains an orderDate, customer information, deliveryAddress, and lines for the order items. We use the customer constants "george" and "harry" from previous inserts. The second argument to "db.order.insert" specifies a fetching strategy. This fetching strategy plays a critical role in determining the depth of the data retrieved from the database after insertion. The fetching strategy specifies which associated data should be retrieved and included in the resulting orders object. In this case, the fetching strategy instructs the database to retrieve the customer, deliveryAddress, and lines for each order.
 
-Without a fetching strategy, "db.order.insert" would only return the root level of each order. In that case you would only get the id, orderDate, and customerId for each order.
+Without a fetching strategy, "db.order.insert" would only return the root level of each order. In that case you would only get the id, orderDate, and customerId for each order.  
+
+<sub>📄 insert.js</sub>
 ```javascript
-//insert.js
 import db from './db';
 import init from './init';
 
@@ -207,8 +206,8 @@ The fetching strategy in RDB is optional, and its use is influenced by your spec
 
 __All rows__
 
+<sub>📄 allRows.js</sub>
 ```javascript
-//allRows.js
 import db from './db';
 
 getRows();
@@ -223,9 +222,10 @@ async function getRows() {
 }
 ```
 __Limit, offset and order by__  
-This script demonstrates how to fetch orders with customer, lines and deliveryAddress, limiting the results to 10, skipping the first row, and sorting the data based on the orderDate in descending order followed by id. The lines are sorted by product.
+This script demonstrates how to fetch orders with customer, lines and deliveryAddress, limiting the results to 10, skipping the first row, and sorting the data based on the orderDate in descending order followed by id. The lines are sorted by product.  
+
+<sub>📄 limit.js</sub>
 ```javascript
-//limit.js
 import db from './db';
 
 getRows();
@@ -247,8 +247,8 @@ async function getRows() {
 
 __Many rows filtered__
 
+<sub>📄 manyRowsFiltered.js</sub>
 ```javascript
-//manyRowsFiltered.js
 import db from './db';
 
 getRows();
@@ -267,8 +267,8 @@ async function getRows() {
 
 __Single row filtered__
 
+<sub>📄 singleRowFiltered.js</sub>
 ```javascript
-//singleRowFiltered.js
 import db from './db';
 
 getRows();
@@ -289,8 +289,8 @@ async function getRows() {
 __Single row by primary key__
 
 
+<sub>📄 singleRowByPrimary.js</sub>
 ```javascript
-//singleRowByPrimary.js
 import db from './db';
 
 getRows();
@@ -307,8 +307,8 @@ async function getRows() {
 
 __Many rows by primary key__
 
+<sub>📄 manyRowsByPrimary.js</sub>
 ```javascript
-//manyRowsByPrimary.js
 import db from './db';
 
 getRows();
