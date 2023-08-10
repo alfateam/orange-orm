@@ -327,6 +327,7 @@ async function getRows() {
 	console.dir(order, {depth: Infinity});
 }
 ```
-</details>
-
+</details>  
+  
 ### [Changelog](https://github.com/alfateam/rdb/blob/master/docs/changelog.md)
+### [Code of Conduct](https://github.com/alfateam/rdb/blob/master/docs/CODE_OF_CONDUCT.md)
