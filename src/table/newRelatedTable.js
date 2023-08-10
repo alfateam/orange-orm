@@ -10,20 +10,20 @@ function newRelatedTable(relations, isShallow, isMany) {
 	var columns = table._columns;
 
 	let c;
-	if (isMany) {
-		c = all(relations);
-		// @ts-ignore
-		c.all = c;
-		// @ts-ignore
-		c.any = any(relations);
-	}
-	else {
-		c = any(relations);
-		// @ts-ignore
-		c.all = all(relations);
-		// @ts-ignore
-		c.any = c;
-	}
+	// if (isMany) {
+	// 	c = all(relations);
+	// 	// @ts-ignore
+	// 	c.all = c;
+	// 	// @ts-ignore
+	// 	c.any = any(relations);
+	// }
+	// else {
+	c = any(relations);
+	// @ts-ignore
+	c.all = all(relations);
+	// @ts-ignore
+	c.any = c;
+	// }
 
 	// @ts-ignore
 	c.none = none(relations);

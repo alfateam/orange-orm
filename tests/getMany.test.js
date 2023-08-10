@@ -162,7 +162,7 @@ describe('getMany any sub filter', () => {
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
-		const filter = db.order.lines.any(x => x.product.eq('Bicycle'));
+		const filter = db.order.lines.product.eq('Bicycle');
 		const rows = await db.order.getMany(filter);
 
 		//mssql workaround because datetime has no time offset

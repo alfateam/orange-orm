@@ -419,8 +419,8 @@ type MappedColumnsAndRelations<T> = RemoveNeverFlat<{
 	: T[K] extends JSONColumnTypeDef<infer M>
 	? JSONColumnType<M>
 	: T[K] extends ManyRelation
-	? MappedColumnsAndRelations<PickTypesOf<T[K], RelatedTable>> &
-	ManyTable<T[K]>
+	? MappedColumnsAndRelations<T[K]> &
+	ManyTable<T[K]> & OneOrJoinTable<T[K]>
 	: T[K] extends RelatedTable
 	? MappedColumnsAndRelations<T[K]> & OneOrJoinTable<T[K]>
 	: never;
@@ -432,13 +432,11 @@ type OneOrJoinTable<T> = ((
 	exists: () => Filter;
 };
 
-type ManyTable<T> = ((
-	fn: (table: MappedColumnsAndRelations<T>) => RawFilter
+type ManyTable<T> = ((	
 ) => Filter) & {
 	all(selector: (table: MappedColumnsAndRelations<T>) => RawFilter): Filter;
 	any(selector: (table: MappedColumnsAndRelations<T>) => RawFilter): Filter;
 	none(selector: (table: MappedColumnsAndRelations<T>) => RawFilter): Filter;
-	exists(): Filter;
 };
 
 export type AllowedDbMap<T> = {
