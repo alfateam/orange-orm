@@ -1,5 +1,7 @@
 
 ## Release notes
+__3.1.32__  
+Updated typescript types for filtering on many relations  
 __3.1.31__  
 Documented updating rows in _Modern Typescript Documentation_.  
 __3.1.30__  
