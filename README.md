@@ -398,6 +398,7 @@ async function update() {
 
 __Updating with concurrency__  
 We've set the concurrency strategy for orderDate to 'overwrite'. This implies that if other users modify orderDate while you're making changes, their updates will be overwritten.
+
 <sub>📄 updateWithConcurrency.js</sub>
 ```javascript
 import db from './db';
