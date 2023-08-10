@@ -11,7 +11,7 @@ Thank you for considering a contribution to [rdb](https://github.com/alfateam/rd
 If you're planning significant code changes, it's a good practice to open an issue for discussion. This ensures alignment, reduces duplication of effort, and promotes collaborative problem solving.
 1. **Fork & Clone**  
 	If you haven't already, fork the repository first.  
-	Then clone it:  
+	Then, clone it:  
    `git clone https://github.com/YOUR_USERNAME/rdb.git`
 
 2. **Create a New Branch**  
