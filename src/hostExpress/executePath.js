@@ -78,14 +78,14 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 
 		function tryGetAnyAllNone(path, table) {
 			path = path.split('.');
+			for (let i = 0; i < path.length; i++) {
+				table = table[path[i]];
+			}
+
 			let ops = new Set(['all', 'any', 'none']);
 			let last = path.slice(-1)[0];
-			if (ops.has(last)) {
-				for (let i = 0; i < path.length; i++) {
-					table = table[path[i]];
-				}
+			if (ops.has(last) || (table && table._dbName && table._primaryColumns))
 				return table;
-			}
 		}
 
 		function executePath(path, args) {
