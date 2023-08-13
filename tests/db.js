@@ -23,6 +23,12 @@ const map = rdb.map(x => ({
 		isActive: column('isActive').boolean(),
 	})),
 
+	package: x.table('package').map(({ column }) => ({
+		id: column('packageId').numeric().primary().notNullExceptInsert(),
+		lineId: column('lineId').numeric().notNullExceptInsert(),
+		sscc: column('sscc').string()
+	})),
+
 	order: x.table('_order').map(({ column }) => ({
 		id: column('id').numeric().primary().notNullExceptInsert(),
 		orderDate: column('orderDate').date().notNull(),
@@ -57,11 +63,21 @@ const map = rdb.map(x => ({
 		datetime: column('_datetime').date(),
 		datetime_tz: column('_datetime_tz').dateWithTimeZone()
 	}))
-
 })).map(x => ({
 	order: x.order.map(({ hasOne, hasMany, references }) => ({
 		customer: references(x.customer).by('customerId'),
 		deliveryAddress: hasOne(x.deliveryAddress).by('orderId'),
+	}))
+
+})).map(x => ({
+	orderLine: x.orderLine.map(({ references, hasMany }) => ({
+		order: references(x.order).by('orderId'),
+		packages: hasMany(x.package).by('lineId')
+	}))
+})).map(x => ({
+	order: x.order.map(({ hasOne, hasMany, references }) => ({
+		// customer: references(x.customer).by('customerId'),
+		// deliveryAddress: hasOne(x.deliveryAddress).by('orderId'),
 		lines: hasMany(x.orderLine).by('orderId')
 	}))
 }));

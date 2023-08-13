@@ -29,7 +29,7 @@
   "contributing": "https://github.com/alfateam/rdb/blob/master/CONTRIBUTING.md",
   "scripts": {
     "test": "vitest run --threads=false",
-    "testw": "vitest --threads=false dateformat",
+    "testw": "vitest --threads=false getMany",
     "concat": "node ./src/client/merge.js",
     "build": "rollup -c ./src/client/rollup.config.js && npm run concat",
     "lint": "eslint ./",

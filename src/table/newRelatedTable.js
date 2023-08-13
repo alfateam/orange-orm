@@ -5,32 +5,26 @@ var any = require('./relatedTable/any');
 var all = require('./relatedTable/all');
 var none = require('./relatedTable/none');
 
-function newRelatedTable(relations, isShallow, isMany) {
+function newRelatedTable(relations, isShallow, depth = 0) {
 	var table = relations[relations.length - 1].childTable;
 	var columns = table._columns;
 
 	let c;
-	// if (isMany) {
-	// 	c = all(relations);
-	// 	// @ts-ignore
-	// 	c.all = c;
-	// 	// @ts-ignore
-	// 	c.any = any(relations);
-	// }
-	// else {
-	c = any(relations);
+	if (isShallow)
+		c = any(relations.slice(-1), depth);
+	else
+		c = any(relations, depth);
 	// @ts-ignore
-	c.all = all(relations);
+	c.all = all(relations, depth);
 	// @ts-ignore
 	c.any = c;
-	// }
 
 	// @ts-ignore
 	c.none = none(relations);
 
 	Object.defineProperty(c, '_shallow', {
 		get: function() {
-			return newRelatedTable(relations, true, isMany);
+			return newRelatedTable(relations, true, depth);
 		}
 	});
 
@@ -42,9 +36,9 @@ function newRelatedTable(relations, isShallow, isMany) {
 	for (var i = 0; i < columns.length; i++) {
 		var col = columns[i];
 		if (col.alias === 'name')
-			c._name = newRelatedColumn(col, relations, isShallow);
+			c._name = newRelatedColumn(col, relations, isShallow, depth);
 		else
-			c[col.alias] = newRelatedColumn(col, relations, isShallow);
+			c[col.alias] = newRelatedColumn(col, relations, isShallow, depth);
 	}
 	defineChildren();
 
@@ -62,7 +56,7 @@ function newRelatedTable(relations, isShallow, isMany) {
 
 		Object.defineProperty(c, alias, {
 			get: function() {
-				return nextRelatedTable(children, isShallow, relation.isMany);
+				return nextRelatedTable(children, isShallow, depth);
 			}
 		});
 	}
@@ -94,9 +88,9 @@ function newRelatedTable(relations, isShallow, isMany) {
 	return cProxy;
 }
 
-function _nextRelatedTable(relations, isShallow, isMany) {
+function _nextRelatedTable(relations, isShallow, depth) {
 	nextRelatedTable = require('./newRelatedTable');
-	return nextRelatedTable(relations, isShallow, isMany);
+	return nextRelatedTable(relations, isShallow, depth);
 }
 
 module.exports = newRelatedTable;

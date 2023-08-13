@@ -1,6 +1,6 @@
 var newShallowJoinSql = require('../query/singleQuery/joinSql/newShallowJoinSql');
 
-function newJoinSql(relations) {
+function newJoinSql(relations, depth) {
 	if (relations.length === 1)
 		return  '';
 	var leftAlias,
@@ -30,8 +30,8 @@ function newJoinSql(relations) {
 	}
 
 	for (i = relations.length-1; i > 0; i--) {
-		leftAlias = '_' + (i+1);
-		rightAlias = '_' + i;
+		leftAlias = '_' + (i-1+depth);
+		rightAlias = '_' + (i+depth);
 		relation = relations[i];
 		relation.accept(c);
 	}

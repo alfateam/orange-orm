@@ -1,8 +1,9 @@
 var newSubFilter = require('./subFilter');
 
-function newRelatedColumn(column,relations,isShallow) {
+function newRelatedColumn(column,relations,isShallow, depth) {
 	var c = {};
-	var alias = '_' + relations.length;
+	var alias = '_' + (depth);
+	// var alias = '_' + relations.length;
 	for (var propName in column) {
 		var prop = column[propName];
 		if (prop instanceof Function)
@@ -23,7 +24,7 @@ function newRelatedColumn(column,relations,isShallow) {
 			var shallowFilter =  filter.apply(null,args);
 			if (isShallow)
 				return shallowFilter;
-			return newSubFilter(relations,shallowFilter);
+			return newSubFilter(relations,shallowFilter, depth);
 		}
 	}
 

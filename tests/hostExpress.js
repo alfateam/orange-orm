@@ -1,7 +1,6 @@
 const initPg = require('./initPg');
 const rdb = require('./db');
 const Rdb = require('../src/index');
-Rdb.log(console.dir);
 const express = require('express');
 const { json } = require('body-parser');
 

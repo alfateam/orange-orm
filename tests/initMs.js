@@ -1,4 +1,5 @@
 const sql = `
+DROP TABLE if exists package;
 DROP TABLE if exists orderLine;
 DROP TABLE if exists deliveryAddress;
 DROP TABLE if exists _order;
@@ -32,6 +33,11 @@ CREATE TABLE orderLine (
     id int IDENTITY(1,1) PRIMARY KEY,
     orderId INTEGER REFERENCES _order,
     product VARCHAR(100)
+);
+CREATE TABLE package (
+    packageId int IDENTITY(1,1) PRIMARY KEY,
+    lineId INTEGER REFERENCES orderLine,
+    sscc VARCHAR(100)
 );
 
 CREATE TABLE deliveryAddress (

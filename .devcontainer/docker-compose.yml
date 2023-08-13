@@ -26,7 +26,7 @@ services:
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=postgres
     ports:
-      - 54320:5432
+      - 14332:5432
     # restart: always
   mssql:
     image: mcr.microsoft.com/mssql/server:2019-latest

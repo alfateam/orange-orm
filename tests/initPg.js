@@ -31,6 +31,12 @@ CREATE TABLE orderLine (
     product TEXT
 );
 
+CREATE TABLE package (
+    packageId SERIAL PRIMARY KEY,
+    lineId INTEGER REFERENCES orderLine,
+    sscc TEXT
+);
+
 CREATE TABLE deliveryAddress (
     id SERIAL PRIMARY KEY,
     orderId INTEGER REFERENCES _order,
