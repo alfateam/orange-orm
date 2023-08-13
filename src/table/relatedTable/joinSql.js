@@ -29,9 +29,10 @@ function newJoinSql(relations, depth) {
 		sql += ' INNER' + newShallowJoinSql(table,leftColumns,rightColumns,leftAlias,rightAlias);
 	}
 
+	const length = relations.length;
 	for (i = relations.length-1; i > 0; i--) {
-		leftAlias = '_' + (i-1+depth);
-		rightAlias = '_' + (i+depth);
+		leftAlias = '_' + (length - i-1+depth);
+		rightAlias = '_' + (length - i+depth);
 		relation = relations[i];
 		relation.accept(c);
 	}

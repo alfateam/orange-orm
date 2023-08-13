@@ -52,6 +52,7 @@ function hostLocal() {
 	}
 
 	async function post(body, request, response) {
+		console.dir(body, {depth: Infinity});
 		body = typeof body === 'string' ? JSON.parse(body) : body;
 		let result;
 

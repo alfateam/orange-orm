@@ -10,9 +10,9 @@ function newRelatedTable(relations, isShallow, depth = 0) {
 	var columns = table._columns;
 
 	let c;
-	if (isShallow)
-		c = any(relations.slice(-1), depth);
-	else
+	// if (isShallow)
+	// 	c = any(relations.slice(-1), depth);
+	// else
 		c = any(relations, depth);
 	// @ts-ignore
 	c.all = all(relations, depth);
@@ -22,11 +22,6 @@ function newRelatedTable(relations, isShallow, depth = 0) {
 	// @ts-ignore
 	c.none = none(relations);
 
-	Object.defineProperty(c, '_shallow', {
-		get: function() {
-			return newRelatedTable(relations, true, depth);
-		}
-	});
 
 	Object.defineProperty(c, '_relation', {
 		value: relations[relations.length - 1],
@@ -56,7 +51,7 @@ function newRelatedTable(relations, isShallow, depth = 0) {
 
 		Object.defineProperty(c, alias, {
 			get: function() {
-				return nextRelatedTable(children, isShallow, depth);
+				return nextRelatedTable(children, false, depth);
 			}
 		});
 	}
@@ -65,7 +60,7 @@ function newRelatedTable(relations, isShallow, depth = 0) {
 	c.exists = function() {
 		if (isShallow)
 			return '';
-		return subFilter(relations, isShallow);
+		return subFilter(relations, false, depth);
 	};
 
 	let cProxy = new Proxy(c, {

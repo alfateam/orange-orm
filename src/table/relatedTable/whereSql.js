@@ -7,7 +7,7 @@ function newWhereSql(relations,shallowFilter, depth) {
 
 	c.visitJoin = function(relation) {
 		var table = relation.childTable;
-		var alias = depth === 0 ? relation.parentTable._dbName : '_' + (depth);
+		var alias = depth === 0 ? relation.parentTable._dbName : '_' + (depth-1);
 		var leftColumns = relation.columns;
 		var rightColumns = table._primaryColumns;
 		where(alias,leftColumns,rightColumns);
@@ -18,7 +18,7 @@ function newWhereSql(relations,shallowFilter, depth) {
 		var rightColumns = joinRelation.columns;
 		var childTable = joinRelation.childTable;
 		var leftColumns = childTable._primaryColumns;
-		var alias = depth === 0 ? childTable._dbName : '_' + (depth);
+		var alias = depth === 0 ? childTable._dbName : '_' + (depth-1);
 
 		where(alias,leftColumns,rightColumns);
 	};
