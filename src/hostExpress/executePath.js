@@ -61,15 +61,32 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 	let res = await parseFilter(JSONFilter, table) || {};
 	return res;
 
-	async function parseFilter(json, table) {
+	 function parseFilter(json, table) {
 		if (isFilter(json)) {
 			let subFilters = [];
-			for (let i = 0; i < json.args.length; i++) {
-				subFilters.push(await parseFilter(json.args[i], nextTable(json.path, table)));
+			let anyAllNone = tryGetAnyAllNone(json.path, table);
+			if (anyAllNone)
+				return anyAllNone(x => parseFilter(json.args[0], x));
+			else {
+				for (let i = 0; i < json.args.length; i++) {
+					subFilters.push( parseFilter(json.args[i], nextTable(json.path, table)));
+				}
 			}
 			return executePath(json.path, subFilters);
 		}
 		return json;
+
+		function tryGetAnyAllNone(path, table) {
+			path = path.split('.');
+			for (let i = 0; i < path.length; i++) {
+				table = table[path[i]];
+			}
+
+			let ops = new Set(['all', 'any', 'none']);
+			let last = path.slice(-1)[0];
+			if (ops.has(last) || (table && table._dbName && table._primaryColumns))
+				return table;
+		}
 
 		function executePath(path, args) {
 			if (path in ops) {
@@ -144,7 +161,7 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 			for (let i = 0; i < path.length - 1; i++) {
 				table = table[path[i]];
 			}
-			return table._shallow;
+			return table
 		}
 		else {
 			let lastObj = table;

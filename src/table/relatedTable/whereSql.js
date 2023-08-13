@@ -1,12 +1,13 @@
 var newShallowJoinSql = require('../query/singleQuery/joinSql/newShallowJoinSqlCore');
 
-function newWhereSql(relation,shallowFilter) {
+function newWhereSql(relations,shallowFilter, depth) {
+	let relation = relations[0];
 	var c = {};
 	var sql;
 
 	c.visitJoin = function(relation) {
 		var table = relation.childTable;
-		var alias = relation.parentTable._dbName;
+		var alias = depth === 0 ? relation.parentTable._dbName : '_' + (depth-1);
 		var leftColumns = relation.columns;
 		var rightColumns = table._primaryColumns;
 		where(alias,leftColumns,rightColumns);
@@ -17,7 +18,8 @@ function newWhereSql(relation,shallowFilter) {
 		var rightColumns = joinRelation.columns;
 		var childTable = joinRelation.childTable;
 		var leftColumns = childTable._primaryColumns;
-		var alias = childTable._dbName;
+		var alias = depth === 0 ? childTable._dbName : '_' + (depth-1);
+
 		where(alias,leftColumns,rightColumns);
 	};
 
@@ -25,7 +27,7 @@ function newWhereSql(relation,shallowFilter) {
 
 	function where(alias,leftColumns,rightColumns) {
 		var table = relation.childTable;
-		var joinCore = newShallowJoinSql(table,leftColumns,rightColumns,alias,'_1');
+		var joinCore = newShallowJoinSql(table,leftColumns,rightColumns,alias,'_' + (relations.length -1 + depth));
 		if (shallowFilter)
 			sql = shallowFilter.prepend(' WHERE ' + joinCore + ' AND ');
 		else

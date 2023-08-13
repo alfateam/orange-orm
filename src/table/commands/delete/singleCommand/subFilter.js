@@ -2,6 +2,7 @@ var newSelect = require('./selectSql');
 var newJoin = require('./joinSql');
 var newWhere = require('./whereSql');
 var createAlias = require('../createAlias');
+
 function newSubFilter(relations, shallowFilter) {
 	var relationCount = relations.length;
 	if (relationCount === 0)
