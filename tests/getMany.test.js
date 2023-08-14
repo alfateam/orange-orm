@@ -1,5 +1,4 @@
 import { describe, test, beforeAll, expect } from 'vitest';
-import Rdb from '../src/index';
 const db = require('./db');
 const initPg = require('./initPg');
 const initMs = require('./initMs');
@@ -97,15 +96,14 @@ beforeAll(async () => {
 	}
 });
 describe('any-subFilter filter nested', () => {
-	Rdb.log(console.dir);
 
-	// test('pg', async () => await verify('pg'));
+	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
-	// if (major > 17)
-	// 	test('mssqlNative', async () => await verify('mssqlNative'));
-	// test('mysql', async () => await verify('mysql'));
-	// test('sqlite', async () => await verify('sqlite'));
-	// test('sap', async () => await verify('sap'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
@@ -133,13 +131,13 @@ describe('any-subFilter filter nested', () => {
 
 describe('getMany hasOne sub filter', () => {
 
-	// test('pg', async () => await verify('pg'));
+	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
-	// if (major > 17)
-	// 	test('mssqlNative', async () => await verify('mssqlNative'));
-	// test('mysql', async () => await verify('mysql'));
-	// test('sqlite', async () => await verify('sqlite'));
-	// test('sap', async () => await verify('sap'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
