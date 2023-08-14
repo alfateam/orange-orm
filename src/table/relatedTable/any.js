@@ -1,15 +1,17 @@
 let newRelatedTable = _newRelatedTable;
 const negotiateRawSqlFilter = require('../column/negotiateRawSqlFilter');
+// let subFilter = require('./subFilterAny');
 let subFilter = require('./subFilter');
 let isShallow = true;
 
 function newAny(relations, depth) {
 
 	function any(fn) {
-		let relatedTable = newRelatedTable(relations.slice(-1), isShallow, depth + 1);
+		let relatedTable = newRelatedTable(relations, isShallow, depth + 1);
 		let arg = typeof fn === 'function' ? fn(relatedTable) : fn;
 		let filter = negotiateRawSqlFilter(arg);
-		return subFilter(relations.slice(-1), filter, depth);
+		let sub =  subFilter(relations, filter, depth);
+		return sub;
 	}
 	return any;
 }

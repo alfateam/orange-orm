@@ -1,6 +1,5 @@
 var newJoinRelation = require('./newJoinRelation');
 var newRelatedTable = require('./newRelatedTable');
-const isMany = false;
 
 function newJoin(parentTable, childTable) {
 	var c = {};

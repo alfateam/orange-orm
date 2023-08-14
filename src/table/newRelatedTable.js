@@ -13,14 +13,14 @@ function newRelatedTable(relations, isShallow, depth = 0) {
 	// if (isShallow)
 	// 	c = any(relations.slice(-1), depth);
 	// else
-		c = any(relations, depth);
+	c = any(relations, depth);
 	// @ts-ignore
 	c.all = all(relations, depth);
 	// @ts-ignore
 	c.any = c;
 
 	// @ts-ignore
-	c.none = none(relations);
+	c.none = none(relations, depth);
 
 
 	Object.defineProperty(c, '_relation', {

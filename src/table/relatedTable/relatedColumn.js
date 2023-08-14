@@ -1,11 +1,11 @@
 var newSubFilter = require('./subFilter');
 
 function newRelatedColumn(column,relations,isShallow, depth) {
-	if (isShallow)
-		depth = depth -1 ;
+	// if (isShallow)
+	// 	depth = depth -1 ;
 	var c = {};
 
-	var alias = '_' + (depth);
+	var alias = '_' + relations.length;
 	for (var propName in column) {
 		var prop = column[propName];
 		if (prop instanceof Function)

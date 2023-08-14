@@ -51,35 +51,29 @@ const map = rdb.map(x => ({
 		countryCode: column('countryCode').string(),
 	})),
 
-	datetest: x.table('datetest').map(({column}) => ({
+	datetest: x.table('datetest').map(({ column }) => ({
 		id: column('id').numeric().primary().notNullExceptInsert(),
 		date: column('_date').date(),
 		datetime: column('_datetime').date(),
 	})),
 
-	datetestWithTz: x.table('datetest').map(({column}) => ({
+	datetestWithTz: x.table('datetest').map(({ column }) => ({
 		id: column('id').numeric().primary().notNullExceptInsert(),
 		date: column('_date').date(),
 		datetime: column('_datetime').date(),
 		datetime_tz: column('_datetime_tz').dateWithTimeZone()
 	}))
 })).map(x => ({
-	order: x.order.map(({ hasOne, hasMany, references }) => ({
-		customer: references(x.customer).by('customerId'),
-		deliveryAddress: hasOne(x.deliveryAddress).by('orderId'),
-	}))
-
-})).map(x => ({
-	orderLine: x.orderLine.map(({ references, hasMany }) => ({
-		order: references(x.order).by('orderId'),
+	orderLine: x.orderLine.map(({ hasMany }) => ({
 		packages: hasMany(x.package).by('lineId')
 	}))
 })).map(x => ({
 	order: x.order.map(({ hasOne, hasMany, references }) => ({
-		// customer: references(x.customer).by('customerId'),
-		// deliveryAddress: hasOne(x.deliveryAddress).by('orderId'),
+		customer: references(x.customer).by('customerId'),
+		deliveryAddress: hasOne(x.deliveryAddress).by('orderId'),
 		lines: hasMany(x.orderLine).by('orderId')
 	}))
+
 }));
 
 module.exports = map;

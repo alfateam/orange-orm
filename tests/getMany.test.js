@@ -49,8 +49,18 @@ beforeAll(async () => {
 					countryCode: 'NO'
 				},
 				lines: [
-					{ product: 'Bicycle' },
-					{ product: 'Small guitar' }
+					{
+						product: 'Bicycle',
+						packages: [
+							{ sscc: 'aaaa' }
+						]
+					},
+					{
+						product: 'Small guitar',
+						packages: [
+							{ sscc: 'bbbb' }
+						]
+					}
 				]
 			},
 			{
@@ -64,7 +74,12 @@ beforeAll(async () => {
 					countryCode: 'UK'
 				},
 				lines: [
-					{ product: 'Magic wand' }
+					{
+						product: 'Magic wand',
+						packages: [
+							{ sscc: '1234' }
+						]
+					}
 				]
 			}
 		]);
@@ -80,8 +95,7 @@ beforeAll(async () => {
 		await db.query(sql);
 	}
 });
-
-describe('getMany all sub filter', () => {
+describe('any-subFilter filter nested', () => {
 
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
@@ -93,8 +107,7 @@ describe('getMany all sub filter', () => {
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
-		// const filter = db.order.lines.exists();
-		const filter = db.order.lines(x => x.product.contains('l'));
+		const filter = db.order.lines.any(x => x.packages.any(x => x.sscc.startsWith('aaa')));
 		const rows = await db.order.getMany(filter);
 
 		//mssql workaround because datetime has no time offset
@@ -114,6 +127,7 @@ describe('getMany all sub filter', () => {
 		expect(rows).toEqual(expected);
 	}
 });
+
 
 describe('getMany hasOne sub filter', () => {
 
@@ -150,38 +164,6 @@ describe('getMany hasOne sub filter', () => {
 	}
 });
 
-describe('getMany any sub filter', () => {
-
-	test('pg', async () => await verify('pg'));
-	test('mssql', async () => await verify('mssql'));
-	if (major > 17)
-		test('mssqlNative', async () => await verify('mssqlNative'));
-	test('mysql', async () => await verify('mysql'));
-	test('sqlite', async () => await verify('sqlite'));
-	test('sap', async () => await verify('sap'));
-
-	async function verify(dbName) {
-		const { db } = getDb(dbName);
-		const filter = db.order.lines.product.eq('Bicycle');
-		const rows = await db.order.getMany(filter);
-
-		//mssql workaround because datetime has no time offset
-		for (let i = 0; i < rows.length; i++) {
-			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate));
-		}
-
-		const date1 = new Date(2022, 0, 11, 9, 24, 47);
-		const expected = [
-			{
-				id: 1,
-				orderDate: dateToISOString(date1),
-				customerId: 1,
-			}
-		];
-
-		expect(rows).toEqual(expected);
-	}
-});
 
 describe('getMany none sub filter', () => {
 
@@ -355,20 +337,20 @@ function getDb(name) {
 	if (name === 'mssql')
 		return {
 			db:
-			db.mssql({
-				server: 'mssql',
-				options: {
-					encrypt: false,
-					database: 'master'
-				},
-				authentication: {
-					type: 'default',
+				db.mssql({
+					server: 'mssql',
 					options: {
-						userName: 'sa',
-						password: 'P@assword123',
+						encrypt: false,
+						database: 'master'
+					},
+					authentication: {
+						type: 'default',
+						options: {
+							userName: 'sa',
+							password: 'P@assword123',
+						}
 					}
-				}
-			}),
+				}),
 			init: initMs
 
 		};
