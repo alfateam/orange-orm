@@ -1,6 +1,10 @@
 ![RDB](./docs/logo-sm.jpg)  
-RDB is the ultimate Object Relational Mapper for Node.js, offering seamless integration with popular databases like Postgres, MS SQL, MySQL, Sybase SAP, and SQLite. Whether you're building applications in TypeScript or JavaScript  (including both CommonJS and ECMAScript), RDB has got you covered.
+RDB is the ultimate Object Relational Mapper for Node.js, offering seamless integration with popular databases like Postgres, MS SQL, MySQL, Sybase SAP, and SQLite. Whether you're building applications in TypeScript or JavaScript  (including both CommonJS and ECMAScript), RDB has got you covered.  
 
+https://github.com/alfateam/rdb/blob/master/.github/workflows/ci.yml
+
+[![npm version](https://img.shields.io/npm/v/rdb.svg?style=flat-square)](https://www.npmjs.org/package/rdb)
+[![Build status](https://img.shields.io/github/actions/workflow/status/alfateam/rdb/ci.yml?label=CI&logo=github&style=flat-square)](https://github.com/alfateam/rdb/blob/master/.github/workflows/ci.yml)
 ## Key Features
 
 - **Rich Querying Model**: RDB provides a powerful and intuitive querying model, making it easy to retrieve, filter, and manipulate data from your databases.
