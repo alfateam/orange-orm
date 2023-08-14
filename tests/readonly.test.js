@@ -120,7 +120,18 @@ describe('readonly everything', () => {
 				lines: {
 					id: { readonly: true },
 					orderId: { readonly: true },
-					product: { readonly: true }
+					product: { readonly: true },
+					packages: {
+						id: {
+							readonly: true,
+						},
+						lineId: {
+							readonly: true,
+						},
+						sscc: {
+							readonly: true,
+						},
+					},
 				},
 				deliveryAddress: {
 					id: { readonly: true },
@@ -144,7 +155,18 @@ describe('readonly everything', () => {
 			orderLine: {
 				id: { readonly: true },
 				orderId: { readonly: true },
-				product: { readonly: true }
+				product: { readonly: true },
+				packages: {
+					id: {
+						readonly: true,
+					},
+					lineId: {
+						readonly: true,
+					},
+					sscc: {
+						readonly: true,
+					},
+				},
 			},
 			package: {
 				id: {
