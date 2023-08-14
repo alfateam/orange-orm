@@ -10,15 +10,15 @@ const dateToISOString = require('../src/dateToISOString');
 const versionArray = process.version.replace('v', '').split('.');
 const major = parseInt(versionArray[0]);
 
-beforeAll(async () => {	
+beforeAll(async () => {
 	await createMs('mssql');
-	// await insertData('pg');
-	// await insertData('mssql');
-	// if (major > 17)
-	// 	await insertData('mssqlNative');
-	// await insertData('mysql');
-	// await insertData('sqlite');
-	// await insertData('sap');
+	await insertData('pg');
+	await insertData('mssql');
+	if (major > 17)
+		await insertData('mssqlNative');
+	await insertData('mysql');
+	await insertData('sqlite');
+	await insertData('sap');
 
 	async function insertData(dbName) {
 		const { db, init } = getDb(dbName);
@@ -50,17 +50,18 @@ beforeAll(async () => {
 					countryCode: 'NO'
 				},
 				lines: [
-					{ 
+					{
 						product: 'Bicycle',
 						packages: [
-							{sscc: 'aaaa'}
+							{ sscc: 'aaaa' }
 						]
-				 },
-					{ 
+					},
+					{
 						product: 'Small guitar',
 						packages: [
-							{sscc: 'bbbb'}
-						] }
+							{ sscc: 'bbbb' }
+						]
+					}
 				]
 			},
 			{
@@ -74,10 +75,10 @@ beforeAll(async () => {
 					countryCode: 'UK'
 				},
 				lines: [
-					{ 
+					{
 						product: 'Magic wand',
 						packages: [
-							{sscc: '1234'}
+							{ sscc: '1234' }
 						]
 					}
 				]
@@ -95,7 +96,7 @@ beforeAll(async () => {
 		await db.query(sql);
 	}
 });
-describe('getMany-lines-packages-any filter', () => {
+describe('any-subFilter filter nested', () => {
 	Rdb.log(console.dir);
 
 	// test('pg', async () => await verify('pg'));
@@ -108,8 +109,8 @@ describe('getMany-lines-packages-any filter', () => {
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
-		const filter = db.order.lines.packages.any(x => x.id.notEqual(null));
-		const rows = await db.order.getMany(filter, {limit: 1});
+		const filter = db.order.lines.any(x => x.packages.any(x => x.sscc.startsWith('aaa')));
+		const rows = await db.order.getMany(filter);
 
 		//mssql workaround because datetime has no time offset
 		for (let i = 0; i < rows.length; i++) {
@@ -130,8 +131,7 @@ describe('getMany-lines-packages-any filter', () => {
 });
 
 
-describe('getMany-lines-packages filter', () => {
-	Rdb.log(console.dir);
+describe('getMany hasOne sub filter', () => {
 
 	// test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
@@ -143,8 +143,10 @@ describe('getMany-lines-packages filter', () => {
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
-		const filter = db.order.lines.packages.sscc.startsWith('aa');
-		const rows = await db.order.getMany(filter, {limit: 1});
+
+
+		const filter = db.order.deliveryAddress(x => x.name.eq('George'));
+		const rows = await db.order.getMany(filter);
 
 		//mssql workaround because datetime has no time offset
 		for (let i = 0; i < rows.length; i++) {
@@ -164,260 +166,193 @@ describe('getMany-lines-packages filter', () => {
 	}
 });
 
-// describe('getMany hasOne sub filter', () => {
 
-// 	test('pg', async () => await verify('pg'));
-// 	test('mssql', async () => await verify('mssql'));
-// 	if (major > 17)
-// 		test('mssqlNative', async () => await verify('mssqlNative'));
-// 	test('mysql', async () => await verify('mysql'));
-// 	test('sqlite', async () => await verify('sqlite'));
-// 	test('sap', async () => await verify('sap'));
+describe('getMany none sub filter', () => {
 
-// 	async function verify(dbName) {
-// 		const { db } = getDb(dbName);
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+		const filter = db.order.lines.none(x => x.product.eq('Bicycle'));
+		const rows = await db.order.getMany(filter);
 
-// 		const filter = db.order.deliveryAddress(x => x.name.eq('George'));
-// 		const rows = await db.order.getMany(filter);
+		//mssql workaround because datetime has no time offset
+		for (let i = 0; i < rows.length; i++) {
+			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate));
+		}
 
-// 		//mssql workaround because datetime has no time offset
-// 		for (let i = 0; i < rows.length; i++) {
-// 			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate));
-// 		}
+		const date2 = new Date(2021, 0, 11, 12, 22, 45);
+		const expected = [
+			{
+				id: 2,
+				orderDate: dateToISOString(date2),
+				customerId: 2,
+			}
+		];
 
-// 		const date1 = new Date(2022, 0, 11, 9, 24, 47);
-// 		const expected = [
-// 			{
-// 				id: 1,
-// 				orderDate: dateToISOString(date1),
-// 				customerId: 1,
-// 			}
-// 		];
+		expect(rows).toEqual(expected);
+	}
+});
 
-// 		expect(rows).toEqual(expected);
-// 	}
-// });
+describe('getMany', () => {
 
-// describe('getMany any sub filter', () => {
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 
-// 	test('pg', async () => await verify('pg'));
-// 	test('mssql', async () => await verify('mssql'));
-// 	if (major > 17)
-// 		test('mssqlNative', async () => await verify('mssqlNative'));
-// 	test('mysql', async () => await verify('mysql'));
-// 	test('sqlite', async () => await verify('sqlite'));
-// 	test('sap', async () => await verify('sap'));
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
 
-// 	async function verify(dbName) {
-// 		const { db } = getDb(dbName);
-// 		const filter = db.order.lines.product.eq('Bicycle');
-// 		const rows = await db.order.getMany(filter);
+		const rows = await db.customer.getAll();
 
-// 		//mssql workaround because datetime has no time offset
-// 		for (let i = 0; i < rows.length; i++) {
-// 			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate));
-// 		}
+		const expected = [{
+			id: 1,
+			name: 'George',
+			balance: 177,
+			isActive: true
+		}, {
+			id: 2,
+			name: 'Harry',
+			balance: 200,
+			isActive: true
+		}
+		];
 
-// 		const date1 = new Date(2022, 0, 11, 9, 24, 47);
-// 		const expected = [
-// 			{
-// 				id: 1,
-// 				orderDate: dateToISOString(date1),
-// 				customerId: 1,
-// 			}
-// 		];
+		expect(rows).toEqual(expected);
+	}
+});
 
-// 		expect(rows).toEqual(expected);
-// 	}
-// });
+describe('getMany with column strategy', () => {
 
-// describe('getMany none sub filter', () => {
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 
-// 	test('pg', async () => await verify('pg'));
-// 	test('mssql', async () => await verify('mssql'));
-// 	if (major > 17)
-// 		test('mssqlNative', async () => await verify('mssqlNative'));
-// 	test('mysql', async () => await verify('mysql'));
-// 	test('sqlite', async () => await verify('sqlite'));
-// 	test('sap', async () => await verify('sap'));
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
 
-// 	async function verify(dbName) {
-// 		const { db } = getDb(dbName);
-// 		const filter = db.order.lines.none(x => x.product.eq('Bicycle'));
-// 		const rows = await db.order.getMany(filter);
+		const rows = await db.customer.getAll({ name: true });
 
-// 		//mssql workaround because datetime has no time offset
-// 		for (let i = 0; i < rows.length; i++) {
-// 			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate));
-// 		}
+		const expected = [{
+			id: 1,
+			name: 'George'
+		}, {
+			id: 2,
+			name: 'Harry'
+		}
+		];
 
-// 		const date2 = new Date(2021, 0, 11, 12, 22, 45);
-// 		const expected = [
-// 			{
-// 				id: 2,
-// 				orderDate: dateToISOString(date2),
-// 				customerId: 2,
-// 			}
-// 		];
+		expect(rows).toEqual(expected);
+	}
+});
+describe('getMany with relations', () => {
 
-// 		expect(rows).toEqual(expected);
-// 	}
-// });
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 
-// describe('getMany', () => {
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
 
-// 	test('pg', async () => await verify('pg'));
-// 	test('mssql', async () => await verify('mssql'));
-// 	if (major > 17)
-// 		test('mssqlNative', async () => await verify('mssqlNative'));
-// 	test('mysql', async () => await verify('mysql'));
-// 	test('sqlite', async () => await verify('sqlite'));
-// 	test('sap', async () => await verify('sap'));
+		const rows = await db.order.getAll({ lines: {}, customer: { order: { lines: { order: {} } } }, deliveryAddress: {} });
+		//mssql workaround because datetime has no time offset
+		for (let i = 0; i < rows.length; i++) {
+			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate));
+		}
 
-// 	async function verify(dbName) {
-// 		const { db } = getDb(dbName);
-
-// 		const rows = await db.customer.getAll();
-
-// 		const expected = [{
-// 			id: 1,
-// 			name: 'George',
-// 			balance: 177,
-// 			isActive: true
-// 		}, {
-// 			id: 2,
-// 			name: 'Harry',
-// 			balance: 200,
-// 			isActive: true
-// 		}
-// 		];
-
-// 		expect(rows).toEqual(expected);
-// 	}
-// });
-
-// describe('getMany with column strategy', () => {
-
-// 	test('pg', async () => await verify('pg'));
-// 	test('mssql', async () => await verify('mssql'));
-// 	if (major > 17)
-// 		test('mssqlNative', async () => await verify('mssqlNative'));
-// 	test('mysql', async () => await verify('mysql'));
-// 	test('sqlite', async () => await verify('sqlite'));
-// 	test('sap', async () => await verify('sap'));
-
-// 	async function verify(dbName) {
-// 		const { db } = getDb(dbName);
-
-// 		const rows = await db.customer.getAll({ name: true });
-
-// 		const expected = [{
-// 			id: 1,
-// 			name: 'George'
-// 		}, {
-// 			id: 2,
-// 			name: 'Harry'
-// 		}
-// 		];
-
-// 		expect(rows).toEqual(expected);
-// 	}
-// });
-// describe('getMany with relations', () => {
-
-// 	test('pg', async () => await verify('pg'));
-// 	test('mssql', async () => await verify('mssql'));
-// 	if (major > 17)
-// 		test('mssqlNative', async () => await verify('mssqlNative'));
-// 	test('mysql', async () => await verify('mysql'));
-// 	test('sqlite', async () => await verify('sqlite'));
-// 	test('sap', async () => await verify('sap'));
-
-// 	async function verify(dbName) {
-// 		const { db } = getDb(dbName);
-
-// 		const rows = await db.order.getAll({ lines: {}, customer: { order: { lines: { order: {} } } }, deliveryAddress: {} });
-// 		//mssql workaround because datetime has no time offset
-// 		for (let i = 0; i < rows.length; i++) {
-// 			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate));
-// 		}
-
-// 		const date1 = new Date(2022, 0, 11, 9, 24, 47);
-// 		const date2 = new Date(2021, 0, 11, 12, 22, 45);
-// 		const expected = [
-// 			{
-// 				id: 1,
-// 				orderDate: dateToISOString(date1),
-// 				customerId: 1,
-// 				customer: {
-// 					id: 1,
-// 					name: 'George',
-// 					balance: 177,
-// 					isActive: true
-// 				},
-// 				deliveryAddress: {
-// 					id: 1,
-// 					orderId: 1,
-// 					name: 'George',
-// 					street: 'Node street 1',
-// 					postalCode: '7059',
-// 					postalPlace: 'Jakobsli',
-// 					countryCode: 'NO'
-// 				},
-// 				lines: [
-// 					{ product: 'Bicycle', id: 1, orderId: 1 },
-// 					{ product: 'Small guitar', id: 2, orderId: 1 }
-// 				]
-// 			},
-// 			{
-// 				id: 2,
-// 				customerId: 2,
-// 				customer: {
-// 					id: 2,
-// 					name: 'Harry',
-// 					balance: 200,
-// 					isActive: true
-// 				},
-// 				orderDate: dateToISOString(date2),
-// 				deliveryAddress: {
-// 					id: 2,
-// 					orderId: 2,
-// 					name: 'Harry Potter',
-// 					street: '4 Privet Drive, Little Whinging',
-// 					postalCode: 'GU4',
-// 					postalPlace: 'Surrey',
-// 					countryCode: 'UK'
-// 				},
-// 				lines: [
-// 					{ product: 'Magic wand', id: 3, orderId: 2 }
-// 				]
-// 			}
-// 		];
+		const date1 = new Date(2022, 0, 11, 9, 24, 47);
+		const date2 = new Date(2021, 0, 11, 12, 22, 45);
+		const expected = [
+			{
+				id: 1,
+				orderDate: dateToISOString(date1),
+				customerId: 1,
+				customer: {
+					id: 1,
+					name: 'George',
+					balance: 177,
+					isActive: true
+				},
+				deliveryAddress: {
+					id: 1,
+					orderId: 1,
+					name: 'George',
+					street: 'Node street 1',
+					postalCode: '7059',
+					postalPlace: 'Jakobsli',
+					countryCode: 'NO'
+				},
+				lines: [
+					{ product: 'Bicycle', id: 1, orderId: 1 },
+					{ product: 'Small guitar', id: 2, orderId: 1 }
+				]
+			},
+			{
+				id: 2,
+				customerId: 2,
+				customer: {
+					id: 2,
+					name: 'Harry',
+					balance: 200,
+					isActive: true
+				},
+				orderDate: dateToISOString(date2),
+				deliveryAddress: {
+					id: 2,
+					orderId: 2,
+					name: 'Harry Potter',
+					street: '4 Privet Drive, Little Whinging',
+					postalCode: 'GU4',
+					postalPlace: 'Surrey',
+					countryCode: 'UK'
+				},
+				lines: [
+					{ product: 'Magic wand', id: 3, orderId: 2 }
+				]
+			}
+		];
 
 
-// 		expect(rows).toEqual(expected);
-// 	}
-// });
+		expect(rows).toEqual(expected);
+	}
+});
 
 function getDb(name) {
 	if (name === 'mssql')
 		return {
 			db:
-			db.mssql({
-				server: 'mssql',
-				options: {
-					encrypt: false,
-					database: 'master'
-				},
-				authentication: {
-					type: 'default',
+				db.mssql({
+					server: 'mssql',
 					options: {
-						userName: 'sa',
-						password: 'P@assword123',
+						encrypt: false,
+						database: 'master'
+					},
+					authentication: {
+						type: 'default',
+						options: {
+							userName: 'sa',
+							password: 'P@assword123',
+						}
 					}
-				}
-			}),
+				}),
 			init: initMs
 
 		};

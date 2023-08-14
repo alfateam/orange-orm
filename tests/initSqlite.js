@@ -1,4 +1,4 @@
-const sql = `DROP TABLE IF EXISTS deliveryAddress; DROP TABLE IF EXISTS orderLine; DROP TABLE IF EXISTS _order; DROP TABLE IF EXISTS customer; DROP TABLE IF EXISTS datetest;
+const sql = `DROP TABLE IF EXISTS deliveryAddress; DROP TABLE IF EXISTS package; DROP TABLE IF EXISTS orderLine; DROP TABLE IF EXISTS _order; DROP TABLE IF EXISTS customer; DROP TABLE IF EXISTS datetest;
 CREATE TABLE customer (
     id INTEGER PRIMARY KEY,
     name TEXT,
@@ -16,6 +16,12 @@ CREATE TABLE orderLine (
     id INTEGER PRIMARY KEY,
     orderId INTEGER REFERENCES _order,
     product TEXT
+);
+
+CREATE TABLE package (
+    packageId INTEGER PRIMARY KEY,
+    lineId INTEGER REFERENCES orderLine,
+    sscc TEXT
 );
 
 CREATE TABLE deliveryAddress (

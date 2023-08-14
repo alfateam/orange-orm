@@ -8,9 +8,19 @@ BEGIN
 END
 
 GO
+
+IF EXISTS (SELECT 1 FROM
+sysobjects WHERE type = 'U' and name = 'package')
+
+BEGIN
+    DROP TABLE package
+END
+
+GO
+
 IF
 EXISTS (SELECT 1 FROM
-sysobjects WHERE type = 'U' and name = 'orderLine')
+    sysobjects WHERE type = 'U' and name = 'orderLine')
 
 BEGIN
 	DROP TABLE orderLine
@@ -85,6 +95,14 @@ CREATE TABLE orderLine (
     orderId INTEGER REFERENCES _order,
     product VARCHAR(100)
 )
+
+GO
+
+CREATE TABLE package (
+    packageId int IDENTITY PRIMARY KEY,
+    lineId INTEGER REFERENCES orderLine,
+    sscc VARCHAR(100)
+);
 
 GO
 
