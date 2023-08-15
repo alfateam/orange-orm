@@ -116,8 +116,8 @@ jobs:
         name: Create the Badge
         uses: schneegans/dynamic-badges-action@v1.0.0
         with:
-          auth: ${{ secrets.GIST_SECRET }}          
-          gistID: 3a40a63cbce71a25f3dfa0066fb0b99b
+          auth: ${{ secrets.GIST_SECRET }}                    
+          gistID: 1a69422f03da7f8155cf94fe66022452
           filename: rdb__${{ env.BRANCH }}.json
           label: Test Coverage
           message: ${{ env.COVERAGE }}
