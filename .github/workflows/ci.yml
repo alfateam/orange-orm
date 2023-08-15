@@ -96,22 +96,21 @@ jobs:
           # SUMMARY = SUMMARY.split('\n')[5]; // 'Lines        : 31.93% ( 38/119 )'
           # SUMMARY = SUMMARY.split(':')[1].split('(')[0].trim(); // '31.93%'
           echo SUMMARY="$(npm run coverage | tail -2 | head -1)"
-          #TOKENS=("$SUMMARY")
-          set -- $SUMMARY
-          COVERAGE=$3
-          # process.env.COVERAGE = '31.93%';
+          echo "Debug: SUMMARY=$SUMMARY"
+
+          COVERAGE=$(echo $SUMMARY | awk -F':' '{print $2}' | awk '{print $1}')
+          echo "Debug: COVERAGE=$COVERAGE"
           echo "COVERAGE=$COVERAGE" >> $GITHUB_ENV
 
-          # var REF = 'refs/pull/27/merge.json';
           REF=${{ github.ref }}
-          # console.log('github.ref: ' + REF);
+          echo "Debug: REF=$REF"
           echo "github.ref: $REF"
-          # var PATHS = REF.split('/');
-          echo $REF | IFS='/' read -r PATH1 PATH2 PATH3 PATH4
+
+          echo $REF | IFS='/' read -r PATH1 PATH2 PATH3
           BRANCH_NAME="${PATH2}_${PATH3}"
+          echo "Debug: BRANCH_NAME=$BRANCH_NAME"
           echo $BRANCH_NAME
-          # process.env.BRANCH = 'pull_27';
-          echo "BRANCH=$(echo ${BRANCH_NAME})" >> $GITHUB_ENV
+          echo "BRANCH=$BRANCH_NAME" >> $GITHUB_ENV
       - if: ${{ matrix.container == 'node:16-alpine' }}
         name: Create the Badge
         uses: schneegans/dynamic-badges-action@v1.0.0
@@ -119,6 +118,7 @@ jobs:
           auth: ${{ secrets.GIST_SECRET }}                    
           gistID: 1a69422f03da7f8155cf94fe66022452
           filename: rdb__${{ env.BRANCH }}.json
+          # https://gist.githubusercontent.com/lroal/1a69422f03da7f8155cf94fe66022452/raw/rdb___.json
           label: Test Coverage
           message: ${{ env.COVERAGE }}
           color: green
