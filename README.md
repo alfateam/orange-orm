@@ -3,8 +3,8 @@ RDB is the ultimate Object Relational Mapper for Node.js, offering seamless inte
 
 [![npm version](https://img.shields.io/npm/v/rdb.svg?style=flat-square)](https://www.npmjs.org/package/rdb)
 [![Build status](https://img.shields.io/github/actions/workflow/status/alfateam/rdb/ci.yml?label=CI&logo=github&style=flat-square)](https://github.com/alfateam/rdb/actions)
-<!-- [![Coverage Badge](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/lroal/1a69422f03da7f8155cf94fe66022452/raw/rdb__heads_main.json)]
- -->
+[![Coverage Badge](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/lroal/1a69422f03da7f8155cf94fe66022452/raw/rdb__heads_master.json)](https://github.com/alfateam/rdb/actions)
+
 
 ## Key Features
 
