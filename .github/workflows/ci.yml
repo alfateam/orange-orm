@@ -110,7 +110,7 @@ jobs:
           
       - if: ${{ matrix.container == 'node:16-alpine' }}
         name: Create the Badge
-        uses: schneegans/dynamic-badges-action@v1.0.0
+        uses: schneegans/dynamic-badges-action@v1.6.0
         with:
           auth: ${{ secrets.GIST_SECRET }}                    
           gistID: 1a69422f03da7f8155cf94fe66022452
