@@ -1,6 +1,6 @@
 {
   "name": "rdb",
-  "version": "3.1.34",
+  "version": "3.1.35",
   "main": "./src/index.js",
   "browser": "./src/client/index.mjs",
   "bin": {
@@ -19,7 +19,8 @@
     "Microsoft Sql Server",
     "postgres",
     "pg",
-    "rdb"
+    "sap",
+    "rdb"    
   ],
   "authors": [
     "Lars-Erik Roald <lars.roald@gmail.com>"

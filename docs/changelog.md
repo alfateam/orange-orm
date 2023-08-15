@@ -1,6 +1,8 @@
 
 ## Release notes
 __3.1.34__  
+Fix CI badge  
+__3.1.34__  
 Badges for npm, ci and coverage  
 __3.1.33__  
 Bugfix for all, any and none. It did not handle nested any properly    
