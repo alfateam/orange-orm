@@ -1,6 +1,8 @@
 ![RDB](./docs/logo-sm.jpg)  
-RDB is the ultimate Object Relational Mapper for Node.js, offering seamless integration with popular databases like Postgres, MS SQL, MySQL, Sybase SAP, and SQLite. Whether you're building applications in TypeScript or JavaScript  (including both CommonJS and ECMAScript), RDB has got you covered.
+RDB is the ultimate Object Relational Mapper for Node.js, offering seamless integration with popular databases like Postgres, MS SQL, MySQL, Sybase SAP, and SQLite. Whether you're building applications in TypeScript or JavaScript  (including both CommonJS and ECMAScript), RDB has got you covered.  
 
+[![npm version](https://img.shields.io/npm/v/rdb.svg?style=flat-square)](https://www.npmjs.org/package/rdb)
+[![Build status](https://img.shields.io/github/actions/workflow/status/alfateam/rdb/ci.yml?label=CI&logo=github&style=flat-square)](https://github.com/alfateam/rdb/actions)
 ## Key Features
 
 - **Rich Querying Model**: RDB provides a powerful and intuitive querying model, making it easy to retrieve, filter, and manipulate data from your databases.
@@ -331,14 +333,7 @@ async function getRows() {
 
 <details><summary><strong>Updating rows</strong></summary>
 	
-To update rows, you can simply modify the property values and invoke the method <strong><i>saveChanges()</i></strong>. The function updates only the modified columns, not the entire row. Rows in child relations can also be updated as long as the parent order <i>owns</i> the child tables. In our illustration, the <strong>order</strong> table owns both the <strong>deliveryAddress</strong> and the <strong>lines</strong> tables because they're part of a <i>hasOne/hasMany relationship</i>. Contrastingly, the <strong>customer</strong> is part of a <i>reference relationship</i> and thus can't be updated here. But you can detach the reference to the customer by assigning it to null or undefined. (Setting order.customerId to null or undefined achieves the same result.)
-
-Rows get updated using an <i>optimistic</i> concurrency approach by default. This means if a property being edited was meanwhile altered, an exception is raised, indicating the row was modified by a different user. You can change the concurrency strategy either at the table or column level.
-
-Currently, there are three concurrency strategies:
-- <strong>optimistic:</strong> Raises an exception if another user changes the property during an update.
-- <strong>overwrite:</strong> Overwrites the property, regardless of changes by others.
-- <strong>skipOnConflict:</strong> Silently avoids updating the property if another user has modified it in the interim.
+To update rows, modify the property values and invoke the method <strong><i>saveChanges()</i></strong>. The function updates only the modified columns, not the entire row. Rows in child relations can also be updated as long as the parent order <i>owns</i> the child tables. In our illustration, the <strong>order</strong> table owns both the <strong>deliveryAddress</strong> and the <strong>lines</strong> tables because they're part of a <i>hasOne/hasMany relationship</i>. Contrastingly, the <strong>customer</strong> is part of a <i>reference relationship</i> and thus can't be updated here. But you can detach the reference to the customer by assigning it to null or undefined. (Setting order.customerId to null or undefined achieves the same result.)
 
 __Updating a single row__
 
@@ -394,7 +389,14 @@ async function update() {
 ```
 
 __Updating with concurrency__  
-We've set the concurrency strategy for orderDate to 'overwrite'. This implies that if other users modify orderDate while you're making changes, their updates will be overwritten.
+Rows get updated using an <i>optimistic</i> concurrency approach by default. This means if a property being edited was meanwhile altered, an exception is raised, indicating the row was modified by a different user. You can change the concurrency strategy either at the table or column level.
+
+Currently, there are three concurrency strategies:
+- <strong>optimistic:</strong> Raises an exception if another user changes the property during an update.
+- <strong>overwrite:</strong> Overwrites the property, regardless of changes by others.
+- <strong>skipOnConflict:</strong> Silently avoids updating the property if another user has modified it in the interim.
+
+In the example below, we've set the concurrency strategy for orderDate to 'overwrite'. This implies that if other users modify orderDate while you're making changes, their updates will be overwritten.
 
 <sub>📄 updateWithConcurrency.js</sub>
 ```javascript

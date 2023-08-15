@@ -1,5 +1,7 @@
 
 ## Release notes
+__3.1.33__  
+Bugfix for all, any and none. It did not handle nested any properly    
 __3.1.32__  
 Updated typescript types for filtering on many relations  
 __3.1.31__  
