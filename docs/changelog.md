@@ -1,6 +1,6 @@
 
 ## Release notes
-__3.1.34__  
+__3.1.35__  
 Fix CI badge  
 __3.1.34__  
 Badges for npm, ci and coverage  
