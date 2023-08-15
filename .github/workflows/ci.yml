@@ -100,17 +100,15 @@ jobs:
           set -- $SUMMARY
           COVERAGE=$3
           # process.env.COVERAGE = '31.93%';
-          echo "COVERAGE=$(echo ${TOKENS[2]})" >> $GITHUB_ENV
+          echo "COVERAGE=$COVERAGE" >> $GITHUB_ENV
 
           # var REF = 'refs/pull/27/merge.json';
           REF=${{ github.ref }}
           # console.log('github.ref: ' + REF);
           echo "github.ref: $REF"
           # var PATHS = REF.split('/');
-          IFS='/' read -ra PATHS <<< "$REF"
-          # var BRANCH_NAME = PATHS[1] + PATHS[2];
-          BRANCH_NAME="${PATHS[1]}_${PATHS[2]}"
-          # console.log(BRANCH_NAME); // 'pull_27'
+          echo $REF | IFS='/' read -r PATH1 PATH2 PATH3 PATH4
+          BRANCH_NAME="${PATH2}_${PATH3}"
           echo $BRANCH_NAME
           # process.env.BRANCH = 'pull_27';
           echo "BRANCH=$(echo ${BRANCH_NAME})" >> $GITHUB_ENV
