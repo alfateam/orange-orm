@@ -95,7 +95,7 @@ jobs:
           # ];
           # SUMMARY = SUMMARY.split('\n')[5]; // 'Lines        : 31.93% ( 38/119 )'
           # SUMMARY = SUMMARY.split(':')[1].split('(')[0].trim(); // '31.93%'
-          SUMMARY="$(npm run coverage | tail -2 | head -1)"
+          echo SUMMARY="$(npm run coverage | tail -2 | head -1)"
           TOKENS=($SUMMARY)
           # process.env.COVERAGE = '31.93%';
           echo "COVERAGE=$(echo ${TOKENS[2]})" >> $GITHUB_ENV
