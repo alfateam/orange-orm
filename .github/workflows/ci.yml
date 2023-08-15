@@ -106,10 +106,11 @@ jobs:
           REF=${{ github.ref }}
           echo "REF=$REF"
 
-          IFS='/' read -r -a PATHS <<< "$REF"
+          echo $REF | IFS='/' read -r -a PATHS
           BRANCH_NAME="${PATHS[1]}_${PATHS[2]}"
           echo "BRANCH_NAME=$BRANCH_NAME"
           echo "BRANCH=$BRANCH_NAME" >> $GITHUB_ENV
+          
       - if: ${{ matrix.container == 'node:16-alpine' }}
         name: Create the Badge
         uses: schneegans/dynamic-badges-action@v1.0.0
