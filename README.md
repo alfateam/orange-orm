@@ -423,3 +423,7 @@ async function update() {
   
 ### [Changelog](https://github.com/alfateam/rdb/blob/master/docs/changelog.md)
 ### [Code of Conduct](https://github.com/alfateam/rdb/blob/master/docs/CODE_OF_CONDUCT.md)
+<!-- 
+How to setup code coverage
+https://github.com/nystudio107/rollup-plugin-critical/blob/master/package.json
+https://dev.to/thejaredwilcurt/coverage-badge-with-github-actions-finally-59fa -->
