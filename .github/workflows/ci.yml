@@ -78,4 +78,48 @@ jobs:
       # - run: ldd /__w/rdb/rdb/tests/libsybdrvodb.so
       - run: npm install
       - run: npm run lint
-      - run: npm test
+      - run: npm run coverage
+       # Only run the coverage once
+      - if: ${{ matrix.container == 'node:16-alpine' }}
+        name: Get Coverage for badge
+        run: |
+          # var SUMMARY = [
+          #   '',
+          #   '=============================== Coverage summary ===============================',
+          #   'Statements   : 32.5% ( 39/120 )',
+          #   'Branches     : 38.89% ( 21/54 )',
+          #   'Functions    : 21.74% ( 5/23 )',
+          #   'Lines        : 31.93% ( 38/119 )',
+          #   '================================================================================',
+          #   ''
+          # ];
+          # SUMMARY = SUMMARY.split('\n')[5]; // 'Lines        : 31.93% ( 38/119 )'
+          # SUMMARY = SUMMARY.split(':')[1].split('(')[0].trim(); // '31.93%'
+          SUMMARY="$(npm run test-ci | tail -2 | head -1)"
+          TOKENS=($SUMMARY)
+          # process.env.COVERAGE = '31.93%';
+          echo "COVERAGE=$(echo ${TOKENS[2]})" >> $GITHUB_ENV
+
+          # var REF = 'refs/pull/27/merge.json';
+          REF=${{ github.ref }}
+          # console.log('github.ref: ' + REF);
+          echo "github.ref: $REF"
+          # var PATHS = REF.split('/');
+          IFS='/' read -ra PATHS <<< "$REF"
+          # var BRANCH_NAME = PATHS[1] + PATHS[2];
+          BRANCH_NAME="${PATHS[1]}_${PATHS[2]}"
+          # console.log(BRANCH_NAME); // 'pull_27'
+          echo $BRANCH_NAME
+          # process.env.BRANCH = 'pull_27';
+          echo "BRANCH=$(echo ${BRANCH_NAME})" >> $GITHUB_ENV
+      - if: ${{ matrix.container == 'node:16-alpine' }}
+        name: Create the Badge
+        uses: schneegans/dynamic-badges-action@v1.0.0
+        with:
+          auth: ${{ secrets.GIST_SECRET }}
+          gistID: cfb56f970e321be9465f34e32cac3ae9
+          filename: rdb__${{ env.BRANCH }}.json
+          label: Test Coverage
+          message: ${{ env.COVERAGE }}
+          color: green
+          namedLogo: jest
