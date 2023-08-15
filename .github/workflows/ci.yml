@@ -102,12 +102,8 @@ jobs:
           COVERAGE=$(echo $SUMMARY | awk -F':' '{print $2}' | awk '{print $1}')
           echo "COVERAGE=$COVERAGE"
           echo "COVERAGE=$COVERAGE" >> $GITHUB_ENV
-
-          REF=${{ github.ref }}
-          echo "REF=$REF"
-
-          echo $REF | IFS='/' read -r PATH0 PATH1 PATH2
-          BRANCH_NAME="${PATH1}_${PATH2}"
+          
+          BRANCH_NAME=$(echo $GITHUB_REF | awk 'BEGIN { FS = "/" } ; { print $2 "_" $3 }')
           echo "BRANCH_NAME=$BRANCH_NAME"
           echo "BRANCH=$BRANCH_NAME" >> $GITHUB_ENV
           
@@ -119,7 +115,7 @@ jobs:
           gistID: 1a69422f03da7f8155cf94fe66022452
           filename: rdb__${{ env.BRANCH }}.json
           # https://gist.githubusercontent.com/lroal/1a69422f03da7f8155cf94fe66022452/raw/rdb___.json
-          label: Test Coverage
+          label: coverage
           message: ${{ env.COVERAGE }}
           color: green
           namedLogo: jest
