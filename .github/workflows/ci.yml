@@ -95,21 +95,20 @@ jobs:
           # ];
           # SUMMARY = SUMMARY.split('\n')[5]; // 'Lines        : 31.93% ( 38/119 )'
           # SUMMARY = SUMMARY.split(':')[1].split('(')[0].trim(); // '31.93%'
-          echo SUMMARY="$(npm run coverage | tail -2 | head -1)"
-          echo "Debug: SUMMARY=$SUMMARY"
+          
+          SUMMARY="$(npm run coverage | tail -2 | head -1)"
+          echo "SUMMARY=$SUMMARY"
 
           COVERAGE=$(echo $SUMMARY | awk -F':' '{print $2}' | awk '{print $1}')
-          echo "Debug: COVERAGE=$COVERAGE"
+          echo "COVERAGE=$COVERAGE"
           echo "COVERAGE=$COVERAGE" >> $GITHUB_ENV
 
           REF=${{ github.ref }}
-          echo "Debug: REF=$REF"
-          echo "github.ref: $REF"
+          echo "REF=$REF"
 
-          echo $REF | IFS='/' read -r PATH1 PATH2 PATH3
-          BRANCH_NAME="${PATH2}_${PATH3}"
-          echo "Debug: BRANCH_NAME=$BRANCH_NAME"
-          echo $BRANCH_NAME
+          IFS='/' read -r -a PATHS <<< "$REF"
+          BRANCH_NAME="${PATHS[1]}_${PATHS[2]}"
+          echo "BRANCH_NAME=$BRANCH_NAME"
           echo "BRANCH=$BRANCH_NAME" >> $GITHUB_ENV
       - if: ${{ matrix.container == 'node:16-alpine' }}
         name: Create the Badge
