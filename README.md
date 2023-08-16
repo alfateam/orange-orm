@@ -13,7 +13,7 @@ RDB is the ultimate Object Relational Mapper for Node.js, offering seamless inte
 - **No Code Generation Required**: Enjoy full IntelliSense, even in table mappings, without the need for cumbersome code generation.
 - **TypeScript and JavaScript Support**: RDB fully supports both TypeScript and JavaScript, allowing you to leverage the benefits of static typing and modern ECMAScript features.
 - **Works in the Browser**: RDB even works in the browser through hosting in Express, giving you the flexibility to build web applications with ease.  
-
+ddb
 This is the _Modern Typescript Documentation_. Are you looking for the [_Classic Documentation_](https://github.com/alfateam/rdb/blob/master/docs/docs.md) ?
 
 ## Installation
@@ -37,7 +37,7 @@ Each column within your database table is designated by using the <strong><i>col
 
 Relationships between tables can also be outlined. By using methods like <strong><i>hasOne</i></strong>, <strong><i>hasMany</i></strong>, and <strong><i>references</i></strong>, you can establish connections that reflect the relationships in your data schema. In the example below, an 'order' is linked to a 'customer' reference, a 'deliveryAddress', and multiple 'lines'. The hasMany and hasOne relations represents ownership - the tables 'deliveryAddress' and 'orderLine' are owned by the 'order' table, and therefore, they contain the 'orderId' column referring to their parent table, which is 'order'. Conversely, the customer table is independent and can exist without any knowledge of the 'order' table. Therefore we say that the order table <i>references</i> the customer table - necessitating the existence of a 'customerId' column in the 'order' table.  
 
-<sub>📄 db.js</sub>]
+<sub>📄 db.js</sub>
 ```javascript
 import rdb from 'rdb';
 
@@ -144,7 +144,6 @@ Next, we insert and array array of two orders in the order table. Each order con
 
 Without a fetching strategy, "db.order.insert" would only return the root level of each order. In that case you would only get the id, orderDate, and customerId for each order.  
 
-<sub>📄 insert.js</sub>
 ```javascript
 import db from './db';
 import init from './init';
@@ -211,7 +210,6 @@ The fetching strategy in RDB is optional, and its use is influenced by your spec
 
 __All rows__
 
-<sub>📄 allRows.js</sub>
 ```javascript
 import db from './db';
 
@@ -229,7 +227,6 @@ async function getRows() {
 __Limit, offset and order by__  
 This script demonstrates how to fetch orders with customer, lines and deliveryAddress, limiting the results to 10, skipping the first row, and sorting the data based on the orderDate in descending order followed by id. The lines are sorted by product.  
 
-<sub>📄 limit.js</sub>
 ```javascript
 import db from './db';
 
@@ -252,7 +249,6 @@ async function getRows() {
 
 __Many rows filtered__
 
-<sub>📄 manyRowsFiltered.js</sub>
 ```javascript
 import db from './db';
 
@@ -272,7 +268,6 @@ async function getRows() {
 
 __Single row filtered__
 
-<sub>📄 singleRowFiltered.js</sub>
 ```javascript
 import db from './db';
 
@@ -294,8 +289,6 @@ async function getRows() {
 
 __Single row by primary key__
 
-
-<sub>📄 singleRowByPrimary.js</sub>
 ```javascript
 import db from './db';
 
@@ -313,7 +306,6 @@ async function getRows() {
 
 __Many rows by primary key__
 
-<sub>📄 manyRowsByPrimary.js</sub>
 ```javascript
 import db from './db';
 
@@ -340,7 +332,6 @@ To update rows, modify the property values and invoke the method <strong><i>save
 
 __Updating a single row__
 
-<sub>📄 updateSingleRow.js</sub>
 ```javascript
 import db from './db';
 
@@ -363,7 +354,6 @@ async function update() {
 ```
 __Updating many rows__
 
-<sub>📄 updateManyRows.js</sub>
 ```javascript
 import db from './db';
 
@@ -401,7 +391,6 @@ Currently, there are three concurrency strategies:
 
 In the example below, we've set the concurrency strategy for orderDate to 'overwrite'. This implies that if other users modify orderDate while you're making changes, their updates will be overwritten.
 
-<sub>📄 updateWithConcurrency.js</sub>
 ```javascript
 import db from './db';
 
@@ -431,9 +420,6 @@ async function update() {
 Rows in owner tables cascade deletes to their child tables. In essence, if a table has ownership over other tables through <strong><i>hasOne</i></strong> and <strong><i>hasMany</i></strong> relationships, removing a record from the parent table also removes its corresponding records in its child tables. This approach safeguards against leaving orphaned records and upholds data integrity. On the contrary, tables that are merely referenced, through <strong><i>reference relationship </i></strong> relationships, remain unaffected upon deletions. For a deeper dive into these relationships and behaviors, refer to the section on table mapping.
 
 __Deleting a single row__
-
-
-<sub>📄 deleteSingleRow.js</sub>
 ```javascript
 import db from './db';
 
@@ -442,7 +428,7 @@ deleteRow();
 async function deleteRow() {		
 	const order = await db.order.getById(1);
 
-	await order.delete();/
+	await order.delete();
 	//will also delete deliveryAddress and lines
 	//but not customer
 }
@@ -450,7 +436,6 @@ async function deleteRow() {
 
 __Deleting many rows__
 
-<sub>📄 deletemanyRows.js</sub>
 ```javascript
 import db from './db';
 
@@ -466,7 +451,6 @@ async function deleteRows() {
 __Deleting with concurrency__
 
 Concurrent operations can lead to conflicts. When you still want to proceed with the deletion regardless of potential interim changes, the 'overwrite' concurrency strategy can be used. This example demonstrates deleting rows even if the "delivery address" has been modified in the meantime. You can read more about concurrency strategies in the 'Updating rows' section.   
-<sub>📄 deleteRowsConcurrency.js</sub>
 ```javascript
 import db from './db';
 
@@ -493,7 +477,6 @@ When removing a large number of records based on a certain condition, batch dele
 
 However, it's worth noting that batch deletes don't follow the cascade delete behavior by default. To achieve cascading in batch deletes, you must explicitly call the deleteCascade method.  
 
-<sub>📄 batchDelete.js</sub>
 ```javascript
 import db from './db';
 
@@ -507,7 +490,7 @@ async function deleteRows() {
 __Batch delete cascade__
 
 When deleting records, sometimes associated data in related tables also needs to be removed. This cascade delete helps maintain database integrity.  
-<sub>📄 batchDeleteCascade.js</sub>
+
 ```javascript
 import db from './db';
 
@@ -521,7 +504,7 @@ async function deleteRows() {
 __Batch delete by primary key__
 
 For efficiency, you can also delete records directly if you know their primary keys.  
-<sub>📄 batchDeleteByPrimary.js</sub>
+
 ```javascript
 import db from './db';
 
