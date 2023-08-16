@@ -37,7 +37,7 @@ Each column within your database table is designated by using the <strong><i>col
 
 Relationships between tables can also be outlined. By using methods like <strong><i>hasOne</i></strong>, <strong><i>hasMany</i></strong>, and <strong><i>references</i></strong>, you can establish connections that reflect the relationships in your data schema. In the example below, an 'order' is linked to a 'customer' reference, a 'deliveryAddress', and multiple 'lines'. The hasMany and hasOne relations represents ownership - the tables 'deliveryAddress' and 'orderLine' are owned by the 'order' table, and therefore, they contain the 'orderId' column referring to their parent table, which is 'order'. Conversely, the customer table is independent and can exist without any knowledge of the 'order' table. Therefore we say that the order table <i>references</i> the customer table - necessitating the existence of a 'customerId' column in the 'order' table.  
 
-<sub>📄 db.js</sub>
+<sub>📄 db.js</sub>]
 ```javascript
 import rdb from 'rdb';
 
@@ -425,6 +425,113 @@ async function update() {
 	console.dir(order, {depth: Infinity});
 }
 ```
+</details>  
+
+<details><summary><strong>Deleting rows</strong></summary>
+Rows in owner tables cascade deletes to their child tables. In essence, if a table has ownership over other tables through <strong><i>hasOne</i></strong> and <strong><i>hasMany</i></strong> relationships, removing a record from the parent table also removes its corresponding records in its child tables. This approach safeguards against leaving orphaned records and upholds data integrity. On the contrary, tables that are merely referenced, through <strong><i>reference relationship </i></strong> relationships, remain unaffected upon deletions. For a deeper dive into these relationships and behaviors, refer to the section on table mapping.
+
+__Deleting a single row__
+
+
+<sub>📄 deleteSingleRow.js</sub>
+```javascript
+import db from './db';
+
+deleteRow();
+
+async function deleteRow() {		
+	const order = await db.order.getById(1);
+
+	await order.delete();/
+	//will also delete deliveryAddress and lines
+	//but not customer
+}
+```
+
+__Deleting many rows__
+
+<sub>📄 deletemanyRows.js</sub>
+```javascript
+import db from './db';
+
+deleteRows();
+
+async function deleteRows() {
+	const filter = db.order.customer.name.eq('George');
+	let orders = await db.order.getMany(filter);
+
+	await orders.delete();
+}
+```
+__Deleting with concurrency__
+
+Concurrent operations can lead to conflicts. When you still want to proceed with the deletion regardless of potential interim changes, the 'overwrite' concurrency strategy can be used. This example demonstrates deleting rows even if the "delivery address" has been modified in the meantime. You can read more about concurrency strategies in the 'Updating rows' section.   
+<sub>📄 deleteRowsConcurrency.js</sub>
+```javascript
+import db from './db';
+
+deleteRows();
+
+async function deleteRows() {
+	const filter = db.order.deliveryAddress.name.eq('George');
+	let orders = await db.order.getMany(filter, {
+		customer: true, 
+		deliveryAddress: true, 
+		lines: true
+	});
+
+	await orders.delete({
+		deliveryAddress: {
+			concurrency: 'overwrite'
+		}
+	});
+}
+```
+__Batch delete__
+
+When removing a large number of records based on a certain condition, batch deletion can be efficient.   
+
+However, it's worth noting that batch deletes don't follow the cascade delete behavior by default. To achieve cascading in batch deletes, you must explicitly call the deleteCascade method.  
+
+<sub>📄 batchDelete.js</sub>
+```javascript
+import db from './db';
+
+deleteRows();
+
+async function deleteRows() {
+	const filter = db.order.deliveryAddress.name.eq('George');
+	await db.order.delete(filter);
+}
+```
+__Batch delete cascade__
+
+When deleting records, sometimes associated data in related tables also needs to be removed. This cascade delete helps maintain database integrity.  
+<sub>📄 batchDeleteCascade.js</sub>
+```javascript
+import db from './db';
+
+deleteRows();
+
+async function deleteRows() {
+	const filter = db.order.deliveryAddress.name.eq('George');
+	await db.order.deleteCascade(filter);
+}
+```
+__Batch delete by primary key__
+
+For efficiency, you can also delete records directly if you know their primary keys.  
+<sub>📄 batchDeleteByPrimary.js</sub>
+```javascript
+import db from './db';
+
+deleteRows();
+
+async function deleteRows() {
+	db.customer.delete([{id: 1}, {id: 2}]);
+}
+```
+
   
 ### [Changelog](https://github.com/alfateam/rdb/blob/master/docs/changelog.md)
 ### [Code of Conduct](https://github.com/alfateam/rdb/blob/master/docs/CODE_OF_CONDUCT.md)
