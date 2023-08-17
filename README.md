@@ -21,30 +21,30 @@ This is the _Modern Typescript Documentation_. Are you looking for the [_Classic
 import rdb from 'rdb';
 
 const map = rdb.map(x => ({
-	customer: x.table('customer').map(({ column }) => ({
-	  id: column('id').numeric().primary().notNullExceptInsert(),
-		name: column('name').string(),
-		balance: column('balance').numeric(),
-		isActive: column('isActive').boolean(),
-	})),
+  customer: x.table('customer').map(({ column }) => ({
+    id: column('id').numeric().primary().notNullExceptInsert(),
+    name: column('name').string(),
+    balance: column('balance').numeric(),
+    isActive: column('isActive').boolean(),
+  })),
 
-	order: x.table('_order').map(({ column }) => ({
-		id: column('id').numeric().primary().notNullExceptInsert(),
-		orderDate: column('orderDate').date().notNull(),
-		customerId: column('customerId').numeric().notNullExceptInsert(),
-	})),
+  order: x.table('_order').map(({ column }) => ({
+    id: column('id').numeric().primary().notNullExceptInsert(),
+    orderDate: column('orderDate').date().notNull(),
+    customerId: column('customerId').numeric().notNullExceptInsert(),
+  })),
 
-	orderLine: x.table('orderLine').map(({ column }) => ({
-		id: column('id').numeric().primary().notNullExceptInsert(),
-		orderId: column('orderId').numeric(),
-		product: column('product').string(),
-	}))
+  orderLine: x.table('orderLine').map(({ column }) => ({
+  id: column('id').numeric().primary().notNullExceptInsert(),
+    orderId: column('orderId').numeric(),
+    product: column('product').string(),
+  }))
 
 })).map(x => ({
-	order: x.order.map(v => ({
-		customer: v.references(x.customer).by('customerId'),
-		lines: v.hasMany(x.orderLine).by('orderId')
-	}))
+  order: x.order.map(v => ({
+    customer: v.references(x.customer).by('customerId'),
+    lines: v.hasMany(x.orderLine).by('orderId')
+  }))
 }));
 
 const db = map.sqlite('demo.db');
@@ -52,18 +52,18 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-	const filter = db.order.lines.any(line => line.product.startsWith('Magic wand'))
-		.and(db.order.customer.name.eq('Harry Potter'));
+  const filter = db.order.lines.any(line => line.product.startsWith('Magic wand'))
+                 .and(db.order.customer.name.eq('Harry Potter'));
 
-	const order = await db.order.getOne(filter, {
-		lines: true,
-		customer: true
-	});
-	order.lines.push({
-		product: 'broomstick'
-	});
+  const order = await db.order.getOne(filter, {
+    lines: true,
+    customer: true
+  });
+  order.lines.push({
+    product: 'broomstick'
+  });
 
-	await order.saveChanges();
+  await order.saveChanges();
 }
 
 ```
@@ -94,41 +94,41 @@ Relationships between tables can also be outlined. By using methods like <strong
 import rdb from 'rdb';
 
 const map = rdb.map(x => ({
-	customer: x.table('customer').map(({ column }) => ({
-		id: column('id').numeric().primary().notNullExceptInsert(),
-		name: column('name').string(),
-		balance: column('balance').numeric(),
-		isActive: column('isActive').boolean(),
-	})),
+  customer: x.table('customer').map(({ column }) => ({
+    id: column('id').numeric().primary().notNullExceptInsert(),
+    name: column('name').string(),
+    balance: column('balance').numeric(),
+    isActive: column('isActive').boolean(),
+  })),
 
-	order: x.table('_order').map(({ column }) => ({
-		id: column('id').numeric().primary().notNullExceptInsert(),
-		orderDate: column('orderDate').date().notNull(),
-		customerId: column('customerId').numeric().notNullExceptInsert(),
-	})),
+  order: x.table('_order').map(({ column }) => ({
+    id: column('id').numeric().primary().notNullExceptInsert(),
+    orderDate: column('orderDate').date().notNull(),
+    customerId: column('customerId').numeric().notNullExceptInsert(),
+  })),
 
-	orderLine: x.table('orderLine').map(({ column }) => ({
-		id: column('id').numeric().primary().notNullExceptInsert(),
-		orderId: column('orderId').numeric(),
-		product: column('product').string(),
-	})),
+  orderLine: x.table('orderLine').map(({ column }) => ({
+    id: column('id').numeric().primary().notNullExceptInsert(),
+    orderId: column('orderId').numeric(),
+    product: column('product').string(),
+  })),
 
-	deliveryAddress: x.table('deliveryAddress').map(({ column }) => ({
-		id: column('id').numeric().primary().notNullExceptInsert(),
-		orderId: column('orderId').numeric(),
-		name: column('name').string(),
-		street: column('street').string(),
-		postalCode: column('postalCode').string(),
-		postalPlace: column('postalPlace').string(),
-		countryCode: column('countryCode').string(),
-	}))
+  deliveryAddress: x.table('deliveryAddress').map(({ column }) => ({
+    id: column('id').numeric().primary().notNullExceptInsert(),
+    orderId: column('orderId').numeric(),
+    name: column('name').string(),
+    street: column('street').string(),
+    postalCode: column('postalCode').string(),
+    postalPlace: column('postalPlace').string(),
+    countryCode: column('countryCode').string(),
+  }))
 
 })).map(x => ({
-	order: x.order.map(({ hasOne, hasMany, references }) => ({
-		customer: references(x.customer).by('customerId'),
-		deliveryAddress: hasOne(x.deliveryAddress).by('orderId'),
-		lines: hasMany(x.orderLine).by('orderId')
-	}))
+  order: x.order.map(({ hasOne, hasMany, references }) => ({
+    customer: references(x.customer).by('customerId'),
+    deliveryAddress: hasOne(x.deliveryAddress).by('orderId'),
+    lines: hasMany(x.orderLine).by('orderId')
+  }))
 }));
 
 export default map.sqlite('demo.db');
@@ -178,10 +178,10 @@ CREATE TABLE deliveryAddress (
 
 
 async function init() {
-	const statements = sql.split(';');
-	for (let i = 0; i < statements.length; i++) {
-		await db.query(statements[i]);
-	}
+  const statements = sql.split(';');
+  for (let i = 0; i < statements.length; i++) {
+    await db.query(statements[i]);
+  }
 }
 export default init;
 ```
@@ -203,52 +203,52 @@ import init from './init';
 insertRows();
 
 async function insertRows() {
-	await init();
+  await init();
 
-	const george = await db.customer.insert({
-		name: 'George',
-		balance: 177,
-		isActive: true
-	});
+  const george = await db.customer.insert({
+    name: 'George',
+    balance: 177,
+    isActive: true
+  });
 
-	const harry = await db.customer.insert({
-		name: 'Harry',
-		balance: 200,
-		isActive: true
-	});
+  const harry = await db.customer.insert({
+    name: 'Harry',
+    balance: 200,
+    isActive: true
+  });
 
-	const orders = await db.order.insert([
-		{
-			orderDate: new Date(2022, 0, 11, 9, 24, 47),
-			customer: george,
-			deliveryAddress: {
-				name: 'George',
-				street: 'Node street 1',
-				postalCode: '7059',
-				postalPlace: 'Jakobsli',
-				countryCode: 'NO'
-			},
-			lines: [
-				{ product: 'Bicycle' },
-				{ product: 'Small guitar' }
-			]
-		},
-		{
-			customer: harry,
-			orderDate: new Date(2021, 0, 11, 12, 22, 45),
-			deliveryAddress: {
-				name: 'Harry Potter',
-				street: '4 Privet Drive, Little Whinging',
-				postalCode: 'GU4',
-				postalPlace: 'Surrey',
-				countryCode: 'UK'
-			},
-			lines: [
-				{ product: 'Magic wand' }
-			]
-		}
-	], {customer: true, deliveryAddress: true, lines: true}); //fetching strategy
-	console.dir(orders, {depth: Infinity});
+  const orders = await db.order.insert([
+    {
+      orderDate: new Date(2022, 0, 11, 9, 24, 47),
+      customer: george,
+      deliveryAddress: {
+        name: 'George',
+        street: 'Node street 1',
+        postalCode: '7059',
+        postalPlace: 'Jakobsli',
+        countryCode: 'NO'
+      },
+      lines: [
+        { product: 'Bicycle' },
+        { product: 'Small guitar' }
+      ]
+    },
+    {
+      customer: harry,
+      orderDate: new Date(2021, 0, 11, 12, 22, 45),
+      deliveryAddress: {
+        name: 'Harry Potter',
+        street: '4 Privet Drive, Little Whinging',
+        postalCode: 'GU4',
+        postalPlace: 'Surrey',
+        countryCode: 'UK'
+      },
+      lines: [
+        { product: 'Magic wand' }
+      ]
+    }
+  ], {customer: true, deliveryAddress: true, lines: true}); //fetching strategy
+  console.dir(orders, {depth: Infinity});
 }
 ```
 
@@ -268,12 +268,12 @@ import db from './db';
 getRows();
 
 async function getRows() {
-	const orders = await db.order.getAll({
-		customer: true, 
-		deliveryAddress: true, 
-		lines: true
-	});
-	console.dir(orders, {depth: Infinity});
+  const orders = await db.order.getAll({
+    customer: true, 
+    deliveryAddress: true, 
+    lines: true
+  });
+  console.dir(orders, {depth: Infinity});
 }
 ```
 __Limit, offset and order by__  
@@ -285,17 +285,17 @@ import db from './db';
 getRows();
 
 async function getRows() {
-	const orders = await db.order.getAll({
-		offset: 1,
-		orderBy: ['orderDate desc', 'id'],
-		limit: 10,
-		customer: true, 
-		deliveryAddress: true, 
-		lines: {
-			orderBy: 'product'
-		},
-	});
-	console.dir(orders, {depth: Infinity});
+  const orders = await db.order.getAll({
+    offset: 1,
+    orderBy: ['orderDate desc', 'id'],
+    limit: 10,
+    customer: true, 
+    deliveryAddress: true, 
+    lines: {
+      orderBy: 'product'
+    },
+  });
+  console.dir(orders, {depth: Infinity});
 }
 ```
 
@@ -307,14 +307,14 @@ import db from './db';
 getRows();
 
 async function getRows() {
-	const filter = db.order.lines.any(line => line.product.contains('i'))
-				.and(db.order.customer.balance.greaterThan(180));
-	const orders = await db.order.getMany(filter, {
-		customer: true, 
-		deliveryAddress: true, 
-		lines: true
-	});
-	console.dir(orders, {depth: Infinity});
+  const filter = db.order.lines.any(line => line.product.contains('i'))
+                 .and(db.order.customer.balance.greaterThan(180));
+  const orders = await db.order.getMany(filter, {
+    customer: true, 
+    deliveryAddress: true, 
+    lines: true
+  });
+  console.dir(orders, {depth: Infinity});
 }
 ```
 
@@ -326,16 +326,16 @@ import db from './db';
 getRows();
 
 async function getRows() {
-	const filter = db.order.customer(customer => customer.isActive.eq(true)
-					.and(customer.startsWith('Harr')));
-	//equivalent, but creates slighly different sql:
-	// const filter = db.order.customer.isActive.eq(true).and(db.order.customer.startsWith('Harr'));
-	const order = await db.order.getOne(filter, {
-		customer: true, 
-		deliveryAddress: true, 
-		lines: true
-	});
-	console.dir(order, {depth: Infinity});
+  const filter = db.order.customer(customer => customer.isActive.eq(true)
+                 .and(customer.startsWith('Harr')));
+                 //equivalent, but creates slighly different sql:
+                 // const filter = db.order.customer.isActive.eq(true).and(db.order.customer.startsWith('Harr'));
+  const order = await db.order.getOne(filter, {
+    customer: true, 
+    deliveryAddress: true, 
+    lines: true
+  });
+  console.dir(order, {depth: Infinity});
 }
 ```
 
@@ -347,12 +347,12 @@ import db from './db';
 getRows();
 
 async function getRows() {
-	const order = await db.order.getById(1, {
-		customer: true, 
-		deliveryAddress: true, 
-		lines: true
-	});
-	console.dir(order, {depth: Infinity});
+  const order = await db.order.getById(1, {
+    customer: true, 
+    deliveryAddress: true, 
+    lines: true
+  });
+  console.dir(order, {depth: Infinity});
 }
 ```
 
@@ -364,22 +364,22 @@ import db from './db';
 getRows();
 
 async function getRows() {
-	const orders = await db.order.getMany([
-			{id: 1},
-			{id: 2}
-		], 
-		{
-			customer: true, 
-			deliveryAddress: true, 
-			lines: true
-	});
-	console.dir(orders, {depth: Infinity});
+  const orders = await db.order.getMany([
+      {id: 1},
+      {id: 2}
+    ], 
+    {
+      customer: true, 
+      deliveryAddress: true, 
+      lines: true
+  });
+  console.dir(orders, {depth: Infinity});
 }
 ```
 </details>  
 
 <details><summary><strong>Updating rows</strong></summary>
-	
+  
 To update rows, modify the property values and invoke the method <strong><i>saveChanges()</i></strong>. The function updates only the modified columns, not the entire row. Rows in child relations can also be updated as long as the parent order <i>owns</i> the child tables. In our illustration, the <strong>order</strong> table owns both the <strong>deliveryAddress</strong> and the <strong>lines</strong> tables because they're part of a <i>hasOne/hasMany relationship</i>. Contrastingly, the <strong>customer</strong> is part of a <i>reference relationship</i> and thus can't be updated here. But you can detach the reference to the customer by assigning it to null or undefined. (Setting order.customerId to null or undefined achieves the same result.)
 
 __Updating a single row__
@@ -390,18 +390,18 @@ import db from './db';
 update();
 
 async function update() {
-	const order = await db.order.getById(1, {
-		customer: true, 
-		deliveryAddress: true, 
-		lines: true
-	});
+  const order = await db.order.getById(1, {
+    customer: true, 
+    deliveryAddress: true, 
+    lines: true
+  });
 
-	order.orderDate = new Date();
-	order.deliveryAddress = null;
-	order.lines.push({product: 'Cloak of invisibility'});
+  order.orderDate = new Date();
+  order.deliveryAddress = null;
+  order.lines.push({product: 'Cloak of invisibility'});
 
-	await order.saveChanges();
-	console.dir(order, {depth: Infinity});
+  await order.saveChanges();
+  console.dir(order, {depth: Infinity});
 }
 ```
 __Updating many rows__
@@ -412,24 +412,24 @@ import db from './db';
 update();
 
 async function update() {
-	let orders = await db.order.getAll({
-		orderBy: 'id',
-		lines: true, 
-		deliveryAddress: true, 
-		customer: true
-	});
+  let orders = await db.order.getAll({
+    orderBy: 'id',
+    lines: true, 
+    deliveryAddress: true, 
+    customer: true
+  });
 
-	orders[0].orderDate = new Date();
-	orders[0].deliveryAddress.street = 'Node street 2';
-	orders[0].lines[1].product = 'Big guitar';
+  orders[0].orderDate = new Date();
+  orders[0].deliveryAddress.street = 'Node street 2';
+  orders[0].lines[1].product = 'Big guitar';
 
-	orders[1].orderDate = '2023-07-14T12:00:00'; //iso-string is allowed
-	orders[1].deliveryAddress = null;
-	orders[1].customer = null;
-	orders[1].lines.push({product: 'Cloak of invisibility'});
+  orders[1].orderDate = '2023-07-14T12:00:00'; //iso-string is allowed
+  orders[1].deliveryAddress = null;
+  orders[1].customer = null;
+  orders[1].lines.push({product: 'Cloak of invisibility'});
 
-	await orders.saveChanges();
-	console.dir(orders, {depth: Infinity});
+  await orders.saveChanges();
+  console.dir(orders, {depth: Infinity});
 }
 ```
 
@@ -449,21 +449,21 @@ import db from './db';
 update();
 
 async function update() {
-	const order = await db.order.getById(1, {
-		customer: true, 
-		deliveryAddress: true, 
-		lines: true
-	});
+  const order = await db.order.getById(1, {
+    customer: true, 
+    deliveryAddress: true, 
+    lines: true
+  });
 
-	order.orderDate = new Date();
-	order.deliveryAddress = null;
-	order.lines.push({product: 'Cloak of invisibility'});
+  order.orderDate = new Date();
+  order.deliveryAddress = null;
+  order.lines.push({product: 'Cloak of invisibility'});
 
-	await order.saveChanges( {
-		orderDate: {
-			concurrency: 'overwrite'
-	}});
-	console.dir(order, {depth: Infinity});
+  await order.saveChanges( {
+    orderDate: {
+      concurrency: 'overwrite'
+  }});
+  console.dir(order, {depth: Infinity});
 }
 ```
 </details>  
@@ -477,12 +477,12 @@ import db from './db';
 
 deleteRow();
 
-async function deleteRow() {		
-	const order = await db.order.getById(1);
+async function deleteRow() {    
+  const order = await db.order.getById(1);
 
-	await order.delete();
-	//will also delete deliveryAddress and lines
-	//but not customer
+  await order.delete();
+  //will also delete deliveryAddress and lines
+  //but not customer
 }
 ```
 
@@ -494,10 +494,10 @@ import db from './db';
 deleteRows();
 
 async function deleteRows() {
-	const filter = db.order.customer.name.eq('George');
-	let orders = await db.order.getMany(filter);
+  const filter = db.order.customer.name.eq('George');
+  let orders = await db.order.getMany(filter);
 
-	await orders.delete();
+  await orders.delete();
 }
 ```
 __Deleting with concurrency__
@@ -509,18 +509,18 @@ import db from './db';
 deleteRows();
 
 async function deleteRows() {
-	const filter = db.order.deliveryAddress.name.eq('George');
-	let orders = await db.order.getMany(filter, {
-		customer: true, 
-		deliveryAddress: true, 
-		lines: true
-	});
+  const filter = db.order.deliveryAddress.name.eq('George');
+  let orders = await db.order.getMany(filter, {
+    customer: true, 
+    deliveryAddress: true, 
+    lines: true
+  });
 
-	await orders.delete({
-		deliveryAddress: {
-			concurrency: 'overwrite'
-		}
-	});
+  await orders.delete({
+    deliveryAddress: {
+      concurrency: 'overwrite'
+    }
+  });
 }
 ```
 __Batch delete__
@@ -535,8 +535,8 @@ import db from './db';
 deleteRows();
 
 async function deleteRows() {
-	const filter = db.order.deliveryAddress.name.eq('George');
-	await db.order.delete(filter);
+  const filter = db.order.deliveryAddress.name.eq('George');
+  await db.order.delete(filter);
 }
 ```
 __Batch delete cascade__
@@ -549,8 +549,8 @@ import db from './db';
 deleteRows();
 
 async function deleteRows() {
-	const filter = db.order.deliveryAddress.name.eq('George');
-	await db.order.deleteCascade(filter);
+  const filter = db.order.deliveryAddress.name.eq('George');
+  await db.order.deleteCascade(filter);
 }
 ```
 __Batch delete by primary key__
@@ -563,7 +563,7 @@ import db from './db';
 deleteRows();
 
 async function deleteRows() {
-	db.customer.delete([{id: 1}, {id: 2}]);
+  db.customer.delete([{id: 1}, {id: 2}]);
 }
 ```
 
