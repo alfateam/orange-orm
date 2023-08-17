@@ -566,6 +566,28 @@ async function deleteRows() {
   db.customer.delete([{id: 1}, {id: 2}]);
 }
 ```
+</details>
+<details><summary><strong>Transactions</strong></summary>
+We initiate a database transaction using db.transaction.
+Within the transaction, a customer is retrieved and its balance updated using the tx object to ensure operations are transactional.
+An error is deliberately thrown to demonstrate a rollback, ensuring all previous changes within the transaction are reverted.
+Always use the provided tx object for operations within the transaction to maintain data integrity.
+
+```javascript
+import db from './db';
+
+execute();
+
+async function execute() {
+  await db.transaction(async tx => {
+    const customer = await tx.customer.getById(1);
+      customer.balance = 100;
+      await customer.saveChanges();
+      throw new Error('This will rollback');
+  });
+}
+
+```
 
   
 ### [Changelog](https://github.com/alfateam/rdb/blob/master/docs/changelog.md)
