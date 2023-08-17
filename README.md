@@ -13,8 +13,60 @@ RDB is the ultimate Object Relational Mapper for Node.js, offering seamless inte
 - **No Code Generation Required**: Enjoy full IntelliSense, even in table mappings, without the need for cumbersome code generation.
 - **TypeScript and JavaScript Support**: RDB fully supports both TypeScript and JavaScript, allowing you to leverage the benefits of static typing and modern ECMAScript features.
 - **Works in the Browser**: RDB even works in the browser through hosting in Express, giving you the flexibility to build web applications with ease.  
-ddb
+
 This is the _Modern Typescript Documentation_. Are you looking for the [_Classic Documentation_](https://github.com/alfateam/rdb/blob/master/docs/docs.md) ?
+
+## Example
+```javascript
+import rdb from 'rdb';
+
+const map = rdb.map(x => ({
+	customer: x.table('customer').map(({ column }) => ({
+	  id: column('id').numeric().primary().notNullExceptInsert(),
+		name: column('name').string(),
+		balance: column('balance').numeric(),
+		isActive: column('isActive').boolean(),
+	})),
+
+	order: x.table('_order').map(({ column }) => ({
+		id: column('id').numeric().primary().notNullExceptInsert(),
+		orderDate: column('orderDate').date().notNull(),
+		customerId: column('customerId').numeric().notNullExceptInsert(),
+	})),
+
+	orderLine: x.table('orderLine').map(({ column }) => ({
+		id: column('id').numeric().primary().notNullExceptInsert(),
+		orderId: column('orderId').numeric(),
+		product: column('product').string(),
+	}))
+
+})).map(x => ({
+	order: x.order.map(v => ({
+		customer: v.references(x.customer).by('customerId'),
+		lines: v.hasMany(x.orderLine).by('orderId')
+	}))
+}));
+
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+	const filter = db.order.lines.any(line => line.product.startsWith('Magic wand'))
+		.and(db.order.customer.name.eq('Harry Potter'));
+
+	const order = await db.order.getOne(filter, {
+		lines: true,
+		customer: true
+	});
+	order.lines.push({
+		product: 'broomstick'
+	});
+
+	await order.saveChanges();
+}
+
+```
 
 ## Installation
 `npm install rdb`  
