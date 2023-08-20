@@ -746,11 +746,13 @@ type MappedTableDef<T> = {
 
 type NotNullProperties<T> = Pick<
 	T,
-	{ [K in keyof T]: T[K] extends NotNull ? K : never }[keyof T]
+	{ [K in keyof T]: T[K] extends NotNull ? K :  T[K] extends ManyRelation ? K : never}[keyof T]
 >;
+
+
 type NullProperties<T> = Pick<
 	T,
-	{ [K in keyof T]: T[K] extends NotNull ? never : K }[keyof T]
+	{ [K in keyof T]: T[K] extends NotNull | ManyRelation? never : K }[keyof T]
 >;
 
 type NotNullInsertProperties<T> = Pick<
