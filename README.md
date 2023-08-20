@@ -16,7 +16,26 @@ RDB is the ultimate Object Relational Mapper for Node.js, offering seamless inte
 
 This is the _Modern Typescript Documentation_. Are you looking for the [_Classic Documentation_](https://github.com/alfateam/rdb/blob/master/docs/docs.md) ?
 
+## Installation
+```bash
+$ npm install rdb
+```  
+<details><summary><strong>Installing drivers</strong></summary>
+
+To ensure RDB works properly with your database, you'll also need to install the appropriate driver:
+- **SQLite**: `$ npm install sqlite3`
+- **MySQL**: `$ npm install mysql2`
+- **MS SQL**: `$ npm install tedious`
+- **PostgreSQL (pg)**: `$ npm install pg`
+- **SAP**: `$npm install msnodesqlv8`
+
+</details>  
+
 ## Example
+Here we choose SQLite.  
+```bash
+$ npm install sqlite3
+```
 ```javascript
 import rdb from 'rdb';
 
@@ -38,26 +57,36 @@ const map = rdb.map(x => ({
   id: column('id').numeric().primary().notNullExceptInsert(),
     orderId: column('orderId').numeric(),
     product: column('product').string(),
+  })),
+
+  deliveryAddress: x.table('deliveryAddress').map(({ column }) => ({
+    id: column('id').numeric().primary().notNullExceptInsert(),
+    orderId: column('orderId').numeric(),
+    name: column('name').string(),
+    street: column('street').string(),
+    postalCode: column('postalCode').string(),
+    postalPlace: column('postalPlace').string(),
+    countryCode: column('countryCode').string(),
   }))
 
 })).map(x => ({
   order: x.order.map(v => ({
     customer: v.references(x.customer).by('customerId'),
     lines: v.hasMany(x.orderLine).by('orderId')
+    deliveryAddress: hasOne(x.deliveryAddress).by('orderId'),
   }))
 }));
 
 const db = map.sqlite('demo.db');
 
-getRows();
+updateRow();
 
-async function getRows() {
+async function updateRow() {
   const filter = db.order.lines.any(line => line.product.startsWith('Magic wand'))
-                 .and(db.order.customer.name.eq('Harry Potter'));
+                 .and(db.order.customer.name.eq('Harry'));
 
   const order = await db.order.getOne(filter, {
-    lines: true,
-    customer: true
+    lines: true
   });
   order.lines.push({
     product: 'broomstick'
@@ -68,20 +97,8 @@ async function getRows() {
 
 ```
 
-## Installation
-`npm install rdb`  
-<details><summary><strong>Installing drivers</strong></summary>
+## API 
 
-To ensure RDB works properly with your database, you'll also need to install the appropriate driver:
-- **SQLite**: `npm install sqlite3`
-- **MySQL**: `npm install mysql2`
-- **MS SQL**: `npm install tedious`
-- **PostgreSQL (pg)**: `npm install pg`
-- **SAP**: `npm install msnodesqlv8`
-
-</details>  
-
-## Fundamentals 
 <details><summary><strong>Mapping tables</strong></summary>
 To define a mapping, you employ the <strong><i>map()</i></strong> method, linking your tables and columns to corresponding object properties. You provide a callback function that engages with a parameter representing a database table.
 
@@ -192,7 +209,7 @@ In SQLite, columns with the INTEGER PRIMARY KEY attribute are designed to autoin
 
 In the code below, we initially import the table-mapping feature "db.js" and the setup script "init.js", both of which were defined in the preceding step. The setup script executes a raw query that creates the necessary tables. Subsequently, we insert two customers, named "George" and "Harry", into the customer table, and this is achieved through calling "db.customer.insert".
 
-Next, we insert and array array of two orders in the order table. Each order contains an orderDate, customer information, deliveryAddress, and lines for the order items. We use the customer constants "george" and "harry" from previous inserts. The second argument to "db.order.insert" specifies a fetching strategy. This fetching strategy plays a critical role in determining the depth of the data retrieved from the database after insertion. The fetching strategy specifies which associated data should be retrieved and included in the resulting orders object. In this case, the fetching strategy instructs the database to retrieve the customer, deliveryAddress, and lines for each order.
+Next, we insert and array array of two orders in the order table. Each order contains an orderDate, customer information, deliveryAddress, and lines for the order items. We use the customer constants "george" and "harry" from previous inserts. Observe that we don't pass in any primary keys. This is because all tables here have autoincremental keys. The second argument to "db.order.insert" specifies a fetching strategy. This fetching strategy plays a critical role in determining the depth of the data retrieved from the database after insertion. The fetching strategy specifies which associated data should be retrieved and included in the resulting orders object. In this case, the fetching strategy instructs the database to retrieve the customer, deliveryAddress, and lines for each order.
 
 Without a fetching strategy, "db.order.insert" would only return the root level of each order. In that case you would only get the id, orderDate, and customerId for each order.  
 
@@ -567,6 +584,28 @@ async function deleteRows() {
 }
 ```
 </details>
+<details><summary><strong>In the browser</strong></summary>
+We initiate a database transaction using db.transaction.
+Within the transaction, a customer is retrieved and its balance updated using the tx object to ensure operations are transactional.
+An error is deliberately thrown to demonstrate a rollback, ensuring all previous changes within the transaction are reverted.
+Always use the provided tx object for operations within the transaction to maintain data integrity.
+
+```javascript
+import db from './db';
+
+execute();
+
+async function execute() {
+  await db.transaction(async tx => {
+    const customer = await tx.customer.getById(1);
+      customer.balance = 100;
+      await customer.saveChanges();
+      throw new Error('This will rollback');
+  });
+}
+
+```
+</details>
 <details><summary><strong>Transactions</strong></summary>
 We initiate a database transaction using db.transaction.
 Within the transaction, a customer is retrieved and its balance updated using the tx object to ensure operations are transactional.
@@ -588,7 +627,7 @@ async function execute() {
 }
 
 ```
-
+</details>
   
 ### [Changelog](https://github.com/alfateam/rdb/blob/master/docs/changelog.md)
 ### [Code of Conduct](https://github.com/alfateam/rdb/blob/master/docs/CODE_OF_CONDUCT.md)
