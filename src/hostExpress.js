@@ -17,19 +17,18 @@ function hostExpress(client, options = {}) {
 			c[tableName] = hostLocal({...dbOptions,...options, ...{ table: client.tables[tableName], ...{baseFilter: options?.[tableName]?.baseFilter}, isHttp: true, client }});
 		}
 
-	async function handler(req) {
+	async function handler(req, res) {
 		if (req.method === 'POST')
 			return post.apply(null, arguments);
 		if (req.method === 'PATCH')
 			return patch.apply(null, arguments);
 		if (req.method === 'GET')
 			return get.apply(null, arguments);
-		else {
-			const e = new Error('Unhandled method ' + req.method);
-			// @ts-ignore
-			e.status = 400;
-			throw e;
-		}
+		if (req.method === 'OPTIONS')
+			return handleOptions(req, res); // assuming the second argument is `response`
+
+		else
+			res.status(405).set('Allow', 'GET, POST, PATCH, OPTIONS').send('Method Not Allowed');
 	}
 
 	handler.db = handler;
@@ -93,6 +92,14 @@ function hostExpress(client, options = {}) {
 			response.status(e.status || 500).send(e && e.stack);
 		}
 
+	}
+
+	function handleOptions(req, response) {
+		response.setHeader('Access-Control-Allow-Origin', '*'); // Adjust this as per your CORS needs
+		response.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS'); // And any other methods you support
+		response.setHeader('Access-Control-Allow-Headers', 'Content-Type'); // And any other headers you expect in requests
+		response.setHeader('Access-Control-Max-Age', '86400'); // Cache preflight request for a day. Adjust as you see fit
+		response.status(204).send(); // 204 No Content response for successful OPTIONS requests
 	}
 
 	return handler;
