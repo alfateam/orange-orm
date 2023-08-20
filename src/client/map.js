@@ -68,7 +68,9 @@ function map(index, context, fn) {
 	context.mysql = connect.bind(null, 'mysql');
 	context.sap = connect.bind(null, 'sap');
 	context.sqlite = connect.bind(null, 'sqlite');
-	context.http = connect.bind(null, 'http');
+	context.http = function(url) {
+		return index({db: url, providers: index});
+	};
 
 	function connect(name, ...args) {
 		const provider = index[name];
