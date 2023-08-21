@@ -1,4 +1,4 @@
-function map(fn) {
+function map(index, fn) {
 	const handler = {
 		get(target, prop) {
 			if (prop === 'map') {
@@ -37,16 +37,20 @@ function map(fn) {
 		sqlite: throwDb,
 	};
 
+
+
 	function throwDb() {
 		throw new Error('Cannot create pool for database outside node');
 	}
 
 	function onFinal(arg) {
-		if (arg.db && typeof arg === 'function') {
-			arg.db = arg.db(dbMap);
-		}
-		return fn(arg);
+		return index({...arg, providers: dbMap});
 	}
+
+	onFinal.http = (url) => index({db: url, providers: dbMap});
+
+
+	return new Proxy(onFinal, handler);
 }
 
 module.exports = map;
