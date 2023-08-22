@@ -1,8 +1,9 @@
 const _axios = require('axios');
-function httpAdapter(baseURL, path, axios) {
+
+function httpAdapter(baseURL, path, axiosInterceptor) {
 	//@ts-ignore
-	// const axios = _axios.default ? _axios.default.create({baseURL}) : _axios.create({baseURL});
-	// axiosInterceptor.setInstance(axios);
+	const axios = _axios.default ? _axios.default.create({baseURL}) : _axios.create({baseURL});
+	axiosInterceptor.applyTo(axios);
 
 	let c = {
 		get,
@@ -92,7 +93,7 @@ function netAdapter(url, { axios, tableOptions }) {
 	async function getInnerAdapter() {
 		const db = await getDb();
 		if (typeof db === 'string') {
-			url = db + url;
+			// url = db + url;
 			return httpAdapter(db, url, axios);
 		}
 		else if (db && db.transaction) {

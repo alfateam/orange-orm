@@ -1,28 +1,46 @@
-class AxiosInterceptorManager {
+class InterceptorProxy {
 	constructor() {
 		this.requestInterceptors = [];
 		this.responseInterceptors = [];
 	}
 
-	setInstance(instance) {
-		this.requestInterceptors.forEach(interceptor => {
-			instance.interceptors.request.use(interceptor.fulfilled, interceptor.rejected);
-		});
-
-		this.responseInterceptors.forEach(interceptor => {
-			instance.interceptors.response.use(interceptor.fulfilled, interceptor.rejected);
-		});
+	get request() {
+		return {
+			use: (onFulfilled, onRejected) => {
+				const id = Math.random().toString(36).substr(2, 9); // unique id
+				this.requestInterceptors.push({ id, onFulfilled, onRejected });
+				return id;
+			},
+			eject: (id) => {
+				this.requestInterceptors = this.requestInterceptors.filter(interceptor => interceptor.id !== id);
+			}
+		};
 	}
 
-	addRequestInterceptor(fulfilled, rejected) {
-		this.requestInterceptors.push({ fulfilled, rejected });
+	get response() {
+		return {
+			use: (onFulfilled, onRejected) => {
+				const id = Math.random().toString(36).substr(2, 9); // unique id
+				this.responseInterceptors.push({ id, onFulfilled, onRejected });
+				return id;
+			},
+			eject: (id) => {
+				this.responseInterceptors = this.responseInterceptors.filter(interceptor => interceptor.id !== id);
+			}
+		};
 	}
 
-	addResponseInterceptor(fulfilled, rejected) {
-		this.responseInterceptors.push({ fulfilled, rejected });
+	applyTo(axiosInstance) {
+		for (const { onFulfilled, onRejected } of this.requestInterceptors) {
+			axiosInstance.interceptors.request.use(onFulfilled, onRejected);
+		}
+
+		for (const { onFulfilled, onRejected } of this.responseInterceptors) {
+			axiosInstance.interceptors.response.use(onFulfilled, onRejected);
+		}
 	}
 }
 
 module.exports = function create() {
-	return new AxiosInterceptorManager();
+	return new InterceptorProxy();
 };

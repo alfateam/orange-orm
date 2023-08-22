@@ -8,8 +8,7 @@ const targetKey = Symbol();
 // const _axios = require('axios');
 const map = require('./clientMap');
 const clone = require('rfdc/default');
-const _axios = require('axios');
-// const createAxiosInterceptor = require('./axiosInterceptor');
+const createAxiosInterceptor = require('./axiosInterceptor');
 
 function rdbClient(options = {}) {
 	if (options.pg)
@@ -19,7 +18,9 @@ function rdbClient(options = {}) {
 	let baseUrl = options.db;
 	let providers = options.providers || {};
 	//@ts-ignore
-	const axiosInterceptor = _axios.default ? _axios.default.create() : _axios.create();
+	// const axiosInterceptor = _axios.default ? _axios.default.create({}) : _axios.create({});
+	const axiosInterceptor = 	createAxiosInterceptor();
+
 	//
 	function client(_options = {}) {
 		if (_options.pg)
@@ -34,6 +35,7 @@ function rdbClient(options = {}) {
 		enumerable: true,
 		configurable: false
 	});
+	client.interceptors = axiosInterceptor;
 	client.createPatch = _createPatch;
 	client.table = table;
 	client.or = column('or');
@@ -47,8 +49,6 @@ function rdbClient(options = {}) {
 			return;
 		}
 	};
-	// axiosInterceptor = axiosInterceptor();
-	// const axiosInterceptor = axiosInterceptor.interceptors;
 	client.query = query;
 	client.transaction = runInTransaction;
 	client.db = baseUrl;

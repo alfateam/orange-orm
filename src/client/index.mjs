@@ -1587,89 +1587,6 @@ var createPatch$1 = function createPatch(original, dto, options) {
 
 };
 
-function httpAdapter$1(url, axios) {
-	let c = {
-		get,
-		post,
-		patch,
-		query,
-		express
-	};
-
-	return c;
-
-	async function get() {
-		const headers = {'Content-Type': 'application/json', 'Accept': 'application/json' };
-		const res = await axios.request({baseURL: url, headers, method: 'get'});
-		return res.data;
-	}
-
-	async function patch(body) {
-		const headers = {'Content-Type': 'application/json'};
-		const res = await axios.request({baseURL: url, headers, method: 'patch', data: body});
-		return res.data;
-	}
-
-	async function post(body) {
-		const headers = {'Content-Type': 'application/json'};
-		const res = await axios.request({baseURL: url, headers, method: 'post', data: body});
-		return res.data;
-	}
-
-
-	function query() {
-		throw new Error('Queries are not supported through http');
-	}
-
-	function express() {
-		throw new Error('Hosting in express is not supported on the client side');
-	}
-}
-
-function createNetAdapter(url, options) {
-	if (url && url.hostLocal)
-		return url.hostLocal(options.tableOptions);
-	else if (url &&  url.query)
-		return url;
-	else if (url &&  typeof url === 'function' && url().query)
-		return url();
-	else
-		return httpAdapter$1(url, options.axios);
-}
-
-var netAdapter$1 = createNetAdapter;
-
-const stringify$1 = stringify_1;
-const { v4: uuid } = require$$1;
-
-function toKeyPositionMap$1(rows, options) {
-	return rows.reduce((map, element, i) => {
-		if (options && options.keys && element === Object(element)) {
-			let key = [];
-			for (let i = 0; i < options.keys.length; i++) {
-				let keyName = options.keys[i].name;
-				key.push(negotiateTempKey(element[keyName]));
-			}
-			map[stringify$1(key)] = i;
-		}
-		else if ('id' in element)
-			map[stringify$1(element.id)] = i;
-		else
-			map[i] = i;
-		return map;
-	}, {});
-
-}
-
-function negotiateTempKey(value) {
-	if (value === undefined)
-		return `~${uuid()}`;
-	else
-		return value;
-}
-
-var toKeyPositionMap_1 = toKeyPositionMap$1;
-
 function bind(fn, thisArg) {
   return function wrap() {
     return fn.apply(thisArg, arguments);
@@ -1862,12 +1779,16 @@ const isStream = (val) => isObject(val) && isFunction(val.pipe);
  * @returns {boolean} True if value is an FormData, otherwise false
  */
 const isFormData = (thing) => {
-  const pattern = '[object FormData]';
+  let kind;
   return thing && (
-    (typeof FormData === 'function' && thing instanceof FormData) ||
-    toString.call(thing) === pattern ||
-    (isFunction(thing.toString) && thing.toString() === pattern)
-  );
+    (typeof FormData === 'function' && thing instanceof FormData) || (
+      isFunction(thing.append) && (
+        (kind = kindOf(thing)) === 'formdata' ||
+        // detect form-data instance
+        (kind === 'object' && isFunction(thing.toString) && thing.toString() === '[object FormData]')
+      )
+    )
+  )
 };
 
 /**
@@ -2186,7 +2107,7 @@ const matchAll = (regExp, str) => {
 const isHTMLForm = kindOfTest('HTMLFormElement');
 
 const toCamelCase = str => {
-  return str.toLowerCase().replace(/[_-\s]([a-z\d])(\w*)/g,
+  return str.toLowerCase().replace(/[-_\s]([a-z\d])(\w*)/g,
     function replacer(m, p1, p2) {
       return p1.toUpperCase() + p2;
     }
@@ -2270,6 +2191,37 @@ const toFiniteNumber = (value, defaultValue) => {
   return Number.isFinite(value) ? value : defaultValue;
 };
 
+const ALPHA = 'abcdefghijklmnopqrstuvwxyz';
+
+const DIGIT = '0123456789';
+
+const ALPHABET = {
+  DIGIT,
+  ALPHA,
+  ALPHA_DIGIT: ALPHA + ALPHA.toUpperCase() + DIGIT
+};
+
+const generateString = (size = 16, alphabet = ALPHABET.ALPHA_DIGIT) => {
+  let str = '';
+  const {length} = alphabet;
+  while (size--) {
+    str += alphabet[Math.random() * length|0];
+  }
+
+  return str;
+};
+
+/**
+ * If the thing is a FormData object, return true, otherwise return false.
+ *
+ * @param {unknown} thing - The thing to check.
+ *
+ * @returns {boolean}
+ */
+function isSpecCompliantForm(thing) {
+  return !!(thing && isFunction(thing.append) && thing[Symbol.toStringTag] === 'FormData' && thing[Symbol.iterator]);
+}
+
 const toJSONObject = (obj) => {
   const stack = new Array(10);
 
@@ -2300,6 +2252,11 @@ const toJSONObject = (obj) => {
 
   return visit(obj, 0);
 };
+
+const isAsyncFn = kindOfTest('AsyncFunction');
+
+const isThenable = (thing) =>
+  thing && (isObject(thing) || isFunction(thing)) && isFunction(thing.then) && isFunction(thing.catch);
 
 var utils = {
   isArray,
@@ -2347,7 +2304,12 @@ var utils = {
   findKey,
   global: _global,
   isContextDefined,
-  toJSONObject
+  ALPHABET,
+  generateString,
+  isSpecCompliantForm,
+  toJSONObject,
+  isAsyncFn,
+  isThenable
 };
 
 /**
@@ -2445,10 +2407,8 @@ AxiosError.from = (error, code, config, request, response, customProps) => {
   return axiosError;
 };
 
-/* eslint-env browser */
-var browser = typeof self == 'object' ? self.FormData : window.FormData;
-
-var FormData$2 = browser;
+// eslint-disable-next-line strict
+var httpAdapter$1 = null;
 
 /**
  * Determines if the given thing is a array or js object.
@@ -2506,17 +2466,6 @@ const predicates = utils.toFlatObject(utils, {}, null, function filter(prop) {
 });
 
 /**
- * If the thing is a FormData object, return true, otherwise return false.
- *
- * @param {unknown} thing - The thing to check.
- *
- * @returns {boolean}
- */
-function isSpecCompliant(thing) {
-  return thing && utils.isFunction(thing.append) && thing[Symbol.toStringTag] === 'FormData' && thing[Symbol.iterator];
-}
-
-/**
  * Convert a data object to FormData
  *
  * @param {Object} obj
@@ -2545,7 +2494,7 @@ function toFormData(obj, formData, options) {
   }
 
   // eslint-disable-next-line no-param-reassign
-  formData = formData || new (FormData$2 || FormData)();
+  formData = formData || new (FormData)();
 
   // eslint-disable-next-line no-param-reassign
   options = utils.toFlatObject(options, {
@@ -2563,7 +2512,7 @@ function toFormData(obj, formData, options) {
   const dots = options.dots;
   const indexes = options.indexes;
   const _Blob = options.Blob || typeof Blob !== 'undefined' && Blob;
-  const useBlob = _Blob && isSpecCompliant(formData);
+  const useBlob = _Blob && utils.isSpecCompliantForm(formData);
 
   if (!utils.isFunction(visitor)) {
     throw new TypeError('visitor must be a function');
@@ -2608,7 +2557,7 @@ function toFormData(obj, formData, options) {
         value = JSON.stringify(value);
       } else if (
         (utils.isArray(value) && isFlatArray(value)) ||
-        (utils.isFileList(value) || utils.endsWith(key, '[]') && (arr = utils.toArray(value))
+        ((utils.isFileList(value) || utils.endsWith(key, '[]')) && (arr = utils.toArray(value))
         )) {
         // eslint-disable-next-line no-param-reassign
         key = removeBrackets(key);
@@ -2860,7 +2809,9 @@ var transitionalDefaults = {
 
 var URLSearchParams$1 = typeof URLSearchParams !== 'undefined' ? URLSearchParams : AxiosURLSearchParams;
 
-var FormData$1 = FormData;
+var FormData$1 = typeof FormData !== 'undefined' ? FormData : null;
+
+var Blob$1 = typeof Blob !== 'undefined' ? Blob : null;
 
 /**
  * Determine if we're running in a standard browser environment
@@ -2916,7 +2867,7 @@ var platform = {
   classes: {
     URLSearchParams: URLSearchParams$1,
     FormData: FormData$1,
-    Blob
+    Blob: Blob$1
   },
   isStandardBrowserEnv,
   isStandardBrowserWebWorkerEnv,
@@ -3258,13 +3209,15 @@ function parseTokens(str) {
   return tokens;
 }
 
-function isValidHeaderName(str) {
-  return /^[-_a-zA-Z]+$/.test(str.trim());
-}
+const isValidHeaderName = (str) => /^[-_a-zA-Z0-9^`|~,!#$%&'*+.]+$/.test(str.trim());
 
-function matchHeaderValue(context, value, header, filter) {
+function matchHeaderValue(context, value, header, filter, isHeaderNameFilter) {
   if (utils.isFunction(filter)) {
     return filter.call(this, value, header);
+  }
+
+  if (isHeaderNameFilter) {
+    value = header;
   }
 
   if (!utils.isString(value)) return;
@@ -3370,7 +3323,7 @@ class AxiosHeaders {
     if (header) {
       const key = utils.findKey(this, header);
 
-      return !!(key && (!matcher || matchHeaderValue(this, this[key], key, matcher)));
+      return !!(key && this[key] !== undefined && (!matcher || matchHeaderValue(this, this[key], key, matcher)));
     }
 
     return false;
@@ -3403,8 +3356,20 @@ class AxiosHeaders {
     return deleted;
   }
 
-  clear() {
-    return Object.keys(this).forEach(this.delete.bind(this));
+  clear(matcher) {
+    const keys = Object.keys(this);
+    let i = keys.length;
+    let deleted = false;
+
+    while (i--) {
+      const key = keys[i];
+      if(!matcher || matchHeaderValue(this, this[key], key, matcher, true)) {
+        delete this[key];
+        deleted = true;
+      }
+    }
+
+    return deleted;
   }
 
   normalize(format) {
@@ -3547,9 +3512,6 @@ function CanceledError(message, config, request) {
 utils.inherits(CanceledError, AxiosError, {
   __CANCEL__: true
 });
-
-// eslint-disable-next-line strict
-var httpAdapter = null;
 
 /**
  * Resolve or reject a Promise based on response status.
@@ -3835,8 +3797,12 @@ var xhrAdapter = isXHRAdapterSupported && function (config) {
       }
     }
 
-    if (utils.isFormData(requestData) && (platform.isStandardBrowserEnv || platform.isStandardBrowserWebWorkerEnv)) {
-      requestHeaders.setContentType(false); // Let the browser set it
+    if (utils.isFormData(requestData)) {
+      if (platform.isStandardBrowserEnv || platform.isStandardBrowserWebWorkerEnv) {
+        requestHeaders.setContentType(false); // Let the browser set it
+      } else {
+        requestHeaders.setContentType('multipart/form-data;', false); // mobile/desktop app frameworks
+      }
     }
 
     let request = new XMLHttpRequest();
@@ -4023,7 +3989,7 @@ var xhrAdapter = isXHRAdapterSupported && function (config) {
 };
 
 const knownAdapters = {
-  http: httpAdapter,
+  http: httpAdapter$1,
   xhr: xhrAdapter
 };
 
@@ -4242,7 +4208,7 @@ function mergeConfig(config1, config2) {
     headers: (a, b) => mergeDeepProperties(headersToObject(a), headersToObject(b), true)
   };
 
-  utils.forEach(Object.keys(config1).concat(Object.keys(config2)), function computeConfigValue(prop) {
+  utils.forEach(Object.keys(Object.assign({}, config1, config2)), function computeConfigValue(prop) {
     const merge = mergeMap[prop] || mergeDeepProperties;
     const configValue = merge(config1[prop], config2[prop], prop);
     (utils.isUndefined(configValue) && merge !== mergeDirectKeys) || (config[prop] = configValue);
@@ -4251,7 +4217,7 @@ function mergeConfig(config1, config2) {
   return config;
 }
 
-const VERSION = "1.2.6";
+const VERSION = "1.4.0";
 
 const validators$1 = {};
 
@@ -4388,11 +4354,17 @@ class Axios {
       }, false);
     }
 
-    if (paramsSerializer !== undefined) {
-      validator.assertOptions(paramsSerializer, {
-        encode: validators.function,
-        serialize: validators.function
-      }, true);
+    if (paramsSerializer != null) {
+      if (utils.isFunction(paramsSerializer)) {
+        config.paramsSerializer = {
+          serialize: paramsSerializer
+        };
+      } else {
+        validator.assertOptions(paramsSerializer, {
+          encode: validators.function,
+          serialize: validators.function
+        }, true);
+      }
     }
 
     // Set config.method
@@ -4822,7 +4794,215 @@ axios.default = axios;
 
 var axios_1 = axios;
 
-function map$1(fn) {
+const _axios = axios_1;
+
+function httpAdapter(baseURL, path, axiosInterceptor) {
+	//@ts-ignore
+	const axios = _axios.default ? _axios.default.create({baseURL}) : _axios.create({baseURL});
+	axiosInterceptor.applyTo(axios);
+
+	let c = {
+		get,
+		post,
+		patch,
+		query,
+		express
+	};
+
+	return c;
+
+	async function get() {
+		const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
+		const res = await axios.request(path, {  headers, method: 'get' });
+		return res.data;
+	}
+
+	async function patch(body) {
+		try {
+
+			const headers = { 'Content-Type': 'application/json' };
+			const res = await axios.request(path, { headers, method: 'patch', data: body });
+			return res.data;
+		}
+		catch(e) {
+			if (e.response?.data)
+				throw new Error(e.response?.data);
+			else
+				throw e;
+		}
+
+
+	}
+
+	async function post(body) {
+		try {
+			const headers = { 'Content-Type': 'application/json' };
+			const res = await axios.request(path, { headers, method: 'post', data: body });
+			return res.data;
+		}
+		catch(e) {
+			console.dir(e);
+			throw e;
+		}
+	}
+
+
+	function query() {
+		throw new Error('Queries are not supported through http');
+	}
+
+	function express() {
+		throw new Error('Hosting in express is not supported on the client side');
+	}
+}
+
+function netAdapter$1(url, { axios, tableOptions }) {
+	let c = {
+		get,
+		post,
+		patch,
+		query
+	};
+
+	return c;
+
+	async function get() {
+		const adapter = await getInnerAdapter();
+		return adapter.get.apply(null, arguments);
+	}
+
+	async function patch(_body) {
+		const adapter = await getInnerAdapter();
+		return adapter.patch.apply(null, arguments);
+	}
+
+	async function post(_body) {
+		const adapter = await getInnerAdapter();
+		return adapter.post.apply(null, arguments);
+	}
+
+	async function query() {
+		const adapter = await getInnerAdapter();
+		return adapter.query.apply(null, arguments);
+	}
+
+	async function getInnerAdapter() {
+		const db = await getDb();
+		if (typeof db === 'string') {
+			// url = db + url;
+			return httpAdapter(db, url, axios);
+		}
+		else if (db && db.transaction) {
+			return db.hostLocal({ ...tableOptions, db, table: url });
+
+		}
+		else
+			throw new Error('Invalid arguments');
+	}
+
+	async function getDb() {
+		let db = tableOptions.db;
+		if (db.transaction)
+			return db;
+		if (typeof db === 'function') {
+			let dbPromise = db();
+			if (dbPromise.then)
+				db = await dbPromise;
+			else
+				db = dbPromise;
+		}
+
+		return db;
+	}
+
+}
+
+var netAdapter_1 = netAdapter$1;
+
+const stringify$1 = stringify_1;
+const { v4: uuid } = require$$1;
+
+function toKeyPositionMap$1(rows, options) {
+	return rows.reduce((map, element, i) => {
+		if (options && options.keys && element === Object(element)) {
+			let key = [];
+			for (let i = 0; i < options.keys.length; i++) {
+				let keyName = options.keys[i].name;
+				key.push(negotiateTempKey(element[keyName]));
+			}
+			map[stringify$1(key)] = i;
+		}
+		else if ('id' in element)
+			map[stringify$1(element.id)] = i;
+		else
+			map[i] = i;
+		return map;
+	}, {});
+
+}
+
+function negotiateTempKey(value) {
+	if (value === undefined)
+		return `~${uuid()}`;
+	else
+		return value;
+}
+
+var toKeyPositionMap_1 = toKeyPositionMap$1;
+
+function map$1(index, fn) {
+	const handler = {
+		get(target, prop) {
+			if (prop === 'map') {
+				return () => {
+					return new Proxy(onFinal, handler);
+				};
+			} else if (typeof target[prop] !== 'undefined') {
+				return target[prop];
+			} else {
+				return () => {
+					return new Proxy({}, handler);
+				};
+			}
+		},
+		apply(target, _thisArg, argumentsList) {
+			if (target === onFinal) {
+				return target(...argumentsList);
+			} else {
+				return new Proxy({}, handler);
+			}
+		},
+		set(target, prop, value) {
+			target[prop] = value;
+			return true;
+		},
+	};
+
+	const dbMap = {
+		http: (url) => url,
+		pg: throwDb,
+		postgres: throwDb,
+		mssql: throwDb,
+		mssqlNative: throwDb,
+		mysql: throwDb,
+		sap: throwDb,
+		sqlite: throwDb,
+	};
+
+
+
+	function throwDb() {
+		throw new Error('Cannot create pool for database outside node');
+	}
+
+	function onFinal(arg) {
+		return index({...arg, providers: dbMap});
+	}
+
+	onFinal.http = (url) => index({db: url, providers: dbMap});
+
+
+	return new Proxy(onFinal, handler);
 }
 
 var clientMap = map$1;
@@ -5020,17 +5200,64 @@ function rfdcCircles (opts) {
 
 var _default = rfdc_1();
 
+class InterceptorProxy {
+	constructor() {
+		this.requestInterceptors = [];
+		this.responseInterceptors = [];
+	}
+
+	get request() {
+		return {
+			use: (onFulfilled, onRejected) => {
+				const id = Math.random().toString(36).substr(2, 9); // unique id
+				this.requestInterceptors.push({ id, onFulfilled, onRejected });
+				return id;
+			},
+			eject: (id) => {
+				this.requestInterceptors = this.requestInterceptors.filter(interceptor => interceptor.id !== id);
+			}
+		};
+	}
+
+	get response() {
+		return {
+			use: (onFulfilled, onRejected) => {
+				const id = Math.random().toString(36).substr(2, 9); // unique id
+				this.responseInterceptors.push({ id, onFulfilled, onRejected });
+				return id;
+			},
+			eject: (id) => {
+				this.responseInterceptors = this.responseInterceptors.filter(interceptor => interceptor.id !== id);
+			}
+		};
+	}
+
+	applyTo(axiosInstance) {
+		for (const { onFulfilled, onRejected } of this.requestInterceptors) {
+			axiosInstance.interceptors.request.use(onFulfilled, onRejected);
+		}
+
+		for (const { onFulfilled, onRejected } of this.responseInterceptors) {
+			axiosInstance.interceptors.response.use(onFulfilled, onRejected);
+		}
+	}
+}
+
+var axiosInterceptor = function create() {
+	return new InterceptorProxy();
+};
+
 const createPatch = createPatch$1;
 const stringify = stringify_1;
-const netAdapter = netAdapter$1;
+const netAdapter = netAdapter_1;
 const toKeyPositionMap = toKeyPositionMap_1;
 const rootMap = new WeakMap();
 const fetchingStrategyMap = new WeakMap();
 const targetKey = Symbol();
-const _axios = axios_1;
+// const _axios = require('axios');
 const map = clientMap;
 const clone = _default;
-
+const createAxiosInterceptor = axiosInterceptor;
 
 function rdbClient(options = {}) {
 	if (options.pg)
@@ -5039,9 +5266,11 @@ function rdbClient(options = {}) {
 	let _reactive = options.reactive;
 	let baseUrl = options.db;
 	let providers = options.providers || {};
-	// @ts-ignore
-	const axios = _axios.default ? _axios.default.create() : _axios.create();
+	//@ts-ignore
+	// const axiosInterceptor = _axios.default ? _axios.default.create({}) : _axios.create({});
+	const axiosInterceptor = 	createAxiosInterceptor();
 
+	//
 	function client(_options = {}) {
 		if (_options.pg)
 			_options = { db: _options };
@@ -5055,6 +5284,7 @@ function rdbClient(options = {}) {
 		enumerable: true,
 		configurable: false
 	});
+	client.interceptors = axiosInterceptor;
 	client.createPatch = _createPatch;
 	client.table = table;
 	client.or = column('or');
@@ -5068,12 +5298,9 @@ function rdbClient(options = {}) {
 			return;
 		}
 	};
-	client.interceptors = axios.interceptors;
 	client.query = query;
 	client.transaction = runInTransaction;
 	client.db = baseUrl;
-	client.express = express;
-
 	client.mssql = onProvider.bind(null, 'mssql');
 	client.mssqlNative = onProvider.bind(null, 'mssqlNative');
 	client.pg = onProvider.bind(null, 'pg');
@@ -5082,10 +5309,11 @@ function rdbClient(options = {}) {
 	client.sap = onProvider.bind(null, 'sap');
 	client.http = onProvider.bind(null, 'http');
 	client.mysql = onProvider.bind(null, 'mysql');
+	client.express = express;
 
 	function onProvider(name, ...args) {
 		let db = providers[name].apply(null, args);
-		return client({db});
+		return client({ db });
 	}
 
 	if (options.tables) {
@@ -5102,7 +5330,7 @@ function rdbClient(options = {}) {
 				if (property in client)
 					return Reflect.get(...arguments);
 				else
-					return table(`${baseUrl}?table=${property}`,);
+					return table(`?table=${property}`,);
 			}
 
 		};
@@ -5146,13 +5374,19 @@ function rdbClient(options = {}) {
 	}
 
 	async function query() {
-		let db = await getDb();
-		return netAdapter(baseUrl, { tableOptions: { db }, axios }).query.apply(null, arguments);
+		// let db = await getDb();
+		return netAdapter(baseUrl, { tableOptions: { db: baseUrl } }).query.apply(null, arguments);
 	}
 
-	function express(options) {
-		return netAdapter(baseUrl, { tableOptions: { db: baseUrl } }).express(client, options);
+	function express(arg) {
+		if (providers.express) {
+			return providers.express(client, {...options, ...arg});
+		}
+		else
+			throw new Error('Cannot host express clientside');
 	}
+
+
 
 	function _createPatch(original, modified, ...restArgs) {
 		if (!Array.isArray(original)) {
@@ -5192,15 +5426,12 @@ function rdbClient(options = {}) {
 	}
 
 	function table(url, tableOptions) {
-		if (!(typeof url === 'string')) {
-			tableOptions = tableOptions || {};
-			tableOptions = { db: baseUrl, ...tableOptions, transaction };
-		}
+		tableOptions = tableOptions || {};
+		tableOptions = { db: baseUrl, ...tableOptions, transaction };
 		let meta;
 		let c = {
 			getMany,
 			getAll,
-			express,
 			getOne,
 			getById,
 			proxify,
@@ -5275,7 +5506,7 @@ function rdbClient(options = {}) {
 				path: 'getManyDto',
 				args
 			});
-			let adapter = netAdapter(url, { axios, tableOptions });
+			let adapter = netAdapter(url, { axios: axiosInterceptor, tableOptions });
 			return adapter.post(body);
 		}
 
@@ -5285,7 +5516,7 @@ function rdbClient(options = {}) {
 				path: 'insertAndForget',
 				args
 			});
-			let adapter = netAdapter(url, { axios, tableOptions });
+			let adapter = netAdapter(url, { axios: axiosInterceptor, tableOptions });
 			return adapter.post(body);
 		}
 
@@ -5295,7 +5526,7 @@ function rdbClient(options = {}) {
 				path: 'delete',
 				args
 			});
-			let adapter = netAdapter(url, { axios, tableOptions });
+			let adapter = netAdapter(url, { axios: axiosInterceptor, tableOptions });
 			return adapter.post(body);
 		}
 
@@ -5305,7 +5536,7 @@ function rdbClient(options = {}) {
 				path: 'deleteCascade',
 				args
 			});
-			let adapter = netAdapter(url, { axios, tableOptions });
+			let adapter = netAdapter(url, { axios: axiosInterceptor, tableOptions });
 			return adapter.post(body);
 		}
 
@@ -5425,7 +5656,7 @@ function rdbClient(options = {}) {
 		async function getMeta() {
 			if (meta)
 				return meta;
-			let adapter = netAdapter(url, { axios, tableOptions });
+			let adapter = netAdapter(url, { axios: axiosInterceptor, tableOptions });
 			meta = await adapter.get();
 
 			while (hasUnresolved(meta)) {
@@ -5473,7 +5704,7 @@ function rdbClient(options = {}) {
 			if (patch.length === 0)
 				return;
 			let body = stringify({ patch, options: { strategy, ...concurrencyOptions, deduceStrategy } });
-			let adapter = netAdapter(url, { axios, tableOptions });
+			let adapter = netAdapter(url, { axios: axiosInterceptor, tableOptions });
 			let p = adapter.patch(body);
 			let updatedPositions = extractChangedRowsPositions(array, patch, meta);
 			let insertedPositions = getInsertedRowsPosition(array);
@@ -5489,7 +5720,7 @@ function rdbClient(options = {}) {
 			if (patch.length === 0)
 				return;
 			let body = stringify({ patch, options: { strategy, ...concurrencyOptions, deduceStrategy } });
-			let adapter = netAdapter(url, { axios, tableOptions });
+			let adapter = netAdapter(url, { axios: axiosInterceptor, tableOptions });
 			await adapter.patch(body);
 			return;
 		}
@@ -5577,7 +5808,7 @@ function rdbClient(options = {}) {
 			let meta = await getMeta();
 			let patch = createPatch(array, [], meta);
 			let body = stringify({ patch, options });
-			let adapter = netAdapter(url, { axios, tableOptions });
+			let adapter = netAdapter(url, { axios: axiosInterceptor, tableOptions });
 			let { strategy } = await adapter.patch(body);
 			array.length = 0;
 			rootMap.set(array, { jsonMap: stringify(array), strategy });
@@ -5652,7 +5883,7 @@ function rdbClient(options = {}) {
 			let meta = await getMeta();
 			let patch = createPatch([row], [], meta);
 			let body = stringify({ patch, options });
-			let adapter = netAdapter(url, { axios, tableOptions });
+			let adapter = netAdapter(url, { axios: axiosInterceptor, tableOptions });
 			await adapter.patch(body);
 			rootMap.set(row, { strategy });
 		}
@@ -5675,7 +5906,7 @@ function rdbClient(options = {}) {
 
 			let body = stringify({ patch, options: { ...concurrencyOptions, strategy, deduceStrategy } });
 
-			let adapter = netAdapter(url, { axios, tableOptions });
+			let adapter = netAdapter(url, { axios: axiosInterceptor, tableOptions });
 			let { changed, strategy: newStrategy } = await adapter.patch(body);
 			copyInto(changed, [row]);
 			rootMap.set(row, { json: stringify(row), strategy: newStrategy });
