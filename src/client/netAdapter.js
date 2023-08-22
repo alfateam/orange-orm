@@ -1,8 +1,8 @@
 const _axios = require('axios');
-function httpAdapter(baseURL, path, axiosInterceptor) {
+function httpAdapter(baseURL, path, axios) {
 	//@ts-ignore
-	const axios = _axios.default ? _axios.default.create({baseURL}) : _axios.create({baseURL});
-	axiosInterceptor.setInstance(axios);
+	// const axios = _axios.default ? _axios.default.create({baseURL}) : _axios.create({baseURL});
+	// axiosInterceptor.setInstance(axios);
 
 	let c = {
 		get,
@@ -21,15 +21,32 @@ function httpAdapter(baseURL, path, axiosInterceptor) {
 	}
 
 	async function patch(body) {
-		const headers = { 'Content-Type': 'application/json' };
-		const res = await axios.request(path, { headers, method: 'patch', data: body });
-		return res.data;
+		try {
+
+			const headers = { 'Content-Type': 'application/json' };
+			const res = await axios.request(path, { headers, method: 'patch', data: body });
+			return res.data;
+		}
+		catch(e) {
+			if (e.response?.data)
+				throw new Error(e.response?.data);
+			else
+				throw e;
+		}
+
+
 	}
 
 	async function post(body) {
-		const headers = { 'Content-Type': 'application/json' };
-		const res = await axios.request(path, { headers, method: 'post', data: body });
-		return res.data;
+		try {
+			const headers = { 'Content-Type': 'application/json' };
+			const res = await axios.request(path, { headers, method: 'post', data: body });
+			return res.data;
+		}
+		catch(e) {
+			console.dir(e);
+			throw e;
+		}
 	}
 
 

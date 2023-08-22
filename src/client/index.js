@@ -8,7 +8,8 @@ const targetKey = Symbol();
 // const _axios = require('axios');
 const map = require('./clientMap');
 const clone = require('rfdc/default');
-const axiosInterceptor = require('./axiosInterceptor');
+const _axios = require('axios');
+// const createAxiosInterceptor = require('./axiosInterceptor');
 
 function rdbClient(options = {}) {
 	if (options.pg)
@@ -17,7 +18,9 @@ function rdbClient(options = {}) {
 	let _reactive = options.reactive;
 	let baseUrl = options.db;
 	let providers = options.providers || {};
-
+	//@ts-ignore
+	const axiosInterceptor = _axios.default ? _axios.default.create() : _axios.create();
+	//
 	function client(_options = {}) {
 		if (_options.pg)
 			_options = { db: _options };
@@ -44,7 +47,8 @@ function rdbClient(options = {}) {
 			return;
 		}
 	};
-	client.interceptors = axiosInterceptor();
+	// axiosInterceptor = axiosInterceptor();
+	// const axiosInterceptor = axiosInterceptor.interceptors;
 	client.query = query;
 	client.transaction = runInTransaction;
 	client.db = baseUrl;
@@ -125,9 +129,9 @@ function rdbClient(options = {}) {
 		return netAdapter(baseUrl, { tableOptions: { db: baseUrl } }).query.apply(null, arguments);
 	}
 
-	function express(options) {
+	function express(arg) {
 		if (providers.express) {
-			return providers.express(client, { options: {...options, ...arguments[0]} });
+			return providers.express(client, {...options, ...arg});
 		}
 		else
 			throw new Error('Cannot host express clientside');
@@ -253,7 +257,7 @@ function rdbClient(options = {}) {
 				path: 'getManyDto',
 				args
 			});
-			let adapter = netAdapter(url, { axios: client.interceptors, tableOptions });
+			let adapter = netAdapter(url, { axios: axiosInterceptor, tableOptions });
 			return adapter.post(body);
 		}
 
@@ -263,7 +267,7 @@ function rdbClient(options = {}) {
 				path: 'insertAndForget',
 				args
 			});
-			let adapter = netAdapter(url, { axios: client.interceptors, tableOptions });
+			let adapter = netAdapter(url, { axios: axiosInterceptor, tableOptions });
 			return adapter.post(body);
 		}
 
@@ -273,7 +277,7 @@ function rdbClient(options = {}) {
 				path: 'delete',
 				args
 			});
-			let adapter = netAdapter(url, { axios: client.interceptors, tableOptions });
+			let adapter = netAdapter(url, { axios: axiosInterceptor, tableOptions });
 			return adapter.post(body);
 		}
 
@@ -283,7 +287,7 @@ function rdbClient(options = {}) {
 				path: 'deleteCascade',
 				args
 			});
-			let adapter = netAdapter(url, { axios: client.interceptors, tableOptions });
+			let adapter = netAdapter(url, { axios: axiosInterceptor, tableOptions });
 			return adapter.post(body);
 		}
 
@@ -403,7 +407,7 @@ function rdbClient(options = {}) {
 		async function getMeta() {
 			if (meta)
 				return meta;
-			let adapter = netAdapter(url, { axios: client.interceptors, tableOptions });
+			let adapter = netAdapter(url, { axios: axiosInterceptor, tableOptions });
 			meta = await adapter.get();
 
 			while (hasUnresolved(meta)) {
@@ -451,7 +455,7 @@ function rdbClient(options = {}) {
 			if (patch.length === 0)
 				return;
 			let body = stringify({ patch, options: { strategy, ...concurrencyOptions, deduceStrategy } });
-			let adapter = netAdapter(url, { axios: client.interceptors, tableOptions });
+			let adapter = netAdapter(url, { axios: axiosInterceptor, tableOptions });
 			let p = adapter.patch(body);
 			let updatedPositions = extractChangedRowsPositions(array, patch, meta);
 			let insertedPositions = getInsertedRowsPosition(array);
@@ -467,7 +471,7 @@ function rdbClient(options = {}) {
 			if (patch.length === 0)
 				return;
 			let body = stringify({ patch, options: { strategy, ...concurrencyOptions, deduceStrategy } });
-			let adapter = netAdapter(url, { axios: client.interceptors, tableOptions });
+			let adapter = netAdapter(url, { axios: axiosInterceptor, tableOptions });
 			await adapter.patch(body);
 			return;
 		}
@@ -555,7 +559,7 @@ function rdbClient(options = {}) {
 			let meta = await getMeta();
 			let patch = createPatch(array, [], meta);
 			let body = stringify({ patch, options });
-			let adapter = netAdapter(url, { axios: client.interceptors, tableOptions });
+			let adapter = netAdapter(url, { axios: axiosInterceptor, tableOptions });
 			let { strategy } = await adapter.patch(body);
 			array.length = 0;
 			rootMap.set(array, { jsonMap: stringify(array), strategy });
@@ -630,7 +634,7 @@ function rdbClient(options = {}) {
 			let meta = await getMeta();
 			let patch = createPatch([row], [], meta);
 			let body = stringify({ patch, options });
-			let adapter = netAdapter(url, { axios: client.interceptors, tableOptions });
+			let adapter = netAdapter(url, { axios: axiosInterceptor, tableOptions });
 			await adapter.patch(body);
 			rootMap.set(row, { strategy });
 		}
@@ -653,7 +657,7 @@ function rdbClient(options = {}) {
 
 			let body = stringify({ patch, options: { ...concurrencyOptions, strategy, deduceStrategy } });
 
-			let adapter = netAdapter(url, { axios: client.interceptors, tableOptions });
+			let adapter = netAdapter(url, { axios: axiosInterceptor, tableOptions });
 			let { changed, strategy: newStrategy } = await adapter.patch(body);
 			copyInto(changed, [row]);
 			rootMap.set(row, { json: stringify(row), strategy: newStrategy });

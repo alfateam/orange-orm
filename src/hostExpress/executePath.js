@@ -121,6 +121,8 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 		if (typeof baseFilter === 'function') {
 			const context = { db: bindDb(client), request, response };
 			const res = await baseFilter.apply(null, [context]);
+			if (!res)
+				return;
 			const JSONFilter = JSON.parse(JSON.stringify(res));
 			//@ts-ignore
 			return executePath({ table, JSONFilter, request, response });

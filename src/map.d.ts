@@ -91,6 +91,7 @@ type MappedDbInstance<T> = {
 	): Promise<void>;
 	express(): Express.RequestHandler;
 	express(config: ExpressConfig<T>): Express.RequestHandler;
+	readonly metaData: DbConcurrency<T>;
 } & DbConnectable<T>;
 
 
@@ -489,6 +490,16 @@ type Concurrency<T> = {
 	readonly?: boolean;
 	concurrency?: ConcurrencyValues;
 };
+
+type DbConcurrency<T> = {
+	[K in keyof T]: T[K] extends MappedTableDef<infer U>
+	? Concurrency<U>
+	: never;
+} & {
+	readonly?: boolean;
+	concurrency?: ConcurrencyValues;
+};
+
 
 type ConcurrencyValues = 'optimistic' | 'skipOnConflict' | 'overwrite';
 
