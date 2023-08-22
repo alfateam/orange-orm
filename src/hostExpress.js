@@ -12,11 +12,10 @@ function hostExpress(client, options = {}) {
 		c[tableName] = hostLocal({
 			...dbOptions,
 			...readonly,
-			...options[tableName], ...{
-				table: client.tables[tableName],
-				...{ baseFilter: options?.[tableName]?.baseFilter },
-				isHttp: true, client
-			}
+			...options[tableName],
+			table: client.tables[tableName],
+			isHttp: true, client
+
 		});
 	}
 

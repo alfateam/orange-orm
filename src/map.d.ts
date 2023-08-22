@@ -89,8 +89,8 @@ type MappedDbInstance<T> = {
 	transaction(
 		fn: (db: MappedDbInstance<T>) => Promise<unknown>
 	): Promise<void>;
-	express(): Express.RequestHandler;
-	express(config: ExpressConfig<T>): Express.RequestHandler;
+	express(): import('express').RequestHandler;
+	express(config: ExpressConfig<T>): import('express').RequestHandler;
 	readonly metaData: DbConcurrency<T>;
 } & DbConnectable<T>;
 
@@ -104,7 +104,7 @@ type ExpressConfig<T> = {
 }
 
 type ExpressTableConfig<T> = {
-	baseFilter?: RawFilter | ((db: MappedDbInstance<T>, req: Express.Request, res: Express.Response) => RawFilter);
+	baseFilter?: RawFilter | ((db: MappedDbInstance<T>, req: import('express').Request, res: import('express').Response) => RawFilter);
 }
 
 
