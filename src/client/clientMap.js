@@ -1,4 +1,4 @@
-function map(index, fn) {
+function map(index, _fn) {
 	const handler = {
 		get(target, prop) {
 			if (prop === 'map') {

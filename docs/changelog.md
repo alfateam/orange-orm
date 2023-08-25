@@ -1,5 +1,7 @@
 
 ## Release notes
+__3.1.36__  
+Fixed typescript types in definition file.  
 __3.1.35__  
 Fix CI badge  
 __3.1.34__  
