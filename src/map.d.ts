@@ -1,5 +1,6 @@
 import type { Options } from 'ajv';
 import type { ConnectionConfig } from 'tedious';
+import type { AxiosInterceptorManager, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 
 export type MappedDbDef<T> = {
 	map<V extends AllowedDbMap<V>>(
@@ -92,7 +93,13 @@ type MappedDbInstance<T> = {
 	express(): import('express').RequestHandler;
 	express(config: ExpressConfig<T>): import('express').RequestHandler;
 	readonly metaData: DbConcurrency<T>;
-} & DbConnectable<T>;
+	interceptors: WithInterceptors;
+} & DbConnectable<T> & WithInterceptors;
+
+interface WithInterceptors {
+	request: AxiosInterceptorManager<InternalAxiosRequestConfig>;
+    response: AxiosInterceptorManager<AxiosResponse>;
+}
 
 
 type ExpressConfig<T> = {
