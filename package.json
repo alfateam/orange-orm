@@ -1,6 +1,6 @@
 {
   "name": "rdb",
-  "version": "3.1.35",
+  "version": "3.1.36",
   "main": "./src/index.js",
   "browser": "./src/client/index.mjs",
   "bin": {
