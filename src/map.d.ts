@@ -1013,9 +1013,10 @@ type StrategyToInsertRowData<T> = {
 		? JsonType | null
 		: // : never
 		T[K] extends ManyRelation
-		? StrategyToInsertRowData<T[K]>[]
-		: StrategyToInsertRowData<T[K]>;
-	};
+		? InsertableRow<T[K]>[]
+		: InsertableRow<T[K]>;
+	}, 'formulaDiscriminators' | 'columnDiscriminators' | 'map'>
+	;
 
 type NegotiateDefaultStrategy<T> = T extends ColumnSymbols ? T : never;
 
