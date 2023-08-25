@@ -1,4 +1,5 @@
 import { describe, test, beforeAll, expect } from 'vitest';
+const express = require('express');
 const db = require('./db');
 const initPg = require('./initPg');
 const initMs = require('./initMs');
@@ -8,6 +9,8 @@ const initSap = require('./initSap');
 const dateToISOString = require('../src/dateToISOString');
 const versionArray = process.version.replace('v', '').split('.');
 const major = parseInt(versionArray[0]);
+import { json } from 'body-parser';
+import cors from 'cors';
 
 beforeAll(async () => {
 	await createMs('mssql');
@@ -17,7 +20,9 @@ beforeAll(async () => {
 		await insertData('mssqlNative');
 	await insertData('mysql');
 	await insertData('sqlite');
+	await insertData('sqlite2');
 	await insertData('sap');
+	hostExpress();
 
 	async function insertData(dbName) {
 		const { db, init } = getDb(dbName);
@@ -94,6 +99,15 @@ beforeAll(async () => {
 		`;
 		await db.query(sql);
 	}
+
+	function hostExpress() {
+		const { db }= getDb('sqlite2');
+		let app = express();
+		app.disable('x-powered-by')
+			.use(json({ limit: '100mb' }))
+			.use('/rdb', cors(), db.express());
+		app.listen(3000, () => console.log('Example app listening on port 3000!'));
+	}
 });
 describe('any-subFilter filter nested', () => {
 
@@ -103,7 +117,7 @@ describe('any-subFilter filter nested', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
-	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
@@ -137,7 +151,7 @@ describe('getMany hasOne sub filter', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
-	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
@@ -173,7 +187,7 @@ describe('getMany none sub filter', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
-	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
@@ -206,12 +220,15 @@ describe('getMany', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
-	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
 
-		const rows = await db.customer.getAll();
+		const rows = await db.customer.getMany();
+
+		console.dir(JSON.stringify(rows), {depth: Infinity});
 
 		const expected = [{
 			id: 1,
@@ -238,7 +255,7 @@ describe('getMany with column strategy', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
-	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
@@ -265,7 +282,7 @@ describe('getMany with relations', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
-	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
@@ -369,6 +386,11 @@ function getDb(name) {
 			db: db.sqlite(sqliteName),
 			init: initSqlite
 		};
+	else if (name === 'sqlite2')
+		return {
+			db: db.sqlite(sqliteName2),
+			init: initSqlite
+		};
 	else if (name === 'sap')
 		return {
 			db: db.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master`),
@@ -379,7 +401,13 @@ function getDb(name) {
 			db: db.mysql('mysql://test:test@mysql/test'),
 			init: initMysql
 		};
+	else if (name === 'http')
+		return {
+			db: db.http('http://localhost:3000/rdb'),
+			// init: initSqlite
+		};
 
 	throw new Error('unknown db');
 }
 const sqliteName = `demo${new Date().getUTCMilliseconds()}.db`;
+const sqliteName2 = `demo2${new Date().getUTCMilliseconds()}.db`;

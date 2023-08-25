@@ -1,4 +1,10 @@
-function httpAdapter(url, axios) {
+const _axios = require('axios');
+
+function httpAdapter(baseURL, path, axiosInterceptor) {
+	//@ts-ignore
+	const axios = _axios.default ? _axios.default.create({baseURL}) : _axios.create({baseURL});
+	axiosInterceptor.applyTo(axios);
+
 	let c = {
 		get,
 		post,
@@ -10,21 +16,38 @@ function httpAdapter(url, axios) {
 	return c;
 
 	async function get() {
-		const headers = {'Content-Type': 'application/json', 'Accept': 'application/json' };
-		const res = await axios.request({baseURL: url, headers, method: 'get'});
+		const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
+		const res = await axios.request(path, {  headers, method: 'get' });
 		return res.data;
 	}
 
 	async function patch(body) {
-		const headers = {'Content-Type': 'application/json'};
-		const res = await axios.request({baseURL: url, headers, method: 'patch', data: body});
-		return res.data;
+		try {
+
+			const headers = { 'Content-Type': 'application/json' };
+			const res = await axios.request(path, { headers, method: 'patch', data: body });
+			return res.data;
+		}
+		catch(e) {
+			if (e.response?.data)
+				throw new Error(e.response?.data);
+			else
+				throw e;
+		}
+
+
 	}
 
 	async function post(body) {
-		const headers = {'Content-Type': 'application/json'};
-		const res = await axios.request({baseURL: url, headers, method: 'post', data: body});
-		return res.data;
+		try {
+			const headers = { 'Content-Type': 'application/json' };
+			const res = await axios.request(path, { headers, method: 'post', data: body });
+			return res.data;
+		}
+		catch(e) {
+			console.dir(e);
+			throw e;
+		}
 	}
 
 
@@ -37,15 +60,65 @@ function httpAdapter(url, axios) {
 	}
 }
 
-function createNetAdapter(url, options) {
-	if (url && url.hostLocal)
-		return url.hostLocal(options.tableOptions);
-	else if (url &&  url.query)
-		return url;
-	else if (url &&  typeof url === 'function' && url().query)
-		return url();
-	else
-		return httpAdapter(url, options.axios);
+function netAdapter(url, { axios, tableOptions }) {
+	let c = {
+		get,
+		post,
+		patch,
+		query
+	};
+
+	return c;
+
+	async function get() {
+		const adapter = await getInnerAdapter();
+		return adapter.get.apply(null, arguments);
+	}
+
+	async function patch(_body) {
+		const adapter = await getInnerAdapter();
+		return adapter.patch.apply(null, arguments);
+	}
+
+	async function post(_body) {
+		const adapter = await getInnerAdapter();
+		return adapter.post.apply(null, arguments);
+	}
+
+	async function query() {
+		const adapter = await getInnerAdapter();
+		return adapter.query.apply(null, arguments);
+	}
+
+	async function getInnerAdapter() {
+		const db = await getDb();
+		if (typeof db === 'string') {
+			// url = db + url;
+			return httpAdapter(db, url, axios);
+		}
+		else if (db && db.transaction) {
+			return db.hostLocal({ ...tableOptions, db, table: url });
+
+		}
+		else
+			throw new Error('Invalid arguments');
+	}
+
+	async function getDb() {
+		let db = tableOptions.db;
+		if (db.transaction)
+			return db;
+		if (typeof db === 'function') {
+			let dbPromise = db();
+			if (dbPromise.then)
+				db = await dbPromise;
+			else
+				db = dbPromise;
+		}
+
+		return db;
+	}
+
 }
 
-module.exports = createNetAdapter;
+module.exports = netAdapter;

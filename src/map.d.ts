@@ -1,5 +1,6 @@
 import type { Options } from 'ajv';
 import type { ConnectionConfig } from 'tedious';
+import type { AxiosInterceptorManager, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 
 export type MappedDbDef<T> = {
 	map<V extends AllowedDbMap<V>>(
@@ -89,9 +90,16 @@ type MappedDbInstance<T> = {
 	transaction(
 		fn: (db: MappedDbInstance<T>) => Promise<unknown>
 	): Promise<void>;
-	express(): Express.RequestHandler;
-	express(config: ExpressConfig<T>): Express.RequestHandler;
-} & DbConnectable<T>;
+	express(): import('express').RequestHandler;
+	express(config: ExpressConfig<T>): import('express').RequestHandler;
+	readonly metaData: DbConcurrency<T>;
+	interceptors: WithInterceptors;
+} & DbConnectable<T> & WithInterceptors;
+
+interface WithInterceptors {
+	request: AxiosInterceptorManager<InternalAxiosRequestConfig>;
+    response: AxiosInterceptorManager<AxiosResponse>;
+}
 
 
 type ExpressConfig<T> = {
@@ -103,7 +111,7 @@ type ExpressConfig<T> = {
 }
 
 type ExpressTableConfig<T> = {
-	baseFilter?: RawFilter | ((db: MappedDbInstance<T>, req: Express.Request, res: Express.Response) => RawFilter);
+	baseFilter?: RawFilter | ((db: MappedDbInstance<T>, req: import('express').Request, res: import('express').Response) => RawFilter);
 }
 
 
@@ -389,7 +397,7 @@ type ColumnToType<T> = T extends UuidColumnSymbol
 	? number
 	: T extends DateColumnSymbol
 	? string | Date
-	: T extends DateWithTimeZoneSymbol
+	: T extends DateWithTimeZoneColumnSymbol
 	? string | Date
 	: T extends BinaryColumnSymbol
 	? string
@@ -489,6 +497,16 @@ type Concurrency<T> = {
 	readonly?: boolean;
 	concurrency?: ConcurrencyValues;
 };
+
+type DbConcurrency<T> = {
+	[K in keyof T]: T[K] extends MappedTableDef<infer U>
+	? Concurrency<U>
+	: never;
+} & {
+	readonly?: boolean;
+	concurrency?: ConcurrencyValues;
+};
+
 
 type ConcurrencyValues = 'optimistic' | 'skipOnConflict' | 'overwrite';
 
@@ -746,11 +764,13 @@ type MappedTableDef<T> = {
 
 type NotNullProperties<T> = Pick<
 	T,
-	{ [K in keyof T]: T[K] extends NotNull ? K : never }[keyof T]
+	{ [K in keyof T]: T[K] extends NotNull ? K :  T[K] extends ManyRelation ? K : never}[keyof T]
 >;
+
+
 type NullProperties<T> = Pick<
 	T,
-	{ [K in keyof T]: T[K] extends NotNull ? never : K }[keyof T]
+	{ [K in keyof T]: T[K] extends NotNull | ManyRelation? never : K }[keyof T]
 >;
 
 type NotNullInsertProperties<T> = Pick<
@@ -946,7 +966,7 @@ type StrategyToRowData<T> = {
 		: StrategyToRowData<T[K]>;
 	};
 
-type StrategyToInsertRowData<T> = {
+type StrategyToInsertRowData<T> = Omit<{
 	[K in keyof RemoveNever<
 		NotNullInsertProperties<T>
 	>]: T[K] extends StringColumnSymbol
@@ -995,7 +1015,8 @@ type StrategyToInsertRowData<T> = {
 		T[K] extends ManyRelation
 		? StrategyToInsertRowData<T[K]>[]
 		: StrategyToInsertRowData<T[K]>;
-	};
+	}, 'formulaDiscriminators' | 'columnDiscriminators' | 'map'>
+	;
 
 type NegotiateDefaultStrategy<T> = T extends ColumnSymbols ? T : never;
 

@@ -1,4 +1,7 @@
 import { describe, test, beforeAll, expect } from 'vitest';
+import express from 'express';
+import cors from 'cors';
+import { json } from 'body-parser';
 const dateToISOString = require('../src/dateToISOString');
 const db = require('./db');
 const initPg = require('./initPg');
@@ -20,6 +23,8 @@ beforeAll(async () => {
 	await insertData('mysql');
 	await insertData('sap');
 	await insertData('sqlite');
+	await insertData('sqlite2');
+	hostExpress();
 
 	async function insertData(dbName) {
 		const { db, init } = getDb(dbName);
@@ -69,6 +74,16 @@ beforeAll(async () => {
 			}
 		]);
 	}
+
+	function hostExpress() {
+		const { db }= getDb('sqlite2');
+		let app = express();
+		app.disable('x-powered-by')
+			.use(json({ limit: '100mb' }))
+			.use('/rdb', cors(), db.express());
+		app.listen(3000, () => console.log('Example app listening on port 3000!'));
+	}
+
 });
 
 
@@ -81,6 +96,7 @@ describe('update date', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sap', async () => await verify('sap'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('http', async () => await verify('sqlite'));
 
 	async function verify(dbName) {
 
@@ -103,6 +119,7 @@ describe('update date in array', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sap', async () => await verify('sap'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('http', async () => await verify('sqlite'));
 
 	async function verify(dbName) {
 
@@ -126,6 +143,7 @@ describe('update multiple in array', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sap', async () => await verify('sap'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('http', async () => await verify('sqlite'));
 
 	async function verify(dbName) {
 
@@ -207,6 +225,7 @@ describe('delete row', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sap', async () => await verify('sap'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('http', async () => await verify('sqlite'));
 
 	async function verify(dbName) {
 
@@ -256,17 +275,27 @@ function getDb(name) {
 			db: db({ db: (cons) => cons.sqlite(sqliteName) }),
 			init: initSqlite
 		};
+	else if (name === 'sqlite2')
+		return {
+			db: db.sqlite(sqliteName2),
+			init: initSqlite
+		};
 	else if (name === 'sap')
 		return {
-			db: db({ db: (cons) => cons.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master`) }),
+			db: db.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master`),
 			init: initSap
 		};
 	else if (name === 'mysql')
 		return {
-			db: db({ db: (cons) => cons.mysql('mysql://test:test@mysql/test') }),
+			db: db.mysql('mysql://test:test@mysql/test'),
 			init: initMysql
+		};
+	else if (name === 'http')
+		return {
+			db: db.http('http://localhost:3000/rdb'),
 		};
 
 	throw new Error('unknown db');
 }
 const sqliteName = `demo${new Date().getUTCMilliseconds()}.db`;
+const sqliteName2 = `demo2${new Date().getUTCMilliseconds()}.db`;
