@@ -397,7 +397,7 @@ type ColumnToType<T> = T extends UuidColumnSymbol
 	? number
 	: T extends DateColumnSymbol
 	? string | Date
-	: T extends DateWithTimeZoneSymbol
+	: T extends DateWithTimeZoneColumnSymbol
 	? string | Date
 	: T extends BinaryColumnSymbol
 	? string
@@ -966,7 +966,7 @@ type StrategyToRowData<T> = {
 		: StrategyToRowData<T[K]>;
 	};
 
-type StrategyToInsertRowData<T> = {
+type StrategyToInsertRowData<T> = Omit<{
 	[K in keyof RemoveNever<
 		NotNullInsertProperties<T>
 	>]: T[K] extends StringColumnSymbol
@@ -1013,8 +1013,8 @@ type StrategyToInsertRowData<T> = {
 		? JsonType | null
 		: // : never
 		T[K] extends ManyRelation
-		? InsertableRow<T[K]>[]
-		: InsertableRow<T[K]>;
+		? StrategyToInsertRowData<T[K]>[]
+		: StrategyToInsertRowData<T[K]>;
 	}, 'formulaDiscriminators' | 'columnDiscriminators' | 'map'>
 	;
 
