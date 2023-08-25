@@ -667,7 +667,7 @@ function hostExpress(options) {
 	app.disable('x-powered-by')
 		.use(json({ limit: '100mb' }))
 		.use('/rdb', cors(), db.express());
-	server = app.listen(3000, () => console.log('Example app listening on port 3000!'));
+	server = app.listen(3001, () => console.log('Example app listening on port 3001!'));
 }
 
 
@@ -725,7 +725,7 @@ function getDb(name) {
 		};
 	else if (name === 'http')
 		return {
-			db: db.http('http://localhost:3000/rdb'),
+			db: db.http('http://localhost:3001/rdb'),
 		};
 
 	throw new Error('unknown db');

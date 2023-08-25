@@ -1,4 +1,4 @@
-import { describe, test, beforeAll, expect } from 'vitest';
+import { describe, test, beforeAll, afterAll, expect } from 'vitest';
 import express from 'express';
 import cors from 'cors';
 import { json } from 'body-parser';
@@ -14,6 +14,14 @@ const major = parseInt(versionArray[0]);
 
 const date1 = new Date(2022, 0, 11, 9, 24, 47);
 const date2 = new Date(2021, 0, 11, 12, 22, 45);
+let server = null;
+
+afterAll(async () => {
+	return new Promise((res) => {
+		server.close(res);
+	});
+});
+
 
 beforeAll(async () => {
 	await insertData('pg');
@@ -76,12 +84,12 @@ beforeAll(async () => {
 	}
 
 	function hostExpress() {
-		const { db }= getDb('sqlite2');
+		const { db } = getDb('sqlite2');
 		let app = express();
 		app.disable('x-powered-by')
 			.use(json({ limit: '100mb' }))
 			.use('/rdb', cors(), db.express());
-		app.listen(3000, () => console.log('Example app listening on port 3000!'));
+		server = app.listen(3002, () => console.log('Example app listening on port 3002!'));
 	}
 
 });
@@ -96,7 +104,7 @@ describe('update date', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sap', async () => await verify('sap'));
 	test('sqlite', async () => await verify('sqlite'));
-	test('http', async () => await verify('sqlite'));
+	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
 
@@ -119,7 +127,7 @@ describe('update date in array', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sap', async () => await verify('sap'));
 	test('sqlite', async () => await verify('sqlite'));
-	test('http', async () => await verify('sqlite'));
+	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
 
@@ -143,13 +151,13 @@ describe('update multiple in array', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sap', async () => await verify('sap'));
 	test('sqlite', async () => await verify('sqlite'));
-	test('http', async () => await verify('sqlite'));
+	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
 
 
 		const { db } = getDb(dbName);
-		let rows = await db.order.getAll({lines: true, deliveryAddress: true, customer: true, orderBy: 'id'});
+		let rows = await db.order.getAll({ lines: true, deliveryAddress: true, customer: true, orderBy: 'id' });
 		const date1 = new Date(2021, 0, 11, 9, 11, 47);
 		const date2 = new Date(2022, 0, 12, 8, 22, 46);
 
@@ -159,7 +167,7 @@ describe('update multiple in array', () => {
 
 		rows[1].orderDate = date2;
 		rows[1].deliveryAddress = null;
-		rows[1].lines.push({product: 'Cloak of invisibility'});
+		rows[1].lines.push({ product: 'Cloak of invisibility' });
 
 		await rows.saveChanges();
 		await rows.refresh();
@@ -225,7 +233,7 @@ describe('delete row', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sap', async () => await verify('sap'));
 	test('sqlite', async () => await verify('sqlite'));
-	test('http', async () => await verify('sqlite'));
+	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
 
@@ -292,7 +300,7 @@ function getDb(name) {
 		};
 	else if (name === 'http')
 		return {
-			db: db.http('http://localhost:3000/rdb'),
+			db: db.http('http://localhost:3002/rdb'),
 		};
 
 	throw new Error('unknown db');

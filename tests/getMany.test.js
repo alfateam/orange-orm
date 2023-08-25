@@ -1,4 +1,4 @@
-import { describe, test, beforeAll, expect } from 'vitest';
+import { describe, test, beforeAll, afterAll, expect } from 'vitest';
 const express = require('express');
 const db = require('./db');
 const initPg = require('./initPg');
@@ -11,6 +11,14 @@ const versionArray = process.version.replace('v', '').split('.');
 const major = parseInt(versionArray[0]);
 import { json } from 'body-parser';
 import cors from 'cors';
+
+let server;
+
+afterAll(async () => {
+	return new Promise((res) => {
+		server.close(res);
+	});
+});
 
 beforeAll(async () => {
 	await createMs('mssql');
@@ -106,7 +114,7 @@ beforeAll(async () => {
 		app.disable('x-powered-by')
 			.use(json({ limit: '100mb' }))
 			.use('/rdb', cors(), db.express());
-		app.listen(3000, () => console.log('Example app listening on port 3000!'));
+		server = app.listen(3000, () => console.log('Example app listening on port 3000!'));
 	}
 });
 describe('any-subFilter filter nested', () => {
