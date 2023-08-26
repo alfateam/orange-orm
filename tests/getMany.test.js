@@ -16,7 +16,10 @@ let server;
 
 afterAll(async () => {
 	return new Promise((res) => {
-		server.close(res);
+		if (server)
+			server.close(res);
+		else
+			res();
 	});
 });
 
@@ -131,6 +134,7 @@ describe('any-subFilter filter nested', () => {
 		const { db } = getDb(dbName);
 		const filter = db.order.lines.any(x => x.packages.any(x => x.sscc.startsWith('aaa')));
 		const rows = await db.order.getMany(filter);
+
 
 		//mssql workaround because datetime has no time offset
 		for (let i = 0; i < rows.length; i++) {

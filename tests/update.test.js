@@ -18,7 +18,10 @@ let server = null;
 
 afterAll(async () => {
 	return new Promise((res) => {
-		server.close(res);
+		if (server)
+			server.close(res);
+		else
+			res();
 	});
 });
 
