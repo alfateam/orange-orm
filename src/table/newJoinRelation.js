@@ -57,6 +57,15 @@ function _newJoin(parentTable, childTable, columnNames) {
 		return childTable._cache.getInnerCache();
 	};
 
+	c.notNullExceptInsert = function() {
+		return c;
+	};
+
+	c.notNull = function() {
+		return c;
+	};
+
+
 	return c;
 
 	function addColumns() {
