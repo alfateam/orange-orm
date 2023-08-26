@@ -18,6 +18,15 @@ function newOne(joinRelation) {
 		return relation;
 	};
 
+	c.notNullExceptInsert = function() {
+		return c;
+	};
+
+	c.notNull = function() {
+		return c;
+	};
+
+
 	return c;
 }
 
