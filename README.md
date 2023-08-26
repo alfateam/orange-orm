@@ -36,6 +36,7 @@ Here we choose SQLite.
 ```bash
 $ npm install sqlite3
 ```
+<sub>📄 db.js</sub>
 ```javascript
 import rdb from 'rdb';
 
@@ -77,7 +78,12 @@ const map = rdb.map(x => ({
   }))
 }));
 
-const db = map.sqlite('demo.db');
+export default map.sqlite('demo.db');
+```  
+<sub>📄 update.js</sub>
+
+```javascript
+import db from './db';
 
 updateRow();
 
@@ -585,23 +591,125 @@ async function deleteRows() {
 ```
 </details>
 <details><summary><strong>In the browser</strong></summary>
-We initiate a database transaction using db.transaction.
-Within the transaction, a customer is retrieved and its balance updated using the tx object to ensure operations are transactional.
-An error is deliberately thrown to demonstrate a rollback, ensuring all previous changes within the transaction are reverted.
-Always use the provided tx object for operations within the transaction to maintain data integrity.
+You can use <strong><i>RDB</i></strong> directly in the browser using the adapter for the Express.js framework. Instead of sending raw SQL queries from the client to the server, this approach records the method calls in the client. These method calls are then replayed at the server, ensuring a higher level of security by not exposing raw SQL on the client side.  
+Raw sql queries and raw sql filters are disabled at the http client due to security reasons.  If you would like RDB to support other web frameworks, like nestJs, fastify, etc, please let me know.
+
+<sub>📄 server.js</sub>
+```javascript
+import db from './db';
+import { json } from 'body-parser';
+import express from 'express';
+
+express().disable('x-powered-by')
+  .use(json({ limit: '100mb' }))
+  .use('/rdb', db.express())
+  .listen(3000, () => console.log('Example app listening on port 3000!'));
+```
+
+<sub>📄 browser.js</sub>
+```javascript
+import map from './db';
+
+updateRows();
+
+async function updateRows() {
+  const db = map.http('http://localhost:3000/rdb');
+  const filter = db.order.lines.any(
+    line => line.product.startsWith('Magic wand'))
+    .and(db.order.customer.name.startsWith('Harry')
+  );
+
+  const order = await db.order.getOne(filter, {
+    lines: true
+  });
+  
+  order.lines.push({
+    product: 'broomstick'
+  });
+
+  await order.saveChanges();
+}
+
+```
+
+__Interceptors and base filter__
+
+In the next setup, axios interceptors are employed on the client side to add an Authorization header of requests. Meanwhile, on the server side, an Express.js middleware (validateToken) is utilized to ensure the presence of the Authorization header, while a base filter is applied on the order table to filter incoming requests based on the customerId extracted from this header. This combined approach enhances security by ensuring that users can only access data relevant to their authorization level and that every request is accompanied by a token. In real-world applications, it's advisable to use a more comprehensive token system and expand error handling to manage a wider range of potential issues.  
+One notable side effect compared to the previous example, is that only the order table is exposed for interaction, while all other potential tables in the database remain shielded from direct client access (except for related tables).  
+
+<sub>📄 server.js</sub>
 
 ```javascript
 import db from './db';
+import { json } from 'body-parser';
+import express from 'express';
 
-execute();
+express().disable('x-powered-by')
+  .use(json({ limit: '100mb' }))
+  .use('/rdb', validateToken)
+  .use('/rdb', db.express({
+    order: {
+      baseFilter: (db, req, _res) => {
+        const customerId = Number.parseInt(req.headers.authorization.split(' ')[1]); //Bearer 2
+        return db.order.customerId.eq(Number.parseInt(customerId));
+      }
+    }
+  }))
+  .listen(3000, () => console.log('Example app listening on port 3000!'));
 
-async function execute() {
-  await db.transaction(async tx => {
-    const customer = await tx.customer.getById(1);
-      customer.balance = 100;
-      await customer.saveChanges();
-      throw new Error('This will rollback');
+function validateToken(req, res, next) {
+  // For demo purposes, we're just checking against existence of authorization header
+  // In a real-world scenario, this would be a dangerous approach because it bypasses signature validation
+  const authHeader = req.headers.authorization;
+  if (authHeader)
+    return next();
+  else
+    return res.status(401).json({ error: 'Authorization header missing' });
+}
+```
+
+<sub>📄 browser.js</sub>
+```javascript
+import map from './db';
+
+updateRows();
+
+async function updateRows() {
+  const db = map.http('http://localhost:3000/rdb');
+  
+  db.interceptors.request.use((config) => {
+    // For demo purposes, we're just adding hardcoded token
+    // In a real-world scenario, use a proper JSON web token
+    config.headers.Authorization = 'Bearer 2' //customerId
+    return config;
   });
+
+  db.interceptors.response.use(
+    response => response, 
+    (error) => {
+      if (error.response && error.response.status === 401) {
+        console.dir('Unauthorized, dispatch a login action');
+        //redirectToLogin();
+      }
+      return Promise.reject(error);
+    }
+  );
+
+  const filter = db.order.lines.any(
+    line => line.product.startsWith('Magic wand'))
+    .and(db.order.customer.name.startsWith('Harry')
+  );
+
+  const order = await db.order.getOne(filter, {
+    lines: true
+  });
+  
+  order.lines.push({
+    product: 'broomstick'
+  });
+
+  await order.saveChanges();
+
 }
 
 ```
@@ -629,6 +737,13 @@ async function execute() {
 ```
 </details>
   
+<details><summary><strong>What it is not</strong></summary>
+
+- **It is not about migrations** <p>The allure of ORMs handling SQL migrations is undeniably attractive and sweet. However, this sweetness can become painful. Auto-generated migration scripts might not capture all nuances. Using dedicated migration tools separate from the ORM or manually managing migrations might be the less painful route in the long run.  RDB aim for database agnosticism. And when you're dealing with migrations, you might want to use features specific to a database platform. However, I might consider adding support for (non-auto-generated) migrations at a later point. But for now, it is not on the roadmap.</p>
+- **It is not about NoSql databases** <p>Applying ORMs to NoSQL, which inherently diverges from the relational model, can lead to data representation mismatches and a loss of specialized NoSQL features. Moreover, the added ORM layer can introduce performance inefficiencies, complicate debugging, and increase maintenance concerns. Given the unique capabilities of each NoSQL system, crafting custom data access solutions tailored to specific needs often provides better results than a generalized ORM approach.</p>
+- **It is not about GrapQL** <p>RDB, already supports remote data operations via HTTP, eliminating the primary need for integrating GraphQL. RDB's built-in safety mechanisms and tailored optimization layers ensure secure and efficient data operations, which might be compromised by adding GraphQL. Furthermore, RDB's inherent expressivity and powerful querying capabilities could be overshadowed by the introduction of GraphQL. Integrating GraphQL could introduce unnecessary complexity, potential performance overhead, and maintenance challenges, especially as both systems continue to evolve. Therefore, considering RDB's robust features and design, supporting GraphQL might not offer sufficient advantages to warrant the associated complications. </p>
+</details>
+
 ### [Changelog](https://github.com/alfateam/rdb/blob/master/docs/changelog.md)
 ### [Code of Conduct](https://github.com/alfateam/rdb/blob/master/docs/CODE_OF_CONDUCT.md)
 <!-- 

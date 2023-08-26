@@ -48,7 +48,13 @@ function map(index, _fn) {
 	}
 
 	onFinal.http = (url) => index({db: url, providers: dbMap});
-
+	onFinal.pg = () => index({db: throwDb, providers: dbMap});
+	onFinal.postgres = () => index({db: throwDb, providers: dbMap});
+	onFinal.mssql = () => index({db: throwDb, providers: dbMap});
+	onFinal.mssqlNative = () => index({db: throwDb, providers: dbMap});
+	onFinal.mysql = () => index({db: throwDb, providers: dbMap});
+	onFinal.sap = () => index({db: throwDb, providers: dbMap});
+	onFinal.sqlite = () => index({db: throwDb, providers: dbMap});
 
 	return new Proxy(onFinal, handler);
 }
