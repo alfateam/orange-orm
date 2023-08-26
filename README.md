@@ -20,16 +20,6 @@ This is the _Modern Typescript Documentation_. Are you looking for the [_Classic
 ```bash
 $ npm install rdb
 ```  
-<details><summary><strong>Installing drivers</strong></summary>
-
-To ensure RDB works properly with your database, you'll also need to install the appropriate driver:
-- **SQLite**: `$ npm install sqlite3`
-- **MySQL**: `$ npm install mysql2`
-- **MS SQL**: `$ npm install tedious`
-- **PostgreSQL (pg)**: `$ npm install pg`
-- **SAP**: `$npm install msnodesqlv8`
-
-</details>  
 
 ## Example
 Here we choose SQLite.  
@@ -209,6 +199,83 @@ async function init() {
 export default init;
 ```
 In SQLite, columns with the INTEGER PRIMARY KEY attribute are designed to autoincrement by default. This means that each time a new record is inserted into the table, SQLite automatically produces a numeric key for the id column that is one greater than the largest existing key. This mechanism is particularly handy when you want to create unique identifiers for your table rows without manually entering each id.
+</details>
+
+<details><summary><strong>Connecting</strong></summary>
+
+__SQLite__
+```bash
+$ npm install sqlite3
+```  
+```javascript
+import map from './db';
+const db = map.sqlite('demo.db');
+```
+__With connection pool__
+```bash
+$ npm install sqlite3
+```  
+```javascript
+import map from './db';
+const db = map.sqlite('demo.db', { size: 10 });
+```
+
+__MySQL__
+```bash
+$ npm install mysql2
+```  
+```javascript
+import map from './db';
+const db = map.mysql('mysql://test:test@mysql/test');
+```
+
+
+__MS SQL__
+```bash
+$ npm install tedious
+```  
+```javascript
+import map from './db';
+const db = map.mssql({
+          server: 'mssql',
+          options: {
+            encrypt: false,
+            database: 'test'
+          },
+          authentication: {
+            type: 'default',
+            options: {
+              userName: 'sa',
+              password: 'P@assword123',
+            }
+          }
+        });
+```
+
+__PostgreSQL__
+```bash
+$ npm install pg
+```  
+```javascript
+import map from './db';
+const db = map.pg('postgres://postgres:postgres@postgres/postgres');
+```
+__SAP Adaptive Server__
+```bash
+$ npm install msnodesqlv8
+```  
+```javascript
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import map from './db';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+//download odbc driver from sap web pages
+const db = map.pg(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=test`);
+
+```
+
 </details>
 
 <details><summary><strong>Inserting rows</strong></summary>
