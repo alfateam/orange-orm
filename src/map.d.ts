@@ -164,16 +164,31 @@ type ExpandedMappedTable<T, FL = ExpandedFetchingStrategy<T>> = {
 		fetchingStrategy?: FS
 	): Promise<StrategyToRow<FetchedProperties<T, FL>, T>>;
 
-	insert<TRow extends StrategyToInsertRowData<T>>(
-		row: TRow
+	insert(
+		row: StrategyToInsertRowData<T>
 	): Promise<StrategyToRow<FetchedProperties<T, FL>, T>>;
-	insertAndForget<TRow extends StrategyToRowData<T>>(
-		row: TRow
-	): Promise<void>;
-	insert<TRow extends StrategyToInsertRowData<T>, FS extends FetchingStrategy<T>>(
-		row: TRow,
+
+	insert(
+		row: StrategyToInsertRowData<T>[]
+	): Promise<StrategyToRowArray<FetchedProperties<T, FL>, T>>;
+	
+	insert<FS extends FetchingStrategy<T>>(
+		row: StrategyToInsertRowData<T>,
 		strategy: FS
 	): Promise<StrategyToRow<FetchedProperties<T, FL>, T>>;
+
+	insert<FS extends FetchingStrategy<T>>(
+		row: StrategyToInsertRowData<T>[],
+		strategy: FS
+	): Promise<StrategyToRowArray<FetchedProperties<T, FL>, T>>;
+
+	insertAndForget(
+		row: StrategyToRowData<T>
+	): Promise<void>;
+	
+	insertAndForget(
+		row: StrategyToRowData<T>[]
+	): Promise<void>;
 
 	getMany(
 		filter?: Filter | PrimaryRowFilter<T>[]
@@ -237,14 +252,23 @@ type MappedTable<T> = {
 		fetchingStrategy?: FS
 	): Promise<StrategyToRow<FetchedProperties<T, FS>, T>>;
 
-	insert<TRow extends StrategyToInsertRowData<T> | StrategyToInsertRowData<T>[]>(
-		row: TRow
-	): ReturnArrayOrObj<TRow, Promise<StrategyToRow<FetchedProperties<T, {}>, T>>, Promise<StrategyToRowArray<FetchedProperties<T, {}>, T>>>;
+	insert(
+		row: StrategyToInsertRowData<T>
+	): StrategyToRow<FetchedProperties<T, {}>, T>;
+	
+	insert(
+		row: StrategyToInsertRowData<T>[]
+	): Promise<StrategyToRowArray<FetchedProperties<T, {}>, T>>;
 
-	insert<TRow extends StrategyToInsertRowData<T> | StrategyToInsertRowData<T>[], FS extends FetchingStrategy<T>>(
-		row: TRow,
+	insert<FS extends FetchingStrategy<T>>(
+		row: StrategyToInsertRowData<T>,
 		strategy: FS
-	): ReturnArrayOrObj<TRow, Promise<StrategyToRow<FetchedProperties<T, FS>, T>>, Promise<StrategyToRowArray<FetchedProperties<T, FS>, T>>>;
+	): StrategyToRow<FetchedProperties<T, FS>, T>;
+	
+	insert<FS extends FetchingStrategy<T>>(
+		row: StrategyToInsertRowData<T>[],
+		strategy: FS
+	): Promise<StrategyToRowArray<FetchedProperties<T, FS>, T>>;
 
 	insertAndForget<TRow extends StrategyToInsertRowData<T> | StrategyToInsertRowData<T>[]>(
 		row: TRow
@@ -620,7 +644,7 @@ type ReferenceMapperHelper<TFrom, TTo, TPrimaryCount> =
 			column4: C4,
 			column5: C5,
 			column6: C6
-		): MappedTableDef<TTo> & RelatedTable & NegotiateNotNullRef<Pick<TFrom, C1 | C2 | C3 | C4 | C5 | C6>>;
+		): MappedTableDef<TTo> & RelatedTable;
 	}
 	: 5 extends TPrimaryCount
 	? {
@@ -630,7 +654,7 @@ type ReferenceMapperHelper<TFrom, TTo, TPrimaryCount> =
 			column3: C3,
 			column4: C4,
 			column5: C5
-		): MappedTableDef<TTo> & RelatedTable & NegotiateNotNullRef<Pick<TFrom, C1 | C2 | C3 | C4 | C5>>;
+		): MappedTableDef<TTo> & RelatedTable;
 	}
 	: 4 extends TPrimaryCount
 	? {
@@ -639,7 +663,7 @@ type ReferenceMapperHelper<TFrom, TTo, TPrimaryCount> =
 			column2: C2,
 			column3: C3,
 			column4: C4
-		): MappedTableDef<TTo> & RelatedTable & NegotiateNotNullRef<Pick<TFrom, C1 | C2 | C3 | C4>>;
+		): MappedTableDef<TTo> & RelatedTable;
 	}
 	: 3 extends TPrimaryCount
 	? {
@@ -647,28 +671,21 @@ type ReferenceMapperHelper<TFrom, TTo, TPrimaryCount> =
 			column: C1,
 			column2: C2,
 			column3: C3
-		): MappedTableDef<TTo> & RelatedTable & NegotiateNotNullRef<Pick<TFrom, C1 | C2 | C3>>;
+		): MappedTableDef<TTo> & RelatedTable;
 	}
 	: 2 extends TPrimaryCount
 	? {
 		by<C1 extends keyof KeyCandidates1<TFrom, TTo>, C2 extends keyof KeyCandidates2<TFrom, TTo>>(
 			column: C1,
 			column2: C2
-		): MappedTableDef<TTo> & RelatedTable & NegotiateNotNullRef<Pick<TFrom, C1 | C2>>;
+		): MappedTableDef<TTo> & RelatedTable;
 	}
 	: 1 extends TPrimaryCount
 	? {
 		by<C1 extends keyof KeyCandidates1<TFrom, TTo>>(
 			column: C1
-		): MappedTableDef<TTo> & RelatedTable & NegotiateNotNullRef<Pick<TFrom, C1>>;
+		): MappedTableDef<TTo> & RelatedTable;
 	}
-	: {};
-
-
-type NegotiateNotNullRef<T> = keyof T extends never
-	? {}
-	: T extends Record<keyof T, NotNull>
-	? NotNull
 	: {};
 
 type HasMapperHelper<

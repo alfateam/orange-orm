@@ -78,6 +78,7 @@ jobs:
       # - run: ldd /__w/rdb/rdb/tests/libsybdrvodb.so
       - run: npm install
       - run: npm run lint
+      - run: npm run tscheck
       - run: npm run test
       - run: npm run coverage
        # Only run the coverage once

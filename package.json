@@ -32,6 +32,7 @@
     "test": "vitest run --threads=false",
     "coverage": "vitest run --coverage.enabled --coverage.reporter='text-summary' --threads=false",
     "testw": "vitest --threads=false update",
+    "tscheck": "tsc ./src/index.d.ts --module commonjs --target es6 --noEmit true --strict true --esModuleInterop true",
     "concat": "node ./src/client/merge.js",
     "build": "rollup -c ./src/client/rollup.config.js && npm run concat",
     "lint": "eslint ./",
