@@ -24,6 +24,7 @@ afterAll(async () => {
 });
 
 beforeAll(async () => {
+	await createMs('mssql');
 	await insertData('pg');
 	await insertData('mssql');
 	if (major > 17)
