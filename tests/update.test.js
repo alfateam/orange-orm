@@ -98,50 +98,6 @@ beforeAll(async () => {
 });
 
 
-describe('update boolean', () => {
-
-	test('pg', async () => await verify('pg'));
-	test('mssql', async () => await verify('mssql'));
-	if (major > 17)
-		test('mssqlNative', async () => await verify('mssqlNative'));
-	test('mysql', async () => await verify('mysql'));
-	test('sap', async () => await verify('sap'));
-	test('sqlite', async () => await verify('sqlite'));
-	test('http', async () => await verify('http'));
-
-	async function verify(dbName) {
-
-		const { db } = getDb(dbName);
-		let row = await db.customer.getOne();
-		row.isActive = false;
-		await row.saveChanges();
-		await row.refresh();
-		expect(row.isActive).toEqual(false);
-	}
-});
-
-describe('update date', () => {
-
-	test('pg', async () => await verify('pg'));
-	test('mssql', async () => await verify('mssql'));
-	if (major > 17)
-		test('mssqlNative', async () => await verify('mssqlNative'));
-	test('mysql', async () => await verify('mysql'));
-	test('sap', async () => await verify('sap'));
-	test('sqlite', async () => await verify('sqlite'));
-	test('http', async () => await verify('http'));
-
-	async function verify(dbName) {
-
-		const { db } = getDb(dbName);
-		let row = await db.order.getOne();
-		const date = new Date(2021, 0, 11, 9, 11, 47);
-		row.orderDate = date;
-		await row.saveChanges();
-		await row.refresh();
-		expect(row.orderDate).toEqual(dateToISOString(date).substring(0, row.orderDate.length));
-	}
-});
 
 describe('update date in array', () => {
 
@@ -167,7 +123,7 @@ describe('update date in array', () => {
 	}
 });
 
-describe('update multiple in array', () => {
+describe.only('update multiple in array', () => {
 
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
@@ -270,6 +226,52 @@ describe('delete row', () => {
 		expect(row).toEqual(undefined);
 	}
 });
+
+describe('update boolean', () => {
+
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sap', async () => await verify('sap'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+
+		const { db } = getDb(dbName);
+		let row = await db.customer.getOne();
+		row.isActive = false;
+		await row.saveChanges();
+		await row.refresh();
+		expect(row.isActive).toEqual(false);
+	}
+});
+
+describe('update date', () => {
+
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sap', async () => await verify('sap'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+
+		const { db } = getDb(dbName);
+		let row = await db.order.getOne();
+		const date = new Date(2021, 0, 11, 9, 11, 47);
+		row.orderDate = date;
+		await row.saveChanges();
+		await row.refresh();
+		expect(row.orderDate).toEqual(dateToISOString(date).substring(0, row.orderDate.length));
+	}
+});
+
 
 function getDb(name) {
 	if (name === 'mssql')
