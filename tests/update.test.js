@@ -123,7 +123,7 @@ describe('update date in array', () => {
 	}
 });
 
-describe.only('update multiple in array', () => {
+describe('update multiple in array', () => {
 
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
