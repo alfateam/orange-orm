@@ -98,6 +98,28 @@ beforeAll(async () => {
 });
 
 
+describe('update boolean', () => {
+
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sap', async () => await verify('sap'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+
+		const { db } = getDb(dbName);
+		let row = await db.customer.getOne();
+		row.isActive = false;
+		await row.saveChanges();
+		await row.refresh();
+		expect(row.isActive).toEqual(false);
+	}
+});
+
 describe('update date', () => {
 
 	test('pg', async () => await verify('pg'));
