@@ -827,7 +827,7 @@ import rdb from 'rdb';
  */
 
 /** @type {Person} */
-const pet;
+let pet;
 
 const map = rdb.map(x => ({
     demo: x.table('demo').map(x => ({
