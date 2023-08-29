@@ -1,15 +1,5 @@
 const rdb = require('../src/index');
 
-/**
- * @typedef {Object} Pet
- * @property {string} name - The name of the pet.
- * @property {number} kind - The kind of pet
- */
-
-/** @type {Person} */
-const pet;
-
-
 const nameSchema = {
 	type: 'string',
 };
@@ -82,17 +72,6 @@ const map = rdb.map(x => ({
 		customer: references(x.customer).by('customerId'),
 		deliveryAddress: hasOne(x.deliveryAddress).by('orderId'),
 		lines: hasMany(x.orderLine).by('orderId')
-	})),
-
-	datatype: x.table('datatype').map(x => ({
-		id: x.column('id').uuid().primary().notNull(),
-		name: x.column('name').string(),
-		balance: x.column('balance').numeric(),
-		regularDate: x.column('regularDate').date(),
-		tzDate: x.column('tzDate').dateWithTimeZone(),
-		picture: x.column('picture').binary(),
-		pet: x.column('pet').jsonOf(pet),
-		pet2: x.column('pet2').json(),
 	}))
 
 }));
