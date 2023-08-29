@@ -120,6 +120,46 @@ beforeAll(async () => {
 		server = app.listen(3000, () => console.log('Example app listening on port 3000!'));
 	}
 });
+
+describe('boolean filter', () => {
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+		const filter = db.order.customer.isActive.eq(false);
+		const rows = await db.order.getMany(filter);
+
+		const expected = [];
+
+		expect(rows).toEqual(expected);
+	}
+});
+
+describe('boolean true filter', () => {
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+		const filter = db.order.customer.isActive.eq(true);
+		const rows = await db.order.getMany(filter);
+
+		expect(rows.length).toEqual(2);
+	}
+});
+
+
 describe('any-subFilter filter nested', () => {
 
 	test('pg', async () => await verify('pg'));

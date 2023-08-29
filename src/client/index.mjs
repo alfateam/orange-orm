@@ -4950,7 +4950,7 @@ function negotiateTempKey(value) {
 
 var toKeyPositionMap_1 = toKeyPositionMap$1;
 
-function map$1(index, fn) {
+function map$1(index, _fn) {
 	const handler = {
 		get(target, prop) {
 			if (prop === 'map') {
@@ -5000,7 +5000,13 @@ function map$1(index, fn) {
 	}
 
 	onFinal.http = (url) => index({db: url, providers: dbMap});
-
+	onFinal.pg = () => index({db: throwDb, providers: dbMap});
+	onFinal.postgres = () => index({db: throwDb, providers: dbMap});
+	onFinal.mssql = () => index({db: throwDb, providers: dbMap});
+	onFinal.mssqlNative = () => index({db: throwDb, providers: dbMap});
+	onFinal.mysql = () => index({db: throwDb, providers: dbMap});
+	onFinal.sap = () => index({db: throwDb, providers: dbMap});
+	onFinal.sqlite = () => index({db: throwDb, providers: dbMap});
 
 	return new Proxy(onFinal, handler);
 }

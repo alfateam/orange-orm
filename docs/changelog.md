@@ -1,5 +1,9 @@
 
 ## Release notes
+__3.1.38__  
+Unknown data type in mssql when .eq() on boolean column.  
+__3.1.37__  
+Documented in the browser.  
 __3.1.36__  
 Fixed typescript types in definition file.  
 __3.1.35__  
