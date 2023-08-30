@@ -826,7 +826,7 @@ import rdb from 'rdb';
  * @property {string} kind - The kind of pet
  */
 
-/** @type {Person} */
+/** @type {Pet} */
 let pet;
 
 const map = rdb.map(x => ({
@@ -838,7 +838,7 @@ const map = rdb.map(x => ({
       tzDate: x.column('tzDate').dateWithTimeZone(),
       picture: x.column('picture').binary(),
       pet: x.column('pet').jsonOf(pet), //generic
-      pet2: x.column('pet2').json(),
+      pet2: x.column('pet2').json(), //non-generic
   }))
 }));
 ```
@@ -859,8 +859,8 @@ const map = rdb.map(x => ({
       regularDate: x.column('regularDate').date(),
       tzDate: x.column('tzDate').dateWithTimeZone(),
       picture: x.column('picture').binary(),
-      pet: x.column('pet').jsonOf<Pet>(),
-      pet2: x.column('pet2').json(),
+      pet: x.column('pet').jsonOf<Pet>(), //generic
+      pet2: x.column('pet2').json(), //non-generic
   }))
 }));
 ```
@@ -879,7 +879,7 @@ import rdb from 'rdb';
  * @property {string} kind - The kind of pet
  */
 
-/** @type {Person} */
+/** @type {Pet} */
 let pet;
 
 let petSchema = {
