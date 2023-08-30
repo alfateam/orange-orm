@@ -826,7 +826,7 @@ import rdb from 'rdb';
  * @property {string} kind - The kind of pet
  */
 
-/** @type {Person} */
+/** @type {Pet} */
 let pet;
 
 const map = rdb.map(x => ({
