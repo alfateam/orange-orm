@@ -280,8 +280,6 @@ describe('getMany', () => {
 
 		const rows = await db.customer.getMany();
 
-		console.dir(JSON.stringify(rows), {depth: Infinity});
-
 		const expected = [{
 			id: 1,
 			name: 'George',

@@ -3,7 +3,7 @@ var purify = require('./purify');
 
 function _new(column) {
 
-	return function(value) {
+	var encode = function(value) {
 		value = purify(value);
 		if (value == null) {
 			if (column.dbNull === null)
@@ -12,6 +12,20 @@ function _new(column) {
 		}
 		return newPara('?', [value]);
 	};
+
+	encode.unsafe = function(value) {
+		value = purify(value);
+		value = purify(value);
+		if (value == null) {
+			if (column.dbNull === null)
+				return 'null';
+			return '\'' + column.dbNull + '\'';
+		}
+		return '\'' + value + '\'';
+	};
+
+	return encode;
+
 }
 
 module.exports = _new;

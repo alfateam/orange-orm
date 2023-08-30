@@ -181,7 +181,7 @@ describe('validate notNullExceptInsert', () => {
 			isActive: true
 		});
 
-		const order = await db.order.insert({orderDate: new Date()});
+		const order = await db.order.insert({ orderDate: new Date() });
 		order.customer = george;
 		await order.saveChanges();
 
@@ -224,6 +224,111 @@ describe('insert autoincremental', () => {
 		};
 
 		expect(george).toEqual(expected);
+	}
+});
+
+describe('insert default', () => {
+
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+
+	async function verify(dbName) {
+		const { db, init } = getDb(dbName);
+		await init(db);
+
+		const george = await db.customer.insert({
+			name: 'George',
+			balance: 177
+		});
+
+		const expected = {
+			id: 1,
+			name: 'George',
+			balance: 177,
+			isActive: false
+		};
+
+		expect(george).toEqual(expected);
+	}
+});
+
+describe('insert default override', () => {
+
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+
+	async function verify(dbName) {
+		const { db, init } = getDb(dbName);
+		await init(db);
+
+		const george = await db.customerDefault.insert({
+			name: 'George',
+			balance: 177
+		});
+
+		const expected = {
+			id: 1,
+			name: 'George',
+			balance: 177,
+			isActive: true
+		};
+
+		expect(george).toEqual(expected);
+	}
+});
+
+describe('insert dbNull', () => {
+
+
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+
+	async function verify(dbName) {
+		const { db, init } = getDb(dbName);
+		await init(db);
+
+		const george = await db.customerDbNull.insert({
+			balance: 177
+		});
+
+		const georgeBeforeRefresh = JSON.parse(JSON.stringify(george));
+		await george.refresh();
+
+		const george2 = await db.customer.getOne();
+
+
+		const expected = {
+			id: 1,
+			name: null,
+			balance: 177,
+			isActive: false
+		};
+
+		const expected2 = {
+			id: 1,
+			name: 'foo',
+			balance: 177,
+			isActive: false
+		};
+
+		expect(georgeBeforeRefresh).toEqual(expected);
+		expect(george).toEqual(expected);
+		expect(george2).toEqual(expected2);
 	}
 });
 

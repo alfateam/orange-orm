@@ -23,6 +23,20 @@ const map = rdb.map(x => ({
 		isActive: column('isActive').boolean(),
 	})),
 
+	customerDefault: x.table('customer').map(({ column }) => ({
+		id: column('id').numeric().primary().notNullExceptInsert(),
+		name: column('name').string(),
+		balance: column('balance').numeric(),
+		isActive: column('isActive').boolean().default(true),
+	})),
+
+	customerDbNull: x.table('customer').map(({ column }) => ({
+		id: column('id').numeric().primary().notNullExceptInsert(),
+		name: column('name').string().validate(validateName).dbNull('foo'),
+		balance: column('balance').numeric(),
+		isActive: column('isActive').boolean(),
+	})),
+
 	package: x.table('package').map(({ column }) => ({
 		id: column('packageId').numeric().primary().notNullExceptInsert(),
 		lineId: column('lineId').numeric().notNullExceptInsert(),

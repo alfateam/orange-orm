@@ -3,7 +3,6 @@ var newParam = require('../../query/newParameterized');
 
 function _new(_column) {
 
-	return encode;
 
 	function encode(value) {
 		value = purify(value);
@@ -11,6 +10,14 @@ function _new(_column) {
 			return newParam('null');
 		return newParam('?', [Buffer.from(value, 'base64')]);
 	}
+	encode.unsafe = function(value) {
+		value = purify(value);
+		if (value === null)
+			return 'null';
+		return Buffer.from(value, 'base64');
+	};
+
+	return encode;
 }
 
 module.exports = _new;

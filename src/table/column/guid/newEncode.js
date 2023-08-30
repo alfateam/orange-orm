@@ -3,15 +3,28 @@ var purify = require('./purify');
 
 function _new(column) {
 
-	return function(candidate) {
+	const encode = function(candidate) {
 		var value = purify(candidate);
 		if (value == null) {
-			if(column.dbNull === null)
+			if (column.dbNull === null)
 				return newPara('null');
 			return newPara('\'' + column.dbNull + '\'');
 		}
 		return newPara('\'' + value + '\'');
 	};
+
+	encode.unsafe = function(candidate) {
+		var value = purify(candidate);
+		if (value == null) {
+			if (column.dbNull === null)
+				return 'null';
+			return '\'' + column.dbNull + '\'';
+		}
+		return '\'' + value + '\'';
+	};
+
+
+	return encode;
 }
 
 module.exports = _new;

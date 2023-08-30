@@ -13,6 +13,16 @@ function _new(column) {
 		return newPara('?', [encodeDate(value)]);
 	};
 
+	encode.unsafe = function(value) {
+		value = purify(value);
+		if (value == null) {
+			if (column.dbNull === null)
+				return 'null';
+			return '\'' + column.dbNull + '\'';
+		}
+		return encodeDate(value);
+	};
+
 	return encode;
 
 

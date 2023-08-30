@@ -14,6 +14,17 @@ function _new(column) {
 		return newPara('?', [encodeCore(value)]);
 	};
 
+	encode.unsafe = function(value) {
+		value = purify(value);
+		if (value == null) {
+			if (column.dbNull === null)
+				return newPara('null');
+			return newPara('\'' + column.dbNull + '\'');
+		}
+		var encodeCore = getSessionSingleton('encodeDate') || encodeDate;
+		return encodeCore(value);
+	};
+
 	return encode;
 
 

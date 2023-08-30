@@ -22,6 +22,8 @@ function newRow(table) {
 			else
 				dto[alias] = column.lazyDefault;
 		}
+		else if (column.dbNull !== null)
+			dto[alias] = null;
 		else
 			dto[alias] = undefined;
 	}

@@ -5,14 +5,20 @@ function _new(table,alias,span) {
 	var columnFormat = '%s as "%s"';
 	var columns = table._columns;
 	var sql = '';
-	var separator = alias + '.';
+	var separator = '';
 	for (var i = 0; i < columns.length; i++) {
 		var column = columns[i];
 		if (!('serializable' in column && !column.serializable) && (!columnsMap || (columnsMap.get(column)))) {
-			sql = sql + separator + util.format(columnFormat, column._dbName, column.alias);
-			separator = ',' + alias + '.';
+			if (column.dbNull === null)
+				sql = sql + separator + alias + '.' + util.format(columnFormat, column._dbName, column.alias);
+			else {
+				const encoded = column.encode.unsafe(column.dbNull);
+				sql = sql + separator + `CASE WHEN ${alias}.${column._dbName}=${encoded} THEN null ELSE ${alias}.${column._dbName} END as ${column.alias}`;
+			}
+			separator = ',';
 		}
 	}
+
 	return sql;
 }
 
