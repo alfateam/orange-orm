@@ -116,7 +116,7 @@
     "type": "git",
     "url": "git@github.com:alfateam/rdb.git"
   },
-  "homepage": "https://github.com/alfateam/rdb/blob/master/README.md",
+  "homepage": "https://rdbjs.org",
   "jshintConfig": {
     "asi": true,
     "eqnull": true,
