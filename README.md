@@ -1,3 +1,10 @@
+---
+title: RDB - the ultimate ORM for Node and Typescript
+type: website
+url: https://github.com/alfateam/rdb
+image: https://github.com/alfateam/rdb/blob/master/docs/logo-sm.jpg?raw=true
+---
+    
 <link rel="icon" href="./favicon.ico" type="image/x-icon">
 
 ![RDB](./docs/logo-sm.jpg)  
