@@ -4,3 +4,4 @@ tests
 .devcontainer
 demo.db
 demo*.db*
+favicon.ico
