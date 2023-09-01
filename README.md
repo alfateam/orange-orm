@@ -49,7 +49,7 @@ const map = rdb.map(x => ({
   })),
 
   orderLine: x.table('orderLine').map(({ column }) => ({
-  id: column('id').numeric().primary().notNullExceptInsert(),
+    id: column('id').numeric().primary().notNullExceptInsert(),
     orderId: column('orderId').numeric(),
     product: column('product').string(),
   })),
