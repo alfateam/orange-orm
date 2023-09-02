@@ -6,7 +6,6 @@ logo: "docs/logo-sm.jpg"
 
 markdown: GFM
 # remote_theme: pages-themes/primer
-theme: primer
 plugins:
   - jekyll-seo-tag
   - jekyll-remote-theme
