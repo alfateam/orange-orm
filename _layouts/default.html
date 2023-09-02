@@ -3,7 +3,7 @@
 
 <head>
 	{% include head.html %}
-	<!-- <link rel="stylesheet" href="{{ "/assets/css/custom.css" | relative_url }}"> -->
+	<link rel="stylesheet" href="{{ "/assets/css/custom.css" | relative_url }}">
 	{% seo %}
 	<meta property="og:image" content="https://rdbjs.org/docs/logo-sm.jpg" />
 	<meta name="twitter:image:src" content="https://rdbjs.org/docs/logo-sm.jpg" />
@@ -12,13 +12,8 @@
 	<meta name="twitter:description" content="The ultimate ORM for Node and Typescript" />
 </head>
 
-<body>
-	<div style="  background-color: #fff; /* White background for content */
-    width: 70%; /* This determines the width of your content. Adjust to your liking. */
-    padding: 20px; /* Optional padding for the content */
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Optional shadow for some depth */">
-		{{ content }}
-	</div>
+<body>	
+	{{ content }}
 </body>
 
 </html>
