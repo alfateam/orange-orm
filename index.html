@@ -1,6 +1,3 @@
----
-# even an empty front matter is ok
----
 <!DOCTYPE html>
 <html>
 <head>
@@ -8,5 +5,6 @@
 </head>
 <body>
   {{ content }}
+  {% include_relative README.md %}
 </body>
 </html>
