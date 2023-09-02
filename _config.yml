@@ -1,8 +1,8 @@
 title: RDB
 description: The ultimate ORM for Node and Typescript
-image: "docs/logo-sm.jpg"
+image: "/docs/logo-sm.jpg"
 url: "https://rdbjs.org" 
-logo: "docs/logo-sm.jpg"
+logo: "/docs/logo-sm.jpg"
 
 markdown: GFM
 theme: minima
