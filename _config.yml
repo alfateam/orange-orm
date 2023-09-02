@@ -1,4 +1,4 @@
 markdown: GFM
-# remote_theme: pages-themes/primer
+remote_theme: pages-themes/primer
 plugins:
   - jekyll-seo-tag
