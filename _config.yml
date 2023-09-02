@@ -5,7 +5,7 @@ url: "https://rdbjs.org"
 logo: "/docs/logo-sm.jpg"
 
 markdown: GFM
-theme: modernist
+theme: hacker
 # remote_theme: pages-themes/primer
 plugins:
   - jekyll-seo-tag
