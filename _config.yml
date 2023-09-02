@@ -6,7 +6,7 @@ logo: "/docs/logo-sm.jpg"
 
 markdown: GFM
 # theme: minima
-remote_theme: pages-themes/primer@v0.2.0
+remote_theme: pages-themes/modernist
 # remote_theme: pages-themes/primer
 plugins:
   - jekyll-seo-tag
