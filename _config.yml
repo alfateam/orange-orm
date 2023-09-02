@@ -11,4 +11,4 @@ plugins:
   - jekyll-remote-theme
 
 # Jekyll-remote-theme settings
-remote_theme: pages-themes/primer
+remote_theme: pages-themes/minimal
