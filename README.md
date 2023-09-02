@@ -1,5 +1,6 @@
 ---
-layout: default
+title: "My Page Title"  # This is an example. You can add any other front matter you usually use.
+image: /docs/logo-sm.jpg
 ---
 ![RDB](./docs/logo-sm.jpg)  
 RDB is the ultimate Object Relational Mapper for Node.js, offering seamless integration with popular databases like Postgres, MS SQL, MySQL, Sybase SAP, and SQLite. Whether you're building applications in TypeScript or JavaScript  (including both CommonJS and ECMAScript), RDB has got you covered.  

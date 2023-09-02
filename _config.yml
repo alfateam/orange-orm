@@ -1,19 +1,4 @@
-# Site settings
-title: RDB
-email: lars.roald@gmail.com
-description: The ultimate ORM for Node & Typescript
-#baseurl: ""  # e.g., "/blog" if your site is at "yourdomain.com/blog"
-url: "https://rdbjs.org"  # The base hostname & protocol for your site
-
-# Social links (you can add or remove these as needed)
-twitter_username: lroal
-github_username:  lroal
-
-# Build settings
-markdown: kramdown
-kramdown:
-  input: GFM
-
-# Theme (if you're using one)
-theme: minima  # Example theme - you might be using a different one
-
+markdown: GFM
+# remote_theme: pages-themes/primer
+plugins:
+  - jekyll-seo-tag
