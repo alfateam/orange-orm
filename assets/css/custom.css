@@ -9,5 +9,7 @@ body {
 @media (max-width: 768px) { /* This value is for tablets. Adjust as necessary */
     body {
         width: auto; 
+        padding-left: 20px;
+        padding-right: 20px;
     }
 }
