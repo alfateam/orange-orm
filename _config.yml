@@ -15,18 +15,5 @@ kramdown:
   input: GFM
 
 # Theme (if you're using one)
-#theme: minima  # Example theme - you might be using a different one
-
-# Plugins
-plugins:
-  - jekyll-feed  # Example plugin
-
-# Exclusions
-exclude:
-  - Gemfile
-  - Gemfile.lock
-  - node_modules
-  - vendor
-
-# Additional configurations might go here...
+theme: minima  # Example theme - you might be using a different one
 
