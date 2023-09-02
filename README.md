@@ -1,12 +1,5 @@
-<!-- ---
-title: RDB - the ultimate ORM for Node and Typescript
-type: website
-url: https://github.com/alfateam/rdb
-image: https://github.com/alfateam/rdb/blob/master/docs/logo-sm.jpg?raw=true
---- -->
-
-<link rel="icon" href="./favicon.ico" type="image/x-icon">
-
+---
+---
 ![RDB](./docs/logo-sm.jpg)  
 RDB is the ultimate Object Relational Mapper for Node.js, offering seamless integration with popular databases like Postgres, MS SQL, MySQL, Sybase SAP, and SQLite. Whether you're building applications in TypeScript or JavaScript  (including both CommonJS and ECMAScript), RDB has got you covered.  
 
