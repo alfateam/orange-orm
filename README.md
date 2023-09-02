@@ -1,3 +1,6 @@
+---
+layout: default
+---
 ![RDB](./docs/logo-sm.jpg)  
 RDB is the ultimate Object Relational Mapper for Node.js, offering seamless integration with popular databases like Postgres, MS SQL, MySQL, Sybase SAP, and SQLite. Whether you're building applications in TypeScript or JavaScript  (including both CommonJS and ECMAScript), RDB has got you covered.  
 
