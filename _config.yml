@@ -5,6 +5,6 @@ url: "https://rdbjs.org"
 logo: "/docs/logo-sm.jpg"
 
 markdown: GFM
-remote_theme: pages-themes/primer@v0.2.0
+theme: minima
 plugins:
   - jekyll-seo-tag
