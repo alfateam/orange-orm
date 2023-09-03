@@ -2,9 +2,6 @@ title: RDB - The ultimate ORM for Node and Typescript
 url: "https://rdbjs.org" 
 description: The most developer friendly ORM ever. Fetch rows directly in the browser in a safe manner. Powerful filtering. Change detection and concurrency handling.
 image: "/docs/logo-sm.jpg"
-# # logo: "/docs/logo-sm.jpg"
-twitter:
-  card: "summary_large_image"
 
 markdown: GFM
 theme: minima
