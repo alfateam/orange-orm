@@ -1,12 +1,11 @@
-title: RDB - The ultimate ORM for Node and Typescript
-description: The most developer friendly ORM ever. Fetch rows directly in the browser in a safe manner. Powerful filtering. Change detection and concurrency handling.
-image: "/docs/logo-sm.jpg"
-url: "https://rdbjs.org" 
-logo: "/docs/logo-sm.jpg"
-twitter:
-  card: "summary_large_image"
+# title: RDB - The ultimate ORM for Node and Typescript
+# description: The most developer friendly ORM ever. Fetch rows directly in the browser in a safe manner. Powerful filtering. Change detection and concurrency handling.
+# image: "https://rdbjs.org/docs/logo-sm.jpg"
+# url: "https://rdbjs.org" 
+# # logo: "/docs/logo-sm.jpg"
+# twitter:
+#   card: "summary_large_image"
 
 markdown: GFM
 theme: minima
 plugins:
-  - jekyll-seo-tag
