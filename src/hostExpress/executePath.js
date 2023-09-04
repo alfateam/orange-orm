@@ -307,8 +307,7 @@ function validateArgs() {
 			continue;
 		if (filter && filter.isSafe === isSafe)
 			continue;
-		// if (filter.sql || typeof (filter) === 'string') {
-		if (filter.sql) {
+		if (filter.sql || typeof (filter) === 'string') {
 			const e = new Error('Raw filters are disallowed');
 			// @ts-ignore
 			e.status = 403;
