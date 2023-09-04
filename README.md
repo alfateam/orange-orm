@@ -930,11 +930,50 @@ const map = rdb.map(x => ({
   }))
 }));
 ```
-
-
-
-
 </details>
+
+<details><summary><strong>Raw sql filters</strong></summary>
+This illustrates the implementation of raw SQL filters, for querying customer data. You can use the raw SQL filter alone or in combination with a regular filter.
+ Here the raw filter queries for customer with name ending with "arry". The composite filter combines the raw SQL filter and a regular filter that checks for a customer balance greater than 100. It is important to note that due to security precautions aimed at preventing SQL injection attacks, using raw SQL filters directly via browser inputs is not allowed. Attempting to do so will result in an HTTP status 403 (Forbidden) being returned.
+ 
+```javascript
+import db from './db';
+
+getRows();
+
+async function getRows() {
+  const rawFilter = {
+    sql: 'name like ?',
+    parameters: ['%arry']
+  };
+                 
+  const ordersWithRawFilter = await db.customer.getOne(rawFilter);
+  
+  const combinedFilter = db.customer.balance.greaterThan(100).and(rawFilter);
+  const ordersWithCombinedFilter = await db.customer.getOne(combinedFilter);  
+}
+```
+</details>
+
+<details><summary><strong>Raw sql queries</strong></summary>
+You can employ raw SQL queries directly to fetch rows from the database, bypassing the ORM (Object-Relational Mapper). It is important to note that due to security precautions aimed at preventing SQL injection attacks, using raw SQL filters directly via browser inputs is not allowed. Attempting to do so will result in an HTTP status 403 (Forbidden) being returned.
+
+```javascript
+import db from './db';
+
+getRows();
+
+async function getRows() {
+  const query = {
+    sql: 'select * from customer where name like ?',
+    parameters: ['%arry']
+  };
+                 
+  const rows = await db.query(query)   
+}
+```
+</details>
+
 
 <details><summary><strong>What it is not</strong></summary>
 

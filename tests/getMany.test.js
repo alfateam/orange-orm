@@ -400,6 +400,62 @@ describe('getMany with relations', () => {
 	}
 });
 
+describe('getMany raw filter', () => {
+
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+
+		const rawFilter = {
+			sql: 'name like ?',
+			parameters: ['%arry']
+		};
+
+		const rows = await db.customer.getMany(rawFilter);
+
+		const expected = [
+			{
+				id: 2,
+				name: 'Harry',
+				balance: 200,
+				isActive: true
+			}
+		];
+		expect(rows).toEqual(expected);
+	}
+});
+
+describe('getMany raw filter http', () => {
+
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+
+		const rawFilter = {
+			sql: 'name like ?',
+			parameters: ['%arry']
+		};
+
+		let error;
+		try {
+			await db.customer.getMany(rawFilter);
+
+		}
+		catch(e) {
+			error = e;
+		}
+
+		expect(error?.message).toEqual('Request failed with status code 403');
+	}
+});
+
 function getDb(name) {
 	if (name === 'mssql')
 		return {

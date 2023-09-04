@@ -55,7 +55,7 @@ let _allowedOps = {
 	none: true
 };
 
-async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, request, response, readonly, disableBulkDeletes, isBrowser, client }) {
+async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, request, response, readonly, disableBulkDeletes, isHttp, client }) {
 	let allowedOps = { ..._allowedOps, insert: !readonly, insertAndForget: !readonly, ...extractRelations(getMeta(table)) };
 	let ops = { ..._ops, ...getCustomFilterPaths(customFilters), getManyDto, getMany, delete: _delete, cascadeDelete };
 	let res = await parseFilter(JSONFilter, table) || {};
@@ -90,7 +90,7 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 
 		function executePath(path, args) {
 			if (path in ops) {
-				if (isBrowser)
+				if (isHttp)
 					validateArgs(args);
 				let op = ops[path].apply(null, args);
 				if (op.then)
@@ -104,8 +104,13 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 			let pathArray = path.split('.');
 			let target = table;
 			let op = pathArray[pathArray.length - 1];
-			if (!allowedOps[op] && isBrowser)
-				throw new Error('Disallowed operator ' + op);
+			if (!allowedOps[op] && isHttp) {
+				let e =  new Error('Disallowed operator ' + op);
+				// @ts-ignore
+				e.status = 403;
+				throw e;
+
+			}
 			for (let i = 0; i < pathArray.length; i++) {
 				target = target[pathArray[i]];
 			}
@@ -177,8 +182,12 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 	}
 
 	async function _delete(filter) {
-		if (readonly || disableBulkDeletes)
-			throw new Error('Bulk deletes are not allowed. Parameter "disableBulkDeletes" must be true.');
+		if (readonly || disableBulkDeletes) {
+			let e = new Error('Bulk deletes are not allowed. Parameter "disableBulkDeletes" must be true.');
+			// @ts-ignore
+			e.status = 403;
+			throw e;
+		}
 		filter = negotiateFilter(filter);
 		const _baseFilter = await invokeBaseFilter();
 		if (_baseFilter)
@@ -188,8 +197,13 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 	}
 
 	async function cascadeDelete(filter) {
-		if (readonly || disableBulkDeletes)
-			throw new Error('Bulk deletes are not allowed. Parameter "disableBulkDeletes" must be true.');
+		if (readonly || disableBulkDeletes) {
+			const e = new Error('Bulk deletes are not allowed. Parameter "disableBulkDeletes" must be true.');
+			// @ts-ignore
+			e.status = 403;
+			throw e;
+
+		}
 		filter = negotiateFilter(filter);
 		const _baseFilter = await invokeBaseFilter();
 		if (_baseFilter)
@@ -242,13 +256,18 @@ function validateStrategy(table, strategy) {
 function validateLimit(strategy) {
 	if (!('limit' in strategy) || Number.isInteger(strategy.limit))
 		return;
-	throw new Error('Invalid limit: ' + strategy.limit);
+	const e =  new Error('Invalid limit: ' + strategy.limit);
+	// @ts-ignore
+	e.status = 400;
 }
 
 function validateOffset(strategy) {
 	if (!('offset' in strategy) || Number.isInteger(strategy.offset))
 		return;
-	throw new Error('Invalid offset: ' + strategy.offset);
+	const e =  new Error('Invalid offset: ' + strategy.offset);
+	// @ts-ignore
+	e.status = 400;
+	throw e;
 }
 
 function validateOrderBy(table, strategy) {
@@ -266,8 +285,12 @@ function validateOrderBy(table, strategy) {
 		});
 		for (let p of parts) {
 			let col = table[p];
-			if (!(col && col.equal))
-				throw new Error('Unknown column: ' + p);
+			if (!(col && col.equal)) {
+				const e = new Error('Unknown column: ' + p);
+				// @ts-ignore
+				e.status = 400;
+				throw e;
+			}
 		}
 	}
 }
@@ -279,8 +302,12 @@ function validateArgs() {
 			continue;
 		if (filter && filter.isSafe === isSafe)
 			continue;
-		if (filter.sql || typeof (filter) === 'string')
-			throw new Error('Raw filters are disallowed');
+		if (filter.sql || typeof (filter) === 'string') {
+			const e = new Error('Raw filters are disallowed');
+			// @ts-ignore
+			e.status = 403;
+			throw e;
+		}
 		if (Array.isArray(filter))
 			for (let i = 0; i < filter.length; i++) {
 				validateArgs(filter[i]);
