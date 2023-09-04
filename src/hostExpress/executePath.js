@@ -65,8 +65,12 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 		if (isFilter(json)) {
 			let subFilters = [];
 			let anyAllNone = tryGetAnyAllNone(json.path, table);
-			if (anyAllNone)
-				return anyAllNone(x => parseFilter(json.args[0], x));
+			if (anyAllNone) {
+
+				const f =  anyAllNone(x => parseFilter(json.args[0], x));
+				f.isSafe = isSafe;
+				return f;
+			}
 			else {
 				for (let i = 0; i < json.args.length; i++) {
 					subFilters.push(parseFilter(json.args[i], nextTable(json.path, table)));
@@ -105,6 +109,7 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 			let target = table;
 			let op = pathArray[pathArray.length - 1];
 			if (!allowedOps[op] && isHttp) {
+
 				let e =  new Error('Disallowed operator ' + op);
 				// @ts-ignore
 				e.status = 403;
@@ -302,7 +307,8 @@ function validateArgs() {
 			continue;
 		if (filter && filter.isSafe === isSafe)
 			continue;
-		if (filter.sql || typeof (filter) === 'string') {
+		// if (filter.sql || typeof (filter) === 'string') {
+		if (filter.sql) {
 			const e = new Error('Raw filters are disallowed');
 			// @ts-ignore
 			e.status = 403;

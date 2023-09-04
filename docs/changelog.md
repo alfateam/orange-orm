@@ -1,5 +1,7 @@
 
 ## Release notes
+__3.1.41__  
+Bugfix: false positive 403.  
 __3.1.40__  
 Documented raw sql queries and filters.  
 __3.1.39__  
