@@ -17,6 +17,7 @@ body {
 }
 
 .custom-button {
+    color: black !important;
     background-color: lightgray;
     border-radius: 25px;
 }
