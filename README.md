@@ -947,10 +947,10 @@ async function getRows() {
     parameters: ['%arry']
   };
                  
-  const ordersWithRawFilter = await db.customer.getOne(rawFilter);
+  const rowsWithRawFilter = await db.customer.getOne(rawFilter);
   
   const combinedFilter = db.customer.balance.greaterThan(100).and(rawFilter);
-  const ordersWithCombinedFilter = await db.customer.getOne(combinedFilter);  
+  const rowsWithCombinedFilter = await db.customer.getOne(combinedFilter);  
 }
 ```
 </details>
