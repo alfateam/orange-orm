@@ -665,9 +665,11 @@ Raw sql queries and raw sql filters are disabled at the http client due to secur
 import db from './db';
 import { json } from 'body-parser';
 import express from 'express';
+import cors from 'cors';
 
 express().disable('x-powered-by')
   .use(json({ limit: '100mb' }))
+  .use(cors())
   .use('/rdb', db.express())
   .listen(3000, () => console.log('Example app listening on port 3000!'));
 ```
@@ -709,9 +711,11 @@ One notable side effect compared to the previous example, is that only the order
 import db from './db';
 import { json } from 'body-parser';
 import express from 'express';
+import cors from 'cors';
 
 express().disable('x-powered-by')
   .use(json({ limit: '100mb' }))
+  .use(cors())
   .use('/rdb', validateToken)
   .use('/rdb', db.express({
     order: {
