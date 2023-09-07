@@ -7,3 +7,5 @@ demo*.db*
 favicon.ico
 assets
 _config.yml
+_layouts
+.github
