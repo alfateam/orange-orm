@@ -23,6 +23,15 @@ const map = rdb.map(x => ({
 		isActive: column('isActive').boolean(),
 	})),
 
+	customer2: x.table('customer').map(({ column }) => ({
+		id: column('id').numeric().primary().notNullExceptInsert(),
+		name: column('name').string().validate(validateName).validate(truthy).JSONSchema(nameSchema),
+		balance: column('balance').numeric(),
+		isActive: column('isActive').boolean(),
+		data: column('data').json(),
+		picture: column('picture').binary()
+	})),
+
 	customerDefault: x.table('customer').map(({ column }) => ({
 		id: column('id').numeric().primary().notNullExceptInsert(),
 		name: column('name').string(),

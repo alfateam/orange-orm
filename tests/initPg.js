@@ -16,7 +16,9 @@ CREATE TABLE customer (
     id SERIAL	 PRIMARY KEY,
     name TEXT,
     balance NUMERIC,
-    isActive BOOLEAN
+    isActive BOOLEAN,
+    data JSONB,
+    picture BYTEA
 );
 
 CREATE TABLE _order (

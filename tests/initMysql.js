@@ -14,7 +14,9 @@ CREATE TABLE customer (
     id INTEGER AUTO_INCREMENT PRIMARY KEY,
     name TEXT,
     balance DECIMAL(10,2),
-    isActive BOOLEAN
+    isActive BOOLEAN,
+    data JSON,
+    picture BLOB
 );
 
 CREATE TABLE _order (

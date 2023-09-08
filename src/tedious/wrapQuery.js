@@ -94,6 +94,12 @@ function addParameters(request, params) {
 		// @ts-ignore
 		else if (p instanceof Date && !isNaN(p))
 			return TYPES.Date;
+		else if (Array.isArray(p))
+			return TYPES.NVarChar;
+		else if (Buffer.isBuffer(p))
+			return TYPES.VarBinary;
+		else if (typeof p === 'object' && p instanceof Object)
+			return TYPES.NVarChar;
 		else
 			throw new Error('Unknown data type');
 

@@ -1,5 +1,7 @@
 import { describe, test, beforeAll, afterAll, expect } from 'vitest';
 const express = require('express');
+import { json } from 'body-parser';
+import cors from 'cors';
 const db = require('./db');
 const initPg = require('./initPg');
 const initMs = require('./initMs');
@@ -9,8 +11,6 @@ const initSap = require('./initSap');
 const dateToISOString = require('../src/dateToISOString');
 const versionArray = process.version.replace('v', '').split('.');
 const major = parseInt(versionArray[0]);
-import { json } from 'body-parser';
-import cors from 'cors';
 
 let server;
 

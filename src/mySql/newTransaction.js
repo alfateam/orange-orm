@@ -26,6 +26,7 @@ function newResolveTransaction(domain, pool) {
 				rdb.dbClient = connection;
 				rdb.dbClientDone = done;
 				rdb.encodeBoolean = encodeBoolean;
+				rdb.encodeJSON = JSON.stringify;
 				rdb.deleteFromSql = deleteFromSql;
 				rdb.insertDefault = 'VALUES ()';
 				rdb.selectForUpdateSql = selectForUpdateSql;

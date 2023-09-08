@@ -20,7 +20,10 @@ CREATE TABLE customer (
     id int IDENTITY(1,1) PRIMARY KEY,   
     name VARCHAR(100),
     balance NUMERIC,
-    isActive BIT
+    isActive BIT,
+    data  NVARCHAR(MAX),
+    picture VARBINARY(MAX)
+
 );
 
 CREATE TABLE _order (

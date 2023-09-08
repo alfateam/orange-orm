@@ -3,7 +3,9 @@ CREATE TABLE customer (
     id INTEGER PRIMARY KEY,
     name TEXT,
     balance NUMERIC,
-    isActive INTEGER
+    isActive INTEGER,
+    data JSONB,
+    picture BLOB
 );
 
 CREATE TABLE _order (

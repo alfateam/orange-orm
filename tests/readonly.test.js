@@ -128,6 +128,14 @@ describe('readonly everything', () => {
 				balance: { readonly: true },
 				isActive: { readonly: true }
 			},
+			customer2: {
+				id: { readonly: true },
+				name: { readonly: true },
+				balance: { readonly: true },
+				isActive: { readonly: true },
+				data: { readonly: true },
+				picture: { readonly: true }
+			},
 			customerDbNull: {
 				balance: {
 					readonly: true,

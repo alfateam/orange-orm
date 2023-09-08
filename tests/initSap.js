@@ -77,7 +77,10 @@ CREATE TABLE customer (
     id int IDENTITY PRIMARY KEY,   
     name VARCHAR(100),
     balance NUMERIC,
-    isActive BIT
+    isActive BIT,
+    data TEXT NULL,
+    picture VARBINARY NULL
+
 )
 
 GO
