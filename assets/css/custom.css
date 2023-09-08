@@ -6,10 +6,24 @@ body {
 }
 
 /* Media query for small devices */
-@media (max-width: 768px) { /* This value is for tablets. Adjust as necessary */
+@media (max-width: 768px) {
+
+    /* This value is for tablets. Adjust as necessary */
     body {
-        width: auto; 
+        width: auto;
         padding-left: 20px;
         padding-right: 20px;
     }
+}
+
+.custom-button {
+    color: black !important;
+    background-color: lightgray;
+    border-radius: 25px;
+}
+
+.top-right-buttons {
+    position: absolute;
+    top: 10px;
+    right: 10px;
 }
