@@ -904,6 +904,8 @@ const map = rdb.map(x => ({
       pet: x.column('pet').jsonOf(pet).JSONSchema(petSchema)
   }))
 }));
+
+export default map.sqlite('demo.db');
 ```
 <sub>📄 db.ts</sub>
 ```javascript
@@ -933,6 +935,8 @@ const map = rdb.map(x => ({
       pet: x.column('pet').jsonOf<Pet>().JSONSchema(petSchema)
   }))
 }));
+
+export default map.sqlite('demo.db');
 ```
 </details>
 
@@ -978,6 +982,45 @@ async function getRows() {
 ```
 </details>
 
+<details><summary><strong>Excluding sensitive data</strong></summary>
+
+To secure your application by preventing sensitive data from being serialized and possibly leaked, you can use the <strong>serializable(false)</strong> attribute on certain fields within your database schema. Here, the serializable(false) attribute has been applied to the balance column, indicating that this field will not be serialized when a record is converted to a JSON string.
+
+<sub>📄 db.js</sub>
+```javascript
+import rdb from 'rdb';
+
+const map = rdb.map(x => ({
+  customer: x.table('customer').map(({ column }) => ({
+    id: column('id').numeric().primary().notNullExceptInsert(),
+    name: column('name').string(),
+    balance: column('balance').numeric().serializable(false),
+    isActive: column('isActive').boolean(),
+  }))
+}));
+
+export default map.sqlite('demo.db');
+```
+<sub>📄 sensitive.js</sub>
+```javascript
+import db from './db';
+
+getRows();
+
+async function getRows() {
+
+  const george = await db.customer.insert({
+    name: 'George',
+    balance: 177,
+    isActive: true
+  });
+  
+  console.dir(JSON.stringify(george), {depth: Infinity});
+  //note that balance is excluded:
+  //'{"id":1,"name":"George","isActive":true}'
+}
+```
+</details>
 
 <details><summary><strong>What it is not</strong></summary>
 
