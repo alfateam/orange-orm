@@ -1,5 +1,7 @@
 
 ## Release notes
+__3.1.42__  
+Bugfixes: errors when inserting json and binary in postgres, mysql and sqlite.  
 __3.1.41__  
 Bugfix: false positive 403.  
 __3.1.40__  
