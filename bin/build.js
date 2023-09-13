@@ -84,7 +84,7 @@ async function findSchemaJs(cwd) {
 		ignore: ['**/node_modules/**', '**/dist/**', '**/dev/**', '**/deploy/**', '**/build/**'],
 		cwd
 	};
-	let files = glob('**/schema.*(js|mjs|ts)', options);
+	let files = await glob('**/schema.*(js|mjs|ts)', options);
 	files.sort((a, b) => {
 		const aIsTs = a.substring(a.length - 2) === 'ts';
 		const bIsTs = b.substring(b.length - 2) === 'ts';

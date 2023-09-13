@@ -1,5 +1,7 @@
 
 ## Release notes
+__3.1.44__  
+Bugfix with globbing, only related for those still using legacy / code generation  
 __3.1.43__  
 Updated dependency [glob@^10.3.4](https://npmjs.org/package/glob).  
 __3.1.42__  
