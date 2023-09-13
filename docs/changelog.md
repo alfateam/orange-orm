@@ -1,5 +1,7 @@
 
 ## Release notes
+__3.1.43__  
+Updated dependency [glob@^10.3.4](https://npmjs.org/package/glob).  
 __3.1.42__  
 Bugfixes: errors when inserting json and binary in postgres, mysql and sqlite.  
 __3.1.41__  

@@ -1,6 +1,6 @@
 let url = require('url');
 let compile = require('./compile');
-let glob = require('glob');
+let { glob } = require('glob');
 let path = require('path');
 let findNodeModules = require('findup-sync');
 let fs = require('fs');
@@ -84,31 +84,20 @@ async function findSchemaJs(cwd) {
 		ignore: ['**/node_modules/**', '**/dist/**', '**/dev/**', '**/deploy/**', '**/build/**'],
 		cwd
 	};
-	return new Promise(function(resolve, reject) {
-		glob('**/schema.*(js|mjs|ts)', options, async function(err, files) {
-			// glob('**/*(rdb|db)*/**/schema.*(js|mjs|ts)', options, async function(err, files) {
-			if (err)
-				reject(err);
-			else if (files.length === 0)
-				resolve([]);
-			else {
-				files.sort((a, b) => {
-					const aIsTs = a.substring(a.length - 2) === 'ts';
-					const bIsTs = b.substring(b.length - 2) === 'ts';
-					if (aIsTs && bIsTs)
-						return 0;
-					else if (aIsTs)
-						return -1;
-					else if (bIsTs)
-						return 1;
-					else
-						return 0;
-				});
-				files = files.map(x => path.join(cwd, '/', x));
-				resolve(files);
-			}
-		});
+	let files = glob('**/schema.*(js|mjs|ts)', options);
+	files.sort((a, b) => {
+		const aIsTs = a.substring(a.length - 2) === 'ts';
+		const bIsTs = b.substring(b.length - 2) === 'ts';
+		if (aIsTs && bIsTs)
+			return 0;
+		else if (aIsTs)
+			return -1;
+		else if (bIsTs)
+			return 1;
+		else
+			return 0;
 	});
+	return files.map(x => path.join(cwd, '/', x));
 }
 
 function tryDownload(_url, _isNamespace) {

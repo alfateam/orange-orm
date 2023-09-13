@@ -45,7 +45,7 @@ export interface ${Name}Table {
 	getMany(${name}s: Array<${Name}>): Promise<${Name}Array>;
 	getMany(${name}s: Array<${Name}>, fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
 	getOne(filter?: RawFilter): Promise<${Name}Row>;
-	getOne(filter: RawFilter, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
+	getOne(filter?: RawFilter, fetchingStrategy?: ${Name}Strategy): Promise<${Name}Row>;
 	getOne(${name}: ${Name}): Promise<${Name}Row>;
 	getOne(${name}: ${Name}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
 	getById(${getIdArgs(table)}): Promise<${Name}Row>;

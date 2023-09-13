@@ -1,6 +1,6 @@
 {
   "name": "rdb",
-  "version": "3.1.42",
+  "version": "3.1.43",
   "main": "./src/index.js",
   "browser": "./src/client/index.mjs",
   "bin": {
@@ -97,7 +97,7 @@
     "eslint": "^8.6.0",
     "eslint-plugin-jest": "^27.1.7",
     "express": "^4.18.2",
-    "glob": "^7.1.7",
+    "glob": "^10.3.4",
     "msnodesqlv8": "^2.2.0",
     "mysql2": "^2.2.5",
     "owasp-dependency-check": "^0.0.21",
