@@ -500,7 +500,7 @@ async function getRows() {
 ```
 </details>  
 
-<details><summary><strong>Updating rows</strong></summary>
+<details id="updating-rows"><summary><strong>Updating rows</strong></summary>
   
 To update rows, modify the property values and invoke the method <strong><i>saveChanges()</i></strong>. The function updates only the modified columns, not the entire row. Rows in child relations can also be updated as long as the parent order <i>owns</i> the child tables. In our illustration, the <strong>order</strong> table owns both the <strong>deliveryAddress</strong> and the <strong>lines</strong> tables because they're part of a <i>hasOne/hasMany relationship</i>. Contrastingly, the <strong>customer</strong> is part of a <i>reference relationship</i> and thus can't be updated here. But you can detach the reference to the customer by assigning it to null or undefined. (Setting order.customerId to null or undefined achieves the same result.)
 
@@ -629,7 +629,7 @@ async function deleteRows() {
 ```
 __Deleting with concurrency__
 
-Concurrent operations can lead to conflicts. When you still want to proceed with the deletion regardless of potential interim changes, the 'overwrite' concurrency strategy can be used. This example demonstrates deleting rows even if the "delivery address" has been modified in the meantime. You can read more about concurrency strategies in the 'Updating rows' section.   
+Concurrent operations can lead to conflicts. When you still want to proceed with the deletion regardless of potential interim changes, the 'overwrite' concurrency strategy can be used. This example demonstrates deleting rows even if the "delivery address" has been modified in the meantime. You can read more about concurrency strategies in the ('Updating rows' section)["#user-content-updating-rows"].   
 ```javascript
 import map from './map';
 const db = map.sqlite('demo.db');
