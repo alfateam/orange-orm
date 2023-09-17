@@ -28,6 +28,11 @@ Here we choose SQLite.
 ```bash
 $ npm install sqlite3
 ```
+
+<!-- ![RDB](./assets/img/relations.jpg)   -->
+<img src="./assets/img/relations.jpg" alt="Relations" width="50%">
+
+
 <sub>📄 map.js</sub>
 ```javascript
 import rdb from 'rdb';
