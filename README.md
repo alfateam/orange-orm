@@ -95,7 +95,7 @@ async function updateRow() {
 
 ## API 
 
-<details><summary><strong>Mapping tables</strong></summary>
+<details id="table-mapping"><summary><strong>Mapping tables</strong></summary>
 To define a mapping, you employ the <strong><i>map()</i></strong> method, linking your tables and columns to corresponding object properties. You provide a callback function that engages with a parameter representing a database table.
 
 Each column within your database table is designated by using the <strong><i>column()</i></strong> method, in which you specify its name. This action generates a reference to a column object that enables you to articulate further column properties like its data type or if it serves as a primary key.
@@ -221,7 +221,7 @@ import map from './map';
 const db = map.sqlite('demo.db', { size: 10 });
 ```
 __From the browser__  
-You can securely use RDB from the browser by utilizing the Express.js plugin, which serves to safeguard sensitive database credentials from exposure at the client level. This technique bypasses the need to transmit raw SQL queries directly from the client to the server. Instead, it logs method calls initiated by the client, which are later replayed and authenticated on the server. This not only reinforces security by preventing the disclosure of raw SQL queries on the client side but also facilitates a smoother operation. Essentially, this method mirrors a traditional REST API, augmented with advanced TypeScript tooling for enhanced functionality. You can read more about it in the section called  <i>In the browser</i>  
+You can securely use RDB from the browser by utilizing the Express.js plugin, which serves to safeguard sensitive database credentials from exposure at the client level. This technique bypasses the need to transmit raw SQL queries directly from the client to the server. Instead, it logs method calls initiated by the client, which are later replayed and authenticated on the server. This not only reinforces security by preventing the disclosure of raw SQL queries on the client side but also facilitates a smoother operation. Essentially, this method mirrors a traditional REST API, augmented with advanced TypeScript tooling for enhanced functionality. You can read more about it in the section called  [In the browser](#user-content-in-the-browser)  
 <sub>📄 server.js</sub>
 ```javascript
 import map from './map';
@@ -372,7 +372,7 @@ async function insertRows() {
 
 <details><summary><strong>Fetching rows</strong></summary>
 
- RDB has a rich querying model. As you navigate through, you'll learn about the various methods available to retrieve data from your tables, whether you want to fetch all rows, many rows with specific criteria, or a single row based on a primary key. If you want do dig even deeper into filtering possibilities, there is a whole section about it further down the page.
+ RDB has a rich querying model. As you navigate through, you'll learn about the various methods available to retrieve data from your tables, whether you want to fetch all rows, many rows with specific criteria, or a single row based on a primary key.  
 
 The fetching strategy in RDB is optional, and its use is influenced by your specific needs. You can define the fetching strategy either on the table level or the column level. This granularity gives you the freedom to decide how much related data you want to pull along with your primary request.
 
@@ -500,7 +500,7 @@ async function getRows() {
 ```
 </details>  
 
-<details><summary><strong>Updating rows</strong></summary>
+<details id="updating-rows"><summary><strong>Updating rows</strong></summary>
   
 To update rows, modify the property values and invoke the method <strong><i>saveChanges()</i></strong>. The function updates only the modified columns, not the entire row. Rows in child relations can also be updated as long as the parent order <i>owns</i> the child tables. In our illustration, the <strong>order</strong> table owns both the <strong>deliveryAddress</strong> and the <strong>lines</strong> tables because they're part of a <i>hasOne/hasMany relationship</i>. Contrastingly, the <strong>customer</strong> is part of a <i>reference relationship</i> and thus can't be updated here. But you can detach the reference to the customer by assigning it to null or undefined. (Setting order.customerId to null or undefined achieves the same result.)
 
@@ -594,7 +594,7 @@ async function update() {
 </details>  
 
 <details><summary><strong>Deleting rows</strong></summary>
-Rows in owner tables cascade deletes to their child tables. In essence, if a table has ownership over other tables through <strong><i>hasOne</i></strong> and <strong><i>hasMany</i></strong> relationships, removing a record from the parent table also removes its corresponding records in its child tables. This approach safeguards against leaving orphaned records and upholds data integrity. On the contrary, tables that are merely referenced, through <strong><i>reference relationships </i></strong> , remain unaffected upon deletions. For a deeper dive into these relationships and behaviors, refer to the section on table mapping.
+Rows in owner tables cascade deletes to their child tables. In essence, if a table has ownership over other tables through <strong><i>hasOne</i></strong> and <strong><i>hasMany</i></strong> relationships, removing a record from the parent table also removes its corresponding records in its child tables. This approach safeguards against leaving orphaned records and upholds data integrity. On the contrary, tables that are merely referenced, through <strong><i>reference relationships </i></strong> , remain unaffected upon deletions. For a deeper dive into these relationships and behaviors, refer to the section on (table mapping)[#user-content-table-mapping].
 
 __Deleting a single row__
 ```javascript
@@ -629,7 +629,7 @@ async function deleteRows() {
 ```
 __Deleting with concurrency__
 
-Concurrent operations can lead to conflicts. When you still want to proceed with the deletion regardless of potential interim changes, the 'overwrite' concurrency strategy can be used. This example demonstrates deleting rows even if the "delivery address" has been modified in the meantime. You can read more about concurrency strategies in the 'Updating rows' section.   
+Concurrent operations can lead to conflicts. When you still want to proceed with the deletion regardless of potential interim changes, the 'overwrite' concurrency strategy can be used. This example demonstrates deleting rows even if the "delivery address" has been modified in the meantime. You can read more about concurrency strategies in the ('Updating rows' section)["#user-content-updating-rows"].   
 ```javascript
 import map from './map';
 const db = map.sqlite('demo.db');
@@ -698,7 +698,7 @@ async function deleteRows() {
 }
 ```
 </details>
-<details><summary><strong>In the browser</strong></summary>
+<details id="in-the-browser"><summary><strong>In the browser</strong></summary>
 You can use <strong><i>RDB</i></strong> in the browser by using the adapter for Express.js. Instead of sending raw SQL queries from the client to the server, this approach records the method calls in the client. These method calls are then replayed at the server, ensuring a higher level of security by not exposing raw SQL on the client side.  
 Raw sql queries, raw sql filters and transactions are disabled at the http client due to security reasons.  If you would like RDB to support other web frameworks, like nestJs, fastify, etc, please let me know.
 
