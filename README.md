@@ -221,7 +221,7 @@ import map from './map';
 const db = map.sqlite('demo.db', { size: 10 });
 ```
 __From the browser__  
-You can securely use RDB from the browser by utilizing the Express.js plugin, which serves to safeguard sensitive database credentials from exposure at the client level. This technique bypasses the need to transmit raw SQL queries directly from the client to the server. Instead, it logs method calls initiated by the client, which are later replayed and authenticated on the server. This not only reinforces security by preventing the disclosure of raw SQL queries on the client side but also facilitates a smoother operation. Essentially, this method mirrors a traditional REST API, augmented with advanced TypeScript tooling for enhanced functionality. You can read more about it in the section called  [In the browser](#in-the-browser)  
+You can securely use RDB from the browser by utilizing the Express.js plugin, which serves to safeguard sensitive database credentials from exposure at the client level. This technique bypasses the need to transmit raw SQL queries directly from the client to the server. Instead, it logs method calls initiated by the client, which are later replayed and authenticated on the server. This not only reinforces security by preventing the disclosure of raw SQL queries on the client side but also facilitates a smoother operation. Essentially, this method mirrors a traditional REST API, augmented with advanced TypeScript tooling for enhanced functionality. You can read more about it in the section called  [In the browser](#user-content-in-the-browser)  
 <sub>📄 server.js</sub>
 ```javascript
 import map from './map';
