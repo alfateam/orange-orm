@@ -95,7 +95,7 @@ async function updateRow() {
 
 ## API 
 
-<details><summary><strong>Mapping tables</strong></summary>
+<details id="table-mapping"><summary><strong>Mapping tables</strong></summary>
 To define a mapping, you employ the <strong><i>map()</i></strong> method, linking your tables and columns to corresponding object properties. You provide a callback function that engages with a parameter representing a database table.
 
 Each column within your database table is designated by using the <strong><i>column()</i></strong> method, in which you specify its name. This action generates a reference to a column object that enables you to articulate further column properties like its data type or if it serves as a primary key.
@@ -372,7 +372,7 @@ async function insertRows() {
 
 <details><summary><strong>Fetching rows</strong></summary>
 
- RDB has a rich querying model. As you navigate through, you'll learn about the various methods available to retrieve data from your tables, whether you want to fetch all rows, many rows with specific criteria, or a single row based on a primary key. If you want do dig even deeper into filtering possibilities, there is a whole section about it further down the page.
+ RDB has a rich querying model. As you navigate through, you'll learn about the various methods available to retrieve data from your tables, whether you want to fetch all rows, many rows with specific criteria, or a single row based on a primary key.  
 
 The fetching strategy in RDB is optional, and its use is influenced by your specific needs. You can define the fetching strategy either on the table level or the column level. This granularity gives you the freedom to decide how much related data you want to pull along with your primary request.
 
@@ -594,7 +594,7 @@ async function update() {
 </details>  
 
 <details><summary><strong>Deleting rows</strong></summary>
-Rows in owner tables cascade deletes to their child tables. In essence, if a table has ownership over other tables through <strong><i>hasOne</i></strong> and <strong><i>hasMany</i></strong> relationships, removing a record from the parent table also removes its corresponding records in its child tables. This approach safeguards against leaving orphaned records and upholds data integrity. On the contrary, tables that are merely referenced, through <strong><i>reference relationships </i></strong> , remain unaffected upon deletions. For a deeper dive into these relationships and behaviors, refer to the section on table mapping.
+Rows in owner tables cascade deletes to their child tables. In essence, if a table has ownership over other tables through <strong><i>hasOne</i></strong> and <strong><i>hasMany</i></strong> relationships, removing a record from the parent table also removes its corresponding records in its child tables. This approach safeguards against leaving orphaned records and upholds data integrity. On the contrary, tables that are merely referenced, through <strong><i>reference relationships </i></strong> , remain unaffected upon deletions. For a deeper dive into these relationships and behaviors, refer to the section on (table mapping)[#user-content-table-mapping].
 
 __Deleting a single row__
 ```javascript
