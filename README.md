@@ -221,7 +221,7 @@ import map from './map';
 const db = map.sqlite('demo.db', { size: 10 });
 ```
 __From the browser__  
-You can securely use RDB from the browser by utilizing the Express.js plugin, which serves to safeguard sensitive database credentials from exposure at the client level. This technique bypasses the need to transmit raw SQL queries directly from the client to the server. Instead, it logs method calls initiated by the client, which are later replayed and authenticated on the server. This not only reinforces security by preventing the disclosure of raw SQL queries on the client side but also facilitates a smoother operation. Essentially, this method mirrors a traditional REST API, augmented with advanced TypeScript tooling for enhanced functionality. You can read more about it in the section called  <i>In the browser</i>  
+You can securely use RDB from the browser by utilizing the Express.js plugin, which serves to safeguard sensitive database credentials from exposure at the client level. This technique bypasses the need to transmit raw SQL queries directly from the client to the server. Instead, it logs method calls initiated by the client, which are later replayed and authenticated on the server. This not only reinforces security by preventing the disclosure of raw SQL queries on the client side but also facilitates a smoother operation. Essentially, this method mirrors a traditional REST API, augmented with advanced TypeScript tooling for enhanced functionality. You can read more about it in the section called  [In the browser](#in-the-browser)  
 <sub>📄 server.js</sub>
 ```javascript
 import map from './map';
@@ -698,7 +698,7 @@ async function deleteRows() {
 }
 ```
 </details>
-<details><summary><strong>In the browser</strong></summary>
+<details ="in-the-browser"><summary><strong>In the browser</strong></summary>
 You can use <strong><i>RDB</i></strong> in the browser by using the adapter for Express.js. Instead of sending raw SQL queries from the client to the server, this approach records the method calls in the client. These method calls are then replayed at the server, ensuring a higher level of security by not exposing raw SQL on the client side.  
 Raw sql queries, raw sql filters and transactions are disabled at the http client due to security reasons.  If you would like RDB to support other web frameworks, like nestJs, fastify, etc, please let me know.
 
