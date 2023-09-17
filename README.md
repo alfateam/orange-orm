@@ -14,7 +14,7 @@ RDB is the ultimate Object Relational Mapper for Node.js and Typescript, offerin
 - **Concise API**: With a concise and developer-friendly API, RDB enables you to interact with your database using simple and expressive syntax.
 - **No Code Generation Required**: Enjoy full IntelliSense, even in table mappings, without the need for cumbersome code generation.
 - **TypeScript and JavaScript Support**: RDB fully supports both TypeScript and JavaScript, allowing you to leverage the benefits of static typing and modern ECMAScript features.
-- **Works in the Browser**: RDB even works in the browser through hosting in Express, giving you the flexibility to build web applications with ease.  
+- **Works in the Browser**: You can securely use RDB in the browser by utilizing the Express.js plugin, which serves to safeguard sensitive database credentials from exposure at the client level. This method mirrors a traditional REST API, augmented with advanced TypeScript tooling for enhanced functionality.
 
 This is the _Modern Typescript Documentation_. Are you looking for the [_Classic Documentation_](https://github.com/alfateam/rdb/blob/master/docs/docs.md) ?
 
@@ -28,7 +28,7 @@ Here we choose SQLite.
 ```bash
 $ npm install sqlite3
 ```
-<sub>📄 db.js</sub>
+<sub>📄 map.js</sub>
 ```javascript
 import rdb from 'rdb';
 
@@ -70,12 +70,13 @@ const map = rdb.map(x => ({
   }))
 }));
 
-export default map.sqlite('demo.db');
+export default map;
 ```  
 <sub>📄 update.js</sub>
 
 ```javascript
-import db from './db';
+import map from './map';
+const db = map.sqlite('demo.db');
 
 updateRow();
 
@@ -101,7 +102,7 @@ Each column within your database table is designated by using the <strong><i>col
 
 Relationships between tables can also be outlined. By using methods like <strong><i>hasOne</i></strong>, <strong><i>hasMany</i></strong>, and <strong><i>references</i></strong>, you can establish connections that reflect the relationships in your data schema. In the example below, an 'order' is linked to a 'customer' reference, a 'deliveryAddress', and multiple 'lines'. The hasMany and hasOne relations represents ownership - the tables 'deliveryAddress' and 'orderLine' are owned by the 'order' table, and therefore, they contain the 'orderId' column referring to their parent table, which is 'order'. Conversely, the customer table is independent and can exist without any knowledge of the 'order' table. Therefore we say that the order table <i>references</i> the customer table - necessitating the existence of a 'customerId' column in the 'order' table.  
 
-<sub>📄 db.js</sub>
+<sub>📄 map.js</sub>
 ```javascript
 import rdb from 'rdb';
 
@@ -143,11 +144,11 @@ const map = rdb.map(x => ({
   }))
 }));
 
-export default map.sqlite('demo.db');
+export default map;
 ```
 The init.js script resets our SQLite database. It's worth noting that SQLite databases are represented as single files, which makes them wonderfully straightforward to manage.
 
-At the start of the script, we import our database mapping from the db.js file. This gives us access to the db object, which we'll use to interact with our SQLite database.
+At the start of the script, we import our database mapping from the map.js file. This gives us access to the db object, which we'll use to interact with our SQLite database.
 
 Then, we define a SQL string. This string outlines the structure of our SQLite database. It first specifies to drop existing tables named 'deliveryAddress', 'orderLine', '_order', and 'customer' if they exist. This ensures we have a clean slate. Then, it dictates how to create these tables anew with the necessary columns and constraints.
 
@@ -155,7 +156,8 @@ Because of a peculiarity in SQLite, which only allows one statement execution at
 
 <sub>📄 init.js</sub>
 ```javascript
-import db from './db';
+import map from './map';
+const db = map.sqlite('demo.db');
 
 const sql = `DROP TABLE IF EXISTS deliveryAddress; DROP TABLE IF EXISTS orderLine; DROP TABLE IF EXISTS _order; DROP TABLE IF EXISTS customer;
 CREATE TABLE customer (
@@ -207,7 +209,7 @@ __SQLite__
 $ npm install sqlite3
 ```  
 ```javascript
-import map from './db';
+import map from './map';
 const db = map.sqlite('demo.db');
 ```
 __With connection pool__
@@ -215,16 +217,40 @@ __With connection pool__
 $ npm install sqlite3
 ```  
 ```javascript
-import map from './db';
+import map from './map';
 const db = map.sqlite('demo.db', { size: 10 });
 ```
+__From the browser__  
+You can securely use RDB from the browser by utilizing the Express.js plugin, which serves to safeguard sensitive database credentials from exposure at the client level. This technique bypasses the need to transmit raw SQL queries directly from the client to the server. Instead, it logs method calls initiated by the client, which are later replayed and authenticated on the server. This not only reinforces security by preventing the disclosure of raw SQL queries on the client side but also facilitates a smoother operation. Essentially, this method mirrors a traditional REST API, augmented with advanced TypeScript tooling for enhanced functionality. You can read more about it in the section called  <i>In the browser</i>  
+<sub>📄 server.js</sub>
+```javascript
+import map from './map';
+import { json } from 'body-parser';
+import express from 'express';
+import cors from 'cors';
 
+const db = map.sqlite('demo.db');
+
+express().disable('x-powered-by')
+  .use(json({ limit: '100mb' }))
+  .use(cors())
+  //for demonstrational purposes, authentication middleware is not shown here.
+  .use('/rdb', db.express())
+  .listen(3000, () => console.log('Example app listening on port 3000!'));
+```
+
+<sub>📄 browser.js</sub>
+```javascript
+import map from './map';
+
+const db = map.http('http://localhost:3000/rdb');
+```
 __MySQL__
 ```bash
 $ npm install mysql2
 ```  
 ```javascript
-import map from './db';
+import map from './map';
 const db = map.mysql('mysql://test:test@mysql/test');
 ```
 
@@ -234,7 +260,7 @@ __MS SQL__
 $ npm install tedious
 ```  
 ```javascript
-import map from './db';
+import map from './map';
 const db = map.mssql({
           server: 'mssql',
           options: {
@@ -256,7 +282,7 @@ __PostgreSQL__
 $ npm install pg
 ```  
 ```javascript
-import map from './db';
+import map from './map';
 const db = map.pg('postgres://postgres:postgres@postgres/postgres');
 ```
 __SAP Adaptive Server__
@@ -266,7 +292,7 @@ $ npm install msnodesqlv8
 ```javascript
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import map from './db';
+import map from './map';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -279,14 +305,15 @@ const db = map.pg(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;U
 
 <details><summary><strong>Inserting rows</strong></summary>
 
-In the code below, we initially import the table-mapping feature "db.js" and the setup script "init.js", both of which were defined in the preceding step. The setup script executes a raw query that creates the necessary tables. Subsequently, we insert two customers, named "George" and "Harry", into the customer table, and this is achieved through calling "db.customer.insert".
+In the code below, we initially import the table-mapping feature "map.js" and the setup script "init.js", both of which were defined in the preceding step. The setup script executes a raw query that creates the necessary tables. Subsequently, we insert two customers, named "George" and "Harry", into the customer table, and this is achieved through calling "db.customer.insert".
 
 Next, we insert an array of two orders in the order table. Each order contains an orderDate, customer information, deliveryAddress, and lines for the order items. We use the customer constants "george" and "harry" from previous inserts. Observe that we don't pass in any primary keys. This is because all tables here have autoincremental keys. The second argument to "db.order.insert" specifies a fetching strategy. This fetching strategy plays a critical role in determining the depth of the data retrieved from the database after insertion. The fetching strategy specifies which associated data should be retrieved and included in the resulting orders object. In this case, the fetching strategy instructs the database to retrieve the customer, deliveryAddress, and lines for each order.
 
 Without a fetching strategy, "db.order.insert" would only return the root level of each order. In that case you would only get the id, orderDate, and customerId for each order.  
 
 ```javascript
-import db from './db';
+import map from './map';
+const db = map.sqlite('demo.db');
 import init from './init';
 
 insertRows();
@@ -352,7 +379,8 @@ The fetching strategy in RDB is optional, and its use is influenced by your spec
 __All rows__
 
 ```javascript
-import db from './db';
+import map from './map';
+const db = map.sqlite('demo.db');
 
 getRows();
 
@@ -369,7 +397,8 @@ __Limit, offset and order by__
 This script demonstrates how to fetch orders with customer, lines and deliveryAddress, limiting the results to 10, skipping the first row, and sorting the data based on the orderDate in descending order followed by id. The lines are sorted by product.  
 
 ```javascript
-import db from './db';
+import map from './map';
+const db = map.sqlite('demo.db');
 
 getRows();
 
@@ -391,7 +420,8 @@ async function getRows() {
 __Many rows filtered__
 
 ```javascript
-import db from './db';
+import map from './map';
+const db = map.sqlite('demo.db');
 
 getRows();
 
@@ -410,7 +440,8 @@ async function getRows() {
 __Single row filtered__
 
 ```javascript
-import db from './db';
+import map from './map';
+const db = map.sqlite('demo.db');
 
 getRows();
 
@@ -431,7 +462,8 @@ async function getRows() {
 __Single row by primary key__
 
 ```javascript
-import db from './db';
+import map from './map';
+const db = map.sqlite('demo.db');
 
 getRows();
 
@@ -448,7 +480,8 @@ async function getRows() {
 __Many rows by primary key__
 
 ```javascript
-import db from './db';
+import map from './map';
+const db = map.sqlite('demo.db');
 
 getRows();
 
@@ -474,7 +507,8 @@ To update rows, modify the property values and invoke the method <strong><i>save
 __Updating a single row__
 
 ```javascript
-import db from './db';
+import map from './map';
+const db = map.sqlite('demo.db');
 
 update();
 
@@ -496,7 +530,8 @@ async function update() {
 __Updating many rows__
 
 ```javascript
-import db from './db';
+import map from './map';
+const db = map.sqlite('demo.db');
 
 update();
 
@@ -533,7 +568,8 @@ Currently, there are three concurrency strategies:
 In the example below, we've set the concurrency strategy for orderDate to 'overwrite'. This implies that if other users modify orderDate while you're making changes, their updates will be overwritten.
 
 ```javascript
-import db from './db';
+import map from './map';
+const db = map.sqlite('demo.db');
 
 update();
 
@@ -562,7 +598,8 @@ Rows in owner tables cascade deletes to their child tables. In essence, if a tab
 
 __Deleting a single row__
 ```javascript
-import db from './db';
+import map from './map';
+const db = map.sqlite('demo.db');
 
 deleteRow();
 
@@ -578,7 +615,8 @@ async function deleteRow() {
 __Deleting many rows__
 
 ```javascript
-import db from './db';
+import map from './map';
+const db = map.sqlite('demo.db');
 
 deleteRows();
 
@@ -593,7 +631,8 @@ __Deleting with concurrency__
 
 Concurrent operations can lead to conflicts. When you still want to proceed with the deletion regardless of potential interim changes, the 'overwrite' concurrency strategy can be used. This example demonstrates deleting rows even if the "delivery address" has been modified in the meantime. You can read more about concurrency strategies in the 'Updating rows' section.   
 ```javascript
-import db from './db';
+import map from './map';
+const db = map.sqlite('demo.db');
 
 deleteRows();
 
@@ -619,7 +658,8 @@ When removing a large number of records based on a certain condition, batch dele
 However, it's worth noting that batch deletes don't follow the cascade delete behavior by default. To achieve cascading in batch deletes, you must explicitly call the deleteCascade method.  
 
 ```javascript
-import db from './db';
+import map from './map';
+const db = map.sqlite('demo.db');
 
 deleteRows();
 
@@ -633,7 +673,8 @@ __Batch delete cascade__
 When deleting records, sometimes associated data in related tables also needs to be removed. This cascade delete helps maintain database integrity.  
 
 ```javascript
-import db from './db';
+import map from './map';
+const db = map.sqlite('demo.db');
 
 deleteRows();
 
@@ -647,7 +688,8 @@ __Batch delete by primary key__
 For efficiency, you can also delete records directly if you know their primary keys.  
 
 ```javascript
-import db from './db';
+import map from './map';
+const db = map.sqlite('demo.db');
 
 deleteRows();
 
@@ -657,15 +699,17 @@ async function deleteRows() {
 ```
 </details>
 <details><summary><strong>In the browser</strong></summary>
-You can use <strong><i>RDB</i></strong> directly in the browser using the adapter for the Express.js framework. Instead of sending raw SQL queries from the client to the server, this approach records the method calls in the client. These method calls are then replayed at the server, ensuring a higher level of security by not exposing raw SQL on the client side.  
-Raw sql queries and raw sql filters are disabled at the http client due to security reasons.  If you would like RDB to support other web frameworks, like nestJs, fastify, etc, please let me know.
+You can use <strong><i>RDB</i></strong> in the browser by using the adapter for Express.js. Instead of sending raw SQL queries from the client to the server, this approach records the method calls in the client. These method calls are then replayed at the server, ensuring a higher level of security by not exposing raw SQL on the client side.  
+Raw sql queries, raw sql filters and transactions are disabled at the http client due to security reasons.  If you would like RDB to support other web frameworks, like nestJs, fastify, etc, please let me know.
 
 <sub>📄 server.js</sub>
 ```javascript
-import db from './db';
+import map from './map';
 import { json } from 'body-parser';
 import express from 'express';
 import cors from 'cors';
+
+const db = map.sqlite('demo.db');
 
 express().disable('x-powered-by')
   .use(json({ limit: '100mb' }))
@@ -676,12 +720,13 @@ express().disable('x-powered-by')
 
 <sub>📄 browser.js</sub>
 ```javascript
-import map from './db';
+import map from './map';
+
+const db = map.http('http://localhost:3000/rdb');
 
 updateRows();
 
 async function updateRows() {
-  const db = map.http('http://localhost:3000/rdb');
   const filter = db.order.lines.any(
     line => line.product.startsWith('Magic wand'))
     .and(db.order.customer.name.startsWith('Harry')
@@ -708,10 +753,12 @@ One notable side effect compared to the previous example, is that only the order
 <sub>📄 server.js</sub>
 
 ```javascript
-import db from './db';
+import map from './map';
 import { json } from 'body-parser';
 import express from 'express';
 import cors from 'cors';
+
+const db = map.sqlite('demo.db');
 
 express().disable('x-powered-by')
   .use(json({ limit: '100mb' }))
@@ -740,12 +787,13 @@ function validateToken(req, res, next) {
 
 <sub>📄 browser.js</sub>
 ```javascript
-import map from './db';
+import map from './map';
+
+const db = map.http('http://localhost:3000/rdb');
 
 updateRows();
 
 async function updateRows() {
-  const db = map.http('http://localhost:3000/rdb');
   
   db.interceptors.request.use((config) => {
     // For demo purposes, we're just adding hardcoded token
@@ -791,7 +839,8 @@ An error is deliberately thrown to demonstrate a rollback, ensuring all previous
 Always use the provided tx object for operations within the transaction to maintain data integrity.
 
 ```javascript
-import db from './db';
+import map from './map';
+const db = map.sqlite('demo.db');
 
 execute();
 
@@ -819,7 +868,7 @@ RDB is database agnostic - meaning it can work with multiple database systems wi
 - **binary** is represented as a base64 string in javascript and maps to BLOB, BYTEA or VARBINARY(max) in sql.
 - **json** and **jsonOf\<T\>** are represented as an object or array in javascript and maps to JSON, JSONB, NVARCHAR(max) or TEXT (sqlite) in sql.
 
-<sub>📄 db.js</sub>
+<sub>📄 map.js</sub>
 ```javascript
 import rdb from 'rdb';
 
@@ -845,7 +894,7 @@ const map = rdb.map(x => ({
   }))
 }));
 ```
-<sub>📄 db.ts</sub>
+<sub>📄 map.ts</sub>
 ```javascript
 import rdb from 'rdb';
 
@@ -872,7 +921,7 @@ const map = rdb.map(x => ({
 <details><summary><strong>Validation</strong></summary>
 In the previous sections you have already seen the <strong><i>notNull()</i></strong> validator being used on some columns. This will not only generate correct typescript mapping, but also throw an error if value is set to null or undefined. However, sometimes we do not want the notNull-validator to be run on inserts. Typically, when we have an autoincremental key or server generated uuid, it does not make sense to check for null on insert. This is where <strong><i>notNullExceptInsert()</strong></i> comes to rescue. You can also create your own custom validator as shown below. The last kind of validator, is the <a href="https://ajv.js.org/json-schema.html">ajv JSON schema validator</a>. This can be used on json columns as well as any other column type.
 
-<sub>📄 db.js</sub>
+<sub>📄 map.js</sub>
 ```javascript
 import rdb from 'rdb';
 
@@ -905,9 +954,9 @@ const map = rdb.map(x => ({
   }))
 }));
 
-export default map.sqlite('demo.db');
+export default map;
 ```
-<sub>📄 db.ts</sub>
+<sub>📄 map.ts</sub>
 ```javascript
 import rdb from 'rdb';
 
@@ -936,7 +985,7 @@ const map = rdb.map(x => ({
   }))
 }));
 
-export default map.sqlite('demo.db');
+export default map;
 ```
 </details>
 
@@ -945,7 +994,8 @@ This illustrates the implementation of raw SQL filters, for querying customer da
  Here the raw filter queries for customer with name ending with "arry". The composite filter combines the raw SQL filter and a regular filter that checks for a customer balance greater than 100. It is important to note that due to security precautions aimed at preventing SQL injection attacks, using raw SQL filters directly via browser inputs is not allowed. Attempting to do so will result in an HTTP status 403 (Forbidden) being returned.
  
 ```javascript
-import db from './db';
+import map from './map';
+const db = map.sqlite('demo.db');
 
 getRows();
 
@@ -967,7 +1017,8 @@ async function getRows() {
 You can employ raw SQL queries directly to fetch rows from the database, bypassing the ORM (Object-Relational Mapper). It is important to note that due to security precautions aimed at preventing SQL injection attacks, using raw SQL filters directly via browser inputs is not allowed. Attempting to do so will result in an HTTP status 403 (Forbidden) being returned.
 
 ```javascript
-import db from './db';
+import map from './map';
+const db = map.sqlite('demo.db');
 
 getRows();
 
@@ -986,7 +1037,7 @@ async function getRows() {
 
 To secure your application by preventing sensitive data from being serialized and possibly leaked, you can use the <strong>serializable(false)</strong> attribute on certain fields within your database schema. Here, the serializable(false) attribute has been applied to the balance column, indicating that this field will not be serialized when a record is converted to a JSON string.
 
-<sub>📄 db.js</sub>
+<sub>📄 map.js</sub>
 ```javascript
 import rdb from 'rdb';
 
@@ -999,11 +1050,12 @@ const map = rdb.map(x => ({
   }))
 }));
 
-export default map.sqlite('demo.db');
+export default map;
 ```
 <sub>📄 sensitive.js</sub>
 ```javascript
-import db from './db';
+import map from './map';
+const db = map.sqlite('demo.db');
 
 getRows();
 
