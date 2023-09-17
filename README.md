@@ -698,7 +698,7 @@ async function deleteRows() {
 }
 ```
 </details>
-<details ="in-the-browser"><summary><strong>In the browser</strong></summary>
+<details id="in-the-browser"><summary><strong>In the browser</strong></summary>
 You can use <strong><i>RDB</i></strong> in the browser by using the adapter for Express.js. Instead of sending raw SQL queries from the client to the server, this approach records the method calls in the client. These method calls are then replayed at the server, ensuring a higher level of security by not exposing raw SQL on the client side.  
 Raw sql queries, raw sql filters and transactions are disabled at the http client due to security reasons.  If you would like RDB to support other web frameworks, like nestJs, fastify, etc, please let me know.
 
