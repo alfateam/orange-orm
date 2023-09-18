@@ -8,7 +8,7 @@ RDB is the ultimate Object Relational Mapper for Node.js and Typescript, offerin
 
 
 
-## Key Features
+## Key Features 
 
 - **Rich Querying Model**: RDB provides a powerful and intuitive querying model, making it easy to retrieve, filter, and manipulate data from your databases.
 - **Concise API**: With a concise and developer-friendly API, RDB enables you to interact with your database using simple and expressive syntax.

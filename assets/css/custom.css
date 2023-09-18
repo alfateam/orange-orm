@@ -16,10 +16,23 @@ body {
     }
 }
 
+ 
+
 .custom-button {
     color: black !important;
     background-color: lightgray;
     border-radius: 25px;
+    display: inline-flex;
+    align-items: center;
+    padding: 10px 20px;
+    color: #fff;
+    border: none;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.custom-button .icon {
+    margin-right: 10px; 
 }
 
 .top-right-buttons {
