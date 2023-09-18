@@ -31,10 +31,6 @@ body {
     cursor: pointer;
 }
 
-.custom-button .icon {
-    margin-right: 10px; 
-}
-
 .top-right-buttons {
     position: absolute;
     top: 10px;
