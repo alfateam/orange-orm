@@ -24,8 +24,7 @@ $ npm install rdb
 ```  
 
 ## Example
-<!-- ![RDB](./assets/img/relations2.jpg)   -->
-<img src="./docs/relations.png" alt="Relations" width="66%">
+![Relations diagram](./docs/relations.png)  
 
 Here we choose SQLite.  
 ```bash
