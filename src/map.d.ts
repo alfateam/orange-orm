@@ -79,8 +79,8 @@ type MappedDbInstance<T> = {
 	: never;
 } & {
 	filter: Filter;
-	and(filter: Filter, ...filters: Filter[]): Filter;
-	or(filter: Filter, ...filters: Filter[]): Filter;
+	and(filter: Filter | RawFilter[], ...filters: RawFilter[]): Filter;
+	or(filter: Filter | RawFilter[], ...filters: RawFilter[]): Filter;
 	not(): Filter;
 	query(filter: RawFilter | string): Promise<unknown[]>;
 	query<T>(filter: RawFilter | string): Promise<T[]>;
@@ -1456,8 +1456,8 @@ interface RawFilter {
 }
 
 interface Filter extends RawFilter {
-	and(filter: Filter, ...filters: Filter[]): Filter;
-	or(filter: Filter, ...filters: Filter[]): Filter;
+	and(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
+	or(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
 	not(): Filter;
 }
 

@@ -366,8 +366,8 @@ declare namespace r {${getTables(isHttp)}
 		if (!isHttp)
 			result += `
 
-	function and(filter: Filter, ...filters: Filter[]): Filter;
-	function or(filter: Filter, ...filters: Filter[]): Filter;
+	function and(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
+	function or(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
 	function not(): Filter;
 	function transaction(fn: (transaction: RdbClient) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
 	function query(filter: RawFilter | string): Promise<unknown[]>;
@@ -385,8 +385,8 @@ declare namespace r {${getTables(isHttp)}
 		response: AxiosInterceptorManager<AxiosResponse>;
 	};
 	function reactive(proxyMethod: (obj: unknown) => unknown): void;	
-	function and(filter: Filter, ...filters: Filter[]): Filter;
-	function or(filter: Filter, ...filters: Filter[]): Filter;
+	function and(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
+	function or(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
 	function not(): Filter;
 	const filter: Filter;
 `;
@@ -454,8 +454,8 @@ export interface ExpressTables {${getExpressTables()}
         response: AxiosInterceptorManager<AxiosResponse>;
     };
 	reactive(proxyMethod: (obj: unknown) => unknown): void;
-	and(filter: Filter, ...filters: Filter[]): Filter;
-	or(filter: Filter, ...filters: Filter[]): Filter;
+	and(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
+	or(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
 	not(): Filter;
 	transaction(fn: (transaction: RdbClient) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
 	filter: Filter;
@@ -464,8 +464,8 @@ export interface ExpressTables {${getExpressTables()}
 		else
 			result += `
 	(config: RdbConfig): RdbClient;
-	and(filter: Filter, ...filters: Filter[]): Filter;
-	or(filter: Filter, ...filters: Filter[]): Filter;
+	and(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
+	or(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
 	not(): Filter;
 	query(filter: RawFilter | string): Promise<unknown[]>;
 	query<T>(filter: RawFilter | string): Promise<T[]>;
