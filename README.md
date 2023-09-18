@@ -49,13 +49,13 @@ const map = rdb.map(x => ({
   })),
 
   orderLine: x.table('orderLine').map(({ column }) => ({
-    id: column('id').numeric().primary().notNullExceptInsert(),
+    id: column('id').numeric().primary(),
     orderId: column('orderId').numeric(),
     product: column('product').string(),
   })),
 
   deliveryAddress: x.table('deliveryAddress').map(({ column }) => ({
-    id: column('id').numeric().primary().notNullExceptInsert(),
+    id: column('id').numeric().primary(),
     orderId: column('orderId').numeric(),
     name: column('name').string(),
     street: column('street').string(),
@@ -123,13 +123,13 @@ const map = rdb.map(x => ({
   })),
 
   orderLine: x.table('orderLine').map(({ column }) => ({
-    id: column('id').numeric().primary().notNullExceptInsert(),
+    id: column('id').numeric().primary(),
     orderId: column('orderId').numeric(),
     product: column('product').string(),
   })),
 
   deliveryAddress: x.table('deliveryAddress').map(({ column }) => ({
-    id: column('id').numeric().primary().notNullExceptInsert(),
+    id: column('id').numeric().primary(),
     orderId: column('orderId').numeric(),
     name: column('name').string(),
     street: column('street').string(),
