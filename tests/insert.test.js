@@ -1,6 +1,6 @@
 const db = require('./db');
-import { describe, test, beforeAll, expect } from 'vitest';
-
+import { describe, test, beforeAll, afterAll, expect } from 'vitest';
+import fs from 'fs';
 const initPg = require('./initPg');
 const initMs = require('./initMs');
 const initMysql = require('./initMysql');
@@ -9,6 +9,7 @@ const initSap = require('./initSap');
 const dateToISOString = require('../src/dateToISOString');
 const versionArray = process.version.replace('v', '').split('.');
 const major = parseInt(versionArray[0]);
+const sqliteFile = 'demo.insert.db';
 
 beforeAll(async () => {
 
@@ -23,6 +24,10 @@ beforeAll(async () => {
 		`;
 		await db.query(sql);
 	}
+});
+
+afterAll(async () => {
+	await fs.promises.unlink(sqliteFile);
 });
 
 describe('transaction', () => {
@@ -483,7 +488,8 @@ function getDb(name) {
 		};
 	else if (name === 'sqlite')
 		return {
-			db: db({ db: (cons) => cons.sqlite(`demo${new Date().getUTCMilliseconds()}.db`) }),
+			db: db({ db: (cons) => {
+				return  cons.sqlite(sqliteFile);} }),
 			init: initSqlite
 		};
 	else if (name === 'sap')

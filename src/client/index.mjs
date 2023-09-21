@@ -4856,7 +4856,7 @@ function httpAdapter(baseURL, path, axiosInterceptor) {
 	}
 }
 
-function netAdapter$1(url, { axios, tableOptions }) {
+function netAdapter$1(url, tableName, { axios, tableOptions }) {
 	let c = {
 		get,
 		post,
@@ -4889,8 +4889,7 @@ function netAdapter$1(url, { axios, tableOptions }) {
 	async function getInnerAdapter() {
 		const db = await getDb();
 		if (typeof db === 'string') {
-			// url = db + url;
-			return httpAdapter(db, url, axios);
+			return httpAdapter(db, `?table=${tableName}` , axios);
 		}
 		else if (db && db.transaction) {
 			return db.hostLocal({ ...tableOptions, db, table: url });
@@ -4978,35 +4977,43 @@ function map$1(index, _fn) {
 		},
 	};
 
-	const dbMap = {
-		http: (url) => url,
-		pg: throwDb,
-		postgres: throwDb,
-		mssql: throwDb,
-		mssqlNative: throwDb,
-		mysql: throwDb,
-		sap: throwDb,
-		sqlite: throwDb,
-	};
+	function dbMap(fn) {
+		return fn(dbMap);
+	}
 
-
+	dbMap.http = (url) => url;
+	dbMap.pg = throwDb;
+	dbMap.postgres = throwDb;
+	dbMap.mssql = throwDb;
+	dbMap.mssqlNative = throwDb;
+	dbMap.mysql = throwDb;
+	dbMap.sap = throwDb;
+	dbMap.sqlite = throwDb;
 
 	function throwDb() {
 		throw new Error('Cannot create pool for database outside node');
 	}
 
 	function onFinal(arg) {
-		return index({...arg, providers: dbMap});
+		if (arg && arg.db && typeof arg.db === 'function') {
+			return index({
+				...arg,
+				db: dbMap(arg.db),
+				providers: dbMap
+			});
+		}
+
+		return index({ ...arg, providers: dbMap });
 	}
 
-	onFinal.http = (url) => index({db: url, providers: dbMap});
-	onFinal.pg = () => index({db: throwDb, providers: dbMap});
-	onFinal.postgres = () => index({db: throwDb, providers: dbMap});
-	onFinal.mssql = () => index({db: throwDb, providers: dbMap});
-	onFinal.mssqlNative = () => index({db: throwDb, providers: dbMap});
-	onFinal.mysql = () => index({db: throwDb, providers: dbMap});
-	onFinal.sap = () => index({db: throwDb, providers: dbMap});
-	onFinal.sqlite = () => index({db: throwDb, providers: dbMap});
+	onFinal.http = (url) => index({ db: url, providers: dbMap });
+	onFinal.pg = () => index({ db: throwDb, providers: dbMap });
+	onFinal.postgres = () => index({ db: throwDb, providers: dbMap });
+	onFinal.mssql = () => index({ db: throwDb, providers: dbMap });
+	onFinal.mssqlNative = () => index({ db: throwDb, providers: dbMap });
+	onFinal.mysql = () => index({ db: throwDb, providers: dbMap });
+	onFinal.sap = () => index({ db: throwDb, providers: dbMap });
+	onFinal.sqlite = () => index({ db: throwDb, providers: dbMap });
 
 	return new Proxy(onFinal, handler);
 }
@@ -5270,11 +5277,13 @@ function rdbClient(options = {}) {
 		options = { db: options };
 	let transaction = options.transaction;
 	let _reactive = options.reactive;
-	let baseUrl = options.db;
 	let providers = options.providers || {};
+	let baseUrl = typeof options.db === 'function' ? providers(options.db) : options.db;
+	// let baseUrl =  options.db;
+
 	//@ts-ignore
 	// const axiosInterceptor = _axios.default ? _axios.default.create({}) : _axios.create({});
-	const axiosInterceptor = 	createAxiosInterceptor();
+	const axiosInterceptor = createAxiosInterceptor();
 
 	//
 	function client(_options = {}) {
@@ -5313,7 +5322,7 @@ function rdbClient(options = {}) {
 	client.postgres = onProvider.bind(null, 'postgres');
 	client.sqlite = onProvider.bind(null, 'sqlite');
 	client.sap = onProvider.bind(null, 'sap');
-	client.http = onProvider.bind(null, 'http');
+	client.http = onProvider.bind(null, 'http');//todo
 	client.mysql = onProvider.bind(null, 'mysql');
 	client.express = express;
 
@@ -5323,25 +5332,27 @@ function rdbClient(options = {}) {
 	}
 
 	if (options.tables) {
-		const readonly = { readonly: options.readonly, concurrency: options.concurrency };
-		for (let name in options.tables) {
-			client[name] = table(options.tables[name], { ...readonly, ...clone(options[name]) });
-		}
+		// for (let name in options.tables) {
+		// 	client[name] = table(options.tables[name], name, { ...readonly, ...clone(options[name]) });
+		// }
 		client.tables = options.tables;
-		return client;
+		// return client;
 	}
-	else {
-		let handler = {
-			get(_target, property,) {
-				if (property in client)
-					return Reflect.get(...arguments);
-				else
-					return table(`?table=${property}`,);
+	// else {
+	let handler = {
+		get(_target, property,) {
+			if (property in client)
+				return Reflect.get(...arguments);
+			else {
+				const readonly = { readonly: options.readonly, concurrency: options.concurrency };
+				return table(options?.tables?.[property] || baseUrl, property, { ...readonly, ...clone(options[property]) });
+				// return table(baseUrl, property);
 			}
+		}
 
-		};
-		return new Proxy(client, handler);
-	}
+	};
+	return new Proxy(client, handler);
+	// }
 
 	function getMetaData() {
 		const result = { readonly: options.readonly, concurrency: options.concurrency };
@@ -5380,13 +5391,12 @@ function rdbClient(options = {}) {
 	}
 
 	async function query() {
-		// let db = await getDb();
-		return netAdapter(baseUrl, { tableOptions: { db: baseUrl } }).query.apply(null, arguments);
+		return netAdapter(baseUrl, undefined, { tableOptions: { db: baseUrl } }).query.apply(null, arguments);
 	}
 
 	function express(arg) {
 		if (providers.express) {
-			return providers.express(client, {...options, ...arg});
+			return providers.express(client, { ...options, ...arg });
 		}
 		else
 			throw new Error('Cannot host express clientside');
@@ -5431,7 +5441,7 @@ function rdbClient(options = {}) {
 		}
 	}
 
-	function table(url, tableOptions) {
+	function table(url, tableName, tableOptions) {
 		tableOptions = tableOptions || {};
 		tableOptions = { db: baseUrl, ...tableOptions, transaction };
 		let meta;
@@ -5512,7 +5522,7 @@ function rdbClient(options = {}) {
 				path: 'getManyDto',
 				args
 			});
-			let adapter = netAdapter(url, { axios: axiosInterceptor, tableOptions });
+			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
 			return adapter.post(body);
 		}
 
@@ -5522,7 +5532,7 @@ function rdbClient(options = {}) {
 				path: 'insertAndForget',
 				args
 			});
-			let adapter = netAdapter(url, { axios: axiosInterceptor, tableOptions });
+			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
 			return adapter.post(body);
 		}
 
@@ -5532,7 +5542,7 @@ function rdbClient(options = {}) {
 				path: 'delete',
 				args
 			});
-			let adapter = netAdapter(url, { axios: axiosInterceptor, tableOptions });
+			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
 			return adapter.post(body);
 		}
 
@@ -5542,7 +5552,7 @@ function rdbClient(options = {}) {
 				path: 'deleteCascade',
 				args
 			});
-			let adapter = netAdapter(url, { axios: axiosInterceptor, tableOptions });
+			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
 			return adapter.post(body);
 		}
 
@@ -5662,7 +5672,7 @@ function rdbClient(options = {}) {
 		async function getMeta() {
 			if (meta)
 				return meta;
-			let adapter = netAdapter(url, { axios: axiosInterceptor, tableOptions });
+			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
 			meta = await adapter.get();
 
 			while (hasUnresolved(meta)) {
@@ -5710,7 +5720,7 @@ function rdbClient(options = {}) {
 			if (patch.length === 0)
 				return;
 			let body = stringify({ patch, options: { strategy, ...concurrencyOptions, deduceStrategy } });
-			let adapter = netAdapter(url, { axios: axiosInterceptor, tableOptions });
+			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
 			let p = adapter.patch(body);
 			let updatedPositions = extractChangedRowsPositions(array, patch, meta);
 			let insertedPositions = getInsertedRowsPosition(array);
@@ -5726,7 +5736,7 @@ function rdbClient(options = {}) {
 			if (patch.length === 0)
 				return;
 			let body = stringify({ patch, options: { strategy, ...concurrencyOptions, deduceStrategy } });
-			let adapter = netAdapter(url, { axios: axiosInterceptor, tableOptions });
+			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
 			await adapter.patch(body);
 			return;
 		}
@@ -5814,7 +5824,7 @@ function rdbClient(options = {}) {
 			let meta = await getMeta();
 			let patch = createPatch(array, [], meta);
 			let body = stringify({ patch, options });
-			let adapter = netAdapter(url, { axios: axiosInterceptor, tableOptions });
+			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
 			let { strategy } = await adapter.patch(body);
 			array.length = 0;
 			rootMap.set(array, { jsonMap: stringify(array), strategy });
@@ -5889,7 +5899,7 @@ function rdbClient(options = {}) {
 			let meta = await getMeta();
 			let patch = createPatch([row], [], meta);
 			let body = stringify({ patch, options });
-			let adapter = netAdapter(url, { axios: axiosInterceptor, tableOptions });
+			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
 			await adapter.patch(body);
 			rootMap.set(row, { strategy });
 		}
@@ -5912,7 +5922,7 @@ function rdbClient(options = {}) {
 
 			let body = stringify({ patch, options: { ...concurrencyOptions, strategy, deduceStrategy } });
 
-			let adapter = netAdapter(url, { axios: axiosInterceptor, tableOptions });
+			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
 			let { changed, strategy: newStrategy } = await adapter.patch(body);
 			copyInto(changed, [row]);
 			rootMap.set(row, { json: stringify(row), strategy: newStrategy });

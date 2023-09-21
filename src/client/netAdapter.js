@@ -60,7 +60,7 @@ function httpAdapter(baseURL, path, axiosInterceptor) {
 	}
 }
 
-function netAdapter(url, { axios, tableOptions }) {
+function netAdapter(url, tableName, { axios, tableOptions }) {
 	let c = {
 		get,
 		post,
@@ -93,8 +93,7 @@ function netAdapter(url, { axios, tableOptions }) {
 	async function getInnerAdapter() {
 		const db = await getDb();
 		if (typeof db === 'string') {
-			// url = db + url;
-			return httpAdapter(db, url, axios);
+			return httpAdapter(db, `?table=${tableName}` , axios);
 		}
 		else if (db && db.transaction) {
 			return db.hostLocal({ ...tableOptions, db, table: url });

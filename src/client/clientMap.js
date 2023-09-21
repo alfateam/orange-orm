@@ -26,35 +26,43 @@ function map(index, _fn) {
 		},
 	};
 
-	const dbMap = {
-		http: (url) => url,
-		pg: throwDb,
-		postgres: throwDb,
-		mssql: throwDb,
-		mssqlNative: throwDb,
-		mysql: throwDb,
-		sap: throwDb,
-		sqlite: throwDb,
-	};
+	function dbMap(fn) {
+		return fn(dbMap);
+	}
 
-
+	dbMap.http = (url) => url;
+	dbMap.pg = throwDb;
+	dbMap.postgres = throwDb;
+	dbMap.mssql = throwDb;
+	dbMap.mssqlNative = throwDb;
+	dbMap.mysql = throwDb;
+	dbMap.sap = throwDb;
+	dbMap.sqlite = throwDb;
 
 	function throwDb() {
 		throw new Error('Cannot create pool for database outside node');
 	}
 
 	function onFinal(arg) {
-		return index({...arg, providers: dbMap});
+		if (arg && arg.db && typeof arg.db === 'function') {
+			return index({
+				...arg,
+				db: dbMap(arg.db),
+				providers: dbMap
+			});
+		}
+
+		return index({ ...arg, providers: dbMap });
 	}
 
-	onFinal.http = (url) => index({db: url, providers: dbMap});
-	onFinal.pg = () => index({db: throwDb, providers: dbMap});
-	onFinal.postgres = () => index({db: throwDb, providers: dbMap});
-	onFinal.mssql = () => index({db: throwDb, providers: dbMap});
-	onFinal.mssqlNative = () => index({db: throwDb, providers: dbMap});
-	onFinal.mysql = () => index({db: throwDb, providers: dbMap});
-	onFinal.sap = () => index({db: throwDb, providers: dbMap});
-	onFinal.sqlite = () => index({db: throwDb, providers: dbMap});
+	onFinal.http = (url) => index({ db: url, providers: dbMap });
+	onFinal.pg = () => index({ db: throwDb, providers: dbMap });
+	onFinal.postgres = () => index({ db: throwDb, providers: dbMap });
+	onFinal.mssql = () => index({ db: throwDb, providers: dbMap });
+	onFinal.mssqlNative = () => index({ db: throwDb, providers: dbMap });
+	onFinal.mysql = () => index({ db: throwDb, providers: dbMap });
+	onFinal.sap = () => index({ db: throwDb, providers: dbMap });
+	onFinal.sqlite = () => index({ db: throwDb, providers: dbMap });
 
 	return new Proxy(onFinal, handler);
 }

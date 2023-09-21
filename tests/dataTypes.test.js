@@ -11,6 +11,7 @@ const initSqlite = require('./initSqlite');
 const initSap = require('./initSap');
 const versionArray = process.version.replace('v', '').split('.');
 const major = parseInt(versionArray[0]);
+const port = 3005;
 let server;
 
 afterAll(async () => {
@@ -58,7 +59,7 @@ beforeAll(async () => {
 		app.disable('x-powered-by')
 			.use(json({ limit: '100mb' }))
 			.use('/rdb', cors(), db.express());
-		server = app.listen(3003, () => console.log('Example app listening on port 3000!'));
+		server = app.listen(port, () => console.log(`Example app listening on port ${port}!`));
 	}
 
 });
@@ -153,7 +154,7 @@ function getDb(name) {
 		};
 	else if (name === 'http')
 		return {
-			db: db.http('http://localhost:3003/rdb'),
+			db: db.http(`http://localhost:${port}/rdb`),
 		};
 
 	throw new Error('unknown db');

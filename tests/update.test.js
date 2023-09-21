@@ -15,6 +15,7 @@ const major = parseInt(versionArray[0]);
 const date1 = new Date(2022, 0, 11, 9, 24, 47);
 const date2 = new Date(2021, 0, 11, 12, 22, 45);
 let server = null;
+const port = 3002;
 
 afterAll(async () => {
 	return new Promise((res) => {
@@ -92,10 +93,10 @@ beforeAll(async () => {
 		app.disable('x-powered-by')
 			.use(json({ limit: '100mb' }))
 			.use('/rdb', cors(), db.express());
-		server = app.listen(3002, () => console.log('Example app listening on port 3002!'));
+		server = app.listen(port, () => console.log(`Example app listening on port ${port}!`));
 	}
 
-});
+}, 20000);
 
 
 
@@ -272,12 +273,13 @@ describe('update date', () => {
 	}
 });
 
-
-function getDb(name) {
-	if (name === 'mssql')
-		return {
-			db: db({
-				db: (cons) => cons.mssql({
+const sqliteName = 'demo.update.db';
+const sqliteName2 = 'demo.update2.db';
+const connections = {
+	mssql: {
+		db:
+			db({
+				db: (con) => con.mssql({
 					server: 'mssql',
 					options: {
 						encrypt: false,
@@ -290,47 +292,42 @@ function getDb(name) {
 							password: 'P@assword123',
 						}
 					}
-				})
-			}),
-			init: initMs
+				}, {size: 1})
+			}, ),
+		init: initMs
+	},
+	mssqlNative:
+	{
+		db: db({ db: (con) => con.mssqlNative('server=mssql;Database=demo;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes') }),
+		init: initMs
+	},
+	pg: {
+		db: db({ db: con => con.postgres('postgres://postgres:postgres@postgres/postgres') }),
+		init: initPg
+	},
+	sqlite: {
+		db: db({ db: (con) => con.sqlite(sqliteName) }),
+		init: initSqlite
+	},
+	sqlite2: {
 
-		};
-	else if (name === 'mssqlNative')
-		return {
-			db: db({ db: (cons) => cons.mssqlNative('server=mssql;Database=demo;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes') }),
-			init: initMs
-		};
-	else if (name === 'pg')
-		return {
-			db: db({ db: (cons) => cons.postgres('postgres://postgres:postgres@postgres/postgres') }),
-			init: initPg
-		};
-	else if (name === 'sqlite')
-		return {
-			db: db({ db: (cons) => cons.sqlite(sqliteName) }),
-			init: initSqlite
-		};
-	else if (name === 'sqlite2')
-		return {
-			db: db.sqlite(sqliteName2),
-			init: initSqlite
-		};
-	else if (name === 'sap')
-		return {
-			db: db.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master`),
-			init: initSap
-		};
-	else if (name === 'mysql')
-		return {
-			db: db.mysql('mysql://test:test@mysql/test'),
-			init: initMysql
-		};
-	else if (name === 'http')
-		return {
-			db: db.http('http://localhost:3002/rdb'),
-		};
+		db: db({ db: (con) => con.sqlite(sqliteName2) }),
+		init: initSqlite
+	},
+	sap: {
+		db: db({ db: (con) => con.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master`) }),
+		init: initSap
+	},
+	mysql: {
+		db: db({ db: (con) => con.mysql('mysql://test:test@mysql/test') }),
+		init: initMysql
+	},
+	http: {
+		db: db.http(`http://localhost:${port}/rdb`),
+	}
 
-	throw new Error('unknown db');
+};
+
+function getDb(name) {
+	return connections[name];
 }
-const sqliteName = `demo${new Date().getUTCMilliseconds()}.db`;
-const sqliteName2 = `demo2${new Date().getUTCMilliseconds()}.db`;

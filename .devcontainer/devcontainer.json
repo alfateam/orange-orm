@@ -25,7 +25,7 @@
 	"postStartCommand": "git config --global --add safe.directory ${containerWorkspaceFolder}",
 	"postCreateCommand": "sudo chown node node_modules",
 	"features": {
-		"git": "latest"
+		// "git": "latest"
 	}
 	// "initializeCommand": "ssh-add -A"
 }

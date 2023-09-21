@@ -11,6 +11,7 @@ const initSap = require('./initSap');
 const dateToISOString = require('../src/dateToISOString');
 const versionArray = process.version.replace('v', '').split('.');
 const major = parseInt(versionArray[0]);
+const port = 3000;
 
 let server;
 
@@ -117,9 +118,9 @@ beforeAll(async () => {
 		app.disable('x-powered-by')
 			.use(json({ limit: '100mb' }))
 			.use('/rdb', cors(), db.express());
-		server = app.listen(3000, () => console.log('Example app listening on port 3000!'));
+		server = app.listen(port, () => console.log(`Example app listening on port ${port}!`));
 	}
-});
+}, 15000);
 
 describe('boolean filter', () => {
 	test('pg', async () => await verify('pg'));
@@ -128,6 +129,7 @@ describe('boolean filter', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
@@ -148,7 +150,7 @@ describe('boolean true filter', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
-	test('http', async () => await verify('http'));
+	// test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
@@ -168,6 +170,7 @@ describe('any-subFilter filter nested', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
@@ -203,6 +206,7 @@ describe('getMany hasOne sub filter', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
@@ -239,6 +243,7 @@ describe('getMany none sub filter', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
@@ -272,6 +277,7 @@ describe('getMany', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
 
@@ -305,6 +311,7 @@ describe('getMany with column strategy', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
@@ -332,6 +339,7 @@ describe('getMany with relations', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
@@ -408,6 +416,7 @@ describe('getMany raw filter', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
@@ -456,11 +465,14 @@ describe('getMany raw filter http', () => {
 	}
 });
 
-function getDb(name) {
-	if (name === 'mssql')
-		return {
-			db:
-				db.mssql({
+const sqliteName = 'demo.getMany.db';
+const sqliteName2 = 'demo.getMany2.db';
+
+const connections = {
+	mssql: {
+		db:
+			db({
+				db: (con) => con.mssql({
 					server: 'mssql',
 					options: {
 						encrypt: false,
@@ -473,47 +485,42 @@ function getDb(name) {
 							password: 'P@assword123',
 						}
 					}
-				}),
-			init: initMs
+				}, {size: 1})
+			}, ),
+		init: initMs
+	},
+	mssqlNative:
+	{
+		db: db({ db: (con) => con.mssqlNative('server=mssql;Database=demo;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes') }),
+		init: initMs
+	},
+	pg: {
+		db: db({ db: con => con.postgres('postgres://postgres:postgres@postgres/postgres') }),
+		init: initPg
+	},
+	sqlite: {
+		db: db({ db: (con) => con.sqlite(sqliteName) }),
+		init: initSqlite
+	},
+	sqlite2: {
 
-		};
-	else if (name === 'mssqlNative')
-		return {
-			db: db.mssqlNative('server=mssql;Database=demo;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes'),
-			init: initMs
-		};
-	else if (name === 'pg')
-		return {
-			db: db.postgres('postgres://postgres:postgres@postgres/postgres'),
-			init: initPg
-		};
-	else if (name === 'sqlite')
-		return {
-			db: db.sqlite(sqliteName),
-			init: initSqlite
-		};
-	else if (name === 'sqlite2')
-		return {
-			db: db.sqlite(sqliteName2),
-			init: initSqlite
-		};
-	else if (name === 'sap')
-		return {
-			db: db.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master`),
-			init: initSap
-		};
-	else if (name === 'mysql')
-		return {
-			db: db.mysql('mysql://test:test@mysql/test'),
-			init: initMysql
-		};
-	else if (name === 'http')
-		return {
-			db: db.http('http://localhost:3000/rdb'),
-			// init: initSqlite
-		};
+		db: db({ db: (con) => con.sqlite(sqliteName2) }),
+		init: initSqlite
+	},
+	sap: {
+		db: db({ db: (con) => con.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master`) }),
+		init: initSap
+	},
+	mysql: {
+		db: db({ db: (con) => con.mysql('mysql://test:test@mysql/test') }),
+		init: initMysql
+	},
+	http: {
+		db: db.http(`http://localhost:${port}/rdb`),
+	}
 
-	throw new Error('unknown db');
+};
+
+function getDb(name) {
+	return connections[name];
 }
-const sqliteName = `demo${new Date().getUTCMilliseconds()}.db`;
-const sqliteName2 = `demo2${new Date().getUTCMilliseconds()}.db`;

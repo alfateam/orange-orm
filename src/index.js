@@ -31,6 +31,10 @@ connectViaPool.lock = require('./lock');
 connectViaPool.schema = require('./pg/schema');
 connectViaPool.map = map.bind(null, connectViaPool);
 
+connectViaPool.http = function(url) {
+	return url;
+};
+
 Object.defineProperty(connectViaPool, 'mysql', {
 	get: function() {
 		if (!_mySql)

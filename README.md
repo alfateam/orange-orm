@@ -94,6 +94,29 @@ async function updateRow() {
 }
 
 ```
+<sub>📄 filter.js</sub>
+
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const filter = db.order.lines.any(
+    line => line.product.contains('broomstick'))
+    .and(db.order.customer.name.startsWith('Harry'));
+  
+  const orders = await db.order.getMany(filter, {
+    lines: true,
+    deliveryAddress: true,
+    customer: true
+  });
+  
+  console.dir(orders, { depth: Infinity });
+}
+
+```
 
 ## API 
 
