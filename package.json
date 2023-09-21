@@ -53,7 +53,8 @@
     "node-cls": "^1.0.5",
     "promise": "^8.0.3",
     "rfdc": "^1.2.0",
-    "uuid": "^8.3.2"
+    "uuid": "^8.3.2",
+    "glob": "^10.3.4"
   },
   "peerDependencies": {
     "msnodesqlv8": "^2.2.0",
@@ -97,7 +98,6 @@
     "eslint": "^8.6.0",
     "eslint-plugin-jest": "^27.1.7",
     "express": "^4.18.2",
-    "glob": "^10.3.4",
     "msnodesqlv8": "^2.2.0",
     "mysql2": "^2.2.5",
     "owasp-dependency-check": "^0.0.21",
