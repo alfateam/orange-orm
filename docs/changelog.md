@@ -1,5 +1,8 @@
 
-## Release notes
+## Changelog
+__3.1.45__  
+Memoize pool when resolving through func.  See #123.  
+Improved ts types for and/or-operators: now accepting arrays of RawFilter.  
 __3.1.44__  
 Bugfix with globbing, only related for those still using legacy / code generation  
 __3.1.43__  
