@@ -2,9 +2,11 @@ name: Node.js CI
 
 on:
   push:
-    branches: [ master, next, test ]
+    branches:
+      - '**'
   pull_request:
-    branches: [ master, next, test ]
+    branches: 
+      - '**'
 
 jobs:
   build:
@@ -82,7 +84,7 @@ jobs:
       - run: npm run test
       - run: npm run coverage
        # Only run the coverage once
-      - if: ${{ matrix.container == 'node:16-alpine' }}
+      - if: ${{ matrix.container == 'node:16-alpine' && github.ref == 'refs/heads/master'}}
         name: Get Coverage for badge
         run: |
           # var SUMMARY = [
@@ -109,7 +111,7 @@ jobs:
           echo "BRANCH_NAME=$BRANCH_NAME"
           echo "BRANCH=$BRANCH_NAME" >> $GITHUB_ENV
           
-      - if: ${{ matrix.container == 'node:16-alpine' }}
+      - if: ${{ matrix.container == 'node:16-alpine' && github.ref == 'refs/heads/master'}}
         name: Create the Badge
         uses: schneegans/dynamic-badges-action@v1.6.0
         with:
