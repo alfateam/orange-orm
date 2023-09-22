@@ -5267,7 +5267,6 @@ const toKeyPositionMap = toKeyPositionMap_1;
 const rootMap = new WeakMap();
 const fetchingStrategyMap = new WeakMap();
 const targetKey = Symbol();
-// const _axios = require('axios');
 const map = clientMap;
 const clone = _default;
 const createAxiosInterceptor = axiosInterceptor;
@@ -5278,14 +5277,11 @@ function rdbClient(options = {}) {
 	let transaction = options.transaction;
 	let _reactive = options.reactive;
 	let providers = options.providers || {};
-	let baseUrl = typeof options.db === 'function' ? providers(options.db) : options.db;
-	// let baseUrl =  options.db;
-
-	//@ts-ignore
-	// const axiosInterceptor = _axios.default ? _axios.default.create({}) : _axios.create({});
+	let baseUrl = options.db;
+	if (typeof providers === 'function')
+		baseUrl = typeof options.db === 'function' ? providers(options.db) : options.db;
 	const axiosInterceptor = createAxiosInterceptor();
 
-	//
 	function client(_options = {}) {
 		if (_options.pg)
 			_options = { db: _options };
@@ -5346,7 +5342,6 @@ function rdbClient(options = {}) {
 			else {
 				const readonly = { readonly: options.readonly, concurrency: options.concurrency };
 				return table(options?.tables?.[property] || baseUrl, property, { ...readonly, ...clone(options[property]) });
-				// return table(baseUrl, property);
 			}
 		}
 

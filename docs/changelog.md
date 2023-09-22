@@ -1,5 +1,7 @@
 
 ## Changelog
+__3.1.46__  
+Bugfix code generation, only related for those still using legacy / code generation.  
 __3.1.45__  
 Memoize pool when resolving through func.  See [#45](https://github.com/alfateam/rdb/issues/45).  
 Improved ts types for and/or-operators: now accepting arrays of RawFilter.  

@@ -15,9 +15,10 @@ function rdbClient(options = {}) {
 	let transaction = options.transaction;
 	let _reactive = options.reactive;
 	let providers = options.providers || {};
-	let baseUrl = typeof options.db === 'function' ? providers(options.db) : options.db;
+	let baseUrl = options.db;
+	if (typeof providers === 'function')
+		baseUrl = typeof options.db === 'function' ? providers(options.db) : options.db;
 	const axiosInterceptor = createAxiosInterceptor();
-
 
 	function client(_options = {}) {
 		if (_options.pg)
