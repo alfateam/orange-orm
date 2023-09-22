@@ -22,7 +22,7 @@ const map = rdb.map(x => ({
 		balance: column('balance').numeric(),
 		isActive: column('isActive').boolean(),
 	})),
-	
+
 	vendor: x.table('vendor').map(({ column }) => ({
 		id: column('id').numeric().primary().notNull(),
 		name: column('name').string().validate(validateName).validate(truthy).JSONSchema(nameSchema),

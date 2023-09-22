@@ -5,7 +5,7 @@ const express = require('express');
 import { json } from 'body-parser';
 const initSqlite = require('./initSqlite');
 const dateToISOString = require('../src/dateToISOString');
-
+const port = 3008;
 let server;
 
 afterAll(async () => {
@@ -104,7 +104,7 @@ beforeAll(async () => {
 
 
 
-		server = app.listen(3004, () => console.log('Example app listening on port 3000!'));
+		server = app.listen(port, () => console.log(`Example app listening on port ${port}!`));
 	}
 });
 

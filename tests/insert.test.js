@@ -1,7 +1,9 @@
-import { describe, test, beforeAll, afterAll, expect } from 'vitest';
+import { describe, test, beforeAll, expect, afterAll } from 'vitest';
 import { fileURLToPath } from 'url';
+const express = require('express');
+import { json } from 'body-parser';
+import cors from 'cors';
 const map = require('./db');
-import fs from 'fs';
 const initPg = require('./initPg');
 const initMs = require('./initMs');
 const initMysql = require('./initMysql');
@@ -10,11 +12,13 @@ const initSap = require('./initSap');
 const dateToISOString = require('../src/dateToISOString');
 const versionArray = process.version.replace('v', '').split('.');
 const major = parseInt(versionArray[0]);
-const sqliteFile = 'demo.insert.db';
+const port = 3010;
+let server;
 
 beforeAll(async () => {
 
 	await createMs('mssql');
+	hostExpress();
 
 	async function createMs(dbName) {
 		const { db } = getDb(dbName);
@@ -25,11 +29,26 @@ beforeAll(async () => {
 		`;
 		await db.query(sql);
 	}
+
+	function hostExpress() {
+		const { db } = getDb('sqlite2');
+		let app = express();
+		app.disable('x-powered-by')
+			.use(json({ limit: '100mb' }))
+			.use('/rdb', cors(), db.express());
+		server = app.listen(port, () => console.log(`Example app listening on port ${port}!`));
+	}
 });
 
 afterAll(async () => {
-	await fs.promises.unlink(sqliteFile);
+	return new Promise((res) => {
+		if (server)
+			server.close(res);
+		else
+			res();
+	});
 });
+
 
 describe('transaction', () => {
 
@@ -40,6 +59,7 @@ describe('transaction', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
+
 
 	async function verify(dbName) {
 		let result;
@@ -60,6 +80,7 @@ describe('validate', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
+
 
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
@@ -93,6 +114,7 @@ describe('validate chained', () => {
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 
+
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
 		let error;
@@ -121,6 +143,7 @@ describe('validate JSONSchema', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
+
 
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
@@ -151,6 +174,7 @@ describe('validate notNull', () => {
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 
+
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
 		let error;
@@ -175,6 +199,7 @@ describe('validate notNullExceptInsert', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
+
 
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
@@ -212,6 +237,7 @@ describe('insert autoincremental', () => {
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 
+
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
 		await init(db);
@@ -243,6 +269,7 @@ describe('insert default', () => {
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 
+
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
 		await init(db);
@@ -272,6 +299,7 @@ describe('insert default override', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
+
 
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
@@ -303,6 +331,7 @@ describe('insert dbNull', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
+
 
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
@@ -346,6 +375,7 @@ describe('insert autoincremental with relations', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
+
 
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
@@ -474,8 +504,8 @@ const connections = {
 							password: 'P@assword123',
 						}
 					}
-				}, {size: 1})
-			}, ),
+				}, { size: 1 })
+			},),
 		init: initMs
 	},
 	mssqlNative:

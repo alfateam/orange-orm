@@ -9,7 +9,7 @@ const initMs = require('./initMs');
 const initMysql = require('./initMysql');
 const initSqlite = require('./initSqlite');
 const initSap = require('./initSap');
-
+const port = 3009;
 let server;
 
 beforeAll(async () => {
@@ -124,6 +124,12 @@ describe('readonly everything', () => {
 			readonly: true,
 			concurrency: undefined,
 			customer: {
+				id: { readonly: true },
+				name: { readonly: true },
+				balance: { readonly: true },
+				isActive: { readonly: true }
+			},
+			vendor: {
 				id: { readonly: true },
 				name: { readonly: true },
 				balance: { readonly: true },
@@ -704,7 +710,7 @@ function hostExpress(options) {
 	app.disable('x-powered-by')
 		.use(json({ limit: '100mb' }))
 		.use('/rdb', cors(), db.express());
-	server = app.listen(3001, () => console.log('Example app listening on port 3001!'));
+	server = app.listen(port, () => console.log(`Example app listening on port ${port}}!`));
 }
 
 const sqliteName = `demo.${fileURLToPath(import.meta.url).split('/').at(-1).split('.')[0]}.db`;
