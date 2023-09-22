@@ -1,5 +1,6 @@
-const db = require('./db');
 import { describe, test, beforeAll, afterAll, expect } from 'vitest';
+import { fileURLToPath } from 'url';
+const map = require('./db');
 import fs from 'fs';
 const initPg = require('./initPg');
 const initMs = require('./initMs');
@@ -453,12 +454,14 @@ describe('insert autoincremental with relations', () => {
 
 });
 
+const sqliteName = `demo.${fileURLToPath(import.meta.url).split('/').at(-1).split('.')[0]}.db`;
+const sqliteName2 = `demo.${fileURLToPath(import.meta.url).split('/').at(-1).split('.')[0]}2.db`;
 
-function getDb(name) {
-	if (name === 'mssql')
-		return {
-			db: db({
-				db: (cons) => cons.mssql({
+const connections = {
+	mssql: {
+		db:
+			map({
+				db: (con) => con.mssql({
 					server: 'mssql',
 					options: {
 						encrypt: false,
@@ -471,37 +474,59 @@ function getDb(name) {
 							password: 'P@assword123',
 						}
 					}
-				})
-			}),
-			init: initMs
+				}, {size: 1})
+			}, ),
+		init: initMs
+	},
+	mssqlNative:
+	{
+		db: map({ db: (con) => con.mssqlNative('server=mssql;Database=demo;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes') }),
+		init: initMs
+	},
+	pg: {
+		db: map({ db: con => con.postgres('postgres://postgres:postgres@postgres/postgres') }),
+		init: initPg
+	},
+	sqlite: {
+		db: map({ db: (con) => con.sqlite(sqliteName) }),
+		init: initSqlite
+	},
+	sqlite2: {
 
-		};
+		db: map({ db: (con) => con.sqlite(sqliteName2) }),
+		init: initSqlite
+	},
+	sap: {
+		db: map({ db: (con) => con.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master`) }),
+		init: initSap
+	},
+	mysql: {
+		db: map({ db: (con) => con.mysql('mysql://test:test@mysql/test') }),
+		init: initMysql
+	},
+	http: {
+		db: map.http(`http://localhost:${port}/rdb`),
+	}
+
+};
+
+function getDb(name) {
+	if (name === 'mssql')
+		return connections.mssql;
 	else if (name === 'mssqlNative')
-		return {
-			db: db({ db: (cons) => cons.mssqlNative('server=mssql;Database=demo;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes') }),
-			init: initMs
-		};
+		return connections.mssqlNative;
 	else if (name === 'pg')
-		return {
-			db: db({ db: (cons) => cons.postgres('postgres://postgres:postgres@postgres/postgres') }),
-			init: initPg
-		};
+		return connections.pg;
 	else if (name === 'sqlite')
-		return {
-			db: db({ db: (cons) => {
-				return  cons.sqlite(sqliteFile);} }),
-			init: initSqlite
-		};
+		return connections.sqlite;
+	else if (name === 'sqlite2')
+		return connections.sqlite2;
 	else if (name === 'sap')
-		return {
-			db: db({ db: (cons) => cons.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master`) }),
-			init: initSap
-		};
+		return connections.sap;
 	else if (name === 'mysql')
-		return {
-			db: db({ db: (cons) => cons.mysql('mysql://test:test@mysql/test') }),
-			init: initMysql
-		};
-
-	throw new Error('unknown db');
+		return connections.mysql;
+	else if (name === 'http')
+		return connections.http;
+	else
+		throw new Error('unknown');
 }

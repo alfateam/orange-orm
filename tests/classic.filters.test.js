@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'url';
 import { describe, test, beforeAll, expect } from 'vitest';
 import rdb from '../src/index';
 const db = require('./db');
@@ -457,6 +458,8 @@ function getDb(name) {
 
 	throw new Error('unknown db');
 }
+const sqliteName = `demo.${fileURLToPath(import.meta.url).split('/').at(-1).split('.')[0]}.db`;
+
 
 function getClassicDb(name) {
 	if (name === 'mssql')
@@ -489,4 +492,3 @@ function getClassicDb(name) {
 }
 
 
-const sqliteName = `demo${new Date().getUTCMilliseconds()}.db`;

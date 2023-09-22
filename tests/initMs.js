@@ -3,6 +3,7 @@ DROP TABLE if exists package;
 DROP TABLE if exists orderLine;
 DROP TABLE if exists deliveryAddress;
 DROP TABLE if exists _order;
+DROP TABLE if exists vendor;
 DROP TABLE if exists customer;
 DROP TABLE if exists datetest;
 
@@ -23,7 +24,13 @@ CREATE TABLE customer (
     isActive BIT,
     data  NVARCHAR(MAX),
     picture VARBINARY(MAX)
+);
 
+CREATE TABLE vendor  (
+    id int PRIMARY KEY,
+    name VARCHAR(100),
+    balance NUMERIC,
+    isActive BIT
 );
 
 CREATE TABLE _order (
@@ -52,6 +59,7 @@ CREATE TABLE deliveryAddress (
     postalPlace VARCHAR(100),
     countryCode VARCHAR(100)
 )
+
 
 `;
 

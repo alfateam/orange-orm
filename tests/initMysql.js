@@ -1,4 +1,4 @@
-const sql = `DROP TABLE IF EXISTS deliveryAddress; DROP TABLE IF EXISTS package; DROP TABLE IF EXISTS orderLine; DROP TABLE IF EXISTS _order; DROP TABLE IF EXISTS customer;DROP TABLE IF EXISTS datetest;
+const sql = `DROP TABLE IF EXISTS deliveryAddress; DROP TABLE IF EXISTS package; DROP TABLE IF EXISTS orderLine; DROP TABLE IF EXISTS _order; DROP TABLE IF EXISTS customer;DROP TABLE IF EXISTS vendor;DROP TABLE IF EXISTS datetest;
 
 CREATE TABLE datetest (
     id INTEGER AUTO_INCREMENT PRIMARY KEY,
@@ -17,6 +17,13 @@ CREATE TABLE customer (
     isActive BOOLEAN,
     data JSON,
     picture BLOB
+);
+
+CREATE TABLE vendor (
+    id INTEGER PRIMARY KEY,
+    name TEXT,
+    balance DECIMAL(10,2),
+    isActive BOOLEAN    
 );
 
 CREATE TABLE _order (
