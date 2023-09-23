@@ -1,5 +1,3 @@
-import rdb from '../src/index';
-rdb.log(console.log);
 import { describe, test, beforeAll, expect, afterAll } from 'vitest';
 import { fileURLToPath } from 'url';
 const express = require('express');
