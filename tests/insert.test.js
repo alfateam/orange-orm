@@ -1,3 +1,5 @@
+import rdb from '../src/index';
+rdb.log(console.log);
 import { describe, test, beforeAll, expect, afterAll } from 'vitest';
 import { fileURLToPath } from 'url';
 const express = require('express');
@@ -484,8 +486,11 @@ describe('insert autoincremental with relations', () => {
 
 });
 
-const sqliteName = `demo.${fileURLToPath(import.meta.url).split('/').at(-1).split('.')[0]}.db`;
-const sqliteName2 = `demo.${fileURLToPath(import.meta.url).split('/').at(-1).split('.')[0]}2.db`;
+const pathSegments = fileURLToPath(import.meta.url).split('/');
+const lastSegment = pathSegments[pathSegments.length - 1];
+const fileNameWithoutExtension = lastSegment.split('.')[0];
+const sqliteName = `demo.${fileNameWithoutExtension}.db`;
+const sqliteName2 = `demo.${fileNameWithoutExtension}2.db`;
 
 const connections = {
 	mssql: {
@@ -504,7 +509,7 @@ const connections = {
 							password: 'P@assword123',
 						}
 					}
-				}, { size: 1 })
+				})
 			},),
 		init: initMs
 	},

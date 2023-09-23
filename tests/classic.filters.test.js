@@ -458,8 +458,12 @@ function getDb(name) {
 
 	throw new Error('unknown db');
 }
-const sqliteName = `demo.${fileURLToPath(import.meta.url).split('/').at(-1).split('.')[0]}.db`;
 
+
+const pathSegments = fileURLToPath(import.meta.url).split('/');
+const lastSegment = pathSegments[pathSegments.length - 1];
+const fileNameWithoutExtension = lastSegment.split('.')[0];
+const sqliteName = `demo.${fileNameWithoutExtension}.db`;
 
 function getClassicDb(name) {
 	if (name === 'mssql')
