@@ -8,20 +8,22 @@ function wrapQuery(connection) {
 		const result = [];
 		const sql = replaceParamChar(query.sql(), query.parameters);
 		if (sql.length < 18 && query.parameters.length === 0) {
-			log.emitQuery({ sql, parameters: query.parameters });
 			if (sql === 'BEGIN TRANSACTION') {
+				log.emitQuery({ sql, parameters: [] });
 				connection.beginTransaction((err) => {
 					onCompleted(extractError(err), []);
 				});
 				return;
 			}
 			else if (sql === 'COMMIT') {
+				log.emitQuery({ sql, parameters: [] });
 				connection.commitTransaction((err) => {
 					onCompleted(extractError(err), []);
 				});
 				return;
 			}
 			else if (sql === 'ROLLBACK') {
+				log.emitQuery({ sql, parameters: [] });
 				connection.rollbackTransaction((err) => {
 					onCompleted(extractError(err), []);
 				});
