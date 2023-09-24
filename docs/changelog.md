@@ -1,5 +1,8 @@
 
 ## Changelog
+__3.1.47__  
+Bugfix: Raw queries ran outside transaction.  See [#46](https://github.com/alfateam/rdb/issues/46).  
+Documented logging.  
 __3.1.46__  
 Bugfix code generation, only related for those still using legacy / code generation.  
 __3.1.45__  

@@ -5386,7 +5386,7 @@ function rdbClient(options = {}) {
 	}
 
 	async function query() {
-		return netAdapter(baseUrl, undefined, { tableOptions: { db: baseUrl } }).query.apply(null, arguments);
+		return netAdapter(baseUrl, undefined, { tableOptions: { db: baseUrl, transaction } }).query.apply(null, arguments);
 	}
 
 	function express(arg) {
