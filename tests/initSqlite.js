@@ -1,4 +1,4 @@
-const sql = `DROP TABLE IF EXISTS deliveryAddress; DROP TABLE IF EXISTS package; DROP TABLE IF EXISTS orderLine; DROP TABLE IF EXISTS _order; DROP TABLE IF EXISTS customer; DROP TABLE IF EXISTS datetest;
+const sql = `DROP TABLE IF EXISTS deliveryAddress; DROP TABLE IF EXISTS package; DROP TABLE IF EXISTS orderLine; DROP TABLE IF EXISTS _order; DROP TABLE IF EXISTS customer;DROP TABLE IF EXISTS vendor; DROP TABLE IF EXISTS datetest;
 CREATE TABLE customer (
     id INTEGER PRIMARY KEY,
     name TEXT,
@@ -6,6 +6,13 @@ CREATE TABLE customer (
     isActive INTEGER,
     data JSONB,
     picture BLOB
+);
+
+CREATE TABLE vendor (
+    id INTEGER PRIMARY KEY,
+    name TEXT,
+    balance NUMERIC,
+    isActive INTEGER    
 );
 
 CREATE TABLE _order (

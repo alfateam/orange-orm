@@ -161,7 +161,7 @@ const connections = {
 							password: 'P@assword123',
 						}
 					}
-				}, {size: 1})
+				})
 			}, ),
 		init: initMs
 	},

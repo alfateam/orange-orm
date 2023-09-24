@@ -1,10 +1,11 @@
 import { describe, test, beforeAll, afterAll, expect } from 'vitest';
+import { fileURLToPath } from 'url';
+const map = require('./db');
 const express = require('express');
 import { json } from 'body-parser';
-const db = require('./db');
 const initSqlite = require('./initSqlite');
 const dateToISOString = require('../src/dateToISOString');
-
+const port = 3008;
 let server;
 
 afterAll(async () => {
@@ -103,7 +104,7 @@ beforeAll(async () => {
 
 
 
-		server = app.listen(3004, () => console.log('Example app listening on port 3000!'));
+		server = app.listen(port, () => console.log(`Example app listening on port ${port}!`));
 	}
 });
 
@@ -137,7 +138,7 @@ describe('express update with basefilter and interceptors', () => {
 		);
 
 		const filter = db.order.lines.exists();
-		let row = await db.order.getOne(filter, { lines: { orderBy: 'id'}, customer: true, deliveryAddress: true });
+		let row = await db.order.getOne(filter, { lines: { orderBy: 'id' }, customer: true, deliveryAddress: true });
 		row.lines.push({ product: 'Broomstick' });
 		await row.saveChanges();
 		await row.refresh();
@@ -175,20 +176,36 @@ describe('express update with basefilter and interceptors', () => {
 	}
 });
 
+const pathSegments = fileURLToPath(import.meta.url).split('/');
+const lastSegment = pathSegments[pathSegments.length - 1];
+const fileNameWithoutExtension = lastSegment.split('.')[0];
+const sqliteName = `demo.${fileNameWithoutExtension}.db`;
+const sqliteName2 = `demo.${fileNameWithoutExtension}2.db`;
 
+
+const connections = {
+	sqlite: {
+		db: map({ db: (con) => con.sqlite(sqliteName) }),
+		init: initSqlite
+	},
+	sqlite2: {
+
+		db: map({ db: (con) => con.sqlite(sqliteName2) }),
+		init: initSqlite
+	},
+	http: {
+		db: map.http(`http://localhost:${port}/rdb`),
+	}
+
+};
 
 function getDb(name) {
-	if (name === 'sqlite2')
-		return {
-			db: db.sqlite(sqliteName2),
-			init: initSqlite
-		};
+	if (name === 'sqlite')
+		return connections.sqlite;
+	else if (name === 'sqlite2')
+		return connections.sqlite2;
 	else if (name === 'http')
-		return {
-			db: db.http('http://localhost:3004/rdb'),
-			// init: initSqlite
-		};
-
-	throw new Error('unknown db');
+		return connections.http;
+	else
+		throw new Error('unknown');
 }
-const sqliteName2 = `demo2${new Date().getUTCMilliseconds()}.db`;

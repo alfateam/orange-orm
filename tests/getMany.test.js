@@ -1,8 +1,9 @@
 import { describe, test, beforeAll, afterAll, expect } from 'vitest';
+import { fileURLToPath } from 'url';
 const express = require('express');
 import { json } from 'body-parser';
 import cors from 'cors';
-const db = require('./db');
+const map = require('./db');
 const initPg = require('./initPg');
 const initMs = require('./initMs');
 const initMysql = require('./initMysql');
@@ -465,13 +466,16 @@ describe('getMany raw filter http', () => {
 	}
 });
 
-const sqliteName = 'demo.getMany.db';
-const sqliteName2 = 'demo.getMany2.db';
+const pathSegments = fileURLToPath(import.meta.url).split('/');
+const lastSegment = pathSegments[pathSegments.length - 1];
+const fileNameWithoutExtension = lastSegment.split('.')[0];
+const sqliteName = `demo.${fileNameWithoutExtension}.db`;
+const sqliteName2 = `demo.${fileNameWithoutExtension}2.db`;
 
 const connections = {
 	mssql: {
 		db:
-			db({
+			map({
 				db: (con) => con.mssql({
 					server: 'mssql',
 					options: {
@@ -485,42 +489,59 @@ const connections = {
 							password: 'P@assword123',
 						}
 					}
-				}, {size: 1})
+				})
 			}, ),
 		init: initMs
 	},
 	mssqlNative:
 	{
-		db: db({ db: (con) => con.mssqlNative('server=mssql;Database=demo;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes') }),
+		db: map({ db: (con) => con.mssqlNative('server=mssql;Database=demo;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes') }),
 		init: initMs
 	},
 	pg: {
-		db: db({ db: con => con.postgres('postgres://postgres:postgres@postgres/postgres') }),
+		db: map({ db: con => con.postgres('postgres://postgres:postgres@postgres/postgres') }),
 		init: initPg
 	},
 	sqlite: {
-		db: db({ db: (con) => con.sqlite(sqliteName) }),
+		db: map({ db: (con) => con.sqlite(sqliteName) }),
 		init: initSqlite
 	},
 	sqlite2: {
 
-		db: db({ db: (con) => con.sqlite(sqliteName2) }),
+		db: map({ db: (con) => con.sqlite(sqliteName2) }),
 		init: initSqlite
 	},
 	sap: {
-		db: db({ db: (con) => con.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master`) }),
+		db: map({ db: (con) => con.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master`) }),
 		init: initSap
 	},
 	mysql: {
-		db: db({ db: (con) => con.mysql('mysql://test:test@mysql/test') }),
+		db: map({ db: (con) => con.mysql('mysql://test:test@mysql/test') }),
 		init: initMysql
 	},
 	http: {
-		db: db.http(`http://localhost:${port}/rdb`),
+		db: map.http(`http://localhost:${port}/rdb`),
 	}
 
 };
 
 function getDb(name) {
-	return connections[name];
+	if (name === 'mssql')
+		return connections.mssql;
+	else if (name === 'mssqlNative')
+		return connections.mssqlNative;
+	else if (name === 'pg')
+		return connections.pg;
+	else if (name === 'sqlite')
+		return connections.sqlite;
+	else if (name === 'sqlite2')
+		return connections.sqlite2;
+	else if (name === 'sap')
+		return connections.sap;
+	else if (name === 'mysql')
+		return connections.mysql;
+	else if (name === 'http')
+		return connections.http;
+	else
+		throw new Error('unknown');
 }

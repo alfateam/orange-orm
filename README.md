@@ -1099,6 +1099,51 @@ async function getRows() {
 ```
 </details>
 
+<details><summary><strong>Logging</strong></summary>
+You enable logging by listening to the query event on the rdb object. During this event, both the SQL statement and any associated parameters are logged. The logged output reveals the sequence of SQL commands executed, offering developers a transparent view into database operations, which aids in debugging and ensures data integrity.
+
+```javascript
+import rdb from 'rdb';
+import map from './map';
+const db = map.sqlite('demo.db');
+
+rdb.on('query', (e) => {
+  console.log(e.sql);
+  if (e.parameters.length > 0)
+    console.log(e.parameters);
+});
+
+updateRow();
+
+async function updateRow() {
+  const order = await db.order.getById(2, {
+    lines: true
+  });
+  order.lines.push({
+    product: 'broomstick'
+  });
+
+  await order.saveChanges();
+}
+```
+
+output:
+```bash
+BEGIN
+select  _order.id as s_order0,_order.orderDate as s_order1,_order.customerId as s_order2 from _order _order where _order.id=2 order by _order.id limit 1
+select  orderLine.id as sorderLine0,orderLine.orderId as sorderLine1,orderLine.product as sorderLine2 from orderLine orderLine where orderLine.orderId in (2) order by orderLine.id
+COMMIT
+BEGIN
+select  _order.id as s_order0,_order.orderDate as s_order1,_order.customerId as s_order2 from _order _order where _order.id=2 order by _order.id limit 1
+INSERT INTO orderLine (orderId,product) VALUES (2,?)
+[ 'broomstick' ]
+SELECT id,orderId,product FROM orderLine WHERE rowid IN (select last_insert_rowid())
+select  orderLine.id as sorderLine0,orderLine.orderId as sorderLine1,orderLine.product as sorderLine2 from orderLine orderLine where orderLine.orderId in (2) order by orderLine.id
+COMMIT
+```
+
+</details>
+
 <details><summary><strong>What it is not</strong></summary>
 
 - **It is not about migrations** <p>The allure of ORMs handling SQL migrations is undeniably attractive and sweet. However, this sweetness can become painful. Auto-generated migration scripts might not capture all nuances. Using dedicated migration tools separate from the ORM or manually managing migrations might be the less painful route in the long run.  RDB aim for database agnosticism. And when you're dealing with migrations, you might want to use features specific to a database platform. However, I might consider adding support for (non-auto-generated) migrations at a later point. But for now, it is not on the roadmap.</p>

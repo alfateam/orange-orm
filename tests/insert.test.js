@@ -1,6 +1,9 @@
-const db = require('./db');
-import { describe, test, beforeAll, afterAll, expect } from 'vitest';
-import fs from 'fs';
+import { describe, test, beforeAll, expect, afterAll } from 'vitest';
+import { fileURLToPath } from 'url';
+const express = require('express');
+import { json } from 'body-parser';
+import cors from 'cors';
+const map = require('./db');
 const initPg = require('./initPg');
 const initMs = require('./initMs');
 const initMysql = require('./initMysql');
@@ -9,11 +12,13 @@ const initSap = require('./initSap');
 const dateToISOString = require('../src/dateToISOString');
 const versionArray = process.version.replace('v', '').split('.');
 const major = parseInt(versionArray[0]);
-const sqliteFile = 'demo.insert.db';
+const port = 3010;
+let server;
 
 beforeAll(async () => {
 
 	await createMs('mssql');
+	hostExpress();
 
 	async function createMs(dbName) {
 		const { db } = getDb(dbName);
@@ -24,11 +29,26 @@ beforeAll(async () => {
 		`;
 		await db.query(sql);
 	}
+
+	function hostExpress() {
+		const { db } = getDb('sqlite2');
+		let app = express();
+		app.disable('x-powered-by')
+			.use(json({ limit: '100mb' }))
+			.use('/rdb', cors(), db.express());
+		server = app.listen(port, () => console.log(`Example app listening on port ${port}!`));
+	}
 });
 
 afterAll(async () => {
-	await fs.promises.unlink(sqliteFile);
+	return new Promise((res) => {
+		if (server)
+			server.close(res);
+		else
+			res();
+	});
 });
+
 
 describe('transaction', () => {
 
@@ -39,6 +59,7 @@ describe('transaction', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
+
 
 	async function verify(dbName) {
 		let result;
@@ -59,6 +80,7 @@ describe('validate', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
+
 
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
@@ -92,6 +114,7 @@ describe('validate chained', () => {
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 
+
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
 		let error;
@@ -120,6 +143,7 @@ describe('validate JSONSchema', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
+
 
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
@@ -150,6 +174,7 @@ describe('validate notNull', () => {
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 
+
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
 		let error;
@@ -174,6 +199,7 @@ describe('validate notNullExceptInsert', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
+
 
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
@@ -211,6 +237,7 @@ describe('insert autoincremental', () => {
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 
+
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
 		await init(db);
@@ -242,6 +269,7 @@ describe('insert default', () => {
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 
+
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
 		await init(db);
@@ -271,6 +299,7 @@ describe('insert default override', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
+
 
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
@@ -302,6 +331,7 @@ describe('insert dbNull', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
+
 
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
@@ -345,6 +375,7 @@ describe('insert autoincremental with relations', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
+
 
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
@@ -453,12 +484,17 @@ describe('insert autoincremental with relations', () => {
 
 });
 
+const pathSegments = fileURLToPath(import.meta.url).split('/');
+const lastSegment = pathSegments[pathSegments.length - 1];
+const fileNameWithoutExtension = lastSegment.split('.')[0];
+const sqliteName = `demo.${fileNameWithoutExtension}.db`;
+const sqliteName2 = `demo.${fileNameWithoutExtension}2.db`;
 
-function getDb(name) {
-	if (name === 'mssql')
-		return {
-			db: db({
-				db: (cons) => cons.mssql({
+const connections = {
+	mssql: {
+		db:
+			map({
+				db: (con) => con.mssql({
 					server: 'mssql',
 					options: {
 						encrypt: false,
@@ -472,36 +508,58 @@ function getDb(name) {
 						}
 					}
 				})
-			}),
-			init: initMs
+			},),
+		init: initMs
+	},
+	mssqlNative:
+	{
+		db: map({ db: (con) => con.mssqlNative('server=mssql;Database=demo;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes') }),
+		init: initMs
+	},
+	pg: {
+		db: map({ db: con => con.postgres('postgres://postgres:postgres@postgres/postgres') }),
+		init: initPg
+	},
+	sqlite: {
+		db: map({ db: (con) => con.sqlite(sqliteName) }),
+		init: initSqlite
+	},
+	sqlite2: {
 
-		};
+		db: map({ db: (con) => con.sqlite(sqliteName2) }),
+		init: initSqlite
+	},
+	sap: {
+		db: map({ db: (con) => con.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master`) }),
+		init: initSap
+	},
+	mysql: {
+		db: map({ db: (con) => con.mysql('mysql://test:test@mysql/test') }),
+		init: initMysql
+	},
+	http: {
+		db: map.http(`http://localhost:${port}/rdb`),
+	}
+
+};
+
+function getDb(name) {
+	if (name === 'mssql')
+		return connections.mssql;
 	else if (name === 'mssqlNative')
-		return {
-			db: db({ db: (cons) => cons.mssqlNative('server=mssql;Database=demo;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes') }),
-			init: initMs
-		};
+		return connections.mssqlNative;
 	else if (name === 'pg')
-		return {
-			db: db({ db: (cons) => cons.postgres('postgres://postgres:postgres@postgres/postgres') }),
-			init: initPg
-		};
+		return connections.pg;
 	else if (name === 'sqlite')
-		return {
-			db: db({ db: (cons) => {
-				return  cons.sqlite(sqliteFile);} }),
-			init: initSqlite
-		};
+		return connections.sqlite;
+	else if (name === 'sqlite2')
+		return connections.sqlite2;
 	else if (name === 'sap')
-		return {
-			db: db({ db: (cons) => cons.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master`) }),
-			init: initSap
-		};
+		return connections.sap;
 	else if (name === 'mysql')
-		return {
-			db: db({ db: (cons) => cons.mysql('mysql://test:test@mysql/test') }),
-			init: initMysql
-		};
-
-	throw new Error('unknown db');
+		return connections.mysql;
+	else if (name === 'http')
+		return connections.http;
+	else
+		throw new Error('unknown');
 }

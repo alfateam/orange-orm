@@ -1,5 +1,6 @@
-const db = require('./db');
 import { describe, test, beforeAll, expect } from 'vitest';
+import { fileURLToPath } from 'url';
+const map = require('./db');
 
 const initPg = require('./initPg');
 const initMs = require('./initMs');
@@ -112,72 +113,79 @@ describe('dateformat get', () => {
 	test('pg', async () => {
 		const { db } = getDb('pg');
 		const result = await db.datetestWithTz.getOne();
-		expect(result).toEqual({id:1, date: '2023-07-14', datetime: '2023-07-14T12:00:00', datetime_tz: '2023-07-14T20:00:00+00'});
+		expect(result).toEqual({ id: 1, date: '2023-07-14', datetime: '2023-07-14T12:00:00', datetime_tz: '2023-07-14T20:00:00+00' });
 		result.date = newValue;
 		result.datetime = newValue;
 		result.datetime_tz = newValue;
 		await result.saveChanges();
 		await result.refresh();
-		expect(result).toEqual({id:1, date: '2023-08-05', datetime: '2023-08-05T12:00:00', datetime_tz: '2023-08-05T15:00:00+00'});
+		expect(result).toEqual({ id: 1, date: '2023-08-05', datetime: '2023-08-05T12:00:00', datetime_tz: '2023-08-05T15:00:00+00' });
 	});
 
 	test('mssql', async () => {
 		const { db } = getDb('mssql');
 		const result = await db.datetestWithTz.getOne();
-		expect(result).toEqual({id: 1, date: '2023-07-14', datetime: '2023-07-14T12:00:00', datetime_tz: '2023-07-14T12:00:00-08:00' });
+		expect(result).toEqual({ id: 1, date: '2023-07-14', datetime: '2023-07-14T12:00:00', datetime_tz: '2023-07-14T12:00:00-08:00' });
 		result.date = newValue;
 		result.datetime = newValue;
 		result.datetime_tz = newValue;
 		await result.saveChanges();
 		await result.refresh();
-		expect(result).toEqual({id:1, date: '2023-08-05', datetime: '2023-08-05T12:00:00', datetime_tz: newValue});
+		expect(result).toEqual({ id: 1, date: '2023-08-05', datetime: '2023-08-05T12:00:00', datetime_tz: newValue });
 	});
 
 	test('sap', async () => {
 		const { db } = getDb('sap');
 		const result = await db.datetest.getOne();
-		expect(result).toEqual({id: 1, date: '2023-07-14T00:00:00', datetime: '2023-07-14T12:00:00'});
+		expect(result).toEqual({ id: 1, date: '2023-07-14T00:00:00', datetime: '2023-07-14T12:00:00' });
 		result.date = newValue;
 		result.datetime = newValue;
 		result.datetime_tz = newValue;
 		await result.saveChanges();
 		await result.refresh();
-		expect(result).toEqual({id:1, date: '2023-08-05T00:00:00', datetime: '2023-08-05T12:00:00'});
+		expect(result).toEqual({ id: 1, date: '2023-08-05T00:00:00', datetime: '2023-08-05T12:00:00' });
 	});
 
 	test('mysql', async () => {
 		const { db } = getDb('mysql');
 		const result = await db.datetestWithTz.getOne();
-		expect(result).toEqual({id: 1, date: '2023-07-14', datetime: '2023-07-14T03:00:00', datetime_tz: '2023-07-14T20:00:00'});
+		expect(result).toEqual({ id: 1, date: '2023-07-14', datetime: '2023-07-14T03:00:00', datetime_tz: '2023-07-14T20:00:00' });
 		result.date = newValue;
 		result.datetime = newValue;
 		result.datetime_tz = newValue;
 		await result.saveChanges();
 		await result.refresh();
-		expect(result).toEqual({id:1, date: '2023-08-05', datetime: '2023-08-05T12:00:00', datetime_tz: '2023-08-05T15:00:00'});
+		expect(result).toEqual({ id: 1, date: '2023-08-05', datetime: '2023-08-05T12:00:00', datetime_tz: '2023-08-05T15:00:00' });
 
 	});
 
 	test('sqlite', async () => {
 		const { db } = getDb('sqlite');
 		const result = await db.datetestWithTz.getOne();
-		expect(result).toEqual({ id: 1, date: '2023-07-14T12:00:00', datetime: '2023-07-14T12:00:00', datetime_tz: '2023-07-14T12:00:00-08:00'  });
+		expect(result).toEqual({ id: 1, date: '2023-07-14T12:00:00', datetime: '2023-07-14T12:00:00', datetime_tz: '2023-07-14T12:00:00-08:00' });
 		result.date = newValue;
 		result.datetime = newValue;
 		result.datetime_tz = newValue;
 		await result.saveChanges();
 		await result.refresh();
-		expect(result).toEqual({ id: 1, date: '2023-08-05T12:00:00', datetime: '2023-08-05T12:00:00' , datetime_tz: '2023-08-05T12:00:00-03:00'});
+		expect(result).toEqual({ id: 1, date: '2023-08-05T12:00:00', datetime: '2023-08-05T12:00:00', datetime_tz: '2023-08-05T12:00:00-03:00' });
 	});
 
 
 });
 
-function getDb(name) {
-	if (name === 'mssql')
-		return {
-			db: db({
-				db: (cons) => cons.mssql({
+const pathSegments = fileURLToPath(import.meta.url).split('/');
+const lastSegment = pathSegments[pathSegments.length - 1];
+const fileNameWithoutExtension = lastSegment.split('.')[0];
+const sqliteName = `demo.${fileNameWithoutExtension}.db`;
+const sqliteName2 = `demo.${fileNameWithoutExtension}2.db`;
+
+
+const connections = {
+	mssql: {
+		db:
+			map({
+				db: (con) => con.mssql({
 					server: 'mssql',
 					options: {
 						encrypt: false,
@@ -191,38 +199,54 @@ function getDb(name) {
 						}
 					}
 				})
-			}),
-			init: initMs
+			},),
+		init: initMs
+	},
+	mssqlNative:
+	{
+		db: map({ db: (con) => con.mssqlNative('server=mssql;Database=demo;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes') }),
+		init: initMs
+	},
+	pg: {
+		db: map({ db: con => con.postgres('postgres://postgres:postgres@postgres/postgres') }),
+		init: initPg
+	},
+	sqlite: {
+		db: map({ db: (con) => con.sqlite(sqliteName) }),
+		init: initSqlite
+	},
+	sqlite2: {
 
-		};
+		db: map({ db: (con) => con.sqlite(sqliteName2) }),
+		init: initSqlite
+	},
+	sap: {
+		db: map({ db: (con) => con.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master`) }),
+		init: initSap
+	},
+	mysql: {
+		db: map({ db: (con) => con.mysql('mysql://test:test@mysql/test') }),
+		init: initMysql
+	}
+};
+
+function getDb(name) {
+	if (name === 'mssql')
+		return connections.mssql;
 	else if (name === 'mssqlNative')
-		return {
-			db: db({ db: (cons) => cons.mssqlNative('server=mssql;Database=demo;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes') }),
-			init: initMs
-		};
+		return connections.mssqlNative;
 	else if (name === 'pg')
-		return {
-			db: db({ db: (cons) => cons.postgres('postgres://postgres:postgres@postgres/postgres') }),
-			init: initPg
-		};
+		return connections.pg;
 	else if (name === 'sqlite')
-		return {
-			db: db({ db: (cons) => cons.sqlite(sqliteName) }),
-			init: initSqlite
-		};
-
+		return connections.sqlite;
+	else if (name === 'sqlite2')
+		return connections.sqlite2;
 	else if (name === 'sap')
-		return {
-			db: db({ db: (cons) => cons.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master`) }),
-			init: initSap
-		};
+		return connections.sap;
 	else if (name === 'mysql')
-		return {
-			db: db({ db: (cons) => cons.mysql('mysql://test:test@mysql/test') }),
-			init: initMysql
-		};
-
-	throw new Error('unknown db');
+		return connections.mysql;
+	else if (name === 'http')
+		return connections.http;
+	else
+		throw new Error('unknown');
 }
-
-const sqliteName = `demo${new Date().getUTCMilliseconds()}.db`;

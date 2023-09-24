@@ -59,6 +59,16 @@ END
 
 GO
 
+IF
+EXISTS (SELECT 1 FROM
+sysobjects WHERE type = 'U' and name = 'vendor')
+
+BEGIN
+	DROP TABLE vendor
+END
+
+GO
+
 CREATE TABLE datetest (
     id int IDENTITY PRIMARY KEY,
     _date DATE,
@@ -81,6 +91,15 @@ CREATE TABLE customer (
     data TEXT NULL,
     picture VARBINARY NULL
 
+)
+
+GO
+
+CREATE TABLE vendor (
+    id int PRIMARY KEY,   
+    name VARCHAR(100),
+    balance NUMERIC,
+    isActive BIT
 )
 
 GO

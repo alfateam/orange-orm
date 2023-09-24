@@ -21,6 +21,13 @@ CREATE TABLE customer (
     picture BYTEA
 );
 
+CREATE TABLE vendor (
+    id NUMERIC PRIMARY KEY,
+    name TEXT,
+    balance NUMERIC,
+    isActive BOOLEAN    
+);
+
 CREATE TABLE _order (
     id SERIAL PRIMARY KEY,
     orderDate TIMESTAMP,
