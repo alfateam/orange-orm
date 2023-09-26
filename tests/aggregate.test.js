@@ -140,7 +140,7 @@ describe('count', () => {
 	}
 });
 
-describe.only('count filter', () => {
+describe('count filter', () => {
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
 	if (major > 17)
