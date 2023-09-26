@@ -1,5 +1,7 @@
 
 ## Changelog
+__3.2.0__  
+Support for aggregate count() function.  
 __3.1.47__  
 Bugfix: Raw queries ran outside transaction.  See [#46](https://github.com/alfateam/rdb/issues/46).  
 Documented logging.  
