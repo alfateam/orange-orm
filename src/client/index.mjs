@@ -5441,6 +5441,7 @@ function rdbClient(options = {}) {
 		tableOptions = { db: baseUrl, ...tableOptions, transaction };
 		let meta;
 		let c = {
+			count,
 			getMany,
 			getAll,
 			getOne,
@@ -5483,6 +5484,16 @@ function rdbClient(options = {}) {
 			let rows = await getManyCore.apply(null, args);
 			await metaPromise;
 			return proxify(rows, strategy);
+		}
+
+		async function count(_) {
+			let args = [_].concat(Array.prototype.slice.call(arguments).slice(1));
+			let body = stringify({
+				path: 'count',
+				args
+			});
+			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+			return adapter.post(body);
 		}
 
 		async function getOne(filter, strategy) {
