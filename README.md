@@ -1058,6 +1058,25 @@ async function getRows() {
 ```
 </details>
 
+<details><summary><strong>Aggregate functions</strong></summary>
+Currently there is only the <strong><i>count</i></strong> aggregate available.
+
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getCount();
+
+async function getCount() {
+  const filter = db.order.lines.any(
+    line => line.product.contains('broomstick')
+  );
+  const count = await db.order.count(filter);
+  console.log(count); //2
+}
+```
+</details>
+
 <details><summary><strong>Excluding sensitive data</strong></summary>
 
 To secure your application by preventing sensitive data from being serialized and possibly leaked, you can use the <strong>serializable(false)</strong> attribute on certain fields within your database schema. Here, the serializable(false) attribute has been applied to the balance column, indicating that this field will not be serialized when a record is converted to a JSON string.

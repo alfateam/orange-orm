@@ -4,6 +4,7 @@ var join = require('./table/join');
 var hasMany = require('./table/hasMany');
 var hasOne = require('./table/hasOne');
 var getMany = require('./table/getMany');
+var count = require('./table/count');
 var getManyDto = require('./table/getManyDto');
 var getById = require('./table/getById');
 var tryGetById = require('./table/tryGetById');
@@ -58,10 +59,13 @@ function _new(tableName) {
 		return hasOne(joinRelation);
 	};
 
+	table.count = function(filter) {
+		return Promise.resolve().then(() => count(table, filter));
+	};
+
 	table.getMany = function(filter, strategy) {
 		return Promise.resolve().then(() => getMany(table, filter, strategy));
 	};
-
 	table.getManyDto = function(filter, strategy) {
 		return Promise.resolve().then(() => getManyDto(table, filter, strategy));
 	};
