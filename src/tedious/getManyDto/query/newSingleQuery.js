@@ -1,7 +1,7 @@
 var newColumnSql = require('./singleQuery/newShallowColumnSql');
 var newWhereSql = require('../../../table/query/singleQuery/newWhereSql');
 
-function _new(table,filter,span, alias,subQueries,orderBy,limit) {
+function _new(table,filter,span, alias,subQueries,orderBy,limit,offset) {
 	var c = {};
 
 	var name = table._dbName;
@@ -12,8 +12,9 @@ function _new(table,filter,span, alias,subQueries,orderBy,limit) {
 	if (limit)
 		limit = limit + ' ';
 
+
 	c.sql = function() {
-		return 'select ' + limit + columnSql + ' from ' + name + ' ' + alias +  whereSql + orderBy ;
+		return 'select ' + limit + columnSql + ' from ' + name + ' ' + alias +  whereSql + orderBy +  offset;
 	};
 
 	c.parameters = filter.parameters;
