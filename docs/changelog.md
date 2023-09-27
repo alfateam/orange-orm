@@ -1,5 +1,7 @@
 
 ## Changelog
+__3.2.2__  
+Bugfix for Sql Server: OFFSET was ignored. See [#46](https://github.com/alfateam/rdb/issues/49).  
 __3.2.1__  
 Bugfix for those using code generation: count had wrong signature.  
 __3.2.0__  
