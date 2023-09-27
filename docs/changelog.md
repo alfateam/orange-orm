@@ -1,5 +1,7 @@
 
 ## Changelog
+__3.2.1__  
+Bugfix for those using code generation: count had wrong signature.  
 __3.2.0__  
 Support for aggregate count() function.  
 __3.1.47__  

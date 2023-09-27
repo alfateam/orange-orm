@@ -38,7 +38,7 @@ function getTSDefinition(tableConfigs, {isNamespace = false, isHttp = false} = {
 	function getTable(table, Name, name, customFilters) {
 		return `
 export interface ${Name}Table {
-	count(filter?: Filter | PrimaryRowFilter<T>[]): Promise<number>;
+	count(filter?: RawFilter): Promise<number>;
 	getAll(): Promise<${Name}Array>;
 	getAll(fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
 	getMany(filter?: RawFilter): Promise<${Name}Array>;
