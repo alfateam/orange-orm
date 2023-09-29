@@ -131,15 +131,27 @@ describe('offset', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
-	//TODO, sap does not have OFFSET
 	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
 
 		const rows = await db.order.getAll({ offset: 1, limit: 1 });
+		for (let i = 0; i < rows.length; i++) {
+			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate));
+		}
 
 		expect(rows.length).toEqual(1);
+		const date1 = new Date(2021, 0, 11, 12, 22, 45);
+
+		const expected = [
+			{
+				id: 2,
+				orderDate: dateToISOString(date1),
+				customerId: 2,
+			}
+		];
+		expect(rows).toEqual(expected);
 	}
 });
 
