@@ -21,7 +21,7 @@ This is the _Modern Typescript Documentation_. Are you looking for the [_Classic
 
 ## Community
 
-Join our [Discord server](https://discord.gg/RQ5HbgS4) or [github discussions](https://github.com/alfateam/rdb/discussions) to discuss the project, ask questions, and collaborate with fellow members.
+Join our [Discord server](https://discord.gg/QjuEgvQXzd) or [github discussions](https://github.com/alfateam/rdb/discussions) to discuss the project, ask questions, and collaborate with fellow members.
 
 
 ## Installation
