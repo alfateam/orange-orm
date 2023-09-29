@@ -4,6 +4,7 @@ var deleteFromSql = require('./deleteFromSql');
 var selectForUpdateSql = require('./selectForUpdateSql');
 var lastInsertedSql = require('./lastInsertedSql');
 var formatDateColumn = require('./formatDateColumn');
+var limitAndOffset = require('./limitAndOffset');
 
 function newResolveTransaction(domain, pool) {
 	var rdb = {poolFactory: pool};
@@ -35,11 +36,14 @@ function newResolveTransaction(domain, pool) {
 				rdb.multipleStatements = false;
 				rdb.begin = 'BEGIN TRANSACTION';
 				rdb.limit = (span) => {
-					if (span.limit || span.limit == 0)
+					if (span.offset)
+						return '';
+					else if (span.limit || span.limit === 0)
 						return 'TOP ' + span.limit;
 					else
 						return '';
 				};
+				rdb.limitAndOffset = limitAndOffset;
 				rdb.accept = function(caller) {
 					caller.visitSap();
 				};
