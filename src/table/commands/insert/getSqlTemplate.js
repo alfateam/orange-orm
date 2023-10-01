@@ -1,6 +1,15 @@
 let getSessionContext = require('../../getSessionContext');
 
-function getSqlTemplate(table, row) {
+function getSqlTemplate(_table, _row) {
+	let context = getSessionContext();
+	if (context.insertSql)
+		return context.insertSql.apply(null, arguments);
+	else
+		return getSqlTemplateDefault.apply(null, arguments);
+
+}
+
+function getSqlTemplateDefault(table, row) {
 	let columnNames = [];
 	let regularColumnNames = [];
 	let values = [];

@@ -5,7 +5,7 @@ let newInsertCommand = require('./commands/newInsertCommand');
 let newGetLastInsertedCommand = require('./commands/newGetLastInsertedCommand');
 let pushCommand = require('./commands/pushCommand');
 
-function insert(table, arg) {
+function insert({table, options}, arg) {
 	if (Array.isArray(arg)) {
 		let all = [];
 		for (let i = 0; i < arg.length; i++) {
@@ -13,12 +13,12 @@ function insert(table, arg) {
 		}
 		return Promise.all(all);
 	}
-	let args = [].slice.call(arguments);
+	let args = [table].slice.call(arguments);
 	let row = newRow.apply(null, args);
 	let hasPrimary = getHasPrimary(table, row);
 	if (hasPrimary)
 		row = table._cache.tryAdd(row);
-	let cmd = newInsertCommand(table, row);
+	let cmd = newInsertCommand(table, row, options);
 
 	pushCommand(cmd);
 	expand(table, row);

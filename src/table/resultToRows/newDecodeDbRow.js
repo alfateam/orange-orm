@@ -148,8 +148,7 @@ function newDecodeDbRow(table, dbRow, filteredAliases, shouldValidate, isInsert)
 		let i = offset;
 		for(let p in dbRow) {
 			let key = keys[i];
-			if (this._dbRow[key] === undefined)
-				this._dbRow[key] = columns[i].decode(dbRow[p]);
+			this._dbRow[key] = columns[i].decode(dbRow[p]);
 			i++;
 		}
 	};

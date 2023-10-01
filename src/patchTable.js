@@ -86,7 +86,7 @@ async function patchTableCore(table, patches, { strategy = undefined, deduceStra
 				if (keyValue && typeof (keyValue) === 'string' && keyValue.indexOf('~') === 0)
 					value[pkName] = undefined;
 			}
-			let row = table.insert.apply(null, [value]);
+			let row = table.insertWithConcurrency.apply(null, [options, value]);
 
 			if (relation && relation.joinRelation) {
 				for (let i = 0; i < relation.joinRelation.columns.length; i++) {

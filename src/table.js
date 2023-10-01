@@ -123,12 +123,18 @@ function _new(tableName) {
 	};
 
 	table.insert = function() {
-		let args = [table].concat([].slice.call(arguments));
+		const concurrency = undefined;
+		let args = [{table, concurrency}].concat([].slice.call(arguments));
 		return insert.apply(null, args);
 	};
 
-	table.insertAndForget = function() {
-		let args = [table].concat([].slice.call(arguments));
+	table.insertWithConcurrency = function(options, ...rows) {
+		let args = [{table, options}].concat([].slice.call(rows));
+		return insert.apply(null, args);
+	};
+
+	table.insertAndForget = function(concurrency, ...rows) {
+		let args = [{table, concurrency}].concat([].slice.call(rows));
 		return insertAndForget.apply(null, args);
 	};
 

@@ -8,6 +8,7 @@ var lastInsertedSql = require('./lastInsertedSql');
 var limitAndOffset = require('./limitAndOffset');
 var formatDateColumn = require('./formatDateColumn');
 var encodeJSON = require('./encodeJSON');
+var insertSql = require('./insertSql');
 
 
 function newResolveTransaction(domain, pool) {
@@ -38,6 +39,7 @@ function newResolveTransaction(domain, pool) {
 				rdb.selectForUpdateSql = selectForUpdateSql;
 				rdb.lastInsertedSql = lastInsertedSql;
 				rdb.lastInsertedIsSeparate = false;
+				rdb.insertSql = insertSql;
 				rdb.multipleStatements = true;
 				rdb.limitAndOffset = limitAndOffset;
 				rdb.accept = function(caller) {
