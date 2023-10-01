@@ -1,4 +1,3 @@
-import exp from 'constants';
 import { fileURLToPath } from 'url';
 const rdb = require('../src/index');
 const map = require('./db');
