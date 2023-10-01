@@ -5,6 +5,9 @@ RDB is the ultimate Object Relational Mapper for Node.js and Typescript, offerin
 [![Build status](https://github.com/alfateam/rdb/workflows/Node.js%20CI/badge.svg)](https://github.com/alfateam/rdb/actions)
 [![Coverage Badge](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/lroal/1a69422f03da7f8155cf94fe66022452/raw/rdb__heads_master.json)](https://github.com/alfateam/rdb/actions)
 [![Github](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/lroal/1ccb2b79abbe0258d636e9b5e4630a1a/raw/rdb__heads_master.json)](https://github.com/alfateam/rdb)
+![GitHub Discussions](https://img.shields.io/github/discussions/alfateam/rdb)
+[![Discord](https://badgen.net/discord/online-members/QjuEgvQXzd?icon=discord&label=Discord)](https://discord.gg/QjuEgvQXzd)
+
 
 
 
@@ -17,12 +20,6 @@ RDB is the ultimate Object Relational Mapper for Node.js and Typescript, offerin
 - **Works in the Browser**: You can securely use RDB in the browser by utilizing the Express.js plugin, which serves to safeguard sensitive database credentials from exposure at the client level. This method mirrors a traditional REST API, augmented with advanced TypeScript tooling for enhanced functionality.
 
 This is the _Modern Typescript Documentation_. Are you looking for the [_Classic Documentation_](https://github.com/alfateam/rdb/blob/master/docs/docs.md) ?
-
-
-## Community
-
-Join our [Discord server](https://discord.gg/QjuEgvQXzd) or [github discussions](https://github.com/alfateam/rdb/discussions) to discuss the project, ask questions, and collaborate with fellow members.
-
 
 ## Installation
 
