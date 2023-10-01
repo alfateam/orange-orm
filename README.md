@@ -250,7 +250,7 @@ import map from './map';
 const db = map.sqlite('demo.db', { size: 10 });
 ```
 __From the browser__  
-You can securely use RDB from the browser by utilizing the Express.js plugin, which serves to safeguard sensitive database credentials from exposure at the client level. This technique bypasses the need to transmit raw SQL queries directly from the client to the server. Instead, it logs method calls initiated by the client, which are later replayed and authenticated on the server. This not only reinforces security by preventing the disclosure of raw SQL queries on the client side but also facilitates a smoother operation. Essentially, this method mirrors a traditional REST API, augmented with advanced TypeScript tooling for enhanced functionality. You can read more about it in the section called  [In the browser](#user-content-in-the-browser)  
+You can securely use RDB from the browser by utilizing the Express.js plugin, which serves to safeguard sensitive database credentials from exposure at the client level. This technique bypasses the need to transmit raw SQL queries directly from the client to the server. Instead, it logs method calls initiated by the client, which are later replayed and authenticated on the server. This not only reinforces security by preventing the disclosure of raw SQL queries on the client side but also facilitates a smoother operation. Essentially, this method mirrors a traditional REST API, augmented with advanced TypeScript tooling for enhanced functionality. You can read more about it in the section called [In the browser](#user-content-in-the-browser)  
 <sub>📄 server.js</sub>
 ```javascript
 import map from './map';
@@ -590,9 +590,9 @@ __Updating with concurrency__
 Rows get updated using an <i>optimistic</i> concurrency approach by default. This means if a property being edited was meanwhile altered, an exception is raised, indicating the row was modified by a different user. You can change the concurrency strategy either at the table or column level.
 
 Currently, there are three concurrency strategies:
-- <strong>optimistic:</strong> Raises an exception if another user changes the property during an update.
-- <strong>overwrite:</strong> Overwrites the property, regardless of changes by others.
-- <strong>skipOnConflict:</strong> Silently avoids updating the property if another user has modified it in the interim.
+- <strong>`optimistic`</strong> Raises an exception if another user changes the property during an update.
+- <strong>`overwrite`</strong> Overwrites the property, regardless of changes by others.
+- <strong>`skipOnConflict`</strong> Silently avoids updating the property if another user has modified it in the interim.
 
 In the example below, we've set the concurrency strategy for orderDate to 'overwrite'. This implies that if other users modify orderDate while you're making changes, their updates will be overwritten.
 
@@ -623,7 +623,7 @@ async function update() {
 </details>  
 
 <details><summary><strong>Deleting rows</strong></summary>
-Rows in owner tables cascade deletes to their child tables. In essence, if a table has ownership over other tables through <strong><i>hasOne</i></strong> and <strong><i>hasMany</i></strong> relationships, removing a record from the parent table also removes its corresponding records in its child tables. This approach safeguards against leaving orphaned records and upholds data integrity. On the contrary, tables that are merely referenced, through <strong><i>reference relationships </i></strong> , remain unaffected upon deletions. For a deeper dive into these relationships and behaviors, refer to the section on (table mapping)[#user-content-table-mapping].
+Rows in owner tables cascade deletes to their child tables. In essence, if a table has ownership over other tables through <strong><i>hasOne</i></strong> and <strong><i>hasMany</i></strong> relationships, removing a record from the parent table also removes its corresponding records in its child tables. This approach safeguards against leaving orphaned records and upholds data integrity. On the contrary, tables that are merely referenced, through <strong><i>reference relationships </i></strong> , remain unaffected upon deletions. For a deeper dive into these relationships and behaviors, refer to the section on <a href="#user-content-table-mapping">Mapping tables</a>.
 
 __Deleting a single row__
 ```javascript
@@ -656,9 +656,8 @@ async function deleteRows() {
   await orders.delete();
 }
 ```
-__Deleting with concurrency__
-
-Concurrent operations can lead to conflicts. When you still want to proceed with the deletion regardless of potential interim changes, the 'overwrite' concurrency strategy can be used. This example demonstrates deleting rows even if the "delivery address" has been modified in the meantime. You can read more about concurrency strategies in the ('Updating rows' section)["#user-content-updating-rows"].   
+__Deleting with concurrency__  
+Concurrent operations can lead to conflicts. When you still want to proceed with the deletion regardless of potential interim changes, the 'overwrite' concurrency strategy can be used. This example demonstrates deleting rows even if the "delivery address" has been modified in the meantime. You can read more about concurrency strategies in <a href="#user-content-updating-rows">Updating rows</a>.   
 ```javascript
 import map from './map';
 const db = map.sqlite('demo.db');
@@ -888,14 +887,14 @@ async function execute() {
 <details><summary><strong>Data types</strong></summary>
 RDB is database agnostic - meaning it can work with multiple database systems without being specifically tied to any one of them. When the ORM behaves consistently across various databases, developers don't need to remember specific quirks or differences when switching between databases. They can rely on the ORM to provide the same mapping behavior, which reduces the cognitive load and potential for errors. There are currently 8 column types in RDB:  
 
-- **string** maps to VARCHAR or TEXT in sql
-- **numeric** maps to INTEGER, DECIMAL, NUMERIC, TINYINT FLOAT/REAL or DOUBLE in sql.
-- **boolean** maps to BIT, TINYINT(1) or INTEGER in sql.
-- **uuid** is represented as string in javascript and maps to UUID, GUID or VARCHAR in sql.
-- **date** is represented as ISO 8601 string  in javascript and maps to DATE, DATETIME, TIMPESTAMP or DAY in sql. Representing datetime values as ISO 8601 strings, rather than relying on JavaScript's native Date object, has multiple advantages, especially when dealing with databases and servers in different time zones. The datetime values are inherently accompanied by their respective time zones. This ensures that the datetime value remains consistent regardless of where it's being viewed or interpreted. On the other hand, JavaScript's Date object is typically tied to the time zone of the environment in which it's executed, which could lead to inconsistencies between the client and the database server.
-- **dateWithTimeZone** is represented as ISO 8601 string  in javascript and maps to TIMESTAMP WITH TIME ZONE in postgres and DATETIMEOFFSET in ms sql.<br> Contrary to what its name might imply, timestamptz (TIMESTAMP WITH TIME ZONE) in postgres doesn't store the time zone data. Instead, it adjusts the provided time value to UTC (Coordinated Universal Time) before storing it. When a timestamptz value is retrieved, PostgreSQL will automatically adjust the date-time to the time zone setting of the PostgreSQL session (often the server's timezone, unless changed by the user). The primary benefit of DATETIMEOFFSET in ms sql is its ability to keep track of the time zone context. If you're dealing with global applications where understanding the original time zone context is critical (like for coordinating meetings across time zones or logging events), DATETIMEOFFSET is incredibly valuable.
-- **binary** is represented as a base64 string in javascript and maps to BLOB, BYTEA or VARBINARY(max) in sql.
-- **json** and **jsonOf\<T\>** are represented as an object or array in javascript and maps to JSON, JSONB, NVARCHAR(max) or TEXT (sqlite) in sql.
+- **`string`** maps to VARCHAR or TEXT in sql
+- **`numeric`** maps to INTEGER, DECIMAL, NUMERIC, TINYINT FLOAT/REAL or DOUBLE in sql.
+- **`boolean`** maps to BIT, TINYINT(1) or INTEGER in sql.
+- **`uuid`** is represented as string in javascript and maps to UUID, GUID or VARCHAR in sql.
+- **`date`** is represented as ISO 8601 string  in javascript and maps to DATE, DATETIME, TIMPESTAMP or DAY in sql. Representing datetime values as ISO 8601 strings, rather than relying on JavaScript's native Date object, has multiple advantages, especially when dealing with databases and servers in different time zones. The datetime values are inherently accompanied by their respective time zones. This ensures that the datetime value remains consistent regardless of where it's being viewed or interpreted. On the other hand, JavaScript's Date object is typically tied to the time zone of the environment in which it's executed, which could lead to inconsistencies between the client and the database server.
+- **`dateWithTimeZone`** is represented as ISO 8601 string  in javascript and maps to TIMESTAMP WITH TIME ZONE in postgres and DATETIMEOFFSET in ms sql.<br> Contrary to what its name might imply, timestamptz (TIMESTAMP WITH TIME ZONE) in postgres doesn't store the time zone data. Instead, it adjusts the provided time value to UTC (Coordinated Universal Time) before storing it. When a timestamptz value is retrieved, PostgreSQL will automatically adjust the date-time to the time zone setting of the PostgreSQL session (often the server's timezone, unless changed by the user). The primary benefit of DATETIMEOFFSET in ms sql is its ability to keep track of the time zone context. If you're dealing with global applications where understanding the original time zone context is critical (like for coordinating meetings across time zones or logging events), DATETIMEOFFSET is incredibly valuable.
+- **`binary`** is represented as a base64 string in javascript and maps to BLOB, BYTEA or VARBINARY(max) in sql.
+- **`json`** and **`jsonOf<T>`** are represented as an object or array in javascript and maps to JSON, JSONB, NVARCHAR(max) or TEXT (sqlite) in sql.
 
 <sub>📄 map.js</sub>
 ```javascript
