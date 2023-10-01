@@ -214,7 +214,7 @@ describe('insert overwrite with optimistic column changed', () => {
 	}
 });
 
-describe.only('insert overwrite with optimistic column unchanged', () => {
+describe('insert overwrite with optimistic column unchanged', () => {
 	rdb.log(console.log);
 	test('pg', async () => await verify('pg'));
 	// test('mssql', async () => await verify('mssql'));
