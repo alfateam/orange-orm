@@ -51,9 +51,8 @@ function insertSql(table, row, options) {
 			if (concurrency === 'overwrite')
 				conflictColumnUpdates.push(`${column._dbName}=EXCLUDED.${column._dbName}`);
 			else if (concurrency === 'optimistic')
-				conflictColumnUpdates.push(`${column._dbName} = CAST(random()::int || '12345678-1234-1234-1234-123456789012 Conflict when updating ${column._dbName}' AS INTEGER)`);
+				conflictColumnUpdates.push(`${column._dbName} = CASE WHEN ${table._dbName}.${column._dbName} <> EXCLUDED.${column._dbName} THEN CAST(random()::int || '12345678-1234-1234-1234-123456789012 Conflict when updating ${column._dbName}' AS INTEGER) ELSE ${table._dbName}.${column._dbName} END`);
 		}
-
 	}
 
 

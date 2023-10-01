@@ -1,3 +1,4 @@
+import exp from 'constants';
 import { fileURLToPath } from 'url';
 const rdb = require('../src/index');
 const map = require('./db');
@@ -8,9 +9,9 @@ const initMs = require('./initMs');
 const initMysql = require('./initMysql');
 const initSqlite = require('./initSqlite');
 const initSap = require('./initSap');
-const dateToISOString = require('../src/dateToISOString');
-const versionArray = process.version.replace('v', '').split('.');
-const major = parseInt(versionArray[0]);
+// const dateToISOString = require('../src/dateToISOString');
+// const versionArray = process.version.replace('v', '').split('.');
+// const major = parseInt(versionArray[0]);
 const port = 3007;
 
 
@@ -165,7 +166,7 @@ describe('insert overwrite with skipOnConflict column', () => {
 	}
 });
 
-describe('insert overwrite with optimistic column', () => {
+describe('insert overwrite with optimistic column changed', () => {
 	rdb.log(console.log);
 	test('pg', async () => await verify('pg'));
 	// test('mssql', async () => await verify('mssql'));
@@ -198,7 +199,7 @@ describe('insert overwrite with optimistic column', () => {
 		let message;
 		try {
 
-			const george = await db.vendor.insert({
+			await db.vendor.insert({
 				id: 1,
 				name: 'George',
 				balance: 177,
@@ -210,6 +211,54 @@ describe('insert overwrite with optimistic column', () => {
 		}
 
 		expect(message).toEqual('Conflict when updating balance');
+	}
+});
+
+describe.only('insert overwrite with optimistic column unchanged', () => {
+	rdb.log(console.log);
+	test('pg', async () => await verify('pg'));
+	// test('mssql', async () => await verify('mssql'));
+	// if (major > 17)
+	// 	test('mssqlNative', async () => await verify('mssqlNative'));
+	// test('mysql', async () => await verify('mysql'));
+	// test('sqlite', async () => await verify('sqlite'));
+	// test('sap', async () => await verify('sap'));
+
+	async function verify(dbName) {
+		let { db, init } = getDb(dbName);
+		await init(db);
+
+		db = db({
+			vendor: {
+				balance: {
+					concurrency: 'optimistic'
+				},
+				concurrency: 'overwrite'
+			}
+		});
+
+		await db.vendor.insert({
+			id: 1,
+			name: 'John',
+			balance: 100,
+			isActive: true
+		});
+
+
+		const rows = await db.vendor.insert({
+			id: 1,
+			name: 'George',
+			balance: 100,
+			isActive: false
+		});
+		const expected = {
+			id: 1,
+			name: 'George',
+			balance: 100,
+			isActive: false
+		};
+
+		expect(rows).toEqual(expected);
 	}
 });
 
