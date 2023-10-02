@@ -742,6 +742,7 @@ const db = map.sqlite('demo.db');
 express().disable('x-powered-by')
   .use(json({ limit: '100mb' }))
   .use(cors())
+  //for demonstrational purposes, authentication middleware is not shown here.
   .use('/rdb', db.express())
   .listen(3000, () => console.log('Example app listening on port 3000!'));
 ```
