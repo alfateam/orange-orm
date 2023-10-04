@@ -21,6 +21,9 @@ RDB is the ultimate Object Relational Mapper for Node.js and Typescript, offerin
 
 This is the _Modern Typescript Documentation_. Are you looking for the [_Classic Documentation_](https://github.com/alfateam/rdb/blob/master/docs/docs.md) ?
 
+## Sponsorship <span style="font-size: larger; color: darkred;">♡</span>
+If you value the hard work behind RDB and wish to see it evolve further, consider [sponsoring](https://github.com/alfateam/rdb/sponsors/lroal). Your support fuels the journey of refining and expanding this tool for our developer community.
+
 ## Installation
 
 ```bash
