@@ -3,6 +3,7 @@ let mergeSql = require('./mergeSql');
 
 function getSqlTemplate(_table, _row, options) {
 
+	console.dir(_row);
 	if (hasConcurrency(_table, options) && hasColumns())
 		return mergeSql.apply(null, arguments);
 	else
@@ -10,8 +11,12 @@ function getSqlTemplate(_table, _row, options) {
 
 	function hasColumns() {
 		for(let p in _row) {
-			if (_table[p]?.equal)
+			let alias = _table[p]?.alias;
+			if (alias &&  _row['__' + alias] !== undefined && _table[p]?.equal) {
+				console.dir(p);
+				console.dir(_row[p]);
 				return true;
+			}
 		}
 	}
 }
