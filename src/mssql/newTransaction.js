@@ -1,10 +1,11 @@
 var wrapQuery = require('./wrapQuery');
-var encodeBoolean = require('./encodeBoolean');
-var deleteFromSql = require('./deleteFromSql');
-var selectForUpdateSql = require('./selectForUpdateSql');
-var outputInsertedSql = require('./outputInsertedSql');
-const limitAndOffset = require('./limitAndOffset');
-const formatDateColumn = require('./formatDateColumn');
+var encodeBoolean = require('../tedious/encodeBoolean');
+var deleteFromSql = require('../tedious/deleteFromSql');
+var selectForUpdateSql = require('../tedious/selectForUpdateSql');
+var outputInsertedSql = require('../tedious/outputInsertedSql');
+const limitAndOffset = require('../tedious/limitAndOffset');
+const formatDateColumn = require('../tedious/formatDateColumn');
+const insertSql = require('../tedious/insertSql');
 
 function newResolveTransaction(domain, pool) {
 	var rdb = {poolFactory: pool};
@@ -33,6 +34,7 @@ function newResolveTransaction(domain, pool) {
 				rdb.deleteFromSql = deleteFromSql;
 				rdb.selectForUpdateSql = selectForUpdateSql;
 				rdb.outputInsertedSql = outputInsertedSql;
+				rdb.insertSql = insertSql;
 				rdb.lastInsertedIsSeparate = false;
 				rdb.multipleStatements = true;
 				rdb.begin = 'BEGIN TRANSACTION';

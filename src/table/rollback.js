@@ -14,9 +14,10 @@ function rollback(e) {
 		.then(releaseDbClient);
 
 	if (e) {
-		let errors = e.message && e.message.split(conflictId + ' ') || [];
-		if (errors.length > 1)
-			return newThrow(new Error(errors[1].slice(0, errors[1].length-1)), chain);
+		let errors = e.message && e.message.split(conflictId) || [];
+		if (errors.length > 1) {
+			return newThrow(new Error(errors[1]), chain);
+		}
 		else
 			return newThrow(e, chain);
 	}

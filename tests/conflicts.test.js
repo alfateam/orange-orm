@@ -1,5 +1,4 @@
 import { fileURLToPath } from 'url';
-const rdb = require('../src/index');
 const map = require('./db');
 import { describe, test, beforeAll, expect } from 'vitest';
 
@@ -9,8 +8,8 @@ const initMysql = require('./initMysql');
 const initSqlite = require('./initSqlite');
 const initSap = require('./initSap');
 // const dateToISOString = require('../src/dateToISOString');
-// const versionArray = process.version.replace('v', '').split('.');
-// const major = parseInt(versionArray[0]);
+const versionArray = process.version.replace('v', '').split('.');
+const major = parseInt(versionArray[0]);
 const port = 3007;
 
 
@@ -33,9 +32,9 @@ beforeAll(async () => {
 describe('optimistic fail', () => {
 
 	test('pg', async () => await verify('pg'));
-	// test('mssql', async () => await verify('mssql'));
-	// if (major > 17)
-	// 	test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
 	// test('mysql', async () => await verify('mysql'));
 	// test('sqlite', async () => await verify('sqlite'));
 	// test('sap', async () => await verify('sap'));
@@ -69,11 +68,10 @@ describe('optimistic fail', () => {
 });
 
 describe('insert skipOnConflict with overwrite column', () => {
-	rdb.log(console.log);
 	test('pg', async () => await verify('pg'));
-	// test('mssql', async () => await verify('mssql'));
-	// if (major > 17)
-	// 	test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
 	// test('mysql', async () => await verify('mysql'));
 	// test('sqlite', async () => await verify('sqlite'));
 	// test('sap', async () => await verify('sap'));
@@ -116,13 +114,97 @@ describe('insert skipOnConflict with overwrite column', () => {
 	}
 });
 
+describe('insert empty skipOnConflict', () => {
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	// test('mysql', async () => await verify('mysql'));
+	// test('sqlite', async () => await verify('sqlite'));
+	// test('sap', async () => await verify('sap'));
+
+	async function verify(dbName) {
+		let { db, init } = getDb(dbName);
+		await init(db);
+
+		db = db({
+			datetest: {
+				concurrency: 'skipOnConflict'
+			}
+		});
+
+		const row = await db.datetest.insert({});
+
+		const expected = {
+			id: 2,
+			date: null,
+			datetime: null
+		};
+
+		expect(row).toEqual(expected);
+	}
+});
+
+describe('columnDiscriminator insert skipOnConflict with overwrite column', () => {
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	// test('mysql', async () => await verify('mysql'));
+	// test('sqlite', async () => await verify('sqlite'));
+	// test('sap', async () => await verify('sap'));
+
+	async function verify(dbName) {
+		let { db, init } = getDb(dbName);
+		await init(db);
+
+		db = db({
+			vendorDiscr: {
+				isActive: {
+					concurrency: 'overwrite'
+				},
+				concurrency: 'skipOnConflict'
+			}
+		});
+
+		await db.vendorDiscr.insert({
+			id: 99,
+			name: 'John',
+			isActive: false
+		});
+
+		const george = await db.vendorDiscr.insert({
+			id: 99,
+			name: 'George',
+			isActive: true
+		});
+
+		const georgeWithoutDiscr = await db.vendor.getById(99);
+
+		const expected = {
+			id: 99,
+			name: 'John',
+			isActive: true
+		};
+
+		const expectedWithoutDiscr = {
+			id: 99,
+			name: 'John',
+			isActive: true,
+			balance: 1,
+		};
+
+		expect(george).toEqual(expected);
+		expect(georgeWithoutDiscr).toEqual(expectedWithoutDiscr);
+	}
+});
+
 
 describe('insert overwrite with skipOnConflict column', () => {
-	rdb.log(console.log);
 	test('pg', async () => await verify('pg'));
-	// test('mssql', async () => await verify('mssql'));
-	// if (major > 17)
-	// 	test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
 	// test('mysql', async () => await verify('mysql'));
 	// test('sqlite', async () => await verify('sqlite'));
 	// test('sap', async () => await verify('sap'));
@@ -165,12 +247,11 @@ describe('insert overwrite with skipOnConflict column', () => {
 	}
 });
 
-describe('insert overwrite with optimistic column changed', () => {
-	rdb.log(console.log);
+describe.only('insert overwrite with optimistic column changed', () => {
 	test('pg', async () => await verify('pg'));
-	// test('mssql', async () => await verify('mssql'));
-	// if (major > 17)
-	// 	test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
 	// test('mysql', async () => await verify('mysql'));
 	// test('sqlite', async () => await verify('sqlite'));
 	// test('sap', async () => await verify('sap'));
@@ -214,11 +295,10 @@ describe('insert overwrite with optimistic column changed', () => {
 });
 
 describe('insert overwrite with optimistic column unchanged', () => {
-	rdb.log(console.log);
 	test('pg', async () => await verify('pg'));
-	// test('mssql', async () => await verify('mssql'));
-	// if (major > 17)
-	// 	test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
 	// test('mysql', async () => await verify('mysql'));
 	// test('sqlite', async () => await verify('sqlite'));
 	// test('sap', async () => await verify('sap'));

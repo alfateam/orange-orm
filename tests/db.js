@@ -29,6 +29,11 @@ const map = rdb.map(x => ({
 		balance: column('balance').numeric(),
 		isActive: column('isActive').boolean(),
 	})),
+	vendorDiscr: x.table('vendor').map(({ column }) => ({
+		id: column('id').numeric().primary().notNull(),
+		name: column('name').string(),
+		isActive: column('isActive').boolean(),
+	})).columnDiscriminators('balance=1'),
 
 	customer2: x.table('customer').map(({ column }) => ({
 		id: column('id').numeric().primary().notNullExceptInsert(),

@@ -10,7 +10,7 @@ function insertSql(table, row, options) {
 	addDiscriminators();
 	addColumns();
 	if (columnNames.length === 0)
-		sql += `${outputInserted()}${defaultValues()}${lastInsertedSql()}`;
+		sql += `${outputInserted()}${defaultValues()}`;
 	else
 		sql = sql + '('+ columnNames.join(',') + ') ' + outputInserted() +  'VALUES (' + values.join(',') + ')' + onConflict() + lastInsertedSql(table) ;
 	return sql;
@@ -51,7 +51,7 @@ function insertSql(table, row, options) {
 			if (concurrency === 'overwrite')
 				conflictColumnUpdates.push(`${column._dbName}=EXCLUDED.${column._dbName}`);
 			else if (concurrency === 'optimistic')
-				conflictColumnUpdates.push(`${column._dbName} = CASE WHEN ${table._dbName}.${column._dbName} <> EXCLUDED.${column._dbName} THEN CAST(random()::int || '12345678-1234-1234-1234-123456789012 Conflict when updating ${column._dbName}' AS INTEGER) ELSE ${table._dbName}.${column._dbName} END`);
+				conflictColumnUpdates.push(`${column._dbName} = CASE WHEN ${table._dbName}.${column._dbName} <> EXCLUDED.${column._dbName} THEN CAST(random()::int || '12345678-1234-1234-1234-123456789012Conflict when updating ${column._dbName}12345678-1234-1234-1234-123456789012' AS INTEGER) ELSE ${table._dbName}.${column._dbName} END`);
 		}
 	}
 
@@ -66,7 +66,7 @@ function insertSql(table, row, options) {
 	function defaultValues() {
 		let context = getSessionContext();
 		let _default = context.insertDefault || 'DEFAULT VALUES';
-		return `${_default}${lastInsertedSql()}`;
+		return `${_default} ${lastInsertedSql(table)}`;
 
 	}
 }
