@@ -247,7 +247,7 @@ describe('insert overwrite with skipOnConflict column', () => {
 	}
 });
 
-describe.only('insert overwrite with optimistic column changed', () => {
+describe('insert overwrite with optimistic column changed', () => {
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
 	if (major > 17)
