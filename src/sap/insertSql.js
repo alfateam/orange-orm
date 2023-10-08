@@ -33,7 +33,6 @@ function insertSql(table, row) {
 	addDiscriminators();
 	addColumns();
 	if (columnNames.length === 0)
-		// sql += '';
 		sql += ' VALUES()';
 	else
 		sql = sql + '('+ columnNames.join(',') + ')' + ' VALUES (' + values.join(',') + ')';
