@@ -71,9 +71,9 @@ GO
 
 CREATE TABLE datetest (
     id int IDENTITY PRIMARY KEY,
-    _date DATE,
-    _datetime DATETIME,
-    _datetime_tz DATETIME
+    _date DATE NULL,
+    _datetime DATETIME NULL,
+    _datetime_tz DATETIME NULL
     );
     
 GO

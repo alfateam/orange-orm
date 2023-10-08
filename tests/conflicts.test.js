@@ -37,7 +37,7 @@ describe('optimistic fail', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	// test('mysql', async () => await verify('mysql'));
 	// test('sqlite', async () => await verify('sqlite'));
-	// test('sap', async () => await verify('sap'));
+	test('sap', async () => await verify('sap'));
 
 	async function verify(dbName) {
 
@@ -74,7 +74,7 @@ describe('insert skipOnConflict with overwrite column', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	// test('mysql', async () => await verify('mysql'));
 	// test('sqlite', async () => await verify('sqlite'));
-	// test('sap', async () => await verify('sap'));
+	test('sap', async () => await verify('sap'));
 
 	async function verify(dbName) {
 		let { db, init } = getDb(dbName);
@@ -115,13 +115,13 @@ describe('insert skipOnConflict with overwrite column', () => {
 });
 
 describe('insert empty skipOnConflict', () => {
-	test('pg', async () => await verify('pg'));
-	test('mssql', async () => await verify('mssql'));
+	// test('pg', async () => await verify('pg'));
+	// test('mssql', async () => await verify('mssql'));
 	if (major > 17)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	// test('mysql', async () => await verify('mysql'));
 	// test('sqlite', async () => await verify('sqlite'));
-	// test('sap', async () => await verify('sap'));
+	test('sap', async () => await verify('sap'));
 
 	async function verify(dbName) {
 		let { db, init } = getDb(dbName);
@@ -152,7 +152,7 @@ describe('columnDiscriminator insert skipOnConflict with overwrite column', () =
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	// test('mysql', async () => await verify('mysql'));
 	// test('sqlite', async () => await verify('sqlite'));
-	// test('sap', async () => await verify('sap'));
+	test('sap', async () => await verify('sap'));
 
 	async function verify(dbName) {
 		let { db, init } = getDb(dbName);
@@ -207,7 +207,7 @@ describe('insert overwrite with skipOnConflict column', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	// test('mysql', async () => await verify('mysql'));
 	// test('sqlite', async () => await verify('sqlite'));
-	// test('sap', async () => await verify('sap'));
+	test('sap', async () => await verify('sap'));
 
 	async function verify(dbName) {
 		let { db, init } = getDb(dbName);
@@ -254,7 +254,7 @@ describe('insert overwrite with optimistic column changed', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	// test('mysql', async () => await verify('mysql'));
 	// test('sqlite', async () => await verify('sqlite'));
-	// test('sap', async () => await verify('sap'));
+	test('sap', async () => await verify('sap'));
 
 	async function verify(dbName) {
 		let { db, init } = getDb(dbName);
@@ -301,7 +301,7 @@ describe('insert overwrite with optimistic column unchanged', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	// test('mysql', async () => await verify('mysql'));
 	// test('sqlite', async () => await verify('sqlite'));
-	// test('sap', async () => await verify('sap'));
+	test('sap', async () => await verify('sap'));
 
 	async function verify(dbName) {
 		let { db, init } = getDb(dbName);

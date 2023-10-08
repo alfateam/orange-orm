@@ -31,7 +31,7 @@ function newGetLastInsertedCommandCore(table, row) {
 		else
 			parameterized = newParameterized(filter);
 		parameters = parameters.concat(parameterized.parameters);
-		return [discriminators(), parameterized.sql()].filter(x => x).join(',');
+		return [discriminators(), parameterized.sql()].filter(x => x).join(' AND ');
 	}
 
 	function discriminators() {

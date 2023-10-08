@@ -1,5 +1,3 @@
-const outputInsertedSql = require('./outputInsertedSql');
-
 function insertSql(table, row, options) {
 	let columnNames = [];
 	let regularColumnNames = [];
@@ -8,7 +6,7 @@ function insertSql(table, row, options) {
 	addDiscriminators();
 	addColumns();
 
-	let sql = `MERGE INTO ${table._dbName} AS target USING (SELECT ${values.join(',')}) AS source ON ${join()} WHEN MATCHED THEN ${whenMatched()} WHEN NOT MATCHED THEN ${whenNotMatched()} ${outputInsertedSql(table)};`;
+	let sql = `MERGE INTO ${table._dbName} AS target USING (SELECT ${values.join(',')}) AS source ON ${join()} WHEN MATCHED THEN ${whenMatched()} WHEN NOT MATCHED THEN ${whenNotMatched()};`;
 
 	return sql;
 

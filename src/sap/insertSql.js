@@ -1,7 +1,7 @@
-let outputInsertedSql = require('./outputInsertedSql');
-let mergeSql = require('./mergeSql');
+const mergeSql = require('./mergeSql');
 
 function getSqlTemplate(_table, _row, options) {
+
 	if (hasConcurrency(_table, options) && hasColumns())
 		return mergeSql.apply(null, arguments);
 	else
@@ -33,9 +33,10 @@ function insertSql(table, row) {
 	addDiscriminators();
 	addColumns();
 	if (columnNames.length === 0)
-		sql += `${outputInserted()}DEFAULT VALUES`;
+		// sql += '';
+		sql += ' VALUES()';
 	else
-		sql = sql + '('+ columnNames.join(',') + ')' + outputInserted() +  'VALUES (' + values.join(',') + ')';
+		sql = sql + '('+ columnNames.join(',') + ')' + ' VALUES (' + values.join(',') + ')';
 	return sql;
 
 	function addDiscriminators() {
@@ -57,12 +58,6 @@ function insertSql(table, row) {
 				values.push('%s');
 			}
 		}
-	}
-
-
-	function outputInserted() {
-
-		return ' ' + outputInsertedSql(table) + ' ';
 	}
 
 }

@@ -1,9 +1,10 @@
-var wrapQuery = require('../mssql/wrapQuery');
-var encodeBoolean = require('./encodeBoolean');
-var deleteFromSql = require('./deleteFromSql');
-var selectForUpdateSql = require('./selectForUpdateSql');
-var lastInsertedSql = require('./lastInsertedSql');
-var formatDateColumn = require('./formatDateColumn');
+const wrapQuery = require('../mssql/wrapQuery');
+const encodeBoolean = require('./encodeBoolean');
+const deleteFromSql = require('./deleteFromSql');
+const selectForUpdateSql = require('./selectForUpdateSql');
+const lastInsertedSql = require('./lastInsertedSql');
+const formatDateColumn = require('./formatDateColumn');
+const insertSql = require('./insertSql');
 
 function newResolveTransaction(domain, pool) {
 	var rdb = {poolFactory: pool};
@@ -31,6 +32,7 @@ function newResolveTransaction(domain, pool) {
 				rdb.selectForUpdateSql = selectForUpdateSql;
 				rdb.formatDateColumn = formatDateColumn;
 				rdb.lastInsertedSql = lastInsertedSql;
+				rdb.insertSql = insertSql;
 				rdb.lastInsertedIsSeparate = true;
 				rdb.multipleStatements = false;
 				rdb.begin = 'BEGIN TRANSACTION';
