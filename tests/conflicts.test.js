@@ -35,7 +35,7 @@ describe('optimistic fail', () => {
 	test('mssql', async () => await verify('mssql'));
 	if (major > 17)
 		test('mssqlNative', async () => await verify('mssqlNative'));
-	// test('mysql', async () => await verify('mysql'));
+	test('mysql', async () => await verify('mysql'));
 	// test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 
@@ -72,7 +72,7 @@ describe('insert skipOnConflict with overwrite column', () => {
 	test('mssql', async () => await verify('mssql'));
 	if (major > 17)
 		test('mssqlNative', async () => await verify('mssqlNative'));
-	// test('mysql', async () => await verify('mysql'));
+	test('mysql', async () => await verify('mysql'));
 	// test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 
@@ -119,7 +119,7 @@ describe('insert empty skipOnConflict', () => {
 	// test('mssql', async () => await verify('mssql'));
 	if (major > 17)
 		test('mssqlNative', async () => await verify('mssqlNative'));
-	// test('mysql', async () => await verify('mysql'));
+	test('mysql', async () => await verify('mysql'));
 	// test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 
@@ -150,7 +150,7 @@ describe('columnDiscriminator insert skipOnConflict with overwrite column', () =
 	test('mssql', async () => await verify('mssql'));
 	if (major > 17)
 		test('mssqlNative', async () => await verify('mssqlNative'));
-	// test('mysql', async () => await verify('mysql'));
+	test('mysql', async () => await verify('mysql'));
 	// test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 
@@ -205,7 +205,7 @@ describe('insert overwrite with skipOnConflict column', () => {
 	test('mssql', async () => await verify('mssql'));
 	if (major > 17)
 		test('mssqlNative', async () => await verify('mssqlNative'));
-	// test('mysql', async () => await verify('mysql'));
+	test('mysql', async () => await verify('mysql'));
 	// test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 
@@ -252,7 +252,7 @@ describe('insert overwrite with optimistic column changed', () => {
 	test('mssql', async () => await verify('mssql'));
 	if (major > 17)
 		test('mssqlNative', async () => await verify('mssqlNative'));
-	// test('mysql', async () => await verify('mysql'));
+	test('mysql', async () => await verify('mysql'));
 	// test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 
@@ -299,7 +299,7 @@ describe('insert overwrite with optimistic column unchanged', () => {
 	test('mssql', async () => await verify('mssql'));
 	if (major > 17)
 		test('mssqlNative', async () => await verify('mssqlNative'));
-	// test('mysql', async () => await verify('mysql'));
+	test('mysql', async () => await verify('mysql'));
 	// test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 

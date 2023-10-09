@@ -1,9 +1,10 @@
-let wrapQuery = require('./wrapQuery');
-let encodeBoolean = require('./encodeBoolean');
-let deleteFromSql = require('./deleteFromSql');
-let selectForUpdateSql = require('./selectForUpdateSql');
-let lastInsertedSql = require('./lastInsertedSql');
-let limitAndOffset = require('./limitAndOffset');
+const wrapQuery = require('./wrapQuery');
+const encodeBoolean = require('./encodeBoolean');
+const deleteFromSql = require('./deleteFromSql');
+const selectForUpdateSql = require('./selectForUpdateSql');
+const lastInsertedSql = require('./lastInsertedSql');
+const limitAndOffset = require('./limitAndOffset');
+const insertSql = require('./insertSql');
 
 function newResolveTransaction(domain, pool) {
 	var rdb = {poolFactory: pool};
@@ -28,10 +29,10 @@ function newResolveTransaction(domain, pool) {
 				rdb.encodeBoolean = encodeBoolean;
 				rdb.encodeJSON = JSON.stringify;
 				rdb.deleteFromSql = deleteFromSql;
-				rdb.insertDefault = 'VALUES ()';
 				rdb.selectForUpdateSql = selectForUpdateSql;
 				rdb.lastInsertedIsSeparate = true;
 				rdb.lastInsertedSql = lastInsertedSql;
+				rdb.insertSql = insertSql;
 				rdb.multipleStatements = false;
 				rdb.limitAndOffset = limitAndOffset;
 				rdb.accept = function(caller) {

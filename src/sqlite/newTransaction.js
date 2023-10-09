@@ -1,9 +1,10 @@
-var wrapQuery = require('./wrapQuery');
-var encodeBoolean = require('./encodeBoolean');
-var deleteFromSql = require('./deleteFromSql');
-var selectForUpdateSql = require('./selectForUpdateSql');
-var lastInsertedSql = require('./lastInsertedSql');
-var limitAndOffset = require('./limitAndOffset');
+const wrapQuery = require('./wrapQuery');
+const encodeBoolean = require('./encodeBoolean');
+const deleteFromSql = require('./deleteFromSql');
+const selectForUpdateSql = require('./selectForUpdateSql');
+const lastInsertedSql = require('./lastInsertedSql');
+const limitAndOffset = require('./limitAndOffset');
+// const insertSql = require('./insertSql');
 
 function newResolveTransaction(domain, pool) {
 	var rdb = {poolFactory: pool};

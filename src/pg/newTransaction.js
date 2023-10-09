@@ -4,7 +4,6 @@ var encodeDate = require('./encodeDate');
 var encodeBoolean = require('./encodeBoolean');
 var deleteFromSql = require('./deleteFromSql');
 var selectForUpdateSql = require('./selectForUpdateSql');
-var lastInsertedSql = require('./lastInsertedSql');
 var limitAndOffset = require('./limitAndOffset');
 var formatDateColumn = require('./formatDateColumn');
 var encodeJSON = require('./encodeJSON');
@@ -37,7 +36,6 @@ function newResolveTransaction(domain, pool) {
 				rdb.formatDateColumn = formatDateColumn;
 				rdb.deleteFromSql = deleteFromSql;
 				rdb.selectForUpdateSql = selectForUpdateSql;
-				rdb.lastInsertedSql = lastInsertedSql;
 				rdb.lastInsertedIsSeparate = false;
 				rdb.insertSql = insertSql;
 				rdb.multipleStatements = true;

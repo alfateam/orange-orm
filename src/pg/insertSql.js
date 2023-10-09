@@ -10,7 +10,7 @@ function insertSql(table, row, options) {
 	addDiscriminators();
 	addColumns();
 	if (columnNames.length === 0)
-		sql += `${outputInserted()}${defaultValues()}`;
+		sql += `${outputInserted()}DEFAULT VALUES`;
 	else
 		sql = sql + '('+ columnNames.join(',') + ') ' + outputInserted() +  'VALUES (' + values.join(',') + ')' + onConflict() + lastInsertedSql(table) ;
 	return sql;
@@ -61,13 +61,6 @@ function insertSql(table, row, options) {
 		if (!context.lastInsertedIsSeparate && context.outputInsertedSql)
 			return ' ' + context.outputInsertedSql(table) + ' ';
 		return '';
-	}
-
-	function defaultValues() {
-		let context = getSessionContext();
-		let _default = context.insertDefault || 'DEFAULT VALUES';
-		return `${_default} ${lastInsertedSql(table)}`;
-
 	}
 }
 
