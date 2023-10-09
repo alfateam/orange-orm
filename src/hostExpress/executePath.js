@@ -57,9 +57,12 @@ let _allowedOps = {
 
 async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, request, response, readonly, disableBulkDeletes, isHttp, client }) {
 	let allowedOps = { ..._allowedOps, insert: !readonly, ...extractRelations(getMeta(table)) };
-	let ops = { ..._ops, ...getCustomFilterPaths(customFilters), getManyDto, getMany, delete: _delete, cascadeDelete };
-	let res = await parseFilter(JSONFilter, table) || {};
-	return res;
+	let ops = { ..._ops, ...getCustomFilterPaths(customFilters), getManyDto, getMany, count, delete: _delete, cascadeDelete };
+	let res = await parseFilter(JSONFilter, table);
+	if (res === undefined)
+		return {};
+	else
+		return res;
 
 	function parseFilter(json, table) {
 		if (isFilter(json)) {
@@ -222,6 +225,16 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 			return negotiateRawSqlFilter(filter, table);
 		else
 			return emptyFilter;
+	}
+
+	async function count(filter, strategy) {
+		validateStrategy(table, strategy);
+		filter = negotiateFilter(filter);
+		const _baseFilter = await invokeBaseFilter();
+		if (_baseFilter)
+			filter = filter.and(_baseFilter);
+		let args = [filter].concat(Array.prototype.slice.call(arguments).slice(1));
+		return table.count.apply(null, args);
 	}
 
 	async function getManyDto(filter, strategy) {

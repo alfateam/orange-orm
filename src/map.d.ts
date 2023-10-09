@@ -201,7 +201,7 @@ type ExpandedMappedTable<T, FL = ExpandedFetchingStrategy<T>> = {
 	getAll<FS extends FetchingStrategy<T>>(
 		fetchingStrategy?: FS
 	): Promise<StrategyToRowArray<FetchedProperties<T, FL>, T>>;
-
+	count(filter?: Filter | PrimaryRowFilter<T>[]): Promise<number>;
 	delete(filter?: Filter | PrimaryRowFilter<T>[]): Promise<void>;
 	deleteCascade(filter?: Filter | PrimaryRowFilter<T>[]): Promise<void>;
 
@@ -284,7 +284,7 @@ type MappedTable<T> = {
 	getAll<FS extends FetchingStrategy<T>>(
 		fetchingStrategy?: FS
 	): Promise<StrategyToRowArray<FetchedProperties<T, FS>, T>>;
-
+	count(filter?: Filter | PrimaryRowFilter<T>[]): Promise<number>;	
 	delete(filter?: Filter | PrimaryRowFilter<T>[]): Promise<void>;
 	deleteCascade(filter?: Filter | PrimaryRowFilter<T>[]): Promise<void>;
 

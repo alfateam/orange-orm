@@ -114,7 +114,7 @@ beforeAll(async () => {
 	}
 
 	function hostExpress() {
-		const { db }= getDb('sqlite2');
+		const { db } = getDb('sqlite2');
 		let app = express();
 		app.disable('x-powered-by')
 			.use(json({ limit: '100mb' }))
@@ -122,6 +122,38 @@ beforeAll(async () => {
 		server = app.listen(port, () => console.log(`Example app listening on port ${port}!`));
 	}
 }, 15000);
+
+describe('offset', () => {
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+
+		const rows = await db.order.getAll({ offset: 1, limit: 1 });
+		for (let i = 0; i < rows.length; i++) {
+			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate));
+		}
+
+		expect(rows.length).toEqual(1);
+		const date1 = new Date(2021, 0, 11, 12, 22, 45);
+
+		const expected = [
+			{
+				id: 2,
+				orderDate: dateToISOString(date1),
+				customerId: 2,
+			}
+		];
+		expect(rows).toEqual(expected);
+	}
+});
 
 describe('boolean filter', () => {
 	test('pg', async () => await verify('pg'));
@@ -151,7 +183,7 @@ describe('boolean true filter', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
-	// test('http', async () => await verify('http'));
+	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
@@ -458,7 +490,7 @@ describe('getMany raw filter http', () => {
 			await db.customer.getMany(rawFilter);
 
 		}
-		catch(e) {
+		catch (e) {
 			error = e;
 		}
 
@@ -490,7 +522,7 @@ const connections = {
 						}
 					}
 				})
-			}, ),
+			},),
 		init: initMs
 	},
 	mssqlNative:
