@@ -23,6 +23,7 @@ function newResolveTransaction(domain, pool) {
 					return;
 				}
 				client.executeQuery = wrapQuery(client);
+				rdb.engine = 'sap';
 				rdb.dbClient = client;
 				rdb.dbClientDone = done;
 				rdb.encodeBoolean = encodeBoolean;

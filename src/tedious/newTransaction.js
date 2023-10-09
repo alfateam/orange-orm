@@ -26,6 +26,7 @@ function newResolveTransaction(domain, pool) {
 					return;
 				}
 				client.executeQuery = wrapQuery(client);
+				rdb.engine = 'mssql';
 				rdb.getManyDto = getManyDto;
 				rdb.dbClient = client;
 				rdb.dbClientDone = done;

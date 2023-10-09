@@ -68,7 +68,7 @@ function newDecodeDbRow(table, dbRow, filteredAliases, shouldValidate, isInsert)
 					if (!(name in this._proxies)) {
 						let value = this[intName];
 						this._proxies[name] = column.onChange(this._dbRow[key], () => {
-							if(this[intName] !== onChange.target(value)) {
+							if (this[intName] !== onChange.target(value)) {
 								return;
 							}
 							this[intName] = this._dbRow[key];
@@ -76,14 +76,14 @@ function newDecodeDbRow(table, dbRow, filteredAliases, shouldValidate, isInsert)
 					}
 					return this._proxies[name];
 				}
-				return  negotiateNull(this[intName]);
+				return negotiateNull(this[intName]);
 			},
 			set: function(value) {
 				if (column.onChange && (this[intName] !== null && this[intName] !== undefined) && typeof value === 'object') {
-					if(this[intName] === onChange.target(value))
+					if (this[intName] === onChange.target(value))
 						return;
 					this._proxies[name] = column.onChange(value, () => {
-						if(this[intName] !== onChange.target(value))
+						if (this[intName] !== onChange.target(value))
 							return;
 						this[intName] = this._dbRow[key];
 					});
@@ -145,11 +145,24 @@ function newDecodeDbRow(table, dbRow, filteredAliases, shouldValidate, isInsert)
 
 
 	Row.prototype.hydrate = function(dbRow) {
+		const engine = tryGetSessionContext()?.engine;
 		let i = offset;
-		for(let p in dbRow) {
-			let key = keys[i];
-			this._dbRow[key] = columns[i].decode(dbRow[p]);
-			i++;
+		if (engine === 'sqlite') {
+			const errorSeparator = '12345678-1234-1234-1234-123456789012';
+			for (let p in dbRow) {
+				if (typeof dbRow[p] === 'string' && dbRow[p].indexOf(errorSeparator) === 0)
+					throw new Error(dbRow[p].split(errorSeparator)[1]);
+				let key = keys[i];
+				this._dbRow[key] = columns[i].decode(dbRow[p]);
+				i++;
+			}
+		}
+		else {
+			for (let p in dbRow) {
+				let key = keys[i];
+				this._dbRow[key] = columns[i].decode(dbRow[p]);
+				i++;
+			}
 		}
 	};
 
@@ -161,7 +174,7 @@ function newDecodeDbRow(table, dbRow, filteredAliases, shouldValidate, isInsert)
 		if (!tryGetSessionContext()) {
 			return toDto(strategy, table, this, new Set());
 		}
-		let p =  toDto(strategy, table, this);
+		let p = toDto(strategy, table, this);
 		return Promise.resolve().then(() => p);
 	};
 
@@ -192,9 +205,9 @@ function newDecodeDbRow(table, dbRow, filteredAliases, shouldValidate, isInsert)
 	};
 
 
-	Row.prototype[util.inspect.custom] =  function() {
+	Row.prototype[util.inspect.custom] = function() {
 		let dtos = toDto(undefined, table, this, new Set());
-		return util.inspect(dtos, {compact: false, colors: true});
+		return util.inspect(dtos, { compact: false, colors: true });
 	};
 
 	function decodeDbRow(row) {
@@ -209,7 +222,7 @@ function newDecodeDbRow(table, dbRow, filteredAliases, shouldValidate, isInsert)
 		let target = new Row(row);
 		const p = new Proxy(target, {
 			ownKeys: function() {
-				return Array.from(aliases).concat( Object.keys(target._related).filter(alias => {
+				return Array.from(aliases).concat(Object.keys(target._related).filter(alias => {
 					return target._related[alias] && target._related[alias].expanded;
 				}));
 			},
@@ -240,7 +253,7 @@ function newDecodeDbRow(table, dbRow, filteredAliases, shouldValidate, isInsert)
 		this._emitColumnChanged = {};
 		this._emitChanged = newEmitEvent();
 		this._proxies = {};
-		this._oldValues =  JSON.stringify(createDto(table, this));
+		this._oldValues = JSON.stringify(createDto(table, this));
 	}
 
 	return decodeDbRow;

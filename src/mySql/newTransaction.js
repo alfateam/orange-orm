@@ -24,6 +24,7 @@ function newResolveTransaction(domain, pool) {
 				}
 				connection.executeQuery = wrapQuery(connection);
 				// connection.streamQuery = wrapQueryStream(connection);
+				rdb.engine = 'mysql';
 				rdb.dbClient = connection;
 				rdb.dbClientDone = done;
 				rdb.encodeBoolean = encodeBoolean;

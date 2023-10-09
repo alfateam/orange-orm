@@ -7,7 +7,6 @@ const initMs = require('./initMs');
 const initMysql = require('./initMysql');
 const initSqlite = require('./initSqlite');
 const initSap = require('./initSap');
-// const dateToISOString = require('../src/dateToISOString');
 const versionArray = process.version.replace('v', '').split('.');
 const major = parseInt(versionArray[0]);
 const port = 3007;
@@ -36,7 +35,7 @@ describe('optimistic fail', () => {
 	if (major > 17)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
-	// test('sqlite', async () => await verify('sqlite'));
+	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 
 	async function verify(dbName) {
@@ -73,7 +72,7 @@ describe('insert skipOnConflict with overwrite column', () => {
 	if (major > 17)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
-	// test('sqlite', async () => await verify('sqlite'));
+	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 
 	async function verify(dbName) {
@@ -115,12 +114,12 @@ describe('insert skipOnConflict with overwrite column', () => {
 });
 
 describe('insert empty skipOnConflict', () => {
-	// test('pg', async () => await verify('pg'));
-	// test('mssql', async () => await verify('mssql'));
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
 	if (major > 17)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
-	// test('sqlite', async () => await verify('sqlite'));
+	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 
 	async function verify(dbName) {
@@ -151,7 +150,7 @@ describe('columnDiscriminator insert skipOnConflict with overwrite column', () =
 	if (major > 17)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
-	// test('sqlite', async () => await verify('sqlite'));
+	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 
 	async function verify(dbName) {
@@ -206,7 +205,7 @@ describe('insert overwrite with skipOnConflict column', () => {
 	if (major > 17)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
-	// test('sqlite', async () => await verify('sqlite'));
+	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 
 	async function verify(dbName) {
@@ -253,7 +252,7 @@ describe('insert overwrite with optimistic column changed', () => {
 	if (major > 17)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
-	// test('sqlite', async () => await verify('sqlite'));
+	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 
 	async function verify(dbName) {
@@ -269,6 +268,7 @@ describe('insert overwrite with optimistic column changed', () => {
 			}
 		});
 
+		db.vendor.ins;
 		await db.vendor.insert({
 			id: 1,
 			name: 'John',
@@ -279,12 +279,13 @@ describe('insert overwrite with optimistic column changed', () => {
 		let message;
 		try {
 
-			await db.vendor.insert({
+			const row = await db.vendor.insert({
 				id: 1,
 				name: 'George',
 				balance: 177,
 				isActive: false
 			});
+			console.dir(row, {depth: Infinity});
 		}
 		catch (e) {
 			message = e.message;
@@ -292,7 +293,7 @@ describe('insert overwrite with optimistic column changed', () => {
 
 		expect(message).toEqual('Conflict when updating balance');
 	}
-});
+},1000000);
 
 describe('insert overwrite with optimistic column unchanged', () => {
 	test('pg', async () => await verify('pg'));
@@ -300,7 +301,7 @@ describe('insert overwrite with optimistic column unchanged', () => {
 	if (major > 17)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
-	// test('sqlite', async () => await verify('sqlite'));
+	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 
 	async function verify(dbName) {

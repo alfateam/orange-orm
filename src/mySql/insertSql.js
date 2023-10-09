@@ -49,7 +49,7 @@ function insertSql(table, row, options) {
 			if (concurrency === 'overwrite') {
 				conflictColumnUpdates.push(`${column._dbName}=VALUES(${column._dbName})`);
 			} else if (concurrency === 'optimistic') {
-				conflictColumnUpdates.push(`${column._dbName} = CASE WHEN ${table._dbName}.${column._dbName} <> VALUES(${column._dbName}) THEN CAST(CONCAT(FLOOR(RAND() * 1000000000), '12345678-1234-1234-1234-123456789012Conflict when updating ${column._dbName}12345678-1234-1234-1234-123456789012') AS SIGNED) ELSE ${table._dbName}.${column._dbName} END`);
+				conflictColumnUpdates.push(`${column._dbName} = CASE WHEN ${table._dbName}.${column._dbName} <> VALUES(${column._dbName}) THEN CAST('12345678-1234-1234-1234-123456789012Conflict when updating ${column._dbName}12345678-1234-1234-1234-123456789012' AS SIGNED) ELSE ${table._dbName}.${column._dbName} END`);
 			}
 		}
 	}

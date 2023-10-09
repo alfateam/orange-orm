@@ -28,6 +28,7 @@ function newResolveTransaction(domain, pool) {
 				}
 				client.executeQuery = wrapQuery(client);
 				client.streamQuery = wrapQueryStream(client);
+				rdb.engine = 'pg';
 				rdb.dbClient = client;
 				rdb.dbClientDone = done;
 				rdb.encodeBoolean = encodeBoolean;
