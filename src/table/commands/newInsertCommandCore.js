@@ -1,11 +1,10 @@
 var newParameterized = require('../query/newParameterized');
 var getSqlTemplate = require('./insert/getSqlTemplate');
-var getSqlForgetTemplate = require('./insertAndForget/getSqlTemplate');
 var util = require('util');
 
-function newInsertCommandCore(table, row, {insertAndForget = false, ...options} = {}) {
+function newInsertCommandCore(table, row, options = {}) {
 	var parameters = [];
-	var values = [insertAndForget? getSqlForgetTemplate(table, row) : getSqlTemplate(table, row, options)];
+	var values = [getSqlTemplate(table, row, options)];
 
 	var columns = table._columns;
 	for (var i = 0; i < columns.length; i++) {

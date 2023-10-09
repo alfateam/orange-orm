@@ -293,7 +293,7 @@ describe('insert overwrite with optimistic column changed', () => {
 
 		expect(message).toEqual('Conflict when updating balance');
 	}
-},1000000);
+});
 
 describe('insert overwrite with optimistic column unchanged', () => {
 	test('pg', async () => await verify('pg'));

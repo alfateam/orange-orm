@@ -32,6 +32,10 @@ async function patchTableCore(table, patches, { strategy = undefined, deduceStra
 		else if (result.updated)
 			changed.add(result.updated);
 	}
+	if (strategy['insertAndForget'])
+		return {
+			changed: [], strategy
+		};
 	return { changed: await toDtos(changed), strategy };
 
 	async function toDtos(set) {

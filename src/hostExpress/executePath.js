@@ -56,7 +56,7 @@ let _allowedOps = {
 };
 
 async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, request, response, readonly, disableBulkDeletes, isHttp, client }) {
-	let allowedOps = { ..._allowedOps, insert: !readonly, insertAndForget: !readonly, ...extractRelations(getMeta(table)) };
+	let allowedOps = { ..._allowedOps, insert: !readonly, ...extractRelations(getMeta(table)) };
 	let ops = { ..._ops, ...getCustomFilterPaths(customFilters), getManyDto, getMany, delete: _delete, cascadeDelete };
 	let res = await parseFilter(JSONFilter, table) || {};
 	return res;
