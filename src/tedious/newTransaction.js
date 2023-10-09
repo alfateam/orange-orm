@@ -5,7 +5,8 @@ var selectForUpdateSql = require('./selectForUpdateSql');
 var outputInsertedSql = require('./outputInsertedSql');
 const limitAndOffset = require('./limitAndOffset');
 const getManyDto = require('./getManyDto');
-const formatDateColumn = require('../mssql/formatDateColumn');
+const formatDateColumn = require('./formatDateColumn');
+const insertSql = require('./insertSql');
 // const getManyDto = require('../table/getManyDtoFast');
 
 function newResolveTransaction(domain, pool) {
@@ -25,6 +26,7 @@ function newResolveTransaction(domain, pool) {
 					return;
 				}
 				client.executeQuery = wrapQuery(client);
+				rdb.engine = 'mssql';
 				rdb.getManyDto = getManyDto;
 				rdb.dbClient = client;
 				rdb.dbClientDone = done;
@@ -35,6 +37,7 @@ function newResolveTransaction(domain, pool) {
 				rdb.selectForUpdateSql = selectForUpdateSql;
 				rdb.outputInsertedSql = outputInsertedSql;
 				rdb.lastInsertedIsSeparate = false;
+				rdb.insertSql = insertSql;
 				rdb.formatDateColumn = formatDateColumn;
 				rdb.multipleStatements = true;
 				rdb.begin = 'BEGIN TRANSACTION';

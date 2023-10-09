@@ -1,48 +1,24 @@
-import { describe, test, beforeAll, afterAll, expect } from 'vitest';
+import { describe, test, beforeAll, expect, afterAll } from 'vitest';
 import { fileURLToPath } from 'url';
 const express = require('express');
-const map = require('./db');
 import { json } from 'body-parser';
 import cors from 'cors';
-
+const map = require('./db');
 const initPg = require('./initPg');
 const initMs = require('./initMs');
 const initMysql = require('./initMysql');
 const initSqlite = require('./initSqlite');
 const initSap = require('./initSap');
+const dateToISOString = require('../src/dateToISOString');
 const versionArray = process.version.replace('v', '').split('.');
 const major = parseInt(versionArray[0]);
-const port = 3005;
+const port = 3011;
 let server;
-
-afterAll(async () => {
-	return new Promise((res) => {
-		if (server)
-			server.close(res);
-		else
-			res();
-	});
-});
 
 beforeAll(async () => {
 
 	await createMs('mssql');
-
-	await insertData('pg');
-	await insertData('mssql');
-	if (major > 17)
-		await insertData('mssqlNative');
-	await insertData('mysql');
-	await insertData('sqlite');
-	await insertData('sqlite2');
-	await insertData('sap');
 	hostExpress();
-
-	async function insertData(dbName) {
-		const { db, init } = getDb(dbName);
-		await init(db);
-	}
-
 
 	async function createMs(dbName) {
 		const { db } = getDb(dbName);
@@ -62,43 +38,143 @@ beforeAll(async () => {
 			.use('/rdb', cors(), db.express());
 		server = app.listen(port, () => console.log(`Example app listening on port ${port}!`));
 	}
+});
 
+afterAll(async () => {
+	return new Promise((res) => {
+		if (server)
+			server.close(res);
+		else
+			res();
+	});
 });
 
 
-describe('insert-get', () => {
+
+describe('insertAndForget autoincremental with relations', () => {
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
 	if (major > 17)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
-	//todo fix sap and binary
-	// test('sap', async () => await verify('sap'));
-	test('http', async () => await verify('http'));
+	test('sap', async () => await verify('sap'));
+
 
 	async function verify(dbName) {
-		const { db } = getDb(dbName);
+		const { db, init } = getDb(dbName);
+		await init(db);
 
-		const customer = await db.customer2.insert({
-			name: 'Voldemort',
-			balance: -200,
-			isActive: true,
-			data: ['evil', 'magician'],
-			picture: 'V/cAIibr+r/2RueTQqUiEw=='
+		const date1 = new Date(2022, 0, 11, 9, 24, 47);
+		const date2 = new Date(2021, 0, 11, 12, 22, 45);
+
+		const george = await db.customer.insert({
+			name: 'George',
+			balance: 177,
+			isActive: true
 		});
 
-		const expected = {
-			id: 1,
-			name: 'Voldemort',
-			balance: -200,
-			isActive: true,
-			data: ['evil', 'magician'],
-			picture: 'V/cAIibr+r/2RueTQqUiEw=='
-		};
+		const john = await db.customer.insert({
+			name: 'Harry',
+			balance: 200,
+			isActive: true
+		});
 
-		expect(customer).toEqual(expected);
+		let result = await db.order.insertAndForget([
+			{
+				orderDate: date1,
+				customer: george,
+				deliveryAddress: {
+					name: 'George',
+					street: 'Node street 1',
+					postalCode: '7059',
+					postalPlace: 'Jakobsli',
+					countryCode: 'NO'
+				},
+				lines: [
+					{ product: 'Bicycle' },
+					{ product: 'Small guitar' }
+				]
+			},
+			{
+				customer: john,
+				orderDate: date2,
+				deliveryAddress: {
+					name: 'Harry Potter',
+					street: '4 Privet Drive, Little Whinging',
+					postalCode: 'GU4',
+					postalPlace: 'Surrey',
+					countryCode: 'UK'
+				},
+				lines: [
+					{ product: 'Magic wand' }
+				]
+			}
+		]);
+
+		let orders = await db.order.getAll({customer: true, deliveryAddress: true, lines: true});
+
+		//workaround because some databases return offset and some dont
+		for (let i = 0; i < orders.length; i++) {
+			orders[i].orderDate = dateToISOString(new Date(orders[i].orderDate));
+		}
+
+
+		const expected = [
+			{
+				id: 1,
+				orderDate: dateToISOString(date1),
+				customerId: 1,
+				customer: {
+					id: 1,
+					name: 'George',
+					balance: 177,
+					isActive: true
+				},
+				deliveryAddress: {
+					id: 1,
+					orderId: 1,
+					name: 'George',
+					street: 'Node street 1',
+					postalCode: '7059',
+					postalPlace: 'Jakobsli',
+					countryCode: 'NO'
+				},
+				lines: [
+					{ product: 'Bicycle', id: 1, orderId: 1 },
+					{ product: 'Small guitar', id: 2, orderId: 1 }
+				]
+			},
+			{
+				id: 2,
+				customerId: 2,
+				customer: {
+					id: 2,
+					name: 'Harry',
+					balance: 200,
+					isActive: true
+				},
+				orderDate: dateToISOString(date2),
+				deliveryAddress: {
+					id: 2,
+					orderId: 2,
+					name: 'Harry Potter',
+					street: '4 Privet Drive, Little Whinging',
+					postalCode: 'GU4',
+					postalPlace: 'Surrey',
+					countryCode: 'UK'
+				},
+				lines: [
+					{ product: 'Magic wand', id: 3, orderId: 2 }
+				]
+			}
+		];
+
+		expect(result).toBeUndefined();
+		expect(orders).toEqual(expected);
+
 	}
+
 });
 
 const pathSegments = fileURLToPath(import.meta.url).split('/');

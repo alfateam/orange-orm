@@ -4,10 +4,10 @@ var encodeDate = require('./encodeDate');
 var encodeBoolean = require('./encodeBoolean');
 var deleteFromSql = require('./deleteFromSql');
 var selectForUpdateSql = require('./selectForUpdateSql');
-var lastInsertedSql = require('./lastInsertedSql');
 var limitAndOffset = require('./limitAndOffset');
 var formatDateColumn = require('./formatDateColumn');
 var encodeJSON = require('./encodeJSON');
+var insertSql = require('./insertSql');
 
 
 function newResolveTransaction(domain, pool) {
@@ -28,6 +28,7 @@ function newResolveTransaction(domain, pool) {
 				}
 				client.executeQuery = wrapQuery(client);
 				client.streamQuery = wrapQueryStream(client);
+				rdb.engine = 'pg';
 				rdb.dbClient = client;
 				rdb.dbClientDone = done;
 				rdb.encodeBoolean = encodeBoolean;
@@ -36,8 +37,8 @@ function newResolveTransaction(domain, pool) {
 				rdb.formatDateColumn = formatDateColumn;
 				rdb.deleteFromSql = deleteFromSql;
 				rdb.selectForUpdateSql = selectForUpdateSql;
-				rdb.lastInsertedSql = lastInsertedSql;
 				rdb.lastInsertedIsSeparate = false;
+				rdb.insertSql = insertSql;
 				rdb.multipleStatements = true;
 				rdb.limitAndOffset = limitAndOffset;
 				rdb.accept = function(caller) {

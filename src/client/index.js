@@ -270,16 +270,6 @@ function rdbClient(options = {}) {
 			return adapter.post(body);
 		}
 
-		async function insertAndForget() {
-			let args = Array.prototype.slice.call(arguments);
-			let body = stringify({
-				path: 'insertAndForget',
-				args
-			});
-			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
-			return adapter.post(body);
-		}
-
 		async function _delete() {
 			let args = Array.prototype.slice.call(arguments);
 			let body = stringify({
@@ -314,6 +304,21 @@ function rdbClient(options = {}) {
 				return proxify(proxy[0], args[0]);
 			}
 		}
+
+		async function insertAndForget(rows, arg1, arg2, ...rest) {
+			let args = [arg1, {insertAndForget: true, ...arg2}].concat(rest);
+			if (Array.isArray(rows)) {
+				let proxy = proxify([], args[0]);
+				proxy.splice.apply(proxy, [0, 0, ...rows]);
+				await proxy.saveChanges.apply(proxy, args);
+			}
+			else {
+				let proxy = proxify([], args[0]);
+				proxy.splice.apply(proxy, [0, 0, rows]);
+				await proxy.saveChanges.apply(proxy, args);
+			}
+		}
+
 
 		function proxify(itemOrArray, strategy) {
 			if (Array.isArray(itemOrArray))
@@ -466,6 +471,11 @@ function rdbClient(options = {}) {
 			let body = stringify({ patch, options: { strategy, ...concurrencyOptions, deduceStrategy } });
 			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
 			let p = adapter.patch(body);
+			if (strategy?.insertAndForget) {
+				await p;
+				return;
+			}
+
 			let updatedPositions = extractChangedRowsPositions(array, patch, meta);
 			let insertedPositions = getInsertedRowsPosition(array);
 			let { changed, strategy: newStrategy } = await p;

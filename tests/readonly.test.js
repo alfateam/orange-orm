@@ -123,6 +123,17 @@ describe('readonly everything', () => {
 		const expectedMeta = {
 			readonly: true,
 			concurrency: undefined,
+			vendorDiscr: {
+				id:  {
+					readonly: true,
+				},
+				isActive:  {
+					readonly: true,
+				},
+				name:  {
+					readonly: true,
+				}
+			},
 			customer: {
 				id: { readonly: true },
 				name: { readonly: true },

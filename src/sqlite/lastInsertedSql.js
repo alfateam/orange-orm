@@ -1,7 +1,12 @@
-let sql = 'rowid IN (select last_insert_rowid())';
+function lastInsertedSql(table, keyValues) {
+	return keyValues.map((value,i) => {
+		let column = table._primaryColumns[i];
+		if (value === undefined && column.tsType === 'NumberColumn')
+			return 'rowid IN (select last_insert_rowid())';
+		else
+			return column.eq(value);
+	});
 
-function lastInsertedSql() {
-	return sql;
 }
 
 module.exports = lastInsertedSql;

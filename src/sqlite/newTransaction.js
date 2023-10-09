@@ -1,9 +1,10 @@
-var wrapQuery = require('./wrapQuery');
-var encodeBoolean = require('./encodeBoolean');
-var deleteFromSql = require('./deleteFromSql');
-var selectForUpdateSql = require('./selectForUpdateSql');
-var lastInsertedSql = require('./lastInsertedSql');
-var limitAndOffset = require('./limitAndOffset');
+const wrapQuery = require('./wrapQuery');
+const encodeBoolean = require('./encodeBoolean');
+const deleteFromSql = require('./deleteFromSql');
+const selectForUpdateSql = require('./selectForUpdateSql');
+const lastInsertedSql = require('./lastInsertedSql');
+const limitAndOffset = require('./limitAndOffset');
+const insertSql = require('./insertSql');
 
 function newResolveTransaction(domain, pool) {
 	var rdb = {poolFactory: pool};
@@ -22,6 +23,7 @@ function newResolveTransaction(domain, pool) {
 					return;
 				}
 				client.executeQuery = wrapQuery(client);
+				rdb.engine = 'sqlite';
 				rdb.dbClient = client;
 				rdb.dbClientDone = done;
 				rdb.encodeBoolean = encodeBoolean;
@@ -30,6 +32,7 @@ function newResolveTransaction(domain, pool) {
 				rdb.deleteFromSql = deleteFromSql;
 				rdb.selectForUpdateSql = selectForUpdateSql;
 				rdb.lastInsertedSql = lastInsertedSql;
+				rdb.insertSql = insertSql;
 				rdb.lastInsertedIsSeparate = true;
 				rdb.multipleStatements = false;
 				rdb.limitAndOffset = limitAndOffset;

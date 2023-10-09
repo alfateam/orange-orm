@@ -1,6 +1,6 @@
 var decodeDbRow = require('../resultToRows/decodeDbRow');
 
-function newRow(table) {
+function newRow({table, _options}) {
 	var dto = {};
 	table._columns.forEach(addColumn);
 
