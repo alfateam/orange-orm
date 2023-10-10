@@ -278,14 +278,12 @@ describe('insert overwrite with optimistic column changed', () => {
 
 		let message;
 		try {
-
-			const row = await db.vendor.insert({
+			await db.vendor.insert({
 				id: 1,
 				name: 'George',
 				balance: 177,
 				isActive: false
 			});
-			console.dir(row, {depth: Infinity});
 		}
 		catch (e) {
 			message = e.message;

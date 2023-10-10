@@ -1,5 +1,7 @@
 
 ## Changelog
+__3.2.3__  
+Conflict resolution on insert. See [#42](https://github.com/alfateam/rdb/issues/42) and [Inserting rows](https://github.com/alfateam/rdb/tree/master#user-content-inserting-rows).  
 __3.2.2__  
 Bugfix for Sql Server: OFFSET was ignored. See [#46](https://github.com/alfateam/rdb/issues/49).  
 __3.2.1__  

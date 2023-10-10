@@ -1,6 +1,6 @@
 import { describe, test, beforeAll, afterAll, expect } from 'vitest';
 import { fileURLToPath } from 'url';
-const map = require('./db');
+const map = require('./db2');
 import express from 'express';
 import cors from 'cors';
 import { json } from 'body-parser';
@@ -140,48 +140,6 @@ describe('readonly everything', () => {
 				balance: { readonly: true },
 				isActive: { readonly: true }
 			},
-			vendor: {
-				id: { readonly: true },
-				name: { readonly: true },
-				balance: { readonly: true },
-				isActive: { readonly: true }
-			},
-			customer2: {
-				id: { readonly: true },
-				name: { readonly: true },
-				balance: { readonly: true },
-				isActive: { readonly: true },
-				data: { readonly: true },
-				picture: { readonly: true }
-			},
-			customerDbNull: {
-				balance: {
-					readonly: true,
-				},
-				id: {
-					readonly: true,
-				},
-				isActive: {
-					readonly: true,
-				},
-				name: {
-					readonly: true,
-				},
-			},
-			customerDefault: {
-				balance: {
-					readonly: true,
-				},
-				id: {
-					readonly: true,
-				},
-				isActive: {
-					readonly: true,
-				},
-				name: {
-					readonly: true,
-				},
-			},
 			order: {
 				id: { readonly: true },
 				orderDate: { readonly: true },
@@ -247,17 +205,6 @@ describe('readonly everything', () => {
 				sscc: {
 					readonly: true,
 				},
-			},
-			datetest: {
-				id: { readonly: true },
-				date: { readonly: true },
-				datetime: { readonly: true },
-			},
-			datetestWithTz: {
-				id: { readonly: true },
-				date: { readonly: true },
-				datetime: { readonly: true },
-				datetime_tz: { readonly: true },
 			}
 		};
 		expect(error?.message).toEqual('Cannot update column name because it is readonly');
