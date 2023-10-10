@@ -400,6 +400,59 @@ async function insertRows() {
 }
 ```
 
+__Conflict resolution__  
+By default, the strategy for inserting rows is set to an optimistic approach. In this case, if a row is being inserted with an already existing primary key, the database raises an exception.
+
+Currently, there are three concurrency strategies:
+- <strong>`optimistic`</strong> Raises an exception if another row was already inserted on that primary key.
+- <strong>`overwrite`</strong> Overwrites the property, regardless of changes by others.
+- <strong>`skipOnConflict`</strong> Silently avoids updating the property if another user has modified it in the interim.
+
+The <strong>concurrency</strong> option can be set either globally a table or individually for each column. In the example below, we've set the concurrency strategy on <strong>vendor</strong> table to <strong>overwrite</strong> except for the column <strong>balance</strong> which uses the <strong>skipOnConflict</strong> strategy..  In this particular case, a row with id: 1 already exists, the name and isActive fields will be overwritten, but the balance will remain the same as in the original record, demonstrating the effectiveness of combining multiple <strong>concurrency</strong> strategies.
+
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+import init from './init';
+
+insertRows();
+
+async function insertRows() {
+  await init();
+
+  db2 = db({
+    vendor: {
+      balance: {
+        concurrency: 'skipOnConflict'
+      },
+      concurrency: 'overwrite'
+    }
+	});
+
+  await db2.vendor.insert({
+    id: 1,
+    name: 'John',
+    balance: 100,
+    isActive: true
+  });
+
+  //this will overwrite all fields but balance
+  const george = await db2.vendor.insert({
+    id: 1,
+    name: 'George',
+    balance: 177,
+    isActive: false
+  });
+  console.dir(orders, {depth: Infinity});
+  // {
+  //   id: 1,
+  //   name: 'George',
+  //   balance: 100,
+  //   isActive: false
+  // }
+}
+```
+
 </details>
 
 <details><summary><strong>Fetching rows</strong></summary>
@@ -589,7 +642,7 @@ async function update() {
 }
 ```
 
-__Updating with concurrency__  
+__Conflict resolution__  
 Rows get updated using an <i>optimistic</i> concurrency approach by default. This means if a property being edited was meanwhile altered, an exception is raised, indicating the row was modified by a different user. You can change the concurrency strategy either at the table or column level.
 
 Currently, there are three concurrency strategies:
