@@ -278,7 +278,6 @@ describe('insert overwrite with optimistic column changed', () => {
 
 		let message;
 		try {
-
 			await db.vendor.insert({
 				id: 1,
 				name: 'George',
