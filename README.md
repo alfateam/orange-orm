@@ -441,7 +441,7 @@ async function insertRows() {
     balance: 177,
     isActive: false
   });
-  console.dir(orders, {depth: Infinity});
+  console.dir(george, {depth: Infinity});
   // {
   //   id: 1,
   //   name: 'George',
