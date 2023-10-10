@@ -413,12 +413,10 @@ The <strong>concurrency</strong> option can be set either globally a table or in
 ```javascript
 import map from './map';
 const db = map.sqlite('demo.db');
-import init from './init';
 
 insertRows();
 
 async function insertRows() {
-  await init();
 
   db2 = db({
     vendor: {
