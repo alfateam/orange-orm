@@ -425,7 +425,7 @@ async function insertRows() {
       },
       concurrency: 'overwrite'
     }
-	});
+  });
 
   await db2.vendor.insert({
     id: 1,
