@@ -335,7 +335,7 @@ const db = map.pg(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;U
 
 </details>
 
-<details><summary><strong>Inserting rows</strong></summary>
+<details id="inserting-rows"><summary><strong>Inserting rows</strong></summary>
 
 In the code below, we initially import the table-mapping feature "map.js" and the setup script "init.js", both of which were defined in the preceding step. The setup script executes a raw query that creates the necessary tables. Subsequently, we insert two customers, named "George" and "Harry", into the customer table, and this is achieved through calling "db.customer.insert".
 
