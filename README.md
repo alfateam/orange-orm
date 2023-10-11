@@ -408,7 +408,7 @@ Currently, there are three concurrency strategies:
 - <strong>`overwrite`</strong> Overwrites the property, regardless of changes by others.
 - <strong>`skipOnConflict`</strong> Silently avoids updating the property if another user has modified it in the interim.
 
-The <strong>concurrency</strong> option can be set either globally a table or individually for each column. In the example below, we've set the concurrency strategy on <strong>vendor</strong> table to <strong>overwrite</strong> except for the column <strong>balance</strong> which uses the <strong>skipOnConflict</strong> strategy..  In this particular case, a row with id: 1 already exists, the name and isActive fields will be overwritten, but the balance will remain the same as in the original record, demonstrating the effectiveness of combining multiple <strong>concurrency</strong> strategies.
+The <strong>concurrency</strong> option can be set either globally a table or individually for each column. In the example below, we've set the concurrency strategy on <strong>vendor</strong> table to <strong>overwrite</strong> except for the column <strong>balance</strong> which uses the <strong>skipOnConflict</strong> strategy.  In this particular case, a row with <strong>id: 1</strong> already exists, the <strong>name</strong> and <strong>isActive</strong> fields will be overwritten, but the balance will remain the same as in the original record, demonstrating the effectiveness of combining multiple <strong>concurrency</strong> strategies.
 
 ```javascript
 import map from './map';
