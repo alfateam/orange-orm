@@ -73,8 +73,7 @@ describe('insert-get', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
-	//todo fix sap and binary
-	// test('sap', async () => await verify('sap'));
+	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {

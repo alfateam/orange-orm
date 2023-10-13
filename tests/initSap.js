@@ -89,7 +89,7 @@ CREATE TABLE customer (
     balance NUMERIC,
     isActive BIT,
     data TEXT NULL,
-    picture VARBINARY NULL
+    picture VARBINARY(4000) NULL
 
 )
 

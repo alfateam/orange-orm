@@ -49,15 +49,15 @@
     "deferred": "^0.7.5",
     "fast-json-patch": "^3.1.1",
     "findup-sync": "^5.0.0",
+    "glob": "^10.3.4",
     "module-definition": "^4.0.0",
     "node-cls": "^1.0.5",
     "promise": "^8.0.3",
     "rfdc": "^1.2.0",
-    "uuid": "^8.3.2",
-    "glob": "^10.3.4"
+    "uuid": "^8.3.2"
   },
   "peerDependencies": {
-    "msnodesqlv8": "^2.2.0",
+    "msnodesqlv8": "^4.1.0",
     "mysql2": "^2.2.5",
     "pg": "^8.5.1",
     "pg-native": "^3.0.0",
@@ -98,7 +98,7 @@
     "eslint": "^8.6.0",
     "eslint-plugin-jest": "^27.1.7",
     "express": "^4.18.2",
-    "msnodesqlv8": "^2.2.0",
+    "msnodesqlv8": "^4.1.0",
     "mysql2": "^2.2.5",
     "owasp-dependency-check": "^0.0.21",
     "pg": "^8.5.1",
