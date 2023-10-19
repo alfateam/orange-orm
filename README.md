@@ -75,7 +75,7 @@ const map = rdb.map(x => ({
   order: x.order.map(v => ({
     customer: v.references(x.customer).by('customerId'),
     lines: v.hasMany(x.orderLine).by('orderId'),
-    deliveryAddress: hasOne(x.deliveryAddress).by('orderId'),
+    deliveryAddress: v.hasOne(x.deliveryAddress).by('orderId'),
   }))
 }));
 
