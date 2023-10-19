@@ -1,5 +1,7 @@
 
 ## Changelog
+__3.2.4__  
+Bugfix: array of filters. See [#56](https://github.com/alfateam/rdb/issues/56) and [#57](https://github.com/alfateam/rdb/issues/57).  
 __3.2.3__  
 Conflict resolution on insert. See [#42](https://github.com/alfateam/rdb/issues/42) and [Inserting rows](https://github.com/alfateam/rdb/tree/master#user-content-inserting-rows).  
 __3.2.2__  
