@@ -81,6 +81,13 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 			}
 			return executePath(json.path, subFilters);
 		}
+		else if (Array.isArray(json)) {
+			const result = [];
+			for (let i = 0; i < json.length; i++) {
+				result.push(parseFilter(json[i], table));
+			}
+			return result;
+		}
 		return json;
 
 		function tryGetAnyAllNone(path, table) {
@@ -222,7 +229,7 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 
 	function negotiateFilter(filter) {
 		if (filter)
-			return negotiateRawSqlFilter(filter, table);
+			return negotiateRawSqlFilter(filter, table, true);
 		else
 			return emptyFilter;
 	}

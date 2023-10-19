@@ -8,9 +8,11 @@ let newBoolean = function() {
 	return newBoolean.apply(null, arguments);
 };
 
-function negotiateRawSqlFilter(filter, optionalTable) {
-	if (Array.isArray(filter) && filter.length === 0)
-		return newBoolean(newParameterized('1 = 2'));
+function negotiateRawSqlFilter(filter, optionalTable, emptyArrayMeansFalse) {
+	if (Array.isArray(filter) && filter.length === 0) {
+		const sql = emptyArrayMeansFalse ? '1 = 2' : '1 = 1';
+		return newBoolean(newParameterized(sql));
+	}
 	else if (Array.isArray(filter)) {
 		let curFilter;
 		let curObjectFilter;
