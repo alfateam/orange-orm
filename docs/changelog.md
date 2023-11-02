@@ -1,5 +1,7 @@
 
 ## Changelog
+__3.2.5__  
+Fix typescript signature for insert overload. See [#62](https://github.com/alfateam/rdb/issues/62).  
 __3.2.4__  
 Bugfix: array of filters. See [#56](https://github.com/alfateam/rdb/issues/56) and [#57](https://github.com/alfateam/rdb/issues/57).  
 __3.2.3__  
