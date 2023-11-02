@@ -1019,7 +1019,7 @@ const map = rdb.map(x => ({
   }))
 }));
 
-module.exports = map;
+export default map;
 ```  
 </details>
 
@@ -1092,6 +1092,55 @@ const map = rdb.map(x => ({
 
 export default map;
 ```
+</details>
+
+<details id="column-discriminators"><summary><strong>Column discriminators</strong></summary>
+Column discriminators are used to distinguish between different types of data in the same table. Think of them as labels that identify whether a record is one category or another.
+In the example, the <strong>client_type</strong> column serves as the discriminator that labels records as <strong>customer</strong> or <strong>vendor</strong> in the 'client' table. On inserts, the column will automatically be given the correct discriminator value. Similarly, when fetching and deleting, the discrimiminator will be added to the WHERE clause.
+
+```javascript
+import rdb from 'rdb';
+
+const map = rdb.map(x => ({
+  customer: x.table('client').map(({ column }) => ({
+    id: column('id').numeric().primary(),
+    name: column('name').string()
+  })).columnDiscriminators(`client_type='customer'`),
+
+  vendor: x.table('client').map(({ column }) => ({
+    id: column('id').numeric().primary(),
+    name: column('name').string()
+  })).columnDiscriminators(`client_type='vendor'`),
+}));
+
+export default map;
+```  
+</details>
+
+<details id="formula-discriminators"><summary><strong>Formula discriminators</strong></summary>
+Formula discriminators are used to distinguish between different types of data in the same table. They differ from column discriminators by using a logical expression rather than a static value in a column.
+
+In the example below, the formula discriminator categorize bookings into <strong>customerBooking</strong> and <strong>internalBooking</strong> within the same <strong>booking</strong> table. The categorization is based on the value of the <strong>booking_no</strong> column. For <strong>customerBooking</strong>, records are identified where the booking number falls within the range of 10000 to 99999. For <strong>internalBooking</strong>, the range is between 1000 to 9999. These conditions are utilized during fetch and delete operations to ensure that the program interacts with the appropriate subset of records according to their booking number. Unlike column discriminators, formula discriminators are not used during insert operations since they rely on existing data to evaluate the condition.
+
+The <strong><i>'@this'</strong></i> acts as a placeholder within the formula. When RDB constructs a query, it replaces <strong>'@this'</strong> with the appropriate alias for the table being queried. This replacement is crucial to avoid ambiguity, especially when dealing with joins with ambigious column names. 
+```javascript
+import rdb from 'rdb';
+
+
+const map = rdb.map(x => ({
+  customerBooking: x.table('booking').map(({ column }) => ({
+    id: column('id').uuid().primary(),
+    bookingNo: column('booking_no').numeric()
+  })).formulaDiscriminators('@this.booking_no between 10000 and 99999'),
+
+  internalBooking: x.table('booking').map(({ column }) => ({
+    id: column('id').uuid().primary(),
+    bookingNo: column('booking_no').numeric()
+  })).formulaDiscriminators('@this.booking_no between 1000 and 9999'),
+}));
+
+export default map;
+```  
 </details>
 
 <details><summary><strong>Raw sql filters</strong></summary>
