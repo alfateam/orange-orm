@@ -197,7 +197,7 @@ type ExpandedMappedTable<T, FL = ExpandedFetchingStrategy<T>> = {
 		filter?: Filter | PrimaryRowFilter<T>[],
 		fetchingStrategy?: FS
 	): Promise<StrategyToRowArray<FetchedProperties<T, FL>, T>>;
-	getAll(): StrategyToRowArray<FetchedProperties<T, FL>, T>;
+	getAll(): Promise<StrategyToRowArray<FetchedProperties<T, FL>, T>>;
 	getAll<FS extends FetchingStrategy<T>>(
 		fetchingStrategy?: FS
 	): Promise<StrategyToRowArray<FetchedProperties<T, FL>, T>>;
@@ -254,7 +254,7 @@ type MappedTable<T> = {
 
 	insert(
 		row: StrategyToInsertRowData<T>
-	): StrategyToRow<FetchedProperties<T, {}>, T>;
+	): Promise<StrategyToRow<FetchedProperties<T, {}>, T>>;
 	
 	insert(
 		row: StrategyToInsertRowData<T>[]
@@ -263,7 +263,7 @@ type MappedTable<T> = {
 	insert<FS extends FetchingStrategy<T>>(
 		row: StrategyToInsertRowData<T>,
 		strategy: FS
-	): StrategyToRow<FetchedProperties<T, FS>, T>;
+	): Promise<StrategyToRow<FetchedProperties<T, FS>, T>>;
 	
 	insert<FS extends FetchingStrategy<T>>(
 		row: StrategyToInsertRowData<T>[],
@@ -280,7 +280,7 @@ type MappedTable<T> = {
 		filter?: Filter | PrimaryRowFilter<T>[],
 		fetchingStrategy?: FS
 	): Promise<StrategyToRowArray<FetchedProperties<T, FS>, T>>;
-	getAll(): StrategyToRowArray<FetchedProperties<T, {}>, T>;
+	getAll(): Promise<StrategyToRowArray<FetchedProperties<T, {}>, T>>;
 	getAll<FS extends FetchingStrategy<T>>(
 		fetchingStrategy?: FS
 	): Promise<StrategyToRowArray<FetchedProperties<T, FS>, T>>;
