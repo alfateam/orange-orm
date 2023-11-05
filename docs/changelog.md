@@ -1,5 +1,7 @@
 
 ## Changelog
+__3.2.6__  
+Hide metadata types from intellisense on insert().  
 __3.2.5__  
 Fix typescript signature for insert overload. See [#62](https://github.com/alfateam/rdb/issues/62).  
 __3.2.4__  
