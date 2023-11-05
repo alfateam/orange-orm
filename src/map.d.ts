@@ -1032,7 +1032,7 @@ type StrategyToInsertRowData<T> = Omit<{
 		T[K] extends ManyRelation
 		? StrategyToInsertRowData<T[K]>[]
 		: StrategyToInsertRowData<T[K]>;
-	}, 'formulaDiscriminators' | 'columnDiscriminators' | 'map'>
+	}, 'formulaDiscriminators' | 'columnDiscriminators' | 'map' | ' isManyRelation' | ' relatedTable' | ' isOneRelation'>
 	;
 
 type NegotiateDefaultStrategy<T> = T extends ColumnSymbols ? T : never;
