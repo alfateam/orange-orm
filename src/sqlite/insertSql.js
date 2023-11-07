@@ -48,7 +48,7 @@ function insertSql(table, row, options) {
 		}
 		if (conflictColumnUpdates.length === 0)
 			conflictColumnUpdateSql =  'DO NOTHING';
-		else 
+		else
 			conflictColumnUpdateSql = 'DO UPDATE SET ' + conflictColumnUpdates.join(',');
 
 		function addConflictUpdate(column) {

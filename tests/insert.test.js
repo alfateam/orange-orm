@@ -504,7 +504,7 @@ describe('insert autoincremental with relations', () => {
 		//workaround because some databases return offset and some dont
 		for (let i = 0; i < orders.length; i++) {
 			orders[i].orderDate = dateToISOString(new Date(orders[i].orderDate));
-		}		
+		}
 		expect(orders).toEqual(expectedEager);
 
 	}

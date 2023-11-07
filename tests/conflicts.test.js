@@ -140,7 +140,7 @@ describe('savechanges overload overwrite', () => {
 		george.name = 'John 1';
 		await george.saveChanges();
 
-		george2.name = 'John 2'
+		george2.name = 'John 2';
 		await george2.saveChanges({ name: { concurrency: 'overwrite' } });
 
 		const expected = {
@@ -158,7 +158,6 @@ describe('savechanges overload overwrite', () => {
 });
 
 describe('savechanges overload optimistic', () => {
-	rdb.on('query', console.dir);
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
 	if (major > 17)
@@ -189,7 +188,7 @@ describe('savechanges overload optimistic', () => {
 		george.name = 'John 1';
 		await george.saveChanges();
 
-		george2.name = 'John 2'
+		george2.name = 'John 2';
 		let error;
 		try {
 			await george2.saveChanges({ name: { concurrency: 'optimistic' } });
@@ -197,7 +196,7 @@ describe('savechanges overload optimistic', () => {
 		catch (e) {
 			error = e;
 		}
-		expect(error.message).toEqual(`The field name was changed by another user. Expected 'John', but was 'John 1'.`);
+		expect(error.message).toEqual('The field name was changed by another user. Expected \'John\', but was \'John 1\'.');
 	}
 });
 
