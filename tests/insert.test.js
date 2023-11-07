@@ -439,6 +439,150 @@ describe('insert autoincremental with relations', () => {
 				id: 1,
 				orderDate: dateToISOString(date1),
 				customerId: 1,
+			},
+			{
+				id: 2,
+				customerId: 2,
+				orderDate: dateToISOString(date2),
+			}
+		];
+
+		const expectedEager = [
+			{
+				id: 1,
+				orderDate: dateToISOString(date1),
+				customerId: 1,
+				customer: {
+					id: 1,
+					name: 'George',
+					balance: 177,
+					isActive: true
+				},
+				deliveryAddress: {
+					id: 1,
+					orderId: 1,
+					name: 'George',
+					street: 'Node street 1',
+					postalCode: '7059',
+					postalPlace: 'Jakobsli',
+					countryCode: 'NO'
+				},
+				lines: [
+					{ product: 'Bicycle', id: 1, orderId: 1 },
+					{ product: 'Small guitar', id: 2, orderId: 1 }
+				]
+			},
+			{
+				id: 2,
+				customerId: 2,
+				customer: {
+					id: 2,
+					name: 'Harry',
+					balance: 200,
+					isActive: true
+				},
+				orderDate: dateToISOString(date2),
+				deliveryAddress: {
+					id: 2,
+					orderId: 2,
+					name: 'Harry Potter',
+					street: '4 Privet Drive, Little Whinging',
+					postalCode: 'GU4',
+					postalPlace: 'Surrey',
+					countryCode: 'UK'
+				},
+				lines: [
+					{ product: 'Magic wand', id: 3, orderId: 2 }
+				]
+			}
+		];
+
+
+		expect(orders).toEqual(expected);
+
+		await orders.refresh({lines: true, customer: true, deliveryAddress: true});
+		//workaround because some databases return offset and some dont
+		for (let i = 0; i < orders.length; i++) {
+			orders[i].orderDate = dateToISOString(new Date(orders[i].orderDate));
+		}		
+		expect(orders).toEqual(expectedEager);
+
+	}
+
+});
+
+describe('insert autoincremental with relations and strategy', () => {
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+
+
+	async function verify(dbName) {
+		const { db, init } = getDb(dbName);
+		await init(db);
+
+		const date1 = new Date(2022, 0, 11, 9, 24, 47);
+		const date2 = new Date(2021, 0, 11, 12, 22, 45);
+
+		const george = await db.customer.insert({
+			name: 'George',
+			balance: 177,
+			isActive: true
+		});
+
+		const john = await db.customer.insert({
+			name: 'Harry',
+			balance: 200,
+			isActive: true
+		});
+
+		let orders = await db.order.insert([
+			{
+				orderDate: date1,
+				customer: george,
+				deliveryAddress: {
+					name: 'George',
+					street: 'Node street 1',
+					postalCode: '7059',
+					postalPlace: 'Jakobsli',
+					countryCode: 'NO'
+				},
+				lines: [
+					{ product: 'Bicycle' },
+					{ product: 'Small guitar' }
+				]
+			},
+			{
+				customer: john,
+				orderDate: date2,
+				deliveryAddress: {
+					name: 'Harry Potter',
+					street: '4 Privet Drive, Little Whinging',
+					postalCode: 'GU4',
+					postalPlace: 'Surrey',
+					countryCode: 'UK'
+				},
+				lines: [
+					{ product: 'Magic wand' }
+				]
+			}
+		], {customer: true, lines: true, deliveryAddress: true});
+
+		//workaround because some databases return offset and some dont
+		for (let i = 0; i < orders.length; i++) {
+			orders[i].orderDate = dateToISOString(new Date(orders[i].orderDate));
+		}
+
+
+		const expected = [
+			{
+				id: 1,
+				orderDate: dateToISOString(date1),
+				customerId: 1,
 				customer: {
 					id: 1,
 					name: 'George',

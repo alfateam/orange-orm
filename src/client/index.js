@@ -290,7 +290,9 @@ function rdbClient(options = {}) {
 			return adapter.post(body);
 		}
 
-		async function insert(rows, ...args) {
+		async function insert(rows, ...rest) {
+			const strategy = undefined;
+			const args = [strategy].concat(rest);
 			if (Array.isArray(rows)) {
 				let proxy = proxify([], args[0]);
 				proxy.splice.apply(proxy, [0, 0, ...rows]);
@@ -459,7 +461,7 @@ function rdbClient(options = {}) {
 		async function saveArray(array, concurrencyOptions, strategy) {
 			let deduceStrategy;
 			if (arguments.length < 3)
-				deduceStrategy = true;
+				deduceStrategy = false;
 			let { json } = rootMap.get(array);
 			strategy = extractStrategy({ strategy }, array);
 			strategy = extractFetchingStrategy(array, strategy);
@@ -486,7 +488,7 @@ function rdbClient(options = {}) {
 		async function patch(patch, concurrencyOptions, strategy) {
 			let deduceStrategy;
 			if (arguments.length < 3)
-				deduceStrategy = true;
+				deduceStrategy = false;
 			if (patch.length === 0)
 				return;
 			let body = stringify({ patch, options: { strategy, ...concurrencyOptions, deduceStrategy } });
@@ -661,7 +663,7 @@ function rdbClient(options = {}) {
 		async function saveRow(row, concurrencyOptions, strategy) {
 			let deduceStrategy;
 			if (arguments.length < 3)
-				deduceStrategy = true;
+				deduceStrategy = false;
 			strategy = extractStrategy({ strategy }, row);
 			strategy = extractFetchingStrategy(row, strategy);
 

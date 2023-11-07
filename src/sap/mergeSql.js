@@ -6,7 +6,12 @@ function insertSql(table, row, options) {
 	addDiscriminators();
 	addColumns();
 
-	let sql = `MERGE INTO ${table._dbName} AS target USING (SELECT ${values.join(',')}) AS source ON ${join()} WHEN MATCHED THEN ${whenMatched()} WHEN NOT MATCHED THEN ${whenNotMatched()};`;
+	const matched = whenMatched();
+	let sql;
+	if (matched)
+		sql = `MERGE INTO ${table._dbName} AS target USING (SELECT ${values.join(',')}) AS source ON ${join()} WHEN MATCHED THEN ${matched} WHEN NOT MATCHED THEN ${whenNotMatched()};`;
+	else
+		sql = `MERGE INTO ${table._dbName} AS target USING (SELECT ${values.join(',')}) AS source ON ${join()} WHEN NOT MATCHED THEN ${whenNotMatched()};`;
 
 	return sql;
 
@@ -22,7 +27,7 @@ function insertSql(table, row, options) {
 
 	function whenMatched() {
 		if (options.concurrency === 'skipOnConflict' || options.concurrency === 'overwrite') {
-			return `UPDATE SET ${conflictColumnUpdateSql}`;
+			return conflictColumnUpdateSql;
 		}
 		else return '';
 	}
@@ -52,7 +57,8 @@ function insertSql(table, row, options) {
 				addConflictUpdate(column);
 			}
 		}
-		conflictColumnUpdateSql = conflictColumnUpdates.join(',');
+		if (conflictColumnUpdates.length > 0)
+			conflictColumnUpdateSql = 'UPDATE SET ' + conflictColumnUpdates.join(',');
 
 		function addConflictUpdate(column) {
 			let concurrency = options[column.alias]?.concurrency || options.concurrency;

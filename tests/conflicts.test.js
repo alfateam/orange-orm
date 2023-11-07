@@ -11,10 +11,7 @@ const versionArray = process.version.replace('v', '').split('.');
 const major = parseInt(versionArray[0]);
 const port = 3007;
 
-
-
 beforeAll(async () => {
-
 	await createMs('mssql');
 
 	async function createMs(dbName) {
@@ -29,7 +26,6 @@ beforeAll(async () => {
 });
 
 describe('optimistic fail', () => {
-
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
 	if (major > 17)
@@ -110,6 +106,98 @@ describe('insert skipOnConflict with overwrite column', () => {
 		};
 
 		expect(george).toEqual(expected);
+	}
+});
+
+describe('savechanges overload overwrite', () => {
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+
+	async function verify(dbName) {
+		let { db, init } = getDb(dbName);
+		await init(db);
+
+		db = db({
+			vendor: {
+				concurrency: 'skipOnConflict',
+			},
+		});
+
+		const george = await db.vendor.insert({
+			id: 1,
+			name: 'John',
+			balance: 100,
+			isActive: true
+		});
+
+		const george2 = await db.vendor.getById(1);
+
+		george.name = 'John 1';
+		await george.saveChanges();
+
+		george2.name = 'John 2'
+		await george2.saveChanges({ name: { concurrency: 'overwrite' } });
+
+		const expected = {
+			id: 1,
+			name: 'John 2',
+			balance: 100,
+			isActive: true
+		};
+
+		await george.refresh();
+
+		expect(george2).toEqual(expected);
+		expect(george).toEqual(expected);
+	}
+});
+
+describe('savechanges overload optimistic', () => {
+	rdb.on('query', console.dir);
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major > 17)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+
+	async function verify(dbName) {
+		let { db, init } = getDb(dbName);
+		await init(db);
+
+		db = db({
+			vendor: {
+				concurrency: 'skipOnConflict',
+			},
+		});
+
+		const george = await db.vendor.insert({
+			id: 1,
+			name: 'John',
+			balance: 100,
+			isActive: true
+		});
+
+		const george2 = await db.vendor.getById(1);
+
+		george.name = 'John 1';
+		await george.saveChanges();
+
+		george2.name = 'John 2'
+		let error;
+		try {
+			await george2.saveChanges({ name: { concurrency: 'optimistic' } });
+		}
+		catch (e) {
+			error = e;
+		}
+		expect(error.message).toEqual(`The field name was changed by another user. Expected 'John', but was 'John 1'.`);
 	}
 });
 
