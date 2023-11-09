@@ -37,7 +37,7 @@ Here we choose SQLite.
 ```bash
 $ npm install sqlite3
 ```
-<sub>📄 map.js</sub>
+<sub>📄 map.ts</sub>
 ```javascript
 import rdb from 'rdb';
 
@@ -81,7 +81,7 @@ const map = rdb.map(x => ({
 
 export default map;
 ```  
-<sub>📄 update.js</sub>
+<sub>📄 update.ts</sub>
 
 ```javascript
 import map from './map';
@@ -101,7 +101,7 @@ async function updateRow() {
 }
 
 ```
-<sub>📄 filter.js</sub>
+<sub>📄 filter.ts</sub>
 
 ```javascript
 import map from './map';
@@ -134,7 +134,7 @@ Each column within your database table is designated by using the <strong><i>col
 
 Relationships between tables can also be outlined. By using methods like <strong><i>hasOne</i></strong>, <strong><i>hasMany</i></strong>, and <strong><i>references</i></strong>, you can establish connections that reflect the relationships in your data schema. In the example below, an 'order' is linked to a 'customer' reference, a 'deliveryAddress', and multiple 'lines'. The hasMany and hasOne relations represents ownership - the tables 'deliveryAddress' and 'orderLine' are owned by the 'order' table, and therefore, they contain the 'orderId' column referring to their parent table, which is 'order'. Conversely, the customer table is independent and can exist without any knowledge of the 'order' table. Therefore we say that the order table <i>references</i> the customer table - necessitating the existence of a 'customerId' column in the 'order' table.  
 
-<sub>📄 map.js</sub>
+<sub>📄 map.ts</sub>
 ```javascript
 import rdb from 'rdb';
 
@@ -178,15 +178,15 @@ const map = rdb.map(x => ({
 
 export default map;
 ```
-The init.js script resets our SQLite database. It's worth noting that SQLite databases are represented as single files, which makes them wonderfully straightforward to manage.
+The init.ts script resets our SQLite database. It's worth noting that SQLite databases are represented as single files, which makes them wonderfully straightforward to manage.
 
-At the start of the script, we import our database mapping from the map.js file. This gives us access to the db object, which we'll use to interact with our SQLite database.
+At the start of the script, we import our database mapping from the map.ts file. This gives us access to the db object, which we'll use to interact with our SQLite database.
 
 Then, we define a SQL string. This string outlines the structure of our SQLite database. It first specifies to drop existing tables named 'deliveryAddress', 'orderLine', '_order', and 'customer' if they exist. This ensures we have a clean slate. Then, it dictates how to create these tables anew with the necessary columns and constraints.
 
 Because of a peculiarity in SQLite, which only allows one statement execution at a time, we split this SQL string into separate statements. We do this using the split() method, which breaks up the string at every semicolon.  
 
-<sub>📄 init.js</sub>
+<sub>📄 init.ts</sub>
 ```javascript
 import map from './map';
 const db = map.sqlite('demo.db');
@@ -253,8 +253,8 @@ import map from './map';
 const db = map.sqlite('demo.db', { size: 10 });
 ```
 __From the browser__  
-You can securely use RDB from the browser by utilizing the Express.js plugin, which serves to safeguard sensitive database credentials from exposure at the client level. This technique bypasses the need to transmit raw SQL queries directly from the client to the server. Instead, it logs method calls initiated by the client, which are later replayed and authenticated on the server. This not only reinforces security by preventing the disclosure of raw SQL queries on the client side but also facilitates a smoother operation. Essentially, this method mirrors a traditional REST API, augmented with advanced TypeScript tooling for enhanced functionality. You can read more about it in the section called [In the browser](#user-content-in-the-browser)  
-<sub>📄 server.js</sub>
+You can securely use RDB from the browser by utilizing the Express plugin, which serves to safeguard sensitive database credentials from exposure at the client level. This technique bypasses the need to transmit raw SQL queries directly from the client to the server. Instead, it logs method calls initiated by the client, which are later replayed and authenticated on the server. This not only reinforces security by preventing the disclosure of raw SQL queries on the client side but also facilitates a smoother operation. Essentially, this method mirrors a traditional REST API, augmented with advanced TypeScript tooling for enhanced functionality. You can read more about it in the section called [In the browser](#user-content-in-the-browser)  
+<sub>📄 server.ts</sub>
 ```javascript
 import map from './map';
 import { json } from 'body-parser';
@@ -271,7 +271,7 @@ express().disable('x-powered-by')
   .listen(3000, () => console.log('Example app listening on port 3000!'));
 ```
 
-<sub>📄 browser.js</sub>
+<sub>📄 browser.ts</sub>
 ```javascript
 import map from './map';
 
@@ -337,7 +337,7 @@ const db = map.pg(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;U
 
 <details id="inserting-rows"><summary><strong>Inserting rows</strong></summary>
 
-In the code below, we initially import the table-mapping feature "map.js" and the setup script "init.js", both of which were defined in the preceding step. The setup script executes a raw query that creates the necessary tables. Subsequently, we insert two customers, named "George" and "Harry", into the customer table, and this is achieved through calling "db.customer.insert".
+In the code below, we initially import the table-mapping feature "map.ts" and the setup script "init.ts", both of which were defined in the preceding step. The setup script executes a raw query that creates the necessary tables. Subsequently, we insert two customers, named "George" and "Harry", into the customer table, and this is achieved through calling "db.customer.insert".
 
 Next, we insert an array of two orders in the order table. Each order contains an orderDate, customer information, deliveryAddress, and lines for the order items. We use the customer constants "george" and "harry" from previous inserts. Observe that we don't pass in any primary keys. This is because all tables here have autoincremental keys. The second argument to "db.order.insert" specifies a fetching strategy. This fetching strategy plays a critical role in determining the depth of the data retrieved from the database after insertion. The fetching strategy specifies which associated data should be retrieved and included in the resulting orders object. In this case, the fetching strategy instructs the database to retrieve the customer, deliveryAddress, and lines for each order.
 
@@ -781,10 +781,10 @@ async function deleteRows() {
 ```
 </details>
 <details id="in-the-browser"><summary><strong>In the browser</strong></summary>
-You can use <strong><i>RDB</i></strong> in the browser by using the adapter for Express.js. Instead of sending raw SQL queries from the client to the server, this approach records the method calls in the client. These method calls are then replayed at the server, ensuring a higher level of security by not exposing raw SQL on the client side.  
+You can use <strong><i>RDB</i></strong> in the browser by using the adapter for Express. Instead of sending raw SQL queries from the client to the server, this approach records the method calls in the client. These method calls are then replayed at the server, ensuring a higher level of security by not exposing raw SQL on the client side.  
 Raw sql queries, raw sql filters and transactions are disabled at the http client due to security reasons.  If you would like RDB to support other web frameworks, like nestJs, fastify, etc, please let me know.
 
-<sub>📄 server.js</sub>
+<sub>📄 server.ts</sub>
 ```javascript
 import map from './map';
 import { json } from 'body-parser';
@@ -801,7 +801,7 @@ express().disable('x-powered-by')
   .listen(3000, () => console.log('Example app listening on port 3000!'));
 ```
 
-<sub>📄 browser.js</sub>
+<sub>📄 browser.ts</sub>
 ```javascript
 import map from './map';
 
@@ -830,10 +830,10 @@ async function updateRows() {
 
 __Interceptors and base filter__
 
-In the next setup, axios interceptors are employed on the client side to add an Authorization header of requests. Meanwhile, on the server side, an Express.js middleware (validateToken) is utilized to ensure the presence of the Authorization header, while a base filter is applied on the order table to filter incoming requests based on the customerId extracted from this header. This combined approach enhances security by ensuring that users can only access data relevant to their authorization level and that every request is accompanied by a token. In real-world applications, it's advisable to use a more comprehensive token system and expand error handling to manage a wider range of potential issues.  
+In the next setup, axios interceptors are employed on the client side to add an Authorization header of requests. Meanwhile, on the server side, an Express middleware (validateToken) is utilized to ensure the presence of the Authorization header, while a base filter is applied on the order table to filter incoming requests based on the customerId extracted from this header. This combined approach enhances security by ensuring that users can only access data relevant to their authorization level and that every request is accompanied by a token. In real-world applications, it's advisable to use a more comprehensive token system and expand error handling to manage a wider range of potential issues.  
 One notable side effect compared to the previous example, is that only the order table is exposed for interaction, while all other potential tables in the database remain shielded from direct client access (except for related tables). If you want to expose a table without a baseFilter, just set the tableName to an empty object.    
 
-<sub>📄 server.js</sub>
+<sub>📄 server.ts</sub>
 
 ```javascript
 import map from './map';
@@ -868,7 +868,7 @@ function validateToken(req, res, next) {
 }
 ```
 
-<sub>📄 browser.js</sub>
+<sub>📄 browser.ts</sub>
 ```javascript
 import map from './map';
 
@@ -951,6 +951,28 @@ RDB is database agnostic - meaning it can work with multiple database systems wi
 - **`binary`** is represented as a base64 string in javascript and maps to BLOB, BYTEA or VARBINARY(max) in sql.
 - **`json`** and **`jsonOf<T>`** are represented as an object or array in javascript and maps to JSON, JSONB, NVARCHAR(max) or TEXT (sqlite) in sql.
 
+<sub>📄 map.ts</sub>
+```javascript
+import rdb from 'rdb';
+
+interface Pet {
+    name: string;
+    kind: string;
+}
+
+const map = rdb.map(x => ({
+    demo: x.table('demo').map(x => ({
+      id: x.column('id').uuid().primary().notNull(),
+      name: x.column('name').string(),
+      balance: x.column('balance').numeric(),
+      regularDate: x.column('regularDate').date(),
+      tzDate: x.column('tzDate').dateWithTimeZone(),
+      picture: x.column('picture').binary(),
+      pet: x.column('pet').jsonOf<Pet>(), //generic
+      pet2: x.column('pet2').json(), //non-generic
+  }))
+}));
+```
 <sub>📄 map.js</sub>
 ```javascript
 import rdb from 'rdb';
@@ -973,28 +995,6 @@ const map = rdb.map(x => ({
       tzDate: x.column('tzDate').dateWithTimeZone(),
       picture: x.column('picture').binary(),
       pet: x.column('pet').jsonOf(pet), //generic
-      pet2: x.column('pet2').json(), //non-generic
-  }))
-}));
-```
-<sub>📄 map.ts</sub>
-```javascript
-import rdb from 'rdb';
-
-interface Pet {
-    name: string;
-    kind: string;
-}
-
-const map = rdb.map(x => ({
-    demo: x.table('demo').map(x => ({
-      id: x.column('id').uuid().primary().notNull(),
-      name: x.column('name').string(),
-      balance: x.column('balance').numeric(),
-      regularDate: x.column('regularDate').date(),
-      tzDate: x.column('tzDate').dateWithTimeZone(),
-      picture: x.column('picture').binary(),
-      pet: x.column('pet').jsonOf<Pet>(), //generic
       pet2: x.column('pet2').json(), //non-generic
   }))
 }));
@@ -1026,6 +1026,37 @@ export default map;
 <details><summary><strong>Validation</strong></summary>
 In the previous sections you have already seen the <strong><i>notNull()</i></strong> validator being used on some columns. This will not only generate correct typescript mapping, but also throw an error if value is set to null or undefined. However, sometimes we do not want the notNull-validator to be run on inserts. Typically, when we have an autoincremental key or server generated uuid, it does not make sense to check for null on insert. This is where <strong><i>notNullExceptInsert()</strong></i> comes to rescue. You can also create your own custom validator as shown below. The last kind of validator, is the <a href="https://ajv.js.org/json-schema.html">ajv JSON schema validator</a>. This can be used on json columns as well as any other column type.
 
+<sub>📄 map.ts</sub>
+```javascript
+import rdb from 'rdb';
+
+interface Pet {
+    name: string;
+    kind: string;
+}
+
+let petSchema = {
+    "properties": {
+        "name": { "type": "string" },
+        "kind": { "type": "string" }
+    }
+};
+
+function validateName(value) {
+	if (value && value.length > 10)
+		throw new Error('Length cannot exceed 10 characters');
+}
+
+const map = rdb.map(x => ({
+    demo: x.table('demo').map(x => ({
+      id: x.column('id').uuid().primary().notNullExceptInsert(),
+      name: x.column('name').string().validate(validateName),
+      pet: x.column('pet').jsonOf<Pet>().JSONSchema(petSchema)
+  }))
+}));
+
+export default map;
+```
 <sub>📄 map.js</sub>
 ```javascript
 import rdb from 'rdb';
@@ -1056,37 +1087,6 @@ const map = rdb.map(x => ({
       id: x.column('id').uuid().primary().notNullExceptInsert(),
       name: x.column('name').string().validate(validateName),
       pet: x.column('pet').jsonOf(pet).JSONSchema(petSchema)
-  }))
-}));
-
-export default map;
-```
-<sub>📄 map.ts</sub>
-```javascript
-import rdb from 'rdb';
-
-interface Pet {
-    name: string;
-    kind: string;
-}
-
-let petSchema = {
-    "properties": {
-        "name": { "type": "string" },
-        "kind": { "type": "string" }
-    }
-};
-
-function validateName(value) {
-	if (value && value.length > 10)
-		throw new Error('Length cannot exceed 10 characters');
-}
-
-const map = rdb.map(x => ({
-    demo: x.table('demo').map(x => ({
-      id: x.column('id').uuid().primary().notNullExceptInsert(),
-      name: x.column('name').string().validate(validateName),
-      pet: x.column('pet').jsonOf<Pet>().JSONSchema(petSchema)
   }))
 }));
 
@@ -1210,7 +1210,7 @@ async function getCount() {
 
 To secure your application by preventing sensitive data from being serialized and possibly leaked, you can use the <strong>serializable(false)</strong> attribute on certain fields within your database schema. Here, the serializable(false) attribute has been applied to the balance column, indicating that this field will not be serialized when a record is converted to a JSON string.
 
-<sub>📄 map.js</sub>
+<sub>📄 map.ts</sub>
 ```javascript
 import rdb from 'rdb';
 
@@ -1225,7 +1225,7 @@ const map = rdb.map(x => ({
 
 export default map;
 ```
-<sub>📄 sensitive.js</sub>
+<sub>📄 sensitive.ts</sub>
 ```javascript
 import map from './map';
 const db = map.sqlite('demo.db');
