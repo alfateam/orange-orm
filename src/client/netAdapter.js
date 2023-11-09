@@ -2,7 +2,7 @@ const _axios = require('axios');
 
 function httpAdapter(baseURL, path, axiosInterceptor) {
 	//@ts-ignore
-	const axios = _axios.default ? _axios.default.create({baseURL}) : _axios.create({baseURL});
+	const axios = _axios.default ? _axios.default.create({ baseURL }) : _axios.create({ baseURL });
 	axiosInterceptor.applyTo(axios);
 
 	let c = {
@@ -16,9 +16,18 @@ function httpAdapter(baseURL, path, axiosInterceptor) {
 	return c;
 
 	async function get() {
-		const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
-		const res = await axios.request(path, {  headers, method: 'get' });
-		return res.data;
+		try {
+			const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
+			const res = await axios.request(path, { headers, method: 'get' });
+			return res.data;
+		}
+		catch (e) {
+			if (e.response?.data)
+				throw new Error(e.response?.data.replace(/^Error: /, ''));
+			else
+				throw e;
+		}
+
 	}
 
 	async function patch(body) {
@@ -28,9 +37,9 @@ function httpAdapter(baseURL, path, axiosInterceptor) {
 			const res = await axios.request(path, { headers, method: 'patch', data: body });
 			return res.data;
 		}
-		catch(e) {
+		catch (e) {
 			if (e.response?.data)
-				throw new Error(e.response?.data);
+				throw new Error(e.response?.data.replace(/^Error: /, ''));
 			else
 				throw e;
 		}
@@ -44,9 +53,10 @@ function httpAdapter(baseURL, path, axiosInterceptor) {
 			const res = await axios.request(path, { headers, method: 'post', data: body });
 			return res.data;
 		}
-		catch(e) {
-			console.dir(e);
-			throw e;
+		catch (e) {
+			if (e.response?.data)
+				throw new Error(e.response?.data.replace(/^Error: /, ''));
+			else throw e;
 		}
 	}
 
@@ -61,6 +71,7 @@ function httpAdapter(baseURL, path, axiosInterceptor) {
 }
 
 function netAdapter(url, tableName, { axios, tableOptions }) {
+
 	let c = {
 		get,
 		post,
@@ -93,10 +104,10 @@ function netAdapter(url, tableName, { axios, tableOptions }) {
 	async function getInnerAdapter() {
 		const db = await getDb();
 		if (typeof db === 'string') {
-			return httpAdapter(db, `?table=${tableName}` , axios);
+			return httpAdapter(db, `?table=${tableName}`, axios);
 		}
 		else if (db && db.transaction) {
-			return db.hostLocal({ ...tableOptions, db, table: url });
+			return db.hostLocal({ db, table: url });
 
 		}
 		else

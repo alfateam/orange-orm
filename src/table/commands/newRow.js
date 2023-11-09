@@ -1,4 +1,5 @@
 var decodeDbRow = require('../resultToRows/decodeDbRow');
+var flags = require('../../flags');
 
 function newRow({table, _options}) {
 	var dto = {};
@@ -14,7 +15,7 @@ function newRow({table, _options}) {
 			else
 				dto[alias] = column.default;
 		}
-		else if ('lazyDefault' in column && !column.isPrimary) {
+		else if (flags.useLazyDefaults && 'lazyDefault' in column && !column.isPrimary) {
 			if (typeof column.lazyDefault === 'function')
 				dto[alias] = column.lazyDefault();
 			else if (column.toDto)

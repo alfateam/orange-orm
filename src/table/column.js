@@ -84,8 +84,11 @@ function defineColumn(column, table) {
 	c.notNull = function() {
 		column._notNull = true;
 		function validate(value) {
-			if (value === undefined || value === null)
-				throw new Error(`Column ${column.alias} cannot be null or undefined`);
+			if (value === undefined || value === null) {
+				const error =  new Error(`Column ${column.alias} cannot be null or undefined`);
+				error.status = 400;
+				throw error;
+			}
 		}
 
 		return c.validate(validate);
@@ -111,8 +114,16 @@ function defineColumn(column, table) {
 			column.validate = value;
 
 		function nestedValidate() {
-			previousValue.apply(null, arguments);
-			value.apply(null, arguments);
+			try {
+				previousValue.apply(null, arguments);
+				value.apply(null, arguments);
+			}
+			catch (e) {
+				const error = new Error(e.message || e);
+				// @ts-ignore
+				error.status = 400;
+				throw error;
+			}
 		}
 		return c;
 	};
@@ -130,6 +141,7 @@ function defineColumn(column, table) {
 			if (!valid) {
 				let e = new Error(`Column ${table._dbName}.${column._dbName} violates JSON Schema: ${inspect(validate.errors, false, 10)}`);
 				e.errors = validate.errors;
+				e.status = 400;
 				throw e;
 			}
 		}

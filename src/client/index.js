@@ -8,8 +8,10 @@ const targetKey = Symbol();
 const map = require('./clientMap');
 const clone = require('rfdc/default');
 const createAxiosInterceptor = require('./axiosInterceptor');
+const flags = require('../flags');
 
 function rdbClient(options = {}) {
+	flags.useLazyDefaults = false;
 	if (options.pg)
 		options = { db: options };
 	let transaction = options.transaction;
@@ -291,8 +293,8 @@ function rdbClient(options = {}) {
 		}
 
 		async function insert(rows, ...rest) {
-			const strategy = undefined;
-			const args = [strategy].concat(rest);
+			const concurrency = undefined;
+			const args = [concurrency].concat(rest);
 			if (Array.isArray(rows)) {
 				let proxy = proxify([], args[0]);
 				proxy.splice.apply(proxy, [0, 0, ...rows]);
@@ -307,8 +309,9 @@ function rdbClient(options = {}) {
 			}
 		}
 
-		async function insertAndForget(rows, arg1, arg2, ...rest) {
-			let args = [arg1, {insertAndForget: true, ...arg2}].concat(rest);
+		async function insertAndForget(rows) {
+			const concurrency = undefined;
+			let args = [concurrency, {insertAndForget: true}];
 			if (Array.isArray(rows)) {
 				let proxy = proxify([], args[0]);
 				proxy.splice.apply(proxy, [0, 0, ...rows]);
@@ -459,9 +462,7 @@ function rdbClient(options = {}) {
 		}
 
 		async function saveArray(array, concurrencyOptions, strategy) {
-			let deduceStrategy;
-			if (arguments.length < 3)
-				deduceStrategy = false;
+			let deduceStrategy = false;
 			let { json } = rootMap.get(array);
 			strategy = extractStrategy({ strategy }, array);
 			strategy = extractFetchingStrategy(array, strategy);
@@ -470,7 +471,7 @@ function rdbClient(options = {}) {
 			const patch = createPatch(JSON.parse(json), array, meta);
 			if (patch.length === 0)
 				return;
-			let body = stringify({ patch, options: { strategy, ...concurrencyOptions, deduceStrategy } });
+			let body = stringify({ patch, options: { strategy, ...tableOptions, ...concurrencyOptions, deduceStrategy } });
 			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
 			let p = adapter.patch(body);
 			if (strategy?.insertAndForget) {
@@ -486,12 +487,10 @@ function rdbClient(options = {}) {
 		}
 
 		async function patch(patch, concurrencyOptions, strategy) {
-			let deduceStrategy;
-			if (arguments.length < 3)
-				deduceStrategy = false;
+			let deduceStrategy = false;
 			if (patch.length === 0)
 				return;
-			let body = stringify({ patch, options: { strategy, ...concurrencyOptions, deduceStrategy } });
+			let body = stringify({ patch, options: { strategy, ...tableOptions, ...concurrencyOptions, deduceStrategy } });
 			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
 			await adapter.patch(body);
 			return;
@@ -676,7 +675,7 @@ function rdbClient(options = {}) {
 			if (patch.length === 0)
 				return;
 
-			let body = stringify({ patch, options: { ...concurrencyOptions, strategy, deduceStrategy } });
+			let body = stringify({ patch, options: { ...tableOptions, ...concurrencyOptions, strategy, deduceStrategy } });
 
 			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
 			let { changed, strategy: newStrategy } = await adapter.patch(body);

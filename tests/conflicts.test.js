@@ -1,7 +1,9 @@
 import { fileURLToPath } from 'url';
 const map = require('./db');
-import { describe, test, beforeAll, expect } from 'vitest';
-
+import { describe, test, beforeAll, afterAll, expect } from 'vitest';
+const express = require('express');
+import { json } from 'body-parser';
+import cors from 'cors';
 const initPg = require('./initPg');
 const initMs = require('./initMs');
 const initMysql = require('./initMysql');
@@ -10,9 +12,11 @@ const initSap = require('./initSap');
 const versionArray = process.version.replace('v', '').split('.');
 const major = parseInt(versionArray[0]);
 const port = 3007;
+let server;
 
 beforeAll(async () => {
 	await createMs('mssql');
+	hostExpress();
 
 	async function createMs(dbName) {
 		const { db } = getDb(dbName);
@@ -23,6 +27,24 @@ beforeAll(async () => {
 		`;
 		await db.query(sql);
 	}
+
+	function hostExpress() {
+		const { db } = getDb('sqlite2');
+		let app = express();
+		app.disable('x-powered-by')
+			.use(json({ limit: '100mb' }))
+			.use('/rdb', cors(), db.express());
+		server = app.listen(port, () => console.log(`Example app listening on port ${port}!`));
+	}
+});
+
+afterAll(async () => {
+	return new Promise((res) => {
+		if (server)
+			server.close(res);
+		else
+			res();
+	});
 });
 
 describe('optimistic fail', () => {
@@ -33,11 +55,18 @@ describe('optimistic fail', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
 
 		let { db, init } = getDb(dbName);
-		await init(db);
+		if (dbName === 'http') {
+			const { db, init } = getDb('sqlite2');
+			await init(db);
+		}
+		else
+			await init(db);
+
 		let error;
 
 		await db.vendor.insert({
@@ -70,10 +99,17 @@ describe('insert skipOnConflict with overwrite column', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
 		let { db, init } = getDb(dbName);
-		await init(db);
+		if (dbName === 'http') {
+			const { db, init } = getDb('sqlite2');
+			await init(db);
+		}
+		else
+			await init(db);
+
 
 		db = db({
 			vendor: {
@@ -117,10 +153,17 @@ describe('savechanges overload overwrite', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
 		let { db, init } = getDb(dbName);
-		await init(db);
+		if (dbName === 'http') {
+			const { db, init } = getDb('sqlite2');
+			await init(db);
+		}
+		else
+			await init(db);
+
 
 		db = db({
 			vendor: {
@@ -165,10 +208,17 @@ describe('savechanges overload optimistic', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
 		let { db, init } = getDb(dbName);
-		await init(db);
+		if (dbName === 'http') {
+			const { db, init } = getDb('sqlite2');
+			await init(db);
+		}
+		else
+			await init(db);
+
 
 		db = db({
 			vendor: {
@@ -208,10 +258,17 @@ describe('insert empty skipOnConflict', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
 		let { db, init } = getDb(dbName);
-		await init(db);
+		if (dbName === 'http') {
+			const { db, init } = getDb('sqlite2');
+			await init(db);
+		}
+		else
+			await init(db);
+
 
 		db = db({
 			datetest: {
@@ -239,10 +296,17 @@ describe('columnDiscriminator insert skipOnConflict with overwrite column', () =
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
 		let { db, init } = getDb(dbName);
-		await init(db);
+		if (dbName === 'http') {
+			const { db, init } = getDb('sqlite2');
+			await init(db);
+		}
+		else
+			await init(db);
+
 
 		db = db({
 			vendorDiscr: {
@@ -294,10 +358,17 @@ describe('insert overwrite with skipOnConflict column', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
 		let { db, init } = getDb(dbName);
-		await init(db);
+		if (dbName === 'http') {
+			const { db, init } = getDb('sqlite2');
+			await init(db);
+		}
+		else
+			await init(db);
+
 
 		db = db({
 			vendor: {
@@ -341,10 +412,17 @@ describe('insert overwrite with optimistic column changed', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
 		let { db, init } = getDb(dbName);
-		await init(db);
+		if (dbName === 'http') {
+			const { db, init } = getDb('sqlite2');
+			await init(db);
+		}
+		else
+			await init(db);
+
 
 		db = db({
 			vendor: {
@@ -388,10 +466,17 @@ describe('insert overwrite with optimistic column unchanged', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
 		let { db, init } = getDb(dbName);
-		await init(db);
+		if (dbName === 'http') {
+			const { db, init } = getDb('sqlite2');
+			await init(db);
+		}
+		else
+			await init(db);
+
 
 		db = db({
 			vendor: {

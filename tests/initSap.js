@@ -86,8 +86,8 @@ GO
 CREATE TABLE customer (
     id int IDENTITY PRIMARY KEY,   
     name VARCHAR(100),
-    balance NUMERIC,
-    isActive BIT,
+    balance NUMERIC NULL,
+    isActive NUMERIC NULL,
     data TEXT NULL,
     picture VARBINARY(4000) NULL
 
@@ -99,7 +99,7 @@ CREATE TABLE vendor (
     id int PRIMARY KEY,   
     name VARCHAR(100),
     balance NUMERIC,
-    isActive BIT
+    isActive NUMERIC NULL
 )
 
 GO

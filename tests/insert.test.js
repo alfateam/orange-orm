@@ -60,7 +60,6 @@ describe('transaction', () => {
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 
-
 	async function verify(dbName) {
 		let result;
 		const { db } = getDb(dbName);
@@ -80,13 +79,19 @@ describe('validate', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
 
 
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
 
 		let error;
-		await init(db);
+		if (dbName === 'http') {
+			const { db, init } = getDb('sqlite2');
+			await init(db);
+		}
+		else
+			await init(db);
 
 		try {
 			await db.customer.insert({
@@ -100,7 +105,6 @@ describe('validate', () => {
 			error = e;
 		}
 
-
 		expect(error?.message).toEqual('Length cannot exceed 10 characters');
 	}
 });
@@ -113,12 +117,17 @@ describe('validate chained', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
-
+	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
 		let error;
-		await init(db);
+		if (dbName === 'http') {
+			const { db, init } = getDb('sqlite2');
+			await init(db);
+		}
+		else
+			await init(db);
 
 		try {
 			await db.customer.insert({
@@ -143,12 +152,18 @@ describe('validate JSONSchema', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
 
 
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
 		let error;
-		await init(db);
+		if (dbName === 'http') {
+			const { db, init } = getDb('sqlite2');
+			await init(db);
+		}
+		else
+			await init(db);
 
 		try {
 			await db.customer.insert({
@@ -173,12 +188,18 @@ describe('validate notNull', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
 
 
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
 		let error;
-		await init(db);
+		if (dbName === 'http') {
+			const { db, init } = getDb('sqlite2');
+			await init(db);
+		}
+		else
+			await init(db);
 
 		try {
 			await db.order.insert({});
@@ -199,12 +220,18 @@ describe('validate notNullExceptInsert', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
 
 
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
 		let error;
-		await init(db);
+		if (dbName === 'http') {
+			const { db, init } = getDb('sqlite2');
+			await init(db);
+		}
+		else
+			await init(db);
 
 		const george = await db.customer.insert({
 			name: 'George',
@@ -236,11 +263,17 @@ describe('insert autoincremental', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
 
 
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
-		await init(db);
+		if (dbName === 'http') {
+			const { db, init } = getDb('sqlite2');
+			await init(db);
+		}
+		else
+			await init(db);
 
 		const george = await db.customer.insert({
 			name: 'George',
@@ -268,22 +301,27 @@ describe('insert default', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
 
 
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
-		await init(db);
+		if (dbName === 'http') {
+			const { db, init } = getDb('sqlite2');
+			await init(db);
+		}
+		else
+			await init(db);
 
 		const george = await db.customer.insert({
-			name: 'George',
-			balance: 177
+			name: 'George'
 		});
 
 		const expected = {
 			id: 1,
 			name: 'George',
-			balance: 177,
-			isActive: false
+			balance: null,
+			isActive: null
 		};
 
 		expect(george).toEqual(expected);
@@ -299,21 +337,26 @@ describe('insert default override', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
 
 
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
-		await init(db);
+		if (dbName === 'http') {
+			const { db, init } = getDb('sqlite2');
+			await init(db);
+		}
+		else
+			await init(db);
 
 		const george = await db.customerDefault.insert({
-			name: 'George',
-			balance: 177
+			name: 'George'
 		});
 
 		const expected = {
 			id: 1,
 			name: 'George',
-			balance: 177,
+			balance: 0,
 			isActive: true
 		};
 
@@ -331,11 +374,17 @@ describe('insert dbNull', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
 
 
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
-		await init(db);
+		if (dbName === 'http') {
+			const { db, init } = getDb('sqlite2');
+			await init(db);
+		}
+		else
+			await init(db);
 
 		const george = await db.customerDbNull.insert({
 			balance: 177
@@ -351,14 +400,14 @@ describe('insert dbNull', () => {
 			id: 1,
 			name: null,
 			balance: 177,
-			isActive: false
+			isActive: null
 		};
 
 		const expected2 = {
 			id: 1,
 			name: 'foo',
 			balance: 177,
-			isActive: false
+			isActive: null
 		};
 
 		expect(georgeBeforeRefresh).toEqual(expected);
@@ -375,11 +424,17 @@ describe('insert autoincremental with relations', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
 
 
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
-		await init(db);
+		if (dbName === 'http') {
+			const { db, init } = getDb('sqlite2');
+			await init(db);
+		}
+		else
+			await init(db);
 
 		const date1 = new Date(2022, 0, 11, 9, 24, 47);
 		const date2 = new Date(2021, 0, 11, 12, 22, 45);
@@ -519,11 +574,17 @@ describe('insert autoincremental with relations and strategy', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
 
 
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
-		await init(db);
+		if (dbName === 'http') {
+			const { db, init } = getDb('sqlite2');
+			await init(db);
+		}
+		else
+			await init(db);
 
 		const date1 = new Date(2022, 0, 11, 9, 24, 47);
 		const date2 = new Date(2021, 0, 11, 12, 22, 45);
@@ -675,7 +736,6 @@ const connections = {
 		init: initSqlite
 	},
 	sqlite2: {
-
 		db: map({ db: (con) => con.sqlite(sqliteName2) }),
 		init: initSqlite
 	},

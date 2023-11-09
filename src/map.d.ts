@@ -1345,7 +1345,7 @@ type StringColumnTypeDef<M> = StringValidator<M> & {
 	notNullExceptInsert(): StringColumnTypeDef<M & NotNull & NotNullExceptInsert> & NotNull & NotNullExceptInsert;
 	serializable(value: boolean): StringColumnTypeDef<M>;
 	JSONSchema(schema: object, options?: Options): StringColumnTypeDef<M>;
-	default(value: string | (() => string)): StringColumnTypeDef<M>;
+	default(value: string | null | undefined | (() => string | null | undefined)): StringColumnTypeDef<M>;
 	dbNull(value: string): StringColumnTypeDef<M>;
 } & ColumnTypeOf<StringColumnType<M>> &
 	M;
@@ -1356,7 +1356,7 @@ type NumericColumnTypeDef<M> = NumericValidator<M> & {
 	notNullExceptInsert(): NumericColumnTypeDef<M & NotNull & NotNullExceptInsert> & NotNull & NotNullExceptInsert;
 	serializable(value: boolean): NumericColumnTypeDef<M>;
 	JSONSchema(schema: object, options?: Options): NumericColumnTypeDef<M>;
-	default(value: number | (() => string)): NumericColumnTypeDef<M>;
+	default(value: number | null | undefined | (() => string | null | undefined)): NumericColumnTypeDef<M>;
 	dbNull(value: number): NumericColumnTypeDef<M>;
 } & ColumnTypeOf<NumericColumnType<M>> &
 	M;
@@ -1367,7 +1367,7 @@ type UuidColumnTypeDef<M> = UuidValidator<M> & {
 	notNullExceptInsert(): UuidColumnTypeDef<M & NotNull & NotNullExceptInsert> & NotNull & NotNullExceptInsert;
 	serializable(value: boolean): UuidColumnTypeDef<M>;
 	JSONSchema(schema: object, options?: Options): UuidColumnTypeDef<M>;
-	default(value: string | (() => string)): UuidColumnTypeDef<M>;
+	default(value: string | null | undefined | (() => string | null | undefined)): UuidColumnTypeDef<M>;
 	dbNull(value: string): UuidColumnTypeDef<M>;
 } & ColumnTypeOf<UuidColumnType<M>> &
 	M;
@@ -1378,7 +1378,7 @@ type JSONColumnTypeDef<M> = JSONValidator<M> & {
 	notNullExceptInsert(): JSONColumnTypeDef<M & NotNull & NotNullExceptInsert> & NotNull & NotNullExceptInsert;
 	serializable(value: boolean): JSONColumnTypeDef<M>;
 	JSONSchema(schema: object, options?: Options): JSONColumnTypeDef<M>;
-	default(value: ToJsonType<M> | (() => string)): JSONColumnTypeDef<M>;
+	default(value: ToJsonType<M> | null | undefined | (() => string | null | undefined)): JSONColumnTypeDef<M>;
 	dbNull(value: ToJsonType<M>): JSONColumnTypeDef<M>;
 } & ColumnTypeOf<JSONColumnType<M>> &
 	M;
@@ -1389,7 +1389,7 @@ type BinaryColumnTypeDef<M> = BinaryValidator<M> & {
 	notNullExceptInsert(): BinaryColumnTypeDef<M & NotNull & NotNullExceptInsert> & NotNull & NotNullExceptInsert;
 	serializable(value: boolean): BinaryColumnTypeDef<M>;
 	JSONSchema(schema: object, options?: Options): BinaryColumnTypeDef<M>;
-	default(value: string | (() => string)): BinaryColumnTypeDef<M>;
+	default(value: string | null | undefined | (() => string | null | undefined)): BinaryColumnTypeDef<M>;
 	dbNull(value: string): BinaryColumnTypeDef<M>;
 } & ColumnTypeOf<BinaryColumnType<M>> &
 	M;
@@ -1400,7 +1400,7 @@ type BooleanColumnTypeDef<M> = BooleanValidator<M> & {
 	notNullExceptInsert(): BooleanColumnTypeDef<M & NotNull & NotNullExceptInsert> & NotNull & NotNullExceptInsert;
 	serializable(value: boolean): BooleanColumnTypeDef<M>;
 	JSONSchema(schema: object, options?: Options): BooleanColumnTypeDef<M>;
-	default(value: boolean | (() => string)): BooleanColumnTypeDef<M>;
+	default(value: boolean | null | undefined | (() => string | null | undefined)): BooleanColumnTypeDef<M>;
 	dbNull(value: boolean): BooleanColumnTypeDef<M>;
 } & ColumnTypeOf<BooleanColumnType<M>> &
 	M;
@@ -1411,7 +1411,7 @@ type DateColumnTypeDef<M> = DateValidator<M> & {
 	notNullExceptInsert(): DateColumnTypeDef<M & NotNull & NotNullExceptInsert> & NotNull & NotNullExceptInsert;
 	serializable(value: boolean): DateColumnTypeDef<M>;
 	JSONSchema(schema: object, options?: Options): DateColumnTypeDef<M>;
-	default(value: string | Date | (() => string | Date)): DateColumnTypeDef<M>;
+	default(value: string | Date | null | undefined | (() => string | Date | null | undefined)): DateColumnTypeDef<M>;
 	dbNull(value: String | Date): DateColumnTypeDef<M>;
 } & ColumnTypeOf<DateColumnType<M>> &
 	M;
@@ -1422,7 +1422,7 @@ type DateWithTimeZoneColumnTypeDef<M> = DateValidator<M> & {
 	notNullExceptInsert(): DateWithTimeZoneColumnTypeDef<M & NotNull & NotNullExceptInsert> & NotNull & NotNullExceptInsert;
 	serializable(value: boolean): DateWithTimeZoneColumnTypeDef<M>;
 	JSONSchema(schema: object, options?: Options): DateWithTimeZoneColumnTypeDef<M>;
-	default(value: string | Date | (() => string | Date)): DateWithTimeZoneColumnTypeDef<M>;
+	default(value: string | Date | null | undefined | (() => string | Date | null | undefined)): DateWithTimeZoneColumnTypeDef<M>;
 	dbNull(value: String | Date): DateWithTimeZoneColumnTypeDef<M>;
 } & ColumnTypeOf<DateWithTimeZoneColumnType<M>> &
 	M;
