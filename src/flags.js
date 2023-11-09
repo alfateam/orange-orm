@@ -1,5 +1,6 @@
 let flags = {
-	useProxy: true
+	useProxy: true,
+	useLazyDefaults: true
 };
 
 module.exports = flags;
