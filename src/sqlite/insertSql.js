@@ -19,7 +19,7 @@ function insertSql(table, row, options) {
 	function onConflict() {
 		if (options.concurrency === 'skipOnConflict' || options.concurrency === 'overwrite') {
 			const primaryKeys = table._primaryColumns.map(x => x._dbName).join(',');
-			return ` ON CONFLICT(${primaryKeys}) DO UPDATE SET ${conflictColumnUpdateSql}`;
+			return ` ON CONFLICT(${primaryKeys}) ${conflictColumnUpdateSql}`;
 		} else {
 			return '';
 		}
@@ -46,7 +46,10 @@ function insertSql(table, row, options) {
 				addConflictUpdate(column);
 			}
 		}
-		conflictColumnUpdateSql = conflictColumnUpdates.join(',');
+		if (conflictColumnUpdates.length === 0)
+			conflictColumnUpdateSql =  'DO NOTHING';
+		else
+			conflictColumnUpdateSql = 'DO UPDATE SET ' + conflictColumnUpdates.join(',');
 
 		function addConflictUpdate(column) {
 			let concurrency = options[column.alias]?.concurrency || options.concurrency;

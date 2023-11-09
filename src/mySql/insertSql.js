@@ -42,6 +42,10 @@ function insertSql(table, row, options) {
 				addConflictUpdate(column);
 			}
 		}
+		if (conflictColumnUpdates.length === 0) {
+			const column = table._primaryColumns[0];
+			conflictColumnUpdates.push(`${column._dbName}=VALUES(${column._dbName})`);
+		}
 		conflictColumnUpdateSql = conflictColumnUpdates.join(',');
 
 		function addConflictUpdate(column) {

@@ -47,7 +47,7 @@ const map = rdb.map(x => ({
 	customerDefault: x.table('customer').map(({ column }) => ({
 		id: column('id').numeric().primary().notNullExceptInsert(),
 		name: column('name').string(),
-		balance: column('balance').numeric(),
+		balance: column('balance').numeric().default(0),
 		isActive: column('isActive').boolean().default(true),
 	})),
 

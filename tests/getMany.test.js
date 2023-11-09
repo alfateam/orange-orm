@@ -550,7 +550,7 @@ describe('getMany raw filter http', () => {
 			error = e;
 		}
 
-		expect(error?.message).toEqual('Request failed with status code 403');
+		expect(error?.message).toEqual('Raw filters are disallowed');
 	}
 });
 

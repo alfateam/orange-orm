@@ -61,7 +61,7 @@ function hostExpress(client, options = {}) {
 		}
 		catch (e) {
 			if (e.status === undefined)
-				response.status(500).send(e && e.stack);
+				response.status(500).send(e.message || e);
 			else
 				response.status(e.status).send(e.message);
 		}
@@ -73,7 +73,7 @@ function hostExpress(client, options = {}) {
 		}
 		catch (e) {
 			if (e.status === undefined)
-				response.status(500).send(e && e.stack);
+				response.status(500).send(e.message || e);
 			else
 				response.status(e.status).send(e.message);
 
@@ -99,7 +99,7 @@ function hostExpress(client, options = {}) {
 		}
 		catch (e) {
 			if (e.status === undefined)
-				response.status(500).send(e && e.stack);
+				response.status(500).send(e.message || e);
 			else
 				response.status(e.status).send(e.message);
 		}

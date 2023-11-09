@@ -97,7 +97,7 @@ declare namespace r {
         JSONSchema(schema: object, options?: Options): DateColumnDef;
         serializable(value: boolean): DateColumnDef;
         as(dbName: string): DateColumnDef;
-        default(value: Date | string | (() => Date | string)): DateColumnDef
+        default(value: Date | string | null | undefined | (() => Date | string | null | undefined)): DateColumnDef
         dbNull(value: Date | string | null): DateColumnDef;
     }
 
@@ -106,7 +106,7 @@ declare namespace r {
         JSONSchema(schema: object, options?: Options): DateColumnNotNullDef;
         serializable(value: boolean): DateColumnNotNullDef;
         as(dbName: string): DateColumnNotNullDef;
-        default(value: Date | string | (() => Date | string)): DateColumnNotNullDef
+        default(value: Date | string | null | undefined | (() => Date | string | null | undefined)): DateColumnNotNullDef
         dbNull(value: Date | string | null): DateColumnNotNullDef;
     }
 
@@ -116,7 +116,7 @@ declare namespace r {
         JSONSchema(schema: object, options?: Options): BinaryColumnDef;
         serializable(value: boolean): BinaryColumnDef;
         as(dbName: string): BinaryColumnDef;
-        default(value: Buffer | string | (() => Buffer | string)): BinaryColumnDef
+        default(value: Buffer | string | null | undefined | (() => Buffer | string | null | undefined)): BinaryColumnDef
         dbNull(value: Buffer | string | null): BinaryColumnDef;
     }
 
@@ -125,7 +125,7 @@ declare namespace r {
         JSONSchema(schema: object, options?: Options): BinaryColumnNotNullDef;
         serializable(value: boolean): BinaryColumnNotNullDef;
         as(dbName: string): BinaryColumnNotNullDef;
-        default(value: Buffer | string | (() => Buffer | string)): BinaryColumnNotNullDef
+        default(value: Buffer | string | null | undefined | (() => Buffer | string | null | undefined)): BinaryColumnNotNullDef
         dbNull(value: Buffer | string | null): BinaryColumnNotNullDef;
     }
 
@@ -134,7 +134,7 @@ declare namespace r {
         notNull(): ColumnNotNullOf<T>;
         JSONSchema(schema: object, options?: Options): ColumnOf<T>;
         serializable(value: boolean): ColumnOf<T>;
-        default(value: T | (() => T)): ColumnOf<T>;
+        default(value: T | null | undefined | (() => T | null | undefined)): ColumnOf<T>;
         dbNull(value: T | null): ColumnOf<T>;
         as(dbName: string): ColumnOf<T>;
     }
@@ -144,7 +144,7 @@ declare namespace r {
         notNull(): ColumnNotNullOf<T>;
         JSONSchema(schema: object, options?: Options): ColumnNotNullOf<T>;
         serializable(value: boolean): ColumnNotNullOf<T>;
-        default(value: T | (() => T)): ColumnNotNullOf<T>;
+        default(value: T | null | undefined | (() => T | null | undefined)): ColumnNotNullOf<T>;
         dbNull(value: T | null): ColumnNotNullOf<T>;
         as(dbName: string): ColumnNotNullOf<T>;
     }

@@ -12,7 +12,7 @@ let hostExpress = require('./hostExpress');
 // 	disableBulkDeletes, isBrowser }
 function hostLocal() {
 	const _options = arguments[0];
-	let { table, transaction, db  } = _options;
+	let { table, transaction, db, isHttp } = _options;
 
 	let c = { get, post, patch, query, express };
 
@@ -47,7 +47,7 @@ function hostLocal() {
 		async function fn() {
 			setSessionSingleton('ignoreSerializable', true);
 			let patch = body.patch;
-			result = await table.patch(patch, { ...body.options, ..._options });
+			result = await table.patch(patch, { ..._options, ...body.options, isHttp });
 		}
 	}
 
@@ -71,7 +71,7 @@ function hostLocal() {
 
 		async function fn() {
 			setSessionSingleton('ignoreSerializable', true);
-			const options = { ...body.options, ..._options, JSONFilter: body, request, response };
+			const options = { ..._options, ...body.options, JSONFilter: body, request, response, isHttp };
 			result = await executePath(options);
 		}
 	}
