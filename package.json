@@ -28,6 +28,10 @@
   "license": "ISC",
   "codeOfConduct": "https://github.com/alfateam/rdb/blob/master/docs/CODE_OF_CONDUCT.md",
   "contributing": "https://github.com/alfateam/rdb/blob/master/CONTRIBUTING.md",
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/lroal"
+  },
   "scripts": {
     "test": "vitest run --threads=false",
     "coverage": "vitest run --coverage.enabled --coverage.reporter='text-summary' --threads=false",
