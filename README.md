@@ -7,7 +7,7 @@ RDB is the ultimate Object Relational Mapper for Node.js and Typescript, offerin
 [![Github](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/lroal/1ccb2b79abbe0258d636e9b5e4630a1a/raw/rdb__heads_master.json)](https://github.com/alfateam/rdb)
 ![GitHub Discussions](https://img.shields.io/github/discussions/alfateam/rdb)
 [![Discord](https://badgen.net/discord/online-members/QjuEgvQXzd?icon=discord&label=Discord)](https://discord.gg/QjuEgvQXzd)
-![YouTube Video Views](https://img.shields.io/youtube/views/1IwwjPr2lMs)
+[![YouTube Video Views](https://img.shields.io/youtube/views/1IwwjPr2lMs)](https://youtu.be/1IwwjPr2lMs)
 
 
 
