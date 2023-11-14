@@ -31,6 +31,8 @@ $ npm install rdb
 ```  
 
 ## Example
+Watch the [tutorial video on YouTube](https://youtu.be/1IwwjPr2lMs)
+
 ![Relations diagram](./docs/relations.png)  
 
 Here we choose SQLite.  
