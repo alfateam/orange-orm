@@ -1,5 +1,7 @@
 
 ## Changelog
+__3.2.8__  
+Signature for fetchingStrategy should accept boolean as well object (code generation only). See [#67](https://github.com/alfateam/rdb/issues/67).  
 __3.2.7__  
 Bugfix Inserting with skipOnConflict on whole table yields incorrect sql. See [#63](https://github.com/alfateam/rdb/issues/63).  
 __3.2.6__  
