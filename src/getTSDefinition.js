@@ -167,7 +167,7 @@ ${Concurrency(table, Name, true)}
 
 			otherConcurrency += `${Concurrency(relation.childTable, tableTypeName)}`;
 			concurrencyRelations += `${relationName}?: ${tableTypeName}Concurrency;${separator}`;
-			strategyRelations += `${relationName}?: ${tableTypeName}Strategy;${separator}`;
+			strategyRelations += `${relationName}?: ${tableTypeName}Strategy | boolean;${separator}`;
 			regularRelations += `${relationName}?: ${tableTypeName} | null;${separator}`;
 		};
 		visitor.visitOne = visitor.visitJoin;
