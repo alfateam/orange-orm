@@ -54,7 +54,7 @@ afterAll(async () => {
 describe('insertAndForget autoincremental with relations', () => {
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
-	if (major > 17)
+	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));

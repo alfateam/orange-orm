@@ -333,7 +333,7 @@ function getPrefixTs(isNamespace) {
 /* eslint-disable @typescript-eslint/no-empty-interface */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { AxiosInterceptorManager, AxiosRequestConfig, AxiosResponse } from 'axios';
+import type { AxiosInterceptorManager, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 import type { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Url, ColumnConcurrency, JsonPatch } from 'rdb';
 export { RequestHandler } from 'express';
 export { Concurrency, Filter, RawFilter, Config, TransactionOptions, Pool } from 'rdb';
@@ -346,7 +346,7 @@ declare function r(config: Config): r.RdbClient;
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import schema from './schema';
-import type { AxiosInterceptorManager, AxiosRequestConfig, AxiosResponse } from 'axios';
+import type { AxiosInterceptorManager, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 import type { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Url, ColumnConcurrency, JsonPatch } from 'rdb';
 export default schema as RdbClient;`;
 }
@@ -382,7 +382,7 @@ declare namespace r {${getTables(isHttp)}
 			result += `
 
 	const interceptors: {
-		request: AxiosInterceptorManager<AxiosRequestConfig>;
+		request: AxiosInterceptorManager<InternalAxiosRequestConfig>;
 		response: AxiosInterceptorManager<AxiosResponse>;
 	};
 	function reactive(proxyMethod: (obj: unknown) => unknown): void;	
@@ -451,7 +451,7 @@ export interface ExpressTables {${getExpressTables()}
 			result += `
 	(config: {db: Url}): RdbClient;
 	interceptors: {
-        request: AxiosInterceptorManager<AxiosRequestConfig>;
+        request: AxiosInterceptorManager<InternalAxiosRequestConfig>;
         response: AxiosInterceptorManager<AxiosResponse>;
     };
 	reactive(proxyMethod: (obj: unknown) => unknown): void;

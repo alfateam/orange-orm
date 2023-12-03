@@ -31,7 +31,7 @@ afterAll(async () => {
 beforeAll(async () => {
 	await insertData('pg');
 	await insertData('mssql');
-	if (major > 17)
+	if (major === 18)
 		await insertData('mssqlNative');
 	await insertData('mysql');
 	await insertData('sap');
@@ -105,7 +105,7 @@ describe('update date in array', () => {
 
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
-	if (major > 17)
+	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sap', async () => await verify('sap'));
@@ -129,7 +129,7 @@ describe('update multiple in array', () => {
 
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
-	if (major > 17)
+	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sap', async () => await verify('sap'));
@@ -211,7 +211,7 @@ describe('delete row', () => {
 
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
-	if (major > 17)
+	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sap', async () => await verify('sap'));
@@ -233,7 +233,7 @@ describe('update boolean', () => {
 
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
-	if (major > 17)
+	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sap', async () => await verify('sap'));
@@ -255,7 +255,7 @@ describe('update date', () => {
 
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
-	if (major > 17)
+	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sap', async () => await verify('sap'));

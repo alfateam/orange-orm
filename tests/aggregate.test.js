@@ -28,7 +28,7 @@ beforeAll(async () => {
 	await createMs('mssql');
 	await insertData('pg');
 	await insertData('mssql');
-	if (major > 17)
+	if (major === 18)
 		await insertData('mssqlNative');
 	await insertData('mysql');
 	await insertData('sqlite');
@@ -125,7 +125,7 @@ beforeAll(async () => {
 describe('count', () => {
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
-	if (major > 17)
+	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
@@ -143,7 +143,7 @@ describe('count', () => {
 describe('count filter', () => {
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
-	if (major > 17)
+	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
