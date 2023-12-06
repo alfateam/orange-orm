@@ -61,8 +61,15 @@ describe('transaction', () => {
 	test('sap', async () => await verify('sap'));
 
 	async function verify(dbName) {
+		const { db, init } = getDb(dbName);
+		if (dbName === 'http') {
+			const { db, init } = getDb('sqlite2');
+			await init(db);
+		}
+		else
+			await init(db);
+
 		let result;
-		const { db } = getDb(dbName);
 
 		await db.transaction(async (db) => {
 			await db.customer.insert({
@@ -723,7 +730,7 @@ const connections = {
 							password: 'P@assword123',
 						}
 					}
-				}, {size: 1})
+				}, { size: 1 })
 			},),
 		init: initMs
 	},
