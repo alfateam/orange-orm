@@ -107,8 +107,7 @@ function netAdapter(url, tableName, { axios, tableOptions }) {
 			return httpAdapter(db, `?table=${tableName}`, axios);
 		}
 		else if (db && db.transaction) {
-			return db.hostLocal({ db, table: url });
-
+			return db.hostLocal({ ...tableOptions, db, table: url });
 		}
 		else
 			throw new Error('Invalid arguments');

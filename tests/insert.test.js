@@ -65,6 +65,11 @@ describe('transaction', () => {
 		const { db } = getDb(dbName);
 
 		await db.transaction(async (db) => {
+			await db.customer.insert({
+				name: 'George',
+				balance: 177,
+				isActive: true
+			});
 			result = await db.query('select 1 as foo');
 		});
 		expect(result).toEqual([{ foo: 1 }]);
@@ -555,7 +560,7 @@ describe('insert autoincremental with relations', () => {
 
 		expect(orders).toEqual(expected);
 
-		await orders.refresh({lines: true, customer: true, deliveryAddress: true});
+		await orders.refresh({ lines: true, customer: true, deliveryAddress: true });
 		//workaround because some databases return offset and some dont
 		for (let i = 0; i < orders.length; i++) {
 			orders[i].orderDate = dateToISOString(new Date(orders[i].orderDate));
@@ -631,7 +636,7 @@ describe('insert autoincremental with relations and strategy', () => {
 					{ product: 'Magic wand' }
 				]
 			}
-		], {customer: true, lines: true, deliveryAddress: true});
+		], { customer: true, lines: true, deliveryAddress: true });
 
 		//workaround because some databases return offset and some dont
 		for (let i = 0; i < orders.length; i++) {
@@ -718,33 +723,33 @@ const connections = {
 							password: 'P@assword123',
 						}
 					}
-				})
+				}, {size: 1})
 			},),
 		init: initMs
 	},
 	mssqlNative:
 	{
-		db: map({ db: (con) => con.mssqlNative('server=mssql;Database=demo;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes') }),
+		db: map({ db: (con) => con.mssqlNative('server=mssql;Database=demo;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes', { size: 0 }) }),
 		init: initMs
 	},
 	pg: {
-		db: map({ db: con => con.postgres('postgres://postgres:postgres@postgres/postgres') }),
+		db: map({ db: con => con.postgres('postgres://postgres:postgres@postgres/postgres', { size: 1 }) }),
 		init: initPg
 	},
 	sqlite: {
-		db: map({ db: (con) => con.sqlite(sqliteName) }),
+		db: map({ db: (con) => con.sqlite(sqliteName, { size: 1 }) }),
 		init: initSqlite
 	},
 	sqlite2: {
-		db: map({ db: (con) => con.sqlite(sqliteName2) }),
+		db: map({ db: (con) => con.sqlite(sqliteName2, { size: 1 }) }),
 		init: initSqlite
 	},
 	sap: {
-		db: map({ db: (con) => con.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master`) }),
+		db: map({ db: (con) => con.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master`, { size: 1 }) }),
 		init: initSap
 	},
 	mysql: {
-		db: map({ db: (con) => con.mysql('mysql://test:test@mysql/test') }),
+		db: map({ db: (con) => con.mysql('mysql://test:test@mysql/test', { size: 1 }) }),
 		init: initMysql
 	},
 	http: {
