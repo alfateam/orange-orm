@@ -1,5 +1,8 @@
 
 ## Changelog
+__3.2.9__  
+Transaction was ignored. See [#68](https://github.com/alfateam/rdb/issues/68).  
+Proxify method had incorrect type signature. See [#69](https://github.com/alfateam/rdb/issues/69).  
 __3.2.8__  
 Signature for fetchingStrategy should accept boolean as well object (code generation only). See [#67](https://github.com/alfateam/rdb/issues/67).  
 __3.2.7__  
