@@ -98,7 +98,7 @@ type MappedDbInstance<T> = {
 
 interface WithInterceptors {
 	request: AxiosInterceptorManager<InternalAxiosRequestConfig>;
-    response: AxiosInterceptorManager<AxiosResponse>;
+	response: AxiosInterceptorManager<AxiosResponse>;
 }
 
 
@@ -171,7 +171,7 @@ type ExpandedMappedTable<T, FL = ExpandedFetchingStrategy<T>> = {
 	insert(
 		row: StrategyToInsertRowData<T>[]
 	): Promise<StrategyToRowArray<FetchedProperties<T, FL>, T>>;
-	
+
 	insert<FS extends FetchingStrategy<T>>(
 		row: StrategyToInsertRowData<T>,
 		strategy: FS
@@ -185,7 +185,7 @@ type ExpandedMappedTable<T, FL = ExpandedFetchingStrategy<T>> = {
 	insertAndForget(
 		row: StrategyToRowData<T>
 	): Promise<void>;
-	
+
 	insertAndForget(
 		row: StrategyToRowData<T>[]
 	): Promise<void>;
@@ -204,24 +204,25 @@ type ExpandedMappedTable<T, FL = ExpandedFetchingStrategy<T>> = {
 	count(filter?: Filter | PrimaryRowFilter<T>[]): Promise<number>;
 	delete(filter?: Filter | PrimaryRowFilter<T>[]): Promise<void>;
 	deleteCascade(filter?: Filter | PrimaryRowFilter<T>[]): Promise<void>;
+	
+	proxify(
+		row: StrategyToInsertRowData<T>
+	): StrategyToRow<FetchedProperties<T, FL>, T>;
 
-	proxify<TRow extends StrategyToRowData<T>>(
-		row: TRow
-	): StrategyToRow<FetchedProperties<T, FL>, T>;
-	proxify<TRow extends StrategyToRowData<T>, FS extends FetchingStrategy<T>>(
-		row: TRow,
+	proxify(
+		row: StrategyToInsertRowData<T>[]
+	): StrategyToRowArray<FetchedProperties<T, FL>, T>;
+
+	proxify<FS extends FetchingStrategy<T>>(
+		row: StrategyToInsertRowData<T>,
 		strategy: FS
 	): StrategyToRow<FetchedProperties<T, FL>, T>;
-	proxify<TRow extends StrategyToRowData<T>[]>(
-		rows: TRow[]
-	): StrategyToRowArray<FetchedProperties<T, FL>, T>;
-	proxify<
-		TRow extends StrategyToRowData<T>[],
-		FS extends FetchingStrategy<T>
-	>(
-		rows: TRow[],
+
+	proxify<FS extends FetchingStrategy<T>>(
+		row: StrategyToInsertRowData<T>[],
 		strategy: FS
 	): StrategyToRowArray<FetchedProperties<T, FL>, T>;
+
 
 	patch<C extends Concurrency<T>>(
 		patch: JsonPatch,
@@ -255,7 +256,7 @@ type MappedTable<T> = {
 	insert(
 		row: StrategyToInsertRowData<T>
 	): Promise<StrategyToRow<FetchedProperties<T, {}>, T>>;
-	
+
 	insert(
 		row: StrategyToInsertRowData<T>[]
 	): Promise<StrategyToRowArray<FetchedProperties<T, {}>, T>>;
@@ -264,7 +265,7 @@ type MappedTable<T> = {
 		row: StrategyToInsertRowData<T>,
 		strategy: FS
 	): Promise<StrategyToRow<FetchedProperties<T, FS>, T>>;
-	
+
 	insert<FS extends FetchingStrategy<T>>(
 		row: StrategyToInsertRowData<T>[],
 		strategy: FS
@@ -284,25 +285,25 @@ type MappedTable<T> = {
 	getAll<FS extends FetchingStrategy<T>>(
 		fetchingStrategy?: FS
 	): Promise<StrategyToRowArray<FetchedProperties<T, FS>, T>>;
-	count(filter?: Filter | PrimaryRowFilter<T>[]): Promise<number>;	
+	count(filter?: Filter | PrimaryRowFilter<T>[]): Promise<number>;
 	delete(filter?: Filter | PrimaryRowFilter<T>[]): Promise<void>;
 	deleteCascade(filter?: Filter | PrimaryRowFilter<T>[]): Promise<void>;
 
-	proxify<TRow extends StrategyToRowData<T>>(
-		row: TRow
+	proxify(
+		row: StrategyToInsertRowData<T>
 	): StrategyToRow<FetchedProperties<T, {}>, T>;
-	proxify<TRow extends StrategyToRowData<T>, FS extends FetchingStrategy<T>>(
-		row: TRow,
+
+	proxify(
+		row: StrategyToInsertRowData<T>[]
+	): StrategyToRowArray<FetchedProperties<T, {}>, T>;
+
+	proxify<FS extends FetchingStrategy<T>>(
+		row: StrategyToInsertRowData<T>,
 		strategy: FS
 	): StrategyToRow<FetchedProperties<T, FS>, T>;
-	proxify<TRow extends StrategyToRowData<T>[]>(
-		rows: TRow[]
-	): StrategyToRowArray<FetchedProperties<T, {}>, T>;
-	proxify<
-		TRow extends StrategyToRowData<T>[],
-		FS extends FetchingStrategy<T>
-	>(
-		rows: TRow[],
+
+	proxify<FS extends FetchingStrategy<T>>(
+		row: StrategyToInsertRowData<T>[],
 		strategy: FS
 	): StrategyToRowArray<FetchedProperties<T, FS>, T>;
 
@@ -464,7 +465,7 @@ type OneOrJoinTable<T> = ((
 	exists: () => Filter;
 };
 
-type ManyTable<T> = ((	
+type ManyTable<T> = ((
 ) => Filter) & {
 	all(selector: (table: MappedColumnsAndRelations<T>) => RawFilter): Filter;
 	any(selector: (table: MappedColumnsAndRelations<T>) => RawFilter): Filter;
@@ -781,13 +782,13 @@ type MappedTableDef<T> = {
 
 type NotNullProperties<T> = Pick<
 	T,
-	{ [K in keyof T]: T[K] extends NotNull ? K :  T[K] extends ManyRelation ? K : never}[keyof T]
+	{ [K in keyof T]: T[K] extends NotNull ? K : T[K] extends ManyRelation ? K : never }[keyof T]
 >;
 
 
 type NullProperties<T> = Pick<
 	T,
-	{ [K in keyof T]: T[K] extends NotNull | ManyRelation? never : K }[keyof T]
+	{ [K in keyof T]: T[K] extends NotNull | ManyRelation ? never : K }[keyof T]
 >;
 
 type NotNullInsertProperties<T> = Pick<
