@@ -8,6 +8,7 @@ var limitAndOffset = require('./limitAndOffset');
 var formatDateColumn = require('./formatDateColumn');
 var encodeJSON = require('./encodeJSON');
 var insertSql = require('./insertSql');
+var getManyDto = require('./getManyDto');
 
 
 function newResolveTransaction(domain, pool) {
@@ -29,6 +30,7 @@ function newResolveTransaction(domain, pool) {
 				client.executeQuery = wrapQuery(client);
 				client.streamQuery = wrapQueryStream(client);
 				rdb.engine = 'pg';
+				rdb.getManyDto = getManyDto;
 				rdb.dbClient = client;
 				rdb.dbClientDone = done;
 				rdb.encodeBoolean = encodeBoolean;

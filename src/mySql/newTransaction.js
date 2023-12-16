@@ -5,6 +5,7 @@ const selectForUpdateSql = require('./selectForUpdateSql');
 const lastInsertedSql = require('./lastInsertedSql');
 const limitAndOffset = require('./limitAndOffset');
 const insertSql = require('./insertSql');
+let getManyDto = require('../pg/getManyDto');
 
 function newResolveTransaction(domain, pool) {
 	var rdb = {poolFactory: pool};
@@ -23,6 +24,7 @@ function newResolveTransaction(domain, pool) {
 					return;
 				}
 				connection.executeQuery = wrapQuery(connection);
+				rdb.getManyDto = getManyDto;
 				// connection.streamQuery = wrapQueryStream(connection);
 				rdb.engine = 'mysql';
 				rdb.dbClient = connection;
