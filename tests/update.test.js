@@ -120,7 +120,6 @@ describe('update date in array', () => {
 
 		rows[0].orderDate = date;
 		await rows.saveChanges();
-		await rows.refresh();
 		expect(rows[0].orderDate).toEqual(dateToISOString(date).substring(0, rows[0].orderDate.length));
 	}
 });
@@ -153,8 +152,6 @@ describe('update multiple in array', () => {
 		rows[1].lines.push({ product: 'Cloak of invisibility' });
 
 		await rows.saveChanges();
-		await rows.refresh();
-
 		for (let i = 0; i < rows.length; i++) {
 			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate));
 		}
@@ -246,7 +243,6 @@ describe('update boolean', () => {
 		let row = await db.customer.getOne();
 		row.isActive = false;
 		await row.saveChanges();
-		await row.refresh();
 		expect(row.isActive).toEqual(false);
 	}
 });
@@ -269,7 +265,6 @@ describe('update date', () => {
 		const date = new Date(2021, 0, 11, 9, 11, 47);
 		row.orderDate = date;
 		await row.saveChanges();
-		await row.refresh();
 		expect(row.orderDate).toEqual(dateToISOString(date).substring(0, row.orderDate.length));
 	}
 });

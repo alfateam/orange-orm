@@ -1,5 +1,6 @@
 var newEncode = require('./json/newEncode');
 var newDecode = require('./json/newDecode');
+var format = require('./json/format');
 var purify = require('./json/purify');
 var onChange = require('@lroal/on-change');
 let clone = require('rfdc/default');
@@ -9,6 +10,7 @@ function _new(column) {
 	column.purify = purify;
 	column.encode = newEncode(column);
 	column.decode = newDecode(column);
+	column.format = format.bind(null, column);
 	column.onChange = onChange;
 	column.toDto = toDto;
 }

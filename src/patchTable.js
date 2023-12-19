@@ -40,11 +40,7 @@ async function patchTableCore(table, patches, { strategy = undefined, deduceStra
 
 	async function toDtos(set) {
 		set = [...set];
-		let result = [];
-		for (let i = 0; i < set.length; i++) {
-			result.push(await set[i].toDto(strategy));
-		}
-		return result;
+		return table.getManyDto(set, strategy);
 	}
 
 	function toKey(property) {

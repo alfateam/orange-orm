@@ -1,5 +1,4 @@
 import { describe, test, beforeAll, afterAll, expect } from 'vitest';
-import rdb from '../src/index';
 import { fileURLToPath } from 'url';
 const express = require('express');
 import { json } from 'body-parser';
@@ -419,22 +418,22 @@ describe('getMany with column strategy', () => {
 		expect(rows).toEqual(expected);
 	}
 });
-describe.only('getMany with relations', () => {
+describe('getMany with relations', () => {
 
 	test('pg', async () => await verify('pg'));
-	// test('mssql', async () => await verify('mssql'));
-	// if (major === 18)
-	// 	test('mssqlNative', async () => await verify('mssqlNative'));
-	// test('mysql', async () => await verify('mysql'));
-	// test('sqlite', async () => await verify('sqlite'));
-	// test('sap', async () => await verify('sap'));
-	// test('http', async () => await verify('http'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
-		rdb.on('query', console.dir);
 
-		const rows = await db.order.getAll({ lines: {}, customer: { order: { lines: { order: {} } } }, deliveryAddress: {} });
+		const rows = await db.order.getAll({ lines: {}, customer: { } , deliveryAddress: {} });
+
 		//mssql workaround because datetime has no time offset
 		for (let i = 0; i < rows.length; i++) {
 			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate));
