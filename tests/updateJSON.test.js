@@ -127,8 +127,6 @@ describe('update with JSON diff', () => {
 
 
 		let changedRow = await db.order.updateChanges(row, oldRow, {deliveryAddress: true, lines: {orderBy: 'id'}});
-		await changedRow.refresh({deliveryAddress: true, lines: {orderBy: 'id'}});
-		await changedRow.refresh();
 		const expected = {
 			id: 1,
 			orderDate: dateToISOString(date1).substring(0, changedRow.orderDate.length),
