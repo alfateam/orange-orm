@@ -1,5 +1,5 @@
 # FROM node:18-alpine
-FROM mcr.microsoft.com/vscode/devcontainers/javascript-node:0-16-bullseye
+FROM mcr.microsoft.com/vscode/devcontainers/javascript-node:0-20-bullseye
 
 
 # [Optional] Uncomment this section to install additional OS packages.

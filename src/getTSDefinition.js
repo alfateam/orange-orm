@@ -51,6 +51,14 @@ export interface ${Name}Table {
 	getOne(${name}: ${Name}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
 	getById(${getIdArgs(table)}): Promise<${Name}Row>;
 	getById(${getIdArgs(table)}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
+	update(${name}s: ${Name}[]): Promise<${Name}Array>;
+	updateChanges(${name}s: ${Name}[], old${name}s: ${Name}[]): Promise<${Name}Array>;
+	update(${name}s: ${Name}[], fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
+	updateChanges(${name}s: ${Name}[],old${name}s: ${Name}[], fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
+	update(${name}: ${Name}): Promise<${Name}Row>;
+	updateChanges(${name}: ${Name}, old${name}: ${Name}): Promise<${Name}Row>;
+	update(${name}: ${Name}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
+	updateChanges(${name}: ${Name},${name}: ${Name}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
 	insert(${name}s: ${Name}[]): Promise<${Name}Array>;
 	insert(${name}s: ${Name}[], fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
 	insert(${name}: ${Name}): Promise<${Name}Row>;
