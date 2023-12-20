@@ -8,7 +8,7 @@ var mysql = require('mysql2');
 
 function newGenericPool(connectionString, poolOptions) {
 	if (typeof connectionString === 'string')
-		connectionString = connectionString + '?dateStrings=true';
+		connectionString = connectionString + '?dateStrings=true&decimalNumbers=true';
 	else
 		connectionString.dateStrings = true;
 	poolOptions = poolOptions || {};

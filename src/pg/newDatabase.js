@@ -15,18 +15,22 @@ let hostLocal = require('../hostLocal');
 let doQuery = require('../query');
 let releaseDbClient = require('../table/releaseDbClient');
 let setSessionSingleton = require('../table/setSessionSingleton');
+let types = require('pg').types;
 
+types.setTypeParser(1700, function(val) {
+	return parseFloat(val);
+});
 
 function newDatabase(connectionString, poolOptions) {
 	if (!connectionString)
 		throw new Error('Connection string cannot be empty');
 	var pool;
 	if (!poolOptions)
-		pool = newPool.bind(null,connectionString, poolOptions);
+		pool = newPool.bind(null, connectionString, poolOptions);
 	else
 		pool = newPool(connectionString, poolOptions);
 
-	let c = {poolFactory: pool, hostLocal, express};
+	let c = { poolFactory: pool, hostLocal, express };
 
 	c.transaction = function(options, fn) {
 		if ((arguments.length === 1) && (typeof options === 'function')) {

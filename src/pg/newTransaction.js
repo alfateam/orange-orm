@@ -9,7 +9,6 @@ var formatDateColumn = require('./formatDateColumn');
 var encodeJSON = require('./encodeJSON');
 var insertSql = require('./insertSql');
 
-
 function newResolveTransaction(domain, pool) {
 	var rdb = {poolFactory: pool};
 	if (!pool.connect) {

@@ -35,7 +35,7 @@ services:
       - SA_PASSWORD=P@assword123
     ports:
       - 14330:1433
-    restart: always
+    #restart: always
   mysql:
     image: mysql:8.0.31
     environment:

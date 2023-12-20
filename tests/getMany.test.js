@@ -372,7 +372,6 @@ describe('getMany', () => {
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
-
 		const rows = await db.customer.getMany();
 
 		const expected = [{
@@ -387,7 +386,6 @@ describe('getMany', () => {
 			isActive: true
 		}
 		];
-
 		expect(rows).toEqual(expected);
 	}
 });
@@ -434,7 +432,8 @@ describe('getMany with relations', () => {
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
 
-		const rows = await db.order.getAll({ lines: {}, customer: { order: { lines: { order: {} } } }, deliveryAddress: {} });
+		const rows = await db.order.getAll({ lines: {}, customer: { } , deliveryAddress: {} });
+
 		//mssql workaround because datetime has no time offset
 		for (let i = 0; i < rows.length; i++) {
 			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate));

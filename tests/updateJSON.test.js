@@ -100,9 +100,7 @@ beforeAll(async () => {
 }, 20000);
 
 
-
-describe('update date in array', () => {
-
+describe('update with JSON diff', () => {
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
@@ -115,97 +113,69 @@ describe('update date in array', () => {
 	async function verify(dbName) {
 
 		const { db } = getDb(dbName);
-		let rows = await db.order.getMany();
+		const originalRow = await db.order.getById(1, {deliveryAddress: true, lines: true});
+		const json = JSON.stringify(originalRow);
+		const row = JSON.parse(json);
+		const oldRow = JSON.parse(json);
+
+		originalRow.deliveryAddress.postalCode = '7058';
+		originalRow.lines.push({product: 'meantime'});
+		await originalRow.saveChanges();
+
+		row.lines.push({product: 'new product'});
+		row.deliveryAddress.name = 'new name';
+
+
+		let changedRow = await db.order.updateChanges(row, oldRow, {deliveryAddress: true, lines: {orderBy: 'id'}});
+		const expected = {
+			id: 1,
+			orderDate: dateToISOString(date1).substring(0, changedRow.orderDate.length),
+			customerId: 1,
+			deliveryAddress: {
+				id: 1,
+				orderId: 1,
+				name: 'new name',
+				street: 'Node street 1',
+				postalCode: '7058',
+				postalPlace: 'Jakobsli',
+				countryCode: 'NO'
+			},
+			lines: [
+				{ id: 1, orderId: 1, product: 'Bicycle' },
+				{ id: 2, orderId: 1, product: 'Small guitar' },
+				{ id: 4, orderId: 1, product: 'meantime' },
+				{ id: 5, orderId: 1, product: 'new product' },
+			]
+		};
+
+		expect(changedRow).toEqual(expected);
+	}
+});
+
+describe('update date in array with JSON', () => {
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sap', async () => await verify('sap'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+
+		const { db } = getDb(dbName);
+		const json = JSON.stringify(await db.order.getMany());
+		let rows = JSON.parse(json);
 		const date = new Date(2021, 0, 11, 9, 11, 47);
 
 		rows[0].orderDate = date;
-		await rows.saveChanges();
-		expect(rows[0].orderDate).toEqual(dateToISOString(date).substring(0, rows[0].orderDate.length));
+		const changedRows = await db.order.update(rows);
+		expect(changedRows[0].orderDate).toEqual(dateToISOString(date).substring(0, changedRows[0].orderDate.length));
 	}
 });
 
-describe('update multiple in array', () => {
-
-	test('pg', async () => await verify('pg'));
-	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
-		test('mssqlNative', async () => await verify('mssqlNative'));
-	test('mysql', async () => await verify('mysql'));
-	test('sap', async () => await verify('sap'));
-	test('sqlite', async () => await verify('sqlite'));
-	test('http', async () => await verify('http'));
-
-	async function verify(dbName) {
-
-
-		const { db } = getDb(dbName);
-		let rows = await db.order.getAll({ lines: true, deliveryAddress: true, customer: true, orderBy: 'id' });
-		const date1 = new Date(2021, 0, 11, 9, 11, 47);
-		const date2 = new Date(2022, 0, 12, 8, 22, 46);
-
-		rows[0].orderDate = date1;
-		rows[0].deliveryAddress.street = 'Node street 2';
-		rows[0].lines[1].product = 'Big guitar';
-
-		rows[1].orderDate = date2;
-		rows[1].deliveryAddress = null;
-		rows[1].lines.push({ product: 'Cloak of invisibility' });
-
-		await rows.saveChanges();
-		for (let i = 0; i < rows.length; i++) {
-			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate));
-		}
-
-		const expected = [
-			{
-				id: 1,
-				orderDate: dateToISOString(date1),
-				customerId: 1,
-				customer: {
-					id: 1,
-					name: 'George',
-					balance: 177,
-					isActive: true
-				},
-				deliveryAddress: {
-					id: 1,
-					orderId: 1,
-					name: 'George',
-					street: 'Node street 2',
-					postalCode: '7059',
-					postalPlace: 'Jakobsli',
-					countryCode: 'NO'
-				},
-				lines: [
-					{ product: 'Bicycle', id: 1, orderId: 1 },
-					{ product: 'Big guitar', id: 2, orderId: 1 }
-				]
-			},
-			{
-				id: 2,
-				customerId: 2,
-				customer: {
-					id: 2,
-					name: 'Harry',
-					balance: 200,
-					isActive: true
-				},
-				orderDate: dateToISOString(date2),
-				deliveryAddress: null,
-				lines: [
-					{ product: 'Magic wand', id: 3, orderId: 2 },
-					{ product: 'Cloak of invisibility', id: 4, orderId: 2 }
-				]
-			}
-		];
-
-
-		expect(rows).toEqual(expected);
-	}
-});
-
-describe('delete row', () => {
-
+describe('update date with JSON', () => {
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
@@ -219,53 +189,12 @@ describe('delete row', () => {
 
 		const { db } = getDb(dbName);
 
-		let row = await db.order.getOne();
-		await row.delete();
-		row = await db.order.getById(row.id);
-		expect(row).toEqual(undefined);
-	}
-});
-
-describe('update boolean', () => {
-
-	test('pg', async () => await verify('pg'));
-	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
-		test('mssqlNative', async () => await verify('mssqlNative'));
-	test('mysql', async () => await verify('mysql'));
-	test('sap', async () => await verify('sap'));
-	test('sqlite', async () => await verify('sqlite'));
-	test('http', async () => await verify('http'));
-
-	async function verify(dbName) {
-
-		const { db } = getDb(dbName);
-		let row = await db.customer.getOne();
-		row.isActive = false;
-		await row.saveChanges();
-		expect(row.isActive).toEqual(false);
-	}
-});
-
-describe('update date', () => {
-
-	test('pg', async () => await verify('pg'));
-	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
-		test('mssqlNative', async () => await verify('mssqlNative'));
-	test('mysql', async () => await verify('mysql'));
-	test('sap', async () => await verify('sap'));
-	test('sqlite', async () => await verify('sqlite'));
-	test('http', async () => await verify('http'));
-
-	async function verify(dbName) {
-
-		const { db } = getDb(dbName);
-		let row = await db.order.getOne();
+		let json = JSON.stringify(await db.order.getOne());
+		let row = JSON.parse(json);
 		const date = new Date(2021, 0, 11, 9, 11, 47);
 		row.orderDate = date;
-		await row.saveChanges();
-		expect(row.orderDate).toEqual(dateToISOString(date).substring(0, row.orderDate.length));
+		const changedRow = await db.order.update(row);
+		expect(changedRow.orderDate).toEqual(dateToISOString(date).substring(0, changedRow.orderDate.length));
 	}
 });
 

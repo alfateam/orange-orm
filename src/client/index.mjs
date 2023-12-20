@@ -5481,6 +5481,8 @@ function rdbClient(options = {}) {
 			getOne,
 			getById,
 			proxify,
+			update,
+			updateChanges,
 			insert,
 			insertAndForget,
 			delete: _delete,
@@ -5584,6 +5586,41 @@ function rdbClient(options = {}) {
 			});
 			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
 			return adapter.post(body);
+		}
+
+		async function update(rows, ...rest) {
+			const concurrency = undefined;
+			const args = [concurrency].concat(rest);
+			if (Array.isArray(rows)) {
+				const proxy = await getMany.apply(null, [rows, ...rest]);
+				proxy.splice.apply(proxy, [0, proxy.length, ...rows]);
+				await proxy.saveChanges.apply(proxy, args);
+				return proxy;
+			}
+			else {
+				const proxy = await getMany.apply(null, [[rows], ...rest]);
+				proxy.splice.apply(proxy, [0, 1, rows]);
+				await proxy.saveChanges.apply(proxy, args);
+				return proxify(proxy[0], args[0]);
+			}
+		}
+
+		async function updateChanges(rows, oldRows, ...rest) {
+			const concurrency = undefined;
+			const args = [concurrency].concat(rest);
+			if (Array.isArray(rows)) {
+				//todo
+				const proxy = await getMany.apply(null, [rows, ...rest]);
+				proxy.splice.apply(proxy, [0, proxy.length, ...rows]);
+				await proxy.saveChanges.apply(proxy, args);
+				return proxy;
+			}
+			else {
+				let proxy = proxify([oldRows], args[0]);
+				proxy.splice.apply(proxy, [0, 1, rows]);
+				await proxy.saveChanges.apply(proxy, args);
+				return proxify(proxy[0], args[0]);
+			}
 		}
 
 		async function insert(rows, ...rest) {

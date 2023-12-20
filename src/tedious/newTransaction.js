@@ -6,8 +6,9 @@ var outputInsertedSql = require('./outputInsertedSql');
 const limitAndOffset = require('./limitAndOffset');
 const getManyDto = require('./getManyDto');
 const formatDateColumn = require('./formatDateColumn');
+const formatJSONColumn = require('./formatJSONColumn');
 const insertSql = require('./insertSql');
-// const getManyDto = require('../table/getManyDtoFast');
+
 
 function newResolveTransaction(domain, pool) {
 	var rdb = {poolFactory: pool};
@@ -39,6 +40,7 @@ function newResolveTransaction(domain, pool) {
 				rdb.lastInsertedIsSeparate = false;
 				rdb.insertSql = insertSql;
 				rdb.formatDateColumn = formatDateColumn;
+				rdb.formatJSONColumn = formatJSONColumn;
 				rdb.multipleStatements = true;
 				rdb.begin = 'BEGIN TRANSACTION';
 				rdb.limit = (span) => {
