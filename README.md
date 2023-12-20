@@ -641,7 +641,77 @@ async function update() {
   console.dir(orders, {depth: Infinity});
 }
 ```
+__Updating from JSON__  
+The update method is suitable when a complete overwrite is required from a JSON object - typically in a REST API. However, it's important to consider that this method replaces the entire row and it's children, which might not always be desirable in a multi-user environment.
 
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+update();
+
+async function update() {
+
+  const modified = {
+    orderDate: '2023-07-14T12:00:00',
+    customer: {
+      id: 2
+    },
+    deliveryAddress: {
+      name: 'Roger',
+      street: 'Node street 1',
+      postalCode: '7059',
+      postalPlace: 'Jakobsli',
+      countryCode: 'NO'
+    },
+    lines: [
+      { id: 1, product: 'Bicycle' },
+      { id: 2, product: 'Small guitar' },
+      { product: 'Piano' } //the new line to be inserted
+    ]
+  };
+
+  const order = await db.order.update(modified, {customer: true, deliveryAddress: true, lines: true});
+}
+```
+__Partially updating from JSON__  
+ The updateChanges method applies a partial update based on difference between original and modified row. It is often preferable because it minimizes the risk of unintentionally overwriting data that may have been altered by other users in the meantime. To do so, you need to pass in the original row object before modification as well.
+
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+update();
+
+async function update() {
+
+  const original = {
+    id: 1,
+    orderDate: '2023-07-14T12:00:00',
+    customer: {
+      id: 2
+    },
+    deliveryAddress: {
+      id: 1,
+      name: 'George',
+      street: 'Node street 1',
+      postalCode: '7059',
+      postalPlace: 'Jakobsli',
+      countryCode: 'NO'
+    },
+    lines: [
+      { id: 1, product: 'Bicycle' },
+      { id: 2, product: 'Small guitar' }
+    ]
+  };
+
+  const modified = JSON.parse(JSON.stringify(original));
+  deliveryAddress.name = 'Roger';
+  modified.lines.push({ product: 'Piano' });
+
+  const order = await db.order.updateChanges(modified, original, { customer: true, deliveryAddress: true, lines: true });
+}
+```
 __Conflict resolution__  
 Rows get updated using an <i>optimistic</i> concurrency approach by default. This means if a property being edited was meanwhile altered, an exception is raised, indicating the row was modified by a different user. You can change the concurrency strategy either at the table or column level.
 
@@ -1044,9 +1114,9 @@ let petSchema = {
     }
 };
 
-function validateName(value) {
-	if (value && value.length > 10)
-		throw new Error('Length cannot exceed 10 characters');
+function validateName(value?: string) {
+  if (value && value.length > 10)
+    throw new Error('Length cannot exceed 10 characters');
 }
 
 const map = rdb.map(x => ({
@@ -1079,9 +1149,9 @@ let petSchema = {
     }
 };
 
-function validateName(name?: string) {
-	if (value && value.length > 10)
-		throw new Error('Length cannot exceed 10 characters');
+function validateName(value) {
+  if (value && value.length > 10)
+    throw new Error('Length cannot exceed 10 characters');
 }
 
 const map = rdb.map(x => ({
