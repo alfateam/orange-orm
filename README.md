@@ -658,7 +658,7 @@ async function update() {
       id: 2
     },
     deliveryAddress: {
-      name: 'Roger',
+      name: 'Roger', //modified name
       street: 'Node street 1',
       postalCode: '7059',
       postalPlace: 'Jakobsli',
