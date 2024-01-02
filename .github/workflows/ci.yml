@@ -60,7 +60,7 @@ jobs:
       oracle:
         image: gvenzl/oracle-xe
         env:
-          - ORACLE_PASSWORD=P@assword123   
+          ORACLE_PASSWORD: P@assword123   
         ports:
           - 1521:1521
     steps:
