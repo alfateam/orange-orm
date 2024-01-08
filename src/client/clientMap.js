@@ -37,6 +37,7 @@ function map(index, _fn) {
 	dbMap.mssqlNative = throwDb;
 	dbMap.mysql = throwDb;
 	dbMap.sap = throwDb;
+	dbMap.oracle = throwDb;
 	dbMap.sqlite = throwDb;
 
 	function throwDb() {
@@ -62,6 +63,7 @@ function map(index, _fn) {
 	onFinal.mssqlNative = () => index({ db: throwDb, providers: dbMap });
 	onFinal.mysql = () => index({ db: throwDb, providers: dbMap });
 	onFinal.sap = () => index({ db: throwDb, providers: dbMap });
+	onFinal.oracle = () => index({ db: throwDb, providers: dbMap });
 	onFinal.sqlite = () => index({ db: throwDb, providers: dbMap });
 
 	return new Proxy(onFinal, handler);

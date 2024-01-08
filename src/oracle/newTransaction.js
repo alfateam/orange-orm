@@ -1,12 +1,9 @@
-var wrapQuery = require('./wrapQuery');
-var encodeBoolean = require('./encodeBoolean');
-var deleteFromSql = require('./deleteFromSql');
-var selectForUpdateSql = require('./selectForUpdateSql');
-var outputInsertedSql = require('./outputInsertedSql');
+const wrapQuery = require('./wrapQuery');
+const encodeBoolean = require('./encodeBoolean');
+const deleteFromSql = require('./deleteFromSql');
+const selectForUpdateSql = require('./selectForUpdateSql');
+const lastInsertedSql = require('./lastInsertedSql');
 const limitAndOffset = require('./limitAndOffset');
-const getManyDto = require('./getManyDto');
-const formatDateColumn = require('./formatDateColumn');
-const formatJSONColumn = require('./formatJSONColumn');
 const insertSql = require('./insertSql');
 const insert = require('./insert');
 
@@ -27,8 +24,8 @@ function newResolveTransaction(domain, pool) {
 					return;
 				}
 				client.executeQuery = wrapQuery(client);
-				rdb.engine = 'mssql';
-				rdb.getManyDto = getManyDto;
+				rdb.begin = 'SET TRANSACTION ISOLATION LEVEL READ COMMITTED';
+				rdb.engine = 'oracle';
 				rdb.dbClient = client;
 				rdb.dbClientDone = done;
 				rdb.encodeBoolean = encodeBoolean;
@@ -36,22 +33,11 @@ function newResolveTransaction(domain, pool) {
 				rdb.encodeJSON = JSON.stringify;
 				rdb.deleteFromSql = deleteFromSql;
 				rdb.selectForUpdateSql = selectForUpdateSql;
-				rdb.outputInsertedSql = outputInsertedSql;
-				rdb.lastInsertedIsSeparate = false;
-				rdb.insert = insert;
+				rdb.lastInsertedSql = lastInsertedSql;
 				rdb.insertSql = insertSql;
-				rdb.formatDateColumn = formatDateColumn;
-				rdb.formatJSONColumn = formatJSONColumn;
-				rdb.multipleStatements = true;
-				rdb.begin = 'BEGIN TRANSACTION';
-				rdb.limit = (span) => {
-					if (span.offset)
-						return '';
-					else if (span.limit || span.limit === 0)
-						return 'TOP ' + span.limit;
-					else
-						return '';
-				};
+				rdb.insert = insert;
+				rdb.lastInsertedIsSeparate = true;
+				rdb.multipleStatements = false;
 				rdb.limitAndOffset = limitAndOffset;
 				rdb.accept = function(caller) {
 					caller.visitSqlite();
@@ -64,7 +50,8 @@ function newResolveTransaction(domain, pool) {
 		}
 	};
 }
-function decodeJSON(value){
+
+function decodeJSON(value) {
 	return JSON.parse(value);
 }
 

@@ -1,5 +1,8 @@
 const oracledb = require('oracledb');
 
+console.dir('sysdba');
+console.dir(oracledb.SYSDBA);
+
 async function run() {
 	let connection;
 
@@ -12,9 +15,18 @@ async function run() {
 		});
 
 		// Replace with your query
+		const out = ['foo'];
 		const result = await connection.execute(
-			'SELECT \'Hello, World!\' FROM DUAL'
+			`
+			declare
+  l_id     t.id%type;
+begin
+  INSERT INTO customer (name,balance) VALUES (:p1,177) RETURNING id INTO l_id;
+  SELECT l_id as id;
+end;`,
+			out
 		);
+		console.dir(out);
 		console.log(result.rows);
 
 	} catch (err) {

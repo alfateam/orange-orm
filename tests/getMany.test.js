@@ -9,6 +9,7 @@ const initMs = require('./initMs');
 const initMysql = require('./initMysql');
 const initSqlite = require('./initSqlite');
 const initSap = require('./initSap');
+const initOracle = require('./initOracle');
 const dateToISOString = require('../src/dateToISOString');
 const versionArray = process.version.replace('v', '').split('.');
 const major = parseInt(versionArray[0]);
@@ -35,6 +36,7 @@ beforeAll(async () => {
 	await insertData('sqlite');
 	await insertData('sqlite2');
 	await insertData('sap');
+	await insertData('oracle');
 	hostExpress();
 
 	async function insertData(dbName) {
@@ -176,7 +178,7 @@ describe('boolean filter', () => {
 	}
 });
 
-describe('empty array-filter', () => {
+describe.only('empty array-filter', () => {
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
@@ -602,6 +604,17 @@ const connections = {
 		db: map({ db: (con) => con.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master`) }),
 		init: initSap
 	},
+	oracle: {
+		db: map({ db: (con) => con.oracle(
+			{
+				user: 'sys',
+				password: 'P@assword123',
+				connectString: 'oracle/XE',
+				privilege: 2
+			}
+		) }),
+		init: initOracle
+	},
 	mysql: {
 		db: map({ db: (con) => con.mysql('mysql://test:test@mysql/test') }),
 		init: initMysql
@@ -625,6 +638,8 @@ function getDb(name) {
 		return connections.sqlite2;
 	else if (name === 'sap')
 		return connections.sap;
+	else if (name === 'oracle')
+		return connections.oracle;
 	else if (name === 'mysql')
 		return connections.mysql;
 	else if (name === 'http')

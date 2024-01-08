@@ -20,6 +20,10 @@ function newInsertCommandCore(table, row, options = {}) {
 		}
 	}
 
+	//todo
+	//add outParams
+	//result.resultFromOutParams = true;
+	//result.outParamsLength = 2;
 	var sql = util.format.apply(null, values);
 	return newParameterized(sql, parameters);
 }

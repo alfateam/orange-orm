@@ -20,6 +20,10 @@ function newQuery() {
 		throw new Error('Sap not supported');
 	};
 
+	c.visitOracle = function() {
+		throw new Error('Oracle not supported');
+	};
+
 	getSessionContext().accept(c);
 
 	return _newQuery.apply(null, arguments);

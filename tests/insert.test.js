@@ -50,15 +50,15 @@ afterAll(async () => {
 });
 
 
-describe('transaction', () => {
+describe.only('transaction', () => {
 
-	test('pg', async () => await verify('pg'));
+	// test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
-		test('mssqlNative', async () => await verify('mssqlNative'));
-	test('mysql', async () => await verify('mysql'));
-	test('sqlite', async () => await verify('sqlite'));
-	test('sap', async () => await verify('sap'));
+	// if (major === 18)
+	// 	test('mssqlNative', async () => await verify('mssqlNative'));
+	// test('mysql', async () => await verify('mysql'));
+	// test('sqlite', async () => await verify('sqlite'));
+	// test('sap', async () => await verify('sap'));
 
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);

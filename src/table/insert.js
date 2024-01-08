@@ -1,11 +1,25 @@
 let getSessionContext = require('./getSessionContext');
 let executeQueries = require('./executeQueries');
 let newRow = require('./commands/newRow');
-let newInsertCommand = require('./commands/newInsertCommand');
-let newGetLastInsertedCommand = require('./commands/newGetLastInsertedCommand');
-let pushCommand = require('./commands/pushCommand');
+// let newInsertCommand = require('./commands/newInsertCommand');
+// let newGetLastInsertedCommand = require('./commands/newGetLastInsertedCommand');
+// let pushCommand = require('./commands/pushCommand');
+// let cmd = newInsertCommand(table, row, options);
+// pushCommand(cmd);
+// let selectCmd;
+// if (getSessionContext().lastInsertedIsSeparate) {
+// 	selectCmd = newGetLastInsertedCommand(table, row, cmd);
+// 	pushCommand(selectCmd);
+// 	selectCmd.onResult = onResult;
+// }
+// else {
+// 	cmd.onResult = onResult;
+// 	cmd.disallowCompress = true;
+// }
 
-function insert({table, options}, arg) {
+
+
+function insert({ table, options }, arg) {
 	if (Array.isArray(arg)) {
 		let all = [];
 		for (let i = 0; i < arg.length; i++) {
@@ -18,9 +32,6 @@ function insert({table, options}, arg) {
 	let hasPrimary = getHasPrimary(table, row);
 	if (hasPrimary)
 		row = table._cache.tryAdd(row);
-	let cmd = newInsertCommand(table, row, options);
-
-	pushCommand(cmd);
 	expand(table, row);
 	Object.defineProperty(row, 'then', {
 		value: then,
@@ -29,19 +40,10 @@ function insert({table, options}, arg) {
 		configurable: true
 	});
 
-	let selectCmd;
-	if (getSessionContext().lastInsertedIsSeparate) {
-		selectCmd = newGetLastInsertedCommand(table, row, cmd);
-		pushCommand(selectCmd);
-		selectCmd.onResult = onResult;
-	}
-	else {
-		cmd.onResult = onResult;
-		cmd.disallowCompress = true;
-	}
+	getSessionContext().insert({table, row, options}, onResult);
 
 	return row;
-	function then(fn,efn) {
+	function then(fn, efn) {
 		delete row.then;
 		return executeQueries([]).then(() => fn(row), efn);
 	}
