@@ -1,5 +1,7 @@
 
 ## Changelog
+__3.3.0__  
+Possible to apply updates from JSON object. See [#70](https://github.com/alfateam/rdb/issues/70).  
 __3.2.9__  
 Transaction was ignored. See [#68](https://github.com/alfateam/rdb/issues/68).  
 Proxify method had incorrect type signature. See [#69](https://github.com/alfateam/rdb/issues/69).  

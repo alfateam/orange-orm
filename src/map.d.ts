@@ -170,7 +170,7 @@ type ExpandedMappedTable<T, FL = ExpandedFetchingStrategy<T>> = {
 	): Promise<StrategyToRow<FetchedProperties<T, FL>, T>>;
 	updateChanges(
 		row: StrategyToInsertRowData<T>,
-		oldRow: StrategyToInsertRowData<T>
+		originalRow: StrategyToInsertRowData<T>
 	): Promise<StrategyToRow<FetchedProperties<T, FL>, T>>;
 
 	update(
@@ -178,7 +178,7 @@ type ExpandedMappedTable<T, FL = ExpandedFetchingStrategy<T>> = {
 	): Promise<StrategyToRowArray<FetchedProperties<T, FL>, T>>;
 	updateChanges(
 		rows: StrategyToInsertRowData<T>[],
-		oldRows: StrategyToInsertRowData<T>[]
+		originalRows: StrategyToInsertRowData<T>[]
 	): Promise<StrategyToRowArray<FetchedProperties<T, FL>, T>>;
 	
 	update<FS extends FetchingStrategy<T>>(
@@ -187,7 +187,7 @@ type ExpandedMappedTable<T, FL = ExpandedFetchingStrategy<T>> = {
 	): Promise<StrategyToRow<FetchedProperties<T, FL>, T>>;
 	updateChanges<FS extends FetchingStrategy<T>>(
 		row: StrategyToInsertRowData<T>,
-		oldRow: StrategyToInsertRowData<T>,
+		originalRow: StrategyToInsertRowData<T>,
 		strategy: FS
 	): Promise<StrategyToRow<FetchedProperties<T, FL>, T>>;
 
@@ -197,7 +197,7 @@ type ExpandedMappedTable<T, FL = ExpandedFetchingStrategy<T>> = {
 	): Promise<StrategyToRowArray<FetchedProperties<T, FL>, T>>;
 	updateChanges<FS extends FetchingStrategy<T>>(
 		rows: StrategyToInsertRowData<T>[],
-		oldRows: StrategyToInsertRowData<T>[],
+		originalRows: StrategyToInsertRowData<T>[],
 		strategy: FS
 	): Promise<StrategyToRowArray<FetchedProperties<T, FL>, T>>;
 
@@ -294,16 +294,16 @@ type MappedTable<T> = {
 		row: StrategyToInsertRowData<T>
 	): Promise<StrategyToRow<FetchedProperties<T, {}>, T>>;
 	updateChanges(
-		row: StrategyToInsertRowData<T>,
-		oldRow: StrategyToInsertRowData<T>
+		modifiedRow: StrategyToInsertRowData<T>,
+		originalRow: StrategyToInsertRowData<T>
 	): Promise<StrategyToRow<FetchedProperties<T, {}>, T>>;
 
 	update(
 		rows: StrategyToInsertRowData<T>[]
 	): Promise<StrategyToRowArray<FetchedProperties<T, {}>, T>>;
 	updateChanges(
-		rows: StrategyToInsertRowData<T>[],
-		oldRows: StrategyToInsertRowData<T>[]
+		modifiedRows: StrategyToInsertRowData<T>[],
+		originalRows: StrategyToInsertRowData<T>[]
 	): Promise<StrategyToRowArray<FetchedProperties<T, {}>, T>>;
 	
 	update<FS extends FetchingStrategy<T>>(
@@ -311,8 +311,8 @@ type MappedTable<T> = {
 		strategy: FS
 	): Promise<StrategyToRow<FetchedProperties<T, FS>, T>>;
 	updateChanges<FS extends FetchingStrategy<T>>(
-		row: StrategyToInsertRowData<T>,
-		oldRow: StrategyToInsertRowData<T>,
+		modifiedRow: StrategyToInsertRowData<T>,
+		originalRow: StrategyToInsertRowData<T>,
 		strategy: FS
 	): Promise<StrategyToRow<FetchedProperties<T, FS>, T>>;
 
@@ -321,8 +321,8 @@ type MappedTable<T> = {
 		strategy: FS
 	): Promise<StrategyToRowArray<FetchedProperties<T, FS>, T>>;
 	updateChanges<FS extends FetchingStrategy<T>>(
-		rows: StrategyToInsertRowData<T>[],
-		oldRows: StrategyToInsertRowData<T>[],
+		modifiedRows: StrategyToInsertRowData<T>[],
+		originalRows: StrategyToInsertRowData<T>[],
 		strategy: FS
 	): Promise<StrategyToRowArray<FetchedProperties<T, FS>, T>>;
 
