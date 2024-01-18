@@ -20,12 +20,9 @@ function resolveExecuteQuery(query) {
 		}
 
 		function onCompleted(err, rows) {
-			if (!err) {
-				var lastIndex = rows.length - 1;
-				if (!Array.isArray(rows[0]) && Array.isArray(rows[lastIndex]))
-					rows = rows[lastIndex];
+			if (!err)
 				success(rows);
-			} else
+			else
 				failed(err);
 		}
 	}
