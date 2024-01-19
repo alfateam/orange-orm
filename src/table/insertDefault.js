@@ -1,9 +1,12 @@
 let getSessionContext = require('./getSessionContext');
+let executeQueries = require('./executeQueries');
 let newRow = require('./commands/newRow');
-let insertDefault = require('./insertDefault');
+let newInsertCommand = require('./commands/newInsertCommand');
+let newInsertCommandCore = require('./commands/newInsertCommandCore');
+let newGetLastInsertedCommand = require('./commands/newGetLastInsertedCommand');
+let pushCommand = require('./commands/pushCommand');
 
-function insert({ table, options }, arg) {
-	// return insertDefault.apply(null, arguments);
+function insert({table, options}, arg) {
 	if (Array.isArray(arg)) {
 		let all = [];
 		for (let i = 0; i < arg.length; i++) {
@@ -14,52 +17,41 @@ function insert({ table, options }, arg) {
 	let args = [table].slice.call(arguments);
 	let row = newRow.apply(null, args);
 	let hasPrimary = getHasPrimary(table, row);
-	if (hasPrimary) {
+	if (hasPrimary)
 		row = table._cache.tryAdd(row);
-	}
+	let cmd = newInsertCommand(newInsertCommandCore, table, row, options);
+
+	pushCommand(cmd);
 	expand(table, row);
-	// Object.defineProperty(row, 'then', {
-	// 	value: then,
-	// 	writable: true,
-	// 	enumerable: false,
-	// 	configurable: true
-	// });
-	const context = getSessionContext();
-	const insertP = context.insert(table, row, options).then(onResult);
+	Object.defineProperty(row, 'then', {
+		value: then,
+		writable: true,
+		enumerable: false,
+		configurable: true
+	});
 
+	let selectCmd;
+	if (getSessionContext().lastInsertedIsSeparate) {
+		selectCmd = newGetLastInsertedCommand(table, row, cmd);
+		pushCommand(selectCmd);
+		selectCmd.onResult = onResult;
+	}
+	else {
+		cmd.onResult = onResult;
+		cmd.disallowCompress = true;
+	}
 
-	// }
-	// else {
-	// 	// Non-PG case, use Promise
-	// 	result = new Promise((resolve, reject) => {
-	// 		([result]) => {
-	// 			row.hydrate(result);
-	// 			if (!hasPrimary) {
-	// 				row = table._cache.tryAdd(row);
-	// 			}
-	// 			table._cache.tryAdd(row);
-	// 			resolve(row);
-	// 		};
-	// 	});
-	// }
-
-	// async function then(fn, efn) {
-	// 	delete row.then;
-	// 	return insertP.then(() => fn(row), efn);
-	// }
-	return insertP;
 	return row;
+	function then(fn,efn) {
+		delete row.then;
+		return executeQueries([]).then(() => fn(row), efn);
+	}
 
 	function onResult([result]) {
-		console.dir('result');
-		console.dir(result);
 		row.hydrate(result);
-		if (!hasPrimary) {
+		if (!hasPrimary)
 			row = table._cache.tryAdd(row);
-		}
 		table._cache.tryAdd(row);
-		console.dir(row.toJSON());
-		return row;
 	}
 }
 
@@ -80,16 +72,17 @@ function expand(table, row) {
 		let relation = table._relations[relationName];
 		relation.accept(visitor);
 	}
+
 }
 
 function getHasPrimary(table, row) {
 	for (let i = 0; i < table._primaryColumns.length; i++) {
 		let column = table._primaryColumns[i];
-		if (row[column.alias] === null) {
-			return false;
-		}
+		if (row[column.alias] === null)
+			return;
 	}
 	return true;
+
 }
 
 module.exports = insert;

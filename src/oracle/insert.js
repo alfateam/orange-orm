@@ -1,18 +1,31 @@
-let newInsertCommand = require('../table/commands/newInsertCommand');
-let pushCommand = require('../table/commands/pushCommand');
+const newInsertCommand = require('../table/commands/newInsertCommand');
+const newInsertCommandCore = require('./newInsertCommandCore');
+const setSessionSingleton = require('../table/setSessionSingleton');
+const newGetLastInsertedCommand = require('../table/commands/newGetLastInsertedCommand');
+let executeQueries = require('../table/executeQueries');
+const pushCommand = require('../table/commands/pushCommand');
 
-function insert({ table, row, options }, cb) {
-	let cmd = newInsertCommand(table, row, options);
-	pushCommand(cmd);
-	// console.dir('parameters');
-	// console.dir(cmd.parameters);
-	cmd.onResult = onResult;
-	cmd.disallowCompress = true;
+function insert(table, row, options) {
 
+	return new Promise((res, rej) => {
+		console.dir('start');
+		const cmd = newInsertCommand(newInsertCommandCore, table, row, options);
+		cmd.disallowCompress = true;
+		cmd.onResult = onResult;
+		// console.dir('start');
+		pushCommand(cmd);
+		executeQueries([]);
+		// executeQueries([]).then((result) => result[0]).then(onResult).then(res, rej);
 
-	function onResult() {
+		function onResult([result]) {
+			console.dir('got result');
+			console.dir(result);
+			setSessionSingleton('lastRowid', result.lastRowid);
+			const selectCmd = newGetLastInsertedCommand(table, row, cmd);
+			return executeQueries([selectCmd]).then((result) => res(result[0]));
+		}
 
-	}
+	});
 }
 
 module.exports = insert;

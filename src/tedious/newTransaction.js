@@ -38,8 +38,8 @@ function newResolveTransaction(domain, pool) {
 				rdb.selectForUpdateSql = selectForUpdateSql;
 				rdb.outputInsertedSql = outputInsertedSql;
 				rdb.lastInsertedIsSeparate = false;
-				rdb.insert = insert;
 				rdb.insertSql = insertSql;
+				rdb.insert = insert;
 				rdb.formatDateColumn = formatDateColumn;
 				rdb.formatJSONColumn = formatJSONColumn;
 				rdb.multipleStatements = true;

@@ -5,6 +5,7 @@ const selectForUpdateSql = require('./selectForUpdateSql');
 const lastInsertedSql = require('./lastInsertedSql');
 const formatDateColumn = require('./formatDateColumn');
 const insertSql = require('./insertSql');
+const insert = require('./insert');
 const limitAndOffset = require('./limitAndOffset');
 
 function newResolveTransaction(domain, pool) {
@@ -35,6 +36,7 @@ function newResolveTransaction(domain, pool) {
 				rdb.formatDateColumn = formatDateColumn;
 				rdb.lastInsertedSql = lastInsertedSql;
 				rdb.insertSql = insertSql;
+				rdb.insert = insert;
 				rdb.lastInsertedIsSeparate = true;
 				rdb.multipleStatements = false;
 				rdb.begin = 'BEGIN TRANSACTION';

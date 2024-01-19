@@ -5,6 +5,7 @@ var defaults = require('./defaults');
 var genericPool = require('../../generic-pool');
 var oracle = require('oracledb');
 
+oracle.outFormat = oracle.OUT_FORMAT_OBJECT;
 
 function newGenericPool(connectionString, poolOptions) {
 	poolOptions = poolOptions || {};

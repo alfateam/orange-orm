@@ -1,9 +1,11 @@
+import rdb from '../src/index';
 import { describe, test, beforeAll, expect, afterAll } from 'vitest';
 import { fileURLToPath } from 'url';
 const express = require('express');
 import { json } from 'body-parser';
 import cors from 'cors';
 const map = require('./db');
+const initOracle = require('./initOracle');
 const initPg = require('./initPg');
 const initMs = require('./initMs');
 const initMysql = require('./initMysql');
@@ -50,15 +52,18 @@ afterAll(async () => {
 });
 
 
-describe.only('transaction', () => {
+describe('transaction', () => {
 
-	// test('pg', async () => await verify('pg'));
+	rdb.on('query', console.dir);
+
+	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
-	// if (major === 18)
-	// 	test('mssqlNative', async () => await verify('mssqlNative'));
-	// test('mysql', async () => await verify('mysql'));
-	// test('sqlite', async () => await verify('sqlite'));
-	// test('sap', async () => await verify('sap'));
+	test('oracle', async () => await verify('oracle'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
@@ -69,6 +74,8 @@ describe.only('transaction', () => {
 		else
 			await init(db);
 
+		console.dir('done init');
+
 		let result;
 
 		await db.transaction(async (db) => {
@@ -77,7 +84,8 @@ describe.only('transaction', () => {
 				balance: 177,
 				isActive: true
 			});
-			result = await db.query('select 1 as foo');
+			const fooSql = dbName === 'oracle' ? 'select 1 as foo from dual' : 'select 1 as foo';
+			result =  await db.query(fooSql);
 		});
 		expect(result).toEqual([{ foo: 1 }]);
 	}
@@ -86,6 +94,7 @@ describe.only('transaction', () => {
 describe('validate', () => {
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
+	test('oracle', async () => await verify('oracle'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
@@ -124,6 +133,7 @@ describe('validate', () => {
 describe('validate chained', () => {
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
+	test('oracle', async () => await verify('oracle'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
@@ -159,6 +169,7 @@ describe('validate chained', () => {
 describe('validate JSONSchema', () => {
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
+	test('oracle', async () => await verify('oracle'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
@@ -195,6 +206,7 @@ describe('validate JSONSchema', () => {
 describe('validate notNull', () => {
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
+	test('oracle', async () => await verify('oracle'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
@@ -227,6 +239,7 @@ describe('validate notNull', () => {
 describe('validate notNullExceptInsert', () => {
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
+	test('oracle', async () => await verify('oracle'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
@@ -270,6 +283,7 @@ describe('insert autoincremental', () => {
 
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
+	test('oracle', async () => await verify('oracle'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
@@ -308,6 +322,7 @@ describe('insert default', () => {
 
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
+	test('oracle', async () => await verify('oracle'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
@@ -344,6 +359,7 @@ describe('insert default override', () => {
 
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
+	test('oracle', async () => await verify('oracle'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
@@ -381,6 +397,7 @@ describe('insert dbNull', () => {
 
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
+	test('oracle', async () => await verify('oracle'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
@@ -428,15 +445,16 @@ describe('insert dbNull', () => {
 	}
 });
 
-describe('insert autoincremental with relations', () => {
-	test('pg', async () => await verify('pg'));
-	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
-		test('mssqlNative', async () => await verify('mssqlNative'));
-	test('mysql', async () => await verify('mysql'));
-	test('sqlite', async () => await verify('sqlite'));
-	test('sap', async () => await verify('sap'));
-	test('http', async () => await verify('http'));
+describe.only('insert autoincremental with relations', () => {
+	// test('pg', async () => await verify('pg'));
+	// test('mssql', async () => await verify('mssql'));
+	test('oracle', async () => await verify('oracle'));
+	// if (major === 18)
+	// 	test('mssqlNative', async () => await verify('mssqlNative'));
+	// test('mysql', async () => await verify('mysql'));
+	// test('sqlite', async () => await verify('sqlite'));
+	// test('sap', async () => await verify('sap'));
+	// test('http', async () => await verify('http'));
 
 
 	async function verify(dbName) {
@@ -579,14 +597,15 @@ describe('insert autoincremental with relations', () => {
 });
 
 describe('insert autoincremental with relations and strategy', () => {
-	test('pg', async () => await verify('pg'));
+	// test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
-		test('mssqlNative', async () => await verify('mssqlNative'));
-	test('mysql', async () => await verify('mysql'));
-	test('sqlite', async () => await verify('sqlite'));
-	test('sap', async () => await verify('sap'));
-	test('http', async () => await verify('http'));
+	test('oracle', async () => await verify('oracle'));
+	// if (major === 18)
+	// 	test('mssqlNative', async () => await verify('mssqlNative'));
+	// test('mysql', async () => await verify('mysql'));
+	// test('sqlite', async () => await verify('sqlite'));
+	// test('sap', async () => await verify('sap'));
+	// test('http', async () => await verify('http'));
 
 
 	async function verify(dbName) {
@@ -755,6 +774,17 @@ const connections = {
 		db: map({ db: (con) => con.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master`, { size: 1 }) }),
 		init: initSap
 	},
+	oracle: {
+		db: map({ db: (con) => con.oracle(
+			{
+				user: 'sys',
+				password: 'P@assword123',
+				connectString: 'oracle/XE',
+				privilege: 2
+			}
+		) }),
+		init: initOracle
+	},
 	mysql: {
 		db: map({ db: (con) => con.mysql('mysql://test:test@mysql/test', { size: 1 }) }),
 		init: initMysql
@@ -778,6 +808,8 @@ function getDb(name) {
 		return connections.sqlite2;
 	else if (name === 'sap')
 		return connections.sap;
+	else if (name === 'oracle')
+		return connections.oracle;
 	else if (name === 'mysql')
 		return connections.mysql;
 	else if (name === 'http')

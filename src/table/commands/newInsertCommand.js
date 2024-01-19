@@ -1,13 +1,13 @@
-var newInsertCommandCore = require('./newInsertCommandCore');
+// var newInsertCommandCore = require('./newInsertCommandCore');
 var newImmutable = require('../../newImmutable');
 var createPatch = require('../../client/createPatch');
 var createDto = require('../resultToRows/toDto/createDto');
 
-function newInsertCommand(table, row, options) {
-	return new InsertCommand(table, row,  options);
+function newInsertCommand(newInsertCommandCore, table, row, options) {
+	return new InsertCommand(newInsertCommandCore, table, row,  options);
 }
 
-function InsertCommand(table, row, options) {
+function InsertCommand(newInsertCommandCore, table, row, options) {
 	this.__getCoreCommand = newImmutable(newInsertCommandCore);
 	this._table = table;
 	this._row = row;

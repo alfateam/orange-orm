@@ -5,6 +5,7 @@ const selectForUpdateSql = require('./selectForUpdateSql');
 const lastInsertedSql = require('./lastInsertedSql');
 const limitAndOffset = require('./limitAndOffset');
 const insertSql = require('./insertSql');
+const insert = require('./insert');
 
 function newResolveTransaction(domain, pool) {
 	var rdb = {poolFactory: pool};
@@ -33,6 +34,7 @@ function newResolveTransaction(domain, pool) {
 				rdb.selectForUpdateSql = selectForUpdateSql;
 				rdb.lastInsertedSql = lastInsertedSql;
 				rdb.insertSql = insertSql;
+				rdb.insert = insert;
 				rdb.lastInsertedIsSeparate = true;
 				rdb.multipleStatements = false;
 				rdb.limitAndOffset = limitAndOffset;

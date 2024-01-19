@@ -64,7 +64,7 @@ const map = rdb.map(x => ({
 		sscc: column('sscc').string()
 	})),
 
-	order: x.table('_order').map(({ column }) => ({
+	order: x.table('torder').map(({ column }) => ({
 		id: column('id').numeric().primary().notNullExceptInsert(),
 		orderDate: column('orderDate').date().notNull(),
 		customerId: column('customerId').numeric().notNullExceptInsert(),

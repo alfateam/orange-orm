@@ -158,6 +158,8 @@ function newDecodeDbRow(table, dbRow, filteredAliases, shouldValidate, isInsert)
 			}
 		}
 		else {
+			console.dir('hydrate');
+			console.dir(keys);
 			for (let p in dbRow) {
 				let key = keys[i];
 				this._dbRow[key] = columns[i].decode(dbRow[p]);

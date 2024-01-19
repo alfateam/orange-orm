@@ -3,8 +3,6 @@ const oracledb = require('oracledb');
 
 async function run() {
 	let connection;
-	console.dir('oracledb.SYSDBA');
-	console.dir(oracledb.SYSDBA);
 	try {
 		connection = await oracledb.getConnection({
 			user: 'sys',

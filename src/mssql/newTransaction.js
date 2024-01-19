@@ -6,6 +6,7 @@ var outputInsertedSql = require('../tedious/outputInsertedSql');
 const limitAndOffset = require('../tedious/limitAndOffset');
 const formatDateColumn = require('../tedious/formatDateColumn');
 const insertSql = require('../tedious/insertSql');
+const insert = require('../tedious/insert');
 
 function newResolveTransaction(domain, pool) {
 	var rdb = {poolFactory: pool};
@@ -36,6 +37,7 @@ function newResolveTransaction(domain, pool) {
 				rdb.selectForUpdateSql = selectForUpdateSql;
 				rdb.outputInsertedSql = outputInsertedSql;
 				rdb.insertSql = insertSql;
+				rdb.insert = insert;
 				rdb.lastInsertedIsSeparate = false;
 				rdb.multipleStatements = true;
 				rdb.begin = 'BEGIN TRANSACTION';
