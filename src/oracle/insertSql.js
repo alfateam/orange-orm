@@ -54,7 +54,10 @@ function insertSql(table, row) {
 			regularColumnNames.push(column._dbName);
 			if (row['__' + column.alias] !== undefined) {
 				columnNames.push(column._dbName);
-				values.push('%s');
+				if (column.tsType === 'DateColumn')
+					values.push('TO_TIMESTAMP(%s, \'YYYY-MM-DD"T"HH24:MI:SS.FF6\')');
+				else
+					values.push('%s');
 			}
 		}
 	}

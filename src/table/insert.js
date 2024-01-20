@@ -18,14 +18,14 @@ function insert({ table, options }, arg) {
 		row = table._cache.tryAdd(row);
 	}
 	expand(table, row);
-	// Object.defineProperty(row, 'then', {
-	// 	value: then,
-	// 	writable: true,
-	// 	enumerable: false,
-	// 	configurable: true
-	// });
+	Object.defineProperty(row, 'then', {
+		value: then,
+		writable: true,
+		enumerable: false,
+		configurable: true
+	});
 	const context = getSessionContext();
-	const insertP = context.insert(table, row, options).then(onResult);
+	const insertP = (context.insert || insertDefault)(table, row, options).then(onResult);
 
 
 	// }
@@ -38,16 +38,16 @@ function insert({ table, options }, arg) {
 	// 				row = table._cache.tryAdd(row);
 	// 			}
 	// 			table._cache.tryAdd(row);
-	// 			resolve(row);
+	// 			resolve(row);qq
 	// 		};
 	// 	});
 	// }
 
-	// async function then(fn, efn) {
-	// 	delete row.then;
-	// 	return insertP.then(() => fn(row), efn);
-	// }
-	return insertP;
+	async function then(fn, efn) {
+		delete row.then;
+		return insertP.then(() => fn(row), efn);
+	}
+
 	return row;
 
 	function onResult([result]) {
@@ -55,6 +55,7 @@ function insert({ table, options }, arg) {
 		console.dir(result);
 		row.hydrate(result);
 		if (!hasPrimary) {
+			console.dir('no primary');
 			row = table._cache.tryAdd(row);
 		}
 		table._cache.tryAdd(row);

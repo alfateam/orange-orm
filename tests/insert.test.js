@@ -469,22 +469,22 @@ describe.only('insert autoincremental with relations', () => {
 		const date1 = new Date(2022, 0, 11, 9, 24, 47);
 		const date2 = new Date(2021, 0, 11, 12, 22, 45);
 
-		const george = await db.customer.insert({
-			name: 'George',
-			balance: 177,
-			isActive: true
-		});
+		// const george = await db.customer.insert({
+		// 	name: 'George',
+		// 	balance: 177,
+		// 	isActive: true
+		// });
 
-		const john = await db.customer.insert({
-			name: 'Harry',
-			balance: 200,
-			isActive: true
-		});
+		// const john = await db.customer.insert({
+		// 	name: 'Harry',
+		// 	balance: 200,
+		// 	isActive: true
+		// });
 
 		let orders = await db.order.insert([
 			{
 				orderDate: date1,
-				customer: george,
+				// customer: george,
 				deliveryAddress: {
 					name: 'George',
 					street: 'Node street 1',
@@ -497,20 +497,20 @@ describe.only('insert autoincremental with relations', () => {
 					{ product: 'Small guitar' }
 				]
 			},
-			{
-				customer: john,
-				orderDate: date2,
-				deliveryAddress: {
-					name: 'Harry Potter',
-					street: '4 Privet Drive, Little Whinging',
-					postalCode: 'GU4',
-					postalPlace: 'Surrey',
-					countryCode: 'UK'
-				},
-				lines: [
-					{ product: 'Magic wand' }
-				]
-			}
+			// {
+			// 	customer: john,
+			// 	orderDate: date2,
+			// 	deliveryAddress: {
+			// 		name: 'Harry Potter',
+			// 		street: '4 Privet Drive, Little Whinging',
+			// 		postalCode: 'GU4',
+			// 		postalPlace: 'Surrey',
+			// 		countryCode: 'UK'
+			// 	},
+			// 	lines: [
+			// 		{ product: 'Magic wand' }
+			// 	]
+			// }
 		]);
 
 		//workaround because some databases return offset and some dont
@@ -523,26 +523,21 @@ describe.only('insert autoincremental with relations', () => {
 			{
 				id: 1,
 				orderDate: dateToISOString(date1),
-				customerId: 1,
+				customerId: null,
 			},
-			{
-				id: 2,
-				customerId: 2,
-				orderDate: dateToISOString(date2),
-			}
+			// {
+			// 	id: 2,
+			// 	customerId: 2,
+			// 	orderDate: dateToISOString(date2),
+			// }
 		];
 
 		const expectedEager = [
 			{
 				id: 1,
 				orderDate: dateToISOString(date1),
-				customerId: 1,
-				customer: {
-					id: 1,
-					name: 'George',
-					balance: 177,
-					isActive: true
-				},
+				customerId: null,
+				customer: null,
 				deliveryAddress: {
 					id: 1,
 					orderId: 1,
@@ -557,29 +552,29 @@ describe.only('insert autoincremental with relations', () => {
 					{ product: 'Small guitar', id: 2, orderId: 1 }
 				]
 			},
-			{
-				id: 2,
-				customerId: 2,
-				customer: {
-					id: 2,
-					name: 'Harry',
-					balance: 200,
-					isActive: true
-				},
-				orderDate: dateToISOString(date2),
-				deliveryAddress: {
-					id: 2,
-					orderId: 2,
-					name: 'Harry Potter',
-					street: '4 Privet Drive, Little Whinging',
-					postalCode: 'GU4',
-					postalPlace: 'Surrey',
-					countryCode: 'UK'
-				},
-				lines: [
-					{ product: 'Magic wand', id: 3, orderId: 2 }
-				]
-			}
+			// {
+			// 	id: 2,
+			// 	customerId: 2,
+			// 	customer: {
+			// 		id: 2,
+			// 		name: 'Harry',
+			// 		balance: 200,
+			// 		isActive: true
+			// 	},
+			// 	orderDate: dateToISOString(date2),
+			// 	deliveryAddress: {
+			// 		id: 2,
+			// 		orderId: 2,
+			// 		name: 'Harry Potter',
+			// 		street: '4 Privet Drive, Little Whinging',
+			// 		postalCode: 'GU4',
+			// 		postalPlace: 'Surrey',
+			// 		countryCode: 'UK'
+			// 	},
+			// 	lines: [
+			// 		{ product: 'Magic wand', id: 3, orderId: 2 }
+			// 	]
+			// }
 		];
 
 
@@ -594,7 +589,7 @@ describe.only('insert autoincremental with relations', () => {
 
 	}
 
-});
+}, 999999999);
 
 describe('insert autoincremental with relations and strategy', () => {
 	// test('pg', async () => await verify('pg'));

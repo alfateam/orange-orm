@@ -3,7 +3,7 @@ let newInsertCommandCore = require('../table/commands/newInsertCommandCore');
 let executeQueries = require('../table/executeQueries');
 
 
-async function insertDefault(table, row, options) {
+function insertDefault(table, row, options) {
 	let insertCmd = newInsertCommand(newInsertCommandCore, table, row, options);
 	insertCmd.disallowCompress = true;
 

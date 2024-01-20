@@ -87,19 +87,22 @@ async function patchTableCore(table, patches, { strategy = undefined, deduceStra
 				if (keyValue && typeof (keyValue) === 'string' && keyValue.indexOf('~') === 0)
 					value[pkName] = undefined;
 			}
-			let row = table.insertWithConcurrency.apply(null, [options, value]);
 
 			if (relation && relation.joinRelation) {
 				for (let i = 0; i < relation.joinRelation.columns.length; i++) {
 					let column = relation.joinRelation.columns[i];
 					let fkName = column.alias;
 					let parentPk = relation.joinRelation.childTable._primaryColumns[i].alias;
-					if (!row[fkName]) {
-						row[fkName] = parentRow[parentPk];
+					if (!value[fkName]) {
+						value[fkName] = parentRow[parentPk];
 					}
 				}
 			}
+			let row = table.insertWithConcurrency.apply(null, [options, value]);
 			row = await row;
+			const id = row.orderId;
+			console.dir('parentId');
+			console.dir(id);
 			for (let i = 0; i < childInserts.length; i++) {
 				await childInserts[i](row);
 			}

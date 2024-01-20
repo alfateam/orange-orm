@@ -11,15 +11,10 @@ function insert(table, row, options) {
 		console.dir('start');
 		const cmd = newInsertCommand(newInsertCommandCore, table, row, options);
 		cmd.disallowCompress = true;
-		cmd.onResult = onResult;
-		// console.dir('start');
 		pushCommand(cmd);
-		executeQueries([]);
-		// executeQueries([]).then((result) => result[0]).then(onResult).then(res, rej);
+		executeQueries([cmd]).then((result) => result[0]).then(onResult).then(res, rej);
 
 		function onResult([result]) {
-			console.dir('got result');
-			console.dir(result);
 			setSessionSingleton('lastRowid', result.lastRowid);
 			const selectCmd = newGetLastInsertedCommand(table, row, cmd);
 			return executeQueries([selectCmd]).then((result) => res(result[0]));
