@@ -1,8 +1,8 @@
 function limitAndOffset(span) {
 	if (span.offset)
-		return ` limit ${limit()} offset ${span.offset}`;
+		return ` OFFSET ${span.offset} ROWS FETCH NEXT ${limit()} ROWS ONLY`;
 	else if (span.limit || span.limit === 0)
-		return ` limit ${span.limit}`;
+		return ` FETCH FIRST ${span.limit} ROWS ONLY`;
 	else
 		return '';
 
@@ -10,7 +10,7 @@ function limitAndOffset(span) {
 		if (span.limit || span.limit === 0)
 			return span.limit;
 		else
-			return '-1';
+			return '';
 	}
 
 }

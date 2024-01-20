@@ -100,9 +100,7 @@ async function patchTableCore(table, patches, { strategy = undefined, deduceStra
 			}
 			let row = table.insertWithConcurrency.apply(null, [options, value]);
 			row = await row;
-			const id = row.orderId;
-			console.dir('parentId');
-			console.dir(id);
+
 			for (let i = 0; i < childInserts.length; i++) {
 				await childInserts[i](row);
 			}

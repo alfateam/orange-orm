@@ -1,8 +1,5 @@
 const oracledb = require('oracledb');
 
-console.dir('sysdba');
-console.dir(oracledb.SYSDBA);
-
 async function run() {
 	let connection;
 

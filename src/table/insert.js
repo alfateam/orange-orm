@@ -51,15 +51,10 @@ function insert({ table, options }, arg) {
 	return row;
 
 	function onResult([result]) {
-		console.dir('result');
-		console.dir(result);
 		row.hydrate(result);
-		if (!hasPrimary) {
-			console.dir('no primary');
+		if (!hasPrimary)
 			row = table._cache.tryAdd(row);
-		}
 		table._cache.tryAdd(row);
-		console.dir(row.toJSON());
 		return row;
 	}
 }

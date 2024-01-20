@@ -340,7 +340,7 @@ describe('readonly table delete', () => {
 		catch (e) {
 			error = e;
 		}
-		expect(error?.message).toEqual('Cannot delete _order because it is readonly');
+		expect(error?.message).toEqual('Cannot delete torder because it is readonly');
 	}
 });
 

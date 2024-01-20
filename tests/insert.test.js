@@ -1,4 +1,3 @@
-import rdb from '../src/index';
 import { describe, test, beforeAll, expect, afterAll } from 'vitest';
 import { fileURLToPath } from 'url';
 const express = require('express');
@@ -53,9 +52,6 @@ afterAll(async () => {
 
 
 describe('transaction', () => {
-
-	rdb.on('query', console.dir);
-
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
 	test('oracle', async () => await verify('oracle'));
@@ -74,8 +70,6 @@ describe('transaction', () => {
 		else
 			await init(db);
 
-		console.dir('done init');
-
 		let result;
 
 		await db.transaction(async (db) => {
@@ -85,7 +79,7 @@ describe('transaction', () => {
 				isActive: true
 			});
 			const fooSql = dbName === 'oracle' ? 'select 1 as foo from dual' : 'select 1 as foo';
-			result =  await db.query(fooSql);
+			result = await db.query(fooSql);
 		});
 		expect(result).toEqual([{ foo: 1 }]);
 	}
@@ -247,7 +241,6 @@ describe('validate notNullExceptInsert', () => {
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
-
 	async function verify(dbName) {
 		const { db, init } = getDb(dbName);
 		let error;
@@ -393,8 +386,6 @@ describe('insert default override', () => {
 });
 
 describe('insert dbNull', () => {
-
-
 	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
 	test('oracle', async () => await verify('oracle'));
@@ -445,16 +436,16 @@ describe('insert dbNull', () => {
 	}
 });
 
-describe.only('insert autoincremental with relations', () => {
-	// test('pg', async () => await verify('pg'));
-	// test('mssql', async () => await verify('mssql'));
+describe('insert autoincremental with relations', () => {
+	test('pg', async () => await verify('pg'));
+	test('mssql', async () => await verify('mssql'));
 	test('oracle', async () => await verify('oracle'));
-	// if (major === 18)
-	// 	test('mssqlNative', async () => await verify('mssqlNative'));
-	// test('mysql', async () => await verify('mysql'));
-	// test('sqlite', async () => await verify('sqlite'));
-	// test('sap', async () => await verify('sap'));
-	// test('http', async () => await verify('http'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
 
 
 	async function verify(dbName) {
@@ -469,22 +460,22 @@ describe.only('insert autoincremental with relations', () => {
 		const date1 = new Date(2022, 0, 11, 9, 24, 47);
 		const date2 = new Date(2021, 0, 11, 12, 22, 45);
 
-		// const george = await db.customer.insert({
-		// 	name: 'George',
-		// 	balance: 177,
-		// 	isActive: true
-		// });
+		const george = await db.customer.insert({
+			name: 'George',
+			balance: 177,
+			isActive: true
+		});
 
-		// const john = await db.customer.insert({
-		// 	name: 'Harry',
-		// 	balance: 200,
-		// 	isActive: true
-		// });
+		const john = await db.customer.insert({
+			name: 'Harry',
+			balance: 200,
+			isActive: true
+		});
 
 		let orders = await db.order.insert([
 			{
 				orderDate: date1,
-				// customer: george,
+				customer: george,
 				deliveryAddress: {
 					name: 'George',
 					street: 'Node street 1',
@@ -497,20 +488,20 @@ describe.only('insert autoincremental with relations', () => {
 					{ product: 'Small guitar' }
 				]
 			},
-			// {
-			// 	customer: john,
-			// 	orderDate: date2,
-			// 	deliveryAddress: {
-			// 		name: 'Harry Potter',
-			// 		street: '4 Privet Drive, Little Whinging',
-			// 		postalCode: 'GU4',
-			// 		postalPlace: 'Surrey',
-			// 		countryCode: 'UK'
-			// 	},
-			// 	lines: [
-			// 		{ product: 'Magic wand' }
-			// 	]
-			// }
+			{
+				customer: john,
+				orderDate: date2,
+				deliveryAddress: {
+					name: 'Harry Potter',
+					street: '4 Privet Drive, Little Whinging',
+					postalCode: 'GU4',
+					postalPlace: 'Surrey',
+					countryCode: 'UK'
+				},
+				lines: [
+					{ product: 'Magic wand' }
+				]
+			}
 		]);
 
 		//workaround because some databases return offset and some dont
@@ -523,21 +514,26 @@ describe.only('insert autoincremental with relations', () => {
 			{
 				id: 1,
 				orderDate: dateToISOString(date1),
-				customerId: null,
+				customerId: 1,
 			},
-			// {
-			// 	id: 2,
-			// 	customerId: 2,
-			// 	orderDate: dateToISOString(date2),
-			// }
+			{
+				id: 2,
+				customerId: 2,
+				orderDate: dateToISOString(date2),
+			}
 		];
 
 		const expectedEager = [
 			{
 				id: 1,
 				orderDate: dateToISOString(date1),
-				customerId: null,
-				customer: null,
+				customerId: 1,
+				customer: {
+					id: 1,
+					name: 'George',
+					balance: 177,
+					isActive: true
+				},
 				deliveryAddress: {
 					id: 1,
 					orderId: 1,
@@ -552,29 +548,29 @@ describe.only('insert autoincremental with relations', () => {
 					{ product: 'Small guitar', id: 2, orderId: 1 }
 				]
 			},
-			// {
-			// 	id: 2,
-			// 	customerId: 2,
-			// 	customer: {
-			// 		id: 2,
-			// 		name: 'Harry',
-			// 		balance: 200,
-			// 		isActive: true
-			// 	},
-			// 	orderDate: dateToISOString(date2),
-			// 	deliveryAddress: {
-			// 		id: 2,
-			// 		orderId: 2,
-			// 		name: 'Harry Potter',
-			// 		street: '4 Privet Drive, Little Whinging',
-			// 		postalCode: 'GU4',
-			// 		postalPlace: 'Surrey',
-			// 		countryCode: 'UK'
-			// 	},
-			// 	lines: [
-			// 		{ product: 'Magic wand', id: 3, orderId: 2 }
-			// 	]
-			// }
+			{
+				id: 2,
+				customerId: 2,
+				customer: {
+					id: 2,
+					name: 'Harry',
+					balance: 200,
+					isActive: true
+				},
+				orderDate: dateToISOString(date2),
+				deliveryAddress: {
+					id: 2,
+					orderId: 2,
+					name: 'Harry Potter',
+					street: '4 Privet Drive, Little Whinging',
+					postalCode: 'GU4',
+					postalPlace: 'Surrey',
+					countryCode: 'UK'
+				},
+				lines: [
+					{ product: 'Magic wand', id: 3, orderId: 2 }
+				]
+			}
 		];
 
 
@@ -770,14 +766,16 @@ const connections = {
 		init: initSap
 	},
 	oracle: {
-		db: map({ db: (con) => con.oracle(
-			{
-				user: 'sys',
-				password: 'P@assword123',
-				connectString: 'oracle/XE',
-				privilege: 2
-			}
-		) }),
+		db: map({
+			db: (con) => con.oracle(
+				{
+					user: 'sys',
+					password: 'P@assword123',
+					connectString: 'oracle/XE',
+					privilege: 2
+				}
+			)
+		}),
 		init: initOracle
 	},
 	mysql: {

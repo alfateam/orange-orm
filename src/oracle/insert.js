@@ -3,15 +3,12 @@ const newInsertCommandCore = require('./newInsertCommandCore');
 const setSessionSingleton = require('../table/setSessionSingleton');
 const newGetLastInsertedCommand = require('../table/commands/newGetLastInsertedCommand');
 let executeQueries = require('../table/executeQueries');
-const pushCommand = require('../table/commands/pushCommand');
 
 function insert(table, row, options) {
 
 	return new Promise((res, rej) => {
-		console.dir('start');
 		const cmd = newInsertCommand(newInsertCommandCore, table, row, options);
 		cmd.disallowCompress = true;
-		pushCommand(cmd);
 		executeQueries([cmd]).then((result) => result[0]).then(onResult).then(res, rej);
 
 		function onResult([result]) {

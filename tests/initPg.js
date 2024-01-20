@@ -28,7 +28,7 @@ CREATE TABLE vendor (
     isActive BOOLEAN    
 );
 
-CREATE TABLE _order (
+CREATE TABLE torder (
     id SERIAL PRIMARY KEY,
     orderDate TIMESTAMP,
     customerId INTEGER REFERENCES customer
@@ -36,7 +36,7 @@ CREATE TABLE _order (
 
 CREATE TABLE orderLine (
     id SERIAL PRIMARY KEY,
-    orderId INTEGER REFERENCES _order,
+    orderId INTEGER REFERENCES torder,
     product TEXT
 );
 
@@ -48,7 +48,7 @@ CREATE TABLE package (
 
 CREATE TABLE deliveryAddress (
     id SERIAL PRIMARY KEY,
-    orderId INTEGER REFERENCES _order,
+    orderId INTEGER REFERENCES torder,
     name TEXT, 
     street TEXT,
     postalCode TEXT,

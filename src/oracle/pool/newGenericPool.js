@@ -15,12 +15,9 @@ function newGenericPool(connectionString, poolOptions) {
 		reapIntervalMillis: poolOptions.reapIntervalMillis || defaults.reapIntervalMillis,
 		log: poolOptions.log || defaults.poolLog,
 		create: function(cb) {
-
-			console.dir(connectionString);
 			var client;
 			oracle.getConnection(connectionString, onConnected);
 			function onConnected(err, _client) {
-				console.dir('on connected');
 				client = _client;
 				if (err)
 					return cb(err, null);

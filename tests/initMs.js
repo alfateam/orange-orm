@@ -2,7 +2,7 @@ const sql = `
 DROP TABLE if exists package;
 DROP TABLE if exists orderLine;
 DROP TABLE if exists deliveryAddress;
-DROP TABLE if exists _order;
+DROP TABLE if exists torder;
 DROP TABLE if exists vendor;
 DROP TABLE if exists customer;
 DROP TABLE if exists datetest;
@@ -33,7 +33,7 @@ CREATE TABLE vendor  (
     isActive BIT
 );
 
-CREATE TABLE _order (
+CREATE TABLE torder (
     id int IDENTITY(1,1) PRIMARY KEY,
     orderDate DATETIME,
     customerId INTEGER REFERENCES customer
@@ -41,7 +41,7 @@ CREATE TABLE _order (
 
 CREATE TABLE orderLine (
     id int IDENTITY(1,1) PRIMARY KEY,
-    orderId INTEGER REFERENCES _order,
+    orderId INTEGER REFERENCES torder,
     product VARCHAR(100)
 );
 CREATE TABLE package (
@@ -52,7 +52,7 @@ CREATE TABLE package (
 
 CREATE TABLE deliveryAddress (
     id int IDENTITY(1,1) PRIMARY KEY,
-    orderId INTEGER REFERENCES _order,
+    orderId INTEGER REFERENCES torder,
     name VARCHAR(100), 
     street VARCHAR(100),
     postalCode VARCHAR(100),
