@@ -239,7 +239,7 @@ ${row}`;
 			let name = pascalCase(relationName);
 			let count = 2;
 			while (tableNames.has(name)) {
-				name = name + '_' + count;
+				name = name + 'x' + count;
 				count++;
 			}
 			rootTablesAdded.set(relation.childTable, name);

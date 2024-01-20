@@ -5,7 +5,7 @@ function newRelatedColumn(column,relations,isShallow, depth) {
 	// 	depth = depth -1 ;
 	var c = {};
 
-	var alias = '_' + relations.length;
+	var alias = 'x' + relations.length;
 	for (var propName in column) {
 		var prop = column[propName];
 		if (prop instanceof Function)

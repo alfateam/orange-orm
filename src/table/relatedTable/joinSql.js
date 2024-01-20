@@ -27,8 +27,8 @@ function newJoinSql(relations, depth) {
 	}
 
 	for (let i = relations.length-1; i > depth; i--) {
-		leftAlias = '_' + (i+1);
-		rightAlias = '_' + i;
+		leftAlias = 'x' + (i+1);
+		rightAlias = 'x' + i;
 		relation = relations[i];
 		relation.accept(c);
 	}

@@ -1,5 +1,3 @@
-import rdb from '../src/index';
-rdb.on('query', (q) => console.dir(q, {depth: Infinity}));
 import { describe, test, beforeAll, afterAll, expect } from 'vitest';
 import { fileURLToPath } from 'url';
 const express = require('express');
@@ -161,16 +159,16 @@ describe('offset', () => {
 	}
 });
 
-describe.only('boolean filter', () => {
-	// test('pg', async () => await verify('pg'));
+describe('boolean filter', () => {
+	test('pg', async () => await verify('pg'));
 	test('oracle', async () => await verify('oracle'));
-	// test('mssql', async () => await verify('mssql'));
-	// if (major === 18)
-	// 	test('mssqlNative', async () => await verify('mssqlNative'));
-	// test('mysql', async () => await verify('mysql'));
-	// test('sqlite', async () => await verify('sqlite'));
-	// test('sap', async () => await verify('sap'));
-	// test('http', async () => await verify('http'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);

@@ -18,7 +18,7 @@ function _new(span,alias) {
 	c.visitMany = function() {};
 
 	function onEachLeg(leg) {
-		childAlias = alias + '_' + legNo;
+		childAlias = alias + 'x' + legNo;
 		leg.accept(c);
 		legNo++;
 	}

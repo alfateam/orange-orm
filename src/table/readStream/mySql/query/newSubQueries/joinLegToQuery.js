@@ -3,7 +3,7 @@ var newQuery = require('./newQueryCore');
 var util = require('util');
 
 function joinLegToQuery(parentAlias,leg,legNo) {
-	var childAlias = parentAlias + '_' + legNo;
+	var childAlias = parentAlias + 'x' + legNo;
 	var span = leg.span;
 	var childTable = span.table;
 	var parentTable = leg.table;
