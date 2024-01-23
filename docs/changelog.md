@@ -1,5 +1,7 @@
 
 ## Changelog
+__3.4.0__  
+Allow multiple resultset for SAP and mssql. See [#72](https://github.com/alfateam/rdb/issues/72).  
 __3.3.0__  
 Possible to apply updates from JSON object. See [#70](https://github.com/alfateam/rdb/issues/70).  
 __3.2.9__  
