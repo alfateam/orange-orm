@@ -21,12 +21,12 @@ RDB is the ultimate Object Relational Mapper for Node.js and Typescript, offerin
 
 ## Supported Databases
 
-- [x] Postgres
-- [x] MS SQL
-- [x] MySQL
-- [x] Oracle
-- [x] Sybase SAP
-- [x] SQLite
+✅ Postgres  
+✅ MS SQL  
+✅ MySQL  
+✅ Oracle  
+✅ Sybase SAP  
+✅ SQLite
 
 
 This is the _Modern Typescript Documentation_. Are you looking for the [_Classic Documentation_](https://github.com/alfateam/rdb/blob/master/docs/docs.md) ?
