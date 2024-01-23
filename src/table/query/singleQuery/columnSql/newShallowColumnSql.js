@@ -18,14 +18,13 @@ function _new(table,alias, span, ignoreNulls) {
 	return sql;
 
 	function formatColumn(column) {
-		const formatted = column.format ? column.format(alias) : alias + '.' + column._dbName;
+		const formatted = column.formatOut ? column.formatOut(alias) : alias + '.' + column._dbName;
 		if (column.dbNull === null)
 			return formatted;
 		else {
 			const encoded = column.encode.unsafe(column.dbNull);
 			return `CASE WHEN ${formatted}=${encoded} THEN null ELSE ${formatted} END`;
 		}
-
 	}
 }
 

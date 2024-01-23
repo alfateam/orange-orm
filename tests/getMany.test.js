@@ -624,7 +624,8 @@ const connections = {
 					password: 'P@assword123',
 					connectString: 'oracle/XE',
 					privilege: 2
-				}
+				}, {size: 1}
+
 			)
 		}),
 		init: initOracle

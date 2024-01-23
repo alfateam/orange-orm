@@ -1,7 +1,4 @@
-void !function() {
-	typeof self === 'undefined' && typeof global === 'object'
-		? global.self = global : null;
-}();var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
+var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
 
 function getAugmentedNamespace(n) {
 	if (n.__esModule) return n;
@@ -3607,7 +3604,7 @@ function isAbsoluteURL(url) {
  */
 function combineURLs(baseURL, relativeURL) {
   return relativeURL
-    ? baseURL.replace(/\/+$/, '') + '/' + relativeURL.replace(/^\/+/, '')
+    ? baseURL.replace(/\/?\/$/, '') + '/' + relativeURL.replace(/^\/+/, '')
     : baseURL;
 }
 
@@ -4241,7 +4238,7 @@ function mergeConfig(config1, config2) {
   return config;
 }
 
-const VERSION = "1.6.2";
+const VERSION = "1.6.3";
 
 const validators$1 = {};
 
@@ -5022,6 +5019,7 @@ function map$1(index, _fn) {
 	dbMap.mssqlNative = throwDb;
 	dbMap.mysql = throwDb;
 	dbMap.sap = throwDb;
+	dbMap.oracle = throwDb;
 	dbMap.sqlite = throwDb;
 
 	function throwDb() {
@@ -5047,6 +5045,7 @@ function map$1(index, _fn) {
 	onFinal.mssqlNative = () => index({ db: throwDb, providers: dbMap });
 	onFinal.mysql = () => index({ db: throwDb, providers: dbMap });
 	onFinal.sap = () => index({ db: throwDb, providers: dbMap });
+	onFinal.oracle = () => index({ db: throwDb, providers: dbMap });
 	onFinal.sqlite = () => index({ db: throwDb, providers: dbMap });
 
 	return new Proxy(onFinal, handler);
@@ -5352,6 +5351,7 @@ function rdbClient(options = {}) {
 	client.postgres = onProvider.bind(null, 'postgres');
 	client.sqlite = onProvider.bind(null, 'sqlite');
 	client.sap = onProvider.bind(null, 'sap');
+	client.oracle = onProvider.bind(null, 'oracle');
 	client.http = onProvider.bind(null, 'http');//todo
 	client.mysql = onProvider.bind(null, 'mysql');
 	client.express = express;

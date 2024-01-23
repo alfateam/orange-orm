@@ -1,7 +1,6 @@
 const oracledb = require('oracledb');
 
-console.dir('sysdba');
-console.dir(oracledb.SYSDBA);
+oracledb.fetchAsString = [ oracledb.DATE];
 
 async function run() {
 	let connection;
@@ -24,14 +23,16 @@ async function run() {
 		// Replace with your query
 		const out = [];
 		await connection.execute(
-			'INSERT INTO torder (orderDate,customerId)  VALUES (TO_TIMESTAMP(\'2022-01-11T09:24:47.000\', \'YYYY-MM-DD"T"HH24:MI:SS.FF3\') ,1)',
+			'INSERT INTO datetest (ID) values(DEFAULT)',
 			out
 		);
 		 const result = await connection.execute(
-			'select * from torder'
+			'select * from datetest'
 		);
+
 		// 'INSERT INTO torder (orderDate,customerId)  VALUES (TO_TIMESTAMP(\'2022-01-11T09:24:47.000\', \'YYYY-MM-DD"T"HH24:MI:SS.FF3\') ,1)',
 		console.dir(out);
+		// const d = typeof result.rows[0][1];
 		console.log(result);
 
 		const lastRowId = result.lastRowid;

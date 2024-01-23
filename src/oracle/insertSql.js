@@ -33,7 +33,7 @@ function insertSql(table, row) {
 	addDiscriminators();
 	addColumns();
 	if (columnNames.length === 0)
-		sql += `${outputInserted()}DEFAULT VALUES`;
+		sql += `${outputInserted()} (${table._primaryColumns[0]._dbName}) VALUES(DEFAULT)`;
 	else
 		sql = sql + '('+ columnNames.join(',') + ')' + outputInserted() +  'VALUES (' + values.join(',') + ')';
 	return sql;

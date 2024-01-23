@@ -2,7 +2,8 @@ const newInsertCommand = require('../table/commands/newInsertCommand');
 const newInsertCommandCore = require('./newInsertCommandCore');
 const setSessionSingleton = require('../table/setSessionSingleton');
 const newGetLastInsertedCommand = require('../table/commands/newGetLastInsertedCommand');
-let executeQueries = require('../table/executeQueries');
+const executeQueries = require('../table/executeQueries');
+const pushCommand = require('../table/commands/pushCommand');
 
 function insert(table, row, options) {
 

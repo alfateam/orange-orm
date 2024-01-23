@@ -15,7 +15,7 @@ function _new(table,alias, span) {
 
 	function formatColumn(column) {
 
-		const formatted = column.format && column.tsType !== 'DateColumn' ? column.format(alias) : alias + '.' + column._dbName;
+		const formatted = column.formatOut && column.tsType !== 'DateColumn' ? column.formatOut(alias) : alias + '.' + column._dbName;
 		if (column.dbNull === null)
 			return formatted;
 		else {

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /* eslint-disable no-prototype-builtins */
 var EventEmitter = require('events').EventEmitter;
 
@@ -6,6 +7,7 @@ var genericPool = require('../../generic-pool');
 var oracle = require('oracledb');
 
 oracle.outFormat = oracle.OUT_FORMAT_OBJECT;
+oracle.fetchAsBuffer = [ oracle.BLOB ];
 
 function newGenericPool(connectionString, poolOptions) {
 	poolOptions = poolOptions || {};

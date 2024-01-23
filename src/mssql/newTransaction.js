@@ -4,7 +4,7 @@ var deleteFromSql = require('../tedious/deleteFromSql');
 var selectForUpdateSql = require('../tedious/selectForUpdateSql');
 var outputInsertedSql = require('../tedious/outputInsertedSql');
 const limitAndOffset = require('../tedious/limitAndOffset');
-const formatDateColumn = require('../tedious/formatDateColumn');
+const formatDateOut = require('../tedious/formatDateOut');
 const insertSql = require('../tedious/insertSql');
 const insert = require('../tedious/insert');
 
@@ -32,7 +32,7 @@ function newResolveTransaction(domain, pool) {
 				rdb.encodeBoolean = encodeBoolean;
 				rdb.decodeJSON = decodeJSON;
 				rdb.encodeJSON = JSON.stringify;
-				rdb.formatDateColumn = formatDateColumn;
+				rdb.formatDateOut = formatDateOut;
 				rdb.deleteFromSql = deleteFromSql;
 				rdb.selectForUpdateSql = selectForUpdateSql;
 				rdb.outputInsertedSql = outputInsertedSql;

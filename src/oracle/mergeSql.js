@@ -11,9 +11,9 @@ function insertSql(table, row, options) {
 	const matched = whenMatched();
 	let sql;
 	if (matched)
-		sql = `MERGE INTO ${table._dbName} AS target USING (SELECT ${values.join(',')}) AS source ON ${join()} WHEN MATCHED THEN ${matched} WHEN NOT MATCHED THEN ${whenNotMatched()} ${outputInsertedSql(table)};`;
+		sql = `MERGE INTO ${table._dbName} target USING (SELECT ${values.join(',')} FROM DUAL) source ON (${join()}) WHEN MATCHED THEN ${matched} WHEN NOT MATCHED THEN ${whenNotMatched()} ${outputInsertedSql(table)}`;
 	else
-		sql = `MERGE INTO ${table._dbName} AS target USING (SELECT ${values.join(',')}) AS source ON ${join()} WHEN NOT MATCHED THEN ${whenNotMatched()} ${outputInsertedSql(table)};`;
+		sql = `MERGE INTO ${table._dbName} target USING (SELECT ${values.join(',')} FROM DUAL) source ON (${join()}) WHEN NOT MATCHED THEN ${whenNotMatched()} ${outputInsertedSql(table)}`;
 	return sql;
 
 	function join() {
@@ -42,7 +42,7 @@ function insertSql(table, row, options) {
 		for (let i = 0; i < discriminators.length; i++) {
 			let parts = discriminators[i].split('=');
 			columnNames.push(parts[0]);
-			values.push(`${parts[1]} AS ${parts[0]}`);
+			values.push(`${parts[1]} ${parts[0]}`);
 		}
 	}
 
@@ -54,8 +54,9 @@ function insertSql(table, row, options) {
 			regularColumnNames.push(column._dbName);
 			if (row['__' + column.alias] !== undefined) {
 				columnNames.push(column._dbName);
-				values.push(`%s AS ${column.alias}`);
-				addConflictUpdate(column);
+				values.push(`%s ${column.alias}`);
+				if (!column.isPrimary)
+					addConflictUpdate(column);
 			}
 		}
 
@@ -68,7 +69,9 @@ function insertSql(table, row, options) {
 			if (concurrency === 'overwrite')
 				conflictColumnUpdates.push(`target.${column._dbName}=source.${column._dbName}`);
 			else if (concurrency === 'optimistic')
-				conflictColumnUpdates.push(`target.${column._dbName} = CASE WHEN target.${column._dbName} <> source.${column._dbName} THEN CAST('12345678-1234-1234-1234-123456789012Conflict when updating ${column._dbName}12345678-1234-1234-1234-123456789012' AS INTEGER) ELSE target.${column._dbName} END`);
+				// conflictColumnUpdates.push(`target.${column._dbName} = CASE WHEN target.${column._dbName} <> source.${column._dbName} THEN RAISE_APPLICATION_ERROR(-20001, 'Conflict when updating ${column._dbName}') ELSE target.${column._dbName} END`);
+				conflictColumnUpdates.push(`target.${column._dbName} = CASE WHEN target.${column._dbName} <> source.${column._dbName} THEN 1/0 ELSE target.${column._dbName} END`);
+
 		}
 	}
 }

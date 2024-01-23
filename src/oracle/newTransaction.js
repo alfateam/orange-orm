@@ -6,6 +6,8 @@ const lastInsertedSql = require('./lastInsertedSql');
 const limitAndOffset = require('./limitAndOffset');
 const insertSql = require('./insertSql');
 const insert = require('./insert');
+const formatDateOut = require('./formatDateOut');
+const formatDateIn = require('./formatDateIn');
 
 function newResolveTransaction(domain, pool) {
 	var rdb = {poolFactory: pool};
@@ -31,6 +33,8 @@ function newResolveTransaction(domain, pool) {
 				rdb.encodeBoolean = encodeBoolean;
 				rdb.decodeJSON = decodeJSON;
 				rdb.encodeJSON = JSON.stringify;
+				rdb.formatDateOut = formatDateOut;
+				rdb.formatDateIn = formatDateIn;
 				rdb.deleteFromSql = deleteFromSql;
 				rdb.selectForUpdateSql = selectForUpdateSql;
 				rdb.lastInsertedSql = lastInsertedSql;

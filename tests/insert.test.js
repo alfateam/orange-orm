@@ -585,7 +585,7 @@ describe('insert autoincremental with relations', () => {
 
 	}
 
-}, 999999999);
+});
 
 describe('insert autoincremental with relations and strategy', () => {
 	// test('pg', async () => await verify('pg'));
@@ -773,7 +773,8 @@ const connections = {
 					password: 'P@assword123',
 					connectString: 'oracle/XE',
 					privilege: 2
-				}
+				}, {size: 1}
+
 			)
 		}),
 		init: initOracle
