@@ -41,10 +41,10 @@ GO
 
 IF
 EXISTS (SELECT 1 FROM
-sysobjects WHERE type = 'U' and name = '_order')
+sysobjects WHERE type = 'U' and name = 'torder')
 
 BEGIN
-	DROP TABLE _order
+	DROP TABLE torder
 END
 
 GO
@@ -71,14 +71,14 @@ GO
 
 CREATE TABLE datetest (
     id int IDENTITY PRIMARY KEY,
-    _date DATE NULL,
-    _datetime DATETIME NULL,
-    _datetime_tz DATETIME NULL
+    tdate DATE NULL,
+    tdatetime DATETIME NULL,
+    tdatetime_tz DATETIME NULL
     );
     
 GO
 
-INSERT INTO datetest (_date, _datetime, _datetime_tz)
+INSERT INTO datetest (tdate, tdatetime, tdatetime_tz)
 VALUES ('2023-07-14 12:00:00', '2023-07-14T12:00:00', '2023-07-14 12:00:00');
 
 GO
@@ -104,7 +104,7 @@ CREATE TABLE vendor (
 
 GO
 
-CREATE TABLE _order (
+CREATE TABLE torder (
     id int IDENTITY PRIMARY KEY,
     orderDate DATETIME,
     customerId INTEGER NULL REFERENCES customer
@@ -114,7 +114,7 @@ GO
 
 CREATE TABLE orderLine (
     id int IDENTITY PRIMARY KEY,
-    orderId INTEGER REFERENCES _order,
+    orderId INTEGER REFERENCES torder,
     product VARCHAR(100)
 )
 
@@ -130,7 +130,7 @@ GO
 
 CREATE TABLE deliveryAddress (
     id int IDENTITY PRIMARY KEY,
-    orderId INTEGER REFERENCES _order,
+    orderId INTEGER REFERENCES torder,
     name VARCHAR(100), 
     street VARCHAR(100),
     postalCode VARCHAR(100),

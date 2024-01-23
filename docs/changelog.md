@@ -1,5 +1,7 @@
 
 ## Changelog
+__3.5.0__  
+Support for Oracle.  
 __3.4.0__  
 Allow multiple resultset for SAP and mssql. See [#72](https://github.com/alfateam/rdb/issues/72).  
 __3.3.0__  

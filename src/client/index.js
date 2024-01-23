@@ -58,6 +58,7 @@ function rdbClient(options = {}) {
 	client.postgres = onProvider.bind(null, 'postgres');
 	client.sqlite = onProvider.bind(null, 'sqlite');
 	client.sap = onProvider.bind(null, 'sap');
+	client.oracle = onProvider.bind(null, 'oracle');
 	client.http = onProvider.bind(null, 'http');//todo
 	client.mysql = onProvider.bind(null, 'mysql');
 	client.express = express;

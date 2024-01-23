@@ -14,7 +14,7 @@ function newJoinSql(relations) {
 	}
 
 	relations.forEach(function(relation, i){
-		leftAlias = '_' + (length-i);
+		leftAlias = 'x' + (length-i);
 		rightAlias = createAlias(relation.childTable, length-i-1);
 		addSql(relation);
 

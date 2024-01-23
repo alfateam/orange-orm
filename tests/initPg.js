@@ -4,12 +4,12 @@ create schema public;
 
 CREATE TABLE datetest (
     id SERIAL	 PRIMARY KEY,
-    _date DATE,
-    _datetime TIMESTAMP,
-    _datetime_tz TIMESTAMP WITH TIME ZONE
+    tdate DATE,
+    tdatetime TIMESTAMP,
+    tdatetime_tz TIMESTAMP WITH TIME ZONE
 );
 
-INSERT INTO datetest (_date, _datetime, _datetime_tz)
+INSERT INTO datetest (tdate, tdatetime, tdatetime_tz)
 VALUES ('2023-07-14 12:00:00+09:00', '2023-07-14 12:00:00+09:00', '2023-07-14 12:00:00-08:00');
 
 CREATE TABLE customer (
@@ -28,7 +28,7 @@ CREATE TABLE vendor (
     isActive BOOLEAN    
 );
 
-CREATE TABLE _order (
+CREATE TABLE torder (
     id SERIAL PRIMARY KEY,
     orderDate TIMESTAMP,
     customerId INTEGER REFERENCES customer
@@ -36,7 +36,7 @@ CREATE TABLE _order (
 
 CREATE TABLE orderLine (
     id SERIAL PRIMARY KEY,
-    orderId INTEGER REFERENCES _order,
+    orderId INTEGER REFERENCES torder,
     product TEXT
 );
 
@@ -48,7 +48,7 @@ CREATE TABLE package (
 
 CREATE TABLE deliveryAddress (
     id SERIAL PRIMARY KEY,
-    orderId INTEGER REFERENCES _order,
+    orderId INTEGER REFERENCES torder,
     name TEXT, 
     street TEXT,
     postalCode TEXT,

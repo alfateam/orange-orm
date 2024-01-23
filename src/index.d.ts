@@ -1,6 +1,7 @@
 import { Options } from 'ajv';
 import { RequestHandler } from 'express';
 import { ConnectionConfig } from 'tedious';
+import { PoolAttributes } from 'oracledb';
 import { AllowedDbMap, DbMapper, MappedDbDef } from './map';
 
 declare function r(config: r.Config): unknown;
@@ -16,6 +17,7 @@ declare namespace r {
     function mssql(connectionString: string, options?: PoolOptions): Pool;
     function mssqlNative(connectionString: string, options?: PoolOptions): Pool;
     function mysql(connectionString: string, options?: PoolOptions): Pool;
+    function oracle(config: PoolAttributes, options?: PoolOptions): Pool;
     function on(type: 'query', cb: (e: QueryEvent) => void): void;
     function off(type: 'query', cb: (e: QueryEvent) => void): void;
     function map<V extends AllowedDbMap<V>>(

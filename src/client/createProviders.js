@@ -38,6 +38,11 @@ function createProviders(index) {
 			return createPool.bind(null, 'sap');
 		}
 	});
+	Object.defineProperty(dbMap, 'oracle', {
+		get:  function() {
+			return createPool.bind(null, 'oracle');
+		}
+	});
 	Object.defineProperty(dbMap, 'sqlite', {
 		get:  function() {
 			return createPool.bind(null, 'sqlite');
@@ -85,6 +90,9 @@ function negotiateCachedPool(fn, providers) {
 		},
 		get sap() {
 			return createPool.bind(null, 'sap');
+		},
+		get oracle() {
+			return createPool.bind(null, 'oracle');
 		},
 		get sqlite() {
 			return createPool.bind(null, 'sqlite');

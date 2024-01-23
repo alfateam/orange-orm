@@ -5022,6 +5022,7 @@ function map$1(index, _fn) {
 	dbMap.mssqlNative = throwDb;
 	dbMap.mysql = throwDb;
 	dbMap.sap = throwDb;
+	dbMap.oracle = throwDb;
 	dbMap.sqlite = throwDb;
 
 	function throwDb() {
@@ -5047,6 +5048,7 @@ function map$1(index, _fn) {
 	onFinal.mssqlNative = () => index({ db: throwDb, providers: dbMap });
 	onFinal.mysql = () => index({ db: throwDb, providers: dbMap });
 	onFinal.sap = () => index({ db: throwDb, providers: dbMap });
+	onFinal.oracle = () => index({ db: throwDb, providers: dbMap });
 	onFinal.sqlite = () => index({ db: throwDb, providers: dbMap });
 
 	return new Proxy(onFinal, handler);
@@ -5352,6 +5354,7 @@ function rdbClient(options = {}) {
 	client.postgres = onProvider.bind(null, 'postgres');
 	client.sqlite = onProvider.bind(null, 'sqlite');
 	client.sap = onProvider.bind(null, 'sap');
+	client.oracle = onProvider.bind(null, 'oracle');
 	client.http = onProvider.bind(null, 'http');//todo
 	client.mysql = onProvider.bind(null, 'mysql');
 	client.express = express;

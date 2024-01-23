@@ -6,6 +6,7 @@ var _sqlite;
 var _mssqlNative;
 var _sap;
 var _mssql;
+var _oracle;
 var flags = require('./flags');
 var map = require('./client/map');
 
@@ -96,6 +97,14 @@ Object.defineProperty(connectViaPool, 'sap', {
 		if (!_sap)
 			_sap = require('./sap/newDatabase');
 		return _sap;
+	}
+});
+
+Object.defineProperty(connectViaPool, 'oracle', {
+	get: function() {
+		if (!_oracle)
+			_oracle = require('./oracle/newDatabase');
+		return _oracle;
 	}
 });
 

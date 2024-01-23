@@ -4,7 +4,7 @@ var newParameterized = require('../../../../table/query/newParameterized');
 var util = require('util');
 
 function oneLegToQuery(rightAlias,leg,legNo) {
-	var leftAlias = rightAlias + '_' + legNo;
+	var leftAlias = rightAlias + 'x' + legNo;
 	var span = leg.span;
 	var rightTable = leg.table;
 	var rightColumns = rightTable._primaryColumns;

@@ -46,6 +46,7 @@ function map(index, context, providers, fn) {
 	context.mssqlNative = connect.bind(null, 'mssqlNative');
 	context.mysql = connect.bind(null, 'mysql');
 	context.sap = connect.bind(null, 'sap');
+	context.oracle = connect.bind(null, 'oracle');
 	context.sqlite = connect.bind(null, 'sqlite');
 	context.http = function(url) {
 		return index({ db: url, providers});

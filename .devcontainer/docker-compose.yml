@@ -52,5 +52,12 @@ services:
     ports:
       - 50000:5000
     # restart: always
+  oracle:
+    image: gvenzl/oracle-xe
+    environment:
+      - ORACLE_PASSWORD=P@assword123   
+    hostname: oracle
+    ports:
+      - 1521:1521
 volumes:
   try-node-node_modules:

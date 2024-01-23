@@ -6,6 +6,7 @@ import cors from 'cors';
 import { json } from 'body-parser';
 const dateToISOString = require('../src/dateToISOString');
 const initPg = require('./initPg');
+const initOracle = require('./initOracle');
 const initMs = require('./initMs');
 const initMysql = require('./initMysql');
 const initSqlite = require('./initSqlite');
@@ -30,6 +31,7 @@ afterAll(async () => {
 
 beforeAll(async () => {
 	await insertData('pg');
+	await insertData('oracle');
 	await insertData('mssql');
 	if (major === 18)
 		await insertData('mssqlNative');
@@ -102,8 +104,8 @@ beforeAll(async () => {
 
 
 describe('update date in array', () => {
-
 	test('pg', async () => await verify('pg'));
+	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
@@ -127,6 +129,7 @@ describe('update date in array', () => {
 describe('update multiple in array', () => {
 
 	test('pg', async () => await verify('pg'));
+	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
@@ -207,6 +210,7 @@ describe('update multiple in array', () => {
 describe('delete row', () => {
 
 	test('pg', async () => await verify('pg'));
+	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
@@ -229,6 +233,7 @@ describe('delete row', () => {
 describe('update boolean', () => {
 
 	test('pg', async () => await verify('pg'));
+	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
@@ -250,6 +255,7 @@ describe('update boolean', () => {
 describe('update date', () => {
 
 	test('pg', async () => await verify('pg'));
+	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
@@ -292,34 +298,47 @@ const connections = {
 							password: 'P@assword123',
 						}
 					}
-				})
+				}, { size: 1 })
 			},),
 		init: initMs
 	},
 	mssqlNative:
 	{
-		db: map({ db: (con) => con.mssqlNative('server=mssql;Database=demo;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes') }),
+		db: map({ db: (con) => con.mssqlNative('server=mssql;Database=demo;Trusted_Connection=No;Uid=sa;pwd=P@assword123;Driver={ODBC Driver 18 for SQL Server};TrustServerCertificate=yes', { size: 0 }) }),
 		init: initMs
 	},
 	pg: {
-		db: map({ db: con => con.postgres('postgres://postgres:postgres@postgres/postgres') }),
+		db: map({ db: con => con.postgres('postgres://postgres:postgres@postgres/postgres', { size: 1 }) }),
 		init: initPg
 	},
 	sqlite: {
-		db: map({ db: (con) => con.sqlite(sqliteName) }),
+		db: map({ db: (con) => con.sqlite(sqliteName, { size: 1 }) }),
 		init: initSqlite
 	},
 	sqlite2: {
-
-		db: map({ db: (con) => con.sqlite(sqliteName2) }),
+		db: map({ db: (con) => con.sqlite(sqliteName2, { size: 1 }) }),
 		init: initSqlite
 	},
 	sap: {
-		db: map({ db: (con) => con.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master`) }),
+		db: map({ db: (con) => con.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master`, { size: 1 }) }),
 		init: initSap
 	},
+	oracle: {
+		db: map({
+			db: (con) => con.oracle(
+				{
+					user: 'sys',
+					password: 'P@assword123',
+					connectString: 'oracle/XE',
+					privilege: 2
+				}, {size: 1}
+
+			)
+		}),
+		init: initOracle
+	},
 	mysql: {
-		db: map({ db: (con) => con.mysql('mysql://test:test@mysql/test') }),
+		db: map({ db: (con) => con.mysql('mysql://test:test@mysql/test', { size: 1 }) }),
 		init: initMysql
 	},
 	http: {
@@ -341,6 +360,8 @@ function getDb(name) {
 		return connections.sqlite2;
 	else if (name === 'sap')
 		return connections.sap;
+	else if (name === 'oracle')
+		return connections.oracle;
 	else if (name === 'mysql')
 		return connections.mysql;
 	else if (name === 'http')

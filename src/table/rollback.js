@@ -14,6 +14,8 @@ function rollback(e) {
 		.then(releaseDbClient);
 
 	if (e) {
+		if (e.message.indexOf('ORA-01476: divisor is equal to zero') > -1)
+			return newThrow(new Error('Conflict when updating a column'), chain);
 		let errors = e.message && e.message.split(conflictId) || [];
 		if (errors.length > 1) {
 			return newThrow(new Error(errors[1]), chain);

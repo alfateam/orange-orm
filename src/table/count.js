@@ -24,7 +24,7 @@ function newQuery(table, filter, alias) {
 		var name = table._dbName;
 		var whereSql = newWhereSql(table, filter, alias);
 
-		return 'select count(*) _count from ' + name + ' ' + alias  + whereSql;
+		return 'select count(*) "_count" from ' + name + ' ' + alias  + whereSql;
 	};
 
 	c.parameters = filter.parameters;

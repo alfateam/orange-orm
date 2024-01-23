@@ -64,7 +64,7 @@ const map = rdb.map(x => ({
 		sscc: column('sscc').string()
 	})),
 
-	order: x.table('_order').map(({ column }) => ({
+	order: x.table('torder').map(({ column }) => ({
 		id: column('id').numeric().primary().notNullExceptInsert(),
 		orderDate: column('orderDate').date().notNull(),
 		customerId: column('customerId').numeric().notNullExceptInsert(),
@@ -88,15 +88,15 @@ const map = rdb.map(x => ({
 
 	datetest: x.table('datetest').map(({ column }) => ({
 		id: column('id').numeric().primary().notNullExceptInsert(),
-		date: column('_date').date(),
-		datetime: column('_datetime').date(),
+		date: column('tdate').date(),
+		datetime: column('tdatetime').date(),
 	})),
 
 	datetestWithTz: x.table('datetest').map(({ column }) => ({
 		id: column('id').numeric().primary().notNullExceptInsert(),
-		date: column('_date').date(),
-		datetime: column('_datetime').date(),
-		datetime_tz: column('_datetime_tz').dateWithTimeZone()
+		date: column('tdate').date(),
+		datetime: column('tdatetime').date(),
+		datetime_tz: column('tdatetime_tz').dateWithTimeZone()
 	}))
 })).map(x => ({
 	orderLine: x.orderLine.map(({ hasMany }) => ({

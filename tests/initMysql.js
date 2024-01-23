@@ -1,13 +1,13 @@
-const sql = `DROP TABLE IF EXISTS deliveryAddress; DROP TABLE IF EXISTS package; DROP TABLE IF EXISTS orderLine; DROP TABLE IF EXISTS _order; DROP TABLE IF EXISTS customer;DROP TABLE IF EXISTS vendor;DROP TABLE IF EXISTS datetest;
+const sql = `DROP TABLE IF EXISTS deliveryAddress; DROP TABLE IF EXISTS package; DROP TABLE IF EXISTS orderLine; DROP TABLE IF EXISTS torder; DROP TABLE IF EXISTS customer;DROP TABLE IF EXISTS vendor;DROP TABLE IF EXISTS datetest;
 
 CREATE TABLE datetest (
     id INTEGER AUTO_INCREMENT PRIMARY KEY,
-    _date DATE,
-    _datetime DATETIME,
-    _datetime_tz TIMESTAMP
+    tdate DATE,
+    tdatetime DATETIME,
+    tdatetime_tz TIMESTAMP
 );
 
-INSERT INTO datetest (_date, _datetime, _datetime_tz)
+INSERT INTO datetest (tdate, tdatetime, tdatetime_tz)
 VALUES ('2023-07-14T12:00:00+09:00', '2023-07-14T12:00:00+09:00', '2023-07-14 12:00:00-08:00');
 
 CREATE TABLE customer (
@@ -26,7 +26,7 @@ CREATE TABLE vendor (
     isActive BOOLEAN    
 );
 
-CREATE TABLE _order (
+CREATE TABLE torder (
     id INTEGER AUTO_INCREMENT PRIMARY KEY,
     orderDate TEXT,
     customerId INTEGER REFERENCES customer
@@ -34,7 +34,7 @@ CREATE TABLE _order (
 
 CREATE TABLE orderLine (
     id INTEGER AUTO_INCREMENT PRIMARY KEY,
-    orderId INTEGER REFERENCES _order,
+    orderId INTEGER REFERENCES torder,
     product TEXT
 );
 
@@ -46,7 +46,7 @@ CREATE TABLE package (
 
 CREATE TABLE deliveryAddress (
     id INTEGER AUTO_INCREMENT PRIMARY KEY,
-    orderId INTEGER REFERENCES _order,
+    orderId INTEGER REFERENCES torder,
     name TEXT, 
     street TEXT,
     postalCode TEXT,

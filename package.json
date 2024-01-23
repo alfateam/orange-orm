@@ -1,6 +1,6 @@
 {
   "name": "rdb",
-  "version": "3.4.0",
+  "version": "3.5.0",
   "main": "./src/index.js",
   "browser": "./src/client/index.mjs",
   "bin": {
@@ -47,6 +47,7 @@
     "@lroal/on-change": "^4.0.2",
     "@tediousjs/connection-string": "^0.4.1",
     "@types/express": "^4.17.13",
+    "@types/oracledb": "^6.0.4",
     "@types/tedious": "^4.0.9",
     "ajv": "^6.10.2",
     "axios": "^1.6.2",
@@ -63,6 +64,7 @@
   "peerDependencies": {
     "msnodesqlv8": "^4.1.0",
     "mysql2": "^2.2.5",
+    "oracledb": "^6.3.0",
     "pg": "^8.5.1",
     "pg-native": "^3.0.0",
     "pg-query-stream": "^3.3.2",
@@ -104,6 +106,7 @@
     "express": "^4.18.2",
     "msnodesqlv8": "^4.1.0",
     "mysql2": "^2.2.5",
+    "oracledb": "^6.3.0",
     "owasp-dependency-check": "^0.0.21",
     "pg": "^8.5.1",
     "pg-query-stream": "^3.3.2",

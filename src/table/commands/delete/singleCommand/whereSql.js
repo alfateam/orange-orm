@@ -4,7 +4,7 @@ function newWhereSql(relations, shallowFilter, rightAlias) {
 	var sql;
 	var relationCount = relations.length;
 	var relation = relations[0];
-	var leftAlias = '_' + relationCount;
+	var leftAlias = 'x' + relationCount;
 	var table = relation.childTable;
 	var leftColumns = relation.columns;
 	var rightColumns = table._primaryColumns;

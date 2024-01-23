@@ -4,7 +4,7 @@ var newParameterized = require('../../../../table/query/newParameterized');
 var util = require('util');
 
 function joinLegToQuery(parentAlias,leg,legNo) {
-	var childAlias = parentAlias + '_' + legNo;
+	var childAlias = parentAlias + 'x' + legNo;
 	var span = leg.span;
 	var parentTable = leg.table;
 	var childColumns = span.table._primaryColumns;

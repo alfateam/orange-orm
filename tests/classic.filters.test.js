@@ -3,6 +3,7 @@ import { describe, test, beforeAll, expect } from 'vitest';
 import rdb from '../src/index';
 const db = require('./db');
 const initPg = require('./initPg');
+const initOracle = require('./initOracle');
 const initMs = require('./initMs');
 const initMysql = require('./initMysql');
 const initSqlite = require('./initSqlite');
@@ -11,7 +12,7 @@ const dateToISOString = require('../src/dateToISOString');
 const versionArray = process.version.replace('v', '').split('.');
 const major = parseInt(versionArray[0]);
 
-const Order = rdb.table('_order');
+const Order = rdb.table('torder');
 Order.column('id').numeric().primary().notNullExceptInsert(),
 Order.column('orderDate').date().notNull();
 
@@ -35,8 +36,9 @@ Lines.hasMany(packageJoin).as('packages');
 
 beforeAll(async () => {
 	await createMs('mssql');
-	await insertData('pg');
 	await insertData('mssql');
+	await insertData('pg');
+	await insertData('oracle');
 	if (major === 18)
 		await insertData('mssqlNative');
 	await insertData('mysql');
@@ -124,6 +126,7 @@ beforeAll(async () => {
 describe('basic filter', async () => {
 
 	test('pg', async () => await verify('pg'));
+	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
@@ -160,6 +163,7 @@ describe('basic filter', async () => {
 describe('basic nested filter', async () => {
 
 	test('pg', async () => await verify('pg'));
+	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
@@ -195,6 +199,7 @@ describe('basic nested filter', async () => {
 describe('any filter', async () => {
 
 	test('pg', async () => await verify('pg'));
+	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
@@ -231,6 +236,7 @@ describe('any filter', async () => {
 describe('all filter', async () => {
 
 	test('pg', async () => await verify('pg'));
+	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
@@ -267,6 +273,7 @@ describe('all filter', async () => {
 describe('none filter', async () => {
 
 	test('pg', async () => await verify('pg'));
+	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
@@ -303,6 +310,7 @@ describe('none filter', async () => {
 describe('any-subFilter filter', async () => {
 
 	test('pg', async () => await verify('pg'));
+	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
@@ -339,6 +347,7 @@ describe('any-subFilter filter', async () => {
 describe('any-subFilter filter nested', async () => {
 
 	test('pg', async () => await verify('pg'));
+	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
@@ -375,6 +384,7 @@ describe('any-subFilter filter nested', async () => {
 describe('any-subFilter filter nested chained', async () => {
 
 	test('pg', async () => await verify('pg'));
+	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
@@ -440,6 +450,19 @@ function getDb(name) {
 			db: db.postgres('postgres://postgres:postgres@postgres/postgres'),
 			init: initPg
 		};
+	else if (name === 'oracle')
+		return {
+			db: db.oracle(
+				{
+					user: 'sys',
+					password: 'P@assword123',
+					connectString: 'oracle/XE',
+					privilege: 2
+				}, { size: 1 }
+
+			),
+			init: initOracle
+		};
 	else if (name === 'sqlite')
 		return {
 			db: db.sqlite(sqliteName),
@@ -489,6 +512,13 @@ function getClassicDb(name) {
 		return rdb.sqlite(sqliteName);
 	else if (name === 'sap')
 		return rdb.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master`);
+	else if (name === 'oracle')
+		return rdb.oracle({
+			user: 'sys',
+			password: 'P@assword123',
+			connectString: 'oracle/XE',
+			privilege: 2
+		});
 	else if (name === 'mysql')
 		return rdb.mysql('mysql://test:test@mysql/test');
 	else

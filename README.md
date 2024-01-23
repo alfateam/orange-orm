@@ -1,5 +1,5 @@
 ![RDB](./docs/logo-sm.jpg)  
-RDB is the ultimate Object Relational Mapper for Node.js and Typescript, offering seamless integration with popular databases like Postgres, MS SQL, MySQL, Sybase SAP, and SQLite. Whether you're building applications in TypeScript or JavaScript  (including both CommonJS and ECMAScript), RDB has got you covered.  
+RDB is the ultimate Object Relational Mapper for Node.js and Typescript, offering seamless integration with a variety of popular databases. Whether you're building applications in TypeScript or JavaScript  (including both CommonJS and ECMAScript), RDB has got you covered.  
 
 [![npm version](https://img.shields.io/npm/v/rdb.svg?style=flat-square)](https://www.npmjs.org/package/rdb)
 [![Build status](https://github.com/alfateam/rdb/workflows/Node.js%20CI/badge.svg)](https://github.com/alfateam/rdb/actions)
@@ -18,6 +18,16 @@ RDB is the ultimate Object Relational Mapper for Node.js and Typescript, offerin
 - **No Code Generation Required**: Enjoy full IntelliSense, even in table mappings, without the need for cumbersome code generation.
 - **TypeScript and JavaScript Support**: RDB fully supports both TypeScript and JavaScript, allowing you to leverage the benefits of static typing and modern ECMAScript features.
 - **Works in the Browser**: You can securely use RDB in the browser by utilizing the Express.js plugin, which serves to safeguard sensitive database credentials from exposure at the client level. This method mirrors a traditional REST API, augmented with advanced TypeScript tooling for enhanced functionality.
+
+## Supported Databases
+
+- [x] Postgres
+- [x] MS SQL
+- [x] MySQL
+- [x] Oracle
+- [x] Sybase SAP
+- [x] SQLite
+
 
 This is the _Modern Typescript Documentation_. Are you looking for the [_Classic Documentation_](https://github.com/alfateam/rdb/blob/master/docs/docs.md) ?
 
@@ -318,6 +328,19 @@ $ npm install pg
 ```javascript
 import map from './map';
 const db = map.pg('postgres://postgres:postgres@postgres/postgres');
+```
+__Oracle__
+```bash
+$ npm install oracledb
+```  
+```javascript
+import map from './map';
+const db = map.oracle({
+  user: 'sys',
+  password: 'P@assword123',
+  connectString: 'oracle/XE',
+  privilege: 2
+});
 ```
 __SAP Adaptive Server__
 ```bash

@@ -1,5 +1,6 @@
 import type { Options } from 'ajv';
 import type { ConnectionConfig } from 'tedious';
+import type { PoolAttributes } from 'oracledb';
 import type { AxiosInterceptorManager, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 
 export type MappedDbDef<T> = {
@@ -35,6 +36,7 @@ type DbConnectable<T> = {
 	mssql(connectionString: string, options?: PoolOptions): MappedDbInstance<T>;
 	mssqlNative(connectionString: string, options?: PoolOptions): MappedDbInstance<T>;
 	mysql(connectionString: string, options?: PoolOptions): MappedDbInstance<T>;
+	oracle(config: PoolAttributes, options?: PoolOptions): MappedDbInstance<T>;
 };
 
 type NegotiateDbInstance<T, C> = C extends WithDb
@@ -62,7 +64,7 @@ interface Connectors {
 	sap(connectionString: string, options?: PoolOptions): Pool;
 	mssql(connectionConfig: ConnectionConfig, options?: PoolOptions): Pool;
 	mssql(connectionString: string, options?: PoolOptions): Pool;
-	mysql(connectionString: string, options?: PoolOptions): Pool;
+	oracle(config: PoolAttributes, options?: PoolOptions): Pool;
 }
 
 export interface Pool {
