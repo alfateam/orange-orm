@@ -4,7 +4,6 @@ const releaseDbClient = require('./releaseDbClient');
 const popChanges = require('./popChanges');
 const newThrow = require('./newThrow');
 const resultToPromise = require('./resultToPromise');
-const { escape } = require('mysql2');
 const conflictId = '12345678-1234-1234-1234-123456789012';
 
 function rollback(e) {

@@ -24,19 +24,19 @@ beforeAll(async () => {
 		const { db, init } = getDb(dbName);
 		await init(db);
 
-	// 	const george = await db.customer.insert({
-	// 		name: 'George',
-	// 		balance: 177,
-	// 		isActive: true
-	// 	});
+		// 	const george = await db.customer.insert({
+		// 		name: 'George',
+		// 		balance: 177,
+		// 		isActive: true
+		// 	});
 
-	// 	const john = await db.customer.insert({
-	// 		name: 'Harry',
-	// 		balance: 200,
-	// 		isActive: true
-	// 	});
-	// 	const date1 = new Date(2022, 0, 11, 9, 24, 47);
-	// 	const date2 = new Date(2021, 0, 11, 12, 22, 45);
+		// 	const john = await db.customer.insert({
+		// 		name: 'Harry',
+		// 		balance: 200,
+		// 		isActive: true
+		// 	});
+		// 	const date1 = new Date(2022, 0, 11, 9, 24, 47);
+		// 	const date2 = new Date(2021, 0, 11, 12, 22, 45);
 
 	// 	await db.order.insert([
 	// 		{

@@ -9,7 +9,7 @@ function _new(column) {
 		if (value == null) {
 			if (column.dbNull === null)
 				return newPara('null');
-			return newPara('\'' + column.dbNull + '\'');			
+			return newPara('\'' + column.dbNull + '\'');
 		}
 		var context = getSessionContext();
 		var encodeCore = context.encodeDate || encodeDate;

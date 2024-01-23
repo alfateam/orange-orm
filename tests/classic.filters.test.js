@@ -14,7 +14,7 @@ const major = parseInt(versionArray[0]);
 
 const Order = rdb.table('torder');
 Order.column('id').numeric().primary().notNullExceptInsert(),
-	Order.column('orderDate').date().notNull();
+Order.column('orderDate').date().notNull();
 
 const Lines = rdb.table('orderLine');
 Lines.column('id').numeric().primary().notNullExceptInsert();
