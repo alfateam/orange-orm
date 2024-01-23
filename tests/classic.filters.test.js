@@ -36,6 +36,7 @@ Lines.hasMany(packageJoin).as('packages');
 
 beforeAll(async () => {
 	await createMs('mssql');
+	await insertData('mssql');
 	await insertData('pg');
 	await insertData('oracle');
 	if (major === 18)
