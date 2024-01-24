@@ -1,5 +1,7 @@
 
 ## Changelog
+__3.5.1__  
+Mssql: fix precision date types.  
 __3.5.0__  
 Support for Oracle.  
 __3.4.0__  
