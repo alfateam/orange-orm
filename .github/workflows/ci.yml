@@ -117,9 +117,9 @@ jobs:
           echo "BRANCH_NAME=$BRANCH_NAME"
           echo "BRANCH=$BRANCH_NAME" >> $GITHUB_ENV
           
-      - if: ${{ matrix.container == 'node:16-alpine' && github.ref == 'refs/heads/master'}}
+      - if: ${{ matrix.container == 'node:20-alpine' && github.ref == 'refs/heads/master'}}
         name: Create the Badge
-        uses: schneegans/dynamic-badges-action@v1.6.0
+        uses: schneegans/dynamic-badges-action@v1.7.0
         with:
           auth: ${{ secrets.GIST_SECRET }}                    
           gistID: 1a69422f03da7f8155cf94fe66022452
