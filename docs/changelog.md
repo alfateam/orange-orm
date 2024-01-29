@@ -1,5 +1,7 @@
 
 ## Changelog
+__3.5.2__  
+MssqlNative and SAP ASE: PRINT statements no longer yields error.  
 __3.5.1__  
 Mssql: fix precision date types.  
 __3.5.0__  
