@@ -25,7 +25,7 @@ RDB is the ultimate Object Relational Mapper for Node.js and Typescript, offerin
 ✅ MS SQL  
 ✅ MySQL  
 ✅ Oracle  
-✅ Sybase SAP  
+✅ SAP ASE  
 ✅ SQLite
 
 
@@ -342,7 +342,8 @@ const db = map.oracle({
   privilege: 2
 });
 ```
-__SAP Adaptive Server__
+__SAP Adaptive Server__  
+Even though msnodesqlv8 was developed for MS SQL, it also works for SAP ASE as it is ODBC compliant.  
 ```bash
 $ npm install msnodesqlv8
 ```  
@@ -354,7 +355,7 @@ import map from './map';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 //download odbc driver from sap web pages
-const db = map.pg(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=test`);
+const db = map.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=test`);
 
 ```
 
