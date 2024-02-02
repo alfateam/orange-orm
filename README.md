@@ -791,7 +791,7 @@ async function deleteRow() {
 }
 ```
 __Deleting a row in an array__  
-A typical scenario is that you first fetch many rows, and then wants to delete a single row inside an array. This is straightforward to do with RDB. In fact, you can update, insert and delete any row in a single operation. Just add or remove the rows from the array, and then call the <strong><i>saveChanges()</i></strong> method on the array.
+A common workflow involves retrieving multiple rows, followed by the need to delete a specific row from an array. This operation is straightforward to do with RDB, which allow for the updating, inserting, and deleting of multiple rows in a single transaction. To modify the array, simply add, update, or remove elements, and then invoke the saveChanges() method on the array to persist the changes.
 
 ```javascript
 import map from './map';
