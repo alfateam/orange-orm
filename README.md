@@ -790,6 +790,50 @@ async function deleteRow() {
   //but not customer
 }
 ```
+__Deleting a row in an array__  
+A typical scenario is that you first fetch many rows, and then wants to delete a single row inside an array. This is straightforward to do with RDB. In fact, you can update, insert and delete any row in a single operation. Just add or remove the rows from the array, and then call the <strong><i>saveChanges()</i></strong> method on the array.
+
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+deleteRow();
+
+async function deleteRow() {    
+  const orders = await db.order.getAll({
+    customer: true, 
+    deliveryAddress: true, 
+    lines: true
+  });
+
+  
+  orders[0].lines.push({ //will add line to the first order
+    product: 'secret weapon'
+  });
+  
+  orders.splice(1, 1);//will delete second row
+
+  orders.push({ //will insert a new order with lines, deliveryAddress and set customerId
+    orderDate: new Date(2022, 0, 11, 9, 24, 47),
+    customer: {
+      id: 1
+    },
+    deliveryAddress: {
+      name: 'George',
+      street: 'Node street 1',
+      postalCode: '7059',
+      postalPlace: 'Jakobsli',
+      countryCode: 'NO'
+    },
+    lines: [
+      { product: 'Magic tent' }
+    ]
+  });
+
+  await orders.saveChanges();
+
+}
+```
 
 __Deleting many rows__
 
