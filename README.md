@@ -806,14 +806,16 @@ async function deleteRow() {
     lines: true
   });
 
-  
-  orders[0].lines.push({ //will add line to the first order
+  //will add line to the first order
+  orders[0].lines.push({
     product: 'secret weapon'
   });
   
-  orders.splice(1, 1);//will delete second row
+  //will delete second row
+  orders.splice(1, 1);
 
-  orders.push({ //will insert a new order with lines, deliveryAddress and set customerId
+  //will insert a new order with lines, deliveryAddress and set customerId
+  orders.push({
     orderDate: new Date(2022, 0, 11, 9, 24, 47),
     customer: {
       id: 1
