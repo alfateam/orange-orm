@@ -797,9 +797,9 @@ A common workflow involves retrieving multiple rows, followed by the need to del
 import map from './map';
 const db = map.sqlite('demo.db');
 
-deleteRow();
+updateInsertDelete();
 
-async function deleteRow() {    
+async function updateInsertDelete() {    
   const orders = await db.order.getAll({
     customer: true, 
     deliveryAddress: true, 
