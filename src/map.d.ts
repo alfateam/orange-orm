@@ -571,6 +571,7 @@ type FetchingStrategy<T> = {
 	| OrderBy<Extract<keyof AllowedColumns<T>, string>>;
 	limit?: number;
 	offset?: number;
+	where?: (table: MappedColumnsAndRelations<T>) => RawFilter;
 };
 
 type ColumnConcurrency = {

@@ -5,6 +5,7 @@ var getSessionContext = require('../getSessionContext');
 
 function _new(table, filter, span, alias, orderBy, limit) {
 	//unused ?
+	
 	if (!limit)
 		return;
 	var whereSql = newWhereSql(table, filter, alias);

@@ -1,6 +1,7 @@
 var newDiscriminatorSql = require('./newDiscriminatorSql');
+var newParameterized = require('../../newParameterized')
 
-function _new(rightTable,leftColumns,rightColumns,leftAlias,rightAlias) {
+function _new(rightTable,leftColumns,rightColumns,leftAlias,rightAlias,filter) {
 	var sql = '';
 	var delimiter = '';
 	for (var i = 0; i < leftColumns.length; i++) {
@@ -15,7 +16,10 @@ function _new(rightTable,leftColumns,rightColumns,leftAlias,rightAlias) {
 	}
 
 	sql += newDiscriminatorSql(rightTable,rightAlias);
-	return sql;
+	var result = newParameterized(sql);
+	if (filter)
+		result = result.append(delimiter).append(filter);
+	return result;
 }
 
 module.exports = _new;

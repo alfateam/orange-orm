@@ -3,6 +3,7 @@ var nextRelatedTable = _nextRelatedTable;
 var subFilter = require('./relatedTable/subFilter');
 var any = require('./relatedTable/any');
 var all = require('./relatedTable/all');
+var where = require('./relatedTable/where');
 var none = require('./relatedTable/none');
 
 function newRelatedTable(relations, isShallow, depth = 0) {
@@ -18,10 +19,12 @@ function newRelatedTable(relations, isShallow, depth = 0) {
 	c.all = all(relations, depth);
 	// @ts-ignore
 	c.any = c;
-
+	
 	// @ts-ignore
 	c.none = none(relations, depth);
-
+	
+	// @ts-ignore
+	c.where =  where(relations, depth);
 
 	Object.defineProperty(c, '_relation', {
 		value: relations[relations.length - 1],
@@ -55,6 +58,7 @@ function newRelatedTable(relations, isShallow, depth = 0) {
 			}
 		});
 	}
+	
 
 	// @ts-ignore
 	c.exists = function() {

@@ -1,3 +1,4 @@
+import rdb from '../src/index'
 import { describe, test, beforeAll, afterAll, expect } from 'vitest';
 import { fileURLToPath } from 'url';
 const express = require('express');
@@ -27,8 +28,6 @@ afterAll(async () => {
 });
 
 beforeAll(async () => {
-	await createMs('mssql');
-	await insertData('oracle');
 	await insertData('pg');
 	await insertData('mssql');
 	if (major === 18)
@@ -124,7 +123,7 @@ beforeAll(async () => {
 			.use('/rdb', cors(), db.express());
 		server = app.listen(port, () => console.log(`Example app listening on port ${port}!`));
 	}
-}, 15000);
+}, 9999999);
 
 describe('offset', () => {
 	test('pg', async () => await verify('pg'));
@@ -295,6 +294,40 @@ describe('any-subFilter filter nested', () => {
 	}
 });
 
+describe('any-subFilter filter nested where', () => {
+	test('pg', async () => await verify('pg'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+		const rows = await db.order.getMany(null , {where: (order) => order.lines.any(x => x.packages.any(x => x.sscc.startsWith('aaa')))});
+
+
+		//mssql workaround because datetime has no time offset
+		for (let i = 0; i < rows.length; i++) {
+			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate));
+		}
+
+		const date1 = new Date(2022, 0, 11, 9, 24, 47);
+		const expected = [
+			{
+				id: 1,
+				orderDate: dateToISOString(date1),
+				customerId: 1,
+			}
+		];
+
+		expect(rows).toEqual(expected);
+	}
+});
+
 
 describe('getMany hasOne sub filter', () => {
 
@@ -335,7 +368,6 @@ describe('getMany hasOne sub filter', () => {
 
 
 describe('getMany none sub filter', () => {
-
 	test('pg', async () => await verify('pg'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
@@ -446,7 +478,7 @@ describe('getMany with relations', () => {
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
 
-		const rows = await db.order.getAll({ lines: {}, customer: { } , deliveryAddress: {} });
+		const rows = await db.order.getAll({ lines: {}, customer: {}, deliveryAddress: {} });
 
 		//mssql workaround because datetime has no time offset
 		for (let i = 0; i < rows.length; i++) {
@@ -509,6 +541,79 @@ describe('getMany with relations', () => {
 		expect(rows).toEqual(expected);
 	}
 });
+describe('getMany with filtered relations', () => {
+	test('pg', async () => await verify('pg'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'), { timeout: 9999999});
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+		const rows = await db.order.getMany(db.order.customer.name.notEqual(null), {
+			lines: {
+				where: x => x.product.eq('Bicycle').or(x.product.startsWith('Magic'))
+			},
+			customer: {
+				where: (x => x.name.startsWith('Harry'))
+			},
+			deliveryAddress: {
+				where: (x =>  x.order(y => y.customer.name.startsWith('Harry').and(y.lines.all(z => z.product.startsWith('Magic')))).and(x.name.startsWith('Harry'))),
+				// where: (x =>  x.name.startsWith('Harry'))
+			}
+		});
+
+		//mssql workaround because datetime has no time offset
+		for (let i = 0; i < rows.length; i++) {
+			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate));
+		}
+
+		const date1 = new Date(2022, 0, 11, 9, 24, 47);
+		const date2 = new Date(2021, 0, 11, 12, 22, 45);
+		const expected = [
+			{
+				id: 1,
+				orderDate: dateToISOString(date1),
+				deliveryAddress: null,
+				customerId: 1,
+				customer: null,
+				lines: [
+					{ product: 'Bicycle', id: 1, orderId: 1 },
+				]
+			},
+			{
+				id: 2,
+				customerId: 2,
+				customer: {
+					id: 2,
+					name: 'Harry',
+					balance: 200,
+					isActive: true
+				},
+				orderDate: dateToISOString(date2),
+				deliveryAddress: {
+					id: 2,
+					orderId: 2,
+					name: 'Harry Potter',
+					street: '4 Privet Drive, Little Whinging',
+					postalCode: 'GU4',
+					postalPlace: 'Surrey',
+					countryCode: 'UK'
+				},
+				lines: [
+					{ product: 'Magic wand', id: 3, orderId: 2 }
+				]
+			}
+		];
+
+
+		expect(rows).toEqual(expected);
+	}
+}, 999999);
 
 describe('getMany raw filter', () => {
 
@@ -543,6 +648,39 @@ describe('getMany raw filter', () => {
 	}
 });
 
+describe('getMany raw filter where', () => {
+
+	test('pg', async () => await verify('pg'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+
+		const rawFilter = {
+			sql: 'name like ?',
+			parameters: ['%arry']
+		};
+
+		const rows = await db.customer.getMany(null, { where: () => rawFilter});
+
+		const expected = [
+			{
+				id: 2,
+				name: 'Harry',
+				balance: 200,
+				isActive: true
+			}
+		];
+		expect(rows).toEqual(expected);
+	}
+});
+
 describe('getMany raw filter http', () => {
 
 	test('http', async () => await verify('http'));
@@ -558,6 +696,73 @@ describe('getMany raw filter http', () => {
 		let error;
 		try {
 			await db.customer.getMany(rawFilter);
+
+		}
+		catch (e) {
+			error = e;
+		}
+
+		expect(error?.message).toEqual('Raw filters are disallowed');
+	}
+});
+
+describe('getMany raw filter http where', () => {
+
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+
+		const rawFilter = {
+			sql: 'name like ?',
+			parameters: ['%arry']
+		};
+
+		let error;
+		try {
+			await db.customer.getMany(null, { where: () => rawFilter});
+
+		}
+		catch (e) {
+			error = e;
+		}
+
+		expect(error?.message).toEqual('Raw filters are disallowed');
+	}
+});
+
+describe('getMany none raw sub filter http', () => {
+	
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+		const filter = db.order.lines.none(x => '1=2');
+		
+		
+		let error;
+		try {
+			await db.order.getMany(filter);
+
+		}
+		catch (e) {
+			error = e;
+		}
+
+		expect(error?.message).toEqual('Raw filters are disallowed');
+	}
+});
+
+describe('getMany none raw sub filter http where', () => {
+	
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);		
+		
+		let error;
+		try {
+			await db.order.getMany(null, { where: (order) => order.lines.none(x => '1=2')});
 
 		}
 		catch (e) {
@@ -624,7 +829,7 @@ const connections = {
 					password: 'P@assword123',
 					connectString: 'oracle/XE',
 					privilege: 2
-				}, {size: 1}
+				}, { size: 1 }
 
 			)
 		}),

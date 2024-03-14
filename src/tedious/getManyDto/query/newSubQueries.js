@@ -1,20 +1,21 @@
 var joinLegToQuery = _joinLegToQuery;
 var oneLegToQuery = _oneLegToQuery;
 var manyLegToQuery = _manyLegToQuery;
+var newParameterized = require('../../../table/query/newParameterized');
 
-function newSubQueries(table,span,alias) {
-	var result = [];
+function newSubQueries(_table,span,alias) {
+	var result = newParameterized('', []);
 	var c = {};
 	var _legNo;
 
 	c.visitJoin = function(leg) {
-		result.push(joinLegToQuery( alias,leg,_legNo));
+		result = result.append(',').append(joinLegToQuery( alias,leg,_legNo));
 	};
 	c.visitOne = function(leg) {
-		result.push(oneLegToQuery( alias,leg,_legNo));
+		result = result.append(',').append(oneLegToQuery( alias,leg,_legNo));
 	};
 	c.visitMany = function(leg) {
-		result.push(manyLegToQuery( alias,leg,_legNo));
+		result = result.append(',').append(manyLegToQuery( alias,leg,_legNo));
 	};
 
 	span.legs.forEach(onEachLeg);
@@ -24,7 +25,7 @@ function newSubQueries(table,span,alias) {
 		leg.accept(c);
 	}
 
-	return result.join(',');
+	return result;
 }
 
 function _joinLegToQuery() {

@@ -2,15 +2,15 @@ var newSelect = require('./selectSql');
 var newJoin = require('./joinSql');
 var newWhere = require('./whereSql');
 
-function newSubFilter(relations, shallowFilter, depth) {
+function relationFilter(relations, shallowFilter, depth) {
 	var relationCount = relations.length;
 	var alias = 'x' + relationCount;
 	var table = relations[relationCount-1].childTable;
 	var exists = newSelect(table,alias).prepend('EXISTS (');
-	var join = newJoin(relations, depth);//todo
-	var where = newWhere(relations,shallowFilter, depth);//todo
+	var join = newJoin(relations, depth);
+	var where = newWhere(relations,shallowFilter, depth);
 	return exists.append(join).append(where).append(')');
 
 }
 
-module.exports = newSubFilter;
+module.exports = relationFilter;

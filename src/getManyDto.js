@@ -7,6 +7,10 @@ const newForeignKeyFilter = require('./table/relation/newForeignKeyFilter');
 
 async function getManyDto(table, filter, strategy) {
 	filter = negotiateRawSqlFilter(filter, table);
+	if (strategy && strategy.where) {
+		let arg = typeof strategy.where === 'function' ? strategy.where(table) : strategy.where;
+		filter = filter.and(arg);
+	}
 	let span = strategyToSpan(table, strategy);
 	let alias = table._dbName;
 

@@ -6,7 +6,7 @@ module.exports = function(span,alias,ignoreNull) {
 	var sql = '';
 
 	c.visitJoin = function(leg) {
-		var joinSql = joinLegToColumnSql(leg,alias + 'x' + index, ignoreNull);
+		var joinSql = joinLegToColumnSql(leg,alias  + leg.name, ignoreNull);
 		sql = sql + joinSql;
 	};
 

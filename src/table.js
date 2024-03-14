@@ -21,6 +21,7 @@ var patchTable = require('./patchTable');
 var newEmitEvent = require('./emitEvent');
 var hostLocal = require('./hostLocal');
 var getTSDefinition = require('./getTSDefinition');
+var where = require('./table/where');
 
 function _new(tableName) {
 	var table = newContext();
@@ -156,6 +157,8 @@ function _new(tableName) {
 	table.ts = function(name) {
 		return getTSDefinition(table, {name});
 	};
+
+	table.where = where(table);
 
 	return table;
 }
