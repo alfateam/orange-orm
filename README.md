@@ -959,9 +959,7 @@ const db = map.sqlite('demo.db');
 
 getRows();
 
-async function getRows() {
-  const filter = db.order.customer.name.startsWith('Harry');
-  
+async function getRows() {  
   const orders = await db.order.getAll({
     where: x => x.customer.name.startsWith('Harry'),
     lines: {

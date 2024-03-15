@@ -1,5 +1,7 @@
 
 ## Changelog
+__3.6.0__  
+Filters on relations.  
 __3.5.2__  
 MssqlNative and SAP ASE: PRINT statements no longer yields error.  
 __3.5.1__  
