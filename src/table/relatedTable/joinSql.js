@@ -8,7 +8,7 @@ function newJoinSql(relations, depth) {
 	var sql = '';
 
 	c.visitJoin = function(relation) {
-		sql += ' INNER' + newShallowJoinSql(relation.parentTable,relation.childTable._primaryColumns,relation.columns,leftAlias,rightAlias);
+		sql = newShallowJoinSql(relation.parentTable,relation.childTable._primaryColumns,relation.columns,leftAlias,rightAlias).prepend(' INNER').prepend(sql);
 	};
 
 	c.visitOne = function(relation) {
@@ -23,7 +23,7 @@ function newJoinSql(relations, depth) {
 		var rightColumns = table._primaryColumns;
 		var leftColumns = joinRelation.columns;
 
-		sql += ' INNER' + newShallowJoinSql(table,leftColumns,rightColumns,leftAlias,rightAlias);
+		sql = newShallowJoinSql(table,leftColumns,rightColumns,leftAlias,rightAlias).prepend(' INNER').prepend(sql);
 	}
 
 	for (let i = relations.length-1; i > depth; i--) {
