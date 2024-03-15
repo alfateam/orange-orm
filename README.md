@@ -922,6 +922,61 @@ async function deleteRows() {
 }
 ```
 </details>
+
+<details><summary><strong>Filtering relations</strong></summary>
+
+Relation filters are particularly useful as they allow for the dynamic exclusion of related data based on specific criteria.
+This example demonstrates how to retrieve orders where the customer's name starts with "Harry" and the order lines include products containing "broomstick". Also note that the fetching strategies for deliveryParty and customer are set to true, implying those two relations will be fetched as well.
+
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const filter = db.order.customer.name.startsWith('Harry');
+  
+  const orders = await db.order.getMany(filter, {
+    lines: {
+      where: x => x.product.contains('broomstick')
+    },
+    deliveryAddress: true,
+    customer: true
+  });
+  
+  console.dir(orders, { depth: Infinity });
+}
+```
+
+__Alternative syntax__ 
+
+This demonstrates an alternative approach to the previous example. Instead of calling "getMany" with the filter as the first argument, we call "getAll" with filter as the "where property" on the root of the fetching strategy. 
+
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const filter = db.order.customer.name.startsWith('Harry');
+  
+  const orders = await db.order.getAll({
+    where: x => x.customer.name.startsWith('Harry'),
+    lines: {
+      where: x => x.product.contains('broomstick')
+    },
+    deliveryAddress: true,
+    customer: true
+  });
+  
+  console.dir(orders, { depth: Infinity });
+}
+
+```
+</details>
+
 <details id="in-the-browser"><summary><strong>In the browser</strong></summary>
 You can use <strong><i>RDB</i></strong> in the browser by using the adapter for Express. Instead of sending raw SQL queries from the client to the server, this approach records the method calls in the client. These method calls are then replayed at the server, ensuring a higher level of security by not exposing raw SQL on the client side.  
 Raw sql queries, raw sql filters and transactions are disabled at the http client due to security reasons.  If you would like RDB to support other web frameworks, like nestJs, fastify, etc, please let me know.
