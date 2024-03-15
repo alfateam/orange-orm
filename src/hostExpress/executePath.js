@@ -71,7 +71,7 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 
 			let anyAllNone = tryGetAnyAllNone(json.path, table);
 			if (anyAllNone) {
-				if (isHttp) 
+				if (isHttp)
 					validateArgs(json.args[0]);
 				const f =  anyAllNone(x => parseFilter(json.args[0], x));
 				f.isSafe = isSafe;
@@ -86,7 +86,7 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 		}
 		else if (Array.isArray(json)) {
 			const result = [];
-			for (let i = 0; i < json.length; i++) {				
+			for (let i = 0; i < json.length; i++) {
 				result.push(parseFilter(json[i], table));
 			}
 			return result;
@@ -145,7 +145,7 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 			for (let i = 0; i < pathArray.length; i++) {
 				target = target[pathArray[i]];
 			}
-			
+
 			let res = target.apply(null, args);
 			setSafe(res);
 			return res;
@@ -369,7 +369,7 @@ function validateArgs() {
 		}
 		if (Array.isArray(filter))
 			for (let i = 0; i < filter.length; i++) {
-				
+
 				validateArgs(filter[i]);
 			}
 	}
@@ -385,7 +385,7 @@ function setSafe(o) {
 		Object.defineProperty(o, 'isSafe', {
 			value: isSafe,
 			enumerable: false
-			
+
 		});
 }
 

@@ -19,10 +19,10 @@ function newRelatedTable(relations, isShallow, depth = 0) {
 	c.all = all(relations, depth);
 	// @ts-ignore
 	c.any = c;
-	
+
 	// @ts-ignore
 	c.none = none(relations, depth);
-	
+
 	// @ts-ignore
 	c.where =  where(relations, depth);
 
@@ -58,7 +58,7 @@ function newRelatedTable(relations, isShallow, depth = 0) {
 			}
 		});
 	}
-	
+
 
 	// @ts-ignore
 	c.exists = function() {

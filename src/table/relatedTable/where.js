@@ -15,11 +15,11 @@ function newWhere(relations, _depth) {
 			let arg = typeof fn === 'function' ? fn(table) : fn;
 			let anyFilter = negotiateRawSqlFilter(arg);
 			delete table._rootAlias;
-			return anyFilter
+			return anyFilter;
 		}
 		catch(e) {
 			delete table._rootAlias;
-			throw e;	
+			throw e;
 		}
 	}
 	return where;

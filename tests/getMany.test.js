@@ -1,4 +1,3 @@
-import rdb from '../src/index'
 import { describe, test, beforeAll, afterAll, expect } from 'vitest';
 import { fileURLToPath } from 'url';
 const express = require('express');
@@ -103,16 +102,6 @@ beforeAll(async () => {
 				]
 			}
 		]);
-	}
-
-	async function createMs(dbName) {
-		const { db } = getDb(dbName);
-		const sql = `IF NOT EXISTS(SELECT * FROM sys.databases WHERE name = 'demo')
-		BEGIN
-			CREATE DATABASE demo
-		END
-		`;
-		await db.query(sql);
 	}
 
 	function hostExpress() {
@@ -732,14 +721,12 @@ describe('getMany raw filter http where', () => {
 });
 
 describe('getMany none raw sub filter http', () => {
-	
+
 	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
-		const filter = db.order.lines.none(x => '1=2');
-		
-		
+		const filter = db.order.lines.none(() => '1=2');
 		let error;
 		try {
 			await db.order.getMany(filter);
@@ -754,15 +741,15 @@ describe('getMany none raw sub filter http', () => {
 });
 
 describe('getMany none raw sub filter http where', () => {
-	
+
 	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
-		const { db } = getDb(dbName);		
-		
+		const { db } = getDb(dbName);
+
 		let error;
 		try {
-			await db.order.getMany(null, { where: (order) => order.lines.none(x => '1=2')});
+			await db.order.getMany(null, { where: (order) => order.lines.none(() => '1=2')});
 
 		}
 		catch (e) {

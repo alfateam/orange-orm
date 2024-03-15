@@ -45,7 +45,7 @@ function rdbClient(options = {}) {
 		or: client.or,
 		and: client.and,
 		not: client.not,
-		toJSON: function () {
+		toJSON: function() {
 			return;
 		}
 	};
@@ -266,7 +266,7 @@ function rdbClient(options = {}) {
 		}
 
 		async function getManyCore() {
-			let args = negotiateWhere.apply(null, arguments);;
+			let args = negotiateWhere.apply(null, arguments);
 			let body = stringify({
 				path: 'getManyDto',
 				args

@@ -1,5 +1,5 @@
 var newDiscriminatorSql = require('./newDiscriminatorSql');
-var newParameterized = require('../../newParameterized')
+var newParameterized = require('../../newParameterized');
 
 function _new(rightTable,leftColumns,rightColumns,leftAlias,rightAlias,filter) {
 	var sql = '';
