@@ -105,19 +105,6 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 				return table;
 		}
 
-		//todo
-		// function tryGetWhere(path, table) {
-		// 	path = path.split('.');
-		// 	for (let i = 0; i < path.length; i++) {
-		// 		table = table[path[i]];
-		// 	}
-
-		// 	let ops = new Set(['where']);
-		// 	let last = path.slice(-1)[0];
-		// 	if (ops.has(last) || (table &&  (table._primaryColumns || (table.any && table.all))))
-		// 		return table;
-		// }
-
 		function executePath(path, args) {
 			if (path in ops) {
 				if (isHttp)

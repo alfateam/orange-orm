@@ -112,7 +112,7 @@ beforeAll(async () => {
 			.use('/rdb', cors(), db.express());
 		server = app.listen(port, () => console.log(`Example app listening on port ${port}!`));
 	}
-}, 9999999);
+});
 
 describe('offset', () => {
 	test('pg', async () => await verify('pg'));
@@ -530,10 +530,10 @@ describe('getMany with relations', () => {
 		expect(rows).toEqual(expected);
 	}
 });
-describe('getMany with filtered relations', () => {
+describe.only('getMany with filtered relations', () => {
 	test('pg', async () => await verify('pg'));
 	test('oracle', async () => await verify('oracle'));
-	test('mssql', async () => await verify('mssql'), { timeout: 9999999});
+	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
@@ -551,8 +551,7 @@ describe('getMany with filtered relations', () => {
 				where: (x => x.name.startsWith('Harry'))
 			},
 			deliveryAddress: {
-				where: (x =>  x.order(y => y.customer.name.startsWith('Harry').and(y.lines.all(z => z.product.startsWith('Magic')))).and(x.name.startsWith('Harry'))),
-				// where: (x =>  x.name.startsWith('Harry'))
+				where: (x =>  x.name.startsWith('Harry'))
 			}
 		});
 

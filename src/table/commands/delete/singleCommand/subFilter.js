@@ -11,9 +11,6 @@ function newSubFilter(relations, shallowFilter) {
 	var alias = createAlias(table, relationCount -1);
 	var filter = newSelect(table,alias).prepend('EXISTS (');
 	var join = newJoin(relations.slice(1));
-	console.dir('filter..');
-	console.dir(join);
-
 	var where = newWhere(relations,shallowFilter,alias);
 	return filter.append(join).append(where).append(')');
 

@@ -18,18 +18,11 @@ async function count(table, filter) {
 
 function newQuery(table, filter, alias) {
 	filter = extractFilter(filter);
+	var name = table._dbName;
+	var whereSql = newWhereSql(table, filter, alias);
 
-	let c = {};
-	c.sql = function() {
-		var name = table._dbName;
-		var whereSql = newWhereSql(table, filter, alias);
+	return whereSql.prepend('select count(*) "_count" from ' + name + ' ' + alias);
 
-		return whereSql.prepend('select count(*) "_count" from ' + name + ' ' + alias);
-	};
-
-	c.parameters = filter.parameters;
-
-	return c;
 
 }
 
