@@ -10,7 +10,7 @@ function newJoinSql(relations) {
 	function addSql(relation) {
 		var rightColumns = relation.childTable._primaryColumns;
 		var leftColumns = relation.columns;
-		sql += ' INNER' + newShallowJoinSql(relation.childTable,leftColumns,rightColumns,leftAlias,rightAlias);
+		sql += ' INNER' + newShallowJoinSql(relation.childTable,leftColumns,rightColumns,leftAlias,rightAlias).sql();
 	}
 
 	relations.forEach(function(relation, i){

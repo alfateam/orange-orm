@@ -12,12 +12,13 @@ function newWhereSql(relations, shallowFilter, rightAlias) {
 
 	function where() {
 		var table = relation.childTable;
-		var joinCore = newShallowJoinSql(table, leftColumns, rightColumns, leftAlias, rightAlias);
-		if (shallowFilter.sql())
-			sql = shallowFilter.prepend(' WHERE ' + joinCore + ' AND ');
+		var joinCore = newShallowJoinSql(table, leftColumns, rightColumns, leftAlias, rightAlias);		
+		if (shallowFilter.sql()) 
+			sql = shallowFilter.prepend(' AND ').prepend(joinCore).prepend(' WHERE ');
 		else
-			sql = ' WHERE ' + joinCore;
+			sql = joinCore.prepend(' WHERE ');
 	}
+	
 	return sql;
 }
 

@@ -11,10 +11,16 @@ function newWhere(relations, _depth) {
 		if (!relations[0].isMany || includeMany)
 			table._rootAlias = alias;
 
-		let arg = typeof fn === 'function' ? fn(table) : fn;
-		let anyFilter = negotiateRawSqlFilter(arg);
-		delete table._rootAlias;
-		return anyFilter
+		try {
+			let arg = typeof fn === 'function' ? fn(table) : fn;
+			let anyFilter = negotiateRawSqlFilter(arg);
+			delete table._rootAlias;
+			return anyFilter
+		}
+		catch(e) {
+			delete table._rootAlias;
+			throw e;	
+		}
 	}
 	return where;
 

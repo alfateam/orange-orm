@@ -14,8 +14,6 @@ function newQuery(table,filter,span,alias) {
 
 	var subQueries = newSubQueries(table,span,alias);
 	return newSingleQuery(table,filter,span,alias,subQueries,orderBy,limit,offset);
-	// return newParameterized(query.sql(), query.parameters);
-	//todo
 }
 
 module.exports = newQuery;

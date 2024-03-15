@@ -6,7 +6,7 @@ var createAlias = require('./createAlias');
 
 function _new(table,filter,relations) {
 	var alias = createAlias(table, relations.length);
-	filter = extractFilter(filter);
+	filter = extractFilter(filter);	
 	filter = newSubFilter(relations, filter);
 	var discriminator = newDiscriminatorSql(table, alias);
 	if (discriminator !== '')
