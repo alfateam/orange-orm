@@ -27,6 +27,7 @@ afterAll(async () => {
 });
 
 beforeAll(async () => {
+	await createMs('mssql');
 	await insertData('pg');
 	await insertData('mssql');
 	if (major === 18)
@@ -102,6 +103,16 @@ beforeAll(async () => {
 				]
 			}
 		]);
+	}
+
+	async function createMs(dbName) {
+		const { db } = getDb(dbName);
+		const sql = `IF NOT EXISTS(SELECT * FROM sys.databases WHERE name = 'demo')
+		BEGIN
+			CREATE DATABASE demo
+		END
+		`;
+		await db.query(sql);
 	}
 
 	function hostExpress() {
