@@ -530,7 +530,7 @@ describe('getMany with relations', () => {
 		expect(rows).toEqual(expected);
 	}
 });
-describe.only('getMany with filtered relations', () => {
+describe('getMany with filtered relations', () => {
 	test('pg', async () => await verify('pg'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
