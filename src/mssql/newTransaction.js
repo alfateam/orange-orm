@@ -26,7 +26,7 @@ function newResolveTransaction(domain, pool) {
 				}
 				client.setUseUTC(false);
 				client.executeQuery = wrapQuery(client);
-				rdb.engine = 'mssql';
+				rdb.engine = 'mssqlNative';
 				rdb.dbClient = client;
 				rdb.dbClientDone = done;
 				rdb.encodeBoolean = encodeBoolean;
