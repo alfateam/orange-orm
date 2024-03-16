@@ -17,10 +17,18 @@ body:
     validations:
       required: true
 
+  - type: input
+    attributes:
+      label: Database Version
+      description: Specify the version of your database engine.
+      placeholder: e.g., 12.3
+    validations:
+      required: false      
+
   - type: dropdown
     attributes:
       label: Database
-      description: Specify the database (e.g., Postgres, Ms Sql, MySql, Sqlite, SAP ASE, Oracle).
+      description: Specify the database.
       options:
         - Postgres
         - Ms Sql
@@ -42,28 +50,13 @@ body:
   - type: textarea
     attributes:
       label: Description
-      description: Describe the bug in detail here.
+      description: Steps to reproduce.
     validations:
       required: true
 
   - type: textarea
     attributes:
-      label: Steps to Reproduce
-      description: Provide detailed steps to reproduce the bug.
-      placeholder: "1.\n2.\n3."
-    validations:
-      required: false
-
-  - type: textarea
-    attributes:
       label: Expected Behavior
       description: What did you expect to happen?
-    validations:
-      required: false
-
-  - type: textarea
-    attributes:
-      label: Actual Behavior
-      description: What actually happened?
     validations:
       required: false
