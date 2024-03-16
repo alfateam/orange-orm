@@ -1289,6 +1289,38 @@ export default map;
 ```
 </details>
 
+<details id="composite-keys"><summary><strong>Composite keys</strong></summary>
+
+A composite key is defined by marking multiple columns as primary keys. This is done using the ".primary()"" method on each column that is part of the composite key.
+
+Consider a scenario where we have orders and order lines, and each order line is uniquely identified by combining the order type, order number, and line number.
+```javascript
+import rdb from 'rdb';
+
+const map = rdb.map(x => ({
+  order: x.table('_order').map(({ column }) => ({
+    orderType: column('orderType').string().primary().notNull(),
+    orderNo: column('orderNo').numeric().primary().notNull(),
+    orderDate: column('orderDate').date().notNull(),
+  })),
+
+  orderLine: x.table('orderLine').map(({ column }) => ({
+    orderType: column('orderType').string().primary().notNull(),
+    orderNo: column('orderNo').numeric().primary().notNull(),
+    lineNo: column('lineNo').numeric().primary().notNull(),
+    product: column('product').string(),
+  }))
+})).map(x => ({
+  order: x.order.map(v => ({
+    lines: v.hasMany(x.orderLine).by('orderType', 'orderNo'),
+  }))
+}));
+
+export default map;
+```  
+</details>
+
+
 <details id="column-discriminators"><summary><strong>Column discriminators</strong></summary>
 Column discriminators are used to distinguish between different types of data in the same table. Think of them as labels that identify whether a record is one category or another.
 In the example, the <strong>client_type</strong> column serves as the discriminator that labels records as <strong>customer</strong> or <strong>vendor</strong> in the 'client' table. On inserts, the column will automatically be given the correct discriminator value. Similarly, when fetching and deleting, the discrimiminator will be added to the WHERE clause.
