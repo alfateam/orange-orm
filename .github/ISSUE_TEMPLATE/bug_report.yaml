@@ -17,13 +17,6 @@ body:
     validations:
       required: true
 
-  - type: input
-    attributes:
-      label: Database Version
-      description: Specify the version of your database engine.
-      placeholder: e.g., 12.3
-    validations:
-      required: false      
 
   - type: dropdown
     attributes:
@@ -38,6 +31,14 @@ body:
         - Oracle
     validations:
       required: false
+
+  - type: input
+    attributes:
+      label: Database Version
+      description: Specify the version of your database engine.
+      placeholder: e.g., 12.3
+    validations:
+      required: false      
 
   - type: input
     attributes:
