@@ -1,0 +1,17 @@
+name: "Feature Request"
+description: Suggest an idea for this project
+title: "[ENHANCEMENT]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Feature Request Form
+        Thank you for suggesting an idea for `rdb`! Please fill out this form as completely as possible to help us understand your proposal.
+        
+  - type: textarea
+    attributes:
+      label: Feature Description
+      description: A clear and concise description of what you want to happen.
+    validations:
+      required: true
