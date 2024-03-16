@@ -1,0 +1,69 @@
+name: "Bug Report"
+description: Report an issue or possible bug with rdb
+title: "[BUG]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Bug Report Form
+        Thank you for taking the time to file a bug report for `rdb`! Please fill out this form as completely as possible to help us identify and fix the issue.
+        
+  - type: input
+    attributes:
+      label: rdb Version
+      description: Please specify the version of rdb you are using.
+      placeholder: e.g., 1.2.3
+    validations:
+      required: true
+
+  - type: dropdown
+    attributes:
+      label: Database
+      description: Specify the database (e.g., Postgres, Ms Sql, MySql, Sqlite, SAP ASE, Oracle).
+      options:
+        - Postgres
+        - Ms Sql
+        - MySql
+        - Sqlite
+        - SAP ASE
+        - Oracle
+    validations:
+      required: false
+
+  - type: input
+    attributes:
+      label: Operating System
+      description: Specify the operating system and version.
+      placeholder: e.g., Windows 10, Ubuntu 20.04
+    validations:
+      required: false
+
+  - type: textarea
+    attributes:
+      label: Description
+      description: Describe the bug in detail here.
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Steps to Reproduce
+      description: Provide detailed steps to reproduce the bug.
+      placeholder: "1.\n2.\n3."
+    validations:
+      required: false
+
+  - type: textarea
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+    validations:
+      required: false
+
+  - type: textarea
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+    validations:
+      required: false
