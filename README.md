@@ -923,7 +923,200 @@ async function deleteRows() {
 ```
 </details>
 
-<details id="filtering-relations"><summary><strong>Filtering relations</strong></summary>
+<details id="basic-filters"><summary><strong>Basic filters</strong></summary>
+
+__Equal__  
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const filter = db.customer.name.equal('Harry');
+
+  const rows = await db.customer.getMany(filter);
+}
+```
+__Not equal__  
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const filter = db.customer.name.notEqual('Harry');
+
+  const rows = await db.customer.getMany(filter);
+}
+```
+__Contains__  
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const filter = db.customer.name.contains('arr');
+
+  const rows = await db.customer.getMany(filter);
+}
+```
+__Starts with__  
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const filter = db.customer.name.startsWith('Harr');
+
+  const rows = await db.customer.getMany(filter);
+}
+```
+__Ends with__  
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const filter = db.customer.name.endsWith('arry');
+
+  const rows = await db.customer.getMany(filter);
+}
+```
+__Greater than__  
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const filter = db.order.orderDate.greaterThan('2023-07-14T12:00:00');
+
+  const rows = await db.order.getMany(filter);
+}
+```
+__Greater than or equal__  
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const filter = db.order.orderDate.greaterThanOrEqual('2023-07-14T12:00:00');
+
+  const rows = await db.order.getMany(filter);
+}
+```
+__Less than__  
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const filter = db.order.orderDate.lessThan('2024-07-14T12:00:00');
+
+  const rows = await db.order.getMany(filter);
+}
+```
+__Less than or equal__  
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const filter = db.order.orderDate.lessThanOrEqual('2024-07-14T12:00:00');
+
+  const rows = await db.order.getMany(filter);
+}
+```
+__Between__  
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const filter = db.order.orderDate.between('2023-07-14T12:00:00', '2024-07-14T12:00:00');
+
+  const rows = await db.order.getMany(filter);
+}
+```
+__In__  
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const filter = db.customer.name.in('George', 'Harry');
+
+  const rows = await db.customer.getMany(filter);
+}
+```
+
+</details>
+
+<details id="logical-filters"><summary><strong>And, or, not filters</strong></summary>
+
+__And__  
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const filter = db.order.customer.name.equal('Harry').and(db.order.orderDate.greaterThan('2023-07-14T12:00:00'));
+
+  const rows = await db.order.getMany(filter);  
+}
+```
+__Or__  
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const filter = db.order.customer(x => x.name.equal('George').or(x.name.equal('Harry')));
+
+  const rows = await db.order.getMany(filter);  
+}
+```
+__Not__  
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const filter = db.order.customer(x => x.name.equal('George').or(x.name.equal('Harry'))).not();
+  //Neither George nor Harry
+
+  const rows = await db.order.getMany(filter);  
+}
+```
+
+</details>
+
+<details id="filtering-relations"><summary><strong>Relation filters</strong></summary>
 
 Relation filters are particularly useful as they allow for the dynamic exclusion of related data based on specific criteria.
 In this example all orders are fetched, but the lines only having products containing "broomstick". By setting deliveryAddress and customer to true, we also ensure the inclusion of these related entities in our result set.
@@ -942,12 +1135,10 @@ async function getRows() {
     deliveryAddress: true,
     customer: true
   });
-  
-  console.dir(orders, { depth: Infinity });
 }
 ```
-
 </details>
+
 
 <details id="in-the-browser"><summary><strong>In the browser</strong></summary>
 You can use <strong><i>RDB</i></strong> in the browser by using the adapter for Express. Instead of sending raw SQL queries from the client to the server, this approach records the method calls in the client. These method calls are then replayed at the server, ensuring a higher level of security by not exposing raw SQL on the client side.  
