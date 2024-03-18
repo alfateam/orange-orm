@@ -926,7 +926,7 @@ async function deleteRows() {
 <details id="filtering-relations"><summary><strong>Filtering relations</strong></summary>
 
 Relation filters are particularly useful as they allow for the dynamic exclusion of related data based on specific criteria.
-In this example all orders are fetched, but only the lines with product containing "broomstick" are included. By setting deliveryAddress and customer to true, we also ensure the inclusion of these related entities in our result set.
+In this example all orders are fetched, but the lines property only has products containing "broomstick". By setting deliveryAddress and customer to true, we also ensure the inclusion of these related entities in our result set.
 
 ```javascript
 import map from './map';
