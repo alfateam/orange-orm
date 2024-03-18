@@ -923,7 +923,7 @@ async function deleteRows() {
 ```
 </details>
 
-<details><summary><strong>Filtering relations</strong></summary>
+<details id="filtering-relations"><summary><strong>Filtering relations</strong></summary>
 
 Relation filters are particularly useful as they allow for the dynamic exclusion of related data based on specific criteria.
 This example demonstrates how to retrieve orders where the customer's name starts with "Harry" and the order lines include products containing "broomstick". Also note that the fetching strategies for deliveryParty and customer are set to true, implying those two relations will be fetched as well.
