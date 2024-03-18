@@ -926,7 +926,7 @@ async function deleteRows() {
 <details id="filtering-relations"><summary><strong>Filtering relations</strong></summary>
 
 Relation filters are particularly useful as they allow for the dynamic exclusion of related data based on specific criteria.
-This example demonstrates how to retrieve orders where the customer's name starts with "Harry" and the order lines include products containing "broomstick". Also note that the fetching strategies for deliveryParty and customer are set to true, implying those two relations will be fetched as well.
+In this example all orders are fetched, but only the lines with product containing "broomstick" are included. By setting deliveryAddress and customer to true, we also ensure the inclusion of these related entities in our result set.
 
 ```javascript
 import map from './map';
@@ -935,33 +935,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const filter = db.order.customer.name.startsWith('Harry');
-  
-  const orders = await db.order.getMany(filter, {
-    lines: {
-      where: x => x.product.contains('broomstick')
-    },
-    deliveryAddress: true,
-    customer: true
-  });
-  
-  console.dir(orders, { depth: Infinity });
-}
-```
-
-__Alternative syntax__ 
-
-This demonstrates an alternative approach to the previous example. Instead of calling "getMany" with the filter as the first argument, we call "getAll" with filter as the "where property" on the root of the fetching strategy. 
-
-```javascript
-import map from './map';
-const db = map.sqlite('demo.db');
-
-getRows();
-
-async function getRows() {  
   const orders = await db.order.getAll({
-    where: x => x.customer.name.startsWith('Harry'),
     lines: {
       where: x => x.product.contains('broomstick')
     },
@@ -971,8 +945,8 @@ async function getRows() {
   
   console.dir(orders, { depth: Infinity });
 }
-
 ```
+
 </details>
 
 <details id="in-the-browser"><summary><strong>In the browser</strong></summary>
