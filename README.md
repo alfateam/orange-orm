@@ -923,7 +923,144 @@ async function deleteRows() {
 ```
 </details>
 
+<details id="in-the-browser"><summary><strong>In the browser</strong></summary>
+You can use <strong><i>RDB</i></strong> in the browser by using the adapter for Express. Instead of sending raw SQL queries from the client to the server, this approach records the method calls in the client. These method calls are then replayed at the server, ensuring a higher level of security by not exposing raw SQL on the client side.  
+Raw sql queries, raw sql filters and transactions are disabled at the http client due to security reasons.  If you would like RDB to support other web frameworks, like nestJs, fastify, etc, please let me know.
+
+<sub>📄 server.ts</sub>
+```javascript
+import map from './map';
+import { json } from 'body-parser';
+import express from 'express';
+import cors from 'cors';
+
+const db = map.sqlite('demo.db');
+
+express().disable('x-powered-by')
+  .use(json({ limit: '100mb' }))
+  .use(cors())
+  //for demonstrational purposes, authentication middleware is not shown here.
+  .use('/rdb', db.express())
+  .listen(3000, () => console.log('Example app listening on port 3000!'));
+```
+
+<sub>📄 browser.ts</sub>
+```javascript
+import map from './map';
+
+const db = map.http('http://localhost:3000/rdb');
+
+updateRows();
+
+async function updateRows() {
+  const filter = db.order.lines.any(
+    line => line.product.startsWith('Magic wand'))
+    .and(db.order.customer.name.startsWith('Harry')
+  );
+
+  const order = await db.order.getOne(filter, {
+    lines: true
+  });
+  
+  order.lines.push({
+    product: 'broomstick'
+  });
+
+  await order.saveChanges();
+}
+
+```
+
+__Interceptors and base filter__
+
+In the next setup, axios interceptors are employed on the client side to add an Authorization header of requests. Meanwhile, on the server side, an Express middleware (validateToken) is utilized to ensure the presence of the Authorization header, while a base filter is applied on the order table to filter incoming requests based on the customerId extracted from this header. This combined approach enhances security by ensuring that users can only access data relevant to their authorization level and that every request is accompanied by a token. In real-world applications, it's advisable to use a more comprehensive token system and expand error handling to manage a wider range of potential issues.  
+One notable side effect compared to the previous example, is that only the order table is exposed for interaction, while all other potential tables in the database remain shielded from direct client access (except for related tables). If you want to expose a table without a baseFilter, just set the tableName to an empty object.    
+
+<sub>📄 server.ts</sub>
+
+```javascript
+import map from './map';
+import { json } from 'body-parser';
+import express from 'express';
+import cors from 'cors';
+
+const db = map.sqlite('demo.db');
+
+express().disable('x-powered-by')
+  .use(json({ limit: '100mb' }))
+  .use(cors())
+  .use('/rdb', validateToken)
+  .use('/rdb', db.express({
+    order: {
+      baseFilter: (db, req, _res) => {
+        const customerId = Number.parseInt(req.headers.authorization.split(' ')[1]); //Bearer 2
+        return db.order.customerId.eq(Number.parseInt(customerId));
+      }
+    }
+  }))
+  .listen(3000, () => console.log('Example app listening on port 3000!'));
+
+function validateToken(req, res, next) {
+  // For demo purposes, we're just checking against existence of authorization header
+  // In a real-world scenario, this would be a dangerous approach because it bypasses signature validation
+  const authHeader = req.headers.authorization;
+  if (authHeader)
+    return next();
+  else
+    return res.status(401).json({ error: 'Authorization header missing' });
+}
+```
+
+<sub>📄 browser.ts</sub>
+```javascript
+import map from './map';
+
+const db = map.http('http://localhost:3000/rdb');
+
+updateRows();
+
+async function updateRows() {
+  
+  db.interceptors.request.use((config) => {
+    // For demo purposes, we're just adding hardcoded token
+    // In a real-world scenario, use a proper JSON web token
+    config.headers.Authorization = 'Bearer 2' //customerId
+    return config;
+  });
+
+  db.interceptors.response.use(
+    response => response, 
+    (error) => {
+      if (error.response && error.response.status === 401) {
+        console.dir('Unauthorized, dispatch a login action');
+        //redirectToLogin();
+      }
+      return Promise.reject(error);
+    }
+  );
+
+  const filter = db.order.lines.any(
+    line => line.product.startsWith('Magic wand'))
+    .and(db.order.customer.name.startsWith('Harry')
+  );
+
+  const order = await db.order.getOne(filter, {
+    lines: true
+  });
+  
+  order.lines.push({
+    product: 'broomstick'
+  });
+
+  await order.saveChanges();
+
+}
+
+```
+</details>
+
 <details id="basic-filters"><summary><strong>Basic filters</strong></summary>
+Filters are a versatile tool for both data retrieval and bulk deletions. They allow for precise targeting of records based on specific criteria and can be combined with operators like <i>any</i> and <i>exists</i> and even raw sql for more nuanced control. Filters can also be nested to any depth, enabling complex queries that can efficiently manage and manipulate large datasets. This dual functionality enhances database management by ensuring data relevance and optimizing performance.
 
 __Equal__  
 ```javascript
@@ -1068,10 +1205,32 @@ async function getRows() {
   const rows = await db.customer.getMany(filter);
 }
 ```
+__Raw sql filter__  
+You can use the raw SQL filter alone or in combination with a regular filter.
+ Here the raw filter queries for customer with name ending with "arry". The composite filter combines the raw SQL filter and a regular filter that checks for a customer balance greater than 100. It is important to note that due to security precautions aimed at preventing SQL injection attacks, using raw SQL filters directly via browser inputs is not allowed. Attempting to do so will result in an HTTP status 403 (Forbidden) being returned.
+ 
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const rawFilter = {
+    sql: 'name like ?',
+    parameters: ['%arry']
+  };                 
+  const combinedFilter = db.customer.balance.greaterThan(100).and(rawFilter);
+  
+  const rowsWithRaw = await db.customer.getMany(rawFilter);
+  const rowsWithCombined = await db.customer.getMany(combinedFilter);  
+}
+```
 
 </details>
 
-<details id="logical-filters"><summary><strong>And, or, not filters</strong></summary>
+<details id="logical-filters"><summary><strong>And, or, not, exists</strong></summary>
+These operators serve as the backbone for constructing complex queries that allow for more granular control over the data fetched from the database. The examples provided below are self-explanatory for anyone familiar with basic programming concepts and database operations. The design philosophy underscores the importance of clear, readable code that doesn't sacrifice power for simplicity.
 
 __And__  
 ```javascript
@@ -1081,7 +1240,9 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const filter = db.order.customer.name.equal('Harry').and(db.order.orderDate.greaterThan('2023-07-14T12:00:00'));
+  const nameFilter = db.order.customer.name.equal('Harry');
+  const dateFilter = db.order.orderDate.greaterThan('2023-07-14T12:00:00');
+  const filter = nameFilter.and(dateFilter);
 
   const rows = await db.order.getMany(filter);  
 }
@@ -1113,13 +1274,75 @@ async function getRows() {
   const rows = await db.order.getMany(filter);  
 }
 ```
+__Exists__  
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const filter = db.order.deliveryAddress.exists();
+
+  const rows = await db.order.getMany(filter);  
+}
+```
+
+</details>
+
+<details id="any-filters"><summary><strong>Any, all, none</strong></summary>
+These operators are used in scenarios involving relationships within database records.
+
+__Any__  
+The <i>any</i> operator is employed when the objective is to find records where at least one item in a collection meets the specified criteria.
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const filter = db.order.lines.any(x => x.product.contains('guitar'));
+  //equivalent syntax:
+  // const filter = db.order.lines.product.contains('guitar');
+
+  const rows = await db.order.getMany(filter);  
+}
+```
+__All__  
+Conversely, the <i>all</i> operator ensures that every item in a collection adheres to the defined condition.
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const filter = db.order.lines.all(x => x.product.contains('a'));
+
+  const rows = await db.order.getMany(filter);  
+}
+```
+__None__  
+The <i>none</i> operator, as the name suggests, is used to select records where not a single item in a collection meets the condition. 
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const filter = db.order.lines.none(x => x.product.equal('Magic wand'));
+
+  const rows = await db.order.getMany(filter);  
+}
+```
 
 </details>
 
 <details id="filtering-relations"><summary><strong>Relation filters</strong></summary>
 
-Relation filters are particularly useful as they allow for the dynamic exclusion of related data based on specific criteria.
-In this example all orders are fetched, but the lines only having products containing "broomstick". By setting deliveryAddress and customer to true, we also ensure the inclusion of these related entities in our result set.
+Relation filters offer a dynamic approach to selectively include or exclude related data based on specific criteria. In the provided example, all orders are retrieved, yet it filters the order lines to only include those that feature products with "broomstick" in their description.  By setting deliveryAddress and customer to true, we also ensure the inclusion of these related entities in our result set.
 
 ```javascript
 import map from './map';
@@ -1139,142 +1362,6 @@ async function getRows() {
 ```
 </details>
 
-
-<details id="in-the-browser"><summary><strong>In the browser</strong></summary>
-You can use <strong><i>RDB</i></strong> in the browser by using the adapter for Express. Instead of sending raw SQL queries from the client to the server, this approach records the method calls in the client. These method calls are then replayed at the server, ensuring a higher level of security by not exposing raw SQL on the client side.  
-Raw sql queries, raw sql filters and transactions are disabled at the http client due to security reasons.  If you would like RDB to support other web frameworks, like nestJs, fastify, etc, please let me know.
-
-<sub>📄 server.ts</sub>
-```javascript
-import map from './map';
-import { json } from 'body-parser';
-import express from 'express';
-import cors from 'cors';
-
-const db = map.sqlite('demo.db');
-
-express().disable('x-powered-by')
-  .use(json({ limit: '100mb' }))
-  .use(cors())
-  //for demonstrational purposes, authentication middleware is not shown here.
-  .use('/rdb', db.express())
-  .listen(3000, () => console.log('Example app listening on port 3000!'));
-```
-
-<sub>📄 browser.ts</sub>
-```javascript
-import map from './map';
-
-const db = map.http('http://localhost:3000/rdb');
-
-updateRows();
-
-async function updateRows() {
-  const filter = db.order.lines.any(
-    line => line.product.startsWith('Magic wand'))
-    .and(db.order.customer.name.startsWith('Harry')
-  );
-
-  const order = await db.order.getOne(filter, {
-    lines: true
-  });
-  
-  order.lines.push({
-    product: 'broomstick'
-  });
-
-  await order.saveChanges();
-}
-
-```
-
-__Interceptors and base filter__
-
-In the next setup, axios interceptors are employed on the client side to add an Authorization header of requests. Meanwhile, on the server side, an Express middleware (validateToken) is utilized to ensure the presence of the Authorization header, while a base filter is applied on the order table to filter incoming requests based on the customerId extracted from this header. This combined approach enhances security by ensuring that users can only access data relevant to their authorization level and that every request is accompanied by a token. In real-world applications, it's advisable to use a more comprehensive token system and expand error handling to manage a wider range of potential issues.  
-One notable side effect compared to the previous example, is that only the order table is exposed for interaction, while all other potential tables in the database remain shielded from direct client access (except for related tables). If you want to expose a table without a baseFilter, just set the tableName to an empty object.    
-
-<sub>📄 server.ts</sub>
-
-```javascript
-import map from './map';
-import { json } from 'body-parser';
-import express from 'express';
-import cors from 'cors';
-
-const db = map.sqlite('demo.db');
-
-express().disable('x-powered-by')
-  .use(json({ limit: '100mb' }))
-  .use(cors())
-  .use('/rdb', validateToken)
-  .use('/rdb', db.express({
-    order: {
-      baseFilter: (db, req, _res) => {
-        const customerId = Number.parseInt(req.headers.authorization.split(' ')[1]); //Bearer 2
-        return db.order.customerId.eq(Number.parseInt(customerId));
-      }
-    }
-  }))
-  .listen(3000, () => console.log('Example app listening on port 3000!'));
-
-function validateToken(req, res, next) {
-  // For demo purposes, we're just checking against existence of authorization header
-  // In a real-world scenario, this would be a dangerous approach because it bypasses signature validation
-  const authHeader = req.headers.authorization;
-  if (authHeader)
-    return next();
-  else
-    return res.status(401).json({ error: 'Authorization header missing' });
-}
-```
-
-<sub>📄 browser.ts</sub>
-```javascript
-import map from './map';
-
-const db = map.http('http://localhost:3000/rdb');
-
-updateRows();
-
-async function updateRows() {
-  
-  db.interceptors.request.use((config) => {
-    // For demo purposes, we're just adding hardcoded token
-    // In a real-world scenario, use a proper JSON web token
-    config.headers.Authorization = 'Bearer 2' //customerId
-    return config;
-  });
-
-  db.interceptors.response.use(
-    response => response, 
-    (error) => {
-      if (error.response && error.response.status === 401) {
-        console.dir('Unauthorized, dispatch a login action');
-        //redirectToLogin();
-      }
-      return Promise.reject(error);
-    }
-  );
-
-  const filter = db.order.lines.any(
-    line => line.product.startsWith('Magic wand'))
-    .and(db.order.customer.name.startsWith('Harry')
-  );
-
-  const order = await db.order.getOne(filter, {
-    lines: true
-  });
-  
-  order.lines.push({
-    product: 'broomstick'
-  });
-
-  await order.saveChanges();
-
-}
-
-```
-</details>
 <details><summary><strong>Transactions</strong></summary>
 We initiate a database transaction using db.transaction.
 Within the transaction, a customer is retrieved and its balance updated using the tx object to ensure operations are transactional.
@@ -1533,30 +1620,6 @@ const map = rdb.map(x => ({
 
 export default map;
 ```  
-</details>
-
-<details><summary><strong>Raw sql filters</strong></summary>
-This illustrates the implementation of raw SQL filters, for querying customer data. You can use the raw SQL filter alone or in combination with a regular filter.
- Here the raw filter queries for customer with name ending with "arry". The composite filter combines the raw SQL filter and a regular filter that checks for a customer balance greater than 100. It is important to note that due to security precautions aimed at preventing SQL injection attacks, using raw SQL filters directly via browser inputs is not allowed. Attempting to do so will result in an HTTP status 403 (Forbidden) being returned.
- 
-```javascript
-import map from './map';
-const db = map.sqlite('demo.db');
-
-getRows();
-
-async function getRows() {
-  const rawFilter = {
-    sql: 'name like ?',
-    parameters: ['%arry']
-  };
-                 
-  const rowsWithRawFilter = await db.customer.getOne(rawFilter);
-  
-  const combinedFilter = db.customer.balance.greaterThan(100).and(rawFilter);
-  const rowsWithCombinedFilter = await db.customer.getOne(combinedFilter);  
-}
-```
 </details>
 
 <details><summary><strong>Raw sql queries</strong></summary>
