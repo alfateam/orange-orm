@@ -140,11 +140,11 @@ async function getRows() {
 ## API 
 
 <details id="table-mapping"><summary><strong>Mapping tables</strong></summary>
-To define a mapping, you employ the <strong><i>map()</i></strong> method, linking your tables and columns to corresponding object properties. You provide a callback function that engages with a parameter representing a database table.
+<p>To define a mapping, you employ the <strong><i>map()</i></strong> method, linking your tables and columns to corresponding object properties. You provide a callback function that engages with a parameter representing a database table.
 
 Each column within your database table is designated by using the <strong><i>column()</i></strong> method, in which you specify its name. This action generates a reference to a column object that enables you to articulate further column properties like its data type or if it serves as a primary key.
 
-Relationships between tables can also be outlined. By using methods like <strong><i>hasOne</i></strong>, <strong><i>hasMany</i></strong>, and <strong><i>references</i></strong>, you can establish connections that reflect the relationships in your data schema. In the example below, an 'order' is linked to a 'customer' reference, a 'deliveryAddress', and multiple 'lines'. The hasMany and hasOne relations represents ownership - the tables 'deliveryAddress' and 'orderLine' are owned by the 'order' table, and therefore, they contain the 'orderId' column referring to their parent table, which is 'order'. Conversely, the customer table is independent and can exist without any knowledge of the 'order' table. Therefore we say that the order table <i>references</i> the customer table - necessitating the existence of a 'customerId' column in the 'order' table.  
+Relationships between tables can also be outlined. By using methods like <strong><i>hasOne</i></strong>, <strong><i>hasMany</i></strong>, and <strong><i>references</i></strong>, you can establish connections that reflect the relationships in your data schema. In the example below, an 'order' is linked to a 'customer' reference, a 'deliveryAddress', and multiple 'lines'. The hasMany and hasOne relations represents ownership - the tables 'deliveryAddress' and 'orderLine' are owned by the 'order' table, and therefore, they contain the 'orderId' column referring to their parent table, which is 'order'. Conversely, the customer table is independent and can exist without any knowledge of the 'order' table. Therefore we say that the order table <i>references</i> the customer table - necessitating the existence of a 'customerId' column in the 'order' table.</p>
 
 <sub>📄 map.ts</sub>
 ```javascript
@@ -363,11 +363,11 @@ const db = map.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;
 
 <details id="inserting-rows"><summary><strong>Inserting rows</strong></summary>
 
-In the code below, we initially import the table-mapping feature "map.ts" and the setup script "init.ts", both of which were defined in the preceding step. The setup script executes a raw query that creates the necessary tables. Subsequently, we insert two customers, named "George" and "Harry", into the customer table, and this is achieved through calling "db.customer.insert".
+<p>In the code below, we initially import the table-mapping feature "map.ts" and the setup script "init.ts", both of which were defined in the preceding step. The setup script executes a raw query that creates the necessary tables. Subsequently, we insert two customers, named "George" and "Harry", into the customer table, and this is achieved through calling "db.customer.insert".
 
 Next, we insert an array of two orders in the order table. Each order contains an orderDate, customer information, deliveryAddress, and lines for the order items. We use the customer constants "george" and "harry" from previous inserts. Observe that we don't pass in any primary keys. This is because all tables here have autoincremental keys. The second argument to "db.order.insert" specifies a fetching strategy. This fetching strategy plays a critical role in determining the depth of the data retrieved from the database after insertion. The fetching strategy specifies which associated data should be retrieved and included in the resulting orders object. In this case, the fetching strategy instructs the database to retrieve the customer, deliveryAddress, and lines for each order.
 
-Without a fetching strategy, "db.order.insert" would only return the root level of each order. In that case you would only get the id, orderDate, and customerId for each order.  
+Without a fetching strategy, "db.order.insert" would only return the root level of each order. In that case you would only get the id, orderDate, and customerId for each order.</p>
 
 ```javascript
 import map from './map';
@@ -480,10 +480,9 @@ async function insertRows() {
 </details>
 
 <details><summary><strong>Fetching rows</strong></summary>
+<p>RDB has a rich querying model. As you navigate through, you'll learn about the various methods available to retrieve data from your tables, whether you want to fetch all rows, many rows with specific criteria, or a single row based on a primary key.  
 
- RDB has a rich querying model. As you navigate through, you'll learn about the various methods available to retrieve data from your tables, whether you want to fetch all rows, many rows with specific criteria, or a single row based on a primary key.  
-
-The fetching strategy in RDB is optional, and its use is influenced by your specific needs. You can define the fetching strategy either on the table level or the column level. This granularity gives you the freedom to decide how much related data you want to pull along with your primary request.
+The fetching strategy in RDB is optional, and its use is influenced by your specific needs. You can define the fetching strategy either on the table level or the column level. This granularity gives you the freedom to decide how much related data you want to pull along with your primary request.</p>
 
 __All rows__
 
@@ -610,8 +609,7 @@ async function getRows() {
 </details>  
 
 <details id="updating-rows"><summary><strong>Updating rows</strong></summary>
-  
-To update rows, modify the property values and invoke the method <strong><i>saveChanges()</i></strong>. The function updates only the modified columns, not the entire row. Rows in child relations can also be updated as long as the parent order <i>owns</i> the child tables. In our illustration, the <strong>order</strong> table owns both the <strong>deliveryAddress</strong> and the <strong>lines</strong> tables because they're part of a <i>hasOne/hasMany relationship</i>. Contrastingly, the <strong>customer</strong> is part of a <i>reference relationship</i> and thus can't be updated here. But you can detach the reference to the customer by assigning it to null or undefined. (Setting order.customerId to null or undefined achieves the same result.)
+<p>To update rows, modify the property values and invoke the method <strong><i>saveChanges()</i></strong>. The function updates only the modified columns, not the entire row. Rows in child relations can also be updated as long as the parent order <i>owns</i> the child tables. In our illustration, the <strong>order</strong> table owns both the <strong>deliveryAddress</strong> and the <strong>lines</strong> tables because they're part of a <i>hasOne/hasMany relationship</i>. Contrastingly, the <strong>customer</strong> is part of a <i>reference relationship</i> and thus can't be updated here. But you can detach the reference to the customer by assigning it to null or undefined. (Setting order.customerId to null or undefined achieves the same result.)</p>
 
 __Updating a single row__
 
@@ -773,7 +771,7 @@ async function update() {
 </details>  
 
 <details><summary><strong>Deleting rows</strong></summary>
-Rows in owner tables cascade deletes to their child tables. In essence, if a table has ownership over other tables through <strong><i>hasOne</i></strong> and <strong><i>hasMany</i></strong> relationships, removing a record from the parent table also removes its corresponding records in its child tables. This approach safeguards against leaving orphaned records and upholds data integrity. On the contrary, tables that are merely referenced, through <strong><i>reference relationships </i></strong> , remain unaffected upon deletions. For a deeper dive into these relationships and behaviors, refer to the section on <a href="#user-content-table-mapping">Mapping tables</a>.
+<p>Rows in owner tables cascade deletes to their child tables. In essence, if a table has ownership over other tables through <strong><i>hasOne</i></strong> and <strong><i>hasMany</i></strong> relationships, removing a record from the parent table also removes its corresponding records in its child tables. This approach safeguards against leaving orphaned records and upholds data integrity. On the contrary, tables that are merely referenced, through <strong><i>reference relationships </i></strong> , remain unaffected upon deletions. For a deeper dive into these relationships and behaviors, refer to the section on <a href="#user-content-table-mapping">Mapping tables</a>.</p>
 
 __Deleting a single row__
 ```javascript
@@ -923,35 +921,9 @@ async function deleteRows() {
 ```
 </details>
 
-<details id="filtering-relations"><summary><strong>Filtering relations</strong></summary>
-
-Relation filters are particularly useful as they allow for the dynamic exclusion of related data based on specific criteria.
-In this example all orders are fetched, but the lines only having products containing "broomstick". By setting deliveryAddress and customer to true, we also ensure the inclusion of these related entities in our result set.
-
-```javascript
-import map from './map';
-const db = map.sqlite('demo.db');
-
-getRows();
-
-async function getRows() {
-  const orders = await db.order.getAll({
-    lines: {
-      where: x => x.product.contains('broomstick')
-    },
-    deliveryAddress: true,
-    customer: true
-  });
-  
-  console.dir(orders, { depth: Infinity });
-}
-```
-
-</details>
-
 <details id="in-the-browser"><summary><strong>In the browser</strong></summary>
-You can use <strong><i>RDB</i></strong> in the browser by using the adapter for Express. Instead of sending raw SQL queries from the client to the server, this approach records the method calls in the client. These method calls are then replayed at the server, ensuring a higher level of security by not exposing raw SQL on the client side.  
-Raw sql queries, raw sql filters and transactions are disabled at the http client due to security reasons.  If you would like RDB to support other web frameworks, like nestJs, fastify, etc, please let me know.
+<p>You can use <strong><i>RDB</i></strong> in the browser by using the adapter for Express. Instead of sending raw SQL queries from the client to the server, this approach records the method calls in the client. These method calls are then replayed at the server, ensuring a higher level of security by not exposing raw SQL on the client side.  
+Raw sql queries, raw sql filters and transactions are disabled at the http client due to security reasons.  If you would like RDB to support other web frameworks, like nestJs, fastify, etc, please let me know.</p>
 
 <sub>📄 server.ts</sub>
 ```javascript
@@ -1038,6 +1010,7 @@ function validateToken(req, res, next) {
 ```
 
 <sub>📄 browser.ts</sub>
+
 ```javascript
 import map from './map';
 
@@ -1084,11 +1057,316 @@ async function updateRows() {
 
 ```
 </details>
+
+<details id="basic-filters"><summary><strong>Basic filters</strong></summary>
+<p>Filters are a versatile tool for both data retrieval and bulk deletions. They allow for precise targeting of records based on specific criteria and can be combined with operators like <i>any</i> and <i>exists</i> and even raw sql for more nuanced control. Filters can also be nested to any depth, enabling complex queries that can efficiently manage and manipulate large datasets. This dual functionality enhances database management by ensuring data relevance and optimizing performance.</p>
+
+
+__Equal__  
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const filter = db.customer.name.equal('Harry');
+
+  const rows = await db.customer.getMany(filter);
+}
+```
+__Not equal__  
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const filter = db.customer.name.notEqual('Harry');
+
+  const rows = await db.customer.getMany(filter);
+}
+```
+__Contains__  
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const filter = db.customer.name.contains('arr');
+
+  const rows = await db.customer.getMany(filter);
+}
+```
+__Starts with__  
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const filter = db.customer.name.startsWith('Harr');
+
+  const rows = await db.customer.getMany(filter);
+}
+```
+__Ends with__  
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const filter = db.customer.name.endsWith('arry');
+
+  const rows = await db.customer.getMany(filter);
+}
+```
+__Greater than__  
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const filter = db.order.orderDate.greaterThan('2023-07-14T12:00:00');
+
+  const rows = await db.order.getMany(filter);
+}
+```
+__Greater than or equal__  
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const filter = db.order.orderDate.greaterThanOrEqual('2023-07-14T12:00:00');
+
+  const rows = await db.order.getMany(filter);
+}
+```
+__Less than__  
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const filter = db.order.orderDate.lessThan('2024-07-14T12:00:00');
+
+  const rows = await db.order.getMany(filter);
+}
+```
+__Less than or equal__  
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const filter = db.order.orderDate.lessThanOrEqual('2024-07-14T12:00:00');
+
+  const rows = await db.order.getMany(filter);
+}
+```
+__Between__  
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const filter = db.order.orderDate.between('2023-07-14T12:00:00', '2024-07-14T12:00:00');
+
+  const rows = await db.order.getMany(filter);
+}
+```
+__In__  
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const filter = db.customer.name.in('George', 'Harry');
+
+  const rows = await db.customer.getMany(filter);
+}
+```
+__Raw sql filter__  
+You can use the raw SQL filter alone or in combination with a regular filter. 
+Here the raw filter queries for customer with name ending with "arry". The composite filter combines the raw SQL filter and a regular filter that checks for a customer balance greater than 100. It is important to note that due to security precautions aimed at preventing SQL injection attacks, using raw SQL filters directly via browser inputs is not allowed. Attempting to do so will result in an HTTP status 403 (Forbidden) being returned.
+ 
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const rawFilter = {
+    sql: 'name like ?',
+    parameters: ['%arry']
+  };                 
+  const combinedFilter = db.customer.balance.greaterThan(100).and(rawFilter);
+  
+  const rowsWithRaw = await db.customer.getMany(rawFilter);
+  const rowsWithCombined = await db.customer.getMany(combinedFilter);  
+}
+```
+
+</details>
+
+<details id="logical-filters"><summary><strong>And, or, not, exists</strong></summary>
+<p>These operators serve as the backbone for constructing complex queries that allow for more granular control over the data fetched from the database. The examples provided below are self-explanatory for anyone familiar with basic programming concepts and database operations. The design philosophy underscores the importance of clear, readable code that doesn't sacrifice power for simplicity.</p>
+
+__And__  
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const nameFilter = db.order.customer.name.equal('Harry');
+  const dateFilter = db.order.orderDate.greaterThan('2023-07-14T12:00:00');
+  const filter = nameFilter.and(dateFilter);
+
+  const rows = await db.order.getMany(filter);  
+}
+```
+__Or__  
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const filter = db.order.customer(x => x.name.equal('George').or(x.name.equal('Harry')));
+
+  const rows = await db.order.getMany(filter);  
+}
+```
+__Not__  
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const filter = db.order.customer(x => x.name.equal('George').or(x.name.equal('Harry'))).not();
+  //Neither George nor Harry
+
+  const rows = await db.order.getMany(filter);  
+}
+```
+__Exists__  
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const filter = db.order.deliveryAddress.exists();
+
+  const rows = await db.order.getMany(filter);  
+}
+```
+
+</details>
+
+<details id="any-filters"><summary><strong>Any, all, none</strong></summary>
+<p>These operators are used in scenarios involving relationships within database records.</p>
+
+
+__Any__  
+The <i>any</i> operator is employed when the objective is to find records where at least one item in a collection meets the specified criteria.
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const filter = db.order.lines.any(x => x.product.contains('guitar'));
+  //equivalent syntax:
+  // const filter = db.order.lines.product.contains('guitar');
+
+  const rows = await db.order.getMany(filter);  
+}
+```
+__All__  
+Conversely, the <i>all</i> operator ensures that every item in a collection adheres to the defined condition.
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const filter = db.order.lines.all(x => x.product.contains('a'));
+
+  const rows = await db.order.getMany(filter);  
+}
+```
+__None__  
+The <i>none</i> operator, as the name suggests, is used to select records where not a single item in a collection meets the condition. 
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const filter = db.order.lines.none(x => x.product.equal('Magic wand'));
+
+  const rows = await db.order.getMany(filter);  
+}
+```
+
+</details>
+
+<details id="filtering-relations"><summary><strong>Relation filters</strong></summary>
+<p>Relation filters offer a dynamic approach to selectively include or exclude related data based on specific criteria. In the provided example, all orders are retrieved, yet it filters the order lines to only include those that feature products with "broomstick" in their description.  By setting deliveryAddress and customer to true, we also ensure the inclusion of these related entities in our result set.</p>
+
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const orders = await db.order.getAll({
+    lines: {
+      where: x => x.product.contains('broomstick')
+    },
+    deliveryAddress: true,
+    customer: true
+  });
+}
+```
+</details>
+
 <details><summary><strong>Transactions</strong></summary>
-We initiate a database transaction using db.transaction.
+<p>We initiate a database transaction using db.transaction.
 Within the transaction, a customer is retrieved and its balance updated using the tx object to ensure operations are transactional.
 An error is deliberately thrown to demonstrate a rollback, ensuring all previous changes within the transaction are reverted.
-Always use the provided tx object for operations within the transaction to maintain data integrity.
+Always use the provided tx object for operations within the transaction to maintain data integrity.</p>
 
 ```javascript
 import map from './map';
@@ -1109,7 +1387,7 @@ async function execute() {
 </details>
 
 <details><summary><strong>Data types</strong></summary>
-RDB is database agnostic - meaning it can work with multiple database systems without being specifically tied to any one of them. When the ORM behaves consistently across various databases, developers don't need to remember specific quirks or differences when switching between databases. They can rely on the ORM to provide the same mapping behavior, which reduces the cognitive load and potential for errors. There are currently 8 column types in RDB:  
+<p>RDB is database agnostic - meaning it can work with multiple database systems without being specifically tied to any one of them. When the ORM behaves consistently across various databases, developers don't need to remember specific quirks or differences when switching between databases. They can rely on the ORM to provide the same mapping behavior, which reduces the cognitive load and potential for errors. There are currently 8 column types in RDB:</p>
 
 - **`string`** maps to VARCHAR or TEXT in sql
 - **`numeric`** maps to INTEGER, DECIMAL, NUMERIC, TINYINT FLOAT/REAL or DOUBLE in sql.
@@ -1171,9 +1449,9 @@ const map = rdb.map(x => ({
 </details>
 
 <details id="default-values"><summary><strong>Default values</strong></summary>
-Utilizing default values can be especially useful for automatically populating these fields when the underlying database doesn't offer native support for default value generation.  
+<p>Utilizing default values can be especially useful for automatically populating these fields when the underlying database doesn't offer native support for default value generation.  
 
-In the provided code, the id column's default value is set to a UUID generated by crypto.randomUUID(), and the isActive column's default is set to true. 
+In the provided code, the id column's default value is set to a UUID generated by crypto.randomUUID(), and the isActive column's default is set to true.</p>
 
 ```javascript
 import rdb from 'rdb';
@@ -1193,7 +1471,7 @@ export default map;
 </details>
 
 <details><summary><strong>Validation</strong></summary>
-In the previous sections you have already seen the <strong><i>notNull()</i></strong> validator being used on some columns. This will not only generate correct typescript mapping, but also throw an error if value is set to null or undefined. However, sometimes we do not want the notNull-validator to be run on inserts. Typically, when we have an autoincremental key or server generated uuid, it does not make sense to check for null on insert. This is where <strong><i>notNullExceptInsert()</strong></i> comes to rescue. You can also create your own custom validator as shown below. The last kind of validator, is the <a href="https://ajv.js.org/json-schema.html">ajv JSON schema validator</a>. This can be used on json columns as well as any other column type.
+<p>In the previous sections you have already seen the <strong><i>notNull()</i></strong> validator being used on some columns. This will not only generate correct typescript mapping, but also throw an error if value is set to null or undefined. However, sometimes we do not want the notNull-validator to be run on inserts. Typically, when we have an autoincremental key or server generated uuid, it does not make sense to check for null on insert. This is where <strong><i>notNullExceptInsert()</strong></i> comes to rescue. You can also create your own custom validator as shown below. The last kind of validator, is the <a href="https://ajv.js.org/json-schema.html">ajv JSON schema validator</a>. This can be used on json columns as well as any other column type.</p>
 
 <sub>📄 map.ts</sub>
 ```javascript
@@ -1264,10 +1542,10 @@ export default map;
 </details>
 
 <details id="composite-keys"><summary><strong>Composite keys</strong></summary>
+<p>A composite key is defined by marking multiple columns as primary keys. This is done using the ".primary()"" method on each column that is part of the composite key.
 
-A composite key is defined by marking multiple columns as primary keys. This is done using the ".primary()"" method on each column that is part of the composite key.
+Consider a scenario where we have orders and order lines, and each order line is uniquely identified by combining the order type, order number, and line number.</p>
 
-Consider a scenario where we have orders and order lines, and each order line is uniquely identified by combining the order type, order number, and line number.
 ```javascript
 import rdb from 'rdb';
 
@@ -1296,8 +1574,8 @@ export default map;
 
 
 <details id="column-discriminators"><summary><strong>Column discriminators</strong></summary>
-Column discriminators are used to distinguish between different types of data in the same table. Think of them as labels that identify whether a record is one category or another.
-In the example, the <strong>client_type</strong> column serves as the discriminator that labels records as <strong>customer</strong> or <strong>vendor</strong> in the 'client' table. On inserts, the column will automatically be given the correct discriminator value. Similarly, when fetching and deleting, the discrimiminator will be added to the WHERE clause.
+<p>Column discriminators are used to distinguish between different types of data in the same table. Think of them as labels that identify whether a record is one category or another.
+In the example, the <strong>client_type</strong> column serves as the discriminator that labels records as <strong>customer</strong> or <strong>vendor</strong> in the 'client' table. On inserts, the column will automatically be given the correct discriminator value. Similarly, when fetching and deleting, the discrimiminator will be added to the WHERE clause.</p>
 
 ```javascript
 import rdb from 'rdb';
@@ -1319,11 +1597,12 @@ export default map;
 </details>
 
 <details id="formula-discriminators"><summary><strong>Formula discriminators</strong></summary>
-Formula discriminators are used to distinguish between different types of data in the same table. They differ from column discriminators by using a logical expression rather than a static value in a column.
+<p>Formula discriminators are used to distinguish between different types of data in the same table. They differ from column discriminators by using a logical expression rather than a static value in a column.
 
 In the example below, the formula discriminator categorize bookings into <strong>customerBooking</strong> and <strong>internalBooking</strong> within the same <strong>booking</strong> table. The categorization is based on the value of the <strong>booking_no</strong> column. For <strong>customerBooking</strong>, records are identified where the booking number falls within the range of 10000 to 99999. For <strong>internalBooking</strong>, the range is between 1000 to 9999. These conditions are utilized during fetch and delete operations to ensure that the program interacts with the appropriate subset of records according to their booking number. Unlike column discriminators, formula discriminators are not used during insert operations since they rely on existing data to evaluate the condition.
 
-The <strong><i>'@this'</strong></i> acts as a placeholder within the formula. When RDB constructs a query, it replaces <strong>'@this'</strong> with the appropriate alias for the table being queried. This replacement is crucial to avoid ambiguity, especially when dealing with joins with ambigious column names. 
+The <strong><i>'@this'</strong></i> acts as a placeholder within the formula. When RDB constructs a query, it replaces <strong>'@this'</strong> with the appropriate alias for the table being queried. This replacement is crucial to avoid ambiguity, especially when dealing with joins with ambigious column names.</p>
+
 ```javascript
 import rdb from 'rdb';
 
@@ -1344,32 +1623,8 @@ export default map;
 ```  
 </details>
 
-<details><summary><strong>Raw sql filters</strong></summary>
-This illustrates the implementation of raw SQL filters, for querying customer data. You can use the raw SQL filter alone or in combination with a regular filter.
- Here the raw filter queries for customer with name ending with "arry". The composite filter combines the raw SQL filter and a regular filter that checks for a customer balance greater than 100. It is important to note that due to security precautions aimed at preventing SQL injection attacks, using raw SQL filters directly via browser inputs is not allowed. Attempting to do so will result in an HTTP status 403 (Forbidden) being returned.
- 
-```javascript
-import map from './map';
-const db = map.sqlite('demo.db');
-
-getRows();
-
-async function getRows() {
-  const rawFilter = {
-    sql: 'name like ?',
-    parameters: ['%arry']
-  };
-                 
-  const rowsWithRawFilter = await db.customer.getOne(rawFilter);
-  
-  const combinedFilter = db.customer.balance.greaterThan(100).and(rawFilter);
-  const rowsWithCombinedFilter = await db.customer.getOne(combinedFilter);  
-}
-```
-</details>
-
 <details><summary><strong>Raw sql queries</strong></summary>
-You can employ raw SQL queries directly to fetch rows from the database, bypassing the ORM (Object-Relational Mapper). It is important to note that due to security precautions aimed at preventing SQL injection attacks, using raw SQL filters directly via browser inputs is not allowed. Attempting to do so will result in an HTTP status 403 (Forbidden) being returned.
+<p>You can employ raw SQL queries directly to fetch rows from the database, bypassing the ORM (Object-Relational Mapper). It is important to note that due to security precautions aimed at preventing SQL injection attacks, using raw SQL filters directly via browser inputs is not allowed. Attempting to do so will result in an HTTP status 403 (Forbidden) being returned.</p>
 
 ```javascript
 import map from './map';
@@ -1389,7 +1644,7 @@ async function getRows() {
 </details>
 
 <details><summary><strong>Aggregate functions</strong></summary>
-Currently there is only the <strong><i>count</i></strong> aggregate available.
+<p>Currently there is only the <strong><i>count</i></strong> aggregate available.</p>
 
 ```javascript
 import map from './map';
@@ -1408,10 +1663,10 @@ async function getCount() {
 </details>
 
 <details><summary><strong>Excluding sensitive data</strong></summary>
-
-To secure your application by preventing sensitive data from being serialized and possibly leaked, you can use the <strong>serializable(false)</strong> attribute on certain fields within your database schema. Here, the serializable(false) attribute has been applied to the balance column, indicating that this field will not be serialized when a record is converted to a JSON string.
+<p>To secure your application by preventing sensitive data from being serialized and possibly leaked, you can use the <strong>serializable(false)</strong> attribute on certain fields within your database schema. Here, the serializable(false) attribute has been applied to the balance column, indicating that this field will not be serialized when a record is converted to a JSON string.</p>
 
 <sub>📄 map.ts</sub>
+
 ```javascript
 import rdb from 'rdb';
 
@@ -1427,6 +1682,7 @@ const map = rdb.map(x => ({
 export default map;
 ```
 <sub>📄 sensitive.ts</sub>
+
 ```javascript
 import map from './map';
 const db = map.sqlite('demo.db');
@@ -1449,7 +1705,7 @@ async function getRows() {
 </details>
 
 <details><summary><strong>Logging</strong></summary>
-You enable logging by listening to the query event on the rdb object. During this event, both the SQL statement and any associated parameters are logged. The logged output reveals the sequence of SQL commands executed, offering developers a transparent view into database operations, which aids in debugging and ensures data integrity.
+<p>You enable logging by listening to the query event on the rdb object. During this event, both the SQL statement and any associated parameters are logged. The logged output reveals the sequence of SQL commands executed, offering developers a transparent view into database operations, which aids in debugging and ensures data integrity.</p>
 
 ```javascript
 import rdb from 'rdb';
@@ -1494,10 +1750,14 @@ COMMIT
 </details>
 
 <details><summary><strong>What it is not</strong></summary>
+<p>
+<ul>
+  <li><strong>It is not about migrations</strong> <p>The allure of ORMs handling SQL migrations is undeniably attractive and sweet. However, this sweetness can become painful. Auto-generated migration scripts might not capture all nuances. Using dedicated migration tools separate from the ORM or manually managing migrations might be the less painful route in the long run.  RDB aim for database agnosticism. And when you're dealing with migrations, you might want to use features specific to a database platform. However, I might consider adding support for (non-auto-generated) migrations at a later point. But for now, it is not on the roadmap.</p></li>
+  <li><strong>It is not about NoSql databases</strong> <p>Applying ORMs to NoSQL, which inherently diverges from the relational model, can lead to data representation mismatches and a loss of specialized NoSQL features. Moreover, the added ORM layer can introduce performance inefficiencies, complicate debugging, and increase maintenance concerns. Given the unique capabilities of each NoSQL system, crafting custom data access solutions tailored to specific needs often provides better results than a generalized ORM approach.</p></li>
+  <li><strong>It is not about GrapQL</strong> <p>RDB, already supports remote data operations via HTTP, eliminating the primary need for integrating GraphQL. RDB's built-in safety mechanisms and tailored optimization layers ensure secure and efficient data operations, which might be compromised by adding GraphQL. Furthermore, RDB's inherent expressivity and powerful querying capabilities could be overshadowed by the introduction of GraphQL. Integrating GraphQL could introduce unnecessary complexity, potential performance overhead, and maintenance challenges, especially as both systems continue to evolve. Therefore, considering RDB's robust features and design, supporting GraphQL might not offer sufficient advantages to warrant the associated complications. </p></li>
+</ul>
 
-- **It is not about migrations** <p>The allure of ORMs handling SQL migrations is undeniably attractive and sweet. However, this sweetness can become painful. Auto-generated migration scripts might not capture all nuances. Using dedicated migration tools separate from the ORM or manually managing migrations might be the less painful route in the long run.  RDB aim for database agnosticism. And when you're dealing with migrations, you might want to use features specific to a database platform. However, I might consider adding support for (non-auto-generated) migrations at a later point. But for now, it is not on the roadmap.</p>
-- **It is not about NoSql databases** <p>Applying ORMs to NoSQL, which inherently diverges from the relational model, can lead to data representation mismatches and a loss of specialized NoSQL features. Moreover, the added ORM layer can introduce performance inefficiencies, complicate debugging, and increase maintenance concerns. Given the unique capabilities of each NoSQL system, crafting custom data access solutions tailored to specific needs often provides better results than a generalized ORM approach.</p>
-- **It is not about GrapQL** <p>RDB, already supports remote data operations via HTTP, eliminating the primary need for integrating GraphQL. RDB's built-in safety mechanisms and tailored optimization layers ensure secure and efficient data operations, which might be compromised by adding GraphQL. Furthermore, RDB's inherent expressivity and powerful querying capabilities could be overshadowed by the introduction of GraphQL. Integrating GraphQL could introduce unnecessary complexity, potential performance overhead, and maintenance challenges, especially as both systems continue to evolve. Therefore, considering RDB's robust features and design, supporting GraphQL might not offer sufficient advantages to warrant the associated complications. </p>
+</p>
 </details>
 
 ### [Changelog](https://github.com/alfateam/rdb/blob/master/docs/changelog.md)
