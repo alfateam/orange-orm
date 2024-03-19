@@ -1232,7 +1232,7 @@ async function getRows() {
 
 <details id="logical-filters"><summary><strong>And, or, not, exists</strong></summary>
 These operators serve as the backbone for constructing complex queries that allow for more granular control over the data fetched from the database. The examples provided below are self-explanatory for anyone familiar with basic programming concepts and database operations. The design philosophy underscores the importance of clear, readable code that doesn't sacrifice power for simplicity.
-
+<br>
 
 __And__  
 ```javascript
