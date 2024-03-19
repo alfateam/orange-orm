@@ -1062,6 +1062,7 @@ async function updateRows() {
 <details id="basic-filters"><summary><strong>Basic filters</strong></summary>
 Filters are a versatile tool for both data retrieval and bulk deletions. They allow for precise targeting of records based on specific criteria and can be combined with operators like <i>any</i> and <i>exists</i> and even raw sql for more nuanced control. Filters can also be nested to any depth, enabling complex queries that can efficiently manage and manipulate large datasets. This dual functionality enhances database management by ensuring data relevance and optimizing performance.
 
+
 __Equal__  
 ```javascript
 import map from './map';
@@ -1232,6 +1233,7 @@ async function getRows() {
 <details id="logical-filters"><summary><strong>And, or, not, exists</strong></summary>
 These operators serve as the backbone for constructing complex queries that allow for more granular control over the data fetched from the database. The examples provided below are self-explanatory for anyone familiar with basic programming concepts and database operations. The design philosophy underscores the importance of clear, readable code that doesn't sacrifice power for simplicity.
 
+
 __And__  
 ```javascript
 import map from './map';
@@ -1291,7 +1293,8 @@ async function getRows() {
 </details>
 
 <details id="any-filters"><summary><strong>Any, all, none</strong></summary>
-These operators are used in scenarios involving relationships within database records.
+These operators are used in scenarios involving relationships within database records.  
+
 
 __Any__  
 The <i>any</i> operator is employed when the objective is to find records where at least one item in a collection meets the specified criteria.
