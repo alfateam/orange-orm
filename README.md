@@ -1,6 +1,6 @@
 <!-- ![RDB](./docs/orange-small-alpha.png)   -->
-<img src="./docs/orange-small-alpha.png" width="250" alt="RDB"/>
-<img src="./docs/orange.svg" width="250" alt="RDB"/>
+
+<img src="./docs/orange.svg" alt="RDB" style="display: block; margin-left: auto; margin-right: auto;" width="250">
 
 RDB is the ultimate Object Relational Mapper for Node.js and Typescript, offering seamless integration with a variety of popular databases. Whether you're building applications in TypeScript or JavaScript  (including both CommonJS and ECMAScript), RDB has got you covered.  
 
