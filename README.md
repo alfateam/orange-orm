@@ -1,4 +1,4 @@
-<!-- ![RDB](./docs/orange-small-alpha.png)   -->
+![RDB](./docs/orange.svg){: width="250"}  
 
 <img src="./docs/orange.svg" alt="RDB" style="display: block; margin-left: auto; margin-right: auto;" width="250">
 
