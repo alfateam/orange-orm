@@ -1100,6 +1100,26 @@ async function getRows() {
 
 </details>
 
+<details id="filtering-relations"><summary><strong>Relation filters</strong></summary>
+<p>Relation filters offer a dynamic approach to selectively include or exclude related data based on specific criteria. In the provided example, all orders are retrieved, yet it filters the order lines to only include those that feature products with "broomstick" in their description.  By setting deliveryAddress and customer to true, we also ensure the inclusion of these related entities in our result set.</p>
+
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const orders = await db.order.getAll({
+    lines: {
+      where: x => x.product.contains('broomstick')
+    },
+    deliveryAddress: true,
+    customer: true
+  });
+}
+```
+</details>
 
 <details id="basic-filters"><summary><strong>Basic filters</strong></summary>
 <p>Filters are a versatile tool for both data retrieval and bulk deletions. They allow for precise targeting of records based on specific criteria and can be combined with operators like <i>any</i> and <i>exists</i> and even raw sql for more nuanced control. Filters can also be nested to any depth, enabling complex queries that can efficiently manage and manipulate large datasets. This dual functionality enhances database management by ensuring data relevance and optimizing performance.</p>
@@ -1382,27 +1402,6 @@ async function getRows() {
 }
 ```
 
-</details>
-
-<details id="filtering-relations"><summary><strong>Relation filters</strong></summary>
-<p>Relation filters offer a dynamic approach to selectively include or exclude related data based on specific criteria. In the provided example, all orders are retrieved, yet it filters the order lines to only include those that feature products with "broomstick" in their description.  By setting deliveryAddress and customer to true, we also ensure the inclusion of these related entities in our result set.</p>
-
-```javascript
-import map from './map';
-const db = map.sqlite('demo.db');
-
-getRows();
-
-async function getRows() {
-  const orders = await db.order.getAll({
-    lines: {
-      where: x => x.product.contains('broomstick')
-    },
-    deliveryAddress: true,
-    customer: true
-  });
-}
-```
 </details>
 
 <details><summary><strong>Transactions</strong></summary>

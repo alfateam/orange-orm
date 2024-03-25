@@ -92,6 +92,7 @@ type MappedDbInstance<T> = {
 	transaction(
 		fn: (db: MappedDbInstance<T>) => Promise<unknown>
 	): Promise<void>;
+	saveChanges(arraysOrRow: {saveChanges(): Promise<void>}): Promise<void>;
 	express(): import('express').RequestHandler;
 	express(config: ExpressConfig<T>): import('express').RequestHandler;
 	readonly metaData: DbConcurrency<T>;
