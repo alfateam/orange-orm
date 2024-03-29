@@ -1,7 +1,10 @@
+
 <div align="center">
 <img src="./docs/orange.svg" alt="RDB" width="250"/>
 </div>
-  Orange ORM is the ultimate Object Relational Mapper for Node.js and Typescript, offering seamless integration with a variety of popular databases. Whether you're building applications in TypeScript or JavaScript  (including both CommonJS and ECMAScript), RDB has got you covered.  
+
+
+  The ultimate Object Relational Mapper for Node.js and Typescript, offering seamless integration with a variety of popular databases. Whether you're building applications in TypeScript or JavaScript  (including both CommonJS and ECMAScript), Orange ORM has got you covered.  
 
 
 [![npm version](https://img.shields.io/npm/v/rdb.svg?style=flat-square)](https://www.npmjs.org/package/rdb)
@@ -15,7 +18,6 @@
 
 
 ## Key Features 
-
 - **Rich Querying Model**: RDB provides a powerful and intuitive querying model, making it easy to retrieve, filter, and manipulate data from your databases.
 - **Concise API**: With a concise and developer-friendly API, RDB enables you to interact with your database using simple and expressive syntax.
 - **No Code Generation Required**: Enjoy full IntelliSense, even in table mappings, without the need for cumbersome code generation.
@@ -24,12 +26,12 @@
 
 ## Supported Databases
 
-✅ Postgres  
-✅ MS SQL  
-✅ MySQL  
-✅ Oracle  
-✅ SAP ASE  
-✅ SQLite
+✓ Postgres  
+✓ MS SQL  
+✓ MySQL  
+✓ Oracle  
+✓ SAP ASE  
+✓ SQLite
 
 
 This is the _Modern Typescript Documentation_. Are you looking for the [_Classic Documentation_](https://github.com/alfateam/rdb/blob/master/docs/docs.md) ?
