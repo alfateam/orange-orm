@@ -2,11 +2,11 @@ let newRelatedTable = _newRelatedTable;
 const negotiateRawSqlFilter = require('../column/negotiateRawSqlFilter');
 let tryGetSessionContext = require('../tryGetSessionContext');
 
-function newWhere(relations, _depth) {
+function newWhere(_relations, _depth) {
 
 	function where(fn) {
 		const includeMany = tryGetSessionContext()?.engine === 'mssql';
-		let  { relations, alias } = extract(includeMany);
+		let { relations, alias } = extract(includeMany, _relations);
 		const table = relations[relations.length - 1].childTable;
 		if (!relations[0].isMany || includeMany)
 			table._rootAlias = alias;
@@ -17,27 +17,27 @@ function newWhere(relations, _depth) {
 			delete table._rootAlias;
 			return anyFilter;
 		}
-		catch(e) {
+		catch (e) {
 			delete table._rootAlias;
 			throw e;
 		}
 	}
 	return where;
 
-	function extract(includeMany) {
+	function extract(includeMany, relations) {
 		let alias = relations[0].toLeg().table._dbName;
 		let result = [];
 		for (let i = 0; i < relations.length; i++) {
 			if (relations[i].isMany && !includeMany) {
-				result = [];
-				alias =  relations[0].toLeg().table._dbName;
+				result = [relations[i]];
+				alias = relations[i].toLeg().table._dbName;
 			}
 			else {
 				result.push(relations[i]);
 				alias += relations[i].toLeg().name;
 			}
 		}
-		return { relations, alias};
+		return { relations: result, alias };
 	}
 
 }
