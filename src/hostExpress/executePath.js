@@ -52,7 +52,8 @@ let _allowedOps = {
 	exists: true,
 	all: true,
 	any: true,
-	none: true
+	none: true,
+	where: true,
 };
 
 async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, request, response, readonly, disableBulkDeletes, isHttp, client }) {
@@ -67,9 +68,11 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 	function parseFilter(json, table) {
 		if (isFilter(json)) {
 			let subFilters = [];
+
 			let anyAllNone = tryGetAnyAllNone(json.path, table);
 			if (anyAllNone) {
-
+				if (isHttp)
+					validateArgs(json.args[0]);
 				const f =  anyAllNone(x => parseFilter(json.args[0], x));
 				f.isSafe = isSafe;
 				return f;
@@ -96,7 +99,7 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 				table = table[path[i]];
 			}
 
-			let ops = new Set(['all', 'any', 'none']);
+			let ops = new Set(['all', 'any', 'none', 'where']);
 			let last = path.slice(-1)[0];
 			if (ops.has(last) || (table &&  (table._primaryColumns || (table.any && table.all))))
 				return table;
@@ -129,6 +132,7 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 			for (let i = 0; i < pathArray.length; i++) {
 				target = target[pathArray[i]];
 			}
+
 			let res = target.apply(null, args);
 			setSafe(res);
 			return res;
@@ -251,7 +255,23 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 		if (_baseFilter)
 			filter = filter.and(_baseFilter);
 		let args = [filter].concat(Array.prototype.slice.call(arguments).slice(1));
+		await negotiateWhere(strategy);
 		return table.getManyDto.apply(null, args);
+	}
+
+	async function negotiateWhere(strategy) {
+		if (typeof strategy !== 'object')
+			return;
+
+		for(let name in strategy) {
+			if(name === 'where') {
+				// validateArgs(strategy);
+				strategy.where = await parseFilter(strategy[name], table);
+			}
+			else
+				await negotiateWhere(strategy[name]);
+		}
+
 	}
 
 	async function getMany(filter, strategy) {
@@ -261,6 +281,7 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 		if (_baseFilter)
 			filter = filter.and(_baseFilter);
 		let args = [filter].concat(Array.prototype.slice.call(arguments).slice(1));
+		await negotiateWhere(strategy);
 		return table.getMany.apply(null, args);
 	}
 
@@ -335,6 +356,7 @@ function validateArgs() {
 		}
 		if (Array.isArray(filter))
 			for (let i = 0; i < filter.length; i++) {
+
 				validateArgs(filter[i]);
 			}
 	}
@@ -350,6 +372,7 @@ function setSafe(o) {
 		Object.defineProperty(o, 'isSafe', {
 			value: isSafe,
 			enumerable: false
+
 		});
 }
 

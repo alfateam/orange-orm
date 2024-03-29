@@ -1,0 +1,9 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Ask a question in Discord
+    url: https://discord.gg/QjuEgvQXzd
+    about: Ask questions and discuss with other community members in Discord
+  
+  - name: Ask a question in Github Discussions
+    url: https://github.com/alfateam/rdb/discussions
+    about: Ask questions and discuss with other community members in Github Discussions

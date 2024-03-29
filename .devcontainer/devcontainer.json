@@ -9,8 +9,14 @@
 		"vscode": {
 			// Add the IDs of extensions you want installed when the container is created.
 			"extensions": [
-				"dbaeumer.vscode-eslint"
-			]
+				"dbaeumer.vscode-eslint",
+				"adpyke.vscode-sql-formatter"
+			],
+			"settings": {
+                "[sql]": {
+                    "editor.defaultFormatter": "adpyke.vscode-sql-formatter"
+                }
+            }
 		}
 	},
 	// "workspaceMount": "source=${localWorkspaceFolder}/sub-folder,target=/workspace,type=bind",

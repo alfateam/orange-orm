@@ -11,6 +11,7 @@ const initMs = require('./initMs');
 const initMysql = require('./initMysql');
 const initSqlite = require('./initSqlite');
 const initSap = require('./initSap');
+
 const versionArray = process.version.replace('v', '').split('.');
 const major = parseInt(versionArray[0]);
 

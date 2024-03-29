@@ -5562,13 +5562,34 @@ function rdbClient(options = {}) {
 		}
 
 		async function getManyCore() {
-			let args = Array.prototype.slice.call(arguments);
+			let args = negotiateWhere.apply(null, arguments);
 			let body = stringify({
 				path: 'getManyDto',
 				args
 			});
 			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
 			return adapter.post(body);
+		}
+
+		function negotiateWhere(_, strategy, ...rest) {
+			const args = Array.prototype.slice.call(arguments);
+			if (strategy)
+				return [_, where(strategy), ...rest];
+			else
+				return args;
+		}
+
+		function where(_strategy, path = '') {
+			if (typeof _strategy !== 'object')
+				return _strategy;
+			const strategy = { ..._strategy };
+			for (let name in _strategy) {
+				if (name === 'where' && typeof strategy[name] === 'function')
+					strategy.where = column(path + 'where')(strategy.where);
+				else
+					strategy[name] = where(_strategy[name], path + name + '.');
+			}
+			return strategy;
 		}
 
 		async function _delete() {
@@ -5645,7 +5666,7 @@ function rdbClient(options = {}) {
 
 		async function insertAndForget(rows) {
 			const concurrency = undefined;
-			let args = [concurrency, {insertAndForget: true}];
+			let args = [concurrency, { insertAndForget: true }];
 			if (Array.isArray(rows)) {
 				let proxy = proxify([], args[0]);
 				proxy.splice.apply(proxy, [0, 0, ...rows]);
