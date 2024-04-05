@@ -1,5 +1,7 @@
 
 ## Changelog
+__3.6.1__  
+Fixed bug in filtered relations regarding incorrect alias. See [#76](https://github.com/alfateam/rdb/issues/76)  
 __3.6.0__  
 Filters on relations.  
 __3.5.2__  
