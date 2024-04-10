@@ -5580,17 +5580,23 @@ function rdbClient(options = {}) {
 		}
 
 		function where(_strategy, path = '') {
-			if (typeof _strategy !== 'object')
+			if (typeof _strategy !== 'object' || _strategy === null)
 				return _strategy;
+		
+			if (Array.isArray(_strategy)) {
+				return _strategy.map(item => where(item, path));
+			}
+		
 			const strategy = { ..._strategy };
 			for (let name in _strategy) {
 				if (name === 'where' && typeof strategy[name] === 'function')
-					strategy.where = column(path + 'where')(strategy.where);
+					strategy.where = column(path + 'where')(strategy.where); // Assuming `column` is defined elsewhere.
 				else
 					strategy[name] = where(_strategy[name], path + name + '.');
 			}
 			return strategy;
 		}
+		
 
 		async function _delete() {
 			let args = Array.prototype.slice.call(arguments);
