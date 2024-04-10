@@ -434,6 +434,40 @@ describe('getMany', () => {
 	}
 });
 
+describe('getAll orderBy array', () => {
+
+	test('pg', async () => await verify('pg'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+		const rows = await db.customer.getAll({ orderBy: ['id desc', 'balance']});
+
+		const expected = [{
+			id: 2,
+			name: 'Harry',
+			balance: 200,
+			isActive: true
+		},
+		{
+			id: 1,
+			name: 'George',
+			balance: 177,
+			isActive: true
+		}
+		];
+		expect(rows).toEqual(expected);
+	}
+});
+
 describe('getMany with column strategy', () => {
 
 	test('pg', async () => await verify('pg'));
@@ -541,6 +575,7 @@ describe('getMany with relations', () => {
 		expect(rows).toEqual(expected);
 	}
 });
+
 describe('getMany with filtered relations', () => {
 	test('pg', async () => await verify('pg'));
 	test('oracle', async () => await verify('oracle'));
