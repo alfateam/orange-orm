@@ -20,16 +20,8 @@ function newInsertCommandCore(table, row, options = {}) {
 		}
 	}
 
-	//todo
-	//add outParams
-	//result.resultFromOutParams = true;
-	//result.outParamsLength = 2;
 	var sql = util.format.apply(null, values);
 	return newParameterized(sql, parameters);
 }
 
 module.exports = newInsertCommandCore;
-
-// INSERT INTO _order (orderDate,customerId)  OUTPUT INSERTED.id,INSERTED.orderDate,INSERTED.customerId VALUES (@0,1)
-// parameters: 0,[object Object],'2022-01-11T09:24:47.000'
-

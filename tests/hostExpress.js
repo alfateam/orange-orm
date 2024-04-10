@@ -11,6 +11,12 @@ const express = require('express');
 
 server();
 
+db.order.getAll({
+	where: (table) => {
+		return table.orderDate.notEqual(null);
+	}
+});
+
 async function server() {
 	await insertData(db);
 	express().disable('x-powered-by')

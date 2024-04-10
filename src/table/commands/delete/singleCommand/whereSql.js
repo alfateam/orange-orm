@@ -14,10 +14,11 @@ function newWhereSql(relations, shallowFilter, rightAlias) {
 		var table = relation.childTable;
 		var joinCore = newShallowJoinSql(table, leftColumns, rightColumns, leftAlias, rightAlias);
 		if (shallowFilter.sql())
-			sql = shallowFilter.prepend(' WHERE ' + joinCore + ' AND ');
+			sql = shallowFilter.prepend(' AND ').prepend(joinCore).prepend(' WHERE ');
 		else
-			sql = ' WHERE ' + joinCore;
+			sql = joinCore.prepend(' WHERE ');
 	}
+
 	return sql;
 }
 

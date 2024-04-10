@@ -15,7 +15,7 @@ async function getSubRows(parentRows, filter, span, alias, innerJoin, orderBy) {
 		var parentColumns = leg.columns;
 		var shallowJoin = newShallowJoinSql(parentTable, parentColumns, childColumns, nextAlias, rightAlias);
 		var nextOrderBy = orderBy + ',' + extractOrderBy(leg.span.table, nextAlias, leg.span.orderBy).substring(9);
-		var nextInnerJoin = shallowJoin + innerJoin;
+		var nextInnerJoin = shallowJoin.append(innerJoin);
 		var query = newSingleQuery(leg.span.table, filter, leg.span, nextAlias, nextInnerJoin, nextOrderBy);
 
 		promises.push(executeQueries([query])
@@ -34,7 +34,7 @@ async function getSubRows(parentRows, filter, span, alias, innerJoin, orderBy) {
 		var parentColumns = leg.columns;
 		var shallowJoin = newShallowJoinSql(parentTable, parentColumns, childColumns, nextAlias, rightAlias);
 		var nextOrderBy = orderBy + ',' + extractOrderBy(leg.span.table, nextAlias, leg.span.orderBy).substring(9);
-		var nextInnerJoin = shallowJoin + innerJoin;
+		var nextInnerJoin = shallowJoin.append(innerJoin);
 		var query = newSingleQuery(leg.span.table, filter, leg.span, nextAlias, nextInnerJoin, nextOrderBy);
 
 		promises.push(executeQueries([query])
@@ -53,7 +53,7 @@ async function getSubRows(parentRows, filter, span, alias, innerJoin, orderBy) {
 		var parentColumns = leg.columns;
 		var shallowJoin = newShallowJoinSql(parentTable, childColumns, parentColumns, nextAlias, alias);
 		var nextOrderBy = orderBy + ',' + extractOrderBy(leg.span.table, nextAlias, leg.span.orderBy).substring(9);
-		var nextInnerJoin = shallowJoin + innerJoin;
+		var nextInnerJoin = shallowJoin.append(innerJoin);
 		var query = newSingleQuery(span.table, filter, span, nextAlias, nextInnerJoin, nextOrderBy);
 
 		promises.push(executeQueries([query])

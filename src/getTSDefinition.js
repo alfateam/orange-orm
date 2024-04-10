@@ -36,6 +36,8 @@ function getTSDefinition(tableConfigs, {isNamespace = false, isHttp = false} = {
 	}
 
 	function getTable(table, Name, name, customFilters) {
+		const _columns = columns(table);
+		const _tableRelations = tableRelations(table);
 		return `
 export interface ${Name}Table {
 	count(filter?: RawFilter): Promise<number>;
@@ -76,8 +78,13 @@ export interface ${Name}Table {
 	patch(patch: JsonPatch): Promise<void>;
 	patch(patch: JsonPatch, concurrency: ${Name}Concurrency, fetchingStrategy?: ${Name}Strategy): Promise<void>;	
 	customFilters: ${Name}CustomFilters;
-	${columns(table)}
-	${tableRelations(table)}
+	${_columns}
+	${_tableRelations}
+}
+
+export interface ${Name}TableBase {	
+	${_columns}
+	${_tableRelations}
 }
 
 export interface ${Name}ExpressConfig {
@@ -223,6 +230,7 @@ export interface ${name}Strategy {
 	limit?: number;
 	offset?: number;
 	orderBy?: Array<${orderByColumns(table)}> | ${orderByColumns(table)};
+	where?: (table: ${name}TableBase) => RawFilter;
 }
 
 ${otherConcurrency}

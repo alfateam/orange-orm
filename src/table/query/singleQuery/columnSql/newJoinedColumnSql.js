@@ -1,12 +1,11 @@
 var joinLegToColumnSql = require('./joinLegToColumnSql');
 
 module.exports = function(span,alias,ignoreNull) {
-	var index = 0;
 	var c = {};
 	var sql = '';
 
 	c.visitJoin = function(leg) {
-		var joinSql = joinLegToColumnSql(leg,alias + 'x' + index, ignoreNull);
+		var joinSql = joinLegToColumnSql(leg,alias  + leg.name, ignoreNull);
 		sql = sql + joinSql;
 	};
 
@@ -22,7 +21,6 @@ module.exports = function(span,alias,ignoreNull) {
 
 	function onEach(leg) {
 		leg.accept(c);
-		index++;
 	}
 
 	return sql;

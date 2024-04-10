@@ -1,26 +1,24 @@
 var joinLegToJoinSql = require('./joinSql/joinLegToJoinSql');
 var oneLegToJoinSql = require('./joinSql/oneLegToJoinSql');
 
-function _new(span,alias) {
+function _new(span,alias = '') {
 	var sql = '';
-	var legNo = 0;
 	var childAlias;
 
 	var c = {};
 	c.visitJoin = function(leg) {
-		sql = sql + joinLegToJoinSql(leg,alias,childAlias);
+		sql = joinLegToJoinSql(leg,alias,childAlias).prepend(sql);
 	};
 
 	c.visitOne = function(leg) {
-		sql = sql + oneLegToJoinSql(leg,alias,childAlias);
+		sql = oneLegToJoinSql(leg,alias,childAlias).prepend(sql);
 	};
 
 	c.visitMany = function() {};
 
 	function onEachLeg(leg) {
-		childAlias = alias + 'x' + legNo;
+		childAlias = alias + leg.name;
 		leg.accept(c);
-		legNo++;
 	}
 
 	span.legs.forEach(onEachLeg);
