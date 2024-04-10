@@ -1,5 +1,7 @@
 
 ## Changelog
+__3.6.2__  
+Fixed bug with orderBy array that appeared in v3.6.0. See  [#78](https://github.com/alfateam/rdb/issues/78)  
 __3.6.1__  
 Fixed bug in filtered relations regarding incorrect alias. See [#76](https://github.com/alfateam/rdb/issues/76)  
 __3.6.0__  
