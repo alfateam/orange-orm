@@ -286,11 +286,11 @@ function rdbClient(options = {}) {
 		function where(_strategy, path = '') {
 			if (typeof _strategy !== 'object' || _strategy === null)
 				return _strategy;
-		
+
 			if (Array.isArray(_strategy)) {
 				return _strategy.map(item => where(item, path));
 			}
-		
+
 			const strategy = { ..._strategy };
 			for (let name in _strategy) {
 				if (name === 'where' && typeof strategy[name] === 'function')
@@ -300,7 +300,7 @@ function rdbClient(options = {}) {
 			}
 			return strategy;
 		}
-		
+
 
 		async function _delete() {
 			let args = Array.prototype.slice.call(arguments);
