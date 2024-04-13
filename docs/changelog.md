@@ -1,5 +1,7 @@
 
 ## Changelog
+__3.7.0__  
+Upgraded to mysql2@3.9.4 and tedious@18.1.0    
 __3.6.2__  
 Fixed bug with orderBy array that appeared in v3.6.0. See  [#78](https://github.com/alfateam/rdb/issues/78)  
 __3.6.1__  
