@@ -69,7 +69,7 @@
     "pg-native": "^3.0.0",
     "pg-query-stream": "^3.3.2",
     "sqlite3": "^5.0.2",
-    "tedious": "^15.1.2 || ^16.0.0"
+    "tedious": "^15.1.2 || ^16.0.0 || ^18.1.0"
   },
   "peerDependenciesMeta": {
     "pg": {
