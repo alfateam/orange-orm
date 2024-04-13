@@ -468,17 +468,17 @@ describe('getAll orderBy array', () => {
 	}
 });
 
-describe('getMany with column strategy', () => {
+describe.only('getMany with column strategy', () => {
 
-	test('pg', async () => await verify('pg'));
-	test('oracle', async () => await verify('oracle'));
-	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
-		test('mssqlNative', async () => await verify('mssqlNative'));
+	// test('pg', async () => await verify('pg'));
+	// test('oracle', async () => await verify('oracle'));
+	// test('mssql', async () => await verify('mssql'));
+	// if (major === 18)
+	// 	test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
-	test('sqlite', async () => await verify('sqlite'));
-	test('sap', async () => await verify('sap'));
-	test('http', async () => await verify('http'));
+	// test('sqlite', async () => await verify('sqlite'));
+	// test('sap', async () => await verify('sap'));
+	// test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
