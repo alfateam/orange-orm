@@ -92,7 +92,7 @@ type MappedDbInstance<T> = {
 	transaction(
 		fn: (db: MappedDbInstance<T>) => Promise<unknown>
 	): Promise<void>;
-	saveChanges(arraysOrRow: {saveChanges(): Promise<void>}): Promise<void>;
+	saveChanges(arraysOrRow: { saveChanges(): Promise<void> }): Promise<void>;
 	express(): import('express').RequestHandler;
 	express(config: ExpressConfig<T>): import('express').RequestHandler;
 	readonly metaData: DbConcurrency<T>;
@@ -183,7 +183,7 @@ type ExpandedMappedTable<T, FL = ExpandedFetchingStrategy<T>> = {
 		rows: StrategyToInsertRowData<T>[],
 		originalRows: StrategyToInsertRowData<T>[]
 	): Promise<StrategyToRowArray<FetchedProperties<T, FL>, T>>;
-	
+
 	update<FS extends FetchingStrategy<T>>(
 		row: StrategyToInsertRowData<T>,
 		strategy: FS
@@ -244,7 +244,7 @@ type ExpandedMappedTable<T, FL = ExpandedFetchingStrategy<T>> = {
 	count(filter?: Filter | PrimaryRowFilter<T>[]): Promise<number>;
 	delete(filter?: Filter | PrimaryRowFilter<T>[]): Promise<void>;
 	deleteCascade(filter?: Filter | PrimaryRowFilter<T>[]): Promise<void>;
-	
+
 	proxify(
 		row: StrategyToInsertRowData<T>
 	): StrategyToRow<FetchedProperties<T, FL>, T>;
@@ -308,7 +308,7 @@ type MappedTable<T> = {
 		modifiedRows: StrategyToInsertRowData<T>[],
 		originalRows: StrategyToInsertRowData<T>[]
 	): Promise<StrategyToRowArray<FetchedProperties<T, {}>, T>>;
-	
+
 	update<FS extends FetchingStrategy<T>>(
 		row: StrategyToInsertRowData<T>,
 		strategy: FS
@@ -535,6 +535,14 @@ type MappedColumnsAndRelations<T> = RemoveNeverFlat<{
 	: never;
 }>;
 
+type Relations<T> = RemoveNeverFlat<{
+	[K in keyof T]: T[K] extends ManyRelation
+	? Relations<T[K]> & RelatedTable
+	: T[K] extends RelatedTable
+	? Relations<T[K]> & RelatedTable
+	: never;
+}>;
+
 type OneOrJoinTable<T> = ((
 	fn: (table: MappedColumnsAndRelations<T>) => RawFilter
 ) => Filter) & {
@@ -573,7 +581,44 @@ type FetchingStrategy<T> = {
 	limit?: number;
 	offset?: number;
 	where?: (table: MappedColumnsAndRelations<T>) => RawFilter;
+	[customFilterName: string]: (agg: Agggregate<T>) => Filter;
 };
+
+
+type Agggregate<T> = {
+
+	sum(fn: (x: NumericColumnsDeep<T>) => NumericColumnTypeDef<infer M>,
+		strategy: FetchingStrategy<T>): Filter;
+	avg(fn: (x: NumericColumnsDeep<T>) => NumericColumnTypeDef<infer M>,
+		strategy: FetchingStrategy<T>): Filter;
+	min(fn: (x: NumericColumnsDeep<T>) => NumericColumnTypeDef<infer M>,
+		strategy: FetchingStrategy<T>): Filter;
+	max(fn: (x: NumericColumnsDeep<T>) => NumericColumnTypeDef<infer M>,
+		strategy: FetchingStrategy<T>): Filter;
+	count(fn: (x: TablesDeep<T>) => ManyRelation | RelatedTable,
+		strategy: FetchingStrategy<T>): Filter;
+	exists(fn: (x: TablesDeep<T>) => ManyRelation | RelatedTable,
+		strategy: FetchingStrategy<T>): Filter;		
+}
+
+type NumericColumnsDeep<T> = RemoveNeverFlat<{
+	[K in keyof T]:
+	T[K] extends NumericColumnTypeDef<infer M> ? T[K]
+	:T[K] extends ManyRelation
+	? NumericColumnsDeep<T[K]>
+	: T[K] extends RelatedTable
+	? NumericColumnsDeep<T[K]>
+	: never;
+}>;
+
+type TablesDeep<T> = RemoveNeverFlat<{
+	[K in keyof T]:
+	T[K] extends ManyRelation
+	? TablesDeep<T[K]>
+	: T[K] extends RelatedTable
+	? TablesDeep<T[K]>
+	: never;
+}>;
 
 type ColumnConcurrency = {
 	readonly?: boolean;
