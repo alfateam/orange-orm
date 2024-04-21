@@ -1,6 +1,6 @@
 {
   "name": "rdb",
-  "version": "3.6.1",
+  "version": "3.7.0",
   "main": "./src/index.js",
   "browser": "./src/client/index.mjs",
   "bin": {
@@ -63,13 +63,13 @@
   },
   "peerDependencies": {
     "msnodesqlv8": "^4.1.0",
-    "mysql2": "^2.2.5",
+    "mysql2": "^2.2.5 || ^3.9.4",
     "oracledb": "^6.3.0",
     "pg": "^8.5.1",
     "pg-native": "^3.0.0",
     "pg-query-stream": "^3.3.2",
     "sqlite3": "^5.0.2",
-    "tedious": "^15.1.2 || ^16.0.0"
+    "tedious": "^15.1.2 || ^16.0.0 || ^18.1.0"
   },
   "peerDependenciesMeta": {
     "pg": {
@@ -105,7 +105,7 @@
     "eslint-plugin-jest": "^27.1.7",
     "express": "^4.18.2",
     "msnodesqlv8": "^4.1.0",
-    "mysql2": "^2.2.5",
+    "mysql2": "^3.9.4",
     "oracledb": "^6.3.0",
     "owasp-dependency-check": "^0.0.21",
     "pg": "^8.5.1",
