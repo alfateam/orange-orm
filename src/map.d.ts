@@ -535,14 +535,6 @@ type MappedColumnsAndRelations<T> = RemoveNeverFlat<{
 	: never;
 }>;
 
-type Relations<T> = RemoveNeverFlat<{
-	[K in keyof T]: T[K] extends ManyRelation
-	? Relations<T[K]> & RelatedTable
-	: T[K] extends RelatedTable
-	? Relations<T[K]> & RelatedTable
-	: never;
-}>;
-
 type OneOrJoinTable<T> = ((
 	fn: (table: MappedColumnsAndRelations<T>) => RawFilter
 ) => Filter) & {
@@ -567,13 +559,19 @@ type AllowedColumnsAndTablesConcurrency<T> = {
 	[P in keyof T]: T[P] extends ColumnAndTableTypes ? T[P] : never;
 };
 
-type FetchingStrategy<T> = {
+
+type FetchingStrategy<T> = FetchingStrategyBase<T> | AggType<T>
+type AggType<T> = {
+	[name: string] : (agg: Aggregate<T>) => NumericColumnSymbol;
+};
+
+type FetchingStrategyBase<T> = {
 	[K in keyof T &
 	keyof RemoveNever<
 		AllowedColumnsAndTablesStrategy<T>
 	>]?: T[K] extends ColumnSymbols
 	? boolean
-	: boolean | FetchingStrategy<T[K]>;
+	: boolean | FetchingStrategyBase<T[K]> | AggType<T[K]>;
 } & {
 	orderBy?:
 	| OrderBy<Extract<keyof AllowedColumns<T>, string>>[]
@@ -581,33 +579,30 @@ type FetchingStrategy<T> = {
 	limit?: number;
 	offset?: number;
 	where?: (table: MappedColumnsAndRelations<T>) => RawFilter;
-	[customFilterName: string]: (agg: Agggregate<T>) => Filter;
 };
 
-
-type Agggregate<T> = {
-
-	sum(fn: (x: NumericColumnsDeep<T>) => NumericColumnTypeDef<infer M>,
-		strategy: FetchingStrategy<T>): Filter;
-	avg(fn: (x: NumericColumnsDeep<T>) => NumericColumnTypeDef<infer M>,
-		strategy: FetchingStrategy<T>): Filter;
-	min(fn: (x: NumericColumnsDeep<T>) => NumericColumnTypeDef<infer M>,
-		strategy: FetchingStrategy<T>): Filter;
-	max(fn: (x: NumericColumnsDeep<T>) => NumericColumnTypeDef<infer M>,
-		strategy: FetchingStrategy<T>): Filter;
-	count(fn: (x: TablesDeep<T>) => ManyRelation | RelatedTable,
-		strategy: FetchingStrategy<T>): Filter;
-	exists(fn: (x: TablesDeep<T>) => ManyRelation | RelatedTable,
-		strategy: FetchingStrategy<T>): Filter;		
+type Aggregate<T> = {
+	sum(fn: (x: AggregateColumns<T>) => NumericColumnTypeDef<any>,
+		strategy?: FetchingStrategy<T>): NumericColumnSymbol;
+	avg(fn: (x: AggregateColumns<T>) => NumericColumnTypeDef<any>,
+		strategy?: FetchingStrategy<T>): NumericColumnSymbol;
+	min(fn: (x: AggregateColumns<T>) => NumericColumnTypeDef<any>,
+		strategy?: FetchingStrategy<T>): NumericColumnSymbol;
+	max(fn: (x: AggregateColumns<T>) => NumericColumnTypeDef<any>,
+		strategy?: FetchingStrategy<T>): NumericColumnSymbol;
+	count(fn: (x: TablesDeep<T>) => RelatedTable,
+		strategy?: FetchingStrategy<T>): NumericColumnSymbol;
+	exists(fn: (x: TablesDeep<T>) => RelatedTable,
+		strategy?: FetchingStrategy<T>): BooleanColumnSymbol;
 }
 
-type NumericColumnsDeep<T> = RemoveNeverFlat<{
+type AggregateColumns<T> = RemoveNeverFlat<{
 	[K in keyof T]:
 	T[K] extends NumericColumnTypeDef<infer M> ? T[K]
 	:T[K] extends ManyRelation
-	? NumericColumnsDeep<T[K]>
+	? AggregateColumns<T[K]>
 	: T[K] extends RelatedTable
-	? NumericColumnsDeep<T[K]>
+	? AggregateColumns<T[K]>
 	: never;
 }>;
 
@@ -1015,8 +1010,15 @@ type ExtractColumnBools<T, TStrategy> = RemoveNever<{
 
 type NegotiateNotNull<T> = T extends NotNull ? NotNull : {};
 
-type FetchedProperties<T, TStrategy> = FetchedColumnProperties<T, TStrategy> &
-	FetchedRelationProperties<T, TStrategy>;
+type FetchedProperties<T, TStrategy> = FetchedColumnProperties<T, TStrategy> & FetchedRelationProperties<T, TStrategy> & ExtractAggregates< TStrategy>
+
+type ExtractAggregates<Agg> = {
+    [K in keyof Agg as 
+        Required<Agg>[K] extends (agg: Aggregate<any>) => NumericColumnSymbol | BooleanColumnSymbol 
+        ? K 
+        : never
+    ]: Agg[K] extends (agg: Aggregate<any>) => infer R ? R & NotNull : never;
+}
 
 type FetchedRelationProperties<T, TStrategy> = RemoveNeverFlat<{
 	[K in keyof T]: K extends keyof TStrategy
