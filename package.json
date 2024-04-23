@@ -10,17 +10,22 @@
   "description": "Object Relational Mapper",
   "types": "./src/index.d.ts",
   "keywords": [
+    "typescript orm",
     "orm",
     "sql",
     "mySql",
-    "sqlite",
-    "mysql",
+    "SQLite",
+    "MySQL",
     "mssql",
     "Microsoft Sql Server",
-    "postgres",
+    "PostgreSql",
+    "Postgres",
     "pg",
     "sap",
-    "rdb"
+    "sapase",
+    "Oracle",
+    "rdb",
+    "active record"
   ],
   "authors": [
     "Lars-Erik Roald <lars.roald@gmail.com>"
