@@ -735,7 +735,7 @@ async function update() {
 }
 ```
 __Conflict resolution__  
-Rows get updated using an <i>optimistic</i> concurrency approach by default. This means if a property being edited was meanwhile altered, an exception is raised, indicating the row was modified by a different user. You can change the concurrency strategy either at the table or column level.
+Rows get updated using an <i id="conflicts">optimistic</i> concurrency approach by default. This means if a property being edited was meanwhile altered, an exception is raised, indicating the row was modified by a different user. You can change the concurrency strategy either at the table or column level.
 
 Currently, there are three concurrency strategies:
 - <strong>`optimistic`</strong> Raises an exception if another user changes the property during an update.
