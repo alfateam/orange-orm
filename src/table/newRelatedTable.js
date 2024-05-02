@@ -4,6 +4,7 @@ var subFilter = require('./relatedTable/subFilter');
 var any = require('./relatedTable/any');
 var all = require('./relatedTable/all');
 var where = require('./relatedTable/where');
+var aggregate = require('./relatedTable/aggregate');
 var none = require('./relatedTable/none');
 
 function newRelatedTable(relations, isShallow, depth = 0) {
@@ -25,6 +26,10 @@ function newRelatedTable(relations, isShallow, depth = 0) {
 
 	// @ts-ignore
 	c.where =  where(relations, depth);
+
+	//todo
+	// @ts-ignore
+	c.aggregate = aggregate(relations);
 
 	Object.defineProperty(c, '_relation', {
 		value: relations[relations.length - 1],

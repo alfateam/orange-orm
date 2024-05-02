@@ -271,6 +271,7 @@ function rdbClient(options = {}) {
 				path: 'getManyDto',
 				args
 			});
+			console.dir(body, { depth: Infinity});
 			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
 			return adapter.post(body);
 		}
@@ -295,6 +296,9 @@ function rdbClient(options = {}) {
 			for (let name in _strategy) {
 				if (name === 'where' && typeof strategy[name] === 'function')
 					strategy.where = column(path + 'where')(strategy.where); // Assuming `column` is defined elsewhere.
+				else if (typeof strategy[name] === 'function') {
+					strategy[name] = aggregate(path, strategy[name]);
+				}
 				else
 					strategy[name] = where(_strategy[name], path + name + '.');
 			}
@@ -803,6 +807,35 @@ function tableProxy() {
 	return new Proxy({}, handler);
 }
 
+function aggregate(path, arg) {
+	const c = {
+		sum,
+		count,
+		avg,
+		max,
+		min
+	};
+
+	return arg(c);
+
+
+	function sum(fn) {
+		return column(path + 'aggregate')(fn(column('')).sum());
+	}
+	function avg(fn) {
+		return column(path + 'aggregate')(fn(column('')).avg());
+	}
+	function max(fn) {
+		return column(path + 'aggregate')(fn(column('')).max());
+	}
+	function min(fn) {
+		return column(path + 'aggregate')(fn(column('')).min());
+	}
+	function count(fn) {
+		return column(path + 'aggregate')(fn(column('')).count());
+	}
+}
+
 function column(path, ...previous) {
 	function c() {
 		let args = [];
@@ -835,8 +868,10 @@ function column(path, ...previous) {
 				return Reflect.get(...arguments);
 			else if (property === 'then')
 				return;
-			else
-				return column(path + '.' + property);
+			else {
+				const nextPath = path ? path + '.' : '';
+				return column(nextPath + property);
+			}
 		}
 
 	};

@@ -1,13 +1,13 @@
-function _new(table,alias, span, ignoreNulls) {
+function _new(table, alias, span, ignoreNulls) {
 	let columnsMap = span.columns;
 	var columns = table._columns;
 	var sql = '';
 	var separator = '';
 
-	for (var i = 0; i < columns.length; i++) {
+	for (let i = 0; i < columns.length; i++) {
 		var column = columns[i];
 		if (!columnsMap || (columnsMap.get(column))) {
-			sql = sql + separator  + formatColumn(column) + ' as s' + alias + i;
+			sql = sql + separator + formatColumn(column) + ' as s' + alias + i;
 			separator = ',';
 		}
 		else if (!ignoreNulls) {
@@ -15,6 +15,11 @@ function _new(table,alias, span, ignoreNulls) {
 			separator = ',';
 		}
 	}
+
+	for (let name in span.aggregates || {}) {
+		sql = sql + separator + span.aggregates[name].expression.sql();
+	}
+
 	return sql;
 
 	function formatColumn(column) {

@@ -560,10 +560,13 @@ type AllowedColumnsAndTablesConcurrency<T> = {
 };
 
 
-type FetchingStrategy<T> = FetchingStrategyBase<T> | AggType<T>
+type FetchingStrategy<T> = FetchingStrategyBase<T> | AggType<T> 
 type AggType<T> = {
 	[name: string] : (agg: Aggregate<T>) => NumericColumnSymbol;
+	where?: (agg: MappedColumnsAndRelations<T>) => RawFilter;
+
 };
+
 
 type FetchingStrategyBase<T> = {
 	[K in keyof T &
@@ -578,27 +581,20 @@ type FetchingStrategyBase<T> = {
 	| OrderBy<Extract<keyof AllowedColumns<T>, string>>;
 	limit?: number;
 	offset?: number;
-	where?: (table: MappedColumnsAndRelations<T>) => RawFilter;
+
 };
 
 type Aggregate<T> = {
-	sum(fn: (x: AggregateColumns<T>) => NumericColumnTypeDef<any>,
-		strategy?: FetchingStrategy<T>): NumericColumnSymbol;
-	avg(fn: (x: AggregateColumns<T>) => NumericColumnTypeDef<any>,
-		strategy?: FetchingStrategy<T>): NumericColumnSymbol;
-	min(fn: (x: AggregateColumns<T>) => NumericColumnTypeDef<any>,
-		strategy?: FetchingStrategy<T>): NumericColumnSymbol;
-	max(fn: (x: AggregateColumns<T>) => NumericColumnTypeDef<any>,
-		strategy?: FetchingStrategy<T>): NumericColumnSymbol;
-	count(fn: (x: TablesDeep<T>) => RelatedTable,
-		strategy?: FetchingStrategy<T>): NumericColumnSymbol;
-	exists(fn: (x: TablesDeep<T>) => RelatedTable,
-		strategy?: FetchingStrategy<T>): BooleanColumnSymbol;
+	sum(fn: (x: AggregateColumns<T>) => NumericColumnTypeDef<any>): ColumnTypeOf<any>;
+	avg(fn: (x: AggregateColumns<T>) => NumericColumnTypeDef<any>): ColumnTypeOf<any>;
+	min(fn: (x: AggregateColumns<T>) => NumericColumnTypeDef<any>): ColumnTypeOf<any>;
+	max(fn: (x: AggregateColumns<T>) => NumericColumnTypeDef<any>): ColumnTypeOf<any>;
+	count(fn: (x: AggregateColumns<T>) => NumericColumnTypeDef<any>): ColumnTypeOf<any>;
 }
 
 type AggregateColumns<T> = RemoveNeverFlat<{
 	[K in keyof T]:
-	T[K] extends NumericColumnTypeDef<infer M> ? T[K]
+	T[K] extends NumericColumnTypeDef<infer M> ? ColumnTypeOf<any>
 	:T[K] extends ManyRelation
 	? AggregateColumns<T[K]>
 	: T[K] extends RelatedTable
@@ -1015,7 +1011,7 @@ type FetchedProperties<T, TStrategy> = FetchedColumnProperties<T, TStrategy> & F
 type ExtractAggregates<Agg> = {
     [K in keyof Agg as 
         Required<Agg>[K] extends (agg: Aggregate<any>) => NumericColumnSymbol | BooleanColumnSymbol 
-        ? K 
+        ? K extends 'where'? never : K
         : never
     ]: Agg[K] extends (agg: Aggregate<any>) => infer R ? R & NotNull : never;
 }

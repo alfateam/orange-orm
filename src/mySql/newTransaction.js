@@ -41,6 +41,7 @@ function newResolveTransaction(domain, pool) {
 				rdb.accept = function(caller) {
 					caller.visitMySql();
 				};
+				rdb.aggregateCount = 0;
 				domain.rdb = rdb;
 				onSuccess();
 			} catch (e) {

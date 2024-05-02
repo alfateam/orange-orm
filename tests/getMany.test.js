@@ -15,6 +15,11 @@ const versionArray = process.version.replace('v', '').split('.');
 const major = parseInt(versionArray[0]);
 const port = 3000;
 
+const rdb = require('../src/index');
+rdb.on('query', (q) => {
+	console.dir(q.sql);
+});
+
 let server;
 
 afterAll(async () => {
@@ -123,7 +128,7 @@ beforeAll(async () => {
 			.use('/rdb', cors(), db.express());
 		server = app.listen(port, () => console.log(`Example app listening on port ${port}!`));
 	}
-});
+}, 20000);
 
 describe('offset', () => {
 	test('pg', async () => await verify('pg'));
@@ -307,7 +312,7 @@ describe('any-subFilter filter nested where', () => {
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
-		const rows = await db.order.getMany(null , {where: (order) => order.lines.any(x => x.packages.any(x => x.sscc.startsWith('aaa')))});
+		const rows = await db.order.getMany(null, { where: (order) => order.lines.any(x => x.packages.any(x => x.sscc.startsWith('aaa'))) });
 
 
 		//mssql workaround because datetime has no time offset
@@ -449,7 +454,7 @@ describe('getAll orderBy array', () => {
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
-		const rows = await db.customer.getAll({ orderBy: ['id desc', 'balance']});
+		const rows = await db.customer.getAll({ orderBy: ['id desc', 'balance'] });
 
 		const expected = [{
 			id: 2,
@@ -497,6 +502,81 @@ describe('getMany with column strategy', () => {
 		expect(rows).toEqual(expected);
 	}
 });
+
+describe.only('getMany with aggregates', () => {
+
+	test('pg', async () => await verify('pg'));
+	// test('oracle', async () => await verify('oracle'));
+	// test('mssql', async () => await verify('mssql'));
+	// if (major === 18)
+	// 	test('mssqlNative', async () => await verify('mssqlNative'));
+	// test('mysql', async () => await verify('mysql'));
+	// test('sqlite', async () => await verify('sqlite'));
+	// test('sap', async () => await verify('sap'));
+	// test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+		const rows = await db.order.getAll({
+			// lines: true,
+			// customer: {
+			// 	bar: x => x.sum(x => x.balance),
+			// },
+			// sumLines: x => x.max(x => x.lines.id),
+			numberOfLines: x => x.count(x => x.lines.id),
+			// avgPackages: x => x.avg(x => x.lines.packages.id),
+			// balance: x => x.min(x => x.customer.balance),
+			customerId2: x => x.sum(x => x.customer.id),
+		});
+
+		//mssql workaround because datetime has no time offset
+		for (let i = 0; i < rows.length; i++) {
+			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate));
+		}
+
+		const date1 = new Date(2022, 0, 11, 9, 24, 47);
+		const date2 = new Date(2021, 0, 11, 12, 22, 45);
+		const expected = [
+			{
+				id: 1,
+				orderDate: dateToISOString(date1),
+				customerId: 1,
+				// sumLines: 3,
+				numberOfLines: 2,
+				// avgPackages: 3,
+				// balance: 177,
+				customerId2: 1,
+				// customer: {
+				// 	id: 1,
+				// 	name: 'George',
+				// 	balance: 177,
+				// 	isActive: true,
+				// 	bar: 177
+				// },
+			},
+			{
+				id: 2,
+				orderDate: dateToISOString(date2),
+				customerId: 2,
+				// sumLines: 3,
+				numberOfLines: 1,
+				// avgPackages: 3,
+				// balance: 200,
+				customerId2: 2,
+				// customer: {
+				// 	id: 2,
+				// 	name: 'Harry',
+				// 	balance: 200,
+				// 	isActive: true,
+				// 	bar: 200
+				// },
+			}
+		];
+
+
+		expect(rows).toEqual(expected);
+	}
+}, 20000);
 describe('getMany with relations', () => {
 
 	test('pg', async () => await verify('pg'));
@@ -575,7 +655,6 @@ describe('getMany with relations', () => {
 		expect(rows).toEqual(expected);
 	}
 });
-
 describe('getMany with filtered relations', () => {
 	test('pg', async () => await verify('pg'));
 	test('oracle', async () => await verify('oracle'));
@@ -597,7 +676,7 @@ describe('getMany with filtered relations', () => {
 				where: (x => x.name.startsWith('Harry'))
 			},
 			deliveryAddress: {
-				where: (x =>  x.name.startsWith('Harry'))
+				where: (x => x.name.startsWith('Harry'))
 			}
 		});
 
@@ -701,7 +780,7 @@ describe('getMany raw filter where', () => {
 			parameters: ['%arry']
 		};
 
-		const rows = await db.customer.getMany(null, { where: () => rawFilter});
+		const rows = await db.customer.getMany(null, { where: () => rawFilter });
 
 		const expected = [
 			{
@@ -754,7 +833,7 @@ describe('getMany raw filter http where', () => {
 
 		let error;
 		try {
-			await db.customer.getMany(null, { where: () => rawFilter});
+			await db.customer.getMany(null, { where: () => rawFilter });
 
 		}
 		catch (e) {
@@ -794,7 +873,7 @@ describe('getMany none raw sub filter http where', () => {
 
 		let error;
 		try {
-			await db.order.getMany(null, { where: (order) => order.lines.none(() => '1=2')});
+			await db.order.getMany(null, { where: (order) => order.lines.none(() => '1=2') });
 
 		}
 		catch (e) {

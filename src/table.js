@@ -22,6 +22,7 @@ var newEmitEvent = require('./emitEvent');
 var hostLocal = require('./hostLocal');
 var getTSDefinition = require('./getTSDefinition');
 var where = require('./table/where');
+var aggregate = require('./table/aggregate');
 
 function _new(tableName) {
 	var table = newContext();
@@ -159,6 +160,7 @@ function _new(tableName) {
 	};
 
 	table.where = where(table);
+	table.aggregate = aggregate(table);
 
 	return table;
 }

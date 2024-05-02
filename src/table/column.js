@@ -1,5 +1,5 @@
-let Ajv = require('ajv');
-let inspect = require('util').inspect;
+const Ajv = require('ajv');
+const inspect = require('util').inspect;
 
 function defineColumn(column, table) {
 	var c = {};

@@ -22,6 +22,11 @@ function _new(span,alias = '') {
 	}
 
 	span.legs.forEach(onEachLeg);
+
+	for(let key in span.aggregates) {
+		sql = span.aggregates[key].join.prepend(sql);
+	}
+
 	return sql;
 }
 
