@@ -15,8 +15,6 @@ const versionArray = process.version.replace('v', '').split('.');
 const major = parseInt(versionArray[0]);
 const port = 3000;
 
-const rdb = require('../src/index');
-
 let server;
 
 afterAll(async () => {
