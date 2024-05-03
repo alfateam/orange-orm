@@ -6,8 +6,6 @@ function columnAggregate(operator, column, relations) {
 	const context = getSessionContext();
 	const outerAlias = 'y' + context.aggregateCount++;
 	const alias = 'x' + relations.length;
-	console.dir('relations.length');
-	console.dir(relations);
 	const foreignKeys = getForeignKeys(relations[0]);
 	const select = ` LEFT JOIN (SELECT ${foreignKeys},${operator}(${alias}.${column._dbName}) as amount`;
 	const innerJoin = relations.length > 1 ? newJoin(relations).sql() : '';
@@ -16,7 +14,7 @@ function columnAggregate(operator, column, relations) {
 	const join = select  + from ;
 
 	return {
-		expression: `COALESCE(${outerAlias}.amount, 0) ${outerAlias}_a`,
+		expression: (alias) => `COALESCE(${outerAlias}.amount, 0) ${alias}`,
 		join: join
 	};
 }

@@ -562,11 +562,12 @@ type AllowedColumnsAndTablesConcurrency<T> = {
 
 type FetchingStrategy<T> = FetchingStrategyBase<T> | AggType<T> 
 type AggType<T> = {
-	[name: string] : (agg: Aggregate<T>) => NumericColumnSymbol;
-	where?: (agg: MappedColumnsAndRelations<T>) => RawFilter;
-
+    [name: string]: AggregationFunction<T>;
+} & {
+    where?: (agg: MappedColumnsAndRelations<T>) => RawFilter;
 };
 
+type AggregationFunction<T> = (agg: Aggregate<T>) => NumericColumnSymbol;
 
 type FetchingStrategyBase<T> = {
 	[K in keyof T &

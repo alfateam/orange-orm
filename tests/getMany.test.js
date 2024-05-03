@@ -16,9 +16,6 @@ const major = parseInt(versionArray[0]);
 const port = 3000;
 
 const rdb = require('../src/index');
-rdb.on('query', (q) => {
-	console.dir(q.sql);
-});
 
 let server;
 
@@ -503,17 +500,17 @@ describe('getMany with column strategy', () => {
 	}
 });
 
-describe.skip('getMany with aggregates', () => {
+describe('getMany with aggregates', () => {
 
 	test('pg', async () => await verify('pg'));
-	// test('oracle', async () => await verify('oracle'));
-	// test('mssql', async () => await verify('mssql'));
-	// if (major === 18)
-	// 	test('mssqlNative', async () => await verify('mssqlNative'));
-	// test('mysql', async () => await verify('mysql'));
-	// test('sqlite', async () => await verify('sqlite'));
-	// test('sap', async () => await verify('sap'));
-	// test('http', async () => await verify('http'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
@@ -521,12 +518,9 @@ describe.skip('getMany with aggregates', () => {
 			lines: {
 				numberOfPackages: x => x.count(x => x.packages.id)
 			},
-			// customer: {
-			// 	bar: x => x.sum(x => x.balance),
-			// },
 			maxLines: x => x.max(x => x.lines.id),
 			numberOfPackages: x => x.count(x => x.lines.packages.id),
-			avgPackages: x => x.avg(x => x.lines.packages.id),
+			sumPackages: x => x.sum(x => x.lines.packages.id),
 			balance: x => x.min(x => x.customer.balance),
 			customerId2: x => x.sum(x => x.customer.id),
 		});
@@ -545,7 +539,7 @@ describe.skip('getMany with aggregates', () => {
 				customerId: 1,
 				maxLines: 2,
 				numberOfPackages: 2,
-				avgPackages: 1.5,
+				sumPackages: 3,
 				balance: 177,
 				customerId2: 1,
 				lines: [
@@ -566,7 +560,7 @@ describe.skip('getMany with aggregates', () => {
 				customerId: 2,
 				maxLines: 3,
 				numberOfPackages: 1,
-				avgPackages: 3,
+				sumPackages: 3,
 				balance: 200,
 				customerId2: 2,
 				lines: [
@@ -664,7 +658,7 @@ describe('getMany with relations', () => {
 		expect(rows).toEqual(expected);
 	}
 });
-describe.only('getMany with filtered relations', () => {
+describe('getMany with filtered relations', () => {
 	test('pg', async () => await verify('pg'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
@@ -677,8 +671,7 @@ describe.only('getMany with filtered relations', () => {
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
-		const rows = await db.order.getMany(db.order.lines.packages.sscc.notEqual(null), {
-		// const rows = await db.order.getMany(db.order.customer.name.notEqual(null), {
+		const rows = await db.order.getMany(db.order.customer.name.notEqual(null), {
 			lines: {
 				where: x => x.product.eq('Bicycle').or(x.product.startsWith('Magic'))
 			},

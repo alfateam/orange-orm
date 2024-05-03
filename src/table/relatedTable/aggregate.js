@@ -11,11 +11,7 @@ function newAggregate(_relations) {
 			table._rootAlias = alias;
 
 		try {
-			//tod
 			const query = fn(table);
-			// const query = fn(table);
-			console.dir('query');
-			console.dir(query, { depth: Infinity});
 			delete table._rootAlias;
 			return query;
 		}

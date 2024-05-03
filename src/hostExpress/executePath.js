@@ -58,12 +58,11 @@ let _allowedOps = {
 	avg: true,
 	max: true,
 	min: true,
+	count: true,
 	aggregate: true
 };
 
 async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, request, response, readonly, disableBulkDeletes, isHttp, client }) {
-	console.dir('JSONFilter', {depth: Infinity});
-	console.dir(JSONFilter, {depth: Infinity});
 	let allowedOps = { ..._allowedOps, insert: !readonly, ...extractRelations(getMeta(table)) };
 	let ops = { ..._ops, ...getCustomFilterPaths(customFilters), getManyDto, getMany, count, delete: _delete, cascadeDelete };
 	let res = await parseFilter(JSONFilter, table);
@@ -264,7 +263,6 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 			filter = filter.and(_baseFilter);
 		let args = [filter].concat(Array.prototype.slice.call(arguments).slice(1));
 		await negotiateWhereAndAggregate(strategy);
-		console.dir(strategy, {depth: Infinity});
 		return table.getManyDto.apply(null, args);
 	}
 

@@ -271,7 +271,6 @@ function rdbClient(options = {}) {
 				path: 'getManyDto',
 				args
 			});
-			console.dir(body, { depth: Infinity});
 			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
 			return adapter.post(body);
 		}
