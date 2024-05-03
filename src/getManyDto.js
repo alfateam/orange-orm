@@ -4,7 +4,6 @@ const strategyToSpan = require('./table/strategyToSpan');
 const executeQueries = require('./table/executeQueries');
 const newPrimaryKeyFilter = require('./table/newPrimaryKeyFilter');
 const newForeignKeyFilter = require('./table/relation/newForeignKeyFilter');
-const { Numeric } = require('msnodesqlv8');
 
 async function getManyDto(table, filter, strategy) {
 	filter = negotiateRawSqlFilter(filter, table);
@@ -95,7 +94,6 @@ function hasManyRelations(span) {
 }
 
 async function decode(strategy, span, rows, keys = rows.length > 0 ? Object.keys(rows[0]) : []) {
-	console.dir(rows, {depth: Infinity});
 	const table = span.table;
 	let columnsMap = span.columns;
 	const columns = table._columns.filter(column => !columnsMap || columnsMap.get(column));

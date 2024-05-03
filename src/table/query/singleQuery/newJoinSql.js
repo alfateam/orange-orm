@@ -1,8 +1,9 @@
 var joinLegToJoinSql = require('./joinSql/joinLegToJoinSql');
 var oneLegToJoinSql = require('./joinSql/oneLegToJoinSql');
+var newParameterized = require('../newParameterized');
 
 function _new(span,alias = '') {
-	var sql = '';
+	var sql = newParameterized('');
 	var childAlias;
 
 	var c = {};
@@ -24,7 +25,7 @@ function _new(span,alias = '') {
 	span.legs.forEach(onEachLeg);
 
 	for(let key in span.aggregates) {
-		sql = span.aggregates[key].join.prepend(sql);
+		sql = sql.append(span.aggregates[key].join);
 	}
 
 	return sql;

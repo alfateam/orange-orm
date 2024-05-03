@@ -12,18 +12,7 @@ function _new(table,filter,span, alias,orderBy,limit,offset) {
 	if (limit)
 		limit = limit + ' ';
 
-	var groupBy = '';
-
-	if (Object.keys(span.aggregates).length > 0) {
-		groupBy = ' group by';
-		groupBy = ' group by torder.id, torder.orderDate, torder.customerId';
-		// groupBy = ' group by torder.id, torder.orderDate, torder.customerId, tordercustomer.id, tordercustomer.name, tordercustomer.balance, tordercustomer.isActive';
-		// for (let i = 0; i < table._primaryColumns.length; i++) {
-		// 	const col = table._primaryColumns[i];
-		// 	groupBy += ` ${alias}.${col._dbName}`;
-		// }
-	}
-	return newParameterized('select ' + limit + columnSql + ' from ' + name + ' ' + alias).append(joinSql).append(whereSql).append(groupBy + orderBy + offset);
+	return newParameterized('select ' + limit + columnSql + ' from ' + name + ' ' + alias).append(joinSql).append(whereSql).append(orderBy + offset);
 
 }
 

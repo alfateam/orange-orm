@@ -6,7 +6,6 @@ const greaterThan = require('./greaterThan');
 const greaterThanOrEqual = require('./greaterThanOrEqual');
 const _in = require('./in');
 const _extractAlias = require('./extractAlias');
-const columnAggregate = require('./columnAggregate');
 
 module.exports = function(table, name) {
 	var c = {};
@@ -74,12 +73,6 @@ module.exports = function(table, name) {
 	c.le = c.lessThanOrEqual;
 	c.LE = c.le;
 	c.IN = c.in;
-
-	c.sum = columnAggregate.bind(null, 'sum', c, table);
-	c.avg = columnAggregate.bind(null, 'avg', c, table);
-	c.min = columnAggregate.bind(null, 'min', c, table);
-	c.max = columnAggregate.bind(null, 'max', c, table);
-	c.count = columnAggregate.bind(null, 'count', c, table);
 
 	return c;
 };

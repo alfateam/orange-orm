@@ -1,24 +1,61 @@
-var newParameterized = require('../query/newParameterized');
-var newJoinSql = require('./aggregate/joinSql');
+var newJoin = require('./joinSql');
 var getSessionContext = require('../getSessionContext');
+var newJoinCore = require('../query/singleQuery/joinSql/newShallowJoinSqlCore');
 
-function columnAggregate(operator, column, _relations) {
+function columnAggregate(operator, column, relations) {
 	const context = getSessionContext();
-	const prefix = 'y' + context.aggregateCount++ + '_';
-	const alias = prefix + (_relations.length-1);
+	const outerAlias = 'y' + context.aggregateCount++;
+	const alias = 'x' + relations.length;
+	console.dir('relations.length');
+	console.dir(relations);
+	const foreignKeys = getForeignKeys(relations[0]);
+	const select = ` LEFT JOIN (SELECT ${foreignKeys},${operator}(${alias}.${column._dbName}) as amount`;
+	const innerJoin = relations.length > 1 ? newJoin(relations).sql() : '';
+	const onClause = createOnClause(relations[0], outerAlias);
+	const from = ` FROM ${relations.at(-1).childTable._dbName} ${alias} ${innerJoin} GROUP BY ${foreignKeys}) ${outerAlias} ON (${onClause})`;
+	const join = select  + from ;
 
 	return {
-		expression: newParameterized(`${operator}(${alias}.${column._dbName})`),
-		join: newJoinSql(_relations, prefix)
+		expression: `COALESCE(${outerAlias}.amount, 0) ${outerAlias}_a`,
+		join: join
+	};
+}
+
+function createOnClause(relation, rightAlias) {
+	var c = {};
+	var sql = '';
+	let leftAlias = relation.parentTable._rootAlias || relation.parentTable._dbName;
+
+	c.visitJoin = function(relation) {
+		sql = newJoinCore(relation.childTable,relation.columns,relation.childTable._primaryColumns,leftAlias,rightAlias).sql();
 	};
 
-	// LEFT JOIN (
-	// 	SELECT line1.sale_id, SUM(line1.amount) AS total_amount
-	// 	FROM line1
-	// 	GROUP BY line1.sale_id
-	// ) l1 ON s.sale_id = l1.sale_id
+	c.visitOne = function(relation) {
+		innerJoin(relation);
+	};
 
+	c.visitMany = c.visitOne;
 
+	function innerJoin(relation) {
+		var joinRelation = relation.joinRelation;
+		var childTable = relation.childTable;
+		var parentTable = relation.parentTable;
+		var columns = joinRelation.columns;
+
+		sql = newJoinCore(childTable,parentTable._primaryColumns,columns,leftAlias, rightAlias).sql();
+	}
+	relation.accept(c);
+	return sql;
+}
+
+function getForeignKeys(relation) {
+	let columns;
+	let alias = 'x1';
+	if (relation.joinRelation)
+		columns = relation.joinRelation.columns;
+	else
+		columns = relation.childTable._primaryColumns;
+	return columns.map(x => `${alias}.${x._dbName}`).join(',');
 }
 
 module.exports = columnAggregate;

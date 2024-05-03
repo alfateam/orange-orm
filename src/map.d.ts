@@ -594,11 +594,20 @@ type Aggregate<T> = {
 
 type AggregateColumns<T> = RemoveNeverFlat<{
 	[K in keyof T]:
+	T[K] extends ManyRelation
+	? AggregateColumns2<T[K]>
+	: T[K] extends RelatedTable
+	? AggregateColumns2<T[K]>
+	: never;
+}>;
+
+type AggregateColumns2<T> = RemoveNeverFlat<{
+	[K in keyof T]:
 	T[K] extends NumericColumnTypeDef<infer M> ? ColumnTypeOf<any>
 	:T[K] extends ManyRelation
-	? AggregateColumns<T[K]>
+	? AggregateColumns2<T[K]>
 	: T[K] extends RelatedTable
-	? AggregateColumns<T[K]>
+	? AggregateColumns2<T[K]>
 	: never;
 }>;
 

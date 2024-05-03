@@ -503,7 +503,7 @@ describe('getMany with column strategy', () => {
 	}
 });
 
-describe.only('getMany with aggregates', () => {
+describe.skip('getMany with aggregates', () => {
 
 	test('pg', async () => await verify('pg'));
 	// test('oracle', async () => await verify('oracle'));
@@ -518,14 +518,16 @@ describe.only('getMany with aggregates', () => {
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
 		const rows = await db.order.getAll({
-			// lines: true,
+			lines: {
+				numberOfPackages: x => x.count(x => x.packages.id)
+			},
 			// customer: {
 			// 	bar: x => x.sum(x => x.balance),
 			// },
-			// sumLines: x => x.max(x => x.lines.id),
-			numberOfLines: x => x.count(x => x.lines.id),
-			// avgPackages: x => x.avg(x => x.lines.packages.id),
-			// balance: x => x.min(x => x.customer.balance),
+			maxLines: x => x.max(x => x.lines.id),
+			numberOfPackages: x => x.count(x => x.lines.packages.id),
+			avgPackages: x => x.avg(x => x.lines.packages.id),
+			balance: x => x.min(x => x.customer.balance),
 			customerId2: x => x.sum(x => x.customer.id),
 		});
 
@@ -541,11 +543,15 @@ describe.only('getMany with aggregates', () => {
 				id: 1,
 				orderDate: dateToISOString(date1),
 				customerId: 1,
-				// sumLines: 3,
-				numberOfLines: 2,
-				// avgPackages: 3,
-				// balance: 177,
+				maxLines: 2,
+				numberOfPackages: 2,
+				avgPackages: 1.5,
+				balance: 177,
 				customerId2: 1,
+				lines: [
+					{ product: 'Bicycle', id: 1, orderId: 1, numberOfPackages: 1 },
+					{ product: 'Small guitar', id: 2, orderId: 1, numberOfPackages: 1 }
+				]
 				// customer: {
 				// 	id: 1,
 				// 	name: 'George',
@@ -558,11 +564,14 @@ describe.only('getMany with aggregates', () => {
 				id: 2,
 				orderDate: dateToISOString(date2),
 				customerId: 2,
-				// sumLines: 3,
-				numberOfLines: 1,
-				// avgPackages: 3,
-				// balance: 200,
+				maxLines: 3,
+				numberOfPackages: 1,
+				avgPackages: 3,
+				balance: 200,
 				customerId2: 2,
+				lines: [
+					{ product: 'Magic wand', id: 3, orderId: 2, numberOfPackages: 1 }
+				]
 				// customer: {
 				// 	id: 2,
 				// 	name: 'Harry',
@@ -655,7 +664,7 @@ describe('getMany with relations', () => {
 		expect(rows).toEqual(expected);
 	}
 });
-describe('getMany with filtered relations', () => {
+describe.only('getMany with filtered relations', () => {
 	test('pg', async () => await verify('pg'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
@@ -668,7 +677,8 @@ describe('getMany with filtered relations', () => {
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
-		const rows = await db.order.getMany(db.order.customer.name.notEqual(null), {
+		const rows = await db.order.getMany(db.order.lines.packages.sscc.notEqual(null), {
+		// const rows = await db.order.getMany(db.order.customer.name.notEqual(null), {
 			lines: {
 				where: x => x.product.eq('Bicycle').or(x.product.startsWith('Magic'))
 			},
