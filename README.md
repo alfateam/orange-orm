@@ -524,6 +524,28 @@ async function getRows() {
   console.dir(orders, {depth: Infinity});
 }
 ```
+__With aggregated results__  
+RDB allows you to count records and aggregate number columns.  
+The following operators are supported:
+- count
+- sum
+- min 
+- max  
+- avg
+<div id="aggregate-results"></div>
+
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const orders = await db.order.getAll({
+    numberOfLines: x => x.count(x => x.lines.id)
+  });
+}
+```
 
 __Many rows filtered__
 
