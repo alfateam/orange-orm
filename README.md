@@ -524,8 +524,9 @@ async function getRows() {
   console.dir(orders, {depth: Infinity});
 }
 ```
-__With aggregated results__  <a name="aggregate-results">  </a>  
-RDB allows you to count records and aggregate number columns.  
+<a name="aggregate-results">  </a>
+__With aggregated results__  
+You can count records and aggregate number columns.  
 The following operators are supported:
 - count
 - sum
