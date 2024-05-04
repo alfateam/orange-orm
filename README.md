@@ -533,7 +533,6 @@ The following operators are supported:
 - min 
 - max  
 - avg
-<div id="aggregate-results"></div>
 
 ```javascript
 import map from './map';
