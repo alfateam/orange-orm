@@ -4,6 +4,7 @@ var purifyStrategy = require('./purifyStrategy');
 
 function toSpan(table,strategy) {
 	var span = {};
+	span.aggregates = {};
 	span.legs = newCollection();
 	span.table = table;
 	strategy = purifyStrategy(table, strategy);
@@ -24,6 +25,8 @@ function toSpan(table,strategy) {
 				addLeg(legs,table,strategy,name);
 			else if (table[name] && table[name].eq)
 				columns.set(table[name], strategy[name]);
+			else if (strategy[name]?.expression && strategy[name]?.join)
+				span.aggregates[name] = strategy[name];
 			else
 				span[name] = strategy[name];
 		}
@@ -35,6 +38,7 @@ function toSpan(table,strategy) {
 		var leg = relation.toLeg();
 		leg.span.queryContext.strategy = strategy;
 		leg.span.where = strategy[name].where;
+		leg.span.aggregates = {};
 		legs.add(leg);
 		var subStrategy = strategy[name];
 		var childTable = relation.childTable;

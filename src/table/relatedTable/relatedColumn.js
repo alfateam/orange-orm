@@ -1,8 +1,7 @@
 var newSubFilter = require('./subFilter');
+var aggregate = require('./columnAggregate');
 
-function newRelatedColumn(column,relations,isShallow, depth) {
-	// if (isShallow)
-	// 	depth = depth -1 ;
+function newRelatedColumn(column, relations, isShallow, depth) {
 	var c = {};
 
 	var alias = 'x' + relations.length;
@@ -12,6 +11,13 @@ function newRelatedColumn(column,relations,isShallow, depth) {
 
 			c[propName] = wrapFilter(prop);
 	}
+
+	c.sum = aggregate.bind(null, 'sum', column, relations);
+	c.avg = aggregate.bind(null, 'avg', column, relations);
+	c.min = aggregate.bind(null, 'min', column, relations);
+	c.max = aggregate.bind(null, 'max', column, relations);
+	c.count = aggregate.bind(null, 'count', column, relations);
+
 	return c;
 
 	function wrapFilter(filter) {
@@ -23,10 +29,10 @@ function newRelatedColumn(column,relations,isShallow, depth) {
 				args.push(arguments[i]);
 			}
 			args.push(alias);
-			var shallowFilter =  filter.apply(null,args);
+			var shallowFilter = filter.apply(null, args);
 			if (isShallow)
 				return shallowFilter;
-			return newSubFilter(relations,shallowFilter, depth);
+			return newSubFilter(relations, shallowFilter, depth);
 		}
 	}
 

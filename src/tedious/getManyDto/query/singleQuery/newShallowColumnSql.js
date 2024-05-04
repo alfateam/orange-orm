@@ -11,6 +11,11 @@ function _new(table,alias, span) {
 			separator = ',';
 		}
 	}
+
+	for (let name in span.aggregates || {}) {
+		sql = sql + separator + span.aggregates[name].expression(name);
+	}
+
 	return sql;
 
 	function formatColumn(column) {

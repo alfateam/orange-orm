@@ -92,7 +92,7 @@ type MappedDbInstance<T> = {
 	transaction(
 		fn: (db: MappedDbInstance<T>) => Promise<unknown>
 	): Promise<void>;
-	saveChanges(arraysOrRow: {saveChanges(): Promise<void>}): Promise<void>;
+	saveChanges(arraysOrRow: { saveChanges(): Promise<void> }): Promise<void>;
 	express(): import('express').RequestHandler;
 	express(config: ExpressConfig<T>): import('express').RequestHandler;
 	readonly metaData: DbConcurrency<T>;
@@ -183,7 +183,7 @@ type ExpandedMappedTable<T, FL = ExpandedFetchingStrategy<T>> = {
 		rows: StrategyToInsertRowData<T>[],
 		originalRows: StrategyToInsertRowData<T>[]
 	): Promise<StrategyToRowArray<FetchedProperties<T, FL>, T>>;
-	
+
 	update<FS extends FetchingStrategy<T>>(
 		row: StrategyToInsertRowData<T>,
 		strategy: FS
@@ -244,7 +244,7 @@ type ExpandedMappedTable<T, FL = ExpandedFetchingStrategy<T>> = {
 	count(filter?: Filter | PrimaryRowFilter<T>[]): Promise<number>;
 	delete(filter?: Filter | PrimaryRowFilter<T>[]): Promise<void>;
 	deleteCascade(filter?: Filter | PrimaryRowFilter<T>[]): Promise<void>;
-	
+
 	proxify(
 		row: StrategyToInsertRowData<T>
 	): StrategyToRow<FetchedProperties<T, FL>, T>;
@@ -308,7 +308,7 @@ type MappedTable<T> = {
 		modifiedRows: StrategyToInsertRowData<T>[],
 		originalRows: StrategyToInsertRowData<T>[]
 	): Promise<StrategyToRowArray<FetchedProperties<T, {}>, T>>;
-	
+
 	update<FS extends FetchingStrategy<T>>(
 		row: StrategyToInsertRowData<T>,
 		strategy: FS
@@ -559,21 +559,67 @@ type AllowedColumnsAndTablesConcurrency<T> = {
 	[P in keyof T]: T[P] extends ColumnAndTableTypes ? T[P] : never;
 };
 
-type FetchingStrategy<T> = {
+
+type FetchingStrategy<T> = FetchingStrategyBase<T> | AggType<T> 
+type AggType<T> = {
+    [name: string]: AggregationFunction<T>;
+} & {
+    where?: (agg: MappedColumnsAndRelations<T>) => RawFilter;
+};
+
+type AggregationFunction<T> = (agg: Aggregate<T>) => NumericColumnSymbol;
+
+type FetchingStrategyBase<T> = {
 	[K in keyof T &
 	keyof RemoveNever<
 		AllowedColumnsAndTablesStrategy<T>
 	>]?: T[K] extends ColumnSymbols
 	? boolean
-	: boolean | FetchingStrategy<T[K]>;
+	: boolean | FetchingStrategyBase<T[K]> | AggType<T[K]>;
 } & {
 	orderBy?:
 	| OrderBy<Extract<keyof AllowedColumns<T>, string>>[]
 	| OrderBy<Extract<keyof AllowedColumns<T>, string>>;
 	limit?: number;
 	offset?: number;
-	where?: (table: MappedColumnsAndRelations<T>) => RawFilter;
+
 };
+
+type Aggregate<T> = {
+	sum(fn: (x: AggregateColumns<T>) => NumericColumnTypeDef<any>): ColumnTypeOf<any>;
+	avg(fn: (x: AggregateColumns<T>) => NumericColumnTypeDef<any>): ColumnTypeOf<any>;
+	min(fn: (x: AggregateColumns<T>) => NumericColumnTypeDef<any>): ColumnTypeOf<any>;
+	max(fn: (x: AggregateColumns<T>) => NumericColumnTypeDef<any>): ColumnTypeOf<any>;
+	count(fn: (x: AggregateColumns<T>) => NumericColumnTypeDef<any>): ColumnTypeOf<any>;
+}
+
+type AggregateColumns<T> = RemoveNeverFlat<{
+	[K in keyof T]:
+	T[K] extends ManyRelation
+	? AggregateColumns2<T[K]>
+	: T[K] extends RelatedTable
+	? AggregateColumns2<T[K]>
+	: never;
+}>;
+
+type AggregateColumns2<T> = RemoveNeverFlat<{
+	[K in keyof T]:
+	T[K] extends NumericColumnTypeDef<infer M> ? ColumnTypeOf<any>
+	:T[K] extends ManyRelation
+	? AggregateColumns2<T[K]>
+	: T[K] extends RelatedTable
+	? AggregateColumns2<T[K]>
+	: never;
+}>;
+
+type TablesDeep<T> = RemoveNeverFlat<{
+	[K in keyof T]:
+	T[K] extends ManyRelation
+	? TablesDeep<T[K]>
+	: T[K] extends RelatedTable
+	? TablesDeep<T[K]>
+	: never;
+}>;
 
 type ColumnConcurrency = {
 	readonly?: boolean;
@@ -970,8 +1016,15 @@ type ExtractColumnBools<T, TStrategy> = RemoveNever<{
 
 type NegotiateNotNull<T> = T extends NotNull ? NotNull : {};
 
-type FetchedProperties<T, TStrategy> = FetchedColumnProperties<T, TStrategy> &
-	FetchedRelationProperties<T, TStrategy>;
+type FetchedProperties<T, TStrategy> = FetchedColumnProperties<T, TStrategy> & FetchedRelationProperties<T, TStrategy> & ExtractAggregates< TStrategy>
+
+type ExtractAggregates<Agg> = {
+    [K in keyof Agg as 
+        Required<Agg>[K] extends (agg: Aggregate<any>) => NumericColumnSymbol | BooleanColumnSymbol 
+        ? K extends 'where'? never : K
+        : never
+    ]: Agg[K] extends (agg: Aggregate<any>) => infer R ? R & NotNull : never;
+}
 
 type FetchedRelationProperties<T, TStrategy> = RemoveNeverFlat<{
 	[K in keyof T]: K extends keyof TStrategy

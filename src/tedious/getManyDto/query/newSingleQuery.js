@@ -9,7 +9,13 @@ function _new(table, filter, span, alias, subQueries, orderBy, limit, offset) {
 	var whereSql = newWhereSql(table, filter, alias);
 	if (limit)
 		limit = limit + ' ';
-	return newParameterized('select ' + limit + columnSql).append(subQueries).append(' from ' + name + ' ' + alias).append(whereSql).append(orderBy + offset);
+
+	let join = '';
+	for (let name in span.aggregates || {}) {
+		join = join +  span.aggregates[name].join;
+	}
+
+	return newParameterized('select ' + limit + columnSql).append(subQueries).append(' from ' + name + ' ' + alias + join).append(whereSql).append(orderBy + offset);
 }
 
 module.exports = _new;

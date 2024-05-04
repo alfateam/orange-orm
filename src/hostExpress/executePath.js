@@ -54,6 +54,12 @@ let _allowedOps = {
 	any: true,
 	none: true,
 	where: true,
+	sum: true,
+	avg: true,
+	max: true,
+	min: true,
+	count: true,
+	aggregate: true
 };
 
 async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, request, response, readonly, disableBulkDeletes, isHttp, client }) {
@@ -99,7 +105,8 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 				table = table[path[i]];
 			}
 
-			let ops = new Set(['all', 'any', 'none', 'where']);
+			let ops = new Set(['all', 'any', 'none', 'where', 'aggregate']);
+			// let ops = new Set(['all', 'any', 'none', 'where']);
 			let last = path.slice(-1)[0];
 			if (ops.has(last) || (table &&  (table._primaryColumns || (table.any && table.all))))
 				return table;
@@ -255,21 +262,20 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 		if (_baseFilter)
 			filter = filter.and(_baseFilter);
 		let args = [filter].concat(Array.prototype.slice.call(arguments).slice(1));
-		await negotiateWhere(strategy);
+		await negotiateWhereAndAggregate(strategy);
 		return table.getManyDto.apply(null, args);
 	}
 
-	async function negotiateWhere(strategy) {
+	async function negotiateWhereAndAggregate(strategy) {
 		if (typeof strategy !== 'object')
 			return;
 
 		for(let name in strategy) {
-			if(name === 'where') {
-				// validateArgs(strategy);
-				strategy.where = await parseFilter(strategy[name], table);
-			}
+			const target = strategy[name];
+			if (isFilter(target))
+				strategy[name] = await parseFilter(strategy[name], table);
 			else
-				await negotiateWhere(strategy[name]);
+				await negotiateWhereAndAggregate(strategy[name]);
 		}
 
 	}
@@ -281,7 +287,7 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 		if (_baseFilter)
 			filter = filter.and(_baseFilter);
 		let args = [filter].concat(Array.prototype.slice.call(arguments).slice(1));
-		await negotiateWhere(strategy);
+		await negotiateWhereAndAggregate(strategy);
 		return table.getMany.apply(null, args);
 	}
 

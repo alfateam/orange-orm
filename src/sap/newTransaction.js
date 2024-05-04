@@ -52,6 +52,7 @@ function newResolveTransaction(domain, pool) {
 				rdb.accept = function(caller) {
 					caller.visitSap();
 				};
+				rdb.aggregateCount = 0;
 				domain.rdb = rdb;
 				onSuccess();
 			} catch (e) {
