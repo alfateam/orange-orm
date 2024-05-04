@@ -11,6 +11,7 @@ function newOneRelation(joinRelation) {
 
 	c.joinRelation = joinRelation;
 	c.childTable = joinRelation.parentTable;
+	c.parentTable = joinRelation.childTable;
 	c.isOne = true;
 
 	c.accept = function(visitor) {

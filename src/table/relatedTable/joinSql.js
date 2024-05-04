@@ -1,13 +1,15 @@
 var newShallowJoinSql = require('../query/singleQuery/joinSql/newShallowJoinSql');
+var newParameterized = require('../query/newParameterized');
 
-function newJoinSql(relations, depth) {
+function newJoinSql(relations, depth = 0) {
 	var leftAlias,
 		rightAlias;
 	var relation;
 	var c = {};
-	var sql = '';
+	var sql = newParameterized('');
 
 	c.visitJoin = function(relation) {
+		//todo fix discriminators on childTable
 		sql = newShallowJoinSql(relation.parentTable,relation.childTable._primaryColumns,relation.columns,leftAlias,rightAlias).prepend(' INNER').prepend(sql);
 	};
 

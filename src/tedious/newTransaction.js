@@ -56,6 +56,7 @@ function newResolveTransaction(domain, pool) {
 				rdb.accept = function(caller) {
 					caller.visitSqlite();
 				};
+				rdb.aggregateCount = 0;
 				domain.rdb = rdb;
 				onSuccess();
 			} catch (e) {

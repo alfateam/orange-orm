@@ -1,6 +1,6 @@
 var newShallowJoinSql = require('../query/singleQuery/joinSql/newShallowJoinSqlCore');
 
-function newWhereSql(relations, shallowFilter, depth) {
+function newWhereSql(relations, shallowFilter, depth = 0) {
 	let relation = relations[depth];
 	var c = {};
 	var sql;

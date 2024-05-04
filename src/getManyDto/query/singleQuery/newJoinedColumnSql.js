@@ -1,5 +1,5 @@
 var util = require('util');
-
+//todo delete
 function _new(table,alias,span) {
 	let columnsMap = span.columns;
 	var columnFormat = '%s as "%s"';

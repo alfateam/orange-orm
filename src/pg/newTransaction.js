@@ -45,6 +45,7 @@ function newResolveTransaction(domain, pool) {
 				rdb.accept = function(caller) {
 					caller.visitPg();
 				};
+				rdb.aggregateCount = 0;
 				domain.rdb = rdb;
 				onSuccess();
 			} catch (e) {

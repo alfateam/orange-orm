@@ -1,11 +1,11 @@
 var joinLegToColumnSql = require('./joinLegToColumnSql');
 
-module.exports = function(span,alias,ignoreNull) {
+module.exports = function(span, alias, ignoreNull) {
 	var c = {};
 	var sql = '';
 
 	c.visitJoin = function(leg) {
-		var joinSql = joinLegToColumnSql(leg,alias  + leg.name, ignoreNull);
+		var joinSql = joinLegToColumnSql(leg, alias + leg.name, ignoreNull);
 		sql = sql + joinSql;
 	};
 
@@ -16,8 +16,8 @@ module.exports = function(span,alias,ignoreNull) {
 	c.visitMany = function() {
 	};
 
-	span.legs.forEach(onEach);
 
+	span.legs.forEach(onEach);
 
 	function onEach(leg) {
 		leg.accept(c);

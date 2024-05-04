@@ -11,6 +11,7 @@ async function getManyDto(table, filter, strategy) {
 		let arg = typeof strategy.where === 'function' ? strategy.where(table) : strategy.where;
 		filter = filter.and(arg);
 	}
+
 	let span = strategyToSpan(table, strategy);
 	let alias = table._dbName;
 
@@ -26,8 +27,8 @@ function newCreateRow(span) {
 	const manyNames = [];
 
 	const c = {};
-	c.visitJoin = () => {};
-	c.visitOne = () => {};
+	c.visitJoin = () => { };
+	c.visitOne = () => { };
 	c.visitMany = function(leg) {
 		manyNames.push(leg.name);
 	};
@@ -53,6 +54,9 @@ function createProto(columns, span) {
 	for (let i = 0; i < columns.length; i++) {
 		obj[columns[i].alias] = null;
 	}
+	for (let key in span.aggregates) {
+		obj[key] = null;
+	}
 	const c = {};
 
 	c.visitJoin = function(leg) {
@@ -75,7 +79,7 @@ function createProto(columns, span) {
 function hasManyRelations(span) {
 	let result;
 	const c = {};
-	c.visitJoin = () => {};
+	c.visitJoin = () => { };
 	c.visitOne = c.visitJoin;
 	c.visitMany = function() {
 		result = true;
@@ -100,6 +104,7 @@ async function decode(strategy, span, rows, keys = rows.length > 0 ? Object.keys
 	const rowsMap = new Map();
 	const fkIds = new Array(rows.length);
 	const getIds = createGetIds();
+	const aggregateKeys = Object.keys(span.aggregates);
 
 	const outRows = new Array(rowsLength);
 	const createRow = newCreateRow(span);
@@ -122,13 +127,19 @@ async function decode(strategy, span, rows, keys = rows.length > 0 ? Object.keys
 			if (shouldCreateMap)
 				fkIds[i] = getIds(outRow);
 		}
+
+		for (let j = 0; j < aggregateKeys.length; j++) {
+			outRow[aggregateKeys[j]] =  Number.parseFloat(row[keys[j+columnsLength]]);
+		}
+
 		outRows[i] = outRow;
 		if (shouldCreateMap)
 			addToMap(rowsMap, primaryColumns, outRow);
 	}
 	span._rowsMap = rowsMap;
 	span._ids = fkIds;
-	for (let i = 0; i < columnsLength; i++) {
+
+	for (let i = 0; i < columnsLength + aggregateKeys.length; i++) {
 		keys.shift();
 	}
 	await decodeRelations(strategy, span, rows, outRows, keys);
