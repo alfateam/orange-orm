@@ -14,7 +14,7 @@ RDB is the ultimate Object Relational Mapper for Node.js and Typescript, offerin
 ## Key Features 
 
 - **Rich Querying Model**: RDB provides a powerful and intuitive querying model, making it easy to retrieve, filter, and manipulate data from your databases.
-- **Concise API**: With a concise and developer-friendly API, RDB enables you to interact with your database using simple and expressive syntax.
+- **Active Record**: With a concise and expressive syntax, RDB enables you to interact with your database using the [*Active Record Pattern*](https://en.wikipedia.org/wiki/Active_record_pattern).
 - **No Code Generation Required**: Enjoy full IntelliSense, even in table mappings, without the need for cumbersome code generation.
 - **TypeScript and JavaScript Support**: RDB fully supports both TypeScript and JavaScript, allowing you to leverage the benefits of static typing and modern ECMAScript features.
 - **Works in the Browser**: You can securely use RDB in the browser by utilizing the Express.js plugin, which serves to safeguard sensitive database credentials from exposure at the client level. This method mirrors a traditional REST API, augmented with advanced TypeScript tooling for enhanced functionality.
