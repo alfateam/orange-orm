@@ -422,7 +422,6 @@ async function insertRows() {
       ]
     }
   ], {customer: true, deliveryAddress: true, lines: true}); //fetching strategy
-  console.dir(orders, {depth: Infinity});
 }
 ```
 
@@ -434,7 +433,7 @@ Currently, there are three concurrency strategies:
 - <strong>`overwrite`</strong> Overwrites the property, regardless of changes by others.
 - <strong>`skipOnConflict`</strong> Silently avoids updating the property if another user has modified it in the interim.
 
-The <strong>concurrency</strong> option can be set either globally a table or individually for each column. In the example below, we've set the concurrency strategy on <strong>vendor</strong> table to <strong>overwrite</strong> except for the column <strong>balance</strong> which uses the <strong>skipOnConflict</strong> strategy.  In this particular case, a row with <strong>id: 1</strong> already exists, the <strong>name</strong> and <strong>isActive</strong> fields will be overwritten, but the balance will remain the same as in the original record, demonstrating the effectiveness of combining multiple <strong>concurrency</strong> strategies.
+The <strong>concurrency</strong> option can be set either for the whole table or individually for each column. In the example below, we've set the concurrency strategy on <strong>vendor</strong> table to <strong>overwrite</strong> except for the column <strong>balance</strong> which uses the <strong>skipOnConflict</strong> strategy.  In this particular case, a row with <strong>id: 1</strong> already exists, the <strong>name</strong> and <strong>isActive</strong> fields will be overwritten, but the balance will remain the same as in the original record, demonstrating the effectiveness of combining multiple <strong>concurrency</strong> strategies.
 
 ```javascript
 import map from './map';
@@ -465,7 +464,7 @@ async function insertRows() {
     id: 1,
     name: 'George',
     balance: 177,
-    isActive: false
+        isActive: false
   });
   console.dir(george, {depth: Infinity});
   // {
@@ -498,7 +497,6 @@ async function getRows() {
     deliveryAddress: true, 
     lines: true
   });
-  console.dir(orders, {depth: Infinity});
 }
 ```
 __Limit, offset and order by__  
@@ -521,7 +519,6 @@ async function getRows() {
       orderBy: 'product'
     },
   });
-  console.dir(orders, {depth: Infinity});
 }
 ```
 <a name="aggregate-results">  </a>
@@ -563,7 +560,6 @@ async function getRows() {
     deliveryAddress: true, 
     lines: true
   });
-  console.dir(orders, {depth: Infinity});
 }
 ```
 
@@ -585,7 +581,6 @@ async function getRows() {
     deliveryAddress: true, 
     lines: true
   });
-  console.dir(order, {depth: Infinity});
 }
 ```
 
@@ -603,7 +598,6 @@ async function getRows() {
     deliveryAddress: true, 
     lines: true
   });
-  console.dir(order, {depth: Infinity});
 }
 ```
 
@@ -625,7 +619,6 @@ async function getRows() {
       deliveryAddress: true, 
       lines: true
   });
-  console.dir(orders, {depth: Infinity});
 }
 ```
 </details>  
@@ -653,7 +646,6 @@ async function update() {
   order.lines.push({product: 'Cloak of invisibility'});
 
   await order.saveChanges();
-  console.dir(order, {depth: Infinity});
 }
 ```
 __Updating many rows__
@@ -682,7 +674,6 @@ async function update() {
   orders[1].lines.push({product: 'Cloak of invisibility'});
 
   await orders.saveChanges();
-  console.dir(orders, {depth: Infinity});
 }
 ```
 __Updating from JSON__  
@@ -787,10 +778,63 @@ async function update() {
     orderDate: {
       concurrency: 'overwrite'
   }});
-  console.dir(order, {depth: Infinity});
 }
 ```
 </details>  
+
+<details><summary><strong>Upserting rows</strong></summary>
+The default strategy for inserting rows is set to an optimistic approach. This means that if a row is being inserted with an already existing primary key, the database raises an exception. However, it is possible to perform 'upserts' by taking advantage of the 'overwrite' strategy.
+
+Currently, there are three concurrency strategies:
+- <strong>`optimistic`</strong> Raises an exception if another row was already inserted on that primary key.
+- <strong>`overwrite`</strong> Overwrites the property, regardless of changes by others.
+- <strong>`skipOnConflict`</strong> Silently avoids updating the property if another user has modified it in the interim.
+
+The <strong>concurrency</strong> option can be set either for the whole table or individually for each column. In the example below, we've set the concurrency strategy on <strong>vendor</strong> table to <strong>overwrite</strong> except for the column <strong>balance</strong> which uses the <strong>skipOnConflict</strong> strategy.  In this particular case, a row with <strong>id: 1</strong> already exists, the <strong>name</strong> and <strong>isActive</strong> fields will be overwritten, but the balance will remain the same as in the original record, demonstrating the effectiveness of combining multiple <strong>concurrency</strong> strategies.
+
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+insertRows();
+
+async function insertRows() {
+
+  db2 = db({
+    vendor: {
+      balance: {
+        concurrency: 'skipOnConflict'
+      },
+      concurrency: 'overwrite'
+    }
+  });
+
+  await db2.vendor.insert({
+    id: 1,
+    name: 'John',
+    balance: 100,
+    isActive: true
+  });
+
+  //this will overwrite all fields but balance
+  const george = await db2.vendor.insert({
+    id: 1,
+    name: 'George',
+    balance: 177,
+        isActive: false
+  });
+  console.dir(george, {depth: Infinity});
+  // {
+  //   id: 1,
+  //   name: 'George',
+  //   balance: 100,
+  //   isActive: false
+  // }
+}
+```
+
+</details>
+
 
 <details><summary><strong>Deleting rows</strong></summary>
 <p>Rows in owner tables cascade deletes to their child tables. In essence, if a table has ownership over other tables through <strong><i>hasOne</i></strong> and <strong><i>hasMany</i></strong> relationships, removing a record from the parent table also removes its corresponding records in its child tables. This approach safeguards against leaving orphaned records and upholds data integrity. On the contrary, tables that are merely referenced, through <strong><i>reference relationships </i></strong> , remain unaffected upon deletions. For a deeper dive into these relationships and behaviors, refer to the section on <a href="#user-content-table-mapping">Mapping tables</a>.</p>
