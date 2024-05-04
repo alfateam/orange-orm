@@ -1,5 +1,7 @@
 
 ## Changelog
+__3.8.0__  
+Aggregate operators: count, max, min, avg and sum.      
 __3.7.0__  
 Upgraded to mysql2@3.9.4 and tedious@18.1.0    
 __3.6.2__  
