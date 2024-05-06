@@ -783,7 +783,7 @@ async function update() {
 </details>  
 
 <details><summary><strong>Upserting rows</strong></summary>
-The default strategy for inserting rows is set to an optimistic approach. This means that if a row is being inserted with an already existing primary key, the database raises an exception. However, it is possible to perform 'upserts' by taking advantage of the 'overwrite' strategy.
+It is possible to perform 'upserts' by taking advantage of the 'overwrite' strategy.
 
 Currently, there are three concurrency strategies:
 - <strong>`optimistic`</strong> Raises an exception if another row was already inserted on that primary key.
