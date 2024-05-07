@@ -590,7 +590,7 @@ type ExtractAggregates<Agg> = {
         Required<Agg>[K] extends (agg: Aggregate<infer V>) => ColumnSymbols
         ? K extends 'where'? never : K
         : never
-    ]: Agg[K] extends (agg: Aggregate<infer V>) => infer R ? R & NotNull : never;
+    ]: Agg[K] extends (agg: Aggregate<infer V>) => infer R ? R : never;
 }
 
 type ColumnSymbols = StringColumnSymbol | UuidColumnSymbol | NumericColumnSymbol | DateColumnSymbol | DateWithTimeZoneColumnSymbol | BinaryColumnSymbol | BooleanColumnSymbol | JSONColumnSymbol;
@@ -599,11 +599,11 @@ type AggregationFunction<T> = (agg: Aggregate<T>) => ColumnSymbols;
 type Aggregate<T> = 
 RelatedColumns<T> &
 {
-	sum(fn: (x: AggregateColumns<T>) => NumericColumnSymbol): NumericColumnSymbol;
-	avg(fn: (x: AggregateColumns<T>) => NumericColumnSymbol): NumericColumnSymbol;
-	min(fn: (x: AggregateColumns<T>) => NumericColumnSymbol): NumericColumnSymbol;
-	max(fn: (x: AggregateColumns<T>) => NumericColumnSymbol): NumericColumnSymbol;
-	count(fn: (x: AggregateColumns<T>) => NumericColumnSymbol): NumericColumnSymbol;
+	sum(fn: (x: AggregateColumns<T>) => NumericColumnSymbol): NumericColumnSymbol & NotNull;
+	avg(fn: (x: AggregateColumns<T>) => NumericColumnSymbol): NumericColumnSymbol & NotNull;
+	min(fn: (x: AggregateColumns<T>) => NumericColumnSymbol): NumericColumnSymbol & NotNull;
+	max(fn: (x: AggregateColumns<T>) => NumericColumnSymbol): NumericColumnSymbol & NotNull;
+	count(fn: (x: AggregateColumns<T>) => NumericColumnSymbol): NumericColumnSymbol  & NotNull;
 }
 
 type RelatedColumns<T> = RemoveNeverFlat<{
