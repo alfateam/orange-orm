@@ -522,7 +522,7 @@ describe('getMany with aggregates', () => {
 			balance: x => x.min(x => x.customer.balance),
 			customerId2: x => x.sum(x => x.customer.id),
 		});
-
+rows[0].
 		//mssql workaround because datetime has no time offset
 		for (let i = 0; i < rows.length; i++) {
 			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate));

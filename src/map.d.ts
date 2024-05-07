@@ -567,7 +567,7 @@ type AggType<T> = {
     where?: (agg: MappedColumnsAndRelations<T>) => RawFilter;
 };
 
-type AggregationFunction<T> = (agg: Aggregate<T>) => NumericColumnSymbol;
+
 
 type FetchingStrategyBase<T> = {
 	[K in keyof T &
@@ -585,12 +585,14 @@ type FetchingStrategyBase<T> = {
 
 };
 
+type AggregationFunction<T> = (agg: Aggregate<T>) => NumericColumnSymbol;
+
 type Aggregate<T> = {
-	sum(fn: (x: AggregateColumns<T>) => NumericColumnTypeDef<any>): ColumnTypeOf<any>;
-	avg(fn: (x: AggregateColumns<T>) => NumericColumnTypeDef<any>): ColumnTypeOf<any>;
-	min(fn: (x: AggregateColumns<T>) => NumericColumnTypeDef<any>): ColumnTypeOf<any>;
-	max(fn: (x: AggregateColumns<T>) => NumericColumnTypeDef<any>): ColumnTypeOf<any>;
-	count(fn: (x: AggregateColumns<T>) => NumericColumnTypeDef<any>): ColumnTypeOf<any>;
+	sum(fn: (x: AggregateColumns<T>) => NumericColumnTypeDef<any>): NumericColumnSymbol;
+	avg(fn: (x: AggregateColumns<T>) => NumericColumnTypeDef<any>): NumericColumnSymbol;
+	min(fn: (x: AggregateColumns<T>) => NumericColumnTypeDef<any>): NumericColumnSymbol;
+	max(fn: (x: AggregateColumns<T>) => NumericColumnTypeDef<any>): NumericColumnSymbol;
+	count(fn: (x: AggregateColumns<T>) => NumericColumnTypeDef<any>): NumericColumnSymbol;
 }
 
 type AggregateColumns<T> = RemoveNeverFlat<{
