@@ -585,15 +585,44 @@ type FetchingStrategyBase<T> = {
 
 };
 
-type AggregationFunction<T> = (agg: Aggregate<T>) => NumericColumnSymbol;
-
-type Aggregate<T> = {
-	sum(fn: (x: AggregateColumns<T>) => NumericColumnTypeDef<any>): NumericColumnSymbol;
-	avg(fn: (x: AggregateColumns<T>) => NumericColumnTypeDef<any>): NumericColumnSymbol;
-	min(fn: (x: AggregateColumns<T>) => NumericColumnTypeDef<any>): NumericColumnSymbol;
-	max(fn: (x: AggregateColumns<T>) => NumericColumnTypeDef<any>): NumericColumnSymbol;
-	count(fn: (x: AggregateColumns<T>) => NumericColumnTypeDef<any>): NumericColumnSymbol;
+type ExtractAggregates<Agg> = {
+    [K in keyof Agg as 
+        Required<Agg>[K] extends (agg: Aggregate<infer V>) => ColumnSymbols
+        ? K extends 'where'? never : K
+        : never
+    ]: Agg[K] extends (agg: Aggregate<infer V>) => infer R ? R & NotNull : never;
 }
+
+type ColumnSymbols = StringColumnSymbol | UuidColumnSymbol | NumericColumnSymbol | DateColumnSymbol | DateWithTimeZoneColumnSymbol | BinaryColumnSymbol | BooleanColumnSymbol | JSONColumnSymbol;
+type AggregationFunction<T> = (agg: Aggregate<T>) => ColumnSymbols;
+
+type Aggregate<T> = 
+RelatedColumns<T> &
+{
+	sum(fn: (x: AggregateColumns<T>) => NumericColumnSymbol): NumericColumnSymbol;
+	avg(fn: (x: AggregateColumns<T>) => NumericColumnSymbol): NumericColumnSymbol;
+	min(fn: (x: AggregateColumns<T>) => NumericColumnSymbol): NumericColumnSymbol;
+	max(fn: (x: AggregateColumns<T>) => NumericColumnSymbol): NumericColumnSymbol;
+	count(fn: (x: AggregateColumns<T>) => NumericColumnSymbol): NumericColumnSymbol;
+}
+
+type RelatedColumns<T> = RemoveNeverFlat<{
+	[K in keyof T]:
+	T[K] extends StringColumnTypeDef<infer M> ? StringColumnSymbol
+	:T[K] extends UuidColumnTypeDef<infer M> ? UuidColumnSymbol
+	:T[K] extends NumericColumnTypeDef<infer M> ? NumericColumnSymbol
+	:T[K] extends DateColumnTypeDef<infer M> ? DateColumnSymbol
+	:T[K] extends DateWithTimeZoneColumnTypeDef<infer M> ? DateWithTimeZoneColumnSymbol
+	:T[K] extends BinaryColumnTypeDef<infer M> ? BinaryColumnSymbol
+	:T[K] extends BooleanColumnTypeDef<infer M> ? BooleanColumnSymbol
+	:T[K] extends JSONColumnTypeDef<infer M> ? JSONColumnSymbol	
+	:T[K] extends ManyRelation
+	? RelatedColumns<T[K]>
+	: T[K] extends RelatedTable
+	? RelatedColumns<T[K]>
+	: never;
+}>;
+
 
 type AggregateColumns<T> = RemoveNeverFlat<{
 	[K in keyof T]:
@@ -606,7 +635,7 @@ type AggregateColumns<T> = RemoveNeverFlat<{
 
 type AggregateColumns2<T> = RemoveNeverFlat<{
 	[K in keyof T]:
-	T[K] extends NumericColumnTypeDef<infer M> ? ColumnTypeOf<any>
+	T[K] extends NumericColumnTypeDef<infer M> ? NumericColumnSymbol
 	:T[K] extends ManyRelation
 	? AggregateColumns2<T[K]>
 	: T[K] extends RelatedTable
@@ -1020,13 +1049,6 @@ type NegotiateNotNull<T> = T extends NotNull ? NotNull : {};
 
 type FetchedProperties<T, TStrategy> = FetchedColumnProperties<T, TStrategy> & FetchedRelationProperties<T, TStrategy> & ExtractAggregates< TStrategy>
 
-type ExtractAggregates<Agg> = {
-    [K in keyof Agg as 
-        Required<Agg>[K] extends (agg: Aggregate<any>) => NumericColumnSymbol | BooleanColumnSymbol 
-        ? K extends 'where'? never : K
-        : never
-    ]: Agg[K] extends (agg: Aggregate<any>) => infer R ? R & NotNull : never;
-}
 
 type FetchedRelationProperties<T, TStrategy> = RemoveNeverFlat<{
 	[K in keyof T]: K extends keyof TStrategy
