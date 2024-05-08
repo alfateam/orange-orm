@@ -23,7 +23,6 @@ var hostLocal = require('./hostLocal');
 var getTSDefinition = require('./getTSDefinition');
 var where = require('./table/where');
 var aggregate = require('./table/aggregate');
-var subColumn = require('./table/aggregate');
 
 function _new(tableName) {
 	var table = newContext();

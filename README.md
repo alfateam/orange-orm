@@ -523,13 +523,15 @@ async function getRows() {
 ```
 <a name="aggregate-results">  </a>
 __With aggregated results__  
-You can count records and aggregate number columns.  
+You can count records and aggregate numerical columns. 
 The following operators are supported:
 - count
 - sum
 - min 
 - max  
-- avg
+- avg  
+
+You can also elevate associated data to the root level for easier access. In the example below, <i>balance</i> of the customer is elevated to the root level.
 
 ```javascript
 import map from './map';
@@ -539,7 +541,8 @@ getRows();
 
 async function getRows() {
   const orders = await db.order.getAll({
-    numberOfLines: x => x.count(x => x.lines.id)
+    numberOfLines: x => x.count(x => x.lines.id),
+    balance: x => x.customer.balance
   });
 }
 ```
@@ -1752,6 +1755,33 @@ async function getRows() {
 </details>
 
 <details><summary><strong>Aggregate functions</strong></summary>
+
+You can count records and aggregate numerical columns.  This can either be done for all rows or for associcated columns for each row.  
+Supported functions include:
+- count
+- sum
+- min 
+- max  
+- avg  
+
+__On each row__  
+For each row we are counting the number of lines.  
+You can also elevate associated data to the root level for easier access. In the example below, <i>balance</i> of the customer is elevated to the root level.
+
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const orders = await db.order.getAll({
+    numberOfLines: x => x.count(x => x.lines.id),
+    balance: x => x.customer.balance
+  });
+}
+```
+__Across all rows__  
 <p>Currently there is only the <strong><i>count</i></strong> aggregate available.</p>
 
 ```javascript
