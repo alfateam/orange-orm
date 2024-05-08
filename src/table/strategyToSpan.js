@@ -25,7 +25,7 @@ function toSpan(table,strategy) {
 				addLeg(legs,table,strategy,name);
 			else if (table[name] && table[name].eq)
 				columns.set(table[name], strategy[name]);
-			else if (strategy[name]?.expression && strategy[name]?.join)
+			else if (strategy[name]?.expression && (strategy[name]?.join || strategy[name]?.column))
 				span.aggregates[name] = strategy[name];
 			else
 				span[name] = strategy[name];

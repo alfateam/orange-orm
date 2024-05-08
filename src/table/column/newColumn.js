@@ -73,6 +73,16 @@ module.exports = function(table, name) {
 	c.le = c.lessThanOrEqual;
 	c.LE = c.le;
 	c.IN = c.in;
+	c.self = self;
+
+	function self() {
+		const tableAlias = table._rootAlias || table._dbName;
+		return {
+			expression: (alias) => `${tableAlias}.${c._dbName} ${alias}`,
+			join: '',
+			column: c
+		};
+	}
 
 	return c;
 };

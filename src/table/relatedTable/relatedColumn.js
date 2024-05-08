@@ -1,5 +1,6 @@
 var newSubFilter = require('./subFilter');
 var aggregate = require('./columnAggregate');
+var childColumn = require('./childColumn');
 
 function newRelatedColumn(column, relations, isShallow, depth) {
 	var c = {};
@@ -17,6 +18,7 @@ function newRelatedColumn(column, relations, isShallow, depth) {
 	c.min = aggregate.bind(null, 'min', column, relations);
 	c.max = aggregate.bind(null, 'max', column, relations);
 	c.count = aggregate.bind(null, 'count', column, relations);
+	c.self = childColumn.bind(null, column, relations);
 
 	return c;
 

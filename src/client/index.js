@@ -807,6 +807,7 @@ function tableProxy() {
 }
 
 function aggregate(path, arg) {
+
 	const c = {
 		sum,
 		count,
@@ -815,7 +816,26 @@ function aggregate(path, arg) {
 		min
 	};
 
-	return arg(c);
+	let handler = {
+		get(_target, property,) {
+			if (property in c)
+				return Reflect.get(...arguments);
+			else {
+				subColumn = column(path + 'aggregate');
+				return column(property);
+			}
+		}
+
+	};
+	let subColumn;
+	const proxy = new Proxy(c, handler);
+
+	const result =  arg(proxy);
+
+	if (subColumn)
+		return subColumn(result.self());
+	else
+		return result;
 
 
 	function sum(fn) {
