@@ -1,5 +1,7 @@
 
 ## Changelog
+__3.9.0__  
+Possible to elevate associated column on a related table to a parent table when fetching.  See https://github.com/alfateam/rdb/#user-content-aggregate-results  
 __3.8.0__  
 Aggregate operators: count, max, min, avg and sum.      
 __3.7.0__  

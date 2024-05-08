@@ -531,7 +531,7 @@ The following operators are supported:
 - max  
 - avg  
 
-You can also elevate associated data to the root level for easier access. In the example below, <i>balance</i> of the customer is elevated to the root level.
+You can also elevate associated data to a parent level for easier access. In the example below, <i>balance</i> of the customer is elevated to the root level.
 
 ```javascript
 import map from './map';
@@ -1766,7 +1766,7 @@ Supported functions include:
 
 __On each row__  
 For each row we are counting the number of lines.  
-You can also elevate associated data to the root level for easier access. In the example below, <i>balance</i> of the customer is elevated to the root level.
+You can also elevate associated data to the a parent level for easier access. In the example below, <i>balance</i> of the customer is elevated to the root level.
 
 ```javascript
 import map from './map';
