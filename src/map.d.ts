@@ -593,7 +593,6 @@ type ExtractAggregates<Agg> = {
     ]: Agg[K] extends (agg: Aggregate<infer V>) => infer R ? R : never;
 }
 
-type ColumnSymbols = StringColumnSymbol | UuidColumnSymbol | NumericColumnSymbol | DateColumnSymbol | DateWithTimeZoneColumnSymbol | BinaryColumnSymbol | BooleanColumnSymbol | JSONColumnSymbol;
 type AggregationFunction<T> = (agg: Aggregate<T>) => ColumnSymbols;
 
 type Aggregate<T> = 
