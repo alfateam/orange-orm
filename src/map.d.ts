@@ -359,8 +359,13 @@ type MappedTable<T> = {
 	): Promise<StrategyToRowArray<FetchedProperties<T, FS>, T>>;
 	getAll(): Promise<StrategyToRowArray<FetchedProperties<T, {}>, T>>;
 	getAll<FS extends FetchingStrategy<T>>(
-		fetchingStrategy?: FS
+		fetchingStrategy: FS
 	): Promise<StrategyToRowArray<FetchedProperties<T, FS>, T>>;
+
+	aggregate<FS extends AggregateStrategy<T>>(
+		fetchingStrategy: FS
+	): Promise<StrategyToRowData<FetchedAggregateProperties<T, FS>>[]>;
+
 	count(filter?: Filter | PrimaryRowFilter<T>[]): Promise<number>;
 	delete(filter?: Filter | PrimaryRowFilter<T>[]): Promise<void>;
 	deleteCascade(filter?: Filter | PrimaryRowFilter<T>[]): Promise<void>;
@@ -560,14 +565,25 @@ type AllowedColumnsAndTablesConcurrency<T> = {
 };
 
 
-type FetchingStrategy<T> = FetchingStrategyBase<T> | AggType<T> 
+type FetchingStrategy<T> = FetchingStrategyBase<T> | AggType<T>
+
+type AggregateStrategy<T> = AggregateStrategyBase<T> | AggType<T>
+
 type AggType<T> = {
-    [name: string]: AggregationFunction<T>;
+	[name: string]: AggregationFunction<T>;
 } & {
-    where?: (agg: MappedColumnsAndRelations<T>) => RawFilter;
+	where?: (agg: MappedColumnsAndRelations<T>) => RawFilter;
 };
 
-
+type AggregateStrategyBase<T> =
+	{
+		orderBy?:
+		| OrderBy<Extract<keyof AllowedColumns<T>, string>>[]
+		| OrderBy<Extract<keyof AllowedColumns<T>, string>>;
+		limit?: number;
+		offset?: number;
+		where?: (agg: MappedColumnsAndRelations<T>) => RawFilter;
+	};
 
 type FetchingStrategyBase<T> = {
 	[K in keyof T &
@@ -582,40 +598,40 @@ type FetchingStrategyBase<T> = {
 	| OrderBy<Extract<keyof AllowedColumns<T>, string>>;
 	limit?: number;
 	offset?: number;
+	where?: (agg: MappedColumnsAndRelations<T>) => RawFilter;
 
 };
-
 type ExtractAggregates<Agg> = {
-    [K in keyof Agg as 
-        Required<Agg>[K] extends (agg: Aggregate<infer V>) => ColumnSymbols
-        ? K extends 'where'? never : K
-        : never
-    ]: Agg[K] extends (agg: Aggregate<infer V>) => infer R ? R : never;
+	[K in keyof Agg as
+	Required<Agg>[K] extends (agg: Aggregate<infer V>) => ColumnSymbols
+	? K extends 'where' ? never : K
+	: never
+	]: Agg[K] extends (agg: Aggregate<infer V>) => infer R ? R : never;
 }
 
 type AggregationFunction<T> = (agg: Aggregate<T>) => ColumnSymbols;
 
-type Aggregate<T> = 
-RelatedColumns<T> &
-{
-	sum(fn: (x: AggregateColumns<T>) => NumericColumnSymbol): NumericColumnSymbol & NotNull;
-	avg(fn: (x: AggregateColumns<T>) => NumericColumnSymbol): NumericColumnSymbol & NotNull;
-	min(fn: (x: AggregateColumns<T>) => NumericColumnSymbol): NumericColumnSymbol & NotNull;
-	max(fn: (x: AggregateColumns<T>) => NumericColumnSymbol): NumericColumnSymbol & NotNull;
-	count(fn: (x: AggregateColumns<T>) => NumericColumnSymbol): NumericColumnSymbol  & NotNull;
-}
+type Aggregate<T> =
+	RelatedColumns<T> &
+	{
+		sum(fn: (x: AggregateColumns<T>) => NumericColumnSymbol): NumericColumnSymbol & NotNull;
+		avg(fn: (x: AggregateColumns<T>) => NumericColumnSymbol): NumericColumnSymbol & NotNull;
+		min(fn: (x: AggregateColumns<T>) => NumericColumnSymbol): NumericColumnSymbol & NotNull;
+		max(fn: (x: AggregateColumns<T>) => NumericColumnSymbol): NumericColumnSymbol & NotNull;
+		count(fn: (x: AggregateColumns<T>) => NumericColumnSymbol): NumericColumnSymbol & NotNull;
+	}
 
 type RelatedColumns<T> = RemoveNeverFlat<{
 	[K in keyof T]:
 	T[K] extends StringColumnTypeDef<infer M> ? StringColumnSymbol
-	:T[K] extends UuidColumnTypeDef<infer M> ? UuidColumnSymbol
-	:T[K] extends NumericColumnTypeDef<infer M> ? NumericColumnSymbol
-	:T[K] extends DateColumnTypeDef<infer M> ? DateColumnSymbol
-	:T[K] extends DateWithTimeZoneColumnTypeDef<infer M> ? DateWithTimeZoneColumnSymbol
-	:T[K] extends BinaryColumnTypeDef<infer M> ? BinaryColumnSymbol
-	:T[K] extends BooleanColumnTypeDef<infer M> ? BooleanColumnSymbol
-	:T[K] extends JSONColumnTypeDef<infer M> ? JSONColumnSymbol	
-	:T[K] extends ManyRelation
+	: T[K] extends UuidColumnTypeDef<infer M> ? UuidColumnSymbol
+	: T[K] extends NumericColumnTypeDef<infer M> ? NumericColumnSymbol
+	: T[K] extends DateColumnTypeDef<infer M> ? DateColumnSymbol
+	: T[K] extends DateWithTimeZoneColumnTypeDef<infer M> ? DateWithTimeZoneColumnSymbol
+	: T[K] extends BinaryColumnTypeDef<infer M> ? BinaryColumnSymbol
+	: T[K] extends BooleanColumnTypeDef<infer M> ? BooleanColumnSymbol
+	: T[K] extends JSONColumnTypeDef<infer M> ? JSONColumnSymbol
+	: T[K] extends ManyRelation
 	? RelatedColumns<T[K]>
 	: T[K] extends RelatedTable
 	? RelatedColumns<T[K]>
@@ -635,7 +651,7 @@ type AggregateColumns<T> = RemoveNeverFlat<{
 type AggregateColumns2<T> = RemoveNeverFlat<{
 	[K in keyof T]:
 	T[K] extends NumericColumnTypeDef<infer M> ? NumericColumnSymbol
-	:T[K] extends ManyRelation
+	: T[K] extends ManyRelation
 	? AggregateColumns2<T[K]>
 	: T[K] extends RelatedTable
 	? AggregateColumns2<T[K]>
@@ -975,6 +991,7 @@ type StrategyToRow<T, U> = StrategyToRowData<T> & {
 	delete(concurrency: Concurrency<U>): Promise<void>;
 };
 
+
 type StrategyToRowArray<T, U> = StrategyToRowData<T>[] & {
 	saveChanges(): Promise<void>;
 	saveChanges<C extends Concurrency<U>>(concurrency?: C): Promise<void>;
@@ -1046,7 +1063,8 @@ type ExtractColumnBools<T, TStrategy> = RemoveNever<{
 
 type NegotiateNotNull<T> = T extends NotNull ? NotNull : {};
 
-type FetchedProperties<T, TStrategy> = FetchedColumnProperties<T, TStrategy> & FetchedRelationProperties<T, TStrategy> & ExtractAggregates< TStrategy>
+type FetchedProperties<T, TStrategy> = FetchedColumnProperties<T, TStrategy> & FetchedRelationProperties<T, TStrategy> & ExtractAggregates<TStrategy>
+type FetchedAggregateProperties<T, TStrategy> = FetchedColumnProperties<T, TStrategy> & ExtractAggregates<TStrategy>
 
 
 type FetchedRelationProperties<T, TStrategy> = RemoveNeverFlat<{
@@ -1182,8 +1200,7 @@ type StrategyToInsertRowData<T> = Omit<{
 		? M | null
 		: T[K] extends JSONColumnSymbol
 		? JsonType | null
-		: // : never
-		T[K] extends ManyRelation
+		: T[K] extends ManyRelation
 		? StrategyToInsertRowData<T[K]>[]
 		: StrategyToInsertRowData<T[K]>;
 	}, 'formulaDiscriminators' | 'columnDiscriminators' | 'map' | ' isManyRelation' | ' relatedTable' | ' isOneRelation'>
@@ -1602,7 +1619,6 @@ type MapPropertiesTo6<T, V extends number = 6> = {
 	[K in keyof T]: UnionOfTypes<MapPropertiesTo5<Omit<T, K>, V>>;
 };
 type UnionOfTypes<T> = T[keyof T];
-// type CountProperties<T> = UnionOfTypes<MapPropertiesTo6<T>> | UnionOfTypes<MapPropertiesTo5<T>> | UnionOfTypes<MapPropertiesTo4<T>> | UnionOfTypes<MapPropertiesTo3<T>> | UnionOfTypes<MapPropertiesTo2<T>> | UnionOfTypes<MapPropertiesTo1<T>>;
 
 interface RawFilter {
 	sql: string | (() => string);

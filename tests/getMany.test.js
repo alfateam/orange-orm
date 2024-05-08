@@ -498,7 +498,69 @@ describe('getMany with column strategy', () => {
 	}
 });
 
-describe('getMany with aggregates', () => {
+describe('aggregate', () => {
+
+	test('pg', async () => await verify('pg'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+		const rows = await db.order.aggregate({
+			where: x => x.customer.name.notEqual(null),
+			id: x => x.id,
+			customerSum: x => x.sum(x => x.customer.id),
+			customerName: x => x.customer.name,
+			postalPlace: x => x.deliveryAddress.postalPlace,
+			maxLines: x => x.max(x => x.lines.id),
+			numberOfPackages: x => x.count(x => x.lines.packages.id),
+			sumPackages: x => x.sum(x => x.lines.packages.id),
+			balance: x => x.min(x => x.customer.balance),
+		});
+
+		//mssql workaround because datetime has no time offset
+		for (let i = 0; i < rows.length; i++) {
+			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate));
+		}
+
+		const date1 = new Date(2022, 0, 11, 9, 24, 47);
+		const date2 = new Date(2021, 0, 11, 12, 22, 45);
+		const expected = [
+			{
+				id: 1,
+				customerSum: 1,
+				customerName: 'George',
+				postalPlace: 'Jakobsli',
+				orderDate: dateToISOString(date1),
+				maxLines: 2,
+				numberOfPackages: 2,
+				sumPackages: 3,
+				balance: 177,
+			},
+			{
+				id: 2,
+				customerSum: 2,
+				customerName: 'Harry',
+				postalPlace: 'Surrey',
+				orderDate: dateToISOString(date2),
+				maxLines: 3,
+				numberOfPackages: 1,
+				sumPackages: 3,
+				balance: 200,
+			}
+		];
+
+		expect(rows).toEqual(expected);
+	}
+}, 20000);
+
+describe('aggregate each row', () => {
 
 	test('pg', async () => await verify('pg'));
 	test('oracle', async () => await verify('oracle'));
@@ -517,6 +579,7 @@ describe('getMany with aggregates', () => {
 			customerName: x => x.customer.name,
 			id2: x => x.id,
 			lines: {
+				id: true,
 				id2: x => x.id,
 				numberOfPackages: x => x.count(x => x.packages.id)
 			},
@@ -530,12 +593,10 @@ describe('getMany with aggregates', () => {
 			balance: x => x.min(x => x.customer.balance),
 			customerId2: x => x.sum(x => x.customer.id),
 		});
-
 		//mssql workaround because datetime has no time offset
 		for (let i = 0; i < rows.length; i++) {
 			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate));
 		}
-
 		const date1 = new Date(2022, 0, 11, 9, 24, 47);
 		const date2 = new Date(2021, 0, 11, 12, 22, 45);
 		const expected = [
@@ -587,7 +648,6 @@ describe('getMany with aggregates', () => {
 				},
 			}
 		];
-
 
 		expect(rows).toEqual(expected);
 	}
