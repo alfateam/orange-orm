@@ -513,9 +513,17 @@ describe('getMany with aggregates', () => {
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
 		const rows = await db.order.getAll({
+			where: x => x.customer.name.notEqual(null),
+			customerName: x => x.customer.name,
+			id2: x => x.id,
 			lines: {
+				id2: x => x.id,
 				numberOfPackages: x => x.count(x => x.packages.id)
 			},
+			customer: {
+				bar: x => x.balance
+			},
+			postalPlace: x => x.deliveryAddress.postalPlace,
 			maxLines: x => x.max(x => x.lines.id),
 			numberOfPackages: x => x.count(x => x.lines.packages.id),
 			sumPackages: x => x.sum(x => x.lines.packages.id),
@@ -533,6 +541,9 @@ describe('getMany with aggregates', () => {
 		const expected = [
 			{
 				id: 1,
+				id2: 1,
+				customerName: 'George',
+				postalPlace: 'Jakobsli',
 				orderDate: dateToISOString(date1),
 				customerId: 1,
 				maxLines: 2,
@@ -541,19 +552,22 @@ describe('getMany with aggregates', () => {
 				balance: 177,
 				customerId2: 1,
 				lines: [
-					{ product: 'Bicycle', id: 1, orderId: 1, numberOfPackages: 1 },
-					{ product: 'Small guitar', id: 2, orderId: 1, numberOfPackages: 1 }
-				]
-				// customer: {
-				// 	id: 1,
-				// 	name: 'George',
-				// 	balance: 177,
-				// 	isActive: true,
-				// 	bar: 177
-				// },
+					{ id2: 1, product: 'Bicycle', id: 1, orderId: 1, numberOfPackages: 1 },
+					{ id2: 2, product: 'Small guitar', id: 2, orderId: 1, numberOfPackages: 1 }
+				],
+				customer: {
+					id: 1,
+					name: 'George',
+					balance: 177,
+					isActive: true,
+					bar: 177
+				},
 			},
 			{
 				id: 2,
+				id2: 2,
+				customerName: 'Harry',
+				postalPlace: 'Surrey',
 				orderDate: dateToISOString(date2),
 				customerId: 2,
 				maxLines: 3,
@@ -562,15 +576,15 @@ describe('getMany with aggregates', () => {
 				balance: 200,
 				customerId2: 2,
 				lines: [
-					{ product: 'Magic wand', id: 3, orderId: 2, numberOfPackages: 1 }
-				]
-				// customer: {
-				// 	id: 2,
-				// 	name: 'Harry',
-				// 	balance: 200,
-				// 	isActive: true,
-				// 	bar: 200
-				// },
+					{ id2: 3, product: 'Magic wand', id: 3, orderId: 2, numberOfPackages: 1 }
+				],
+				customer: {
+					id: 2,
+					name: 'Harry',
+					balance: 200,
+					isActive: true,
+					bar: 200
+				},
 			}
 		];
 

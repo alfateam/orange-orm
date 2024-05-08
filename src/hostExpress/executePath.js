@@ -59,7 +59,8 @@ let _allowedOps = {
 	max: true,
 	min: true,
 	count: true,
-	aggregate: true
+	aggregate: true,
+	self: true,
 };
 
 async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, request, response, readonly, disableBulkDeletes, isHttp, client }) {
