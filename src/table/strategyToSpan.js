@@ -2,12 +2,12 @@ var newCollection = require('../newCollection');
 var newQueryContext = require('./query/singleQuery/newQueryContext');
 var purifyStrategy = require('./purifyStrategy');
 
-function toSpan(table,strategy) {
+function toSpan(table, strategy, options) {
 	var span = {};
 	span.aggregates = {};
 	span.legs = newCollection();
 	span.table = table;
-	strategy = purifyStrategy(table, strategy);
+	strategy = purifyStrategy(table, strategy, options);
 	applyStrategy(table,span,strategy);
 	span.queryContext = newQueryContext();
 	span.queryContext.strategy = strategy;
