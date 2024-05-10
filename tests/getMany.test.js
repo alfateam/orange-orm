@@ -517,6 +517,7 @@ describe('getMany with aggregates', () => {
 			customerName: x => x.customer.name,
 			id2: x => x.id,
 			lines: {
+				product: true,
 				id2: x => x.id,
 				numberOfPackages: x => x.count(x => x.packages.id)
 			},
@@ -530,6 +531,7 @@ describe('getMany with aggregates', () => {
 			balance: x => x.min(x => x.customer.balance),
 			customerId2: x => x.sum(x => x.customer.id),
 		});
+		// rows[0].lines[0].
 
 		//mssql workaround because datetime has no time offset
 		for (let i = 0; i < rows.length; i++) {
@@ -576,7 +578,7 @@ describe('getMany with aggregates', () => {
 				balance: 200,
 				customerId2: 2,
 				lines: [
-					{ id2: 3, product: 'Magic wand', id: 3, orderId: 2, numberOfPackages: 1 }
+					{ id2: 3, product: 'Magic wand', id: 3, orderId: 2,  numberOfPackages: 1 }
 				],
 				customer: {
 					id: 2,

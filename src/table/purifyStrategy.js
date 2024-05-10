@@ -11,8 +11,9 @@ function purifyStrategy(table, strategy, columns = new Map()) {
 			continue;
 		else if (table._relations[name])
 			strategy[name] = addLeg(table._relations[name], strategy[name], columns);
-		else if (table[name] && table[name].eq) {
-			columns.set(table[name], strategy[name]);
+		else if (table[name] && table[name].eq ) {
+			if (!columns.has(table[name]))
+				columns.set(table[name], strategy[name]);
 			hasIncludedColumns = hasIncludedColumns || strategy[name];
 		}
 	}
