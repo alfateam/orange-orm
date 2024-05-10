@@ -1,5 +1,7 @@
 
 ## Changelog
+__3.9.1_  
+Bugfix: Crashing on many relations if foreign key column is omitted in strategy.  See [#83](https://github.com/alfateam/rdb/issues/83)  
 __3.9.0__  
 Possible to elevate associated column on a related table to a parent table when fetching.  See https://github.com/alfateam/rdb/#user-content-aggregate-results  
 __3.8.0__  
