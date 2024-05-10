@@ -16,8 +16,10 @@ function _new(table, alias, span, ignoreNulls) {
 		}
 	}
 
+	
 	for (let name in span.aggregates || {}) {
 		sql = sql + separator + span.aggregates[name].expression(name);
+		separator = ',';
 	}
 
 	return sql;

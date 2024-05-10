@@ -7,14 +7,14 @@ function columnAggregate(operator, column, relations) {
 	const outerAlias = 'y' + context.aggregateCount++;
 	const alias = 'x' + relations.length;
 	const foreignKeys = getForeignKeys(relations[0]);
-	const select = ` LEFT JOIN (SELECT ${foreignKeys},${alias}.${column._dbName} as amount`;
+	const select = ` LEFT JOIN (SELECT ${foreignKeys},${operator}(${alias}.${column._dbName}) as amount`;
 	const innerJoin = relations.length > 1 ? newJoin(relations).sql() : '';
 	const onClause = createOnClause(relations[0], outerAlias);
-	const from = ` FROM ${relations.at(-1).childTable._dbName} ${alias} ${innerJoin}) ${outerAlias} ON (${onClause})`;
+	const from = ` FROM ${relations.at(-1).childTable._dbName} ${alias} ${innerJoin} GROUP BY ${foreignKeys}) ${outerAlias} ON (${onClause})`;
 	const join = select  + from ;
 
 	return {
-		expression: (alias) => `COALESCE(${operator}(${outerAlias}.amount), 0) ${alias}`,
+		expression: (alias) => `COALESCE(${outerAlias}.amount, 0) ${alias}`,
 		join: join
 	};
 }

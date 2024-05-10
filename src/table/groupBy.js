@@ -10,7 +10,9 @@ async function groupBy(table, filter, strategy) {
 		filter = filter.and(arg);
 	}
 
-	let span = strategyToSpan(table, strategy, { skipPrimary: true });
+	let span = strategyToSpan(table, strategy);
+	span.columns = new Map();
+
 	let alias = table._dbName;
 
 	const query = newQuery(table, filter, span, alias);

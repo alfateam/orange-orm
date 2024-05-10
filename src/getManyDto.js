@@ -192,6 +192,10 @@ async function decodeRelations(strategy, span, rawRows, resultRows, keys) {
 			for (let i = 0; i < subRows.length; i++) {
 				const key = leg.columns.map(column => subRows[i][column.alias]);
 				const parentRow = getFromMap(rowsMap, table._primaryColumns, key);
+				console.dir('parentRow');
+				console.dir(parentRow);
+				console.dir('name');
+				console.dir(name);
 				parentRow[name].push(subRows[i]);
 			}
 		});

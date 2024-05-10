@@ -362,7 +362,7 @@ type MappedTable<T> = {
 		fetchingStrategy: FS
 	): Promise<StrategyToRowArray<FetchedProperties<T, FS>, T>>;
 
-	aggregate<FS extends AggregateStrategy<T>>(
+	groupBy<FS extends AggregateStrategy<T>>(
 		fetchingStrategy: FS
 	): Promise<StrategyToRowData<FetchedAggregateProperties<T, FS>>[]>;
 
@@ -577,9 +577,6 @@ type AggType<T> = {
 
 type AggregateStrategyBase<T> =
 	{
-		orderBy?:
-		| OrderBy<Extract<keyof AllowedColumns<T>, string>>[]
-		| OrderBy<Extract<keyof AllowedColumns<T>, string>>;
 		limit?: number;
 		offset?: number;
 		where?: (agg: MappedColumnsAndRelations<T>) => RawFilter;

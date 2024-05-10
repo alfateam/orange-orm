@@ -1,4 +1,4 @@
-function purifyStrategy(table, strategy, {skipPrimary, columns = new Map()} = {}) {
+function purifyStrategy(table, strategy, columns = new Map()) {
 	strategy = { ...strategy };
 	for (let p in strategy) {
 		if (strategy[p] === null)
@@ -20,10 +20,10 @@ function purifyStrategy(table, strategy, {skipPrimary, columns = new Map()} = {}
 		let column = table._columns[i];
 		strategy[column.alias] = !hasIncludedColumns;
 	}
-	if (!skipPrimary)
-		table._primaryColumns.forEach(column => {
-			strategy[column.alias] = true;
-		});
+
+	table._primaryColumns.forEach(column => {
+		strategy[column.alias] = true;
+	});
 	columns.forEach((value, key) => strategy[key.alias] = value);
 
 	return strategy;
@@ -42,7 +42,7 @@ function addLeg(relation, strategy, columns) {
 		});
 	}
 	let childTable = relation.childTable;
-	return purifyStrategy(childTable, strategy, {columns: nextColumns});
+	return purifyStrategy(childTable, strategy, nextColumns);
 }
 
 module.exports = purifyStrategy;

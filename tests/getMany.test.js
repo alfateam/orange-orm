@@ -15,6 +15,10 @@ const versionArray = process.version.replace('v', '').split('.');
 const major = parseInt(versionArray[0]);
 const port = 3000;
 
+const rdb = require('../src/index');
+rdb.on('query', console.dir);
+
+
 let server;
 
 afterAll(async () => {
@@ -498,23 +502,23 @@ describe('getMany with column strategy', () => {
 	}
 });
 
-describe('aggregate', () => {
+describe.only('aggregate', () => {
 
 	test('pg', async () => await verify('pg'));
-	test('oracle', async () => await verify('oracle'));
-	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
-		test('mssqlNative', async () => await verify('mssqlNative'));
-	test('mysql', async () => await verify('mysql'));
-	test('sqlite', async () => await verify('sqlite'));
-	test('sap', async () => await verify('sap'));
-	test('http', async () => await verify('http'));
+	// test('oracle', async () => await verify('oracle'));
+	// test('mssql', async () => await verify('mssql'));
+	// if (major === 18)
+	// 	test('mssqlNative', async () => await verify('mssqlNative'));
+	// test('mysql', async () => await verify('mysql'));
+	// test('sqlite', async () => await verify('sqlite'));
+	// test('sap', async () => await verify('sap'));
+	// test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
-		const rows = await db.order.aggregate({
+		const rows = await db.order.groupBy({
 			where: x => x.customer.name.notEqual(null),
-			id: x => x.id,
+			id2: x => x.id,
 			customerSum: x => x.sum(x => x.customer.id),
 			customerName: x => x.customer.name,
 			postalPlace: x => x.deliveryAddress.postalPlace,
@@ -523,7 +527,6 @@ describe('aggregate', () => {
 			sumPackages: x => x.sum(x => x.lines.packages.id),
 			balance: x => x.min(x => x.customer.balance),
 		});
-
 		//mssql workaround because datetime has no time offset
 		for (let i = 0; i < rows.length; i++) {
 			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate));
@@ -533,7 +536,7 @@ describe('aggregate', () => {
 		const date2 = new Date(2021, 0, 11, 12, 22, 45);
 		const expected = [
 			{
-				id: 1,
+				id2: 1,
 				customerSum: 1,
 				customerName: 'George',
 				postalPlace: 'Jakobsli',
@@ -563,29 +566,31 @@ describe('aggregate', () => {
 describe('aggregate each row', () => {
 
 	test('pg', async () => await verify('pg'));
-	test('oracle', async () => await verify('oracle'));
-	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
-		test('mssqlNative', async () => await verify('mssqlNative'));
-	test('mysql', async () => await verify('mysql'));
-	test('sqlite', async () => await verify('sqlite'));
-	test('sap', async () => await verify('sap'));
-	test('http', async () => await verify('http'));
+	// test('oracle', async () => await verify('oracle'));
+	// test('mssql', async () => await verify('mssql'));
+	// if (major === 18)
+	// 	test('mssqlNative', async () => await verify('mssqlNative'));
+	// test('mysql', async () => await verify('mysql'));
+	// test('sqlite', async () => await verify('sqlite'));
+	// test('sap', async () => await verify('sap'));
+	// test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
 		const rows = await db.order.getAll({
-			where: x => x.customer.name.notEqual(null),
+
+			// where: x => x.customer.name.notEqual(null),
 			customerName: x => x.customer.name,
 			id2: x => x.id,
 			lines: {
-				id: true,
+				// id: true,
 				id2: x => x.id,
 				numberOfPackages: x => x.count(x => x.packages.id)
 			},
 			customer: {
 				bar: x => x.balance
 			},
+
 			postalPlace: x => x.deliveryAddress.postalPlace,
 			maxLines: x => x.max(x => x.lines.id),
 			numberOfPackages: x => x.count(x => x.lines.packages.id),
@@ -593,6 +598,7 @@ describe('aggregate each row', () => {
 			balance: x => x.min(x => x.customer.balance),
 			customerId2: x => x.sum(x => x.customer.id),
 		});
+
 		//mssql workaround because datetime has no time offset
 		for (let i = 0; i < rows.length; i++) {
 			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate));

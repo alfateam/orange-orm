@@ -73,7 +73,7 @@ function _new(tableName) {
 		return Promise.resolve().then(() => getManyDto(table, filter, strategy));
 	};
 
-	table.getManyDto = function(filter, strategy) {
+	table.groupBy = function(filter, strategy) {
 		return groupBy(table, filter, strategy);
 	};
 
