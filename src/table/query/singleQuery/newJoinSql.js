@@ -24,8 +24,15 @@ function _new(span,alias = '') {
 
 	span.legs.forEach(onEachLeg);
 
+	const set = new Set();
 	for(let key in span.aggregates) {
-		sql = sql.append(span.aggregates[key].join);
+		const agg = span.aggregates[key];
+		for(let join of agg.joins) {
+			if (!set.has(join)) {
+				sql = sql.append(join);
+				set.add(join);
+			}
+		}
 	}
 
 	return sql;

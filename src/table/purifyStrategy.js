@@ -21,6 +21,7 @@ function purifyStrategy(table, strategy, columns = new Map()) {
 		let column = table._columns[i];
 		strategy[column.alias] = !hasIncludedColumns;
 	}
+
 	table._primaryColumns.forEach(column => {
 		strategy[column.alias] = true;
 	});

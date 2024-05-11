@@ -2,7 +2,7 @@ let newRelatedTable = _newRelatedTable;
 let tryGetSessionContext = require('../tryGetSessionContext');
 
 function newAggregate(_relations) {
-//todo
+
 	function aggregate(fn) {
 		const includeMany = tryGetSessionContext()?.engine === 'mssql';
 		let { relations, alias } = extract(includeMany, _relations);

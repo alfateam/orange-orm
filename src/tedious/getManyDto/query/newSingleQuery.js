@@ -11,9 +11,17 @@ function _new(table, filter, span, alias, subQueries, orderBy, limit, offset) {
 		limit = limit + ' ';
 
 	let join = '';
-	for (let name in span.aggregates || {}) {
-		join = join +  span.aggregates[name].join;
+	const set = new Set();
+	for(let key in span.aggregates) {
+		const agg = span.aggregates[key];
+		for(let sql of agg.joins) {
+			if (!set.has(sql)) {
+				join = join + sql;
+				set.add(sql);
+			}
+		}
 	}
+
 
 	return newParameterized('select ' + limit + columnSql).append(subQueries).append(' from ' + name + ' ' + alias + join).append(whereSql).append(orderBy + offset);
 }

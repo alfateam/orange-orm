@@ -79,8 +79,9 @@ module.exports = function(table, name) {
 		const tableAlias = table._rootAlias || table._dbName;
 		return {
 			expression: (alias) => `${tableAlias}.${c._dbName} ${alias}`,
-			join: '',
-			column: c
+			joins: [''],
+			column: c,
+			groupBy: `${tableAlias}.${c._dbName}`
 		};
 	}
 

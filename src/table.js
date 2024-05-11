@@ -1,28 +1,30 @@
-var newColumn = require('./table/column/newColumn');
-var column = require('./table/column');
-var join = require('./table/join');
-var hasMany = require('./table/hasMany');
-var hasOne = require('./table/hasOne');
-var getMany = require('./table/getMany');
-var count = require('./table/count');
-var getManyDto = require('./table/getManyDto');
-var getById = require('./table/getById');
-var tryGetById = require('./table/tryGetById');
-var tryGetFirst = require('./table/tryGetFirstFromDb');
-var newCache = require('./table/newRowCache');
-var newContext = require('./newObject');
-var insert = require('./table/insert');
-var _delete = require('./table/delete');
-var cascadeDelete = require('./table/cascadeDelete');
-var createReadStream = require('./table/createReadStream');
-var createJSONReadStream = require('./table/createJSONReadStream');
-var getIdArgs = require('./table/getIdArgs');
-var patchTable = require('./patchTable');
-var newEmitEvent = require('./emitEvent');
-var hostLocal = require('./hostLocal');
-var getTSDefinition = require('./getTSDefinition');
-var where = require('./table/where');
-var aggregate = require('./table/aggregate');
+const newColumn = require('./table/column/newColumn');
+const column = require('./table/column');
+const join = require('./table/join');
+const hasMany = require('./table/hasMany');
+const hasOne = require('./table/hasOne');
+const getMany = require('./table/getMany');
+const count = require('./table/count');
+const getManyDto = require('./table/getManyDto');
+const getById = require('./table/getById');
+const tryGetById = require('./table/tryGetById');
+const tryGetFirst = require('./table/tryGetFirstFromDb');
+const newCache = require('./table/newRowCache');
+const newContext = require('./newObject');
+const insert = require('./table/insert');
+const _delete = require('./table/delete');
+const cascadeDelete = require('./table/cascadeDelete');
+const createReadStream = require('./table/createReadStream');
+const createJSONReadStream = require('./table/createJSONReadStream');
+const getIdArgs = require('./table/getIdArgs');
+const patchTable = require('./patchTable');
+const newEmitEvent = require('./emitEvent');
+const hostLocal = require('./hostLocal');
+const getTSDefinition = require('./getTSDefinition');
+const where = require('./table/where');
+const aggregate = require('./table/aggregate');
+const groupBy = require('./table/groupBy');
+
 
 function _new(tableName) {
 	var table = newContext();
@@ -69,6 +71,10 @@ function _new(tableName) {
 	};
 	table.getManyDto = function(filter, strategy) {
 		return Promise.resolve().then(() => getManyDto(table, filter, strategy));
+	};
+
+	table.aggregate = function(filter, strategy) {
+		return groupBy(table, filter, strategy);
 	};
 
 	table.getMany.exclusive = function(filter, strategy) {
@@ -160,7 +166,7 @@ function _new(tableName) {
 	};
 
 	table.where = where(table);
-	table.aggregate = aggregate(table);
+	table._aggregate = aggregate(table);
 
 	return table;
 }
