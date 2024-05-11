@@ -2,7 +2,7 @@ var newJoin = require('./joinSql');
 var getSessionContext = require('../getSessionContext');
 var newJoinCore = require('../query/singleQuery/joinSql/newShallowJoinSqlCore');
 
-function columnAggregate(operator, column, relations) {
+function columnAggregate(operator, column, relations, coalesce = true) {
 	const context = getSessionContext();
 	const outerAlias = 'y' + context.aggregateCount++;
 	const alias = 'x' + relations.length;
@@ -14,8 +14,8 @@ function columnAggregate(operator, column, relations) {
 	const join = select  + from ;
 
 	return {
-		expression: (alias) => `COALESCE(${outerAlias}.amount, 0) ${alias}`,
-		join: join
+		expression: (alias) => coalesce? `COALESCE(${outerAlias}.amount, 0) as ${alias}` : `${outerAlias}.amount as ${alias}`,
+		joins: [join]
 	};
 }
 

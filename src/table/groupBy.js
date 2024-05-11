@@ -17,13 +17,11 @@ async function groupBy(table, filter, strategy) {
 
 	const query = newQuery(table, filter, span, alias);
 	const res = await executeQueries([query]);
-	return decode(strategy, span, await res[0]);
+	return decode(span, await res[0]);
 }
 
 function newCreateRow(span) {
-	let columnsMap = span.columns;
-	const columns = span.table._columns.filter(column => !columnsMap || columnsMap.get(column));
-	const protoRow = createProto(columns, span);
+	const protoRow = createProto(span);
 
 	return createRow;
 
@@ -42,7 +40,7 @@ function createProto(span) {
 }
 
 
-async function decode(strategy, span, rows, keys = rows.length > 0 ? Object.keys(rows[0]) : []) {
+async function decode(span, rows, keys = rows.length > 0 ? Object.keys(rows[0]) : []) {
 	const rowsLength = rows.length;
 	const aggregateKeys = Object.keys(span.aggregates);
 

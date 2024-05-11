@@ -23,10 +23,10 @@ function toSpan(table, strategy) {
 				continue;
 			if (table._relations[name])
 				addLeg(legs,table,strategy,name);
+			else if (strategy[name]?.expression && (strategy[name]?.joins || strategy[name]?.join || strategy[name]?.column))
+				span.aggregates[name] = strategy[name];
 			else if (table[name] && table[name].eq)
 				columns.set(table[name], strategy[name]);
-			else if (strategy[name]?.expression && (strategy[name]?.join || strategy[name]?.column))
-				span.aggregates[name] = strategy[name];
 			else
 				span[name] = strategy[name];
 		}

@@ -14,10 +14,10 @@ function childColumn(column, relations) {
 	const join = select  + from ;
 
 	return {
-		//todo
 		expression: (alias) => `${outerAlias}.prop ${alias}`,
-		join,
-		column
+		joins: [join],
+		column,
+		groupBy:  `${outerAlias}.prop`,
 	};
 }
 

@@ -71,7 +71,6 @@ let _allowedOps = {
 async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, request, response, readonly, disableBulkDeletes, isHttp, client }) {
 	let allowedOps = { ..._allowedOps, insert: !readonly, ...extractRelations(getMeta(table)) };
 	let ops = { ..._ops, ...getCustomFilterPaths(customFilters), getManyDto, getMany, groupBy, count, delete: _delete, cascadeDelete };
-	console.dir(JSONFilter, {depth: Infinity});
 	let res = await parseFilter(JSONFilter, table);
 	if (res === undefined)
 		return {};

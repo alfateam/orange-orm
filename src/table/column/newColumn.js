@@ -78,10 +78,10 @@ module.exports = function(table, name) {
 	function self() {
 		const tableAlias = table._rootAlias || table._dbName;
 		return {
-			//todo
 			expression: (alias) => `${tableAlias}.${c._dbName} ${alias}`,
-			join: '',
-			column: c
+			joins: [''],
+			column: c,
+			groupBy: `${tableAlias}.${c._dbName}`
 		};
 	}
 

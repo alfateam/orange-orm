@@ -5,14 +5,14 @@ const executeQueries = require('./table/executeQueries');
 const newPrimaryKeyFilter = require('./table/newPrimaryKeyFilter');
 const newForeignKeyFilter = require('./table/relation/newForeignKeyFilter');
 
-async function getManyDto(table, filter, strategy) {
+async function getManyDto(table, filter, strategy, spanFromParent) {
 	filter = negotiateRawSqlFilter(filter, table);
 	if (strategy && strategy.where) {
 		let arg = typeof strategy.where === 'function' ? strategy.where(table) : strategy.where;
 		filter = filter.and(arg);
 	}
 
-	let span = strategyToSpan(table, strategy);
+	let span = spanFromParent || strategyToSpan(table, strategy);
 	let alias = table._dbName;
 
 	const query = newQuery(table, filter, span, alias);
@@ -188,14 +188,10 @@ async function decodeRelations(strategy, span, rawRows, resultRows, keys) {
 		const relation = table._relations[name];
 		const filter = createOneFilter(relation, span._ids, resultRows, table);
 		const rowsMap = span._rowsMap;
-		const p = getManyDto(relation.childTable, filter, strategy[name]).then(subRows => {
+		const p = getManyDto(relation.childTable, filter, strategy[name], leg.span).then(subRows => {
 			for (let i = 0; i < subRows.length; i++) {
 				const key = leg.columns.map(column => subRows[i][column.alias]);
 				const parentRow = getFromMap(rowsMap, table._primaryColumns, key);
-				console.dir('parentRow');
-				console.dir(parentRow);
-				console.dir('name');
-				console.dir(name);
 				parentRow[name].push(subRows[i]);
 			}
 		});
