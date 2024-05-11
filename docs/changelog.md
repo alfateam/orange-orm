@@ -1,5 +1,7 @@
 
 ## Changelog
+__3.10.0_  
+Aggregate functions  
 __3.9.1_  
 Bugfix: Crashing on many relations if foreign key column is omitted in strategy.  See [#83](https://github.com/alfateam/rdb/issues/83)  
 __3.9.0__  
