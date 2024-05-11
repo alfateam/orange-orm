@@ -73,7 +73,7 @@ function _new(tableName) {
 		return Promise.resolve().then(() => getManyDto(table, filter, strategy));
 	};
 
-	table.groupBy = function(filter, strategy) {
+	table.aggregate = function(filter, strategy) {
 		return groupBy(table, filter, strategy);
 	};
 
@@ -166,7 +166,7 @@ function _new(tableName) {
 	};
 
 	table.where = where(table);
-	table.aggregate = aggregate(table);
+	table._aggregate = aggregate(table);
 
 	return table;
 }

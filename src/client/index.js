@@ -184,7 +184,7 @@ function rdbClient(options = {}) {
 		let c = {
 			count,
 			getMany,
-			groupBy,
+			aggregate: groupBy,
 			getAll,
 			getOne,
 			getById,
@@ -233,7 +233,7 @@ function rdbClient(options = {}) {
 		async function groupBy(strategy) {
 			let args = negotiateGroupBy(null, strategy);
 			let body = stringify({
-				path: 'groupBy',
+				path: 'aggregate',
 				args
 			});
 			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
@@ -868,7 +868,7 @@ function aggregate(path, arg) {
 			if (property in c)
 				return Reflect.get(...arguments);
 			else {
-				subColumn = column(path + 'aggregate');
+				subColumn = column(path + 'aggregates');
 				return column(property);
 			}
 		}
@@ -886,19 +886,19 @@ function aggregate(path, arg) {
 
 
 	function sum(fn) {
-		return column(path + 'aggregate')(fn(column('')).groupSum());
+		return column(path + '_aggregate')(fn(column('')).groupSum());
 	}
 	function avg(fn) {
-		return column(path + 'aggregate')(fn(column('')).groupAvg());
+		return column(path + '_aggregate')(fn(column('')).groupAvg());
 	}
 	function max(fn) {
-		return column(path + 'aggregate')(fn(column('')).groupMax());
+		return column(path + '_aggregate')(fn(column('')).groupMax());
 	}
 	function min(fn) {
-		return column(path + 'aggregate')(fn(column('')).groupMin());
+		return column(path + '_aggregate')(fn(column('')).groupMin());
 	}
 	function count(fn) {
-		return column(path + 'aggregate')(fn(column('')).groupCount());
+		return column(path + '_aggregate')(fn(column('')).groupCount());
 	}
 }
 
@@ -917,7 +917,7 @@ function groupByAggregate(path, arg) {
 			if (property in c)
 				return Reflect.get(...arguments);
 			else {
-				subColumn = column(path + 'aggregate');
+				subColumn = column(path + '_aggregate');
 				return column(property);
 			}
 		}
@@ -935,19 +935,19 @@ function groupByAggregate(path, arg) {
 
 
 	function sum(fn) {
-		return column(path + 'aggregate')(fn(column('')).sum());
+		return column(path + '_aggregate')(fn(column('')).sum());
 	}
 	function avg(fn) {
-		return column(path + 'aggregate')(fn(column('')).avg());
+		return column(path + '_aggregate')(fn(column('')).avg());
 	}
 	function max(fn) {
-		return column(path + 'aggregate')(fn(column('')).max());
+		return column(path + '_aggregate')(fn(column('')).max());
 	}
 	function min(fn) {
-		return column(path + 'aggregate')(fn(column('')).min());
+		return column(path + '_aggregate')(fn(column('')).min());
 	}
 	function count(fn) {
-		return column(path + 'aggregate')(fn(column('')).count());
+		return column(path + '_aggregate')(fn(column('')).count());
 	}
 }
 

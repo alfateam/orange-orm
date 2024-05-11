@@ -29,7 +29,7 @@ function newRelatedTable(relations, isShallow, depth = 0) {
 
 	//todo
 	// @ts-ignore
-	c.aggregate = aggregate(relations);
+	c._aggregate = aggregate(relations);
 
 	Object.defineProperty(c, '_relation', {
 		value: relations[relations.length - 1],
