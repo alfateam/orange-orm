@@ -1756,7 +1756,7 @@ async function getRows() {
 
 <details><summary><strong>Aggregate functions</strong></summary>
 
-You can count records and aggregate numerical columns.  This can either be done for all rows or for associcated columns for each row.  
+You can count records and aggregate numerical columns.  This can either be done across rows or separately for each row.  
 Supported functions include:
 - count
 - sum
@@ -1765,7 +1765,7 @@ Supported functions include:
 - avg  
 
 __On each row__  
-For each row we are counting the number of lines.  
+In this example, we are counting the number of lines for each order.  This is represented as the property <i>numberOfLines</i>. You can call these aggregated properties whatever you want.  
 You can also elevate associated data to the a parent level for easier access. In the example below, <i>balance</i> of the customer is elevated to the root level.
 
 ```javascript
@@ -1782,8 +1782,28 @@ async function getRows() {
 }
 ```
 __Across all rows__  
-<p>Currently there is only the <strong><i>count</i></strong> aggregate available.</p>
+The aggregate function effeciently groups data together.
+In this particular example , for each customer, it counts the number of lines associated with their orders and calculates the total amount of these lines.  
+Under the hood, it will run an sql group by customerId and customerName.
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
 
+getAggregates();
+
+async function getAggregates() {
+  const orders = await db.order.aggregate({
+    where: x => x.orderDate.greaterThan(new Date(2022, 0, 11, 9, 24, 47)),
+    customerId: x => x.customerId,
+    customerName: x => x.customer.name,
+    numberOfLines: x => x.count(x => x.lines.id),
+    totals: x => x.sum(x => lines.amount)    
+  });
+}
+```
+
+__Count__  
+For convenience, you can use the <i>count</i> directly on the table instead of using the aggregated query syntax in the previous example.
 ```javascript
 import map from './map';
 const db = map.sqlite('demo.db');
