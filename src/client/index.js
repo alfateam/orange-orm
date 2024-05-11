@@ -868,7 +868,7 @@ function aggregate(path, arg) {
 			if (property in c)
 				return Reflect.get(...arguments);
 			else {
-				subColumn = column(path + 'aggregates');
+				subColumn = column(path + '_aggregate');
 				return column(property);
 			}
 		}
