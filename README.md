@@ -1803,7 +1803,7 @@ async function getAggregates() {
 ```
 
 __Count__  
-For convenience, you can use the <i>count</i> directly on the table instead of using the aggregated query syntax in the previous example.
+For convenience, you can use the <i>count</i> directly on the table instead of using the aggregated query syntax.
 ```javascript
 import map from './map';
 const db = map.sqlite('demo.db');
