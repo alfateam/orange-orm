@@ -510,7 +510,7 @@ describe('aggregate', () => {
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
-		const rows = await db.order.groupBy({
+		const rows = await db.order.aggregate({
 			where: x => x.customer.name.notEqual(null),
 			customerId: x => x.customerId,
 			customerName: x => x.customer.name,
