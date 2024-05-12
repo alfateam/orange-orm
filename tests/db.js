@@ -74,7 +74,7 @@ const map = rdb.map(x => ({
 		id: column('id').numeric().primary().notNullExceptInsert(),
 		orderId: column('orderId').numeric(),
 		product: column('product').string(),
-		amount: column('amount').numeric(),
+		amount: column('amount').numeric().notNull(),
 	})),
 
 	deliveryAddress: x.table('deliveryAddress').map(({ column }) => ({
