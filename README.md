@@ -556,9 +556,23 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
+  const orders = await db.order.getAll({
+    where: x => x.lines.any(line => line.product.contains('i'))
+      .and(x.customer.balance.greaterThan(180)),
+    customer: true, 
+    deliveryAddress: true, 
+    lines: true
+  });
+}
+```
+You can also use the alternative syntax for the `where-filter`. This way, the filter can be constructed independently from the fetching strategy. Keep in mind that you must use the `getMany` method instead of the `getAll` method.  
+It is also possible to combine `where-filter` with the independent filter when using the `getMany` method.  
+```javascript
+async function getRows() {
   const filter = db.order.lines.any(line => line.product.contains('i'))
                  .and(db.order.customer.balance.greaterThan(180));
   const orders = await db.order.getMany(filter, {
+    //where: x => ... can be combined as well
     customer: true, 
     deliveryAddress: true, 
     lines: true
@@ -575,6 +589,19 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
+  const order = await db.order.getOne(undefined /* optional filter */, {
+    where: x => x.order.customer(customer => customer.isActive.eq(true)
+                 .and(customer.startsWith('Harr'))),
+    customer: true, 
+    deliveryAddress: true, 
+    lines: true
+  });
+}
+```
+You can use also the alternative syntax for the `where-filter`. This way, the filter can be constructed independently from the fetching strategy.    
+It is also possible to combine `where-filter` with the independent filter when using the `getOne` method.  
+```javascript
+async function getRows() {
   const filter = db.order.customer(customer => customer.isActive.eq(true)
                  .and(customer.startsWith('Harr')));
                  //equivalent, but creates slighly different sql:
@@ -585,6 +612,7 @@ async function getRows() {
     lines: true
   });
 }
+```
 ```
 
 __Single row by primary key__
@@ -913,9 +941,10 @@ const db = map.sqlite('demo.db');
 
 deleteRows();
 
-async function deleteRows() {
-  const filter = db.order.customer.name.eq('George');
-  let orders = await db.order.getMany(filter);
+async function deleteRows() {  
+  let orders = await db.order.getAll({
+    where: x => x.customer.name.eq('George')
+  });
 
   await orders.delete();
 }
@@ -929,8 +958,8 @@ const db = map.sqlite('demo.db');
 deleteRows();
 
 async function deleteRows() {
-  const filter = db.order.deliveryAddress.name.eq('George');
-  let orders = await db.order.getMany(filter, {
+  let orders = await db.order.getAll({
+    where: x => x.deliveryAddress.name.eq('George'),
     customer: true, 
     deliveryAddress: true, 
     lines: true
@@ -1021,12 +1050,9 @@ const db = map.http('http://localhost:3000/rdb');
 updateRows();
 
 async function updateRows() {
-  const filter = db.order.lines.any(
-    line => line.product.startsWith('Magic wand'))
-    .and(db.order.customer.name.startsWith('Harry')
-  );
-
-  const order = await db.order.getOne(filter, {
+  const order = await db.order.getOne(undefined, {
+    where: x => x.lines.any(line => line.product.startsWith('Magic wand'))
+      .and(x.customer.name.startsWith('Harry'),
     lines: true
   });
   
@@ -1109,12 +1135,9 @@ async function updateRows() {
     }
   );
 
-  const filter = db.order.lines.any(
-    line => line.product.startsWith('Magic wand'))
-    .and(db.order.customer.name.startsWith('Harry')
-  );
-
-  const order = await db.order.getOne(filter, {
+  const order = await db.order.getOne(undefined, {
+    where: x => x.lines.any(line => line.product.startsWith('Magic wand'))
+      .and(db.order.customer.name.startsWith('Harry')),
     lines: true
   });
   
@@ -1184,9 +1207,9 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const filter = db.customer.name.equal('Harry');
-
-  const rows = await db.customer.getMany(filter);
+  const rows = await db.customer.getAll({
+    where x => x.name.equal('Harry')
+  });
 }
 ```
 __Not equal__  
@@ -1197,9 +1220,9 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const filter = db.customer.name.notEqual('Harry');
-
-  const rows = await db.customer.getMany(filter);
+  const rows = await db.customer.getAll({
+    where x => x.name.notEqual('Harry')
+  });
 }
 ```
 __Contains__  
@@ -1210,9 +1233,9 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const filter = db.customer.name.contains('arr');
-
-  const rows = await db.customer.getMany(filter);
+  const rows = await db.customer.getAll({
+    where: x => x.name.contains('arr')
+  });
 }
 ```
 __Starts with__  
@@ -1225,7 +1248,9 @@ getRows();
 async function getRows() {
   const filter = db.customer.name.startsWith('Harr');
 
-  const rows = await db.customer.getMany(filter);
+  const rows = await db.customer.getAll({
+    where: x => x.name.startsWith('Harr')
+  });
 }
 ```
 __Ends with__  
@@ -1236,9 +1261,9 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const filter = db.customer.name.endsWith('arry');
-
-  const rows = await db.customer.getMany(filter);
+  const rows = await db.customer.getAll({
+    where: x => x.name.endsWith('arry')
+  });
 }
 ```
 __Greater than__  
@@ -1249,9 +1274,9 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const filter = db.order.orderDate.greaterThan('2023-07-14T12:00:00');
-
-  const rows = await db.order.getMany(filter);
+  const rows = await db.order.getAll({
+    where: x => x.orderDate.greaterThan('2023-07-14T12:00:00')
+  });
 }
 ```
 __Greater than or equal__  
@@ -1262,9 +1287,9 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const filter = db.order.orderDate.greaterThanOrEqual('2023-07-14T12:00:00');
-
-  const rows = await db.order.getMany(filter);
+  const rows = await db.order.getAll({
+    where: x => x.orderDate.greaterThanOrEqual('2023-07-14T12:00:00')
+  });
 }
 ```
 __Less than__  
@@ -1275,9 +1300,9 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const filter = db.order.orderDate.lessThan('2024-07-14T12:00:00');
-
-  const rows = await db.order.getMany(filter);
+  const rows = await db.order.getAll({
+    where: x => x.orderDate.lessThan('2023-07-14T12:00:00')
+  });
 }
 ```
 __Less than or equal__  
@@ -1288,9 +1313,9 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const filter = db.order.orderDate.lessThanOrEqual('2024-07-14T12:00:00');
-
-  const rows = await db.order.getMany(filter);
+  const rows = await db.order.getAll({
+    where: x => x.orderDate.lessThanOrEqual('2023-07-14T12:00:00')
+  });
 }
 ```
 __Between__  
@@ -1301,9 +1326,9 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const filter = db.order.orderDate.between('2023-07-14T12:00:00', '2024-07-14T12:00:00');
-
-  const rows = await db.order.getMany(filter);
+  const rows = await db.order.getAll({
+    where: x => x.orderDate.between('2023-07-14T12:00:00', '2024-07-14T12:00:00')
+  });
 }
 ```
 __In__  
@@ -1314,9 +1339,10 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const filter = db.customer.name.in('George', 'Harry');
+  const rows = await db.order.getAll({
+    where: x => x.customer.name.in('George', 'Harry')
+  });
 
-  const rows = await db.customer.getMany(filter);
 }
 ```
 __Raw sql filter__  
@@ -1334,10 +1360,14 @@ async function getRows() {
     sql: 'name like ?',
     parameters: ['%arry']
   };                 
-  const combinedFilter = db.customer.balance.greaterThan(100).and(rawFilter);
   
-  const rowsWithRaw = await db.customer.getMany(rawFilter);
-  const rowsWithCombined = await db.customer.getMany(combinedFilter);  
+  const rowsWithRaw = await db.customer.getAll({
+    where: () => rawFilter
+  });
+
+  const rowsWithCombined = await db.customer.getAll({
+    where: x => x.balance.greaterThan(100).and(rawFilter)
+  });  
 }
 ```
 
@@ -1375,11 +1405,10 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const nameFilter = db.order.customer.name.equal('Harry');
-  const dateFilter = db.order.orderDate.greaterThan('2023-07-14T12:00:00');
-  const filter = nameFilter.and(dateFilter);
-
-  const rows = await db.order.getMany(filter);  
+  const rows = await db.order.getAll({
+    where: x => x.customer.name.equal('Harry')
+      .and(x.orderDate.greaterThan('2023-07-14T12:00:00'))
+  });  
 }
 ```
 __Or__  
@@ -1390,9 +1419,11 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const filter = db.order.customer(x => x.name.equal('George').or(x.name.equal('Harry')));
 
-  const rows = await db.order.getMany(filter);  
+  const rows = await db.order.getAll({
+    where: y => y.customer( x => x.name.equal('George')
+      .or(x.name.equal('Harry')))
+  });  
 }
 ```
 __Not__  
@@ -1403,10 +1434,12 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const filter = db.order.customer(x => x.name.equal('George').or(x.name.equal('Harry'))).not();
   //Neither George nor Harry
-
-  const rows = await db.order.getMany(filter);  
+  const rows = await db.order.getAll({
+    where: y => y.customer(x => x.name.equal('George')
+        .or(x.name.equal('Harry')))
+      .not()
+  });  
 }
 ```
 __Exists__  
@@ -1417,9 +1450,9 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const filter = db.order.deliveryAddress.exists();
-
-  const rows = await db.order.getMany(filter);  
+  const rows = await db.order.getAll({
+    where: x => x.deliveryAddress.exists()
+  });  
 }
 ```
 
@@ -1442,7 +1475,9 @@ async function getRows() {
   //equivalent syntax:
   // const filter = db.order.lines.product.contains('guitar');
 
-  const rows = await db.order.getMany(filter);  
+  const rows = await db.order.getAll({
+    where: y => y.lines.any(x => x.product.contains('guitar'))
+  });  
 }
 ```
 __All__  
@@ -1454,9 +1489,9 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const filter = db.order.lines.all(x => x.product.contains('a'));
-
-  const rows = await db.order.getMany(filter);  
+  const rows = await db.order.getAll({
+    where: y => y.lines.all(x => x.product.contains('a'))
+  });  
 }
 ```
 __None__  
@@ -1468,9 +1503,9 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const filter = db.order.lines.none(x => x.product.equal('Magic wand'));
-
-  const rows = await db.order.getMany(filter);  
+  const rows = await db.order.getAll({
+    where: y => y.lines.none(x => x.product.equal('Magic wand'))
+  });  
 }
 ```
 
