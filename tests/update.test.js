@@ -181,8 +181,8 @@ describe('update multiple in array', () => {
 					countryCode: 'NO'
 				},
 				lines: [
-					{ product: 'Bicycle', id: 1, orderId: 1 },
-					{ product: 'Big guitar', id: 2, orderId: 1 }
+					{ product: 'Bicycle', amount: null, id: 1, orderId: 1 },
+					{ product: 'Big guitar', amount: null, id: 2, orderId: 1 }
 				]
 			},
 			{
@@ -197,8 +197,8 @@ describe('update multiple in array', () => {
 				orderDate: dateToISOString(date2),
 				deliveryAddress: null,
 				lines: [
-					{ product: 'Magic wand', id: 3, orderId: 2 },
-					{ product: 'Cloak of invisibility', id: 4, orderId: 2 }
+					{ product: 'Magic wand', amount: null, id: 3, orderId: 2 },
+					{ product: 'Cloak of invisibility', amount: null, id: 4, orderId: 2 }
 				]
 			}
 		];

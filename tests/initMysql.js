@@ -36,7 +36,7 @@ CREATE TABLE orderLine (
     id INTEGER AUTO_INCREMENT PRIMARY KEY,
     orderId INTEGER REFERENCES torder,
     product TEXT,
-    amount DECIMAL(10,2)
+    amount DECIMAL(10,2) NULL
 );
 
 CREATE TABLE package (

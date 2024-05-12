@@ -38,7 +38,7 @@ CREATE TABLE orderLine (
     id SERIAL PRIMARY KEY,
     orderId INTEGER REFERENCES torder,
     product TEXT,
-    amount NUMERIC(10,2)
+    amount NUMERIC(10,2) NULL
 );
 
 CREATE TABLE package (

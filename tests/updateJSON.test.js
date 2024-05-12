@@ -144,10 +144,10 @@ describe('update with JSON diff', () => {
 				countryCode: 'NO'
 			},
 			lines: [
-				{ id: 1, orderId: 1, product: 'Bicycle' },
-				{ id: 2, orderId: 1, product: 'Small guitar' },
-				{ id: 4, orderId: 1, product: 'meantime' },
-				{ id: 5, orderId: 1, product: 'new product' },
+				{ id: 1, orderId: 1, amount: null, product: 'Bicycle' },
+				{ id: 2, orderId: 1, amount: null, product: 'Small guitar' },
+				{ id: 4, orderId: 1, amount: null, product: 'meantime' },
+				{ id: 5, orderId: 1, amount: null, product: 'new product' },
 			]
 		};
 

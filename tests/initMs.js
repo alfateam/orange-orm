@@ -43,7 +43,7 @@ CREATE TABLE orderLine (
     id int IDENTITY(1,1) PRIMARY KEY,
     orderId INTEGER REFERENCES torder,
     product VARCHAR(100),
-    amount DECIMAL(10,2)
+    amount DECIMAL(10,2) NULL
 );
 CREATE TABLE package (
     packageId int IDENTITY(1,1) PRIMARY KEY,
