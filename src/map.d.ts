@@ -1,5 +1,5 @@
 import type { Options } from 'ajv';
-import type { ConnectionConfig } from 'tedious';
+import type { ConnectionConfiguration } from 'tedious';
 import type { PoolAttributes } from 'oracledb';
 import type { AxiosInterceptorManager, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 
@@ -32,7 +32,7 @@ type DbConnectable<T> = {
 	postgres(connectionString: string, options?: PoolOptions): MappedDbInstance<T>;
 	sqlite(connectionString: string, options?: PoolOptions): MappedDbInstance<T>;
 	sap(connectionString: string, options?: PoolOptions): MappedDbInstance<T>;
-	mssql(connectionConfig: ConnectionConfig, options?: PoolOptions): MappedDbInstance<T>;
+	mssql(connectionConfig: ConnectionConfiguration, options?: PoolOptions): MappedDbInstance<T>;
 	mssql(connectionString: string, options?: PoolOptions): MappedDbInstance<T>;
 	mssqlNative(connectionString: string, options?: PoolOptions): MappedDbInstance<T>;
 	mysql(connectionString: string, options?: PoolOptions): MappedDbInstance<T>;
@@ -62,7 +62,7 @@ interface Connectors {
 	postgres(connectionString: string, options?: PoolOptions): Pool;
 	sqlite(connectionString: string, options?: PoolOptions): Pool;
 	sap(connectionString: string, options?: PoolOptions): Pool;
-	mssql(connectionConfig: ConnectionConfig, options?: PoolOptions): Pool;
+	mssql(connectionConfig: ConnectionConfiguration, options?: PoolOptions): Pool;
 	mssql(connectionString: string, options?: PoolOptions): Pool;
 	oracle(config: PoolAttributes, options?: PoolOptions): Pool;
 }
