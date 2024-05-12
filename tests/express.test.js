@@ -138,8 +138,8 @@ describe('express update with basefilter and interceptors', () => {
 		);
 
 		const filter = db.order.lines.exists();
-		let row = await db.order.getOne(filter, { lines: { orderBy: 'id' }, customer: true, deliveryAddress: true });
-		row.lines.push({ product: 'Broomstick' });
+		let row = await db.order.getById(2, { lines: true});
+		row.lines.push({ product: 'Broomstick', amount: 300 });
 		await row.saveChanges();
 		await row.refresh();
 

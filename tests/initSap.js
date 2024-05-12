@@ -115,7 +115,8 @@ GO
 CREATE TABLE orderLine (
     id int IDENTITY PRIMARY KEY,
     orderId INTEGER REFERENCES torder,
-    product VARCHAR(100)
+    product VARCHAR(100),
+    amount NUMERIC(10,2)
 )
 
 GO

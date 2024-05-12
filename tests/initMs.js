@@ -42,7 +42,8 @@ CREATE TABLE torder (
 CREATE TABLE orderLine (
     id int IDENTITY(1,1) PRIMARY KEY,
     orderId INTEGER REFERENCES torder,
-    product VARCHAR(100)
+    product VARCHAR(100),
+    amount DECIMAL(10,2)
 );
 CREATE TABLE package (
     packageId int IDENTITY(1,1) PRIMARY KEY,

@@ -70,12 +70,14 @@ beforeAll(async () => {
 				lines: [
 					{
 						product: 'Bicycle',
+						amount: 678.90,
 						packages: [
 							{ sscc: 'aaaa' }
 						]
 					},
 					{
 						product: 'Small guitar',
+						amount: 123.45,
 						packages: [
 							{ sscc: 'bbbb' }
 						]
@@ -95,6 +97,7 @@ beforeAll(async () => {
 				lines: [
 					{
 						product: 'Magic wand',
+						amount: 300,
 						packages: [
 							{ sscc: '1234' }
 						]
@@ -574,6 +577,7 @@ describe('aggregate each row', () => {
 			numberOfPackages: x => x.count(x => x.lines.packages.id),
 			sumPackages: x => x.sum(x => x.lines.packages.id),
 			balance: x => x.min(x => x.customer.balance),
+			totalAmount: x => x.sum(x => x.lines.amount),
 			customerId2: x => x.sum(x => x.customer.id),
 		});
 
@@ -595,6 +599,7 @@ describe('aggregate each row', () => {
 				numberOfPackages: 2,
 				sumPackages: 3,
 				balance: 177,
+				totalAmount: 802.35,
 				customerId2: 1,
 				lines: [
 					{ id2: 1, product: 'Bicycle', id: 1, orderId: 1, numberOfPackages: 1 },
@@ -619,6 +624,7 @@ describe('aggregate each row', () => {
 				numberOfPackages: 1,
 				sumPackages: 3,
 				balance: 200,
+				totalAmount: 300,
 				customerId2: 2,
 				lines: [
 					{ id2: 3, product: 'Magic wand', id: 3, orderId: 2,  numberOfPackages: 1 }
@@ -681,8 +687,8 @@ describe('getMany with relations', () => {
 					countryCode: 'NO'
 				},
 				lines: [
-					{ product: 'Bicycle', id: 1, orderId: 1 },
-					{ product: 'Small guitar', id: 2, orderId: 1 }
+					{ product: 'Bicycle', id: 1, amount: 678.90, orderId: 1 },
+					{ product: 'Small guitar', id: 2, amount: 123.45, orderId: 1 }
 				]
 			},
 			{
@@ -705,7 +711,7 @@ describe('getMany with relations', () => {
 					countryCode: 'UK'
 				},
 				lines: [
-					{ product: 'Magic wand', id: 3, orderId: 2 }
+					{ product: 'Magic wand', id: 3, amount: 300, orderId: 2 }
 				]
 			}
 		];
@@ -754,7 +760,7 @@ describe('getMany with filtered relations', () => {
 				customerId: 1,
 				customer: null,
 				lines: [
-					{ product: 'Bicycle', id: 1, orderId: 1 },
+					{ product: 'Bicycle', id:1,  amount: 678.9, orderId: 1 },
 				]
 			},
 			{
@@ -777,7 +783,7 @@ describe('getMany with filtered relations', () => {
 					countryCode: 'UK'
 				},
 				lines: [
-					{ product: 'Magic wand', id: 3, orderId: 2 }
+					{ product: 'Magic wand', amount: 300, id: 3, orderId: 2 }
 				]
 			}
 		];

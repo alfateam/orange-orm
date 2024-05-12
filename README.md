@@ -71,6 +71,7 @@ const map = rdb.map(x => ({
     id: column('id').numeric().primary(),
     orderId: column('orderId').numeric(),
     product: column('product').string(),
+    amount: column('amount').numeric(),
   })),
 
   deliveryAddress: x.table('deliveryAddress').map(({ column }) => ({
@@ -106,7 +107,8 @@ async function updateRow() {
     lines: true
   });
   order.lines.push({
-    product: 'broomstick'
+    product: 'broomstick',
+    amount: 300
   });
 
   await order.saveChanges();
@@ -122,17 +124,13 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const filter = db.order.lines.any(
-    line => line.product.contains('broomstick'))
-    .and(db.order.customer.name.startsWith('Harry'));
-  
-  const orders = await db.order.getMany(filter, {
+  const orders = await db.order.getAll({
+    where: x => x.lines.any(line => line.product.contains('broomstick'))
+      .and(db.order.customer.name.startsWith('Harry')),
     lines: true,
     deliveryAddress: true,
     customer: true
-  });
-  
-  console.dir(orders, { depth: Infinity });
+  });  
 }
 
 ```
@@ -220,7 +218,8 @@ CREATE TABLE _order (
 CREATE TABLE orderLine (
     id INTEGER PRIMARY KEY,
     orderId INTEGER REFERENCES _order,
-    product TEXT
+    product TEXT,
+    amount NUMERIC(10,2)
 );
 
 CREATE TABLE deliveryAddress (
@@ -403,8 +402,8 @@ async function insertRows() {
         countryCode: 'NO'
       },
       lines: [
-        { product: 'Bicycle' },
-        { product: 'Small guitar' }
+        { product: 'Bicycle', amount: 250 },
+        { product: 'Small guitar', amount: 150 }
       ]
     },
     {
@@ -418,7 +417,7 @@ async function insertRows() {
         countryCode: 'UK'
       },
       lines: [
-        { product: 'Magic wand' }
+        { product: 'Magic wand', amount: 300 }
       ]
     }
   ], {customer: true, deliveryAddress: true, lines: true}); //fetching strategy
@@ -542,6 +541,7 @@ getRows();
 async function getRows() {
   const orders = await db.order.getAll({
     numberOfLines: x => x.count(x => x.lines.id),
+    totalAmount: x => x.sum(x => lines.amount),
     balance: x => x.customer.balance
   });
 }
@@ -646,7 +646,7 @@ async function update() {
 
   order.orderDate = new Date();
   order.deliveryAddress = null;
-  order.lines.push({product: 'Cloak of invisibility'});
+  order.lines.push({product: 'Cloak of invisibility', amount: 600});
 
   await order.saveChanges();
 }
@@ -674,7 +674,7 @@ async function update() {
   orders[1].orderDate = '2023-07-14T12:00:00'; //iso-string is allowed
   orders[1].deliveryAddress = null;
   orders[1].customer = null;
-  orders[1].lines.push({product: 'Cloak of invisibility'});
+  orders[1].lines.push({product: 'Cloak of invisibility', amount: 600});
 
   await orders.saveChanges();
 }
@@ -703,9 +703,9 @@ async function update() {
       countryCode: 'NO'
     },
     lines: [
-      { id: 1, product: 'Bicycle' },
-      { id: 2, product: 'Small guitar' },
-      { product: 'Piano' } //the new line to be inserted
+      { id: 1, product: 'Bicycle', amount: 250 },
+      { id: 2, product: 'Small guitar', amount: 150 },
+      { product: 'Piano', amount: 800 } //the new line to be inserted
     ]
   };
 
@@ -738,14 +738,14 @@ async function update() {
       countryCode: 'NO'
     },
     lines: [
-      { id: 1, product: 'Bicycle' },
-      { id: 2, product: 'Small guitar' }
+      { id: 1, product: 'Bicycle', amount: 250 },
+      { id: 2, product: 'Small guitar', amount: 150 }
     ]
   };
 
   const modified = JSON.parse(JSON.stringify(original));
   deliveryAddress.name = 'Roger';
-  modified.lines.push({ product: 'Piano' });
+  modified.lines.push({ product: 'Piano', amount: 800 });
 
   const order = await db.order.updateChanges(modified, original, { customer: true, deliveryAddress: true, lines: true });
 }
@@ -775,7 +775,7 @@ async function update() {
 
   order.orderDate = new Date();
   order.deliveryAddress = null;
-  order.lines.push({product: 'Cloak of invisibility'});
+  order.lines.push({product: 'Cloak of invisibility',  amount: 600});
 
   await order.saveChanges( {
     orderDate: {
@@ -875,7 +875,8 @@ async function updateInsertDelete() {
 
   //will add line to the first order
   orders[0].lines.push({
-    product: 'secret weapon'
+    product: 'secret weapon',
+    amount: 355
   });
   
   //will delete second row
@@ -895,7 +896,7 @@ async function updateInsertDelete() {
       countryCode: 'NO'
     },
     lines: [
-      { product: 'Magic tent' }
+      { product: 'Magic tent', amount: 349 }
     ]
   });
 
@@ -1030,7 +1031,8 @@ async function updateRows() {
   });
   
   order.lines.push({
-    product: 'broomstick'
+    product: 'broomstick',
+    amount: 300,
   });
 
   await order.saveChanges();
@@ -1117,7 +1119,8 @@ async function updateRows() {
   });
   
   order.lines.push({
-    product: 'broomstick'
+    product: 'broomstick',
+    amount: 300
   });
 
   await order.saveChanges();
@@ -1765,7 +1768,7 @@ Supported functions include:
 - avg  
 
 __On each row__  
-In this example, we are counting the number of lines for each order.  This is represented as the property <i>numberOfLines</i>. You can call these aggregated properties whatever you want.  
+In this example, we are counting the number of lines calculating total amount for each order.  This is represented as the property <i>numberOfLines</i>. You can call these aggregated properties whatever you want.  
 You can also elevate associated data to the a parent level for easier access. In the example below, <i>balance</i> of the customer is elevated to the root level.
 
 ```javascript
@@ -1777,6 +1780,7 @@ getRows();
 async function getRows() {
   const orders = await db.order.getAll({
     numberOfLines: x => x.count(x => x.lines.id),
+    totalAmount: x => x.sum(x => lines.amount),
     balance: x => x.customer.balance
   });
 }
@@ -1883,7 +1887,8 @@ async function updateRow() {
     lines: true
   });
   order.lines.push({
-    product: 'broomstick'
+    product: 'broomstick',
+    amount: 300,
   });
 
   await order.saveChanges();
@@ -1894,13 +1899,13 @@ output:
 ```bash
 BEGIN
 select  _order.id as s_order0,_order.orderDate as s_order1,_order.customerId as s_order2 from _order _order where _order.id=2 order by _order.id limit 1
-select  orderLine.id as sorderLine0,orderLine.orderId as sorderLine1,orderLine.product as sorderLine2 from orderLine orderLine where orderLine.orderId in (2) order by orderLine.id
+select  orderLine.id as sorderLine0,orderLine.orderId as sorderLine1,orderLine.product as sorderLine2,orderLine.amount as sorderLine3 from orderLine orderLine where orderLine.orderId in (2) order by orderLine.id
 COMMIT
 BEGIN
 select  _order.id as s_order0,_order.orderDate as s_order1,_order.customerId as s_order2 from _order _order where _order.id=2 order by _order.id limit 1
-INSERT INTO orderLine (orderId,product) VALUES (2,?)
+INSERT INTO orderLine (orderId,product,amount) VALUES (2,?,300)
 [ 'broomstick' ]
-SELECT id,orderId,product FROM orderLine WHERE rowid IN (select last_insert_rowid())
+SELECT id,orderId,product,amount FROM orderLine WHERE rowid IN (select last_insert_rowid())
 select  orderLine.id as sorderLine0,orderLine.orderId as sorderLine1,orderLine.product as sorderLine2 from orderLine orderLine where orderLine.orderId in (2) order by orderLine.id
 COMMIT
 ```

@@ -24,7 +24,8 @@ CREATE TABLE torder (
 CREATE TABLE orderLine (
     id INTEGER PRIMARY KEY,
     orderId INTEGER REFERENCES torder,
-    product TEXT
+    product TEXT,
+    amount NUMERIC(10,2)
 );
 
 CREATE TABLE package (
