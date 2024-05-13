@@ -184,6 +184,7 @@ function rdbClient(options = {}) {
 		let c = {
 			count,
 			getMany,
+			aggregate: groupBy,
 			getAll,
 			getOne,
 			getById,
@@ -227,6 +228,16 @@ function rdbClient(options = {}) {
 			let rows = await getManyCore.apply(null, args);
 			await metaPromise;
 			return proxify(rows, strategy);
+		}
+
+		async function groupBy(strategy) {
+			let args = negotiateGroupBy(null, strategy);
+			let body = stringify({
+				path: 'aggregate',
+				args
+			});
+			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+			return adapter.post(body);
 		}
 
 		async function count(_) {
@@ -281,28 +292,64 @@ function rdbClient(options = {}) {
 				return [_, where(strategy), ...rest];
 			else
 				return args;
-		}
 
-		function where(_strategy, path = '') {
-			if (typeof _strategy !== 'object' || _strategy === null)
-				return _strategy;
+			function where(_strategy, path = '') {
+				if (typeof _strategy !== 'object' || _strategy === null)
+					return _strategy;
 
-			if (Array.isArray(_strategy)) {
-				return _strategy.map(item => where(item, path));
-			}
-
-			const strategy = { ..._strategy };
-			for (let name in _strategy) {
-				if (name === 'where' && typeof strategy[name] === 'function')
-					strategy.where = column(path + 'where')(strategy.where); // Assuming `column` is defined elsewhere.
-				else if (typeof strategy[name] === 'function') {
-					strategy[name] = aggregate(path, strategy[name]);
+				if (Array.isArray(_strategy)) {
+					return _strategy.map(item => where(item, path));
 				}
-				else
-					strategy[name] = where(_strategy[name], path + name + '.');
+
+				const strategy = { ..._strategy };
+				for (let name in _strategy) {
+					if (name === 'where' && typeof strategy[name] === 'function')
+						strategy.where = column(path + 'where')(strategy.where); // Assuming `column` is defined elsewhere.
+					else if (typeof strategy[name] === 'function') {
+						strategy[name] = aggregate(path, strategy[name]);
+					}
+					else
+						strategy[name] = where(_strategy[name], path + name + '.');
+				}
+				return strategy;
 			}
-			return strategy;
+
 		}
+
+
+
+		function negotiateGroupBy(_, strategy, ...rest) {
+			const args = Array.prototype.slice.call(arguments);
+			if (strategy)
+				return [_, where(strategy), ...rest];
+			else
+				return args;
+
+			function where(_strategy, path = '') {
+				if (typeof _strategy !== 'object' || _strategy === null)
+					return _strategy;
+
+				if (Array.isArray(_strategy)) {
+					return _strategy.map(item => where(item, path));
+				}
+
+				const strategy = { ..._strategy };
+				for (let name in _strategy) {
+					if (name === 'where' && typeof strategy[name] === 'function')
+						strategy.where = column(path + 'where')(strategy.where); // Assuming `column` is defined elsewhere.
+					else if (typeof strategy[name] === 'function') {
+						strategy[name] = groupByAggregate(path, strategy[name]);
+					}
+					else
+						strategy[name] = where(_strategy[name], path + name + '.');
+				}
+				return strategy;
+			}
+
+		}
+
+
+
 
 
 		async function _delete() {
@@ -821,7 +868,7 @@ function aggregate(path, arg) {
 			if (property in c)
 				return Reflect.get(...arguments);
 			else {
-				subColumn = column(path + 'aggregate');
+				subColumn = column(path + '_aggregate');
 				return column(property);
 			}
 		}
@@ -830,7 +877,7 @@ function aggregate(path, arg) {
 	let subColumn;
 	const proxy = new Proxy(c, handler);
 
-	const result =  arg(proxy);
+	const result = arg(proxy);
 
 	if (subColumn)
 		return subColumn(result.self());
@@ -839,19 +886,68 @@ function aggregate(path, arg) {
 
 
 	function sum(fn) {
-		return column(path + 'aggregate')(fn(column('')).sum());
+		return column(path + '_aggregate')(fn(column('')).groupSum());
 	}
 	function avg(fn) {
-		return column(path + 'aggregate')(fn(column('')).avg());
+		return column(path + '_aggregate')(fn(column('')).groupAvg());
 	}
 	function max(fn) {
-		return column(path + 'aggregate')(fn(column('')).max());
+		return column(path + '_aggregate')(fn(column('')).groupMax());
 	}
 	function min(fn) {
-		return column(path + 'aggregate')(fn(column('')).min());
+		return column(path + '_aggregate')(fn(column('')).groupMin());
 	}
 	function count(fn) {
-		return column(path + 'aggregate')(fn(column('')).count());
+		return column(path + '_aggregate')(fn(column('')).groupCount());
+	}
+}
+
+function groupByAggregate(path, arg) {
+
+	const c = {
+		sum,
+		count,
+		avg,
+		max,
+		min
+	};
+
+	let handler = {
+		get(_target, property,) {
+			if (property in c)
+				return Reflect.get(...arguments);
+			else {
+				subColumn = column(path + '_aggregate');
+				return column(property);
+			}
+		}
+
+	};
+	let subColumn;
+	const proxy = new Proxy(c, handler);
+
+	const result = arg(proxy);
+
+	if (subColumn)
+		return subColumn(result.self());
+	else
+		return result;
+
+
+	function sum(fn) {
+		return column(path + '_aggregate')(fn(column('')).sum());
+	}
+	function avg(fn) {
+		return column(path + '_aggregate')(fn(column('')).avg());
+	}
+	function max(fn) {
+		return column(path + '_aggregate')(fn(column('')).max());
+	}
+	function min(fn) {
+		return column(path + '_aggregate')(fn(column('')).min());
+	}
+	function count(fn) {
+		return column(path + '_aggregate')(fn(column('')).count());
 	}
 }
 

@@ -4,13 +4,13 @@ const map = require('./db');
 import express from 'express';
 import cors from 'cors';
 import { json } from 'body-parser';
-const dateToISOString = require('../src/dateToISOString');
 const initPg = require('./initPg');
 const initOracle = require('./initOracle');
 const initMs = require('./initMs');
 const initMysql = require('./initMysql');
 const initSqlite = require('./initSqlite');
 const initSap = require('./initSap');
+
 const versionArray = process.version.replace('v', '').split('.');
 const major = parseInt(versionArray[0]);
 
@@ -101,8 +101,8 @@ beforeAll(async () => {
 
 }, 20000);
 
+describe('deleteCascade', () => {
 
-describe('update with JSON diff', () => {
 	test('pg', async () => await verify('pg'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
@@ -111,97 +111,40 @@ describe('update with JSON diff', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sap', async () => await verify('sap'));
 	test('sqlite', async () => await verify('sqlite'));
-	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
 
 		const { db } = getDb(dbName);
-		const originalRow = await db.order.getById(1, {deliveryAddress: true, lines: true});
-		const json = JSON.stringify(originalRow);
-		const row = JSON.parse(json);
-		const oldRow = JSON.parse(json);
 
-		originalRow.deliveryAddress.postalCode = '7058';
-		originalRow.lines.push({product: 'meantime'});
-		await originalRow.saveChanges();
-
-		row.lines.push({product: 'new product'});
-		row.deliveryAddress.name = 'new name';
-
-
-		let changedRow = await db.order.updateChanges(row, oldRow, {deliveryAddress: true, lines: {orderBy: 'id'}});
-		const expected = {
-			id: 1,
-			orderDate: dateToISOString(date1).substring(0, changedRow.orderDate.length),
-			customerId: 1,
-			deliveryAddress: {
-				id: 1,
-				orderId: 1,
-				name: 'new name',
-				street: 'Node street 1',
-				postalCode: '7058',
-				postalPlace: 'Jakobsli',
-				countryCode: 'NO'
-			},
-			lines: [
-				{ id: 1, orderId: 1, amount: null, product: 'Bicycle' },
-				{ id: 2, orderId: 1, amount: null, product: 'Small guitar' },
-				{ id: 4, orderId: 1, amount: null, product: 'meantime' },
-				{ id: 5, orderId: 1, amount: null, product: 'new product' },
-			]
-		};
-
-		expect(changedRow).toEqual(expected);
+		let row = await db.order.getOne();
+		const id = row.id;
+		await db.order.deleteCascade({id});
+		let deletedRow = await db.order.getOne({id});
+		expect(deletedRow).toEqual(undefined);
 	}
 });
+describe('deleteCascade http', () => {
 
-describe('update date in array with JSON', () => {
-	test('pg', async () => await verify('pg'));
-	test('oracle', async () => await verify('oracle'));
-	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
-		test('mssqlNative', async () => await verify('mssqlNative'));
-	test('mysql', async () => await verify('mysql'));
-	test('sap', async () => await verify('sap'));
-	test('sqlite', async () => await verify('sqlite'));
-	test('http', async () => await verify('http'));
-
-	async function verify(dbName) {
-
-		const { db } = getDb(dbName);
-		const json = JSON.stringify(await db.order.getMany());
-		let rows = JSON.parse(json);
-		const date = new Date(2021, 0, 11, 9, 11, 47);
-
-		rows[0].orderDate = date;
-		const changedRows = await db.order.update(rows);
-		expect(changedRows[0].orderDate).toEqual(dateToISOString(date).substring(0, changedRows[0].orderDate.length));
-	}
-});
-
-describe('update date with JSON', () => {
-	test('pg', async () => await verify('pg'));
-	test('oracle', async () => await verify('oracle'));
-	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
-		test('mssqlNative', async () => await verify('mssqlNative'));
-	test('mysql', async () => await verify('mysql'));
-	test('sap', async () => await verify('sap'));
-	test('sqlite', async () => await verify('sqlite'));
 	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
 
 		const { db } = getDb(dbName);
 
-		let json = JSON.stringify(await db.order.getOne());
-		let row = JSON.parse(json);
-		const date = new Date(2021, 0, 11, 9, 11, 47);
-		row.orderDate = date;
-		const changedRow = await db.order.update(row);
-		expect(changedRow.orderDate).toEqual(dateToISOString(date).substring(0, changedRow.orderDate.length));
+		let row = await db.order.getOne();
+		let message;
+		const id = row.id;
+		try {
+			await db.order.deleteCascade({id});
+		}
+		catch(e) {
+			message = e.message;
+		}
+		expect(message).toEqual('Disallowed operator deleteCascade');
 	}
 });
+
+
 
 const pathSegments = fileURLToPath(import.meta.url).split('/');
 const lastSegment = pathSegments[pathSegments.length - 1];

@@ -485,8 +485,8 @@ describe('insert autoincremental with relations', () => {
 					countryCode: 'NO'
 				},
 				lines: [
-					{ product: 'Bicycle' },
-					{ product: 'Small guitar' }
+					{ product: 'Bicycle', amount: 1 },
+					{ product: 'Small guitar', amount: 2 }
 				]
 			},
 			{
@@ -500,7 +500,7 @@ describe('insert autoincremental with relations', () => {
 					countryCode: 'UK'
 				},
 				lines: [
-					{ product: 'Magic wand' }
+					{ product: 'Magic wand', amount: 3 }
 				]
 			}
 		]);
@@ -545,8 +545,8 @@ describe('insert autoincremental with relations', () => {
 					countryCode: 'NO'
 				},
 				lines: [
-					{ product: 'Bicycle', id: 1, orderId: 1 },
-					{ product: 'Small guitar', id: 2, orderId: 1 }
+					{ product: 'Bicycle', amount: 1, id: 1, orderId: 1 },
+					{ product: 'Small guitar', amount: 2, id: 2, orderId: 1 }
 				]
 			},
 			{
@@ -569,7 +569,7 @@ describe('insert autoincremental with relations', () => {
 					countryCode: 'UK'
 				},
 				lines: [
-					{ product: 'Magic wand', id: 3, orderId: 2 }
+					{ product: 'Magic wand', amount: 3, id: 3, orderId: 2 }
 				]
 			}
 		];
@@ -589,15 +589,15 @@ describe('insert autoincremental with relations', () => {
 });
 
 describe('insert autoincremental with relations and strategy', () => {
-	// test('pg', async () => await verify('pg'));
+	test('pg', async () => await verify('pg'));
 	test('mssql', async () => await verify('mssql'));
 	test('oracle', async () => await verify('oracle'));
-	// if (major === 18)
-	// 	test('mssqlNative', async () => await verify('mssqlNative'));
-	// test('mysql', async () => await verify('mysql'));
-	// test('sqlite', async () => await verify('sqlite'));
-	// test('sap', async () => await verify('sap'));
-	// test('http', async () => await verify('http'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
 
 
 	async function verify(dbName) {
@@ -636,8 +636,8 @@ describe('insert autoincremental with relations and strategy', () => {
 					countryCode: 'NO'
 				},
 				lines: [
-					{ product: 'Bicycle' },
-					{ product: 'Small guitar' }
+					{ product: 'Bicycle', amount: 250 },
+					{ product: 'Small guitar', amount: 150 }
 				]
 			},
 			{
@@ -651,7 +651,7 @@ describe('insert autoincremental with relations and strategy', () => {
 					countryCode: 'UK'
 				},
 				lines: [
-					{ product: 'Magic wand' }
+					{ product: 'Magic wand', amount: 300 }
 				]
 			}
 		], { customer: true, lines: true, deliveryAddress: true });
@@ -683,8 +683,8 @@ describe('insert autoincremental with relations and strategy', () => {
 					countryCode: 'NO'
 				},
 				lines: [
-					{ product: 'Bicycle', id: 1, orderId: 1 },
-					{ product: 'Small guitar', id: 2, orderId: 1 }
+					{ product: 'Bicycle', amount: 250, id: 1, orderId: 1 },
+					{ product: 'Small guitar', amount: 150, id: 2, orderId: 1 }
 				]
 			},
 			{
@@ -707,7 +707,7 @@ describe('insert autoincremental with relations and strategy', () => {
 					countryCode: 'UK'
 				},
 				lines: [
-					{ product: 'Magic wand', id: 3, orderId: 2 }
+					{ product: 'Magic wand', amount: 300, id: 3, orderId: 2 }
 				]
 			}
 		];

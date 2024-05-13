@@ -59,13 +59,18 @@ let _allowedOps = {
 	max: true,
 	min: true,
 	count: true,
-	aggregate: true,
+	groupSum: true,
+	groupAvg: true,
+	groupMax: true,
+	groupMin: true,
+	groupCount: true,
+	_aggregate: true,
 	self: true,
 };
 
 async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, request, response, readonly, disableBulkDeletes, isHttp, client }) {
 	let allowedOps = { ..._allowedOps, insert: !readonly, ...extractRelations(getMeta(table)) };
-	let ops = { ..._ops, ...getCustomFilterPaths(customFilters), getManyDto, getMany, count, delete: _delete, cascadeDelete };
+	let ops = { ..._ops, ...getCustomFilterPaths(customFilters), getManyDto, getMany, aggregate, count, delete: _delete, cascadeDelete };
 	let res = await parseFilter(JSONFilter, table);
 	if (res === undefined)
 		return {};
@@ -106,7 +111,7 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 				table = table[path[i]];
 			}
 
-			let ops = new Set(['all', 'any', 'none', 'where', 'aggregate']);
+			let ops = new Set(['all', 'any', 'none', 'where', '_aggregate']);
 			// let ops = new Set(['all', 'any', 'none', 'where']);
 			let last = path.slice(-1)[0];
 			if (ops.has(last) || (table &&  (table._primaryColumns || (table.any && table.all))))
@@ -265,6 +270,17 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 		let args = [filter].concat(Array.prototype.slice.call(arguments).slice(1));
 		await negotiateWhereAndAggregate(strategy);
 		return table.getManyDto.apply(null, args);
+	}
+
+	async function aggregate(filter, strategy) {
+		validateStrategy(table, strategy);
+		filter = negotiateFilter(filter);
+		const _baseFilter = await invokeBaseFilter();
+		if (_baseFilter)
+			filter = filter.and(_baseFilter);
+		let args = [filter].concat(Array.prototype.slice.call(arguments).slice(1));
+		await negotiateWhereAndAggregate(strategy);
+		return table.aggregate.apply(null, args);
 	}
 
 	async function negotiateWhereAndAggregate(strategy) {

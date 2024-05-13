@@ -2,22 +2,20 @@ var newJoin = require('./joinSql');
 var getSessionContext = require('../getSessionContext');
 var newJoinCore = require('../query/singleQuery/joinSql/newShallowJoinSqlCore');
 
-function childColumn(column, relations) {
+function columnAggregate(operator, column, relations, coalesce = true) {
 	const context = getSessionContext();
 	const outerAlias = 'y' + context.aggregateCount++;
 	const alias = 'x' + relations.length;
 	const foreignKeys = getForeignKeys(relations[0]);
-	const select = ` LEFT JOIN (SELECT ${foreignKeys},${alias}.${column._dbName} as prop`;
+	const select = ` LEFT JOIN (SELECT ${foreignKeys},${operator}(${alias}.${column._dbName}) as amount`;
 	const innerJoin = relations.length > 1 ? newJoin(relations).sql() : '';
 	const onClause = createOnClause(relations[0], outerAlias);
-	const from = ` FROM ${relations.at(-1).childTable._dbName} ${alias} ${innerJoin}) ${outerAlias} ON (${onClause})`;
+	const from = ` FROM ${relations.at(-1).childTable._dbName} ${alias} ${innerJoin} GROUP BY ${foreignKeys}) ${outerAlias} ON (${onClause})`;
 	const join = select  + from ;
 
 	return {
-		expression: (alias) => `${outerAlias}.prop ${alias}`,
-		joins: [join],
-		column,
-		groupBy:  `${outerAlias}.prop`,
+		expression: (alias) => coalesce? `COALESCE(${outerAlias}.amount, 0) as ${alias}` : `${outerAlias}.amount as ${alias}`,
+		joins: [join]
 	};
 }
 
@@ -58,4 +56,4 @@ function getForeignKeys(relation) {
 	return columns.map(x => `${alias}.${x._dbName}`).join(',');
 }
 
-module.exports = childColumn;
+module.exports = columnAggregate;

@@ -94,8 +94,8 @@ describe('insertAndForget autoincremental with relations', () => {
 					countryCode: 'NO'
 				},
 				lines: [
-					{ product: 'Bicycle' },
-					{ product: 'Small guitar' }
+					{ product: 'Bicycle', amount: 1 },
+					{ product: 'Small guitar', amount: 2 }
 				]
 			},
 			{
@@ -109,7 +109,7 @@ describe('insertAndForget autoincremental with relations', () => {
 					countryCode: 'UK'
 				},
 				lines: [
-					{ product: 'Magic wand' }
+					{ product: 'Magic wand', amount: 3 }
 				]
 			}
 		]);
@@ -143,8 +143,8 @@ describe('insertAndForget autoincremental with relations', () => {
 					countryCode: 'NO'
 				},
 				lines: [
-					{ product: 'Bicycle', id: 1, orderId: 1 },
-					{ product: 'Small guitar', id: 2, orderId: 1 }
+					{ product: 'Bicycle', amount: 1, id: 1, orderId: 1 },
+					{ product: 'Small guitar', amount: 2,  id: 2, orderId: 1 }
 				]
 			},
 			{
@@ -167,7 +167,7 @@ describe('insertAndForget autoincremental with relations', () => {
 					countryCode: 'UK'
 				},
 				lines: [
-					{ product: 'Magic wand', id: 3, orderId: 2 }
+					{ product: 'Magic wand', amount: 3, id: 3, orderId: 2 }
 				]
 			}
 		];

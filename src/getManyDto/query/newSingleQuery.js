@@ -4,7 +4,7 @@ var newJoinSql = require('../../table/query/singleQuery/newJoinSql');
 var newParameterized = require('../../table/query/newParameterized');
 
 function _new(table,filter,span, alias,orderBy,limit,offset) {
-
+//todo
 	var name = table._dbName;
 	var columnSql = newColumnSql(table,span,alias,true);
 	var joinSql = newJoinSql(span, alias);

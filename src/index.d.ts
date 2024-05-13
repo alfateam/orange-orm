@@ -1,6 +1,6 @@
 import { Options } from 'ajv';
 import { RequestHandler } from 'express';
-import { ConnectionConfig } from 'tedious';
+import { ConnectionConfiguration } from 'tedious';
 import { PoolAttributes } from 'oracledb';
 import { AllowedDbMap, DbMapper, MappedDbDef } from './map';
 
@@ -13,7 +13,7 @@ declare namespace r {
     function postgres(connectionString: string, options?: PoolOptions): Pool;
     function sqlite(connectionString: string, options?: PoolOptions): Pool;
     function sap(connectionString: string, options?: PoolOptions): Pool;
-    function mssql(connectionConfig: ConnectionConfig, options?: PoolOptions): Pool;
+    function mssql(connectionConfig: ConnectionConfiguration, options?: PoolOptions): Pool;
     function mssql(connectionString: string, options?: PoolOptions): Pool;
     function mssqlNative(connectionString: string, options?: PoolOptions): Pool;
     function mysql(connectionString: string, options?: PoolOptions): Pool;

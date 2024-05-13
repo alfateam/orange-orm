@@ -137,9 +137,13 @@ describe('express update with basefilter and interceptors', () => {
 			}
 		);
 
-		const filter = db.order.lines.exists();
-		let row = await db.order.getOne(filter, { lines: { orderBy: 'id' }, customer: true, deliveryAddress: true });
-		row.lines.push({ product: 'Broomstick' });
+		let row = await db.order.getOne(null, {
+			where: x => x.lines.exists(),
+			lines: { orderBy: 'id' },
+			customer: true,
+			deliveryAddress: true
+		});
+		row.lines.push({ product: 'Broomstick', amount: 300 });
 		await row.saveChanges();
 		await row.refresh();
 
@@ -167,8 +171,8 @@ describe('express update with basefilter and interceptors', () => {
 				countryCode: 'UK'
 			},
 			lines: [
-				{ product: 'Magic wand', id: 3, orderId: 2 },
-				{ product: 'Broomstick', id: 4, orderId: 2 }
+				{ product: 'Magic wand', amount: null, id: 3, orderId: 2 },
+				{ product: 'Broomstick', amount: 300, id: 4, orderId: 2 }
 			]
 		};
 
