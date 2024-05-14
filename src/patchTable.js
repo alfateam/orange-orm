@@ -119,8 +119,6 @@ async function patchTableCore(table, patches, { strategy = undefined, deduceStra
 		else if (isOneRelation(property, table)) {
 			let relation = table[property]._relation;
 			let subRow = await row[property];
-			if (!subRow)
-				throw new Error(`${property} was not found`);
 			strategy[property] = strategy[property] || {};
 			options[property] = inferOptions(options, property);
 

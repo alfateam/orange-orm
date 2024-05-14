@@ -276,6 +276,55 @@ describe('update date', () => {
 	}
 });
 
+
+describe('add hasOne', () => {
+
+	test('pg', async () => await verify('pg'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sap', async () => await verify('sap'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db, init } = getDb(dbName);
+		if (dbName === 'http') {
+			const { db, init } = getDb('sqlite2');
+			await init(db);
+		}
+		else
+			await init(db);
+
+		const row = await db.order.insert({orderDate: date1}, {deliveryAddress: true});
+		row.deliveryAddress = {
+			name: 'bar',
+			street: 'Node street 2',
+		};
+		await row.saveChanges({});
+		row.orderDate = dateToISOString(new Date(row.orderDate));
+
+		const expected = {
+			id: 1,
+			customerId: null,
+			orderDate: dateToISOString(date1),
+			deliveryAddress: {
+				id: 1,
+				orderId: 1,
+				name: 'bar',
+				street: 'Node street 2',
+				postalCode: null,
+				postalPlace: null,
+				countryCode: null
+			}
+		};
+		expect(row).toEqual(expected);
+	}
+});
+
+
 const pathSegments = fileURLToPath(import.meta.url).split('/');
 const lastSegment = pathSegments[pathSegments.length - 1];
 const fileNameWithoutExtension = lastSegment.split('.')[0];

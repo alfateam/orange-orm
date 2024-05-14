@@ -54,11 +54,11 @@ CREATE TABLE package (
 CREATE TABLE deliveryAddress (
     id int IDENTITY(1,1) PRIMARY KEY,
     orderId INTEGER REFERENCES torder,
-    name VARCHAR(100), 
-    street VARCHAR(100),
-    postalCode VARCHAR(100),
-    postalPlace VARCHAR(100),
-    countryCode VARCHAR(100)
+    name VARCHAR(100) NULL, 
+    street VARCHAR(100) NULL,
+    postalCode VARCHAR(100) NULL,
+    postalPlace VARCHAR(100) NULL,
+    countryCode VARCHAR(100) NULL
 )
 
 
