@@ -1,5 +1,6 @@
-
 ## Changelog
+__3.10.1_  
+Bugfix: Adding hasOne row to existing parent throws.  See [#86](https://github.com/alfateam/rdb/issues/86)  
 __3.10.0_  
 Aggregate functions  
 __3.9.1_  

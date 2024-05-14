@@ -115,7 +115,8 @@ GO
 CREATE TABLE orderLine (
     id int IDENTITY PRIMARY KEY,
     orderId INTEGER REFERENCES torder,
-    product VARCHAR(100)
+    product VARCHAR(100),
+    amount NUMERIC(10,2) NULL
 )
 
 GO
@@ -131,11 +132,11 @@ GO
 CREATE TABLE deliveryAddress (
     id int IDENTITY PRIMARY KEY,
     orderId INTEGER REFERENCES torder,
-    name VARCHAR(100), 
-    street VARCHAR(100),
-    postalCode VARCHAR(100),
-    postalPlace VARCHAR(100),
-    countryCode VARCHAR(100)
+    name VARCHAR(100) NULL, 
+    street VARCHAR(100) NULL,
+    postalCode VARCHAR(100) NULL,
+    postalPlace VARCHAR(100) NULL,
+    countryCode VARCHAR(100) NULL
 )
 
 `;

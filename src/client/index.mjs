@@ -3607,7 +3607,7 @@ function isAbsoluteURL(url) {
  */
 function combineURLs(baseURL, relativeURL) {
   return relativeURL
-    ? baseURL.replace(/\/+$/, '') + '/' + relativeURL.replace(/^\/+/, '')
+    ? baseURL.replace(/\/?\/$/, '') + '/' + relativeURL.replace(/^\/+/, '')
     : baseURL;
 }
 
@@ -4241,7 +4241,7 @@ function mergeConfig(config1, config2) {
   return config;
 }
 
-const VERSION = "1.6.2";
+const VERSION = "1.6.3";
 
 const validators$1 = {};
 
@@ -5707,7 +5707,7 @@ function rdbClient(options = {}) {
 			const concurrency = undefined;
 			const args = [concurrency].concat(rest);
 			if (Array.isArray(rows)) {
-				let proxy = proxify([], args[0]);
+				let proxy = proxify([], rest[0]);
 				proxy.splice.apply(proxy, [0, 0, ...rows]);
 				await proxy.saveChanges.apply(proxy, args);
 				return proxy;
@@ -5716,7 +5716,7 @@ function rdbClient(options = {}) {
 				let proxy = proxify([], args[0]);
 				proxy.splice.apply(proxy, [0, 0, rows]);
 				await proxy.saveChanges.apply(proxy, args);
-				return proxify(proxy[0], args[0]);
+				return proxify(proxy[0], rest[0]);
 			}
 		}
 

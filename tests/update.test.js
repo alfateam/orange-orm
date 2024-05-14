@@ -181,8 +181,8 @@ describe('update multiple in array', () => {
 					countryCode: 'NO'
 				},
 				lines: [
-					{ product: 'Bicycle', id: 1, orderId: 1 },
-					{ product: 'Big guitar', id: 2, orderId: 1 }
+					{ product: 'Bicycle', amount: null, id: 1, orderId: 1 },
+					{ product: 'Big guitar', amount: null, id: 2, orderId: 1 }
 				]
 			},
 			{
@@ -197,8 +197,8 @@ describe('update multiple in array', () => {
 				orderDate: dateToISOString(date2),
 				deliveryAddress: null,
 				lines: [
-					{ product: 'Magic wand', id: 3, orderId: 2 },
-					{ product: 'Cloak of invisibility', id: 4, orderId: 2 }
+					{ product: 'Magic wand', amount: null, id: 3, orderId: 2 },
+					{ product: 'Cloak of invisibility', amount: null, id: 4, orderId: 2 }
 				]
 			}
 		];
@@ -275,6 +275,55 @@ describe('update date', () => {
 		expect(row.orderDate).toEqual(dateToISOString(date).substring(0, row.orderDate.length));
 	}
 });
+
+
+describe('add hasOne', () => {
+
+	test('pg', async () => await verify('pg'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sap', async () => await verify('sap'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db, init } = getDb(dbName);
+		if (dbName === 'http') {
+			const { db, init } = getDb('sqlite2');
+			await init(db);
+		}
+		else
+			await init(db);
+
+		const row = await db.order.insert({orderDate: date1}, {deliveryAddress: true});
+		row.deliveryAddress = {
+			name: 'bar',
+			street: 'Node street 2',
+		};
+		await row.saveChanges({});
+		row.orderDate = dateToISOString(new Date(row.orderDate));
+
+		const expected = {
+			id: 1,
+			customerId: null,
+			orderDate: dateToISOString(date1),
+			deliveryAddress: {
+				id: 1,
+				orderId: 1,
+				name: 'bar',
+				street: 'Node street 2',
+				postalCode: null,
+				postalPlace: null,
+				countryCode: null
+			}
+		};
+		expect(row).toEqual(expected);
+	}
+});
+
 
 const pathSegments = fileURLToPath(import.meta.url).split('/');
 const lastSegment = pathSegments[pathSegments.length - 1];

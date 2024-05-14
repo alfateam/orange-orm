@@ -468,15 +468,15 @@ describe('insert overwrite with optimistic column changed', () => {
 });
 
 describe('insert overwrite with optimistic column unchanged', () => {
-	// test('pg', async () => await verify('pg'));
+	test('pg', async () => await verify('pg'));
 	test('oracle', async () => await verify('oracle'));
-	// test('mssql', async () => await verify('mssql'));
-	// if (major === 18)
-	// 	test('mssqlNative', async () => await verify('mssqlNative'));
-	// test('mysql', async () => await verify('mysql'));
-	// test('sqlite', async () => await verify('sqlite'));
-	// test('sap', async () => await verify('sap'));
-	// test('http', async () => await verify('http'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
 		let { db, init } = getDb(dbName);
