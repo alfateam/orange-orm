@@ -5707,7 +5707,7 @@ function rdbClient(options = {}) {
 			const concurrency = undefined;
 			const args = [concurrency].concat(rest);
 			if (Array.isArray(rows)) {
-				let proxy = proxify([], args[0]);
+				let proxy = proxify([], rest[0]);
 				proxy.splice.apply(proxy, [0, 0, ...rows]);
 				await proxy.saveChanges.apply(proxy, args);
 				return proxy;
@@ -5716,7 +5716,7 @@ function rdbClient(options = {}) {
 				let proxy = proxify([], args[0]);
 				proxy.splice.apply(proxy, [0, 0, rows]);
 				await proxy.saveChanges.apply(proxy, args);
-				return proxify(proxy[0], args[0]);
+				return proxify(proxy[0], rest[0]);
 			}
 		}
 
