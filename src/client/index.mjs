@@ -3607,7 +3607,7 @@ function isAbsoluteURL(url) {
  */
 function combineURLs(baseURL, relativeURL) {
   return relativeURL
-    ? baseURL.replace(/\/?\/$/, '') + '/' + relativeURL.replace(/^\/+/, '')
+    ? baseURL.replace(/\/+$/, '') + '/' + relativeURL.replace(/^\/+/, '')
     : baseURL;
 }
 
@@ -4241,7 +4241,7 @@ function mergeConfig(config1, config2) {
   return config;
 }
 
-const VERSION = "1.6.3";
+const VERSION = "1.6.2";
 
 const validators$1 = {};
 
