@@ -1,4 +1,7 @@
-![RDB](./docs/logo-sm.jpg)  
+<div style="display: flex; justify-content: center;">
+  <img src="./docs/orange.svg" alt="RDB" width="250" style="transform: translateX(-10px);" />
+</div>
+
 RDB is the ultimate Object Relational Mapper for Node.js and Typescript, offering seamless integration with a variety of popular databases. Whether you're building applications in TypeScript or JavaScript  (including both CommonJS and ECMAScript), RDB has got you covered.  
 
 [![npm version](https://img.shields.io/npm/v/rdb.svg?style=flat-square)](https://www.npmjs.org/package/rdb)
