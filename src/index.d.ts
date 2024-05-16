@@ -151,10 +151,6 @@ declare namespace r {
         as(dbName: string): ColumnNotNullOf<T>;
     }
 
-    // export interface Rdb {
-    //     (config: Config): Rdb;
-    // }
-
     var filter: Filter;
     export interface RawFilter {
         sql: string | (() => string);

@@ -1,12 +1,12 @@
 {
-  "name": "rdb",
+  "name": "orange-orm",
   "version": "3.10.1",
   "main": "./src/index.js",
   "browser": "./src/client/index.mjs",
   "bin": {
-    "rdb": "bin/rdb.js"
+    "orange-orm": "bin/rdb.js"
   },
-  "title": "rdb",
+  "title": "Orange ORM",
   "description": "Object Relational Mapper",
   "types": "./src/index.d.ts",
   "keywords": [
@@ -25,14 +25,15 @@
     "sapase",
     "Oracle",
     "rdb",
+    "Orange ORM",
     "active record"
   ],
   "authors": [
     "Lars-Erik Roald <lars.roald@gmail.com>"
   ],
   "license": "ISC",
-  "codeOfConduct": "https://github.com/alfateam/rdb/blob/master/docs/CODE_OF_CONDUCT.md",
-  "contributing": "https://github.com/alfateam/rdb/blob/master/CONTRIBUTING.md",
+  "codeOfConduct": "https://github.com/alfateam/orange-orm/blob/master/docs/CODE_OF_CONDUCT.md",
+  "contributing": "https://github.com/alfateam/orange-orm/blob/master/CONTRIBUTING.md",
   "funding": {
     "type": "github",
     "url": "https://github.com/sponsors/lroal"
@@ -126,9 +127,9 @@
   },
   "repository": {
     "type": "git",
-    "url": "git@github.com:alfateam/rdb.git"
+    "url": "git@github.com:alfateam/orange-orm.git"
   },
-  "homepage": "https://rdbjs.org",
+  "homepage": "https://orange-orm.org",
   "jshintConfig": {
     "asi": true,
     "eqnull": true,

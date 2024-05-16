@@ -1,5 +1,5 @@
 name: "Bug Report"
-description: Report an issue or possible bug with rdb
+description: Report an issue or possible bug with orange
 title: "[BUG]: "
 labels: ["bug"]
 body:
@@ -7,12 +7,12 @@ body:
     attributes:
       value: |
         ## Bug Report Form
-        Thank you for taking the time to file a bug report for `rdb`! Please fill out this form as completely as possible to help us identify and fix the issue.
+        Thank you for taking the time to file a bug report for `orange`! Please fill out this form as completely as possible to help us identify and fix the issue.
         
   - type: input
     attributes:
-      label: rdb Version
-      description: Please specify the version of rdb you are using.
+      label: orange Version
+      description: Please specify the version of orange you are using.
       placeholder: e.g., 1.2.3
     validations:
       required: true

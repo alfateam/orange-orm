@@ -1,14 +1,14 @@
 <div style="display: flex; justify-content: center;">
-  <img src="./docs/orange.svg" alt="RDB" width="250" style="transform: translateX(-10px);" />
+  <img src="./docs/orange.svg" alt="Orange" width="250" style="transform: translateX(-10px);" />
 </div>
 
-RDB is the ultimate Object Relational Mapper for Node.js and Typescript, offering seamless integration with a variety of popular databases. Whether you're building applications in TypeScript or JavaScript  (including both CommonJS and ECMAScript), RDB has got you covered.  
+The ultimate Object Relational Mapper for Node.js and Typescript, offering seamless integration with a variety of popular databases. Whether you're building applications in TypeScript or JavaScript  (including both CommonJS and ECMAScript), Orange has got you covered.  
 
-[![npm version](https://img.shields.io/npm/v/rdb.svg?style=flat-square)](https://www.npmjs.org/package/rdb)
-[![Build status](https://github.com/alfateam/rdb/workflows/Node.js%20CI/badge.svg)](https://github.com/alfateam/rdb/actions)
-[![Coverage Badge](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/lroal/1a69422f03da7f8155cf94fe66022452/raw/rdb__heads_master.json)](https://github.com/alfateam/rdb/actions)
-[![Github](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/lroal/1ccb2b79abbe0258d636e9b5e4630a1a/raw/rdb__heads_master.json)](https://github.com/alfateam/rdb)
-[![GitHub Discussions](https://img.shields.io/github/discussions/alfateam/rdb)](https://github.com/alfateam/rdb/discussions)
+[![npm version](https://img.shields.io/npm/v/rdb.svg?style=flat-square)](https://www.npmjs.org/package/orange-orm)
+[![Build status](https://github.com/alfateam/orange-orm/workflows/Node.js%20CI/badge.svg)](https://github.com/alfateam/orange-orm/actions)
+[![Coverage Badge](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/lroal/1a69422f03da7f8155cf94fe66022452/raw/rdb__heads_master.json)](https://github.com/alfateam/orange-orm/actions)
+[![Github](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/lroal/1ccb2b79abbe0258d636e9b5e4630a1a/raw/rdb__heads_master.json)](https://github.com/alfateam/orange-orm)
+[![GitHub Discussions](https://img.shields.io/github/discussions/alfateam/orange-orm)](https://github.com/alfateam/orange-orm/discussions)
 [![Discord](https://badgen.net/discord/online-members/QjuEgvQXzd?icon=discord&label=Discord)](https://discord.gg/QjuEgvQXzd)
 [![YouTube Video Views](https://img.shields.io/youtube/views/1IwwjPr2lMs)](https://youtu.be/1IwwjPr2lMs)
 
@@ -16,11 +16,11 @@ RDB is the ultimate Object Relational Mapper for Node.js and Typescript, offerin
 
 ## Key Features 
 
-- **Rich Querying Model**: RDB provides a powerful and intuitive querying model, making it easy to retrieve, filter, and manipulate data from your databases.
-- **Active Record**: With a concise and expressive syntax, RDB enables you to interact with your database using the [*Active Record Pattern*](https://en.wikipedia.org/wiki/Active_record_pattern).
+- **Rich Querying Model**: Orange provides a powerful and intuitive querying model, making it easy to retrieve, filter, and manipulate data from your databases.
+- **Active Record**: With a concise and expressive syntax, Orange enables you to interact with your database using the [*Active Record Pattern*](https://en.wikipedia.org/wiki/Active_record_pattern).
 - **No Code Generation Required**: Enjoy full IntelliSense, even in table mappings, without the need for cumbersome code generation.
-- **TypeScript and JavaScript Support**: RDB fully supports both TypeScript and JavaScript, allowing you to leverage the benefits of static typing and modern ECMAScript features.
-- **Works in the Browser**: You can securely use RDB in the browser by utilizing the Express.js plugin, which serves to safeguard sensitive database credentials from exposure at the client level. This method mirrors a traditional REST API, augmented with advanced TypeScript tooling for enhanced functionality.
+- **TypeScript and JavaScript Support**: Orange fully supports both TypeScript and JavaScript, allowing you to leverage the benefits of static typing and modern ECMAScript features.
+- **Works in the Browser**: You can securely use Orange in the browser by utilizing the Express.js plugin, which serves to safeguard sensitive database credentials from exposure at the client level. This method mirrors a traditional REST API, augmented with advanced TypeScript tooling for enhanced functionality.
 
 ## Supported Databases
 
@@ -32,15 +32,15 @@ RDB is the ultimate Object Relational Mapper for Node.js and Typescript, offerin
 ✅ SQLite
 
 
-This is the _Modern Typescript Documentation_. Are you looking for the [_Classic Documentation_](https://github.com/alfateam/rdb/blob/master/docs/docs.md) ?
+This is the _Modern Typescript Documentation_. Are you looking for the [_Classic Documentation_](https://github.com/alfateam/orange-orm/blob/master/docs/docs.md) ?
 
 ## Sponsorship <span style="font-size: larger; color: darkred;">♡</span>
-If you value the hard work behind RDB and wish to see it evolve further, consider [sponsoring](https://github.com/sponsors/lroal). Your support fuels the journey of refining and expanding this tool for our developer community.
+If you value the hard work behind Orange and wish to see it evolve further, consider [sponsoring](https://github.com/sponsors/lroal). Your support fuels the journey of refining and expanding this tool for our developer community.
 
 ## Installation
 
 ```bash
-$ npm install rdb
+$ npm install orange-orm
 ```  
 
 ## Example
@@ -54,9 +54,9 @@ $ npm install sqlite3
 ```
 <sub>📄 map.ts</sub>
 ```javascript
-import rdb from 'rdb';
+import orange from 'orange-orm';
 
-const map = rdb.map(x => ({
+const map = orange.map(x => ({
   customer: x.table('customer').map(({ column }) => ({
     id: column('id').numeric().primary().notNullExceptInsert(),
     name: column('name').string(),
@@ -149,9 +149,9 @@ Relationships between tables can also be outlined. By using methods like <strong
 
 <sub>📄 map.ts</sub>
 ```javascript
-import rdb from 'rdb';
+import orange from 'orange-orm';
 
-const map = rdb.map(x => ({
+const map = orange.map(x => ({
   customer: x.table('customer').map(({ column }) => ({
     id: column('id').numeric().primary().notNullExceptInsert(),
     name: column('name').string(),
@@ -267,7 +267,7 @@ import map from './map';
 const db = map.sqlite('demo.db', { size: 10 });
 ```
 __From the browser__  
-You can securely use RDB from the browser by utilizing the Express plugin, which serves to safeguard sensitive database credentials from exposure at the client level. This technique bypasses the need to transmit raw SQL queries directly from the client to the server. Instead, it logs method calls initiated by the client, which are later replayed and authenticated on the server. This not only reinforces security by preventing the disclosure of raw SQL queries on the client side but also facilitates a smoother operation. Essentially, this method mirrors a traditional REST API, augmented with advanced TypeScript tooling for enhanced functionality. You can read more about it in the section called [In the browser](#user-content-in-the-browser)  
+You can securely use Orange from the browser by utilizing the Express plugin, which serves to safeguard sensitive database credentials from exposure at the client level. This technique bypasses the need to transmit raw SQL queries directly from the client to the server. Instead, it logs method calls initiated by the client, which are later replayed and authenticated on the server. This not only reinforces security by preventing the disclosure of raw SQL queries on the client side but also facilitates a smoother operation. Essentially, this method mirrors a traditional REST API, augmented with advanced TypeScript tooling for enhanced functionality. You can read more about it in the section called [In the browser](#user-content-in-the-browser)  
 <sub>📄 server.ts</sub>
 ```javascript
 import map from './map';
@@ -281,7 +281,7 @@ express().disable('x-powered-by')
   .use(json({ limit: '100mb' }))
   .use(cors())
   //for demonstrational purposes, authentication middleware is not shown here.
-  .use('/rdb', db.express())
+  .use('/orange', db.express())
   .listen(3000, () => console.log('Example app listening on port 3000!'));
 ```
 
@@ -289,7 +289,7 @@ express().disable('x-powered-by')
 ```javascript
 import map from './map';
 
-const db = map.http('http://localhost:3000/rdb');
+const db = map.http('http://localhost:3000/orange');
 ```
 __MySQL__
 ```bash
@@ -481,9 +481,9 @@ async function insertRows() {
 </details>
 
 <details><summary><strong>Fetching rows</strong></summary>
-<p>RDB has a rich querying model. As you navigate through, you'll learn about the various methods available to retrieve data from your tables, whether you want to fetch all rows, many rows with specific criteria, or a single row based on a primary key.  
+<p>Orange has a rich querying model. As you navigate through, you'll learn about the various methods available to retrieve data from your tables, whether you want to fetch all rows, many rows with specific criteria, or a single row based on a primary key.  
 
-The fetching strategy in RDB is optional, and its use is influenced by your specific needs. You can define the fetching strategy either on the table level or the column level. This granularity gives you the freedom to decide how much related data you want to pull along with your primary request.</p>
+The fetching strategy in Orange is optional, and its use is influenced by your specific needs. You can define the fetching strategy either on the table level or the column level. This granularity gives you the freedom to decide how much related data you want to pull along with your primary request.</p>
 
 __All rows__
 
@@ -889,7 +889,7 @@ async function deleteRow() {
 }
 ```
 __Deleting a row in an array__  
-A common workflow involves retrieving multiple rows, followed by the need to delete a specific row from an array. This operation is straightforward to do with RDB, which allow for the updating, inserting, and deleting of multiple rows in a single transaction. To modify the array, simply add, update, or remove elements, and then invoke the saveChanges() method on the array to persist the changes.
+A common workflow involves retrieving multiple rows, followed by the need to delete a specific row from an array. This operation is straightforward to do with Orange, which allow for the updating, inserting, and deleting of multiple rows in a single transaction. To modify the array, simply add, update, or remove elements, and then invoke the saveChanges() method on the array to persist the changes.
 
 ```javascript
 import map from './map';
@@ -1024,8 +1024,8 @@ async function deleteRows() {
 </details>
 
 <details id="in-the-browser"><summary><strong>In the browser</strong></summary>
-<p>You can use <strong><i>RDB</i></strong> in the browser by using the adapter for Express. Instead of sending raw SQL queries from the client to the server, this approach records the method calls in the client. These method calls are then replayed at the server, ensuring a higher level of security by not exposing raw SQL on the client side.  
-Raw sql queries, raw sql filters and transactions are disabled at the http client due to security reasons.  If you would like RDB to support other web frameworks, like nestJs, fastify, etc, please let me know.</p>
+<p>You can use <strong><i>Orange</i></strong> in the browser by using the adapter for Express. Instead of sending raw SQL queries from the client to the server, this approach records the method calls in the client. These method calls are then replayed at the server, ensuring a higher level of security by not exposing raw SQL on the client side.  
+Raw sql queries, raw sql filters and transactions are disabled at the http client due to security reasons.  If you would like Orange to support other web frameworks, like nestJs, fastify, etc, please let me know.</p>
 
 <sub>📄 server.ts</sub>
 ```javascript
@@ -1040,7 +1040,7 @@ express().disable('x-powered-by')
   .use(json({ limit: '100mb' }))
   .use(cors())
   //for demonstrational purposes, authentication middleware is not shown here.
-  .use('/rdb', db.express())
+  .use('/orange', db.express())
   .listen(3000, () => console.log('Example app listening on port 3000!'));
 ```
 
@@ -1048,7 +1048,7 @@ express().disable('x-powered-by')
 ```javascript
 import map from './map';
 
-const db = map.http('http://localhost:3000/rdb');
+const db = map.http('http://localhost:3000/orange');
 
 updateRows();
 
@@ -1087,8 +1087,8 @@ const db = map.sqlite('demo.db');
 express().disable('x-powered-by')
   .use(json({ limit: '100mb' }))
   .use(cors())
-  .use('/rdb', validateToken)
-  .use('/rdb', db.express({
+  .use('/orange', validateToken)
+  .use('/orange', db.express({
     order: {
       baseFilter: (db, req, _res) => {
         const customerId = Number.parseInt(req.headers.authorization.split(' ')[1]); //Bearer 2
@@ -1114,7 +1114,7 @@ function validateToken(req, res, next) {
 ```javascript
 import map from './map';
 
-const db = map.http('http://localhost:3000/rdb');
+const db = map.http('http://localhost:3000/orange');
 
 updateRows();
 
@@ -1539,7 +1539,7 @@ async function execute() {
 </details>
 
 <details><summary><strong>Data types</strong></summary>
-<p>RDB is database agnostic - meaning it can work with multiple database systems without being specifically tied to any one of them. When the ORM behaves consistently across various databases, developers don't need to remember specific quirks or differences when switching between databases. They can rely on the ORM to provide the same mapping behavior, which reduces the cognitive load and potential for errors. There are currently 8 column types in RDB:</p>
+<p>Orange is database agnostic - meaning it can work with multiple database systems without being specifically tied to any one of them. When the ORM behaves consistently across various databases, developers don't need to remember specific quirks or differences when switching between databases. They can rely on the ORM to provide the same mapping behavior, which reduces the cognitive load and potential for errors. There are currently 8 column types in Orange:</p>
 
 - **`string`** maps to VARCHAR or TEXT in sql
 - **`numeric`** maps to INTEGER, DECIMAL, NUMERIC, TINYINT FLOAT/REAL or DOUBLE in sql.
@@ -1552,14 +1552,14 @@ async function execute() {
 
 <sub>📄 map.ts</sub>
 ```javascript
-import rdb from 'rdb';
+import orange from 'orange-orm';
 
 interface Pet {
     name: string;
     kind: string;
 }
 
-const map = rdb.map(x => ({
+const map = orange.map(x => ({
     demo: x.table('demo').map(x => ({
       id: x.column('id').uuid().primary().notNull(),
       name: x.column('name').string(),
@@ -1574,7 +1574,7 @@ const map = rdb.map(x => ({
 ```
 <sub>📄 map.js</sub>
 ```javascript
-import rdb from 'rdb';
+import orange from 'orange-orm';
 
 /**
  * @typedef {Object} Pet
@@ -1585,7 +1585,7 @@ import rdb from 'rdb';
 /** @type {Pet} */
 let pet;
 
-const map = rdb.map(x => ({
+const map = orange.map(x => ({
     demo: x.table('demo').map(x => ({
       id: x.column('id').uuid().primary().notNull(),
       name: x.column('name').string(),
@@ -1606,10 +1606,10 @@ const map = rdb.map(x => ({
 In the provided code, the id column's default value is set to a UUID generated by crypto.randomUUID(), and the isActive column's default is set to true.</p>
 
 ```javascript
-import rdb from 'rdb';
+import orange from 'orange-orm';
 import crypto 'crypto';
 
-const map = rdb.map(x => ({
+const map = orange.map(x => ({
   myTable: x.table('myTable').map(({ column }) => ({
     id: column('id').uuid().primary().default(() => crypto.randomUUID()),
     name: column('name').string(),
@@ -1627,7 +1627,7 @@ export default map;
 
 <sub>📄 map.ts</sub>
 ```javascript
-import rdb from 'rdb';
+import orange from 'orange-orm';
 
 interface Pet {
     name: string;
@@ -1646,7 +1646,7 @@ function validateName(value?: string) {
     throw new Error('Length cannot exceed 10 characters');
 }
 
-const map = rdb.map(x => ({
+const map = orange.map(x => ({
     demo: x.table('demo').map(x => ({
       id: x.column('id').uuid().primary().notNullExceptInsert(),
       name: x.column('name').string().validate(validateName),
@@ -1658,7 +1658,7 @@ export default map;
 ```
 <sub>📄 map.js</sub>
 ```javascript
-import rdb from 'rdb';
+import orange from 'orange-orm';
 
 /**
  * @typedef {Object} Pet
@@ -1681,7 +1681,7 @@ function validateName(value) {
     throw new Error('Length cannot exceed 10 characters');
 }
 
-const map = rdb.map(x => ({
+const map = orange.map(x => ({
     demo: x.table('demo').map(x => ({
       id: x.column('id').uuid().primary().notNullExceptInsert(),
       name: x.column('name').string().validate(validateName),
@@ -1699,9 +1699,9 @@ export default map;
 Consider a scenario where we have orders and order lines, and each order line is uniquely identified by combining the order type, order number, and line number.</p>
 
 ```javascript
-import rdb from 'rdb';
+import orange from 'orange-orm';
 
-const map = rdb.map(x => ({
+const map = orange.map(x => ({
   order: x.table('_order').map(({ column }) => ({
     orderType: column('orderType').string().primary().notNull(),
     orderNo: column('orderNo').numeric().primary().notNull(),
@@ -1730,9 +1730,9 @@ export default map;
 In the example, the <strong>client_type</strong> column serves as the discriminator that labels records as <strong>customer</strong> or <strong>vendor</strong> in the 'client' table. On inserts, the column will automatically be given the correct discriminator value. Similarly, when fetching and deleting, the discrimiminator will be added to the WHERE clause.</p>
 
 ```javascript
-import rdb from 'rdb';
+import orange from 'orange-orm';
 
-const map = rdb.map(x => ({
+const map = orange.map(x => ({
   customer: x.table('client').map(({ column }) => ({
     id: column('id').numeric().primary(),
     name: column('name').string()
@@ -1753,13 +1753,13 @@ export default map;
 
 In the example below, the formula discriminator categorize bookings into <strong>customerBooking</strong> and <strong>internalBooking</strong> within the same <strong>booking</strong> table. The categorization is based on the value of the <strong>booking_no</strong> column. For <strong>customerBooking</strong>, records are identified where the booking number falls within the range of 10000 to 99999. For <strong>internalBooking</strong>, the range is between 1000 to 9999. These conditions are utilized during fetch and delete operations to ensure that the program interacts with the appropriate subset of records according to their booking number. Unlike column discriminators, formula discriminators are not used during insert operations since they rely on existing data to evaluate the condition.
 
-The <strong><i>'@this'</strong></i> acts as a placeholder within the formula. When RDB constructs a query, it replaces <strong>'@this'</strong> with the appropriate alias for the table being queried. This replacement is crucial to avoid ambiguity, especially when dealing with joins with ambigious column names.</p>
+The <strong><i>'@this'</strong></i> acts as a placeholder within the formula. When Orange constructs a query, it replaces <strong>'@this'</strong> with the appropriate alias for the table being queried. This replacement is crucial to avoid ambiguity, especially when dealing with joins with ambigious column names.</p>
 
 ```javascript
-import rdb from 'rdb';
+import orange from 'orange-orm';
 
 
-const map = rdb.map(x => ({
+const map = orange.map(x => ({
   customerBooking: x.table('booking').map(({ column }) => ({
     id: column('id').uuid().primary(),
     bookingNo: column('booking_no').numeric()
@@ -1868,9 +1868,9 @@ async function getCount() {
 <sub>📄 map.ts</sub>
 
 ```javascript
-import rdb from 'rdb';
+import orange from 'orange-orm';
 
-const map = rdb.map(x => ({
+const map = orange.map(x => ({
   customer: x.table('customer').map(({ column }) => ({
     id: column('id').numeric().primary().notNullExceptInsert(),
     name: column('name').string(),
@@ -1905,14 +1905,14 @@ async function getRows() {
 </details>
 
 <details><summary><strong>Logging</strong></summary>
-<p>You enable logging by listening to the query event on the rdb object. During this event, both the SQL statement and any associated parameters are logged. The logged output reveals the sequence of SQL commands executed, offering developers a transparent view into database operations, which aids in debugging and ensures data integrity.</p>
+<p>You enable logging by listening to the query event on the `orange` object. During this event, both the SQL statement and any associated parameters are logged. The logged output reveals the sequence of SQL commands executed, offering developers a transparent view into database operations, which aids in debugging and ensures data integrity.</p>
 
 ```javascript
-import rdb from 'rdb';
+import orange from 'orange-orm';
 import map from './map';
 const db = map.sqlite('demo.db');
 
-rdb.on('query', (e) => {
+orange.on('query', (e) => {
   console.log(e.sql);
   if (e.parameters.length > 0)
     console.log(e.parameters);
@@ -1953,16 +1953,16 @@ COMMIT
 <details><summary><strong>What it is not</strong></summary>
 <p>
 <ul>
-  <li><strong>It is not about migrations</strong> <p>The allure of ORMs handling SQL migrations is undeniably attractive and sweet. However, this sweetness can become painful. Auto-generated migration scripts might not capture all nuances. Using dedicated migration tools separate from the ORM or manually managing migrations might be the less painful route in the long run.  RDB aim for database agnosticism. And when you're dealing with migrations, you might want to use features specific to a database platform. However, I might consider adding support for (non-auto-generated) migrations at a later point. But for now, it is not on the roadmap.</p></li>
+  <li><strong>It is not about migrations</strong> <p>The allure of ORMs handling SQL migrations is undeniably attractive and sweet. However, this sweetness can become painful. Auto-generated migration scripts might not capture all nuances. Using dedicated migration tools separate from the ORM or manually managing migrations might be the less painful route in the long run.  Orange aim for database agnosticism. And when you're dealing with migrations, you might want to use features specific to a database platform. However, I might consider adding support for (non-auto-generated) migrations at a later point. But for now, it is not on the roadmap.</p></li>
   <li><strong>It is not about NoSql databases</strong> <p>Applying ORMs to NoSQL, which inherently diverges from the relational model, can lead to data representation mismatches and a loss of specialized NoSQL features. Moreover, the added ORM layer can introduce performance inefficiencies, complicate debugging, and increase maintenance concerns. Given the unique capabilities of each NoSQL system, crafting custom data access solutions tailored to specific needs often provides better results than a generalized ORM approach.</p></li>
-  <li><strong>It is not about GrapQL</strong> <p>RDB, already supports remote data operations via HTTP, eliminating the primary need for integrating GraphQL. RDB's built-in safety mechanisms and tailored optimization layers ensure secure and efficient data operations, which might be compromised by adding GraphQL. Furthermore, RDB's inherent expressivity and powerful querying capabilities could be overshadowed by the introduction of GraphQL. Integrating GraphQL could introduce unnecessary complexity, potential performance overhead, and maintenance challenges, especially as both systems continue to evolve. Therefore, considering RDB's robust features and design, supporting GraphQL might not offer sufficient advantages to warrant the associated complications. </p></li>
+  <li><strong>It is not about GrapQL</strong> <p>Orange, already supports remote data operations via HTTP, eliminating the primary need for integrating GraphQL. Orange's built-in safety mechanisms and tailored optimization layers ensure secure and efficient data operations, which might be compromised by adding GraphQL. Furthermore, Orange's inherent expressivity and powerful querying capabilities could be overshadowed by the introduction of GraphQL. Integrating GraphQL could introduce unnecessary complexity, potential performance overhead, and maintenance challenges, especially as both systems continue to evolve. Therefore, considering Orange's robust features and design, supporting GraphQL might not offer sufficient advantages to warrant the associated complications. </p></li>
 </ul>
 
 </p>
 </details>
 
-### [Changelog](https://github.com/alfateam/rdb/blob/master/docs/changelog.md)
-### [Code of Conduct](https://github.com/alfateam/rdb/blob/master/docs/CODE_OF_CONDUCT.md)
+### [Changelog](https://github.com/alfateam/orange-orm/blob/master/docs/changelog.md)
+### [Code of Conduct](https://github.com/alfateam/orange-orm/blob/master/docs/CODE_OF_CONDUCT.md)
 <!-- 
 How to setup code coverage
 https://github.com/nystudio107/rollup-plugin-critical/blob/master/package.json

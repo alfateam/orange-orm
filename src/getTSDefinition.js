@@ -326,7 +326,7 @@ function getCustomFilters(filters) {
 				result += '\n' + tabs + '}';
 			}
 			else if (typeof obj[p] === 'function')
-				result += '\n' + tabs + p + ': (' + getParamNames(obj[p]) + ') => import(\'rdb\').Filter;';
+				result += '\n' + tabs + p + ': (' + getParamNames(obj[p]) + ') => import(\'orange-orm\').Filter;';
 		}
 		return result;
 	}
