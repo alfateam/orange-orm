@@ -1,5 +1,5 @@
-<div style="display: flex; justify-content: center;">
-  <img src="./docs/orange.svg" alt="Orange" width="250" style="transform: translateX(-10px);" />
+<div align="center">
+<img src="./docs/orange.svg" alt="Orange ORM Logo" width="250"/>
 </div>
 
 The ultimate Object Relational Mapper for Node.js and Typescript, offering seamless integration with a variety of popular databases. Whether you're building applications in TypeScript or JavaScript  (including both CommonJS and ECMAScript), Orange has got you covered.  
