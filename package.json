@@ -129,7 +129,7 @@
     "type": "git",
     "url": "git@github.com:alfateam/orange-orm.git"
   },
-  "homepage": "https://orange-orm.io\",
+  "homepage": "https://orange-orm.io",
   "jshintConfig": {
     "asi": true,
     "eqnull": true,
