@@ -1,4 +1,6 @@
 ## Changelog
+__3.10.2_  
+This package has been moved to [orange-orm](https://npmjs.org/package/orange-orm)  
 __3.10.1_  
 Bugfix: Adding hasOne row to existing parent throws.  See [#86](https://github.com/alfateam/rdb/issues/86)  
 __3.10.0_  
