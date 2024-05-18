@@ -1795,7 +1795,7 @@ async function getRows() {
 ```
 </details>
 
-<details><summary><strong>Aggregate functions</strong></summary>
+<details id="aggregates"><summary><strong>Aggregate functions</strong></summary>
 
 You can count records and aggregate numerical columns.  This can either be done across rows or separately for each row.  
 Supported functions include:
