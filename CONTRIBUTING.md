@@ -1,10 +1,10 @@
-# **Contributing to rdb**
+# **Contributing to Orange ORM**
 
-Thank you for considering a contribution to [rdb](https://github.com/alfateam/rdb)!
+Thank you for considering a contribution to [orange orm](https://github.com/alfateam/orange-orm)!
 
 ## **1. Reporting Issues**
 
-- Begin by exploring the [existing issues](https://github.com/alfateam/rdb/issues).
+- Begin by exploring the [existing issues](https://github.com/alfateam/orange-orm/issues).
 - If you don't find an existing issue related to yours, please open a new one with detailed information.
 
 ## **2. Making Changes**
@@ -12,7 +12,7 @@ If you're planning significant code changes, it's a good practice to open an iss
 1. **Fork & Clone**  
 	If you haven't already, fork the repository first.  
 	Then, clone it:  
-   `git clone https://github.com/YOUR_USERNAME/rdb.git`
+   `git clone https://github.com/YOUR_USERNAME/orange-orm.git`
 
 2. **Create a New Branch**  
    `git checkout -b your-branch-name`

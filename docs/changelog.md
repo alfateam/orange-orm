@@ -1,20 +1,20 @@
 ## Changelog
 __3.10.1_  
-Bugfix: Adding hasOne row to existing parent throws.  See [#86](https://github.com/alfateam/rdb/issues/86)  
+Bugfix: Adding hasOne row to existing parent throws.  See [#86](https://github.com/alfateam/orange-orm/issues/86)  
 __3.10.0_  
 Aggregate functions  
 __3.9.1_  
-Bugfix: Crashing on many relations if foreign key column is omitted in strategy.  See [#83](https://github.com/alfateam/rdb/issues/83)  
+Bugfix: Crashing on many relations if foreign key column is omitted in strategy.  See [#83](https://github.com/alfateam/orange-orm/issues/83)  
 __3.9.0__  
-Possible to elevate associated column on a related table to a parent table when fetching.  See https://github.com/alfateam/rdb/#user-content-aggregate-results  
+Possible to elevate associated column on a related table to a parent table when fetching.  See https://github.com/alfateam/orange-orm/#user-content-aggregate-results  
 __3.8.0__  
 Aggregate operators: count, max, min, avg and sum.      
 __3.7.0__  
 Upgraded to mysql2@3.9.4 and tedious@18.1.0    
 __3.6.2__  
-Fixed bug with orderBy array that appeared in v3.6.0. See  [#78](https://github.com/alfateam/rdb/issues/78)  
+Fixed bug with orderBy array that appeared in v3.6.0. See  [#78](https://github.com/alfateam/orange-orm/issues/78)  
 __3.6.1__  
-Fixed bug in filtered relations regarding incorrect alias. See [#76](https://github.com/alfateam/rdb/issues/76)  
+Fixed bug in filtered relations regarding incorrect alias. See [#76](https://github.com/alfateam/orange-orm/issues/76)  
 __3.6.0__  
 Filters on relations.  
 __3.5.2__  
@@ -24,37 +24,37 @@ Mssql: fix precision date types.
 __3.5.0__  
 Support for Oracle.  
 __3.4.0__  
-Allow multiple resultset for SAP and mssql. See [#72](https://github.com/alfateam/rdb/issues/72).  
+Allow multiple resultset for SAP and mssql. See [#72](https://github.com/alfateam/orange-orm/issues/72).  
 __3.3.0__  
-Possible to apply updates from JSON object. See [#70](https://github.com/alfateam/rdb/issues/70).  
+Possible to apply updates from JSON object. See [#70](https://github.com/alfateam/orange-orm/issues/70).  
 __3.2.9__  
-Transaction was ignored. See [#68](https://github.com/alfateam/rdb/issues/68).  
-Proxify method had incorrect type signature. See [#69](https://github.com/alfateam/rdb/issues/69).  
+Transaction was ignored. See [#68](https://github.com/alfateam/orange-orm/issues/68).  
+Proxify method had incorrect type signature. See [#69](https://github.com/alfateam/orange-orm/issues/69).  
 __3.2.8__  
-Signature for fetchingStrategy should accept boolean as well object (code generation only). See [#67](https://github.com/alfateam/rdb/issues/67).  
+Signature for fetchingStrategy should accept boolean as well object (code generation only). See [#67](https://github.com/alfateam/orange-orm/issues/67).  
 __3.2.7__  
-Bugfix Inserting with skipOnConflict on whole table yields incorrect sql. See [#63](https://github.com/alfateam/rdb/issues/63).  
+Bugfix Inserting with skipOnConflict on whole table yields incorrect sql. See [#63](https://github.com/alfateam/orange-orm/issues/63).  
 __3.2.6__  
 Hide metadata types from intellisense on insert().  
 __3.2.5__  
-Fix typescript signature for insert overload. See [#62](https://github.com/alfateam/rdb/issues/62).  
+Fix typescript signature for insert overload. See [#62](https://github.com/alfateam/orange-orm/issues/62).  
 __3.2.4__  
-Bugfix: array of filters. See [#56](https://github.com/alfateam/rdb/issues/56) and [#57](https://github.com/alfateam/rdb/issues/57).  
+Bugfix: array of filters. See [#56](https://github.com/alfateam/orange-orm/issues/56) and [#57](https://github.com/alfateam/orange-orm/issues/57).  
 __3.2.3__  
-Conflict resolution on insert. See [#42](https://github.com/alfateam/rdb/issues/42) and [Inserting rows](https://github.com/alfateam/rdb/tree/master#user-content-inserting-rows).  
+Conflict resolution on insert. See [#42](https://github.com/alfateam/orange-orm/issues/42) and [Inserting rows](https://github.com/alfateam/orange-orm/tree/master#user-content-inserting-rows).  
 __3.2.2__  
-Bugfix for Sql Server: OFFSET was ignored. See [#46](https://github.com/alfateam/rdb/issues/49).  
+Bugfix for Sql Server: OFFSET was ignored. See [#46](https://github.com/alfateam/orange-orm/issues/49).  
 __3.2.1__  
 Bugfix for those using code generation: count had wrong signature.  
 __3.2.0__  
 Support for aggregate count() function.  
 __3.1.47__  
-Bugfix: Raw queries ran outside transaction.  See [#46](https://github.com/alfateam/rdb/issues/46).  
+Bugfix: Raw queries ran outside transaction.  See [#46](https://github.com/alfateam/orange-orm/issues/46).  
 Documented logging.  
 __3.1.46__  
 Bugfix code generation, only related for those still using legacy / code generation.  
 __3.1.45__  
-Memoize pool when resolving through func.  See [#45](https://github.com/alfateam/rdb/issues/45).  
+Memoize pool when resolving through func.  See [#45](https://github.com/alfateam/orange-orm/issues/45).  
 Improved ts types for and/or-operators: now accepting arrays of RawFilter.  
 __3.1.44__  
 Bugfix with globbing, only related for those still using legacy / code generation  
@@ -168,9 +168,9 @@ Improve typescript code generation.
 __3.0.24__  
 Bugfixed related to wathcing JSON column when value is null.  
 __3.0.23__  
-Still some bugfix related to: [Converting date to ISO sometimes gives incorrect milliseconds part](https://github.com/alfateam/rdb/issues/29).  
+Still some bugfix related to: [Converting date to ISO sometimes gives incorrect milliseconds part](https://github.com/alfateam/orange-orm/issues/29).  
 __3.0.22__  
-Bugfix: [Converting date to ISO sometimes gives incorrect milliseconds part](https://github.com/alfateam/rdb/issues/29).  
+Bugfix: [Converting date to ISO sometimes gives incorrect milliseconds part](https://github.com/alfateam/orange-orm/issues/29).  
 __3.0.21__  
 Fix typescript generation for Express.  
 __3.0.20__  
@@ -292,7 +292,7 @@ Bugfix with insert and hasOne relation.
 __1.8.0__  
 Pooling is disabled when there is no pool option object sent in. Previously, a pool with default size 10 was always created.  
 __1.7.7__  
-Commit/rollback are implicit if sending a callback to the transaction function. [See example](https://github.com/alfateam/rdb/blob/await/src/docs/docs.md#_connecttopostgres)  
+Commit/rollback are implicit if sending a callback to the transaction function. [See example](https://github.com/alfateam/orange-orm/blob/await/src/docs/docs.md#_connecttopostgres)  
 The callback must return a promise or be an async function.  
 __1.7.6__  
 Order By now supports jsonb-fields.  
@@ -309,9 +309,9 @@ Support for schemas (postgres only).
 __1.7.0__  
 sqlite3 is now a peer dependency. Add it to your own package.json if you intend to use it.  
 __1.6.9__  
-Bugfix: [one-to-many relation returns empty if strategy is included](https://github.com/alfateam/rdb/issues/22).  
+Bugfix: [one-to-many relation returns empty if strategy is included](https://github.com/alfateam/orange-orm/issues/22).  
 __1.6.8__  
-Bugfix: [one-to-many relation returns empty if insert/update is done earlier in transaction](https://github.com/alfateam/rdb/issues/21).  
+Bugfix: [one-to-many relation returns empty if insert/update is done earlier in transaction](https://github.com/alfateam/orange-orm/issues/21).  
 __1.6.7__  
 Bugfix in relations.  
 __1.6.6__  
@@ -351,17 +351,17 @@ Upgraded to pg 6.0.3
 __1.5.2__  
 Improved performance and reduced memory footprint.  
 __1.5.1__  
-Documented JSON column type. [Bug fix: Insert and foreign key violation](https://github.com/alfateam/rdb/issues/19).  
+Documented JSON column type. [Bug fix: Insert and foreign key violation](https://github.com/alfateam/orange-orm/issues/19).  
 __1.5.0__  
 JSON column type. Postgres json type does not support rdb filters.  
 __1.4.1__  
-[Empty filter would sometimes cause invalid filter.](https://github.com/alfateam/rdb/issues/18)  
+[Empty filter would sometimes cause invalid filter.](https://github.com/alfateam/orange-orm/issues/18)  
 __1.4.0__  
 Raw SQL query.  
 __1.3.0__  
 getMany() now supports limit and orderBy - same syntax as in streaming.  
 __1.2.3__  
-Bugfix: [iEqual gave incorrect sql when parameterized.](https://github.com/alfateam/rdb/issues/17)  
+Bugfix: [iEqual gave incorrect sql when parameterized.](https://github.com/alfateam/orange-orm/issues/17)  
 __1.2.2__  
 Exlusive no longer returns a clone of table. It has changes current table to exclusive locking.  
 __1.2.1__  
@@ -379,7 +379,7 @@ Bugfix: Transaction domain should not forward rdb singleton from old domain.
 __1.0.5__  
 Documentation cleanup.  
 __1.0.4__  
-[orderBy](https://github.com/alfateam/rdb/blob/master/src/docs/docs.md#_todtowithorderby) in toDto().  
+[orderBy](https://github.com/alfateam/orange-orm/blob/master/src/docs/docs.md#_todtowithorderby) in toDto().  
 __1.0.3__  
 toDto() using next tick on every thousandth row to avoid maximum call stack size exceeded.  
 __1.0.2__  
@@ -392,8 +392,8 @@ Semantic versioning from now on.
 __0.5.1__  
 Improved performance  
 __0.5.0__  
-[Logging](https://github.com/alfateam/rdb-demo/blob/master/logging.js): rdb.log(someFunc) logs sql and parameters.  
-[Raw sql filters.](https://github.com/alfateam/rdb-demo/blob/master/filtering/rawSqlFilter.js)  
+[Logging](https://github.com/alfateam/orange-orm-demo/blob/master/logging.js): rdb.log(someFunc) logs sql and parameters.  
+[Raw sql filters.](https://github.com/alfateam/orange-orm-demo/blob/master/filtering/rawSqlFilter.js)  
 __0.4.9__  
 New method: tryGetById.  
 New filter: iEqual, postgres only.  
@@ -411,9 +411,9 @@ Oops. Forgot to use pg.js instead of pg.
 __0.4.4__  
 Upgraded all dependencies to latest. Using pg.js instead of pg.  
 __0.4.3__  
-[Can ignore columns when serializing to dto](https://github.com/alfateam/rdb-demo/blob/master/serializable.js).  
+[Can ignore columns when serializing to dto](https://github.com/alfateam/orange-orm-demo/blob/master/serializable.js).  
 __0.4.2__  
-Bugfix: [update on a row crashes when a delete occurs earlier in same transaction](https://github.com/alfateam/rdb/issues/12).  
+Bugfix: [update on a row crashes when a delete occurs earlier in same transaction](https://github.com/alfateam/orange-orm/issues/12).  
 __0.4.1__  
 Bugfix: more global leaks.  
 __0.4.0__  

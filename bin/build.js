@@ -30,7 +30,7 @@ async function runSingle(schemaTs) {
 			schemaJsPath = schemaTs;
 			isPureJs = true;
 		}
-		console.log(`Rdb: found schema ${schemaTs}`);
+		console.log(`Orange: found schema ${schemaTs}`);
 		if (!schemaJsPath) {
 			let nodeModules = findNodeModules('node_modules', { cwd: schemaTs });
 			outDir = path.join(nodeModules, '/.rdb', '/' + new Date().getUTCMilliseconds());
@@ -40,7 +40,7 @@ async function runSingle(schemaTs) {
 		if ('default' in schemaJs)
 			schemaJs = schemaJs.default;
 		if (!schemaJs.tables) {
-			console.log('Rdb: no tables found.');
+			console.log('Orange: no tables found.');
 			return;
 		}
 		let src = '';
@@ -60,7 +60,7 @@ async function runSingle(schemaTs) {
 		if (isPureJs)
 			await writeIndexJs(schemaJsPath);
 
-		console.log('Rdb: created ts typings successfully.');
+		console.log('Orange: created ts typings successfully.');
 	}
 	catch(e) {
 		console.dir(e);
@@ -111,7 +111,7 @@ function tryDownload(_url, _isNamespace) {
 
 async function download(url, isNamespace) {
 	url = `${url}?isNamespace=${isNamespace}`;
-	console.log(`Rdb: downloading from  ${url}`);
+	console.log(`Orange: downloading from  ${url}`);
 	// eslint-disable-next-line no-undef
 	try {
 		let response = await axios.get(url);
