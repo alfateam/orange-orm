@@ -593,7 +593,7 @@ getRows();
 
 async function getRows() {
   const order = await db.order.getOne(undefined /* optional filter */, {
-    where: x => x.order.customer(customer => customer.isActive.eq(true)
+    where: x => x.customer(customer => customer.isActive.eq(true)
                  .and(customer.startsWith('Harr'))),
     customer: true, 
     deliveryAddress: true, 
@@ -615,7 +615,6 @@ async function getRows() {
     lines: true
   });
 }
-```
 ```
 
 __Single row by primary key__
