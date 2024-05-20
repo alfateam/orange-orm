@@ -329,7 +329,7 @@ $ npm install pg
 ```  
 ```javascript
 import map from './map';
-const db = map.pg('postgres://postgres:postgres@postgres/postgres');
+const db = map.postgres('postgres://postgres:postgres@postgres/postgres');
 ```
 __Oracle__
 ```bash
