@@ -46,7 +46,7 @@ $ npm install orange-orm
 ## Example
 Watch the [tutorial video on YouTube](https://youtu.be/1IwwjPr2lMs)
 
-![Relations diagram](./docs/relations.png)  
+![Relations diagram](./docs/diagram.svg)  
 
 Here we choose SQLite.  
 ```bash
@@ -77,6 +77,12 @@ const map = orange.map(x => ({
     amount: column('amount').numeric(),
   })),
 
+  package: x.table('package').map(({ column }) => ({
+    id: column('packageId').numeric().primary().notNullExceptInsert(),
+    lineId: column('lineId').numeric().notNullExceptInsert(),
+    sscc: column('sscc').string() //the barcode
+  })),
+
   deliveryAddress: x.table('deliveryAddress').map(({ column }) => ({
     id: column('id').numeric().primary(),
     orderId: column('orderId').numeric(),
@@ -87,6 +93,10 @@ const map = orange.map(x => ({
     countryCode: column('countryCode').string(),
   }))
 
+})).map(x => ({
+	orderLine: x.orderLine.map(({ hasMany }) => ({
+		packages: hasMany(x.package).by('lineId')
+	}))
 })).map(x => ({
   order: x.order.map(v => ({
     customer: v.references(x.customer).by('customerId'),
@@ -130,8 +140,10 @@ async function getRows() {
   const orders = await db.order.getAll({
     where: x => x.lines.any(line => line.product.contains('broomstick'))
       .and(db.order.customer.name.startsWith('Harry')),
-    lines: true,
-    deliveryAddress: true,
+    lines: {
+      packages: true
+    },
+    deliveryAddress: true,    
     customer: true
   });  
 }
@@ -145,7 +157,7 @@ async function getRows() {
 
 Each column within your database table is designated by using the <strong><i>column()</i></strong> method, in which you specify its name. This action generates a reference to a column object that enables you to articulate further column properties like its data type or if it serves as a primary key.
 
-Relationships between tables can also be outlined. By using methods like <strong><i>hasOne</i></strong>, <strong><i>hasMany</i></strong>, and <strong><i>references</i></strong>, you can establish connections that reflect the relationships in your data schema. In the example below, an 'order' is linked to a 'customer' reference, a 'deliveryAddress', and multiple 'lines'. The hasMany and hasOne relations represents ownership - the tables 'deliveryAddress' and 'orderLine' are owned by the 'order' table, and therefore, they contain the 'orderId' column referring to their parent table, which is 'order'. Conversely, the customer table is independent and can exist without any knowledge of the 'order' table. Therefore we say that the order table <i>references</i> the customer table - necessitating the existence of a 'customerId' column in the 'order' table.</p>
+Relationships between tables can also be outlined. By using methods like <strong><i>hasOne</i></strong>, <strong><i>hasMany</i></strong>, and <strong><i>references</i></strong>, you can establish connections that reflect the relationships in your data schema. In the example below, an 'order' is linked to a 'customer' reference, a 'deliveryAddress', and multiple 'lines'. The hasMany and hasOne relations represents ownership - the tables 'deliveryAddress' and 'orderLine' are owned by the 'order' table, and therefore, they contain the 'orderId' column referring to their parent table, which is 'order'. The similar relationship exists between orderLine and package - hence the packages are owned by the orderLine. Conversely, the customer table is independent and can exist without any knowledge of the 'order' table. Therefore we say that the order table <i>references</i> the customer table - necessitating the existence of a 'customerId' column in the 'order' table.</p>
 
 <sub>📄 map.ts</sub>
 ```javascript
@@ -171,6 +183,12 @@ const map = orange.map(x => ({
     product: column('product').string(),
   })),
 
+  package: x.table('package').map(({ column }) => ({
+    id: column('packageId').numeric().primary().notNullExceptInsert(),
+    lineId: column('lineId').numeric().notNullExceptInsert(),
+    sscc: column('sscc').string() //the barcode
+  })),
+
   deliveryAddress: x.table('deliveryAddress').map(({ column }) => ({
     id: column('id').numeric().primary(),
     orderId: column('orderId').numeric(),
@@ -181,6 +199,10 @@ const map = orange.map(x => ({
     countryCode: column('countryCode').string(),
   }))
 
+})).map(x => ({
+	orderLine: x.orderLine.map(({ hasMany }) => ({
+		packages: hasMany(x.package).by('lineId')
+	}))
 })).map(x => ({
   order: x.order.map(({ hasOne, hasMany, references }) => ({
     customer: references(x.customer).by('customerId'),
@@ -223,6 +245,12 @@ CREATE TABLE orderLine (
     orderId INTEGER REFERENCES _order,
     product TEXT,
     amount NUMERIC(10,2)
+);
+
+CREATE TABLE package (
+    packageId INTEGER PRIMARY KEY,
+    lineId INTEGER REFERENCES orderLine,
+    sscc TEXT
 );
 
 CREATE TABLE deliveryAddress (
@@ -497,12 +525,14 @@ async function getRows() {
   const orders = await db.order.getAll({
     customer: true, 
     deliveryAddress: true, 
-    lines: true
+    lines: {
+      packages: true
+    }
   });
 }
 ```
 __Limit, offset and order by__  
-This script demonstrates how to fetch orders with customer, lines and deliveryAddress, limiting the results to 10, skipping the first row, and sorting the data based on the orderDate in descending order followed by id. The lines are sorted by product.  
+This script demonstrates how to fetch orders with customer, lines, packages and deliveryAddress, limiting the results to 10, skipping the first row, and sorting the data based on the orderDate in descending order followed by id. The lines are sorted by product.  
 
 ```javascript
 import map from './map';
@@ -518,6 +548,7 @@ async function getRows() {
     customer: true, 
     deliveryAddress: true, 
     lines: {
+      packages: true,
       orderBy: 'product'
     },
   });
