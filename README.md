@@ -94,9 +94,9 @@ const map = orange.map(x => ({
   }))
 
 })).map(x => ({
-	orderLine: x.orderLine.map(({ hasMany }) => ({
-		packages: hasMany(x.package).by('lineId')
-	}))
+  orderLine: x.orderLine.map(({ hasMany }) => ({
+    packages: hasMany(x.package).by('lineId')
+  }))
 })).map(x => ({
   order: x.order.map(v => ({
     customer: v.references(x.customer).by('customerId'),
@@ -200,9 +200,9 @@ const map = orange.map(x => ({
   }))
 
 })).map(x => ({
-	orderLine: x.orderLine.map(({ hasMany }) => ({
-		packages: hasMany(x.package).by('lineId')
-	}))
+  orderLine: x.orderLine.map(({ hasMany }) => ({
+    packages: hasMany(x.package).by('lineId')
+  }))
 })).map(x => ({
   order: x.order.map(({ hasOne, hasMany, references }) => ({
     customer: references(x.customer).by('customerId'),
