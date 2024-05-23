@@ -53,14 +53,17 @@ export interface ${Name}Table {
 	getOne(${name}: ${Name}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
 	getById(${getIdArgs(table)}): Promise<${Name}Row>;
 	getById(${getIdArgs(table)}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
+
 	update(${name}s: ${Name}[]): Promise<${Name}Array>;
-	updateChanges(${name}s: ${Name}[], old${name}s: ${Name}[]): Promise<${Name}Array>;
 	update(${name}s: ${Name}[], fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
-	updateChanges(${name}s: ${Name}[],old${name}s: ${Name}[], fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
 	update(${name}: ${Name}): Promise<${Name}Row>;
-	updateChanges(${name}: ${Name}, old${name}: ${Name}): Promise<${Name}Row>;
 	update(${name}: ${Name}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
-	updateChanges(${name}: ${Name},${name}: ${Name}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
+
+	updateChanges(${name}s: ${Name}[], old${name}s: ${Name}[]): Promise<${Name}Array>;
+	updateChanges(${name}s: ${Name}[],old${name}s: ${Name}[], fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
+	updateChanges(${name}: ${Name}, old${name}: ${Name}): Promise<${Name}Row>;
+	updateChanges(${name}: ${Name},old${name}: ${Name}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
+	
 	insert(${name}s: ${Name}[]): Promise<${Name}Array>;
 	insert(${name}s: ${Name}[], fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
 	insert(${name}: ${Name}): Promise<${Name}Row>;
@@ -78,11 +81,6 @@ export interface ${Name}Table {
 	patch(patch: JsonPatch): Promise<void>;
 	patch(patch: JsonPatch, concurrency: ${Name}Concurrency, fetchingStrategy?: ${Name}Strategy): Promise<void>;	
 	customFilters: ${Name}CustomFilters;
-	${_columns}
-	${_tableRelations}
-}
-
-export interface ${Name}TableBase {	
 	${_columns}
 	${_tableRelations}
 }
@@ -224,6 +222,12 @@ export interface ${name} {
 	${regularRelations}
 }
 
+export interface ${name}TableBase {	
+	${columns(table)}
+	${tableRelations(table)}
+}
+
+
 export interface ${name}Strategy {
 	${strategyColumns(table)}
 	${strategyRelations}
@@ -350,9 +354,9 @@ function getPrefixTs(isNamespace) {
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { AxiosInterceptorManager, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
-import type { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Url, ColumnConcurrency, JsonPatch } from 'rdb';
+import type { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Url, ColumnConcurrency, JsonPatch } from 'orange-orm';
 export { RequestHandler } from 'express';
-export { Concurrency, Filter, RawFilter, Config, TransactionOptions, Pool } from 'rdb';
+export { Concurrency, Filter, RawFilter, Config, TransactionOptions, Pool } from 'orange-orm';
 export = r;
 declare function r(config: Config): r.RdbClient;
 `;
@@ -363,7 +367,7 @@ declare function r(config: Config): r.RdbClient;
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import schema from './schema';
 import type { AxiosInterceptorManager, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
-import type { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Url, ColumnConcurrency, JsonPatch } from 'rdb';
+import type { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Url, ColumnConcurrency, JsonPatch } from 'orange-orm';
 export default schema as RdbClient;`;
 }
 

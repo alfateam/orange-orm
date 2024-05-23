@@ -1,4 +1,6 @@
 ## Changelog
+__3.10.3_  
+Fix duplicate method signatures for those still using code generation  
 __3.10.2_  
 Orange ORM was renamed from rdb. New installation url: [npmjs.org/package/orange-orm](https://npmjs.org/package/orange-orm) . Old url was npmjs.org/package/rdb  
 __3.10.1_  
