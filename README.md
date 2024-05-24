@@ -752,6 +752,7 @@ update();
 async function update() {
 
   const modified = {
+    id: 1,
     orderDate: '2023-07-14T12:00:00',
     customer: {
       id: 2
