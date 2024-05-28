@@ -384,8 +384,6 @@ function rdbClient(options = {}) {
 			const result =  await adapter.post(body);
 			if (strategy)
 				return proxify(result, strategy);
-			else
-				return;
 		}
 
 		async function replace(_row, strategy) {
