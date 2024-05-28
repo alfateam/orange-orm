@@ -740,8 +740,8 @@ async function update() {
   await orders.saveChanges();
 }
 ```
-__Batch updates__  
-The update method is ideal for updating specific columns and relationships in one or multiple rows. You must provide a where filter to specify the target rows. If you include a fetching strategy, the affected rows and their related data will be returned; otherwise, no data is returned.
+__Selective updates__  
+The update method is ideal for updating specific columns and relationships across one or multiple rows. You must provide a where filter to specify the target rows. If you include a fetching strategy, the affected rows and their related data will be returned; otherwise, no data is returned.
 
 ```javascript
 import map from './map';
@@ -761,8 +761,8 @@ async function update() {
     ]
   };
 
-  const optionalFetchingStrategy = {customer: true, deliveryAddress: true, lines: true};
-  const orders = await db.order.update(propsToBeModified, { where: x => x.id.eq(1) }, optionalFetchingStrategy);
+  const strategy = {customer: true, deliveryAddress: true, lines: true};
+  const orders = await db.order.update(propsToBeModified, { where: x => x.id.eq(1) }, strategy);
 }
 ```
 __Replacing a row from JSON__  
