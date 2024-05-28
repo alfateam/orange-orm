@@ -1,10 +1,3 @@
-let extractSubStrategy = _extractSubStrategy;
-
-function _extractSubStrategy(table, map) {
-	extractSubStrategy = require('./getMeta');
-	return extractSubStrategy(table, map);
-}
-
 function getMeta(table, map = new Map()) {
 	if (map.has(table))
 		return map.get(table).id;
@@ -30,11 +23,11 @@ function getMeta(table, map = new Map()) {
 
 	let visitor = {};
 	visitor.visitJoin = function(relation) {
-		strategy.relations[relationName] = extractSubStrategy(relation.childTable, map);
+		strategy.relations[relationName] = getMeta(relation.childTable, map);
 	};
 
 	visitor.visitMany = function(relation) {
-		strategy.relations[relationName] = extractSubStrategy(relation.childTable, map);
+		strategy.relations[relationName] = getMeta(relation.childTable, map);
 	};
 
 	visitor.visitOne = visitor.visitMany;
