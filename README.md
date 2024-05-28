@@ -741,7 +741,7 @@ async function update() {
 }
 ```
 __Selective updates__  
-The update method is ideal for updating specific columns and relationships across one or multiple rows. You must provide a where filter to specify the target rows. If you include a fetching strategy, the affected rows and their related data will be returned; otherwise, no data is returned.
+The update method is ideal for updating specific columns and relationships across one or multiple rows. You must provide a where filter to specify which rows to target. If you include a fetching strategy, the affected rows and their related data will be returned; otherwise, no data is returned.
 
 ```javascript
 import map from './map';
