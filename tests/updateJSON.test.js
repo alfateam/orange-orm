@@ -19,17 +19,7 @@ const date2 = new Date(2021, 0, 11, 12, 22, 45);
 let server = null;
 const port = 3002;
 
-afterAll(async () => {
-	return new Promise((res) => {
-		if (server)
-			server.close(res);
-		else
-			res();
-	});
-});
-
-
-beforeAll(async () => {
+async function globalSetup() {
 	await insertData('pg');
 	await insertData('oracle');
 	await insertData('mssql');
@@ -40,69 +30,84 @@ beforeAll(async () => {
 	await insertData('sqlite');
 	await insertData('sqlite2');
 	hostExpress();
+}
 
-	async function insertData(dbName) {
-		const { db, init } = getDb(dbName);
-		await init(db);
+async function insertData(dbName) {
+	const { db, init } = getDb(dbName);
+	await init(db);
 
-		const george = await db.customer.insert({
-			name: 'George',
-			balance: 177,
-			isActive: true
-		});
+	const george = await db.customer.insert({
+		name: 'George',
+		balance: 177,
+		isActive: true
+	});
 
-		const john = await db.customer.insert({
-			name: 'Harry',
-			balance: 200,
-			isActive: true
-		});
+	const john = await db.customer.insert({
+		name: 'Harry',
+		balance: 200,
+		isActive: true
+	});
 
-		await db.order.insert([
-			{
-				orderDate: date1,
-				customer: george,
-				deliveryAddress: {
-					name: 'George',
-					street: 'Node street 1',
-					postalCode: '7059',
-					postalPlace: 'Jakobsli',
-					countryCode: 'NO'
-				},
-				lines: [
-					{ product: 'Bicycle' },
-					{ product: 'Small guitar' }
-				]
+	await db.order.insert([
+		{
+			orderDate: date1,
+			customer: george,
+			deliveryAddress: {
+				name: 'George',
+				street: 'Node street 1',
+				postalCode: '7059',
+				postalPlace: 'Jakobsli',
+				countryCode: 'NO'
 			},
-			{
-				customer: john,
-				orderDate: date2,
-				deliveryAddress: {
-					name: 'Harry Potter',
-					street: '4 Privet Drive, Little Whinging',
-					postalCode: 'GU4',
-					postalPlace: 'Surrey',
-					countryCode: 'UK'
-				},
-				lines: [
-					{ product: 'Magic wand' }
-				]
-			}
-		]);
-	}
+			lines: [
+				{ product: 'Bicycle' },
+				{ product: 'Small guitar' }
+			]
+		},
+		{
+			customer: john,
+			orderDate: date2,
+			deliveryAddress: {
+				name: 'Harry Potter',
+				street: '4 Privet Drive, Little Whinging',
+				postalCode: 'GU4',
+				postalPlace: 'Surrey',
+				countryCode: 'UK'
+			},
+			lines: [
+				{ product: 'Magic wand' }
+			]
+		}
+	]);
+}
 
-	function hostExpress() {
-		const { db } = getDb('sqlite2');
-		let app = express();
-		app.disable('x-powered-by')
-			.use(json({ limit: '100mb' }))
-			.use('/rdb', cors(), db.express());
-		server = app.listen(port, () => console.log(`Example app listening on port ${port}!`));
-	}
+function hostExpress() {
+	const { db } = getDb('sqlite2');
+	let app = express();
+	app.disable('x-powered-by')
+		.use(json({ limit: '100mb' }))
+		.use('/rdb', cors(), db.express());
+	server = app.listen(port, () => console.log(`Example app listening on port ${port}!`));
+}
 
-}, 20000);
+function globalTeardown() {
+	return new Promise((res) => {
+		if (server)
+			server.close(res);
+		else
+			res();
+	});
+}
 
+describe('updateChanges', () => {
+	beforeAll(async () => {
+		await globalSetup();
+	});
 
-describe('update with JSON diff', () => {
+	afterAll(async () => {
+		await globalTeardown();
+	});
+
 	test('pg', async () => await verify('pg'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
@@ -114,22 +119,20 @@ describe('update with JSON diff', () => {
 	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
-
 		const { db } = getDb(dbName);
-		const originalRow = await db.order.getById(1, {deliveryAddress: true, lines: true});
+		const originalRow = await db.order.getById(1, { deliveryAddress: true, lines: true });
 		const json = JSON.stringify(originalRow);
 		const row = JSON.parse(json);
 		const oldRow = JSON.parse(json);
 
 		originalRow.deliveryAddress.postalCode = '7058';
-		originalRow.lines.push({product: 'meantime'});
+		originalRow.lines.push({ product: 'meantime' });
 		await originalRow.saveChanges();
 
-		row.lines.push({product: 'new product'});
+		row.lines.push({ product: 'new product' });
 		row.deliveryAddress.name = 'new name';
 
-
-		let changedRow = await db.order.updateChanges(row, oldRow, {deliveryAddress: true, lines: {orderBy: 'id'}});
+		let changedRow = await db.order.updateChanges(row, oldRow, { deliveryAddress: true, lines: { orderBy: 'id' } });
 		const expected = {
 			id: 1,
 			orderDate: dateToISOString(date1).substring(0, changedRow.orderDate.length),
@@ -155,7 +158,16 @@ describe('update with JSON diff', () => {
 	}
 });
 
-describe('update date in array with JSON', () => {
+
+describe('replace then return rows', () => {
+	beforeAll(async () => {
+		await globalSetup();
+	});
+
+	afterAll(async () => {
+		await globalTeardown();
+	});
+
 	test('pg', async () => await verify('pg'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
@@ -167,19 +179,138 @@ describe('update date in array with JSON', () => {
 	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
-
 		const { db } = getDb(dbName);
-		const json = JSON.stringify(await db.order.getMany());
-		let rows = JSON.parse(json);
-		const date = new Date(2021, 0, 11, 9, 11, 47);
 
-		rows[0].orderDate = date;
-		const changedRows = await db.order.update(rows);
-		expect(changedRows[0].orderDate).toEqual(dateToISOString(date).substring(0, changedRows[0].orderDate.length));
+		let originalRow = await db.order.getOne(null, { customer: true, lines: true, deliveryAddress: true, where: x => x.id.eq(1) });
+		let row = {
+			id: 1,
+			customerId: 2,
+			orderDate: originalRow.orderDate,
+			lines: [
+				{
+					orderId: originalRow.id,
+					product: 'kazoo',
+					amount: 166
+				}]
+		};
+
+		const returned = await db.order.replace(row, { customer: true, lines: true, deliveryAddress: true });
+
+		const expected = {
+			customer: {
+				balance: 200,
+				id: 2,
+				isActive: true,
+				name: 'Harry',
+			},
+			customerId: 2,
+			deliveryAddress: {
+				countryCode: 'NO',
+				id: 1,
+				name: 'George',
+				orderId: 1,
+				postalCode: '7059',
+				postalPlace: 'Jakobsli',
+				street: 'Node street 1',
+			},
+			id: 1,
+			lines: [
+				{
+					amount: 166,
+					id: 4,
+					orderId: 1,
+					product: 'kazoo',
+				},
+			],
+			orderDate: originalRow.orderDate,
+		};
+
+		expect(returned).toEqual(expected);
+
+	}
+});
+describe('replace', () => {
+	beforeAll(async () => {
+		await globalSetup();
+	});
+
+	afterAll(async () => {
+		await globalTeardown();
+	});
+
+	test('pg', async () => await verify('pg'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sap', async () => await verify('sap'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+
+		let originalRow = await db.order.getOne(null, { customer: true, lines: true, deliveryAddress: true, where: x => x.id.eq(1) });
+		let row = {
+			id: 1,
+			customerId: 2,
+			orderDate: originalRow.orderDate,
+			lines: [
+				{
+					orderId: originalRow.id,
+					product: 'kazoo',
+					amount: 166
+				}]
+		};
+
+		const returned = await db.order.replace(row);
+		const changedRow = await db.order.getById(originalRow.id, { customer: true, lines: true, deliveryAddress: true });
+
+		const expected = {
+			customer: {
+				balance: 200,
+				id: 2,
+				isActive: true,
+				name: 'Harry',
+			},
+			customerId: 2,
+			deliveryAddress: {
+				countryCode: 'NO',
+				id: 1,
+				name: 'George',
+				orderId: 1,
+				postalCode: '7059',
+				postalPlace: 'Jakobsli',
+				street: 'Node street 1',
+			},
+			id: 1,
+			lines: [
+				{
+					amount: 166,
+					id: 4,
+					orderId: 1,
+					product: 'kazoo',
+				},
+			],
+			orderDate: originalRow.orderDate,
+		};
+
+		expect(returned).toEqual(undefined);
+		expect(changedRow).toEqual(expected);
+
 	}
 });
 
-describe('update date with JSON', () => {
+describe('update with JSON', () => {
+	beforeAll(async () => {
+		await globalSetup();
+	});
+
+	afterAll(async () => {
+		await globalTeardown();
+	});
+
 	test('pg', async () => await verify('pg'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
@@ -191,15 +322,125 @@ describe('update date with JSON', () => {
 	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
-
 		const { db } = getDb(dbName);
 
-		let json = JSON.stringify(await db.order.getOne());
-		let row = JSON.parse(json);
-		const date = new Date(2021, 0, 11, 9, 11, 47);
-		row.orderDate = date;
-		const changedRow = await db.order.update(row);
-		expect(changedRow.orderDate).toEqual(dateToISOString(date).substring(0, changedRow.orderDate.length));
+		let originalRow = await db.order.getOne(null, { customer: true, lines: true, deliveryAddress: true, where: x => x.id.eq(1) });
+
+		let row = {
+			id: 1,
+			customerId: 2,
+			lines: [
+				{
+					orderId: originalRow.id,
+					product: 'kazoo',
+					amount: 166
+				}]
+		};
+
+		const returned = await db.order.update(row, { where: x => x.customerId.eq(1) });
+		const changedRow = await db.order.getById(originalRow.id, { customer: true, lines: true, deliveryAddress: true });
+
+		const expected = {
+			customer: {
+				balance: 200,
+				id: 2,
+				isActive: true,
+				name: 'Harry',
+			},
+			customerId: 2,
+			deliveryAddress: {
+				countryCode: 'NO',
+				id: 1,
+				name: 'George',
+				orderId: 1,
+				postalCode: '7059',
+				postalPlace: 'Jakobsli',
+				street: 'Node street 1',
+			},
+			id: 1,
+			lines: [
+				{
+					amount: 166,
+					id: 4,
+					orderId: 1,
+					product: 'kazoo',
+				},
+			],
+			orderDate: originalRow.orderDate,
+		};
+
+		expect(returned).toEqual(undefined);
+		expect(changedRow).toEqual(expected);
+
+	}
+});
+
+describe('update with JSON then return rows', () => {
+	beforeAll(async () => {
+		await globalSetup();
+	});
+
+	afterAll(async () => {
+		await globalTeardown();
+	});
+
+	test('pg', async () => await verify('pg'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sap', async () => await verify('sap'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+
+		let originalRow = await db.order.getOne(null, { customer: true, lines: true, deliveryAddress: true, where: x => x.id.eq(1) });
+
+		let row = {
+			customerId: 2,
+			lines: [
+				{
+					orderId: originalRow.id,
+					product: 'kazoo',
+					amount: 166
+				}]
+		};
+
+		const returned = await db.order.update(row, { where: x => x.customerId.eq(1) }, { customer: true, lines: true, deliveryAddress: true });
+
+		const expected = [{
+			customer: {
+				balance: 200,
+				id: 2,
+				isActive: true,
+				name: 'Harry',
+			},
+			customerId: 2,
+			deliveryAddress: {
+				countryCode: 'NO',
+				id: 1,
+				name: 'George',
+				orderId: 1,
+				postalCode: '7059',
+				postalPlace: 'Jakobsli',
+				street: 'Node street 1',
+			},
+			id: 1,
+			lines: [
+				{
+					amount: 166,
+					id: 4,
+					orderId: 1,
+					product: 'kazoo',
+				},
+			],
+			orderDate: originalRow.orderDate,
+		}];
+
+		expect(returned).toEqual(expected);
 	}
 });
 
@@ -259,7 +500,7 @@ const connections = {
 					password: 'P@assword123',
 					connectString: 'oracle/XE',
 					privilege: 2
-				}, {size: 1}
+				}, { size: 1 }
 
 			)
 		}),

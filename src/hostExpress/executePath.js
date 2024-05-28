@@ -1,4 +1,5 @@
-let emptyFilter = require('../emptyFilter');
+const createPatch = require('../client/createPatch');
+const emptyFilter = require('../emptyFilter');
 const negotiateRawSqlFilter = require('../table/column/negotiateRawSqlFilter');
 let getMeta = require('./getMeta');
 let isSafe = Symbol();
@@ -70,7 +71,8 @@ let _allowedOps = {
 
 async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, request, response, readonly, disableBulkDeletes, isHttp, client }) {
 	let allowedOps = { ..._allowedOps, insert: !readonly, ...extractRelations(getMeta(table)) };
-	let ops = { ..._ops, ...getCustomFilterPaths(customFilters), getManyDto, getMany, aggregate, count, delete: _delete, cascadeDelete };
+	let ops = { ..._ops, ...getCustomFilterPaths(customFilters), getManyDto, getMany, aggregate, count, delete: _delete, cascadeDelete, update, replace };
+
 	let res = await parseFilter(JSONFilter, table);
 	if (res === undefined)
 		return {};
@@ -85,7 +87,7 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 			if (anyAllNone) {
 				if (isHttp)
 					validateArgs(json.args[0]);
-				const f =  anyAllNone(x => parseFilter(json.args[0], x));
+				const f = anyAllNone(x => parseFilter(json.args[0], x));
 				f.isSafe = isSafe;
 				return f;
 			}
@@ -114,7 +116,7 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 			let ops = new Set(['all', 'any', 'none', 'where', '_aggregate']);
 			// let ops = new Set(['all', 'any', 'none', 'where']);
 			let last = path.slice(-1)[0];
-			if (ops.has(last) || (table &&  (table._primaryColumns || (table.any && table.all))))
+			if (ops.has(last) || (table && (table._primaryColumns || (table.any && table.all))))
 				return table;
 		}
 
@@ -136,7 +138,7 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 			let op = pathArray[pathArray.length - 1];
 			if (!allowedOps[op] && isHttp) {
 
-				let e =  new Error('Disallowed operator ' + op);
+				let e = new Error('Disallowed operator ' + op);
 				// @ts-ignore
 				e.status = 403;
 				throw e;
@@ -146,6 +148,8 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 				target = target[pathArray[i]];
 			}
 
+			if (!target)
+				throw new Error(`Method '${path}' does not exist`);
 			let res = target.apply(null, args);
 			setSafe(res);
 			return res;
@@ -272,6 +276,66 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 		return table.getManyDto.apply(null, args);
 	}
 
+	async function replace(subject, strategy = { insertAndForget: true }) {
+		validateStrategy(table, strategy);
+		const refinedStrategy = objectToStrategy(subject, {}, table);
+		const JSONFilter2 = {
+			path: 'getManyDto',
+			args: [subject, refinedStrategy]
+		};
+		const originals = await executePath({ table, JSONFilter: JSONFilter2, baseFilter, customFilters, request, response, readonly, disableBulkDeletes, isHttp, client });
+		const meta = getMeta(table);
+		const patch = createPatch(originals, Array.isArray(subject) ? subject : [subject], meta);
+		const { changed } =  await table.patch(patch, { strategy });
+		if (Array.isArray(subject))
+			return changed;
+		else
+			return changed[0];
+	}
+
+	async function update(subject, whereStrategy, strategy = { insertAndForget: true }) {
+		validateStrategy(table, strategy);
+		const refinedWhereStrategy = objectToStrategy(subject, whereStrategy, table);
+		const JSONFilter2 = {
+			path: 'getManyDto',
+			args: [null, refinedWhereStrategy]
+		};
+		const rows = await executePath({ table, JSONFilter: JSONFilter2, baseFilter, customFilters, request, response, readonly, disableBulkDeletes, isHttp, client });
+		const originals = new Array(rows.length);
+		for (let i = 0; i < rows.length; i++) {
+			const row = rows[i];
+			originals[i] = { ...row };
+			for (let p in subject) {
+				row[p] = subject[p];
+			}
+		}
+		const meta = getMeta(table);
+		const patch = createPatch(originals, rows, meta);
+		const { changed } =  await table.patch(patch, { strategy });
+		return changed;
+	}
+
+	function objectToStrategy(object, whereStrategy, table, strategy = {}) {
+		strategy = {...whereStrategy, ...strategy};
+		if (Array.isArray(object)) {
+			for (let i = 0; i < object.length; i++) {
+				objectToStrategy(object[i], table, strategy);
+			}
+			return;
+		}
+		for (let name in object) {
+			const relation =  table[name]?._relation;
+			if (relation && !relation.columns) {//notJoin, that is one or many
+				strategy[name] = {};
+				objectToStrategy(object[name], whereStrategy?.[name], table[name], strategy[name]);
+			}
+			else
+				strategy[name] = true;
+		}
+		return strategy;
+	}
+
+
 	async function aggregate(filter, strategy) {
 		validateStrategy(table, strategy);
 		filter = negotiateFilter(filter);
@@ -283,11 +347,13 @@ async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, 
 		return table.aggregate.apply(null, args);
 	}
 
+
+
 	async function negotiateWhereAndAggregate(strategy) {
 		if (typeof strategy !== 'object')
 			return;
 
-		for(let name in strategy) {
+		for (let name in strategy) {
 			const target = strategy[name];
 			if (isFilter(target))
 				strategy[name] = await parseFilter(strategy[name], table);
@@ -325,7 +391,7 @@ function validateStrategy(table, strategy) {
 function validateLimit(strategy) {
 	if (!('limit' in strategy) || Number.isInteger(strategy.limit))
 		return;
-	const e =  new Error('Invalid limit: ' + strategy.limit);
+	const e = new Error('Invalid limit: ' + strategy.limit);
 	// @ts-ignore
 	e.status = 400;
 }
@@ -333,7 +399,7 @@ function validateLimit(strategy) {
 function validateOffset(strategy) {
 	if (!('offset' in strategy) || Number.isInteger(strategy.offset))
 		return;
-	const e =  new Error('Invalid offset: ' + strategy.offset);
+	const e = new Error('Invalid offset: ' + strategy.offset);
 	// @ts-ignore
 	e.status = 400;
 	throw e;

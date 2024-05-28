@@ -166,9 +166,7 @@ type ExpandedMappedTable<T, FL = ExpandedFetchingStrategy<T>> = {
 		filter?: Filter | PrimaryRowFilter<T>,
 		fetchingStrategy?: FS
 	): Promise<StrategyToRow<FetchedProperties<T, FL>, T>>;
-
-
-	update(
+	replace(
 		row: StrategyToInsertRowData<T>
 	): Promise<StrategyToRow<FetchedProperties<T, FL>, T>>;
 	updateChanges(
@@ -176,7 +174,7 @@ type ExpandedMappedTable<T, FL = ExpandedFetchingStrategy<T>> = {
 		originalRow: StrategyToInsertRowData<T>
 	): Promise<StrategyToRow<FetchedProperties<T, FL>, T>>;
 
-	update(
+	replace(
 		rows: StrategyToInsertRowData<T>[]
 	): Promise<StrategyToRowArray<FetchedProperties<T, FL>, T>>;
 	updateChanges(
@@ -184,7 +182,7 @@ type ExpandedMappedTable<T, FL = ExpandedFetchingStrategy<T>> = {
 		originalRows: StrategyToInsertRowData<T>[]
 	): Promise<StrategyToRowArray<FetchedProperties<T, FL>, T>>;
 
-	update<FS extends FetchingStrategy<T>>(
+	replace<FS extends FetchingStrategy<T>>(
 		row: StrategyToInsertRowData<T>,
 		strategy: FS
 	): Promise<StrategyToRow<FetchedProperties<T, FL>, T>>;
@@ -194,7 +192,7 @@ type ExpandedMappedTable<T, FL = ExpandedFetchingStrategy<T>> = {
 		strategy: FS
 	): Promise<StrategyToRow<FetchedProperties<T, FL>, T>>;
 
-	update<FS extends FetchingStrategy<T>>(
+	replace<FS extends FetchingStrategy<T>>(
 		rows: StrategyToInsertRowData<T>[],
 		strategy: FS
 	): Promise<StrategyToRowArray<FetchedProperties<T, FL>, T>>;
@@ -296,36 +294,49 @@ type MappedTable<T> = {
 		fetchingStrategy?: FS
 	): Promise<StrategyToRow<FetchedProperties<T, FS>, T>>;
 
+	
 	update(
-		row: StrategyToInsertRowData<T>
-	): Promise<StrategyToRow<FetchedProperties<T, {}>, T>>;
+		values: StrategyToUpdateRowData<T>,
+		where: FetchingStrategy<T>
+	): Promise<void>;
+
+	update<FS extends FetchingStrategy<T>>(
+		values: StrategyToUpdateRowData<T>,
+		where: FetchingStrategy<T>,
+		strategy: FS
+	): Promise<StrategyToRowArray<FetchedProperties<T, FS>, T>>;
+
+	replace(
+		row: StrategyToInsertRowData<T> | StrategyToInsertRowData<T>[]
+	): Promise<void>;
+	
+	replace<FS extends FetchingStrategy<T>>(
+		row: StrategyToInsertRowData<T>,
+		strategy: FS
+	): Promise<StrategyToRow<FetchedProperties<T, FS>, T>>;
+
+	replace<FS extends FetchingStrategy<T>>(
+		rows: StrategyToInsertRowData<T>[],
+		strategy: FS
+	): Promise<StrategyToRowArray<FetchedProperties<T, FS>, T>>;
+
 	updateChanges(
 		modifiedRow: StrategyToInsertRowData<T>,
 		originalRow: StrategyToInsertRowData<T>
 	): Promise<StrategyToRow<FetchedProperties<T, {}>, T>>;
 
-	update(
-		rows: StrategyToInsertRowData<T>[]
-	): Promise<StrategyToRowArray<FetchedProperties<T, {}>, T>>;
+
 	updateChanges(
 		modifiedRows: StrategyToInsertRowData<T>[],
 		originalRows: StrategyToInsertRowData<T>[]
 	): Promise<StrategyToRowArray<FetchedProperties<T, {}>, T>>;
 
-	update<FS extends FetchingStrategy<T>>(
-		row: StrategyToInsertRowData<T>,
-		strategy: FS
-	): Promise<StrategyToRow<FetchedProperties<T, FS>, T>>;
 	updateChanges<FS extends FetchingStrategy<T>>(
 		modifiedRow: StrategyToInsertRowData<T>,
 		originalRow: StrategyToInsertRowData<T>,
 		strategy: FS
 	): Promise<StrategyToRow<FetchedProperties<T, FS>, T>>;
 
-	update<FS extends FetchingStrategy<T>>(
-		rows: StrategyToInsertRowData<T>[],
-		strategy: FS
-	): Promise<StrategyToRowArray<FetchedProperties<T, FS>, T>>;
 	updateChanges<FS extends FetchingStrategy<T>>(
 		modifiedRows: StrategyToInsertRowData<T>[],
 		originalRows: StrategyToInsertRowData<T>[],
@@ -1154,6 +1165,31 @@ type StrategyToRowData<T> = {
 		? StrategyToRowData<T[K]>[]
 		: StrategyToRowData<T[K]>;
 	};
+
+type StrategyToUpdateRowData<T> = Omit<{
+	[K in keyof T]?: T[K] extends StringColumnSymbol
+	? string
+	: T[K] extends UuidColumnSymbol
+	? string
+	: T[K] extends NumericColumnSymbol
+	? number
+	: T[K] extends DateColumnSymbol
+	? string | Date
+	: T[K] extends DateWithTimeZoneColumnSymbol
+	? string | Date
+	: T[K] extends BinaryColumnSymbol
+	? string
+	: T[K] extends BooleanColumnSymbol
+	? boolean
+	: T[K] extends JsonOf<infer M>
+	? M
+	: T[K] extends JSONColumnSymbol
+	? JsonType
+	: T[K] extends ManyRelation
+	? StrategyToInsertRowData<T[K]>[]
+	: StrategyToInsertRowData<T[K]>;
+	}, 'formulaDiscriminators' | 'columnDiscriminators' | 'map' | ' isManyRelation' | ' relatedTable' | ' isOneRelation'>
+	;
 
 type StrategyToInsertRowData<T> = Omit<{
 	[K in keyof RemoveNever<

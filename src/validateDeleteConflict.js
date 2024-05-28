@@ -31,7 +31,7 @@ async function validateDeleteConflict({ row, oldValue, options, table }) {
 				let childRow = await childTable.tryGetById.apply(null, JSON.parse(name));
 				if (!childRow)
 					throw new Error(`${p} with id ${name} was deleted by another user`);
-				if (! await validateDeleteConflict({ row: childRow, oldValue: oldValue[p][name], defaultConcurrency, concurrency: concurrency[p], table: childTable }))
+				if (! await validateDeleteConflict({ row: childRow, oldValue: oldValue[p][name], options: inferOptions(options, p), table: childTable }))
 					return false;
 			}
 		}
@@ -40,7 +40,7 @@ async function validateDeleteConflict({ row, oldValue, options, table }) {
 			let childRow = await row[p];
 			if (!childRow)
 				throw new Error(`${p} was deleted by another user`);
-			if (! await validateDeleteConflict({ row: childRow, oldValue: oldValue[p], defaultConcurrency, concurrency: concurrency[p], table: childTable }))
+			if (! await validateDeleteConflict({ row: childRow, oldValue: oldValue[p], options: inferOptions(options, p), table: childTable }))
 				return false;
 		}
 
