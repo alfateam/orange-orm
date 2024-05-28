@@ -740,8 +740,8 @@ async function update() {
   await orders.saveChanges();
 }
 ```
-__Updating from JSON__  
-The update method is suitable when a complete overwrite is required from a JSON object - typically in a REST API. However, it's important to consider that this method replaces the entire row and it's children, which might not always be desirable in a multi-user environment.
+__Batch updates__  
+The update method is ideal for updating specific columns and relationships in one or multiple rows. You must provide a where filter to specify the target rows. If you include a fetching strategy, the affected rows and their related data will be returned; otherwise, no data is returned.
 
 ```javascript
 import map from './map';
@@ -750,6 +750,31 @@ const db = map.sqlite('demo.db');
 update();
 
 async function update() {
+
+  const propsToBeModified = {
+    orderDate: new Date(),
+    customerId: 2,
+    lines: [
+      { id: 1, product: 'Bicycle', amount: 250 }, //already existing line
+      { id: 2, product: 'Small guitar', amount: 150 }, //already existing line
+      { product: 'Piano', amount: 800 } //the new line to be inserted
+    ]
+  };
+
+  const optionalFetchingStrategy = {customer: true, deliveryAddress: true, lines: true};
+  const orders = await db.order.update(propsToBeModified, { where: x => x.id.eq(1) }, optionalFetchingStrategy);
+}
+```
+__Replacing a row from JSON__  
+The replace method is suitable when a complete overwrite is required from a JSON object - typically in a REST API. However, it's important to consider that this method replaces the entire row and it's children, which might not always be desirable in a multi-user environment.
+
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+replace();
+
+async function replace() {
 
   const modified = {
     id: 1,
@@ -771,7 +796,7 @@ async function update() {
     ]
   };
 
-  const order = await db.order.update(modified, {customer: true, deliveryAddress: true, lines: true});
+  const order = await db.order.replace(modified, {customer: true, deliveryAddress: true, lines: true});
 }
 ```
 __Partially updating from JSON__  
