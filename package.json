@@ -1,6 +1,6 @@
 {
   "name": "orange-orm",
-  "version": "3.10.3",
+  "version": "4.0.0",
   "main": "./src/index.js",
   "browser": "./src/client/index.mjs",
   "bin": {

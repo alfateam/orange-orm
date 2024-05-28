@@ -1,4 +1,6 @@
 ## Changelog
+__4.0.0__  
+Changed the behaviour of `update` to accept a `where` filter and only update passed in columns and relations. The previous behaviour of `update` has moved to `replace` method.  
 __3.10.3__  
 Fix duplicate method signatures for those still using code generation  
 __3.10.2__  

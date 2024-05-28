@@ -5486,6 +5486,7 @@ function rdbClient(options = {}) {
 			getById,
 			proxify,
 			update,
+			replace,
 			updateChanges,
 			insert,
 			insertAndForget,
@@ -5585,31 +5586,32 @@ function rdbClient(options = {}) {
 		function negotiateWhere(_, strategy, ...rest) {
 			const args = Array.prototype.slice.call(arguments);
 			if (strategy)
-				return [_, where(strategy), ...rest];
+				return [_, negotiateWhereSingle(strategy), ...rest];
 			else
 				return args;
 
-			function where(_strategy, path = '') {
-				if (typeof _strategy !== 'object' || _strategy === null)
-					return _strategy;
 
-				if (Array.isArray(_strategy)) {
-					return _strategy.map(item => where(item, path));
-				}
+		}
 
-				const strategy = { ..._strategy };
-				for (let name in _strategy) {
-					if (name === 'where' && typeof strategy[name] === 'function')
-						strategy.where = column(path + 'where')(strategy.where); // Assuming `column` is defined elsewhere.
-					else if (typeof strategy[name] === 'function') {
-						strategy[name] = aggregate(path, strategy[name]);
-					}
-					else
-						strategy[name] = where(_strategy[name], path + name + '.');
-				}
-				return strategy;
+		function negotiateWhereSingle(_strategy, path = '') {
+			if (typeof _strategy !== 'object' || _strategy === null)
+				return _strategy;
+
+			if (Array.isArray(_strategy)) {
+				return _strategy.map(item => negotiateWhereSingle(item, path));
 			}
 
+			const strategy = { ..._strategy };
+			for (let name in _strategy) {
+				if (name === 'where' && typeof strategy[name] === 'function')
+					strategy.where = column(path + 'where')(strategy.where); // Assuming `column` is defined elsewhere.
+				else if (typeof strategy[name] === 'function') {
+					strategy[name] = aggregate(path, strategy[name]);
+				}
+				else
+					strategy[name] = negotiateWhereSingle(_strategy[name], path + name + '.');
+			}
+			return strategy;
 		}
 
 
@@ -5668,28 +5670,34 @@ function rdbClient(options = {}) {
 			return adapter.post(body);
 		}
 
-		async function update(rows, ...rest) {
-			const concurrency = undefined;
-			const args = [concurrency].concat(rest);
-			if (Array.isArray(rows)) {
-				const proxy = await getMany.apply(null, [rows, ...rest]);
-				proxy.splice.apply(proxy, [0, proxy.length, ...rows]);
-				await proxy.saveChanges.apply(proxy, args);
-				return proxy;
-			}
-			else {
-				const proxy = await getMany.apply(null, [[rows], ...rest]);
-				proxy.splice.apply(proxy, [0, 1, rows]);
-				await proxy.saveChanges.apply(proxy, args);
-				return proxify(proxy[0], args[0]);
-			}
+		async function update(_row, _where, strategy) {
+			let args = [_row, negotiateWhereSingle(_where), negotiateWhereSingle(strategy)];
+			let body = stringify({
+				path: 'update',
+				args
+			});
+			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+			const result =  await adapter.post(body);
+			if (strategy)
+				return proxify(result, strategy);
+		}
+
+		async function replace(_row, strategy) {
+			let args = [_row, negotiateWhereSingle(strategy)];
+			let body = stringify({
+				path: 'replace',
+				args
+			});
+			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+			const result =  await adapter.post(body);
+			if (strategy)
+				return proxify(result, strategy);
 		}
 
 		async function updateChanges(rows, oldRows, ...rest) {
 			const concurrency = undefined;
 			const args = [concurrency].concat(rest);
 			if (Array.isArray(rows)) {
-				//todo
 				const proxy = await getMany.apply(null, [rows, ...rest]);
 				proxy.splice.apply(proxy, [0, proxy.length, ...rows]);
 				await proxy.saveChanges.apply(proxy, args);
