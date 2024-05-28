@@ -166,36 +166,49 @@ type ExpandedMappedTable<T, FL = ExpandedFetchingStrategy<T>> = {
 		filter?: Filter | PrimaryRowFilter<T>,
 		fetchingStrategy?: FS
 	): Promise<StrategyToRow<FetchedProperties<T, FL>, T>>;
+
+	update(
+		values: StrategyToUpdateRowData<T>,
+		where: FetchingStrategy<T>
+	): Promise<void>;
+
+	update<FS extends FetchingStrategy<T>>(
+		values: StrategyToUpdateRowData<T>,
+		where: FetchingStrategy<T>,
+		strategy: FS
+	): Promise<StrategyToRowArray<FetchedProperties<T, FL>, T>>;
+
 	replace(
-		row: StrategyToInsertRowData<T>
+		row: StrategyToInsertRowData<T> | StrategyToInsertRowData<T>[]
+	): Promise<void>;
+	
+	replace<FS extends FetchingStrategy<T>>(
+		row: StrategyToInsertRowData<T>,
+		strategy: FS
 	): Promise<StrategyToRow<FetchedProperties<T, FL>, T>>;
+
+	replace<FS extends FetchingStrategy<T>>(
+		rows: StrategyToInsertRowData<T>[],
+		strategy: FS
+	): Promise<StrategyToRowArray<FetchedProperties<T, FL>, T>>;
+
+
 	updateChanges(
 		row: StrategyToInsertRowData<T>,
 		originalRow: StrategyToInsertRowData<T>
 	): Promise<StrategyToRow<FetchedProperties<T, FL>, T>>;
 
-	replace(
-		rows: StrategyToInsertRowData<T>[]
-	): Promise<StrategyToRowArray<FetchedProperties<T, FL>, T>>;
 	updateChanges(
 		rows: StrategyToInsertRowData<T>[],
 		originalRows: StrategyToInsertRowData<T>[]
 	): Promise<StrategyToRowArray<FetchedProperties<T, FL>, T>>;
 
-	replace<FS extends FetchingStrategy<T>>(
-		row: StrategyToInsertRowData<T>,
-		strategy: FS
-	): Promise<StrategyToRow<FetchedProperties<T, FL>, T>>;
 	updateChanges<FS extends FetchingStrategy<T>>(
 		row: StrategyToInsertRowData<T>,
 		originalRow: StrategyToInsertRowData<T>,
 		strategy: FS
 	): Promise<StrategyToRow<FetchedProperties<T, FL>, T>>;
 
-	replace<FS extends FetchingStrategy<T>>(
-		rows: StrategyToInsertRowData<T>[],
-		strategy: FS
-	): Promise<StrategyToRowArray<FetchedProperties<T, FL>, T>>;
 	updateChanges<FS extends FetchingStrategy<T>>(
 		rows: StrategyToInsertRowData<T>[],
 		originalRows: StrategyToInsertRowData<T>[],
@@ -293,7 +306,6 @@ type MappedTable<T> = {
 		filter?: Filter | PrimaryRowFilter<T>,
 		fetchingStrategy?: FS
 	): Promise<StrategyToRow<FetchedProperties<T, FS>, T>>;
-
 	
 	update(
 		values: StrategyToUpdateRowData<T>,
