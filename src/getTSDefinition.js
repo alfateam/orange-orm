@@ -54,10 +54,14 @@ export interface ${Name}Table {
 	getById(${getIdArgs(table)}): Promise<${Name}Row>;
 	getById(${getIdArgs(table)}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
 
-	update(${name}s: ${Name}[]): Promise<${Name}Array>;
-	update(${name}s: ${Name}[], fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
-	update(${name}: ${Name}): Promise<${Name}Row>;
-	update(${name}: ${Name}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
+	replace(${name}s: ${Name}[] | ${Name}): Promise<void>;
+	replace(${name}s: ${Name}[], fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
+	replace(${name}: ${Name}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
+	
+	update(${name}: ${Name}): Promise<void>;
+	update(${name}: ${Name}, whereStrategy: ${Name}Strategy): Promise<void>;
+	update(${name}: ${Name}, whereStrategy: ${Name}Strategy): Promise<void>;
+	update(${name}: ${Name}, whereStrategy: ${Name}Strategy, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row[]>;
 
 	updateChanges(${name}s: ${Name}[], old${name}s: ${Name}[]): Promise<${Name}Array>;
 	updateChanges(${name}s: ${Name}[],old${name}s: ${Name}[], fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
