@@ -217,7 +217,7 @@ The init.ts script resets our SQLite database. It's worth noting that SQLite dat
 
 At the start of the script, we import our database mapping from the map.ts file. This gives us access to the db object, which we'll use to interact with our SQLite database.
 
-Then, we define a SQL string. This string outlines the structure of our SQLite database. It first specifies to drop existing tables named 'deliveryAddress', 'orderLine', '_order', and 'customer' if they exist. This ensures we have a clean slate. Then, it dictates how to create these tables anew with the necessary columns and constraints.
+Then, we define a SQL string. This string outlines the structure of our SQLite database. It first specifies to drop existing tables named 'deliveryAddress', 'package', 'orderLine', '_order', and 'customer' if they exist. This ensures we have a clean slate. Then, it dictates how to create these tables anew with the necessary columns and constraints.
 
 Because of a peculiarity in SQLite, which only allows one statement execution at a time, we split this SQL string into separate statements. We do this using the split() method, which breaks up the string at every semicolon.  
 
@@ -226,7 +226,7 @@ Because of a peculiarity in SQLite, which only allows one statement execution at
 import map from './map';
 const db = map.sqlite('demo.db');
 
-const sql = `DROP TABLE IF EXISTS deliveryAddress; DROP TABLE IF EXISTS orderLine; DROP TABLE IF EXISTS _order; DROP TABLE IF EXISTS customer;
+const sql = `DROP TABLE IF EXISTS deliveryAddress; DROP TABLE IF EXISTS package; DROP TABLE IF EXISTS orderLine; DROP TABLE IF EXISTS _order; DROP TABLE IF EXISTS customer;
 CREATE TABLE customer (
     id INTEGER PRIMARY KEY,
     name TEXT,
