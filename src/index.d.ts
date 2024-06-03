@@ -1,8 +1,8 @@
-import { Options } from 'ajv';
-import { RequestHandler } from 'express';
-import { ConnectionConfiguration } from 'tedious';
-import { PoolAttributes } from 'oracledb';
-import { AllowedDbMap, DbMapper, MappedDbDef } from './map';
+import type { Options } from './ajv';
+import type { RequestHandler } from 'express';
+import type { ConnectionConfiguration } from 'tedious';
+import type { PoolAttributes } from 'oracledb';
+import type { AllowedDbMap, DbMapper, MappedDbDef } from './map';
 
 declare function r(config: r.Config): unknown;
 
