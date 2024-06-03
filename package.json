@@ -118,7 +118,7 @@
     "pg-query-stream": "^3.3.2",
     "rollup": "^2.52.7",
     "sqlite3": "^5.0.2",
-    "tedious": "^18.1.0",
+    "tedious": "^18.2.0",
     "typescript": "^5.4.5",
     "vitest": "^0.34.1"
   },

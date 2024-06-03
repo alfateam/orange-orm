@@ -1,4 +1,4 @@
-import type { Options } from 'ajv';
+import type { Options } from './ajv';
 import type { ConnectionConfiguration } from 'tedious';
 import type { PoolAttributes } from 'oracledb';
 import type { AxiosInterceptorManager, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
@@ -1775,3 +1775,4 @@ type Increment<C extends number> = C extends 0
 	: C extends 4
 	? 5
 	: 0;
+	
