@@ -2,8 +2,7 @@ import type { Options } from './ajv';
 import type { RequestHandler } from 'express';
 import type { ConnectionConfiguration } from 'tedious';
 import type { PoolAttributes } from 'oracledb';
-import type { DbMapper, MappedDbDef } from './map';
-import type { AllowedDbMap } from './types';
+import type { AllowedDbMap, DbMapper, MappedDbDef } from './map';
 
 declare function r(config: r.Config): unknown;
 
@@ -22,8 +21,8 @@ declare namespace r {
     function on(type: 'query', cb: (e: QueryEvent) => void): void;
     function off(type: 'query', cb: (e: QueryEvent) => void): void;
     function map<V extends AllowedDbMap<V>>(
-        fn: (mapper: DbMapper<{}>) => V
-    ): MappedDbDef<V>;
+		fn: (mapper: DbMapper<{}>) => V
+	): MappedDbDef<V>;
     function createPatch(original: any[], modified: any[]): JsonPatch;
     function createPatch(original: any, modified: any): JsonPatch;
 
