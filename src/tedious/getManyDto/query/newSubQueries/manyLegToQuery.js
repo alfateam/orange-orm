@@ -2,6 +2,8 @@ var newShallowJoinSql = require('../../../../table/query/singleQuery/joinSql/new
 var newQuery = require('../../newQueryCore');
 
 function manyLegToQuery(rightAlias, leg, _legNo) {
+	// rightAlias = quote(rightAlias);
+	//todo remove
 	var leftAlias = rightAlias + leg.name;
 	var span = leg.span;
 	var rightTable = leg.table;

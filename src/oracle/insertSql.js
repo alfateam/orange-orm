@@ -1,6 +1,7 @@
 let outputInsertedSql = require('./outputInsertedSql');
 let mergeSql = require('./mergeSql');
 
+
 function getSqlTemplate(_table, _row, options) {
 	if (hasConcurrency(_table, options) && hasColumns())
 		return mergeSql.apply(null, arguments);
@@ -29,7 +30,7 @@ function insertSql(table, row) {
 	let columnNames = [];
 	let regularColumnNames = [];
 	let values = [];
-	let sql = 'INSERT INTO ' + table._dbName + ' ';
+	let sql = 'INSERT INTO "' + table._dbName + '" ';
 	addDiscriminators();
 	addColumns();
 	if (columnNames.length === 0)

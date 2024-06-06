@@ -1,23 +1,26 @@
 var newJoin = require('./joinSql');
 var getSessionContext = require('../getSessionContext');
 var newJoinCore = require('../query/singleQuery/joinSql/newShallowJoinSqlCore');
+const getSessionSingleton = require('../getSessionSingleton');
 
 function childColumn(column, relations) {
+	const quote = getSessionSingleton('quote');
 	const context = getSessionContext();
 	const outerAlias = 'y' + context.aggregateCount++;
+	const outerAliasQuoted = quote(outerAlias);
 	const alias = 'x' + relations.length;
 	const foreignKeys = getForeignKeys(relations[0]);
 	const select = ` LEFT JOIN (SELECT ${foreignKeys},${alias}.${column._dbName} as prop`;
 	const innerJoin = relations.length > 1 ? newJoin(relations).sql() : '';
 	const onClause = createOnClause(relations[0], outerAlias);
-	const from = ` FROM ${relations.at(-1).childTable._dbName} ${alias} ${innerJoin}) ${outerAlias} ON (${onClause})`;
+	const from = ` FROM ${quote(relations.at(-1).childTable._dbName)} ${alias} ${innerJoin}) ${outerAliasQuoted} ON (${onClause})`;
 	const join = select  + from ;
 
 	return {
-		expression: (alias) => `${outerAlias}.prop ${alias}`,
+		expression: (alias) => `${outerAliasQuoted}.prop ${quote(alias)}`,
 		joins: [join],
 		column,
-		groupBy:  `${outerAlias}.prop`,
+		groupBy:  `${outerAliasQuoted}.prop`,
 	};
 }
 

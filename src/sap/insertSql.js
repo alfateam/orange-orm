@@ -1,3 +1,4 @@
+const getSessionSingleton = require('../table/getSessionSingleton');
 const mergeSql = require('./mergeSql');
 
 function getSqlTemplate(_table, _row, options) {
@@ -26,10 +27,11 @@ function hasConcurrency(table,options) {
 }
 
 function insertSql(table, row) {
+	const quote = getSessionSingleton('quote');
 	let columnNames = [];
 	let regularColumnNames = [];
 	let values = [];
-	let sql = 'INSERT INTO ' + table._dbName + ' ';
+	let sql = 'INSERT INTO ' + quote(table._dbName) + ' ';
 	addDiscriminators();
 	addColumns();
 	if (columnNames.length === 0)

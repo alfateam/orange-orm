@@ -28,28 +28,28 @@ CREATE TABLE vendor (
     isActive BOOLEAN    
 );
 
-CREATE TABLE torder (
+CREATE TABLE "order" (
     id SERIAL PRIMARY KEY,
     orderDate TIMESTAMP,
     customerId INTEGER REFERENCES customer
 );
 
-CREATE TABLE orderLine (
+CREATE TABLE "orderLine" (
     id SERIAL PRIMARY KEY,
-    orderId INTEGER REFERENCES torder,
+    orderId INTEGER REFERENCES "order",
     product TEXT,
     amount NUMERIC(10,2) NULL
 );
 
 CREATE TABLE package (
     packageId SERIAL PRIMARY KEY,
-    lineId INTEGER REFERENCES orderLine,
+    lineId INTEGER REFERENCES "orderLine",
     sscc TEXT
 );
 
-CREATE TABLE deliveryAddress (
+CREATE TABLE "deliveryAddress" (
     id SERIAL PRIMARY KEY,
-    orderId INTEGER REFERENCES torder,
+    orderId INTEGER REFERENCES "order",
     name TEXT, 
     street TEXT,
     postalCode TEXT,

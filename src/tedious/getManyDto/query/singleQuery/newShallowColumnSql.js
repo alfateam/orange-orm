@@ -1,4 +1,7 @@
+const quote = require('../../../../table/quote');
+
 function _new(table,alias, span) {
+	alias = quote(alias);
 	let columnsMap = span.columns;
 	var columns = table._columns;
 	var sql = '';

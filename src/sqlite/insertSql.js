@@ -1,10 +1,12 @@
+const quote = require('../table/quote');
+
 function insertSql(table, row, options) {
 	let columnNames = [];
 	let regularColumnNames = [];
 	let conflictColumnUpdateSql = '';
 	let values = [];
 
-	let sql = 'INSERT INTO ' + table._dbName + ' ';
+	let sql = 'INSERT INTO ' + quote(table._dbName) + ' ';
 	addDiscriminators();
 	addColumns();
 

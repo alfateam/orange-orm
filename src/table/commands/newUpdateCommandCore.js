@@ -1,7 +1,8 @@
 var newParameterized = require('../query/newParameterized');
+const quote = require('../quote');
 
 function newUpdateCommandCore(table, columns, row) {
-	var command = newParameterized('UPDATE ' + table._dbName + ' SET');
+	var command = newParameterized('UPDATE ' + quote(table._dbName) + ' SET');
 	var separator = ' ';
 
 	addColumns();

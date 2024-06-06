@@ -1,4 +1,5 @@
 let getSessionContext = require('../../getSessionContext');
+let quote = require('../../quote');
 
 function getSqlTemplate(_table, _row) {
 	let context = getSessionContext();
@@ -13,7 +14,7 @@ function getSqlTemplateDefault(table, row) {
 	let columnNames = [];
 	let regularColumnNames = [];
 	let values = [];
-	let sql = 'INSERT INTO ' + table._dbName + ' ';
+	let sql = 'INSERT INTO ' + quote(table._dbName) + ' ';
 	addDiscriminators();
 	addColumns();
 	if (columnNames.length === 0)

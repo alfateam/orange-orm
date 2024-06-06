@@ -1,4 +1,4 @@
-const sql = `DROP TABLE IF EXISTS deliveryAddress; DROP TABLE IF EXISTS package; DROP TABLE IF EXISTS orderLine; DROP TABLE IF EXISTS torder; DROP TABLE IF EXISTS customer;DROP TABLE IF EXISTS vendor; DROP TABLE IF EXISTS datetest;
+const sql = `DROP TABLE IF EXISTS deliveryAddress; DROP TABLE IF EXISTS package; DROP TABLE IF EXISTS orderLine; DROP TABLE IF EXISTS "order";DROP TABLE IF EXISTS "order"; DROP TABLE IF EXISTS customer;DROP TABLE IF EXISTS vendor; DROP TABLE IF EXISTS datetest;
 CREATE TABLE customer (
     id INTEGER PRIMARY KEY,
     name TEXT,
@@ -15,7 +15,7 @@ CREATE TABLE vendor (
     isActive INTEGER    
 );
 
-CREATE TABLE torder (
+CREATE TABLE "order" (
     id INTEGER PRIMARY KEY,
     orderDate TEXT,
     customerId INTEGER REFERENCES customer
@@ -23,7 +23,7 @@ CREATE TABLE torder (
 
 CREATE TABLE orderLine (
     id INTEGER PRIMARY KEY,
-    orderId INTEGER REFERENCES torder,
+    orderId INTEGER REFERENCES "order",
     product TEXT,
     amount NUMERIC(10,2)
 );
@@ -36,7 +36,7 @@ CREATE TABLE package (
 
 CREATE TABLE deliveryAddress (
     id INTEGER PRIMARY KEY,
-    orderId INTEGER REFERENCES torder,
+    orderId INTEGER REFERENCES "order",
     name TEXT, 
     street TEXT,
     postalCode TEXT,

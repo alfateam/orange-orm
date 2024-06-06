@@ -12,7 +12,7 @@ const dateToISOString = require('../src/dateToISOString');
 const versionArray = process.version.replace('v', '').split('.');
 const major = parseInt(versionArray[0]);
 
-const Order = rdb.table('torder');
+const Order = rdb.table('order');
 Order.column('id').numeric().primary().notNullExceptInsert(),
 Order.column('orderDate').date().notNull();
 

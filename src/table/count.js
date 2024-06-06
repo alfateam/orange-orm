@@ -2,6 +2,7 @@ const executeQueries = require('./executeQueries');
 const negotiateRawSqlFilter = require('./column/negotiateRawSqlFilter');
 const extractFilter = require('./query/extractFilter');
 const newWhereSql = require('./query/singleQuery/newWhereSql');
+const quote = require('./quote');
 
 async function count(table, filter) {
 	let alias = table._dbName;
@@ -18,7 +19,8 @@ async function count(table, filter) {
 
 function newQuery(table, filter, alias) {
 	filter = extractFilter(filter);
-	var name = table._dbName;
+	var name = quote(table._dbName);
+	alias = quote(alias);
 	var whereSql = newWhereSql(table, filter, alias);
 
 	return whereSql.prepend('select count(*) "_count" from ' + name + ' ' + alias);

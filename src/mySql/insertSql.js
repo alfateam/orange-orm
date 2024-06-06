@@ -1,9 +1,11 @@
+let quote = require('../table/quote');
+
 function insertSql(table, row, options) {
 	let columnNames = [];
 	let regularColumnNames = [];
 	let conflictColumnUpdateSql = '';
 	let values = [];
-	let sql = 'INSERT INTO ' + table._dbName + ' ';
+	let sql = 'INSERT INTO ' + quote(table._dbName) + ' ';
 	addDiscriminators();
 	addColumns();
 	if (columnNames.length === 0) {
@@ -53,7 +55,7 @@ function insertSql(table, row, options) {
 			if (concurrency === 'overwrite') {
 				conflictColumnUpdates.push(`${column._dbName}=VALUES(${column._dbName})`);
 			} else if (concurrency === 'optimistic') {
-				conflictColumnUpdates.push(`${column._dbName} = CASE WHEN ${table._dbName}.${column._dbName} <> VALUES(${column._dbName}) THEN CAST('12345678-1234-1234-1234-123456789012Conflict when updating ${column._dbName}12345678-1234-1234-1234-123456789012' AS SIGNED) ELSE ${table._dbName}.${column._dbName} END`);
+				conflictColumnUpdates.push(`${column._dbName} = CASE WHEN ${quote(table._dbName)}.${column._dbName} <> VALUES(${column._dbName}) THEN CAST('12345678-1234-1234-1234-123456789012Conflict when updating ${column._dbName}12345678-1234-1234-1234-123456789012' AS SIGNED) ELSE ${table._dbName}.${column._dbName} END`);
 			}
 		}
 	}

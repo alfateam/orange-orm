@@ -1,4 +1,7 @@
+const quote = require('../quote');
+
 function extractOrderBy(table, alias, orderBy, originalOrderBy) {
+	alias = quote(alias);
 	var dbNames = [];
 	var i;
 	if (orderBy) {

@@ -1,7 +1,9 @@
+const quote = require('../../quote');
 var newBoolean = require('../newBoolean');
 var nullOperator = ' is ';
 
 function endsWithCore(operator, column,arg,alias) {
+	alias = quote(alias);
 	operator = ' ' + operator + ' ';
 	var encoded = column.encode(arg);
 	if (encoded.sql() == 'null')

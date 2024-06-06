@@ -1,4 +1,7 @@
+const quote = require('../../quote');
+
 function newDiscriminatorSql(table, alias) {
+	alias = quote(alias);
 	var result = '';
 	var formulaDiscriminators = table._formulaDiscriminators;
 	var columnDiscriminators = table._columnDiscriminators;

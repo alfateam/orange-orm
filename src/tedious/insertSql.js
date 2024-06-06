@@ -29,7 +29,7 @@ function insertSql(table, row) {
 	let columnNames = [];
 	let regularColumnNames = [];
 	let values = [];
-	let sql = 'INSERT INTO ' + table._dbName + ' ';
+	let sql = `INSERT INTO [${table._dbName}] `;
 	addDiscriminators();
 	addColumns();
 	if (columnNames.length === 0)

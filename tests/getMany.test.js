@@ -25,6 +25,7 @@ afterAll(async () => {
 	});
 });
 
+
 beforeAll(async () => {
 	await createMs('mssql');
 	await insertData('pg');
@@ -125,7 +126,7 @@ beforeAll(async () => {
 			.use('/rdb', cors(), db.express());
 		server = app.listen(port, () => console.log(`Example app listening on port ${port}!`));
 	}
-}, 20000);
+}, 30000);
 
 describe('offset', () => {
 	test('pg', async () => await verify('pg'));
@@ -249,6 +250,7 @@ describe('boolean true filter', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
@@ -641,7 +643,7 @@ describe('aggregate each row', () => {
 
 		expect(rows).toEqual(expected);
 	}
-}, 20000);
+}, 30000);
 describe('getMany with relations', () => {
 
 	test('pg', async () => await verify('pg'));

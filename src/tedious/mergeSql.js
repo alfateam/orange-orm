@@ -1,6 +1,9 @@
+const getSessionSingleton = require('../table/getSessionSingleton');
 const outputInsertedSql = require('./outputInsertedSql');
 
+
 function insertSql(table, row, options) {
+	const quote = getSessionSingleton('quote');
 	let columnNames = [];
 	let regularColumnNames = [];
 	let conflictColumnUpdateSql = '';
@@ -11,9 +14,9 @@ function insertSql(table, row, options) {
 	const matched = whenMatched();
 	let sql;
 	if (matched)
-		sql = `MERGE INTO ${table._dbName} AS target USING (SELECT ${values.join(',')}) AS source ON ${join()} WHEN MATCHED THEN ${matched} WHEN NOT MATCHED THEN ${whenNotMatched()} ${outputInsertedSql(table)};`;
+		sql = `MERGE INTO ${quote(table._dbName)} AS target USING (SELECT ${values.join(',')}) AS source ON ${join()} WHEN MATCHED THEN ${matched} WHEN NOT MATCHED THEN ${whenNotMatched()} ${outputInsertedSql(table)};`;
 	else
-		sql = `MERGE INTO ${table._dbName} AS target USING (SELECT ${values.join(',')}) AS source ON ${join()} WHEN NOT MATCHED THEN ${whenNotMatched()} ${outputInsertedSql(table)};`;
+		sql = `MERGE INTO ${quote(table._dbName)} AS target USING (SELECT ${values.join(',')}) AS source ON ${join()} WHEN NOT MATCHED THEN ${whenNotMatched()} ${outputInsertedSql(table)};`;
 	return sql;
 
 	function join() {
