@@ -1,5 +1,5 @@
 ## Changelog
-__4.0.1_  
+__4.0.1__  
 Inhouse definitions of ajv to avoid trouble with nestjs.  
 __4.0.0__  
 Changed the behaviour of `update` to accept a `where` filter and only update passed in columns and relations. The previous behaviour of `update` has moved to `replace` method.  
