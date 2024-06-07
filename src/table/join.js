@@ -36,6 +36,15 @@ function newJoin(parentTable, childTable) {
 
 		return relation;
 	};
+
+	c.notNullExceptInsert = function() {
+		return c;
+	};
+
+	c.notNull = function() {
+		return c;
+	};
+
 	return c;
 }
 

@@ -105,11 +105,11 @@ const map = rdb.map(x => ({
 	}))
 })).map(x => ({
 	order: x.order.map(({ hasOne, hasMany, references }) => ({
-		customer: references(x.customer).by('customerId'),
-		deliveryAddress: hasOne(x.deliveryAddress).by('orderId'),
+		customer: references(x.customer).by('customerId').notNull(),
+		deliveryAddress: hasOne(x.deliveryAddress).by('orderId').notNull(),
 		lines: hasMany(x.orderLine).by('orderId')
 	}))
 
 }));
 
-module.exports = map;
+module.exports = map();

@@ -23,6 +23,7 @@ function newOne(joinRelation) {
 	};
 
 	c.notNull = function() {
+
 		return c;
 	};
 

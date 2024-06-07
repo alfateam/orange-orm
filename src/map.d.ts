@@ -837,7 +837,7 @@ type ReferenceMapperHelper<TFrom, TTo, TPrimaryCount> =
 			column4: C4,
 			column5: C5,
 			column6: C6
-		): MappedTableDef<TTo> & RelatedTable & NegotiateNotNullColumn<C1,TFrom>;
+		): MappedTableDef<TTo> & RelatedTable & NotNullRelationHelper<MappedTableDef<TTo> & RelatedTable>;
 	}
 	: 5 extends TPrimaryCount
 	? {
@@ -847,7 +847,7 @@ type ReferenceMapperHelper<TFrom, TTo, TPrimaryCount> =
 			column3: C3,
 			column4: C4,
 			column5: C5
-		): MappedTableDef<TTo> & RelatedTable & NegotiateNotNullColumn<C1,TFrom>;
+		): MappedTableDef<TTo> & RelatedTable & NotNullRelationHelper<MappedTableDef<TTo> & RelatedTable>;
 	}
 	: 4 extends TPrimaryCount
 	? {
@@ -856,7 +856,7 @@ type ReferenceMapperHelper<TFrom, TTo, TPrimaryCount> =
 			column2: C2,
 			column3: C3,
 			column4: C4
-		): MappedTableDef<TTo> & RelatedTable & NegotiateNotNullColumn<C1,TFrom>;
+		): MappedTableDef<TTo> & RelatedTable & NotNullRelationHelper<MappedTableDef<TTo> & RelatedTable>;
 	}
 	: 3 extends TPrimaryCount
 	? {
@@ -864,24 +864,23 @@ type ReferenceMapperHelper<TFrom, TTo, TPrimaryCount> =
 			column: C1,
 			column2: C2,
 			column3: C3
-		): MappedTableDef<TTo> & RelatedTable & NegotiateNotNullColumn<C1,TFrom>;
+		): MappedTableDef<TTo> & RelatedTable & NotNullRelationHelper<MappedTableDef<TTo> & RelatedTable>;
 	}
 	: 2 extends TPrimaryCount
 	? {
 		by<C1 extends keyof KeyCandidates1<TFrom, TTo>, C2 extends keyof KeyCandidates2<TFrom, TTo>>(
 			column: C1,
 			column2: C2
-		): MappedTableDef<TTo> & RelatedTable & NegotiateNotNullColumn<C1,TFrom>;
+		): MappedTableDef<TTo> & RelatedTable & NotNullRelationHelper<MappedTableDef<TTo> & RelatedTable>;
 	}
 	: 1 extends TPrimaryCount
 	? {
 		by<C1 extends keyof KeyCandidates1<TFrom, TTo>>(
 			column: C1
-		): MappedTableDef<TTo> & RelatedTable & NegotiateNotNullColumn<C1,TFrom>;
+		): MappedTableDef<TTo> & RelatedTable & NotNullRelationHelper<MappedTableDef<TTo> & RelatedTable>;
 	}
 	: {};
 
-type NegotiateNotNullColumn<C, TFrom> = C extends keyof TFrom ? TFrom[C] extends NotNullExceptInsert ? NotNullExceptInsert : TFrom[C] extends NotNull ? NotNull : {}: {};
 
 type HasMapperHelper<
 	TFrom,
@@ -897,7 +896,7 @@ type HasMapperHelper<
 			column4: keyof KeyCandidates4<TTo, TFrom>,
 			column5: keyof KeyCandidates5<TTo, TFrom>,
 			column6: keyof KeyCandidates6<TTo, TFrom>
-		): MappedTableDef<TTo> & RelatedTable & TExtra & HasMapperHelper2<MappedTableDef<TTo> & RelatedTable & TExtra>;
+		): MappedTableDef<TTo> & RelatedTable & TExtra & NotNullRelationHelper<MappedTableDef<TTo> & RelatedTable & TExtra>;
 	}
 	: 5 extends TPrimaryCount
 	? {
@@ -907,7 +906,7 @@ type HasMapperHelper<
 			column3: keyof KeyCandidates3<TTo, TFrom>,
 			column4: keyof KeyCandidates4<TTo, TFrom>,
 			column5: keyof KeyCandidates5<TTo, TFrom>
-		): MappedTableDef<TTo> & RelatedTable & TExtra & HasMapperHelper2<MappedTableDef<TTo> & RelatedTable & TExtra>;
+		): MappedTableDef<TTo> & RelatedTable & TExtra & NotNullRelationHelper<MappedTableDef<TTo> & RelatedTable & TExtra>;
 	}
 	: 4 extends TPrimaryCount
 	? {
@@ -916,7 +915,7 @@ type HasMapperHelper<
 			column2: keyof KeyCandidates2<TTo, TFrom>,
 			column3: keyof KeyCandidates3<TTo, TFrom>,
 			column4: keyof KeyCandidates4<TTo, TFrom>
-		): MappedTableDef<TTo> & RelatedTable & TExtra & HasMapperHelper2<MappedTableDef<TTo> & RelatedTable & TExtra>;
+		): MappedTableDef<TTo> & RelatedTable & TExtra & NotNullRelationHelper<MappedTableDef<TTo> & RelatedTable & TExtra>;
 	}
 	: 3 extends TPrimaryCount
 	? {
@@ -924,26 +923,25 @@ type HasMapperHelper<
 			column: keyof KeyCandidates1<TTo, TFrom>,
 			column2: keyof KeyCandidates2<TTo, TFrom>,
 			column3: keyof KeyCandidates3<TTo, TFrom>
-		): MappedTableDef<TTo> & RelatedTable & TExtra & HasMapperHelper2<MappedTableDef<TTo> & RelatedTable & TExtra>;
+		): MappedTableDef<TTo> & RelatedTable & TExtra & NotNullRelationHelper<MappedTableDef<TTo> & RelatedTable & TExtra>;
 	}
 	: 2 extends TPrimaryCount
 	? {
 		by(
 			column: keyof KeyCandidates1<TTo, TFrom>,
 			column2: keyof KeyCandidates2<TTo, TFrom>
-		): MappedTableDef<TTo> & RelatedTable & TExtra & HasMapperHelper2<MappedTableDef<TTo> & RelatedTable & TExtra>;
+		): MappedTableDef<TTo> & RelatedTable & TExtra & NotNullRelationHelper<MappedTableDef<TTo> & RelatedTable & TExtra>;
 	}
 	: 1 extends TPrimaryCount
 	? {
 		by(
 			column: keyof KeyCandidates1<TTo, TFrom>
-		): MappedTableDef<TTo> & RelatedTable & TExtra & HasMapperHelper2<MappedTableDef<TTo> & RelatedTable & TExtra>;
+		): MappedTableDef<TTo> & RelatedTable & TExtra & NotNullRelationHelper<MappedTableDef<TTo> & RelatedTable & TExtra>;
 	}
 	: {};
 
-type HasMapperHelper2<T> = {
+type NotNullRelationHelper<T> = {
 	notNull(): T & NotNull;
-	notNullExceptInsert(): T & NotNull & NotNullExceptInsert;
 }
 
 type ColumnMapperInit<T> = {
@@ -1207,7 +1205,7 @@ type StrategyToUpdateRowData<T> = Omit<{
 	: T[K] extends ManyRelation
 	? StrategyToInsertRowData<T[K]>[]
 	: StrategyToInsertRowData<T[K]>;
-	}, 'formulaDiscriminators' | 'columnDiscriminators' | 'map' | ' isManyRelation' | ' relatedTable' | ' isOneRelation'>
+	}, 'formulaDiscriminators' | 'columnDiscriminators' | ' notNull' | ' notNullExceptInsert' | 'map' | ' isManyRelation' | ' relatedTable' | ' isOneRelation'>
 	;
 
 type StrategyToInsertRowData<T> = Omit<{
@@ -1258,7 +1256,7 @@ type StrategyToInsertRowData<T> = Omit<{
 		: T[K] extends ManyRelation
 		? StrategyToInsertRowData<T[K]>[]
 		: StrategyToInsertRowData<T[K]>;
-	}, 'formulaDiscriminators' | 'columnDiscriminators' | 'map' | ' isManyRelation' | ' relatedTable' | ' isOneRelation'>
+	}, 'formulaDiscriminators' | 'columnDiscriminators' | ' notNull' | ' notNullExceptInsert' | 'map' | ' isManyRelation' | ' relatedTable' | ' isOneRelation'>
 	;
 
 type NegotiateDefaultStrategy<T> = T extends ColumnSymbols ? T : never;
