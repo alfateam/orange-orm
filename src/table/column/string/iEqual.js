@@ -1,6 +1,7 @@
 var newBoolean = require('../newBoolean');
 var nullOperator = ' is ';
 var encodeFilterArg = require('../encodeFilterArg');
+const quote = require('../../quote');
 
 function iEqual(column,arg,alias) {
 	var operator = ' ILIKE ';
