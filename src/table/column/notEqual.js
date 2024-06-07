@@ -8,7 +8,7 @@ function notEqual(column,arg,alias) {
 	var encoded = encodeFilterArg(column, arg);
 	if (encoded.sql() == 'null')
 		operator = nullOperator;
-	var firstPart = quote(alias) + '.' + column._dbName + operator;
+	var firstPart = quote(alias) + '.' + quote(column._dbName) + operator;
 	var filter =  encoded.prepend(firstPart);
 	return newBoolean(filter);
 }

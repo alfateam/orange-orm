@@ -27,7 +27,6 @@ function newRelatedTable(relations, isShallow, depth = 0) {
 	// @ts-ignore
 	c.where =  where(relations, depth);
 
-	//todo
 	// @ts-ignore
 	c._aggregate = aggregate(relations);
 

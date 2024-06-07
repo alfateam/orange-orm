@@ -71,14 +71,14 @@ GO
 
 CREATE TABLE datetest (
     id int IDENTITY PRIMARY KEY,
-    tdate DATE NULL,
+    [date] DATE NULL,
     tdatetime DATETIME NULL,
     tdatetime_tz DATETIME NULL
     );
     
 GO
 
-INSERT INTO datetest (tdate, tdatetime, tdatetime_tz)
+INSERT INTO datetest ([date], tdatetime, tdatetime_tz)
 VALUES ('2023-07-14 12:00:00', '2023-07-14T12:00:00', '2023-07-14 12:00:00');
 
 GO

@@ -808,9 +808,10 @@ describe('getMany raw filter', () => {
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
+		const _quote = quote.bind(null, dbName);
 
 		const rawFilter = {
-			sql: 'name like ?',
+			sql: `${_quote('name')} like ?`,
 			parameters: ['%arry']
 		};
 
@@ -842,8 +843,10 @@ describe('getMany raw filter where', () => {
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
 
+		const _quote = quote.bind(null, dbName);
+
 		const rawFilter = {
-			sql: 'name like ?',
+			sql: `${_quote('name')} like ?`,
 			parameters: ['%arry']
 		};
 
@@ -910,6 +913,13 @@ describe('getMany raw filter http where', () => {
 		expect(error?.message).toEqual('Raw filters are disallowed');
 	}
 });
+
+function quote(dbName, prop) {
+	if (dbName === 'oracle')
+		return `"${prop}"`;
+	else
+		return prop;
+}
 
 describe('getMany none raw sub filter http', () => {
 

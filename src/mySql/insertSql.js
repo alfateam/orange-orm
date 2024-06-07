@@ -1,6 +1,7 @@
-let quote = require('../table/quote');
+const getSessionSingleton = require('../table/getSessionSingleton');
 
 function insertSql(table, row, options) {
+	const quote = getSessionSingleton('quote');
 	let columnNames = [];
 	let regularColumnNames = [];
 	let conflictColumnUpdateSql = '';
@@ -27,7 +28,7 @@ function insertSql(table, row, options) {
 		let discriminators = table._columnDiscriminators;
 		for (let i = 0; i < discriminators.length; i++) {
 			let parts = discriminators[i].split('=');
-			columnNames.push(parts[0]);
+			columnNames.push(quote(parts[0]));
 			values.push(parts[1]);
 		}
 	}
@@ -37,25 +38,29 @@ function insertSql(table, row, options) {
 		let columns = table._columns;
 		for (let i = 0; i < columns.length; i++) {
 			let column = columns[i];
-			regularColumnNames.push(column._dbName);
+			const columnName = quote(column._dbName);
+			regularColumnNames.push(columnName);
 			if (row['__' + column.alias] !== undefined) {
-				columnNames.push(column._dbName);
+				columnNames.push(columnName);
 				values.push('%s');
 				addConflictUpdate(column);
 			}
 		}
 		if (conflictColumnUpdates.length === 0) {
 			const column = table._primaryColumns[0];
-			conflictColumnUpdates.push(`${column._dbName}=VALUES(${column._dbName})`);
+			const columnName = quote(column._dbName);
+			conflictColumnUpdates.push(`${columnName}=VALUES(${columnName})`);
 		}
 		conflictColumnUpdateSql = conflictColumnUpdates.join(',');
 
 		function addConflictUpdate(column) {
 			let concurrency = options[column.alias]?.concurrency || options.concurrency;
+			const columnName = quote(column._dbName);
+			const tableName = quote(table._dbName);
 			if (concurrency === 'overwrite') {
-				conflictColumnUpdates.push(`${column._dbName}=VALUES(${column._dbName})`);
+				conflictColumnUpdates.push(`${columnName}=VALUES(${columnName})`);
 			} else if (concurrency === 'optimistic') {
-				conflictColumnUpdates.push(`${column._dbName} = CASE WHEN ${quote(table._dbName)}.${column._dbName} <> VALUES(${column._dbName}) THEN CAST('12345678-1234-1234-1234-123456789012Conflict when updating ${column._dbName}12345678-1234-1234-1234-123456789012' AS SIGNED) ELSE ${table._dbName}.${column._dbName} END`);
+				conflictColumnUpdates.push(`${columnName} = CASE WHEN ${tableName}.${columnName} <> VALUES(${columnName}) THEN CAST('12345678-1234-1234-1234-123456789012Conflict when updating ${columnName}12345678-1234-1234-1234-123456789012' AS SIGNED) ELSE ${tableName}.${columnName} END`);
 			}
 		}
 	}

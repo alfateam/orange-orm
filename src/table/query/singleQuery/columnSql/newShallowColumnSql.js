@@ -28,7 +28,7 @@ function _new(table, alias, span, ignoreNulls) {
 	return sql;
 
 	function formatColumn(column) {
-		const formatted = column.formatOut ? column.formatOut(quotedAlias) : quotedAlias + '.' + column._dbName;
+		const formatted = column.formatOut ? column.formatOut(quotedAlias) : quotedAlias + '.' + quote(column._dbName);
 		if (column.dbNull === null)
 			return formatted;
 		else {

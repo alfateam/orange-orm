@@ -1,4 +1,5 @@
 var util = require('util');
+const quote = require('../../../../quote');
 
 function _new(table,alias,span) {
 	let columnsMap = span.columns;
@@ -9,7 +10,7 @@ function _new(table,alias,span) {
 	for (var i = 0; i < columns.length; i++) {
 		var column = columns[i];
 		if (!('serializable' in column && !column.serializable) && (!columnsMap || (columnsMap.get(column)))) {
-			sql = sql + separator + util.format(columnFormat, column._dbName, column.alias);
+			sql = sql + separator + util.format(columnFormat, quote(column._dbName), quote(column.alias));
 			separator = ',' + alias + '.';
 		}
 	}

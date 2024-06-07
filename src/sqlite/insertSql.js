@@ -2,7 +2,6 @@ const quote = require('../table/quote');
 
 function insertSql(table, row, options) {
 	let columnNames = [];
-	let regularColumnNames = [];
 	let conflictColumnUpdateSql = '';
 	let values = [];
 
@@ -20,7 +19,7 @@ function insertSql(table, row, options) {
 
 	function onConflict() {
 		if (options.concurrency === 'skipOnConflict' || options.concurrency === 'overwrite') {
-			const primaryKeys = table._primaryColumns.map(x => x._dbName).join(',');
+			const primaryKeys = table._primaryColumns.map(x => quote(x._dbName)).join(',');
 			return ` ON CONFLICT(${primaryKeys}) ${conflictColumnUpdateSql}`;
 		} else {
 			return '';
@@ -31,7 +30,7 @@ function insertSql(table, row, options) {
 		let discriminators = table._columnDiscriminators;
 		for (let i = 0; i < discriminators.length; i++) {
 			let parts = discriminators[i].split('=');
-			columnNames.push(parts[0]);
+			columnNames.push(quote(parts[0]));
 			values.push(parts[1]);
 		}
 	}
@@ -41,9 +40,9 @@ function insertSql(table, row, options) {
 		let columns = table._columns;
 		for (let i = 0; i < columns.length; i++) {
 			let column = columns[i];
-			regularColumnNames.push(column._dbName);
+			const columnName = quote(column._dbName);
 			if (row['__' + column.alias] !== undefined) {
-				columnNames.push(column._dbName);
+				columnNames.push(columnName);
 				values.push('%s');
 				addConflictUpdate(column);
 			}
@@ -55,10 +54,12 @@ function insertSql(table, row, options) {
 
 		function addConflictUpdate(column) {
 			let concurrency = options[column.alias]?.concurrency || options.concurrency;
+			const tableName = table._dbName;
+			const columnName = quote(column._dbName);
 			if (concurrency === 'overwrite') {
-				conflictColumnUpdates.push(`${column._dbName}=excluded.${column._dbName}`);
+				conflictColumnUpdates.push(`${columnName}=excluded.${columnName}`);
 			} else if (concurrency === 'optimistic')
-				conflictColumnUpdates.push(`${column._dbName} = CASE WHEN ${table._dbName}.${column._dbName} <> excluded.${column._dbName} THEN '12345678-1234-1234-1234-123456789012Conflict when updating ${column._dbName}12345678-1234-1234-1234-123456789012' ELSE ${table._dbName}.${column._dbName} END`);
+				conflictColumnUpdates.push(`${columnName} = CASE WHEN ${tableName}.${columnName} <> excluded.${columnName} THEN '12345678-1234-1234-1234-123456789012Conflict when updating ${columnName}12345678-1234-1234-1234-123456789012' ELSE ${tableName}.${columnName} END`);
 		}
 	}
 }

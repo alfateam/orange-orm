@@ -10,7 +10,7 @@ function columnAggregate(operator, column, relations, coalesce = true) {
 	const outerAliasQuoted = quote(outerAlias);
 	const alias = quote('x' + relations.length);
 	const foreignKeys = getForeignKeys(relations[0]);
-	const select = ` LEFT JOIN (SELECT ${foreignKeys},${operator}(${alias}.${column._dbName}) as amount`;
+	const select = ` LEFT JOIN (SELECT ${foreignKeys},${operator}(${alias}.${quote(column._dbName)}) as amount`;
 	const innerJoin = relations.length > 1 ? newJoin(relations).sql() : '';
 	const onClause = createOnClause(relations[0], outerAlias);
 	const from = ` FROM ${quote(relations.at(-1).childTable._dbName)} ${alias} ${innerJoin} GROUP BY ${foreignKeys}) ${outerAliasQuoted} ON (${onClause})`;
@@ -28,7 +28,7 @@ function columnAggregate(operator, column, relations, coalesce = true) {
 			columns = relation.joinRelation.columns;
 		else
 			columns = relation.childTable._primaryColumns;
-		return columns.map(x => `${alias}.${x._dbName}`).join(',');
+		return columns.map(x => `${alias}.${quote(x._dbName)}`).join(',');
 	}
 }
 

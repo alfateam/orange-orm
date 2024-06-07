@@ -2,12 +2,12 @@ const sql = `DROP TABLE IF EXISTS deliveryAddress; DROP TABLE IF EXISTS package;
 
 CREATE TABLE datetest (
     id INTEGER AUTO_INCREMENT PRIMARY KEY,
-    tdate DATE,
+    \`date\` DATE,
     tdatetime DATETIME,
     tdatetime_tz TIMESTAMP
 );
 
-INSERT INTO datetest (tdate, tdatetime, tdatetime_tz)
+INSERT INTO datetest (\`date\`, tdatetime, tdatetime_tz)
 VALUES ('2023-07-14T12:00:00+09:00', '2023-07-14T12:00:00+09:00', '2023-07-14 12:00:00-08:00');
 
 CREATE TABLE customer (

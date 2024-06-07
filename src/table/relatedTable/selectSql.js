@@ -1,10 +1,11 @@
 var newParameterized = require('../query/newParameterized');
 var newBoolean = require('../column/newBoolean');
-var quote = require('../quote');
+const getSessionSingleton = require('../getSessionSingleton');
 
 function newSelectSql(table, alias) {
+	const quote = getSessionSingleton('quote');
 	const quotedAlias  = quote(alias);
-	const colName = table._primaryColumns[0]._dbName;
+	const colName = quote(table._primaryColumns[0]._dbName);
 	const sql = 'SELECT ' + quotedAlias + '.' + colName + ' FROM ' + quote(table._dbName) + ' ' + quotedAlias;
 	const sqlp = newParameterized(sql);
 	return newBoolean(sqlp);

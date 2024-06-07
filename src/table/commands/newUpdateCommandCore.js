@@ -1,7 +1,8 @@
+const getSessionSingleton = require('../getSessionSingleton');
 var newParameterized = require('../query/newParameterized');
-const quote = require('../quote');
 
 function newUpdateCommandCore(table, columns, row) {
+	const quote = getSessionSingleton('quote');
 	var command = newParameterized('UPDATE ' + quote(table._dbName) + ' SET');
 	var separator = ' ';
 
@@ -13,7 +14,7 @@ function newUpdateCommandCore(table, columns, row) {
 		for (var alias in columns) {
 			var column = columns[alias];
 			var encoded = column.encode(row[alias]);
-			command = command.append(separator + column._dbName + '=').append(encoded);
+			command = command.append(separator + quote(column._dbName) + '=').append(encoded);
 			separator = ',';
 		}
 	}
@@ -25,7 +26,7 @@ function newUpdateCommandCore(table, columns, row) {
 			var column = columns[i];
 			var value = row[column.alias];
 			var encoded = column.encode(value);
-			command = command.append(separator + column._dbName + '=').append(encoded);
+			command = command.append(separator + quote(column._dbName) + '=').append(encoded);
 			separator = ' AND ';
 		}
 	}

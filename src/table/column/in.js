@@ -9,7 +9,7 @@ function _in(column,values,alias) {
 		filter =  newParameterized('1=2');
 		return newBoolean(filter);
 	}
-	var firstPart = quote(alias) + '.' + column._dbName + ' in ';
+	var firstPart = quote(alias) + '.' + quote(column._dbName) + ' in ';
 	var parameterized = newParameterized(firstPart);
 	var separator = '(';
 

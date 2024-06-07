@@ -15,7 +15,7 @@ function _new(rightTable,leftColumns,rightColumns,leftAlias,rightAlias,filter) {
 	function addColumn(index) {
 		var leftColumn = leftColumns[index];
 		var rightColumn = rightColumns[index];
-		sql += delimiter + leftAlias + '.' + leftColumn._dbName + '=' + rightAlias + '.' + rightColumn._dbName;
+		sql += delimiter + leftAlias + '.' + quote(leftColumn._dbName) + '=' + rightAlias + '.' + quote(rightColumn._dbName);
 	}
 
 	sql += newDiscriminatorSql(rightTable,rightAlias);

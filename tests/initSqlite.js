@@ -46,13 +46,13 @@ CREATE TABLE deliveryAddress (
 
 CREATE TABLE datetest (
     id INTEGER PRIMARY KEY,
-    tdate TEXT,
+    "date" TEXT,
     tdatetime TEXT,
     tdatetime_tz TEXT
 );
     
 
-INSERT INTO datetest (id, tdate, tdatetime, tdatetime_tz) VALUES (1, '2023-07-14T12:00:00', '2023-07-14T12:00:00', '2023-07-14T12:00:00-08:00')
+INSERT INTO datetest (id, "date", tdatetime, tdatetime_tz) VALUES (1, '2023-07-14T12:00:00', '2023-07-14T12:00:00', '2023-07-14T12:00:00-08:00')
 
 
 `;

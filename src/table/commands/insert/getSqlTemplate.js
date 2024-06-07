@@ -12,7 +12,6 @@ function getSqlTemplate(_table, _row) {
 
 function getSqlTemplateDefault(table, row) {
 	let columnNames = [];
-	let regularColumnNames = [];
 	let values = [];
 	let sql = 'INSERT INTO ' + quote(table._dbName) + ' ';
 	addDiscriminators();
@@ -27,7 +26,7 @@ function getSqlTemplateDefault(table, row) {
 		let discriminators = table._columnDiscriminators;
 		for (let i = 0; i < discriminators.length; i++) {
 			let parts = discriminators[i].split('=');
-			columnNames.push(parts[0]);
+			columnNames.push(quote(parts[0]));
 			values.push(parts[1]);
 		}
 	}
@@ -36,9 +35,8 @@ function getSqlTemplateDefault(table, row) {
 		let columns = table._columns;
 		for (let i = 0; i < columns.length; i++) {
 			let column = columns[i];
-			regularColumnNames.push(column._dbName);
 			if (row['__' + column.alias] !== undefined) {
-				columnNames.push(column._dbName);
+				columnNames.push(quote(column._dbName));
 				values.push('%s');
 			}
 		}

@@ -1,6 +1,7 @@
-const quote = require('../../quote');
+const getSessionSingleton = require('../../getSessionSingleton');
 
 function newDiscriminatorSql(table, alias) {
+	const quote = getSessionSingleton('quote');
 	alias = quote(alias);
 	var result = '';
 	var formulaDiscriminators = table._formulaDiscriminators;
@@ -19,9 +20,9 @@ function newDiscriminatorSql(table, alias) {
 
 	function addColumn() {
 		for (var i = 0; i< columnDiscriminators.length; i++) {
-			var current = columnDiscriminators[i];
+			var current = columnDiscriminators[i].split('=');
 			and();
-			result += alias + '.' + current;
+			result += alias + '.' + quote(current[0]) + '=' + current[1];
 		}
 	}
 

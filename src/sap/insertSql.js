@@ -44,7 +44,7 @@ function insertSql(table, row) {
 		let discriminators = table._columnDiscriminators;
 		for (let i = 0; i < discriminators.length; i++) {
 			let parts = discriminators[i].split('=');
-			columnNames.push(parts[0]);
+			columnNames.push(quote(parts[0]));
 			values.push(parts[1]);
 		}
 	}
@@ -53,9 +53,10 @@ function insertSql(table, row) {
 		let columns = table._columns;
 		for (let i = 0; i < columns.length; i++) {
 			let column = columns[i];
+			const columnName = quote(column._dbName);
 			regularColumnNames.push(column._dbName);
 			if (row['__' + column.alias] !== undefined) {
-				columnNames.push(column._dbName);
+				columnNames.push(columnName);
 				values.push('%s');
 			}
 		}

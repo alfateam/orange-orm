@@ -8,9 +8,10 @@ function columnAggregate(operator, column, relations, coalesce = true) {
 		return prev + relation.toLeg().name;
 	}, 'z');
 	tableAlias = quote(tableAlias);
+	const columnName = quote(column._dbName);
 
 	return {
-		expression: (alias) => coalesce ? `COALESCE(${operator}(${tableAlias}.${column._dbName}), 0) as ${quote(alias)}` : `${operator}(${tableAlias}.${column._dbName}) as ${alias}`,
+		expression: (alias) => coalesce ? `COALESCE(${operator}(${tableAlias}.${columnName}), 0) as ${quote(alias)}` : `${operator}(${tableAlias}.${columnName}) as ${alias}`,
 
 		joins: newJoinArray(relations)
 	};

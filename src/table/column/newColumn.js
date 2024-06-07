@@ -78,11 +78,13 @@ module.exports = function(table, name) {
 
 	function self() {
 		const tableAlias = quote(table._rootAlias || table._dbName);
+		const columnName = quote(c._dbName);
+
 		return {
-			expression: (alias) => `${tableAlias}.${c._dbName} ${alias}`,
+			expression: (alias) => `${tableAlias}.${columnName} ${quote(alias)}`,
 			joins: [''],
 			column: c,
-			groupBy: `${tableAlias}.${c._dbName}`
+			groupBy: `${tableAlias}.${columnName}`
 		};
 	}
 

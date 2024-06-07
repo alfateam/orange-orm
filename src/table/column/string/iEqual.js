@@ -7,7 +7,7 @@ function iEqual(column,arg,alias) {
 	var encoded = encodeFilterArg(column, arg);
 	if (encoded.sql() == 'null')
 		operator = nullOperator;
-	var firstPart = alias + '.' + column._dbName + operator;
+	var firstPart = alias + '.' + quote(column._dbName) + operator;
 	var filter =  encoded.prepend(firstPart);
 	return newBoolean(filter);
 }
