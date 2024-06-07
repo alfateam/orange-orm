@@ -1,4 +1,9 @@
 ## Changelog
+__4.1.1__  
+Some fixes regarding NotNull mappings. [#104](https://github.com/alfateam/orange-orm/issues/91)    
+__4.1.0__  
+Escape table and column names. [#91](https://github.com/alfateam/orange-orm/issues/91)  [#92](https://github.com/alfateam/orange-orm/issues/92)  
+NotNullable relations [#104](https://github.com/alfateam/orange-orm/issues/104)  
 __4.0.1__  
 Inhouse definitions of ajv to avoid trouble with nestjs.  
 __4.0.0__  
