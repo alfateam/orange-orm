@@ -6,6 +6,7 @@ const greaterThan = require('./greaterThan');
 const greaterThanOrEqual = require('./greaterThanOrEqual');
 const _in = require('./in');
 const _extractAlias = require('./extractAlias');
+const quote = require('../../table/quote');
 
 module.exports = function(table, name) {
 	var c = {};
@@ -76,12 +77,14 @@ module.exports = function(table, name) {
 	c.self = self;
 
 	function self() {
-		const tableAlias = table._rootAlias || table._dbName;
+		const tableAlias = quote(table._rootAlias || table._dbName);
+		const columnName = quote(c._dbName);
+
 		return {
-			expression: (alias) => `${tableAlias}.${c._dbName} ${alias}`,
+			expression: (alias) => `${tableAlias}.${columnName} ${quote(alias)}`,
 			joins: [''],
 			column: c,
-			groupBy: `${tableAlias}.${c._dbName}`
+			groupBy: `${tableAlias}.${columnName}`
 		};
 	}
 

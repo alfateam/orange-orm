@@ -1,6 +1,8 @@
 const outputInsertedSql = require('./outputInsertedSql');
+const getSessionSingleton = require('../table/getSessionSingleton');
 
 function insertSql(table, row, options) {
+	const quote = getSessionSingleton('quote');
 	let columnNames = [];
 	let regularColumnNames = [];
 	let conflictColumnUpdateSql = '';
@@ -11,18 +13,17 @@ function insertSql(table, row, options) {
 	const matched = whenMatched();
 	let sql;
 	if (matched)
-		sql = `MERGE INTO ${table._dbName} target USING (SELECT ${values.join(',')} FROM DUAL) source ON (${join()}) WHEN MATCHED THEN ${matched} WHEN NOT MATCHED THEN ${whenNotMatched()} ${outputInsertedSql(table)}`;
+		sql = `MERGE INTO ${quote(table._dbName)} target USING (SELECT ${values.join(',')} FROM DUAL) source ON (${join()}) WHEN MATCHED THEN ${matched} WHEN NOT MATCHED THEN ${whenNotMatched()} ${outputInsertedSql(table)}`;
 	else
-		sql = `MERGE INTO ${table._dbName} target USING (SELECT ${values.join(',')} FROM DUAL) source ON (${join()}) WHEN NOT MATCHED THEN ${whenNotMatched()} ${outputInsertedSql(table)}`;
+		sql = `MERGE INTO ${quote(table._dbName)} target USING (SELECT ${values.join(',')} FROM DUAL) source ON (${join()}) WHEN NOT MATCHED THEN ${whenNotMatched()} ${outputInsertedSql(table)}`;
 	return sql;
 
 	function join() {
 		const discriminators = table._columnDiscriminators.map(x => {
 			const name = x.split('=')[0];
-
-			return `target.${name}=source.${name}`;
+			return `target."${name}"=source."${name}"`;
 		});
-		const primaries = table._primaryColumns.map(x => `target.${x._dbName}=source.${x._dbName}`);
+		const primaries = table._primaryColumns.map(x => `target.${quote(x._dbName)}=source.${quote(x._dbName)}`);
 		return [...discriminators, ...primaries].join(' AND ');
 	}
 
@@ -41,8 +42,8 @@ function insertSql(table, row, options) {
 		let discriminators = table._columnDiscriminators;
 		for (let i = 0; i < discriminators.length; i++) {
 			let parts = discriminators[i].split('=');
-			columnNames.push(parts[0]);
-			values.push(`${parts[1]} ${parts[0]}`);
+			columnNames.push(quote(parts[0]));
+			values.push(`${parts[1]} ${quote(parts[0])}`);
 		}
 	}
 
@@ -51,10 +52,11 @@ function insertSql(table, row, options) {
 		let columns = table._columns;
 		for (let i = 0; i < columns.length; i++) {
 			let column = columns[i];
-			regularColumnNames.push(column._dbName);
+			const columnName = quote(column._dbName);
+			regularColumnNames.push(columnName);
 			if (row['__' + column.alias] !== undefined) {
-				columnNames.push(column._dbName);
-				values.push(`%s ${column.alias}`);
+				columnNames.push(columnName);
+				values.push(`%s ${quote(column.alias)}`);
 				if (!column.isPrimary)
 					addConflictUpdate(column);
 			}
@@ -66,11 +68,12 @@ function insertSql(table, row, options) {
 
 		function addConflictUpdate(column) {
 			let concurrency = options[column.alias]?.concurrency || options.concurrency;
+			const columnName = quote(column._dbName);
 			if (concurrency === 'overwrite')
-				conflictColumnUpdates.push(`target.${column._dbName}=source.${column._dbName}`);
+				conflictColumnUpdates.push(`target.${columnName}=source.${columnName}`);
 			else if (concurrency === 'optimistic')
 				// conflictColumnUpdates.push(`target.${column._dbName} = CASE WHEN target.${column._dbName} <> source.${column._dbName} THEN RAISE_APPLICATION_ERROR(-20001, 'Conflict when updating ${column._dbName}') ELSE target.${column._dbName} END`);
-				conflictColumnUpdates.push(`target.${column._dbName} = CASE WHEN target.${column._dbName} <> source.${column._dbName} THEN 1/0 ELSE target.${column._dbName} END`);
+				conflictColumnUpdates.push(`target.${columnName} = CASE WHEN target.${columnName} <> source.${columnName} THEN 1/0 ELSE target.${columnName} END`);
 
 		}
 	}

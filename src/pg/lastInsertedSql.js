@@ -1,8 +1,11 @@
+const getSessionSingleton = require('../table/getSessionSingleton');
+
 function lastInsertedSql(table) {
+	const quote = getSessionSingleton('quote');
 	let separator = '';
 	let result = 'RETURNING ';
 	for (let i = 0; i < table._columns.length; i++) {
-		result += separator + table._columns[i]._dbName;
+		result += separator + quote(table._columns[i]._dbName);
 		separator = ',';
 	}
 	return result;

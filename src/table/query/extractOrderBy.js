@@ -1,4 +1,8 @@
+const getSessionSingleton = require('../getSessionSingleton');
+
 function extractOrderBy(table, alias, orderBy, originalOrderBy) {
+	const quote = getSessionSingleton('quote');
+	alias = quote(alias);
 	var dbNames = [];
 	var i;
 	if (orderBy) {
@@ -33,7 +37,7 @@ function extractOrderBy(table, alias, orderBy, originalOrderBy) {
 		var column = getTableColumn(property);
 		var jsonQuery = getJsonQuery(property, column.alias);
 
-		dbNames.push(alias + '.' + column._dbName + jsonQuery + direction);
+		dbNames.push(alias + '.' + quote(column._dbName) + jsonQuery + direction);
 	}
 
 	function getTableColumn(property) {

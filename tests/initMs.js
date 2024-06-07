@@ -3,18 +3,19 @@ DROP TABLE if exists package;
 DROP TABLE if exists orderLine;
 DROP TABLE if exists deliveryAddress;
 DROP TABLE if exists torder;
+DROP TABLE if exists [order];
 DROP TABLE if exists vendor;
 DROP TABLE if exists customer;
 DROP TABLE if exists datetest;
 
 CREATE TABLE datetest (
     id int IDENTITY(1,1) PRIMARY KEY,
-    tdate DATE,
+    [date] DATE,
     tdatetime DATETIME,
     tdatetime_tz DATETIMEOFFSET
 );
 
-INSERT INTO datetest (tdate, tdatetime, tdatetime_tz)
+INSERT INTO datetest ([date], tdatetime, tdatetime_tz)
 VALUES ('2023-07-14 12:00:00', '2023-07-14 12:00:00', '2023-07-14T12:00:00-08:00');
 
 CREATE TABLE customer (
@@ -33,7 +34,7 @@ CREATE TABLE vendor  (
     isActive BIT
 );
 
-CREATE TABLE torder (
+CREATE TABLE [order] (
     id int IDENTITY(1,1) PRIMARY KEY,
     orderDate DATETIME,
     customerId INTEGER REFERENCES customer
@@ -41,7 +42,7 @@ CREATE TABLE torder (
 
 CREATE TABLE orderLine (
     id int IDENTITY(1,1) PRIMARY KEY,
-    orderId INTEGER REFERENCES torder,
+    orderId INTEGER REFERENCES [order],
     product VARCHAR(100),
     amount DECIMAL(10,2) NULL
 );
@@ -53,7 +54,7 @@ CREATE TABLE package (
 
 CREATE TABLE deliveryAddress (
     id int IDENTITY(1,1) PRIMARY KEY,
-    orderId INTEGER REFERENCES torder,
+    orderId INTEGER REFERENCES [order],
     name VARCHAR(100) NULL, 
     street VARCHAR(100) NULL,
     postalCode VARCHAR(100) NULL,

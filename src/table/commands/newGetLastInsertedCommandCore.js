@@ -1,14 +1,16 @@
-let newParameterized = require('../query/newParameterized');
-let getSessionContext = require('../getSessionContext');
+const newParameterized = require('../query/newParameterized');
+const getSessionContext = require('../getSessionContext');
+const newDiscriminatorSql = require('../query/singleQuery/newDiscriminatorSql');
+const quote = require('../quote');
 
 function newGetLastInsertedCommandCore(table, row) {
 	let parameters = [];
 	let keyValues = table._primaryColumns.map(column => row['__' + column.alias]);
-	let sql = `SELECT ${columnNames()} FROM ${table._dbName} WHERE ${whereSql()}`;
+	let sql = `SELECT ${columnNames()} FROM ${quote(table._dbName)} WHERE ${whereSql()}`;
 	return newParameterized(sql, parameters);
 
 	function columnNames() {
-		return table._columns.map(col => col._dbName).join(',');
+		return table._columns.map(col => quote(col._dbName)).join(',');
 	}
 
 	function whereSql() {
@@ -35,7 +37,7 @@ function newGetLastInsertedCommandCore(table, row) {
 	}
 
 	function discriminators() {
-		return table._columnDiscriminators.join(',');
+		return newDiscriminatorSql(table, table._dbName);
 	}
 }
 

@@ -25,6 +25,7 @@ afterAll(async () => {
 	});
 });
 
+
 beforeAll(async () => {
 	await createMs('mssql');
 	await insertData('pg');
@@ -125,7 +126,7 @@ beforeAll(async () => {
 			.use('/rdb', cors(), db.express());
 		server = app.listen(port, () => console.log(`Example app listening on port ${port}!`));
 	}
-}, 20000);
+}, 30000);
 
 describe('offset', () => {
 	test('pg', async () => await verify('pg'));
@@ -249,6 +250,7 @@ describe('boolean true filter', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
@@ -641,7 +643,7 @@ describe('aggregate each row', () => {
 
 		expect(rows).toEqual(expected);
 	}
-}, 20000);
+}, 30000);
 describe('getMany with relations', () => {
 
 	test('pg', async () => await verify('pg'));
@@ -806,9 +808,10 @@ describe('getMany raw filter', () => {
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
+		const _quote = quote.bind(null, dbName);
 
 		const rawFilter = {
-			sql: 'name like ?',
+			sql: `${_quote('name')} like ?`,
 			parameters: ['%arry']
 		};
 
@@ -840,8 +843,10 @@ describe('getMany raw filter where', () => {
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
 
+		const _quote = quote.bind(null, dbName);
+
 		const rawFilter = {
-			sql: 'name like ?',
+			sql: `${_quote('name')} like ?`,
 			parameters: ['%arry']
 		};
 
@@ -908,6 +913,13 @@ describe('getMany raw filter http where', () => {
 		expect(error?.message).toEqual('Raw filters are disallowed');
 	}
 });
+
+function quote(dbName, prop) {
+	if (dbName === 'oracle')
+		return `"${prop}"`;
+	else
+		return prop;
+}
 
 describe('getMany none raw sub filter http', () => {
 

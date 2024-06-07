@@ -37,7 +37,7 @@ beforeAll(async () => {
 			.use('/rdb', cors(), db.express());
 		server = app.listen(port, () => console.log(`Example app listening on port ${port}!`));
 	}
-});
+}, 20000);
 
 afterAll(async () => {
 	return new Promise((res) => {
@@ -46,7 +46,7 @@ afterAll(async () => {
 		else
 			res();
 	});
-});
+}, 20000);
 
 describe('optimistic fail', () => {
 	test('pg', async () => await verify('pg'));
@@ -202,7 +202,7 @@ describe('savechanges overload overwrite', () => {
 		expect(george2).toEqual(expected);
 		expect(george).toEqual(expected);
 	}
-});
+}, 20000);
 
 describe('savechanges overload optimistic', () => {
 	test('pg', async () => await verify('pg'));

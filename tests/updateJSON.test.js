@@ -120,7 +120,7 @@ describe('updateChanges', () => {
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
-		const originalRow = await db.order.getById(1, { deliveryAddress: true, lines: true });
+		const originalRow = await db.order.getById(1, { deliveryAddress: true, lines: true});
 		const json = JSON.stringify(originalRow);
 		const row = JSON.parse(json);
 		const oldRow = JSON.parse(json);

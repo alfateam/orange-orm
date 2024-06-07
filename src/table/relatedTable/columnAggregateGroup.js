@@ -1,22 +1,35 @@
 var newJoin = require('./joinSql');
 var getSessionContext = require('../getSessionContext');
 var newJoinCore = require('../query/singleQuery/joinSql/newShallowJoinSqlCore');
+const getSessionSingleton = require('../getSessionSingleton');
 
 function columnAggregate(operator, column, relations, coalesce = true) {
+	const quote = getSessionSingleton('quote');
 	const context = getSessionContext();
 	const outerAlias = 'y' + context.aggregateCount++;
-	const alias = 'x' + relations.length;
+	const outerAliasQuoted = quote(outerAlias);
+	const alias = quote('x' + relations.length);
 	const foreignKeys = getForeignKeys(relations[0]);
-	const select = ` LEFT JOIN (SELECT ${foreignKeys},${operator}(${alias}.${column._dbName}) as amount`;
+	const select = ` LEFT JOIN (SELECT ${foreignKeys},${operator}(${alias}.${quote(column._dbName)}) as amount`;
 	const innerJoin = relations.length > 1 ? newJoin(relations).sql() : '';
 	const onClause = createOnClause(relations[0], outerAlias);
-	const from = ` FROM ${relations.at(-1).childTable._dbName} ${alias} ${innerJoin} GROUP BY ${foreignKeys}) ${outerAlias} ON (${onClause})`;
+	const from = ` FROM ${quote(relations.at(-1).childTable._dbName)} ${alias} ${innerJoin} GROUP BY ${foreignKeys}) ${outerAliasQuoted} ON (${onClause})`;
 	const join = select  + from ;
 
 	return {
-		expression: (alias) => coalesce? `COALESCE(${outerAlias}.amount, 0) as ${alias}` : `${outerAlias}.amount as ${alias}`,
+		expression: (alias) => coalesce? `COALESCE(${outerAliasQuoted}.amount, 0) as ${quote(alias)}` : `${outerAliasQuoted}.amount as ${alias}`,
 		joins: [join]
 	};
+
+	function getForeignKeys(relation) {
+		let columns;
+		let alias = quote('x1');
+		if (relation.joinRelation)
+			columns = relation.joinRelation.columns;
+		else
+			columns = relation.childTable._primaryColumns;
+		return columns.map(x => `${alias}.${quote(x._dbName)}`).join(',');
+	}
 }
 
 function createOnClause(relation, rightAlias) {
@@ -42,18 +55,11 @@ function createOnClause(relation, rightAlias) {
 
 		sql = newJoinCore(childTable,parentTable._primaryColumns,columns,leftAlias, rightAlias).sql();
 	}
+
 	relation.accept(c);
 	return sql;
 }
 
-function getForeignKeys(relation) {
-	let columns;
-	let alias = 'x1';
-	if (relation.joinRelation)
-		columns = relation.joinRelation.columns;
-	else
-		columns = relation.childTable._primaryColumns;
-	return columns.map(x => `${alias}.${x._dbName}`).join(',');
-}
+
 
 module.exports = columnAggregate;

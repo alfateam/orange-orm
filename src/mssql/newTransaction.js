@@ -54,6 +54,7 @@ function newResolveTransaction(domain, pool) {
 					caller.visitSqlite();
 				};
 				rdb.aggregateCount = 0;
+				rdb.quote = (name) => `[${name}]`;
 				domain.rdb = rdb;
 				onSuccess();
 			} catch (e) {

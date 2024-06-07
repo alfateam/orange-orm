@@ -1,4 +1,5 @@
 var newShallowJoinSql = require('../../../../query/singleQuery/joinSql/newShallowJoinSqlCore');
+const quote = require('../../../../quote');
 var newQuery = require('./newQueryCore');
 var util = require('util');
 
@@ -13,7 +14,7 @@ function joinLegToQuery(parentAlias,leg,legNo) {
 	var shallowJoin  = newShallowJoinSql(parentTable,childColumns,parentColumns,childAlias,parentAlias);
 	var query = newQuery(childTable,span,childAlias);
 
-	return util.format(',\'%s\',(select %s from %s %s where %s)', leg.name, query.sql(), childTable._dbName, childAlias, shallowJoin);
+	return util.format(',\'%s\',(select %s from %s %s where %s)', leg.name, query.sql(), quote(childTable._dbName), quote(childAlias), shallowJoin);
 }
 
 module.exports = joinLegToQuery;

@@ -1,5 +1,6 @@
 var newBoolean = require('../newBoolean');
 var nullOperator = ' is ';
+var quote = require('../../quote');
 
 function startsWithCore(operator, column,arg,alias) {
 	operator = ' ' + operator + ' ';
@@ -8,7 +9,7 @@ function startsWithCore(operator, column,arg,alias) {
 		operator = nullOperator;
 	else
 		encoded = column.encode(arg + '%');
-	var firstPart = alias + '.' + column._dbName + operator;
+	var firstPart = quote(alias) + '.' + quote(column._dbName) + operator;
 	var filter =  encoded.prepend(firstPart);
 	return newBoolean(filter);
 }

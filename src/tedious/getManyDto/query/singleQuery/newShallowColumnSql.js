@@ -1,4 +1,8 @@
+const getSessionSingleton = require('../../../../table/getSessionSingleton');
+
 function _new(table,alias, span) {
+	const quote = getSessionSingleton('quote');
+	alias = quote(alias);
 	let columnsMap = span.columns;
 	var columns = table._columns;
 	var sql = '';
@@ -7,7 +11,7 @@ function _new(table,alias, span) {
 	for (var i = 0; i < columns.length; i++) {
 		var column = columns[i];
 		if (!columnsMap || (columnsMap.get(column))) {
-			sql = sql + separator  + formatColumn(column) + ' as ' + column.alias;
+			sql = sql + separator  + formatColumn(column) + ' as ' + quote(column.alias);
 			separator = ',';
 		}
 	}
@@ -20,7 +24,7 @@ function _new(table,alias, span) {
 
 	function formatColumn(column) {
 
-		const formatted = column.formatOut && column.tsType !== 'DateColumn' ? column.formatOut(alias) : alias + '.' + column._dbName;
+		const formatted = column.formatOut && column.tsType !== 'DateColumn' ? column.formatOut(alias) : alias + '.' + quote(column._dbName);
 		if (column.dbNull === null)
 			return formatted;
 		else {
