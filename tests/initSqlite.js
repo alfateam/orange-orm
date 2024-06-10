@@ -1,4 +1,4 @@
-const sql = `DROP TABLE IF EXISTS deliveryAddress; DROP TABLE IF EXISTS package; DROP TABLE IF EXISTS orderLine; DROP TABLE IF EXISTS "order";DROP TABLE IF EXISTS "order"; DROP TABLE IF EXISTS customer;DROP TABLE IF EXISTS vendor; DROP TABLE IF EXISTS datetest;
+const sql = `DROP TABLE IF EXISTS deliveryAddress; DROP TABLE IF EXISTS package; DROP TABLE IF EXISTS orderLine; DROP TABLE IF EXISTS "order";DROP TABLE IF EXISTS "order"; DROP TABLE IF EXISTS customer;DROP TABLE IF EXISTS vendor; DROP TABLE IF EXISTS datetest;DROP TABLE IF EXISTS compositeOrderLine;DROP TABLE IF EXISTS compositeOrder;
 CREATE TABLE customer (
     id INTEGER PRIMARY KEY,
     name TEXT,
@@ -27,6 +27,22 @@ CREATE TABLE orderLine (
     product TEXT,
     amount NUMERIC(10,2)
 );
+
+CREATE TABLE compositeOrder (
+    companyId TEXT, 
+    orderNo INTEGER,     
+    PRIMARY KEY (companyId, orderNo)
+);
+
+CREATE TABLE compositeOrderLine (
+    companyId TEXT,
+    orderNo INTEGER,
+    lineNo INTEGER,
+    product TEXT,
+    PRIMARY KEY (companyId, orderNo, lineNo),
+    FOREIGN KEY (companyId, orderNo) REFERENCES compositeOrder(companyId, orderNo)
+);
+
 
 CREATE TABLE package (
     packageId INTEGER PRIMARY KEY,

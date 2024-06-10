@@ -14,6 +14,13 @@ BEGIN
   `,
 	`
 BEGIN
+      EXECUTE IMMEDIATE 'DROP TABLE "compositeOrderLine"';
+  EXCEPTION
+      WHEN OTHERS THEN NULL;
+  END;
+  `,
+	`
+BEGIN
       EXECUTE IMMEDIATE 'DROP TABLE "deliveryAddress"';
   EXCEPTION
       WHEN OTHERS THEN NULL;
@@ -22,6 +29,13 @@ BEGIN
 	`
 BEGIN
       EXECUTE IMMEDIATE 'DROP TABLE "order"';
+  EXCEPTION
+      WHEN OTHERS THEN NULL;
+  END;
+`,
+	`
+BEGIN
+      EXECUTE IMMEDIATE 'DROP TABLE "compositeOrder"';
   EXCEPTION
       WHEN OTHERS THEN NULL;
   END;
@@ -82,6 +96,22 @@ BEGIN
         "product" VARCHAR2(100),
         "amount" NUMBER(10, 2) NULL,
         FOREIGN KEY("orderId") REFERENCES "order"("id")
+    )
+    `,
+	`CREATE TABLE "compositeOrder"(
+        "companyId" VARCHAR2(10), 
+        "orderNo" INTEGER,     
+        CONSTRAINT pk_compositeOrder PRIMARY KEY ("companyId", "orderNo")
+    )
+    `,
+	`CREATE TABLE "compositeOrderLine"(
+        "companyId" VARCHAR2(10),
+        "orderNo" INTEGER,
+        "lineNo" INTEGER,
+        "product" VARCHAR2(40),
+        CONSTRAINT pk_compositeOrderLine PRIMARY KEY ("companyId", "orderNo", "lineNo"),
+        CONSTRAINT fk_compositeOrderLine_compositeOrder FOREIGN KEY ("companyId", "orderNo") 
+            REFERENCES "compositeOrder" ("companyId", "orderNo")
     )
     `,
 	`CREATE TABLE "package"(

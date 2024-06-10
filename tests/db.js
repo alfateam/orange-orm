@@ -64,6 +64,18 @@ const map = rdb.map(x => ({
 		sscc: column('sscc').string()
 	})),
 
+	compositeOrder: x.table('compositeOrder').map(({ column }) => ({
+		companyId: column('companyId').string().primary().notNullExceptInsert(),
+		orderNo: column('orderNo').numeric().primary().notNullExceptInsert(),
+	})),
+
+	compositeOrderLine: x.table('compositeOrderLine').map(({ column }) => ({
+		companyId: column('companyId').string().primary().notNullExceptInsert(),
+		orderNo: column('orderNo').numeric().primary().notNullExceptInsert(),
+		lineNo: column('lineNo').numeric().primary().notNullExceptInsert(),
+		product: column('product').string(),
+	})),
+
 	order: x.table('order').map(({ column }) => ({
 		id: column('id').numeric().primary().notNullExceptInsert(),
 		orderDate: column('orderDate').date().notNull(),
@@ -108,6 +120,9 @@ const map = rdb.map(x => ({
 		customer: references(x.customer).by('customerId').notNull(),
 		deliveryAddress: hasOne(x.deliveryAddress).by('orderId').notNull(),
 		lines: hasMany(x.orderLine).by('orderId')
+	})),
+	compositeOrder: x.compositeOrder.map(({ hasMany }) => ({
+		lines: hasMany(x.compositeOrderLine).by('companyId', 'orderNo')
 	}))
 
 }));

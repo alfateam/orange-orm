@@ -30,6 +30,16 @@ GO
 
 IF
 EXISTS (SELECT 1 FROM
+    sysobjects WHERE type = 'U' and name = 'compositeOrderLine')
+
+BEGIN
+	DROP TABLE [compositeOrderLine]
+END
+
+GO
+
+IF
+EXISTS (SELECT 1 FROM
 sysobjects WHERE type = 'U' and name = 'deliveryAddress')
 
 BEGIN
@@ -45,6 +55,16 @@ sysobjects WHERE type = 'U' and name = 'order')
 
 BEGIN
 	DROP TABLE [order]
+END
+
+GO
+
+IF
+EXISTS (SELECT 1 FROM
+sysobjects WHERE type = 'U' and name = 'compositeOrder')
+
+BEGIN
+	DROP TABLE [compositeOrder]
 END
 
 GO
@@ -119,6 +139,24 @@ CREATE TABLE orderLine (
     amount NUMERIC(10,2) NULL
 )
 
+GO
+
+CREATE TABLE compositeOrder (
+    companyId VARCHAR(10), 
+    orderNo INT,     
+    PRIMARY KEY (companyId, orderNo)
+);
+
+GO
+
+CREATE TABLE compositeOrderLine (
+    companyId VARCHAR(10),
+    orderNo INTEGER,
+    [lineNo] INTEGER,
+    product VARCHAR(40),
+    PRIMARY KEY (companyId, orderNo, [lineNo]),
+    FOREIGN KEY (companyId, orderNo) REFERENCES compositeOrder(companyId, orderNo)
+);
 GO
 
 CREATE TABLE package (

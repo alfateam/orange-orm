@@ -1,4 +1,6 @@
 ## Changelog
+__4.1.2__  
+Bugfix with composite primary key with hasMany relation. [#106](https://github.com/alfateam/orange-orm/issues/106)  
 __4.1.1__  
 Some fixes regarding NotNull mappings. [#104](https://github.com/alfateam/orange-orm/issues/91)    
 __4.1.0__  
