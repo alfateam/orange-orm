@@ -524,7 +524,7 @@ describe('aggregate', () => {
 			sumPackages: x => x.sum(x => x.lines.packages.id),
 		});
 
-		rows.sort( (a,b) => a.customerId-b.customerId);
+		rows.sort((a, b) => a.customerId - b.customerId);
 
 		const expected = [
 			{
@@ -629,7 +629,7 @@ describe('aggregate each row', () => {
 				totalAmount: 300,
 				customerId2: 2,
 				lines: [
-					{ id2: 3, product: 'Magic wand', id: 3, orderId: 2,  numberOfPackages: 1 }
+					{ id2: 3, product: 'Magic wand', id: 3, orderId: 2, numberOfPackages: 1 }
 				],
 				customer: {
 					id: 2,
@@ -644,8 +644,8 @@ describe('aggregate each row', () => {
 		expect(rows).toEqual(expected);
 	}
 }, 30000);
-describe('getMany with relations', () => {
 
+describe('getMany with relations', () => {
 	test('pg', async () => await verify('pg'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
@@ -762,7 +762,7 @@ describe('getMany with filtered relations', () => {
 				customerId: 1,
 				customer: null,
 				lines: [
-					{ product: 'Bicycle', id:1,  amount: 678.9, orderId: 1 },
+					{ product: 'Bicycle', id: 1, amount: 678.9, orderId: 1 },
 				]
 			},
 			{
@@ -794,6 +794,55 @@ describe('getMany with filtered relations', () => {
 		expect(rows).toEqual(expected);
 	}
 }, 999999);
+
+describe('getMany composite', () => {
+
+	test('pg', async () => await verify('pg'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+
+		await db.compositeOrder.insertAndForget({
+			companyId: 'test',
+			orderNo: 1,
+			lines: [{
+				lineNo: 1,
+				product: 'abc'
+			}, {
+				lineNo: 2,
+				product: 'def'
+			}]
+		});
+
+		const rows = await db.compositeOrder.getAll({ lines: true });
+
+		const expected = [
+			{
+				companyId: 'test',
+				orderNo: 1,
+				lines: [{
+					companyId: 'test',
+					orderNo: 1,
+					lineNo: 1,
+					product: 'abc'
+				}, {
+					companyId: 'test',
+					orderNo: 1,
+					lineNo: 2,
+					product: 'def'
+				}]
+			}
+		];
+		expect(rows).toEqual(expected);
+	}
+});
 
 describe('getMany raw filter', () => {
 

@@ -1,9 +1,8 @@
+const emptyFilter = require('./emptyFilter');
 const newQuery = require('./getManyDto/newQuery');
 const negotiateRawSqlFilter = require('./table/column/negotiateRawSqlFilter');
 const strategyToSpan = require('./table/strategyToSpan');
 const executeQueries = require('./table/executeQueries');
-const newPrimaryKeyFilter = require('./table/newPrimaryKeyFilter');
-const newForeignKeyFilter = require('./table/relation/newForeignKeyFilter');
 
 async function getManyDto(table, filter, strategy, spanFromParent) {
 	filter = negotiateRawSqlFilter(filter, table);
@@ -151,7 +150,7 @@ async function decode(strategy, span, rows, keys = rows.length > 0 ? Object.keys
 	function createGetIds() {
 		const primaryColumns = table._primaryColumns;
 		const length = primaryColumns.length;
-		if (length > 1) {
+		if (length === 1) {
 			const alias = table._primaryColumns[0].alias;
 			return (row) => row[alias];
 		}
@@ -186,7 +185,7 @@ async function decodeRelations(strategy, span, rawRows, resultRows, keys) {
 		const name = leg.name;
 		const table = span.table;
 		const relation = table._relations[name];
-		const filter = createOneFilter(relation, span._ids, resultRows, table);
+		const filter = createOneFilter(relation, span._ids);
 		const rowsMap = span._rowsMap;
 		const p = getManyDto(relation.childTable, filter, strategy[name], leg.span).then(subRows => {
 			for (let i = 0; i < subRows.length; i++) {
@@ -207,21 +206,26 @@ async function decodeRelations(strategy, span, rawRows, resultRows, keys) {
 	await Promise.all(promises);
 }
 
-function createOneFilter(relation, ids, parentRows, table) {
-	let parentTable = relation.joinRelation.childTable;
+function createOneFilter(relation, ids) {
+	const columns = relation.joinRelation.columns;
 
-	if (parentTable._primaryColumns.length === 1)
-		return relation.joinRelation.columns[0].in(ids);
+	if (columns.length === 1)
+		return columns[0].in(ids);
 
 	else
 		return createCompositeFilter();
 
 	function createCompositeFilter() {
-		var filter = newPrimaryKeyFilter.apply(null, parentRows[0]);
-
-		for (var i = 1; i < ids.length; i++) {
-			const args = [table].concat(parentRows[i]);
-			filter = filter.or(newForeignKeyFilter.apply(null, args));
+		let filter = emptyFilter;
+		for(let id of ids) {
+			let nextFilter;
+			for (let i = 0; i < columns.length; i++) {
+				if (nextFilter)
+					nextFilter = nextFilter.and(columns[i].eq(id[i]));
+				else
+					nextFilter = columns[i].eq(id[i]);
+			}
+			filter = filter.or(nextFilter);
 		}
 		return filter;
 	}

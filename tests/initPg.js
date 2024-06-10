@@ -41,6 +41,19 @@ CREATE TABLE "orderLine" (
     amount NUMERIC(10,2) NULL
 );
 
+CREATE TABLE "compositeOrder" (
+    "companyId" VARCHAR(10), 
+    "orderNo" numeric,     
+    PRIMARY KEY ("companyId","orderNo")
+);
+
+CREATE TABLE "compositeOrderLine" (
+    "companyId" VARCHAR(10),
+    "orderNo" numeric,
+    "lineNo" numeric,
+    "product" varchar(40),
+    PRIMARY KEY ("companyId","orderNo", "lineNo"));
+
 CREATE TABLE package (
     "packageId" SERIAL PRIMARY KEY,
     "lineId" INTEGER REFERENCES "orderLine",

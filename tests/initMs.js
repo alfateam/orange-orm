@@ -1,6 +1,8 @@
 const sql = `
 DROP TABLE if exists package;
 DROP TABLE if exists orderLine;
+DROP TABLE if exists compositeOrderLine;
+DROP TABLE if exists compositeOrder;
 DROP TABLE if exists deliveryAddress;
 DROP TABLE if exists torder;
 DROP TABLE if exists [order];
@@ -46,6 +48,22 @@ CREATE TABLE orderLine (
     product VARCHAR(100),
     amount DECIMAL(10,2) NULL
 );
+
+CREATE TABLE compositeOrder (
+    companyId VARCHAR(10), 
+    orderNo INTEGER,     
+    PRIMARY KEY (companyId, orderNo)
+);
+
+CREATE TABLE compositeOrderLine (
+    companyId VARCHAR(10),
+    orderNo INTEGER,
+    [lineNo] INTEGER,
+    product VARCHAR(40),
+    PRIMARY KEY (companyId, orderNo, [lineNo]),
+    FOREIGN KEY (companyId, orderNo) REFERENCES compositeOrder(companyId, orderNo)
+);
+
 CREATE TABLE package (
     packageId int IDENTITY(1,1) PRIMARY KEY,
     lineId INTEGER REFERENCES orderLine,
