@@ -1,6 +1,6 @@
 let createDomain = require('../createDomain');
 let newTransaction = require('./newTransaction');
-let begin = require('../table/begin');
+let _begin = require('../table/begin');
 let commit = require('../table/commit');
 let rollback = require('../table/rollback');
 let newPool = require('./newPool');
@@ -19,13 +19,13 @@ function newDatabase(connectionString, poolOptions) {
 		throw new Error('Connection string cannot be empty');
 	var pool;
 	if (!poolOptions)
-		pool = newPool.bind(null,connectionString, poolOptions);
+		pool = newPool.bind(null, connectionString, poolOptions);
 	else
 		pool = newPool(connectionString, poolOptions);
 
-	let c = {poolFactory: pool, hostLocal, express};
+	let c = { poolFactory: pool, hostLocal, express };
 
-	c.transaction = function(options, fn) {
+	c.transaction = function (options, fn) {
 		if ((arguments.length === 1) && (typeof options === 'function')) {
 			fn = options;
 			options = undefined;
@@ -41,6 +41,10 @@ function newDatabase(connectionString, poolOptions) {
 		else
 			return domain.run(run);
 
+		function begin() {
+			return _begin(options?.readonly);
+		}
+
 		async function runInTransaction() {
 			let result;
 			let transaction = newTransaction(domain, pool);
@@ -52,6 +56,7 @@ function newDatabase(connectionString, poolOptions) {
 				.then(null, c.rollback);
 			return result;
 		}
+
 
 		function run() {
 			let p;
@@ -66,10 +71,10 @@ function newDatabase(connectionString, poolOptions) {
 
 	};
 
-	c.createTransaction = function() {
+	c.createTransaction = function () {
 		let domain = createDomain();
 		let transaction = newTransaction(domain, pool);
-		let p = domain.run(() => new Promise(transaction).then(begin));
+		let p = domain.run(() => new Promise(transaction).then(_begin));
 
 		function run(fn) {
 			return p.then(domain.run.bind(domain, fn));
@@ -77,7 +82,7 @@ function newDatabase(connectionString, poolOptions) {
 		return run;
 	};
 
-	c.bindTransaction = function() {
+	c.bindTransaction = function () {
 		// @ts-ignore
 		var domain = process.domain;
 		let p = domain.run(() => true);
@@ -88,7 +93,7 @@ function newDatabase(connectionString, poolOptions) {
 		return run;
 	};
 
-	c.query = function(query) {
+	c.query = function (query) {
 		let domain = createDomain();
 		let transaction = newTransaction(domain, pool);
 		let p = domain.run(() => new Promise(transaction)
@@ -111,14 +116,14 @@ function newDatabase(connectionString, poolOptions) {
 	c.rollback = rollback;
 	c.commit = commit;
 
-	c.end = function() {
+	c.end = function () {
 		if (poolOptions)
 			return pool.end();
 		else
 			return Promise.resolve();
 	};
 
-	c.accept = function(caller) {
+	c.accept = function (caller) {
 		caller.visitSqlite();
 	};
 

@@ -41,10 +41,6 @@ function newDatabase(connectionString, poolOptions) {
 		else
 			return domain.run(run);
 
-		function begin() {
-			return _begin(options?.readonly);
-		}
-
 		async function runInTransaction() {
 			let result;
 			let transaction = newTransaction(domain, pool);
@@ -55,6 +51,10 @@ function newDatabase(connectionString, poolOptions) {
 				.then(c.commit)
 				.then(null, c.rollback);
 			return result;
+		}
+
+		function begin() {
+			return _begin(options?.readonly);
 		}
 
 		function run() {
@@ -73,7 +73,7 @@ function newDatabase(connectionString, poolOptions) {
 	c.createTransaction = function () {
 		let domain = createDomain();
 		let transaction = newTransaction(domain, pool);
-		let p = domain.run(() => new Promise(transaction).then(begin));
+		let p = domain.run(() => new Promise(transaction).then(_begin));
 
 		function run(fn) {
 			return p.then(domain.run.bind(domain, fn));
