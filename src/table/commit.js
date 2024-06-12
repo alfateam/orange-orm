@@ -3,6 +3,7 @@ let pushCommand = require('./commands/pushCommand');
 let executeChanges = require('./executeQueries/executeChanges');
 let releaseDbClient = require('./releaseDbClient');
 let popChanges = require('./popChanges');
+const getSessionSingleton = require('./getSessionSingleton');
 
 function commit(result) {
 	return popAndPushChanges()
@@ -19,7 +20,8 @@ function commit(result) {
 			await executeChanges(changes);
 			changes = popChanges();
 		}
-		pushCommand(commitCommand);
+		if (!getSessionSingleton('readonly'))
+			pushCommand(commitCommand);
 		return executeChanges(popChanges());
 	}
 }

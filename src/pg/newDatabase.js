@@ -1,6 +1,6 @@
 let createDomain = require('../createDomain');
 let newTransaction = require('./newTransaction');
-let begin = require('../table/begin');
+let _begin = require('../table/begin');
 let commit = require('../table/commit');
 let rollback = require('../table/rollback');
 let newPool = require('./newPool');
@@ -17,9 +17,7 @@ let releaseDbClient = require('../table/releaseDbClient');
 let setSessionSingleton = require('../table/setSessionSingleton');
 let types = require('pg').types;
 
-types.setTypeParser(1700, function(val) {
-	return parseFloat(val);
-});
+types.setTypeParser(1700, (val) => Number.parseFloat(val));
 
 function newDatabase(connectionString, poolOptions) {
 	if (!connectionString)
@@ -32,7 +30,7 @@ function newDatabase(connectionString, poolOptions) {
 
 	let c = { poolFactory: pool, hostLocal, express };
 
-	c.transaction = function(options, fn) {
+	c.transaction = (options, fn) => {
 		if ((arguments.length === 1) && (typeof options === 'function')) {
 			fn = options;
 			options = undefined;
@@ -61,6 +59,10 @@ function newDatabase(connectionString, poolOptions) {
 			return result;
 		}
 
+		function begin() {
+			return _begin(options?.readonly);
+		}
+
 		function run() {
 			let p;
 			let transaction = newTransaction(domain, pool);
@@ -81,10 +83,10 @@ function newDatabase(connectionString, poolOptions) {
 		}
 	};
 
-	c.createTransaction = function(options) {
+	c.createTransaction = (options) => {
 		let domain = createDomain();
 		let transaction = newTransaction(domain, pool);
-		let p = domain.run(() => new Promise(transaction).then(begin).then(negotiateSchema));
+		let p = domain.run(() => new Promise(transaction).then(_begin).then(negotiateSchema));
 
 		function run(fn) {
 			return p.then(domain.run.bind(domain, fn));
@@ -100,7 +102,7 @@ function newDatabase(connectionString, poolOptions) {
 		return run;
 	};
 
-	c.bindTransaction = function() {
+	c.bindTransaction = () => {
 		// @ts-ignore
 		var domain = process.domain;
 		let p = domain.run(() => true);
@@ -111,7 +113,7 @@ function newDatabase(connectionString, poolOptions) {
 		return run;
 	};
 
-	c.query = function(query) {
+	c.query = (query) => {
 		let domain = createDomain();
 		let transaction = newTransaction(domain, pool);
 		let p = domain.run(() => new Promise(transaction)
@@ -136,14 +138,14 @@ function newDatabase(connectionString, poolOptions) {
 	c.lock = lock;
 	c.schema = executeSchema;
 
-	c.end = function() {
+	c.end = () => {
 		if (poolOptions)
 			return pool.end();
 		else
 			return Promise.resolve();
 	};
 
-	c.accept = function(caller) {
+	c.accept = (caller) => {
 		caller.visitPg();
 	};
 

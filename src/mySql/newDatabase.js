@@ -1,6 +1,6 @@
 let createDomain = require('../createDomain');
 let newTransaction = require('./newTransaction');
-let begin = require('../table/begin');
+let _begin = require('../table/begin');
 let commit = require('../table/commit');
 let rollback = require('../table/rollback');
 let newPool = require('./newPool');
@@ -50,6 +50,10 @@ function newDatabase(connectionString, poolOptions) {
 				.then(c.commit)
 				.then(null, c.rollback);
 			return result;
+		}
+
+		function begin() {
+			return _begin(options?.readonly);
 		}
 
 		function run() {
