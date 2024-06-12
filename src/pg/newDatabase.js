@@ -17,7 +17,9 @@ let releaseDbClient = require('../table/releaseDbClient');
 let setSessionSingleton = require('../table/setSessionSingleton');
 let types = require('pg').types;
 
-types.setTypeParser(1700, (val) => Number.parseFloat(val));
+types.setTypeParser(1700, function(val) {
+	return parseFloat(val);
+});
 
 function newDatabase(connectionString, poolOptions) {
 	if (!connectionString)
@@ -30,7 +32,7 @@ function newDatabase(connectionString, poolOptions) {
 
 	let c = { poolFactory: pool, hostLocal, express };
 
-	c.transaction = (options, fn) => {
+	c.transaction = function(options, fn) {
 		if ((arguments.length === 1) && (typeof options === 'function')) {
 			fn = options;
 			options = undefined;
@@ -45,6 +47,8 @@ function newDatabase(connectionString, poolOptions) {
 		}
 		else
 			return domain.run(run);
+
+
 
 		async function runInTransaction() {
 			let result;
@@ -83,7 +87,7 @@ function newDatabase(connectionString, poolOptions) {
 		}
 	};
 
-	c.createTransaction = (options) => {
+	c.createTransaction = function(options) {
 		let domain = createDomain();
 		let transaction = newTransaction(domain, pool);
 		let p = domain.run(() => new Promise(transaction).then(_begin).then(negotiateSchema));
@@ -102,7 +106,7 @@ function newDatabase(connectionString, poolOptions) {
 		return run;
 	};
 
-	c.bindTransaction = () => {
+	c.bindTransaction = function() {
 		// @ts-ignore
 		var domain = process.domain;
 		let p = domain.run(() => true);
@@ -113,7 +117,7 @@ function newDatabase(connectionString, poolOptions) {
 		return run;
 	};
 
-	c.query = (query) => {
+	c.query = function(query) {
 		let domain = createDomain();
 		let transaction = newTransaction(domain, pool);
 		let p = domain.run(() => new Promise(transaction)
@@ -138,14 +142,14 @@ function newDatabase(connectionString, poolOptions) {
 	c.lock = lock;
 	c.schema = executeSchema;
 
-	c.end = () => {
+	c.end = function() {
 		if (poolOptions)
 			return pool.end();
 		else
 			return Promise.resolve();
 	};
 
-	c.accept = (caller) => {
+	c.accept = function(caller) {
 		caller.visitPg();
 	};
 
