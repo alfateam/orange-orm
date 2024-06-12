@@ -3,7 +3,7 @@ let getMeta = require('./hostExpress/getMeta');
 let setSessionSingleton = require('./table/setSessionSingleton');
 let executeQuery = require('./query');
 let hostExpress = require('./hostExpress');
-
+const readonlyOps = ['getManyDto', 'getMany', 'aggregate', 'count'];
 // { db, table, defaultConcurrency,
 // 	concurrency,
 // 	customFilters,
@@ -20,7 +20,7 @@ function hostLocal() {
 		return getMeta(table);
 
 	}
-	async function patch(body,_req, _res) {
+	async function patch(body, _req, _res) {
 		if (!table) {
 			const error = new Error('Table is not exposed');
 			// @ts-ignore
@@ -65,7 +65,10 @@ function hostLocal() {
 				else
 					db = dbPromise;
 			}
-			await db.transaction(fn);
+			if (readonlyOps.includes(body.path))
+				await db.transaction({ readonly: true }, fn);
+			else
+				await db.transaction(fn);
 		}
 		return result;
 
@@ -101,7 +104,7 @@ function hostLocal() {
 	}
 
 	function express(client, options) {
-		return hostExpress(client, options );
+		return hostExpress(client, options);
 	}
 
 	return c;

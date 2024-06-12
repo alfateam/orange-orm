@@ -1,6 +1,6 @@
 let createDomain = require('../createDomain');
 let newTransaction = require('./newTransaction');
-let begin = require('../table/begin');
+let _begin = require('../table/begin');
 let commit = require('../table/commit');
 let rollback = require('../table/rollback');
 let newPool = require('./newPool');
@@ -41,6 +41,10 @@ function newDatabase(connectionString, poolOptions) {
 		else
 			return domain.run(run);
 
+		function begin() {
+			return _begin(options?.readonly);
+		}
+
 		async function runInTransaction() {
 			let result;
 			let transaction = newTransaction(domain, pool);
@@ -69,7 +73,7 @@ function newDatabase(connectionString, poolOptions) {
 	c.createTransaction = function() {
 		let domain = createDomain();
 		let transaction = newTransaction(domain, pool);
-		let p = domain.run(() => new Promise(transaction).then(begin));
+		let p = domain.run(() => new Promise(transaction).then(_begin));
 
 		function run(fn) {
 			return p.then(domain.run.bind(domain, fn));
