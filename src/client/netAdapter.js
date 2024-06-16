@@ -37,7 +37,7 @@ function httpAdapter(baseURL, path, axiosInterceptor) {
 			const res = await axios.request(path, { headers, method: 'patch', data: body });
 			return res.data;
 		}
-		catch (e) {			
+		catch (e) {
 			if (typeof e.response?.data === 'string')
 				throw new Error(e.response.data.replace(/^Error: /, ''));
 			else
