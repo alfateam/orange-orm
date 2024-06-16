@@ -4842,8 +4842,8 @@ function httpAdapter(baseURL, path, axiosInterceptor) {
 			return res.data;
 		}
 		catch (e) {
-			if (e.response?.data)
-				throw new Error(e.response?.data.replace(/^Error: /, ''));
+			if (typeof e.response?.data === 'string')
+				throw new Error(e.response.data.replace(/^Error: /, ''));
 			else
 				throw e;
 		}
@@ -4857,9 +4857,9 @@ function httpAdapter(baseURL, path, axiosInterceptor) {
 			const res = await axios.request(path, { headers, method: 'patch', data: body });
 			return res.data;
 		}
-		catch (e) {
-			if (e.response?.data)
-				throw new Error(e.response?.data.replace(/^Error: /, ''));
+		catch (e) {			
+			if (typeof e.response?.data === 'string')
+				throw new Error(e.response.data.replace(/^Error: /, ''));
 			else
 				throw e;
 		}
@@ -4874,8 +4874,8 @@ function httpAdapter(baseURL, path, axiosInterceptor) {
 			return res.data;
 		}
 		catch (e) {
-			if (e.response?.data)
-				throw new Error(e.response?.data.replace(/^Error: /, ''));
+			if (typeof e.response?.data === 'string')
+				throw new Error(e.response.data.replace(/^Error: /, ''));
 			else throw e;
 		}
 	}
