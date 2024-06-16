@@ -1,4 +1,6 @@
 ## Changelog
+__4.1.4__  
+Better error message when running over http.  
 __4.1.3__  
 Do not use transaction in readonly operations. [#109](https://github.com/alfateam/orange-orm/issues/109)  
 __4.1.2__  
