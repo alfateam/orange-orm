@@ -139,7 +139,7 @@ getRows();
 async function getRows() {
   const orders = await db.order.getAll({
     where: x => x.lines.any(line => line.product.contains('broomstick'))
-      .and(db.order.customer.name.startsWith('Harry')),
+      .and(x.customer.name.startsWith('Harry')),
     lines: {
       packages: true
     },
