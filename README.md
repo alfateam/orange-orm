@@ -831,7 +831,7 @@ async function update() {
   };
 
   const modified = JSON.parse(JSON.stringify(original));
-  deliveryAddress.name = 'Roger';
+  modified.deliveryAddress.name = 'Roger';
   modified.lines.push({ product: 'Piano', amount: 800 });
 
   const order = await db.order.updateChanges(modified, original, { customer: true, deliveryAddress: true, lines: true });
