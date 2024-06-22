@@ -1,5 +1,6 @@
 const createPatch = require('./createPatch');
 const stringify = require('./stringify');
+const cloneRows = require('./cloneRows');
 const netAdapter = require('./netAdapter');
 const toKeyPositionMap = require('./toKeyPositionMap');
 const rootMap = new WeakMap();
@@ -483,7 +484,7 @@ function rdbClient(options = {}) {
 
 			};
 			let innerProxy = new Proxy(array, handler);
-			rootMap.set(array, { json: stringify(array), strategy, originalArray: [...array] });
+			rootMap.set(array, { json: cloneRows(array), strategy, originalArray: [...array] });
 			if (strategy !== undefined) {
 				const { limit, ...cleanStrategy } = { ...strategy };
 				fetchingStrategyMap.set(array, cleanStrategy);
@@ -516,7 +517,7 @@ function rdbClient(options = {}) {
 
 			};
 			let innerProxy = new Proxy(row, handler);
-			rootMap.set(row, { json: stringify(row), strategy });
+			rootMap.set(row, { json: cloneRows(row), strategy });
 			fetchingStrategyMap.set(row, strategy);
 			return innerProxy;
 		}
@@ -606,7 +607,7 @@ function rdbClient(options = {}) {
 			let insertedPositions = getInsertedRowsPosition(array);
 			let { changed, strategy: newStrategy } = await p;
 			copyIntoArray(changed, array, [...insertedPositions, ...updatedPositions]);
-			rootMap.set(array, { json: stringify(array), strategy: newStrategy, originalArray: [...array] });
+			rootMap.set(array, { json: cloneRows(array), strategy: newStrategy, originalArray: [...array] });
 		}
 
 		async function patch(patch, concurrencyOptions, strategy) {
@@ -705,7 +706,7 @@ function rdbClient(options = {}) {
 			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
 			let { strategy } = await adapter.patch(body);
 			array.length = 0;
-			rootMap.set(array, { jsonMap: stringify(array), strategy });
+			rootMap.set(array, { jsonMap: cloneRows(array), strategy });
 		}
 
 		function setMapValue(rowsMap, keys, row, index) {
@@ -768,7 +769,7 @@ function rdbClient(options = {}) {
 				array.splice(i + offset, 1);
 				offset--;
 			}
-			rootMap.set(array, { json: stringify(array), strategy, originalArray: [...array] });
+			rootMap.set(array, { json: cloneRows(array), strategy, originalArray: [...array] });
 			fetchingStrategyMap.set(array, strategy);
 		}
 
@@ -803,7 +804,7 @@ function rdbClient(options = {}) {
 			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
 			let { changed, strategy: newStrategy } = await adapter.patch(body);
 			copyInto(changed, [row]);
-			rootMap.set(row, { json: stringify(row), strategy: newStrategy });
+			rootMap.set(row, { json: cloneRows(row), strategy: newStrategy });
 		}
 
 		async function refreshRow(row, strategy) {
@@ -827,13 +828,13 @@ function rdbClient(options = {}) {
 			for (let p in rows[0]) {
 				row[p] = rows[0][p];
 			}
-			rootMap.set(row, { json: stringify(row), strategy });
+			rootMap.set(row, { json: cloneRows(row), strategy });
 			fetchingStrategyMap.set(row, strategy);
 		}
 
 		function acceptChangesRow(row) {
 			const { strategy } = rootMap.get(row);
-			rootMap.set(row, { json: stringify(row), strategy });
+			rootMap.set(row, { json: cloneRows(row), strategy });
 		}
 
 		function clearChangesRow(row) {
