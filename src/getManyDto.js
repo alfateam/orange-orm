@@ -19,99 +19,6 @@ async function getManyDto(table, filter, strategy, spanFromParent) {
 	return decode(strategy, span, await res[0]);
 }
 
-function newCreateRow2(span, keys, _aggregateKeys) {
-	// console.dir('keys');
-	// console.dir(keys);
-	let columnsMap = span.columns;
-	const columns = span.table._columns.filter(column => !columnsMap || columnsMap.get(column));
-	// const protoRow = createProto(columns, span);
-	// const manyNames = [];
-
-	function Row(row) {
-		// console.dir('inside row')
-		// console.dir(row)
-		this._row = row;
-		this._manyObject = {};				
-	}
-	
-	// Object.defineProperty(Row.prototype, "_row", {
-	// 	enumerable: false
-	// });
-
-	// Object.defineProperty(Row.prototype, "_manyObject", {
-	// 	enumerable: false
-	// });
-
-
-	for (let i = 0; i < columns.length; i++) {		
-		Object.defineProperty(Row.prototype, columns[i].alias, {
-			get() {
-				return columns[i].decode(this._row[keys[i]]);
-			},
-			enumerable: true
-		});
-	}
-
-	let isMany;
-	const c = {};	
-	c.visitJoin = () => isMany = false;
-	c.visitOne = () => isMany  = false;
-	c.visitMany = () => isMany = true;
-	const legs = span.legs.toArray();
-	for (let i = 0; i < legs.length; i++) {
-		legs[i].accept(c);		
-		const name = legs[i].name;
-		if (isMany) {
-			Object.defineProperty(Row.prototype, name, {
-				get() {
-					console.dir('get many name');
-					console.dir(name);
-					if (this._manyObject[name] === undefined) {
-						console.dir('is undefined.....................')
-						this._manyObject[name] = [];
-					}
-					return this._manyObject[name];
-				},
-				enumerable: true,
-				set: function(value) {
-					this._manyObject[name] = value;
-				}
-			});
-		}
-		else {
-			Object.defineProperty(Row.prototype, name, {
-				get() {
-					console.dir('get many name');
-					console.dir(name);
-					if (this._manyObject[name] === undefined) {
-						console.dir('is undefined.....................')
-						this._manyObject[name] = null;
-					}
-					return this._manyObject[name];
-				},
-				enumerable: true,
-				set: function(value) {
-					this._manyObject[name] = value;
-				}
-			});
-		}
-
-	}
-
-	span.legs.forEach(onEachLeg);
-	return createRow;
-
-	function createRow(row) {
-		return new Row(row);
-	}
-
-	function onEachLeg(leg) {
-		leg.accept(c);
-	}
-}
-
-
-
 function newCreateRow(span) {
 	let columnsMap = span.columns;
 	const columns = span.table._columns.filter(column => !columnsMap || columnsMap.get(column));
@@ -203,37 +110,21 @@ async function decode(strategy, span, rows, keys = rows.length > 0 ? Object.keys
 	const shouldCreateMap = hasManyRelations(span);
 	for (let i = 0; i < rowsLength; i++) {
 		const row = rows[i];
-		let outRow = createRow(row);		
+		let outRow = createRow();
 		let pkWithNullCount = 0;
-		for (let j = 0; j < primaryColumnsLength; j++) {
-			if (row[keys[j]] === null)
-				pkWithNullCount++;
-			if (pkWithNullCount === primaryColumnsLength) {
-				outRow = null;
-				break;
+		for (let j = 0; j < columnsLength; j++) {
+			if (j < primaryColumnsLength) {
+				if (row[keys[j]] === null)
+					pkWithNullCount++;
+				if (pkWithNullCount === primaryColumnsLength) {
+					outRow = null;
+					break;
+				}
 			}
 			const column = columns[j];
 			outRow[column.alias] = column.decode(row[keys[j]]);
-		}
-		if (shouldCreateMap) {
-			fkIds[i] = getIds(outRow);
-			addToMap(rowsMap, primaryColumns, outRow);
-		}
-		outRows[i] = outRow;
-	}
-	span._rowsMap = rowsMap;
-	span._ids = fkIds;
-
-	const manyPromise = decodeManyRelations(strategy, span);
-
-	for (let i = 0; i < rowsLength; i++) {
-		const row = rows[i];
-		// console.dir('before create')
-		// console.dir(row)
-		let outRow = outRows[i];		
-		for (let j = primaryColumnsLength; j < columnsLength; j++) {
-			const column = columns[j];
-			outRow[column.alias] = column.decode(row[keys[j]]);
+			if (shouldCreateMap)
+				fkIds[i] = getIds(outRow);
 		}
 
 		for (let j = 0; j < aggregateKeys.length; j++) {
@@ -241,14 +132,18 @@ async function decode(strategy, span, rows, keys = rows.length > 0 ? Object.keys
 			const parse = span.aggregates[key].column?.decode || Number.parseFloat;
 			outRow[key] =  parse(row[keys[j+columnsLength]]);
 		}
-		
+
+		outRows[i] = outRow;
+		if (shouldCreateMap)
+			addToMap(rowsMap, primaryColumns, outRow);
 	}
+	span._rowsMap = rowsMap;
+	span._ids = fkIds;
 
 	for (let i = 0; i < columnsLength + aggregateKeys.length; i++) {
 		keys.shift();
 	}
 	await decodeRelations(strategy, span, rows, outRows, keys);
-	await manyPromise;
 	return outRows;
 
 
@@ -271,10 +166,19 @@ async function decode(strategy, span, rows, keys = rows.length > 0 ? Object.keys
 
 }
 
-async function decodeManyRelations(strategy, span) {
+async function decodeRelations(strategy, span, rawRows, resultRows, keys) {
 	const promises = [];
 	const c = {};
-	c.visitJoin = () => {};
+	c.visitJoin = function(leg) {
+		const name = leg.name;
+		const p = decode(strategy[name], leg.span, rawRows, keys).then((rows) => {
+			for (let i = 0; i < rows.length; i++) {
+				resultRows[i][name] = rows[i];
+			}
+		});
+		promises.push(p);
+	};
+
 	c.visitOne = c.visitJoin;
 
 	c.visitMany = function(leg) {
@@ -293,30 +197,6 @@ async function decodeManyRelations(strategy, span) {
 		promises.push(p);
 	};
 
-	span.legs.forEach(onEachLeg);
-
-	function onEachLeg(leg) {
-		leg.accept(c);
-	}
-
-	await Promise.all(promises);
-}
-async function decodeRelations(strategy, span, rawRows, resultRows, keys) {
-	const promises = [];
-	const c = {};
-	c.visitJoin = function(leg) {
-		const name = leg.name;
-		const p = decode(strategy[name], leg.span, rawRows, keys).then((rows) => {
-			for (let i = 0; i < rows.length; i++) {
-				resultRows[i][name] = rows[i];
-			}
-		});
-		promises.push(p);
-	};
-
-	c.visitOne = c.visitJoin;
-
-	c.visitMany = () => {};	
 	span.legs.forEach(onEachLeg);
 
 	function onEachLeg(leg) {
