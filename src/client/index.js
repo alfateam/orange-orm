@@ -484,7 +484,7 @@ function rdbClient(options = {}) {
 
 			};
 			let innerProxy = new Proxy(array, handler);
-			//todo			
+			//todo
 			rootMap.set(array, { json: cloneFromDb(array), strategy, originalArray: [...array] });
 			if (strategy !== undefined) {
 				const { limit, ...cleanStrategy } = { ...strategy };
