@@ -3607,7 +3607,7 @@ function isAbsoluteURL(url) {
  */
 function combineURLs(baseURL, relativeURL) {
   return relativeURL
-    ? baseURL.replace(/\/+$/, '') + '/' + relativeURL.replace(/^\/+/, '')
+    ? baseURL.replace(/\/?\/$/, '') + '/' + relativeURL.replace(/^\/+/, '')
     : baseURL;
 }
 
@@ -4241,7 +4241,7 @@ function mergeConfig(config1, config2) {
   return config;
 }
 
-const VERSION = "1.6.2";
+const VERSION = "1.6.3";
 
 const validators$1 = {};
 
@@ -4857,7 +4857,7 @@ function httpAdapter(baseURL, path, axiosInterceptor) {
 			const res = await axios.request(path, { headers, method: 'patch', data: body });
 			return res.data;
 		}
-		catch (e) {			
+		catch (e) {
 			if (typeof e.response?.data === 'string')
 				throw new Error(e.response.data.replace(/^Error: /, ''));
 			else
@@ -5524,7 +5524,7 @@ function rdbClient(options = {}) {
 			let args = [_, strategy].concat(Array.prototype.slice.call(arguments).slice(2));
 			let rows = await getManyCore.apply(null, args);
 			await metaPromise;
-			return proxify(rows, strategy);
+			return proxify(rows, strategy, {fastStringify : true});
 		}
 
 		async function groupBy(strategy) {
@@ -5556,7 +5556,7 @@ function rdbClient(options = {}) {
 			await metaPromise;
 			if (rows.length === 0)
 				return;
-			return proxify(rows[0], strategy);
+			return proxify(rows[0], strategy, {fastStringify : true});
 		}
 
 		async function getById() {
@@ -5744,14 +5744,14 @@ function rdbClient(options = {}) {
 		}
 
 
-		function proxify(itemOrArray, strategy) {
+		function proxify(itemOrArray, strategy, options) {
 			if (Array.isArray(itemOrArray))
-				return proxifyArray(itemOrArray, strategy);
+				return proxifyArray(itemOrArray, strategy, options);
 			else
-				return proxifyRow(itemOrArray, strategy);
+				return proxifyRow(itemOrArray, strategy, options);
 		}
 
-		function proxifyArray(array, strategy) {
+		function proxifyArray(array, strategy, { fastStringify } = {}) {
 			let _array = array;
 			if (_reactive)
 				array = _reactive(array);
@@ -5779,7 +5779,7 @@ function rdbClient(options = {}) {
 
 			};
 			let innerProxy = new Proxy(array, handler);
-			rootMap.set(array, { json: stringify(array), strategy, originalArray: [...array] });
+			rootMap.set(array, { json: fastStringify ? JSON.stringify(array) : stringify(array), strategy, originalArray: [...array] });
 			if (strategy !== undefined) {
 				const { limit, ...cleanStrategy } = { ...strategy };
 				fetchingStrategyMap.set(array, cleanStrategy);
@@ -5787,7 +5787,7 @@ function rdbClient(options = {}) {
 			return innerProxy;
 		}
 
-		function proxifyRow(row, strategy) {
+		function proxifyRow(row, strategy, { fastStringify } = {}) {
 			let handler = {
 				get(_target, property,) {
 					if (property === 'save' || property === 'saveChanges') //call server then acceptChanges
@@ -5812,7 +5812,7 @@ function rdbClient(options = {}) {
 
 			};
 			let innerProxy = new Proxy(row, handler);
-			rootMap.set(row, { json: stringify(row), strategy });
+			rootMap.set(row, { json: fastStringify ? JSON.stringify(row) : stringify(row), strategy });
 			fetchingStrategyMap.set(row, strategy);
 			return innerProxy;
 		}
