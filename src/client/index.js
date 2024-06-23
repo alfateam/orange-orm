@@ -229,7 +229,7 @@ function rdbClient(options = {}) {
 			let args = [_, strategy].concat(Array.prototype.slice.call(arguments).slice(2));
 			let rows = await getManyCore.apply(null, args);
 			await metaPromise;
-			return proxify(rows, strategy, {fast: true});
+			return proxify(rows, strategy, true);
 		}
 
 		async function groupBy(strategy) {
@@ -261,7 +261,7 @@ function rdbClient(options = {}) {
 			await metaPromise;
 			if (rows.length === 0)
 				return;
-			return proxify(rows[0], strategy, {fast: true});
+			return proxify(rows[0], strategy, true);
 		}
 
 		async function getById() {
@@ -449,14 +449,14 @@ function rdbClient(options = {}) {
 		}
 
 
-		function proxify(itemOrArray, strategy, options) {
+		function proxify(itemOrArray, strategy, fast) {
 			if (Array.isArray(itemOrArray))
-				return proxifyArray(itemOrArray, strategy, options);
+				return proxifyArray(itemOrArray, strategy, fast);
 			else
-				return proxifyRow(itemOrArray, strategy, options);
+				return proxifyRow(itemOrArray, strategy, fast);
 		}
 
-		function proxifyArray(array, strategy,  { fast } = { }) {
+		function proxifyArray(array, strategy, fast) {
 			let _array = array;
 			if (_reactive)
 				array = _reactive(array);
@@ -485,7 +485,7 @@ function rdbClient(options = {}) {
 			};
 			let innerProxy = new Proxy(array, handler);
 			//todo
-			rootMap.set(array, { json: fast ? structuredClone(array) : cloneFromDb(array), strategy, originalArray: [...array] });
+			rootMap.set(array, { json: cloneFromDb(array, fast), strategy, originalArray: [...array] });
 			if (strategy !== undefined) {
 				const { limit, ...cleanStrategy } = { ...strategy };
 				fetchingStrategyMap.set(array, cleanStrategy);
@@ -493,7 +493,7 @@ function rdbClient(options = {}) {
 			return innerProxy;
 		}
 
-		function proxifyRow(row, strategy, { fast } = {}) {
+		function proxifyRow(row, strategy, fast) {
 			let handler = {
 				get(_target, property,) {
 					if (property === 'save' || property === 'saveChanges') //call server then acceptChanges
@@ -518,7 +518,7 @@ function rdbClient(options = {}) {
 
 			};
 			let innerProxy = new Proxy(row, handler);
-			rootMap.set(row, { json: fast ? structuredClone(row) : cloneFromDb(row), strategy });
+			rootMap.set(row, { json: cloneFromDb(row, fast), strategy });
 			fetchingStrategyMap.set(row, strategy);
 			return innerProxy;
 		}
