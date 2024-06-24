@@ -483,9 +483,12 @@ function rdbClient(options = {}) {
 				}
 
 			};
-			let innerProxy = new Proxy(array, handler);
+
+			let watcher = onChange(array, () => {
+				rootMap.set(array, { json: cloneFromDb(array, fast), strategy, originalArray: [...array] });
+			});
+			let innerProxy = new Proxy(watcher, handler);
 			//todo
-			rootMap.set(array, { json: cloneFromDb(array, fast), strategy, originalArray: [...array] });
 			if (strategy !== undefined) {
 				const { limit, ...cleanStrategy } = { ...strategy };
 				fetchingStrategyMap.set(array, cleanStrategy);
@@ -517,8 +520,10 @@ function rdbClient(options = {}) {
 				}
 
 			};
-			let innerProxy = new Proxy(row, handler);
-			rootMap.set(row, { json: cloneFromDb(row, fast), strategy });
+			let watcher = onChange(row, () => {
+				rootMap.set(row, { json: cloneFromDb(row, fast), strategy });
+			});
+			let innerProxy = new Proxy(watcher, handler);
 			fetchingStrategyMap.set(row, strategy);
 			return innerProxy;
 		}
@@ -1003,5 +1008,32 @@ function column(path, ...previous) {
 	return new Proxy(c, handler);
 
 }
+
+function onChange(target, onChange) {
+
+	let  notified = false;
+	const handler = {
+		get(target, prop, receiver) {
+			const value = Reflect.get(target, prop, receiver);
+			if (typeof value === 'object' && value !== null) {
+				return new Proxy(value, handler);
+			}
+			return value;
+		},
+		set(target, prop, value, receiver) {
+			if (!notified) {
+				notified = true;
+				onChange(JSON.stringify(target));
+			}
+			return Reflect.set(target, prop, value, receiver);
+
+		}
+
+
+	};
+
+	return new Proxy(target, handler);
+}
+
 
 module.exports = rdbClient();
