@@ -595,7 +595,7 @@ function rdbClient(options = {}) {
 			let deduceStrategy = false;
 			let json = rootMap.get(array)?.json;
 			if (!json)
-					return;
+				return;
 			strategy = extractStrategy({ strategy }, array);
 			strategy = extractFetchingStrategy(array, strategy);
 
