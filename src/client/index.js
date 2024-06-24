@@ -844,7 +844,7 @@ function rdbClient(options = {}) {
 		}
 
 		function clearChangesRow(row) {
-			let { json } = rootMap.get(row);
+			let json = rootMap.get(row)?.json;
 			if (!json)
 				return;
 			let old = cloneFromDb(json);
