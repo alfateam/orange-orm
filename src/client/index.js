@@ -593,7 +593,9 @@ function rdbClient(options = {}) {
 
 		async function saveArray(array, concurrencyOptions, strategy) {
 			let deduceStrategy = false;
-			let { json } = rootMap.get(array);
+			let json = rootMap.get(array)?.json;
+			if (!json)
+					return;
 			strategy = extractStrategy({ strategy }, array);
 			strategy = extractFetchingStrategy(array, strategy);
 
@@ -673,7 +675,7 @@ function rdbClient(options = {}) {
 				return options.strategy;
 			if (obj) {
 				let context = rootMap.get(obj);
-				if (context.strategy !== undefined) {
+				if (context?.strategy !== undefined) {
 					// @ts-ignore
 					let { limit, ...strategy } = { ...context.strategy };
 					return strategy;
@@ -692,13 +694,17 @@ function rdbClient(options = {}) {
 		}
 
 		function clearChangesArray(array) {
-			let { json } = rootMap.get(array);
+			let json = rootMap.get(array)?.json;
+			if (!json)
+				return;
 			let old = cloneFromDb(json);
 			array.splice(0, old.length, ...old);
 		}
 
 		function acceptChangesArray(array) {
 			const map = rootMap.get(array);
+			if (!map)
+				return;
 			map.json = cloneFromDb(array);
 			map.originalArray = [...array];
 		}
@@ -796,7 +802,7 @@ function rdbClient(options = {}) {
 			strategy = extractStrategy({ strategy }, row);
 			strategy = extractFetchingStrategy(row, strategy);
 
-			let { json } = rootMap.get(row);
+			let json = rootMap.get(row)?.json;
 			if (!json)
 				return;
 			let meta = await getMeta();
@@ -839,12 +845,15 @@ function rdbClient(options = {}) {
 		}
 
 		function acceptChangesRow(row) {
-			const { strategy } = rootMap.get(row);
+			const data = rootMap.get(row);
+			if (!data)
+				return;
+			const { strategy } = data;
 			rootMap.set(row, { json: cloneFromDb(row), strategy });
 		}
 
 		function clearChangesRow(row) {
-			let { json } = rootMap.get(row);
+			let json = rootMap.get(row)?.json;
 			if (!json)
 				return;
 			let old = cloneFromDb(json);
