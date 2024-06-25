@@ -488,7 +488,6 @@ function rdbClient(options = {}) {
 				rootMap.set(array, { json: cloneFromDb(array, fast), strategy, originalArray: [...array] });
 			});
 			let innerProxy = new Proxy(watcher, handler);
-			//todo
 			if (strategy !== undefined) {
 				const { limit, ...cleanStrategy } = { ...strategy };
 				fetchingStrategyMap.set(array, cleanStrategy);
@@ -1036,9 +1035,14 @@ function onChange(target, onChange) {
 			}
 			return Reflect.set(target, prop, value, receiver);
 
+		},
+		deleteProperty(target, prop) {
+			if (!notified) {
+				notified = true;
+				onChange(JSON.stringify(target));
+			}
+			return Reflect.deleteProperty(target, prop);
 		}
-
-
 	};
 
 	return new Proxy(target, handler);
