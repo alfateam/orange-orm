@@ -1,4 +1,6 @@
 ## Changelog
+__4.2.0__  
+Improved performance.  
 __4.1.4__  
 Better error message when running over http.  
 __4.1.3__  
