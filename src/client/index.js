@@ -1,5 +1,6 @@
 const createPatch = require('./createPatch');
 const stringify = require('./stringify');
+const cloneFromDb = require('./cloneFromDb');
 const netAdapter = require('./netAdapter');
 const toKeyPositionMap = require('./toKeyPositionMap');
 const rootMap = new WeakMap();
@@ -228,7 +229,7 @@ function rdbClient(options = {}) {
 			let args = [_, strategy].concat(Array.prototype.slice.call(arguments).slice(2));
 			let rows = await getManyCore.apply(null, args);
 			await metaPromise;
-			return proxify(rows, strategy);
+			return proxify(rows, strategy, true);
 		}
 
 		async function groupBy(strategy) {
@@ -260,7 +261,7 @@ function rdbClient(options = {}) {
 			await metaPromise;
 			if (rows.length === 0)
 				return;
-			return proxify(rows[0], strategy);
+			return proxify(rows[0], strategy, true);
 		}
 
 		async function getById() {
@@ -448,14 +449,14 @@ function rdbClient(options = {}) {
 		}
 
 
-		function proxify(itemOrArray, strategy) {
+		function proxify(itemOrArray, strategy, fast) {
 			if (Array.isArray(itemOrArray))
-				return proxifyArray(itemOrArray, strategy);
+				return proxifyArray(itemOrArray, strategy, fast);
 			else
-				return proxifyRow(itemOrArray, strategy);
+				return proxifyRow(itemOrArray, strategy, fast);
 		}
 
-		function proxifyArray(array, strategy) {
+		function proxifyArray(array, strategy, fast) {
 			let _array = array;
 			if (_reactive)
 				array = _reactive(array);
@@ -482,8 +483,11 @@ function rdbClient(options = {}) {
 				}
 
 			};
-			let innerProxy = new Proxy(array, handler);
-			rootMap.set(array, { json: stringify(array), strategy, originalArray: [...array] });
+
+			let watcher = onChange(array, () => {
+				rootMap.set(array, { json: cloneFromDb(array, fast), strategy, originalArray: [...array] });
+			});
+			let innerProxy = new Proxy(watcher, handler);
 			if (strategy !== undefined) {
 				const { limit, ...cleanStrategy } = { ...strategy };
 				fetchingStrategyMap.set(array, cleanStrategy);
@@ -491,18 +495,18 @@ function rdbClient(options = {}) {
 			return innerProxy;
 		}
 
-		function proxifyRow(row, strategy) {
+		function proxifyRow(row, strategy, fast) {
 			let handler = {
 				get(_target, property,) {
 					if (property === 'save' || property === 'saveChanges') //call server then acceptChanges
 						return saveRow.bind(null, row);
-					else if (property === 'delete') //call server then remove from jsonMap and original
+					else if (property === 'delete') //call server then remove from json and original
 						return deleteRow.bind(null, row);
 					else if (property === 'refresh') //refresh from server then acceptChanges
 						return refreshRow.bind(null, row);
-					else if (property === 'clearChanges') //refresh from jsonMap, update original if present
+					else if (property === 'clearChanges') //refresh from json, update original if present
 						return clearChangesRow.bind(null, row);
-					else if (property === 'acceptChanges') //remove from jsonMap
+					else if (property === 'acceptChanges') //remove from json
 						return acceptChangesRow.bind(null, row);
 					else if (property === 'toJSON')
 						return () => {
@@ -515,8 +519,10 @@ function rdbClient(options = {}) {
 				}
 
 			};
-			let innerProxy = new Proxy(row, handler);
-			rootMap.set(row, { json: stringify(row), strategy });
+			let watcher = onChange(row, () => {
+				rootMap.set(row, { json: cloneFromDb(row, fast), strategy });
+			});
+			let innerProxy = new Proxy(watcher, handler);
 			fetchingStrategyMap.set(row, strategy);
 			return innerProxy;
 		}
@@ -586,12 +592,14 @@ function rdbClient(options = {}) {
 
 		async function saveArray(array, concurrencyOptions, strategy) {
 			let deduceStrategy = false;
-			let { json } = rootMap.get(array);
+			let json = rootMap.get(array)?.json;
+			if (!json)
+				return;
 			strategy = extractStrategy({ strategy }, array);
 			strategy = extractFetchingStrategy(array, strategy);
 
 			let meta = await getMeta();
-			const patch = createPatch(JSON.parse(json), array, meta);
+			const patch = createPatch(json, array, meta);
 			if (patch.length === 0)
 				return;
 			let body = stringify({ patch, options: { strategy, ...tableOptions, ...concurrencyOptions, deduceStrategy } });
@@ -606,7 +614,7 @@ function rdbClient(options = {}) {
 			let insertedPositions = getInsertedRowsPosition(array);
 			let { changed, strategy: newStrategy } = await p;
 			copyIntoArray(changed, array, [...insertedPositions, ...updatedPositions]);
-			rootMap.set(array, { json: stringify(array), strategy: newStrategy, originalArray: [...array] });
+			rootMap.set(array, { json: cloneFromDb(array), strategy: newStrategy, originalArray: [...array] });
 		}
 
 		async function patch(patch, concurrencyOptions, strategy) {
@@ -666,7 +674,7 @@ function rdbClient(options = {}) {
 				return options.strategy;
 			if (obj) {
 				let context = rootMap.get(obj);
-				if (context.strategy !== undefined) {
+				if (context?.strategy !== undefined) {
 					// @ts-ignore
 					let { limit, ...strategy } = { ...context.strategy };
 					return strategy;
@@ -685,14 +693,18 @@ function rdbClient(options = {}) {
 		}
 
 		function clearChangesArray(array) {
-			let { json } = rootMap.get(array);
-			let old = JSON.parse(json);
+			let json = rootMap.get(array)?.json;
+			if (!json)
+				return;
+			let old = cloneFromDb(json);
 			array.splice(0, old.length, ...old);
 		}
 
 		function acceptChangesArray(array) {
 			const map = rootMap.get(array);
-			map.json = stringify(array);
+			if (!map)
+				return;
+			map.json = cloneFromDb(array);
 			map.originalArray = [...array];
 		}
 
@@ -705,7 +717,7 @@ function rdbClient(options = {}) {
 			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
 			let { strategy } = await adapter.patch(body);
 			array.length = 0;
-			rootMap.set(array, { jsonMap: stringify(array), strategy });
+			rootMap.set(array, { json: cloneFromDb(array), strategy });
 		}
 
 		function setMapValue(rowsMap, keys, row, index) {
@@ -768,7 +780,7 @@ function rdbClient(options = {}) {
 				array.splice(i + offset, 1);
 				offset--;
 			}
-			rootMap.set(array, { json: stringify(array), strategy, originalArray: [...array] });
+			rootMap.set(array, { json: cloneFromDb(array), strategy, originalArray: [...array] });
 			fetchingStrategyMap.set(array, strategy);
 		}
 
@@ -789,12 +801,12 @@ function rdbClient(options = {}) {
 			strategy = extractStrategy({ strategy }, row);
 			strategy = extractFetchingStrategy(row, strategy);
 
-			let { json } = rootMap.get(row);
+			let json = rootMap.get(row)?.json;
 			if (!json)
 				return;
 			let meta = await getMeta();
 
-			let patch = createPatch([JSON.parse(json)], [row], meta);
+			let patch = createPatch([json], [row], meta);
 			if (patch.length === 0)
 				return;
 
@@ -803,7 +815,7 @@ function rdbClient(options = {}) {
 			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
 			let { changed, strategy: newStrategy } = await adapter.patch(body);
 			copyInto(changed, [row]);
-			rootMap.set(row, { json: stringify(row), strategy: newStrategy });
+			rootMap.set(row, { json: cloneFromDb(row), strategy: newStrategy });
 		}
 
 		async function refreshRow(row, strategy) {
@@ -827,20 +839,23 @@ function rdbClient(options = {}) {
 			for (let p in rows[0]) {
 				row[p] = rows[0][p];
 			}
-			rootMap.set(row, { json: stringify(row), strategy });
+			rootMap.set(row, { json: cloneFromDb(row), strategy });
 			fetchingStrategyMap.set(row, strategy);
 		}
 
 		function acceptChangesRow(row) {
-			const { strategy } = rootMap.get(row);
-			rootMap.set(row, { json: stringify(row), strategy });
+			const data = rootMap.get(row);
+			if (!data)
+				return;
+			const { strategy } = data;
+			rootMap.set(row, { json: cloneFromDb(row), strategy });
 		}
 
 		function clearChangesRow(row) {
-			let { json } = rootMap.get(row);
+			let json = rootMap.get(row)?.json;
 			if (!json)
 				return;
-			let old = JSON.parse(json);
+			let old = cloneFromDb(json);
 			for (let p in row) {
 				delete row[p];
 			}
@@ -1001,5 +1016,37 @@ function column(path, ...previous) {
 	return new Proxy(c, handler);
 
 }
+
+function onChange(target, onChange) {
+
+	let  notified = false;
+	const handler = {
+		get(target, prop, receiver) {
+			const value = Reflect.get(target, prop, receiver);
+			if (typeof value === 'object' && value !== null) {
+				return new Proxy(value, handler);
+			}
+			return value;
+		},
+		set(target, prop, value, receiver) {
+			if (!notified) {
+				notified = true;
+				onChange(JSON.stringify(target));
+			}
+			return Reflect.set(target, prop, value, receiver);
+
+		},
+		deleteProperty(target, prop) {
+			if (!notified) {
+				notified = true;
+				onChange(JSON.stringify(target));
+			}
+			return Reflect.deleteProperty(target, prop);
+		}
+	};
+
+	return new Proxy(target, handler);
+}
+
 
 module.exports = rdbClient();

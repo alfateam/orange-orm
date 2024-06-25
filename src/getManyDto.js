@@ -123,8 +123,6 @@ async function decode(strategy, span, rows, keys = rows.length > 0 ? Object.keys
 			}
 			const column = columns[j];
 			outRow[column.alias] = column.decode(row[keys[j]]);
-			if (shouldCreateMap)
-				fkIds[i] = getIds(outRow);
 		}
 
 		for (let j = 0; j < aggregateKeys.length; j++) {
@@ -134,15 +132,16 @@ async function decode(strategy, span, rows, keys = rows.length > 0 ? Object.keys
 		}
 
 		outRows[i] = outRow;
-		if (shouldCreateMap)
+		if (shouldCreateMap) {
+			fkIds[i] = getIds(outRow);
 			addToMap(rowsMap, primaryColumns, outRow);
+		}
 	}
 	span._rowsMap = rowsMap;
 	span._ids = fkIds;
 
-	for (let i = 0; i < columnsLength + aggregateKeys.length; i++) {
-		keys.shift();
-	}
+	keys.splice(0, columnsLength + aggregateKeys.length);
+
 	await decodeRelations(strategy, span, rows, outRows, keys);
 	return outRows;
 
