@@ -72,6 +72,7 @@
     "msnodesqlv8": "^4.1.0",
     "mysql2": "^2.2.5 || ^3.9.4",
     "oracledb": "^6.3.0",
+    "postgres": "^3.4.4",
     "pg": "^8.5.1",
     "pg-native": "^3.0.0",
     "pg-query-stream": "^3.3.2",
@@ -79,6 +80,9 @@
     "tedious": "^15.1.2 || ^16.0.0 || ^18.1.0"
   },
   "peerDependenciesMeta": {
+    "postgres": {
+      "optional": true
+    },
     "pg": {
       "optional": true
     },
@@ -115,6 +119,7 @@
     "mysql2": "^3.9.4",
     "oracledb": "^6.3.0",
     "owasp-dependency-check": "^0.0.21",
+    "postgres": "^3.4.4",
     "pg": "^8.5.1",
     "pg-query-stream": "^3.3.2",
     "rollup": "^2.52.7",
