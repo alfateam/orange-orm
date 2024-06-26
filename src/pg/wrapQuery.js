@@ -2,7 +2,7 @@ var log = require('../table/log');
 var replaceParamChar = require('./replaceParamChar');
 
 function wrapQuery(connection) {
-	var runOriginalQuery = connection.query;
+	// var runOriginalQuery = connection.query;
 	return runQuery;
 
 	function runQuery(query, onCompleted) {
@@ -13,18 +13,15 @@ function wrapQuery(connection) {
 			values: params,
 			types: query.types
 		};
-		log.emitQuery({sql, parameters: params});
+		log.emitQuery({ sql, parameters: params });
 
-		runOriginalQuery.call(connection, query, onInnerCompleted);
+		connection.unsafe(sql, params).then(onInnerCompleted, onCompleted);
+		// runOriginalQuery.call(connection, query, onInnerCompleted);
 
-		function onInnerCompleted(err, result) {
-			if (err)
-				onCompleted(err);
-			else {
-				if (Array.isArray(result))
-					result = result[result.length-1];
-				onCompleted(null, result.rows);
-			}
+		function onInnerCompleted(result) {
+			// if (Array.isArray(result))
+			// 	result = result[result.length - 1];
+			onCompleted(null, result);
 		}
 	}
 

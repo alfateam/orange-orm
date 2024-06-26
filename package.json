@@ -63,6 +63,7 @@
     "glob": "^10.3.4",
     "module-definition": "^4.0.0",
     "node-cls": "^1.0.5",
+    "postgres": "^3.4.4",
     "promise": "^8.0.3",
     "rfdc": "^1.2.0",
     "uuid": "^8.3.2"

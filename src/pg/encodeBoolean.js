@@ -1,5 +1,5 @@
 function encodeBoolean(bool) {
-	return bool.toString();
+	return bool;
 }
 
 module.exports = encodeBoolean;
