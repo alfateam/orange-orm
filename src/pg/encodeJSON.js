@@ -6,11 +6,11 @@ function encode(arg) {
 }
 
 //todo
-class JsonBArrayParam {
-	constructor(actualArray) { this.actualArray = actualArray; }
-	toPostgres() {
-		return JSON.stringify(this.actualArray);
-	}
-}
+// class JsonBArrayParam {
+// 	constructor(actualArray) { this.actualArray = actualArray; }
+// 	toPostgres() {
+// 		return JSON.stringify(this.actualArray);
+// 	}
+// }
 
 module.exports = encode;
