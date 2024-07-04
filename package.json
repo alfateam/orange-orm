@@ -1,6 +1,6 @@
 {
   "name": "orange-orm",
-  "version": "4.2.0",
+  "version": "4.3.0-beta.1",
   "main": "./src/index.js",
   "browser": "./src/client/index.mjs",
   "bin": {
@@ -47,7 +47,8 @@
     "build": "rollup -c ./src/client/rollup.config.js && npm run concat",
     "lint": "eslint ./",
     "fix": "eslint ./ --fix",
-    "owasp": "owasp-dependency-check --project \"MY_PROJECT\" --scan \"package-lock.json\" --exclude \"dependency-check-bin\" --out \"owasp\" --format HTML"
+    "owasp": "owasp-dependency-check --project \"MY_PROJECT\" --scan \"package-lock.json\" --exclude \"dependency-check-bin\" --out \"owasp\" --format HTML",
+    "beta": "publish --tag beta"
   },
   "dependencies": {
     "@lroal/on-change": "^4.0.2",
