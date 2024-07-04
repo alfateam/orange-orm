@@ -14,7 +14,6 @@ function newResolveTransaction(domain, pool, { readonly } = {}) {
 		pool = pool();
 		rdb.pool = pool;
 	}
-	client.setUseUTC(false);
 	rdb.engine = 'mssqlNative';
 	rdb.encodeBoolean = encodeBoolean;
 	rdb.decodeJSON = decodeJSON;
@@ -51,6 +50,7 @@ function newResolveTransaction(domain, pool, { readonly } = {}) {
 						return callback(err);
 					}
 					try {
+						client.setUseUTC(false);
 						client.executeQuery = wrapQuery(client);
 						rdb.dbClient = client;
 						wrapQuery(client)(query, (err, res) => {
@@ -79,6 +79,7 @@ function newResolveTransaction(domain, pool, { readonly } = {}) {
 					onError(err);
 					return;
 				}
+				client.setUseUTC(false);
 				client.executeQuery = wrapQuery(client);
 				rdb.dbClient = client;
 				rdb.dbClientDone = done;

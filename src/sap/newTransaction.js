@@ -82,7 +82,7 @@ function newResolveTransaction(domain, pool, { readonly } = {}) {
 				client.executeQuery = wrapQuery(client);
 				rdb.dbClient = client;
 				rdb.dbClientDone = done;
-				domain.rdb = rdb;				
+				domain.rdb = rdb;
 				onSuccess();
 			} catch (e) {
 				onError(e);

@@ -36,7 +36,7 @@ function newResolveTransaction(domain, pool, { readonly } = {}) {
 	};
 	rdb.aggregateCount = 0;
 	rdb.quote = (name) => `"${name}"`;
-	
+
 	if (readonly) {
 		rdb.dbClient = {
 			executeQuery: function(query, callback) {
@@ -76,7 +76,7 @@ function newResolveTransaction(domain, pool, { readonly } = {}) {
 				}
 				client.executeQuery = wrapQuery(client);
 				rdb.dbClient = client;
-				rdb.dbClientDone = done;				
+				rdb.dbClientDone = done;
 				domain.rdb = rdb;
 
 				onSuccess();
