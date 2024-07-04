@@ -8,11 +8,66 @@ const formatDateOut = require('../tedious/formatDateOut');
 const insertSql = require('../tedious/insertSql');
 const insert = require('../tedious/insert');
 
-function newResolveTransaction(domain, pool) {
+function newResolveTransaction(domain, pool, { readonly } = {}) {
 	var rdb = {poolFactory: pool};
 	if (!pool.connect) {
 		pool = pool();
 		rdb.pool = pool;
+	}
+	client.setUseUTC(false);
+	rdb.engine = 'mssqlNative';
+	rdb.encodeBoolean = encodeBoolean;
+	rdb.decodeJSON = decodeJSON;
+	rdb.encodeJSON = JSON.stringify;
+	rdb.formatDateOut = formatDateOut;
+	rdb.deleteFromSql = deleteFromSql;
+	rdb.selectForUpdateSql = selectForUpdateSql;
+	rdb.outputInsertedSql = outputInsertedSql;
+	rdb.insertSql = insertSql;
+	rdb.insert = insert;
+	rdb.lastInsertedIsSeparate = false;
+	rdb.multipleStatements = true;
+	rdb.begin = 'BEGIN TRANSACTION';
+	rdb.limit = (span) => {
+		if (span.offset)
+			return '';
+		else if (span.limit || span.limit === 0)
+			return 'TOP ' + span.limit;
+		else
+			return '';
+	};
+	rdb.limitAndOffset = limitAndOffset;
+	rdb.accept = function(caller) {
+		caller.visitSqlite();
+	};
+	rdb.aggregateCount = 0;
+	rdb.quote = (name) => `[${name}]`;
+
+	if (readonly) {
+		rdb.dbClient = {
+			executeQuery: function(query, callback) {
+				pool.connect((err, client, done) => {
+					if (err) {
+						return callback(err);
+					}
+					try {
+						client.executeQuery = wrapQuery(client);
+						rdb.dbClient = client;
+						wrapQuery(client)(query, (err, res) => {
+							done();
+							rdb.dbClient = undefined;
+							callback(err, res);
+						});
+					} catch (e) {
+						done();
+						rdb.dbClient = undefined;
+						callback(e);
+					}
+				});
+			}
+		};
+		domain.rdb = rdb;
+		return (onSuccess) => onSuccess();
 	}
 
 	return function(onSuccess, onError) {
@@ -24,37 +79,9 @@ function newResolveTransaction(domain, pool) {
 					onError(err);
 					return;
 				}
-				client.setUseUTC(false);
 				client.executeQuery = wrapQuery(client);
-				rdb.engine = 'mssqlNative';
 				rdb.dbClient = client;
 				rdb.dbClientDone = done;
-				rdb.encodeBoolean = encodeBoolean;
-				rdb.decodeJSON = decodeJSON;
-				rdb.encodeJSON = JSON.stringify;
-				rdb.formatDateOut = formatDateOut;
-				rdb.deleteFromSql = deleteFromSql;
-				rdb.selectForUpdateSql = selectForUpdateSql;
-				rdb.outputInsertedSql = outputInsertedSql;
-				rdb.insertSql = insertSql;
-				rdb.insert = insert;
-				rdb.lastInsertedIsSeparate = false;
-				rdb.multipleStatements = true;
-				rdb.begin = 'BEGIN TRANSACTION';
-				rdb.limit = (span) => {
-					if (span.offset)
-						return '';
-					else if (span.limit || span.limit === 0)
-						return 'TOP ' + span.limit;
-					else
-						return '';
-				};
-				rdb.limitAndOffset = limitAndOffset;
-				rdb.accept = function(caller) {
-					caller.visitSqlite();
-				};
-				rdb.aggregateCount = 0;
-				rdb.quote = (name) => `[${name}]`;
 				domain.rdb = rdb;
 				onSuccess();
 			} catch (e) {

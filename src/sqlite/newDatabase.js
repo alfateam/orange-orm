@@ -47,7 +47,7 @@ function newDatabase(connectionString, poolOptions) {
 
 		async function runInTransaction() {
 			let result;
-			let transaction = newTransaction(domain, pool);
+			let transaction = newTransaction(domain, pool, options);
 			await new Promise(transaction)
 				.then(begin)
 				.then(fn)
@@ -59,7 +59,7 @@ function newDatabase(connectionString, poolOptions) {
 
 		function run() {
 			let p;
-			let transaction = newTransaction(domain, pool);
+			let transaction = newTransaction(domain, pool, options);
 			if (useHook())
 				p = new Promise(transaction);
 			else

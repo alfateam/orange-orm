@@ -9,12 +9,61 @@ const insert = require('./insert');
 const formatDateOut = require('./formatDateOut');
 const formatDateIn = require('./formatDateIn');
 
-function newResolveTransaction(domain, pool) {
+function newResolveTransaction(domain, pool, { readonly } = {}) {
 	var rdb = {poolFactory: pool};
 	if (!pool.connect) {
 		pool = pool();
 		rdb.pool = pool;
 	}
+
+	rdb.begin = 'SET TRANSACTION ISOLATION LEVEL READ COMMITTED';
+	rdb.engine = 'oracle';
+	rdb.encodeBoolean = encodeBoolean;
+	rdb.decodeJSON = decodeJSON;
+	rdb.encodeJSON = JSON.stringify;
+	rdb.formatDateOut = formatDateOut;
+	rdb.formatDateIn = formatDateIn;
+	rdb.deleteFromSql = deleteFromSql;
+	rdb.selectForUpdateSql = selectForUpdateSql;
+	rdb.lastInsertedSql = lastInsertedSql;
+	rdb.insertSql = insertSql;
+	rdb.insert = insert;
+	rdb.lastInsertedIsSeparate = true;
+	rdb.multipleStatements = false;
+	rdb.limitAndOffset = limitAndOffset;
+	rdb.accept = function(caller) {
+		caller.visitSqlite();
+	};
+	rdb.aggregateCount = 0;
+	rdb.quote = (name) => `"${name}"`;
+	
+	if (readonly) {
+		rdb.dbClient = {
+			executeQuery: function(query, callback) {
+				pool.connect((err, client, done) => {
+					if (err) {
+						return callback(err);
+					}
+					try {
+						client.executeQuery = wrapQuery(client);
+						rdb.dbClient = client;
+						wrapQuery(client)(query, (err, res) => {
+							done();
+							rdb.dbClient = undefined;
+							callback(err, res);
+						});
+					} catch (e) {
+						done();
+						rdb.dbClient = undefined;
+						callback(e);
+					}
+				});
+			}
+		};
+		domain.rdb = rdb;
+		return (onSuccess) => onSuccess();
+	}
+
 
 	return function(onSuccess, onError) {
 		pool.connect(onConnected);
@@ -26,29 +75,10 @@ function newResolveTransaction(domain, pool) {
 					return;
 				}
 				client.executeQuery = wrapQuery(client);
-				rdb.begin = 'SET TRANSACTION ISOLATION LEVEL READ COMMITTED';
-				rdb.engine = 'oracle';
 				rdb.dbClient = client;
-				rdb.dbClientDone = done;
-				rdb.encodeBoolean = encodeBoolean;
-				rdb.decodeJSON = decodeJSON;
-				rdb.encodeJSON = JSON.stringify;
-				rdb.formatDateOut = formatDateOut;
-				rdb.formatDateIn = formatDateIn;
-				rdb.deleteFromSql = deleteFromSql;
-				rdb.selectForUpdateSql = selectForUpdateSql;
-				rdb.lastInsertedSql = lastInsertedSql;
-				rdb.insertSql = insertSql;
-				rdb.insert = insert;
-				rdb.lastInsertedIsSeparate = true;
-				rdb.multipleStatements = false;
-				rdb.limitAndOffset = limitAndOffset;
-				rdb.accept = function(caller) {
-					caller.visitSqlite();
-				};
-				rdb.aggregateCount = 0;
-				rdb.quote = (name) => `"${name}"`;
+				rdb.dbClientDone = done;				
 				domain.rdb = rdb;
+
 				onSuccess();
 			} catch (e) {
 				onError(e);
