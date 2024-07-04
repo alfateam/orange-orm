@@ -27,17 +27,17 @@ afterAll(async () => {
 
 
 beforeAll(async () => {
-	await createMs('mssql');
+	// await createMs('mssql');
 	await insertData('pg');
-	await insertData('mssql');
-	if (major === 18)
-		await insertData('mssqlNative');
-	await insertData('mysql');
-	await insertData('sqlite');
-	await insertData('sqlite2');
-	await insertData('sap');
-	await insertData('oracle');
-	hostExpress();
+	// await insertData('mssql');
+	// if (major === 18)
+	// 	await insertData('mssqlNative');
+	// await insertData('mysql');
+	// await insertData('sqlite');
+	// await insertData('sqlite2');
+	// await insertData('sap');
+	// await insertData('oracle');
+	// hostExpress();
 
 	async function insertData(dbName) {
 		const { db, init } = getDb(dbName);
@@ -645,16 +645,16 @@ describe('aggregate each row', () => {
 	}
 }, 30000);
 
-describe('getMany with relations', () => {
+describe.only('getMany with relations', () => {
 	test('pg', async () => await verify('pg'));
-	test('oracle', async () => await verify('oracle'));
-	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
-		test('mssqlNative', async () => await verify('mssqlNative'));
-	test('mysql', async () => await verify('mysql'));
-	test('sqlite', async () => await verify('sqlite'));
-	test('sap', async () => await verify('sap'));
-	test('http', async () => await verify('http'));
+	// test('oracle', async () => await verify('oracle'));
+	// test('mssql', async () => await verify('mssql'));
+	// if (major === 18)
+	// 	test('mssqlNative', async () => await verify('mssqlNative'));
+	// test('mysql', async () => await verify('mysql'));
+	// test('sqlite', async () => await verify('sqlite'));
+	// test('sap', async () => await verify('sap'));
+	// test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);

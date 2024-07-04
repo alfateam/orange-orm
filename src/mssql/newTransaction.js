@@ -51,16 +51,12 @@ function newResolveTransaction(domain, pool, { readonly } = {}) {
 					}
 					try {
 						client.setUseUTC(false);
-						client.executeQuery = wrapQuery(client);
-						rdb.dbClient = client;
 						wrapQuery(client)(query, (err, res) => {
 							done();
-							rdb.dbClient = undefined;
 							callback(err, res);
 						});
 					} catch (e) {
 						done();
-						rdb.dbClient = undefined;
 						callback(e);
 					}
 				});
