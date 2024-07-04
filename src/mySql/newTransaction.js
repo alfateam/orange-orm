@@ -41,7 +41,6 @@ function newResolveTransaction(domain, pool, { readonly } = {}) {
 					try {
 						wrapQuery(client)(query, (err, res) => {
 							done();
-							rdb.dbClient = undefined;
 							callback(err, res);
 						});
 					} catch (e) {
