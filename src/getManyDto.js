@@ -28,7 +28,7 @@ function newCreateRow(span) {
 	const c = {};
 	c.visitJoin = () => { };
 	c.visitOne = () => { };
-	c.visitMany = function (leg) {
+	c.visitMany = function(leg) {
 		manyNames.push(leg.name);
 	};
 
@@ -58,11 +58,11 @@ function createProto(columns, span) {
 	}
 	const c = {};
 
-	c.visitJoin = function (leg) {
+	c.visitJoin = function(leg) {
 		obj[leg.name] = null;
 	};
 	c.visitOne = c.visitJoin;
-	c.visitMany = function (leg) {
+	c.visitMany = function(leg) {
 		obj[leg.name] = null;
 	};
 
@@ -80,7 +80,7 @@ function hasManyRelations(span) {
 	const c = {};
 	c.visitJoin = () => { };
 	c.visitOne = c.visitJoin;
-	c.visitMany = function () {
+	c.visitMany = function() {
 		result = true;
 	};
 
@@ -144,10 +144,10 @@ async function decode(strategy, span, rows, keys = rows.length > 0 ? Object.keys
 	if (span.legs.toArray().length === 0)
 		return outRows;
 
-	const all = [];;
+	const all = [];
 
-	if (shouldCreateMap) 
-		all.push(decodeManyRelations(strategy, span).then(() => decodeRelations2(strategy, span, rows, outRows, keys)));		
+	if (shouldCreateMap)
+		all.push(decodeManyRelations(strategy, span).then(() => decodeRelations2(strategy, span, rows, outRows, keys)));
 	else
 		all.push(decodeRelations2(strategy, span, rows, outRows, keys));
 
@@ -175,13 +175,13 @@ async function decode(strategy, span, rows, keys = rows.length > 0 ? Object.keys
 
 }
 
-async function decodeManyRelations(strategy, span, rawRows, resultRows, keys) {
+async function decodeManyRelations(strategy, span) {
 	const promises = [];
 	const c = {};
 	c.visitJoin = () => { };
 	c.visitOne = c.visitJoin;
 
-	c.visitMany = function (leg) {
+	c.visitMany = function(leg) {
 		const name = leg.name;
 		const table = span.table;
 		const relation = table._relations[name];
@@ -234,45 +234,45 @@ async function decodeRelations2(strategy, span, rawRows, resultRows, keys) {
 }
 
 
-async function decodeRelations(strategy, span, rawRows, resultRows, keys) {
-	const promises = [];
-	const c = {};
-	c.visitJoin = function (leg) {
-		const name = leg.name;
-		const p = decode(strategy[name], leg.span, rawRows, keys).then((rows) => {
-			for (let i = 0; i < rows.length; i++) {
-				resultRows[i][name] = rows[i];
-			}
-		});
-		promises.push(p);
-	};
+// async function decodeRelations(strategy, span, rawRows, resultRows, keys) {
+// 	const promises = [];
+// 	const c = {};
+// 	c.visitJoin = function (leg) {
+// 		const name = leg.name;
+// 		const p = decode(strategy[name], leg.span, rawRows, keys).then((rows) => {
+// 			for (let i = 0; i < rows.length; i++) {
+// 				resultRows[i][name] = rows[i];
+// 			}
+// 		});
+// 		promises.push(p);
+// 	};
 
-	c.visitOne = c.visitJoin;
+// 	c.visitOne = c.visitJoin;
 
-	c.visitMany = function (leg) {
-		const name = leg.name;
-		const table = span.table;
-		const relation = table._relations[name];
-		const filter = createOneFilter(relation, span._ids);
-		const rowsMap = span._rowsMap;
-		const p = getManyDto(relation.childTable, filter, strategy[name], leg.span).then(subRows => {
-			for (let i = 0; i < subRows.length; i++) {
-				const key = leg.columns.map(column => subRows[i][column.alias]);
-				const parentRow = getFromMap(rowsMap, table._primaryColumns, key);
-				parentRow[name].push(subRows[i]);
-			}
-		});
-		promises.push(p);
-	};
+// 	c.visitMany = function (leg) {
+// 		const name = leg.name;
+// 		const table = span.table;
+// 		const relation = table._relations[name];
+// 		const filter = createOneFilter(relation, span._ids);
+// 		const rowsMap = span._rowsMap;
+// 		const p = getManyDto(relation.childTable, filter, strategy[name], leg.span).then(subRows => {
+// 			for (let i = 0; i < subRows.length; i++) {
+// 				const key = leg.columns.map(column => subRows[i][column.alias]);
+// 				const parentRow = getFromMap(rowsMap, table._primaryColumns, key);
+// 				parentRow[name].push(subRows[i]);
+// 			}
+// 		});
+// 		promises.push(p);
+// 	};
 
-	span.legs.forEach(onEachLeg);
+// 	span.legs.forEach(onEachLeg);
 
-	function onEachLeg(leg) {
-		leg.accept(c);
-	}
+// 	function onEachLeg(leg) {
+// 		leg.accept(c);
+// 	}
 
-	await Promise.all(promises);
-}
+// 	await Promise.all(promises);
+// }
 
 function createOneFilter(relation, ids) {
 	const columns = relation.joinRelation.columns;
