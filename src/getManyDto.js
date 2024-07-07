@@ -108,52 +108,35 @@ async function decode(strategy, span, rows, keys = rows.length > 0 ? Object.keys
 	const outRows = new Array(rowsLength);
 	const createRow = newCreateRow(span);
 	const shouldCreateMap = hasManyRelations(span);
-	let all = [];
-
 	for (let i = 0; i < rowsLength; i++) {
 		const row = rows[i];
 		let outRow = createRow();
 		let pkWithNullCount = 0;
-		for (let j = 0; j < primaryColumnsLength; j++) {
-			if (row[keys[j]] === null)
-				pkWithNullCount++;
-			if (pkWithNullCount === primaryColumnsLength) {
-				outRow = null;
-				break;
+		for (let j = 0; j < columnsLength; j++) {
+			if (j < primaryColumnsLength) {
+				if (row[keys[j]] === null)
+					pkWithNullCount++;
+				if (pkWithNullCount === primaryColumnsLength) {
+					outRow = null;
+					break;
+				}
 			}
 			const column = columns[j];
 			outRow[column.alias] = column.decode(row[keys[j]]);
-
 		}
 
-		if (shouldCreateMap && outRow) {
+		for (let j = 0; j < aggregateKeys.length; j++) {
+			const key = aggregateKeys[j];
+			const parse = span.aggregates[key].column?.decode || Number.parseFloat;
+			outRow[key] = parse(row[keys[j + columnsLength]]);
+		}
+
+		outRows[i] = outRow;
+		if (shouldCreateMap) {
 			fkIds[i] = getIds(outRow);
 			addToMap(rowsMap, primaryColumns, outRow);
 		}
-		outRows[i] = outRow;
 	}
-
-	all.push(new Promise((resolve) => {
-		setImmediate(async () => {
-			for (let i = 0; i < rowsLength; i++) {
-				const currentOutRow = outRows[i];
-				const currentRow = rows[i];
-				for (let j = primaryColumnsLength; j < columnsLength; j++) {
-					const column = columns[j];
-					currentOutRow[column.alias] = column.decode(currentRow[keys[j]]);
-				}
-
-				for (let j = 0; j < aggregateKeys.length; j++) {
-					const key = aggregateKeys[j];
-					const parse = span.aggregates[key].column?.decode || Number.parseFloat;
-					currentOutRow[key] = parse(currentRow[keys[j + columnsLength]]);
-				}
-			}
-			resolve();
-		});
-	}));
-
-
 	span._rowsMap = rowsMap;
 	span._ids = fkIds;
 
@@ -161,22 +144,17 @@ async function decode(strategy, span, rows, keys = rows.length > 0 ? Object.keys
 	if (span.legs.toArray().length === 0)
 		return outRows;
 
+	const all = [];
 
-	if (shouldCreateMap) {
-		// all.push( decodeRelations2(strategy, span, rows, outRows, keys).then(() => decodeManyRelations(strategy, span)));
-		all.push(decodeManyRelations(strategy, span));
-		all.push(decodeRelations2(strategy, span, rows, outRows, keys));
-		// all.push( decodeManyRelations(strategy, span).then(() => decodeRelations2(strategy, span, rows, outRows, keys)));
-		// all.push( decodeManyRelations(strategy, span));
-		// all.push(decodeRelations2(strategy, span, rows, outRows, keys));
-		// all.push( decodeRelations2(strategy, span, rows, outRows, keys) );
-	}
+	if (shouldCreateMap)
+		all.push(decodeManyRelations(strategy, span).then(() => decodeRelations2(strategy, span, rows, outRows, keys)));
 	else
 		all.push(decodeRelations2(strategy, span, rows, outRows, keys));
 
-
 	await Promise.all(all);
+
 	return outRows;
+
 
 	function createGetIds() {
 		const primaryColumns = table._primaryColumns;
@@ -196,45 +174,6 @@ async function decode(strategy, span, rows, keys = rows.length > 0 ? Object.keys
 	}
 
 }
-async function decodeRelations2(strategy, span, rawRows, resultRows, keys) {
-	const legs = span.legs.toArray();
-	if (legs.length === 0)
-		return;
-	const promises = [];
-	const c = {};
-	c.visitJoin = function(leg) {
-		const name = leg.name;
-		const p = decode(strategy[name], leg.span, rawRows, keys).then((rows) => {
-			for (let i = 0; i < rows.length; i++) {
-				resultRows[i][name] = rows[i];
-			}
-		});
-		promises.push(p);
-	};
-
-	c.visitOne = c.visitJoin;
-
-	c.visitMany = () => { };
-
-	function processLegs(index) {
-		if (index >= legs.length) {
-			return;
-		}
-		const leg = legs[index];
-		leg.accept(c);
-		Promise.all(promises).then(() => {
-			setImmediate(() => {
-				processLegs(index + 1);
-			});
-		});
-	}
-
-	processLegs(0);
-
-	await Promise.all(promises);
-}
-
-
 
 async function decodeManyRelations(strategy, span) {
 	const promises = [];
@@ -266,6 +205,74 @@ async function decodeManyRelations(strategy, span) {
 
 	await Promise.all(promises);
 }
+
+async function decodeRelations2(strategy, span, rawRows, resultRows, keys) {
+	const promises = [];
+	const c = {};
+	c.visitJoin = function(leg) {
+		const name = leg.name;
+		const p = decode(strategy[name], leg.span, rawRows, keys).then((rows) => {
+			for (let i = 0; i < rows.length; i++) {
+				resultRows[i][name] = rows[i];
+			}
+		});
+		promises.push(p);
+	};
+
+	c.visitOne = c.visitJoin;
+
+	c.visitMany = () => { };
+
+
+	span.legs.forEach(onEachLeg);
+
+	function onEachLeg(leg) {
+		leg.accept(c);
+	}
+
+	await Promise.all(promises);
+}
+
+
+// async function decodeRelations(strategy, span, rawRows, resultRows, keys) {
+// 	const promises = [];
+// 	const c = {};
+// 	c.visitJoin = function (leg) {
+// 		const name = leg.name;
+// 		const p = decode(strategy[name], leg.span, rawRows, keys).then((rows) => {
+// 			for (let i = 0; i < rows.length; i++) {
+// 				resultRows[i][name] = rows[i];
+// 			}
+// 		});
+// 		promises.push(p);
+// 	};
+
+// 	c.visitOne = c.visitJoin;
+
+// 	c.visitMany = function (leg) {
+// 		const name = leg.name;
+// 		const table = span.table;
+// 		const relation = table._relations[name];
+// 		const filter = createOneFilter(relation, span._ids);
+// 		const rowsMap = span._rowsMap;
+// 		const p = getManyDto(relation.childTable, filter, strategy[name], leg.span).then(subRows => {
+// 			for (let i = 0; i < subRows.length; i++) {
+// 				const key = leg.columns.map(column => subRows[i][column.alias]);
+// 				const parentRow = getFromMap(rowsMap, table._primaryColumns, key);
+// 				parentRow[name].push(subRows[i]);
+// 			}
+// 		});
+// 		promises.push(p);
+// 	};
+
+// 	span.legs.forEach(onEachLeg);
+
+// 	function onEachLeg(leg) {
+// 		leg.accept(c);
+// 	}
+
+// 	await Promise.all(promises);
+// }
 
 function createOneFilter(relation, ids) {
 	const columns = relation.joinRelation.columns;
