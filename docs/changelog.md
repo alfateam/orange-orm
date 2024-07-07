@@ -1,4 +1,6 @@
 ## Changelog
+__4.3.0__  
+Minor performance improvements.  
 __4.2.0__  
 Improved performance.  
 __4.1.4__  
