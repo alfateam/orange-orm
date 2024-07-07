@@ -7,11 +7,51 @@ const limitAndOffset = require('./limitAndOffset');
 const insertSql = require('./insertSql');
 const insert = require('./insert');
 
-function newResolveTransaction(domain, pool) {
+function newResolveTransaction(domain, pool, { readonly } = {})  {
 	var rdb = {poolFactory: pool};
 	if (!pool.connect) {
 		pool = pool();
 		rdb.pool = pool;
+	}
+	rdb.engine = 'sqlite';
+	rdb.encodeBoolean = encodeBoolean;
+	rdb.decodeJSON = decodeJSON;
+	rdb.encodeJSON = JSON.stringify;
+	rdb.deleteFromSql = deleteFromSql;
+	rdb.selectForUpdateSql = selectForUpdateSql;
+	rdb.lastInsertedSql = lastInsertedSql;
+	rdb.insertSql = insertSql;
+	rdb.insert = insert;
+	rdb.lastInsertedIsSeparate = true;
+	rdb.multipleStatements = false;
+	rdb.limitAndOffset = limitAndOffset;
+	rdb.accept = function(caller) {
+		caller.visitSqlite();
+	};
+	rdb.aggregateCount = 0;
+	rdb.quote = (name) => `"${name}"`;
+
+	if (readonly) {
+		rdb.dbClient = {
+			executeQuery: function(query, callback) {
+				pool.connect((err, client, done) => {
+					if (err) {
+						return callback(err);
+					}
+					try {
+						wrapQuery(client)(query, (err, res) => {
+							done();
+							callback(err, res);
+						});
+					} catch (e) {
+						done();
+						callback(e);
+					}
+				});
+			}
+		};
+		domain.rdb = rdb;
+		return (onSuccess) => onSuccess();
 	}
 
 	return function(onSuccess, onError) {
@@ -24,25 +64,8 @@ function newResolveTransaction(domain, pool) {
 					return;
 				}
 				client.executeQuery = wrapQuery(client);
-				rdb.engine = 'sqlite';
 				rdb.dbClient = client;
 				rdb.dbClientDone = done;
-				rdb.encodeBoolean = encodeBoolean;
-				rdb.decodeJSON = decodeJSON;
-				rdb.encodeJSON = JSON.stringify;
-				rdb.deleteFromSql = deleteFromSql;
-				rdb.selectForUpdateSql = selectForUpdateSql;
-				rdb.lastInsertedSql = lastInsertedSql;
-				rdb.insertSql = insertSql;
-				rdb.insert = insert;
-				rdb.lastInsertedIsSeparate = true;
-				rdb.multipleStatements = false;
-				rdb.limitAndOffset = limitAndOffset;
-				rdb.accept = function(caller) {
-					caller.visitSqlite();
-				};
-				rdb.aggregateCount = 0;
-				rdb.quote = (name) => `"${name}"`;
 				domain.rdb = rdb;
 				onSuccess();
 			} catch (e) {

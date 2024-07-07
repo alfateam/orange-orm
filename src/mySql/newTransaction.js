@@ -7,42 +7,65 @@ const limitAndOffset = require('./limitAndOffset');
 const insertSql = require('./insertSql');
 const insert = require('./insert');
 
-function newResolveTransaction(domain, pool) {
+function newResolveTransaction(domain, pool, { readonly } = {}) {
 	var rdb = {poolFactory: pool};
 	if (!pool.connect) {
 		pool = pool();
 		rdb.pool = pool;
 	}
+	rdb.engine = 'mysql';
+	rdb.encodeBoolean = encodeBoolean;
+	rdb.encodeJSON = JSON.stringify;
+	rdb.deleteFromSql = deleteFromSql;
+	rdb.selectForUpdateSql = selectForUpdateSql;
+	rdb.lastInsertedIsSeparate = true;
+	rdb.lastInsertedSql = lastInsertedSql;
+	rdb.insertSql = insertSql;
+	rdb.insert = insert;
+	rdb.multipleStatements = false;
+	rdb.limitAndOffset = limitAndOffset;
+	rdb.accept = function(caller) {
+		caller.visitMySql();
+	};
+	rdb.aggregateCount = 0;
+	rdb.quote = (name) => `\`${name}\``;
+
+
+	if (readonly) {
+		rdb.dbClient = {
+			executeQuery: function(query, callback) {
+				pool.connect((err, client, done) => {
+					if (err) {
+						return callback(err);
+					}
+					try {
+						wrapQuery(client)(query, (err, res) => {
+							done();
+							callback(err, res);
+						});
+					} catch (e) {
+						done();
+						callback(e);
+					}
+				});
+			}
+		};
+		domain.rdb = rdb;
+		return (onSuccess) => onSuccess();
+	}
 
 	return function(onSuccess, onError) {
 		pool.connect(onConnected);
 
-		function onConnected(err, connection, done) {
+		function onConnected(err, client, done) {
 			try {
 				if (err) {
 					onError(err);
 					return;
 				}
-				connection.executeQuery = wrapQuery(connection);
-				// connection.streamQuery = wrapQueryStream(connection);
-				rdb.engine = 'mysql';
-				rdb.dbClient = connection;
+				client.executeQuery = wrapQuery(client);
+				rdb.dbClient = client;
 				rdb.dbClientDone = done;
-				rdb.encodeBoolean = encodeBoolean;
-				rdb.encodeJSON = JSON.stringify;
-				rdb.deleteFromSql = deleteFromSql;
-				rdb.selectForUpdateSql = selectForUpdateSql;
-				rdb.lastInsertedIsSeparate = true;
-				rdb.lastInsertedSql = lastInsertedSql;
-				rdb.insertSql = insertSql;
-				rdb.insert = insert;
-				rdb.multipleStatements = false;
-				rdb.limitAndOffset = limitAndOffset;
-				rdb.accept = function(caller) {
-					caller.visitMySql();
-				};
-				rdb.aggregateCount = 0;
-				rdb.quote = (name) => `\`${name}\``;
 				domain.rdb = rdb;
 				onSuccess();
 			} catch (e) {

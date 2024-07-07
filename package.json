@@ -1,6 +1,6 @@
 {
   "name": "orange-orm",
-  "version": "4.2.0",
+  "version": "4.3.0-beta.3",
   "main": "./src/index.js",
   "browser": "./src/client/index.mjs",
   "bin": {
@@ -47,7 +47,8 @@
     "build": "rollup -c ./src/client/rollup.config.js && npm run concat",
     "lint": "eslint ./",
     "fix": "eslint ./ --fix",
-    "owasp": "owasp-dependency-check --project \"MY_PROJECT\" --scan \"package-lock.json\" --exclude \"dependency-check-bin\" --out \"owasp\" --format HTML"
+    "owasp": "owasp-dependency-check --project \"MY_PROJECT\" --scan \"package-lock.json\" --exclude \"dependency-check-bin\" --out \"owasp\" --format HTML",
+    "beta": "publish --tag beta"
   },
   "dependencies": {
     "@lroal/on-change": "^4.0.2",
@@ -103,11 +104,11 @@
   "devDependencies": {
     "@rollup/plugin-commonjs": "^21.0.1",
     "@rollup/plugin-node-resolve": "^13.0.0",
-    "@typescript-eslint/eslint-plugin": "^5.42.1",
-    "@typescript-eslint/parser": "^5.42.1",
+    "@typescript-eslint/eslint-plugin": "^6.x",
+    "@typescript-eslint/parser": "^6.x",
     "@vitest/coverage-v8": "^0.34.1",
     "cors": "^2.8.5",
-    "eslint": "^8.6.0",
+    "eslint": "^8.57.0",
     "eslint-plugin-jest": "^27.1.7",
     "express": "^4.18.2",
     "msnodesqlv8": "^4.1.0",
