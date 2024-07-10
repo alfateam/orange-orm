@@ -23,6 +23,16 @@ function _new(column) {
 		return encodeDate(value);
 	};
 
+	encode.direct = function(value) {
+		value = purify(value);
+		if (value == null) {
+			if (column.dbNull === null)
+				return null;
+			return column.dbNull;
+		}
+		return encodeDate(value);
+	};
+
 	return encode;
 
 

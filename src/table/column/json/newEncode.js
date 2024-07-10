@@ -35,6 +35,21 @@ function _new(column) {
 		return value;
 	};
 
+	encode.direct = function(candidate) {
+		var value = purify(candidate);
+		if (value == null) {
+			if(column.dbNull === null)
+				return null;
+			return column.dbNull;
+		}
+		var encodeCore = getSessionSingleton('encodeJSON');
+
+		if (encodeCore) {
+			value = encodeCore(value);
+		}
+		return value;
+	};
+
 	return encode;
 }
 
