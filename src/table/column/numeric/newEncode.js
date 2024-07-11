@@ -19,7 +19,11 @@ module.exports = function(column) {
 			return '' + dbNull + '';
 		}
 		return '' + value;
-
 	};
+
+	encode.direct = function(value) {
+		return value ;
+	};
+
 	return encode;
 };

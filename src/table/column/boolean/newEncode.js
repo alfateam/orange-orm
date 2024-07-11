@@ -30,6 +30,12 @@ function _new(column) {
 		return encodeCore(value);
 	};
 
+	encode.direct = function(value) {
+		var encodeCore = getSessionSingleton('encodeBoolean');
+
+		return encodeCore(value);
+	};
+
 	return encode;
 }
 

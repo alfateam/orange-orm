@@ -35,6 +35,15 @@ function _new(column) {
 		return value;
 	};
 
+	encode.direct = function(value) {
+		var encodeCore = getSessionSingleton('encodeJSON');
+
+		if (encodeCore) {
+			value = encodeCore(value);
+		}
+		return value;
+	};
+
 	return encode;
 }
 

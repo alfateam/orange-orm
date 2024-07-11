@@ -23,6 +23,10 @@ function _new(column) {
 		return '\'' + value + '\'';
 	};
 
+	encode.direct = function(value) {
+		return value ;
+	};
+
 
 	return encode;
 }

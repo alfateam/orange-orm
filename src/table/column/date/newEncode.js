@@ -21,9 +21,14 @@ function _new(column) {
 		value = purify(value);
 		if (value == null) {
 			if (column.dbNull === null)
-				return newPara('null');
-			return newPara('\'' + column.dbNull + '\'');
+				'null';
+			return '\'' + column.dbNull + '\'';
 		}
+		var encodeCore = getSessionSingleton('encodeDate') || encodeDate;
+		return encodeCore(value);
+	};
+
+	encode.direct = function(value) {
 		var encodeCore = getSessionSingleton('encodeDate') || encodeDate;
 		return encodeCore(value);
 	};

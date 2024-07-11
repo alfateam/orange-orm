@@ -17,6 +17,10 @@ function _new(_column) {
 		return Buffer.from(value, 'base64');
 	};
 
+	encode.direct = function(value) {
+		return Buffer.from(value, 'base64');
+	};
+
 	return encode;
 }
 

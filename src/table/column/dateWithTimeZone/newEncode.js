@@ -23,6 +23,10 @@ function _new(column) {
 		return encodeDate(value);
 	};
 
+	encode.direct = function(value) {
+		return encodeDate(value);
+	};
+
 	return encode;
 
 
