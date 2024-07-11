@@ -31,12 +31,6 @@ function _new(column) {
 	};
 
 	encode.direct = function(value) {
-		value = purify(value);
-		if (value === null) {
-			if (column.dbNull === null)
-				return null;
-			return column.dbNull ;
-		}
 		var encodeCore = getSessionSingleton('encodeBoolean');
 
 		return encodeCore(value);

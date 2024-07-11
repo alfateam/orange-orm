@@ -18,9 +18,6 @@ function _new(_column) {
 	};
 
 	encode.direct = function(value) {
-		value = purify(value);
-		if (value === null)
-			return null;
 		return Buffer.from(value, 'base64');
 	};
 
