@@ -40,7 +40,7 @@ If you value the hard work behind Orange and wish to see it evolve further, cons
 ## Installation
 
 ```bash
-$ npm install orange-orm
+npm install orange-orm
 ```  
 
 ## Example
@@ -50,7 +50,7 @@ Watch the [tutorial video on YouTube](https://youtu.be/1IwwjPr2lMs)
 
 Here we choose SQLite.  
 ```bash
-$ npm install sqlite3
+npm install sqlite3
 ```
 <sub>📄 map.ts</sub>
 ```javascript
@@ -280,7 +280,7 @@ In SQLite, columns with the INTEGER PRIMARY KEY attribute are designed to autoin
 
 __SQLite__
 ```bash
-$ npm install sqlite3
+npm install sqlite3
 ```  
 ```javascript
 import map from './map';
@@ -288,7 +288,7 @@ const db = map.sqlite('demo.db');
 ```
 __With connection pool__
 ```bash
-$ npm install sqlite3
+npm install sqlite3
 ```  
 ```javascript
 import map from './map';
@@ -331,7 +331,7 @@ const db = map.mysql('mysql://test:test@mysql/test');
 
 __MS SQL__
 ```bash
-$ npm install tedious
+npm install tedious
 ```  
 ```javascript
 import map from './map';
@@ -353,7 +353,7 @@ const db = map.mssql({
 
 __PostgreSQL__
 ```bash
-$ npm install pg
+npm install pg
 ```  
 ```javascript
 import map from './map';
@@ -361,7 +361,7 @@ const db = map.postgres('postgres://postgres:postgres@postgres/postgres');
 ```
 __Oracle__
 ```bash
-$ npm install oracledb
+npm install oracledb
 ```  
 ```javascript
 import map from './map';
@@ -375,7 +375,7 @@ const db = map.oracle({
 __SAP Adaptive Server__  
 Even though msnodesqlv8 was developed for MS SQL, it also works for SAP ASE as it is ODBC compliant.  
 ```bash
-$ npm install msnodesqlv8
+npm install msnodesqlv8
 ```  
 ```javascript
 import { fileURLToPath } from 'url';
