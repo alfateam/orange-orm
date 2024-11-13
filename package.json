@@ -48,7 +48,7 @@
     "lint": "eslint ./",
     "fix": "eslint ./ --fix",
     "owasp": "owasp-dependency-check --project \"MY_PROJECT\" --scan \"package-lock.json\" --exclude \"dependency-check-bin\" --out \"owasp\" --format HTML",
-    "beta": "publish --tag beta"
+    "beta": "npm publish --tag beta"
   },
   "dependencies": {
     "@lroal/on-change": "^4.0.2",
