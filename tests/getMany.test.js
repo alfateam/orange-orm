@@ -1,5 +1,6 @@
 import { describe, test, beforeAll, afterAll, expect } from 'vitest';
 import { fileURLToPath } from 'url';
+import setupD1 from './setupD1';
 const express = require('express');
 import { json } from 'body-parser';
 import cors from 'cors';
@@ -15,8 +16,11 @@ const versionArray = process.version.replace('v', '').split('.');
 const major = parseInt(versionArray[0]);
 const port = 3000;
 let server;
+let d1;
+let miniflare;
 
 afterAll(async () => {
+	await miniflare.dispose();
 	return new Promise((res) => {
 		if (server)
 			server.close(res);
@@ -27,6 +31,7 @@ afterAll(async () => {
 
 
 beforeAll(async () => {
+	({ d1, miniflare } = await setupD1(fileURLToPath(import.meta.url)));
 	await createMs('mssql');
 	await insertData('pg');
 	await insertData('mssql');
@@ -34,6 +39,7 @@ beforeAll(async () => {
 		await insertData('mssqlNative');
 	await insertData('mysql');
 	await insertData('sqlite');
+	await insertData('d1');
 	await insertData('sqlite2');
 	await insertData('sap');
 	await insertData('oracle');
@@ -136,6 +142,7 @@ describe('offset', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -169,6 +176,7 @@ describe('boolean filter', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -191,6 +199,7 @@ describe('empty array-filter', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -212,6 +221,7 @@ describe('AND empty-array', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -231,6 +241,7 @@ describe('AND one in array', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -250,6 +261,7 @@ describe('boolean true filter', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -271,6 +283,7 @@ describe('any-subFilter filter nested', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -306,6 +319,7 @@ describe('any-subFilter filter nested where', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -342,6 +356,7 @@ describe('getMany hasOne sub filter', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -379,6 +394,7 @@ describe('getMany none sub filter', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -414,6 +430,7 @@ describe('getMany', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -447,6 +464,7 @@ describe('getAll orderBy array', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -481,6 +499,7 @@ describe('getMany with column strategy', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -510,6 +529,7 @@ describe('aggregate', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -555,6 +575,7 @@ describe('aggregate each row', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -653,6 +674,7 @@ describe('getMany with relations', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -730,6 +752,7 @@ describe('getMany with filtered relations', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -804,6 +827,7 @@ describe('getMany composite', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 
 	async function verify(dbName) {
@@ -853,6 +877,7 @@ describe('getMany raw filter', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 
 	async function verify(dbName) {
@@ -887,6 +912,7 @@ describe('getMany raw filter where', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 
 	async function verify(dbName) {
@@ -1050,6 +1076,10 @@ const connections = {
 		db: map({ db: (con) => con.sqlite(sqliteName, { size: 1 }) }),
 		init: initSqlite
 	},
+	d1: {
+		db: map({ db: (con) => con.d1(d1, { size: 1 }) }),
+		init: initSqlite
+	},
 	sqlite2: {
 		db: map({ db: (con) => con.sqlite(sqliteName2, { size: 1 }) }),
 		init: initSqlite
@@ -1091,6 +1121,8 @@ function getDb(name) {
 		return connections.pg;
 	else if (name === 'sqlite')
 		return connections.sqlite;
+	else if (name === 'd1')
+		return connections.d1;
 	else if (name === 'sqlite2')
 		return connections.sqlite2;
 	else if (name === 'sap')

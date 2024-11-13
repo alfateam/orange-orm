@@ -8,7 +8,7 @@ const formatDateOut = require('../tedious/formatDateOut');
 const insertSql = require('../tedious/insertSql');
 const insert = require('../tedious/insert');
 
-function newResolveTransaction(domain, pool, { readonly } = {}) {
+function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 	var rdb = {poolFactory: pool};
 	if (!pool.connect) {
 		pool = pool();

@@ -20,7 +20,7 @@ function commit(result) {
 			await executeChanges(changes);
 			changes = popChanges();
 		}
-		if (!getSessionSingleton('readonly'))
+		if (!getSessionSingleton('transactionLess'))
 			pushCommand(commitCommand);
 		return executeChanges(popChanges());
 	}

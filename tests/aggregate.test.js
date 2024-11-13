@@ -1,5 +1,6 @@
 import { describe, test, beforeAll, afterAll, expect } from 'vitest';
 import { fileURLToPath } from 'url';
+import setupD1 from './setupD1';
 const express = require('express');
 import { json } from 'body-parser';
 import cors from 'cors';
@@ -13,10 +14,12 @@ const initSap = require('./initSap');
 const versionArray = process.version.replace('v', '').split('.');
 const major = parseInt(versionArray[0]);
 const port = 3010;
-
 let server;
+let d1;
+let miniflare;
 
 afterAll(async () => {
+	await miniflare.dispose();
 	return new Promise((res) => {
 		if (server)
 			server.close(res);
@@ -26,6 +29,7 @@ afterAll(async () => {
 });
 
 beforeAll(async () => {
+	({ d1, miniflare } = await setupD1(fileURLToPath(import.meta.url)));
 	await createMs('mssql');
 	await insertData('pg');
 	await insertData('oracle');
@@ -34,6 +38,7 @@ beforeAll(async () => {
 		await insertData('mssqlNative');
 	await insertData('mysql');
 	await insertData('sqlite');
+	await insertData('d1');
 	await insertData('sqlite2');
 	await insertData('sap');
 	hostExpress();
@@ -132,6 +137,7 @@ describe('count', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -151,6 +157,7 @@ describe('count filter', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -203,6 +210,10 @@ const connections = {
 		db: map({ db: (con) => con.sqlite(sqliteName, { size: 1 }) }),
 		init: initSqlite
 	},
+	d1: {
+		db: map({ db: (con) => con.d1(d1, { size: 1 }) }),
+		init: initSqlite
+	},
 	sqlite2: {
 		db: map({ db: (con) => con.sqlite(sqliteName2, { size: 1 }) }),
 		init: initSqlite
@@ -219,7 +230,7 @@ const connections = {
 					password: 'P@assword123',
 					connectString: 'oracle/XE',
 					privilege: 2
-				}, {size: 1}
+				}, { size: 1 }
 
 			)
 		}),
@@ -244,6 +255,8 @@ function getDb(name) {
 		return connections.pg;
 	else if (name === 'sqlite')
 		return connections.sqlite;
+	else if (name === 'd1')
+		return connections.d1;
 	else if (name === 'sqlite2')
 		return connections.sqlite2;
 	else if (name === 'sap')

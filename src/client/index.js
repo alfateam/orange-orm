@@ -57,6 +57,7 @@ function rdbClient(options = {}) {
 	client.mssqlNative = onProvider.bind(null, 'mssqlNative');
 	client.pg = onProvider.bind(null, 'pg');
 	client.postgres = onProvider.bind(null, 'postgres');
+	client.d1 = onProvider.bind(null, 'd1');
 	client.sqlite = onProvider.bind(null, 'sqlite');
 	client.sap = onProvider.bind(null, 'sap');
 	client.oracle = onProvider.bind(null, 'oracle');
@@ -128,7 +129,8 @@ function rdbClient(options = {}) {
 	}
 
 	async function query() {
-		return netAdapter(baseUrl, undefined, { tableOptions: { db: baseUrl, transaction } }).query.apply(null, arguments);
+		const adapter = netAdapter(baseUrl, undefined, { tableOptions: { db: baseUrl, transaction } });
+		return adapter.query.apply(null, arguments);
 	}
 
 	function express(arg) {

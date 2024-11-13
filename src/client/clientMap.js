@@ -39,6 +39,7 @@ function map(index, _fn) {
 	dbMap.sap = throwDb;
 	dbMap.oracle = throwDb;
 	dbMap.sqlite = throwDb;
+	dbMap.d1 = throwDb;
 
 	function throwDb() {
 		throw new Error('Cannot create pool for database outside node');
@@ -65,6 +66,7 @@ function map(index, _fn) {
 	onFinal.sap = () => index({ db: throwDb, providers: dbMap });
 	onFinal.oracle = () => index({ db: throwDb, providers: dbMap });
 	onFinal.sqlite = () => index({ db: throwDb, providers: dbMap });
+	onFinal.d1 = () => index({ db: throwDb, providers: dbMap });
 
 	return new Proxy(onFinal, handler);
 }

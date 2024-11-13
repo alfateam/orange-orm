@@ -48,6 +48,7 @@ function map(index, context, providers, fn) {
 	context.sap = connect.bind(null, 'sap');
 	context.oracle = connect.bind(null, 'oracle');
 	context.sqlite = connect.bind(null, 'sqlite');
+	context.d1 = connect.bind(null, 'd1');
 	context.http = function(url) {
 		return index({ db: url, providers});
 	};

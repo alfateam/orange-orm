@@ -1,50 +1,35 @@
-var wrapQuery = require('./wrapQuery');
-var encodeBoolean = require('./encodeBoolean');
-var deleteFromSql = require('./deleteFromSql');
-var selectForUpdateSql = require('./selectForUpdateSql');
-var outputInsertedSql = require('./outputInsertedSql');
-const limitAndOffset = require('./limitAndOffset');
-const getManyDto = require('./getManyDto');
-const formatDateOut = require('./formatDateOut');
-const formatJSONOut = require('./formatJSONOut');
-const insertSql = require('./insertSql');
-const insert = require('./insert');
+const wrapQuery = require('./wrapQuery');
+const encodeBoolean = require('../sqlite/encodeBoolean');
+const deleteFromSql = require('../sqlite/deleteFromSql');
+const selectForUpdateSql = require('../sqlite/selectForUpdateSql');
+const lastInsertedSql = require('../sqlite/lastInsertedSql');
+const limitAndOffset = require('../sqlite/limitAndOffset');
+const insertSql = require('../sqlite/insertSql');
+const insert = require('../sqlite/insert');
 
-function newResolveTransaction(domain, pool, { readonly = false } = {}) {
+function newResolveTransaction(domain, pool, { readonly = false } = {})  {
 	var rdb = {poolFactory: pool};
 	if (!pool.connect) {
 		pool = pool();
 		rdb.pool = pool;
 	}
-	rdb.engine = 'mssql';
-	rdb.getManyDto = getManyDto;
+	rdb.engine = 'sqlite';
 	rdb.encodeBoolean = encodeBoolean;
 	rdb.decodeJSON = decodeJSON;
 	rdb.encodeJSON = JSON.stringify;
 	rdb.deleteFromSql = deleteFromSql;
 	rdb.selectForUpdateSql = selectForUpdateSql;
-	rdb.outputInsertedSql = outputInsertedSql;
-	rdb.lastInsertedIsSeparate = false;
+	rdb.lastInsertedSql = lastInsertedSql;
 	rdb.insertSql = insertSql;
 	rdb.insert = insert;
-	rdb.formatDateOut = formatDateOut;
-	rdb.formatJSONOut = formatJSONOut;
-	rdb.multipleStatements = true;
-	rdb.begin = 'BEGIN TRANSACTION';
-	rdb.limit = (span) => {
-		if (span.offset)
-			return '';
-		else if (span.limit || span.limit === 0)
-			return 'TOP ' + span.limit;
-		else
-			return '';
-	};
+	rdb.lastInsertedIsSeparate = true;
+	rdb.multipleStatements = false;
 	rdb.limitAndOffset = limitAndOffset;
 	rdb.accept = function(caller) {
 		caller.visitSqlite();
 	};
 	rdb.aggregateCount = 0;
-	rdb.quote = (name) => `[${name}]`;
+	rdb.quote = (name) => `"${name}"`;
 
 	if (readonly) {
 		rdb.dbClient = {
@@ -89,7 +74,8 @@ function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 		}
 	};
 }
-function decodeJSON(value){
+
+function decodeJSON(value) {
 	return JSON.parse(value);
 }
 

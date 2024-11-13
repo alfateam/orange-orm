@@ -9,7 +9,7 @@ var encodeJSON = require('./encodeJSON');
 var insertSql = require('./insertSql');
 var insert = require('./insert');
 
-function newResolveTransaction(domain, pool, { readonly } = {}) {
+function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 	var rdb = { poolFactory: pool };
 	if (!pool.connect) {
 		pool = pool();

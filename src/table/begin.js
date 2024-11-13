@@ -5,7 +5,7 @@ let setSessionSingleton = require('./setSessionSingleton');
 function begin(readonly) {
 	setSessionSingleton('changes', []);
 	if (readonly) {
-		setSessionSingleton('readonly', true);
+		setSessionSingleton('transactionLess', true);
 		return Promise.resolve();
 	}
 	return executeQuery(beginCommand());

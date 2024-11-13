@@ -66,7 +66,8 @@
     "node-cls": "^1.0.5",
     "promise": "^8.0.3",
     "rfdc": "^1.2.0",
-    "uuid": "^8.3.2"
+    "uuid": "^8.3.2",
+    "wrangler": "^3.86.0"
   },
   "peerDependencies": {
     "msnodesqlv8": "^4.1.0",
@@ -102,6 +103,8 @@
     }
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241106.0",
+    "@miniflare/d1": "^2.14.4",
     "@rollup/plugin-commonjs": "^21.0.1",
     "@rollup/plugin-node-resolve": "^13.0.0",
     "@typescript-eslint/eslint-plugin": "^6.x",

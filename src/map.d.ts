@@ -1,5 +1,6 @@
 import type { Options } from './ajv';
 import type { ConnectionConfiguration } from 'tedious';
+import type { D1Database } from '@cloudflare/workers-types';
 import type { PoolAttributes } from 'oracledb';
 import type { AxiosInterceptorManager, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 
@@ -29,6 +30,7 @@ type MappedDb<T> = {
 
 type DbConnectable<T> = {
 	http(url: string): MappedDbInstance<T>;
+	d1(database: D1Database): MappedDbInstance<T>;
 	postgres(connectionString: string, options?: PoolOptions): MappedDbInstance<T>;
 	sqlite(connectionString: string, options?: PoolOptions): MappedDbInstance<T>;
 	sap(connectionString: string, options?: PoolOptions): MappedDbInstance<T>;
@@ -59,6 +61,7 @@ type DbOptions<T> = {
 
 interface Connectors {
 	http(url: string): Pool;
+	d1(database: D1Database): Pool;
 	postgres(connectionString: string, options?: PoolOptions): Pool;
 	sqlite(connectionString: string, options?: PoolOptions): Pool;
 	sap(connectionString: string, options?: PoolOptions): Pool;

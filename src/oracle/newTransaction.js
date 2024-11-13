@@ -9,7 +9,7 @@ const insert = require('./insert');
 const formatDateOut = require('./formatDateOut');
 const formatDateIn = require('./formatDateIn');
 
-function newResolveTransaction(domain, pool, { readonly } = {}) {
+function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 	var rdb = {poolFactory: pool};
 	if (!pool.connect) {
 		pool = pool();

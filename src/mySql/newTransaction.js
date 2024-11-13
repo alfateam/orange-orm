@@ -7,7 +7,7 @@ const limitAndOffset = require('./limitAndOffset');
 const insertSql = require('./insertSql');
 const insert = require('./insert');
 
-function newResolveTransaction(domain, pool, { readonly } = {}) {
+function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 	var rdb = {poolFactory: pool};
 	if (!pool.connect) {
 		pool = pool();

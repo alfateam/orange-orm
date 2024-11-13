@@ -2,6 +2,7 @@ var hostExpress = require('./hostExpress');
 var client = require('./client/index.js');
 var _mySql;
 var _pg;
+var _d1;
 var _sqlite;
 var _mssqlNative;
 var _sap;
@@ -73,6 +74,14 @@ Object.defineProperty(connectViaPool, 'sqlite', {
 		if (!_sqlite)
 			_sqlite = require('./sqlite/newDatabase');
 		return _sqlite;
+	}
+});
+
+Object.defineProperty(connectViaPool, 'd1', {
+	get: function() {
+		if (!_d1)
+			_d1 = require('./d1/newDatabase');
+		return _d1;
 	}
 });
 
