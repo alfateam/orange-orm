@@ -72,7 +72,7 @@ jobs:
       - run: curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add -
       - run: curl https://packages.microsoft.com/config/debian/11/prod.list > /etc/apt/sources.list.d/mssql-release.list
       - run: apt-get update
-      - run: sudo ACCEPT_EULA=Y apt-get install -y msodbcsql18
+      - run: ACCEPT_EULA=Y apt-get install -y msodbcsql18
       - run: apt-get install -y unixodbc-dev
       - run: npm install
       - run: npm run lint
