@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'url';
-import { describe, test, beforeAll, expect } from 'vitest';
+import { describe, test, afterAll, beforeAll, expect } from 'vitest';
+import setupD1 from './setupD1';
 import rdb from '../src/index';
 const db = require('./db');
 const initPg = require('./initPg');
@@ -11,6 +12,9 @@ const initSap = require('./initSap');
 const dateToISOString = require('../src/dateToISOString');
 const versionArray = process.version.replace('v', '').split('.');
 const major = parseInt(versionArray[0]);
+let d1;
+let miniflare;
+
 
 const Order = rdb.table('order');
 Order.column('id').numeric().primary().notNullExceptInsert(),
@@ -34,7 +38,12 @@ Order.hasMany(lineJoin).as('lines');
 Lines.hasMany(packageJoin).as('packages');
 
 
+afterAll(async () => {
+	await miniflare.dispose();
+});
+
 beforeAll(async () => {
+	({ d1, miniflare } = await setupD1(fileURLToPath(import.meta.url)));
 	await createMs('mssql');
 	await insertData('mssql');
 	await insertData('pg');
@@ -43,6 +52,7 @@ beforeAll(async () => {
 		await insertData('mssqlNative');
 	await insertData('mysql');
 	await insertData('sqlite');
+	await insertData('d1');
 	await insertData('sap');
 
 	async function insertData(dbName) {
@@ -132,6 +142,7 @@ describe('basic filter', async () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 
 	async function verify(dbName) {
@@ -169,6 +180,7 @@ describe('basic nested filter', async () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 
 	async function verify(dbName) {
@@ -205,6 +217,7 @@ describe('any filter', async () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 
 	async function verify(dbName) {
@@ -242,6 +255,7 @@ describe('all filter', async () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 
 	async function verify(dbName) {
@@ -279,6 +293,7 @@ describe('none filter', async () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 
 	async function verify(dbName) {
@@ -316,6 +331,7 @@ describe('any-subFilter filter', async () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 
 	async function verify(dbName) {
@@ -353,6 +369,7 @@ describe('any-subFilter filter nested', async () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 
 	async function verify(dbName) {
@@ -390,6 +407,7 @@ describe('any-subFilter filter nested chained', async () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 
 	async function verify(dbName) {
@@ -468,6 +486,11 @@ function getDb(name) {
 			db: db.sqlite(sqliteName),
 			init: initSqlite
 		};
+	else if (name === 'd1')
+		return {
+			db: db.d1(d1),
+			init: initSqlite
+		};
 	else if (name === 'sap')
 		return {
 			db: db.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master`),
@@ -510,6 +533,8 @@ function getClassicDb(name) {
 		return rdb.postgres('postgres://postgres:postgres@postgres/postgres');
 	else if (name === 'sqlite')
 		return rdb.sqlite(sqliteName);
+	else if (name === 'd1')
+		return rdb.d1(d1);
 	else if (name === 'sap')
 		return rdb.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master`);
 	else if (name === 'oracle')
@@ -524,5 +549,3 @@ function getClassicDb(name) {
 	else
 		throw new Error('unknown db');
 }
-
-

@@ -1,4 +1,3 @@
-import rdb from '../src/index.js';
 import { describe, test, beforeAll, expect, afterAll } from 'vitest';
 import { fileURLToPath } from 'url';
 import setupD1 from './setupD1';
@@ -20,10 +19,7 @@ let server;
 let d1;
 let miniflare;
 
-rdb.on('query', (query) => {	console.dir(query); });
-
 beforeAll(async () => {
-
 	({ d1, miniflare } = await setupD1(fileURLToPath(import.meta.url)));
 	await createMs('mssql');
 	hostExpress();
