@@ -1,4 +1,6 @@
 ## Changelog
+__4.4.1__  
+Support for date-only ISO strings. [#116](https://github.com/alfateam/orange-orm/issues/116)  
 __4.4.0__  
 More performance gains.  
 __4.3.0__  
