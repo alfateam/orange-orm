@@ -1,14 +1,18 @@
 /* eslint-disable no-prototype-builtins */
 //slightly modified code from github.com/brianc/node-postgres
+var log = require('../../table/log');
 var EventEmitter = require('events').EventEmitter;
 
 var defaults = require('./defaults');
 var genericPool = require('../../generic-pool');
 var _pg = require('pg');
+var parseSearchPathParam = require('./parseSearchPathParam');
 
 function newPgPool(connectionString, poolOptions) {
 	poolOptions = poolOptions || {};
 	let pg = poolOptions.native ? _pg.native : _pg;
+
+	// @ts-ignore
 	var pool = genericPool.Pool({
 		max: poolOptions.size || poolOptions.poolSize || defaults.poolSize,
 		idleTimeoutMillis: poolOptions.idleTimeout || defaults.poolIdleTimeout,
@@ -41,7 +45,8 @@ function newPgPool(connectionString, poolOptions) {
 					}
 				});
 				client.poolCount = 0;
-				return cb(null, client);
+				negotiateSearchPath(client, connectionString, (err) => cb(err, client));
+
 			});
 		},
 		destroy: function(client) {
@@ -65,7 +70,8 @@ function newPgPool(connectionString, poolOptions) {
 				cb = domain.bind(cb);
 			}
 			if (err) return cb(err, null, function() {
-				/*NOOP*/ });
+				/*NOOP*/
+			});
 			client.poolCount++;
 			cb(null, client, function(err) {
 				if (err) {
@@ -77,6 +83,19 @@ function newPgPool(connectionString, poolOptions) {
 		});
 	};
 	return pool;
+}
+
+function negotiateSearchPath(client, connectionString, cb) {
+	const searchPath = parseSearchPathParam(connectionString);
+	if (searchPath) {
+		const sql = `set search_path to ${searchPath}`;
+		log.emitQuery({sql, parameters: []});
+		return client.query(sql, cb);
+	}
+	else
+		cb();
+
+
 }
 
 module.exports = newPgPool;

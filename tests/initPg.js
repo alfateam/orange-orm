@@ -1,6 +1,9 @@
 const sql = `
+drop schema if exists custom cascade;
 drop schema if exists public cascade;
 create schema public;
+create schema custom;
+
 
 CREATE TABLE datetest (
     id SERIAL	 PRIMARY KEY,
@@ -68,8 +71,12 @@ CREATE TABLE "deliveryAddress" (
     "postalCode" TEXT,
     "postalPlace" TEXT,
     "countryCode" TEXT
-)
+);
 
+CREATE TABLE custom."withSchema" (
+    id SERIAL	 PRIMARY KEY,
+    name TEXT
+)
 `;
 
 module.exports = async function(db) {

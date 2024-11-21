@@ -22,6 +22,10 @@ const map = rdb.map(x => ({
 		balance: column('balance').numeric(),
 		isActive: column('isActive').boolean(),
 	})),
+	withSchema: x.table('withSchema').map(({ column }) => ({
+		id: column('id').numeric().primary().notNullExceptInsert(),
+		name: column('name').string(),
+	})),
 
 	vendor: x.table('vendor').map(({ column }) => ({
 		id: column('id').numeric().primary().notNull(),
