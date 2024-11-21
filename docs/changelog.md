@@ -1,4 +1,6 @@
 ## Changelog
+__4.4.2__  
+Support for schema in connection string. Postgrs only. [#116](https://github.com/alfateam/orange-orm/issues/118)  
 __4.4.1__  
 Support for date-only ISO strings. [#116](https://github.com/alfateam/orange-orm/issues/116)  
 __4.4.0__  

@@ -359,6 +359,11 @@ npm install pg
 import map from './map';
 const db = map.postgres('postgres://postgres:postgres@postgres/postgres');
 ```
+With schema
+```javascript
+import map from './map';
+const db = map.postgres('postgres://postgres:postgres@postgres/postgres?search_path=custom');
+```
 __Oracle__
 ```bash
 npm install oracledb
