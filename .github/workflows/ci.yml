@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        container: ["node:16-alpine", "node:18-alpine", "node:20-alpine"]
+        container: ["node:18-alpine", "node:20-alpine", "node:22-alpine"]
     container:
       image: ${{ matrix.container }}
     services:
