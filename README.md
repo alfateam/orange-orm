@@ -1867,7 +1867,7 @@ Supported functions include:
 - avg  
 
 __On each row__  
-In this example, we are counting the number of lines calculating total amount for each order.  This is represented as the property <i>numberOfLines</i>. You can call these aggregated properties whatever you want.  
+In this example, we are counting the number of lines on each order.  This is represented as the property <i>numberOfLines</i>. You can name these aggregated properties whatever you want.  
 You can also elevate associated data to the a parent level for easier access. In the example below, <i>balance</i> of the customer is elevated to the root level.
 
 ```javascript
