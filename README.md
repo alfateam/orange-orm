@@ -468,7 +468,7 @@ Currently, there are three concurrency strategies:
 - <strong>`overwrite`</strong> Overwrites the property, regardless of changes by others.
 - <strong>`skipOnConflict`</strong> Silently avoids updating the property if another user has modified it in the interim.
 
-The <strong>concurrency</strong> option can be set either for the whole table or individually for each column. In the example below, we've set the concurrency strategy on <strong>vendor</strong> table to <strong>overwrite</strong> except for the column <strong>balance</strong> which uses the <strong>skipOnConflict</strong> strategy.  In this particular case, a row with <strong>id: 1</strong> already exists, the <strong>name</strong> and <strong>isActive</strong> fields will be overwritten, but the balance will remain the same as in the original record, demonstrating the effectiveness of combining multiple <strong>concurrency</strong> strategies.
+The <strong>concurrency</strong> option can be set either for the whole table or individually for each column. In the example below, we are using the <strong>overwrite</strong> strategy on the <strong>vendor</strong> table except on the column <strong>balance</strong> which uses the <strong>skipOnConflict</strong> strategy.  In this particular case, a row with <strong>id: 1</strong> already exists, the <strong>name</strong> and <strong>isActive</strong> fields will be overwritten, but the balance will remain the same as in the original record, demonstrating the effectiveness of combining multiple <strong>concurrency</strong> strategies.
 
 ```javascript
 import map from './map';
@@ -885,7 +885,7 @@ Currently, there are three concurrency strategies:
 - <strong>`overwrite`</strong> Overwrites the property, regardless of changes by others.
 - <strong>`skipOnConflict`</strong> Silently avoids updating the property if another user has modified it in the interim.
 
-The <strong>concurrency</strong> option can be set either for the whole table or individually for each column. In the example below, we've set the concurrency strategy on <strong>vendor</strong> table to <strong>overwrite</strong> except for the column <strong>balance</strong> which uses the <strong>skipOnConflict</strong> strategy.  In this particular case, a row with <strong>id: 1</strong> already exists, the <strong>name</strong> and <strong>isActive</strong> fields will be overwritten, but the balance will remain the same as in the original record, demonstrating the effectiveness of combining multiple <strong>concurrency</strong> strategies.
+The <strong>concurrency</strong> option can be set either for the whole table or individually for each column. In the example below, we are using the <strong>overwrite</strong> strategy on the table <strong>vendor</strong> except on the column <strong>balance</strong> which uses the <strong>skipOnConflict</strong> strategy.  In this particular case, a row with <strong>id: 1</strong> already exists, the <strong>name</strong> and <strong>isActive</strong> fields will be overwritten, but the balance will remain the same as in the original record, demonstrating the effectiveness of combining multiple <strong>concurrency</strong> strategies.
 
 ```javascript
 import map from './map';
@@ -1966,7 +1966,7 @@ async function getRows() {
 </details>
 
 <details><summary><strong>Logging</strong></summary>
-<p>You enable logging by listening to the query event on the `orange` object. During this event, both the SQL statement and any associated parameters are logged. The logged output reveals the sequence of SQL commands executed, offering developers a transparent view into database operations, which aids in debugging and ensures data integrity.</p>
+<p>You enable logging by listening to the query event on the `orange` object. During this event, both the SQL statement and any associated parameters are logged.</p>
 
 ```javascript
 import orange from 'orange-orm';
@@ -1996,10 +1996,8 @@ async function updateRow() {
 
 output:
 ```bash
-BEGIN
 select  _order.id as s_order0,_order.orderDate as s_order1,_order.customerId as s_order2 from _order _order where _order.id=2 order by _order.id limit 1
 select  orderLine.id as sorderLine0,orderLine.orderId as sorderLine1,orderLine.product as sorderLine2,orderLine.amount as sorderLine3 from orderLine orderLine where orderLine.orderId in (2) order by orderLine.id
-COMMIT
 BEGIN
 select  _order.id as s_order0,_order.orderDate as s_order1,_order.customerId as s_order2 from _order _order where _order.id=2 order by _order.id limit 1
 INSERT INTO orderLine (orderId,product,amount) VALUES (2,?,300)
