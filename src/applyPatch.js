@@ -1,6 +1,4 @@
 const fastjson = require('fast-json-patch');
-let { inspect } = require('util');
-let assert = require('assert');
 let fromCompareObject = require('./fromCompareObject');
 let toCompareObject = require('./toCompareObject');
 
@@ -43,12 +41,12 @@ function applyPatch({ options = {} }, dto, changes, column) {
 						assertDatesEqual(oldValue, expectedOldValue);
 					}
 					else
-						assert.deepEqual(oldValue, expectedOldValue);
+						assertDeepEqual(oldValue, expectedOldValue);
 				}
 				catch (e) {
 					if (concurrency === 'skipOnConflict')
 						return false;
-					throw new Error(`The field ${change.path.replace('/', '')} was changed by another user. Expected ${inspect(fromCompareObject(expectedOldValue), false, 10)}, but was ${inspect(fromCompareObject(oldValue), false, 10)}.`);
+					throw new Error(`The field ${change.path.replace('/', '')} was changed by another user. Expected ${inspect(fromCompareObject(expectedOldValue))}, but was ${inspect(fromCompareObject(oldValue))}.`);
 				}
 			}
 			return true;
@@ -99,7 +97,16 @@ function assertDatesEqual(date1, date2) {
 		date1 = `${parts1[0]}T${time1parts[0]}`;
 		date2 = `${parts2[0]}T${time2parts[0]}`;
 	}
-	assert.deepEqual(date1, date2);
+	assertDeepEqual(date1, date2);
+}
+
+function assertDeepEqual(a, b) {
+	if (JSON.stringify(a) !== JSON.stringify(b))
+		throw new Error('A, b are not equal');
+}
+
+function inspect(obj) {
+	return JSON.stringify(obj, null, 2);
 }
 
 module.exports = applyPatch;

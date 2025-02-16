@@ -1,9 +1,9 @@
 var executeQuery = require('./executeQuery');
 
-function executeQueriesCore(queries) {
+function executeQueriesCore(context, queries) {
 	var promises = [];
 	for (var i = 0; i < queries.length; i++) {
-		var q = executeQuery(queries[i]);
+		var q = executeQuery(context, queries[i]);
 		promises.push(q);
 	}
 	return promises;

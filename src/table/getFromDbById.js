@@ -1,6 +1,6 @@
 let tryGetFromDbById = require('./tryGetFromDbById');
 
-function get(table, ...ids) {
+function get(_context, table, ...ids) {
 	return tryGetFromDbById.apply(null, arguments).then((row) => onResult(table, row, ids));
 }
 

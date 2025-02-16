@@ -44,10 +44,10 @@ function hostLocal() {
 		}
 		return result;
 
-		async function fn() {
-			setSessionSingleton('ignoreSerializable', true);
+		async function fn(context) {
+			setSessionSingleton(context, 'ignoreSerializable', true);
 			let patch = body.patch;
-			result = await table.patch(patch, { ..._options, ...body.options, isHttp });
+			result = await table.patch(context, patch, { ..._options, ...body.options, isHttp });
 		}
 	}
 
@@ -72,10 +72,10 @@ function hostLocal() {
 		}
 		return result;
 
-		async function fn() {
-			setSessionSingleton('ignoreSerializable', true);
+		async function fn(context) {
+			setSessionSingleton(context, 'ignoreSerializable', true);
 			const options = { ..._options, ...body.options, JSONFilter: body, request, response, isHttp };
-			result = await executePath(options);
+			result = await executePath(context, options);
 		}
 	}
 	async function query() {
@@ -97,14 +97,14 @@ function hostLocal() {
 
 		return result;
 
-		async function fn() {
-			result = await executeQuery.apply(null, args);
+		async function fn(...args1) {
+			result = await executeQuery.apply(null, [...args1, ...args]);
 		}
 
 	}
 
 	function express(client, options) {
-		return hostExpress(client, options);
+		return hostExpress(hostLocal, client, options);
 	}
 
 	return c;

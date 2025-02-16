@@ -4,12 +4,12 @@ var extractOrderBy = require('./query/extractOrderBy');
 var extractLimit = require('./query/extractLimit');
 var extractOffset = require('./query/extractOffset');
 
-function newQuery(queries,table,filter,span,alias,innerJoin,orderBy,exclusive) {
+function newQuery(context, queries,table,filter,span,alias,innerJoin,orderBy,exclusive) {
 	filter = extractFilter(filter);
-	orderBy = extractOrderBy(table,alias,span.orderBy,orderBy);
-	var limit = extractLimit(span);
-	var offset = extractOffset(span);
-	var singleQuery = newSingleQuery(table,filter,span,alias,innerJoin,orderBy,limit,offset,exclusive);
+	orderBy = extractOrderBy(context, table,alias,span.orderBy,orderBy);
+	var limit = extractLimit(context, span);
+	var offset = extractOffset(context, span);
+	var singleQuery = newSingleQuery(context, table,filter,span,alias,innerJoin,orderBy,limit,offset,exclusive);
 	queries.push(singleQuery);
 
 	return queries;

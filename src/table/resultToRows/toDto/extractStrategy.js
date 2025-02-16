@@ -1,5 +1,3 @@
-let extractSubStrategy = _extractSubStrategy;
-
 //either..
 //strategy, table
 //or..
@@ -21,7 +19,7 @@ function extractStrategy(_strategyOrTable, _optinonalTable) {
 	visitor.visitJoin = function() { };
 
 	visitor.visitMany = function(relation) {
-		strategy[relationName] = extractSubStrategy(relation.childTable);
+		strategy[relationName] = extractStrategy(relation.childTable);
 	};
 
 	visitor.visitOne = visitor.visitMany;
@@ -33,9 +31,5 @@ function extractStrategy(_strategyOrTable, _optinonalTable) {
 	return strategy;
 }
 
-function _extractSubStrategy(table) {
-	extractSubStrategy = require('./extractStrategy');
-	return extractSubStrategy(table);
-}
 
 module.exports = extractStrategy;

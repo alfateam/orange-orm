@@ -1,3 +1,3 @@
 var startsWithCore = require('./startsWithCore');
 
-module.exports = startsWithCore.bind(null, 'ILIKE');
+module.exports = (context, ...rest) => startsWithCore.apply(null, [context, 'ILIKE', ...rest]);

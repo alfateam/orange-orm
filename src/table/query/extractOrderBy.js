@@ -1,7 +1,7 @@
 const getSessionSingleton = require('../getSessionSingleton');
 
-function extractOrderBy(table, alias, orderBy, originalOrderBy) {
-	const quote = getSessionSingleton('quote');
+function extractOrderBy(context, table, alias, orderBy, originalOrderBy) {
+	const quote = getSessionSingleton(context, 'quote');
 	alias = quote(alias);
 	var dbNames = [];
 	var i;

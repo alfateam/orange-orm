@@ -1,8 +1,9 @@
-var newDiscriminatorSql = require('./newDiscriminatorSql');
-var newParameterized = require('../../newParameterized');
-var quote = require('../../../quote');
+const newDiscriminatorSql = require('./newDiscriminatorSql');
+const newParameterized = require('../../newParameterized');
+const getSessionSingleton = require('../../../getSessionSingleton');
 
-function _new(rightTable,leftColumns,rightColumns,leftAlias,rightAlias,filter) {
+function _new(context, rightTable, leftColumns, rightColumns, leftAlias, rightAlias, filter) {
+	const quote = getSessionSingleton(context, 'quote');
 	leftAlias = quote(leftAlias);
 	rightAlias = quote(rightAlias);
 	var sql = '';
@@ -18,7 +19,7 @@ function _new(rightTable,leftColumns,rightColumns,leftAlias,rightAlias,filter) {
 		sql += delimiter + leftAlias + '.' + quote(leftColumn._dbName) + '=' + rightAlias + '.' + quote(rightColumn._dbName);
 	}
 
-	sql += newDiscriminatorSql(rightTable,rightAlias);
+	sql += newDiscriminatorSql(context, rightTable, rightAlias);
 	var result = newParameterized(sql);
 	if (filter)
 		result = result.append(delimiter).append(filter);

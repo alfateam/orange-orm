@@ -2,15 +2,15 @@ var wrapQuery = require('./wrapQuery');
 var encodeBoolean = require('./encodeBoolean');
 var deleteFromSql = require('./deleteFromSql');
 var selectForUpdateSql = require('./selectForUpdateSql');
-var outputInsertedSql = require('./outputInsertedSql');
 const limitAndOffset = require('./limitAndOffset');
+const insertSql = require('./insertSql');
 const getManyDto = require('./getManyDto');
 const formatDateOut = require('./formatDateOut');
 const formatJSONOut = require('./formatJSONOut');
-const insertSql = require('./insertSql');
 const insert = require('./insert');
+const quote = require('./quote');
 
-function newResolveTransaction(domain, pool, { readonly } = {}) {
+function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 	var rdb = {poolFactory: pool};
 	if (!pool.connect) {
 		pool = pool();
@@ -23,7 +23,6 @@ function newResolveTransaction(domain, pool, { readonly } = {}) {
 	rdb.encodeJSON = JSON.stringify;
 	rdb.deleteFromSql = deleteFromSql;
 	rdb.selectForUpdateSql = selectForUpdateSql;
-	rdb.outputInsertedSql = outputInsertedSql;
 	rdb.lastInsertedIsSeparate = false;
 	rdb.insertSql = insertSql;
 	rdb.insert = insert;
@@ -44,7 +43,7 @@ function newResolveTransaction(domain, pool, { readonly } = {}) {
 		caller.visitSqlite();
 	};
 	rdb.aggregateCount = 0;
-	rdb.quote = (name) => `[${name}]`;
+	rdb.quote = quote;
 
 	if (readonly) {
 		rdb.dbClient = {

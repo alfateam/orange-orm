@@ -1,18 +1,11 @@
-var getSessionSingleton = require('../getSessionSingleton');
+const getSessionSingleton = require('../getSessionSingleton');
 
-function resolveExecuteQuery(query) {
+function resolveExecuteQuery(context, query) {
 	return resolve;
 
 	function resolve(success, failed) {
 		try {
-
-			var domain = process.domain;
-			if (domain) {
-				success = process.domain.bind(success);
-				failed = process.domain.bind(failed);
-			}
-
-			var client = getSessionSingleton('dbClient');
+			var client = getSessionSingleton(context, 'dbClient');
 			query = negotiateNullParams(query);
 			client.executeQuery(query, onCompleted);
 		} catch (e) {

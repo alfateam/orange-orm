@@ -4,12 +4,12 @@ let getSessionContext = require('../../getSessionContext');
 function _new(column) {
 	let decodeCore = newDecodeCore(column);
 
-	return function(value) {
-		value = decodeCore(value);
+	return function(context, value) {
+		value = decodeCore(context, value);
 		if (value === null)
 			return value;
 		if (typeof value !== 'object') {
-			let decode = getSessionContext().decodeJSON;
+			let decode = getSessionContext(context).decodeJSON;
 			if (decode)
 				return decode(value);
 			return value;

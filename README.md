@@ -29,7 +29,8 @@ The ultimate Object Relational Mapper for Node.js and Typescript, offering seaml
 ✅ MySQL  
 ✅ Oracle  
 ✅ SAP ASE  
-✅ SQLite
+✅ SQLite  
+✅ Cloudflare D1
 
 
 This is the _Modern Typescript Documentation_. Are you looking for the [_Classic Documentation_](https://github.com/alfateam/orange-orm/blob/master/docs/docs.md) ?
@@ -319,6 +320,7 @@ import map from './map';
 
 const db = map.http('http://localhost:3000/orange');
 ```
+
 __MySQL__
 ```bash
 $ npm install mysql2
@@ -363,6 +365,38 @@ With schema
 ```javascript
 import map from './map';
 const db = map.postgres('postgres://postgres:postgres@postgres/postgres?search_path=custom');
+```
+__Cloudflare D1__  
+<sub>📄 wrangler.toml</sub>  
+```toml
+name = "d1-tutorial"
+main = "src/index.ts"
+compatibility_date = "2025-02-04"
+
+# Bind a D1 database. D1 is Cloudflare’s native serverless SQL database.
+# Docs: https://developers.cloudflare.com/workers/wrangler/configuration/#d1-databases
+[[d1_databases]]
+binding = "DB"
+database_name = "<your-name-for-the-database>"
+database_id = "<your-guid-for-the-database>"
+```
+
+<sub>📄 src/index.ts</sub>  
+```javascript
+import map from './map';
+
+export interface Env {
+  // Must match the binding name in wrangler.toml  
+  DB: D1Database;
+}
+
+export default {
+  async fetch(request, env): Promise<Response> {
+    const db = map.d1(env.DB);
+    const customers = await db.customer.getAll();
+    return Response.json(customers);
+  },
+} satisfies ExportedHandler<Env>;
 ```
 __Oracle__
 ```bash
@@ -468,7 +502,7 @@ Currently, there are three concurrency strategies:
 - <strong>`overwrite`</strong> Overwrites the property, regardless of changes by others.
 - <strong>`skipOnConflict`</strong> Silently avoids updating the property if another user has modified it in the interim.
 
-The <strong>concurrency</strong> option can be set either for the whole table or individually for each column. In the example below, we are using the <strong>overwrite</strong> strategy on the <strong>vendor</strong> table except on the column <strong>balance</strong> which uses the <strong>skipOnConflict</strong> strategy.  In this particular case, a row with <strong>id: 1</strong> already exists, the <strong>name</strong> and <strong>isActive</strong> fields will be overwritten, but the balance will remain the same as in the original record, demonstrating the effectiveness of combining multiple <strong>concurrency</strong> strategies.
+The <strong>concurrency</strong> option can be set either for the whole table or individually for each column. In the example below, we've set the concurrency strategy on <strong>vendor</strong> table to <strong>overwrite</strong> except for the column <strong>balance</strong> which uses the <strong>skipOnConflict</strong> strategy.  In this particular case, a row with <strong>id: 1</strong> already exists, the <strong>name</strong> and <strong>isActive</strong> fields will be overwritten, but the balance will remain the same as in the original record, demonstrating the effectiveness of combining multiple <strong>concurrency</strong> strategies.
 
 ```javascript
 import map from './map';
@@ -885,7 +919,7 @@ Currently, there are three concurrency strategies:
 - <strong>`overwrite`</strong> Overwrites the property, regardless of changes by others.
 - <strong>`skipOnConflict`</strong> Silently avoids updating the property if another user has modified it in the interim.
 
-The <strong>concurrency</strong> option can be set either for the whole table or individually for each column. In the example below, we are using the <strong>overwrite</strong> strategy on the table <strong>vendor</strong> except on the column <strong>balance</strong> which uses the <strong>skipOnConflict</strong> strategy.  In this particular case, a row with <strong>id: 1</strong> already exists, the <strong>name</strong> and <strong>isActive</strong> fields will be overwritten, but the balance will remain the same as in the original record, demonstrating the effectiveness of combining multiple <strong>concurrency</strong> strategies.
+The <strong>concurrency</strong> option can be set either for the whole table or individually for each column. In the example below, we've set the concurrency strategy on <strong>vendor</strong> table to <strong>overwrite</strong> except for the column <strong>balance</strong> which uses the <strong>skipOnConflict</strong> strategy.  In this particular case, a row with <strong>id: 1</strong> already exists, the <strong>name</strong> and <strong>isActive</strong> fields will be overwritten, but the balance will remain the same as in the original record, demonstrating the effectiveness of combining multiple <strong>concurrency</strong> strategies.
 
 ```javascript
 import map from './map';
@@ -1580,6 +1614,8 @@ async function getRows() {
 Within the transaction, a customer is retrieved and its balance updated using the tx object to ensure operations are transactional.
 An error is deliberately thrown to demonstrate a rollback, ensuring all previous changes within the transaction are reverted.
 Always use the provided tx object for operations within the transaction to maintain data integrity.</p>
+<p>(NOTE: Transactions are not supported for Cloudflare D1)</p>
+
 
 ```javascript
 import map from './map';
@@ -1597,6 +1633,7 @@ async function execute() {
 }
 
 ```
+
 </details>
 
 <details><summary><strong>Data types</strong></summary>
@@ -1966,7 +2003,7 @@ async function getRows() {
 </details>
 
 <details><summary><strong>Logging</strong></summary>
-<p>You enable logging by listening to the query event on the `orange` object. During this event, both the SQL statement and any associated parameters are logged.</p>
+<p>You enable logging by listening to the query event on the `orange` object. During this event, both the SQL statement and any associated parameters are logged. The logged output reveals the sequence of SQL commands executed, offering developers a transparent view into database operations, which aids in debugging and ensures data integrity.</p>
 
 ```javascript
 import orange from 'orange-orm';
@@ -1996,8 +2033,10 @@ async function updateRow() {
 
 output:
 ```bash
+BEGIN
 select  _order.id as s_order0,_order.orderDate as s_order1,_order.customerId as s_order2 from _order _order where _order.id=2 order by _order.id limit 1
 select  orderLine.id as sorderLine0,orderLine.orderId as sorderLine1,orderLine.product as sorderLine2,orderLine.amount as sorderLine3 from orderLine orderLine where orderLine.orderId in (2) order by orderLine.id
+COMMIT
 BEGIN
 select  _order.id as s_order0,_order.orderDate as s_order1,_order.customerId as s_order2 from _order _order where _order.id=2 order by _order.id limit 1
 INSERT INTO orderLine (orderId,product,amount) VALUES (2,?,300)

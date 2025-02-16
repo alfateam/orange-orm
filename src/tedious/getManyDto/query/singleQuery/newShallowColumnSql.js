@@ -1,7 +1,6 @@
-const getSessionSingleton = require('../../../../table/getSessionSingleton');
+const quote = require('../../../quote');
 
-function _new(table,alias, span) {
-	const quote = getSessionSingleton('quote');
+function _new(context, table, alias, span) {
 	alias = quote(alias);
 	let columnsMap = span.columns;
 	var columns = table._columns;
@@ -11,7 +10,7 @@ function _new(table,alias, span) {
 	for (var i = 0; i < columns.length; i++) {
 		var column = columns[i];
 		if (!columnsMap || (columnsMap.get(column))) {
-			sql = sql + separator  + formatColumn(column) + ' as ' + quote(column.alias);
+			sql = sql + separator + formatColumn(column) + ' as ' + quote(column.alias);
 			separator = ',';
 		}
 	}
@@ -24,11 +23,11 @@ function _new(table,alias, span) {
 
 	function formatColumn(column) {
 
-		const formatted = column.formatOut && column.tsType !== 'DateColumn' ? column.formatOut(alias) : alias + '.' + quote(column._dbName);
+		const formatted = column.formatOut && column.tsType !== 'DateColumn' ? column.formatOut(context, alias) : alias + '.' + quote(column._dbName);
 		if (column.dbNull === null)
 			return formatted;
 		else {
-			const encoded = column.encode.unsafe(column.dbNull);
+			const encoded = column.encode.unsafe(context, column.dbNull);
 			return `CASE WHEN ${formatted}=${encoded} THEN null ELSE ${formatted} END`;
 		}
 

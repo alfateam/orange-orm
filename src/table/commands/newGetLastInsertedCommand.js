@@ -1,15 +1,15 @@
 var newGetLastInsertedCommandCore = require('./newGetLastInsertedCommandCore');
 var newImmutable = require('../../newImmutable');
 
-function newGetLastInsertedCommand(table, row, insertCommand) {
-	let cmd =  new InsertCommand(table, row, insertCommand);
+function newGetLastInsertedCommand(context, table, row, insertCommand) {
+	let cmd =  new InsertCommand(context, table, row, insertCommand);
 	insertCommand.endEdit = () => {};
 	return cmd;
 }
 
-function InsertCommand(table, row, insertCommand) {
+function InsertCommand(context, table, row, insertCommand) {
 	this._insertCommand = insertCommand;
-	this.__getCoreCommand = newImmutable(newGetLastInsertedCommandCore);
+	this.__getCoreCommand = newImmutable(newGetLastInsertedCommandCore.bind(null, context));
 	this._table = table;
 	this._row = row;
 }

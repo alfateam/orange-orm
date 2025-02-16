@@ -1,10 +1,10 @@
-var format = 'delete %s from %s as %s%s';
-var util = require('util');
-const quote = require('../table/quote');
+const format = 'delete %s from %s as %s%s';
+const formatString = require('../format');
+const quote = require('./quote');
 
 function deleteFromSql(table, alias, whereSql) {
-	var name = quote(table._dbName);
+	const name = quote(table._dbName);
 	alias = quote(alias);
-	return util.format(format, alias, name, alias, whereSql);
+	return formatString(format, alias, name, alias, whereSql);
 }
 module.exports = deleteFromSql;

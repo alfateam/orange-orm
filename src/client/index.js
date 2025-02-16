@@ -57,6 +57,7 @@ function rdbClient(options = {}) {
 	client.mssqlNative = onProvider.bind(null, 'mssqlNative');
 	client.pg = onProvider.bind(null, 'pg');
 	client.postgres = onProvider.bind(null, 'postgres');
+	client.d1 = onProvider.bind(null, 'd1');
 	client.sqlite = onProvider.bind(null, 'sqlite');
 	client.sap = onProvider.bind(null, 'sap');
 	client.oracle = onProvider.bind(null, 'oracle');
@@ -128,7 +129,8 @@ function rdbClient(options = {}) {
 	}
 
 	async function query() {
-		return netAdapter(baseUrl, undefined, { tableOptions: { db: baseUrl, transaction } }).query.apply(null, arguments);
+		const adapter = netAdapter(baseUrl, undefined, { tableOptions: { db: baseUrl, transaction } });
+		return adapter.query.apply(null, arguments);
 	}
 
 	function express(arg) {
@@ -168,13 +170,14 @@ function rdbClient(options = {}) {
 		if (!db.createTransaction)
 			throw new Error('Transaction not supported through http');
 		const transaction = db.createTransaction(_options);
+
 		try {
 			const nextClient = client({ transaction });
 			await fn(nextClient);
-			await transaction(db.commit);
+			await transaction(transaction.commit);
 		}
 		catch (e) {
-			await transaction(db.rollback.bind(null, e));
+			await transaction(transaction.rollback.bind(null, e));
 		}
 	}
 

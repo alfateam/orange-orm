@@ -1,7 +1,7 @@
 var getSessionContext = require('../getSessionContext');
 
-function extractOffset(span) {
-	let {limitAndOffset} = getSessionContext();
+function extractOffset(context, span) {
+	let {limitAndOffset} = getSessionContext(context);
 	if (limitAndOffset)
 		return limitAndOffset(span);
 	else

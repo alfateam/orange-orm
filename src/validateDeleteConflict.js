@@ -1,7 +1,5 @@
 // @ts-nocheck
 /* eslint-disable */
-let { inspect } = require('util');
-let assert = require('assert');
 const toCompareObject = require('./toCompareObject');
 
 async function validateDeleteConflict({ row, oldValue, options, table }) {
@@ -16,10 +14,10 @@ async function validateDeleteConflict({ row, oldValue, options, table }) {
 						assertDatesEqual(oldValue[p], toCompareObject(row[p]));
 					}
 					else
-						assert.deepEqual(oldValue[p], toCompareObject(row[p]));						
+						assertDeepEqual(oldValue[p], toCompareObject(row[p]));						
 				}
 				catch (e) {
-					throw new Error(`The field ${p} was changed by another user. Expected ${inspect(oldValue[p], false, 10)}, but was ${inspect(row[p], false, 10)}.`);
+					throw new Error(`The field ${p} was changed by another user. Expected ${inspect(oldValue[p])}, but was ${inspect(row[p])}.`);
 				}
 			}
 		}
@@ -85,8 +83,16 @@ function assertDatesEqual(date1, date2) {
 		date1 = `${parts1[0]}T${time1parts[0]}`;
 		date2 = `${parts2[0]}T${time2parts[0]}`;
 	}
-	assert.deepEqual(date1, date2);
+	assertDeepEqual(date1, date2);
 }
 
+function assertDeepEqual(a, b) {
+	if (JSON.stringify(a) !== JSON.stringify(b))
+		throw new Error('A, b are not equal');
+}
+
+function inspect(obj) {
+	return JSON.stringify(obj, null, 2);
+}
 
 module.exports = validateDeleteConflict;

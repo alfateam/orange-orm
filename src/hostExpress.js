@@ -1,8 +1,8 @@
 const getTSDefinition = require('./getTSDefinition');
-let hostLocal = _hostLocal;
+// let hostLocal = _hostLocal;
 const getMeta = require('./hostExpress/getMeta');
 
-function hostExpress(client, options = {}) {
+function hostExpress(hostLocal, client, options = {}) {
 	if ('db' in options && (options.db ?? undefined) === undefined || !client.db)
 		throw new Error('No db specified');
 	const dbOptions = { db: options.db || client.db };
@@ -115,11 +115,6 @@ function hostExpress(client, options = {}) {
 	}
 
 	return handler;
-}
-
-function _hostLocal() {
-	hostLocal = require('./hostLocal');
-	return hostLocal.apply(null, arguments);
 }
 
 module.exports = hostExpress;

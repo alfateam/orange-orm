@@ -17,34 +17,34 @@ function _new(table, column) {
 	column.decode = newDecode(column);
 	var extractAlias = _extractAlias.bind(null, table);
 
-	column.startsWith = function(arg, alias) {
+	column.startsWith = function(context, arg, alias) {
 		alias = extractAlias(alias);
-		return startsWith(column, arg, alias);
+		return startsWith(context, column, arg, alias);
 	};
-	column.endsWith = function(arg, alias) {
+	column.endsWith = function(context, arg, alias) {
 		alias = extractAlias(alias);
-		return endsWith(column, arg, alias);
+		return endsWith(context, column, arg, alias);
 	};
-	column.contains = function(arg, alias) {
+	column.contains = function(context, arg, alias) {
 		alias = extractAlias(alias);
-		return contains(column, arg, alias);
+		return contains(context, column, arg, alias);
 	};
-	column.iStartsWith = function(arg, alias) {
+	column.iStartsWith = function(context, arg, alias) {
 		alias = extractAlias(alias);
-		return iStartsWith(column, arg, alias);
+		return iStartsWith(context, column, arg, alias);
 	};
-	column.iEndsWith = function(arg, alias) {
+	column.iEndsWith = function(context, arg, alias) {
 		alias = extractAlias(alias);
-		return iEndsWith(column, arg, alias);
+		return iEndsWith(context, column, arg, alias);
 	};
-	column.iContains = function(arg, alias) {
+	column.iContains = function(context, arg, alias) {
 		alias = extractAlias(alias);
-		return iContains(column, arg, alias);
+		return iContains(context, column, arg, alias);
 	};
 
-	column.iEqual = function(arg, alias) {
+	column.iEqual = function(context, arg, alias) {
 		alias = extractAlias(alias);
-		return iEqual(column, arg, alias);
+		return iEqual(context, column, arg, alias);
 	};
 
 	column.iEq = column.iEqual;

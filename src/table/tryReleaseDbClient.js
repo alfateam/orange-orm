@@ -1,8 +1,8 @@
 var release = require('./releaseDbClient');
 
-function tryReleaseDbClient() {
+function tryReleaseDbClient(context) {
 	try {
-		release();
+		release(context);
 	}
 	// eslint-disable-next-line no-empty
 	catch (e) {

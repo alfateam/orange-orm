@@ -7,8 +7,9 @@ const formatDateOut = require('./formatDateOut');
 const insertSql = require('./insertSql');
 const insert = require('./insert');
 const limitAndOffset = require('./limitAndOffset');
+const quote = require('./quote');
 
-function newResolveTransaction(domain, pool, { readonly } = {}) {
+function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 	var rdb = {poolFactory: pool};
 	if (!pool.connect) {
 		pool = pool();
@@ -40,7 +41,7 @@ function newResolveTransaction(domain, pool, { readonly } = {}) {
 		caller.visitSap();
 	};
 	rdb.aggregateCount = 0;
-	rdb.quote = (name) => `[${name}]`;
+	rdb.quote = quote;
 
 	if (readonly) {
 		rdb.dbClient = {

@@ -1,6 +1,6 @@
 {
   "name": "orange-orm",
-  "version": "4.4.2",
+  "version": "4.5.0",
   "main": "./src/index.js",
   "browser": "./src/client/index.mjs",
   "bin": {
@@ -48,23 +48,21 @@
     "lint": "eslint ./",
     "fix": "eslint ./ --fix",
     "owasp": "owasp-dependency-check --project \"MY_PROJECT\" --scan \"package-lock.json\" --exclude \"dependency-check-bin\" --out \"owasp\" --format HTML",
-    "beta": "publish --tag beta"
+    "beta": "npm publish --tag beta"
   },
   "dependencies": {
     "@lroal/on-change": "^4.0.2",
     "@tediousjs/connection-string": "^0.4.1",
     "@types/express": "^4.17.13",
+    "@cloudflare/workers-types": "^4.20241106.0",
     "@types/oracledb": "^6.0.4",
     "@types/tedious": "^4.0.14",
     "ajv": "^6.10.2",
     "axios": "^1.6.2",
-    "deferred": "^0.7.5",
     "fast-json-patch": "^3.1.1",
     "findup-sync": "^5.0.0",
     "glob": "^10.3.4",
     "module-definition": "^4.0.0",
-    "node-cls": "^1.0.5",
-    "promise": "^8.0.3",
     "rfdc": "^1.2.0",
     "uuid": "^8.3.2"
   },
@@ -99,10 +97,15 @@
     },
     "tedious": {
       "optional": true
+    },
+    "oracledb": {
+      "optional": true
     }
   },
-  "devDependencies": {
-    "@rollup/plugin-commonjs": "^21.0.1",
+  "devDependencies": {    
+    "@miniflare/d1": "^2.14.4",
+    "@rollup/plugin-commonjs": "^28.0.2",
+    "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^13.0.0",
     "@typescript-eslint/eslint-plugin": "^6.x",
     "@typescript-eslint/parser": "^6.x",
@@ -111,6 +114,7 @@
     "eslint": "^8.57.0",
     "eslint-plugin-jest": "^27.1.7",
     "express": "^4.18.2",
+    "miniflare": "^3.20250129.0",
     "msnodesqlv8": "^4.1.0",
     "mysql2": "^3.9.4",
     "oracledb": "^6.3.0",
@@ -121,7 +125,7 @@
     "sqlite3": "^5.0.2",
     "tedious": "^18.2.0",
     "typescript": "^5.4.5",
-    "vitest": "^0.34.1"
+    "vitest": "^0.34.6"
   },
   "engines": {
     "node": ">= 8.0.0"

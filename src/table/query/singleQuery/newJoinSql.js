@@ -1,18 +1,18 @@
-var joinLegToJoinSql = require('./joinSql/joinLegToJoinSql');
-var oneLegToJoinSql = require('./joinSql/oneLegToJoinSql');
-var newParameterized = require('../newParameterized');
+const joinLegToJoinSql = require('./joinSql/joinLegToJoinSql');
+const oneLegToJoinSql = require('./joinSql/oneLegToJoinSql');
+const newParameterized = require('../newParameterized');
 
-function _new(span,alias = '') {
+function newJoinSql(context,span,alias = '') {
 	var sql = newParameterized('');
 	var childAlias;
 
 	var c = {};
 	c.visitJoin = function(leg) {
-		sql = joinLegToJoinSql(leg,alias,childAlias).prepend(sql);
+		sql = joinLegToJoinSql(newJoinSql, context,leg,alias,childAlias).prepend(sql);
 	};
 
 	c.visitOne = function(leg) {
-		sql = oneLegToJoinSql(leg,alias,childAlias).prepend(sql);
+		sql = oneLegToJoinSql(newJoinSql, context,leg,alias,childAlias).prepend(sql);
 	};
 
 	c.visitMany = function() {};
@@ -38,4 +38,4 @@ function _new(span,alias = '') {
 	return sql;
 }
 
-module.exports = _new;
+module.exports = newJoinSql;

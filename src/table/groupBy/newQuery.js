@@ -4,13 +4,13 @@ var extractLimit = require('../query/extractLimit');
 var newParameterized = require('../query/newParameterized');
 var extractOffset = require('../query/extractOffset');
 
-function newQuery(table,filter,span,alias) {
+function newQuery(context, table,filter,span,alias) {
 	filter = extractFilter(filter);
 	var orderBy = '';
-	var limit = extractLimit(span);
-	var offset = extractOffset(span);
+	var limit = extractLimit(context, span);
+	var offset = extractOffset(context, span);
 
-	var query = newSingleQuery(table,filter,span,alias,orderBy,limit,offset);
+	var query = newSingleQuery(context, table,filter,span,alias,orderBy,limit,offset);
 	const groupClause = groupBy(span);
 	return newParameterized(query.sql(), query.parameters).append(groupClause);
 }

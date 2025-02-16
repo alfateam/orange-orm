@@ -23,17 +23,17 @@ function newManyRelation(joinRelation) {
 		return fuzzyPromise(result);
 	};
 
-	c.getFromDb = function(parent) {
-		var filter = newForeignKeyFilter(joinRelation, parent);
-		return c.childTable.getMany(filter, null);
+	c.getFromDb = function(context, parent) {
+		var filter = newForeignKeyFilter(context, joinRelation, parent);
+		return c.childTable.getMany(context, filter, null);
 	};
 
-	c.getRelatives = function(parent) {
-		return getRelatives(parent, c);
+	c.getRelatives = function(context, parent) {
+		return getRelatives(context, parent, c);
 	};
 
-	c.toGetRelated = function(parent) {
-		return newGetRelated(parent, c);
+	c.toGetRelated = function(context, parent) {
+		return newGetRelated(context, parent, c);
 	};
 
 	c.expand = function(parent) {
@@ -51,8 +51,8 @@ function newManyRelation(joinRelation) {
 		return newLeg(c);
 	};
 
-	c.getInnerCache = function() {
-		return manyCache.getInnerCache();
+	c.getInnerCache = function(context) {
+		return manyCache.getInnerCache(context);
 	};
 
 	return c;

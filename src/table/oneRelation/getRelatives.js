@@ -2,7 +2,7 @@ let emptyFilter = require('../../emptyFilter');
 let newForeignKeyFilter = require('../relation/newForeignKeyFilter');
 let negotiateExpandInverse = require('../negotiateExpandInverse');
 
-function getRelatives(parent, relation) {
+function getRelatives(context, parent, relation) {
 	let queryContext = parent.queryContext;
 	let strategy = queryContext && queryContext.strategy[relation.joinRelation.rightAlias];
 
@@ -22,17 +22,17 @@ function getRelatives(parent, relation) {
 			return row[parentAlias];
 		});
 		let column = relation.joinRelation.columns[0];
-		return column.in(ids);
+		return column.in(context, ids);
 	}
 
 	function createCompositeFilter() {
 		let filters = queryContext.rows.map(function(row) {
-			return newForeignKeyFilter(relation.joinRelation, row);
+			return newForeignKeyFilter(context, relation.joinRelation, row);
 		});
-		return emptyFilter.or.apply(emptyFilter, filters);
+		return emptyFilter.or.apply(emptyFilter, [context, ...filters]);
 	}
 
-	return relation.childTable.getMany(filter, strategy).then(onRows);
+	return relation.childTable.getMany(context, filter, strategy).then(onRows);
 
 	function onRows(rows) {
 		queryContext.expand(relation);

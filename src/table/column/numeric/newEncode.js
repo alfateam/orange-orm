@@ -3,7 +3,7 @@ var newParam = require('../../query/newParameterized');
 
 module.exports = function(column) {
 
-	function encode(value) {
+	function encode(_context, value) {
 		value = purify(value);
 		if (value == null) {
 			var dbNull = column.dbNull;
@@ -12,7 +12,7 @@ module.exports = function(column) {
 		return newParam('' + value);
 	}
 
-	encode.unsafe = function(value) {
+	encode.unsafe = function(_context, value) {
 		value = purify(value);
 		if (value == null) {
 			var dbNull = column.dbNull;
@@ -21,7 +21,7 @@ module.exports = function(column) {
 		return '' + value;
 	};
 
-	encode.direct = function(value) {
+	encode.direct = function(_context, value) {
 		return value ;
 	};
 

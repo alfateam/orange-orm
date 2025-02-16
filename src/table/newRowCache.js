@@ -6,43 +6,43 @@ function newRowCache(table) {
 	let id = Symbol();
 	let c = {};
 
-	c.tryGet = function(row) {
-		return getCache(table, id).tryGet(row);
+	c.tryGet = function(context, row) {
+		return getCache(context, table, id).tryGet(row);
 	};
 
-	c.tryAdd = function(row) {
-		return getCache(table, id).tryAdd(row);
+	c.tryAdd = function(context, row) {
+		return getCache(context, table, id).tryAdd(row);
 	};
 
-	c.tryRemove = function(row) {
-		return getCache(table, id).tryRemove(row);
+	c.tryRemove = function(context, row) {
+		return getCache(context, table, id).tryRemove(row);
 	};
 
-	c.subscribeAdded = function() {
-		return getCache(table, id).subscribeAdded.apply(null, arguments);
+	c.subscribeAdded = function(context, ...rest) {
+		return getCache(context, table, id).subscribeAdded.apply(null, rest);
 	};
 
-	c.subscribeRemoved = function() {
-		return getCache(table, id).subscribeRemoved.apply(null, arguments);
+	c.subscribeRemoved = function(context, ...rest) {
+		return getCache(context, table, id).subscribeRemoved.apply(null, rest);
 	};
 
-	c.getAll = function() {
-		return getCache(table, id).getAll.apply(null, arguments);
+	c.getAll = function(context) {
+		return getCache(context, table, id).getAll.apply(null, arguments);
 	};
 
-	c.getInnerCache = function() {
-		return getCache(table, id);
+	c.getInnerCache = function(context) {
+		return getCache(context, table, id);
 	};
 	return c;
 }
 
 
-function getCache(table, id) {
-	let cache = getSessionSingleton(id);
+function getCache(context, table, id) {
+	let cache = getSessionSingleton(context, id);
 	if (cache)
 		return cache;
 	cache = _newRowCache(table);
-	setSessionSingleton(id, cache);
+	setSessionSingleton(context, id, cache);
 	return cache;
 }
 

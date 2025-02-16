@@ -4,32 +4,32 @@ var getSessionContext = require('../../getSessionContext');
 var getSessionSingleton = require('../../getSessionSingleton');
 
 function _new(column) {
-	var encode = function(value) {
+	var encode = function(context, value) {
 		value = purify(value);
 		if (value == null) {
 			if (column.dbNull === null)
 				return newPara('null');
 			return newPara('\'' + column.dbNull + '\'');
 		}
-		var context = getSessionContext();
-		var encodeCore = context.encodeDate || encodeDate;
-		var formatIn = context.formatDateIn;
+		var ctx = getSessionContext(context);
+		var encodeCore = ctx.encodeDate || encodeDate;
+		var formatIn = ctx.formatDateIn;
 		return newPara(formatIn ? formatIn('?') : '?', [encodeCore(value)]);
 	};
 
-	encode.unsafe = function(value) {
+	encode.unsafe = function(context, value) {
 		value = purify(value);
 		if (value == null) {
 			if (column.dbNull === null)
 				'null';
 			return '\'' + column.dbNull + '\'';
 		}
-		var encodeCore = getSessionSingleton('encodeDate') || encodeDate;
+		var encodeCore = getSessionSingleton(context, 'encodeDate') || encodeDate;
 		return encodeCore(value);
 	};
 
-	encode.direct = function(value) {
-		var encodeCore = getSessionSingleton('encodeDate') || encodeDate;
+	encode.direct = function(context, value) {
+		var encodeCore = getSessionSingleton(context, 'encodeDate') || encodeDate;
 		return encodeCore(value);
 	};
 

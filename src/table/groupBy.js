@@ -3,11 +3,11 @@ const negotiateRawSqlFilter = require('./column/negotiateRawSqlFilter');
 const strategyToSpan = require('./strategyToSpan');
 const executeQueries = require('./executeQueries');
 
-async function groupBy(table, filter, strategy) {
-	filter = negotiateRawSqlFilter(filter, table);
+async function groupBy(context, table, filter, strategy) {
+	filter = negotiateRawSqlFilter(context, filter, table);
 	if (strategy && strategy.where) {
 		let arg = typeof strategy.where === 'function' ? strategy.where(table) : strategy.where;
-		filter = filter.and(arg);
+		filter = filter.and(context, arg);
 	}
 
 	let span = strategyToSpan(table, strategy);
@@ -15,9 +15,9 @@ async function groupBy(table, filter, strategy) {
 
 	let alias = table._dbName;
 
-	const query = newQuery(table, filter, span, alias);
-	const res = await executeQueries([query]);
-	return decode(span, await res[0]);
+	const query = newQuery(context, table, filter, span, alias);
+	const res = await executeQueries(context, [query]);
+	return decode(context, span, await res[0]);
 }
 
 function newCreateRow(span) {
@@ -40,7 +40,7 @@ function createProto(span) {
 }
 
 
-async function decode(span, rows, keys = rows.length > 0 ? Object.keys(rows[0]) : []) {
+async function decode(context, span, rows, keys = rows.length > 0 ? Object.keys(rows[0]) : []) {
 	const rowsLength = rows.length;
 	const aggregateKeys = Object.keys(span.aggregates);
 
@@ -52,8 +52,8 @@ async function decode(span, rows, keys = rows.length > 0 ? Object.keys(rows[0]) 
 
 		for (let j = 0; j < aggregateKeys.length; j++) {
 			const key = aggregateKeys[j];
-			const parse = span.aggregates[key].column?.decode || Number.parseFloat;
-			outRow[key] =  parse(row[keys[j]]);
+			const parse = span.aggregates[key].column?.decode || ((_context, arg) => Number.parseFloat(arg));
+			outRow[key] =  parse(context, row[keys[j]]);
 		}
 
 		outRows[i] = outRow;

@@ -1,13 +1,11 @@
 var negotiateQueryContext = require('./negotiateQueryContext');
 var decodeDbRow = require('./decodeDbRow');
-var nextDbRowToRow = _nextDbRowToRow;
 
-
-function dbRowToRow(span, dbRow) {
+function dbRowToRow(context, span, dbRow) {
 	var table = span.table;
-	var row = decodeDbRow(span, table, dbRow);
+	var row = decodeDbRow(context, span, table, dbRow);
 	var cache = table._cache;
-	if (!cache.tryGet(row)) {
+	if (!cache.tryGet(context, row)) {
 		var queryContext = span.queryContext;
 		negotiateQueryContext(queryContext, row);
 		Object.defineProperty(row, 'queryContext', {
@@ -17,17 +15,17 @@ function dbRowToRow(span, dbRow) {
 		});
 		row.queryContext = queryContext;
 	}
-	row = cache.tryAdd(row);
+	row = cache.tryAdd(context, row);
 
 	var c = {};
 
 	c.visitOne = function(leg) {
-		nextDbRowToRow(leg.span, dbRow);
+		dbRowToRow(context, leg.span, dbRow);
 		leg.expand(row);
 	};
 
 	c.visitJoin = function(leg) {
-		nextDbRowToRow(leg.span, dbRow);
+		dbRowToRow(context, leg.span, dbRow);
 		leg.expand(row);
 	};
 
@@ -41,11 +39,6 @@ function dbRowToRow(span, dbRow) {
 	}
 
 	return row;
-}
-
-function _nextDbRowToRow(span, dbRow) {
-	nextDbRowToRow = require('./dbRowToRow');
-	nextDbRowToRow(span, dbRow);
 }
 
 module.exports = dbRowToRow;

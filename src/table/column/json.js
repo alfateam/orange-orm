@@ -10,7 +10,8 @@ function _new(column) {
 	column.purify = purify;
 	column.encode = newEncode(column);
 	column.decode = newDecode(column);
-	column.formatOut = formatOut.bind(null, column);
+	column.formatOut = (context, ...rest) => formatOut.apply(null, [context, column, ...rest]);
+
 	column.onChange = onChange;
 	column.toDto = toDto;
 }

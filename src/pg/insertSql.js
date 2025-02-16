@@ -1,9 +1,7 @@
 let lastInsertedSql = require('./lastInsertedSql');
-let getSessionContext = require('../table/getSessionContext');
-const getSessionSingleton = require('../table/getSessionSingleton');
+const quote = require('./quote');
 
-function insertSql(table, row, options) {
-	const quote = getSessionSingleton('quote');
+function insertSql(_context, table, row, options) {
 	let columnNames = [];
 	let regularColumnNames = [];
 	let conflictColumnUpdateSql = '';
@@ -65,9 +63,6 @@ function insertSql(table, row, options) {
 
 
 	function outputInserted() {
-		let context = getSessionContext();
-		if (!context.lastInsertedIsSeparate && context.outputInsertedSql)
-			return context.outputInsertedSql(table) + ' ';
 		return '';
 	}
 }

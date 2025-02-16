@@ -5,16 +5,16 @@ const getSessionSingleton = require('../getSessionSingleton');
 const _quote = require('../quote');
 
 
-function childColumn(column, relations) {
-	const quote = getSessionSingleton('quote');
-	const context = getSessionContext();
-	const outerAlias = 'y' + context.aggregateCount++;
+function childColumn(context, column, relations) {
+	const quote = getSessionSingleton(context, 'quote');
+	const rdb = getSessionContext(context);
+	const outerAlias = 'y' + rdb.aggregateCount++;
 	const outerAliasQuoted = quote(outerAlias);
 	const alias = 'x' + relations.length;
-	const foreignKeys = getForeignKeys(relations[0]);
+	const foreignKeys = getForeignKeys(context, relations[0]);
 	const select = ` LEFT JOIN (SELECT ${foreignKeys},${alias}.${quote(column._dbName)} as prop`;
-	const innerJoin = relations.length > 1 ? newJoin(relations).sql() : '';
-	const onClause = createOnClause(relations[0], outerAlias);
+	const innerJoin = relations.length > 1 ? newJoin(context, relations).sql() : '';
+	const onClause = createOnClause(context, relations[0], outerAlias);
 	const from = ` FROM ${quote(relations.at(-1).childTable._dbName)} ${alias} ${innerJoin}) ${outerAliasQuoted} ON (${onClause})`;
 	const join = select  + from ;
 
@@ -26,13 +26,13 @@ function childColumn(column, relations) {
 	};
 }
 
-function createOnClause(relation, rightAlias) {
+function createOnClause(context, relation, rightAlias) {
 	var c = {};
 	var sql = '';
 	let leftAlias = relation.parentTable._rootAlias || relation.parentTable._dbName;
 
 	c.visitJoin = function(relation) {
-		sql = newJoinCore(relation.childTable,relation.columns,relation.childTable._primaryColumns,leftAlias,rightAlias).sql();
+		sql = newJoinCore(context, relation.childTable,relation.columns,relation.childTable._primaryColumns,leftAlias,rightAlias).sql();
 	};
 
 	c.visitOne = function(relation) {
@@ -47,20 +47,20 @@ function createOnClause(relation, rightAlias) {
 		var parentTable = relation.parentTable;
 		var columns = joinRelation.columns;
 
-		sql = newJoinCore(childTable,parentTable._primaryColumns,columns,leftAlias, rightAlias).sql();
+		sql = newJoinCore(context, childTable,parentTable._primaryColumns,columns,leftAlias, rightAlias).sql();
 	}
 	relation.accept(c);
 	return sql;
 }
 
-function getForeignKeys(relation) {
+function getForeignKeys(context, relation) {
 	let columns;
 	let alias = 'x1';
 	if (relation.joinRelation)
 		columns = relation.joinRelation.columns;
 	else
 		columns = relation.childTable._primaryColumns;
-	return columns.map(x => `${alias}.${_quote(x._dbName)}`).join(',');
+	return columns.map(x => `${alias}.${_quote(context, x._dbName)}`).join(',');
 }
 
 module.exports = childColumn;

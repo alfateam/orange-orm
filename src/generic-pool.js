@@ -1,27 +1,39 @@
 /* eslint-disable @typescript-eslint/no-this-alias */
-
-// @ts-nocheck
-//Taken from https://raw.githubusercontent.com/coopernurse/node-pool/6c98fa9163bbe35b683ffc2b55ac741d02956096/lib/generic-pool.js
-//Version 3 of generic-pool has lots og bugs and node program will never finish.
-//So I copied version 2.5.4 below
+/* @ts-nocheck */
 
 /**
- * @class
- * @private
+ * A helper function to schedule a callback in a cross-platform manner:
+ * - Uses setImmediate if available (Node).
+ * - Else uses queueMicrotask if available (Deno, modern browsers).
+ * - Else falls back to setTimeout(fn, 0).
  */
+function queueTask(fn) {
+	if (typeof setImmediate === 'function') {
+		setImmediate(fn);
+	}
+	else if
+	(typeof queueMicrotask === 'function') {
+		queueMicrotask(fn);
+	} else {
+		setTimeout(fn, 0);
+	}
+}
+
+/**
+   * @class
+   * @private
+   */
 function PriorityQueue(size) {
 	if (!(this instanceof PriorityQueue)) {
-		return new PriorityQueue();
+		return new PriorityQueue(size);
 	}
 
-	this._size = size;
-	this._slots = null;
+	this._size = Math.max(+size | 0, 1);
+	this._slots = [];
 	this._total = null;
 
 	// initialize arrays to hold queue elements
-	size = Math.max(+size | 0, 1);
-	this._slots = [];
-	for (var i = 0; i < size; i += 1) {
+	for (let i = 0; i < this._size; i += 1) {
 		this._slots.push([]);
 	}
 }
@@ -29,7 +41,7 @@ function PriorityQueue(size) {
 PriorityQueue.prototype.size = function size() {
 	if (this._total === null) {
 		this._total = 0;
-		for (var i = 0; i < this._size; i += 1) {
+		for (let i = 0; i < this._size; i += 1) {
 			this._total += this._slots[i].length;
 		}
 	}
@@ -37,30 +49,22 @@ PriorityQueue.prototype.size = function size() {
 };
 
 PriorityQueue.prototype.enqueue = function enqueue(obj, priority) {
-	var priorityOrig;
-
 	// Convert to integer with a default value of 0.
 	priority = priority && +priority | 0 || 0;
-
-	// Clear cache for total.
 	this._total = null;
-	if (priority) {
-		priorityOrig = priority;
-		if (priority < 0 || priority >= this._size) {
-			priority = (this._size - 1);
-			// put obj at the end of the line
-			console.error('invalid priority: ' + priorityOrig + ' must be between 0 and ' + priority);
-		}
+	if (priority < 0 || priority >= this._size) {
+		console.error(
+			'invalid priority: ' + priority + ' must be between 0 and ' + (this._size - 1)
+		);
+		priority = this._size - 1; // put obj at the end of the line
 	}
-
 	this._slots[priority].push(obj);
 };
 
-PriorityQueue.prototype.dequeue = function dequeue(_callback) {
-	var obj = null;
-	// Clear cache for total.
+PriorityQueue.prototype.dequeue = function dequeue() {
+	let obj = null;
 	this._total = null;
-	for (var i = 0, sl = this._slots.length; i < sl; i += 1) {
+	for (let i = 0, sl = this._slots.length; i < sl; i += 1) {
 		if (this._slots[i].length) {
 			obj = this._slots[i].shift();
 			break;
@@ -70,7 +74,7 @@ PriorityQueue.prototype.dequeue = function dequeue(_callback) {
 };
 
 function doWhileAsync(conditionFn, iterateFn, callbackFn) {
-	var next = function() {
+	const next = function() {
 		if (conditionFn()) {
 			iterateFn(next);
 		} else {
@@ -81,57 +85,29 @@ function doWhileAsync(conditionFn, iterateFn, callbackFn) {
 }
 
 /**
- * Generate an Object pool with a specified `factory`.
- *
- * @class
- * @param {Object} factory
- *   Factory to be used for generating and destorying the items.
- * @param {String} factory.name
- *   Name of the factory. Serves only logging purposes.
- * @param {Function} factory.create
- *   Should create the item to be acquired,
- *   and call it's first callback argument with the generated item as it's argument.
- * @param {Function} factory.destroy
- *   Should gently close any resources that the item is using.
- *   Called before the items is destroyed.
- * @param {Function} factory.validate
- *   Should return true if connection is still valid and false
- *   If it should be removed from pool. Called before item is
- *   acquired from pool.
- * @param {Function} factory.validateAsync
- *   Asynchronous validate function. Receives a callback function
- *   as its second argument, that should be called with a single
- *   boolean argument being true if the item is still valid and false
- *   if it should be removed from pool. Called before item is
- *   acquired from pool. Only one of validate/validateAsync may be specified
- * @param {Number} factory.max
- *   Maximum number of items that can exist at the same time.  Default: 1.
- *   Any further acquire requests will be pushed to the waiting list.
- * @param {Number} factory.min
- *   Minimum number of items in pool (including in-use). Default: 0.
- *   When the pool is created, or a resource destroyed, this minimum will
- *   be checked. If the pool resource count is below the minimum, a new
- *   resource will be created and added to the pool.
- * @param {Number} factory.idleTimeoutMillis
- *   Delay in milliseconds after the idle items in the pool will be destroyed.
- *   And idle item is that is not acquired yet. Waiting items doesn't count here.
- * @param {Number} factory.reapIntervalMillis
- *   Cleanup is scheduled in every `factory.reapIntervalMillis` milliseconds.
- * @param {Boolean|Function} factory.log
- *   Whether the pool should log activity. If function is specified,
- *   that will be used instead. The function expects the arguments msg, loglevel
- * @param {Number} factory.priorityRange
- *   The range from 1 to be treated as a valid priority
- * @param {RefreshIdle} factory.refreshIdle
- *   Should idle resources at or below the min threshold be destroyed and recreated every idleTimeoutMillis? Default: true.
- * @param {Bool} [factory.returnToHead=false]
- *   Returns released object to head of available objects list
- */
+   * Generate an Object pool with a specified `factory`.
+   *
+   * @class
+   * @param {Object} factory
+   *   Factory to be used for generating and destroying the items.
+   * @param {String} factory.name
+   * @param {Function} factory.create
+   * @param {Function} factory.destroy
+   * @param {Function} factory.validate
+   * @param {Function} factory.validateAsync
+   * @param {Number} factory.max
+   * @param {Number} factory.min
+   * @param {Number} factory.idleTimeoutMillis
+   * @param {Number} factory.reapIntervalMillis
+   * @param {Boolean|Function} factory.log
+   * @param {Number} factory.priorityRange
+   * @param {Boolean} factory.refreshIdle
+   * @param {Boolean} [factory.returnToHead=false]
+   */
 function Pool(factory) {
 	if (!(this instanceof Pool)) {
 		return new Pool(factory);
 	}
-
 	if (factory.validate && factory.validateAsync) {
 		throw new Error('Only one of validate or validateAsync may be specified');
 	}
@@ -148,7 +124,6 @@ function Pool(factory) {
 
 	factory.max = parseInt(factory.max, 10);
 	factory.min = parseInt(factory.min, 10);
-
 	factory.max = Math.max(isNaN(factory.max) ? 1 : factory.max, 1);
 	factory.min = Math.min(isNaN(factory.min) ? 0 : factory.min, factory.max - 1);
 
@@ -167,12 +142,12 @@ function Pool(factory) {
 }
 
 /**
- * logs to console or user defined log function
- * @private
- * @param {string} str
- * @param {string} level
- */
-Pool.prototype._log = function log(str, level) {
+   * logs to console or user-defined log function
+   * @private
+   * @param {string} str
+   * @param {string} level
+   */
+Pool.prototype._log = function _log(str, level) {
 	if (typeof this._factory.log === 'function') {
 		this._factory.log(str, level);
 	} else if (this._factory.log) {
@@ -181,30 +156,30 @@ Pool.prototype._log = function log(str, level) {
 };
 
 /**
- * Request the client to be destroyed. The factory's destroy handler
- * will also be called.
- *
- * This should be called within an acquire() block as an alternative to release().
- *
- * @param {Object} obj
- *   The acquired item to be destoyed.
- * @param {Function} callback
- *   Optional. Callback invoked after client is destroyed
- */
+   * Request the client to be destroyed. The factory's destroy handler
+   * will also be called.
+   *
+   * This should be called within an acquire() block as an alternative to release().
+   *
+   * @param {Object} obj
+   *   The acquired item to be destroyed.
+   * @param {Function} [cb]
+   *   Optional. Callback invoked after client is destroyed
+   */
 Pool.prototype.destroy = function destroy(obj, cb) {
 	this._count -= 1;
 	if (this._count < 0) this._count = 0;
-	this._availableObjects = this._availableObjects.filter(function(objWithTimeout) {
-		return (objWithTimeout.obj !== obj);
-	});
 
-	this._inUseObjects = this._inUseObjects.filter(function(objInUse) {
-		return (objInUse !== obj);
-	});
+	this._availableObjects = this._availableObjects.filter(
+		(objWithTimeout) => objWithTimeout.obj !== obj
+	);
+	this._inUseObjects = this._inUseObjects.filter(
+		(objInUse) => objInUse !== obj
+	);
 
 	this._factory.destroy(obj, cb);
 
-	// keep compatibily with old interface
+	// keep compatibility with old interface
 	if (this._factory.destroy.length === 1 && cb && typeof cb === 'function') {
 		cb();
 	}
@@ -213,40 +188,41 @@ Pool.prototype.destroy = function destroy(obj, cb) {
 };
 
 /**
- * Checks and removes the available (idle) clients that have timed out.
- * @private
- */
-Pool.prototype._removeIdle = function removeIdle() {
-	var toRemove = [];
-	var now = new Date().getTime();
-	var i;
-	var al = this._availableObjects.length;
-	var refreshIdle = this._factory.refreshIdle;
-	var maxRemovable = this._count - this._factory.min;
-	var timeout;
+   * Checks and removes the available (idle) clients that have timed out.
+   * @private
+   */
+Pool.prototype._removeIdle = function _removeIdle() {
+	const now = new Date().getTime();
+	const refreshIdle = this._factory.refreshIdle;
+	const maxRemovable = this._count - this._factory.min;
+	const toRemove = [];
 
 	this._removeIdleScheduled = false;
 
-	// Go through the available (idle) items,
-	// check if they have timed out
-	for (i = 0; i < al && (refreshIdle || (maxRemovable > toRemove.length)); i++) {
-		timeout = this._availableObjects[i].timeout;
-		if (now >= timeout) {
-			// Client timed out, so destroy it.
-			this._log('removeIdle() destroying obj - now:' + now + ' timeout:' + timeout, 'verbose');
-			toRemove.push(this._availableObjects[i].obj);
+	for (let i = 0; i < this._availableObjects.length; i++) {
+		const objWithTimeout = this._availableObjects[i];
+		if (
+			now >= objWithTimeout.timeout &&
+			(refreshIdle || toRemove.length < maxRemovable)
+		) {
+			this._log(
+				'removeIdle() destroying obj - now:' +
+				now +
+				' timeout:' +
+				objWithTimeout.timeout,
+				'verbose'
+			);
+			toRemove.push(objWithTimeout.obj);
 		}
 	}
 
-	toRemove.forEach(this.destroy, this);
+	toRemove.forEach((obj) => this.destroy(obj));
 
-	// NOTE: we are re-calcing this value because it may have changed
-	// after destroying items above
-	// Replace the available items with the ones to keep.
-	al = this._availableObjects.length;
-
-	if (al > 0) {
-		this._log('this._availableObjects.length=' + al, 'verbose');
+	if (this._availableObjects.length > 0) {
+		this._log(
+			'this._availableObjects.length=' + this._availableObjects.length,
+			'verbose'
+		);
 		this._scheduleRemoveIdle();
 	} else {
 		this._log('removeIdle() all objects removed', 'verbose');
@@ -254,60 +230,61 @@ Pool.prototype._removeIdle = function removeIdle() {
 };
 
 /**
- * Schedule removal of idle items in the pool.
- *
- * More schedules cannot run concurrently.
- */
-Pool.prototype._scheduleRemoveIdle = function scheduleRemoveIdle() {
-	var self = this;
+   * Schedule removal of idle items in the pool.
+   *
+   * More schedules cannot run concurrently.
+   */
+Pool.prototype._scheduleRemoveIdle = function _scheduleRemoveIdle() {
 	if (!this._removeIdleScheduled) {
 		this._removeIdleScheduled = true;
-		this._removeIdleTimer = setTimeout(function() {
-			self._removeIdle();
+		this._removeIdleTimer = setTimeout(() => {
+			this._removeIdle();
 		}, this._factory.reapInterval);
 	}
 };
 
 /**
- * Try to get a new client to work, and clean up pool unused (idle) items.
- *
- *  - If there are available clients waiting, shift the first one out (LIFO),
- *    and call its callback.
- *  - If there are no waiting clients, try to create one if it won't exceed
- *    the maximum number of clients.
- *  - If creating a new client would exceed the maximum, add the client to
- *    the wait list.
- * @private
- */
-Pool.prototype._dispense = function dispense() {
-	var self = this;
-	var objWithTimeout = null;
-	var clientCb = null;
-	var waitingCount = this._waitingClients.size();
-
-	this._log('dispense() clients=' + waitingCount + ' available=' + this._availableObjects.length, 'info');
+   * Try to get a new client to work, and clean up pool unused (idle) items.
+   *
+   *  - If there are available clients waiting, shift the first one out,
+   *    and call its callback.
+   *  - If there are no waiting clients, try to create one if it won't exceed
+   *    the maximum number of clients.
+   *  - If creating a new client would exceed the maximum, add the client to
+   *    the wait list.
+   * @private
+   */
+Pool.prototype._dispense = function _dispense() {
+	const waitingCount = this._waitingClients.size();
+	this._log(
+		'dispense() clients=' +
+		waitingCount +
+		' available=' +
+		this._availableObjects.length,
+		'info'
+	);
 
 	if (waitingCount < 1) {
 		return;
 	}
 
 	if (this._factory.validateAsync) {
-		doWhileAsync(function() {
-			return self._availableObjects.length > 0;
-		},
-		this._createAsyncValidator(),
-		function() {
-			if (self._count < self._factory.max) {
-				self._createResource();
+		doWhileAsync(
+			() => this._availableObjects.length > 0,
+			this._createAsyncValidator(),
+			() => {
+				if (this._count < this._factory.max) {
+					this._createResource();
+				}
 			}
-		});
-
+		);
 		return;
 	}
 
 	while (this._availableObjects.length > 0) {
 		this._log('dispense() - reusing obj', 'verbose');
-		objWithTimeout = this._availableObjects[0];
+		const objWithTimeout = this._availableObjects[0];
+
 		if (!this._factory.validate(objWithTimeout.obj)) {
 			this.destroy(objWithTimeout.obj);
 			continue;
@@ -315,7 +292,7 @@ Pool.prototype._dispense = function dispense() {
 
 		this._availableObjects.shift();
 		this._inUseObjects.push(objWithTimeout.obj);
-		clientCb = this._waitingClients.dequeue();
+		const clientCb = this._waitingClients.dequeue();
 		return clientCb(null, objWithTimeout.obj);
 	}
 
@@ -325,203 +302,193 @@ Pool.prototype._dispense = function dispense() {
 };
 
 Pool.prototype._createAsyncValidator = function _createAsyncValidator() {
-	var self = this;
-	return function asyncValidate(next) {
-		self._log('dispense() - reusing obj', 'verbose');
+	return (next) => {
+		this._log('dispense() - reusing obj', 'verbose');
+		const objWithTimeout = this._availableObjects.shift();
+		this._asyncTestObjects.push(objWithTimeout);
 
-		var objWithTimeout = self._availableObjects.shift();
-		self._asyncTestObjects.push(objWithTimeout);
-
-		self._factory.validateAsync(objWithTimeout.obj, function(valid) {
-			var pos = self._asyncTestObjects.indexOf(objWithTimeout);
-			self._asyncTestObjects.splice(pos, 1);
+		this._factory.validateAsync(objWithTimeout.obj, (valid) => {
+			const pos = this._asyncTestObjects.indexOf(objWithTimeout);
+			this._asyncTestObjects.splice(pos, 1);
 
 			if (!valid) {
-				self.destroy(objWithTimeout.obj);
+				this.destroy(objWithTimeout.obj);
 				return next();
 			}
-			if (self._waitingClients.size() < 1) {
-				// there is no longer anyone waiting for a resource
-				self._addResourceToAvailableObjects(objWithTimeout.obj);
+			if (this._waitingClients.size() < 1) {
+				// no longer anyone waiting for a resource
+				this._addResourceToAvailableObjects(objWithTimeout.obj);
 				return;
 			}
 
-			self._inUseObjects.push(objWithTimeout.obj);
-			var clientCb = self._waitingClients.dequeue();
+			this._inUseObjects.push(objWithTimeout.obj);
+			const clientCb = this._waitingClients.dequeue();
 			clientCb(null, objWithTimeout.obj);
 		});
 	};
 };
 
 /**
- * @private
- */
+   * @private
+   */
 Pool.prototype._createResource = function _createResource() {
 	this._count += 1;
-	this._log('createResource() - creating obj - count=' + this._count + ' min=' + this._factory.min + ' max=' + this._factory.max, 'verbose');
-	var self = this;
-	this._factory.create(function() {
-		var err, obj;
-		var clientCb = self._waitingClients.dequeue();
-		if (arguments.length > 1) {
-			err = arguments[0];
-			obj = arguments[1];
+	this._log(
+		'createResource() - creating obj - count=' +
+		this._count +
+		' min=' +
+		this._factory.min +
+		' max=' +
+		this._factory.max,
+		'verbose'
+	);
+
+	this._factory.create((...args) => {
+		let err, obj;
+		if (args.length > 1) {
+			[err, obj] = args;
 		} else {
-			err = (arguments[0] instanceof Error) ? arguments[0] : null;
-			obj = (arguments[0] instanceof Error) ? null : arguments[0];
+			err = args[0] instanceof Error ? args[0] : null;
+			obj = args[0] instanceof Error ? null : args[0];
 		}
+
+		const clientCb = this._waitingClients.dequeue();
+
 		if (err) {
-			self._count -= 1;
-			if (self._count < 0) self._count = 0;
+			this._count -= 1;
+			if (this._count < 0) this._count = 0;
 			if (clientCb) {
 				clientCb(err, obj);
 			}
-			process.nextTick(function() {
-				self._dispense();
+			// queueTask to simulate process.nextTick
+			queueTask(() => {
+				this._dispense();
 			});
 		} else {
-			self._inUseObjects.push(obj);
+			this._inUseObjects.push(obj);
 			if (clientCb) {
-				clientCb(err, obj);
+				clientCb(null, obj);
 			} else {
-				self._addResourceToAvailableObjects(obj);
+				this._addResourceToAvailableObjects(obj);
 			}
 		}
 	});
 };
 
 Pool.prototype._addResourceToAvailableObjects = function(obj) {
-	var objWithTimeout = {
-		obj: obj,
-		timeout: (new Date().getTime() + this._factory.idleTimeoutMillis)
+	const objWithTimeout = {
+		obj,
+		timeout: new Date().getTime() + this._factory.idleTimeoutMillis,
 	};
-
 	if (this._factory.returnToHead) {
-		this._availableObjects.splice(0, 0, objWithTimeout);
+		this._availableObjects.unshift(objWithTimeout);
 	} else {
 		this._availableObjects.push(objWithTimeout);
 	}
-
 	this._dispense();
 	this._scheduleRemoveIdle();
 };
 
 /**
- * @private
- */
+   * @private
+   */
 Pool.prototype._ensureMinimum = function _ensureMinimum() {
-	var i, diff;
-	if (!this._draining && (this._count < this._factory.min)) {
-		diff = this._factory.min - this._count;
-		for (i = 0; i < diff; i++) {
+	if (!this._draining && this._count < this._factory.min) {
+		const diff = this._factory.min - this._count;
+		for (let i = 0; i < diff; i++) {
 			this._createResource();
 		}
 	}
 };
 
 /**
- * Request a new client. The callback will be called,
- * when a new client will be availabe, passing the client to it.
- *
- * @param {Function} callback
- *   Callback function to be called after the acquire is successful.
- *   The function will receive the acquired item as the first parameter.
- *
- * @param {Number} priority
- *   Optional.  Integer between 0 and (priorityRange - 1).  Specifies the priority
- *   of the caller if there are no available resources.  Lower numbers mean higher
- *   priority.
- *
- * @returns {boolean} `true` if the pool is not fully utilized, `false` otherwise.
- */
+   * Request a new client. The callback will be called
+   * when a new client is available.
+   *
+   * @param {Function} callback
+   * @param {Number} [priority]
+   * @returns {Boolean} true if the pool is not fully utilized, false otherwise
+   */
 Pool.prototype.acquire = function acquire(callback, priority) {
 	if (this._draining) {
 		throw new Error('pool is draining and cannot accept work');
 	}
-	if (process.domain) {
-		callback = process.domain.bind(callback);
-	}
 	this._waitingClients.enqueue(callback, priority);
 	this._dispense();
-	return (this._count < this._factory.max);
+	return this._count < this._factory.max;
 };
 
 /**
- * @deprecated
- */
+   * @deprecated
+   */
 Pool.prototype.borrow = function borrow(callback, priority) {
 	this._log('borrow() is deprecated. use acquire() instead', 'warn');
-	this.acquire(callback, priority);
+	return this.acquire(callback, priority);
 };
 
 /**
- * Return the client to the pool, in case it is no longer required.
- *
- * @param {Object} obj
- *   The acquired object to be put back to the pool.
- */
+   * Return the client to the pool, indicating it is no longer needed.
+   *
+   * @param {Object} obj
+   */
 Pool.prototype.release = function release(obj) {
-	// check to see if this object has already been released (i.e., is back in the pool of this._availableObjects)
-	if (this._availableObjects.some(function(objWithTimeout) {
-		return (objWithTimeout.obj === obj);
-	})) {
-		this._log('release called twice for the same resource: ' + (new Error().stack), 'error');
+	// Check whether this object has already been released
+	const alreadyReleased = this._availableObjects.some(o => o.obj === obj);
+	if (alreadyReleased) {
+		this._log(
+			'release called twice for the same resource: ' + new Error().stack,
+			'error'
+		);
 		return;
 	}
 
-	// check to see if this object exists in the `in use` list and remove it
-	var index = this._inUseObjects.indexOf(obj);
+	// remove from in-use list
+	const index = this._inUseObjects.indexOf(obj);
 	if (index < 0) {
-		this._log('attempt to release an invalid resource: ' + (new Error().stack), 'error');
+		this._log(
+			'attempt to release an invalid resource: ' + new Error().stack,
+			'error'
+		);
 		return;
 	}
 
-	// this._log("return to pool")
 	this._inUseObjects.splice(index, 1);
 	this._addResourceToAvailableObjects(obj);
 };
 
 /**
- * @deprecated
- */
+   * @deprecated
+   */
 Pool.prototype.returnToPool = function returnToPool(obj) {
 	this._log('returnToPool() is deprecated. use release() instead', 'warn');
 	this.release(obj);
 };
 
 function invoke(cb) {
-	if (typeof setImmediate === 'function') {
-		setImmediate(cb);
-	} else {
-		setTimeout(cb, 0);
-	}
+	queueTask(cb);
 }
 
 /**
- * Disallow any new requests and let the request backlog dissapate.
- *
- * @param {Function} callback
- *   Optional. Callback invoked when all work is done and all clients have been
- *   released.
- */
+   * Disallow any new requests and let the request backlog dissipate.
+   *
+   * @param {Function} [callback]
+   *   Callback invoked when all work is done and all clients have been released.
+   */
 Pool.prototype.drain = function drain(callback) {
 	this._log('draining', 'info');
-
-	// disable the ability to put more work on the queue.
 	this._draining = true;
 
-	var self = this;
-	var check = function() {
-		if (self._waitingClients.size() > 0) {
-			// wait until all client requests have been satisfied.
+	const check = () => {
+		if (this._waitingClients.size() > 0) {
+			// wait until all client requests have been satisfied
 			return setTimeout(check, 100);
 		}
-		if (self._asyncTestObjects.length > 0) {
-			// wait until any async tests have finished
+		if (this._asyncTestObjects.length > 0) {
+			// wait until async validations are done
 			return setTimeout(check, 100);
 		}
-		if (self._availableObjects.length !== self._count) {
-			// wait until in use object have been released.
+		if (this._availableObjects.length !== this._count) {
+			// wait until in-use objects have been released
 			return setTimeout(check, 100);
 		}
 		if (callback) {
@@ -532,25 +499,22 @@ Pool.prototype.drain = function drain(callback) {
 };
 
 /**
- * Forcibly destroys all clients regardless of timeout.  Intended to be
- * invoked as part of a drain.  Does not prevent the creation of new
- * clients as a result of subsequent calls to acquire.
- *
- * Note that if factory.min > 0, the pool will destroy all idle resources
- * in the pool, but replace them with newly created resources up to the
- * specified factory.min value.  If this is not desired, set factory.min
- * to zero before calling destroyAllNow()
- *
- * @param {Function} callback
- *   Optional. Callback invoked after all existing clients are destroyed.
- */
+   * Forcibly destroys all clients regardless of timeout.
+   * Does not prevent creation of new clients from subsequent calls to acquire.
+   *
+   * If factory.min > 0, the pool will destroy all idle resources
+   * but replace them with newly created resources up to factory.min.
+   * If this is not desired, set factory.min to zero before calling.
+   *
+   * @param {Function} [callback]
+   *   Invoked after all existing clients are destroyed.
+   */
 Pool.prototype.destroyAllNow = function destroyAllNow(callback) {
 	this._log('force destroying all objects', 'info');
-	var willDie = this._availableObjects;
+	const willDie = this._availableObjects;
 	this._availableObjects = [];
-	var todo = willDie.length;
-	var done = 0;
-	var obj = willDie.shift();
+	const todo = willDie.length;
+	let done = 0;
 
 	this._removeIdleScheduled = false;
 	clearTimeout(this._removeIdleTimer);
@@ -559,37 +523,30 @@ Pool.prototype.destroyAllNow = function destroyAllNow(callback) {
 		invoke(callback);
 		return;
 	}
-	while (obj !== null && obj !== undefined) {
-		this.destroy(obj.obj, function() {
-			++done;
+
+	while (willDie.length > 0) {
+		const { obj } = willDie.shift();
+		this.destroy(obj, () => {
+			done += 1;
 			if (done === todo && callback) {
 				invoke(callback);
-				return;
 			}
 		});
-		obj = willDie.shift();
 	}
 };
 
 /**
- * Decorates a function to use a acquired client from the object pool when called.
- *
- * @param {Function} decorated
- *   The decorated function, accepting a client as the first argument and
- *   (optionally) a callback as the final argument.
- *
- * @param {Number} priority
- *   Optional.  Integer between 0 and (priorityRange - 1).  Specifies the priority
- *   of the caller if there are no available resources.  Lower numbers mean higher
- *   priority.
- */
+   * Decorates a function to use an acquired client from the pool when called.
+   *
+   * @param {Function} decorated
+   * @param {Number} [priority]
+   */
 Pool.prototype.pooled = function pooled(decorated, priority) {
-	var self = this;
-	return function() {
-		var callerArgs = arguments;
-		var callerCallback = callerArgs[callerArgs.length - 1];
-		var callerHasCallback = typeof callerCallback === 'function';
-		self.acquire(function(err, client) {
+	return (...args) => {
+		const callerCallback = args[args.length - 1];
+		const callerHasCallback = typeof callerCallback === 'function';
+
+		this.acquire((err, client) => {
 			if (err) {
 				if (callerHasCallback) {
 					callerCallback(err);
@@ -597,15 +554,19 @@ Pool.prototype.pooled = function pooled(decorated, priority) {
 				return;
 			}
 
-			var args = [client].concat(Array.prototype.slice.call(callerArgs, 0, callerHasCallback ? -1 : undefined));
-			args.push(function() {
-				self.release(client);
+			// We pass everything except the user's final callback
+			const invokeArgs = [client].concat(
+				args.slice(0, callerHasCallback ? -1 : undefined)
+			);
+			// then the final callback after we release the resource
+			invokeArgs.push((...cbArgs) => {
+				this.release(client);
 				if (callerHasCallback) {
-					callerCallback.apply(null, arguments);
+					callerCallback(...cbArgs);
 				}
 			});
 
-			decorated.apply(null, args);
+			decorated(...invokeArgs);
 		}, priority);
 	};
 };
@@ -638,4 +599,4 @@ Pool.prototype.getMinPoolSize = function getMinPoolSize() {
 	return this._factory.min;
 };
 
-exports.Pool = Pool;
+module.exports = { Pool };

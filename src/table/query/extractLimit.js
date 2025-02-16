@@ -1,7 +1,7 @@
 var getSessionContext = require('../getSessionContext');
 
-function extractLimit(span) {
-	let limit = getSessionContext().limit;
+function extractLimit(context, span) {
+	let limit = getSessionContext(context).limit;
 	if (limit)
 		return limit(span);
 	else

@@ -4,8 +4,8 @@ var dateToISOString = require('../../../dateToISOString');
 function _new(column) {
 	var decodeCore = newDecodeCore(column);
 
-	return function(value) {
-		value = decodeCore(value);
+	return function(context, value) {
+		value = decodeCore(context, value);
 		if (value === null)
 			return value;
 		else if (typeof value === 'string')

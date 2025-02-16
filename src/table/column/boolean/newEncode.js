@@ -4,34 +4,34 @@ var getSessionSingleton = require('../../getSessionSingleton');
 
 function _new(column) {
 
-	function encode(value) {
+	function encode(context, value) {
 		value = purify(value);
 		if (value === null) {
 			if (column.dbNull === null)
 				return newParam('null');
 			return newParam('\'' + column.dbNull + '\'');
 		}
-		var encodeCore = getSessionSingleton('encodeBoolean');
+		var encodeCore = getSessionSingleton(context, 'encodeBoolean');
 
 
 		return newParam('?', [encodeCore(value)]);
 	}
 
-	encode.unsafe = function(value) {
+	encode.unsafe = function(context, value) {
 		value = purify(value);
 		if (value === null) {
 			if (column.dbNull === null)
 				return 'null';
 			return '\'' + column.dbNull + '\'';
 		}
-		var encodeCore = getSessionSingleton('encodeBoolean');
+		var encodeCore = getSessionSingleton(context, 'encodeBoolean');
 
 
 		return encodeCore(value);
 	};
 
-	encode.direct = function(value) {
-		var encodeCore = getSessionSingleton('encodeBoolean');
+	encode.direct = function(context, value) {
+		var encodeCore = getSessionSingleton(context, 'encodeBoolean');
 
 		return encodeCore(value);
 	};

@@ -1,10 +1,10 @@
-function newGetRelated(parent, relation) {
+function newGetRelated(context, parent, relation) {
 	function getRelated() {
 		if (getRelated.expanded)
 			return relation.getFromCache(parent);
 		if (parent.queryContext)
-			return relation.getRelatives(parent).then(onRelatives);
-		return relation.getFromDb(parent).then(onFromDb);
+			return relation.getRelatives(context, parent).then(onRelatives);
+		return relation.getFromDb(context, parent).then(onFromDb);
 
 		function onFromDb(rows) {
 			getRelated.expanded = true;

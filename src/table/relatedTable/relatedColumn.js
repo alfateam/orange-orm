@@ -14,24 +14,24 @@ function newRelatedColumn(column, relations, isShallow, depth) {
 			c[propName] = wrapFilter(prop);
 	}
 
-	c.groupSum = aggregateGroup.bind(null, 'sum', column, relations);
-	c.groupAvg = aggregateGroup.bind(null, 'avg', column, relations);
-	c.groupMin = aggregateGroup.bind(null, 'min', column, relations);
-	c.groupMax = aggregateGroup.bind(null, 'max', column, relations);
-	c.groupCount = aggregateGroup.bind(null, 'count', column, relations, false);
-	c.sum = aggregate.bind(null, 'sum', column, relations);
-	c.avg = aggregate.bind(null, 'avg', column, relations);
-	c.min = aggregate.bind(null, 'min', column, relations);
-	c.max = aggregate.bind(null, 'max', column, relations);
-	c.count = aggregate.bind(null, 'count', column, relations, false);
-	c.self = childColumn.bind(null, column, relations);
+	c.groupSum = (context, ...rest) => aggregateGroup.apply(null, [context, 'sum', column, relations, ...rest]);
+	c.groupAvg = (context, ...rest) => aggregateGroup.apply(null, [context, 'avg', column, relations, ...rest]);
+	c.groupMin = (context, ...rest) => aggregateGroup.apply(null, [context, 'min', column, relations, ...rest]);
+	c.groupMax = (context, ...rest) => aggregateGroup.apply(null, [context, 'max', column, relations, ...rest]);
+	c.groupCount = (context, ...rest) => aggregateGroup.apply(null, [context, 'count', column, relations, false, ...rest]);
+	c.sum = (context, ...rest) => aggregate.apply(null, [context, 'sum', column, relations, ...rest]);
+	c.avg = (context, ...rest) => aggregate.apply(null, [context, 'avg', column, relations, ...rest]);
+	c.min = (context, ...rest) => aggregate.apply(null, [context, 'min', column, relations, ...rest]);
+	c.max = (context, ...rest) => aggregate.apply(null, [context, 'max', column, relations, ...rest]);
+	c.count = (context, ...rest) => aggregate.apply(null, [context, 'count', column, relations, false, ...rest]);
+	c.self = (context, ...rest) => childColumn.apply(null, [context, column, relations, ...rest]);
 
 	return c;
 
 	function wrapFilter(filter) {
 		return runFilter;
 
-		function runFilter() {
+		function runFilter(context) {
 			var args = [];
 			for (var i = 0; i < arguments.length; i++) {
 				args.push(arguments[i]);
@@ -40,7 +40,7 @@ function newRelatedColumn(column, relations, isShallow, depth) {
 			var shallowFilter = filter.apply(null, args);
 			if (isShallow)
 				return shallowFilter;
-			return newSubFilter(relations, shallowFilter, depth);
+			return newSubFilter(context, relations, shallowFilter, depth);
 		}
 	}
 

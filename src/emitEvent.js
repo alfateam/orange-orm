@@ -6,12 +6,14 @@ function emitEvent() {
 		var result = [];
 		for (var i = 0; i < copy.length; i++) {
 			var callback = copy[i];
-			result.push(callback.apply(null,arguments));
+			result.push(callback.apply(null, arguments));
 		}
 		return result;
 	};
 
 	emit.add = function(callback) {
+		if (!callback)
+			throw new Error('missing callback');
 		callbacks.push(callback);
 	};
 
@@ -22,15 +24,15 @@ function emitEvent() {
 
 	emit.remove = function(callback) {
 		for (var i = 0; i < callbacks.length; i++) {
-			if(callbacks[i] === callback){
-				callbacks.splice(i,1);
+			if (callbacks[i] === callback) {
+				callbacks.splice(i, 1);
 				return;
 			}
 		}
 	};
 
 	emit.tryRemove = function(callback) {
-		if(callback)
+		if (callback)
 			emit.remove(callback);
 	};
 

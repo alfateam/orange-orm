@@ -1,17 +1,17 @@
-var pools = require('../pools');
-var promise = require('../table/promise');
-var end = require('./pool/end');
-var newPgPool = require('./pool/newPgPool');
-var newId = require('../newId');
+const promisify = require('../promisify');
+const pools = require('../pools');
+const end = require('./pool/end');
+const newPgPool = require('./pool/newPgPool');
+const newId = require('../newId');
 
 function newPool(connectionString, poolOptions) {
-	var pool = newPgPool(connectionString, poolOptions);
-	var id = newId();
-	var boundEnd = end.bind(null, pool, id);
-	var c = {};
+	let pool = newPgPool(connectionString, poolOptions);
+	let id = newId();
+	let boundEnd = end.bind(null, pool, id);
+	let c = {};
 
 	c.connect = pool.connect;
-	c.end = promise.denodeify(boundEnd);
+	c.end = promisify(boundEnd);
 	pools[id] = c;
 	return c;
 }

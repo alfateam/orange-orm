@@ -4,14 +4,14 @@ let newColumnList = require('../../newObject');
 var createPatch = require('../../client/createPatch');
 let createDto = require('../resultToRows/toDto/createDto');
 
-function newUpdateCommand(table, column, row) {
-	return new UpdateCommand(table, column, row);
+function newUpdateCommand(context, table, column, row) {
+	return new UpdateCommand(context, table, column, row);
 }
 
-function UpdateCommand(table, column, row) {
+function UpdateCommand(context, table, column, row) {
 	this._table = table;
 	this._row = row;
-	this.__getCoreCommand = newImmutable(newUpdateCommandCore);
+	this.__getCoreCommand = newImmutable(newUpdateCommandCore.bind(null, context));
 	this._columnList = newColumnList();
 	this._columnList[column.alias] = column;
 	this.onFieldChanged = this.onFieldChanged.bind(this);

@@ -4,10 +4,6 @@ let _begin = require('../table/begin');
 let commit = require('../table/commit');
 let rollback = require('../table/rollback');
 let newPool = require('./newPool');
-let useHook = require('../useHook');
-let promise = require('promise/domains');
-let versionArray = process.version.replace('v', '').split('.');
-let major = parseInt(versionArray[0]);
 let express = require('../hostExpress');
 let hostLocal = require('../hostLocal');
 let doQuery = require('../query');
@@ -34,15 +30,12 @@ function newDatabase(connectionString, poolOptions) {
 
 		if (fn)
 			return domain.run(runInTransaction);
-		else if ((major >= 12) && useHook()) {
-			domain.exitContext = true;
-			return domain.start().then(run);
-		}
 		else
 			return domain.run(run);
 
+
 		function begin() {
-			return _begin(options?.readonly);
+			return _begin(domain, options);
 		}
 
 		async function runInTransaction() {
@@ -50,68 +43,64 @@ function newDatabase(connectionString, poolOptions) {
 			let transaction = newTransaction(domain, pool, options);
 			await new Promise(transaction)
 				.then(begin)
-				.then(fn)
+				.then(() => fn(domain))
 				.then((res) => result = res)
-				.then(c.commit)
-				.then(null, c.rollback);
+				.then(() => commit(domain))
+				.then(null, (e) => rollback(domain, e));
 			return result;
+
 		}
 
 		function run() {
 			let p;
 			let transaction = newTransaction(domain, pool, options);
-			if (useHook())
-				p = new Promise(transaction);
-			else
-				p = new promise(transaction);
+			p = new Promise(transaction);
 
 			return p.then(begin);
 		}
 
 	};
 
-	c.createTransaction = function() {
+	c.createTransaction = function(options) {
 		let domain = createDomain();
 		let transaction = newTransaction(domain, pool);
-		let p = domain.run(() => new Promise(transaction).then(_begin));
+		let p = domain.run(() => new Promise(transaction).then(begin));
 
 		function run(fn) {
-			return p.then(domain.run.bind(domain, fn));
+			return p.then(() => fn(domain));
 		}
+
+		function begin() {
+			return _begin(domain, options);
+		}
+
+		run.rollback = rollback.bind(null, domain);
+		run.commit = commit.bind(null, domain);
+
 		return run;
+
 	};
 
-	c.bindTransaction = function() {
-		// @ts-ignore
-		var domain = process.domain;
-		let p = domain.run(() => true);
 
-		function run(fn) {
-			return p.then(domain.run.bind(domain, fn));
-		}
-		return run;
-	};
 
 	c.query = function(query) {
 		let domain = createDomain();
 		let transaction = newTransaction(domain, pool);
 		let p = domain.run(() => new Promise(transaction)
-			.then(() => setSessionSingleton('changes', []))
-			.then(() => doQuery(query).then(onResult, onError)));
+			.then(() => setSessionSingleton(domain, 'changes', []))
+			.then(() => doQuery(domain, query).then(onResult, onError)));
 		return p;
 
 		function onResult(result) {
-			releaseDbClient();
+			releaseDbClient(domain);
 			return result;
 		}
 
 		function onError(e) {
-			releaseDbClient();
+			releaseDbClient(domain);
 			throw e;
 		}
 	};
-
-
 
 	c.rollback = rollback;
 	c.commit = commit;

@@ -1,11 +1,11 @@
-function primaryKeyFilter(table) {
+function primaryKeyFilter(context, table) {
 	var primaryColumns = table._primaryColumns;
-	var key = arguments[1];
-	var filter = primaryColumns[0].equal(key);
-	for (var i = 1; i < primaryColumns.length; i++) {
+	var key = arguments[2];
+	var filter = primaryColumns[0].equal(context, key);
+	for (var i = 2; i < primaryColumns.length; i++) {
 		key = arguments[i+1];
-		var colFilter = primaryColumns[i].equal(key);
-		filter = filter.and(colFilter);
+		var colFilter = primaryColumns[i].equal(context, key);
+		filter = filter.and(context, colFilter);
 	}
 	return filter;
 }

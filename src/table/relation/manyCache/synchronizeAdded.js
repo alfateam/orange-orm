@@ -1,8 +1,8 @@
 var extractParentKey = require('./extractParentKey');
 
-function synchronizeAdded(action, joinRelation) {
+function synchronizeAdded(context, action, joinRelation) {
 	var cache = joinRelation.parentTable._cache;
-	cache.subscribeAdded(onAdded);
+	cache.subscribeAdded(context, onAdded);
 
 	function onAdded(child) {
 		var parent = extractParentKey(joinRelation, child);

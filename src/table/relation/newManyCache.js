@@ -9,46 +9,54 @@ var setSessionSingleton = require('../setSessionSingleton');
 
 function newManyCache(joinRelation) {
 	var c = {};
-	var key = newId();
+	var key;
 
-	c.tryAdd = function(parent, child) {
-		c.getInnerCache().tryAdd(parent, child);
-		synchronizeChanged(c, joinRelation, parent, child);
+	c.tryAdd = function(context, parent, child) {
+		c.getInnerCache(context).tryAdd(parent, child);
+		synchronizeChanged(context, c, joinRelation, parent, child);
 	};
 
-	c.tryRemove = function(parent, child) {
-		c.getInnerCache().tryRemove(parent, child);
+	c.tryRemove = function(context, parent, child) {
+		c.getInnerCache(context).tryRemove(parent, child);
 	};
 
-	c.tryGet = function(parentRow) {
-		return c.getInnerCache().tryGet(parentRow);
+	c.tryGet = function(context, parentRow) {
+		return c.getInnerCache(context).tryGet(parentRow);
 	};
 
-	c.getInnerCache = function() {
-		var cache = getSessionSingleton(key);
+	c.getInnerCache = function(context) {
+		const theKey = negotiateKey();
+		var cache = getSessionSingleton(context, theKey);
 		if (!cache) {
 			cache = newCacheCore(joinRelation);
-			setSessionSingleton(key, cache);
-			fillCache();
-			synchronizeAdded(c.tryAdd, joinRelation);
-			synchronizeRemoved(c.tryRemove, joinRelation);
+			setSessionSingleton(context, theKey, cache);
+			fillCache(context);
+			synchronizeAdded(context, c.tryAdd.bind(null, context), joinRelation);
+			synchronizeRemoved(context, c.tryRemove.bind(null, context), joinRelation);
 		}
 		return cache;
 	};
 
 
-	function fillCache() {
+	function fillCache(context) {
 		var childTable = joinRelation.parentTable;
 		var childCache = childTable._cache;
-		var children = childCache.getAll();
+		var children = childCache.getAll(context);
 		children.forEach(addToCache);
 
 		function addToCache(child) {
 			var parent = extractParentKey(joinRelation, child);
-			c.tryAdd(parent, child);
+			c.tryAdd(context, parent, child);
 		}
 	}
 
+	function negotiateKey() {
+		if (key)
+			return key;
+		key = newId();
+		return key;
+
+	}
 
 
 	return c;

@@ -1,7 +1,7 @@
 var newDiscriminatorSqlCore = require('../newDiscriminatorSql');
 
-function newDiscriminatorSql(table, alias) {
-	var result = newDiscriminatorSqlCore(table,alias);
+function newDiscriminatorSql(context, table, alias) {
+	var result = newDiscriminatorSqlCore(context,table,alias);
 	if (result)
 		return ' AND' + result;
 	return result;

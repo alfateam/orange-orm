@@ -8,8 +8,9 @@ const insertSql = require('./insertSql');
 const insert = require('./insert');
 const formatDateOut = require('./formatDateOut');
 const formatDateIn = require('./formatDateIn');
+const quote = require('./quote');
 
-function newResolveTransaction(domain, pool, { readonly } = {}) {
+function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 	var rdb = {poolFactory: pool};
 	if (!pool.connect) {
 		pool = pool();
@@ -35,7 +36,7 @@ function newResolveTransaction(domain, pool, { readonly } = {}) {
 		caller.visitSqlite();
 	};
 	rdb.aggregateCount = 0;
-	rdb.quote = (name) => `"${name}"`;
+	rdb.quote = quote;
 
 	if (readonly) {
 		rdb.dbClient = {

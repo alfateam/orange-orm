@@ -1,3 +1,3 @@
 var endsWithCore = require('./endsWithCore');
 
-module.exports = endsWithCore.bind(null, 'LIKE');
+module.exports = (context, ...rest) => endsWithCore.apply(null, [context, 'LIKE', ...rest]);

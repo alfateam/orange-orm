@@ -1,9 +1,9 @@
 var executeQueries = require('./table/executeQueries');
 var wrapQuery = require('./query/wrapQuery');
 
-function doQuery(query) {
+function doQuery(context, query) {
 	var wrappedQuery = wrapQuery(query);
-	return executeQueries([wrappedQuery]).then(unwrapResult);
+	return executeQueries(context, [wrappedQuery]).then(unwrapResult);
 }
 
 function unwrapResult(results) {

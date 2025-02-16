@@ -4,14 +4,14 @@ var extractFilter = require('../../query/extractFilter');
 var newSingleCommandCore = require('./singleCommand/newSingleCommandCore');
 var createAlias = require('./createAlias');
 
-function _new(table,filter,relations) {
+function _new(context, table, filter, relations) {
 	var alias = createAlias(table, relations.length);
 	filter = extractFilter(filter);
-	filter = newSubFilter(relations, filter);
-	var discriminator = newDiscriminatorSql(table, alias);
+	filter = newSubFilter(context, relations, filter);
+	var discriminator = newDiscriminatorSql(context, table, alias);
 	if (discriminator !== '')
-		filter = filter.and(discriminator);
-	return newSingleCommandCore(table, filter, alias);
+		filter = filter.and(context, discriminator);
+	return newSingleCommandCore(context, table, filter, alias);
 }
 
 module.exports = _new;

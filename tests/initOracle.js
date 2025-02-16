@@ -135,7 +135,7 @@ BEGIN
 	`INSERT INTO "datetest"("date", "tdatetime", "tdatetime_tz")
 VALUES(TO_TIMESTAMP('2023-07-14T12:00:00.000', 'YYYY-MM-DD"T"HH24:MI:SS.FF6'), TO_TIMESTAMP('2023-07-14T12:00:00.000', 'YYYY-MM-DD"T"HH24:MI:SS.FF6'), TO_TIMESTAMP('2023-07-14T12:00:00.000', 'YYYY-MM-DD"T"HH24:MI:SS.FF6')
         )
-        `, 'COMMIT'];
+        `];
 
 module.exports = async function(db) {
 	await db.transaction(async (db) => {
@@ -143,4 +143,9 @@ module.exports = async function(db) {
 			await db.query(statements[i]);
 		}
 	});
+	// await db.transaction(async (db) => {
+	// for (let i = 0; i < statements.length; i++) {
+	// 	await db.query(statements[i]);
+	// }
+	// });
 };

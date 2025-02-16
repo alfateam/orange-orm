@@ -3,7 +3,7 @@ var purify = require('./purify');
 
 function _new(column) {
 
-	var encode = function(value) {
+	var encode = function(_context, value) {
 		value = purify(value);
 		if (value == null) {
 			if (column.dbNull === null)
@@ -13,7 +13,7 @@ function _new(column) {
 		return newPara('?', [value]);
 	};
 
-	encode.unsafe = function(value) {
+	encode.unsafe = function(_context, value) {
 		value = purify(value);
 		if (value == null) {
 			if (column.dbNull === null)
@@ -23,7 +23,7 @@ function _new(column) {
 		return '\'' + value + '\'';
 	};
 
-	encode.direct = function(value) {
+	encode.direct = function(_context, value) {
 		return value ;
 	};
 

@@ -1,4 +1,3 @@
-// var newInsertCommandCore = require('./newInsertCommandCore');
 var newImmutable = require('../../newImmutable');
 var createPatch = require('../../client/createPatch');
 var createDto = require('../resultToRows/toDto/createDto');
@@ -30,7 +29,7 @@ InsertCommand.prototype.matches = function(otherRow) {
 InsertCommand.prototype.endEdit = function() {
 	this.sql();
 	var dto = createDto(this._table, this._row);
-	if (this._table._emitChanged.callbacks.length > 0)
+	if (this._disallowCompress || this._table._emitChanged.callbacks.length > 0)
 		this._patch = createPatch([], [dto]);
 };
 
@@ -47,8 +46,11 @@ Object.defineProperty(InsertCommand.prototype, 'parameters', {
 
 Object.defineProperty(InsertCommand.prototype, 'disallowCompress', {
 	get: function() {
-		return this._table._emitChanged.callbacks.length > 0;
+		return this._disallowCompress || this._table._emitChanged.callbacks.length > 0;
 
+	},
+	set: function(value) {
+		this._disallowCompress = value;
 	}
 });
 

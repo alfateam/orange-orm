@@ -8,8 +8,9 @@ var formatDateOut = require('./formatDateOut');
 var encodeJSON = require('./encodeJSON');
 var insertSql = require('./insertSql');
 var insert = require('./insert');
+var quote = require('./quote');
 
-function newResolveTransaction(domain, pool, { readonly } = {}) {
+function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 	var rdb = { poolFactory: pool };
 	if (!pool.connect) {
 		pool = pool();
@@ -32,7 +33,7 @@ function newResolveTransaction(domain, pool, { readonly } = {}) {
 		caller.visitPg();
 	};
 	rdb.aggregateCount = 0;
-	rdb.quote = (name) => `"${name}"`;
+	rdb.quote = quote;
 
 	if (readonly) {
 		rdb.dbClient = {

@@ -12,7 +12,7 @@ async function patchTable() {
 	return patchTableCore.apply(null, arguments);
 }
 
-async function patchTableCore(table, patches, { strategy = undefined, deduceStrategy = false, ...options } = {}, dryrun) {
+async function patchTableCore(context, table, patches, { strategy = undefined, deduceStrategy = false, ...options } = {}, dryrun) {
 	options = cleanOptions(options);
 	strategy = JSON.parse(JSON.stringify(strategy || {}));
 	let changed = new Set();
@@ -41,7 +41,8 @@ async function patchTableCore(table, patches, { strategy = undefined, deduceStra
 
 	async function toDtos(set) {
 		set = [...set];
-		return table.getManyDto(set, strategy);
+		const result = await table.getManyDto(context, set, strategy);
+		return result;
 	}
 
 	function toKey(property) {
@@ -56,7 +57,7 @@ async function patchTableCore(table, patches, { strategy = undefined, deduceStra
 		path = path.slice(1);
 		if (!row && path.length > 0) {
 			const key = toKey(property);
-			row =  await table.tryGetById.apply(null, toKey(property), strategy);
+			row =  await table.tryGetById.apply(null, [context, ...key, strategy]);
 			if (!row)
 				throw new Error(`Row ${table._dbName} with id ${key} was not found.`);
 		}
@@ -98,7 +99,7 @@ async function patchTableCore(table, patches, { strategy = undefined, deduceStra
 					}
 				}
 			}
-			let row = table.insertWithConcurrency.apply(null, [options, value]);
+			let row = table.insertWithConcurrency.apply(null, [context, options, value]);
 			row = await row;
 
 			for (let i = 0; i < childInserts.length; i++) {
@@ -212,7 +213,7 @@ async function patchTableCore(table, patches, { strategy = undefined, deduceStra
 	async function remove({ path, op, oldValue, options }, table, row) {
 		let property = path[0];
 		path = path.slice(1);
-		row = row || await table.getById.apply(null, toKey(property));
+		row = row || await table.getById.apply(null, [context, ...toKey(property)]);
 		if (path.length === 0) {
 			await validateDeleteAllowed({ row, options, table });
 			if (await validateDeleteConflict({ row, oldValue, options, table }))

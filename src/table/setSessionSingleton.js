@@ -1,5 +1,8 @@
 var getSessionContext = require('./getSessionContext');
 
-module.exports = function(name, value) {
-	getSessionContext()[name] = value;
-};
+function setSessionSingleton(context, name, value) {
+	const rdb = getSessionContext(context);
+	rdb[name] = value;
+}
+
+module.exports = setSessionSingleton;

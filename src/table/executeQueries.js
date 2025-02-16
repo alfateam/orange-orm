@@ -2,13 +2,13 @@ var executeChanges = require('./executeQueries/executeChanges');
 var popChanges = require('./popChanges');
 var executeQueriesCore = require('./executeQueries/executeQueriesCore');
 
-function executeQueries(queries) {
-	var changes = popChanges();
+function executeQueries(context, queries) {
+	var changes = popChanges(context);
 
-	return executeChanges(changes).then(onDoneChanges);
+	return executeChanges(context, changes).then(onDoneChanges);
 
 	function onDoneChanges() {
-		return executeQueriesCore(queries);
+		return executeQueriesCore(context, queries);
 	}
 }
 

@@ -1,10 +1,9 @@
-let newRelatedTable = _newRelatedTable;
 let tryGetSessionContext = require('../tryGetSessionContext');
 
 function newAggregate(_relations) {
 
-	function aggregate(fn) {
-		const includeMany = tryGetSessionContext()?.engine === 'mssql';
+	function aggregate(context, fn) {
+		const includeMany = tryGetSessionContext(context)?.engine === 'mssql';
 		let { relations, alias } = extract(includeMany, _relations);
 		const table = relations[relations.length - 1].childTable;
 		if (!relations[0].isMany || includeMany)
@@ -38,11 +37,6 @@ function newAggregate(_relations) {
 		return { relations: result, alias };
 	}
 
-}
-
-function _newRelatedTable() {
-	newRelatedTable = require('../newRelatedTable');
-	return newRelatedTable.apply(null, arguments);
 }
 
 module.exports = newAggregate;

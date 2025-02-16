@@ -1,5 +1,6 @@
 import { describe, test, beforeAll, afterAll, expect } from 'vitest';
 import { fileURLToPath } from 'url';
+import setupD1 from './setupD1';
 const map = require('./db');
 import express from 'express';
 import cors from 'cors';
@@ -19,8 +20,11 @@ const date1 = new Date(2022, 0, 11, 9, 24, 47);
 const date2 = new Date(2021, 0, 11, 12, 22, 45);
 let server = null;
 const port = 3002;
+let d1;
+let miniflare;
 
 afterAll(async () => {
+	await miniflare.dispose();
 	return new Promise((res) => {
 		if (server)
 			server.close(res);
@@ -31,6 +35,7 @@ afterAll(async () => {
 
 
 beforeAll(async () => {
+	({ d1, miniflare } = await setupD1(fileURLToPath(import.meta.url)));
 	await insertData('pg');
 	await insertData('oracle');
 	await insertData('mssql');
@@ -39,6 +44,7 @@ beforeAll(async () => {
 	await insertData('mysql');
 	await insertData('sap');
 	await insertData('sqlite');
+	await insertData('d1');
 	await insertData('sqlite2');
 	hostExpress();
 
@@ -113,6 +119,7 @@ describe('update date in array', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sap', async () => await verify('sap'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
@@ -137,6 +144,7 @@ describe('update multiple in array', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sap', async () => await verify('sap'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
@@ -218,6 +226,7 @@ describe('delete row', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sap', async () => await verify('sap'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
@@ -241,6 +250,7 @@ describe('update boolean', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sap', async () => await verify('sap'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
@@ -263,6 +273,7 @@ describe('update date', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sap', async () => await verify('sap'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
@@ -287,6 +298,7 @@ describe('add hasOne', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sap', async () => await verify('sap'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
@@ -365,6 +377,10 @@ const connections = {
 		db: map({ db: (con) => con.sqlite(sqliteName, { size: 1 }) }),
 		init: initSqlite
 	},
+	d1: {
+		db: map({ db: (con) => con.d1(d1, { size: 1 }) }),
+		init: initSqlite
+	},
 	sqlite2: {
 		db: map({ db: (con) => con.sqlite(sqliteName2, { size: 1 }) }),
 		init: initSqlite
@@ -381,7 +397,7 @@ const connections = {
 					password: 'P@assword123',
 					connectString: 'oracle/XE',
 					privilege: 2
-				}, {size: 1}
+				}, { size: 1 }
 
 			)
 		}),
@@ -406,6 +422,8 @@ function getDb(name) {
 		return connections.pg;
 	else if (name === 'sqlite')
 		return connections.sqlite;
+	else if (name === 'd1')
+		return connections.d1;
 	else if (name === 'sqlite2')
 		return connections.sqlite2;
 	else if (name === 'sap')

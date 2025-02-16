@@ -1,14 +1,15 @@
-var hostExpress = require('./hostExpress');
-var client = require('./client/index.js');
-var _mySql;
-var _pg;
-var _sqlite;
-var _mssqlNative;
-var _sap;
-var _mssql;
-var _oracle;
-var flags = require('./flags');
-var map = require('./client/map');
+const hostExpress = require('./hostExpress');
+const hostLocal = require('./hostLocal');
+const client = require('./client/index.js');
+const map = require('./client/map');
+let _mySql;
+let _pg;
+let _sqlite;
+let _mssqlNative;
+let _sap;
+let _mssql;
+let _oracle;
+let _d1;
 
 var connectViaPool = function(connectionString) {
 	if (connectionString.indexOf && connectionString.indexOf('mysql') === 0)
@@ -51,7 +52,6 @@ Object.defineProperty(connectViaPool, 'mySql', {
 		return _mySql;
 	}
 });
-
 Object.defineProperty(connectViaPool, 'postgres', {
 	get: function() {
 		if (!_pg)
@@ -73,6 +73,14 @@ Object.defineProperty(connectViaPool, 'sqlite', {
 		if (!_sqlite)
 			_sqlite = require('./sqlite/newDatabase');
 		return _sqlite;
+	}
+});
+
+Object.defineProperty(connectViaPool, 'd1', {
+	get: function() {
+		if (!_d1)
+			_d1 = require('./d1/newDatabase');
+		return _d1;
 	}
 });
 
@@ -108,9 +116,6 @@ Object.defineProperty(connectViaPool, 'oracle', {
 	}
 });
 
-connectViaPool.express = hostExpress;
-connectViaPool.useHook = function(bool) {
-	flags.useHook = bool;
-};
+connectViaPool.express = hostExpress.bind(null, hostLocal);
 
 module.exports = connectViaPool;

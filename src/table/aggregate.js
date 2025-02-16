@@ -1,6 +1,6 @@
 function newAggregate(table) {
 
-	function aggregate(fn) {
+	function aggregate(_context, fn) {
 		return fn(table);
 	}
 	return aggregate;

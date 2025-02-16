@@ -1,5 +1,6 @@
 import { describe, test, beforeAll, expect, afterAll } from 'vitest';
 import { fileURLToPath } from 'url';
+import setupD1 from './setupD1';
 const express = require('express');
 import { json } from 'body-parser';
 import cors from 'cors';
@@ -15,9 +16,11 @@ const versionArray = process.version.replace('v', '').split('.');
 const major = parseInt(versionArray[0]);
 const port = 3010;
 let server;
+let d1;
+let miniflare;
 
 beforeAll(async () => {
-
+	({ d1, miniflare } = await setupD1(fileURLToPath(import.meta.url)));
 	await createMs('mssql');
 	hostExpress();
 
@@ -42,6 +45,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+	await miniflare.dispose();
 	return new Promise((res) => {
 		if (server)
 			server.close(res);
@@ -93,6 +97,7 @@ describe('validate', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -132,6 +137,7 @@ describe('validate chained', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -168,6 +174,7 @@ describe('validate JSONSchema', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -205,6 +212,7 @@ describe('validate notNull', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -238,6 +246,7 @@ describe('validate notNullExceptInsert', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -281,6 +290,7 @@ describe('insert autoincremental', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -321,6 +331,7 @@ describe('insert default', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -358,6 +369,7 @@ describe('insert default override', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -394,6 +406,7 @@ describe('insert dbNull', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -445,6 +458,7 @@ describe('insert autoincremental with relations', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -596,6 +610,7 @@ describe('insert autoincremental with relations and strategy', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -758,6 +773,10 @@ const connections = {
 		db: map({ db: (con) => con.sqlite(sqliteName, { size: 1 }) }),
 		init: initSqlite
 	},
+	d1: {
+		db: map({ db: (con) => con.d1(d1, { size: 1 }) }),
+		init: initSqlite
+	},
 	sqlite2: {
 		db: map({ db: (con) => con.sqlite(sqliteName2, { size: 1 }) }),
 		init: initSqlite
@@ -774,7 +793,7 @@ const connections = {
 					password: 'P@assword123',
 					connectString: 'oracle/XE',
 					privilege: 2
-				}, {size: 1}
+				}, { size: 1 }
 
 			)
 		}),
@@ -799,6 +818,8 @@ function getDb(name) {
 		return connections.pg;
 	else if (name === 'sqlite')
 		return connections.sqlite;
+	else if (name === 'd1')
+		return connections.d1;
 	else if (name === 'sqlite2')
 		return connections.sqlite2;
 	else if (name === 'sap')

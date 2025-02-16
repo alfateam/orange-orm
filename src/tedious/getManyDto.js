@@ -3,17 +3,17 @@ const negotiateRawSqlFilter = require('../table/column/negotiateRawSqlFilter');
 const strategyToSpan = require('../table/strategyToSpan');
 const executeQueries = require('../table/executeQueries');
 
-async function getManyDto(table, filter, strategy) {
-	filter = negotiateRawSqlFilter(filter, table);
+async function getManyDto(context, table, filter, strategy) {
+	filter = negotiateRawSqlFilter(context, filter, table);
 	if (strategy && strategy.where) {
 		let arg = typeof strategy.where === 'function' ? strategy.where(table) : strategy.where;
-		filter = filter.and(arg);
+		filter = filter.and(context, arg);
 	}
-	let span = strategyToSpan(table,strategy);
+	let span = strategyToSpan(table, strategy);
 	let alias = table._dbName;
 
-	const query = newQuery(table, filter, span, alias);
-	const res =  await executeQueries([query]);
+	const query = newQuery(context, table, filter, span, alias);
+	const res = await executeQueries(context, [query]);
 	const rows = await res[0];
 	if (rows.length === 0)
 		return [];

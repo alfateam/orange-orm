@@ -1,13 +1,7 @@
 var oneLegToShallowJoinSql = require('./oneLegToShallowJoinSql');
-var newJoinSql = _newJoinSql;
 
-function toJoinSql(leg,alias,childAlias) {
-	return oneLegToShallowJoinSql(leg,alias,childAlias).append(newJoinSql(leg.span,childAlias));
-}
-
-function _newJoinSql() {
-	newJoinSql = require('../newJoinSql');
-	return newJoinSql.apply(null,arguments);
+function toJoinSql(newJoinSql, context,leg,alias,childAlias) {
+	return oneLegToShallowJoinSql(context,leg,alias,childAlias).append(newJoinSql(context,leg.span,childAlias));
 }
 
 module.exports = toJoinSql;

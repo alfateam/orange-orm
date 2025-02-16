@@ -1,7 +1,7 @@
 var decodeDbRow = require('../resultToRows/decodeDbRow');
 var flags = require('../../flags');
 
-function newRow({table, _options}) {
+function newRow(context, {table, _options}) {
 	var dto = {};
 	table._columns.forEach(addColumn);
 
@@ -28,20 +28,20 @@ function newRow({table, _options}) {
 		else
 			dto[alias] = undefined;
 	}
-	const arg = arguments[1];
+	const arg = arguments[2];
 	if (isObject(arg))
 		for (let name in arg) {
 			if (table[name] && table[name].equal)
 				dto[name] = arg[name];
 		}
 	else
-		for (var i = 1; i < arguments.length; i++) {
+		for (var i = 2; i < arguments.length; i++) {
 			var pkValue = arguments[i];
 			var column = table._primaryColumns[i - 1];
 			dto[column.alias] = pkValue;
 		}
 
-	return decodeDbRow(table, table, dto, true, true);
+	return decodeDbRow(context, table, table, dto, true, true);
 }
 
 function isObject(object) {

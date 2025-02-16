@@ -1,5 +1,6 @@
 import type { Options } from './ajv';
 import type { RequestHandler } from 'express';
+import type { D1Database } from '@cloudflare/workers-types';
 import type { ConnectionConfiguration } from 'tedious';
 import type { PoolAttributes } from 'oracledb';
 import type { AllowedDbMap, DbMapper, MappedDbDef } from './map';
@@ -10,6 +11,7 @@ declare namespace r {
 
     function table(name: string): Table;
     function end(): Promise<void>;
+    function d1(database: D1Database, options?: PoolOptions): Pool;
     function postgres(connectionString: string, options?: PoolOptions): Pool;
     function sqlite(connectionString: string, options?: PoolOptions): Pool;
     function sap(connectionString: string, options?: PoolOptions): Pool;

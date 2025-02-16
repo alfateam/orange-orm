@@ -1,6 +1,6 @@
 var newShallowJoinSql = require('../../../query/singleQuery/joinSql/newShallowJoinSqlCore');
 
-function newWhereSql(relations, shallowFilter, rightAlias) {
+function newWhereSql(context, relations, shallowFilter, rightAlias) {
 	var sql;
 	var relationCount = relations.length;
 	var relation = relations[0];
@@ -12,7 +12,7 @@ function newWhereSql(relations, shallowFilter, rightAlias) {
 
 	function where() {
 		var table = relation.childTable;
-		var joinCore = newShallowJoinSql(table, leftColumns, rightColumns, leftAlias, rightAlias);
+		var joinCore = newShallowJoinSql(context, table, leftColumns, rightColumns, leftAlias, rightAlias);
 		if (shallowFilter.sql())
 			sql = shallowFilter.prepend(' AND ').prepend(joinCore).prepend(' WHERE ');
 		else

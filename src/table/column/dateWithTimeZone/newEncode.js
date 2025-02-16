@@ -1,9 +1,8 @@
 var newPara = require('../../query/newParameterized');
 var purify = require('../date/purify');
-// var getSessionSingleton = require('../../getSessionSingleton');
 
 function _new(column) {
-	var encode = function(value) {
+	var encode = function(_context, value) {
 		value = purify(value);
 		if (value == null) {
 			if (column.dbNull === null)
@@ -13,7 +12,7 @@ function _new(column) {
 		return newPara('?', [encodeDate(value)]);
 	};
 
-	encode.unsafe = function(value) {
+	encode.unsafe = function(_context, value) {
 		value = purify(value);
 		if (value == null) {
 			if (column.dbNull === null)
@@ -23,7 +22,7 @@ function _new(column) {
 		return encodeDate(value);
 	};
 
-	encode.direct = function(value) {
+	encode.direct = function(_context, value) {
 		return encodeDate(value);
 	};
 

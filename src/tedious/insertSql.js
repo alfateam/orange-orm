@@ -1,11 +1,11 @@
 let outputInsertedSql = require('./outputInsertedSql');
 let mergeSql = require('./mergeSql');
 
-function getSqlTemplate(_table, _row, options) {
+function getSqlTemplate(_context, _table, _row, options) {
 	if (hasConcurrency(_table, options) && hasColumns())
-		return mergeSql.apply(null, arguments);
+		return mergeSql.apply(null, [...arguments].slice(1));
 	else
-		return insertSql.apply(null, arguments);
+		return insertSql.apply(null, [...arguments].slice(1));
 
 	function hasColumns() {
 		for(let p in _row) {

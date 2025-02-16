@@ -1,8 +1,8 @@
 var getMany = require('./getMany');
 
-function tryGet(table, filter, strategy) {
+function tryGet(context, table, filter, strategy) {
 	strategy = setLimit(strategy);
-	return getMany(table, filter, strategy).then(filterRows);
+	return getMany(context, table, filter, strategy).then(filterRows);
 }
 
 function filterRows(rows) {
@@ -11,9 +11,9 @@ function filterRows(rows) {
 	return null;
 }
 
-tryGet.exclusive = function(table, filter, strategy) {
+tryGet.exclusive = function(context, table, filter, strategy) {
 	strategy = setLimit(strategy);
-	return getMany.exclusive(table, filter, strategy).then(filterRows);
+	return getMany.exclusive(context, table, filter, strategy).then(filterRows);
 };
 
 function setLimit(strategy) {

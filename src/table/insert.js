@@ -1,21 +1,18 @@
 let getSessionContext = require('./getSessionContext');
 let newRow = require('./commands/newRow');
-let insertDefault = require('./insertDefault');
 
-function insert({ table, options }, arg) {
-	// return insertDefault.apply(null, arguments);
+function insert(context, { table, options }, arg) {
 	if (Array.isArray(arg)) {
 		let all = [];
 		for (let i = 0; i < arg.length; i++) {
-			all.push(insert(table, arg[i]));
+			all.push(insert(context, table, arg[i]));
 		}
 		return Promise.all(all);
 	}
-	let args = [table].slice.call(arguments);
-	let row = newRow.apply(null, args);
+	let row = newRow.apply(null, [...arguments]);
 	let hasPrimary = getHasPrimary(table, row);
 	if (hasPrimary) {
-		row = table._cache.tryAdd(row);
+		row = table._cache.tryAdd(context, row);
 	}
 	expand(table, row);
 	Object.defineProperty(row, 'then', {
@@ -24,8 +21,8 @@ function insert({ table, options }, arg) {
 		enumerable: false,
 		configurable: true
 	});
-	const context = getSessionContext();
-	const insertP = (context.insert || insertDefault)(table, row, options).then(onResult);
+	const rdb = getSessionContext(context);
+	const insertP = rdb.insert(context, table, row, options).then(onResult);
 
 
 	// }
@@ -51,10 +48,10 @@ function insert({ table, options }, arg) {
 	return row;
 
 	function onResult([result]) {
-		row.hydrate(result);
-		if (!hasPrimary)
-			row = table._cache.tryAdd(row);
-		table._cache.tryAdd(row);
+		row.hydrate(context, result);
+		// if (!hasPrimary)
+		// 	row = table._cache.tryAdd(context, row);
+		row = table._cache.tryAdd(context, row);
 		return row;
 	}
 }

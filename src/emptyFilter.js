@@ -7,26 +7,26 @@ function emptyFilter() {
 emptyFilter.sql = parameterized.sql;
 emptyFilter.parameters = parameterized.parameters;
 
-emptyFilter.and = function(other) {
-	other = negotiateRawSqlFilter(other);
-	for (var i = 1; i < arguments.length; i++) {
-		other = other.and(arguments[i]);
+emptyFilter.and = function(context, other) {
+	other = negotiateRawSqlFilter(context, other);
+	for (var i = 2; i < arguments.length; i++) {
+		other = other.and(context, arguments[i]);
 	}
 	return other;
 };
 
-emptyFilter.or = function(other) {
-	other = negotiateRawSqlFilter(other);
-	for (var i = 1; i < arguments.length; i++) {
-		other = other.or(arguments[i]);
+emptyFilter.or = function(context, other) {
+	other = negotiateRawSqlFilter(context, other);
+	for (var i = 2; i < arguments.length; i++) {
+		other = other.or(context, arguments[i]);
 	}
 	return other;
 };
 
-emptyFilter.not = function(other) {
-	other = negotiateRawSqlFilter(other).not();
-	for (var i = 1; i < arguments.length; i++) {
-		other = other.and(arguments[i]);
+emptyFilter.not = function(context, other) {
+	other = negotiateRawSqlFilter(context, other).not(context);
+	for (var i = 2; i < arguments.length; i++) {
+		other = other.and(context, arguments[i]);
 	}
 	return other;
 

@@ -1,10 +1,10 @@
 var getSessionSingleton = require('./getSessionSingleton');
 var deleteSessionContext = require('./deleteSessionContext');
 
-function release() {
-	var done = getSessionSingleton('dbClientDone');
-	var pool = getSessionSingleton('pool');
-	deleteSessionContext();
+function release(context) {
+	var done = getSessionSingleton(context, 'dbClientDone');
+	var pool = getSessionSingleton(context, 'pool');
+	deleteSessionContext(context);
 	if (done)
 		done();
 	if (pool)

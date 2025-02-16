@@ -1,7 +1,6 @@
-const getSessionSingleton = require('../table/getSessionSingleton');
+const quote = require('./quote');
 
-function insertSql(table, row, options) {
-	const quote = getSessionSingleton('quote');
+function insertSql(_context, table, row, options) {
 	let columnNames = [];
 	let regularColumnNames = [];
 	let conflictColumnUpdateSql = '';

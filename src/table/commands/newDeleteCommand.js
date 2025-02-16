@@ -1,20 +1,15 @@
 var newSingleCommand = require('./delete/newSingleCommand');
 
-var nextCommand = function() {
-	nextCommand = require('./newDeleteCommand');
-	nextCommand.apply(null, arguments);
-};
-
-function newCommand(queries,table,filter,strategy,relations) {
-	var singleCommand = newSingleCommand(table,filter,relations);
-	for(var name in strategy) {
+function newCommand(context, queries, table, filter, strategy, relations) {
+	var singleCommand = newSingleCommand(context, table, filter, relations);
+	for (var name in strategy) {
 		if (!(strategy[name] === null || strategy[name]))
 			continue;
 		var childStrategy = strategy[name];
 		var childRelation = table._relations[name];
 		var joinRelation = childRelation.joinRelation;
-		var	childRelations = [joinRelation].concat(relations);
-		nextCommand(queries,childRelation.childTable,filter,childStrategy,childRelations);
+		var childRelations = [joinRelation].concat(relations);
+		newCommand(context, queries, childRelation.childTable, filter, childStrategy, childRelations);
 	}
 	queries.push(singleCommand);
 	return queries;

@@ -1,6 +1,6 @@
 var extractParentKey = require('./extractParentKey');
 
-function synchronizeChanged(manyCache, joinRelation, parent, child) {
+function synchronizeChanged(context, manyCache, joinRelation, parent, child) {
 	var columns = joinRelation.columns;
 	columns.forEach(subscribeColumn);
 	child = null;
@@ -19,9 +19,9 @@ function synchronizeChanged(manyCache, joinRelation, parent, child) {
 
 	function onChanged(child) {
 		unsubscribe(child);
-		manyCache.tryRemove(parent, child);
+		manyCache.tryRemove(context, parent, child);
 		var newParent = extractParentKey(joinRelation, child);
-		manyCache.tryAdd(newParent, child);
+		manyCache.tryAdd(context, newParent, child);
 	}
 
 

@@ -5,25 +5,25 @@ var newPrimaryKeyFilter = require('../newPrimaryKeyFilter');
 var createPatch = require('../../client/createPatch');
 var createDto = require('./toDto/createDto');
 
-function _delete(row, strategy, table) {
+function _delete(context, row, strategy, table) {
 	var relations = [];
-	removeFromCache(row, strategy, table);
+	removeFromCache(context, row, strategy, table);
 
-	var args = [table];
+	var args = [context, table];
 	table._primaryColumns.forEach(function(primary) {
 		args.push(row[primary.alias]);
 	});
 	var filter = newPrimaryKeyFilter.apply(null, args);
-	var cmds = newDeleteCommand([], table, filter, strategy, relations);
+	var cmds = newDeleteCommand(context, [], table, filter, strategy, relations);
 	cmds.forEach(function(cmd) {
-		pushCommand(cmd);
+		pushCommand(context, cmd);
 	});
 	var cmd = cmds[0];
 	if (table._emitChanged.callbacks.length > 0) {
 		cmd.disallowCompress = true;
 		var dto = createDto(table, row);
 		let patch =  createPatch([dto],[]);
-		cmd.emitChanged = table._emitChanged.bind(null, {row: row, patch: patch});
+		cmd.emitChanged = table._emitChanged.bind(null, {row: row, patch: patch}); //todo remove ?
 	}
 
 }

@@ -1,6 +1,6 @@
 var getSessionSingleton = require('../getSessionSingleton');
-function getChangeSet() {
-	return getSessionSingleton('changes');
+function getChangeSet(context) {
+	return getSessionSingleton(context, 'changes');
 }
 
 module.exports = getChangeSet;

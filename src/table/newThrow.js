@@ -1,9 +1,9 @@
 var tryReleaseDbClient = require('./tryReleaseDbClient');
 
-function newThrow(e, previousPromise) {
+function newThrow(context, e, previousPromise) {
 	return previousPromise.then(throwError, throwError);
 	function throwError() {
-		tryReleaseDbClient();
+		tryReleaseDbClient(context);
 		throw e;
 	}
 }

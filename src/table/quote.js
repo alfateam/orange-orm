@@ -1,10 +1,10 @@
 let tryGetSessionContext = require('./tryGetSessionContext');
 
-function quote(name) {
-	let context = tryGetSessionContext();
-	if (!context)
+function quote(context, name) {
+	let rdb = tryGetSessionContext(context);
+	if (!rdb)
 		throw new Error('Rdb transaction is no longer available. Is promise chain broken ?');
-	let fn = context.quote || (() => `"${name}"`);
+	let fn = rdb.quote || (() => `"${name}"`);
 	return fn(name);
 }
 

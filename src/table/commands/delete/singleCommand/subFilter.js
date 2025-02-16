@@ -1,17 +1,17 @@
-var newSelect = require('./selectSql');
-var newJoin = require('./joinSql');
-var newWhere = require('./whereSql');
-var createAlias = require('../createAlias');
+const newSelect = require('./selectSql');
+const newJoin = require('./joinSql');
+const newWhere = require('./whereSql');
+const createAlias = require('../createAlias');
 
-function newSubFilter(relations, shallowFilter) {
-	var relationCount = relations.length;
+function newSubFilter(context,relations, shallowFilter) {
+	const relationCount = relations.length;
 	if (relationCount === 0)
 		return shallowFilter;
-	var table = relations[0].childTable;
-	var alias = createAlias(table, relationCount -1);
-	var filter = newSelect(table,alias).prepend('EXISTS (');
-	var join = newJoin(relations.slice(1));
-	var where = newWhere(relations,shallowFilter,alias);
+	const table = relations[0].childTable;
+	const alias = createAlias(table, relationCount -1);
+	const filter = newSelect(context,table,alias).prepend('EXISTS (');
+	const join = newJoin(context, relations.slice(1));
+	const where = newWhere(context,relations,shallowFilter,alias);
 	return filter.append(join).append(where).append(')');
 
 }

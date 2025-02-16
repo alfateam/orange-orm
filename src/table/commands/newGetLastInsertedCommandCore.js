@@ -3,19 +3,19 @@ const getSessionContext = require('../getSessionContext');
 const newDiscriminatorSql = require('../query/singleQuery/newDiscriminatorSql');
 const quote = require('../quote');
 
-function newGetLastInsertedCommandCore(table, row) {
+function newGetLastInsertedCommandCore(context, table, row) {
 	let parameters = [];
 	let keyValues = table._primaryColumns.map(column => row['__' + column.alias]);
-	let sql = `SELECT ${columnNames()} FROM ${quote(table._dbName)} WHERE ${whereSql()}`;
+	let sql = `SELECT ${columnNames()} FROM ${quote(context, table._dbName)} WHERE ${whereSql()}`;
 	return newParameterized(sql, parameters);
 
 	function columnNames() {
-		return table._columns.map(col => quote(col._dbName)).join(',');
+		return table._columns.map(col => quote(context, col._dbName)).join(',');
 	}
 
 	function whereSql() {
 		let parameterized;
-		let filter = getSessionContext().lastInsertedSql(table, keyValues);
+		let filter = getSessionContext(context).lastInsertedSql(context, table, keyValues);
 		if (Array.isArray(filter)) {
 			for (let i = 0; i < filter.length; i++) {
 				const sep = i === 0 ? '' : ' AND ';
@@ -37,7 +37,7 @@ function newGetLastInsertedCommandCore(table, row) {
 	}
 
 	function discriminators() {
-		return newDiscriminatorSql(table, table._dbName);
+		return newDiscriminatorSql(context, table, table._dbName);
 	}
 }
 

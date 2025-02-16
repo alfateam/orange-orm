@@ -1,7 +1,7 @@
 const getSessionSingleton = require('../../getSessionSingleton');
 
-function newDiscriminatorSql(table, alias) {
-	const quote = getSessionSingleton('quote');
+function newDiscriminatorSql(context, table, alias) {
+	const quote = getSessionSingleton(context, 'quote');
 	alias = quote(alias);
 	var result = '';
 	var formulaDiscriminators = table._formulaDiscriminators;

@@ -1,10 +1,10 @@
 let tryGetSessionContext = require('./tryGetSessionContext');
 
-function getSessionContext() {
-	let context = tryGetSessionContext();
-	if (!context)
+function getSessionContext(context) {
+	const rdb = tryGetSessionContext(context);
+	if (!rdb)
 		throw new Error('Rdb transaction is no longer available. Is promise chain broken ?');
-	return context;
+	return rdb;
 }
 
 module.exports = getSessionContext;

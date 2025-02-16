@@ -1,4 +1,3 @@
-let util = require('util');
 let updateField = require('../updateField');
 let newEmitEvent = require('../../emitEvent');
 let extractStrategy = require('./toDto/extractStrategy');
@@ -51,7 +50,7 @@ function newDecodeDbRow(table, dbRow, filteredAliases, shouldValidate, isInsert)
 				this._dbRow[key] = value;
 				if (column.validate)
 					column.validate(value, this._dbRow);
-				updateField(table, column, this);
+				updateField(this._context, table, column, this);
 				let emit = this._emitColumnChanged[name];
 				if (emit)
 					emit(this, column, value, oldValue);
@@ -114,8 +113,8 @@ function newDecodeDbRow(table, dbRow, filteredAliases, shouldValidate, isInsert)
 		let get = row._related[alias];
 		if (!get) {
 			let relation = table._relations[alias];
-			get = relation.toGetRelated(row);
-			row._relationCacheMap.set(relation, relation.getInnerCache());
+			get = relation.toGetRelated(row._context, row);
+			row._relationCacheMap.set(relation, relation.getInnerCache(row._context));
 			row._related[alias] = get;
 		}
 		return get;
@@ -144,8 +143,8 @@ function newDecodeDbRow(table, dbRow, filteredAliases, shouldValidate, isInsert)
 	};
 
 
-	Row.prototype.hydrate = function(dbRow) {
-		const engine = tryGetSessionContext()?.engine;
+	Row.prototype.hydrate = function(context, dbRow) {
+		const engine = tryGetSessionContext(context)?.engine;
 		let i = offset;
 		if (engine === 'sqlite') {
 			const errorSeparator = '12345678-1234-1234-1234-123456789012';
@@ -153,14 +152,14 @@ function newDecodeDbRow(table, dbRow, filteredAliases, shouldValidate, isInsert)
 				if (typeof dbRow[p] === 'string' && dbRow[p].indexOf(errorSeparator) === 0)
 					throw new Error(dbRow[p].split(errorSeparator)[1]);
 				let key = keys[i];
-				this._dbRow[key] = columns[i].decode(dbRow[p]);
+				this._dbRow[key] = columns[i].decode(context, dbRow[p]);
 				i++;
 			}
 		}
 		else {
 			for (let p in dbRow) {
 				let key = keys[i];
-				this._dbRow[key] = columns[i].decode(dbRow[p]);
+				this._dbRow[key] = columns[i].decode(context, dbRow[p]);
 				i++;
 			}
 		}
@@ -171,10 +170,10 @@ function newDecodeDbRow(table, dbRow, filteredAliases, shouldValidate, isInsert)
 			strategy = extractStrategy(table);
 		}
 		strategy = purifyStrategy(table, strategy);
-		if (!tryGetSessionContext()) {
-			return toDto(strategy, table, this, new Set());
+		if (!tryGetSessionContext(this._context)) {
+			return toDto(this._context, strategy, table, this, new Set());
 		}
-		let p = toDto(strategy, table, this);
+		let p = toDto(this._context, strategy, table, this);
 		return Promise.resolve().then(() => p);
 	};
 
@@ -189,37 +188,31 @@ function newDecodeDbRow(table, dbRow, filteredAliases, shouldValidate, isInsert)
 
 	Row.prototype.delete = function(strategy) {
 		strategy = extractDeleteStrategy(strategy);
-		_delete(this, strategy, table);
+		_delete(this._context, this, strategy, table);
 	};
 
 	Row.prototype.cascadeDelete = function() {
 		let strategy = newCascadeDeleteStrategy(newObject(), table);
-		_delete(this, strategy, table);
+		_delete(this._context, this, strategy, table);
 	};
 
 	Row.prototype.deleteCascade = Row.prototype.cascadeDelete;
 
 	Row.prototype.patch = async function(patches, options) {
-		await patchRow(table, this, patches, options);
+		await patchRow(this._context, table, this, patches, options);
 		return this;
 	};
 
-
-	Row.prototype[util.inspect.custom] = function() {
-		let dtos = toDto(undefined, table, this, new Set());
-		return util.inspect(dtos, { compact: false, colors: true });
-	};
-
-	function decodeDbRow(row) {
+	function decodeDbRow(context, row) {
 		for (let i = 0; i < numberOfColumns; i++) {
 			let index = offset + i;
 			let key = keys[index];
 			if (row[key] !== undefined)
-				row[key] = columns[i].decode(row[key]);
+				row[key] = columns[i].decode(context, row[key]);
 			if (shouldValidate && columns[i].validate)
 				columns[i].validate(row[key], row, isInsert);
 		}
-		let target = new Row(row);
+		let target = new Row(context, row);
 		const p = new Proxy(target, {
 			ownKeys: function() {
 				return Array.from(aliases).concat(Object.keys(target._related).filter(alias => {
@@ -245,9 +238,10 @@ function newDecodeDbRow(table, dbRow, filteredAliases, shouldValidate, isInsert)
 		return value;
 	}
 
-	function Row(dbRow) {
+	function Row(context, dbRow) {
+		this._context = context;
 		this._relationCacheMap = new Map();
-		this._cache = table._cache.getInnerCache();
+		this._cache = table._cache.getInnerCache(context);
 		this._dbRow = dbRow;
 		this._related = {};
 		this._emitColumnChanged = {};

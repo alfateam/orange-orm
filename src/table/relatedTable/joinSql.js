@@ -1,7 +1,7 @@
 var newShallowJoinSql = require('../query/singleQuery/joinSql/newShallowJoinSql');
 var newParameterized = require('../query/newParameterized');
 
-function newJoinSql(relations, depth = 0) {
+function newJoinSql(context, relations, depth = 0) {
 	var leftAlias,
 		rightAlias;
 	var relation;
@@ -10,7 +10,7 @@ function newJoinSql(relations, depth = 0) {
 
 	c.visitJoin = function(relation) {
 		//todo fix discriminators on childTable
-		sql = newShallowJoinSql(relation.parentTable,relation.childTable._primaryColumns,relation.columns,leftAlias,rightAlias).prepend(' INNER').prepend(sql);
+		sql = newShallowJoinSql(context, relation.parentTable, relation.childTable._primaryColumns, relation.columns, leftAlias, rightAlias).prepend(' INNER').prepend(sql);
 	};
 
 	c.visitOne = function(relation) {
@@ -25,11 +25,11 @@ function newJoinSql(relations, depth = 0) {
 		var rightColumns = table._primaryColumns;
 		var leftColumns = joinRelation.columns;
 
-		sql = newShallowJoinSql(table,leftColumns,rightColumns,leftAlias,rightAlias).prepend(' INNER').prepend(sql);
+		sql = newShallowJoinSql(context, table, leftColumns, rightColumns, leftAlias, rightAlias).prepend(' INNER').prepend(sql);
 	}
 
-	for (let i = relations.length-1; i > depth; i--) {
-		leftAlias = 'x' + (i+1);
+	for (let i = relations.length - 1; i > depth; i--) {
+		leftAlias = 'x' + (i + 1);
 		rightAlias = 'x' + i;
 		relation = relations[i];
 		relation.accept(c);

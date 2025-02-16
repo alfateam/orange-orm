@@ -1,4 +1,3 @@
-var addSubStrategies = _addSubStrategies;
 var newObject = require('../newObject');
 
 function newCascadeDeleteStrategy(strategy, table) {
@@ -10,7 +9,7 @@ function newCascadeDeleteStrategy(strategy, table) {
 	c.visitOne = function(relation) {
 		var subStrategy = newObject();
 		strategy[relationName] = subStrategy;
-		addSubStrategies(subStrategy, relation.childTable);
+		newCascadeDeleteStrategy(subStrategy, relation.childTable);
 	};
 
 	c.visitMany = c.visitOne;
@@ -20,11 +19,6 @@ function newCascadeDeleteStrategy(strategy, table) {
 		relation.accept(c);
 	}
 	return strategy;
-}
-
-function _addSubStrategies(strategy, table) {
-	addSubStrategies = require('./newCascadeDeleteStrategy');
-	addSubStrategies(strategy, table);
 }
 
 module.exports = newCascadeDeleteStrategy;

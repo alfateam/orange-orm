@@ -4,14 +4,14 @@ var getSessionSingleton = require('../../getSessionSingleton');
 
 function _new(column) {
 
-	const encode = function(candidate) {
+	const encode = function(context, candidate) {
 		var value = purify(candidate);
 		if (value == null) {
 			if(column.dbNull === null)
 				return newPara('null');
 			return newPara('\'' + column.dbNull + '\'');
 		}
-		var encodeCore = getSessionSingleton('encodeJSON');
+		var encodeCore = getSessionSingleton(context, 'encodeJSON');
 
 		if (encodeCore) {
 			value = encodeCore(value);
@@ -20,14 +20,14 @@ function _new(column) {
 
 	};
 
-	encode.unsafe = function(candidate) {
+	encode.unsafe = function(context, candidate) {
 		var value = purify(candidate);
 		if (value == null) {
 			if(column.dbNull === null)
 				return 'null';
 			return '\'' + column.dbNull + '\'';
 		}
-		var encodeCore = getSessionSingleton('encodeJSON');
+		var encodeCore = getSessionSingleton(context, 'encodeJSON');
 
 		if (encodeCore) {
 			value = encodeCore(value);
@@ -35,8 +35,8 @@ function _new(column) {
 		return value;
 	};
 
-	encode.direct = function(value) {
-		var encodeCore = getSessionSingleton('encodeJSON');
+	encode.direct = function(context, value) {
+		var encodeCore = getSessionSingleton(context, 'encodeJSON');
 
 		if (encodeCore) {
 			value = encodeCore(value);

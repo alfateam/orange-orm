@@ -1,4 +1,6 @@
 ## Changelog
+__4.5.0__  
+Support for Cloudflare D1.  
 __4.4.2__  
 Support for schema in connection string. Postgrs only. [#116](https://github.com/alfateam/orange-orm/issues/118)  
 __4.4.1__  

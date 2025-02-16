@@ -5,9 +5,9 @@ let releaseDbClient = require('./releaseDbClient');
 let popChanges = require('./popChanges');
 const getSessionSingleton = require('./getSessionSingleton');
 
-function commit(result) {
+function _commit(context, result) {
 	return popAndPushChanges()
-		.then(releaseDbClient)
+		.then(releaseDbClient.bind(null, context))
 		.then(onReleased);
 
 	function onReleased() {
@@ -15,18 +15,20 @@ function commit(result) {
 	}
 
 	async function popAndPushChanges() {
-		let changes = popChanges();
+		let changes = popChanges(context);
 		while (changes.length > 0) {
-			await executeChanges(changes);
-			changes = popChanges();
+			await executeChanges(context, changes);
+			changes = popChanges(context);
 		}
-		if (!getSessionSingleton('readonly'))
-			pushCommand(commitCommand);
-		return executeChanges(popChanges());
+		if (!getSessionSingleton(context, 'transactionLess'))
+			pushCommand(context, commitCommand);
+		return executeChanges(context, popChanges(context));
 	}
 }
 
-module.exports = function(result) {
+function commit(context, result) {
 	return Promise.resolve()
-		.then(() => commit(result));
-};
+		.then(() => _commit(context, result));
+}
+
+module.exports = commit;

@@ -1,7 +1,6 @@
-const getSessionSingleton = require('../table/getSessionSingleton');
+const quote = require('./quote');
 
 function lastInsertedSql(table) {
-	const quote = getSessionSingleton('quote');
 	let separator = '';
 	let result = 'RETURNING ';
 	for (let i = 0; i < table._columns.length; i++) {

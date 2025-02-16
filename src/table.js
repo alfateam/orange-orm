@@ -14,13 +14,10 @@ const newContext = require('./newObject');
 const insert = require('./table/insert');
 const _delete = require('./table/delete');
 const cascadeDelete = require('./table/cascadeDelete');
-const createReadStream = require('./table/createReadStream');
-const createJSONReadStream = require('./table/createJSONReadStream');
-const getIdArgs = require('./table/getIdArgs');
 const patchTable = require('./patchTable');
 const newEmitEvent = require('./emitEvent');
 const hostLocal = require('./hostLocal');
-const getTSDefinition = require('./getTSDefinition');
+// const getTSDefinition = require('./getTSDefinition'); //todo: unused ?
 const where = require('./table/where');
 const aggregate = require('./table/aggregate');
 const groupBy = require('./table/groupBy');
@@ -62,62 +59,62 @@ function _new(tableName) {
 		return hasOne(joinRelation);
 	};
 
-	table.count = function(filter) {
-		return Promise.resolve().then(() => count(table, filter));
+	table.count = function(context, ...rest) {
+		const args = [context, table, ...rest];
+		return Promise.resolve().then(() => count.apply(null, args));
 	};
 
-	table.getMany = function(filter, strategy) {
-		return Promise.resolve().then(() => getMany(table, filter, strategy));
+	table.getMany = function(context, ...rest) {
+		const args = [context, table, ...rest];
+		return Promise.resolve().then(() => getMany.apply(null, args));
 	};
-	table.getManyDto = function(filter, strategy) {
-		return Promise.resolve().then(() => getManyDto(table, filter, strategy));
-	};
-
-	table.aggregate = function(filter, strategy) {
-		return groupBy(table, filter, strategy);
+	table.getManyDto = function(context, ...rest) {
+		const args = [context, table, ...rest];
+		return Promise.resolve().then(() => getManyDto.apply(null, args));
 	};
 
-	table.getMany.exclusive = function(filter, strategy) {
-		return Promise.resolve().then(() => getMany.exclusive(table, filter, strategy));
+	table.aggregate = function(context, ...rest) {
+		const args = [context, table, ...rest];
+		return groupBy.apply(null, args);
 	};
 
-	table.tryGetFirst = function(filter, strategy) {
-		return Promise.resolve().then(() => tryGetFirst(table, filter, strategy));
+	table.getMany.exclusive = function(context, ...rest) {
+		const args = [context, table, ...rest];
+		return Promise.resolve().then(() => getMany.exclusive.apply(null, args));
 	};
-	table.tryGetFirst.exclusive = function(filter, strategy) {
-		return Promise.resolve().then(() => tryGetFirst.exclusive(table, filter, strategy));
+
+	table.tryGetFirst = function(context, ...rest) {
+		const args = [context, table, ...rest];
+		return Promise.resolve().then(() => tryGetFirst.apply(null, args));
 	};
+	table.tryGetFirst.exclusive = function(context, ...rest) {
+		const args = [context, table, ...rest];
+		return Promise.resolve().then(() => tryGetFirst.exclusive.apply(null, args));
+	};
+
 	table.getOne = table.tryGetFirst;
 	table.getOne.exclusive = table.tryGetFirst.exclusive;
 
-	function callAsync(func, args) {
-		return Promise.resolve().then(() => call(func, args));
-	}
-
-	function call(func, args) {
-		var mergedArgs = [table];
-		for (var i = 0; i < args.length; i++) {
-			mergedArgs.push(args[i]);
-		}
-		return func.apply(null, mergedArgs);
-	}
-
-	table.getById = function() {
-		return callAsync(getById, getIdArgs(table, arguments));
+	table.getById = function(context, ...rest) {
+		const args = [context, table, ...rest];
+		return Promise.resolve().then(() => getById.apply(null, args));
 	};
 
-	table.getById.exclusive = function() {
-
-		return callAsync(getById.exclusive, getIdArgs(table, arguments));
+	table.getById.exclusive = function(context, ...rest) {
+		const args = [context, table, ...rest];
+		return Promise.resolve().then(() => getById.exclusive.apply(null, args));
 	};
 
-	table.tryGetById = function() {
-		return callAsync(tryGetById, getIdArgs(table, arguments));
+	table.tryGetById = function(context, ...rest) {
+		const args = [context, table, ...rest];
+		return Promise.resolve().then(() => tryGetById.apply(null, args));
 	};
 
-	table.tryGetById.exclusive = function() {
-		return callAsync(tryGetById.exclusive, getIdArgs(table, arguments));
+	table.tryGetById.exclusive = function(context, ...rest) {
+		const args = [context, table, ...rest];
+		return Promise.resolve().then(() => tryGetById.exclusive.apply(null, args));
 	};
+
 
 	table.columnDiscriminators = function() {
 		for (var i = 0; i < arguments.length; i++) {
@@ -133,37 +130,43 @@ function _new(tableName) {
 		return table;
 	};
 
-	table.insert = function() {
+	table.insert = function(context, ...rest) {
 		const concurrency = undefined;
-		let args = [{table, concurrency}].concat([].slice.call(arguments));
+		let args = [context, {table, concurrency}, ...rest];
 		return insert.apply(null, args);
 	};
 
-	table.insertWithConcurrency = function(options, ...rows) {
-		let args = [{table, options}].concat([].slice.call(rows));
+	table.insertWithConcurrency = function(context, options, ...rows) {
+		let args = [context, {table, options}].concat([].slice.call(rows));
 		return insert.apply(null, args);
 	};
 
 	table.delete = _delete.bind(null, table);
-	table.cascadeDelete = cascadeDelete.bind(null, table);
-	table.deleteCascade = cascadeDelete.bind(null, table);
-	table.createReadStream = createReadStream.bind(null, table);
-	table.createJSONReadStream = createJSONReadStream.bind(null, table);
+	table.cascadeDelete = function(context, ...rest) {
+		const args = [context, table, ...rest];
+		return cascadeDelete.apply(null, args);
+	};
+
+	table.deleteCascade = table.cascadeDelete;
 	table.exclusive = function() {
 		table._exclusive = true;
 		return table;
 	};
-	table.patch = patchTable.bind(null, table);
-	table.subscribeChanged = table._emitChanged.add;
-	table.unsubscribeChanged = table._emitChanged.remove;
+	table.patch = function(context, ...rest) {
+		const args = [context, table, ...rest];
+		return patchTable.apply(null, args);
+	};
+
+	// table.subscribeChanged = table._emitChanged.add; //legacy
+	// table.unsubscribeChanged = table._emitChanged.remove; //legacy
 
 	table.hostLocal = function(options) {
 		return hostLocal({table, ...options});
 	};
 
-	table.ts = function(name) {
-		return getTSDefinition(table, {name});
-	};
+	// table.ts = function(name) { //unused ?
+	// 	return getTSDefinition(table, {name});
+	// };
 
 	table.where = where(table);
 	table._aggregate = aggregate(table);

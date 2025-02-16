@@ -1,3 +1,3 @@
 var startsWithCore = require('./startsWithCore');
 
-module.exports = startsWithCore.bind(null, 'LIKE');
+module.exports = (context, ...rest) => startsWithCore.apply(null, [context, 'LIKE', ...rest]);

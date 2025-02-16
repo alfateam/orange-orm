@@ -1,8 +1,8 @@
 var newParameterized = require('../query/newParameterized');
 var getSessionSingleton = require('../getSessionSingleton');
 
-function compress(queries) {
-	var multipleStatements = getSessionSingleton('multipleStatements');
+function compress(context, queries) {
+	var multipleStatements = getSessionSingleton(context, 'multipleStatements');
 	var compressed = [];
 	var queryCount = queries.length;
 

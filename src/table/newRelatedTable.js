@@ -1,5 +1,4 @@
 var newRelatedColumn = require('./relatedTable/relatedColumn');
-var nextRelatedTable = _nextRelatedTable;
 var subFilter = require('./relatedTable/subFilter');
 var any = require('./relatedTable/any');
 var all = require('./relatedTable/all');
@@ -15,14 +14,14 @@ function newRelatedTable(relations, isShallow, depth = 0) {
 	// if (isShallow)
 	// 	c = any(relations.slice(-1), depth);
 	// else
-	c = any(relations, depth);
+	c = any(newRelatedTable, relations, depth);
 	// @ts-ignore
-	c.all = all(relations, depth);
+	c.all = all(newRelatedTable, relations, depth);
 	// @ts-ignore
 	c.any = c;
 
 	// @ts-ignore
-	c.none = none(relations, depth);
+	c.none = none(newRelatedTable, relations, depth);
 
 	// @ts-ignore
 	c.where =  where(relations, depth);
@@ -58,17 +57,17 @@ function newRelatedTable(relations, isShallow, depth = 0) {
 
 		Object.defineProperty(c, alias, {
 			get: function() {
-				return nextRelatedTable(children, false, depth);
+				return newRelatedTable(children, false, depth);
 			}
 		});
 	}
 
 
 	// @ts-ignore
-	c.exists = function() {
+	c.exists = function(context) {
 		if (isShallow)
 			return '';
-		return subFilter(relations, false, depth);
+		return subFilter(context, relations, false, depth);
 	};
 
 	let cProxy = new Proxy(c, {
@@ -89,11 +88,6 @@ function newRelatedTable(relations, isShallow, depth = 0) {
 	});
 
 	return cProxy;
-}
-
-function _nextRelatedTable(relations, isShallow, depth) {
-	nextRelatedTable = require('./newRelatedTable');
-	return nextRelatedTable(relations, isShallow, depth);
 }
 
 module.exports = newRelatedTable;

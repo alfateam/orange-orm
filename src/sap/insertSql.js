@@ -1,12 +1,12 @@
-const getSessionSingleton = require('../table/getSessionSingleton');
 const mergeSql = require('./mergeSql');
+const quote = require('./quote');
 
-function getSqlTemplate(_table, _row, options) {
+function getSqlTemplate(_context, _table, _row, options) {
 
 	if (hasConcurrency(_table, options) && hasColumns())
-		return mergeSql.apply(null, arguments);
+		return mergeSql.apply(null, [...arguments].slice(1));
 	else
-		return insertSql.apply(null, arguments);
+		return insertSql.apply(null, [...arguments].slice(1));
 
 	function hasColumns() {
 		for(let p in _row) {
@@ -27,7 +27,6 @@ function hasConcurrency(table,options) {
 }
 
 function insertSql(table, row) {
-	const quote = getSessionSingleton('quote');
 	let columnNames = [];
 	let regularColumnNames = [];
 	let values = [];

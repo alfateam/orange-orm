@@ -2,7 +2,7 @@ var newPrimaryKeyFilter = require('../newPrimaryKeyFilter');
 var emptyFilter = require('../../emptyFilter');
 var negotiateExpandInverse = require('../negotiateExpandInverse');
 
-function getRelatives(parent, relation) {
+function getRelatives(context, parent, relation) {
 	var queryContext = parent.queryContext;
 	let strategy = queryContext && queryContext.strategy[relation.leftAlias];
 	var filter = emptyFilter;
@@ -24,15 +24,15 @@ function getRelatives(parent, relation) {
 		}
 
 		if (ids.length > 0)
-			filter = relation.childTable._primaryColumns[0].in(ids);
+			filter = relation.childTable._primaryColumns[0].in(context, ids);
 	}
 
 	function createCompositeFilter() {
 		var keyFilter;
 		for (var i = 0; i < queryContext.rows.length; i++) {
-			keyFilter = rowToPrimaryKeyFilter(queryContext.rows[i], relation);
+			keyFilter = rowToPrimaryKeyFilter(context, queryContext.rows[i], relation);
 			if (keyFilter)
-				filter = filter.or(keyFilter);
+				filter = filter.or(context, keyFilter);
 		}
 	}
 
@@ -46,14 +46,14 @@ function getRelatives(parent, relation) {
 
 }
 
-function rowToPrimaryKeyFilter(row, relation) {
+function rowToPrimaryKeyFilter(context, row, relation) {
 	var key = relation.columns.map( function(column) {
 		return row[column.alias];
 	});
 	if (key.some(isNullOrUndefined)) {
 		return;
 	}
-	var args = [relation.childTable].concat(key);
+	var args = [context, relation.childTable].concat(key);
 	return newPrimaryKeyFilter.apply(null, args);
 }
 

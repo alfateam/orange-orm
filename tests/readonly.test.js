@@ -1,5 +1,6 @@
 import { describe, test, beforeAll, afterAll, expect } from 'vitest';
 import { fileURLToPath } from 'url';
+import setupD1 from './setupD1';
 const map = require('./db2');
 import express from 'express';
 import cors from 'cors';
@@ -12,14 +13,18 @@ const initSqlite = require('./initSqlite');
 const initSap = require('./initSap');
 const port = 3009;
 let server;
+let d1;
+let miniflare;
 
 beforeAll(async () => {
+	({ d1, miniflare } = await setupD1(fileURLToPath(import.meta.url)));
 	await insertData('pg');
 	await insertData('oracle');
 	await insertData('mssql');
 	await insertData('mysql');
 	await insertData('sap');
 	await insertData('sqlite');
+	await insertData('d1');
 	await insertData('sqlite2');
 
 	async function insertData(dbName) {
@@ -74,6 +79,11 @@ beforeAll(async () => {
 	}
 });
 
+afterAll(async () => {
+	await miniflare.dispose();
+});
+
+
 describe('readonly everything', () => {
 	const options = { readonly: true };
 
@@ -90,6 +100,7 @@ describe('readonly everything', () => {
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -221,6 +232,7 @@ describe('readonly table', () => {
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -274,6 +286,7 @@ describe('readonly column', () => {
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -329,6 +342,7 @@ describe('readonly table delete', () => {
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -367,6 +381,7 @@ describe('readonly nested table delete', () => {
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -404,6 +419,7 @@ describe('readonly on grandChildren table delete', () => {
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -442,6 +458,7 @@ describe('readonly nested table delete override', () => {
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -475,6 +492,7 @@ describe('readonly column no change', () => {
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -521,6 +539,7 @@ describe('readonly nested column', () => {
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -564,6 +583,7 @@ describe('readonly nested table', () => {
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -602,6 +622,7 @@ describe('readonly table with column override', () => {
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -649,6 +670,7 @@ describe('readonly column delete', () => {
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -714,6 +736,10 @@ const connections = {
 		db: map({ db: (con) => con.sqlite(sqliteName, { size: 1 }) }),
 		init: initSqlite
 	},
+	d1: {
+		db: map({ db: (con) => con.d1(d1, { size: 1 }) }),
+		init: initSqlite
+	},
 	sqlite2: {
 		db: map({ db: (con) => con.sqlite(sqliteName2, { size: 1 }) }),
 		init: initSqlite
@@ -730,7 +756,7 @@ const connections = {
 					password: 'P@assword123',
 					connectString: 'oracle/XE',
 					privilege: 2
-				}, {size: 1}
+				}, { size: 1 }
 
 			)
 		}),
@@ -755,6 +781,8 @@ function getDb(name) {
 		return connections.pg;
 	else if (name === 'sqlite')
 		return connections.sqlite;
+	else if (name === 'd1')
+		return connections.d1;
 	else if (name === 'sqlite2')
 		return connections.sqlite2;
 	else if (name === 'sap')

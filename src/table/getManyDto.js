@@ -1,9 +1,8 @@
-const tryGetSessionContext = require('../table/tryGetSessionContext');
+const getSessionSingleton = require('../table/getSessionSingleton');
 const getManyDtoCore = require('../getManyDto');
 
-
-function getManyDto(_table, _filter, _strategy) {
-	const _getManyDto = tryGetSessionContext().getManyDto || getManyDtoCore;
+function getManyDto(context, _table, _filter, _strategy) {
+	const _getManyDto = getSessionSingleton(context, 'getManyDto') || getManyDtoCore;
 	return _getManyDto.apply(null, arguments);
 }
 

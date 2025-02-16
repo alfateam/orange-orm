@@ -4,12 +4,12 @@ var newJoinSql = require('../../table/query/singleQuery/newJoinSql');
 var newParameterized = require('../../table/query/newParameterized');
 var getSessionSingleton = require('../../table/getSessionSingleton');
 
-function _new(table,filter,span, alias,orderBy,limit,offset) {
-	var quote = getSessionSingleton('quote');
+function _new(context,table,filter,span, alias,orderBy,limit,offset) {
+	var quote = getSessionSingleton(context, 'quote');
 	var name = quote(table._dbName);
-	var columnSql = newColumnSql(table,span,alias,true);
-	var joinSql = newJoinSql(span, alias);
-	var whereSql = newWhereSql(table,filter,alias);
+	var columnSql = newColumnSql(context,table,span,alias,true);
+	var joinSql = newJoinSql(context, span, alias);
+	var whereSql = newWhereSql(context,table,filter,alias);
 	if (limit)
 		limit = limit + ' ';
 

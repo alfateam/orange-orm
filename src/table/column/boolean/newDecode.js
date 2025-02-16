@@ -2,7 +2,7 @@ var purify = require('./purify');
 
 function _new(column) {
 
-	return function(value) {
+	return function(context, value) {
 		if (value == column.dbNull)
 			return null;
 		return purify(value);

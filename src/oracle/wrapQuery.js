@@ -10,9 +10,6 @@ function wrapQuery(connection) {
 		var sql = replaceParamChar(query, params);
 		log.emitQuery({ sql, parameters: params });
 
-
-
-
 		runOriginalQuery.call(connection, sql, params, {
 			fetchTypeHandler: function(metaData) {
 				// Tells the database to return column names in lowercase

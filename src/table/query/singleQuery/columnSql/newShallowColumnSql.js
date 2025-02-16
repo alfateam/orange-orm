@@ -1,7 +1,7 @@
 const getSessionSingleton = require('../../../getSessionSingleton');
 
-function _new(table, alias, span, ignoreNulls) {
-	const quote = getSessionSingleton('quote');
+function _new(context, table, alias, span, ignoreNulls) {
+	const quote = getSessionSingleton(context, 'quote');
 	const quotedAlias = quote(alias);
 	let columnsMap = span.columns;
 	var columns = table._columns;
@@ -28,11 +28,11 @@ function _new(table, alias, span, ignoreNulls) {
 	return sql;
 
 	function formatColumn(column) {
-		const formatted = column.formatOut ? column.formatOut(quotedAlias) : quotedAlias + '.' + quote(column._dbName);
+		const formatted = column.formatOut ? column.formatOut(context, quotedAlias) : quotedAlias + '.' + quote(column._dbName);
 		if (column.dbNull === null)
 			return formatted;
 		else {
-			const encoded = column.encode.unsafe(column.dbNull);
+			const encoded = column.encode.unsafe(context, column.dbNull);
 			return `CASE WHEN ${formatted}=${encoded} THEN null ELSE ${formatted} END`;
 		}
 	}

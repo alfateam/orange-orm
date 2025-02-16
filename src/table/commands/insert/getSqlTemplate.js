@@ -1,19 +1,19 @@
 let getSessionContext = require('../../getSessionContext');
 let quote = require('../../quote');
 
-function getSqlTemplate(_table, _row) {
-	let context = getSessionContext();
-	if (context.insertSql)
-		return context.insertSql.apply(null, arguments);
+function getSqlTemplate(context, _table, _row) {
+	let rdb = getSessionContext(context);
+	if (rdb.insertSql)
+		return rdb.insertSql.apply(null, arguments);
 	else
 		return getSqlTemplateDefault.apply(null, arguments);
 
 }
 
-function getSqlTemplateDefault(table, row) {
+function getSqlTemplateDefault(context, table, row) {
 	let columnNames = [];
 	let values = [];
-	let sql = 'INSERT INTO ' + quote(table._dbName) + ' ';
+	let sql = 'INSERT INTO ' + quote(context, table._dbName) + ' ';
 	addDiscriminators();
 	addColumns();
 	if (columnNames.length === 0)
@@ -26,7 +26,7 @@ function getSqlTemplateDefault(table, row) {
 		let discriminators = table._columnDiscriminators;
 		for (let i = 0; i < discriminators.length; i++) {
 			let parts = discriminators[i].split('=');
-			columnNames.push(quote(parts[0]));
+			columnNames.push(quote(context, parts[0]));
 			values.push(parts[1]);
 		}
 	}
@@ -36,29 +36,29 @@ function getSqlTemplateDefault(table, row) {
 		for (let i = 0; i < columns.length; i++) {
 			let column = columns[i];
 			if (row['__' + column.alias] !== undefined) {
-				columnNames.push(quote(column._dbName));
+				columnNames.push(quote(context, column._dbName));
 				values.push('%s');
 			}
 		}
 	}
 
 	function lastInserted() {
-		let context = getSessionContext();
-		if (!context.lastInsertedIsSeparate && context.lastInsertedSql)
-			return ' ' + context.lastInsertedSql(table);
+		let rdb = getSessionContext(context);
+		if (!rdb.lastInsertedIsSeparate && rdb.lastInsertedSql)
+			return ' ' + rdb.lastInsertedSql(table);
 		return '';
 	}
 
 	function outputInserted() {
-		let context = getSessionContext();
-		if (!context.lastInsertedIsSeparate && context.outputInsertedSql)
-			return ' ' + context.outputInsertedSql(table) + ' ';
+		let rdb = getSessionContext(context);
+		if (!rdb.lastInsertedIsSeparate && rdb.outputInsertedSql)
+			return ' ' + rdb.outputInsertedSql(table) + ' ';
 		return '';
 	}
 
 	function defaultValues() {
-		let context = getSessionContext();
-		let _default = context.insertDefault || 'DEFAULT VALUES';
+		let rdb = getSessionContext(context);
+		let _default = rdb.insertDefault || 'DEFAULT VALUES';
 		return `${_default}${lastInserted()}`;
 
 	}

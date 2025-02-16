@@ -1,5 +1,4 @@
 const Ajv = require('ajv');
-const inspect = require('util').inspect;
 
 function defineColumn(column, table) {
 	var c = {};
@@ -139,7 +138,7 @@ function defineColumn(column, table) {
 				previousValidate.apply(null, arguments);
 			let valid = validate.apply(null, arguments);
 			if (!valid) {
-				let e = new Error(`Column ${table._dbName}.${column._dbName} violates JSON Schema: ${inspect(validate.errors, false, 10)}`);
+				let e = new Error(`Column ${table._dbName}.${column._dbName} violates JSON Schema: ${inspect(validate.errors)}`);
 				e.errors = validate.errors;
 				e.status = 400;
 				throw e;
@@ -150,5 +149,10 @@ function defineColumn(column, table) {
 
 	return c;
 }
+
+function inspect(obj) {
+	return JSON.stringify(obj, null, 2);
+}
+
 
 module.exports = defineColumn;

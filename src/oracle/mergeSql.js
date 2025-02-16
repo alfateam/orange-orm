@@ -1,8 +1,6 @@
-const outputInsertedSql = require('./outputInsertedSql');
-const getSessionSingleton = require('../table/getSessionSingleton');
+const quote = require('./quote');
 
 function insertSql(table, row, options) {
-	const quote = getSessionSingleton('quote');
 	let columnNames = [];
 	let regularColumnNames = [];
 	let conflictColumnUpdateSql = '';
@@ -13,9 +11,9 @@ function insertSql(table, row, options) {
 	const matched = whenMatched();
 	let sql;
 	if (matched)
-		sql = `MERGE INTO ${quote(table._dbName)} target USING (SELECT ${values.join(',')} FROM DUAL) source ON (${join()}) WHEN MATCHED THEN ${matched} WHEN NOT MATCHED THEN ${whenNotMatched()} ${outputInsertedSql(table)}`;
+		sql = `MERGE INTO ${quote(table._dbName)} target USING (SELECT ${values.join(',')} FROM DUAL) source ON (${join()}) WHEN MATCHED THEN ${matched} WHEN NOT MATCHED THEN ${whenNotMatched()}`;
 	else
-		sql = `MERGE INTO ${quote(table._dbName)} target USING (SELECT ${values.join(',')} FROM DUAL) source ON (${join()}) WHEN NOT MATCHED THEN ${whenNotMatched()} ${outputInsertedSql(table)}`;
+		sql = `MERGE INTO ${quote(table._dbName)} target USING (SELECT ${values.join(',')} FROM DUAL) source ON (${join()}) WHEN NOT MATCHED THEN ${whenNotMatched()}`;
 	return sql;
 
 	function join() {
@@ -72,7 +70,6 @@ function insertSql(table, row, options) {
 			if (concurrency === 'overwrite')
 				conflictColumnUpdates.push(`target.${columnName}=source.${columnName}`);
 			else if (concurrency === 'optimistic')
-				// conflictColumnUpdates.push(`target.${column._dbName} = CASE WHEN target.${column._dbName} <> source.${column._dbName} THEN RAISE_APPLICATION_ERROR(-20001, 'Conflict when updating ${column._dbName}') ELSE target.${column._dbName} END`);
 				conflictColumnUpdates.push(`target.${columnName} = CASE WHEN target.${columnName} <> source.${columnName} THEN 1/0 ELSE target.${columnName} END`);
 
 		}

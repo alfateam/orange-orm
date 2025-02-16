@@ -3,20 +3,21 @@ const newQuery = require('./getManyDto/newQuery');
 const negotiateRawSqlFilter = require('./table/column/negotiateRawSqlFilter');
 const strategyToSpan = require('./table/strategyToSpan');
 const executeQueries = require('./table/executeQueries');
+const getSessionSingleton = require('./table/getSessionSingleton');
 
-async function getManyDto(table, filter, strategy, spanFromParent, updateParent) {
-	filter = negotiateRawSqlFilter(filter, table);
+async function getManyDto(context, table, filter, strategy, spanFromParent, updateParent) {
+	filter = negotiateRawSqlFilter(context, filter, table);
 	if (strategy && strategy.where) {
-		let arg = typeof strategy.where === 'function' ? strategy.where(table) : strategy.where;
-		filter = filter.and(arg);
+		let arg = typeof strategy.where === 'function' ? strategy.where(context, table) : strategy.where;
+		filter = filter.and(context, arg);
 	}
 
 	let span = spanFromParent || strategyToSpan(table, strategy);
 	let alias = table._dbName;
 
-	const query = newQuery(table, filter, span, alias);
-	const res = await executeQueries([query]);
-	return decode(strategy, span, await res[0], undefined, updateParent);
+	const query = newQuery(context, table, filter, span, alias);
+	const res = await executeQueries(context, [query]);
+	return decode(context, strategy, span, await res[0], undefined, updateParent);
 }
 
 function newCreateRow(span) {
@@ -149,7 +150,7 @@ function hasManyRelations(span) {
 	}
 }
 
-async function decode(strategy, span, rows, keys = rows.length > 0 ? Object.keys(rows[0]) : [], updateParent) {
+async function decode(context, strategy, span, rows, keys = rows.length > 0 ? Object.keys(rows[0]) : [], updateParent) {
 	const table = span.table;
 	let columnsMap = span.columns;
 	const columns = table._columns.filter(column => !columnsMap || columnsMap.get(column));
@@ -179,18 +180,16 @@ async function decode(strategy, span, rows, keys = rows.length > 0 ? Object.keys
 				}
 			}
 			const column = columns[j];
-			outRow[column.alias] = column.decode(row[keys[j]]);
+			outRow[column.alias] = column.decode(context, row[keys[j]]);
 		}
 
 		for (let j = 0; j < aggregateKeys.length; j++) {
 			const key = aggregateKeys[j];
-			const parse = span.aggregates[key].column?.decode || Number.parseFloat;
-			outRow[key] = parse(row[keys[j + columnsLength]]);
+			const parse = span.aggregates[key].column?.decode || ((context, arg) => Number.parseFloat(arg));
+			outRow[key] = parse(context, row[keys[j + columnsLength]]);
 		}
 
 		outRows[i] = outRow;
-		// if (parentRows)
-		// 	parentRows[i][parentProp] = outRow;
 		if (updateParent)
 			updateParent(outRow, i);
 		if (shouldCreateMap) {
@@ -208,13 +207,11 @@ async function decode(strategy, span, rows, keys = rows.length > 0 ? Object.keys
 	const all = [];
 
 	if (shouldCreateMap) {
-		all.push(decodeManyRelations(strategy, span));
-		all.push(decodeRelations2(strategy, span, rows, outRows, keys));
+		all.push(decodeManyRelations(context, strategy, span));
+		all.push(decodeRelations2(context, strategy, span, rows, outRows, keys));
 	}
-	// decodeRelations2(strategy, span, rows, outRows, keys);
-	// }
 	else
-		all.push(decodeRelations2(strategy, span, rows, outRows, keys));
+		all.push(decodeRelations2(context, strategy, span, rows, outRows, keys));
 
 	await Promise.all(all);
 
@@ -240,11 +237,25 @@ async function decode(strategy, span, rows, keys = rows.length > 0 ? Object.keys
 
 }
 
-async function decodeManyRelations(strategy, span) {
+async function decodeManyRelations(context, strategy, span) {
+	const maxParameters = getSessionSingleton(context, 'maxParameters');
+	const maxRows = maxParameters
+		? maxParameters * span.table._primaryColumns.length
+		: undefined;
+
 	const promises = [];
 	const c = {};
 	c.visitJoin = () => { };
 	c.visitOne = c.visitJoin;
+
+	// Helper function to split an array into chunks
+	function chunk(array, size) {
+		const results = [];
+		for (let i = 0; i < array.length; i += size) {
+			results.push(array.slice(i, i + size));
+		}
+		return results;
+	}
 
 	c.visitMany = function(leg) {
 		const name = leg.name;
@@ -252,58 +263,79 @@ async function decodeManyRelations(strategy, span) {
 		const relation = table._relations[name];
 		const rowsMap = span._rowsMap;
 
-		const filter = createOneFilter(relation, span._ids);
 		const extractKey = createExtractKey(leg);
 		const extractFromMap = createExtractFromMap(rowsMap, table._primaryColumns);
 
-		const p = getManyDto(relation.childTable, filter, strategy[name], leg.span, updateParent);
-		// .then(subRows => {
-		// 	for (let i = 0; i < subRows.length; i++) {
-		// 		const key = extractKey(subRows[i]);
-		// 		const parentRow = extractFromMap(key);
-		// 		parentRow[name].push(subRows[i]);
-		// 	}
-		// });
+		// If maxRows is defined, chunk the IDs before calling getManyDto
+		if (maxRows) {
+			const chunkedIds = chunk(span._ids, maxRows);
+			for (const idsChunk of chunkedIds) {
+				const filter = createOneFilter(context, relation, idsChunk);
+				const p = getManyDto(
+					context,
+					relation.childTable,
+					filter,
+					strategy[name],
+					leg.span,
+					updateParent
+				);
+				promises.push(p);
+			}
+		} else {
+			// Otherwise, do the entire set in one go
+			const filter = createOneFilter(context, relation, span._ids);
+			const p = getManyDto(
+				context,
+				relation.childTable,
+				filter,
+				strategy[name],
+				leg.span,
+				updateParent
+			);
+			promises.push(p);
+		}
 
 		function updateParent(subRow) {
 			const key = extractKey(subRow);
 			const parentRow = extractFromMap(key);
 			parentRow[name].push(subRow);
 		}
-
-		promises.push(p);
 	};
 
 	function createExtractKey(leg) {
 		if (leg.columns.length === 1) {
 			const alias = leg.columns[0].alias;
 			return (row) => row[alias];
-		}
-		else {
+		} else {
 			const aliases = leg.columns.map(column => column.alias);
 			return (row) => aliases.map(alias => row[alias]);
 		}
 	}
+
 	function createExtractFromMap(map, primaryColumns) {
-		if (primaryColumns.length === 1)
+		if (primaryColumns.length === 1) {
 			return (key) => map.get(key);
-		else
+		} else {
 			return getFromMap.bind(null, map, primaryColumns);
+		}
 	}
 
+	// Visit all legs
 	span.legs.forEach(onEachLeg);
 
 	function onEachLeg(leg) {
 		leg.accept(c);
 	}
 
+	// Wait until all promises resolve
 	await Promise.all(promises);
 }
-async function decodeRelations2(strategy, span, rawRows, resultRows, keys) {
+
+async function decodeRelations2(context, strategy, span, rawRows, resultRows, keys) {
 	const c = {};
 	c.visitJoin = function(leg) {
 		const name = leg.name;
-		return decode(strategy[name], leg.span, rawRows, keys, updateParent);
+		return decode(context, strategy[name], leg.span, rawRows, keys, updateParent);
 
 		function updateParent(subRow, i) {
 			resultRows[i][name] = subRow;
@@ -323,11 +355,11 @@ async function decodeRelations2(strategy, span, rawRows, resultRows, keys) {
 	await processLegsSequentially(span.legs);
 }
 
-function createOneFilter(relation, ids) {
+function createOneFilter(context, relation, ids) {
 	const columns = relation.joinRelation.columns;
 
 	if (columns.length === 1)
-		return columns[0].in(ids);
+		return columns[0].in(context, ids);
 
 	else
 		return createCompositeFilter();
@@ -338,11 +370,11 @@ function createOneFilter(relation, ids) {
 			let nextFilter;
 			for (let i = 0; i < columns.length; i++) {
 				if (nextFilter)
-					nextFilter = nextFilter.and(columns[i].eq(id[i]));
+					nextFilter = nextFilter.and(context, columns[i].eq(context, id[i]));
 				else
-					nextFilter = columns[i].eq(id[i]);
+					nextFilter = columns[i].eq(context, id[i]);
 			}
-			filter = filter.or(nextFilter);
+			filter = filter.or(context, nextFilter);
 		}
 		return filter;
 	}

@@ -1,12 +1,11 @@
-let outputInsertedSql = require('./outputInsertedSql');
 let mergeSql = require('./mergeSql');
-const getSessionSingleton = require('../table/getSessionSingleton');
+const quote = require('./quote');
 
-function getSqlTemplate(_table, _row, options) {
+function getSqlTemplate(_context, _table, _row, options) {
 	if (hasConcurrency(_table, options) && hasColumns())
-		return mergeSql.apply(null, arguments);
+		return mergeSql.apply(null, [...arguments].slice(1));
 	else
-		return insertSql.apply(null, arguments);
+		return insertSql.apply(null, [...arguments].slice(1));
 
 	function hasColumns() {
 		for(let p in _row) {
@@ -27,7 +26,6 @@ function hasConcurrency(table,options) {
 }
 
 function insertSql(table, row) {
-	const quote = getSessionSingleton('quote');
 	let columnNames = [];
 	let regularColumnNames = [];
 	let values = [];
@@ -35,9 +33,9 @@ function insertSql(table, row) {
 	addDiscriminators();
 	addColumns();
 	if (columnNames.length === 0)
-		sql += `${outputInserted()} (${quote(table._primaryColumns[0]._dbName)}) VALUES(DEFAULT)`;
+		sql += ` (${quote(table._primaryColumns[0]._dbName)}) VALUES(DEFAULT)`;
 	else
-		sql = sql + '('+ columnNames.join(',') + ')' + outputInserted() +  'VALUES (' + values.join(',') + ')';
+		sql = sql + '('+ columnNames.join(',') + ')'  +  ' VALUES (' + values.join(',') + ')';
 	return sql;
 
 	function addDiscriminators() {
@@ -63,12 +61,6 @@ function insertSql(table, row) {
 					values.push('%s');
 			}
 		}
-	}
-
-
-	function outputInserted() {
-
-		return ' ' + outputInsertedSql(table) + ' ';
 	}
 
 }

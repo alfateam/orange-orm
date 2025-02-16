@@ -1,17 +1,17 @@
-var newParameterized = require('../query/newParameterized');
-var getSqlTemplate = require('./insert/getSqlTemplate');
-var util = require('util');
+const newParameterized = require('../query/newParameterized');
+const getSqlTemplate = require('./insert/getSqlTemplate');
+const formatString = require('../../format');
 
-function newInsertCommandCore(table, row, options = {}) {
-	var parameters = [];
-	var values = [getSqlTemplate(table, row, options)];
+function newInsertCommandCore(context, table, row, options = {}) {
+	let parameters = [];
+	let values = [getSqlTemplate(context, table, row, options)];
 
-	var columns = table._columns;
-	for (var i = 0; i < columns.length; i++) {
-		var column = columns[i];
-		var alias = column.alias;
+	let columns = table._columns;
+	for (let i = 0; i < columns.length; i++) {
+		let column = columns[i];
+		let alias = column.alias;
 		if (row['__' + column.alias] !== undefined) {
-			var encoded = column.encode(row[alias]);
+			let encoded = column.encode(context, row[alias]);
 			if (encoded.parameters.length > 0) {
 				values.push('?');
 				parameters.push(encoded.parameters[0]);
@@ -20,7 +20,7 @@ function newInsertCommandCore(table, row, options = {}) {
 		}
 	}
 
-	var sql = util.format.apply(null, values);
+	let sql = formatString.apply(null, values);
 	return newParameterized(sql, parameters);
 }
 

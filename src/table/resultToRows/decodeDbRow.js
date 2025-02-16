@@ -1,6 +1,6 @@
 var newDecodeDbRow = require('./newDecodeDbRow');
 
-function decodeDbRow(span, table, dbRow, shouldValidate, isInsert) {
+function decodeDbRow(context, span, table, dbRow, shouldValidate, isInsert) {
 	var decode = span._decodeDbRow;
 	if (!decode) {
 		let aliases = new Set();
@@ -19,7 +19,7 @@ function decodeDbRow(span, table, dbRow, shouldValidate, isInsert) {
 			},
 		});
 	}
-	return decode(dbRow);
+	return decode(context, dbRow);
 }
 
 module.exports = decodeDbRow;

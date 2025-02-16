@@ -6,10 +6,6 @@ let rollback = require('../table/rollback');
 let newPool = require('./newPool');
 let lock = require('../lock');
 let executeSchema = require('./schema');
-let useHook = require('../useHook');
-let promise = require('promise/domains');
-let versionArray = process.version.replace('v', '').split('.');
-let major = parseInt(versionArray[0]);
 let express = require('../hostExpress');
 let hostLocal = require('../hostLocal');
 let doQuery = require('../query');
@@ -41,14 +37,8 @@ function newDatabase(connectionString, poolOptions) {
 
 		if (fn)
 			return domain.run(runInTransaction);
-		else if ((major >= 12) && useHook()) {
-			domain.exitContext = true;
-			return domain.start().then(run);
-		}
 		else
 			return domain.run(run);
-
-
 
 		async function runInTransaction() {
 			let result;
@@ -56,24 +46,21 @@ function newDatabase(connectionString, poolOptions) {
 			await new Promise(transaction)
 				.then(begin)
 				.then(negotiateSchema)
-				.then(fn)
+				.then(() => fn(domain))
 				.then((res) => result = res)
-				.then(c.commit)
-				.then(null, c.rollback);
+				.then(() => commit(domain))
+				.then(null, (e) => rollback(domain,e));
 			return result;
 		}
 
 		function begin() {
-			return _begin(options?.readonly);
+			return _begin(domain, options);
 		}
 
 		function run() {
 			let p;
 			let transaction = newTransaction(domain, pool, options);
-			if (useHook())
-				p = new Promise(transaction);
-			else
-				p = new promise(transaction);
+			p = new Promise(transaction);
 
 			return p.then(begin)
 				.then(negotiateSchema);
@@ -83,37 +70,34 @@ function newDatabase(connectionString, poolOptions) {
 			let schema = options && options.schema;
 			if (!schema)
 				return previous;
-			return executeSchema(schema);
+			return executeSchema(domain, schema);
 		}
 	};
 
 	c.createTransaction = function(options) {
 		let domain = createDomain();
-		let transaction = newTransaction(domain, pool);
-		let p = domain.run(() => new Promise(transaction).then(_begin).then(negotiateSchema));
+		let transaction = newTransaction(domain, pool, options);
+		let p = domain.run(() => new Promise(transaction)
+			.then(begin).then(negotiateSchema));
 
 		function run(fn) {
 			return p.then(domain.run.bind(domain, fn));
+		}
+
+		function begin() {
+			return _begin(domain, options);
 		}
 
 		function negotiateSchema(previous) {
 			let schema = options && options.schema;
 			if (!schema)
 				return previous;
-			return executeSchema(schema);
+			return executeSchema(domain,schema);
 		}
 
-		return run;
-	};
+		run.rollback = rollback.bind(null, domain);
+		run.commit = commit.bind(null, domain);
 
-	c.bindTransaction = function() {
-		// @ts-ignore
-		var domain = process.domain;
-		let p = domain.run(() => true);
-
-		function run(fn) {
-			return p.then(domain.run.bind(domain, fn));
-		}
 		return run;
 	};
 
@@ -121,21 +105,20 @@ function newDatabase(connectionString, poolOptions) {
 		let domain = createDomain();
 		let transaction = newTransaction(domain, pool);
 		let p = domain.run(() => new Promise(transaction)
-			.then(() => setSessionSingleton('changes', []))
-			.then(() => doQuery(query).then(onResult, onError)));
+			.then(() => setSessionSingleton(domain, 'changes', []))
+			.then(() => doQuery(domain, query).then(onResult, onError)));
 		return p;
 
 		function onResult(result) {
-			releaseDbClient();
+			releaseDbClient(domain);
 			return result;
 		}
 
 		function onError(e) {
-			releaseDbClient();
+			releaseDbClient(domain);
 			throw e;
 		}
 	};
-
 
 	c.rollback = rollback;
 	c.commit = commit;

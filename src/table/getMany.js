@@ -5,18 +5,18 @@ let strategyToSpan = require('./strategyToSpan');
 let emptyInnerJoin = require('./query/newParameterized')();
 let negotiateRawSqlFilter = require('./column/negotiateRawSqlFilter');
 
-function getMany(table,filter,strategy) {
-	return getManyCore(table,filter,strategy);
+function getMany(context,table,filter,strategy) {
+	return getManyCore(context, table,filter,strategy);
 }
 
-async function getManyCore(table,filter,strategy,exclusive) {
+async function getManyCore(context,table,filter,strategy,exclusive) {
 	let alias = table._dbName;
 	let noOrderBy;
-	filter = negotiateRawSqlFilter(filter, table);
+	filter = negotiateRawSqlFilter(context, filter, table);
 	let span = strategyToSpan(table,strategy);
-	let queries = newQuery([],table,filter,span,alias,emptyInnerJoin,noOrderBy,exclusive);
-	let result = await executeQueries(queries);
-	return resultToRows(span,result);
+	let queries = newQuery(context, [],table,filter,span,alias,emptyInnerJoin,noOrderBy,exclusive);
+	let result = await executeQueries(context, queries);
+	return resultToRows(context, span,result);
 }
 
 getMany.exclusive = function(table,filter,strategy) {

@@ -1,5 +1,5 @@
+const promisify = require('../promisify');
 var pools = require('../pools');
-var promise = require('../table/promise');
 var end = require('./pool/end');
 var newGenericPool = require('../mssql/pool/newGenericPool');
 var newId = require('../newId');
@@ -11,7 +11,7 @@ function newPool(connectionString, poolOptions) {
 	var c = {};
 
 	c.connect = pool.connect;
-	c.end = promise.denodeify(boundEnd);
+	c.end = promisify(boundEnd);
 	pools[id] = c;
 	return c;
 }

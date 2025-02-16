@@ -3,21 +3,21 @@ var getSessionContext = require('../getSessionContext');
 var newJoinCore = require('../query/singleQuery/joinSql/newShallowJoinSqlCore');
 const getSessionSingleton = require('../getSessionSingleton');
 
-function columnAggregate(operator, column, relations, coalesce = true) {
-	const quote = getSessionSingleton('quote');
-	const context = getSessionContext();
-	const outerAlias = 'y' + context.aggregateCount++;
+function columnAggregate(context, operator, column, relations, coalesce = true) {
+	const quote = getSessionSingleton(context, 'quote');
+	const rdb = getSessionContext(context);
+	const outerAlias = 'y' + rdb.aggregateCount++;
 	const outerAliasQuoted = quote(outerAlias);
 	const alias = quote('x' + relations.length);
 	const foreignKeys = getForeignKeys(relations[0]);
 	const select = ` LEFT JOIN (SELECT ${foreignKeys},${operator}(${alias}.${quote(column._dbName)}) as amount`;
-	const innerJoin = relations.length > 1 ? newJoin(relations).sql() : '';
-	const onClause = createOnClause(relations[0], outerAlias);
+	const innerJoin = relations.length > 1 ? newJoin(context, relations).sql() : '';
+	const onClause = createOnClause(context, relations[0], outerAlias);
 	const from = ` FROM ${quote(relations.at(-1).childTable._dbName)} ${alias} ${innerJoin} GROUP BY ${foreignKeys}) ${outerAliasQuoted} ON (${onClause})`;
-	const join = select  + from ;
+	const join = select + from;
 
 	return {
-		expression: (alias) => coalesce? `COALESCE(${outerAliasQuoted}.amount, 0) as ${quote(alias)}` : `${outerAliasQuoted}.amount as ${alias}`,
+		expression: (alias) => coalesce ? `COALESCE(${outerAliasQuoted}.amount, 0) as ${quote(alias)}` : `${outerAliasQuoted}.amount as ${alias}`,
 		joins: [join]
 	};
 
@@ -32,13 +32,13 @@ function columnAggregate(operator, column, relations, coalesce = true) {
 	}
 }
 
-function createOnClause(relation, rightAlias) {
+function createOnClause(context, relation, rightAlias) {
 	var c = {};
 	var sql = '';
 	let leftAlias = relation.parentTable._rootAlias || relation.parentTable._dbName;
 
 	c.visitJoin = function(relation) {
-		sql = newJoinCore(relation.childTable,relation.columns,relation.childTable._primaryColumns,leftAlias,rightAlias).sql();
+		sql = newJoinCore(context, relation.childTable, relation.columns, relation.childTable._primaryColumns, leftAlias, rightAlias).sql();
 	};
 
 	c.visitOne = function(relation) {
@@ -53,7 +53,7 @@ function createOnClause(relation, rightAlias) {
 		var parentTable = relation.parentTable;
 		var columns = joinRelation.columns;
 
-		sql = newJoinCore(childTable,parentTable._primaryColumns,columns,leftAlias, rightAlias).sql();
+		sql = newJoinCore(context, childTable, parentTable._primaryColumns, columns, leftAlias, rightAlias).sql();
 	}
 
 	relation.accept(c);

@@ -19,46 +19,46 @@ module.exports = function(table, name) {
 	table._columns.push(c);
 	table[name] = c;
 
-	c.equal = function(arg, alias) {
+	c.equal = function(context, arg, alias) {
 		alias = extractAlias(alias);
-		return equal(c, arg, alias);
+		return equal(context, c, arg, alias);
 	};
 
-	c.notEqual = function(arg, alias) {
+	c.notEqual = function(context, arg, alias) {
 		alias = extractAlias(alias);
-		return notEqual(c, arg, alias);
+		return notEqual(context, c, arg, alias);
 	};
 
-	c.lessThan = function(arg, alias) {
+	c.lessThan = function(context, arg, alias) {
 		alias = extractAlias(alias);
-		return lessThan(c, arg, alias);
+		return lessThan(context, c, arg, alias);
 	};
 
-	c.lessThanOrEqual = function(arg, alias) {
+	c.lessThanOrEqual = function(context, arg, alias) {
 		alias = extractAlias(alias);
-		return lessThanOrEqual(c, arg, alias);
+		return lessThanOrEqual(context, c, arg, alias);
 	};
 
-	c.greaterThan = function(arg, alias) {
+	c.greaterThan = function(context, arg, alias) {
 		alias = extractAlias(alias);
-		return greaterThan(c, arg, alias);
+		return greaterThan(context, c, arg, alias);
 	};
 
-	c.greaterThanOrEqual = function(arg, alias) {
+	c.greaterThanOrEqual = function(context, arg, alias) {
 		alias = extractAlias(alias);
-		return greaterThanOrEqual(c, arg, alias);
+		return greaterThanOrEqual(context, c, arg, alias);
 	};
 
-	c.between = function(from, to, alias) {
+	c.between = function(context, from, to, alias) {
 		alias = extractAlias(alias);
-		from = c.greaterThanOrEqual(from, alias);
-		to = c.lessThanOrEqual(to, alias);
+		from = c.greaterThanOrEqual(context, from, alias);
+		to = c.lessThanOrEqual(context, to, alias);
 		return from.and(to);
 	};
 
-	c.in = function(arg, alias) {
+	c.in = function(context, arg, alias) {
 		alias = extractAlias(alias);
-		return _in(c, arg, alias);
+		return _in(context, c, arg, alias);
 	};
 
 	c.eq = c.equal;
@@ -76,12 +76,12 @@ module.exports = function(table, name) {
 	c.IN = c.in;
 	c.self = self;
 
-	function self() {
-		const tableAlias = quote(table._rootAlias || table._dbName);
-		const columnName = quote(c._dbName);
+	function self(context) {
+		const tableAlias = quote(context,table._rootAlias || table._dbName);
+		const columnName = quote(context, c._dbName);
 
 		return {
-			expression: (alias) => `${tableAlias}.${columnName} ${quote(alias)}`,
+			expression: (alias) => `${tableAlias}.${columnName} ${quote(context, alias)}`,
 			joins: [''],
 			column: c,
 			groupBy: `${tableAlias}.${columnName}`

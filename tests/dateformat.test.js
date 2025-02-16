@@ -1,7 +1,7 @@
-import { describe, test, beforeAll, expect } from 'vitest';
+import { describe, test, beforeAll, expect, afterAll } from 'vitest';
 import { fileURLToPath } from 'url';
+import setupD1 from './setupD1';
 const map = require('./db');
-
 const initPg = require('./initPg');
 const initOracle = require('./initOracle');
 const initMs = require('./initMs');
@@ -10,15 +10,18 @@ const initSqlite = require('./initSqlite');
 const initSap = require('./initSap');
 
 const port = 3002;
+let d1;
+let miniflare;
 
 beforeAll(async () => {
-
+	({ d1, miniflare } = await setupD1(fileURLToPath(import.meta.url)));
 	await insertData('pg');
 	await insertData('oracle');
 	await insertData('mssql');
 	await insertData('mysql');
 	await insertData('sap');
 	await insertData('sqlite');
+	await insertData('d1');
 
 	async function insertData(dbName) {
 		const { db, init } = getDb(dbName);
@@ -71,6 +74,11 @@ beforeAll(async () => {
 	// 	]);
 	}
 });
+
+afterAll(async () => {
+	await miniflare.dispose();
+});
+
 
 // describe('dateformat raw', () => {
 
@@ -186,6 +194,18 @@ describe('dateformat get', () => {
 		expect(result).toEqual({ id: 1, date: '2023-08-05T12:00:00', datetime: '2023-08-05T12:00:00', datetime_tz: '2023-08-05T12:00:00-03:00' });
 	});
 
+	test('d1', async () => {
+		const { db } = getDb('d1');
+		const result = await db.datetestWithTz.getOne();
+		expect(result).toEqual({ id: 1, date: '2023-07-14T12:00:00', datetime: '2023-07-14T12:00:00', datetime_tz: '2023-07-14T12:00:00-08:00' });
+		result.date = newValue;
+		result.datetime = newValue;
+		result.datetime_tz = newValue;
+		await result.saveChanges();
+		await result.refresh();
+		expect(result).toEqual({ id: 1, date: '2023-08-05T12:00:00', datetime: '2023-08-05T12:00:00', datetime_tz: '2023-08-05T12:00:00-03:00' });
+	});
+
 
 });
 
@@ -194,7 +214,6 @@ const lastSegment = pathSegments[pathSegments.length - 1];
 const fileNameWithoutExtension = lastSegment.split('.')[0];
 const sqliteName = `demo.${fileNameWithoutExtension}.db`;
 const sqliteName2 = `demo.${fileNameWithoutExtension}2.db`;
-
 
 const connections = {
 	mssql: {
@@ -230,6 +249,10 @@ const connections = {
 		db: map({ db: (con) => con.sqlite(sqliteName, { size: 1 }) }),
 		init: initSqlite
 	},
+	d1: {
+		db: map({ db: (con) => con.d1(d1, { size: 1 }) }),
+		init: initSqlite
+	},
 	sqlite2: {
 		db: map({ db: (con) => con.sqlite(sqliteName2, { size: 1 }) }),
 		init: initSqlite
@@ -246,7 +269,7 @@ const connections = {
 					password: 'P@assword123',
 					connectString: 'oracle/XE',
 					privilege: 2
-				}, {size: 1}
+				}, { size: 1 }
 
 			)
 		}),
@@ -271,6 +294,8 @@ function getDb(name) {
 		return connections.pg;
 	else if (name === 'sqlite')
 		return connections.sqlite;
+	else if (name === 'd1')
+		return connections.d1;
 	else if (name === 'sqlite2')
 		return connections.sqlite2;
 	else if (name === 'sap')

@@ -1,4 +1,4 @@
-function newForeignKeyFilter(joinRelation, parentRow) {
+function newForeignKeyFilter(context, joinRelation, parentRow) {
 	var columns = joinRelation.columns;
 	var rightTable = joinRelation.childTable;
 
@@ -12,7 +12,7 @@ function newForeignKeyFilter(joinRelation, parentRow) {
 	function getNextFilterPart(index) {
 		var column = columns[index];
 		var pk = rightTable._primaryColumns[index];
-		return column.eq(parentRow[pk.alias]);
+		return column.eq(context, parentRow[pk.alias]);
 	}
 	return filter;
 }

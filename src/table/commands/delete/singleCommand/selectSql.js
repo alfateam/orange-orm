@@ -1,11 +1,11 @@
-var newParameterized = require('../../../query/newParameterized');
-var newBoolean = require('../../../column/newBoolean');
+const newParameterized = require('../../../query/newParameterized');
+const newBoolean = require('../../../column/newBoolean');
 const quote = require('../../../quote');
 
-function newSelectSql(table, alias) {
-	var colName = quote(table._primaryColumns[0]._dbName);
-	alias = quote(alias);
-	var sql = 'SELECT ' + alias + '.' + colName + ' FROM ' + quote(table._dbName) + ' ' + alias;
+function newSelectSql(context, table, alias) {
+	const colName = quote(context, table._primaryColumns[0]._dbName);
+	alias = quote(context, alias);
+	let sql = 'SELECT ' + alias + '.' + colName + ' FROM ' + quote(context, table._dbName) + ' ' + alias;
 	sql = newParameterized(sql);
 	return newBoolean(sql);
 }

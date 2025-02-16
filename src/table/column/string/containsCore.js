@@ -2,15 +2,15 @@ const quote = require('../../quote');
 var newBoolean = require('../newBoolean');
 var nullOperator = ' is ';
 
-function endsWithCore(operator, column,arg,alias) {
-	alias = quote(alias);
+function endsWithCore(context, operator, column,arg,alias) {
+	alias = quote(context, alias);
 	operator = ' ' + operator + ' ';
-	var encoded = column.encode(arg);
+	var encoded = column.encode(context, arg);
 	if (encoded.sql() == 'null')
 		operator = nullOperator;
 	else
-		encoded = column.encode('%' + arg + '%');
-	var firstPart = alias + '.' + quote(column._dbName) + operator;
+		encoded = column.encode(context, '%' + arg + '%');
+	var firstPart = alias + '.' + quote(context, column._dbName) + operator;
 	var filter =  encoded.prepend(firstPart);
 	return newBoolean(filter);
 }
