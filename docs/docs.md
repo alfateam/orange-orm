@@ -1,4 +1,5 @@
 All examples below are found at [npmjs.org/package/rdb-demo](https://npmjs.org/package/rdb-demo).  
+The _Classic mode_ is only available below version 4.5.0.  
 This is the _Classic Documentation_.  Are you looking for the [_Modern Typescript Documentation_](https://github.com/alfateam/orange-orm/blob/master/README.md) ?
 ---------------
 __Connecting__  
