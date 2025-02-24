@@ -22,7 +22,17 @@ The ultimate Object Relational Mapper for Node.js and Typescript, offering seaml
 - **TypeScript and JavaScript Support**: Orange fully supports both TypeScript and JavaScript, allowing you to leverage the benefits of static typing and modern ECMAScript features.
 - **Works in the Browser**: You can securely use Orange in the browser by utilizing the Express.js plugin, which serves to safeguard sensitive database credentials from exposure at the client level and protect against SQL injection. This method mirrors a traditional REST API, augmented with advanced TypeScript tooling for enhanced functionality.
 
-## Supported Databases
+## Supported Databases and Runtimes
+|               | Node | Deno | Bun |
+| ------------- | :-----: | :-----: | :-----: | 
+| Postgres      | ✅ | ✅ | ✅ |
+| MS SQL        | ✅ |  | ✅ |
+| MySQL         | ✅ | ✅ | ✅ |
+| Oracle        | ✅ | ✅ | ✅ |
+| SAP ASE       | ✅ |  |  |
+| SQLite        | ✅ | ✅ | ✅ |
+| Cloudflare D1 | ✅ |  |  |
+
 
 ✅ Postgres  
 ✅ MS SQL  
