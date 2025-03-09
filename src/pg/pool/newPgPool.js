@@ -4,12 +4,11 @@ var log = require('../../table/log');
 
 var defaults = require('../../poolDefaults');
 var genericPool = require('../../generic-pool');
-var _pg = require('pg');
+var pg;
 var parseSearchPathParam = require('./parseSearchPathParam');
 
 function newPgPool(connectionString, poolOptions) {
 	poolOptions = poolOptions || {};
-	let pg = poolOptions.native ? _pg.native : _pg;
 
 	// @ts-ignore
 	var pool = genericPool.Pool({
@@ -17,7 +16,20 @@ function newPgPool(connectionString, poolOptions) {
 		idleTimeoutMillis: poolOptions.idleTimeout || defaults.poolIdleTimeout,
 		reapIntervalMillis: poolOptions.reapIntervalMillis || defaults.reapIntervalMillis,
 		log: poolOptions.log,
-		create: function(cb) {
+		create: async function(cb) {
+			try {
+				if (!pg) {
+					pg = await import('pg');
+					pg  = pg.default || pg;
+					let types = pg.types || pg.types;
+					types.setTypeParser(1700, function(val) {
+						return parseFloat(val);
+					});
+				}
+			}
+			catch(e) {
+				return cb(e, null);
+			}
 			var client = new pg.Client(connectionString);
 			client.connect(function(err) {
 				if (err) return cb(err, null);

@@ -1,9 +1,8 @@
-// @ts-nocheck
 /* eslint-disable no-prototype-builtins */
-
 var defaults = require('../../poolDefaults');
+
 var genericPool = require('../../generic-pool');
-var mssql;
+var sqlite;
 
 function newGenericPool(connectionString, poolOptions) {
 	poolOptions = poolOptions || {};
@@ -14,19 +13,17 @@ function newGenericPool(connectionString, poolOptions) {
 		log: poolOptions.log || defaults.poolLog,
 		create: async function(cb) {
 			try {
-				if (!mssql)
-					mssql = await import('msnodesqlv8');
+				if (!sqlite)
+					sqlite = await import('sqlite3');
 			}
 			catch (err) {
 				return cb(err, null);
 			}
-			var client;
-			mssql.open(connectionString, onConnected);
+			var client = new sqlite.Database(connectionString, onConnected);
 
-			function onConnected(err, _client) {
+			function onConnected(err) {
 				if(err)
 					return cb(err, null);
-				client = _client;
 				client.poolCount = 0;
 				return cb(null, client);
 			}

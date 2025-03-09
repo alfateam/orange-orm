@@ -23,15 +23,15 @@ The ultimate Object Relational Mapper for Node.js and Typescript, offering seaml
 - **Works in the Browser**: You can securely use Orange in the browser by utilizing the Express.js plugin, which serves to safeguard sensitive database credentials from exposure at the client level and protect against SQL injection. This method mirrors a traditional REST API, augmented with advanced TypeScript tooling for enhanced functionality.
 
 ## Supported Databases and Runtimes
-|               | Node | Deno | Bun |
-| ------------- | :-----: | :-----: | :-----: | 
-| Postgres      | ✅ | ✅ | ✅ |
-| MS SQL        | ✅ |  | ✅ |
-| MySQL         | ✅ | ✅ | ✅ |
-| Oracle        | ✅ | ✅ | ✅ |
-| SAP ASE       | ✅ |  |  |
-| SQLite        | ✅ | ✅ | ✅ |
-| Cloudflare D1 | ✅ |  |  |
+|               | Node | Deno | Bun |Cloudflare |
+| ------------- | :-----: | :-----: | :-----: | :-----: | 
+| Postgres      | ✅ | ✅ | ✅ | ✅
+| MS SQL        | ✅ |  | ✅ | 
+| MySQL         | ✅ | ✅ | ✅ | 
+| Oracle        | ✅ | ✅ | ✅ | 
+| SAP ASE       | ✅ |  |  | 
+| SQLite        | ✅ | ✅ | ✅ | 
+| Cloudflare D1 |  |  |  | ✅
 
 
 ✅ Postgres  

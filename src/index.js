@@ -2,6 +2,8 @@ const hostExpress = require('./hostExpress');
 const hostLocal = require('./hostLocal');
 const client = require('./client/index.js');
 const map = require('./client/map');
+const runtimes = require('./runtimes');
+
 let _mySql;
 let _pg;
 let _sqlite;
@@ -70,8 +72,16 @@ Object.defineProperty(connectViaPool, 'pg', {
 
 Object.defineProperty(connectViaPool, 'sqlite', {
 	get: function() {
-		if (!_sqlite)
-			_sqlite = require('./sqlite/newDatabase');
+		if (!_sqlite) {
+			if (runtimes.deno || (runtimes.node && runtimes.node.major >= 22))
+				_sqlite = require('./nodeSqlite/newDatabase');
+			else if (runtimes.deno)
+				_sqlite = require('./denoSqlite');
+			else if (runtimes.node)
+				_sqlite = require('./sqlite3/newDatabase');
+			else
+				throw new Error('SQLite is not supported in this environment');
+		}
 		return _sqlite;
 	}
 });

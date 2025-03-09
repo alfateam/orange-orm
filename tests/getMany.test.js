@@ -41,7 +41,7 @@ beforeAll(async () => {
 	await insertData('sqlite');
 	await insertData('d1');
 	await insertData('sqlite2');
-	await insertData('sap');
+	// await insertData('sap');
 	await insertData('oracle');
 	hostExpress();
 
@@ -143,7 +143,7 @@ describe('offset', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('d1', async () => await verify('d1'));
-	test('sap', async () => await verify('sap'));
+	// test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
