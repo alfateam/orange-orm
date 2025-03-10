@@ -1,4 +1,8 @@
+// @ts-ignore
+// eslint-disable-next-line no-undef
 const deno = typeof Deno !== 'undefined' && Deno.version?.deno;
+// @ts-ignore
+// eslint-disable-next-line no-undef
 const bun = typeof Bun !== 'undefined' && Bun.version;
 const node = (typeof process !== 'undefined' && process.versions?.node && !deno && !bun) ? process.versions.node : false;
 
@@ -11,7 +15,6 @@ function parseVersion(version) {
 			minor: parseInt(versionArray[1]),
 			patch: parseInt(versionArray[2])
 		};
-
 	}
 	else
 		return false;
