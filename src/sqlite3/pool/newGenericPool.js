@@ -15,6 +15,7 @@ function newGenericPool(connectionString, poolOptions) {
 			try {
 				if (!sqlite)
 					sqlite = await import('sqlite3');
+				sqlite = sqlite.default || sqlite;
 			}
 			catch (err) {
 				return cb(err, null);
