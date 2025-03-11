@@ -33,16 +33,6 @@ The ultimate Object Relational Mapper for Node.js and Typescript, offering seaml
 | SQLite        | ✅ | ✅ | ✅ | 
 | Cloudflare D1 |  |  |  | ✅
 
-
-✅ Postgres  
-✅ MS SQL  
-✅ MySQL  
-✅ Oracle  
-✅ SAP ASE  
-✅ SQLite  
-✅ Cloudflare D1
-
-
 This is the _Modern Typescript Documentation_. Are you looking for the [_Classic Documentation_](https://github.com/alfateam/orange-orm/blob/master/docs/docs.md) ?
 
 ## Sponsorship <span style="font-size: larger; color: darkred;">♡</span>
