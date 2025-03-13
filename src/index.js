@@ -65,7 +65,10 @@ Object.defineProperty(connectViaPool, 'postgres', {
 Object.defineProperty(connectViaPool, 'pg', {
 	get: function() {
 		if (!_pg)
-			_pg = require('./pg/newDatabase');
+			if (runtimes.bun)
+				_sqlite = require('./bunPg/newDatabase');
+			else
+				_pg = require('./pg/newDatabase');
 		return _pg;
 	}
 });

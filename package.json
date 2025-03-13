@@ -2,7 +2,15 @@
   "name": "orange-orm",
   "version": "4.5.0",
   "main": "./src/index.js",
-  "browser": "./src/client/index.mjs",
+  "module": "./dist/index.mjs",
+  "browser": "./dist/index.browser.mjs",
+  "exports": {
+    ".": {
+      "require": "./src/index.js",
+      "import": "./dist/index.mjs",
+      "browser": "./dist/index.browser.mjs"
+    }
+  },
   "bin": {
     "orange-orm": "bin/rdb.js"
   },
@@ -43,8 +51,10 @@
     "coverage": "vitest run --coverage.enabled --coverage.reporter='text-summary' --threads=false",
     "testw": "vitest --threads=false update",
     "tscheck": "tsc ./src/index.d.ts --module commonjs --target es2022 --noEmit true --strict true --esModuleInterop true",
-    "concat": "node ./src/client/merge.js",
-    "build": "rollup -c ./src/client/rollup.config.js && npm run concat",
+    "concat-server": "node ./src/merge-server.js",
+    "concat-browser": "node ./src/merge-browser.js",
+    "build-server": "rollup -c ./src/rollup.config.server.js && npm run concat-server",
+    "build-browser": "rollup -c ./src/rollup.config.browser.js && npm run concat-browser",
     "lint": "eslint ./",
     "fix": "eslint ./ --fix",
     "owasp": "owasp-dependency-check --project \"MY_PROJECT\" --scan \"package-lock.json\" --exclude \"dependency-check-bin\" --out \"owasp\" --format HTML",
