@@ -2,7 +2,7 @@
 var defaults = require('../../poolDefaults');
 
 var genericPool = require('../../generic-pool');
-var sqlite;
+var Database;
 
 function newGenericPool(connectionString, poolOptions) {
 	poolOptions = poolOptions || {};
@@ -14,17 +14,14 @@ function newGenericPool(connectionString, poolOptions) {
 		create: async function(cb) {
 			try {
 				try {
-					if (!sqlite) {
-						sqlite = await import('bun:sqlite');
-						sqlite = sqlite.default || sqlite;
-
-					}
+					if (!Database)
+						({ Database } = await import('bun:Database'));
 				}
 				catch (err) {
 					return cb(err, null);
 				}
 
-				var client = new sqlite.Database(connectionString);
+				var client = new Database(connectionString);
 				client.poolCount = 0;
 				cb(null, client);
 			}
