@@ -14,14 +14,17 @@ function newGenericPool(connectionString, poolOptions) {
 		create: async function(cb) {
 			try {
 				try {
-					if (!sqlite)
+					if (!sqlite) {
 						sqlite = await import('bun:sqlite');
+						sqlite = sqlite.default || sqlite;
+
+					}
 				}
 				catch (err) {
 					return cb(err, null);
 				}
 
-				var client = new sqlite.DatabaseSync(connectionString);
+				var client = new sqlite.Database(connectionString);
 				client.poolCount = 0;
 				cb(null, client);
 			}

@@ -15101,9 +15101,6 @@ function requireEncodeBinary () {
 	if (hasRequiredEncodeBinary) return encodeBinary_1;
 	hasRequiredEncodeBinary = 1;
 	function encodeBinary(base64) {
-		// return Buffer.from(base64, 'base64');
-
-
 		// Decode base64 to a binary string
 		const binaryString = atob(base64);
 
@@ -15686,7 +15683,7 @@ function requireWrapQuery$5 () {
 				var sql = query.sql();
 				log.emitQuery({ sql, parameters: params });
 
-				var statement = connection.prepare(sql);
+				var statement = connection.query(sql);
 				const rows = statement.all.apply(statement, params);
 				onCompleted(null, rows);
 			}
@@ -15709,6 +15706,8 @@ function requireNewTransaction$6 () {
 	hasRequiredNewTransaction$6 = 1;
 	const wrapQuery = requireWrapQuery$5();
 	const encodeBoolean = requireEncodeBoolean$4();
+	const encodeBinary = requireEncodeBinary();
+	const decodeBinary = requireDecodeBinary();
 	const deleteFromSql = requireDeleteFromSql$4();
 	const selectForUpdateSql = requireSelectForUpdateSql$4();
 	const lastInsertedSql = requireLastInsertedSql$3();
@@ -15725,6 +15724,8 @@ function requireNewTransaction$6 () {
 		}
 		rdb.engine = 'sqlite';
 		rdb.encodeBoolean = encodeBoolean;
+		rdb.encodeBinary = encodeBinary;
+		rdb.decodeBinary = decodeBinary;
 		rdb.decodeJSON = decodeJSON;
 		rdb.encodeJSON = JSON.stringify;
 		rdb.deleteFromSql = deleteFromSql;
@@ -15816,14 +15817,17 @@ function requireNewGenericPool$5 () {
 			create: async function(cb) {
 				try {
 					try {
-						if (!sqlite)
+						if (!sqlite) {
 							sqlite = await import('bun:sqlite');
+							sqlite = sqlite.default || sqlite;
+
+						}
 					}
 					catch (err) {
 						return cb(err, null);
 					}
 
-					var client = new sqlite.DatabaseSync(connectionString);
+					var client = new sqlite.Database(connectionString);
 					client.poolCount = 0;
 					cb(null, client);
 				}

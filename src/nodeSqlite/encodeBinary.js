@@ -1,7 +1,4 @@
 function encodeBinary(base64) {
-	// return Buffer.from(base64, 'base64');
-
-
 	// Decode base64 to a binary string
 	const binaryString = atob(base64);
 

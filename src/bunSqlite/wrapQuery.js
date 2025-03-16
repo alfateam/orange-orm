@@ -9,7 +9,7 @@ function wrapQuery(connection) {
 			var sql = query.sql();
 			log.emitQuery({ sql, parameters: params });
 
-			var statement = connection.prepare(sql);
+			var statement = connection.query(sql);
 			const rows = statement.all.apply(statement, params);
 			onCompleted(null, rows);
 		}
