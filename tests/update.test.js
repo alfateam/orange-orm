@@ -108,8 +108,6 @@ beforeAll(async () => {
 
 }, 20000);
 
-
-
 describe('update date in array', () => {
 	test('pg', async () => await verify('pg'));
 	test('oracle', async () => await verify('oracle'));
@@ -288,6 +286,38 @@ describe('update date', () => {
 });
 
 
+describe.only('update same row twice in same transaction', () => {
+	test('pg', async () => await verify('pg'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	//exclude sap because it will throw instead of truncate
+	//exclude sqlite and d1 because it does not have precision
+
+	async function verify(dbName) {
+
+		const { db } = getDb(dbName);
+
+		await db.transaction(async (db) =>  {
+			let row = await db.customer.getById(1);
+			row.balance = row.balance + 0.42335;
+			await row.saveChanges();
+
+			row = await db.customer.getById(1);
+			const expectedBalance = row.balance + .22;
+			row.balance = row.balance + 0.22335;
+			await row.saveChanges();
+
+			expect(row.balance).toEqual(expectedBalance);
+		} );
+
+	}
+
+});
+
+//this test must be last because it runs init(..)
 describe('add hasOne', () => {
 
 	test('pg', async () => await verify('pg'));

@@ -18,7 +18,7 @@ VALUES ('2023-07-14 12:00:00+09:00', '2023-07-14 12:00:00+09:00', '2023-07-14 12
 CREATE TABLE customer (
     id SERIAL	 PRIMARY KEY,
     name TEXT,
-    balance NUMERIC,
+    balance NUMERIC(9,2),
     "isActive" BOOLEAN,
     data JSONB,
     picture BYTEA
