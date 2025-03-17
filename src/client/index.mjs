@@ -1758,7 +1758,7 @@ var hasRequiredSetSessionSingleton;
 function requireSetSessionSingleton () {
 	if (hasRequiredSetSessionSingleton) return setSessionSingleton_1;
 	hasRequiredSetSessionSingleton = 1;
-	var getSessionContext = requireGetSessionContext();
+	const getSessionContext = requireGetSessionContext();
 
 	function setSessionSingleton(context, name, value) {
 		const rdb = getSessionContext(context);
@@ -7372,6 +7372,22 @@ function requireValidateDeleteAllowed () {
 	return validateDeleteAllowed_1;
 }
 
+var clearCache_1;
+var hasRequiredClearCache;
+
+function requireClearCache () {
+	if (hasRequiredClearCache) return clearCache_1;
+	hasRequiredClearCache = 1;
+	var setSessionSingleton = requireSetSessionSingleton();
+
+	function clearCache(context) {
+		setSessionSingleton(context, 'cache', {});
+	}
+
+	clearCache_1 = clearCache;
+	return clearCache_1;
+}
+
 /* eslint-disable require-atomic-updates */
 
 var patchTable_1;
@@ -7384,13 +7400,16 @@ function requirePatchTable () {
 	let fromCompareObject = requireFromCompareObject();
 	let validateDeleteConflict = requireValidateDeleteConflict();
 	let validateDeleteAllowed = requireValidateDeleteAllowed();
+	let clearCache = requireClearCache();
 
 	async function patchTable() {
 		// const dryrun = true;
 		//traverse all rows you want to update before updatinng or inserting anything.
 		//this is to avoid page locks in ms sql
 		// await patchTableCore.apply(null, [...arguments, dryrun]);
-		return patchTableCore.apply(null, arguments);
+		const result = await  patchTableCore.apply(null, arguments);
+		clearCache(arguments[0]);
+		return result;
 	}
 
 	async function patchTableCore(context, table, patches, { strategy = undefined, deduceStrategy = false, ...options } = {}, dryrun) {
@@ -10053,6 +10072,40 @@ function requireNewId () {
 	return newId;
 }
 
+var getSessionCache_1;
+var hasRequiredGetSessionCache;
+
+function requireGetSessionCache () {
+	if (hasRequiredGetSessionCache) return getSessionCache_1;
+	hasRequiredGetSessionCache = 1;
+	const getSessionSingleton = requireGetSessionSingleton();
+
+	function getSessionCache(context, id) {
+		const cache = getSessionSingleton(context, 'cache');
+		return cache[id];
+	}
+
+	getSessionCache_1 = getSessionCache;
+	return getSessionCache_1;
+}
+
+var setSessionCache_1;
+var hasRequiredSetSessionCache;
+
+function requireSetSessionCache () {
+	if (hasRequiredSetSessionCache) return setSessionCache_1;
+	hasRequiredSetSessionCache = 1;
+	const getSessionSingleton = requireGetSessionSingleton();
+
+	function setSessionCache(context, id, value) {
+		const cache = getSessionSingleton(context, 'cache');
+		cache[id] = value;
+	}
+
+	setSessionCache_1 = setSessionCache;
+	return setSessionCache_1;
+}
+
 var newManyCache_1;
 var hasRequiredNewManyCache;
 
@@ -10065,8 +10118,8 @@ function requireNewManyCache () {
 	var extractParentKey = requireExtractParentKey();
 	var newCacheCore = requireNewManyCacheCore();
 	var newId = requireNewId();
-	var getSessionSingleton = requireGetSessionSingleton();
-	var setSessionSingleton = requireSetSessionSingleton();
+	var getSessionCache = requireGetSessionCache();
+	var setSessionCache = requireSetSessionCache();
 
 	function newManyCache(joinRelation) {
 		var c = {};
@@ -10087,10 +10140,10 @@ function requireNewManyCache () {
 
 		c.getInnerCache = function(context) {
 			const theKey = negotiateKey();
-			var cache = getSessionSingleton(context, theKey);
+			var cache = getSessionCache(context, theKey);
 			if (!cache) {
 				cache = newCacheCore(joinRelation);
-				setSessionSingleton(context, theKey, cache);
+				setSessionCache(context, theKey, cache);
 				fillCache(context);
 				synchronizeAdded(context, c.tryAdd.bind(null, context), joinRelation);
 				synchronizeRemoved(context, c.tryRemove.bind(null, context), joinRelation);
@@ -11040,8 +11093,8 @@ function requireNewRowCache () {
 	if (hasRequiredNewRowCache) return newRowCache_1;
 	hasRequiredNewRowCache = 1;
 	let newCache = requireNewCache();
-	let getSessionSingleton = requireGetSessionSingleton();
-	let setSessionSingleton = requireSetSessionSingleton();
+	let getSessionCache = requireGetSessionCache();
+	let setSessionCache = requireSetSessionCache();
 
 	function newRowCache(table) {
 		let id = Symbol();
@@ -11079,11 +11132,11 @@ function requireNewRowCache () {
 
 
 	function getCache(context, table, id) {
-		let cache = getSessionSingleton(context, id);
+		let cache = getSessionCache(context, id);
 		if (cache)
 			return cache;
 		cache = _newRowCache(table);
-		setSessionSingleton(context, id, cache);
+		setSessionCache(context, id, cache);
 		return cache;
 	}
 
@@ -12944,6 +12997,7 @@ function requireNewTransaction () {
 		};
 		rdb.aggregateCount = 0;
 		rdb.quote = (name) => `"${name}"`;
+		rdb.cache = {};
 
 		if (readonly) {
 			rdb.dbClient = {
