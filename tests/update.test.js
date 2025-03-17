@@ -103,7 +103,7 @@ beforeAll(async () => {
 }, 20000);
 
 
-describe.only('update same row twice in same transaction', () => {
+describe('update same row twice in same transaction', () => {
 	test('pg', async () => await verify('pg'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
