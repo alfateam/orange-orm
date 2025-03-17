@@ -4,7 +4,7 @@ var log = require('../../table/log');
 
 var defaults = require('../../poolDefaults');
 var genericPool = require('../../generic-pool');
-var pg;
+var SQL;
 var parseSearchPathParam = require('../../pg/pool/parseSearchPathParam');
 
 function newPgPool(connectionString, poolOptions) {
@@ -18,44 +18,16 @@ function newPgPool(connectionString, poolOptions) {
 		log: poolOptions.log,
 		create: async function(cb) {
 			try {
-				if (!pg) {
-					const bunImport = await import('bun');
-					const { sql } = bunImport.default || bunImport;
-					pg = sql;
-				}
+				if (!SQL)
+					({ SQL } = await import('bun'));
+				var client = new SQL(connectionString);
+				client.poolCount = 0;
+				cb(null, client);
+				// negotiateSearchPath(client, connectionString, (err) => cb(err, client));
 			}
 			catch(e) {
 				return cb(e, null);
 			}
-			var client = new pg.Client(connectionString);
-			client.connect(function(err) {
-				if (err) return cb(err, null);
-
-				//handle connected client background errors by emitting event
-				//via the pg object and then removing errored client from the pool
-				client.on('error', function(e) {
-					pool.emit('error', e, client);
-
-					// If the client is already being destroyed, the error
-					// occurred during stream ending. Do not attempt to destroy
-					// the client again.
-					if (!client._destroying) {
-						pool.destroy(client);
-					}
-				});
-
-				// Remove connection from pool on disconnect
-				client.on('end', function(_e) {
-					// Do not enter infinite loop between pool.destroy
-					// and client 'end' event...
-					if (!client._destroying) {
-						pool.destroy(client);
-					}
-				});
-				client.poolCount = 0;
-				negotiateSearchPath(client, connectionString, (err) => cb(err, client));
-
-			});
 		},
 		destroy: function(client) {
 			client._destroying = true;

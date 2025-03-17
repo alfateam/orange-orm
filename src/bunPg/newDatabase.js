@@ -1,5 +1,5 @@
 let createDomain = require('../createDomain');
-let newTransaction = require('../pg/newTransaction');
+let newTransaction = require('./newTransaction');
 let _begin = require('../table/begin');
 let commit = require('../table/commit');
 let rollback = require('../table/rollback');

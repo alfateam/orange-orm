@@ -2086,12 +2086,12 @@ function requireNegotiateParameters () {
 	return negotiateParameters_1;
 }
 
-var wrapQuery_1$9;
-var hasRequiredWrapQuery$9;
+var wrapQuery_1$a;
+var hasRequiredWrapQuery$a;
 
-function requireWrapQuery$9 () {
-	if (hasRequiredWrapQuery$9) return wrapQuery_1$9;
-	hasRequiredWrapQuery$9 = 1;
+function requireWrapQuery$a () {
+	if (hasRequiredWrapQuery$a) return wrapQuery_1$a;
+	hasRequiredWrapQuery$a = 1;
 	var negotiateSql = requireNegotiateSql();
 	var negotiateParameters = requireNegotiateParameters();
 
@@ -2108,8 +2108,8 @@ function requireWrapQuery$9 () {
 	}
 
 
-	wrapQuery_1$9 = wrapQuery;
-	return wrapQuery_1$9;
+	wrapQuery_1$a = wrapQuery;
+	return wrapQuery_1$a;
 }
 
 var query;
@@ -2119,7 +2119,7 @@ function requireQuery () {
 	if (hasRequiredQuery) return query;
 	hasRequiredQuery = 1;
 	var executeQueries = requireExecuteQueries();
-	var wrapQuery = requireWrapQuery$9();
+	var wrapQuery = requireWrapQuery$a();
 
 	function doQuery(context, query) {
 		var wrappedQuery = wrapQuery(query);
@@ -12408,12 +12408,12 @@ function requireCreateDomain () {
 	return createDomain_1;
 }
 
-var wrapQuery_1$8;
-var hasRequiredWrapQuery$8;
+var wrapQuery_1$9;
+var hasRequiredWrapQuery$9;
 
-function requireWrapQuery$8 () {
-	if (hasRequiredWrapQuery$8) return wrapQuery_1$8;
-	hasRequiredWrapQuery$8 = 1;
+function requireWrapQuery$9 () {
+	if (hasRequiredWrapQuery$9) return wrapQuery_1$9;
+	hasRequiredWrapQuery$9 = 1;
 	var log = requireLog();
 
 	function wrapQuery(connection) {
@@ -12429,8 +12429,8 @@ function requireWrapQuery$8 () {
 
 	}
 
-	wrapQuery_1$8 = wrapQuery;
-	return wrapQuery_1$8;
+	wrapQuery_1$9 = wrapQuery;
+	return wrapQuery_1$9;
 }
 
 var encodeBoolean_1$6;
@@ -12952,13 +12952,13 @@ function requireInsert$6 () {
 	return insert$5;
 }
 
-var newTransaction$9;
-var hasRequiredNewTransaction$9;
+var newTransaction$a;
+var hasRequiredNewTransaction$a;
 
-function requireNewTransaction$9 () {
-	if (hasRequiredNewTransaction$9) return newTransaction$9;
-	hasRequiredNewTransaction$9 = 1;
-	const wrapQuery = requireWrapQuery$8();
+function requireNewTransaction$a () {
+	if (hasRequiredNewTransaction$a) return newTransaction$a;
+	hasRequiredNewTransaction$a = 1;
+	const wrapQuery = requireWrapQuery$9();
 	const encodeBoolean = requireEncodeBoolean$6();
 	const deleteFromSql = requireDeleteFromSql$6();
 	const selectForUpdateSql = requireSelectForUpdateSql$6();
@@ -13035,8 +13035,8 @@ function requireNewTransaction$9 () {
 		};
 	}
 
-	newTransaction$9 = newResolveTransaction;
-	return newTransaction$9;
+	newTransaction$a = newResolveTransaction;
+	return newTransaction$a;
 }
 
 var beginCommand;
@@ -13881,7 +13881,7 @@ function requireNewDatabase$a () {
 	if (hasRequiredNewDatabase$a) return newDatabase_1$a;
 	hasRequiredNewDatabase$a = 1;
 	let createDomain = requireCreateDomain();
-	let newTransaction = requireNewTransaction$9();
+	let newTransaction = requireNewTransaction$a();
 	let _begin = requireBegin();
 	let commit = requireCommit();
 	let rollback = requireRollback();
@@ -14023,46 +14023,43 @@ function requireReplaceParamChar$1 () {
 	return replaceParamChar_1$1;
 }
 
-var wrapQuery_1$7;
-var hasRequiredWrapQuery$7;
+var wrapQuery_1$8;
+var hasRequiredWrapQuery$8;
 
-function requireWrapQuery$7 () {
-	if (hasRequiredWrapQuery$7) return wrapQuery_1$7;
-	hasRequiredWrapQuery$7 = 1;
+function requireWrapQuery$8 () {
+	if (hasRequiredWrapQuery$8) return wrapQuery_1$8;
+	hasRequiredWrapQuery$8 = 1;
 	var log = requireLog();
 	var replaceParamChar = requireReplaceParamChar$1();
 
 	function wrapQuery(connection) {
-		var runOriginalQuery = connection.query;
 		return runQuery;
 
-		function runQuery(query, onCompleted) {
-			var params = query.parameters;
-			var sql = replaceParamChar(query, params);
-			query = {
-				text: sql,
-				values: params,
-				types: query.types
-			};
-			log.emitQuery({sql, parameters: params});
+		async function runQuery(query, onCompleted) {
+			try {
 
-			runOriginalQuery.call(connection, query, onInnerCompleted);
+				var params = query.parameters;
+				var sql = replaceParamChar(query, params);
+				log.emitQuery({sql, parameters: params});
 
-			function onInnerCompleted(err, result) {
-				if (err)
-					onCompleted(err);
-				else {
-					if (Array.isArray(result))
-						result = result[result.length-1];
-					onCompleted(null, result.rows);
-				}
+				let result;
+				if (query.parameters.length === 0)
+					result =  await connection.unsafe(sql);
+				else
+					result =  await connection.unsafe(sql, query.parameters);
+				if (Array.isArray(result))
+					result = result[result.length-1];
+				onCompleted(null, result);
+			}
+			catch(e) {
+				onCompleted(e);
 			}
 		}
 
 	}
 
-	wrapQuery_1$7 = wrapQuery;
-	return wrapQuery_1$7;
+	wrapQuery_1$8 = wrapQuery;
+	return wrapQuery_1$8;
 }
 
 var encodeDate_1;
@@ -14093,6 +14090,50 @@ function requireEncodeBoolean$5 () {
 
 	encodeBoolean_1$5 = encodeBoolean;
 	return encodeBoolean_1$5;
+}
+
+var encodeBinary_1;
+var hasRequiredEncodeBinary;
+
+function requireEncodeBinary () {
+	if (hasRequiredEncodeBinary) return encodeBinary_1;
+	hasRequiredEncodeBinary = 1;
+	function encodeBinary(base64) {
+		// Decode base64 to a binary string
+		const binaryString = atob(base64);
+
+		// Create a new Uint8Array with the same length as the binary string
+		const len = binaryString.length;
+		const bytes = new Uint8Array(len);
+
+		// Populate the Uint8Array with numeric character codes
+		for (let i = 0; i < len; i++) {
+			bytes[i] = binaryString.charCodeAt(i);
+		}
+
+		return bytes;
+	}
+
+	encodeBinary_1 = encodeBinary;
+	return encodeBinary_1;
+}
+
+var decodeBinary_1;
+var hasRequiredDecodeBinary;
+
+function requireDecodeBinary () {
+	if (hasRequiredDecodeBinary) return decodeBinary_1;
+	hasRequiredDecodeBinary = 1;
+	function decodeBinary(u8Arr) {
+		let binaryString = '';
+		for (let i = 0; i < u8Arr.length; i++) {
+			binaryString += String.fromCharCode(u8Arr[i]);
+		}
+		return btoa(binaryString);
+	}
+
+	decodeBinary_1 = decodeBinary;
+	return decodeBinary_1;
 }
 
 var quote$5;
@@ -14325,15 +14366,17 @@ function requireInsert$5 () {
 	return insert$4;
 }
 
-var newTransaction$8;
-var hasRequiredNewTransaction$8;
+var newTransaction$9;
+var hasRequiredNewTransaction$9;
 
-function requireNewTransaction$8 () {
-	if (hasRequiredNewTransaction$8) return newTransaction$8;
-	hasRequiredNewTransaction$8 = 1;
-	var wrapQuery = requireWrapQuery$7();
+function requireNewTransaction$9 () {
+	if (hasRequiredNewTransaction$9) return newTransaction$9;
+	hasRequiredNewTransaction$9 = 1;
+	var wrapQuery = requireWrapQuery$8();
 	var encodeDate = requireEncodeDate();
 	var encodeBoolean = requireEncodeBoolean$5();
+	const encodeBinary = requireEncodeBinary();
+	const decodeBinary = requireDecodeBinary();
 	var deleteFromSql = requireDeleteFromSql$5();
 	var selectForUpdateSql = requireSelectForUpdateSql$5();
 	var limitAndOffset = requireLimitAndOffset$5();
@@ -14353,6 +14396,8 @@ function requireNewTransaction$8 () {
 		rdb.engine = 'pg';
 		rdb.encodeBoolean = encodeBoolean;
 		rdb.encodeDate = encodeDate;
+		rdb.encodeBinary = encodeBinary;
+		rdb.decodeBinary = decodeBinary;
 		rdb.encodeJSON = encodeJSON;
 		rdb.formatDateOut = formatDateOut;
 		rdb.deleteFromSql = deleteFromSql;
@@ -14412,8 +14457,8 @@ function requireNewTransaction$8 () {
 		};
 	}
 
-	newTransaction$8 = newResolveTransaction;
-	return newTransaction$8;
+	newTransaction$9 = newResolveTransaction;
+	return newTransaction$9;
 }
 
 var end$8;
@@ -14466,12 +14511,12 @@ function requireNewPgPool$1 () {
 	if (hasRequiredNewPgPool$1) return newPgPool_1$1;
 	hasRequiredNewPgPool$1 = 1;
 	//slightly modified code from github.com/brianc/node-postgres
-	var log = requireLog();
+	requireLog();
 
 	var defaults = requirePoolDefaults();
 	var genericPool = requireGenericPool();
-	var pg;
-	var parseSearchPathParam = requireParseSearchPathParam();
+	var SQL;
+	requireParseSearchPathParam();
 
 	function newPgPool(connectionString, poolOptions) {
 		poolOptions = poolOptions || {};
@@ -14484,47 +14529,16 @@ function requireNewPgPool$1 () {
 			log: poolOptions.log,
 			create: async function(cb) {
 				try {
-					if (!pg) {
-						pg = await import('pg');
-						pg  = pg.default || pg;
-						let types = pg.types || pg.types;
-						types.setTypeParser(1700, function(val) {
-							return parseFloat(val);
-						});
-					}
+					if (!SQL)
+						({ SQL } = await import('bun'));
+					var client = new SQL(connectionString);
+					client.poolCount = 0;
+					cb(null, client);
+					// negotiateSearchPath(client, connectionString, (err) => cb(err, client));
 				}
 				catch(e) {
 					return cb(e, null);
 				}
-				var client = new pg.Client(connectionString);
-				client.connect(function(err) {
-					if (err) return cb(err, null);
-
-					//handle connected client background errors by emitting event
-					//via the pg object and then removing errored client from the pool
-					client.on('error', function(e) {
-						pool.emit('error', e, client);
-
-						// If the client is already being destroyed, the error
-						// occurred during stream ending. Do not attempt to destroy
-						// the client again.
-						if (!client._destroying) {
-							pool.destroy(client);
-						}
-					});
-
-					// Remove connection from pool on disconnect
-					client.on('end', function(_e) {
-						// Do not enter infinite loop between pool.destroy
-						// and client 'end' event...
-						if (!client._destroying) {
-							pool.destroy(client);
-						}
-					});
-					client.poolCount = 0;
-					negotiateSearchPath(client, connectionString, (err) => cb(err, client));
-
-				});
 			},
 			destroy: function(client) {
 				client._destroying = true;
@@ -14549,19 +14563,6 @@ function requireNewPgPool$1 () {
 			});
 		};
 		return pool;
-	}
-
-	function negotiateSearchPath(client, connectionString, cb) {
-		const searchPath = parseSearchPathParam(connectionString);
-		if (searchPath) {
-			const sql = `set search_path to ${searchPath}`;
-			log.emitQuery({sql, parameters: []});
-			return client.query(sql, cb);
-		}
-		else
-			cb();
-
-
 	}
 
 	newPgPool_1$1 = newPgPool;
@@ -14603,7 +14604,7 @@ function requireNewDatabase$9 () {
 	if (hasRequiredNewDatabase$9) return newDatabase_1$9;
 	hasRequiredNewDatabase$9 = 1;
 	let createDomain = requireCreateDomain();
-	let newTransaction = requireNewTransaction$8();
+	let newTransaction = requireNewTransaction$9();
 	let _begin = requireBegin();
 	let commit = requireCommit();
 	let rollback = requireRollback();
@@ -14742,6 +14743,139 @@ function requireNewDatabase$9 () {
 	return newDatabase_1$9;
 }
 
+var wrapQuery_1$7;
+var hasRequiredWrapQuery$7;
+
+function requireWrapQuery$7 () {
+	if (hasRequiredWrapQuery$7) return wrapQuery_1$7;
+	hasRequiredWrapQuery$7 = 1;
+	var log = requireLog();
+	var replaceParamChar = requireReplaceParamChar$1();
+
+	function wrapQuery(connection) {
+		var runOriginalQuery = connection.query;
+		return runQuery;
+
+		function runQuery(query, onCompleted) {
+			var params = query.parameters;
+			var sql = replaceParamChar(query, params);
+			query = {
+				text: sql,
+				values: params,
+				types: query.types
+			};
+			log.emitQuery({sql, parameters: params});
+
+			runOriginalQuery.call(connection, query, onInnerCompleted);
+
+			function onInnerCompleted(err, result) {
+				if (err)
+					onCompleted(err);
+				else {
+					if (Array.isArray(result))
+						result = result[result.length-1];
+					onCompleted(null, result.rows);
+				}
+			}
+		}
+
+	}
+
+	wrapQuery_1$7 = wrapQuery;
+	return wrapQuery_1$7;
+}
+
+var newTransaction$8;
+var hasRequiredNewTransaction$8;
+
+function requireNewTransaction$8 () {
+	if (hasRequiredNewTransaction$8) return newTransaction$8;
+	hasRequiredNewTransaction$8 = 1;
+	var wrapQuery = requireWrapQuery$7();
+	var encodeDate = requireEncodeDate();
+	var encodeBoolean = requireEncodeBoolean$5();
+	var deleteFromSql = requireDeleteFromSql$5();
+	var selectForUpdateSql = requireSelectForUpdateSql$5();
+	var limitAndOffset = requireLimitAndOffset$5();
+	var formatDateOut = requireFormatDateOut$3();
+	var encodeJSON = requireEncodeJSON();
+	var insertSql = requireInsertSql$5();
+	var insert = requireInsert$5();
+	var quote = requireQuote$5();
+
+	function newResolveTransaction(domain, pool, { readonly = false } = {}) {
+		var rdb = { poolFactory: pool };
+		if (!pool.connect) {
+			pool = pool();
+			rdb.pool = pool;
+		}
+
+		rdb.engine = 'pg';
+		rdb.encodeBoolean = encodeBoolean;
+		rdb.encodeDate = encodeDate;
+		rdb.encodeJSON = encodeJSON;
+		rdb.formatDateOut = formatDateOut;
+		rdb.deleteFromSql = deleteFromSql;
+		rdb.selectForUpdateSql = selectForUpdateSql;
+		rdb.lastInsertedIsSeparate = false;
+		rdb.insertSql = insertSql;
+		rdb.insert = insert;
+		rdb.multipleStatements = true;
+		rdb.limitAndOffset = limitAndOffset;
+		rdb.accept = function(caller) {
+			caller.visitPg();
+		};
+		rdb.aggregateCount = 0;
+		rdb.quote = quote;
+
+		if (readonly) {
+			rdb.dbClient = {
+				executeQuery: function(query, callback) {
+					pool.connect((err, client, done) => {
+						if (err) {
+							return callback(err);
+						}
+						try {
+							wrapQuery(client)(query, (err, res) => {
+								done();
+								callback(err, res);
+							});
+						} catch (e) {
+							done();
+							callback(e);
+						}
+					});
+				}
+			};
+			domain.rdb = rdb;
+			return (onSuccess) => onSuccess();
+		}
+
+		return function(onSuccess, onError) {
+			pool.connect(onConnected);
+
+			function onConnected(err, client, done) {
+				try {
+					if (err) {
+						onError(err);
+						return;
+					}
+					client.executeQuery = wrapQuery(client);
+					rdb.dbClient = client;
+					rdb.dbClientDone = done;
+					domain.rdb = rdb;
+					onSuccess();
+				} catch (e) {
+					onError(e);
+				}
+			}
+		};
+	}
+
+	newTransaction$8 = newResolveTransaction;
+	return newTransaction$8;
+}
+
 var end$7;
 var hasRequiredEnd$7;
 
@@ -14792,9 +14926,12 @@ function requireNewPgPool () {
 			create: async function(cb) {
 				try {
 					if (!pg) {
-						const bunImport = await import('bun');
-						const { sql } = bunImport.default || bunImport;
-						pg = sql;
+						pg = await import('pg');
+						pg  = pg.default || pg;
+						let types = pg.types || pg.types;
+						types.setTypeParser(1700, function(val) {
+							return parseFloat(val);
+						});
 					}
 				}
 				catch(e) {
@@ -15092,50 +15229,6 @@ function requireEncodeBoolean$4 () {
 
 	encodeBoolean_1$4 = encodeBoolean;
 	return encodeBoolean_1$4;
-}
-
-var encodeBinary_1;
-var hasRequiredEncodeBinary;
-
-function requireEncodeBinary () {
-	if (hasRequiredEncodeBinary) return encodeBinary_1;
-	hasRequiredEncodeBinary = 1;
-	function encodeBinary(base64) {
-		// Decode base64 to a binary string
-		const binaryString = atob(base64);
-
-		// Create a new Uint8Array with the same length as the binary string
-		const len = binaryString.length;
-		const bytes = new Uint8Array(len);
-
-		// Populate the Uint8Array with numeric character codes
-		for (let i = 0; i < len; i++) {
-			bytes[i] = binaryString.charCodeAt(i);
-		}
-
-		return bytes;
-	}
-
-	encodeBinary_1 = encodeBinary;
-	return encodeBinary_1;
-}
-
-var decodeBinary_1;
-var hasRequiredDecodeBinary;
-
-function requireDecodeBinary () {
-	if (hasRequiredDecodeBinary) return decodeBinary_1;
-	hasRequiredDecodeBinary = 1;
-	function decodeBinary(u8Arr) {
-		let binaryString = '';
-		for (let i = 0; i < u8Arr.length; i++) {
-			binaryString += String.fromCharCode(u8Arr[i]);
-		}
-		return btoa(binaryString);
-	}
-
-	decodeBinary_1 = decodeBinary;
-	return decodeBinary_1;
 }
 
 var quote$4;
@@ -19918,7 +20011,10 @@ function requireSrc () {
 	Object.defineProperty(connectViaPool, 'postgres', {
 		get: function() {
 			if (!_pg)
-				_pg = requireNewDatabase$9();
+				if (runtimes.bun)
+					_pg = requireNewDatabase$9();
+				else
+					_pg = requireNewDatabase$8();
 			return _pg;
 		}
 	});
@@ -19927,9 +20023,9 @@ function requireSrc () {
 		get: function() {
 			if (!_pg)
 				if (runtimes.bun)
-					_sqlite = requireNewDatabase$8();
-				else
 					_pg = requireNewDatabase$9();
+				else
+					_pg = requireNewDatabase$8();
 			return _pg;
 		}
 	});
