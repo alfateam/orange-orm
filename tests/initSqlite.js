@@ -2,7 +2,7 @@ const sql = `DROP TABLE IF EXISTS deliveryAddress; DROP TABLE IF EXISTS package;
 CREATE TABLE customer (
     id INTEGER PRIMARY KEY,
     name TEXT,
-    balance NUMERIC,
+    balance NUMERIC(9,2),
     isActive INTEGER,
     data JSONB,
     picture BLOB

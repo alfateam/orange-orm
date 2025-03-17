@@ -3,13 +3,16 @@ let applyPatch = require('./applyPatch');
 let fromCompareObject = require('./fromCompareObject');
 let validateDeleteConflict = require('./validateDeleteConflict');
 let validateDeleteAllowed = require('./validateDeleteAllowed');
+let clearCache = require('./table/clearCache');
 
 async function patchTable() {
 	// const dryrun = true;
 	//traverse all rows you want to update before updatinng or inserting anything.
 	//this is to avoid page locks in ms sql
 	// await patchTableCore.apply(null, [...arguments, dryrun]);
-	return patchTableCore.apply(null, arguments);
+	const result = patchTableCore.apply(null, arguments);
+	clearCache();
+	return result;
 }
 
 async function patchTableCore(table, patches, { strategy = undefined, deduceStrategy = false, ...options } = {}, dryrun) {

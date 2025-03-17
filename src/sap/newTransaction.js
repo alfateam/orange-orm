@@ -53,6 +53,7 @@ function newResolveTransaction(domain, pool) {
 					caller.visitSap();
 				};
 				rdb.aggregateCount = 0;
+				rdb.cache = {};
 				domain.rdb = rdb;
 				onSuccess();
 			} catch (e) {

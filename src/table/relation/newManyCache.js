@@ -4,8 +4,8 @@ var synchronizeRemoved = require('./manyCache/synchronizeRemoved');
 var extractParentKey = require('./manyCache/extractParentKey');
 var newCacheCore = require('./newManyCacheCore');
 var newId = require('../../newId');
-var getSessionSingleton = require('../getSessionSingleton');
-var setSessionSingleton = require('../setSessionSingleton');
+var getSessionCache = require('../getSessionCache');
+var setSessionCache = require('../setSessionCache');
 
 function newManyCache(joinRelation) {
 	var c = {};
@@ -25,10 +25,10 @@ function newManyCache(joinRelation) {
 	};
 
 	c.getInnerCache = function() {
-		var cache = getSessionSingleton(key);
+		var cache = getSessionCache(key);
 		if (!cache) {
 			cache = newCacheCore(joinRelation);
-			setSessionSingleton(key, cache);
+			setSessionCache(key, cache);
 			fillCache();
 			synchronizeAdded(c.tryAdd, joinRelation);
 			synchronizeRemoved(c.tryRemove, joinRelation);

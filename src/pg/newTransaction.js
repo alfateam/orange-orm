@@ -46,6 +46,7 @@ function newResolveTransaction(domain, pool) {
 					caller.visitPg();
 				};
 				rdb.aggregateCount = 0;
+				rdb.cache = {};
 				domain.rdb = rdb;
 				onSuccess();
 			} catch (e) {

@@ -87,7 +87,7 @@ CREATE TABLE customer (
     id int IDENTITY PRIMARY KEY,   
     name VARCHAR(100),
     balance NUMERIC NULL,
-    isActive NUMERIC NULL,
+    isActive NUMERIC(9,2) NULL,
     data TEXT NULL,
     picture VARBINARY(4000) NULL
 

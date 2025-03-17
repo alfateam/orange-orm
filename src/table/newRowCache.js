@@ -1,6 +1,6 @@
 let newCache = require('./newCache');
-let getSessionSingleton = require('./getSessionSingleton');
-let setSessionSingleton = require('./setSessionSingleton');
+let getSessionCache = require('./getSessionCache');
+let setSessionCache = require('./setSessionCache');
 
 function newRowCache(table) {
 	let id = Symbol();
@@ -38,11 +38,11 @@ function newRowCache(table) {
 
 
 function getCache(table, id) {
-	let cache = getSessionSingleton(id);
+	let cache = getSessionCache(id);
 	if (cache)
 		return cache;
 	cache = _newRowCache(table);
-	setSessionSingleton(id, cache);
+	setSessionCache(id, cache);
 	return cache;
 }
 

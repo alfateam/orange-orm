@@ -2,6 +2,7 @@ const sql = `
 DROP TABLE if exists package;
 DROP TABLE if exists orderLine;
 DROP TABLE if exists deliveryAddress;
+DROP TABLE if exists "order";
 DROP TABLE if exists torder;
 DROP TABLE if exists vendor;
 DROP TABLE if exists customer;
@@ -20,7 +21,7 @@ VALUES ('2023-07-14 12:00:00', '2023-07-14 12:00:00', '2023-07-14T12:00:00-08:00
 CREATE TABLE customer (
     id int IDENTITY(1,1) PRIMARY KEY,   
     name VARCHAR(100),
-    balance NUMERIC,
+    balance NUMERIC(9,2),
     isActive BIT,
     data  NVARCHAR(MAX),
     picture VARBINARY(MAX)
