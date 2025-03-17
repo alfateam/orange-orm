@@ -10,7 +10,7 @@ async function patchTable() {
 	//traverse all rows you want to update before updatinng or inserting anything.
 	//this is to avoid page locks in ms sql
 	// await patchTableCore.apply(null, [...arguments, dryrun]);
-	const result = patchTableCore.apply(null, arguments);
+	const result = await patchTableCore.apply(null, arguments);
 	clearCache();
 	return result;
 }
