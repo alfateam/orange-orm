@@ -1,14 +1,15 @@
 ## Changelog
-__3.10.4_  
+__3.10.4__  
 Bugfix: "Changed by Other User" Error Triggered by Precision Mismatch in Numeric Column.  See [#120](https://github.com/alfateam/orange-orm/issues/120)  
-__3.10.3_  
+__3.10.3__  
 Fix duplicate method signatures for those still using code generation  
-__3.10.2_  
+__3.10.2__  
 Orange ORM was renamed from rdb. New installation url: [npmjs.org/package/orange-orm](https://npmjs.org/package/orange-orm) . Old url was npmjs.org/package/rdb  
-__3.10.1_  
-__3.10.0_  
+__3.10.1__ 
+Bugfix: Adding hasOne row to existing parent throws.  See [#86](https://github.com/alfateam/orange-orm/issues/86)  
+__3.10.0__  
 Aggregate functions  
-__3.9.1_  
+__3.9.1__  
 Bugfix: Crashing on many relations if foreign key column is omitted in strategy.  See [#83](https://github.com/alfateam/orange-orm/issues/83)  
 __3.9.0__  
 Possible to elevate associated column on a related table to a parent table when fetching.  See https://github.com/alfateam/orange-orm/#user-content-aggregate-results  
