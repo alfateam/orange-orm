@@ -10,3 +10,4 @@ _config.yml
 _layouts
 .github
 assets
+.env
