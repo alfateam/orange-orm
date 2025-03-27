@@ -1085,7 +1085,7 @@ type ExtractColumnBools<T, TStrategy> = RemoveNever<{
 type NegotiateNotNull<T> = T extends NotNull ? NotNull : {};
 
 type FetchedProperties<T, TStrategy> = FetchedColumnProperties<T, TStrategy> & FetchedRelationProperties<T, TStrategy> & ExtractAggregates<TStrategy>
-type FetchedAggregateProperties<T, TStrategy> = FetchedColumnProperties<T, TStrategy> & ExtractAggregates<TStrategy>
+type FetchedAggregateProperties<T, TStrategy> = ExtractAggregates<TStrategy>;
 
 
 type FetchedRelationProperties<T, TStrategy> = RemoveNeverFlat<{

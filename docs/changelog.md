@@ -1,4 +1,6 @@
 ## Changelog
+__4.5.3__  
+Minor improvements of types in aggregate functions.    
 __4.5.2__  
 Bugfix: Aggregate functions are not allowed on root tables .  See [#120](https://github.com/alfateam/orange-orm/issues/121)  
 __4.5.1__  
