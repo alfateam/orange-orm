@@ -7,6 +7,8 @@ const greaterThanOrEqual = require('./greaterThanOrEqual');
 const _in = require('./in');
 const _extractAlias = require('./extractAlias');
 const quote = require('../../table/quote');
+const aggregate = require('./columnAggregate');
+const aggregateGroup = require('./columnAggregateGroup');
 
 module.exports = function(table, name) {
 	var c = {};
@@ -75,6 +77,17 @@ module.exports = function(table, name) {
 	c.LE = c.le;
 	c.IN = c.in;
 	c.self = self;
+
+	c.groupSum = (context, ...rest) => aggregateGroup.apply(null, [context, 'sum', c, table, ...rest]);
+	c.groupAvg = (context, ...rest) => aggregateGroup.apply(null, [context, 'avg', c, table, ...rest]);
+	c.groupMin = (context, ...rest) => aggregateGroup.apply(null, [context, 'min', c, table, ...rest]);
+	c.groupMax = (context, ...rest) => aggregateGroup.apply(null, [context, 'max', c, table, ...rest]);
+	c.groupCount = (context, ...rest) => aggregateGroup.apply(null, [context, 'count', c, table, false, ...rest]);
+	c.sum = (context, ...rest) => aggregate.apply(null, [context, 'sum', c, table, ...rest]);
+	c.avg = (context, ...rest) => aggregate.apply(null, [context, 'avg', c, table, ...rest]);
+	c.min = (context, ...rest) => aggregate.apply(null, [context, 'min', c, table, ...rest]);
+	c.max = (context, ...rest) => aggregate.apply(null, [context, 'max', c, table, ...rest]);
+	c.count = (context, ...rest) => aggregate.apply(null, [context, 'count', c, table, false, ...rest]);
 
 	function self(context) {
 		const tableAlias = quote(context,table._rootAlias || table._dbName);

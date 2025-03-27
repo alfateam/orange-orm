@@ -535,6 +535,41 @@ describe('aggregate', () => {
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
+		const rows = await db.orderLine.aggregate({
+			orderId: x => x.orderId,
+			count: x => x.count(x => x.id),
+		});
+
+		rows.sort((a, b) => a.orderId - b.orderId);
+
+		const expected = [
+			{
+				orderId: 1,
+				count: 2,
+			},
+			{
+				orderId: 2,
+				count: 1,
+			}
+		];
+
+		expect(rows).toEqual(expected);
+	}
+}, 20000);
+describe('aggregate on relations', () => {
+	test('pg', async () => await verify('pg'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
 		const rows = await db.order.aggregate({
 			where: x => x.customer.name.notEqual(null),
 			customerId: x => x.customerId,
@@ -589,6 +624,7 @@ describe('aggregate each row', () => {
 			lines: {
 				product: true,
 				id2: x => x.id,
+				foo: x => x.count(x => x.id), //weird, but ok..
 				numberOfPackages: x => x.count(x => x.packages.id)
 			},
 			customer: {
@@ -625,8 +661,8 @@ describe('aggregate each row', () => {
 				totalAmount: 802.35,
 				customerId2: 1,
 				lines: [
-					{ id2: 1, product: 'Bicycle', id: 1, orderId: 1, numberOfPackages: 1 },
-					{ id2: 2, product: 'Small guitar', id: 2, orderId: 1, numberOfPackages: 1 }
+					{ id2: 1, foo: 1, product: 'Bicycle', id: 1, orderId: 1, numberOfPackages: 1 },
+					{ id2: 2, foo: 1, product: 'Small guitar', id: 2, orderId: 1, numberOfPackages: 1 }
 				],
 				customer: {
 					id: 1,
@@ -650,7 +686,7 @@ describe('aggregate each row', () => {
 				totalAmount: 300,
 				customerId2: 2,
 				lines: [
-					{ id2: 3, product: 'Magic wand', id: 3, orderId: 2, numberOfPackages: 1 }
+					{ id2: 3, foo: 1, product: 'Magic wand', id: 3, orderId: 2, numberOfPackages: 1 }
 				],
 				customer: {
 					id: 2,
