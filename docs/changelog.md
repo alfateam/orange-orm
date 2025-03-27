@@ -1,4 +1,6 @@
 ## Changelog
+__4.5.2__  
+Bugfix: Aggregate functions are not allowed on root tables .  See [#120](https://github.com/alfateam/orange-orm/issues/121)  
 __4.5.1__  
 Bugfix: "Changed by Other User" Error Triggered by Precision Mismatch in Numeric Column.  See [#120](https://github.com/alfateam/orange-orm/issues/120)  
 __4.5.0__  
