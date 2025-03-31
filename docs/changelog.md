@@ -1,8 +1,10 @@
 ## Changelog
+__4.5.4__  
+Bugfix:  hasMany relation through references relation gives empty array .  See [#122](https://github.com/alfateam/orange-orm/issues/122)  
 __4.5.3__  
 Minor improvements of types in aggregate functions.    
 __4.5.2__  
-Bugfix: Aggregate functions are not allowed on root tables .  See [#120](https://github.com/alfateam/orange-orm/issues/121)  
+Bugfix: Aggregate functions are not allowed on root tables .  See [#121](https://github.com/alfateam/orange-orm/issues/121)  
 __4.5.1__  
 Bugfix: "Changed by Other User" Error Triggered by Precision Mismatch in Numeric Column.  See [#120](https://github.com/alfateam/orange-orm/issues/120)  
 __4.5.0__  

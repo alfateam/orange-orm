@@ -5676,7 +5676,7 @@ function requireNewJoinLeg () {
 		c.expand = relation.expand;
 
 		c.accept = function(visitor) {
-			visitor.visitJoin(c);
+			return visitor.visitJoin(c);
 		};
 
 		return c;
@@ -9853,7 +9853,7 @@ function requireNewManyLeg () {
 		var c = newOneLeg(relation);
 		c.name = relation.joinRelation.rightAlias;
 		c.accept = function(visitor) {
-			visitor.visitMany(c);
+			return visitor.visitMany(c);
 		};
 
 		c.expand = relation.expand;
