@@ -4,7 +4,6 @@ const nameSchema = {
 	type: 'string',
 };
 
-
 function validateName(value) {
 	if (value && value.length > 10)
 		throw new Error('Length cannot exceed 10 characters');
@@ -83,7 +82,7 @@ const map = rdb.map(x => ({
 	order: x.table('order').map(({ column }) => ({
 		id: column('id').numeric().primary().notNullExceptInsert(),
 		orderDate: column('orderDate').date().notNull(),
-		customerId: column('customerId').numeric().notNullExceptInsert(),
+		customerId: column('customerId').numeric(),
 	})),
 
 	orderLine: x.table('orderLine').map(({ column }) => ({
@@ -118,6 +117,9 @@ const map = rdb.map(x => ({
 })).map(x => ({
 	orderLine: x.orderLine.map(({ hasMany }) => ({
 		packages: hasMany(x.package).by('lineId')
+	})),
+	customer: x.customer.map(({hasMany}) => ({
+		orders: hasMany(x.order).by('customerId')
 	}))
 })).map(x => ({
 	order: x.order.map(({ hasOne, hasMany, references }) => ({
