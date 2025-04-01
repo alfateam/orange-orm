@@ -611,22 +611,28 @@ type AggregateStrategyBase<T> =
 		where?: (agg: MappedColumnsAndRelations<T>) => RawFilter;
 	};
 
-type FetchingStrategyBase<T> = {
+
+type FetchingStrategyBase<T, IsMany = true> = 
+{
 	[K in keyof T &
 	keyof RemoveNever<
 		AllowedColumnsAndTablesStrategy<T>
 	>]?: T[K] extends ColumnSymbols
 	? boolean
-	: boolean | FetchingStrategyBase<T[K]> | AggType<T[K]>;
-} & {
+	: boolean | FetchingStrategyBase<T[K], T[K] extends ManyRelation ? true: false> | AggType<T[K]>;
+} & 
+(IsMany extends true ? {
+	limit?: number;
+	offset?: number;
 	orderBy?:
 	| OrderBy<Extract<keyof AllowedColumns<T>, string>>[]
 	| OrderBy<Extract<keyof AllowedColumns<T>, string>>;
-	limit?: number;
-	offset?: number;
 	where?: (agg: MappedColumnsAndRelations<T>) => RawFilter;
+}
+: {
+	where?: (agg: MappedColumnsAndRelations<T>) => RawFilter;
+});
 
-};
 type ExtractAggregates<Agg> = {
 	[K in keyof Agg as
 	Required<Agg>[K] extends (agg: Aggregate<infer V>) => ColumnSymbols
