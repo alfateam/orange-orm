@@ -6,18 +6,30 @@ import type { AxiosInterceptorManager, InternalAxiosRequestConfig, AxiosResponse
 
 export type MappedDbDef<T> = {
 	map<V extends AllowedDbMap<V>>(
-		callback: (mapper: DbMapper<T>) => V
+	  callback: (mapper: DbMapper<T>) => V
 	): MappedDbDef<MergeProperties<T, V>>;
 	<O extends DbOptions<T>>(concurrency: O): NegotiateDbInstance<T, O>;
-} & T & DbConnectable<T>;
+  } & T & DbConnectable<T>;
+  
 
+//todo
 type MergeProperties<T, V> = {
 	[K in keyof T | keyof V]:
-	K extends keyof T ? (T[K] extends MappedTableDef<infer M>
-		? (K extends keyof V ? (V[K] extends MappedTableDef<infer N> ? MappedTableDef<M & N> : V[K]) : T[K])
-		: T[K])
-	: (K extends keyof V ? V[K] : never);
-};
+	  K extends keyof T
+		? T[K] extends MappedTableDef<infer M>
+		  ? K extends keyof V
+			? V[K] extends MappedTableDef<infer N>
+			  ? MappedTableDef<M & N & TableAlias<K>>
+			  : V[K]
+			: T[K]
+		  : T[K]
+		: K extends keyof V
+		? V[K] extends MappedTableDef<infer N>
+		  ? MappedTableDef<N & TableAlias<K>>
+		  : V[K]
+		: never;
+  };
+  
 
 
 export type DbMapper<T> = {
@@ -968,6 +980,7 @@ type MappedTableDefInit<T> = {
 	): MappedTableDef<T & V>;
 } & T;
 
+//todo
 type MappedTableDef<T> = {
 	map<V extends AllowedColumnsAndTablesMap<V>>(
 		callback: (mapper: ColumnMapper<T>) => V
@@ -1779,4 +1792,9 @@ type Increment<C extends number> = C extends 0
 	: C extends 4
 	? 5
 	: 0;
+
 	
+type TableAlias<Alias extends string> = {
+	__tableAlias: Alias;
+  };
+  
