@@ -422,7 +422,6 @@ describe('getMany none sub filter', () => {
 });
 
 describe('getMany', () => {
-
 	test('pg', async () => await verify('pg'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
@@ -434,10 +433,16 @@ describe('getMany', () => {
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
-
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
-		const rows = await db.customer.getMany();
+		const rows = await db.customer.getAll({
+			where: x => {
+				if (dbName === 'pg')
+					return x.name.iContains('harry').or(x.name.iContains('george'));
+				else
+					return x.name.contains('harry').or(x.name.contains('george'));
+			}
+		});
 
 		const expected = [{
 			id: 1,
@@ -1190,7 +1195,7 @@ const connections = {
 		init: initSqlite
 	},
 	sap: {
-		db: map({ db: (con) => con.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master`, { size: 1 }) }),
+		db: map({ db: (con) => con.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master;SortOrder=nocase_utf8;CharSet=NoConversions`, { size: 1 }) }),
 		init: initSap
 	},
 	oracle: {
