@@ -1,4 +1,6 @@
 ## Changelog
+__4.5.5__  
+Bugfix:  Parameterized queries are case sensitive on SAP ASE .  See [#123](https://github.com/alfateam/orange-orm/issues/123)  
 __4.5.4__  
 Bugfix:  hasMany relation through references relation gives empty array .  See [#122](https://github.com/alfateam/orange-orm/issues/122)  
 __4.5.3__  
