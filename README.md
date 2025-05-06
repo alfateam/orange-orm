@@ -49,10 +49,6 @@ Watch the [tutorial video on YouTube](https://youtu.be/1IwwjPr2lMs)
 
 ![Relations diagram](./docs/diagram.svg)  
 
-Here we choose SQLite.  
-```bash
-npm install sqlite3
-```
 <sub>📄 map.ts</sub>
 ```javascript
 import orange from 'orange-orm';
@@ -279,10 +275,15 @@ In SQLite, columns with the INTEGER PRIMARY KEY attribute are designed to autoin
 
 <details><summary><strong>Connecting</strong></summary>
 
-__SQLite__
+__SQLite__  
+
+**Node.js 21 and earlier**
 ```bash
 npm install sqlite3
 ```  
+__Node.js 22+, Bun, or Deno__  
+When running Node.js 22 and later, Bun, or Deno, you can use the builtin SQLite dependency and don't need to install sqlite3.
+
 ```javascript
 import map from './map';
 const db = map.sqlite('demo.db');
@@ -353,7 +354,8 @@ const db = map.mssql({
         });
 ```
 
-__PostgreSQL__
+__PostgreSQL__  
+With Bun, you don't need to install the 'pg' package as PostgreSQL support is built-in.
 ```bash
 npm install pg
 ```  
