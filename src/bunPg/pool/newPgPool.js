@@ -1,67 +1,77 @@
 /* eslint-disable no-prototype-builtins */
-//slightly modified code from github.com/brianc/node-postgres
-var log = require('../../table/log');
+// Simplified pool creator using URL API and handling search_path param
 
-var defaults = require('../../poolDefaults');
-var genericPool = require('../../generic-pool');
-var SQL;
-var parseSearchPathParam = require('../../pg/pool/parseSearchPathParam');
+const log = require('../../table/log');
+const defaults = require('../../poolDefaults');
+const genericPool = require('../../generic-pool');
+const { URL } = require('url');
+let SQL;
 
-function newPgPool(connectionString, poolOptions) {
-	poolOptions = poolOptions || {};
+function newPgPool(connectionString, poolOptions = {}) {
+	let searchPath;
+	let connStr = connectionString;
 
-	// @ts-ignore
-	var pool = genericPool.Pool({
+	try {
+		const url = new URL(connectionString);
+		const paramName = url.searchParams.has('search_path')
+			? 'search_path'
+			: url.searchParams.has('searchPath')
+				? 'searchPath'
+				: null;
+		if (paramName) {
+			searchPath = url.searchParams.get(paramName);
+			url.searchParams.delete(paramName);
+			connStr = url.toString();
+		}
+	} catch {
+		// Non-URL string; leave as-is
+	}
+
+	//@ts-ignore
+	const pool = genericPool.Pool({
 		max: poolOptions.size || poolOptions.poolSize || defaults.poolSize,
 		idleTimeoutMillis: poolOptions.idleTimeout || defaults.poolIdleTimeout,
 		reapIntervalMillis: poolOptions.reapIntervalMillis || defaults.reapIntervalMillis,
 		log: poolOptions.log,
-		create: async function(cb) {
+
+		create: async (cb) => {
 			try {
-				if (!SQL)
-					({ SQL } = await import('bun'));
-				var client = new SQL(connectionString);
+				if (!SQL) ({ SQL } = await import('bun'));
+				const client = new SQL(connStr);
 				client.poolCount = 0;
-				negotiateSearchPath(client, connectionString).then(() => cb(null, client), e => cb(e, client));
-			}
-			catch(e) {
-				return cb(e, null);
+				await applySearchPath(client, searchPath);
+				cb(null, client);
+			} catch (err) {
+				cb(err, null);
 			}
 		},
-		destroy: function(client) {
+
+		destroy: (client) => {
 			client._destroying = true;
 			client.poolCount = undefined;
 			client.end();
-		}
+		},
 	});
-	//monkey-patch with connect method
-	pool.connect = function(cb) {
-		pool.acquire(function(err, client) {
-			if (err) return cb(err, null, function() {
-				/*NOOP*/
-			});
+
+	pool.connect = (cb) => {
+		pool.acquire((err, client) => {
+			if (err) return cb(err, null, () => {});
 			client.poolCount++;
-			cb(null, client, function(err) {
-				if (err) {
-					pool.destroy(client);
-				} else {
-					pool.release(client);
-				}
+			cb(null, client, (releaseErr) => {
+				releaseErr ? pool.destroy(client) : pool.release(client);
 			});
 		});
 	};
+
 	return pool;
 }
 
-function negotiateSearchPath(client, connectionString) {
-	const searchPath = parseSearchPathParam(connectionString);
+async function applySearchPath(client, searchPath) {
 	if (searchPath) {
-		const sql = `set search_path to ${searchPath}`;
-		log.emitQuery({sql, parameters: []});
-		return client.unsafe(sql);
+		const sql = `SET search_path TO ${searchPath}`;
+		log.emitQuery({ sql, parameters: [] });
+		await client.unsafe(sql);
 	}
-	else
-		return Promise.resolve();
 }
 
 module.exports = newPgPool;

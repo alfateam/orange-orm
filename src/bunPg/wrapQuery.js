@@ -33,9 +33,9 @@ function wrapQuery(context, connection) {
 				else if (sql === 'ROLLBACK') {
 					if (!transactionHandler)
 						return onCompleted(new Error('Cannot rollback outside transaction'), []);
-					transactionHandler.reject(new Error('rollback'));
+					transactionHandler.reject(new Error('__rollback__'));
 					transactionHandler.promise.then(null, (err) => {
-						if (err.message === 'rollback')
+						if (err.message === '__rollback__')
 							onCompleted(null, []);
 						else
 							onCompleted(err, []);
@@ -88,7 +88,8 @@ function beginTransaction(connection) {
 		e => {
 			if (!beginIsResolved)
 				rejectBegin(e);
-			throw e;
+			if (e?.message !== '__rollback__')
+				throw e;
 		});
 	return beginPromise;
 }

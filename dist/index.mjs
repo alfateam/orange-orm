@@ -7,6 +7,7 @@ import * as axios from 'axios';
 import * as _default from 'rfdc/default';
 import * as ajv from 'ajv';
 import * as onChange from '@lroal/on-change';
+import * as url from 'url';
 import * as connectionString from '@tediousjs/connection-string';
 
 function getDefaultExportFromCjs (x) {
@@ -14199,9 +14200,9 @@ function requireWrapQuery$8 () {
 					else if (sql === 'ROLLBACK') {
 						if (!transactionHandler)
 							return onCompleted(new Error('Cannot rollback outside transaction'), []);
-						transactionHandler.reject(new Error('rollback'));
+						transactionHandler.reject(new Error('__rollback__'));
 						transactionHandler.promise.then(null, (err) => {
-							if (err.message === 'rollback')
+							if (err.message === '__rollback__')
 								onCompleted(null, []);
 							else
 								onCompleted(err, []);
@@ -14254,7 +14255,8 @@ function requireWrapQuery$8 () {
 			e => {
 				if (!beginIsResolved)
 					rejectBegin(e);
-				throw e;
+				if (e?.message !== '__rollback__')
+					throw e;
 			});
 		return beginPromise;
 	}
@@ -14613,6 +14615,7 @@ function requireNewTransaction$9 () {
 		};
 		rdb.aggregateCount = 0;
 		rdb.quote = quote;
+		rdb.cache = {};
 
 		if (readonly) {
 			rdb.dbClient = {
@@ -14684,24 +14687,7 @@ function requireEnd$8 () {
 	return end$8;
 }
 
-var parseSearchPathParam_1;
-var hasRequiredParseSearchPathParam;
-
-function requireParseSearchPathParam () {
-	if (hasRequiredParseSearchPathParam) return parseSearchPathParam_1;
-	hasRequiredParseSearchPathParam = 1;
-	function parseSearchPathParam(connectionString = '') {
-		const [, queryString] = connectionString.split('?');
-		if (!queryString)
-			return;
-		const params = new URLSearchParams(queryString);
-		const searchPath = params.get('search_path');
-		return searchPath;
-	}
-
-	parseSearchPathParam_1 = parseSearchPathParam;
-	return parseSearchPathParam_1;
-}
+var require$$3 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(url);
 
 /* eslint-disable no-prototype-builtins */
 
@@ -14711,69 +14697,79 @@ var hasRequiredNewPgPool$1;
 function requireNewPgPool$1 () {
 	if (hasRequiredNewPgPool$1) return newPgPool_1$1;
 	hasRequiredNewPgPool$1 = 1;
-	//slightly modified code from github.com/brianc/node-postgres
-	var log = requireLog();
+	// Simplified pool creator using URL API and handling search_path param
 
-	var defaults = requirePoolDefaults();
-	var genericPool = requireGenericPool();
-	var SQL;
-	var parseSearchPathParam = requireParseSearchPathParam();
+	const log = requireLog();
+	const defaults = requirePoolDefaults();
+	const genericPool = requireGenericPool();
+	const { URL } = require$$3;
+	let SQL;
 
-	function newPgPool(connectionString, poolOptions) {
-		poolOptions = poolOptions || {};
+	function newPgPool(connectionString, poolOptions = {}) {
+		let searchPath;
+		let connStr = connectionString;
 
-		// @ts-ignore
-		var pool = genericPool.Pool({
+		try {
+			const url = new URL(connectionString);
+			const paramName = url.searchParams.has('search_path')
+				? 'search_path'
+				: url.searchParams.has('searchPath')
+					? 'searchPath'
+					: null;
+			if (paramName) {
+				searchPath = url.searchParams.get(paramName);
+				url.searchParams.delete(paramName);
+				connStr = url.toString();
+			}
+		} catch {
+			// Non-URL string; leave as-is
+		}
+
+		//@ts-ignore
+		const pool = genericPool.Pool({
 			max: poolOptions.size || poolOptions.poolSize || defaults.poolSize,
 			idleTimeoutMillis: poolOptions.idleTimeout || defaults.poolIdleTimeout,
 			reapIntervalMillis: poolOptions.reapIntervalMillis || defaults.reapIntervalMillis,
 			log: poolOptions.log,
-			create: async function(cb) {
+
+			create: async (cb) => {
 				try {
-					if (!SQL)
-						({ SQL } = await import('bun'));
-					var client = new SQL(connectionString);
+					if (!SQL) ({ SQL } = await import('bun'));
+					const client = new SQL(connStr);
 					client.poolCount = 0;
-					negotiateSearchPath(client, connectionString).then(() => cb(null, client), e => cb(e, client));
-				}
-				catch(e) {
-					return cb(e, null);
+					await applySearchPath(client, searchPath);
+					cb(null, client);
+				} catch (err) {
+					cb(err, null);
 				}
 			},
-			destroy: function(client) {
+
+			destroy: (client) => {
 				client._destroying = true;
 				client.poolCount = undefined;
 				client.end();
-			}
+			},
 		});
-		//monkey-patch with connect method
-		pool.connect = function(cb) {
-			pool.acquire(function(err, client) {
-				if (err) return cb(err, null, function() {
-					/*NOOP*/
-				});
+
+		pool.connect = (cb) => {
+			pool.acquire((err, client) => {
+				if (err) return cb(err, null, () => {});
 				client.poolCount++;
-				cb(null, client, function(err) {
-					if (err) {
-						pool.destroy(client);
-					} else {
-						pool.release(client);
-					}
+				cb(null, client, (releaseErr) => {
+					releaseErr ? pool.destroy(client) : pool.release(client);
 				});
 			});
 		};
+
 		return pool;
 	}
 
-	function negotiateSearchPath(client, connectionString) {
-		const searchPath = parseSearchPathParam(connectionString);
+	async function applySearchPath(client, searchPath) {
 		if (searchPath) {
-			const sql = `set search_path to ${searchPath}`;
-			log.emitQuery({sql, parameters: []});
-			return client.unsafe(sql);
+			const sql = `SET search_path TO ${searchPath}`;
+			log.emitQuery({ sql, parameters: [] });
+			await client.unsafe(sql);
 		}
-		else
-			return Promise.resolve();
 	}
 
 	newPgPool_1$1 = newPgPool;
@@ -15108,6 +15104,25 @@ function requireEnd$7 () {
 
 	end$7 = endPool;
 	return end$7;
+}
+
+var parseSearchPathParam_1;
+var hasRequiredParseSearchPathParam;
+
+function requireParseSearchPathParam () {
+	if (hasRequiredParseSearchPathParam) return parseSearchPathParam_1;
+	hasRequiredParseSearchPathParam = 1;
+	function parseSearchPathParam(connectionString = '') {
+		const [, queryString] = connectionString.split('?');
+		if (!queryString)
+			return;
+		const params = new URLSearchParams(queryString);
+		const searchPath = params.get('search_path');
+		return searchPath;
+	}
+
+	parseSearchPathParam_1 = parseSearchPathParam;
+	return parseSearchPathParam_1;
 }
 
 /* eslint-disable no-prototype-builtins */
