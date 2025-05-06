@@ -52,7 +52,7 @@ function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 					}
 					try {
 						client.setUseUTC(false);
-						wrapQuery(client)(query, (err, res) => {
+						wrapQuery(domain, client)(query, (err, res) => {
 							done();
 							callback(err, res);
 						});
@@ -77,7 +77,7 @@ function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 					return;
 				}
 				client.setUseUTC(false);
-				client.executeQuery = wrapQuery(client);
+				client.executeQuery = wrapQuery(domain, client);
 				rdb.dbClient = client;
 				rdb.dbClientDone = done;
 				domain.rdb = rdb;

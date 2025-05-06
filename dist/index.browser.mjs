@@ -12382,7 +12382,7 @@ function requireWrapQuery () {
 	hasRequiredWrapQuery = 1;
 	var log = requireLog();
 
-	function wrapQuery(client) {
+	function wrapQuery(_context, client) {
 
 		return runQuery;
 
@@ -12974,7 +12974,7 @@ function requireNewTransaction () {
 							return callback(err);
 						}
 						try {
-							wrapQuery(client)(query, (err, res) => {
+							wrapQuery(domain, client)(query, (err, res) => {
 								done();
 								callback(err, res);
 							});
@@ -12998,7 +12998,7 @@ function requireNewTransaction () {
 						onError(err);
 						return;
 					}
-					client.executeQuery = wrapQuery(client);
+					client.executeQuery = wrapQuery(domain, client);
 					rdb.dbClient = client;
 					rdb.dbClientDone = done;
 					domain.rdb = rdb;

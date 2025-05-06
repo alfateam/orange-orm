@@ -22,8 +22,7 @@ function newPgPool(connectionString, poolOptions) {
 					({ SQL } = await import('bun'));
 				var client = new SQL(connectionString);
 				client.poolCount = 0;
-				cb(null, client);
-				// negotiateSearchPath(client, connectionString, (err) => cb(err, client));
+				negotiateSearchPath(client, connectionString).then(() => cb(null, client), e => cb(e, client));
 			}
 			catch(e) {
 				return cb(e, null);
@@ -54,17 +53,15 @@ function newPgPool(connectionString, poolOptions) {
 	return pool;
 }
 
-function negotiateSearchPath(client, connectionString, cb) {
+function negotiateSearchPath(client, connectionString) {
 	const searchPath = parseSearchPathParam(connectionString);
 	if (searchPath) {
 		const sql = `set search_path to ${searchPath}`;
 		log.emitQuery({sql, parameters: []});
-		return client.query(sql, cb);
+		return client.unsafe(sql);
 	}
 	else
-		cb();
-
-
+		return Promise.resolve();
 }
 
 module.exports = newPgPool;

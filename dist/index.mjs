@@ -3747,11 +3747,11 @@ function requireEncodeFilterArg () {
 }
 
 var quote_1;
-var hasRequiredQuote$7;
+var hasRequiredQuote$6;
 
-function requireQuote$7 () {
-	if (hasRequiredQuote$7) return quote_1;
-	hasRequiredQuote$7 = 1;
+function requireQuote$6 () {
+	if (hasRequiredQuote$6) return quote_1;
+	hasRequiredQuote$6 = 1;
 	let tryGetSessionContext = requireTryGetSessionContext();
 
 	function quote(context, name) {
@@ -3775,7 +3775,7 @@ function requireEqual () {
 	var newBoolean = requireNewBoolean();
 	var nullOperator = ' is ';
 	var encodeFilterArg = requireEncodeFilterArg();
-	var quote = requireQuote$7();
+	var quote = requireQuote$6();
 
 	function equal(context, column,arg,alias) {
 		var operator = '=';
@@ -3800,7 +3800,7 @@ function requireNotEqual () {
 	var newBoolean = requireNewBoolean();
 	var encodeFilterArg = requireEncodeFilterArg();
 	var nullOperator = ' is not ';
-	var quote = requireQuote$7();
+	var quote = requireQuote$6();
 
 	function notEqual(context, column,arg,alias) {
 		var operator = '<>';
@@ -3824,7 +3824,7 @@ function requireLessThan () {
 	hasRequiredLessThan = 1;
 	var newBoolean = requireNewBoolean();
 	var encodeFilterArg = requireEncodeFilterArg();
-	var quote = requireQuote$7();
+	var quote = requireQuote$6();
 
 	function lessThanOrEqual(context, column,arg,alias) {
 		var operator = '<';
@@ -3869,7 +3869,7 @@ function requireGreaterThan () {
 	hasRequiredGreaterThan = 1;
 	var newBoolean = requireNewBoolean();
 	var encodeFilterArg = requireEncodeFilterArg();
-	var quote = requireQuote$7();
+	var quote = requireQuote$6();
 
 	function greaterThan(context, column,arg,alias) {
 		var operator = '>';
@@ -3891,7 +3891,7 @@ function requireGreaterThanOrEqual () {
 	hasRequiredGreaterThanOrEqual = 1;
 	var newBoolean = requireNewBoolean();
 	var encodeFilterArg = requireEncodeFilterArg();
-	var quote = requireQuote$7();
+	var quote = requireQuote$6();
 
 	function greaterThanOrEqual(context, column,arg,alias) {
 		var operator = '>=';
@@ -3913,7 +3913,7 @@ function require_in () {
 	hasRequired_in = 1;
 	const newParameterized = requireNewParameterized();
 	const newBoolean = requireNewBoolean();
-	const quote = requireQuote$7();
+	const quote = requireQuote$6();
 
 	function _in(context, column,values,alias) {
 		let filter;
@@ -3966,7 +3966,7 @@ function requireNewColumn () {
 	const greaterThanOrEqual = requireGreaterThanOrEqual();
 	const _in = require_in();
 	const _extractAlias = requireExtractAlias();
-	const quote = requireQuote$7();
+	const quote = requireQuote$6();
 
 	newColumn = function(table, name) {
 		var c = {};
@@ -4141,7 +4141,7 @@ function requireStartsWithCore () {
 	hasRequiredStartsWithCore = 1;
 	var newBoolean = requireNewBoolean();
 	var nullOperator = ' is ';
-	var quote = requireQuote$7();
+	var quote = requireQuote$6();
 
 	function startsWithCore(context, operator, column,arg,alias) {
 		operator = ' ' + operator + ' ';
@@ -4177,7 +4177,7 @@ var hasRequiredEndsWithCore;
 function requireEndsWithCore () {
 	if (hasRequiredEndsWithCore) return endsWithCore_1;
 	hasRequiredEndsWithCore = 1;
-	const quote = requireQuote$7();
+	const quote = requireQuote$6();
 	var newBoolean = requireNewBoolean();
 	var nullOperator = ' is ';
 
@@ -4216,7 +4216,7 @@ var hasRequiredContainsCore;
 function requireContainsCore () {
 	if (hasRequiredContainsCore) return containsCore;
 	hasRequiredContainsCore = 1;
-	const quote = requireQuote$7();
+	const quote = requireQuote$6();
 	var newBoolean = requireNewBoolean();
 	var nullOperator = ' is ';
 
@@ -4294,7 +4294,7 @@ function requireIEqual () {
 	var newBoolean = requireNewBoolean();
 	var nullOperator = ' is ';
 	var encodeFilterArg = requireEncodeFilterArg();
-	const quote = requireQuote$7();
+	const quote = requireQuote$6();
 
 	function iEqual(context, column,arg,alias) {
 		var operator = ' ILIKE ';
@@ -4486,7 +4486,7 @@ function requireFormatOut$1 () {
 	if (hasRequiredFormatOut$1) return formatOut_1$1;
 	hasRequiredFormatOut$1 = 1;
 	var getSessionSingleton = requireGetSessionSingleton();
-	const quote = requireQuote$7();
+	const quote = requireQuote$6();
 
 	function formatOut(context, column, alias) {
 		var formatColumn = getSessionSingleton(context, 'formatJSONOut');
@@ -4777,7 +4777,7 @@ function requireFormatOut () {
 	if (hasRequiredFormatOut) return formatOut_1;
 	hasRequiredFormatOut = 1;
 	var getSessionSingleton = requireGetSessionSingleton();
-	const quote = requireQuote$7();
+	const quote = requireQuote$6();
 
 	function formatOut(context, column, alias) {
 		var formatColumn = getSessionSingleton(context, 'formatDateOut');
@@ -6015,7 +6015,7 @@ function requireNewSingleQuery$2 () {
 	var negotiateLimit = requireNegotiateLimit();
 	var negotiateExclusive = requireNegotiateExclusive();
 	var newParameterized = requireNewParameterized();
-	var quote = requireQuote$7();
+	var quote = requireQuote$6();
 
 	function _new(context, table, filter, span, alias, innerJoin, orderBy, limit, offset, exclusive) {
 
@@ -6677,7 +6677,7 @@ function requireSelectSql$1 () {
 	hasRequiredSelectSql$1 = 1;
 	const newParameterized = requireNewParameterized();
 	const newBoolean = requireNewBoolean();
-	const quote = requireQuote$7();
+	const quote = requireQuote$6();
 
 	function newSelectSql(context, table, alias) {
 		const colName = quote(context, table._primaryColumns[0]._dbName);
@@ -9216,7 +9216,7 @@ function requireChildColumn () {
 	var getSessionContext = requireGetSessionContext();
 	var newJoinCore = requireNewShallowJoinSqlCore();
 	const getSessionSingleton = requireGetSessionSingleton();
-	const _quote = requireQuote$7();
+	const _quote = requireQuote$6();
 
 
 	function childColumn(context, column, relations) {
@@ -10504,7 +10504,7 @@ function requireCount () {
 	const negotiateRawSqlFilter = requireNegotiateRawSqlFilter();
 	const extractFilter = requireExtractFilter();
 	const newWhereSql = requireNewWhereSql();
-	const quote = requireQuote$7();
+	const quote = requireQuote$6();
 
 	async function count(context, table, filter) {
 		let alias = table._dbName;
@@ -11231,11 +11231,11 @@ function requireNewRow () {
 }
 
 var insert_1$1;
-var hasRequiredInsert$7;
+var hasRequiredInsert$6;
 
-function requireInsert$7 () {
-	if (hasRequiredInsert$7) return insert_1$1;
-	hasRequiredInsert$7 = 1;
+function requireInsert$6 () {
+	if (hasRequiredInsert$6) return insert_1$1;
+	hasRequiredInsert$6 = 1;
 	let getSessionContext = requireGetSessionContext();
 	let newRow = requireNewRow();
 
@@ -11542,7 +11542,7 @@ function requireTable () {
 	const tryGetFirst = requireTryGetFirstFromDb();
 	const newCache = requireNewRowCache();
 	const newContext = requireNewObject();
-	const insert = requireInsert$7();
+	const insert = requireInsert$6();
 	const _delete = require_delete();
 	const cascadeDelete = requireCascadeDelete();
 	const patchTable = requirePatchTable();
@@ -12416,7 +12416,7 @@ function requireWrapQuery$9 () {
 	hasRequiredWrapQuery$9 = 1;
 	var log = requireLog();
 
-	function wrapQuery(connection) {
+	function wrapQuery(_context, connection) {
 		var runOriginalQuery = connection.query;
 		return runQuery;
 
@@ -12433,20 +12433,20 @@ function requireWrapQuery$9 () {
 	return wrapQuery_1$9;
 }
 
-var encodeBoolean_1$6;
-var hasRequiredEncodeBoolean$6;
+var encodeBoolean_1$5;
+var hasRequiredEncodeBoolean$5;
 
-function requireEncodeBoolean$6 () {
-	if (hasRequiredEncodeBoolean$6) return encodeBoolean_1$6;
-	hasRequiredEncodeBoolean$6 = 1;
+function requireEncodeBoolean$5 () {
+	if (hasRequiredEncodeBoolean$5) return encodeBoolean_1$5;
+	hasRequiredEncodeBoolean$5 = 1;
 	function encodeBoolean(bool) {
 		if (bool)
 			return 1;
 		return 0;
 	}
 
-	encodeBoolean_1$6 = encodeBoolean;
-	return encodeBoolean_1$6;
+	encodeBoolean_1$5 = encodeBoolean;
+	return encodeBoolean_1$5;
 }
 
 var format_1;
@@ -12467,54 +12467,54 @@ function requireFormat () {
 	return format_1;
 }
 
-var quote$6;
-var hasRequiredQuote$6;
+var quote$5;
+var hasRequiredQuote$5;
 
-function requireQuote$6 () {
-	if (hasRequiredQuote$6) return quote$6;
-	hasRequiredQuote$6 = 1;
-	quote$6 = (name) => `\`${name}\``;
-	return quote$6;
+function requireQuote$5 () {
+	if (hasRequiredQuote$5) return quote$5;
+	hasRequiredQuote$5 = 1;
+	quote$5 = (name) => `\`${name}\``;
+	return quote$5;
 }
 
-var deleteFromSql_1$6;
-var hasRequiredDeleteFromSql$6;
+var deleteFromSql_1$5;
+var hasRequiredDeleteFromSql$5;
 
-function requireDeleteFromSql$6 () {
-	if (hasRequiredDeleteFromSql$6) return deleteFromSql_1$6;
-	hasRequiredDeleteFromSql$6 = 1;
+function requireDeleteFromSql$5 () {
+	if (hasRequiredDeleteFromSql$5) return deleteFromSql_1$5;
+	hasRequiredDeleteFromSql$5 = 1;
 	const format = 'delete %s from %s as %s%s';
 	const formatString = requireFormat();
-	const quote = requireQuote$6();
+	const quote = requireQuote$5();
 
 	function deleteFromSql(table, alias, whereSql) {
 		const name = quote(table._dbName);
 		alias = quote(alias);
 		return formatString(format, alias, name, alias, whereSql);
 	}
-	deleteFromSql_1$6 = deleteFromSql;
-	return deleteFromSql_1$6;
+	deleteFromSql_1$5 = deleteFromSql;
+	return deleteFromSql_1$5;
 }
 
-var selectForUpdateSql$6;
-var hasRequiredSelectForUpdateSql$6;
+var selectForUpdateSql$5;
+var hasRequiredSelectForUpdateSql$5;
 
-function requireSelectForUpdateSql$6 () {
-	if (hasRequiredSelectForUpdateSql$6) return selectForUpdateSql$6;
-	hasRequiredSelectForUpdateSql$6 = 1;
-	selectForUpdateSql$6 = function(_alias) {
+function requireSelectForUpdateSql$5 () {
+	if (hasRequiredSelectForUpdateSql$5) return selectForUpdateSql$5;
+	hasRequiredSelectForUpdateSql$5 = 1;
+	selectForUpdateSql$5 = function(_alias) {
 		return ' FOR UPDATE';
 	};
-	return selectForUpdateSql$6;
+	return selectForUpdateSql$5;
 }
 
-var lastInsertedSql_1$5;
-var hasRequiredLastInsertedSql$5;
+var lastInsertedSql_1$4;
+var hasRequiredLastInsertedSql$4;
 
-function requireLastInsertedSql$5 () {
-	if (hasRequiredLastInsertedSql$5) return lastInsertedSql_1$5;
-	hasRequiredLastInsertedSql$5 = 1;
-	const quote = requireQuote$6();
+function requireLastInsertedSql$4 () {
+	if (hasRequiredLastInsertedSql$4) return lastInsertedSql_1$4;
+	hasRequiredLastInsertedSql$4 = 1;
+	const quote = requireQuote$5();
 
 	function lastInsertedSql(context,table, keyValues) {
 		return keyValues.map((value,i) => {
@@ -12526,16 +12526,16 @@ function requireLastInsertedSql$5 () {
 		});
 	}
 
-	lastInsertedSql_1$5 = lastInsertedSql;
-	return lastInsertedSql_1$5;
+	lastInsertedSql_1$4 = lastInsertedSql;
+	return lastInsertedSql_1$4;
 }
 
-var limitAndOffset_1$6;
-var hasRequiredLimitAndOffset$6;
+var limitAndOffset_1$5;
+var hasRequiredLimitAndOffset$5;
 
-function requireLimitAndOffset$6 () {
-	if (hasRequiredLimitAndOffset$6) return limitAndOffset_1$6;
-	hasRequiredLimitAndOffset$6 = 1;
+function requireLimitAndOffset$5 () {
+	if (hasRequiredLimitAndOffset$5) return limitAndOffset_1$5;
+	hasRequiredLimitAndOffset$5 = 1;
 	function limitAndOffset(span) {
 		if (span.offset)
 			return ` limit ${span.offset}${limit()}`;
@@ -12553,17 +12553,17 @@ function requireLimitAndOffset$6 () {
 
 	}
 
-	limitAndOffset_1$6 = limitAndOffset;
-	return limitAndOffset_1$6;
+	limitAndOffset_1$5 = limitAndOffset;
+	return limitAndOffset_1$5;
 }
 
-var insertSql_1$6;
-var hasRequiredInsertSql$6;
+var insertSql_1$5;
+var hasRequiredInsertSql$5;
 
-function requireInsertSql$6 () {
-	if (hasRequiredInsertSql$6) return insertSql_1$6;
-	hasRequiredInsertSql$6 = 1;
-	const quote = requireQuote$6();
+function requireInsertSql$5 () {
+	if (hasRequiredInsertSql$5) return insertSql_1$5;
+	hasRequiredInsertSql$5 = 1;
+	const quote = requireQuote$5();
 
 	function insertSql(_context, table, row, options) {
 		let columnNames = [];
@@ -12628,8 +12628,8 @@ function requireInsertSql$6 () {
 		}
 	}
 
-	insertSql_1$6 = insertSql;
-	return insertSql_1$6;
+	insertSql_1$5 = insertSql;
+	return insertSql_1$5;
 }
 
 var newInsertCommand_1;
@@ -12706,7 +12706,7 @@ function requireGetSqlTemplate () {
 	if (hasRequiredGetSqlTemplate) return getSqlTemplate_1;
 	hasRequiredGetSqlTemplate = 1;
 	let getSessionContext = requireGetSessionContext();
-	let quote = requireQuote$7();
+	let quote = requireQuote$6();
 
 	function getSqlTemplate(context, _table, _row) {
 		let rdb = getSessionContext(context);
@@ -12820,7 +12820,7 @@ function requireNewGetLastInsertedCommandCore () {
 	const newParameterized = requireNewParameterized();
 	const getSessionContext = requireGetSessionContext();
 	const newDiscriminatorSql = requireNewDiscriminatorSql$1();
-	const quote = requireQuote$7();
+	const quote = requireQuote$6();
 
 	function newGetLastInsertedCommandCore(context, table, row) {
 		let parameters = [];
@@ -12922,12 +12922,12 @@ function requireNewGetLastInsertedCommand () {
 	return newGetLastInsertedCommand_1;
 }
 
-var insert$5;
-var hasRequiredInsert$6;
+var insert$4;
+var hasRequiredInsert$5;
 
-function requireInsert$6 () {
-	if (hasRequiredInsert$6) return insert$5;
-	hasRequiredInsert$6 = 1;
+function requireInsert$5 () {
+	if (hasRequiredInsert$5) return insert$4;
+	hasRequiredInsert$5 = 1;
 	let newInsertCommand = requireNewInsertCommand();
 	let newInsertCommandCore = requireNewInsertCommandCore$1();
 	let newGetLastInsertedCommand = requireNewGetLastInsertedCommand();
@@ -12948,8 +12948,8 @@ function requireInsert$6 () {
 
 	}
 
-	insert$5 = insertDefault;
-	return insert$5;
+	insert$4 = insertDefault;
+	return insert$4;
 }
 
 var newTransaction$a;
@@ -12959,14 +12959,14 @@ function requireNewTransaction$a () {
 	if (hasRequiredNewTransaction$a) return newTransaction$a;
 	hasRequiredNewTransaction$a = 1;
 	const wrapQuery = requireWrapQuery$9();
-	const encodeBoolean = requireEncodeBoolean$6();
-	const deleteFromSql = requireDeleteFromSql$6();
-	const selectForUpdateSql = requireSelectForUpdateSql$6();
-	const lastInsertedSql = requireLastInsertedSql$5();
-	const limitAndOffset = requireLimitAndOffset$6();
-	const insertSql = requireInsertSql$6();
-	const insert = requireInsert$6();
-	const quote = requireQuote$6();
+	const encodeBoolean = requireEncodeBoolean$5();
+	const deleteFromSql = requireDeleteFromSql$5();
+	const selectForUpdateSql = requireSelectForUpdateSql$5();
+	const lastInsertedSql = requireLastInsertedSql$4();
+	const limitAndOffset = requireLimitAndOffset$5();
+	const insertSql = requireInsertSql$5();
+	const insert = requireInsert$5();
+	const quote = requireQuote$5();
 
 	function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 		var rdb = {poolFactory: pool};
@@ -12999,7 +12999,7 @@ function requireNewTransaction$a () {
 							return callback(err);
 						}
 						try {
-							wrapQuery(client)(query, (err, res) => {
+							wrapQuery(domain, client)(query, (err, res) => {
 								done();
 								callback(err, res);
 							});
@@ -13023,7 +13023,7 @@ function requireNewTransaction$a () {
 						onError(err);
 						return;
 					}
-					client.executeQuery = wrapQuery(client);
+					client.executeQuery = wrapQuery(domain, client);
 					rdb.dbClient = client;
 					rdb.dbClientDone = done;
 					domain.rdb = rdb;
@@ -14029,33 +14029,99 @@ var hasRequiredWrapQuery$8;
 function requireWrapQuery$8 () {
 	if (hasRequiredWrapQuery$8) return wrapQuery_1$8;
 	hasRequiredWrapQuery$8 = 1;
-	var log = requireLog();
-	var replaceParamChar = requireReplaceParamChar$1();
+	const log = requireLog();
+	const replaceParamChar = requireReplaceParamChar$1();
+	const tryGetSessionContext = requireTryGetSessionContext();
 
-	function wrapQuery(connection) {
+	function wrapQuery(context, connection) {
 		return runQuery;
 
 		async function runQuery(query, onCompleted) {
 			try {
 
-				var params = query.parameters;
-				var sql = replaceParamChar(query, params);
-				log.emitQuery({sql, parameters: params});
+				const sql = replaceParamChar(query, query.parameters);
+				let rdb = tryGetSessionContext(context);
+				let transactionHandler = rdb.transactionHandler;
+				log.emitQuery({ sql, parameters: query.parameters });
+
+				if (sql.length < 18 && query.parameters.length === 0) {
+					if (sql === 'BEGIN TRANSACTION' || sql === 'BEGIN') {
+						if (transactionHandler)
+							return onCompleted(new Error('Already inside a transaction'), []);
+						beginTransaction(connection).then(_transactionHandler => {
+							rdb.transactionHandler = _transactionHandler;
+							onCompleted(null, []);
+						}, onCompleted);
+						return;
+					}
+					else if (sql === 'COMMIT') {
+						if (!transactionHandler)
+							return onCompleted(new Error('Cannot commit outside transaction'), []);
+						transactionHandler.resolve();
+						transactionHandler.promise.then(() => onCompleted(null, []), err => onCompleted(err, []));
+						return;
+					}
+					else if (sql === 'ROLLBACK') {
+						if (!transactionHandler)
+							return onCompleted(new Error('Cannot rollback outside transaction'), []);
+						transactionHandler.reject(new Error('rollback'));
+						transactionHandler.promise.then(null, (err) => {
+							if (err.message === 'rollback')
+								onCompleted(null, []);
+							else
+								onCompleted(err, []);
+						});
+						return;
+					}
+				}
 
 				let result;
+				const _connection = transactionHandler?.tx || connection;
 				if (query.parameters.length === 0)
-					result =  await connection.unsafe(sql);
+					result = await _connection.unsafe(sql);
 				else
-					result =  await connection.unsafe(sql, query.parameters);
-				if (Array.isArray(result))
-					result = result[result.length-1];
+					result = await _connection.unsafe(sql, query.parameters);
 				onCompleted(null, result);
 			}
-			catch(e) {
+			catch (e) {
 				onCompleted(e);
 			}
 		}
 
+	}
+
+	function beginTransaction(connection) {
+
+		let beginIsResolved = false;
+		let resolve;
+		let reject;
+		let resolveBegin;
+		let rejectBegin;
+
+		let sqlPromise = new Promise((res, rej) => {
+			resolve = res;
+			reject = rej;
+		});
+		let beginPromise = new Promise((res,rej) => {
+			resolveBegin = res;
+			rejectBegin = rej;
+		});
+		connection.begin(async (tx) => {
+			beginIsResolved = true;
+			resolveBegin({
+				tx,
+				resolve,
+				reject,
+				promise: sqlPromise,
+			});
+			return sqlPromise;
+		}).then(null,
+			e => {
+				if (!beginIsResolved)
+					rejectBegin(e);
+				throw e;
+			});
+		return beginPromise;
 	}
 
 	wrapQuery_1$8 = wrapQuery;
@@ -14078,18 +14144,18 @@ function requireEncodeDate () {
 	return encodeDate_1;
 }
 
-var encodeBoolean_1$5;
-var hasRequiredEncodeBoolean$5;
+var encodeBoolean_1$4;
+var hasRequiredEncodeBoolean$4;
 
-function requireEncodeBoolean$5 () {
-	if (hasRequiredEncodeBoolean$5) return encodeBoolean_1$5;
-	hasRequiredEncodeBoolean$5 = 1;
+function requireEncodeBoolean$4 () {
+	if (hasRequiredEncodeBoolean$4) return encodeBoolean_1$4;
+	hasRequiredEncodeBoolean$4 = 1;
 	function encodeBoolean(bool) {
 		return bool.toString();
 	}
 
-	encodeBoolean_1$5 = encodeBoolean;
-	return encodeBoolean_1$5;
+	encodeBoolean_1$4 = encodeBoolean;
+	return encodeBoolean_1$4;
 }
 
 var encodeBinary_1;
@@ -14136,55 +14202,55 @@ function requireDecodeBinary () {
 	return decodeBinary_1;
 }
 
-var quote$5;
-var hasRequiredQuote$5;
+var quote$4;
+var hasRequiredQuote$4;
 
-function requireQuote$5 () {
-	if (hasRequiredQuote$5) return quote$5;
-	hasRequiredQuote$5 = 1;
-	quote$5 = (name) => `"${name}"`;
-	return quote$5;
+function requireQuote$4 () {
+	if (hasRequiredQuote$4) return quote$4;
+	hasRequiredQuote$4 = 1;
+	quote$4 = (name) => `"${name}"`;
+	return quote$4;
 }
 
-var deleteFromSql_1$5;
-var hasRequiredDeleteFromSql$5;
+var deleteFromSql_1$4;
+var hasRequiredDeleteFromSql$4;
 
-function requireDeleteFromSql$5 () {
-	if (hasRequiredDeleteFromSql$5) return deleteFromSql_1$5;
-	hasRequiredDeleteFromSql$5 = 1;
+function requireDeleteFromSql$4 () {
+	if (hasRequiredDeleteFromSql$4) return deleteFromSql_1$4;
+	hasRequiredDeleteFromSql$4 = 1;
 	const format = 'delete from %s %s%s';
 	const formatString = requireFormat();
-	const quote = requireQuote$5();
+	const quote = requireQuote$4();
 
 	function deleteFromSql(table, alias, whereSql) {
 		const name = quote(table._dbName);
 		alias = quote(alias);
 		return formatString(format, name, alias, whereSql);
 	}
-	deleteFromSql_1$5 = deleteFromSql;
-	return deleteFromSql_1$5;
+	deleteFromSql_1$4 = deleteFromSql;
+	return deleteFromSql_1$4;
 }
 
-var selectForUpdateSql$5;
-var hasRequiredSelectForUpdateSql$5;
+var selectForUpdateSql$4;
+var hasRequiredSelectForUpdateSql$4;
 
-function requireSelectForUpdateSql$5 () {
-	if (hasRequiredSelectForUpdateSql$5) return selectForUpdateSql$5;
-	hasRequiredSelectForUpdateSql$5 = 1;
-	const quote = requireQuote$7();
+function requireSelectForUpdateSql$4 () {
+	if (hasRequiredSelectForUpdateSql$4) return selectForUpdateSql$4;
+	hasRequiredSelectForUpdateSql$4 = 1;
+	const quote = requireQuote$6();
 
-	selectForUpdateSql$5 = function(alias) {
+	selectForUpdateSql$4 = function(alias) {
 		return ' FOR UPDATE OF ' + quote(alias);
 	};
-	return selectForUpdateSql$5;
+	return selectForUpdateSql$4;
 }
 
-var limitAndOffset_1$5;
-var hasRequiredLimitAndOffset$5;
+var limitAndOffset_1$4;
+var hasRequiredLimitAndOffset$4;
 
-function requireLimitAndOffset$5 () {
-	if (hasRequiredLimitAndOffset$5) return limitAndOffset_1$5;
-	hasRequiredLimitAndOffset$5 = 1;
+function requireLimitAndOffset$4 () {
+	if (hasRequiredLimitAndOffset$4) return limitAndOffset_1$4;
+	hasRequiredLimitAndOffset$4 = 1;
 	function limitAndOffset(span) {
 		if (span.offset)
 			return ` limit ${limit()} offset ${span.offset}`;
@@ -14202,8 +14268,8 @@ function requireLimitAndOffset$5 () {
 
 	}
 
-	limitAndOffset_1$5 = limitAndOffset;
-	return limitAndOffset_1$5;
+	limitAndOffset_1$4 = limitAndOffset;
+	return limitAndOffset_1$4;
 }
 
 var formatDateOut_1$2;
@@ -14244,13 +14310,13 @@ function requireEncodeJSON () {
 	return encodeJSON;
 }
 
-var lastInsertedSql_1$4;
-var hasRequiredLastInsertedSql$4;
+var lastInsertedSql_1$3;
+var hasRequiredLastInsertedSql$3;
 
-function requireLastInsertedSql$4 () {
-	if (hasRequiredLastInsertedSql$4) return lastInsertedSql_1$4;
-	hasRequiredLastInsertedSql$4 = 1;
-	const quote = requireQuote$5();
+function requireLastInsertedSql$3 () {
+	if (hasRequiredLastInsertedSql$3) return lastInsertedSql_1$3;
+	hasRequiredLastInsertedSql$3 = 1;
+	const quote = requireQuote$4();
 
 	function lastInsertedSql(table) {
 		let separator = '';
@@ -14262,18 +14328,18 @@ function requireLastInsertedSql$4 () {
 		return result;
 	}
 
-	lastInsertedSql_1$4 = lastInsertedSql;
-	return lastInsertedSql_1$4;
+	lastInsertedSql_1$3 = lastInsertedSql;
+	return lastInsertedSql_1$3;
 }
 
-var insertSql_1$5;
-var hasRequiredInsertSql$5;
+var insertSql_1$4;
+var hasRequiredInsertSql$4;
 
-function requireInsertSql$5 () {
-	if (hasRequiredInsertSql$5) return insertSql_1$5;
-	hasRequiredInsertSql$5 = 1;
-	let lastInsertedSql = requireLastInsertedSql$4();
-	const quote = requireQuote$5();
+function requireInsertSql$4 () {
+	if (hasRequiredInsertSql$4) return insertSql_1$4;
+	hasRequiredInsertSql$4 = 1;
+	let lastInsertedSql = requireLastInsertedSql$3();
+	const quote = requireQuote$4();
 
 	function insertSql(_context, table, row, options) {
 		let columnNames = [];
@@ -14339,16 +14405,16 @@ function requireInsertSql$5 () {
 		}
 	}
 
-	insertSql_1$5 = insertSql;
-	return insertSql_1$5;
+	insertSql_1$4 = insertSql;
+	return insertSql_1$4;
 }
 
-var insert$4;
-var hasRequiredInsert$5;
+var insert$3;
+var hasRequiredInsert$4;
 
-function requireInsert$5 () {
-	if (hasRequiredInsert$5) return insert$4;
-	hasRequiredInsert$5 = 1;
+function requireInsert$4 () {
+	if (hasRequiredInsert$4) return insert$3;
+	hasRequiredInsert$4 = 1;
 	let newInsertCommand = requireNewInsertCommand();
 	let newInsertCommandCore = requireNewInsertCommandCore$1();
 	let executeQueries = requireExecuteQueries();
@@ -14362,8 +14428,8 @@ function requireInsert$5 () {
 
 	}
 
-	insert$4 = insertDefault;
-	return insert$4;
+	insert$3 = insertDefault;
+	return insert$3;
 }
 
 var newTransaction$9;
@@ -14374,17 +14440,17 @@ function requireNewTransaction$9 () {
 	hasRequiredNewTransaction$9 = 1;
 	var wrapQuery = requireWrapQuery$8();
 	var encodeDate = requireEncodeDate();
-	var encodeBoolean = requireEncodeBoolean$5();
+	var encodeBoolean = requireEncodeBoolean$4();
 	const encodeBinary = requireEncodeBinary();
 	const decodeBinary = requireDecodeBinary();
-	var deleteFromSql = requireDeleteFromSql$5();
-	var selectForUpdateSql = requireSelectForUpdateSql$5();
-	var limitAndOffset = requireLimitAndOffset$5();
+	var deleteFromSql = requireDeleteFromSql$4();
+	var selectForUpdateSql = requireSelectForUpdateSql$4();
+	var limitAndOffset = requireLimitAndOffset$4();
 	var formatDateOut = requireFormatDateOut$3();
 	var encodeJSON = requireEncodeJSON();
-	var insertSql = requireInsertSql$5();
-	var insert = requireInsert$5();
-	var quote = requireQuote$5();
+	var insertSql = requireInsertSql$4();
+	var insert = requireInsert$4();
+	var quote = requireQuote$4();
 
 	function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 		var rdb = { poolFactory: pool };
@@ -14421,7 +14487,7 @@ function requireNewTransaction$9 () {
 							return callback(err);
 						}
 						try {
-							wrapQuery(client)(query, (err, res) => {
+							wrapQuery(domain, client)(query, (err, res) => {
 								done();
 								callback(err, res);
 							});
@@ -14445,7 +14511,7 @@ function requireNewTransaction$9 () {
 						onError(err);
 						return;
 					}
-					client.executeQuery = wrapQuery(client);
+					client.executeQuery = wrapQuery(domain, client);
 					rdb.dbClient = client;
 					rdb.dbClientDone = done;
 					domain.rdb = rdb;
@@ -14511,12 +14577,12 @@ function requireNewPgPool$1 () {
 	if (hasRequiredNewPgPool$1) return newPgPool_1$1;
 	hasRequiredNewPgPool$1 = 1;
 	//slightly modified code from github.com/brianc/node-postgres
-	requireLog();
+	var log = requireLog();
 
 	var defaults = requirePoolDefaults();
 	var genericPool = requireGenericPool();
 	var SQL;
-	requireParseSearchPathParam();
+	var parseSearchPathParam = requireParseSearchPathParam();
 
 	function newPgPool(connectionString, poolOptions) {
 		poolOptions = poolOptions || {};
@@ -14533,8 +14599,7 @@ function requireNewPgPool$1 () {
 						({ SQL } = await import('bun'));
 					var client = new SQL(connectionString);
 					client.poolCount = 0;
-					cb(null, client);
-					// negotiateSearchPath(client, connectionString, (err) => cb(err, client));
+					negotiateSearchPath(client, connectionString).then(() => cb(null, client), e => cb(e, client));
 				}
 				catch(e) {
 					return cb(e, null);
@@ -14563,6 +14628,17 @@ function requireNewPgPool$1 () {
 			});
 		};
 		return pool;
+	}
+
+	function negotiateSearchPath(client, connectionString) {
+		const searchPath = parseSearchPathParam(connectionString);
+		if (searchPath) {
+			const sql = `set search_path to ${searchPath}`;
+			log.emitQuery({sql, parameters: []});
+			return client.unsafe(sql);
+		}
+		else
+			return Promise.resolve();
 	}
 
 	newPgPool_1$1 = newPgPool;
@@ -14752,7 +14828,7 @@ function requireWrapQuery$7 () {
 	var log = requireLog();
 	var replaceParamChar = requireReplaceParamChar$1();
 
-	function wrapQuery(connection) {
+	function wrapQuery(_context, connection) {
 		var runOriginalQuery = connection.query;
 		return runQuery;
 
@@ -14793,15 +14869,15 @@ function requireNewTransaction$8 () {
 	hasRequiredNewTransaction$8 = 1;
 	var wrapQuery = requireWrapQuery$7();
 	var encodeDate = requireEncodeDate();
-	var encodeBoolean = requireEncodeBoolean$5();
-	var deleteFromSql = requireDeleteFromSql$5();
-	var selectForUpdateSql = requireSelectForUpdateSql$5();
-	var limitAndOffset = requireLimitAndOffset$5();
+	var encodeBoolean = requireEncodeBoolean$4();
+	var deleteFromSql = requireDeleteFromSql$4();
+	var selectForUpdateSql = requireSelectForUpdateSql$4();
+	var limitAndOffset = requireLimitAndOffset$4();
 	var formatDateOut = requireFormatDateOut$3();
 	var encodeJSON = requireEncodeJSON();
-	var insertSql = requireInsertSql$5();
-	var insert = requireInsert$5();
-	var quote = requireQuote$5();
+	var insertSql = requireInsertSql$4();
+	var insert = requireInsert$4();
+	var quote = requireQuote$4();
 
 	function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 		var rdb = { poolFactory: pool };
@@ -14836,7 +14912,7 @@ function requireNewTransaction$8 () {
 							return callback(err);
 						}
 						try {
-							wrapQuery(client)(query, (err, res) => {
+							wrapQuery(domain, client)(query, (err, res) => {
 								done();
 								callback(err, res);
 							});
@@ -14860,7 +14936,7 @@ function requireNewTransaction$8 () {
 						onError(err);
 						return;
 					}
-					client.executeQuery = wrapQuery(client);
+					client.executeQuery = wrapQuery(domain, client);
 					rdb.dbClient = client;
 					rdb.dbClientDone = done;
 					domain.rdb = rdb;
@@ -15191,7 +15267,7 @@ function requireWrapQuery$6 () {
 	hasRequiredWrapQuery$6 = 1;
 	var log = requireLog();
 
-	function wrapQuery(connection) {
+	function wrapQuery(_context, connection) {
 		return runQuery;
 
 		function runQuery(query, onCompleted) {
@@ -15215,71 +15291,71 @@ function requireWrapQuery$6 () {
 	return wrapQuery_1$6;
 }
 
-var encodeBoolean_1$4;
-var hasRequiredEncodeBoolean$4;
+var encodeBoolean_1$3;
+var hasRequiredEncodeBoolean$3;
 
-function requireEncodeBoolean$4 () {
-	if (hasRequiredEncodeBoolean$4) return encodeBoolean_1$4;
-	hasRequiredEncodeBoolean$4 = 1;
+function requireEncodeBoolean$3 () {
+	if (hasRequiredEncodeBoolean$3) return encodeBoolean_1$3;
+	hasRequiredEncodeBoolean$3 = 1;
 	function encodeBoolean(bool) {
 		if (bool)
 			return 1;
 		return 0;
 	}
 
-	encodeBoolean_1$4 = encodeBoolean;
-	return encodeBoolean_1$4;
+	encodeBoolean_1$3 = encodeBoolean;
+	return encodeBoolean_1$3;
 }
 
-var quote$4;
-var hasRequiredQuote$4;
+var quote$3;
+var hasRequiredQuote$3;
 
-function requireQuote$4 () {
-	if (hasRequiredQuote$4) return quote$4;
-	hasRequiredQuote$4 = 1;
-	quote$4 = (name) => `"${name}"`;
-	return quote$4;
+function requireQuote$3 () {
+	if (hasRequiredQuote$3) return quote$3;
+	hasRequiredQuote$3 = 1;
+	quote$3 = (name) => `"${name}"`;
+	return quote$3;
 }
 
-var deleteFromSql_1$4;
-var hasRequiredDeleteFromSql$4;
+var deleteFromSql_1$3;
+var hasRequiredDeleteFromSql$3;
 
-function requireDeleteFromSql$4 () {
-	if (hasRequiredDeleteFromSql$4) return deleteFromSql_1$4;
-	hasRequiredDeleteFromSql$4 = 1;
+function requireDeleteFromSql$3 () {
+	if (hasRequiredDeleteFromSql$3) return deleteFromSql_1$3;
+	hasRequiredDeleteFromSql$3 = 1;
 	const format = 'delete from %s where %s.rowId in (SELECT %s.rowId FROM %s %s%s)';
 	const formatString = requireFormat();
-	const quote = requireQuote$4();
+	const quote = requireQuote$3();
 
 	function deleteFromSql(table, alias, whereSql) {
 		const name = quote(table._dbName);
 		alias = quote(alias);
 		return formatString(format, name, name, alias, name, alias, whereSql);
 	}
-	deleteFromSql_1$4 = deleteFromSql;
-	return deleteFromSql_1$4;
+	deleteFromSql_1$3 = deleteFromSql;
+	return deleteFromSql_1$3;
 }
 
-var selectForUpdateSql$4;
-var hasRequiredSelectForUpdateSql$4;
+var selectForUpdateSql$3;
+var hasRequiredSelectForUpdateSql$3;
 
-function requireSelectForUpdateSql$4 () {
-	if (hasRequiredSelectForUpdateSql$4) return selectForUpdateSql$4;
-	hasRequiredSelectForUpdateSql$4 = 1;
-	const quote = requireQuote$7();
+function requireSelectForUpdateSql$3 () {
+	if (hasRequiredSelectForUpdateSql$3) return selectForUpdateSql$3;
+	hasRequiredSelectForUpdateSql$3 = 1;
+	const quote = requireQuote$6();
 
-	selectForUpdateSql$4 = function(alias) {
+	selectForUpdateSql$3 = function(alias) {
 		return ' FOR UPDATE OF ' + quote(alias);
 	};
-	return selectForUpdateSql$4;
+	return selectForUpdateSql$3;
 }
 
-var lastInsertedSql_1$3;
-var hasRequiredLastInsertedSql$3;
+var lastInsertedSql_1$2;
+var hasRequiredLastInsertedSql$2;
 
-function requireLastInsertedSql$3 () {
-	if (hasRequiredLastInsertedSql$3) return lastInsertedSql_1$3;
-	hasRequiredLastInsertedSql$3 = 1;
+function requireLastInsertedSql$2 () {
+	if (hasRequiredLastInsertedSql$2) return lastInsertedSql_1$2;
+	hasRequiredLastInsertedSql$2 = 1;
 	function lastInsertedSql(context, table, keyValues) {
 		return keyValues.map((value,i) => {
 			let column = table._primaryColumns[i];
@@ -15291,16 +15367,16 @@ function requireLastInsertedSql$3 () {
 
 	}
 
-	lastInsertedSql_1$3 = lastInsertedSql;
-	return lastInsertedSql_1$3;
+	lastInsertedSql_1$2 = lastInsertedSql;
+	return lastInsertedSql_1$2;
 }
 
-var limitAndOffset_1$4;
-var hasRequiredLimitAndOffset$4;
+var limitAndOffset_1$3;
+var hasRequiredLimitAndOffset$3;
 
-function requireLimitAndOffset$4 () {
-	if (hasRequiredLimitAndOffset$4) return limitAndOffset_1$4;
-	hasRequiredLimitAndOffset$4 = 1;
+function requireLimitAndOffset$3 () {
+	if (hasRequiredLimitAndOffset$3) return limitAndOffset_1$3;
+	hasRequiredLimitAndOffset$3 = 1;
 	function limitAndOffset(span) {
 		if (span.offset)
 			return ` limit ${limit()} offset ${span.offset}`;
@@ -15318,17 +15394,17 @@ function requireLimitAndOffset$4 () {
 
 	}
 
-	limitAndOffset_1$4 = limitAndOffset;
-	return limitAndOffset_1$4;
+	limitAndOffset_1$3 = limitAndOffset;
+	return limitAndOffset_1$3;
 }
 
-var insertSql_1$4;
-var hasRequiredInsertSql$4;
+var insertSql_1$3;
+var hasRequiredInsertSql$3;
 
-function requireInsertSql$4 () {
-	if (hasRequiredInsertSql$4) return insertSql_1$4;
-	hasRequiredInsertSql$4 = 1;
-	const quote = requireQuote$4();
+function requireInsertSql$3 () {
+	if (hasRequiredInsertSql$3) return insertSql_1$3;
+	hasRequiredInsertSql$3 = 1;
+	const quote = requireQuote$3();
 
 	function insertSql(_context, table, row, options) {
 		let columnNames = [];
@@ -15394,16 +15470,16 @@ function requireInsertSql$4 () {
 		}
 	}
 
-	insertSql_1$4 = insertSql;
-	return insertSql_1$4;
+	insertSql_1$3 = insertSql;
+	return insertSql_1$3;
 }
 
-var insert$3;
-var hasRequiredInsert$4;
+var insert$2;
+var hasRequiredInsert$3;
 
-function requireInsert$4 () {
-	if (hasRequiredInsert$4) return insert$3;
-	hasRequiredInsert$4 = 1;
+function requireInsert$3 () {
+	if (hasRequiredInsert$3) return insert$2;
+	hasRequiredInsert$3 = 1;
 	let newInsertCommand = requireNewInsertCommand();
 	let newInsertCommandCore = requireNewInsertCommandCore$1();
 	let newGetLastInsertedCommand = requireNewGetLastInsertedCommand();
@@ -15424,8 +15500,8 @@ function requireInsert$4 () {
 
 	}
 
-	insert$3 = insertDefault;
-	return insert$3;
+	insert$2 = insertDefault;
+	return insert$2;
 }
 
 var newTransaction$7;
@@ -15435,16 +15511,16 @@ function requireNewTransaction$7 () {
 	if (hasRequiredNewTransaction$7) return newTransaction$7;
 	hasRequiredNewTransaction$7 = 1;
 	const wrapQuery = requireWrapQuery$6();
-	const encodeBoolean = requireEncodeBoolean$4();
+	const encodeBoolean = requireEncodeBoolean$3();
 	const encodeBinary = requireEncodeBinary();
 	const decodeBinary = requireDecodeBinary();
-	const deleteFromSql = requireDeleteFromSql$4();
-	const selectForUpdateSql = requireSelectForUpdateSql$4();
-	const lastInsertedSql = requireLastInsertedSql$3();
-	const limitAndOffset = requireLimitAndOffset$4();
-	const insertSql = requireInsertSql$4();
-	const insert = requireInsert$4();
-	const quote = requireQuote$4();
+	const deleteFromSql = requireDeleteFromSql$3();
+	const selectForUpdateSql = requireSelectForUpdateSql$3();
+	const lastInsertedSql = requireLastInsertedSql$2();
+	const limitAndOffset = requireLimitAndOffset$3();
+	const insertSql = requireInsertSql$3();
+	const insert = requireInsert$3();
+	const quote = requireQuote$3();
 
 	function newResolveTransaction(domain, pool, { readonly = false } = {})  {
 		var rdb = {poolFactory: pool};
@@ -15480,7 +15556,7 @@ function requireNewTransaction$7 () {
 							return callback(err);
 						}
 						try {
-							wrapQuery(client)(query, (err, res) => {
+							wrapQuery(domain, client)(query, (err, res) => {
 								done();
 								callback(err, res);
 							});
@@ -15504,7 +15580,7 @@ function requireNewTransaction$7 () {
 						onError(err);
 						return;
 					}
-					client.executeQuery = wrapQuery(client);
+					client.executeQuery = wrapQuery(domain, client);
 					rdb.dbClient = client;
 					rdb.dbClientDone = done;
 					domain.rdb = rdb;
@@ -15767,7 +15843,7 @@ function requireWrapQuery$5 () {
 	hasRequiredWrapQuery$5 = 1;
 	var log = requireLog();
 
-	function wrapQuery(connection) {
+	function wrapQuery(_context, connection) {
 		return runQuery;
 
 		function runQuery(query, onCompleted) {
@@ -15798,16 +15874,16 @@ function requireNewTransaction$6 () {
 	if (hasRequiredNewTransaction$6) return newTransaction$6;
 	hasRequiredNewTransaction$6 = 1;
 	const wrapQuery = requireWrapQuery$5();
-	const encodeBoolean = requireEncodeBoolean$4();
+	const encodeBoolean = requireEncodeBoolean$3();
 	const encodeBinary = requireEncodeBinary();
 	const decodeBinary = requireDecodeBinary();
-	const deleteFromSql = requireDeleteFromSql$4();
-	const selectForUpdateSql = requireSelectForUpdateSql$4();
-	const lastInsertedSql = requireLastInsertedSql$3();
-	const limitAndOffset = requireLimitAndOffset$4();
-	const insertSql = requireInsertSql$4();
-	const insert = requireInsert$4();
-	const quote = requireQuote$4();
+	const deleteFromSql = requireDeleteFromSql$3();
+	const selectForUpdateSql = requireSelectForUpdateSql$3();
+	const lastInsertedSql = requireLastInsertedSql$2();
+	const limitAndOffset = requireLimitAndOffset$3();
+	const insertSql = requireInsertSql$3();
+	const insert = requireInsert$3();
+	const quote = requireQuote$3();
 
 	function newResolveTransaction(domain, pool, { readonly = false } = {})  {
 		var rdb = {poolFactory: pool};
@@ -15843,7 +15919,7 @@ function requireNewTransaction$6 () {
 							return callback(err);
 						}
 						try {
-							wrapQuery(client)(query, (err, res) => {
+							wrapQuery(domain, client)(query, (err, res) => {
 								done();
 								callback(err, res);
 							});
@@ -15867,7 +15943,7 @@ function requireNewTransaction$6 () {
 						onError(err);
 						return;
 					}
-					client.executeQuery = wrapQuery(client);
+					client.executeQuery = wrapQuery(domain, client);
 					rdb.dbClient = client;
 					rdb.dbClientDone = done;
 					domain.rdb = rdb;
@@ -16113,7 +16189,7 @@ function requireWrapQuery$4 () {
 	hasRequiredWrapQuery$4 = 1;
 	var log = requireLog();
 
-	function wrapQuery(connection) {
+	function wrapQuery(_context, connection) {
 		var runOriginalQuery = connection.all;
 		return runQuery;
 
@@ -16136,219 +16212,6 @@ function requireWrapQuery$4 () {
 
 	wrapQuery_1$4 = wrapQuery;
 	return wrapQuery_1$4;
-}
-
-var encodeBoolean_1$3;
-var hasRequiredEncodeBoolean$3;
-
-function requireEncodeBoolean$3 () {
-	if (hasRequiredEncodeBoolean$3) return encodeBoolean_1$3;
-	hasRequiredEncodeBoolean$3 = 1;
-	function encodeBoolean(bool) {
-		if (bool)
-			return 1;
-		return 0;
-	}
-
-	encodeBoolean_1$3 = encodeBoolean;
-	return encodeBoolean_1$3;
-}
-
-var quote$3;
-var hasRequiredQuote$3;
-
-function requireQuote$3 () {
-	if (hasRequiredQuote$3) return quote$3;
-	hasRequiredQuote$3 = 1;
-	quote$3 = (name) => `"${name}"`;
-	return quote$3;
-}
-
-var deleteFromSql_1$3;
-var hasRequiredDeleteFromSql$3;
-
-function requireDeleteFromSql$3 () {
-	if (hasRequiredDeleteFromSql$3) return deleteFromSql_1$3;
-	hasRequiredDeleteFromSql$3 = 1;
-	const format = 'delete from %s where %s.rowId in (SELECT %s.rowId FROM %s %s%s)';
-	const formatString = requireFormat();
-	const quote = requireQuote$3();
-
-	function deleteFromSql(table, alias, whereSql) {
-		const name = quote(table._dbName);
-		alias = quote(alias);
-		return formatString(format, name, name, alias, name, alias, whereSql);
-	}
-	deleteFromSql_1$3 = deleteFromSql;
-	return deleteFromSql_1$3;
-}
-
-var selectForUpdateSql$3;
-var hasRequiredSelectForUpdateSql$3;
-
-function requireSelectForUpdateSql$3 () {
-	if (hasRequiredSelectForUpdateSql$3) return selectForUpdateSql$3;
-	hasRequiredSelectForUpdateSql$3 = 1;
-	const quote = requireQuote$7();
-
-	selectForUpdateSql$3 = function(alias) {
-		return ' FOR UPDATE OF ' + quote(alias);
-	};
-	return selectForUpdateSql$3;
-}
-
-var lastInsertedSql_1$2;
-var hasRequiredLastInsertedSql$2;
-
-function requireLastInsertedSql$2 () {
-	if (hasRequiredLastInsertedSql$2) return lastInsertedSql_1$2;
-	hasRequiredLastInsertedSql$2 = 1;
-	function lastInsertedSql(context, table, keyValues) {
-		return keyValues.map((value,i) => {
-			let column = table._primaryColumns[i];
-			if (value === undefined && column.tsType === 'NumberColumn')
-				return 'rowid IN (select last_insert_rowid())';
-			else
-				return column.eq(context, value);
-		});
-
-	}
-
-	lastInsertedSql_1$2 = lastInsertedSql;
-	return lastInsertedSql_1$2;
-}
-
-var limitAndOffset_1$3;
-var hasRequiredLimitAndOffset$3;
-
-function requireLimitAndOffset$3 () {
-	if (hasRequiredLimitAndOffset$3) return limitAndOffset_1$3;
-	hasRequiredLimitAndOffset$3 = 1;
-	function limitAndOffset(span) {
-		if (span.offset)
-			return ` limit ${limit()} offset ${span.offset}`;
-		else if (span.limit || span.limit === 0)
-			return ` limit ${span.limit}`;
-		else
-			return '';
-
-		function limit() {
-			if (span.limit || span.limit === 0)
-				return span.limit;
-			else
-				return '-1';
-		}
-
-	}
-
-	limitAndOffset_1$3 = limitAndOffset;
-	return limitAndOffset_1$3;
-}
-
-var insertSql_1$3;
-var hasRequiredInsertSql$3;
-
-function requireInsertSql$3 () {
-	if (hasRequiredInsertSql$3) return insertSql_1$3;
-	hasRequiredInsertSql$3 = 1;
-	const quote = requireQuote$3();
-
-	function insertSql(_context, table, row, options) {
-		let columnNames = [];
-		let conflictColumnUpdateSql = '';
-		let values = [];
-
-		let sql = 'INSERT INTO ' + quote(table._dbName) + ' ';
-		addDiscriminators();
-		addColumns();
-
-		if (columnNames.length === 0) {
-			sql += 'DEFAULT VALUES';
-		} else {
-			sql = sql + '(' + columnNames.join(',') + ') ' + 'VALUES (' + values.join(',') + ')' + onConflict();
-		}
-
-		return sql;
-
-		function onConflict() {
-			if (options.concurrency === 'skipOnConflict' || options.concurrency === 'overwrite') {
-				const primaryKeys = table._primaryColumns.map(x => quote(x._dbName)).join(',');
-				return ` ON CONFLICT(${primaryKeys}) ${conflictColumnUpdateSql}`;
-			} else {
-				return '';
-			}
-		}
-
-		function addDiscriminators() {
-			let discriminators = table._columnDiscriminators;
-			for (let i = 0; i < discriminators.length; i++) {
-				let parts = discriminators[i].split('=');
-				columnNames.push(quote(parts[0]));
-				values.push(parts[1]);
-			}
-		}
-
-		function addColumns() {
-			let conflictColumnUpdates = [];
-			let columns = table._columns;
-			for (let i = 0; i < columns.length; i++) {
-				let column = columns[i];
-				const columnName = quote(column._dbName);
-				if (row['__' + column.alias] !== undefined) {
-					columnNames.push(columnName);
-					values.push('%s');
-					addConflictUpdate(column);
-				}
-			}
-			if (conflictColumnUpdates.length === 0)
-				conflictColumnUpdateSql =  'DO NOTHING';
-			else
-				conflictColumnUpdateSql = 'DO UPDATE SET ' + conflictColumnUpdates.join(',');
-
-			function addConflictUpdate(column) {
-				let concurrency = options[column.alias]?.concurrency || options.concurrency;
-				const tableName = table._dbName;
-				const columnName = quote(column._dbName);
-				if (concurrency === 'overwrite') {
-					conflictColumnUpdates.push(`${columnName}=excluded.${columnName}`);
-				} else if (concurrency === 'optimistic')
-					conflictColumnUpdates.push(`${columnName} = CASE WHEN ${tableName}.${columnName} <> excluded.${columnName} THEN '12345678-1234-1234-1234-123456789012Conflict when updating ${columnName}12345678-1234-1234-1234-123456789012' ELSE ${tableName}.${columnName} END`);
-			}
-		}
-	}
-
-	insertSql_1$3 = insertSql;
-	return insertSql_1$3;
-}
-
-var insert$2;
-var hasRequiredInsert$3;
-
-function requireInsert$3 () {
-	if (hasRequiredInsert$3) return insert$2;
-	hasRequiredInsert$3 = 1;
-	let newInsertCommand = requireNewInsertCommand();
-	let newInsertCommandCore = requireNewInsertCommandCore$1();
-	let newGetLastInsertedCommand = requireNewGetLastInsertedCommand();
-	let executeQueries = requireExecuteQueries();
-	let pushCommand = requirePushCommand();
-
-
-	function insertDefault(context, table, row, options) {
-		let commands = [];
-		let insertCmd = newInsertCommand(newInsertCommandCore.bind(null, context), table, row, options);
-		insertCmd.disallowCompress = true;
-		pushCommand(context, insertCmd);
-
-		let selectCmd = newGetLastInsertedCommand(context, table, row, insertCmd);
-		commands.push(selectCmd);
-
-		return executeQueries(context, commands).then((result) => result[result.length - 1]);
-
-	}
-
-	insert$2 = insertDefault;
-	return insert$2;
 }
 
 var newTransaction$5;
@@ -16399,7 +16262,7 @@ function requireNewTransaction$5 () {
 							return callback(err);
 						}
 						try {
-							wrapQuery(client)(query, (err, res) => {
+							wrapQuery(domain, client)(query, (err, res) => {
 								done();
 								callback(err, res);
 							});
@@ -16423,7 +16286,7 @@ function requireNewTransaction$5 () {
 						onError(err);
 						return;
 					}
-					client.executeQuery = wrapQuery(client);
+					client.executeQuery = wrapQuery(domain, client);
 					rdb.dbClient = client;
 					rdb.dbClientDone = done;
 					domain.rdb = rdb;
@@ -16691,7 +16554,7 @@ function requireWrapQuery$3 () {
 	hasRequiredWrapQuery$3 = 1;
 	var log = requireLog();
 
-	function wrapQuery(client) {
+	function wrapQuery(_context, client) {
 
 		return runQuery;
 
@@ -16721,13 +16584,13 @@ function requireNewTransaction$4 () {
 	if (hasRequiredNewTransaction$4) return newTransaction$4;
 	hasRequiredNewTransaction$4 = 1;
 	const wrapQuery = requireWrapQuery$3();
-	const encodeBoolean = requireEncodeBoolean$4();
-	const deleteFromSql = requireDeleteFromSql$4();
-	const selectForUpdateSql = requireSelectForUpdateSql$4();
-	const lastInsertedSql = requireLastInsertedSql$3();
-	const limitAndOffset = requireLimitAndOffset$4();
-	const insertSql = requireInsertSql$4();
-	const insert = requireInsert$4();
+	const encodeBoolean = requireEncodeBoolean$3();
+	const deleteFromSql = requireDeleteFromSql$3();
+	const selectForUpdateSql = requireSelectForUpdateSql$3();
+	const lastInsertedSql = requireLastInsertedSql$2();
+	const limitAndOffset = requireLimitAndOffset$3();
+	const insertSql = requireInsertSql$3();
+	const insert = requireInsert$3();
 
 	function newResolveTransaction(domain, pool, { readonly = false } = {})  {
 		var rdb = {poolFactory: pool};
@@ -16762,7 +16625,7 @@ function requireNewTransaction$4 () {
 							return callback(err);
 						}
 						try {
-							wrapQuery(client)(query, (err, res) => {
+							wrapQuery(domain, client)(query, (err, res) => {
 								done();
 								callback(err, res);
 							});
@@ -16786,7 +16649,7 @@ function requireNewTransaction$4 () {
 						onError(err);
 						return;
 					}
-					client.executeQuery = wrapQuery(client);
+					client.executeQuery = wrapQuery(domain, client);
 					rdb.dbClient = client;
 					rdb.dbClientDone = done;
 					domain.rdb = rdb;
@@ -17042,7 +16905,7 @@ function requireWrapQuery$2 () {
 	hasRequiredWrapQuery$2 = 1;
 	var log = requireLog();
 
-	function wrapQuery(connection) {
+	function wrapQuery(_context, connection) {
 		var runOriginalQuery = connection.query;
 		return runQuery;
 
@@ -17128,7 +16991,7 @@ var hasRequiredSelectForUpdateSql$2;
 function requireSelectForUpdateSql$2 () {
 	if (hasRequiredSelectForUpdateSql$2) return selectForUpdateSql$2;
 	hasRequiredSelectForUpdateSql$2 = 1;
-	const quote = requireQuote$7();
+	const quote = requireQuote$6();
 
 	selectForUpdateSql$2 = function(alias) {
 		return ' FOR UPDATE OF ' + quote(alias);
@@ -17454,7 +17317,7 @@ function requireNewTransaction$3 () {
 						}
 						try {
 							client.setUseUTC(false);
-							wrapQuery(client)(query, (err, res) => {
+							wrapQuery(domain, client)(query, (err, res) => {
 								done();
 								callback(err, res);
 							});
@@ -17479,7 +17342,7 @@ function requireNewTransaction$3 () {
 						return;
 					}
 					client.setUseUTC(false);
-					client.executeQuery = wrapQuery(client);
+					client.executeQuery = wrapQuery(domain, client);
 					rdb.dbClient = client;
 					rdb.dbClientDone = done;
 					domain.rdb = rdb;
@@ -17752,7 +17615,7 @@ function requireWrapQuery$1 () {
 	hasRequiredWrapQuery$1 = 1;
 	var log = requireLog();
 
-	function wrapQuery(connection) {
+	function wrapQuery(_context, connection) {
 		let CachedRequest = null;
 		let CachedTypes = null;
 
@@ -18226,7 +18089,7 @@ function requireNewTransaction$2 () {
 							return callback(err);
 						}
 						try {
-							wrapQuery(client)(query, (err, res) => {
+							wrapQuery(domain, client)(query, (err, res) => {
 								done();
 								callback(err, res);
 							});
@@ -18250,7 +18113,7 @@ function requireNewTransaction$2 () {
 						onError(err);
 						return;
 					}
-					client.executeQuery = wrapQuery(client);
+					client.executeQuery = wrapQuery(domain, client);
 					rdb.dbClient = client;
 					rdb.dbClientDone = done;
 					domain.rdb = rdb;
@@ -18622,7 +18485,7 @@ var hasRequiredSelectForUpdateSql$1;
 function requireSelectForUpdateSql$1 () {
 	if (hasRequiredSelectForUpdateSql$1) return selectForUpdateSql$1;
 	hasRequiredSelectForUpdateSql$1 = 1;
-	const quote = requireQuote$7();
+	const quote = requireQuote$6();
 
 	selectForUpdateSql$1 = function(alias) {
 		return ' FOR UPDATE OF ' + quote(alias);
@@ -18940,7 +18803,7 @@ function requireNewTransaction$1 () {
 							return callback(err);
 						}
 						try {
-							wrapQuery(client)(query, (err, res) => {
+							wrapQuery(domain, client)(query, (err, res) => {
 								done();
 								callback(err, res);
 							});
@@ -18965,7 +18828,7 @@ function requireNewTransaction$1 () {
 						onError(err);
 						return;
 					}
-					client.executeQuery = wrapQuery(client);
+					client.executeQuery = wrapQuery(domain, client);
 					rdb.dbClient = client;
 					rdb.dbClientDone = done;
 					domain.rdb = rdb;
@@ -19198,7 +19061,7 @@ function requireWrapQuery () {
 	var log = requireLog();
 	var replaceParamChar = requireReplaceParamChar();
 
-	function wrapQuery(connection) {
+	function wrapQuery(_context, connection) {
 		var runOriginalQuery = connection.execute;
 		return runQuery;
 
@@ -19284,7 +19147,7 @@ var hasRequiredSelectForUpdateSql;
 function requireSelectForUpdateSql () {
 	if (hasRequiredSelectForUpdateSql) return selectForUpdateSql;
 	hasRequiredSelectForUpdateSql = 1;
-	const quote = requireQuote$7();
+	const quote = requireQuote$6();
 
 	selectForUpdateSql = function(alias) {
 		return ' FOR UPDATE OF ' + quote(alias);
@@ -19655,7 +19518,7 @@ function requireNewTransaction () {
 							return callback(err);
 						}
 						try {
-							wrapQuery(client)(query, (err, res) => {
+							wrapQuery(domain, client)(query, (err, res) => {
 								done();
 								callback(err, res);
 							});
@@ -19680,7 +19543,7 @@ function requireNewTransaction () {
 						onError(err);
 						return;
 					}
-					client.executeQuery = wrapQuery(client);
+					client.executeQuery = wrapQuery(domain, client);
 					rdb.dbClient = client;
 					rdb.dbClientDone = done;
 					domain.rdb = rdb;
