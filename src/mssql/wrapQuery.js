@@ -8,6 +8,12 @@ function wrapQuery(_context, connection) {
 		var params = query.parameters;
 		var sql = query.sql();
 		log.emitQuery({ sql, parameters: params });
+		const sap = connection.msnodesqlv8;
+		for (let i = 0; i < params.length; i++) {
+			const parameter = params[i];
+			if (typeof parameter === 'string')
+				params[i] = sap.VarChar(parameter);
+		}
 
 		runOriginalQuery.call(connection, sql, params, onInnerCompleted);
 		let result = [];

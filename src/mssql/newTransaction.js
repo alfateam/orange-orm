@@ -42,6 +42,7 @@ function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 	};
 	rdb.aggregateCount = 0;
 	rdb.quote = quote;
+	rdb.cache = {};
 
 	if (readonly) {
 		rdb.dbClient = {

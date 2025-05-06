@@ -422,7 +422,6 @@ describe('getMany none sub filter', () => {
 });
 
 describe('getMany', () => {
-
 	test('pg', async () => await verify('pg'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
@@ -434,10 +433,16 @@ describe('getMany', () => {
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
-
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
-		const rows = await db.customer.getMany();
+		const rows = await db.customer.getAll({
+			where: x => {
+				if (dbName === 'pg')
+					return x.name.iContains('harry').or(x.name.iContains('george'));
+				else
+					return x.name.contains('harry').or(x.name.contains('george'));
+			}
+		});
 
 		const expected = [{
 			id: 1,
@@ -535,6 +540,41 @@ describe('aggregate', () => {
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
+		const rows = await db.orderLine.aggregate({
+			orderId: x => x.orderId,
+			count: x => x.count(x => x.id),
+		});
+
+		rows.sort((a, b) => a.orderId - b.orderId);
+
+		const expected = [
+			{
+				orderId: 1,
+				count: 2,
+			},
+			{
+				orderId: 2,
+				count: 1,
+			}
+		];
+
+		expect(rows).toEqual(expected);
+	}
+}, 20000);
+describe('aggregate on relations', () => {
+	test('pg', async () => await verify('pg'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
 		const rows = await db.order.aggregate({
 			where: x => x.customer.name.notEqual(null),
 			customerId: x => x.customerId,
@@ -589,6 +629,7 @@ describe('aggregate each row', () => {
 			lines: {
 				product: true,
 				id2: x => x.id,
+				foo: x => x.count(x => x.id), //weird, but ok..
 				numberOfPackages: x => x.count(x => x.packages.id)
 			},
 			customer: {
@@ -625,8 +666,8 @@ describe('aggregate each row', () => {
 				totalAmount: 802.35,
 				customerId2: 1,
 				lines: [
-					{ id2: 1, product: 'Bicycle', id: 1, orderId: 1, numberOfPackages: 1 },
-					{ id2: 2, product: 'Small guitar', id: 2, orderId: 1, numberOfPackages: 1 }
+					{ id2: 1, foo: 1, product: 'Bicycle', id: 1, orderId: 1, numberOfPackages: 1 },
+					{ id2: 2, foo: 1, product: 'Small guitar', id: 2, orderId: 1, numberOfPackages: 1 }
 				],
 				customer: {
 					id: 1,
@@ -650,7 +691,7 @@ describe('aggregate each row', () => {
 				totalAmount: 300,
 				customerId2: 2,
 				lines: [
-					{ id2: 3, product: 'Magic wand', id: 3, orderId: 2, numberOfPackages: 1 }
+					{ id2: 3, foo: 1, product: 'Magic wand', id: 3, orderId: 2, numberOfPackages: 1 }
 				],
 				customer: {
 					id: 2,
@@ -737,6 +778,75 @@ describe('getMany with relations', () => {
 				lines: [
 					{ product: 'Magic wand', id: 3, amount: 300, orderId: 2 }
 				]
+			}
+		];
+
+		expect(rows).toEqual(expected);
+	}
+});
+describe('getMany with references - many', () => {
+	test('pg', async () => await verify('pg'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+
+		const rows = await db.order.getAll({
+			customer: {
+				orders: true
+			}
+		});
+
+		//mssql workaround because datetime has no time offset
+		for (let i = 0; i < rows.length; i++) {
+			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate));
+			for (let j = 0; j < rows[i].customer.orders.length; j++) {
+				rows[i].customer.orders[j].orderDate = dateToISOString(new Date(rows[i].customer.orders[j].orderDate));
+			}
+		}
+
+		const date1 = new Date(2022, 0, 11, 9, 24, 47);
+		const date2 = new Date(2021, 0, 11, 12, 22, 45);
+		const expected = [
+			{
+				id: 1,
+				orderDate: dateToISOString(date1),
+				customerId: 1,
+				customer: {
+					id: 1,
+					name: 'George',
+					balance: 177,
+					isActive: true,
+					orders: [{
+						id: 1,
+						orderDate: dateToISOString(date1),
+						customerId: 1,
+					}]
+				},
+			},
+			{
+				id: 2,
+				customerId: 2,
+				customer: {
+					id: 2,
+					name: 'Harry',
+					balance: 200,
+					isActive: true,
+					orders: [{
+						id: 2,
+						orderDate: dateToISOString(date2),
+						customerId: 2,
+					}]
+				},
+				orderDate: dateToISOString(date2),
 			}
 		];
 
@@ -1085,7 +1195,7 @@ const connections = {
 		init: initSqlite
 	},
 	sap: {
-		db: map({ db: (con) => con.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master`, { size: 1 }) }),
+		db: map({ db: (con) => con.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master;SortOrder=nocase_utf8;CharSet=NoConversions`, { size: 1 }) }),
 		init: initSap
 	},
 	oracle: {

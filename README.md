@@ -2,7 +2,7 @@
 <img src="./docs/orange.svg" alt="Orange ORM Logo" width="250"/>
 </div>
 
-The ultimate Object Relational Mapper for Node.js and Typescript, offering seamless integration with a variety of popular databases. Whether you're building applications in TypeScript or JavaScript, including both CommonJS and ECMAScript, Orange ORM has got you covered.  
+The ultimate Object Relational Mapper for Node.js and Typescript, offering seamless integration with a variety of popular databases. Orange ORM supports both TypeScript and JavaScript, including both CommonJS and ECMAScript.  
 
 [![npm version](https://img.shields.io/npm/v/orange-orm.svg?style=flat-square)](https://www.npmjs.org/package/orange-orm)
 [![Build status](https://github.com/alfateam/orange-orm/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/alfateam/orange-orm/actions)

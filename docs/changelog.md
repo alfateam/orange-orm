@@ -1,4 +1,14 @@
 ## Changelog
+__4.5.5__  
+Bugfix:  Parameterized queries are case sensitive on SAP ASE .  See [#123](https://github.com/alfateam/orange-orm/issues/123)  
+__4.5.4__  
+Bugfix:  hasMany relation through references relation gives empty array .  See [#122](https://github.com/alfateam/orange-orm/issues/122)  
+__4.5.3__  
+Minor improvements of types in aggregate functions.    
+__4.5.2__  
+Bugfix: Aggregate functions are not allowed on root tables .  See [#121](https://github.com/alfateam/orange-orm/issues/121)  
+__4.5.1__  
+Bugfix: "Changed by Other User" Error Triggered by Precision Mismatch in Numeric Column.  See [#120](https://github.com/alfateam/orange-orm/issues/120)  
 __4.5.0__  
 Support for Cloudflare D1.  
 __4.4.2__  
@@ -26,6 +36,8 @@ __4.0.1__
 Inhouse definitions of ajv to avoid trouble with nestjs.  
 __4.0.0__  
 Changed the behaviour of `update` to accept a `where` filter and only update passed in columns and relations. The previous behaviour of `update` has moved to `replace` method.  
+__3.10.4__  
+Bugfix: "Changed by Other User" Error Triggered by Precision Mismatch in Numeric Column.  See [#120](https://github.com/alfateam/orange-orm/issues/120)  
 __3.10.3__  
 Fix duplicate method signatures for those still using code generation  
 __3.10.2__  

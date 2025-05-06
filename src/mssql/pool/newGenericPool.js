@@ -28,6 +28,7 @@ function newGenericPool(connectionString, poolOptions) {
 					return cb(err, null);
 				client = _client;
 				client.poolCount = 0;
+				client.msnodesqlv8 = mssql;
 				return cb(null, client);
 			}
 		},

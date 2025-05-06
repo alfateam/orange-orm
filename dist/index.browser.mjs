@@ -1758,7 +1758,7 @@ var hasRequiredSetSessionSingleton;
 function requireSetSessionSingleton () {
 	if (hasRequiredSetSessionSingleton) return setSessionSingleton_1;
 	hasRequiredSetSessionSingleton = 1;
-	var getSessionContext = requireGetSessionContext();
+	const getSessionContext = requireGetSessionContext();
 
 	function setSessionSingleton(context, name, value) {
 		const rdb = getSessionContext(context);
@@ -3951,6 +3951,178 @@ function requireExtractAlias () {
 	return extractAlias;
 }
 
+var columnAggregate_1$1;
+var hasRequiredColumnAggregate$1;
+
+function requireColumnAggregate$1 () {
+	if (hasRequiredColumnAggregate$1) return columnAggregate_1$1;
+	hasRequiredColumnAggregate$1 = 1;
+	const getSessionSingleton = requireGetSessionSingleton();
+
+	function columnAggregate(context, operator, column, table, coalesce = true) {
+		const quote = getSessionSingleton(context, 'quote');
+
+		const tableAlias = quote(table._rootAlias || table._dbName);
+		const columnName = quote(column._dbName);
+
+		return {
+			expression: (alias) => coalesce ? `COALESCE(${operator}(${tableAlias}.${columnName}), 0) as ${quote(alias)}` : `${operator}(${tableAlias}.${columnName}) as ${quote(alias)}`,
+			joins: ['']
+		};
+	}
+
+	columnAggregate_1$1 = columnAggregate;
+	return columnAggregate_1$1;
+}
+
+var newDiscriminatorSql_1$1;
+var hasRequiredNewDiscriminatorSql$1;
+
+function requireNewDiscriminatorSql$1 () {
+	if (hasRequiredNewDiscriminatorSql$1) return newDiscriminatorSql_1$1;
+	hasRequiredNewDiscriminatorSql$1 = 1;
+	const getSessionSingleton = requireGetSessionSingleton();
+
+	function newDiscriminatorSql(context, table, alias) {
+		const quote = getSessionSingleton(context, 'quote');
+		alias = quote(alias);
+		var result = '';
+		var formulaDiscriminators = table._formulaDiscriminators;
+		var columnDiscriminators = table._columnDiscriminators;
+		addFormula();
+		addColumn();
+		return result;
+
+		function addFormula() {
+			for (var i = 0; i<formulaDiscriminators.length; i++) {
+				var current = formulaDiscriminators[i].replace('@this',alias);
+				and();
+				result += '(' + current + ')';
+			}
+		}
+
+		function addColumn() {
+			for (var i = 0; i< columnDiscriminators.length; i++) {
+				var current = columnDiscriminators[i].split('=');
+				and();
+				result += alias + '.' + quote(current[0]) + '=' + current[1];
+			}
+		}
+
+		function and() {
+			if(result)
+				result += ' AND ';
+			else
+				result = ' ';
+		}
+	}
+
+	newDiscriminatorSql_1$1 = newDiscriminatorSql;
+	return newDiscriminatorSql_1$1;
+}
+
+var newDiscriminatorSql_1;
+var hasRequiredNewDiscriminatorSql;
+
+function requireNewDiscriminatorSql () {
+	if (hasRequiredNewDiscriminatorSql) return newDiscriminatorSql_1;
+	hasRequiredNewDiscriminatorSql = 1;
+	var newDiscriminatorSqlCore = requireNewDiscriminatorSql$1();
+
+	function newDiscriminatorSql(context, table, alias) {
+		var result = newDiscriminatorSqlCore(context,table,alias);
+		if (result)
+			return ' AND' + result;
+		return result;
+
+	}
+
+	newDiscriminatorSql_1 = newDiscriminatorSql;
+	return newDiscriminatorSql_1;
+}
+
+var newShallowJoinSqlCore;
+var hasRequiredNewShallowJoinSqlCore;
+
+function requireNewShallowJoinSqlCore () {
+	if (hasRequiredNewShallowJoinSqlCore) return newShallowJoinSqlCore;
+	hasRequiredNewShallowJoinSqlCore = 1;
+	const newDiscriminatorSql = requireNewDiscriminatorSql();
+	const newParameterized = requireNewParameterized();
+	const getSessionSingleton = requireGetSessionSingleton();
+
+	function _new(context, rightTable, leftColumns, rightColumns, leftAlias, rightAlias, filter) {
+		const quote = getSessionSingleton(context, 'quote');
+		leftAlias = quote(leftAlias);
+		rightAlias = quote(rightAlias);
+		var sql = '';
+		var delimiter = '';
+		for (var i = 0; i < leftColumns.length; i++) {
+			addColumn(i);
+			delimiter = ' AND ';
+		}
+
+		function addColumn(index) {
+			var leftColumn = leftColumns[index];
+			var rightColumn = rightColumns[index];
+			sql += delimiter + leftAlias + '.' + quote(leftColumn._dbName) + '=' + rightAlias + '.' + quote(rightColumn._dbName);
+		}
+
+		sql += newDiscriminatorSql(context, rightTable, rightAlias);
+		var result = newParameterized(sql);
+		if (filter)
+			result = result.append(delimiter).append(filter);
+		return result;
+	}
+
+	newShallowJoinSqlCore = _new;
+	return newShallowJoinSqlCore;
+}
+
+var columnAggregateGroup$1;
+var hasRequiredColumnAggregateGroup$1;
+
+function requireColumnAggregateGroup$1 () {
+	if (hasRequiredColumnAggregateGroup$1) return columnAggregateGroup$1;
+	hasRequiredColumnAggregateGroup$1 = 1;
+	var getSessionContext = requireGetSessionContext();
+	var newJoinCore = requireNewShallowJoinSqlCore();
+	const getSessionSingleton = requireGetSessionSingleton();
+
+	function columnAggregate(context, operator, column, table, coalesce = true) {
+		const quote = getSessionSingleton(context, 'quote');
+		const rdb = getSessionContext(context);
+		const outerAlias = 'y' + rdb.aggregateCount++;
+		const outerAliasQuoted = quote(outerAlias);
+		const alias = quote('x');
+		const foreignKeys = getForeignKeys(table);
+		const select = ` LEFT JOIN (SELECT ${foreignKeys},${operator}(${alias}.${quote(column._dbName)}) as amount`;
+		const onClause = createOnClause(context, table, outerAlias);
+		const from = ` FROM ${quote(table._dbName)} ${alias} GROUP BY ${foreignKeys}) ${outerAliasQuoted} ON (${onClause})`;
+		const join = select + from;
+
+		return {
+			expression: (alias) => coalesce ? `COALESCE(${outerAliasQuoted}.amount, 0) as ${quote(alias)}` : `${outerAliasQuoted}.amount as ${alias}`,
+			joins: [join]
+		};
+
+		function getForeignKeys(table) {
+			return table._primaryColumns.map(x => `${alias}.${quote(x._dbName)}`).join(',');
+		}
+	}
+
+	function createOnClause(context, table, rightAlias) {
+		let leftAlias = table._rootAlias || table._dbName;
+		const columns = table._primaryColumns;
+		return newJoinCore(context, table, columns, columns, leftAlias, rightAlias).sql();
+	}
+
+
+
+	columnAggregateGroup$1 = columnAggregate;
+	return columnAggregateGroup$1;
+}
+
 var newColumn;
 var hasRequiredNewColumn;
 
@@ -3966,6 +4138,8 @@ function requireNewColumn () {
 	const _in = require_in();
 	const _extractAlias = requireExtractAlias();
 	const quote = requireQuote$1();
+	const aggregate = requireColumnAggregate$1();
+	const aggregateGroup = requireColumnAggregateGroup$1();
 
 	newColumn = function(table, name) {
 		var c = {};
@@ -4034,6 +4208,17 @@ function requireNewColumn () {
 		c.LE = c.le;
 		c.IN = c.in;
 		c.self = self;
+
+		c.groupSum = (context, ...rest) => aggregateGroup.apply(null, [context, 'sum', c, table, ...rest]);
+		c.groupAvg = (context, ...rest) => aggregateGroup.apply(null, [context, 'avg', c, table, ...rest]);
+		c.groupMin = (context, ...rest) => aggregateGroup.apply(null, [context, 'min', c, table, ...rest]);
+		c.groupMax = (context, ...rest) => aggregateGroup.apply(null, [context, 'max', c, table, ...rest]);
+		c.groupCount = (context, ...rest) => aggregateGroup.apply(null, [context, 'count', c, table, false, ...rest]);
+		c.sum = (context, ...rest) => aggregate.apply(null, [context, 'sum', c, table, ...rest]);
+		c.avg = (context, ...rest) => aggregate.apply(null, [context, 'avg', c, table, ...rest]);
+		c.min = (context, ...rest) => aggregate.apply(null, [context, 'min', c, table, ...rest]);
+		c.max = (context, ...rest) => aggregate.apply(null, [context, 'max', c, table, ...rest]);
+		c.count = (context, ...rest) => aggregate.apply(null, [context, 'count', c, table, false, ...rest]);
 
 		function self(context) {
 			const tableAlias = quote(context,table._rootAlias || table._dbName);
@@ -5512,7 +5697,7 @@ function requireNewJoinLeg () {
 		c.expand = relation.expand;
 
 		c.accept = function(visitor) {
-			visitor.visitJoin(c);
+			return visitor.visitJoin(c);
 		};
 
 		return c;
@@ -5689,110 +5874,6 @@ function requireNewColumnSql () {
 		return shallowColumnSql + joinedColumnSql;
 	};
 	return newColumnSql;
-}
-
-var newDiscriminatorSql_1$1;
-var hasRequiredNewDiscriminatorSql$1;
-
-function requireNewDiscriminatorSql$1 () {
-	if (hasRequiredNewDiscriminatorSql$1) return newDiscriminatorSql_1$1;
-	hasRequiredNewDiscriminatorSql$1 = 1;
-	const getSessionSingleton = requireGetSessionSingleton();
-
-	function newDiscriminatorSql(context, table, alias) {
-		const quote = getSessionSingleton(context, 'quote');
-		alias = quote(alias);
-		var result = '';
-		var formulaDiscriminators = table._formulaDiscriminators;
-		var columnDiscriminators = table._columnDiscriminators;
-		addFormula();
-		addColumn();
-		return result;
-
-		function addFormula() {
-			for (var i = 0; i<formulaDiscriminators.length; i++) {
-				var current = formulaDiscriminators[i].replace('@this',alias);
-				and();
-				result += '(' + current + ')';
-			}
-		}
-
-		function addColumn() {
-			for (var i = 0; i< columnDiscriminators.length; i++) {
-				var current = columnDiscriminators[i].split('=');
-				and();
-				result += alias + '.' + quote(current[0]) + '=' + current[1];
-			}
-		}
-
-		function and() {
-			if(result)
-				result += ' AND ';
-			else
-				result = ' ';
-		}
-	}
-
-	newDiscriminatorSql_1$1 = newDiscriminatorSql;
-	return newDiscriminatorSql_1$1;
-}
-
-var newDiscriminatorSql_1;
-var hasRequiredNewDiscriminatorSql;
-
-function requireNewDiscriminatorSql () {
-	if (hasRequiredNewDiscriminatorSql) return newDiscriminatorSql_1;
-	hasRequiredNewDiscriminatorSql = 1;
-	var newDiscriminatorSqlCore = requireNewDiscriminatorSql$1();
-
-	function newDiscriminatorSql(context, table, alias) {
-		var result = newDiscriminatorSqlCore(context,table,alias);
-		if (result)
-			return ' AND' + result;
-		return result;
-
-	}
-
-	newDiscriminatorSql_1 = newDiscriminatorSql;
-	return newDiscriminatorSql_1;
-}
-
-var newShallowJoinSqlCore;
-var hasRequiredNewShallowJoinSqlCore;
-
-function requireNewShallowJoinSqlCore () {
-	if (hasRequiredNewShallowJoinSqlCore) return newShallowJoinSqlCore;
-	hasRequiredNewShallowJoinSqlCore = 1;
-	const newDiscriminatorSql = requireNewDiscriminatorSql();
-	const newParameterized = requireNewParameterized();
-	const getSessionSingleton = requireGetSessionSingleton();
-
-	function _new(context, rightTable, leftColumns, rightColumns, leftAlias, rightAlias, filter) {
-		const quote = getSessionSingleton(context, 'quote');
-		leftAlias = quote(leftAlias);
-		rightAlias = quote(rightAlias);
-		var sql = '';
-		var delimiter = '';
-		for (var i = 0; i < leftColumns.length; i++) {
-			addColumn(i);
-			delimiter = ' AND ';
-		}
-
-		function addColumn(index) {
-			var leftColumn = leftColumns[index];
-			var rightColumn = rightColumns[index];
-			sql += delimiter + leftAlias + '.' + quote(leftColumn._dbName) + '=' + rightAlias + '.' + quote(rightColumn._dbName);
-		}
-
-		sql += newDiscriminatorSql(context, rightTable, rightAlias);
-		var result = newParameterized(sql);
-		if (filter)
-			result = result.append(delimiter).append(filter);
-		return result;
-	}
-
-	newShallowJoinSqlCore = _new;
-	return newShallowJoinSqlCore;
 }
 
 var newShallowJoinSql;
@@ -7393,6 +7474,22 @@ function requireValidateDeleteAllowed () {
 	return validateDeleteAllowed_1;
 }
 
+var clearCache_1;
+var hasRequiredClearCache;
+
+function requireClearCache () {
+	if (hasRequiredClearCache) return clearCache_1;
+	hasRequiredClearCache = 1;
+	var setSessionSingleton = requireSetSessionSingleton();
+
+	function clearCache(context) {
+		setSessionSingleton(context, 'cache', {});
+	}
+
+	clearCache_1 = clearCache;
+	return clearCache_1;
+}
+
 /* eslint-disable require-atomic-updates */
 
 var patchTable_1;
@@ -7405,13 +7502,16 @@ function requirePatchTable () {
 	let fromCompareObject = requireFromCompareObject();
 	let validateDeleteConflict = requireValidateDeleteConflict();
 	let validateDeleteAllowed = requireValidateDeleteAllowed();
+	let clearCache = requireClearCache();
 
 	async function patchTable() {
 		// const dryrun = true;
 		//traverse all rows you want to update before updatinng or inserting anything.
 		//this is to avoid page locks in ms sql
 		// await patchTableCore.apply(null, [...arguments, dryrun]);
-		return patchTableCore.apply(null, arguments);
+		const result = await  patchTableCore.apply(null, arguments);
+		clearCache(arguments[0]);
+		return result;
 	}
 
 	async function patchTableCore(context, table, patches, { strategy = undefined, deduceStrategy = false, ...options } = {}, dryrun) {
@@ -9195,7 +9295,7 @@ function requireColumnAggregate () {
 		const columnName = quote(column._dbName);
 
 		return {
-			expression: (alias) => coalesce ? `COALESCE(${operator}(${tableAlias}.${columnName}), 0) as ${quote(alias)}` : `${operator}(${tableAlias}.${columnName}) as ${alias}`,
+			expression: (alias) => coalesce ? `COALESCE(${operator}(${tableAlias}.${columnName}), 0) as ${quote(alias)}` : `${operator}(${tableAlias}.${columnName}) as ${quote(alias)}`,
 
 			joins: newJoinArray(context, relations)
 		};
@@ -9774,7 +9874,7 @@ function requireNewManyLeg () {
 		var c = newOneLeg(relation);
 		c.name = relation.joinRelation.rightAlias;
 		c.accept = function(visitor) {
-			visitor.visitMany(c);
+			return visitor.visitMany(c);
 		};
 
 		c.expand = relation.expand;
@@ -10074,6 +10174,40 @@ function requireNewId () {
 	return newId;
 }
 
+var getSessionCache_1;
+var hasRequiredGetSessionCache;
+
+function requireGetSessionCache () {
+	if (hasRequiredGetSessionCache) return getSessionCache_1;
+	hasRequiredGetSessionCache = 1;
+	const getSessionSingleton = requireGetSessionSingleton();
+
+	function getSessionCache(context, id) {
+		const cache = getSessionSingleton(context, 'cache');
+		return cache[id];
+	}
+
+	getSessionCache_1 = getSessionCache;
+	return getSessionCache_1;
+}
+
+var setSessionCache_1;
+var hasRequiredSetSessionCache;
+
+function requireSetSessionCache () {
+	if (hasRequiredSetSessionCache) return setSessionCache_1;
+	hasRequiredSetSessionCache = 1;
+	const getSessionSingleton = requireGetSessionSingleton();
+
+	function setSessionCache(context, id, value) {
+		const cache = getSessionSingleton(context, 'cache');
+		cache[id] = value;
+	}
+
+	setSessionCache_1 = setSessionCache;
+	return setSessionCache_1;
+}
+
 var newManyCache_1;
 var hasRequiredNewManyCache;
 
@@ -10086,8 +10220,8 @@ function requireNewManyCache () {
 	var extractParentKey = requireExtractParentKey();
 	var newCacheCore = requireNewManyCacheCore();
 	var newId = requireNewId();
-	var getSessionSingleton = requireGetSessionSingleton();
-	var setSessionSingleton = requireSetSessionSingleton();
+	var getSessionCache = requireGetSessionCache();
+	var setSessionCache = requireSetSessionCache();
 
 	function newManyCache(joinRelation) {
 		var c = {};
@@ -10108,10 +10242,10 @@ function requireNewManyCache () {
 
 		c.getInnerCache = function(context) {
 			const theKey = negotiateKey();
-			var cache = getSessionSingleton(context, theKey);
+			var cache = getSessionCache(context, theKey);
 			if (!cache) {
 				cache = newCacheCore(joinRelation);
-				setSessionSingleton(context, theKey, cache);
+				setSessionCache(context, theKey, cache);
 				fillCache(context);
 				synchronizeAdded(context, c.tryAdd.bind(null, context), joinRelation);
 				synchronizeRemoved(context, c.tryRemove.bind(null, context), joinRelation);
@@ -11061,8 +11195,8 @@ function requireNewRowCache () {
 	if (hasRequiredNewRowCache) return newRowCache_1;
 	hasRequiredNewRowCache = 1;
 	let newCache = requireNewCache();
-	let getSessionSingleton = requireGetSessionSingleton();
-	let setSessionSingleton = requireSetSessionSingleton();
+	let getSessionCache = requireGetSessionCache();
+	let setSessionCache = requireSetSessionCache();
 
 	function newRowCache(table) {
 		let id = Symbol();
@@ -11100,11 +11234,11 @@ function requireNewRowCache () {
 
 
 	function getCache(context, table, id) {
-		let cache = getSessionSingleton(context, id);
+		let cache = getSessionCache(context, id);
 		if (cache)
 			return cache;
 		cache = _newRowCache(table);
-		setSessionSingleton(context, id, cache);
+		setSessionCache(context, id, cache);
 		return cache;
 	}
 
@@ -12965,6 +13099,7 @@ function requireNewTransaction () {
 		};
 		rdb.aggregateCount = 0;
 		rdb.quote = (name) => `"${name}"`;
+		rdb.cache = {};
 
 		if (readonly) {
 			rdb.dbClient = {
