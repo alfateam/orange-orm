@@ -1,6 +1,6 @@
 {
   "name": "orange-orm",
-  "version": "4.6.0-beta.1",
+  "version": "4.6.0",
   "main": "./src/index.js",
   "module": "./dist/index.mjs",
   "browser": "./dist/index.browser.mjs",
