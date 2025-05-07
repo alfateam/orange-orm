@@ -2,7 +2,7 @@
 /* eslint-disable no-prototype-builtins */
 var defaults = require('../../poolDefaults');
 var genericPool = require('../../generic-pool');
-var mysql = require('mysql2');
+var mysql;
 
 function newGenericPool(connectionString, poolOptions) {
 	if (typeof connectionString === 'string')
@@ -15,7 +15,16 @@ function newGenericPool(connectionString, poolOptions) {
 		idleTimeoutMillis: poolOptions.idleTimeout || defaults.poolIdleTimeout,
 		reapIntervalMillis: poolOptions.reapIntervalMillis || defaults.reapIntervalMillis,
 		log: poolOptions.log,
-		create: function(cb) {
+		create: async function(cb) {
+			try {
+				if(!mysql) {
+					mysql = await import('mysql2');
+					mysql = mysql.default || mysql;
+				}
+			}
+			catch(err) {
+				return cb(err, null);
+			}
 			var innerPool = mysql.createPool(connectionString);
 			return cb(null, innerPool);
 			// innerPool.getConnection(onConnected);

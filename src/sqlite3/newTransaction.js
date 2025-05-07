@@ -1,12 +1,12 @@
 const wrapQuery = require('./wrapQuery');
-const encodeBoolean = require('./encodeBoolean');
-const deleteFromSql = require('./deleteFromSql');
-const selectForUpdateSql = require('./selectForUpdateSql');
-const lastInsertedSql = require('./lastInsertedSql');
-const limitAndOffset = require('./limitAndOffset');
-const insertSql = require('./insertSql');
-const insert = require('./insert');
-const quote = require('./quote');
+const encodeBoolean = require('../sqlite/encodeBoolean');
+const deleteFromSql = require('../sqlite/deleteFromSql');
+const selectForUpdateSql = require('../sqlite/selectForUpdateSql');
+const lastInsertedSql = require('../sqlite/lastInsertedSql');
+const limitAndOffset = require('../sqlite/limitAndOffset');
+const insertSql = require('../sqlite/insertSql');
+const insert = require('../sqlite/insert');
+const quote = require('../sqlite/quote');
 
 function newResolveTransaction(domain, pool, { readonly = false } = {})  {
 	var rdb = {poolFactory: pool};
@@ -41,7 +41,7 @@ function newResolveTransaction(domain, pool, { readonly = false } = {})  {
 						return callback(err);
 					}
 					try {
-						wrapQuery(client)(query, (err, res) => {
+						wrapQuery(domain, client)(query, (err, res) => {
 							done();
 							callback(err, res);
 						});
@@ -65,7 +65,7 @@ function newResolveTransaction(domain, pool, { readonly = false } = {})  {
 					onError(err);
 					return;
 				}
-				client.executeQuery = wrapQuery(client);
+				client.executeQuery = wrapQuery(domain, client);
 				rdb.dbClient = client;
 				rdb.dbClientDone = done;
 				domain.rdb = rdb;

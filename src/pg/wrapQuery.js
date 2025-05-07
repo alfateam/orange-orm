@@ -1,7 +1,7 @@
 var log = require('../table/log');
 var replaceParamChar = require('./replaceParamChar');
 
-function wrapQuery(connection) {
+function wrapQuery(_context, connection) {
 	var runOriginalQuery = connection.query;
 	return runQuery;
 

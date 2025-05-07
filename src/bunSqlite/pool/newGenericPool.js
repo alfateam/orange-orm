@@ -2,7 +2,7 @@
 var defaults = require('../../poolDefaults');
 
 var genericPool = require('../../generic-pool');
-var sqlite = require('sqlite3');
+var Database;
 
 function newGenericPool(connectionString, poolOptions) {
 	poolOptions = poolOptions || {};
@@ -11,14 +11,22 @@ function newGenericPool(connectionString, poolOptions) {
 		idleTimeoutMillis: poolOptions.idleTimeout || defaults.poolIdleTimeout,
 		reapIntervalMillis: poolOptions.reapIntervalMillis || defaults.reapIntervalMillis,
 		log: poolOptions.log || defaults.poolLog,
-		create: function(cb) {
-			var client = new sqlite.Database(connectionString, onConnected);
-
-			function onConnected(err) {
-				if(err)
+		create: async function(cb) {
+			try {
+				try {
+					if (!Database)
+						({ Database } = await import('bun:Database'));
+				}
+				catch (err) {
 					return cb(err, null);
+				}
+
+				var client = new Database(connectionString);
 				client.poolCount = 0;
-				return cb(null, client);
+				cb(null, client);
+			}
+			catch(err) {
+				return cb(err, null);
 			}
 		},
 

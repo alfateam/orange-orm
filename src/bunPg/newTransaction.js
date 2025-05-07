@@ -1,32 +1,40 @@
-const wrapQuery = require('./wrapQuery');
-const encodeBoolean = require('./encodeBoolean');
-const deleteFromSql = require('./deleteFromSql');
-const selectForUpdateSql = require('./selectForUpdateSql');
-const lastInsertedSql = require('./lastInsertedSql');
-const limitAndOffset = require('./limitAndOffset');
-const insertSql = require('./insertSql');
-const insert = require('./insert');
-const quote = require('./quote');
+var wrapQuery = require('./wrapQuery');
+var encodeDate = require('../pg/encodeDate');
+var encodeBoolean = require('../pg/encodeBoolean');
+const encodeBinary = require('../nodeSqlite/encodeBinary');
+const decodeBinary = require('../nodeSqlite/decodeBinary');
+var deleteFromSql = require('../pg/deleteFromSql');
+var selectForUpdateSql = require('../pg/selectForUpdateSql');
+var limitAndOffset = require('../pg/limitAndOffset');
+var formatDateOut = require('../pg/formatDateOut');
+var encodeJSON = require('../pg/encodeJSON');
+var insertSql = require('../pg/insertSql');
+var insert = require('../pg/insert');
+var quote = require('../pg/quote');
 
 function newResolveTransaction(domain, pool, { readonly = false } = {}) {
-	var rdb = {poolFactory: pool};
+	var rdb = { poolFactory: pool };
 	if (!pool.connect) {
 		pool = pool();
 		rdb.pool = pool;
 	}
-	rdb.engine = 'mysql';
+
+	rdb.engine = 'pg';
 	rdb.encodeBoolean = encodeBoolean;
-	rdb.encodeJSON = JSON.stringify;
+	rdb.encodeDate = encodeDate;
+	rdb.encodeBinary = encodeBinary;
+	rdb.decodeBinary = decodeBinary;
+	rdb.encodeJSON = encodeJSON;
+	rdb.formatDateOut = formatDateOut;
 	rdb.deleteFromSql = deleteFromSql;
 	rdb.selectForUpdateSql = selectForUpdateSql;
-	rdb.lastInsertedIsSeparate = true;
-	rdb.lastInsertedSql = lastInsertedSql;
+	rdb.lastInsertedIsSeparate = false;
 	rdb.insertSql = insertSql;
 	rdb.insert = insert;
-	rdb.multipleStatements = false;
+	rdb.multipleStatements = true;
 	rdb.limitAndOffset = limitAndOffset;
 	rdb.accept = function(caller) {
-		caller.visitMySql();
+		caller.visitPg();
 	};
 	rdb.aggregateCount = 0;
 	rdb.quote = quote;

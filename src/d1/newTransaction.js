@@ -41,7 +41,7 @@ function newResolveTransaction(domain, pool, { readonly = false } = {})  {
 						return callback(err);
 					}
 					try {
-						wrapQuery(client)(query, (err, res) => {
+						wrapQuery(domain, client)(query, (err, res) => {
 							done();
 							callback(err, res);
 						});
@@ -65,7 +65,7 @@ function newResolveTransaction(domain, pool, { readonly = false } = {})  {
 					onError(err);
 					return;
 				}
-				client.executeQuery = wrapQuery(client);
+				client.executeQuery = wrapQuery(domain, client);
 				rdb.dbClient = client;
 				rdb.dbClientDone = done;
 				domain.rdb = rdb;

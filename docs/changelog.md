@@ -1,4 +1,7 @@
 ## Changelog
+__4.6.0__  
+Support for Deno and Bun.  
+Using builtin sqlite for Node22++.    
 __4.5.5__  
 Bugfix:  Parameterized queries are case sensitive on SAP ASE .  See [#123](https://github.com/alfateam/orange-orm/issues/123)  
 __4.5.4__  

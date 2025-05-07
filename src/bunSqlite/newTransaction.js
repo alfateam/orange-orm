@@ -1,32 +1,37 @@
 const wrapQuery = require('./wrapQuery');
-const encodeBoolean = require('./encodeBoolean');
-const deleteFromSql = require('./deleteFromSql');
-const selectForUpdateSql = require('./selectForUpdateSql');
-const lastInsertedSql = require('./lastInsertedSql');
-const limitAndOffset = require('./limitAndOffset');
-const insertSql = require('./insertSql');
-const insert = require('./insert');
-const quote = require('./quote');
+const encodeBoolean = require('../sqlite/encodeBoolean');
+const encodeBinary = require('../nodeSqlite/encodeBinary');
+const decodeBinary = require('../nodeSqlite/decodeBinary');
+const deleteFromSql = require('../sqlite/deleteFromSql');
+const selectForUpdateSql = require('../sqlite/selectForUpdateSql');
+const lastInsertedSql = require('../sqlite/lastInsertedSql');
+const limitAndOffset = require('../sqlite/limitAndOffset');
+const insertSql = require('../sqlite/insertSql');
+const insert = require('../sqlite/insert');
+const quote = require('../sqlite/quote');
 
-function newResolveTransaction(domain, pool, { readonly = false } = {}) {
+function newResolveTransaction(domain, pool, { readonly = false } = {})  {
 	var rdb = {poolFactory: pool};
 	if (!pool.connect) {
 		pool = pool();
 		rdb.pool = pool;
 	}
-	rdb.engine = 'mysql';
+	rdb.engine = 'sqlite';
 	rdb.encodeBoolean = encodeBoolean;
+	rdb.encodeBinary = encodeBinary;
+	rdb.decodeBinary = decodeBinary;
+	rdb.decodeJSON = decodeJSON;
 	rdb.encodeJSON = JSON.stringify;
 	rdb.deleteFromSql = deleteFromSql;
 	rdb.selectForUpdateSql = selectForUpdateSql;
-	rdb.lastInsertedIsSeparate = true;
 	rdb.lastInsertedSql = lastInsertedSql;
 	rdb.insertSql = insertSql;
 	rdb.insert = insert;
+	rdb.lastInsertedIsSeparate = true;
 	rdb.multipleStatements = false;
 	rdb.limitAndOffset = limitAndOffset;
 	rdb.accept = function(caller) {
-		caller.visitMySql();
+		caller.visitSqlite();
 	};
 	rdb.aggregateCount = 0;
 	rdb.quote = quote;
@@ -74,6 +79,10 @@ function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 			}
 		}
 	};
+}
+
+function decodeJSON(value) {
+	return JSON.parse(value);
 }
 
 module.exports = newResolveTransaction;

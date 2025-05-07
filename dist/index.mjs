@@ -7,6 +7,8 @@ import * as axios from 'axios';
 import * as _default from 'rfdc/default';
 import * as ajv from 'ajv';
 import * as onChange from '@lroal/on-change';
+import * as url from 'url';
+import * as connectionString from '@tediousjs/connection-string';
 
 function getDefaultExportFromCjs (x) {
 	return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, 'default') ? x['default'] : x;
@@ -723,7 +725,7 @@ function requireHostExpress () {
 	return hostExpress_1;
 }
 
-var require$$0$3 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(fastJsonPatch);
+var require$$0$4 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(fastJsonPatch);
 
 var dateToISOString_1;
 var hasRequiredDateToISOString;
@@ -783,7 +785,7 @@ function requireStringify () {
 	return stringify_1;
 }
 
-var require$$0$2 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(uuid);
+var require$$0$3 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(uuid);
 
 var createPatch;
 var hasRequiredCreatePatch;
@@ -791,10 +793,10 @@ var hasRequiredCreatePatch;
 function requireCreatePatch () {
 	if (hasRequiredCreatePatch) return createPatch;
 	hasRequiredCreatePatch = 1;
-	const jsonpatch = require$$0$3;
+	const jsonpatch = require$$0$4;
 	let dateToIsoString = requireDateToISOString();
 	let stringify = requireStringify();
-	let { v4: uuid } = require$$0$2;
+	let { v4: uuid } = require$$0$3;
 
 	createPatch = function createPatch(original, dto, options) {
 		let subject = toCompareObject({ d: original }, options, true);
@@ -2085,12 +2087,12 @@ function requireNegotiateParameters () {
 	return negotiateParameters_1;
 }
 
-var wrapQuery_1$1;
-var hasRequiredWrapQuery$1;
+var wrapQuery_1$a;
+var hasRequiredWrapQuery$a;
 
-function requireWrapQuery$1 () {
-	if (hasRequiredWrapQuery$1) return wrapQuery_1$1;
-	hasRequiredWrapQuery$1 = 1;
+function requireWrapQuery$a () {
+	if (hasRequiredWrapQuery$a) return wrapQuery_1$a;
+	hasRequiredWrapQuery$a = 1;
 	var negotiateSql = requireNegotiateSql();
 	var negotiateParameters = requireNegotiateParameters();
 
@@ -2107,8 +2109,8 @@ function requireWrapQuery$1 () {
 	}
 
 
-	wrapQuery_1$1 = wrapQuery;
-	return wrapQuery_1$1;
+	wrapQuery_1$a = wrapQuery;
+	return wrapQuery_1$a;
 }
 
 var query;
@@ -2118,7 +2120,7 @@ function requireQuery () {
 	if (hasRequiredQuery) return query;
 	hasRequiredQuery = 1;
 	var executeQueries = requireExecuteQueries();
-	var wrapQuery = requireWrapQuery$1();
+	var wrapQuery = requireWrapQuery$a();
 
 	function doQuery(context, query) {
 		var wrappedQuery = wrapQuery(query);
@@ -2314,7 +2316,7 @@ function requireCloneFromDb () {
 	return cloneFromDb_1;
 }
 
-var require$$0$1 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(axios);
+var require$$0$2 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(axios);
 
 var netAdapter_1;
 var hasRequiredNetAdapter;
@@ -2322,7 +2324,7 @@ var hasRequiredNetAdapter;
 function requireNetAdapter () {
 	if (hasRequiredNetAdapter) return netAdapter_1;
 	hasRequiredNetAdapter = 1;
-	const _axios = require$$0$1;
+	const _axios = require$$0$2;
 
 	function httpAdapter(baseURL, path, axiosInterceptor) {
 		//@ts-ignore
@@ -2465,7 +2467,7 @@ function requireToKeyPositionMap () {
 	if (hasRequiredToKeyPositionMap) return toKeyPositionMap_1;
 	hasRequiredToKeyPositionMap = 1;
 	const stringify = requireStringify();
-	const { v4: uuid } = require$$0$2;
+	const { v4: uuid } = require$$0$3;
 
 	function toKeyPositionMap(rows, options) {
 		return rows.reduce((map, element, i) => {
@@ -3746,11 +3748,11 @@ function requireEncodeFilterArg () {
 }
 
 var quote_1;
-var hasRequiredQuote$1;
+var hasRequiredQuote$6;
 
-function requireQuote$1 () {
-	if (hasRequiredQuote$1) return quote_1;
-	hasRequiredQuote$1 = 1;
+function requireQuote$6 () {
+	if (hasRequiredQuote$6) return quote_1;
+	hasRequiredQuote$6 = 1;
 	let tryGetSessionContext = requireTryGetSessionContext();
 
 	function quote(context, name) {
@@ -3774,7 +3776,7 @@ function requireEqual () {
 	var newBoolean = requireNewBoolean();
 	var nullOperator = ' is ';
 	var encodeFilterArg = requireEncodeFilterArg();
-	var quote = requireQuote$1();
+	var quote = requireQuote$6();
 
 	function equal(context, column,arg,alias) {
 		var operator = '=';
@@ -3799,7 +3801,7 @@ function requireNotEqual () {
 	var newBoolean = requireNewBoolean();
 	var encodeFilterArg = requireEncodeFilterArg();
 	var nullOperator = ' is not ';
-	var quote = requireQuote$1();
+	var quote = requireQuote$6();
 
 	function notEqual(context, column,arg,alias) {
 		var operator = '<>';
@@ -3823,7 +3825,7 @@ function requireLessThan () {
 	hasRequiredLessThan = 1;
 	var newBoolean = requireNewBoolean();
 	var encodeFilterArg = requireEncodeFilterArg();
-	var quote = requireQuote$1();
+	var quote = requireQuote$6();
 
 	function lessThanOrEqual(context, column,arg,alias) {
 		var operator = '<';
@@ -3868,7 +3870,7 @@ function requireGreaterThan () {
 	hasRequiredGreaterThan = 1;
 	var newBoolean = requireNewBoolean();
 	var encodeFilterArg = requireEncodeFilterArg();
-	var quote = requireQuote$1();
+	var quote = requireQuote$6();
 
 	function greaterThan(context, column,arg,alias) {
 		var operator = '>';
@@ -3890,7 +3892,7 @@ function requireGreaterThanOrEqual () {
 	hasRequiredGreaterThanOrEqual = 1;
 	var newBoolean = requireNewBoolean();
 	var encodeFilterArg = requireEncodeFilterArg();
-	var quote = requireQuote$1();
+	var quote = requireQuote$6();
 
 	function greaterThanOrEqual(context, column,arg,alias) {
 		var operator = '>=';
@@ -3912,7 +3914,7 @@ function require_in () {
 	hasRequired_in = 1;
 	const newParameterized = requireNewParameterized();
 	const newBoolean = requireNewBoolean();
-	const quote = requireQuote$1();
+	const quote = requireQuote$6();
 
 	function _in(context, column,values,alias) {
 		let filter;
@@ -4137,7 +4139,7 @@ function requireNewColumn () {
 	const greaterThanOrEqual = requireGreaterThanOrEqual();
 	const _in = require_in();
 	const _extractAlias = requireExtractAlias();
-	const quote = requireQuote$1();
+	const quote = requireQuote$6();
 	const aggregate = requireColumnAggregate$1();
 	const aggregateGroup = requireColumnAggregateGroup$1();
 
@@ -4237,7 +4239,7 @@ function requireNewColumn () {
 	return newColumn;
 }
 
-var require$$0 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(ajv);
+var require$$0$1 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(ajv);
 
 var purify_1$5;
 var hasRequiredPurify$6;
@@ -4325,7 +4327,7 @@ function requireStartsWithCore () {
 	hasRequiredStartsWithCore = 1;
 	var newBoolean = requireNewBoolean();
 	var nullOperator = ' is ';
-	var quote = requireQuote$1();
+	var quote = requireQuote$6();
 
 	function startsWithCore(context, operator, column,arg,alias) {
 		operator = ' ' + operator + ' ';
@@ -4361,7 +4363,7 @@ var hasRequiredEndsWithCore;
 function requireEndsWithCore () {
 	if (hasRequiredEndsWithCore) return endsWithCore_1;
 	hasRequiredEndsWithCore = 1;
-	const quote = requireQuote$1();
+	const quote = requireQuote$6();
 	var newBoolean = requireNewBoolean();
 	var nullOperator = ' is ';
 
@@ -4400,7 +4402,7 @@ var hasRequiredContainsCore;
 function requireContainsCore () {
 	if (hasRequiredContainsCore) return containsCore;
 	hasRequiredContainsCore = 1;
-	const quote = requireQuote$1();
+	const quote = requireQuote$6();
 	var newBoolean = requireNewBoolean();
 	var nullOperator = ' is ';
 
@@ -4478,7 +4480,7 @@ function requireIEqual () {
 	var newBoolean = requireNewBoolean();
 	var nullOperator = ' is ';
 	var encodeFilterArg = requireEncodeFilterArg();
-	const quote = requireQuote$1();
+	const quote = requireQuote$6();
 
 	function iEqual(context, column,arg,alias) {
 		var operator = ' ILIKE ';
@@ -4670,7 +4672,7 @@ function requireFormatOut$1 () {
 	if (hasRequiredFormatOut$1) return formatOut_1$1;
 	hasRequiredFormatOut$1 = 1;
 	var getSessionSingleton = requireGetSessionSingleton();
-	const quote = requireQuote$1();
+	const quote = requireQuote$6();
 
 	function formatOut(context, column, alias) {
 		var formatColumn = getSessionSingleton(context, 'formatJSONOut');
@@ -4961,7 +4963,7 @@ function requireFormatOut () {
 	if (hasRequiredFormatOut) return formatOut_1;
 	hasRequiredFormatOut = 1;
 	var getSessionSingleton = requireGetSessionSingleton();
-	const quote = requireQuote$1();
+	const quote = requireQuote$6();
 
 	function formatOut(context, column, alias) {
 		var formatColumn = getSessionSingleton(context, 'formatDateOut');
@@ -5322,27 +5324,37 @@ function requireNewEncode () {
 	hasRequiredNewEncode = 1;
 	var purify = requirePurify();
 	var newParam = requireNewParameterized();
+	var getSessionSingleton = requireGetSessionSingleton();
 
 	function _new(_column) {
 
-		function encode(_context, value) {
+		function encode(context, value) {
 			value = purify(value);
 			if (value === null)
 				return newParam('null');
-			return newParam('?', [Buffer.from(value, 'base64')]);
+
+			var encodeCore = getSessionSingleton(context, 'encodeBinary') || encodeDefault;
+			const enc = encodeCore(value);
+			return newParam('?', [enc]);
 		}
-		encode.unsafe = function(_context, value) {
+		encode.unsafe = function(context, value) {
 			value = purify(value);
 			if (value === null)
 				return 'null';
-			return Buffer.from(value, 'base64');
+			var encodeCore = getSessionSingleton(context, 'encodeBinary') || encodeDefault;
+			return encodeCore(value);
 		};
 
-		encode.direct = function(_context, value) {
-			return Buffer.from(value, 'base64');
+		encode.direct = function(context, value) {
+			var encodeCore = getSessionSingleton(context, 'encodeBinary') || encodeDefault;
+			return encodeCore(value);
 		};
 
 		return encode;
+	}
+
+	function encodeDefault(base64) {
+		return Buffer.from(base64, 'base64');
 	}
 
 	newEncode = _new;
@@ -5356,17 +5368,28 @@ function requireNewDecode () {
 	if (hasRequiredNewDecode) return newDecode;
 	hasRequiredNewDecode = 1;
 	var newDecodeCore = requireNewDecodeCore();
+	var getSessionSingleton = requireGetSessionSingleton();
 
 	function _new(column) {
 		var decodeCore = newDecodeCore(column);
 
 		return function(context, value) {
+
+			var toBase64  = getSessionSingleton(context, 'decodeBinary') || toBase64Default;
+
 			value = decodeCore(context, value);
 			if (value === null)
 				return value;
-			else
-				return value.toString('base64');
+			else {
+				const ret = toBase64(value);
+				return ret;
+			}
 		};
+	}
+
+	function toBase64Default(buffer) {
+		return buffer.toString('base64');
+
 	}
 
 	newDecode = _new;
@@ -5400,7 +5423,7 @@ var hasRequiredColumn;
 function requireColumn () {
 	if (hasRequiredColumn) return column;
 	hasRequiredColumn = 1;
-	const Ajv = require$$0;
+	const Ajv = require$$0$1;
 
 	function defineColumn(column, table) {
 		var c = {};
@@ -5729,12 +5752,12 @@ function requireNewPrimaryKeyFilter () {
 	return newPrimaryKeyFilter;
 }
 
-var newShallowColumnSql;
-var hasRequiredNewShallowColumnSql;
+var newShallowColumnSql$1;
+var hasRequiredNewShallowColumnSql$1;
 
-function requireNewShallowColumnSql () {
-	if (hasRequiredNewShallowColumnSql) return newShallowColumnSql;
-	hasRequiredNewShallowColumnSql = 1;
+function requireNewShallowColumnSql$1 () {
+	if (hasRequiredNewShallowColumnSql$1) return newShallowColumnSql$1;
+	hasRequiredNewShallowColumnSql$1 = 1;
 	const getSessionSingleton = requireGetSessionSingleton();
 
 	function _new(context, table, alias, span, ignoreNulls) {
@@ -5775,8 +5798,8 @@ function requireNewShallowColumnSql () {
 		}
 	}
 
-	newShallowColumnSql = _new;
-	return newShallowColumnSql;
+	newShallowColumnSql$1 = _new;
+	return newShallowColumnSql$1;
 }
 
 var sharedJoinUtils;
@@ -5785,7 +5808,7 @@ var hasRequiredSharedJoinUtils;
 function requireSharedJoinUtils () {
 	if (hasRequiredSharedJoinUtils) return sharedJoinUtils;
 	hasRequiredSharedJoinUtils = 1;
-	var newShallowColumnSql = requireNewShallowColumnSql();
+	var newShallowColumnSql = requireNewShallowColumnSql$1();
 
 	function joinLegToColumnSql(context, leg, alias, ignoreNull) {
 		var span = leg.span;
@@ -5844,7 +5867,7 @@ var hasRequiredNewColumnSql;
 function requireNewColumnSql () {
 	if (hasRequiredNewColumnSql) return newColumnSql;
 	hasRequiredNewColumnSql = 1;
-	var newShallowColumnSql = requireNewShallowColumnSql();
+	var newShallowColumnSql = requireNewShallowColumnSql$1();
 	var newJoinedColumnSql = requireNewJoinedColumnSql();
 
 	newColumnSql = function(context,table,span,alias,ignoreNull) {
@@ -6062,19 +6085,19 @@ function requireNegotiateExclusive () {
 	return negotiateExclusive_1;
 }
 
-var newSingleQuery$1;
-var hasRequiredNewSingleQuery$1;
+var newSingleQuery$2;
+var hasRequiredNewSingleQuery$2;
 
-function requireNewSingleQuery$1 () {
-	if (hasRequiredNewSingleQuery$1) return newSingleQuery$1;
-	hasRequiredNewSingleQuery$1 = 1;
+function requireNewSingleQuery$2 () {
+	if (hasRequiredNewSingleQuery$2) return newSingleQuery$2;
+	hasRequiredNewSingleQuery$2 = 1;
 	var newColumnSql = requireNewColumnSql();
 	var newJoinSql = requireNewJoinSql();
 	var newWhereSql = requireNewWhereSql();
 	var negotiateLimit = requireNegotiateLimit();
 	var negotiateExclusive = requireNegotiateExclusive();
 	var newParameterized = requireNewParameterized();
-	var quote = requireQuote$1();
+	var quote = requireQuote$6();
 
 	function _new(context, table, filter, span, alias, innerJoin, orderBy, limit, offset, exclusive) {
 
@@ -6091,8 +6114,8 @@ function requireNewSingleQuery$1 () {
 			.append(orderBy + offset + exclusiveClause);
 	}
 
-	newSingleQuery$1 = _new;
-	return newSingleQuery$1;
+	newSingleQuery$2 = _new;
+	return newSingleQuery$2;
 }
 
 var extractFilter;
@@ -6223,13 +6246,13 @@ function requireExtractOffset () {
 	return extractOffset_1;
 }
 
-var newQuery_1$2;
-var hasRequiredNewQuery$2;
+var newQuery_1$3;
+var hasRequiredNewQuery$3;
 
-function requireNewQuery$2 () {
-	if (hasRequiredNewQuery$2) return newQuery_1$2;
-	hasRequiredNewQuery$2 = 1;
-	var newSingleQuery = requireNewSingleQuery$1();
+function requireNewQuery$3 () {
+	if (hasRequiredNewQuery$3) return newQuery_1$3;
+	hasRequiredNewQuery$3 = 1;
+	var newSingleQuery = requireNewSingleQuery$2();
 	var extractFilter = requireExtractFilter();
 	var extractOrderBy = requireExtractOrderBy();
 	var extractLimit = requireExtractLimit();
@@ -6246,8 +6269,8 @@ function requireNewQuery$2 () {
 		return queries;
 	}
 
-	newQuery_1$2 = newQuery;
-	return newQuery_1$2;
+	newQuery_1$3 = newQuery;
+	return newQuery_1$3;
 }
 
 var negotiateQueryContext_1;
@@ -6736,7 +6759,7 @@ function requireSelectSql$1 () {
 	hasRequiredSelectSql$1 = 1;
 	const newParameterized = requireNewParameterized();
 	const newBoolean = requireNewBoolean();
-	const quote = requireQuote$1();
+	const quote = requireQuote$6();
 
 	function newSelectSql(context, table, alias) {
 		const colName = quote(context, table._primaryColumns[0]._dbName);
@@ -7173,7 +7196,7 @@ var hasRequiredApplyPatch;
 function requireApplyPatch () {
 	if (hasRequiredApplyPatch) return applyPatch_1;
 	hasRequiredApplyPatch = 1;
-	const fastjson = require$$0$3;
+	const fastjson = require$$0$4;
 	let fromCompareObject = requireFromCompareObject();
 	let toCompareObject = requireToCompareObject();
 
@@ -8093,7 +8116,7 @@ function requireNewDecodeDbRow () {
 			for (let i = 0; i < numberOfColumns; i++) {
 				let index = offset + i;
 				let key = keys[index];
-				if (row[key] !== undefined)
+				if (row[key] !== undefined && !isInsert)
 					row[key] = columns[i].decode(context, row[key]);
 				if (shouldValidate && columns[i].validate)
 					columns[i].validate(row[key], row, isInsert);
@@ -8526,7 +8549,7 @@ var hasRequiredGetMany;
 function requireGetMany () {
 	if (hasRequiredGetMany) return getMany_1;
 	hasRequiredGetMany = 1;
-	let newQuery = requireNewQuery$2();
+	let newQuery = requireNewQuery$3();
 	let executeQueries = requireExecuteQueries();
 	let resultToRows = requireResultToRows();
 	let strategyToSpan = requireStrategyToSpan();
@@ -9294,7 +9317,7 @@ function requireChildColumn () {
 	var getSessionContext = requireGetSessionContext();
 	var newJoinCore = requireNewShallowJoinSqlCore();
 	const getSessionSingleton = requireGetSessionSingleton();
-	const _quote = requireQuote$1();
+	const _quote = requireQuote$6();
 
 
 	function childColumn(context, column, relations) {
@@ -10148,7 +10171,7 @@ var hasRequiredNewId;
 function requireNewId () {
 	if (hasRequiredNewId) return newId;
 	hasRequiredNewId = 1;
-	const { v4 : uuid} = require$$0$2;
+	const { v4 : uuid} = require$$0$3;
 	newId = uuid;
 	return newId;
 }
@@ -10616,7 +10639,7 @@ function requireCount () {
 	const negotiateRawSqlFilter = requireNegotiateRawSqlFilter();
 	const extractFilter = requireExtractFilter();
 	const newWhereSql = requireNewWhereSql();
-	const quote = requireQuote$1();
+	const quote = requireQuote$6();
 
 	async function count(context, table, filter) {
 		let alias = table._dbName;
@@ -10646,12 +10669,12 @@ function requireCount () {
 	return count_1;
 }
 
-var newSingleQuery;
-var hasRequiredNewSingleQuery;
+var newSingleQuery$1;
+var hasRequiredNewSingleQuery$1;
 
-function requireNewSingleQuery () {
-	if (hasRequiredNewSingleQuery) return newSingleQuery;
-	hasRequiredNewSingleQuery = 1;
+function requireNewSingleQuery$1 () {
+	if (hasRequiredNewSingleQuery$1) return newSingleQuery$1;
+	hasRequiredNewSingleQuery$1 = 1;
 	var newColumnSql = requireNewColumnSql();
 	var newWhereSql = requireNewWhereSql();
 	var newJoinSql = requireNewJoinSql();
@@ -10671,17 +10694,17 @@ function requireNewSingleQuery () {
 
 	}
 
-	newSingleQuery = _new;
-	return newSingleQuery;
+	newSingleQuery$1 = _new;
+	return newSingleQuery$1;
 }
 
-var newQuery_1$1;
-var hasRequiredNewQuery$1;
+var newQuery_1$2;
+var hasRequiredNewQuery$2;
 
-function requireNewQuery$1 () {
-	if (hasRequiredNewQuery$1) return newQuery_1$1;
-	hasRequiredNewQuery$1 = 1;
-	var newSingleQuery = requireNewSingleQuery();
+function requireNewQuery$2 () {
+	if (hasRequiredNewQuery$2) return newQuery_1$2;
+	hasRequiredNewQuery$2 = 1;
+	var newSingleQuery = requireNewSingleQuery$1();
 	var extractFilter = requireExtractFilter();
 	var extractOrderBy = requireExtractOrderBy();
 	var extractLimit = requireExtractLimit();
@@ -10698,18 +10721,18 @@ function requireNewQuery$1 () {
 		return newParameterized(query.sql(), query.parameters);
 	}
 
-	newQuery_1$1 = newQuery;
-	return newQuery_1$1;
+	newQuery_1$2 = newQuery;
+	return newQuery_1$2;
 }
 
-var getManyDto_1$1;
-var hasRequiredGetManyDto$1;
+var getManyDto_1$2;
+var hasRequiredGetManyDto$2;
 
-function requireGetManyDto$1 () {
-	if (hasRequiredGetManyDto$1) return getManyDto_1$1;
-	hasRequiredGetManyDto$1 = 1;
+function requireGetManyDto$2 () {
+	if (hasRequiredGetManyDto$2) return getManyDto_1$2;
+	hasRequiredGetManyDto$2 = 1;
 	const emptyFilter = requireEmptyFilter();
-	const newQuery = requireNewQuery$1();
+	const newQuery = requireNewQuery$2();
 	const negotiateRawSqlFilter = requireNegotiateRawSqlFilter();
 	const strategyToSpan = requireStrategyToSpan();
 	const executeQueries = requireExecuteQueries();
@@ -11123,26 +11146,26 @@ function requireGetManyDto$1 () {
 	}
 
 
-	getManyDto_1$1 = getManyDto;
-	return getManyDto_1$1;
+	getManyDto_1$2 = getManyDto;
+	return getManyDto_1$2;
 }
 
-var getManyDto_1;
-var hasRequiredGetManyDto;
+var getManyDto_1$1;
+var hasRequiredGetManyDto$1;
 
-function requireGetManyDto () {
-	if (hasRequiredGetManyDto) return getManyDto_1;
-	hasRequiredGetManyDto = 1;
+function requireGetManyDto$1 () {
+	if (hasRequiredGetManyDto$1) return getManyDto_1$1;
+	hasRequiredGetManyDto$1 = 1;
 	const getSessionSingleton = requireGetSessionSingleton();
-	const getManyDtoCore = requireGetManyDto$1();
+	const getManyDtoCore = requireGetManyDto$2();
 
 	function getManyDto(context, _table, _filter, _strategy) {
 		const _getManyDto = getSessionSingleton(context, 'getManyDto') || getManyDtoCore;
 		return _getManyDto.apply(null, arguments);
 	}
 
-	getManyDto_1 = getManyDto;
-	return getManyDto_1;
+	getManyDto_1$1 = getManyDto;
+	return getManyDto_1$1;
 }
 
 var tryGetById;
@@ -11342,12 +11365,12 @@ function requireNewRow () {
 	return newRow_1;
 }
 
-var insert_1;
-var hasRequiredInsert$1;
+var insert_1$1;
+var hasRequiredInsert$6;
 
-function requireInsert$1 () {
-	if (hasRequiredInsert$1) return insert_1;
-	hasRequiredInsert$1 = 1;
+function requireInsert$6 () {
+	if (hasRequiredInsert$6) return insert_1$1;
+	hasRequiredInsert$6 = 1;
 	let getSessionContext = requireGetSessionContext();
 	let newRow = requireNewRow();
 
@@ -11435,8 +11458,8 @@ function requireInsert$1 () {
 		return true;
 	}
 
-	insert_1 = insert;
-	return insert_1;
+	insert_1$1 = insert;
+	return insert_1$1;
 }
 
 var _delete_1;
@@ -11527,13 +11550,13 @@ function requireAggregate () {
 	return aggregate;
 }
 
-var newQuery_1;
-var hasRequiredNewQuery;
+var newQuery_1$1;
+var hasRequiredNewQuery$1;
 
-function requireNewQuery () {
-	if (hasRequiredNewQuery) return newQuery_1;
-	hasRequiredNewQuery = 1;
-	var newSingleQuery = requireNewSingleQuery();
+function requireNewQuery$1 () {
+	if (hasRequiredNewQuery$1) return newQuery_1$1;
+	hasRequiredNewQuery$1 = 1;
+	var newSingleQuery = requireNewSingleQuery$1();
 	var extractFilter = requireExtractFilter();
 	var extractLimit = requireExtractLimit();
 	var newParameterized = requireNewParameterized();
@@ -11557,8 +11580,8 @@ function requireNewQuery () {
 		return ' GROUP BY ' + keys.map(key => span.aggregates[key].groupBy).join(',');
 	}
 
-	newQuery_1 = newQuery;
-	return newQuery_1;
+	newQuery_1$1 = newQuery;
+	return newQuery_1$1;
 }
 
 var groupBy_1;
@@ -11567,7 +11590,7 @@ var hasRequiredGroupBy;
 function requireGroupBy () {
 	if (hasRequiredGroupBy) return groupBy_1;
 	hasRequiredGroupBy = 1;
-	const newQuery = requireNewQuery();
+	const newQuery = requireNewQuery$1();
 	const negotiateRawSqlFilter = requireNegotiateRawSqlFilter();
 	const strategyToSpan = requireStrategyToSpan();
 	const executeQueries = requireExecuteQueries();
@@ -11648,13 +11671,13 @@ function requireTable () {
 	const hasOne = requireHasOne();
 	const getMany = requireGetMany();
 	const count = requireCount();
-	const getManyDto = requireGetManyDto();
+	const getManyDto = requireGetManyDto$1();
 	const getById = requireGetById();
 	const tryGetById = requireTryGetById();
 	const tryGetFirst = requireTryGetFirstFromDb();
 	const newCache = requireNewRowCache();
 	const newContext = requireNewObject();
-	const insert = requireInsert$1();
+	const insert = requireInsert$6();
 	const _delete = require_delete();
 	const cascadeDelete = requireCascadeDelete();
 	const patchTable = requirePatchTable();
@@ -12083,6 +12106,39 @@ function requireMap () {
 	return map_1;
 }
 
+var runtimes;
+var hasRequiredRuntimes;
+
+function requireRuntimes () {
+	if (hasRequiredRuntimes) return runtimes;
+	hasRequiredRuntimes = 1;
+	// @ts-ignore
+	// eslint-disable-next-line no-undef
+	const deno = typeof Deno !== 'undefined' && Deno.version?.deno;
+	// @ts-ignore
+	// eslint-disable-next-line no-undef
+	const bun = typeof Bun !== 'undefined' && Bun.version;
+	const node = (typeof process !== 'undefined' && process.versions?.node && !deno && !bun) ? process.versions.node : false;
+
+	function parseVersion(version) {
+		if (version) {
+			const versionArray = version.split('.');
+			return {
+				version,
+				major: parseInt(versionArray[0]),
+				minor: parseInt(versionArray[1]),
+				patch: parseInt(versionArray[2])
+			};
+		}
+		else
+			return false;
+	}
+
+
+	runtimes = { deno: parseVersion(deno), bun: parseVersion(bun), node: parseVersion(node) };
+	return runtimes;
+}
+
 var commitCommand;
 var hasRequiredCommitCommand;
 
@@ -12487,51 +12543,45 @@ function requireCreateDomain () {
 	return createDomain_1;
 }
 
-var wrapQuery_1;
-var hasRequiredWrapQuery;
+var wrapQuery_1$9;
+var hasRequiredWrapQuery$9;
 
-function requireWrapQuery () {
-	if (hasRequiredWrapQuery) return wrapQuery_1;
-	hasRequiredWrapQuery = 1;
+function requireWrapQuery$9 () {
+	if (hasRequiredWrapQuery$9) return wrapQuery_1$9;
+	hasRequiredWrapQuery$9 = 1;
 	var log = requireLog();
 
-	function wrapQuery(client) {
-
+	function wrapQuery(_context, connection) {
+		var runOriginalQuery = connection.query;
 		return runQuery;
 
 		function runQuery(query, onCompleted) {
-
 			var params = query.parameters;
 			var sql = query.sql();
 			log.emitQuery({sql, parameters: params});
-			client.d1.prepare(sql, params).bind(...params).all().then(onInnerCompleted, onCompleted);
-
-			function onInnerCompleted(response) {
-				onCompleted(null, response.results);
-			}
-
+			return runOriginalQuery.call(connection, sql, params, onCompleted);
 		}
 
 	}
 
-	wrapQuery_1 = wrapQuery;
-	return wrapQuery_1;
+	wrapQuery_1$9 = wrapQuery;
+	return wrapQuery_1$9;
 }
 
-var encodeBoolean_1;
-var hasRequiredEncodeBoolean;
+var encodeBoolean_1$5;
+var hasRequiredEncodeBoolean$5;
 
-function requireEncodeBoolean () {
-	if (hasRequiredEncodeBoolean) return encodeBoolean_1;
-	hasRequiredEncodeBoolean = 1;
+function requireEncodeBoolean$5 () {
+	if (hasRequiredEncodeBoolean$5) return encodeBoolean_1$5;
+	hasRequiredEncodeBoolean$5 = 1;
 	function encodeBoolean(bool) {
 		if (bool)
 			return 1;
 		return 0;
 	}
 
-	encodeBoolean_1 = encodeBoolean;
-	return encodeBoolean_1;
+	encodeBoolean_1$5 = encodeBoolean;
+	return encodeBoolean_1$5;
 }
 
 var format_1;
@@ -12552,79 +12602,78 @@ function requireFormat () {
 	return format_1;
 }
 
-var quote;
-var hasRequiredQuote;
+var quote$5;
+var hasRequiredQuote$5;
 
-function requireQuote () {
-	if (hasRequiredQuote) return quote;
-	hasRequiredQuote = 1;
-	quote = (name) => `"${name}"`;
-	return quote;
+function requireQuote$5 () {
+	if (hasRequiredQuote$5) return quote$5;
+	hasRequiredQuote$5 = 1;
+	quote$5 = (name) => `\`${name}\``;
+	return quote$5;
 }
 
-var deleteFromSql_1;
-var hasRequiredDeleteFromSql;
+var deleteFromSql_1$5;
+var hasRequiredDeleteFromSql$5;
 
-function requireDeleteFromSql () {
-	if (hasRequiredDeleteFromSql) return deleteFromSql_1;
-	hasRequiredDeleteFromSql = 1;
-	const format = 'delete from %s where %s.rowId in (SELECT %s.rowId FROM %s %s%s)';
+function requireDeleteFromSql$5 () {
+	if (hasRequiredDeleteFromSql$5) return deleteFromSql_1$5;
+	hasRequiredDeleteFromSql$5 = 1;
+	const format = 'delete %s from %s as %s%s';
 	const formatString = requireFormat();
-	const quote = requireQuote();
+	const quote = requireQuote$5();
 
 	function deleteFromSql(table, alias, whereSql) {
 		const name = quote(table._dbName);
 		alias = quote(alias);
-		return formatString(format, name, name, alias, name, alias, whereSql);
+		return formatString(format, alias, name, alias, whereSql);
 	}
-	deleteFromSql_1 = deleteFromSql;
-	return deleteFromSql_1;
+	deleteFromSql_1$5 = deleteFromSql;
+	return deleteFromSql_1$5;
 }
 
-var selectForUpdateSql;
-var hasRequiredSelectForUpdateSql;
+var selectForUpdateSql$5;
+var hasRequiredSelectForUpdateSql$5;
 
-function requireSelectForUpdateSql () {
-	if (hasRequiredSelectForUpdateSql) return selectForUpdateSql;
-	hasRequiredSelectForUpdateSql = 1;
-	const quote = requireQuote$1();
-
-	selectForUpdateSql = function(alias) {
-		return ' FOR UPDATE OF ' + quote(alias);
+function requireSelectForUpdateSql$5 () {
+	if (hasRequiredSelectForUpdateSql$5) return selectForUpdateSql$5;
+	hasRequiredSelectForUpdateSql$5 = 1;
+	selectForUpdateSql$5 = function(_alias) {
+		return ' FOR UPDATE';
 	};
-	return selectForUpdateSql;
+	return selectForUpdateSql$5;
 }
 
-var lastInsertedSql_1;
-var hasRequiredLastInsertedSql;
+var lastInsertedSql_1$4;
+var hasRequiredLastInsertedSql$4;
 
-function requireLastInsertedSql () {
-	if (hasRequiredLastInsertedSql) return lastInsertedSql_1;
-	hasRequiredLastInsertedSql = 1;
-	function lastInsertedSql(context, table, keyValues) {
+function requireLastInsertedSql$4 () {
+	if (hasRequiredLastInsertedSql$4) return lastInsertedSql_1$4;
+	hasRequiredLastInsertedSql$4 = 1;
+	const quote = requireQuote$5();
+
+	function lastInsertedSql(context,table, keyValues) {
 		return keyValues.map((value,i) => {
 			let column = table._primaryColumns[i];
 			if (value === undefined && column.tsType === 'NumberColumn')
-				return 'rowid IN (select last_insert_rowid())';
+				return `${quote(column._dbName)}=LAST_INSERT_ID()`;
 			else
 				return column.eq(context, value);
 		});
-
 	}
 
-	lastInsertedSql_1 = lastInsertedSql;
-	return lastInsertedSql_1;
+	lastInsertedSql_1$4 = lastInsertedSql;
+	return lastInsertedSql_1$4;
 }
 
-var limitAndOffset_1;
-var hasRequiredLimitAndOffset;
+var limitAndOffset_1$5;
+var hasRequiredLimitAndOffset$5;
 
-function requireLimitAndOffset () {
-	if (hasRequiredLimitAndOffset) return limitAndOffset_1;
-	hasRequiredLimitAndOffset = 1;
+function requireLimitAndOffset$5 () {
+	if (hasRequiredLimitAndOffset$5) return limitAndOffset_1$5;
+	hasRequiredLimitAndOffset$5 = 1;
 	function limitAndOffset(span) {
 		if (span.offset)
-			return ` limit ${limit()} offset ${span.offset}`;
+			return ` limit ${span.offset}${limit()}`;
 		else if (span.limit || span.limit === 0)
 			return ` limit ${span.limit}`;
 		else
@@ -12632,46 +12681,42 @@ function requireLimitAndOffset () {
 
 		function limit() {
 			if (span.limit || span.limit === 0)
-				return span.limit;
+				return `, ${span.limit}`;
 			else
-				return '-1';
+				return '';
 		}
 
 	}
 
-	limitAndOffset_1 = limitAndOffset;
-	return limitAndOffset_1;
+	limitAndOffset_1$5 = limitAndOffset;
+	return limitAndOffset_1$5;
 }
 
-var insertSql_1;
-var hasRequiredInsertSql;
+var insertSql_1$5;
+var hasRequiredInsertSql$5;
 
-function requireInsertSql () {
-	if (hasRequiredInsertSql) return insertSql_1;
-	hasRequiredInsertSql = 1;
-	const quote = requireQuote();
+function requireInsertSql$5 () {
+	if (hasRequiredInsertSql$5) return insertSql_1$5;
+	hasRequiredInsertSql$5 = 1;
+	const quote = requireQuote$5();
 
 	function insertSql(_context, table, row, options) {
 		let columnNames = [];
 		let conflictColumnUpdateSql = '';
 		let values = [];
-
 		let sql = 'INSERT INTO ' + quote(table._dbName) + ' ';
 		addDiscriminators();
 		addColumns();
-
 		if (columnNames.length === 0) {
-			sql += 'DEFAULT VALUES';
+			sql += 'VALUES ()';
 		} else {
-			sql = sql + '(' + columnNames.join(',') + ') ' + 'VALUES (' + values.join(',') + ')' + onConflict();
+			sql = sql + '(' + columnNames.join(',') + ') ' + 'VALUES (' + values.join(',') + ')' + onDuplicateKeyUpdate();
 		}
-
 		return sql;
 
-		function onConflict() {
+		function onDuplicateKeyUpdate() {
 			if (options.concurrency === 'skipOnConflict' || options.concurrency === 'overwrite') {
-				const primaryKeys = table._primaryColumns.map(x => quote(x._dbName)).join(',');
-				return ` ON CONFLICT(${primaryKeys}) ${conflictColumnUpdateSql}`;
+				return ` ON DUPLICATE KEY UPDATE ${conflictColumnUpdateSql} `;
 			} else {
 				return '';
 			}
@@ -12698,25 +12743,28 @@ function requireInsertSql () {
 					addConflictUpdate(column);
 				}
 			}
-			if (conflictColumnUpdates.length === 0)
-				conflictColumnUpdateSql =  'DO NOTHING';
-			else
-				conflictColumnUpdateSql = 'DO UPDATE SET ' + conflictColumnUpdates.join(',');
+			if (conflictColumnUpdates.length === 0) {
+				const column = table._primaryColumns[0];
+				const columnName = quote(column._dbName);
+				conflictColumnUpdates.push(`${columnName}=VALUES(${columnName})`);
+			}
+			conflictColumnUpdateSql = conflictColumnUpdates.join(',');
 
 			function addConflictUpdate(column) {
 				let concurrency = options[column.alias]?.concurrency || options.concurrency;
-				const tableName = table._dbName;
 				const columnName = quote(column._dbName);
+				const tableName = quote(table._dbName);
 				if (concurrency === 'overwrite') {
-					conflictColumnUpdates.push(`${columnName}=excluded.${columnName}`);
-				} else if (concurrency === 'optimistic')
-					conflictColumnUpdates.push(`${columnName} = CASE WHEN ${tableName}.${columnName} <> excluded.${columnName} THEN '12345678-1234-1234-1234-123456789012Conflict when updating ${columnName}12345678-1234-1234-1234-123456789012' ELSE ${tableName}.${columnName} END`);
+					conflictColumnUpdates.push(`${columnName}=VALUES(${columnName})`);
+				} else if (concurrency === 'optimistic') {
+					conflictColumnUpdates.push(`${columnName} = CASE WHEN ${tableName}.${columnName} <> VALUES(${columnName}) THEN CAST('12345678-1234-1234-1234-123456789012Conflict when updating ${columnName}12345678-1234-1234-1234-123456789012' AS SIGNED) ELSE ${tableName}.${columnName} END`);
+				}
 			}
 		}
 	}
 
-	insertSql_1 = insertSql;
-	return insertSql_1;
+	insertSql_1$5 = insertSql;
+	return insertSql_1$5;
 }
 
 var newInsertCommand_1;
@@ -12793,7 +12841,7 @@ function requireGetSqlTemplate () {
 	if (hasRequiredGetSqlTemplate) return getSqlTemplate_1;
 	hasRequiredGetSqlTemplate = 1;
 	let getSessionContext = requireGetSessionContext();
-	let quote = requireQuote$1();
+	let quote = requireQuote$6();
 
 	function getSqlTemplate(context, _table, _row) {
 		let rdb = getSessionContext(context);
@@ -12862,12 +12910,12 @@ function requireGetSqlTemplate () {
 	return getSqlTemplate_1;
 }
 
-var newInsertCommandCore_1;
-var hasRequiredNewInsertCommandCore;
+var newInsertCommandCore_1$1;
+var hasRequiredNewInsertCommandCore$1;
 
-function requireNewInsertCommandCore () {
-	if (hasRequiredNewInsertCommandCore) return newInsertCommandCore_1;
-	hasRequiredNewInsertCommandCore = 1;
+function requireNewInsertCommandCore$1 () {
+	if (hasRequiredNewInsertCommandCore$1) return newInsertCommandCore_1$1;
+	hasRequiredNewInsertCommandCore$1 = 1;
 	const newParameterized = requireNewParameterized();
 	const getSqlTemplate = requireGetSqlTemplate();
 	const formatString = requireFormat();
@@ -12894,8 +12942,8 @@ function requireNewInsertCommandCore () {
 		return newParameterized(sql, parameters);
 	}
 
-	newInsertCommandCore_1 = newInsertCommandCore;
-	return newInsertCommandCore_1;
+	newInsertCommandCore_1$1 = newInsertCommandCore;
+	return newInsertCommandCore_1$1;
 }
 
 var newGetLastInsertedCommandCore_1;
@@ -12907,7 +12955,7 @@ function requireNewGetLastInsertedCommandCore () {
 	const newParameterized = requireNewParameterized();
 	const getSessionContext = requireGetSessionContext();
 	const newDiscriminatorSql = requireNewDiscriminatorSql$1();
-	const quote = requireQuote$1();
+	const quote = requireQuote$6();
 
 	function newGetLastInsertedCommandCore(context, table, row) {
 		let parameters = [];
@@ -13009,14 +13057,14 @@ function requireNewGetLastInsertedCommand () {
 	return newGetLastInsertedCommand_1;
 }
 
-var insert;
-var hasRequiredInsert;
+var insert$4;
+var hasRequiredInsert$5;
 
-function requireInsert () {
-	if (hasRequiredInsert) return insert;
-	hasRequiredInsert = 1;
+function requireInsert$5 () {
+	if (hasRequiredInsert$5) return insert$4;
+	hasRequiredInsert$5 = 1;
 	let newInsertCommand = requireNewInsertCommand();
-	let newInsertCommandCore = requireNewInsertCommandCore();
+	let newInsertCommandCore = requireNewInsertCommandCore$1();
 	let newGetLastInsertedCommand = requireNewGetLastInsertedCommand();
 	let executeQueries = requireExecuteQueries();
 	let pushCommand = requirePushCommand();
@@ -13035,49 +13083,48 @@ function requireInsert () {
 
 	}
 
-	insert = insertDefault;
-	return insert;
+	insert$4 = insertDefault;
+	return insert$4;
 }
 
-var newTransaction;
-var hasRequiredNewTransaction;
+var newTransaction$a;
+var hasRequiredNewTransaction$a;
 
-function requireNewTransaction () {
-	if (hasRequiredNewTransaction) return newTransaction;
-	hasRequiredNewTransaction = 1;
-	const wrapQuery = requireWrapQuery();
-	const encodeBoolean = requireEncodeBoolean();
-	const deleteFromSql = requireDeleteFromSql();
-	const selectForUpdateSql = requireSelectForUpdateSql();
-	const lastInsertedSql = requireLastInsertedSql();
-	const limitAndOffset = requireLimitAndOffset();
-	const insertSql = requireInsertSql();
-	const insert = requireInsert();
+function requireNewTransaction$a () {
+	if (hasRequiredNewTransaction$a) return newTransaction$a;
+	hasRequiredNewTransaction$a = 1;
+	const wrapQuery = requireWrapQuery$9();
+	const encodeBoolean = requireEncodeBoolean$5();
+	const deleteFromSql = requireDeleteFromSql$5();
+	const selectForUpdateSql = requireSelectForUpdateSql$5();
+	const lastInsertedSql = requireLastInsertedSql$4();
+	const limitAndOffset = requireLimitAndOffset$5();
+	const insertSql = requireInsertSql$5();
+	const insert = requireInsert$5();
+	const quote = requireQuote$5();
 
-	function newResolveTransaction(domain, pool, { readonly = false } = {})  {
+	function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 		var rdb = {poolFactory: pool};
 		if (!pool.connect) {
 			pool = pool();
 			rdb.pool = pool;
 		}
-		rdb.engine = 'sqlite';
-		rdb.maxParameters = 100;
+		rdb.engine = 'mysql';
 		rdb.encodeBoolean = encodeBoolean;
-		rdb.decodeJSON = decodeJSON;
 		rdb.encodeJSON = JSON.stringify;
 		rdb.deleteFromSql = deleteFromSql;
 		rdb.selectForUpdateSql = selectForUpdateSql;
+		rdb.lastInsertedIsSeparate = true;
 		rdb.lastInsertedSql = lastInsertedSql;
 		rdb.insertSql = insertSql;
 		rdb.insert = insert;
-		rdb.lastInsertedIsSeparate = true;
 		rdb.multipleStatements = false;
 		rdb.limitAndOffset = limitAndOffset;
 		rdb.accept = function(caller) {
-			caller.visitSqlite();
+			caller.visitMySql();
 		};
 		rdb.aggregateCount = 0;
-		rdb.quote = (name) => `"${name}"`;
+		rdb.quote = quote;
 		rdb.cache = {};
 
 		if (readonly) {
@@ -13088,7 +13135,7 @@ function requireNewTransaction () {
 							return callback(err);
 						}
 						try {
-							wrapQuery(client)(query, (err, res) => {
+							wrapQuery(domain, client)(query, (err, res) => {
 								done();
 								callback(err, res);
 							});
@@ -13112,7 +13159,7 @@ function requireNewTransaction () {
 						onError(err);
 						return;
 					}
-					client.executeQuery = wrapQuery(client);
+					client.executeQuery = wrapQuery(domain, client);
 					rdb.dbClient = client;
 					rdb.dbClientDone = done;
 					domain.rdb = rdb;
@@ -13124,12 +13171,8 @@ function requireNewTransaction () {
 		};
 	}
 
-	function decodeJSON(value) {
-		return JSON.parse(value);
-	}
-
-	newTransaction = newResolveTransaction;
-	return newTransaction;
+	newTransaction$a = newResolveTransaction;
+	return newTransaction$a;
 }
 
 var beginCommand;
@@ -13210,12 +13253,12 @@ function requirePromisify () {
 	return promisify_1;
 }
 
-var end;
-var hasRequiredEnd;
+var end$9;
+var hasRequiredEnd$9;
 
-function requireEnd () {
-	if (hasRequiredEnd) return end;
-	hasRequiredEnd = 1;
+function requireEnd$9 () {
+	if (hasRequiredEnd$9) return end$9;
+	hasRequiredEnd$9 = 1;
 	var pools = requirePools();
 
 	function endPool(genericPool, id, done) {
@@ -13228,8 +13271,8 @@ function requireEnd () {
 		}
 	}
 
-	end = endPool;
-	return end;
+	end$9 = endPool;
+	return end$9;
 }
 
 var poolDefaults;
@@ -13867,14 +13910,2950 @@ function requireGenericPool () {
 	return genericPool;
 }
 
+var newGenericPool_1$7;
+var hasRequiredNewGenericPool$7;
+
+function requireNewGenericPool$7 () {
+	if (hasRequiredNewGenericPool$7) return newGenericPool_1$7;
+	hasRequiredNewGenericPool$7 = 1;
+	// @ts-nocheck
+	/* eslint-disable no-prototype-builtins */
+	var defaults = requirePoolDefaults();
+	var genericPool = requireGenericPool();
+	var mysql;
+
+	function newGenericPool(connectionString, poolOptions) {
+		if (typeof connectionString === 'string')
+			connectionString = connectionString + '?dateStrings=true&decimalNumbers=true';
+		else
+			connectionString.dateStrings = true;
+		poolOptions = poolOptions || {};
+		var pool = genericPool.Pool({
+			max: poolOptions.size || poolOptions.poolSize || defaults.poolSize,
+			idleTimeoutMillis: poolOptions.idleTimeout || defaults.poolIdleTimeout,
+			reapIntervalMillis: poolOptions.reapIntervalMillis || defaults.reapIntervalMillis,
+			log: poolOptions.log,
+			create: async function(cb) {
+				try {
+					if(!mysql) {
+						mysql = await import('mysql2');
+						mysql = mysql.default || mysql;
+					}
+				}
+				catch(err) {
+					return cb(err, null);
+				}
+				var innerPool = mysql.createPool(connectionString);
+				return cb(null, innerPool);
+				// innerPool.getConnection(onConnected);
+
+				// function onConnected(err, client) {
+				// 	console.dir('onConnected');
+				// 	if(err)
+				// 		return cb(err, null);
+				// 	client.poolCount = 0;
+				// 	return cb(null, client);
+				// }
+			},
+
+			destroy: function(client) {
+				client.poolCount = undefined;
+				client.end();
+			}
+		});
+		//monkey-patch with connect method
+		pool.connect = function(cb) {
+			pool.acquire(function(err, client) {
+				if(err)  return cb(err, null, function() {/*NOOP*/});
+				client.poolCount++;
+				cb(null, client, function(err) {
+					if(err) {
+						pool.destroy(client);
+					} else {
+						pool.release(client);
+					}
+				});
+			});
+		};
+		return pool;
+	}
+
+	newGenericPool_1$7 = newGenericPool;
+	return newGenericPool_1$7;
+}
+
+var newPool_1$a;
+var hasRequiredNewPool$a;
+
+function requireNewPool$a () {
+	if (hasRequiredNewPool$a) return newPool_1$a;
+	hasRequiredNewPool$a = 1;
+	const promisify = requirePromisify();
+	const pools = requirePools();
+	const end = requireEnd$9();
+	const newGenericPool = requireNewGenericPool$7();
+	const newId = requireNewId();
+
+	function newPool(connectionString, poolOptions) {
+		let pool = newGenericPool(connectionString, poolOptions);
+		let id = newId();
+		let boundEnd = end.bind(null, pool, id);
+		let c = {};
+
+		c.connect = pool.connect;
+		c.end = promisify(boundEnd);
+		pools[id] = c;
+		return c;
+	}
+
+	newPool_1$a = newPool;
+	return newPool_1$a;
+}
+
+var newDatabase_1$a;
+var hasRequiredNewDatabase$a;
+
+function requireNewDatabase$a () {
+	if (hasRequiredNewDatabase$a) return newDatabase_1$a;
+	hasRequiredNewDatabase$a = 1;
+	let createDomain = requireCreateDomain();
+	let newTransaction = requireNewTransaction$a();
+	let _begin = requireBegin();
+	let commit = requireCommit();
+	let rollback = requireRollback();
+	let newPool = requireNewPool$a();
+	let express = requireHostExpress();
+	let hostLocal = requireHostLocal();
+	let doQuery = requireQuery();
+	let releaseDbClient = requireReleaseDbClient();
+	let setSessionSingleton = requireSetSessionSingleton();
+
+	function newDatabase(connectionString, poolOptions) {
+		if (!connectionString)
+			throw new Error('Connection string cannot be empty');
+		var pool;
+		if (!poolOptions)
+			pool = newPool.bind(null, connectionString, poolOptions);
+		else
+			pool = newPool(connectionString, poolOptions);
+
+		let c = { poolFactory: pool, hostLocal, express };
+
+		c.transaction = function(options, fn) {
+			if ((arguments.length === 1) && (typeof options === 'function')) {
+				fn = options;
+				options = undefined;
+			}
+			let domain = createDomain();
+
+			if (fn)
+				return domain.run(runInTransaction);
+			else
+				return domain.run(run);
+
+			async function runInTransaction() {
+				let result;
+				let transaction = newTransaction(domain, pool, options);
+				await new Promise(transaction)
+					.then(begin)
+					.then(() => fn(domain))
+					.then((res) => result = res)
+					.then(() => commit(domain))
+					.then(null, (e) => rollback(domain, e));
+				return result;
+			}
+
+			function begin() {
+				return _begin(domain, options);
+			}
+
+			function run() {
+				let p;
+				let transaction = newTransaction(domain, pool, options);
+				p = new Promise(transaction);
+
+				return p.then(begin);
+			}
+
+		};
+
+		c.createTransaction = function(options) {
+			let domain = createDomain();
+			let transaction = newTransaction(domain, pool);
+			let p = domain.run(() => new Promise(transaction).then(begin));
+
+			function run(fn) {
+				return p.then(() => fn(domain));
+			}
+			run.rollback = rollback.bind(null, domain);
+			run.commit = commit.bind(null, domain);
+			return run;
+
+			function begin() {
+				return _begin(domain, options);
+			}
+		};
+
+
+		c.query = function(query) {
+			let domain = createDomain();
+			let transaction = newTransaction(domain, pool);
+			let p = domain.run(() => new Promise(transaction)
+				.then(() => setSessionSingleton(domain, 'changes', []))
+				.then(() => doQuery(domain, query).then(onResult, onError)));
+			return p;
+
+			function onResult(result) {
+				releaseDbClient(domain);
+				return result;
+			}
+
+			function onError(e) {
+				releaseDbClient(domain);
+				throw e;
+			}
+		};
+
+
+		c.rollback = rollback;
+		c.commit = commit;
+
+		c.end = function() {
+			if (poolOptions)
+				return pool.end();
+			else
+				return Promise.resolve();
+		};
+
+		c.accept = function(caller) {
+			caller.visitMySql();
+		};
+
+		return c;
+	}
+
+	newDatabase_1$a = newDatabase;
+	return newDatabase_1$a;
+}
+
+var replaceParamChar_1$1;
+var hasRequiredReplaceParamChar$1;
+
+function requireReplaceParamChar$1 () {
+	if (hasRequiredReplaceParamChar$1) return replaceParamChar_1$1;
+	hasRequiredReplaceParamChar$1 = 1;
+	function replaceParamChar(query, params) {
+		if (params.length === 0)
+			return query.sql();
+		var splitted = query.sql().split('?');
+		var sql = '';
+		var lastIndex = splitted.length - 1;
+		for (var i = 0; i < lastIndex; i++) {
+			sql += splitted[i] + '$' + (i + 1);
+		}
+		sql += splitted[lastIndex];
+		return sql;
+	}
+
+	replaceParamChar_1$1 = replaceParamChar;
+	return replaceParamChar_1$1;
+}
+
+var wrapQuery_1$8;
+var hasRequiredWrapQuery$8;
+
+function requireWrapQuery$8 () {
+	if (hasRequiredWrapQuery$8) return wrapQuery_1$8;
+	hasRequiredWrapQuery$8 = 1;
+	const log = requireLog();
+	const replaceParamChar = requireReplaceParamChar$1();
+	const tryGetSessionContext = requireTryGetSessionContext();
+
+	function wrapQuery(context, connection) {
+		return runQuery;
+
+		async function runQuery(query, onCompleted) {
+			try {
+
+				const sql = replaceParamChar(query, query.parameters);
+				let rdb = tryGetSessionContext(context);
+				let transactionHandler = rdb.transactionHandler;
+				log.emitQuery({ sql, parameters: query.parameters });
+
+				if (sql.length < 18 && query.parameters.length === 0) {
+					if (sql === 'BEGIN TRANSACTION' || sql === 'BEGIN') {
+						if (transactionHandler)
+							return onCompleted(new Error('Already inside a transaction'), []);
+						beginTransaction(connection).then(_transactionHandler => {
+							rdb.transactionHandler = _transactionHandler;
+							onCompleted(null, []);
+						}, onCompleted);
+						return;
+					}
+					else if (sql === 'COMMIT') {
+						if (!transactionHandler)
+							return onCompleted(new Error('Cannot commit outside transaction'), []);
+						transactionHandler.resolve();
+						transactionHandler.promise.then(() => onCompleted(null, []), err => onCompleted(err, []));
+						return;
+					}
+					else if (sql === 'ROLLBACK') {
+						if (!transactionHandler)
+							return onCompleted(new Error('Cannot rollback outside transaction'), []);
+						transactionHandler.reject(new Error('__rollback__'));
+						transactionHandler.promise.then(null, (err) => {
+							if (err.message === '__rollback__')
+								onCompleted(null, []);
+							else
+								onCompleted(err, []);
+						});
+						return;
+					}
+				}
+
+				let result;
+				const _connection = transactionHandler?.tx || connection;
+				if (query.parameters.length === 0)
+					result = await _connection.unsafe(sql);
+				else
+					result = await _connection.unsafe(sql, query.parameters);
+				onCompleted(null, result);
+			}
+			catch (e) {
+				onCompleted(e);
+			}
+		}
+
+	}
+
+	function beginTransaction(connection) {
+
+		let beginIsResolved = false;
+		let resolve;
+		let reject;
+		let resolveBegin;
+		let rejectBegin;
+
+		let sqlPromise = new Promise((res, rej) => {
+			resolve = res;
+			reject = rej;
+		});
+		let beginPromise = new Promise((res,rej) => {
+			resolveBegin = res;
+			rejectBegin = rej;
+		});
+		connection.begin(async (tx) => {
+			beginIsResolved = true;
+			resolveBegin({
+				tx,
+				resolve,
+				reject,
+				promise: sqlPromise,
+			});
+			return sqlPromise;
+		}).then(null,
+			e => {
+				if (!beginIsResolved)
+					rejectBegin(e);
+				if (e?.message !== '__rollback__')
+					throw e;
+			});
+		return beginPromise;
+	}
+
+	wrapQuery_1$8 = wrapQuery;
+	return wrapQuery_1$8;
+}
+
+var encodeDate_1;
+var hasRequiredEncodeDate;
+
+function requireEncodeDate () {
+	if (hasRequiredEncodeDate) return encodeDate_1;
+	hasRequiredEncodeDate = 1;
+	function encodeDate(date) {
+		if (date.toISOString)
+			return  '\'' + date.toISOString() + '\'';
+		return '\'' + date + '\'';
+	}
+
+	encodeDate_1 = encodeDate;
+	return encodeDate_1;
+}
+
+var encodeBoolean_1$4;
+var hasRequiredEncodeBoolean$4;
+
+function requireEncodeBoolean$4 () {
+	if (hasRequiredEncodeBoolean$4) return encodeBoolean_1$4;
+	hasRequiredEncodeBoolean$4 = 1;
+	function encodeBoolean(bool) {
+		return bool.toString();
+	}
+
+	encodeBoolean_1$4 = encodeBoolean;
+	return encodeBoolean_1$4;
+}
+
+var encodeBinary_1;
+var hasRequiredEncodeBinary;
+
+function requireEncodeBinary () {
+	if (hasRequiredEncodeBinary) return encodeBinary_1;
+	hasRequiredEncodeBinary = 1;
+	function encodeBinary(base64) {
+		// Decode base64 to a binary string
+		const binaryString = atob(base64);
+
+		// Create a new Uint8Array with the same length as the binary string
+		const len = binaryString.length;
+		const bytes = new Uint8Array(len);
+
+		// Populate the Uint8Array with numeric character codes
+		for (let i = 0; i < len; i++) {
+			bytes[i] = binaryString.charCodeAt(i);
+		}
+
+		return bytes;
+	}
+
+	encodeBinary_1 = encodeBinary;
+	return encodeBinary_1;
+}
+
+var decodeBinary_1;
+var hasRequiredDecodeBinary;
+
+function requireDecodeBinary () {
+	if (hasRequiredDecodeBinary) return decodeBinary_1;
+	hasRequiredDecodeBinary = 1;
+	function decodeBinary(u8Arr) {
+		let binaryString = '';
+		for (let i = 0; i < u8Arr.length; i++) {
+			binaryString += String.fromCharCode(u8Arr[i]);
+		}
+		return btoa(binaryString);
+	}
+
+	decodeBinary_1 = decodeBinary;
+	return decodeBinary_1;
+}
+
+var quote$4;
+var hasRequiredQuote$4;
+
+function requireQuote$4 () {
+	if (hasRequiredQuote$4) return quote$4;
+	hasRequiredQuote$4 = 1;
+	quote$4 = (name) => `"${name}"`;
+	return quote$4;
+}
+
+var deleteFromSql_1$4;
+var hasRequiredDeleteFromSql$4;
+
+function requireDeleteFromSql$4 () {
+	if (hasRequiredDeleteFromSql$4) return deleteFromSql_1$4;
+	hasRequiredDeleteFromSql$4 = 1;
+	const format = 'delete from %s %s%s';
+	const formatString = requireFormat();
+	const quote = requireQuote$4();
+
+	function deleteFromSql(table, alias, whereSql) {
+		const name = quote(table._dbName);
+		alias = quote(alias);
+		return formatString(format, name, alias, whereSql);
+	}
+	deleteFromSql_1$4 = deleteFromSql;
+	return deleteFromSql_1$4;
+}
+
+var selectForUpdateSql$4;
+var hasRequiredSelectForUpdateSql$4;
+
+function requireSelectForUpdateSql$4 () {
+	if (hasRequiredSelectForUpdateSql$4) return selectForUpdateSql$4;
+	hasRequiredSelectForUpdateSql$4 = 1;
+	const quote = requireQuote$6();
+
+	selectForUpdateSql$4 = function(alias) {
+		return ' FOR UPDATE OF ' + quote(alias);
+	};
+	return selectForUpdateSql$4;
+}
+
+var limitAndOffset_1$4;
+var hasRequiredLimitAndOffset$4;
+
+function requireLimitAndOffset$4 () {
+	if (hasRequiredLimitAndOffset$4) return limitAndOffset_1$4;
+	hasRequiredLimitAndOffset$4 = 1;
+	function limitAndOffset(span) {
+		if (span.offset)
+			return ` limit ${limit()} offset ${span.offset}`;
+		else if (span.limit || span.limit === 0)
+			return ` limit ${span.limit}`;
+		else
+			return '';
+
+		function limit() {
+			if (span.limit || span.limit === 0)
+				return span.limit;
+			else
+				return 'all';
+		}
+
+	}
+
+	limitAndOffset_1$4 = limitAndOffset;
+	return limitAndOffset_1$4;
+}
+
+var formatDateOut_1$2;
+var hasRequiredFormatDateOut$3;
+
+function requireFormatDateOut$3 () {
+	if (hasRequiredFormatDateOut$3) return formatDateOut_1$2;
+	hasRequiredFormatDateOut$3 = 1;
+	function formatDateOut(column, alias) {
+		return `${alias}."${(column._dbName)}"::text`;
+	}
+
+	formatDateOut_1$2 = formatDateOut;
+	return formatDateOut_1$2;
+}
+
+var encodeJSON;
+var hasRequiredEncodeJSON;
+
+function requireEncodeJSON () {
+	if (hasRequiredEncodeJSON) return encodeJSON;
+	hasRequiredEncodeJSON = 1;
+	function encode(arg) {
+		if (Array.isArray(arg))
+			return new JsonBArrayParam(arg);
+		else
+			return arg;
+	}
+
+	class JsonBArrayParam {
+		constructor(actualArray) { this.actualArray = actualArray; }
+		toPostgres() {
+			return JSON.stringify(this.actualArray);
+		}
+	}
+
+	encodeJSON = encode;
+	return encodeJSON;
+}
+
+var lastInsertedSql_1$3;
+var hasRequiredLastInsertedSql$3;
+
+function requireLastInsertedSql$3 () {
+	if (hasRequiredLastInsertedSql$3) return lastInsertedSql_1$3;
+	hasRequiredLastInsertedSql$3 = 1;
+	const quote = requireQuote$4();
+
+	function lastInsertedSql(table) {
+		let separator = '';
+		let result = 'RETURNING ';
+		for (let i = 0; i < table._columns.length; i++) {
+			result += separator + quote(table._columns[i]._dbName);
+			separator = ',';
+		}
+		return result;
+	}
+
+	lastInsertedSql_1$3 = lastInsertedSql;
+	return lastInsertedSql_1$3;
+}
+
+var insertSql_1$4;
+var hasRequiredInsertSql$4;
+
+function requireInsertSql$4 () {
+	if (hasRequiredInsertSql$4) return insertSql_1$4;
+	hasRequiredInsertSql$4 = 1;
+	let lastInsertedSql = requireLastInsertedSql$3();
+	const quote = requireQuote$4();
+
+	function insertSql(_context, table, row, options) {
+		let columnNames = [];
+		let conflictColumnUpdateSql = '';
+		let values = [];
+		let sql = 'INSERT INTO ' + quote(table._dbName) + ' ';
+		addDiscriminators();
+		addColumns();
+		if (columnNames.length === 0)
+			sql += `${outputInserted()}DEFAULT VALUES ${lastInsertedSql(table)}`;
+		else
+			sql = sql + '(' + columnNames.join(',') + ') ' + outputInserted() + 'VALUES (' + values.join(',') + ')' + onConflict() + lastInsertedSql(table);
+		return sql;
+
+		function onConflict() {
+			if (options.concurrency === 'skipOnConflict' || options.concurrency === 'overwrite') {
+				const primaryKeys = table._primaryColumns.map(x => quote(x._dbName)).join(',');
+				return ` ON CONFLICT(${primaryKeys}) ${conflictColumnUpdateSql} `;
+			}
+			else return '';
+		}
+
+		function addDiscriminators() {
+			let discriminators = table._columnDiscriminators;
+			for (let i = 0; i < discriminators.length; i++) {
+				let parts = discriminators[i].split('=');
+				columnNames.push(quote(parts[0]));
+				values.push(parts[1]);
+			}
+		}
+
+		function addColumns() {
+			let conflictColumnUpdates = [];
+			let columns = table._columns;
+			for (let i = 0; i < columns.length; i++) {
+				let column = columns[i];
+				const columnName = quote(column._dbName);
+				if (row['__' + column.alias] !== undefined) {
+					columnNames.push(columnName);
+					values.push('%s');
+					addConflictUpdate(column);
+				}
+			}
+			if (conflictColumnUpdates.length === 0)
+				conflictColumnUpdateSql = 'DO NOTHING';
+			else
+				conflictColumnUpdateSql = 'DO UPDATE SET ' + conflictColumnUpdates.join(',');
+
+			function addConflictUpdate(column) {
+				let concurrency = options[column.alias]?.concurrency || options.concurrency;
+				const columnName = quote(column._dbName);
+				const tableName = quote(table._dbName);
+				if (concurrency === 'overwrite')
+					conflictColumnUpdates.push(`${columnName}=EXCLUDED.${columnName}`);
+				else if (concurrency === 'optimistic')
+					conflictColumnUpdates.push(`${columnName} = CASE WHEN ${tableName}.${columnName} <> EXCLUDED.${columnName} THEN CAST(random()::int || '12345678-1234-1234-1234-123456789012Conflict when updating ${columnName}12345678-1234-1234-1234-123456789012' AS INTEGER) ELSE ${tableName}.${columnName} END`);
+			}
+		}
+
+
+		function outputInserted() {
+			return '';
+		}
+	}
+
+	insertSql_1$4 = insertSql;
+	return insertSql_1$4;
+}
+
+var insert$3;
+var hasRequiredInsert$4;
+
+function requireInsert$4 () {
+	if (hasRequiredInsert$4) return insert$3;
+	hasRequiredInsert$4 = 1;
+	let newInsertCommand = requireNewInsertCommand();
+	let newInsertCommandCore = requireNewInsertCommandCore$1();
+	let executeQueries = requireExecuteQueries();
+
+
+	function insertDefault(context, table, row, options) {
+		let insertCmd = newInsertCommand(newInsertCommandCore.bind(null, context), table, row, options);
+		insertCmd.disallowCompress = true;
+
+		return executeQueries(context, [insertCmd]).then((result) => result[result.length - 1]);
+
+	}
+
+	insert$3 = insertDefault;
+	return insert$3;
+}
+
+var newTransaction$9;
+var hasRequiredNewTransaction$9;
+
+function requireNewTransaction$9 () {
+	if (hasRequiredNewTransaction$9) return newTransaction$9;
+	hasRequiredNewTransaction$9 = 1;
+	var wrapQuery = requireWrapQuery$8();
+	var encodeDate = requireEncodeDate();
+	var encodeBoolean = requireEncodeBoolean$4();
+	const encodeBinary = requireEncodeBinary();
+	const decodeBinary = requireDecodeBinary();
+	var deleteFromSql = requireDeleteFromSql$4();
+	var selectForUpdateSql = requireSelectForUpdateSql$4();
+	var limitAndOffset = requireLimitAndOffset$4();
+	var formatDateOut = requireFormatDateOut$3();
+	var encodeJSON = requireEncodeJSON();
+	var insertSql = requireInsertSql$4();
+	var insert = requireInsert$4();
+	var quote = requireQuote$4();
+
+	function newResolveTransaction(domain, pool, { readonly = false } = {}) {
+		var rdb = { poolFactory: pool };
+		if (!pool.connect) {
+			pool = pool();
+			rdb.pool = pool;
+		}
+
+		rdb.engine = 'pg';
+		rdb.encodeBoolean = encodeBoolean;
+		rdb.encodeDate = encodeDate;
+		rdb.encodeBinary = encodeBinary;
+		rdb.decodeBinary = decodeBinary;
+		rdb.encodeJSON = encodeJSON;
+		rdb.formatDateOut = formatDateOut;
+		rdb.deleteFromSql = deleteFromSql;
+		rdb.selectForUpdateSql = selectForUpdateSql;
+		rdb.lastInsertedIsSeparate = false;
+		rdb.insertSql = insertSql;
+		rdb.insert = insert;
+		rdb.multipleStatements = true;
+		rdb.limitAndOffset = limitAndOffset;
+		rdb.accept = function(caller) {
+			caller.visitPg();
+		};
+		rdb.aggregateCount = 0;
+		rdb.quote = quote;
+		rdb.cache = {};
+
+		if (readonly) {
+			rdb.dbClient = {
+				executeQuery: function(query, callback) {
+					pool.connect((err, client, done) => {
+						if (err) {
+							return callback(err);
+						}
+						try {
+							wrapQuery(domain, client)(query, (err, res) => {
+								done();
+								callback(err, res);
+							});
+						} catch (e) {
+							done();
+							callback(e);
+						}
+					});
+				}
+			};
+			domain.rdb = rdb;
+			return (onSuccess) => onSuccess();
+		}
+
+		return function(onSuccess, onError) {
+			pool.connect(onConnected);
+
+			function onConnected(err, client, done) {
+				try {
+					if (err) {
+						onError(err);
+						return;
+					}
+					client.executeQuery = wrapQuery(domain, client);
+					rdb.dbClient = client;
+					rdb.dbClientDone = done;
+					domain.rdb = rdb;
+					onSuccess();
+				} catch (e) {
+					onError(e);
+				}
+			}
+		};
+	}
+
+	newTransaction$9 = newResolveTransaction;
+	return newTransaction$9;
+}
+
+var end$8;
+var hasRequiredEnd$8;
+
+function requireEnd$8 () {
+	if (hasRequiredEnd$8) return end$8;
+	hasRequiredEnd$8 = 1;
+	var pools = requirePools();
+
+	function endPool(pgPool, id, done) {
+		pgPool.drain(onDrained);
+
+		function onDrained() {
+			pgPool.destroyAllNow();
+			delete pools[id];
+			done();
+		}
+	}
+
+	end$8 = endPool;
+	return end$8;
+}
+
+var require$$3 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(url);
+
 /* eslint-disable no-prototype-builtins */
 
-var newGenericPool_1;
-var hasRequiredNewGenericPool;
+var newPgPool_1$1;
+var hasRequiredNewPgPool$1;
 
-function requireNewGenericPool () {
-	if (hasRequiredNewGenericPool) return newGenericPool_1;
-	hasRequiredNewGenericPool = 1;
+function requireNewPgPool$1 () {
+	if (hasRequiredNewPgPool$1) return newPgPool_1$1;
+	hasRequiredNewPgPool$1 = 1;
+	// Simplified pool creator using URL API and handling search_path param
+
+	const log = requireLog();
+	const defaults = requirePoolDefaults();
+	const genericPool = requireGenericPool();
+	const { URL } = require$$3;
+	let SQL;
+
+	function newPgPool(connectionString, poolOptions = {}) {
+		let searchPath;
+		let connStr = connectionString;
+
+		try {
+			const url = new URL(connectionString);
+			const paramName = url.searchParams.has('search_path')
+				? 'search_path'
+				: url.searchParams.has('searchPath')
+					? 'searchPath'
+					: null;
+			if (paramName) {
+				searchPath = url.searchParams.get(paramName);
+				url.searchParams.delete(paramName);
+				connStr = url.toString();
+			}
+		} catch {
+			// Non-URL string; leave as-is
+		}
+
+		//@ts-ignore
+		const pool = genericPool.Pool({
+			max: poolOptions.size || poolOptions.poolSize || defaults.poolSize,
+			idleTimeoutMillis: poolOptions.idleTimeout || defaults.poolIdleTimeout,
+			reapIntervalMillis: poolOptions.reapIntervalMillis || defaults.reapIntervalMillis,
+			log: poolOptions.log,
+
+			create: async (cb) => {
+				try {
+					if (!SQL) ({ SQL } = await import('bun'));
+					const client = new SQL(connStr);
+					client.poolCount = 0;
+					await applySearchPath(client, searchPath);
+					cb(null, client);
+				} catch (err) {
+					cb(err, null);
+				}
+			},
+
+			destroy: (client) => {
+				client._destroying = true;
+				client.poolCount = undefined;
+				client.end();
+			},
+		});
+
+		pool.connect = (cb) => {
+			pool.acquire((err, client) => {
+				if (err) return cb(err, null, () => {});
+				client.poolCount++;
+				cb(null, client, (releaseErr) => {
+					releaseErr ? pool.destroy(client) : pool.release(client);
+				});
+			});
+		};
+
+		return pool;
+	}
+
+	async function applySearchPath(client, searchPath) {
+		if (searchPath) {
+			const sql = `SET search_path TO ${searchPath}`;
+			log.emitQuery({ sql, parameters: [] });
+			await client.unsafe(sql);
+		}
+	}
+
+	newPgPool_1$1 = newPgPool;
+	return newPgPool_1$1;
+}
+
+var newPool_1$9;
+var hasRequiredNewPool$9;
+
+function requireNewPool$9 () {
+	if (hasRequiredNewPool$9) return newPool_1$9;
+	hasRequiredNewPool$9 = 1;
+	const promisify = requirePromisify();
+	const pools = requirePools();
+	const end = requireEnd$8();
+	const newPgPool = requireNewPgPool$1();
+	const newId = requireNewId();
+
+	function newPool(connectionString, poolOptions) {
+		let pool = newPgPool(connectionString, poolOptions);
+		let id = newId();
+		let boundEnd = end.bind(null, pool, id);
+		let c = {};
+
+		c.connect = pool.connect;
+		c.end = promisify(boundEnd);
+		pools[id] = c;
+		return c;
+	}
+
+	newPool_1$9 = newPool;
+	return newPool_1$9;
+}
+
+var newDatabase_1$9;
+var hasRequiredNewDatabase$9;
+
+function requireNewDatabase$9 () {
+	if (hasRequiredNewDatabase$9) return newDatabase_1$9;
+	hasRequiredNewDatabase$9 = 1;
+	let createDomain = requireCreateDomain();
+	let newTransaction = requireNewTransaction$9();
+	let _begin = requireBegin();
+	let commit = requireCommit();
+	let rollback = requireRollback();
+	let newPool = requireNewPool$9();
+	let lock = requireLock();
+	let executeSchema = requireSchema();
+	let express = requireHostExpress();
+	let hostLocal = requireHostLocal();
+	let doQuery = requireQuery();
+	let releaseDbClient = requireReleaseDbClient();
+	let setSessionSingleton = requireSetSessionSingleton();
+
+	function newDatabase(connectionString, poolOptions) {
+		if (!connectionString)
+			throw new Error('Connection string cannot be empty');
+		var pool;
+		if (!poolOptions)
+			pool = newPool.bind(null, connectionString, poolOptions);
+		else
+			pool = newPool(connectionString, poolOptions);
+
+		let c = { poolFactory: pool, hostLocal, express };
+
+		c.transaction = function(options, fn) {
+			if ((arguments.length === 1) && (typeof options === 'function')) {
+				fn = options;
+				options = undefined;
+			}
+			let domain = createDomain();
+
+			if (fn)
+				return domain.run(runInTransaction);
+			else
+				return domain.run(run);
+
+			async function runInTransaction() {
+				let result;
+				let transaction = newTransaction(domain, pool, options);
+				await new Promise(transaction)
+					.then(begin)
+					.then(negotiateSchema)
+					.then(() => fn(domain))
+					.then((res) => result = res)
+					.then(() => commit(domain))
+					.then(null, (e) => rollback(domain,e));
+				return result;
+			}
+
+			function begin() {
+				return _begin(domain, options);
+			}
+
+			function run() {
+				let p;
+				let transaction = newTransaction(domain, pool, options);
+				p = new Promise(transaction);
+
+				return p.then(begin)
+					.then(negotiateSchema);
+			}
+
+			function negotiateSchema(previous) {
+				let schema = options && options.schema;
+				if (!schema)
+					return previous;
+				return executeSchema(domain, schema);
+			}
+		};
+
+		c.createTransaction = function(options) {
+			let domain = createDomain();
+			let transaction = newTransaction(domain, pool, options);
+			let p = domain.run(() => new Promise(transaction)
+				.then(begin).then(negotiateSchema));
+
+			function run(fn) {
+				return p.then(domain.run.bind(domain, fn));
+			}
+
+			function begin() {
+				return _begin(domain, options);
+			}
+
+			function negotiateSchema(previous) {
+				let schema = options && options.schema;
+				if (!schema)
+					return previous;
+				return executeSchema(domain,schema);
+			}
+
+			run.rollback = rollback.bind(null, domain);
+			run.commit = commit.bind(null, domain);
+
+			return run;
+		};
+
+		c.query = function(query) {
+			let domain = createDomain();
+			let transaction = newTransaction(domain, pool);
+			let p = domain.run(() => new Promise(transaction)
+				.then(() => setSessionSingleton(domain, 'changes', []))
+				.then(() => doQuery(domain, query).then(onResult, onError)));
+			return p;
+
+			function onResult(result) {
+				releaseDbClient(domain);
+				return result;
+			}
+
+			function onError(e) {
+				releaseDbClient(domain);
+				throw e;
+			}
+		};
+
+		c.rollback = rollback;
+		c.commit = commit;
+		c.lock = lock;
+		c.schema = executeSchema;
+
+		c.end = function() {
+			if (poolOptions)
+				return pool.end();
+			else
+				return Promise.resolve();
+		};
+
+		c.accept = function(caller) {
+			caller.visitPg();
+		};
+
+		return c;
+	}
+
+	newDatabase_1$9 = newDatabase;
+	return newDatabase_1$9;
+}
+
+var wrapQuery_1$7;
+var hasRequiredWrapQuery$7;
+
+function requireWrapQuery$7 () {
+	if (hasRequiredWrapQuery$7) return wrapQuery_1$7;
+	hasRequiredWrapQuery$7 = 1;
+	var log = requireLog();
+	var replaceParamChar = requireReplaceParamChar$1();
+
+	function wrapQuery(_context, connection) {
+		var runOriginalQuery = connection.query;
+		return runQuery;
+
+		function runQuery(query, onCompleted) {
+			var params = query.parameters;
+			var sql = replaceParamChar(query, params);
+			query = {
+				text: sql,
+				values: params,
+				types: query.types
+			};
+			log.emitQuery({sql, parameters: params});
+
+			runOriginalQuery.call(connection, query, onInnerCompleted);
+
+			function onInnerCompleted(err, result) {
+				if (err)
+					onCompleted(err);
+				else {
+					if (Array.isArray(result))
+						result = result[result.length-1];
+					onCompleted(null, result.rows);
+				}
+			}
+		}
+
+	}
+
+	wrapQuery_1$7 = wrapQuery;
+	return wrapQuery_1$7;
+}
+
+var newTransaction$8;
+var hasRequiredNewTransaction$8;
+
+function requireNewTransaction$8 () {
+	if (hasRequiredNewTransaction$8) return newTransaction$8;
+	hasRequiredNewTransaction$8 = 1;
+	var wrapQuery = requireWrapQuery$7();
+	var encodeDate = requireEncodeDate();
+	var encodeBoolean = requireEncodeBoolean$4();
+	var deleteFromSql = requireDeleteFromSql$4();
+	var selectForUpdateSql = requireSelectForUpdateSql$4();
+	var limitAndOffset = requireLimitAndOffset$4();
+	var formatDateOut = requireFormatDateOut$3();
+	var encodeJSON = requireEncodeJSON();
+	var insertSql = requireInsertSql$4();
+	var insert = requireInsert$4();
+	var quote = requireQuote$4();
+
+	function newResolveTransaction(domain, pool, { readonly = false } = {}) {
+		var rdb = { poolFactory: pool };
+		if (!pool.connect) {
+			pool = pool();
+			rdb.pool = pool;
+		}
+
+		rdb.engine = 'pg';
+		rdb.encodeBoolean = encodeBoolean;
+		rdb.encodeDate = encodeDate;
+		rdb.encodeJSON = encodeJSON;
+		rdb.formatDateOut = formatDateOut;
+		rdb.deleteFromSql = deleteFromSql;
+		rdb.selectForUpdateSql = selectForUpdateSql;
+		rdb.lastInsertedIsSeparate = false;
+		rdb.insertSql = insertSql;
+		rdb.insert = insert;
+		rdb.multipleStatements = true;
+		rdb.limitAndOffset = limitAndOffset;
+		rdb.accept = function(caller) {
+			caller.visitPg();
+		};
+		rdb.aggregateCount = 0;
+		rdb.quote = quote;
+		rdb.cache = {};
+
+		if (readonly) {
+			rdb.dbClient = {
+				executeQuery: function(query, callback) {
+					pool.connect((err, client, done) => {
+						if (err) {
+							return callback(err);
+						}
+						try {
+							wrapQuery(domain, client)(query, (err, res) => {
+								done();
+								callback(err, res);
+							});
+						} catch (e) {
+							done();
+							callback(e);
+						}
+					});
+				}
+			};
+			domain.rdb = rdb;
+			return (onSuccess) => onSuccess();
+		}
+
+		return function(onSuccess, onError) {
+			pool.connect(onConnected);
+
+			function onConnected(err, client, done) {
+				try {
+					if (err) {
+						onError(err);
+						return;
+					}
+					client.executeQuery = wrapQuery(domain, client);
+					rdb.dbClient = client;
+					rdb.dbClientDone = done;
+					domain.rdb = rdb;
+					onSuccess();
+				} catch (e) {
+					onError(e);
+				}
+			}
+		};
+	}
+
+	newTransaction$8 = newResolveTransaction;
+	return newTransaction$8;
+}
+
+var end$7;
+var hasRequiredEnd$7;
+
+function requireEnd$7 () {
+	if (hasRequiredEnd$7) return end$7;
+	hasRequiredEnd$7 = 1;
+	var pools = requirePools();
+
+	function endPool(pgPool, id, done) {
+		pgPool.drain(onDrained);
+
+		function onDrained() {
+			pgPool.destroyAllNow();
+			delete pools[id];
+			done();
+		}
+	}
+
+	end$7 = endPool;
+	return end$7;
+}
+
+var parseSearchPathParam_1;
+var hasRequiredParseSearchPathParam;
+
+function requireParseSearchPathParam () {
+	if (hasRequiredParseSearchPathParam) return parseSearchPathParam_1;
+	hasRequiredParseSearchPathParam = 1;
+	function parseSearchPathParam(connectionString = '') {
+		const [, queryString] = connectionString.split('?');
+		if (!queryString)
+			return;
+		const params = new URLSearchParams(queryString);
+		const searchPath = params.get('search_path');
+		return searchPath;
+	}
+
+	parseSearchPathParam_1 = parseSearchPathParam;
+	return parseSearchPathParam_1;
+}
+
+/* eslint-disable no-prototype-builtins */
+
+var newPgPool_1;
+var hasRequiredNewPgPool;
+
+function requireNewPgPool () {
+	if (hasRequiredNewPgPool) return newPgPool_1;
+	hasRequiredNewPgPool = 1;
+	//slightly modified code from github.com/brianc/node-postgres
+	var log = requireLog();
+
+	var defaults = requirePoolDefaults();
+	var genericPool = requireGenericPool();
+	var pg;
+	var parseSearchPathParam = requireParseSearchPathParam();
+
+	function newPgPool(connectionString, poolOptions) {
+		poolOptions = poolOptions || {};
+
+		// @ts-ignore
+		var pool = genericPool.Pool({
+			max: poolOptions.size || poolOptions.poolSize || defaults.poolSize,
+			idleTimeoutMillis: poolOptions.idleTimeout || defaults.poolIdleTimeout,
+			reapIntervalMillis: poolOptions.reapIntervalMillis || defaults.reapIntervalMillis,
+			log: poolOptions.log,
+			create: async function(cb) {
+				try {
+					if (!pg) {
+						pg = await import('pg');
+						pg  = pg.default || pg;
+						let types = pg.types || pg.types;
+						types.setTypeParser(1700, function(val) {
+							return parseFloat(val);
+						});
+					}
+				}
+				catch(e) {
+					return cb(e, null);
+				}
+				var client = new pg.Client(connectionString);
+				client.connect(function(err) {
+					if (err) return cb(err, null);
+
+					//handle connected client background errors by emitting event
+					//via the pg object and then removing errored client from the pool
+					client.on('error', function(e) {
+						pool.emit('error', e, client);
+
+						// If the client is already being destroyed, the error
+						// occurred during stream ending. Do not attempt to destroy
+						// the client again.
+						if (!client._destroying) {
+							pool.destroy(client);
+						}
+					});
+
+					// Remove connection from pool on disconnect
+					client.on('end', function(_e) {
+						// Do not enter infinite loop between pool.destroy
+						// and client 'end' event...
+						if (!client._destroying) {
+							pool.destroy(client);
+						}
+					});
+					client.poolCount = 0;
+					negotiateSearchPath(client, connectionString, (err) => cb(err, client));
+
+				});
+			},
+			destroy: function(client) {
+				client._destroying = true;
+				client.poolCount = undefined;
+				client.end();
+			}
+		});
+		//monkey-patch with connect method
+		pool.connect = function(cb) {
+			pool.acquire(function(err, client) {
+				if (err) return cb(err, null, function() {
+					/*NOOP*/
+				});
+				client.poolCount++;
+				cb(null, client, function(err) {
+					if (err) {
+						pool.destroy(client);
+					} else {
+						pool.release(client);
+					}
+				});
+			});
+		};
+		return pool;
+	}
+
+	function negotiateSearchPath(client, connectionString, cb) {
+		const searchPath = parseSearchPathParam(connectionString);
+		if (searchPath) {
+			const sql = `set search_path to ${searchPath}`;
+			log.emitQuery({sql, parameters: []});
+			return client.query(sql, cb);
+		}
+		else
+			cb();
+
+
+	}
+
+	newPgPool_1 = newPgPool;
+	return newPgPool_1;
+}
+
+var newPool_1$8;
+var hasRequiredNewPool$8;
+
+function requireNewPool$8 () {
+	if (hasRequiredNewPool$8) return newPool_1$8;
+	hasRequiredNewPool$8 = 1;
+	const promisify = requirePromisify();
+	const pools = requirePools();
+	const end = requireEnd$7();
+	const newPgPool = requireNewPgPool();
+	const newId = requireNewId();
+
+	function newPool(connectionString, poolOptions) {
+		let pool = newPgPool(connectionString, poolOptions);
+		let id = newId();
+		let boundEnd = end.bind(null, pool, id);
+		let c = {};
+
+		c.connect = pool.connect;
+		c.end = promisify(boundEnd);
+		pools[id] = c;
+		return c;
+	}
+
+	newPool_1$8 = newPool;
+	return newPool_1$8;
+}
+
+var newDatabase_1$8;
+var hasRequiredNewDatabase$8;
+
+function requireNewDatabase$8 () {
+	if (hasRequiredNewDatabase$8) return newDatabase_1$8;
+	hasRequiredNewDatabase$8 = 1;
+	let createDomain = requireCreateDomain();
+	let newTransaction = requireNewTransaction$8();
+	let _begin = requireBegin();
+	let commit = requireCommit();
+	let rollback = requireRollback();
+	let newPool = requireNewPool$8();
+	let lock = requireLock();
+	let executeSchema = requireSchema();
+	let express = requireHostExpress();
+	let hostLocal = requireHostLocal();
+	let doQuery = requireQuery();
+	let releaseDbClient = requireReleaseDbClient();
+	let setSessionSingleton = requireSetSessionSingleton();
+
+	function newDatabase(connectionString, poolOptions) {
+		if (!connectionString)
+			throw new Error('Connection string cannot be empty');
+		var pool;
+		if (!poolOptions)
+			pool = newPool.bind(null, connectionString, poolOptions);
+		else
+			pool = newPool(connectionString, poolOptions);
+
+		let c = { poolFactory: pool, hostLocal, express };
+
+		c.transaction = function(options, fn) {
+			if ((arguments.length === 1) && (typeof options === 'function')) {
+				fn = options;
+				options = undefined;
+			}
+			let domain = createDomain();
+
+			if (fn)
+				return domain.run(runInTransaction);
+			else
+				return domain.run(run);
+
+			async function runInTransaction() {
+				let result;
+				let transaction = newTransaction(domain, pool, options);
+				await new Promise(transaction)
+					.then(begin)
+					.then(negotiateSchema)
+					.then(() => fn(domain))
+					.then((res) => result = res)
+					.then(() => commit(domain))
+					.then(null, (e) => rollback(domain,e));
+				return result;
+			}
+
+			function begin() {
+				return _begin(domain, options);
+			}
+
+			function run() {
+				let p;
+				let transaction = newTransaction(domain, pool, options);
+				p = new Promise(transaction);
+
+				return p.then(begin)
+					.then(negotiateSchema);
+			}
+
+			function negotiateSchema(previous) {
+				let schema = options && options.schema;
+				if (!schema)
+					return previous;
+				return executeSchema(domain, schema);
+			}
+		};
+
+		c.createTransaction = function(options) {
+			let domain = createDomain();
+			let transaction = newTransaction(domain, pool, options);
+			let p = domain.run(() => new Promise(transaction)
+				.then(begin).then(negotiateSchema));
+
+			function run(fn) {
+				return p.then(domain.run.bind(domain, fn));
+			}
+
+			function begin() {
+				return _begin(domain, options);
+			}
+
+			function negotiateSchema(previous) {
+				let schema = options && options.schema;
+				if (!schema)
+					return previous;
+				return executeSchema(domain,schema);
+			}
+
+			run.rollback = rollback.bind(null, domain);
+			run.commit = commit.bind(null, domain);
+
+			return run;
+		};
+
+		c.query = function(query) {
+			let domain = createDomain();
+			let transaction = newTransaction(domain, pool);
+			let p = domain.run(() => new Promise(transaction)
+				.then(() => setSessionSingleton(domain, 'changes', []))
+				.then(() => doQuery(domain, query).then(onResult, onError)));
+			return p;
+
+			function onResult(result) {
+				releaseDbClient(domain);
+				return result;
+			}
+
+			function onError(e) {
+				releaseDbClient(domain);
+				throw e;
+			}
+		};
+
+		c.rollback = rollback;
+		c.commit = commit;
+		c.lock = lock;
+		c.schema = executeSchema;
+
+		c.end = function() {
+			if (poolOptions)
+				return pool.end();
+			else
+				return Promise.resolve();
+		};
+
+		c.accept = function(caller) {
+			caller.visitPg();
+		};
+
+		return c;
+	}
+
+	newDatabase_1$8 = newDatabase;
+	return newDatabase_1$8;
+}
+
+var wrapQuery_1$6;
+var hasRequiredWrapQuery$6;
+
+function requireWrapQuery$6 () {
+	if (hasRequiredWrapQuery$6) return wrapQuery_1$6;
+	hasRequiredWrapQuery$6 = 1;
+	var log = requireLog();
+
+	function wrapQuery(_context, connection) {
+		return runQuery;
+
+		function runQuery(query, onCompleted) {
+			try {
+				var params = query.parameters;
+				var sql = query.sql();
+				log.emitQuery({ sql, parameters: params });
+
+				var statement = connection.prepare(sql);
+				const rows = statement.all.apply(statement, params);
+				onCompleted(null, rows);
+			}
+			catch (e) {
+				onCompleted(e);
+			}
+		}
+
+	}
+
+	wrapQuery_1$6 = wrapQuery;
+	return wrapQuery_1$6;
+}
+
+var encodeBoolean_1$3;
+var hasRequiredEncodeBoolean$3;
+
+function requireEncodeBoolean$3 () {
+	if (hasRequiredEncodeBoolean$3) return encodeBoolean_1$3;
+	hasRequiredEncodeBoolean$3 = 1;
+	function encodeBoolean(bool) {
+		if (bool)
+			return 1;
+		return 0;
+	}
+
+	encodeBoolean_1$3 = encodeBoolean;
+	return encodeBoolean_1$3;
+}
+
+var quote$3;
+var hasRequiredQuote$3;
+
+function requireQuote$3 () {
+	if (hasRequiredQuote$3) return quote$3;
+	hasRequiredQuote$3 = 1;
+	quote$3 = (name) => `"${name}"`;
+	return quote$3;
+}
+
+var deleteFromSql_1$3;
+var hasRequiredDeleteFromSql$3;
+
+function requireDeleteFromSql$3 () {
+	if (hasRequiredDeleteFromSql$3) return deleteFromSql_1$3;
+	hasRequiredDeleteFromSql$3 = 1;
+	const format = 'delete from %s where %s.rowId in (SELECT %s.rowId FROM %s %s%s)';
+	const formatString = requireFormat();
+	const quote = requireQuote$3();
+
+	function deleteFromSql(table, alias, whereSql) {
+		const name = quote(table._dbName);
+		alias = quote(alias);
+		return formatString(format, name, name, alias, name, alias, whereSql);
+	}
+	deleteFromSql_1$3 = deleteFromSql;
+	return deleteFromSql_1$3;
+}
+
+var selectForUpdateSql$3;
+var hasRequiredSelectForUpdateSql$3;
+
+function requireSelectForUpdateSql$3 () {
+	if (hasRequiredSelectForUpdateSql$3) return selectForUpdateSql$3;
+	hasRequiredSelectForUpdateSql$3 = 1;
+	const quote = requireQuote$6();
+
+	selectForUpdateSql$3 = function(alias) {
+		return ' FOR UPDATE OF ' + quote(alias);
+	};
+	return selectForUpdateSql$3;
+}
+
+var lastInsertedSql_1$2;
+var hasRequiredLastInsertedSql$2;
+
+function requireLastInsertedSql$2 () {
+	if (hasRequiredLastInsertedSql$2) return lastInsertedSql_1$2;
+	hasRequiredLastInsertedSql$2 = 1;
+	function lastInsertedSql(context, table, keyValues) {
+		return keyValues.map((value,i) => {
+			let column = table._primaryColumns[i];
+			if (value === undefined && column.tsType === 'NumberColumn')
+				return 'rowid IN (select last_insert_rowid())';
+			else
+				return column.eq(context, value);
+		});
+
+	}
+
+	lastInsertedSql_1$2 = lastInsertedSql;
+	return lastInsertedSql_1$2;
+}
+
+var limitAndOffset_1$3;
+var hasRequiredLimitAndOffset$3;
+
+function requireLimitAndOffset$3 () {
+	if (hasRequiredLimitAndOffset$3) return limitAndOffset_1$3;
+	hasRequiredLimitAndOffset$3 = 1;
+	function limitAndOffset(span) {
+		if (span.offset)
+			return ` limit ${limit()} offset ${span.offset}`;
+		else if (span.limit || span.limit === 0)
+			return ` limit ${span.limit}`;
+		else
+			return '';
+
+		function limit() {
+			if (span.limit || span.limit === 0)
+				return span.limit;
+			else
+				return '-1';
+		}
+
+	}
+
+	limitAndOffset_1$3 = limitAndOffset;
+	return limitAndOffset_1$3;
+}
+
+var insertSql_1$3;
+var hasRequiredInsertSql$3;
+
+function requireInsertSql$3 () {
+	if (hasRequiredInsertSql$3) return insertSql_1$3;
+	hasRequiredInsertSql$3 = 1;
+	const quote = requireQuote$3();
+
+	function insertSql(_context, table, row, options) {
+		let columnNames = [];
+		let conflictColumnUpdateSql = '';
+		let values = [];
+
+		let sql = 'INSERT INTO ' + quote(table._dbName) + ' ';
+		addDiscriminators();
+		addColumns();
+
+		if (columnNames.length === 0) {
+			sql += 'DEFAULT VALUES';
+		} else {
+			sql = sql + '(' + columnNames.join(',') + ') ' + 'VALUES (' + values.join(',') + ')' + onConflict();
+		}
+
+		return sql;
+
+		function onConflict() {
+			if (options.concurrency === 'skipOnConflict' || options.concurrency === 'overwrite') {
+				const primaryKeys = table._primaryColumns.map(x => quote(x._dbName)).join(',');
+				return ` ON CONFLICT(${primaryKeys}) ${conflictColumnUpdateSql}`;
+			} else {
+				return '';
+			}
+		}
+
+		function addDiscriminators() {
+			let discriminators = table._columnDiscriminators;
+			for (let i = 0; i < discriminators.length; i++) {
+				let parts = discriminators[i].split('=');
+				columnNames.push(quote(parts[0]));
+				values.push(parts[1]);
+			}
+		}
+
+		function addColumns() {
+			let conflictColumnUpdates = [];
+			let columns = table._columns;
+			for (let i = 0; i < columns.length; i++) {
+				let column = columns[i];
+				const columnName = quote(column._dbName);
+				if (row['__' + column.alias] !== undefined) {
+					columnNames.push(columnName);
+					values.push('%s');
+					addConflictUpdate(column);
+				}
+			}
+			if (conflictColumnUpdates.length === 0)
+				conflictColumnUpdateSql =  'DO NOTHING';
+			else
+				conflictColumnUpdateSql = 'DO UPDATE SET ' + conflictColumnUpdates.join(',');
+
+			function addConflictUpdate(column) {
+				let concurrency = options[column.alias]?.concurrency || options.concurrency;
+				const tableName = table._dbName;
+				const columnName = quote(column._dbName);
+				if (concurrency === 'overwrite') {
+					conflictColumnUpdates.push(`${columnName}=excluded.${columnName}`);
+				} else if (concurrency === 'optimistic')
+					conflictColumnUpdates.push(`${columnName} = CASE WHEN ${tableName}.${columnName} <> excluded.${columnName} THEN '12345678-1234-1234-1234-123456789012Conflict when updating ${columnName}12345678-1234-1234-1234-123456789012' ELSE ${tableName}.${columnName} END`);
+			}
+		}
+	}
+
+	insertSql_1$3 = insertSql;
+	return insertSql_1$3;
+}
+
+var insert$2;
+var hasRequiredInsert$3;
+
+function requireInsert$3 () {
+	if (hasRequiredInsert$3) return insert$2;
+	hasRequiredInsert$3 = 1;
+	let newInsertCommand = requireNewInsertCommand();
+	let newInsertCommandCore = requireNewInsertCommandCore$1();
+	let newGetLastInsertedCommand = requireNewGetLastInsertedCommand();
+	let executeQueries = requireExecuteQueries();
+	let pushCommand = requirePushCommand();
+
+
+	function insertDefault(context, table, row, options) {
+		let commands = [];
+		let insertCmd = newInsertCommand(newInsertCommandCore.bind(null, context), table, row, options);
+		insertCmd.disallowCompress = true;
+		pushCommand(context, insertCmd);
+
+		let selectCmd = newGetLastInsertedCommand(context, table, row, insertCmd);
+		commands.push(selectCmd);
+
+		return executeQueries(context, commands).then((result) => result[result.length - 1]);
+
+	}
+
+	insert$2 = insertDefault;
+	return insert$2;
+}
+
+var newTransaction$7;
+var hasRequiredNewTransaction$7;
+
+function requireNewTransaction$7 () {
+	if (hasRequiredNewTransaction$7) return newTransaction$7;
+	hasRequiredNewTransaction$7 = 1;
+	const wrapQuery = requireWrapQuery$6();
+	const encodeBoolean = requireEncodeBoolean$3();
+	const encodeBinary = requireEncodeBinary();
+	const decodeBinary = requireDecodeBinary();
+	const deleteFromSql = requireDeleteFromSql$3();
+	const selectForUpdateSql = requireSelectForUpdateSql$3();
+	const lastInsertedSql = requireLastInsertedSql$2();
+	const limitAndOffset = requireLimitAndOffset$3();
+	const insertSql = requireInsertSql$3();
+	const insert = requireInsert$3();
+	const quote = requireQuote$3();
+
+	function newResolveTransaction(domain, pool, { readonly = false } = {})  {
+		var rdb = {poolFactory: pool};
+		if (!pool.connect) {
+			pool = pool();
+			rdb.pool = pool;
+		}
+		rdb.engine = 'sqlite';
+		rdb.encodeBoolean = encodeBoolean;
+		rdb.encodeBinary = encodeBinary;
+		rdb.decodeBinary = decodeBinary;
+		rdb.decodeJSON = decodeJSON;
+		rdb.encodeJSON = JSON.stringify;
+		rdb.deleteFromSql = deleteFromSql;
+		rdb.selectForUpdateSql = selectForUpdateSql;
+		rdb.lastInsertedSql = lastInsertedSql;
+		rdb.insertSql = insertSql;
+		rdb.insert = insert;
+		rdb.lastInsertedIsSeparate = true;
+		rdb.multipleStatements = false;
+		rdb.limitAndOffset = limitAndOffset;
+		rdb.accept = function(caller) {
+			caller.visitSqlite();
+		};
+		rdb.aggregateCount = 0;
+		rdb.quote = quote;
+		rdb.cache = {};
+
+		if (readonly) {
+			rdb.dbClient = {
+				executeQuery: function(query, callback) {
+					pool.connect((err, client, done) => {
+						if (err) {
+							return callback(err);
+						}
+						try {
+							wrapQuery(domain, client)(query, (err, res) => {
+								done();
+								callback(err, res);
+							});
+						} catch (e) {
+							done();
+							callback(e);
+						}
+					});
+				}
+			};
+			domain.rdb = rdb;
+			return (onSuccess) => onSuccess();
+		}
+
+		return function(onSuccess, onError) {
+			pool.connect(onConnected);
+
+			function onConnected(err, client, done) {
+				try {
+					if (err) {
+						onError(err);
+						return;
+					}
+					client.executeQuery = wrapQuery(domain, client);
+					rdb.dbClient = client;
+					rdb.dbClientDone = done;
+					domain.rdb = rdb;
+					onSuccess();
+				} catch (e) {
+					onError(e);
+				}
+			}
+		};
+	}
+
+	function decodeJSON(value) {
+		return JSON.parse(value);
+	}
+
+	newTransaction$7 = newResolveTransaction;
+	return newTransaction$7;
+}
+
+var end$6;
+var hasRequiredEnd$6;
+
+function requireEnd$6 () {
+	if (hasRequiredEnd$6) return end$6;
+	hasRequiredEnd$6 = 1;
+	var pools = requirePools();
+
+	function endPool(genericPool, id, done) {
+		genericPool.drain(onDrained);
+
+		function onDrained() {
+			genericPool.destroyAllNow();
+			delete pools[id];
+			done();
+		}
+	}
+
+	end$6 = endPool;
+	return end$6;
+}
+
+/* eslint-disable no-prototype-builtins */
+
+var newGenericPool_1$6;
+var hasRequiredNewGenericPool$6;
+
+function requireNewGenericPool$6 () {
+	if (hasRequiredNewGenericPool$6) return newGenericPool_1$6;
+	hasRequiredNewGenericPool$6 = 1;
+	var defaults = requirePoolDefaults();
+
+	var genericPool = requireGenericPool();
+	var sqlite;
+
+	function newGenericPool(connectionString, poolOptions) {
+
+		poolOptions = poolOptions || {};
+		var pool = genericPool.Pool({
+			max: poolOptions.size || poolOptions.poolSize || defaults.poolSize,
+			idleTimeoutMillis: poolOptions.idleTimeout || defaults.poolIdleTimeout,
+			reapIntervalMillis: poolOptions.reapIntervalMillis || defaults.reapIntervalMillis,
+			log: poolOptions.log || defaults.poolLog,
+			create: async function(cb) {
+				try {
+					if (!sqlite)
+						sqlite = await import('node:sqlite');
+					var client = new sqlite.DatabaseSync(connectionString);
+					client.poolCount = 0;
+					cb(null, client);
+				}
+				catch(err) {
+					return cb(err, null);
+				}
+			},
+
+			destroy: function(client) {
+				client.poolCount = undefined;
+				client.close();
+			}
+		});
+		//monkey-patch with connect method
+		pool.connect = function(cb) {
+			pool.acquire(function(err, client) {
+				if(err)  return cb(err, null, function() {/*NOOP*/});
+				client.poolCount++;
+				cb(null, client, function(err) {
+					if(err) {
+						pool.destroy(client);
+					} else {
+						pool.release(client);
+					}
+				});
+			});
+		};
+		return pool;
+	}
+
+	newGenericPool_1$6 = newGenericPool;
+	return newGenericPool_1$6;
+}
+
+var newPool_1$7;
+var hasRequiredNewPool$7;
+
+function requireNewPool$7 () {
+	if (hasRequiredNewPool$7) return newPool_1$7;
+	hasRequiredNewPool$7 = 1;
+	const promisify = requirePromisify();
+	const pools = requirePools();
+	const end = requireEnd$6();
+	const newGenericPool = requireNewGenericPool$6();
+	const newId = requireNewId();
+
+	function newPool(connectionString, poolOptions) {
+		let pool = newGenericPool(connectionString, poolOptions);
+		let id = newId();
+		let boundEnd = end.bind(null, pool, id);
+		let c = {};
+
+		c.connect = pool.connect;
+		c.end = promisify(boundEnd);
+		pools[id] = c;
+		return c;
+	}
+
+	newPool_1$7 = newPool;
+	return newPool_1$7;
+}
+
+var newDatabase_1$7;
+var hasRequiredNewDatabase$7;
+
+function requireNewDatabase$7 () {
+	if (hasRequiredNewDatabase$7) return newDatabase_1$7;
+	hasRequiredNewDatabase$7 = 1;
+	let createDomain = requireCreateDomain();
+	let newTransaction = requireNewTransaction$7();
+	let _begin = requireBegin();
+	let commit = requireCommit();
+	let rollback = requireRollback();
+	let newPool = requireNewPool$7();
+	let express = requireHostExpress();
+	let hostLocal = requireHostLocal();
+	let doQuery = requireQuery();
+	let releaseDbClient = requireReleaseDbClient();
+	let setSessionSingleton = requireSetSessionSingleton();
+
+	function newDatabase(connectionString, poolOptions) {
+		if (!connectionString)
+			throw new Error('Connection string cannot be empty');
+		var pool;
+		if (!poolOptions)
+			pool = newPool.bind(null,connectionString, poolOptions);
+		else
+			pool = newPool(connectionString, poolOptions);
+
+		let c = {poolFactory: pool, hostLocal, express};
+
+		c.transaction = function(options, fn) {
+			if ((arguments.length === 1) && (typeof options === 'function')) {
+				fn = options;
+				options = undefined;
+			}
+			let domain = createDomain();
+
+			if (fn)
+				return domain.run(runInTransaction);
+			else
+				return domain.run(run);
+
+			function begin() {
+				return _begin(domain, options);
+			}
+
+			async function runInTransaction() {
+				let result;
+				let transaction = newTransaction(domain, pool, options);
+				await new Promise(transaction)
+					.then(begin)
+					.then(() => fn(domain))
+					.then((res) => result = res)
+					.then(() => commit(domain))
+					.then(null, (e) => rollback(domain, e));
+				return result;
+			}
+
+			function run() {
+				let p;
+				let transaction = newTransaction(domain, pool, options);
+				p = new Promise(transaction);
+
+				return p.then(begin);
+			}
+
+		};
+
+		c.createTransaction = function(options) {
+			let domain = createDomain();
+			let transaction = newTransaction(domain, pool);
+			let p = domain.run(() => new Promise(transaction).then(begin));
+
+			function run(fn) {
+				return p.then(() => fn(domain));
+			}
+			run.rollback = rollback.bind(null, domain);
+			run.commit = commit.bind(null, domain);
+			return run;
+
+			function begin() {
+				return _begin(domain, options);
+			}
+		};
+
+		c.query = function(query) {
+			let domain = createDomain();
+			let transaction = newTransaction(domain, pool);
+			let p = domain.run(() => new Promise(transaction)
+				.then(() => setSessionSingleton(domain, 'changes', []))
+				.then(() => doQuery(domain, query).then(onResult, onError)));
+			return p;
+
+			function onResult(result) {
+				releaseDbClient(domain);
+				return result;
+			}
+
+			function onError(e) {
+				releaseDbClient(domain);
+				throw e;
+			}
+		};
+
+
+		c.rollback = rollback;
+		c.commit = commit;
+
+		c.end = function() {
+			if (poolOptions)
+				return pool.end();
+			else
+				return Promise.resolve();
+		};
+
+		c.accept = function(caller) {
+			caller.visitSqlite();
+		};
+
+		return c;
+	}
+
+	newDatabase_1$7 = newDatabase;
+	return newDatabase_1$7;
+}
+
+var wrapQuery_1$5;
+var hasRequiredWrapQuery$5;
+
+function requireWrapQuery$5 () {
+	if (hasRequiredWrapQuery$5) return wrapQuery_1$5;
+	hasRequiredWrapQuery$5 = 1;
+	var log = requireLog();
+
+	function wrapQuery(_context, connection) {
+		return runQuery;
+
+		function runQuery(query, onCompleted) {
+			try {
+				var params = query.parameters;
+				var sql = query.sql();
+				log.emitQuery({ sql, parameters: params });
+
+				var statement = connection.query(sql);
+				const rows = statement.all.apply(statement, params);
+				onCompleted(null, rows);
+			}
+			catch (e) {
+				onCompleted(e);
+			}
+		}
+
+	}
+
+	wrapQuery_1$5 = wrapQuery;
+	return wrapQuery_1$5;
+}
+
+var newTransaction$6;
+var hasRequiredNewTransaction$6;
+
+function requireNewTransaction$6 () {
+	if (hasRequiredNewTransaction$6) return newTransaction$6;
+	hasRequiredNewTransaction$6 = 1;
+	const wrapQuery = requireWrapQuery$5();
+	const encodeBoolean = requireEncodeBoolean$3();
+	const encodeBinary = requireEncodeBinary();
+	const decodeBinary = requireDecodeBinary();
+	const deleteFromSql = requireDeleteFromSql$3();
+	const selectForUpdateSql = requireSelectForUpdateSql$3();
+	const lastInsertedSql = requireLastInsertedSql$2();
+	const limitAndOffset = requireLimitAndOffset$3();
+	const insertSql = requireInsertSql$3();
+	const insert = requireInsert$3();
+	const quote = requireQuote$3();
+
+	function newResolveTransaction(domain, pool, { readonly = false } = {})  {
+		var rdb = {poolFactory: pool};
+		if (!pool.connect) {
+			pool = pool();
+			rdb.pool = pool;
+		}
+		rdb.engine = 'sqlite';
+		rdb.encodeBoolean = encodeBoolean;
+		rdb.encodeBinary = encodeBinary;
+		rdb.decodeBinary = decodeBinary;
+		rdb.decodeJSON = decodeJSON;
+		rdb.encodeJSON = JSON.stringify;
+		rdb.deleteFromSql = deleteFromSql;
+		rdb.selectForUpdateSql = selectForUpdateSql;
+		rdb.lastInsertedSql = lastInsertedSql;
+		rdb.insertSql = insertSql;
+		rdb.insert = insert;
+		rdb.lastInsertedIsSeparate = true;
+		rdb.multipleStatements = false;
+		rdb.limitAndOffset = limitAndOffset;
+		rdb.accept = function(caller) {
+			caller.visitSqlite();
+		};
+		rdb.aggregateCount = 0;
+		rdb.quote = quote;
+		rdb.cache = {};
+
+		if (readonly) {
+			rdb.dbClient = {
+				executeQuery: function(query, callback) {
+					pool.connect((err, client, done) => {
+						if (err) {
+							return callback(err);
+						}
+						try {
+							wrapQuery(domain, client)(query, (err, res) => {
+								done();
+								callback(err, res);
+							});
+						} catch (e) {
+							done();
+							callback(e);
+						}
+					});
+				}
+			};
+			domain.rdb = rdb;
+			return (onSuccess) => onSuccess();
+		}
+
+		return function(onSuccess, onError) {
+			pool.connect(onConnected);
+
+			function onConnected(err, client, done) {
+				try {
+					if (err) {
+						onError(err);
+						return;
+					}
+					client.executeQuery = wrapQuery(domain, client);
+					rdb.dbClient = client;
+					rdb.dbClientDone = done;
+					domain.rdb = rdb;
+					onSuccess();
+				} catch (e) {
+					onError(e);
+				}
+			}
+		};
+	}
+
+	function decodeJSON(value) {
+		return JSON.parse(value);
+	}
+
+	newTransaction$6 = newResolveTransaction;
+	return newTransaction$6;
+}
+
+/* eslint-disable no-prototype-builtins */
+
+var newGenericPool_1$5;
+var hasRequiredNewGenericPool$5;
+
+function requireNewGenericPool$5 () {
+	if (hasRequiredNewGenericPool$5) return newGenericPool_1$5;
+	hasRequiredNewGenericPool$5 = 1;
+	var defaults = requirePoolDefaults();
+
+	var genericPool = requireGenericPool();
+	var Database;
+
+	function newGenericPool(connectionString, poolOptions) {
+		poolOptions = poolOptions || {};
+		var pool = genericPool.Pool({
+			max: poolOptions.size || poolOptions.poolSize || defaults.poolSize,
+			idleTimeoutMillis: poolOptions.idleTimeout || defaults.poolIdleTimeout,
+			reapIntervalMillis: poolOptions.reapIntervalMillis || defaults.reapIntervalMillis,
+			log: poolOptions.log || defaults.poolLog,
+			create: async function(cb) {
+				try {
+					try {
+						if (!Database)
+							({ Database } = await import('bun:Database'));
+					}
+					catch (err) {
+						return cb(err, null);
+					}
+
+					var client = new Database(connectionString);
+					client.poolCount = 0;
+					cb(null, client);
+				}
+				catch(err) {
+					return cb(err, null);
+				}
+			},
+
+			destroy: function(client) {
+				client.poolCount = undefined;
+				client.close();
+			}
+		});
+		//monkey-patch with connect method
+		pool.connect = function(cb) {
+			pool.acquire(function(err, client) {
+				if(err)  return cb(err, null, function() {/*NOOP*/});
+				client.poolCount++;
+				cb(null, client, function(err) {
+					if(err) {
+						pool.destroy(client);
+					} else {
+						pool.release(client);
+					}
+				});
+			});
+		};
+		return pool;
+	}
+
+	newGenericPool_1$5 = newGenericPool;
+	return newGenericPool_1$5;
+}
+
+var newPool_1$6;
+var hasRequiredNewPool$6;
+
+function requireNewPool$6 () {
+	if (hasRequiredNewPool$6) return newPool_1$6;
+	hasRequiredNewPool$6 = 1;
+	const promisify = requirePromisify();
+	const pools = requirePools();
+	const end = requireEnd$6();
+	const newGenericPool = requireNewGenericPool$5();
+	const newId = requireNewId();
+
+	function newPool(connectionString, poolOptions) {
+		let pool = newGenericPool(connectionString, poolOptions);
+		let id = newId();
+		let boundEnd = end.bind(null, pool, id);
+		let c = {};
+
+		c.connect = pool.connect;
+		c.end = promisify(boundEnd);
+		pools[id] = c;
+		return c;
+	}
+
+	newPool_1$6 = newPool;
+	return newPool_1$6;
+}
+
+var newDatabase_1$6;
+var hasRequiredNewDatabase$6;
+
+function requireNewDatabase$6 () {
+	if (hasRequiredNewDatabase$6) return newDatabase_1$6;
+	hasRequiredNewDatabase$6 = 1;
+	let createDomain = requireCreateDomain();
+	let newTransaction = requireNewTransaction$6();
+	let _begin = requireBegin();
+	let commit = requireCommit();
+	let rollback = requireRollback();
+	let newPool = requireNewPool$6();
+	let express = requireHostExpress();
+	let hostLocal = requireHostLocal();
+	let doQuery = requireQuery();
+	let releaseDbClient = requireReleaseDbClient();
+	let setSessionSingleton = requireSetSessionSingleton();
+
+	function newDatabase(connectionString, poolOptions) {
+		if (!connectionString)
+			throw new Error('Connection string cannot be empty');
+		var pool;
+		if (!poolOptions)
+			pool = newPool.bind(null,connectionString, poolOptions);
+		else
+			pool = newPool(connectionString, poolOptions);
+
+		let c = {poolFactory: pool, hostLocal, express};
+
+		c.transaction = function(options, fn) {
+			if ((arguments.length === 1) && (typeof options === 'function')) {
+				fn = options;
+				options = undefined;
+			}
+			let domain = createDomain();
+
+			if (fn)
+				return domain.run(runInTransaction);
+			else
+				return domain.run(run);
+
+			function begin() {
+				return _begin(domain, options);
+			}
+
+			async function runInTransaction() {
+				let result;
+				let transaction = newTransaction(domain, pool, options);
+				await new Promise(transaction)
+					.then(begin)
+					.then(() => fn(domain))
+					.then((res) => result = res)
+					.then(() => commit(domain))
+					.then(null, (e) => rollback(domain, e));
+				return result;
+			}
+
+			function run() {
+				let p;
+				let transaction = newTransaction(domain, pool, options);
+				p = new Promise(transaction);
+
+				return p.then(begin);
+			}
+
+		};
+
+		c.createTransaction = function(options) {
+			let domain = createDomain();
+			let transaction = newTransaction(domain, pool);
+			let p = domain.run(() => new Promise(transaction).then(begin));
+
+			function run(fn) {
+				return p.then(() => fn(domain));
+			}
+			run.rollback = rollback.bind(null, domain);
+			run.commit = commit.bind(null, domain);
+			return run;
+
+			function begin() {
+				return _begin(domain, options);
+			}
+		};
+
+		c.query = function(query) {
+			let domain = createDomain();
+			let transaction = newTransaction(domain, pool);
+			let p = domain.run(() => new Promise(transaction)
+				.then(() => setSessionSingleton(domain, 'changes', []))
+				.then(() => doQuery(domain, query).then(onResult, onError)));
+			return p;
+
+			function onResult(result) {
+				releaseDbClient(domain);
+				return result;
+			}
+
+			function onError(e) {
+				releaseDbClient(domain);
+				throw e;
+			}
+		};
+
+
+		c.rollback = rollback;
+		c.commit = commit;
+
+		c.end = function() {
+			if (poolOptions)
+				return pool.end();
+			else
+				return Promise.resolve();
+		};
+
+		c.accept = function(caller) {
+			caller.visitSqlite();
+		};
+
+		return c;
+	}
+
+	newDatabase_1$6 = newDatabase;
+	return newDatabase_1$6;
+}
+
+var wrapQuery_1$4;
+var hasRequiredWrapQuery$4;
+
+function requireWrapQuery$4 () {
+	if (hasRequiredWrapQuery$4) return wrapQuery_1$4;
+	hasRequiredWrapQuery$4 = 1;
+	var log = requireLog();
+
+	function wrapQuery(_context, connection) {
+		var runOriginalQuery = connection.all;
+		return runQuery;
+
+		function runQuery(query, onCompleted) {
+			var params = query.parameters;
+			var sql = query.sql();
+			log.emitQuery({sql, parameters: params});
+
+			runOriginalQuery.call(connection, sql, params, onInnerCompleted);
+
+			function onInnerCompleted(err, rows) {
+				if (err)
+					onCompleted(err);
+				else
+					onCompleted(null, rows);
+			}
+		}
+
+	}
+
+	wrapQuery_1$4 = wrapQuery;
+	return wrapQuery_1$4;
+}
+
+var newTransaction$5;
+var hasRequiredNewTransaction$5;
+
+function requireNewTransaction$5 () {
+	if (hasRequiredNewTransaction$5) return newTransaction$5;
+	hasRequiredNewTransaction$5 = 1;
+	const wrapQuery = requireWrapQuery$4();
+	const encodeBoolean = requireEncodeBoolean$3();
+	const deleteFromSql = requireDeleteFromSql$3();
+	const selectForUpdateSql = requireSelectForUpdateSql$3();
+	const lastInsertedSql = requireLastInsertedSql$2();
+	const limitAndOffset = requireLimitAndOffset$3();
+	const insertSql = requireInsertSql$3();
+	const insert = requireInsert$3();
+	const quote = requireQuote$3();
+
+	function newResolveTransaction(domain, pool, { readonly = false } = {})  {
+		var rdb = {poolFactory: pool};
+		if (!pool.connect) {
+			pool = pool();
+			rdb.pool = pool;
+		}
+		rdb.engine = 'sqlite';
+		rdb.encodeBoolean = encodeBoolean;
+		rdb.decodeJSON = decodeJSON;
+		rdb.encodeJSON = JSON.stringify;
+		rdb.deleteFromSql = deleteFromSql;
+		rdb.selectForUpdateSql = selectForUpdateSql;
+		rdb.lastInsertedSql = lastInsertedSql;
+		rdb.insertSql = insertSql;
+		rdb.insert = insert;
+		rdb.lastInsertedIsSeparate = true;
+		rdb.multipleStatements = false;
+		rdb.limitAndOffset = limitAndOffset;
+		rdb.accept = function(caller) {
+			caller.visitSqlite();
+		};
+		rdb.aggregateCount = 0;
+		rdb.quote = quote;
+		rdb.cache = {};
+
+		if (readonly) {
+			rdb.dbClient = {
+				executeQuery: function(query, callback) {
+					pool.connect((err, client, done) => {
+						if (err) {
+							return callback(err);
+						}
+						try {
+							wrapQuery(domain, client)(query, (err, res) => {
+								done();
+								callback(err, res);
+							});
+						} catch (e) {
+							done();
+							callback(e);
+						}
+					});
+				}
+			};
+			domain.rdb = rdb;
+			return (onSuccess) => onSuccess();
+		}
+
+		return function(onSuccess, onError) {
+			pool.connect(onConnected);
+
+			function onConnected(err, client, done) {
+				try {
+					if (err) {
+						onError(err);
+						return;
+					}
+					client.executeQuery = wrapQuery(domain, client);
+					rdb.dbClient = client;
+					rdb.dbClientDone = done;
+					domain.rdb = rdb;
+					onSuccess();
+				} catch (e) {
+					onError(e);
+				}
+			}
+		};
+	}
+
+	function decodeJSON(value) {
+		return JSON.parse(value);
+	}
+
+	newTransaction$5 = newResolveTransaction;
+	return newTransaction$5;
+}
+
+var end$5;
+var hasRequiredEnd$5;
+
+function requireEnd$5 () {
+	if (hasRequiredEnd$5) return end$5;
+	hasRequiredEnd$5 = 1;
+	var pools = requirePools();
+
+	function endPool(genericPool, id, done) {
+		genericPool.drain(onDrained);
+
+		function onDrained() {
+			genericPool.destroyAllNow();
+			delete pools[id];
+			done();
+		}
+	}
+
+	end$5 = endPool;
+	return end$5;
+}
+
+/* eslint-disable no-prototype-builtins */
+
+var newGenericPool_1$4;
+var hasRequiredNewGenericPool$4;
+
+function requireNewGenericPool$4 () {
+	if (hasRequiredNewGenericPool$4) return newGenericPool_1$4;
+	hasRequiredNewGenericPool$4 = 1;
+	var defaults = requirePoolDefaults();
+
+	var genericPool = requireGenericPool();
+	var sqlite;
+
+	function newGenericPool(connectionString, poolOptions) {
+		poolOptions = poolOptions || {};
+		var pool = genericPool.Pool({
+			max: poolOptions.size || poolOptions.poolSize || defaults.poolSize,
+			idleTimeoutMillis: poolOptions.idleTimeout || defaults.poolIdleTimeout,
+			reapIntervalMillis: poolOptions.reapIntervalMillis || defaults.reapIntervalMillis,
+			log: poolOptions.log || defaults.poolLog,
+			create: async function(cb) {
+				try {
+					if (!sqlite)
+						sqlite = await import('sqlite3');
+					sqlite = sqlite.default || sqlite;
+				}
+				catch (err) {
+					return cb(err, null);
+				}
+				var client = new sqlite.Database(connectionString, onConnected);
+
+				function onConnected(err) {
+					if(err)
+						return cb(err, null);
+					client.poolCount = 0;
+					return cb(null, client);
+				}
+			},
+
+			destroy: function(client) {
+				client.poolCount = undefined;
+				client.close();
+			}
+		});
+		//monkey-patch with connect method
+		pool.connect = function(cb) {
+			pool.acquire(function(err, client) {
+				if(err)  return cb(err, null, function() {/*NOOP*/});
+				client.poolCount++;
+				cb(null, client, function(err) {
+					if(err) {
+						pool.destroy(client);
+					} else {
+						pool.release(client);
+					}
+				});
+			});
+		};
+		return pool;
+	}
+
+	newGenericPool_1$4 = newGenericPool;
+	return newGenericPool_1$4;
+}
+
+var newPool_1$5;
+var hasRequiredNewPool$5;
+
+function requireNewPool$5 () {
+	if (hasRequiredNewPool$5) return newPool_1$5;
+	hasRequiredNewPool$5 = 1;
+	const promisify = requirePromisify();
+	const pools = requirePools();
+	const end = requireEnd$5();
+	const newGenericPool = requireNewGenericPool$4();
+	const newId = requireNewId();
+
+	function newPool(connectionString, poolOptions) {
+		let pool = newGenericPool(connectionString, poolOptions);
+		let id = newId();
+		let boundEnd = end.bind(null, pool, id);
+		let c = {};
+
+		c.connect = pool.connect;
+		c.end = promisify(boundEnd);
+		pools[id] = c;
+		return c;
+	}
+
+	newPool_1$5 = newPool;
+	return newPool_1$5;
+}
+
+var newDatabase_1$5;
+var hasRequiredNewDatabase$5;
+
+function requireNewDatabase$5 () {
+	if (hasRequiredNewDatabase$5) return newDatabase_1$5;
+	hasRequiredNewDatabase$5 = 1;
+	let createDomain = requireCreateDomain();
+	let newTransaction = requireNewTransaction$5();
+	let _begin = requireBegin();
+	let commit = requireCommit();
+	let rollback = requireRollback();
+	let newPool = requireNewPool$5();
+	let express = requireHostExpress();
+	let hostLocal = requireHostLocal();
+	let doQuery = requireQuery();
+	let releaseDbClient = requireReleaseDbClient();
+	let setSessionSingleton = requireSetSessionSingleton();
+
+	function newDatabase(connectionString, poolOptions) {
+		if (!connectionString)
+			throw new Error('Connection string cannot be empty');
+		var pool;
+		if (!poolOptions)
+			pool = newPool.bind(null,connectionString, poolOptions);
+		else
+			pool = newPool(connectionString, poolOptions);
+
+		let c = {poolFactory: pool, hostLocal, express};
+
+		c.transaction = function(options, fn) {
+			if ((arguments.length === 1) && (typeof options === 'function')) {
+				fn = options;
+				options = undefined;
+			}
+			let domain = createDomain();
+
+			if (fn)
+				return domain.run(runInTransaction);
+			else
+				return domain.run(run);
+
+			function begin() {
+				return _begin(domain, options);
+			}
+
+			async function runInTransaction() {
+				let result;
+				let transaction = newTransaction(domain, pool, options);
+				await new Promise(transaction)
+					.then(begin)
+					.then(() => fn(domain))
+					.then((res) => result = res)
+					.then(() => commit(domain))
+					.then(null, (e) => rollback(domain, e));
+				return result;
+			}
+
+			function run() {
+				let p;
+				let transaction = newTransaction(domain, pool, options);
+				p = new Promise(transaction);
+
+				return p.then(begin);
+			}
+
+		};
+
+		c.createTransaction = function(options) {
+			let domain = createDomain();
+			let transaction = newTransaction(domain, pool);
+			let p = domain.run(() => new Promise(transaction).then(begin));
+
+			function run(fn) {
+				return p.then(() => fn(domain));
+			}
+			run.rollback = rollback.bind(null, domain);
+			run.commit = commit.bind(null, domain);
+			return run;
+
+			function begin() {
+				return _begin(domain, options);
+			}
+		};
+
+		c.query = function(query) {
+			let domain = createDomain();
+			let transaction = newTransaction(domain, pool);
+			let p = domain.run(() => new Promise(transaction)
+				.then(() => setSessionSingleton(domain, 'changes', []))
+				.then(() => doQuery(domain, query).then(onResult, onError)));
+			return p;
+
+			function onResult(result) {
+				releaseDbClient(domain);
+				return result;
+			}
+
+			function onError(e) {
+				releaseDbClient(domain);
+				throw e;
+			}
+		};
+
+
+		c.rollback = rollback;
+		c.commit = commit;
+
+		c.end = function() {
+			if (poolOptions)
+				return pool.end();
+			else
+				return Promise.resolve();
+		};
+
+		c.accept = function(caller) {
+			caller.visitSqlite();
+		};
+
+		return c;
+	}
+
+	newDatabase_1$5 = newDatabase;
+	return newDatabase_1$5;
+}
+
+var wrapQuery_1$3;
+var hasRequiredWrapQuery$3;
+
+function requireWrapQuery$3 () {
+	if (hasRequiredWrapQuery$3) return wrapQuery_1$3;
+	hasRequiredWrapQuery$3 = 1;
+	var log = requireLog();
+
+	function wrapQuery(_context, client) {
+
+		return runQuery;
+
+		function runQuery(query, onCompleted) {
+
+			var params = query.parameters;
+			var sql = query.sql();
+			log.emitQuery({sql, parameters: params});
+			client.d1.prepare(sql, params).bind(...params).all().then(onInnerCompleted, onCompleted);
+
+			function onInnerCompleted(response) {
+				onCompleted(null, response.results);
+			}
+
+		}
+
+	}
+
+	wrapQuery_1$3 = wrapQuery;
+	return wrapQuery_1$3;
+}
+
+var newTransaction$4;
+var hasRequiredNewTransaction$4;
+
+function requireNewTransaction$4 () {
+	if (hasRequiredNewTransaction$4) return newTransaction$4;
+	hasRequiredNewTransaction$4 = 1;
+	const wrapQuery = requireWrapQuery$3();
+	const encodeBoolean = requireEncodeBoolean$3();
+	const deleteFromSql = requireDeleteFromSql$3();
+	const selectForUpdateSql = requireSelectForUpdateSql$3();
+	const lastInsertedSql = requireLastInsertedSql$2();
+	const limitAndOffset = requireLimitAndOffset$3();
+	const insertSql = requireInsertSql$3();
+	const insert = requireInsert$3();
+
+	function newResolveTransaction(domain, pool, { readonly = false } = {})  {
+		var rdb = {poolFactory: pool};
+		if (!pool.connect) {
+			pool = pool();
+			rdb.pool = pool;
+		}
+		rdb.engine = 'sqlite';
+		rdb.maxParameters = 100;
+		rdb.encodeBoolean = encodeBoolean;
+		rdb.decodeJSON = decodeJSON;
+		rdb.encodeJSON = JSON.stringify;
+		rdb.deleteFromSql = deleteFromSql;
+		rdb.selectForUpdateSql = selectForUpdateSql;
+		rdb.lastInsertedSql = lastInsertedSql;
+		rdb.insertSql = insertSql;
+		rdb.insert = insert;
+		rdb.lastInsertedIsSeparate = true;
+		rdb.multipleStatements = false;
+		rdb.limitAndOffset = limitAndOffset;
+		rdb.accept = function(caller) {
+			caller.visitSqlite();
+		};
+		rdb.aggregateCount = 0;
+		rdb.quote = (name) => `"${name}"`;
+		rdb.cache = {};
+
+		if (readonly) {
+			rdb.dbClient = {
+				executeQuery: function(query, callback) {
+					pool.connect((err, client, done) => {
+						if (err) {
+							return callback(err);
+						}
+						try {
+							wrapQuery(domain, client)(query, (err, res) => {
+								done();
+								callback(err, res);
+							});
+						} catch (e) {
+							done();
+							callback(e);
+						}
+					});
+				}
+			};
+			domain.rdb = rdb;
+			return (onSuccess) => onSuccess();
+		}
+
+		return function(onSuccess, onError) {
+			pool.connect(onConnected);
+
+			function onConnected(err, client, done) {
+				try {
+					if (err) {
+						onError(err);
+						return;
+					}
+					client.executeQuery = wrapQuery(domain, client);
+					rdb.dbClient = client;
+					rdb.dbClientDone = done;
+					domain.rdb = rdb;
+					onSuccess();
+				} catch (e) {
+					onError(e);
+				}
+			}
+		};
+	}
+
+	function decodeJSON(value) {
+		return JSON.parse(value);
+	}
+
+	newTransaction$4 = newResolveTransaction;
+	return newTransaction$4;
+}
+
+var end$4;
+var hasRequiredEnd$4;
+
+function requireEnd$4 () {
+	if (hasRequiredEnd$4) return end$4;
+	hasRequiredEnd$4 = 1;
+	var pools = requirePools();
+
+	function endPool(genericPool, id, done) {
+		genericPool.drain(onDrained);
+
+		function onDrained() {
+			genericPool.destroyAllNow();
+			delete pools[id];
+			done();
+		}
+	}
+
+	end$4 = endPool;
+	return end$4;
+}
+
+/* eslint-disable no-prototype-builtins */
+
+var newGenericPool_1$3;
+var hasRequiredNewGenericPool$3;
+
+function requireNewGenericPool$3 () {
+	if (hasRequiredNewGenericPool$3) return newGenericPool_1$3;
+	hasRequiredNewGenericPool$3 = 1;
 	var defaults = requirePoolDefaults();
 	var genericPool = requireGenericPool();
 
@@ -13913,20 +16892,20 @@ function requireNewGenericPool () {
 		return pool;
 	}
 
-	newGenericPool_1 = newGenericPool;
-	return newGenericPool_1;
+	newGenericPool_1$3 = newGenericPool;
+	return newGenericPool_1$3;
 }
 
-var newPool_1;
-var hasRequiredNewPool;
+var newPool_1$4;
+var hasRequiredNewPool$4;
 
-function requireNewPool () {
-	if (hasRequiredNewPool) return newPool_1;
-	hasRequiredNewPool = 1;
+function requireNewPool$4 () {
+	if (hasRequiredNewPool$4) return newPool_1$4;
+	hasRequiredNewPool$4 = 1;
 	const promisify = requirePromisify();
 	const pools = requirePools();
-	const end = requireEnd();
-	const newGenericPool = requireNewGenericPool();
+	const end = requireEnd$4();
+	const newGenericPool = requireNewGenericPool$3();
 	const newId = requireNewId();
 
 	function newPool(d1Database, poolOptions) {
@@ -13941,22 +16920,22 @@ function requireNewPool () {
 		return c;
 	}
 
-	newPool_1 = newPool;
-	return newPool_1;
+	newPool_1$4 = newPool;
+	return newPool_1$4;
 }
 
-var newDatabase_1;
-var hasRequiredNewDatabase;
+var newDatabase_1$4;
+var hasRequiredNewDatabase$4;
 
-function requireNewDatabase () {
-	if (hasRequiredNewDatabase) return newDatabase_1;
-	hasRequiredNewDatabase = 1;
+function requireNewDatabase$4 () {
+	if (hasRequiredNewDatabase$4) return newDatabase_1$4;
+	hasRequiredNewDatabase$4 = 1;
 	let createDomain = requireCreateDomain();
-	let newTransaction = requireNewTransaction();
+	let newTransaction = requireNewTransaction$4();
 	let _begin = requireBegin();
 	let commit = requireCommit();
 	let rollback = requireRollback();
-	let newPool = requireNewPool();
+	let newPool = requireNewPool$4();
 	let express = requireHostExpress();
 	let hostLocal = requireHostLocal();
 	let doQuery = requireQuery();
@@ -14069,24 +17048,2961 @@ function requireNewDatabase () {
 		return c;
 	}
 
+	newDatabase_1$4 = newDatabase;
+	return newDatabase_1$4;
+}
+
+var wrapQuery_1$2;
+var hasRequiredWrapQuery$2;
+
+function requireWrapQuery$2 () {
+	if (hasRequiredWrapQuery$2) return wrapQuery_1$2;
+	hasRequiredWrapQuery$2 = 1;
+	var log = requireLog();
+
+	function wrapQuery(_context, connection) {
+		var runOriginalQuery = connection.query;
+		return runQuery;
+
+		function runQuery(query, onCompleted) {
+			var params = query.parameters;
+			var sql = query.sql();
+			log.emitQuery({ sql, parameters: params });
+			const sap = connection.msnodesqlv8;
+			for (let i = 0; i < params.length; i++) {
+				const parameter = params[i];
+				if (typeof parameter === 'string')
+					params[i] = sap.VarChar(parameter);
+			}
+
+			runOriginalQuery.call(connection, sql, params, onInnerCompleted);
+			let result = [];
+
+			function onInnerCompleted(err, rows, hasMore) {
+				if (err) {
+					if (err.code)
+						onCompleted(err);
+					return;
+				}
+				result.push(rows);
+				if (!hasMore) {
+
+					if (result.length === 1)
+						onCompleted(null, result[0]);
+					else
+						onCompleted(null, result);
+				}
+			}
+		}
+
+	}
+
+	wrapQuery_1$2 = wrapQuery;
+	return wrapQuery_1$2;
+}
+
+var encodeBoolean_1$2;
+var hasRequiredEncodeBoolean$2;
+
+function requireEncodeBoolean$2 () {
+	if (hasRequiredEncodeBoolean$2) return encodeBoolean_1$2;
+	hasRequiredEncodeBoolean$2 = 1;
+	function encodeBoolean(bool) {
+		if (bool)
+			return 1;
+		return 0;
+	}
+
+	encodeBoolean_1$2 = encodeBoolean;
+	return encodeBoolean_1$2;
+}
+
+var quote$2;
+var hasRequiredQuote$2;
+
+function requireQuote$2 () {
+	if (hasRequiredQuote$2) return quote$2;
+	hasRequiredQuote$2 = 1;
+	quote$2 = (name) => `[${name}]`;
+	return quote$2;
+}
+
+var deleteFromSql_1$2;
+var hasRequiredDeleteFromSql$2;
+
+function requireDeleteFromSql$2 () {
+	if (hasRequiredDeleteFromSql$2) return deleteFromSql_1$2;
+	hasRequiredDeleteFromSql$2 = 1;
+	const format = 'delete %s from %s as %s%s';
+	const formatString = requireFormat();
+	const quote = requireQuote$2();
+
+	function deleteFromSql(table, alias, whereSql) {
+		const name = quote(table._dbName);
+		alias = quote(alias);
+		return formatString(format, alias, name, alias, whereSql);
+	}
+	deleteFromSql_1$2 = deleteFromSql;
+	return deleteFromSql_1$2;
+}
+
+var selectForUpdateSql$2;
+var hasRequiredSelectForUpdateSql$2;
+
+function requireSelectForUpdateSql$2 () {
+	if (hasRequiredSelectForUpdateSql$2) return selectForUpdateSql$2;
+	hasRequiredSelectForUpdateSql$2 = 1;
+	const quote = requireQuote$6();
+
+	selectForUpdateSql$2 = function(alias) {
+		return ' FOR UPDATE OF ' + quote(alias);
+	};
+	return selectForUpdateSql$2;
+}
+
+var limitAndOffset_1$2;
+var hasRequiredLimitAndOffset$2;
+
+function requireLimitAndOffset$2 () {
+	if (hasRequiredLimitAndOffset$2) return limitAndOffset_1$2;
+	hasRequiredLimitAndOffset$2 = 1;
+	function limitAndOffset(span) {
+		if (span.offset)
+			return ` OFFSET ${span.offset} ROWS${limit()}`;
+		else
+			return '';
+
+		function limit() {
+			if (span.limit || span.limit === 0)
+				return ` FETCH NEXT ${span.limit} ROW ONLY`;
+			else
+				return '';
+		}
+
+	}
+
+	limitAndOffset_1$2 = limitAndOffset;
+	return limitAndOffset_1$2;
+}
+
+var formatDateOut_1$1;
+var hasRequiredFormatDateOut$2;
+
+function requireFormatDateOut$2 () {
+	if (hasRequiredFormatDateOut$2) return formatDateOut_1$1;
+	hasRequiredFormatDateOut$2 = 1;
+	const quote = requireQuote$2();
+
+	function formatDateOut(column, alias) {
+		return `CONVERT(VARCHAR, ${alias}.${quote(column._dbName)}, 121)`;
+	}
+
+	formatDateOut_1$1 = formatDateOut;
+	return formatDateOut_1$1;
+}
+
+var formatJSONOut_1;
+var hasRequiredFormatJSONOut;
+
+function requireFormatJSONOut () {
+	if (hasRequiredFormatJSONOut) return formatJSONOut_1;
+	hasRequiredFormatJSONOut = 1;
+	function formatJSONOut(column, alias) {
+		return `JSON_QUERY(${alias}.[${column._dbName}])`;
+	}
+
+	formatJSONOut_1 = formatJSONOut;
+	return formatJSONOut_1;
+}
+
+var outputInsertedSql_1;
+var hasRequiredOutputInsertedSql;
+
+function requireOutputInsertedSql () {
+	if (hasRequiredOutputInsertedSql) return outputInsertedSql_1;
+	hasRequiredOutputInsertedSql = 1;
+	function outputInsertedSql(table) {
+		let separator = '';
+		let result = 'OUTPUT ';
+		for (let i = 0; i < table._columns.length; i++) {
+			result += separator + 'INSERTED.[' + table._columns[i]._dbName + ']';
+			separator = ',';
+		}
+		return result;
+	}
+
+	outputInsertedSql_1 = outputInsertedSql;
+	return outputInsertedSql_1;
+}
+
+var mergeSql$2;
+var hasRequiredMergeSql$2;
+
+function requireMergeSql$2 () {
+	if (hasRequiredMergeSql$2) return mergeSql$2;
+	hasRequiredMergeSql$2 = 1;
+	const outputInsertedSql = requireOutputInsertedSql();
+
+	function insertSql(table, row, options) {
+
+		let columnNames = [];
+		let conflictColumnUpdateSql = '';
+		let values = [];
+		addDiscriminators();
+		addColumns();
+
+		const matched = whenMatched();
+		let sql;
+		if (matched)
+			sql = `MERGE INTO [${table._dbName}] AS target USING (SELECT ${values.join(',')}) AS source ON ${join()} WHEN MATCHED THEN ${matched} WHEN NOT MATCHED THEN ${whenNotMatched()} ${outputInsertedSql(table)};`;
+		else
+			sql = `MERGE INTO [${table._dbName}] AS target USING (SELECT ${values.join(',')}) AS source ON ${join()} WHEN NOT MATCHED THEN ${whenNotMatched()} ${outputInsertedSql(table)};`;
+		return sql;
+
+		function join() {
+			const discriminators = table._columnDiscriminators.map(x => {
+				const name = `[${x.split('=')[0]}]`;
+
+				return `target.${name}=source.${name}`;
+			});
+			const primaries = table._primaryColumns.map(x => `target.[${x._dbName}]=source.[${x._dbName}]`);
+			return [...discriminators, ...primaries].join(' AND ');
+		}
+
+		function whenMatched() {
+			if (options.concurrency === 'skipOnConflict' || options.concurrency === 'overwrite') {
+				return conflictColumnUpdateSql;
+			}
+			else return '';
+		}
+
+		function whenNotMatched() {
+			return `INSERT (${columnNames.join(',')}) VALUES (${columnNames.map(name => 'source.' + name)})`;
+		}
+
+		function addDiscriminators() {
+			let discriminators = table._columnDiscriminators;
+			for (let i = 0; i < discriminators.length; i++) {
+				let parts = discriminators[i].split('=');
+				columnNames.push(`[${parts[0]}]`);
+				values.push(`${parts[1]} AS ${[parts[0]]}`);
+			}
+		}
+
+		function addColumns() {
+			let conflictColumnUpdates = [];
+			let columns = table._columns;
+			for (let i = 0; i < columns.length; i++) {
+				let column = columns[i];
+				if (row['__' + column.alias] !== undefined) {
+					columnNames.push(`[${column._dbName}]`);
+					values.push(`%s AS [${column.alias}]`);
+					addConflictUpdate(column);
+				}
+			}
+
+			if (conflictColumnUpdates.length > 0)
+				conflictColumnUpdateSql = 'UPDATE SET ' + conflictColumnUpdates.join(',');
+
+
+			function addConflictUpdate(column) {
+				let concurrency = options[column.alias]?.concurrency || options.concurrency;
+				if (concurrency === 'overwrite')
+					conflictColumnUpdates.push(`target.[${column._dbName}]=source.[${column._dbName}]`);
+				else if (concurrency === 'optimistic')
+					conflictColumnUpdates.push(`target.[${column._dbName}] = CASE WHEN target.[${column._dbName}] <> source.[${column._dbName}] THEN CAST('12345678-1234-1234-1234-123456789012Conflict when updating [${column._dbName}]12345678-1234-1234-1234-123456789012' AS INTEGER) ELSE target.[${column._dbName}] END`);
+			}
+		}
+	}
+
+	mergeSql$2 = insertSql;
+	return mergeSql$2;
+}
+
+var insertSql_1$2;
+var hasRequiredInsertSql$2;
+
+function requireInsertSql$2 () {
+	if (hasRequiredInsertSql$2) return insertSql_1$2;
+	hasRequiredInsertSql$2 = 1;
+	let outputInsertedSql = requireOutputInsertedSql();
+	let mergeSql = requireMergeSql$2();
+
+	function getSqlTemplate(_context, _table, _row, options) {
+		if (hasConcurrency(_table, options) && hasColumns())
+			return mergeSql.apply(null, [...arguments].slice(1));
+		else
+			return insertSql.apply(null, [...arguments].slice(1));
+
+		function hasColumns() {
+			for(let p in _row) {
+				let alias = _table[p]?.alias;
+				if (alias &&  _row['__' + alias] !== undefined && _table[p]?.equal)
+					return true;
+			}
+		}
+	}
+
+	function hasConcurrency(table,options) {
+		for (let i = 0; i < table._primaryColumns.length; i++) {
+			const concurrency = options[table._primaryColumns[i]]?.concurrency;
+			if ( concurrency === 'skipOnConflict' || concurrency === 'overwrite' )
+				return true;
+		}
+		return options.concurrency === 'skipOnConflict' || options.concurrency === 'overwrite';
+	}
+
+	function insertSql(table, row) {
+		let columnNames = [];
+		let values = [];
+		let sql = `INSERT INTO [${table._dbName}] `;
+		addDiscriminators();
+		addColumns();
+		if (columnNames.length === 0)
+			sql += `${outputInserted()}DEFAULT VALUES`;
+		else
+			sql = sql + '('+ columnNames.join(',') + ')' + outputInserted() +  'VALUES (' + values.join(',') + ')';
+		return sql;
+
+		function addDiscriminators() {
+			let discriminators = table._columnDiscriminators;
+			for (let i = 0; i < discriminators.length; i++) {
+				let parts = discriminators[i].split('=');
+				columnNames.push(`[${parts[0]}]`);
+				values.push(parts[1]);
+			}
+		}
+
+		function addColumns() {
+			let columns = table._columns;
+			for (let i = 0; i < columns.length; i++) {
+				let column = columns[i];
+				if (row['__' + column.alias] !== undefined) {
+					columnNames.push(`[${column._dbName}]`);
+					values.push('%s');
+				}
+			}
+		}
+
+
+		function outputInserted() {
+
+			return ' ' + outputInsertedSql(table) + ' ';
+		}
+
+	}
+
+	insertSql_1$2 = getSqlTemplate;
+	return insertSql_1$2;
+}
+
+var insert$1;
+var hasRequiredInsert$2;
+
+function requireInsert$2 () {
+	if (hasRequiredInsert$2) return insert$1;
+	hasRequiredInsert$2 = 1;
+	let newInsertCommand = requireNewInsertCommand();
+	let newInsertCommandCore = requireNewInsertCommandCore$1();
+	let executeQueries = requireExecuteQueries();
+
+	async function insertDefault(context, table, row, options) {
+		let insertCmd = newInsertCommand(newInsertCommandCore.bind(null, context), table, row, options);
+		insertCmd.disallowCompress = true;
+
+		return executeQueries(context, [insertCmd]).then((result) => result[result.length - 1]);
+
+	}
+
+	insert$1 = insertDefault;
+	return insert$1;
+}
+
+var newTransaction$3;
+var hasRequiredNewTransaction$3;
+
+function requireNewTransaction$3 () {
+	if (hasRequiredNewTransaction$3) return newTransaction$3;
+	hasRequiredNewTransaction$3 = 1;
+	var wrapQuery = requireWrapQuery$2();
+	var encodeBoolean = requireEncodeBoolean$2();
+	var deleteFromSql = requireDeleteFromSql$2();
+	var selectForUpdateSql = requireSelectForUpdateSql$2();
+	const limitAndOffset = requireLimitAndOffset$2();
+	const formatDateOut = requireFormatDateOut$2();
+	const formatJSONOut = requireFormatJSONOut();
+	const insertSql = requireInsertSql$2();
+	const insert = requireInsert$2();
+	const quote = requireQuote$2();
+
+	function newResolveTransaction(domain, pool, { readonly = false } = {}) {
+		var rdb = {poolFactory: pool};
+		if (!pool.connect) {
+			pool = pool();
+			rdb.pool = pool;
+		}
+		rdb.engine = 'mssqlNative';
+		rdb.encodeBoolean = encodeBoolean;
+		rdb.decodeJSON = decodeJSON;
+		rdb.encodeJSON = JSON.stringify;
+		rdb.formatDateOut = formatDateOut;
+		rdb.formatJSONOut = formatJSONOut;
+		rdb.deleteFromSql = deleteFromSql;
+		rdb.selectForUpdateSql = selectForUpdateSql;
+		rdb.insertSql = insertSql;
+		rdb.insert = insert;
+		rdb.lastInsertedIsSeparate = false;
+		rdb.multipleStatements = true;
+		rdb.begin = 'BEGIN TRANSACTION';
+		rdb.limit = (span) => {
+			if (span.offset)
+				return '';
+			else if (span.limit || span.limit === 0)
+				return 'TOP ' + span.limit;
+			else
+				return '';
+		};
+		rdb.limitAndOffset = limitAndOffset;
+		rdb.accept = function(caller) {
+			caller.visitSqlite();
+		};
+		rdb.aggregateCount = 0;
+		rdb.quote = quote;
+		rdb.cache = {};
+
+		if (readonly) {
+			rdb.dbClient = {
+				executeQuery: function(query, callback) {
+					pool.connect((err, client, done) => {
+						if (err) {
+							return callback(err);
+						}
+						try {
+							client.setUseUTC(false);
+							wrapQuery(domain, client)(query, (err, res) => {
+								done();
+								callback(err, res);
+							});
+						} catch (e) {
+							done();
+							callback(e);
+						}
+					});
+				}
+			};
+			domain.rdb = rdb;
+			return (onSuccess) => onSuccess();
+		}
+
+		return function(onSuccess, onError) {
+			pool.connect(onConnected);
+
+			function onConnected(err, client, done) {
+				try {
+					if (err) {
+						onError(err);
+						return;
+					}
+					client.setUseUTC(false);
+					client.executeQuery = wrapQuery(domain, client);
+					rdb.dbClient = client;
+					rdb.dbClientDone = done;
+					domain.rdb = rdb;
+					onSuccess();
+				} catch (e) {
+					onError(e);
+				}
+			}
+		};
+	}
+	function decodeJSON(value){
+		return JSON.parse(value);
+	}
+
+	newTransaction$3 = newResolveTransaction;
+	return newTransaction$3;
+}
+
+var end$3;
+var hasRequiredEnd$3;
+
+function requireEnd$3 () {
+	if (hasRequiredEnd$3) return end$3;
+	hasRequiredEnd$3 = 1;
+	var pools = requirePools();
+
+	function endPool(genericPool, id, done) {
+		genericPool.drain(onDrained);
+
+		function onDrained() {
+			genericPool.destroyAllNow();
+			delete pools[id];
+			done();
+		}
+	}
+
+	end$3 = endPool;
+	return end$3;
+}
+
+var newGenericPool_1$2;
+var hasRequiredNewGenericPool$2;
+
+function requireNewGenericPool$2 () {
+	if (hasRequiredNewGenericPool$2) return newGenericPool_1$2;
+	hasRequiredNewGenericPool$2 = 1;
+	// @ts-nocheck
+	/* eslint-disable no-prototype-builtins */
+
+	var defaults = requirePoolDefaults();
+	var genericPool = requireGenericPool();
+	var mssql;
+
+	function newGenericPool(connectionString, poolOptions) {
+		poolOptions = poolOptions || {};
+		var pool = genericPool.Pool({
+			max: poolOptions.size || poolOptions.poolSize || defaults.poolSize,
+			idleTimeoutMillis: poolOptions.idleTimeout || defaults.poolIdleTimeout,
+			reapIntervalMillis: poolOptions.reapIntervalMillis || defaults.reapIntervalMillis,
+			log: poolOptions.log || defaults.poolLog,
+			create: async function(cb) {
+				try {
+					if (!mssql)
+						mssql = await import('msnodesqlv8');
+				}
+				catch (err) {
+					return cb(err, null);
+				}
+				var client;
+				mssql.open(connectionString, onConnected);
+
+				function onConnected(err, _client) {
+					if(err)
+						return cb(err, null);
+					client = _client;
+					client.poolCount = 0;
+					client.msnodesqlv8 = mssql;
+					return cb(null, client);
+				}
+			},
+
+			destroy: function(client) {
+				client.poolCount = undefined;
+				client.close();
+			}
+		});
+		//monkey-patch with connect method
+		pool.connect = function(cb) {
+			pool.acquire(function(err, client) {
+				if(err)  return cb(err, null, function() {/*NOOP*/});
+				client.poolCount++;
+				cb(null, client, function(err) {
+					if(err) {
+						pool.destroy(client);
+					} else {
+						pool.release(client);
+					}
+				});
+			});
+		};
+		return pool;
+	}
+
+	newGenericPool_1$2 = newGenericPool;
+	return newGenericPool_1$2;
+}
+
+var newPool_1$3;
+var hasRequiredNewPool$3;
+
+function requireNewPool$3 () {
+	if (hasRequiredNewPool$3) return newPool_1$3;
+	hasRequiredNewPool$3 = 1;
+	const promisify = requirePromisify();
+	var pools = requirePools();
+	var end = requireEnd$3();
+	var newGenericPool = requireNewGenericPool$2();
+	var newId = requireNewId();
+
+	function newPool(connectionString, poolOptions) {
+		var pool = newGenericPool(connectionString, poolOptions);
+		var id = newId();
+		var boundEnd = end.bind(null, pool, id);
+		var c = {};
+
+		c.connect = pool.connect;
+		c.end = promisify(boundEnd);
+		pools[id] = c;
+		return c;
+	}
+
+	newPool_1$3 = newPool;
+	return newPool_1$3;
+}
+
+var newDatabase_1$3;
+var hasRequiredNewDatabase$3;
+
+function requireNewDatabase$3 () {
+	if (hasRequiredNewDatabase$3) return newDatabase_1$3;
+	hasRequiredNewDatabase$3 = 1;
+	let createDomain = requireCreateDomain();
+	let newTransaction = requireNewTransaction$3();
+	let _begin = requireBegin();
+	let commit = requireCommit();
+	let rollback = requireRollback();
+	let newPool = requireNewPool$3();
+	let express = requireHostExpress();
+	let hostLocal = requireHostLocal();
+	let doQuery = requireQuery();
+	let releaseDbClient = requireReleaseDbClient();
+	let setSessionSingleton = requireSetSessionSingleton();
+
+	function newDatabase(connectionString, poolOptions) {
+		if (!connectionString)
+			throw new Error('Connection string cannot be empty');
+		var pool;
+		if (!poolOptions)
+			pool = newPool.bind(null, connectionString, poolOptions);
+		else
+			pool = newPool(connectionString, poolOptions);
+
+		let c = { poolFactory: pool, hostLocal, express };
+
+		c.transaction = function(options, fn) {
+			if ((arguments.length === 1) && (typeof options === 'function')) {
+				fn = options;
+				options = undefined;
+			}
+			let domain = createDomain();
+
+			if (fn)
+				return domain.run(runInTransaction);
+			else
+				return domain.run(run);
+
+			async function runInTransaction() {
+				let result;
+				let transaction = newTransaction(domain, pool, options);
+				await new Promise(transaction)
+					.then(begin)
+					.then(() => fn(domain))
+					.then((res) => result = res)
+					.then(() => c.commit(domain))
+					.then(null, (e) => c.rollback(domain, e));
+				return result;
+			}
+
+			function begin() {
+				return _begin(domain, options);
+			}
+
+			function run() {
+				let p;
+				let transaction = newTransaction(domain, pool, options);
+				p = new Promise(transaction);
+
+				return p.then(begin);
+			}
+
+		};
+
+		c.createTransaction = function(options) {
+			let domain = createDomain();
+			let transaction = newTransaction(domain, pool);
+			let p = domain.run(() => new Promise(transaction).then(begin));
+
+			function run(fn) {
+				return p.then(domain.run.bind(domain, fn));
+			}
+
+			function begin() {
+				return _begin(domain, options);
+			}
+
+			run.rollback = rollback.bind(null, domain);
+			run.commit = commit.bind(null, domain);
+
+			return run;
+
+
+		};
+
+		c.query = function(query) {
+			let domain = createDomain();
+			let transaction = newTransaction(domain, pool);
+			let p = domain.run(() => new Promise(transaction)
+				.then(() => setSessionSingleton(domain, 'changes', []))
+				.then(() => doQuery(domain, query).then(onResult, onError)));
+			return p;
+
+			function onResult(result) {
+				releaseDbClient(domain);
+				return result;
+			}
+
+			function onError(e) {
+				releaseDbClient(domain);
+				throw e;
+			}
+		};
+
+
+		c.rollback = rollback;
+		c.commit = commit;
+
+		c.end = function() {
+			if (poolOptions)
+				return pool.end();
+			else
+				return Promise.resolve();
+		};
+
+		c.accept = function(caller) {
+			caller.visitSqlite();
+		};
+
+
+		return c;
+	}
+
+	newDatabase_1$3 = newDatabase;
+	return newDatabase_1$3;
+}
+
+var wrapQuery_1$1;
+var hasRequiredWrapQuery$1;
+
+function requireWrapQuery$1 () {
+	if (hasRequiredWrapQuery$1) return wrapQuery_1$1;
+	hasRequiredWrapQuery$1 = 1;
+	var log = requireLog();
+
+	function wrapQuery(_context, connection) {
+		let CachedRequest = null;
+		let CachedTypes = null;
+
+		return runQuery;
+
+		function runQuery(query, onCompleted) {
+			if (!CachedRequest || !CachedTypes) {
+				import('tedious')
+					.then(({ Request, TYPES }) => {
+						CachedRequest = Request;
+						CachedTypes = TYPES;
+						doQuery(query, onCompleted);
+					})
+					.catch(err => onCompleted(extractError(err), []));
+			}
+			else {
+				doQuery(query, onCompleted);
+			}
+		}
+
+		function doQuery(query, onCompleted) {
+			const result = [];
+			const sql = replaceParamChar(query.sql(), query.parameters);
+
+			// Transaction statements
+			if (sql.length < 18 && query.parameters.length === 0) {
+				if (sql === 'BEGIN TRANSACTION') {
+					log.emitQuery({ sql, parameters: [] });
+					connection.beginTransaction((err) => {
+						onCompleted(extractError(err), []);
+					});
+					return;
+				}
+				else if (sql === 'COMMIT') {
+					log.emitQuery({ sql, parameters: [] });
+					connection.commitTransaction((err) => {
+						onCompleted(extractError(err), []);
+					});
+					return;
+				}
+				else if (sql === 'ROLLBACK') {
+					log.emitQuery({ sql, parameters: [] });
+					connection.rollbackTransaction((err) => {
+						onCompleted(extractError(err), []);
+					});
+					return;
+				}
+			}
+
+			let keys;
+			// Now we can safely create Request using CachedRequest
+			var request = new CachedRequest(sql, onInnerCompleted);
+			const params = addParameters(request, query.parameters, CachedTypes);
+
+			request.on('row', rows => {
+				const tmp = {};
+				if (!keys) {
+					keys = Object.keys(rows);
+				}
+				keys.forEach(cols => {
+					tmp[cols] = rows[cols].value;
+				});
+				result.push(tmp);
+			});
+
+			log.emitQuery({ sql, parameters: params });
+			connection.execSql(request);
+
+			function onInnerCompleted(err) {
+				if (err) {
+					onCompleted(extractError(err));
+				} else {
+					onCompleted(null, result);
+				}
+			}
+		}
+	}
+
+	// same helpers as before
+
+	function extractError(e) {
+		if (e && e.errors) {
+			return e.errors[0];
+		}
+		else {
+			return e;
+		}
+	}
+
+	function replaceParamChar(sql, params) {
+		if (params.length === 0)
+			return sql;
+		var splitted = sql.split('?');
+		sql = '';
+		var lastIndex = splitted.length - 1;
+		for (var i = 0; i < lastIndex; i++) {
+			sql += splitted[i] + '@' + i;
+		}
+		sql += splitted[lastIndex];
+		return sql;
+	}
+
+	function addParameters(request, params, TYPES) {
+		const res = [];
+		for (let i = 0; i < params.length; i++) {
+			const p = [`${i}`, toType(params[i]), params[i]];
+			request.addParameter.apply(request, p);
+			res.push(p);
+		}
+		return res;
+
+		function toType(p) {
+			if (typeof p === 'string')
+				return TYPES.VarChar;
+			else if (Number.isInteger(p))
+				return TYPES.Int;
+			else if (typeof p === 'number')
+				return TYPES.Money;
+			else if (p instanceof Date && !isNaN(p))
+				return TYPES.Date;
+			else if (Array.isArray(p))
+				return TYPES.NVarChar;
+			else if (Buffer.isBuffer(p))
+				return TYPES.VarBinary;
+			else if (typeof p === 'object' && p instanceof Object)
+				return TYPES.NVarChar;
+			else
+				throw new Error('Unknown data type');
+		}
+	}
+
+	wrapQuery_1$1 = wrapQuery;
+	return wrapQuery_1$1;
+}
+
+var newShallowColumnSql;
+var hasRequiredNewShallowColumnSql;
+
+function requireNewShallowColumnSql () {
+	if (hasRequiredNewShallowColumnSql) return newShallowColumnSql;
+	hasRequiredNewShallowColumnSql = 1;
+	const quote = requireQuote$2();
+
+	function _new(context, table, alias, span) {
+		alias = quote(alias);
+		let columnsMap = span.columns;
+		var columns = table._columns;
+		var sql = '';
+		var separator = '';
+
+		for (var i = 0; i < columns.length; i++) {
+			var column = columns[i];
+			if (!columnsMap || (columnsMap.get(column))) {
+				sql = sql + separator + formatColumn(column) + ' as ' + quote(column.alias);
+				separator = ',';
+			}
+		}
+
+		for (let name in span.aggregates || {}) {
+			sql = sql + separator + span.aggregates[name].expression(name);
+		}
+
+		return sql;
+
+		function formatColumn(column) {
+
+			const formatted = column.formatOut && column.tsType !== 'DateColumn' ? column.formatOut(context, alias) : alias + '.' + quote(column._dbName);
+			if (column.dbNull === null)
+				return formatted;
+			else {
+				const encoded = column.encode.unsafe(context, column.dbNull);
+				return `CASE WHEN ${formatted}=${encoded} THEN null ELSE ${formatted} END`;
+			}
+
+		}
+	}
+
+	newShallowColumnSql = _new;
+	return newShallowColumnSql;
+}
+
+var newSingleQuery;
+var hasRequiredNewSingleQuery;
+
+function requireNewSingleQuery () {
+	if (hasRequiredNewSingleQuery) return newSingleQuery;
+	hasRequiredNewSingleQuery = 1;
+	var newColumnSql = requireNewShallowColumnSql();
+	var newWhereSql = requireNewWhereSql();
+	var newParameterized = requireNewParameterized();
+
+	function _new(context, table, filter, span, alias, subQueries, orderBy, limit, offset) {
+		var columnSql = newColumnSql(context, table, alias, span);
+		var whereSql = newWhereSql(context, table, filter, alias);
+		if (limit)
+			limit = limit + ' ';
+
+		let join = '';
+		const set = new Set();
+		for (let key in span.aggregates) {
+			const agg = span.aggregates[key];
+			for (let sql of agg.joins) {
+				if (!set.has(sql)) {
+					join = join + sql;
+					set.add(sql);
+				}
+			}
+		}
+
+
+		return newParameterized('select ' + limit + columnSql).append(subQueries).append(' from ' + `[${table._dbName}] [${alias}]` + join).append(whereSql).append(orderBy + offset);
+	}
+
+	newSingleQuery = _new;
+	return newSingleQuery;
+}
+
+var joinLegToQuery_1;
+var hasRequiredJoinLegToQuery;
+
+function requireJoinLegToQuery () {
+	if (hasRequiredJoinLegToQuery) return joinLegToQuery_1;
+	hasRequiredJoinLegToQuery = 1;
+	const newShallowJoinSql = requireNewShallowJoinSqlCore();
+
+	function joinLegToQuery(newQuery, context, parentAlias, leg, _legNo) {
+		var childAlias = parentAlias + leg.name;
+		var span = leg.span;
+		var parentTable = leg.table;
+		var childColumns = span.table._primaryColumns;
+		var parentColumns = leg.columns;
+
+		var filter = newShallowJoinSql(context, parentTable, childColumns, parentColumns, childAlias, parentAlias, leg.span.where);
+		var query = newQuery(context, span.table, filter, span, childAlias);
+		return query.prepend('JSON_QUERY((').append(` FOR JSON PATH, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER)) "${leg.name}"`);
+	}
+
+	joinLegToQuery_1 = joinLegToQuery;
+	return joinLegToQuery_1;
+}
+
+var oneLegToQuery_1;
+var hasRequiredOneLegToQuery;
+
+function requireOneLegToQuery () {
+	if (hasRequiredOneLegToQuery) return oneLegToQuery_1;
+	hasRequiredOneLegToQuery = 1;
+	const newShallowJoinSql = requireNewShallowJoinSqlCore();
+	const newParameterized = requireNewParameterized();
+	const formatString = requireFormat();
+
+	function oneLegToQuery(newQuery, context, rightAlias, leg, _legNo) {
+		let leftAlias = rightAlias + leg.name;
+		let span = leg.span;
+		let rightTable = leg.table;
+		let rightColumns = rightTable._primaryColumns;
+		let leftColumns = leg.columns;
+
+		let filter = newShallowJoinSql(context, rightTable, leftColumns, rightColumns, leftAlias, rightAlias, leg.span.where);
+		let query = newQuery(context, span.table, filter, span, leftAlias);
+		let sql = 'SELECT TOP 1' + query.sql().substring(6);
+		return newParameterized(formatString('JSON_QUERY((%s FOR JSON PATH, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER)) "%s"', sql, leg.name), query.parameters);
+	}
+
+	oneLegToQuery_1 = oneLegToQuery;
+	return oneLegToQuery_1;
+}
+
+var manyLegToQuery_1;
+var hasRequiredManyLegToQuery;
+
+function requireManyLegToQuery () {
+	if (hasRequiredManyLegToQuery) return manyLegToQuery_1;
+	hasRequiredManyLegToQuery = 1;
+	const newShallowJoinSql = requireNewShallowJoinSqlCore();
+
+	function manyLegToQuery(newQuery, context, rightAlias, leg, _legNo) {
+		var leftAlias = rightAlias + leg.name;
+		var span = leg.span;
+		var rightTable = leg.table;
+		var rightColumns = rightTable._primaryColumns;
+		var leftColumns = leg.columns;
+
+		var filter = newShallowJoinSql(context, rightTable, leftColumns, rightColumns, leftAlias, rightAlias, leg.span.where);
+		var query = newQuery(context, span.table, filter, span, leftAlias);
+		return query.prepend('JSON_QUERY( coalesce((').append(` FOR JSON PATH, INCLUDE_NULL_VALUES),'[]')) "${leg.name}"`);
+	}
+
+	manyLegToQuery_1 = manyLegToQuery;
+	return manyLegToQuery_1;
+}
+
+var newSubQueries_1;
+var hasRequiredNewSubQueries;
+
+function requireNewSubQueries () {
+	if (hasRequiredNewSubQueries) return newSubQueries_1;
+	hasRequiredNewSubQueries = 1;
+	const newParameterized = requireNewParameterized();
+	const joinLegToQuery = requireJoinLegToQuery();
+	const oneLegToQuery = requireOneLegToQuery();
+	const manyLegToQuery = requireManyLegToQuery();
+
+	function newSubQueries(newQuery, context, _table, span, alias) {
+		var result = newParameterized('', []);
+		var c = {};
+		var _legNo;
+
+		c.visitJoin = function(leg) {
+			result = result.append(',').append(joinLegToQuery(newQuery, context, alias, leg, _legNo));
+		};
+		c.visitOne = function(leg) {
+			result = result.append(',').append(oneLegToQuery(newQuery, context, alias, leg, _legNo));
+		};
+		c.visitMany = function(leg) {
+			result = result.append(',').append(manyLegToQuery(newQuery, context, alias, leg, _legNo));
+		};
+
+		span.legs.forEach(onEachLeg);
+
+		function onEachLeg(leg, legNo) {
+			_legNo = legNo;
+			leg.accept(c);
+		}
+
+		return result;
+	}
+
+	newSubQueries_1 = newSubQueries;
+	return newSubQueries_1;
+}
+
+var newQueryCore;
+var hasRequiredNewQueryCore;
+
+function requireNewQueryCore () {
+	if (hasRequiredNewQueryCore) return newQueryCore;
+	hasRequiredNewQueryCore = 1;
+	var newSingleQuery = requireNewSingleQuery();
+	var newSubQueries = requireNewSubQueries();
+	var extractFilter = requireExtractFilter();
+	var extractOrderBy = requireExtractOrderBy();
+	var extractLimit = requireExtractLimit();
+	var limitAndOffset = requireLimitAndOffset$2();
+
+	function newQuery(context, table, filter, span, alias) {
+		filter = extractFilter(filter);
+		var orderBy = extractOrderBy(context, table, alias, span.orderBy);
+		var limit = extractLimit(context, span);
+		var offset = limitAndOffset(span);
+
+		var subQueries = newSubQueries(newQuery, context, table, span, alias);
+		return newSingleQuery(context, table, filter, span, alias, subQueries, orderBy, limit, offset);
+	}
+
+	newQueryCore = newQuery;
+	return newQueryCore;
+}
+
+var newQuery_1;
+var hasRequiredNewQuery;
+
+function requireNewQuery () {
+	if (hasRequiredNewQuery) return newQuery_1;
+	hasRequiredNewQuery = 1;
+	var newQueryCore = requireNewQueryCore();
+
+	function newQuery() {
+		var query = newQueryCore.apply(null, arguments);
+		return query.append(' FOR JSON path, INCLUDE_NULL_VALUES');
+	}
+
+	newQuery_1 = newQuery;
+	return newQuery_1;
+}
+
+var getManyDto_1;
+var hasRequiredGetManyDto;
+
+function requireGetManyDto () {
+	if (hasRequiredGetManyDto) return getManyDto_1;
+	hasRequiredGetManyDto = 1;
+	const newQuery = requireNewQuery();
+	const negotiateRawSqlFilter = requireNegotiateRawSqlFilter();
+	const strategyToSpan = requireStrategyToSpan();
+	const executeQueries = requireExecuteQueries();
+
+	async function getManyDto(context, table, filter, strategy) {
+		filter = negotiateRawSqlFilter(context, filter, table);
+		if (strategy && strategy.where) {
+			let arg = typeof strategy.where === 'function' ? strategy.where(table) : strategy.where;
+			filter = filter.and(context, arg);
+		}
+		let span = strategyToSpan(table, strategy);
+		let alias = table._dbName;
+
+		const query = newQuery(context, table, filter, span, alias);
+		const res = await executeQueries(context, [query]);
+		const rows = await res[0];
+		if (rows.length === 0)
+			return [];
+		let json = '';
+		for (let i = 0; i < rows.length; i++) {
+			json += rows[i]['JSON_F52E2B61-18A1-11d1-B105-00805F49916B'];
+		}
+		return JSON.parse(json);
+	}
+
+	getManyDto_1 = getManyDto;
+	return getManyDto_1;
+}
+
+var newTransaction$2;
+var hasRequiredNewTransaction$2;
+
+function requireNewTransaction$2 () {
+	if (hasRequiredNewTransaction$2) return newTransaction$2;
+	hasRequiredNewTransaction$2 = 1;
+	var wrapQuery = requireWrapQuery$1();
+	var encodeBoolean = requireEncodeBoolean$2();
+	var deleteFromSql = requireDeleteFromSql$2();
+	var selectForUpdateSql = requireSelectForUpdateSql$2();
+	const limitAndOffset = requireLimitAndOffset$2();
+	const insertSql = requireInsertSql$2();
+	const getManyDto = requireGetManyDto();
+	const formatDateOut = requireFormatDateOut$2();
+	const formatJSONOut = requireFormatJSONOut();
+	const insert = requireInsert$2();
+	const quote = requireQuote$2();
+
+	function newResolveTransaction(domain, pool, { readonly = false } = {}) {
+		var rdb = {poolFactory: pool};
+		if (!pool.connect) {
+			pool = pool();
+			rdb.pool = pool;
+		}
+		rdb.engine = 'mssql';
+		rdb.getManyDto = getManyDto;
+		rdb.encodeBoolean = encodeBoolean;
+		rdb.decodeJSON = decodeJSON;
+		rdb.encodeJSON = JSON.stringify;
+		rdb.deleteFromSql = deleteFromSql;
+		rdb.selectForUpdateSql = selectForUpdateSql;
+		rdb.lastInsertedIsSeparate = false;
+		rdb.insertSql = insertSql;
+		rdb.insert = insert;
+		rdb.formatDateOut = formatDateOut;
+		rdb.formatJSONOut = formatJSONOut;
+		rdb.multipleStatements = true;
+		rdb.begin = 'BEGIN TRANSACTION';
+		rdb.limit = (span) => {
+			if (span.offset)
+				return '';
+			else if (span.limit || span.limit === 0)
+				return 'TOP ' + span.limit;
+			else
+				return '';
+		};
+		rdb.limitAndOffset = limitAndOffset;
+		rdb.accept = function(caller) {
+			caller.visitSqlite();
+		};
+		rdb.aggregateCount = 0;
+		rdb.quote = quote;
+		rdb.cache = {};
+
+		if (readonly) {
+			rdb.dbClient = {
+				executeQuery: function(query, callback) {
+					pool.connect((err, client, done) => {
+						if (err) {
+							return callback(err);
+						}
+						try {
+							wrapQuery(domain, client)(query, (err, res) => {
+								done();
+								callback(err, res);
+							});
+						} catch (e) {
+							done();
+							callback(e);
+						}
+					});
+				}
+			};
+			domain.rdb = rdb;
+			return (onSuccess) => onSuccess();
+		}
+
+		return function(onSuccess, onError) {
+			pool.connect(onConnected);
+
+			function onConnected(err, client, done) {
+				try {
+					if (err) {
+						onError(err);
+						return;
+					}
+					client.executeQuery = wrapQuery(domain, client);
+					rdb.dbClient = client;
+					rdb.dbClientDone = done;
+					domain.rdb = rdb;
+					onSuccess();
+				} catch (e) {
+					onError(e);
+				}
+			}
+		};
+	}
+	function decodeJSON(value){
+		return JSON.parse(value);
+	}
+
+	newTransaction$2 = newResolveTransaction;
+	return newTransaction$2;
+}
+
+var end$2;
+var hasRequiredEnd$2;
+
+function requireEnd$2 () {
+	if (hasRequiredEnd$2) return end$2;
+	hasRequiredEnd$2 = 1;
+	var pools = requirePools();
+
+	function endPool(genericPool, id, done) {
+		genericPool.drain(onDrained);
+
+		function onDrained() {
+			genericPool.destroyAllNow();
+			delete pools[id];
+			done();
+		}
+	}
+
+	end$2 = endPool;
+	return end$2;
+}
+
+var require$$0 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(connectionString);
+
+var parseConnectionString_1;
+var hasRequiredParseConnectionString;
+
+function requireParseConnectionString () {
+	if (hasRequiredParseConnectionString) return parseConnectionString_1;
+	hasRequiredParseConnectionString = 1;
+	var { parseConnectionString } = require$$0;
+
+	function parse(connectionString) {
+		const config = { options: {useUTC: false}, authentication: { type: 'default', options: {} } };
+		const elements = parseConnectionString(connectionString);
+		for (const key in elements) {
+			const value = elements[key];
+			switch (key) {
+			case 'uid':
+				config.authentication.options.userName = value;
+				break;
+			case 'pwd':
+				config.authentication.options.password = value;
+				break;
+			case 'server':
+				config.server = value.split(',')[0];
+				if (value.split(',')[1] !== undefined)
+					config.options.port = Number.parseInt(value.split(',')[1]);
+				break;
+			case 'database':
+				config.options.database = value;
+				break;
+			case 'trustservercertificate':
+				config.options.trustServerCertificate = value.toLowerCase() === 'yes';
+				break;
+			case 'app':
+				config.options.appName = value;
+				break;
+			case 'appname':
+				config.options.appName = value;
+				break;
+			}
+		}
+		return config;
+	}
+
+	parseConnectionString_1 = parse;
+	return parseConnectionString_1;
+}
+
+var newGenericPool_1$1;
+var hasRequiredNewGenericPool$1;
+
+function requireNewGenericPool$1 () {
+	if (hasRequiredNewGenericPool$1) return newGenericPool_1$1;
+	hasRequiredNewGenericPool$1 = 1;
+	// @ts-nocheck
+	/* eslint-disable no-prototype-builtins */
+
+	var defaults = requirePoolDefaults();
+	var genericPool = requireGenericPool();
+	var tedious;
+	var parseConnectionString = requireParseConnectionString();
+
+	function newGenericPool(connectionString, poolOptions) {
+		if (typeof connectionString === 'string')
+			connectionString = parseConnectionString(connectionString);
+		if (typeof connectionString === 'object')
+			connectionString.options = { ...connectionString.options, ...{ useColumnNames: true } };
+		poolOptions = poolOptions || {};
+		var pool = genericPool.Pool({
+			max: poolOptions.size || poolOptions.poolSize || defaults.poolSize,
+			idleTimeoutMillis: poolOptions.idleTimeout || defaults.poolIdleTimeout,
+			reapIntervalMillis: poolOptions.reapIntervalMillis || defaults.reapIntervalMillis,
+			log: poolOptions.log || defaults.poolLog,
+			create: async function(cb) {
+				try {
+					if (!tedious)
+						tedious = await import('tedious');
+				} catch (err) {
+					return cb(err, null);
+				}
+				var client = new tedious.Connection(connectionString);
+				client.on('connect', onConnected);
+				client.connect();
+
+				function onConnected(err) {
+					if (err) {
+						if (err.errors)
+							return cb(err.errors[0], null);
+						else
+							return cb(err, null);
+					}
+					client.poolCount = 0;
+					return cb(null, client);
+				}
+			},
+
+			destroy: function(client) {
+				client.poolCount = undefined;
+				client.close();
+			}
+		});
+		//monkey-patch with connect method
+		pool.connect = function(cb) {
+			pool.acquire(function(err, client) {
+				if (err) return cb(err, null, function() {/*NOOP*/ });
+				client.poolCount++;
+				cb(null, client, function(err) {
+					if (err) {
+						pool.destroy(client);
+					} else {
+						pool.release(client);
+					}
+				});
+			});
+		};
+		return pool;
+	}
+
+	newGenericPool_1$1 = newGenericPool;
+	return newGenericPool_1$1;
+}
+
+var newPool_1$2;
+var hasRequiredNewPool$2;
+
+function requireNewPool$2 () {
+	if (hasRequiredNewPool$2) return newPool_1$2;
+	hasRequiredNewPool$2 = 1;
+	const promisify = requirePromisify();
+	const pools = requirePools();
+	const end = requireEnd$2();
+	const newGenericPool = requireNewGenericPool$1();
+	const newId = requireNewId();
+
+	function newPool(connectionString, poolOptions) {
+		let pool = newGenericPool(connectionString, poolOptions);
+		let id = newId();
+		let boundEnd = end.bind(null, pool, id);
+		let c = {};
+
+		c.connect = pool.connect;
+		c.end = promisify(boundEnd);
+		pools[id] = c;
+		return c;
+	}
+
+	newPool_1$2 = newPool;
+	return newPool_1$2;
+}
+
+var newDatabase_1$2;
+var hasRequiredNewDatabase$2;
+
+function requireNewDatabase$2 () {
+	if (hasRequiredNewDatabase$2) return newDatabase_1$2;
+	hasRequiredNewDatabase$2 = 1;
+	let createDomain = requireCreateDomain();
+	let newTransaction = requireNewTransaction$2();
+	let _begin = requireBegin();
+	let commit = requireCommit();
+	let rollback = requireRollback();
+	let newPool = requireNewPool$2();
+	let express = requireHostExpress();
+	let hostLocal = requireHostLocal();
+	let doQuery = requireQuery();
+	let releaseDbClient = requireReleaseDbClient();
+	let setSessionSingleton = requireSetSessionSingleton();
+
+	function newDatabase(connectionString, poolOptions) {
+		if (!connectionString)
+			throw new Error('Connection string cannot be empty');
+		var pool;
+		if (!poolOptions)
+			pool = newPool.bind(null, connectionString, poolOptions);
+		else
+			pool = newPool(connectionString, poolOptions);
+
+		let c = { poolFactory: pool, hostLocal, express };
+
+		c.transaction = function(options, fn) {
+			if ((arguments.length === 1) && (typeof options === 'function')) {
+				fn = options;
+				options = undefined;
+			}
+			let domain = createDomain();
+
+			if (fn)
+				return domain.run(runInTransaction);
+			else
+				return domain.run(run);
+
+			function begin() {
+				return _begin(domain, options);
+			}
+
+			async function runInTransaction() {
+				let result;
+				let transaction = newTransaction(domain, pool, options);
+				await new Promise(transaction)
+					.then(begin)
+					.then(() => fn(domain))
+					.then((res) => result = res)
+					.then(() => c.commit(domain))
+					.then(null, (e) => c.rollback(domain,e));
+				return result;
+			}
+
+
+			function run() {
+				let p;
+				let transaction = newTransaction(domain, pool, options);
+				p = new Promise(transaction);
+
+				return p.then(begin);
+			}
+
+		};
+
+		c.createTransaction = function(options) {
+			let domain = createDomain();
+			let transaction = newTransaction(domain, pool);
+			let p = domain.run(() => new Promise(transaction).then(begin));
+
+			function run(fn) {
+				return p.then(domain.run.bind(domain, fn));
+			}
+
+			run.rollback = rollback.bind(null, domain);
+			run.commit = commit.bind(null, domain);
+			return run;
+
+
+			function begin() {
+				return _begin(domain, options);
+			}
+
+		};
+
+		c.query = function(query) {
+			let domain = createDomain();
+			let transaction = newTransaction(domain, pool);
+			let p = domain.run(() => new Promise(transaction)
+				.then(() => setSessionSingleton(domain, 'changes', []))
+				.then(() => doQuery(domain, query).then(onResult, onError)));
+			return p;
+
+			function onResult(result) {
+				releaseDbClient(domain);
+				return result;
+			}
+
+			function onError(e) {
+				releaseDbClient(domain);
+				throw e;
+			}
+		};
+
+
+		c.rollback = rollback;
+		c.commit = commit;
+
+		c.end = function() {
+			if (poolOptions)
+				return pool.end();
+			else
+				return Promise.resolve();
+		};
+
+		c.accept = function(caller) {
+			caller.visitSqlite();
+		};
+
+
+		return c;
+	}
+
+	newDatabase_1$2 = newDatabase;
+	return newDatabase_1$2;
+}
+
+var encodeBoolean_1$1;
+var hasRequiredEncodeBoolean$1;
+
+function requireEncodeBoolean$1 () {
+	if (hasRequiredEncodeBoolean$1) return encodeBoolean_1$1;
+	hasRequiredEncodeBoolean$1 = 1;
+	function encodeBoolean(bool) {
+		if (bool)
+			return 1;
+		return 0;
+	}
+
+	encodeBoolean_1$1 = encodeBoolean;
+	return encodeBoolean_1$1;
+}
+
+var quote$1;
+var hasRequiredQuote$1;
+
+function requireQuote$1 () {
+	if (hasRequiredQuote$1) return quote$1;
+	hasRequiredQuote$1 = 1;
+	quote$1 = (name) => `[${name}]`;
+	return quote$1;
+}
+
+var deleteFromSql_1$1;
+var hasRequiredDeleteFromSql$1;
+
+function requireDeleteFromSql$1 () {
+	if (hasRequiredDeleteFromSql$1) return deleteFromSql_1$1;
+	hasRequiredDeleteFromSql$1 = 1;
+	var format = 'delete from %s from %s as %s %s';
+	const formatString = requireFormat();
+	const quote = requireQuote$1();
+
+	function deleteFromSql(table, alias, whereSql) {
+		var name = quote(table._dbName);
+		alias = quote(alias)	;
+		return formatString(format, name, name, alias, whereSql);
+	}
+	deleteFromSql_1$1 = deleteFromSql;
+	return deleteFromSql_1$1;
+}
+
+var selectForUpdateSql$1;
+var hasRequiredSelectForUpdateSql$1;
+
+function requireSelectForUpdateSql$1 () {
+	if (hasRequiredSelectForUpdateSql$1) return selectForUpdateSql$1;
+	hasRequiredSelectForUpdateSql$1 = 1;
+	const quote = requireQuote$6();
+
+	selectForUpdateSql$1 = function(alias) {
+		return ' FOR UPDATE OF ' + quote(alias);
+	};
+	return selectForUpdateSql$1;
+}
+
+var lastInsertedSql_1$1;
+var hasRequiredLastInsertedSql$1;
+
+function requireLastInsertedSql$1 () {
+	if (hasRequiredLastInsertedSql$1) return lastInsertedSql_1$1;
+	hasRequiredLastInsertedSql$1 = 1;
+	function lastInsertedSql(context, table, keyValues) {
+		return keyValues.map((value, i) => {
+			let column = table._primaryColumns[i];
+			if (value === undefined && column.tsType === 'NumberColumn')
+				return `${column._dbName}=@@identity`;
+			else
+				return column.eq(context, value);
+		});
+
+	}
+
+	lastInsertedSql_1$1 = lastInsertedSql;
+	return lastInsertedSql_1$1;
+}
+
+var formatDateOut_1;
+var hasRequiredFormatDateOut$1;
+
+function requireFormatDateOut$1 () {
+	if (hasRequiredFormatDateOut$1) return formatDateOut_1;
+	hasRequiredFormatDateOut$1 = 1;
+	const quote = requireQuote$1();
+
+	function formatDateOut(column, alias) {
+		return `CONVERT(VARCHAR, ${alias}.${quote(column._dbName)}, 23)`;
+	}
+
+	formatDateOut_1 = formatDateOut;
+	return formatDateOut_1;
+}
+
+var mergeSql$1;
+var hasRequiredMergeSql$1;
+
+function requireMergeSql$1 () {
+	if (hasRequiredMergeSql$1) return mergeSql$1;
+	hasRequiredMergeSql$1 = 1;
+	const quote = requireQuote$1();
+
+	function insertSql(table, row, options) {
+		let columnNames = [];
+		let conflictColumnUpdateSql = '';
+		let values = [];
+		addDiscriminators();
+		addColumns();
+
+		const matched = whenMatched();
+		let sql;
+		if (matched)
+			sql = `MERGE INTO ${quote(table._dbName)} AS target USING (SELECT ${values.join(',')}) AS source ON ${join()} WHEN MATCHED THEN ${matched} WHEN NOT MATCHED THEN ${whenNotMatched()};`;
+		else
+			sql = `MERGE INTO ${quote(table._dbName)} AS target USING (SELECT ${values.join(',')}) AS source ON ${join()} WHEN NOT MATCHED THEN ${whenNotMatched()};`;
+
+		return sql;
+
+		function join() {
+			const discriminators = table._columnDiscriminators.map(x => {
+				const name = quote(x.split('=')[0]);
+
+				return `target.${name}=source.${name}`;
+			});
+			const primaries = table._primaryColumns.map(x => `target.${quote(x._dbName)}=source.${quote(x._dbName)}`);
+			return [...discriminators, ...primaries].join(' AND ');
+		}
+
+		function whenMatched() {
+			if (options.concurrency === 'skipOnConflict' || options.concurrency === 'overwrite') {
+				return conflictColumnUpdateSql;
+			}
+			else return '';
+		}
+
+		function whenNotMatched() {
+			return `INSERT (${columnNames.join(',')}) VALUES (${columnNames.map(name => 'source.' + name)})`;
+		}
+
+		function addDiscriminators() {
+			let discriminators = table._columnDiscriminators;
+			for (let i = 0; i < discriminators.length; i++) {
+				let parts = discriminators[i].split('=');
+				columnNames.push(quote(parts[0]));
+				values.push(`${parts[1]} AS ${parts[0]}`);
+			}
+		}
+
+		function addColumns() {
+			let conflictColumnUpdates = [];
+			let columns = table._columns;
+			for (let i = 0; i < columns.length; i++) {
+				let column = columns[i];
+				const columnName = quote(column._dbName);
+				if (row['__' + column.alias] !== undefined) {
+					columnNames.push(columnName);
+					values.push(`%s AS ${quote(column.alias)}`);
+					addConflictUpdate(column);
+				}
+			}
+			if (conflictColumnUpdates.length > 0)
+				conflictColumnUpdateSql = 'UPDATE SET ' + conflictColumnUpdates.join(',');
+
+			function addConflictUpdate(column) {
+				let concurrency = options[column.alias]?.concurrency || options.concurrency;
+				const columnName = quote(column._dbName);
+				if (concurrency === 'overwrite')
+					conflictColumnUpdates.push(`target.${columnName}=source.${columnName}`);
+				else if (concurrency === 'optimistic')
+					conflictColumnUpdates.push(`target.${columnName} = CASE WHEN target.${columnName} <> source.${columnName} THEN CAST('12345678-1234-1234-1234-123456789012Conflict when updating ${columnName}12345678-1234-1234-1234-123456789012' AS INTEGER) ELSE target.${columnName} END`);
+			}
+		}
+	}
+
+	mergeSql$1 = insertSql;
+	return mergeSql$1;
+}
+
+var insertSql_1$1;
+var hasRequiredInsertSql$1;
+
+function requireInsertSql$1 () {
+	if (hasRequiredInsertSql$1) return insertSql_1$1;
+	hasRequiredInsertSql$1 = 1;
+	const mergeSql = requireMergeSql$1();
+	const quote = requireQuote$1();
+
+	function getSqlTemplate(_context, _table, _row, options) {
+
+		if (hasConcurrency(_table, options) && hasColumns())
+			return mergeSql.apply(null, [...arguments].slice(1));
+		else
+			return insertSql.apply(null, [...arguments].slice(1));
+
+		function hasColumns() {
+			for(let p in _row) {
+				let alias = _table[p]?.alias;
+				if (alias &&  _row['__' + alias] !== undefined && _table[p]?.equal)
+					return true;
+			}
+		}
+	}
+
+	function hasConcurrency(table,options) {
+		for (let i = 0; i < table._primaryColumns.length; i++) {
+			const concurrency = options[table._primaryColumns[i]]?.concurrency;
+			if ( concurrency === 'skipOnConflict' || concurrency === 'overwrite' )
+				return true;
+		}
+		return options.concurrency === 'skipOnConflict' || options.concurrency === 'overwrite';
+	}
+
+	function insertSql(table, row) {
+		let columnNames = [];
+		let regularColumnNames = [];
+		let values = [];
+		let sql = 'INSERT INTO ' + quote(table._dbName) + ' ';
+		addDiscriminators();
+		addColumns();
+		if (columnNames.length === 0)
+			sql += ' VALUES()';
+		else
+			sql = sql + '('+ columnNames.join(',') + ')' + ' VALUES (' + values.join(',') + ')';
+		return sql;
+
+		function addDiscriminators() {
+			let discriminators = table._columnDiscriminators;
+			for (let i = 0; i < discriminators.length; i++) {
+				let parts = discriminators[i].split('=');
+				columnNames.push(quote(parts[0]));
+				values.push(parts[1]);
+			}
+		}
+
+		function addColumns() {
+			let columns = table._columns;
+			for (let i = 0; i < columns.length; i++) {
+				let column = columns[i];
+				const columnName = quote(column._dbName);
+				regularColumnNames.push(column._dbName);
+				if (row['__' + column.alias] !== undefined) {
+					columnNames.push(columnName);
+					values.push('%s');
+				}
+			}
+		}
+
+	}
+
+	insertSql_1$1 = getSqlTemplate;
+	return insertSql_1$1;
+}
+
+var insert;
+var hasRequiredInsert$1;
+
+function requireInsert$1 () {
+	if (hasRequiredInsert$1) return insert;
+	hasRequiredInsert$1 = 1;
+	let newInsertCommand = requireNewInsertCommand();
+	let newInsertCommandCore = requireNewInsertCommandCore$1();
+	let newGetLastInsertedCommand = requireNewGetLastInsertedCommand();
+	let executeQueries = requireExecuteQueries();
+	let pushCommand = requirePushCommand();
+
+
+	function insertDefault(context, table, row, options) {
+		let commands = [];
+		let insertCmd = newInsertCommand(newInsertCommandCore.bind(null, context), table, row, options);
+		insertCmd.disallowCompress = true;
+		pushCommand(context, insertCmd);
+
+		let selectCmd = newGetLastInsertedCommand(context, table, row, insertCmd);
+		commands.push(selectCmd);
+
+		return executeQueries(context, commands).then((result) => result[result.length - 1]);
+
+	}
+
+	insert = insertDefault;
+	return insert;
+}
+
+var limitAndOffset_1$1;
+var hasRequiredLimitAndOffset$1;
+
+function requireLimitAndOffset$1 () {
+	if (hasRequiredLimitAndOffset$1) return limitAndOffset_1$1;
+	hasRequiredLimitAndOffset$1 = 1;
+	function limitAndOffset(span) {
+		if (span.offset)
+			return ` ROWS ${limit()} OFFSET ${span.offset}`;
+		else
+			return '';
+
+		function limit() {
+			if (span.limit || span.limit === 0)
+				return ` LIMIT ${span.limit}`;
+			else
+				return '';
+		}
+
+	}
+
+	limitAndOffset_1$1 = limitAndOffset;
+	return limitAndOffset_1$1;
+}
+
+var newTransaction$1;
+var hasRequiredNewTransaction$1;
+
+function requireNewTransaction$1 () {
+	if (hasRequiredNewTransaction$1) return newTransaction$1;
+	hasRequiredNewTransaction$1 = 1;
+	const wrapQuery = requireWrapQuery$2();
+	const encodeBoolean = requireEncodeBoolean$1();
+	const deleteFromSql = requireDeleteFromSql$1();
+	const selectForUpdateSql = requireSelectForUpdateSql$1();
+	const lastInsertedSql = requireLastInsertedSql$1();
+	const formatDateOut = requireFormatDateOut$1();
+	const insertSql = requireInsertSql$1();
+	const insert = requireInsert$1();
+	const limitAndOffset = requireLimitAndOffset$1();
+	const quote = requireQuote$1();
+
+	function newResolveTransaction(domain, pool, { readonly = false } = {}) {
+		var rdb = {poolFactory: pool};
+		if (!pool.connect) {
+			pool = pool();
+			rdb.pool = pool;
+		}
+		rdb.engine = 'sap';
+		rdb.encodeBoolean = encodeBoolean;
+		rdb.decodeJSON = decodeJSON;
+		rdb.encodeJSON = JSON.stringify;
+		rdb.deleteFromSql = deleteFromSql;
+		rdb.selectForUpdateSql = selectForUpdateSql;
+		rdb.formatDateOut = formatDateOut;
+		rdb.lastInsertedSql = lastInsertedSql;
+		rdb.insertSql = insertSql;
+		rdb.insert = insert;
+		rdb.lastInsertedIsSeparate = true;
+		rdb.multipleStatements = false;
+		rdb.begin = 'BEGIN TRANSACTION';
+		rdb.limit = (span) => {
+			if (span.offset)
+				return '';
+			else if (span.limit || span.limit === 0)
+				return 'TOP ' + span.limit;
+			else
+				return '';
+		};
+		rdb.limitAndOffset = limitAndOffset;
+		rdb.accept = function(caller) {
+			caller.visitSap();
+		};
+		rdb.aggregateCount = 0;
+		rdb.quote = quote;
+		rdb.cache = {};
+
+		if (readonly) {
+			rdb.dbClient = {
+				executeQuery: function(query, callback) {
+					pool.connect((err, client, done) => {
+						if (err) {
+							return callback(err);
+						}
+						try {
+							wrapQuery(domain, client)(query, (err, res) => {
+								done();
+								callback(err, res);
+							});
+						} catch (e) {
+							done();
+							callback(e);
+						}
+					});
+				}
+			};
+			domain.rdb = rdb;
+			return (onSuccess) => onSuccess();
+		}
+
+
+		return function(onSuccess, onError) {
+			pool.connect(onConnected);
+
+			function onConnected(err, client, done) {
+				try {
+					if (err) {
+						onError(err);
+						return;
+					}
+					client.executeQuery = wrapQuery(domain, client);
+					rdb.dbClient = client;
+					rdb.dbClientDone = done;
+					domain.rdb = rdb;
+					onSuccess();
+				} catch (e) {
+					onError(e);
+				}
+			}
+		};
+	}
+
+	function decodeJSON(value) {
+		return JSON.parse(value);
+	}
+
+	newTransaction$1 = newResolveTransaction;
+	return newTransaction$1;
+}
+
+var end$1;
+var hasRequiredEnd$1;
+
+function requireEnd$1 () {
+	if (hasRequiredEnd$1) return end$1;
+	hasRequiredEnd$1 = 1;
+	var pools = requirePools();
+
+	function endPool(genericPool, id, done) {
+		genericPool.drain(onDrained);
+
+		function onDrained() {
+			genericPool.destroyAllNow();
+			delete pools[id];
+			done();
+		}
+	}
+
+	end$1 = endPool;
+	return end$1;
+}
+
+var newPool_1$1;
+var hasRequiredNewPool$1;
+
+function requireNewPool$1 () {
+	if (hasRequiredNewPool$1) return newPool_1$1;
+	hasRequiredNewPool$1 = 1;
+	const promisify = requirePromisify();
+	var pools = requirePools();
+	var end = requireEnd$1();
+	var newGenericPool = requireNewGenericPool$2();
+	var newId = requireNewId();
+
+	function newPool(connectionString, poolOptions) {
+		var pool = newGenericPool(connectionString, poolOptions);
+		var id = newId();
+		var boundEnd = end.bind(null, pool, id);
+		var c = {};
+
+		c.connect = pool.connect;
+		c.end = promisify(boundEnd);
+		pools[id] = c;
+		return c;
+	}
+
+	newPool_1$1 = newPool;
+	return newPool_1$1;
+}
+
+var newDatabase_1$1;
+var hasRequiredNewDatabase$1;
+
+function requireNewDatabase$1 () {
+	if (hasRequiredNewDatabase$1) return newDatabase_1$1;
+	hasRequiredNewDatabase$1 = 1;
+	let createDomain = requireCreateDomain();
+	let newTransaction = requireNewTransaction$1();
+	let _begin = requireBegin();
+	let commit = requireCommit();
+	let rollback = requireRollback();
+	let newPool = requireNewPool$1();
+	let express = requireHostExpress();
+	let hostLocal = requireHostLocal();
+	let doQuery = requireQuery();
+	let releaseDbClient = requireReleaseDbClient();
+	let setSessionSingleton = requireSetSessionSingleton();
+
+	function newDatabase(connectionString, poolOptions) {
+		if (!connectionString)
+			throw new Error('Connection string cannot be empty');
+		var pool;
+		if (!poolOptions)
+			pool = newPool.bind(null,connectionString, poolOptions);
+		else
+			pool = newPool(connectionString, poolOptions);
+
+		let c = {poolFactory: pool, hostLocal, express};
+
+		c.transaction = function(options, fn) {
+			if ((arguments.length === 1) && (typeof options === 'function')) {
+				fn = options;
+				options = undefined;
+			}
+			let domain = createDomain();
+
+			if (fn)
+				return domain.run(runInTransaction);
+			else
+				return domain.run(run);
+
+
+			function begin() {
+				return _begin(domain, options);
+			}
+
+			async function runInTransaction() {
+				let result;
+				let transaction = newTransaction(domain, pool, options);
+				await new Promise(transaction)
+					.then(begin)
+					.then(() => fn(domain))
+					.then((res) => result = res)
+					.then(() => commit(domain))
+					.then(null, (e) => rollback(domain, e));
+				return result;
+
+			}
+
+			function run() {
+				let p;
+				let transaction = newTransaction(domain, pool, options);
+				p = new Promise(transaction);
+
+				return p.then(begin);
+			}
+
+		};
+
+		c.createTransaction = function(options) {
+			let domain = createDomain();
+			let transaction = newTransaction(domain, pool);
+			let p = domain.run(() => new Promise(transaction).then(begin));
+
+			function run(fn) {
+				return p.then(() => fn(domain));
+			}
+
+			function begin() {
+				return _begin(domain, options);
+			}
+
+			run.rollback = rollback.bind(null, domain);
+			run.commit = commit.bind(null, domain);
+
+			return run;
+
+		};
+
+
+
+		c.query = function(query) {
+			let domain = createDomain();
+			let transaction = newTransaction(domain, pool);
+			let p = domain.run(() => new Promise(transaction)
+				.then(() => setSessionSingleton(domain, 'changes', []))
+				.then(() => doQuery(domain, query).then(onResult, onError)));
+			return p;
+
+			function onResult(result) {
+				releaseDbClient(domain);
+				return result;
+			}
+
+			function onError(e) {
+				releaseDbClient(domain);
+				throw e;
+			}
+		};
+
+		c.rollback = rollback;
+		c.commit = commit;
+
+		c.end = function() {
+			if (poolOptions)
+				return pool.end();
+			else
+				return Promise.resolve();
+		};
+
+		c.accept = function(caller) {
+			caller.visitSap();
+		};
+
+		return c;
+	}
+
+	newDatabase_1$1 = newDatabase;
+	return newDatabase_1$1;
+}
+
+var replaceParamChar_1;
+var hasRequiredReplaceParamChar;
+
+function requireReplaceParamChar () {
+	if (hasRequiredReplaceParamChar) return replaceParamChar_1;
+	hasRequiredReplaceParamChar = 1;
+	function replaceParamChar(query, params) {
+		if (params.length === 0)
+			return query.sql();
+		var splitted = query.sql().split('?');
+		var sql = '';
+		var lastIndex = splitted.length - 1;
+		for (var i = 0; i < lastIndex; i++) {
+			sql += splitted[i] + ':p' + (i + 1);
+		}
+		sql += splitted[lastIndex];
+		return sql;
+	}
+
+	replaceParamChar_1 = replaceParamChar;
+	return replaceParamChar_1;
+}
+
+var wrapQuery_1;
+var hasRequiredWrapQuery;
+
+function requireWrapQuery () {
+	if (hasRequiredWrapQuery) return wrapQuery_1;
+	hasRequiredWrapQuery = 1;
+	var log = requireLog();
+	var replaceParamChar = requireReplaceParamChar();
+
+	function wrapQuery(_context, connection) {
+		var runOriginalQuery = connection.execute;
+		return runQuery;
+
+		function runQuery(query, onCompleted) {
+			var params = query.parameters;
+			var sql = replaceParamChar(query, params);
+			log.emitQuery({ sql, parameters: params });
+
+			runOriginalQuery.call(connection, sql, params, {
+				fetchTypeHandler: function(metaData) {
+					// Tells the database to return column names in lowercase
+					metaData.name = metaData.name.toLowerCase();
+				}
+			}, onInnerCompleted);
+
+			function onInnerCompleted(err, rows) {
+				if (err)
+					onCompleted(err);
+				else {
+					if (rows.rows)
+						rows = rows.rows;
+					else
+						rows = [rows];
+					onCompleted(null, rows);
+				}
+			}
+		}
+
+	}
+
+	wrapQuery_1 = wrapQuery;
+	return wrapQuery_1;
+}
+
+var encodeBoolean_1;
+var hasRequiredEncodeBoolean;
+
+function requireEncodeBoolean () {
+	if (hasRequiredEncodeBoolean) return encodeBoolean_1;
+	hasRequiredEncodeBoolean = 1;
+	function encodeBoolean(bool) {
+		if (bool)
+			return 1;
+		return 0;
+	}
+
+	encodeBoolean_1 = encodeBoolean;
+	return encodeBoolean_1;
+}
+
+var quote;
+var hasRequiredQuote;
+
+function requireQuote () {
+	if (hasRequiredQuote) return quote;
+	hasRequiredQuote = 1;
+	quote = (name) => `"${name}"`;
+	return quote;
+}
+
+var deleteFromSql_1;
+var hasRequiredDeleteFromSql;
+
+function requireDeleteFromSql () {
+	if (hasRequiredDeleteFromSql) return deleteFromSql_1;
+	hasRequiredDeleteFromSql = 1;
+	const format = 'delete from %s where %s.rowId in (SELECT %s.rowId FROM %s %s%s)';
+	const formatString = requireFormat();
+	const quote = requireQuote();
+
+	function deleteFromSql(table, alias, whereSql) {
+		const name = quote(table._dbName);
+		alias = quote(alias);
+		return formatString(format, name, name, alias, name, alias, whereSql);
+	}
+	deleteFromSql_1 = deleteFromSql;
+	return deleteFromSql_1;
+}
+
+var selectForUpdateSql;
+var hasRequiredSelectForUpdateSql;
+
+function requireSelectForUpdateSql () {
+	if (hasRequiredSelectForUpdateSql) return selectForUpdateSql;
+	hasRequiredSelectForUpdateSql = 1;
+	const quote = requireQuote$6();
+
+	selectForUpdateSql = function(alias) {
+		return ' FOR UPDATE OF ' + quote(alias);
+	};
+	return selectForUpdateSql;
+}
+
+var lastInsertedSql_1;
+var hasRequiredLastInsertedSql;
+
+function requireLastInsertedSql () {
+	if (hasRequiredLastInsertedSql) return lastInsertedSql_1;
+	hasRequiredLastInsertedSql = 1;
+	let getSessionSingleton = requireGetSessionSingleton();
+
+	function lastInsertedSql(context,table, keyValues) {
+		return keyValues.map((value,i) => {
+			let column = table._primaryColumns[i];
+			if (value === undefined)
+				return `ROWID='${getSessionSingleton(context, 'lastRowid')}'`;
+			else
+				return column.eq(context, value);
+		});
+
+	}
+
+	lastInsertedSql_1 = lastInsertedSql;
+	return lastInsertedSql_1;
+}
+
+var limitAndOffset_1;
+var hasRequiredLimitAndOffset;
+
+function requireLimitAndOffset () {
+	if (hasRequiredLimitAndOffset) return limitAndOffset_1;
+	hasRequiredLimitAndOffset = 1;
+	function limitAndOffset(span) {
+		if (span.offset)
+			return ` OFFSET ${span.offset} ROWS FETCH NEXT ${limit()} ROWS ONLY`;
+		else if (span.limit || span.limit === 0)
+			return ` FETCH FIRST ${span.limit} ROWS ONLY`;
+		else
+			return '';
+
+		function limit() {
+			if (span.limit || span.limit === 0)
+				return span.limit;
+			else
+				return '';
+		}
+
+	}
+
+	limitAndOffset_1 = limitAndOffset;
+	return limitAndOffset_1;
+}
+
+var mergeSql;
+var hasRequiredMergeSql;
+
+function requireMergeSql () {
+	if (hasRequiredMergeSql) return mergeSql;
+	hasRequiredMergeSql = 1;
+	const quote = requireQuote();
+
+	function insertSql(table, row, options) {
+		let columnNames = [];
+		let conflictColumnUpdateSql = '';
+		let values = [];
+		addDiscriminators();
+		addColumns();
+
+		const matched = whenMatched();
+		let sql;
+		if (matched)
+			sql = `MERGE INTO ${quote(table._dbName)} target USING (SELECT ${values.join(',')} FROM DUAL) source ON (${join()}) WHEN MATCHED THEN ${matched} WHEN NOT MATCHED THEN ${whenNotMatched()}`;
+		else
+			sql = `MERGE INTO ${quote(table._dbName)} target USING (SELECT ${values.join(',')} FROM DUAL) source ON (${join()}) WHEN NOT MATCHED THEN ${whenNotMatched()}`;
+		return sql;
+
+		function join() {
+			const discriminators = table._columnDiscriminators.map(x => {
+				const name = x.split('=')[0];
+				return `target."${name}"=source."${name}"`;
+			});
+			const primaries = table._primaryColumns.map(x => `target.${quote(x._dbName)}=source.${quote(x._dbName)}`);
+			return [...discriminators, ...primaries].join(' AND ');
+		}
+
+		function whenMatched() {
+			if (options.concurrency === 'skipOnConflict' || options.concurrency === 'overwrite') {
+				return conflictColumnUpdateSql;
+			}
+			else return '';
+		}
+
+		function whenNotMatched() {
+			return `INSERT (${columnNames.join(',')}) VALUES (${columnNames.map(name => 'source.' + name)})`;
+		}
+
+		function addDiscriminators() {
+			let discriminators = table._columnDiscriminators;
+			for (let i = 0; i < discriminators.length; i++) {
+				let parts = discriminators[i].split('=');
+				columnNames.push(quote(parts[0]));
+				values.push(`${parts[1]} ${quote(parts[0])}`);
+			}
+		}
+
+		function addColumns() {
+			let conflictColumnUpdates = [];
+			let columns = table._columns;
+			for (let i = 0; i < columns.length; i++) {
+				let column = columns[i];
+				const columnName = quote(column._dbName);
+				if (row['__' + column.alias] !== undefined) {
+					columnNames.push(columnName);
+					values.push(`%s ${quote(column.alias)}`);
+					if (!column.isPrimary)
+						addConflictUpdate(column);
+				}
+			}
+
+			if (conflictColumnUpdates.length > 0)
+				conflictColumnUpdateSql = 'UPDATE SET ' + conflictColumnUpdates.join(',');
+
+
+			function addConflictUpdate(column) {
+				let concurrency = options[column.alias]?.concurrency || options.concurrency;
+				const columnName = quote(column._dbName);
+				if (concurrency === 'overwrite')
+					conflictColumnUpdates.push(`target.${columnName}=source.${columnName}`);
+				else if (concurrency === 'optimistic')
+					conflictColumnUpdates.push(`target.${columnName} = CASE WHEN target.${columnName} <> source.${columnName} THEN 1/0 ELSE target.${columnName} END`);
+
+			}
+		}
+	}
+
+	mergeSql = insertSql;
+	return mergeSql;
+}
+
+var insertSql_1;
+var hasRequiredInsertSql;
+
+function requireInsertSql () {
+	if (hasRequiredInsertSql) return insertSql_1;
+	hasRequiredInsertSql = 1;
+	let mergeSql = requireMergeSql();
+	const quote = requireQuote();
+
+	function getSqlTemplate(_context, _table, _row, options) {
+		if (hasConcurrency(_table, options) && hasColumns())
+			return mergeSql.apply(null, [...arguments].slice(1));
+		else
+			return insertSql.apply(null, [...arguments].slice(1));
+
+		function hasColumns() {
+			for(let p in _row) {
+				let alias = _table[p]?.alias;
+				if (alias &&  _row['__' + alias] !== undefined && _table[p]?.equal)
+					return true;
+			}
+		}
+	}
+
+	function hasConcurrency(table,options) {
+		for (let i = 0; i < table._primaryColumns.length; i++) {
+			const concurrency = options[table._primaryColumns[i]]?.concurrency;
+			if ( concurrency === 'skipOnConflict' || concurrency === 'overwrite' )
+				return true;
+		}
+		return options.concurrency === 'skipOnConflict' || options.concurrency === 'overwrite';
+	}
+
+	function insertSql(table, row) {
+		let columnNames = [];
+		let values = [];
+		let sql = 'INSERT INTO "' + table._dbName + '" ';
+		addDiscriminators();
+		addColumns();
+		if (columnNames.length === 0)
+			sql += ` (${quote(table._primaryColumns[0]._dbName)}) VALUES(DEFAULT)`;
+		else
+			sql = sql + '('+ columnNames.join(',') + ')'  +  ' VALUES (' + values.join(',') + ')';
+		return sql;
+
+		function addDiscriminators() {
+			let discriminators = table._columnDiscriminators;
+			for (let i = 0; i < discriminators.length; i++) {
+				let parts = discriminators[i].split('=');
+				columnNames.push(quote(parts[0]));
+				values.push(parts[1]);
+			}
+		}
+
+		function addColumns() {
+			let columns = table._columns;
+			for (let i = 0; i < columns.length; i++) {
+				let column = columns[i];
+				const columnName = quote(column._dbName);
+				if (row['__' + column.alias] !== undefined) {
+					columnNames.push(columnName);
+					if (column.tsType === 'DateColumn')
+						values.push('TO_TIMESTAMP(%s, \'YYYY-MM-DD"T"HH24:MI:SS.FF6\')');
+					else
+						values.push('%s');
+				}
+			}
+		}
+
+	}
+
+	insertSql_1 = getSqlTemplate;
+	return insertSql_1;
+}
+
+var newInsertCommandCore_1;
+var hasRequiredNewInsertCommandCore;
+
+function requireNewInsertCommandCore () {
+	if (hasRequiredNewInsertCommandCore) return newInsertCommandCore_1;
+	hasRequiredNewInsertCommandCore = 1;
+	var newParameterized = requireNewParameterized();
+	var insertSql = requireInsertSql();
+	const formatString = requireFormat();
+
+	function newInsertCommandCore(context,table, row, options = {}) {
+		var parameters = [];
+		var values = [insertSql(context,table, row, options)];
+
+		var columns = table._columns;
+		for (var i = 0; i < columns.length; i++) {
+			var column = columns[i];
+			var alias = column.alias;
+			if (row['__' + column.alias] !== undefined) {
+				var encoded = column.encode(context, row[alias]);
+				if (encoded.parameters.length > 0) {
+					values.push('?');
+					parameters.push(encoded.parameters[0]);
+				} else
+					values.push(encoded.sql());
+			}
+		}
+
+		var sql = formatString.apply(null, values);
+		return newParameterized(sql, parameters);
+	}
+
+	newInsertCommandCore_1 = newInsertCommandCore;
+	return newInsertCommandCore_1;
+}
+
+var insert_1;
+var hasRequiredInsert;
+
+function requireInsert () {
+	if (hasRequiredInsert) return insert_1;
+	hasRequiredInsert = 1;
+	const newInsertCommand = requireNewInsertCommand();
+	const newInsertCommandCore = requireNewInsertCommandCore();
+	const setSessionSingleton = requireSetSessionSingleton();
+	const newGetLastInsertedCommand = requireNewGetLastInsertedCommand();
+	const executeQueries = requireExecuteQueries();
+
+	function insert(context, table, row, options) {
+
+		return new Promise((res, rej) => {
+			const cmd = newInsertCommand(newInsertCommandCore.bind(null, context), table, row, options);
+			cmd.disallowCompress = true;
+			executeQueries(context, [cmd]).then((result) => result[0]).then(onResult).then(res, rej);
+
+			function onResult([result]) {
+				setSessionSingleton(context, 'lastRowid', result.lastRowid);
+				const selectCmd = newGetLastInsertedCommand(context, table, row, cmd);
+				return executeQueries(context, [selectCmd]).then((result) => res(result[0]));
+			}
+
+		});
+	}
+
+	insert_1 = insert;
+	return insert_1;
+}
+
+var formatDateOut;
+var hasRequiredFormatDateOut;
+
+function requireFormatDateOut () {
+	if (hasRequiredFormatDateOut) return formatDateOut;
+	hasRequiredFormatDateOut = 1;
+	const quote = requireQuote();
+
+	function formatDateColumn(column, alias) {
+		return `TO_CHAR(${alias}.${quote(column._dbName)}, 'YYYY-MM-DD"T"HH24:MI:SS.FF3')`;
+	}
+
+	formatDateOut = formatDateColumn;
+	return formatDateOut;
+}
+
+var formatDateIn;
+var hasRequiredFormatDateIn;
+
+function requireFormatDateIn () {
+	if (hasRequiredFormatDateIn) return formatDateIn;
+	hasRequiredFormatDateIn = 1;
+	function formatDateColumn(value) {
+		return `TO_TIMESTAMP(${value}, 'YYYY-MM-DD"T"HH24:MI:SS.FF3')`;
+	}
+
+	formatDateIn = formatDateColumn;
+	return formatDateIn;
+}
+
+var newTransaction;
+var hasRequiredNewTransaction;
+
+function requireNewTransaction () {
+	if (hasRequiredNewTransaction) return newTransaction;
+	hasRequiredNewTransaction = 1;
+	const wrapQuery = requireWrapQuery();
+	const encodeBoolean = requireEncodeBoolean();
+	const deleteFromSql = requireDeleteFromSql();
+	const selectForUpdateSql = requireSelectForUpdateSql();
+	const lastInsertedSql = requireLastInsertedSql();
+	const limitAndOffset = requireLimitAndOffset();
+	const insertSql = requireInsertSql();
+	const insert = requireInsert();
+	const formatDateOut = requireFormatDateOut();
+	const formatDateIn = requireFormatDateIn();
+	const quote = requireQuote();
+
+	function newResolveTransaction(domain, pool, { readonly = false } = {}) {
+		var rdb = {poolFactory: pool};
+		if (!pool.connect) {
+			pool = pool();
+			rdb.pool = pool;
+		}
+
+		rdb.begin = 'SET TRANSACTION ISOLATION LEVEL READ COMMITTED';
+		rdb.engine = 'oracle';
+		rdb.encodeBoolean = encodeBoolean;
+		rdb.decodeJSON = decodeJSON;
+		rdb.encodeJSON = JSON.stringify;
+		rdb.formatDateOut = formatDateOut;
+		rdb.formatDateIn = formatDateIn;
+		rdb.deleteFromSql = deleteFromSql;
+		rdb.selectForUpdateSql = selectForUpdateSql;
+		rdb.lastInsertedSql = lastInsertedSql;
+		rdb.insertSql = insertSql;
+		rdb.insert = insert;
+		rdb.lastInsertedIsSeparate = true;
+		rdb.multipleStatements = false;
+		rdb.limitAndOffset = limitAndOffset;
+		rdb.accept = function(caller) {
+			caller.visitSqlite();
+		};
+		rdb.aggregateCount = 0;
+		rdb.quote = quote;
+		rdb.cache = {};
+
+		if (readonly) {
+			rdb.dbClient = {
+				executeQuery: function(query, callback) {
+					pool.connect((err, client, done) => {
+						if (err) {
+							return callback(err);
+						}
+						try {
+							wrapQuery(domain, client)(query, (err, res) => {
+								done();
+								callback(err, res);
+							});
+						} catch (e) {
+							done();
+							callback(e);
+						}
+					});
+				}
+			};
+			domain.rdb = rdb;
+			return (onSuccess) => onSuccess();
+		}
+
+
+		return function(onSuccess, onError) {
+			pool.connect(onConnected);
+
+			function onConnected(err, client, done) {
+				try {
+					if (err) {
+						onError(err);
+						return;
+					}
+					client.executeQuery = wrapQuery(domain, client);
+					rdb.dbClient = client;
+					rdb.dbClientDone = done;
+					domain.rdb = rdb;
+
+					onSuccess();
+				} catch (e) {
+					onError(e);
+				}
+			}
+		};
+	}
+
+	function decodeJSON(value) {
+		return JSON.parse(value);
+	}
+
+	newTransaction = newResolveTransaction;
+	return newTransaction;
+}
+
+var end;
+var hasRequiredEnd;
+
+function requireEnd () {
+	if (hasRequiredEnd) return end;
+	hasRequiredEnd = 1;
+	var pools = requirePools();
+
+	function endPool(genericPool, id, done) {
+		genericPool.drain(onDrained);
+
+		function onDrained() {
+			genericPool.destroyAllNow();
+			delete pools[id];
+			done();
+		}
+	}
+
+	end = endPool;
+	return end;
+}
+
+var newGenericPool_1;
+var hasRequiredNewGenericPool;
+
+function requireNewGenericPool () {
+	if (hasRequiredNewGenericPool) return newGenericPool_1;
+	hasRequiredNewGenericPool = 1;
+	// @ts-nocheck
+	/* eslint-disable no-prototype-builtins */
+
+	var defaults = requirePoolDefaults();
+	var genericPool = requireGenericPool();
+	var oracle;
+
+	function newGenericPool(connectionString, poolOptions) {
+		poolOptions = poolOptions || {};
+		var pool = genericPool.Pool({
+			max: poolOptions.size || poolOptions.poolSize || defaults.poolSize,
+			idleTimeoutMillis: poolOptions.idleTimeout || defaults.poolIdleTimeout,
+			reapIntervalMillis: poolOptions.reapIntervalMillis || defaults.reapIntervalMillis,
+			log: poolOptions.log,
+			create: async function(cb) {
+				var client;
+				try {
+					if (!oracle) {
+						oracle = await import('oracledb');
+						oracle = oracle.default || oracle;
+						oracle.outFormat = oracle.OUT_FORMAT_OBJECT;
+						oracle.fetchAsBuffer = [ oracle.BLOB ];
+					}
+				}
+				catch (err) {
+					return cb(err, null);
+				}
+				oracle.getConnection(connectionString, onConnected);
+				function onConnected(err, _client) {
+					client = _client;
+					if (err)
+						return cb(err, null);
+					client.poolCount = 0;
+					return cb(null, client);
+				}
+			},
+
+			destroy: function(client) {
+				client.poolCount = undefined;
+				client.close();
+			}
+		});
+		//monkey-patch with connect method
+		pool.connect = function(cb) {
+			pool.acquire(function(err, client) {
+				if (err) return cb(err, null, function() {/*NOOP*/ });
+				client.poolCount++;
+				cb(null, client, function(err) {
+					if (err) {
+						pool.destroy(client);
+					} else {
+						pool.release(client);
+					}
+				});
+			});
+		};
+		return pool;
+	}
+
+	newGenericPool_1 = newGenericPool;
+	return newGenericPool_1;
+}
+
+var newPool_1;
+var hasRequiredNewPool;
+
+function requireNewPool () {
+	if (hasRequiredNewPool) return newPool_1;
+	hasRequiredNewPool = 1;
+	const promisify = requirePromisify();
+	const pools = requirePools();
+	const end = requireEnd();
+	const newGenericPool = requireNewGenericPool();
+	const newId = requireNewId();
+
+	function newPool(connectionString, poolOptions) {
+		let pool = newGenericPool(connectionString, poolOptions);
+		let id = newId();
+		let boundEnd = end.bind(null, pool, id);
+		let c = {};
+
+		c.connect = pool.connect;
+		c.end = promisify(boundEnd);
+		pools[id] = c;
+		return c;
+	}
+
+	newPool_1 = newPool;
+	return newPool_1;
+}
+
+var newDatabase_1;
+var hasRequiredNewDatabase;
+
+function requireNewDatabase () {
+	if (hasRequiredNewDatabase) return newDatabase_1;
+	hasRequiredNewDatabase = 1;
+	let createDomain = requireCreateDomain();
+	let newTransaction = requireNewTransaction();
+	let _begin = requireBegin();
+	let commit = requireCommit();
+	let rollback = requireRollback();
+	let newPool = requireNewPool();
+	let express = requireHostExpress();
+	let hostLocal = requireHostLocal();
+	let doQuery = requireQuery();
+	let releaseDbClient = requireReleaseDbClient();
+	let setSessionSingleton = requireSetSessionSingleton();
+
+	function newDatabase(connectionString, poolOptions) {
+		if (!connectionString)
+			throw new Error('Connection string cannot be empty');
+		var pool;
+		if (!poolOptions)
+			pool = newPool.bind(null, connectionString, poolOptions);
+		else
+			pool = newPool(connectionString, poolOptions);
+
+		let c = { poolFactory: pool, hostLocal, express };
+
+		c.transaction = function(options, fn) {
+			if ((arguments.length === 1) && (typeof options === 'function')) {
+				fn = options;
+				options = undefined;
+			}
+			let domain = createDomain();
+
+			if (fn)
+				return domain.run(runInTransaction);
+			else
+				return domain.run(run);
+
+
+			function begin() {
+				return _begin(domain, options);
+			}
+
+			async function runInTransaction() {
+				let result;
+				let transaction = newTransaction(domain, pool, options);
+				await new Promise(transaction)
+					.then(begin)
+					.then(() => fn(domain))
+					.then((res) => result = res)
+					.then(() => commit(domain))
+					.then(null, (e) => rollback(domain, e));
+				return result;
+
+			}
+
+			function run() {
+				let p;
+				let transaction = newTransaction(domain, pool, options);
+				p = new Promise(transaction);
+
+				return p.then(begin);
+			}
+
+		};
+
+		c.createTransaction = function(options) {
+			let domain = createDomain();
+			let transaction = newTransaction(domain, pool);
+			let p = domain.run(() => new Promise(transaction).then(begin));
+
+			function run(fn) {
+				return p.then(() => fn(domain));
+			}
+			run.rollback = rollback.bind(null, domain);
+			run.commit = commit.bind(null, domain);
+			return run;
+
+			function begin() {
+				return _begin(domain, options);
+			}
+		};
+
+		c.query = function(query) {
+			let domain = createDomain();
+			let transaction = newTransaction(domain, pool);
+			let p = domain.run(() => new Promise(transaction)
+				.then(() => setSessionSingleton(domain, 'changes', []))
+				.then(() => doQuery(domain, query).then(onResult, onError)));
+			return p;
+
+			function onResult(result) {
+				releaseDbClient(domain);
+				return result;
+			}
+
+			function onError(e) {
+				releaseDbClient(domain);
+				throw e;
+			}
+		};
+
+		c.rollback = rollback;
+		c.commit = commit;
+
+		c.end = function() {
+			if (poolOptions)
+				return pool.end();
+			else
+				return Promise.resolve();
+		};
+
+		c.accept = function(caller) {
+			caller.visitSqlite();
+		};
+
+		return c;
+	}
+
 	newDatabase_1 = newDatabase;
 	return newDatabase_1;
 }
 
-var indexBrowser$1;
-var hasRequiredIndexBrowser;
+var src;
+var hasRequiredSrc;
 
-function requireIndexBrowser () {
-	if (hasRequiredIndexBrowser) return indexBrowser$1;
-	hasRequiredIndexBrowser = 1;
+function requireSrc () {
+	if (hasRequiredSrc) return src;
+	hasRequiredSrc = 1;
 	const hostExpress = requireHostExpress();
 	const hostLocal = requireHostLocal();
 	const client = requireClient();
 	const map = requireMap();
+	const runtimes = requireRuntimes();
+
+	let _mySql;
+	let _pg;
+	let _sqlite;
+	let _mssqlNative;
+	let _sap;
+	let _mssql;
+	let _oracle;
 	let _d1;
 
-	var connectViaPool = function() {
-		return client.apply(null, arguments);
+	var connectViaPool = function(connectionString) {
+		if (connectionString.indexOf && connectionString.indexOf('mysql') === 0)
+			return connectViaPool.mySql.apply(null, arguments);
+		else if (connectionString.indexOf && connectionString.indexOf('postgres') === 0)
+			connectViaPool.pg.apply(null, arguments);
+		else
+			return client.apply(null, arguments);
 	};
 	connectViaPool.createPatch = client.createPatch;
 	connectViaPool.table = requireTable();
@@ -14106,22 +20022,106 @@ function requireIndexBrowser () {
 		return url;
 	};
 
+	Object.defineProperty(connectViaPool, 'mysql', {
+		get: function() {
+			if (!_mySql)
+				_mySql = requireNewDatabase$a();
+			return _mySql;
+		}
+	});
+
+	Object.defineProperty(connectViaPool, 'mySql', {
+		get: function() {
+			if (!_mySql)
+				_mySql = requireNewDatabase$a();
+			return _mySql;
+		}
+	});
+	Object.defineProperty(connectViaPool, 'postgres', {
+		get: function() {
+			if (!_pg)
+				if (runtimes.bun)
+					_pg = requireNewDatabase$9();
+				else
+					_pg = requireNewDatabase$8();
+			return _pg;
+		}
+	});
+
+	Object.defineProperty(connectViaPool, 'pg', {
+		get: function() {
+			if (!_pg)
+				if (runtimes.bun)
+					_pg = requireNewDatabase$9();
+				else
+					_pg = requireNewDatabase$8();
+			return _pg;
+		}
+	});
+
+	Object.defineProperty(connectViaPool, 'sqlite', {
+		get: function() {
+			if (!_sqlite) {
+				if (runtimes.deno || (runtimes.node && runtimes.node.major >= 22))
+					_sqlite = requireNewDatabase$7();
+				else if (runtimes.bun)
+					_sqlite = requireNewDatabase$6();
+				else if (runtimes.node)
+					_sqlite = requireNewDatabase$5();
+				else
+					throw new Error('SQLite is not supported in this environment');
+			}
+			return _sqlite;
+		}
+	});
 
 	Object.defineProperty(connectViaPool, 'd1', {
 		get: function() {
 			if (!_d1)
-				_d1 = requireNewDatabase();
+				_d1 = requireNewDatabase$4();
 			return _d1;
+		}
+	});
+
+	Object.defineProperty(connectViaPool, 'mssqlNative', {
+		get: function() {
+			if (!_mssqlNative)
+				_mssqlNative = requireNewDatabase$3();
+			return _mssqlNative;
+		}
+	});
+
+	Object.defineProperty(connectViaPool, 'mssql', {
+		get: function() {
+			if (!_mssql)
+				_mssql = requireNewDatabase$2();
+			return _mssql;
+		}
+	});
+
+	Object.defineProperty(connectViaPool, 'sap', {
+		get: function() {
+			if (!_sap)
+				_sap = requireNewDatabase$1();
+			return _sap;
+		}
+	});
+
+	Object.defineProperty(connectViaPool, 'oracle', {
+		get: function() {
+			if (!_oracle)
+				_oracle = requireNewDatabase();
+			return _oracle;
 		}
 	});
 
 	connectViaPool.express = hostExpress.bind(null, hostLocal);
 
-	indexBrowser$1 = connectViaPool;
-	return indexBrowser$1;
+	src = connectViaPool;
+	return src;
 }
 
-var indexBrowserExports = requireIndexBrowser();
-var indexBrowser = /*@__PURE__*/getDefaultExportFromCjs(indexBrowserExports);
+var srcExports = requireSrc();
+var index = /*@__PURE__*/getDefaultExportFromCjs(srcExports);
 
-export { indexBrowser as default };
+export { index as default };

@@ -207,7 +207,7 @@ function newDecodeDbRow(table, dbRow, filteredAliases, shouldValidate, isInsert)
 		for (let i = 0; i < numberOfColumns; i++) {
 			let index = offset + i;
 			let key = keys[index];
-			if (row[key] !== undefined)
+			if (row[key] !== undefined && !isInsert)
 				row[key] = columns[i].decode(context, row[key]);
 			if (shouldValidate && columns[i].validate)
 				columns[i].validate(row[key], row, isInsert);
