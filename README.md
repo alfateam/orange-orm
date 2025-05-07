@@ -289,9 +289,6 @@ import map from './map';
 const db = map.sqlite('demo.db');
 ```
 __With connection pool__
-```bash
-npm install sqlite3
-```  
 ```javascript
 import map from './map';
 const db = map.sqlite('demo.db', { size: 10 });
