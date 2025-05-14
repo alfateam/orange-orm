@@ -41,7 +41,6 @@ function _new(column) {
 
 function encodeDefault(value) {
 	return value;
-	return new Boolean(value);
 }
 
 module.exports = _new;
