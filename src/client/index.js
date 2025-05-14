@@ -56,6 +56,7 @@ function rdbClient(options = {}) {
 	client.mssql = onProvider.bind(null, 'mssql');
 	client.mssqlNative = onProvider.bind(null, 'mssqlNative');
 	client.pg = onProvider.bind(null, 'pg');
+	client.pglite = onProvider.bind(null, 'pglite');
 	client.postgres = onProvider.bind(null, 'postgres');
 	client.d1 = onProvider.bind(null, 'd1');
 	client.sqlite = onProvider.bind(null, 'sqlite');

@@ -2087,12 +2087,12 @@ function requireNegotiateParameters () {
 	return negotiateParameters_1;
 }
 
-var wrapQuery_1$a;
-var hasRequiredWrapQuery$a;
+var wrapQuery_1$b;
+var hasRequiredWrapQuery$b;
 
-function requireWrapQuery$a () {
-	if (hasRequiredWrapQuery$a) return wrapQuery_1$a;
-	hasRequiredWrapQuery$a = 1;
+function requireWrapQuery$b () {
+	if (hasRequiredWrapQuery$b) return wrapQuery_1$b;
+	hasRequiredWrapQuery$b = 1;
 	var negotiateSql = requireNegotiateSql();
 	var negotiateParameters = requireNegotiateParameters();
 
@@ -2109,8 +2109,8 @@ function requireWrapQuery$a () {
 	}
 
 
-	wrapQuery_1$a = wrapQuery;
-	return wrapQuery_1$a;
+	wrapQuery_1$b = wrapQuery;
+	return wrapQuery_1$b;
 }
 
 var query;
@@ -2120,7 +2120,7 @@ function requireQuery () {
 	if (hasRequiredQuery) return query;
 	hasRequiredQuery = 1;
 	var executeQueries = requireExecuteQueries();
-	var wrapQuery = requireWrapQuery$a();
+	var wrapQuery = requireWrapQuery$b();
 
 	function doQuery(context, query) {
 		var wrappedQuery = wrapQuery(query);
@@ -2539,6 +2539,7 @@ function requireClientMap () {
 
 		dbMap.http = (url) => url;
 		dbMap.pg = throwDb;
+		dbMap.pglite = throwDb;
 		dbMap.postgres = throwDb;
 		dbMap.mssql = throwDb;
 		dbMap.mssqlNative = throwDb;
@@ -2566,6 +2567,7 @@ function requireClientMap () {
 
 		onFinal.http = (url) => index({ db: url, providers: dbMap });
 		onFinal.pg = () => index({ db: throwDb, providers: dbMap });
+		onFinal.pglite = () => index({ db: throwDb, providers: dbMap });
 		onFinal.postgres = () => index({ db: throwDb, providers: dbMap });
 		onFinal.mssql = () => index({ db: throwDb, providers: dbMap });
 		onFinal.mssqlNative = () => index({ db: throwDb, providers: dbMap });
@@ -2718,6 +2720,7 @@ function requireClient () {
 		client.mssql = onProvider.bind(null, 'mssql');
 		client.mssqlNative = onProvider.bind(null, 'mssqlNative');
 		client.pg = onProvider.bind(null, 'pg');
+		client.pglite = onProvider.bind(null, 'pglite');
 		client.postgres = onProvider.bind(null, 'postgres');
 		client.d1 = onProvider.bind(null, 'd1');
 		client.sqlite = onProvider.bind(null, 'sqlite');
@@ -11865,6 +11868,11 @@ function requireCreateProviders () {
 				return createPool.bind(null, 'pg');
 			}
 		});
+		Object.defineProperty(dbMap, 'pglite', {
+			get:  function() {
+				return createPool.bind(null, 'pglite');
+			}
+		});
 		Object.defineProperty(dbMap, 'postgres', {
 			get:  function() {
 				return createPool.bind(null, 'pg');
@@ -11932,6 +11940,9 @@ function requireCreateProviders () {
 		const dbMap = {
 			get pg() {
 				return createPool.bind(null, 'pg');
+			},
+			get pglite() {
+				return createPool.bind(null, 'pglite');
 			},
 			get postgres() {
 				return createPool.bind(null, 'pg');
@@ -12035,6 +12046,7 @@ function requireMap () {
 		}
 		context.map = map.bind(null, index, context, providers);
 		context.pg = connect.bind(null, 'pg');
+		context.pglite = connect.bind(null, 'pglite');
 		context.postgres = connect.bind(null, 'pg');
 		context.mssql = connect.bind(null, 'mssql');
 		context.mssqlNative = connect.bind(null, 'mssqlNative');
@@ -12543,12 +12555,12 @@ function requireCreateDomain () {
 	return createDomain_1;
 }
 
-var wrapQuery_1$9;
-var hasRequiredWrapQuery$9;
+var wrapQuery_1$a;
+var hasRequiredWrapQuery$a;
 
-function requireWrapQuery$9 () {
-	if (hasRequiredWrapQuery$9) return wrapQuery_1$9;
-	hasRequiredWrapQuery$9 = 1;
+function requireWrapQuery$a () {
+	if (hasRequiredWrapQuery$a) return wrapQuery_1$a;
+	hasRequiredWrapQuery$a = 1;
 	var log = requireLog();
 
 	function wrapQuery(_context, connection) {
@@ -12564,8 +12576,8 @@ function requireWrapQuery$9 () {
 
 	}
 
-	wrapQuery_1$9 = wrapQuery;
-	return wrapQuery_1$9;
+	wrapQuery_1$a = wrapQuery;
+	return wrapQuery_1$a;
 }
 
 var encodeBoolean_1$5;
@@ -13087,13 +13099,13 @@ function requireInsert$5 () {
 	return insert$4;
 }
 
-var newTransaction$a;
-var hasRequiredNewTransaction$a;
+var newTransaction$b;
+var hasRequiredNewTransaction$b;
 
-function requireNewTransaction$a () {
-	if (hasRequiredNewTransaction$a) return newTransaction$a;
-	hasRequiredNewTransaction$a = 1;
-	const wrapQuery = requireWrapQuery$9();
+function requireNewTransaction$b () {
+	if (hasRequiredNewTransaction$b) return newTransaction$b;
+	hasRequiredNewTransaction$b = 1;
+	const wrapQuery = requireWrapQuery$a();
 	const encodeBoolean = requireEncodeBoolean$5();
 	const deleteFromSql = requireDeleteFromSql$5();
 	const selectForUpdateSql = requireSelectForUpdateSql$5();
@@ -13171,8 +13183,8 @@ function requireNewTransaction$a () {
 		};
 	}
 
-	newTransaction$a = newResolveTransaction;
-	return newTransaction$a;
+	newTransaction$b = newResolveTransaction;
+	return newTransaction$b;
 }
 
 var beginCommand;
@@ -13253,12 +13265,12 @@ function requirePromisify () {
 	return promisify_1;
 }
 
-var end$9;
-var hasRequiredEnd$9;
+var end$a;
+var hasRequiredEnd$a;
 
-function requireEnd$9 () {
-	if (hasRequiredEnd$9) return end$9;
-	hasRequiredEnd$9 = 1;
+function requireEnd$a () {
+	if (hasRequiredEnd$a) return end$a;
+	hasRequiredEnd$a = 1;
 	var pools = requirePools();
 
 	function endPool(genericPool, id, done) {
@@ -13271,8 +13283,8 @@ function requireEnd$9 () {
 		}
 	}
 
-	end$9 = endPool;
-	return end$9;
+	end$a = endPool;
+	return end$a;
 }
 
 var poolDefaults;
@@ -13982,15 +13994,15 @@ function requireNewGenericPool$7 () {
 	return newGenericPool_1$7;
 }
 
-var newPool_1$a;
-var hasRequiredNewPool$a;
+var newPool_1$b;
+var hasRequiredNewPool$b;
 
-function requireNewPool$a () {
-	if (hasRequiredNewPool$a) return newPool_1$a;
-	hasRequiredNewPool$a = 1;
+function requireNewPool$b () {
+	if (hasRequiredNewPool$b) return newPool_1$b;
+	hasRequiredNewPool$b = 1;
 	const promisify = requirePromisify();
 	const pools = requirePools();
-	const end = requireEnd$9();
+	const end = requireEnd$a();
 	const newGenericPool = requireNewGenericPool$7();
 	const newId = requireNewId();
 
@@ -14006,22 +14018,22 @@ function requireNewPool$a () {
 		return c;
 	}
 
-	newPool_1$a = newPool;
-	return newPool_1$a;
+	newPool_1$b = newPool;
+	return newPool_1$b;
 }
 
-var newDatabase_1$a;
-var hasRequiredNewDatabase$a;
+var newDatabase_1$b;
+var hasRequiredNewDatabase$b;
 
-function requireNewDatabase$a () {
-	if (hasRequiredNewDatabase$a) return newDatabase_1$a;
-	hasRequiredNewDatabase$a = 1;
+function requireNewDatabase$b () {
+	if (hasRequiredNewDatabase$b) return newDatabase_1$b;
+	hasRequiredNewDatabase$b = 1;
 	let createDomain = requireCreateDomain();
-	let newTransaction = requireNewTransaction$a();
+	let newTransaction = requireNewTransaction$b();
 	let _begin = requireBegin();
 	let commit = requireCommit();
 	let rollback = requireRollback();
-	let newPool = requireNewPool$a();
+	let newPool = requireNewPool$b();
 	let express = requireHostExpress();
 	let hostLocal = requireHostLocal();
 	let doQuery = requireQuery();
@@ -14132,8 +14144,8 @@ function requireNewDatabase$a () {
 		return c;
 	}
 
-	newDatabase_1$a = newDatabase;
-	return newDatabase_1$a;
+	newDatabase_1$b = newDatabase;
+	return newDatabase_1$b;
 }
 
 var replaceParamChar_1$1;
@@ -14159,110 +14171,46 @@ function requireReplaceParamChar$1 () {
 	return replaceParamChar_1$1;
 }
 
-var wrapQuery_1$8;
-var hasRequiredWrapQuery$8;
+var wrapQuery_1$9;
+var hasRequiredWrapQuery$9;
 
-function requireWrapQuery$8 () {
-	if (hasRequiredWrapQuery$8) return wrapQuery_1$8;
-	hasRequiredWrapQuery$8 = 1;
-	const log = requireLog();
-	const replaceParamChar = requireReplaceParamChar$1();
-	const tryGetSessionContext = requireTryGetSessionContext();
+function requireWrapQuery$9 () {
+	if (hasRequiredWrapQuery$9) return wrapQuery_1$9;
+	hasRequiredWrapQuery$9 = 1;
+	var log = requireLog();
+	var replaceParamChar = requireReplaceParamChar$1();
 
-	function wrapQuery(context, connection) {
+	function wrapQuery(_context, connection) {
+		var runOriginalQuery = connection.query;
 		return runQuery;
 
-		async function runQuery(query, onCompleted) {
-			try {
+		function runQuery(query, onCompleted) {
+			var params = query.parameters;
+			var sql = replaceParamChar(query, params);
+			query = {
+				text: sql,
+				values: params,
+				types: query.types
+			};
+			log.emitQuery({sql, parameters: params});
 
-				const sql = replaceParamChar(query, query.parameters);
-				let rdb = tryGetSessionContext(context);
-				let transactionHandler = rdb.transactionHandler;
-				log.emitQuery({ sql, parameters: query.parameters });
+			runOriginalQuery.call(connection, query, onInnerCompleted);
 
-				if (sql.length < 18 && query.parameters.length === 0) {
-					if (sql === 'BEGIN TRANSACTION' || sql === 'BEGIN') {
-						if (transactionHandler)
-							return onCompleted(new Error('Already inside a transaction'), []);
-						beginTransaction(connection).then(_transactionHandler => {
-							rdb.transactionHandler = _transactionHandler;
-							onCompleted(null, []);
-						}, onCompleted);
-						return;
-					}
-					else if (sql === 'COMMIT') {
-						if (!transactionHandler)
-							return onCompleted(new Error('Cannot commit outside transaction'), []);
-						transactionHandler.resolve();
-						transactionHandler.promise.then(() => onCompleted(null, []), err => onCompleted(err, []));
-						return;
-					}
-					else if (sql === 'ROLLBACK') {
-						if (!transactionHandler)
-							return onCompleted(new Error('Cannot rollback outside transaction'), []);
-						transactionHandler.reject(new Error('__rollback__'));
-						transactionHandler.promise.then(null, (err) => {
-							if (err.message === '__rollback__')
-								onCompleted(null, []);
-							else
-								onCompleted(err, []);
-						});
-						return;
-					}
+			function onInnerCompleted(err, result) {
+				if (err)
+					onCompleted(err);
+				else {
+					if (Array.isArray(result))
+						result = result[result.length-1];
+					onCompleted(null, result.rows);
 				}
-
-				let result;
-				const _connection = transactionHandler?.tx || connection;
-				if (query.parameters.length === 0)
-					result = await _connection.unsafe(sql);
-				else
-					result = await _connection.unsafe(sql, query.parameters);
-				onCompleted(null, result);
-			}
-			catch (e) {
-				onCompleted(e);
 			}
 		}
 
 	}
 
-	function beginTransaction(connection) {
-
-		let beginIsResolved = false;
-		let resolve;
-		let reject;
-		let resolveBegin;
-		let rejectBegin;
-
-		let sqlPromise = new Promise((res, rej) => {
-			resolve = res;
-			reject = rej;
-		});
-		let beginPromise = new Promise((res,rej) => {
-			resolveBegin = res;
-			rejectBegin = rej;
-		});
-		connection.begin(async (tx) => {
-			beginIsResolved = true;
-			resolveBegin({
-				tx,
-				resolve,
-				reject,
-				promise: sqlPromise,
-			});
-			return sqlPromise;
-		}).then(null,
-			e => {
-				if (!beginIsResolved)
-					rejectBegin(e);
-				if (e?.message !== '__rollback__')
-					throw e;
-			});
-		return beginPromise;
-	}
-
-	wrapQuery_1$8 = wrapQuery;
-	return wrapQuery_1$8;
+	wrapQuery_1$9 = wrapQuery;
+	return wrapQuery_1$9;
 }
 
 var encodeDate_1;
@@ -14569,6 +14517,493 @@ function requireInsert$4 () {
 	return insert$3;
 }
 
+var newTransaction$a;
+var hasRequiredNewTransaction$a;
+
+function requireNewTransaction$a () {
+	if (hasRequiredNewTransaction$a) return newTransaction$a;
+	hasRequiredNewTransaction$a = 1;
+	var wrapQuery = requireWrapQuery$9();
+	var encodeDate = requireEncodeDate();
+	var encodeBoolean = requireEncodeBoolean$4();
+	const encodeBinary = requireEncodeBinary();
+	const decodeBinary = requireDecodeBinary();
+	var deleteFromSql = requireDeleteFromSql$4();
+	var selectForUpdateSql = requireSelectForUpdateSql$4();
+	var limitAndOffset = requireLimitAndOffset$4();
+	var formatDateOut = requireFormatDateOut$3();
+	var encodeJSON = requireEncodeJSON();
+	var insertSql = requireInsertSql$4();
+	var insert = requireInsert$4();
+	var quote = requireQuote$4();
+
+	function newResolveTransaction(domain, pool, { readonly = false } = {}) {
+		var rdb = { poolFactory: pool };
+		if (!pool.connect) {
+			pool = pool();
+			rdb.pool = pool;
+		}
+
+		rdb.engine = 'pg';
+		rdb.encodeBoolean = encodeBoolean;
+		rdb.encodeDate = encodeDate;
+		rdb.encodeBinary = encodeBinary;
+		rdb.decodeBinary = decodeBinary;
+		rdb.encodeJSON = encodeJSON;
+		rdb.formatDateOut = formatDateOut;
+		rdb.deleteFromSql = deleteFromSql;
+		rdb.selectForUpdateSql = selectForUpdateSql;
+		rdb.lastInsertedIsSeparate = false;
+		rdb.insertSql = insertSql;
+		rdb.insert = insert;
+		rdb.multipleStatements = true;
+		rdb.limitAndOffset = limitAndOffset;
+		rdb.accept = function(caller) {
+			caller.visitPg();
+		};
+		rdb.aggregateCount = 0;
+		rdb.quote = quote;
+		rdb.cache = {};
+
+		if (readonly) {
+			rdb.dbClient = {
+				executeQuery: function(query, callback) {
+					pool.connect((err, client, done) => {
+						if (err) {
+							return callback(err);
+						}
+						try {
+							wrapQuery(domain, client)(query, (err, res) => {
+								done();
+								callback(err, res);
+							});
+						} catch (e) {
+							done();
+							callback(e);
+						}
+					});
+				}
+			};
+			domain.rdb = rdb;
+			return (onSuccess) => onSuccess();
+		}
+
+		return function(onSuccess, onError) {
+			pool.connect(onConnected);
+
+			function onConnected(err, client, done) {
+				try {
+					if (err) {
+						onError(err);
+						return;
+					}
+					client.executeQuery = wrapQuery(domain, client);
+					rdb.dbClient = client;
+					rdb.dbClientDone = done;
+					domain.rdb = rdb;
+					onSuccess();
+				} catch (e) {
+					onError(e);
+				}
+			}
+		};
+	}
+
+	newTransaction$a = newResolveTransaction;
+	return newTransaction$a;
+}
+
+var end$9;
+var hasRequiredEnd$9;
+
+function requireEnd$9 () {
+	if (hasRequiredEnd$9) return end$9;
+	hasRequiredEnd$9 = 1;
+	var pools = requirePools();
+
+	function endPool(pgPool, id, done) {
+		pgPool.drain(onDrained);
+
+		function onDrained() {
+			pgPool.destroyAllNow();
+			delete pools[id];
+			done();
+		}
+	}
+
+	end$9 = endPool;
+	return end$9;
+}
+
+var require$$3 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(url);
+
+/* eslint-disable no-prototype-builtins */
+
+var newPgPool_1$2;
+var hasRequiredNewPgPool$2;
+
+function requireNewPgPool$2 () {
+	if (hasRequiredNewPgPool$2) return newPgPool_1$2;
+	hasRequiredNewPgPool$2 = 1;
+	// Simplified pool creator using URL API and handling search_path param
+
+	const log = requireLog();
+	const defaults = requirePoolDefaults();
+	const genericPool = requireGenericPool();
+	const { URL } = require$$3;
+	let PGlite;
+
+	function newPgPool(connectionString, poolOptions = {}) {
+		let searchPath;
+		let connStr = connectionString;
+
+		try {
+			const url = new URL(connectionString);
+			const paramName = url.searchParams.has('search_path')
+				? 'search_path'
+				: url.searchParams.has('searchPath')
+					? 'searchPath'
+					: null;
+			if (paramName) {
+				searchPath = url.searchParams.get(paramName);
+				url.searchParams.delete(paramName);
+				connStr = url.toString();
+			}
+		} catch {
+			// Non-URL string; leave as-is
+		}
+
+		//@ts-ignore
+		const pool = genericPool.Pool({
+			max: poolOptions.size || poolOptions.poolSize || defaults.poolSize,
+			idleTimeoutMillis: poolOptions.idleTimeout || defaults.poolIdleTimeout,
+			reapIntervalMillis: poolOptions.reapIntervalMillis || defaults.reapIntervalMillis,
+			log: poolOptions.log,
+
+			create: async (cb) => {
+				try {
+					if (!PGlite) ({ PGlite } = await import('@electric-sql/pglite'));
+					const client = new PGlite(connStr);
+					client.poolCount = 0;
+					await applySearchPath(client, searchPath);
+					cb(null, client);
+				} catch (err) {
+					cb(err, null);
+				}
+			},
+
+			destroy: (client) => {
+				client._destroying = true;
+				client.poolCount = undefined;
+				client.end();
+			},
+		});
+
+		pool.connect = (cb) => {
+			pool.acquire((err, client) => {
+				if (err) return cb(err, null, () => {});
+				client.poolCount++;
+				cb(null, client, (releaseErr) => {
+					releaseErr ? pool.destroy(client) : pool.release(client);
+				});
+			});
+		};
+
+		return pool;
+	}
+
+	async function applySearchPath(client, searchPath) {
+		if (searchPath) {
+			const sql = `SET search_path TO ${searchPath}`;
+			log.emitQuery({ sql, parameters: [] });
+			await client.exec(sql);
+		}
+	}
+
+	newPgPool_1$2 = newPgPool;
+	return newPgPool_1$2;
+}
+
+var newPool_1$a;
+var hasRequiredNewPool$a;
+
+function requireNewPool$a () {
+	if (hasRequiredNewPool$a) return newPool_1$a;
+	hasRequiredNewPool$a = 1;
+	const promisify = requirePromisify();
+	const pools = requirePools();
+	const end = requireEnd$9();
+	const newPgPool = requireNewPgPool$2();
+	const newId = requireNewId();
+
+	function newPool(connectionString, poolOptions) {
+		let pool = newPgPool(connectionString, poolOptions);
+		let id = newId();
+		let boundEnd = end.bind(null, pool, id);
+		let c = {};
+
+		c.connect = pool.connect;
+		c.end = promisify(boundEnd);
+		pools[id] = c;
+		return c;
+	}
+
+	newPool_1$a = newPool;
+	return newPool_1$a;
+}
+
+var newDatabase_1$a;
+var hasRequiredNewDatabase$a;
+
+function requireNewDatabase$a () {
+	if (hasRequiredNewDatabase$a) return newDatabase_1$a;
+	hasRequiredNewDatabase$a = 1;
+	let createDomain = requireCreateDomain();
+	let newTransaction = requireNewTransaction$a();
+	let _begin = requireBegin();
+	let commit = requireCommit();
+	let rollback = requireRollback();
+	let newPool = requireNewPool$a();
+	let lock = requireLock();
+	let executeSchema = requireSchema();
+	let express = requireHostExpress();
+	let hostLocal = requireHostLocal();
+	let doQuery = requireQuery();
+	let releaseDbClient = requireReleaseDbClient();
+	let setSessionSingleton = requireSetSessionSingleton();
+
+	function newDatabase(connectionString, poolOptions) {
+		if (!connectionString)
+			throw new Error('Connection string cannot be empty');
+		var pool;
+		if (!poolOptions)
+			pool = newPool.bind(null, connectionString, poolOptions);
+		else
+			pool = newPool(connectionString, poolOptions);
+
+		let c = { poolFactory: pool, hostLocal, express };
+
+		c.transaction = function(options, fn) {
+			if ((arguments.length === 1) && (typeof options === 'function')) {
+				fn = options;
+				options = undefined;
+			}
+			let domain = createDomain();
+
+			if (fn)
+				return domain.run(runInTransaction);
+			else
+				return domain.run(run);
+
+			async function runInTransaction() {
+				let result;
+				let transaction = newTransaction(domain, pool, options);
+				await new Promise(transaction)
+					.then(begin)
+					.then(negotiateSchema)
+					.then(() => fn(domain))
+					.then((res) => result = res)
+					.then(() => commit(domain))
+					.then(null, (e) => rollback(domain,e));
+				return result;
+			}
+
+			function begin() {
+				return _begin(domain, options);
+			}
+
+			function run() {
+				let p;
+				let transaction = newTransaction(domain, pool, options);
+				p = new Promise(transaction);
+
+				return p.then(begin)
+					.then(negotiateSchema);
+			}
+
+			function negotiateSchema(previous) {
+				let schema = options && options.schema;
+				if (!schema)
+					return previous;
+				return executeSchema(domain, schema);
+			}
+		};
+
+		c.createTransaction = function(options) {
+			let domain = createDomain();
+			let transaction = newTransaction(domain, pool, options);
+			let p = domain.run(() => new Promise(transaction)
+				.then(begin).then(negotiateSchema));
+
+			function run(fn) {
+				return p.then(domain.run.bind(domain, fn));
+			}
+
+			function begin() {
+				return _begin(domain, options);
+			}
+
+			function negotiateSchema(previous) {
+				let schema = options && options.schema;
+				if (!schema)
+					return previous;
+				return executeSchema(domain,schema);
+			}
+
+			run.rollback = rollback.bind(null, domain);
+			run.commit = commit.bind(null, domain);
+
+			return run;
+		};
+
+		c.query = function(query) {
+			let domain = createDomain();
+			let transaction = newTransaction(domain, pool);
+			let p = domain.run(() => new Promise(transaction)
+				.then(() => setSessionSingleton(domain, 'changes', []))
+				.then(() => doQuery(domain, query).then(onResult, onError)));
+			return p;
+
+			function onResult(result) {
+				releaseDbClient(domain);
+				return result;
+			}
+
+			function onError(e) {
+				releaseDbClient(domain);
+				throw e;
+			}
+		};
+
+		c.rollback = rollback;
+		c.commit = commit;
+		c.lock = lock;
+		c.schema = executeSchema;
+
+		c.end = function() {
+			if (poolOptions)
+				return pool.end();
+			else
+				return Promise.resolve();
+		};
+
+		c.accept = function(caller) {
+			caller.visitPg();
+		};
+
+		return c;
+	}
+
+	newDatabase_1$a = newDatabase;
+	return newDatabase_1$a;
+}
+
+var wrapQuery_1$8;
+var hasRequiredWrapQuery$8;
+
+function requireWrapQuery$8 () {
+	if (hasRequiredWrapQuery$8) return wrapQuery_1$8;
+	hasRequiredWrapQuery$8 = 1;
+	const log = requireLog();
+	const replaceParamChar = requireReplaceParamChar$1();
+	const tryGetSessionContext = requireTryGetSessionContext();
+
+	function wrapQuery(context, connection) {
+		return runQuery;
+
+		async function runQuery(query, onCompleted) {
+			try {
+
+				const sql = replaceParamChar(query, query.parameters);
+				let rdb = tryGetSessionContext(context);
+				let transactionHandler = rdb.transactionHandler;
+				log.emitQuery({ sql, parameters: query.parameters });
+
+				if (sql.length < 18 && query.parameters.length === 0) {
+					if (sql === 'BEGIN TRANSACTION' || sql === 'BEGIN') {
+						if (transactionHandler)
+							return onCompleted(new Error('Already inside a transaction'), []);
+						beginTransaction(connection).then(_transactionHandler => {
+							rdb.transactionHandler = _transactionHandler;
+							onCompleted(null, []);
+						}, onCompleted);
+						return;
+					}
+					else if (sql === 'COMMIT') {
+						if (!transactionHandler)
+							return onCompleted(new Error('Cannot commit outside transaction'), []);
+						transactionHandler.resolve();
+						transactionHandler.promise.then(() => onCompleted(null, []), err => onCompleted(err, []));
+						return;
+					}
+					else if (sql === 'ROLLBACK') {
+						if (!transactionHandler)
+							return onCompleted(new Error('Cannot rollback outside transaction'), []);
+						transactionHandler.reject(new Error('__rollback__'));
+						transactionHandler.promise.then(null, (err) => {
+							if (err.message === '__rollback__')
+								onCompleted(null, []);
+							else
+								onCompleted(err, []);
+						});
+						return;
+					}
+				}
+
+				let result;
+				const _connection = transactionHandler?.tx || connection;
+				if (query.parameters.length === 0)
+					result = await _connection.unsafe(sql);
+				else
+					result = await _connection.unsafe(sql, query.parameters);
+				onCompleted(null, result);
+			}
+			catch (e) {
+				onCompleted(e);
+			}
+		}
+
+	}
+
+	function beginTransaction(connection) {
+
+		let beginIsResolved = false;
+		let resolve;
+		let reject;
+		let resolveBegin;
+		let rejectBegin;
+
+		let sqlPromise = new Promise((res, rej) => {
+			resolve = res;
+			reject = rej;
+		});
+		let beginPromise = new Promise((res,rej) => {
+			resolveBegin = res;
+			rejectBegin = rej;
+		});
+		connection.begin(async (tx) => {
+			beginIsResolved = true;
+			resolveBegin({
+				tx,
+				resolve,
+				reject,
+				promise: sqlPromise,
+			});
+			return sqlPromise;
+		}).then(null,
+			e => {
+				if (!beginIsResolved)
+					rejectBegin(e);
+				if (e?.message !== '__rollback__')
+					throw e;
+			});
+		return beginPromise;
+	}
+
+	wrapQuery_1$8 = wrapQuery;
+	return wrapQuery_1$8;
+}
+
 var newTransaction$9;
 var hasRequiredNewTransaction$9;
 
@@ -14686,8 +15121,6 @@ function requireEnd$8 () {
 	end$8 = endPool;
 	return end$8;
 }
-
-var require$$3 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(url);
 
 /* eslint-disable no-prototype-builtins */
 
@@ -19989,6 +20422,7 @@ function requireSrc () {
 
 	let _mySql;
 	let _pg;
+	let _pglite;
 	let _sqlite;
 	let _mssqlNative;
 	let _sap;
@@ -20025,7 +20459,7 @@ function requireSrc () {
 	Object.defineProperty(connectViaPool, 'mysql', {
 		get: function() {
 			if (!_mySql)
-				_mySql = requireNewDatabase$a();
+				_mySql = requireNewDatabase$b();
 			return _mySql;
 		}
 	});
@@ -20033,8 +20467,15 @@ function requireSrc () {
 	Object.defineProperty(connectViaPool, 'mySql', {
 		get: function() {
 			if (!_mySql)
-				_mySql = requireNewDatabase$a();
+				_mySql = requireNewDatabase$b();
 			return _mySql;
+		}
+	});
+	Object.defineProperty(connectViaPool, 'pglite', {
+		get: function() {
+			if (!_pglite)
+				_pglite = requireNewDatabase$a();
+			return _pglite;
 		}
 	});
 	Object.defineProperty(connectViaPool, 'postgres', {

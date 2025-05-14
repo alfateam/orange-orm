@@ -13,6 +13,11 @@ function createProviders(index) {
 			return createPool.bind(null, 'pg');
 		}
 	});
+	Object.defineProperty(dbMap, 'pglite', {
+		get:  function() {
+			return createPool.bind(null, 'pglite');
+		}
+	});
 	Object.defineProperty(dbMap, 'postgres', {
 		get:  function() {
 			return createPool.bind(null, 'pg');
@@ -80,6 +85,9 @@ function negotiateCachedPool(fn, providers) {
 	const dbMap = {
 		get pg() {
 			return createPool.bind(null, 'pg');
+		},
+		get pglite() {
+			return createPool.bind(null, 'pglite');
 		},
 		get postgres() {
 			return createPool.bind(null, 'pg');

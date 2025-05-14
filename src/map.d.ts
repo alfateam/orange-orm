@@ -63,6 +63,7 @@ interface Connectors {
 	http(url: string): Pool;
 	d1(database: D1Database): Pool;
 	postgres(connectionString: string, options?: PoolOptions): Pool;
+	pglite(connectionString: string, options?: PoolOptions): Pool;
 	sqlite(connectionString: string, options?: PoolOptions): Pool;
 	sap(connectionString: string, options?: PoolOptions): Pool;
 	mssql(connectionConfig: ConnectionConfiguration, options?: PoolOptions): Pool;

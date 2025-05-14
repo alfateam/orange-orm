@@ -2537,6 +2537,7 @@ function requireClientMap () {
 
 		dbMap.http = (url) => url;
 		dbMap.pg = throwDb;
+		dbMap.pglite = throwDb;
 		dbMap.postgres = throwDb;
 		dbMap.mssql = throwDb;
 		dbMap.mssqlNative = throwDb;
@@ -2564,6 +2565,7 @@ function requireClientMap () {
 
 		onFinal.http = (url) => index({ db: url, providers: dbMap });
 		onFinal.pg = () => index({ db: throwDb, providers: dbMap });
+		onFinal.pglite = () => index({ db: throwDb, providers: dbMap });
 		onFinal.postgres = () => index({ db: throwDb, providers: dbMap });
 		onFinal.mssql = () => index({ db: throwDb, providers: dbMap });
 		onFinal.mssqlNative = () => index({ db: throwDb, providers: dbMap });
@@ -2716,6 +2718,7 @@ function requireClient () {
 		client.mssql = onProvider.bind(null, 'mssql');
 		client.mssqlNative = onProvider.bind(null, 'mssqlNative');
 		client.pg = onProvider.bind(null, 'pg');
+		client.pglite = onProvider.bind(null, 'pglite');
 		client.postgres = onProvider.bind(null, 'postgres');
 		client.d1 = onProvider.bind(null, 'd1');
 		client.sqlite = onProvider.bind(null, 'sqlite');
@@ -11863,6 +11866,11 @@ function requireCreateProviders () {
 				return createPool.bind(null, 'pg');
 			}
 		});
+		Object.defineProperty(dbMap, 'pglite', {
+			get:  function() {
+				return createPool.bind(null, 'pglite');
+			}
+		});
 		Object.defineProperty(dbMap, 'postgres', {
 			get:  function() {
 				return createPool.bind(null, 'pg');
@@ -11930,6 +11938,9 @@ function requireCreateProviders () {
 		const dbMap = {
 			get pg() {
 				return createPool.bind(null, 'pg');
+			},
+			get pglite() {
+				return createPool.bind(null, 'pglite');
 			},
 			get postgres() {
 				return createPool.bind(null, 'pg');
@@ -12033,6 +12044,7 @@ function requireMap () {
 		}
 		context.map = map.bind(null, index, context, providers);
 		context.pg = connect.bind(null, 'pg');
+		context.pglite = connect.bind(null, 'pglite');
 		context.postgres = connect.bind(null, 'pg');
 		context.mssql = connect.bind(null, 'mssql');
 		context.mssqlNative = connect.bind(null, 'mssqlNative');

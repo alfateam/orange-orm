@@ -55,6 +55,7 @@ afterAll(async () => {
 
 describe('optimistic fail', () => {
 	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
@@ -101,6 +102,7 @@ describe('optimistic fail', () => {
 
 describe('insert skipOnConflict with overwrite column', () => {
 	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
@@ -157,6 +159,7 @@ describe('insert skipOnConflict with overwrite column', () => {
 
 describe('savechanges overload overwrite', () => {
 	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
@@ -214,6 +217,7 @@ describe('savechanges overload overwrite', () => {
 
 describe('savechanges overload optimistic', () => {
 	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
@@ -266,6 +270,7 @@ describe('savechanges overload optimistic', () => {
 
 describe('insert empty skipOnConflict', () => {
 	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
@@ -306,6 +311,7 @@ describe('insert empty skipOnConflict', () => {
 
 describe('columnDiscriminator insert skipOnConflict with overwrite column', () => {
 	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
@@ -370,6 +376,7 @@ describe('columnDiscriminator insert skipOnConflict with overwrite column', () =
 
 describe('insert overwrite with skipOnConflict column', () => {
 	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
@@ -426,6 +433,7 @@ describe('insert overwrite with skipOnConflict column', () => {
 
 describe('insert overwrite with optimistic column changed', () => {
 	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
@@ -482,6 +490,7 @@ describe('insert overwrite with optimistic column changed', () => {
 
 describe('insert overwrite with optimistic column unchanged', () => {
 	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
@@ -572,7 +581,10 @@ const connections = {
 		db: map({ db: con => con.postgres('postgres://postgres:postgres@postgres/postgres', { size: 1 }) }),
 		init: initPg
 	},
-	sqlite: {
+	pglite: {
+		db: map({ db: con => con.pglite( undefined, { size: 1 }) }),
+		init: initPg
+	},	sqlite: {
 		db: map({ db: (con) => con.sqlite(sqliteName, { size: 1 }) }),
 		init: initSqlite
 	},
@@ -619,6 +631,8 @@ function getDb(name) {
 		return connections.mssqlNative;
 	else if (name === 'pg')
 		return connections.pg;
+	else if (name === 'pglite')
+		return connections.pglite;
 	else if (name === 'sqlite')
 		return connections.sqlite;
 	else if (name === 'd1')
