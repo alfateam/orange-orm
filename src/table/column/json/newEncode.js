@@ -11,7 +11,7 @@ function _new(column) {
 				return newPara('null');
 			return newPara('\'' + column.dbNull + '\'');
 		}
-		var encodeCore = getSessionSingleton(context, 'encodeJSON');
+		var encodeCore = getSessionSingleton(context, 'encodeJSON') || ((v) => v);
 
 		if (encodeCore) {
 			value = encodeCore(value);
@@ -27,7 +27,7 @@ function _new(column) {
 				return 'null';
 			return '\'' + column.dbNull + '\'';
 		}
-		var encodeCore = getSessionSingleton(context, 'encodeJSON');
+		var encodeCore = getSessionSingleton(context, 'encodeJSON') || ((v) => v);
 
 		if (encodeCore) {
 			value = encodeCore(value);
@@ -36,7 +36,7 @@ function _new(column) {
 	};
 
 	encode.direct = function(context, value) {
-		var encodeCore = getSessionSingleton(context, 'encodeJSON');
+		var encodeCore = getSessionSingleton(context, 'encodeJSON') || ((v) => v);
 
 		if (encodeCore) {
 			value = encodeCore(value);
