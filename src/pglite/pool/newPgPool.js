@@ -31,7 +31,7 @@ function newPgPool(connectionString, poolOptions = {}) {
 		destroy: (client) => {
 			client._destroying = true;
 			client.poolCount = undefined;
-			client.end();
+			client.close();
 		},
 	});
 
