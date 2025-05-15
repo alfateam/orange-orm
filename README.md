@@ -1571,12 +1571,10 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const filter = db.order.lines.any(x => x.product.contains('guitar'));
-  //equivalent syntax:
-  // const filter = db.order.lines.product.contains('guitar');
-
   const rows = await db.order.getAll({
     where: y => y.lines.any(x => x.product.contains('guitar'))
+    //equivalent syntax:
+    //where: x => x.lines.product.contains('guitar')
   });  
 }
 ```
