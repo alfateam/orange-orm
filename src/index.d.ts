@@ -14,7 +14,7 @@ declare namespace r {
     function end(): Promise<void>;
     function d1(database: D1Database, options?: PoolOptions): Pool;
     function postgres(connectionString: string, options?: PoolOptions): Pool;
-    function pglite(config?: PGliteOptions | string, options?: PoolOptions): Pool;
+    function pglite(config?: PGliteOptions | string | undefined, options?: PoolOptions): Pool;
     function sqlite(connectionString: string, options?: PoolOptions): Pool;
     function sap(connectionString: string, options?: PoolOptions): Pool;
     function mssql(connectionConfig: ConnectionConfiguration, options?: PoolOptions): Pool;

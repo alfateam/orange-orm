@@ -33,7 +33,7 @@ type DbConnectable<T> = {
 	http(url: string): MappedDbInstance<T>;
 	d1(database: D1Database): MappedDbInstance<T>;
 	postgres(connectionString: string, options?: PoolOptions): MappedDbInstance<T>;
-	pglite(config?: PGliteOptions| string, options?: PoolOptions): MappedDbInstance<T>;
+	pglite(config?: PGliteOptions| string | undefined, options?: PoolOptions): MappedDbInstance<T>;
 	sqlite(connectionString: string, options?: PoolOptions): MappedDbInstance<T>;
 	sap(connectionString: string, options?: PoolOptions): MappedDbInstance<T>;
 	mssql(connectionConfig: ConnectionConfiguration, options?: PoolOptions): MappedDbInstance<T>;
@@ -65,8 +65,7 @@ interface Connectors {
 	http(url: string): Pool;
 	d1(database: D1Database): Pool;
 	postgres(connectionString: string, options?: PoolOptions): Pool;
-	pglite(config?: PGliteOptions| string, options?: PoolOptions): Pool;
-	pglite(connectionString: string, options?: PoolOptions): Pool;
+	pglite(config?: PGliteOptions| string | undefined, options?: PoolOptions): Pool;
 	sqlite(connectionString: string, options?: PoolOptions): Pool;
 	sap(connectionString: string, options?: PoolOptions): Pool;
 	mssql(connectionConfig: ConnectionConfiguration, options?: PoolOptions): Pool;

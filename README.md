@@ -23,15 +23,16 @@ The ultimate Object Relational Mapper for Node.js, Bun and Deno, offering seamle
 - **Works in the Browser**: You can securely use Orange in the browser by utilizing the Express.js plugin, which serves to safeguard sensitive database credentials from exposure at the client level and protect against SQL injection. This method mirrors a traditional REST API, augmented with advanced TypeScript tooling for enhanced functionality.
 
 ## Supported Databases and Runtimes
-|               | Node | Deno | Bun |Cloudflare |
-| ------------- | :-----: | :-----: | :-----: | :-----: | 
-| Postgres      | ✅ | ✅ | ✅ | ✅
-| MS SQL        | ✅ |  | ✅ | 
-| MySQL         | ✅ | ✅ | ✅ | 
-| Oracle        | ✅ | ✅ | ✅ | 
-| SAP ASE       | ✅ |  |  | 
-| SQLite        | ✅ | ✅ | ✅ | 
-| Cloudflare D1 |  |  |  | ✅
+|               | Node | Deno | Bun |Cloudflare | Web |
+| ------------- | :-----: | :-----: | :-----: | :-----: | :-----: | 
+| Postgres      | ✅ | ✅ | ✅ | ✅|
+| PGlite      | ✅ | ✅ | ✅ | ✅ | ✅
+| MS SQL        | ✅ |  | ✅ | |
+| MySQL         | ✅ | ✅ | ✅ || 
+| Oracle        | ✅ | ✅ | ✅ | |
+| SAP ASE       | ✅ |  |  | |
+| SQLite        | ✅ | ✅ | ✅ | |
+| Cloudflare D1 |  |  |  | ✅|
 
 This is the _Modern Typescript Documentation_. Are you looking for the [_Classic Documentation_](https://github.com/alfateam/orange-orm/blob/master/docs/docs.md) ?
 
@@ -276,13 +277,11 @@ In SQLite, columns with the INTEGER PRIMARY KEY attribute are designed to autoin
 <details><summary><strong>Connecting</strong></summary>
 
 __SQLite__  
-
-**Node.js 21 and earlier**
+When running **Node.js 21 and earlier**, you need to install the `sqlite3` dependency.  
+When running Node.js 22 and later, Bun, or Deno,  you don't need it as it is built-in.  
 ```bash
 npm install sqlite3
 ```  
-__Node.js 22+, Bun, or Deno__  
-When running Node.js 22 and later, Bun, or Deno, you can use the builtin SQLite dependency and don't need to install sqlite3.
 
 ```javascript
 import map from './map';
@@ -355,7 +354,7 @@ const db = map.mssql({
 ```
 
 __PostgreSQL__  
-With Bun, you don't need to install the 'pg' package as PostgreSQL support is built-in.
+With Bun, you don't need to install the `pg` package as PostgreSQL support is built-in.
 ```bash
 npm install pg
 ```  
@@ -367,6 +366,16 @@ With schema
 ```javascript
 import map from './map';
 const db = map.postgres('postgres://postgres:postgres@postgres/postgres?search_path=custom');
+```
+__PGlite__  
+```bash
+npm install @electric-sql/pglite
+```  
+In this example we use the in-memory Postgres.  
+Read more about [PGLite connection configs](https://pglite.dev/docs/).  
+```javascript
+import map from './map';
+const db = map.pglite( /* config? : PGliteOptions */);
 ```
 __Cloudflare D1__  
 <sub>📄 wrangler.toml</sub>  
