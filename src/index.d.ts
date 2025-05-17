@@ -1,4 +1,5 @@
 import type { Options } from './ajv';
+import type { PGliteOptions } from './pglite.d.ts';
 import type { RequestHandler } from 'express';
 import type { D1Database } from '@cloudflare/workers-types';
 import type { ConnectionConfiguration } from 'tedious';
@@ -13,6 +14,7 @@ declare namespace r {
     function end(): Promise<void>;
     function d1(database: D1Database, options?: PoolOptions): Pool;
     function postgres(connectionString: string, options?: PoolOptions): Pool;
+    function pglite(config?: PGliteOptions | string, options?: PoolOptions): Pool;
     function sqlite(connectionString: string, options?: PoolOptions): Pool;
     function sap(connectionString: string, options?: PoolOptions): Pool;
     function mssql(connectionConfig: ConnectionConfiguration, options?: PoolOptions): Pool;

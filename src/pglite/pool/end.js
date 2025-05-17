@@ -4,6 +4,7 @@ function endPool(pgPool, id, done) {
 	pgPool.drain(onDrained);
 
 	function onDrained() {
+		//todo await
 		pgPool.destroyAllNow();
 		delete pools[id];
 		done();
