@@ -1,4 +1,3 @@
-import { PGlite } from '@electric-sql/pglite';
 import { describe, test, beforeAll, afterAll, expect } from 'vitest';
 import { fileURLToPath } from 'url';
 import setupD1 from './setupD1';
