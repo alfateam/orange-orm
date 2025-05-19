@@ -4368,7 +4368,7 @@ function requireEndsWithCore () {
 	var nullOperator = ' is ';
 
 	function endsWithCore(context, operator, column,arg,alias) {
-		alias = quote(alias);
+		alias = quote(context, alias);
 		operator = ' ' + operator + ' ';
 		var encoded = column.encode(context, arg);
 		if (encoded.sql() == 'null')
@@ -6076,7 +6076,7 @@ function requireNegotiateExclusive () {
 	function negotiateExclusive(context, table, alias, _exclusive) {
 		if (table._exclusive || _exclusive) {
 			var encode =  getSessionSingleton(context, 'selectForUpdateSql');
-			return encode(alias);
+			return encode(context, alias);
 		}
 		return '';
 	}
@@ -15495,8 +15495,8 @@ function requireSelectForUpdateSql$3 () {
 	hasRequiredSelectForUpdateSql$3 = 1;
 	const quote = requireQuote$6();
 
-	selectForUpdateSql$3 = function(alias) {
-		return ' FOR UPDATE OF ' + quote(alias);
+	selectForUpdateSql$3 = function(context, alias) {
+		return ' FOR UPDATE OF ' + quote(context, alias);
 	};
 	return selectForUpdateSql$3;
 }

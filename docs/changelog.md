@@ -1,4 +1,6 @@
 ## Changelog
+__4.6.2__  
+Bugfix:  crashed when combining endsWith filter with other filter: e.g. `endsWith('foo').or(...)`  
 __4.6.1__  
 Bugfix:  No intellisense when running in browser mode .  See [#125](https://github.com/alfateam/)  
 __4.6.0__  
