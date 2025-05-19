@@ -1,5 +1,5 @@
 const quote = require('../table/quote');
 
-module.exports = function(alias) {
-	return ' FOR UPDATE OF ' + quote(alias);
+module.exports = function(context, alias) {
+	return ' FOR UPDATE OF ' + quote(context, alias);
 };
