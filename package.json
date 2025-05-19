@@ -1,6 +1,6 @@
 {
   "name": "orange-orm",
-  "version": "4.6.0",
+  "version": "4.6.1",
   "main": "./src/index.js",
   "module": "./dist/index.mjs",
   "browser": "./dist/index.browser.mjs",
@@ -8,7 +8,8 @@
     ".": {
       "require": "./src/index.js",
       "import": "./dist/index.mjs",
-      "browser": "./dist/index.browser.mjs"
+      "browser": "./dist/index.browser.mjs",
+      "types": "./src/index.d.ts"
     }
   },
   "bin": {
@@ -16,7 +17,6 @@
   },
   "title": "Orange ORM",
   "description": "Object Relational Mapper",
-  "types": "./src/index.d.ts",
   "keywords": [
     "typescript orm",
     "orm",

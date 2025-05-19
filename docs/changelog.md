@@ -1,4 +1,6 @@
 ## Changelog
+__4.6.1__  
+Bugfix:  No intellisense when running in browser mode .  See [#125](https://github.com/alfateam/)  
 __4.6.0__  
 Support for Deno and Bun.  
 Using builtin sqlite for Node22++.    
