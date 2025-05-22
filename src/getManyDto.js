@@ -338,8 +338,8 @@ async function decodeRelations2(context, strategy, span, rawRows, resultRows, ke
 		return decode(context, strategy[name], leg.span, rawRows, keys, updateParent);
 
 		function updateParent(subRow, i) {
-			resultRows[i][name] = subRow;
-
+			if (resultRows[i])
+				resultRows[i][name] = subRow;
 		}
 	};
 

@@ -11071,8 +11071,8 @@ function requireGetManyDto$2 () {
 			return decode(context, strategy[name], leg.span, rawRows, keys, updateParent);
 
 			function updateParent(subRow, i) {
-				resultRows[i][name] = subRow;
-
+				if (resultRows[i])
+					resultRows[i][name] = subRow;
 			}
 		};
 

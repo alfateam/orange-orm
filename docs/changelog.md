@@ -1,8 +1,10 @@
 ## Changelog
+__4.6.3__  
+Bugfix:  Chained Reference relation throws if first one is null. See [#126](https://github.com/alfateam/issues/126)  
 __4.6.2__  
 Bugfix:  crashed when combining endsWith filter with other filter: e.g. `endsWith('foo').or(...)`  
 __4.6.1__  
-Bugfix:  No intellisense when running in browser mode .  See [#125](https://github.com/alfateam/)  
+Bugfix:  No intellisense when running in browser mode .  See [#125](https://github.com/alfateam/issues/125)  
 __4.6.0__  
 Support for Deno and Bun.  
 Using builtin sqlite for Node22++.    
