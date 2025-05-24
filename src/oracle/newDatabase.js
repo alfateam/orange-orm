@@ -13,11 +13,8 @@ let setSessionSingleton = require('../table/setSessionSingleton');
 function newDatabase(connectionString, poolOptions) {
 	if (!connectionString)
 		throw new Error('Connection string cannot be empty');
-	var pool;
-	if (!poolOptions)
-		pool = newPool.bind(null, connectionString, poolOptions);
-	else
-		pool = newPool(connectionString, poolOptions);
+	poolOptions = poolOptions || { min: 1 };
+	var pool = newPool(connectionString, poolOptions);
 
 	let c = { poolFactory: pool, hostLocal, express };
 

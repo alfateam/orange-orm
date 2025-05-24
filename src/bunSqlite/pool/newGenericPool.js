@@ -7,6 +7,7 @@ var Database;
 function newGenericPool(connectionString, poolOptions) {
 	poolOptions = poolOptions || {};
 	var pool = genericPool.Pool({
+		min: poolOptions.min || 0,
 		max: poolOptions.size || poolOptions.poolSize || defaults.poolSize,
 		idleTimeoutMillis: poolOptions.idleTimeout || defaults.poolIdleTimeout,
 		reapIntervalMillis: poolOptions.reapIntervalMillis || defaults.reapIntervalMillis,

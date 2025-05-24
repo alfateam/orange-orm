@@ -6,6 +6,7 @@ const runtimes = require('./runtimes');
 
 let _mySql;
 let _pg;
+let _pglite;
 let _sqlite;
 let _mssqlNative;
 let _sap;
@@ -52,6 +53,13 @@ Object.defineProperty(connectViaPool, 'mySql', {
 		if (!_mySql)
 			_mySql = require('./mySql/newDatabase');
 		return _mySql;
+	}
+});
+Object.defineProperty(connectViaPool, 'pglite', {
+	get: function() {
+		if (!_pglite)
+			_pglite = require('./pglite/newDatabase');
+		return _pglite;
 	}
 });
 Object.defineProperty(connectViaPool, 'postgres', {

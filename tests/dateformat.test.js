@@ -16,6 +16,7 @@ let miniflare;
 beforeAll(async () => {
 	({ d1, miniflare } = await setupD1(fileURLToPath(import.meta.url)));
 	await insertData('pg');
+	await insertData('pglite');
 	await insertData('oracle');
 	await insertData('mssql');
 	await insertData('mysql');
@@ -124,6 +125,18 @@ describe('dateformat get', () => {
 
 	test('pg', async () => {
 		const { db } = getDb('pg');
+		const result = await db.datetestWithTz.getOne();
+		expect(result).toEqual({ id: 1, date: '2023-07-14', datetime: '2023-07-14T12:00:00', datetime_tz: '2023-07-14T20:00:00+00' });
+		result.date = newValue;
+		result.datetime = newValue;
+		result.datetime_tz = newValue;
+		await result.saveChanges();
+		await result.refresh();
+		expect(result).toEqual({ id: 1, date: '2023-08-05', datetime: '2023-08-05T12:00:00', datetime_tz: '2023-08-05T15:00:00+00' });
+	});
+
+	test('pglite', async () => {
+		const { db } = getDb('pglite');
 		const result = await db.datetestWithTz.getOne();
 		expect(result).toEqual({ id: 1, date: '2023-07-14', datetime: '2023-07-14T12:00:00', datetime_tz: '2023-07-14T20:00:00+00' });
 		result.date = newValue;
@@ -245,7 +258,10 @@ const connections = {
 		db: map({ db: con => con.postgres('postgres://postgres:postgres@postgres/postgres', { size: 1 }) }),
 		init: initPg
 	},
-	sqlite: {
+	pglite: {
+		db: map({ db: con => con.pglite( undefined, { size: 1 }) }),
+		init: initPg
+	},	sqlite: {
 		db: map({ db: (con) => con.sqlite(sqliteName, { size: 1 }) }),
 		init: initSqlite
 	},
@@ -292,6 +308,8 @@ function getDb(name) {
 		return connections.mssqlNative;
 	else if (name === 'pg')
 		return connections.pg;
+	else if (name === 'pglite')
+		return connections.pglite;
 	else if (name === 'sqlite')
 		return connections.sqlite;
 	else if (name === 'd1')

@@ -4,6 +4,8 @@ let _begin = require('../table/begin');
 let commit = require('../table/commit');
 let rollback = require('../table/rollback');
 let newPool = require('./newPool');
+let lock = require('../lock');
+let executeSchema = require('../pg/schema');
 let express = require('../hostExpress');
 let hostLocal = require('../hostLocal');
 let doQuery = require('../query');
@@ -11,12 +13,10 @@ let releaseDbClient = require('../table/releaseDbClient');
 let setSessionSingleton = require('../table/setSessionSingleton');
 
 function newDatabase(connectionString, poolOptions) {
-	if (!connectionString)
-		throw new Error('Connection string cannot be empty');
 	poolOptions = poolOptions || { min: 1 };
 	var pool = newPool(connectionString, poolOptions);
 
-	let c = {poolFactory: pool, hostLocal, express};
+	let c = { poolFactory: pool, hostLocal, express };
 
 	c.transaction = function(options, fn) {
 		if ((arguments.length === 1) && (typeof options === 'function')) {
@@ -30,20 +30,21 @@ function newDatabase(connectionString, poolOptions) {
 		else
 			return domain.run(run);
 
-		function begin() {
-			return _begin(domain, options);
-		}
-
 		async function runInTransaction() {
 			let result;
 			let transaction = newTransaction(domain, pool, options);
 			await new Promise(transaction)
 				.then(begin)
+				.then(negotiateSchema)
 				.then(() => fn(domain))
 				.then((res) => result = res)
 				.then(() => commit(domain))
-				.then(null, (e) => rollback(domain, e));
+				.then(null, (e) => rollback(domain,e));
 			return result;
+		}
+
+		function begin() {
+			return _begin(domain, options);
 		}
 
 		function run() {
@@ -51,26 +52,43 @@ function newDatabase(connectionString, poolOptions) {
 			let transaction = newTransaction(domain, pool, options);
 			p = new Promise(transaction);
 
-			return p.then(begin);
+			return p.then(begin)
+				.then(negotiateSchema);
 		}
 
+		function negotiateSchema(previous) {
+			let schema = options && options.schema;
+			if (!schema)
+				return previous;
+			return executeSchema(domain, schema);
+		}
 	};
 
 	c.createTransaction = function(options) {
 		let domain = createDomain();
-		let transaction = newTransaction(domain, pool);
-		let p = domain.run(() => new Promise(transaction).then(begin));
+		let transaction = newTransaction(domain, pool, options);
+		let p = domain.run(() => new Promise(transaction)
+			.then(begin).then(negotiateSchema));
 
 		function run(fn) {
-			return p.then(() => fn(domain));
+			return p.then(domain.run.bind(domain, fn));
 		}
-		run.rollback = rollback.bind(null, domain);
-		run.commit = commit.bind(null, domain);
-		return run;
 
 		function begin() {
 			return _begin(domain, options);
 		}
+
+		function negotiateSchema(previous) {
+			let schema = options && options.schema;
+			if (!schema)
+				return previous;
+			return executeSchema(domain,schema);
+		}
+
+		run.rollback = rollback.bind(null, domain);
+		run.commit = commit.bind(null, domain);
+
+		return run;
 	};
 
 	c.query = function(query) {
@@ -92,9 +110,10 @@ function newDatabase(connectionString, poolOptions) {
 		}
 	};
 
-
 	c.rollback = rollback;
 	c.commit = commit;
+	c.lock = lock;
+	c.schema = executeSchema;
 
 	c.end = function() {
 		if (poolOptions)
@@ -104,7 +123,7 @@ function newDatabase(connectionString, poolOptions) {
 	};
 
 	c.accept = function(caller) {
-		caller.visitSqlite();
+		caller.visitPg();
 	};
 
 	return c;

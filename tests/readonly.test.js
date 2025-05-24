@@ -19,6 +19,7 @@ let miniflare;
 beforeAll(async () => {
 	({ d1, miniflare } = await setupD1(fileURLToPath(import.meta.url)));
 	await insertData('pg');
+	await insertData('pglite');
 	await insertData('oracle');
 	await insertData('mssql');
 	await insertData('mysql');
@@ -96,6 +97,7 @@ describe('readonly everything', () => {
 	});
 
 	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
@@ -228,6 +230,7 @@ describe('readonly table', () => {
 
 
 	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
@@ -282,6 +285,7 @@ describe('readonly column', () => {
 
 
 	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
@@ -338,6 +342,7 @@ describe('readonly table delete', () => {
 
 
 	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
@@ -377,6 +382,7 @@ describe('readonly nested table delete', () => {
 
 
 	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
@@ -415,6 +421,7 @@ describe('readonly on grandChildren table delete', () => {
 
 
 	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
@@ -454,6 +461,7 @@ describe('readonly nested table delete override', () => {
 
 
 	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
@@ -488,6 +496,7 @@ describe('readonly column no change', () => {
 
 
 	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
@@ -535,6 +544,7 @@ describe('readonly nested column', () => {
 
 
 	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
@@ -579,6 +589,7 @@ describe('readonly nested table', () => {
 
 
 	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
@@ -618,6 +629,7 @@ describe('readonly table with column override', () => {
 
 
 	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
@@ -666,6 +678,7 @@ describe('readonly column delete', () => {
 
 
 	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
@@ -732,7 +745,10 @@ const connections = {
 		db: map({ db: con => con.postgres('postgres://postgres:postgres@postgres/postgres', { size: 1 }) }),
 		init: initPg
 	},
-	sqlite: {
+	pglite: {
+		db: map({ db: con => con.pglite( undefined, { size: 1 }) }),
+		init: initPg
+	},	sqlite: {
 		db: map({ db: (con) => con.sqlite(sqliteName, { size: 1 }) }),
 		init: initSqlite
 	},
@@ -779,6 +795,8 @@ function getDb(name) {
 		return connections.mssqlNative;
 	else if (name === 'pg')
 		return connections.pg;
+	else if (name === 'pglite')
+		return connections.pglite;
 	else if (name === 'sqlite')
 		return connections.sqlite;
 	else if (name === 'd1')

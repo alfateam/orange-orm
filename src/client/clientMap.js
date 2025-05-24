@@ -32,6 +32,7 @@ function map(index, _fn) {
 
 	dbMap.http = (url) => url;
 	dbMap.pg = throwDb;
+	dbMap.pglite = throwDb;
 	dbMap.postgres = throwDb;
 	dbMap.mssql = throwDb;
 	dbMap.mssqlNative = throwDb;
@@ -59,6 +60,7 @@ function map(index, _fn) {
 
 	onFinal.http = (url) => index({ db: url, providers: dbMap });
 	onFinal.pg = () => index({ db: throwDb, providers: dbMap });
+	onFinal.pglite = () => index({ db: throwDb, providers: dbMap });
 	onFinal.postgres = () => index({ db: throwDb, providers: dbMap });
 	onFinal.mssql = () => index({ db: throwDb, providers: dbMap });
 	onFinal.mssqlNative = () => index({ db: throwDb, providers: dbMap });

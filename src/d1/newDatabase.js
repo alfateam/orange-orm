@@ -13,11 +13,8 @@ let setSessionSingleton = require('../table/setSessionSingleton');
 function newDatabase(d1Database, poolOptions) {
 	if (!d1Database)
 		throw new Error('Missing d1Database');
-	var pool;
-	if (!poolOptions)
-		pool = newPool.bind(null,d1Database, poolOptions);
-	else
-		pool = newPool(d1Database, poolOptions);
+	poolOptions = poolOptions || { min: 1 };
+	var pool = newPool(d1Database, poolOptions);
 
 	let c = {poolFactory: pool, hostLocal, express};
 

@@ -41,6 +41,7 @@ function map(index, context, providers, fn) {
 	}
 	context.map = map.bind(null, index, context, providers);
 	context.pg = connect.bind(null, 'pg');
+	context.pglite = connect.bind(null, 'pglite');
 	context.postgres = connect.bind(null, 'pg');
 	context.mssql = connect.bind(null, 'mssql');
 	context.mssqlNative = connect.bind(null, 'mssqlNative');

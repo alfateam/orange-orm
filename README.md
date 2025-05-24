@@ -23,15 +23,16 @@ The ultimate Object Relational Mapper for Node.js, Bun and Deno, offering seamle
 - **Works in the Browser**: You can securely use Orange in the browser by utilizing the Express.js plugin, which serves to safeguard sensitive database credentials from exposure at the client level and protect against SQL injection. This method mirrors a traditional REST API, augmented with advanced TypeScript tooling for enhanced functionality.
 
 ## Supported Databases and Runtimes
-|               | Node | Deno | Bun |Cloudflare |
-| ------------- | :-----: | :-----: | :-----: | :-----: | 
-| Postgres      | ✅ | ✅ | ✅ | ✅
-| MS SQL        | ✅ |  | ✅ | 
-| MySQL         | ✅ | ✅ | ✅ | 
-| Oracle        | ✅ | ✅ | ✅ | 
-| SAP ASE       | ✅ |  |  | 
-| SQLite        | ✅ | ✅ | ✅ | 
-| Cloudflare D1 |  |  |  | ✅
+|               | Node | Deno | Bun |Cloudflare | Web |
+| ------------- | :-----: | :-----: | :-----: | :-----: | :-----: | 
+| Postgres      | ✅ | ✅ | ✅ | ✅|
+| PGlite      | ✅ | ✅ | ✅ | ✅ | ✅
+| MS SQL        | ✅ |  | ✅ | |
+| MySQL         | ✅ | ✅ | ✅ || 
+| Oracle        | ✅ | ✅ | ✅ | |
+| SAP ASE       | ✅ |  |  | |
+| SQLite        | ✅ | ✅ | ✅ | |
+| Cloudflare D1 |  |  |  | ✅|
 
 This is the _Modern Typescript Documentation_. Are you looking for the [_Classic Documentation_](https://github.com/alfateam/orange-orm/blob/master/docs/docs.md) ?
 
@@ -276,17 +277,19 @@ In SQLite, columns with the INTEGER PRIMARY KEY attribute are designed to autoin
 <details><summary><strong>Connecting</strong></summary>
 
 __SQLite__  
-
-**Node.js 21 and earlier**
+When running **Node.js 21 and earlier**, you need to install the `sqlite3` dependency.  
+When running Node.js 22 and later, Bun, or Deno,  you don't need it as it is built-in.  
 ```bash
 npm install sqlite3
 ```  
-__Node.js 22+, Bun, or Deno__  
-When running Node.js 22 and later, Bun, or Deno, you can use the builtin SQLite dependency and don't need to install sqlite3.
 
 ```javascript
 import map from './map';
 const db = map.sqlite('demo.db');
+// … use the database …
+
+// IMPORTANT for serverless functions:
+await db.close();           // closes the client connection
 ```
 __With connection pool__
 ```bash
@@ -295,7 +298,14 @@ npm install sqlite3
 ```javascript
 import map from './map';
 const db = map.sqlite('demo.db', { size: 10 });
+// … use the pool …
+
+// IMPORTANT for serverless functions:
+await pool.close();         // closes all pooled connections
 ```
+__Why close ?__  
+In serverless environments (e.g. AWS Lambda, Vercel, Cloudflare Workers) execution contexts are frequently frozen and resumed. Explicitly closing the client or pool ensures that file handles are released promptly and prevents “database locked” errors between invocations.  
+
 __From the browser__  
 You can securely use Orange from the browser by utilizing the Express plugin, which serves to safeguard sensitive database credentials from exposure at the client level. This technique bypasses the need to transmit raw SQL queries directly from the client to the server. Instead, it logs method calls initiated by the client, which are later replayed and authenticated on the server. This not only reinforces security by preventing the disclosure of raw SQL queries on the client side but also facilitates a smoother operation. Essentially, this method mirrors a traditional REST API, augmented with advanced TypeScript tooling for enhanced functionality. You can read more about it in the section called [In the browser](#user-content-in-the-browser)  
 <sub>📄 server.ts</sub>
@@ -355,7 +365,7 @@ const db = map.mssql({
 ```
 
 __PostgreSQL__  
-With Bun, you don't need to install the 'pg' package as PostgreSQL support is built-in.
+With Bun, you don't need to install the `pg` package as PostgreSQL support is built-in.
 ```bash
 npm install pg
 ```  
@@ -367,6 +377,16 @@ With schema
 ```javascript
 import map from './map';
 const db = map.postgres('postgres://postgres:postgres@postgres/postgres?search_path=custom');
+```
+__PGlite__  
+```bash
+npm install @electric-sql/pglite
+```  
+In this example we use the in-memory Postgres.  
+Read more about [PGLite connection configs](https://pglite.dev/docs/).  
+```javascript
+import map from './map';
+const db = map.pglite( /* config? : PGliteOptions */);
 ```
 __Cloudflare D1__  
 <sub>📄 wrangler.toml</sub>  

@@ -32,6 +32,7 @@ beforeAll(async () => {
 	({ d1, miniflare } = await setupD1(fileURLToPath(import.meta.url)));
 	await createMs('mssql');
 	await insertData('pg');
+	await insertData('pglite');
 	await insertData('oracle');
 	await insertData('mssql');
 	if (major === 18)
@@ -131,6 +132,7 @@ beforeAll(async () => {
 
 describe('count', () => {
 	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
@@ -151,6 +153,7 @@ describe('count', () => {
 
 describe('count filter', () => {
 	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
@@ -206,7 +209,10 @@ const connections = {
 		db: map({ db: con => con.postgres('postgres://postgres:postgres@postgres/postgres', { size: 1 }) }),
 		init: initPg
 	},
-	sqlite: {
+	pglite: {
+		db: map({ db: con => con.pglite( undefined, { size: 1 }) }),
+		init: initPg
+	},	sqlite: {
 		db: map({ db: (con) => con.sqlite(sqliteName, { size: 1 }) }),
 		init: initSqlite
 	},
@@ -253,6 +259,8 @@ function getDb(name) {
 		return connections.mssqlNative;
 	else if (name === 'pg')
 		return connections.pg;
+	else if (name === 'pglite')
+		return connections.pglite;
 	else if (name === 'sqlite')
 		return connections.sqlite;
 	else if (name === 'd1')
