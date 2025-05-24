@@ -11,7 +11,7 @@ declare function r(config: r.Config): unknown;
 declare namespace r {
 
     function table(name: string): Table;
-    function end(): Promise<void>;
+    function close(): Promise<void>;
     function d1(database: D1Database, options?: PoolOptions): Pool;
     function postgres(connectionString: string, options?: PoolOptions): Pool;
     function pglite(config?: PGliteOptions | string | undefined, options?: PoolOptions): Pool;

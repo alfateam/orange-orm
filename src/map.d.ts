@@ -86,6 +86,7 @@ type MappedDbInstance<T> = {
 	? MappedTable<T[K]>
 	: never;
 } & {
+	close(): Promise<void>;
 	filter: Filter;
 	and(filter: Filter | RawFilter[], ...filters: RawFilter[]): Filter;
 	or(filter: Filter | RawFilter[], ...filters: RawFilter[]): Filter;

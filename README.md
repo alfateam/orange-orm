@@ -286,6 +286,10 @@ npm install sqlite3
 ```javascript
 import map from './map';
 const db = map.sqlite('demo.db');
+// … use the database …
+
+// IMPORTANT for serverless functions:
+await db.close();           // closes the client connection
 ```
 __With connection pool__
 ```bash
@@ -294,7 +298,14 @@ npm install sqlite3
 ```javascript
 import map from './map';
 const db = map.sqlite('demo.db', { size: 10 });
+// … use the pool …
+
+// IMPORTANT for serverless functions:
+await pool.close();         // closes all pooled connections
 ```
+__Why close ?__  
+In serverless environments (e.g. AWS Lambda, Vercel, Cloudflare Workers) execution contexts are frequently frozen and resumed. Explicitly closing the client or pool ensures that file handles are released promptly and prevents “database locked” errors between invocations.  
+
 __From the browser__  
 You can securely use Orange from the browser by utilizing the Express plugin, which serves to safeguard sensitive database credentials from exposure at the client level. This technique bypasses the need to transmit raw SQL queries directly from the client to the server. Instead, it logs method calls initiated by the client, which are later replayed and authenticated on the server. This not only reinforces security by preventing the disclosure of raw SQL queries on the client side but also facilitates a smoother operation. Essentially, this method mirrors a traditional REST API, augmented with advanced TypeScript tooling for enhanced functionality. You can read more about it in the section called [In the browser](#user-content-in-the-browser)  
 <sub>📄 server.ts</sub>

@@ -13,11 +13,8 @@ let releaseDbClient = require('../table/releaseDbClient');
 let setSessionSingleton = require('../table/setSessionSingleton');
 
 function newDatabase(connectionString, poolOptions) {
-	var pool;
-	if (!poolOptions)
-		pool = newPool.bind(null, connectionString, poolOptions);
-	else
-		pool = newPool(connectionString, poolOptions);
+	poolOptions = poolOptions || { min: 1 };
+	var pool = newPool(connectionString, poolOptions);
 
 	let c = { poolFactory: pool, hostLocal, express };
 

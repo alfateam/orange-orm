@@ -65,6 +65,11 @@ function rdbClient(options = {}) {
 	client.http = onProvider.bind(null, 'http');//todo
 	client.mysql = onProvider.bind(null, 'mysql');
 	client.express = express;
+	client.close = close;
+
+	function close() {
+		return client.db.end ? client.db.end() : Promise.resolve();
+	}
 
 	function onProvider(name, ...args) {
 		let db = providers[name].apply(null, args);

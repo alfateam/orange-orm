@@ -12,10 +12,8 @@ var quote = require('../pg/quote');
 
 function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 	var rdb = { poolFactory: pool };
-	if (!pool.connect) {
+	if (!pool.connect)
 		pool = pool();
-		rdb.pool = pool;
-	}
 
 	rdb.engine = 'pg';
 	rdb.encodeDate = encodeDate;
