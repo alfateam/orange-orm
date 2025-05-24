@@ -4598,7 +4598,7 @@ function requireNewEncode$6 () {
 					return newPara('null');
 				return newPara('\'' + column.dbNull + '\'');
 			}
-			var encodeCore = getSessionSingleton(context, 'encodeJSON');
+			var encodeCore = getSessionSingleton(context, 'encodeJSON') || ((v) => v);
 
 			if (encodeCore) {
 				value = encodeCore(value);
@@ -4614,7 +4614,7 @@ function requireNewEncode$6 () {
 					return 'null';
 				return '\'' + column.dbNull + '\'';
 			}
-			var encodeCore = getSessionSingleton(context, 'encodeJSON');
+			var encodeCore = getSessionSingleton(context, 'encodeJSON') || ((v) => v);
 
 			if (encodeCore) {
 				value = encodeCore(value);
@@ -4623,7 +4623,7 @@ function requireNewEncode$6 () {
 		};
 
 		encode.direct = function(context, value) {
-			var encodeCore = getSessionSingleton(context, 'encodeJSON');
+			var encodeCore = getSessionSingleton(context, 'encodeJSON') || ((v) => v);
 
 			if (encodeCore) {
 				value = encodeCore(value);
@@ -5222,7 +5222,7 @@ function requireNewEncode$1 () {
 					return newParam('null');
 				return newParam('\'' + column.dbNull + '\'');
 			}
-			var encodeCore = getSessionSingleton(context, 'encodeBoolean');
+			var encodeCore = getSessionSingleton(context, 'encodeBoolean') || encodeDefault;
 
 
 			return newParam('?', [encodeCore(value)]);
@@ -5235,19 +5235,23 @@ function requireNewEncode$1 () {
 					return 'null';
 				return '\'' + column.dbNull + '\'';
 			}
-			var encodeCore = getSessionSingleton(context, 'encodeBoolean');
+			var encodeCore = getSessionSingleton(context, 'encodeBoolean') || encodeDefault;
 
 
 			return encodeCore(value);
 		};
 
 		encode.direct = function(context, value) {
-			var encodeCore = getSessionSingleton(context, 'encodeBoolean');
+			var encodeCore = getSessionSingleton(context, 'encodeBoolean') || encodeDefault;
 
 			return encodeCore(value);
 		};
 
 		return encode;
+	}
+
+	function encodeDefault(value) {
+		return value;
 	}
 
 	newEncode$1 = _new;
@@ -14187,14 +14191,8 @@ function requireWrapQuery$9 () {
 		function runQuery(query, onCompleted) {
 			var params = query.parameters;
 			var sql = replaceParamChar(query, params);
-			query = {
-				text: sql,
-				values: params,
-				types: query.types
-			};
 			log.emitQuery({sql, parameters: params});
-
-			runOriginalQuery.call(connection, query, onInnerCompleted);
+			runOriginalQuery.call(connection, sql, params).then((result) => onInnerCompleted(null, result), (e) => onInnerCompleted(e));
 
 			function onInnerCompleted(err, result) {
 				if (err)
@@ -14227,20 +14225,6 @@ function requireEncodeDate () {
 
 	encodeDate_1 = encodeDate;
 	return encodeDate_1;
-}
-
-var encodeBoolean_1$4;
-var hasRequiredEncodeBoolean$4;
-
-function requireEncodeBoolean$4 () {
-	if (hasRequiredEncodeBoolean$4) return encodeBoolean_1$4;
-	hasRequiredEncodeBoolean$4 = 1;
-	function encodeBoolean(bool) {
-		return bool.toString();
-	}
-
-	encodeBoolean_1$4 = encodeBoolean;
-	return encodeBoolean_1$4;
 }
 
 var encodeBinary_1;
@@ -14369,30 +14353,6 @@ function requireFormatDateOut$3 () {
 
 	formatDateOut_1$2 = formatDateOut;
 	return formatDateOut_1$2;
-}
-
-var encodeJSON;
-var hasRequiredEncodeJSON;
-
-function requireEncodeJSON () {
-	if (hasRequiredEncodeJSON) return encodeJSON;
-	hasRequiredEncodeJSON = 1;
-	function encode(arg) {
-		if (Array.isArray(arg))
-			return new JsonBArrayParam(arg);
-		else
-			return arg;
-	}
-
-	class JsonBArrayParam {
-		constructor(actualArray) { this.actualArray = actualArray; }
-		toPostgres() {
-			return JSON.stringify(this.actualArray);
-		}
-	}
-
-	encodeJSON = encode;
-	return encodeJSON;
 }
 
 var lastInsertedSql_1$3;
@@ -14525,14 +14485,12 @@ function requireNewTransaction$a () {
 	hasRequiredNewTransaction$a = 1;
 	var wrapQuery = requireWrapQuery$9();
 	var encodeDate = requireEncodeDate();
-	var encodeBoolean = requireEncodeBoolean$4();
 	const encodeBinary = requireEncodeBinary();
 	const decodeBinary = requireDecodeBinary();
 	var deleteFromSql = requireDeleteFromSql$4();
 	var selectForUpdateSql = requireSelectForUpdateSql$4();
 	var limitAndOffset = requireLimitAndOffset$4();
 	var formatDateOut = requireFormatDateOut$3();
-	var encodeJSON = requireEncodeJSON();
 	var insertSql = requireInsertSql$4();
 	var insert = requireInsert$4();
 	var quote = requireQuote$4();
@@ -14545,11 +14503,9 @@ function requireNewTransaction$a () {
 		}
 
 		rdb.engine = 'pg';
-		rdb.encodeBoolean = encodeBoolean;
 		rdb.encodeDate = encodeDate;
 		rdb.encodeBinary = encodeBinary;
 		rdb.decodeBinary = decodeBinary;
-		rdb.encodeJSON = encodeJSON;
 		rdb.formatDateOut = formatDateOut;
 		rdb.deleteFromSql = deleteFromSql;
 		rdb.selectForUpdateSql = selectForUpdateSql;
@@ -14625,6 +14581,7 @@ function requireEnd$9 () {
 		pgPool.drain(onDrained);
 
 		function onDrained() {
+			//todo await
 			pgPool.destroyAllNow();
 			delete pools[id];
 			done();
@@ -14634,8 +14591,6 @@ function requireEnd$9 () {
 	end$9 = endPool;
 	return end$9;
 }
-
-var require$$3 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(url);
 
 /* eslint-disable no-prototype-builtins */
 
@@ -14650,28 +14605,10 @@ function requireNewPgPool$2 () {
 	const log = requireLog();
 	const defaults = requirePoolDefaults();
 	const genericPool = requireGenericPool();
-	const { URL } = require$$3;
 	let PGlite;
 
 	function newPgPool(connectionString, poolOptions = {}) {
-		let searchPath;
-		let connStr = connectionString;
-
-		try {
-			const url = new URL(connectionString);
-			const paramName = url.searchParams.has('search_path')
-				? 'search_path'
-				: url.searchParams.has('searchPath')
-					? 'searchPath'
-					: null;
-			if (paramName) {
-				searchPath = url.searchParams.get(paramName);
-				url.searchParams.delete(paramName);
-				connStr = url.toString();
-			}
-		} catch {
-			// Non-URL string; leave as-is
-		}
+		let { connStr, searchPath } = extractSearchPath(connectionString);
 
 		//@ts-ignore
 		const pool = genericPool.Pool({
@@ -14683,7 +14620,7 @@ function requireNewPgPool$2 () {
 			create: async (cb) => {
 				try {
 					if (!PGlite) ({ PGlite } = await import('@electric-sql/pglite'));
-					const client = new PGlite(connStr);
+					const client = connStr === undefined ? new PGlite() : new PGlite(connStr);
 					client.poolCount = 0;
 					await applySearchPath(client, searchPath);
 					cb(null, client);
@@ -14695,13 +14632,13 @@ function requireNewPgPool$2 () {
 			destroy: (client) => {
 				client._destroying = true;
 				client.poolCount = undefined;
-				client.end();
+				client.close();
 			},
 		});
 
 		pool.connect = (cb) => {
 			pool.acquire((err, client) => {
-				if (err) return cb(err, null, () => {});
+				if (err) return cb(err, null, () => { });
 				client.poolCount++;
 				cb(null, client, (releaseErr) => {
 					releaseErr ? pool.destroy(client) : pool.release(client);
@@ -14719,6 +14656,43 @@ function requireNewPgPool$2 () {
 			await client.exec(sql);
 		}
 	}
+
+	function extractSearchPath(connectionString) {
+		let connStr = connectionString;
+		let searchPath;
+
+		// Guard: nothing to do
+		if (typeof connectionString !== 'string' || connectionString.length === 0) {
+			return { connStr, searchPath };
+		}
+
+		// Split on the *first* "?" only
+		const qPos = connectionString.indexOf('?');
+		if (qPos === -1) {
+			// No query-string segment
+			return { connStr, searchPath };
+		}
+
+		const pathPart = connectionString.slice(0, qPos);
+		const qsPart = connectionString.slice(qPos + 1);
+
+		// Robust query-string handling via URLSearchParams
+		const params = new URLSearchParams(qsPart);
+
+		const paramName = 'search_path';
+
+		{
+			searchPath = params.get(paramName);
+			params.delete(paramName);
+		}
+
+		// Re-assemble the cleaned connection string
+		const remainingQs = params.toString();
+		connStr = remainingQs ? `${pathPart}?${remainingQs}` : pathPart;
+
+		return { connStr, searchPath };
+	}
+
 
 	newPgPool_1$2 = newPgPool;
 	return newPgPool_1$2;
@@ -14773,8 +14747,6 @@ function requireNewDatabase$a () {
 	let setSessionSingleton = requireSetSessionSingleton();
 
 	function newDatabase(connectionString, poolOptions) {
-		if (!connectionString)
-			throw new Error('Connection string cannot be empty');
 		var pool;
 		if (!poolOptions)
 			pool = newPool.bind(null, connectionString, poolOptions);
@@ -15004,6 +14976,30 @@ function requireWrapQuery$8 () {
 	return wrapQuery_1$8;
 }
 
+var encodeJSON;
+var hasRequiredEncodeJSON;
+
+function requireEncodeJSON () {
+	if (hasRequiredEncodeJSON) return encodeJSON;
+	hasRequiredEncodeJSON = 1;
+	function encode(arg) {
+		if (Array.isArray(arg))
+			return new JsonBArrayParam(arg);
+		else
+			return arg;
+	}
+
+	class JsonBArrayParam {
+		constructor(actualArray) { this.actualArray = actualArray; }
+		toPostgres() {
+			return JSON.stringify(this.actualArray);
+		}
+	}
+
+	encodeJSON = encode;
+	return encodeJSON;
+}
+
 var newTransaction$9;
 var hasRequiredNewTransaction$9;
 
@@ -15012,7 +15008,6 @@ function requireNewTransaction$9 () {
 	hasRequiredNewTransaction$9 = 1;
 	var wrapQuery = requireWrapQuery$8();
 	var encodeDate = requireEncodeDate();
-	var encodeBoolean = requireEncodeBoolean$4();
 	const encodeBinary = requireEncodeBinary();
 	const decodeBinary = requireDecodeBinary();
 	var deleteFromSql = requireDeleteFromSql$4();
@@ -15032,7 +15027,6 @@ function requireNewTransaction$9 () {
 		}
 
 		rdb.engine = 'pg';
-		rdb.encodeBoolean = encodeBoolean;
 		rdb.encodeDate = encodeDate;
 		rdb.encodeBinary = encodeBinary;
 		rdb.decodeBinary = decodeBinary;
@@ -15121,6 +15115,8 @@ function requireEnd$8 () {
 	end$8 = endPool;
 	return end$8;
 }
+
+var require$$3 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(url);
 
 /* eslint-disable no-prototype-builtins */
 
@@ -15423,6 +15419,20 @@ function requireWrapQuery$7 () {
 
 	wrapQuery_1$7 = wrapQuery;
 	return wrapQuery_1$7;
+}
+
+var encodeBoolean_1$4;
+var hasRequiredEncodeBoolean$4;
+
+function requireEncodeBoolean$4 () {
+	if (hasRequiredEncodeBoolean$4) return encodeBoolean_1$4;
+	hasRequiredEncodeBoolean$4 = 1;
+	function encodeBoolean(bool) {
+		return bool.toString();
+	}
+
+	encodeBoolean_1$4 = encodeBoolean;
+	return encodeBoolean_1$4;
 }
 
 var newTransaction$8;

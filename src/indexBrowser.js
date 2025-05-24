@@ -3,6 +3,7 @@ const hostLocal = require('./hostLocal');
 const client = require('./client/index.js');
 const map = require('./client/map');
 let _d1;
+let _pglite;
 
 var connectViaPool = function() {
 	return client.apply(null, arguments);
@@ -31,6 +32,14 @@ Object.defineProperty(connectViaPool, 'd1', {
 		if (!_d1)
 			_d1 = require('./d1/newDatabase');
 		return _d1;
+	}
+});
+
+Object.defineProperty(connectViaPool, 'pglite', {
+	get: function() {
+		if (!_pglite)
+			_pglite = require('./pglite/newDatabase');
+		return _pglite;
 	}
 });
 
