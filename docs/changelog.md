@@ -1,4 +1,6 @@
 ## Changelog
+__4.7.0__  
+Support for [PGLite](https://pglite.dev/). See [#124](https://github.com/alfateam/issues/124)  
 __4.6.3__  
 Bugfix:  Chained Reference relation throws if first one is null. See [#126](https://github.com/alfateam/issues/126)  
 __4.6.2__  
