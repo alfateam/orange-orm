@@ -1,4 +1,6 @@
 ## Changelog
+__4.7.1__  
+Bugfix:  Error when using bun and sqlite: Cannot find package 'Database'. See [#127](https://github.com/alfateam/issues/127)  
 __4.7.0__  
 Support for [PGLite](https://pglite.dev/). See [#124](https://github.com/alfateam/issues/124)  
 __4.6.3__  

@@ -16564,7 +16564,6 @@ function requireNewGenericPool$5 () {
 
 	var genericPool = requireGenericPool();
 	var Database;
-
 	function newGenericPool(connectionString, poolOptions) {
 		poolOptions = poolOptions || {};
 		var pool = genericPool.Pool({
@@ -16577,7 +16576,8 @@ function requireNewGenericPool$5 () {
 				try {
 					try {
 						if (!Database)
-							({ Database } = await import('bun:Database'));
+							({ Database } = await import('bun:sqlite'));
+
 					}
 					catch (err) {
 						return cb(err, null);
