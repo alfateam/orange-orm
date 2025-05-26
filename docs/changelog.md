@@ -2,13 +2,13 @@
 __4.7.1__  
 Bugfix:  Error when using bun and sqlite: Cannot find package 'Database'. See [#127](https://github.com/alfateam/issues/127)  
 __4.7.0__  
-Support for [PGLite](https://pglite.dev/). See [#124](https://github.com/alfateam/issues/124)  
+Support for [PGLite](https://pglite.dev/). See [#124](https://github.com/alfateam/orange-orm/issues/124)  
 __4.6.3__  
-Bugfix:  Chained Reference relation throws if first one is null. See [#126](https://github.com/alfateam/issues/126)  
+Bugfix:  Chained Reference relation throws if first one is null. See [#126](https://github.com/alfateam/orange-orm/issues/126)  
 __4.6.2__  
 Bugfix:  crashed when combining endsWith filter with other filter: e.g. `endsWith('foo').or(...)`  
 __4.6.1__  
-Bugfix:  No intellisense when running in browser mode .  See [#125](https://github.com/alfateam/issues/125)  
+Bugfix:  No intellisense when running in browser mode .  See [#125](https://github.com/alfateam/orange-orm/issues/125)  
 __4.6.0__  
 Support for Deno and Bun.  
 Using builtin sqlite for Node22++.    
