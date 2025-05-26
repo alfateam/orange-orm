@@ -3,7 +3,6 @@ var defaults = require('../../poolDefaults');
 
 var genericPool = require('../../generic-pool');
 var Database;
-
 function newGenericPool(connectionString, poolOptions) {
 	poolOptions = poolOptions || {};
 	var pool = genericPool.Pool({
@@ -16,7 +15,8 @@ function newGenericPool(connectionString, poolOptions) {
 			try {
 				try {
 					if (!Database)
-						({ Database } = await import('bun:Database'));
+						({ Database } = await import('bun:sqlite'));
+
 				}
 				catch (err) {
 					return cb(err, null);
