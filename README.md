@@ -2053,10 +2053,8 @@ async function updateRow() {
 
 output:
 ```bash
-BEGIN
 select  _order.id as s_order0,_order.orderDate as s_order1,_order.customerId as s_order2 from _order _order where _order.id=2 order by _order.id limit 1
 select  orderLine.id as sorderLine0,orderLine.orderId as sorderLine1,orderLine.product as sorderLine2,orderLine.amount as sorderLine3 from orderLine orderLine where orderLine.orderId in (2) order by orderLine.id
-COMMIT
 BEGIN
 select  _order.id as s_order0,_order.orderDate as s_order1,_order.customerId as s_order2 from _order _order where _order.id=2 order by _order.id limit 1
 INSERT INTO orderLine (orderId,product,amount) VALUES (2,?,300)
