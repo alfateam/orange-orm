@@ -7,7 +7,6 @@ import * as axios from 'axios';
 import * as _default from 'rfdc/default';
 import * as ajv from 'ajv';
 import * as onChange from '@lroal/on-change';
-import * as url from 'url';
 import * as connectionString from '@tediousjs/connection-string';
 
 function getDefaultExportFromCjs (x) {
@@ -15115,8 +15114,6 @@ function requireEnd$8 () {
 	return end$8;
 }
 
-var require$$3 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(url);
-
 /* eslint-disable no-prototype-builtins */
 
 var newPgPool_1$1;
@@ -15130,7 +15127,6 @@ function requireNewPgPool$1 () {
 	const log = requireLog();
 	const defaults = requirePoolDefaults();
 	const genericPool = requireGenericPool();
-	const { URL } = require$$3;
 	let SQL;
 
 	function newPgPool(connectionString, poolOptions = {}) {
