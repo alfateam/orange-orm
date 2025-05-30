@@ -68,25 +68,24 @@
     "@types/express": "^4.17.13",
     "@types/oracledb": "^6.0.4",
     "@types/tedious": "^4.0.14",
-    "ajv": "^6.10.2",
+    "ajv": "^8.17.1",
     "axios": "^1.6.2",
     "fast-json-patch": "^3.1.1",
     "findup-sync": "^5.0.0",
-    "glob": "^10.3.4",
-    "module-definition": "^4.0.0",
+    "glob": "^10.3.4 || ^11.0.2",
+    "module-definition": "^4.0.0 || ^5.0.0 || || ^6.0.0",
     "rfdc": "^1.2.0",
-    "uuid": "^8.3.2"
+    "uuid": "^8.3.2 || ^9.0.0 || ^10.0.0 || ^11.1.0"
   },
   "peerDependencies": {
+    "@electric-sql/pglite": "^0.3.0",
     "msnodesqlv8": "^4.1.0",
     "mysql2": "^2.2.5 || ^3.9.4",
     "oracledb": "^6.3.0",
     "pg": "^8.5.1",
-    "pg-native": "^3.0.0",
     "pg-query-stream": "^3.3.2",
     "sqlite3": "^5.0.2",
-    "tedious": "^15.1.2 || ^16.0.0 || ^18.1.0",
-    "@electric-sql/pglite": "^0.3.0"
+    "tedious": "^15.1.2 || ^16.0.0 || ^18.1.0"
   },
   "peerDependenciesMeta": {
     "pg": {
