@@ -1,12 +1,31 @@
 var log = require('../table/log');
-var { Request, TYPES } = require('tedious');
 
-function wrapQuery(connection) {
+function wrapQuery(_context, connection) {
+	let CachedRequest = null;
+	let CachedTypes = null;
+
 	return runQuery;
 
 	function runQuery(query, onCompleted) {
+		if (!CachedRequest || !CachedTypes) {
+			import('tedious')
+				.then(({ Request, TYPES }) => {
+					CachedRequest = Request;
+					CachedTypes = TYPES;
+					doQuery(query, onCompleted);
+				})
+				.catch(err => onCompleted(extractError(err), []));
+		}
+		else {
+			doQuery(query, onCompleted);
+		}
+	}
+
+	function doQuery(query, onCompleted) {
 		const result = [];
 		const sql = replaceParamChar(query.sql(), query.parameters);
+
+		// Transaction statements
 		if (sql.length < 18 && query.parameters.length === 0) {
 			if (sql === 'BEGIN TRANSACTION') {
 				log.emitQuery({ sql, parameters: [] });
@@ -30,38 +49,45 @@ function wrapQuery(connection) {
 				return;
 			}
 		}
+
 		let keys;
-		var request = new Request(sql, onInnerCompleted);
-		const params = addParameters(request, query.parameters);
+		// Now we can safely create Request using CachedRequest
+		var request = new CachedRequest(sql, onInnerCompleted);
+		const params = addParameters(request, query.parameters, CachedTypes);
+
 		request.on('row', rows => {
 			const tmp = {};
 			if (!keys) {
 				keys = Object.keys(rows);
 			}
-			keys.forEach((cols) => {
+			keys.forEach(cols => {
 				tmp[cols] = rows[cols].value;
 			});
 			result.push(tmp);
 		});
+
 		log.emitQuery({ sql, parameters: params });
 		connection.execSql(request);
 
 		function onInnerCompleted(err) {
 			if (err) {
 				onCompleted(extractError(err));
-			}
-			else
+			} else {
 				onCompleted(null, result);
+			}
 		}
 	}
+}
 
-	function extractError(e) {
-		if (e && e.errors)
-			return e.errors[0];
-		else
-			return e;
+// same helpers as before
+
+function extractError(e) {
+	if (e && e.errors) {
+		return e.errors[0];
 	}
-
+	else {
+		return e;
+	}
 }
 
 function replaceParamChar(sql, params) {
@@ -77,7 +103,7 @@ function replaceParamChar(sql, params) {
 	return sql;
 }
 
-function addParameters(request, params) {
+function addParameters(request, params, TYPES) {
 	const res = [];
 	for (let i = 0; i < params.length; i++) {
 		const p = [`${i}`, toType(params[i]), params[i]];
@@ -93,7 +119,6 @@ function addParameters(request, params) {
 			return TYPES.Int;
 		else if (typeof p === 'number')
 			return TYPES.Money;
-		// @ts-ignore
 		else if (p instanceof Date && !isNaN(p))
 			return TYPES.Date;
 		else if (Array.isArray(p))
@@ -104,9 +129,7 @@ function addParameters(request, params) {
 			return TYPES.NVarChar;
 		else
 			throw new Error('Unknown data type');
-
 	}
-
 }
 
 module.exports = wrapQuery;

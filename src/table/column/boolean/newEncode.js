@@ -11,7 +11,7 @@ function _new(column) {
 				return newParam('null');
 			return newParam('\'' + column.dbNull + '\'');
 		}
-		var encodeCore = getSessionSingleton(context, 'encodeBoolean');
+		var encodeCore = getSessionSingleton(context, 'encodeBoolean') || encodeDefault;
 
 
 		return newParam('?', [encodeCore(value)]);
@@ -24,19 +24,23 @@ function _new(column) {
 				return 'null';
 			return '\'' + column.dbNull + '\'';
 		}
-		var encodeCore = getSessionSingleton(context, 'encodeBoolean');
+		var encodeCore = getSessionSingleton(context, 'encodeBoolean') || encodeDefault;
 
 
 		return encodeCore(value);
 	};
 
 	encode.direct = function(context, value) {
-		var encodeCore = getSessionSingleton(context, 'encodeBoolean');
+		var encodeCore = getSessionSingleton(context, 'encodeBoolean') || encodeDefault;
 
 		return encodeCore(value);
 	};
 
 	return encode;
+}
+
+function encodeDefault(value) {
+	return value;
 }
 
 module.exports = _new;

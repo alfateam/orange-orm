@@ -3,16 +3,24 @@
 
 var defaults = require('../../poolDefaults');
 var genericPool = require('../../generic-pool');
-var mssql = require('msnodesqlv8');
+var mssql;
 
 function newGenericPool(connectionString, poolOptions) {
 	poolOptions = poolOptions || {};
 	var pool = genericPool.Pool({
+		min: poolOptions.min || 0,
 		max: poolOptions.size || poolOptions.poolSize || defaults.poolSize,
 		idleTimeoutMillis: poolOptions.idleTimeout || defaults.poolIdleTimeout,
 		reapIntervalMillis: poolOptions.reapIntervalMillis || defaults.reapIntervalMillis,
 		log: poolOptions.log || defaults.poolLog,
-		create: function(cb) {
+		create: async function(cb) {
+			try {
+				if (!mssql)
+					mssql = await import('msnodesqlv8');
+			}
+			catch (err) {
+				return cb(err, null);
+			}
 			var client;
 			mssql.open(connectionString, onConnected);
 
@@ -21,6 +29,7 @@ function newGenericPool(connectionString, poolOptions) {
 					return cb(err, null);
 				client = _client;
 				client.poolCount = 0;
+				client.msnodesqlv8 = mssql;
 				return cb(null, client);
 			}
 		},

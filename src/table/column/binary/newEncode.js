@@ -1,26 +1,36 @@
 var purify = require('./purify');
 var newParam = require('../../query/newParameterized');
+var getSessionSingleton = require('../../getSessionSingleton');
 
 function _new(_column) {
 
-	function encode(_context, value) {
+	function encode(context, value) {
 		value = purify(value);
 		if (value === null)
 			return newParam('null');
-		return newParam('?', [Buffer.from(value, 'base64')]);
+
+		var encodeCore = getSessionSingleton(context, 'encodeBinary') || encodeDefault;
+		const enc = encodeCore(value);
+		return newParam('?', [enc]);
 	}
-	encode.unsafe = function(_context, value) {
+	encode.unsafe = function(context, value) {
 		value = purify(value);
 		if (value === null)
 			return 'null';
-		return Buffer.from(value, 'base64');
+		var encodeCore = getSessionSingleton(context, 'encodeBinary') || encodeDefault;
+		return encodeCore(value);
 	};
 
-	encode.direct = function(_context, value) {
-		return Buffer.from(value, 'base64');
+	encode.direct = function(context, value) {
+		var encodeCore = getSessionSingleton(context, 'encodeBinary') || encodeDefault;
+		return encodeCore(value);
 	};
 
 	return encode;
+}
+
+function encodeDefault(base64) {
+	return Buffer.from(base64, 'base64');
 }
 
 module.exports = _new;

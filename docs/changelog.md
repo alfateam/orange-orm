@@ -1,4 +1,21 @@
 ## Changelog
+__4.7.2__  
+Updated dependencies    
+__4.7.1__  
+Bugfix:  Error when using bun and sqlite: Cannot find package 'Database'. See [#127](https://github.com/alfateam/issues/127)  
+__4.7.0__  
+Support for [PGLite](https://pglite.dev/). See [#124](https://github.com/alfateam/orange-orm/issues/124)  
+__4.6.3__  
+Bugfix:  Chained Reference relation throws if first one is null. See [#126](https://github.com/alfateam/orange-orm/issues/126)  
+__4.6.2__  
+Bugfix:  crashed when combining endsWith filter with other filter: e.g. `endsWith('foo').or(...)`  
+__4.6.1__  
+Bugfix:  No intellisense when running in browser mode .  See [#125](https://github.com/alfateam/orange-orm/issues/125)  
+__4.6.0__  
+Support for Deno and Bun.  
+Using builtin sqlite for Node22++.    
+__4.5.5__  
+Bugfix:  Parameterized queries are case sensitive on SAP ASE .  See [#123](https://github.com/alfateam/orange-orm/issues/123)  
 __4.5.4__  
 Bugfix:  hasMany relation through references relation gives empty array .  See [#122](https://github.com/alfateam/orange-orm/issues/122)  
 __4.5.3__  

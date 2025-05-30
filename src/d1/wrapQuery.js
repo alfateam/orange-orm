@@ -1,6 +1,6 @@
 var log = require('../table/log');
 
-function wrapQuery(client) {
+function wrapQuery(_context, client) {
 
 	return runQuery;
 

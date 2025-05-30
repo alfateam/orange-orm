@@ -34,6 +34,7 @@ beforeAll(async () => {
 	({ d1, miniflare } = await setupD1(fileURLToPath(import.meta.url)));
 	await createMs('mssql');
 	await insertData('pg');
+	await insertData('pglite');
 	await insertData('mssql');
 	if (major === 18)
 		await insertData('mssqlNative');
@@ -136,6 +137,7 @@ beforeAll(async () => {
 
 describe('offset', () => {
 	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
@@ -170,6 +172,7 @@ describe('offset', () => {
 
 describe('boolean filter', () => {
 	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
@@ -193,6 +196,7 @@ describe('boolean filter', () => {
 
 describe('empty array-filter', () => {
 	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
@@ -215,7 +219,7 @@ describe('empty array-filter', () => {
 
 describe('AND empty-array', () => {
 	test('pg', async () => await verify('pg'));
-	test('oracle', async () => await verify('oracle'));
+	test('pglite', async () => await verify('pglite'));	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
@@ -235,7 +239,7 @@ describe('AND empty-array', () => {
 
 describe('AND one in array', () => {
 	test('pg', async () => await verify('pg'));
-	test('oracle', async () => await verify('oracle'));
+	test('pglite', async () => await verify('pglite'));	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
@@ -255,7 +259,7 @@ describe('AND one in array', () => {
 
 describe('boolean true filter', () => {
 	test('pg', async () => await verify('pg'));
-	test('oracle', async () => await verify('oracle'));
+	test('pglite', async () => await verify('pglite'));	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
@@ -277,7 +281,7 @@ describe('boolean true filter', () => {
 
 describe('any-subFilter filter nested', () => {
 	test('pg', async () => await verify('pg'));
-	test('oracle', async () => await verify('oracle'));
+	test('pglite', async () => await verify('pglite'));	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
@@ -313,7 +317,7 @@ describe('any-subFilter filter nested', () => {
 
 describe('any-subFilter filter nested where', () => {
 	test('pg', async () => await verify('pg'));
-	test('oracle', async () => await verify('oracle'));
+	test('pglite', async () => await verify('pglite'));	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
@@ -350,7 +354,7 @@ describe('any-subFilter filter nested where', () => {
 describe('getMany hasOne sub filter', () => {
 
 	test('pg', async () => await verify('pg'));
-	test('oracle', async () => await verify('oracle'));
+	test('pglite', async () => await verify('pglite'));	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
@@ -388,7 +392,7 @@ describe('getMany hasOne sub filter', () => {
 
 describe('getMany none sub filter', () => {
 	test('pg', async () => await verify('pg'));
-	test('oracle', async () => await verify('oracle'));
+	test('pglite', async () => await verify('pglite'));	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
@@ -422,9 +426,8 @@ describe('getMany none sub filter', () => {
 });
 
 describe('getMany', () => {
-
 	test('pg', async () => await verify('pg'));
-	test('oracle', async () => await verify('oracle'));
+	test('pglite', async () => await verify('pglite'));	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
@@ -434,10 +437,16 @@ describe('getMany', () => {
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
-
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
-		const rows = await db.customer.getMany();
+		const rows = await db.customer.getAll({
+			where: x => {
+				if (dbName === 'pg' || dbName === 'pglite')
+					return x.name.iContains('harry').or(x.name.iContains('george'));
+				else
+					return x.name.contains('harry').or(x.name.contains('george'));
+			}
+		});
 
 		const expected = [{
 			id: 1,
@@ -458,7 +467,7 @@ describe('getMany', () => {
 describe('getAll orderBy array', () => {
 
 	test('pg', async () => await verify('pg'));
-	test('oracle', async () => await verify('oracle'));
+	test('pglite', async () => await verify('pglite'));	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
@@ -493,7 +502,7 @@ describe('getAll orderBy array', () => {
 describe('getMany with column strategy', () => {
 
 	test('pg', async () => await verify('pg'));
-	test('oracle', async () => await verify('oracle'));
+	test('pglite', async () => await verify('pglite'));	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
@@ -523,7 +532,7 @@ describe('getMany with column strategy', () => {
 
 describe('aggregate', () => {
 	test('pg', async () => await verify('pg'));
-	test('oracle', async () => await verify('oracle'));
+	test('pglite', async () => await verify('pglite'));	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
@@ -558,7 +567,7 @@ describe('aggregate', () => {
 }, 20000);
 describe('aggregate on relations', () => {
 	test('pg', async () => await verify('pg'));
-	test('oracle', async () => await verify('oracle'));
+	test('pglite', async () => await verify('pglite'));	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
@@ -604,7 +613,7 @@ describe('aggregate on relations', () => {
 
 describe('aggregate each row', () => {
 	test('pg', async () => await verify('pg'));
-	test('oracle', async () => await verify('oracle'));
+	test('pglite', async () => await verify('pglite'));	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
@@ -704,7 +713,7 @@ describe('aggregate each row', () => {
 
 describe('getMany with relations', () => {
 	test('pg', async () => await verify('pg'));
-	test('oracle', async () => await verify('oracle'));
+	test('pglite', async () => await verify('pglite'));	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
@@ -781,7 +790,7 @@ describe('getMany with relations', () => {
 });
 describe('getMany with references - many', () => {
 	test('pg', async () => await verify('pg'));
-	test('oracle', async () => await verify('oracle'));
+	test('pglite', async () => await verify('pglite'));	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
@@ -851,7 +860,7 @@ describe('getMany with references - many', () => {
 });
 describe('getMany with filtered relations', () => {
 	test('pg', async () => await verify('pg'));
-	test('oracle', async () => await verify('oracle'));
+	test('pglite', async () => await verify('pglite'));	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
@@ -926,7 +935,7 @@ describe('getMany with filtered relations', () => {
 describe('getMany composite', () => {
 
 	test('pg', async () => await verify('pg'));
-	test('oracle', async () => await verify('oracle'));
+	test('pglite', async () => await verify('pglite'));	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
@@ -976,7 +985,7 @@ describe('getMany composite', () => {
 describe('getMany raw filter', () => {
 
 	test('pg', async () => await verify('pg'));
-	test('oracle', async () => await verify('oracle'));
+	test('pglite', async () => await verify('pglite'));	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
@@ -1011,7 +1020,7 @@ describe('getMany raw filter', () => {
 describe('getMany raw filter where', () => {
 
 	test('pg', async () => await verify('pg'));
-	test('oracle', async () => await verify('oracle'));
+	test('pglite', async () => await verify('pglite'));	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
@@ -1177,7 +1186,10 @@ const connections = {
 		db: map({ db: con => con.postgres('postgres://postgres:postgres@postgres/postgres', { size: 1 }) }),
 		init: initPg
 	},
-	sqlite: {
+	pglite: {
+		db: map({ db: con => con.pglite( undefined, { size: 1 }) }),
+		init: initPg
+	},	sqlite: {
 		db: map({ db: (con) => con.sqlite(sqliteName, { size: 1 }) }),
 		init: initSqlite
 	},
@@ -1190,7 +1202,7 @@ const connections = {
 		init: initSqlite
 	},
 	sap: {
-		db: map({ db: (con) => con.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master`, { size: 1 }) }),
+		db: map({ db: (con) => con.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master;SortOrder=nocase_utf8;CharSet=NoConversions`, { size: 1 }) }),
 		init: initSap
 	},
 	oracle: {
@@ -1224,6 +1236,8 @@ function getDb(name) {
 		return connections.mssqlNative;
 	else if (name === 'pg')
 		return connections.pg;
+	else if (name === 'pglite')
+		return connections.pglite;
 	else if (name === 'sqlite')
 		return connections.sqlite;
 	else if (name === 'd1')

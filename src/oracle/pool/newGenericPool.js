@@ -3,20 +3,29 @@
 
 var defaults = require('../../poolDefaults');
 var genericPool = require('../../generic-pool');
-var oracle = require('oracledb');
-
-oracle.outFormat = oracle.OUT_FORMAT_OBJECT;
-oracle.fetchAsBuffer = [ oracle.BLOB ];
+var oracle;
 
 function newGenericPool(connectionString, poolOptions) {
 	poolOptions = poolOptions || {};
 	var pool = genericPool.Pool({
+		min: poolOptions.min || 0,
 		max: poolOptions.size || poolOptions.poolSize || defaults.poolSize,
 		idleTimeoutMillis: poolOptions.idleTimeout || defaults.poolIdleTimeout,
 		reapIntervalMillis: poolOptions.reapIntervalMillis || defaults.reapIntervalMillis,
 		log: poolOptions.log,
-		create: function(cb) {
+		create: async function(cb) {
 			var client;
+			try {
+				if (!oracle) {
+					oracle = await import('oracledb');
+					oracle = oracle.default || oracle;
+					oracle.outFormat = oracle.OUT_FORMAT_OBJECT;
+					oracle.fetchAsBuffer = [ oracle.BLOB ];
+				}
+			}
+			catch (err) {
+				return cb(err, null);
+			}
 			oracle.getConnection(connectionString, onConnected);
 			function onConnected(err, _client) {
 				client = _client;

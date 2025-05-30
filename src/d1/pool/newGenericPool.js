@@ -6,6 +6,7 @@ function newGenericPool(d1Database, poolOptions) {
 	poolOptions = poolOptions || {};
 	// @ts-ignore
 	var pool = genericPool.Pool({
+		min: poolOptions.min || 0,
 		max: 1,
 		idleTimeoutMillis: poolOptions.idleTimeout || defaults.poolIdleTimeout,
 		reapIntervalMillis: poolOptions.reapIntervalMillis || defaults.reapIntervalMillis,

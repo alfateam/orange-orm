@@ -2,8 +2,11 @@ const hostExpress = require('./hostExpress');
 const hostLocal = require('./hostLocal');
 const client = require('./client/index.js');
 const map = require('./client/map');
+const runtimes = require('./runtimes');
+
 let _mySql;
 let _pg;
+let _pglite;
 let _sqlite;
 let _mssqlNative;
 let _sap;
@@ -52,10 +55,20 @@ Object.defineProperty(connectViaPool, 'mySql', {
 		return _mySql;
 	}
 });
+Object.defineProperty(connectViaPool, 'pglite', {
+	get: function() {
+		if (!_pglite)
+			_pglite = require('./pglite/newDatabase');
+		return _pglite;
+	}
+});
 Object.defineProperty(connectViaPool, 'postgres', {
 	get: function() {
 		if (!_pg)
-			_pg = require('./pg/newDatabase');
+			if (runtimes.bun)
+				_pg = require('./bunPg/newDatabase');
+			else
+				_pg = require('./pg/newDatabase');
 		return _pg;
 	}
 });
@@ -63,15 +76,26 @@ Object.defineProperty(connectViaPool, 'postgres', {
 Object.defineProperty(connectViaPool, 'pg', {
 	get: function() {
 		if (!_pg)
-			_pg = require('./pg/newDatabase');
+			if (runtimes.bun)
+				_pg = require('./bunPg/newDatabase');
+			else
+				_pg = require('./pg/newDatabase');
 		return _pg;
 	}
 });
 
 Object.defineProperty(connectViaPool, 'sqlite', {
 	get: function() {
-		if (!_sqlite)
-			_sqlite = require('./sqlite/newDatabase');
+		if (!_sqlite) {
+			if (runtimes.deno || (runtimes.node && runtimes.node.major >= 22))
+				_sqlite = require('./nodeSqlite/newDatabase');
+			else if (runtimes.bun)
+				_sqlite = require('./bunSqlite/newDatabase');
+			else if (runtimes.node)
+				_sqlite = require('./sqlite3/newDatabase');
+			else
+				throw new Error('SQLite is not supported in this environment');
+		}
 		return _sqlite;
 	}
 });

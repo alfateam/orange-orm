@@ -3,7 +3,7 @@
 
 var defaults = require('../../poolDefaults');
 var genericPool = require('../../generic-pool');
-var tedious = require('tedious');
+var tedious;
 var parseConnectionString = require('./parseConnectionString');
 
 function newGenericPool(connectionString, poolOptions) {
@@ -13,11 +13,18 @@ function newGenericPool(connectionString, poolOptions) {
 		connectionString.options = { ...connectionString.options, ...{ useColumnNames: true } };
 	poolOptions = poolOptions || {};
 	var pool = genericPool.Pool({
+		min: poolOptions.min || 0,
 		max: poolOptions.size || poolOptions.poolSize || defaults.poolSize,
 		idleTimeoutMillis: poolOptions.idleTimeout || defaults.poolIdleTimeout,
 		reapIntervalMillis: poolOptions.reapIntervalMillis || defaults.reapIntervalMillis,
 		log: poolOptions.log || defaults.poolLog,
-		create: function(cb) {
+		create: async function(cb) {
+			try {
+				if (!tedious)
+					tedious = await import('tedious');
+			} catch (err) {
+				return cb(err, null);
+			}
 			var client = new tedious.Connection(connectionString);
 			client.on('connect', onConnected);
 			client.connect();

@@ -2,7 +2,7 @@
 <img src="./docs/orange.svg" alt="Orange ORM Logo" width="250"/>
 </div>
 
-The ultimate Object Relational Mapper for Node.js and Typescript, offering seamless integration with a variety of popular databases. Orange ORM supports both TypeScript and JavaScript, including both CommonJS and ECMAScript.  
+The ultimate Object Relational Mapper for Node.js, Bun and Deno, offering seamless integration with a variety of popular databases. Orange ORM supports both TypeScript and JavaScript, including both CommonJS and ECMAScript.  
 
 [![npm version](https://img.shields.io/npm/v/orange-orm.svg?style=flat-square)](https://www.npmjs.org/package/orange-orm)
 [![Build status](https://github.com/alfateam/orange-orm/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/alfateam/orange-orm/actions)
@@ -22,16 +22,17 @@ The ultimate Object Relational Mapper for Node.js and Typescript, offering seaml
 - **TypeScript and JavaScript Support**: Orange fully supports both TypeScript and JavaScript, allowing you to leverage the benefits of static typing and modern ECMAScript features.
 - **Works in the Browser**: You can securely use Orange in the browser by utilizing the Express.js plugin, which serves to safeguard sensitive database credentials from exposure at the client level and protect against SQL injection. This method mirrors a traditional REST API, augmented with advanced TypeScript tooling for enhanced functionality.
 
-## Supported Databases
-
-✅ Postgres  
-✅ MS SQL  
-✅ MySQL  
-✅ Oracle  
-✅ SAP ASE  
-✅ SQLite  
-✅ Cloudflare D1
-
+## Supported Databases and Runtimes
+|               | Node | Deno | Bun |Cloudflare | Web |
+| ------------- | :-----: | :-----: | :-----: | :-----: | :-----: | 
+| Postgres      | ✅ | ✅ | ✅ | ✅|
+| PGlite      | ✅ | ✅ | ✅ | ✅ | ✅
+| MS SQL        | ✅ |  | ✅ | |
+| MySQL         | ✅ | ✅ | ✅ || 
+| Oracle        | ✅ | ✅ | ✅ | |
+| SAP ASE       | ✅ |  |  | |
+| SQLite        | ✅ | ✅ | ✅ | |
+| Cloudflare D1 |  |  |  | ✅|
 
 This is the _Modern Typescript Documentation_. Are you looking for the [_Classic Documentation_](https://github.com/alfateam/orange-orm/blob/master/docs/docs.md) ?
 
@@ -49,10 +50,6 @@ Watch the [tutorial video on YouTube](https://youtu.be/1IwwjPr2lMs)
 
 ![Relations diagram](./docs/diagram.svg)  
 
-Here we choose SQLite.  
-```bash
-npm install sqlite3
-```
 <sub>📄 map.ts</sub>
 ```javascript
 import orange from 'orange-orm';
@@ -279,13 +276,20 @@ In SQLite, columns with the INTEGER PRIMARY KEY attribute are designed to autoin
 
 <details><summary><strong>Connecting</strong></summary>
 
-__SQLite__
+__SQLite__  
+When running **Node.js 21 and earlier**, you need to install the `sqlite3` dependency.  
+When running Node.js 22 and later, Bun, or Deno,  you don't need it as it is built-in.  
 ```bash
 npm install sqlite3
 ```  
+
 ```javascript
 import map from './map';
 const db = map.sqlite('demo.db');
+// … use the database …
+
+// IMPORTANT for serverless functions:
+await db.close();           // closes the client connection
 ```
 __With connection pool__
 ```bash
@@ -294,7 +298,14 @@ npm install sqlite3
 ```javascript
 import map from './map';
 const db = map.sqlite('demo.db', { size: 10 });
+// … use the pool …
+
+// IMPORTANT for serverless functions:
+await pool.close();         // closes all pooled connections
 ```
+__Why close ?__  
+In serverless environments (e.g. AWS Lambda, Vercel, Cloudflare Workers) execution contexts are frequently frozen and resumed. Explicitly closing the client or pool ensures that file handles are released promptly and prevents “database locked” errors between invocations.  
+
 __From the browser__  
 You can securely use Orange from the browser by utilizing the Express plugin, which serves to safeguard sensitive database credentials from exposure at the client level. This technique bypasses the need to transmit raw SQL queries directly from the client to the server. Instead, it logs method calls initiated by the client, which are later replayed and authenticated on the server. This not only reinforces security by preventing the disclosure of raw SQL queries on the client side but also facilitates a smoother operation. Essentially, this method mirrors a traditional REST API, augmented with advanced TypeScript tooling for enhanced functionality. You can read more about it in the section called [In the browser](#user-content-in-the-browser)  
 <sub>📄 server.ts</sub>
@@ -353,7 +364,8 @@ const db = map.mssql({
         });
 ```
 
-__PostgreSQL__
+__PostgreSQL__  
+With Bun, you don't need to install the `pg` package as PostgreSQL support is built-in.
 ```bash
 npm install pg
 ```  
@@ -365,6 +377,16 @@ With schema
 ```javascript
 import map from './map';
 const db = map.postgres('postgres://postgres:postgres@postgres/postgres?search_path=custom');
+```
+__PGlite__  
+```bash
+npm install @electric-sql/pglite
+```  
+In this example we use the in-memory Postgres.  
+Read more about [PGLite connection configs](https://pglite.dev/docs/).  
+```javascript
+import map from './map';
+const db = map.pglite( /* config? : PGliteOptions */);
 ```
 __Cloudflare D1__  
 <sub>📄 wrangler.toml</sub>  
@@ -1569,12 +1591,10 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const filter = db.order.lines.any(x => x.product.contains('guitar'));
-  //equivalent syntax:
-  // const filter = db.order.lines.product.contains('guitar');
-
   const rows = await db.order.getAll({
     where: y => y.lines.any(x => x.product.contains('guitar'))
+    //equivalent syntax:
+    //where: x => x.lines.product.contains('guitar')
   });  
 }
 ```
@@ -2033,10 +2053,8 @@ async function updateRow() {
 
 output:
 ```bash
-BEGIN
 select  _order.id as s_order0,_order.orderDate as s_order1,_order.customerId as s_order2 from _order _order where _order.id=2 order by _order.id limit 1
 select  orderLine.id as sorderLine0,orderLine.orderId as sorderLine1,orderLine.product as sorderLine2,orderLine.amount as sorderLine3 from orderLine orderLine where orderLine.orderId in (2) order by orderLine.id
-COMMIT
 BEGIN
 select  _order.id as s_order0,_order.orderDate as s_order1,_order.customerId as s_order2 from _order _order where _order.id=2 order by _order.id limit 1
 INSERT INTO orderLine (orderId,product,amount) VALUES (2,?,300)

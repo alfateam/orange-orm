@@ -57,6 +57,7 @@ afterAll(async () => {
 
 describe('transaction', () => {
 	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
 	test('mssql', async () => await verify('mssql'));
 	test('oracle', async () => await verify('oracle'));
 	if (major === 18)
@@ -91,6 +92,7 @@ describe('transaction', () => {
 
 describe('validate', () => {
 	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
 	test('mssql', async () => await verify('mssql'));
 	test('oracle', async () => await verify('oracle'));
 	if (major === 18)
@@ -131,6 +133,7 @@ describe('validate', () => {
 
 describe('validate chained', () => {
 	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
 	test('mssql', async () => await verify('mssql'));
 	test('oracle', async () => await verify('oracle'));
 	if (major === 18)
@@ -168,6 +171,7 @@ describe('validate chained', () => {
 
 describe('validate JSONSchema', () => {
 	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
 	test('mssql', async () => await verify('mssql'));
 	test('oracle', async () => await verify('oracle'));
 	if (major === 18)
@@ -206,6 +210,7 @@ describe('validate JSONSchema', () => {
 
 describe('validate notNull', () => {
 	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
 	test('mssql', async () => await verify('mssql'));
 	test('oracle', async () => await verify('oracle'));
 	if (major === 18)
@@ -240,6 +245,7 @@ describe('validate notNull', () => {
 
 describe('validate notNullExceptInsert', () => {
 	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
 	test('mssql', async () => await verify('mssql'));
 	test('oracle', async () => await verify('oracle'));
 	if (major === 18)
@@ -284,6 +290,7 @@ describe('validate notNullExceptInsert', () => {
 describe('insert autoincremental', () => {
 
 	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
 	test('mssql', async () => await verify('mssql'));
 	test('oracle', async () => await verify('oracle'));
 	if (major === 18)
@@ -325,6 +332,7 @@ describe('insert autoincremental', () => {
 describe('insert default', () => {
 
 	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
 	test('mssql', async () => await verify('mssql'));
 	test('oracle', async () => await verify('oracle'));
 	if (major === 18)
@@ -363,6 +371,7 @@ describe('insert default', () => {
 describe('insert default override', () => {
 
 	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
 	test('mssql', async () => await verify('mssql'));
 	test('oracle', async () => await verify('oracle'));
 	if (major === 18)
@@ -400,6 +409,7 @@ describe('insert default override', () => {
 
 describe('insert dbNull', () => {
 	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
 	test('mssql', async () => await verify('mssql'));
 	test('oracle', async () => await verify('oracle'));
 	if (major === 18)
@@ -452,6 +462,7 @@ describe('insert dbNull', () => {
 
 describe('insert autoincremental with relations', () => {
 	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
 	test('mssql', async () => await verify('mssql'));
 	test('oracle', async () => await verify('oracle'));
 	if (major === 18)
@@ -604,6 +615,7 @@ describe('insert autoincremental with relations', () => {
 
 describe('insert autoincremental with relations and strategy', () => {
 	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
 	test('mssql', async () => await verify('mssql'));
 	test('oracle', async () => await verify('oracle'));
 	if (major === 18)
@@ -769,7 +781,10 @@ const connections = {
 		db: map({ db: con => con.postgres('postgres://postgres:postgres@postgres/postgres', { size: 1 }) }),
 		init: initPg
 	},
-	sqlite: {
+	pglite: {
+		db: map({ db: con => con.pglite( undefined, { size: 1 }) }),
+		init: initPg
+	},	sqlite: {
 		db: map({ db: (con) => con.sqlite(sqliteName, { size: 1 }) }),
 		init: initSqlite
 	},
@@ -816,6 +831,8 @@ function getDb(name) {
 		return connections.mssqlNative;
 	else if (name === 'pg')
 		return connections.pg;
+	else if (name === 'pglite')
+		return connections.pglite;
 	else if (name === 'sqlite')
 		return connections.sqlite;
 	else if (name === 'd1')

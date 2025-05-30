@@ -3,7 +3,7 @@ var newBoolean = require('../newBoolean');
 var nullOperator = ' is ';
 
 function endsWithCore(context, operator, column,arg,alias) {
-	alias = quote(alias);
+	alias = quote(context, alias);
 	operator = ' ' + operator + ' ';
 	var encoded = column.encode(context, arg);
 	if (encoded.sql() == 'null')

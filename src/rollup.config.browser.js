@@ -5,7 +5,7 @@ import nodeResolve from '@rollup/plugin-node-resolve';
 export default {
 	input: './src/indexBrowser.js',
 	output: {
-		file: './src/client/index.mjs',
+		file: './dist/index.browser.mjs',
 		format: 'esm',
 		interop: 'auto'
 	},
