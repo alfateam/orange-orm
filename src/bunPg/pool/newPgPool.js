@@ -4,7 +4,6 @@
 const log = require('../../table/log');
 const defaults = require('../../poolDefaults');
 const genericPool = require('../../generic-pool');
-const { URL } = require('url');
 let SQL;
 
 function newPgPool(connectionString, poolOptions = {}) {
