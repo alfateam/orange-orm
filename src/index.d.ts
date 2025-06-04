@@ -4,7 +4,7 @@ import type { RequestHandler } from 'express';
 import type { D1Database } from '@cloudflare/workers-types';
 import type { ConnectionConfiguration } from 'tedious';
 import type { PoolAttributes } from 'oracledb';
-import type { AllowedDbMap, DbMapper, MappedDbDef } from './map';
+import type { AllowedDbMap, DbMapper, MappedDbDef, MergeProperties } from './map';
 
 declare function r(config: r.Config): unknown;
 
@@ -26,12 +26,13 @@ declare namespace r {
     function off(type: 'query', cb: (e: QueryEvent) => void): void;
     function map<V extends AllowedDbMap<V>>(
 		fn: (mapper: DbMapper<{}>) => V
-	): MappedDbDef<V>;
+	): MappedDbDef<MergeProperties<V, V>>;
+
     function createPatch(original: any[], modified: any[]): JsonPatch;
     function createPatch(original: any, modified: any): JsonPatch;
 
     type JsonPatch = Array<{
-        op: "add" | "remove" | "replace" | "copy" | "move" | "test";
+        op: 'add' | 'remove' | 'replace' | 'copy' | 'move' | 'test';
         path: string;
         value?: any;
         from?: string;
@@ -65,8 +66,8 @@ declare namespace r {
     }
 
     export abstract class JoinRelation {
-        columns: ColumnDef[];
-        childTable: Table;
+    	columns: ColumnDef[];
+    	childTable: Table;
     }
 
     export interface Table {
@@ -223,11 +224,11 @@ declare namespace r {
          */
         iEqual(value: string | null): Filter;
         /**
-        * ignore case, postgres only         
+        * ignore case, postgres only
         * */
         iEq(value: string | null): Filter;
         /**
-         * ignore case, postgres only         
+         * ignore case, postgres only
          */
         iEq(value: string | null): Filter;
     }

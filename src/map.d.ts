@@ -11,10 +11,10 @@ export type MappedDbDef<T> = {
 	): MappedDbDef<MergeProperties<T, V>>;
 	<O extends DbOptions<T>>(concurrency: O): NegotiateDbInstance<T, O>;
   } & T & DbConnectable<T>;
-  
+
 
 //todo
-type MergeProperties<T, V> = {
+export type MergeProperties<T, V> = {
 	[K in keyof T | keyof V]:
 	  K extends keyof T
 		? T[K] extends MappedTableDef<infer M>
@@ -30,7 +30,7 @@ type MergeProperties<T, V> = {
 		  : V[K]
 		: never;
   };
-  
+
 
 
 export type DbMapper<T> = {
@@ -200,7 +200,7 @@ type ExpandedMappedTable<T, FL = ExpandedFetchingStrategy<T>> = {
 	replace(
 		row: StrategyToInsertRowData<T> | StrategyToInsertRowData<T>[]
 	): Promise<void>;
-	
+
 	replace<FS extends FetchingStrategy<T>>(
 		row: StrategyToInsertRowData<T>,
 		strategy: FS
@@ -325,7 +325,7 @@ type MappedTable<T> = {
 		filter?: Filter | PrimaryRowFilter<T>,
 		fetchingStrategy?: FS
 	): Promise<StrategyToRow<FetchedProperties<T, FS>, T>>;
-	
+
 	update(
 		values: StrategyToUpdateRowData<T>,
 		where: FetchingStrategy<T>
@@ -340,7 +340,7 @@ type MappedTable<T> = {
 	replace(
 		row: StrategyToInsertRowData<T> | StrategyToInsertRowData<T>[]
 	): Promise<void>;
-	
+
 	replace<FS extends FetchingStrategy<T>>(
 		row: StrategyToInsertRowData<T>,
 		strategy: FS
@@ -628,7 +628,7 @@ type AggregateStrategyBase<T> =
 	};
 
 
-type FetchingStrategyBase<T, IsMany = true> = 
+type FetchingStrategyBase<T, IsMany = true> =
 {
 	[K in keyof T &
 	keyof RemoveNever<
@@ -636,7 +636,7 @@ type FetchingStrategyBase<T, IsMany = true> =
 	>]?: T[K] extends ColumnSymbols
 	? boolean
 	: boolean | FetchingStrategyBase<T[K], T[K] extends ManyRelation ? true: false> | AggType<T[K]>;
-} & 
+} &
 (IsMany extends true ? {
 	limit?: number;
 	offset?: number;
@@ -1652,7 +1652,7 @@ type DateColumnTypeDef<M> = DateValidator<M> & {
 	serializable(value: boolean): DateColumnTypeDef<M>;
 	JSONSchema(schema: object, options?: Options): DateColumnTypeDef<M>;
 	default(value: string | Date | null | undefined | (() => string | Date | null | undefined)): DateColumnTypeDef<M>;
-	dbNull(value: String | Date): DateColumnTypeDef<M>;
+	dbNull(value: string | Date): DateColumnTypeDef<M>;
 } & ColumnTypeOf<DateColumnType<M>> &
 	M;
 
@@ -1663,7 +1663,7 @@ type DateWithTimeZoneColumnTypeDef<M> = DateValidator<M> & {
 	serializable(value: boolean): DateWithTimeZoneColumnTypeDef<M>;
 	JSONSchema(schema: object, options?: Options): DateWithTimeZoneColumnTypeDef<M>;
 	default(value: string | Date | null | undefined | (() => string | Date | null | undefined)): DateWithTimeZoneColumnTypeDef<M>;
-	dbNull(value: String | Date): DateWithTimeZoneColumnTypeDef<M>;
+	dbNull(value: string | Date): DateWithTimeZoneColumnTypeDef<M>;
 } & ColumnTypeOf<DateWithTimeZoneColumnType<M>> &
 	M;
 
@@ -1797,8 +1797,7 @@ type Increment<C extends number> = C extends 0
 	? 5
 	: 0;
 
-	
-type TableAlias<Alias extends string> = {
+
+type TableAlias<Alias> = {
 	__tableAlias: Alias;
   };
-  
