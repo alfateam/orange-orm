@@ -1,8 +1,11 @@
+// client.ts
+
 import { db } from './map2';
 
 /**
- * We must ensure each relation’s `type` and `target` are literal‐typed,
- * not plain `string`. Here, we use `as const` on those fields.
+ * 1) Define a schema where `orderLines` has:
+ *     • a composite PK: ['orderId','productId']
+ *     • a hasMany → `packages` (packages also have a composite PK)
  */
 const schema = {
 	customers: {
@@ -11,18 +14,12 @@ const schema = {
 			name: '' as string,
 			email: '' as string,
 		},
+		primaryKey: ['id'] as const,
 		relations: {
-			// A customer can have many orders
 			orders: {
-				type: 'hasMany'    as const,
-				target: 'orders'   as const,
-				fkColumn: 'customerId',
-			},
-			// (Optional) A customer might have one “defaultAddress”
-			defaultAddress: {
-				type: 'hasOne'         as const,
-				target: 'deliveryAddresses' as const,
-				fkColumn: 'customerId',
+				type: 'hasMany'          as const,
+				target: 'orders'         as const,
+				fkColumns: ['customerId'] as const,
 			},
 		},
 	},
@@ -34,103 +31,152 @@ const schema = {
 			placedAt: new Date() as Date,
 			status: '' as string,
 		},
+		primaryKey: ['id'] as const,
 		relations: {
-			// Each order references exactly one customer
 			customer: {
 				type: 'references' as const,
 				target: 'customers'  as const,
-				fkColumn: 'customerId',
+				fkColumns: ['customerId'] as const,
 			},
-			// Each order has many orderLines
 			lines: {
-				type: 'hasMany'      as const,
-				target: 'orderLines' as const,
-				fkColumn: 'orderId',
+				type: 'hasMany'        as const,
+				target: 'orderLines'   as const,
+				fkColumns: ['orderId'] as const,
 			},
-			// Each order has exactly one deliveryAddress
-			deliveryAddress: {
-				type: 'hasOne'             as const,
-				target: 'deliveryAddresses' as const,
-				fkColumn: 'orderId',
-			},
-		},
-	},
-	packages: {
-		columns: {
-			id: 0 as number,
-			orderId: 0 as number,
-			product: '' as string
 		},
 	},
 
 	orderLines: {
 		columns: {
-			id: 0 as number,
 			orderId: 0 as number,
 			productId: 0 as number,
 			quantity: 0 as number,
 			price: 0 as number,
 		},
+		// Composite PK: orderId + productId
+		primaryKey: ['orderId', 'productId'] as const,
 		relations: {
-			// Each orderLine references exactly one order
 			order: {
 				type: 'references' as const,
 				target: 'orders'    as const,
-				fkColumn: 'orderId',
+				fkColumns: ['orderId'] as const,
 			},
+			// “orderLines” hasMany “packages” (each package belongs to one orderLine)
 			packages: {
-				type: 'hasMany' as const,
-				target: 'packages'    as const,
-				fkColumn: 'orderId',
+				type: 'hasMany'          as const,
+				target: 'packages'       as const,
+				fkColumns: ['orderId', 'productId'] as const,
 			},
 		},
 	},
 
-	deliveryAddresses: {
+	packages: {
 		columns: {
-			id: 0 as number,
 			orderId: 0 as number,
-			customerId: 0 as number,
-			street: '' as string,
-			city: '' as string,
-			postalCode: '' as string,
+			productId: 0 as number,
+			packageId: 0 as number, // e.g. the nth package for that orderLine
+			weight: 0 as number,
+			shippedAt: new Date() as Date,
 		},
+		// Composite PK: [orderId, productId, packageId]
+		primaryKey: ['orderId', 'productId', 'packageId'] as const,
 		relations: {
-			// This deliveryAddress references exactly one order
-			order: {
-				type: 'references' as const,
-				target: 'orders'    as const,
-				fkColumn: 'orderId',
-			},
-			// (Optional) This could also reference a customer
-			customer: {
-				type: 'references'  as const,
-				target: 'customers' as const,
-				fkColumn: 'customerId',
+			// Each package references exactly one orderLine via (orderId, productId)
+			orderLine: {
+				type: 'references'         as const,
+				target: 'orderLines'       as const,
+				fkColumns: ['orderId', 'productId'] as const,
 			},
 		},
 	},
-} as const; // <-- `as const` here means every literal string stays a literal
+} as const;
 
-async function exampleRelations() {
-	// Now TypeScript will infer the proper literal types for each relation’s
-	// `type` and `target`, so `db(schema)` no longer complains.
-
+async function examplePackages() {
 	const database = db(schema);
 
-	const orders = await database.orders.getAll({
-		customer: {}, // Include the customer relation
-		lines: {
-			packages: {},
-			order: {
-				customer: {},
-				deliveryAddress: {}
+	// —— getAll for `orderLines` including `packages` relation ——
+	// IntelliSense: when typing { packages: { … } }, you'll see "packages" suggested.
+	// Inside { packages: { … } }, you'll see "orderLine" suggested (for the `packages` table).
+	const linesWithPackages = await database.orderLines.getAll({
+		packages: {
+
+			orderLine: {
+				order: {
+					customer: {}
+				}
+			}
+		},
+	});
+	// Inferred type of `linesWithPackages`:
+	// Array<{
+	//   orderId: number;
+	//   productId: number;
+	//   quantity: number;
+	//   price: number;
+	//
+	//   packages: Array<{
+	//     orderId: number;
+	//     productId: number;
+	//     packageId: number;
+	//     weight: number;
+	//     shippedAt: Date;
+	//
+	//     orderLine: {
+	//       orderId: number;
+	//       productId: number;
+	//
+	//       order: {
+	//         id: number;
+	//         customerId: number;
+	//         placedAt: Date;
+	//         status: string;
+	//         customer: {
+	//           id: number;
+	//           name: string;
+	//           email: string;
+	//         } | null;
+	//       } | null;
+	//     } | null;
+	//   }>;
+	// }>
+
+	console.log(linesWithPackages);
+
+	// —— getById for a single package (composite PK) with nested relations ——
+	const singlePkg = await database.packages.getById(
+		{ orderId: 100, productId: 200, packageId: 1 },
+		{
+			orderLine: {
+				order: {
+					customer: {}
+				}
 			}
 		}
-	});
-	orders[0].lines[0].packages[0].
+	);
 
-		console.log('All orders with nested relations:', orders);
+	// Inferred type of `singlePkg`:
+	// {
+	//   orderId: number;
+	//   productId: number;
+	//   packageId: number;
+	//   weight: number;
+	//   shippedAt: Date;
+	//
+	//   orderLine: {
+	//     orderId: number;
+	//     productId: number;
+	//
+	//     order: {
+	//       id: number;
+	//       customerId: number;
+	//       placedAt: Date;
+	//       status: string;
+	//       customer: { id: number; name: string; email: string } | null;
+	//     } | null;
+	//   } | null;
+	// } | null
+
+	console.log(singlePkg);
 }
 
-exampleRelations().catch(console.error);
+examplePackages().catch(console.error);
