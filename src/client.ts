@@ -3,9 +3,11 @@
 import { db } from './map2';
 
 /**
- * 1) Define a schema where `orderLines` has:
- *     • a composite PK: ['orderId','productId']
- *     • a hasMany → `packages` (packages also have a composite PK)
+ * 1) Define a schema where:
+ *    • `orderLines` has a composite PK: ['orderId','productId']
+ *    • `orderLines` hasMany → `packages` (packages also have a composite PK).
+ *
+ *    Notice how `primaryKey` and `fkColumns` are now just `readonly string[]`.
  */
 const schema = {
 	customers: {
@@ -34,14 +36,14 @@ const schema = {
 		primaryKey: ['id'] as const,
 		relations: {
 			customer: {
-				type: 'references' as const,
-				target: 'customers'  as const,
+				type: 'references'       as const,
+				target: 'customers'      as const,
 				fkColumns: ['customerId'] as const,
 			},
 			lines: {
-				type: 'hasMany'        as const,
-				target: 'orderLines'   as const,
-				fkColumns: ['orderId'] as const,
+				type: 'hasMany'          as const,
+				target: 'orderLines'     as const,
+				fkColumns: ['orderId']    as const,
 			},
 		},
 	},
@@ -57,11 +59,11 @@ const schema = {
 		primaryKey: ['orderId', 'productId'] as const,
 		relations: {
 			order: {
-				type: 'references' as const,
-				target: 'orders'    as const,
-				fkColumns: ['orderId'] as const,
+				type: 'references'       as const,
+				target: 'orders'         as const,
+				fkColumns: ['orderId']    as const,
 			},
-			// “orderLines” hasMany “packages” (each package belongs to one orderLine)
+			// “orderLines” hasMany “packages” (each package belongs to exactly one orderLine)
 			packages: {
 				type: 'hasMany'          as const,
 				target: 'packages'       as const,
@@ -74,7 +76,7 @@ const schema = {
 		columns: {
 			orderId: 0 as number,
 			productId: 0 as number,
-			packageId: 0 as number, // e.g. the nth package for that orderLine
+			packageId: 0 as number,  // e.g. the nth package for that orderLine
 			weight: 0 as number,
 			shippedAt: new Date() as Date,
 		},
@@ -95,11 +97,10 @@ async function examplePackages() {
 	const database = db(schema);
 
 	// —— getAll for `orderLines` including `packages` relation ——
-	// IntelliSense: when typing { packages: { … } }, you'll see "packages" suggested.
-	// Inside { packages: { … } }, you'll see "orderLine" suggested (for the `packages` table).
+	// IntelliSense: typing { packages: { … } } will suggest "packages".
+	// Then inside packages: { orderLine: { … } } suggests "orderLine", etc.
 	const linesWithPackages = await database.orderLines.getAll({
 		packages: {
-
 			orderLine: {
 				order: {
 					customer: {}
@@ -107,7 +108,13 @@ async function examplePackages() {
 			}
 		},
 	});
-	// Inferred type of `linesWithPackages`:
+
+	const foo = await linesWithPackages.saveChanges({order: {}});
+	foo[0].
+		foo[0];
+
+
+	// Inferred type:
 	// Array<{
 	//   orderId: number;
 	//   productId: number;
@@ -153,8 +160,11 @@ async function examplePackages() {
 			}
 		}
 	);
-
-	// Inferred type of `singlePkg`:
+	singlePkg;
+	const res = await singlePkg.saveChanges();
+	res.
+		res.
+	// Inferred type:
 	// {
 	//   orderId: number;
 	//   productId: number;
@@ -176,7 +186,7 @@ async function examplePackages() {
 	//   } | null;
 	// } | null
 
-	console.log(singlePkg);
+		console.log(singlePkg);
 }
 
 examplePackages().catch(console.error);

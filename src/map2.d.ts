@@ -145,43 +145,81 @@ export type PrimaryKeyOf<
     };
 
 /**
+ * RowWithSave<M, K, FS> = a selected row type for table K (with fetch strategy FS),
+ * extended with saveChanges overloads:
+ *
+ *   - saveChanges(): Promise<rootColumns>
+ *   - saveChanges<FS2 extends FetchStrategy<M,K>>(fetchStrategy: FS2): Promise<nestedColumns(FS2)>
+ */
+export type RowWithSave<
+  M extends Record<string, TableDefinition<M>>,
+  K extends keyof M,
+  FS extends Record<string, any>
+> = DeepExpand<Selection<M, K, FS>> & {
+  saveChanges(): Promise<DeepExpand<Selection<M, K, {}>>>;
+  saveChanges<FS2 extends FetchStrategy<M, K>>(
+    fetchStrategy: FS2
+  ): Promise<DeepExpand<Selection<M, K, FS2>>>;
+};
+
+/**
+ * ArrayWithSave<M, K, FS> = an array of selected rows for table K (with fetch strategy FS),
+ * extended with saveChanges overloads that return ArrayWithSave as well:
+ *
+ *   - saveChanges(): Promise<ArrayWithSave<M, K, {}>>
+ *   - saveChanges<FS2 extends FetchStrategy<M,K>>(fetchStrategy: FS2): Promise<ArrayWithSave<M, K, FS2>>
+ */
+export type ArrayWithSave<
+  M extends Record<string, TableDefinition<M>>,
+  K extends keyof M,
+  FS extends Record<string, any>
+> = Array<RowWithSave<M, K, FS>> & {
+  saveChanges(): Promise<ArrayWithSave<M, K, {}>>;
+  saveChanges<FS2 extends FetchStrategy<M, K>>(
+    fetchStrategy: FS2
+  ): Promise<ArrayWithSave<M, K, FS2>>;
+};
+
+/**
  * DBClient<M> supplies, for each table K:
  *
  *   // getAll without fetch‐strategy:
- *   getAll(): Promise<DeepExpand<Selection<M, K, {}>>[]>
+ *   getAll(): Promise<ArrayWithSave<M, K, {}>>
  *
  *   // getAll with fetch‐strategy:
- *   getAll<FS extends FetchStrategy<M, K>>(fetchStrategy: FS): Promise<DeepExpand<Selection<M, K, FS>>[]>
+ *   getAll<FS extends FetchStrategy<M, K>>(fetchStrategy: FS): Promise<ArrayWithSave<M, K, FS>>
  *
  *   // getById without fetch‐strategy:
- *   getById(id: PrimaryKeyOf<M, K>): Promise<DeepExpand<Selection<M, K, {}>> | null>
+ *   getById(id: PrimaryKeyOf<M, K>): Promise<RowWithSave<M, K, {}> | null>
  *
  *   // getById with fetch‐strategy:
  *   getById<FS extends FetchStrategy<M, K>>(
  *     id: PrimaryKeyOf<M, K>,
  *     fetchStrategy: FS
- *   ): Promise<DeepExpand<Selection<M, K, FS>> | null>
+ *   ): Promise<RowWithSave<M, K, FS> | null>
  */
 export type DBClient<M extends Record<string, TableDefinition<M>>> = {
   [TableName in keyof M]: {
-    getAll(): Promise<DeepExpand<Selection<M, TableName, {}>>[]>;
+    getAll(): Promise<ArrayWithSave<M, TableName, {}>>;
     getAll<FS extends FetchStrategy<M, TableName>>(
       fetchStrategy: FS
-    ): Promise<DeepExpand<Selection<M, TableName, FS>>[]>;
+    ): Promise<ArrayWithSave<M, TableName, FS>>;
 
     getById(
       id: PrimaryKeyOf<M, TableName>
-    ): Promise<DeepExpand<Selection<M, TableName, {}>> | null>;
+    ): Promise<RowWithSave<M, TableName, {}> | null>;
     getById<FS extends FetchStrategy<M, TableName>>(
       id: PrimaryKeyOf<M, TableName>,
       fetchStrategy: FS
-    ): Promise<DeepExpand<Selection<M, TableName, FS>> | null>;
+    ): Promise<RowWithSave<M, TableName, FS> | null>;
   };
 };
 
 /**
  * The single entry‐point.  `db(schema)` infers M = typeof schema,
- * and returns a DBClient<M> that has both getAll(...) and getById(...).
+ * and returns a DBClient<M> that has both getAll(...) and getById(...),
+ * with saveChanges(fetchStrategy?) appropriately typed, and arrays returned
+ * from saveChanges also supporting saveChanges themselves.
  */
 export function db<
   M extends Record<string, TableDefinition<M>>
