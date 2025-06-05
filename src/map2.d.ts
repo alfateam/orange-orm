@@ -53,31 +53,6 @@ export type DeepExpand<T> =
     : T;
 
 /**
- * ModelFor<M, K> = the “full” nested shape for table K in map M:
- *  1) All columns of M[K]['columns'].
- *  2) For each relation in M[K]['relations'], recurses to ModelFor<M, target>.
- */
-export type ModelFor<
-  M extends Record<string, TableDefinition<M>>,
-  K extends keyof M
-> = {
-  [C in keyof M[K]['columns']]: M[K]['columns'][C];
-} &
-  (M[K] extends { relations: infer R }
-    ? {
-        [RName in keyof R]: R[RName] extends RelationDefinition<M>
-          ? R[RName]['type'] extends 'hasMany'
-            ? ModelFor<M, R[RName]['target']>[]
-            : R[RName]['type'] extends 'hasOne'
-            ? ModelFor<M, R[RName]['target']> | null
-            : R[RName]['type'] extends 'references'
-            ? ModelFor<M, R[RName]['target']> | null
-            : never
-          : never;
-      }
-    : {});
-
-/**
  * FetchStrategy<M, K> describes which relations of table K you want to include:
  *  • If K has no `relations`, then FetchStrategy<M, K> = {}.
  *  • Otherwise, it’s an object whose keys are exactly `keyof M[K]['relations']`,
@@ -145,83 +120,76 @@ export type PrimaryKeyOf<
     };
 
 /**
- * RowWithSave<M, K, FS> = a selected row type for table K (with fetch strategy FS),
- * extended with saveChanges overloads:
- *
- *   - saveChanges(): Promise<SavedRow<rootColumns>>
- *   - saveChanges<FS2 extends FetchStrategy<M,K>>(fetchStrategy: FS2): Promise<SavedRow<nestedColumns(FS2)>>
- *
- * Where SavedRow<...> is each property also extended with saveChanges again.
+ * “Saveable” intersection: take type T (a plain object) and add an overloadable
+ * saveChanges method that can be called with or without a fetch strategy.
  */
-export type RowWithSave<
+type Saveable<
+  T,
   M extends Record<string, TableDefinition<M>>,
-  K extends keyof M,
-  FS extends Record<string, any>
-> = DeepExpand<Selection<M, K, FS>> & {
-  saveChanges(): Promise<RowWithSave<M, K, {}>>;
+  K extends keyof M
+> = T & {
+  saveChanges(): Promise<Saveable<DeepExpand<Selection<M, K, {}>>, M, K>>;
   saveChanges<FS2 extends FetchStrategy<M, K>>(
     fetchStrategy: FS2
-  ): Promise<RowWithSave<M, K, FS2>>;
+  ): Promise<Saveable<DeepExpand<Selection<M, K, FS2>>, M, K>>;
 };
 
 /**
- * ArrayWithSave<M, K, FS> = an array of selected rows for table K (with fetch strategy FS),
- * extended with saveChanges overloads that return a new ArrayWithSave as well:
- *
- *   - saveChanges(): Promise<ArrayWithSave<M, K, {}>>
- *   - saveChanges<FS2 extends FetchStrategy<M,K>>(fetchStrategy: FS2): Promise<ArrayWithSave<M, K, FS2>>
+ * “SaveableArray” intersection: take Array<T> (T plain) and add saveChanges overloads
+ * that return a saveable array of either root or nested selections.
  */
-export type ArrayWithSave<
+type SaveableArray<
+  T,
   M extends Record<string, TableDefinition<M>>,
-  K extends keyof M,
-  FS extends Record<string, any>
-> = Array<RowWithSave<M, K, FS>> & {
-  saveChanges(): Promise<ArrayWithSave<M, K, {}>>;
+  K extends keyof M
+> = Array<T> & {
+  saveChanges(): Promise<SaveableArray<DeepExpand<Selection<M, K, {}>>, M, K>>;
   saveChanges<FS2 extends FetchStrategy<M, K>>(
     fetchStrategy: FS2
-  ): Promise<ArrayWithSave<M, K, FS2>>;
+  ): Promise<SaveableArray<DeepExpand<Selection<M, K, FS2>>, M, K>>;
 };
 
 /**
  * DBClient<M> supplies, for each table K:
  *
- *   // getAll without fetch‐strategy:
- *   getAll(): Promise<ArrayWithSave<M, K, {}>>
+ *   // getAll without fetch‐strategy: returns plain Selection<M,K,{}>[] + added saveChanges
+ *   getAll(): Promise<SaveableArray<DeepExpand<Selection<M, K, {}>>, M, K>>
  *
- *   // getAll with fetch‐strategy:
- *   getAll<FS extends FetchStrategy<M, K>>(fetchStrategy: FS): Promise<ArrayWithSave<M, K, FS>>
+ *   // getAll with fetch‐strategy: returns plain Selection<M,K,FS>[] + added saveChanges
+ *   getAll<FS extends FetchStrategy<M, K>>(fetchStrategy: FS):
+ *     Promise<SaveableArray<DeepExpand<Selection<M, K, FS>>, M, K>>
  *
- *   // getById without fetch‐strategy:
- *   getById(id: PrimaryKeyOf<M, K>): Promise<RowWithSave<M, K, {}> | null>
+ *   // getById without fetch‐strategy: returns plain Selection<M,K,{}> | null + added saveChanges
+ *   getById(id: PrimaryKeyOf<M, K>): Promise<Saveable<DeepExpand<Selection<M, K, {}>>, M, K> | null>
  *
- *   // getById with fetch‐strategy:
+ *   // getById with fetch‐strategy: returns plain Selection<M,K,FS> | null + added saveChanges
  *   getById<FS extends FetchStrategy<M, K>>(
  *     id: PrimaryKeyOf<M, K>,
  *     fetchStrategy: FS
- *   ): Promise<RowWithSave<M, K, FS> | null>
+ *   ): Promise<Saveable<DeepExpand<Selection<M, K, FS>>, M, K> | null>
  */
 export type DBClient<M extends Record<string, TableDefinition<M>>> = {
   [TableName in keyof M]: {
-    getAll(): Promise<ArrayWithSave<M, TableName, {}>>;
+    getAll(): Promise<SaveableArray<DeepExpand<Selection<M, TableName, {}>>, M, TableName>>;
     getAll<FS extends FetchStrategy<M, TableName>>(
       fetchStrategy: FS
-    ): Promise<ArrayWithSave<M, TableName, FS>>;
+    ): Promise<SaveableArray<DeepExpand<Selection<M, TableName, FS>>, M, TableName>>;
 
     getById(
       id: PrimaryKeyOf<M, TableName>
-    ): Promise<RowWithSave<M, TableName, {}> | null>;
+    ): Promise<Saveable<DeepExpand<Selection<M, TableName, {}>>, M, TableName> | null>;
     getById<FS extends FetchStrategy<M, TableName>>(
       id: PrimaryKeyOf<M, TableName>,
       fetchStrategy: FS
-    ): Promise<RowWithSave<M, TableName, FS> | null>;
+    ): Promise<Saveable<DeepExpand<Selection<M, TableName, FS>>, M, TableName> | null>;
   };
 };
 
 /**
  * The single entry‐point.  `db(schema)` infers M = typeof schema,
  * and returns a DBClient<M> that has both getAll(...) and getById(...),
- * with saveChanges(fetchStrategy?) appropriately typed, and arrays / returned rows
- * from saveChanges also supporting saveChanges themselves.
+ * returning plain objects which have saveChanges methods added. Arrays returned
+ * from getAll or saveChanges also support saveChanges recursively.
  */
 export function db<
   M extends Record<string, TableDefinition<M>>
