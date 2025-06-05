@@ -58,7 +58,9 @@ export type DeepExpand<T> =
  *    – If any column is `true`, only those are included.
  *    – Else if any column is `false`, all except those are included.
  *    – If no column‐keys appear, all columns are included by default.
- *  • Relation keys (from M[K]['relations']) mapped to nested FetchStrategy for that target.
+ *  • Relation keys (from M[K]['relations']) mapped to `true` or nested FetchStrategy for that target.
+ *
+ *    – If FS[RName] is `true`, treat it as `{}` (include all columns of related row).
  */
 export type FetchStrategy<
   M extends Record<string, TableDefinition<M>>,
@@ -66,9 +68,9 @@ export type FetchStrategy<
 > =
   // column‐level flags
   Partial<Record<keyof M[K]['columns'], boolean>> &
-  // relation‐level nested strategies
+  // relation‐level: either `true` or nested FetchStrategy for that target
   (M[K] extends { relations: infer R }
-    ? { [RName in keyof R]?: FetchStrategy<M, R[RName]['target']> }
+    ? { [RName in keyof R]?: true | FetchStrategy<M, R[RName]['target']> }
     : {});
 
 /**
@@ -121,14 +123,30 @@ type SelectedColumns<
     : TrueKeys<M, K, FS>;
 
 /**
+ * For a given relation entry FS[RName], interpret `true` as `{}` (all columns).
+ */
+type RelationStrategyOrEmpty<
+  M extends Record<string, TableDefinition<M>>,
+  From extends keyof M,
+  RName extends string
+> = FS extends FetchStrategy<M, From>
+  ? FS[RName] extends true
+    ? {}
+    : FS[RName] extends FetchStrategy<M, M[From]['relations'][RName]['target']>
+      ? FS[RName]
+      : never
+  : never;
+
+/**
  * Selection<M, K, FS> = the returned shape for table K given strategy FS:
  *
  * 1) Include exactly the columns from SelectedColumns<M, K, FS>.
- * 2) For each `RName` in FS that is also a relation key:
+ * 2) For each `RName` in FS that is a relation key:
+ *     - Let RS = FS[RName] extends true ? {} : FS[RName]
  *     - If relation type = 'hasMany', then
- *         RName: DeepExpand<Selection<M, target, FS[RName]>>[]
+ *         RName: DeepExpand<Selection<M, target, RS>>[]
  *     - If type = 'hasOne' or 'references', then
- *         RName: DeepExpand<Selection<M, target, FS[RName]>> | null
+ *         RName: DeepExpand<Selection<M, target, RS>> | null
  * 3) Omit any relation not mentioned in FS.
  */
 export type Selection<
@@ -136,101 +154,73 @@ export type Selection<
   K extends keyof M,
   FS extends Record<string, any>
 > =
-  // 1) Column selection
   { [C in SelectedColumns<M, K, FS>]: M[K]['columns'][C] } &
-  // 2) Relation selection
   (
     M[K] extends { relations: infer R }
       ? {
           [RName in Extract<keyof FS, keyof R>]: R[RName] extends RelationDefinition<M>
             ? R[RName]['type'] extends 'hasMany'
-              ? DeepExpand<Selection<M, R[RName]['target'], FS[RName]>>[]
-              : DeepExpand<Selection<M, R[RName]['target'], FS[RName]>> | null
+              ? DeepExpand<
+                  Selection<
+                    M,
+                    R[RName]['target'],
+                    FS[RName] extends true ? {} : Extract<FS[RName], Record<string, any>>
+                  >
+                >[]
+              : DeepExpand<
+                  Selection<
+                    M,
+                    R[RName]['target'],
+                    FS[RName] extends true ? {} : Extract<FS[RName], Record<string, any>>
+                  >
+                > | null
             : never;
         }
       : {}
   );
 
 /**
- * “SaveableRow”: given a plain‐selection row type T for table K, add:
- *  - saveChanges(): Promise<SaveableRow<M, K, DeepExpand<Selection<M, K, {}>>>>
- *  - saveChanges<FS2 extends FetchStrategy<M,K>>(fs: FS2): Promise<SaveableRow<M, K, DeepExpand<Selection<M, K, FS2>>>>
- *
- * The returned row is again a “saveable” fully-expanded plain object (with saveChanges).
- */
-type SaveableRow<
-  M extends Record<string, TableDefinition<M>>,
-  K extends keyof M,
-  T
-> = T & {
-  saveChanges(): Promise<SaveableRow<M, K, DeepExpand<Selection<M, K, {}>>>>;
-  saveChanges<FS2 extends FetchStrategy<M, K>>(
-    fetchStrategy: FS2
-  ): Promise<SaveableRow<M, K, DeepExpand<Selection<M, K, FS2>>>>;
-};
-
-/**
- * “SaveableArray”: given a plain array of rows T for table K, add:
- *  - saveChanges(): Promise<SaveableArray<M, K, DeepExpand<Selection<M, K, {}>>>>
- *  - saveChanges<FS2 extends FetchStrategy<M,K>>(fs: FS2): Promise<SaveableArray<M, K, DeepExpand<Selection<M, K, FS2>>>>
- *
- * The returned promise gives you a new “saveable” array of fully-expanded plain rows,
- * on which you can again call saveChanges(). Individual items remain plain.
- */
-type SaveableArray<
-  M extends Record<string, TableDefinition<M>>,
-  K extends keyof M,
-  T
-> = Array<T> & {
-  saveChanges(): Promise<SaveableArray<M, K, DeepExpand<Selection<M, K, {}>>>>;
-  saveChanges<FS2 extends FetchStrategy<M, K>>(
-    fetchStrategy: FS2
-  ): Promise<SaveableArray<M, K, DeepExpand<Selection<M, K, FS2>>>>;
-};
-
-/**
  * DBClient<M> supplies, for each table K:
  *
- *   // getAll, no strategy → SaveableArray<M,K,DeepExpand<Selection<M,K,{}>>>
- *   getAll(): Promise<SaveableArray<M, TableName, DeepExpand<Selection<M, TableName, {}>>>>
+ *   // getAll, no strategy → DeepExpand<Selection<M,K,{}>>[]
+ *   getAll(): Promise<Array<DeepExpand<Selection<M, TableName, {}>>>>
  *
- *   // getAll, with strategy → SaveableArray<M,K,DeepExpand<Selection<M,K,FS>>>
- *   getAll<FS extends FetchStrategy<M, TableName>>(fetchStrategy: FS):
- *     Promise<SaveableArray<M, TableName, DeepExpand<Selection<M, TableName, FS>>>>
+ *   // getAll, with strategy → DeepExpand<Selection<M,K,FS>>[]
+ *   getAll<FS extends FetchStrategy<M, K>>(fetchStrategy: FS):
+ *     Promise<Array<DeepExpand<Selection<M, TableName, FS>>>>
  *
- *   // getById, no strategy → SaveableRow<M,K,DeepExpand<Selection<M,K,{}>>> | null
- *   getById(id: PrimaryKeyOf<M, TableName>):
- *     Promise<SaveableRow<M, TableName, DeepExpand<Selection<M, TableName, {}>>> | null>
+ *   // getById, no strategy → DeepExpand<Selection<M,K,{}>> | null
+ *   getById(id: PrimaryKeyOf<M, K>): Promise<DeepExpand<Selection<M, TableName, {}>> | null>
  *
- *   // getById, with strategy → SaveableRow<M,K,DeepExpand<Selection<M,K,FS>>> | null
- *   getById<FS extends FetchStrategy<M, TableName>>(
- *     id: PrimaryKeyOf<M, TableName>,
+ *   // getById, with strategy → DeepExpand<Selection<M,K,FS>> | null
+ *   getById<FS extends FetchStrategy<M, K>>(
+ *     id: PrimaryKeyOf<M, K>,
  *     fetchStrategy: FS
- *   ): Promise<SaveableRow<M, TableName, DeepExpand<Selection<M, TableName, FS>>> | null>
+ *   ): Promise<DeepExpand<Selection<M, TableName, FS>> | null>
  */
 export type DBClient<M extends Record<string, TableDefinition<M>>> = {
   [TableName in keyof M]: {
-    getAll(): Promise<SaveableArray<M, TableName, DeepExpand<Selection<M, TableName, {}>>>>;
+    getAll(): Promise<Array<DeepExpand<Selection<M, TableName, {}>>>>;
     getAll<FS extends FetchStrategy<M, TableName>>(
       fetchStrategy: FS
-    ): Promise<SaveableArray<M, TableName, DeepExpand<Selection<M, TableName, FS>>>>;
+    ): Promise<Array<DeepExpand<Selection<M, TableName, FS>>>>;
 
     getById(
       id: PrimaryKeyOf<M, TableName>
-    ): Promise<SaveableRow<M, TableName, DeepExpand<Selection<M, TableName, {}>>> | null>;
+    ): Promise<DeepExpand<Selection<M, TableName, {}>> | null>;
     getById<FS extends FetchStrategy<M, TableName>>(
       id: PrimaryKeyOf<M, TableName>,
       fetchStrategy: FS
-    ): Promise<SaveableRow<M, TableName, DeepExpand<Selection<M, TableName, FS>>> | null>;
+    ): Promise<DeepExpand<Selection<M, TableName, FS>> | null>;
   };
 };
 
 /**
  * The single entry-point.  `db(schema)` infers M = typeof schema
  * and returns a DBClient<M> where:
- *  • `getAll()` returns a plain-row array with `saveChanges()` on the array.
- *  • `getById(id)` returns a plain-row object with `saveChanges()` on it, and calling saveChanges again returns another saveable row.
- *  • Passing a strategy object allows fine-grained column+relation fetch as described.
+ *  • `getAll()` returns `DeepExpand<Selection<M, K, {}>>[]`
+ *  • `getById(id)` returns `DeepExpand<Selection<M, K, {}>> | null`
+ *  • Passing a FetchStrategy object, where relation fields can be `true` or `{ ... }`, allows fine-grained column+relation fetch.
  */
 export function db<
   M extends Record<string, TableDefinition<M>>
