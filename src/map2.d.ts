@@ -58,9 +58,10 @@ export type DeepExpand<T> =
  *    – If any column is `true`, only those are included.
  *    – Else if any column is `false`, all except those are included.
  *    – If no column‐keys appear, all columns are included by default.
- *  • Relation keys (from M[K]['relations']) mapped to `true` or nested FetchStrategy for that target.
- *
- *    – If FS[RName] is `true`, treat it as `{}` (include all columns of related row).
+ *  • Relation keys (from M[K]['relations']) mapped to:
+ *      - `true` (include all columns of the related row),
+ *      - `false` (explicitly exclude that relation), or
+ *      - a nested FetchStrategy for that target.
  */
 export type FetchStrategy<
   M extends Record<string, TableDefinition<M>>,
@@ -68,15 +69,15 @@ export type FetchStrategy<
 > =
   // column‐level flags
   Partial<Record<keyof M[K]['columns'], boolean>> &
-  // relation‐level: either `true` or nested FetchStrategy for that target
+  // relation‐level flags or nested strategies
   (M[K] extends { relations: infer R }
-    ? { [RName in keyof R]?: true | FetchStrategy<M, R[RName]['target']> }
+    ? { [RName in keyof R]?: true | false | FetchStrategy<M, R[RName]['target']> }
     : {});
 
 /**
  * PrimaryKeyOf<M, K>:
  *  • If `primaryKey` = ['id'], then PrimaryKeyOf<M, K> = columns['id'].
- *  • Otherwise (composite), = { key: columns[key], … } for each key.
+ *  • Otherwise (composite), = { [key in PK]: columns[key] }.
  */
 export type PrimaryKeyOf<
   M extends Record<string, TableDefinition<M>>,
@@ -123,55 +124,48 @@ type SelectedColumns<
     : TrueKeys<M, K, FS>;
 
 /**
- * For a given relation entry FS[RName], interpret `true` as `{}` (all columns).
- */
-type RelationStrategyOrEmpty<
-  M extends Record<string, TableDefinition<M>>,
-  From extends keyof M,
-  RName extends string
-> = FS extends FetchStrategy<M, From>
-  ? FS[RName] extends true
-    ? {}
-    : FS[RName] extends FetchStrategy<M, M[From]['relations'][RName]['target']>
-      ? FS[RName]
-      : never
-  : never;
-
-/**
  * Selection<M, K, FS> = the returned shape for table K given strategy FS:
  *
  * 1) Include exactly the columns from SelectedColumns<M, K, FS>.
- * 2) For each `RName` in FS that is a relation key:
- *     - Let RS = FS[RName] extends true ? {} : FS[RName]
- *     - If relation type = 'hasMany', then
- *         RName: DeepExpand<Selection<M, target, RS>>[]
- *     - If type = 'hasOne' or 'references', then
- *         RName: DeepExpand<Selection<M, target, RS>> | null
- * 3) Omit any relation not mentioned in FS.
+ * 2) For each RName in FS ∩ keyof M[K]['relations']:
+ *     - If FS[RName] is `false`, omit.
+ *     - Else let RS = FS[RName] extends true ? {} : Extract<FS[RName], Record<string, any>>.
+ *       • If relation type = 'hasMany', then
+ *           RName: DeepExpand<Selection<M, target, RS>>[]
+ *       • If type = 'hasOne' or 'references', then
+ *           RName: DeepExpand<Selection<M, target, RS>> | null
  */
 export type Selection<
   M extends Record<string, TableDefinition<M>>,
   K extends keyof M,
   FS extends Record<string, any>
 > =
+  // 1) Columns selection
   { [C in SelectedColumns<M, K, FS>]: M[K]['columns'][C] } &
+  // 2) Relations selection, omitting RName where FS[RName] is false
   (
     M[K] extends { relations: infer R }
       ? {
-          [RName in Extract<keyof FS, keyof R>]: R[RName] extends RelationDefinition<M>
+          [RName in Extract<keyof FS, keyof R> as
+            FS[RName] extends false ? never : RName
+          ]: R[RName] extends RelationDefinition<M>
             ? R[RName]['type'] extends 'hasMany'
               ? DeepExpand<
                   Selection<
                     M,
                     R[RName]['target'],
-                    FS[RName] extends true ? {} : Extract<FS[RName], Record<string, any>>
+                    FS[RName] extends true
+                      ? {}
+                      : Extract<FS[RName], Record<string, any>>
                   >
                 >[]
               : DeepExpand<
                   Selection<
                     M,
                     R[RName]['target'],
-                    FS[RName] extends true ? {} : Extract<FS[RName], Record<string, any>>
+                    FS[RName] extends true
+                      ? {}
+                      : Extract<FS[RName], Record<string, any>>
                   >
                 > | null
             : never;
@@ -185,14 +179,14 @@ export type Selection<
  *   // getAll, no strategy → DeepExpand<Selection<M,K,{}>>[]
  *   getAll(): Promise<Array<DeepExpand<Selection<M, TableName, {}>>>>
  *
- *   // getAll, with strategy → DeepExpand<Selection<M,K,FS>>[]
+ *   // getAll, with strategy (columns + relations where FS[RName] can be true|false|nested)
  *   getAll<FS extends FetchStrategy<M, K>>(fetchStrategy: FS):
  *     Promise<Array<DeepExpand<Selection<M, TableName, FS>>>>
  *
  *   // getById, no strategy → DeepExpand<Selection<M,K,{}>> | null
  *   getById(id: PrimaryKeyOf<M, K>): Promise<DeepExpand<Selection<M, TableName, {}>> | null>
  *
- *   // getById, with strategy → DeepExpand<Selection<M,K,FS>> | null
+ *   // getById, with strategy (columns + relations where FS[RName] can be true|false|nested)
  *   getById<FS extends FetchStrategy<M, K>>(
  *     id: PrimaryKeyOf<M, K>,
  *     fetchStrategy: FS
@@ -216,11 +210,16 @@ export type DBClient<M extends Record<string, TableDefinition<M>>> = {
 };
 
 /**
- * The single entry-point.  `db(schema)` infers M = typeof schema
+ * The single entry‐point.  `db(schema)` infers M = typeof schema
  * and returns a DBClient<M> where:
- *  • `getAll()` returns `DeepExpand<Selection<M, K, {}>>[]`
- *  • `getById(id)` returns `DeepExpand<Selection<M, K, {}>> | null`
- *  • Passing a FetchStrategy object, where relation fields can be `true` or `{ ... }`, allows fine-grained column+relation fetch.
+ *  • `getAll()` returns `DeepExpand<Selection<M, K, {}>>[]`.
+ *  • `getById(id)` returns `DeepExpand<Selection<M, K, {}>> | null`.
+ *  • Passing a FetchStrategy object allows fine‐grained column+relation fetch:
+ *      – relation fields can be `true` (include all), `false` (exclude), or nested `{ … }`.
+ *  • E.g.:
+ *      await db(schema).orderLines.getAll({ packages: true });  // include full `packages` relation
+ *      await db(schema).orderLines.getAll({ packages: {} });    // same
+ *      await db(schema).orderLines.getAll({ packages: false }); // exclude `packages` relation
  */
 export function db<
   M extends Record<string, TableDefinition<M>>
