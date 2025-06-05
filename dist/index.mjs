@@ -3854,10 +3854,9 @@ function requireLessThanOrEqual () {
 	hasRequiredLessThanOrEqual = 1;
 	var newBoolean = requireNewBoolean();
 	var encodeFilterArg = requireEncodeFilterArg();
-	const getSessionSingleton = requireGetSessionSingleton();
+	var quote = requireQuote$6();
 
 	function lessThanOrEqual(context, column,arg,alias) {
-		const quote = getSessionSingleton(context, 'quote');
 		var operator = '<=';
 		var encoded = encodeFilterArg(context, column, arg);
 		var firstPart = quote(context, alias) + '.' + quote(context, column._dbName) + operator;
@@ -10820,63 +10819,6 @@ function requireGetManyDto$2 () {
 		return obj;
 	}
 
-
-	// function newCreateRow(span) {
-	// 	const columnsMap = span.columns;
-	// 	const columns = span.table._columns.filter(column => !columnsMap || columnsMap.get(column));
-	// 	const ProtoRow = createProto(columns, span);
-	// 	const manyNames = [];
-
-	// 	const c = {
-	// 		visitJoin: () => { },
-	// 		visitOne: () => { },
-	// 		visitMany: function(leg) {
-	// 			manyNames.push(leg.name);
-	// 		}
-	// 	};
-
-	// 	span.legs.forEach(leg => leg.accept(c));
-
-	// 	return createRow;
-
-	// 	function createRow() {
-	// 		const obj = new ProtoRow();
-	// 		manyNames.forEach(name => {
-	// 			obj[name] = [];
-	// 		});
-	// 		return obj;
-	// 	}
-	// }
-
-	// function createProto(columns, span) {
-	// 	function ProtoRow() {
-	// 		columns.forEach(column => {
-	// 			this[column.alias] = null;
-	// 		});
-
-	// 		for (const key in span.aggregates) {
-	// 			this[key] = null;
-	// 		}
-
-	// 		const c = {
-	// 			visitJoin: (leg) => {
-	// 				this[leg.name] = null;
-	// 			},
-	// 			visitOne: (leg) => {
-	// 				this[leg.name] = null;
-	// 			},
-	// 			visitMany: (leg) => {
-	// 				this[leg.name] = null;
-	// 			}
-	// 		};
-
-	// 		span.legs.forEach(leg => leg.accept(c));
-	// 	}
-
-	// 	return ProtoRow;
-	// }
-
-
 	function hasManyRelations(span) {
 		let result;
 		const c = {};
@@ -11041,8 +10983,10 @@ function requireGetManyDto$2 () {
 
 			function updateParent(subRow) {
 				const key = extractKey(subRow);
-				const parentRow = extractFromMap(key);
-				parentRow[name].push(subRow);
+				const parentRows = extractFromMap(key) || [];
+				parentRows.forEach(parentRow => {
+					parentRow[name].push(subRow);
+				});
 			}
 		};
 
@@ -11126,22 +11070,29 @@ function requireGetManyDto$2 () {
 
 	function addToMap(map, values, row) {
 		if (Array.isArray(values)) {
-
+			let m = map;
 			const lastIndex = values.length - 1;
 			for (let i = 0; i < lastIndex; i++) {
 				const id = values[i];
-				if (map.has(id))
-					map = map.get(id);
-				else {
-					const next = new Map();
-					map.set(id, next);
-					map = next;
+				if (!m.has(id)) {
+					m.set(id, new Map());
 				}
+				m = m.get(id);
 			}
-			map.set(values[lastIndex], row);
+			const leafKey = values[lastIndex];
+			if (!m.has(leafKey)) {
+				m.set(leafKey, [row]);
+			} else {
+				m.get(leafKey).push(row);
+			}
 		}
-		else
-			map.set(values, row);
+		else {
+			if (!map.has(values)) {
+				map.set(values, [row]);
+			} else {
+				map.get(values).push(row);
+			}
+		}
 	}
 
 	function getFromMap(map, primaryColumns, values) {
@@ -11155,7 +11106,6 @@ function requireGetManyDto$2 () {
 		else
 			return map.get(values);
 	}
-
 
 	getManyDto_1$2 = getManyDto;
 	return getManyDto_1$2;
