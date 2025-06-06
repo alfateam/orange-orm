@@ -61,18 +61,40 @@ export type DeepExpand<T> =
     : T;
 
 /**
+ * OrderBy<M, K> = array of column names or "column asc"/"column desc" literals for table K.
+ *  • Extract<keyof M[K]['columns'], string> yields each column name as a string.
+ *  • Template literal offers "colName", "colName asc", "colName desc".
+ */
+export type OrderBy<
+  M extends Record<string, TableDefinition<M>>,
+  K extends keyof M
+> = Array<
+  | `${Extract<keyof M[K]['columns'], string>}`
+  | `${Extract<keyof M[K]['columns'], string>} asc`
+  | `${Extract<keyof M[K]['columns'], string>} desc`
+>;
+
+/**
  * FetchStrategy<M, K> may specify:
+ *  • orderBy?: OrderBy<M, K>           — list of "column" | "column asc" | "column desc" entries
  *  • Columns (keys of M[K]['columns']) → boolean (true/false).
  *    – If any column is `true`, include only those.
  *    – Else if any column is `false`, include all except those.
  *    – If no column flags appear, include all columns.
  *  • Relations (keys of M[K]['relations']) → `true` | `false` | nested FetchStrategy.
+ *
+ * Example:
+ *   { orderBy: ['placedAt desc', 'status asc'], status: true, customer: { email: true } }
  */
 export type FetchStrategy<
   M extends Record<string, TableDefinition<M>>,
   K extends keyof M
 > =
+  // allow optional orderBy array with specific allowed values
+  { orderBy?: OrderBy<M, K> } &
+  // column‐level flags
   Partial<Record<keyof M[K]['columns'], boolean>> &
+  // relation‐level flags or nested strategies
   (M[K] extends { relations: infer R }
     ? { [RName in keyof R]?: true | false | FetchStrategy<M, R[RName]['target']> }
     : {});
@@ -210,6 +232,7 @@ export interface ColumnFilterType<Val> {
  *  • Relation filters for hasMany (HasManyRelationFilter<M, Target>)
  *  • Relation refs for hasOne/references (SingleRelationRefs<M, Target>)
  *  • Table‐level predicate: (row => BooleanFilterType) → BooleanFilterType
+ *  • exists() on the table as a whole
  */
 export type TableRefs<
   M extends Record<string, TableDefinition<M>>,
@@ -222,7 +245,7 @@ export type TableRefs<
   };
 
 /**
- * HasManyRelationFilter<M, Target> provides any/all/none on a hasMany relation.
+ * HasManyRelationFilter<M, Target> provides any/all/none/exists on a hasMany relation.
  *  • `any(predicate)`      → BooleanFilterType
  *  • `all(predicate)`      → BooleanFilterType
  *  • `none(predicate)`     → BooleanFilterType
@@ -314,7 +337,7 @@ export type DBClient<M extends Record<string, TableDefinition<M>>> = {
 };
 
 /**
- * The single entry‐point.  `db(schema)` infers M = typeof schema
+ * The single entry-point.  `db(schema)` infers M = typeof schema
  * and returns a DBClient<M> where:
  *  • You can reference columns: `database.customers.name.equal('Lars')`.
  *  • You can combine: `filter.and(anotherFilter)`.
@@ -325,6 +348,8 @@ export type DBClient<M extends Record<string, TableDefinition<M>>> = {
  *  • You can shorthand a related‐row column: `database.orders.lines.weight.equal(100)`
  *    (interpreted as `database.orders.lines.any(x => x.weight.equal(100))`).
  *  • At table‐level, you can write `database.orders(x => x.name.equal('foo'))` to get a BooleanFilterType.
+ *  • Pass `orderBy` array in any FetchStrategy (nested as well), with intellisense on allowed columns and "asc"/"desc":
+ *      `await database.orders.getAll({ orderBy: ['customerId', 'placedAt desc', 'status asc'] });`
  *  • Root‐level:
  *      – `database.filter.and(otherFilter)`, `database.filter.or(otherFilter)`, `database.filter.not()`.
  *      – `database.and(filter3)`, `database.or(filter4)`, `database.not(filter5)`.
