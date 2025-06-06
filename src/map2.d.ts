@@ -61,6 +61,107 @@ export type DeepExpand<T> =
     : T;
 
 /**
+ * BooleanFilterType: can combine with AND, OR, NOT.
+ */
+export interface BooleanFilterType {
+  and(other: BooleanFilterType): BooleanFilterType;
+  or(other: BooleanFilterType): BooleanFilterType;
+  not(): BooleanFilterType;
+}
+
+/**
+ * ColumnFilterType<Val> supports equality and comparison for values of type Val.
+ */
+export interface ColumnFilterType<Val> {
+  equal(value: Val): BooleanFilterType;
+  notEqual(value: Val): BooleanFilterType;
+  lessThan(value: Val): BooleanFilterType;
+  lessThanOrEqual(value: Val): BooleanFilterType;
+  greaterThan(value: Val): BooleanFilterType;
+  greaterThanOrEqual(value: Val): BooleanFilterType;
+  in(values: Val[]): BooleanFilterType;
+  notIn(values: Val[]): BooleanFilterType;
+  isNull(): BooleanFilterType;
+  isNotNull(): BooleanFilterType;
+}
+
+/**
+ * For any table Target, TableRefs<M, Target> provides:
+ *  • Column filters (ColumnRefs<M, Target>)
+ *  • Relation filters for hasMany (HasManyRelationFilter<M, Target>)
+ *  • Relation refs for hasOne/references (SingleRelationRefs<M, Target>)
+ *  • Table‐level predicate: (row => BooleanFilterType) → BooleanFilterType
+ *  • exists() on the table as a whole
+ */
+export type TableRefs<
+  M extends Record<string, TableDefinition<M>>,
+  Target extends keyof M
+> = ColumnRefs<M, Target> &
+  RelationRefs<M, Target> & {
+    (predicate: (row: TableRefs<M, Target>) => BooleanFilterType): BooleanFilterType;
+    exists(): BooleanFilterType;
+  };
+
+/**
+ * HasManyRelationFilter<M, Target> provides any/all/none/exists on a hasMany relation.
+ *  • `any(predicate)`      → BooleanFilterType
+ *  • `all(predicate)`      → BooleanFilterType
+ *  • `none(predicate)`     → BooleanFilterType
+ *  • `exists()`             → BooleanFilterType
+ *
+ * The `predicate` receives `TableRefs<M, TargetTable>` so you can nest deeply.
+ */
+export type HasManyRelationFilter<
+  M extends Record<string, TableDefinition<M>>,
+  Target extends keyof M
+> = {
+  any(predicate: (row: TableRefs<M, Target>) => BooleanFilterType): BooleanFilterType;
+  all(predicate: (row: TableRefs<M, Target>) => BooleanFilterType): BooleanFilterType;
+  none(predicate: (row: TableRefs<M, Target>) => BooleanFilterType): BooleanFilterType;
+  exists(): BooleanFilterType;
+};
+
+/**
+ * SingleRelationRefs<M, Target> provides for a single‐row relation (hasOne or references),
+ * the same TableRefs<M, Target> so you can navigate filters on that related row.
+ */
+export type SingleRelationRefs<
+  M extends Record<string, TableDefinition<M>>,
+  Target extends keyof M
+> = TableRefs<M, Target> | null;
+
+/**
+ * For each table K, ColumnRefs<M,K> provides a ColumnFilterType for each column C.
+ */
+export type ColumnRefs<
+  M extends Record<string, TableDefinition<M>>,
+  K extends keyof M
+> = {
+  [C in keyof M[K]['columns']]: ColumnFilterType<ColumnTypeToTS<M[K]['columns'][C]>>;
+};
+
+/**
+ * RelationRefs<M,K> provides:
+ *  • For each hasMany relation RName: both HasManyRelationFilter<M, RTarget>
+ *    and TableRefs<M, RTarget> (to allow shorthand and nested).
+ *  • For each hasOne/references relation RName: SingleRelationRefs<M, RTarget>.
+ */
+export type RelationRefs<
+  M extends Record<string, TableDefinition<M>>,
+  K extends keyof M
+> = M[K] extends { relations: infer R }
+  ? {
+      [RName in keyof R]: R[RName] extends RelationDefinition<M>
+        ? R[RName]['type'] extends 'hasMany'
+          ? HasManyRelationFilter<M, R[RName]['target']> & TableRefs<M, R[RName]['target']>
+          : R[RName]['type'] extends 'hasOne' | 'references'
+          ? SingleRelationRefs<M, R[RName]['target']>
+          : never
+        : never;
+    }
+  : {};
+
+/**
  * OrderBy<M, K> = array of column names or "column asc"/"column desc" literals for table K.
  *  • Extract<keyof M[K]['columns'], string> yields each column name as a string.
  *  • Template literal offers "colName", "colName asc", "colName desc".
@@ -76,7 +177,8 @@ export type OrderBy<
 
 /**
  * FetchStrategy<M, K> may specify:
- *  • orderBy?: OrderBy<M, K>           — list of "column" | "column asc" | "column desc" entries
+ *  • orderBy?: OrderBy<M, K>            — list of "column" | "column asc" | "column desc" entries
+ *  • where?: (row: TableRefs<M, K>) => BooleanFilterType
  *  • Columns (keys of M[K]['columns']) → boolean (true/false).
  *    – If any column is `true`, include only those.
  *    – Else if any column is `false`, include all except those.
@@ -84,20 +186,24 @@ export type OrderBy<
  *  • Relations (keys of M[K]['relations']) → `true` | `false` | nested FetchStrategy.
  *
  * Example:
- *   { orderBy: ['placedAt desc', 'status asc'], status: true, customer: { email: true } }
+ *   {
+ *     orderBy: ['placedAt desc', 'status asc'],
+ *     where: x => x.status.equal('open').and(x.lines.any(l => l.quantity.greaterThan(5))),
+ *     status: true,
+ *     customer: { email: true, where: c => c.country.equal('NO') }
+ *   }
  */
 export type FetchStrategy<
   M extends Record<string, TableDefinition<M>>,
   K extends keyof M
 > =
-  // allow optional orderBy array with specific allowed values
-  { orderBy?: OrderBy<M, K> } &
-  // column‐level flags
+  { orderBy?: OrderBy<M, K>; where?: (row: TableRefs<M, K>) => BooleanFilterType } &
   Partial<Record<keyof M[K]['columns'], boolean>> &
-  // relation‐level flags or nested strategies
-  (M[K] extends { relations: infer R }
-    ? { [RName in keyof R]?: true | false | FetchStrategy<M, R[RName]['target']> }
-    : {});
+  (
+    M[K] extends { relations: infer R }
+      ? { [RName in keyof R]?: true | false | FetchStrategy<M, R[RName]['target']> }
+      : {}
+  );
 
 /**
  * PrimaryKeyOf<M, K>:
@@ -202,108 +308,6 @@ export type Selection<
   );
 
 /**
- * BooleanFilterType: can combine with AND, OR, NOT.
- */
-export interface BooleanFilterType {
-  and(other: BooleanFilterType): BooleanFilterType;
-  or(other: BooleanFilterType): BooleanFilterType;
-  not(): BooleanFilterType;
-}
-
-/**
- * ColumnFilterType<Val> supports equality and comparison for values of type Val.
- */
-export interface ColumnFilterType<Val> {
-  equal(value: Val): BooleanFilterType;
-  notEqual(value: Val): BooleanFilterType;
-  lessThan(value: Val): BooleanFilterType;
-  lessThanOrEqual(value: Val): BooleanFilterType;
-  greaterThan(value: Val): BooleanFilterType;
-  greaterThanOrEqual(value: Val): BooleanFilterType;
-  in(values: Val[]): BooleanFilterType;
-  notIn(values: Val[]): BooleanFilterType;
-  isNull(): BooleanFilterType;
-  isNotNull(): BooleanFilterType;
-}
-
-/**
- * TableRefs<M, Target> provides:
- *  • Column filters (ColumnRefs<M, Target>)
- *  • Relation filters for hasMany (HasManyRelationFilter<M, Target>)
- *  • Relation refs for hasOne/references (SingleRelationRefs<M, Target>)
- *  • Table‐level predicate: (row => BooleanFilterType) → BooleanFilterType
- *  • exists() on the table as a whole
- */
-export type TableRefs<
-  M extends Record<string, TableDefinition<M>>,
-  Target extends keyof M
-> = ColumnRefs<M, Target> &
-  RelationRefs<M, Target> & {
-    (predicate: (row: TableRefs<M, Target>) => BooleanFilterType): BooleanFilterType;
-  } & {
-    exists(): BooleanFilterType;
-  };
-
-/**
- * HasManyRelationFilter<M, Target> provides any/all/none/exists on a hasMany relation.
- *  • `any(predicate)`      → BooleanFilterType
- *  • `all(predicate)`      → BooleanFilterType
- *  • `none(predicate)`     → BooleanFilterType
- *  • `exists()`             → BooleanFilterType
- *
- * The `predicate` receives `TableRefs<M, TargetTable>` so you can nest deeply.
- */
-export type HasManyRelationFilter<
-  M extends Record<string, TableDefinition<M>>,
-  Target extends keyof M
-> = {
-  any(predicate: (row: TableRefs<M, Target>) => BooleanFilterType): BooleanFilterType;
-  all(predicate: (row: TableRefs<M, Target>) => BooleanFilterType): BooleanFilterType;
-  none(predicate: (row: TableRefs<M, Target>) => BooleanFilterType): BooleanFilterType;
-  exists(): BooleanFilterType;
-};
-
-/**
- * SingleRelationRefs<M, Target> provides for a single‐row relation (hasOne or references),
- * the same TableRefs<M, Target> so you can navigate filters on that related row.
- */
-export type SingleRelationRefs<
-  M extends Record<string, TableDefinition<M>>,
-  Target extends keyof M
-> = TableRefs<M, Target> | null;
-
-/**
- * For each table K, ColumnRefs<M,K> provides a ColumnFilterType for each column C.
- */
-export type ColumnRefs<
-  M extends Record<string, TableDefinition<M>>,
-  K extends keyof M
-> = {
-  [C in keyof M[K]['columns']]: ColumnFilterType<ColumnTypeToTS<M[K]['columns'][C]>>;
-};
-
-/**
- * RelationRefs<M,K> provides:
- *  • For each hasMany relation RName: both HasManyRelationFilter<M, RTarget>
- *    and TableRefs<M, RTarget> (to allow shorthand and nested).
- *  • For each hasOne/references relation RName: SingleRelationRefs<M, RTarget>.
- */
-export type RelationRefs<
-  M extends Record<string, TableDefinition<M>>,
-  K extends keyof M
-> = M[K] extends { relations: infer R }
-  ? {
-      [RName in keyof R]: R[RName] extends RelationDefinition<M>
-        ? R[RName]['type'] extends 'hasMany'
-          ? HasManyRelationFilter<M, R[RName]['target']> & TableRefs<M, R[RName]['target']>
-          : R[RName]['type'] extends 'hasOne' | 'references'
-          ? SingleRelationRefs<M, R[RName]['target']>
-          : never
-        : never;
-    }
-  : {};
-
-/**
  * TableClient<M, K> provides getAll and getById for table K.
  */
 export type TableClient<
@@ -350,6 +354,8 @@ export type DBClient<M extends Record<string, TableDefinition<M>>> = {
  *  • At table‐level, you can write `database.orders(x => x.name.equal('foo'))` to get a BooleanFilterType.
  *  • Pass `orderBy` array in any FetchStrategy (nested as well), with intellisense on allowed columns and "asc"/"desc":
  *      `await database.orders.getAll({ orderBy: ['customerId', 'placedAt desc', 'status asc'] });`
+ *  • Pass `where` predicate at any level (nested as well):
+ *      `await database.orders.getAll({ where: x => x.lines.productId.equal('p1q2r3-uuid') });`
  *  • Root‐level:
  *      – `database.filter.and(otherFilter)`, `database.filter.or(otherFilter)`, `database.filter.not()`.
  *      – `database.and(filter3)`, `database.or(filter4)`, `database.not(filter5)`.

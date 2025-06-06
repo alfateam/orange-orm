@@ -180,7 +180,6 @@ async function exampleUsage() {
 	const filter4 = database.orders.lines.all(x => x.productId.equal('p1q2r3-uuid'));
 	const filter5 = database.orders.lines.none(x => x.productId.equal('p1q2r3-uuid'));
 
-
 	const filter6 = database.orders.lines.none(x =>  x.packages.any(y => y.orderLine.price.equal(100)));
 
 	const sorted = await database.orders.getAll({
@@ -188,6 +187,21 @@ async function exampleUsage() {
 			orderBy: ['productId asc']
 		},
 		orderBy: ['customerId']
+	});
+
+
+	const filtered = await database.orders.getAll({
+		where: x => x.lines.all(x => x.order( x => x.customerId.equal('d'))),
+		customer: {
+			where: x => x.name.equal('John Doe')
+		}
+	});
+
+	const filtered2 = await database.orders.getById('dd',{
+		where: x => x.lines.all(x => x.order( x => x.customerId.equal('d'))),
+		customer: {
+			where: x => x.name.equal('John Doe')
+		}
 	});
 
 	console.log('Deep nested fetch (orders → lines → packages):', deepFetch);
