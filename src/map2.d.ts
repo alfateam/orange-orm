@@ -72,9 +72,7 @@ export type FetchStrategy<
   M extends Record<string, TableDefinition<M>>,
   K extends keyof M
 > =
-  // column‐level flags
   Partial<Record<keyof M[K]['columns'], boolean>> &
-  // relation‐level flags or nested strategies
   (M[K] extends { relations: infer R }
     ? { [RName in keyof R]?: true | false | FetchStrategy<M, R[RName]['target']> }
     : {});
@@ -93,7 +91,8 @@ export type PrimaryKeyOf<
       ? ColumnTypeToTS<M[K]['columns'][Single]>
       : never
     : {
-        [P in Extract<M[K]['primaryKey'][number], keyof M[K]['columns']>]: ColumnTypeToTS<M[K]['columns'][P]>;
+        [P in Extract<M[K]['primaryKey'][number], keyof M[K]['columns']>]:
+          ColumnTypeToTS<M[K]['columns'][P]>;
       };
 
 /** Helper: all column‐names of table K. */
@@ -153,9 +152,7 @@ export type Selection<
   K extends keyof M,
   FS extends Record<string, any>
 > =
-  // 1) Columns → TS types
   { [C in SelectedColumns<M, K, FS>]: ColumnTypeToTS<M[K]['columns'][C]> } &
-  // 2) Relations
   (
     M[K] extends { relations: infer R }
       ? {
@@ -216,30 +213,30 @@ export interface ColumnFilterType<Val> {
 export type TableRefs<
   M extends Record<string, TableDefinition<M>>,
   Target extends keyof M
-> = ColumnRefs<M, Target> & RelationRefs<M, Target>;
+> = ColumnRefs<M, Target> &
+  RelationRefs<M, Target> & {
+    // Table-level predicate shorthand: db.table(predicate) ⇒ BooleanFilterType
+    (predicate: (row: TableRefs<M, Target>) => BooleanFilterType): BooleanFilterType;
+  };
 
 /**
- * HasManyRelationFilter<M, Target> provides any/all/none on a hasMany relation.
- *  • `any(predicate)` returns BooleanFilterType
- *  • `all(predicate)` returns BooleanFilterType
- *  • `none(predicate)` returns BooleanFilterType
+ * HasManyRelationFilter<M, Target> provides any/all/none/exists on a hasMany relation.
+ *  • `any(predicate)`                              → BooleanFilterType
+ *  • `all(predicate)`                              → BooleanFilterType
+ *  • `none(predicate)`                             → BooleanFilterType
+ *  • `exists()`                                     → BooleanFilterType
  *
- * The `predicate` receives a full `TableRefs<M, TargetTable>` so you can filter columns
- * and further relations (hasMany or hasOne) recursively.
+ * The `predicate` receives a full `TableRefs<M, TargetTable>` so you can filter
+ * columns, hasMany and hasOne/references relations, nesting arbitrarily deep.
  */
 export type HasManyRelationFilter<
   M extends Record<string, TableDefinition<M>>,
   Target extends keyof M
 > = {
-  any(
-    predicate: (row: TableRefs<M, Target>) => BooleanFilterType
-  ): BooleanFilterType;
-  all(
-    predicate: (row: TableRefs<M, Target>) => BooleanFilterType
-  ): BooleanFilterType;
-  none(
-    predicate: (row: TableRefs<M, Target>) => BooleanFilterType
-  ): BooleanFilterType;
+  any(predicate: (row: TableRefs<M, Target>) => BooleanFilterType): BooleanFilterType;
+  all(predicate: (row: TableRefs<M, Target>) => BooleanFilterType): BooleanFilterType;
+  none(predicate: (row: TableRefs<M, Target>) => BooleanFilterType): BooleanFilterType;
+  exists(): BooleanFilterType;
 };
 
 /**
@@ -264,8 +261,8 @@ export type ColumnRefs<
 /**
  * RelationRefs<M,K> provides:
  *  • For each hasMany relation RName: both HasManyRelationFilter<M, RTarget>
- *    and TableRefs<M, RTarget> to allow direct column filters shorthand.
- *  • For each hasOne/references relation RName: SingleRelationRefs<M, RTarget>.
+ *    and TableRefs<M, RTarget> to allow direct column filters shorthand + nested filters.
+ *  • For each hasOne/references relation RName: SingleRelationRefs<M, RTarget> | null.
  */
 export type RelationRefs<
   M extends Record<string, TableDefinition<M>>,
@@ -290,37 +287,33 @@ export type TableClient<
   K extends keyof M
 > = {
   getAll(): Promise<Array<DeepExpand<Selection<M, K, {}>>>>;
-  getAll<FS extends FetchStrategy<M, K>>(
-    fetchStrategy: FS
-  ): Promise<Array<DeepExpand<Selection<M, K, FS>>>>;
+  getAll<FS extends FetchStrategy<M, K>>(fetchStrategy: FS): Promise<Array<DeepExpand<Selection<M, K, FS>>>>;
 
-  getById(
-    id: PrimaryKeyOf<M, K>
-  ): Promise<DeepExpand<Selection<M, K, {}>> | null>;
-  getById<FS extends FetchStrategy<M, K>>(
-    id: PrimaryKeyOf<M, K>,
-    fetchStrategy: FS
-  ): Promise<DeepExpand<Selection<M, K, FS>> | null>;
+  getById(id: PrimaryKeyOf<M, K>): Promise<DeepExpand<Selection<M, K, {}>> | null>;
+  getById<FS extends FetchStrategy<M, K>>(id: PrimaryKeyOf<M, K>, fetchStrategy: FS): Promise<DeepExpand<Selection<M, K, FS>> | null>;
 };
 
 /**
  * DBClient<M> supplies, for each table K:
- *  • TableRefs<M, K> (all column filters + relation filters + relation refs)
- *  • TableClient<M, K>  (getAll, getById)
+ *  • TableRefs<M, K>   (all column filters + relation filters + relation refs + table-level predicate)
+ *  • TableClient<M, K> (getAll, getById)
  */
 export type DBClient<M extends Record<string, TableDefinition<M>>> = {
   [TableName in keyof M]: TableRefs<M, TableName> & TableClient<M, TableName>;
 };
 
 /**
- * The single entry-point.  `db(schema)` infers M = typeof schema
+ * The single entry‐point.  `db(schema)` infers M = typeof schema
  * and returns a DBClient<M> where:
  *  • You can reference columns: `database.customers.name.equal('Lars')`.
  *  • You can combine: `filter.and(anotherFilter)`.
- *  • You can filter hasMany relations with `.any(...)`, `.all(...)`, `.none(...)`,
- *    and nest further deep.
+ *  • You can filter hasMany relations with `.any(...)`, `.all(...)`, `.none(...)`, `.exists()`,
+ *    and nest further deep: e.g. `orders.lines.none(x => x.packages.any(y => y.orderLine.weight.equal(100)))`.
  *  • For hasOne/references, you can navigate to single relation refs.
- *  • getAll/getById as before.
+ *  • You can shorthand a related‐row column: `database.orders.lines.weight.equal(100)`
+ *    (interpreted as `database.orders.lines.any(x => x.weight.equal(100))`).
+ *  • At table‐level, you can write `database.orders(x => x.name.equal('foo'))` to get a BooleanFilterType.
+ *  • getAll/getById as before for actual data fetching.
  *
  * Example usage:
  *
@@ -329,13 +322,16 @@ export type DBClient<M extends Record<string, TableDefinition<M>>> = {
  *
  *   const database = db(schema);
  *
- *   // Simple column filter:
+ *   // Table‐level predicate:
+ *   const f0 = database.orders(x => x.name.equal('foo'));
+ *
+ *   // Column filters:
  *   const f1 = database.customers.name.equal('Lars');
  *
  *   // Combine:
  *   const f2 = f1.and(database.customers.name.equal('Anne'));
  *
- *   // any/all/none on hasMany (nested):
+ *   // any/all/none/exists on hasMany (nested):
  *   const f3 = database.orders.lines.any(x =>
  *     x.productId.equal('p1q2r3-uuid')
  *   );
@@ -351,10 +347,11 @@ export type DBClient<M extends Record<string, TableDefinition<M>>> = {
  *     x.packages.any(y => y.orderLine.weight.equal(100))
  *   );
  *
- *   // Direct shorthand column filter on hasMany target:
- *   const f7 = database.orders.lines.equal; // Invalid: must use `.any(...)` or direct snippet below
- *   // But we allow:
- *   const f8 = database.orders.lines.weight.equal(100); // shorthand for `.any(x => x.weight.equal(100))`
+ *   // Check existence only:
+ *   const f7 = database.orders.lines.exists();
+ *
+ *   // Shorthand column filter on hasMany target:
+ *   const f8 = database.orders.lines.weight.equal(100);
  *
  *   // Standard getAll/getById:
  *   const allCusts = await database.customers.getAll({ name: true });
