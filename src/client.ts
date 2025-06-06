@@ -170,7 +170,10 @@ async function exampleUsage() {
        }>;
      }>
   */
+	const filter0 = database.filter.and(database.customers.name.equal('John Doe'));
 	const filter = database.customers.orders.placedAt.equal('foo');
+	const filterA = database.customers.orders(x => x.placedAt.greaterThan('foo'));
+	const exists = database.customers.orders.exists();
 
 	const filter2 = database.orders.lines.productId.equal('p1q2r3-uuid');
 	const filter3 = database.orders.lines.any(x => x.productId.equal('p1q2r3-uuid'));
