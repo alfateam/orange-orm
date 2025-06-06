@@ -1,192 +1,186 @@
 // client.ts
 
 import { db } from './map2';
+import { schema } from './schema';
 
-/**
- * 1) Define a schema where:
- *    • `orderLines` has a composite PK: ['orderId','productId']
- *    • `orderLines` hasMany → `packages` (packages also have a composite PK).
- *
- *    Notice how `primaryKey` and `fkColumns` are now just `readonly string[]`.
- */
-const schema = {
-	customers: {
-		columns: {
-			id: 0 as number,
-			name: '' as string,
-			email: '' as string,
-		},
-		primaryKey: ['id'] as const,
-		relations: {
-			orders: {
-				type: 'hasMany'          as const,
-				target: 'orders'         as const,
-				fkColumns: ['customerId'] as const,
-			},
-		},
-	},
+// Initialize the client
+const database = db(schema);
 
-	orders: {
-		columns: {
-			id: 0 as number,
-			customerId: 0 as number,
-			placedAt: new Date() as Date,
-			status: '' as string,
-		},
-		primaryKey: ['id'] as const,
-		relations: {
-			customer: {
-				type: 'references'       as const,
-				target: 'customers'      as const,
-				fkColumns: ['customerId'] as const,
-			},
-			lines: {
-				type: 'hasMany'          as const,
-				target: 'orderLines'     as const,
-				fkColumns: ['orderId']    as const,
-			},
-		},
-	},
+async function exampleUsage() {
+	// 1) Simple getAll without any fetch strategy → returns all columns for each row
 
-	orderLines: {
-		columns: {
-			orderId: 0 as number,
-			productId: 0 as number,
-			quantity: 0 as number,
-			price: 0 as number,
-		},
-		// Composite PK: orderId + productId
-		primaryKey: ['orderId', 'productId'] as const,
-		relations: {
-			order: {
-				type: 'references'       as const,
-				target: 'orders'         as const,
-				fkColumns: ['orderId']    as const,
-			},
-			// “orderLines” hasMany “packages” (each package belongs to exactly one orderLine)
-			packages: {
-				type: 'hasMany'          as const,
-				target: 'packages'       as const,
-				fkColumns: ['orderId', 'productId'] as const,
-			},
-		},
-	},
+	const allCustomers = await database.customers.getAll();
+	// Type of allCustomers: Array<{ id: string; name: string; email: string }>
+	console.log('All customers:', allCustomers);
 
-	packages: {
-		columns: {
-			orderId: 0 as number,
-			productId: 0 as number,
-			packageId: 0 as number,  // e.g. the nth package for that orderLine
-			weight: 0 as number,
-			shippedAt: new Date() as Date,
-		},
-		// Composite PK: [orderId, productId, packageId]
-		primaryKey: ['orderId', 'productId', 'packageId'] as const,
-		relations: {
-			// Each package references exactly one orderLine via (orderId, productId)
-			orderLine: {
-				type: 'references'         as const,
-				target: 'orderLines'       as const,
-				fkColumns: ['orderId', 'productId'] as const,
-			},
-		},
-	},
-} as const;
+	const allOrders = await database.orders.getAll();
+	// Type of allOrders: Array<{ id: string; customerId: string; status: string; placedAt: string }>
+	console.log('All orders:', allOrders);
 
-async function examplePackages() {
-	const database = db(schema);
+	// 2) getById without fetch strategy → returns all columns for that single row or null
 
-	// —— getAll for `orderLines` including `packages` relation ——
-	// IntelliSense: typing { packages: { … } } will suggest "packages".
-	// Then inside packages: { orderLine: { … } } suggests "orderLine", etc.
-	const linesWithPackages = await database.orderLines.getAll({
-		packages: {
-			orderLine: {
-				order: {
-					customer: {}
-				}
-			}
-		},
+	const customer1 = await database.customers.getById('a1b2c3d4-uuid');
+	// Type of customer1: { id: string; name: string; email: string } | null
+	console.log('Customer #1:', customer1);
+
+	const order1 = await database.orders.getById('z9y8x7w6-uuid');
+	// Type of order1: { id: string; customerId: string; status: string; placedAt: string } | null
+	console.log('Order #1:', order1);
+
+	// 3) Fetch only specific columns (e.g. pick name and email for customers):
+
+	const partialCustomers = await database.customers.getAll({
+		name: true,
+		email: true
 	});
+	// Type: Array<{ name: string; email: string }>
+	console.log('Partial customers (name + email):', partialCustomers);
 
-	const foo = await linesWithPackages.saveChanges({order: {}});
-	foo[0].
-		foo[0];
+	// 4) Exclude certain columns (e.g. fetch all columns except email for customers):
 
+	const noEmailCustomers = await database.customers.getAll({
+		email: false
+	});
+	// Type: Array<{ id: string; name: string }>
+	console.log('Customers without email field:', noEmailCustomers);
 
-	// Inferred type:
-	// Array<{
-	//   orderId: number;
-	//   productId: number;
-	//   quantity: number;
-	//   price: number;
-	//
-	//   packages: Array<{
-	//     orderId: number;
-	//     productId: number;
-	//     packageId: number;
-	//     weight: number;
-	//     shippedAt: Date;
-	//
-	//     orderLine: {
-	//       orderId: number;
-	//       productId: number;
-	//
-	//       order: {
-	//         id: number;
-	//         customerId: number;
-	//         placedAt: Date;
-	//         status: string;
-	//         customer: {
-	//           id: number;
-	//           name: string;
-	//           email: string;
-	//         } | null;
-	//       } | null;
-	//     } | null;
-	//   }>;
-	// }>
+	// 5) Fetch a customer plus all of their orders (relation 'orders: true'):
 
-	console.log(linesWithPackages);
+	const customerWithOrders = await database.customers.getById('a1b2c3d4-uuid', {
+		orders: true
+	});
+	/* Type of customerWithOrders:
+     {
+       id: string;
+       name: string;
+       email: string;
+       orders: Array<{
+         id: string;
+         customerId: string;
+         status: string;
+         placedAt: string;
+       }>;
+     } | null
+  */
+	console.log('Customer with all orders:', customerWithOrders);
 
-	// —— getById for a single package (composite PK) with nested relations ——
-	const singlePkg = await database.packages.getById(
-		{ orderId: 100, productId: 200, packageId: 1 },
-		{
-			orderLine: {
-				order: {
-					customer: {}
-				}
+	// 6) Fetch an order and only include its status + placedAt, plus the customer’s email:
+
+	const orderPartial = await database.orders.getById('z9y8x7w6-uuid', {
+		status: true,
+		placedAt: true,
+		customer: { email: true }
+	});
+	/* Type of orderPartial:
+     {
+       status: string;
+       placedAt: string;
+       customer: { email: string } | null;
+     } | null
+  */
+	console.log('Order with partial fields + customer email:', orderPartial);
+
+	// 7) Fetch all orderLines including the full “packages” relation:
+
+	const linesWithAllPackages = await database.orderLines.getAll({
+		packages: true
+	});
+	/* Type of linesWithAllPackages:
+     Array<{
+       orderId: string;
+       productId: string;
+       quantity: number;
+       price: number;
+       packages: Array<{
+         id: string;
+         orderLineOrderId: string;
+         orderLineProductId: string;
+         weight: number;
+         shippedAt: string;
+       }>;
+     }>
+  */
+	console.log('OrderLines with all packages:', linesWithAllPackages);
+
+	// 8) Equivalent to include packages via an empty object:
+
+	const linesWithPackagesEmpty = await database.orderLines.getAll({
+		packages: {}
+	});
+	// Same type as above
+	console.log('OrderLines with packages (using {}):', linesWithPackagesEmpty);
+
+	// 9) Exclude the packages relation entirely:
+
+	const linesNoPackages = await database.orderLines.getAll({
+		packages: false
+	});
+	/* Type of linesNoPackages:
+     Array<{
+       orderId: string;
+       productId: string;
+       quantity: number;
+       price: number;
+     }>
+  */
+	console.log('OrderLines without packages:', linesNoPackages);
+
+	// 10) Composite‐key getById example: fetch a single orderLine, include only quantity + price, and include its packages (only weight & shippedAt):
+
+	const lineKey = { orderId: 'z9y8x7w6-uuid', productId: 'p1q2r3-uuid' };
+	const singleLine = await database.orderLines.getById(lineKey, {
+		quantity: true,
+		price: true,
+		packages: {
+			weight: true,
+			shippedAt: true
+		}
+	});
+	/* Type of singleLine:
+     {
+       quantity: number;
+       price: number;
+       packages: Array<{
+         weight: number;
+         shippedAt: string;
+       }>;
+     } | null
+  */
+	console.log('Single OrderLine with partial packages:', singleLine);
+
+	// 11) You can also fetch a deep nested example: fetch orders with each line (only productId) and for each line include packages with only id:
+
+	const deepFetch = await database.orders.getAll({
+		lines: {
+			productId: true,
+			packages: {
+				id: true
 			}
 		}
-	);
-	singlePkg;
-	const res = await singlePkg.saveChanges();
-	res.
-		res.
-	// Inferred type:
-	// {
-	//   orderId: number;
-	//   productId: number;
-	//   packageId: number;
-	//   weight: number;
-	//   shippedAt: Date;
-	//
-	//   orderLine: {
-	//     orderId: number;
-	//     productId: number;
-	//
-	//     order: {
-	//       id: number;
-	//       customerId: number;
-	//       placedAt: Date;
-	//       status: string;
-	//       customer: { id: number; name: string; email: string } | null;
-	//     } | null;
-	//   } | null;
-	// } | null
+	});
+	/* Type of deepFetch:
+     Array<{
+       orderId: string;
+       productId: string;
+       quantity: number;
+       price: number;
+       lines: Array<{
+         productId: string;
+         packages: Array<{ id: string }>;
+       }>;
+     }>
+  */
+	const filter = database.customers.orders.placedAt.equal('foo');
 
-		console.log(singlePkg);
+	const filter2 = database.orders.lines.productId.equal('p1q2r3-uuid');
+	const filter3 = database.orders.lines.any(x => x.productId.equal('p1q2r3-uuid'));
+	const filter4 = database.orders.lines.all(x => x.productId.equal('p1q2r3-uuid'));
+	const filter5 = database.orders.lines.none(x => x.productId.equal('p1q2r3-uuid'));
+
+
+	const filter6 = database.orders.lines.none(x =>  x.packages.any(y => y.orderLine.price.equal(100)));
+
+	console.log('Deep nested fetch (orders → lines → packages):', deepFetch);
 }
 
-examplePackages().catch(console.error);
+exampleUsage().catch(console.error);
