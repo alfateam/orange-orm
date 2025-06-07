@@ -210,7 +210,7 @@ async function exampleUsage() {
 
 	console.log('Deep nested fetch (orders → lines → packages):', deepFetch);
 
-	const composite = await database.orderLines.getById({orderId: 1, productId: 2}, {
+	const composite = await database.orderLines.getById({orderId: '1', productId: '2'}, {
 		quantity: true});
 
 }
