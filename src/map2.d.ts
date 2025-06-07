@@ -86,6 +86,16 @@ export interface ColumnFilterType<Val> {
 }
 
 /**
+ * A wrapper to allow both:
+ *   - direct property access: x.customer.name.equal(...)
+ *   - callable form: x.customer(x => x.name.equal(...))
+ */
+export type FilterableSingleRelation<M extends Record<string, TableDefinition<M>>, Target extends keyof M> =
+  TableRefs<M, Target> & {
+    (predicate: (row: TableRefs<M, Target>) => BooleanFilterType): BooleanFilterType;
+  };
+
+/**
  * For any table Target, TableRefs<M,Target> provides:
  *  • Column filters (ColumnRefs<M,Target>)  
  *  • Relation filters for hasMany (HasManyRelationFilter<M,Target>)  
@@ -140,12 +150,6 @@ export type ColumnRefs<
   [C in keyof M[K]['columns']]: ColumnFilterType<ColumnTypeToTS<M[K]['columns'][C]>>;
 };
 
-/**
- * RelationRefs<M,K> provides:
- *  • For each hasMany relation RName: both HasManyRelationFilter<M,RTarget>
- *    and TableRefs<M,RTarget> (to allow shorthand and nested).  
- *  • For each hasOne/references relation RName: SingleRelationRefs<M,RTarget>.
- */
 export type RelationRefs<
   M extends Record<string, TableDefinition<M>>,
   K extends keyof M
@@ -155,8 +159,8 @@ export type RelationRefs<
         ? R[RName]['type'] extends 'hasMany'
           ? HasManyRelationFilter<M, R[RName]['target']> & TableRefs<M, R[RName]['target']>
           : R[RName]['type'] extends 'hasOne' | 'references'
-          ? SingleRelationRefs<M, R[RName]['target']>
-          : never
+            ? FilterableSingleRelation<M, R[RName]['target']> // ← changed here
+            : never
         : never;
     }
   : {};

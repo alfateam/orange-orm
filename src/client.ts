@@ -171,9 +171,12 @@ async function exampleUsage() {
      }>
   */
 	const filter0 = database.filter.and(database.customers.name.equal('John Doe'));
-	const filter = database.customers.orders.placedAt.equal('foo');
-	const filterA = database.customers.orders(x => x.placedAt.greaterThan('foo'));
+	const filter = database.orders.customer(x => x .name.equal('John Doe'));
+	const filterB = database.customers.orders.placedAt.equal('foo');
+	const filterA = database.customers.orders.any(x => x.placedAt.equal('foo'));
+
 	const exists = database.customers.orders.exists();
+
 
 	const filter2 = database.orders.lines.productId.equal('p1q2r3-uuid');
 	const filter3 = database.orders.lines.any(x => x.productId.equal('p1q2r3-uuid'));
@@ -193,9 +196,10 @@ async function exampleUsage() {
 	const filtered = await database.orders.getAll({
 		where: x => x.lines.all(x => x.order( x => x.customerId.equal('d'))),
 		customer: {
-			where: x => x.name.equal('John Doe')
+			where: x => x .name.equal('John Doe')
 		}
 	});
+
 
 	const filtered2 = await database.orders.getById('dd',{
 		where: x => x.lines.all(x => x.order( x => x.customerId.equal('d'))),
@@ -205,6 +209,10 @@ async function exampleUsage() {
 	});
 
 	console.log('Deep nested fetch (orders → lines → packages):', deepFetch);
+
+	const composite = await database.orderLines.getById({orderId: 1, productId: 2}, {
+		quantity: true});
+
 }
 
 exampleUsage().catch(console.error);
