@@ -12,8 +12,13 @@
 export type ORMColumnType = 'string' | 'bigint' | 'uuid' | 'date' | 'numeric';
 
 /** Convert each ORMColumnType to its corresponding TS type. */
-type ColumnTypeToTS<CT extends ORMColumnType> =
-  CT extends 'numeric' ? number : string;
+type ColumnTypeToTS<CT> =
+  CT extends { type: infer T }
+    ? T extends ORMColumnType
+      ? ColumnTypeToTS<T>
+      : never
+    : CT extends 'numeric' ? number : string;
+
 
 /**
  * RelationType must be one of these three string literals.
@@ -45,10 +50,16 @@ export type RelationDefinition<
 export type TableDefinition<
   Tables extends Record<string, any>
 > = {
-  columns: Record<string, ORMColumnType>;
+  columns: {
+    [columnName: string]: ORMColumnType | {
+      type: ORMColumnType;
+      notNull?: boolean;
+    }
+  };
   primaryKey: readonly (keyof any)[];
   relations?: Record<string, RelationDefinition<Tables>>;
 };
+
 
 /**
  * Recursively expand any nested object/array into a plain‐object type.
@@ -257,6 +268,10 @@ type SelectedColumns<
         : Exclude<keyof M[K]['columns'], FalseKeys<M, K, FS>>)
     : TrueKeys<M, K, FS];
 
+  type IsRequired<CT> =
+  CT extends { notNull: true } ? true : false;
+
+
 /**
  * Selection<M,K,FS> = returned shape for table K given FS:
  * 1) Columns chosen by SelectedColumns<…> with TS types.  
@@ -271,8 +286,16 @@ export type Selection<
   K extends keyof M,
   FS extends Record<string, any>
 > =
-  // 1) Map selected columns
-  { [C in SelectedColumns<M, K, FS>]: ColumnTypeToTS<M[K]['columns'][C]> } &
+  // 1) Columns: split into required and optional based on notNull
+  {
+    [C in SelectedColumns<M, K, FS> as
+      IsRequired<M[K]['columns'][C]> extends true ? C : never
+    ]: ColumnTypeToTS<M[K]['columns'][C]>;
+  } & {
+    [C in SelectedColumns<M, K, FS> as
+      IsRequired<M[K]['columns'][C]> extends true ? never : C
+    ]?: ColumnTypeToTS<M[K]['columns'][C]>;
+  } &
   // 2) Map relations
   (
     M[K] extends { relations: infer R }

@@ -194,7 +194,7 @@ async function exampleUsage() {
 
 
 	const filtered = await database.orders.getAll({
-		where: x => x.lines.all(x => x.order( x => x.customerId.equal('d'))),
+		where: x => x.lines.all(x => x.order.lines.packages.all(x => x.id.equal('1'))),
 		customer: {
 			where: x => x .name.equal('John Doe')
 		}
@@ -212,6 +212,8 @@ async function exampleUsage() {
 
 	const composite = await database.orderLines.getById({orderId: '1', productId: '2'}, {
 		quantity: true});
+
+	const customer = await database.customers.getById('a1b2c3d4-uuid');
 
 }
 
