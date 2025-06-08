@@ -134,21 +134,20 @@ export type Selection<M extends Record<string, TableDefinition<M>>, K extends ke
       : {}
   );
 
-export type PrimaryKeyOf<M extends Record<string, TableDefinition<M>>, K extends keyof M> =
-  M[K]['primaryKey'] extends readonly [infer Single]
-    ? Single extends keyof M[K]['columns']
-      ? ColumnTypeToTS<M[K]['columns'][Single]>
-      : never
-    : {
-        [P in Extract<M[K]['primaryKey'][number], keyof M[K]['columns']>]: ColumnTypeToTS<M[K]['columns'][P]>;
-      };
+export type PrimaryKeyArgs<M extends Record<string, TableDefinition<M>>, K extends keyof M> =
+  M[K]['primaryKey'] extends readonly [infer A extends keyof M[K]['columns']] ? [key1: ColumnTypeToTS<M[K]['columns'][A]>] :
+  M[K]['primaryKey'] extends readonly [infer A extends keyof M[K]['columns'], infer B extends keyof M[K]['columns']] ? [key1: ColumnTypeToTS<M[K]['columns'][A]>, key2: ColumnTypeToTS<M[K]['columns'][B]>] :
+  M[K]['primaryKey'] extends readonly [infer A extends keyof M[K]['columns'], infer B, infer C] ? [key1: any, key2: any, key3: any] :
+  M[K]['primaryKey'] extends readonly [infer A, infer B, infer C, infer D] ? [key1: any, key2: any, key3: any, key4: any] :
+  M[K]['primaryKey'] extends readonly [infer A, infer B, infer C, infer D, infer E] ? [key1: any, key2: any, key3: any, key4: any, key5: any] :
+  M[K]['primaryKey'] extends readonly [infer A, infer B, infer C, infer D, infer E, infer F] ? [key1: any, key2: any, key3: any, key4: any, key5: any, key6: any] :
+  never;
 
 export type TableClient<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
   getAll(): Promise<Array<DeepExpand<Selection<M, K, {}>>>>;
-  getAll<FS extends FetchStrategy<M, K>>(fetchStrategy: FS): Promise<Array<DeepExpand<Selection<M, K, FS>>>>;
+  getAll<strategy extends FetchStrategy<M, K>>(strategy: strategy): Promise<Array<DeepExpand<Selection<M, K, strategy>>>>;
 
-  getById(id: PrimaryKeyOf<M, K>): Promise<DeepExpand<Selection<M, K, {}>> | null>;
-  getById<FS extends FetchStrategy<M, K>>(id: PrimaryKeyOf<M, K>, fetchStrategy: FS): Promise<DeepExpand<Selection<M, K, FS>> | null>;
+  getById(...args: [...PrimaryKeyArgs<M, K>, strategy?: FetchStrategy<M, K>]): Promise<DeepExpand<Selection<M, K, FetchStrategy<M, K>>> | null>;
 };
 
 export type DBClient<M extends Record<string, TableDefinition<M>>> = {
