@@ -147,7 +147,11 @@ export type TableClient<M extends Record<string, TableDefinition<M>>, K extends 
   getAll(): Promise<Array<DeepExpand<Selection<M, K, {}>>>>;
   getAll<strategy extends FetchStrategy<M, K>>(strategy: strategy): Promise<Array<DeepExpand<Selection<M, K, strategy>>>>;
 
-  getById(...args: [...PrimaryKeyArgs<M, K>, strategy?: FetchStrategy<M, K>]): Promise<DeepExpand<Selection<M, K, FetchStrategy<M, K>>> | null>;
+  // getById(...args: [...PrimaryKeyArgs<M, K>, strategy?: FetchStrategy<M, K>]): Promise<DeepExpand<Selection<M, K, FetchStrategy<M, K>>> | null>;
+   getById<strategy extends FetchStrategy<M, K>>(
+    ...args: [...PrimaryKeyArgs<M, K>, strategy?: strategy]
+  ): Promise<DeepExpand<Selection<M, K, strategy>> | null>;
+
 };
 
 export type DBClient<M extends Record<string, TableDefinition<M>>> = {
