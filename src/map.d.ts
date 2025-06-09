@@ -1808,7 +1808,8 @@ type TableSchema<T> = {
   columns: {
     [K in keyof T as T[K] extends ColumnSymbols ? K : never]: ColumnToSchemaType<T[K]>;
   };
-  primaryKey: Extract<keyof ExtractPrimary<T>, string>[];
+  primaryKey: ExtractPrimaryKeyNames<T>;
+
   relations?: {
     [K in keyof T as T[K] extends RelatedTable | ManyRelation ? K : never]:
       T[K] extends ManyRelation
@@ -1818,6 +1819,12 @@ type TableSchema<T> = {
           : never;
   };
 };
+
+type ExtractPrimaryKeyNames<T> =
+  UnionToTuple<{ [K in keyof T]: T[K] extends IsPrimary ? K : never }[keyof T]> extends infer R
+    ? R extends string[] ? R : []
+    : [];
+
 
 type RelationTarget<T> =
   T extends { __tableAlias: infer S } ? Extract<S, string> : string;
