@@ -7,9 +7,10 @@
 export const schema = {
 	customers: {
 		columns: {
-			id: 'uuid',
-			name: 'string',
+			id: { type: 'uuid', notNull: true },
+			name: {type: 'string'},
 			email: 'string',
+			isActive: 'boolean',
 			defaultAddressId: 'uuid'
 		},
 		primaryKey: ['id'] as const,
@@ -70,7 +71,7 @@ export const schema = {
 	orderLines: {
 		columns: {
 			orderId: 'uuid',
-			productId: 'uuid',
+			productId: 'numeric',
 			quantity: 'numeric',
 			price: 'numeric'
 		},
@@ -93,7 +94,7 @@ export const schema = {
 		columns: {
 			id: 'uuid',
 			orderLineOrderId: 'uuid',
-			orderLineProductId: 'uuid',
+			orderLineProductId: 'numeric',
 			weight: 'numeric',
 			shippedAt: 'date'
 		},

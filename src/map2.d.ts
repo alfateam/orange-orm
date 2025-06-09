@@ -1,4 +1,4 @@
-export type ORMColumnType = 'string' | 'bigint' | 'uuid' | 'date' | 'numeric';
+export type ORMColumnType = 'string' | 'bigint' | 'uuid' | 'date' | 'numeric' | 'boolean';
 
 type NormalizeColumn<T> =
   T extends ORMColumnType ? { type: T; notNull?: false } :
@@ -8,7 +8,9 @@ type NormalizeColumn<T> =
 type IsRequired<CT> = NormalizeColumn<CT>['notNull'] extends true ? true : false;
 
 type ColumnTypeToTS<CT> =
-  NormalizeColumn<CT>['type'] extends 'numeric' ? number : string;
+  NormalizeColumn<CT>['type'] extends 'numeric' ? number :
+  NormalizeColumn<CT>['type'] extends 'boolean' ? boolean :
+  string;
 
 export type RelationType = 'hasMany' | 'hasOne' | 'references';
 
@@ -148,14 +150,12 @@ export type PrimaryKeyArgs<M extends Record<string, TableDefinition<M>>, K exten
   : M[K]['primaryKey'] extends readonly [infer A extends keyof M[K]['columns'], infer B extends keyof M[K]['columns'], infer C extends keyof M[K]['columns'], infer D extends keyof M[K]['columns'], infer E extends keyof M[K]['columns'], infer F extends keyof M[K]['columns']]
     ? [key1: ColumnTypeToTS<M[K]['columns'][A]>, key2: ColumnTypeToTS<M[K]['columns'][B]>, key3: ColumnTypeToTS<M[K]['columns'][C]>, key4: ColumnTypeToTS<M[K]['columns'][D]>, key5: ColumnTypeToTS<M[K]['columns'][E]>, key6: ColumnTypeToTS<M[K]['columns'][F]>]
   : never;
-never;
 
 export type TableClient<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
   getAll(): Promise<Array<DeepExpand<Selection<M, K, {}>>>>;
   getAll<strategy extends FetchStrategy<M, K>>(strategy: strategy): Promise<Array<DeepExpand<Selection<M, K, strategy>>>>;
 
-  // getById(...args: [...PrimaryKeyArgs<M, K>, strategy?: FetchStrategy<M, K>]): Promise<DeepExpand<Selection<M, K, FetchStrategy<M, K>>> | null>;
-   getById<strategy extends FetchStrategy<M, K>>(
+  getById<strategy extends FetchStrategy<M, K>>(
     ...args: [...PrimaryKeyArgs<M, K>, strategy?: strategy]
   ): Promise<DeepExpand<Selection<M, K, strategy>> | null>;
 

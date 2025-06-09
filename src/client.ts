@@ -128,7 +128,7 @@ async function exampleUsage() {
 	// 10) Composite‐key getById example: fetch a single orderLine, include only quantity + price, and include its packages (only weight & shippedAt):
 
 	const lineKey = { orderId: 'z9y8x7w6-uuid', productId: 'p1q2r3-uuid' };
-	const singleLine = await database.orderLines.getById(lineKey, {
+	const singleLine = await database.orderLines.getById('foo', 1, {
 		quantity: true,
 		price: true,
 		packages: {
@@ -178,10 +178,10 @@ async function exampleUsage() {
 	const exists = database.customers.orders.exists();
 
 
-	const filter2 = database.orders.lines.productId.equal('p1q2r3-uuid');
-	const filter3 = database.orders.lines.any(x => x.productId.equal('p1q2r3-uuid'));
-	const filter4 = database.orders.lines.all(x => x.productId.equal('p1q2r3-uuid'));
-	const filter5 = database.orders.lines.none(x => x.productId.equal('p1q2r3-uuid'));
+	const filter2 = database.orders.lines.productId.equal(1);
+	const filter3 = database.orders.lines.any(x => x.productId.equal(1));
+	const filter4 = database.orders.lines.all(x => x.productId.equal(1));
+	const filter5 = database.orders.lines.none(x => x.productId.equal(1));
 
 	const filter6 = database.orders.lines.none(x =>  x.packages.any(y => y.orderLine.price.equal(undefined)));
 
@@ -212,8 +212,9 @@ async function exampleUsage() {
 
 	console.log('Deep nested fetch (orders → lines → packages):', deepFetch);
 
-	const composite = await database.orderLines.getById({orderId: '1', productId: '2'}, {
-		quantity: true});
+	const composite = await database.orderLines.getById('1', 2, {
+		quantity: true}
+	);
 
 	const customer = await database.customers.getById('a1b2c3d4-uuid');
 
