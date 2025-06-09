@@ -195,24 +195,40 @@ async function exampleUsage() {
 	const filtered = await database.orders.getAll({
 		where: x => x.lines.all(x => x.order.lines.packages.all(x => x.id.equal(null))),
 		customer: {
+			defaultAddress: true,
+			orders: {
+				deliveryAddress: true,
+				customer: {},
+				lines: {
+					packages: true
+				}
+			},
 			where: x => x .name.equal('John Doe')
-		}
+		},
+		lines: {
+			packages: {
+
+			}
+		},
 	});
+
+	const lines = filtered[0].customer?.orders[0].lines[0];
 
 
 	const filtered2 = await database.orders.getById('dd',{
 		where: x => x.lines.all(x => x.order( x => x.customerId.equal('d'))),
 		customer: {
-			where: x => x.name.equal('John Doe')
+			// where: x => x.name.equal('John Doe')
 		}
 	});
 	filtered2.id = null;
-	filtered2.customer.email =  '';
+	filtered2.
 
-	console.log('Deep nested fetch (orders → lines → packages):', deepFetch);
+		console.log('Deep nested fetch (orders → lines → packages):', deepFetch);
 
 	const composite = await database.orderLines.getById('1', 2, {
-		quantity: true}
+		quantity: true,
+		order:true}
 	);
 
 	const customer = await database.customers.getById('a1b2c3d4-uuid');

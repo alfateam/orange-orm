@@ -114,21 +114,49 @@ type RequiredColumnKeys<M extends Record<string, TableDefinition<M>>, K extends 
 type OptionalColumnKeys<M extends Record<string, TableDefinition<M>>, K extends keyof M, FS extends Record<string, any>> =
   Exclude<SelectedColumns<M, K, FS>, RequiredColumnKeys<M, K, FS>>;
 
-export type Selection<M extends Record<string, TableDefinition<M>>, K extends keyof M, FS extends Record<string, any>> =
+export type Selection<
+  M extends Record<string, TableDefinition<M>>,
+  K extends keyof M,
+  FS extends Record<string, any>
+> =
+  // required columns
   {
     [C in RequiredColumnKeys<M, K, FS>]: ColumnTypeToTS<M[K]['columns'][C]>;
-  } & {
+  } &
+
+  // optional columns
+  {
     [C in OptionalColumnKeys<M, K, FS>]?: ColumnTypeToTS<M[K]['columns'][C]>;
-  } & (
+  } &
+
+  // relations block
+  (
     M[K] extends { relations: infer R }
       ? {
-          [RName in Extract<keyof FS, keyof R> as FS[RName] extends false ? never : RName]?: (
-            R[RName] extends RelationDefinition<M>
-              ? R[RName]['type'] extends 'hasMany'
-                ? Array<DeepExpand<Selection<M, R[RName]['target'], FS[RName] extends true ? {} : Extract<FS[RName], Record<string, any>>>>>
-                : DeepExpand<Selection<M, R[RName]['target'], FS[RName] extends true ? {} : Extract<FS[RName], Record<string, any>>>> | null
-              : never
-          );
+          // hasMany: required
+          [RName in keyof R & keyof FS as
+            R[RName] extends { type: 'hasMany' } ? RName : never
+          ]:
+            R[RName] extends { target: infer Target extends keyof M }
+              ? FS[RName] extends true
+                ? Array<DeepExpand<Selection<M, Target, {}>>>
+                : FS[RName] extends Record<string, any>
+                  ? Array<DeepExpand<Selection<M, Target, FS[RName]>>>
+                  : never
+              : never;
+
+        } & {
+          // hasOne | references: optional
+          [RName in keyof R & keyof FS as
+            R[RName] extends { type: 'hasOne' | 'references' } ? RName : never
+          ]?:
+            R[RName] extends { target: infer Target extends keyof M }
+              ? FS[RName] extends true
+                ? DeepExpand<Selection<M, Target, {}>> | null
+                : FS[RName] extends Record<string, any>
+                  ? DeepExpand<Selection<M, Target, FS[RName]>> | null
+                  : never
+              : never;
         }
       : {}
   );
