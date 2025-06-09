@@ -12,12 +12,10 @@ export type Schema = {
       orders: {
         type: 'hasMany';
         target: 'orders';
-        fkColumns: ['customerId'];
       };
       defaultAddress: {
         type: 'hasOne';
         target: 'deliveryAddresses';
-        fkColumns: ['defaultAddressId'];
       };
     };
   };
@@ -46,17 +44,14 @@ export type Schema = {
       customer: {
         type: 'references';
         target: 'customers';
-        fkColumns: ['customerId'];
       };
       lines: {
         type: 'hasMany';
         target: 'orderLines';
-        fkColumns: ['orderId'];
       };
       deliveryAddress: {
         type: 'hasOne';
         target: 'deliveryAddresses';
-        fkColumns: ['deliveryAddressId'];
       };
     };
   };
@@ -73,12 +68,10 @@ export type Schema = {
       order: {
         type: 'references';
         target: 'orders';
-        fkColumns: ['orderId'];
       };
       packages: {
         type: 'hasMany';
         target: 'packages';
-        fkColumns: ['orderLineOrderId', 'orderLineProductId'];
       };
     };
   };
@@ -96,7 +89,6 @@ export type Schema = {
       orderLine: {
         type: 'references';
         target: 'orderLines';
-        fkColumns: ['orderLineOrderId', 'orderLineProductId'];
       };
     };
   };
