@@ -1,10 +1,10 @@
 // client.ts
 
 import { db } from './map2';
-import { schema } from './schema';
+import type { Schema } from './schema';
 
 // Initialize the client
-const database = db(schema);
+const database = db<Schema>();
 
 async function exampleUsage() {
 	// 1) Simple getAll without any fetch strategy → returns all columns for each row
@@ -127,7 +127,6 @@ async function exampleUsage() {
 
 	// 10) Composite‐key getById example: fetch a single orderLine, include only quantity + price, and include its packages (only weight & shippedAt):
 
-	const lineKey = { orderId: 'z9y8x7w6-uuid', productId: 'p1q2r3-uuid' };
 	const singleLine = await database.orderLines.getById('foo', 1, {
 		quantity: true,
 		price: true,

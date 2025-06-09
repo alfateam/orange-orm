@@ -170,7 +170,7 @@ export type DBClient<M extends Record<string, TableDefinition<M>>> = {
   not(f: BooleanFilterType): BooleanFilterType;
 };
 
-export function db<M extends Record<string, TableDefinition<M>>>(schema: M): DBClient<M>;
+export function db<M extends Record<string, TableDefinition<M>>>(): DBClient<M>;
 
 export type DeepExpand<T> =
   T extends Array<infer U>
