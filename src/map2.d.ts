@@ -135,13 +135,20 @@ export type Selection<M extends Record<string, TableDefinition<M>>, K extends ke
   );
 
 export type PrimaryKeyArgs<M extends Record<string, TableDefinition<M>>, K extends keyof M> =
-  M[K]['primaryKey'] extends readonly [infer A extends keyof M[K]['columns']] ? [key1: ColumnTypeToTS<M[K]['columns'][A]>] :
-  M[K]['primaryKey'] extends readonly [infer A extends keyof M[K]['columns'], infer B extends keyof M[K]['columns']] ? [key1: ColumnTypeToTS<M[K]['columns'][A]>, key2: ColumnTypeToTS<M[K]['columns'][B]>] :
-  M[K]['primaryKey'] extends readonly [infer A extends keyof M[K]['columns'], infer B, infer C] ? [key1: any, key2: any, key3: any] :
-  M[K]['primaryKey'] extends readonly [infer A, infer B, infer C, infer D] ? [key1: any, key2: any, key3: any, key4: any] :
-  M[K]['primaryKey'] extends readonly [infer A, infer B, infer C, infer D, infer E] ? [key1: any, key2: any, key3: any, key4: any, key5: any] :
-  M[K]['primaryKey'] extends readonly [infer A, infer B, infer C, infer D, infer E, infer F] ? [key1: any, key2: any, key3: any, key4: any, key5: any, key6: any] :
-  never;
+  M[K]['primaryKey'] extends readonly [infer A extends keyof M[K]['columns']]
+    ? [key1: ColumnTypeToTS<M[K]['columns'][A]>]
+  : M[K]['primaryKey'] extends readonly [infer A extends keyof M[K]['columns'], infer B extends keyof M[K]['columns']]
+    ? [key1: ColumnTypeToTS<M[K]['columns'][A]>, key2: ColumnTypeToTS<M[K]['columns'][B]>]
+  : M[K]['primaryKey'] extends readonly [infer A extends keyof M[K]['columns'], infer B extends keyof M[K]['columns'], infer C extends keyof M[K]['columns']]
+    ? [key1: ColumnTypeToTS<M[K]['columns'][A]>, key2: ColumnTypeToTS<M[K]['columns'][B]>, key3: ColumnTypeToTS<M[K]['columns'][C]>]
+  : M[K]['primaryKey'] extends readonly [infer A extends keyof M[K]['columns'], infer B extends keyof M[K]['columns'], infer C extends keyof M[K]['columns'], infer D extends keyof M[K]['columns']]
+    ? [key1: ColumnTypeToTS<M[K]['columns'][A]>, key2: ColumnTypeToTS<M[K]['columns'][B]>, key3: ColumnTypeToTS<M[K]['columns'][C]>, key4: ColumnTypeToTS<M[K]['columns'][D]>]
+  : M[K]['primaryKey'] extends readonly [infer A extends keyof M[K]['columns'], infer B extends keyof M[K]['columns'], infer C extends keyof M[K]['columns'], infer D extends keyof M[K]['columns'], infer E extends keyof M[K]['columns']]
+    ? [key1: ColumnTypeToTS<M[K]['columns'][A]>, key2: ColumnTypeToTS<M[K]['columns'][B]>, key3: ColumnTypeToTS<M[K]['columns'][C]>, key4: ColumnTypeToTS<M[K]['columns'][D]>, key5: ColumnTypeToTS<M[K]['columns'][E]>]
+  : M[K]['primaryKey'] extends readonly [infer A extends keyof M[K]['columns'], infer B extends keyof M[K]['columns'], infer C extends keyof M[K]['columns'], infer D extends keyof M[K]['columns'], infer E extends keyof M[K]['columns'], infer F extends keyof M[K]['columns']]
+    ? [key1: ColumnTypeToTS<M[K]['columns'][A]>, key2: ColumnTypeToTS<M[K]['columns'][B]>, key3: ColumnTypeToTS<M[K]['columns'][C]>, key4: ColumnTypeToTS<M[K]['columns'][D]>, key5: ColumnTypeToTS<M[K]['columns'][E]>, key6: ColumnTypeToTS<M[K]['columns'][F]>]
+  : never;
+never;
 
 export type TableClient<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
   getAll(): Promise<Array<DeepExpand<Selection<M, K, {}>>>>;
