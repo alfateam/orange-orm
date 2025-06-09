@@ -10,20 +10,17 @@ type IsRequired<CT> = NormalizeColumn<CT>['notNull'] extends true ? true : false
 type ColumnTypeToTS<CT> =
   NormalizeColumn<CT>['type'] extends 'numeric' ? number :
   NormalizeColumn<CT>['type'] extends 'boolean' ? boolean :
-  string;
-
+  string
 export type RelationType = 'hasMany' | 'hasOne' | 'references';
 
 export type RelationDefinition<Tables extends Record<string, any>> = {
   type: RelationType;
   target: keyof Tables;
-  fkColumns: readonly (keyof any)[];
 };
 
 export type TableDefinition<Tables extends Record<string, any>> = {
   columns: Record<string, ORMColumnType | { type: ORMColumnType; notNull?: boolean }>;
   primaryKey: readonly (keyof any)[];
-  relations?: Record<string, RelationDefinition<Tables>>;
 };
 
 export interface BooleanFilterType {

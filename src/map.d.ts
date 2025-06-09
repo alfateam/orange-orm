@@ -5,12 +5,6 @@ import type { D1Database } from '@cloudflare/workers-types';
 import type { PoolAttributes } from 'oracledb';
 import type { AxiosInterceptorManager, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 
-export type MappedDbDef<T> = {
-	map<V extends AllowedDbMap<V>>(
-	  callback: (mapper: DbMapper<T>) => V
-	): MappedDbDef<MergeProperties<T, V>>;
-	<O extends DbOptions<T>>(concurrency: O): NegotiateDbInstance<T, O>;
-  } & T & DbConnectable<T>;
 
 
 //todo
@@ -1801,3 +1795,53 @@ type Increment<C extends number> = C extends 0
 type TableAlias<Alias> = {
 	__tableAlias: Alias;
   };
+
+
+
+export type SchemaFromMappedDb<T> = {
+  [K in keyof T]: T[K] extends MappedTableDef<infer Def>
+    ? TableSchema<Def>
+    : never;
+};
+
+type TableSchema<T> = {
+  columns: {
+    [K in keyof T as T[K] extends ColumnSymbols ? K : never]: ColumnToSchemaType<T[K]>;
+  };
+  primaryKey: Extract<keyof ExtractPrimary<T>, string>[];
+  relations?: {
+    [K in keyof T as T[K] extends RelatedTable | ManyRelation ? K : never]:
+      T[K] extends ManyRelation
+        ? { type: 'hasMany'; target: RelationTarget<T[K]> }
+        : T[K] extends RelatedTable
+          ? { type: 'hasOne'; target: RelationTarget<T[K]> }
+          : never;
+  };
+};
+
+type RelationTarget<T> =
+  T extends { __tableAlias: infer S } ? Extract<S, string> : string;
+
+type ColumnToSchemaType<T> =
+  T extends StringColumnSymbol ? 'string' :
+  T extends UuidColumnSymbol ? 'uuid' :
+  T extends NumericColumnSymbol ? 'numeric' :
+  T extends DateColumnSymbol ? 'date' :
+  T extends DateWithTimeZoneColumnSymbol ? 'date' :
+  T extends BooleanColumnSymbol ? 'boolean' :
+  T extends BinaryColumnSymbol ? 'binary' :
+  T extends JSONColumnSymbol ? 'json' :
+  never;
+
+export type MappedDbDef<T> = {
+  map<V extends AllowedDbMap<V>>(
+    callback: (mapper: DbMapper<T>) => V
+  ): MappedDbDef<MergeProperties<T, V>>;
+  <O extends DbOptions<T>>(concurrency: O): NegotiateDbInstance<T, O>;
+
+  /**
+   * Returns the schema of the mapped DB as a generic type
+   * Usage: type Schema = ReturnType<typeof db.toSchema>
+   */
+  toSchema: <U = T>() => SchemaFromMappedDb<U>;
+} & T & DbConnectable<T>;
