@@ -1,3 +1,4 @@
+//map2.d.ts
 export type ORMColumnType = 'string' | 'bigint' | 'uuid' | 'date' | 'numeric' | 'boolean';
 
 type NormalizeColumn<T> =
@@ -36,22 +37,48 @@ export interface BooleanFilterType extends RawFilter {
   not(): BooleanFilterType;
 }
 
-export interface ColumnFilterType<Val> {
+type StringOnlyMethods = {
+  startsWith(value: string | null | undefined): BooleanFilterType;
+  iStartsWith(value: string| null | undefined): BooleanFilterType;
+  endsWith(value: string| null | undefined): BooleanFilterType;
+  iEndsWith(value: string| null | undefined): BooleanFilterType;
+  contains(value: string| null | undefined): BooleanFilterType;
+  iContains(value: string| null | undefined): BooleanFilterType;
+  iEqual(value: string | null | undefined): BooleanFilterType;
+  ieq(value: string | null | undefined): BooleanFilterType;
+};
+
+export type ColumnFilterType<Val, ColumnType = any> = {
   equal(value: Val | null | undefined): BooleanFilterType;
+  eq(value: Val | null | undefined): BooleanFilterType;
   notEqual(value: Val | null | undefined): BooleanFilterType;
+  ne(value: Val | null | undefined): BooleanFilterType;
   lessThan(value: Val | null | undefined): BooleanFilterType;
-  lessThanOrEqual(value: Val | null | undefined): BooleanFilterType;
+  lt(value: Val | null | undefined): BooleanFilterType;
+  le(value: Val | null | undefined): BooleanFilterType;
   greaterThan(value: Val | null | undefined): BooleanFilterType;
+  gt(value: Val | null | undefined): BooleanFilterType;
   greaterThanOrEqual(value: Val | null | undefined): BooleanFilterType;
+  ge(value: Val | null | undefined): BooleanFilterType;
   in(values: (Val | null | undefined)[]): BooleanFilterType;
+  between(from: Val | null | undefined, to: Val | null | undefined): BooleanFilterType;
   notIn(values: (Val | null | undefined)[]): BooleanFilterType;
   isNull(): BooleanFilterType;
   isNotNull(): BooleanFilterType;
-}
+} & (ColumnType extends 'string' ? StringOnlyMethods : {});
+
 
 export type ColumnRefs<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
   [C in keyof M[K]['columns']]: ColumnFilterType<ColumnTypeToTS<M[K]['columns'][C]>>;
 };
+
+export type ColumnRefs<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
+  [C in keyof M[K]['columns']]: ColumnFilterType<
+    ColumnTypeToTS<M[K]['columns'][C]>,
+    NormalizeColumn<M[K]['columns'][C]>['type']
+  >;
+};
+
 
 export type RootTableRefs<M extends Record<string, TableDefinition<M>>, Target extends keyof M> =
   ColumnRefs<M, Target> & RelationRefs<M, Target>;
