@@ -1,3 +1,8 @@
+interface Foo {
+  bar: string;
+  baz: number;
+}
+
 export type Schema = {
   customers: {
     columns: {
@@ -5,6 +10,7 @@ export type Schema = {
       name: { type: 'string' };
       email: 'string';
       isActive: 'boolean';
+      customType: { type: 'json'; tsType: Foo; };
       defaultAddressId: 'uuid';
     };
     primaryKey: ['id'];

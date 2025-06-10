@@ -1,9 +1,10 @@
 //map2.d.ts
-export type ORMColumnType = 'string' | 'bigint' | 'uuid' | 'date' | 'numeric' | 'boolean';
+export type ORMColumnType = 'string' | 'bigint' | 'uuid' | 'date' | 'numeric' | 'boolean' | 'json';
 
 type NormalizeColumn<T> =
   T extends ORMColumnType ? { type: T; notNull?: false } :
   T extends { type: ORMColumnType } ? T :
+  T extends { type: 'json'; tsType: any } ? T :
   never;
 
 type IsRequired<CT> = NormalizeColumn<CT>['notNull'] extends true ? true : false;
@@ -11,6 +12,8 @@ type IsRequired<CT> = NormalizeColumn<CT>['notNull'] extends true ? true : false
 type ColumnTypeToTS<CT> =
   NormalizeColumn<CT>['type'] extends 'numeric' ? number :
   NormalizeColumn<CT>['type'] extends 'boolean' ? boolean :
+  NormalizeColumn<CT>['type'] extends 'json' ? NormalizeColumn<CT>['tsType'] :
+  NormalizeColumn<CT>['type'] extends 'date' ? (string | Date) :
   string;
 
 export type RelationType = 'hasMany' | 'hasOne' | 'references';
@@ -39,11 +42,11 @@ export interface BooleanFilterType extends RawFilter {
 
 type StringOnlyMethods = {
   startsWith(value: string | null | undefined): BooleanFilterType;
-  iStartsWith(value: string| null | undefined): BooleanFilterType;
-  endsWith(value: string| null | undefined): BooleanFilterType;
-  iEndsWith(value: string| null | undefined): BooleanFilterType;
-  contains(value: string| null | undefined): BooleanFilterType;
-  iContains(value: string| null | undefined): BooleanFilterType;
+  iStartsWith(value: string | null | undefined): BooleanFilterType;
+  endsWith(value: string | null | undefined): BooleanFilterType;
+  iEndsWith(value: string | null | undefined): BooleanFilterType;
+  contains(value: string | null | undefined): BooleanFilterType;
+  iContains(value: string | null | undefined): BooleanFilterType;
   iEqual(value: string | null | undefined): BooleanFilterType;
   ieq(value: string | null | undefined): BooleanFilterType;
 };
@@ -67,10 +70,15 @@ export type ColumnFilterType<Val, ColumnType = any> = {
   isNotNull(): BooleanFilterType;
 } & (ColumnType extends 'string' ? StringOnlyMethods : {});
 
+export type JsonArray = Array<JsonValue>;
+export type JsonObject = { [key: string]: JsonValue };
+export type JsonValue = string | number | boolean | null | JsonArray | JsonObject;
 
-export type ColumnRefs<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
-  [C in keyof M[K]['columns']]: ColumnFilterType<ColumnTypeToTS<M[K]['columns'][C]>>;
-};
+export type DeepExpand<T> =
+  T extends Date ? T :
+  T extends Array<infer U> ? Array<DeepExpand<U>> :
+  T extends object ? { [K in keyof T]: DeepExpand<T[K]> } :
+  T;
 
 export type ColumnRefs<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
   [C in keyof M[K]['columns']]: ColumnFilterType<
@@ -206,9 +214,16 @@ export type TableClient<M extends Record<string, TableDefinition<M>>, K extends 
   getAll<strategy extends FetchStrategy<M, K>>(strategy: strategy): Promise<Array<DeepExpand<Selection<M, K, strategy>>>>;
 
   getById<strategy extends FetchStrategy<M, K>>(
-    ...args: [...PrimaryKeyArgs<M, K>, strategy?: strategy]
+    ...args: [...PrimaryKeyArgs<M, K>, strategy: strategy]
   ): Promise<DeepExpand<Selection<M, K, strategy>> | null>;
+
+  getById(
+    ...args: [...PrimaryKeyArgs<M, K>]
+  ): Promise<DeepExpand<Selection<M, K, {}>> | null>;
+
 };
+
+
 
 export type DBClient<M extends Record<string, TableDefinition<M>>> = {
   [TableName in keyof M]: RootTableRefs<M, TableName> & TableClient<M, TableName>;
