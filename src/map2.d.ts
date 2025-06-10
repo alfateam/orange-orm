@@ -1,5 +1,5 @@
 //map2.d.ts
-export type ORMColumnType = 'string' | 'bigint' | 'uuid' | 'date' | 'numeric' | 'boolean' | 'json';
+export type ORMColumnType = 'string' | 'bigint' | 'uuid' | 'date' | 'numeric' | 'boolean' | 'json' | 'binary';
 
 type NormalizeColumn<T> =
   T extends ORMColumnType ? { type: T; notNull?: false } :
