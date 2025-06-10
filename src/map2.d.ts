@@ -10,7 +10,8 @@ type IsRequired<CT> = NormalizeColumn<CT>['notNull'] extends true ? true : false
 type ColumnTypeToTS<CT> =
   NormalizeColumn<CT>['type'] extends 'numeric' ? number :
   NormalizeColumn<CT>['type'] extends 'boolean' ? boolean :
-  string
+  string;
+
 export type RelationType = 'hasMany' | 'hasOne' | 'references';
 
 export type RelationDefinition<Tables extends Record<string, any>> = {
@@ -21,11 +22,17 @@ export type RelationDefinition<Tables extends Record<string, any>> = {
 export type TableDefinition<Tables extends Record<string, any>> = {
   columns: Record<string, ORMColumnType | { type: ORMColumnType; notNull?: boolean }>;
   primaryKey: readonly (keyof any)[];
+  relations?: Record<string, RelationDefinition<Tables>>;
 };
 
-export interface BooleanFilterType {
-  and(other: BooleanFilterType): BooleanFilterType;
-  or(other: BooleanFilterType): BooleanFilterType;
+export interface RawFilter {
+  sql: string | (() => string);
+  parameters?: any[];
+}
+
+export interface BooleanFilterType extends RawFilter {
+  and(other: BooleanFilterType | RawFilter[], ...filters: RawFilter[]): BooleanFilterType;
+  or(other: BooleanFilterType | RawFilter[], ...filters: RawFilter[]): BooleanFilterType;
   not(): BooleanFilterType;
 }
 
@@ -42,34 +49,36 @@ export interface ColumnFilterType<Val> {
   isNotNull(): BooleanFilterType;
 }
 
-export type TableRefs<M extends Record<string, TableDefinition<M>>, Target extends keyof M> =
-  ColumnRefs<M, Target> &
-  RelationRefs<M, Target> & {
+export type ColumnRefs<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
+  [C in keyof M[K]['columns']]: ColumnFilterType<ColumnTypeToTS<M[K]['columns'][C]>>;
+};
+
+export type RootTableRefs<M extends Record<string, TableDefinition<M>>, Target extends keyof M> =
+  ColumnRefs<M, Target> & RelationRefs<M, Target>;
+
+export type RelationTableRefs<M extends Record<string, TableDefinition<M>>, Target extends keyof M> =
+  ColumnRefs<M, Target> & RelationRefs<M, Target> & {
     exists(): BooleanFilterType;
   };
 
 export type HasManyRelationFilter<M extends Record<string, TableDefinition<M>>, Target extends keyof M> = {
-  any(predicate: (row: TableRefs<M, Target>) => BooleanFilterType): BooleanFilterType;
-  all(predicate: (row: TableRefs<M, Target>) => BooleanFilterType): BooleanFilterType;
-  none(predicate: (row: TableRefs<M, Target>) => BooleanFilterType): BooleanFilterType;
+  any(predicate: (row: RelationTableRefs<M, Target>) => BooleanFilterType): BooleanFilterType;
+  all(predicate: (row: RelationTableRefs<M, Target>) => BooleanFilterType): BooleanFilterType;
+  none(predicate: (row: RelationTableRefs<M, Target>) => BooleanFilterType): BooleanFilterType;
   exists(): BooleanFilterType;
 };
 
 export type FilterableSingleRelation<M extends Record<string, TableDefinition<M>>, Target extends keyof M> =
-  TableRefs<M, Target> & {
-    (predicate: (row: TableRefs<M, Target>) => BooleanFilterType): BooleanFilterType;
+  RelationTableRefs<M, Target> & {
+    (predicate: (row: RelationTableRefs<M, Target>) => BooleanFilterType): BooleanFilterType;
   };
-
-export type ColumnRefs<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
-  [C in keyof M[K]['columns']]: ColumnFilterType<ColumnTypeToTS<M[K]['columns'][C]>>;
-};
 
 export type RelationRefs<M extends Record<string, TableDefinition<M>>, K extends keyof M> =
   M[K] extends { relations: infer R }
     ? {
         [RName in keyof R]: R[RName] extends RelationDefinition<M>
           ? R[RName]['type'] extends 'hasMany'
-            ? HasManyRelationFilter<M, R[RName]['target']> & TableRefs<M, R[RName]['target']>
+            ? HasManyRelationFilter<M, R[RName]['target']> & RelationTableRefs<M, R[RName]['target']>
             : R[RName]['type'] extends 'hasOne' | 'references'
               ? FilterableSingleRelation<M, R[RName]['target']>
               : never
@@ -85,7 +94,7 @@ export type OrderBy<M extends Record<string, TableDefinition<M>>, K extends keyo
 
 export type FetchStrategy<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
   orderBy?: OrderBy<M, K>;
-  where?: (row: TableRefs<M, K>) => BooleanFilterType;
+  where?: (row: RootTableRefs<M, K>) => BooleanFilterType;
 } & Partial<Record<keyof M[K]['columns'], boolean>> & (
   M[K] extends { relations: infer R }
     ? { [RName in keyof R]?: true | false | FetchStrategy<M, R[RName]['target']> }
@@ -118,48 +127,37 @@ export type Selection<
   M extends Record<string, TableDefinition<M>>,
   K extends keyof M,
   FS extends Record<string, any>
-> =
-  // required columns
-  {
-    [C in RequiredColumnKeys<M, K, FS>]: ColumnTypeToTS<M[K]['columns'][C]>;
-  } &
-
-  // optional columns
-  {
-    [C in OptionalColumnKeys<M, K, FS>]?: ColumnTypeToTS<M[K]['columns'][C]>;
-  } &
-
-  // relations block
-  (
-    M[K] extends { relations: infer R }
-      ? {
-          // hasMany: required
-          [RName in keyof R & keyof FS as
-            R[RName] extends { type: 'hasMany' } ? RName : never
-          ]:
-            R[RName] extends { target: infer Target extends keyof M }
-              ? FS[RName] extends true
-                ? Array<DeepExpand<Selection<M, Target, {}>>>
-                : FS[RName] extends Record<string, any>
-                  ? Array<DeepExpand<Selection<M, Target, FS[RName]>>>
-                  : never
-              : never;
-
-        } & {
-          // hasOne | references: optional
-          [RName in keyof R & keyof FS as
-            R[RName] extends { type: 'hasOne' | 'references' } ? RName : never
-          ]?:
-            R[RName] extends { target: infer Target extends keyof M }
-              ? FS[RName] extends true
-                ? DeepExpand<Selection<M, Target, {}>> | null
-                : FS[RName] extends Record<string, any>
-                  ? DeepExpand<Selection<M, Target, FS[RName]>> | null
-                  : never
-              : never;
-        }
-      : {}
-  );
+> = {
+  [C in RequiredColumnKeys<M, K, FS>]: ColumnTypeToTS<M[K]['columns'][C]>;
+} & {
+  [C in OptionalColumnKeys<M, K, FS>]?: ColumnTypeToTS<M[K]['columns'][C]>;
+} & (
+  M[K] extends { relations: infer R }
+    ? {
+        [RName in keyof R & keyof FS as
+          R[RName] extends { type: 'hasMany' } ? RName : never
+        ]:
+          R[RName] extends { target: infer Target extends keyof M }
+            ? FS[RName] extends true
+              ? Array<DeepExpand<Selection<M, Target, {}>>>
+              : FS[RName] extends Record<string, any>
+                ? Array<DeepExpand<Selection<M, Target, FS[RName]>>>
+                : never
+            : never;
+      } & {
+        [RName in keyof R & keyof FS as
+          R[RName] extends { type: 'hasOne' | 'references' } ? RName : never
+        ]?:
+          R[RName] extends { target: infer Target extends keyof M }
+            ? FS[RName] extends true
+              ? DeepExpand<Selection<M, Target, {}>> | null
+              : FS[RName] extends Record<string, any>
+                ? DeepExpand<Selection<M, Target, FS[RName]>> | null
+                : never
+            : never;
+      }
+    : {}
+);
 
 export type PrimaryKeyArgs<M extends Record<string, TableDefinition<M>>, K extends keyof M> =
   M[K]['primaryKey'] extends readonly [infer A extends keyof M[K]['columns']]
@@ -183,16 +181,15 @@ export type TableClient<M extends Record<string, TableDefinition<M>>, K extends 
   getById<strategy extends FetchStrategy<M, K>>(
     ...args: [...PrimaryKeyArgs<M, K>, strategy?: strategy]
   ): Promise<DeepExpand<Selection<M, K, strategy>> | null>;
-
 };
 
 export type DBClient<M extends Record<string, TableDefinition<M>>> = {
-  [TableName in keyof M]: TableRefs<M, TableName> & TableClient<M, TableName>;
+  [TableName in keyof M]: RootTableRefs<M, TableName> & TableClient<M, TableName>;
 } & {
   filter: BooleanFilterType;
-  and(f: BooleanFilterType): BooleanFilterType;
-  or(f: BooleanFilterType): BooleanFilterType;
-  not(f: BooleanFilterType): BooleanFilterType;
+  and(f: BooleanFilterType | RawFilter[], ...filters: RawFilter[]): BooleanFilterType;
+  or(f: BooleanFilterType | RawFilter[], ...filters: RawFilter[]): BooleanFilterType;
+  not(): BooleanFilterType;
 };
 
 export function db<M extends Record<string, TableDefinition<M>>>(): DBClient<M>;
