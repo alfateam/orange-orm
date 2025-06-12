@@ -87,7 +87,6 @@ export type ColumnRefs<M extends Record<string, TableDefinition<M>>, K extends k
   >;
 };
 
-
 export type RootTableRefs<M extends Record<string, TableDefinition<M>>, Target extends keyof M> =
   ColumnRefs<M, Target> & RelationRefs<M, Target>;
 
@@ -127,14 +126,60 @@ export type OrderBy<M extends Record<string, TableDefinition<M>>, K extends keyo
   | `${Extract<keyof M[K]['columns'], string>} desc`
 >;
 
-export type FetchStrategy<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
+// Reserved property names that should not conflict with relation selectors
+type ReservedFetchStrategyProps = 'orderBy' | 'where';
+
+// Base fetch strategy properties (reserved props)
+type BaseFetchStrategy<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
   orderBy?: OrderBy<M, K>;
   where?: (row: RootTableRefs<M, K>) => BooleanFilterType;
-} & Partial<Record<keyof M[K]['columns'], boolean>> & (
+};
+
+// Column selection properties
+type ColumnSelection<M extends Record<string, TableDefinition<M>>, K extends keyof M> = 
+  Partial<Record<keyof M[K]['columns'], boolean>>;
+
+// Relation selection properties (excluding reserved names)
+type RelationSelection<M extends Record<string, TableDefinition<M>>, K extends keyof M> =
   M[K] extends { relations: infer R }
-    ? { [RName in keyof R]?: true | false | FetchStrategy<M, R[RName]['target']> }
-    : {}
-);
+    ? { 
+        [RName in keyof R as RName extends ReservedFetchStrategyProps ? never : RName]?: 
+          true | false | FetchStrategy<M, R[RName]['target']> 
+      }
+    : {};
+
+// Helper type to extract only column filter types (not relation objects)
+type AllColumnFilterTypes<M extends Record<string, TableDefinition<M>>, K extends keyof M> = 
+  ColumnRefs<M, K>[keyof ColumnRefs<M, K>];
+
+// Helper type to get column filter types from related tables
+type RelatedColumnFilterTypes<M extends Record<string, TableDefinition<M>>, K extends keyof M> = 
+  M[K] extends { relations: infer R }
+    ? {
+        [RName in keyof R]: R[RName] extends { target: infer Target extends keyof M }
+          ? ColumnRefs<M, Target>[keyof ColumnRefs<M, Target>]
+          : never;
+      }[keyof R]
+    : never;
+
+// All valid column filter types (direct columns + related table columns)
+type ValidColumnFilterTypes<M extends Record<string, TableDefinition<M>>, K extends keyof M> = 
+  AllColumnFilterTypes<M, K> | RelatedColumnFilterTypes<M, K>;
+
+// Custom selector functions - allows arbitrary property names with selector functions
+// The return type must be a ColumnFilterType that actually exists in the schema
+type CustomSelectors<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
+  [key: string]: (row: RootTableRefs<M, K>) => ValidColumnFilterTypes<M, K>;
+};
+
+// Main FetchStrategy type using union to avoid conflicts
+export type FetchStrategy<M extends Record<string, TableDefinition<M>>, K extends keyof M> = 
+  BaseFetchStrategy<M, K> & 
+  (ColumnSelection<M, K> | RelationSelection<M, K> | CustomSelectors<M, K> | 
+   (ColumnSelection<M, K> & RelationSelection<M, K>) |
+   (ColumnSelection<M, K> & CustomSelectors<M, K>) |
+   (RelationSelection<M, K> & CustomSelectors<M, K>) |
+   (ColumnSelection<M, K> & RelationSelection<M, K> & CustomSelectors<M, K>));
 
 type TrueKeys<M extends Record<string, TableDefinition<M>>, K extends keyof M, FS extends Record<string, any>> = {
   [C in keyof M[K]['columns']]: FS extends Record<C, infer B> ? (B extends true ? C : never) : never;
@@ -157,6 +202,24 @@ type RequiredColumnKeys<M extends Record<string, TableDefinition<M>>, K extends 
 
 type OptionalColumnKeys<M extends Record<string, TableDefinition<M>>, K extends keyof M, FS extends Record<string, any>> =
   Exclude<SelectedColumns<M, K, FS>, RequiredColumnKeys<M, K, FS>>;
+
+// Helper type to infer the TypeScript type from a column filter
+type InferColumnFilterTypeScript<T> = 
+  T extends ColumnFilterType<infer Val, any> ? Val : never;
+
+// Helper type to extract custom selector properties and their return types
+type CustomSelectorProperties<M extends Record<string, TableDefinition<M>>, K extends keyof M, FS extends Record<string, any>> = {
+  [P in keyof FS as 
+    P extends keyof M[K]['columns'] ? never :
+    P extends ReservedFetchStrategyProps ? never :
+    P extends (M[K] extends { relations: infer R } ? keyof R : never) ? never :
+    FS[P] extends (row: any) => any ? 
+      (InferColumnFilterTypeScript<FS[P] extends (row: RootTableRefs<M, K>) => infer ReturnType ? ReturnType : never> extends never ? never : P)
+      : never
+  ]: FS[P] extends (row: RootTableRefs<M, K>) => infer ReturnType 
+      ? InferColumnFilterTypeScript<ReturnType>
+      : never;
+};
 
 export type Selection<
   M extends Record<string, TableDefinition<M>>,
@@ -192,8 +255,7 @@ export type Selection<
             : never;
       }
     : {}
-);
-
+) & CustomSelectorProperties<M, K, FS>;
 
 export type PrimaryKeyArgs<M extends Record<string, TableDefinition<M>>, K extends keyof M> =
   M[K]['primaryKey'] extends readonly [infer A extends keyof M[K]['columns']]
@@ -223,8 +285,6 @@ export type TableClient<M extends Record<string, TableDefinition<M>>, K extends 
   ): Promise<DeepExpand<Selection<M, K, {}>>>;
 
 };
-
-
 
 export type DBClient<M extends Record<string, TableDefinition<M>>> = {
   [TableName in keyof M]: RootTableRefs<M, TableName> & TableClient<M, TableName>;
