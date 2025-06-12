@@ -1810,7 +1810,7 @@ type TableSchema<T> = {
   };
   primaryKey: ExtractPrimaryKeyNames<T>;
 
-  relations?: {
+  relations: {
     [K in keyof T as T[K] extends RelatedTable | ManyRelation ? K : never]:
       T[K] extends ManyRelation
         ? { type: 'hasMany'; target: RelationTarget<T[K]> }
@@ -1830,14 +1830,24 @@ type RelationTarget<T> =
   T extends { __tableAlias: infer S } ? Extract<S, string> : string;
 
 type ColumnToSchemaType<T> =
-  T extends StringColumnSymbol ? 'string' :
-  T extends UuidColumnSymbol ? 'uuid' :
-  T extends NumericColumnSymbol ? 'numeric' :
-  T extends DateColumnSymbol ? 'date' :
-  T extends DateWithTimeZoneColumnSymbol ? 'date' :
-  T extends BooleanColumnSymbol ? 'boolean' :
-  T extends BinaryColumnSymbol ? 'binary' :
-  T extends JSONColumnSymbol ? 'json' :
+  T extends JsonOf<infer U>
+    ? { type: 'json'; tsType: U } & (T extends NotNull ? { notNull: true } : {}) :
+  T extends JSONColumnSymbol & JsonOf<infer U>
+    ? { type: 'json'; tsType: U } & (T extends NotNull ? { notNull: true } : {}) :
+  T extends StringColumnSymbol
+    ? (T extends NotNull ? { type: 'string'; notNull: true } : { type: 'string' }) :
+  T extends UuidColumnSymbol
+    ? (T extends NotNull ? { type: 'uuid'; notNull: true } : { type: 'uuid' }) :
+  T extends NumericColumnSymbol
+    ? (T extends NotNull ? { type: 'numeric'; notNull: true } : { type: 'numeric' }) :
+  T extends DateColumnSymbol
+    ? (T extends NotNull ? { type: 'date'; notNull: true } : { type: 'date' }) :
+  T extends DateWithTimeZoneColumnSymbol
+    ? (T extends NotNull ? { type: 'date'; notNull: true } : { type: 'date' }) :
+  T extends BooleanColumnSymbol
+    ? (T extends NotNull ? { type: 'boolean'; notNull: true } : { type: 'boolean' }) :
+  T extends BinaryColumnSymbol
+    ? (T extends NotNull ? { type: 'binary'; notNull: true } : { type: 'binary' }) :
   never;
 
 export type MappedDbDef<T> = {

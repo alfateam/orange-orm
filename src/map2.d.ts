@@ -165,7 +165,7 @@ export type Selection<
 > = {
   [C in RequiredColumnKeys<M, K, FS>]: ColumnTypeToTS<M[K]['columns'][C]>;
 } & {
-  [C in OptionalColumnKeys<M, K, FS>]?: ColumnTypeToTS<M[K]['columns'][C]>;
+  [C in OptionalColumnKeys<M, K, FS>]?: ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
 } & (
   M[K] extends { relations: infer R }
     ? {
@@ -194,6 +194,7 @@ export type Selection<
     : {}
 );
 
+
 export type PrimaryKeyArgs<M extends Record<string, TableDefinition<M>>, K extends keyof M> =
   M[K]['primaryKey'] extends readonly [infer A extends keyof M[K]['columns']]
     ? [key1: ColumnTypeToTS<M[K]['columns'][A]>]
@@ -215,11 +216,11 @@ export type TableClient<M extends Record<string, TableDefinition<M>>, K extends 
 
   getById<strategy extends FetchStrategy<M, K>>(
     ...args: [...PrimaryKeyArgs<M, K>, strategy: strategy]
-  ): Promise<DeepExpand<Selection<M, K, strategy>> | null>;
+  ): Promise<DeepExpand<Selection<M, K, strategy>>>;
 
   getById(
     ...args: [...PrimaryKeyArgs<M, K>]
-  ): Promise<DeepExpand<Selection<M, K, {}>> | null>;
+  ): Promise<DeepExpand<Selection<M, K, {}>>>;
 
 };
 
