@@ -35,8 +35,8 @@ export interface RawFilter {
 }
 
 export interface BooleanFilterType extends RawFilter {
-  and(other: BooleanFilterType | RawFilter[], ...filters: RawFilter[]): BooleanFilterType;
-  or(other: BooleanFilterType | RawFilter[], ...filters: RawFilter[]): BooleanFilterType;
+  and(other: RawFilter | RawFilter[], ...filters: RawFilter[]): BooleanFilterType;
+  or(other: RawFilter | RawFilter[], ...filters: RawFilter[]): BooleanFilterType;
   not(): BooleanFilterType;
 }
 
@@ -132,8 +132,15 @@ type ReservedFetchStrategyProps = 'orderBy' | 'where';
 // Base fetch strategy properties (reserved props)
 type BaseFetchStrategy<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
   orderBy?: OrderBy<M, K>;
-  where?: (row: RootTableRefs<M, K>) => BooleanFilterType;
+  where?: ((row: RootTableRefs<M, K>) => RawFilter | Array<PrimaryKeyObject<M, K>>) ;
+
 };
+
+export type PrimaryKeyObject<M extends Record<string, TableDefinition<M>>, K extends keyof M> =
+  M[K]['primaryKey'] extends readonly (infer Keys extends keyof M[K]['columns'])[]
+    ? { [PK in Keys]: ColumnTypeToTS<M[K]['columns'][PK]> }
+    : never;
+
 
 // Column selection properties
 type ColumnSelection<M extends Record<string, TableDefinition<M>>, K extends keyof M> = 
@@ -166,10 +173,78 @@ type RelatedColumnFilterTypes<M extends Record<string, TableDefinition<M>>, K ex
 type ValidColumnFilterTypes<M extends Record<string, TableDefinition<M>>, K extends keyof M> = 
   AllColumnFilterTypes<M, K> | RelatedColumnFilterTypes<M, K>;
 
+// Column selection refs without filter methods - only for getting values/references
+type ColumnSelectionRefs<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
+  [C in keyof M[K]['columns']]: ColumnTypeToTS<M[K]['columns'][C]>;
+};
+
+// Relation selection refs without filter methods - supports deep nesting
+// In selectors, all relation types just provide access to the target table structure
+// But WITHOUT aggregate functions (only available at root level)
+type RelationSelectionRefs<M extends Record<string, TableDefinition<M>>, K extends keyof M> =
+  M[K] extends { relations: infer R }
+    ? {
+        [RName in keyof R]: R[RName] extends RelationDefinition<M>
+          ? R[RName]['type'] extends 'hasMany' | 'hasOne' | 'references'
+            ? SelectionRefsWithoutAggregates<M, R[RName]['target']> // Use version without aggregates
+            : never
+          : never;
+      }
+    : {};
+
+// Selection refs without aggregate functions (for use inside aggregate function selectors)
+type SelectionRefsWithoutAggregates<M extends Record<string, TableDefinition<M>>, Target extends keyof M> =
+  ColumnSelectionRefs<M, Target> & RelationSelectionRefs<M, Target>;
+
+// Aggregate function types that work with numeric columns
+type AggregateFunctions<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
+  count(selector: (row: SelectionRefsWithoutAggregates<M, K>) => NumericColumnValue<M, K>): number;
+  avg(selector: (row: SelectionRefsWithoutAggregates<M, K>) => NumericColumnValue<M, K>): number;
+  sum(selector: (row: SelectionRefsWithoutAggregates<M, K>) => NumericColumnValue<M, K>): number;
+  max(selector: (row: SelectionRefsWithoutAggregates<M, K>) => NumericColumnValue<M, K>): number;
+  min(selector: (row: SelectionRefsWithoutAggregates<M, K>) => NumericColumnValue<M, K>): number;
+};
+
+// Helper type to extract numeric column values from the schema
+type NumericColumnValue<M extends Record<string, TableDefinition<M>>, K extends keyof M> = 
+  // Direct numeric columns
+  {
+    [C in keyof M[K]['columns']]: NormalizeColumn<M[K]['columns'][C]>['type'] extends 'numeric' 
+      ? ColumnTypeToTS<M[K]['columns'][C]>
+      : never;
+  }[keyof M[K]['columns']] |
+  // Numeric columns from related tables
+  (M[K] extends { relations: infer R }
+    ? {
+        [RName in keyof R]: R[RName] extends { target: infer Target extends keyof M }
+          ? {
+              [C in keyof M[Target]['columns']]: NormalizeColumn<M[Target]['columns'][C]>['type'] extends 'numeric'
+                ? ColumnTypeToTS<M[Target]['columns'][C]>
+                : never;
+            }[keyof M[Target]['columns']]
+          : never;
+      }[keyof R]
+    : never);
+
+// Root selection refs for custom selectors (no filter methods) - supports deep nesting + aggregates
+type RootSelectionRefs<M extends Record<string, TableDefinition<M>>, Target extends keyof M> =
+  ColumnSelectionRefs<M, Target> & RelationSelectionRefs<M, Target> & AggregateFunctions<M, Target>;
+
+// Valid return types for custom selectors - now supports deep paths through any relation type
+type ValidSelectorReturnTypes<M extends Record<string, TableDefinition<M>>, K extends keyof M> = 
+  // Direct column types
+  ColumnTypeToTS<M[K]['columns'][keyof M[K]['columns']]> |
+  // Related table column types (any depth, any relation type)
+  (M extends Record<string, TableDefinition<M>>
+    ? {
+        [TableKey in keyof M]: ColumnTypeToTS<M[TableKey]['columns'][keyof M[TableKey]['columns']]>
+      }[keyof M]
+    : never);
+
 // Custom selector functions - allows arbitrary property names with selector functions
-// The return type must be a ColumnFilterType that actually exists in the schema
+// Uses RootSelectionRefs which supports deep nesting without filter methods
 type CustomSelectors<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
-  [key: string]: (row: RootTableRefs<M, K>) => ValidColumnFilterTypes<M, K>;
+  [key: string]: (row: RootSelectionRefs<M, K>) => ValidSelectorReturnTypes<M, K>;
 };
 
 // Main FetchStrategy type using union to avoid conflicts
@@ -203,21 +278,48 @@ type RequiredColumnKeys<M extends Record<string, TableDefinition<M>>, K extends 
 type OptionalColumnKeys<M extends Record<string, TableDefinition<M>>, K extends keyof M, FS extends Record<string, any>> =
   Exclude<SelectedColumns<M, K, FS>, RequiredColumnKeys<M, K, FS>>;
 
-// Helper type to infer the TypeScript type from a column filter
-type InferColumnFilterTypeScript<T> = 
-  T extends ColumnFilterType<infer Val, any> ? Val : never;
+// Helper type to check if a value is actually a column reference from the row object
+// This is a bit of a hack - we check if the type has the structure of a ColumnFilterType
+// but without the filter methods (which is what ColumnSelectionRefs provides)
+type IsActualColumnReference<T, M extends Record<string, TableDefinition<M>>, K extends keyof M> = 
+  T extends ColumnTypeToTS<infer CT> 
+    ? CT extends ORMColumnType | { type: ORMColumnType; notNull?: boolean } | { type: 'json'; tsType: any }
+      ? true 
+      : false
+    : false;
+
+// Alternative approach: Check if the type matches what we'd get from accessing ColumnSelectionRefs
+type IsFromColumnSelectionRefs<M extends Record<string, TableDefinition<M>>, K extends keyof M, T = any> =
+  T extends ColumnSelectionRefs<M, K>[keyof ColumnSelectionRefs<M, K>] ? true :
+  T extends (M[K] extends { relations: infer R }
+    ? {
+        [RName in keyof R]: R[RName] extends { target: infer Target extends keyof M }
+          ? ColumnSelectionRefs<M, Target>[keyof ColumnSelectionRefs<M, Target>]
+          : never;
+      }[keyof R]
+    : never) ? true :
+  T extends number ? true : // Allow aggregate function return type (number)
+  false;
+
+// Helper type to infer the TypeScript type from selector return values
+// Only allows types that come from actual column selections or aggregate functions
+type InferSelectorReturnType<T, M extends Record<string, TableDefinition<M>>, K extends keyof M> = 
+  IsFromColumnSelectionRefs<M, K, T> extends true ? T : never;
 
 // Helper type to extract custom selector properties and their return types
+// Aggregate functions return required numbers, column selections remain optional
 type CustomSelectorProperties<M extends Record<string, TableDefinition<M>>, K extends keyof M, FS extends Record<string, any>> = {
   [P in keyof FS as 
     P extends keyof M[K]['columns'] ? never :
     P extends ReservedFetchStrategyProps ? never :
     P extends (M[K] extends { relations: infer R } ? keyof R : never) ? never :
     FS[P] extends (row: any) => any ? 
-      (InferColumnFilterTypeScript<FS[P] extends (row: RootTableRefs<M, K>) => infer ReturnType ? ReturnType : never> extends never ? never : P)
+      (InferSelectorReturnType<FS[P] extends (row: RootSelectionRefs<M, K>) => infer ReturnType ? ReturnType : never, M, K> extends never ? never : P)
       : never
-  ]: FS[P] extends (row: RootTableRefs<M, K>) => infer ReturnType 
-      ? InferColumnFilterTypeScript<ReturnType>
+  ]: FS[P] extends (row: RootSelectionRefs<M, K>) => infer ReturnType 
+      ? ReturnType extends number 
+        ? number  // Aggregate functions return required number
+        : InferSelectorReturnType<ReturnType, M, K> | null | undefined  // Column selections remain optional
       : never;
 };
 
@@ -283,6 +385,26 @@ export type TableClient<M extends Record<string, TableDefinition<M>>, K extends 
   getById(
     ...args: [...PrimaryKeyArgs<M, K>]
   ): Promise<DeepExpand<Selection<M, K, {}>>>;
+
+  update(
+  row: Partial<{
+    [C in keyof M[K]['columns']]: IsRequired<M[K]['columns'][C]> extends true
+      ? ColumnTypeToTS<M[K]['columns'][C]>
+      : ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
+  }>,
+  opts: { where: (row: RootTableRefs<M, K>) => RawFilter }
+): Promise<void>;
+
+update<strategy extends FetchStrategy<M, K>>(
+  row: {
+    [C in keyof M[K]['columns']]?: IsRequired<M[K]['columns'][C]> extends true
+      ? ColumnTypeToTS<M[K]['columns'][C]>
+      : ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
+  },
+  opts: { where: (row: RootTableRefs<M, K>) => RawFilter },
+  strategy: strategy
+): Promise<Array<DeepExpand<Selection<M, K, strategy>>>>;
+
 
 };
 
