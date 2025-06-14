@@ -396,25 +396,123 @@ export type TableClient<M extends Record<string, TableDefinition<M>>, K extends 
 ): Promise<void>;
 
 update<strategy extends FetchStrategy<M, K>>(
+  row: Partial<{
+    [C in keyof M[K]['columns']]: IsRequired<M[K]['columns'][C]> extends true
+      ? ColumnTypeToTS<M[K]['columns'][C]>
+      : ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
+  }>,
+  opts: { where: (row: RootTableRefs<M, K>) => RawFilter },
+  strategy: strategy
+): Promise<Array<DeepExpand<Selection<M, K, strategy>>>>;
+
+replace(
+  row: ReplaceRow<M, K> | ReplaceRow<M, K>[]
+): Promise<void>;
+
+replace<strategy extends FetchStrategy<M, K>>(
+  row: ReplaceRow<M, K>,
+  strategy: strategy
+): Promise<DeepExpand<Selection<M, K, strategy>>>;
+
+replace<strategy extends FetchStrategy<M, K>>(
+  rows: ReplaceRow<M, K>[],
+  strategy: strategy
+): Promise<Array<DeepExpand<Selection<M, K, strategy>>>>;
+
+updateChanges(
   row: {
     [C in keyof M[K]['columns']]?: IsRequired<M[K]['columns'][C]> extends true
       ? ColumnTypeToTS<M[K]['columns'][C]>
       : ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
   },
-  opts: { where: (row: RootTableRefs<M, K>) => RawFilter },
+  originalRow: {
+    [C in keyof M[K]['columns']]?: IsRequired<M[K]['columns'][C]> extends true
+      ? ColumnTypeToTS<M[K]['columns'][C]>
+      : ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
+  }
+): Promise<void>;
+
+updateChanges(
+  rows: Array<[
+    row: {
+      [C in keyof M[K]['columns']]?: IsRequired<M[K]['columns'][C]> extends true
+        ? ColumnTypeToTS<M[K]['columns'][C]>
+        : ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
+    },
+    originalRow: {
+      [C in keyof M[K]['columns']]?: IsRequired<M[K]['columns'][C]> extends true
+        ? ColumnTypeToTS<M[K]['columns'][C]>
+        : ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
+    }
+  ]>
+): Promise<void>;
+
+updateChanges<strategy extends FetchStrategy<M, K>>(
+  row: {
+    [C in keyof M[K]['columns']]?: IsRequired<M[K]['columns'][C]> extends true
+      ? ColumnTypeToTS<M[K]['columns'][C]>
+      : ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
+  },
+  originalRow: {
+    [C in keyof M[K]['columns']]?: IsRequired<M[K]['columns'][C]> extends true
+      ? ColumnTypeToTS<M[K]['columns'][C]>
+      : ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
+  },
+  strategy: strategy
+): Promise<DeepExpand<Selection<M, K, strategy>>>;
+
+
+
+updateChanges<strategy extends FetchStrategy<M, K>>(
+  rows: Array<[
+    row: {
+      [C in keyof M[K]['columns']]?: IsRequired<M[K]['columns'][C]> extends true
+        ? ColumnTypeToTS<M[K]['columns'][C]>
+        : ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
+    },
+    originalRow: {
+      [C in keyof M[K]['columns']]?: IsRequired<M[K]['columns'][C]> extends true
+        ? ColumnTypeToTS<M[K]['columns'][C]>
+        : ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
+    }
+  ]>,
   strategy: strategy
 ): Promise<Array<DeepExpand<Selection<M, K, strategy>>>>;
 
 
 };
 
+export type ConcurrencyStrategy = 'optimistic' | 'overwrite' | 'skipOnConflict';
+
+export type ConcurrencyConfig<M extends Record<string, TableDefinition<M>>> = {
+  [K in keyof M]?: {
+    concurrency?: ConcurrencyStrategy;
+    readonly?: boolean;
+  } & {
+    [C in keyof M[K]['columns']]?: {
+      concurrency: ConcurrencyStrategy;
+    };
+  } & (
+    M[K] extends { relations: infer R }
+      ? {
+          [RName in keyof R]?: ConcurrencyConfig<M>[R[RName] extends { target: infer T extends keyof M } ? T : never];
+        }
+      : {}
+  );
+};
+
+
 export type DBClient<M extends Record<string, TableDefinition<M>>> = {
   [TableName in keyof M]: RootTableRefs<M, TableName> & TableClient<M, TableName>;
 } & {
   filter: BooleanFilterType;
-  and(f: BooleanFilterType | RawFilter[], ...filters: RawFilter[]): BooleanFilterType;
-  or(f: BooleanFilterType | RawFilter[], ...filters: RawFilter[]): BooleanFilterType;
+  and(f: BooleanFilterType | RawFilter[], ...filters: BooleanFilterType[]): BooleanFilterType;
+  or(f: BooleanFilterType | RawFilter[], ...filters: BooleanFilterType[]): BooleanFilterType;
   not(): BooleanFilterType;
+} & {
+  (
+    config?: ConcurrencyConfig<M>
+  ): DBClient<M>;
 };
 
 export function db<M extends Record<string, TableDefinition<M>>>(): DBClient<M>;
