@@ -380,6 +380,19 @@ export type PrimaryKeyArgs<M extends Record<string, TableDefinition<M>>, K exten
 export type TableClient<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
   getAll(): Promise<Array<DeepExpand<Selection<M, K, {}>>>>;
   getAll<strategy extends FetchStrategy<M, K>>(strategy: strategy): Promise<Array<DeepExpand<Selection<M, K, strategy>>>>;
+  getMany(filter: RawFilter | Array<PrimaryKeyObject<M, K>>): Promise<Array<DeepExpand<Selection<M, K, {}>>>>;
+  getMany<strategy extends FetchStrategy<M, K>>(filter: RawFilter | Array<PrimaryKeyObject<M, K>>, strategy: strategy): Promise<Array<DeepExpand<Selection<M, K, strategy>>>>;
+
+
+
+  getOne<strategy extends FetchStrategy<M, K>>(
+    filter: RawFilter | Array<PrimaryKeyObject<M, K>>
+  ): Promise<DeepExpand<Selection<M, K, strategy>>>;
+
+  getOne<strategy extends FetchStrategy<M, K>>(
+      filter: RawFilter | Array<PrimaryKeyObject<M, K>>,
+      strategy: strategy
+  ): Promise<DeepExpand<Selection<M, K, strategy>>>;
 
   getById<strategy extends FetchStrategy<M, K>>(
     ...args: [...PrimaryKeyArgs<M, K>, strategy: strategy]
