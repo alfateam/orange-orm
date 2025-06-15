@@ -7,12 +7,16 @@ type NormalizeColumn<T> =
   T extends { type: 'json'; tsType: any } ? T :
   never;
 
-type IsRequired<CT> = NormalizeColumn<CT>['notNull'] extends true ? true : false;
+
+
+type IsRequired<CT> = CT extends { notNull: true } ? true : false;
+
 
 type ColumnTypeToTS<CT> =
   NormalizeColumn<CT>['type'] extends 'numeric' ? number :
   NormalizeColumn<CT>['type'] extends 'boolean' ? boolean :
-  NormalizeColumn<CT>['type'] extends 'json' ? NormalizeColumn<CT>['tsType'] :
+  NormalizeColumn<CT>['type'] extends 'json'
+    ? CT extends { type: 'json'; tsType: infer T } ? T : any :
   NormalizeColumn<CT>['type'] extends 'date' ? (string | Date) :
   string;
 
@@ -73,12 +77,6 @@ export type ColumnFilterType<Val, ColumnType = any> = {
 export type JsonArray = Array<JsonValue>;
 export type JsonObject = { [key: string]: JsonValue };
 export type JsonValue = string | number | boolean | null | JsonArray | JsonObject;
-
-export type DeepExpand<T> =
-  T extends Date ? T :
-  T extends Array<infer U> ? Array<DeepExpand<U>> :
-  T extends object ? { [K in keyof T]: DeepExpand<T[K]> } :
-  T;
 
 export type ColumnRefs<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
   [C in keyof M[K]['columns']]: ColumnFilterType<
@@ -143,24 +141,29 @@ export type PrimaryKeyObject<M extends Record<string, TableDefinition<M>>, K ext
 
 
 // Column selection properties
-type ColumnSelection<M extends Record<string, TableDefinition<M>>, K extends keyof M> = 
+type ColumnSelection<M extends Record<string, TableDefinition<M>>, K extends keyof M> =
   Partial<Record<keyof M[K]['columns'], boolean>>;
 
 // Relation selection properties (excluding reserved names)
 type RelationSelection<M extends Record<string, TableDefinition<M>>, K extends keyof M> =
   M[K] extends { relations: infer R }
-    ? { 
-        [RName in keyof R as RName extends ReservedFetchStrategyProps ? never : RName]?: 
-          true | false | FetchStrategy<M, R[RName]['target']> 
+    ? {
+        [RName in keyof R as RName extends ReservedFetchStrategyProps ? never : RName]?:
+  R[RName] extends { target: infer T }
+    ? T extends keyof M
+      ? true | false | FetchStrategy<M, T>
+      : never
+    : never;
+
       }
     : {};
 
 // Helper type to extract only column filter types (not relation objects)
-type AllColumnFilterTypes<M extends Record<string, TableDefinition<M>>, K extends keyof M> = 
+type AllColumnFilterTypes<M extends Record<string, TableDefinition<M>>, K extends keyof M> =
   ColumnRefs<M, K>[keyof ColumnRefs<M, K>];
 
 // Helper type to get column filter types from related tables
-type RelatedColumnFilterTypes<M extends Record<string, TableDefinition<M>>, K extends keyof M> = 
+type RelatedColumnFilterTypes<M extends Record<string, TableDefinition<M>>, K extends keyof M> =
   M[K] extends { relations: infer R }
     ? {
         [RName in keyof R]: R[RName] extends { target: infer Target extends keyof M }
@@ -170,7 +173,7 @@ type RelatedColumnFilterTypes<M extends Record<string, TableDefinition<M>>, K ex
     : never;
 
 // All valid column filter types (direct columns + related table columns)
-type ValidColumnFilterTypes<M extends Record<string, TableDefinition<M>>, K extends keyof M> = 
+type ValidColumnFilterTypes<M extends Record<string, TableDefinition<M>>, K extends keyof M> =
   AllColumnFilterTypes<M, K> | RelatedColumnFilterTypes<M, K>;
 
 // Column selection refs without filter methods - only for getting values/references
@@ -206,10 +209,10 @@ type AggregateFunctions<M extends Record<string, TableDefinition<M>>, K extends 
 };
 
 // Helper type to extract numeric column values from the schema
-type NumericColumnValue<M extends Record<string, TableDefinition<M>>, K extends keyof M> = 
+type NumericColumnValue<M extends Record<string, TableDefinition<M>>, K extends keyof M> =
   // Direct numeric columns
   {
-    [C in keyof M[K]['columns']]: NormalizeColumn<M[K]['columns'][C]>['type'] extends 'numeric' 
+    [C in keyof M[K]['columns']]: NormalizeColumn<M[K]['columns'][C]>['type'] extends 'numeric'
       ? ColumnTypeToTS<M[K]['columns'][C]>
       : never;
   }[keyof M[K]['columns']] |
@@ -231,7 +234,7 @@ type RootSelectionRefs<M extends Record<string, TableDefinition<M>>, Target exte
   ColumnSelectionRefs<M, Target> & RelationSelectionRefs<M, Target> & AggregateFunctions<M, Target>;
 
 // Valid return types for custom selectors - now supports deep paths through any relation type
-type ValidSelectorReturnTypes<M extends Record<string, TableDefinition<M>>, K extends keyof M> = 
+type ValidSelectorReturnTypes<M extends Record<string, TableDefinition<M>>, K extends keyof M> =
   // Direct column types
   ColumnTypeToTS<M[K]['columns'][keyof M[K]['columns']]> |
   // Related table column types (any depth, any relation type)
@@ -248,9 +251,9 @@ type CustomSelectors<M extends Record<string, TableDefinition<M>>, K extends key
 };
 
 // Main FetchStrategy type using union to avoid conflicts
-export type FetchStrategy<M extends Record<string, TableDefinition<M>>, K extends keyof M> = 
-  BaseFetchStrategy<M, K> & 
-  (ColumnSelection<M, K> | RelationSelection<M, K> | CustomSelectors<M, K> | 
+export type FetchStrategy<M extends Record<string, TableDefinition<M>>, K extends keyof M> =
+  BaseFetchStrategy<M, K> &
+  (ColumnSelection<M, K> | RelationSelection<M, K> | CustomSelectors<M, K> |
    (ColumnSelection<M, K> & RelationSelection<M, K>) |
    (ColumnSelection<M, K> & CustomSelectors<M, K>) |
    (RelationSelection<M, K> & CustomSelectors<M, K>) |
@@ -281,10 +284,10 @@ type OptionalColumnKeys<M extends Record<string, TableDefinition<M>>, K extends 
 // Helper type to check if a value is actually a column reference from the row object
 // This is a bit of a hack - we check if the type has the structure of a ColumnFilterType
 // but without the filter methods (which is what ColumnSelectionRefs provides)
-type IsActualColumnReference<T, M extends Record<string, TableDefinition<M>>, K extends keyof M> = 
-  T extends ColumnTypeToTS<infer CT> 
+type IsActualColumnReference<T, M extends Record<string, TableDefinition<M>>, K extends keyof M> =
+  T extends ColumnTypeToTS<infer CT>
     ? CT extends ORMColumnType | { type: ORMColumnType; notNull?: boolean } | { type: 'json'; tsType: any }
-      ? true 
+      ? true
       : false
     : false;
 
@@ -303,21 +306,21 @@ type IsFromColumnSelectionRefs<M extends Record<string, TableDefinition<M>>, K e
 
 // Helper type to infer the TypeScript type from selector return values
 // Only allows types that come from actual column selections or aggregate functions
-type InferSelectorReturnType<T, M extends Record<string, TableDefinition<M>>, K extends keyof M> = 
+type InferSelectorReturnType<T, M extends Record<string, TableDefinition<M>>, K extends keyof M> =
   IsFromColumnSelectionRefs<M, K, T> extends true ? T : never;
 
 // Helper type to extract custom selector properties and their return types
 // Aggregate functions return required numbers, column selections remain optional
 type CustomSelectorProperties<M extends Record<string, TableDefinition<M>>, K extends keyof M, FS extends Record<string, any>> = {
-  [P in keyof FS as 
+  [P in keyof FS as
     P extends keyof M[K]['columns'] ? never :
     P extends ReservedFetchStrategyProps ? never :
     P extends (M[K] extends { relations: infer R } ? keyof R : never) ? never :
-    FS[P] extends (row: any) => any ? 
+    FS[P] extends (row: any) => any ?
       (InferSelectorReturnType<FS[P] extends (row: RootSelectionRefs<M, K>) => infer ReturnType ? ReturnType : never, M, K> extends never ? never : P)
       : never
-  ]: FS[P] extends (row: RootSelectionRefs<M, K>) => infer ReturnType 
-      ? ReturnType extends number 
+  ]: FS[P] extends (row: RootSelectionRefs<M, K>) => infer ReturnType
+      ? ReturnType extends number
         ? number  // Aggregate functions return required number
         : InferSelectorReturnType<ReturnType, M, K> | null | undefined  // Column selections remain optional
       : never;
@@ -406,16 +409,32 @@ update<strategy extends FetchStrategy<M, K>>(
 ): Promise<Array<DeepExpand<Selection<M, K, strategy>>>>;
 
 replace(
-  row: ReplaceRow<M, K> | ReplaceRow<M, K>[]
+  row: Array<{
+    [C in keyof M[K]['columns']]?: IsRequired<M[K]['columns'][C]> extends true
+      ? ColumnTypeToTS<M[K]['columns'][C]>
+      : ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
+  } | {
+    [C in keyof M[K]['columns']]?: IsRequired<M[K]['columns'][C]> extends true
+      ? ColumnTypeToTS<M[K]['columns'][C]>
+      : ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
+  }>,
 ): Promise<void>;
 
 replace<strategy extends FetchStrategy<M, K>>(
-  row: ReplaceRow<M, K>,
+  row: {
+    [C in keyof M[K]['columns']]?: IsRequired<M[K]['columns'][C]> extends true
+      ? ColumnTypeToTS<M[K]['columns'][C]>
+      : ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
+  },
   strategy: strategy
 ): Promise<DeepExpand<Selection<M, K, strategy>>>;
 
 replace<strategy extends FetchStrategy<M, K>>(
-  rows: ReplaceRow<M, K>[],
+  rows: Array<{
+    [C in keyof M[K]['columns']]?: IsRequired<M[K]['columns'][C]> extends true
+      ? ColumnTypeToTS<M[K]['columns'][C]>
+      : ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
+  }>,
   strategy: strategy
 ): Promise<Array<DeepExpand<Selection<M, K, strategy>>>>;
 
@@ -433,18 +452,16 @@ updateChanges(
 ): Promise<void>;
 
 updateChanges(
-  rows: Array<[
-    row: {
-      [C in keyof M[K]['columns']]?: IsRequired<M[K]['columns'][C]> extends true
-        ? ColumnTypeToTS<M[K]['columns'][C]>
-        : ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
-    },
-    originalRow: {
-      [C in keyof M[K]['columns']]?: IsRequired<M[K]['columns'][C]> extends true
-        ? ColumnTypeToTS<M[K]['columns'][C]>
-        : ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
-    }
-  ]>
+  rows: Array<{
+    [C in keyof M[K]['columns']]?: IsRequired<M[K]['columns'][C]> extends true
+      ? ColumnTypeToTS<M[K]['columns'][C]>
+      : ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
+  }>,
+  originalRows: Array<{
+    [C in keyof M[K]['columns']]?: IsRequired<M[K]['columns'][C]> extends true
+      ? ColumnTypeToTS<M[K]['columns'][C]>
+      : ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
+  }>
 ): Promise<void>;
 
 updateChanges<strategy extends FetchStrategy<M, K>>(
@@ -461,21 +478,69 @@ updateChanges<strategy extends FetchStrategy<M, K>>(
   strategy: strategy
 ): Promise<DeepExpand<Selection<M, K, strategy>>>;
 
-
-
 updateChanges<strategy extends FetchStrategy<M, K>>(
-  rows: Array<[
-    row: {
-      [C in keyof M[K]['columns']]?: IsRequired<M[K]['columns'][C]> extends true
-        ? ColumnTypeToTS<M[K]['columns'][C]>
-        : ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
-    },
-    originalRow: {
-      [C in keyof M[K]['columns']]?: IsRequired<M[K]['columns'][C]> extends true
-        ? ColumnTypeToTS<M[K]['columns'][C]>
-        : ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
-    }
-  ]>,
+  rows: Array<{
+    [C in keyof M[K]['columns']]?: IsRequired<M[K]['columns'][C]> extends true
+      ? ColumnTypeToTS<M[K]['columns'][C]>
+      : ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
+  }>,
+  originalRows: Array<{
+    [C in keyof M[K]['columns']]?: IsRequired<M[K]['columns'][C]> extends true
+      ? ColumnTypeToTS<M[K]['columns'][C]>
+      : ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
+  }>,
+  strategy: strategy
+): Promise<Array<DeepExpand<Selection<M, K, strategy>>>>;
+
+
+//todo
+insertAndForget(
+  row: {
+    [C in keyof M[K]['columns']]?: IsRequired<M[K]['columns'][C]> extends true
+      ? ColumnTypeToTS<M[K]['columns'][C]>
+      : ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
+  }
+): Promise<void>;
+
+insertAndForget(
+  rows: Array<{
+    [C in keyof M[K]['columns']]?: IsRequired<M[K]['columns'][C]> extends true
+      ? ColumnTypeToTS<M[K]['columns'][C]>
+      : ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
+  }>
+): Promise<void>;
+
+insert(
+  row: {
+    [C in keyof M[K]['columns']]?: IsRequired<M[K]['columns'][C]> extends true
+      ? ColumnTypeToTS<M[K]['columns'][C]>
+      : ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
+  }
+): Promise<DeepExpand<Selection<M, K, {}>>>;
+
+insert(
+  rows: Array<{
+    [C in keyof M[K]['columns']]?: IsRequired<M[K]['columns'][C]> extends true
+      ? ColumnTypeToTS<M[K]['columns'][C]>
+      : ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
+  }>
+): Promise<Array<DeepExpand<Selection<M, K, {}>>>>;
+
+insert<strategy extends FetchStrategy<M, K>>(
+  row: {
+    [C in keyof M[K]['columns']]?: IsRequired<M[K]['columns'][C]> extends true
+      ? ColumnTypeToTS<M[K]['columns'][C]>
+      : ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
+  },
+  strategy: strategy
+): Promise<DeepExpand<Selection<M, K, strategy>>>;
+
+insert<strategy extends FetchStrategy<M, K>>(
+  rows: Array<{
+    [C in keyof M[K]['columns']]?: IsRequired<M[K]['columns'][C]> extends true
+      ? ColumnTypeToTS<M[K]['columns'][C]>
+      : ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
+  }>,
   strategy: strategy
 ): Promise<Array<DeepExpand<Selection<M, K, strategy>>>>;
 
@@ -515,11 +580,11 @@ export type DBClient<M extends Record<string, TableDefinition<M>>> = {
   ): DBClient<M>;
 };
 
-export function db<M extends Record<string, TableDefinition<M>>>(): DBClient<M>;
 
 export type DeepExpand<T> =
-  T extends Array<infer U>
-    ? Array<DeepExpand<U>>
-    : T extends object
-      ? { [K in keyof T]: DeepExpand<T[K]> }
-      : T;
+T extends Date ? T :
+T extends Array<infer U> ? Array<DeepExpand<U>> :
+T extends object ? { [K in keyof T]: DeepExpand<T[K]> } :
+T;
+
+export function db<M extends Record<string, TableDefinition<M>>>(): DBClient<M>;
