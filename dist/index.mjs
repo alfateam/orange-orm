@@ -17456,8 +17456,10 @@ function requireWrapQuery$2 () {
 
 			function onInnerCompleted(err, rows, hasMore) {
 				if (err) {
-					if (err.code)
+					if (err.code && err.severity !== 0)
 						onCompleted(err);
+					if (rows)
+						result.push(rows);
 					return;
 				}
 				result.push(rows);
