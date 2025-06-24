@@ -1,4 +1,6 @@
 ## Changelog
+__4.7.4__  
+Bugfix: SAP ASE: Do not throw errors on warnings. See [#129](https://github.com/alfateam/issues/129)  
 __4.7.3__  
 Bugfix:  lessThanOrEqual throws incorrect syntax. See [#128](https://github.com/alfateam/issues/128)  
 __4.7.2__  

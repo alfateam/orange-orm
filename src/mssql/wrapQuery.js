@@ -20,7 +20,7 @@ function wrapQuery(_context, connection) {
 
 		function onInnerCompleted(err, rows, hasMore) {
 			if (err) {
-				if (err.code && err.severity !== 0)
+				if (err.code && err.code !== 3604)
 					onCompleted(err);
 				if (rows)
 					result.push(rows);
