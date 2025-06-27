@@ -12,7 +12,7 @@ function wrapQuery(_context, connection) {
 		for (let i = 0; i < params.length; i++) {
 			const parameter = params[i];
 			if (typeof parameter === 'string')
-				params[i] = sap.VarChar(parameter);
+				params[i] = sap.NVarChar(parameter);
 		}
 
 		runOriginalQuery.call(connection, sql, params, onInnerCompleted);
