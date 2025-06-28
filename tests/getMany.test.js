@@ -1202,7 +1202,7 @@ const connections = {
 		init: initSqlite
 	},
 	sap: {
-		db: map({ db: (con) => con.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master;SortOrder=nocase_utf8;CharSet=NoConversions`, { size: 1 }) }),
+		db: map({ db: (con) => con.sap(`Driver=${__dirname}/libsybdrvodb.so;SERVER=sapase;Port=5000;UID=sa;PWD=sybase;DATABASE=master;SortOrder=nocase_utf8;CharSet=utf8`, { size: 1 }) }),
 		init: initSap
 	},
 	oracle: {
