@@ -14,6 +14,7 @@ function wrapQuery(_context, connection) {
 		const engine = getSessionSingleton(_context, 'engine');
 
 		if (engine === 'sap') {
+			const sap = connection.msnodesqlv8;
 			// Helper function to check for non-ASCII UTF-8 characters
 
 			// Check if this is a stored procedure call
@@ -24,33 +25,37 @@ function wrapQuery(_context, connection) {
 			for (let i = 0; i < params.length; i++) {
 				const parameter = params[i];
 
-				if (typeof parameter === 'string' && hasNonAsciiCharacters(parameter)) {
-					const hexValue = stringToHex(parameter);
+				if (typeof parameter === 'string') {
+					if (hasNonAsciiCharacters(parameter)) {
 
-					if (isStoredProcCall) {
-						// For stored procedures, create a variable
-						const varName = `@hex_param_${i}`;
-						const convertClause = `CONVERT(VARCHAR(255), CONVERT(VARBINARY(127), 0x${hexValue}))`;
+						const hexValue = stringToHex(parameter);
 
-						hexVariables.push({
-							declaration: `DECLARE ${varName} VARCHAR(255)`,
-							assignment: `SET ${varName} = ${convertClause}`
-						});
+						if (isStoredProcCall) {
+							// For stored procedures, create a variable
+							const varName = `@hex_param_${i}`;
+							const convertClause = `CONVERT(VARCHAR(255), CONVERT(VARBINARY(127), 0x${hexValue}))`;
 
-						replacements.push({
-							index: i,
-							replacement: varName
-						});
-					} else {
-						// For regular queries, use inline conversion
-						const convertClause = `CONVERT(VARCHAR(255), CONVERT(VARBINARY(127), 0x${hexValue}))`;
-						replacements.push({
-							index: i,
-							replacement: convertClause
-						});
+							hexVariables.push({
+								declaration: `DECLARE ${varName} VARCHAR(255)`,
+								assignment: `SET ${varName} = ${convertClause}`
+							});
+
+							replacements.push({
+								index: i,
+								replacement: varName
+							});
+						} else {
+							// For regular queries, use inline conversion
+							const convertClause = `CONVERT(VARCHAR(255), CONVERT(VARBINARY(127), 0x${hexValue}))`;
+							replacements.push({
+								index: i,
+								replacement: convertClause
+							});
+						}
+						parametersToRemove.push(i);
 					}
-
-					parametersToRemove.push(i);
+					else
+						params[i] = sap.VarChar(parameter);
 				}
 			}
 
