@@ -8,59 +8,93 @@ function wrapQuery(_context, connection) {
 	function runQuery(query, onCompleted) {
 		var params = query.parameters;
 		var sql = query.sql();
-		log.emitQuery({ sql, parameters: params });
-
-		// Helper function to check for non-ASCII UTF-8 characters
-		function hasNonAsciiCharacters(str) {
-			// Check if string contains any character with code point > 127 (non-ASCII)
-			return /[\u0080-\uFFFF]/.test(str);
-		}
-
-		function stringToHex(str) {
-			return Buffer.from(str, 'utf8').toString('hex');
-		}
 
 		const replacements = [];
 		const parametersToRemove = [];
 		const engine = getSessionSingleton(_context, 'engine');
 
 		if (engine === 'sap') {
-			//non-ASCII UTF-8 characters workaround
+			// Helper function to check for non-ASCII UTF-8 characters
+
+			// Check if this is a stored procedure call
+			const isStoredProcCall = /EXECUTE\s+/i.test(sql) || /EXEC\s+/i.test(sql);
+			let hexVariables = [];
+
+			// Non-ASCII UTF-8 characters workaround
 			for (let i = 0; i < params.length; i++) {
 				const parameter = params[i];
 
 				if (typeof parameter === 'string' && hasNonAsciiCharacters(parameter)) {
 					const hexValue = stringToHex(parameter);
-					const convertClause = `CONVERT(VARCHAR(255), CONVERT(VARBINARY(127), 0x${hexValue}))`;
 
-					replacements.push({
-						index: i,
-						replacement: convertClause
-					});
+					if (isStoredProcCall) {
+						// For stored procedures, create a variable
+						const varName = `@hex_param_${i}`;
+						const convertClause = `CONVERT(VARCHAR(255), CONVERT(VARBINARY(127), 0x${hexValue}))`;
+
+						hexVariables.push({
+							declaration: `DECLARE ${varName} VARCHAR(255)`,
+							assignment: `SET ${varName} = ${convertClause}`
+						});
+
+						replacements.push({
+							index: i,
+							replacement: varName
+						});
+					} else {
+						// For regular queries, use inline conversion
+						const convertClause = `CONVERT(VARCHAR(255), CONVERT(VARBINARY(127), 0x${hexValue}))`;
+						replacements.push({
+							index: i,
+							replacement: convertClause
+						});
+					}
 
 					parametersToRemove.push(i);
 				}
 			}
-		}
 
-		// Second pass: replace the ? placeholders at specific positions
-		if (replacements.length > 0) {
-			let questionMarkIndex = 0;
-			sql = sql.replace(/\?/g, (match) => {
-				const replacement = replacements.find(r => r.index === questionMarkIndex);
-				questionMarkIndex++;
+			// Apply replacements
+			if (replacements.length > 0) {
+				let questionMarkIndex = 0;
+				sql = sql.replace(/\?/g, (match) => {
+					const replacement = replacements.find(r => r.index === questionMarkIndex);
+					questionMarkIndex++;
 
-				if (replacement) {
-					return replacement.replacement;
+					if (replacement) {
+						return replacement.replacement;
+					}
+					return match;
+				});
+
+				// For stored procedures, inject hex variable declarations
+				if (isStoredProcCall && hexVariables.length > 0) {
+					const lines = sql.split('\n');
+					let insertIndex = 0;
+
+					// Find the last DECLARE statement
+					for (let i = 0; i < lines.length; i++) {
+						if (/^\s*DECLARE\s+/i.test(lines[i])) {
+							insertIndex = i + 1;
+						}
+					}
+
+					// Insert hex variable declarations and assignments
+					const hexDeclarations = hexVariables.map(v => v.declaration);
+					const hexAssignments = hexVariables.map(v => v.assignment);
+
+					lines.splice(insertIndex, 0, ...hexDeclarations, ...hexAssignments);
+					sql = lines.join('\n');
 				}
-				return match;
+			}
+
+			// Remove parameters in reverse order to maintain correct indices
+			parametersToRemove.reverse().forEach(index => {
+				params.splice(index, 1);
 			});
 		}
 
-		// Remove parameters in reverse order to maintain correct indices
-		parametersToRemove.reverse().forEach(index => {
-			params.splice(index, 1);
-		});
+		log.emitQuery({ sql, parameters: params });
 
 		runOriginalQuery.call(connection, sql, params, onInnerCompleted);
 		let result = [];
@@ -75,7 +109,6 @@ function wrapQuery(_context, connection) {
 			}
 			result.push(rows);
 			if (!hasMore) {
-
 				if (result.length === 1)
 					onCompleted(null, result[0]);
 				else
@@ -83,7 +116,16 @@ function wrapQuery(_context, connection) {
 			}
 		}
 	}
-
 }
+
+function hasNonAsciiCharacters(str) {
+	// Check if string contains any character with code point > 127 (non-ASCII)
+	return /[\u0080-\uFFFF]/.test(str);
+}
+
+function stringToHex(str) {
+	return Buffer.from(str, 'utf8').toString('hex');
+}
+
 
 module.exports = wrapQuery;
