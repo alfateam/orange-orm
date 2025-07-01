@@ -1,4 +1,6 @@
 ## Changelog
+__4.7.6__  
+Changed logging for SAP ASE.  
 __4.7.5__  
 Implemented automatic hex conversion for non-ASCII UTF-8 characters in database parameters to resolve SAP ASE encoding issues.  
 __4.7.4__  

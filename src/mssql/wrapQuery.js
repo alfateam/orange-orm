@@ -8,6 +8,7 @@ function wrapQuery(_context, connection) {
 	function runQuery(query, onCompleted) {
 		var params = query.parameters;
 		var sql = query.sql();
+		log.emitQuery({ sql, parameters: params });
 
 		const replacements = [];
 		const parametersToRemove = [];
@@ -100,8 +101,6 @@ function wrapQuery(_context, connection) {
 				params.splice(index, 1);
 			});
 		}
-
-		log.emitQuery({ sql, parameters: params });
 
 		runOriginalQuery.call(connection, sql, params, onInnerCompleted);
 		let result = [];
