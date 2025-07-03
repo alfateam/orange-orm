@@ -1,6 +1,6 @@
 ## Changelog
 __4.7.8__  
-Bugfix: Support for multiple result sets from stored procedures in MsSql. See [#130](https://github.com/alfateam/issues/130)  
+Bugfix: Support for multiple result sets from stored procedures in MsSql. See [#130](https://github.com/alfateam/orange-orm/issues/130)  
 __4.7.7__  
 Always do logging with question mark as placeholder instead of dialect specific placeholder.  
 __4.7.6__  
@@ -8,13 +8,13 @@ Changed logging for SAP ASE.
 __4.7.5__  
 Implemented automatic hex conversion for non-ASCII UTF-8 characters in database parameters to resolve SAP ASE encoding issues.  
 __4.7.4__  
-Bugfix: SAP ASE: Do not throw errors on warnings. See [#129](https://github.com/alfateam/issues/129)  
+Bugfix: SAP ASE: Do not throw errors on warnings. See [#129](https://github.com/alfateam/orange-orm/issues/129)  
 __4.7.3__  
-Bugfix:  lessThanOrEqual throws incorrect syntax. See [#128](https://github.com/alfateam/issues/128)  
+Bugfix:  lessThanOrEqual throws incorrect syntax. See [#128](https://github.com/alfateam/orange-orm/issues/128)  
 __4.7.2__  
 Updated dependencies    
 __4.7.1__  
-Bugfix:  Error when using bun and sqlite: Cannot find package 'Database'. See [#127](https://github.com/alfateam/issues/127)  
+Bugfix:  Error when using bun and sqlite: Cannot find package 'Database'. See [#127](https://github.com/alfateam/orange-orm/issues/127)  
 __4.7.0__  
 Support for [PGLite](https://pglite.dev/). See [#124](https://github.com/alfateam/orange-orm/issues/124)  
 __4.6.3__  
