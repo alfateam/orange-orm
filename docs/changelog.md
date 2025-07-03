@@ -1,4 +1,6 @@
 ## Changelog
+__4.7.7__  
+Always do logging with question mark as placeholder instead of dialect specific placeholder.  
 __4.7.6__  
 Changed logging for SAP ASE.  
 __4.7.5__  

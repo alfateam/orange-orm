@@ -14833,11 +14833,10 @@ function requireWrapQuery$8 () {
 
 		async function runQuery(query, onCompleted) {
 			try {
-
+				log.emitQuery({ sql: query.sql(), parameters: query.parameters });
 				const sql = replaceParamChar(query, query.parameters);
 				let rdb = tryGetSessionContext(context);
 				let transactionHandler = rdb.transactionHandler;
-				log.emitQuery({ sql, parameters: query.parameters });
 
 				if (sql.length < 18 && query.parameters.length === 0) {
 					if (sql === 'BEGIN TRANSACTION' || sql === 'BEGIN') {
@@ -15337,13 +15336,13 @@ function requireWrapQuery$7 () {
 
 		function runQuery(query, onCompleted) {
 			var params = query.parameters;
+			log.emitQuery({sql: query.sql(), parameters: params});
 			var sql = replaceParamChar(query, params);
 			query = {
 				text: sql,
 				values: params,
 				types: query.types
 			};
-			log.emitQuery({sql, parameters: params});
 
 			runOriginalQuery.call(connection, query, onInnerCompleted);
 
@@ -18271,26 +18270,25 @@ function requireWrapQuery$1 () {
 
 		function doQuery(query, onCompleted) {
 			const result = [];
+
+			log.emitQuery({ sql: query.sql(), parameters: query.parameters });
 			const sql = replaceParamChar(query.sql(), query.parameters);
 
 			// Transaction statements
 			if (sql.length < 18 && query.parameters.length === 0) {
 				if (sql === 'BEGIN TRANSACTION') {
-					log.emitQuery({ sql, parameters: [] });
 					connection.beginTransaction((err) => {
 						onCompleted(extractError(err), []);
 					});
 					return;
 				}
 				else if (sql === 'COMMIT') {
-					log.emitQuery({ sql, parameters: [] });
 					connection.commitTransaction((err) => {
 						onCompleted(extractError(err), []);
 					});
 					return;
 				}
 				else if (sql === 'ROLLBACK') {
-					log.emitQuery({ sql, parameters: [] });
 					connection.rollbackTransaction((err) => {
 						onCompleted(extractError(err), []);
 					});
@@ -18301,7 +18299,7 @@ function requireWrapQuery$1 () {
 			let keys;
 			// Now we can safely create Request using CachedRequest
 			var request = new CachedRequest(sql, onInnerCompleted);
-			const params = addParameters(request, query.parameters, CachedTypes);
+			addParameters(request, query.parameters, CachedTypes);
 
 			request.on('row', rows => {
 				const tmp = {};
@@ -18314,7 +18312,6 @@ function requireWrapQuery$1 () {
 				result.push(tmp);
 			});
 
-			log.emitQuery({ sql, parameters: params });
 			connection.execSql(request);
 
 			function onInnerCompleted(err) {
@@ -19697,8 +19694,8 @@ function requireWrapQuery () {
 
 		function runQuery(query, onCompleted) {
 			var params = query.parameters;
+			log.emitQuery({sql: query.sql(), parameters: params});
 			var sql = replaceParamChar(query, params);
-			log.emitQuery({ sql, parameters: params });
 
 			runOriginalQuery.call(connection, sql, params, {
 				fetchTypeHandler: function(metaData) {
