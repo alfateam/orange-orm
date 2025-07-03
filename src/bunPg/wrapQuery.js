@@ -7,11 +7,10 @@ function wrapQuery(context, connection) {
 
 	async function runQuery(query, onCompleted) {
 		try {
-
+			log.emitQuery({ sql: query.sql(), parameters: query.parameters });
 			const sql = replaceParamChar(query, query.parameters);
 			let rdb = tryGetSessionContext(context);
 			let transactionHandler = rdb.transactionHandler;
-			log.emitQuery({ sql, parameters: query.parameters });
 
 			if (sql.length < 18 && query.parameters.length === 0) {
 				if (sql === 'BEGIN TRANSACTION' || sql === 'BEGIN') {

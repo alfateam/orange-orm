@@ -7,13 +7,13 @@ function wrapQuery(_context, connection) {
 
 	function runQuery(query, onCompleted) {
 		var params = query.parameters;
+		log.emitQuery({sql: query.sql(), parameters: params});
 		var sql = replaceParamChar(query, params);
 		query = {
 			text: sql,
 			values: params,
 			types: query.types
 		};
-		log.emitQuery({sql, parameters: params});
 
 		runOriginalQuery.call(connection, query, onInnerCompleted);
 

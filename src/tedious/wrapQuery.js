@@ -23,26 +23,25 @@ function wrapQuery(_context, connection) {
 
 	function doQuery(query, onCompleted) {
 		const result = [];
+
+		log.emitQuery({ sql: query.sql(), parameters: query.parameters });
 		const sql = replaceParamChar(query.sql(), query.parameters);
 
 		// Transaction statements
 		if (sql.length < 18 && query.parameters.length === 0) {
 			if (sql === 'BEGIN TRANSACTION') {
-				log.emitQuery({ sql, parameters: [] });
 				connection.beginTransaction((err) => {
 					onCompleted(extractError(err), []);
 				});
 				return;
 			}
 			else if (sql === 'COMMIT') {
-				log.emitQuery({ sql, parameters: [] });
 				connection.commitTransaction((err) => {
 					onCompleted(extractError(err), []);
 				});
 				return;
 			}
 			else if (sql === 'ROLLBACK') {
-				log.emitQuery({ sql, parameters: [] });
 				connection.rollbackTransaction((err) => {
 					onCompleted(extractError(err), []);
 				});
@@ -53,7 +52,7 @@ function wrapQuery(_context, connection) {
 		let keys;
 		// Now we can safely create Request using CachedRequest
 		var request = new CachedRequest(sql, onInnerCompleted);
-		const params = addParameters(request, query.parameters, CachedTypes);
+		addParameters(request, query.parameters, CachedTypes);
 
 		request.on('row', rows => {
 			const tmp = {};
@@ -66,7 +65,6 @@ function wrapQuery(_context, connection) {
 			result.push(tmp);
 		});
 
-		log.emitQuery({ sql, parameters: params });
 		connection.execSql(request);
 
 		function onInnerCompleted(err) {
