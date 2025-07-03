@@ -1,4 +1,6 @@
 ## Changelog
+__4.7.8__  
+Bugfix: Support for multiple result sets from stored procedures in MsSql. See [#130](https://github.com/alfateam/issues/130)  
 __4.7.7__  
 Always do logging with question mark as placeholder instead of dialect specific placeholder.  
 __4.7.6__  
