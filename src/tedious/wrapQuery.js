@@ -22,7 +22,9 @@ function wrapQuery(_context, connection) {
 	}
 
 	function doQuery(query, onCompleted) {
-		const result = [];
+		const results = []; // Array to hold multiple result sets
+		let currentResult = []; // Current result set being built
+		let hasResultSet = false; // Track if we're in an actual result set
 
 		log.emitQuery({ sql: query.sql(), parameters: query.parameters });
 		const sql = replaceParamChar(query.sql(), query.parameters);
@@ -50,7 +52,6 @@ function wrapQuery(_context, connection) {
 		}
 
 		let keys;
-		// Now we can safely create Request using CachedRequest
 		var request = new CachedRequest(sql, onInnerCompleted);
 		addParameters(request, query.parameters, CachedTypes);
 
@@ -62,7 +63,35 @@ function wrapQuery(_context, connection) {
 			keys.forEach(cols => {
 				tmp[cols] = rows[cols].value;
 			});
-			result.push(tmp);
+			currentResult.push(tmp);
+			hasResultSet = true; // We're definitely in a result set
+		});
+
+		// Handle column metadata - indicates a result set is starting
+		request.on('columnMetadata', (_columns) => {
+			hasResultSet = true; // A result set is starting (even if it ends up empty)
+		});
+
+		// Handle end of each result set
+		request.on('doneInProc', (_rowCount, _more) => {
+			// End of a result set within a stored procedure
+			// Add to results if we had a result set (even if empty)
+			if (hasResultSet) {
+				results.push(currentResult);
+				currentResult = [];
+				keys = null; // Reset keys for next result set
+				hasResultSet = false; // Reset for next potential result set
+			}
+		});
+
+		request.on('doneProc', (_rowCount, _more) => {
+			// End of stored procedure execution
+			// Add to results if we had a result set (even if empty)
+			if (hasResultSet) {
+				results.push(currentResult);
+				currentResult = [];
+				hasResultSet = false; // Reset for next potential result set
+			}
 		});
 
 		connection.execSql(request);
@@ -71,14 +100,28 @@ function wrapQuery(_context, connection) {
 			if (err) {
 				onCompleted(extractError(err));
 			} else {
-				onCompleted(null, result);
+				// If we have any remaining result set, add it
+				if (hasResultSet) {
+					results.push(currentResult);
+				}
+
+				// Return based on number of actual result sets
+				if (results.length === 0) {
+					// No result sets - return empty array
+					onCompleted(null, []);
+				} else if (results.length === 1) {
+					// Single result set - return as single-depth array (even if empty)
+					onCompleted(null, results[0]);
+				} else {
+					// Multiple result sets - return as array of arrays
+					onCompleted(null, results);
+				}
 			}
 		}
 	}
 }
 
-// same helpers as before
-
+// Helper functions remain the same
 function extractError(e) {
 	if (e && e.errors) {
 		return e.errors[0];
