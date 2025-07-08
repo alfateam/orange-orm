@@ -156,8 +156,14 @@ function addParameters(request, params, TYPES) {
 	function toType(p) {
 		if (typeof p === 'string')
 			return TYPES.VarChar;
-		else if (Number.isInteger(p))
-			return TYPES.Int;
+		else if (Number.isInteger(p)) {
+			// Check if the integer is within the 32-bit signed integer range
+			if (p >= -2147483648 && p <= 2147483647) {
+				return TYPES.Int;
+			} else {
+				return TYPES.BigInt;
+			}
+		}
 		else if (typeof p === 'number')
 			return TYPES.Money;
 		else if (p instanceof Date && !isNaN(p))
