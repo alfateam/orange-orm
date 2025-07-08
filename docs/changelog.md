@@ -1,4 +1,6 @@
 ## Changelog
+__4.7.9__  
+Bugfix: MsSql: Validation failed for parameter '0'. Value must be between -2147483648 and 2147483647, inclusive. See [#131](https://github.com/alfateam/orange-orm/issues/131)  
 __4.7.8__  
 Bugfix: Support for multiple result sets from stored procedures in MsSql. See [#130](https://github.com/alfateam/orange-orm/issues/130)  
 __4.7.7__  
