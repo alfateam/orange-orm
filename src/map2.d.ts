@@ -209,8 +209,13 @@ type ValidColumnFilterTypes<M extends Record<string, TableDefinition<M>>, K exte
 
 // Column selection refs without filter methods - only for getting values/references
 type ColumnSelectionRefs<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
-  [C in keyof M[K]['columns']]: M[K]['columns'][C];
+  // Required columns (notNull = true)
+  [C in keyof M[K]['columns'] as IsRequired<M[K]['columns'][C]> extends true ? C : never]: ColumnTypeToTS<M[K]['columns'][C]>;
+} & {
+  // Optional columns (nullable)
+  [C in keyof M[K]['columns'] as IsRequired<M[K]['columns'][C]> extends true ? never : C]?: ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
 };
+
 
 // Relation selection refs without filter methods - supports deep nesting
 // In selectors, all relation types just provide access to the target table structure
