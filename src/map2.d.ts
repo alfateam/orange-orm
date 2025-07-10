@@ -1,4 +1,4 @@
-//map2.d.ts
+//map2.d.ts - Refactored Active Record Methods
 import type { PGliteOptions } from './pglite.d.ts';
 import type { ConnectionConfiguration } from 'tedious';
 import type { D1Database } from '@cloudflare/workers-types';
@@ -98,8 +98,6 @@ export type ColumnFilterType<Val, ColumnType = any> = {
   in(values: (Val | null | undefined)[]): Filter;
   between(from: Val | null | undefined, to: Val | null | undefined): Filter;
   notIn(values: (Val | null | undefined)[]): Filter;
-  // isNull(): Filter;
-  // isNotNull(): Filter;
 } & (ColumnType extends 'string' ? StringOnlyMethods : {});
 
 export type JsonArray = Array<JsonValue>;
@@ -215,7 +213,6 @@ type ColumnSelectionRefs<M extends Record<string, TableDefinition<M>>, K extends
   // Optional columns (nullable)
   [C in keyof M[K]['columns'] as IsRequired<M[K]['columns'][C]> extends true ? never : C]?: ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
 };
-
 
 // Relation selection refs without filter methods - supports deep nesting
 // In selectors, all relation types just provide access to the target table structure
@@ -378,9 +375,6 @@ type RequiredColumnKeys<M extends Record<string, TableDefinition<M>>, K extends 
 type OptionalColumnKeys<M extends Record<string, TableDefinition<M>>, K extends keyof M, FS extends Record<string, any>> =
   Exclude<SelectedColumns<M, K, FS>, RequiredColumnKeys<M, K, FS>>;
 
-// Helper type to check if a value is actually a column reference from the row object
-// This is a bit of a hack - we check if the type has the structure of a ColumnFilterType
-// but without the filter methods (which is what ColumnSelectionRefs provides)
 type IsActualColumnReference<T, M extends Record<string, TableDefinition<M>>, K extends keyof M> =
   T extends ColumnTypeToTS<infer CT>
   ? CT extends ORMColumnDefinition | ORMJsonColumnDefinition
@@ -388,7 +382,6 @@ type IsActualColumnReference<T, M extends Record<string, TableDefinition<M>>, K 
   : false
   : false;
 
-// Alternative approach: Check if the type matches what we'd get from accessing ColumnSelectionRefs
 type IsFromColumnSelectionRefs<M extends Record<string, TableDefinition<M>>, K extends keyof M, T = any> =
   T extends ColumnSelectionRefs<M, K>[keyof ColumnSelectionRefs<M, K>] ? true :
   T extends (M[K] extends { relations: infer R }
@@ -401,24 +394,19 @@ type IsFromColumnSelectionRefs<M extends Record<string, TableDefinition<M>>, K e
   T extends number ? true : // Allow aggregate function return type (number)
   false;
 
-// Helper type to infer the TypeScript type from selector return values
-// Only allows types that come from actual column selections or aggregate functions
 type InferSelectorReturnType<T, M extends Record<string, TableDefinition<M>>, K extends keyof M> =
   IsFromColumnSelectionRefs<M, K, T> extends true ? T : never;
 
-// ADD helper to check if return type is an aggregate function:
 type IsAggregateFunction<T> = T extends BaseAggregateFunction ? true : false;
 
 type IsRequiredAggregate<T> = T extends BaseAggregateFunction & { __functionType: infer FType }
   ? FType extends 'count' | 'sum' | 'avg' ? true : false
   : false;
 
-// Helper to check if it's a min/max function that should preserve column type
 type IsMinMaxAggregate<T> = T extends AggregateMinMaxFunction<any> & { __functionType: infer FType }
   ? FType extends 'max' | 'min' ? true : false
   : false;
 
-// Helper to extract the column type from min/max aggregate
 type ExtractMinMaxColumnType<T> = T extends AggregateMinMaxFunction<infer ColType>
   ? ColumnDefinitionToTS<ColType>
   : never;
@@ -556,7 +544,9 @@ type UpdateChangesRow<M extends Record<string, TableDefinition<M>>, K extends ke
     : ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
 };
 
-// Active record methods for top-level entities
+// REFACTORED: Separate Active Record Methods for Individual Rows vs Arrays
+
+// Active record methods for individual rows
 type ActiveRecordMethods<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
   saveChanges(): Promise<void>;
   saveChanges(concurrency: ConcurrencyConfig<M>[K]): Promise<void>;
@@ -568,18 +558,37 @@ type ActiveRecordMethods<M extends Record<string, TableDefinition<M>>, K extends
   delete<strategy extends FetchStrategy<M, K>>(strategy: strategy): Promise<void>;
 };
 
-// Helper type to add active record methods to selection results
+// Active record methods for arrays of rows
+type ArrayActiveRecordMethods<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
+  saveChanges(): Promise<void>;
+  saveChanges(concurrency: ConcurrencyConfig<M>[K]): Promise<void>;
+  acceptChanges(): void;
+  clearChanges(): void;
+  refresh(): Promise<void>;
+  refresh<strategy extends FetchStrategy<M, K>>(strategy: strategy): Promise<Array<DeepExpand<Selection<M, K, strategy>>>>;
+  delete(): Promise<void>;
+  delete<strategy extends FetchStrategy<M, K>>(strategy: strategy): Promise<void>;
+};
+
+// Helper type to add individual active record methods to selection results
 type WithActiveRecord<T, M extends Record<string, TableDefinition<M>>, K extends keyof M> =
   T & ActiveRecordMethods<M, K>;
 
-export type TableClient<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
-  getAll(): Promise<Array<WithActiveRecord<DeepExpand<Selection<M, K, {}>>, M, K>>>;
-  getAll<strategy extends FetchStrategy<M, K>>(strategy: strategy): Promise<Array<WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K>>>;
-  getMany(filter: RawFilter | Array<PrimaryKeyObject<M, K>>): Promise<Array<WithActiveRecord<DeepExpand<Selection<M, K, {}>>, M, K>>>;
-  getMany<strategy extends FetchStrategy<M, K>>(filter: RawFilter | Array<PrimaryKeyObject<M, K>>, strategy: strategy): Promise<Array<WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K>>>;
+// Helper type to add array active record methods to arrays without adding them to individual items
+type WithArrayActiveRecord<T extends Array<any>, M extends Record<string, TableDefinition<M>>, K extends keyof M> =
+  T & ArrayActiveRecordMethods<M, K>;
 
+export type TableClient<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
+  // Array methods - return arrays with array-level active record methods, but individual items are plain
+  getAll(): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, {}>>>, M, K>>;
+  getAll<strategy extends FetchStrategy<M, K>>(strategy: strategy): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, strategy>>>, M, K>>;
+  getMany(filter: RawFilter | Array<PrimaryKeyObject<M, K>>): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, {}>>>, M, K>>;
+  getMany<strategy extends FetchStrategy<M, K>>(filter: RawFilter | Array<PrimaryKeyObject<M, K>>, strategy: strategy): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, strategy>>>, M, K>>;
+
+  // Aggregate methods - return plain objects (no active record methods)
   aggregate<strategy extends AggregateStrategy<M, K>>(strategy: strategy): Promise<Array<DeepExpand<CustomSelectorProperties<M, K, strategy>>>>;
 
+  // Single item methods - return individual objects with individual active record methods
   getOne<strategy extends FetchStrategy<M, K>>(
     filter: RawFilter | Array<PrimaryKeyObject<M, K>>
   ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K>>;
@@ -597,6 +606,7 @@ export type TableClient<M extends Record<string, TableDefinition<M>>, K extends 
     ...args: [...PrimaryKeyArgs<M, K>]
   ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, {}>>, M, K>>;
 
+  // Bulk update methods
   update(
     row: Partial<{
       [C in keyof M[K]['columns']]: IsRequired<M[K]['columns'][C]> extends true
@@ -606,10 +616,6 @@ export type TableClient<M extends Record<string, TableDefinition<M>>, K extends 
     opts: { where: (row: RootTableRefs<M, K>) => RawFilter }
   ): Promise<void>;
 
-  count(filter: RawFilter | Array<PrimaryKeyObject<M, K>>,): Promise<number>;
-  delete(filter: RawFilter | Array<PrimaryKeyObject<M, K>>,): Promise<void>;
-  deleteCascade(filter: RawFilter | Array<PrimaryKeyObject<M, K>>,): Promise<void>;
-
   update<strategy extends FetchStrategy<M, K>>(
     row: Partial<{
       [C in keyof M[K]['columns']]: IsRequired<M[K]['columns'][C]> extends true
@@ -618,8 +624,14 @@ export type TableClient<M extends Record<string, TableDefinition<M>>, K extends 
     }>,
     opts: { where: (row: RootTableRefs<M, K>) => RawFilter },
     strategy: strategy
-  ): Promise<Array<WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K>>>;
+  ): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, strategy>>>, M, K>>;
 
+  // Count and delete methods (no active record methods needed)
+  count(filter: RawFilter | Array<PrimaryKeyObject<M, K>>,): Promise<number>;
+  delete(filter: RawFilter | Array<PrimaryKeyObject<M, K>>,): Promise<void>;
+  deleteCascade(filter: RawFilter | Array<PrimaryKeyObject<M, K>>,): Promise<void>;
+
+  // Replace methods - can return single or array with appropriate active record methods
   replace(
     row: Array<UpdateChangesRow<M, K>>
   ): Promise<void>;
@@ -632,8 +644,9 @@ export type TableClient<M extends Record<string, TableDefinition<M>>, K extends 
   replace<strategy extends FetchStrategy<M, K>>(
     rows: Array<UpdateChangesRow<M, K>>,
     strategy: strategy
-  ): Promise<Array<WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K>>>;
+  ): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, strategy>>>, M, K>>;
 
+  // UpdateChanges methods - can return single or array with appropriate active record methods
   updateChanges(
     row: UpdateChangesRow<M, K>,
     originalRow: UpdateChangesRow<M, K>
@@ -642,7 +655,7 @@ export type TableClient<M extends Record<string, TableDefinition<M>>, K extends 
   updateChanges(
     rows: Array<UpdateChangesRow<M, K>>,
     originalRows: Array<UpdateChangesRow<M, K>>
-  ): Promise<Array<WithActiveRecord<DeepExpand<Selection<M, K, {}>>, M, K>>>;
+  ): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, {}>>>, M, K>>;
 
   updateChanges<strategy extends FetchStrategy<M, K>>(
     row: UpdateChangesRow<M, K>,
@@ -654,8 +667,9 @@ export type TableClient<M extends Record<string, TableDefinition<M>>, K extends 
     rows: Array<UpdateChangesRow<M, K>>,
     originalRows: Array<UpdateChangesRow<M, K>>,
     strategy: strategy
-  ): Promise<Array<WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K>>>;
+  ): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, strategy>>>, M, K>>;
 
+  // Insert methods - no active record methods for insertAndForget, appropriate methods for others
   insertAndForget(
     row: InsertRow<M, K>
   ): Promise<void>;
@@ -670,7 +684,7 @@ export type TableClient<M extends Record<string, TableDefinition<M>>, K extends 
 
   insert(
     rows: Array<InsertRow<M, K>>
-  ): Promise<Array<WithActiveRecord<DeepExpand<Selection<M, K, {}>>, M, K>>>;
+  ): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, {}>>>, M, K>>;
 
   insert<strategy extends FetchStrategy<M, K>>(
     row: InsertRow<M, K>,
@@ -680,15 +694,16 @@ export type TableClient<M extends Record<string, TableDefinition<M>>, K extends 
   insert<strategy extends FetchStrategy<M, K>>(
     rows: Array<InsertRow<M, K>>,
     strategy: strategy
-  ): Promise<Array<WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K>>>;
+  ): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, strategy>>>, M, K>>;
 
+  // Proxify methods - can return single or array with appropriate active record methods
   proxify(
     row: UpdateChangesRow<M, K>
   ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, {}>>, M, K>>;
 
   proxify(
     rows: Array<UpdateChangesRow<M, K>>
-  ): Promise<Array<WithActiveRecord<DeepExpand<Selection<M, K, {}>>, M, K>>>;
+  ): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, {}>>>, M, K>>;
 
   proxify<strategy extends FetchStrategy<M, K>>(
     row: UpdateChangesRow<M, K>,
@@ -698,20 +713,24 @@ export type TableClient<M extends Record<string, TableDefinition<M>>, K extends 
   proxify<strategy extends FetchStrategy<M, K>>(
     rows: Array<UpdateChangesRow<M, K>>,
     strategy: strategy
-  ): Promise<Array<WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K>>>;
+  ): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, strategy>>>, M, K>>;
 
- patch<strategy extends FetchStrategy<M, K>>(
+  // Patch method
+  patch<strategy extends FetchStrategy<M, K>>(
     patches: JsonPatch,
     strategy: strategy,
     concurrency?: ConcurrencyConfig<M>[K]
   ): Promise<void>;
 
+  // TypeScript type helpers
   tsType(): DeepExpand<Selection<M, K, {}>>;
 
   tsType<strategy extends FetchStrategy<M, K>>(
     strategy: strategy
   ): DeepExpand<Selection<M, K, strategy>>;
 };
+
+// Rest of the type definitions remain the same...
 
 export type ConcurrencyStrategy = 'optimistic' | 'overwrite' | 'skipOnConflict';
 
@@ -739,15 +758,6 @@ export type DbOptions<M extends Record<string, TableDefinition<M>>> =
   & ColumnConcurrency & {
     db?: Pool | ((connectors: Connectors) => Pool | Promise<Pool>);
   };
-
-
-// type NegotiateDbInstance<T, C> = C extends WithDb
-// 	? DbConnectable<SchemaFromMappedDb<MappedDb<T>>>
-// 	: MappedDb<T>;
-
-// type WithDb = {
-// 	db: Pool | ((connectors: Connectors) => Pool | Promise<Pool>)
-// };
 
 export type DbConcurrency<M extends Record<string, TableDefinition<M>>> =
   ConcurrencyConfig<M>
@@ -817,13 +827,12 @@ export type DBClient<M extends Record<string, TableDefinition<M>>> = {
   transaction(
 		fn: (db: DBClient<M>) => Promise<unknown>
 	): Promise<void>;
-  // saveChanges(arraysOrRow: { saveChanges(): Promise<void> }): Promise<void>;
   express(): import('express').RequestHandler;
   express(config: ExpressConfig<M>): import('express').RequestHandler;
   readonly metaData: DbConcurrency<M>;
 
   interceptors: WithInterceptors;
-} & WithInterceptors;
+} & WithInterceptors & DbConnectable<M>;
 
 type ExpressConfig<M extends Record<string, TableDefinition<M>>> = {
   [TableName in keyof M]?: ExpressTableConfig<M>;
