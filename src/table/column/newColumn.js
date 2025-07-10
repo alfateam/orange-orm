@@ -80,13 +80,13 @@ module.exports = function(table, name) {
 
 	c.groupSum = (context, ...rest) => aggregateGroup.apply(null, [context, 'sum', c, table, ...rest]);
 	c.groupAvg = (context, ...rest) => aggregateGroup.apply(null, [context, 'avg', c, table, ...rest]);
-	c.groupMin = (context, ...rest) => aggregateGroup.apply(null, [context, 'min', c, table, ...rest]);
-	c.groupMax = (context, ...rest) => aggregateGroup.apply(null, [context, 'max', c, table, ...rest]);
+	c.groupMin = (context, ...rest) => aggregateGroup.apply(null, [context, 'min', c, table, false, ...rest]);
+	c.groupMax = (context, ...rest) => aggregateGroup.apply(null, [context, 'max', c, table, false, ...rest]);
 	c.groupCount = (context, ...rest) => aggregateGroup.apply(null, [context, 'count', c, table, false, ...rest]);
 	c.sum = (context, ...rest) => aggregate.apply(null, [context, 'sum', c, table, ...rest]);
 	c.avg = (context, ...rest) => aggregate.apply(null, [context, 'avg', c, table, ...rest]);
-	c.min = (context, ...rest) => aggregate.apply(null, [context, 'min', c, table, ...rest]);
-	c.max = (context, ...rest) => aggregate.apply(null, [context, 'max', c, table, ...rest]);
+	c.min = (context, ...rest) => aggregate.apply(null, [context, 'min', c, table, false, ...rest]);
+	c.max = (context, ...rest) => aggregate.apply(null, [context, 'max', c, table, false, ...rest]);
 	c.count = (context, ...rest) => aggregate.apply(null, [context, 'count', c, table, false, ...rest]);
 
 	function self(context) {

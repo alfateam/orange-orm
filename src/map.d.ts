@@ -4,21 +4,28 @@ import type { ConnectionConfiguration } from 'tedious';
 import type { D1Database } from '@cloudflare/workers-types';
 import type { PoolAttributes } from 'oracledb';
 import type { AxiosInterceptorManager, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
+import type { DBClient } from './map2';
 
-export type MappedDbDef<T> = {
-	map<V extends AllowedDbMap<V>>(
-		callback: (mapper: DbMapper<T>) => V
-	): MappedDbDef<MergeProperties<T, V>>;
-	<O extends DbOptions<T>>(concurrency: O): NegotiateDbInstance<T, O>;
-} & T & DbConnectable<T>;
 
-type MergeProperties<T, V> = {
+
+//todo
+export type MergeProperties<T, V> = {
 	[K in keyof T | keyof V]:
-	K extends keyof T ? (T[K] extends MappedTableDef<infer M>
-		? (K extends keyof V ? (V[K] extends MappedTableDef<infer N> ? MappedTableDef<M & N> : V[K]) : T[K])
-		: T[K])
-	: (K extends keyof V ? V[K] : never);
-};
+	  K extends keyof T
+		? T[K] extends MappedTableDef<infer M>
+		  ? K extends keyof V
+			? V[K] extends MappedTableDef<infer N>
+			  ? MappedTableDef<M & N & TableAlias<K>>
+			  : V[K]
+			: T[K]
+		  : T[K]
+		: K extends keyof V
+		? V[K] extends MappedTableDef<infer N>
+		  ? MappedTableDef<N & TableAlias<K>>
+		  : V[K]
+		: never;
+  };
+
 
 
 export type DbMapper<T> = {
@@ -30,21 +37,21 @@ type MappedDb<T> = {
 } & DbConnectable<T>;
 
 type DbConnectable<T> = {
-	http(url: string): MappedDbInstance<T>;
-	d1(database: D1Database): MappedDbInstance<T>;
-	postgres(connectionString: string, options?: PoolOptions): MappedDbInstance<T>;
-	pglite(config?: PGliteOptions| string | undefined, options?: PoolOptions): MappedDbInstance<T>;
-	sqlite(connectionString: string, options?: PoolOptions): MappedDbInstance<T>;
-	sap(connectionString: string, options?: PoolOptions): MappedDbInstance<T>;
-	mssql(connectionConfig: ConnectionConfiguration, options?: PoolOptions): MappedDbInstance<T>;
-	mssql(connectionString: string, options?: PoolOptions): MappedDbInstance<T>;
-	mssqlNative(connectionString: string, options?: PoolOptions): MappedDbInstance<T>;
-	mysql(connectionString: string, options?: PoolOptions): MappedDbInstance<T>;
-	oracle(config: PoolAttributes, options?: PoolOptions): MappedDbInstance<T>;
+	http(url: string): DBClient<SchemaFromMappedDb<T>>;
+	d1(database: D1Database): DBClient<SchemaFromMappedDb<T>>;
+	postgres(connectionString: string, options?: PoolOptions): DBClient<SchemaFromMappedDb<T>>;
+	pglite(config?: PGliteOptions| string | undefined, options?: PoolOptions): DBClient<SchemaFromMappedDb<T>>;
+	sqlite(connectionString: string, options?: PoolOptions): DBClient<SchemaFromMappedDb<T>>;
+	sap(connectionString: string, options?: PoolOptions): DBClient<SchemaFromMappedDb<T>>;
+	mssql(connectionConfig: ConnectionConfiguration, options?: PoolOptions): DBClient<SchemaFromMappedDb<T>>;
+	mssql(connectionString: string, options?: PoolOptions): DBClient<SchemaFromMappedDb<T>>;
+	mssqlNative(connectionString: string, options?: PoolOptions): DBClient<SchemaFromMappedDb<T>>;
+	mysql(connectionString: string, options?: PoolOptions): DBClient<SchemaFromMappedDb<T>>;
+	oracle(config: PoolAttributes, options?: PoolOptions): DBClient<SchemaFromMappedDb<T>>;
 };
 
 type NegotiateDbInstance<T, C> = C extends WithDb
-	? MappedDbInstance<T>
+	? DBClient<SchemaFromMappedDb<T>>
 	: MappedDb<T>;
 
 type WithDb = {
@@ -188,7 +195,7 @@ type ExpandedMappedTable<T, FL = ExpandedFetchingStrategy<T>> = {
 	replace(
 		row: StrategyToInsertRowData<T> | StrategyToInsertRowData<T>[]
 	): Promise<void>;
-	
+
 	replace<FS extends FetchingStrategy<T>>(
 		row: StrategyToInsertRowData<T>,
 		strategy: FS
@@ -313,7 +320,7 @@ type MappedTable<T> = {
 		filter?: Filter | PrimaryRowFilter<T>,
 		fetchingStrategy?: FS
 	): Promise<StrategyToRow<FetchedProperties<T, FS>, T>>;
-	
+
 	update(
 		values: StrategyToUpdateRowData<T>,
 		where: FetchingStrategy<T>
@@ -328,7 +335,7 @@ type MappedTable<T> = {
 	replace(
 		row: StrategyToInsertRowData<T> | StrategyToInsertRowData<T>[]
 	): Promise<void>;
-	
+
 	replace<FS extends FetchingStrategy<T>>(
 		row: StrategyToInsertRowData<T>,
 		strategy: FS
@@ -616,7 +623,7 @@ type AggregateStrategyBase<T> =
 	};
 
 
-type FetchingStrategyBase<T, IsMany = true> = 
+type FetchingStrategyBase<T, IsMany = true> =
 {
 	[K in keyof T &
 	keyof RemoveNever<
@@ -624,7 +631,7 @@ type FetchingStrategyBase<T, IsMany = true> =
 	>]?: T[K] extends ColumnSymbols
 	? boolean
 	: boolean | FetchingStrategyBase<T[K], T[K] extends ManyRelation ? true: false> | AggType<T[K]>;
-} & 
+} &
 (IsMany extends true ? {
 	limit?: number;
 	offset?: number;
@@ -972,6 +979,7 @@ type MappedTableDefInit<T> = {
 	): MappedTableDef<T & V>;
 } & T;
 
+//todo
 type MappedTableDef<T> = {
 	map<V extends AllowedColumnsAndTablesMap<V>>(
 		callback: (mapper: ColumnMapper<T>) => V
@@ -1639,7 +1647,7 @@ type DateColumnTypeDef<M> = DateValidator<M> & {
 	serializable(value: boolean): DateColumnTypeDef<M>;
 	JSONSchema(schema: object, options?: Options): DateColumnTypeDef<M>;
 	default(value: string | Date | null | undefined | (() => string | Date | null | undefined)): DateColumnTypeDef<M>;
-	dbNull(value: String | Date): DateColumnTypeDef<M>;
+	dbNull(value: string | Date): DateColumnTypeDef<M>;
 } & ColumnTypeOf<DateColumnType<M>> &
 	M;
 
@@ -1650,7 +1658,7 @@ type DateWithTimeZoneColumnTypeDef<M> = DateValidator<M> & {
 	serializable(value: boolean): DateWithTimeZoneColumnTypeDef<M>;
 	JSONSchema(schema: object, options?: Options): DateWithTimeZoneColumnTypeDef<M>;
 	default(value: string | Date | null | undefined | (() => string | Date | null | undefined)): DateWithTimeZoneColumnTypeDef<M>;
-	dbNull(value: String | Date): DateWithTimeZoneColumnTypeDef<M>;
+	dbNull(value: string | Date): DateWithTimeZoneColumnTypeDef<M>;
 } & ColumnTypeOf<DateWithTimeZoneColumnType<M>> &
 	M;
 
@@ -1783,4 +1791,97 @@ type Increment<C extends number> = C extends 0
 	: C extends 4
 	? 5
 	: 0;
-	
+
+
+type TableAlias<Alias> = {
+	__tableAlias: Alias;
+  };
+
+
+
+export type SchemaFromMappedDb<T> = {
+  [K in keyof T]: T[K] extends MappedTableDef<infer Def>
+    ? TableSchema<Def>
+    : never;
+};
+
+type TableSchema<T> = {
+  columns: {
+    [K in keyof T as T[K] extends ColumnSymbols ? K : never]: ColumnToSchemaType<T[K]>;
+  };
+  primaryKey: ExtractPrimaryKeyNames<T>;
+
+  relations: {
+    [K in keyof T as T[K] extends RelatedTable | ManyRelation ? K : never]:
+      T[K] extends ManyRelation
+        ? { type: 'hasMany'; target: RelationTarget<T[K]> }
+        : T[K] extends RelatedTable
+          ? { type: 'hasOne'; target: RelationTarget<T[K]> }
+          : never;
+  };
+};
+
+type ExtractPrimaryKeyNames<T> =
+  UnionToTuple<{ [K in keyof T]: T[K] extends IsPrimary ? K : never }[keyof T]> extends infer R
+    ? R extends string[] ? R : []
+    : [];
+
+
+type RelationTarget<T> =
+  T extends { __tableAlias: infer S } ? Extract<S, string> : string;
+
+type ColumnToSchemaType<T> =
+  T extends JsonOf<infer U>
+    ? { ' type': 'json'; ' tsType': U }
+      & (T extends NotNullExceptInsert ? { ' notNull': true; ' notNullExceptInsert': true }
+         : T extends NotNull ? { ' notNull': true }
+         : {}) :
+  T extends JSONColumnSymbol & JsonOf<infer U>
+    ? { ' type': 'json'; ' tsType': U }
+      & (T extends NotNullExceptInsert ? { ' notNull': true; ' notNullExceptInsert': true }
+         : T extends NotNull ? { ' notNull': true }
+         : {}) :
+  T extends StringColumnSymbol
+    ? { ' type': 'string' }
+      & (T extends NotNullExceptInsert ? { ' notNull': true; ' notNullExceptInsert': true }
+         : T extends NotNull ? { ' notNull': true }
+         : {}) :
+  T extends UuidColumnSymbol
+    ? { ' type': 'uuid' }
+      & (T extends NotNullExceptInsert ? { ' notNull': true; ' notNullExceptInsert': true }
+         : T extends NotNull ? { ' notNull': true }
+         : {}) :
+  T extends NumericColumnSymbol
+    ? { ' type': 'numeric' }
+      & (T extends NotNullExceptInsert ? { ' notNull': true; ' notNullExceptInsert': true }
+         : T extends NotNull ? { ' notNull': true }
+         : {}) :
+  T extends DateColumnSymbol | DateWithTimeZoneColumnSymbol
+    ? { ' type': 'date' }
+      & (T extends NotNullExceptInsert ? { ' notNull': true; ' notNullExceptInsert': true }
+         : T extends NotNull ? { ' notNull': true }
+         : {}) :
+  T extends BooleanColumnSymbol
+    ? { ' type': 'boolean' }
+      & (T extends NotNullExceptInsert ? { ' notNull': true; ' notNullExceptInsert': true }
+         : T extends NotNull ? { ' notNull': true }
+         : {}) :
+  T extends BinaryColumnSymbol
+    ? { ' type': 'binary' }
+      & (T extends NotNullExceptInsert ? { ' notNull': true; ' notNullExceptInsert': true }
+         : T extends NotNull ? { ' notNull': true }
+         : {}) :
+  never;
+
+export type MappedDbDef<T> = {
+  map<V extends AllowedDbMap<V>>(
+    callback: (mapper: DbMapper<T>) => V
+  ): MappedDbDef<MergeProperties<T, V>>;
+  <O extends DbOptions<T>>(concurrency: O): NegotiateDbInstance<T, O>;
+
+  /**
+   * Returns the schema of the mapped DB as a generic type
+   * Usage: type Schema = ReturnType<typeof db.toSchema>
+   */
+  toSchema: <U = T>() => SchemaFromMappedDb<U>;
+} & T & DbConnectable<T>;
