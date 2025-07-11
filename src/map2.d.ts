@@ -583,6 +583,45 @@ type WithActiveRecord<T, M extends Record<string, TableDefinition<M>>, K extends
 type WithArrayActiveRecord<T extends Array<any>, M extends Record<string, TableDefinition<M>>, K extends keyof M> =
   T & ArrayActiveRecordMethods<M, K>;
 
+// Separate CustomSelectorProperties for aggregate (allows column name overlap)
+type AggregateCustomSelectorProperties<M extends Record<string, TableDefinition<M>>, K extends keyof M, FS extends Record<string, any>> = {
+  // Required properties (count, sum, avg) - no question mark, no null/undefined
+  [P in keyof FS as
+    P extends ReservedFetchStrategyProps ? never :
+    P extends (M[K] extends { relations: infer R } ? keyof R : never) ? never :
+    FS[P] extends (row: any) => any ?
+      (FS[P] extends (row: RootSelectionRefs<M, K>) => infer ReturnType
+        ? IsRequiredAggregate<ReturnType> extends true
+          ? P  // Required aggregates
+          : never
+        : never)
+      : never
+  ]: FS[P] extends (row: RootSelectionRefs<M, K>) => infer ReturnType
+      ? number  // Required aggregate functions (count, sum, avg) return required number
+      : never;
+} & {
+  // Optional properties (max, min, plain columns) - with question mark AND null/undefined
+  [P in keyof FS as
+    P extends ReservedFetchStrategyProps ? never :
+    P extends (M[K] extends { relations: infer R } ? keyof R : never) ? never :
+    FS[P] extends (row: any) => any ?
+      (FS[P] extends (row: RootSelectionRefs<M, K>) => infer ReturnType
+        ? IsRequiredAggregate<ReturnType> extends true
+          ? never  // Required aggregates are not optional
+          : P  // Everything else is optional
+        : never)
+      : never
+  ]?: FS[P] extends (row: RootSelectionRefs<M, K>) => infer ReturnType
+        ? IsMinMaxAggregate<ReturnType> extends true
+          ? ExtractMinMaxColumnType<ReturnType> | null | undefined
+          : IsAggregateFunction<ReturnType> extends true
+            ? number | null | undefined
+            : ReturnType extends ORMColumnDefinition | ORMJsonColumnDefinition
+              ? ColumnDefinitionToTS<ReturnType> | null | undefined
+              : never
+        : never;
+};
+
 export type TableClient<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
   // Array methods - return arrays with array-level active record methods, but individual items are plain
   getAll(): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, {}>>>, M, K>>;
@@ -591,7 +630,9 @@ export type TableClient<M extends Record<string, TableDefinition<M>>, K extends 
   getMany<strategy extends FetchStrategy<M, K>>(filter: RawFilter | Array<PrimaryKeyObject<M, K>>, strategy: strategy): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, strategy>>>, M, K>>;
 
   // Aggregate methods - return plain objects (no active record methods)
-  aggregate<strategy extends AggregateStrategy<M, K>>(strategy: strategy): Promise<Array<DeepExpand<CustomSelectorProperties<M, K, strategy>>>>;
+  aggregate<strategy extends AggregateStrategy<M, K>>(strategy: strategy): Promise<Array<DeepExpand<AggregateCustomSelectorProperties<M, K, strategy>>>>;
+
+
 
   // Single item methods - return individual objects with individual active record methods
   getOne<strategy extends FetchStrategy<M, K>>(
