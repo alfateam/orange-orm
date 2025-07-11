@@ -14799,6 +14799,7 @@ function requireIndexBrowser () {
 	connectViaPool.commit = requireCommit();
 	connectViaPool.rollback = requireRollback();
 	connectViaPool.end = requirePools().end;
+	connectViaPool.close = connectViaPool.end;
 	connectViaPool.log = requireLog().registerLogger;
 	connectViaPool.on = requireLog().on;
 	connectViaPool.off = requireLog().off;

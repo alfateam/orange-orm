@@ -1,4 +1,4 @@
-//map2.d.ts - Refactored Active Record Methods
+//map2.d.ts - Extended Row Types with Relations Support
 import type { PGliteOptions } from './pglite.d.ts';
 import type { ConnectionConfiguration } from 'tedious';
 import type { D1Database } from '@cloudflare/workers-types';
@@ -550,6 +550,55 @@ type UpdateChangesRow<M extends Record<string, TableDefinition<M>>, K extends ke
     : ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
 };
 
+// NEW: Extended row types with relations support
+
+// Type for relation rows - only respects notNull, ignores notNullExceptInsert
+type RelationRow<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
+  // Required columns (notNull = true, ignoring notNullExceptInsert)
+  [C in keyof M[K]['columns'] as IsRequired<M[K]['columns'][C]> extends true ? C : never]: ColumnTypeToTS<M[K]['columns'][C]>;
+} & {
+  // Optional columns (all others)
+  [C in keyof M[K]['columns'] as IsRequired<M[K]['columns'][C]> extends true ? never : C]?: ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
+};
+
+// Helper type to create relation data for insert/update operations
+type RelationData<M extends Record<string, TableDefinition<M>>, K extends keyof M> =
+  M[K] extends { relations: infer R }
+  ? {
+    [RName in keyof R]?: R[RName] extends RelationDefinition<M>
+    ? R[RName]['type'] extends 'hasMany'
+    ? R[RName]['target'] extends keyof M
+    ? Array<RelationRowWithRelations<M, R[RName]['target']>>
+    : never
+    : R[RName]['type'] extends 'hasOne' | 'references'
+    ? R[RName]['target'] extends keyof M
+    ? RelationRowWithRelations<M, R[RName]['target']> | null
+    : never
+    : never
+    : never;
+  }
+  : {};
+
+// Relation row type with nested relations support
+type RelationRowWithRelations<M extends Record<string, TableDefinition<M>>, K extends keyof M> = 
+  RelationRow<M, K> & RelationData<M, K>;
+
+// Extended insert row type with optional relations
+type InsertRowWithRelations<M extends Record<string, TableDefinition<M>>, K extends keyof M> = 
+  InsertRow<M, K> & RelationData<M, K>;
+
+// Extended update/replace row type with optional relations
+type UpdateChangesRowWithRelations<M extends Record<string, TableDefinition<M>>, K extends keyof M> = 
+  UpdateChangesRow<M, K> & RelationData<M, K>;
+
+// Extended type for bulk update operations with optional relations
+type UpdateRowWithRelations<M extends Record<string, TableDefinition<M>>, K extends keyof M> = 
+  Partial<{
+    [C in keyof M[K]['columns']]: IsRequired<M[K]['columns'][C]> extends true
+    ? ColumnTypeToTS<M[K]['columns'][C]>
+    : ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
+  }> & RelationData<M, K>;
+
 // REFACTORED: Separate Active Record Methods for Individual Rows vs Arrays
 
 // Active record methods for individual rows
@@ -633,8 +682,6 @@ export type TableClient<M extends Record<string, TableDefinition<M>>, K extends 
   // Aggregate methods - return plain objects (no active record methods)
   aggregate<strategy extends AggregateStrategy<M, K>>(strategy: strategy): Promise<Array<DeepExpand<AggregateCustomSelectorProperties<M, K, strategy>>>>;
 
-
-
   // Single item methods - return individual objects with individual active record methods
   getOne<strategy extends FetchStrategy<M, K>>(
     filter: RawFilter | Array<PrimaryKeyObject<M, K>>
@@ -653,22 +700,14 @@ export type TableClient<M extends Record<string, TableDefinition<M>>, K extends 
     ...args: [...PrimaryKeyArgs<M, K>]
   ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, {}>>, M, K>>;
 
-  // Bulk update methods
+  // UPDATED: Bulk update methods with relations support
   update(
-    row: Partial<{
-      [C in keyof M[K]['columns']]: IsRequired<M[K]['columns'][C]> extends true
-      ? ColumnTypeToTS<M[K]['columns'][C]>
-      : ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
-    }>,
+    row: UpdateRowWithRelations<M, K>,
     opts: { where: (row: RootTableRefs<M, K>) => RawFilter }
   ): Promise<void>;
 
   update<strategy extends FetchStrategy<M, K>>(
-    row: Partial<{
-      [C in keyof M[K]['columns']]: IsRequired<M[K]['columns'][C]> extends true
-      ? ColumnTypeToTS<M[K]['columns'][C]>
-      : ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
-    }>,
+    row: UpdateRowWithRelations<M, K>,
     opts: { where: (row: RootTableRefs<M, K>) => RawFilter },
     strategy: strategy
   ): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, strategy>>>, M, K>>;
@@ -678,87 +717,87 @@ export type TableClient<M extends Record<string, TableDefinition<M>>, K extends 
   delete(filter: RawFilter | Array<PrimaryKeyObject<M, K>>,): Promise<void>;
   deleteCascade(filter: RawFilter | Array<PrimaryKeyObject<M, K>>,): Promise<void>;
 
-  // Replace methods - can return single or array with appropriate active record methods
+  // UPDATED: Replace methods with relations support
   replace(
-    row: Array<UpdateChangesRow<M, K>>
+    row: Array<UpdateChangesRowWithRelations<M, K>>
   ): Promise<void>;
 
   replace<strategy extends FetchStrategy<M, K>>(
-    row: UpdateChangesRow<M, K>,
+    row: UpdateChangesRowWithRelations<M, K>,
     strategy: strategy
   ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K>>;
 
   replace<strategy extends FetchStrategy<M, K>>(
-    rows: Array<UpdateChangesRow<M, K>>,
+    rows: Array<UpdateChangesRowWithRelations<M, K>>,
     strategy: strategy
   ): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, strategy>>>, M, K>>;
 
-  // UpdateChanges methods - can return single or array with appropriate active record methods
+  // UPDATED: UpdateChanges methods with relations support
   updateChanges(
-    row: UpdateChangesRow<M, K>,
-    originalRow: UpdateChangesRow<M, K>
+    row: UpdateChangesRowWithRelations<M, K>,
+    originalRow: UpdateChangesRowWithRelations<M, K>
   ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, {}>>, M, K>>;
 
   updateChanges(
-    rows: Array<UpdateChangesRow<M, K>>,
-    originalRows: Array<UpdateChangesRow<M, K>>
+    rows: Array<UpdateChangesRowWithRelations<M, K>>,
+    originalRows: Array<UpdateChangesRowWithRelations<M, K>>
   ): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, {}>>>, M, K>>;
 
   updateChanges<strategy extends FetchStrategy<M, K>>(
-    row: UpdateChangesRow<M, K>,
-    originalRow: UpdateChangesRow<M, K>,
+    row: UpdateChangesRowWithRelations<M, K>,
+    originalRow: UpdateChangesRowWithRelations<M, K>,
     strategy: strategy
   ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K>>;
 
   updateChanges<strategy extends FetchStrategy<M, K>>(
-    rows: Array<UpdateChangesRow<M, K>>,
-    originalRows: Array<UpdateChangesRow<M, K>>,
+    rows: Array<UpdateChangesRowWithRelations<M, K>>,
+    originalRows: Array<UpdateChangesRowWithRelations<M, K>>,
     strategy: strategy
   ): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, strategy>>>, M, K>>;
 
-  // Insert methods - no active record methods for insertAndForget, appropriate methods for others
+  // UPDATED: Insert methods with relations support - no active record methods for insertAndForget, appropriate methods for others
   insertAndForget(
-    row: InsertRow<M, K>
+    row: InsertRowWithRelations<M, K>
   ): Promise<void>;
 
   insertAndForget(
-    rows: Array<InsertRow<M, K>>
+    rows: Array<InsertRowWithRelations<M, K>>
   ): Promise<void>;
 
   insert(
-    row: InsertRow<M, K>
+    row: InsertRowWithRelations<M, K>
   ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, {}>>, M, K>>;
 
   insert(
-    rows: Array<InsertRow<M, K>>
+    rows: Array<InsertRowWithRelations<M, K>>
   ): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, {}>>>, M, K>>;
 
   insert<strategy extends FetchStrategy<M, K>>(
-    row: InsertRow<M, K>,
+    row: InsertRowWithRelations<M, K>,
     strategy: strategy
   ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K>>;
 
   insert<strategy extends FetchStrategy<M, K>>(
-    rows: Array<InsertRow<M, K>>,
+    rows: Array<InsertRowWithRelations<M, K>>,
     strategy: strategy
   ): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, strategy>>>, M, K>>;
 
-  // Proxify methods - can return single or array with appropriate active record methods
+  // UPDATED: Proxify methods with relations support
   proxify(
-    row: UpdateChangesRow<M, K>
+    row: UpdateChangesRowWithRelations<M, K>
   ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, {}>>, M, K>>;
 
   proxify(
-    rows: Array<UpdateChangesRow<M, K>>
+    rows: Array<UpdateChangesRowWithRelations<M, K>>
   ): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, {}>>>, M, K>>;
 
   proxify<strategy extends FetchStrategy<M, K>>(
-    row: UpdateChangesRow<M, K>,
+    row: UpdateChangesRowWithRelations<M, K>,
     strategy: strategy
   ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K>>;
 
   proxify<strategy extends FetchStrategy<M, K>>(
-    rows: Array<UpdateChangesRow<M, K>>,
+    rows: Array<UpdateChangesRowWithRelations<M, K>>,
     strategy: strategy
   ): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, strategy>>>, M, K>>;
 
