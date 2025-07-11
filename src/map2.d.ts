@@ -90,6 +90,7 @@ export type ColumnFilterType<Val, ColumnType = any> = {
   ne(value: Val | null | undefined): Filter;
   lessThan(value: Val | null | undefined): Filter;
   lt(value: Val | null | undefined): Filter;
+  lessThanOrEqual(value: Val | null | undefined): Filter;
   le(value: Val | null | undefined): Filter;
   greaterThan(value: Val | null | undefined): Filter;
   gt(value: Val | null | undefined): Filter;
