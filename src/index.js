@@ -28,6 +28,7 @@ connectViaPool.filter = require('./emptyFilter');
 connectViaPool.commit = require('./table/commit');
 connectViaPool.rollback = require('./table/rollback');
 connectViaPool.end = require('./pools').end;
+connectViaPool.close = connectViaPool.end;
 connectViaPool.log = require('./table/log').registerLogger;
 connectViaPool.on = require('./table/log').on;
 connectViaPool.off = require('./table/log').off;
