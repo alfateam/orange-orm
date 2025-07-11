@@ -115,13 +115,13 @@ const map = rdb.map(x => ({
 		datetime_tz: column('tdatetime_tz').dateWithTimeZone()
 	}))
 })).map(x => ({
-	orderLine: x.orderLine.map(({ hasMany }) => ({
-		packages: hasMany(x.package).by('lineId')
+	orderLine: x.orderLine.map(({ hasMany, references }) => ({
+		packages: hasMany(x.package).by('lineId'),
+		order: references(x.order).by('orderId'),
 	})),
 	customer: x.customer.map(({hasMany}) => ({
 		orders: hasMany(x.order).by('customerId')
-	}))
-})).map(x => ({
+	})),
 	order: x.order.map(({ hasOne, hasMany, references }) => ({
 		customer: references(x.customer).by('customerId').notNull(),
 		deliveryAddress: hasOne(x.deliveryAddress).by('orderId').notNull(),
@@ -130,7 +130,6 @@ const map = rdb.map(x => ({
 	compositeOrder: x.compositeOrder.map(({ hasMany }) => ({
 		lines: hasMany(x.compositeOrderLine).by('companyId', 'orderNo')
 	}))
-
 }));
 
 
