@@ -53,14 +53,12 @@ const map = rdb.map(x => ({
 })).map(x => ({
 	orderLine: x.orderLine.map(({ hasMany }) => ({
 		packages: hasMany(x.package).by('lineId')
-	}))
-})).map(x => ({
+	})),
 	order: x.order.map(({ hasOne, hasMany, references }) => ({
 		customer: references(x.customer).by('customerId'),
 		deliveryAddress: hasOne(x.deliveryAddress).by('orderId'),
 		lines: hasMany(x.orderLine).by('orderId')
 	}))
-
 }));
 
 module.exports = map;
