@@ -4,7 +4,8 @@ import type { RequestHandler } from 'express';
 import type { D1Database } from '@cloudflare/workers-types';
 import type { ConnectionConfiguration } from 'tedious';
 import type { PoolAttributes } from 'oracledb';
-import type { AllowedDbMap, DbMapper, MappedDbDef } from './map';
+import type { AllowedDbMap, DbMapper, MappedDbDef, MergeProperties } from './map';
+import type { Filter as MapFilter, RawFilter as MapRawFilter, Pool as MapPool, PoolOptions as MapPoolOptions } from './map2';
 
 declare function r(config: r.Config): unknown;
 
@@ -26,12 +27,12 @@ declare namespace r {
     function off(type: 'query', cb: (e: QueryEvent) => void): void;
     function map<V extends AllowedDbMap<V>>(
 		fn: (mapper: DbMapper<{}>) => V
-	): MappedDbDef<V>;
+	): MappedDbDef<MergeProperties<V, V>>;
     function createPatch(original: any[], modified: any[]): JsonPatch;
     function createPatch(original: any, modified: any): JsonPatch;
 
     type JsonPatch = Array<{
-        op: "add" | "remove" | "replace" | "copy" | "move" | "test";
+        op: 'add' | 'remove' | 'replace' | 'copy' | 'move' | 'test';
         path: string;
         value?: any;
         from?: string;
@@ -48,13 +49,8 @@ declare namespace r {
         result: []
     }
 
-    export interface Pool {
-        end(): Promise<void>;
-    }
-
-    export interface PoolOptions {
-        size?: number;
-    }
+    export type  Pool = MapPool;
+    export type  PoolOptions = MapPoolOptions;
 
     export interface Join {
         by(...columns: string[]): JoinBy;
@@ -65,8 +61,8 @@ declare namespace r {
     }
 
     export abstract class JoinRelation {
-        columns: ColumnDef[];
-        childTable: Table;
+    	columns: ColumnDef[];
+    	childTable: Table;
     }
 
     export interface Table {
@@ -155,17 +151,10 @@ declare namespace r {
         as(dbName: string): ColumnNotNullOf<T>;
     }
 
-    var filter: Filter;
-    export interface RawFilter {
-        sql: string | (() => string);
-        parameters?: any[];
-    }
+    const filter: Filter;
 
-    export interface Filter extends RawFilter {
-        and(filter: Filter, ...filters: Filter[]): Filter;
-        or(filter: Filter, ...filters: Filter[]): Filter;
-        not(): Filter;
-    }
+    export type RawFilter = MapRawFilter;
+    export type Filter = MapFilter;
 
     export type Concurrency = 'optimistic' | 'skipOnConflict' | 'overwrite';
 
@@ -223,11 +212,11 @@ declare namespace r {
          */
         iEqual(value: string | null): Filter;
         /**
-        * ignore case, postgres only         
+        * ignore case, postgres only
         * */
         iEq(value: string | null): Filter;
         /**
-         * ignore case, postgres only         
+         * ignore case, postgres only
          */
         iEq(value: string | null): Filter;
     }

@@ -4218,13 +4218,13 @@ function requireNewColumn () {
 
 		c.groupSum = (context, ...rest) => aggregateGroup.apply(null, [context, 'sum', c, table, ...rest]);
 		c.groupAvg = (context, ...rest) => aggregateGroup.apply(null, [context, 'avg', c, table, ...rest]);
-		c.groupMin = (context, ...rest) => aggregateGroup.apply(null, [context, 'min', c, table, ...rest]);
-		c.groupMax = (context, ...rest) => aggregateGroup.apply(null, [context, 'max', c, table, ...rest]);
+		c.groupMin = (context, ...rest) => aggregateGroup.apply(null, [context, 'min', c, table, false, ...rest]);
+		c.groupMax = (context, ...rest) => aggregateGroup.apply(null, [context, 'max', c, table, false, ...rest]);
 		c.groupCount = (context, ...rest) => aggregateGroup.apply(null, [context, 'count', c, table, false, ...rest]);
 		c.sum = (context, ...rest) => aggregate.apply(null, [context, 'sum', c, table, ...rest]);
 		c.avg = (context, ...rest) => aggregate.apply(null, [context, 'avg', c, table, ...rest]);
-		c.min = (context, ...rest) => aggregate.apply(null, [context, 'min', c, table, ...rest]);
-		c.max = (context, ...rest) => aggregate.apply(null, [context, 'max', c, table, ...rest]);
+		c.min = (context, ...rest) => aggregate.apply(null, [context, 'min', c, table, false, ...rest]);
+		c.max = (context, ...rest) => aggregate.apply(null, [context, 'max', c, table, false, ...rest]);
 		c.count = (context, ...rest) => aggregate.apply(null, [context, 'count', c, table, false, ...rest]);
 
 		function self(context) {
@@ -9415,13 +9415,13 @@ function requireRelatedColumn () {
 
 		c.groupSum = (context, ...rest) => aggregateGroup.apply(null, [context, 'sum', column, relations, ...rest]);
 		c.groupAvg = (context, ...rest) => aggregateGroup.apply(null, [context, 'avg', column, relations, ...rest]);
-		c.groupMin = (context, ...rest) => aggregateGroup.apply(null, [context, 'min', column, relations, ...rest]);
-		c.groupMax = (context, ...rest) => aggregateGroup.apply(null, [context, 'max', column, relations, ...rest]);
+		c.groupMin = (context, ...rest) => aggregateGroup.apply(null, [context, 'min', column, relations, false, ...rest]);
+		c.groupMax = (context, ...rest) => aggregateGroup.apply(null, [context, 'max', column, relations, false, ...rest]);
 		c.groupCount = (context, ...rest) => aggregateGroup.apply(null, [context, 'count', column, relations, false, ...rest]);
 		c.sum = (context, ...rest) => aggregate.apply(null, [context, 'sum', column, relations, ...rest]);
 		c.avg = (context, ...rest) => aggregate.apply(null, [context, 'avg', column, relations, ...rest]);
-		c.min = (context, ...rest) => aggregate.apply(null, [context, 'min', column, relations, ...rest]);
-		c.max = (context, ...rest) => aggregate.apply(null, [context, 'max', column, relations, ...rest]);
+		c.min = (context, ...rest) => aggregate.apply(null, [context, 'min', column, relations, false, ...rest]);
+		c.max = (context, ...rest) => aggregate.apply(null, [context, 'max', column, relations, false, ...rest]);
 		c.count = (context, ...rest) => aggregate.apply(null, [context, 'count', column, relations, false, ...rest]);
 		c.self = (context, ...rest) => childColumn.apply(null, [context, column, relations, ...rest]);
 
@@ -14799,6 +14799,7 @@ function requireIndexBrowser () {
 	connectViaPool.commit = requireCommit();
 	connectViaPool.rollback = requireRollback();
 	connectViaPool.end = requirePools().end;
+	connectViaPool.close = connectViaPool.end;
 	connectViaPool.log = requireLog().registerLogger;
 	connectViaPool.on = requireLog().on;
 	connectViaPool.off = requireLog().off;

@@ -3,23 +3,24 @@ import type { PGliteOptions } from './pglite.d.ts';
 import type { ConnectionConfiguration } from 'tedious';
 import type { D1Database } from '@cloudflare/workers-types';
 import type { PoolAttributes } from 'oracledb';
-import type { AxiosInterceptorManager, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
+import type { DBClient } from './map2';
 
-export type MappedDbDef<T> = {
-	map<V extends AllowedDbMap<V>>(
-		callback: (mapper: DbMapper<T>) => V
-	): MappedDbDef<MergeProperties<T, V>>;
-	<O extends DbOptions<T>>(concurrency: O): NegotiateDbInstance<T, O>;
-} & T & DbConnectable<T>;
-
-type MergeProperties<T, V> = {
+export type MergeProperties<T, V> = {
 	[K in keyof T | keyof V]:
-	K extends keyof T ? (T[K] extends MappedTableDef<infer M>
-		? (K extends keyof V ? (V[K] extends MappedTableDef<infer N> ? MappedTableDef<M & N> : V[K]) : T[K])
-		: T[K])
-	: (K extends keyof V ? V[K] : never);
+	K extends keyof T
+	? T[K] extends MappedTableDef<infer M>
+	? K extends keyof V
+	? V[K] extends MappedTableDef<infer N>
+	? MappedTableDef<M & N & TableAlias<K>>
+	: V[K]
+	: T[K]
+	: T[K]
+	: K extends keyof V
+	? V[K] extends MappedTableDef<infer N>
+	? MappedTableDef<N & TableAlias<K>>
+	: V[K]
+	: never;
 };
-
 
 export type DbMapper<T> = {
 	table(tableName: string): MappedTableDefInit<{}>;
@@ -30,21 +31,21 @@ type MappedDb<T> = {
 } & DbConnectable<T>;
 
 type DbConnectable<T> = {
-	http(url: string): MappedDbInstance<T>;
-	d1(database: D1Database): MappedDbInstance<T>;
-	postgres(connectionString: string, options?: PoolOptions): MappedDbInstance<T>;
-	pglite(config?: PGliteOptions| string | undefined, options?: PoolOptions): MappedDbInstance<T>;
-	sqlite(connectionString: string, options?: PoolOptions): MappedDbInstance<T>;
-	sap(connectionString: string, options?: PoolOptions): MappedDbInstance<T>;
-	mssql(connectionConfig: ConnectionConfiguration, options?: PoolOptions): MappedDbInstance<T>;
-	mssql(connectionString: string, options?: PoolOptions): MappedDbInstance<T>;
-	mssqlNative(connectionString: string, options?: PoolOptions): MappedDbInstance<T>;
-	mysql(connectionString: string, options?: PoolOptions): MappedDbInstance<T>;
-	oracle(config: PoolAttributes, options?: PoolOptions): MappedDbInstance<T>;
+	http(url: string): DBClient<SchemaFromMappedDb<T>>;
+	d1(database: D1Database): DBClient<SchemaFromMappedDb<T>>;
+	postgres(connectionString: string, options?: PoolOptions): DBClient<SchemaFromMappedDb<T>>;
+	pglite(config?: PGliteOptions| string | undefined, options?: PoolOptions): DBClient<SchemaFromMappedDb<T>>;
+	sqlite(connectionString: string, options?: PoolOptions): DBClient<SchemaFromMappedDb<T>>;
+	sap(connectionString: string, options?: PoolOptions): DBClient<SchemaFromMappedDb<T>>;
+	mssql(connectionConfig: ConnectionConfiguration, options?: PoolOptions): DBClient<SchemaFromMappedDb<T>>;
+	mssql(connectionString: string, options?: PoolOptions): DBClient<SchemaFromMappedDb<T>>;
+	mssqlNative(connectionString: string, options?: PoolOptions): DBClient<SchemaFromMappedDb<T>>;
+	mysql(connectionString: string, options?: PoolOptions): DBClient<SchemaFromMappedDb<T>>;
+	oracle(config: PoolAttributes, options?: PoolOptions): DBClient<SchemaFromMappedDb<T>>;
 };
 
 type NegotiateDbInstance<T, C> = C extends WithDb
-	? MappedDbInstance<T>
+	? DBClient<SchemaFromMappedDb<T>>
 	: MappedDb<T>;
 
 type WithDb = {
@@ -81,50 +82,6 @@ export interface PoolOptions {
 	size?: number;
 }
 
-type MappedDbInstance<T> = {
-	[K in keyof T]: T[K] extends MappedTableDef<infer U>
-	? MappedTable<T[K]>
-	: never;
-} & {
-	close(): Promise<void>;
-	filter: Filter;
-	and(filter: Filter | RawFilter[], ...filters: RawFilter[]): Filter;
-	or(filter: Filter | RawFilter[], ...filters: RawFilter[]): Filter;
-	not(): Filter;
-	query(filter: RawFilter | string): Promise<unknown[]>;
-	query<T>(filter: RawFilter | string): Promise<T[]>;
-	createPatch(original: any[], modified: any[]): JsonPatch;
-	createPatch(original: any, modified: any): JsonPatch;
-	<O extends DbOptions<T>>(concurrency: O): MappedDbInstance<T>;
-	transaction(
-		fn: (db: MappedDbInstance<T>) => Promise<unknown>
-	): Promise<void>;
-	saveChanges(arraysOrRow: { saveChanges(): Promise<void> }): Promise<void>;
-	express(): import('express').RequestHandler;
-	express(config: ExpressConfig<T>): import('express').RequestHandler;
-	readonly metaData: DbConcurrency<T>;
-	interceptors: WithInterceptors;
-} & DbConnectable<T> & WithInterceptors;
-
-interface WithInterceptors {
-	request: AxiosInterceptorManager<InternalAxiosRequestConfig>;
-	response: AxiosInterceptorManager<AxiosResponse>;
-}
-
-
-type ExpressConfig<T> = {
-	[K in keyof T]?: T[K] extends MappedTableDef<infer U>
-	? ExpressTableConfig<T>
-	: never;
-} & {
-	db?: Pool | ((connectors: Connectors) => Pool | Promise<Pool>);
-}
-
-type ExpressTableConfig<T> = {
-	baseFilter?: RawFilter | ((db: MappedDbInstance<T>, req: import('express').Request, res: import('express').Response) => RawFilter);
-}
-
-
 type JsonPatch = Array<{
 	op: 'add' | 'remove' | 'replace' | 'copy' | 'move' | 'test';
 	path: string;
@@ -134,399 +91,10 @@ type JsonPatch = Array<{
 
 type ToJsonType<M> = M extends JsonOf<infer N> ? N : JsonType;
 
-type PrimaryRowFilter<T> = StrategyToRowDataPrimary<ExtractPrimary<T>>;
-type StrategyToRowDataPrimary<T> = {
-	[K in keyof T]: T[K] extends StringColumnSymbol
-	? string
-	: T[K] extends UuidColumnSymbol
-	? string
-	: T[K] extends NumericColumnSymbol
-	? number
-	: T[K] extends DateColumnSymbol
-	? string | Date
-	: T[K] extends DateWithTimeZoneColumnSymbol
-	? string | Date
-	: T[K] extends BinaryColumnSymbol
-	? string
-	: T[K] extends BooleanColumnSymbol
-	? boolean
-	: T[K] extends JSONColumnType<infer M>
-	? ToJsonType<M>
-	: never;
-};
-
-
-type ExpandedFetchingStrategy<T> = {
-	[K in keyof T &
-	keyof RemoveNever<
-		AllowedColumnsAndTablesStrategy<T>
-	>]?: T[K] extends ColumnSymbols
-	? true
-	: ExpandedFetchingStrategy<T[K]>;
-};
-
-type ExpandedMappedTable<T, FL = ExpandedFetchingStrategy<T>> = {
-	getOne(
-		filter?: Filter | PrimaryRowFilter<T>
-	): Promise<StrategyToRow<FetchedProperties<T, FL>, T>>;
-	getOne<FS extends FetchingStrategy<T>>(
-		filter?: Filter | PrimaryRowFilter<T>,
-		fetchingStrategy?: FS
-	): Promise<StrategyToRow<FetchedProperties<T, FL>, T>>;
-
-	update(
-		values: StrategyToUpdateRowData<T>,
-		where: FetchingStrategy<T>
-	): Promise<void>;
-
-	update<FS extends FetchingStrategy<T>>(
-		values: StrategyToUpdateRowData<T>,
-		where: FetchingStrategy<T>,
-		strategy: FS
-	): Promise<StrategyToRowArray<FetchedProperties<T, FL>, T>>;
-
-	replace(
-		row: StrategyToInsertRowData<T> | StrategyToInsertRowData<T>[]
-	): Promise<void>;
-	
-	replace<FS extends FetchingStrategy<T>>(
-		row: StrategyToInsertRowData<T>,
-		strategy: FS
-	): Promise<StrategyToRow<FetchedProperties<T, FL>, T>>;
-
-	replace<FS extends FetchingStrategy<T>>(
-		rows: StrategyToInsertRowData<T>[],
-		strategy: FS
-	): Promise<StrategyToRowArray<FetchedProperties<T, FL>, T>>;
-
-
-	updateChanges(
-		row: StrategyToInsertRowData<T>,
-		originalRow: StrategyToInsertRowData<T>
-	): Promise<StrategyToRow<FetchedProperties<T, FL>, T>>;
-
-	updateChanges(
-		rows: StrategyToInsertRowData<T>[],
-		originalRows: StrategyToInsertRowData<T>[]
-	): Promise<StrategyToRowArray<FetchedProperties<T, FL>, T>>;
-
-	updateChanges<FS extends FetchingStrategy<T>>(
-		row: StrategyToInsertRowData<T>,
-		originalRow: StrategyToInsertRowData<T>,
-		strategy: FS
-	): Promise<StrategyToRow<FetchedProperties<T, FL>, T>>;
-
-	updateChanges<FS extends FetchingStrategy<T>>(
-		rows: StrategyToInsertRowData<T>[],
-		originalRows: StrategyToInsertRowData<T>[],
-		strategy: FS
-	): Promise<StrategyToRowArray<FetchedProperties<T, FL>, T>>;
-
-	insert(
-		row: StrategyToInsertRowData<T>
-	): Promise<StrategyToRow<FetchedProperties<T, FL>, T>>;
-
-	insert(
-		rows: StrategyToInsertRowData<T>[]
-	): Promise<StrategyToRowArray<FetchedProperties<T, FL>, T>>;
-
-	insert<FS extends FetchingStrategy<T>>(
-		row: StrategyToInsertRowData<T>,
-		strategy: FS
-	): Promise<StrategyToRow<FetchedProperties<T, FL>, T>>;
-
-	insert<FS extends FetchingStrategy<T>>(
-		rows: StrategyToInsertRowData<T>[],
-		strategy: FS
-	): Promise<StrategyToRowArray<FetchedProperties<T, FL>, T>>;
-
-	insertAndForget(
-		row: StrategyToRowData<T>
-	): Promise<void>;
-
-	insertAndForget(
-		row: StrategyToRowData<T>[]
-	): Promise<void>;
-
-	getMany(
-		filter?: Filter | PrimaryRowFilter<T>[]
-	): Promise<StrategyToRowArray<FetchedProperties<T, FL>, T>>;
-	getMany<FS extends FetchingStrategy<T>>(
-		filter?: Filter | PrimaryRowFilter<T>[],
-		fetchingStrategy?: FS
-	): Promise<StrategyToRowArray<FetchedProperties<T, FL>, T>>;
-	getAll(): Promise<StrategyToRowArray<FetchedProperties<T, FL>, T>>;
-	getAll<FS extends FetchingStrategy<T>>(
-		fetchingStrategy: FS
-	): Promise<StrategyToRowArray<FetchedProperties<T, FL>, T>>;
-	aggregate<FS extends AggregateStrategy<T>>(
-		fetchingStrategy: FS
-	): Promise<StrategyToRowData<FetchedAggregateProperties<T, FL>>[]>;
-	count(filter?: Filter | PrimaryRowFilter<T>[]): Promise<number>;
-	delete(filter?: Filter | PrimaryRowFilter<T>[]): Promise<void>;
-	deleteCascade(filter?: Filter | PrimaryRowFilter<T>[]): Promise<void>;
-
-	proxify(
-		row: StrategyToInsertRowData<T>
-	): StrategyToRow<FetchedProperties<T, FL>, T>;
-
-	proxify(
-		row: StrategyToInsertRowData<T>[]
-	): StrategyToRowArray<FetchedProperties<T, FL>, T>;
-
-	proxify<FS extends FetchingStrategy<T>>(
-		row: StrategyToInsertRowData<T>,
-		strategy: FS
-	): StrategyToRow<FetchedProperties<T, FL>, T>;
-
-	proxify<FS extends FetchingStrategy<T>>(
-		row: StrategyToInsertRowData<T>[],
-		strategy: FS
-	): StrategyToRowArray<FetchedProperties<T, FL>, T>;
-
-
-	patch<C extends Concurrency<T>>(
-		patch: JsonPatch,
-		concurrency?: C
-	): Promise<void>;
-
-	tsType<FS extends FetchingStrategy<T>>(
-		strategy: FS
-	): StrategyToRowData<FetchedProperties<T, FS>>;
-	tsType(
-	): StrategyToRowData<FetchedProperties<T, FL>>;
-
-	readonly metaData: Concurrency<T>;
-} & MappedColumnsAndRelations<T> &
-	GetById<T, CountProperties<ExtractPrimary<T>>>;
-
 type ReturnArrayOrObj<W, V1, V2> =
 	W extends any[] ? V2 :
 	V1;
 
-type MappedTable<T> = {
-	expand(): ExpandedMappedTable<T>
-	getOne(
-		filter?: Filter | PrimaryRowFilter<T>
-	): Promise<StrategyToRow<FetchedProperties<T, {}>, T>>;
-	getOne<FS extends FetchingStrategy<T>>(
-		filter?: Filter | PrimaryRowFilter<T>,
-		fetchingStrategy?: FS
-	): Promise<StrategyToRow<FetchedProperties<T, FS>, T>>;
-	
-	update(
-		values: StrategyToUpdateRowData<T>,
-		where: FetchingStrategy<T>
-	): Promise<void>;
-
-	update<FS extends FetchingStrategy<T>>(
-		values: StrategyToUpdateRowData<T>,
-		where: FetchingStrategy<T>,
-		strategy: FS
-	): Promise<StrategyToRowArray<FetchedProperties<T, FS>, T>>;
-
-	replace(
-		row: StrategyToInsertRowData<T> | StrategyToInsertRowData<T>[]
-	): Promise<void>;
-	
-	replace<FS extends FetchingStrategy<T>>(
-		row: StrategyToInsertRowData<T>,
-		strategy: FS
-	): Promise<StrategyToRow<FetchedProperties<T, FS>, T>>;
-
-	replace<FS extends FetchingStrategy<T>>(
-		rows: StrategyToInsertRowData<T>[],
-		strategy: FS
-	): Promise<StrategyToRowArray<FetchedProperties<T, FS>, T>>;
-
-	updateChanges(
-		modifiedRow: StrategyToInsertRowData<T>,
-		originalRow: StrategyToInsertRowData<T>
-	): Promise<StrategyToRow<FetchedProperties<T, {}>, T>>;
-
-
-	updateChanges(
-		modifiedRows: StrategyToInsertRowData<T>[],
-		originalRows: StrategyToInsertRowData<T>[]
-	): Promise<StrategyToRowArray<FetchedProperties<T, {}>, T>>;
-
-	updateChanges<FS extends FetchingStrategy<T>>(
-		modifiedRow: StrategyToInsertRowData<T>,
-		originalRow: StrategyToInsertRowData<T>,
-		strategy: FS
-	): Promise<StrategyToRow<FetchedProperties<T, FS>, T>>;
-
-	updateChanges<FS extends FetchingStrategy<T>>(
-		modifiedRows: StrategyToInsertRowData<T>[],
-		originalRows: StrategyToInsertRowData<T>[],
-		strategy: FS
-	): Promise<StrategyToRowArray<FetchedProperties<T, FS>, T>>;
-
-	insert(
-		row: StrategyToInsertRowData<T>
-	): Promise<StrategyToRow<FetchedProperties<T, {}>, T>>;
-
-	insert(
-		rows: StrategyToInsertRowData<T>[]
-	): Promise<StrategyToRowArray<FetchedProperties<T, {}>, T>>;
-
-	insert<FS extends FetchingStrategy<T>>(
-		row: StrategyToInsertRowData<T>,
-		strategy: FS
-	): Promise<StrategyToRow<FetchedProperties<T, FS>, T>>;
-
-	insert<FS extends FetchingStrategy<T>>(
-		rows: StrategyToInsertRowData<T>[],
-		strategy: FS
-	): Promise<StrategyToRowArray<FetchedProperties<T, FS>, T>>;
-
-	insertAndForget<TRow extends StrategyToInsertRowData<T> | StrategyToInsertRowData<T>[]>(
-		row: TRow
-	): Promise<void>;
-	getMany(
-		filter?: Filter | PrimaryRowFilter<T>[]
-	): Promise<StrategyToRowArray<FetchedProperties<T, {}>, T>>;
-	getMany<FS extends FetchingStrategy<T>>(
-		filter?: Filter | PrimaryRowFilter<T>[],
-		fetchingStrategy?: FS
-	): Promise<StrategyToRowArray<FetchedProperties<T, FS>, T>>;
-	getAll(): Promise<StrategyToRowArray<FetchedProperties<T, {}>, T>>;
-	getAll<FS extends FetchingStrategy<T>>(
-		fetchingStrategy: FS
-	): Promise<StrategyToRowArray<FetchedProperties<T, FS>, T>>;
-
-	aggregate<FS extends AggregateStrategy<T>>(
-		fetchingStrategy: FS
-	): Promise<StrategyToRowData<FetchedAggregateProperties<T, FS>>[]>;
-
-	count(filter?: Filter | PrimaryRowFilter<T>[]): Promise<number>;
-	delete(filter?: Filter | PrimaryRowFilter<T>[]): Promise<void>;
-	deleteCascade(filter?: Filter | PrimaryRowFilter<T>[]): Promise<void>;
-
-	proxify(
-		row: StrategyToInsertRowData<T>
-	): StrategyToRow<FetchedProperties<T, {}>, T>;
-
-	proxify(
-		row: StrategyToInsertRowData<T>[]
-	): StrategyToRowArray<FetchedProperties<T, {}>, T>;
-
-	proxify<FS extends FetchingStrategy<T>>(
-		row: StrategyToInsertRowData<T>,
-		strategy: FS
-	): StrategyToRow<FetchedProperties<T, FS>, T>;
-
-	proxify<FS extends FetchingStrategy<T>>(
-		row: StrategyToInsertRowData<T>[],
-		strategy: FS
-	): StrategyToRowArray<FetchedProperties<T, FS>, T>;
-
-	patch<C extends Concurrency<T>>(
-		patch: JsonPatch,
-		concurrency?: C
-	): Promise<void>;
-
-	tsType<FS extends FetchingStrategy<T>>(
-		strategy: FS
-	): StrategyToRowData<FetchedProperties<T, FS>>;
-	tsType(
-	): StrategyToRowData<FetchedProperties<T, {}>>;
-
-	readonly metaData: Concurrency<T>;
-} & MappedColumnsAndRelations<T> &
-	GetById<T, CountProperties<ExtractPrimary<T>>>;
-
-type GetById<T, Count extends number> = Count extends 1
-	? {
-		getById(
-			id: ColumnToType<PickPropertyValue1<PickTypesOf<T, IsPrimary>>>
-		): Promise<StrategyToRow<FetchedProperties<T, {}>, T>>;
-		getById<FS extends FetchingStrategy<T>>(
-			id: ColumnToType<PickPropertyValue1<PickTypesOf<T, IsPrimary>>>,
-			fetchingStrategy: FS
-		): Promise<StrategyToRow<FetchedProperties<T, FS>, T>>;
-	}
-	: Count extends 2
-	? {
-		getById(
-			id: ColumnToType<PickPropertyValue1<PickTypesOf<T, IsPrimary>>>,
-			id2: ColumnToType<PickPropertyValue2<PickTypesOf<T, IsPrimary>>>
-		): Promise<StrategyToRow<FetchedProperties<T, {}>, T>>;
-		getById<FS extends FetchingStrategy<T>>(
-			id: ColumnToType<PickPropertyValue1<PickTypesOf<T, IsPrimary>>>,
-			id2: ColumnToType<PickPropertyValue2<PickTypesOf<T, IsPrimary>>>,
-			fetchingStrategy: FS
-		): Promise<StrategyToRow<FetchedProperties<T, FS>, T>>;
-	}
-	: Count extends 3
-	? {
-		getById(
-			id: ColumnToType<PickPropertyValue1<PickTypesOf<T, IsPrimary>>>,
-			id2: ColumnToType<PickPropertyValue2<PickTypesOf<T, IsPrimary>>>,
-			id3: ColumnToType<PickPropertyValue3<PickTypesOf<T, IsPrimary>>>
-		): Promise<StrategyToRow<FetchedProperties<T, {}>, T>>;
-		getById<FS extends FetchingStrategy<T>>(
-			id: ColumnToType<PickPropertyValue1<PickTypesOf<T, IsPrimary>>>,
-			id2: ColumnToType<PickPropertyValue2<PickTypesOf<T, IsPrimary>>>,
-			id3: ColumnToType<PickPropertyValue3<PickTypesOf<T, IsPrimary>>>,
-			fetchingStrategy: FS
-		): Promise<StrategyToRow<FetchedProperties<T, FS>, T>>;
-	}
-	: Count extends 4
-	? {
-		getById(
-			id: ColumnToType<PickPropertyValue1<PickTypesOf<T, IsPrimary>>>,
-			id2: ColumnToType<PickPropertyValue2<PickTypesOf<T, IsPrimary>>>,
-			id3: ColumnToType<PickPropertyValue3<PickTypesOf<T, IsPrimary>>>,
-			id4: ColumnToType<PickPropertyValue4<PickTypesOf<T, IsPrimary>>>
-		): Promise<StrategyToRow<FetchedProperties<T, {}>, T>>;
-		getById<FS extends FetchingStrategy<T>>(
-			id: ColumnToType<PickPropertyValue1<PickTypesOf<T, IsPrimary>>>,
-			id2: ColumnToType<PickPropertyValue2<PickTypesOf<T, IsPrimary>>>,
-			id3: ColumnToType<PickPropertyValue3<PickTypesOf<T, IsPrimary>>>,
-			id4: ColumnToType<PickPropertyValue4<PickTypesOf<T, IsPrimary>>>,
-			fetchingStrategy: FS
-		): Promise<StrategyToRow<FetchedProperties<T, FS>, T>>;
-	}
-	: Count extends 5
-	? {
-		getById(
-			id: ColumnToType<PickPropertyValue1<PickTypesOf<T, IsPrimary>>>,
-			id2: ColumnToType<PickPropertyValue2<PickTypesOf<T, IsPrimary>>>,
-			id3: ColumnToType<PickPropertyValue3<PickTypesOf<T, IsPrimary>>>,
-			id4: ColumnToType<PickPropertyValue4<PickTypesOf<T, IsPrimary>>>,
-			id5: ColumnToType<PickPropertyValue5<PickTypesOf<T, IsPrimary>>>
-		): Promise<StrategyToRow<FetchedProperties<T, {}>, T>>;
-		getById<FS extends FetchingStrategy<T>>(
-			id: ColumnToType<PickPropertyValue1<PickTypesOf<T, IsPrimary>>>,
-			id2: ColumnToType<PickPropertyValue2<PickTypesOf<T, IsPrimary>>>,
-			id3: ColumnToType<PickPropertyValue3<PickTypesOf<T, IsPrimary>>>,
-			id4: ColumnToType<PickPropertyValue4<PickTypesOf<T, IsPrimary>>>,
-			id5: ColumnToType<PickPropertyValue5<PickTypesOf<T, IsPrimary>>>,
-			fetchingStrategy: FS
-		): Promise<StrategyToRow<FetchedProperties<T, FS>, T>>;
-	}
-	: Count extends 6
-	? {
-		getById(
-			id: ColumnToType<PickPropertyValue1<PickTypesOf<T, IsPrimary>>>,
-			id2: ColumnToType<PickPropertyValue2<PickTypesOf<T, IsPrimary>>>,
-			id3: ColumnToType<PickPropertyValue3<PickTypesOf<T, IsPrimary>>>,
-			id4: ColumnToType<PickPropertyValue4<PickTypesOf<T, IsPrimary>>>,
-			id5: ColumnToType<PickPropertyValue5<PickTypesOf<T, IsPrimary>>>,
-			id6: ColumnToType<PickPropertyValue6<PickTypesOf<T, IsPrimary>>>
-		): Promise<StrategyToRow<FetchedProperties<T, {}>, T>>;
-		getById<FS extends FetchingStrategy<T>>(
-			id: ColumnToType<PickPropertyValue1<PickTypesOf<T, IsPrimary>>>,
-			id2: ColumnToType<PickPropertyValue2<PickTypesOf<T, IsPrimary>>>,
-			id3: ColumnToType<PickPropertyValue3<PickTypesOf<T, IsPrimary>>>,
-			id4: ColumnToType<PickPropertyValue4<PickTypesOf<T, IsPrimary>>>,
-			id5: ColumnToType<PickPropertyValue5<PickTypesOf<T, IsPrimary>>>,
-			id6: ColumnToType<PickPropertyValue6<PickTypesOf<T, IsPrimary>>>,
-			fetchingStrategy: FS
-		): Promise<StrategyToRow<FetchedProperties<T, FS>, T>>;
-	}
-	: never;
 
 type ColumnToType<T> = T extends UuidColumnSymbol
 	? string
@@ -548,44 +116,6 @@ type ColumnToType<T> = T extends UuidColumnSymbol
 	? JsonType
 	: never;
 
-type MappedColumnsAndRelations<T> = RemoveNeverFlat<{
-	[K in keyof T]: T[K] extends StringColumnTypeDef<infer M>
-	? StringColumnType<M>
-	: T[K] extends UuidColumnTypeDef<infer M>
-	? UuidColumnType<M>
-	: T[K] extends NumericColumnTypeDef<infer M>
-	? NumericColumnType<M>
-	: T[K] extends DateColumnTypeDef<infer M>
-	? DateColumnType<M>
-	: T[K] extends DateWithTimeZoneColumnTypeDef<infer M>
-	? DateWithTimeZoneColumnType<M>
-	: T[K] extends BinaryColumnTypeDef<infer M>
-	? BinaryColumnType<M>
-	: T[K] extends BooleanColumnTypeDef<infer M>
-	? BooleanColumnType<M>
-	: T[K] extends JSONColumnTypeDef<infer M>
-	? JSONColumnType<M>
-	: T[K] extends ManyRelation
-	? MappedColumnsAndRelations<T[K]> &
-	ManyTable<T[K]> & OneOrJoinTable<T[K]>
-	: T[K] extends RelatedTable
-	? MappedColumnsAndRelations<T[K]> & OneOrJoinTable<T[K]>
-	: never;
-}>;
-
-type OneOrJoinTable<T> = ((
-	fn: (table: MappedColumnsAndRelations<T>) => RawFilter
-) => Filter) & {
-	exists: () => Filter;
-};
-
-type ManyTable<T> = ((
-) => Filter) & {
-	all(selector: (table: MappedColumnsAndRelations<T>) => RawFilter): Filter;
-	any(selector: (table: MappedColumnsAndRelations<T>) => RawFilter): Filter;
-	none(selector: (table: MappedColumnsAndRelations<T>) => RawFilter): Filter;
-};
-
 export type AllowedDbMap<T> = {
 	[P in keyof T]: T[P] extends MappedTableDef<infer U> ? T[P] : never;
 };
@@ -598,64 +128,6 @@ type AllowedColumnsAndTablesConcurrency<T> = {
 };
 
 
-type FetchingStrategy<T> = FetchingStrategyBase<T> | AggType<T>
-
-type AggregateStrategy<T> = AggregateStrategyBase<T> | AggType<T>
-
-type AggType<T> = {
-	[name: string]: AggregationFunction<T>;
-} & {
-	where?: (agg: MappedColumnsAndRelations<T>) => RawFilter;
-};
-
-type AggregateStrategyBase<T> =
-	{
-		limit?: number;
-		offset?: number;
-		where?: (agg: MappedColumnsAndRelations<T>) => RawFilter;
-	};
-
-
-type FetchingStrategyBase<T, IsMany = true> = 
-{
-	[K in keyof T &
-	keyof RemoveNever<
-		AllowedColumnsAndTablesStrategy<T>
-	>]?: T[K] extends ColumnSymbols
-	? boolean
-	: boolean | FetchingStrategyBase<T[K], T[K] extends ManyRelation ? true: false> | AggType<T[K]>;
-} & 
-(IsMany extends true ? {
-	limit?: number;
-	offset?: number;
-	orderBy?:
-	| OrderBy<Extract<keyof AllowedColumns<T>, string>>[]
-	| OrderBy<Extract<keyof AllowedColumns<T>, string>>;
-	where?: (agg: MappedColumnsAndRelations<T>) => RawFilter;
-}
-: {
-	where?: (agg: MappedColumnsAndRelations<T>) => RawFilter;
-});
-
-type ExtractAggregates<Agg> = {
-	[K in keyof Agg as
-	Required<Agg>[K] extends (agg: Aggregate<infer V>) => ColumnSymbols
-	? K extends 'where' ? never : K
-	: never
-	]: Agg[K] extends (agg: Aggregate<infer V>) => infer R ? R : never;
-}
-
-type AggregationFunction<T> = (agg: Aggregate<T>) => ColumnSymbols;
-
-type Aggregate<T> =
-	RelatedColumns<T> &
-	{
-		sum(fn: (x: AggregateColumns<T>) => NumericColumnSymbol): NumericColumnSymbol & NotNull;
-		avg(fn: (x: AggregateColumns<T>) => NumericColumnSymbol): NumericColumnSymbol & NotNull;
-		min(fn: (x: AggregateColumns<T>) => NumericColumnSymbol): NumericColumnSymbol & NotNull;
-		max(fn: (x: AggregateColumns<T>) => NumericColumnSymbol): NumericColumnSymbol & NotNull;
-		count(fn: (x: AggregateColumns<T>) => NumericColumnSymbol): NumericColumnSymbol & NotNull;
-	}
 
 type RelatedColumns<T> = RemoveNeverFlat<{
 	[K in keyof T]:
@@ -730,8 +202,6 @@ type DbConcurrency<T> = {
 
 type ConcurrencyValues = 'optimistic' | 'skipOnConflict' | 'overwrite';
 
-
-type OrderBy<T extends string> = `${T} ${'asc' | 'desc'}` | T;
 
 type RelatedTable = {
 	[' relatedTable']: boolean;
@@ -1009,33 +479,6 @@ type NullInsertProperties<T> = Pick<
 type ColumnTypes = ColumnSymbols;
 type ColumnAndTableTypes = ColumnSymbols | RelatedTable;
 
-type StrategyToRow<T, U> = StrategyToRowData<T> & {
-	saveChanges(): Promise<void>;
-	saveChanges<C extends Concurrency<U>>(concurrency?: C): Promise<void>;
-	acceptChanges(): void;
-	clearChanges(): void;
-	refresh(): Promise<void>;
-	refresh<FS extends FetchingStrategy<U>>(
-		fetchingStrategy?: FS
-	): Promise<StrategyToRow<FetchedProperties<U, FS>, U>>;
-	delete(): Promise<void>;
-	delete(concurrency: Concurrency<U>): Promise<void>;
-};
-
-
-type StrategyToRowArray<T, U> = StrategyToRowData<T>[] & {
-	saveChanges(): Promise<void>;
-	saveChanges<C extends Concurrency<U>>(concurrency?: C): Promise<void>;
-	acceptChanges(): void;
-	clearChanges(): void;
-	refresh(): Promise<void>;
-	refresh<FS extends FetchingStrategy<U>>(
-		fetchingStrategy?: FS
-	): Promise<StrategyToRowArray<FetchedProperties<U, FS>, U>>;
-	delete(): Promise<void>;
-	delete(concurrency: Concurrency<U>): Promise<void>;
-};
-
 type JsonValue = null | boolean | number | string | JsonArray | JsonObject;
 
 interface JsonArray extends Array<JsonValue> { }
@@ -1094,176 +537,6 @@ type ExtractColumnBools<T, TStrategy> = RemoveNever<{
 
 type NegotiateNotNull<T> = T extends NotNull ? NotNull : {};
 
-type FetchedProperties<T, TStrategy> = FetchedColumnProperties<T, TStrategy> & FetchedRelationProperties<T, TStrategy> & ExtractAggregates<TStrategy>
-type FetchedAggregateProperties<T, TStrategy> = ExtractAggregates<TStrategy>;
-
-
-type FetchedRelationProperties<T, TStrategy> = RemoveNeverFlat<{
-	[K in keyof T]: K extends keyof TStrategy
-	? TStrategy[K] extends true
-	? T[K] extends ColumnSymbols
-	? never
-	: T[K] extends ManyRelation
-	? FetchedProperties<T[K], {}> & ManyRelation
-	: FetchedProperties<T[K], {}> & NegotiateNotNull<T[K]>
-	: TStrategy[K] extends false
-	? never
-	: T[K] extends ManyRelation
-	? FetchedProperties<T[K], TStrategy[K]> & ManyRelation
-	: FetchedProperties<T[K], TStrategy[K]> & NegotiateNotNull<T[K]>
-	: never;
-}>;
-
-type FetchedColumnProperties<T, TStrategy> = RemoveNeverFlat<
-	AtLeastOneTrue<ExtractColumnBools<T, TStrategy>> extends true
-	? {
-		[K in keyof T]: K extends keyof TStrategy
-		? TStrategy[K] extends true
-		? T[K] extends ColumnSymbols
-		? T[K]
-		: never
-		: never
-		: never;
-	}
-	: {
-		[K in keyof T]: K extends keyof TStrategy
-		? TStrategy[K] extends true
-		? T[K] extends ColumnSymbols
-		? T[K]
-		: never
-		: never
-		: NegotiateDefaultStrategy<T[K]>;
-	}
->;
-
-type StrategyToRowData<T> = {
-	[K in keyof RemoveNever<
-		NotNullProperties<T>
-	>]: T[K] extends StringColumnSymbol
-	? string
-	: T[K] extends UuidColumnSymbol
-	? string
-	: T[K] extends NumericColumnSymbol
-	? number
-	: T[K] extends DateColumnSymbol
-	? string | Date
-	: T[K] extends DateWithTimeZoneColumnSymbol
-	? string | Date
-	: T[K] extends BinaryColumnSymbol
-	? string
-	: T[K] extends BooleanColumnSymbol
-	? boolean
-	: T[K] extends JsonOf<infer M>
-	? M
-	: T[K] extends JSONColumnSymbol
-	? JsonType
-	: T[K] extends ManyRelation
-	? StrategyToRowData<T[K]>[]
-	: StrategyToRowData<T[K]>;
-} & {
-		[K in keyof RemoveNever<
-			NullProperties<T>
-		>]?: T[K] extends StringColumnSymbol
-		? string | null
-		: T[K] extends UuidColumnSymbol
-		? string | null
-		: T[K] extends NumericColumnSymbol
-		? number | null
-		: T[K] extends DateColumnSymbol
-		? string | Date | null
-		: T[K] extends DateWithTimeZoneColumnSymbol
-		? string | Date | null
-		: T[K] extends BinaryColumnSymbol
-		? string | null
-		: T[K] extends BooleanColumnSymbol
-		? boolean | null
-		: T[K] extends JsonOf<infer M>
-		? M | null
-		: T[K] extends JSONColumnSymbol
-		? JsonType | null
-		: T[K] extends ManyRelation
-		? StrategyToRowData<T[K]>[]
-		: StrategyToRowData<T[K]>;
-	};
-
-type StrategyToUpdateRowData<T> = Omit<{
-	[K in keyof T]?: T[K] extends StringColumnSymbol
-	? string
-	: T[K] extends UuidColumnSymbol
-	? string
-	: T[K] extends NumericColumnSymbol
-	? number
-	: T[K] extends DateColumnSymbol
-	? string | Date
-	: T[K] extends DateWithTimeZoneColumnSymbol
-	? string | Date
-	: T[K] extends BinaryColumnSymbol
-	? string
-	: T[K] extends BooleanColumnSymbol
-	? boolean
-	: T[K] extends JsonOf<infer M>
-	? M
-	: T[K] extends JSONColumnSymbol
-	? JsonType
-	: T[K] extends ManyRelation
-	? StrategyToInsertRowData<T[K]>[]
-	: StrategyToInsertRowData<T[K]>;
-	}, 'formulaDiscriminators' | 'columnDiscriminators' | ' notNull' | ' notNullExceptInsert' | 'map' | ' isManyRelation' | ' relatedTable' | ' isOneRelation'>
-	;
-
-type StrategyToInsertRowData<T> = Omit<{
-	[K in keyof RemoveNever<
-		NotNullInsertProperties<T>
-	>]: T[K] extends StringColumnSymbol
-	? string
-	: T[K] extends UuidColumnSymbol
-	? string
-	: T[K] extends NumericColumnSymbol
-	? number
-	: T[K] extends DateColumnSymbol
-	? string | Date
-	: T[K] extends DateWithTimeZoneColumnSymbol
-	? string | Date
-	: T[K] extends BinaryColumnSymbol
-	? string
-	: T[K] extends BooleanColumnSymbol
-	? boolean
-	: T[K] extends JsonOf<infer M>
-	? M
-	: T[K] extends JSONColumnSymbol
-	? JsonType
-	: T[K] extends ManyRelation
-	? StrategyToInsertRowData<T[K]>[]
-	: StrategyToInsertRowData<T[K]>;
-} & {
-		[K in keyof RemoveNever<
-			NullInsertProperties<T>
-		>]?: T[K] extends StringColumnSymbol
-		? string | null
-		: T[K] extends UuidColumnSymbol
-		? string | null
-		: T[K] extends NumericColumnSymbol
-		? number | null
-		: T[K] extends DateColumnSymbol
-		? string | Date | null
-		: T[K] extends DateWithTimeZoneColumnSymbol
-		? string | Date | null
-		: T[K] extends BinaryColumnSymbol
-		? string | null
-		: T[K] extends BooleanColumnSymbol
-		? boolean | null
-		: T[K] extends JsonOf<infer M>
-		? M | null
-		: T[K] extends JSONColumnSymbol
-		? JsonType | null
-		: T[K] extends ManyRelation
-		? StrategyToInsertRowData<T[K]>[]
-		: StrategyToInsertRowData<T[K]>;
-	}, 'formulaDiscriminators' | 'columnDiscriminators' | ' notNull' | ' notNullExceptInsert' | 'map' | ' isManyRelation' | ' relatedTable' | ' isOneRelation'>
-	;
-
-type NegotiateDefaultStrategy<T> = T extends ColumnSymbols ? T : never;
-
 type RemoveNever<T> = {
 	[K in keyof T as T[K] extends never ? never : K]: T[K] extends object
 	? RemoveNever<T[K]>
@@ -1277,183 +550,54 @@ type RemoveNeverFlat<T> = {
 type UuidColumnSymbol = {
 	[' isUuid']: true;
 };
-type UuidColumnType<M> = {
-	equal(value: string | null | undefined): Filter;
-	eq(value: string | null | undefined): Filter;
-	notEqual(value: string | null | undefined): Filter;
-	ne(value: string | null | undefined): Filter;
-	lessThan(value: string | null | undefined): Filter;
-	lt(value: string | null | undefined): Filter;
-	lessThanOrEqual(value: string | null | undefined): Filter;
-	le(value: string | null | undefined): Filter;
-	greaterThan(value: string | null | undefined): Filter;
-	gt(value: string | null | undefined): Filter;
-	greaterThanOrEqual(value: string | null | undefined): Filter;
-	ge(value: string | null | undefined): Filter;
-	between(from: string | null | undefined, to: string | null | undefined): Filter;
-	in(values: Array<string | null | undefined>): Filter;
-} & M &
+type UuidColumnType<M> = M &
 	UuidColumnSymbol;
 
 type BinaryColumnSymbol = {
 	[' isBinary']: true;
 };
-type BinaryColumnType<M> = {
-	equal(value: string | null | undefined): Filter;
-	eq(value: string | null | undefined): Filter;
-	notEqual(value: string | null | undefined): Filter;
-	ne(value: string | null | undefined): Filter;
-	lessThan(value: string | null | undefined): Filter;
-	lt(value: string | null | undefined): Filter;
-	lessThanOrEqual(value: string | null | undefined): Filter;
-	le(value: string | null | undefined): Filter;
-	greaterThan(value: string | null | undefined): Filter;
-	gt(value: string | null | undefined): Filter;
-	greaterThanOrEqual(value: string | null | undefined): Filter;
-	ge(value: string | null | undefined): Filter;
-	between(from: string | null | undefined, to: string | null | undefined): Filter;
-	in(values: Array<string | null | undefined>): Filter;
-} & M &
+type BinaryColumnType<M> = M &
 	BinaryColumnSymbol;
 
 type BooleanColumnSymbol = {
 	[' isBoolean']: true;
 };
 
-type BooleanColumnType<M> = {
-	equal(value: boolean | null | undefined): Filter;
-	eq(value: boolean | null | undefined): Filter;
-	notEqual(value: boolean | null | undefined): Filter;
-	ne(value: boolean | null | undefined): Filter;
-	lessThan(value: boolean | null | undefined): Filter;
-	lt(value: boolean | null | undefined): Filter;
-	lessThanOrEqual(value: boolean | null | undefined): Filter;
-	le(value: boolean | null | undefined): Filter;
-	greaterThan(value: boolean | null | undefined): Filter;
-	gt(value: boolean | null | undefined): Filter;
-	greaterThanOrEqual(value: boolean | null | undefined): Filter;
-	ge(value: boolean | null | undefined): Filter;
-	between(from: boolean | null | undefined, to: boolean | null | undefined): Filter;
-	in(values: Array<boolean | null | undefined>): Filter;
-} & M &
+type BooleanColumnType<M> = M &
 	BooleanColumnSymbol;
 
 type DateColumnSymbol = {
 	[' isDate']: true;
 };
 
-type DateColumnType<M> = {
-	equal(value: string | Date | null | undefined): Filter;
-	eq(value: string | Date | null | undefined): Filter;
-	notEqual(value: string | Date | null | undefined): Filter;
-	ne(value: string | Date | null | undefined): Filter;
-	lessThan(value: string | Date | null | undefined): Filter;
-	lt(value: string | Date | null | undefined): Filter;
-	lessThanOrEqual(value: string | Date | null | undefined): Filter;
-	le(value: string | Date | null | undefined): Filter;
-	greaterThan(value: string | Date | null | undefined): Filter;
-	gt(value: string | Date | null | undefined): Filter;
-	greaterThanOrEqual(value: string | Date | null | undefined): Filter;
-	ge(value: string | Date | null | undefined): Filter;
-	between(from: string | Date, to: string | Date | null | undefined): Filter;
-	in(values: Array<string | Date | null | undefined>): Filter;
-} & M &
+type DateColumnType<M> = M &
 	DateColumnSymbol;
 
 type DateWithTimeZoneColumnSymbol = {
 	[' isDateTimeZone']: true;
 };
 
-type DateWithTimeZoneColumnType<M> = {
-	equal(value: string | Date | null | undefined): Filter;
-	eq(value: string | Date | null | undefined): Filter;
-	notEqual(value: string | Date | null | undefined): Filter;
-	ne(value: string | Date | null | undefined): Filter;
-	lessThan(value: string | Date | null | undefined): Filter;
-	lt(value: string | Date | null | undefined): Filter;
-	lessThanOrEqual(value: string | Date | null | undefined): Filter;
-	le(value: string | Date | null | undefined): Filter;
-	greaterThan(value: string | Date | null | undefined): Filter;
-	gt(value: string | Date | null | undefined): Filter;
-	greaterThanOrEqual(value: string | Date | null | undefined): Filter;
-	ge(value: string | Date | null | undefined): Filter;
-	between(from: string | Date, to: string | Date | null | undefined): Filter;
-	in(values: Array<string | Date | null | undefined>): Filter;
-} & M &
+type DateWithTimeZoneColumnType<M> = M &
 	DateWithTimeZoneColumnSymbol;
 
 type StringColumnSymbol = {
 	[' isString']: true;
 };
 
-type StringColumnType<M> = {
-	equal(value: string | null | undefined): Filter;
-	eq(value: string | null | undefined): Filter;
-	notEqual(value: string | null | undefined): Filter;
-	ne(value: string | null | undefined): Filter;
-	lessThan(value: string | null | undefined): Filter;
-	lt(value: string | null | undefined): Filter;
-	lessThanOrEqual(value: string | null | undefined): Filter;
-	le(value: string | null | undefined): Filter;
-	greaterThan(value: string | null | undefined): Filter;
-	gt(value: string | null | undefined): Filter;
-	greaterThanOrEqual(value: string | null | undefined): Filter;
-	ge(value: string | null | undefined): Filter;
-	between(from: string | null | undefined, to: string | null | undefined): Filter;
-	in(values: Array<string | null | undefined>): Filter;
-
-	startsWith(value: string | null | undefined): Filter;
-	endsWith(value: string | null | undefined): Filter;
-	contains(value: string | null | undefined): Filter;
-	iStartsWith(value: string | null | undefined): Filter;
-	iEndsWith(value: string | null | undefined): Filter;
-	iContains(value: string | null | undefined): Filter;
-	iEqual(value: string | null | undefined): Filter;
-	ieq(value: string | null | undefined): Filter;
-} & M &
+type StringColumnType<M> = M &
 	StringColumnSymbol;
 
 type NumericColumnSymbol = {
 	[' isNumeric']: true;
 };
-type NumericColumnType<M> = {
-	equal(value: number | null | undefined): Filter;
-	eq(value: number | null | undefined): Filter;
-	notEqual(value: number | null | undefined): Filter;
-	ne(value: number | null | undefined): Filter;
-	lessThan(value: number | null | undefined): Filter;
-	lt(value: number | null | undefined): Filter;
-	lessThanOrEqual(value: number | null | undefined): Filter;
-	le(value: number | null | undefined): Filter;
-	greaterThan(value: number | null | undefined): Filter;
-	gt(value: number | null | undefined): Filter;
-	greaterThanOrEqual(value: number | null | undefined): Filter;
-	ge(value: number | null | undefined): Filter;
-	between(from: number, to: number | null | undefined): Filter;
-	in(values: Array<number | null | undefined>): Filter;
-} & M &
+type NumericColumnType<M> = M &
 	NumericColumnSymbol;
 
 type JSONColumnSymbol = {
 	[' isJSON']: true;
 };
 
-type JSONColumnType<M> = {
-	equal(value: ToJsonType<M> | null | undefined): Filter;
-	eq(value: ToJsonType<M> | null | undefined): Filter;
-	notEqual(value: ToJsonType<M> | null | undefined): Filter;
-	ne(value: ToJsonType<M> | null | undefined): Filter;
-	lessThan(value: ToJsonType<M> | null | undefined): Filter;
-	lt(value: ToJsonType<M> | null | undefined): Filter;
-	lessThanOrEqual(value: ToJsonType<M> | null | undefined): Filter;
-	le(value: ToJsonType<M> | null | undefined): Filter;
-	greaterThan(value: ToJsonType<M> | null | undefined): Filter;
-	gt(value: ToJsonType<M> | null | undefined): Filter;
-	greaterThanOrEqual(value: ToJsonType<M> | null | undefined): Filter;
-	ge(value: ToJsonType<M> | null | undefined): Filter;
-	between(from: ToJsonType<M>, to: ToJsonType<M> | null | undefined): Filter;
-	in(values: Array<ToJsonType<M> | null | undefined>): Filter;
-} & M &
+type JSONColumnType<M> =  M &
 	JSONColumnSymbol;
 
 interface IsPrimary {
@@ -1639,7 +783,7 @@ type DateColumnTypeDef<M> = DateValidator<M> & {
 	serializable(value: boolean): DateColumnTypeDef<M>;
 	JSONSchema(schema: object, options?: Options): DateColumnTypeDef<M>;
 	default(value: string | Date | null | undefined | (() => string | Date | null | undefined)): DateColumnTypeDef<M>;
-	dbNull(value: String | Date): DateColumnTypeDef<M>;
+	dbNull(value: string | Date): DateColumnTypeDef<M>;
 } & ColumnTypeOf<DateColumnType<M>> &
 	M;
 
@@ -1650,7 +794,7 @@ type DateWithTimeZoneColumnTypeDef<M> = DateValidator<M> & {
 	serializable(value: boolean): DateWithTimeZoneColumnTypeDef<M>;
 	JSONSchema(schema: object, options?: Options): DateWithTimeZoneColumnTypeDef<M>;
 	default(value: string | Date | null | undefined | (() => string | Date | null | undefined)): DateWithTimeZoneColumnTypeDef<M>;
-	dbNull(value: String | Date): DateWithTimeZoneColumnTypeDef<M>;
+	dbNull(value: string | Date): DateWithTimeZoneColumnTypeDef<M>;
 } & ColumnTypeOf<DateWithTimeZoneColumnType<M>> &
 	M;
 
@@ -1783,4 +927,97 @@ type Increment<C extends number> = C extends 0
 	: C extends 4
 	? 5
 	: 0;
-	
+
+
+type TableAlias<Alias> = {
+	__tableAlias: Alias;
+  };
+
+
+
+export type SchemaFromMappedDb<T> = {
+  [K in keyof T]: T[K] extends MappedTableDef<infer Def>
+    ? TableSchema<Def>
+    : never;
+};
+
+type TableSchema<T> = {
+  columns: {
+    [K in keyof T as T[K] extends ColumnSymbols ? K : never]: ColumnToSchemaType<T[K]>;
+  };
+  primaryKey: ExtractPrimaryKeyNames<T>;
+
+  relations: {
+    [K in keyof T as T[K] extends RelatedTable | ManyRelation ? K : never]:
+      T[K] extends ManyRelation
+        ? { type: 'hasMany'; target: RelationTarget<T[K]> }
+        : T[K] extends RelatedTable
+          ? { type: 'hasOne'; target: RelationTarget<T[K]> }
+          : never;
+  };
+};
+
+type ExtractPrimaryKeyNames<T> =
+  UnionToTuple<{ [K in keyof T]: T[K] extends IsPrimary ? K : never }[keyof T]> extends infer R
+    ? R extends string[] ? R : []
+    : [];
+
+
+type RelationTarget<T> =
+  T extends { __tableAlias: infer S } ? Extract<S, string> : string;
+
+type ColumnToSchemaType<T> =
+  T extends JsonOf<infer U>
+    ? { ' type': 'json'; ' tsType': U }
+      & (T extends NotNullExceptInsert ? { ' notNull': true; ' notNullExceptInsert': true }
+         : T extends NotNull ? { ' notNull': true }
+         : {}) :
+  T extends JSONColumnSymbol & JsonOf<infer U>
+    ? { ' type': 'json'; ' tsType': U }
+      & (T extends NotNullExceptInsert ? { ' notNull': true; ' notNullExceptInsert': true }
+         : T extends NotNull ? { ' notNull': true }
+         : {}) :
+  T extends StringColumnSymbol
+    ? { ' type': 'string' }
+      & (T extends NotNullExceptInsert ? { ' notNull': true; ' notNullExceptInsert': true }
+         : T extends NotNull ? { ' notNull': true }
+         : {}) :
+  T extends UuidColumnSymbol
+    ? { ' type': 'uuid' }
+      & (T extends NotNullExceptInsert ? { ' notNull': true; ' notNullExceptInsert': true }
+         : T extends NotNull ? { ' notNull': true }
+         : {}) :
+  T extends NumericColumnSymbol
+    ? { ' type': 'numeric' }
+      & (T extends NotNullExceptInsert ? { ' notNull': true; ' notNullExceptInsert': true }
+         : T extends NotNull ? { ' notNull': true }
+         : {}) :
+  T extends DateColumnSymbol | DateWithTimeZoneColumnSymbol
+    ? { ' type': 'date' }
+      & (T extends NotNullExceptInsert ? { ' notNull': true; ' notNullExceptInsert': true }
+         : T extends NotNull ? { ' notNull': true }
+         : {}) :
+  T extends BooleanColumnSymbol
+    ? { ' type': 'boolean' }
+      & (T extends NotNullExceptInsert ? { ' notNull': true; ' notNullExceptInsert': true }
+         : T extends NotNull ? { ' notNull': true }
+         : {}) :
+  T extends BinaryColumnSymbol
+    ? { ' type': 'binary' }
+      & (T extends NotNullExceptInsert ? { ' notNull': true; ' notNullExceptInsert': true }
+         : T extends NotNull ? { ' notNull': true }
+         : {}) :
+  never;
+
+export type MappedDbDef<T> = {
+  map<V extends AllowedDbMap<V>>(
+    callback: (mapper: DbMapper<T>) => V
+  ): MappedDbDef<MergeProperties<T, V>>;
+  <O extends DbOptions<T>>(concurrency: O): NegotiateDbInstance<T, O>;
+
+  /**
+   * Returns the schema of the mapped DB as a generic type
+   * Usage: type Schema = ReturnType<typeof db.toSchema>
+   */
+  toSchema: <U = T>() => SchemaFromMappedDb<U>;
+} & T & DbConnectable<T>;

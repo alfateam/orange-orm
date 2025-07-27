@@ -1,4 +1,6 @@
 ## Changelog
+__4.7.10__  
+Enabled cyclic dependencies in type mapping to support true bidirectional relationships. See [#132](https://github.com/alfateam/orange-orm/issues/132)  
 __4.7.9__  
 Bugfix: MsSql: Validation failed for parameter '0'. Value must be between -2147483648 and 2147483647, inclusive. See [#131](https://github.com/alfateam/orange-orm/issues/131)  
 __4.7.8__  
