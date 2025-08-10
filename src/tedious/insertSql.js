@@ -3,9 +3,9 @@ let mergeSql = require('./mergeSql');
 
 function getSqlTemplate(context, _table, _row, options) {
 	if (hasConcurrency(_table, options) && hasColumns())
-		return mergeSql.apply(null, [...arguments].slice(1));
+		return mergeSql.apply(null, [...arguments]);
 	else
-		return insertSql.apply(null, [context, ...arguments].slice(1));
+		return insertSql.apply(null, [...arguments]);
 
 	function hasColumns() {
 		for(let p in _row) {
