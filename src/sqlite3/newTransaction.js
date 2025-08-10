@@ -4,6 +4,7 @@ const deleteFromSql = require('../sqlite/deleteFromSql');
 const selectForUpdateSql = require('../sqlite/selectForUpdateSql');
 const lastInsertedSql = require('../sqlite/lastInsertedSql');
 const limitAndOffset = require('../sqlite/limitAndOffset');
+const formatBigintOut = require('../sqlite/formatBigintOut');
 const insertSql = require('../sqlite/insertSql');
 const insert = require('../sqlite/insert');
 const quote = require('../sqlite/quote');
@@ -21,6 +22,7 @@ function newResolveTransaction(domain, pool, { readonly = false } = {})  {
 	rdb.deleteFromSql = deleteFromSql;
 	rdb.selectForUpdateSql = selectForUpdateSql;
 	rdb.lastInsertedSql = lastInsertedSql;
+	rdb.formatBigintOut = formatBigintOut;
 	rdb.insertSql = insertSql;
 	rdb.insert = insert;
 	rdb.lastInsertedIsSeparate = true;

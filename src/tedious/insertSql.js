@@ -1,11 +1,11 @@
 let outputInsertedSql = require('./outputInsertedSql');
 let mergeSql = require('./mergeSql');
 
-function getSqlTemplate(_context, _table, _row, options) {
+function getSqlTemplate(context, _table, _row, options) {
 	if (hasConcurrency(_table, options) && hasColumns())
 		return mergeSql.apply(null, [...arguments].slice(1));
 	else
-		return insertSql.apply(null, [...arguments].slice(1));
+		return insertSql.apply(null, [context, ...arguments].slice(1));
 
 	function hasColumns() {
 		for(let p in _row) {
@@ -25,7 +25,7 @@ function hasConcurrency(table,options) {
 	return options.concurrency === 'skipOnConflict' || options.concurrency === 'overwrite';
 }
 
-function insertSql(table, row) {
+function insertSql(context, table, row) {
 	let columnNames = [];
 	let values = [];
 	let sql = `INSERT INTO [${table._dbName}] `;
@@ -60,7 +60,7 @@ function insertSql(table, row) {
 
 	function outputInserted() {
 
-		return ' ' + outputInsertedSql(table) + ' ';
+		return ' ' + outputInsertedSql(context, table) + ' ';
 	}
 
 }

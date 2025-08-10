@@ -113,6 +113,7 @@ function wrapQuery(_context, connection) {
 					result.push(rows);
 				return;
 			}
+
 			result.push(rows);
 			if (!hasMore) {
 				if (result.length === 1)

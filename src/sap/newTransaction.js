@@ -1,5 +1,7 @@
 const wrapQuery = require('../mssql/wrapQuery');
 const encodeBoolean = require('./encodeBoolean');
+const formatBigintIn = require('./formatBigintIn');
+const formatBigintOut = require('./formatBigintOut');
 const deleteFromSql = require('./deleteFromSql');
 const selectForUpdateSql = require('./selectForUpdateSql');
 const lastInsertedSql = require('./lastInsertedSql');
@@ -17,6 +19,8 @@ function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 	}
 	rdb.engine = 'sap';
 	rdb.encodeBoolean = encodeBoolean;
+	rdb.formatBigintIn = formatBigintIn;
+	rdb.formatBigintOut = formatBigintOut;
 	rdb.decodeJSON = decodeJSON;
 	rdb.encodeJSON = JSON.stringify;
 	rdb.deleteFromSql = deleteFromSql;

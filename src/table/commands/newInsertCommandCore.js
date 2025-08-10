@@ -13,7 +13,7 @@ function newInsertCommandCore(context, table, row, options = {}) {
 		if (row['__' + column.alias] !== undefined) {
 			let encoded = column.encode(context, row[alias]);
 			if (encoded.parameters.length > 0) {
-				values.push('?');
+				values.push(encoded.sql());
 				parameters.push(encoded.parameters[0]);
 			} else
 				values.push(encoded.sql());

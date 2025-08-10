@@ -6,6 +6,7 @@ const deleteFromSql = require('../sqlite/deleteFromSql');
 const selectForUpdateSql = require('../sqlite/selectForUpdateSql');
 const lastInsertedSql = require('../sqlite/lastInsertedSql');
 const limitAndOffset = require('../sqlite/limitAndOffset');
+const formatBigintOut = require('../sqlite/formatBigintOut');
 const insertSql = require('../sqlite/insertSql');
 const insert = require('../sqlite/insert');
 const quote = require('../sqlite/quote');
@@ -22,6 +23,7 @@ function newResolveTransaction(domain, pool, { readonly = false } = {})  {
 	rdb.decodeBinary = decodeBinary;
 	rdb.decodeJSON = decodeJSON;
 	rdb.encodeJSON = JSON.stringify;
+	rdb.formatBigintOut = formatBigintOut;
 	rdb.deleteFromSql = deleteFromSql;
 	rdb.selectForUpdateSql = selectForUpdateSql;
 	rdb.lastInsertedSql = lastInsertedSql;

@@ -6,6 +6,7 @@ const limitAndOffset = require('./limitAndOffset');
 const insertSql = require('./insertSql');
 const getManyDto = require('./getManyDto');
 const formatDateOut = require('./formatDateOut');
+const formatBigintOut = require('./formatBigintOut');
 const formatJSONOut = require('./formatJSONOut');
 const insert = require('./insert');
 const quote = require('./quote');
@@ -27,6 +28,7 @@ function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 	rdb.insertSql = insertSql;
 	rdb.insert = insert;
 	rdb.formatDateOut = formatDateOut;
+	rdb.formatBigintOut = formatBigintOut;
 	rdb.formatJSONOut = formatJSONOut;
 	rdb.multipleStatements = true;
 	rdb.begin = 'BEGIN TRANSACTION';

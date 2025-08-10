@@ -5190,6 +5190,70 @@ function requireNumeric () {
 	return numeric;
 }
 
+var bigint;
+var hasRequiredBigint;
+
+function requireBigint () {
+	if (hasRequiredBigint) return bigint;
+	hasRequiredBigint = 1;
+	var newEncode = requireNewEncode$7();
+	var newDecode = requireNewDecodeCore();
+	var startsWith = requireStartsWith();
+	var endsWith = requireEndsWith();
+	var contains = requireContains();
+	var iStartsWith = requireIStartsWith();
+	var iEndsWith = requireIEndsWith();
+	var iContains = requireIContains();
+	var iEqual = requireIEqual();
+	var purify = requirePurify$6();
+	var _extractAlias = requireExtractAlias();
+
+	function _new(table, column) {
+		column.tsType = 'BigIntColumn';
+		column.purify = purify;
+		column.encode = newEncode(column);
+		column.decode = newDecode(column);
+		var extractAlias = _extractAlias.bind(null, table);
+
+		column.startsWith = function(context, arg, alias) {
+			alias = extractAlias(alias);
+			return startsWith(context, column, arg, alias);
+		};
+		column.endsWith = function(context, arg, alias) {
+			alias = extractAlias(alias);
+			return endsWith(context, column, arg, alias);
+		};
+		column.contains = function(context, arg, alias) {
+			alias = extractAlias(alias);
+			return contains(context, column, arg, alias);
+		};
+		column.iStartsWith = function(context, arg, alias) {
+			alias = extractAlias(alias);
+			return iStartsWith(context, column, arg, alias);
+		};
+		column.iEndsWith = function(context, arg, alias) {
+			alias = extractAlias(alias);
+			return iEndsWith(context, column, arg, alias);
+		};
+		column.iContains = function(context, arg, alias) {
+			alias = extractAlias(alias);
+			return iContains(context, column, arg, alias);
+		};
+
+		column.iEqual = function(context, arg, alias) {
+			alias = extractAlias(alias);
+			return iEqual(context, column, arg, alias);
+		};
+
+		column.iEq = column.iEqual;
+		column.IEQ = column.iEqual;
+		column.ieq = column.iEqual;
+	}
+
+	bigint = _new;
+	return bigint;
+}
+
 var purify_1$1;
 var hasRequiredPurify$1;
 
@@ -5471,6 +5535,11 @@ function requireColumn () {
 
 		c.numeric = function(optionalPrecision,optionalScale) {
 			requireNumeric()(column,optionalPrecision,optionalScale);
+			return c;
+		};
+
+		c.bigint = function() {
+			requireBigint()(column);
 			return c;
 		};
 

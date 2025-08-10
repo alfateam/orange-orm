@@ -10,13 +10,15 @@ function _in(context, column,values,alias) {
 	}
 	const firstPart = `${quote(context, alias)}.${quote(context, column._dbName)} in (`;
 
-	const encode = column.encode.direct;
-	const params = new Array(values.length);
+	const encode = column.encode;
+	const paramsSql = new Array(values.length);
+	let paramsValues = [];
 	for (let i = 0; i < values.length; i++) {
-		params[i] = encode(context, values[i]);
+		paramsSql[i] = encode(context, values[i]);
+		paramsValues = [...paramsValues, ...paramsSql[i].parameters];
 	}
-	const sql = `${firstPart +  new Array(values.length).fill('?').join(',')})`;
-	return newBoolean(newParameterized(sql, params));
+	const sql = `${firstPart +  paramsSql.map(x => x.sql()).join(',')})`;
+	return newBoolean(newParameterized(sql, paramsValues));
 }
 
 module.exports = _in;

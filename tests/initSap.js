@@ -89,6 +89,26 @@ END
 
 GO
 
+IF
+EXISTS (SELECT 1 FROM
+sysobjects WHERE type = 'U' and name = 'bigIntChild')
+
+BEGIN
+	DROP TABLE bigIntChild
+END
+
+GO
+
+IF
+EXISTS (SELECT 1 FROM
+sysobjects WHERE type = 'U' and name = 'bigIntParent')
+
+BEGIN
+	DROP TABLE bigIntParent
+END
+
+GO
+
 CREATE TABLE datetest (
     id int IDENTITY PRIMARY KEY,
     [date] DATE NULL,
@@ -176,6 +196,22 @@ CREATE TABLE deliveryAddress (
     postalCode VARCHAR(100) NULL,
     postalPlace VARCHAR(100) NULL,
     countryCode VARCHAR(100) NULL
+);
+
+GO
+
+CREATE TABLE bigintParent (
+    id BIGINT NOT NULL PRIMARY KEY,
+    foo INT NULL,
+);
+
+GO
+
+CREATE TABLE bigintChild (
+    id BIGINT IDENTITY PRIMARY KEY,
+    bar INT NULL,
+    parentId BIGINT NULL,
+    FOREIGN KEY (parentId) REFERENCES bigintParent(id)    
 )
 
 `;

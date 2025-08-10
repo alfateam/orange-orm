@@ -39,6 +39,11 @@ function defineColumn(column, table) {
 		return c;
 	};
 
+	c.bigint = function() {
+		require('./column/bigint')(column);
+		return c;
+	};
+
 	c.boolean = function() {
 		require('./column/boolean')(column);
 		return c;

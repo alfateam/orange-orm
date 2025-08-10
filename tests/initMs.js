@@ -9,6 +9,8 @@ DROP TABLE if exists [order];
 DROP TABLE if exists vendor;
 DROP TABLE if exists customer;
 DROP TABLE if exists datetest;
+DROP TABLE if exists bigintChild;
+DROP TABLE if exists bigintParent;
 
 CREATE TABLE datetest (
     id int IDENTITY(1,1) PRIMARY KEY,
@@ -80,6 +82,17 @@ CREATE TABLE deliveryAddress (
     countryCode VARCHAR(100) NULL
 )
 
+CREATE TABLE bigintParent (
+    id BIGINT PRIMARY KEY,
+    foo INT
+);
+
+CREATE TABLE bigintChild (
+    id BIGINT IDENTITY(1,1) PRIMARY KEY,
+    bar INT,
+    parentId BIGINT,
+    FOREIGN KEY (parentId) REFERENCES  bigintParent(id)    
+)
 
 `;
 

@@ -4,6 +4,7 @@ const deleteFromSql = require('./deleteFromSql');
 const selectForUpdateSql = require('./selectForUpdateSql');
 const lastInsertedSql = require('./lastInsertedSql');
 const limitAndOffset = require('./limitAndOffset');
+const formatBigintOut = require('./formatBigintOut');
 const insertSql = require('./insertSql');
 const insert = require('./insert');
 const quote = require('./quote');
@@ -21,6 +22,7 @@ function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 	rdb.selectForUpdateSql = selectForUpdateSql;
 	rdb.lastInsertedIsSeparate = true;
 	rdb.lastInsertedSql = lastInsertedSql;
+	rdb.formatBigintOut = formatBigintOut;
 	rdb.insertSql = insertSql;
 	rdb.insert = insert;
 	rdb.multipleStatements = false;
