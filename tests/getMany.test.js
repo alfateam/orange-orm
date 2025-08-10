@@ -1,6 +1,3 @@
-import rdb from '../src/index';
-//
-rdb.on('query', console.dir);
 import { describe, test, beforeAll, afterAll, expect } from 'vitest';
 import { fileURLToPath } from 'url';
 import setupD1 from './setupD1';
