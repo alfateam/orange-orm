@@ -1,5 +1,6 @@
 const wrapQuery = require('./wrapQuery');
 const encodeBoolean = require('../sqlite/encodeBoolean');
+const formatBigintOut = require('../sqlite/formatBigintOut');
 const deleteFromSql = require('../sqlite/deleteFromSql');
 const selectForUpdateSql = require('../sqlite/selectForUpdateSql');
 const lastInsertedSql = require('../sqlite/lastInsertedSql');
@@ -18,6 +19,7 @@ function newResolveTransaction(domain, pool, { readonly = false } = {})  {
 	rdb.encodeBoolean = encodeBoolean;
 	rdb.decodeJSON = decodeJSON;
 	rdb.encodeJSON = JSON.stringify;
+	rdb.formatBigintOut = formatBigintOut;
 	rdb.deleteFromSql = deleteFromSql;
 	rdb.selectForUpdateSql = selectForUpdateSql;
 	rdb.lastInsertedSql = lastInsertedSql;

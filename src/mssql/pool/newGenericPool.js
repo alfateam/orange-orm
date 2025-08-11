@@ -22,12 +22,19 @@ function newGenericPool(connectionString, poolOptions) {
 				return cb(err, null);
 			}
 			var client;
+			// const config = {
+			// 	connectionString: connectionString,
+			// 	options: {
+			// 		useNumericString: true
+			// 	}
+			// };
 			mssql.open(connectionString, onConnected);
 
 			function onConnected(err, _client) {
 				if(err)
 					return cb(err, null);
 				client = _client;
+				// client.setUseNumericString(true);
 				client.poolCount = 0;
 				client.msnodesqlv8 = mssql;
 				return cb(null, client);

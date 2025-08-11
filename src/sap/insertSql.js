@@ -4,7 +4,7 @@ const quote = require('./quote');
 function getSqlTemplate(_context, _table, _row, options) {
 
 	if (hasConcurrency(_table, options) && hasColumns())
-		return mergeSql.apply(null, [...arguments].slice(1));
+		return mergeSql.apply(null, [...arguments]);
 	else
 		return insertSql.apply(null, [...arguments].slice(1));
 

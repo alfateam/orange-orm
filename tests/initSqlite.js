@@ -1,4 +1,4 @@
-const sql = `DROP TABLE IF EXISTS deliveryAddress; DROP TABLE IF EXISTS package; DROP TABLE IF EXISTS orderLine; DROP TABLE IF EXISTS "order";DROP TABLE IF EXISTS "order"; DROP TABLE IF EXISTS customer;DROP TABLE IF EXISTS vendor; DROP TABLE IF EXISTS datetest;DROP TABLE IF EXISTS compositeOrderLine;DROP TABLE IF EXISTS compositeOrder;
+const sql = `DROP TABLE IF EXISTS deliveryAddress; DROP TABLE IF EXISTS package; DROP TABLE IF EXISTS orderLine; DROP TABLE IF EXISTS "order";DROP TABLE IF EXISTS "order"; DROP TABLE IF EXISTS customer;DROP TABLE IF EXISTS vendor; DROP TABLE IF EXISTS datetest;DROP TABLE IF EXISTS compositeOrderLine;DROP TABLE IF EXISTS compositeOrder;DROP TABLE IF EXISTS bigintChild;DROP TABLE IF EXISTS bigintParent;
 CREATE TABLE customer (
     id INTEGER PRIMARY KEY,
     name TEXT,
@@ -66,7 +66,17 @@ CREATE TABLE datetest (
     tdatetime TEXT,
     tdatetime_tz TEXT
 );
-    
+
+CREATE TABLE bigintParent (
+    id INTEGER PRIMARY KEY,
+    foo INTEGER
+);
+
+CREATE TABLE bigintChild (
+    id INTEGER PRIMARY KEY,
+    bar INTEGER,
+    parentId INTEGER REFERENCES bigintParent
+);    
 
 INSERT INTO datetest (id, "date", tdatetime, tdatetime_tz) VALUES (1, '2023-07-14T12:00:00', '2023-07-14T12:00:00', '2023-07-14T12:00:00-08:00')
 

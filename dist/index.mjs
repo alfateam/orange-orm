@@ -3930,13 +3930,15 @@ function require_in () {
 		}
 		const firstPart = `${quote(context, alias)}.${quote(context, column._dbName)} in (`;
 
-		const encode = column.encode.direct;
-		const params = new Array(values.length);
+		const encode = column.encode;
+		const paramsSql = new Array(values.length);
+		let paramsValues = [];
 		for (let i = 0; i < values.length; i++) {
-			params[i] = encode(context, values[i]);
+			paramsSql[i] = encode(context, values[i]);
+			paramsValues = [...paramsValues, ...paramsSql[i].parameters];
 		}
-		const sql = `${firstPart +  new Array(values.length).fill('?').join(',')})`;
-		return newBoolean(newParameterized(sql, params));
+		const sql = `${firstPart +  paramsSql.map(x => x.sql()).join(',')})`;
+		return newBoolean(newParameterized(sql, paramsValues));
 	}
 
 	_in_1 = _in;
@@ -4263,12 +4265,12 @@ function requirePurify$6 () {
 	return purify_1$5;
 }
 
-var newEncode$7;
-var hasRequiredNewEncode$7;
+var newEncode$8;
+var hasRequiredNewEncode$8;
 
-function requireNewEncode$7 () {
-	if (hasRequiredNewEncode$7) return newEncode$7;
-	hasRequiredNewEncode$7 = 1;
+function requireNewEncode$8 () {
+	if (hasRequiredNewEncode$8) return newEncode$8;
+	hasRequiredNewEncode$8 = 1;
 	var newPara = requireNewParameterized();
 	var purify = requirePurify$6();
 
@@ -4302,8 +4304,8 @@ function requireNewEncode$7 () {
 
 	}
 
-	newEncode$7 = _new;
-	return newEncode$7;
+	newEncode$8 = _new;
+	return newEncode$8;
 }
 
 var newDecodeCore;
@@ -4508,7 +4510,7 @@ var hasRequiredString;
 function requireString () {
 	if (hasRequiredString) return string;
 	hasRequiredString = 1;
-	var newEncode = requireNewEncode$7();
+	var newEncode = requireNewEncode$8();
 	var newDecode = requireNewDecodeCore();
 	var startsWith = requireStartsWith();
 	var endsWith = requireEndsWith();
@@ -4582,12 +4584,12 @@ function requirePurify$5 () {
 	return purify_1$4;
 }
 
-var newEncode$6;
-var hasRequiredNewEncode$6;
+var newEncode$7;
+var hasRequiredNewEncode$7;
 
-function requireNewEncode$6 () {
-	if (hasRequiredNewEncode$6) return newEncode$6;
-	hasRequiredNewEncode$6 = 1;
+function requireNewEncode$7 () {
+	if (hasRequiredNewEncode$7) return newEncode$7;
+	hasRequiredNewEncode$7 = 1;
 	var newPara = requireNewParameterized();
 	var purify = requirePurify$5();
 	var getSessionSingleton = requireGetSessionSingleton();
@@ -4637,16 +4639,16 @@ function requireNewEncode$6 () {
 		return encode;
 	}
 
-	newEncode$6 = _new;
-	return newEncode$6;
+	newEncode$7 = _new;
+	return newEncode$7;
 }
 
-var newDecode$5;
-var hasRequiredNewDecode$5;
+var newDecode$6;
+var hasRequiredNewDecode$6;
 
-function requireNewDecode$5 () {
-	if (hasRequiredNewDecode$5) return newDecode$5;
-	hasRequiredNewDecode$5 = 1;
+function requireNewDecode$6 () {
+	if (hasRequiredNewDecode$6) return newDecode$6;
+	hasRequiredNewDecode$6 = 1;
 	let newDecodeCore = requireNewDecodeCore();
 	let getSessionContext = requireGetSessionContext();
 
@@ -4667,29 +4669,31 @@ function requireNewDecode$5 () {
 		};
 	}
 
-	newDecode$5 = _new;
-	return newDecode$5;
+	newDecode$6 = _new;
+	return newDecode$6;
 }
 
-var formatOut_1$1;
-var hasRequiredFormatOut$1;
+var formatOutGeneric_1;
+var hasRequiredFormatOutGeneric;
 
-function requireFormatOut$1 () {
-	if (hasRequiredFormatOut$1) return formatOut_1$1;
-	hasRequiredFormatOut$1 = 1;
+function requireFormatOutGeneric () {
+	if (hasRequiredFormatOutGeneric) return formatOutGeneric_1;
+	hasRequiredFormatOutGeneric = 1;
 	var getSessionSingleton = requireGetSessionSingleton();
 	const quote = requireQuote$6();
 
-	function formatOut(context, column, alias) {
-		var formatColumn = getSessionSingleton(context, 'formatJSONOut');
+	function formatOutGeneric(context, column, fnName, alias) {
+		var formatColumn = getSessionSingleton(context, fnName);
 		if (formatColumn)
 			return formatColumn(column, alias);
-		else
+		else if (alias)
 			return `${alias}.${quote(context, column._dbName)}`;
+		else
+			return `${quote(context, column._dbName)}`;
 	}
 
-	formatOut_1$1 = formatOut;
-	return formatOut_1$1;
+	formatOutGeneric_1 = formatOutGeneric;
+	return formatOutGeneric_1;
 }
 
 var require$$10 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(onChange);
@@ -4700,9 +4704,9 @@ var hasRequiredJson;
 function requireJson () {
 	if (hasRequiredJson) return json;
 	hasRequiredJson = 1;
-	var newEncode = requireNewEncode$6();
-	var newDecode = requireNewDecode$5();
-	var formatOut = requireFormatOut$1();
+	var newEncode = requireNewEncode$7();
+	var newDecode = requireNewDecode$6();
+	var formatOut = requireFormatOutGeneric();
 	var purify = requirePurify$5();
 	var onChange = require$$10;
 	let clone = require$$5;
@@ -4712,7 +4716,7 @@ function requireJson () {
 		column.purify = purify;
 		column.encode = newEncode(column);
 		column.decode = newDecode(column);
-		column.formatOut = (context, ...rest) => formatOut.apply(null, [context, column, ...rest]);
+		column.formatOut = (context, ...rest) => formatOut.apply(null, [context, column, 'formatJSONOut', ...rest]);
 
 		column.onChange = onChange;
 		column.toDto = toDto;
@@ -4745,12 +4749,12 @@ function requirePurify$4 () {
 	return purify;
 }
 
-var newEncode$5;
-var hasRequiredNewEncode$5;
+var newEncode$6;
+var hasRequiredNewEncode$6;
 
-function requireNewEncode$5 () {
-	if (hasRequiredNewEncode$5) return newEncode$5;
-	hasRequiredNewEncode$5 = 1;
+function requireNewEncode$6 () {
+	if (hasRequiredNewEncode$6) return newEncode$6;
+	hasRequiredNewEncode$6 = 1;
 	var newPara = requireNewParameterized();
 	var purify = requirePurify$4();
 
@@ -4784,16 +4788,16 @@ function requireNewEncode$5 () {
 		return encode;
 	}
 
-	newEncode$5 = _new;
-	return newEncode$5;
+	newEncode$6 = _new;
+	return newEncode$6;
 }
 
-var newDecode$4;
-var hasRequiredNewDecode$4;
+var newDecode$5;
+var hasRequiredNewDecode$5;
 
-function requireNewDecode$4 () {
-	if (hasRequiredNewDecode$4) return newDecode$4;
-	hasRequiredNewDecode$4 = 1;
+function requireNewDecode$5 () {
+	if (hasRequiredNewDecode$5) return newDecode$5;
+	hasRequiredNewDecode$5 = 1;
 	function _new(column) {
 
 		return function(_context, value) {
@@ -4803,8 +4807,8 @@ function requireNewDecode$4 () {
 		};
 	}
 
-	newDecode$4 = _new;
-	return newDecode$4;
+	newDecode$5 = _new;
+	return newDecode$5;
 }
 
 var guid;
@@ -4813,8 +4817,8 @@ var hasRequiredGuid;
 function requireGuid () {
 	if (hasRequiredGuid) return guid;
 	hasRequiredGuid = 1;
-	var newEncode = requireNewEncode$5();
-	var newDecode = requireNewDecode$4();
+	var newEncode = requireNewEncode$6();
+	var newDecode = requireNewDecode$5();
 	var purify = requirePurify$4();
 
 	function _new(column) {
@@ -4875,12 +4879,12 @@ function requirePurify$3 () {
 	return purify_1$3;
 }
 
-var newEncode$4;
-var hasRequiredNewEncode$4;
+var newEncode$5;
+var hasRequiredNewEncode$5;
 
-function requireNewEncode$4 () {
-	if (hasRequiredNewEncode$4) return newEncode$4;
-	hasRequiredNewEncode$4 = 1;
+function requireNewEncode$5 () {
+	if (hasRequiredNewEncode$5) return newEncode$5;
+	hasRequiredNewEncode$5 = 1;
 	var newPara = requireNewParameterized();
 	var purify = requirePurify$3();
 	var getSessionContext = requireGetSessionContext();
@@ -4932,16 +4936,16 @@ function requireNewEncode$4 () {
 	}
 
 
-	newEncode$4 = _new;
-	return newEncode$4;
+	newEncode$5 = _new;
+	return newEncode$5;
 }
 
-var newDecode$3;
-var hasRequiredNewDecode$3;
+var newDecode$4;
+var hasRequiredNewDecode$4;
 
-function requireNewDecode$3 () {
-	if (hasRequiredNewDecode$3) return newDecode$3;
-	hasRequiredNewDecode$3 = 1;
+function requireNewDecode$4 () {
+	if (hasRequiredNewDecode$4) return newDecode$4;
+	hasRequiredNewDecode$4 = 1;
 	var newDecodeCore = requireNewDecodeCore();
 	var dateToISOString = requireDateToISOString();
 
@@ -4958,8 +4962,8 @@ function requireNewDecode$3 () {
 		};
 	}
 
-	newDecode$3 = _new;
-	return newDecode$3;
+	newDecode$4 = _new;
+	return newDecode$4;
 }
 
 var formatOut_1;
@@ -4975,8 +4979,10 @@ function requireFormatOut () {
 		var formatColumn = getSessionSingleton(context, 'formatDateOut');
 		if (formatColumn)
 			return formatColumn(column, alias);
-		else
+		else if (alias)
 			return `${alias}.${quote(context, column._dbName)}`;
+		else
+			return `${quote(context, column._dbName)}`;
 	}
 
 	formatOut_1 = formatOut;
@@ -4989,8 +4995,8 @@ var hasRequiredDate;
 function requireDate () {
 	if (hasRequiredDate) return date;
 	hasRequiredDate = 1;
-	var newEncode = requireNewEncode$4();
-	var newDecode = requireNewDecode$3();
+	var newEncode = requireNewEncode$5();
+	var newDecode = requireNewDecode$4();
 	var formatOut = requireFormatOut();
 	var purify = requirePurify$3();
 
@@ -5006,12 +5012,12 @@ function requireDate () {
 	return date;
 }
 
-var newEncode$3;
-var hasRequiredNewEncode$3;
+var newEncode$4;
+var hasRequiredNewEncode$4;
 
-function requireNewEncode$3 () {
-	if (hasRequiredNewEncode$3) return newEncode$3;
-	hasRequiredNewEncode$3 = 1;
+function requireNewEncode$4 () {
+	if (hasRequiredNewEncode$4) return newEncode$4;
+	hasRequiredNewEncode$4 = 1;
 	var newPara = requireNewParameterized();
 	var purify = requirePurify$3();
 
@@ -5055,8 +5061,8 @@ function requireNewEncode$3 () {
 	}
 
 
-	newEncode$3 = _new;
-	return newEncode$3;
+	newEncode$4 = _new;
+	return newEncode$4;
 }
 
 var dateWithTimeZone;
@@ -5065,8 +5071,8 @@ var hasRequiredDateWithTimeZone;
 function requireDateWithTimeZone () {
 	if (hasRequiredDateWithTimeZone) return dateWithTimeZone;
 	hasRequiredDateWithTimeZone = 1;
-	var newEncode = requireNewEncode$3();
-	var newDecode = requireNewDecode$3();
+	var newEncode = requireNewEncode$4();
+	var newDecode = requireNewDecode$4();
 	var formatOut = requireFormatOut();
 	var purify = requirePurify$3();
 
@@ -5103,16 +5109,16 @@ function requirePurify$2 () {
 	return purify_1$2;
 }
 
-var newEncode$2;
-var hasRequiredNewEncode$2;
+var newEncode$3;
+var hasRequiredNewEncode$3;
 
-function requireNewEncode$2 () {
-	if (hasRequiredNewEncode$2) return newEncode$2;
-	hasRequiredNewEncode$2 = 1;
+function requireNewEncode$3 () {
+	if (hasRequiredNewEncode$3) return newEncode$3;
+	hasRequiredNewEncode$3 = 1;
 	var purify = requirePurify$2();
 	var newParam = requireNewParameterized();
 
-	newEncode$2 = function(column) {
+	newEncode$3 = function(column) {
 
 		function encode(_context, value) {
 			value = purify(value);
@@ -5138,6 +5144,108 @@ function requireNewEncode$2 () {
 
 		return encode;
 	};
+	return newEncode$3;
+}
+
+var newDecode$3;
+var hasRequiredNewDecode$3;
+
+function requireNewDecode$3 () {
+	if (hasRequiredNewDecode$3) return newDecode$3;
+	hasRequiredNewDecode$3 = 1;
+	var newDecodeCore = requireNewDecodeCore();
+
+	function _new(column) {
+		var decodeCore = newDecodeCore(column);
+
+		return function(context, value) {
+			value = decodeCore(context, value);
+			if (value === null)
+				return value;
+			if (typeof(value) !== 'number')
+				return parseFloat(value);
+			return value;
+		};
+	}
+
+	newDecode$3 = _new;
+	return newDecode$3;
+}
+
+var numeric;
+var hasRequiredNumeric;
+
+function requireNumeric () {
+	if (hasRequiredNumeric) return numeric;
+	hasRequiredNumeric = 1;
+	var newEncode = requireNewEncode$3();
+	var newDecode = requireNewDecode$3();
+	var purify = requirePurify$2();
+
+	function _new(column) {
+		column.tsType = 'NumberColumn';
+		// if (!column.isPrimary)
+		// 	column.default = 0;
+		column.lazyDefault = 0;
+		column.purify = purify;
+		column.encode = newEncode(column);
+		column.decode = newDecode(column);
+	}
+
+	numeric = _new;
+	return numeric;
+}
+
+var newEncode$2;
+var hasRequiredNewEncode$2;
+
+function requireNewEncode$2 () {
+	if (hasRequiredNewEncode$2) return newEncode$2;
+	hasRequiredNewEncode$2 = 1;
+	var newPara = requireNewParameterized();
+	var purify = requirePurify$6();
+	var getSessionContext = requireGetSessionContext();
+	var getSessionSingleton = requireGetSessionSingleton();
+
+	function _new(column) {
+		var encode = function(context, value) {
+			value = purify(value);
+			if (value == null) {
+				if (column.dbNull === null)
+					return newPara('null');
+				return newPara('\'' + column.dbNull + '\'');
+			}
+			var ctx = getSessionContext(context);
+			var encodeCore = ctx.encodeBigint || encodeBigint;
+			var formatIn = ctx.formatBigintIn;
+			return newPara(formatIn ? formatIn('?') : '?', [encodeCore(value)]);
+		};
+
+		encode.unsafe = function(context, value) {
+			value = purify(value);
+			if (value == null) {
+				if (column.dbNull === null)
+					;
+				return '\'' + column.dbNull + '\'';
+			}
+			var encodeCore = getSessionSingleton(context, 'encodeBigint') || encodeBigint;
+			return encodeCore(value);
+		};
+
+		encode.direct = function(context, value) {
+			var encodeCore = getSessionSingleton(context, 'encodeBigint') || encodeBigint;
+			return encodeCore(value);
+		};
+
+		return encode;
+
+
+	}
+	function encodeBigint(value) {
+		return value;
+	}
+
+	newEncode$2 = _new;
 	return newEncode$2;
 }
 
@@ -5156,8 +5264,10 @@ function requireNewDecode$2 () {
 			value = decodeCore(context, value);
 			if (value === null)
 				return value;
-			if (typeof(value) !== 'number')
-				return parseFloat(value);
+			if (typeof(value) === 'string')
+				return value;
+			if (value.toString)
+				return value.toString();
 			return value;
 		};
 	}
@@ -5166,28 +5276,29 @@ function requireNewDecode$2 () {
 	return newDecode$2;
 }
 
-var numeric;
-var hasRequiredNumeric;
+var bigint;
+var hasRequiredBigint;
 
-function requireNumeric () {
-	if (hasRequiredNumeric) return numeric;
-	hasRequiredNumeric = 1;
+function requireBigint () {
+	if (hasRequiredBigint) return bigint;
+	hasRequiredBigint = 1;
 	var newEncode = requireNewEncode$2();
 	var newDecode = requireNewDecode$2();
-	var purify = requirePurify$2();
+	var formatOut = requireFormatOutGeneric();
+	var purify = requirePurify$6();
 
 	function _new(column) {
-		column.tsType = 'NumberColumn';
-		// if (!column.isPrimary)
-		// 	column.default = 0;
-		column.lazyDefault = 0;
+		column.tsType = 'BigintColumn';
 		column.purify = purify;
+		column.lazyDefault = '0';
 		column.encode = newEncode(column);
 		column.decode = newDecode(column);
+		column.formatOut = (context, ...rest) => formatOut.apply(null, [context, column, 'formatBigintOut', ...rest]);
+
 	}
 
-	numeric = _new;
-	return numeric;
+	bigint = _new;
+	return bigint;
 }
 
 var purify_1$1;
@@ -5471,6 +5582,11 @@ function requireColumn () {
 
 		c.numeric = function(optionalPrecision,optionalScale) {
 			requireNumeric()(column,optionalPrecision,optionalScale);
+			return c;
+		};
+
+		c.bigint = function() {
+			requireBigint()(column);
 			return c;
 		};
 
@@ -12662,6 +12778,26 @@ function requireLimitAndOffset$5 () {
 	return limitAndOffset_1$5;
 }
 
+var formatBigintOut_1$4;
+var hasRequiredFormatBigintOut$4;
+
+function requireFormatBigintOut$4 () {
+	if (hasRequiredFormatBigintOut$4) return formatBigintOut_1$4;
+	hasRequiredFormatBigintOut$4 = 1;
+	const quote = requireQuote$5();
+
+	function formatBigintOut(column, alias) {
+		const quotedCol = quote(column._dbName);
+		if (alias)
+			return `CAST(${alias}.${quotedCol} AS CHAR)`;
+		else
+			return `CAST(${quotedCol} AS CHAR)`;
+	}
+
+	formatBigintOut_1$4 = formatBigintOut;
+	return formatBigintOut_1$4;
+}
+
 var insertSql_1$5;
 var hasRequiredInsertSql$5;
 
@@ -12901,7 +13037,7 @@ function requireNewInsertCommandCore$1 () {
 			if (row['__' + column.alias] !== undefined) {
 				let encoded = column.encode(context, row[alias]);
 				if (encoded.parameters.length > 0) {
-					values.push('?');
+					values.push(encoded.sql());
 					parameters.push(encoded.parameters[0]);
 				} else
 					values.push(encoded.sql());
@@ -12934,7 +13070,17 @@ function requireNewGetLastInsertedCommandCore () {
 		return newParameterized(sql, parameters);
 
 		function columnNames() {
-			return table._columns.map(col => quote(context, col._dbName)).join(',');
+			return table._columns.map(formatColumn).join(',');
+		}
+
+		function formatColumn(column) {
+			const formatted = column.formatOut ? column.formatOut(context)  + ' as ' + quote(context, column._dbName) :  quote(context, column._dbName);
+			if (column.dbNull === null)
+				return formatted;
+			else {
+				const encoded = column.encode.unsafe(context, column.dbNull);
+				return `CASE WHEN ${formatted}=${encoded} THEN null ELSE ${formatted} END`;
+			}
 		}
 
 		function whereSql() {
@@ -13069,6 +13215,7 @@ function requireNewTransaction$b () {
 	const selectForUpdateSql = requireSelectForUpdateSql$5();
 	const lastInsertedSql = requireLastInsertedSql$4();
 	const limitAndOffset = requireLimitAndOffset$5();
+	const formatBigintOut = requireFormatBigintOut$4();
 	const insertSql = requireInsertSql$5();
 	const insert = requireInsert$5();
 	const quote = requireQuote$5();
@@ -13086,6 +13233,7 @@ function requireNewTransaction$b () {
 		rdb.selectForUpdateSql = selectForUpdateSql;
 		rdb.lastInsertedIsSeparate = true;
 		rdb.lastInsertedSql = lastInsertedSql;
+		rdb.formatBigintOut = formatBigintOut;
 		rdb.insertSql = insertSql;
 		rdb.insert = insert;
 		rdb.multipleStatements = false;
@@ -14300,7 +14448,10 @@ function requireFormatDateOut$3 () {
 	if (hasRequiredFormatDateOut$3) return formatDateOut_1$2;
 	hasRequiredFormatDateOut$3 = 1;
 	function formatDateOut(column, alias) {
-		return `${alias}."${(column._dbName)}"::text`;
+		if (alias)
+			return `${alias}."${(column._dbName)}"::text`;
+		else
+			return `"${(column._dbName)}"::text`;
 	}
 
 	formatDateOut_1$2 = formatDateOut;
@@ -15893,7 +16044,7 @@ function requireLastInsertedSql$2 () {
 	function lastInsertedSql(context, table, keyValues) {
 		return keyValues.map((value,i) => {
 			let column = table._primaryColumns[i];
-			if (value === undefined && column.tsType === 'NumberColumn')
+			if (value === undefined && (column.tsType === 'NumberColumn' || column.tsType === 'BigintColumn'))
 				return 'rowid IN (select last_insert_rowid())';
 			else
 				return column.eq(context, value);
@@ -15930,6 +16081,26 @@ function requireLimitAndOffset$3 () {
 
 	limitAndOffset_1$3 = limitAndOffset;
 	return limitAndOffset_1$3;
+}
+
+var formatBigintOut_1$3;
+var hasRequiredFormatBigintOut$3;
+
+function requireFormatBigintOut$3 () {
+	if (hasRequiredFormatBigintOut$3) return formatBigintOut_1$3;
+	hasRequiredFormatBigintOut$3 = 1;
+	const quote = requireQuote$3();
+
+	function formatBigintOut(column, alias) {
+		const quotedCol = quote(column._dbName);
+		if (alias)
+			return `CAST(${alias}.${quotedCol} AS TEXT)`;
+		else
+			return `CAST(${quotedCol} AS TEXT)`;
+	}
+
+	formatBigintOut_1$3 = formatBigintOut;
+	return formatBigintOut_1$3;
 }
 
 var insertSql_1$3;
@@ -16052,6 +16223,7 @@ function requireNewTransaction$7 () {
 	const selectForUpdateSql = requireSelectForUpdateSql$3();
 	const lastInsertedSql = requireLastInsertedSql$2();
 	const limitAndOffset = requireLimitAndOffset$3();
+	const formatBigintOut = requireFormatBigintOut$3();
 	const insertSql = requireInsertSql$3();
 	const insert = requireInsert$3();
 	const quote = requireQuote$3();
@@ -16068,6 +16240,7 @@ function requireNewTransaction$7 () {
 		rdb.decodeBinary = decodeBinary;
 		rdb.decodeJSON = decodeJSON;
 		rdb.encodeJSON = JSON.stringify;
+		rdb.formatBigintOut = formatBigintOut;
 		rdb.deleteFromSql = deleteFromSql;
 		rdb.selectForUpdateSql = selectForUpdateSql;
 		rdb.lastInsertedSql = lastInsertedSql;
@@ -16410,6 +16583,7 @@ function requireNewTransaction$6 () {
 	const encodeBoolean = requireEncodeBoolean$3();
 	const encodeBinary = requireEncodeBinary();
 	const decodeBinary = requireDecodeBinary();
+	const formatBigintOut = requireFormatBigintOut$3();
 	const deleteFromSql = requireDeleteFromSql$3();
 	const selectForUpdateSql = requireSelectForUpdateSql$3();
 	const lastInsertedSql = requireLastInsertedSql$2();
@@ -16428,6 +16602,7 @@ function requireNewTransaction$6 () {
 		rdb.encodeBoolean = encodeBoolean;
 		rdb.encodeBinary = encodeBinary;
 		rdb.decodeBinary = decodeBinary;
+		rdb.formatBigintOut = formatBigintOut;
 		rdb.decodeJSON = decodeJSON;
 		rdb.encodeJSON = JSON.stringify;
 		rdb.deleteFromSql = deleteFromSql;
@@ -16758,6 +16933,7 @@ function requireNewTransaction$5 () {
 	const selectForUpdateSql = requireSelectForUpdateSql$3();
 	const lastInsertedSql = requireLastInsertedSql$2();
 	const limitAndOffset = requireLimitAndOffset$3();
+	const formatBigintOut = requireFormatBigintOut$3();
 	const insertSql = requireInsertSql$3();
 	const insert = requireInsert$3();
 	const quote = requireQuote$3();
@@ -16775,6 +16951,7 @@ function requireNewTransaction$5 () {
 		rdb.deleteFromSql = deleteFromSql;
 		rdb.selectForUpdateSql = selectForUpdateSql;
 		rdb.lastInsertedSql = lastInsertedSql;
+		rdb.formatBigintOut = formatBigintOut;
 		rdb.insertSql = insertSql;
 		rdb.insert = insert;
 		rdb.lastInsertedIsSeparate = true;
@@ -17116,6 +17293,7 @@ function requireNewTransaction$4 () {
 	hasRequiredNewTransaction$4 = 1;
 	const wrapQuery = requireWrapQuery$3();
 	const encodeBoolean = requireEncodeBoolean$3();
+	const formatBigintOut = requireFormatBigintOut$3();
 	const deleteFromSql = requireDeleteFromSql$3();
 	const selectForUpdateSql = requireSelectForUpdateSql$3();
 	const lastInsertedSql = requireLastInsertedSql$2();
@@ -17134,6 +17312,7 @@ function requireNewTransaction$4 () {
 		rdb.encodeBoolean = encodeBoolean;
 		rdb.decodeJSON = decodeJSON;
 		rdb.encodeJSON = JSON.stringify;
+		rdb.formatBigintOut = formatBigintOut;
 		rdb.deleteFromSql = deleteFromSql;
 		rdb.selectForUpdateSql = selectForUpdateSql;
 		rdb.lastInsertedSql = lastInsertedSql;
@@ -17548,6 +17727,7 @@ function requireWrapQuery$2 () {
 						result.push(rows);
 					return;
 				}
+
 				result.push(rows);
 				if (!hasMore) {
 					if (result.length === 1)
@@ -17665,11 +17845,48 @@ function requireFormatDateOut$2 () {
 	const quote = requireQuote$2();
 
 	function formatDateOut(column, alias) {
-		return `CONVERT(VARCHAR, ${alias}.${quote(column._dbName)}, 121)`;
+		if (alias)
+			return `CONVERT(VARCHAR, ${alias}.${quote(column._dbName)}, 121)`;
+		else
+			return `CONVERT(VARCHAR, ${quote(column._dbName)}, 121)`;
 	}
 
 	formatDateOut_1$1 = formatDateOut;
 	return formatDateOut_1$1;
+}
+
+var formatBigintOut_1$2;
+var hasRequiredFormatBigintOut$2;
+
+function requireFormatBigintOut$2 () {
+	if (hasRequiredFormatBigintOut$2) return formatBigintOut_1$2;
+	hasRequiredFormatBigintOut$2 = 1;
+	const quote = requireQuote$2();
+
+	function formatBigintOut(column, alias) {
+		const quotedCol = quote(column._dbName);
+		if (alias)
+			return `CAST(${alias}.${quotedCol} AS NVARCHAR(20))`;
+		else
+			return `CAST(${quotedCol} AS NVARCHAR(20))`;
+	}
+
+	formatBigintOut_1$2 = formatBigintOut;
+	return formatBigintOut_1$2;
+}
+
+var formatBigintIn_1$1;
+var hasRequiredFormatBigintIn$1;
+
+function requireFormatBigintIn$1 () {
+	if (hasRequiredFormatBigintIn$1) return formatBigintIn_1$1;
+	hasRequiredFormatBigintIn$1 = 1;
+	function formatBigintIn(value) {
+		return `CONVERT(BIGINT, ${value})`;
+	}
+
+	formatBigintIn_1$1 = formatBigintIn;
+	return formatBigintIn_1$1;
 }
 
 var formatJSONOut_1;
@@ -17679,7 +17896,10 @@ function requireFormatJSONOut () {
 	if (hasRequiredFormatJSONOut) return formatJSONOut_1;
 	hasRequiredFormatJSONOut = 1;
 	function formatJSONOut(column, alias) {
-		return `JSON_QUERY(${alias}.[${column._dbName}])`;
+		if (alias)
+			return `JSON_QUERY(${alias}.[${column._dbName}])`;
+		else
+			return `JSON_QUERY([${column._dbName}])`;
 	}
 
 	formatJSONOut_1 = formatJSONOut;
@@ -17692,15 +17912,24 @@ var hasRequiredOutputInsertedSql;
 function requireOutputInsertedSql () {
 	if (hasRequiredOutputInsertedSql) return outputInsertedSql_1;
 	hasRequiredOutputInsertedSql = 1;
-	function outputInsertedSql(table) {
+	function outputInsertedSql(context, table) {
 		let separator = '';
 		let result = 'OUTPUT ';
 		for (let i = 0; i < table._columns.length; i++) {
-			result += separator + 'INSERTED.[' + table._columns[i]._dbName + ']';
+			result += separator + formatColumn(table._columns[i]);
 			separator = ',';
 		}
 		return result;
+
+		function formatColumn(column) {
+			if (column.formatOut)
+				return column.formatOut(context, 'INSERTED');
+			else
+				return `INSERTED.[${column._dbName}]`;
+		}
 	}
+
+
 
 	outputInsertedSql_1 = outputInsertedSql;
 	return outputInsertedSql_1;
@@ -17714,7 +17943,7 @@ function requireMergeSql$2 () {
 	hasRequiredMergeSql$2 = 1;
 	const outputInsertedSql = requireOutputInsertedSql();
 
-	function insertSql(table, row, options) {
+	function insertSql(context, table, row, options) {
 
 		let columnNames = [];
 		let conflictColumnUpdateSql = '';
@@ -17725,9 +17954,9 @@ function requireMergeSql$2 () {
 		const matched = whenMatched();
 		let sql;
 		if (matched)
-			sql = `MERGE INTO [${table._dbName}] AS target USING (SELECT ${values.join(',')}) AS source ON ${join()} WHEN MATCHED THEN ${matched} WHEN NOT MATCHED THEN ${whenNotMatched()} ${outputInsertedSql(table)};`;
+			sql = `MERGE INTO [${table._dbName}] AS target USING (SELECT ${values.join(',')}) AS source ON ${join()} WHEN MATCHED THEN ${matched} WHEN NOT MATCHED THEN ${whenNotMatched()} ${outputInsertedSql(context, table)};`;
 		else
-			sql = `MERGE INTO [${table._dbName}] AS target USING (SELECT ${values.join(',')}) AS source ON ${join()} WHEN NOT MATCHED THEN ${whenNotMatched()} ${outputInsertedSql(table)};`;
+			sql = `MERGE INTO [${table._dbName}] AS target USING (SELECT ${values.join(',')}) AS source ON ${join()} WHEN NOT MATCHED THEN ${whenNotMatched()} ${outputInsertedSql(context, table)};`;
 		return sql;
 
 		function join() {
@@ -17799,11 +18028,11 @@ function requireInsertSql$2 () {
 	let outputInsertedSql = requireOutputInsertedSql();
 	let mergeSql = requireMergeSql$2();
 
-	function getSqlTemplate(_context, _table, _row, options) {
+	function getSqlTemplate(context, _table, _row, options) {
 		if (hasConcurrency(_table, options) && hasColumns())
-			return mergeSql.apply(null, [...arguments].slice(1));
+			return mergeSql.apply(null, [...arguments]);
 		else
-			return insertSql.apply(null, [...arguments].slice(1));
+			return insertSql.apply(null, [...arguments]);
 
 		function hasColumns() {
 			for(let p in _row) {
@@ -17823,7 +18052,7 @@ function requireInsertSql$2 () {
 		return options.concurrency === 'skipOnConflict' || options.concurrency === 'overwrite';
 	}
 
-	function insertSql(table, row) {
+	function insertSql(context, table, row) {
 		let columnNames = [];
 		let values = [];
 		let sql = `INSERT INTO [${table._dbName}] `;
@@ -17858,7 +18087,7 @@ function requireInsertSql$2 () {
 
 		function outputInserted() {
 
-			return ' ' + outputInsertedSql(table) + ' ';
+			return ' ' + outputInsertedSql(context, table) + ' ';
 		}
 
 	}
@@ -17901,6 +18130,8 @@ function requireNewTransaction$3 () {
 	var selectForUpdateSql = requireSelectForUpdateSql$2();
 	const limitAndOffset = requireLimitAndOffset$2();
 	const formatDateOut = requireFormatDateOut$2();
+	const formatBigintOut = requireFormatBigintOut$2();
+	const formatBigintIn = requireFormatBigintIn$1();
 	const formatJSONOut = requireFormatJSONOut();
 	const insertSql = requireInsertSql$2();
 	const insert = requireInsert$2();
@@ -17917,6 +18148,8 @@ function requireNewTransaction$3 () {
 		rdb.decodeJSON = decodeJSON;
 		rdb.encodeJSON = JSON.stringify;
 		rdb.formatDateOut = formatDateOut;
+		rdb.formatBigintOut = formatBigintOut;
+		rdb.formatBigintIn = formatBigintIn;
 		rdb.formatJSONOut = formatJSONOut;
 		rdb.deleteFromSql = deleteFromSql;
 		rdb.selectForUpdateSql = selectForUpdateSql;
@@ -18046,12 +18279,19 @@ function requireNewGenericPool$2 () {
 					return cb(err, null);
 				}
 				var client;
+				// const config = {
+				// 	connectionString: connectionString,
+				// 	options: {
+				// 		useNumericString: true
+				// 	}
+				// };
 				mssql.open(connectionString, onConnected);
 
 				function onConnected(err, _client) {
 					if(err)
 						return cb(err, null);
 					client = _client;
+					// client.setUseNumericString(true);
 					client.poolCount = 0;
 					client.msnodesqlv8 = mssql;
 					return cb(null, client);
@@ -18721,6 +18961,7 @@ function requireNewTransaction$2 () {
 	const insertSql = requireInsertSql$2();
 	const getManyDto = requireGetManyDto();
 	const formatDateOut = requireFormatDateOut$2();
+	const formatBigintOut = requireFormatBigintOut$2();
 	const formatJSONOut = requireFormatJSONOut();
 	const insert = requireInsert$2();
 	const quote = requireQuote$2();
@@ -18742,6 +18983,7 @@ function requireNewTransaction$2 () {
 		rdb.insertSql = insertSql;
 		rdb.insert = insert;
 		rdb.formatDateOut = formatDateOut;
+		rdb.formatBigintOut = formatBigintOut;
 		rdb.formatJSONOut = formatJSONOut;
 		rdb.multipleStatements = true;
 		rdb.begin = 'BEGIN TRANSACTION';
@@ -19128,6 +19370,20 @@ function requireEncodeBoolean$1 () {
 	return encodeBoolean_1$1;
 }
 
+var formatBigintIn_1;
+var hasRequiredFormatBigintIn;
+
+function requireFormatBigintIn () {
+	if (hasRequiredFormatBigintIn) return formatBigintIn_1;
+	hasRequiredFormatBigintIn = 1;
+	function formatBigintIn(value) {
+		return `CONVERT(BIGINT, ${value})`;
+	}
+
+	formatBigintIn_1 = formatBigintIn;
+	return formatBigintIn_1;
+}
+
 var quote$1;
 var hasRequiredQuote$1;
 
@@ -19136,6 +19392,26 @@ function requireQuote$1 () {
 	hasRequiredQuote$1 = 1;
 	quote$1 = (name) => `[${name}]`;
 	return quote$1;
+}
+
+var formatBigintOut_1$1;
+var hasRequiredFormatBigintOut$1;
+
+function requireFormatBigintOut$1 () {
+	if (hasRequiredFormatBigintOut$1) return formatBigintOut_1$1;
+	hasRequiredFormatBigintOut$1 = 1;
+	const quote = requireQuote$1();
+
+	function formatBigintOut(column, alias) {
+		const quotedCol = quote(column._dbName);
+		if (alias)
+			return `CONVERT(VARCHAR(20), ${alias}.${quotedCol})`;
+		else
+			return `CONVERT(NVARCHAR(20), ${quotedCol})`;
+	}
+
+	formatBigintOut_1$1 = formatBigintOut;
+	return formatBigintOut_1$1;
 }
 
 var deleteFromSql_1$1;
@@ -19201,7 +19477,10 @@ function requireFormatDateOut$1 () {
 	const quote = requireQuote$1();
 
 	function formatDateOut(column, alias) {
-		return `CONVERT(VARCHAR, ${alias}.${quote(column._dbName)}, 23)`;
+		if (alias)
+			return `CONVERT(VARCHAR, ${alias}.${quote(column._dbName)}, 23)`;
+		else
+			return `CONVERT(VARCHAR, ${quote(column._dbName)}, 23)`;
 	}
 
 	formatDateOut_1 = formatDateOut;
@@ -19216,7 +19495,7 @@ function requireMergeSql$1 () {
 	hasRequiredMergeSql$1 = 1;
 	const quote = requireQuote$1();
 
-	function insertSql(table, row, options) {
+	function insertSql(context, table, row, options) {
 		let columnNames = [];
 		let conflictColumnUpdateSql = '';
 		let values = [];
@@ -19304,7 +19583,7 @@ function requireInsertSql$1 () {
 	function getSqlTemplate(_context, _table, _row, options) {
 
 		if (hasConcurrency(_table, options) && hasColumns())
-			return mergeSql.apply(null, [...arguments].slice(1));
+			return mergeSql.apply(null, [...arguments]);
 		else
 			return insertSql.apply(null, [...arguments].slice(1));
 
@@ -19430,6 +19709,8 @@ function requireNewTransaction$1 () {
 	hasRequiredNewTransaction$1 = 1;
 	const wrapQuery = requireWrapQuery$2();
 	const encodeBoolean = requireEncodeBoolean$1();
+	const formatBigintIn = requireFormatBigintIn();
+	const formatBigintOut = requireFormatBigintOut$1();
 	const deleteFromSql = requireDeleteFromSql$1();
 	const selectForUpdateSql = requireSelectForUpdateSql$1();
 	const lastInsertedSql = requireLastInsertedSql$1();
@@ -19447,6 +19728,8 @@ function requireNewTransaction$1 () {
 		}
 		rdb.engine = 'sap';
 		rdb.encodeBoolean = encodeBoolean;
+		rdb.formatBigintIn = formatBigintIn;
+		rdb.formatBigintOut = formatBigintOut;
 		rdb.decodeJSON = decodeJSON;
 		rdb.encodeJSON = JSON.stringify;
 		rdb.deleteFromSql = deleteFromSql;
@@ -19889,7 +20172,7 @@ function requireMergeSql () {
 	hasRequiredMergeSql = 1;
 	const quote = requireQuote();
 
-	function insertSql(table, row, options) {
+	function insertSql(context, table, row, options) {
 		let columnNames = [];
 		let conflictColumnUpdateSql = '';
 		let values = [];
@@ -19976,9 +20259,9 @@ function requireInsertSql () {
 	let mergeSql = requireMergeSql();
 	const quote = requireQuote();
 
-	function getSqlTemplate(_context, _table, _row, options) {
+	function getSqlTemplate(context, _table, _row, options) {
 		if (hasConcurrency(_table, options) && hasColumns())
-			return mergeSql.apply(null, [...arguments].slice(1));
+			return mergeSql.apply(null, [...arguments]);
 		else
 			return insertSql.apply(null, [...arguments].slice(1));
 
@@ -20110,6 +20393,27 @@ function requireInsert () {
 	return insert_1;
 }
 
+var formatBigintOut_1;
+var hasRequiredFormatBigintOut;
+
+function requireFormatBigintOut () {
+	if (hasRequiredFormatBigintOut) return formatBigintOut_1;
+	hasRequiredFormatBigintOut = 1;
+	const quote = requireQuote();
+
+	function formatBigintOut(column, alias) {
+		const quotedCol = quote(column._dbName);
+		if (alias)
+			return `TO_CHAR(${alias}.${quotedCol})`;
+		else
+			return `TO_CHAR(${quotedCol})`;
+	}
+
+
+	formatBigintOut_1 = formatBigintOut;
+	return formatBigintOut_1;
+}
+
 var formatDateOut;
 var hasRequiredFormatDateOut;
 
@@ -20119,7 +20423,10 @@ function requireFormatDateOut () {
 	const quote = requireQuote();
 
 	function formatDateColumn(column, alias) {
-		return `TO_CHAR(${alias}.${quote(column._dbName)}, 'YYYY-MM-DD"T"HH24:MI:SS.FF3')`;
+		if (alias)
+			return `TO_CHAR(${alias}.${quote(column._dbName)}, 'YYYY-MM-DD"T"HH24:MI:SS.FF3')`;
+		else
+			return `TO_CHAR(${quote(column._dbName)}, 'YYYY-MM-DD"T"HH24:MI:SS.FF3')`;
 	}
 
 	formatDateOut = formatDateColumn;
@@ -20154,6 +20461,7 @@ function requireNewTransaction () {
 	const limitAndOffset = requireLimitAndOffset();
 	const insertSql = requireInsertSql();
 	const insert = requireInsert();
+	const formatBigintOut = requireFormatBigintOut();
 	const formatDateOut = requireFormatDateOut();
 	const formatDateIn = requireFormatDateIn();
 	const quote = requireQuote();
@@ -20172,6 +20480,7 @@ function requireNewTransaction () {
 		rdb.encodeJSON = JSON.stringify;
 		rdb.formatDateOut = formatDateOut;
 		rdb.formatDateIn = formatDateIn;
+		rdb.formatBigintOut = formatBigintOut;
 		rdb.deleteFromSql = deleteFromSql;
 		rdb.selectForUpdateSql = selectForUpdateSql;
 		rdb.lastInsertedSql = lastInsertedSql;

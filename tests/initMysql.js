@@ -1,4 +1,4 @@
-const sql = `DROP TABLE IF EXISTS deliveryAddress; DROP TABLE IF EXISTS package; DROP TABLE IF EXISTS orderLine; DROP TABLE IF EXISTS \`order\`; DROP TABLE IF EXISTS customer;DROP TABLE IF EXISTS vendor;DROP TABLE IF EXISTS datetest;DROP TABLE IF EXISTS compositeOrderLine;DROP TABLE IF EXISTS compositeOrder;
+const sql = `DROP TABLE IF EXISTS deliveryAddress; DROP TABLE IF EXISTS package; DROP TABLE IF EXISTS orderLine; DROP TABLE IF EXISTS \`order\`; DROP TABLE IF EXISTS customer;DROP TABLE IF EXISTS vendor;DROP TABLE IF EXISTS datetest;DROP TABLE IF EXISTS compositeOrderLine;DROP TABLE IF EXISTS compositeOrder;DROP TABLE IF EXISTS bigintChild;DROP TABLE IF EXISTS bigintParent;
 
 CREATE TABLE datetest (
     id INTEGER AUTO_INCREMENT PRIMARY KEY,
@@ -69,6 +69,18 @@ CREATE TABLE deliveryAddress (
     postalCode TEXT,
     postalPlace TEXT,
     countryCode TEXT
+);
+
+CREATE TABLE bigintParent (
+    id BIGINT PRIMARY KEY,
+    foo INT
+);
+
+CREATE TABLE bigintChild (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    bar INT,
+    parentId BIGINT,
+    FOREIGN KEY (parentId) REFERENCES bigintParent(id)
 )
 
 `;

@@ -10,7 +10,17 @@ function newGetLastInsertedCommandCore(context, table, row) {
 	return newParameterized(sql, parameters);
 
 	function columnNames() {
-		return table._columns.map(col => quote(context, col._dbName)).join(',');
+		return table._columns.map(formatColumn).join(',');
+	}
+
+	function formatColumn(column) {
+		const formatted = column.formatOut ? column.formatOut(context)  + ' as ' + quote(context, column._dbName) :  quote(context, column._dbName);
+		if (column.dbNull === null)
+			return formatted;
+		else {
+			const encoded = column.encode.unsafe(context, column.dbNull);
+			return `CASE WHEN ${formatted}=${encoded} THEN null ELSE ${formatted} END`;
+		}
 	}
 
 	function whereSql() {

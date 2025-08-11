@@ -1,6 +1,6 @@
 const quote = require('./quote');
 
-function insertSql(table, row, options) {
+function insertSql(context, table, row, options) {
 	let columnNames = [];
 	let conflictColumnUpdateSql = '';
 	let values = [];

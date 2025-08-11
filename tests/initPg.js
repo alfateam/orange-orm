@@ -73,6 +73,17 @@ CREATE TABLE "deliveryAddress" (
     "countryCode" TEXT
 );
 
+CREATE TABLE "bigintParent" (
+    id BIGINT PRIMARY KEY,
+    foo INTEGER
+);
+
+CREATE TABLE "bigintChild" (
+    id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+    bar INTEGER,
+    "parentId" BIGINT REFERENCES "bigintParent"(id)
+);
+
 CREATE TABLE custom."withSchema" (
     id SERIAL	 PRIMARY KEY,
     name TEXT

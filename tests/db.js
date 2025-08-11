@@ -113,7 +113,17 @@ const map = rdb.map(x => ({
 		date: column('date').date(),
 		datetime: column('tdatetime').date(),
 		datetime_tz: column('tdatetime_tz').dateWithTimeZone()
+	})),
+	bigintParent: x.table('bigintParent').map(({ column}) => ({
+		id: column('id').bigint().primary().notNullExceptInsert(),
+		foo: column('foo').numeric(),
+	})),
+	bigintChild: x.table('bigintChild').map(({ column}) => ({
+		id: column('id').bigint().primary(),
+		bar: column('bar').numeric(),
+		parentId: column('parentId').bigint()
 	}))
+
 })).map(x => ({
 	orderLine: x.orderLine.map(({ hasMany, references }) => ({
 		packages: hasMany(x.package).by('lineId'),
@@ -129,6 +139,9 @@ const map = rdb.map(x => ({
 	})),
 	compositeOrder: x.compositeOrder.map(({ hasMany }) => ({
 		lines: hasMany(x.compositeOrderLine).by('companyId', 'orderNo')
+	})),
+	bigintParent: x.bigintParent.map(({ hasMany }) => ({
+		children: hasMany(x.bigintChild).by('parentId')
 	}))
 }));
 

@@ -3929,13 +3929,15 @@ function require_in () {
 		}
 		const firstPart = `${quote(context, alias)}.${quote(context, column._dbName)} in (`;
 
-		const encode = column.encode.direct;
-		const params = new Array(values.length);
+		const encode = column.encode;
+		const paramsSql = new Array(values.length);
+		let paramsValues = [];
 		for (let i = 0; i < values.length; i++) {
-			params[i] = encode(context, values[i]);
+			paramsSql[i] = encode(context, values[i]);
+			paramsValues = [...paramsValues, ...paramsSql[i].parameters];
 		}
-		const sql = `${firstPart +  new Array(values.length).fill('?').join(',')})`;
-		return newBoolean(newParameterized(sql, params));
+		const sql = `${firstPart +  paramsSql.map(x => x.sql()).join(',')})`;
+		return newBoolean(newParameterized(sql, paramsValues));
 	}
 
 	_in_1 = _in;
@@ -4262,12 +4264,12 @@ function requirePurify$6 () {
 	return purify_1$5;
 }
 
-var newEncode$7;
-var hasRequiredNewEncode$7;
+var newEncode$8;
+var hasRequiredNewEncode$8;
 
-function requireNewEncode$7 () {
-	if (hasRequiredNewEncode$7) return newEncode$7;
-	hasRequiredNewEncode$7 = 1;
+function requireNewEncode$8 () {
+	if (hasRequiredNewEncode$8) return newEncode$8;
+	hasRequiredNewEncode$8 = 1;
 	var newPara = requireNewParameterized();
 	var purify = requirePurify$6();
 
@@ -4301,8 +4303,8 @@ function requireNewEncode$7 () {
 
 	}
 
-	newEncode$7 = _new;
-	return newEncode$7;
+	newEncode$8 = _new;
+	return newEncode$8;
 }
 
 var newDecodeCore;
@@ -4507,7 +4509,7 @@ var hasRequiredString;
 function requireString () {
 	if (hasRequiredString) return string;
 	hasRequiredString = 1;
-	var newEncode = requireNewEncode$7();
+	var newEncode = requireNewEncode$8();
 	var newDecode = requireNewDecodeCore();
 	var startsWith = requireStartsWith();
 	var endsWith = requireEndsWith();
@@ -4581,12 +4583,12 @@ function requirePurify$5 () {
 	return purify_1$4;
 }
 
-var newEncode$6;
-var hasRequiredNewEncode$6;
+var newEncode$7;
+var hasRequiredNewEncode$7;
 
-function requireNewEncode$6 () {
-	if (hasRequiredNewEncode$6) return newEncode$6;
-	hasRequiredNewEncode$6 = 1;
+function requireNewEncode$7 () {
+	if (hasRequiredNewEncode$7) return newEncode$7;
+	hasRequiredNewEncode$7 = 1;
 	var newPara = requireNewParameterized();
 	var purify = requirePurify$5();
 	var getSessionSingleton = requireGetSessionSingleton();
@@ -4636,16 +4638,16 @@ function requireNewEncode$6 () {
 		return encode;
 	}
 
-	newEncode$6 = _new;
-	return newEncode$6;
+	newEncode$7 = _new;
+	return newEncode$7;
 }
 
-var newDecode$5;
-var hasRequiredNewDecode$5;
+var newDecode$6;
+var hasRequiredNewDecode$6;
 
-function requireNewDecode$5 () {
-	if (hasRequiredNewDecode$5) return newDecode$5;
-	hasRequiredNewDecode$5 = 1;
+function requireNewDecode$6 () {
+	if (hasRequiredNewDecode$6) return newDecode$6;
+	hasRequiredNewDecode$6 = 1;
 	let newDecodeCore = requireNewDecodeCore();
 	let getSessionContext = requireGetSessionContext();
 
@@ -4666,29 +4668,31 @@ function requireNewDecode$5 () {
 		};
 	}
 
-	newDecode$5 = _new;
-	return newDecode$5;
+	newDecode$6 = _new;
+	return newDecode$6;
 }
 
-var formatOut_1$1;
-var hasRequiredFormatOut$1;
+var formatOutGeneric_1;
+var hasRequiredFormatOutGeneric;
 
-function requireFormatOut$1 () {
-	if (hasRequiredFormatOut$1) return formatOut_1$1;
-	hasRequiredFormatOut$1 = 1;
+function requireFormatOutGeneric () {
+	if (hasRequiredFormatOutGeneric) return formatOutGeneric_1;
+	hasRequiredFormatOutGeneric = 1;
 	var getSessionSingleton = requireGetSessionSingleton();
 	const quote = requireQuote$2();
 
-	function formatOut(context, column, alias) {
-		var formatColumn = getSessionSingleton(context, 'formatJSONOut');
+	function formatOutGeneric(context, column, fnName, alias) {
+		var formatColumn = getSessionSingleton(context, fnName);
 		if (formatColumn)
 			return formatColumn(column, alias);
-		else
+		else if (alias)
 			return `${alias}.${quote(context, column._dbName)}`;
+		else
+			return `${quote(context, column._dbName)}`;
 	}
 
-	formatOut_1$1 = formatOut;
-	return formatOut_1$1;
+	formatOutGeneric_1 = formatOutGeneric;
+	return formatOutGeneric_1;
 }
 
 var require$$10 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(onChange);
@@ -4699,9 +4703,9 @@ var hasRequiredJson;
 function requireJson () {
 	if (hasRequiredJson) return json;
 	hasRequiredJson = 1;
-	var newEncode = requireNewEncode$6();
-	var newDecode = requireNewDecode$5();
-	var formatOut = requireFormatOut$1();
+	var newEncode = requireNewEncode$7();
+	var newDecode = requireNewDecode$6();
+	var formatOut = requireFormatOutGeneric();
 	var purify = requirePurify$5();
 	var onChange = require$$10;
 	let clone = require$$5;
@@ -4711,7 +4715,7 @@ function requireJson () {
 		column.purify = purify;
 		column.encode = newEncode(column);
 		column.decode = newDecode(column);
-		column.formatOut = (context, ...rest) => formatOut.apply(null, [context, column, ...rest]);
+		column.formatOut = (context, ...rest) => formatOut.apply(null, [context, column, 'formatJSONOut', ...rest]);
 
 		column.onChange = onChange;
 		column.toDto = toDto;
@@ -4744,12 +4748,12 @@ function requirePurify$4 () {
 	return purify;
 }
 
-var newEncode$5;
-var hasRequiredNewEncode$5;
+var newEncode$6;
+var hasRequiredNewEncode$6;
 
-function requireNewEncode$5 () {
-	if (hasRequiredNewEncode$5) return newEncode$5;
-	hasRequiredNewEncode$5 = 1;
+function requireNewEncode$6 () {
+	if (hasRequiredNewEncode$6) return newEncode$6;
+	hasRequiredNewEncode$6 = 1;
 	var newPara = requireNewParameterized();
 	var purify = requirePurify$4();
 
@@ -4783,16 +4787,16 @@ function requireNewEncode$5 () {
 		return encode;
 	}
 
-	newEncode$5 = _new;
-	return newEncode$5;
+	newEncode$6 = _new;
+	return newEncode$6;
 }
 
-var newDecode$4;
-var hasRequiredNewDecode$4;
+var newDecode$5;
+var hasRequiredNewDecode$5;
 
-function requireNewDecode$4 () {
-	if (hasRequiredNewDecode$4) return newDecode$4;
-	hasRequiredNewDecode$4 = 1;
+function requireNewDecode$5 () {
+	if (hasRequiredNewDecode$5) return newDecode$5;
+	hasRequiredNewDecode$5 = 1;
 	function _new(column) {
 
 		return function(_context, value) {
@@ -4802,8 +4806,8 @@ function requireNewDecode$4 () {
 		};
 	}
 
-	newDecode$4 = _new;
-	return newDecode$4;
+	newDecode$5 = _new;
+	return newDecode$5;
 }
 
 var guid;
@@ -4812,8 +4816,8 @@ var hasRequiredGuid;
 function requireGuid () {
 	if (hasRequiredGuid) return guid;
 	hasRequiredGuid = 1;
-	var newEncode = requireNewEncode$5();
-	var newDecode = requireNewDecode$4();
+	var newEncode = requireNewEncode$6();
+	var newDecode = requireNewDecode$5();
 	var purify = requirePurify$4();
 
 	function _new(column) {
@@ -4874,12 +4878,12 @@ function requirePurify$3 () {
 	return purify_1$3;
 }
 
-var newEncode$4;
-var hasRequiredNewEncode$4;
+var newEncode$5;
+var hasRequiredNewEncode$5;
 
-function requireNewEncode$4 () {
-	if (hasRequiredNewEncode$4) return newEncode$4;
-	hasRequiredNewEncode$4 = 1;
+function requireNewEncode$5 () {
+	if (hasRequiredNewEncode$5) return newEncode$5;
+	hasRequiredNewEncode$5 = 1;
 	var newPara = requireNewParameterized();
 	var purify = requirePurify$3();
 	var getSessionContext = requireGetSessionContext();
@@ -4931,16 +4935,16 @@ function requireNewEncode$4 () {
 	}
 
 
-	newEncode$4 = _new;
-	return newEncode$4;
+	newEncode$5 = _new;
+	return newEncode$5;
 }
 
-var newDecode$3;
-var hasRequiredNewDecode$3;
+var newDecode$4;
+var hasRequiredNewDecode$4;
 
-function requireNewDecode$3 () {
-	if (hasRequiredNewDecode$3) return newDecode$3;
-	hasRequiredNewDecode$3 = 1;
+function requireNewDecode$4 () {
+	if (hasRequiredNewDecode$4) return newDecode$4;
+	hasRequiredNewDecode$4 = 1;
 	var newDecodeCore = requireNewDecodeCore();
 	var dateToISOString = requireDateToISOString();
 
@@ -4957,8 +4961,8 @@ function requireNewDecode$3 () {
 		};
 	}
 
-	newDecode$3 = _new;
-	return newDecode$3;
+	newDecode$4 = _new;
+	return newDecode$4;
 }
 
 var formatOut_1;
@@ -4974,8 +4978,10 @@ function requireFormatOut () {
 		var formatColumn = getSessionSingleton(context, 'formatDateOut');
 		if (formatColumn)
 			return formatColumn(column, alias);
-		else
+		else if (alias)
 			return `${alias}.${quote(context, column._dbName)}`;
+		else
+			return `${quote(context, column._dbName)}`;
 	}
 
 	formatOut_1 = formatOut;
@@ -4988,8 +4994,8 @@ var hasRequiredDate;
 function requireDate () {
 	if (hasRequiredDate) return date;
 	hasRequiredDate = 1;
-	var newEncode = requireNewEncode$4();
-	var newDecode = requireNewDecode$3();
+	var newEncode = requireNewEncode$5();
+	var newDecode = requireNewDecode$4();
 	var formatOut = requireFormatOut();
 	var purify = requirePurify$3();
 
@@ -5005,12 +5011,12 @@ function requireDate () {
 	return date;
 }
 
-var newEncode$3;
-var hasRequiredNewEncode$3;
+var newEncode$4;
+var hasRequiredNewEncode$4;
 
-function requireNewEncode$3 () {
-	if (hasRequiredNewEncode$3) return newEncode$3;
-	hasRequiredNewEncode$3 = 1;
+function requireNewEncode$4 () {
+	if (hasRequiredNewEncode$4) return newEncode$4;
+	hasRequiredNewEncode$4 = 1;
 	var newPara = requireNewParameterized();
 	var purify = requirePurify$3();
 
@@ -5054,8 +5060,8 @@ function requireNewEncode$3 () {
 	}
 
 
-	newEncode$3 = _new;
-	return newEncode$3;
+	newEncode$4 = _new;
+	return newEncode$4;
 }
 
 var dateWithTimeZone;
@@ -5064,8 +5070,8 @@ var hasRequiredDateWithTimeZone;
 function requireDateWithTimeZone () {
 	if (hasRequiredDateWithTimeZone) return dateWithTimeZone;
 	hasRequiredDateWithTimeZone = 1;
-	var newEncode = requireNewEncode$3();
-	var newDecode = requireNewDecode$3();
+	var newEncode = requireNewEncode$4();
+	var newDecode = requireNewDecode$4();
 	var formatOut = requireFormatOut();
 	var purify = requirePurify$3();
 
@@ -5102,16 +5108,16 @@ function requirePurify$2 () {
 	return purify_1$2;
 }
 
-var newEncode$2;
-var hasRequiredNewEncode$2;
+var newEncode$3;
+var hasRequiredNewEncode$3;
 
-function requireNewEncode$2 () {
-	if (hasRequiredNewEncode$2) return newEncode$2;
-	hasRequiredNewEncode$2 = 1;
+function requireNewEncode$3 () {
+	if (hasRequiredNewEncode$3) return newEncode$3;
+	hasRequiredNewEncode$3 = 1;
 	var purify = requirePurify$2();
 	var newParam = requireNewParameterized();
 
-	newEncode$2 = function(column) {
+	newEncode$3 = function(column) {
 
 		function encode(_context, value) {
 			value = purify(value);
@@ -5137,6 +5143,108 @@ function requireNewEncode$2 () {
 
 		return encode;
 	};
+	return newEncode$3;
+}
+
+var newDecode$3;
+var hasRequiredNewDecode$3;
+
+function requireNewDecode$3 () {
+	if (hasRequiredNewDecode$3) return newDecode$3;
+	hasRequiredNewDecode$3 = 1;
+	var newDecodeCore = requireNewDecodeCore();
+
+	function _new(column) {
+		var decodeCore = newDecodeCore(column);
+
+		return function(context, value) {
+			value = decodeCore(context, value);
+			if (value === null)
+				return value;
+			if (typeof(value) !== 'number')
+				return parseFloat(value);
+			return value;
+		};
+	}
+
+	newDecode$3 = _new;
+	return newDecode$3;
+}
+
+var numeric;
+var hasRequiredNumeric;
+
+function requireNumeric () {
+	if (hasRequiredNumeric) return numeric;
+	hasRequiredNumeric = 1;
+	var newEncode = requireNewEncode$3();
+	var newDecode = requireNewDecode$3();
+	var purify = requirePurify$2();
+
+	function _new(column) {
+		column.tsType = 'NumberColumn';
+		// if (!column.isPrimary)
+		// 	column.default = 0;
+		column.lazyDefault = 0;
+		column.purify = purify;
+		column.encode = newEncode(column);
+		column.decode = newDecode(column);
+	}
+
+	numeric = _new;
+	return numeric;
+}
+
+var newEncode$2;
+var hasRequiredNewEncode$2;
+
+function requireNewEncode$2 () {
+	if (hasRequiredNewEncode$2) return newEncode$2;
+	hasRequiredNewEncode$2 = 1;
+	var newPara = requireNewParameterized();
+	var purify = requirePurify$6();
+	var getSessionContext = requireGetSessionContext();
+	var getSessionSingleton = requireGetSessionSingleton();
+
+	function _new(column) {
+		var encode = function(context, value) {
+			value = purify(value);
+			if (value == null) {
+				if (column.dbNull === null)
+					return newPara('null');
+				return newPara('\'' + column.dbNull + '\'');
+			}
+			var ctx = getSessionContext(context);
+			var encodeCore = ctx.encodeBigint || encodeBigint;
+			var formatIn = ctx.formatBigintIn;
+			return newPara(formatIn ? formatIn('?') : '?', [encodeCore(value)]);
+		};
+
+		encode.unsafe = function(context, value) {
+			value = purify(value);
+			if (value == null) {
+				if (column.dbNull === null)
+					;
+				return '\'' + column.dbNull + '\'';
+			}
+			var encodeCore = getSessionSingleton(context, 'encodeBigint') || encodeBigint;
+			return encodeCore(value);
+		};
+
+		encode.direct = function(context, value) {
+			var encodeCore = getSessionSingleton(context, 'encodeBigint') || encodeBigint;
+			return encodeCore(value);
+		};
+
+		return encode;
+
+
+	}
+	function encodeBigint(value) {
+		return value;
+	}
+
+	newEncode$2 = _new;
 	return newEncode$2;
 }
 
@@ -5155,8 +5263,10 @@ function requireNewDecode$2 () {
 			value = decodeCore(context, value);
 			if (value === null)
 				return value;
-			if (typeof(value) !== 'number')
-				return parseFloat(value);
+			if (typeof(value) === 'string')
+				return value;
+			if (value.toString)
+				return value.toString();
 			return value;
 		};
 	}
@@ -5165,28 +5275,29 @@ function requireNewDecode$2 () {
 	return newDecode$2;
 }
 
-var numeric;
-var hasRequiredNumeric;
+var bigint;
+var hasRequiredBigint;
 
-function requireNumeric () {
-	if (hasRequiredNumeric) return numeric;
-	hasRequiredNumeric = 1;
+function requireBigint () {
+	if (hasRequiredBigint) return bigint;
+	hasRequiredBigint = 1;
 	var newEncode = requireNewEncode$2();
 	var newDecode = requireNewDecode$2();
-	var purify = requirePurify$2();
+	var formatOut = requireFormatOutGeneric();
+	var purify = requirePurify$6();
 
 	function _new(column) {
-		column.tsType = 'NumberColumn';
-		// if (!column.isPrimary)
-		// 	column.default = 0;
-		column.lazyDefault = 0;
+		column.tsType = 'BigintColumn';
 		column.purify = purify;
+		column.lazyDefault = '0';
 		column.encode = newEncode(column);
 		column.decode = newDecode(column);
+		column.formatOut = (context, ...rest) => formatOut.apply(null, [context, column, 'formatBigintOut', ...rest]);
+
 	}
 
-	numeric = _new;
-	return numeric;
+	bigint = _new;
+	return bigint;
 }
 
 var purify_1$1;
@@ -5470,6 +5581,11 @@ function requireColumn () {
 
 		c.numeric = function(optionalPrecision,optionalScale) {
 			requireNumeric()(column,optionalPrecision,optionalScale);
+			return c;
+		};
+
+		c.bigint = function() {
+			requireBigint()(column);
 			return c;
 		};
 
@@ -12526,6 +12642,36 @@ function requireEncodeBoolean () {
 	return encodeBoolean_1;
 }
 
+var quote$1;
+var hasRequiredQuote$1;
+
+function requireQuote$1 () {
+	if (hasRequiredQuote$1) return quote$1;
+	hasRequiredQuote$1 = 1;
+	quote$1 = (name) => `"${name}"`;
+	return quote$1;
+}
+
+var formatBigintOut_1;
+var hasRequiredFormatBigintOut;
+
+function requireFormatBigintOut () {
+	if (hasRequiredFormatBigintOut) return formatBigintOut_1;
+	hasRequiredFormatBigintOut = 1;
+	const quote = requireQuote$1();
+
+	function formatBigintOut(column, alias) {
+		const quotedCol = quote(column._dbName);
+		if (alias)
+			return `CAST(${alias}.${quotedCol} AS TEXT)`;
+		else
+			return `CAST(${quotedCol} AS TEXT)`;
+	}
+
+	formatBigintOut_1 = formatBigintOut;
+	return formatBigintOut_1;
+}
+
 var format_1;
 var hasRequiredFormat;
 
@@ -12542,16 +12688,6 @@ function requireFormat () {
 	}
 	format_1 = format;
 	return format_1;
-}
-
-var quote$1;
-var hasRequiredQuote$1;
-
-function requireQuote$1 () {
-	if (hasRequiredQuote$1) return quote$1;
-	hasRequiredQuote$1 = 1;
-	quote$1 = (name) => `"${name}"`;
-	return quote$1;
 }
 
 var deleteFromSql_1$1;
@@ -12596,7 +12732,7 @@ function requireLastInsertedSql$1 () {
 	function lastInsertedSql(context, table, keyValues) {
 		return keyValues.map((value,i) => {
 			let column = table._primaryColumns[i];
-			if (value === undefined && column.tsType === 'NumberColumn')
+			if (value === undefined && (column.tsType === 'NumberColumn' || column.tsType === 'BigintColumn'))
 				return 'rowid IN (select last_insert_rowid())';
 			else
 				return column.eq(context, value);
@@ -12875,7 +13011,7 @@ function requireNewInsertCommandCore () {
 			if (row['__' + column.alias] !== undefined) {
 				let encoded = column.encode(context, row[alias]);
 				if (encoded.parameters.length > 0) {
-					values.push('?');
+					values.push(encoded.sql());
 					parameters.push(encoded.parameters[0]);
 				} else
 					values.push(encoded.sql());
@@ -12908,7 +13044,17 @@ function requireNewGetLastInsertedCommandCore () {
 		return newParameterized(sql, parameters);
 
 		function columnNames() {
-			return table._columns.map(col => quote(context, col._dbName)).join(',');
+			return table._columns.map(formatColumn).join(',');
+		}
+
+		function formatColumn(column) {
+			const formatted = column.formatOut ? column.formatOut(context)  + ' as ' + quote(context, column._dbName) :  quote(context, column._dbName);
+			if (column.dbNull === null)
+				return formatted;
+			else {
+				const encoded = column.encode.unsafe(context, column.dbNull);
+				return `CASE WHEN ${formatted}=${encoded} THEN null ELSE ${formatted} END`;
+			}
 		}
 
 		function whereSql() {
@@ -13039,6 +13185,7 @@ function requireNewTransaction$1 () {
 	hasRequiredNewTransaction$1 = 1;
 	const wrapQuery = requireWrapQuery$1();
 	const encodeBoolean = requireEncodeBoolean();
+	const formatBigintOut = requireFormatBigintOut();
 	const deleteFromSql = requireDeleteFromSql$1();
 	const selectForUpdateSql = requireSelectForUpdateSql$1();
 	const lastInsertedSql = requireLastInsertedSql$1();
@@ -13057,6 +13204,7 @@ function requireNewTransaction$1 () {
 		rdb.encodeBoolean = encodeBoolean;
 		rdb.decodeJSON = decodeJSON;
 		rdb.encodeJSON = JSON.stringify;
+		rdb.formatBigintOut = formatBigintOut;
 		rdb.deleteFromSql = deleteFromSql;
 		rdb.selectForUpdateSql = selectForUpdateSql;
 		rdb.lastInsertedSql = lastInsertedSql;
@@ -14259,7 +14407,10 @@ function requireFormatDateOut () {
 	if (hasRequiredFormatDateOut) return formatDateOut_1;
 	hasRequiredFormatDateOut = 1;
 	function formatDateOut(column, alias) {
-		return `${alias}."${(column._dbName)}"::text`;
+		if (alias)
+			return `${alias}."${(column._dbName)}"::text`;
+		else
+			return `"${(column._dbName)}"::text`;
 	}
 
 	formatDateOut_1 = formatDateOut;

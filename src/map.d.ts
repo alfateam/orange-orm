@@ -102,6 +102,8 @@ type ColumnToType<T> = T extends UuidColumnSymbol
 	? string
 	: T extends NumericColumnSymbol
 	? number
+	: T extends BigIntColumnSymbol
+	? bigint
 	: T extends DateColumnSymbol
 	? string | Date
 	: T extends DateWithTimeZoneColumnSymbol
@@ -134,6 +136,7 @@ type RelatedColumns<T> = RemoveNeverFlat<{
 	T[K] extends StringColumnTypeDef<infer M> ? StringColumnSymbol
 	: T[K] extends UuidColumnTypeDef<infer M> ? UuidColumnSymbol
 	: T[K] extends NumericColumnTypeDef<infer M> ? NumericColumnSymbol
+	: T[K] extends BigIntColumnTypeDef<infer M> ? BigIntColumnSymbol
 	: T[K] extends DateColumnTypeDef<infer M> ? DateColumnSymbol
 	: T[K] extends DateWithTimeZoneColumnTypeDef<infer M> ? DateWithTimeZoneColumnSymbol
 	: T[K] extends BinaryColumnTypeDef<infer M> ? BinaryColumnSymbol
@@ -149,6 +152,7 @@ type RelatedColumns<T> = RemoveNeverFlat<{
 type AggregateColumns<T> = RemoveNeverFlat<{
 	[K in keyof T]:
 	T[K] extends NumericColumnTypeDef<infer M> ? NumericColumnSymbol
+	: T[K] extends BigIntColumnTypeDef<infer M> ? BigIntColumnSymbol
 	: T[K] extends ManyRelation
 	? AggregateColumns<T[K]>
 	: T[K] extends RelatedTable
@@ -174,6 +178,7 @@ type ColumnSymbols =
 	| StringColumnSymbol
 	| UuidColumnSymbol
 	| NumericColumnSymbol
+	| BigIntColumnSymbol
 	| DateColumnSymbol
 	| DateWithTimeZoneColumnSymbol
 	| BooleanColumnSymbol
@@ -245,6 +250,8 @@ type ToColumnTypes<T> = {
 	? StringColumnSymbol
 	: T[K] extends NumericColumnSymbol
 	? NumericColumnSymbol
+	: T[K] extends BigIntColumnSymbol
+	? BigIntColumnSymbol
 	: T[K] extends DateColumnSymbol
 	? DateColumnSymbol
 	: T[K] extends DateWithTimeZoneColumnSymbol
@@ -593,6 +600,12 @@ type NumericColumnSymbol = {
 type NumericColumnType<M> = M &
 	NumericColumnSymbol;
 
+type BigIntColumnSymbol = {
+	[' isBigInt']: true;
+};
+type BigIntColumnType<M> = M &
+	BigIntColumnSymbol;
+
 type JSONColumnSymbol = {
 	[' isJSON']: true;
 };
@@ -621,6 +634,7 @@ interface ColumnType<M> {
 	string(): StringColumnTypeDef<M & StringColumnSymbol>;
 	uuid(): UuidColumnTypeDef<M & UuidColumnSymbol>;
 	numeric(): NumericColumnTypeDef<M & NumericColumnSymbol>;
+	bigint(): BigIntColumnTypeDef<M & BigIntColumnSymbol>;
 	date(): DateColumnTypeDef<M & DateColumnSymbol>;
 	dateWithTimeZone(): DateWithTimeZoneColumnTypeDef<M & DateWithTimeZoneColumnSymbol>;
 	binary(): BinaryColumnTypeDef<M & BinaryColumnSymbol>;
@@ -656,6 +670,15 @@ type NumericValidator<M> = M extends NotNull
 		validate(
 			validator: (value?: number | null) => void
 		): NumericColumnTypeDef<M>;
+	};
+type BigIntValidator<M> = M extends NotNull
+	? {
+		validate(validator: (value: bigint) => void): BigIntColumnTypeDef<M>;
+	}
+	: {
+		validate(
+			validator: (value?: bigint | null) => void
+		): BigIntColumnTypeDef<M>;
 	};
 type BinaryValidator<M> = M extends NotNull
 	? {
@@ -730,6 +753,17 @@ type NumericColumnTypeDef<M> = NumericValidator<M> & {
 	default(value: number | null | undefined | (() => string | null | undefined)): NumericColumnTypeDef<M>;
 	dbNull(value: number): NumericColumnTypeDef<M>;
 } & ColumnTypeOf<NumericColumnType<M>> &
+	M;
+
+type BigIntColumnTypeDef<M> = BigIntValidator<M> & {
+	primary(): BigIntColumnTypeDef<M & IsPrimary> & IsPrimary;
+	notNull(): BigIntColumnTypeDef<M & NotNull> & NotNull;
+	notNullExceptInsert(): BigIntColumnTypeDef<M & NotNull & NotNullExceptInsert> & NotNull & NotNullExceptInsert;
+	serializable(value: boolean): BigIntColumnTypeDef<M>;
+	JSONSchema(schema: object, options?: Options): BigIntColumnTypeDef<M>;
+	default(value: bigint | null | undefined | (() => bigint | null | undefined)): BigIntColumnTypeDef<M>;
+	dbNull(value: bigint): BigIntColumnTypeDef<M>;
+} & ColumnTypeOf<BigIntColumnType<M>> &
 	M;
 
 type UuidColumnTypeDef<M> = UuidValidator<M> & {
@@ -989,6 +1023,11 @@ type ColumnToSchemaType<T> =
          : {}) :
   T extends NumericColumnSymbol
     ? { ' type': 'numeric' }
+      & (T extends NotNullExceptInsert ? { ' notNull': true; ' notNullExceptInsert': true }
+         : T extends NotNull ? { ' notNull': true }
+         : {}) :
+  T extends BigIntColumnSymbol
+    ? { ' type': 'bigint' }
       & (T extends NotNullExceptInsert ? { ' notNull': true; ' notNullExceptInsert': true }
          : T extends NotNull ? { ' notNull': true }
          : {}) :

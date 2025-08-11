@@ -1659,6 +1659,7 @@ async function execute() {
 
 - **`string`** maps to VARCHAR or TEXT in sql
 - **`numeric`** maps to INTEGER, DECIMAL, NUMERIC, TINYINT FLOAT/REAL or DOUBLE in sql.
+- **`bigint`** maps to INTEGER, BIGINT in sql.
 - **`boolean`** maps to BIT, TINYINT(1) or INTEGER in sql.
 - **`uuid`** is represented as string in javascript and maps to UUID, GUID or VARCHAR in sql.
 - **`date`** is represented as ISO 8601 string  in javascript and maps to DATE, DATETIME, TIMESTAMP or DAY in sql. Representing datetime values as ISO 8601 strings, rather than relying on JavaScript's native Date object, has multiple advantages, especially when dealing with databases and servers in different time zones. The datetime values are inherently accompanied by their respective time zones. This ensures that the datetime value remains consistent regardless of where it's being viewed or interpreted. On the other hand, JavaScript's Date object is typically tied to the time zone of the environment in which it's executed, which could lead to inconsistencies between the client and the database server.
@@ -1680,6 +1681,7 @@ const map = orange.map(x => ({
       id: x.column('id').uuid().primary().notNull(),
       name: x.column('name').string(),
       balance: x.column('balance').numeric(),
+      discordId: x.column('balance').bigint(),
       regularDate: x.column('regularDate').date(),
       tzDate: x.column('tzDate').dateWithTimeZone(),
       picture: x.column('picture').binary(),
