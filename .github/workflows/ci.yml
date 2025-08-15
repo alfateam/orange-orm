@@ -163,5 +163,5 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: bun --version
-      - run: bun install
+      - run: bun install --ignore-scripts
       - run: bun test --timeout=30000 ./tests/*.bun.test.js
