@@ -79,7 +79,7 @@ jobs:
       - run: ACCEPT_EULA=Y apt-get install -y msodbcsql18
       - run: apt-get install -y unixodbc-dev
 
-      - run: npm ci
+      - run: npm install
       - run: npm run lint
       - run: npm run tscheck
       - run: npm test
