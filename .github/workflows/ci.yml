@@ -116,7 +116,7 @@ jobs:
     container:
       image: oven/bun:latest
 
-        services:
+    services:
       postgres:
         image: postgres
         env:
