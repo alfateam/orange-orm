@@ -145,5 +145,5 @@ const map = rdb.map(x => ({
 	}))
 }));
 
-
+// export default map;
 module.exports = map;

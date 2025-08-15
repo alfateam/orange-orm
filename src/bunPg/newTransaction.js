@@ -6,6 +6,7 @@ var deleteFromSql = require('../pg/deleteFromSql');
 var selectForUpdateSql = require('../pg/selectForUpdateSql');
 var limitAndOffset = require('../pg/limitAndOffset');
 var formatDateOut = require('../pg/formatDateOut');
+var formatJSONIn = require('./formatJSONIn');
 var encodeJSON = require('../pg/encodeJSON');
 var insertSql = require('../pg/insertSql');
 var insert = require('../pg/insert');
@@ -22,6 +23,8 @@ function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 	rdb.encodeDate = encodeDate;
 	rdb.encodeBinary = encodeBinary;
 	rdb.decodeBinary = decodeBinary;
+	rdb.formatJSONIn = formatJSONIn;
+	// rdb.encodeJSON = (e) => JSON.stringify(e);
 	rdb.encodeJSON = encodeJSON;
 	rdb.formatDateOut = formatDateOut;
 	rdb.deleteFromSql = deleteFromSql;
@@ -41,6 +44,7 @@ function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 	if (readonly) {
 		rdb.dbClient = {
 			executeQuery: function(query, callback) {
+				console.dir('executeuery');
 				pool.connect((err, client, done) => {
 					if (err) {
 						return callback(err);
@@ -51,6 +55,7 @@ function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 							callback(err, res);
 						});
 					} catch (e) {
+						console.dir('error');
 						done();
 						callback(e);
 					}
