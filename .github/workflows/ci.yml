@@ -168,10 +168,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Bun
+      - name: Setup Bun (latest)
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: '1.1.x' # or 'latest'
+          bun-version: latest
+
+      # (optional) cache Bun tool + package cache for faster runs
+      - name: Cache Bun
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun
+            ~/.cache/bun
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lockb') }}
+          restore-keys: ${{ runner.os }}-bun-
 
       - run: bun install
       - run: bun test --timeout=30000 ./tests/*.bun.test.js
