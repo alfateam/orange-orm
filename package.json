@@ -49,8 +49,7 @@
     "url": "https://github.com/sponsors/lroal"
   },
   "scripts": {
-    "test": "vitest run --threads=false",
-    "test:node": "vitest run --threads=false",
+    "test": "vitest run \"**/!(*.deno|*.bun).test.js\" --threads=false",
     "test:bun": "bun test --timeout=30000 ./tests/*.bun.test.js",
     "test:deno": "deno test --allow-all --unstable *.deno.test.js",
     "test:all": "echo 'Running Node.js tests...' && npm run test:node && echo 'Running Bun tests...' && npm run test:bun && echo 'Running Deno tests...' && npm run test:deno && echo 'All tests completed!'",
@@ -162,13 +161,5 @@
     "eqnull": true,
     "undef": true,
     "node": true
-  },
-  "vitest": {
-    "exclude": [
-      "**/*.deno.test.js",
-      "**/*.bun.test.js",
-      "**/node_modules/**",
-      "**/dist/**"
-    ]
   }
 }
