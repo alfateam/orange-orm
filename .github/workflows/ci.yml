@@ -114,7 +114,7 @@ jobs:
 
     # Mirror Node job: run inside a container so service hostnames work
     container:
-      image: oven/bun:latest
+      image: node:22-bookworm
 
     services:
       postgres:
@@ -162,6 +162,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      - name: Setup Bun (latest)
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
       - run: bun --version
-      - run: bun install --ignore-scripts
+      - run: bun install --ignore-scripts   # avoid building msnodesqlv8
       - run: bun test --timeout=30000 ./tests/*.bun.test.js
