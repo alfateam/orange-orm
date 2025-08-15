@@ -109,79 +109,56 @@ jobs:
           message: ${{ env.COVERAGE }}
           color: green
           namedLogo: vitest
+test-bun:
+  runs-on: ubuntu-latest
 
-  # ============================================================
-  # Bun job (no Node, no ODBC deps)
-  # ============================================================
-  # test-bun:
-  #   runs-on: ubuntu-latest
+  # Mirror Node job: run inside a container so service hostnames work
+  container:
+    image: oven/bun:latest
 
-  #   services:
-  #     postgres:
-  #       image: postgres
-  #       env:
-  #         POSTGRES_PASSWORD: postgres
-  #         POSTGRES_DB: postgres
-  #       options: >-
-  #         --health-cmd pg_isready
-  #         --health-interval 10s
-  #         --health-timeout 5s
-  #         --health-retries 5
-  #       ports:
-  #         - 5432:5432
+  services:
+    postgres:
+      image: postgres
+      env:
+        POSTGRES_PASSWORD: postgres
+        POSTGRES_DB: postgres
+      options: >-
+        --health-cmd pg_isready
+        --health-interval 10s
+        --health-timeout 5s
+        --health-retries 5
 
-  #     mssql:
-  #       image: mcr.microsoft.com/mssql/server:2019-latest
-  #       env:
-  #         SA_PASSWORD: P@assword123
-  #         ACCEPT_EULA: 'Y'
-  #       ports:
-  #         - 1433:1433
+    mssql:
+      image: mcr.microsoft.com/mssql/server:2019-latest
+      env:
+        SA_PASSWORD: P@assword123
+        ACCEPT_EULA: 'Y'
+      options: >-
+        --health-cmd "(/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'P@assword123' -Q 'SELECT 1' || exit 1)"
+        --health-interval 10s
+        --health-timeout 5s
+        --health-retries 5
 
-  #     mysql:
-  #       image: mysql:8.0.31
-  #       env:
-  #         MYSQL_DATABASE: test
-  #         MYSQL_USER: test
-  #         MYSQL_PASSWORD: test
-  #         MYSQL_ROOT_PASSWORD: test
-  #       ports:
-  #         - 3306:3306
-  #       options: >-
-  #         --health-cmd="mysqladmin ping"
-  #         --health-interval=10s
-  #         --health-timeout=5s
-  #         --health-retries=3
+    mysql:
+      image: mysql:8.0.31
+      env:
+        MYSQL_DATABASE: test
+        MYSQL_USER: test
+        MYSQL_PASSWORD: test
+        MYSQL_ROOT_PASSWORD: test
+      options: >-
+        --health-cmd="mysqladmin ping"
+        --health-interval=10s
+        --health-timeout=5s
+        --health-retries=3
 
-  #     sapase:
-  #       image: larsroald/ase-server
-  #       ports:
-  #         - 5000:5000
+    oracle:
+      image: gvenzl/oracle-xe
+      env:
+        ORACLE_PASSWORD: P@assword123
 
-  #     oracle:
-  #       image: gvenzl/oracle-xe
-  #       env:
-  #         ORACLE_PASSWORD: P@assword123
-  #       ports:
-  #         - 1521:1521
-
-  #   steps:
-  #     - uses: actions/checkout@v4
-
-  #     - name: Setup Bun (latest)
-  #       uses: oven-sh/setup-bun@v2
-  #       with:
-  #         bun-version: latest
-
-  #     # (optional) cache Bun tool + package cache for faster runs
-  #     - name: Cache Bun
-  #       uses: actions/cache@v4
-  #       with:
-  #         path: |
-  #           ~/.bun
-  #           ~/.cache/bun
-  #         key: ${{ runner.os }}-bun-${{ hashFiles('bun.lockb') }}
-  #         restore-keys: ${{ runner.os }}-bun-
-
-  #     - run: bun install
-  #     - run: bun test --timeout=30000 ./tests/*.bun.test.js
+  steps:
+    - uses: actions/checkout@v4
+    - run: bun --version
+    - run: bun install
+    - run: bun test --timeout=30000 ./tests/*.bun.test.js
