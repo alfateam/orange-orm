@@ -44,7 +44,6 @@ function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 	if (readonly) {
 		rdb.dbClient = {
 			executeQuery: function(query, callback) {
-				console.dir('executeuery');
 				pool.connect((err, client, done) => {
 					if (err) {
 						return callback(err);
@@ -55,7 +54,6 @@ function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 							callback(err, res);
 						});
 					} catch (e) {
-						console.dir('error');
 						done();
 						callback(e);
 					}

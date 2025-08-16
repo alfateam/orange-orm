@@ -208,7 +208,7 @@ describe('insert-get', () => {
 		expect(customer2).toEqual(expected);
 	}
 });
-describe.only('insert-get bigint', () => {
+describe('insert-get bigint', () => {
 	test('pg', async () => await verify('pg'));
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
