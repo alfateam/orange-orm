@@ -6,6 +6,7 @@ var deleteFromSql = require('../pg/deleteFromSql');
 var selectForUpdateSql = require('../pg/selectForUpdateSql');
 var limitAndOffset = require('../pg/limitAndOffset');
 var formatDateOut = require('../pg/formatDateOut');
+var formatJSONIn = require('./formatJSONIn');
 var encodeJSON = require('../pg/encodeJSON');
 var insertSql = require('../pg/insertSql');
 var insert = require('../pg/insert');
@@ -22,6 +23,7 @@ function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 	rdb.encodeDate = encodeDate;
 	rdb.encodeBinary = encodeBinary;
 	rdb.decodeBinary = decodeBinary;
+	rdb.formatJSONIn = formatJSONIn;
 	rdb.encodeJSON = encodeJSON;
 	rdb.formatDateOut = formatDateOut;
 	rdb.deleteFromSql = deleteFromSql;

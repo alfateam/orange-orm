@@ -4591,6 +4591,7 @@ function requireNewEncode$7 () {
 	hasRequiredNewEncode$7 = 1;
 	var newPara = requireNewParameterized();
 	var purify = requirePurify$5();
+	var getSessionContext = requireGetSessionContext();
 	var getSessionSingleton = requireGetSessionSingleton();
 
 	function _new(column) {
@@ -4602,13 +4603,10 @@ function requireNewEncode$7 () {
 					return newPara('null');
 				return newPara('\'' + column.dbNull + '\'');
 			}
+			var ctx = getSessionContext(context);
 			var encodeCore = getSessionSingleton(context, 'encodeJSON') || ((v) => v);
-
-			if (encodeCore) {
-				value = encodeCore(value);
-			}
-			return newPara('?', [value]);
-
+			var formatIn = ctx.formatJSONIn;
+			return newPara(formatIn ? formatIn('?') : '?', [encodeCore(value)]);
 		};
 
 		encode.unsafe = function(context, candidate) {

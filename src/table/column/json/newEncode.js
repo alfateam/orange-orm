@@ -1,5 +1,6 @@
 var newPara = require('../../query/newParameterized');
 var purify = require('./purify');
+var getSessionContext = require('../../getSessionContext');
 var getSessionSingleton = require('../../getSessionSingleton');
 
 function _new(column) {
@@ -11,13 +12,10 @@ function _new(column) {
 				return newPara('null');
 			return newPara('\'' + column.dbNull + '\'');
 		}
+		var ctx = getSessionContext(context);
 		var encodeCore = getSessionSingleton(context, 'encodeJSON') || ((v) => v);
-
-		if (encodeCore) {
-			value = encodeCore(value);
-		}
-		return newPara('?', [value]);
-
+		var formatIn = ctx.formatJSONIn;
+		return newPara(formatIn ? formatIn('?') : '?', [encodeCore(value)]);
 	};
 
 	encode.unsafe = function(context, candidate) {

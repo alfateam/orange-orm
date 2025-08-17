@@ -15,6 +15,15 @@ FROM mcr.microsoft.com/vscode/devcontainers/javascript-node:dev-22-bookworm
 
 # RUN sudo apk add --allow-untrusted mssql-tools18_18.1.1.1-1_amd64.apk
 
+# --- Install Bun as the current (non-root) user ---
+RUN curl -fsSL https://bun.sh/install | bash
+RUN "$HOME/.bun/bin/bun" --version
+
+# --- Make Bun globally available (so any shell/user can run `bun`) ---
+RUN sudo cp "$HOME/.bun/bin/bun" /usr/local/bin/bun
+RUN sudo chmod 0755 /usr/local/bin/bun
+RUN bun --version
+
 #debian
 RUN curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add -
 RUN curl https://packages.microsoft.com/config/debian/11/prod.list > /etc/apt/sources.list.d/mssql-release.list

@@ -1,29 +1,31 @@
-name: Node.js CI
+name: Node & Bun CI
 
 on:
   push:
-    branches:
-      - '**'
+    branches: ["**"]
   pull_request:
-    branches: 
-      - '**'
+    branches: ["**"]
 
 jobs:
-  build:
-
+  # ============================================================
+  # Node.js matrix (18/20/22)
+  # ============================================================
+  test-node:
     runs-on: ubuntu-latest
+
     strategy:
       matrix:
         container: ["node:18-bookworm", "node:20-bookworm", "node:22-bookworm"]
+
     container:
       image: ${{ matrix.container }}
+
     services:
       postgres:
         image: postgres
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: postgres
-        # Set health checks to wait until postgres has started
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -31,6 +33,7 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
+
       mssql:
         image: mcr.microsoft.com/mssql/server:2019-latest
         env:
@@ -49,72 +52,120 @@ jobs:
         ports:
           - 3306:3306
         options: >-
-          --health-cmd="mysqladmin ping" 
-          --health-interval=10s 
-          --health-timeout=5s 
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
           --health-retries=3
+
       sapase:
-        image: larsroald/ase-server  
+        image: larsroald/ase-server
         ports:
           - 5000:5000
+
       oracle:
         image: gvenzl/oracle-xe
         env:
-          ORACLE_PASSWORD: P@assword123   
+          ORACLE_PASSWORD: P@assword123
         ports:
           - 1521:1521
+
     steps:
       - uses: actions/checkout@v4
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.node-version }}
+
+      # Inside Node container already; no setup-node needed.
       - run: curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add -
       - run: curl https://packages.microsoft.com/config/debian/11/prod.list > /etc/apt/sources.list.d/mssql-release.list
       - run: apt-get update
       - run: ACCEPT_EULA=Y apt-get install -y msodbcsql18
       - run: apt-get install -y unixodbc-dev
+
       - run: npm install
       - run: npm run lint
       - run: npm run tscheck
-      - run: npm run test
-      - run: npm run coverage       # Only run the coverage once
-      - if: ${{ matrix.container == 'node:18-bookworm' && github.ref == 'refs/heads/master'}}
+      - run: npm test
+
+      # Only run coverage once (pick a single image)
+      - if: ${{ matrix.container == 'node:18-bookworm' }}
+        run: npm run coverage
+
+      - if: ${{ matrix.container == 'node:18-bookworm' && github.ref == 'refs/heads/master' }}
         name: Get Coverage for badge
         run: |
-          # var SUMMARY = [
-          #   '',
-          #   '=============================== Coverage summary ===============================',
-          #   'Statements   : 32.5% ( 39/120 )',
-          #   'Branches     : 38.89% ( 21/54 )',
-          #   'Functions    : 21.74% ( 5/23 )',
-          #   'Lines        : 31.93% ( 38/119 )',
-          #   '================================================================================',
-          #   ''
-          # ];
-          # SUMMARY = SUMMARY.split('\n')[5]; // 'Lines        : 31.93% ( 38/119 )'
-          # SUMMARY = SUMMARY.split(':')[1].split('(')[0].trim(); // '31.93%'
-          
           SUMMARY="$(npm run coverage | tail -2 | head -1)"
           echo "SUMMARY=$SUMMARY"
-
-          COVERAGE=$(echo $SUMMARY | awk -F':' '{print $2}' | awk '{print $1}')
-          echo "COVERAGE=$COVERAGE"
+          COVERAGE=$(echo "$SUMMARY" | awk -F':' '{print $2}' | awk '{print $1}')
           echo "COVERAGE=$COVERAGE" >> $GITHUB_ENV
-          
-          BRANCH_NAME=$(echo $GITHUB_REF | awk 'BEGIN { FS = "/" } ; { print $2 "_" $3 }')
-          echo "BRANCH_NAME=$BRANCH_NAME"
+          BRANCH_NAME=$(echo "$GITHUB_REF" | awk 'BEGIN { FS = "/" } ; { print $2 "_" $3 }')
           echo "BRANCH=$BRANCH_NAME" >> $GITHUB_ENV
-          
-      - if: ${{ matrix.container == 'node:16-alpine' && github.ref == 'refs/heads/master'}}
+
+      - if: ${{ matrix.container == 'node:18-bookworm' && github.ref == 'refs/heads/master' }}
         name: Create the Badge
         uses: schneegans/dynamic-badges-action@v1.7.0
         with:
-          auth: ${{ secrets.GIST_SECRET }}                    
+          auth: ${{ secrets.GIST_SECRET }}
           gistID: 1a69422f03da7f8155cf94fe66022452
           filename: rdb__${{ env.BRANCH }}.json
-          # https://gist.githubusercontent.com/lroal/1a69422f03da7f8155cf94fe66022452/raw/rdb___.json
           label: coverage
           message: ${{ env.COVERAGE }}
           color: green
           namedLogo: vitest
+  test-bun:
+    runs-on: ubuntu-latest
+
+    # Mirror Node job: run inside a container so service hostnames work
+    container:
+      image: node:22-bookworm
+
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2019-latest
+        env:
+          SA_PASSWORD: P@assword123
+          ACCEPT_EULA: 'Y'
+        ports:
+          - 1433:1433
+
+      mysql:
+        image: mysql:8.0.31
+        env:
+          MYSQL_DATABASE: test
+          MYSQL_USER: test
+          MYSQL_PASSWORD: test
+          MYSQL_ROOT_PASSWORD: test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+
+      oracle:
+        image: gvenzl/oracle-xe
+        env:
+          ORACLE_PASSWORD: P@assword123
+        ports:
+          - 1521:1521
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Bun (latest)
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun --version
+      - run: bun install --ignore-scripts   # avoid building msnodesqlv8
+      - run: bun test --timeout=30000 ./tests/*.bun.test.js

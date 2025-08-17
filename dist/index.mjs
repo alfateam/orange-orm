@@ -4592,6 +4592,7 @@ function requireNewEncode$7 () {
 	hasRequiredNewEncode$7 = 1;
 	var newPara = requireNewParameterized();
 	var purify = requirePurify$5();
+	var getSessionContext = requireGetSessionContext();
 	var getSessionSingleton = requireGetSessionSingleton();
 
 	function _new(column) {
@@ -4603,13 +4604,10 @@ function requireNewEncode$7 () {
 					return newPara('null');
 				return newPara('\'' + column.dbNull + '\'');
 			}
+			var ctx = getSessionContext(context);
 			var encodeCore = getSessionSingleton(context, 'encodeJSON') || ((v) => v);
-
-			if (encodeCore) {
-				value = encodeCore(value);
-			}
-			return newPara('?', [value]);
-
+			var formatIn = ctx.formatJSONIn;
+			return newPara(formatIn ? formatIn('?') : '?', [encodeCore(value)]);
 		};
 
 		encode.unsafe = function(context, candidate) {
@@ -14975,6 +14973,7 @@ var hasRequiredWrapQuery$8;
 function requireWrapQuery$8 () {
 	if (hasRequiredWrapQuery$8) return wrapQuery_1$8;
 	hasRequiredWrapQuery$8 = 1;
+
 	const log = requireLog();
 	const replaceParamChar = requireReplaceParamChar$1();
 	const tryGetSessionContext = requireTryGetSessionContext();
@@ -14986,92 +14985,155 @@ function requireWrapQuery$8 () {
 			try {
 				log.emitQuery({ sql: query.sql(), parameters: query.parameters });
 				const sql = replaceParamChar(query, query.parameters);
-				let rdb = tryGetSessionContext(context);
-				let transactionHandler = rdb.transactionHandler;
+				const params = Array.isArray(query.parameters) ? query.parameters : [];
 
-				if (sql.length < 18 && query.parameters.length === 0) {
-					if (sql === 'BEGIN TRANSACTION' || sql === 'BEGIN') {
-						if (transactionHandler)
-							return onCompleted(new Error('Already inside a transaction'), []);
-						beginTransaction(connection).then(_transactionHandler => {
-							rdb.transactionHandler = _transactionHandler;
-							onCompleted(null, []);
-						}, onCompleted);
-						return;
-					}
-					else if (sql === 'COMMIT') {
-						if (!transactionHandler)
-							return onCompleted(new Error('Cannot commit outside transaction'), []);
-						transactionHandler.resolve();
-						transactionHandler.promise.then(() => onCompleted(null, []), err => onCompleted(err, []));
-						return;
-					}
-					else if (sql === 'ROLLBACK') {
-						if (!transactionHandler)
-							return onCompleted(new Error('Cannot rollback outside transaction'), []);
-						transactionHandler.reject(new Error('__rollback__'));
-						transactionHandler.promise.then(null, (err) => {
-							if (err.message === '__rollback__')
+				const rdb = tryGetSessionContext(context);
+				let th = rdb.transactionHandler;
+
+				// --- tx control (short statements, no params) ---
+				if (sql.length < 18 && params.length === 0) {
+					const cmd = sql.trim().toUpperCase();
+
+					if (cmd === 'BEGIN' || cmd === 'BEGIN TRANSACTION') {
+						if (th && !th.closing) return onCompleted(new Error('Already inside a transaction'), []);
+						beginTransaction(connection).then(
+							(_th) => {
+								rdb.transactionHandler = _th;
 								onCompleted(null, []);
-							else
-								onCompleted(err, []);
-						});
+							},
+							(err) => onCompleted(err, [])
+						);
+						return;
+					}
+
+					if (cmd === 'COMMIT') {
+						if (!th) return onCompleted(new Error('Cannot commit outside transaction'), []);
+						try {
+							th.closing = true;   // mark tx as closing; don’t reuse
+							th.resolve();        // resolve the *inner* control promise -> triggers commit
+							// IMPORTANT: wait for the *outer* promise (commit finished on the wire)
+							await th.settled;
+							th.closed = true;
+							rdb.transactionHandler = undefined;
+							onCompleted(null, []);
+						} catch (e) {
+							th.closed = true;
+							rdb.transactionHandler = undefined;
+							onCompleted(e, []);
+						}
+						return;
+					}
+
+					if (cmd === 'ROLLBACK') {
+						if (!th) return onCompleted(new Error('Cannot rollback outside transaction'), []);
+						try {
+							th.closing = true;
+							th.reject(new Error('__rollback__')); // reject inner promise -> triggers rollback
+							// Wait for outer promise to settle (rollback finished)
+							try {
+								await th.settled;
+							} catch (e) {
+								// connection.begin() rejects on rollback; that’s expected
+								if (e?.message !== '__rollback__') throw e;
+							}
+							th.closed = true;
+							rdb.transactionHandler = undefined;
+							onCompleted(null, []);
+						} catch (e) {
+							th.closed = true;
+							rdb.transactionHandler = undefined;
+							onCompleted(e, []);
+						}
 						return;
 					}
 				}
 
-				let result;
-				const _connection = transactionHandler?.tx || connection;
-				if (query.parameters.length === 0)
-					result = await _connection.unsafe(sql);
-				else
-					result = await _connection.unsafe(sql, query.parameters);
+				// --- regular query ---
+				const conn = th && th.tx && !th.closing ? th.tx : connection;
+				const result = params.length === 0
+					? await conn.unsafe(sql)
+					: await conn.unsafe(sql, params);
+
 				onCompleted(null, result);
-			}
-			catch (e) {
+			} catch (e) {
 				onCompleted(e);
 			}
 		}
-
 	}
 
 	function beginTransaction(connection) {
-
-		let beginIsResolved = false;
-		let resolve;
-		let reject;
+		let resolveCommit;
+		let rejectRollback;
 		let resolveBegin;
 		let rejectBegin;
 
-		let sqlPromise = new Promise((res, rej) => {
-			resolve = res;
-			reject = rej;
+		// This promise is controlled by our code: resolve() -> COMMIT, reject() -> ROLLBACK
+		const controlPromise = new Promise((res, rej) => {
+			resolveCommit = res;
+			rejectRollback = rej;
 		});
-		let beginPromise = new Promise((res,rej) => {
+
+		// We resolve this when Bun gives us the tx object
+		const beginPromise = new Promise((res, rej) => {
 			resolveBegin = res;
 			rejectBegin = rej;
 		});
-		connection.begin(async (tx) => {
-			beginIsResolved = true;
+
+		// Start the transaction
+		const settled = connection.begin(async (tx) => {
+			// hand back the handler
 			resolveBegin({
 				tx,
-				resolve,
-				reject,
-				promise: sqlPromise,
+				resolve: resolveCommit,     // call to request COMMIT
+				reject: rejectRollback,     // call to request ROLLBACK
+				promise: controlPromise,    // (inner) resolves/rejects when we signal commit/rollback
+				settled: null,              // will be set to the outer promise below
+				closing: false,
+				closed: false,
 			});
-			return sqlPromise;
-		}).then(null,
-			e => {
-				if (!beginIsResolved)
-					rejectBegin(e);
-				if (e?.message !== '__rollback__')
-					throw e;
-			});
+			// keep tx open until caller resolves/rejects controlPromise
+			return controlPromise;
+		})
+			.then(
+				() => { /* commit finished */ },
+				(e) => {
+					// rollback or begin failure — propagate only non-sentinel errors
+					if (e?.message !== '__rollback__') throw e;
+				}
+			);
+
+		// Attach the outer promise to the handler once it exists
+		settled.then(null, () => {}); // keep microtasks rolling
+		beginPromise.then(
+			(handler) => { handler.settled = settled; },
+			() => {}
+		);
+
+		// Ensure beginPromise rejects if connection.begin() fails before callback runs
+		settled.catch((e) => {
+			// If callback never ran, resolveBegin is still undefined; reject beginPromise
+			if (!resolveBegin) rejectBegin?.(e);
+		});
+
 		return beginPromise;
 	}
 
 	wrapQuery_1$8 = wrapQuery;
 	return wrapQuery_1$8;
+}
+
+var formatJSONIn_1;
+var hasRequiredFormatJSONIn;
+
+function requireFormatJSONIn () {
+	if (hasRequiredFormatJSONIn) return formatJSONIn_1;
+	hasRequiredFormatJSONIn = 1;
+	function formatJSONIn(value) {
+		return `${value}::jsonb`;
+	}
+
+	formatJSONIn_1 = formatJSONIn;
+	return formatJSONIn_1;
 }
 
 var encodeJSON;
@@ -15112,6 +15174,7 @@ function requireNewTransaction$9 () {
 	var selectForUpdateSql = requireSelectForUpdateSql$4();
 	var limitAndOffset = requireLimitAndOffset$4();
 	var formatDateOut = requireFormatDateOut$3();
+	var formatJSONIn = requireFormatJSONIn();
 	var encodeJSON = requireEncodeJSON();
 	var insertSql = requireInsertSql$4();
 	var insert = requireInsert$4();
@@ -15128,6 +15191,7 @@ function requireNewTransaction$9 () {
 		rdb.encodeDate = encodeDate;
 		rdb.encodeBinary = encodeBinary;
 		rdb.decodeBinary = decodeBinary;
+		rdb.formatJSONIn = formatJSONIn;
 		rdb.encodeJSON = encodeJSON;
 		rdb.formatDateOut = formatDateOut;
 		rdb.deleteFromSql = deleteFromSql;
