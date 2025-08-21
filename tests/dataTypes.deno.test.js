@@ -184,7 +184,7 @@ afterAll(async () => {
 
 	await new Promise((resolve) => {
 		if (server) {
-			server.close((err) => {
+			server.close(() => {
 				resolve();
 			});
 		} else {
