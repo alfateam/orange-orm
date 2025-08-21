@@ -1,4 +1,8 @@
 ## Changelog
+__4.7.12__  
+Bugfix: Bun Postgres: Race Condition After Transaction Commit [#133](https://github.com/alfateam/orange-orm/issues/133)  
+__4.7.11__  
+Support for bigint [#102](https://github.com/alfateam/orange-orm/issues/102)  
 __4.7.10__  
 Enabled cyclic dependencies in type mapping to support true bidirectional relationships. See [#132](https://github.com/alfateam/orange-orm/issues/132)  
 __4.7.9__  

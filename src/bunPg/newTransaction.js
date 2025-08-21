@@ -24,7 +24,6 @@ function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 	rdb.encodeBinary = encodeBinary;
 	rdb.decodeBinary = decodeBinary;
 	rdb.formatJSONIn = formatJSONIn;
-	// rdb.encodeJSON = (e) => JSON.stringify(e);
 	rdb.encodeJSON = encodeJSON;
 	rdb.formatDateOut = formatDateOut;
 	rdb.deleteFromSql = deleteFromSql;

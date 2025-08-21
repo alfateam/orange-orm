@@ -1,6 +1,6 @@
 {
   "name": "orange-orm",
-  "version": "4.7.11",
+  "version": "4.7.12",
   "main": "./src/index.js",
   "module": "./dist/index.mjs",
   "browser": "./dist/index.browser.mjs",
@@ -50,8 +50,7 @@
   },
   "scripts": {
     "test": "vitest run --threads=false",
-    "test:bun": "bun test --timeout=30000 ./tests/*.bun.test.js",
-    
+    "test:bun": "bun test --timeout=30000 ./tests/*.bun.test.js",    
     "test:deno": "deno test --allow-all --unstable-detect-cjs ./tests/*.deno.test.js",
     "test:all": "echo 'Running Node.js tests...' && npm run test:node && echo 'Running Bun tests...' && npm run test:bun && echo 'Running Deno tests...' && npm run test:deno && echo 'All tests completed!'",
     "test:all:parallel": "concurrently \"npm:test:node\" \"npm:test:bun\" \"npm:test:deno\"",

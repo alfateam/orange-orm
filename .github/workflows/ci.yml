@@ -68,6 +68,11 @@ jobs:
           ORACLE_PASSWORD: P@assword123
         ports:
           - 1521:1521
+        options: >-
+          --health-cmd="echo 'SELECT 1 FROM DUAL;' | sqlplus -s system/P@assword123@localhost:1521/XE"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
 
     steps:
       - uses: actions/checkout@v4
@@ -159,6 +164,11 @@ jobs:
           ORACLE_PASSWORD: P@assword123
         ports:
           - 1521:1521
+        options: >-
+          --health-cmd="echo 'SELECT 1 FROM DUAL;' | sqlplus -s system/P@assword123@localhost:1521/XE"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
 
     steps:
       - uses: actions/checkout@v4

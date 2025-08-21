@@ -18,6 +18,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # ------------------------------------------------------------
 #  Install Bun as the current (non-root) user
 # ------------------------------------------------------------
+# --- Install Bun as the current (non-root) user ---
 RUN curl -fsSL https://bun.sh/install | bash
 RUN "$HOME/.bun/bin/bun" --version
 
@@ -40,6 +41,11 @@ RUN set -eux; \
 # ------------------------------------------------------------
 #  MS SQL ODBC (your original install kept unchanged)
 # ------------------------------------------------------------
+RUN sudo cp "$HOME/.bun/bin/bun" /usr/local/bin/bun
+RUN sudo chmod 0755 /usr/local/bin/bun
+RUN bun --version
+
+#debian
 RUN curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add -
 RUN curl https://packages.microsoft.com/config/debian/11/prod.list > /etc/apt/sources.list.d/mssql-release.list
 RUN apt-get update
