@@ -169,3 +169,65 @@ jobs:
       - run: bun --version
       - run: bun install --ignore-scripts   # avoid building msnodesqlv8
       - run: bun test --timeout=30000 ./tests/*.bun.test.js
+
+  test-deno:
+    runs-on: ubuntu-latest
+
+    container:
+      image: node:22-bookworm
+
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2019-latest
+        env:
+          SA_PASSWORD: P@assword123
+          ACCEPT_EULA: 'Y'
+        ports:
+          - 1433:1433
+
+      mysql:
+        image: mysql:8.0.31
+        env:
+          MYSQL_DATABASE: test
+          MYSQL_USER: test
+          MYSQL_PASSWORD: test
+          MYSQL_ROOT_PASSWORD: test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+
+      oracle:
+        image: gvenzl/oracle-xe
+        env:
+          ORACLE_PASSWORD: P@assword123
+        ports:
+          - 1521:1521
+
+    steps:
+      - uses: actions/checkout@v4
+      
+      # Install Deno
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      
+      - run: deno install
+      - run: npm run test:deno

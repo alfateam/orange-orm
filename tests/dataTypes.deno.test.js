@@ -6,7 +6,7 @@
 
 import rdb from '../dist/index.mjs';
 import { describe, it, beforeAll, afterAll } from 'jsr:@std/testing/bdd';
-import {  assertObjectMatch   } from 'jsr:@std/assert';
+import { assertObjectMatch } from 'jsr:@std/assert';
 import { dirname, fromFileUrl, join } from 'jsr:@std/path';
 
 // Node/Express deps via npm: (Deno's Node-compat)
@@ -28,6 +28,7 @@ const assertEquals = assertObjectMatch;
 // -----------------------------------------------------------------------------
 // Environment/setup
 
+let sockets = new Set();
 const major = 0;
 const port = 3005;
 let server;
@@ -161,21 +162,38 @@ beforeAll(async () => {
 		server = app.listen(port, () => {
 			console.log(`Example app listening on port ${port}!`);
 		});
+
+		server.on('connection', (socket) => {
+			sockets.add(socket);
+			socket.on('close', () => {
+				sockets.delete(socket);
+			});
+		});
+
+		// Prevent hanging connections
+		server.keepAliveTimeout = 1;
+		server.headersTimeout = 1;
 	}
 });
 
 afterAll(async () => {
 	await rdb.close();
-	await new Promise((resolve, reject) => {
+	for (const socket of sockets) {
+		socket.destroy();
+	}
+
+	await new Promise((resolve) => {
 		if (server) {
 			server.close((err) => {
-				if (err) reject(err);
-				else resolve();
+				resolve();
 			});
 		} else {
 			resolve();
 		}
 	});
+
+	// Wait for cleanup
+	await new Promise(r => setTimeout(r, 100));
 });
 
 
@@ -199,7 +217,7 @@ describe('insert-get', () => {
 				data: ['evil', 'magician'],
 				picture: 'V/cAIibr+r/2RueTQqUiEw==',
 			},
-			{ },
+			{},
 		);
 
 
