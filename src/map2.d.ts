@@ -713,9 +713,9 @@ export type TableClient<M extends Record<string, TableDefinition<M>>, K extends 
   ): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, strategy>>>, M, K>>;
 
   // Count and delete methods (no active record methods needed)
-  count(filter: RawFilter | Array<PrimaryKeyObject<M, K>>,): Promise<number>;
-  delete(filter: RawFilter | Array<PrimaryKeyObject<M, K>>,): Promise<void>;
-  deleteCascade(filter: RawFilter | Array<PrimaryKeyObject<M, K>>,): Promise<void>;
+  count(filter?: RawFilter | Array<PrimaryKeyObject<M, K>>,): Promise<number>;
+  delete(filter?: RawFilter | Array<PrimaryKeyObject<M, K>>,): Promise<void>;
+  deleteCascade(filter?: RawFilter | Array<PrimaryKeyObject<M, K>>,): Promise<void>;
 
   // UPDATED: Replace methods with relations support
   replace(
