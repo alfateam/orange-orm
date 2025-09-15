@@ -151,6 +151,29 @@ describe('deleteCascade http', () => {
 		expect(message).toEqual('Disallowed operator deleteCascade');
 	}
 });
+describe('deleteCascade all should be allowed', () => {
+
+	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sap', async () => await verify('sap'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('d1', async () => await verify('d1'));
+
+	async function verify(dbName) {
+
+		const { db } = getDb(dbName);
+
+		await db.order.deleteCascade();
+		let rows = await db.order.getAll();
+		expect(rows.length).toEqual(0);
+	}
+});
+
 
 const pathSegments = fileURLToPath(import.meta.url).split('/');
 const lastSegment = pathSegments[pathSegments.length - 1];
