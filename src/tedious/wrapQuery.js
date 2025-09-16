@@ -109,9 +109,6 @@ function wrapQuery(_context, connection) {
 				if (results.length === 0) {
 					// No result sets - return empty array
 					onCompleted(null, []);
-				} else if (results.length === 1) {
-					// Single result set - return as single-depth array (even if empty)
-					onCompleted(null, results[0]);
 				} else {
 					// Multiple result sets - return as array of arrays
 					onCompleted(null, results);
