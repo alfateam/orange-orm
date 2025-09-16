@@ -92,6 +92,15 @@ beforeAll(async () => {
 				lines: [
 					{ product: 'Magic wand' }
 				]
+			},
+			{
+				orderDate: new Date(),
+				deliveryAddress: {
+					name: 'Foo',
+				},
+				lines: [
+					{ product: 'Foo' }
+				]
 			}
 		]);
 	}
@@ -170,7 +179,7 @@ describe('deleteCascade all should be allowed', () => {
 
 		await db.order.deleteCascade();
 		let rows = await db.order.getAll();
-		expect(rows.length).toEqual(0);
+		expect(rows.length).toEqual(1);
 	}
 });
 
