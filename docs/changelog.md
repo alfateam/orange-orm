@@ -1,4 +1,6 @@
 ## Changelog
+__4.7.13__  
+Allow count, delete and deleteCasde to have no arguments.  
 __4.7.12__  
 Bugfix: Bun Postgres: Race Condition After Transaction Commit [#133](https://github.com/alfateam/orange-orm/issues/133)  
 __4.7.11__  

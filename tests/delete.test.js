@@ -179,7 +179,7 @@ describe('deleteCascade all should be allowed', () => {
 
 		await db.order.deleteCascade();
 		let rows = await db.order.getAll();
-		expect(rows.length).toEqual(1);
+		expect(rows.length).toEqual(0);
 	}
 });
 
