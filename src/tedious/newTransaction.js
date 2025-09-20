@@ -4,7 +4,6 @@ var deleteFromSql = require('./deleteFromSql');
 var selectForUpdateSql = require('./selectForUpdateSql');
 const limitAndOffset = require('./limitAndOffset');
 const insertSql = require('./insertSql');
-const getManyDto = require('./getManyDto');
 const formatDateOut = require('./formatDateOut');
 const formatBigintOut = require('./formatBigintOut');
 const formatJSONOut = require('./formatJSONOut');
@@ -18,7 +17,6 @@ function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 		rdb.pool = pool;
 	}
 	rdb.engine = 'mssql';
-	rdb.getManyDto = getManyDto;
 	rdb.encodeBoolean = encodeBoolean;
 	rdb.decodeJSON = decodeJSON;
 	rdb.encodeJSON = JSON.stringify;

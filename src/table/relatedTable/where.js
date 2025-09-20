@@ -4,7 +4,8 @@ let tryGetSessionContext = require('../tryGetSessionContext');
 function newWhere(_relations, _depth) {
 
 	function where(context, fn) {
-		const includeMany = tryGetSessionContext(context)?.engine === 'mssql';
+		// const includeMany = tryGetSessionContext(context)?.engine === 'mssql';
+		const includeMany = false;
 		let { relations, alias } = extract(includeMany, _relations);
 		const table = relations[relations.length - 1].childTable;
 		if (!relations[0].isMany || includeMany)
