@@ -1,9 +1,8 @@
 var getSessionSingleton = require('../../getSessionSingleton');
-var formatDateOut = require('../date/formatOut');
 const quote = require('../../quote');
 
 function formatOut(context, column, alias) {
-	var formatColumn = getSessionSingleton(context, 'formatDateTzOut') || formatDateOut;
+	var formatColumn = getSessionSingleton(context, 'formatDateTzOut') ||  getSessionSingleton(context, 'formatDateOut');
 	if (formatColumn)
 		return formatColumn(column, alias);
 	else if (alias)

@@ -5070,11 +5070,10 @@ function requireFormatOut () {
 	if (hasRequiredFormatOut) return formatOut_1;
 	hasRequiredFormatOut = 1;
 	var getSessionSingleton = requireGetSessionSingleton();
-	var formatDateOut = requireFormatOut$1();
 	const quote = requireQuote$6();
 
 	function formatOut(context, column, alias) {
-		var formatColumn = getSessionSingleton(context, 'formatDateTzOut') || formatDateOut;
+		var formatColumn = getSessionSingleton(context, 'formatDateTzOut') ||  getSessionSingleton(context, 'formatDateOut');
 		if (formatColumn)
 			return formatColumn(column, alias);
 		else if (alias)
