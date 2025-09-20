@@ -1,5 +1,4 @@
 const negotiateRawSqlFilter = require('../column/negotiateRawSqlFilter');
-let tryGetSessionContext = require('../tryGetSessionContext');
 
 function newWhere(_relations, _depth) {
 

@@ -9669,12 +9669,13 @@ function requireWhere$1 () {
 	if (hasRequiredWhere$1) return where$1;
 	hasRequiredWhere$1 = 1;
 	const negotiateRawSqlFilter = requireNegotiateRawSqlFilter();
-	let tryGetSessionContext = requireTryGetSessionContext();
+	requireTryGetSessionContext();
 
 	function newWhere(_relations, _depth) {
 
 		function where(context, fn) {
-			const includeMany = tryGetSessionContext(context)?.engine === 'mssql';
+			// const includeMany = tryGetSessionContext(context)?.engine === 'mssql';
+			const includeMany = false;
 			let { relations, alias } = extract(includeMany, _relations);
 			const table = relations[relations.length - 1].childTable;
 			if (!relations[0].isMany || includeMany)
@@ -9721,12 +9722,12 @@ var hasRequiredAggregate$1;
 function requireAggregate$1 () {
 	if (hasRequiredAggregate$1) return aggregate$1;
 	hasRequiredAggregate$1 = 1;
-	let tryGetSessionContext = requireTryGetSessionContext();
-
 	function newAggregate(_relations) {
 
 		function aggregate(context, fn) {
-			const includeMany = tryGetSessionContext(context)?.engine === 'mssql';
+			//todo
+			// const includeMany = tryGetSessionContext(context)?.engine === 'mssql';
+			const includeMany = false;
 			let { relations, alias } = extract(includeMany, _relations);
 			const table = relations[relations.length - 1].childTable;
 			if (!relations[0].isMany || includeMany)
