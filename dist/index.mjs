@@ -4964,12 +4964,12 @@ function requireNewDecode$4 () {
 	return newDecode$4;
 }
 
-var formatOut_1;
-var hasRequiredFormatOut;
+var formatOut_1$1;
+var hasRequiredFormatOut$1;
 
-function requireFormatOut () {
-	if (hasRequiredFormatOut) return formatOut_1;
-	hasRequiredFormatOut = 1;
+function requireFormatOut$1 () {
+	if (hasRequiredFormatOut$1) return formatOut_1$1;
+	hasRequiredFormatOut$1 = 1;
 	var getSessionSingleton = requireGetSessionSingleton();
 	const quote = requireQuote$6();
 
@@ -4983,8 +4983,8 @@ function requireFormatOut () {
 			return `${quote(context, column._dbName)}`;
 	}
 
-	formatOut_1 = formatOut;
-	return formatOut_1;
+	formatOut_1$1 = formatOut;
+	return formatOut_1$1;
 }
 
 var date;
@@ -4995,7 +4995,7 @@ function requireDate () {
 	hasRequiredDate = 1;
 	var newEncode = requireNewEncode$5();
 	var newDecode = requireNewDecode$4();
-	var formatOut = requireFormatOut();
+	var formatOut = requireFormatOut$1();
 	var purify = requirePurify$3();
 
 	function _new(column) {
@@ -5061,6 +5061,30 @@ function requireNewEncode$4 () {
 
 	newEncode$4 = _new;
 	return newEncode$4;
+}
+
+var formatOut_1;
+var hasRequiredFormatOut;
+
+function requireFormatOut () {
+	if (hasRequiredFormatOut) return formatOut_1;
+	hasRequiredFormatOut = 1;
+	var getSessionSingleton = requireGetSessionSingleton();
+	var formatDateOut = requireFormatOut$1();
+	const quote = requireQuote$6();
+
+	function formatOut(context, column, alias) {
+		var formatColumn = getSessionSingleton(context, 'formatDateTzOut') || formatDateOut;
+		if (formatColumn)
+			return formatColumn(column, alias);
+		else if (alias)
+			return `${alias}.${quote(context, column._dbName)}`;
+		else
+			return `${quote(context, column._dbName)}`;
+	}
+
+	formatOut_1 = formatOut;
+	return formatOut_1;
 }
 
 var dateWithTimeZone;
@@ -9670,7 +9694,6 @@ function requireWhere$1 () {
 	if (hasRequiredWhere$1) return where$1;
 	hasRequiredWhere$1 = 1;
 	const negotiateRawSqlFilter = requireNegotiateRawSqlFilter();
-	requireTryGetSessionContext();
 
 	function newWhere(_relations, _depth) {
 
@@ -17911,9 +17934,9 @@ function requireFormatDateOut$2 () {
 
 	function formatDateOut(column, alias) {
 		if (alias)
-			return `CONVERT(VARCHAR, ${alias}.${quote(column._dbName)}, 121)`;
+			return `CONVERT(VARCHAR, ${alias}.${quote(column._dbName)}, 126)`;
 		else
-			return `CONVERT(VARCHAR, ${quote(column._dbName)}, 121)`;
+			return `CONVERT(VARCHAR, ${quote(column._dbName)}, 126)`;
 	}
 
 	formatDateOut_1$1 = formatDateOut;
@@ -18735,6 +18758,29 @@ function requireWrapQuery$1 () {
 	return wrapQuery_1$1;
 }
 
+var formatDateTzOut;
+var hasRequiredFormatDateTzOut;
+
+function requireFormatDateTzOut () {
+	if (hasRequiredFormatDateTzOut) return formatDateTzOut;
+	hasRequiredFormatDateTzOut = 1;
+	const quote = requireQuote$2();
+
+	function formatDateOut(column, alias) {
+		if (alias)
+			return `FORMAT(${alias}.${quote(column._dbName)}, 'yyyy-MM-ddTHH:mm:sszzz')`;
+		// return `LEFT(CONVERT(varchar(33), ${alias}.${quote(column._dbName)}, 127), 25)`;
+		else
+			return `FORMAT(${quote(column._dbName)}, 'yyyy-MM-ddTHH:mm:sszzz')`;
+			// return `LEFT(CONVERT(varchar(33), ${quote(column._dbName)}, 127), 25)`;
+
+
+	}
+
+	formatDateTzOut = formatDateOut;
+	return formatDateTzOut;
+}
+
 var newTransaction$2;
 var hasRequiredNewTransaction$2;
 
@@ -18748,6 +18794,7 @@ function requireNewTransaction$2 () {
 	const limitAndOffset = requireLimitAndOffset$2();
 	const insertSql = requireInsertSql$2();
 	const formatDateOut = requireFormatDateOut$2();
+	const formatDateTzOut = requireFormatDateTzOut();
 	const formatBigintOut = requireFormatBigintOut$2();
 	const formatJSONOut = requireFormatJSONOut();
 	const insert = requireInsert$2();
@@ -18769,6 +18816,7 @@ function requireNewTransaction$2 () {
 		rdb.insertSql = insertSql;
 		rdb.insert = insert;
 		rdb.formatDateOut = formatDateOut;
+		rdb.formatDateTzOut = formatDateTzOut;
 		rdb.formatBigintOut = formatBigintOut;
 		rdb.formatJSONOut = formatJSONOut;
 		rdb.multipleStatements = true;
