@@ -8,9 +8,6 @@ const initMs = require('./initMs');
 const initMysql = require('./initMysql');
 const initSqlite = require('./initSqlite');
 const initSap = require('./initSap');
-const rdb = require('../src/index');
-
-
 
 const port = 3002;
 let d1;
@@ -18,14 +15,14 @@ let miniflare;
 
 beforeAll(async () => {
 	({ d1, miniflare } = await setupD1(fileURLToPath(import.meta.url)));
-	// await insertData('pg');
-	// await insertData('pglite');
-	// await insertData('oracle');
+	await insertData('pg');
+	await insertData('pglite');
+	await insertData('oracle');
 	await insertData('mssql');
-	// await insertData('mysql');
-	// await insertData('sap');
-	// await insertData('sqlite');
-	// await insertData('d1');
+	await insertData('mysql');
+	await insertData('sap');
+	await insertData('sqlite');
+	await insertData('d1');
 
 	async function insertData(dbName) {
 		const { db, init } = getDb(dbName);
@@ -80,7 +77,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-	// await miniflare.dispose();
+	await miniflare.dispose();
 });
 
 
@@ -123,49 +120,45 @@ afterAll(async () => {
 
 // });
 
-describe.only('dateformat get', () => {
+describe('dateformat get', () => {
 	const newValue = '2023-08-05T12:00:00-03:00';
 
-	// test('pg', async () => {
-	// 	const { db } = getDb('pg');
-	// 	const result = await db.datetestWithTz.getOne();
-	// 	expect(result).toEqual({ id: 1, date: '2023-07-14', datetime: '2023-07-14T12:00:00', datetime_tz: '2023-07-14T20:00:00+00' });
-	// 	result.date = newValue;
-	// 	result.datetime = newValue;
-	// 	result.datetime_tz = newValue;
-	// 	await result.saveChanges();
-	// 	await result.refresh();
-	// 	expect(result).toEqual({ id: 1, date: '2023-08-05', datetime: '2023-08-05T12:00:00', datetime_tz: '2023-08-05T15:00:00+00' });
-	// });
+	test('pg', async () => {
+		const { db } = getDb('pg');
+		const result = await db.datetestWithTz.getOne();
+		expect(result).toEqual({ id: 1, date: '2023-07-14', datetime: '2023-07-14T12:00:00', datetime_tz: '2023-07-14T20:00:00+00' });
+		result.date = newValue;
+		result.datetime = newValue;
+		result.datetime_tz = newValue;
+		await result.saveChanges();
+		await result.refresh();
+		expect(result).toEqual({ id: 1, date: '2023-08-05', datetime: '2023-08-05T12:00:00', datetime_tz: '2023-08-05T15:00:00+00' });
+	});
 
-	// test('pglite', async () => {
-	// 	const { db } = getDb('pglite');
-	// 	const result = await db.datetestWithTz.getOne();
-	// 	expect(result).toEqual({ id: 1, date: '2023-07-14', datetime: '2023-07-14T12:00:00', datetime_tz: '2023-07-14T20:00:00+00' });
-	// 	result.date = newValue;
-	// 	result.datetime = newValue;
-	// 	result.datetime_tz = newValue;
-	// 	await result.saveChanges();
-	// 	await result.refresh();
-	// 	expect(result).toEqual({ id: 1, date: '2023-08-05', datetime: '2023-08-05T12:00:00', datetime_tz: '2023-08-05T15:00:00+00' });
-	// });
+	test('pglite', async () => {
+		const { db } = getDb('pglite');
+		const result = await db.datetestWithTz.getOne();
+		expect(result).toEqual({ id: 1, date: '2023-07-14', datetime: '2023-07-14T12:00:00', datetime_tz: '2023-07-14T20:00:00+00' });
+		result.date = newValue;
+		result.datetime = newValue;
+		result.datetime_tz = newValue;
+		await result.saveChanges();
+		await result.refresh();
+		expect(result).toEqual({ id: 1, date: '2023-08-05', datetime: '2023-08-05T12:00:00', datetime_tz: '2023-08-05T15:00:00+00' });
+	});
 
-	// test('oracle', async () => {
-	// 	const { db } = getDb('oracle');
-	// 	const result = await db.datetest.getOne();
-	// 	expect(result).toEqual({ id: 1, date: '2023-07-14T12:00:00.000', datetime: '2023-07-14T12:00:00.000'});
-	// 	result.date = newValue;
-	// 	result.datetime = newValue;
-	// 	await result.saveChanges();
-	// 	await result.refresh();
-	// 	expect(result).toEqual({ id: 1, date: '2023-08-05T12:00:00.000', datetime: '2023-08-05T12:00:00.000'});
-	// });
+	test('oracle', async () => {
+		const { db } = getDb('oracle');
+		const result = await db.datetest.getOne();
+		expect(result).toEqual({ id: 1, date: '2023-07-14T12:00:00.000', datetime: '2023-07-14T12:00:00.000'});
+		result.date = newValue;
+		result.datetime = newValue;
+		await result.saveChanges();
+		await result.refresh();
+		expect(result).toEqual({ id: 1, date: '2023-08-05T12:00:00.000', datetime: '2023-08-05T12:00:00.000'});
+	});
 
 	test('mssql', async () => {
-
-		rdb.on('query', (sql) => {
-			console.log(sql);
-		});
 		const { db } = getDb('mssql');
 		const result = await db.datetestWithTz.getOne();
 		expect(result).toEqual({ id: 1, date: '2023-07-14', datetime: '2023-07-14T12:00:00', datetime_tz: '2023-07-14T12:00:00-08:00' });
@@ -177,54 +170,54 @@ describe.only('dateformat get', () => {
 		expect(result).toEqual({ id: 1, date: '2023-08-05', datetime: '2023-08-05T12:00:00', datetime_tz: newValue });
 	});
 
-	// test('sap', async () => {
-	// 	const { db } = getDb('sap');
-	// 	const result = await db.datetest.getOne();
-	// 	expect(result).toEqual({ id: 1, date: '2023-07-14T00:00:00', datetime: '2023-07-14T12:00:00' });
-	// 	result.date = newValue;
-	// 	result.datetime = newValue;
-	// 	result.datetime_tz = newValue;
-	// 	await result.saveChanges();
-	// 	await result.refresh();
-	// 	expect(result).toEqual({ id: 1, date: '2023-08-05T00:00:00', datetime: '2023-08-05T12:00:00' });
-	// });
+	test('sap', async () => {
+		const { db } = getDb('sap');
+		const result = await db.datetest.getOne();
+		expect(result).toEqual({ id: 1, date: '2023-07-14T00:00:00', datetime: '2023-07-14T12:00:00' });
+		result.date = newValue;
+		result.datetime = newValue;
+		result.datetime_tz = newValue;
+		await result.saveChanges();
+		await result.refresh();
+		expect(result).toEqual({ id: 1, date: '2023-08-05T00:00:00', datetime: '2023-08-05T12:00:00' });
+	});
 
-	// test('mysql', async () => {
-	// 	const { db } = getDb('mysql');
-	// 	const result = await db.datetestWithTz.getOne();
-	// 	expect(result).toEqual({ id: 1, date: '2023-07-14', datetime: '2023-07-14T03:00:00', datetime_tz: '2023-07-14T20:00:00' });
-	// 	result.date = newValue;
-	// 	result.datetime = newValue;
-	// 	result.datetime_tz = newValue;
-	// 	await result.saveChanges();
-	// 	await result.refresh();
-	// 	expect(result).toEqual({ id: 1, date: '2023-08-05', datetime: '2023-08-05T12:00:00', datetime_tz: '2023-08-05T15:00:00' });
+	test('mysql', async () => {
+		const { db } = getDb('mysql');
+		const result = await db.datetestWithTz.getOne();
+		expect(result).toEqual({ id: 1, date: '2023-07-14', datetime: '2023-07-14T03:00:00', datetime_tz: '2023-07-14T20:00:00' });
+		result.date = newValue;
+		result.datetime = newValue;
+		result.datetime_tz = newValue;
+		await result.saveChanges();
+		await result.refresh();
+		expect(result).toEqual({ id: 1, date: '2023-08-05', datetime: '2023-08-05T12:00:00', datetime_tz: '2023-08-05T15:00:00' });
 
-	// });
+	});
 
-	// test('sqlite', async () => {
-	// 	const { db } = getDb('sqlite');
-	// 	const result = await db.datetestWithTz.getOne();
-	// 	expect(result).toEqual({ id: 1, date: '2023-07-14T12:00:00', datetime: '2023-07-14T12:00:00', datetime_tz: '2023-07-14T12:00:00-08:00' });
-	// 	result.date = newValue;
-	// 	result.datetime = newValue;
-	// 	result.datetime_tz = newValue;
-	// 	await result.saveChanges();
-	// 	await result.refresh();
-	// 	expect(result).toEqual({ id: 1, date: '2023-08-05T12:00:00', datetime: '2023-08-05T12:00:00', datetime_tz: '2023-08-05T12:00:00-03:00' });
-	// });
+	test('sqlite', async () => {
+		const { db } = getDb('sqlite');
+		const result = await db.datetestWithTz.getOne();
+		expect(result).toEqual({ id: 1, date: '2023-07-14T12:00:00', datetime: '2023-07-14T12:00:00', datetime_tz: '2023-07-14T12:00:00-08:00' });
+		result.date = newValue;
+		result.datetime = newValue;
+		result.datetime_tz = newValue;
+		await result.saveChanges();
+		await result.refresh();
+		expect(result).toEqual({ id: 1, date: '2023-08-05T12:00:00', datetime: '2023-08-05T12:00:00', datetime_tz: '2023-08-05T12:00:00-03:00' });
+	});
 
-	// test('d1', async () => {
-	// 	const { db } = getDb('d1');
-	// 	const result = await db.datetestWithTz.getOne();
-	// 	expect(result).toEqual({ id: 1, date: '2023-07-14T12:00:00', datetime: '2023-07-14T12:00:00', datetime_tz: '2023-07-14T12:00:00-08:00' });
-	// 	result.date = newValue;
-	// 	result.datetime = newValue;
-	// 	result.datetime_tz = newValue;
-	// 	await result.saveChanges();
-	// 	await result.refresh();
-	// 	expect(result).toEqual({ id: 1, date: '2023-08-05T12:00:00', datetime: '2023-08-05T12:00:00', datetime_tz: '2023-08-05T12:00:00-03:00' });
-	// });
+	test('d1', async () => {
+		const { db } = getDb('d1');
+		const result = await db.datetestWithTz.getOne();
+		expect(result).toEqual({ id: 1, date: '2023-07-14T12:00:00', datetime: '2023-07-14T12:00:00', datetime_tz: '2023-07-14T12:00:00-08:00' });
+		result.date = newValue;
+		result.datetime = newValue;
+		result.datetime_tz = newValue;
+		await result.saveChanges();
+		await result.refresh();
+		expect(result).toEqual({ id: 1, date: '2023-08-05T12:00:00', datetime: '2023-08-05T12:00:00', datetime_tz: '2023-08-05T12:00:00-03:00' });
+	});
 
 
 });
