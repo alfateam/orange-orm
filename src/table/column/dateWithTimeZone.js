@@ -1,6 +1,6 @@
 var newEncode = require('./dateWithTimeZone/newEncode');
 var newDecode = require('./date/newDecode');
-var formatOut = require('./date/formatOut');
+var formatOut = require('./dateWithTimeZone/formatOut');
 var purify = require('./date/purify');
 
 function _new(column) {

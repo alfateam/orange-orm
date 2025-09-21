@@ -4964,12 +4964,12 @@ function requireNewDecode$4 () {
 	return newDecode$4;
 }
 
-var formatOut_1;
-var hasRequiredFormatOut;
+var formatOut_1$1;
+var hasRequiredFormatOut$1;
 
-function requireFormatOut () {
-	if (hasRequiredFormatOut) return formatOut_1;
-	hasRequiredFormatOut = 1;
+function requireFormatOut$1 () {
+	if (hasRequiredFormatOut$1) return formatOut_1$1;
+	hasRequiredFormatOut$1 = 1;
 	var getSessionSingleton = requireGetSessionSingleton();
 	const quote = requireQuote$6();
 
@@ -4983,8 +4983,8 @@ function requireFormatOut () {
 			return `${quote(context, column._dbName)}`;
 	}
 
-	formatOut_1 = formatOut;
-	return formatOut_1;
+	formatOut_1$1 = formatOut;
+	return formatOut_1$1;
 }
 
 var date;
@@ -4995,7 +4995,7 @@ function requireDate () {
 	hasRequiredDate = 1;
 	var newEncode = requireNewEncode$5();
 	var newDecode = requireNewDecode$4();
-	var formatOut = requireFormatOut();
+	var formatOut = requireFormatOut$1();
 	var purify = requirePurify$3();
 
 	function _new(column) {
@@ -5061,6 +5061,29 @@ function requireNewEncode$4 () {
 
 	newEncode$4 = _new;
 	return newEncode$4;
+}
+
+var formatOut_1;
+var hasRequiredFormatOut;
+
+function requireFormatOut () {
+	if (hasRequiredFormatOut) return formatOut_1;
+	hasRequiredFormatOut = 1;
+	var getSessionSingleton = requireGetSessionSingleton();
+	const quote = requireQuote$6();
+
+	function formatOut(context, column, alias) {
+		var formatColumn = getSessionSingleton(context, 'formatDateTzOut') ||  getSessionSingleton(context, 'formatDateOut');
+		if (formatColumn)
+			return formatColumn(column, alias);
+		else if (alias)
+			return `${alias}.${quote(context, column._dbName)}`;
+		else
+			return `${quote(context, column._dbName)}`;
+	}
+
+	formatOut_1 = formatOut;
+	return formatOut_1;
 }
 
 var dateWithTimeZone;
@@ -5876,12 +5899,12 @@ function requireNewPrimaryKeyFilter () {
 	return newPrimaryKeyFilter;
 }
 
-var newShallowColumnSql$1;
-var hasRequiredNewShallowColumnSql$1;
+var newShallowColumnSql;
+var hasRequiredNewShallowColumnSql;
 
-function requireNewShallowColumnSql$1 () {
-	if (hasRequiredNewShallowColumnSql$1) return newShallowColumnSql$1;
-	hasRequiredNewShallowColumnSql$1 = 1;
+function requireNewShallowColumnSql () {
+	if (hasRequiredNewShallowColumnSql) return newShallowColumnSql;
+	hasRequiredNewShallowColumnSql = 1;
 	const getSessionSingleton = requireGetSessionSingleton();
 
 	function _new(context, table, alias, span, ignoreNulls) {
@@ -5922,8 +5945,8 @@ function requireNewShallowColumnSql$1 () {
 		}
 	}
 
-	newShallowColumnSql$1 = _new;
-	return newShallowColumnSql$1;
+	newShallowColumnSql = _new;
+	return newShallowColumnSql;
 }
 
 var sharedJoinUtils;
@@ -5932,7 +5955,7 @@ var hasRequiredSharedJoinUtils;
 function requireSharedJoinUtils () {
 	if (hasRequiredSharedJoinUtils) return sharedJoinUtils;
 	hasRequiredSharedJoinUtils = 1;
-	var newShallowColumnSql = requireNewShallowColumnSql$1();
+	var newShallowColumnSql = requireNewShallowColumnSql();
 
 	function joinLegToColumnSql(context, leg, alias, ignoreNull) {
 		var span = leg.span;
@@ -5991,7 +6014,7 @@ var hasRequiredNewColumnSql;
 function requireNewColumnSql () {
 	if (hasRequiredNewColumnSql) return newColumnSql;
 	hasRequiredNewColumnSql = 1;
-	var newShallowColumnSql = requireNewShallowColumnSql$1();
+	var newShallowColumnSql = requireNewShallowColumnSql();
 	var newJoinedColumnSql = requireNewJoinedColumnSql();
 
 	newColumnSql = function(context,table,span,alias,ignoreNull) {
@@ -6209,12 +6232,12 @@ function requireNegotiateExclusive () {
 	return negotiateExclusive_1;
 }
 
-var newSingleQuery$2;
-var hasRequiredNewSingleQuery$2;
+var newSingleQuery$1;
+var hasRequiredNewSingleQuery$1;
 
-function requireNewSingleQuery$2 () {
-	if (hasRequiredNewSingleQuery$2) return newSingleQuery$2;
-	hasRequiredNewSingleQuery$2 = 1;
+function requireNewSingleQuery$1 () {
+	if (hasRequiredNewSingleQuery$1) return newSingleQuery$1;
+	hasRequiredNewSingleQuery$1 = 1;
 	var newColumnSql = requireNewColumnSql();
 	var newJoinSql = requireNewJoinSql();
 	var newWhereSql = requireNewWhereSql();
@@ -6238,8 +6261,8 @@ function requireNewSingleQuery$2 () {
 			.append(orderBy + offset + exclusiveClause);
 	}
 
-	newSingleQuery$2 = _new;
-	return newSingleQuery$2;
+	newSingleQuery$1 = _new;
+	return newSingleQuery$1;
 }
 
 var extractFilter;
@@ -6370,13 +6393,13 @@ function requireExtractOffset () {
 	return extractOffset_1;
 }
 
-var newQuery_1$3;
-var hasRequiredNewQuery$3;
+var newQuery_1$2;
+var hasRequiredNewQuery$2;
 
-function requireNewQuery$3 () {
-	if (hasRequiredNewQuery$3) return newQuery_1$3;
-	hasRequiredNewQuery$3 = 1;
-	var newSingleQuery = requireNewSingleQuery$2();
+function requireNewQuery$2 () {
+	if (hasRequiredNewQuery$2) return newQuery_1$2;
+	hasRequiredNewQuery$2 = 1;
+	var newSingleQuery = requireNewSingleQuery$1();
 	var extractFilter = requireExtractFilter();
 	var extractOrderBy = requireExtractOrderBy();
 	var extractLimit = requireExtractLimit();
@@ -6393,8 +6416,8 @@ function requireNewQuery$3 () {
 		return queries;
 	}
 
-	newQuery_1$3 = newQuery;
-	return newQuery_1$3;
+	newQuery_1$2 = newQuery;
+	return newQuery_1$2;
 }
 
 var negotiateQueryContext_1;
@@ -8673,7 +8696,7 @@ var hasRequiredGetMany;
 function requireGetMany () {
 	if (hasRequiredGetMany) return getMany_1;
 	hasRequiredGetMany = 1;
-	let newQuery = requireNewQuery$3();
+	let newQuery = requireNewQuery$2();
 	let executeQueries = requireExecuteQueries();
 	let resultToRows = requireResultToRows();
 	let strategyToSpan = requireStrategyToSpan();
@@ -9670,12 +9693,11 @@ function requireWhere$1 () {
 	if (hasRequiredWhere$1) return where$1;
 	hasRequiredWhere$1 = 1;
 	const negotiateRawSqlFilter = requireNegotiateRawSqlFilter();
-	let tryGetSessionContext = requireTryGetSessionContext();
 
 	function newWhere(_relations, _depth) {
 
 		function where(context, fn) {
-			const includeMany = tryGetSessionContext(context)?.engine === 'mssql';
+			const includeMany = false;
 			let { relations, alias } = extract(includeMany, _relations);
 			const table = relations[relations.length - 1].childTable;
 			if (!relations[0].isMany || includeMany)
@@ -9722,12 +9744,10 @@ var hasRequiredAggregate$1;
 function requireAggregate$1 () {
 	if (hasRequiredAggregate$1) return aggregate$1;
 	hasRequiredAggregate$1 = 1;
-	let tryGetSessionContext = requireTryGetSessionContext();
-
 	function newAggregate(_relations) {
 
 		function aggregate(context, fn) {
-			const includeMany = tryGetSessionContext(context)?.engine === 'mssql';
+			const includeMany = false;
 			let { relations, alias } = extract(includeMany, _relations);
 			const table = relations[relations.length - 1].childTable;
 			if (!relations[0].isMany || includeMany)
@@ -10793,12 +10813,12 @@ function requireCount () {
 	return count_1;
 }
 
-var newSingleQuery$1;
-var hasRequiredNewSingleQuery$1;
+var newSingleQuery;
+var hasRequiredNewSingleQuery;
 
-function requireNewSingleQuery$1 () {
-	if (hasRequiredNewSingleQuery$1) return newSingleQuery$1;
-	hasRequiredNewSingleQuery$1 = 1;
+function requireNewSingleQuery () {
+	if (hasRequiredNewSingleQuery) return newSingleQuery;
+	hasRequiredNewSingleQuery = 1;
 	var newColumnSql = requireNewColumnSql();
 	var newWhereSql = requireNewWhereSql();
 	var newJoinSql = requireNewJoinSql();
@@ -10818,17 +10838,17 @@ function requireNewSingleQuery$1 () {
 
 	}
 
-	newSingleQuery$1 = _new;
-	return newSingleQuery$1;
+	newSingleQuery = _new;
+	return newSingleQuery;
 }
 
-var newQuery_1$2;
-var hasRequiredNewQuery$2;
+var newQuery_1$1;
+var hasRequiredNewQuery$1;
 
-function requireNewQuery$2 () {
-	if (hasRequiredNewQuery$2) return newQuery_1$2;
-	hasRequiredNewQuery$2 = 1;
-	var newSingleQuery = requireNewSingleQuery$1();
+function requireNewQuery$1 () {
+	if (hasRequiredNewQuery$1) return newQuery_1$1;
+	hasRequiredNewQuery$1 = 1;
+	var newSingleQuery = requireNewSingleQuery();
 	var extractFilter = requireExtractFilter();
 	var extractOrderBy = requireExtractOrderBy();
 	var extractLimit = requireExtractLimit();
@@ -10845,18 +10865,18 @@ function requireNewQuery$2 () {
 		return newParameterized(query.sql(), query.parameters);
 	}
 
-	newQuery_1$2 = newQuery;
-	return newQuery_1$2;
+	newQuery_1$1 = newQuery;
+	return newQuery_1$1;
 }
 
-var getManyDto_1$2;
-var hasRequiredGetManyDto$2;
+var getManyDto_1$1;
+var hasRequiredGetManyDto$1;
 
-function requireGetManyDto$2 () {
-	if (hasRequiredGetManyDto$2) return getManyDto_1$2;
-	hasRequiredGetManyDto$2 = 1;
+function requireGetManyDto$1 () {
+	if (hasRequiredGetManyDto$1) return getManyDto_1$1;
+	hasRequiredGetManyDto$1 = 1;
 	const emptyFilter = requireEmptyFilter();
-	const newQuery = requireNewQuery$2();
+	const newQuery = requireNewQuery$1();
 	const negotiateRawSqlFilter = requireNegotiateRawSqlFilter();
 	const strategyToSpan = requireStrategyToSpan();
 	const executeQueries = requireExecuteQueries();
@@ -11221,26 +11241,26 @@ function requireGetManyDto$2 () {
 			return map.get(values);
 	}
 
-	getManyDto_1$2 = getManyDto;
-	return getManyDto_1$2;
+	getManyDto_1$1 = getManyDto;
+	return getManyDto_1$1;
 }
 
-var getManyDto_1$1;
-var hasRequiredGetManyDto$1;
+var getManyDto_1;
+var hasRequiredGetManyDto;
 
-function requireGetManyDto$1 () {
-	if (hasRequiredGetManyDto$1) return getManyDto_1$1;
-	hasRequiredGetManyDto$1 = 1;
+function requireGetManyDto () {
+	if (hasRequiredGetManyDto) return getManyDto_1;
+	hasRequiredGetManyDto = 1;
 	const getSessionSingleton = requireGetSessionSingleton();
-	const getManyDtoCore = requireGetManyDto$2();
+	const getManyDtoCore = requireGetManyDto$1();
 
 	function getManyDto(context, _table, _filter, _strategy) {
 		const _getManyDto = getSessionSingleton(context, 'getManyDto') || getManyDtoCore;
 		return _getManyDto.apply(null, arguments);
 	}
 
-	getManyDto_1$1 = getManyDto;
-	return getManyDto_1$1;
+	getManyDto_1 = getManyDto;
+	return getManyDto_1;
 }
 
 var tryGetById;
@@ -11625,13 +11645,13 @@ function requireAggregate () {
 	return aggregate;
 }
 
-var newQuery_1$1;
-var hasRequiredNewQuery$1;
+var newQuery_1;
+var hasRequiredNewQuery;
 
-function requireNewQuery$1 () {
-	if (hasRequiredNewQuery$1) return newQuery_1$1;
-	hasRequiredNewQuery$1 = 1;
-	var newSingleQuery = requireNewSingleQuery$1();
+function requireNewQuery () {
+	if (hasRequiredNewQuery) return newQuery_1;
+	hasRequiredNewQuery = 1;
+	var newSingleQuery = requireNewSingleQuery();
 	var extractFilter = requireExtractFilter();
 	var extractLimit = requireExtractLimit();
 	var newParameterized = requireNewParameterized();
@@ -11655,8 +11675,8 @@ function requireNewQuery$1 () {
 		return ' GROUP BY ' + keys.map(key => span.aggregates[key].groupBy).join(',');
 	}
 
-	newQuery_1$1 = newQuery;
-	return newQuery_1$1;
+	newQuery_1 = newQuery;
+	return newQuery_1;
 }
 
 var groupBy_1;
@@ -11665,7 +11685,7 @@ var hasRequiredGroupBy;
 function requireGroupBy () {
 	if (hasRequiredGroupBy) return groupBy_1;
 	hasRequiredGroupBy = 1;
-	const newQuery = requireNewQuery$1();
+	const newQuery = requireNewQuery();
 	const negotiateRawSqlFilter = requireNegotiateRawSqlFilter();
 	const strategyToSpan = requireStrategyToSpan();
 	const executeQueries = requireExecuteQueries();
@@ -11746,7 +11766,7 @@ function requireTable () {
 	const hasOne = requireHasOne();
 	const getMany = requireGetMany();
 	const count = requireCount();
-	const getManyDto = requireGetManyDto$1();
+	const getManyDto = requireGetManyDto();
 	const getById = requireGetById();
 	const tryGetById = requireTryGetById();
 	const tryGetFirst = requireTryGetFirstFromDb();
@@ -17910,9 +17930,9 @@ function requireFormatDateOut$2 () {
 
 	function formatDateOut(column, alias) {
 		if (alias)
-			return `CONVERT(VARCHAR, ${alias}.${quote(column._dbName)}, 121)`;
+			return `CONVERT(VARCHAR, ${alias}.${quote(column._dbName)}, 126)`;
 		else
-			return `CONVERT(VARCHAR, ${quote(column._dbName)}, 121)`;
+			return `CONVERT(VARCHAR, ${quote(column._dbName)}, 126)`;
 	}
 
 	formatDateOut_1$1 = formatDateOut;
@@ -18734,281 +18754,27 @@ function requireWrapQuery$1 () {
 	return wrapQuery_1$1;
 }
 
-var newShallowColumnSql;
-var hasRequiredNewShallowColumnSql;
+var formatDateTzOut;
+var hasRequiredFormatDateTzOut;
 
-function requireNewShallowColumnSql () {
-	if (hasRequiredNewShallowColumnSql) return newShallowColumnSql;
-	hasRequiredNewShallowColumnSql = 1;
+function requireFormatDateTzOut () {
+	if (hasRequiredFormatDateTzOut) return formatDateTzOut;
+	hasRequiredFormatDateTzOut = 1;
 	const quote = requireQuote$2();
 
-	function _new(context, table, alias, span) {
-		alias = quote(alias);
-		let columnsMap = span.columns;
-		var columns = table._columns;
-		var sql = '';
-		var separator = '';
+	function formatDateOut(column, alias) {
+		if (alias)
+			return `FORMAT(${alias}.${quote(column._dbName)}, 'yyyy-MM-ddTHH:mm:sszzz')`;
+		// return `LEFT(CONVERT(varchar(33), ${alias}.${quote(column._dbName)}, 127), 25)`;
+		else
+			return `FORMAT(${quote(column._dbName)}, 'yyyy-MM-ddTHH:mm:sszzz')`;
+			// return `LEFT(CONVERT(varchar(33), ${quote(column._dbName)}, 127), 25)`;
 
-		for (var i = 0; i < columns.length; i++) {
-			var column = columns[i];
-			if (!columnsMap || (columnsMap.get(column))) {
-				sql = sql + separator + formatColumn(column) + ' as ' + quote(column.alias);
-				separator = ',';
-			}
-		}
 
-		for (let name in span.aggregates || {}) {
-			sql = sql + separator + span.aggregates[name].expression(name);
-		}
-
-		return sql;
-
-		function formatColumn(column) {
-
-			const formatted = column.formatOut && column.tsType !== 'DateColumn' ? column.formatOut(context, alias) : alias + '.' + quote(column._dbName);
-			if (column.dbNull === null)
-				return formatted;
-			else {
-				const encoded = column.encode.unsafe(context, column.dbNull);
-				return `CASE WHEN ${formatted}=${encoded} THEN null ELSE ${formatted} END`;
-			}
-
-		}
 	}
 
-	newShallowColumnSql = _new;
-	return newShallowColumnSql;
-}
-
-var newSingleQuery;
-var hasRequiredNewSingleQuery;
-
-function requireNewSingleQuery () {
-	if (hasRequiredNewSingleQuery) return newSingleQuery;
-	hasRequiredNewSingleQuery = 1;
-	var newColumnSql = requireNewShallowColumnSql();
-	var newWhereSql = requireNewWhereSql();
-	var newParameterized = requireNewParameterized();
-
-	function _new(context, table, filter, span, alias, subQueries, orderBy, limit, offset) {
-		var columnSql = newColumnSql(context, table, alias, span);
-		var whereSql = newWhereSql(context, table, filter, alias);
-		if (limit)
-			limit = limit + ' ';
-
-		let join = '';
-		const set = new Set();
-		for (let key in span.aggregates) {
-			const agg = span.aggregates[key];
-			for (let sql of agg.joins) {
-				if (!set.has(sql)) {
-					join = join + sql;
-					set.add(sql);
-				}
-			}
-		}
-
-
-		return newParameterized('select ' + limit + columnSql).append(subQueries).append(' from ' + `[${table._dbName}] [${alias}]` + join).append(whereSql).append(orderBy + offset);
-	}
-
-	newSingleQuery = _new;
-	return newSingleQuery;
-}
-
-var joinLegToQuery_1;
-var hasRequiredJoinLegToQuery;
-
-function requireJoinLegToQuery () {
-	if (hasRequiredJoinLegToQuery) return joinLegToQuery_1;
-	hasRequiredJoinLegToQuery = 1;
-	const newShallowJoinSql = requireNewShallowJoinSqlCore();
-
-	function joinLegToQuery(newQuery, context, parentAlias, leg, _legNo) {
-		var childAlias = parentAlias + leg.name;
-		var span = leg.span;
-		var parentTable = leg.table;
-		var childColumns = span.table._primaryColumns;
-		var parentColumns = leg.columns;
-
-		var filter = newShallowJoinSql(context, parentTable, childColumns, parentColumns, childAlias, parentAlias, leg.span.where);
-		var query = newQuery(context, span.table, filter, span, childAlias);
-		return query.prepend('JSON_QUERY((').append(` FOR JSON PATH, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER)) "${leg.name}"`);
-	}
-
-	joinLegToQuery_1 = joinLegToQuery;
-	return joinLegToQuery_1;
-}
-
-var oneLegToQuery_1;
-var hasRequiredOneLegToQuery;
-
-function requireOneLegToQuery () {
-	if (hasRequiredOneLegToQuery) return oneLegToQuery_1;
-	hasRequiredOneLegToQuery = 1;
-	const newShallowJoinSql = requireNewShallowJoinSqlCore();
-	const newParameterized = requireNewParameterized();
-	const formatString = requireFormat();
-
-	function oneLegToQuery(newQuery, context, rightAlias, leg, _legNo) {
-		let leftAlias = rightAlias + leg.name;
-		let span = leg.span;
-		let rightTable = leg.table;
-		let rightColumns = rightTable._primaryColumns;
-		let leftColumns = leg.columns;
-
-		let filter = newShallowJoinSql(context, rightTable, leftColumns, rightColumns, leftAlias, rightAlias, leg.span.where);
-		let query = newQuery(context, span.table, filter, span, leftAlias);
-		let sql = 'SELECT TOP 1' + query.sql().substring(6);
-		return newParameterized(formatString('JSON_QUERY((%s FOR JSON PATH, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER)) "%s"', sql, leg.name), query.parameters);
-	}
-
-	oneLegToQuery_1 = oneLegToQuery;
-	return oneLegToQuery_1;
-}
-
-var manyLegToQuery_1;
-var hasRequiredManyLegToQuery;
-
-function requireManyLegToQuery () {
-	if (hasRequiredManyLegToQuery) return manyLegToQuery_1;
-	hasRequiredManyLegToQuery = 1;
-	const newShallowJoinSql = requireNewShallowJoinSqlCore();
-
-	function manyLegToQuery(newQuery, context, rightAlias, leg, _legNo) {
-		var leftAlias = rightAlias + leg.name;
-		var span = leg.span;
-		var rightTable = leg.table;
-		var rightColumns = rightTable._primaryColumns;
-		var leftColumns = leg.columns;
-
-		var filter = newShallowJoinSql(context, rightTable, leftColumns, rightColumns, leftAlias, rightAlias, leg.span.where);
-		var query = newQuery(context, span.table, filter, span, leftAlias);
-		return query.prepend('JSON_QUERY( coalesce((').append(` FOR JSON PATH, INCLUDE_NULL_VALUES),'[]')) "${leg.name}"`);
-	}
-
-	manyLegToQuery_1 = manyLegToQuery;
-	return manyLegToQuery_1;
-}
-
-var newSubQueries_1;
-var hasRequiredNewSubQueries;
-
-function requireNewSubQueries () {
-	if (hasRequiredNewSubQueries) return newSubQueries_1;
-	hasRequiredNewSubQueries = 1;
-	const newParameterized = requireNewParameterized();
-	const joinLegToQuery = requireJoinLegToQuery();
-	const oneLegToQuery = requireOneLegToQuery();
-	const manyLegToQuery = requireManyLegToQuery();
-
-	function newSubQueries(newQuery, context, _table, span, alias) {
-		var result = newParameterized('', []);
-		var c = {};
-		var _legNo;
-
-		c.visitJoin = function(leg) {
-			result = result.append(',').append(joinLegToQuery(newQuery, context, alias, leg, _legNo));
-		};
-		c.visitOne = function(leg) {
-			result = result.append(',').append(oneLegToQuery(newQuery, context, alias, leg, _legNo));
-		};
-		c.visitMany = function(leg) {
-			result = result.append(',').append(manyLegToQuery(newQuery, context, alias, leg, _legNo));
-		};
-
-		span.legs.forEach(onEachLeg);
-
-		function onEachLeg(leg, legNo) {
-			_legNo = legNo;
-			leg.accept(c);
-		}
-
-		return result;
-	}
-
-	newSubQueries_1 = newSubQueries;
-	return newSubQueries_1;
-}
-
-var newQueryCore;
-var hasRequiredNewQueryCore;
-
-function requireNewQueryCore () {
-	if (hasRequiredNewQueryCore) return newQueryCore;
-	hasRequiredNewQueryCore = 1;
-	var newSingleQuery = requireNewSingleQuery();
-	var newSubQueries = requireNewSubQueries();
-	var extractFilter = requireExtractFilter();
-	var extractOrderBy = requireExtractOrderBy();
-	var extractLimit = requireExtractLimit();
-	var limitAndOffset = requireLimitAndOffset$2();
-
-	function newQuery(context, table, filter, span, alias) {
-		filter = extractFilter(filter);
-		var orderBy = extractOrderBy(context, table, alias, span.orderBy);
-		var limit = extractLimit(context, span);
-		var offset = limitAndOffset(span);
-
-		var subQueries = newSubQueries(newQuery, context, table, span, alias);
-		return newSingleQuery(context, table, filter, span, alias, subQueries, orderBy, limit, offset);
-	}
-
-	newQueryCore = newQuery;
-	return newQueryCore;
-}
-
-var newQuery_1;
-var hasRequiredNewQuery;
-
-function requireNewQuery () {
-	if (hasRequiredNewQuery) return newQuery_1;
-	hasRequiredNewQuery = 1;
-	var newQueryCore = requireNewQueryCore();
-
-	function newQuery() {
-		var query = newQueryCore.apply(null, arguments);
-		return query.append(' FOR JSON path, INCLUDE_NULL_VALUES');
-	}
-
-	newQuery_1 = newQuery;
-	return newQuery_1;
-}
-
-var getManyDto_1;
-var hasRequiredGetManyDto;
-
-function requireGetManyDto () {
-	if (hasRequiredGetManyDto) return getManyDto_1;
-	hasRequiredGetManyDto = 1;
-	const newQuery = requireNewQuery();
-	const negotiateRawSqlFilter = requireNegotiateRawSqlFilter();
-	const strategyToSpan = requireStrategyToSpan();
-	const executeQueries = requireExecuteQueries();
-
-	async function getManyDto(context, table, filter, strategy) {
-		filter = negotiateRawSqlFilter(context, filter, table);
-		if (strategy && strategy.where) {
-			let arg = typeof strategy.where === 'function' ? strategy.where(table) : strategy.where;
-			filter = filter.and(context, arg);
-		}
-		let span = strategyToSpan(table, strategy);
-		let alias = table._dbName;
-
-		const query = newQuery(context, table, filter, span, alias);
-		const res = await executeQueries(context, [query]);
-		const rows = await res[0];
-		if (rows.length === 0)
-			return [];
-		let json = '';
-		for (let i = 0; i < rows.length; i++) {
-			json += rows[i]['JSON_F52E2B61-18A1-11d1-B105-00805F49916B'];
-		}
-		return JSON.parse(json);
-	}
-
-	getManyDto_1 = getManyDto;
-	return getManyDto_1;
+	formatDateTzOut = formatDateOut;
+	return formatDateTzOut;
 }
 
 var newTransaction$2;
@@ -19023,8 +18789,8 @@ function requireNewTransaction$2 () {
 	var selectForUpdateSql = requireSelectForUpdateSql$2();
 	const limitAndOffset = requireLimitAndOffset$2();
 	const insertSql = requireInsertSql$2();
-	const getManyDto = requireGetManyDto();
 	const formatDateOut = requireFormatDateOut$2();
+	const formatDateTzOut = requireFormatDateTzOut();
 	const formatBigintOut = requireFormatBigintOut$2();
 	const formatJSONOut = requireFormatJSONOut();
 	const insert = requireInsert$2();
@@ -19037,7 +18803,6 @@ function requireNewTransaction$2 () {
 			rdb.pool = pool;
 		}
 		rdb.engine = 'mssql';
-		rdb.getManyDto = getManyDto;
 		rdb.encodeBoolean = encodeBoolean;
 		rdb.decodeJSON = decodeJSON;
 		rdb.encodeJSON = JSON.stringify;
@@ -19047,6 +18812,7 @@ function requireNewTransaction$2 () {
 		rdb.insertSql = insertSql;
 		rdb.insert = insert;
 		rdb.formatDateOut = formatDateOut;
+		rdb.formatDateTzOut = formatDateTzOut;
 		rdb.formatBigintOut = formatBigintOut;
 		rdb.formatJSONOut = formatJSONOut;
 		rdb.multipleStatements = true;

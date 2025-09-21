@@ -1,4 +1,6 @@
 ## Changelog
+__4.7.14__  
+Improved performance for SQL Server.  
 __4.7.13__  
 Change in *.d.ts: Allow count, delete and deleteCascade to have no arguments.  
 __4.7.12__  
