@@ -1,6 +1,7 @@
 var log = require('../table/log');
 
 function wrapQuery(_context, connection) {
+	const statementCache = new Map();
 	return runQuery;
 
 	function runQuery(query, onCompleted) {
@@ -9,7 +10,11 @@ function wrapQuery(_context, connection) {
 			var sql = query.sql();
 			log.emitQuery({ sql, parameters: params });
 
-			var statement = connection.prepare(sql);
+			let statement = statementCache.get(sql);
+			if (!statement) {
+				statement = connection.prepare(sql);
+				statementCache.set(sql, statement);
+			}
 			const rows = statement.all.apply(statement, params);
 			onCompleted(null, rows);
 		}

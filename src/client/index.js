@@ -12,6 +12,7 @@ const createAxiosInterceptor = require('./axiosInterceptor');
 const flags = require('../flags');
 
 function rdbClient(options = {}) {
+	let cachedAdapter;
 	flags.useLazyDefaults = false;
 	if (options.pg)
 		options = { db: options };
@@ -247,7 +248,14 @@ function rdbClient(options = {}) {
 				path: 'aggregate',
 				args
 			});
-			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+			let adapter;
+			if (cachedAdapter)
+				adapter = cachedAdapter;
+			else {
+				adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+				cachedAdapter = adapter;
+
+			}
 			return adapter.post(body);
 		}
 
@@ -257,7 +265,14 @@ function rdbClient(options = {}) {
 				path: 'count',
 				args
 			});
-			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+			let adapter;
+			if (cachedAdapter)
+				adapter = cachedAdapter;
+			else {
+				adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+				cachedAdapter = adapter;
+
+			}
 			return adapter.post(body);
 		}
 
@@ -293,7 +308,15 @@ function rdbClient(options = {}) {
 				path: 'getManyDto',
 				args
 			});
-			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+
+			let adapter;
+			if (cachedAdapter)
+				adapter = cachedAdapter;
+			else {
+				adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+				cachedAdapter = adapter;
+
+			}
 			return adapter.post(body);
 		}
 
@@ -370,7 +393,14 @@ function rdbClient(options = {}) {
 				path: 'delete',
 				args
 			});
-			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+			let adapter;
+			if (cachedAdapter)
+				adapter = cachedAdapter;
+			else {
+				adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+				cachedAdapter = adapter;
+
+			}
 			return adapter.post(body);
 		}
 
@@ -380,7 +410,14 @@ function rdbClient(options = {}) {
 				path: 'deleteCascade',
 				args
 			});
-			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+			let adapter;
+			if (cachedAdapter)
+				adapter = cachedAdapter;
+			else {
+				adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+				cachedAdapter = adapter;
+
+			}
 			return adapter.post(body);
 		}
 
@@ -390,7 +427,14 @@ function rdbClient(options = {}) {
 				path: 'update',
 				args
 			});
-			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+			let adapter;
+			if (cachedAdapter)
+				adapter = cachedAdapter;
+			else {
+				adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+				cachedAdapter = adapter;
+
+			}
 			const result =  await adapter.post(body);
 			if (strategy)
 				return proxify(result, strategy);
@@ -402,7 +446,14 @@ function rdbClient(options = {}) {
 				path: 'replace',
 				args
 			});
-			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+			let adapter;
+			if (cachedAdapter)
+				adapter = cachedAdapter;
+			else {
+				adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+				cachedAdapter = adapter;
+
+			}
 			const result =  await adapter.post(body);
 			if (strategy)
 				return proxify(result, strategy);
@@ -565,6 +616,7 @@ function rdbClient(options = {}) {
 			if (meta)
 				return meta;
 			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+			cachedAdapter = adapter;
 			meta = await adapter.get();
 
 			while (hasUnresolved(meta)) {

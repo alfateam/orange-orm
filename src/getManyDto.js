@@ -209,6 +209,10 @@ async function decodeManyRelations(context, strategy, span) {
 		const extractKey = createExtractKey(leg);
 		const extractFromMap = createExtractFromMap(rowsMap, table._primaryColumns);
 
+		if (span._ids.length === 0) {
+			return;
+		}
+
 		// If maxRows is defined, chunk the IDs before calling getManyDto
 		if (maxRows) {
 			const chunkedIds = chunk(span._ids, maxRows);
