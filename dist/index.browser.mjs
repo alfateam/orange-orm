@@ -2674,7 +2674,6 @@ function requireClient () {
 	const flags = requireFlags();
 
 	function rdbClient(options = {}) {
-		let cachedAdapter;
 		flags.useLazyDefaults = false;
 		if (options.pg)
 			options = { db: options };
@@ -2910,14 +2909,7 @@ function requireClient () {
 					path: 'aggregate',
 					args
 				});
-				let adapter;
-				if (cachedAdapter)
-					adapter = cachedAdapter;
-				else {
-					adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
-					cachedAdapter = adapter;
-
-				}
+				let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
 				return adapter.post(body);
 			}
 
@@ -2927,14 +2919,7 @@ function requireClient () {
 					path: 'count',
 					args
 				});
-				let adapter;
-				if (cachedAdapter)
-					adapter = cachedAdapter;
-				else {
-					adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
-					cachedAdapter = adapter;
-
-				}
+				let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
 				return adapter.post(body);
 			}
 
@@ -2970,15 +2955,7 @@ function requireClient () {
 					path: 'getManyDto',
 					args
 				});
-
-				let adapter;
-				if (cachedAdapter)
-					adapter = cachedAdapter;
-				else {
-					adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
-					cachedAdapter = adapter;
-
-				}
+				let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
 				return adapter.post(body);
 			}
 
@@ -3055,14 +3032,7 @@ function requireClient () {
 					path: 'delete',
 					args
 				});
-				let adapter;
-				if (cachedAdapter)
-					adapter = cachedAdapter;
-				else {
-					adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
-					cachedAdapter = adapter;
-
-				}
+				let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
 				return adapter.post(body);
 			}
 
@@ -3072,14 +3042,7 @@ function requireClient () {
 					path: 'deleteCascade',
 					args
 				});
-				let adapter;
-				if (cachedAdapter)
-					adapter = cachedAdapter;
-				else {
-					adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
-					cachedAdapter = adapter;
-
-				}
+				let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
 				return adapter.post(body);
 			}
 
@@ -3089,14 +3052,7 @@ function requireClient () {
 					path: 'update',
 					args
 				});
-				let adapter;
-				if (cachedAdapter)
-					adapter = cachedAdapter;
-				else {
-					adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
-					cachedAdapter = adapter;
-
-				}
+				let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
 				const result =  await adapter.post(body);
 				if (strategy)
 					return proxify(result, strategy);
@@ -3108,14 +3064,7 @@ function requireClient () {
 					path: 'replace',
 					args
 				});
-				let adapter;
-				if (cachedAdapter)
-					adapter = cachedAdapter;
-				else {
-					adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
-					cachedAdapter = adapter;
-
-				}
+				let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
 				const result =  await adapter.post(body);
 				if (strategy)
 					return proxify(result, strategy);
@@ -3278,7 +3227,6 @@ function requireClient () {
 				if (meta)
 					return meta;
 				let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
-				cachedAdapter = adapter;
 				meta = await adapter.get();
 
 				while (hasUnresolved(meta)) {
