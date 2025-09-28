@@ -1,7 +1,13 @@
-var log = require('../table/log');
+const log = require('../table/log');
+const connectionCache  = new WeakMap();
 
 function wrapQuery(_context, connection) {
-	const statementCache = new Map();
+	let statementCache = connectionCache.get(connection);
+	if (!statementCache) {
+		statementCache = new Map();
+		connectionCache.set(connection, statementCache);
+	}
+
 	return runQuery;
 
 	function runQuery(query, onCompleted) {

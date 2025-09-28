@@ -16090,10 +16090,16 @@ var hasRequiredWrapQuery$6;
 function requireWrapQuery$6 () {
 	if (hasRequiredWrapQuery$6) return wrapQuery_1$6;
 	hasRequiredWrapQuery$6 = 1;
-	var log = requireLog();
+	const log = requireLog();
+	const connectionCache  = new WeakMap();
 
 	function wrapQuery(_context, connection) {
-		const statementCache = new Map();
+		let statementCache = connectionCache.get(connection);
+		if (!statementCache) {
+			statementCache = new Map();
+			connectionCache.set(connection, statementCache);
+		}
+
 		return runQuery;
 
 		function runQuery(query, onCompleted) {
@@ -20780,7 +20786,7 @@ function requireSrc () {
 	Object.defineProperty(connectViaPool, 'sqlite', {
 		get: function() {
 			if (!_sqlite) {
-				if (runtimes.deno || (runtimes.node && runtimes.node.major >= 22))
+				if (runtimes.deno || (runtimes.node && (runtimes.node.major > 22 || (runtimes.node.major === 22 && runtimes.node.minor >= 5))))
 					_sqlite = requireNewDatabase$7();
 				else if (runtimes.bun)
 					_sqlite = requireNewDatabase$6();
