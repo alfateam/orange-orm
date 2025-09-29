@@ -1,0 +1,48 @@
+name: Manual npm publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      dist_tag:
+        description: "npm dist-tag (e.g., latest, next)"
+        required: false
+        default: "latest"
+      provenance:
+        description: "Publish with provenance?"
+        required: false
+        default: "true"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write   # needed for --provenance
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: npm ci
+
+      # optional: run tests/build here
+      # - run: npm test
+      # - run: npm run build
+
+      - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          TAG="${{ github.event.inputs.dist_tag }}"
+          USE_PROV="${{ github.event.inputs.provenance }}"
+          if [ "$USE_PROV" = "true" ]; then
+            npm publish --tag "$TAG" --provenance || npm publish --tag "$TAG"
+          else
+            npm publish --tag "$TAG"
+          fi
