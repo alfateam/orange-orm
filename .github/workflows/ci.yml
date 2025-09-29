@@ -119,7 +119,9 @@ jobs:
 
     # Mirror Node job: run inside a container so service hostnames work
     container:
-      image: node:22-bookworm
+      #image: node:22-bookworm
+      image: mcr.microsoft.com/vscode/devcontainers/javascript-node:dev-22-bookworm
+      
 
     services:
       postgres:
