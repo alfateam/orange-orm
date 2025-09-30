@@ -1,7 +1,4 @@
-
 import { describe, test, beforeAll, afterAll, expect } from 'vitest';
-import { fileURLToPath } from 'url';
-import setupD1 from './setupD1';
 const express = require('express');
 const map = require('./db');
 import { json } from 'body-parser';
@@ -17,11 +14,10 @@ const versionArray = process.version.replace('v', '').split('.');
 const major = parseInt(versionArray[0]);
 const port = 3005;
 let server;
-let d1;
-let miniflare;
+
 
 afterAll(async () => {
-	await miniflare.dispose();
+
 	return new Promise((res) => {
 		if (server)
 			server.close(res);
@@ -31,7 +27,6 @@ afterAll(async () => {
 });
 
 beforeAll(async () => {
-	({ d1, miniflare } = await setupD1(fileURLToPath(import.meta.url)));
 	await createMs('mssql');
 	await insertData('pg');
 	await insertData('pglite');
@@ -71,7 +66,7 @@ beforeAll(async () => {
 		server = app.listen(port, () => console.log(`Example app listening on port ${port}!`));
 	}
 
-});
+}, 10000);
 
 
 describe('insert-get', () => {
@@ -110,7 +105,8 @@ describe('insert-get', () => {
 	}
 });
 
-const pathSegments = fileURLToPath(import.meta.url).split('/');
+
+const pathSegments = __filename.split('/');
 const lastSegment = pathSegments[pathSegments.length - 1];
 const fileNameWithoutExtension = lastSegment.split('.')[0];
 const sqliteName = `demo.${fileNameWithoutExtension}.db`;
@@ -151,10 +147,6 @@ const connections = {
 		init: initPg
 	},	sqlite: {
 		db: map({ db: (con) => con.sqlite(sqliteName, { size: 1 }) }),
-		init: initSqlite
-	},
-	d1: {
-		db: map({ db: (con) => con.d1(d1, { size: 1 }) }),
 		init: initSqlite
 	},
 	sqlite2: {

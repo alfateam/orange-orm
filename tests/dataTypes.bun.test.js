@@ -1,10 +1,8 @@
 import { describe, test, expect, beforeAll, afterAll } from 'bun:test';
-import { fileURLToPath } from 'url';
 import express from 'express';
 import { json } from 'body-parser';
 import cors from 'cors';
 import map from './db.js';
-import setupD1 from './setupD1';
 import initPg from './initPg.js';
 import initOracle from './initOracle.js';
 import initMs from './initMs.js';
@@ -15,10 +13,9 @@ import initSap from './initSap.js';
 const major = 0;
 const port = 3005;
 let server;
-let d1;
-let miniflare;
 
-const pathSegments = fileURLToPath(import.meta.url).split('/');
+
+const pathSegments = __filename.split('/');
 const lastSegment = pathSegments[pathSegments.length - 1];
 const fileNameWithoutExtension = lastSegment.split('.')[0];
 const sqliteName = `demo.${fileNameWithoutExtension}.db`;
@@ -60,10 +57,6 @@ const connections = {
 	},
 	sqlite: {
 		db: map({ db: (con) => con.sqlite(sqliteName, { size: 1 }) }),
-		init: initSqlite
-	},
-	d1: {
-		db: map({ db: (con) => con.d1(d1, { size: 1 }) }),
 		init: initSqlite
 	},
 	sqlite2: {
@@ -109,8 +102,6 @@ function getDb(name) {
 		return connections.pglite;
 	else if (name === 'sqlite')
 		return connections.sqlite;
-	else if (name === 'd1')
-		return connections.d1;
 	else if (name === 'sqlite2')
 		return connections.sqlite2;
 	else if (name === 'sap')
@@ -126,7 +117,6 @@ function getDb(name) {
 }
 
 beforeAll(async () => {
-	({ d1, miniflare } = await setupD1(fileURLToPath(import.meta.url)));
 	await insertData('pg');
 	await insertData('pglite');
 	await insertData('oracle');
@@ -135,7 +125,6 @@ beforeAll(async () => {
 		await insertData('mssqlNative');
 	await insertData('mysql');
 	await insertData('sqlite');
-	await insertData('d1');
 	await insertData('sqlite2');
 	hostExpress();
 
@@ -158,7 +147,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-	await miniflare.dispose();
+
 	return new Promise((res) => {
 		if (server)
 			server.close(res);

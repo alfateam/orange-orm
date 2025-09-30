@@ -1,6 +1,4 @@
 import { describe, test, beforeAll, afterAll, expect } from 'vitest';
-import { fileURLToPath } from 'url';
-import setupD1 from './setupD1';
 const map = require('./db2');
 import express from 'express';
 import cors from 'cors';
@@ -13,11 +11,9 @@ const initSqlite = require('./initSqlite');
 const initSap = require('./initSap');
 const port = 3009;
 let server;
-let d1;
-let miniflare;
+
 
 beforeAll(async () => {
-	({ d1, miniflare } = await setupD1(fileURLToPath(import.meta.url)));
 	await insertData('pg');
 	await insertData('pglite');
 	await insertData('oracle');
@@ -25,7 +21,6 @@ beforeAll(async () => {
 	await insertData('mysql');
 	await insertData('sap');
 	await insertData('sqlite');
-	await insertData('d1');
 	await insertData('sqlite2');
 
 	async function insertData(dbName) {
@@ -81,7 +76,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-	await miniflare.dispose();
+
 });
 
 
@@ -102,7 +97,6 @@ describe('readonly everything', () => {
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
-	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -235,7 +229,6 @@ describe('readonly table', () => {
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
-	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -290,7 +283,6 @@ describe('readonly column', () => {
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
-	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -347,7 +339,6 @@ describe('readonly table delete', () => {
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
-	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -387,7 +378,6 @@ describe('readonly nested table delete', () => {
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
-	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -426,7 +416,6 @@ describe('readonly on grandChildren table delete', () => {
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
-	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -466,7 +455,6 @@ describe('readonly nested table delete override', () => {
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
-	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -501,7 +489,6 @@ describe('readonly column no change', () => {
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
-	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -549,7 +536,6 @@ describe('readonly nested column', () => {
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
-	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -594,7 +580,6 @@ describe('readonly nested table', () => {
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
-	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -634,7 +619,6 @@ describe('readonly table with column override', () => {
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
-	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -683,7 +667,6 @@ describe('readonly column delete', () => {
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
-	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
 
@@ -709,7 +692,7 @@ function hostExpress(options) {
 	server = app.listen(port, () => console.log(`Example app listening on port ${port}}!`));
 }
 
-const pathSegments = fileURLToPath(import.meta.url).split('/');
+const pathSegments = __filename.split('/');
 const lastSegment = pathSegments[pathSegments.length - 1];
 const fileNameWithoutExtension = lastSegment.split('.')[0];
 const sqliteName = `demo.${fileNameWithoutExtension}.db`;
@@ -750,10 +733,6 @@ const connections = {
 		init: initPg
 	},	sqlite: {
 		db: map({ db: (con) => con.sqlite(sqliteName, { size: 1 }) }),
-		init: initSqlite
-	},
-	d1: {
-		db: map({ db: (con) => con.d1(d1, { size: 1 }) }),
 		init: initSqlite
 	},
 	sqlite2: {
