@@ -36,7 +36,6 @@ beforeAll(async () => {
 		await insertData('mssqlNative');
 	await insertData('mysql');
 	await insertData('sqlite');
-	await insertData('d1');
 	await insertData('sqlite2');
 	await insertData('sap');
 	hostExpress();
