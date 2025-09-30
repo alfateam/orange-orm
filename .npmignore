@@ -18,3 +18,4 @@ publish.log
 .gitattributes
 CNAME
 .env*
+vitest.config.js
