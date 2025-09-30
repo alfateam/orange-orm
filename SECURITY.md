@@ -3,7 +3,8 @@
 ## Supported versions
 
 The following table describes the versions of this project that are currently supported with security updates:
-- [x] 3.x
+- [x] 4.x
+- [ ] 3.x
 - [ ] 2.x
 - [ ] 1.x
 
