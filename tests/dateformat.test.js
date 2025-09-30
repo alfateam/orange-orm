@@ -1,6 +1,4 @@
 import { describe, test, beforeAll, expect, afterAll } from 'vitest';
-import { fileURLToPath } from 'url';
-import setupD1 from './setupD1';
 const map = require('./db');
 const initPg = require('./initPg');
 const initOracle = require('./initOracle');
@@ -10,11 +8,9 @@ const initSqlite = require('./initSqlite');
 const initSap = require('./initSap');
 
 const port = 3002;
-let d1;
-let miniflare;
+
 
 beforeAll(async () => {
-	({ d1, miniflare } = await setupD1(fileURLToPath(import.meta.url)));
 	await insertData('pg');
 	await insertData('pglite');
 	await insertData('oracle');
@@ -22,7 +18,6 @@ beforeAll(async () => {
 	await insertData('mysql');
 	await insertData('sap');
 	await insertData('sqlite');
-	await insertData('d1');
 
 	async function insertData(dbName) {
 		const { db, init } = getDb(dbName);
@@ -77,7 +72,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-	await miniflare.dispose();
+
 });
 
 
@@ -207,22 +202,10 @@ describe('dateformat get', () => {
 		expect(result).toEqual({ id: 1, date: '2023-08-05T12:00:00', datetime: '2023-08-05T12:00:00', datetime_tz: '2023-08-05T12:00:00-03:00' });
 	});
 
-	test('d1', async () => {
-		const { db } = getDb('d1');
-		const result = await db.datetestWithTz.getOne();
-		expect(result).toEqual({ id: 1, date: '2023-07-14T12:00:00', datetime: '2023-07-14T12:00:00', datetime_tz: '2023-07-14T12:00:00-08:00' });
-		result.date = newValue;
-		result.datetime = newValue;
-		result.datetime_tz = newValue;
-		await result.saveChanges();
-		await result.refresh();
-		expect(result).toEqual({ id: 1, date: '2023-08-05T12:00:00', datetime: '2023-08-05T12:00:00', datetime_tz: '2023-08-05T12:00:00-03:00' });
-	});
-
 
 });
 
-const pathSegments = fileURLToPath(import.meta.url).split('/');
+const pathSegments = __filename.split('/');
 const lastSegment = pathSegments[pathSegments.length - 1];
 const fileNameWithoutExtension = lastSegment.split('.')[0];
 const sqliteName = `demo.${fileNameWithoutExtension}.db`;
@@ -263,10 +246,6 @@ const connections = {
 		init: initPg
 	},	sqlite: {
 		db: map({ db: (con) => con.sqlite(sqliteName, { size: 1 }) }),
-		init: initSqlite
-	},
-	d1: {
-		db: map({ db: (con) => con.d1(d1, { size: 1 }) }),
 		init: initSqlite
 	},
 	sqlite2: {

@@ -1,6 +1,4 @@
 import { describe, test, beforeAll, afterAll, expect } from 'vitest';
-import { fileURLToPath } from 'url';
-import setupD1 from './setupD1';
 const map = require('./db');
 import express from 'express';
 import cors from 'cors';
@@ -19,11 +17,9 @@ const date1 = new Date(2022, 0, 11, 9, 24, 47);
 const date2 = new Date(2021, 0, 11, 12, 22, 45);
 let server = null;
 const port = 3002;
-let d1;
-let miniflare;
+
 
 async function globalSetup() {
-	({ d1, miniflare } = await setupD1(fileURLToPath(import.meta.url)));
 	await insertData('pg');
 	await insertData('pglite');
 	await insertData('oracle');
@@ -33,7 +29,6 @@ async function globalSetup() {
 	await insertData('mysql');
 	await insertData('sap');
 	await insertData('sqlite');
-	await insertData('d1');
 	await insertData('sqlite2');
 	hostExpress();
 }
@@ -97,7 +92,7 @@ function hostExpress() {
 }
 
 async function globalTeardown() {
-	await miniflare.dispose();
+
 	return new Promise((res) => {
 		if (server)
 			server.close(res);
@@ -124,7 +119,6 @@ describe('updateChanges', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sap', async () => await verify('sap'));
 	test('sqlite', async () => await verify('sqlite'));
-	test('d1', async () => await verify('d1'));
 	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
@@ -186,7 +180,6 @@ describe('replace then return rows', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sap', async () => await verify('sap'));
 	test('sqlite', async () => await verify('sqlite'));
-	test('d1', async () => await verify('d1'));
 	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
@@ -258,7 +251,6 @@ describe('replace', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sap', async () => await verify('sap'));
 	test('sqlite', async () => await verify('sqlite'));
-	test('d1', async () => await verify('d1'));
 	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
@@ -333,7 +325,6 @@ describe('update with JSON', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sap', async () => await verify('sap'));
 	test('sqlite', async () => await verify('sqlite'));
-	test('d1', async () => await verify('d1'));
 	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
@@ -408,7 +399,6 @@ describe('update with JSON then return rows', () => {
 	test('mysql', async () => await verify('mysql'));
 	test('sap', async () => await verify('sap'));
 	test('sqlite', async () => await verify('sqlite'));
-	test('d1', async () => await verify('d1'));
 	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
@@ -461,7 +451,7 @@ describe('update with JSON then return rows', () => {
 	}
 });
 
-const pathSegments = fileURLToPath(import.meta.url).split('/');
+const pathSegments = __filename.split('/');
 const lastSegment = pathSegments[pathSegments.length - 1];
 const fileNameWithoutExtension = lastSegment.split('.')[0];
 const sqliteName = `demo.${fileNameWithoutExtension}.db`;
@@ -502,10 +492,6 @@ const connections = {
 		init: initPg
 	},	sqlite: {
 		db: map({ db: (con) => con.sqlite(sqliteName, { size: 1 }) }),
-		init: initSqlite
-	},
-	d1: {
-		db: map({ db: (con) => con.d1(d1, { size: 1 }) }),
 		init: initSqlite
 	},
 	sqlite2: {

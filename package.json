@@ -1,165 +1,166 @@
 {
-  "name": "orange-orm",
-  "version": "4.7.15",
-  "main": "./src/index.js",
-  "module": "./dist/index.mjs",
-  "browser": "./dist/index.browser.mjs",
-  "exports": {
-    ".": {
-      "require": "./src/index.js",
-      "import": "./dist/index.mjs",
-      "browser": "./dist/index.browser.mjs",
-      "types": "./src/index.d.ts"
+    "name": "orange-orm",
+    "version": "4.7.15-beta.0",
+    "publishConfig": {
+        "access": "public"
+    },
+    "main": "./src/index.js",
+    "module": "./dist/index.mjs",
+    "browser": "./dist/index.browser.mjs",
+    "exports": {
+        ".": {
+            "types": "./src/index.d.ts",
+            "browser": "./dist/index.browser.mjs",
+            "import": "./dist/index.mjs",
+            "require": "./src/index.js"
+        }
+    },
+    "bin": {
+        "orange-orm": "bin/rdb.js"
+    },
+    "title": "Orange ORM",
+    "description": "Object Relational Mapper",
+    "keywords": [
+        "typescript orm",
+        "orm",
+        "sql",
+        "mySql",
+        "SQLite",
+        "MySQL",
+        "mssql",
+        "Microsoft Sql Server",
+        "PGlite",
+        "Cloudflare D1",
+        "PostgreSql",
+        "Postgres",
+        "pg",
+        "sap",
+        "sapase",
+        "Oracle",
+        "rdb",
+        "Orange ORM",
+        "active record"
+    ],
+    "authors": [
+        "Lars-Erik Roald <lars.roald@gmail.com>"
+    ],
+    "license": "ISC",
+    "codeOfConduct": "https://github.com/alfateam/orange-orm/blob/master/docs/CODE_OF_CONDUCT.md",
+    "contributing": "https://github.com/alfateam/orange-orm/blob/master/CONTRIBUTING.md",
+    "funding": {
+        "type": "github",
+        "url": "https://github.com/sponsors/lroal"
+    },
+    "scripts": {
+        "test": "vitest run --pool=forks --poolOptions.forks.singleFork",
+        "test:bun": "bun test --timeout=30000 ./tests/*.bun.test.js",
+        "test:deno": "deno test --allow-all --unstable-detect-cjs ./tests/*.deno.test.js",
+        "test:all": "echo 'Running Node.js tests...' && npm run test:node && echo 'Running Bun tests...' && npm run test:bun && echo 'Running Deno tests...' && npm run test:deno && echo 'All tests completed!'",
+        "test:all:parallel": "concurrently \"npm:test:node\" \"npm:test:bun\" \"npm:test:deno\"",
+        "coverage": "vitest run --coverage.enabled --coverage.reporter='text-summary' --pool=forks --poolOptions.forks.singleFork",
+        "testw": "vitest --pool=forks --poolOptions.forks.singleFork update",
+        "tscheck": "tsc ./src/index.d.ts --module commonjs --target es2022 --noEmit true --strict true --esModuleInterop true",
+        "concat-server": "node ./src/merge-server.js",
+        "concat-browser": "node ./src/merge-browser.js",
+        "build": "npm run build-server && npm run build-browser",
+        "build-server": "rollup -c ./src/rollup.config.server.js && npm run concat-server",
+        "build-browser": "rollup -c ./src/rollup.config.browser.js && npm run concat-browser",
+        "lint": "eslint ./",
+        "fix": "eslint ./ --fix",
+        "owasp": "owasp-dependency-check --project \"MY_PROJECT\" --scan \"package-lock.json\" --exclude \"dependency-check-bin\" --out \"owasp\" --format HTML",
+        "beta": "npm publish --tag beta"
+    },
+    "dependencies": {
+        "@cloudflare/workers-types": "^4.20241106.0",
+        "@lroal/on-change": "^4.0.2",
+        "@tediousjs/connection-string": "^0.4.1",
+        "@types/express": "^4.17.13",
+        "@types/oracledb": "^6.0.4",
+        "@types/tedious": "^4.0.14",
+        "ajv": "^8.17.1",
+        "axios": "^1.6.2",
+        "fast-json-patch": "^3.1.1",
+        "findup-sync": "^5.0.0",
+        "glob": "^10.3.4 || ^11.0.2",
+        "module-definition": "^4.0.0 || ^5.0.0 || || ^6.0.0",
+        "rfdc": "^1.2.0",
+        "uuid": "^8.3.2 || ^9.0.0 || ^10.0.0 || ^11.1.0"
+    },
+    "peerDependencies": {
+        "@electric-sql/pglite": "^0.3.0",
+        "msnodesqlv8": "^4.1.0",
+        "mysql2": "^2.2.5 || ^3.9.4",
+        "oracledb": "^6.3.0",
+        "pg": "^8.5.1",
+        "pg-query-stream": "^3.3.2",
+        "sqlite3": "^5.0.2",
+        "tedious": "^15.1.2 || ^16.0.0 || ^18.1.0 || || ^19.0.0"
+    },
+    "peerDependenciesMeta": {
+        "pg": {
+            "optional": true
+        },
+        "pg-query-stream": {
+            "optional": true
+        },
+        "mysql2": {
+            "optional": true
+        },
+        "sqlite3": {
+            "optional": true
+        },
+        "pg-native": {
+            "optional": true
+        },
+        "msnodesqlv8": {
+            "optional": true
+        },
+        "tedious": {
+            "optional": true
+        },
+        "oracledb": {
+            "optional": true
+        },
+        "@electric-sql/pglite": {
+            "optional": true
+        }
+    },
+    "devDependencies": {
+        "@electric-sql/pglite": "^0.3.0",
+        "@rollup/plugin-commonjs": "^28.0.2",
+        "@rollup/plugin-json": "^6.1.0",
+        "@rollup/plugin-node-resolve": "^13.0.0",
+        "@typescript-eslint/eslint-plugin": "^6.x",
+        "@typescript-eslint/parser": "^6.x",
+        "@vitest/coverage-v8": "^3.2.4",
+        "cors": "^2.8.5",
+        "eslint": "^8.57.0",
+        "eslint-plugin-jest": "^27.1.7",
+        "express": "^4.18.2",
+        "msnodesqlv8": "^4.1.0",
+        "mysql2": "^3.9.4",
+        "oracledb": "^6.3.0",
+        "owasp-dependency-check": "^0.0.21",
+        "pg": "^8.5.1",
+        "pg-query-stream": "^3.3.2",
+        "rollup": "^2.52.7",
+        "sqlite3": "^5.0.2",
+        "tedious": "^19.0.0",
+        "typescript": "^5.4.5",
+        "vitest": "^3.2.4"
+    },
+    "engines": {
+        "node": ">= 8.0.0"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git@github.com:alfateam/orange-orm.git"
+    },
+    "homepage": "https://orange-orm.io",
+    "jshintConfig": {
+        "asi": true,
+        "eqnull": true,
+        "undef": true,
+        "node": true
     }
-  },
-  "bin": {
-    "orange-orm": "bin/rdb.js"
-  },
-  "title": "Orange ORM",
-  "description": "Object Relational Mapper",
-  "keywords": [
-    "typescript orm",
-    "orm",
-    "sql",
-    "mySql",
-    "SQLite",
-    "MySQL",
-    "mssql",
-    "Microsoft Sql Server",
-    "PGlite",
-    "Cloudflare D1",
-    "PostgreSql",
-    "Postgres",
-    "pg",
-    "sap",
-    "sapase",
-    "Oracle",
-    "rdb",
-    "Orange ORM",
-    "active record"
-  ],
-  "authors": [
-    "Lars-Erik Roald <lars.roald@gmail.com>"
-  ],
-  "license": "ISC",
-  "codeOfConduct": "https://github.com/alfateam/orange-orm/blob/master/docs/CODE_OF_CONDUCT.md",
-  "contributing": "https://github.com/alfateam/orange-orm/blob/master/CONTRIBUTING.md",
-  "funding": {
-    "type": "github",
-    "url": "https://github.com/sponsors/lroal"
-  },
-  "scripts": {
-    "test": "vitest run --threads=false",
-    "test:bun": "bun test --timeout=30000 ./tests/*.bun.test.js",
-    "test:deno": "deno test --allow-all --unstable-detect-cjs ./tests/*.deno.test.js",
-    "test:all": "echo 'Running Node.js tests...' && npm run test:node && echo 'Running Bun tests...' && npm run test:bun && echo 'Running Deno tests...' && npm run test:deno && echo 'All tests completed!'",
-    "test:all:parallel": "concurrently \"npm:test:node\" \"npm:test:bun\" \"npm:test:deno\"",
-    "coverage": "vitest run --coverage.enabled --coverage.reporter='text-summary' --threads=false",
-    "testw": "vitest --threads=false update",
-    "tscheck": "tsc ./src/index.d.ts --module commonjs --target es2022 --noEmit true --strict true --esModuleInterop true",
-    "concat-server": "node ./src/merge-server.js",
-    "concat-browser": "node ./src/merge-browser.js",
-    "build": "npm run build-server && npm run build-browser",
-    "build-server": "rollup -c ./src/rollup.config.server.js && npm run concat-server",
-    "build-browser": "rollup -c ./src/rollup.config.browser.js && npm run concat-browser",
-    "lint": "eslint ./",
-    "fix": "eslint ./ --fix",
-    "owasp": "owasp-dependency-check --project \"MY_PROJECT\" --scan \"package-lock.json\" --exclude \"dependency-check-bin\" --out \"owasp\" --format HTML",
-    "beta": "npm publish --tag beta"
-  },
-  "dependencies": {
-    "@cloudflare/workers-types": "^4.20241106.0",
-    "@lroal/on-change": "^4.0.2",
-    "@tediousjs/connection-string": "^0.4.1",
-    "@types/express": "^4.17.13",
-    "@types/oracledb": "^6.0.4",
-    "@types/tedious": "^4.0.14",
-    "ajv": "^8.17.1",
-    "axios": "^1.6.2",
-    "fast-json-patch": "^3.1.1",
-    "findup-sync": "^5.0.0",
-    "glob": "^10.3.4 || ^11.0.2",
-    "module-definition": "^4.0.0 || ^5.0.0 || || ^6.0.0",
-    "rfdc": "^1.2.0",
-    "uuid": "^8.3.2 || ^9.0.0 || ^10.0.0 || ^11.1.0"
-  },
-  "peerDependencies": {
-    "@electric-sql/pglite": "^0.3.0",
-    "msnodesqlv8": "^4.1.0",
-    "mysql2": "^2.2.5 || ^3.9.4",
-    "oracledb": "^6.3.0",
-    "pg": "^8.5.1",
-    "pg-query-stream": "^3.3.2",
-    "sqlite3": "^5.0.2",
-    "tedious": "^15.1.2 || ^16.0.0 || ^18.1.0 || || ^19.0.0"
-  },
-  "peerDependenciesMeta": {
-    "pg": {
-      "optional": true
-    },
-    "pg-query-stream": {
-      "optional": true
-    },
-    "mysql2": {
-      "optional": true
-    },
-    "sqlite3": {
-      "optional": true
-    },
-    "pg-native": {
-      "optional": true
-    },
-    "msnodesqlv8": {
-      "optional": true
-    },
-    "tedious": {
-      "optional": true
-    },
-    "oracledb": {
-      "optional": true
-    },
-    "@electric-sql/pglite": {
-      "optional": true
-    }
-  },
-  "devDependencies": {
-    "@electric-sql/pglite": "^0.3.0",
-    "@miniflare/d1": "^2.14.4",
-    "@rollup/plugin-commonjs": "^28.0.2",
-    "@rollup/plugin-json": "^6.1.0",
-    "@rollup/plugin-node-resolve": "^13.0.0",
-    "@typescript-eslint/eslint-plugin": "^6.x",
-    "@typescript-eslint/parser": "^6.x",
-    "@vitest/coverage-v8": "^0.34.1",
-    "cors": "^2.8.5",
-    "eslint": "^8.57.0",
-    "eslint-plugin-jest": "^27.1.7",
-    "express": "^4.18.2",
-    "miniflare": "^3.20250129.0",
-    "msnodesqlv8": "^4.1.0",
-    "mysql2": "^3.9.4",
-    "oracledb": "^6.3.0",
-    "owasp-dependency-check": "^0.0.21",
-    "pg": "^8.5.1",
-    "pg-query-stream": "^3.3.2",
-    "rollup": "^2.52.7",
-    "sqlite3": "^5.0.2",
-    "tedious": "^19.0.0",
-    "typescript": "^5.4.5",
-    "vitest": "^0.34.6"
-  },
-  "engines": {
-    "node": ">= 8.0.0"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git@github.com:alfateam/orange-orm.git"
-  },
-  "homepage": "https://orange-orm.io",
-  "jshintConfig": {
-    "asi": true,
-    "eqnull": true,
-    "undef": true,
-    "node": true
-  }
 }

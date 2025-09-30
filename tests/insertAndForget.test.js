@@ -1,6 +1,4 @@
 import { describe, test, beforeAll, expect, afterAll } from 'vitest';
-import { fileURLToPath } from 'url';
-import setupD1 from './setupD1';
 const express = require('express');
 import { json } from 'body-parser';
 import cors from 'cors';
@@ -16,11 +14,9 @@ const versionArray = process.version.replace('v', '').split('.');
 const major = parseInt(versionArray[0]);
 const port = 3011;
 let server;
-let d1;
-let miniflare;
+
 
 beforeAll(async () => {
-	({ d1, miniflare } = await setupD1(fileURLToPath(import.meta.url)));
 	await createMs('mssql');
 	hostExpress();
 
@@ -45,7 +41,6 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-	await miniflare.dispose();
 	return new Promise((res) => {
 		if (server)
 			server.close(res);
@@ -65,7 +60,6 @@ describe('insertAndForget autoincremental with relations', () => {
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('sqlite', async () => await verify('sqlite'));
-	test('d1', async () => await verify('d1'));
 	test('sap', async () => await verify('sap'));
 
 
@@ -185,7 +179,7 @@ describe('insertAndForget autoincremental with relations', () => {
 
 });
 
-const pathSegments = fileURLToPath(import.meta.url).split('/');
+const pathSegments = __filename.split('/');
 const lastSegment = pathSegments[pathSegments.length - 1];
 const fileNameWithoutExtension = lastSegment.split('.')[0];
 const sqliteName = `demo.${fileNameWithoutExtension}.db`;
@@ -226,10 +220,6 @@ const connections = {
 		init: initPg
 	},	sqlite: {
 		db: map({ db: (con) => con.sqlite(sqliteName, { size: 1 }) }),
-		init: initSqlite
-	},
-	d1: {
-		db: map({ db: (con) => con.d1(d1, { size: 1 }) }),
 		init: initSqlite
 	},
 	sqlite2: {

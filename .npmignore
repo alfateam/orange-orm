@@ -2,6 +2,7 @@
 tests
 .vscode
 .devcontainer
+pglite.db*
 demo.db
 demo*.db*
 favicon.ico
@@ -10,3 +11,11 @@ _config.yml
 _layouts
 .github
 assets
+publish.log
+.dockerignore
+.eslintignore
+.eslintrc*
+.gitattributes
+CNAME
+.env*
+vitest.config.js
