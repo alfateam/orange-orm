@@ -222,7 +222,12 @@ Because of a peculiarity in SQLite, which only allows one statement execution at
 import map from './map';
 const db = map.sqlite('demo.db');
 
-const sql = `DROP TABLE IF EXISTS deliveryAddress; DROP TABLE IF EXISTS package; DROP TABLE IF EXISTS orderLine; DROP TABLE IF EXISTS _order; DROP TABLE IF EXISTS customer;
+const sql = `DROP TABLE IF EXISTS deliveryAddress;
+DROP TABLE IF EXISTS package;
+DROP TABLE IF EXISTS orderLine;
+DROP TABLE IF EXISTS _order;
+DROP TABLE IF EXISTS customer;
+
 CREATE TABLE customer (
     id INTEGER PRIMARY KEY,
     name TEXT,
@@ -931,7 +936,7 @@ async function update() {
 ```
 </details>  
 
-<details><summary><strong>Upserting rows</strong></summary>
+<details id="upserting-rows"><summary><strong>Upserting rows</strong></summary>
 It is possible to perform 'upserts' by taking advantage of the 'overwrite' strategy.
 
 Currently, there are three concurrency strategies:
