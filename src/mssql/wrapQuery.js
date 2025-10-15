@@ -26,7 +26,6 @@ function wrapQuery(_context, connection) {
 				const parameter = params[i];
 
 				if (typeof parameter === 'string') {
-					const paramLength = parameter.length;
 					const byteLength = Buffer.from(parameter, 'utf8').length;
 
 					if (hasNonAsciiCharacters(parameter)) {
@@ -35,10 +34,10 @@ function wrapQuery(_context, connection) {
 						if (isStoredProcCall) {
 							// For stored procedures, create a variable with exact lengths
 							const varName = `@hex_param_${i}`;
-							const convertClause = `CONVERT(VARCHAR(${paramLength}), CONVERT(VARBINARY(${byteLength}), 0x${hexValue}))`;
+							const convertClause = `CONVERT(VARCHAR(${byteLength}), CONVERT(VARBINARY(${byteLength}), 0x${hexValue}))`;
 
 							hexVariables.push({
-								declaration: `DECLARE ${varName} VARCHAR(${paramLength})`,
+								declaration: `DECLARE ${varName} VARCHAR(${byteLength})`,
 								assignment: `SET ${varName} = ${convertClause}`
 							});
 
@@ -48,7 +47,7 @@ function wrapQuery(_context, connection) {
 							});
 						} else {
 							// For regular queries, use inline conversion with exact lengths
-							const convertClause = `CONVERT(VARCHAR(${paramLength}), CONVERT(VARBINARY(${byteLength}), 0x${hexValue}))`;
+							const convertClause = `CONVERT(VARCHAR(${byteLength}), CONVERT(VARBINARY(${byteLength}), 0x${hexValue}))`;
 							replacements.push({
 								index: i,
 								replacement: convertClause

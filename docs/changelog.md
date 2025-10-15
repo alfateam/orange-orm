@@ -1,6 +1,7 @@
 ## Changelog
 __4.7.15__  
 Minor performance improvements and node minor version check for node:sqlite.  
+Fixed truncating bug for non ASCII characters in SAP ASE.  
 __4.7.14__  
 Improved performance for SQL Server.  
 __4.7.13__  
