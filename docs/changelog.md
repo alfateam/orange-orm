@@ -1,4 +1,6 @@
 ## Changelog
+__4.7.16__  
+Support msnodesqlv8@5.0.0  
 __4.7.15__  
 Minor performance improvements and node minor version check for node:sqlite.  
 Fixed truncating bug for non ASCII characters in SAP ASE.  
