@@ -3,6 +3,7 @@ const hostLocal = require('./hostLocal');
 const client = require('./client/index.js');
 const map = require('./client/map');
 let _d1;
+let _pg;
 let _pglite;
 
 var connectViaPool = function() {
@@ -43,6 +44,23 @@ Object.defineProperty(connectViaPool, 'pglite', {
 		return _pglite;
 	}
 });
+
+Object.defineProperty(connectViaPool, 'postgres', {
+	get: function() {
+		if (!_pg)
+			_pg = require('./pg/newDatabase');
+		return _pg;
+	}
+});
+
+Object.defineProperty(connectViaPool, 'pg', {
+	get: function() {
+		if (!_pg)
+			_pg = require('./pg/newDatabase');
+		return _pg;
+	}
+});
+
 
 connectViaPool.express = hostExpress.bind(null, hostLocal);
 
