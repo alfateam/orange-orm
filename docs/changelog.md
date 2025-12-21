@@ -1,4 +1,6 @@
 ## Changelog
+__4.7.17__  
+Export PostgreSQL provider in browser bundle for Cloudflare Workers compatibility  
 __4.7.16__  
 Support msnodesqlv8@5.0.0  
 __4.7.15__  

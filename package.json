@@ -1,6 +1,6 @@
 {
     "name": "orange-orm",
-    "version": "4.7.16",
+    "version": "4.7.17",
     "publishConfig": {
         "access": "public"
     },
@@ -54,7 +54,7 @@
     "scripts": {
         "test": "vitest run --pool=forks --poolOptions.forks.singleFork",
         "test:bun": "bun test --timeout=30000 ./tests/*.bun.test.js",
-        "test:deno": "deno test --allow-all --unstable-detect-cjs ./tests/*.deno.test.js",
+        "test:deno": "deno test --allow-all --no-check --unstable-detect-cjs ./tests/*.deno.test.js",
         "test:all": "echo 'Running Node.js tests...' && npm run test:node && echo 'Running Bun tests...' && npm run test:bun && echo 'Running Deno tests...' && npm run test:deno && echo 'All tests completed!'",
         "test:all:parallel": "concurrently \"npm:test:node\" \"npm:test:bun\" \"npm:test:deno\"",
         "coverage": "vitest run --coverage.enabled --coverage.reporter='text-summary' --pool=forks --poolOptions.forks.singleFork",
