@@ -1,6 +1,8 @@
 ## Changelog
+__4.8.0__  
+Transactions now support returning values [#140](https://github.com/alfateam/orange-orm/issues/140)  
 __4.7.17__  
-Export PostgreSQL provider in browser bundle for Cloudflare Workers compatibility  
+Export PostgreSQL provider in browser bundle for Cloudflare Workers compatibility [#139](https://github.com/alfateam/orange-orm/issues/139)  
 __4.7.16__  
 Support msnodesqlv8@5.0.0  
 __4.7.15__  
