@@ -71,6 +71,8 @@ function httpAdapter(baseURL, path, axiosInterceptor) {
 }
 
 function netAdapter(url, tableName, { axios, tableOptions }) {
+	if (tableOptions.transaction?.done)
+		delete tableOptions.transaction;
 
 	let c = {
 		get,

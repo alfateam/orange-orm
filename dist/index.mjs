@@ -2396,6 +2396,8 @@ function requireNetAdapter () {
 	}
 
 	function netAdapter(url, tableName, { axios, tableOptions }) {
+		if (tableOptions.transaction?.done)
+			delete tableOptions.transaction;
 
 		let c = {
 			get,
@@ -2842,8 +2844,10 @@ function requireClient () {
 
 			try {
 				const nextClient = client({ transaction });
-				await fn(nextClient);
+				const result = await fn(nextClient);
+				transaction.done = true;
 				await transaction(transaction.commit);
+				return result;
 			}
 			catch (e) {
 				await transaction(transaction.rollback.bind(null, e));
@@ -3483,7 +3487,6 @@ function requireClient () {
 					return;
 
 				let body = stringify({ patch, options: { ...tableOptions, ...concurrencyOptions, strategy, deduceStrategy } });
-
 				let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
 				let { changed, strategy: newStrategy } = await adapter.patch(body);
 				copyInto(changed, [row]);

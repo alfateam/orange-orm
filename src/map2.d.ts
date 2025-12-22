@@ -910,9 +910,9 @@ export type DBClient<M extends Record<string, TableDefinition<M>>> = {
   (
     config?: DbOptions<M>
   ): DBClient<M>;
-  transaction(
-		fn: (db: DBClient<M>) => Promise<unknown>
-	): Promise<void>;
+  transaction<TR = unknown>(
+    fn: (db: DBClient<M>) => Promise<TR> | TR
+  ): Promise<TR>;
   express(): import('express').RequestHandler;
   express(config: ExpressConfig<M>): import('express').RequestHandler;
   readonly metaData: DbConcurrency<M>;
