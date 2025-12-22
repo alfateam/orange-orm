@@ -70,16 +70,23 @@ describe('transaction', () => {
 
 		let result;
 
-		await db.transaction(async (db) => {
-			await db.customer.insert({
+		const customer = await db.transaction(async (db) => {
+			const res = await db.customer.insert({
 				name: 'George',
 				balance: 177,
 				isActive: true
 			});
 			const fooSql = dbName === 'oracle' ? 'select 1 as foo from dual' : 'select 1 as foo';
 			result = await db.query(fooSql);
+			return res;
+
 		});
+
+		customer.name = 'George c';
+		await customer.saveChanges();
+
 		expect(result).toEqual([{ foo: 1 }]);
+		expect(customer.name).toEqual('George c');
 	}
 });
 
