@@ -20609,6 +20609,7 @@ function requireNewTransaction$1 () {
 	if (hasRequiredNewTransaction$1) return newTransaction$1;
 	hasRequiredNewTransaction$1 = 1;
 	const wrapQuery = requireWrapQuery$2();
+	const wrapCommand = requireWrapCommand$2();
 	const encodeBoolean = requireEncodeBoolean$1();
 	const formatBigintIn = requireFormatBigintIn();
 	const formatBigintOut = requireFormatBigintOut$1();
@@ -20675,6 +20676,22 @@ function requireNewTransaction$1 () {
 							callback(e);
 						}
 					});
+				},
+				executeCommand: function(query, callback) {
+					pool.connect((err, client, done) => {
+						if (err) {
+							return callback(err);
+						}
+						try {
+							wrapCommand(domain, client)(query, (err, res) => {
+								done();
+								callback(err, res);
+							});
+						} catch (e) {
+							done();
+							callback(e);
+						}
+					});
 				}
 			};
 			domain.rdb = rdb;
@@ -20692,6 +20709,7 @@ function requireNewTransaction$1 () {
 						return;
 					}
 					client.executeQuery = wrapQuery(domain, client);
+					client.executeCommand = wrapCommand(domain, client);
 					rdb.dbClient = client;
 					rdb.dbClientDone = done;
 					domain.rdb = rdb;

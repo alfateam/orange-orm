@@ -256,7 +256,7 @@ describe('savechanges overload optimistic', () => {
 		catch (e) {
 			error = e;
 		}
-		expect(error.message).toEqual('The field name was changed by another user. Expected "John", but was "John 1".');
+		expect(error.message).toEqual('The row was changed by another user.');
 	}
 });
 
