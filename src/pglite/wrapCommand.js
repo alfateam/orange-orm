@@ -18,11 +18,12 @@ function wrapCommand(_context, connection) {
 			);
 
 		function onInnerCompleted(err, result) {
+			console.dir(result);
 			if (err) return onCompleted(err);
 
 			if (Array.isArray(result)) result = result[result.length - 1];
 
-			onCompleted(null, { rowsAffected: result.rowCount });
+			onCompleted(null, { affectedRows: result.affectedRows });
 		}
 	}
 }
