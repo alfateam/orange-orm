@@ -3,9 +3,9 @@ let fromCompareObject = require('./fromCompareObject');
 let toCompareObject = require('./toCompareObject');
 
 // todo
-function applyPatch({ _options = {} }, dto, changes, _column) {
+function applyPatch({ options = {} }, dto, changes, _column) {
 	let dtoCompare = toCompareObject(dto);
-	// changes = validateConflict(dtoCompare, changes);
+	changes = validateReadonly(dtoCompare, changes);
 	fastjson.applyPatch(dtoCompare, changes, true, true);
 
 	let result = fromCompareObject(dtoCompare);
@@ -22,6 +22,37 @@ function applyPatch({ _options = {} }, dto, changes, _column) {
 	}
 
 	return dto;
+
+	function validateReadonly(object, changes) {
+		return changes.filter(change => {
+			const option = getOption(change.path);
+			let readonly = option.readonly;
+			if (readonly) {
+				const e = new Error(`Cannot update column ${change.path.replace('/', '')} because it is readonly`);
+				// @ts-ignore
+				e.status = 405;
+				throw e;
+			}
+			return true;
+		});
+	}
+
+	function getOption(path) {
+		let splitPath = path.split('/');
+		splitPath.shift();
+		return splitPath.reduce(extract, options);
+
+		function extract(obj, name) {
+			if (Array.isArray(obj))
+				return obj[0] || options;
+			if (obj === Object(obj))
+				return obj[name] || options;
+			return obj;
+		}
+
+	}
+
+
 
 	// function validateConflict(object, changes) {
 	// 	return changes.filter(change => {
@@ -67,20 +98,6 @@ function applyPatch({ _options = {} }, dto, changes, _column) {
 
 	// }
 
-	// function getOption(path) {
-	// 	let splitPath = path.split('/');
-	// 	splitPath.shift();
-	// 	return splitPath.reduce(extract, options);
-
-	// 	function extract(obj, name) {
-	// 		if (Array.isArray(obj))
-	// 			return obj[0] || options;
-	// 		if (obj === Object(obj))
-	// 			return obj[name] || options;
-	// 		return obj;
-	// 	}
-
-	// }
 }
 
 // function assertDatesEqual(date1, date2) {

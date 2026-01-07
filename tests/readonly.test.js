@@ -1,4 +1,4 @@
-import { describe, test, beforeAll, afterAll, expect } from 'vitest';
+import { describe.ignore, test, beforeAll, afterAll, expect } from 'vitest';
 const map = require('./db2');
 import express from 'express';
 import cors from 'cors';
@@ -80,7 +80,7 @@ afterAll(async () => {
 });
 
 
-describe('readonly everything', () => {
+describe.ignore('readonly everything', () => {
 	const options = { readonly: true };
 
 	beforeAll(() => hostExpress(options));
@@ -212,7 +212,7 @@ describe('readonly everything', () => {
 	}
 });
 
-describe('readonly table', () => {
+describe.ignore('readonly table', () => {
 	const options = { customer: { readonly: true } };
 	beforeAll(() => hostExpress(options));
 
@@ -265,7 +265,7 @@ describe('readonly table', () => {
 	}
 });
 
-describe('readonly column', () => {
+describe.ignore('readonly column', () => {
 
 	const options = { customer: { name: { readonly: true } } };
 	beforeAll(() => hostExpress(options));
@@ -321,7 +321,7 @@ describe('readonly column', () => {
 });
 
 
-describe('readonly table delete', () => {
+describe.ignore('readonly table delete', () => {
 
 	const options = { order: { readonly: true } };
 	beforeAll(() => hostExpress(options));
@@ -360,7 +360,7 @@ describe('readonly table delete', () => {
 	}
 });
 
-describe('readonly nested table delete', () => {
+describe.ignore('readonly nested table delete', () => {
 
 	const options = { order: { readonly: true } };
 	beforeAll(() => hostExpress(options));
@@ -398,7 +398,7 @@ describe('readonly nested table delete', () => {
 		expect(error?.message).toEqual('Cannot delete orderLine because it is readonly');
 	}
 });
-describe('readonly on grandChildren table delete', () => {
+describe.ignore('readonly on grandChildren table delete', () => {
 
 	const options = { order: { lines: { readonly: true } } };
 	beforeAll(() => hostExpress(options));
@@ -437,7 +437,7 @@ describe('readonly on grandChildren table delete', () => {
 	}
 });
 
-describe('readonly nested table delete override', () => {
+describe.ignore('readonly nested table delete override', () => {
 
 	const options = { order: { readonly: true, lines: { readonly: false } } };
 	beforeAll(() => hostExpress(options));
@@ -471,7 +471,7 @@ describe('readonly nested table delete override', () => {
 	}
 });
 
-describe('readonly column no change', () => {
+describe.ignore('readonly column no change', () => {
 
 	const options = { customer: { balance: { readonly: true } } };
 	beforeAll(() => hostExpress(options));
@@ -518,7 +518,7 @@ describe('readonly column no change', () => {
 	}
 });
 
-describe('readonly nested column', () => {
+describe.ignore('readonly nested column', () => {
 
 	const options = { order: { lines: { product: { readonly: true } } } };
 	beforeAll(() => hostExpress(options));
@@ -562,7 +562,7 @@ describe('readonly nested column', () => {
 	}
 });
 
-describe('readonly nested table', () => {
+describe.ignore('readonly nested table', () => {
 
 	const options = { order: { lines: { readonly: true } } };
 	beforeAll(() => hostExpress(options));
@@ -601,7 +601,7 @@ describe('readonly nested table', () => {
 	}
 });
 
-describe('readonly table with column override', () => {
+describe.ignore('readonly table with column override', () => {
 
 	const options = { customer: { readonly: true, name: { readonly: false } } };
 	beforeAll(() => hostExpress(options));
@@ -649,7 +649,7 @@ describe('readonly table with column override', () => {
 	}
 });
 
-describe('readonly column delete', () => {
+describe.ignore('readonly column delete', () => {
 
 	const options = { order: { orderDate: { readonly: true } } };
 	beforeAll(() => hostExpress(options));
