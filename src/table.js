@@ -141,6 +141,20 @@ function _new(tableName) {
 		return insert.apply(null, args);
 	};
 
+	table.updateWithConcurrency = function(context, options, row, property, value, oldValue) {
+		options = options || {};
+		const columnOptions = inferColumnOptions(options, property);
+		const concurrency = columnOptions.concurrency || 'optimistic';
+
+		if (concurrency !== 'overwrite') {
+			const state = row._concurrencyState || { columns: {} };
+			state.columns[property] = { oldValue , concurrency };
+			row._concurrencyState = state;
+		}
+
+		row[property] = value;
+	};
+
 	table.delete = _delete.bind(null, table);
 	table.cascadeDelete = function(context, ...rest) {
 		const args = [context, table, ...rest];
@@ -172,6 +186,17 @@ function _new(tableName) {
 	table._aggregate = aggregate(table);
 
 	return table;
+}
+
+function inferColumnOptions(defaults, property) {
+	const parent = {};
+	if (!defaults)
+		return parent;
+	if ('readonly' in defaults)
+		parent.readonly = defaults.readonly;
+	if ('concurrency' in defaults)
+		parent.concurrency = defaults.concurrency;
+	return { ...parent, ...(defaults[property] || {}) };
 }
 
 module.exports = _new;

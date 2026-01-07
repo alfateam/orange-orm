@@ -1784,36 +1784,12 @@ function requireGetSessionSingleton () {
 	return getSessionSingleton;
 }
 
-var resolveExecuteQuery_1;
-var hasRequiredResolveExecuteQuery;
+var negotiateNullParams_1;
+var hasRequiredNegotiateNullParams;
 
-function requireResolveExecuteQuery () {
-	if (hasRequiredResolveExecuteQuery) return resolveExecuteQuery_1;
-	hasRequiredResolveExecuteQuery = 1;
-	const getSessionSingleton = requireGetSessionSingleton();
-
-	function resolveExecuteQuery(context, query) {
-		return resolve;
-
-		function resolve(success, failed) {
-			try {
-				var client = getSessionSingleton(context, 'dbClient');
-				query = negotiateNullParams(query);
-				client.executeQuery(query, onCompleted);
-			} catch (e) {
-				failed(e);
-			}
-
-			function onCompleted(err, rows) {
-				if (!err)
-					success(rows);
-				else
-					failed(err);
-			}
-		}
-
-	}
-
+function requireNegotiateNullParams () {
+	if (hasRequiredNegotiateNullParams) return negotiateNullParams_1;
+	hasRequiredNegotiateNullParams = 1;
 	function negotiateNullParams(query) {
 		if (query && query.parameters && query.parameters.length > 0 && (query.parameters.filter(x => x === null || x === undefined).length > 0)) {
 			var splitted = query.sql().split('?');
@@ -1839,25 +1815,62 @@ function requireResolveExecuteQuery () {
 			return query;
 	}
 
-	resolveExecuteQuery_1 = resolveExecuteQuery;
-	return resolveExecuteQuery_1;
+	negotiateNullParams_1 = negotiateNullParams;
+	return negotiateNullParams_1;
 }
 
-var executeQuery_1;
-var hasRequiredExecuteQuery;
+var resolveExecuteCommand;
+var hasRequiredResolveExecuteCommand;
 
-function requireExecuteQuery () {
-	if (hasRequiredExecuteQuery) return executeQuery_1;
-	hasRequiredExecuteQuery = 1;
-	var newResolver = requireResolveExecuteQuery();
+function requireResolveExecuteCommand () {
+	if (hasRequiredResolveExecuteCommand) return resolveExecuteCommand;
+	hasRequiredResolveExecuteCommand = 1;
+	const getSessionSingleton = requireGetSessionSingleton();
+	const negotiateNullParams = requireNegotiateNullParams();
 
-	function executeQuery(context, query) {
+	function resolveExecuteQuery(context, query) {
+		return resolve;
+
+		function resolve(success, failed) {
+			try {
+				var client = getSessionSingleton(context, 'dbClient');
+				query = negotiateNullParams(query);
+				client.executeCommand(query, onCompleted);
+			} catch (e) {
+				failed(e);
+			}
+
+			function onCompleted(err, rows) {
+				if (!err)
+					success(rows);
+				else
+					failed(err);
+			}
+		}
+
+	}
+
+
+
+	resolveExecuteCommand = resolveExecuteQuery;
+	return resolveExecuteCommand;
+}
+
+var executeCommand_1;
+var hasRequiredExecuteCommand;
+
+function requireExecuteCommand () {
+	if (hasRequiredExecuteCommand) return executeCommand_1;
+	hasRequiredExecuteCommand = 1;
+	var newResolver = requireResolveExecuteCommand();
+
+	function executeCommand(context, query) {
 		var resolver = newResolver(context, query);
 		return new Promise(resolver);
 	}
 
-	executeQuery_1 = executeQuery;
-	return executeQuery_1;
+	executeCommand_1 = executeCommand;
+	return executeCommand_1;
 }
 
 var promise;
@@ -1883,7 +1896,7 @@ var hasRequiredExecuteChanges;
 function requireExecuteChanges () {
 	if (hasRequiredExecuteChanges) return executeChanges_1;
 	hasRequiredExecuteChanges = 1;
-	var executeQuery = requireExecuteQuery();
+	var executeCommand = requireExecuteCommand();
 	var newPromise = requirePromise();
 
 	function executeChanges(context, queries) {
@@ -1896,9 +1909,9 @@ function requireExecuteChanges () {
 		function execute() {
 			i++;
 			if (i + 1 === queries.length)
-				return executeQuery(context, queries[i]).then(notifyListener);
+				return executeCommand(context, queries[i]).then(notifyListener);
 			else {
-				return executeQuery(context, queries[i]).then(notifyListener).then(execute);
+				return executeCommand(context, queries[i]).then(notifyListener).then(execute);
 			}
 		}
 
@@ -1996,6 +2009,60 @@ function requirePopChanges () {
 
 	popChanges_1 = popChanges;
 	return popChanges_1;
+}
+
+var resolveExecuteQuery_1;
+var hasRequiredResolveExecuteQuery;
+
+function requireResolveExecuteQuery () {
+	if (hasRequiredResolveExecuteQuery) return resolveExecuteQuery_1;
+	hasRequiredResolveExecuteQuery = 1;
+	const getSessionSingleton = requireGetSessionSingleton();
+	const negotiateNullParams = requireNegotiateNullParams();
+
+	function resolveExecuteQuery(context, query) {
+		return resolve;
+
+		function resolve(success, failed) {
+			try {
+				var client = getSessionSingleton(context, 'dbClient');
+				query = negotiateNullParams(query);
+				client.executeQuery(query, onCompleted);
+			} catch (e) {
+				failed(e);
+			}
+
+			function onCompleted(err, rows) {
+				if (!err)
+					success(rows);
+				else
+					failed(err);
+			}
+		}
+
+	}
+
+
+
+	resolveExecuteQuery_1 = resolveExecuteQuery;
+	return resolveExecuteQuery_1;
+}
+
+var executeQuery_1;
+var hasRequiredExecuteQuery;
+
+function requireExecuteQuery () {
+	if (hasRequiredExecuteQuery) return executeQuery_1;
+	hasRequiredExecuteQuery = 1;
+	var newResolver = requireResolveExecuteQuery();
+
+	function executeQuery(context, query) {
+		var resolver = newResolver(context, query);
+		return new Promise(resolver);
+	}
+
+	executeQuery_1 = executeQuery;
+	return executeQuery_1;
 }
 
 var executeQueriesCore_1;
@@ -6446,14 +6513,16 @@ function requireNewUpdateCommandCore () {
 	const getSessionSingleton = requireGetSessionSingleton();
 	var newParameterized = requireNewParameterized();
 
-	function newUpdateCommandCore(context, table, columns, row) {
+	function newUpdateCommandCore(context, table, columns, row, concurrencyState) {
 		const quote = getSessionSingleton(context, 'quote');
+		const engine = getSessionSingleton(context, 'engine');
 		var command = newParameterized('UPDATE ' + quote(table._dbName) + ' SET');
 		var separator = ' ';
 
 		addColumns();
 		addWhereId();
 		addDiscriminators();
+		addConcurrencyChecks();
 
 		function addColumns() {
 			for (var alias in columns) {
@@ -6482,6 +6551,43 @@ function requireNewUpdateCommandCore () {
 				return;
 			discriminators = separator + discriminators.join(' AND ');
 			command = command.append(discriminators);
+		}
+
+		function addConcurrencyChecks() {
+			const columnsState = concurrencyState && concurrencyState.columns;
+			if (!columnsState)
+				return;
+			for (let alias in columnsState) {
+				const state = columnsState[alias];
+				if (!state || state.concurrency === 'overwrite')
+					continue;
+				const column = table[alias];
+				if (!column)
+					continue;
+				const encoded = column.encode(context, state.oldValue);
+				command = appendNullSafeComparison(column, encoded);
+			}
+		}
+
+		function appendNullSafeComparison(column, encoded) {
+			const columnSql = quote(column._dbName);
+			if (engine === 'pg') {
+				command = command.append(separator + columnSql + ' IS NOT DISTINCT FROM ').append(encoded);
+			}
+			else if (engine === 'mysql') {
+				command = command.append(separator + columnSql + ' <=> ').append(encoded);
+			}
+			else if (engine === 'sqlite') {
+				command = command.append(separator + columnSql + ' IS ').append(encoded);
+			}
+			else {
+				if (encoded.sql() === 'null')
+					command = command.append(separator + columnSql + ' IS NULL');
+				else
+					command = command.append(separator + columnSql + '=').append(encoded);
+			}
+			separator = ' AND ';
+			return command;
 		}
 
 		return command;
@@ -6590,6 +6696,9 @@ function requireNewUpdateCommand () {
 		this._columnList[column.alias] = column;
 		this.onFieldChanged = this.onFieldChanged.bind(this);
 		row.subscribeChanged(this.onFieldChanged);
+		this._concurrencyState = undefined;
+		this._concurrencySummary = undefined;
+		this._usesReturning = false;
 	}
 
 	UpdateCommand.prototype.onFieldChanged = function(_row, column) {
@@ -6607,11 +6716,19 @@ function requireNewUpdateCommand () {
 	});
 
 	UpdateCommand.prototype._getCoreCommand = function() {
-		return this.__getCoreCommand(this._table, this._columnList, this._row);
+		return this.__getCoreCommand(this._table, this._columnList, this._row, this._concurrencyState);
 	};
 
 	UpdateCommand.prototype.endEdit = function() {
-		this._getCoreCommand();
+		this._concurrencyState = this._row._concurrencyState;
+		delete this._row._concurrencyState;
+
+		const coreCommand = this._getCoreCommand();
+		this._usesReturning = Boolean(coreCommand._usesReturning);
+		this._concurrencySummary = summarizeConcurrency(this._concurrencyState);
+		if (this._concurrencySummary.hasConcurrency)
+			this.onResult = this._onConcurrencyResult.bind(this);
+
 		this._row.unsubscribeChanged(this.onFieldChanged);
 		let dto = JSON.parse(JSON.stringify(createDto(this._table, this._row)));
 		this._patch = createPatch([JSON.parse(this._row._oldValues)],[dto]);
@@ -6632,6 +6749,48 @@ function requireNewUpdateCommand () {
 
 		}
 	});
+
+	UpdateCommand.prototype._onConcurrencyResult = function(result) {
+		const rowCount = extractRowCount(result, this._usesReturning);
+		if (rowCount === undefined)
+			return;
+		if (rowCount === 0 && this._concurrencySummary.hasOptimistic) {
+			throw new Error('The row was changed by another user.');
+		}
+	};
+
+	function summarizeConcurrency(concurrencyState) {
+		const summary = { hasConcurrency: false, hasOptimistic: false };
+		if (!concurrencyState || !concurrencyState.columns)
+			return summary;
+		for (let name in concurrencyState.columns) {
+			const state = concurrencyState.columns[name];
+			if (!state)
+				continue;
+			const strategy = state.concurrency || 'optimistic';
+			if (strategy === 'overwrite')
+				continue;
+			summary.hasConcurrency = true;
+			if (strategy === 'optimistic')
+				summary.hasOptimistic = true;
+		}
+		return summary;
+	}
+
+	function extractRowCount(result, usesReturning) {
+		if (usesReturning && Array.isArray(result))
+			return result.length;
+		if (Array.isArray(result) && typeof result[0].rowsAffected === 'number')
+			return result[0].rowsAffected;
+		if (!result || typeof result !== 'object')
+			return;
+		if (typeof result.rowCount === 'number')
+			return result.rowCount;
+		if (typeof result.affectedRows === 'number')
+			return result.affectedRows;
+		if (typeof result.rowsAffected === 'number')
+			return result.rowsAffected;
+	}
 
 	newUpdateCommand_1 = newUpdateCommand;
 	return newUpdateCommand_1;
@@ -7349,9 +7508,10 @@ function requireApplyPatch () {
 	let fromCompareObject = requireFromCompareObject();
 	let toCompareObject = requireToCompareObject();
 
-	function applyPatch({ options = {} }, dto, changes, column) {
+	// todo
+	function applyPatch({ _options = {} }, dto, changes, _column) {
 		let dtoCompare = toCompareObject(dto);
-		changes = validateConflict(dtoCompare, changes);
+		// changes = validateConflict(dtoCompare, changes);
 		fastjson.applyPatch(dtoCompare, changes, true, true);
 
 		let result = fromCompareObject(dtoCompare);
@@ -7369,92 +7529,92 @@ function requireApplyPatch () {
 
 		return dto;
 
-		function validateConflict(object, changes) {
-			return changes.filter(change => {
-				let expectedOldValue = change.oldValue;
-				const option = getOption(change.path);
-				let readonly = option.readonly;
-				if (readonly) {
-					const e = new Error(`Cannot update column ${change.path.replace('/', '')} because it is readonly`);
-					// @ts-ignore
-					e.status = 405;
-					throw e;
-				}
-				let concurrency = option.concurrency || 'optimistic';
-				if ((concurrency === 'optimistic') || (concurrency === 'skipOnConflict')) {
-					let oldValue = getOldValue(object, change.path);
-					try {
-						if (column?.tsType === 'DateColumn') {
-							assertDatesEqual(oldValue, expectedOldValue);
-						}
-						else
-							assertDeepEqual(oldValue, expectedOldValue);
-					}
-					catch (e) {
-						if (concurrency === 'skipOnConflict')
-							return false;
-						throw new Error(`The field ${change.path.replace('/', '')} was changed by another user. Expected ${inspect(fromCompareObject(expectedOldValue))}, but was ${inspect(fromCompareObject(oldValue))}.`);
-					}
-				}
-				return true;
-			});
+		// function validateConflict(object, changes) {
+		// 	return changes.filter(change => {
+		// 		let expectedOldValue = change.oldValue;
+		// 		const option = getOption(change.path);
+		// 		let readonly = option.readonly;
+		// 		if (readonly) {
+		// 			const e = new Error(`Cannot update column ${change.path.replace('/', '')} because it is readonly`);
+		// 			// @ts-ignore
+		// 			e.status = 405;
+		// 			throw e;
+		// 		}
+		// 		let concurrency = option.concurrency || 'optimistic';
+		// 		if ((concurrency === 'optimistic') || (concurrency === 'skipOnConflict')) {
+		// 			let oldValue = getOldValue(object, change.path);
+		// 			try {
+		// 				if (column?.tsType === 'DateColumn') {
+		// 					assertDatesEqual(oldValue, expectedOldValue);
+		// 				}
+		// 				else
+		// 					assertDeepEqual(oldValue, expectedOldValue);
+		// 			}
+		// 			catch (e) {
+		// 				if (concurrency === 'skipOnConflict')
+		// 					return false;
+		// 				throw new Error(`The field ${change.path.replace('/', '')} was changed by another user,,,. Expected ${inspect(fromCompareObject(expectedOldValue))}, but was ${inspect(fromCompareObject(oldValue))}.`);
+		// 			}
+		// 		}
+		// 		return true;
+		// 	});
 
-			function getOldValue(obj, path) {
-				let splitPath = path.split('/');
-				splitPath.shift();
-				return splitPath.reduce(extract, obj);
+		// 	function getOldValue(obj, path) {
+		// 		let splitPath = path.split('/');
+		// 		splitPath.shift();
+		// 		return splitPath.reduce(extract, obj);
 
-				function extract(obj, name) {
-					if (obj === Object(obj))
-						return obj[name];
-					return;
-				}
-			}
+		// 		function extract(obj, name) {
+		// 			if (obj === Object(obj))
+		// 				return obj[name];
+		// 			return;
+		// 		}
+		// 	}
 
-		}
+		// }
 
-		function getOption(path) {
-			let splitPath = path.split('/');
-			splitPath.shift();
-			return splitPath.reduce(extract, options);
+		// function getOption(path) {
+		// 	let splitPath = path.split('/');
+		// 	splitPath.shift();
+		// 	return splitPath.reduce(extract, options);
 
-			function extract(obj, name) {
-				if (Array.isArray(obj))
-					return obj[0] || options;
-				if (obj === Object(obj))
-					return obj[name] || options;
-				return obj;
-			}
+		// 	function extract(obj, name) {
+		// 		if (Array.isArray(obj))
+		// 			return obj[0] || options;
+		// 		if (obj === Object(obj))
+		// 			return obj[name] || options;
+		// 		return obj;
+		// 	}
 
-		}
+		// }
 	}
 
-	function assertDatesEqual(date1, date2) {
-		if (date1 && date2) {
-			const parts1 = date1.split('T');
-			const time1parts = (parts1[1] || '').split(/[-+.]/);
-			const parts2 = date2.split('T');
-			const time2parts = (parts2[1] || '').split(/[-+.]/);
-			while (time1parts.length !== time2parts.length) {
-				if (time1parts.length > time2parts.length)
-					time1parts.pop();
-				else if (time1parts.length < time2parts.length)
-					time2parts.pop();
-			}
-			date1 = `${parts1[0]}T${time1parts[0]}`;
-			date2 = `${parts2[0]}T${time2parts[0]}`;
-		}
-		assertDeepEqual(date1, date2);
-	}
+	// function assertDatesEqual(date1, date2) {
+	// 	if (date1 && date2) {
+	// 		const parts1 = date1.split('T');
+	// 		const time1parts = (parts1[1] || '').split(/[-+.]/);
+	// 		const parts2 = date2.split('T');
+	// 		const time2parts = (parts2[1] || '').split(/[-+.]/);
+	// 		while (time1parts.length !== time2parts.length) {
+	// 			if (time1parts.length > time2parts.length)
+	// 				time1parts.pop();
+	// 			else if (time1parts.length < time2parts.length)
+	// 				time2parts.pop();
+	// 		}
+	// 		date1 = `${parts1[0]}T${time1parts[0]}`;
+	// 		date2 = `${parts2[0]}T${time2parts[0]}`;
+	// 	}
+	// 	assertDeepEqual(date1, date2);
+	// }
 
-	function assertDeepEqual(a, b) {
-		if (JSON.stringify(a) !== JSON.stringify(b))
-			throw new Error('A, b are not equal');
-	}
+	// function assertDeepEqual(a, b) {
+	// 	if (JSON.stringify(a) !== JSON.stringify(b))
+	// 		throw new Error('A, b are not equal');
+	// }
 
-	function inspect(obj) {
-		return JSON.stringify(obj, null, 2);
-	}
+	// function inspect(obj) {
+	// 	return JSON.stringify(obj, null, 2);
+	// }
 
 	applyPatch_1 = applyPatch;
 	return applyPatch_1;
@@ -7767,7 +7927,7 @@ function requirePatchTable () {
 				let dto = {};
 				dto[property] = row[property];
 				let result = applyPatch({ options }, dto, [{ path: '/' + path.join('/'), op, value, oldValue }], table[property]);
-				row[property] = result[property];
+				await table.updateWithConcurrency(context, options, row, property, result[property], oldValue);
 				return { updated: row };
 			}
 			else if (isOneRelation(property, table)) {
@@ -11908,6 +12068,20 @@ function requireTable () {
 			return insert.apply(null, args);
 		};
 
+		table.updateWithConcurrency = function(context, options, row, property, value, oldValue) {
+			options = options || {};
+			const columnOptions = inferColumnOptions(options, property);
+			const concurrency = columnOptions.concurrency || 'optimistic';
+
+			if (concurrency !== 'overwrite') {
+				const state = row._concurrencyState || { columns: {} };
+				state.columns[property] = { oldValue , concurrency };
+				row._concurrencyState = state;
+			}
+
+			row[property] = value;
+		};
+
 		table.delete = _delete.bind(null, table);
 		table.cascadeDelete = function(context, ...rest) {
 			const args = [context, table, ...rest];
@@ -11939,6 +12113,17 @@ function requireTable () {
 		table._aggregate = aggregate(table);
 
 		return table;
+	}
+
+	function inferColumnOptions(defaults, property) {
+		const parent = {};
+		if (!defaults)
+			return parent;
+		if ('readonly' in defaults)
+			parent.readonly = defaults.readonly;
+		if ('concurrency' in defaults)
+			parent.concurrency = defaults.concurrency;
+		return { ...parent, ...(defaults[property] || {}) };
 	}
 
 	table = _new;
@@ -12651,6 +12836,49 @@ function requireWrapQuery$2 () {
 	return wrapQuery_1$2;
 }
 
+var wrapCommand_1$2;
+var hasRequiredWrapCommand$2;
+
+function requireWrapCommand$2 () {
+	if (hasRequiredWrapCommand$2) return wrapCommand_1$2;
+	hasRequiredWrapCommand$2 = 1;
+	var log = requireLog();
+
+	function wrapCommand(_context, client) {
+		return runQuery;
+
+		function runQuery(query, onCompleted) {
+			var params = Array.isArray(query.parameters) ? query.parameters : [];
+			var sql = query.sql();
+			log.emitQuery({ sql, parameters: params });
+
+			client.d1
+				.prepare(sql)
+				.bind.apply(null, params)
+				.run()
+				.then(onInnerCompleted, (e) => onCompleted(e, { affectedRows: 0 }));
+
+			function onInnerCompleted(response) {
+				var affectedRows = 0;
+
+				if (response) {
+					if (typeof response.changes === 'number') affectedRows = response.changes;
+					else if (typeof response.meta === 'object' && response.meta && typeof response.meta.changes === 'number') {
+						affectedRows = response.meta.changes;
+					} else if (typeof response.affectedRows === 'number') {
+						affectedRows = response.affectedRows;
+					}
+				}
+
+				onCompleted(null, { affectedRows });
+			}
+		}
+	}
+
+	wrapCommand_1$2 = wrapCommand;
+	return wrapCommand_1$2;
+}
+
 var encodeBoolean_1$1;
 var hasRequiredEncodeBoolean$1;
 
@@ -13209,6 +13437,7 @@ function requireNewTransaction$2 () {
 	if (hasRequiredNewTransaction$2) return newTransaction$2;
 	hasRequiredNewTransaction$2 = 1;
 	const wrapQuery = requireWrapQuery$2();
+	const wrapCommand = requireWrapCommand$2();
 	const encodeBoolean = requireEncodeBoolean$1();
 	const formatBigintOut = requireFormatBigintOut();
 	const deleteFromSql = requireDeleteFromSql$1();
@@ -13262,6 +13491,22 @@ function requireNewTransaction$2 () {
 							callback(e);
 						}
 					});
+				},
+				executeCommand: function(query, callback) {
+					pool.connect((err, client, done) => {
+						if (err) {
+							return callback(err);
+						}
+						try {
+							wrapCommand(domain, client)(query, (err, res) => {
+								done();
+								callback(err, res);
+							});
+						} catch (e) {
+							done();
+							callback(e);
+						}
+					});
 				}
 			};
 			domain.rdb = rdb;
@@ -13278,6 +13523,7 @@ function requireNewTransaction$2 () {
 						return;
 					}
 					client.executeQuery = wrapQuery(domain, client);
+					client.executeCommand = wrapCommand(domain, client);
 					rdb.dbClient = client;
 					rdb.dbClientDone = done;
 					domain.rdb = rdb;
@@ -14295,6 +14541,48 @@ function requireWrapQuery$1 () {
 	return wrapQuery_1$1;
 }
 
+var wrapCommand_1$1;
+var hasRequiredWrapCommand$1;
+
+function requireWrapCommand$1 () {
+	if (hasRequiredWrapCommand$1) return wrapCommand_1$1;
+	hasRequiredWrapCommand$1 = 1;
+	var log = requireLog();
+	var replaceParamChar = requireReplaceParamChar();
+
+	function wrapCommand(_context, connection) {
+		var runOriginalQuery = connection.query;
+		return runQuery;
+
+		function runQuery(query, onCompleted) {
+			var params = query.parameters;
+			var sql = replaceParamChar(query, params);
+			log.emitQuery({ sql, parameters: params });
+
+			runOriginalQuery
+				.call(connection, sql, params)
+				.then(
+					(result) => onInnerCompleted(null, result),
+					(e) => onInnerCompleted(e)
+				);
+
+			function onInnerCompleted(err, result) {
+				if (err) return onCompleted(err);
+
+				if (Array.isArray(result)) result = result[result.length - 1];
+
+				var affectedRows =
+					result && typeof result.rowCount === 'number' ? result.rowCount : 0;
+
+				return onCompleted(null, { affectedRows });
+			}
+		}
+	}
+
+	wrapCommand_1$1 = wrapCommand;
+	return wrapCommand_1$1;
+}
+
 var encodeDate_1;
 var hasRequiredEncodeDate;
 
@@ -14571,6 +14859,7 @@ function requireNewTransaction$1 () {
 	if (hasRequiredNewTransaction$1) return newTransaction$1;
 	hasRequiredNewTransaction$1 = 1;
 	var wrapQuery = requireWrapQuery$1();
+	var wrapCommand = requireWrapCommand$1();
 	var encodeDate = requireEncodeDate();
 	const encodeBinary = requireEncodeBinary();
 	const decodeBinary = requireDecodeBinary();
@@ -14623,6 +14912,22 @@ function requireNewTransaction$1 () {
 							callback(e);
 						}
 					});
+				},
+				executeCommand: function(query, callback) {
+					pool.connect((err, client, done) => {
+						if (err) {
+							return callback(err);
+						}
+						try {
+							wrapCommand(domain, client)(query, (err, res) => {
+								done();
+								callback(err, res);
+							});
+						} catch (e) {
+							done();
+							callback(e);
+						}
+					});
 				}
 			};
 			domain.rdb = rdb;
@@ -14639,6 +14944,7 @@ function requireNewTransaction$1 () {
 						return;
 					}
 					client.executeQuery = wrapQuery(domain, client);
+					client.executeCommand = wrapCommand(domain, client);
 					rdb.dbClient = client;
 					rdb.dbClientDone = done;
 					domain.rdb = rdb;
@@ -14995,6 +15301,46 @@ function requireWrapQuery () {
 	return wrapQuery_1;
 }
 
+var wrapCommand_1;
+var hasRequiredWrapCommand;
+
+function requireWrapCommand () {
+	if (hasRequiredWrapCommand) return wrapCommand_1;
+	hasRequiredWrapCommand = 1;
+	var log = requireLog();
+	var replaceParamChar = requireReplaceParamChar();
+
+	function wrapCommand(_context, connection) {
+		var runOriginalQuery = connection.query;
+		return runCommand;
+
+		function runCommand(query, onCompleted) {
+			var params = query.parameters;
+			log.emitQuery({sql: query.sql(), parameters: params});
+			var sql = replaceParamChar(query, params);
+			query = {
+				text: sql,
+				values: params,
+				types: query.types
+			};
+
+			runOriginalQuery.call(connection, query, onInnerCompleted);
+
+			function onInnerCompleted(err, result) {
+				if (err)
+					onCompleted(err);
+				else
+					onCompleted(null, { rowsAffected: result.rowCount });
+
+			}
+		}
+
+	}
+
+	wrapCommand_1 = wrapCommand;
+	return wrapCommand_1;
+}
+
 var encodeBoolean_1;
 var hasRequiredEncodeBoolean;
 
@@ -15040,6 +15386,7 @@ function requireNewTransaction () {
 	if (hasRequiredNewTransaction) return newTransaction;
 	hasRequiredNewTransaction = 1;
 	var wrapQuery = requireWrapQuery();
+	var wrapCommand = requireWrapCommand();
 	var encodeDate = requireEncodeDate();
 	var encodeBoolean = requireEncodeBoolean();
 	var deleteFromSql = requireDeleteFromSql();
@@ -15094,6 +15441,22 @@ function requireNewTransaction () {
 							callback(e);
 						}
 					});
+				},
+				executeCommand: function(query, callback) {
+					pool.connect((err, client, done) => {
+						if (err) {
+							return callback(err);
+						}
+						try {
+							wrapCommand(domain, client)(query, (err, res) => {
+								done();
+								callback(err, res);
+							});
+						} catch (e) {
+							done();
+							callback(e);
+						}
+					});
 				}
 			};
 			domain.rdb = rdb;
@@ -15110,6 +15473,7 @@ function requireNewTransaction () {
 						return;
 					}
 					client.executeQuery = wrapQuery(domain, client);
+					client.executeCommand = wrapCommand(domain, client);
 					rdb.dbClient = client;
 					rdb.dbClientDone = done;
 					domain.rdb = rdb;

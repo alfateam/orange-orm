@@ -1,4 +1,5 @@
 var wrapQuery = require('./wrapQuery');
+var wrapCommand = require('./wrapCommand');
 var encodeDate = require('../pg/encodeDate');
 const encodeBinary = require('../nodeSqlite/encodeBinary');
 const decodeBinary = require('../nodeSqlite/decodeBinary');
@@ -57,6 +58,22 @@ function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 						callback(e);
 					}
 				});
+			},
+			executeCommand: function(query, callback) {
+				pool.connect((err, client, done) => {
+					if (err) {
+						return callback(err);
+					}
+					try {
+						wrapCommand(domain, client)(query, (err, res) => {
+							done();
+							callback(err, res);
+						});
+					} catch (e) {
+						done();
+						callback(e);
+					}
+				});
 			}
 		};
 		domain.rdb = rdb;
@@ -73,6 +90,7 @@ function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 					return;
 				}
 				client.executeQuery = wrapQuery(domain, client);
+				client.executeCommand = wrapCommand(domain, client);
 				rdb.dbClient = client;
 				rdb.dbClientDone = done;
 				domain.rdb = rdb;

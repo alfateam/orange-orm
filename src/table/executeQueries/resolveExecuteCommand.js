@@ -8,7 +8,7 @@ function resolveExecuteQuery(context, query) {
 		try {
 			var client = getSessionSingleton(context, 'dbClient');
 			query = negotiateNullParams(query);
-			client.executeQuery(query, onCompleted);
+			client.executeCommand(query, onCompleted);
 		} catch (e) {
 			failed(e);
 		}

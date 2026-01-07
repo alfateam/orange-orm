@@ -117,7 +117,7 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 			let dto = {};
 			dto[property] = row[property];
 			let result = applyPatch({ options }, dto, [{ path: '/' + path.join('/'), op, value, oldValue }], table[property]);
-			row[property] = result[property];
+			await table.updateWithConcurrency(context, options, row, property, result[property], oldValue);
 			return { updated: row };
 		}
 		else if (isOneRelation(property, table)) {

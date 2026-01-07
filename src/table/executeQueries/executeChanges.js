@@ -1,4 +1,4 @@
-var executeQuery = require('./executeQuery');
+var executeCommand = require('./executeCommand');
 var newPromise = require('../promise');
 
 function executeChanges(context, queries) {
@@ -11,9 +11,9 @@ function executeChanges(context, queries) {
 	function execute() {
 		i++;
 		if (i + 1 === queries.length)
-			return executeQuery(context, queries[i]).then(notifyListener);
+			return executeCommand(context, queries[i]).then(notifyListener);
 		else {
-			return executeQuery(context, queries[i]).then(notifyListener).then(execute);
+			return executeCommand(context, queries[i]).then(notifyListener).then(execute);
 		}
 	}
 

@@ -1,14 +1,16 @@
 const getSessionSingleton = require('../getSessionSingleton');
 var newParameterized = require('../query/newParameterized');
 
-function newUpdateCommandCore(context, table, columns, row) {
+function newUpdateCommandCore(context, table, columns, row, concurrencyState) {
 	const quote = getSessionSingleton(context, 'quote');
+	const engine = getSessionSingleton(context, 'engine');
 	var command = newParameterized('UPDATE ' + quote(table._dbName) + ' SET');
 	var separator = ' ';
 
 	addColumns();
 	addWhereId();
 	addDiscriminators();
+	addConcurrencyChecks();
 
 	function addColumns() {
 		for (var alias in columns) {
@@ -37,6 +39,43 @@ function newUpdateCommandCore(context, table, columns, row) {
 			return;
 		discriminators = separator + discriminators.join(' AND ');
 		command = command.append(discriminators);
+	}
+
+	function addConcurrencyChecks() {
+		const columnsState = concurrencyState && concurrencyState.columns;
+		if (!columnsState)
+			return;
+		for (let alias in columnsState) {
+			const state = columnsState[alias];
+			if (!state || state.concurrency === 'overwrite')
+				continue;
+			const column = table[alias];
+			if (!column)
+				continue;
+			const encoded = column.encode(context, state.oldValue);
+			command = appendNullSafeComparison(column, encoded);
+		}
+	}
+
+	function appendNullSafeComparison(column, encoded) {
+		const columnSql = quote(column._dbName);
+		if (engine === 'pg') {
+			command = command.append(separator + columnSql + ' IS NOT DISTINCT FROM ').append(encoded);
+		}
+		else if (engine === 'mysql') {
+			command = command.append(separator + columnSql + ' <=> ').append(encoded);
+		}
+		else if (engine === 'sqlite') {
+			command = command.append(separator + columnSql + ' IS ').append(encoded);
+		}
+		else {
+			if (encoded.sql() === 'null')
+				command = command.append(separator + columnSql + ' IS NULL');
+			else
+				command = command.append(separator + columnSql + '=').append(encoded);
+		}
+		separator = ' AND ';
+		return command;
 	}
 
 	return command;
