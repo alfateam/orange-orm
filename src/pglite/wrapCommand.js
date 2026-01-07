@@ -22,10 +22,7 @@ function wrapCommand(_context, connection) {
 
 			if (Array.isArray(result)) result = result[result.length - 1];
 
-			var affectedRows =
-				result && typeof result.rowCount === 'number' ? result.rowCount : 0;
-
-			return onCompleted(null, { affectedRows });
+			onCompleted(null, { rowsAffected: result.rowCount });
 		}
 	}
 }
