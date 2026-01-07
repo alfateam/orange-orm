@@ -1,4 +1,4 @@
-import { describe.ignore, test, beforeAll, afterAll, expect } from 'vitest';
+import { describe, test, beforeAll, afterAll, expect } from 'vitest';
 const map = require('./db2');
 import express from 'express';
 import cors from 'cors';
