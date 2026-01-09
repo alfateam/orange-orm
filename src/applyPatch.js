@@ -2,7 +2,6 @@ const fastjson = require('fast-json-patch');
 let fromCompareObject = require('./fromCompareObject');
 let toCompareObject = require('./toCompareObject');
 
-// todo
 function applyPatch({ options = {} }, dto, changes, _column) {
 	let dtoCompare = toCompareObject(dto);
 	changes = validateReadonly(dtoCompare, changes);

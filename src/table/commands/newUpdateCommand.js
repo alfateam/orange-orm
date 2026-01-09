@@ -44,6 +44,7 @@ UpdateCommand.prototype.endEdit = function() {
 	delete this._row._concurrencyState;
 
 	const coreCommand = this._getCoreCommand();
+	delete this._row._jsonUpdateState;
 	this._usesReturning = Boolean(coreCommand._usesReturning);
 	this._concurrencySummary = summarizeConcurrency(this._concurrencyState);
 	if (this._concurrencySummary.hasConcurrency)

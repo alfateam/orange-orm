@@ -114,10 +114,19 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 		if (isColumn(property, table)) {
 			if (dryrun)
 				return { updated: row };
+			const column = table[property];
+			const oldColumnValue = row[property];
 			let dto = {};
-			dto[property] = row[property];
+			dto[property] = oldColumnValue;
 			let result = applyPatch({ options }, dto, [{ path: '/' + path.join('/'), op, value, oldValue }], table[property]);
-			await table.updateWithConcurrency(context, options, row, property, result[property], oldValue);
+			const patchInfo = column.tsType === 'JSONColumn' ? {
+				path,
+				op,
+				value,
+				oldValue,
+				fullOldValue: oldColumnValue
+			} : undefined;
+			await table.updateWithConcurrency(context, options, row, property, result[property], oldValue, patchInfo);
 			return { updated: row };
 		}
 		else if (isOneRelation(property, table)) {
@@ -224,11 +233,23 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 		}
 		property = path[0];
 		if (isColumn(property, table)) {
+			const column = table[property];
+			const oldColumnValue = row[property];
 			let dto = {};
-			dto[property] = row[property];
+			dto[property] = oldColumnValue;
 			let result = applyPatch({ options }, dto, [{ path: '/' + path.join('/'), op, oldValue }], table[property]);
-
-			row[property] = result[property];
+			if (column.tsType === 'JSONColumn') {
+				const patchInfo = {
+					path,
+					op,
+					value: undefined,
+					oldValue,
+					fullOldValue: oldColumnValue
+				};
+				await table.updateWithConcurrency(context, options, row, property, result[property], oldValue, patchInfo);
+			}
+			else
+				row[property] = result[property];
 			return { updated: row };
 		}
 		else if (isJoinRelation(property, table) && path.length === 1) {
