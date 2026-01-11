@@ -1,5 +1,6 @@
 const getSessionSingleton = require('../getSessionSingleton');
 var newParameterized = require('../query/newParameterized');
+const isJsonUpdateSupported = require('../isJsonUpdateSupported');
 
 function newUpdateCommandCore(context, table, columns, row, concurrencyState) {
 	const quote = getSessionSingleton(context, 'quote');
@@ -96,6 +97,16 @@ function newUpdateCommandCore(context, table, columns, row, concurrencyState) {
 				command = command.append(separator + 'CONVERT(VARCHAR(16384), ' + columnSql + ')=') .append(casted);
 			}
 		}
+		else if (engine === 'oracle' && column.tsType === 'JSONColumn') {
+			if (encoded.sql() === 'null') {
+				command = command.append(separator + columnSql + ' IS NULL');
+			}
+			else {
+				const jsonValue = newParameterized('JSON(' + encoded.sql() + ')', encoded.parameters);
+				const compare = newParameterized('JSON_EQUAL(' + columnSql + ', ' + jsonValue.sql() + ')', jsonValue.parameters);
+				command = command.append(separator).append(compare);
+			}
+		}
 		else {
 			if (encoded.sql() === 'null')
 				command = command.append(separator + columnSql + ' IS NULL');
@@ -115,6 +126,20 @@ function newUpdateCommandCore(context, table, columns, row, concurrencyState) {
 		}
 		else if (engine === 'sqlite') {
 			command = command.append(separator).append(columnExpr).append(' IS ').append(encoded);
+		}
+		else if (engine === 'oracle') {
+			const isJsonQuery = columnExpr.sql().indexOf('JSON_QUERY(') === 0;
+			if (encoded.sql() === 'null') {
+				command = command.append(separator).append(columnExpr).append(' IS NULL');
+			}
+			else if (isJsonQuery) {
+				const jsonValue = newParameterized('JSON(' + encoded.sql() + ')', encoded.parameters);
+				const compare = newParameterized('JSON_EQUAL(' + columnExpr.sql() + ', ' + jsonValue.sql() + ')', columnExpr.parameters.concat(jsonValue.parameters));
+				command = command.append(separator).append(compare);
+			}
+			else {
+				command = command.append(separator).append(columnExpr).append('=').append(encoded);
+			}
 		}
 		else {
 			if (encoded.sql() === 'null')
@@ -167,6 +192,11 @@ function newUpdateCommandCore(context, table, columns, row, concurrencyState) {
 			const sql = 'JSON_MODIFY(' + expr.sql() + ', ' + jsonPath.sql + ', ' + mssqlValue.sql() + ')';
 			return newParameterized(sql, expr.parameters.concat(jsonPath.parameters, mssqlValue.parameters));
 		}
+		if (engine === 'oracle') {
+			const jsonValue = JSON.stringify(value === undefined ? null : value);
+			const sql = 'JSON_TRANSFORM(' + expr.sql() + ', SET ' + jsonPath.sql + ' = JSON(?))';
+			return newParameterized(sql, expr.parameters.concat(jsonPath.parameters, [jsonValue]));
+		}
 		return column.encode(context, row[column.alias]);
 	}
 
@@ -186,6 +216,10 @@ function newUpdateCommandCore(context, table, columns, row, concurrencyState) {
 		}
 		if (engine === 'mssql' || engine === 'mssqlNative') {
 			const sql = 'JSON_MODIFY(' + expr.sql() + ', ' + jsonPath.sql + ', NULL)';
+			return newParameterized(sql, expr.parameters.concat(jsonPath.parameters));
+		}
+		if (engine === 'oracle') {
+			const sql = 'JSON_TRANSFORM(' + expr.sql() + ', REMOVE ' + jsonPath.sql + ')';
 			return newParameterized(sql, expr.parameters.concat(jsonPath.parameters));
 		}
 		return expr;
@@ -209,6 +243,11 @@ function newUpdateCommandCore(context, table, columns, row, concurrencyState) {
 			const sql = fn + '(' + columnSql + ', ' + jsonPath.sql + ')';
 			return newParameterized(sql, jsonPath.parameters);
 		}
+		if (engine === 'oracle') {
+			const fn = isJsonObject(oldValue) ? 'JSON_QUERY' : 'JSON_VALUE';
+			const sql = fn + '(' + columnSql + ', ' + jsonPath.sql + ')';
+			return newParameterized(sql, jsonPath.parameters);
+		}
 		return newParameterized(columnSql);
 	}
 
@@ -216,6 +255,19 @@ function newUpdateCommandCore(context, table, columns, row, concurrencyState) {
 		const tokens = Array.isArray(pathTokens) ? pathTokens : [];
 		if (engine === 'pg')
 			return { tokens, sql: buildPgPathLiteral(tokens), parameters: [] };
+		if (engine === 'oracle') {
+			let jsonPath = '$';
+			for (let i = 0; i < tokens.length; i++) {
+				const token = String(tokens[i]);
+				if (/^\d+$/.test(token))
+					jsonPath += '[' + token + ']';
+				else if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(token))
+					jsonPath += '.' + token;
+				else
+					jsonPath += '["' + token.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"]';
+			}
+			return { tokens, sql: '\'' + jsonPath.replace(/'/g, '\'\'') + '\'', parameters: [] };
+		}
 		let jsonPath = '$';
 		for (let i = 0; i < tokens.length; i++) {
 			const token = String(tokens[i]);
@@ -277,10 +329,6 @@ function newUpdateCommandCore(context, table, columns, row, concurrencyState) {
 
 	function isJsonObject(value) {
 		return value && typeof value === 'object';
-	}
-
-	function isJsonUpdateSupported(engine) {
-		return engine === 'pg' || engine === 'mysql' || engine === 'sqlite' || engine === 'mssql' || engine === 'mssqlNative';
 	}
 
 	return command;

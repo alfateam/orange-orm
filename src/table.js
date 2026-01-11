@@ -18,6 +18,7 @@ const patchTable = require('./patchTable');
 const newEmitEvent = require('./emitEvent');
 const hostLocal = require('./hostLocal');
 const getSessionSingleton = require('./table/getSessionSingleton');
+const isJsonUpdateSupported = require('./table/isJsonUpdateSupported');
 // const getTSDefinition = require('./getTSDefinition'); //todo: unused ?
 const where = require('./table/where');
 const aggregate = require('./table/aggregate');
@@ -234,10 +235,6 @@ function inferColumnOptions(defaults, property) {
 	if ('concurrency' in defaults)
 		parent.concurrency = defaults.concurrency;
 	return { ...parent, ...(defaults[property] || {}) };
-}
-
-function isJsonUpdateSupported(engine) {
-	return engine === 'pg' || engine === 'mysql' || engine === 'sqlite' || engine === 'mssql' || engine === 'mssqlNative';
 }
 
 module.exports = _new;
