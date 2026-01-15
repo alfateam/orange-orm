@@ -1,7 +1,7 @@
 var decodeDbRow = require('../resultToRows/decodeDbRow');
 var flags = require('../../flags');
 
-function newRow(context, {table, _options}) {
+function newRow(context, {table, _options, shouldValidate = true}) {
 	var dto = {};
 	table._columns.forEach(addColumn);
 
@@ -41,7 +41,7 @@ function newRow(context, {table, _options}) {
 			dto[column.alias] = pkValue;
 		}
 
-	return decodeDbRow(context, table, table, dto, true, true);
+	return decodeDbRow(context, table, table, dto, shouldValidate, true);
 }
 
 function isObject(object) {

@@ -16,6 +16,7 @@ async function patchTable() {
 }
 
 async function patchTableCore(context, table, patches, { strategy = undefined, deduceStrategy = false, ...options } = {}, dryrun) {
+	console.dir(patches);
 	options = cleanOptions(options);
 	strategy = JSON.parse(JSON.stringify(strategy || {}));
 	let changed = new Set();
@@ -60,9 +61,26 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 		path = path.slice(1);
 		if (!row && path.length > 0) {
 			const key = toKey(property);
-			row =  await table.tryGetById.apply(null, [context, ...key, strategy]);
-			if (!row)
-				throw new Error(`Row ${table._dbName} with id ${key} was not found.`);
+			const newRow = require('./table/commands/newRow');
+			const getSessionSingleton = require('./table/getSessionSingleton');
+			const engine = getSessionSingleton(context, 'engine');
+			const nextProperty = path[0];
+			const shouldFetchFromDb = engine === 'sap'
+				&& isColumn(nextProperty, table)
+				&& table[nextProperty].tsType === 'JSONColumn';
+			if (shouldFetchFromDb) {
+				row = await table.tryGetById.apply(null, [context, ...key, strategy]);
+				if (!row)
+					throw new Error(`Row ${table._dbName} with id ${key} was not found.`);
+			}
+			else {
+				const pkDto = {};
+				for (let i = 0; i < key.length && i < table._primaryColumns.length; i++) {
+					pkDto[table._primaryColumns[i].alias] = key[i];
+				}
+				row = newRow(context, { table, shouldValidate: false }, pkDto);
+				row = table._cache.tryAdd(context, row);
+			}
 		}
 
 		if (path.length === 0 && value === null) {
@@ -118,7 +136,9 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 			const oldColumnValue = row[property];
 			let dto = {};
 			dto[property] = oldColumnValue;
-			let result = applyPatch({ options }, dto, [{ path: '/' + path.join('/'), op, value, oldValue }], table[property]);
+			console.dir({oldColumnValue});
+			console.dir({path, value});
+			let result = applyPatch({ options, context }, dto, [{ path: '/' + path.join('/'), op, value, oldValue }], table[property]);
 			const patchInfo = column.tsType === 'JSONColumn' ? {
 				path,
 				op,
@@ -237,7 +257,7 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 			const oldColumnValue = row[property];
 			let dto = {};
 			dto[property] = oldColumnValue;
-			let result = applyPatch({ options }, dto, [{ path: '/' + path.join('/'), op, oldValue }], table[property]);
+			let result = applyPatch({ options, context }, dto, [{ path: '/' + path.join('/'), op, oldValue }], table[property]);
 			if (column.tsType === 'JSONColumn') {
 				const patchInfo = {
 					path,

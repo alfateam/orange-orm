@@ -1,11 +1,15 @@
 const fastjson = require('fast-json-patch');
 let fromCompareObject = require('./fromCompareObject');
 let toCompareObject = require('./toCompareObject');
+let getSessionSingleton = require('./table/getSessionSingleton');
 
-function applyPatch({ options = {} }, dto, changes, _column) {
+function applyPatch({ options = {}, context }, dto, changes, column) {
 	let dtoCompare = toCompareObject(dto);
 	changes = validateReadonly(dtoCompare, changes);
-	fastjson.applyPatch(dtoCompare, changes, true, true);
+	const engine = context ? getSessionSingleton(context, 'engine') : undefined;
+	const shouldValidate = column && column.tsType === 'JSONColumn' && engine === 'sap';
+	if (shouldValidate)
+		fastjson.applyPatch(dtoCompare, changes, true, true);
 
 	let result = fromCompareObject(dtoCompare);
 

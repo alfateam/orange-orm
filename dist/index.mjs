@@ -6528,8 +6528,16 @@ function requireNewUpdateCommandCore () {
 		function addColumns() {
 			for (var alias in columns) {
 				var column = columns[alias];
-				var encoded = column.encode(context, row[alias]);
-				command = command.append(separator + quote(column._dbName) + '=').append(encoded);
+				const columnSql = quote(column._dbName);
+				const jsonUpdate = row._jsonUpdateState && row._jsonUpdateState[alias];
+				if (jsonUpdate && jsonUpdate.patches && jsonUpdate.patches.length) {
+					const updated = buildJsonUpdateExpression(columnSql, jsonUpdate.patches, column);
+					command = command.append(separator + columnSql + '=').append(updated);
+				}
+				else {
+					var encoded = column.encode(context, row[alias]);
+					command = command.append(separator + columnSql + '=').append(encoded);
+				}
 				separator = ',';
 			}
 		}
@@ -6565,8 +6573,19 @@ function requireNewUpdateCommandCore () {
 				const column = table[alias];
 				if (!column)
 					continue;
-				const encoded = column.encode(context, state.oldValue);
-				command = appendNullSafeComparison(column, encoded);
+				if (state.paths && state.paths.length) {
+					for (let i = 0; i < state.paths.length; i++) {
+						const pathState = state.paths[i];
+						const encoded = encodeJsonValue(pathState.oldValue, column);
+						const jsonPath = buildJsonPath(pathState.path);
+						const columnExpr = buildJsonExtractExpression(quote(column._dbName), jsonPath, pathState.oldValue);
+						command = appendJsonPathComparison(columnExpr, encoded);
+					}
+				}
+				else {
+					const encoded = column.encode(context, state.oldValue);
+					command = appendNullSafeComparison(column, encoded);
+				}
 			}
 		}
 
@@ -6581,6 +6600,15 @@ function requireNewUpdateCommandCore () {
 			else if (engine === 'sqlite') {
 				command = command.append(separator + columnSql + ' IS ').append(encoded);
 			}
+			else if (engine === 'sap' && column.tsType === 'JSONColumn') {
+				if (encoded.sql() === 'null') {
+					command = command.append(separator + columnSql + ' IS NULL');
+				}
+				else {
+					const casted = newParameterized('CONVERT(VARCHAR(16384), ' + encoded.sql() + ')', encoded.parameters);
+					command = command.append(separator + 'CONVERT(VARCHAR(16384), ' + columnSql + ')=') .append(casted);
+				}
+			}
 			else {
 				if (encoded.sql() === 'null')
 					command = command.append(separator + columnSql + ' IS NULL');
@@ -6589,6 +6617,192 @@ function requireNewUpdateCommandCore () {
 			}
 			separator = ' AND ';
 			return command;
+		}
+
+		function appendJsonPathComparison(columnExpr, encoded) {
+			if (engine === 'pg') {
+				command = command.append(separator).append(columnExpr).append(' IS NOT DISTINCT FROM ').append(encoded);
+			}
+			else if (engine === 'mysql') {
+				command = command.append(separator).append(columnExpr).append(' <=> ').append(encoded);
+			}
+			else if (engine === 'sqlite') {
+				command = command.append(separator).append(columnExpr).append(' IS ').append(encoded);
+			}
+			else {
+				if (encoded.sql() === 'null')
+					command = command.append(separator).append(columnExpr).append(' IS NULL');
+				else
+					command = command.append(separator).append(columnExpr).append('=').append(encoded);
+			}
+			separator = ' AND ';
+			return command;
+		}
+
+		function buildJsonUpdateExpression(columnSql, patches, column) {
+			if (!isJsonUpdateSupported(engine))
+				return column.encode(context, row[column.alias]);
+			let expr = newParameterized(columnSql);
+			for (let i = 0; i < patches.length; i++) {
+				const patch = patches[i];
+				expr = applyJsonPatchExpression(expr, patch, column);
+			}
+			return expr;
+		}
+
+		function applyJsonPatchExpression(expr, patch, column) {
+			const path = patch.path || [];
+			const jsonPath = buildJsonPath(path);
+			if (patch.op === 'remove')
+				return buildJsonRemoveExpression(expr, jsonPath);
+			return buildJsonSetExpression(expr, jsonPath, patch.value, column);
+		}
+
+		function buildJsonSetExpression(expr, jsonPath, value, column) {
+			if (engine === 'pg') {
+				const pathLiteral = buildPgPathLiteral(jsonPath.tokens);
+				const jsonValue = JSON.stringify(value === undefined ? null : value);
+				const sql = 'jsonb_set(' + expr.sql() + ', ' + pathLiteral + ', ?::jsonb, true)';
+				return newParameterized(sql, expr.parameters.concat([jsonValue]));
+			}
+			if (engine === 'mysql') {
+				const jsonValue = JSON.stringify(value === undefined ? null : value);
+				const sql = 'JSON_SET(' + expr.sql() + ', ' + jsonPath.sql + ', CAST(? AS JSON))';
+				return newParameterized(sql, expr.parameters.concat(jsonPath.parameters, [jsonValue]));
+			}
+			if (engine === 'sqlite') {
+				const jsonValue = JSON.stringify(value === undefined ? null : value);
+				const sql = 'json_set(' + expr.sql() + ', ' + jsonPath.sql + ', json(?))';
+				return newParameterized(sql, expr.parameters.concat(jsonPath.parameters, [jsonValue]));
+			}
+			if (engine === 'mssql' || engine === 'mssqlNative') {
+				const mssqlValue = buildMssqlJsonValue(value);
+				const sql = 'JSON_MODIFY(' + expr.sql() + ', ' + jsonPath.sql + ', ' + mssqlValue.sql() + ')';
+				return newParameterized(sql, expr.parameters.concat(jsonPath.parameters, mssqlValue.parameters));
+			}
+			if (engine === 'oracle') {
+				const jsonValue = JSON.stringify(value === undefined ? null : value);
+				const sql = 'JSON_TRANSFORM(' + expr.sql() + ', SET ' + jsonPath.sql + ' = JSON(?))';
+				return newParameterized(sql, expr.parameters.concat(jsonPath.parameters, [jsonValue]));
+			}
+			return column.encode(context, row[column.alias]);
+		}
+
+		function buildJsonRemoveExpression(expr, jsonPath) {
+			if (engine === 'pg') {
+				const pathLiteral = buildPgPathLiteral(jsonPath.tokens);
+				const sql = expr.sql() + ' #- ' + pathLiteral;
+				return newParameterized(sql, expr.parameters);
+			}
+			if (engine === 'mysql') {
+				const sql = 'JSON_REMOVE(' + expr.sql() + ', ' + jsonPath.sql + ')';
+				return newParameterized(sql, expr.parameters.concat(jsonPath.parameters));
+			}
+			if (engine === 'sqlite') {
+				const sql = 'json_remove(' + expr.sql() + ', ' + jsonPath.sql + ')';
+				return newParameterized(sql, expr.parameters.concat(jsonPath.parameters));
+			}
+			if (engine === 'mssql' || engine === 'mssqlNative') {
+				const sql = 'JSON_MODIFY(' + expr.sql() + ', ' + jsonPath.sql + ', NULL)';
+				return newParameterized(sql, expr.parameters.concat(jsonPath.parameters));
+			}
+			if (engine === 'oracle') {
+				const sql = 'JSON_TRANSFORM(' + expr.sql() + ', REMOVE ' + jsonPath.sql + ')';
+				return newParameterized(sql, expr.parameters.concat(jsonPath.parameters));
+			}
+			return expr;
+		}
+
+		function buildJsonExtractExpression(columnSql, jsonPath, oldValue) {
+			if (engine === 'pg') {
+				const sql = columnSql + ' #> ' + buildPgPathLiteral(jsonPath.tokens);
+				return newParameterized(sql);
+			}
+			if (engine === 'mysql') {
+				const sql = 'JSON_EXTRACT(' + columnSql + ', ' + jsonPath.sql + ')';
+				return newParameterized(sql, jsonPath.parameters);
+			}
+			if (engine === 'sqlite') {
+				const sql = 'json_extract(' + columnSql + ', ' + jsonPath.sql + ')';
+				return newParameterized(sql, jsonPath.parameters);
+			}
+			if (engine === 'mssql' || engine === 'mssqlNative') {
+				const fn = isJsonObject(oldValue) ? 'JSON_QUERY' : 'JSON_VALUE';
+				const sql = fn + '(' + columnSql + ', ' + jsonPath.sql + ')';
+				return newParameterized(sql, jsonPath.parameters);
+			}
+			return newParameterized(columnSql);
+		}
+
+		function buildJsonPath(pathTokens) {
+			const tokens = Array.isArray(pathTokens) ? pathTokens : [];
+			if (engine === 'pg')
+				return { tokens, sql: buildPgPathLiteral(tokens), parameters: [] };
+			let jsonPath = '$';
+			for (let i = 0; i < tokens.length; i++) {
+				const token = String(tokens[i]);
+				if (/^\d+$/.test(token))
+					jsonPath += '[' + token + ']';
+				else if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(token))
+					jsonPath += '.' + token;
+				else
+					jsonPath += '["' + token.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"]';
+			}
+			return { tokens, sql: '?', parameters: [jsonPath] };
+		}
+
+		function buildPgPathLiteral(tokens) {
+			const parts = tokens.map(token => {
+				const text = String(token);
+				if (/^[A-Za-z0-9_]+$/.test(text))
+					return text;
+				return '"' + text.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+			});
+			return '\'{'+ parts.join(',') + '}\'';
+		}
+
+		function encodeJsonValue(value, column) {
+			if (engine === 'pg') {
+				const jsonValue = JSON.stringify(value === undefined ? null : value);
+				return newParameterized('?::jsonb', [jsonValue]);
+			}
+			if (engine === 'mysql') {
+				const jsonValue = JSON.stringify(value === undefined ? null : value);
+				return newParameterized('CAST(? AS JSON)', [jsonValue]);
+			}
+			if (engine === 'sqlite') {
+				if (isJsonObject(value)) {
+					const jsonValue = JSON.stringify(value);
+					return newParameterized('?', [jsonValue]);
+				}
+				if (value === null || value === undefined)
+					return newParameterized('null');
+				return newParameterized('?', [value]);
+			}
+			if (engine === 'mssql' || engine === 'mssqlNative') {
+				if (isJsonObject(value))
+					return newParameterized('JSON_QUERY(?)', [JSON.stringify(value)]);
+				if (value === null || value === undefined)
+					return newParameterized('null');
+				return newParameterized('?', [String(value)]);
+			}
+			return column.encode(context, value);
+		}
+
+		function buildMssqlJsonValue(value) {
+			if (isJsonObject(value))
+				return newParameterized('JSON_QUERY(?)', [JSON.stringify(value)]);
+			if (value === null || value === undefined)
+				return newParameterized('null');
+			return newParameterized('?', [value]);
+		}
+
+		function isJsonObject(value) {
+			return value && typeof value === 'object';
+		}
+
+		function isJsonUpdateSupported(engine) {
+			return engine === 'pg' || engine === 'mysql' || engine === 'sqlite' || engine === 'mssql' || engine === 'mssqlNative' || engine === 'oracle';
 		}
 
 		return command;
@@ -6725,6 +6939,7 @@ function requireNewUpdateCommand () {
 		delete this._row._concurrencyState;
 
 		const coreCommand = this._getCoreCommand();
+		delete this._row._jsonUpdateState;
 		this._usesReturning = Boolean(coreCommand._usesReturning);
 		this._concurrencySummary = summarizeConcurrency(this._concurrencyState);
 		if (this._concurrencySummary.hasConcurrency)
@@ -7509,10 +7724,9 @@ function requireApplyPatch () {
 	let fromCompareObject = requireFromCompareObject();
 	let toCompareObject = requireToCompareObject();
 
-	// todo
-	function applyPatch({ _options = {} }, dto, changes, _column) {
+	function applyPatch({ options = {} }, dto, changes, _column) {
 		let dtoCompare = toCompareObject(dto);
-		// changes = validateConflict(dtoCompare, changes);
+		changes = validateReadonly(dtoCompare, changes);
 		fastjson.applyPatch(dtoCompare, changes, true, true);
 
 		let result = fromCompareObject(dtoCompare);
@@ -7529,6 +7743,37 @@ function requireApplyPatch () {
 		}
 
 		return dto;
+
+		function validateReadonly(object, changes) {
+			return changes.filter(change => {
+				const option = getOption(change.path);
+				let readonly = option.readonly;
+				if (readonly) {
+					const e = new Error(`Cannot update column ${change.path.replace('/', '')} because it is readonly`);
+					// @ts-ignore
+					e.status = 405;
+					throw e;
+				}
+				return true;
+			});
+		}
+
+		function getOption(path) {
+			let splitPath = path.split('/');
+			splitPath.shift();
+			return splitPath.reduce(extract, options);
+
+			function extract(obj, name) {
+				if (Array.isArray(obj))
+					return obj[0] || options;
+				if (obj === Object(obj))
+					return obj[name] || options;
+				return obj;
+			}
+
+		}
+
+
 
 		// function validateConflict(object, changes) {
 		// 	return changes.filter(change => {
@@ -7574,20 +7819,6 @@ function requireApplyPatch () {
 
 		// }
 
-		// function getOption(path) {
-		// 	let splitPath = path.split('/');
-		// 	splitPath.shift();
-		// 	return splitPath.reduce(extract, options);
-
-		// 	function extract(obj, name) {
-		// 		if (Array.isArray(obj))
-		// 			return obj[0] || options;
-		// 		if (obj === Object(obj))
-		// 			return obj[name] || options;
-		// 		return obj;
-		// 	}
-
-		// }
 	}
 
 	// function assertDatesEqual(date1, date2) {
@@ -7925,10 +8156,19 @@ function requirePatchTable () {
 			if (isColumn(property, table)) {
 				if (dryrun)
 					return { updated: row };
+				const column = table[property];
+				const oldColumnValue = row[property];
 				let dto = {};
-				dto[property] = row[property];
+				dto[property] = oldColumnValue;
 				let result = applyPatch({ options }, dto, [{ path: '/' + path.join('/'), op, value, oldValue }], table[property]);
-				await table.updateWithConcurrency(context, options, row, property, result[property], oldValue);
+				const patchInfo = column.tsType === 'JSONColumn' ? {
+					path,
+					op,
+					value,
+					oldValue,
+					fullOldValue: oldColumnValue
+				} : undefined;
+				await table.updateWithConcurrency(context, options, row, property, result[property], oldValue, patchInfo);
 				return { updated: row };
 			}
 			else if (isOneRelation(property, table)) {
@@ -8035,11 +8275,23 @@ function requirePatchTable () {
 			}
 			property = path[0];
 			if (isColumn(property, table)) {
+				const column = table[property];
+				const oldColumnValue = row[property];
 				let dto = {};
-				dto[property] = row[property];
+				dto[property] = oldColumnValue;
 				let result = applyPatch({ options }, dto, [{ path: '/' + path.join('/'), op, oldValue }], table[property]);
-
-				row[property] = result[property];
+				if (column.tsType === 'JSONColumn') {
+					const patchInfo = {
+						path,
+						op,
+						value: undefined,
+						oldValue,
+						fullOldValue: oldColumnValue
+					};
+					await table.updateWithConcurrency(context, options, row, property, result[property], oldValue, patchInfo);
+				}
+				else
+					row[property] = result[property];
 				return { updated: row };
 			}
 			else if (isJoinRelation(property, table) && path.length === 1) {
@@ -11945,6 +12197,7 @@ function requireTable () {
 	const patchTable = requirePatchTable();
 	const newEmitEvent = requireEmitEvent();
 	const hostLocal = requireHostLocal();
+	const getSessionSingleton = requireGetSessionSingleton();
 	// const getTSDefinition = require('./getTSDefinition'); //todo: unused ?
 	const where = requireWhere();
 	const aggregate = requireAggregate();
@@ -12069,14 +12322,50 @@ function requireTable () {
 			return insert.apply(null, args);
 		};
 
-		table.updateWithConcurrency = function(context, options, row, property, value, oldValue) {
+		table.updateWithConcurrency = function(context, options, row, property, value, oldValue, patchInfo) {
 			options = options || {};
 			const columnOptions = inferColumnOptions(options, property);
 			const concurrency = columnOptions.concurrency || 'optimistic';
+			const column = table[property];
 
-			if (concurrency !== 'overwrite') {
+			if (patchInfo && column && column.tsType === 'JSONColumn' && Array.isArray(patchInfo.path) && patchInfo.path.length > 1) {
+				const engine = getSessionSingleton(context, 'engine');
+				if (isJsonUpdateSupported(engine)) {
+					const jsonPath = patchInfo.path.slice(1);
+					const jsonUpdateState = row._jsonUpdateState || {};
+					const columnState = jsonUpdateState[property] || { patches: [] };
+					columnState.patches.push({
+						path: jsonPath,
+						op: patchInfo.op,
+						value: patchInfo.value,
+						oldValue: patchInfo.oldValue
+					});
+					jsonUpdateState[property] = columnState;
+					row._jsonUpdateState = jsonUpdateState;
+					if (concurrency !== 'overwrite') {
+						const state = row._concurrencyState || { columns: {} };
+						const columnConcurrency = state.columns[property] || {};
+						columnConcurrency.concurrency = concurrency;
+						columnConcurrency.paths = columnConcurrency.paths || [];
+						columnConcurrency.paths.push({
+							path: jsonPath,
+							oldValue: patchInfo.oldValue
+						});
+						delete columnConcurrency.oldValue;
+						state.columns[property] = columnConcurrency;
+						row._concurrencyState = state;
+					}
+				}
+				else if (concurrency !== 'overwrite') {
+					const state = row._concurrencyState || { columns: {} };
+					const fullOldValue = Object.prototype.hasOwnProperty.call(patchInfo, 'fullOldValue') ? patchInfo.fullOldValue : oldValue;
+					state.columns[property] = { oldValue: fullOldValue, concurrency };
+					row._concurrencyState = state;
+				}
+			}
+			else if (concurrency !== 'overwrite') {
 				const state = row._concurrencyState || { columns: {} };
-				state.columns[property] = { oldValue , concurrency };
+				state.columns[property] = { oldValue, concurrency };
 				row._concurrencyState = state;
 			}
 
@@ -12125,6 +12414,10 @@ function requireTable () {
 		if ('concurrency' in defaults)
 			parent.concurrency = defaults.concurrency;
 		return { ...parent, ...(defaults[property] || {}) };
+	}
+
+	function isJsonUpdateSupported(engine) {
+		return engine === 'pg' || engine === 'mysql' || engine === 'sqlite' || engine === 'mssql' || engine === 'mssqlNative';
 	}
 
 	table = _new;
@@ -14590,14 +14883,12 @@ function requireWrapCommand$9 () {
 				);
 
 			function onInnerCompleted(err, result) {
+				console.dir(result);
 				if (err) return onCompleted(err);
 
 				if (Array.isArray(result)) result = result[result.length - 1];
 
-				var affectedRows =
-					result && typeof result.rowCount === 'number' ? result.rowCount : 0;
-
-				return onCompleted(null, { affectedRows });
+				onCompleted(null, { affectedRows: result.affectedRows });
 			}
 		}
 	}
