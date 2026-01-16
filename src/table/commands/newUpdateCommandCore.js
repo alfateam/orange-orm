@@ -71,7 +71,9 @@ function newUpdateCommandCore(context, table, columns, row, concurrencyState) {
 				}
 			}
 			else {
-				const encoded = column.encode(context, state.oldValue);
+				const encoded = (engine === 'mysql' && column.tsType === 'JSONColumn')
+					? encodeJsonValue(state.oldValue, column)
+					: column.encode(context, state.oldValue);
 				command = appendNullSafeComparison(column, encoded);
 			}
 		}
@@ -292,6 +294,15 @@ function newUpdateCommandCore(context, table, columns, row, concurrencyState) {
 	}
 
 	function encodeJsonValue(value, column) {
+		if (engine === 'oracle') {
+			if (value === null || value === undefined)
+				return newParameterized('null');
+			if (isJsonObject(value))
+				return column.encode(context, value);
+			if (typeof value === 'boolean' || typeof value === 'number')
+				return newParameterized('?', [String(value)]);
+			return newParameterized('?', [value]);
+		}
 		if (engine === 'pg') {
 			const jsonValue = JSON.stringify(value === undefined ? null : value);
 			return newParameterized('?::jsonb', [jsonValue]);

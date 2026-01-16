@@ -1,5 +1,3 @@
-import rdb from '../src/index';
-rdb.on('query', console.dir);
 const map = require('./db');
 import { describe, test, beforeAll, afterAll, expect } from 'vitest';
 const express = require('express');
@@ -149,17 +147,17 @@ describe('optimistic json object', () => {
 	}
 });
 
-describe.only('optimistic fail json object', () => {
-	// test('pg', async () => await verify('pg'));
-	// test('pglite', async () => await verify('pglite'));
-	// test('oracle', async () => await verify('oracle'));
-	// test('mssql', async () => await verify('mssql'));
-	// if (major === 18)
-	// 	test('mssqlNative', async () => await verify('mssqlNative'));
-	// test('mysql', async () => await verify('mysql'));
-	// test('sqlite', async () => await verify('sqlite'));
+describe('optimistic fail json object', () => {
+	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
-	// test('http', async () => await verify('http'));
+	test('http', async () => await verify('http'));
 
 	async function verify(dbName) {
 		let { db, init } = getDb(dbName);

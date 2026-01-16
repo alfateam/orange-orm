@@ -189,7 +189,6 @@ function _new(tableName) {
 			state.columns[property] = { oldValue, concurrency };
 			row._concurrencyState = state;
 		}
-
 		row[property] = value;
 	};
 

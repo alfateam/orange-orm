@@ -4,19 +4,21 @@ let fromCompareObject = require('./fromCompareObject');
 let validateDeleteConflict = require('./validateDeleteConflict');
 let validateDeleteAllowed = require('./validateDeleteAllowed');
 let clearCache = require('./table/clearCache');
+const getSessionSingleton = require('./table/getSessionSingleton');
+
 
 async function patchTable() {
 	// const dryrun = true;
 	//traverse all rows you want to update before updatinng or inserting anything.
 	//this is to avoid page locks in ms sql
 	// await patchTableCore.apply(null, [...arguments, dryrun]);
-	const result = await  patchTableCore.apply(null, arguments);
+	const result = await patchTableCore.apply(null, arguments);
 	clearCache(arguments[0]);
 	return result;
 }
 
 async function patchTableCore(context, table, patches, { strategy = undefined, deduceStrategy = false, ...options } = {}, dryrun) {
-	console.dir(patches);
+	const engine = getSessionSingleton(context, 'engine');
 	options = cleanOptions(options);
 	strategy = JSON.parse(JSON.stringify(strategy || {}));
 	let changed = new Set();
@@ -60,27 +62,11 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 		let property = path[0];
 		path = path.slice(1);
 		if (!row && path.length > 0) {
-			const key = toKey(property);
-			const newRow = require('./table/commands/newRow');
-			const getSessionSingleton = require('./table/getSessionSingleton');
-			const engine = getSessionSingleton(context, 'engine');
-			const nextProperty = path[0];
-			const shouldFetchFromDb = engine === 'sap'
-				&& isColumn(nextProperty, table)
-				&& table[nextProperty].tsType === 'JSONColumn';
-			if (shouldFetchFromDb) {
-				row = await table.tryGetById.apply(null, [context, ...key, strategy]);
-				if (!row)
-					throw new Error(`Row ${table._dbName} with id ${key} was not found.`);
-			}
-			else {
-				const pkDto = {};
-				for (let i = 0; i < key.length && i < table._primaryColumns.length; i++) {
-					pkDto[table._primaryColumns[i].alias] = key[i];
-				}
-				row = newRow(context, { table, shouldValidate: false }, pkDto);
-				row = table._cache.tryAdd(context, row);
-			}
+			row = await getOrCreateRow({
+				table,
+				strategy,
+				property
+			});
 		}
 
 		if (path.length === 0 && value === null) {
@@ -136,17 +122,18 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 			const oldColumnValue = row[property];
 			let dto = {};
 			dto[property] = oldColumnValue;
-			console.dir({oldColumnValue});
-			console.dir({path, value});
+			const _oldValue = fromCompareObject(oldValue);
+			const _value = fromCompareObject(value);
 			let result = applyPatch({ options, context }, dto, [{ path: '/' + path.join('/'), op, value, oldValue }], table[property]);
+
 			const patchInfo = column.tsType === 'JSONColumn' ? {
 				path,
 				op,
-				value,
-				oldValue,
+				value: _value,
+				oldValue : _oldValue,
 				fullOldValue: oldColumnValue
 			} : undefined;
-			await table.updateWithConcurrency(context, options, row, property, result[property], oldValue, patchInfo);
+			await table.updateWithConcurrency(context, options, row, property, result[property], _oldValue, patchInfo);
 			return { updated: row };
 		}
 		else if (isOneRelation(property, table)) {
@@ -245,7 +232,7 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 	async function remove({ path, op, oldValue, options }, table, row) {
 		let property = path[0];
 		path = path.slice(1);
-		row = row || await table.getById.apply(null, [context, ...toKey(property)]);
+		row = row || createRowInCache({context, table, key: toKey(property)});
 		if (path.length === 0) {
 			await validateDeleteAllowed({ row, options, table });
 			if (await validateDeleteConflict({ row, oldValue, options, table }))
@@ -257,16 +244,18 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 			const oldColumnValue = row[property];
 			let dto = {};
 			dto[property] = oldColumnValue;
+			const _oldValue = fromCompareObject(oldValue);
+
 			let result = applyPatch({ options, context }, dto, [{ path: '/' + path.join('/'), op, oldValue }], table[property]);
 			if (column.tsType === 'JSONColumn') {
 				const patchInfo = {
 					path,
 					op,
 					value: undefined,
-					oldValue,
+					oldValue: _oldValue,
 					fullOldValue: oldColumnValue
 				};
-				await table.updateWithConcurrency(context, options, row, property, result[property], oldValue, patchInfo);
+				await table.updateWithConcurrency(context, options, row, property, result[property], _oldValue, patchInfo);
 			}
 			else
 				row[property] = result[property];
@@ -329,6 +318,37 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 
 	function isColumn(name, table) {
 		return table[name] && table[name].equal;
+	}
+
+	function shouldFetchFromDb(table) {
+		return engine === 'sap'
+			&& table._columns.some(x => x.tsType === 'JSONColumn');
+	}
+
+
+	async function getOrCreateRow({ table, strategy, property }) {
+		const key = toKey(property);
+
+		if (shouldFetchFromDb(table)) {
+			const row = await table.tryGetById.apply(null, [context, ...key, strategy]);
+			if (!row)
+				throw new Error(`Row ${table._dbName} with id ${key} was not found.`);
+			return row;
+		}
+
+		return createRowInCache({ context, table, key });
+	}
+
+
+
+	function createRowInCache({ context, table, key }) {
+		const newRow = getOrCreateRow.cachedNewRow || (getOrCreateRow.cachedNewRow = require('./table/commands/newRow'));
+		const pkDto = {};
+		for (let i = 0; i < key.length && i < table._primaryColumns.length; i++) {
+			pkDto[table._primaryColumns[i].alias] = key[i];
+		}
+		let row = newRow(context, { table, shouldValidate: false }, pkDto);
+		return table._cache.tryAdd(context, row);
 	}
 
 	function isManyRelation(name, table) {

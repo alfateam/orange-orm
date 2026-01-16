@@ -78,7 +78,7 @@ function newDecodeDbRow(table, dbRow, filteredAliases, shouldValidate, isInsert)
 				return negotiateNull(this[intName]);
 			},
 			set: function(value) {
-				if (column.onChange && (this[intName] !== null && this[intName] !== undefined) && typeof value === 'object') {
+				if (column.onChange && (this[intName] !== null && this[intName] !== undefined) && value && typeof value === 'object') {
 					if (this[intName] === onChange.target(value))
 						return;
 					this._proxies[name] = column.onChange(value, () => {

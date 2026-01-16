@@ -6,9 +6,14 @@ let getSessionSingleton = require('./table/getSessionSingleton');
 function applyPatch({ options = {}, context }, dto, changes, column) {
 	let dtoCompare = toCompareObject(dto);
 	changes = validateReadonly(dtoCompare, changes);
-	const engine = context ? getSessionSingleton(context, 'engine') : undefined;
-	const shouldValidate = column && column.tsType === 'JSONColumn' && engine === 'sap';
-	if (shouldValidate)
+	if (column.tsType === 'JSONColumn') {
+		const engine = context ? getSessionSingleton(context, 'engine') : undefined;
+		if(column && engine === 'sap') {
+			changes = validateConflict(dtoCompare, changes);
+			fastjson.applyPatch(dtoCompare, changes, true, true);
+		}
+	}
+	else
 		fastjson.applyPatch(dtoCompare, changes, true, true);
 
 	let result = fromCompareObject(dtoCompare);
@@ -57,49 +62,49 @@ function applyPatch({ options = {}, context }, dto, changes, column) {
 
 
 
-	// function validateConflict(object, changes) {
-	// 	return changes.filter(change => {
-	// 		let expectedOldValue = change.oldValue;
-	// 		const option = getOption(change.path);
-	// 		let readonly = option.readonly;
-	// 		if (readonly) {
-	// 			const e = new Error(`Cannot update column ${change.path.replace('/', '')} because it is readonly`);
-	// 			// @ts-ignore
-	// 			e.status = 405;
-	// 			throw e;
-	// 		}
-	// 		let concurrency = option.concurrency || 'optimistic';
-	// 		if ((concurrency === 'optimistic') || (concurrency === 'skipOnConflict')) {
-	// 			let oldValue = getOldValue(object, change.path);
-	// 			try {
-	// 				if (column?.tsType === 'DateColumn') {
-	// 					assertDatesEqual(oldValue, expectedOldValue);
-	// 				}
-	// 				else
-	// 					assertDeepEqual(oldValue, expectedOldValue);
-	// 			}
-	// 			catch (e) {
-	// 				if (concurrency === 'skipOnConflict')
-	// 					return false;
-	// 				throw new Error(`The field ${change.path.replace('/', '')} was changed by another user,,,. Expected ${inspect(fromCompareObject(expectedOldValue))}, but was ${inspect(fromCompareObject(oldValue))}.`);
-	// 			}
-	// 		}
-	// 		return true;
-	// 	});
+	function validateConflict(object, changes) {
+		return changes.filter(change => {
+			let expectedOldValue = change.oldValue;
+			const option = getOption(change.path);
+			let readonly = option.readonly;
+			if (readonly) {
+				const e = new Error(`Cannot update column ${change.path.replace('/', '')} because it is readonly`);
+				// @ts-ignore
+				e.status = 405;
+				throw e;
+			}
+			let concurrency = option.concurrency || 'optimistic';
+			if ((concurrency === 'optimistic') || (concurrency === 'skipOnConflict')) {
+				let oldValue = getOldValue(object, change.path);
+				try {
+					// if (column?.tsType === 'DateColumn') {
+					// 	assertDatesEqual(oldValue, expectedOldValue);
+					// }
+					// else
+					assertDeepEqual(oldValue, expectedOldValue);
+				}
+				catch (e) {
+					if (concurrency === 'skipOnConflict')
+						return false;
+					throw new Error('The row was changed by another user.');
+				}
+			}
+			return true;
+		});
 
-	// 	function getOldValue(obj, path) {
-	// 		let splitPath = path.split('/');
-	// 		splitPath.shift();
-	// 		return splitPath.reduce(extract, obj);
+		function getOldValue(obj, path) {
+			let splitPath = path.split('/');
+			splitPath.shift();
+			return splitPath.reduce(extract, obj);
 
-	// 		function extract(obj, name) {
-	// 			if (obj === Object(obj))
-	// 				return obj[name];
-	// 			return;
-	// 		}
-	// 	}
+			function extract(obj, name) {
+				if (obj === Object(obj))
+					return obj[name];
+				return;
+			}
+		}
 
-	// }
+	}
 
 }
 
@@ -121,13 +126,9 @@ function applyPatch({ options = {}, context }, dto, changes, column) {
 // 	assertDeepEqual(date1, date2);
 // }
 
-// function assertDeepEqual(a, b) {
-// 	if (JSON.stringify(a) !== JSON.stringify(b))
-// 		throw new Error('A, b are not equal');
-// }
-
-// function inspect(obj) {
-// 	return JSON.stringify(obj, null, 2);
-// }
+function assertDeepEqual(a, b) {
+	if (JSON.stringify(a) !== JSON.stringify(b))
+		throw new Error('A, b are not equal');
+}
 
 module.exports = applyPatch;
