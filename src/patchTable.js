@@ -232,7 +232,7 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 	async function remove({ path, op, oldValue, options }, table, row) {
 		let property = path[0];
 		path = path.slice(1);
-		row = row || createRowInCache({context, table, key: toKey(property)});
+		row = row || await fetchFromDb({context, table, key: toKey(property)});
 		if (path.length === 0) {
 			await validateDeleteAllowed({ row, options, table });
 			if (await validateDeleteConflict({ row, oldValue, options, table }))
@@ -326,17 +326,20 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 	}
 
 
-	async function getOrCreateRow({ table, strategy, property }) {
+	function getOrCreateRow({ table, strategy, property }) {
 		const key = toKey(property);
 
-		if (shouldFetchFromDb(table)) {
-			const row = await table.tryGetById.apply(null, [context, ...key, strategy]);
-			if (!row)
-				throw new Error(`Row ${table._dbName} with id ${key} was not found.`);
-			return row;
-		}
-
+		if (shouldFetchFromDb(table))
+			return fetchFromDb({context, table, strategy, key});
 		return createRowInCache({ context, table, key });
+	}
+
+	async function fetchFromDb({context, table, strategy, key}) {
+		const row = await table.tryGetById.apply(null, [context, ...key, strategy]);
+		if (!row)
+			throw new Error(`Row ${table._dbName} with id ${key} was not found.`);
+		return row;
+
 	}
 
 
