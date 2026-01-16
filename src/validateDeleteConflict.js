@@ -2,7 +2,7 @@
 /* eslint-disable */
 const toCompareObject = require('./toCompareObject');
 
-async function validateDeleteConflict({ row, oldValue, options, table }) {
+async function validateDeleteConflict({ context, row, oldValue, options, table }) {
 	for (let p in oldValue) {
 		if (isColumn(p, table)) {
 			const option = inferOptions(options, p);
@@ -26,10 +26,10 @@ async function validateDeleteConflict({ row, oldValue, options, table }) {
 			for (let name in oldValue[p]) {
 				if (name === '__patchType')
 					continue;
-				let childRow = await childTable.tryGetById.apply(null, JSON.parse(name));
+				let childRow = await childTable.tryGetById.apply(null, [context, ...JSON.parse(name)]);
 				if (!childRow)
 					throw new Error(`${p} with id ${name} was deleted by another user`);
-				if (! await validateDeleteConflict({ row: childRow, oldValue: oldValue[p][name], options: inferOptions(options, p), table: childTable }))
+				if (! await validateDeleteConflict({ context, row: childRow, oldValue: oldValue[p][name], options: inferOptions(options, p), table: childTable }))
 					return false;
 			}
 		}
@@ -38,7 +38,7 @@ async function validateDeleteConflict({ row, oldValue, options, table }) {
 			let childRow = await row[p];
 			if (!childRow)
 				throw new Error(`${p} was deleted by another user`);
-			if (! await validateDeleteConflict({ row: childRow, oldValue: oldValue[p], options: inferOptions(options, p), table: childTable }))
+			if (! await validateDeleteConflict({ context, row: childRow, oldValue: oldValue[p], options: inferOptions(options, p), table: childTable }))
 				return false;
 		}
 

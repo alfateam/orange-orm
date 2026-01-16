@@ -211,7 +211,6 @@ describe('update multiple in array', () => {
 });
 
 describe('delete row', () => {
-
 	test('pg', async () => await verify('pg'));
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
@@ -227,7 +226,10 @@ describe('delete row', () => {
 
 		const { db } = getDb(dbName);
 
-		let row = await db.order.getOne();
+		let row = await db.order.getOne(null, {
+			lines: true
+		});
+
 		await row.delete();
 		row = await db.order.getById(row.id);
 		expect(row).toEqual(undefined);

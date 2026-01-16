@@ -235,7 +235,7 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 		row = row || await fetchFromDb({context, table, key: toKey(property)});
 		if (path.length === 0) {
 			await validateDeleteAllowed({ row, options, table });
-			if (await validateDeleteConflict({ row, oldValue, options, table }))
+			if (await validateDeleteConflict({ context, row, oldValue, options, table }))
 				await row.deleteCascade();
 		}
 		property = path[0];
