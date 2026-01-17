@@ -1,7 +1,6 @@
 /* eslint-disable require-atomic-updates */
 let applyPatch = require('./applyPatch');
 let fromCompareObject = require('./fromCompareObject');
-let validateDeleteConflict = require('./validateDeleteConflict');
 let validateDeleteAllowed = require('./validateDeleteAllowed');
 let clearCache = require('./table/clearCache');
 const getSessionSingleton = require('./table/getSessionSingleton');
@@ -232,11 +231,12 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 	async function remove({ path, op, oldValue, options }, table, row) {
 		let property = path[0];
 		path = path.slice(1);
-		row = row || await fetchFromDb({context, table, key: toKey(property)});
+		if (!row)
+			row = await getOrCreateRow({ table, strategy: {}, property });
 		if (path.length === 0) {
 			await validateDeleteAllowed({ row, options, table });
-			if (await validateDeleteConflict({ context, row, oldValue, options, table }))
-				await row.deleteCascade();
+			applyDeleteConcurrencyState(row, oldValue, options, table);
+			await row.deleteCascade();
 		}
 		property = path[0];
 		if (isColumn(property, table)) {
@@ -365,6 +365,32 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 
 	function isJoinRelation(name, table) {
 		return table[name] && table[name]._relation.columns;
+	}
+
+	function applyDeleteConcurrencyState(row, oldValue, options, table) {
+		const state = { columns: {} };
+		if (oldValue && oldValue === Object(oldValue)) {
+			for (let p in oldValue) {
+				if (!isColumn(p, table))
+					continue;
+				const columnOptions = inferOptions(options, p);
+				const concurrency = columnOptions.concurrency || 'optimistic';
+				if (concurrency === 'overwrite')
+					continue;
+				state.columns[p] = { oldValue: fromCompareObject(oldValue[p]), concurrency };
+			}
+		}
+		if (Object.keys(state.columns).length === 0) {
+			const concurrency = options.concurrency || 'optimistic';
+			if (concurrency !== 'overwrite') {
+				for (let i = 0; i < table._primaryColumns.length; i++) {
+					const pkName = table._primaryColumns[i].alias;
+					state.columns[pkName] = { oldValue: row[pkName], concurrency };
+				}
+			}
+		}
+		if (Object.keys(state.columns).length > 0)
+			row._concurrencyState = state;
 	}
 
 	function inferOptions(defaults, property) {

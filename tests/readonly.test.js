@@ -398,6 +398,88 @@ describe('readonly nested table delete', () => {
 		expect(error?.message).toEqual('Cannot delete orderLine because it is readonly');
 	}
 });
+
+describe('readonly nested packages delete without child', () => {
+
+	const options = { order: { lines: { packages: { readonly: true } } } };
+	beforeAll(() => hostExpress(options));
+
+	afterAll(async () => {
+		return new Promise((res) => {
+			server.close(res);
+		});
+	});
+
+
+	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+
+	async function verify(dbName) {
+		const db = getDb(dbName).db(options);
+
+		const rows = await db.order.getAll({ lines: true });
+
+		const length = rows[0].lines.length;
+		let error;
+
+		try {
+			rows[0].lines.pop();
+			await rows.saveChanges();
+		}
+		catch (e) {
+			error = e;
+		}
+		expect(error).toBeUndefined();
+		expect(rows[0].lines.length).toEqual(length - 1);
+	}
+});
+
+describe('readonly nested packages delete with child', () => {
+
+	const options = { order: { lines: { packages: { readonly: true } } } };
+	beforeAll(() => hostExpress(options));
+
+	afterAll(async () => {
+		return new Promise((res) => {
+			server.close(res);
+		});
+	});
+
+	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const db = getDb(dbName).db(options);
+
+		const rows = await db.order.getAll({ lines: true });
+		const line = rows[0].lines[rows[0].lines.length - 1];
+		await db.package.insert({ lineId: line.id, sscc: 'pkg-readonly' });
+		let error;
+
+		try {
+			rows[0].lines.pop();
+			await rows.saveChanges();
+		}
+		catch (e) {
+			error = e;
+		}
+		expect(error?.message).toEqual('Cannot delete package because it is readonly');
+	}
+});
+
 describe('readonly on grandChildren table delete', () => {
 
 	const options = { order: { lines: { readonly: true } } };
