@@ -32,11 +32,11 @@ async function validateDeleteAllowed({ row, options, table }) {
 
 
 function isManyRelation(name, table) {
-	return table[name] && table[name]._relation.isMany;
+	return table[name] && table[name]._relation && table[name]._relation.isMany;
 }
 
 function isOneRelation(name, table) {
-	return table[name] && table[name]._relation.isOne;
+	return table[name] && table[name]._relation && table[name]._relation.isOne;
 }
 
 function inferOptions(defaults, property) {
