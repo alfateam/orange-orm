@@ -21,36 +21,36 @@ function wrapCommand(context, connection) {
 				const cmd = sql.trim().toUpperCase();
 
 				if (cmd === 'BEGIN' || cmd === 'BEGIN TRANSACTION') {
-					if (th && !th.closing) return onCompleted(new Error('Already inside a transaction'), { affectedRows: 0 });
+					if (th && !th.closing) return onCompleted(new Error('Already inside a transaction'), { rowsAffected: 0 });
 					beginTransaction(connection).then(
 						(_th) => {
 							rdb.transactionHandler = _th;
-							onCompleted(null, { affectedRows: 0 });
+							onCompleted(null, { rowsAffected: 0 });
 						},
-						(err) => onCompleted(err, { affectedRows: 0 })
+						(err) => onCompleted(err, { rowsAffected: 0 })
 					);
 					return;
 				}
 
 				if (cmd === 'COMMIT') {
-					if (!th) return onCompleted(new Error('Cannot commit outside transaction'), { affectedRows: 0 });
+					if (!th) return onCompleted(new Error('Cannot commit outside transaction'), { rowsAffected: 0 });
 					try {
 						th.closing = true;
 						th.resolve();
 						await th.settled;
 						th.closed = true;
 						rdb.transactionHandler = undefined;
-						onCompleted(null, { affectedRows: 0 });
+						onCompleted(null, { rowsAffected: 0 });
 					} catch (e) {
 						th.closed = true;
 						rdb.transactionHandler = undefined;
-						onCompleted(e, { affectedRows: 0 });
+						onCompleted(e, { rowsAffected: 0 });
 					}
 					return;
 				}
 
 				if (cmd === 'ROLLBACK') {
-					if (!th) return onCompleted(new Error('Cannot rollback outside transaction'), { affectedRows: 0 });
+					if (!th) return onCompleted(new Error('Cannot rollback outside transaction'), { rowsAffected: 0 });
 					try {
 						th.closing = true;
 						th.reject(new Error('__rollback__'));
@@ -61,11 +61,11 @@ function wrapCommand(context, connection) {
 						}
 						th.closed = true;
 						rdb.transactionHandler = undefined;
-						onCompleted(null, { affectedRows: 0 });
+						onCompleted(null, { rowsAffected: 0 });
 					} catch (e) {
 						th.closed = true;
 						rdb.transactionHandler = undefined;
-						onCompleted(e, { affectedRows: 0 });
+						onCompleted(e, { rowsAffected: 0 });
 					}
 					return;
 				}
@@ -91,9 +91,9 @@ function wrapCommand(context, connection) {
 				}
 			}
 
-			onCompleted(null, { affectedRows });
+			onCompleted(null, { rowsAffected: affectedRows });
 		} catch (e) {
-			onCompleted(e, { affectedRows: 0 });
+			onCompleted(e, { rowsAffected: 0 });
 		}
 	}
 }

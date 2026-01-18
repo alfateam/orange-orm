@@ -19,10 +19,10 @@ function wrapCommand(_context, connection) {
 			if (info && typeof info.changes === 'number') affectedRows = info.changes;
 			else if (info && typeof info.affectedRows === 'number') affectedRows = info.affectedRows;
 
-			onCompleted(null, { affectedRows });
+			onCompleted(null, { rowsAffected: affectedRows });
 		}
 		catch (e) {
-			onCompleted(e, { affectedRows: 0 });
+			onCompleted(e, { rowsAffected: 0 });
 		}
 	}
 }

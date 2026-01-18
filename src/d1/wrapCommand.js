@@ -12,7 +12,7 @@ function wrapCommand(_context, client) {
 			.prepare(sql)
 			.bind.apply(null, params)
 			.run()
-			.then(onInnerCompleted, (e) => onCompleted(e, { affectedRows: 0 }));
+			.then(onInnerCompleted, (e) => onCompleted(e, { rowsAffected: 0 }));
 
 		function onInnerCompleted(response) {
 			var affectedRows = 0;
@@ -26,7 +26,7 @@ function wrapCommand(_context, client) {
 				}
 			}
 
-			onCompleted(null, { affectedRows });
+			onCompleted(null, { rowsAffected: affectedRows });
 		}
 	}
 }

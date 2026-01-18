@@ -14,7 +14,7 @@ function wrapCommand(_context, connection) {
 				onCompleted(err);
 			} else {
 				var affectedRows = typeof this.changes === 'number' ? this.changes : 0;
-				onCompleted(null, { affectedRows });
+				onCompleted(null, { rowsAffected: affectedRows });
 			}
 		});
 	}

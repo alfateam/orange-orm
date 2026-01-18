@@ -29,7 +29,7 @@ function wrapCommand(_context, connection) {
 			var affectedRows =
         typeof result.rowsAffected === 'number' ? result.rowsAffected : 0;
 
-			return onCompleted(null, { affectedRows });
+			return onCompleted(null, { rowsAffected: affectedRows });
 		}
 	}
 }

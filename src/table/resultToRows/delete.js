@@ -65,10 +65,6 @@ function extractRowCount(result) {
 		return result[0].rowsAffected;
 	if (!result || typeof result !== 'object')
 		return;
-	if (typeof result.rowCount === 'number')
-		return result.rowCount;
-	if (typeof result.affectedRows === 'number')
-		return result.affectedRows;
 	if (typeof result.rowsAffected === 'number')
 		return result.rowsAffected;
 }

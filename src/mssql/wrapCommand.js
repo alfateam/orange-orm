@@ -106,13 +106,13 @@ function wrapCommand(_context, connection) {
 		function onInnerCompleted(err, _rows, hasMore) {
 			if (err) {
 				if (err.code && err.code !== 3604) {
-					onCompleted(err, { affectedRows: 0 });
+					onCompleted(err, { rowsAffected: 0 });
 					return;
 				}
 			}
 
 			if (!hasMore) {
-				onCompleted(null, { affectedRows });
+				onCompleted(null, { rowsAffected: affectedRows });
 			}
 		}
 	}

@@ -22,7 +22,7 @@ function wrapCommand(_context, connection) {
 
 			if (Array.isArray(result)) result = result[result.length - 1];
 
-			onCompleted(null, { affectedRows: result.affectedRows });
+			onCompleted(null, { rowsAffected: result.affectedRows });
 		}
 	}
 }

@@ -14,7 +14,7 @@ function wrapCommand(_context, connection) {
 					CachedTypes = TYPES;
 					doQuery(query, onCompleted);
 				})
-				.catch((err) => onCompleted(extractError(err), { affectedRows: 0 }));
+				.catch((err) => onCompleted(extractError(err), { rowsAffected: 0 }));
 		} else {
 			doQuery(query, onCompleted);
 		}
@@ -27,20 +27,20 @@ function wrapCommand(_context, connection) {
 		if (sql.length < 18 && query.parameters.length === 0) {
 			if (sql === 'BEGIN TRANSACTION') {
 				connection.beginTransaction((err) => {
-					if (err) return onCompleted(extractError(err), { affectedRows: 0 });
-					return onCompleted(null, { affectedRows: 0 });
+					if (err) return onCompleted(extractError(err), { rowsAffected: 0 });
+					return onCompleted(null, { rowsAffected: 0 });
 				});
 				return;
 			} else if (sql === 'COMMIT') {
 				connection.commitTransaction((err) => {
-					if (err) return onCompleted(extractError(err), { affectedRows: 0 });
-					return onCompleted(null, { affectedRows: 0 });
+					if (err) return onCompleted(extractError(err), { rowsAffected: 0 });
+					return onCompleted(null, { rowsAffected: 0 });
 				});
 				return;
 			} else if (sql === 'ROLLBACK') {
 				connection.rollbackTransaction((err) => {
-					if (err) return onCompleted(extractError(err), { affectedRows: 0 });
-					return onCompleted(null, { affectedRows: 0 });
+					if (err) return onCompleted(extractError(err), { rowsAffected: 0 });
+					return onCompleted(null, { rowsAffected: 0 });
 				});
 				return;
 			}
@@ -66,8 +66,8 @@ function wrapCommand(_context, connection) {
 		connection.execSql(request);
 
 		function onInnerCompleted(err) {
-			if (err) return onCompleted(extractError(err), { affectedRows: 0 });
-			return onCompleted(null, { affectedRows });
+			if (err) return onCompleted(extractError(err), { rowsAffected: 0 });
+			return onCompleted(null, { rowsAffected: affectedRows });
 		}
 	}
 }
