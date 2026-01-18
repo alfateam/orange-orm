@@ -95,6 +95,120 @@ describe('optimistic fail', () => {
 	}
 });
 
+describe('optimistic json object', () => {
+	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		let { db, init } = getDb(dbName);
+		if (dbName === 'http') {
+			const { db, init } = getDb('sqlite2');
+			await init(db);
+		}
+		else
+			await init(db);
+
+
+
+		const customer = await db.customer2.insert({
+			name: 'Voldemort',
+			balance: -200,
+			isActive: true,
+			picture: null,
+			data: {foo: 1, bar: {baz: {bar: 2, zeta: {hello: 'world'}}}},
+		});
+
+		const customer2 = await db.customer2.getById(customer.id);
+		customer2.data.bar.baz.bar = 'changedBy2';
+		await customer2.saveChanges();
+
+
+		customer.data.bar.baz.zeta = 'changedBy1';
+		await customer.saveChanges();
+
+		const expected = {
+			id: customer.id,
+			name: 'Voldemort',
+			balance: -200,
+			isActive: true,
+			picture: null,
+			data: {foo: 1, bar: {baz: {bar: 'changedBy2', zeta: 'changedBy1'}}},
+		};
+
+		expect(customer).toEqual(expected);
+	}
+});
+
+describe('optimistic fail json object', () => {
+	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		let { db, init } = getDb(dbName);
+		if (dbName === 'http') {
+			const { db, init } = getDb('sqlite2');
+			await init(db);
+		}
+		else
+			await init(db);
+
+		const customer = await db.customer2.insert({
+			name: 'Voldemort',
+			balance: -200,
+			isActive: true,
+			picture: null,
+			data: {foo: 1, bar: {baz: {bar: 2, zeta: {hello: 'world'}}}},
+		});
+
+		const customer2 = await db.customer2.getById(customer.id);
+		customer2.data.bar.baz.bar = 'changedBy2';
+		await customer2.saveChanges();
+
+
+
+		let error;
+		try {
+			customer.data.bar.baz.bar = 'changedBy1';
+			await customer.saveChanges();
+		}
+		catch (e) {
+			error = e;
+		}
+		expect(error?.message).toEqual('The row was changed by another user.');
+
+
+
+
+		// const expected = {
+		// 	id: customer.id,
+		// 	name: 'Voldemort',
+		// 	balance: -200,
+		// 	isActive: true,
+		// 	picture: null,
+		// 	data: {foo: 1, bar: {baz: {bar: 'changedBy2', zeta: 'changedBy1'}}},
+		// };
+
+		// expect(customer).toEqual(expected);
+	}
+});
+
+
 describe('insert skipOnConflict with overwrite column', () => {
 	test('pg', async () => await verify('pg'));
 	test('pglite', async () => await verify('pglite'));
@@ -256,7 +370,7 @@ describe('savechanges overload optimistic', () => {
 		catch (e) {
 			error = e;
 		}
-		expect(error.message).toEqual('The field name was changed by another user. Expected "John", but was "John 1".');
+		expect(error.message).toEqual('The row was changed by another user.');
 	}
 });
 

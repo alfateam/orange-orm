@@ -88,7 +88,7 @@ BEGIN
         "name" VARCHAR2(100),
         "balance" NUMERIC(9,2),
         "isActive" NUMBER(1),
-        "data"  NVARCHAR2(1500),
+        "data"  JSON,
         "picture" BLOB-- VARBINARY(MAX) equivalent
     )
     `,

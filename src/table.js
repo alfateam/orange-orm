@@ -17,6 +17,8 @@ const cascadeDelete = require('./table/cascadeDelete');
 const patchTable = require('./patchTable');
 const newEmitEvent = require('./emitEvent');
 const hostLocal = require('./hostLocal');
+const getSessionSingleton = require('./table/getSessionSingleton');
+const isJsonUpdateSupported = require('./table/isJsonUpdateSupported');
 // const getTSDefinition = require('./getTSDefinition'); //todo: unused ?
 const where = require('./table/where');
 const aggregate = require('./table/aggregate');
@@ -141,6 +143,55 @@ function _new(tableName) {
 		return insert.apply(null, args);
 	};
 
+	table.updateWithConcurrency = function(context, options, row, property, value, oldValue, patchInfo) {
+		options = options || {};
+		const columnOptions = inferColumnOptions(options, property);
+		const concurrency = columnOptions.concurrency || 'optimistic';
+		const column = table[property];
+
+		if (patchInfo && column && column.tsType === 'JSONColumn' && Array.isArray(patchInfo.path) && patchInfo.path.length > 1) {
+			const engine = getSessionSingleton(context, 'engine');
+			if (isJsonUpdateSupported(engine)) {
+				const jsonPath = patchInfo.path.slice(1);
+				const jsonUpdateState = row._jsonUpdateState || {};
+				const columnState = jsonUpdateState[property] || { patches: [] };
+				columnState.patches.push({
+					path: jsonPath,
+					op: patchInfo.op,
+					value: patchInfo.value,
+					oldValue: patchInfo.oldValue
+				});
+				jsonUpdateState[property] = columnState;
+				row._jsonUpdateState = jsonUpdateState;
+				if (concurrency !== 'overwrite') {
+					const state = row._concurrencyState || { columns: {} };
+					const columnConcurrency = state.columns[property] || {};
+					columnConcurrency.concurrency = concurrency;
+					columnConcurrency.paths = columnConcurrency.paths || [];
+					columnConcurrency.paths.push({
+						path: jsonPath,
+						oldValue: patchInfo.oldValue
+					});
+					delete columnConcurrency.oldValue;
+					state.columns[property] = columnConcurrency;
+					row._concurrencyState = state;
+				}
+			}
+			else if (concurrency !== 'overwrite') {
+				const state = row._concurrencyState || { columns: {} };
+				const fullOldValue = Object.prototype.hasOwnProperty.call(patchInfo, 'fullOldValue') ? patchInfo.fullOldValue : oldValue;
+				state.columns[property] = { oldValue: fullOldValue, concurrency };
+				row._concurrencyState = state;
+			}
+		}
+		else if (concurrency !== 'overwrite') {
+			const state = row._concurrencyState || { columns: {} };
+			state.columns[property] = { oldValue, concurrency };
+			row._concurrencyState = state;
+		}
+		row[property] = value;
+	};
+
 	table.delete = _delete.bind(null, table);
 	table.cascadeDelete = function(context, ...rest) {
 		const args = [context, table, ...rest];
@@ -172,6 +223,17 @@ function _new(tableName) {
 	table._aggregate = aggregate(table);
 
 	return table;
+}
+
+function inferColumnOptions(defaults, property) {
+	const parent = {};
+	if (!defaults)
+		return parent;
+	if ('readonly' in defaults)
+		parent.readonly = defaults.readonly;
+	if ('concurrency' in defaults)
+		parent.concurrency = defaults.concurrency;
+	return { ...parent, ...(defaults[property] || {}) };
 }
 
 module.exports = _new;

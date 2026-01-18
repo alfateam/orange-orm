@@ -65,7 +65,7 @@ beforeAll(async () => {
 		server = app.listen(port, () => console.log(`Example app listening on port ${port}!`));
 	}
 
-}, 10000);
+}, 20000);
 
 
 describe('insert-get', () => {
@@ -97,6 +97,127 @@ describe('insert-get', () => {
 			balance: -200,
 			isActive: true,
 			data: ['evil', 'magician'],
+			picture: 'V/cAIibr+r/2RueTQqUiEw=='
+		};
+
+		expect(customer).toEqual(expected);
+	}
+});
+
+//todo
+// describe.only('insert-get-by-json', () => {
+// 	test('pg', async () => await verify('pg'));
+// 	test('pglite', async () => await verify('pglite'));
+// 	test('oracle', async () => await verify('oracle'));
+// 	test('mssql', async () => await verify('mssql'));
+// 	if (major === 18)
+// 		test('mssqlNative', async () => await verify('mssqlNative'));
+// 	test('mysql', async () => await verify('mysql'));
+// 	test('sqlite', async () => await verify('sqlite'));
+// 	test('sap', async () => await verify('sap'));
+// 	test('http', async () => await verify('http'));
+
+// 	async function verify(dbName) {
+// 		const { db } = getDb(dbName);
+
+// 		const customer2 = await db.customer2.insert({
+// 			name: 'Voldemort',
+// 			balance: -200,
+// 			isActive: true,
+// 			data: ['evil', 'magician'],
+// 			picture: 'V/cAIibr+r/2RueTQqUiEw=='
+// 		});
+
+// 		const customer = await db.customer2.getOne(null, {
+// 			where: x => x.data.eq(['evil', 'magician']).and(x.id.eq(customer2.id))
+// 		});
+
+// 		const expected = {
+// 			id: 1,
+// 			name: 'Voldemort',
+// 			balance: -200,
+// 			isActive: true,
+// 			data: ['evil', 'magician'],
+// 			picture: 'V/cAIibr+r/2RueTQqUiEw=='
+// 		};
+
+// 		expect(customer).toEqual(expected);
+// 	}
+// });
+
+describe('insert-update', () => {
+	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+
+		const  customer = await db.customer2.insert({
+			name: 'Voldemort',
+			balance: -200,
+			isActive: true,
+			data: ['evil', 'magician'],
+			picture: 'V/cAIibr+r/2RueTQqUiEw=='
+		});
+
+		customer.data[0] = {sub: {name: 'harr\\y'}};
+		await customer.saveChanges();
+
+
+		const expected = {
+			id: customer.id,
+			name: 'Voldemort',
+			balance: -200,
+			isActive: true,
+			data: [{sub: {name: 'harr\\y'}}, 'magician'],
+			picture: 'V/cAIibr+r/2RueTQqUiEw=='
+		};
+
+		expect(customer).toEqual(expected);
+	}
+});
+
+describe('insert-update-with-null', () => {
+	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+
+		const  customer = await db.customer2.insert({
+			name: 'Voldemort',
+			balance: -200,
+			isActive: true,
+			data: ['evil', 'magician'],
+			picture: 'V/cAIibr+r/2RueTQqUiEw=='
+		});
+
+		customer.data = null;
+		customer.balance = null;
+		await customer.saveChanges();
+
+		const expected = {
+			id: customer.id,
+			name: 'Voldemort',
+			balance: null,
+			isActive: true,
+			data: null,
 			picture: 'V/cAIibr+r/2RueTQqUiEw=='
 		};
 

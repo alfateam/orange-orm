@@ -1,4 +1,6 @@
 ## Changelog
+__4.8.1__  
+Atomic updates/deletes with SQL-level concurrency checks (affectedRows) [#142](https://github.com/alfateam/orange-orm/issues/142)  
 __4.8.0__  
 Transactions now support returning values [#140](https://github.com/alfateam/orange-orm/issues/140)  
 __4.7.17__  

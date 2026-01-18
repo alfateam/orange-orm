@@ -1,7 +1,7 @@
 var newSingleCommand = require('./delete/newSingleCommand');
 
-function newCommand(context, queries, table, filter, strategy, relations) {
-	var singleCommand = newSingleCommand(context, table, filter, relations);
+function newCommand(context, queries, table, filter, strategy, relations, concurrencyState) {
+	var singleCommand = newSingleCommand(context, table, filter, relations, concurrencyState);
 	for (var name in strategy) {
 		if (!(strategy[name] === null || strategy[name]))
 			continue;

@@ -7,7 +7,6 @@ let _delete = require('./delete');
 let newObject = require('../../newObject');
 let toDto = require('./toDto');
 let createDto = require('./toDto/createDto');
-let patchRow = require('../../patchRow');
 let onChange = require('@lroal/on-change');
 let flags = require('../../flags');
 let tryGetSessionContext = require('../tryGetSessionContext');
@@ -78,7 +77,7 @@ function newDecodeDbRow(table, dbRow, filteredAliases, shouldValidate, isInsert)
 				return negotiateNull(this[intName]);
 			},
 			set: function(value) {
-				if (column.onChange && (this[intName] !== null && this[intName] !== undefined) && typeof value === 'object') {
+				if (column.onChange && (this[intName] !== null && this[intName] !== undefined) && value && typeof value === 'object') {
 					if (this[intName] === onChange.target(value))
 						return;
 					this._proxies[name] = column.onChange(value, () => {
@@ -197,11 +196,6 @@ function newDecodeDbRow(table, dbRow, filteredAliases, shouldValidate, isInsert)
 	};
 
 	Row.prototype.deleteCascade = Row.prototype.cascadeDelete;
-
-	Row.prototype.patch = async function(patches, options) {
-		await patchRow(this._context, table, this, patches, options);
-		return this;
-	};
 
 	function decodeDbRow(context, row) {
 		for (let i = 0; i < numberOfColumns; i++) {

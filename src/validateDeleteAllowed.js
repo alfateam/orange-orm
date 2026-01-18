@@ -5,12 +5,14 @@ async function validateDeleteAllowed({ row, options, table }) {
 		e.status = 405;
 		throw e;
 	}
-	for (let p in options)
-		if (isColumn(p, table))
-			return;
-		else if (isManyRelation(p, table)) {
+	if (!hasReadonlyTrue(options))
+		return;
+	for (let p in options) {
+		if (isManyRelation(p, table)) {
 			const childTable = table[p]._relation.childTable;
 			const childOptions = inferOptions(options, p);
+			if (!hasReadonlyTrue(childOptions))
+				continue;
 			const children = await row[p];
 			for (let i = 0; i < children.length; i++) {
 				const childRow = children[i];
@@ -19,22 +21,22 @@ async function validateDeleteAllowed({ row, options, table }) {
 		}
 		else if (isOneRelation(p, table)) {
 			const childOptions = inferOptions(options, p);
+			if (!hasReadonlyTrue(childOptions))
+				continue;
 			const childTable = table[p]._relation.childTable;
 			let childRow = await row[p];
 			await validateDeleteAllowed({ row: childRow, options: childOptions, table: childTable });
 		}
+	}
 }
 
-function isColumn(name, table) {
-	return table[name] && table[name].equal;
-}
 
 function isManyRelation(name, table) {
-	return table[name] && table[name]._relation.isMany;
+	return table[name] && table[name]._relation && table[name]._relation.isMany;
 }
 
 function isOneRelation(name, table) {
-	return table[name] && table[name]._relation.isOne;
+	return table[name] && table[name]._relation && table[name]._relation.isOne;
 }
 
 function inferOptions(defaults, property) {
@@ -44,6 +46,21 @@ function inferOptions(defaults, property) {
 	if ('concurrency' in defaults)
 		parent.concurrency = defaults.concurrency;
 	return {...parent,  ...(defaults[property] || {})};
+}
+
+function hasReadonlyTrue(options) {
+	if (!options || options !== Object(options))
+		return false;
+	if (options.readonly === true)
+		return true;
+	for (let p in options) {
+		const value = options[p];
+		if (!value || value !== Object(value))
+			continue;
+		if (hasReadonlyTrue(value))
+			return true;
+	}
+	return false;
 }
 
 module.exports = validateDeleteAllowed;

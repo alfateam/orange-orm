@@ -1,21 +1,23 @@
 /* eslint-disable require-atomic-updates */
 let applyPatch = require('./applyPatch');
 let fromCompareObject = require('./fromCompareObject');
-let validateDeleteConflict = require('./validateDeleteConflict');
 let validateDeleteAllowed = require('./validateDeleteAllowed');
 let clearCache = require('./table/clearCache');
+const getSessionSingleton = require('./table/getSessionSingleton');
+
 
 async function patchTable() {
 	// const dryrun = true;
 	//traverse all rows you want to update before updatinng or inserting anything.
 	//this is to avoid page locks in ms sql
 	// await patchTableCore.apply(null, [...arguments, dryrun]);
-	const result = await  patchTableCore.apply(null, arguments);
+	const result = await patchTableCore.apply(null, arguments);
 	clearCache(arguments[0]);
 	return result;
 }
 
 async function patchTableCore(context, table, patches, { strategy = undefined, deduceStrategy = false, ...options } = {}, dryrun) {
+	const engine = getSessionSingleton(context, 'engine');
 	options = cleanOptions(options);
 	strategy = JSON.parse(JSON.stringify(strategy || {}));
 	let changed = new Set();
@@ -59,10 +61,11 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 		let property = path[0];
 		path = path.slice(1);
 		if (!row && path.length > 0) {
-			const key = toKey(property);
-			row =  await table.tryGetById.apply(null, [context, ...key, strategy]);
-			if (!row)
-				throw new Error(`Row ${table._dbName} with id ${key} was not found.`);
+			row = await getOrCreateRow({
+				table,
+				strategy,
+				property
+			});
 		}
 
 		if (path.length === 0 && value === null) {
@@ -114,10 +117,22 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 		if (isColumn(property, table)) {
 			if (dryrun)
 				return { updated: row };
+			const column = table[property];
+			const oldColumnValue = row[property];
 			let dto = {};
-			dto[property] = row[property];
-			let result = applyPatch({ options }, dto, [{ path: '/' + path.join('/'), op, value, oldValue }], table[property]);
-			row[property] = result[property];
+			dto[property] = oldColumnValue;
+			const _oldValue = fromCompareObject(oldValue);
+			const _value = fromCompareObject(value);
+			let result = applyPatch({ options, context }, dto, [{ path: '/' + path.join('/'), op, value, oldValue }], table[property]);
+
+			const patchInfo = column.tsType === 'JSONColumn' ? {
+				path,
+				op,
+				value: _value,
+				oldValue : _oldValue,
+				fullOldValue: oldColumnValue
+			} : undefined;
+			await table.updateWithConcurrency(context, options, row, property, result[property], _oldValue, patchInfo);
 			return { updated: row };
 		}
 		else if (isOneRelation(property, table)) {
@@ -216,19 +231,34 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 	async function remove({ path, op, oldValue, options }, table, row) {
 		let property = path[0];
 		path = path.slice(1);
-		row = row || await table.getById.apply(null, [context, ...toKey(property)]);
+		if (!row)
+			row = await getOrCreateRow({ table, strategy: {}, property });
 		if (path.length === 0) {
 			await validateDeleteAllowed({ row, options, table });
-			if (await validateDeleteConflict({ row, oldValue, options, table }))
-				await row.deleteCascade();
+			applyDeleteConcurrencyState(row, oldValue, options, table);
+			await row.deleteCascade();
 		}
 		property = path[0];
 		if (isColumn(property, table)) {
+			const column = table[property];
+			const oldColumnValue = row[property];
 			let dto = {};
-			dto[property] = row[property];
-			let result = applyPatch({ options }, dto, [{ path: '/' + path.join('/'), op, oldValue }], table[property]);
+			dto[property] = oldColumnValue;
+			const _oldValue = fromCompareObject(oldValue);
 
-			row[property] = result[property];
+			let result = applyPatch({ options, context }, dto, [{ path: '/' + path.join('/'), op, oldValue }], table[property]);
+			if (column.tsType === 'JSONColumn') {
+				const patchInfo = {
+					path,
+					op,
+					value: undefined,
+					oldValue: _oldValue,
+					fullOldValue: oldColumnValue
+				};
+				await table.updateWithConcurrency(context, options, row, property, result[property], _oldValue, patchInfo);
+			}
+			else
+				row[property] = result[property];
 			return { updated: row };
 		}
 		else if (isJoinRelation(property, table) && path.length === 1) {
@@ -290,6 +320,40 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 		return table[name] && table[name].equal;
 	}
 
+	function shouldFetchFromDb(table) {
+		return engine === 'sap'
+			&& table._columns.some(x => x.tsType === 'JSONColumn');
+	}
+
+
+	function getOrCreateRow({ table, strategy, property }) {
+		const key = toKey(property);
+
+		if (shouldFetchFromDb(table))
+			return fetchFromDb({context, table, strategy, key});
+		return createRowInCache({ context, table, key });
+	}
+
+	async function fetchFromDb({context, table, strategy, key}) {
+		const row = await table.tryGetById.apply(null, [context, ...key, strategy]);
+		if (!row)
+			throw new Error(`Row ${table._dbName} with id ${key} was not found.`);
+		return row;
+
+	}
+
+
+
+	function createRowInCache({ context, table, key }) {
+		const newRow = getOrCreateRow.cachedNewRow || (getOrCreateRow.cachedNewRow = require('./table/commands/newRow'));
+		const pkDto = {};
+		for (let i = 0; i < key.length && i < table._primaryColumns.length; i++) {
+			pkDto[table._primaryColumns[i].alias] = key[i];
+		}
+		let row = newRow(context, { table, shouldValidate: false }, pkDto);
+		return table._cache.tryAdd(context, row);
+	}
+
 	function isManyRelation(name, table) {
 		return table[name] && table[name]._relation.isMany;
 	}
@@ -303,6 +367,32 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 		return table[name] && table[name]._relation.columns;
 	}
 
+	function applyDeleteConcurrencyState(row, oldValue, options, table) {
+		const state = { columns: {} };
+		if (oldValue && oldValue === Object(oldValue)) {
+			for (let p in oldValue) {
+				if (!isColumn(p, table))
+					continue;
+				const columnOptions = inferOptions(options, p);
+				const concurrency = columnOptions.concurrency || 'optimistic';
+				if (concurrency === 'overwrite')
+					continue;
+				state.columns[p] = { oldValue: fromCompareObject(oldValue[p]), concurrency };
+			}
+		}
+		if (Object.keys(state.columns).length === 0) {
+			const concurrency = options.concurrency || 'optimistic';
+			if (concurrency !== 'overwrite') {
+				for (let i = 0; i < table._primaryColumns.length; i++) {
+					const pkName = table._primaryColumns[i].alias;
+					state.columns[pkName] = { oldValue: row[pkName], concurrency };
+				}
+			}
+		}
+		if (Object.keys(state.columns).length > 0)
+			row._concurrencyState = state;
+	}
+
 	function inferOptions(defaults, property) {
 		const parent = {};
 		if ('readonly' in defaults)
@@ -313,7 +403,7 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 	}
 
 	function cleanOptions(options) {
-		const { table, transaction, db, ..._options } = options;
+		const { table, transaction, db, client, ..._options } = options;
 		return _options;
 	}
 }

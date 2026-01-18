@@ -1,4 +1,5 @@
 var wrapQuery = require('./wrapQuery');
+var wrapCommand = require('./wrapCommand');
 var encodeBoolean = require('../tedious/encodeBoolean');
 var deleteFromSql = require('../tedious/deleteFromSql');
 var selectForUpdateSql = require('../tedious/selectForUpdateSql');
@@ -66,6 +67,23 @@ function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 						callback(e);
 					}
 				});
+			},
+			executeCommand: function(query, callback) {
+				pool.connect((err, client, done) => {
+					if (err) {
+						return callback(err);
+					}
+					try {
+						client.setUseUTC(false);
+						wrapCommand(domain, client)(query, (err, res) => {
+							done();
+							callback(err, res);
+						});
+					} catch (e) {
+						done();
+						callback(e);
+					}
+				});
 			}
 		};
 		domain.rdb = rdb;
@@ -83,6 +101,7 @@ function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 				}
 				client.setUseUTC(false);
 				client.executeQuery = wrapQuery(domain, client);
+				client.executeCommand = wrapCommand(domain, client);
 				rdb.dbClient = client;
 				rdb.dbClientDone = done;
 				domain.rdb = rdb;

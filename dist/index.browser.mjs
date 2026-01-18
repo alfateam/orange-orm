@@ -1784,36 +1784,12 @@ function requireGetSessionSingleton () {
 	return getSessionSingleton;
 }
 
-var resolveExecuteQuery_1;
-var hasRequiredResolveExecuteQuery;
+var negotiateNullParams_1;
+var hasRequiredNegotiateNullParams;
 
-function requireResolveExecuteQuery () {
-	if (hasRequiredResolveExecuteQuery) return resolveExecuteQuery_1;
-	hasRequiredResolveExecuteQuery = 1;
-	const getSessionSingleton = requireGetSessionSingleton();
-
-	function resolveExecuteQuery(context, query) {
-		return resolve;
-
-		function resolve(success, failed) {
-			try {
-				var client = getSessionSingleton(context, 'dbClient');
-				query = negotiateNullParams(query);
-				client.executeQuery(query, onCompleted);
-			} catch (e) {
-				failed(e);
-			}
-
-			function onCompleted(err, rows) {
-				if (!err)
-					success(rows);
-				else
-					failed(err);
-			}
-		}
-
-	}
-
+function requireNegotiateNullParams () {
+	if (hasRequiredNegotiateNullParams) return negotiateNullParams_1;
+	hasRequiredNegotiateNullParams = 1;
 	function negotiateNullParams(query) {
 		if (query && query.parameters && query.parameters.length > 0 && (query.parameters.filter(x => x === null || x === undefined).length > 0)) {
 			var splitted = query.sql().split('?');
@@ -1839,25 +1815,62 @@ function requireResolveExecuteQuery () {
 			return query;
 	}
 
-	resolveExecuteQuery_1 = resolveExecuteQuery;
-	return resolveExecuteQuery_1;
+	negotiateNullParams_1 = negotiateNullParams;
+	return negotiateNullParams_1;
 }
 
-var executeQuery_1;
-var hasRequiredExecuteQuery;
+var resolveExecuteCommand;
+var hasRequiredResolveExecuteCommand;
 
-function requireExecuteQuery () {
-	if (hasRequiredExecuteQuery) return executeQuery_1;
-	hasRequiredExecuteQuery = 1;
-	var newResolver = requireResolveExecuteQuery();
+function requireResolveExecuteCommand () {
+	if (hasRequiredResolveExecuteCommand) return resolveExecuteCommand;
+	hasRequiredResolveExecuteCommand = 1;
+	const getSessionSingleton = requireGetSessionSingleton();
+	const negotiateNullParams = requireNegotiateNullParams();
 
-	function executeQuery(context, query) {
+	function resolveExecuteQuery(context, query) {
+		return resolve;
+
+		function resolve(success, failed) {
+			try {
+				var client = getSessionSingleton(context, 'dbClient');
+				query = negotiateNullParams(query);
+				client.executeCommand(query, onCompleted);
+			} catch (e) {
+				failed(e);
+			}
+
+			function onCompleted(err, rows) {
+				if (!err)
+					success(rows);
+				else
+					failed(err);
+			}
+		}
+
+	}
+
+
+
+	resolveExecuteCommand = resolveExecuteQuery;
+	return resolveExecuteCommand;
+}
+
+var executeCommand_1;
+var hasRequiredExecuteCommand;
+
+function requireExecuteCommand () {
+	if (hasRequiredExecuteCommand) return executeCommand_1;
+	hasRequiredExecuteCommand = 1;
+	var newResolver = requireResolveExecuteCommand();
+
+	function executeCommand(context, query) {
 		var resolver = newResolver(context, query);
 		return new Promise(resolver);
 	}
 
-	executeQuery_1 = executeQuery;
-	return executeQuery_1;
+	executeCommand_1 = executeCommand;
+	return executeCommand_1;
 }
 
 var promise;
@@ -1883,7 +1896,7 @@ var hasRequiredExecuteChanges;
 function requireExecuteChanges () {
 	if (hasRequiredExecuteChanges) return executeChanges_1;
 	hasRequiredExecuteChanges = 1;
-	var executeQuery = requireExecuteQuery();
+	var executeCommand = requireExecuteCommand();
 	var newPromise = requirePromise();
 
 	function executeChanges(context, queries) {
@@ -1896,9 +1909,9 @@ function requireExecuteChanges () {
 		function execute() {
 			i++;
 			if (i + 1 === queries.length)
-				return executeQuery(context, queries[i]).then(notifyListener);
+				return executeCommand(context, queries[i]).then(notifyListener);
 			else {
-				return executeQuery(context, queries[i]).then(notifyListener).then(execute);
+				return executeCommand(context, queries[i]).then(notifyListener).then(execute);
 			}
 		}
 
@@ -1996,6 +2009,60 @@ function requirePopChanges () {
 
 	popChanges_1 = popChanges;
 	return popChanges_1;
+}
+
+var resolveExecuteQuery_1;
+var hasRequiredResolveExecuteQuery;
+
+function requireResolveExecuteQuery () {
+	if (hasRequiredResolveExecuteQuery) return resolveExecuteQuery_1;
+	hasRequiredResolveExecuteQuery = 1;
+	const getSessionSingleton = requireGetSessionSingleton();
+	const negotiateNullParams = requireNegotiateNullParams();
+
+	function resolveExecuteQuery(context, query) {
+		return resolve;
+
+		function resolve(success, failed) {
+			try {
+				var client = getSessionSingleton(context, 'dbClient');
+				query = negotiateNullParams(query);
+				client.executeQuery(query, onCompleted);
+			} catch (e) {
+				failed(e);
+			}
+
+			function onCompleted(err, rows) {
+				if (!err)
+					success(rows);
+				else
+					failed(err);
+			}
+		}
+
+	}
+
+
+
+	resolveExecuteQuery_1 = resolveExecuteQuery;
+	return resolveExecuteQuery_1;
+}
+
+var executeQuery_1;
+var hasRequiredExecuteQuery;
+
+function requireExecuteQuery () {
+	if (hasRequiredExecuteQuery) return executeQuery_1;
+	hasRequiredExecuteQuery = 1;
+	var newResolver = requireResolveExecuteQuery();
+
+	function executeQuery(context, query) {
+		var resolver = newResolver(context, query);
+		return new Promise(resolver);
+	}
+
+	executeQuery_1 = executeQuery;
+	return executeQuery_1;
 }
 
 var executeQueriesCore_1;
@@ -4696,7 +4763,7 @@ function requireFormatOutGeneric () {
 	return formatOutGeneric_1;
 }
 
-var require$$10 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(onChange);
+var require$$9 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(onChange);
 
 var json;
 var hasRequiredJson;
@@ -4708,7 +4775,7 @@ function requireJson () {
 	var newDecode = requireNewDecode$6();
 	var formatOut = requireFormatOutGeneric();
 	var purify = requirePurify$5();
-	var onChange = require$$10;
+	var onChange = require$$9;
 	let clone = require$$5;
 
 	function _new(column) {
@@ -6437,6 +6504,20 @@ function requireNegotiateQueryContext () {
 	return negotiateQueryContext_1;
 }
 
+var isJsonUpdateSupported_1;
+var hasRequiredIsJsonUpdateSupported;
+
+function requireIsJsonUpdateSupported () {
+	if (hasRequiredIsJsonUpdateSupported) return isJsonUpdateSupported_1;
+	hasRequiredIsJsonUpdateSupported = 1;
+	function isJsonUpdateSupported(engine) {
+		return engine === 'pg' || engine === 'mysql' || engine === 'sqlite' || engine === 'mssql' || engine === 'mssqlNative' || engine === 'oracle';
+	}
+
+	isJsonUpdateSupported_1 = isJsonUpdateSupported;
+	return isJsonUpdateSupported_1;
+}
+
 var newUpdateCommandCore_1;
 var hasRequiredNewUpdateCommandCore;
 
@@ -6445,21 +6526,32 @@ function requireNewUpdateCommandCore () {
 	hasRequiredNewUpdateCommandCore = 1;
 	const getSessionSingleton = requireGetSessionSingleton();
 	var newParameterized = requireNewParameterized();
+	const isJsonUpdateSupported = requireIsJsonUpdateSupported();
 
-	function newUpdateCommandCore(context, table, columns, row) {
+	function newUpdateCommandCore(context, table, columns, row, concurrencyState) {
 		const quote = getSessionSingleton(context, 'quote');
+		const engine = getSessionSingleton(context, 'engine');
 		var command = newParameterized('UPDATE ' + quote(table._dbName) + ' SET');
 		var separator = ' ';
 
 		addColumns();
 		addWhereId();
 		addDiscriminators();
+		addConcurrencyChecks();
 
 		function addColumns() {
 			for (var alias in columns) {
 				var column = columns[alias];
-				var encoded = column.encode(context, row[alias]);
-				command = command.append(separator + quote(column._dbName) + '=').append(encoded);
+				const columnSql = quote(column._dbName);
+				const jsonUpdate = row._jsonUpdateState && row._jsonUpdateState[alias];
+				if (jsonUpdate && jsonUpdate.patches && jsonUpdate.patches.length) {
+					const updated = buildJsonUpdateExpression(columnSql, jsonUpdate.patches, column);
+					command = command.append(separator + columnSql + '=').append(updated);
+				}
+				else {
+					var encoded = column.encode(context, row[alias]);
+					command = command.append(separator + columnSql + '=').append(encoded);
+				}
 				separator = ',';
 			}
 		}
@@ -6482,6 +6574,298 @@ function requireNewUpdateCommandCore () {
 				return;
 			discriminators = separator + discriminators.join(' AND ');
 			command = command.append(discriminators);
+		}
+
+		function addConcurrencyChecks() {
+			const columnsState = concurrencyState && concurrencyState.columns;
+			if (!columnsState)
+				return;
+			for (let alias in columnsState) {
+				const state = columnsState[alias];
+				if (!state || state.concurrency === 'overwrite')
+					continue;
+				const column = table[alias];
+				if (!column)
+					continue;
+				if (state.paths && state.paths.length) {
+					for (let i = 0; i < state.paths.length; i++) {
+						const pathState = state.paths[i];
+						const encoded = encodeJsonValue(pathState.oldValue, column);
+						const jsonPath = buildJsonPath(pathState.path);
+						const columnExpr = buildJsonExtractExpression(quote(column._dbName), jsonPath, pathState.oldValue);
+						command = appendJsonPathComparison(columnExpr, encoded);
+					}
+				}
+				else {
+					const encoded = (engine === 'mysql' && column.tsType === 'JSONColumn')
+						? encodeJsonValue(state.oldValue, column)
+						: column.encode(context, state.oldValue);
+					command = appendNullSafeComparison(column, encoded);
+				}
+			}
+		}
+
+		function appendNullSafeComparison(column, encoded) {
+			const columnSql = quote(column._dbName);
+			if (engine === 'pg') {
+				command = command.append(separator + columnSql + ' IS NOT DISTINCT FROM ').append(encoded);
+			}
+			else if (engine === 'mysql') {
+				command = command.append(separator + columnSql + ' <=> ').append(encoded);
+			}
+			else if (engine === 'sqlite') {
+				command = command.append(separator + columnSql + ' IS ').append(encoded);
+			}
+			else if (engine === 'sap' && column.tsType === 'JSONColumn') {
+				if (encoded.sql() === 'null') {
+					command = command.append(separator + columnSql + ' IS NULL');
+				}
+				else {
+					const casted = newParameterized('CONVERT(VARCHAR(16384), ' + encoded.sql() + ')', encoded.parameters);
+					command = command.append(separator + 'CONVERT(VARCHAR(16384), ' + columnSql + ')=') .append(casted);
+				}
+			}
+			else if (engine === 'oracle' && column.tsType === 'JSONColumn') {
+				if (encoded.sql() === 'null') {
+					command = command.append(separator + columnSql + ' IS NULL');
+				}
+				else {
+					const jsonValue = newParameterized('JSON(' + encoded.sql() + ')', encoded.parameters);
+					const compare = newParameterized('JSON_EQUAL(' + columnSql + ', ' + jsonValue.sql() + ')', jsonValue.parameters);
+					command = command.append(separator).append(compare);
+				}
+			}
+			else {
+				if (encoded.sql() === 'null')
+					command = command.append(separator + columnSql + ' IS NULL');
+				else
+					command = command.append(separator + columnSql + '=').append(encoded);
+			}
+			separator = ' AND ';
+			return command;
+		}
+
+		function appendJsonPathComparison(columnExpr, encoded) {
+			if (engine === 'pg') {
+				command = command.append(separator).append(columnExpr).append(' IS NOT DISTINCT FROM ').append(encoded);
+			}
+			else if (engine === 'mysql') {
+				command = command.append(separator).append(columnExpr).append(' <=> ').append(encoded);
+			}
+			else if (engine === 'sqlite') {
+				command = command.append(separator).append(columnExpr).append(' IS ').append(encoded);
+			}
+			else if (engine === 'oracle') {
+				const isJsonQuery = columnExpr.sql().indexOf('JSON_QUERY(') === 0;
+				if (encoded.sql() === 'null') {
+					command = command.append(separator).append(columnExpr).append(' IS NULL');
+				}
+				else if (isJsonQuery) {
+					const jsonValue = newParameterized('JSON(' + encoded.sql() + ')', encoded.parameters);
+					const compare = newParameterized('JSON_EQUAL(' + columnExpr.sql() + ', ' + jsonValue.sql() + ')', columnExpr.parameters.concat(jsonValue.parameters));
+					command = command.append(separator).append(compare);
+				}
+				else {
+					command = command.append(separator).append(columnExpr).append('=').append(encoded);
+				}
+			}
+			else {
+				if (encoded.sql() === 'null')
+					command = command.append(separator).append(columnExpr).append(' IS NULL');
+				else
+					command = command.append(separator).append(columnExpr).append('=').append(encoded);
+			}
+			separator = ' AND ';
+			return command;
+		}
+
+		function buildJsonUpdateExpression(columnSql, patches, column) {
+			if (!isJsonUpdateSupported(engine))
+				return column.encode(context, row[column.alias]);
+			let expr = newParameterized(columnSql);
+			for (let i = 0; i < patches.length; i++) {
+				const patch = patches[i];
+				expr = applyJsonPatchExpression(expr, patch, column);
+			}
+			return expr;
+		}
+
+		function applyJsonPatchExpression(expr, patch, column) {
+			const path = patch.path || [];
+			const jsonPath = buildJsonPath(path);
+			if (patch.op === 'remove')
+				return buildJsonRemoveExpression(expr, jsonPath);
+			return buildJsonSetExpression(expr, jsonPath, patch.value, column);
+		}
+
+		function buildJsonSetExpression(expr, jsonPath, value, column) {
+			if (engine === 'pg') {
+				const pathLiteral = buildPgPathLiteral(jsonPath.tokens);
+				const jsonValue = JSON.stringify(value === undefined ? null : value);
+				const sql = 'jsonb_set(' + expr.sql() + ', ' + pathLiteral + ', ?::jsonb, true)';
+				return newParameterized(sql, expr.parameters.concat([jsonValue]));
+			}
+			if (engine === 'mysql') {
+				const jsonValue = JSON.stringify(value === undefined ? null : value);
+				const sql = 'JSON_SET(' + expr.sql() + ', ' + jsonPath.sql + ', CAST(? AS JSON))';
+				return newParameterized(sql, expr.parameters.concat(jsonPath.parameters, [jsonValue]));
+			}
+			if (engine === 'sqlite') {
+				const jsonValue = JSON.stringify(value === undefined ? null : value);
+				const sql = 'json_set(' + expr.sql() + ', ' + jsonPath.sql + ', json(?))';
+				return newParameterized(sql, expr.parameters.concat(jsonPath.parameters, [jsonValue]));
+			}
+			if (engine === 'mssql' || engine === 'mssqlNative') {
+				const mssqlValue = buildMssqlJsonValue(value);
+				const sql = 'JSON_MODIFY(' + expr.sql() + ', ' + jsonPath.sql + ', ' + mssqlValue.sql() + ')';
+				return newParameterized(sql, expr.parameters.concat(jsonPath.parameters, mssqlValue.parameters));
+			}
+			if (engine === 'oracle') {
+				const jsonValue = JSON.stringify(value === undefined ? null : value);
+				const sql = 'JSON_TRANSFORM(' + expr.sql() + ', SET ' + jsonPath.sql + ' = JSON(?))';
+				return newParameterized(sql, expr.parameters.concat(jsonPath.parameters, [jsonValue]));
+			}
+			return column.encode(context, row[column.alias]);
+		}
+
+		function buildJsonRemoveExpression(expr, jsonPath) {
+			if (engine === 'pg') {
+				const pathLiteral = buildPgPathLiteral(jsonPath.tokens);
+				const sql = expr.sql() + ' #- ' + pathLiteral;
+				return newParameterized(sql, expr.parameters);
+			}
+			if (engine === 'mysql') {
+				const sql = 'JSON_REMOVE(' + expr.sql() + ', ' + jsonPath.sql + ')';
+				return newParameterized(sql, expr.parameters.concat(jsonPath.parameters));
+			}
+			if (engine === 'sqlite') {
+				const sql = 'json_remove(' + expr.sql() + ', ' + jsonPath.sql + ')';
+				return newParameterized(sql, expr.parameters.concat(jsonPath.parameters));
+			}
+			if (engine === 'mssql' || engine === 'mssqlNative') {
+				const sql = 'JSON_MODIFY(' + expr.sql() + ', ' + jsonPath.sql + ', NULL)';
+				return newParameterized(sql, expr.parameters.concat(jsonPath.parameters));
+			}
+			if (engine === 'oracle') {
+				const sql = 'JSON_TRANSFORM(' + expr.sql() + ', REMOVE ' + jsonPath.sql + ')';
+				return newParameterized(sql, expr.parameters.concat(jsonPath.parameters));
+			}
+			return expr;
+		}
+
+		function buildJsonExtractExpression(columnSql, jsonPath, oldValue) {
+			if (engine === 'pg') {
+				const sql = columnSql + ' #> ' + buildPgPathLiteral(jsonPath.tokens);
+				return newParameterized(sql);
+			}
+			if (engine === 'mysql') {
+				const sql = 'JSON_EXTRACT(' + columnSql + ', ' + jsonPath.sql + ')';
+				return newParameterized(sql, jsonPath.parameters);
+			}
+			if (engine === 'sqlite') {
+				const sql = 'json_extract(' + columnSql + ', ' + jsonPath.sql + ')';
+				return newParameterized(sql, jsonPath.parameters);
+			}
+			if (engine === 'mssql' || engine === 'mssqlNative') {
+				const fn = isJsonObject(oldValue) ? 'JSON_QUERY' : 'JSON_VALUE';
+				const sql = fn + '(' + columnSql + ', ' + jsonPath.sql + ')';
+				return newParameterized(sql, jsonPath.parameters);
+			}
+			if (engine === 'oracle') {
+				const fn = isJsonObject(oldValue) ? 'JSON_QUERY' : 'JSON_VALUE';
+				const sql = fn + '(' + columnSql + ', ' + jsonPath.sql + ')';
+				return newParameterized(sql, jsonPath.parameters);
+			}
+			return newParameterized(columnSql);
+		}
+
+		function buildJsonPath(pathTokens) {
+			const tokens = Array.isArray(pathTokens) ? pathTokens : [];
+			if (engine === 'pg')
+				return { tokens, sql: buildPgPathLiteral(tokens), parameters: [] };
+			if (engine === 'oracle') {
+				let jsonPath = '$';
+				for (let i = 0; i < tokens.length; i++) {
+					const token = String(tokens[i]);
+					if (/^\d+$/.test(token))
+						jsonPath += '[' + token + ']';
+					else if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(token))
+						jsonPath += '.' + token;
+					else
+						jsonPath += '["' + token.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"]';
+				}
+				return { tokens, sql: '\'' + jsonPath.replace(/'/g, '\'\'') + '\'', parameters: [] };
+			}
+			let jsonPath = '$';
+			for (let i = 0; i < tokens.length; i++) {
+				const token = String(tokens[i]);
+				if (/^\d+$/.test(token))
+					jsonPath += '[' + token + ']';
+				else if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(token))
+					jsonPath += '.' + token;
+				else
+					jsonPath += '["' + token.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"]';
+			}
+			return { tokens, sql: '?', parameters: [jsonPath] };
+		}
+
+		function buildPgPathLiteral(tokens) {
+			const parts = tokens.map(token => {
+				const text = String(token);
+				if (/^[A-Za-z0-9_]+$/.test(text))
+					return text;
+				return '"' + text.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+			});
+			return '\'{'+ parts.join(',') + '}\'';
+		}
+
+		function encodeJsonValue(value, column) {
+			if (engine === 'oracle') {
+				if (value === null || value === undefined)
+					return newParameterized('null');
+				if (isJsonObject(value))
+					return column.encode(context, value);
+				if (typeof value === 'boolean' || typeof value === 'number')
+					return newParameterized('?', [String(value)]);
+				return newParameterized('?', [value]);
+			}
+			if (engine === 'pg') {
+				const jsonValue = JSON.stringify(value === undefined ? null : value);
+				return newParameterized('?::jsonb', [jsonValue]);
+			}
+			if (engine === 'mysql') {
+				const jsonValue = JSON.stringify(value === undefined ? null : value);
+				return newParameterized('CAST(? AS JSON)', [jsonValue]);
+			}
+			if (engine === 'sqlite') {
+				if (isJsonObject(value)) {
+					const jsonValue = JSON.stringify(value);
+					return newParameterized('?', [jsonValue]);
+				}
+				if (value === null || value === undefined)
+					return newParameterized('null');
+				return newParameterized('?', [value]);
+			}
+			if (engine === 'mssql' || engine === 'mssqlNative') {
+				if (isJsonObject(value))
+					return newParameterized('JSON_QUERY(?)', [JSON.stringify(value)]);
+				if (value === null || value === undefined)
+					return newParameterized('null');
+				return newParameterized('?', [String(value)]);
+			}
+			return column.encode(context, value);
+		}
+
+		function buildMssqlJsonValue(value) {
+			if (isJsonObject(value))
+				return newParameterized('JSON_QUERY(?)', [JSON.stringify(value)]);
+			if (value === null || value === undefined)
+				return newParameterized('null');
+			return newParameterized('?', [value]);
+		}
+
+		function isJsonObject(value) {
+			return value && typeof value === 'object';
 		}
 
 		return command;
@@ -6590,6 +6974,9 @@ function requireNewUpdateCommand () {
 		this._columnList[column.alias] = column;
 		this.onFieldChanged = this.onFieldChanged.bind(this);
 		row.subscribeChanged(this.onFieldChanged);
+		this._concurrencyState = undefined;
+		this._concurrencySummary = undefined;
+		this._usesReturning = false;
 	}
 
 	UpdateCommand.prototype.onFieldChanged = function(_row, column) {
@@ -6607,11 +6994,20 @@ function requireNewUpdateCommand () {
 	});
 
 	UpdateCommand.prototype._getCoreCommand = function() {
-		return this.__getCoreCommand(this._table, this._columnList, this._row);
+		return this.__getCoreCommand(this._table, this._columnList, this._row, this._concurrencyState);
 	};
 
 	UpdateCommand.prototype.endEdit = function() {
-		this._getCoreCommand();
+		this._concurrencyState = this._row._concurrencyState;
+		delete this._row._concurrencyState;
+
+		const coreCommand = this._getCoreCommand();
+		delete this._row._jsonUpdateState;
+		this._usesReturning = Boolean(coreCommand._usesReturning);
+		this._concurrencySummary = summarizeConcurrency(this._concurrencyState);
+		if (this._concurrencySummary.hasConcurrency)
+			this.onResult = this._onConcurrencyResult.bind(this);
+
 		this._row.unsubscribeChanged(this.onFieldChanged);
 		let dto = JSON.parse(JSON.stringify(createDto(this._table, this._row)));
 		this._patch = createPatch([JSON.parse(this._row._oldValues)],[dto]);
@@ -6632,6 +7028,44 @@ function requireNewUpdateCommand () {
 
 		}
 	});
+
+	UpdateCommand.prototype._onConcurrencyResult = function(result) {
+		const rowCount = extractRowCount(result, this._usesReturning);
+		if (rowCount === undefined)
+			return;
+		if (rowCount === 0 && this._concurrencySummary.hasOptimistic) {
+			throw new Error('The row was changed by another user.');
+		}
+	};
+
+	function summarizeConcurrency(concurrencyState) {
+		const summary = { hasConcurrency: false, hasOptimistic: false };
+		if (!concurrencyState || !concurrencyState.columns)
+			return summary;
+		for (let name in concurrencyState.columns) {
+			const state = concurrencyState.columns[name];
+			if (!state)
+				continue;
+			const strategy = state.concurrency || 'optimistic';
+			if (strategy === 'overwrite')
+				continue;
+			summary.hasConcurrency = true;
+			if (strategy === 'optimistic')
+				summary.hasOptimistic = true;
+		}
+		return summary;
+	}
+
+	function extractRowCount(result, usesReturning) {
+		if (usesReturning && Array.isArray(result))
+			return result.length;
+		if (Array.isArray(result) && typeof result[0].rowsAffected === 'number')
+			return result[0].rowsAffected;
+		if (!result || typeof result !== 'object')
+			return;
+		if (typeof result.rowsAffected === 'number')
+			return result.rowsAffected;
+	}
 
 	newUpdateCommand_1 = newUpdateCommand;
 	return newUpdateCommand_1;
@@ -7041,21 +7475,130 @@ function requireNewSingleCommandCore () {
 	if (hasRequiredNewSingleCommandCore) return newSingleCommandCore_1;
 	hasRequiredNewSingleCommandCore = 1;
 	var getSessionSingleton = requireGetSessionSingleton();
+	var newParameterized = requireNewParameterized();
 
-	function newSingleCommandCore(context, table, filter, alias) {
+	function newSingleCommandCore(context, table, filter, alias, concurrencyState) {
 		var c = {};
+		var quote = getSessionSingleton(context, 'quote');
+		var engine = getSessionSingleton(context, 'engine');
+		var concurrency = buildConcurrencyChecks(concurrencyState);
+		var parameters = filter.parameters ? filter.parameters.slice() : [];
+		if (concurrency && concurrency.parameters.length > 0)
+			parameters = parameters.concat(concurrency.parameters);
 
 		c.sql = function() {
 			var whereSql = filter.sql();
+			if (concurrency && concurrency.sql) {
+				if (whereSql)
+					whereSql += ' AND ' + concurrency.sql;
+				else
+					whereSql = concurrency.sql;
+			}
 			if (whereSql)
 				whereSql = ' where ' + whereSql;
 			var deleteFromSql = getSessionSingleton(context, 'deleteFromSql');
 			return deleteFromSql(table, alias, whereSql);
 		};
 
-		c.parameters = filter.parameters;
+		c.parameters = parameters;
 
 		return c;
+
+		function buildConcurrencyChecks(state) {
+			const columnsState = state && state.columns;
+			if (!columnsState)
+				return;
+			const parts = [];
+			const params = [];
+			for (let alias in columnsState) {
+				const columnState = columnsState[alias];
+				if (!columnState || columnState.concurrency === 'overwrite')
+					continue;
+				const column = table[alias];
+				if (!column)
+					continue;
+				const encoded = (engine === 'mysql' && column.tsType === 'JSONColumn')
+					? encodeJsonValue(columnState.oldValue, column)
+					: column.encode(context, columnState.oldValue);
+				const comparison = buildNullSafeComparison(column, encoded);
+				if (comparison.sql)
+					parts.push(comparison.sql());
+				if (comparison.parameters.length > 0)
+					params.push(...comparison.parameters);
+			}
+			if (parts.length === 0)
+				return;
+			return { sql: parts.join(' AND '), parameters: params };
+		}
+
+		function buildNullSafeComparison(column, encoded) {
+			const columnSql = quote(column._dbName);
+			if (engine === 'pg') {
+				return newParameterized(columnSql + ' IS NOT DISTINCT FROM ' + encoded.sql(), encoded.parameters);
+			}
+			if (engine === 'mysql') {
+				return newParameterized(columnSql + ' <=> ' + encoded.sql(), encoded.parameters);
+			}
+			if (engine === 'sqlite') {
+				return newParameterized(columnSql + ' IS ' + encoded.sql(), encoded.parameters);
+			}
+			if (engine === 'sap' && column.tsType === 'JSONColumn') {
+				if (encoded.sql() === 'null')
+					return newParameterized(columnSql + ' IS NULL');
+				const casted = newParameterized('CONVERT(VARCHAR(16384), ' + encoded.sql() + ')', encoded.parameters);
+				return newParameterized('CONVERT(VARCHAR(16384), ' + columnSql + ')=' + casted.sql(), casted.parameters);
+			}
+			if (engine === 'oracle' && column.tsType === 'JSONColumn') {
+				if (encoded.sql() === 'null')
+					return newParameterized(columnSql + ' IS NULL');
+				const jsonValue = newParameterized('JSON(' + encoded.sql() + ')', encoded.parameters);
+				return newParameterized('JSON_EQUAL(' + columnSql + ', ' + jsonValue.sql() + ')', jsonValue.parameters);
+			}
+			if (encoded.sql() === 'null')
+				return newParameterized(columnSql + ' IS NULL');
+			return newParameterized(columnSql + '=' + encoded.sql(), encoded.parameters);
+		}
+
+		function encodeJsonValue(value, column) {
+			if (engine === 'oracle') {
+				if (value === null || value === undefined)
+					return newParameterized('null');
+				if (isJsonObject(value))
+					return column.encode(context, value);
+				if (typeof value === 'boolean' || typeof value === 'number')
+					return newParameterized('?', [String(value)]);
+				return newParameterized('?', [value]);
+			}
+			if (engine === 'pg') {
+				const jsonValue = JSON.stringify(value === undefined ? null : value);
+				return newParameterized('?::jsonb', [jsonValue]);
+			}
+			if (engine === 'mysql') {
+				const jsonValue = JSON.stringify(value === undefined ? null : value);
+				return newParameterized('CAST(? AS JSON)', [jsonValue]);
+			}
+			if (engine === 'sqlite') {
+				if (isJsonObject(value)) {
+					const jsonValue = JSON.stringify(value);
+					return newParameterized('?', [jsonValue]);
+				}
+				if (value === null || value === undefined)
+					return newParameterized('null');
+				return newParameterized('?', [value]);
+			}
+			if (engine === 'mssql' || engine === 'mssqlNative') {
+				if (isJsonObject(value))
+					return newParameterized('JSON_QUERY(?)', [JSON.stringify(value)]);
+				if (value === null || value === undefined)
+					return newParameterized('null');
+				return newParameterized('?', [String(value)]);
+			}
+			return column.encode(context, value);
+		}
+
+		function isJsonObject(value) {
+			return value && typeof value === 'object';
+		}
 	}
 
 	newSingleCommandCore_1 = newSingleCommandCore;
@@ -7074,14 +7617,14 @@ function requireNewSingleCommand () {
 	var newSingleCommandCore = requireNewSingleCommandCore();
 	var createAlias = requireCreateAlias();
 
-	function _new(context, table, filter, relations) {
+	function _new(context, table, filter, relations, concurrencyState) {
 		var alias = createAlias(table, relations.length);
 		filter = extractFilter(filter);
 		filter = newSubFilter(context, relations, filter);
 		var discriminator = newDiscriminatorSql(context, table, alias);
 		if (discriminator !== '')
 			filter = filter.and(context, discriminator);
-		return newSingleCommandCore(context, table, filter, alias);
+		return newSingleCommandCore(context, table, filter, alias, concurrencyState);
 	}
 
 	newSingleCommand = _new;
@@ -7096,8 +7639,8 @@ function requireNewDeleteCommand () {
 	hasRequiredNewDeleteCommand = 1;
 	var newSingleCommand = requireNewSingleCommand();
 
-	function newCommand(context, queries, table, filter, strategy, relations) {
-		var singleCommand = newSingleCommand(context, table, filter, relations);
+	function newCommand(context, queries, table, filter, strategy, relations, concurrencyState) {
+		var singleCommand = newSingleCommand(context, table, filter, relations, concurrencyState);
 		for (var name in strategy) {
 			if (!(strategy[name] === null || strategy[name]))
 				continue;
@@ -7137,11 +7680,25 @@ function require_delete$1 () {
 			args.push(row[primary.alias]);
 		});
 		var filter = newPrimaryKeyFilter.apply(null, args);
-		var cmds = newDeleteCommand(context, [], table, filter, strategy, relations);
+		var concurrencyState = row._concurrencyState;
+		delete row._concurrencyState;
+		var cmds = newDeleteCommand(context, [], table, filter, strategy, relations, concurrencyState);
 		cmds.forEach(function(cmd) {
 			pushCommand(context, cmd);
 		});
 		var cmd = cmds[0];
+		var concurrencySummary = summarizeConcurrency(concurrencyState);
+		if (concurrencySummary.hasConcurrency) {
+			var deleteCmd = cmds[cmds.length - 1];
+			deleteCmd.onResult = function(result) {
+				var rowCount = extractRowCount(result);
+				if (rowCount === undefined)
+					return;
+				if (rowCount === 0 && concurrencySummary.hasOptimistic) {
+					throw new Error('The row was changed by another user.');
+				}
+			};
+		}
 		if (table._emitChanged.callbacks.length > 0) {
 			cmd.disallowCompress = true;
 			var dto = createDto(table, row);
@@ -7149,6 +7706,33 @@ function require_delete$1 () {
 			cmd.emitChanged = table._emitChanged.bind(null, {row: row, patch: patch}); //todo remove ?
 		}
 
+	}
+
+	function summarizeConcurrency(concurrencyState) {
+		const summary = { hasConcurrency: false, hasOptimistic: false };
+		if (!concurrencyState || !concurrencyState.columns)
+			return summary;
+		for (let name in concurrencyState.columns) {
+			const state = concurrencyState.columns[name];
+			if (!state)
+				continue;
+			const strategy = state.concurrency || 'optimistic';
+			if (strategy === 'overwrite')
+				continue;
+			summary.hasConcurrency = true;
+			if (strategy === 'optimistic')
+				summary.hasOptimistic = true;
+		}
+		return summary;
+	}
+
+	function extractRowCount(result) {
+		if (Array.isArray(result) && typeof result[0].rowsAffected === 'number')
+			return result[0].rowsAffected;
+		if (!result || typeof result !== 'object')
+			return;
+		if (typeof result.rowsAffected === 'number')
+			return result.rowsAffected;
 	}
 
 	_delete_1$1 = _delete;
@@ -7256,742 +7840,6 @@ function requireToDto () {
 	return toDto_1;
 }
 
-var fromCompareObject_1;
-var hasRequiredFromCompareObject;
-
-function requireFromCompareObject () {
-	if (hasRequiredFromCompareObject) return fromCompareObject_1;
-	hasRequiredFromCompareObject = 1;
-	function fromCompareObject(object) {
-		if (object === null || object === undefined) return object;
-		if (object.__patchType === 'Array') {
-			let copy = [];
-			let i = 0;
-			for (let id in object) {
-				if (id !== '__patchType') {
-					copy[i] = fromCompareObject(object[id]);
-					i++;
-				}
-			}
-			return copy;
-		} else if (object === Object(object)) {
-			let copy = {};
-			for (let name in object) {
-				if (name !== '__patchType')
-					copy[name] = fromCompareObject(object[name]);
-			}
-			return copy;
-		}
-		return object;
-	}
-
-	fromCompareObject_1 = fromCompareObject;
-	return fromCompareObject_1;
-}
-
-var toCompareObject_1;
-var hasRequiredToCompareObject;
-
-function requireToCompareObject () {
-	if (hasRequiredToCompareObject) return toCompareObject_1;
-	hasRequiredToCompareObject = 1;
-	const dateToISOString = requireDateToISOString();
-	const isNode = (typeof window === 'undefined');
-
-	function toCompareObject(object) {
-		if (Array.isArray(object)) {
-			let copy = {};
-			Object.defineProperty(copy, '__patchType', {
-				value: 'Array',
-				writable: true,
-				enumerable: true
-			});
-
-			for (var i = 0; i < object.length; i++) {
-				let element = toCompareObject(object[i]);
-				if (element === Object(element) && 'id' in element)
-					copy[element.id] = element;
-				else
-					copy[i] = element;
-			}
-			return copy;
-		}
-		if (isNode && isNodeBuffer(object))
-			return object.toString('base64');
-		// @ts-ignore
-		else if (object instanceof Date && !isNaN(object))
-			return dateToISOString(object);
-		else if (object === Object(object)) {
-			let copy = {};
-			for (let name in object) {
-				copy[name] = toCompareObject(object[name]);
-			}
-			return copy;
-		}
-		return object;
-	}
-
-	function isNodeBuffer(object) {
-		return Buffer.isBuffer(object);
-	}
-
-	toCompareObject_1 = toCompareObject;
-	return toCompareObject_1;
-}
-
-var applyPatch_1;
-var hasRequiredApplyPatch;
-
-function requireApplyPatch () {
-	if (hasRequiredApplyPatch) return applyPatch_1;
-	hasRequiredApplyPatch = 1;
-	const fastjson = require$$0$3;
-	let fromCompareObject = requireFromCompareObject();
-	let toCompareObject = requireToCompareObject();
-
-	function applyPatch({ options = {} }, dto, changes, column) {
-		let dtoCompare = toCompareObject(dto);
-		changes = validateConflict(dtoCompare, changes);
-		fastjson.applyPatch(dtoCompare, changes, true, true);
-
-		let result = fromCompareObject(dtoCompare);
-
-		if (Array.isArray(dto))
-			dto.length = 0;
-		else
-			for (let name in dto) {
-				delete dto[name];
-			}
-
-		for (let name in result) {
-			dto[name] = result[name];
-		}
-
-		return dto;
-
-		function validateConflict(object, changes) {
-			return changes.filter(change => {
-				let expectedOldValue = change.oldValue;
-				const option = getOption(change.path);
-				let readonly = option.readonly;
-				if (readonly) {
-					const e = new Error(`Cannot update column ${change.path.replace('/', '')} because it is readonly`);
-					// @ts-ignore
-					e.status = 405;
-					throw e;
-				}
-				let concurrency = option.concurrency || 'optimistic';
-				if ((concurrency === 'optimistic') || (concurrency === 'skipOnConflict')) {
-					let oldValue = getOldValue(object, change.path);
-					try {
-						if (column?.tsType === 'DateColumn') {
-							assertDatesEqual(oldValue, expectedOldValue);
-						}
-						else
-							assertDeepEqual(oldValue, expectedOldValue);
-					}
-					catch (e) {
-						if (concurrency === 'skipOnConflict')
-							return false;
-						throw new Error(`The field ${change.path.replace('/', '')} was changed by another user. Expected ${inspect(fromCompareObject(expectedOldValue))}, but was ${inspect(fromCompareObject(oldValue))}.`);
-					}
-				}
-				return true;
-			});
-
-			function getOldValue(obj, path) {
-				let splitPath = path.split('/');
-				splitPath.shift();
-				return splitPath.reduce(extract, obj);
-
-				function extract(obj, name) {
-					if (obj === Object(obj))
-						return obj[name];
-					return;
-				}
-			}
-
-		}
-
-		function getOption(path) {
-			let splitPath = path.split('/');
-			splitPath.shift();
-			return splitPath.reduce(extract, options);
-
-			function extract(obj, name) {
-				if (Array.isArray(obj))
-					return obj[0] || options;
-				if (obj === Object(obj))
-					return obj[name] || options;
-				return obj;
-			}
-
-		}
-	}
-
-	function assertDatesEqual(date1, date2) {
-		if (date1 && date2) {
-			const parts1 = date1.split('T');
-			const time1parts = (parts1[1] || '').split(/[-+.]/);
-			const parts2 = date2.split('T');
-			const time2parts = (parts2[1] || '').split(/[-+.]/);
-			while (time1parts.length !== time2parts.length) {
-				if (time1parts.length > time2parts.length)
-					time1parts.pop();
-				else if (time1parts.length < time2parts.length)
-					time2parts.pop();
-			}
-			date1 = `${parts1[0]}T${time1parts[0]}`;
-			date2 = `${parts2[0]}T${time2parts[0]}`;
-		}
-		assertDeepEqual(date1, date2);
-	}
-
-	function assertDeepEqual(a, b) {
-		if (JSON.stringify(a) !== JSON.stringify(b))
-			throw new Error('A, b are not equal');
-	}
-
-	function inspect(obj) {
-		return JSON.stringify(obj, null, 2);
-	}
-
-	applyPatch_1 = applyPatch;
-	return applyPatch_1;
-}
-
-var validateDeleteConflict_1;
-var hasRequiredValidateDeleteConflict;
-
-function requireValidateDeleteConflict () {
-	if (hasRequiredValidateDeleteConflict) return validateDeleteConflict_1;
-	hasRequiredValidateDeleteConflict = 1;
-	// @ts-nocheck
-	/* eslint-disable */
-	const toCompareObject = requireToCompareObject();
-
-	async function validateDeleteConflict({ row, oldValue, options, table }) {
-		for (let p in oldValue) {
-			if (isColumn(p, table)) {
-				const option = inferOptions(options, p);
-				let strategy = option.concurrency || 'optimistic';
-				if ((strategy === 'optimistic')) {
-					try {
-						const column = table[p];
-						if (column?.tsType === 'DateColumn') {
-							assertDatesEqual(oldValue[p], toCompareObject(row[p]));
-						}
-						else
-							assertDeepEqual(oldValue[p], toCompareObject(row[p]));						
-					}
-					catch (e) {
-						throw new Error(`The field ${p} was changed by another user. Expected ${inspect(oldValue[p])}, but was ${inspect(row[p])}.`);
-					}
-				}
-			}
-			else if (isManyRelation(p, table)) {
-				const childTable = table[p]._relation.childTable;
-				for (let name in oldValue[p]) {
-					if (name === '__patchType')
-						continue;
-					let childRow = await childTable.tryGetById.apply(null, JSON.parse(name));
-					if (!childRow)
-						throw new Error(`${p} with id ${name} was deleted by another user`);
-					if (! await validateDeleteConflict({ row: childRow, oldValue: oldValue[p][name], options: inferOptions(options, p), table: childTable }))
-						return false;
-				}
-			}
-			else if (isOneRelation(p, table)) {
-				const childTable = table[p]._relation.childTable;
-				let childRow = await row[p];
-				if (!childRow)
-					throw new Error(`${p} was deleted by another user`);
-				if (! await validateDeleteConflict({ row: childRow, oldValue: oldValue[p], options: inferOptions(options, p), table: childTable }))
-					return false;
-			}
-
-		}
-		return true;
-	}
-
-	function isColumn(name, table) {
-		return table[name] && table[name].equal;
-	}
-
-	function isManyRelation(name, table) {
-		return table[name] && table[name]._relation.isMany;
-	}
-
-	function isOneRelation(name, table) {
-		return table[name] && table[name]._relation.isOne;
-
-	}
-
-	function inferOptions(defaults, property) {
-		const parent = {};
-		if ('readonly' in defaults)
-			parent.readonly = defaults.readonly;
-		if ('concurrency' in defaults)
-			parent.concurrency = defaults.concurrency;
-		return {...parent,  ...(defaults[property] || {})};
-	}
-
-	function assertDatesEqual(date1, date2) {
-		if (date1 && date2) {
-			const parts1 = date1.split('T');
-			const time1parts = (parts1[1] || '').split(/[-+.]/);
-			const parts2 = date2.split('T');
-			const time2parts = (parts2[1] || '').split(/[-+.]/);
-			while (time1parts.length !== time2parts.length) {
-				if (time1parts.length > time2parts.length)
-					time1parts.pop();
-				else if (time1parts.length < time2parts.length)
-					time2parts.pop();
-			}
-			date1 = `${parts1[0]}T${time1parts[0]}`;
-			date2 = `${parts2[0]}T${time2parts[0]}`;
-		}
-		assertDeepEqual(date1, date2);
-	}
-
-	function assertDeepEqual(a, b) {
-		if (JSON.stringify(a) !== JSON.stringify(b))
-			throw new Error('A, b are not equal');
-	}
-
-	function inspect(obj) {
-		return JSON.stringify(obj, null, 2);
-	}
-
-	validateDeleteConflict_1 = validateDeleteConflict;
-	return validateDeleteConflict_1;
-}
-
-var validateDeleteAllowed_1;
-var hasRequiredValidateDeleteAllowed;
-
-function requireValidateDeleteAllowed () {
-	if (hasRequiredValidateDeleteAllowed) return validateDeleteAllowed_1;
-	hasRequiredValidateDeleteAllowed = 1;
-	async function validateDeleteAllowed({ row, options, table }) {
-		if (options.readonly) {
-			const e = new Error(`Cannot delete ${table._dbName} because it is readonly`);
-			// @ts-ignore
-			e.status = 405;
-			throw e;
-		}
-		for (let p in options)
-			if (isColumn(p, table))
-				return;
-			else if (isManyRelation(p, table)) {
-				const childTable = table[p]._relation.childTable;
-				const childOptions = inferOptions(options, p);
-				const children = await row[p];
-				for (let i = 0; i < children.length; i++) {
-					const childRow = children[i];
-					await validateDeleteAllowed({ row: childRow, options: childOptions, table: childTable });
-				}
-			}
-			else if (isOneRelation(p, table)) {
-				const childOptions = inferOptions(options, p);
-				const childTable = table[p]._relation.childTable;
-				let childRow = await row[p];
-				await validateDeleteAllowed({ row: childRow, options: childOptions, table: childTable });
-			}
-	}
-
-	function isColumn(name, table) {
-		return table[name] && table[name].equal;
-	}
-
-	function isManyRelation(name, table) {
-		return table[name] && table[name]._relation.isMany;
-	}
-
-	function isOneRelation(name, table) {
-		return table[name] && table[name]._relation.isOne;
-	}
-
-	function inferOptions(defaults, property) {
-		const parent = {};
-		if ('readonly' in defaults)
-			parent.readonly = defaults.readonly;
-		if ('concurrency' in defaults)
-			parent.concurrency = defaults.concurrency;
-		return {...parent,  ...(defaults[property] || {})};
-	}
-
-	validateDeleteAllowed_1 = validateDeleteAllowed;
-	return validateDeleteAllowed_1;
-}
-
-var clearCache_1;
-var hasRequiredClearCache;
-
-function requireClearCache () {
-	if (hasRequiredClearCache) return clearCache_1;
-	hasRequiredClearCache = 1;
-	var setSessionSingleton = requireSetSessionSingleton();
-
-	function clearCache(context) {
-		setSessionSingleton(context, 'cache', {});
-	}
-
-	clearCache_1 = clearCache;
-	return clearCache_1;
-}
-
-/* eslint-disable require-atomic-updates */
-
-var patchTable_1;
-var hasRequiredPatchTable;
-
-function requirePatchTable () {
-	if (hasRequiredPatchTable) return patchTable_1;
-	hasRequiredPatchTable = 1;
-	let applyPatch = requireApplyPatch();
-	let fromCompareObject = requireFromCompareObject();
-	let validateDeleteConflict = requireValidateDeleteConflict();
-	let validateDeleteAllowed = requireValidateDeleteAllowed();
-	let clearCache = requireClearCache();
-
-	async function patchTable() {
-		// const dryrun = true;
-		//traverse all rows you want to update before updatinng or inserting anything.
-		//this is to avoid page locks in ms sql
-		// await patchTableCore.apply(null, [...arguments, dryrun]);
-		const result = await  patchTableCore.apply(null, arguments);
-		clearCache(arguments[0]);
-		return result;
-	}
-
-	async function patchTableCore(context, table, patches, { strategy = undefined, deduceStrategy = false, ...options } = {}, dryrun) {
-		options = cleanOptions(options);
-		strategy = JSON.parse(JSON.stringify(strategy || {}));
-		let changed = new Set();
-		for (let i = 0; i < patches.length; i++) {
-			let patch = { path: undefined, value: undefined, op: undefined };
-			Object.assign(patch, patches[i]);
-			patch.path = patches[i].path.split('/').slice(1);
-			let result;
-			if (patch.op === 'add' || patch.op === 'replace') {
-				result = await add({ path: patch.path, value: patch.value, op: patch.op, oldValue: patch.oldValue, strategy: deduceStrategy ? strategy : {}, options }, table);
-			}
-			else if (patch.op === 'remove')
-				result = await remove({ path: patch.path, op: patch.op, oldValue: patch.oldValue, options }, table);
-
-			if (result.inserted)
-				changed.add(result.inserted);
-			else if (result.updated)
-				changed.add(result.updated);
-		}
-		if (strategy['insertAndForget'])
-			return {
-				changed: [], strategy
-			};
-		return { changed: await toDtos(changed), strategy };
-
-
-		async function toDtos(set) {
-			set = [...set];
-			const result = await table.getManyDto(context, set, strategy);
-			return result;
-		}
-
-		function toKey(property) {
-			if (typeof property === 'string' && property.charAt(0) === '[')
-				return JSON.parse(property);
-			else
-				return [property];
-		}
-
-		async function add({ path, value, op, oldValue, strategy, options }, table, row, parentRow, relation) {
-			let property = path[0];
-			path = path.slice(1);
-			if (!row && path.length > 0) {
-				const key = toKey(property);
-				row =  await table.tryGetById.apply(null, [context, ...key, strategy]);
-				if (!row)
-					throw new Error(`Row ${table._dbName} with id ${key} was not found.`);
-			}
-
-			if (path.length === 0 && value === null) {
-				return remove({ path, op, oldValue, options }, table, row);
-			}
-			if (path.length === 0) {
-				if (dryrun) {
-					return {};
-				}
-				let childInserts = [];
-				for (let name in value) {
-					if (isColumn(name, table))
-						value[name] = fromCompareObject(value[name]);
-					else if (isJoinRelation(name, table)) {
-						strategy[name] = strategy[name] || {};
-						value[name] && updateJoinedColumns(name, value, table, value);
-					}
-					else if (isManyRelation(name, table))
-						value[name] && childInserts.push(insertManyRelation.bind(null, name, value, op, oldValue, table, strategy, options));
-					else if (isOneRelation(name, table) && value)
-						value[name] && childInserts.push(insertOneRelation.bind(null, name, value, op, oldValue, table, strategy, options));
-				}
-				for (let i = 0; i < table._primaryColumns.length; i++) {
-					let pkName = table._primaryColumns[i].alias;
-					let keyValue = value[pkName];
-					if (keyValue && typeof (keyValue) === 'string' && keyValue.indexOf('~') === 0)
-						value[pkName] = undefined;
-				}
-
-				if (relation && relation.joinRelation) {
-					for (let i = 0; i < relation.joinRelation.columns.length; i++) {
-						let column = relation.joinRelation.columns[i];
-						let fkName = column.alias;
-						let parentPk = relation.joinRelation.childTable._primaryColumns[i].alias;
-						if (!value[fkName]) {
-							value[fkName] = parentRow[parentPk];
-						}
-					}
-				}
-				let row = table.insertWithConcurrency.apply(null, [context, options, value]);
-				row = await row;
-
-				for (let i = 0; i < childInserts.length; i++) {
-					await childInserts[i](row);
-				}
-				return { inserted: row };
-			}
-			property = path[0];
-			if (isColumn(property, table)) {
-				if (dryrun)
-					return { updated: row };
-				let dto = {};
-				dto[property] = row[property];
-				let result = applyPatch({ options }, dto, [{ path: '/' + path.join('/'), op, value, oldValue }], table[property]);
-				row[property] = result[property];
-				return { updated: row };
-			}
-			else if (isOneRelation(property, table)) {
-				let relation = table[property]._relation;
-				let subRow = await row[property];
-				strategy[property] = strategy[property] || {};
-				options[property] = inferOptions(options, property);
-
-				await add({ path, value, op, oldValue, strategy: strategy[property], options: options[property] }, relation.childTable, subRow, row, relation);
-				return { updated: row };
-			}
-			else if (isManyRelation(property, table)) {
-				let relation = table[property]._relation;
-				strategy[property] = strategy[property] || {};
-				options[property] = inferOptions(options, property);
-
-
-				if (path.length === 1) {
-					for (let id in value) {
-						if (id === '__patchType')
-							continue;
-						await add({ path: [id], value: value[id], op, oldValue, strategy: strategy[property], options: options[property] }, relation.childTable, undefined, row, relation);
-					}
-				}
-				else {
-					await add({ path: path.slice(1), value, oldValue, op, strategy: strategy[property], options: options[property] }, relation.childTable, undefined, row, relation);
-				}
-				return { updated: row };
-			}
-			else if (isJoinRelation(property, table) && path.length === 1) {
-				let dto = toJoinedColumns(property, { [property]: value }, table);
-				oldValue = toJoinedColumns(property, { [property]: oldValue }, table);
-				let result;
-				for (let p in dto) {
-					result = await add({ path: ['dummy', p], value: dto[p], oldValue: (oldValue || {})[p], op, strategy: strategy, options: options }, table, row, parentRow, relation) || result;
-				}
-				return result || {};
-			}
-			else if (isJoinRelation(property, table) && path.length === 2) {
-				let dto = toJoinedColumns(property, { [property]: { [path[1]]: value } }, table);
-				oldValue = toJoinedColumns(property, { [property]: { [path[1]]: oldValue } }, table);
-				let result;
-				for (let p in dto) {
-					result = await add({ path: ['dummy', p], value: dto[p], oldValue: (oldValue || {})[p], op, strategy: strategy, options: options }, table, row, parentRow, relation) || result;
-				}
-				return result || {};
-			}
-			return {};
-		}
-
-		async function insertManyRelation(name, value, op, oldValue, table, strategy, options, row) {
-			let relation = table[name]._relation;
-			for (let childKey in value[name]) {
-				if (childKey != '__patchType') {
-					let child = value[name][childKey];
-					strategy[name] = strategy[name] || {};
-					options[name] = inferOptions(options, name);
-
-					await add({ path: [childKey], value: child, op, oldValue, strategy: strategy[name], options: options[name] }, relation.childTable, {}, row, relation);
-				}
-			}
-		}
-
-		async function insertOneRelation(name, value, op, oldValue, table, strategy, options, row) {
-			let relation = table[name]._relation;
-			let child = value[name];
-			strategy[name] = strategy[name] || {};
-			options[name] = inferOptions(options, name);
-
-			await add({ path: [name], value: child, op, oldValue, strategy: strategy[name], options: options[name] }, relation.childTable, {}, row, relation);
-		}
-
-		function updateJoinedColumns(name, value, table, row) {
-			let relation = table[name]._relation;
-			for (let i = 0; i < relation.columns.length; i++) {
-				let parentKey = relation.columns[i].alias;
-				let childKey = relation.childTable._primaryColumns[i].alias;
-				if (childKey in value[name])
-					row[parentKey] = fromCompareObject(value[name][childKey]);
-			}
-		}
-		function toJoinedColumns(name, valueObject, table) {
-			let relation = table[name]._relation;
-			let dto = {};
-			for (let i = 0; i < relation.columns.length; i++) {
-				let parentKey = relation.columns[i].alias;
-				let childKey = relation.childTable._primaryColumns[i].alias;
-				if (valueObject && valueObject[name] && childKey in valueObject[name])
-					dto[parentKey] = fromCompareObject(valueObject[name][childKey]);
-				else
-					dto[parentKey] = null;
-			}
-			return dto;
-		}
-
-		async function remove({ path, op, oldValue, options }, table, row) {
-			let property = path[0];
-			path = path.slice(1);
-			row = row || await table.getById.apply(null, [context, ...toKey(property)]);
-			if (path.length === 0) {
-				await validateDeleteAllowed({ row, options, table });
-				if (await validateDeleteConflict({ row, oldValue, options, table }))
-					await row.deleteCascade();
-			}
-			property = path[0];
-			if (isColumn(property, table)) {
-				let dto = {};
-				dto[property] = row[property];
-				let result = applyPatch({ options }, dto, [{ path: '/' + path.join('/'), op, oldValue }], table[property]);
-
-				row[property] = result[property];
-				return { updated: row };
-			}
-			else if (isJoinRelation(property, table) && path.length === 1) {
-				oldValue = toJoinedColumns(property, { [property]: oldValue }, table);
-				let relation = table[property]._relation;
-				let result;
-				for (let i = 0; i < relation.columns.length; i++) {
-					let p = relation.columns[i].alias;
-					row[p];
-					result = await remove({ path: ['dummy', p], oldValue: (oldValue || {})[p], op, options: options }, table, row) || result;
-				}
-				return result || {};
-			}
-			else if (isJoinRelation(property, table) && path.length === 2) {
-				let relation = table[property]._relation;
-				oldValue = toJoinedColumns(property, { [property]: { [path[1]]: oldValue } }, table);
-				let result;
-				for (let i = 0; i < relation.columns.length; i++) {
-					let p = relation.columns[i].alias;
-					let childKey = relation.childTable._primaryColumns[i].alias;
-					if (path[1] === childKey) {
-						row[p];
-						result = await remove({ path: ['dummy', p], oldValue: (oldValue || {})[p], op, options: options }, table, row) || result;
-						break;
-					}
-				}
-				return result || {};
-			}
-			else if (isOneRelation(property, table)) {
-				let child = await row[property];
-				if (!child)
-					throw new Error(property + ' does not exist');
-				options[property] = inferOptions(options, property);
-
-				await remove({ path, op, oldValue, options: options[property] }, table[property], child);
-				return { updated: row };
-			}
-			else if (isManyRelation(property, table)) {
-				let relation = table[property]._relation;
-				options[property] = inferOptions(options, property);
-				if (path.length === 1) {
-					let children = (await row[property]).slice(0);
-					for (let i = 0; i < children.length; i++) {
-						let child = children[i];
-						await remove({ path: path.slice(1), op, oldValue, options: options[property] }, table[property], child);
-					}
-				}
-				else {
-					await remove({ path: path.slice(1), op, oldValue, options: options[property] }, relation.childTable);
-				}
-				return { updated: row };
-			}
-			return {};
-		}
-
-		function isColumn(name, table) {
-			return table[name] && table[name].equal;
-		}
-
-		function isManyRelation(name, table) {
-			return table[name] && table[name]._relation.isMany;
-		}
-
-		function isOneRelation(name, table) {
-			return table[name] && table[name]._relation.isOne;
-
-		}
-
-		function isJoinRelation(name, table) {
-			return table[name] && table[name]._relation.columns;
-		}
-
-		function inferOptions(defaults, property) {
-			const parent = {};
-			if ('readonly' in defaults)
-				parent.readonly = defaults.readonly;
-			if ('concurrency' in defaults)
-				parent.concurrency = defaults.concurrency;
-			return { ...parent, ...(defaults[property] || {}) };
-		}
-
-		function cleanOptions(options) {
-			const { table, transaction, db, ..._options } = options;
-			return _options;
-		}
-	}
-
-	patchTable_1 = patchTable;
-	return patchTable_1;
-}
-
-var patchRow_1;
-var hasRequiredPatchRow;
-
-function requirePatchRow () {
-	if (hasRequiredPatchRow) return patchRow_1;
-	hasRequiredPatchRow = 1;
-	let patchTable = requirePatchTable();
-
-	function patchRow(context, table, row, patches, options) {
-		patches = JSON.parse(JSON.stringify(patches));
-		let pkName = table._primaryColumns[0].alias;
-		let id = row[pkName];
-		for (let i = 0; i < patches.length; i++) {
-			patches[i].path = '/' + id + patches[i].path;
-		}
-		return patchTable(context, table, patches, options);
-	}
-
-	patchRow_1 = patchRow;
-	return patchRow_1;
-}
-
 var purifyStrategy_1;
 var hasRequiredPurifyStrategy;
 
@@ -8065,8 +7913,7 @@ function requireNewDecodeDbRow () {
 	let newObject = requireNewObject();
 	let toDto = requireToDto();
 	let createDto = requireCreateDto();
-	let patchRow = requirePatchRow();
-	let onChange = require$$10;
+	let onChange = require$$9;
 	let flags = requireFlags();
 	let tryGetSessionContext = requireTryGetSessionContext();
 	let purifyStrategy = requirePurifyStrategy();
@@ -8136,7 +7983,7 @@ function requireNewDecodeDbRow () {
 					return negotiateNull(this[intName]);
 				},
 				set: function(value) {
-					if (column.onChange && (this[intName] !== null && this[intName] !== undefined) && typeof value === 'object') {
+					if (column.onChange && (this[intName] !== null && this[intName] !== undefined) && value && typeof value === 'object') {
 						if (this[intName] === onChange.target(value))
 							return;
 						this._proxies[name] = column.onChange(value, () => {
@@ -8256,11 +8103,6 @@ function requireNewDecodeDbRow () {
 
 		Row.prototype.deleteCascade = Row.prototype.cascadeDelete;
 
-		Row.prototype.patch = async function(patches, options) {
-			await patchRow(this._context, table, this, patches, options);
-			return this;
-		};
-
 		function decodeDbRow(context, row) {
 			for (let i = 0; i < numberOfColumns; i++) {
 				let index = offset + i;
@@ -8324,7 +8166,18 @@ function requireDecodeDbRow () {
 	var newDecodeDbRow = requireNewDecodeDbRow();
 
 	function decodeDbRow(context, span, table, dbRow, shouldValidate, isInsert) {
-		var decode = span._decodeDbRow;
+		var decodeCache = span._decodeDbRowCache;
+		if (!decodeCache) {
+			decodeCache = {};
+			Object.defineProperty(span, '_decodeDbRowCache', {
+				enumerable: false,
+				get: function() {
+					return decodeCache;
+				},
+			});
+		}
+		var cacheKey = (shouldValidate ? 'v' : 'nv') + (isInsert ? ':i' : ':u');
+		var decode = decodeCache[cacheKey];
 		if (!decode) {
 			let aliases = new Set();
 			if (span.columns)
@@ -8335,12 +8188,7 @@ function requireDecodeDbRow () {
 			if (aliases.size === 0)
 				aliases = undefined;
 			decode = newDecodeDbRow(table, dbRow, aliases, shouldValidate, isInsert);
-			Object.defineProperty(span, '_decodeDbRow', {
-				enumerable: false,
-				get: function() {
-					return decode;
-				},
-			});
+			decodeCache[cacheKey] = decode;
 		}
 		return decode(context, dbRow);
 	}
@@ -11415,7 +11263,7 @@ function requireNewRow () {
 	var decodeDbRow = requireDecodeDbRow();
 	var flags = requireFlags();
 
-	function newRow(context, {table, _options}) {
+	function newRow(context, {table, _options, shouldValidate = true}) {
 		var dto = {};
 		table._columns.forEach(addColumn);
 
@@ -11455,7 +11303,7 @@ function requireNewRow () {
 				dto[column.alias] = pkValue;
 			}
 
-		return decodeDbRow(context, table, table, dto, true, true);
+		return decodeDbRow(context, table, table, dto, shouldValidate, true);
 	}
 
 	function isObject(object) {
@@ -11610,6 +11458,742 @@ function requireCascadeDelete () {
 
 	cascadeDelete_1 = cascadeDelete;
 	return cascadeDelete_1;
+}
+
+var fromCompareObject_1;
+var hasRequiredFromCompareObject;
+
+function requireFromCompareObject () {
+	if (hasRequiredFromCompareObject) return fromCompareObject_1;
+	hasRequiredFromCompareObject = 1;
+	function fromCompareObject(object) {
+		if (object === null || object === undefined) return object;
+		if (object.__patchType === 'Array') {
+			let copy = [];
+			let i = 0;
+			for (let id in object) {
+				if (id !== '__patchType') {
+					copy[i] = fromCompareObject(object[id]);
+					i++;
+				}
+			}
+			return copy;
+		} else if (object === Object(object)) {
+			let copy = {};
+			for (let name in object) {
+				if (name !== '__patchType')
+					copy[name] = fromCompareObject(object[name]);
+			}
+			return copy;
+		}
+		return object;
+	}
+
+	fromCompareObject_1 = fromCompareObject;
+	return fromCompareObject_1;
+}
+
+var toCompareObject_1;
+var hasRequiredToCompareObject;
+
+function requireToCompareObject () {
+	if (hasRequiredToCompareObject) return toCompareObject_1;
+	hasRequiredToCompareObject = 1;
+	const dateToISOString = requireDateToISOString();
+	const isNode = (typeof window === 'undefined');
+
+	function toCompareObject(object) {
+		if (Array.isArray(object)) {
+			let copy = {};
+			Object.defineProperty(copy, '__patchType', {
+				value: 'Array',
+				writable: true,
+				enumerable: true
+			});
+
+			for (var i = 0; i < object.length; i++) {
+				let element = toCompareObject(object[i]);
+				if (element === Object(element) && 'id' in element)
+					copy[element.id] = element;
+				else
+					copy[i] = element;
+			}
+			return copy;
+		}
+		if (isNode && isNodeBuffer(object))
+			return object.toString('base64');
+		// @ts-ignore
+		else if (object instanceof Date && !isNaN(object))
+			return dateToISOString(object);
+		else if (object === Object(object)) {
+			let copy = {};
+			for (let name in object) {
+				copy[name] = toCompareObject(object[name]);
+			}
+			return copy;
+		}
+		return object;
+	}
+
+	function isNodeBuffer(object) {
+		return Buffer.isBuffer(object);
+	}
+
+	toCompareObject_1 = toCompareObject;
+	return toCompareObject_1;
+}
+
+var applyPatch_1;
+var hasRequiredApplyPatch;
+
+function requireApplyPatch () {
+	if (hasRequiredApplyPatch) return applyPatch_1;
+	hasRequiredApplyPatch = 1;
+	const fastjson = require$$0$3;
+	let fromCompareObject = requireFromCompareObject();
+	let toCompareObject = requireToCompareObject();
+	let getSessionSingleton = requireGetSessionSingleton();
+
+	function applyPatch({ options = {}, context }, dto, changes, column) {
+		let dtoCompare = toCompareObject(dto);
+		changes = validateReadonly(dtoCompare, changes);
+		if (column.tsType === 'JSONColumn') {
+			const engine = context ? getSessionSingleton(context, 'engine') : undefined;
+			if(column && engine === 'sap') {
+				changes = validateConflict(dtoCompare, changes);
+				fastjson.applyPatch(dtoCompare, changes, true, true);
+			}
+		}
+		else
+			fastjson.applyPatch(dtoCompare, changes, true, true);
+
+		let result = fromCompareObject(dtoCompare);
+
+		if (Array.isArray(dto))
+			dto.length = 0;
+		else
+			for (let name in dto) {
+				delete dto[name];
+			}
+
+		for (let name in result) {
+			dto[name] = result[name];
+		}
+
+		return dto;
+
+		function validateReadonly(object, changes) {
+			return changes.filter(change => {
+				const option = getOption(change.path);
+				let readonly = option.readonly;
+				if (readonly) {
+					const e = new Error(`Cannot update column ${change.path.replace('/', '')} because it is readonly`);
+					// @ts-ignore
+					e.status = 405;
+					throw e;
+				}
+				return true;
+			});
+		}
+
+		function getOption(path) {
+			let splitPath = path.split('/');
+			splitPath.shift();
+			return splitPath.reduce(extract, options);
+
+			function extract(obj, name) {
+				if (Array.isArray(obj))
+					return obj[0] || options;
+				if (obj === Object(obj))
+					return obj[name] || options;
+				return obj;
+			}
+
+		}
+
+
+
+		function validateConflict(object, changes) {
+			return changes.filter(change => {
+				let expectedOldValue = change.oldValue;
+				const option = getOption(change.path);
+				let readonly = option.readonly;
+				if (readonly) {
+					const e = new Error(`Cannot update column ${change.path.replace('/', '')} because it is readonly`);
+					// @ts-ignore
+					e.status = 405;
+					throw e;
+				}
+				let concurrency = option.concurrency || 'optimistic';
+				if ((concurrency === 'optimistic') || (concurrency === 'skipOnConflict')) {
+					let oldValue = getOldValue(object, change.path);
+					try {
+						// if (column?.tsType === 'DateColumn') {
+						// 	assertDatesEqual(oldValue, expectedOldValue);
+						// }
+						// else
+						assertDeepEqual(oldValue, expectedOldValue);
+					}
+					catch (e) {
+						if (concurrency === 'skipOnConflict')
+							return false;
+						throw new Error('The row was changed by another user.');
+					}
+				}
+				return true;
+			});
+
+			function getOldValue(obj, path) {
+				let splitPath = path.split('/');
+				splitPath.shift();
+				return splitPath.reduce(extract, obj);
+
+				function extract(obj, name) {
+					if (obj === Object(obj))
+						return obj[name];
+					return;
+				}
+			}
+
+		}
+
+	}
+
+	// function assertDatesEqual(date1, date2) {
+	// 	if (date1 && date2) {
+	// 		const parts1 = date1.split('T');
+	// 		const time1parts = (parts1[1] || '').split(/[-+.]/);
+	// 		const parts2 = date2.split('T');
+	// 		const time2parts = (parts2[1] || '').split(/[-+.]/);
+	// 		while (time1parts.length !== time2parts.length) {
+	// 			if (time1parts.length > time2parts.length)
+	// 				time1parts.pop();
+	// 			else if (time1parts.length < time2parts.length)
+	// 				time2parts.pop();
+	// 		}
+	// 		date1 = `${parts1[0]}T${time1parts[0]}`;
+	// 		date2 = `${parts2[0]}T${time2parts[0]}`;
+	// 	}
+	// 	assertDeepEqual(date1, date2);
+	// }
+
+	function assertDeepEqual(a, b) {
+		if (JSON.stringify(a) !== JSON.stringify(b))
+			throw new Error('A, b are not equal');
+	}
+
+	applyPatch_1 = applyPatch;
+	return applyPatch_1;
+}
+
+var validateDeleteAllowed_1;
+var hasRequiredValidateDeleteAllowed;
+
+function requireValidateDeleteAllowed () {
+	if (hasRequiredValidateDeleteAllowed) return validateDeleteAllowed_1;
+	hasRequiredValidateDeleteAllowed = 1;
+	async function validateDeleteAllowed({ row, options, table }) {
+		if (options.readonly) {
+			const e = new Error(`Cannot delete ${table._dbName} because it is readonly`);
+			// @ts-ignore
+			e.status = 405;
+			throw e;
+		}
+		if (!hasReadonlyTrue(options))
+			return;
+		for (let p in options) {
+			if (isManyRelation(p, table)) {
+				const childTable = table[p]._relation.childTable;
+				const childOptions = inferOptions(options, p);
+				if (!hasReadonlyTrue(childOptions))
+					continue;
+				const children = await row[p];
+				for (let i = 0; i < children.length; i++) {
+					const childRow = children[i];
+					await validateDeleteAllowed({ row: childRow, options: childOptions, table: childTable });
+				}
+			}
+			else if (isOneRelation(p, table)) {
+				const childOptions = inferOptions(options, p);
+				if (!hasReadonlyTrue(childOptions))
+					continue;
+				const childTable = table[p]._relation.childTable;
+				let childRow = await row[p];
+				await validateDeleteAllowed({ row: childRow, options: childOptions, table: childTable });
+			}
+		}
+	}
+
+
+	function isManyRelation(name, table) {
+		return table[name] && table[name]._relation && table[name]._relation.isMany;
+	}
+
+	function isOneRelation(name, table) {
+		return table[name] && table[name]._relation && table[name]._relation.isOne;
+	}
+
+	function inferOptions(defaults, property) {
+		const parent = {};
+		if ('readonly' in defaults)
+			parent.readonly = defaults.readonly;
+		if ('concurrency' in defaults)
+			parent.concurrency = defaults.concurrency;
+		return {...parent,  ...(defaults[property] || {})};
+	}
+
+	function hasReadonlyTrue(options) {
+		if (!options || options !== Object(options))
+			return false;
+		if (options.readonly === true)
+			return true;
+		for (let p in options) {
+			const value = options[p];
+			if (!value || value !== Object(value))
+				continue;
+			if (hasReadonlyTrue(value))
+				return true;
+		}
+		return false;
+	}
+
+	validateDeleteAllowed_1 = validateDeleteAllowed;
+	return validateDeleteAllowed_1;
+}
+
+var clearCache_1;
+var hasRequiredClearCache;
+
+function requireClearCache () {
+	if (hasRequiredClearCache) return clearCache_1;
+	hasRequiredClearCache = 1;
+	var setSessionSingleton = requireSetSessionSingleton();
+
+	function clearCache(context) {
+		setSessionSingleton(context, 'cache', {});
+	}
+
+	clearCache_1 = clearCache;
+	return clearCache_1;
+}
+
+/* eslint-disable require-atomic-updates */
+
+var patchTable_1;
+var hasRequiredPatchTable;
+
+function requirePatchTable () {
+	if (hasRequiredPatchTable) return patchTable_1;
+	hasRequiredPatchTable = 1;
+	let applyPatch = requireApplyPatch();
+	let fromCompareObject = requireFromCompareObject();
+	let validateDeleteAllowed = requireValidateDeleteAllowed();
+	let clearCache = requireClearCache();
+	const getSessionSingleton = requireGetSessionSingleton();
+
+
+	async function patchTable() {
+		// const dryrun = true;
+		//traverse all rows you want to update before updatinng or inserting anything.
+		//this is to avoid page locks in ms sql
+		// await patchTableCore.apply(null, [...arguments, dryrun]);
+		const result = await patchTableCore.apply(null, arguments);
+		clearCache(arguments[0]);
+		return result;
+	}
+
+	async function patchTableCore(context, table, patches, { strategy = undefined, deduceStrategy = false, ...options } = {}, dryrun) {
+		const engine = getSessionSingleton(context, 'engine');
+		options = cleanOptions(options);
+		strategy = JSON.parse(JSON.stringify(strategy || {}));
+		let changed = new Set();
+		for (let i = 0; i < patches.length; i++) {
+			let patch = { path: undefined, value: undefined, op: undefined };
+			Object.assign(patch, patches[i]);
+			patch.path = patches[i].path.split('/').slice(1);
+			let result;
+			if (patch.op === 'add' || patch.op === 'replace') {
+				result = await add({ path: patch.path, value: patch.value, op: patch.op, oldValue: patch.oldValue, strategy: deduceStrategy ? strategy : {}, options }, table);
+			}
+			else if (patch.op === 'remove')
+				result = await remove({ path: patch.path, op: patch.op, oldValue: patch.oldValue, options }, table);
+
+			if (result.inserted)
+				changed.add(result.inserted);
+			else if (result.updated)
+				changed.add(result.updated);
+		}
+		if (strategy['insertAndForget'])
+			return {
+				changed: [], strategy
+			};
+		return { changed: await toDtos(changed), strategy };
+
+
+		async function toDtos(set) {
+			set = [...set];
+			const result = await table.getManyDto(context, set, strategy);
+			return result;
+		}
+
+		function toKey(property) {
+			if (typeof property === 'string' && property.charAt(0) === '[')
+				return JSON.parse(property);
+			else
+				return [property];
+		}
+
+		async function add({ path, value, op, oldValue, strategy, options }, table, row, parentRow, relation) {
+			let property = path[0];
+			path = path.slice(1);
+			if (!row && path.length > 0) {
+				row = await getOrCreateRow({
+					table,
+					strategy,
+					property
+				});
+			}
+
+			if (path.length === 0 && value === null) {
+				return remove({ path, op, oldValue, options }, table, row);
+			}
+			if (path.length === 0) {
+				if (dryrun) {
+					return {};
+				}
+				let childInserts = [];
+				for (let name in value) {
+					if (isColumn(name, table))
+						value[name] = fromCompareObject(value[name]);
+					else if (isJoinRelation(name, table)) {
+						strategy[name] = strategy[name] || {};
+						value[name] && updateJoinedColumns(name, value, table, value);
+					}
+					else if (isManyRelation(name, table))
+						value[name] && childInserts.push(insertManyRelation.bind(null, name, value, op, oldValue, table, strategy, options));
+					else if (isOneRelation(name, table) && value)
+						value[name] && childInserts.push(insertOneRelation.bind(null, name, value, op, oldValue, table, strategy, options));
+				}
+				for (let i = 0; i < table._primaryColumns.length; i++) {
+					let pkName = table._primaryColumns[i].alias;
+					let keyValue = value[pkName];
+					if (keyValue && typeof (keyValue) === 'string' && keyValue.indexOf('~') === 0)
+						value[pkName] = undefined;
+				}
+
+				if (relation && relation.joinRelation) {
+					for (let i = 0; i < relation.joinRelation.columns.length; i++) {
+						let column = relation.joinRelation.columns[i];
+						let fkName = column.alias;
+						let parentPk = relation.joinRelation.childTable._primaryColumns[i].alias;
+						if (!value[fkName]) {
+							value[fkName] = parentRow[parentPk];
+						}
+					}
+				}
+				let row = table.insertWithConcurrency.apply(null, [context, options, value]);
+				row = await row;
+
+				for (let i = 0; i < childInserts.length; i++) {
+					await childInserts[i](row);
+				}
+				return { inserted: row };
+			}
+			property = path[0];
+			if (isColumn(property, table)) {
+				if (dryrun)
+					return { updated: row };
+				const column = table[property];
+				const oldColumnValue = row[property];
+				let dto = {};
+				dto[property] = oldColumnValue;
+				const _oldValue = fromCompareObject(oldValue);
+				const _value = fromCompareObject(value);
+				let result = applyPatch({ options, context }, dto, [{ path: '/' + path.join('/'), op, value, oldValue }], table[property]);
+
+				const patchInfo = column.tsType === 'JSONColumn' ? {
+					path,
+					op,
+					value: _value,
+					oldValue : _oldValue,
+					fullOldValue: oldColumnValue
+				} : undefined;
+				await table.updateWithConcurrency(context, options, row, property, result[property], _oldValue, patchInfo);
+				return { updated: row };
+			}
+			else if (isOneRelation(property, table)) {
+				let relation = table[property]._relation;
+				let subRow = await row[property];
+				strategy[property] = strategy[property] || {};
+				options[property] = inferOptions(options, property);
+
+				await add({ path, value, op, oldValue, strategy: strategy[property], options: options[property] }, relation.childTable, subRow, row, relation);
+				return { updated: row };
+			}
+			else if (isManyRelation(property, table)) {
+				let relation = table[property]._relation;
+				strategy[property] = strategy[property] || {};
+				options[property] = inferOptions(options, property);
+
+
+				if (path.length === 1) {
+					for (let id in value) {
+						if (id === '__patchType')
+							continue;
+						await add({ path: [id], value: value[id], op, oldValue, strategy: strategy[property], options: options[property] }, relation.childTable, undefined, row, relation);
+					}
+				}
+				else {
+					await add({ path: path.slice(1), value, oldValue, op, strategy: strategy[property], options: options[property] }, relation.childTable, undefined, row, relation);
+				}
+				return { updated: row };
+			}
+			else if (isJoinRelation(property, table) && path.length === 1) {
+				let dto = toJoinedColumns(property, { [property]: value }, table);
+				oldValue = toJoinedColumns(property, { [property]: oldValue }, table);
+				let result;
+				for (let p in dto) {
+					result = await add({ path: ['dummy', p], value: dto[p], oldValue: (oldValue || {})[p], op, strategy: strategy, options: options }, table, row, parentRow, relation) || result;
+				}
+				return result || {};
+			}
+			else if (isJoinRelation(property, table) && path.length === 2) {
+				let dto = toJoinedColumns(property, { [property]: { [path[1]]: value } }, table);
+				oldValue = toJoinedColumns(property, { [property]: { [path[1]]: oldValue } }, table);
+				let result;
+				for (let p in dto) {
+					result = await add({ path: ['dummy', p], value: dto[p], oldValue: (oldValue || {})[p], op, strategy: strategy, options: options }, table, row, parentRow, relation) || result;
+				}
+				return result || {};
+			}
+			return {};
+		}
+
+		async function insertManyRelation(name, value, op, oldValue, table, strategy, options, row) {
+			let relation = table[name]._relation;
+			for (let childKey in value[name]) {
+				if (childKey != '__patchType') {
+					let child = value[name][childKey];
+					strategy[name] = strategy[name] || {};
+					options[name] = inferOptions(options, name);
+
+					await add({ path: [childKey], value: child, op, oldValue, strategy: strategy[name], options: options[name] }, relation.childTable, {}, row, relation);
+				}
+			}
+		}
+
+		async function insertOneRelation(name, value, op, oldValue, table, strategy, options, row) {
+			let relation = table[name]._relation;
+			let child = value[name];
+			strategy[name] = strategy[name] || {};
+			options[name] = inferOptions(options, name);
+
+			await add({ path: [name], value: child, op, oldValue, strategy: strategy[name], options: options[name] }, relation.childTable, {}, row, relation);
+		}
+
+		function updateJoinedColumns(name, value, table, row) {
+			let relation = table[name]._relation;
+			for (let i = 0; i < relation.columns.length; i++) {
+				let parentKey = relation.columns[i].alias;
+				let childKey = relation.childTable._primaryColumns[i].alias;
+				if (childKey in value[name])
+					row[parentKey] = fromCompareObject(value[name][childKey]);
+			}
+		}
+		function toJoinedColumns(name, valueObject, table) {
+			let relation = table[name]._relation;
+			let dto = {};
+			for (let i = 0; i < relation.columns.length; i++) {
+				let parentKey = relation.columns[i].alias;
+				let childKey = relation.childTable._primaryColumns[i].alias;
+				if (valueObject && valueObject[name] && childKey in valueObject[name])
+					dto[parentKey] = fromCompareObject(valueObject[name][childKey]);
+				else
+					dto[parentKey] = null;
+			}
+			return dto;
+		}
+
+		async function remove({ path, op, oldValue, options }, table, row) {
+			let property = path[0];
+			path = path.slice(1);
+			if (!row)
+				row = await getOrCreateRow({ table, strategy: {}, property });
+			if (path.length === 0) {
+				await validateDeleteAllowed({ row, options, table });
+				applyDeleteConcurrencyState(row, oldValue, options, table);
+				await row.deleteCascade();
+			}
+			property = path[0];
+			if (isColumn(property, table)) {
+				const column = table[property];
+				const oldColumnValue = row[property];
+				let dto = {};
+				dto[property] = oldColumnValue;
+				const _oldValue = fromCompareObject(oldValue);
+
+				let result = applyPatch({ options, context }, dto, [{ path: '/' + path.join('/'), op, oldValue }], table[property]);
+				if (column.tsType === 'JSONColumn') {
+					const patchInfo = {
+						path,
+						op,
+						value: undefined,
+						oldValue: _oldValue,
+						fullOldValue: oldColumnValue
+					};
+					await table.updateWithConcurrency(context, options, row, property, result[property], _oldValue, patchInfo);
+				}
+				else
+					row[property] = result[property];
+				return { updated: row };
+			}
+			else if (isJoinRelation(property, table) && path.length === 1) {
+				oldValue = toJoinedColumns(property, { [property]: oldValue }, table);
+				let relation = table[property]._relation;
+				let result;
+				for (let i = 0; i < relation.columns.length; i++) {
+					let p = relation.columns[i].alias;
+					row[p];
+					result = await remove({ path: ['dummy', p], oldValue: (oldValue || {})[p], op, options: options }, table, row) || result;
+				}
+				return result || {};
+			}
+			else if (isJoinRelation(property, table) && path.length === 2) {
+				let relation = table[property]._relation;
+				oldValue = toJoinedColumns(property, { [property]: { [path[1]]: oldValue } }, table);
+				let result;
+				for (let i = 0; i < relation.columns.length; i++) {
+					let p = relation.columns[i].alias;
+					let childKey = relation.childTable._primaryColumns[i].alias;
+					if (path[1] === childKey) {
+						row[p];
+						result = await remove({ path: ['dummy', p], oldValue: (oldValue || {})[p], op, options: options }, table, row) || result;
+						break;
+					}
+				}
+				return result || {};
+			}
+			else if (isOneRelation(property, table)) {
+				let child = await row[property];
+				if (!child)
+					throw new Error(property + ' does not exist');
+				options[property] = inferOptions(options, property);
+
+				await remove({ path, op, oldValue, options: options[property] }, table[property], child);
+				return { updated: row };
+			}
+			else if (isManyRelation(property, table)) {
+				let relation = table[property]._relation;
+				options[property] = inferOptions(options, property);
+				if (path.length === 1) {
+					let children = (await row[property]).slice(0);
+					for (let i = 0; i < children.length; i++) {
+						let child = children[i];
+						await remove({ path: path.slice(1), op, oldValue, options: options[property] }, table[property], child);
+					}
+				}
+				else {
+					await remove({ path: path.slice(1), op, oldValue, options: options[property] }, relation.childTable);
+				}
+				return { updated: row };
+			}
+			return {};
+		}
+
+		function isColumn(name, table) {
+			return table[name] && table[name].equal;
+		}
+
+		function shouldFetchFromDb(table) {
+			return engine === 'sap'
+				&& table._columns.some(x => x.tsType === 'JSONColumn');
+		}
+
+
+		function getOrCreateRow({ table, strategy, property }) {
+			const key = toKey(property);
+
+			if (shouldFetchFromDb(table))
+				return fetchFromDb({context, table, strategy, key});
+			return createRowInCache({ context, table, key });
+		}
+
+		async function fetchFromDb({context, table, strategy, key}) {
+			const row = await table.tryGetById.apply(null, [context, ...key, strategy]);
+			if (!row)
+				throw new Error(`Row ${table._dbName} with id ${key} was not found.`);
+			return row;
+
+		}
+
+
+
+		function createRowInCache({ context, table, key }) {
+			const newRow = getOrCreateRow.cachedNewRow || (getOrCreateRow.cachedNewRow = requireNewRow());
+			const pkDto = {};
+			for (let i = 0; i < key.length && i < table._primaryColumns.length; i++) {
+				pkDto[table._primaryColumns[i].alias] = key[i];
+			}
+			let row = newRow(context, { table, shouldValidate: false }, pkDto);
+			return table._cache.tryAdd(context, row);
+		}
+
+		function isManyRelation(name, table) {
+			return table[name] && table[name]._relation.isMany;
+		}
+
+		function isOneRelation(name, table) {
+			return table[name] && table[name]._relation.isOne;
+
+		}
+
+		function isJoinRelation(name, table) {
+			return table[name] && table[name]._relation.columns;
+		}
+
+		function applyDeleteConcurrencyState(row, oldValue, options, table) {
+			const state = { columns: {} };
+			if (oldValue && oldValue === Object(oldValue)) {
+				for (let p in oldValue) {
+					if (!isColumn(p, table))
+						continue;
+					const columnOptions = inferOptions(options, p);
+					const concurrency = columnOptions.concurrency || 'optimistic';
+					if (concurrency === 'overwrite')
+						continue;
+					state.columns[p] = { oldValue: fromCompareObject(oldValue[p]), concurrency };
+				}
+			}
+			if (Object.keys(state.columns).length === 0) {
+				const concurrency = options.concurrency || 'optimistic';
+				if (concurrency !== 'overwrite') {
+					for (let i = 0; i < table._primaryColumns.length; i++) {
+						const pkName = table._primaryColumns[i].alias;
+						state.columns[pkName] = { oldValue: row[pkName], concurrency };
+					}
+				}
+			}
+			if (Object.keys(state.columns).length > 0)
+				row._concurrencyState = state;
+		}
+
+		function inferOptions(defaults, property) {
+			const parent = {};
+			if ('readonly' in defaults)
+				parent.readonly = defaults.readonly;
+			if ('concurrency' in defaults)
+				parent.concurrency = defaults.concurrency;
+			return { ...parent, ...(defaults[property] || {}) };
+		}
+
+		function cleanOptions(options) {
+			const { table, transaction, db, client, ..._options } = options;
+			return _options;
+		}
+	}
+
+	patchTable_1 = patchTable;
+	return patchTable_1;
 }
 
 var where;
@@ -11784,6 +12368,8 @@ function requireTable () {
 	const patchTable = requirePatchTable();
 	const newEmitEvent = requireEmitEvent();
 	const hostLocal = requireHostLocal();
+	const getSessionSingleton = requireGetSessionSingleton();
+	const isJsonUpdateSupported = requireIsJsonUpdateSupported();
 	// const getTSDefinition = require('./getTSDefinition'); //todo: unused ?
 	const where = requireWhere();
 	const aggregate = requireAggregate();
@@ -11908,6 +12494,55 @@ function requireTable () {
 			return insert.apply(null, args);
 		};
 
+		table.updateWithConcurrency = function(context, options, row, property, value, oldValue, patchInfo) {
+			options = options || {};
+			const columnOptions = inferColumnOptions(options, property);
+			const concurrency = columnOptions.concurrency || 'optimistic';
+			const column = table[property];
+
+			if (patchInfo && column && column.tsType === 'JSONColumn' && Array.isArray(patchInfo.path) && patchInfo.path.length > 1) {
+				const engine = getSessionSingleton(context, 'engine');
+				if (isJsonUpdateSupported(engine)) {
+					const jsonPath = patchInfo.path.slice(1);
+					const jsonUpdateState = row._jsonUpdateState || {};
+					const columnState = jsonUpdateState[property] || { patches: [] };
+					columnState.patches.push({
+						path: jsonPath,
+						op: patchInfo.op,
+						value: patchInfo.value,
+						oldValue: patchInfo.oldValue
+					});
+					jsonUpdateState[property] = columnState;
+					row._jsonUpdateState = jsonUpdateState;
+					if (concurrency !== 'overwrite') {
+						const state = row._concurrencyState || { columns: {} };
+						const columnConcurrency = state.columns[property] || {};
+						columnConcurrency.concurrency = concurrency;
+						columnConcurrency.paths = columnConcurrency.paths || [];
+						columnConcurrency.paths.push({
+							path: jsonPath,
+							oldValue: patchInfo.oldValue
+						});
+						delete columnConcurrency.oldValue;
+						state.columns[property] = columnConcurrency;
+						row._concurrencyState = state;
+					}
+				}
+				else if (concurrency !== 'overwrite') {
+					const state = row._concurrencyState || { columns: {} };
+					const fullOldValue = Object.prototype.hasOwnProperty.call(patchInfo, 'fullOldValue') ? patchInfo.fullOldValue : oldValue;
+					state.columns[property] = { oldValue: fullOldValue, concurrency };
+					row._concurrencyState = state;
+				}
+			}
+			else if (concurrency !== 'overwrite') {
+				const state = row._concurrencyState || { columns: {} };
+				state.columns[property] = { oldValue, concurrency };
+				row._concurrencyState = state;
+			}
+			row[property] = value;
+		};
+
 		table.delete = _delete.bind(null, table);
 		table.cascadeDelete = function(context, ...rest) {
 			const args = [context, table, ...rest];
@@ -11939,6 +12574,17 @@ function requireTable () {
 		table._aggregate = aggregate(table);
 
 		return table;
+	}
+
+	function inferColumnOptions(defaults, property) {
+		const parent = {};
+		if (!defaults)
+			return parent;
+		if ('readonly' in defaults)
+			parent.readonly = defaults.readonly;
+		if ('concurrency' in defaults)
+			parent.concurrency = defaults.concurrency;
+		return { ...parent, ...(defaults[property] || {}) };
 	}
 
 	table = _new;
@@ -12651,6 +13297,49 @@ function requireWrapQuery$2 () {
 	return wrapQuery_1$2;
 }
 
+var wrapCommand_1$2;
+var hasRequiredWrapCommand$2;
+
+function requireWrapCommand$2 () {
+	if (hasRequiredWrapCommand$2) return wrapCommand_1$2;
+	hasRequiredWrapCommand$2 = 1;
+	var log = requireLog();
+
+	function wrapCommand(_context, client) {
+		return runQuery;
+
+		function runQuery(query, onCompleted) {
+			var params = Array.isArray(query.parameters) ? query.parameters : [];
+			var sql = query.sql();
+			log.emitQuery({ sql, parameters: params });
+
+			client.d1
+				.prepare(sql)
+				.bind.apply(null, params)
+				.run()
+				.then(onInnerCompleted, (e) => onCompleted(e, { rowsAffected: 0 }));
+
+			function onInnerCompleted(response) {
+				var affectedRows = 0;
+
+				if (response) {
+					if (typeof response.changes === 'number') affectedRows = response.changes;
+					else if (typeof response.meta === 'object' && response.meta && typeof response.meta.changes === 'number') {
+						affectedRows = response.meta.changes;
+					} else if (typeof response.affectedRows === 'number') {
+						affectedRows = response.affectedRows;
+					}
+				}
+
+				onCompleted(null, { rowsAffected: affectedRows });
+			}
+		}
+	}
+
+	wrapCommand_1$2 = wrapCommand;
+	return wrapCommand_1$2;
+}
+
 var encodeBoolean_1$1;
 var hasRequiredEncodeBoolean$1;
 
@@ -13209,6 +13898,7 @@ function requireNewTransaction$2 () {
 	if (hasRequiredNewTransaction$2) return newTransaction$2;
 	hasRequiredNewTransaction$2 = 1;
 	const wrapQuery = requireWrapQuery$2();
+	const wrapCommand = requireWrapCommand$2();
 	const encodeBoolean = requireEncodeBoolean$1();
 	const formatBigintOut = requireFormatBigintOut();
 	const deleteFromSql = requireDeleteFromSql$1();
@@ -13262,6 +13952,22 @@ function requireNewTransaction$2 () {
 							callback(e);
 						}
 					});
+				},
+				executeCommand: function(query, callback) {
+					pool.connect((err, client, done) => {
+						if (err) {
+							return callback(err);
+						}
+						try {
+							wrapCommand(domain, client)(query, (err, res) => {
+								done();
+								callback(err, res);
+							});
+						} catch (e) {
+							done();
+							callback(e);
+						}
+					});
 				}
 			};
 			domain.rdb = rdb;
@@ -13278,6 +13984,7 @@ function requireNewTransaction$2 () {
 						return;
 					}
 					client.executeQuery = wrapQuery(domain, client);
+					client.executeCommand = wrapCommand(domain, client);
 					rdb.dbClient = client;
 					rdb.dbClientDone = done;
 					domain.rdb = rdb;
@@ -14295,6 +15002,45 @@ function requireWrapQuery$1 () {
 	return wrapQuery_1$1;
 }
 
+var wrapCommand_1$1;
+var hasRequiredWrapCommand$1;
+
+function requireWrapCommand$1 () {
+	if (hasRequiredWrapCommand$1) return wrapCommand_1$1;
+	hasRequiredWrapCommand$1 = 1;
+	var log = requireLog();
+	var replaceParamChar = requireReplaceParamChar();
+
+	function wrapCommand(_context, connection) {
+		var runOriginalQuery = connection.query;
+		return runQuery;
+
+		function runQuery(query, onCompleted) {
+			var params = query.parameters;
+			var sql = replaceParamChar(query, params);
+			log.emitQuery({ sql, parameters: params });
+
+			runOriginalQuery
+				.call(connection, sql, params)
+				.then(
+					(result) => onInnerCompleted(null, result),
+					(e) => onInnerCompleted(e)
+				);
+
+			function onInnerCompleted(err, result) {
+				if (err) return onCompleted(err);
+
+				if (Array.isArray(result)) result = result[result.length - 1];
+
+				onCompleted(null, { rowsAffected: result.affectedRows });
+			}
+		}
+	}
+
+	wrapCommand_1$1 = wrapCommand;
+	return wrapCommand_1$1;
+}
+
 var encodeDate_1;
 var hasRequiredEncodeDate;
 
@@ -14571,6 +15317,7 @@ function requireNewTransaction$1 () {
 	if (hasRequiredNewTransaction$1) return newTransaction$1;
 	hasRequiredNewTransaction$1 = 1;
 	var wrapQuery = requireWrapQuery$1();
+	var wrapCommand = requireWrapCommand$1();
 	var encodeDate = requireEncodeDate();
 	const encodeBinary = requireEncodeBinary();
 	const decodeBinary = requireDecodeBinary();
@@ -14623,6 +15370,22 @@ function requireNewTransaction$1 () {
 							callback(e);
 						}
 					});
+				},
+				executeCommand: function(query, callback) {
+					pool.connect((err, client, done) => {
+						if (err) {
+							return callback(err);
+						}
+						try {
+							wrapCommand(domain, client)(query, (err, res) => {
+								done();
+								callback(err, res);
+							});
+						} catch (e) {
+							done();
+							callback(e);
+						}
+					});
 				}
 			};
 			domain.rdb = rdb;
@@ -14639,6 +15402,7 @@ function requireNewTransaction$1 () {
 						return;
 					}
 					client.executeQuery = wrapQuery(domain, client);
+					client.executeCommand = wrapCommand(domain, client);
 					rdb.dbClient = client;
 					rdb.dbClientDone = done;
 					domain.rdb = rdb;
@@ -14995,6 +15759,46 @@ function requireWrapQuery () {
 	return wrapQuery_1;
 }
 
+var wrapCommand_1;
+var hasRequiredWrapCommand;
+
+function requireWrapCommand () {
+	if (hasRequiredWrapCommand) return wrapCommand_1;
+	hasRequiredWrapCommand = 1;
+	var log = requireLog();
+	var replaceParamChar = requireReplaceParamChar();
+
+	function wrapCommand(_context, connection) {
+		var runOriginalQuery = connection.query;
+		return runCommand;
+
+		function runCommand(query, onCompleted) {
+			var params = query.parameters;
+			log.emitQuery({sql: query.sql(), parameters: params});
+			var sql = replaceParamChar(query, params);
+			query = {
+				text: sql,
+				values: params,
+				types: query.types
+			};
+
+			runOriginalQuery.call(connection, query, onInnerCompleted);
+
+			function onInnerCompleted(err, result) {
+				if (err)
+					onCompleted(err);
+				else
+					onCompleted(null, { rowsAffected: result.rowCount });
+
+			}
+		}
+
+	}
+
+	wrapCommand_1 = wrapCommand;
+	return wrapCommand_1;
+}
+
 var encodeBoolean_1;
 var hasRequiredEncodeBoolean;
 
@@ -15040,6 +15844,7 @@ function requireNewTransaction () {
 	if (hasRequiredNewTransaction) return newTransaction;
 	hasRequiredNewTransaction = 1;
 	var wrapQuery = requireWrapQuery();
+	var wrapCommand = requireWrapCommand();
 	var encodeDate = requireEncodeDate();
 	var encodeBoolean = requireEncodeBoolean();
 	var deleteFromSql = requireDeleteFromSql();
@@ -15094,6 +15899,22 @@ function requireNewTransaction () {
 							callback(e);
 						}
 					});
+				},
+				executeCommand: function(query, callback) {
+					pool.connect((err, client, done) => {
+						if (err) {
+							return callback(err);
+						}
+						try {
+							wrapCommand(domain, client)(query, (err, res) => {
+								done();
+								callback(err, res);
+							});
+						} catch (e) {
+							done();
+							callback(e);
+						}
+					});
 				}
 			};
 			domain.rdb = rdb;
@@ -15110,6 +15931,7 @@ function requireNewTransaction () {
 						return;
 					}
 					client.executeQuery = wrapQuery(domain, client);
+					client.executeCommand = wrapCommand(domain, client);
 					rdb.dbClient = client;
 					rdb.dbClientDone = done;
 					domain.rdb = rdb;
