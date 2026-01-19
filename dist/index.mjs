@@ -11804,6 +11804,7 @@ function requirePatchTable () {
 	}
 
 	async function patchTableCore(context, table, patches, { strategy = undefined, deduceStrategy = false, ...options } = {}, dryrun) {
+		console.dir(patches, {depth: Infinity});
 		const engine = getSessionSingleton(context, 'engine');
 		options = cleanOptions(options);
 		strategy = JSON.parse(JSON.stringify(strategy || {}));
@@ -12130,6 +12131,10 @@ function requirePatchTable () {
 
 
 		function createRowInCache({ context, table, key }) {
+			const tryGetFromCacheById = getOrCreateRow.tryGetFromCacheById || (getOrCreateRow.tryGetFromCacheById = requireTryGetFromCacheById());
+			const cachedRow = tryGetFromCacheById(context, table, ...key);
+			if (cachedRow)
+				return cachedRow;
 			const newRow = getOrCreateRow.cachedNewRow || (getOrCreateRow.cachedNewRow = requireNewRow());
 			const pkDto = {};
 			for (let i = 0; i < key.length && i < table._primaryColumns.length; i++) {
