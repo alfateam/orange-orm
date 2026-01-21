@@ -1,4 +1,7 @@
 ## Changelog
+__4.9.0__  
+Node.js 22.5+: Continues using built-in `node:sqlite` (no action needed)  
+Node.js 18-22.4: Now requires `better-sqlite3` instead of `sqlite3`  
 __4.8.2__  
 Slight performance gain on updates and removed accidental console.dir  
 __4.8.1__  

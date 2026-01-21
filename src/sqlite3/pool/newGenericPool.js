@@ -15,19 +15,19 @@ function newGenericPool(connectionString, poolOptions) {
 		create: async function(cb) {
 			try {
 				if (!sqlite)
-					sqlite = await import('sqlite3');
+					sqlite = await import('better-sqlite3');
 				sqlite = sqlite.default || sqlite;
 			}
 			catch (err) {
 				return cb(err, null);
 			}
-			var client = new sqlite.Database(connectionString, onConnected);
-
-			function onConnected(err) {
-				if(err)
-					return cb(err, null);
+			try {
+				var client = new sqlite(connectionString);
 				client.poolCount = 0;
 				return cb(null, client);
+			}
+			catch (err) {
+				return cb(err, null);
 			}
 		},
 

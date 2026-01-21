@@ -1,24 +1,39 @@
-var log = require('../table/log');
+const log = require('../table/log');
+const connectionCache  = new WeakMap();
 
 function wrapQuery(_context, connection) {
-	var runOriginalQuery = connection.all;
+	let statementCache = connectionCache.get(connection);
+	if (!statementCache) {
+		statementCache = new Map();
+		connectionCache.set(connection, statementCache);
+	}
+
 	return runQuery;
 
 	function runQuery(query, onCompleted) {
-		var params = query.parameters;
-		var sql = query.sql();
-		log.emitQuery({sql, parameters: params});
+		try {
+			var params = query.parameters;
+			var sql = query.sql();
+			log.emitQuery({ sql, parameters: params });
 
-		runOriginalQuery.call(connection, sql, params, onInnerCompleted);
+			let statement = statementCache.get(sql);
+			if (!statement) {
+				statement = connection.prepare(sql);
+				statementCache.set(sql, statement);
+			}
 
-		function onInnerCompleted(err, rows) {
-			if (err)
-				onCompleted(err);
-			else
+			if (statement.reader) {
+				const rows = statement.all.apply(statement, params);
 				onCompleted(null, rows);
+			} else {
+				statement.run.apply(statement, params);
+				onCompleted(null, []);
+			}
+		}
+		catch (e) {
+			onCompleted(e);
 		}
 	}
-
 }
 
 module.exports = wrapQuery;
