@@ -93,7 +93,7 @@
         "oracledb": "^6.3.0",
         "pg": "^8.5.1",
         "pg-query-stream": "^3.3.2",
-        "sqlite3": "^5.0.2",
+        "better-sqlite3": "^11.8.1",
         "tedious": "^15.1.2 || ^16.0.0 || ^18.1.0 || || ^19.0.0"
     },
     "peerDependenciesMeta": {
@@ -106,7 +106,7 @@
         "mysql2": {
             "optional": true
         },
-        "sqlite3": {
+        "better-sqlite3": {
             "optional": true
         },
         "pg-native": {
@@ -144,7 +144,7 @@
         "pg": "^8.5.1",
         "pg-query-stream": "^3.3.2",
         "rollup": "^2.52.7",
-        "sqlite3": "^5.0.2",
+        "better-sqlite3": "^11.8.1",
         "tedious": "^19.0.0",
         "typescript": "^5.4.5",
         "vitest": "^3.2.4"

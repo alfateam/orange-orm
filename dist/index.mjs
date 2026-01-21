@@ -18103,27 +18103,42 @@ var hasRequiredWrapQuery$4;
 function requireWrapQuery$4 () {
 	if (hasRequiredWrapQuery$4) return wrapQuery_1$4;
 	hasRequiredWrapQuery$4 = 1;
-	var log = requireLog();
+	const log = requireLog();
+	const connectionCache  = new WeakMap();
 
 	function wrapQuery(_context, connection) {
-		var runOriginalQuery = connection.all;
+		let statementCache = connectionCache.get(connection);
+		if (!statementCache) {
+			statementCache = new Map();
+			connectionCache.set(connection, statementCache);
+		}
+
 		return runQuery;
 
 		function runQuery(query, onCompleted) {
-			var params = query.parameters;
-			var sql = query.sql();
-			log.emitQuery({sql, parameters: params});
+			try {
+				var params = query.parameters;
+				var sql = query.sql();
+				log.emitQuery({ sql, parameters: params });
 
-			runOriginalQuery.call(connection, sql, params, onInnerCompleted);
+				let statement = statementCache.get(sql);
+				if (!statement) {
+					statement = connection.prepare(sql);
+					statementCache.set(sql, statement);
+				}
 
-			function onInnerCompleted(err, rows) {
-				if (err)
-					onCompleted(err);
-				else
+				if (statement.reader) {
+					const rows = statement.all.apply(statement, params);
 					onCompleted(null, rows);
+				} else {
+					statement.run.apply(statement, params);
+					onCompleted(null, []);
+				}
+			}
+			catch (e) {
+				onCompleted(e);
 			}
 		}
-
 	}
 
 	wrapQuery_1$4 = wrapQuery;
@@ -18321,19 +18336,19 @@ function requireNewGenericPool$4 () {
 			create: async function(cb) {
 				try {
 					if (!sqlite)
-						sqlite = await import('sqlite3');
+						sqlite = await import('better-sqlite3');
 					sqlite = sqlite.default || sqlite;
 				}
 				catch (err) {
 					return cb(err, null);
 				}
-				var client = new sqlite.Database(connectionString, onConnected);
-
-				function onConnected(err) {
-					if(err)
-						return cb(err, null);
+				try {
+					var client = new sqlite(connectionString);
 					client.poolCount = 0;
 					return cb(null, client);
+				}
+				catch (err) {
+					return cb(err, null);
 				}
 			},
 
