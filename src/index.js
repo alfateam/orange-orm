@@ -88,10 +88,9 @@ Object.defineProperty(connectViaPool, 'pg', {
 Object.defineProperty(connectViaPool, 'sqlite', {
 	get: function() {
 		if (!_sqlite) {
-			// if (runtimes.deno || (runtimes.node && (runtimes.node.major > 22 || (runtimes.node.major === 22 && runtimes.node.minor >= 5))))
-			// 	_sqlite = require('./nodeSqlite/newDatabase');
-			if (runtimes.bun)
-			// else if (runtimes.bun)
+			if (runtimes.deno || (runtimes.node && (runtimes.node.major > 22 || (runtimes.node.major === 22 && runtimes.node.minor >= 5))))
+				_sqlite = require('./nodeSqlite/newDatabase');
+			else if (runtimes.bun)
 				_sqlite = require('./bunSqlite/newDatabase');
 			else if (runtimes.node)
 				_sqlite = require('./sqlite3/newDatabase');
