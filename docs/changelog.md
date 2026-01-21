@@ -1,4 +1,6 @@
 ## Changelog
+__4.8.2__  
+Slight performance gain on updates and removed accidental console.dir  
 __4.8.1__  
 Atomic updates/deletes with SQL-level concurrency checks (affectedRows) [#142](https://github.com/alfateam/orange-orm/issues/142)  
 __4.8.0__  
