@@ -17,7 +17,6 @@ async function patchTable() {
 }
 
 async function patchTableCore(context, table, patches, { strategy = undefined, deduceStrategy = false, ...options } = {}, dryrun) {
-	console.dir(patches, {depth: Infinity});
 	const engine = getSessionSingleton(context, 'engine');
 	options = cleanOptions(options);
 	strategy = JSON.parse(JSON.stringify(strategy || {}));
