@@ -1,4 +1,6 @@
 ## Changelog
+__4.9.1__  
+Fix: Avoid double-quoting aliases in discriminator join SQL [#144](https://github.com/alfateam/orange-orm/issues/144)    
 __4.9.0__  
 Node.js 22.5+: Continues using built-in `node:sqlite` (no action needed)  
 Node.js 18-22.4: Now requires `better-sqlite3` instead of `sqlite3`  
