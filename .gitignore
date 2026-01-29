@@ -6,6 +6,8 @@ npm-debug.log
 .vscode
 demo.db
 demo*.db*
+other.db
 pglite.db*
 coverage
 .env
+deno.lock

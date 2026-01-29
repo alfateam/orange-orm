@@ -10,7 +10,6 @@ let express = require('../hostExpress');
 let hostLocal = require('../hostLocal');
 let doQuery = require('../query');
 let releaseDbClient = require('../table/releaseDbClient');
-let setSessionSingleton = require('../table/setSessionSingleton');
 
 function newDatabase(connectionString, poolOptions) {
 	if (!connectionString)
@@ -97,7 +96,6 @@ function newDatabase(connectionString, poolOptions) {
 		let domain = createDomain();
 		let transaction = newTransaction(domain, pool);
 		let p = domain.run(() => new Promise(transaction)
-			.then(() => setSessionSingleton(domain, 'changes', []))
 			.then(() => doQuery(domain, query).then(onResult, onError)));
 		return p;
 

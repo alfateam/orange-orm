@@ -51,6 +51,7 @@ function rdbClient(options = {}) {
 		}
 	};
 	client.query = query;
+	client.function = sqliteFunction;
 	client.transaction = runInTransaction;
 	client.db = baseUrl;
 	client.mssql = onProvider.bind(null, 'mssql');
@@ -137,6 +138,11 @@ function rdbClient(options = {}) {
 	async function query() {
 		const adapter = netAdapter(baseUrl, undefined, { tableOptions: { db: baseUrl, transaction } });
 		return adapter.query.apply(null, arguments);
+	}
+
+	async function sqliteFunction() {
+		const adapter = netAdapter(baseUrl, undefined, { tableOptions: { db: baseUrl, transaction } });
+		return adapter.sqliteFunction.apply(null, arguments);
 	}
 
 	function express(arg) {
@@ -822,6 +828,7 @@ function rdbClient(options = {}) {
 				return;
 
 			let body = stringify({ patch, options: { ...tableOptions, ...concurrencyOptions, strategy, deduceStrategy } });
+
 			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
 			let { changed, strategy: newStrategy } = await adapter.patch(body);
 			copyInto(changed, [row]);

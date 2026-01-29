@@ -1238,6 +1238,101 @@ describe('getMany none raw sub filter http where', () => {
 	}
 });
 
+
+describe('wal mode', () => {
+	test('sqlite', async () => await verify('sqlite'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+		await db.query('PRAGMA journal_mode = WAL');
+		await db.query('PRAGMA journal_mode');
+		await db.query('ATTACH DATABASE "other.db" AS other');
+		await db.query('DROP TABLE IF EXISTS other.orderNote');
+		await db.query('CREATE TABLE other.orderNote (id INTEGER PRIMARY KEY, orderId INTEGER, note TEXT)');
+		await db.query('INSERT INTO other.orderNote (id, orderId, note) VALUES (1, 2, \'WAL\')');
+
+		const rows = await db.orderNote.getAll({
+			where: (note) => note.note.eq('WAL'),
+			order: true
+		});
+		for (let i = 0; i < rows.length; i++) {
+			rows[i].order.orderDate = dateToISOString(new Date(rows[i].order.orderDate));
+		}
+
+		const date1 = new Date(2021, 0, 11, 12, 22, 45);
+
+		const expected = [
+			{
+				id: 1,
+				orderId: 2,
+				note: 'WAL',
+				order: {
+					id: 2,
+					orderDate: dateToISOString(date1),
+					customerId: 2
+				}
+			}
+		];
+		expect(rows).toEqual(expected);
+	}
+});
+
+describe('sqlite function', () => {
+	test('sqlite', async () => await verify('sqlite'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+
+		db.function('add_prefix', (text, prefix) => {
+			return `${prefix}${text}`;
+		});
+
+		const rows = await db.query('SELECT id, name, add_prefix(name, \'[VIP] \') AS prefixedName FROM customer');
+
+		const expected = [
+			{
+				id: 1,
+				name: 'George',
+				prefixedName: '[VIP] George'
+			},
+			{
+				id: 2,
+				name: 'Harry',
+				prefixedName: '[VIP] Harry'
+			}		];
+		expect(rows).toEqual(expected);
+	}
+});
+
+describe('sqlite function in transaction', () => {
+	test('sqlite', async () => await verify('sqlite'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+
+		await db.transaction(async (db) => {
+			db.function('add_prefix', (text, prefix) => {
+				return `${prefix}${text}`;
+			});
+
+			const rows = await db.query('SELECT id, name, add_prefix(name, \'[VIP] \') AS prefixedName FROM customer');
+
+			const expected = [
+				{
+					id: 1,
+					name: 'George',
+					prefixedName: '[VIP] George'
+				},
+				{
+					id: 2,
+					name: 'Harry',
+					prefixedName: '[VIP] Harry'
+				}		];
+			expect(rows).toEqual(expected);
+		});
+	}
+});
+
 const pathSegments = __filename.split('/');
 const lastSegment = pathSegments[pathSegments.length - 1];
 const fileNameWithoutExtension = lastSegment.split('.')[0];
