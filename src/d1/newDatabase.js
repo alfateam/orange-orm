@@ -24,10 +24,9 @@ function newDatabase(d1Database, poolOptions) {
 		}
 		let domain = createDomain();
 
-		if (fn)
-			return domain.run(runInTransaction);
-		else
-			return domain.run(run);
+		if (!fn)
+			throw new Error('transaction requires a function');
+		return domain.run(runInTransaction);
 
 		async function runInTransaction() {
 			let result;
@@ -46,13 +45,6 @@ function newDatabase(d1Database, poolOptions) {
 			return _begin(domain, transactionLess);
 		}
 
-		function run() {
-			let p;
-			let transaction = newTransaction(domain, pool, options);
-			p = new Promise(transaction);
-
-			return p.then(begin);
-		}
 
 	};
 

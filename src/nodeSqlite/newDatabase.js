@@ -42,12 +42,10 @@ function newDatabase(connectionString, poolOptions, hooks) {
 		let domain = createDomain();
 		const req = domain && domain.req;
 
-		if (fn) {
-			console.dir('run fn in trans........');
-			return domain.run(runInTransaction);
-		}
-		else
-			return domain.run(run);
+		if (!fn)
+			throw new Error('transaction requires a function');
+		console.dir('run fn in trans........');
+		return domain.run(runInTransaction);
 
 		function begin() {
 			return Promise.resolve()
@@ -72,14 +70,6 @@ function newDatabase(connectionString, poolOptions, hooks) {
 			return result;
 		}
 
-		function run() {
-			//todo delete ?
-			let p;
-			let transaction = newTransaction(domain, pool, options);
-			p = new Promise(transaction);
-
-			return p.then(begin);
-		}
 
 	};
 
