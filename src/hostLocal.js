@@ -13,7 +13,10 @@ const readonlyOps = ['getManyDto', 'getMany', 'aggregate', 'count'];
 // 	disableBulkDeletes, isBrowser }
 function hostLocal() {
 	const _options = arguments[0];
-	let { table, transaction, db, isHttp, hooks } = _options;
+	let { table, transaction, db, isHttp, hooks, client } = _options;
+	const transactionHooks = hooks && hooks.transaction;
+	const getTransactionHook = (name) =>
+		(transactionHooks && transactionHooks[name]) || (hooks && hooks[name]);
 
 	let c = { get, post, patch, query, sqliteFunction, express };
 
@@ -66,19 +69,39 @@ function hostLocal() {
 				else
 					db = dbPromise;
 			}
-			const hasTransactionHooks = !!(hooks?.beforeTransactionBegin
-				|| hooks?.afterTransactionBegin
-				|| hooks?.beforeTransactionCommit
-				|| hooks?.afterTransactionCommit);
+			const beforeBegin = getTransactionHook('beforeBegin');
+			const afterBegin = getTransactionHook('afterBegin');
+			const beforeCommit = getTransactionHook('beforeCommit');
+			const afterCommit = getTransactionHook('afterCommit');
+			const afterRollback = getTransactionHook('afterRollback');
+			const hasTransactionHooks = !!(beforeBegin
+				|| afterBegin
+				|| beforeCommit
+				|| afterCommit
+				|| afterRollback);
 			if (!hasTransactionHooks && readonlyOps.includes(body.path))
 				await db.transaction({ readonly: true }, fn);
 			else {
-				if (hooks?.beforeTransactionBegin) {
-					await hooks.beforeTransactionBegin(db, request, response);
-
-				}
-
-				await db.transaction(fn);
+				await db.transaction(async (context) => {
+					const hookDb = typeof client === 'function'
+						? client({ transaction: (fn) => fn(context) })
+						: (client || db);
+					if (afterCommit)
+						setSessionSingleton(context, 'afterCommitHook', () =>
+							afterCommit(hookDb, request, response)
+						);
+					if (afterRollback)
+						setSessionSingleton(context, 'afterRollbackHook', (error) =>
+							afterRollback(hookDb, request, response, error)
+						);
+					if (beforeBegin)
+						await beforeBegin(hookDb, request, response);
+					if (afterBegin)
+						await afterBegin(hookDb, request, response);
+					await fn(context);
+					if (beforeCommit)
+						await beforeCommit(hookDb, request, response);
+				});
 			}
 
 		}

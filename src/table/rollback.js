@@ -8,10 +8,13 @@ const conflictId = '12345678-1234-1234-1234-123456789012';
 const getSessionSingleton = require('./getSessionSingleton');
 
 function _rollback(context, e) {
+	let hookError;
 	var chain = resultToPromise()
 		.then(() => popChanges(context))
 		.then(executeRollback)
-		.then(() => releaseDbClient(context));
+		.then(callAfterRollback)
+		.then(() => releaseDbClient(context))
+		.then(throwHookErrorIfAny);
 
 
 	function executeRollback() {
@@ -19,6 +22,23 @@ function _rollback(context, e) {
 		if (transactionLess)
 			return Promise.resolve();
 		return executeQuery(context, rollbackCommand);
+	}
+
+	function callAfterRollback() {
+		const hook = getSessionSingleton(context, 'afterRollbackHook');
+		if (!hook)
+			return Promise.resolve();
+		return Promise.resolve()
+			.then(() => hook(e))
+			.catch((err) => {
+				hookError = err;
+			});
+	}
+
+	function throwHookErrorIfAny(res) {
+		if (hookError)
+			throw hookError;
+		return res;
 	}
 
 	if (e) {

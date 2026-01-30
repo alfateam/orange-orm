@@ -18,9 +18,12 @@ function newDatabase(connectionString, poolOptions, hooks) {
 
 	// Normalize hooks with safe no-ops
 	hooks = hooks || {};
+	const transactionHooks = hooks.transaction || {};
+	const getTransactionHook = (name) =>
+		(transactionHooks && transactionHooks[name]) || (hooks && hooks[name]);
 	const callHook = async (name, ...args) => {
 		try {
-			const fn = hooks && hooks[name];
+			const fn = getTransactionHook(name);
 			if (typeof fn === 'function') {
 				return await fn(...args);
 			}
@@ -34,7 +37,6 @@ function newDatabase(connectionString, poolOptions, hooks) {
 	let c = {poolFactory: pool, hostLocal, express};
 
 	c.transaction = function(options, fn) {
-		console.dir('trancation.........yes');
 		if ((arguments.length === 1) && (typeof options === 'function')) {
 			fn = options;
 			options = undefined;
@@ -44,14 +46,13 @@ function newDatabase(connectionString, poolOptions, hooks) {
 
 		if (!fn)
 			throw new Error('transaction requires a function');
-		console.dir('run fn in trans........');
 		return domain.run(runInTransaction);
 
 		function begin() {
 			return Promise.resolve()
-				.then(() => callHook('beforeTransactionBegin', c, req))
+				.then(() => callHook('beforeBegin', c, req))
 				.then(() => _begin(domain, options))
-				.then((res) => Promise.resolve(callHook('afterTransactionBegin', c, req)).then(() => res));
+				.then((res) => Promise.resolve(callHook('afterBegin', c, req)).then(() => res));
 		}
 
 		async function runInTransaction() {
@@ -61,11 +62,11 @@ function newDatabase(connectionString, poolOptions, hooks) {
 				.then(begin)
 				.then(() => fn(domain))
 				.then((res) => result = res)
-				.then(() => Promise.resolve(callHook('beforeTransactionCommit', c, req)))
+				.then(() => Promise.resolve(callHook('beforeCommit', c, req)))
 				.then(() => commit(domain))
-				.then(() => callHook('afterTransactionCommit', c, req))
+				.then(() => callHook('afterCommit', c, req))
 				.then(null, (e) => Promise.resolve(rollback(domain, e))
-					.then(() => callHook('afterTransactionRollback', c, req, e))
+					.then(() => callHook('afterRollback', c, req, e))
 				);
 			return result;
 		}
@@ -85,20 +86,20 @@ function newDatabase(connectionString, poolOptions, hooks) {
 		}
 		run.rollback = function(error) {
 			return Promise.resolve(rollback(domain, error))
-				.then(() => callHook('afterTransactionRollback', c, req, error));
+				.then(() => callHook('afterRollback', c, req, error));
 		};
 		run.commit = function() {
-			return Promise.resolve(callHook('beforeTransactionCommit', c, req))
+			return Promise.resolve(callHook('beforeCommit', c, req))
 				.then(() => commit(domain))
-				.then(() => callHook('afterTransactionCommit', c, req));
+				.then(() => callHook('afterCommit', c, req));
 		};
 		return run;
 
 		function begin() {
 			return Promise.resolve()
-				.then(() => callHook('beforeTransactionBegin', c, req))
+				.then(() => callHook('beforeBegin', c, req))
 				.then(() => _begin(domain, options))
-				.then((res) => Promise.resolve(callHook('afterTransactionBegin', c, req)).then(() => res));
+				.then((res) => Promise.resolve(callHook('afterBegin', c, req)).then(() => res));
 		}
 	};
 

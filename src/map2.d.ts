@@ -924,10 +924,23 @@ type ExpressConfig<M extends Record<string, TableDefinition<M>>> = {
   [TableName in keyof M]?: ExpressTableConfig<M>;
 } & {
   db?: Pool | ((connectors: Connectors) => Pool | Promise<Pool>);
+  hooks?: ExpressHooks<M>;
 }
 
 type ExpressTableConfig<M extends Record<string, TableDefinition<M>>> = {
   baseFilter?: RawFilter | ((db: DBClient<M>, req: import('express').Request, res: import('express').Response) => RawFilter);
+}
+
+type ExpressTransactionHooks<M extends Record<string, TableDefinition<M>>> = {
+  beforeBegin?: (db: DBClient<M>, req: import('express').Request, res: import('express').Response) => void | Promise<void>;
+  afterBegin?: (db: DBClient<M>, req: import('express').Request, res: import('express').Response) => void | Promise<void>;
+  beforeCommit?: (db: DBClient<M>, req: import('express').Request, res: import('express').Response) => void | Promise<void>;
+  afterCommit?: (db: DBClient<M>, req: import('express').Request, res: import('express').Response) => void | Promise<void>;
+  afterRollback?: (db: DBClient<M>, req: import('express').Request, res: import('express').Response, error?: unknown) => void | Promise<void>;
+}
+
+type ExpressHooks<M extends Record<string, TableDefinition<M>>> = ExpressTransactionHooks<M> & {
+  transaction?: ExpressTransactionHooks<M>;
 }
 
 export type DeepExpand<T> =
