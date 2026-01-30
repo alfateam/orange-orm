@@ -791,8 +791,10 @@ function requireStringify () {
 	}
 
 	function replacer(key, value) {
-		// // @ts-ignore
-		if (value instanceof Date  && !isNaN(value))
+		// @ts-ignore
+		if (typeof value === 'bigint')
+			return value.toString();
+		else if (value instanceof Date  && !isNaN(value))
 			return dateToISOString(value);
 		else
 			return value;
@@ -902,6 +904,8 @@ function requireCreatePatch () {
 				}
 				return copy;
 			}
+			else if (typeof object === 'bigint')
+				return object.toString();
 			else if (isValidDate(object))
 				return dateToIsoString(object);
 			else if (object === Object(object)) {

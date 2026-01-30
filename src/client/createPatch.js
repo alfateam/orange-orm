@@ -90,6 +90,8 @@ module.exports = function createPatch(original, dto, options) {
 			}
 			return copy;
 		}
+		else if (typeof object === 'bigint')
+			return object.toString();
 		else if (isValidDate(object))
 			return dateToIsoString(object);
 		else if (object === Object(object)) {
