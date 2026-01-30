@@ -45,7 +45,7 @@ beforeAll(async () => {
 		const { db, init } = getDb(dbName);
 		await init(db);
 
-		const d = await db.bigintParent.insert([
+	 	await db.bigintParent.insert([
 			{
 				id: BigInt('9999999999999999'),
 				foo: 100,
