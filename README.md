@@ -309,6 +309,31 @@ await pool.close();         // closes all pooled connections
 __Why close ?__  
 In serverless environments (e.g. AWS Lambda, Vercel, Cloudflare Workers) execution contexts are frequently frozen and resumed. Explicitly closing the client or pool ensures that file handles are released promptly and prevents “database locked” errors between invocations.  
 
+__SQLite user-defined functions__  
+You can register custom SQLite functions on the connection using `db.function(name, fn)`.  
+
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+db.function('add_prefix', (text, prefix) => `${prefix}${text}`);
+
+const rows = await db.query(
+  "select id, name, add_prefix(name, '[VIP] ') as prefixedName from customer"
+);
+```
+
+If you need the function inside a transaction, register it within the transaction callback to ensure it is available on that connection.  
+
+```javascript
+await db.transaction(async (db) => {
+  db.function('add_prefix', (text, prefix) => `${prefix}${text}`);
+  return db.query(
+    "select id, name, add_prefix(name, '[VIP] ') as prefixedName from customer"
+  );
+});
+```
+
 __From the browser__  
 You can securely use Orange from the browser by utilizing the Express plugin, which serves to safeguard sensitive database credentials from exposure at the client level. This technique bypasses the need to transmit raw SQL queries directly from the client to the server. Instead, it logs method calls initiated by the client, which are later replayed and authenticated on the server. This not only reinforces security by preventing the disclosure of raw SQL queries on the client side but also facilitates a smoother operation. Essentially, this method mirrors a traditional REST API, augmented with advanced TypeScript tooling for enhanced functionality. You can read more about it in the section called [In the browser](#user-content-in-the-browser)  
 <sub>📄 server.ts</sub>
@@ -1273,6 +1298,101 @@ async function updateRows() {
 
 }
 
+```
+
+__Row Level Security (Postgres)__  
+You can enforce tenant isolation at the database level by combining Postgres RLS with Express hooks. The example below mirrors the “Interceptors and base filter” style by putting the tenant id in a (fake) token on the client, then extracting it on the server and setting it inside the transaction. This is convenient for a demo because we can seed data and prove rows are filtered. In a real application you must validate signatures and derive tenant id from a trusted identity source, not from arbitrary client input.  
+
+<sub>📄 setup.sql</sub>
+
+```javascript
+create role rls_app_user nologin;
+
+create table tenant_data (
+  id serial primary key,
+  tenant_id int not null,
+  value text not null
+);
+
+alter table tenant_data enable row level security;
+create policy tenant_data_tenant on tenant_data
+  using (tenant_id = current_setting('app.tenant_id', true)::int);
+
+grant select, insert, update, delete on tenant_data to rls_app_user;
+
+insert into tenant_data (tenant_id, value) values
+  (1, 'alpha'),
+  (1, 'beta'),
+  (2, 'gamma');
+```
+
+<sub>📄 server.ts</sub>
+
+```javascript
+import map from './map';
+import { json } from 'body-parser';
+import express from 'express';
+import cors from 'cors';
+
+const db = map.postgres('postgres://postgres:postgres@localhost/postgres');
+
+express().disable('x-powered-by')
+  .use(json({ limit: '100mb' }))
+  .use(cors())
+  .use('/orange', validateToken)
+  .use('/orange', db.express({
+    hooks: {
+      transaction: {
+        afterBegin: async (db, req) => {
+          const tenantId = Number.parseInt(String(req.user?.tenantId ?? ''), 10);
+          if (!Number.isFinite(tenantId)) throw new Error('Missing tenant id');
+          await db.query('set local role rls_app_user');
+          await db.query({
+            sql: 'select set_config(\'app.tenant_id\', ?, true)',
+            parameters: [String(tenantId)]
+          });
+        }
+      }
+    }
+  }))
+  .listen(3000, () => console.log('Example app listening on port 3000!'));
+
+function validateToken(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ error: 'Authorization header missing' });
+  try {
+    const token = authHeader.replace(/^Bearer\s+/i, '');
+    const payload = decodeFakeJwt(token); // demo-only, do not use in production
+    req.user = { tenantId: String(payload.tenantId) };
+    return next();
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+}
+
+function decodeFakeJwt(token) {
+  // Demo-only format: "tenant:<id>"
+  const match = /^tenant:(\d+)$/.exec(token);
+  if (!match) throw new Error('Invalid demo token');
+  return { tenantId: Number(match[1]) };
+}
+```
+
+<sub>📄 browser.ts</sub>
+
+```javascript
+import map from './map';
+
+const db = map.http('http://localhost:3000/orange');
+
+db.interceptors.request.use((config) => {
+  // Demo-only token: payload carries the tenant id so we can verify filtering
+  config.headers.Authorization = 'Bearer tenant:1';
+  return config;
+});
+
+const rows = await db.tenant_data.getMany();
+// rows => [{ id: 1, tenant_id: 1, value: 'alpha' }, { id: 2, tenant_id: 1, value: 'beta' }]
 ```
 </details>
 

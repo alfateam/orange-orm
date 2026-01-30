@@ -466,6 +466,7 @@ export interface ExpressConfig {
 	concurrency?: Concurrency;
 	readonly?: boolean;
 	disableBulkDeletes?: boolean;
+	hooks?: ExpressHooks;
 }
 
 export interface ExpressContext {
@@ -473,6 +474,18 @@ export interface ExpressContext {
 	response: import('express').Response;
 	client: RdbClient;
 }		
+
+export interface ExpressTransactionHooks {
+	beforeBegin?: (db: Pool, request: import('express').Request, response: import('express').Response) => void | Promise<void>;
+	afterBegin?: (db: Pool, request: import('express').Request, response: import('express').Response) => void | Promise<void>;
+	beforeCommit?: (db: Pool, request: import('express').Request, response: import('express').Response) => void | Promise<void>;
+	afterCommit?: (db: Pool, request: import('express').Request, response: import('express').Response) => void | Promise<void>;
+	afterRollback?: (db: Pool, request: import('express').Request, response: import('express').Response, error?: unknown) => void | Promise<void>;
+}
+
+export interface ExpressHooks extends ExpressTransactionHooks {
+	transaction?: ExpressTransactionHooks;
+}
 
 export interface ExpressTables {${getExpressTables()}
 }
@@ -611,13 +624,18 @@ function requireHostExpress () {
 		const dbOptions = { db: options.db || client.db };
 		let c = {};
 		const readonly = { readonly: options.readonly};
+		const sharedHooks = options.hooks;
 		for (let tableName in client.tables) {
+			const tableOptions = options[tableName] || {};
+			const hooks = tableOptions.hooks || sharedHooks;
 			c[tableName] = hostLocal({
 				...dbOptions,
 				...readonly,
-				...options[tableName],
+				...tableOptions,
 				table: client.tables[tableName],
-				isHttp: true, client
+				isHttp: true,
+				client,
+				hooks
 
 			});
 		}
@@ -2251,7 +2269,10 @@ function requireHostLocal () {
 	// 	disableBulkDeletes, isBrowser }
 	function hostLocal() {
 		const _options = arguments[0];
-		let { table, transaction, db, isHttp, hooks } = _options;
+		let { table, transaction, db, isHttp, hooks, client } = _options;
+		const transactionHooks = hooks && hooks.transaction;
+		const getTransactionHook = (name) =>
+			(transactionHooks && transactionHooks[name]) || (hooks && hooks[name]);
 
 		let c = { get, post, patch, query, sqliteFunction, express };
 
@@ -2304,19 +2325,39 @@ function requireHostLocal () {
 					else
 						db = dbPromise;
 				}
-				const hasTransactionHooks = !!(hooks?.beforeTransactionBegin
-					|| hooks?.afterTransactionBegin
-					|| hooks?.beforeTransactionCommit
-					|| hooks?.afterTransactionCommit);
+				const beforeBegin = getTransactionHook('beforeBegin');
+				const afterBegin = getTransactionHook('afterBegin');
+				const beforeCommit = getTransactionHook('beforeCommit');
+				const afterCommit = getTransactionHook('afterCommit');
+				const afterRollback = getTransactionHook('afterRollback');
+				const hasTransactionHooks = !!(beforeBegin
+					|| afterBegin
+					|| beforeCommit
+					|| afterCommit
+					|| afterRollback);
 				if (!hasTransactionHooks && readonlyOps.includes(body.path))
 					await db.transaction({ readonly: true }, fn);
 				else {
-					if (hooks?.beforeTransactionBegin) {
-						await hooks.beforeTransactionBegin(db, request, response);
-
-					}
-
-					await db.transaction(fn);
+					await db.transaction(async (context) => {
+						const hookDb = typeof client === 'function'
+							? client({ transaction: (fn) => fn(context) })
+							: (client || db);
+						if (afterCommit)
+							setSessionSingleton(context, 'afterCommitHook', () =>
+								afterCommit(hookDb, request, response)
+							);
+						if (afterRollback)
+							setSessionSingleton(context, 'afterRollbackHook', (error) =>
+								afterRollback(hookDb, request, response, error)
+							);
+						if (beforeBegin)
+							await beforeBegin(hookDb, request, response);
+						if (afterBegin)
+							await afterBegin(hookDb, request, response);
+						await fn(context);
+						if (beforeCommit)
+							await beforeCommit(hookDb, request, response);
+					});
 				}
 
 			}
@@ -13056,12 +13097,32 @@ function requireCommit () {
 	const getSessionSingleton = requireGetSessionSingleton();
 
 	function _commit(context, result) {
+		let hookError;
 		return popAndPushChanges()
+			.then(callAfterCommit)
 			.then(releaseDbClient.bind(null, context))
-			.then(onReleased);
+			.then(onReleased)
+			.then(throwHookErrorIfAny);
 
 		function onReleased() {
 			return result;
+		}
+
+		function throwHookErrorIfAny(res) {
+			if (hookError)
+				throw hookError;
+			return res;
+		}
+
+		function callAfterCommit() {
+			const hook = getSessionSingleton(context, 'afterCommitHook');
+			if (!hook)
+				return Promise.resolve();
+			return Promise.resolve()
+				.then(() => hook())
+				.catch((e) => {
+					hookError = e;
+				});
 		}
 
 		async function popAndPushChanges() {
@@ -13164,10 +13225,13 @@ function requireRollback () {
 	const getSessionSingleton = requireGetSessionSingleton();
 
 	function _rollback(context, e) {
+		let hookError;
 		var chain = resultToPromise()
 			.then(() => popChanges(context))
 			.then(executeRollback)
-			.then(() => releaseDbClient(context));
+			.then(callAfterRollback)
+			.then(() => releaseDbClient(context))
+			.then(throwHookErrorIfAny);
 
 
 		function executeRollback() {
@@ -13175,6 +13239,23 @@ function requireRollback () {
 			if (transactionLess)
 				return Promise.resolve();
 			return executeQuery(context, rollbackCommand);
+		}
+
+		function callAfterRollback() {
+			const hook = getSessionSingleton(context, 'afterRollbackHook');
+			if (!hook)
+				return Promise.resolve();
+			return Promise.resolve()
+				.then(() => hook(e))
+				.catch((err) => {
+					hookError = err;
+				});
+		}
+
+		function throwHookErrorIfAny(res) {
+			if (hookError)
+				throw hookError;
+			return res;
 		}
 
 		if (e) {
@@ -14971,10 +15052,9 @@ function requireNewDatabase$b () {
 			}
 			let domain = createDomain();
 
-			if (fn)
-				return domain.run(runInTransaction);
-			else
-				return domain.run(run);
+			if (!fn)
+				throw new Error('transaction requires a function');
+			return domain.run(runInTransaction);
 
 			async function runInTransaction() {
 				let result;
@@ -14992,13 +15072,6 @@ function requireNewDatabase$b () {
 				return _begin(domain, options);
 			}
 
-			function run() {
-				let p;
-				let transaction = newTransaction(domain, pool, options);
-				p = new Promise(transaction);
-
-				return p.then(begin);
-			}
 
 		};
 
@@ -15726,10 +15799,9 @@ function requireNewDatabase$a () {
 			}
 			let domain = createDomain();
 
-			if (fn)
-				return domain.run(runInTransaction);
-			else
-				return domain.run(run);
+			if (!fn)
+				throw new Error('transaction requires a function');
+			return domain.run(runInTransaction);
 
 			async function runInTransaction() {
 				let result;
@@ -15748,14 +15820,6 @@ function requireNewDatabase$a () {
 				return _begin(domain, options);
 			}
 
-			function run() {
-				let p;
-				let transaction = newTransaction(domain, pool, options);
-				p = new Promise(transaction);
-
-				return p.then(begin)
-					.then(negotiateSchema);
-			}
 
 			function negotiateSchema(previous) {
 				let schema = options && options.schema;
@@ -16468,10 +16532,9 @@ function requireNewDatabase$9 () {
 			}
 			let domain = createDomain();
 
-			if (fn)
-				return domain.run(runInTransaction);
-			else
-				return domain.run(run);
+			if (!fn)
+				throw new Error('transaction requires a function');
+			return domain.run(runInTransaction);
 
 			async function runInTransaction() {
 				let result;
@@ -16490,14 +16553,6 @@ function requireNewDatabase$9 () {
 				return _begin(domain, options);
 			}
 
-			function run() {
-				let p;
-				let transaction = newTransaction(domain, pool, options);
-				p = new Promise(transaction);
-
-				return p.then(begin)
-					.then(negotiateSchema);
-			}
 
 			function negotiateSchema(previous) {
 				let schema = options && options.schema;
@@ -16997,10 +17052,9 @@ function requireNewDatabase$8 () {
 			}
 			let domain = createDomain();
 
-			if (fn)
-				return domain.run(runInTransaction);
-			else
-				return domain.run(run);
+			if (!fn)
+				throw new Error('transaction requires a function');
+			return domain.run(runInTransaction);
 
 			async function runInTransaction() {
 				let result;
@@ -17017,10 +17071,6 @@ function requireNewDatabase$8 () {
 
 			function begin() {
 				return _begin(domain, options);
-			}
-
-			function run() {
-				throw new Error('wont happen');
 			}
 
 			function negotiateSchema(previous) {
@@ -17665,50 +17715,26 @@ function requireNewDatabase$7 () {
 	let doSqliteFunction = requireSqliteFunction();
 	let releaseDbClient = requireReleaseDbClient();
 
-	function newDatabase(connectionString, poolOptions, hooks) {
+	function newDatabase(connectionString, poolOptions) {
 		if (!connectionString)
 			throw new Error('Connection string cannot be empty');
 		poolOptions = poolOptions || { min: 1 };
 		var pool = newPool(connectionString, poolOptions);
 
-		// Normalize hooks with safe no-ops
-		hooks = hooks || {};
-		const callHook = async (name, ...args) => {
-			try {
-				const fn = hooks && hooks[name];
-				if (typeof fn === 'function') {
-					return await fn(...args);
-				}
-			} catch (e) {
-				// Hooks should not break core flow; log and continue
-				// Using console.error to avoid introducing new deps
-				console.error(`[orange-orm] Hook ${name} failed:`, e);
-			}
-		};
-
 		let c = {poolFactory: pool, hostLocal, express};
 
 		c.transaction = function(options, fn) {
-			console.dir('trancation.........yes');
 			if ((arguments.length === 1) && (typeof options === 'function')) {
 				fn = options;
 				options = undefined;
 			}
 			let domain = createDomain();
-			const req = domain && domain.req;
-
-			if (fn) {
-				console.dir('run fn in trans........');
-				return domain.run(runInTransaction);
-			}
-			else
-				return domain.run(run);
+			if (!fn)
+				throw new Error('transaction requires a function');
+			return domain.run(runInTransaction);
 
 			function begin() {
-				return Promise.resolve()
-					.then(() => callHook('beforeTransactionBegin', c, req))
-					.then(() => _begin(domain, options))
-					.then((res) => Promise.resolve(callHook('afterTransactionBegin', c, req)).then(() => res));
+				return _begin(domain, options);
 			}
 
 			async function runInTransaction() {
@@ -17718,23 +17744,11 @@ function requireNewDatabase$7 () {
 					.then(begin)
 					.then(() => fn(domain))
 					.then((res) => result = res)
-					.then(() => Promise.resolve(callHook('beforeTransactionCommit', c, req)))
 					.then(() => commit(domain))
-					.then(() => callHook('afterTransactionCommit', c, req))
-					.then(null, (e) => Promise.resolve(rollback(domain, e))
-						.then(() => callHook('afterTransactionRollback', c, req, e))
-					);
+					.then(null, (e) => Promise.resolve(rollback(domain, e)));
 				return result;
 			}
 
-			function run() {
-				//todo delete ?
-				let p;
-				let transaction = newTransaction(domain, pool, options);
-				p = new Promise(transaction);
-
-				return p.then(begin);
-			}
 
 		};
 
@@ -17743,27 +17757,19 @@ function requireNewDatabase$7 () {
 			let domain = createDomain();
 			let transaction = newTransaction(domain, pool);
 			let p = domain.run(() => new Promise(transaction).then(begin));
-			const req = domain && domain.req;
-
 			function run(fn) {
 				return p.then(() => fn(domain));
 			}
 			run.rollback = function(error) {
-				return Promise.resolve(rollback(domain, error))
-					.then(() => callHook('afterTransactionRollback', c, req, error));
+				return Promise.resolve(rollback(domain, error));
 			};
 			run.commit = function() {
-				return Promise.resolve(callHook('beforeTransactionCommit', c, req))
-					.then(() => commit(domain))
-					.then(() => callHook('afterTransactionCommit', c, req));
+				return Promise.resolve(commit(domain));
 			};
 			return run;
 
 			function begin() {
-				return Promise.resolve()
-					.then(() => callHook('beforeTransactionBegin', c, req))
-					.then(() => _begin(domain, options))
-					.then((res) => Promise.resolve(callHook('afterTransactionBegin', c, req)).then(() => res));
+				return _begin(domain, options);
 			}
 		};
 
@@ -18140,10 +18146,9 @@ function requireNewDatabase$6 () {
 			}
 			let domain = createDomain();
 
-			if (fn)
-				return domain.run(runInTransaction);
-			else
-				return domain.run(run);
+			if (!fn)
+				throw new Error('transaction requires a function');
+			return domain.run(runInTransaction);
 
 			function begin() {
 				return _begin(domain, options);
@@ -18161,13 +18166,6 @@ function requireNewDatabase$6 () {
 				return result;
 			}
 
-			function run() {
-				let p;
-				let transaction = newTransaction(domain, pool, options);
-				p = new Promise(transaction);
-
-				return p.then(begin);
-			}
 
 		};
 
@@ -18603,10 +18601,9 @@ function requireNewDatabase$5 () {
 			}
 			let domain = createDomain();
 
-			if (fn)
-				return domain.run(runInTransaction);
-			else
-				return domain.run(run);
+			if (!fn)
+				throw new Error('transaction requires a function');
+			return domain.run(runInTransaction);
 
 			function begin() {
 				return _begin(domain, options);
@@ -18624,13 +18621,6 @@ function requireNewDatabase$5 () {
 				return result;
 			}
 
-			function run() {
-				let p;
-				let transaction = newTransaction(domain, pool, options);
-				p = new Promise(transaction);
-
-				return p.then(begin);
-			}
 
 		};
 
@@ -19030,10 +19020,9 @@ function requireNewDatabase$4 () {
 			}
 			let domain = createDomain();
 
-			if (fn)
-				return domain.run(runInTransaction);
-			else
-				return domain.run(run);
+			if (!fn)
+				throw new Error('transaction requires a function');
+			return domain.run(runInTransaction);
 
 			async function runInTransaction() {
 				let result;
@@ -19052,13 +19041,6 @@ function requireNewDatabase$4 () {
 				return _begin(domain, transactionLess);
 			}
 
-			function run() {
-				let p;
-				let transaction = newTransaction(domain, pool, options);
-				p = new Promise(transaction);
-
-				return p.then(begin);
-			}
 
 		};
 
@@ -20056,10 +20038,9 @@ function requireNewDatabase$3 () {
 			}
 			let domain = createDomain();
 
-			if (fn)
-				return domain.run(runInTransaction);
-			else
-				return domain.run(run);
+			if (!fn)
+				throw new Error('transaction requires a function');
+			return domain.run(runInTransaction);
 
 			async function runInTransaction() {
 				let result;
@@ -20077,13 +20058,6 @@ function requireNewDatabase$3 () {
 				return _begin(domain, options);
 			}
 
-			function run() {
-				let p;
-				let transaction = newTransaction(domain, pool, options);
-				p = new Promise(transaction);
-
-				return p.then(begin);
-			}
 
 		};
 
@@ -20824,10 +20798,9 @@ function requireNewDatabase$2 () {
 			}
 			let domain = createDomain();
 
-			if (fn)
-				return domain.run(runInTransaction);
-			else
-				return domain.run(run);
+			if (!fn)
+				throw new Error('transaction requires a function');
+			return domain.run(runInTransaction);
 
 			function begin() {
 				return _begin(domain, options);
@@ -20846,13 +20819,6 @@ function requireNewDatabase$2 () {
 			}
 
 
-			function run() {
-				let p;
-				let transaction = newTransaction(domain, pool, options);
-				p = new Promise(transaction);
-
-				return p.then(begin);
-			}
 
 		};
 
@@ -21474,10 +21440,9 @@ function requireNewDatabase$1 () {
 			}
 			let domain = createDomain();
 
-			if (fn)
-				return domain.run(runInTransaction);
-			else
-				return domain.run(run);
+			if (!fn)
+				throw new Error('transaction requires a function');
+			return domain.run(runInTransaction);
 
 
 			function begin() {
@@ -21497,13 +21462,6 @@ function requireNewDatabase$1 () {
 
 			}
 
-			function run() {
-				let p;
-				let transaction = newTransaction(domain, pool, options);
-				p = new Promise(transaction);
-
-				return p.then(begin);
-			}
 
 		};
 
@@ -22347,10 +22305,9 @@ function requireNewDatabase () {
 			}
 			let domain = createDomain();
 
-			if (fn)
-				return domain.run(runInTransaction);
-			else
-				return domain.run(run);
+			if (!fn)
+				throw new Error('transaction requires a function');
+			return domain.run(runInTransaction);
 
 
 			function begin() {
@@ -22370,13 +22327,6 @@ function requireNewDatabase () {
 
 			}
 
-			function run() {
-				let p;
-				let transaction = newTransaction(domain, pool, options);
-				p = new Promise(transaction);
-
-				return p.then(begin);
-			}
 
 		};
 

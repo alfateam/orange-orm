@@ -903,6 +903,10 @@ export type DBClient<M extends Record<string, TableDefinition<M>>> = {
   and(f: Filter | RawFilter[], ...filters: RawFilter[]): Filter;
   or(f: Filter | RawFilter[], ...filters: RawFilter[]): Filter;
   not(): Filter;
+  /**
+   * Register a user-defined SQLite function on the connection.
+   */
+  function(name: string, fn: (...args: any[]) => unknown): Promise<unknown> | void;
   query(filter: RawFilter | string): Promise<unknown[]>;
   query<T>(filter: RawFilter | string): Promise<T[]>;
   createPatch(original: any[], modified: any[]): JsonPatch;
