@@ -10,29 +10,11 @@ let doQuery = require('../query');
 let doSqliteFunction = require('../sqliteFunction');
 let releaseDbClient = require('../table/releaseDbClient');
 
-function newDatabase(connectionString, poolOptions, hooks) {
+function newDatabase(connectionString, poolOptions) {
 	if (!connectionString)
 		throw new Error('Connection string cannot be empty');
 	poolOptions = poolOptions || { min: 1 };
 	var pool = newPool(connectionString, poolOptions);
-
-	// Normalize hooks with safe no-ops
-	hooks = hooks || {};
-	const transactionHooks = hooks.transaction || {};
-	const getTransactionHook = (name) =>
-		(transactionHooks && transactionHooks[name]) || (hooks && hooks[name]);
-	const callHook = async (name, ...args) => {
-		try {
-			const fn = getTransactionHook(name);
-			if (typeof fn === 'function') {
-				return await fn(...args);
-			}
-		} catch (e) {
-			// Hooks should not break core flow; log and continue
-			// Using console.error to avoid introducing new deps
-			console.error(`[orange-orm] Hook ${name} failed:`, e);
-		}
-	};
 
 	let c = {poolFactory: pool, hostLocal, express};
 
@@ -42,17 +24,12 @@ function newDatabase(connectionString, poolOptions, hooks) {
 			options = undefined;
 		}
 		let domain = createDomain();
-		const req = domain && domain.req;
-
 		if (!fn)
 			throw new Error('transaction requires a function');
 		return domain.run(runInTransaction);
 
 		function begin() {
-			return Promise.resolve()
-				.then(() => callHook('beforeBegin', c, req))
-				.then(() => _begin(domain, options))
-				.then((res) => Promise.resolve(callHook('afterBegin', c, req)).then(() => res));
+			return _begin(domain, options);
 		}
 
 		async function runInTransaction() {
@@ -62,12 +39,8 @@ function newDatabase(connectionString, poolOptions, hooks) {
 				.then(begin)
 				.then(() => fn(domain))
 				.then((res) => result = res)
-				.then(() => Promise.resolve(callHook('beforeCommit', c, req)))
 				.then(() => commit(domain))
-				.then(() => callHook('afterCommit', c, req))
-				.then(null, (e) => Promise.resolve(rollback(domain, e))
-					.then(() => callHook('afterRollback', c, req, e))
-				);
+				.then(null, (e) => Promise.resolve(rollback(domain, e)));
 			return result;
 		}
 
@@ -79,27 +52,19 @@ function newDatabase(connectionString, poolOptions, hooks) {
 		let domain = createDomain();
 		let transaction = newTransaction(domain, pool);
 		let p = domain.run(() => new Promise(transaction).then(begin));
-		const req = domain && domain.req;
-
 		function run(fn) {
 			return p.then(() => fn(domain));
 		}
 		run.rollback = function(error) {
-			return Promise.resolve(rollback(domain, error))
-				.then(() => callHook('afterRollback', c, req, error));
+			return Promise.resolve(rollback(domain, error));
 		};
 		run.commit = function() {
-			return Promise.resolve(callHook('beforeCommit', c, req))
-				.then(() => commit(domain))
-				.then(() => callHook('afterCommit', c, req));
+			return Promise.resolve(commit(domain));
 		};
 		return run;
 
 		function begin() {
-			return Promise.resolve()
-				.then(() => callHook('beforeBegin', c, req))
-				.then(() => _begin(domain, options))
-				.then((res) => Promise.resolve(callHook('afterBegin', c, req)).then(() => res));
+			return _begin(domain, options);
 		}
 	};
 
