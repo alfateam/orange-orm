@@ -1305,7 +1305,7 @@ You can enforce tenant isolation at the database level by combining Postgres RLS
 
 <sub>📄 setup.sql</sub>
 
-```javascript
+```sql
 create role rls_app_user nologin;
 
 create table tenant_data (
