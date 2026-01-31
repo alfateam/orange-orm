@@ -45,7 +45,7 @@ beforeAll(async () => {
 		const { db, init } = getDb(dbName);
 		await init(db);
 
-	 	await db.bigintParent.insert([
+		await db.bigintParent.insert([
 			{
 				id: BigInt('9999999999999999'),
 				foo: 100,
@@ -1299,7 +1299,7 @@ describe('sqlite function', () => {
 				id: 2,
 				name: 'Harry',
 				prefixedName: '[VIP] Harry'
-			}		];
+			}];
 		expect(rows).toEqual(expected);
 	}
 });
@@ -1327,7 +1327,7 @@ describe('sqlite function in transaction', () => {
 					id: 2,
 					name: 'Harry',
 					prefixedName: '[VIP] Harry'
-				}		];
+				}];
 			expect(rows).toEqual(expected);
 		});
 	}
