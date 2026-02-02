@@ -684,21 +684,25 @@ export type TableClient<M extends Record<string, TableDefinition<M>>, K extends 
 
   // Single item methods - return individual objects with individual active record methods
   getOne<strategy extends FetchStrategy<M, K>>(
-    filter?: RawFilter | Array<PrimaryKeyObject<M, K>>
-  ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K>>;
+    strategy: strategy
+  ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K> | undefined>;
 
   getOne<strategy extends FetchStrategy<M, K>>(
-    filter?: RawFilter | Array<PrimaryKeyObject<M, K>>,
+    filter?: RawFilter | PrimaryKeyObject<M, K>
+  ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K> | undefined>;
+
+  getOne<strategy extends FetchStrategy<M, K>>(
+    filter?: RawFilter | PrimaryKeyObject<M, K>,
     strategy?: strategy
-  ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K>>;
+  ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K> | undefined>;
 
   getById<strategy extends FetchStrategy<M, K>>(
     ...args: [...PrimaryKeyArgs<M, K>, strategy: strategy]
-  ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K>>;
+  ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K> | undefined>;
 
   getById(
     ...args: [...PrimaryKeyArgs<M, K>]
-  ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, {}>>, M, K>>;
+  ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, {}>>, M, K>  | undefined>;
 
   // UPDATED: Bulk update methods with relations support
   update(

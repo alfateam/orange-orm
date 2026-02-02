@@ -3122,13 +3122,69 @@ function requireClient () {
 				return adapter.post(body);
 			}
 
+			function isRawFilter(value) {
+				return value && typeof value === 'object'
+					&& (typeof value.sql === 'string' || typeof value.sql === 'function');
+			}
+
+			function looksLikeFetchStrategy(value) {
+				if (!value || typeof value !== 'object' || Array.isArray(value))
+					return false;
+				if (isRawFilter(value))
+					return false;
+				if (Object.keys(value).length === 0)
+					return true;
+				if ('where' in value || 'orderBy' in value || 'limit' in value || 'offset' in value)
+					return true;
+				for (let key in value) {
+					const v = value[key];
+					if (typeof v === 'boolean')
+						return true;
+					if (v && typeof v === 'object' && !Array.isArray(v))
+						return true;
+				}
+				return false;
+			}
+
+			function isPrimaryKeyObject(meta, value) {
+				if (!value || typeof value !== 'object' || Array.isArray(value))
+					return false;
+				if (isRawFilter(value))
+					return false;
+				const keyNames = meta?.keys?.map(key => key.name);
+				if (!keyNames || keyNames.length === 0)
+					return false;
+				const keys = Object.keys(value);
+				if (keys.length === 0)
+					return false;
+				for (let i = 0; i < keys.length; i++) {
+					const key = keys[i];
+					if (!keyNames.includes(key))
+						return false;
+					const val = value[key];
+					if (val && typeof val === 'object' && !(val instanceof Date))
+						return false;
+				}
+				return true;
+			}
+
+			function normalizeGetOneArgs(meta, filter, strategy) {
+				if (looksLikeFetchStrategy(filter) && (strategy === undefined || !looksLikeFetchStrategy(strategy))) {
+					if (!isPrimaryKeyObject(meta, filter))
+						return { filter: strategy, strategy: filter };
+				}
+				return { filter, strategy };
+			}
+
 			async function getOne(filter, strategy) {
 				let metaPromise = getMeta();
-				strategy = extractFetchingStrategy({}, strategy);
+				let meta = await metaPromise;
+				let normalized = normalizeGetOneArgs(meta, filter, strategy);
+				filter = normalized.filter;
+				strategy = extractFetchingStrategy({}, normalized.strategy);
 				let _strategy = { ...strategy, ...{ limit: 1 } };
 				let args = [filter, _strategy].concat(Array.prototype.slice.call(arguments).slice(2));
 				let rows = await getManyCore.apply(null, args);
-				await metaPromise;
 				if (rows.length === 0)
 					return;
 				return proxify(rows[0], strategy, true);

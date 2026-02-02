@@ -204,6 +204,93 @@ describe('boolean filter', () => {
 	}
 });
 
+describe('getOne ', () => {
+	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+		const row = await db.customer.getOne({});
+
+		expect(row).toBeDefined();
+		expect(row).toHaveProperty('id');
+		expect(row.id).toBeTypeOf('number');
+	}
+
+	test('sqlite strategy first', async () => {
+		const { db } = getDb('sqlite');
+		const row = await db.customer.getOne({
+			isActive: true
+		});
+
+		const expected = {
+			id: 1,
+			isActive: true
+		};
+
+		expect(row).toEqual(expected);
+	});
+
+	test('sqlite strategy first with where (boolean column)', async () => {
+		const { db } = getDb('sqlite');
+		const row = await db.customer.getOne({
+			isActive: true,
+			where: x => x.id.eq(2)
+		});
+
+		const expected = {
+			id: 2,
+			isActive: true
+		};
+
+		expect(row).toEqual(expected);
+	});
+
+	test('sqlite object pk filter first with strategy second', async () => {
+		const { db } = getDb('sqlite');
+		const row = await db.customer.getOne({ id: 2 }, { isActive: true });
+
+		const expected = {
+			id: 2,
+			isActive: true
+		};
+
+		expect(row).toEqual(expected);
+	});
+
+	test('sqlite sql filter first with strategy second', async () => {
+		const { db } = getDb('sqlite');
+		const row = await db.customer.getOne(db.customer.id.eq(2), { isActive: true });
+
+		const expected = {
+			id: 2,
+			isActive: true
+		};
+
+		expect(row).toEqual(expected);
+	});
+
+	test('sqlite raw sql filter first with strategy second', async () => {
+		const { db } = getDb('sqlite');
+		const row = await db.customer.getOne({ sql: 'id=2' }, { isActive: true });
+
+		const expected = {
+			id: 2,
+			isActive: true
+		};
+
+		expect(row).toEqual(expected);
+	});
+});
+
 describe('empty array-filter', () => {
 	test('pg', async () => await verify('pg'));
 	test('pglite', async () => await verify('pglite'));
