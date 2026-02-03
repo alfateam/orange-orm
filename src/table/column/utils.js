@@ -80,8 +80,9 @@ function negotiateRawSqlFilter(context, filter, optionalTable, emptyArrayMeansFa
 				}
 				params.push(sql, filter.parameters);
 			}
-			else if (isObjectFilter(filter, optionalTable))
+			else if (isObjectFilter(filter, optionalTable)) {
 				return newObjectFilter(context, filter, optionalTable);
+			}
 			else
 				params = [filter];
 		} else {

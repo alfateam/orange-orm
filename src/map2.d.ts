@@ -674,25 +674,13 @@ type AggregateCustomSelectorProperties<M extends Record<string, TableDefinition<
 
 export type TableClient<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
   // Array methods - return arrays with array-level active record methods, but individual items are plain
-  getAll(): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, {}>>>, M, K>>;
-  getAll<strategy extends FetchStrategy<M, K>>(strategy: strategy): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, strategy>>>, M, K>>;
-  getMany(filter?: RawFilter | Array<PrimaryKeyObject<M, K>>): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, {}>>>, M, K>>;
-  getMany<strategy extends FetchStrategy<M, K>>(filter?: RawFilter | Array<PrimaryKeyObject<M, K>>, strategy?: strategy): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, strategy>>>, M, K>>;
+  getMany<strategy extends FetchStrategy<M, K> = {}>(strategy: strategy): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, strategy>>>, M, K>>;
 
   // Aggregate methods - return plain objects (no active record methods)
   aggregate<strategy extends AggregateStrategy<M, K>>(strategy: strategy): Promise<Array<DeepExpand<AggregateCustomSelectorProperties<M, K, strategy>>>>;
 
   // Single item methods - return individual objects with individual active record methods
-  getOne<strategy extends FetchStrategy<M, K>>(
-    strategy: strategy
-  ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K> | undefined>;
-
-  getOne<strategy extends FetchStrategy<M, K>>(
-    filter?: RawFilter | PrimaryKeyObject<M, K>
-  ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K> | undefined>;
-
-  getOne<strategy extends FetchStrategy<M, K>>(
-    filter?: RawFilter | PrimaryKeyObject<M, K>,
+  getOne<strategy extends FetchStrategy<M, K> = {}>(
     strategy?: strategy
   ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K> | undefined>;
 

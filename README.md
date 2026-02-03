@@ -1303,6 +1303,7 @@ async function updateRows() {
 
 __Row Level Security (Postgres)__  
 You can enforce tenant isolation at the database level by combining Postgres RLS with Express hooks. The example below mirrors the “Interceptors and base filter” style by putting the tenant id in a (fake) token on the client, then extracting it on the server and setting it inside the transaction. This is convenient for a demo because we can seed data and prove rows are filtered. In a real application you must validate signatures and derive tenant id from a trusted identity source, not from arbitrary client input.  
+Available transaction hooks are `beforeBegin`, `afterBegin`, `beforeCommit`, `afterCommit`, and `afterRollback`.
 
 <sub>📄 setup.sql</sub>
 

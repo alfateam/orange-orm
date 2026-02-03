@@ -1139,8 +1139,9 @@ function requireUtils () {
 					}
 					params.push(sql, filter.parameters);
 				}
-				else if (isObjectFilter(filter, optionalTable))
+				else if (isObjectFilter(filter, optionalTable)) {
 					return newObjectFilter(context, filter, optionalTable);
+				}
 				else
 					params = [filter];
 			} else {
@@ -1312,6 +1313,7 @@ function requireExecutePath () {
 		return executePath(...rest);
 
 		async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, request, response, readonly, disableBulkDeletes, isHttp, client }) {
+			console.dir(JSONFilter, {depth: Infinity});
 			let allowedOps = { ..._allowedOps, insert: !readonly, ...extractRelations(getMeta(table)) };
 			let ops = { ..._ops, ...getCustomFilterPaths(customFilters), getManyDto, getMany, aggregate, count, delete: _delete, cascadeDelete, update, replace };
 
@@ -3096,6 +3098,14 @@ function requireClient () {
 
 			async function getMany(_, strategy) {
 				let metaPromise = getMeta();
+				if (looksLikeFetchStrategy(_) && (strategy === undefined || !looksLikeFetchStrategy(strategy))) {
+					let meta = await metaPromise;
+					if (!isPrimaryKeyObject(meta, _)) {
+						let _strategy = _;
+						_ = strategy;
+						strategy = _strategy;
+					}
+				}
 				strategy = extractFetchingStrategy({}, strategy);
 				let args = [_, strategy].concat(Array.prototype.slice.call(arguments).slice(2));
 				let rows = await getManyCore.apply(null, args);
@@ -9743,7 +9753,7 @@ function requireWhere$1 () {
 
 			try {
 				let arg = typeof fn === 'function' ? fn(table) : fn;
-				let anyFilter = negotiateRawSqlFilter(context, arg);
+				let anyFilter = negotiateRawSqlFilter(context, arg, table, true);
 				delete table._rootAlias;
 				return anyFilter;
 			}
@@ -12400,7 +12410,7 @@ function requireWhere () {
 
 		function where(context, fn) {
 			let arg = typeof fn === 'function' ? fn(table) : fn;
-			return negotiateRawSqlFilter(context, arg);
+			return negotiateRawSqlFilter(context, arg, table, true);
 		}
 		return where;
 	}
@@ -17813,7 +17823,6 @@ function requireNewDatabase$7 () {
 		};
 
 		c.createTransaction = function(options) {
-			console.dir('create transaction');
 			let domain = createDomain();
 			let transaction = newTransaction(domain, pool);
 			let p = domain.run(() => new Promise(transaction).then(begin));

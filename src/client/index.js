@@ -242,6 +242,14 @@ function rdbClient(options = {}) {
 
 		async function getMany(_, strategy) {
 			let metaPromise = getMeta();
+			if (looksLikeFetchStrategy(_) && (strategy === undefined || !looksLikeFetchStrategy(strategy))) {
+				let meta = await metaPromise;
+				if (!isPrimaryKeyObject(meta, _)) {
+					let _strategy = _;
+					_ = strategy;
+					strategy = _strategy;
+				}
+			}
 			strategy = extractFetchingStrategy({}, strategy);
 			let args = [_, strategy].concat(Array.prototype.slice.call(arguments).slice(2));
 			let rows = await getManyCore.apply(null, args);

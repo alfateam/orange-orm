@@ -48,7 +48,6 @@ function newDatabase(connectionString, poolOptions) {
 	};
 
 	c.createTransaction = function(options) {
-		console.dir('create transaction');
 		let domain = createDomain();
 		let transaction = newTransaction(domain, pool);
 		let p = domain.run(() => new Promise(transaction).then(begin));
