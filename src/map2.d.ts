@@ -695,12 +695,12 @@ export type TableClient<M extends Record<string, TableDefinition<M>>, K extends 
   // UPDATED: Bulk update methods with relations support
   update(
     row: UpdateRowWithRelations<M, K>,
-    opts: { where: (row: RootTableRefs<M, K>) => RawFilter }
+    opts: { where: (row: RootTableRefs<M, K>) => RawFilter | Array<PrimaryKeyObject<M, K>> }
   ): Promise<void>;
 
   update<strategy extends FetchStrategy<M, K>>(
     row: UpdateRowWithRelations<M, K>,
-    opts: { where: (row: RootTableRefs<M, K>) => RawFilter },
+    opts: { where: (row: RootTableRefs<M, K>) => RawFilter | Array<PrimaryKeyObject<M, K>> },
     strategy: strategy
   ): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, strategy>>>, M, K>>;
 

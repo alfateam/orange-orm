@@ -1312,7 +1312,6 @@ function requireExecutePath () {
 		return executePath(...rest);
 
 		async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, request, response, readonly, disableBulkDeletes, isHttp, client }) {
-			console.dir(JSONFilter, {depth: Infinity});
 			let allowedOps = { ..._allowedOps, insert: !readonly, ...extractRelations(getMeta(table)) };
 			let ops = { ..._ops, ...getCustomFilterPaths(customFilters), getManyDto, getMany, aggregate, count, delete: _delete, cascadeDelete, update, replace };
 
