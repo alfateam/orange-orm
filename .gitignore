@@ -3,6 +3,7 @@ rdb.sublime-workspace
 README.html
 docs.html
 npm-debug.log
+publish.log
 .vscode
 demo.db
 demo*.db*
@@ -11,3 +12,5 @@ pglite.db*
 coverage
 .env
 deno.lock
+*.db-wal
+*.db-shm
