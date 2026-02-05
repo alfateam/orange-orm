@@ -5887,15 +5887,23 @@ function requireColumn () {
 		};
 
 		c.enum = function(values) {
-			if (!Array.isArray(values))
+			let list = values;
+			if (Array.isArray(values))
+				list = values;
+			else if (values && typeof values === 'object') {
+				const keys = Object.keys(values);
+				const nonNumericKeys = keys.filter((key) => !/^-?\d+$/.test(key));
+				list = (nonNumericKeys.length ? nonNumericKeys : keys).map((key) => values[key]);
+			}
+			else
 				throw new Error('enum values must be an array');
-			const allowed = new Set(values);
-			column.enum = values;
+			const allowed = new Set(list);
+			column.enum = list;
 			function validate(value) {
 				if (value === undefined || value === null)
 					return;
 				if (!allowed.has(value)) {
-					const formatted = values.map((v) => JSON.stringify(v)).join(', ');
+					const formatted = list.map((v) => JSON.stringify(v)).join(', ');
 					throw new Error(`Column ${column.alias} must be one of: ${formatted}`);
 				}
 			}
@@ -5924,7 +5932,6 @@ function requireColumn () {
 			var oldAlias = column.alias;
 			table._aliases.delete(oldAlias);
 			table._aliases.add(alias);
-			delete table[oldAlias];
 			table[alias] = column;
 			column.alias = alias;
 			return c;
