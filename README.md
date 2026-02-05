@@ -51,7 +51,7 @@ Watch the [tutorial video on YouTube](https://youtu.be/1IwwjPr2lMs)
 ![Relations diagram](./docs/diagram.svg)  
 
 <sub>📄 map.ts</sub>
-```javascript
+```ts
 import orange from 'orange-orm';
 
 const map = orange.map(x => ({
@@ -88,7 +88,7 @@ const map = orange.map(x => ({
     street: column('street').string(),
     postalCode: column('postalCode').string(),
     postalPlace: column('postalPlace').string(),
-    countryCode: column('countryCode').string(),
+    countryCode: column('countryCode').string().enum(['NO', 'SE', 'DK', 'FI', 'IS', 'DE', 'FR', 'NL', 'ES', 'IT']),
   }))
 
 })).map(x => ({
@@ -106,7 +106,7 @@ export default map;
 ```  
 <sub>📄 update.ts</sub>
 
-```javascript
+```ts
 import map from './map';
 const db = map.sqlite('demo.db');
 
@@ -127,7 +127,7 @@ async function updateRow() {
 ```
 <sub>📄 filter.ts</sub>
 
-```javascript
+```ts
 import map from './map';
 const db = map.sqlite('demo.db');
 
@@ -157,7 +157,8 @@ Each column within your database table is designated by using the <strong><i>col
 Relationships between tables can also be outlined. By using methods like <strong><i>hasOne</i></strong>, <strong><i>hasMany</i></strong>, and <strong><i>references</i></strong>, you can establish connections that reflect the relationships in your data schema. In the example below, an 'order' is linked to a 'customer' reference, a 'deliveryAddress', and multiple 'lines'. The hasMany and hasOne relations represents ownership - the tables 'deliveryAddress' and 'orderLine' are owned by the 'order' table, and therefore, they contain the 'orderId' column referring to their parent table, which is 'order'. The similar relationship exists between orderLine and package - hence the packages are owned by the orderLine. Conversely, the customer table is independent and can exist without any knowledge of the 'order' table. Therefore we say that the order table <i>references</i> the customer table - necessitating the existence of a 'customerId' column in the 'order' table.</p>
 
 <sub>📄 map.ts</sub>
-```javascript
+
+```ts
 import orange from 'orange-orm';
 
 const map = orange.map(x => ({
@@ -193,7 +194,7 @@ const map = orange.map(x => ({
     street: column('street').string(),
     postalCode: column('postalCode').string(),
     postalPlace: column('postalPlace').string(),
-    countryCode: column('countryCode').string(),
+    countryCode: column('countryCode').string().enum(['NO', 'SE', 'DK', 'FI', 'IS', 'DE', 'FR', 'NL', 'ES', 'IT']),
   }))
 
 })).map(x => ({
@@ -218,7 +219,8 @@ Then, we define a SQL string. This string outlines the structure of our SQLite d
 Because of a peculiarity in SQLite, which only allows one statement execution at a time, we split this SQL string into separate statements. We do this using the split() method, which breaks up the string at every semicolon.  
 
 <sub>📄 init.ts</sub>
-```javascript
+
+```ts
 import map from './map';
 const db = map.sqlite('demo.db');
 
@@ -337,7 +339,7 @@ await db.transaction(async (db) => {
 __From the browser__  
 You can securely use Orange from the browser by utilizing the Express plugin, which serves to safeguard sensitive database credentials from exposure at the client level. This technique bypasses the need to transmit raw SQL queries directly from the client to the server. Instead, it logs method calls initiated by the client, which are later replayed and authenticated on the server. This not only reinforces security by preventing the disclosure of raw SQL queries on the client side but also facilitates a smoother operation. Essentially, this method mirrors a traditional REST API, augmented with advanced TypeScript tooling for enhanced functionality. You can read more about it in the section called [In the browser](#user-content-in-the-browser)  
 <sub>📄 server.ts</sub>
-```javascript
+```ts
 import map from './map';
 import { json } from 'body-parser';
 import express from 'express';
@@ -354,7 +356,7 @@ express().disable('x-powered-by')
 ```
 
 <sub>📄 browser.ts</sub>
-```javascript
+```ts
 import map from './map';
 
 const db = map.http('http://localhost:3000/orange');
@@ -432,7 +434,7 @@ database_id = "<your-guid-for-the-database>"
 ```
 
 <sub>📄 src/index.ts</sub>  
-```javascript
+```ts
 import map from './map';
 
 export interface Env {
@@ -1174,7 +1176,7 @@ Raw sql queries, raw sql filters and transactions are disabled at the http clien
 
 <sub>📄 server.ts</sub>
 
-```javascript
+```ts
 import map from './map';
 import { json } from 'body-parser';
 import express from 'express';
@@ -1191,7 +1193,7 @@ express().disable('x-powered-by')
 ```
 
 <sub>📄 browser.ts</sub>
-```javascript
+```ts
 import map from './map';
 
 const db = map.http('http://localhost:3000/orange');
@@ -1222,7 +1224,7 @@ One notable side effect compared to the previous example, is that only the order
 
 <sub>📄 server.ts</sub>
 
-```javascript
+```ts
 import map from './map';
 import { json } from 'body-parser';
 import express from 'express';
@@ -1257,7 +1259,7 @@ function validateToken(req, res, next) {
 
 <sub>📄 browser.ts</sub>
 
-```javascript
+```ts
 import map from './map';
 
 const db = map.http('http://localhost:3000/orange');
@@ -1303,7 +1305,6 @@ async function updateRows() {
 
 __Row Level Security (Postgres)__  
 You can enforce tenant isolation at the database level by combining Postgres RLS with Express hooks. The example below mirrors the “Interceptors and base filter” style by putting the tenant id in a (fake) token on the client, then extracting it on the server and setting it inside the transaction. This is convenient for a demo because we can seed data and prove rows are filtered. In a real application you must validate signatures and derive tenant id from a trusted identity source, not from arbitrary client input.  
-Available transaction hooks are `beforeBegin`, `afterBegin`, `beforeCommit`, `afterCommit`, and `afterRollback`.
 
 <sub>📄 setup.sql</sub>
 
@@ -1330,7 +1331,7 @@ insert into tenant_data (tenant_id, value) values
 
 <sub>📄 server.ts</sub>
 
-```javascript
+```ts
 import map from './map';
 import { json } from 'body-parser';
 import express from 'express';
@@ -1382,7 +1383,7 @@ function decodeFakeJwt(token) {
 
 <sub>📄 browser.ts</sub>
 
-```javascript
+```ts
 import map from './map';
 
 const db = map.http('http://localhost:3000/orange');
@@ -1795,7 +1796,8 @@ async function execute() {
 - **`json`** and **`jsonOf<T>`** are represented as an object or array in javascript and maps to JSON, JSONB, NVARCHAR(max) or TEXT (sqlite) in sql.
 
 <sub>📄 map.ts</sub>
-```javascript
+
+```ts
 import orange from 'orange-orm';
 
 interface Pet {
@@ -1818,7 +1820,8 @@ const map = orange.map(x => ({
 }));
 ```
 <sub>📄 map.js</sub>
-```javascript
+
+```js
 import orange from 'orange-orm';
 
 /**
@@ -1840,6 +1843,138 @@ const map = orange.map(x => ({
       picture: x.column('picture').binary(),
       pet: x.column('pet').jsonOf(pet), //generic
       pet2: x.column('pet2').json(), //non-generic
+  }))
+}));
+```
+</details>
+
+<details id="enums"><summary><strong>Enums</strong></summary>
+<p>Enums can be defined using object literals, arrays, or TypeScript enums. The <strong><i>enum(...)</i></strong> method uses literal types when possible, so prefer patterns that keep literals (inline objects, <code>as const</code>, or <code>Object.freeze</code> in JS).</p>
+
+<sub>📄 map.ts (TypeScript enum)</sub>
+
+```ts
+enum CountryCode {
+  NORWAY = 'NO',
+  SWEDEN = 'SE',
+  DENMARK = 'DK',
+  FINLAND = 'FI',
+  ICELAND = 'IS',
+  GERMANY = 'DE',
+  FRANCE = 'FR',
+  NETHERLANDS = 'NL',
+  SPAIN = 'ES',
+  ITALY = 'IT',
+}
+
+const map = orange.map(x => ({
+  deliveryAddress: x.table('deliveryAddress').map(({ column }) => ({
+    id: column('id').numeric().primary(),
+    name: column('name').string(),
+    street: column('street').string(),
+    postalCode: column('postalCode').string(),
+    postalPlace: column('postalPlace').string(),
+    countryCode: column('countryCode').string().enum(CountryCode),
+  }))
+}));
+```
+
+
+<sub>📄 map.ts (as const)</sub>
+
+```ts
+const Countries = {
+  NORWAY: 'NO',
+  SWEDEN: 'SE',
+  DENMARK: 'DK',
+  FINLAND: 'FI',
+  ICELAND: 'IS',
+  GERMANY: 'DE',
+  FRANCE: 'FR',
+  NETHERLANDS: 'NL',
+  SPAIN: 'ES',
+  ITALY: 'IT',
+} as const;
+
+const map = orange.map(x => ({
+  deliveryAddress: x.table('deliveryAddress').map(({ column }) => ({
+    id: column('id').numeric().primary(),
+    name: column('name').string(),
+    street: column('street').string(),
+    postalCode: column('postalCode').string(),
+    postalPlace: column('postalPlace').string(),
+    countryCode: column('countryCode').string().enum(Countries),
+  }))
+}));
+```
+
+<sub>📄 map.ts (array)</sub>
+
+```ts
+const map = orange.map(x => ({
+  deliveryAddress: x.table('deliveryAddress').map(({ column }) => ({
+    id: column('id').numeric().primary(),
+    name: column('name').string(),
+    street: column('street').string(),
+    postalCode: column('postalCode').string(),
+    postalPlace: column('postalPlace').string(),
+    countryCode: column('countryCode').string().enum(
+      ['NO', 'SE', 'DK', 'FI', 'IS', 'DE', 'FR', 'NL', 'ES', 'IT']
+    ),
+  }))
+}));
+```
+
+<sub>📄 map.ts (literal object)</sub>
+
+```ts
+const map = orange.map(x => ({
+  deliveryAddress: x.table('deliveryAddress').map(({ column }) => ({
+    id: column('id').numeric().primary(),
+    name: column('name').string(),
+    street: column('street').string(),
+    postalCode: column('postalCode').string(),
+    postalPlace: column('postalPlace').string(),
+    countryCode: column('countryCode').string().enum({
+      NORWAY: 'NO',
+      SWEDEN: 'SE',
+      DENMARK: 'DK',
+      FINLAND: 'FI',
+      ICELAND: 'IS',
+      GERMANY: 'DE',
+      FRANCE: 'FR',
+      NETHERLANDS: 'NL',
+      SPAIN: 'ES',
+      ITALY: 'IT',
+    }),
+  }))
+}));
+```
+
+<sub>📄 map.js (Object.freeze)</sub>
+
+```js
+const Countries = Object.freeze({
+  NORWAY: 'NO',
+  SWEDEN: 'SE',
+  DENMARK: 'DK',
+  FINLAND: 'FI',
+  ICELAND: 'IS',
+  GERMANY: 'DE',
+  FRANCE: 'FR',
+  NETHERLANDS: 'NL',
+  SPAIN: 'ES',
+  ITALY: 'IT',
+});
+
+const map = orange.map(x => ({
+  deliveryAddress: x.table('deliveryAddress').map(({ column }) => ({
+    id: column('id').numeric().primary(),
+    name: column('name').string(),
+    street: column('street').string(),
+    postalCode: column('postalCode').string(),
+    postalPlace: column('postalPlace').string(),
+    countryCode: column('countryCode').string().enum(Countries),
   }))
 }));
 ```
@@ -1871,7 +2006,7 @@ export default map;
 <p>In the previous sections you have already seen the <strong><i>notNull()</i></strong> validator being used on some columns. This will not only generate correct typescript mapping, but also throw an error if value is set to null or undefined. However, sometimes we do not want the notNull-validator to be run on inserts. Typically, when we have an autoincremental key or server generated uuid, it does not make sense to check for null on insert. This is where <strong><i>notNullExceptInsert()</strong></i> comes to rescue. You can also create your own custom validator as shown below. The last kind of validator, is the <a href="https://ajv.js.org/json-schema.html">ajv JSON schema validator</a>. This can be used on json columns as well as any other column type.</p>
 
 <sub>📄 map.ts</sub>
-```javascript
+```ts
 import orange from 'orange-orm';
 
 interface Pet {
@@ -1902,7 +2037,7 @@ const map = orange.map(x => ({
 export default map;
 ```
 <sub>📄 map.js</sub>
-```javascript
+```js
 import orange from 'orange-orm';
 
 /**
@@ -2112,7 +2247,7 @@ async function getCount() {
 
 <sub>📄 map.ts</sub>
 
-```javascript
+```ts
 import orange from 'orange-orm';
 
 const map = orange.map(x => ({
@@ -2128,7 +2263,7 @@ export default map;
 ```
 <sub>📄 sensitive.ts</sub>
 
-```javascript
+```ts
 import map from './map';
 const db = map.sqlite('demo.db');
 

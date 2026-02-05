@@ -54,6 +54,29 @@ function defineColumn(column, table) {
 		return c;
 	};
 
+	c.enum = function(values) {
+		if (!Array.isArray(values))
+			throw new Error('enum values must be an array');
+		const allowed = new Set(values);
+		column.enum = values;
+		function validate(value) {
+			if (value === undefined || value === null)
+				return;
+			if (!allowed.has(value)) {
+				const formatted = values.map((v) => JSON.stringify(v)).join(', ');
+				throw new Error(`Column ${column.alias} must be one of: ${formatted}`);
+			}
+		}
+		return c.validate(validate);
+	};
+
+	c.enum2 = function(...values) {
+		const list = values.length === 1 && Array.isArray(values[0])
+			? values[0]
+			: values;
+		return c.enum(list);
+	};
+
 	c.default = function(value) {
 		column.default = value;
 		return c;

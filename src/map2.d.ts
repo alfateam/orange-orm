@@ -10,6 +10,7 @@ export type ORMColumnType = 'string' | 'bigint' | 'uuid' | 'date' | 'numeric' | 
 // Base column definition with space-prefixed required properties
 export type ORMColumnDefinition = {
   ' type': ORMColumnType;
+  ' enum'?: readonly (string | number | boolean | Date)[] | Record<string, string | number | boolean | Date>;
   ' notNull'?: boolean;
   ' notNullExceptInsert'?: boolean;
 };
@@ -24,7 +25,7 @@ export type ORMJsonColumnDefinition<T = any> = {
 
 type NormalizeColumn<T> =
   T extends ORMColumnType
-  ? { ' type': T; ' notNull'?: boolean; ' notNullExceptInsert'?: boolean }
+  ? { ' type': T; ' enum'?: readonly (string | number | boolean | Date)[] | Record<string, string | number | boolean | Date>; ' notNull'?: boolean; ' notNullExceptInsert'?: boolean }
   : T extends { ' type': ORMColumnType }
   ? { ' notNull'?: boolean; ' notNullExceptInsert'?: boolean } & T
   : T extends { ' type': 'json'; ' tsType': any }
@@ -41,6 +42,8 @@ type IsRequiredInsert<CT> =
   : false; // Otherwise, it's optional
 
 type ColumnTypeToTS<CT> =
+  NormalizeColumn<CT> extends { ' enum': readonly (infer E)[] } ? E :
+  NormalizeColumn<CT> extends { ' enum': Record<string, infer E> } ? E :
   NormalizeColumn<CT>[' type'] extends 'numeric' ? number :
   NormalizeColumn<CT>[' type'] extends 'boolean' ? boolean :
   NormalizeColumn<CT>[' type'] extends 'json'
@@ -674,7 +677,7 @@ type AggregateCustomSelectorProperties<M extends Record<string, TableDefinition<
 
 export type TableClient<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
   // Array methods - return arrays with array-level active record methods, but individual items are plain
-  getMany<strategy extends FetchStrategy<M, K> = {}>(strategy: strategy): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, strategy>>>, M, K>>;
+  getMany<strategy extends FetchStrategy<M, K>>(strategy?: strategy): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, strategy>>>, M, K>>;
 
   // Aggregate methods - return plain objects (no active record methods)
   aggregate<strategy extends AggregateStrategy<M, K>>(strategy: strategy): Promise<Array<DeepExpand<AggregateCustomSelectorProperties<M, K, strategy>>>>;

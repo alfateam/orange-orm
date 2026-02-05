@@ -96,7 +96,9 @@ type ReturnArrayOrObj<W, V1, V2> =
 	V1;
 
 
-type ColumnToType<T> = T extends UuidColumnSymbol
+type ColumnToType<T> = T extends EnumOf<infer E>
+	? E
+	: T extends UuidColumnSymbol
 	? string
 	: T extends StringColumnSymbol
 	? string
@@ -625,6 +627,10 @@ type NotNullExceptInsert = {
 	[' notNullExceptInsert']: boolean;
 };
 
+type EnumOf<T> = {
+	[' enum']: T;
+};
+
 type JsonOf<T> = {
 	[' isjsonOf']: boolean;
 	type: T;
@@ -734,6 +740,11 @@ type DateWithTimeZoneValidator<M> = M extends NotNull
 	};
 
 type StringColumnTypeDef<M> = StringValidator<M> & {
+	enum<const V extends readonly string[]>(values: V): StringColumnTypeDef<M & EnumOf<V[number]>> & EnumOf<V[number]>;
+	enum<const V extends Record<string, string>>(values: V): StringColumnTypeDef<M & EnumOf<V[keyof V]>> & EnumOf<V[keyof V]>;
+	enum<TEnum>(values: Record<string, TEnum>): StringColumnTypeDef<M & EnumOf<TEnum>> & EnumOf<TEnum>;
+	enum<E extends string>(values: readonly E[]): StringColumnTypeDef<M & EnumOf<E>> & EnumOf<E>;
+	enum<E, V extends Record<string, E>>(values: V): StringColumnTypeDef<M & EnumOf<V[keyof V]>> & EnumOf<V[keyof V]>;
 	primary(): StringColumnTypeDef<M & IsPrimary> & IsPrimary;
 	notNull(): StringColumnTypeDef<M & NotNull> & NotNull;
 	notNullExceptInsert(): StringColumnTypeDef<M & NotNull & NotNullExceptInsert> & NotNull & NotNullExceptInsert;
@@ -745,6 +756,10 @@ type StringColumnTypeDef<M> = StringValidator<M> & {
 	M;
 
 type NumericColumnTypeDef<M> = NumericValidator<M> & {
+	enum<const V extends Record<string, number>>(values: V): NumericColumnTypeDef<M & EnumOf<V[keyof V]>> & EnumOf<V[keyof V]>;
+	enum<TEnum>(values: Record<string, TEnum>): NumericColumnTypeDef<M & EnumOf<TEnum>> & EnumOf<TEnum>;
+	enum<E extends number>(values: readonly E[]): NumericColumnTypeDef<M & EnumOf<E>> & EnumOf<E>;
+	enum<E, V extends Record<string, E>>(values: V): NumericColumnTypeDef<M & EnumOf<V[keyof V]>> & EnumOf<V[keyof V]>;
 	primary(): NumericColumnTypeDef<M & IsPrimary> & IsPrimary;
 	notNull(): NumericColumnTypeDef<M & NotNull> & NotNull;
 	notNullExceptInsert(): NumericColumnTypeDef<M & NotNull & NotNullExceptInsert> & NotNull & NotNullExceptInsert;
@@ -756,6 +771,10 @@ type NumericColumnTypeDef<M> = NumericValidator<M> & {
 	M;
 
 type BigIntColumnTypeDef<M> = BigIntValidator<M> & {
+	enum<const V extends Record<string, bigint>>(values: V): BigIntColumnTypeDef<M & EnumOf<V[keyof V]>> & EnumOf<V[keyof V]>;
+	enum<TEnum>(values: Record<string, TEnum>): BigIntColumnTypeDef<M & EnumOf<TEnum>> & EnumOf<TEnum>;
+	enum<E extends bigint>(values: readonly E[]): BigIntColumnTypeDef<M & EnumOf<E>> & EnumOf<E>;
+	enum<E, V extends Record<string, E>>(values: V): BigIntColumnTypeDef<M & EnumOf<V[keyof V]>> & EnumOf<V[keyof V]>;
 	primary(): BigIntColumnTypeDef<M & IsPrimary> & IsPrimary;
 	notNull(): BigIntColumnTypeDef<M & NotNull> & NotNull;
 	notNullExceptInsert(): BigIntColumnTypeDef<M & NotNull & NotNullExceptInsert> & NotNull & NotNullExceptInsert;
@@ -767,6 +786,10 @@ type BigIntColumnTypeDef<M> = BigIntValidator<M> & {
 	M;
 
 type UuidColumnTypeDef<M> = UuidValidator<M> & {
+	enum<const V extends Record<string, string>>(values: V): UuidColumnTypeDef<M & EnumOf<V[keyof V]>> & EnumOf<V[keyof V]>;
+	enum<TEnum>(values: Record<string, TEnum>): UuidColumnTypeDef<M & EnumOf<TEnum>> & EnumOf<TEnum>;
+	enum<E extends string>(values: readonly E[]): UuidColumnTypeDef<M & EnumOf<E>> & EnumOf<E>;
+	enum<E, V extends Record<string, E>>(values: V): UuidColumnTypeDef<M & EnumOf<V[keyof V]>> & EnumOf<V[keyof V]>;
 	primary(): UuidColumnTypeDef<M & IsPrimary> & IsPrimary;
 	notNull(): UuidColumnTypeDef<M & NotNull> & NotNull;
 	notNullExceptInsert(): UuidColumnTypeDef<M & NotNull & NotNullExceptInsert> & NotNull & NotNullExceptInsert;
@@ -789,6 +812,10 @@ type JSONColumnTypeDef<M> = JSONValidator<M> & {
 	M;
 
 type BinaryColumnTypeDef<M> = BinaryValidator<M> & {
+	enum<const V extends Record<string, string>>(values: V): BinaryColumnTypeDef<M & EnumOf<V[keyof V]>> & EnumOf<V[keyof V]>;
+	enum<TEnum>(values: Record<string, TEnum>): BinaryColumnTypeDef<M & EnumOf<TEnum>> & EnumOf<TEnum>;
+	enum<E extends string>(values: readonly E[]): BinaryColumnTypeDef<M & EnumOf<E>> & EnumOf<E>;
+	enum<E, V extends Record<string, E>>(values: V): BinaryColumnTypeDef<M & EnumOf<V[keyof V]>> & EnumOf<V[keyof V]>;
 	primary(): BinaryColumnTypeDef<M & IsPrimary> & IsPrimary;
 	notNull(): BinaryColumnTypeDef<M & NotNull> & NotNull;
 	notNullExceptInsert(): BinaryColumnTypeDef<M & NotNull & NotNullExceptInsert> & NotNull & NotNullExceptInsert;
@@ -800,6 +827,10 @@ type BinaryColumnTypeDef<M> = BinaryValidator<M> & {
 	M;
 
 type BooleanColumnTypeDef<M> = BooleanValidator<M> & {
+	enum<const V extends Record<string, boolean>>(values: V): BooleanColumnTypeDef<M & EnumOf<V[keyof V]>> & EnumOf<V[keyof V]>;
+	enum<TEnum>(values: Record<string, TEnum>): BooleanColumnTypeDef<M & EnumOf<TEnum>> & EnumOf<TEnum>;
+	enum<E extends boolean>(values: readonly E[]): BooleanColumnTypeDef<M & EnumOf<E>> & EnumOf<E>;
+	enum<E, V extends Record<string, E>>(values: V): BooleanColumnTypeDef<M & EnumOf<V[keyof V]>> & EnumOf<V[keyof V]>;
 	primary(): BooleanColumnTypeDef<M & IsPrimary> & IsPrimary;
 	notNull(): BooleanColumnTypeDef<M & NotNull> & NotNull;
 	notNullExceptInsert(): BooleanColumnTypeDef<M & NotNull & NotNullExceptInsert> & NotNull & NotNullExceptInsert;
@@ -811,6 +842,10 @@ type BooleanColumnTypeDef<M> = BooleanValidator<M> & {
 	M;
 
 type DateColumnTypeDef<M> = DateValidator<M> & {
+	enum<const V extends Record<string, string | Date>>(values: V): DateColumnTypeDef<M & EnumOf<V[keyof V]>> & EnumOf<V[keyof V]>;
+	enum<TEnum>(values: Record<string, TEnum>): DateColumnTypeDef<M & EnumOf<TEnum>> & EnumOf<TEnum>;
+	enum<E extends string | Date>(values: readonly E[]): DateColumnTypeDef<M & EnumOf<E>> & EnumOf<E>;
+	enum<E, V extends Record<string, E>>(values: V): DateColumnTypeDef<M & EnumOf<V[keyof V]>> & EnumOf<V[keyof V]>;
 	primary(): DateColumnTypeDef<M & IsPrimary> & IsPrimary;
 	notNull(): DateColumnTypeDef<M & NotNull> & NotNull;
 	notNullExceptInsert(): DateColumnTypeDef<M & NotNull & NotNullExceptInsert> & NotNull & NotNullExceptInsert;
@@ -822,6 +857,10 @@ type DateColumnTypeDef<M> = DateValidator<M> & {
 	M;
 
 type DateWithTimeZoneColumnTypeDef<M> = DateValidator<M> & {
+	enum<const V extends Record<string, string | Date>>(values: V): DateWithTimeZoneColumnTypeDef<M & EnumOf<V[keyof V]>> & EnumOf<V[keyof V]>;
+	enum<TEnum>(values: Record<string, TEnum>): DateWithTimeZoneColumnTypeDef<M & EnumOf<TEnum>> & EnumOf<TEnum>;
+	enum<E extends string | Date>(values: readonly E[]): DateWithTimeZoneColumnTypeDef<M & EnumOf<E>> & EnumOf<E>;
+	enum<E, V extends Record<string, E>>(values: V): DateWithTimeZoneColumnTypeDef<M & EnumOf<V[keyof V]>> & EnumOf<V[keyof V]>;
 	primary(): DateWithTimeZoneColumnTypeDef<M & IsPrimary> & IsPrimary;
 	notNull(): DateWithTimeZoneColumnTypeDef<M & NotNull> & NotNull;
 	notNullExceptInsert(): DateWithTimeZoneColumnTypeDef<M & NotNull & NotNullExceptInsert> & NotNull & NotNullExceptInsert;
@@ -1000,7 +1039,9 @@ type ExtractPrimaryKeyNames<T> =
 type RelationTarget<T> =
   T extends { __tableAlias: infer S } ? Extract<S, string> : string;
 
-type ColumnToSchemaType<T> =
+type EnumSchema<T> = T extends EnumOf<infer E> ? { ' enum': readonly E[] } : {};
+
+type ColumnToSchemaType<T> = (
   T extends JsonOf<infer U>
     ? { ' type': 'json'; ' tsType': U }
       & (T extends NotNullExceptInsert ? { ' notNull': true; ' notNullExceptInsert': true }
@@ -1046,7 +1087,8 @@ type ColumnToSchemaType<T> =
       & (T extends NotNullExceptInsert ? { ' notNull': true; ' notNullExceptInsert': true }
          : T extends NotNull ? { ' notNull': true }
          : {}) :
-  never;
+  never
+) & EnumSchema<T>;
 
 export type MappedDbDef<T> = {
   map<V extends AllowedDbMap<V>>(
