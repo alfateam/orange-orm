@@ -204,6 +204,29 @@ describe('boolean filter', () => {
 	}
 });
 
+describe('boolean filter where direct', () => {
+	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+		const filter = db.order.customer.isActive.eq(false);
+		const rows = await db.order.getMany({ where: filter });
+
+		const expected = [];
+
+		expect(rows).toEqual(expected);
+	}
+});
+
 describe('boolean legacy filter', () => {
 	test('pg', async () => await verify('pg'));
 	test('pglite', async () => await verify('pglite'));

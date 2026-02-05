@@ -134,7 +134,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const orders = await db.order.getAll({
+  const orders = await db.order.getMany({
     where: x => x.lines.any(line => line.product.contains('broomstick'))
       .and(x.customer.name.startsWith('Harry')),
     lines: {
@@ -424,7 +424,7 @@ export interface Env {
 export default {
   async fetch(request, env): Promise<Response> {
     const db = map.d1(env.DB);
-    const customers = await db.customer.getAll();
+    const customers = await db.customer.getMany();
     return Response.json(customers);
   },
 } satisfies ExportedHandler<Env>;
@@ -592,7 +592,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const orders = await db.order.getAll({
+  const orders = await db.order.getMany({
     customer: true, 
     deliveryAddress: true, 
     lines: {
@@ -611,7 +611,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const orders = await db.order.getAll({
+  const orders = await db.order.getMany({
     offset: 1,
     orderBy: ['orderDate desc', 'id'],
     limit: 10,
@@ -643,7 +643,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const orders = await db.order.getAll({
+  const orders = await db.order.getMany({
     numberOfLines: x => x.count(x => x.lines.id),
     totalAmount: x => x.sum(x => lines.amount),
     balance: x => x.customer.balance
@@ -660,7 +660,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const orders = await db.order.getAll({
+  const orders = await db.order.getMany({
     where: x => x.lines.any(line => line.product.contains('i'))
       .and(x.customer.balance.greaterThan(180)),
     customer: true, 
@@ -669,14 +669,13 @@ async function getRows() {
   });
 }
 ```
-You can also use the alternative syntax for the `where-filter`. This way, the filter can be constructed independently from the fetching strategy. Keep in mind that you must use the `getMany` method instead of the `getAll` method.  
-It is also possible to combine `where-filter` with the independent filter when using the `getMany` method.  
+You can also use the alternative syntax for the `where` filter. This way, the filter can be constructed independently from the fetching strategy and passed in via the `where` clause.  
 ```javascript
 async function getRows() {
   const filter = db.order.lines.any(line => line.product.contains('i'))
                  .and(db.order.customer.balance.greaterThan(180));
-  const orders = await db.order.getMany(filter, {
-    //where: x => ... can be combined as well
+  const orders = await db.order.getMany({
+    where: filter,
     customer: true, 
     deliveryAddress: true, 
     lines: true
@@ -791,7 +790,7 @@ const db = map.sqlite('demo.db');
 update();
 
 async function update() {
-  let orders = await db.order.getAll({
+  let orders = await db.order.getMany({
     orderBy: 'id',
     lines: true, 
     deliveryAddress: true, 
@@ -1024,7 +1023,7 @@ const db = map.sqlite('demo.db');
 updateInsertDelete();
 
 async function updateInsertDelete() {    
-  const orders = await db.order.getAll({
+  const orders = await db.order.getMany({
     customer: true, 
     deliveryAddress: true, 
     lines: true
@@ -1071,7 +1070,7 @@ const db = map.sqlite('demo.db');
 deleteRows();
 
 async function deleteRows() {  
-  let orders = await db.order.getAll({
+  let orders = await db.order.getMany({
     where: x => x.customer.name.eq('George')
   });
 
@@ -1087,7 +1086,7 @@ const db = map.sqlite('demo.db');
 deleteRows();
 
 async function deleteRows() {
-  let orders = await db.order.getAll({
+  let orders = await db.order.getMany({
     where: x => x.deliveryAddress.name.eq('George'),
     customer: true, 
     deliveryAddress: true, 
@@ -1398,7 +1397,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const rows = await db.order.getAll({
+  const rows = await db.order.getMany({
     deliveryAddress: true 
   });  
 }
@@ -1414,7 +1413,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const rows = await db.order.getAll({
+  const rows = await db.order.getMany({
     orderDate: false,
     deliveryAddress: {
       countryCode: true,
@@ -1438,7 +1437,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const rows = await db.customer.getAll({
+  const rows = await db.customer.getMany({
     where x => x.name.equal('Harry')
   });
 }
@@ -1451,7 +1450,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const rows = await db.customer.getAll({
+  const rows = await db.customer.getMany({
     where x => x.name.notEqual('Harry')
   });
 }
@@ -1464,7 +1463,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const rows = await db.customer.getAll({
+  const rows = await db.customer.getMany({
     where: x => x.name.contains('arr')
   });
 }
@@ -1479,7 +1478,7 @@ getRows();
 async function getRows() {
   const filter = db.customer.name.startsWith('Harr');
 
-  const rows = await db.customer.getAll({
+  const rows = await db.customer.getMany({
     where: x => x.name.startsWith('Harr')
   });
 }
@@ -1492,7 +1491,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const rows = await db.customer.getAll({
+  const rows = await db.customer.getMany({
     where: x => x.name.endsWith('arry')
   });
 }
@@ -1505,7 +1504,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const rows = await db.order.getAll({
+  const rows = await db.order.getMany({
     where: x => x.orderDate.greaterThan('2023-07-14T12:00:00')
   });
 }
@@ -1518,7 +1517,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const rows = await db.order.getAll({
+  const rows = await db.order.getMany({
     where: x => x.orderDate.greaterThanOrEqual('2023-07-14T12:00:00')
   });
 }
@@ -1531,7 +1530,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const rows = await db.order.getAll({
+  const rows = await db.order.getMany({
     where: x => x.orderDate.lessThan('2023-07-14T12:00:00')
   });
 }
@@ -1544,7 +1543,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const rows = await db.order.getAll({
+  const rows = await db.order.getMany({
     where: x => x.orderDate.lessThanOrEqual('2023-07-14T12:00:00')
   });
 }
@@ -1557,7 +1556,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const rows = await db.order.getAll({
+  const rows = await db.order.getMany({
     where: x => x.orderDate.between('2023-07-14T12:00:00', '2024-07-14T12:00:00')
   });
 }
@@ -1570,7 +1569,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const rows = await db.order.getAll({
+  const rows = await db.order.getMany({
     where: x => x.customer.name.in('George', 'Harry')
   });
 
@@ -1592,11 +1591,11 @@ async function getRows() {
     parameters: ['%arry']
   };                 
   
-  const rowsWithRaw = await db.customer.getAll({
+  const rowsWithRaw = await db.customer.getMany({
     where: () => rawFilter
   });
 
-  const rowsWithCombined = await db.customer.getAll({
+  const rowsWithCombined = await db.customer.getMany({
     where: x => x.balance.greaterThan(100).and(rawFilter)
   });  
 }
@@ -1614,7 +1613,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const orders = await db.order.getAll({
+  const orders = await db.order.getMany({
     lines: {
       where: x => x.product.contains('broomstick')
     },
@@ -1636,7 +1635,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const rows = await db.order.getAll({
+  const rows = await db.order.getMany({
     where: x => x.customer.name.equal('Harry')
       .and(x.orderDate.greaterThan('2023-07-14T12:00:00'))
   });  
@@ -1651,7 +1650,7 @@ getRows();
 
 async function getRows() {
 
-  const rows = await db.order.getAll({
+  const rows = await db.order.getMany({
     where: y => y.customer( x => x.name.equal('George')
       .or(x.name.equal('Harry')))
   });  
@@ -1666,7 +1665,7 @@ getRows();
 
 async function getRows() {
   //Neither George nor Harry
-  const rows = await db.order.getAll({
+  const rows = await db.order.getMany({
     where: y => y.customer(x => x.name.equal('George')
         .or(x.name.equal('Harry')))
       .not()
@@ -1681,7 +1680,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const rows = await db.order.getAll({
+  const rows = await db.order.getMany({
     where: x => x.deliveryAddress.exists()
   });  
 }
@@ -1702,7 +1701,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const rows = await db.order.getAll({
+  const rows = await db.order.getMany({
     where: y => y.lines.any(x => x.product.contains('guitar'))
     //equivalent syntax:
     //where: x => x.lines.product.contains('guitar')
@@ -1718,7 +1717,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const rows = await db.order.getAll({
+  const rows = await db.order.getMany({
     where: y => y.lines.all(x => x.product.contains('a'))
   });  
 }
@@ -1732,7 +1731,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const rows = await db.order.getAll({
+  const rows = await db.order.getMany({
     where: y => y.lines.none(x => x.product.equal('Magic wand'))
   });  
 }
@@ -2218,7 +2217,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const orders = await db.order.getAll({
+  const orders = await db.order.getMany({
     numberOfLines: x => x.count(x => x.lines.id),
     totalAmount: x => x.sum(x => lines.amount),
     balance: x => x.customer.balance

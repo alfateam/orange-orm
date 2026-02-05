@@ -166,7 +166,7 @@ type BaseFetchStrategy<M extends Record<string, TableDefinition<M>>, K extends k
   orderBy?: OrderBy<M, K>;
   limit?: number;
   offset?: number;
-  where?: WhereFunc<M, K>;
+  where?: WhereClause<M, K>;
 };
 
 export type PrimaryKeyObject<M extends Record<string, TableDefinition<M>>, K extends keyof M> =
@@ -344,18 +344,25 @@ export type AggregateStrategy<M extends Record<string, TableDefinition<M>>, K ex
   BaseAggregateStrategy<M, K>
   | CustomAggregateSelectors<M, K>;
 
-type WhereFunc<M extends Record<string, TableDefinition<M>>, K extends keyof M> = (row: RootTableRefs<M, K>) => RawFilter | Array<PrimaryKeyObject<M, K>>;
+type WhereFilter<M extends Record<string, TableDefinition<M>>, K extends keyof M> =
+  RawFilter | Array<PrimaryKeyObject<M, K>>;
+
+type WhereFunc<M extends Record<string, TableDefinition<M>>, K extends keyof M> =
+  (row: RootTableRefs<M, K>) => WhereFilter<M, K>;
+
+type WhereClause<M extends Record<string, TableDefinition<M>>, K extends keyof M> =
+  WhereFilter<M, K> | WhereFunc<M, K> | (() => WhereFilter<M, K>);
 
 type BaseAggregateStrategy<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
   limit?: number;
   offset?: number;
-  where?: WhereFunc<M, K>;
+  where?: WhereClause<M, K>;
 };
 
 type CustomAggregateSelectors<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
   [key: string]: (row: RootSelectionRefs<M, K>) => ValidSelectorReturnTypes<M, K>;
 } & {
-  where?: WhereFunc<M, K>;
+  where?: WhereClause<M, K>;
 } & {
   // Explicitly prevent limit/offset in selectors
   limit?: never;
@@ -698,12 +705,12 @@ export type TableClient<M extends Record<string, TableDefinition<M>>, K extends 
   // UPDATED: Bulk update methods with relations support
   update(
     row: UpdateRowWithRelations<M, K>,
-    opts: { where: (row: RootTableRefs<M, K>) => RawFilter | Array<PrimaryKeyObject<M, K>> }
+    opts: { where: WhereClause<M, K> }
   ): Promise<void>;
 
   update<strategy extends FetchStrategy<M, K>>(
     row: UpdateRowWithRelations<M, K>,
-    opts: { where: (row: RootTableRefs<M, K>) => RawFilter | Array<PrimaryKeyObject<M, K>> },
+    opts: { where: WhereClause<M, K> },
     strategy: strategy
   ): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, strategy>>>, M, K>>;
 
