@@ -10,3 +10,5 @@ demo*.db*
 pglite.db*
 coverage
 .env
+*.db-wal
+*.db-shm
