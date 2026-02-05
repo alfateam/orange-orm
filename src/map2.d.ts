@@ -683,7 +683,7 @@ export type TableClient<M extends Record<string, TableDefinition<M>>, K extends 
   aggregate<strategy extends AggregateStrategy<M, K>>(strategy: strategy): Promise<Array<DeepExpand<AggregateCustomSelectorProperties<M, K, strategy>>>>;
 
   // Single item methods - return individual objects with individual active record methods
-  getOne<strategy extends FetchStrategy<M, K> = {}>(
+  getOne<strategy extends FetchStrategy<M, K>>(
     strategy?: strategy
   ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K> | undefined>;
 
