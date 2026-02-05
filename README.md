@@ -312,29 +312,8 @@ __Why close ?__
 In serverless environments (e.g. AWS Lambda, Vercel, Cloudflare Workers) execution contexts are frequently frozen and resumed. Explicitly closing the client or pool ensures that file handles are released promptly and prevents “database locked” errors between invocations.  
 
 __SQLite user-defined functions__  
-You can register custom SQLite functions on the connection using `db.function(name, fn)`.  
-
-```javascript
-import map from './map';
-const db = map.sqlite('demo.db');
-
-db.function('add_prefix', (text, prefix) => `${prefix}${text}`);
-
-const rows = await db.query(
-  "select id, name, add_prefix(name, '[VIP] ') as prefixedName from customer"
-);
-```
-
-If you need the function inside a transaction, register it within the transaction callback to ensure it is available on that connection.  
-
-```javascript
-await db.transaction(async (db) => {
-  db.function('add_prefix', (text, prefix) => `${prefix}${text}`);
-  return db.query(
-    "select id, name, add_prefix(name, '[VIP] ') as prefixedName from customer"
-  );
-});
-```
+You can register custom SQLite functions using `db.function(name, fn)`.  
+For full behavior, runtime caveats, and examples, see [SQLite user-defined functions](#sqlite-user-defined-functions).
 
 __From the browser__  
 You can securely use Orange from the browser by utilizing the Express plugin, which serves to safeguard sensitive database credentials from exposure at the client level. This technique bypasses the need to transmit raw SQL queries directly from the client to the server. Instead, it logs method calls initiated by the client, which are later replayed and authenticated on the server. This not only reinforces security by preventing the disclosure of raw SQL queries on the client side but also facilitates a smoother operation. Essentially, this method mirrors a traditional REST API, augmented with advanced TypeScript tooling for enhanced functionality. You can read more about it in the section called [In the browser](#user-content-in-the-browser)  
@@ -2179,6 +2158,43 @@ async function getRows() {
   const rows = await db.query(query)   
 }
 ```
+</details>
+
+<details id="sqlite-user-defined-functions"><summary><strong>SQLite user-defined functions</strong></summary>
+
+You can register custom SQLite functions on the connection using `db.function(name, fn)`.
+
+The `fn` argument is your user-defined callback:
+- It is invoked by SQLite every time the SQL function is called.
+- Callback arguments are positional and match the SQL call (for example, `my_fn(a, b)` maps to `(a, b)`).
+- Return a SQLite-compatible scalar value (for example text, number, or `null`).
+- Throwing inside the callback fails the SQL statement.
+
+`db.function(...)` is sync-only in Node and Deno, but can be async or sync in Bun.
+
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+await db.function('add_prefix', (text, prefix) => `${prefix}${text}`);
+
+const rows = await db.query(
+  "select id, name, add_prefix(name, '[VIP] ') as prefixedName from customer"
+);
+```
+
+If you need the function inside a transaction, register it within the transaction callback to ensure it is available on that connection.
+
+```javascript
+await db.transaction(async (db) => {
+  await db.function('add_prefix', (text, prefix) => `${prefix}${text}`);
+  return db.query(
+    "select id, name, add_prefix(name, '[VIP] ') as prefixedName from customer"
+  );
+});
+```
+
+`db.function(...)` is available on direct SQLite connections (for example `map.sqlite(...)`) and not through `map.http(...)`.
 </details>
 
 <details id="aggregates"><summary><strong>Aggregate functions</strong></summary>
