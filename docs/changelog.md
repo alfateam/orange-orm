@@ -1,4 +1,9 @@
 ## Changelog
+__5.0.0__  
+Breaking: `getAll` was removed. Use `getMany` instead (now with the same signature as the removed `getAll`).  
+ExpressJS: Before/after hooks to facilitate row-level security.  
+SQLite: Support for invoking user-defined functions.  
+Support for enums.  
 __4.9.1__  
 Fix: Avoid double-quoting aliases in discriminator join SQL [#144](https://github.com/alfateam/orange-orm/issues/144)    
 __4.9.0__  
