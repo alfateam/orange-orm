@@ -1197,7 +1197,7 @@ function requireEmptyFilter () {
 		return emptyFilter.and.apply(null, arguments);
 	}
 
-	emptyFilter.sql = parameterized.sql;
+	emptyFilter.sql = parameterized.sql.bind(parameterized);
 	emptyFilter.parameters = parameterized.parameters;
 
 	emptyFilter.and = function(context, other) {
@@ -12773,7 +12773,10 @@ function requireTable () {
 			row[property] = value;
 		};
 
-		table.delete = _delete.bind(null, table);
+		table.delete = function(context, ...rest) {
+			const args = [context, table, ...rest];
+			return _delete.apply(null, args);
+		};
 		table.cascadeDelete = function(context, ...rest) {
 			const args = [context, table, ...rest];
 			return cascadeDelete.apply(null, args);
