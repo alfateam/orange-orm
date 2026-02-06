@@ -1104,6 +1104,8 @@ function onChange(target, onChange) {
 	const handler = {
 		get(target, prop, receiver) {
 			const value = Reflect.get(target, prop, receiver);
+			if (value instanceof Date)
+				return value;
 			if (typeof value === 'object' && value !== null) {
 				return new Proxy(value, handler);
 			}
