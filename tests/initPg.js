@@ -15,6 +15,17 @@ CREATE TABLE datetest (
 INSERT INTO datetest ("date", tdatetime, tdatetime_tz)
 VALUES ('2023-07-14 12:00:00+09:00', '2023-07-14 12:00:00+09:00', '2023-07-14 12:00:00-08:00');
 
+CREATE TABLE bruker_rolle_like (
+    bruker_rolle_id VARCHAR(36) PRIMARY KEY,
+    bruker_id VARCHAR(36) NOT NULL,
+    rolle_type_id INTEGER NOT NULL,
+    aktor_id VARCHAR(36) NOT NULL,
+    opprettet_tid TIMESTAMP NOT NULL,
+    avsluttet_tid TIMESTAMP NULL,
+    bruker_rolle_status_type_id INTEGER NOT NULL,
+    sist_endret_av_bruker_id VARCHAR(36) NULL
+);
+
 CREATE TABLE customer (
     id SERIAL	 PRIMARY KEY,
     name TEXT,
