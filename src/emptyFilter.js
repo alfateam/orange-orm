@@ -4,7 +4,7 @@ function emptyFilter() {
 	return emptyFilter.and.apply(null, arguments);
 }
 
-emptyFilter.sql = parameterized.sql;
+emptyFilter.sql = parameterized.sql.bind(parameterized);
 emptyFilter.parameters = parameterized.parameters;
 
 emptyFilter.and = function(context, other) {

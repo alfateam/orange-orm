@@ -1,3 +1,5 @@
+import rdb from '../src/index';
+rdb.on('query', console.dir);
 import { describe, test, beforeAll, afterAll, expect } from 'vitest';
 const map = require('./db');
 import express from 'express';
@@ -190,6 +192,7 @@ describe('delete all orders', () => {
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
+		await db.orderLine.delete();
 		await db.deliveryAddress.delete();
 		await db.order.delete();
 		let rows = await db.order.getAll();

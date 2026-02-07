@@ -9,7 +9,7 @@ function outputInsertedSql(context, table) {
 
 	function formatColumn(column) {
 		if (column.formatOut)
-			return column.formatOut(context, 'INSERTED');
+			return `${column.formatOut(context, 'INSERTED')} AS [${column._dbName}]`;
 		else
 			return `INSERTED.[${column._dbName}]`;
 	}
