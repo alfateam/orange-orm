@@ -55,7 +55,7 @@ module.exports = function(table, name) {
 		alias = extractAlias(alias);
 		from = c.greaterThanOrEqual(context, from, alias);
 		to = c.lessThanOrEqual(context, to, alias);
-		return from.and(to);
+		return from.and(context, to);
 	};
 
 	c.in = function(context, arg, alias) {

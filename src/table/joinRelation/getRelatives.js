@@ -4,6 +4,7 @@ var negotiateExpandInverse = require('../negotiateExpandInverse');
 
 function getRelatives(context, parent, relation) {
 	var queryContext = parent.queryContext;
+	var ctx = context === undefined ? null : context;
 	let strategy = queryContext && queryContext.strategy[relation.leftAlias];
 	var filter = emptyFilter;
 	if (relation.columns.length === 1)
@@ -24,7 +25,7 @@ function getRelatives(context, parent, relation) {
 		}
 
 		if (ids.length > 0)
-			filter = relation.childTable._primaryColumns[0].in(context, ids);
+			filter = relation.childTable._primaryColumns[0].in(ctx, ids);
 	}
 
 	function createCompositeFilter() {
@@ -32,7 +33,7 @@ function getRelatives(context, parent, relation) {
 		for (var i = 0; i < queryContext.rows.length; i++) {
 			keyFilter = rowToPrimaryKeyFilter(context, queryContext.rows[i], relation);
 			if (keyFilter)
-				filter = filter.or(context, keyFilter);
+				filter = filter.or(ctx, keyFilter);
 		}
 	}
 

@@ -1077,6 +1077,10 @@ function requireUtils () {
 		};
 
 		c.and = function(context, other) {
+			if (other === undefined) {
+				other = context;
+				context = null;
+			}
 			other = negotiateRawSqlFilter(context, other);
 			var nextFilter = negotiateNextAndFilter(filter, other);
 			var next = newBoolean(nextFilter);
@@ -1087,6 +1091,10 @@ function requireUtils () {
 		};
 
 		c.or = function(context, other) {
+			if (other === undefined) {
+				other = context;
+				context = null;
+			}
 			other = negotiateRawSqlFilter(context, other);
 			var nextFilter = negotiateNextOrFilter(filter, other);
 			var next = newBoolean(nextFilter);
@@ -1202,6 +1210,10 @@ function requireEmptyFilter () {
 	emptyFilter.parameters = parameterized.parameters;
 
 	emptyFilter.and = function(context, other) {
+		if (other === undefined) {
+			other = context;
+			context = null;
+		}
 		other = negotiateRawSqlFilter(context, other);
 		for (var i = 2; i < arguments.length; i++) {
 			other = other.and(context, arguments[i]);
@@ -1210,6 +1222,10 @@ function requireEmptyFilter () {
 	};
 
 	emptyFilter.or = function(context, other) {
+		if (other === undefined) {
+			other = context;
+			context = null;
+		}
 		other = negotiateRawSqlFilter(context, other);
 		for (var i = 2; i < arguments.length; i++) {
 			other = other.or(context, arguments[i]);
@@ -1218,6 +1234,10 @@ function requireEmptyFilter () {
 	};
 
 	emptyFilter.not = function(context, other) {
+		if (other === undefined) {
+			other = context;
+			context = null;
+		}
 		other = negotiateRawSqlFilter(context, other).not(context);
 		for (var i = 2; i < arguments.length; i++) {
 			other = other.and(context, arguments[i]);
@@ -4464,7 +4484,7 @@ function requireNewColumn () {
 			alias = extractAlias(alias);
 			from = c.greaterThanOrEqual(context, from, alias);
 			to = c.lessThanOrEqual(context, to, alias);
-			return from.and(to);
+			return from.and(context, to);
 		};
 
 		c.in = function(context, arg, alias) {
@@ -9025,6 +9045,7 @@ function requireGetRelatives$1 () {
 
 	function getRelatives(context, parent, relation) {
 		var queryContext = parent.queryContext;
+		var ctx = context === undefined ? null : context;
 		let strategy = queryContext && queryContext.strategy[relation.leftAlias];
 		var filter = emptyFilter;
 		if (relation.columns.length === 1)
@@ -9045,7 +9066,7 @@ function requireGetRelatives$1 () {
 			}
 
 			if (ids.length > 0)
-				filter = relation.childTable._primaryColumns[0].in(context, ids);
+				filter = relation.childTable._primaryColumns[0].in(ctx, ids);
 		}
 
 		function createCompositeFilter() {
@@ -9053,7 +9074,7 @@ function requireGetRelatives$1 () {
 			for (var i = 0; i < queryContext.rows.length; i++) {
 				keyFilter = rowToPrimaryKeyFilter(context, queryContext.rows[i], relation);
 				if (keyFilter)
-					filter = filter.or(context, keyFilter);
+					filter = filter.or(ctx, keyFilter);
 			}
 		}
 
