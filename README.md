@@ -669,7 +669,7 @@ async function getRows() {
   });
 }
 ```
-You can also use the alternative syntax for the `where` filter. This way, the filter can be constructed independently from the fetching strategy and passed in via the `where` clause.  
+You can also build the `where` filter separately and pass it in via the `where` clause. This keeps the filter independent of the fetching strategy and easier to reuse.  
 ```javascript
 async function getRows() {
   const filter = db.order.lines.any(line => line.product.contains('i'))
@@ -692,7 +692,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const order = await db.order.getOne(undefined /* optional filter */, {
+  const order = await db.order.getOne({
     where: x => x.customer(customer => customer.isActive.eq(true)
                  .and(customer.startsWith('Harr'))),
     customer: true, 
@@ -701,15 +701,16 @@ async function getRows() {
   });
 }
 ```
-You can use also the alternative syntax for the `where-filter`. This way, the filter can be constructed independently from the fetching strategy.    
-It is also possible to combine `where-filter` with the independent filter when using the `getOne` method.  
+You can also build the `where` filter independently and reuse it.    
+With `getOne`, you can combine the positional `where` filter with the `where` option to compose filters.  
 ```javascript
 async function getRows() {
   const filter = db.order.customer(customer => customer.isActive.eq(true)
                  .and(customer.startsWith('Harr')));
-                 //equivalent, but creates slighly different sql:
+                 // equivalent, but creates slightly different SQL:
                  // const filter = db.order.customer.isActive.eq(true).and(db.order.customer.startsWith('Harr'));
-  const order = await db.order.getOne(filter, {
+  const order = await db.order.getOne({
+    where: filter,
     customer: true, 
     deliveryAddress: true, 
     lines: true
@@ -1171,6 +1172,7 @@ express().disable('x-powered-by')
 ```
 
 <sub>📄 browser.ts</sub>
+
 ```ts
 import map from './map';
 
@@ -1179,7 +1181,7 @@ const db = map.http('http://localhost:3000/orange');
 updateRows();
 
 async function updateRows() {
-  const order = await db.order.getOne(undefined, {
+  const order = await db.order.getOne({
     where: x => x.lines.any(line => line.product.startsWith('Magic wand'))
       .and(x.customer.name.startsWith('Harry'),
     lines: true
@@ -1264,7 +1266,7 @@ async function updateRows() {
     }
   );
 
-  const order = await db.order.getOne(undefined, {
+  const order = await db.order.getOne({
     where: x => x.lines.any(line => line.product.startsWith('Magic wand'))
       .and(db.order.customer.name.startsWith('Harry')),
     lines: true
