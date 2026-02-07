@@ -125,6 +125,16 @@ const map = rdb.map(x => ({
 		datetime: column('tdatetime').date(),
 		datetime_tz: column('tdatetime_tz').dateWithTimeZone()
 	})),
+	brukerRolleLike: x.table('bruker_rolle_like').map(({ column }) => ({
+		brukerRolleId: column('bruker_rolle_id').string().primary().notNull(),
+		brukerId: column('bruker_id').string().notNull(),
+		rolleTypeId: column('rolle_type_id').numeric().notNull(),
+		aktorId: column('aktor_id').string().notNull(),
+		opprettetTid: column('opprettet_tid').date().notNull(),
+		avsluttetTid: column('avsluttet_tid').date(),
+		brukerRolleStatusTypeId: column('bruker_rolle_status_type_id').numeric().notNull(),
+		sistEndretAvBrukerId: column('sist_endret_av_bruker_id').string()
+	})),
 	bigintParent: x.table('bigintParent').map(({ column}) => ({
 		id: column('id').bigint().primary().notNullExceptInsert(),
 		foo: column('foo').numeric(),

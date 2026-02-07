@@ -3959,6 +3959,8 @@ function requireClient () {
 		const handler = {
 			get(target, prop, receiver) {
 				const value = Reflect.get(target, prop, receiver);
+				if (value instanceof Date)
+					return value;
 				if (typeof value === 'object' && value !== null) {
 					return new Proxy(value, handler);
 				}
@@ -19658,7 +19660,7 @@ function requireOutputInsertedSql () {
 
 		function formatColumn(column) {
 			if (column.formatOut)
-				return column.formatOut(context, 'INSERTED');
+				return `${column.formatOut(context, 'INSERTED')} AS [${column._dbName}]`;
 			else
 				return `INSERTED.[${column._dbName}]`;
 		}

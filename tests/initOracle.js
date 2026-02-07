@@ -62,6 +62,13 @@ BEGIN
   
 `,
 	`BEGIN
+      EXECUTE IMMEDIATE 'DROP TABLE "bruker_rolle_like"';
+  EXCEPTION
+      WHEN OTHERS THEN NULL;
+  END;
+  
+`,
+	`BEGIN
       EXECUTE IMMEDIATE 'DROP TABLE "bigintChild"';
   EXCEPTION
       WHEN OTHERS THEN NULL;
@@ -81,6 +88,17 @@ BEGIN
     "date" TIMESTAMP,
     "tdatetime" TIMESTAMP,
     "tdatetime_tz" TIMESTAMP
+)
+    `,
+	`CREATE TABLE "bruker_rolle_like"(
+    "bruker_rolle_id" VARCHAR2(36) PRIMARY KEY,
+    "bruker_id" VARCHAR2(36) NOT NULL,
+    "rolle_type_id" NUMBER(10) NOT NULL,
+    "aktor_id" VARCHAR2(36) NOT NULL,
+    "opprettet_tid" TIMESTAMP NOT NULL,
+    "avsluttet_tid" TIMESTAMP NULL,
+    "bruker_rolle_status_type_id" NUMBER(10) NOT NULL,
+    "sist_endret_av_bruker_id" VARCHAR2(36) NULL
 )
     `,
 	`CREATE TABLE "customer"(
