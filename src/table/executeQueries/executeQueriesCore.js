@@ -1,13 +1,17 @@
 var executeQuery = require('./executeQuery');
 
-async function executeQueriesCore(context, queries) {
-	var results = [];
+function executeQueriesCore(context, queries) {
+	var promises = [];
+	var chain = Promise.resolve();
 	for (var i = 0; i < queries.length; i++) {
-		// Execute sequentially to avoid overlapping requests on a single connection
-		var q = await executeQuery(context, queries[i]);
-		results.push(q);
+		// Serialize execution while still returning an array of promises
+		var q = chain.then(function(qi) {
+			return executeQuery(context, qi);
+		}.bind(null, queries[i]));
+		promises.push(q);
+		chain = q;
 	}
-	return results;
+	return promises;
 }
 
 module.exports = executeQueriesCore;
