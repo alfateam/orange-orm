@@ -15,10 +15,20 @@ const map = rdb.map(x => ({
 		id: column('innredning_type_id').numeric().primary().notNull(),
 		navn: column('navn').string().notNull(),
 	})),
+	belysningType: x.table('belysning_type_dual').map(({ column }) => ({
+		id: column('belysning_type_id').numeric().primary().notNull(),
+		navn: column('navn').string().notNull(),
+	})),
+	gulvType: x.table('gulv_type_dual').map(({ column }) => ({
+		id: column('gulv_type_id').numeric().primary().notNull(),
+		navn: column('navn').string().notNull(),
+	})),
 	husVerpehoeneEgenskaper: x.table('hus_verpehoene_egenskaper_dual').map(({ column }) => ({
 		id: column('hus_verpehoene_egenskaper_id').string().primary().notNull(),
 		husId: column('hus_id').string().notNull(),
 		innredningTypeId: column('innredning_type_id').numeric().notNull(),
+		belysningTypeId: column('belysning_type_id').numeric().notNull(),
+		gulvTypeId: column('gulv_type_id').numeric().notNull(),
 	})).columnDiscriminators('hus_egenskap_status_id=0'),
 	husSlaktekyllingEgenskaper: x.table('hus_slaktekylling_egenskaper_dual').map(({ column }) => ({
 		id: column('hus_slaktekylling_egenskaper_id').string().primary().notNull(),
@@ -28,6 +38,8 @@ const map = rdb.map(x => ({
 })).map(x => ({
 	husVerpehoeneEgenskaper: x.husVerpehoeneEgenskaper.map(({ references }) => ({
 		innredningType: references(x.innredningType).by('innredningTypeId'),
+		belysningType: references(x.belysningType).by('belysningTypeId'),
+		gulvType: references(x.gulvType).by('gulvTypeId'),
 	})),
 	husSlaktekyllingEgenskaper: x.husSlaktekyllingEgenskaper.map(({ references }) => ({
 		innredningType: references(x.innredningType).by('innredningTypeId'),
@@ -45,6 +57,8 @@ const connections = {
 			const sql = [
 				'DROP TABLE IF EXISTS hus_verpehoene_egenskaper_dual',
 				'DROP TABLE IF EXISTS hus_slaktekylling_egenskaper_dual',
+				'DROP TABLE IF EXISTS belysning_type_dual',
+				'DROP TABLE IF EXISTS gulv_type_dual',
 				'DROP TABLE IF EXISTS innredning_type_dual',
 				'DROP TABLE IF EXISTS hus_dual',
 				`CREATE TABLE hus_dual (
@@ -58,10 +72,20 @@ const connections = {
 					innredning_type_id INTEGER PRIMARY KEY,
 					navn TEXT NOT NULL
 				)`,
+				`CREATE TABLE belysning_type_dual (
+					belysning_type_id INTEGER PRIMARY KEY,
+					navn TEXT NOT NULL
+				)`,
+				`CREATE TABLE gulv_type_dual (
+					gulv_type_id INTEGER PRIMARY KEY,
+					navn TEXT NOT NULL
+				)`,
 				`CREATE TABLE hus_verpehoene_egenskaper_dual (
 					hus_verpehoene_egenskaper_id TEXT PRIMARY KEY,
 					hus_id TEXT NOT NULL,
 					innredning_type_id INTEGER NOT NULL,
+					belysning_type_id INTEGER NOT NULL,
+					gulv_type_id INTEGER NOT NULL,
 					hus_egenskap_status_id INTEGER NOT NULL
 				)`,
 				`CREATE TABLE hus_slaktekylling_egenskaper_dual (
@@ -97,6 +121,8 @@ const connections = {
 			const sql = `
 				IF OBJECT_ID('dbo.hus_verpehoene_egenskaper_dual', 'U') IS NOT NULL DROP TABLE dbo.hus_verpehoene_egenskaper_dual;
 				IF OBJECT_ID('dbo.hus_slaktekylling_egenskaper_dual', 'U') IS NOT NULL DROP TABLE dbo.hus_slaktekylling_egenskaper_dual;
+				IF OBJECT_ID('dbo.belysning_type_dual', 'U') IS NOT NULL DROP TABLE dbo.belysning_type_dual;
+				IF OBJECT_ID('dbo.gulv_type_dual', 'U') IS NOT NULL DROP TABLE dbo.gulv_type_dual;
 				IF OBJECT_ID('dbo.innredning_type_dual', 'U') IS NOT NULL DROP TABLE dbo.innredning_type_dual;
 				IF OBJECT_ID('dbo.hus_dual', 'U') IS NOT NULL DROP TABLE dbo.hus_dual;
 				CREATE TABLE dbo.hus_dual (
@@ -110,10 +136,20 @@ const connections = {
 					innredning_type_id INT PRIMARY KEY,
 					navn NVARCHAR(100) NOT NULL
 				);
+				CREATE TABLE dbo.belysning_type_dual (
+					belysning_type_id INT PRIMARY KEY,
+					navn NVARCHAR(100) NOT NULL
+				);
+				CREATE TABLE dbo.gulv_type_dual (
+					gulv_type_id INT PRIMARY KEY,
+					navn NVARCHAR(100) NOT NULL
+				);
 				CREATE TABLE dbo.hus_verpehoene_egenskaper_dual (
 					hus_verpehoene_egenskaper_id NVARCHAR(36) PRIMARY KEY,
 					hus_id NVARCHAR(36) NOT NULL,
 					innredning_type_id INT NOT NULL,
+					belysning_type_id INT NOT NULL,
+					gulv_type_id INT NOT NULL,
 					hus_egenskap_status_id INT NOT NULL
 				);
 				CREATE TABLE dbo.hus_slaktekylling_egenskaper_dual (
@@ -137,6 +173,14 @@ async function insertData(db) {
 		{ id: 1, navn: 'Verpe' },
 		{ id: 2, navn: 'Slakte' },
 	]);
+	await db.belysningType.insert([
+		{ id: 1, navn: 'LED' },
+		{ id: 2, navn: 'Halogen' },
+	]);
+	await db.gulvType.insert([
+		{ id: 1, navn: 'Betong' },
+		{ id: 2, navn: 'Gummi' },
+	]);
 	await db.hus.insert({
 		id: husId,
 		gaardsbrukId: 'gaard-1',
@@ -148,6 +192,8 @@ async function insertData(db) {
 		id: 'verpe-1',
 		husId,
 		innredningTypeId: 1,
+		belysningTypeId: 1,
+		gulvTypeId: 1,
 		husEgenskapStatusId: 0,
 	});
 	await db.husSlaktekyllingEgenskaper.insert({
@@ -166,13 +212,17 @@ describe('dual hasOne with discriminators', () => {
 		const husId = await insertData(db);
 
 		const rows = await db.hus.getMany(db.hus.id.eq(husId), {
-			verpehoeneEgenskaper: { innredningType: true },
-			slaktekyllingEgenskaper: { innredningType: true },
+			verpehoeneEgenskaper: { innredningType: true, belysningType: true, gulvType: true },
+			slaktekyllingEgenskaper: {
+				innredningType: true
+			},
 		});
 
 		expect(rows[0].verpehoeneEgenskaper).toBeTruthy();
 		expect(rows[0].slaktekyllingEgenskaper).toBeTruthy();
 		expect(rows[0].verpehoeneEgenskaper?.innredningType?.navn).toBe('Verpe');
+		expect(rows[0].verpehoeneEgenskaper?.belysningType?.navn).toBe('LED');
+		expect(rows[0].verpehoeneEgenskaper?.gulvType?.navn).toBe('Betong');
 		expect(rows[0].slaktekyllingEgenskaper?.innredningType?.navn).toBe('Slakte');
 	});
 
@@ -182,13 +232,15 @@ describe('dual hasOne with discriminators', () => {
 		const husId = await insertData(db);
 
 		const rows = await db.hus.getMany(db.hus.id.eq(husId), {
-			verpehoeneEgenskaper: { innredningType: true },
+			verpehoeneEgenskaper: { innredningType: true, belysningType: true, gulvType: true },
 			slaktekyllingEgenskaper: { innredningType: true },
 		});
 
 		expect(rows[0].verpehoeneEgenskaper).toBeTruthy();
 		expect(rows[0].slaktekyllingEgenskaper).toBeTruthy();
 		expect(rows[0].verpehoeneEgenskaper?.innredningType?.navn).toBe('Verpe');
+		expect(rows[0].verpehoeneEgenskaper?.belysningType?.navn).toBe('LED');
+		expect(rows[0].verpehoeneEgenskaper?.gulvType?.navn).toBe('Betong');
 		expect(rows[0].slaktekyllingEgenskaper?.innredningType?.navn).toBe('Slakte');
 	});
 });

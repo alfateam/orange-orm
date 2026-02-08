@@ -10994,11 +10994,20 @@ function requireGetManyDto$1 () {
 		}
 
 		let span = spanFromParent || strategyToSpan(table, strategy);
+		if (!spanFromParent)
+			assignAliases(span, table._dbName);
 		let alias = table._dbName;
 
 		const query = newQuery(context, table, filter, span, alias);
 		const res = await executeQueries(context, [query]);
 		return decode(context, strategy, span, await res[0], undefined, updateParent);
+	}
+
+	function assignAliases(span, alias) {
+		span._alias = alias;
+		span.legs.forEach((leg) => {
+			assignAliases(leg.span, alias + leg.name);
+		});
 	}
 
 	function newCreateRow(span) {
@@ -11086,6 +11095,8 @@ function requireGetManyDto$1 () {
 		const fkIds = new Array(rows.length);
 		const getIds = createGetIds();
 		const aggregateKeys = Object.keys(span.aggregates);
+		const aliasPrefix = span._alias ? 's' + span._alias : null;
+		const useAlias = aliasPrefix && rowsLength > 0 && Object.prototype.hasOwnProperty.call(rows[0], aliasPrefix + '0');
 
 		const outRows = new Array(rowsLength);
 		const createRow = newCreateRow(span);
@@ -11095,8 +11106,9 @@ function requireGetManyDto$1 () {
 			let outRow = createRow();
 			let pkWithNullCount = 0;
 			for (let j = 0; j < columnsLength; j++) {
+				const key = useAlias ? (aliasPrefix + j) : keys[j];
 				if (j < primaryColumnsLength) {
-					if (row[keys[j]] === null)
+					if (row[key] === null)
 						pkWithNullCount++;
 					if (pkWithNullCount === primaryColumnsLength) {
 						outRow = null;
@@ -11104,13 +11116,14 @@ function requireGetManyDto$1 () {
 					}
 				}
 				const column = columns[j];
-				outRow[column.alias] = column.decode(context, row[keys[j]]);
+				outRow[column.alias] = column.decode(context, row[key]);
 			}
 
 			for (let j = 0; j < aggregateKeys.length; j++) {
 				const key = aggregateKeys[j];
 				const parse = span.aggregates[key].column?.decode || ((context, arg) => Number.parseFloat(arg));
-				outRow[key] = parse(context, row[keys[j + columnsLength]]);
+				const value = useAlias ? row[key] : row[keys[j + columnsLength]];
+				outRow[key] = parse(context, value);
 			}
 
 			outRows[i] = outRow;
@@ -11124,7 +11137,8 @@ function requireGetManyDto$1 () {
 		span._rowsMap = rowsMap;
 		span._ids = fkIds;
 
-		keys.splice(0, columnsLength + aggregateKeys.length);
+		if (!useAlias)
+			keys.splice(0, columnsLength + aggregateKeys.length);
 		if (span.legs.toArray().length === 0)
 			return outRows;
 
