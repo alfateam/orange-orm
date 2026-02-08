@@ -7,17 +7,27 @@ function wrapCommand(_context, connection) {
 	return runQuery;
 
 	function runQuery(query, onCompleted) {
-		if (!CachedRequest || !CachedTypes) {
-			import('tedious')
-				.then(({ Request, TYPES }) => {
-					CachedRequest = Request;
-					CachedTypes = TYPES;
-					doQuery(query, onCompleted);
-				})
-				.catch((err) => onCompleted(extractError(err), { rowsAffected: 0 }));
-		} else {
-			doQuery(query, onCompleted);
-		}
+		enqueue(function(done) {
+			function safeCompleted(err, result) {
+				try {
+					onCompleted(err, result);
+				} finally {
+					done();
+				}
+			}
+
+			if (!CachedRequest || !CachedTypes) {
+				import('tedious')
+					.then(({ Request, TYPES }) => {
+						CachedRequest = Request;
+						CachedTypes = TYPES;
+						doQuery(query, safeCompleted);
+					})
+					.catch((err) => safeCompleted(extractError(err), { rowsAffected: 0 }));
+			} else {
+				doQuery(query, safeCompleted);
+			}
+		});
 	}
 
 	function doQuery(query, onCompleted) {
@@ -69,6 +79,19 @@ function wrapCommand(_context, connection) {
 			if (err) return onCompleted(extractError(err), { rowsAffected: 0 });
 			return onCompleted(null, { rowsAffected: affectedRows });
 		}
+	}
+
+	function enqueue(task) {
+		if (!connection.__orangeOrmQueue)
+			connection.__orangeOrmQueue = Promise.resolve();
+		connection.__orangeOrmQueue = connection.__orangeOrmQueue.then(() => new Promise((resolve) => {
+			try {
+				task(resolve);
+			}
+			catch (_e) {
+				resolve();
+			}
+		})).catch(() => {});
 	}
 }
 
