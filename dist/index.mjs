@@ -2117,13 +2117,14 @@ function requireExecuteQueriesCore () {
 	hasRequiredExecuteQueriesCore = 1;
 	var executeQuery = requireExecuteQuery();
 
-	function executeQueriesCore(context, queries) {
-		var promises = [];
+	async function executeQueriesCore(context, queries) {
+		var results = [];
 		for (var i = 0; i < queries.length; i++) {
-			var q = executeQuery(context, queries[i]);
-			promises.push(q);
+			// Execute sequentially to avoid overlapping requests on a single connection
+			var q = await executeQuery(context, queries[i]);
+			results.push(q);
 		}
-		return promises;
+		return results;
 	}
 
 	executeQueriesCore_1 = executeQueriesCore;
