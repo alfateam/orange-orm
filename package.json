@@ -1,6 +1,6 @@
 {
     "name": "orange-orm",
-    "version": "5.0.0-beta.10",
+    "version": "5.0.0",
     "publishConfig": {
         "access": "public"
     },

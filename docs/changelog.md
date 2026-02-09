@@ -5,6 +5,7 @@ Breaking: `getOne` no longer accepts a filter as the first argument. Move the fi
 ExpressJS: Before/after hooks to facilitate row-level security [#135](https://github.com/alfateam/orange-orm/issues/135)  
 SQLite: Support for invoking user-defined functions [#145](https://github.com/alfateam/orange-orm/issues/145)  
 Support for enums [#100](https://github.com/alfateam/orange-orm/issues/100)  
+__4.9.2__  
 Bugfix: getManyDto/getMany with parallel hasOne + discriminator could return null columns. [#147](https://github.com/alfateam/orange-orm/issues/147)  
 __4.9.1__  
 Fix: Avoid double-quoting aliases in discriminator join SQL [#144](https://github.com/alfateam/orange-orm/issues/144)    
