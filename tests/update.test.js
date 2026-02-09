@@ -210,6 +210,72 @@ describe('update multiple in array', () => {
 	}
 });
 
+describe('selective update with where expression', () => {
+
+	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sap', async () => await verify('sap'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+		const rowsBefore = await db.order.getAll({ orderBy: 'id' });
+		const targetId = rowsBefore[0].id;
+		const otherId = rowsBefore[1].id;
+		const originalOtherDate = rowsBefore[1].orderDate;
+		const newDate = new Date(2023, 3, 5, 10, 30, 0);
+
+		await db.order.update({ orderDate: newDate }, { where: x => x.id.eq(targetId) });
+
+		const rowsAfter = await db.order.getAll({ orderBy: 'id' });
+		const rowsAfterById = new Map(rowsAfter.map(row => [row.id, row]));
+		const updated = rowsAfterById.get(targetId);
+		const untouched = rowsAfterById.get(otherId);
+
+		expect(updated.orderDate).toEqual(dateToISOString(newDate).substring(0, updated.orderDate.length));
+		expect(untouched.orderDate).toEqual(originalOtherDate);
+	}
+});
+
+describe('selective update with primary key filter array', () => {
+
+	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sap', async () => await verify('sap'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+		const rowsBefore = await db.order.getAll({ orderBy: 'id' });
+		const targetId = rowsBefore[1].id;
+		const untouchedId = rowsBefore[0].id;
+		const originalUntouchedDate = rowsBefore[0].orderDate;
+		const newDate = new Date(2024, 6, 10, 8, 15, 0);
+
+		await db.order.update({ orderDate: newDate }, { where: () => [{ id: targetId }] });
+
+		const rowsAfter = await db.order.getAll({ orderBy: 'id' });
+		const rowsAfterById = new Map(rowsAfter.map(row => [row.id, row]));
+		const updated = rowsAfterById.get(targetId);
+		const untouched = rowsAfterById.get(untouchedId);
+
+		expect(updated.orderDate).toEqual(dateToISOString(newDate).substring(0, updated.orderDate.length));
+		expect(untouched.orderDate).toEqual(originalUntouchedDate);
+	}
+});
+
 describe('delete row', () => {
 	test('pg', async () => await verify('pg'));
 	test('pglite', async () => await verify('pglite'));

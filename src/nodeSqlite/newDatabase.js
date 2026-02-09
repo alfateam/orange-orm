@@ -7,8 +7,8 @@ let newPool = require('./newPool');
 let express = require('../hostExpress');
 let hostLocal = require('../hostLocal');
 let doQuery = require('../query');
+let doSqliteFunction = require('../sqliteFunction');
 let releaseDbClient = require('../table/releaseDbClient');
-let setSessionSingleton = require('../table/setSessionSingleton');
 
 function newDatabase(connectionString, poolOptions) {
 	if (!connectionString)
@@ -24,11 +24,9 @@ function newDatabase(connectionString, poolOptions) {
 			options = undefined;
 		}
 		let domain = createDomain();
-
-		if (fn)
-			return domain.run(runInTransaction);
-		else
-			return domain.run(run);
+		if (!fn)
+			throw new Error('transaction requires a function');
+		return domain.run(runInTransaction);
 
 		function begin() {
 			return _begin(domain, options);
@@ -42,17 +40,10 @@ function newDatabase(connectionString, poolOptions) {
 				.then(() => fn(domain))
 				.then((res) => result = res)
 				.then(() => commit(domain))
-				.then(null, (e) => rollback(domain, e));
+				.then(null, (e) => Promise.resolve(rollback(domain, e)));
 			return result;
 		}
 
-		function run() {
-			let p;
-			let transaction = newTransaction(domain, pool, options);
-			p = new Promise(transaction);
-
-			return p.then(begin);
-		}
 
 	};
 
@@ -60,12 +51,15 @@ function newDatabase(connectionString, poolOptions) {
 		let domain = createDomain();
 		let transaction = newTransaction(domain, pool);
 		let p = domain.run(() => new Promise(transaction).then(begin));
-
 		function run(fn) {
 			return p.then(() => fn(domain));
 		}
-		run.rollback = rollback.bind(null, domain);
-		run.commit = commit.bind(null, domain);
+		run.rollback = function(error) {
+			return Promise.resolve(rollback(domain, error));
+		};
+		run.commit = function() {
+			return Promise.resolve(commit(domain));
+		};
 		return run;
 
 		function begin() {
@@ -77,7 +71,6 @@ function newDatabase(connectionString, poolOptions) {
 		let domain = createDomain();
 		let transaction = newTransaction(domain, pool);
 		let p = domain.run(() => new Promise(transaction)
-			.then(() => setSessionSingleton(domain, 'changes', []))
 			.then(() => doQuery(domain, query).then(onResult, onError)));
 		return p;
 
@@ -92,6 +85,23 @@ function newDatabase(connectionString, poolOptions) {
 		}
 	};
 
+	c.sqliteFunction = function(...args) {
+		let domain = createDomain();
+		let transaction = newTransaction(domain, pool);
+		let p = domain.run(() => new Promise(transaction)
+			.then(() => doSqliteFunction(domain, ...args).then(onResult, onError)));
+		return p;
+
+		function onResult(result) {
+			releaseDbClient(domain);
+			return result;
+		}
+
+		function onError(e) {
+			releaseDbClient(domain);
+			throw e;
+		}
+	};
 
 	c.rollback = rollback;
 	c.commit = commit;

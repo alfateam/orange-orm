@@ -9,6 +9,7 @@ DROP TABLE if exists [order];
 DROP TABLE if exists vendor;
 DROP TABLE if exists customer;
 DROP TABLE if exists datetest;
+DROP TABLE if exists bruker_rolle_like;
 DROP TABLE if exists bigintChild;
 DROP TABLE if exists bigintParent;
 
@@ -21,6 +22,17 @@ CREATE TABLE datetest (
 
 INSERT INTO datetest ([date], tdatetime, tdatetime_tz)
 VALUES ('2023-07-14 12:00:00', '2023-07-14 12:00:00', '2023-07-14T12:00:00-08:00');
+
+CREATE TABLE bruker_rolle_like (
+    bruker_rolle_id NVARCHAR(36) PRIMARY KEY,
+    bruker_id NVARCHAR(36) NOT NULL,
+    rolle_type_id INT NOT NULL,
+    aktor_id NVARCHAR(36) NOT NULL,
+    opprettet_tid DATETIME NOT NULL,
+    avsluttet_tid DATETIME NULL,
+    bruker_rolle_status_type_id INT NOT NULL,
+    sist_endret_av_bruker_id NVARCHAR(36) NULL
+);
 
 CREATE TABLE customer (
     id int IDENTITY(1,1) PRIMARY KEY,   

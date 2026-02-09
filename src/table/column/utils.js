@@ -18,6 +18,10 @@ function newBoolean(filter) {
 	};
 
 	c.and = function(context, other) {
+		if (other === undefined) {
+			other = context;
+			context = null;
+		}
 		other = negotiateRawSqlFilter(context, other);
 		var nextFilter = negotiateNextAndFilter(filter, other);
 		var next = newBoolean(nextFilter);
@@ -28,6 +32,10 @@ function newBoolean(filter) {
 	};
 
 	c.or = function(context, other) {
+		if (other === undefined) {
+			other = context;
+			context = null;
+		}
 		other = negotiateRawSqlFilter(context, other);
 		var nextFilter = negotiateNextOrFilter(filter, other);
 		var next = newBoolean(nextFilter);
@@ -80,8 +88,9 @@ function negotiateRawSqlFilter(context, filter, optionalTable, emptyArrayMeansFa
 				}
 				params.push(sql, filter.parameters);
 			}
-			else if (isObjectFilter(filter, optionalTable))
+			else if (isObjectFilter(filter, optionalTable)) {
 				return newObjectFilter(context, filter, optionalTable);
+			}
 			else
 				params = [filter];
 		} else {

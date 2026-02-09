@@ -1,4 +1,6 @@
 ## Changelog
+__4.9.2__  
+Bugfix: getManyDto/getMany with parallel hasOne + discriminator could return null columns. [#147](https://github.com/alfateam/orange-orm/issues/147)  
 __4.9.1__  
 Fix: Avoid double-quoting aliases in discriminator join SQL [#144](https://github.com/alfateam/orange-orm/issues/144)    
 __4.9.0__  

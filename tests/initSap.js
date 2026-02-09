@@ -9,6 +9,16 @@ END
 
 GO
 
+IF
+EXISTS (SELECT 1 FROM
+sysobjects WHERE type = 'U' and name = 'bruker_rolle_like')
+
+BEGIN
+	DROP TABLE bruker_rolle_like
+END
+
+GO
+
 IF EXISTS (SELECT 1 FROM
 sysobjects WHERE type = 'U' and name = 'package')
 
@@ -120,6 +130,19 @@ GO
 
 INSERT INTO datetest ([date], tdatetime, tdatetime_tz)
 VALUES ('2023-07-14 12:00:00', '2023-07-14T12:00:00', '2023-07-14 12:00:00');
+
+GO
+
+CREATE TABLE bruker_rolle_like (
+    bruker_rolle_id VARCHAR(36) PRIMARY KEY,
+    bruker_id VARCHAR(36) NOT NULL,
+    rolle_type_id INT NOT NULL,
+    aktor_id VARCHAR(36) NOT NULL,
+    opprettet_tid DATETIME NOT NULL,
+    avsluttet_tid DATETIME NULL,
+    bruker_rolle_status_type_id INT NOT NULL,
+    sist_endret_av_bruker_id VARCHAR(36) NULL
+);
 
 GO
 

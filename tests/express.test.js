@@ -7,6 +7,7 @@ const initSqlite = require('./initSqlite');
 const dateToISOString = require('../src/dateToISOString');
 const port = 3008;
 let server;
+const hookCalls = [];
 
 afterAll(async () => {
 	return new Promise((res) => {
@@ -94,6 +95,64 @@ beforeAll(async () => {
 			.use(json({ limit: '100mb' }))
 			.use('/rdb', validateToken)
 			.use('/rdb', db.express({
+				hooks: {
+					transaction: {
+						beforeBegin: async (_db, req, res) => {
+							await _db.customer.count();
+							hookCalls.push({
+								name: 'beforeBegin',
+								authorization: req.headers.authorization,
+								method: req.method,
+								hasResponse: typeof res?.setHeader === 'function',
+								dbQueryOk: true
+							});
+						},
+						afterBegin: async (_db, req, res) => {
+							await _db.customer.count();
+							hookCalls.push({
+								name: 'afterBegin',
+								authorization: req.headers.authorization,
+								method: req.method,
+								hasResponse: typeof res?.setHeader === 'function',
+								dbQueryOk: true
+							});
+						},
+						beforeCommit: async (_db, req, res) => {
+							await _db.customer.count();
+							hookCalls.push({
+								name: 'beforeCommit',
+								authorization: req.headers.authorization,
+								method: req.method,
+								hasResponse: typeof res?.setHeader === 'function',
+								dbQueryOk: true
+							});
+							if (req.headers['x-force-rollback'] === '1') {
+								throw new Error('forced rollback');
+							}
+						},
+						afterCommit: async (_db, req, res) => {
+							await _db.customer.count();
+							hookCalls.push({
+								name: 'afterCommit',
+								authorization: req.headers.authorization,
+								method: req.method,
+								hasResponse: typeof res?.setHeader === 'function',
+								dbQueryOk: true
+							});
+						},
+						afterRollback: async (_db, req, res, error) => {
+							await _db.customer.count();
+							hookCalls.push({
+								name: 'afterRollback',
+								authorization: req.headers.authorization,
+								method: req.method,
+								hasResponse: typeof res?.setHeader === 'function',
+								hasError: !!error,
+								dbQueryOk: true
+							});
+						}
+					}
+				},
 				order: {
 					baseFilter: (db, req, _res) => {
 						const customerId = Number.parseInt(req.headers.authorization.split(' ')[1]);
@@ -178,6 +237,54 @@ describe('express update with basefilter and interceptors', () => {
 
 		expect(row).toEqual(expected);
 	}
+});
+
+describe('express hooks', () => {
+	test('transaction hook runs for http requests', async () => {
+		hookCalls.length = 0;
+		const { db } = getDb('http');
+		db.interceptors.request.use((config) => {
+			config.headers.Authorization = 'Bearer 2';
+			return config;
+		});
+
+		await db.order.getMany({ where: x => x.id.eq(2) });
+
+		const hookNames = hookCalls.map(call => call.name);
+		expect(hookCalls.length).toBeGreaterThan(0);
+		expect(hookCalls[0].authorization).toBe('Bearer 2');
+		expect(hookCalls[0].method).toBe('POST');
+		expect(hookCalls[0].hasResponse).toBe(true);
+		expect(hookCalls.every(call => call.dbQueryOk === true)).toBe(true);
+		expect(hookNames).toContain('beforeBegin');
+		expect(hookNames).toContain('afterBegin');
+		expect(hookNames).toContain('beforeCommit');
+		expect(hookNames).toContain('afterCommit');
+		expect(hookNames).not.toContain('afterRollback');
+	});
+
+	test('transaction hook runs afterRollback on errors', async () => {
+		hookCalls.length = 0;
+		const { db } = getDb('http');
+		db.interceptors.request.use((config) => {
+			config.headers.Authorization = 'Bearer 2';
+			config.headers['X-Force-Rollback'] = '1';
+			return config;
+		});
+
+		await expect(db.order.getMany({ where: x => x.id.eq(2) }))
+			.rejects.toBeTruthy();
+
+		const hookNames = hookCalls.map(call => call.name);
+		expect(hookNames).toContain('beforeBegin');
+		expect(hookNames).toContain('afterBegin');
+		expect(hookNames).toContain('beforeCommit');
+		expect(hookNames).toContain('afterRollback');
+		expect(hookNames).not.toContain('afterCommit');
+		const rollbackCall = hookCalls.find(call => call.name === 'afterRollback');
+		expect(rollbackCall?.hasError).toBe(true);
+		expect(rollbackCall?.dbQueryOk).toBe(true);
+	});
 });
 
 const pathSegments = __filename.split('/');

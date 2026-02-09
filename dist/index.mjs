@@ -466,6 +466,7 @@ export interface ExpressConfig {
 	concurrency?: Concurrency;
 	readonly?: boolean;
 	disableBulkDeletes?: boolean;
+	hooks?: ExpressHooks;
 }
 
 export interface ExpressContext {
@@ -473,6 +474,18 @@ export interface ExpressContext {
 	response: import('express').Response;
 	client: RdbClient;
 }		
+
+export interface ExpressTransactionHooks {
+	beforeBegin?: (db: Pool, request: import('express').Request, response: import('express').Response) => void | Promise<void>;
+	afterBegin?: (db: Pool, request: import('express').Request, response: import('express').Response) => void | Promise<void>;
+	beforeCommit?: (db: Pool, request: import('express').Request, response: import('express').Response) => void | Promise<void>;
+	afterCommit?: (db: Pool, request: import('express').Request, response: import('express').Response) => void | Promise<void>;
+	afterRollback?: (db: Pool, request: import('express').Request, response: import('express').Response, error?: unknown) => void | Promise<void>;
+}
+
+export interface ExpressHooks extends ExpressTransactionHooks {
+	transaction?: ExpressTransactionHooks;
+}
 
 export interface ExpressTables {${getExpressTables()}
 }
@@ -611,13 +624,18 @@ function requireHostExpress () {
 		const dbOptions = { db: options.db || client.db };
 		let c = {};
 		const readonly = { readonly: options.readonly};
+		const sharedHooks = options.hooks;
 		for (let tableName in client.tables) {
+			const tableOptions = options[tableName] || {};
+			const hooks = tableOptions.hooks || sharedHooks;
 			c[tableName] = hostLocal({
 				...dbOptions,
 				...readonly,
-				...options[tableName],
+				...tableOptions,
 				table: client.tables[tableName],
-				isHttp: true, client
+				isHttp: true,
+				client,
+				hooks
 
 			});
 		}
@@ -773,8 +791,10 @@ function requireStringify () {
 	}
 
 	function replacer(key, value) {
-		// // @ts-ignore
-		if (value instanceof Date  && !isNaN(value))
+		// @ts-ignore
+		if (typeof value === 'bigint')
+			return value.toString();
+		else if (value instanceof Date  && !isNaN(value))
 			return dateToISOString(value);
 		else
 			return value;
@@ -884,6 +904,8 @@ function requireCreatePatch () {
 				}
 				return copy;
 			}
+			else if (typeof object === 'bigint')
+				return object.toString();
 			else if (isValidDate(object))
 				return dateToIsoString(object);
 			else if (object === Object(object)) {
@@ -1055,6 +1077,10 @@ function requireUtils () {
 		};
 
 		c.and = function(context, other) {
+			if (other === undefined) {
+				other = context;
+				context = null;
+			}
 			other = negotiateRawSqlFilter(context, other);
 			var nextFilter = negotiateNextAndFilter(filter, other);
 			var next = newBoolean(nextFilter);
@@ -1065,6 +1091,10 @@ function requireUtils () {
 		};
 
 		c.or = function(context, other) {
+			if (other === undefined) {
+				other = context;
+				context = null;
+			}
 			other = negotiateRawSqlFilter(context, other);
 			var nextFilter = negotiateNextOrFilter(filter, other);
 			var next = newBoolean(nextFilter);
@@ -1117,8 +1147,9 @@ function requireUtils () {
 					}
 					params.push(sql, filter.parameters);
 				}
-				else if (isObjectFilter(filter, optionalTable))
+				else if (isObjectFilter(filter, optionalTable)) {
 					return newObjectFilter(context, filter, optionalTable);
+				}
 				else
 					params = [filter];
 			} else {
@@ -1175,10 +1206,14 @@ function requireEmptyFilter () {
 		return emptyFilter.and.apply(null, arguments);
 	}
 
-	emptyFilter.sql = parameterized.sql;
+	emptyFilter.sql = parameterized.sql.bind(parameterized);
 	emptyFilter.parameters = parameterized.parameters;
 
 	emptyFilter.and = function(context, other) {
+		if (other === undefined) {
+			other = context;
+			context = null;
+		}
 		other = negotiateRawSqlFilter(context, other);
 		for (var i = 2; i < arguments.length; i++) {
 			other = other.and(context, arguments[i]);
@@ -1187,6 +1222,10 @@ function requireEmptyFilter () {
 	};
 
 	emptyFilter.or = function(context, other) {
+		if (other === undefined) {
+			other = context;
+			context = null;
+		}
 		other = negotiateRawSqlFilter(context, other);
 		for (var i = 2; i < arguments.length; i++) {
 			other = other.or(context, arguments[i]);
@@ -1195,6 +1234,10 @@ function requireEmptyFilter () {
 	};
 
 	emptyFilter.not = function(context, other) {
+		if (other === undefined) {
+			other = context;
+			context = null;
+		}
 		other = negotiateRawSqlFilter(context, other).not(context);
 		for (var i = 2; i < arguments.length; i++) {
 			other = other.and(context, arguments[i]);
@@ -2076,9 +2119,14 @@ function requireExecuteQueriesCore () {
 
 	function executeQueriesCore(context, queries) {
 		var promises = [];
+		var chain = Promise.resolve();
 		for (var i = 0; i < queries.length; i++) {
-			var q = executeQuery(context, queries[i]);
+			// Serialize execution while still returning an array of promises
+			var q = chain.then(function(qi) {
+				return executeQuery(context, qi);
+			}.bind(null, queries[i]));
 			promises.push(q);
+			chain = q;
 		}
 		return promises;
 	}
@@ -2201,6 +2249,35 @@ function requireQuery () {
 	return query;
 }
 
+var sqliteFunction;
+var hasRequiredSqliteFunction;
+
+function requireSqliteFunction () {
+	if (hasRequiredSqliteFunction) return sqliteFunction;
+	hasRequiredSqliteFunction = 1;
+	const executeChanges = requireExecuteChanges();
+	const popChanges = requirePopChanges();
+	const getSessionSingleton = requireGetSessionSingleton();
+
+	function executeQueries(context, ...rest) {
+		var changes = popChanges(context);
+
+		return executeChanges(context, changes).then(onDoneChanges);
+
+		function onDoneChanges() {
+			var client = getSessionSingleton(context, 'dbClient');
+			if (client && typeof client.function === 'function')
+				return client.function.apply(client, rest);
+			if (client && typeof client.createFunction === 'function')
+				return client.createFunction.apply(client, rest);
+			throw new Error('SQLite client does not support user-defined functions');
+		}
+	}
+
+	sqliteFunction = executeQueries;
+	return sqliteFunction;
+}
+
 var hostLocal_1;
 var hasRequiredHostLocal;
 
@@ -2211,6 +2288,7 @@ function requireHostLocal () {
 	let getMeta = requireGetMeta();
 	let setSessionSingleton = requireSetSessionSingleton();
 	let executeQuery = requireQuery();
+	let executeSqliteFunction = requireSqliteFunction();
 	let hostExpress = requireHostExpress();
 	const readonlyOps = ['getManyDto', 'getMany', 'aggregate', 'count'];
 	// { db, table, defaultConcurrency,
@@ -2221,9 +2299,12 @@ function requireHostLocal () {
 	// 	disableBulkDeletes, isBrowser }
 	function hostLocal() {
 		const _options = arguments[0];
-		let { table, transaction, db, isHttp } = _options;
+		let { table, transaction, db, isHttp, hooks, client } = _options;
+		const transactionHooks = hooks && hooks.transaction;
+		const getTransactionHook = (name) =>
+			(transactionHooks && transactionHooks[name]) || (hooks && hooks[name]);
 
-		let c = { get, post, patch, query, express };
+		let c = { get, post, patch, query, sqliteFunction, express };
 
 		function get() {
 			return getMeta(table);
@@ -2274,10 +2355,41 @@ function requireHostLocal () {
 					else
 						db = dbPromise;
 				}
-				if (readonlyOps.includes(body.path))
+				const beforeBegin = getTransactionHook('beforeBegin');
+				const afterBegin = getTransactionHook('afterBegin');
+				const beforeCommit = getTransactionHook('beforeCommit');
+				const afterCommit = getTransactionHook('afterCommit');
+				const afterRollback = getTransactionHook('afterRollback');
+				const hasTransactionHooks = !!(beforeBegin
+					|| afterBegin
+					|| beforeCommit
+					|| afterCommit
+					|| afterRollback);
+				if (!hasTransactionHooks && readonlyOps.includes(body.path))
 					await db.transaction({ readonly: true }, fn);
-				else
-					await db.transaction(fn);
+				else {
+					await db.transaction(async (context) => {
+						const hookDb = typeof client === 'function'
+							? client({ transaction: (fn) => fn(context) })
+							: (client || db);
+						if (afterCommit)
+							setSessionSingleton(context, 'afterCommitHook', () =>
+								afterCommit(hookDb, request, response)
+							);
+						if (afterRollback)
+							setSessionSingleton(context, 'afterRollbackHook', (error) =>
+								afterRollback(hookDb, request, response, error)
+							);
+						if (beforeBegin)
+							await beforeBegin(hookDb, request, response);
+						if (afterBegin)
+							await afterBegin(hookDb, request, response);
+						await fn(context);
+						if (beforeCommit)
+							await beforeCommit(hookDb, request, response);
+					});
+				}
+
 			}
 			return result;
 
@@ -2308,6 +2420,31 @@ function requireHostLocal () {
 
 			async function fn(...args1) {
 				result = await executeQuery.apply(null, [...args1, ...args]);
+			}
+
+		}
+
+		async function sqliteFunction() {
+			let args = arguments;
+			let result;
+
+			if (transaction)
+				await transaction(fn);
+			else {
+				if (typeof db === 'function') {
+					let dbPromise = db();
+					if (dbPromise.then)
+						db = await dbPromise;
+					else
+						db = dbPromise;
+				}
+				result = await db.sqliteFunction.apply(null, arguments);
+			}
+
+			return result;
+
+			async function fn(...args1) {
+				result = await executeSqliteFunction.apply(null, [...args1, ...args]);
 			}
 
 		}
@@ -2402,6 +2539,7 @@ function requireNetAdapter () {
 			post,
 			patch,
 			query,
+			sqliteFunction,
 			express
 		};
 
@@ -2457,6 +2595,10 @@ function requireNetAdapter () {
 			throw new Error('Queries are not supported through http');
 		}
 
+		function sqliteFunction() {
+			throw new Error('Sqlite Function is not supported through http');
+		}
+
 		function express() {
 			throw new Error('Hosting in express is not supported on the client side');
 		}
@@ -2470,7 +2612,8 @@ function requireNetAdapter () {
 			get,
 			post,
 			patch,
-			query
+			query,
+			sqliteFunction
 		};
 
 		return c;
@@ -2493,6 +2636,11 @@ function requireNetAdapter () {
 		async function query() {
 			const adapter = await getInnerAdapter();
 			return adapter.query.apply(null, arguments);
+		}
+
+		async function sqliteFunction() {
+			const adapter = await getInnerAdapter();
+			return adapter.sqliteFunction.apply(null, arguments);
 		}
 
 		async function getInnerAdapter() {
@@ -2783,6 +2931,7 @@ function requireClient () {
 			}
 		};
 		client.query = query;
+		client.function = sqliteFunction;
 		client.transaction = runInTransaction;
 		client.db = baseUrl;
 		client.mssql = onProvider.bind(null, 'mssql');
@@ -2869,6 +3018,11 @@ function requireClient () {
 		async function query() {
 			const adapter = netAdapter(baseUrl, undefined, { tableOptions: { db: baseUrl, transaction } });
 			return adapter.query.apply(null, arguments);
+		}
+
+		async function sqliteFunction() {
+			const adapter = netAdapter(baseUrl, undefined, { tableOptions: { db: baseUrl, transaction } });
+			return adapter.sqliteFunction.apply(null, arguments);
 		}
 
 		function express(arg) {
@@ -2968,6 +3122,14 @@ function requireClient () {
 
 			async function getMany(_, strategy) {
 				let metaPromise = getMeta();
+				if (looksLikeFetchStrategy(_) && (strategy === undefined || !looksLikeFetchStrategy(strategy))) {
+					let meta = await metaPromise;
+					if (!isPrimaryKeyObject(meta, _)) {
+						let _strategy = _;
+						_ = strategy;
+						strategy = _strategy;
+					}
+				}
 				strategy = extractFetchingStrategy({}, strategy);
 				let args = [_, strategy].concat(Array.prototype.slice.call(arguments).slice(2));
 				let rows = await getManyCore.apply(null, args);
@@ -2995,13 +3157,69 @@ function requireClient () {
 				return adapter.post(body);
 			}
 
+			function isRawFilter(value) {
+				return value && typeof value === 'object'
+					&& (typeof value.sql === 'string' || typeof value.sql === 'function');
+			}
+
+			function looksLikeFetchStrategy(value) {
+				if (!value || typeof value !== 'object' || Array.isArray(value))
+					return false;
+				if (isRawFilter(value))
+					return false;
+				if (Object.keys(value).length === 0)
+					return true;
+				if ('where' in value || 'orderBy' in value || 'limit' in value || 'offset' in value)
+					return true;
+				for (let key in value) {
+					const v = value[key];
+					if (typeof v === 'boolean')
+						return true;
+					if (v && typeof v === 'object' && !Array.isArray(v))
+						return true;
+				}
+				return false;
+			}
+
+			function isPrimaryKeyObject(meta, value) {
+				if (!value || typeof value !== 'object' || Array.isArray(value))
+					return false;
+				if (isRawFilter(value))
+					return false;
+				const keyNames = meta?.keys?.map(key => key.name);
+				if (!keyNames || keyNames.length === 0)
+					return false;
+				const keys = Object.keys(value);
+				if (keys.length === 0)
+					return false;
+				for (let i = 0; i < keys.length; i++) {
+					const key = keys[i];
+					if (!keyNames.includes(key))
+						return false;
+					const val = value[key];
+					if (val && typeof val === 'object' && !(val instanceof Date))
+						return false;
+				}
+				return true;
+			}
+
+			function normalizeGetOneArgs(meta, filter, strategy) {
+				if (looksLikeFetchStrategy(filter) && (strategy === undefined || !looksLikeFetchStrategy(strategy))) {
+					if (!isPrimaryKeyObject(meta, filter))
+						return { filter: strategy, strategy: filter };
+				}
+				return { filter, strategy };
+			}
+
 			async function getOne(filter, strategy) {
 				let metaPromise = getMeta();
-				strategy = extractFetchingStrategy({}, strategy);
+				let meta = await metaPromise;
+				let normalized = normalizeGetOneArgs(meta, filter, strategy);
+				filter = normalized.filter;
+				strategy = extractFetchingStrategy({}, normalized.strategy);
 				let _strategy = { ...strategy, ...{ limit: 1 } };
 				let args = [filter, _strategy].concat(Array.prototype.slice.call(arguments).slice(2));
 				let rows = await getManyCore.apply(null, args);
-				await metaPromise;
 				if (rows.length === 0)
 					return;
 				return proxify(rows[0], strategy, true);
@@ -3554,6 +3772,7 @@ function requireClient () {
 					return;
 
 				let body = stringify({ patch, options: { ...tableOptions, ...concurrencyOptions, strategy, deduceStrategy } });
+
 				let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
 				let { changed, strategy: newStrategy } = await adapter.patch(body);
 				copyInto(changed, [row]);
@@ -3765,6 +3984,8 @@ function requireClient () {
 		const handler = {
 			get(target, prop, receiver) {
 				const value = Reflect.get(target, prop, receiver);
+				if (value instanceof Date)
+					return value;
 				if (typeof value === 'object' && value !== null) {
 					return new Proxy(value, handler);
 				}
@@ -4268,7 +4489,7 @@ function requireNewColumn () {
 			alias = extractAlias(alias);
 			from = c.greaterThanOrEqual(context, from, alias);
 			to = c.lessThanOrEqual(context, to, alias);
-			return from.and(to);
+			return from.and(context, to);
 		};
 
 		c.in = function(context, arg, alias) {
@@ -5693,6 +5914,37 @@ function requireColumn () {
 			return c;
 		};
 
+		c.enum = function(values) {
+			let list = values;
+			if (Array.isArray(values))
+				list = values;
+			else if (values && typeof values === 'object') {
+				const keys = Object.keys(values);
+				const nonNumericKeys = keys.filter((key) => !/^-?\d+$/.test(key));
+				list = (nonNumericKeys.length ? nonNumericKeys : keys).map((key) => values[key]);
+			}
+			else
+				throw new Error('enum values must be an array');
+			const allowed = new Set(list);
+			column.enum = list;
+			function validate(value) {
+				if (value === undefined || value === null)
+					return;
+				if (!allowed.has(value)) {
+					const formatted = list.map((v) => JSON.stringify(v)).join(', ');
+					throw new Error(`Column ${column.alias} must be one of: ${formatted}`);
+				}
+			}
+			return c.validate(validate);
+		};
+
+		c.enum2 = function(...values) {
+			const list = values.length === 1 && Array.isArray(values[0])
+				? values[0]
+				: values;
+			return c.enum(list);
+		};
+
 		c.default = function(value) {
 			column.default = value;
 			return c;
@@ -5708,7 +5960,6 @@ function requireColumn () {
 			var oldAlias = column.alias;
 			table._aliases.delete(oldAlias);
 			table._aliases.add(alias);
-			delete table[oldAlias];
 			table[alias] = column;
 			column.alias = alias;
 			return c;
@@ -8799,6 +9050,7 @@ function requireGetRelatives$1 () {
 
 	function getRelatives(context, parent, relation) {
 		var queryContext = parent.queryContext;
+		var ctx = context === undefined ? null : context;
 		let strategy = queryContext && queryContext.strategy[relation.leftAlias];
 		var filter = emptyFilter;
 		if (relation.columns.length === 1)
@@ -8819,7 +9071,7 @@ function requireGetRelatives$1 () {
 			}
 
 			if (ids.length > 0)
-				filter = relation.childTable._primaryColumns[0].in(context, ids);
+				filter = relation.childTable._primaryColumns[0].in(ctx, ids);
 		}
 
 		function createCompositeFilter() {
@@ -8827,7 +9079,7 @@ function requireGetRelatives$1 () {
 			for (var i = 0; i < queryContext.rows.length; i++) {
 				keyFilter = rowToPrimaryKeyFilter(context, queryContext.rows[i], relation);
 				if (keyFilter)
-					filter = filter.or(context, keyFilter);
+					filter = filter.or(ctx, keyFilter);
 			}
 		}
 
@@ -9558,7 +9810,7 @@ function requireWhere$1 () {
 
 			try {
 				let arg = typeof fn === 'function' ? fn(table) : fn;
-				let anyFilter = negotiateRawSqlFilter(context, arg);
+				let anyFilter = negotiateRawSqlFilter(context, arg, table, true);
 				delete table._rootAlias;
 				return anyFilter;
 			}
@@ -9851,7 +10103,7 @@ function requireNewOneLeg () {
 		c.expand = relation.expand;
 
 		c.accept = function(visitor) {
-			visitor.visitOne(c);
+			return visitor.visitOne(c);
 		};
 
 		return c;
@@ -12215,7 +12467,7 @@ function requireWhere () {
 
 		function where(context, fn) {
 			let arg = typeof fn === 'function' ? fn(table) : fn;
-			return negotiateRawSqlFilter(context, arg);
+			return negotiateRawSqlFilter(context, arg, table, true);
 		}
 		return where;
 	}
@@ -12550,7 +12802,10 @@ function requireTable () {
 			row[property] = value;
 		};
 
-		table.delete = _delete.bind(null, table);
+		table.delete = function(context, ...rest) {
+			const args = [context, table, ...rest];
+			return _delete.apply(null, args);
+		};
 		table.cascadeDelete = function(context, ...rest) {
 			const args = [context, table, ...rest];
 			return cascadeDelete.apply(null, args);
@@ -12972,12 +13227,32 @@ function requireCommit () {
 	const getSessionSingleton = requireGetSessionSingleton();
 
 	function _commit(context, result) {
+		let hookError;
 		return popAndPushChanges()
+			.then(callAfterCommit)
 			.then(releaseDbClient.bind(null, context))
-			.then(onReleased);
+			.then(onReleased)
+			.then(throwHookErrorIfAny);
 
 		function onReleased() {
 			return result;
+		}
+
+		function throwHookErrorIfAny(res) {
+			if (hookError)
+				throw hookError;
+			return res;
+		}
+
+		function callAfterCommit() {
+			const hook = getSessionSingleton(context, 'afterCommitHook');
+			if (!hook)
+				return Promise.resolve();
+			return Promise.resolve()
+				.then(() => hook())
+				.catch((e) => {
+					hookError = e;
+				});
 		}
 
 		async function popAndPushChanges() {
@@ -13080,10 +13355,13 @@ function requireRollback () {
 	const getSessionSingleton = requireGetSessionSingleton();
 
 	function _rollback(context, e) {
+		let hookError;
 		var chain = resultToPromise()
 			.then(() => popChanges(context))
 			.then(executeRollback)
-			.then(() => releaseDbClient(context));
+			.then(callAfterRollback)
+			.then(() => releaseDbClient(context))
+			.then(throwHookErrorIfAny);
 
 
 		function executeRollback() {
@@ -13091,6 +13369,23 @@ function requireRollback () {
 			if (transactionLess)
 				return Promise.resolve();
 			return executeQuery(context, rollbackCommand);
+		}
+
+		function callAfterRollback() {
+			const hook = getSessionSingleton(context, 'afterRollbackHook');
+			if (!hook)
+				return Promise.resolve();
+			return Promise.resolve()
+				.then(() => hook(e))
+				.catch((err) => {
+					hookError = err;
+				});
+		}
+
+		function throwHookErrorIfAny(res) {
+			if (hookError)
+				throw hookError;
+			return res;
 		}
 
 		if (e) {
@@ -13953,6 +14248,7 @@ function requireNewTransaction$b () {
 		rdb.aggregateCount = 0;
 		rdb.quote = quote;
 		rdb.cache = {};
+		rdb.changes = [];
 
 		if (readonly) {
 			rdb.dbClient = {
@@ -14052,7 +14348,6 @@ function requireBegin () {
 	let setSessionSingleton = requireSetSessionSingleton();
 
 	function begin(context, transactionLess) {
-		setSessionSingleton(context, 'changes', []);
 		if (transactionLess) {
 			setSessionSingleton(context, 'transactionLess', true);
 			return Promise.resolve();
@@ -14871,7 +15166,6 @@ function requireNewDatabase$b () {
 	let hostLocal = requireHostLocal();
 	let doQuery = requireQuery();
 	let releaseDbClient = requireReleaseDbClient();
-	let setSessionSingleton = requireSetSessionSingleton();
 
 	function newDatabase(connectionString, poolOptions) {
 		if (!connectionString)
@@ -14888,10 +15182,9 @@ function requireNewDatabase$b () {
 			}
 			let domain = createDomain();
 
-			if (fn)
-				return domain.run(runInTransaction);
-			else
-				return domain.run(run);
+			if (!fn)
+				throw new Error('transaction requires a function');
+			return domain.run(runInTransaction);
 
 			async function runInTransaction() {
 				let result;
@@ -14909,13 +15202,6 @@ function requireNewDatabase$b () {
 				return _begin(domain, options);
 			}
 
-			function run() {
-				let p;
-				let transaction = newTransaction(domain, pool, options);
-				p = new Promise(transaction);
-
-				return p.then(begin);
-			}
 
 		};
 
@@ -14941,7 +15227,6 @@ function requireNewDatabase$b () {
 			let domain = createDomain();
 			let transaction = newTransaction(domain, pool);
 			let p = domain.run(() => new Promise(transaction)
-				.then(() => setSessionSingleton(domain, 'changes', []))
 				.then(() => doQuery(domain, query).then(onResult, onError)));
 			return p;
 
@@ -15387,6 +15672,7 @@ function requireNewTransaction$a () {
 		rdb.aggregateCount = 0;
 		rdb.quote = quote;
 		rdb.cache = {};
+		rdb.changes = [];
 
 		if (readonly) {
 			rdb.dbClient = {
@@ -15629,7 +15915,6 @@ function requireNewDatabase$a () {
 	let hostLocal = requireHostLocal();
 	let doQuery = requireQuery();
 	let releaseDbClient = requireReleaseDbClient();
-	let setSessionSingleton = requireSetSessionSingleton();
 
 	function newDatabase(connectionString, poolOptions) {
 		poolOptions = poolOptions || { min: 1 };
@@ -15644,10 +15929,9 @@ function requireNewDatabase$a () {
 			}
 			let domain = createDomain();
 
-			if (fn)
-				return domain.run(runInTransaction);
-			else
-				return domain.run(run);
+			if (!fn)
+				throw new Error('transaction requires a function');
+			return domain.run(runInTransaction);
 
 			async function runInTransaction() {
 				let result;
@@ -15666,14 +15950,6 @@ function requireNewDatabase$a () {
 				return _begin(domain, options);
 			}
 
-			function run() {
-				let p;
-				let transaction = newTransaction(domain, pool, options);
-				p = new Promise(transaction);
-
-				return p.then(begin)
-					.then(negotiateSchema);
-			}
 
 			function negotiateSchema(previous) {
 				let schema = options && options.schema;
@@ -15714,7 +15990,6 @@ function requireNewDatabase$a () {
 			let domain = createDomain();
 			let transaction = newTransaction(domain, pool);
 			let p = domain.run(() => new Promise(transaction)
-				.then(() => setSessionSingleton(domain, 'changes', []))
 				.then(() => doQuery(domain, query).then(onResult, onError)));
 			return p;
 
@@ -16149,6 +16424,7 @@ function requireNewTransaction$9 () {
 		rdb.aggregateCount = 0;
 		rdb.quote = quote;
 		rdb.cache = {};
+		rdb.changes = [];
 
 		if (readonly) {
 			rdb.dbClient = {
@@ -16370,7 +16646,6 @@ function requireNewDatabase$9 () {
 	let hostLocal = requireHostLocal();
 	let doQuery = requireQuery();
 	let releaseDbClient = requireReleaseDbClient();
-	let setSessionSingleton = requireSetSessionSingleton();
 
 	function newDatabase(connectionString, poolOptions) {
 		if (!connectionString)
@@ -16387,10 +16662,9 @@ function requireNewDatabase$9 () {
 			}
 			let domain = createDomain();
 
-			if (fn)
-				return domain.run(runInTransaction);
-			else
-				return domain.run(run);
+			if (!fn)
+				throw new Error('transaction requires a function');
+			return domain.run(runInTransaction);
 
 			async function runInTransaction() {
 				let result;
@@ -16409,14 +16683,6 @@ function requireNewDatabase$9 () {
 				return _begin(domain, options);
 			}
 
-			function run() {
-				let p;
-				let transaction = newTransaction(domain, pool, options);
-				p = new Promise(transaction);
-
-				return p.then(begin)
-					.then(negotiateSchema);
-			}
 
 			function negotiateSchema(previous) {
 				let schema = options && options.schema;
@@ -16457,7 +16723,6 @@ function requireNewDatabase$9 () {
 			let domain = createDomain();
 			let transaction = newTransaction(domain, pool);
 			let p = domain.run(() => new Promise(transaction)
-				.then(() => setSessionSingleton(domain, 'changes', []))
 				.then(() => doQuery(domain, query).then(onResult, onError)));
 			return p;
 
@@ -16635,6 +16900,7 @@ function requireNewTransaction$8 () {
 		rdb.aggregateCount = 0;
 		rdb.quote = quote;
 		rdb.cache = {};
+		rdb.changes = [];
 
 		if (readonly) {
 			rdb.dbClient = {
@@ -16900,7 +17166,6 @@ function requireNewDatabase$8 () {
 	let hostLocal = requireHostLocal();
 	let doQuery = requireQuery();
 	let releaseDbClient = requireReleaseDbClient();
-	let setSessionSingleton = requireSetSessionSingleton();
 
 	function newDatabase(connectionString, poolOptions) {
 		if (!connectionString)
@@ -16917,10 +17182,9 @@ function requireNewDatabase$8 () {
 			}
 			let domain = createDomain();
 
-			if (fn)
-				return domain.run(runInTransaction);
-			else
-				return domain.run(run);
+			if (!fn)
+				throw new Error('transaction requires a function');
+			return domain.run(runInTransaction);
 
 			async function runInTransaction() {
 				let result;
@@ -16937,15 +17201,6 @@ function requireNewDatabase$8 () {
 
 			function begin() {
 				return _begin(domain, options);
-			}
-
-			function run() {
-				let p;
-				let transaction = newTransaction(domain, pool, options);
-				p = new Promise(transaction);
-
-				return p.then(begin)
-					.then(negotiateSchema);
 			}
 
 			function negotiateSchema(previous) {
@@ -16987,7 +17242,6 @@ function requireNewDatabase$8 () {
 			let domain = createDomain();
 			let transaction = newTransaction(domain, pool);
 			let p = domain.run(() => new Promise(transaction)
-				.then(() => setSessionSingleton(domain, 'changes', []))
 				.then(() => doQuery(domain, query).then(onResult, onError)));
 			return p;
 
@@ -17391,6 +17645,7 @@ function requireNewTransaction$7 () {
 		rdb.aggregateCount = 0;
 		rdb.quote = quote;
 		rdb.cache = {};
+		rdb.changes = [];
 
 		if (readonly) {
 			rdb.dbClient = {
@@ -17587,8 +17842,8 @@ function requireNewDatabase$7 () {
 	let express = requireHostExpress();
 	let hostLocal = requireHostLocal();
 	let doQuery = requireQuery();
+	let doSqliteFunction = requireSqliteFunction();
 	let releaseDbClient = requireReleaseDbClient();
-	let setSessionSingleton = requireSetSessionSingleton();
 
 	function newDatabase(connectionString, poolOptions) {
 		if (!connectionString)
@@ -17604,11 +17859,9 @@ function requireNewDatabase$7 () {
 				options = undefined;
 			}
 			let domain = createDomain();
-
-			if (fn)
-				return domain.run(runInTransaction);
-			else
-				return domain.run(run);
+			if (!fn)
+				throw new Error('transaction requires a function');
+			return domain.run(runInTransaction);
 
 			function begin() {
 				return _begin(domain, options);
@@ -17622,17 +17875,10 @@ function requireNewDatabase$7 () {
 					.then(() => fn(domain))
 					.then((res) => result = res)
 					.then(() => commit(domain))
-					.then(null, (e) => rollback(domain, e));
+					.then(null, (e) => Promise.resolve(rollback(domain, e)));
 				return result;
 			}
 
-			function run() {
-				let p;
-				let transaction = newTransaction(domain, pool, options);
-				p = new Promise(transaction);
-
-				return p.then(begin);
-			}
 
 		};
 
@@ -17640,12 +17886,15 @@ function requireNewDatabase$7 () {
 			let domain = createDomain();
 			let transaction = newTransaction(domain, pool);
 			let p = domain.run(() => new Promise(transaction).then(begin));
-
 			function run(fn) {
 				return p.then(() => fn(domain));
 			}
-			run.rollback = rollback.bind(null, domain);
-			run.commit = commit.bind(null, domain);
+			run.rollback = function(error) {
+				return Promise.resolve(rollback(domain, error));
+			};
+			run.commit = function() {
+				return Promise.resolve(commit(domain));
+			};
 			return run;
 
 			function begin() {
@@ -17657,7 +17906,6 @@ function requireNewDatabase$7 () {
 			let domain = createDomain();
 			let transaction = newTransaction(domain, pool);
 			let p = domain.run(() => new Promise(transaction)
-				.then(() => setSessionSingleton(domain, 'changes', []))
 				.then(() => doQuery(domain, query).then(onResult, onError)));
 			return p;
 
@@ -17672,6 +17920,23 @@ function requireNewDatabase$7 () {
 			}
 		};
 
+		c.sqliteFunction = function(...args) {
+			let domain = createDomain();
+			let transaction = newTransaction(domain, pool);
+			let p = domain.run(() => new Promise(transaction)
+				.then(() => doSqliteFunction(domain, ...args).then(onResult, onError)));
+			return p;
+
+			function onResult(result) {
+				releaseDbClient(domain);
+				return result;
+			}
+
+			function onError(e) {
+				releaseDbClient(domain);
+				throw e;
+			}
+		};
 
 		c.rollback = rollback;
 		c.commit = commit;
@@ -17812,6 +18077,7 @@ function requireNewTransaction$6 () {
 		rdb.aggregateCount = 0;
 		rdb.quote = quote;
 		rdb.cache = {};
+		rdb.changes = [];
 
 		if (readonly) {
 			rdb.dbClient = {
@@ -17991,8 +18257,8 @@ function requireNewDatabase$6 () {
 	let express = requireHostExpress();
 	let hostLocal = requireHostLocal();
 	let doQuery = requireQuery();
+	let doSqliteFunction = requireSqliteFunction();
 	let releaseDbClient = requireReleaseDbClient();
-	let setSessionSingleton = requireSetSessionSingleton();
 
 	function newDatabase(connectionString, poolOptions) {
 		if (!connectionString)
@@ -18009,10 +18275,9 @@ function requireNewDatabase$6 () {
 			}
 			let domain = createDomain();
 
-			if (fn)
-				return domain.run(runInTransaction);
-			else
-				return domain.run(run);
+			if (!fn)
+				throw new Error('transaction requires a function');
+			return domain.run(runInTransaction);
 
 			function begin() {
 				return _begin(domain, options);
@@ -18030,13 +18295,6 @@ function requireNewDatabase$6 () {
 				return result;
 			}
 
-			function run() {
-				let p;
-				let transaction = newTransaction(domain, pool, options);
-				p = new Promise(transaction);
-
-				return p.then(begin);
-			}
 
 		};
 
@@ -18061,8 +18319,25 @@ function requireNewDatabase$6 () {
 			let domain = createDomain();
 			let transaction = newTransaction(domain, pool);
 			let p = domain.run(() => new Promise(transaction)
-				.then(() => setSessionSingleton(domain, 'changes', []))
 				.then(() => doQuery(domain, query).then(onResult, onError)));
+			return p;
+
+			function onResult(result) {
+				releaseDbClient(domain);
+				return result;
+			}
+
+			function onError(e) {
+				releaseDbClient(domain);
+				throw e;
+			}
+		};
+
+		c.sqliteFunction = function(...args) {
+			let domain = createDomain();
+			let transaction = newTransaction(domain, pool);
+			let p = domain.run(() => new Promise(transaction)
+				.then(() => doSqliteFunction(domain, ...args).then(onResult, onError)));
 			return p;
 
 			function onResult(result) {
@@ -18235,6 +18510,7 @@ function requireNewTransaction$5 () {
 		rdb.aggregateCount = 0;
 		rdb.quote = quote;
 		rdb.cache = {};
+		rdb.changes = [];
 
 		if (readonly) {
 			rdb.dbClient = {
@@ -18436,8 +18712,8 @@ function requireNewDatabase$5 () {
 	let express = requireHostExpress();
 	let hostLocal = requireHostLocal();
 	let doQuery = requireQuery();
+	let doSqliteFunction = requireSqliteFunction();
 	let releaseDbClient = requireReleaseDbClient();
-	let setSessionSingleton = requireSetSessionSingleton();
 
 	function newDatabase(connectionString, poolOptions) {
 		if (!connectionString)
@@ -18454,10 +18730,9 @@ function requireNewDatabase$5 () {
 			}
 			let domain = createDomain();
 
-			if (fn)
-				return domain.run(runInTransaction);
-			else
-				return domain.run(run);
+			if (!fn)
+				throw new Error('transaction requires a function');
+			return domain.run(runInTransaction);
 
 			function begin() {
 				return _begin(domain, options);
@@ -18475,13 +18750,6 @@ function requireNewDatabase$5 () {
 				return result;
 			}
 
-			function run() {
-				let p;
-				let transaction = newTransaction(domain, pool, options);
-				p = new Promise(transaction);
-
-				return p.then(begin);
-			}
 
 		};
 
@@ -18506,8 +18774,25 @@ function requireNewDatabase$5 () {
 			let domain = createDomain();
 			let transaction = newTransaction(domain, pool);
 			let p = domain.run(() => new Promise(transaction)
-				.then(() => setSessionSingleton(domain, 'changes', []))
 				.then(() => doQuery(domain, query).then(onResult, onError)));
+			return p;
+
+			function onResult(result) {
+				releaseDbClient(domain);
+				return result;
+			}
+
+			function onError(e) {
+				releaseDbClient(domain);
+				throw e;
+			}
+		};
+
+		c.sqliteFunction = function(...args) {
+			let domain = createDomain();
+			let transaction = newTransaction(domain, pool);
+			let p = domain.run(() => new Promise(transaction)
+				.then(() => doSqliteFunction(domain, ...args).then(onResult, onError)));
 			return p;
 
 			function onResult(result) {
@@ -18660,6 +18945,7 @@ function requireNewTransaction$4 () {
 		rdb.aggregateCount = 0;
 		rdb.quote = (name) => `"${name}"`;
 		rdb.cache = {};
+		rdb.changes = [];
 
 		if (readonly) {
 			rdb.dbClient = {
@@ -18847,7 +19133,6 @@ function requireNewDatabase$4 () {
 	let hostLocal = requireHostLocal();
 	let doQuery = requireQuery();
 	let releaseDbClient = requireReleaseDbClient();
-	let setSessionSingleton = requireSetSessionSingleton();
 
 	function newDatabase(d1Database, poolOptions) {
 		if (!d1Database)
@@ -18864,10 +19149,9 @@ function requireNewDatabase$4 () {
 			}
 			let domain = createDomain();
 
-			if (fn)
-				return domain.run(runInTransaction);
-			else
-				return domain.run(run);
+			if (!fn)
+				throw new Error('transaction requires a function');
+			return domain.run(runInTransaction);
 
 			async function runInTransaction() {
 				let result;
@@ -18886,13 +19170,6 @@ function requireNewDatabase$4 () {
 				return _begin(domain, transactionLess);
 			}
 
-			function run() {
-				let p;
-				let transaction = newTransaction(domain, pool, options);
-				p = new Promise(transaction);
-
-				return p.then(begin);
-			}
 
 		};
 
@@ -18920,7 +19197,6 @@ function requireNewDatabase$4 () {
 			let domain = createDomain();
 			let transaction = newTransaction(domain, pool);
 			let p = domain.run(() => new Promise(transaction)
-				.then(() => setSessionSingleton(domain, 'changes', []))
 				.then(() => doQuery(domain, query).then(onResult, onError)));
 			return p;
 
@@ -19410,7 +19686,7 @@ function requireOutputInsertedSql () {
 
 		function formatColumn(column) {
 			if (column.formatOut)
-				return column.formatOut(context, 'INSERTED');
+				return `${column.formatOut(context, 'INSERTED')} AS [${column._dbName}]`;
 			else
 				return `INSERTED.[${column._dbName}]`;
 		}
@@ -19661,6 +19937,7 @@ function requireNewTransaction$3 () {
 		rdb.aggregateCount = 0;
 		rdb.quote = quote;
 		rdb.cache = {};
+		rdb.changes = [];
 
 		if (readonly) {
 			rdb.dbClient = {
@@ -19874,7 +20151,6 @@ function requireNewDatabase$3 () {
 	let hostLocal = requireHostLocal();
 	let doQuery = requireQuery();
 	let releaseDbClient = requireReleaseDbClient();
-	let setSessionSingleton = requireSetSessionSingleton();
 
 	function newDatabase(connectionString, poolOptions) {
 		if (!connectionString)
@@ -19891,10 +20167,9 @@ function requireNewDatabase$3 () {
 			}
 			let domain = createDomain();
 
-			if (fn)
-				return domain.run(runInTransaction);
-			else
-				return domain.run(run);
+			if (!fn)
+				throw new Error('transaction requires a function');
+			return domain.run(runInTransaction);
 
 			async function runInTransaction() {
 				let result;
@@ -19912,13 +20187,6 @@ function requireNewDatabase$3 () {
 				return _begin(domain, options);
 			}
 
-			function run() {
-				let p;
-				let transaction = newTransaction(domain, pool, options);
-				p = new Promise(transaction);
-
-				return p.then(begin);
-			}
 
 		};
 
@@ -19947,7 +20215,6 @@ function requireNewDatabase$3 () {
 			let domain = createDomain();
 			let transaction = newTransaction(domain, pool);
 			let p = domain.run(() => new Promise(transaction)
-				.then(() => setSessionSingleton(domain, 'changes', []))
 				.then(() => doQuery(domain, query).then(onResult, onError)));
 			return p;
 
@@ -20000,18 +20267,28 @@ function requireWrapQuery$1 () {
 		return runQuery;
 
 		function runQuery(query, onCompleted) {
-			if (!CachedRequest || !CachedTypes) {
-				import('tedious')
-					.then(({ Request, TYPES }) => {
-						CachedRequest = Request;
-						CachedTypes = TYPES;
-						doQuery(query, onCompleted);
-					})
-					.catch(err => onCompleted(extractError(err), []));
-			}
-			else {
-				doQuery(query, onCompleted);
-			}
+			enqueue(function(done) {
+				function safeCompleted(err, rows) {
+					try {
+						onCompleted(err, rows);
+					} finally {
+						done();
+					}
+				}
+
+				if (!CachedRequest || !CachedTypes) {
+					import('tedious')
+						.then(({ Request, TYPES }) => {
+							CachedRequest = Request;
+							CachedTypes = TYPES;
+							doQuery(query, safeCompleted);
+						})
+						.catch(err => safeCompleted(extractError(err), []));
+				}
+				else {
+					doQuery(query, safeCompleted);
+				}
+			});
 		}
 
 		function doQuery(query, onCompleted) {
@@ -20112,6 +20389,19 @@ function requireWrapQuery$1 () {
 				}
 			}
 		}
+
+		function enqueue(task) {
+			if (!connection.__orangeOrmQueue)
+				connection.__orangeOrmQueue = Promise.resolve();
+			connection.__orangeOrmQueue = connection.__orangeOrmQueue.then(() => new Promise((resolve) => {
+				try {
+					task(resolve);
+				}
+				catch (_e) {
+					resolve();
+				}
+			})).catch(() => {});
+		}
 	}
 
 	// Helper functions remain the same
@@ -20191,17 +20481,27 @@ function requireWrapCommand$1 () {
 		return runQuery;
 
 		function runQuery(query, onCompleted) {
-			if (!CachedRequest || !CachedTypes) {
-				import('tedious')
-					.then(({ Request, TYPES }) => {
-						CachedRequest = Request;
-						CachedTypes = TYPES;
-						doQuery(query, onCompleted);
-					})
-					.catch((err) => onCompleted(extractError(err), { rowsAffected: 0 }));
-			} else {
-				doQuery(query, onCompleted);
-			}
+			enqueue(function(done) {
+				function safeCompleted(err, result) {
+					try {
+						onCompleted(err, result);
+					} finally {
+						done();
+					}
+				}
+
+				if (!CachedRequest || !CachedTypes) {
+					import('tedious')
+						.then(({ Request, TYPES }) => {
+							CachedRequest = Request;
+							CachedTypes = TYPES;
+							doQuery(query, safeCompleted);
+						})
+						.catch((err) => safeCompleted(extractError(err), { rowsAffected: 0 }));
+				} else {
+					doQuery(query, safeCompleted);
+				}
+			});
 		}
 
 		function doQuery(query, onCompleted) {
@@ -20253,6 +20553,19 @@ function requireWrapCommand$1 () {
 				if (err) return onCompleted(extractError(err), { rowsAffected: 0 });
 				return onCompleted(null, { rowsAffected: affectedRows });
 			}
+		}
+
+		function enqueue(task) {
+			if (!connection.__orangeOrmQueue)
+				connection.__orangeOrmQueue = Promise.resolve();
+			connection.__orangeOrmQueue = connection.__orangeOrmQueue.then(() => new Promise((resolve) => {
+				try {
+					task(resolve);
+				}
+				catch (_e) {
+					resolve();
+				}
+			})).catch(() => {});
 		}
 	}
 
@@ -20385,6 +20698,7 @@ function requireNewTransaction$2 () {
 		rdb.aggregateCount = 0;
 		rdb.quote = quote;
 		rdb.cache = {};
+		rdb.changes = [];
 
 		if (readonly) {
 			rdb.dbClient = {
@@ -20643,7 +20957,6 @@ function requireNewDatabase$2 () {
 	let hostLocal = requireHostLocal();
 	let doQuery = requireQuery();
 	let releaseDbClient = requireReleaseDbClient();
-	let setSessionSingleton = requireSetSessionSingleton();
 
 	function newDatabase(connectionString, poolOptions) {
 		if (!connectionString)
@@ -20660,10 +20973,9 @@ function requireNewDatabase$2 () {
 			}
 			let domain = createDomain();
 
-			if (fn)
-				return domain.run(runInTransaction);
-			else
-				return domain.run(run);
+			if (!fn)
+				throw new Error('transaction requires a function');
+			return domain.run(runInTransaction);
 
 			function begin() {
 				return _begin(domain, options);
@@ -20682,13 +20994,6 @@ function requireNewDatabase$2 () {
 			}
 
 
-			function run() {
-				let p;
-				let transaction = newTransaction(domain, pool, options);
-				p = new Promise(transaction);
-
-				return p.then(begin);
-			}
 
 		};
 
@@ -20716,7 +21021,6 @@ function requireNewDatabase$2 () {
 			let domain = createDomain();
 			let transaction = newTransaction(domain, pool);
 			let p = domain.run(() => new Promise(transaction)
-				.then(() => setSessionSingleton(domain, 'changes', []))
 				.then(() => doQuery(domain, query).then(onResult, onError)));
 			return p;
 
@@ -21157,6 +21461,7 @@ function requireNewTransaction$1 () {
 		rdb.aggregateCount = 0;
 		rdb.quote = quote;
 		rdb.cache = {};
+		rdb.changes = [];
 
 		if (readonly) {
 			rdb.dbClient = {
@@ -21294,7 +21599,6 @@ function requireNewDatabase$1 () {
 	let hostLocal = requireHostLocal();
 	let doQuery = requireQuery();
 	let releaseDbClient = requireReleaseDbClient();
-	let setSessionSingleton = requireSetSessionSingleton();
 
 	function newDatabase(connectionString, poolOptions) {
 		if (!connectionString)
@@ -21311,10 +21615,9 @@ function requireNewDatabase$1 () {
 			}
 			let domain = createDomain();
 
-			if (fn)
-				return domain.run(runInTransaction);
-			else
-				return domain.run(run);
+			if (!fn)
+				throw new Error('transaction requires a function');
+			return domain.run(runInTransaction);
 
 
 			function begin() {
@@ -21334,13 +21637,6 @@ function requireNewDatabase$1 () {
 
 			}
 
-			function run() {
-				let p;
-				let transaction = newTransaction(domain, pool, options);
-				p = new Promise(transaction);
-
-				return p.then(begin);
-			}
 
 		};
 
@@ -21370,7 +21666,6 @@ function requireNewDatabase$1 () {
 			let domain = createDomain();
 			let transaction = newTransaction(domain, pool);
 			let p = domain.run(() => new Promise(transaction)
-				.then(() => setSessionSingleton(domain, 'changes', []))
 				.then(() => doQuery(domain, query).then(onResult, onError)));
 			return p;
 
@@ -21960,6 +22255,7 @@ function requireNewTransaction () {
 		rdb.aggregateCount = 0;
 		rdb.quote = quote;
 		rdb.cache = {};
+		rdb.changes = [];
 
 		if (readonly) {
 			rdb.dbClient = {
@@ -22168,7 +22464,6 @@ function requireNewDatabase () {
 	let hostLocal = requireHostLocal();
 	let doQuery = requireQuery();
 	let releaseDbClient = requireReleaseDbClient();
-	let setSessionSingleton = requireSetSessionSingleton();
 
 	function newDatabase(connectionString, poolOptions) {
 		if (!connectionString)
@@ -22185,10 +22480,9 @@ function requireNewDatabase () {
 			}
 			let domain = createDomain();
 
-			if (fn)
-				return domain.run(runInTransaction);
-			else
-				return domain.run(run);
+			if (!fn)
+				throw new Error('transaction requires a function');
+			return domain.run(runInTransaction);
 
 
 			function begin() {
@@ -22208,13 +22502,6 @@ function requireNewDatabase () {
 
 			}
 
-			function run() {
-				let p;
-				let transaction = newTransaction(domain, pool, options);
-				p = new Promise(transaction);
-
-				return p.then(begin);
-			}
 
 		};
 
@@ -22239,7 +22526,6 @@ function requireNewDatabase () {
 			let domain = createDomain();
 			let transaction = newTransaction(domain, pool);
 			let p = domain.run(() => new Promise(transaction)
-				.then(() => setSessionSingleton(domain, 'changes', []))
 				.then(() => doQuery(domain, query).then(onResult, onError)));
 			return p;
 
