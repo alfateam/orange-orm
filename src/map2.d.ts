@@ -10,6 +10,7 @@ export type ORMColumnType = 'string' | 'bigint' | 'uuid' | 'date' | 'numeric' | 
 // Base column definition with space-prefixed required properties
 export type ORMColumnDefinition = {
   ' type': ORMColumnType;
+  ' enum'?: readonly (string | number | boolean | Date)[] | Record<string, string | number | boolean | Date>;
   ' notNull'?: boolean;
   ' notNullExceptInsert'?: boolean;
 };
@@ -24,7 +25,7 @@ export type ORMJsonColumnDefinition<T = any> = {
 
 type NormalizeColumn<T> =
   T extends ORMColumnType
-  ? { ' type': T; ' notNull'?: boolean; ' notNullExceptInsert'?: boolean }
+  ? { ' type': T; ' enum'?: readonly (string | number | boolean | Date)[] | Record<string, string | number | boolean | Date>; ' notNull'?: boolean; ' notNullExceptInsert'?: boolean }
   : T extends { ' type': ORMColumnType }
   ? { ' notNull'?: boolean; ' notNullExceptInsert'?: boolean } & T
   : T extends { ' type': 'json'; ' tsType': any }
@@ -41,6 +42,8 @@ type IsRequiredInsert<CT> =
   : false; // Otherwise, it's optional
 
 type ColumnTypeToTS<CT> =
+  NormalizeColumn<CT> extends { ' enum': readonly (infer E)[] } ? E :
+  NormalizeColumn<CT> extends { ' enum': Record<string, infer E> } ? E :
   NormalizeColumn<CT>[' type'] extends 'numeric' ? number :
   NormalizeColumn<CT>[' type'] extends 'boolean' ? boolean :
   NormalizeColumn<CT>[' type'] extends 'json'
@@ -163,7 +166,7 @@ type BaseFetchStrategy<M extends Record<string, TableDefinition<M>>, K extends k
   orderBy?: OrderBy<M, K>;
   limit?: number;
   offset?: number;
-  where?: WhereFunc<M, K>;
+  where?: WhereClause<M, K>;
 };
 
 export type PrimaryKeyObject<M extends Record<string, TableDefinition<M>>, K extends keyof M> =
@@ -341,18 +344,25 @@ export type AggregateStrategy<M extends Record<string, TableDefinition<M>>, K ex
   BaseAggregateStrategy<M, K>
   | CustomAggregateSelectors<M, K>;
 
-type WhereFunc<M extends Record<string, TableDefinition<M>>, K extends keyof M> = (row: RootTableRefs<M, K>) => RawFilter | Array<PrimaryKeyObject<M, K>>;
+type WhereFilter<M extends Record<string, TableDefinition<M>>, K extends keyof M> =
+  RawFilter | Array<PrimaryKeyObject<M, K>>;
+
+type WhereFunc<M extends Record<string, TableDefinition<M>>, K extends keyof M> =
+  (row: RootTableRefs<M, K>) => WhereFilter<M, K>;
+
+type WhereClause<M extends Record<string, TableDefinition<M>>, K extends keyof M> =
+  WhereFilter<M, K> | WhereFunc<M, K> | (() => WhereFilter<M, K>);
 
 type BaseAggregateStrategy<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
   limit?: number;
   offset?: number;
-  where?: WhereFunc<M, K>;
+  where?: WhereClause<M, K>;
 };
 
 type CustomAggregateSelectors<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
   [key: string]: (row: RootSelectionRefs<M, K>) => ValidSelectorReturnTypes<M, K>;
 } & {
-  where?: WhereFunc<M, K>;
+  where?: WhereClause<M, K>;
 } & {
   // Explicitly prevent limit/offset in selectors
   limit?: never;
@@ -674,41 +684,33 @@ type AggregateCustomSelectorProperties<M extends Record<string, TableDefinition<
 
 export type TableClient<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
   // Array methods - return arrays with array-level active record methods, but individual items are plain
-  getAll(): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, {}>>>, M, K>>;
-  getAll<strategy extends FetchStrategy<M, K>>(strategy: strategy): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, strategy>>>, M, K>>;
-  getMany(filter?: RawFilter | Array<PrimaryKeyObject<M, K>>): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, {}>>>, M, K>>;
-  getMany<strategy extends FetchStrategy<M, K>>(filter?: RawFilter | Array<PrimaryKeyObject<M, K>>, strategy?: strategy): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, strategy>>>, M, K>>;
+  getMany<strategy extends FetchStrategy<M, K>>(strategy?: strategy): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, strategy>>>, M, K>>;
 
   // Aggregate methods - return plain objects (no active record methods)
   aggregate<strategy extends AggregateStrategy<M, K>>(strategy: strategy): Promise<Array<DeepExpand<AggregateCustomSelectorProperties<M, K, strategy>>>>;
 
   // Single item methods - return individual objects with individual active record methods
   getOne<strategy extends FetchStrategy<M, K>>(
-    filter?: RawFilter | Array<PrimaryKeyObject<M, K>>
-  ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K>>;
-
-  getOne<strategy extends FetchStrategy<M, K>>(
-    filter?: RawFilter | Array<PrimaryKeyObject<M, K>>,
     strategy?: strategy
-  ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K>>;
+  ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K> | undefined>;
 
   getById<strategy extends FetchStrategy<M, K>>(
     ...args: [...PrimaryKeyArgs<M, K>, strategy: strategy]
-  ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K>>;
+  ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K> | undefined>;
 
   getById(
     ...args: [...PrimaryKeyArgs<M, K>]
-  ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, {}>>, M, K>>;
+  ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, {}>>, M, K>  | undefined>;
 
   // UPDATED: Bulk update methods with relations support
   update(
     row: UpdateRowWithRelations<M, K>,
-    opts: { where: (row: RootTableRefs<M, K>) => RawFilter }
+    opts: { where: WhereClause<M, K> }
   ): Promise<void>;
 
   update<strategy extends FetchStrategy<M, K>>(
     row: UpdateRowWithRelations<M, K>,
-    opts: { where: (row: RootTableRefs<M, K>) => RawFilter },
+    opts: { where: WhereClause<M, K> },
     strategy: strategy
   ): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, strategy>>>, M, K>>;
 
@@ -903,6 +905,10 @@ export type DBClient<M extends Record<string, TableDefinition<M>>> = {
   and(f: Filter | RawFilter[], ...filters: RawFilter[]): Filter;
   or(f: Filter | RawFilter[], ...filters: RawFilter[]): Filter;
   not(): Filter;
+  /**
+   * Register a user-defined SQLite function on the connection.
+   */
+  function(name: string, fn: (...args: any[]) => unknown): Promise<unknown> | void;
   query(filter: RawFilter | string): Promise<unknown[]>;
   query<T>(filter: RawFilter | string): Promise<T[]>;
   createPatch(original: any[], modified: any[]): JsonPatch;
@@ -924,10 +930,23 @@ type ExpressConfig<M extends Record<string, TableDefinition<M>>> = {
   [TableName in keyof M]?: ExpressTableConfig<M>;
 } & {
   db?: Pool | ((connectors: Connectors) => Pool | Promise<Pool>);
+  hooks?: ExpressHooks<M>;
 }
 
 type ExpressTableConfig<M extends Record<string, TableDefinition<M>>> = {
   baseFilter?: RawFilter | ((db: DBClient<M>, req: import('express').Request, res: import('express').Response) => RawFilter);
+}
+
+type ExpressTransactionHooks<M extends Record<string, TableDefinition<M>>> = {
+  beforeBegin?: (db: DBClient<M>, req: import('express').Request, res: import('express').Response) => void | Promise<void>;
+  afterBegin?: (db: DBClient<M>, req: import('express').Request, res: import('express').Response) => void | Promise<void>;
+  beforeCommit?: (db: DBClient<M>, req: import('express').Request, res: import('express').Response) => void | Promise<void>;
+  afterCommit?: (db: DBClient<M>, req: import('express').Request, res: import('express').Response) => void | Promise<void>;
+  afterRollback?: (db: DBClient<M>, req: import('express').Request, res: import('express').Response, error?: unknown) => void | Promise<void>;
+}
+
+type ExpressHooks<M extends Record<string, TableDefinition<M>>> = ExpressTransactionHooks<M> & {
+  transaction?: ExpressTransactionHooks<M>;
 }
 
 export type DeepExpand<T> =

@@ -6,12 +6,32 @@ let popChanges = require('./popChanges');
 const getSessionSingleton = require('./getSessionSingleton');
 
 function _commit(context, result) {
+	let hookError;
 	return popAndPushChanges()
+		.then(callAfterCommit)
 		.then(releaseDbClient.bind(null, context))
-		.then(onReleased);
+		.then(onReleased)
+		.then(throwHookErrorIfAny);
 
 	function onReleased() {
 		return result;
+	}
+
+	function throwHookErrorIfAny(res) {
+		if (hookError)
+			throw hookError;
+		return res;
+	}
+
+	function callAfterCommit() {
+		const hook = getSessionSingleton(context, 'afterCommitHook');
+		if (!hook)
+			return Promise.resolve();
+		return Promise.resolve()
+			.then(() => hook())
+			.catch((e) => {
+				hookError = e;
+			});
 	}
 
 	async function popAndPushChanges() {

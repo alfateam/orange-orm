@@ -11,7 +11,7 @@ function newWhere(_relations, _depth) {
 
 		try {
 			let arg = typeof fn === 'function' ? fn(table) : fn;
-			let anyFilter = negotiateRawSqlFilter(context, arg);
+			let anyFilter = negotiateRawSqlFilter(context, arg, table, true);
 			delete table._rootAlias;
 			return anyFilter;
 		}

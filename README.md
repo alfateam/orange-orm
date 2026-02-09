@@ -51,7 +51,7 @@ Watch the [tutorial video on YouTube](https://youtu.be/1IwwjPr2lMs)
 ![Relations diagram](./docs/diagram.svg)  
 
 <sub>📄 map.ts</sub>
-```javascript
+```ts
 import orange from 'orange-orm';
 
 const map = orange.map(x => ({
@@ -88,7 +88,7 @@ const map = orange.map(x => ({
     street: column('street').string(),
     postalCode: column('postalCode').string(),
     postalPlace: column('postalPlace').string(),
-    countryCode: column('countryCode').string(),
+    countryCode: column('countryCode').string().enum(['NO', 'SE', 'DK', 'FI', 'IS', 'DE', 'FR', 'NL', 'ES', 'IT']),
   }))
 
 })).map(x => ({
@@ -106,7 +106,7 @@ export default map;
 ```  
 <sub>📄 update.ts</sub>
 
-```javascript
+```ts
 import map from './map';
 const db = map.sqlite('demo.db');
 
@@ -127,14 +127,14 @@ async function updateRow() {
 ```
 <sub>📄 filter.ts</sub>
 
-```javascript
+```ts
 import map from './map';
 const db = map.sqlite('demo.db');
 
 getRows();
 
 async function getRows() {
-  const orders = await db.order.getAll({
+  const orders = await db.order.getMany({
     where: x => x.lines.any(line => line.product.contains('broomstick'))
       .and(x.customer.name.startsWith('Harry')),
     lines: {
@@ -157,7 +157,8 @@ Each column within your database table is designated by using the <strong><i>col
 Relationships between tables can also be outlined. By using methods like <strong><i>hasOne</i></strong>, <strong><i>hasMany</i></strong>, and <strong><i>references</i></strong>, you can establish connections that reflect the relationships in your data schema. In the example below, an 'order' is linked to a 'customer' reference, a 'deliveryAddress', and multiple 'lines'. The hasMany and hasOne relations represents ownership - the tables 'deliveryAddress' and 'orderLine' are owned by the 'order' table, and therefore, they contain the 'orderId' column referring to their parent table, which is 'order'. The similar relationship exists between orderLine and package - hence the packages are owned by the orderLine. Conversely, the customer table is independent and can exist without any knowledge of the 'order' table. Therefore we say that the order table <i>references</i> the customer table - necessitating the existence of a 'customerId' column in the 'order' table.</p>
 
 <sub>📄 map.ts</sub>
-```javascript
+
+```ts
 import orange from 'orange-orm';
 
 const map = orange.map(x => ({
@@ -193,7 +194,7 @@ const map = orange.map(x => ({
     street: column('street').string(),
     postalCode: column('postalCode').string(),
     postalPlace: column('postalPlace').string(),
-    countryCode: column('countryCode').string(),
+    countryCode: column('countryCode').string().enum(['NO', 'SE', 'DK', 'FI', 'IS', 'DE', 'FR', 'NL', 'ES', 'IT']),
   }))
 
 })).map(x => ({
@@ -218,7 +219,8 @@ Then, we define a SQL string. This string outlines the structure of our SQLite d
 Because of a peculiarity in SQLite, which only allows one statement execution at a time, we split this SQL string into separate statements. We do this using the split() method, which breaks up the string at every semicolon.  
 
 <sub>📄 init.ts</sub>
-```javascript
+
+```ts
 import map from './map';
 const db = map.sqlite('demo.db');
 
@@ -309,10 +311,14 @@ await pool.close();         // closes all pooled connections
 __Why close ?__  
 In serverless environments (e.g. AWS Lambda, Vercel, Cloudflare Workers) execution contexts are frequently frozen and resumed. Explicitly closing the client or pool ensures that file handles are released promptly and prevents “database locked” errors between invocations.  
 
+__SQLite user-defined functions__  
+You can register custom SQLite functions using `db.function(name, fn)`.  
+For full behavior, runtime caveats, and examples, see [SQLite user-defined functions](#sqlite-user-defined-functions).
+
 __From the browser__  
 You can securely use Orange from the browser by utilizing the Express plugin, which serves to safeguard sensitive database credentials from exposure at the client level. This technique bypasses the need to transmit raw SQL queries directly from the client to the server. Instead, it logs method calls initiated by the client, which are later replayed and authenticated on the server. This not only reinforces security by preventing the disclosure of raw SQL queries on the client side but also facilitates a smoother operation. Essentially, this method mirrors a traditional REST API, augmented with advanced TypeScript tooling for enhanced functionality. You can read more about it in the section called [In the browser](#user-content-in-the-browser)  
 <sub>📄 server.ts</sub>
-```javascript
+```ts
 import map from './map';
 import { json } from 'body-parser';
 import express from 'express';
@@ -329,7 +335,7 @@ express().disable('x-powered-by')
 ```
 
 <sub>📄 browser.ts</sub>
-```javascript
+```ts
 import map from './map';
 
 const db = map.http('http://localhost:3000/orange');
@@ -407,7 +413,7 @@ database_id = "<your-guid-for-the-database>"
 ```
 
 <sub>📄 src/index.ts</sub>  
-```javascript
+```ts
 import map from './map';
 
 export interface Env {
@@ -418,7 +424,7 @@ export interface Env {
 export default {
   async fetch(request, env): Promise<Response> {
     const db = map.d1(env.DB);
-    const customers = await db.customer.getAll();
+    const customers = await db.customer.getMany();
     return Response.json(customers);
   },
 } satisfies ExportedHandler<Env>;
@@ -586,7 +592,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const orders = await db.order.getAll({
+  const orders = await db.order.getMany({
     customer: true, 
     deliveryAddress: true, 
     lines: {
@@ -605,7 +611,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const orders = await db.order.getAll({
+  const orders = await db.order.getMany({
     offset: 1,
     orderBy: ['orderDate desc', 'id'],
     limit: 10,
@@ -637,7 +643,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const orders = await db.order.getAll({
+  const orders = await db.order.getMany({
     numberOfLines: x => x.count(x => x.lines.id),
     totalAmount: x => x.sum(x => lines.amount),
     balance: x => x.customer.balance
@@ -654,7 +660,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const orders = await db.order.getAll({
+  const orders = await db.order.getMany({
     where: x => x.lines.any(line => line.product.contains('i'))
       .and(x.customer.balance.greaterThan(180)),
     customer: true, 
@@ -663,14 +669,13 @@ async function getRows() {
   });
 }
 ```
-You can also use the alternative syntax for the `where-filter`. This way, the filter can be constructed independently from the fetching strategy. Keep in mind that you must use the `getMany` method instead of the `getAll` method.  
-It is also possible to combine `where-filter` with the independent filter when using the `getMany` method.  
+You can also build the `where` filter separately and pass it in via the `where` clause. This keeps the filter independent of the fetching strategy and easier to reuse.  
 ```javascript
 async function getRows() {
   const filter = db.order.lines.any(line => line.product.contains('i'))
                  .and(db.order.customer.balance.greaterThan(180));
-  const orders = await db.order.getMany(filter, {
-    //where: x => ... can be combined as well
+  const orders = await db.order.getMany({
+    where: filter,
     customer: true, 
     deliveryAddress: true, 
     lines: true
@@ -687,7 +692,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const order = await db.order.getOne(undefined /* optional filter */, {
+  const order = await db.order.getOne({
     where: x => x.customer(customer => customer.isActive.eq(true)
                  .and(customer.startsWith('Harr'))),
     customer: true, 
@@ -696,15 +701,16 @@ async function getRows() {
   });
 }
 ```
-You can use also the alternative syntax for the `where-filter`. This way, the filter can be constructed independently from the fetching strategy.    
-It is also possible to combine `where-filter` with the independent filter when using the `getOne` method.  
+You can also build the `where` filter independently and reuse it.    
+With `getOne`, you can combine the positional `where` filter with the `where` option to compose filters.  
 ```javascript
 async function getRows() {
   const filter = db.order.customer(customer => customer.isActive.eq(true)
                  .and(customer.startsWith('Harr')));
-                 //equivalent, but creates slighly different sql:
+                 // equivalent, but creates slightly different SQL:
                  // const filter = db.order.customer.isActive.eq(true).and(db.order.customer.startsWith('Harr'));
-  const order = await db.order.getOne(filter, {
+  const order = await db.order.getOne({
+    where: filter,
     customer: true, 
     deliveryAddress: true, 
     lines: true
@@ -785,7 +791,7 @@ const db = map.sqlite('demo.db');
 update();
 
 async function update() {
-  let orders = await db.order.getAll({
+  let orders = await db.order.getMany({
     orderBy: 'id',
     lines: true, 
     deliveryAddress: true, 
@@ -1018,7 +1024,7 @@ const db = map.sqlite('demo.db');
 updateInsertDelete();
 
 async function updateInsertDelete() {    
-  const orders = await db.order.getAll({
+  const orders = await db.order.getMany({
     customer: true, 
     deliveryAddress: true, 
     lines: true
@@ -1065,7 +1071,7 @@ const db = map.sqlite('demo.db');
 deleteRows();
 
 async function deleteRows() {  
-  let orders = await db.order.getAll({
+  let orders = await db.order.getMany({
     where: x => x.customer.name.eq('George')
   });
 
@@ -1081,7 +1087,7 @@ const db = map.sqlite('demo.db');
 deleteRows();
 
 async function deleteRows() {
-  let orders = await db.order.getAll({
+  let orders = await db.order.getMany({
     where: x => x.deliveryAddress.name.eq('George'),
     customer: true, 
     deliveryAddress: true, 
@@ -1148,7 +1154,8 @@ async function deleteRows() {
 Raw sql queries, raw sql filters and transactions are disabled at the http client due to security reasons.  If you would like Orange to support other web frameworks, like nestJs, fastify, etc, please let me know.</p>
 
 <sub>📄 server.ts</sub>
-```javascript
+
+```ts
 import map from './map';
 import { json } from 'body-parser';
 import express from 'express';
@@ -1165,7 +1172,8 @@ express().disable('x-powered-by')
 ```
 
 <sub>📄 browser.ts</sub>
-```javascript
+
+```ts
 import map from './map';
 
 const db = map.http('http://localhost:3000/orange');
@@ -1173,7 +1181,7 @@ const db = map.http('http://localhost:3000/orange');
 updateRows();
 
 async function updateRows() {
-  const order = await db.order.getOne(undefined, {
+  const order = await db.order.getOne({
     where: x => x.lines.any(line => line.product.startsWith('Magic wand'))
       .and(x.customer.name.startsWith('Harry'),
     lines: true
@@ -1196,7 +1204,7 @@ One notable side effect compared to the previous example, is that only the order
 
 <sub>📄 server.ts</sub>
 
-```javascript
+```ts
 import map from './map';
 import { json } from 'body-parser';
 import express from 'express';
@@ -1231,7 +1239,7 @@ function validateToken(req, res, next) {
 
 <sub>📄 browser.ts</sub>
 
-```javascript
+```ts
 import map from './map';
 
 const db = map.http('http://localhost:3000/orange');
@@ -1258,7 +1266,7 @@ async function updateRows() {
     }
   );
 
-  const order = await db.order.getOne(undefined, {
+  const order = await db.order.getOne({
     where: x => x.lines.any(line => line.product.startsWith('Magic wand'))
       .and(db.order.customer.name.startsWith('Harry')),
     lines: true
@@ -1273,6 +1281,107 @@ async function updateRows() {
 
 }
 
+```
+
+__Row Level Security__  
+You can enforce tenant isolation at the database level by combining Postgres RLS with Express hooks. The example below mirrors the “Interceptors and base filter” style by putting the tenant id in a (fake) token on the client, then extracting it on the server and setting it inside the transaction. This is convenient for a demo because we can seed data and prove rows are filtered. In a real application you must validate signatures and derive tenant id from a trusted identity source, not from arbitrary client input.  
+
+<sub>📄 setup.sql</sub>
+
+```sql
+create role rls_app_user nologin;
+
+create table tenant_data (
+  id serial primary key,
+  tenant_id int not null,
+  value text not null
+);
+
+alter table tenant_data enable row level security;
+create policy tenant_data_tenant on tenant_data
+  using (tenant_id = current_setting('app.tenant_id', true)::int);
+
+grant select, insert, update, delete on tenant_data to rls_app_user;
+
+insert into tenant_data (tenant_id, value) values
+  (1, 'alpha'),
+  (1, 'beta'),
+  (2, 'gamma');
+```
+
+<sub>📄 server.ts</sub>
+
+```ts
+import map from './map';
+import { json } from 'body-parser';
+import express from 'express';
+import cors from 'cors';
+
+const db = map.postgres('postgres://postgres:postgres@localhost/postgres');
+
+express().disable('x-powered-by')
+  .use(json({ limit: '100mb' }))
+  .use(cors())
+  .use('/orange', validateToken)
+  .use('/orange', db.express({
+    hooks: {
+      transaction: {
+        //beforeBegin: async (db, req) => ...,
+        afterBegin: async (db, req) => {
+          const tenantId = Number.parseInt(String(req.user?.tenantId ?? ''), 10);
+          if (!Number.isFinite(tenantId)) throw new Error('Missing tenant id');
+          await db.query('set local role rls_app_user');
+          await db.query({
+            sql: 'select set_config(\'app.tenant_id\', ?, true)',
+            parameters: [String(tenantId)]
+          });
+        },
+        //beforeCommit: async (db, req) => ...,
+        //afterCommit: async (db, req) => ...,
+        // afterRollback: async (db, req, error) => {
+        //   console.dir(error);
+        // }
+      }
+    }
+  }))
+  .listen(3000, () => console.log('Example app listening on port 3000!'));
+
+function validateToken(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ error: 'Authorization header missing' });
+  try {
+    const token = authHeader.replace(/^Bearer\s+/i, '');
+    const payload = decodeFakeJwt(token); // demo-only, do not use in production
+    req.user = { tenantId: String(payload.tenantId) };
+    return next();
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+}
+
+function decodeFakeJwt(token) {
+  // Demo-only format: "tenant:<id>"
+  const match = /^tenant:(\d+)$/.exec(token);
+  if (!match) throw new Error('Invalid demo token');
+  return { tenantId: Number(match[1]) };
+}
+```
+
+<sub>📄 browser.ts</sub>
+
+```ts
+import map from './map';
+
+const db = map.http('http://localhost:3000/orange');
+
+db.interceptors.request.use((config) => {
+  // Demo-only token: payload carries the tenant id so we can verify filtering
+  config.headers.Authorization = 'Bearer tenant:1';
+  return config;
+});
+
+const rows = await db.tenant_data.getMany();
+// rows => [{ id: 1, tenant_id: 1, value: 'alpha' }, { id: 2, tenant_id: 1, value: 'beta' }]
 ```
 </details>
 
@@ -1290,7 +1399,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const rows = await db.order.getAll({
+  const rows = await db.order.getMany({
     deliveryAddress: true 
   });  
 }
@@ -1306,7 +1415,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const rows = await db.order.getAll({
+  const rows = await db.order.getMany({
     orderDate: false,
     deliveryAddress: {
       countryCode: true,
@@ -1330,7 +1439,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const rows = await db.customer.getAll({
+  const rows = await db.customer.getMany({
     where x => x.name.equal('Harry')
   });
 }
@@ -1343,7 +1452,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const rows = await db.customer.getAll({
+  const rows = await db.customer.getMany({
     where x => x.name.notEqual('Harry')
   });
 }
@@ -1356,7 +1465,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const rows = await db.customer.getAll({
+  const rows = await db.customer.getMany({
     where: x => x.name.contains('arr')
   });
 }
@@ -1371,7 +1480,7 @@ getRows();
 async function getRows() {
   const filter = db.customer.name.startsWith('Harr');
 
-  const rows = await db.customer.getAll({
+  const rows = await db.customer.getMany({
     where: x => x.name.startsWith('Harr')
   });
 }
@@ -1384,7 +1493,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const rows = await db.customer.getAll({
+  const rows = await db.customer.getMany({
     where: x => x.name.endsWith('arry')
   });
 }
@@ -1397,7 +1506,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const rows = await db.order.getAll({
+  const rows = await db.order.getMany({
     where: x => x.orderDate.greaterThan('2023-07-14T12:00:00')
   });
 }
@@ -1410,7 +1519,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const rows = await db.order.getAll({
+  const rows = await db.order.getMany({
     where: x => x.orderDate.greaterThanOrEqual('2023-07-14T12:00:00')
   });
 }
@@ -1423,7 +1532,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const rows = await db.order.getAll({
+  const rows = await db.order.getMany({
     where: x => x.orderDate.lessThan('2023-07-14T12:00:00')
   });
 }
@@ -1436,7 +1545,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const rows = await db.order.getAll({
+  const rows = await db.order.getMany({
     where: x => x.orderDate.lessThanOrEqual('2023-07-14T12:00:00')
   });
 }
@@ -1449,7 +1558,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const rows = await db.order.getAll({
+  const rows = await db.order.getMany({
     where: x => x.orderDate.between('2023-07-14T12:00:00', '2024-07-14T12:00:00')
   });
 }
@@ -1462,7 +1571,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const rows = await db.order.getAll({
+  const rows = await db.order.getMany({
     where: x => x.customer.name.in('George', 'Harry')
   });
 
@@ -1484,11 +1593,11 @@ async function getRows() {
     parameters: ['%arry']
   };                 
   
-  const rowsWithRaw = await db.customer.getAll({
+  const rowsWithRaw = await db.customer.getMany({
     where: () => rawFilter
   });
 
-  const rowsWithCombined = await db.customer.getAll({
+  const rowsWithCombined = await db.customer.getMany({
     where: x => x.balance.greaterThan(100).and(rawFilter)
   });  
 }
@@ -1506,7 +1615,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const orders = await db.order.getAll({
+  const orders = await db.order.getMany({
     lines: {
       where: x => x.product.contains('broomstick')
     },
@@ -1528,7 +1637,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const rows = await db.order.getAll({
+  const rows = await db.order.getMany({
     where: x => x.customer.name.equal('Harry')
       .and(x.orderDate.greaterThan('2023-07-14T12:00:00'))
   });  
@@ -1543,7 +1652,7 @@ getRows();
 
 async function getRows() {
 
-  const rows = await db.order.getAll({
+  const rows = await db.order.getMany({
     where: y => y.customer( x => x.name.equal('George')
       .or(x.name.equal('Harry')))
   });  
@@ -1558,7 +1667,7 @@ getRows();
 
 async function getRows() {
   //Neither George nor Harry
-  const rows = await db.order.getAll({
+  const rows = await db.order.getMany({
     where: y => y.customer(x => x.name.equal('George')
         .or(x.name.equal('Harry')))
       .not()
@@ -1573,7 +1682,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const rows = await db.order.getAll({
+  const rows = await db.order.getMany({
     where: x => x.deliveryAddress.exists()
   });  
 }
@@ -1594,7 +1703,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const rows = await db.order.getAll({
+  const rows = await db.order.getMany({
     where: y => y.lines.any(x => x.product.contains('guitar'))
     //equivalent syntax:
     //where: x => x.lines.product.contains('guitar')
@@ -1610,7 +1719,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const rows = await db.order.getAll({
+  const rows = await db.order.getMany({
     where: y => y.lines.all(x => x.product.contains('a'))
   });  
 }
@@ -1624,7 +1733,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const rows = await db.order.getAll({
+  const rows = await db.order.getMany({
     where: y => y.lines.none(x => x.product.equal('Magic wand'))
   });  
 }
@@ -1673,7 +1782,8 @@ async function execute() {
 - **`json`** and **`jsonOf<T>`** are represented as an object or array in javascript and maps to JSON, JSONB, NVARCHAR(max) or TEXT (sqlite) in sql.
 
 <sub>📄 map.ts</sub>
-```javascript
+
+```ts
 import orange from 'orange-orm';
 
 interface Pet {
@@ -1696,7 +1806,8 @@ const map = orange.map(x => ({
 }));
 ```
 <sub>📄 map.js</sub>
-```javascript
+
+```js
 import orange from 'orange-orm';
 
 /**
@@ -1718,6 +1829,138 @@ const map = orange.map(x => ({
       picture: x.column('picture').binary(),
       pet: x.column('pet').jsonOf(pet), //generic
       pet2: x.column('pet2').json(), //non-generic
+  }))
+}));
+```
+</details>
+
+<details id="enums"><summary><strong>Enums</strong></summary>
+<p>Enums can be defined using object literals, arrays, or TypeScript enums. The <strong><i>enum(...)</i></strong> method uses literal types when possible, so prefer patterns that keep literals (inline objects, <code>as const</code>, or <code>Object.freeze</code> in JS).</p>
+
+<sub>📄 map.ts (TypeScript enum)</sub>
+
+```ts
+enum CountryCode {
+  NORWAY = 'NO',
+  SWEDEN = 'SE',
+  DENMARK = 'DK',
+  FINLAND = 'FI',
+  ICELAND = 'IS',
+  GERMANY = 'DE',
+  FRANCE = 'FR',
+  NETHERLANDS = 'NL',
+  SPAIN = 'ES',
+  ITALY = 'IT',
+}
+
+const map = orange.map(x => ({
+  deliveryAddress: x.table('deliveryAddress').map(({ column }) => ({
+    id: column('id').numeric().primary(),
+    name: column('name').string(),
+    street: column('street').string(),
+    postalCode: column('postalCode').string(),
+    postalPlace: column('postalPlace').string(),
+    countryCode: column('countryCode').string().enum(CountryCode),
+  }))
+}));
+```
+
+
+<sub>📄 map.ts (as const)</sub>
+
+```ts
+const Countries = {
+  NORWAY: 'NO',
+  SWEDEN: 'SE',
+  DENMARK: 'DK',
+  FINLAND: 'FI',
+  ICELAND: 'IS',
+  GERMANY: 'DE',
+  FRANCE: 'FR',
+  NETHERLANDS: 'NL',
+  SPAIN: 'ES',
+  ITALY: 'IT',
+} as const;
+
+const map = orange.map(x => ({
+  deliveryAddress: x.table('deliveryAddress').map(({ column }) => ({
+    id: column('id').numeric().primary(),
+    name: column('name').string(),
+    street: column('street').string(),
+    postalCode: column('postalCode').string(),
+    postalPlace: column('postalPlace').string(),
+    countryCode: column('countryCode').string().enum(Countries),
+  }))
+}));
+```
+
+<sub>📄 map.ts (array)</sub>
+
+```ts
+const map = orange.map(x => ({
+  deliveryAddress: x.table('deliveryAddress').map(({ column }) => ({
+    id: column('id').numeric().primary(),
+    name: column('name').string(),
+    street: column('street').string(),
+    postalCode: column('postalCode').string(),
+    postalPlace: column('postalPlace').string(),
+    countryCode: column('countryCode').string().enum(
+      ['NO', 'SE', 'DK', 'FI', 'IS', 'DE', 'FR', 'NL', 'ES', 'IT']
+    ),
+  }))
+}));
+```
+
+<sub>📄 map.ts (literal object)</sub>
+
+```ts
+const map = orange.map(x => ({
+  deliveryAddress: x.table('deliveryAddress').map(({ column }) => ({
+    id: column('id').numeric().primary(),
+    name: column('name').string(),
+    street: column('street').string(),
+    postalCode: column('postalCode').string(),
+    postalPlace: column('postalPlace').string(),
+    countryCode: column('countryCode').string().enum({
+      NORWAY: 'NO',
+      SWEDEN: 'SE',
+      DENMARK: 'DK',
+      FINLAND: 'FI',
+      ICELAND: 'IS',
+      GERMANY: 'DE',
+      FRANCE: 'FR',
+      NETHERLANDS: 'NL',
+      SPAIN: 'ES',
+      ITALY: 'IT',
+    }),
+  }))
+}));
+```
+
+<sub>📄 map.js (Object.freeze)</sub>
+
+```js
+const Countries = Object.freeze({
+  NORWAY: 'NO',
+  SWEDEN: 'SE',
+  DENMARK: 'DK',
+  FINLAND: 'FI',
+  ICELAND: 'IS',
+  GERMANY: 'DE',
+  FRANCE: 'FR',
+  NETHERLANDS: 'NL',
+  SPAIN: 'ES',
+  ITALY: 'IT',
+});
+
+const map = orange.map(x => ({
+  deliveryAddress: x.table('deliveryAddress').map(({ column }) => ({
+    id: column('id').numeric().primary(),
+    name: column('name').string(),
+    street: column('street').string(),
+    postalCode: column('postalCode').string(),
+    postalPlace: column('postalPlace').string(),
+    countryCode: column('countryCode').string().enum(Countries),
   }))
 }));
 ```
@@ -1749,7 +1992,7 @@ export default map;
 <p>In the previous sections you have already seen the <strong><i>notNull()</i></strong> validator being used on some columns. This will not only generate correct typescript mapping, but also throw an error if value is set to null or undefined. However, sometimes we do not want the notNull-validator to be run on inserts. Typically, when we have an autoincremental key or server generated uuid, it does not make sense to check for null on insert. This is where <strong><i>notNullExceptInsert()</strong></i> comes to rescue. You can also create your own custom validator as shown below. The last kind of validator, is the <a href="https://ajv.js.org/json-schema.html">ajv JSON schema validator</a>. This can be used on json columns as well as any other column type.</p>
 
 <sub>📄 map.ts</sub>
-```javascript
+```ts
 import orange from 'orange-orm';
 
 interface Pet {
@@ -1780,7 +2023,7 @@ const map = orange.map(x => ({
 export default map;
 ```
 <sub>📄 map.js</sub>
-```javascript
+```js
 import orange from 'orange-orm';
 
 /**
@@ -1918,6 +2161,43 @@ async function getRows() {
 ```
 </details>
 
+<details id="sqlite-user-defined-functions"><summary><strong>SQLite user-defined functions</strong></summary>
+
+You can register custom SQLite functions on the connection using `db.function(name, fn)`.
+
+The `fn` argument is your user-defined callback:
+- It is invoked by SQLite every time the SQL function is called.
+- Callback arguments are positional and match the SQL call (for example, `my_fn(a, b)` maps to `(a, b)`).
+- Return a SQLite-compatible scalar value (for example text, number, or `null`).
+- Throwing inside the callback fails the SQL statement.
+
+`db.function(...)` is sync-only in Node and Deno, but can be async or sync in Bun.
+
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+await db.function('add_prefix', (text, prefix) => `${prefix}${text}`);
+
+const rows = await db.query(
+  "select id, name, add_prefix(name, '[VIP] ') as prefixedName from customer"
+);
+```
+
+If you need the function inside a transaction, register it within the transaction callback to ensure it is available on that connection.
+
+```javascript
+await db.transaction(async (db) => {
+  await db.function('add_prefix', (text, prefix) => `${prefix}${text}`);
+  return db.query(
+    "select id, name, add_prefix(name, '[VIP] ') as prefixedName from customer"
+  );
+});
+```
+
+`db.function(...)` is available on direct SQLite connections (for example `map.sqlite(...)`) and not through `map.http(...)`.
+</details>
+
 <details id="aggregates"><summary><strong>Aggregate functions</strong></summary>
 
 You can count records and aggregate numerical columns.  This can either be done across rows or separately for each row.  
@@ -1939,7 +2219,7 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const orders = await db.order.getAll({
+  const orders = await db.order.getMany({
     numberOfLines: x => x.count(x => x.lines.id),
     totalAmount: x => x.sum(x => lines.amount),
     balance: x => x.customer.balance
@@ -1990,7 +2270,7 @@ async function getCount() {
 
 <sub>📄 map.ts</sub>
 
-```javascript
+```ts
 import orange from 'orange-orm';
 
 const map = orange.map(x => ({
@@ -2006,7 +2286,7 @@ export default map;
 ```
 <sub>📄 sensitive.ts</sub>
 
-```javascript
+```ts
 import map from './map';
 const db = map.sqlite('demo.db');
 

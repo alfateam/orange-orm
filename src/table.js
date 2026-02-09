@@ -192,7 +192,10 @@ function _new(tableName) {
 		row[property] = value;
 	};
 
-	table.delete = _delete.bind(null, table);
+	table.delete = function(context, ...rest) {
+		const args = [context, table, ...rest];
+		return _delete.apply(null, args);
+	};
 	table.cascadeDelete = function(context, ...rest) {
 		const args = [context, table, ...rest];
 		return cascadeDelete.apply(null, args);

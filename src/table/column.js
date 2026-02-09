@@ -54,6 +54,37 @@ function defineColumn(column, table) {
 		return c;
 	};
 
+	c.enum = function(values) {
+		let list = values;
+		if (Array.isArray(values))
+			list = values;
+		else if (values && typeof values === 'object') {
+			const keys = Object.keys(values);
+			const nonNumericKeys = keys.filter((key) => !/^-?\d+$/.test(key));
+			list = (nonNumericKeys.length ? nonNumericKeys : keys).map((key) => values[key]);
+		}
+		else
+			throw new Error('enum values must be an array');
+		const allowed = new Set(list);
+		column.enum = list;
+		function validate(value) {
+			if (value === undefined || value === null)
+				return;
+			if (!allowed.has(value)) {
+				const formatted = list.map((v) => JSON.stringify(v)).join(', ');
+				throw new Error(`Column ${column.alias} must be one of: ${formatted}`);
+			}
+		}
+		return c.validate(validate);
+	};
+
+	c.enum2 = function(...values) {
+		const list = values.length === 1 && Array.isArray(values[0])
+			? values[0]
+			: values;
+		return c.enum(list);
+	};
+
 	c.default = function(value) {
 		column.default = value;
 		return c;
@@ -69,7 +100,6 @@ function defineColumn(column, table) {
 		var oldAlias = column.alias;
 		table._aliases.delete(oldAlias);
 		table._aliases.add(alias);
-		delete table[oldAlias];
 		table[alias] = column;
 		column.alias = alias;
 		return c;

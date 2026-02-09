@@ -7,18 +7,28 @@ function wrapQuery(_context, connection) {
 	return runQuery;
 
 	function runQuery(query, onCompleted) {
-		if (!CachedRequest || !CachedTypes) {
-			import('tedious')
-				.then(({ Request, TYPES }) => {
-					CachedRequest = Request;
-					CachedTypes = TYPES;
-					doQuery(query, onCompleted);
-				})
-				.catch(err => onCompleted(extractError(err), []));
-		}
-		else {
-			doQuery(query, onCompleted);
-		}
+		enqueue(function(done) {
+			function safeCompleted(err, rows) {
+				try {
+					onCompleted(err, rows);
+				} finally {
+					done();
+				}
+			}
+
+			if (!CachedRequest || !CachedTypes) {
+				import('tedious')
+					.then(({ Request, TYPES }) => {
+						CachedRequest = Request;
+						CachedTypes = TYPES;
+						doQuery(query, safeCompleted);
+					})
+					.catch(err => safeCompleted(extractError(err), []));
+			}
+			else {
+				doQuery(query, safeCompleted);
+			}
+		});
 	}
 
 	function doQuery(query, onCompleted) {
@@ -118,6 +128,19 @@ function wrapQuery(_context, connection) {
 				}
 			}
 		}
+	}
+
+	function enqueue(task) {
+		if (!connection.__orangeOrmQueue)
+			connection.__orangeOrmQueue = Promise.resolve();
+		connection.__orangeOrmQueue = connection.__orangeOrmQueue.then(() => new Promise((resolve) => {
+			try {
+				task(resolve);
+			}
+			catch (_e) {
+				resolve();
+			}
+		})).catch(() => {});
 	}
 }
 

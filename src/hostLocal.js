@@ -2,6 +2,7 @@ let executePath = require('./hostExpress/executePath');
 let getMeta = require('./hostExpress/getMeta');
 let setSessionSingleton = require('./table/setSessionSingleton');
 let executeQuery = require('./query');
+let executeSqliteFunction = require('./sqliteFunction');
 let hostExpress = require('./hostExpress');
 const readonlyOps = ['getManyDto', 'getMany', 'aggregate', 'count'];
 // { db, table, defaultConcurrency,
@@ -12,9 +13,12 @@ const readonlyOps = ['getManyDto', 'getMany', 'aggregate', 'count'];
 // 	disableBulkDeletes, isBrowser }
 function hostLocal() {
 	const _options = arguments[0];
-	let { table, transaction, db, isHttp } = _options;
+	let { table, transaction, db, isHttp, hooks, client } = _options;
+	const transactionHooks = hooks && hooks.transaction;
+	const getTransactionHook = (name) =>
+		(transactionHooks && transactionHooks[name]) || (hooks && hooks[name]);
 
-	let c = { get, post, patch, query, express };
+	let c = { get, post, patch, query, sqliteFunction, express };
 
 	function get() {
 		return getMeta(table);
@@ -65,10 +69,41 @@ function hostLocal() {
 				else
 					db = dbPromise;
 			}
-			if (readonlyOps.includes(body.path))
+			const beforeBegin = getTransactionHook('beforeBegin');
+			const afterBegin = getTransactionHook('afterBegin');
+			const beforeCommit = getTransactionHook('beforeCommit');
+			const afterCommit = getTransactionHook('afterCommit');
+			const afterRollback = getTransactionHook('afterRollback');
+			const hasTransactionHooks = !!(beforeBegin
+				|| afterBegin
+				|| beforeCommit
+				|| afterCommit
+				|| afterRollback);
+			if (!hasTransactionHooks && readonlyOps.includes(body.path))
 				await db.transaction({ readonly: true }, fn);
-			else
-				await db.transaction(fn);
+			else {
+				await db.transaction(async (context) => {
+					const hookDb = typeof client === 'function'
+						? client({ transaction: (fn) => fn(context) })
+						: (client || db);
+					if (afterCommit)
+						setSessionSingleton(context, 'afterCommitHook', () =>
+							afterCommit(hookDb, request, response)
+						);
+					if (afterRollback)
+						setSessionSingleton(context, 'afterRollbackHook', (error) =>
+							afterRollback(hookDb, request, response, error)
+						);
+					if (beforeBegin)
+						await beforeBegin(hookDb, request, response);
+					if (afterBegin)
+						await afterBegin(hookDb, request, response);
+					await fn(context);
+					if (beforeCommit)
+						await beforeCommit(hookDb, request, response);
+				});
+			}
+
 		}
 		return result;
 
@@ -99,6 +134,31 @@ function hostLocal() {
 
 		async function fn(...args1) {
 			result = await executeQuery.apply(null, [...args1, ...args]);
+		}
+
+	}
+
+	async function sqliteFunction() {
+		let args = arguments;
+		let result;
+
+		if (transaction)
+			await transaction(fn);
+		else {
+			if (typeof db === 'function') {
+				let dbPromise = db();
+				if (dbPromise.then)
+					db = await dbPromise;
+				else
+					db = dbPromise;
+			}
+			result = await db.sqliteFunction.apply(null, arguments);
+		}
+
+		return result;
+
+		async function fn(...args1) {
+			result = await executeSqliteFunction.apply(null, [...args1, ...args]);
 		}
 
 	}

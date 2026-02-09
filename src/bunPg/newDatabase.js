@@ -10,7 +10,6 @@ let express = require('../hostExpress');
 let hostLocal = require('../hostLocal');
 let doQuery = require('../query');
 let releaseDbClient = require('../table/releaseDbClient');
-let setSessionSingleton = require('../table/setSessionSingleton');
 
 function newDatabase(connectionString, poolOptions) {
 	if (!connectionString)
@@ -27,10 +26,9 @@ function newDatabase(connectionString, poolOptions) {
 		}
 		let domain = createDomain();
 
-		if (fn)
-			return domain.run(runInTransaction);
-		else
-			return domain.run(run);
+		if (!fn)
+			throw new Error('transaction requires a function');
+		return domain.run(runInTransaction);
 
 		async function runInTransaction() {
 			let result;
@@ -49,14 +47,6 @@ function newDatabase(connectionString, poolOptions) {
 			return _begin(domain, options);
 		}
 
-		function run() {
-			let p;
-			let transaction = newTransaction(domain, pool, options);
-			p = new Promise(transaction);
-
-			return p.then(begin)
-				.then(negotiateSchema);
-		}
 
 		function negotiateSchema(previous) {
 			let schema = options && options.schema;
@@ -97,7 +87,6 @@ function newDatabase(connectionString, poolOptions) {
 		let domain = createDomain();
 		let transaction = newTransaction(domain, pool);
 		let p = domain.run(() => new Promise(transaction)
-			.then(() => setSessionSingleton(domain, 'changes', []))
 			.then(() => doQuery(domain, query).then(onResult, onError)));
 		return p;
 

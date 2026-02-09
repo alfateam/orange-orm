@@ -1,3 +1,5 @@
+import rdb from '../src/index';
+rdb.on('query', console.dir);
 import { describe, test, beforeAll, afterAll, expect } from 'vitest';
 const map = require('./db');
 import express from 'express';
@@ -171,6 +173,28 @@ describe('deleteCascade all should be allowed', () => {
 		const { db } = getDb(dbName);
 
 		await db.order.deleteCascade();
+		let rows = await db.order.getAll();
+		expect(rows.length).toEqual(0);
+	}
+});
+
+describe('delete all orders', () => {
+
+	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sap', async () => await verify('sap'));
+	test('sqlite', async () => await verify('sqlite'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+		await db.orderLine.delete();
+		await db.deliveryAddress.delete();
+		await db.order.delete();
 		let rows = await db.order.getAll();
 		expect(rows.length).toEqual(0);
 	}

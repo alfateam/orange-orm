@@ -3,7 +3,6 @@ let executeQuery = require('./executeQueries/executeQuery');
 let setSessionSingleton = require('./setSessionSingleton');
 
 function begin(context, transactionLess) {
-	setSessionSingleton(context, 'changes', []);
 	if (transactionLess) {
 		setSessionSingleton(context, 'transactionLess', true);
 		return Promise.resolve();

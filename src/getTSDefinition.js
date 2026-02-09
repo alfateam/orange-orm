@@ -441,6 +441,7 @@ export interface ExpressConfig {
 	concurrency?: Concurrency;
 	readonly?: boolean;
 	disableBulkDeletes?: boolean;
+	hooks?: ExpressHooks;
 }
 
 export interface ExpressContext {
@@ -448,6 +449,18 @@ export interface ExpressContext {
 	response: import('express').Response;
 	client: RdbClient;
 }		
+
+export interface ExpressTransactionHooks {
+	beforeBegin?: (db: Pool, request: import('express').Request, response: import('express').Response) => void | Promise<void>;
+	afterBegin?: (db: Pool, request: import('express').Request, response: import('express').Response) => void | Promise<void>;
+	beforeCommit?: (db: Pool, request: import('express').Request, response: import('express').Response) => void | Promise<void>;
+	afterCommit?: (db: Pool, request: import('express').Request, response: import('express').Response) => void | Promise<void>;
+	afterRollback?: (db: Pool, request: import('express').Request, response: import('express').Response, error?: unknown) => void | Promise<void>;
+}
+
+export interface ExpressHooks extends ExpressTransactionHooks {
+	transaction?: ExpressTransactionHooks;
+}
 
 export interface ExpressTables {${getExpressTables()}
 }

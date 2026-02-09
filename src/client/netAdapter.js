@@ -10,6 +10,7 @@ function httpAdapter(baseURL, path, axiosInterceptor) {
 		post,
 		patch,
 		query,
+		sqliteFunction,
 		express
 	};
 
@@ -65,6 +66,10 @@ function httpAdapter(baseURL, path, axiosInterceptor) {
 		throw new Error('Queries are not supported through http');
 	}
 
+	function sqliteFunction() {
+		throw new Error('Sqlite Function is not supported through http');
+	}
+
 	function express() {
 		throw new Error('Hosting in express is not supported on the client side');
 	}
@@ -78,7 +83,8 @@ function netAdapter(url, tableName, { axios, tableOptions }) {
 		get,
 		post,
 		patch,
-		query
+		query,
+		sqliteFunction
 	};
 
 	return c;
@@ -101,6 +107,11 @@ function netAdapter(url, tableName, { axios, tableOptions }) {
 	async function query() {
 		const adapter = await getInnerAdapter();
 		return adapter.query.apply(null, arguments);
+	}
+
+	async function sqliteFunction() {
+		const adapter = await getInnerAdapter();
+		return adapter.sqliteFunction.apply(null, arguments);
 	}
 
 	async function getInnerAdapter() {

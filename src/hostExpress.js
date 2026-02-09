@@ -8,13 +8,18 @@ function hostExpress(hostLocal, client, options = {}) {
 	const dbOptions = { db: options.db || client.db };
 	let c = {};
 	const readonly = { readonly: options.readonly};
+	const sharedHooks = options.hooks;
 	for (let tableName in client.tables) {
+		const tableOptions = options[tableName] || {};
+		const hooks = tableOptions.hooks || sharedHooks;
 		c[tableName] = hostLocal({
 			...dbOptions,
 			...readonly,
-			...options[tableName],
+			...tableOptions,
 			table: client.tables[tableName],
-			isHttp: true, client
+			isHttp: true,
+			client,
+			hooks
 
 		});
 	}

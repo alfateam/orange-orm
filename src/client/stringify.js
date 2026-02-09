@@ -5,8 +5,10 @@ function stringify(value) {
 }
 
 function replacer(key, value) {
-	// // @ts-ignore
-	if (value instanceof Date  && !isNaN(value))
+	// @ts-ignore
+	if (typeof value === 'bigint')
+		return value.toString();
+	else if (value instanceof Date  && !isNaN(value))
 		return dateToISOString(value);
 	else
 		return value;

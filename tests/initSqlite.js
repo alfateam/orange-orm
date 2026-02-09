@@ -1,4 +1,4 @@
-const sql = `DROP TABLE IF EXISTS deliveryAddress; DROP TABLE IF EXISTS package; DROP TABLE IF EXISTS orderLine; DROP TABLE IF EXISTS "order";DROP TABLE IF EXISTS "order"; DROP TABLE IF EXISTS customer;DROP TABLE IF EXISTS vendor; DROP TABLE IF EXISTS datetest;DROP TABLE IF EXISTS compositeOrderLine;DROP TABLE IF EXISTS compositeOrder;DROP TABLE IF EXISTS bigintChild;DROP TABLE IF EXISTS bigintParent;
+const sql = `DROP TABLE IF EXISTS deliveryAddress; DROP TABLE IF EXISTS package; DROP TABLE IF EXISTS orderLine; DROP TABLE IF EXISTS "order";DROP TABLE IF EXISTS "order"; DROP TABLE IF EXISTS customer;DROP TABLE IF EXISTS vendor; DROP TABLE IF EXISTS datetest;DROP TABLE IF EXISTS bruker_rolle_like;DROP TABLE IF EXISTS compositeOrderLine;DROP TABLE IF EXISTS compositeOrder;DROP TABLE IF EXISTS bigintChild;DROP TABLE IF EXISTS bigintParent;
 CREATE TABLE customer (
     id INTEGER PRIMARY KEY,
     name TEXT,
@@ -65,6 +65,17 @@ CREATE TABLE datetest (
     "date" TEXT,
     tdatetime TEXT,
     tdatetime_tz TEXT
+);
+
+CREATE TABLE bruker_rolle_like (
+    bruker_rolle_id TEXT PRIMARY KEY,
+    bruker_id TEXT NOT NULL,
+    rolle_type_id INTEGER NOT NULL,
+    aktor_id TEXT NOT NULL,
+    opprettet_tid TEXT NOT NULL,
+    avsluttet_tid TEXT NULL,
+    bruker_rolle_status_type_id INTEGER NOT NULL,
+    sist_endret_av_bruker_id TEXT NULL
 );
 
 CREATE TABLE bigintParent (

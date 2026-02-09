@@ -47,7 +47,7 @@ beforeAll(async () => {
 
 		await db.bigintParent.insert([
 			{
-				id: '9999999999999999',
+				id: BigInt('9999999999999999'),
 				foo: 100,
 				children: [{
 
@@ -196,9 +196,214 @@ describe('boolean filter', () => {
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
 		const filter = db.order.customer.isActive.eq(false);
+		const rows = await db.order.getMany({where: () => filter});
+
+		const expected = [];
+
+		expect(rows).toEqual(expected);
+	}
+});
+
+describe('boolean filter where direct', () => {
+	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+		const filter = db.order.customer.isActive.eq(false);
+		const rows = await db.order.getMany({ where: filter });
+
+		const expected = [];
+
+		expect(rows).toEqual(expected);
+	}
+});
+
+describe('boolean legacy filter', () => {
+	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+		const filter = db.order.customer.isActive.eq(false);
 		const rows = await db.order.getMany(filter);
 
 		const expected = [];
+
+		expect(rows).toEqual(expected);
+	}
+});
+
+describe('getOne ', () => {
+	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+		const row = await db.customer.getOne({});
+
+		expect(row).toBeDefined();
+		expect(row).toHaveProperty('id');
+		expect(row.id).toBeTypeOf('number');
+	}
+
+	test('sqlite strategy first', async () => {
+		const { db } = getDb('sqlite');
+		const row = await db.customer.getOne({
+			isActive: true
+		});
+
+		const expected = {
+			id: 1,
+			isActive: true
+		};
+
+		expect(row).toEqual(expected);
+	});
+
+	test('sqlite strategy first with where (boolean column)', async () => {
+		const { db } = getDb('sqlite');
+		const row = await db.customer.getOne({
+			isActive: true,
+			where: x => x.id.eq(2)
+		});
+
+		const expected = {
+			id: 2,
+			isActive: true
+		};
+
+		expect(row).toEqual(expected);
+	});
+
+	test('sqlite object pk filter first with strategy second', async () => {
+		const { db } = getDb('sqlite');
+		const row = await db.customer.getOne({ id: 2 }, { isActive: true });
+
+		const expected = {
+			id: 2,
+			isActive: true
+		};
+
+		expect(row).toEqual(expected);
+	});
+
+	test('sqlite sql filter first with strategy second', async () => {
+		const { db } = getDb('sqlite');
+		const row = await db.customer.getOne(db.customer.id.eq(2), { isActive: true });
+
+		const expected = {
+			id: 2,
+			isActive: true
+		};
+
+		expect(row).toEqual(expected);
+	});
+
+	test('sqlite raw sql filter first with strategy second', async () => {
+		const { db } = getDb('sqlite');
+		const row = await db.customer.getOne({ sql: 'id=2' }, { isActive: true });
+
+		const expected = {
+			id: 2,
+			isActive: true
+		};
+
+		expect(row).toEqual(expected);
+	});
+});
+
+describe('empty array-filter legacy', () => {
+	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+		const rows = await db.order.getMany([]);
+
+		const expected = [];
+
+		expect(rows).toEqual(expected);
+	}
+});
+
+describe('primary key filter array', () => {
+	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+		const rows = await db.customer.getMany({ isActive: true, where: () => {return [{ id: 2 }];}});
+
+		const expected = [{
+			id: 2,
+			isActive: true
+		}];
+
+		expect(rows).toEqual(expected);
+	}
+});
+
+describe('primary key filter array legacy', () => {
+	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+		const rows = await db.customer.getMany([{ id: 2 }], { isActive: true });
+
+		const expected = [{
+			id: 2,
+			isActive: true
+		}];
 
 		expect(rows).toEqual(expected);
 	}
@@ -218,7 +423,7 @@ describe('empty array-filter', () => {
 
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
-		const rows = await db.order.getMany([]);
+		const rows = await db.order.getMany({ where: () => []});
 
 		const expected = [];
 
@@ -286,6 +491,41 @@ describe('boolean true filter', () => {
 
 
 describe('any-subFilter filter nested', () => {
+	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite')); test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+		const filter = db.order.lines.any(x => x.packages.any(x => x.sscc.startsWith('aaa')));
+		const rows = await db.order.getMany({where: () => filter});
+
+
+		//mssql workaround because datetime has no time offset
+		for (let i = 0; i < rows.length; i++) {
+			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate));
+		}
+
+		const date1 = new Date(2022, 0, 11, 9, 24, 47);
+		const expected = [
+			{
+				id: 1,
+				orderDate: dateToISOString(date1),
+				customerId: 1,
+			}
+		];
+
+		expect(rows).toEqual(expected);
+	}
+});
+
+describe('any-subFilter legacy filter nested', () => {
 	test('pg', async () => await verify('pg'));
 	test('pglite', async () => await verify('pglite')); test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
@@ -371,6 +611,43 @@ describe('getMany hasOne sub filter', () => {
 	async function verify(dbName) {
 		const { db } = getDb(dbName);
 
+
+		const filter = db.order.deliveryAddress(x => x.name.eq('George'));
+		const rows = await db.order.getMany( { where: () => filter});
+
+		//mssql workaround because datetime has no time offset
+		for (let i = 0; i < rows.length; i++) {
+			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate));
+		}
+
+		const date1 = new Date(2022, 0, 11, 9, 24, 47);
+		const expected = [
+			{
+				id: 1,
+				orderDate: dateToISOString(date1),
+				customerId: 1,
+			}
+		];
+
+		expect(rows).toEqual(expected);
+	}
+});
+
+describe('getMany hasOne sub legacy filter', () => {
+
+	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
 
 		const filter = db.order.deliveryAddress(x => x.name.eq('George'));
 		const rows = await db.order.getMany(filter);
@@ -1235,6 +1512,101 @@ describe('getMany none raw sub filter http where', () => {
 		}
 
 		expect(error?.message).toEqual('Raw filters are disallowed');
+	}
+});
+
+
+describe('wal mode', () => {
+	test('sqlite', async () => await verify('sqlite'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+		await db.query('PRAGMA journal_mode = WAL');
+		await db.query('PRAGMA journal_mode');
+		await db.query('ATTACH DATABASE "other.db" AS other');
+		await db.query('DROP TABLE IF EXISTS other.orderNote');
+		await db.query('CREATE TABLE other.orderNote (id INTEGER PRIMARY KEY, orderId INTEGER, note TEXT)');
+		await db.query('INSERT INTO other.orderNote (id, orderId, note) VALUES (1, 2, \'WAL\')');
+
+		const rows = await db.orderNote.getAll({
+			where: (note) => note.note.eq('WAL'),
+			order: true
+		});
+		for (let i = 0; i < rows.length; i++) {
+			rows[i].order.orderDate = dateToISOString(new Date(rows[i].order.orderDate));
+		}
+
+		const date1 = new Date(2021, 0, 11, 12, 22, 45);
+
+		const expected = [
+			{
+				id: 1,
+				orderId: 2,
+				note: 'WAL',
+				order: {
+					id: 2,
+					orderDate: dateToISOString(date1),
+					customerId: 2
+				}
+			}
+		];
+		expect(rows).toEqual(expected);
+	}
+});
+
+describe('sqlite function', () => {
+	test('sqlite', async () => await verify('sqlite'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+
+		db.function('add_prefix', (text, prefix) => {
+			return `${prefix}${text}`;
+		});
+
+		const rows = await db.query('SELECT id, name, add_prefix(name, \'[VIP] \') AS prefixedName FROM customer');
+
+		const expected = [
+			{
+				id: 1,
+				name: 'George',
+				prefixedName: '[VIP] George'
+			},
+			{
+				id: 2,
+				name: 'Harry',
+				prefixedName: '[VIP] Harry'
+			}];
+		expect(rows).toEqual(expected);
+	}
+});
+
+describe('sqlite function in transaction', () => {
+	test('sqlite', async () => await verify('sqlite'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+
+		await db.transaction(async (db) => {
+			db.function('add_prefix', (text, prefix) => {
+				return `${prefix}${text}`;
+			});
+
+			const rows = await db.query('SELECT id, name, add_prefix(name, \'[VIP] \') AS prefixedName FROM customer');
+
+			const expected = [
+				{
+					id: 1,
+					name: 'George',
+					prefixedName: '[VIP] George'
+				},
+				{
+					id: 2,
+					name: 'Harry',
+					prefixedName: '[VIP] Harry'
+				}];
+			expect(rows).toEqual(expected);
+		});
 	}
 });
 
