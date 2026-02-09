@@ -194,50 +194,38 @@ async function insertData(db) {
 		innredningTypeId: 1,
 		belysningTypeId: 1,
 		gulvTypeId: 1,
-		husEgenskapStatusId: 0,
 	});
 	await db.husSlaktekyllingEgenskaper.insert({
-		id: 'verpe-1',
+		id: 'kylling-1',
 		husId,
 		innredningTypeId: 2,
-		husEgenskapStatusId: 0,
 	});
 	return husId;
 }
 
 describe('dual hasOne with discriminators', () => {
-	test('sqlite: getMany loads verpehoene even when slaktekylling included', async () => {
-		const { db, init } = connections.sqlite;
+	const cases = [
+		['sqlite', connections.sqlite],
+		['mssql', connections.mssql],
+	];
+
+	test.each(cases)('%s: getMany loads verpehoene even when slaktekylling included', async (_name, { db, init }) => {
 		await init(db);
 		const husId = await insertData(db);
 
 		const rows = await db.hus.getMany(db.hus.id.eq(husId), {
-			verpehoeneEgenskaper: { innredningType: true, belysningType: true, gulvType: true },
+			verpehoeneEgenskaper: {
+				innredningType: true,
+				belysningType: true,
+				gulvType: true
+			},
 			slaktekyllingEgenskaper: {
 				innredningType: true
 			},
 		});
 
-		expect(rows[0].verpehoeneEgenskaper).toBeTruthy();
-		expect(rows[0].slaktekyllingEgenskaper).toBeTruthy();
-		expect(rows[0].verpehoeneEgenskaper?.innredningType?.navn).toBe('Verpe');
-		expect(rows[0].verpehoeneEgenskaper?.belysningType?.navn).toBe('LED');
-		expect(rows[0].verpehoeneEgenskaper?.gulvType?.navn).toBe('Betong');
-		expect(rows[0].slaktekyllingEgenskaper?.innredningType?.navn).toBe('Slakte');
-	});
-
-	test('mssql: getMany loads verpehoene even when slaktekylling included', async () => {
-		const { db, init } = connections.mssql;
-		await init(db);
-		const husId = await insertData(db);
-
-		const rows = await db.hus.getMany(db.hus.id.eq(husId), {
-			verpehoeneEgenskaper: { innredningType: true, belysningType: true, gulvType: true },
-			slaktekyllingEgenskaper: { innredningType: true },
-		});
-
-		expect(rows[0].verpehoeneEgenskaper).toBeTruthy();
-		expect(rows[0].slaktekyllingEgenskaper).toBeTruthy();
+		expect(rows[0].verpehoeneEgenskaper.innredningTypeId).toBe(1);
+		expect(rows[0].slaktekyllingEgenskaper.innredningTypeId).toBe(2);
 		expect(rows[0].verpehoeneEgenskaper?.innredningType?.navn).toBe('Verpe');
 		expect(rows[0].verpehoeneEgenskaper?.belysningType?.navn).toBe('LED');
 		expect(rows[0].verpehoeneEgenskaper?.gulvType?.navn).toBe('Betong');

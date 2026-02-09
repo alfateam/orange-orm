@@ -13,20 +13,11 @@ async function getManyDto(context, table, filter, strategy, spanFromParent, upda
 	}
 
 	let span = spanFromParent || strategyToSpan(table, strategy);
-	if (!spanFromParent)
-		assignAliases(span, table._dbName);
 	let alias = table._dbName;
 
 	const query = newQuery(context, table, filter, span, alias);
 	const res = await executeQueries(context, [query]);
 	return decode(context, strategy, span, await res[0], undefined, updateParent);
-}
-
-function assignAliases(span, alias) {
-	span._alias = alias;
-	span.legs.forEach((leg) => {
-		assignAliases(leg.span, alias + leg.name);
-	});
 }
 
 function newCreateRow(span) {
@@ -105,53 +96,40 @@ function hasManyRelations(span) {
 async function decode(context, strategy, span, rows, keys = rows.length > 0 ? Object.keys(rows[0]) : [], updateParent) {
 	const table = span.table;
 	let columnsMap = span.columns;
-	const selectedColumns = [];
-	for (let i = 0; i < table._columns.length; i++) {
-		const column = table._columns[i];
-		if (!columnsMap || columnsMap.get(column))
-			selectedColumns.push({ column, index: i });
-	}
+	const columns = table._columns.filter(column => !columnsMap || columnsMap.get(column));
 	const rowsLength = rows.length;
-	const columnsLength = selectedColumns.length;
+	const columnsLength = columns.length;
 	const primaryColumns = table._primaryColumns;
 	const primaryColumnsLength = primaryColumns.length;
 	const rowsMap = new Map();
 	const fkIds = new Array(rows.length);
 	const getIds = createGetIds();
 	const aggregateKeys = Object.keys(span.aggregates);
-	const aliasPrefix = span._alias ? 's' + span._alias : null;
-	const aliasProbeIndex = selectedColumns.length ? selectedColumns[0].index : 0;
-	const useAlias = aliasPrefix && rowsLength > 0 && hasKey(rows[0], aliasPrefix + aliasProbeIndex);
 
 	const outRows = new Array(rowsLength);
 	const createRow = newCreateRow(span);
 	const shouldCreateMap = hasManyRelations(span);
 	for (let i = 0; i < rowsLength; i++) {
 		const row = rows[i];
-		const lookup = useAlias ? createLookup(row) : null;
 		let outRow = createRow();
 		let pkWithNullCount = 0;
 		for (let j = 0; j < columnsLength; j++) {
-			const { column, index } = selectedColumns[j];
-			const key = useAlias ? (aliasPrefix + index) : keys[j];
 			if (j < primaryColumnsLength) {
-				const value = useAlias ? getValue(row, lookup, key) : row[key];
-				if (value === null)
+				if (row[keys[j]] === null)
 					pkWithNullCount++;
 				if (pkWithNullCount === primaryColumnsLength) {
 					outRow = null;
 					break;
 				}
 			}
-			const value = useAlias ? getValue(row, lookup, key) : row[key];
-			outRow[column.alias] = column.decode(context, value);
+			const column = columns[j];
+			outRow[column.alias] = column.decode(context, row[keys[j]]);
 		}
 
 		for (let j = 0; j < aggregateKeys.length; j++) {
-			const aggKey = aggregateKeys[j];
-			const parse = span.aggregates[aggKey].column?.decode || ((context, arg) => Number.parseFloat(arg));
-			const value = useAlias ? getValue(row, lookup, aggKey) : row[keys[j + columnsLength]];
-			outRow[aggKey] = parse(context, value);
+			const key = aggregateKeys[j];
+			const parse = span.aggregates[key].column?.decode || ((context, arg) => Number.parseFloat(arg));
+			outRow[key] = parse(context, row[keys[j + columnsLength]]);
 		}
 
 		outRows[i] = outRow;
@@ -165,8 +143,7 @@ async function decode(context, strategy, span, rows, keys = rows.length > 0 ? Ob
 	span._rowsMap = rowsMap;
 	span._ids = fkIds;
 
-	if (!useAlias)
-		keys.splice(0, columnsLength + aggregateKeys.length);
+	keys.splice(0, columnsLength + aggregateKeys.length);
 	if (span.legs.toArray().length === 0)
 		return outRows;
 
@@ -201,34 +178,6 @@ async function decode(context, strategy, span, rows, keys = rows.length > 0 ? Ob
 			};
 	}
 
-}
-
-function hasKey(row, key) {
-	if (Object.prototype.hasOwnProperty.call(row, key))
-		return true;
-	const lower = key.toLowerCase();
-	for (const k in row) {
-		if (k.toLowerCase() === lower)
-			return true;
-	}
-	return false;
-}
-
-function createLookup(row) {
-	const map = new Map();
-	for (const k in row) {
-		map.set(k.toLowerCase(), k);
-	}
-	return map;
-}
-
-function getValue(row, lookup, key) {
-	if (Object.prototype.hasOwnProperty.call(row, key))
-		return row[key];
-	const resolved = lookup.get(key.toLowerCase());
-	if (resolved)
-		return row[resolved];
-	return row[key];
 }
 
 async function decodeManyRelations(context, strategy, span) {

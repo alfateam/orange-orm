@@ -16,7 +16,7 @@ function newLeg(relation) {
 	c.expand = relation.expand;
 
 	c.accept = function(visitor) {
-		visitor.visitOne(c);
+		return visitor.visitOne(c);
 	};
 
 	return c;
