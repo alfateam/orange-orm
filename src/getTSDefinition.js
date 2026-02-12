@@ -97,6 +97,14 @@ export interface ${Name}ExpressConfig {
     disableBulkDeletes?: boolean;
 }
 
+export interface ${Name}HonoConfig {
+	baseFilter?: RawFilter | ((context: HonoContext) => RawFilter | Promise<RawFilter>);
+    customFilters?: Record<string, (context: HonoContext,...args: any[]) => RawFilter | Promise<RawFilter>>;
+    concurrency?: ${Name}Concurrency;
+    readonly?: boolean;
+    disableBulkDeletes?: boolean;
+}
+
 export interface ${Name}CustomFilters {
 	${getCustomFilters(customFilters)}
 }
@@ -358,7 +366,7 @@ function getPrefixTs(isNamespace) {
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { AxiosInterceptorManager, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
-import type { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Url, ColumnConcurrency, JsonPatch } from 'orange-orm';
+import type { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Hono, Url, ColumnConcurrency, JsonPatch } from 'orange-orm';
 export { RequestHandler } from 'express';
 export { Concurrency, Filter, RawFilter, Config, TransactionOptions, Pool } from 'orange-orm';
 export = r;
@@ -371,7 +379,7 @@ declare function r(config: Config): r.RdbClient;
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import schema from './schema';
 import type { AxiosInterceptorManager, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
-import type { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Url, ColumnConcurrency, JsonPatch } from 'orange-orm';
+import type { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Hono, Url, ColumnConcurrency, JsonPatch } from 'orange-orm';
 export default schema as RdbClient;`;
 }
 
@@ -401,6 +409,8 @@ declare namespace r {${getTables(isHttp)}
 	const filter: Filter;
 	function express(): Express;
 	function express(config: ExpressConfig): Express;
+	function hono(): Hono;
+	function hono(config: HonoConfig): Hono;
 `;
 		else
 			result += `
@@ -444,11 +454,40 @@ export interface ExpressConfig {
 	hooks?: ExpressHooks;
 }
 
+export interface HonoConfig {
+	db?: Pool | (() => Pool);
+	tables?: HonoTables;
+	concurrency?: Concurrency;
+	readonly?: boolean;
+	disableBulkDeletes?: boolean;
+	hooks?: HonoHooks;
+}
+
 export interface ExpressContext {
 	request: import('express').Request;
 	response: import('express').Response;
 	client: RdbClient;
 }		
+
+export interface HonoRequest {
+	method: string;
+	query: Record<string, string>;
+	headers: Record<string, string>;
+	json(): Promise<unknown>;
+}
+
+export interface HonoResponse {
+	status(code: number): HonoResponse;
+	setHeader(name: string, value: string): HonoResponse;
+	json(value: unknown): unknown;
+	send(value: unknown): unknown;
+}
+
+export interface HonoContext {
+	request: HonoRequest;
+	response: HonoResponse;
+	client: RdbClient;
+}
 
 export interface ExpressTransactionHooks {
 	beforeBegin?: (db: Pool, request: import('express').Request, response: import('express').Response) => void | Promise<void>;
@@ -462,7 +501,22 @@ export interface ExpressHooks extends ExpressTransactionHooks {
 	transaction?: ExpressTransactionHooks;
 }
 
+export interface HonoTransactionHooks {
+	beforeBegin?: (db: Pool, request: HonoRequest, response: HonoResponse) => void | Promise<void>;
+	afterBegin?: (db: Pool, request: HonoRequest, response: HonoResponse) => void | Promise<void>;
+	beforeCommit?: (db: Pool, request: HonoRequest, response: HonoResponse) => void | Promise<void>;
+	afterCommit?: (db: Pool, request: HonoRequest, response: HonoResponse) => void | Promise<void>;
+	afterRollback?: (db: Pool, request: HonoRequest, response: HonoResponse, error?: unknown) => void | Promise<void>;
+}
+
+export interface HonoHooks extends HonoTransactionHooks {
+	transaction?: HonoTransactionHooks;
+}
+
 export interface ExpressTables {${getExpressTables()}
+}
+
+export interface HonoTables {${getHonoTables()}
 }
 `;
 	function getConcurrencyTables() {
@@ -513,6 +567,8 @@ export interface ExpressTables {${getExpressTables()}
 	createPatch(original: any, modified: any): JsonPatch;
 	express(): Express;
 	express(config: ExpressConfig): Express;
+	hono(): Hono;
+	hono(config: HonoConfig): Hono;
 	readonly metaData: MetaData;`;
 		return result;
 	}
@@ -523,6 +579,16 @@ export interface ExpressTables {${getExpressTables()}
 			result +=
 				`
 	${name}?: boolean | ${Name}ExpressConfig;`;
+		}
+		return result;
+	}
+	function getHonoTables() {
+		let result = '';
+		for (let name in tables) {
+			let Name = name.substring(0, 1).toUpperCase() + name.substring(1);
+			result +=
+				`
+	${name}?: boolean | ${Name}HonoConfig;`;
 		}
 		return result;
 	}

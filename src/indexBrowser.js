@@ -1,4 +1,5 @@
 const hostExpress = require('./hostExpress');
+const hostHono = require('./hostHono');
 const hostLocal = require('./hostLocal');
 const client = require('./client/index.js');
 const map = require('./client/map');
@@ -63,5 +64,6 @@ Object.defineProperty(connectViaPool, 'pg', {
 
 
 connectViaPool.express = hostExpress.bind(null, hostLocal);
+connectViaPool.hono = hostHono.bind(null, hostLocal);
 
 module.exports = connectViaPool;

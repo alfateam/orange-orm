@@ -489,6 +489,161 @@ describe('boolean true filter', () => {
 	}
 });
 
+describe('in filter', () => {
+	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+		const rows = await db.customer.getMany({
+			where: x => x.id.in([1]),
+			orderBy: 'id'
+		});
+
+		const expected = [{
+			id: 1,
+			name: 'George',
+			balance: 177,
+			isActive: true
+		}];
+
+		expect(rows).toEqual(expected);
+	}
+});
+
+describe('in filter on string column', () => {
+	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+		const rows = await db.customer.getMany({
+			where: x => x.name.in(['George']),
+			orderBy: 'id'
+		});
+
+		const expected = [{
+			id: 1,
+			name: 'George',
+			balance: 177,
+			isActive: true
+		}];
+
+		expect(rows).toEqual(expected);
+	}
+});
+
+describe('in filter with OR', () => {
+	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+		const rows = await db.customer.getMany({
+			where: x => x.id.in([1]).or(x.id.in([2])),
+			orderBy: 'id'
+		});
+
+		const expected = [{
+			id: 1,
+			name: 'George',
+			balance: 177,
+			isActive: true
+		}, {
+			id: 2,
+			name: 'Harry',
+			balance: 200,
+			isActive: true
+		}];
+
+		expect(rows).toEqual(expected);
+	}
+});
+
+describe('in filter with AND', () => {
+	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+		const rows = await db.customer.getMany({
+			where: x => x.id.in([1, 2]).and(x.balance.greaterThan(180)),
+			orderBy: 'id'
+		});
+
+		const expected = [{
+			id: 2,
+			name: 'Harry',
+			balance: 200,
+			isActive: true
+		}];
+
+		expect(rows).toEqual(expected);
+	}
+});
+
+describe('in filter with NOT and combined OR/AND', () => {
+	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+		const rows = await db.customer.getAll({
+			where: x => x.id.in([1]).not().and(x.id.in([1, 2]).or(x.id.in([999]))),
+			orderBy: 'id'
+		});
+
+		const expected = [{
+			id: 2,
+			name: 'Harry',
+			balance: 200,
+			isActive: true
+		}];
+
+		expect(rows).toEqual(expected);
+	}
+});
+
 
 describe('any-subFilter filter nested', () => {
 	test('pg', async () => await verify('pg'));
