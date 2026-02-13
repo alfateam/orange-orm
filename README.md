@@ -1150,7 +1150,7 @@ async function deleteRows() {
 </details>
 
 <details id="in-the-browser"><summary><strong>In the browser</strong></summary>
-<p>You can use <strong><i>Orange</i></strong> in the browser by using the adapter for Express. Instead of sending raw SQL queries from the client to the server, this approach records the method calls in the client. These method calls are then replayed at the server, ensuring a higher level of security by not exposing raw SQL on the client side.  
+<p>You can use <strong><i>Orange</i></strong> in the browser by using the adapter for Express or Hono. Instead of sending raw SQL queries from the client to the server, this approach records the method calls in the client. These method calls are then replayed at the server, ensuring a higher level of security by not exposing raw SQL on the client side.  
 Raw sql queries, raw sql filters and transactions are disabled at the http client due to security reasons.  If you would like Orange to support other web frameworks, like nestJs, fastify, etc, please let me know.</p>
 
 <sub>📄 server.ts</sub>
@@ -1196,6 +1196,32 @@ async function updateRows() {
 }
 
 ```
+
+__Hono adapter__
+
+You can host the same HTTP endpoint with Hono by replacing `db.express()` with `db.hono()`. The browser client setup stays the same (`map.http(...)`), so you can reuse the `browser.ts` example above.
+
+<sub>📄 server.ts</sub>
+
+```ts
+import map from './map';
+import { Hono } from 'hono';
+import { cors } from 'hono/cors';
+import { serve } from '@hono/node-server';
+
+const db = map.sqlite('demo.db');
+const app = new Hono();
+
+app.use('/orange', cors());
+app.use('/orange/*', cors());
+// for demonstrational purposes, authentication middleware is not shown here.
+app.all('/orange', db.hono());
+app.all('/orange/*', db.hono());
+
+serve({ fetch: app.fetch, port: 3000 });
+```
+
+`baseFilter` and transaction hooks are also supported in `db.hono({...})`, using Hono-style request/response objects.
 
 __Interceptors and base filter__
 
