@@ -1,5 +1,5 @@
 ## Changelog
-__5.0.1__  
+__5.1.0__  
 Support for Hono [#149](https://github.com/alfateam/orange-orm/issues/149)  
 Removed dependency `glob`  
 Removed dependency `module-definition`  
