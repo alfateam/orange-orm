@@ -1,6 +1,5 @@
 let url = require('url');
 let compile = require('./compile');
-let { glob } = require('glob');
 let path = require('path');
 let findNodeModules = require('findup-sync');
 let fs = require('fs');
@@ -80,11 +79,15 @@ async function writeIndexJs(schemaJsPath) {
 }
 
 async function findSchemaJs(cwd) {
-	let options = {
-		ignore: ['**/node_modules/**', '**/dist/**', '**/dev/**', '**/deploy/**', '**/build/**'],
-		cwd
+	let ignoredDirNames = {
+		node_modules: true,
+		dist: true,
+		dev: true,
+		deploy: true,
+		build: true
 	};
-	let files = await glob('**/schema.*(js|mjs|ts)', options);
+	let files = [];
+	scanForSchemaFiles(cwd, ignoredDirNames, files);
 	files.sort((a, b) => {
 		const aIsTs = a.substring(a.length - 2) === 'ts';
 		const bIsTs = b.substring(b.length - 2) === 'ts';
@@ -97,7 +100,29 @@ async function findSchemaJs(cwd) {
 		else
 			return 0;
 	});
-	return files.map(x => path.join(cwd, '/', x));
+	return files;
+}
+
+function scanForSchemaFiles(currentDir, ignoredDirNames, results) {
+	for (let entry of fs.readdirSync(currentDir)) {
+		const fullPath = path.join(currentDir, entry);
+		let stat;
+		try {
+			stat = fs.statSync(fullPath);
+		}
+		catch (e) {
+			continue;
+		}
+		if (stat.isDirectory()) {
+			if (ignoredDirNames[entry])
+				continue;
+			scanForSchemaFiles(fullPath, ignoredDirNames, results);
+			continue;
+		}
+
+		if (entry === 'schema.js' || entry === 'schema.mjs' || entry === 'schema.ts')
+			results.push(fullPath);
+	}
 }
 
 function tryDownload(_url, _isNamespace) {
