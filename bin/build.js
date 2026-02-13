@@ -1,7 +1,6 @@
 let url = require('url');
 let compile = require('./compile');
 let path = require('path');
-let findNodeModules = require('findup-sync');
 let fs = require('fs');
 let util = require('util');
 let writeFile = util.promisify(fs.writeFile);
@@ -30,7 +29,7 @@ async function runSingle(schemaTs) {
 		}
 		console.log(`Orange: found schema ${schemaTs}`);
 		if (!schemaJsPath) {
-			let nodeModules = findNodeModules('node_modules', { cwd: schemaTs });
+			let nodeModules = findClosestNodeModules(schemaTs);
 			outDir = path.join(nodeModules, '/.rdb', '/' + new Date().getUTCMilliseconds());
 			schemaJsPath = compile(schemaTs, { outDir });
 		}
@@ -110,6 +109,21 @@ function findClosestPackageJson(startDir) {
 		currentDir = parentDir;
 	}
 	return null;
+}
+
+function findClosestNodeModules(startPath) {
+	const startDir = fs.statSync(startPath).isDirectory() ? startPath : path.dirname(startPath);
+	let currentDir = startDir;
+	while (true) {
+		const nodeModulesPath = path.join(currentDir, 'node_modules');
+		if (fs.existsSync(nodeModulesPath))
+			return nodeModulesPath;
+
+		const parentDir = path.dirname(currentDir);
+		if (parentDir === currentDir)
+			return path.join(startDir, 'node_modules');
+		currentDir = parentDir;
+	}
 }
 
 async function findSchemaJs(cwd) {
