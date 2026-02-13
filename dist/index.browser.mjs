@@ -121,6 +121,14 @@ export interface ${Name}ExpressConfig {
     disableBulkDeletes?: boolean;
 }
 
+export interface ${Name}HonoConfig {
+	baseFilter?: RawFilter | ((context: HonoContext) => RawFilter | Promise<RawFilter>);
+    customFilters?: Record<string, (context: HonoContext,...args: any[]) => RawFilter | Promise<RawFilter>>;
+    concurrency?: ${Name}Concurrency;
+    readonly?: boolean;
+    disableBulkDeletes?: boolean;
+}
+
 export interface ${Name}CustomFilters {
 	${getCustomFilters(customFilters)}
 }
@@ -382,7 +390,7 @@ ${row}`;
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { AxiosInterceptorManager, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
-import type { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Url, ColumnConcurrency, JsonPatch } from 'orange-orm';
+import type { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Hono, Url, ColumnConcurrency, JsonPatch } from 'orange-orm';
 export { RequestHandler } from 'express';
 export { Concurrency, Filter, RawFilter, Config, TransactionOptions, Pool } from 'orange-orm';
 export = r;
@@ -395,7 +403,7 @@ declare function r(config: Config): r.RdbClient;
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import schema from './schema';
 import type { AxiosInterceptorManager, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
-import type { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Url, ColumnConcurrency, JsonPatch } from 'orange-orm';
+import type { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Hono, Url, ColumnConcurrency, JsonPatch } from 'orange-orm';
 export default schema as RdbClient;`;
 	}
 
@@ -425,6 +433,8 @@ declare namespace r {${getTables(isHttp)}
 	const filter: Filter;
 	function express(): Express;
 	function express(config: ExpressConfig): Express;
+	function hono(): Hono;
+	function hono(config: HonoConfig): Hono;
 `;
 			else
 				result += `
@@ -468,11 +478,40 @@ export interface ExpressConfig {
 	hooks?: ExpressHooks;
 }
 
+export interface HonoConfig {
+	db?: Pool | (() => Pool);
+	tables?: HonoTables;
+	concurrency?: Concurrency;
+	readonly?: boolean;
+	disableBulkDeletes?: boolean;
+	hooks?: HonoHooks;
+}
+
 export interface ExpressContext {
 	request: import('express').Request;
 	response: import('express').Response;
 	client: RdbClient;
 }		
+
+export interface HonoRequest {
+	method: string;
+	query: Record<string, string>;
+	headers: Record<string, string>;
+	json(): Promise<unknown>;
+}
+
+export interface HonoResponse {
+	status(code: number): HonoResponse;
+	setHeader(name: string, value: string): HonoResponse;
+	json(value: unknown): unknown;
+	send(value: unknown): unknown;
+}
+
+export interface HonoContext {
+	request: HonoRequest;
+	response: HonoResponse;
+	client: RdbClient;
+}
 
 export interface ExpressTransactionHooks {
 	beforeBegin?: (db: Pool, request: import('express').Request, response: import('express').Response) => void | Promise<void>;
@@ -486,7 +525,22 @@ export interface ExpressHooks extends ExpressTransactionHooks {
 	transaction?: ExpressTransactionHooks;
 }
 
+export interface HonoTransactionHooks {
+	beforeBegin?: (db: Pool, request: HonoRequest, response: HonoResponse) => void | Promise<void>;
+	afterBegin?: (db: Pool, request: HonoRequest, response: HonoResponse) => void | Promise<void>;
+	beforeCommit?: (db: Pool, request: HonoRequest, response: HonoResponse) => void | Promise<void>;
+	afterCommit?: (db: Pool, request: HonoRequest, response: HonoResponse) => void | Promise<void>;
+	afterRollback?: (db: Pool, request: HonoRequest, response: HonoResponse, error?: unknown) => void | Promise<void>;
+}
+
+export interface HonoHooks extends HonoTransactionHooks {
+	transaction?: HonoTransactionHooks;
+}
+
 export interface ExpressTables {${getExpressTables()}
+}
+
+export interface HonoTables {${getHonoTables()}
 }
 `;
 		function getConcurrencyTables() {
@@ -537,6 +591,8 @@ export interface ExpressTables {${getExpressTables()}
 	createPatch(original: any, modified: any): JsonPatch;
 	express(): Express;
 	express(config: ExpressConfig): Express;
+	hono(): Hono;
+	hono(config: HonoConfig): Hono;
 	readonly metaData: MetaData;`;
 			return result;
 		}
@@ -547,6 +603,16 @@ export interface ExpressTables {${getExpressTables()}
 				result +=
 					`
 	${name}?: boolean | ${Name}ExpressConfig;`;
+			}
+			return result;
+		}
+		function getHonoTables() {
+			let result = '';
+			for (let name in tables) {
+				let Name = name.substring(0, 1).toUpperCase() + name.substring(1);
+				result +=
+					`
+	${name}?: boolean | ${Name}HonoConfig;`;
 			}
 			return result;
 		}
@@ -739,6 +805,172 @@ function requireHostExpress () {
 
 	hostExpress_1 = hostExpress;
 	return hostExpress_1;
+}
+
+var hostHono_1;
+var hasRequiredHostHono;
+
+function requireHostHono () {
+	if (hasRequiredHostHono) return hostHono_1;
+	hasRequiredHostHono = 1;
+	const getTSDefinition = requireGetTSDefinition();
+	const getMeta = requireGetMeta();
+
+	function hostHono(hostLocal, client, options = {}) {
+		if ('db' in options && (options.db ?? undefined) === undefined || !client.db)
+			throw new Error('No db specified');
+		const dbOptions = { db: options.db || client.db };
+		let c = {};
+		const readonly = { readonly: options.readonly };
+		const sharedHooks = options.hooks;
+		for (let tableName in client.tables) {
+			const tableOptions = options[tableName] || {};
+			const hooks = tableOptions.hooks || sharedHooks;
+			c[tableName] = hostLocal({
+				...dbOptions,
+				...readonly,
+				...tableOptions,
+				table: client.tables[tableName],
+				isHttp: true,
+				client,
+				hooks
+			});
+		}
+
+		async function handler(ctx) {
+			const request = createRequest(ctx);
+			const response = createResponse();
+
+			try {
+				if (request.method === 'POST')
+					return await post(request, response);
+				if (request.method === 'PATCH')
+					return await patch(request, response);
+				if (request.method === 'GET')
+					return get(request, response);
+				if (request.method === 'OPTIONS')
+					return handleOptions(response);
+				return response
+					.status(405)
+					.setHeader('Allow', 'GET, POST, PATCH, OPTIONS')
+					.send('Method Not Allowed');
+			}
+			catch (e) {
+				if (e.status === undefined)
+					return response.status(500).send(e.message || e);
+				return response.status(e.status).send(e.message);
+			}
+		}
+
+		handler.db = handler;
+		handler.dts = get;
+
+		function get(request, response) {
+			if (request.query.table) {
+				if (!(request.query.table in c)) {
+					let e = new Error('Table is not exposed or does not exist');
+					// @ts-ignore
+					e.status = 400;
+					throw e;
+				}
+
+				const result = getMeta(client.tables[request.query.table]);
+				response.setHeader('content-type', 'text/plain');
+				return response.status(200).send(result);
+			}
+			const isNamespace = request.query.isNamespace === 'true';
+			let tsArg = Object.keys(c).map(x => {
+				return { table: client.tables[x], customFilters: options?.tables?.[x].customFilters, name: x };
+			});
+			response.setHeader('content-type', 'text/plain');
+			return response.status(200).send(getTSDefinition(tsArg, { isNamespace, isHttp: true }));
+		}
+
+		async function patch(request, response) {
+			const table = request.query.table;
+			const body = await request.json();
+			return response.json(await c[table].patch(body, request, response));
+		}
+
+		async function post(request, response) {
+			if (!request.query.table) {
+				let e = new Error('Table not defined');
+				// @ts-ignore
+				e.status = 400;
+				throw e;
+			}
+			if (!(request.query.table in c)) {
+				let e = new Error('Table is not exposed or does not exist');
+				// @ts-ignore
+				e.status = 400;
+				throw e;
+			}
+
+			const body = await request.json();
+			return response.json(await c[request.query.table].post(body, request, response));
+		}
+
+		function handleOptions(response) {
+			response.setHeader('Access-Control-Allow-Origin', '*');
+			response.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
+			response.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+			response.setHeader('Access-Control-Max-Age', '86400');
+			return response.status(204).send('');
+		}
+
+		function createRequest(ctx) {
+			let bodyPromise;
+			const query = Object.fromEntries(new URL(ctx.req.url).searchParams.entries());
+			const headers = {};
+			for (const [name, value] of ctx.req.raw.headers.entries())
+				headers[name] = value;
+			return {
+				method: ctx.req.method,
+				query,
+				headers,
+				json: async () => {
+					if (!bodyPromise)
+						bodyPromise = ctx.req.json();
+					return bodyPromise;
+				}
+			};
+		}
+
+		function createResponse() {
+			let statusCode = 200;
+			const headers = new Headers();
+			return {
+				status(code) {
+					statusCode = code;
+					return this;
+				},
+				setHeader(name, value) {
+					headers.set(name, value);
+					return this;
+				},
+				json(value) {
+					if (!headers.has('content-type'))
+						headers.set('content-type', 'application/json');
+					return new Response(JSON.stringify(value), { status: statusCode, headers });
+				},
+				send(value) {
+					if (typeof value === 'string') {
+						if (!headers.has('content-type'))
+							headers.set('content-type', 'text/plain');
+						return new Response(value, { status: statusCode, headers });
+					}
+					if (!headers.has('content-type'))
+						headers.set('content-type', 'application/json');
+					return new Response(JSON.stringify(value), { status: statusCode, headers });
+				}
+			};
+		}
+
+		return handler;
+	}
+
+	hostHono_1 = hostHono;
+	return hostHono_1;
 }
 
 var require$$0$3 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(fastJsonPatch);
@@ -2289,6 +2521,7 @@ function requireHostLocal () {
 	let executeQuery = requireQuery();
 	let executeSqliteFunction = requireSqliteFunction();
 	let hostExpress = requireHostExpress();
+	let hostHono = requireHostHono();
 	const readonlyOps = ['getManyDto', 'getMany', 'aggregate', 'count'];
 	// { db, table, defaultConcurrency,
 	// 	concurrency,
@@ -2303,7 +2536,7 @@ function requireHostLocal () {
 		const getTransactionHook = (name) =>
 			(transactionHooks && transactionHooks[name]) || (hooks && hooks[name]);
 
-		let c = { get, post, patch, query, sqliteFunction, express };
+		let c = { get, post, patch, query, sqliteFunction, express, hono };
 
 		function get() {
 			return getMeta(table);
@@ -2450,6 +2683,10 @@ function requireHostLocal () {
 
 		function express(client, options) {
 			return hostExpress(hostLocal, client, options);
+		}
+
+		function hono(client, options) {
+			return hostHono(hostLocal, client, options);
 		}
 
 		return c;
@@ -2945,6 +3182,7 @@ function requireClient () {
 		client.http = onProvider.bind(null, 'http');//todo
 		client.mysql = onProvider.bind(null, 'mysql');
 		client.express = express;
+		client.hono = hono;
 		client.close = close;
 
 		function close() {
@@ -3030,6 +3268,14 @@ function requireClient () {
 			}
 			else
 				throw new Error('Cannot host express clientside');
+		}
+
+		function hono(arg) {
+			if (providers.hono) {
+				return providers.hono(client, { ...options, ...arg });
+			}
+			else
+				throw new Error('Cannot host hono clientside');
 		}
 
 
@@ -12925,6 +13171,7 @@ function requireCreateProviders () {
 		});
 
 		dbMap.express = index.express;
+		dbMap.hono = index.hono;
 
 		function createPool(providerName, ...args) {
 			const provider = index[providerName];
@@ -15132,6 +15379,7 @@ function requireNewDatabase$2 () {
 	let rollback = requireRollback();
 	let newPool = requireNewPool$2();
 	let express = requireHostExpress();
+	let hono = requireHostHono();
 	let hostLocal = requireHostLocal();
 	let doQuery = requireQuery();
 	let releaseDbClient = requireReleaseDbClient();
@@ -15142,7 +15390,7 @@ function requireNewDatabase$2 () {
 		poolOptions = poolOptions || { min: 1 };
 		var pool = newPool(d1Database, poolOptions);
 
-		let c = {poolFactory: pool, hostLocal, express};
+		let c = { poolFactory: pool, hostLocal, express, hono };
 
 		c.transaction = function(options, fn) {
 			if ((arguments.length === 1) && (typeof options === 'function')) {
@@ -15883,6 +16131,7 @@ function requireNewDatabase$1 () {
 	let lock = requireLock();
 	let executeSchema = requireSchema();
 	let express = requireHostExpress();
+	let hono = requireHostHono();
 	let hostLocal = requireHostLocal();
 	let doQuery = requireQuery();
 	let releaseDbClient = requireReleaseDbClient();
@@ -15891,7 +16140,7 @@ function requireNewDatabase$1 () {
 		poolOptions = poolOptions || { min: 1 };
 		var pool = newPool(connectionString, poolOptions);
 
-		let c = { poolFactory: pool, hostLocal, express };
+		let c = { poolFactory: pool, hostLocal, express, hono };
 
 		c.transaction = function(options, fn) {
 			if ((arguments.length === 1) && (typeof options === 'function')) {
@@ -16425,6 +16674,7 @@ function requireNewDatabase () {
 	let lock = requireLock();
 	let executeSchema = requireSchema();
 	let express = requireHostExpress();
+	let hono = requireHostHono();
 	let hostLocal = requireHostLocal();
 	let doQuery = requireQuery();
 	let releaseDbClient = requireReleaseDbClient();
@@ -16435,7 +16685,7 @@ function requireNewDatabase () {
 		poolOptions = poolOptions || { min: 1 };
 		var pool = newPool(connectionString, poolOptions);
 
-		let c = { poolFactory: pool, hostLocal, express };
+		let c = { poolFactory: pool, hostLocal, express, hono };
 
 		c.transaction = function(options, fn) {
 			if ((arguments.length === 1) && (typeof options === 'function')) {
@@ -16548,6 +16798,7 @@ function requireIndexBrowser () {
 	if (hasRequiredIndexBrowser) return indexBrowser$1;
 	hasRequiredIndexBrowser = 1;
 	const hostExpress = requireHostExpress();
+	const hostHono = requireHostHono();
 	const hostLocal = requireHostLocal();
 	const client = requireClient();
 	const map = requireMap();
@@ -16612,6 +16863,7 @@ function requireIndexBrowser () {
 
 
 	connectViaPool.express = hostExpress.bind(null, hostLocal);
+	connectViaPool.hono = hostHono.bind(null, hostLocal);
 
 	indexBrowser$1 = connectViaPool;
 	return indexBrowser$1;

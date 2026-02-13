@@ -65,6 +65,7 @@ function createProviders(index) {
 	});
 
 	dbMap.express = index.express;
+	dbMap.hono = index.hono;
 
 	function createPool(providerName, ...args) {
 		const provider = index[providerName];

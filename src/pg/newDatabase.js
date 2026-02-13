@@ -7,6 +7,7 @@ let newPool = require('./newPool');
 let lock = require('../lock');
 let executeSchema = require('./schema');
 let express = require('../hostExpress');
+let hono = require('../hostHono');
 let hostLocal = require('../hostLocal');
 let doQuery = require('../query');
 let releaseDbClient = require('../table/releaseDbClient');
@@ -17,7 +18,7 @@ function newDatabase(connectionString, poolOptions) {
 	poolOptions = poolOptions || { min: 1 };
 	var pool = newPool(connectionString, poolOptions);
 
-	let c = { poolFactory: pool, hostLocal, express };
+	let c = { poolFactory: pool, hostLocal, express, hono };
 
 	c.transaction = function(options, fn) {
 		if ((arguments.length === 1) && (typeof options === 'function')) {

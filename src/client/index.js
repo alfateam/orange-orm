@@ -66,6 +66,7 @@ function rdbClient(options = {}) {
 	client.http = onProvider.bind(null, 'http');//todo
 	client.mysql = onProvider.bind(null, 'mysql');
 	client.express = express;
+	client.hono = hono;
 	client.close = close;
 
 	function close() {
@@ -151,6 +152,14 @@ function rdbClient(options = {}) {
 		}
 		else
 			throw new Error('Cannot host express clientside');
+	}
+
+	function hono(arg) {
+		if (providers.hono) {
+			return providers.hono(client, { ...options, ...arg });
+		}
+		else
+			throw new Error('Cannot host hono clientside');
 	}
 
 

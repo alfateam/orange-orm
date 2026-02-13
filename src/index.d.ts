@@ -168,6 +168,33 @@ declare namespace r {
         dts: import('express').RequestHandler
     }
 
+    export interface Hono {
+        (context: HonoContextLike): unknown | Promise<unknown>;
+        db: (context: HonoContextLike) => unknown | Promise<unknown>;
+        dts: (request: HonoRequestLike, response: HonoResponseLike) => unknown | Promise<unknown>;
+    }
+
+    export interface HonoRequestLike {
+        method: string;
+        url: string;
+        header(name: string): string | undefined;
+        json(): Promise<unknown>;
+        raw: {
+            headers: Iterable<[string, string]>;
+        };
+    }
+
+    export interface HonoContextLike {
+        req: HonoRequestLike;
+    }
+
+    export interface HonoResponseLike {
+        status(code: number): HonoResponseLike;
+        setHeader(name: string, value: string): HonoResponseLike;
+        json(value: unknown): unknown;
+        send(value: unknown): unknown;
+    }
+
     export interface CustomFilters {
         [key: string]: (...args: any[]) => RawFilter | CustomFilters
     }
@@ -254,7 +281,7 @@ declare namespace r {
          */
         ge(value: TType | null): Filter;
         between(from: TType, to: TType | null): Filter;
-        in(values: TType[] | null): Filter;
+        in(values: readonly TType[] | null): Filter;
     }
 
     interface ColumnBase2<TType, TType2> {
@@ -289,7 +316,7 @@ declare namespace r {
          */
         ge(value: TType | TType2 | null): Filter;
         between(from: TType | TType2, to: TType | TType2): Filter;
-        in(values: Array<TType | TType2>[] | null): Filter;
+        in(values: readonly (TType | TType2)[] | null): Filter;
     }
 
     export interface TransactionOptions {

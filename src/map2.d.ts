@@ -99,9 +99,9 @@ export type ColumnFilterType<Val, ColumnType = any> = {
   gt(value: Val | null | undefined): Filter;
   greaterThanOrEqual(value: Val | null | undefined): Filter;
   ge(value: Val | null | undefined): Filter;
-  in(values: (Val | null | undefined)[]): Filter;
+  in(values: readonly (Val | null | undefined)[]): Filter;
   between(from: Val | null | undefined, to: Val | null | undefined): Filter;
-  notIn(values: (Val | null | undefined)[]): Filter;
+  notIn(values: readonly (Val | null | undefined)[]): Filter;
 } & (ColumnType extends 'string' ? StringOnlyMethods : {});
 
 export type JsonArray = Array<JsonValue>;
@@ -921,10 +921,42 @@ export type DBClient<M extends Record<string, TableDefinition<M>>> = {
   ): Promise<TR>;
   express(): import('express').RequestHandler;
   express(config: ExpressConfig<M>): import('express').RequestHandler;
+  hono(): HonoHandler;
+  hono(config: HonoConfig<M>): HonoHandler;
   readonly metaData: DbConcurrency<M>;
 
   interceptors: WithInterceptors;
 } & WithInterceptors & DbConnectable<M>;
+
+type HonoRequest = {
+  method: string;
+  query: Record<string, string>;
+  headers: Record<string, string>;
+  json(): Promise<unknown>;
+}
+
+type HonoResponse = {
+  status(code: number): HonoResponse;
+  setHeader(name: string, value: string): HonoResponse;
+  json(value: unknown): unknown;
+  send(value: unknown): unknown;
+}
+
+type HonoRawRequest = {
+  method: string;
+  url: string;
+  header(name: string): string | undefined;
+  json(): Promise<unknown>;
+  raw: {
+    headers: Iterable<[string, string]>;
+  };
+}
+
+type HonoContextLike = {
+  req: HonoRawRequest;
+}
+
+type HonoHandler = (context: HonoContextLike) => unknown | Promise<unknown>;
 
 type ExpressConfig<M extends Record<string, TableDefinition<M>>> = {
   [TableName in keyof M]?: ExpressTableConfig<M>;
@@ -933,8 +965,19 @@ type ExpressConfig<M extends Record<string, TableDefinition<M>>> = {
   hooks?: ExpressHooks<M>;
 }
 
+type HonoConfig<M extends Record<string, TableDefinition<M>>> = {
+  [TableName in keyof M]?: HonoTableConfig<M>;
+} & {
+  db?: Pool | ((connectors: Connectors) => Pool | Promise<Pool>);
+  hooks?: HonoHooks<M>;
+}
+
 type ExpressTableConfig<M extends Record<string, TableDefinition<M>>> = {
   baseFilter?: RawFilter | ((db: DBClient<M>, req: import('express').Request, res: import('express').Response) => RawFilter);
+}
+
+type HonoTableConfig<M extends Record<string, TableDefinition<M>>> = {
+  baseFilter?: RawFilter | ((db: DBClient<M>, req: HonoRequest, res: HonoResponse) => RawFilter);
 }
 
 type ExpressTransactionHooks<M extends Record<string, TableDefinition<M>>> = {
@@ -945,8 +988,20 @@ type ExpressTransactionHooks<M extends Record<string, TableDefinition<M>>> = {
   afterRollback?: (db: DBClient<M>, req: import('express').Request, res: import('express').Response, error?: unknown) => void | Promise<void>;
 }
 
+type HonoTransactionHooks<M extends Record<string, TableDefinition<M>>> = {
+  beforeBegin?: (db: DBClient<M>, req: HonoRequest, res: HonoResponse) => void | Promise<void>;
+  afterBegin?: (db: DBClient<M>, req: HonoRequest, res: HonoResponse) => void | Promise<void>;
+  beforeCommit?: (db: DBClient<M>, req: HonoRequest, res: HonoResponse) => void | Promise<void>;
+  afterCommit?: (db: DBClient<M>, req: HonoRequest, res: HonoResponse) => void | Promise<void>;
+  afterRollback?: (db: DBClient<M>, req: HonoRequest, res: HonoResponse, error?: unknown) => void | Promise<void>;
+}
+
 type ExpressHooks<M extends Record<string, TableDefinition<M>>> = ExpressTransactionHooks<M> & {
   transaction?: ExpressTransactionHooks<M>;
+}
+
+type HonoHooks<M extends Record<string, TableDefinition<M>>> = HonoTransactionHooks<M> & {
+  transaction?: HonoTransactionHooks<M>;
 }
 
 export type DeepExpand<T> =

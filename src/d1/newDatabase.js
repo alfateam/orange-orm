@@ -5,6 +5,7 @@ let commit = require('../table/commit');
 let rollback = require('../table/rollback');
 let newPool = require('./newPool');
 let express = require('../hostExpress');
+let hono = require('../hostHono');
 let hostLocal = require('../hostLocal');
 let doQuery = require('../query');
 let releaseDbClient = require('../table/releaseDbClient');
@@ -15,7 +16,7 @@ function newDatabase(d1Database, poolOptions) {
 	poolOptions = poolOptions || { min: 1 };
 	var pool = newPool(d1Database, poolOptions);
 
-	let c = {poolFactory: pool, hostLocal, express};
+	let c = { poolFactory: pool, hostLocal, express, hono };
 
 	c.transaction = function(options, fn) {
 		if ((arguments.length === 1) && (typeof options === 'function')) {

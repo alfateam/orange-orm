@@ -4,6 +4,7 @@ let setSessionSingleton = require('./table/setSessionSingleton');
 let executeQuery = require('./query');
 let executeSqliteFunction = require('./sqliteFunction');
 let hostExpress = require('./hostExpress');
+let hostHono = require('./hostHono');
 const readonlyOps = ['getManyDto', 'getMany', 'aggregate', 'count'];
 // { db, table, defaultConcurrency,
 // 	concurrency,
@@ -18,7 +19,7 @@ function hostLocal() {
 	const getTransactionHook = (name) =>
 		(transactionHooks && transactionHooks[name]) || (hooks && hooks[name]);
 
-	let c = { get, post, patch, query, sqliteFunction, express };
+	let c = { get, post, patch, query, sqliteFunction, express, hono };
 
 	function get() {
 		return getMeta(table);
@@ -165,6 +166,10 @@ function hostLocal() {
 
 	function express(client, options) {
 		return hostExpress(hostLocal, client, options);
+	}
+
+	function hono(client, options) {
+		return hostHono(hostLocal, client, options);
 	}
 
 	return c;
