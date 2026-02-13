@@ -1,4 +1,9 @@
 ## Changelog
+__5.0.1__  
+Support for Hono [#149](https://github.com/alfateam/orange-orm/issues/149)  
+Removed dependency `glob`  
+Removed dependency `module-definition`  
+Removed dependency `findup-sync`  
 __5.0.0__  
 Breaking: `getAll` was removed. Use `getMany` instead (now with the same signature as the removed `getAll`).  
 Breaking: `getOne` no longer accepts a filter as the first argument. Move the filter to the strategy `where` clause (same pattern as `getMany`).  
