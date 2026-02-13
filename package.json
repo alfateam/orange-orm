@@ -1,6 +1,6 @@
 {
     "name": "orange-orm",
-    "version": "5.0.1-beta.0",    
+    "version": "5.0.1-beta.0",
     "publishConfig": {
         "access": "public"
     },
@@ -81,18 +81,17 @@
         "axios": "^1.6.2",
         "fast-json-patch": "^3.1.1",
         "findup-sync": "^5.0.0",
-        "module-definition": "^4.0.0 || ^5.0.0 || || ^6.0.0",
         "rfdc": "^1.2.0",
         "uuid": "^8.3.2 || ^9.0.0 || ^10.0.0 || ^11.1.0"
     },
     "peerDependencies": {
         "@electric-sql/pglite": "^0.3.0",
+        "better-sqlite3": "^11.8.1",
         "msnodesqlv8": "^4.1.0 || ^5.0.0",
         "mysql2": "^2.2.5 || ^3.9.4",
         "oracledb": "^6.3.0",
         "pg": "^8.5.1",
         "pg-query-stream": "^3.3.2",
-        "better-sqlite3": "^11.8.1",
         "tedious": "^15.1.2 || ^16.0.0 || ^18.1.0 || || ^19.0.0"
     },
     "peerDependenciesMeta": {
@@ -132,6 +131,7 @@
         "@typescript-eslint/eslint-plugin": "^6.x",
         "@typescript-eslint/parser": "^6.x",
         "@vitest/coverage-v8": "^3.2.4",
+        "better-sqlite3": "^11.8.1",
         "cors": "^2.8.5",
         "eslint": "^8.57.0",
         "eslint-plugin-jest": "^27.1.7",
@@ -143,7 +143,6 @@
         "pg": "^8.5.1",
         "pg-query-stream": "^3.3.2",
         "rollup": "^2.52.7",
-        "better-sqlite3": "^11.8.1",
         "tedious": "^19.0.0",
         "typescript": "^5.4.5",
         "vitest": "^3.2.4"

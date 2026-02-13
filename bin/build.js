@@ -6,7 +6,6 @@ let fs = require('fs');
 let util = require('util');
 let writeFile = util.promisify(fs.writeFile);
 let ts = require('typescript');
-let moduleDefinition = require('module-definition');
 let getTSDefinition = require('../src/getTSDefinition');
 const _axios = require('axios');
 const axios = _axios.default ? _axios.default.create() : _axios.create();
@@ -72,10 +71,45 @@ async function runSingle(schemaTs) {
 async function writeIndexJs(schemaJsPath) {
 	const schema = path.basename(schemaJsPath);
 	const indexJs = path.join(path.dirname(schemaJsPath), '/index' + path.extname(schemaJsPath));
-	if (moduleDefinition.sync(schemaJsPath) === 'commonjs')
+	if (detectModuleFormat(schemaJsPath) === 'commonjs')
 		await writeFile(indexJs, `module.exports = require('./${schema}');`);
 	else
 		await writeFile(indexJs, `export {default} from './${schema}';`);
+}
+
+function detectModuleFormat(filePath) {
+	const extension = path.extname(filePath);
+	if (extension === '.mjs')
+		return 'module';
+	if (extension === '.cjs')
+		return 'commonjs';
+
+	const pkg = findClosestPackageJson(path.dirname(filePath));
+	if (pkg && pkg.type === 'module')
+		return 'module';
+
+	return 'commonjs';
+}
+
+function findClosestPackageJson(startDir) {
+	let currentDir = startDir;
+	while (currentDir) {
+		const packageJsonPath = path.join(currentDir, 'package.json');
+		if (fs.existsSync(packageJsonPath)) {
+			try {
+				return JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+			}
+			catch (e) {
+				return null;
+			}
+		}
+
+		const parentDir = path.dirname(currentDir);
+		if (parentDir === currentDir)
+			return null;
+		currentDir = parentDir;
+	}
+	return null;
 }
 
 async function findSchemaJs(cwd) {
