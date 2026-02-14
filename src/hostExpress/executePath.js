@@ -120,14 +120,16 @@ function _executePath(context, ...rest) {
 			return json;
 
 			function tryGetAnyAllNone(path, table) {
-				path = path.split('.');
-				for (let i = 0; i < path.length; i++) {
-					table = table[path[i]];
+				const parts = path.split('.');
+				for (let i = 0; i < parts.length; i++) {
+					table = table[parts[i]];
 				}
 
-				let ops = new Set(['all', 'any', 'none', 'count', 'where', '_aggregate']);
+				let ops = new Set(['all', 'any', 'none', 'where', '_aggregate']);
 				// let ops = new Set(['all', 'any', 'none', 'where']);
-				let last = path.slice(-1)[0];
+				let last = parts[parts.length - 1];
+				if (last === 'count' && parts.length > 1)
+					ops.add('count');
 				if (ops.has(last) || (table && (table._primaryColumns || (table.any && table.all))))
 					return table;
 			}
