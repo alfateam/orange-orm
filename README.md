@@ -1589,6 +1589,33 @@ async function getRows() {
   });
 }
 ```
+__Column-to-column filters__  
+You can compare one column to another column instead of comparing to a constant value.  
+This works both on the same table and across relations.
+
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  // equality between related columns
+  const sameName = await db.order.getMany({
+    where: x => x.deliveryAddress.name.eq(x.customer.name)
+  });
+
+  // string pattern match against another column
+  const containsName = await db.order.getMany({
+    where: x => x.deliveryAddress.name.contains(x.customer.name)
+  });
+
+  // column as one of the bounds in between
+  const withColumnBound = await db.customer.getMany({
+    where: x => x.balance.between(x.id, 180)
+  });
+}
+```
 __In__  
 ```javascript
 import map from './map';
