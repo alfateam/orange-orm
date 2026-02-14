@@ -128,6 +128,8 @@ export type HasManyRelationFilter<M extends Record<string, TableDefinition<M>>, 
   all(predicate: (row: RelationTableRefs<M, Target>) => Filter): Filter;
   none(predicate: (row: RelationTableRefs<M, Target>) => Filter): Filter;
   exists(): Filter;
+  count(): ColumnFilterType<number, 'numeric'>;
+  count(predicate: (row: RelationTableRefs<M, Target>) => Filter): ColumnFilterType<number, 'numeric'>;
 };
 
 export type FilterableSingleRelation<M extends Record<string, TableDefinition<M>>, Target extends keyof M> =

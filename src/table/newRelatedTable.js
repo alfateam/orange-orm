@@ -5,6 +5,7 @@ var all = require('./relatedTable/all');
 var where = require('./relatedTable/where');
 var aggregate = require('./relatedTable/aggregate');
 var none = require('./relatedTable/none');
+var count = require('./relatedTable/count');
 
 function newRelatedTable(relations, isShallow, depth = 0) {
 	var table = relations[relations.length - 1].childTable;
@@ -25,6 +26,9 @@ function newRelatedTable(relations, isShallow, depth = 0) {
 
 	// @ts-ignore
 	c.where =  where(relations, depth);
+
+	// @ts-ignore
+	c.count = count(newRelatedTable, relations, depth);
 
 	// @ts-ignore
 	c._aggregate = aggregate(relations);

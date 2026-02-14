@@ -90,9 +90,12 @@ function _executePath(context, ...rest) {
 
 				let anyAllNone = tryGetAnyAllNone(json.path, table);
 				if (anyAllNone) {
-					if (isHttp)
-						validateArgs(json.args[0]);
-					const f = anyAllNone(context, x => parseFilter(json.args[0], x));
+					const arg0 = json.args[0];
+					if (isHttp && arg0 !== undefined)
+						validateArgs(arg0);
+					const f = arg0 === undefined
+						? anyAllNone(context)
+						: anyAllNone(context, x => parseFilter(arg0, x));
 					if(!('isSafe' in f))
 						f.isSafe = isSafe;
 					return f;
@@ -119,7 +122,7 @@ function _executePath(context, ...rest) {
 					table = table[path[i]];
 				}
 
-				let ops = new Set(['all', 'any', 'none', 'where', '_aggregate']);
+				let ops = new Set(['all', 'any', 'none', 'count', 'where', '_aggregate']);
 				// let ops = new Set(['all', 'any', 'none', 'where']);
 				let last = path.slice(-1)[0];
 				if (ops.has(last) || (table && (table._primaryColumns || (table.any && table.all))))
@@ -154,8 +157,21 @@ function _executePath(context, ...rest) {
 					target = target[pathArray[i]];
 				}
 
-				if (!target)
+				if (!target) {
+					const left = args && args[0];
+					if (left) {
+						target = left;
+						for (let i = 0; i < pathArray.length; i++) {
+							target = target[pathArray[i]];
+						}
+						if (target) {
+							let res = target.apply(null, [context].concat(args.slice(1)));
+							setSafe(res);
+							return res;
+						}
+					}
 					throw new Error(`Method '${path}' does not exist`);
+				}
 				let res = target.apply(null, [context, ...args]);
 				setSafe(res);
 				return res;
@@ -201,7 +217,7 @@ function _executePath(context, ...rest) {
 
 		function nextTable(path, table) {
 			path = path.split('.');
-			let ops = new Set(['all', 'any', 'none']);
+			let ops = new Set(['all', 'any', 'none', 'count']);
 			let last = path.slice(-1)[0];
 			if (ops.has(last)) {
 				for (let i = 0; i < path.length - 1; i++) {

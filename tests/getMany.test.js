@@ -898,6 +898,78 @@ describe('getMany none sub filter', () => {
 	}
 });
 
+describe('getMany many-relation count filter', () => {
+	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+		const rows = await db.order.getMany({
+			where: x => x.lines.count().le(1),
+			orderBy: 'id'
+		});
+
+		for (let i = 0; i < rows.length; i++) {
+			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate));
+		}
+
+		const date2 = new Date(2021, 0, 11, 12, 22, 45);
+		const expected = [
+			{
+				id: 2,
+				orderDate: dateToISOString(date2),
+				customerId: 2,
+			}
+		];
+
+		expect(rows).toEqual(expected);
+	}
+});
+
+describe('getMany many-relation count filter with predicate', () => {
+	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+		const rows = await db.order.getMany({
+			where: x => x.lines.count(line => line.product.contains('guitar')).eq(1),
+			orderBy: 'id'
+		});
+
+		for (let i = 0; i < rows.length; i++) {
+			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate));
+		}
+
+		const date1 = new Date(2022, 0, 11, 9, 24, 47);
+		const expected = [
+			{
+				id: 1,
+				orderDate: dateToISOString(date1),
+				customerId: 1,
+			}
+		];
+
+		expect(rows).toEqual(expected);
+	}
+});
+
 describe('getMany', () => {
 	test('pg', async () => await verify('pg'));
 	test('pglite', async () => await verify('pglite'));
