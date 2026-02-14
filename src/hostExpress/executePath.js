@@ -114,6 +114,9 @@ function _executePath(context, ...rest) {
 				}
 				return result;
 			}
+			else if (isColumnRef(json)) {
+				return resolveColumnRef(table, json.__columnRef);
+			}
 			return json;
 
 			function tryGetAnyAllNone(path, table) {
@@ -474,6 +477,27 @@ function _executePath(context, ...rest) {
 
 	function isFilter(json) {
 		return json instanceof Object && 'path' in json && 'args' in json;
+	}
+
+	function isColumnRef(json) {
+		return json instanceof Object && typeof json.__columnRef === 'string';
+	}
+
+	function resolveColumnRef(table, path) {
+		let current = table;
+		const parts = path.split('.');
+		for (let i = 0; i < parts.length; i++) {
+			if (current)
+				current = current[parts[i]];
+		}
+
+		if (!current || typeof current._toFilterArg !== 'function') {
+			let e = new Error(`Column reference '${path}' is invalid`);
+			// @ts-ignore
+			e.status = 400;
+			throw e;
+		}
+		return current;
 	}
 
 	function setSafe(o) {

@@ -644,6 +644,65 @@ describe('in filter with NOT and combined OR/AND', () => {
 	}
 });
 
+describe('between filter', () => {
+	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+		const rows = await db.customer.getMany({
+			where: x => x.balance.between(178, 200),
+			orderBy: 'id'
+		});
+
+		const expected = [{
+			id: 2,
+			name: 'Harry',
+			balance: 200,
+			isActive: true
+		}];
+
+		expect(rows).toEqual(expected);
+	}
+});
+
+describe('between filter with column bound', () => {
+	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+		const rows = await db.customer.getMany({
+			where: x => x.balance.between(x.id, 180),
+			orderBy: 'id'
+		});
+
+		const expected = [{
+			id: 1,
+			name: 'George',
+			balance: 177,
+			isActive: true
+		}];
+
+		expect(rows).toEqual(expected);
+	}
+});
 
 describe('any-subFilter filter nested', () => {
 	test('pg', async () => await verify('pg'));
@@ -1804,6 +1863,159 @@ describe('sqlite function', () => {
 				name: 'Harry',
 				prefixedName: '[VIP] Harry'
 			}];
+		expect(rows).toEqual(expected);
+	}
+});
+
+describe('column to column filter', () => {
+	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+		const rows = await db.order.getMany({
+			where: x => x.deliveryAddress.name.eq(x.customer.name),
+			orderBy: 'id'
+		});
+		console.dir(rows, {depth: Infinity});
+
+		for (let i = 0; i < rows.length; i++) {
+			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate));
+		}
+
+		const date1 = new Date(2022, 0, 11, 9, 24, 47);
+		const expected = [
+			{
+				id: 1,
+				orderDate: dateToISOString(date1),
+				customerId: 1,
+			}
+		];
+		expect(rows).toEqual(expected);
+	}
+});
+
+describe('column to column contains filter', () => {
+	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+		const rows = await db.order.getMany({
+			where: x => x.deliveryAddress.name.contains(x.customer.name),
+			orderBy: 'id'
+		});
+
+		for (let i = 0; i < rows.length; i++) {
+			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate));
+		}
+
+		const date1 = new Date(2022, 0, 11, 9, 24, 47);
+		const date2 = new Date(2021, 0, 11, 12, 22, 45);
+		const expected = [
+			{
+				id: 1,
+				orderDate: dateToISOString(date1),
+				customerId: 1,
+			},
+			{
+				id: 2,
+				orderDate: dateToISOString(date2),
+				customerId: 2,
+			}
+		];
+		expect(rows).toEqual(expected);
+	}
+});
+
+describe('column to column startsWith filter', () => {
+	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+		const rows = await db.order.getMany({
+			where: x => x.deliveryAddress.name.startsWith(x.customer.name),
+			orderBy: 'id'
+		});
+
+		for (let i = 0; i < rows.length; i++) {
+			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate));
+		}
+
+		const date1 = new Date(2022, 0, 11, 9, 24, 47);
+		const date2 = new Date(2021, 0, 11, 12, 22, 45);
+		const expected = [
+			{
+				id: 1,
+				orderDate: dateToISOString(date1),
+				customerId: 1,
+			},
+			{
+				id: 2,
+				orderDate: dateToISOString(date2),
+				customerId: 2,
+			}
+		];
+		expect(rows).toEqual(expected);
+	}
+});
+
+describe('column to column endsWith filter', () => {
+	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+		const rows = await db.order.getMany({
+			where: x => x.deliveryAddress.name.endsWith(x.customer.name),
+			orderBy: 'id'
+		});
+
+		for (let i = 0; i < rows.length; i++) {
+			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate));
+		}
+
+		const date1 = new Date(2022, 0, 11, 9, 24, 47);
+		const expected = [
+			{
+				id: 1,
+				orderDate: dateToISOString(date1),
+				customerId: 1,
+			}
+		];
 		expect(rows).toEqual(expected);
 	}
 });

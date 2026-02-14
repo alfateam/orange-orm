@@ -75,34 +75,40 @@ export interface Filter extends RawFilter {
   not(): Filter;
 }
 
-type StringOnlyMethods = {
-  startsWith(value: string | null | undefined): Filter;
-  iStartsWith(value: string | null | undefined): Filter;
-  endsWith(value: string | null | undefined): Filter;
-  iEndsWith(value: string | null | undefined): Filter;
-  contains(value: string | null | undefined): Filter;
-  iContains(value: string | null | undefined): Filter;
-  iEqual(value: string | null | undefined): Filter;
-  ieq(value: string | null | undefined): Filter;
+type ComparableValue<Val, ColumnType = any> =
+  | Val
+  | null
+  | undefined
+  | ColumnFilterType<any, ColumnType>;
+
+type StringOnlyMethods<ColumnType = 'string'> = {
+  startsWith(value: ComparableValue<string, ColumnType>): Filter;
+  iStartsWith(value: ComparableValue<string, ColumnType>): Filter;
+  endsWith(value: ComparableValue<string, ColumnType>): Filter;
+  iEndsWith(value: ComparableValue<string, ColumnType>): Filter;
+  contains(value: ComparableValue<string, ColumnType>): Filter;
+  iContains(value: ComparableValue<string, ColumnType>): Filter;
+  iEqual(value: ComparableValue<string, ColumnType>): Filter;
+  ieq(value: ComparableValue<string, ColumnType>): Filter;
 };
 
 export type ColumnFilterType<Val, ColumnType = any> = {
-  equal(value: Val | null | undefined): Filter;
-  eq(value: Val | null | undefined): Filter;
-  notEqual(value: Val | null | undefined): Filter;
-  ne(value: Val | null | undefined): Filter;
-  lessThan(value: Val | null | undefined): Filter;
-  lt(value: Val | null | undefined): Filter;
-  lessThanOrEqual(value: Val | null | undefined): Filter;
-  le(value: Val | null | undefined): Filter;
-  greaterThan(value: Val | null | undefined): Filter;
-  gt(value: Val | null | undefined): Filter;
-  greaterThanOrEqual(value: Val | null | undefined): Filter;
-  ge(value: Val | null | undefined): Filter;
-  in(values: readonly (Val | null | undefined)[]): Filter;
-  between(from: Val | null | undefined, to: Val | null | undefined): Filter;
-  notIn(values: readonly (Val | null | undefined)[]): Filter;
-} & (ColumnType extends 'string' ? StringOnlyMethods : {});
+  equal(value: ComparableValue<Val, ColumnType>): Filter;
+  eq(value: ComparableValue<Val, ColumnType>): Filter;
+  notEqual(value: ComparableValue<Val, ColumnType>): Filter;
+  ne(value: ComparableValue<Val, ColumnType>): Filter;
+  lessThan(value: ComparableValue<Val, ColumnType>): Filter;
+  lt(value: ComparableValue<Val, ColumnType>): Filter;
+  lessThanOrEqual(value: ComparableValue<Val, ColumnType>): Filter;
+  le(value: ComparableValue<Val, ColumnType>): Filter;
+  greaterThan(value: ComparableValue<Val, ColumnType>): Filter;
+  gt(value: ComparableValue<Val, ColumnType>): Filter;
+  greaterThanOrEqual(value: ComparableValue<Val, ColumnType>): Filter;
+  ge(value: ComparableValue<Val, ColumnType>): Filter;
+  in(values: readonly ComparableValue<Val, ColumnType>[]): Filter;
+  between(from: ComparableValue<Val, ColumnType>, to: ComparableValue<Val, ColumnType>): Filter;
+  notIn(values: readonly ComparableValue<Val, ColumnType>[]): Filter;
+} & (ColumnType extends 'string' ? StringOnlyMethods<ColumnType> : {});
 
 export type JsonArray = Array<JsonValue>;
 export type JsonObject = { [key: string]: JsonValue };

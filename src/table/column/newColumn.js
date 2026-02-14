@@ -9,6 +9,7 @@ const _extractAlias = require('./extractAlias');
 const quote = require('../../table/quote');
 const aggregate = require('./columnAggregate');
 const aggregateGroup = require('./columnAggregateGroup');
+const newParameterized = require('../query/newParameterized');
 
 module.exports = function(table, name) {
 	var c = {};
@@ -16,6 +17,16 @@ module.exports = function(table, name) {
 	c._dbName = name;
 	c.alias = name;
 	table._aliases.add(name);
+	Object.defineProperty(c, '_table', {
+		value: table,
+		enumerable: false,
+		writable: false
+	});
+	Object.defineProperty(c, '_toFilterArg', {
+		value: toFilterArg,
+		enumerable: false,
+		writable: false
+	});
 
 	c.dbNull = null;
 	table._columns.push(c);
@@ -99,6 +110,12 @@ module.exports = function(table, name) {
 			column: c,
 			groupBy: `${tableAlias}.${columnName}`
 		};
+	}
+
+	function toFilterArg(context) {
+		const tableAlias = quote(context, table._rootAlias || table._dbName);
+		const columnName = quote(context, c._dbName);
+		return newParameterized(`${tableAlias}.${columnName}`);
 	}
 
 	return c;
