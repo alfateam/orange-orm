@@ -114,6 +114,7 @@ function findClosestPackageJson(startDir) {
 function findClosestNodeModules(startPath) {
 	const startDir = fs.statSync(startPath).isDirectory() ? startPath : path.dirname(startPath);
 	let currentDir = startDir;
+	// eslint-disable-next-line no-constant-condition
 	while (true) {
 		const nodeModulesPath = path.join(currentDir, 'node_modules');
 		if (fs.existsSync(nodeModulesPath))
