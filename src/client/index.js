@@ -212,6 +212,7 @@ function rdbClient(options = {}) {
 			count,
 			getMany,
 			aggregate: groupBy,
+			distinct,
 			getAll,
 			getOne,
 			getById,
@@ -267,9 +268,17 @@ function rdbClient(options = {}) {
 		}
 
 		async function groupBy(strategy) {
+			return executeGroupBy('aggregate', strategy);
+		}
+
+		async function distinct(strategy) {
+			return executeGroupBy('distinct', strategy);
+		}
+
+		async function executeGroupBy(path, strategy) {
 			let args = negotiateGroupBy(null, strategy);
 			let body = stringify({
-				path: 'aggregate',
+				path,
 				args
 			});
 			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });

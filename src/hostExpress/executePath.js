@@ -76,7 +76,7 @@ function _executePath(context, ...rest) {
 
 	async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, request, response, readonly, disableBulkDeletes, isHttp, client }) {
 		let allowedOps = { ..._allowedOps, insert: !readonly, ...extractRelations(getMeta(table)) };
-		let ops = { ..._ops, ...getCustomFilterPaths(customFilters), getManyDto, getMany, aggregate, count, delete: _delete, cascadeDelete, update, replace };
+		let ops = { ..._ops, ...getCustomFilterPaths(customFilters), getManyDto, getMany, aggregate, distinct, count, delete: _delete, cascadeDelete, update, replace };
 
 		let res = await parseFilter(JSONFilter, table);
 		if (res === undefined)
@@ -370,6 +370,17 @@ function _executePath(context, ...rest) {
 			let args = [context, filter].concat(Array.prototype.slice.call(arguments).slice(1));
 			await negotiateWhereAndAggregate(strategy);
 			return table.aggregate.apply(null, args);
+		}
+
+		async function distinct(filter, strategy) {
+			validateStrategy(table, strategy);
+			filter = negotiateFilter(filter);
+			const _baseFilter = await invokeBaseFilter();
+			if (_baseFilter)
+				filter = filter.and(context, _baseFilter);
+			let args = [context, filter].concat(Array.prototype.slice.call(arguments).slice(1));
+			await negotiateWhereAndAggregate(strategy);
+			return table.distinct.apply(null, args);
 		}
 
 

@@ -5,7 +5,7 @@ let executeQuery = require('./query');
 let executeSqliteFunction = require('./sqliteFunction');
 let hostExpress = require('./hostExpress');
 let hostHono = require('./hostHono');
-const readonlyOps = ['getManyDto', 'getMany', 'aggregate', 'count'];
+const readonlyOps = ['getManyDto', 'getMany', 'aggregate', 'distinct', 'count'];
 // { db, table, defaultConcurrency,
 // 	concurrency,
 // 	customFilters,

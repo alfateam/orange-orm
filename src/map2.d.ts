@@ -696,6 +696,7 @@ export type TableClient<M extends Record<string, TableDefinition<M>>, K extends 
 
   // Aggregate methods - return plain objects (no active record methods)
   aggregate<strategy extends AggregateStrategy<M, K>>(strategy: strategy): Promise<Array<DeepExpand<AggregateCustomSelectorProperties<M, K, strategy>>>>;
+  distinct<strategy extends AggregateStrategy<M, K>>(strategy: strategy): Promise<Array<DeepExpand<AggregateCustomSelectorProperties<M, K, strategy>>>>;
 
   // Single item methods - return individual objects with individual active record methods
   getOne<strategy extends FetchStrategy<M, K>>(
