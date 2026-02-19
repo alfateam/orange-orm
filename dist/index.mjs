@@ -1566,7 +1566,7 @@ function requireExecutePath () {
 
 		async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, request, response, readonly, disableBulkDeletes, isHttp, client }) {
 			let allowedOps = { ..._allowedOps, insert: !readonly, ...extractRelations(getMeta(table)) };
-			let ops = { ..._ops, ...getCustomFilterPaths(customFilters), getManyDto, getMany, aggregate, count, delete: _delete, cascadeDelete, update, replace };
+			let ops = { ..._ops, ...getCustomFilterPaths(customFilters), getManyDto, getMany, aggregate, distinct, count, delete: _delete, cascadeDelete, update, replace };
 
 			let res = await parseFilter(JSONFilter, table);
 			if (res === undefined)
@@ -1580,9 +1580,12 @@ function requireExecutePath () {
 
 					let anyAllNone = tryGetAnyAllNone(json.path, table);
 					if (anyAllNone) {
-						if (isHttp)
-							validateArgs(json.args[0]);
-						const f = anyAllNone(context, x => parseFilter(json.args[0], x));
+						const arg0 = json.args[0];
+						if (isHttp && arg0 !== undefined)
+							validateArgs(arg0);
+						const f = arg0 === undefined
+							? anyAllNone(context)
+							: anyAllNone(context, x => parseFilter(arg0, x));
 						if(!('isSafe' in f))
 							f.isSafe = isSafe;
 						return f;
@@ -1601,17 +1604,22 @@ function requireExecutePath () {
 					}
 					return result;
 				}
+				else if (isColumnRef(json)) {
+					return resolveColumnRef(table, json.__columnRef);
+				}
 				return json;
 
 				function tryGetAnyAllNone(path, table) {
-					path = path.split('.');
-					for (let i = 0; i < path.length; i++) {
-						table = table[path[i]];
+					const parts = path.split('.');
+					for (let i = 0; i < parts.length; i++) {
+						table = table[parts[i]];
 					}
 
 					let ops = new Set(['all', 'any', 'none', 'where', '_aggregate']);
 					// let ops = new Set(['all', 'any', 'none', 'where']);
-					let last = path.slice(-1)[0];
+					let last = parts[parts.length - 1];
+					if (last === 'count' && parts.length > 1)
+						ops.add('count');
 					if (ops.has(last) || (table && (table._primaryColumns || (table.any && table.all))))
 						return table;
 				}
@@ -1644,8 +1652,21 @@ function requireExecutePath () {
 						target = target[pathArray[i]];
 					}
 
-					if (!target)
+					if (!target) {
+						const left = args && args[0];
+						if (left) {
+							target = left;
+							for (let i = 0; i < pathArray.length; i++) {
+								target = target[pathArray[i]];
+							}
+							if (target) {
+								let res = target.apply(null, [context].concat(args.slice(1)));
+								setSafe(res);
+								return res;
+							}
+						}
 						throw new Error(`Method '${path}' does not exist`);
+					}
 					let res = target.apply(null, [context, ...args]);
 					setSafe(res);
 					return res;
@@ -1691,7 +1712,7 @@ function requireExecutePath () {
 
 			function nextTable(path, table) {
 				path = path.split('.');
-				let ops = new Set(['all', 'any', 'none']);
+				let ops = new Set(['all', 'any', 'none', 'count']);
 				let last = path.slice(-1)[0];
 				if (ops.has(last)) {
 					for (let i = 0; i < path.length - 1; i++) {
@@ -1841,6 +1862,17 @@ function requireExecutePath () {
 				return table.aggregate.apply(null, args);
 			}
 
+			async function distinct(filter, strategy) {
+				validateStrategy(table, strategy);
+				filter = negotiateFilter(filter);
+				const _baseFilter = await invokeBaseFilter();
+				if (_baseFilter)
+					filter = filter.and(context, _baseFilter);
+				let args = [context, filter].concat(Array.prototype.slice.call(arguments).slice(1));
+				await negotiateWhereAndAggregate(strategy);
+				return table.distinct.apply(null, args);
+			}
+
 
 
 			async function negotiateWhereAndAggregate(strategy) {
@@ -1948,6 +1980,27 @@ function requireExecutePath () {
 
 		function isFilter(json) {
 			return json instanceof Object && 'path' in json && 'args' in json;
+		}
+
+		function isColumnRef(json) {
+			return json instanceof Object && typeof json.__columnRef === 'string';
+		}
+
+		function resolveColumnRef(table, path) {
+			let current = table;
+			const parts = path.split('.');
+			for (let i = 0; i < parts.length; i++) {
+				if (current)
+					current = current[parts[i]];
+			}
+
+			if (!current || typeof current._toFilterArg !== 'function') {
+				let e = new Error(`Column reference '${path}' is invalid`);
+				// @ts-ignore
+				e.status = 400;
+				throw e;
+			}
+			return current;
 		}
 
 		function setSafe(o) {
@@ -2523,7 +2576,7 @@ function requireHostLocal () {
 	let executeSqliteFunction = requireSqliteFunction();
 	let hostExpress = requireHostExpress();
 	let hostHono = requireHostHono();
-	const readonlyOps = ['getManyDto', 'getMany', 'aggregate', 'count'];
+	const readonlyOps = ['getManyDto', 'getMany', 'aggregate', 'distinct', 'count'];
 	// { db, table, defaultConcurrency,
 	// 	concurrency,
 	// 	customFilters,
@@ -3329,6 +3382,7 @@ function requireClient () {
 				count,
 				getMany,
 				aggregate: groupBy,
+				distinct,
 				getAll,
 				getOne,
 				getById,
@@ -3384,9 +3438,17 @@ function requireClient () {
 			}
 
 			async function groupBy(strategy) {
+				return executeGroupBy('aggregate', strategy);
+			}
+
+			async function distinct(strategy) {
+				return executeGroupBy('distinct', strategy);
+			}
+
+			async function executeGroupBy(path, strategy) {
 				let args = negotiateGroupBy(null, strategy);
 				let body = stringify({
-					path: 'aggregate',
+					path,
 					args
 				});
 				let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
@@ -4181,12 +4243,20 @@ function requireClient () {
 		}
 	}
 
+	const isColumnProxyKey = '__isColumnProxy';
+	const columnPathKey = '__columnPath';
+	const columnRefKey = '__columnRef';
+
 	function column(path, ...previous) {
 		function c() {
 			let args = [];
 			for (let i = 0; i < arguments.length; i++) {
-				if (typeof arguments[i] === 'function')
-					args[i] = arguments[i](tableProxy(path.split('.').slice(0, -1).join('.')));
+				if (typeof arguments[i] === 'function') {
+					if (arguments[i][isColumnProxyKey])
+						args[i] = { [columnRefKey]: arguments[i][columnPathKey] };
+					else
+						args[i] = arguments[i](tableProxy(path.split('.').slice(0, -1).join('.')));
+				}
 				else
 					args[i] = arguments[i];
 			}
@@ -4209,6 +4279,10 @@ function requireClient () {
 		}
 		let handler = {
 			get(_target, property) {
+				if (property === isColumnProxyKey)
+					return true;
+				if (property === columnPathKey)
+					return path;
 				if (property === 'toJSON')
 					return Reflect.get(...arguments);
 				else if (property === 'then')
@@ -4281,6 +4355,8 @@ function requireEncodeFilterArg () {
 	if (hasRequiredEncodeFilterArg) return encodeFilterArg_1;
 	hasRequiredEncodeFilterArg = 1;
 	function encodeFilterArg(context, column, arg) {
+		if (arg && typeof arg._toFilterArg === 'function')
+			return arg._toFilterArg(context);
 		if (column.encode.safe)
 			return column.encode.safe(context, arg);
 		else
@@ -4689,6 +4765,7 @@ function requireNewColumn () {
 	const quote = requireQuote$6();
 	const aggregate = requireColumnAggregate$1();
 	const aggregateGroup = requireColumnAggregateGroup$1();
+	const newParameterized = requireNewParameterized();
 
 	newColumn = function(table, name) {
 		var c = {};
@@ -4696,6 +4773,16 @@ function requireNewColumn () {
 		c._dbName = name;
 		c.alias = name;
 		table._aliases.add(name);
+		Object.defineProperty(c, '_table', {
+			value: table,
+			enumerable: false,
+			writable: false
+		});
+		Object.defineProperty(c, '_toFilterArg', {
+			value: toFilterArg,
+			enumerable: false,
+			writable: false
+		});
 
 		c.dbNull = null;
 		table._columns.push(c);
@@ -4779,6 +4866,12 @@ function requireNewColumn () {
 				column: c,
 				groupBy: `${tableAlias}.${columnName}`
 			};
+		}
+
+		function toFilterArg(context) {
+			const tableAlias = quote(context, table._rootAlias || table._dbName);
+			const columnName = quote(context, c._dbName);
+			return newParameterized(`${tableAlias}.${columnName}`);
 		}
 
 		return c;
@@ -4866,6 +4959,53 @@ function requireNewDecodeCore () {
 	return newDecodeCore;
 }
 
+var newLikeColumnArg_1;
+var hasRequiredNewLikeColumnArg;
+
+function requireNewLikeColumnArg () {
+	if (hasRequiredNewLikeColumnArg) return newLikeColumnArg_1;
+	hasRequiredNewLikeColumnArg = 1;
+	var getSessionSingleton = requireGetSessionSingleton();
+	var newParameterized = requireNewParameterized();
+
+	function newLikeColumnArg(context, column, encodedArg, prefix, suffix) {
+		var encodedPrefix = prefix ? column.encode(context, prefix) : null;
+		var encodedSuffix = suffix ? column.encode(context, suffix) : null;
+		var engine = getSessionSingleton(context, 'engine');
+
+		if (engine === 'mysql')
+			return concatWithFunction(encodedPrefix, encodedArg, encodedSuffix);
+		if (engine === 'mssql' || engine === 'mssqlNative')
+			return concatWithOperator('+', encodedPrefix, encodedArg, encodedSuffix);
+		return concatWithOperator('||', encodedPrefix, encodedArg, encodedSuffix);
+	}
+
+	function concatWithFunction(prefix, value, suffix) {
+		var args = [prefix, value, suffix].filter(Boolean);
+		var sql = 'CONCAT(' + args.map(x => x.sql()).join(',') + ')';
+		var parameters = [];
+		for (var i = 0; i < args.length; i++)
+			parameters = parameters.concat(args[i].parameters);
+		return newParameterized(sql, parameters);
+	}
+
+	function concatWithOperator(operator, prefix, value, suffix) {
+		var args = [prefix, value, suffix].filter(Boolean);
+		var sql = '';
+		var parameters = [];
+		for (var i = 0; i < args.length; i++) {
+			if (i > 0)
+				sql += ' ' + operator + ' ';
+			sql += args[i].sql();
+			parameters = parameters.concat(args[i].parameters);
+		}
+		return newParameterized(sql, parameters);
+	}
+
+	newLikeColumnArg_1 = newLikeColumnArg;
+	return newLikeColumnArg_1;
+}
+
 var startsWithCore_1;
 var hasRequiredStartsWithCore;
 
@@ -4875,12 +5015,16 @@ function requireStartsWithCore () {
 	var newBoolean = requireNewBoolean();
 	var nullOperator = ' is ';
 	var quote = requireQuote$6();
+	var encodeFilterArg = requireEncodeFilterArg();
+	var newLikeColumnArg = requireNewLikeColumnArg();
 
 	function startsWithCore(context, operator, column,arg,alias) {
 		operator = ' ' + operator + ' ';
-		var encoded = column.encode(context, arg);
+		var encoded = encodeFilterArg(context, column, arg);
 		if (encoded.sql() == 'null')
 			operator = nullOperator;
+		else if (arg && typeof arg._toFilterArg === 'function')
+			encoded = newLikeColumnArg(context, column, encoded, null, '%');
 		else
 			encoded = column.encode(context, arg + '%');
 		var firstPart = quote(context, alias) + '.' + quote(context, column._dbName) + operator;
@@ -4913,13 +5057,17 @@ function requireEndsWithCore () {
 	const quote = requireQuote$6();
 	var newBoolean = requireNewBoolean();
 	var nullOperator = ' is ';
+	var encodeFilterArg = requireEncodeFilterArg();
+	var newLikeColumnArg = requireNewLikeColumnArg();
 
 	function endsWithCore(context, operator, column,arg,alias) {
 		alias = quote(context, alias);
 		operator = ' ' + operator + ' ';
-		var encoded = column.encode(context, arg);
+		var encoded = encodeFilterArg(context, column, arg);
 		if (encoded.sql() == 'null')
 			operator = nullOperator;
+		else if (arg && typeof arg._toFilterArg === 'function')
+			encoded = newLikeColumnArg(context, column, encoded, '%', null);
 		else
 			encoded = column.encode(context, '%' + arg);
 		var firstPart = alias + '.' + quote(context, column._dbName) + operator;
@@ -4943,22 +5091,26 @@ function requireEndsWith () {
 	return endsWith;
 }
 
-var containsCore;
+var containsCore_1;
 var hasRequiredContainsCore;
 
 function requireContainsCore () {
-	if (hasRequiredContainsCore) return containsCore;
+	if (hasRequiredContainsCore) return containsCore_1;
 	hasRequiredContainsCore = 1;
 	const quote = requireQuote$6();
 	var newBoolean = requireNewBoolean();
 	var nullOperator = ' is ';
+	var encodeFilterArg = requireEncodeFilterArg();
+	var newLikeColumnArg = requireNewLikeColumnArg();
 
-	function endsWithCore(context, operator, column,arg,alias) {
+	function containsCore(context, operator, column,arg,alias) {
 		alias = quote(context, alias);
 		operator = ' ' + operator + ' ';
-		var encoded = column.encode(context, arg);
+		var encoded = encodeFilterArg(context, column, arg);
 		if (encoded.sql() == 'null')
 			operator = nullOperator;
+		else if (arg && typeof arg._toFilterArg === 'function')
+			encoded = newLikeColumnArg(context, column, encoded, '%', '%');
 		else
 			encoded = column.encode(context, '%' + arg + '%');
 		var firstPart = alias + '.' + quote(context, column._dbName) + operator;
@@ -4966,8 +5118,8 @@ function requireContainsCore () {
 		return newBoolean(filter);
 	}
 
-	containsCore = endsWithCore;
-	return containsCore;
+	containsCore_1 = containsCore;
+	return containsCore_1;
 }
 
 var contains;
@@ -9880,6 +10032,35 @@ function requireChildColumn () {
 	return childColumn_1;
 }
 
+var newFilterArg_1;
+var hasRequiredNewFilterArg;
+
+function requireNewFilterArg () {
+	if (hasRequiredNewFilterArg) return newFilterArg_1;
+	hasRequiredNewFilterArg = 1;
+	var newJoin = requireJoinSql();
+	var newWhere = requireWhereSql();
+	var newParameterized = requireNewParameterized();
+	var quote = requireQuote$6();
+
+	function newFilterArg(context, column, relations, depth = 0) {
+		var relationCount = relations.length;
+		var alias = 'x' + relationCount;
+		var table = relations[relationCount - 1].childTable;
+
+		var quotedAlias = quote(context, alias);
+		var quotedColumn = quote(context, column._dbName);
+		var quotedTable = quote(context, table._dbName);
+		var select = newParameterized(`(SELECT ${quotedAlias}.${quotedColumn} FROM ${quotedTable} ${quotedAlias}`);
+		var join = newJoin(context, relations, depth);
+		var where = newWhere(context, relations, null, depth);
+		return select.append(join).append(where).append(')');
+	}
+
+	newFilterArg_1 = newFilterArg;
+	return newFilterArg_1;
+}
+
 var relatedColumn;
 var hasRequiredRelatedColumn;
 
@@ -9890,6 +10071,7 @@ function requireRelatedColumn () {
 	var aggregateGroup = requireColumnAggregateGroup();
 	var aggregate = requireColumnAggregate();
 	var childColumn = requireChildColumn();
+	var newFilterArg = requireNewFilterArg();
 
 	function newRelatedColumn(column, relations, isShallow, depth) {
 		var c = {};
@@ -9913,8 +10095,17 @@ function requireRelatedColumn () {
 		c.max = (context, ...rest) => aggregate.apply(null, [context, 'max', column, relations, false, ...rest]);
 		c.count = (context, ...rest) => aggregate.apply(null, [context, 'count', column, relations, false, ...rest]);
 		c.self = (context, ...rest) => childColumn.apply(null, [context, column, relations, ...rest]);
+		Object.defineProperty(c, '_toFilterArg', {
+			value: toFilterArg,
+			enumerable: false,
+			writable: false
+		});
 
 		return c;
+
+		function toFilterArg(context) {
+			return newFilterArg(context, column, relations, depth);
+		}
 
 		function wrapFilter(filter) {
 			return runFilter;
@@ -10163,6 +10354,154 @@ function requireNone () {
 	return none;
 }
 
+var count;
+var hasRequiredCount$1;
+
+function requireCount$1 () {
+	if (hasRequiredCount$1) return count;
+	hasRequiredCount$1 = 1;
+	const negotiateRawSqlFilter = requireNegotiateRawSqlFilter();
+	const newJoin = requireJoinSql();
+	const newWhere = requireWhereSql();
+	const getSessionSingleton = requireGetSessionSingleton();
+	const newParameterized = requireNewParameterized();
+	const newBoolean = requireNewBoolean();
+
+	const nullOperator = ' is ';
+	const notNullOperator = ' is not ';
+	const isShallow = true;
+
+	function newCount(newRelatedTable, relations, depth) {
+
+		function count(context, fn) {
+			let shallowFilter;
+
+			if (fn !== undefined) {
+				let relatedTable = newRelatedTable(relations, isShallow, depth + 1);
+				let arg = typeof fn === 'function' ? fn(relatedTable) : fn;
+				shallowFilter = negotiateRawSqlFilter(context, arg);
+			}
+
+			const subQuery = newCountSubQuery(context, relations, shallowFilter, depth);
+			return newCountFilter(subQuery);
+		}
+
+		return count;
+	}
+
+	function newCountSubQuery(context, relations, shallowFilter, depth) {
+		const quote = getSessionSingleton(context, 'quote');
+		const relationCount = relations.length;
+		const alias = 'x' + relationCount;
+		const table = relations[relationCount - 1].childTable;
+		const select = newParameterized(`SELECT COUNT(*) FROM ${quote(table._dbName)} ${quote(alias)}`);
+		const join = newJoin(context, relations, depth);
+		const where = newWhere(context, relations, shallowFilter, depth);
+
+		return select.append(join).append(where);
+	}
+
+	function newCountFilter(subQuery) {
+		let c = {};
+
+		c.equal = function(context, arg) {
+			return compare(context, '=', arg);
+		};
+
+		c.notEqual = function(context, arg) {
+			return compare(context, '<>', arg);
+		};
+
+		c.lessThan = function(context, arg) {
+			return compare(context, '<', arg);
+		};
+
+		c.lessThanOrEqual = function(context, arg) {
+			return compare(context, '<=', arg);
+		};
+
+		c.greaterThan = function(context, arg) {
+			return compare(context, '>', arg);
+		};
+
+		c.greaterThanOrEqual = function(context, arg) {
+			return compare(context, '>=', arg);
+		};
+
+		c.between = function(context, from, to) {
+			from = c.greaterThanOrEqual(context, from);
+			to = c.lessThanOrEqual(context, to);
+			return from.and(context, to);
+		};
+
+		c.in = function(context, values) {
+			if (values.length === 0)
+				return newBoolean(newParameterized('1=2'));
+
+			let sqlParts = new Array(values.length);
+			let params = [];
+			for (let i = 0; i < values.length; i++) {
+				const encoded = encodeArg(context, values[i]);
+				sqlParts[i] = encoded.sql();
+				params = params.concat(encoded.parameters);
+			}
+
+			const sql = toSubQuery().sql() + ' in (' + sqlParts.join(',') + ')';
+			const allParams = toSubQuery().parameters.concat(params);
+			return newBoolean(newParameterized(sql, allParams));
+		};
+
+		c.notIn = function(context, values) {
+			return c.in(context, values).not(context);
+		};
+
+		c.eq = c.equal;
+		c.EQ = c.eq;
+		c.ne = c.notEqual;
+		c.NE = c.ne;
+		c.gt = c.greaterThan;
+		c.GT = c.gt;
+		c.ge = c.greaterThanOrEqual;
+		c.GE = c.ge;
+		c.lt = c.lessThan;
+		c.LT = c.lt;
+		c.le = c.lessThanOrEqual;
+		c.LE = c.le;
+		c.IN = c.in;
+
+		return c;
+
+		function compare(context, operator, arg) {
+			let encoded = encodeArg(context, arg);
+			let operatorSql = ' ' + operator + ' ';
+			if (encoded.sql() === 'null') {
+				if (operator === '=')
+					operatorSql = nullOperator;
+				else if (operator === '<>')
+					operatorSql = notNullOperator;
+			}
+
+			let sql = toSubQuery().append(operatorSql).append(encoded);
+			return newBoolean(sql);
+		}
+
+		function encodeArg(context, arg) {
+			if (arg && typeof arg._toFilterArg === 'function')
+				return arg._toFilterArg(context);
+			if (arg == null)
+				return newParameterized('null');
+			return newParameterized('?', [arg]);
+		}
+
+		function toSubQuery() {
+			return subQuery.prepend('(').append(')');
+		}
+	}
+
+	count = newCount;
+	return count;
+}
+
 var newRelatedTable_1;
 var hasRequiredNewRelatedTable;
 
@@ -10176,6 +10515,7 @@ function requireNewRelatedTable () {
 	var where = requireWhere$1();
 	var aggregate = requireAggregate$1();
 	var none = requireNone();
+	var count = requireCount$1();
 
 	function newRelatedTable(relations, isShallow, depth = 0) {
 		var table = relations[relations.length - 1].childTable;
@@ -10196,6 +10536,9 @@ function requireNewRelatedTable () {
 
 		// @ts-ignore
 		c.where =  where(relations, depth);
+
+		// @ts-ignore
+		c.count = count(newRelatedTable, relations, depth);
 
 		// @ts-ignore
 		c._aggregate = aggregate(relations);
@@ -11176,7 +11519,7 @@ function requireNewSingleQuery () {
 	var newParameterized = requireNewParameterized();
 	var getSessionSingleton = requireGetSessionSingleton();
 
-	function _new(context,table,filter,span, alias,orderBy,limit,offset) {
+	function _new(context,table,filter,span, alias,orderBy,limit,offset,distinct = false) {
 		var quote = getSessionSingleton(context, 'quote');
 		var name = quote(table._dbName);
 		var columnSql = newColumnSql(context,table,span,alias,true);
@@ -11184,8 +11527,9 @@ function requireNewSingleQuery () {
 		var whereSql = newWhereSql(context,table,filter,alias);
 		if (limit)
 			limit = limit + ' ';
+		const selectClause = distinct ? 'select distinct ' : 'select ';
 
-		return newParameterized('select ' + limit + columnSql + ' from ' + name + ' ' + quote(alias)).append(joinSql).append(whereSql).append(orderBy + offset);
+		return newParameterized(selectClause + limit + columnSql + ' from ' + name + ' ' + quote(alias)).append(joinSql).append(whereSql).append(orderBy + offset);
 
 	}
 
@@ -12752,13 +13096,17 @@ function requireNewQuery () {
 	var newParameterized = requireNewParameterized();
 	var extractOffset = requireExtractOffset();
 
-	function newQuery(context, table,filter,span,alias) {
+	function newQuery(context, table,filter,span,alias,options = {}) {
 		filter = extractFilter(filter);
 		var orderBy = '';
 		var limit = extractLimit(context, span);
 		var offset = extractOffset(context, span);
+		const useDistinct = options.distinct && canUseDistinct(span);
 
-		var query = newSingleQuery(context, table,filter,span,alias,orderBy,limit,offset);
+		var query = newSingleQuery(context, table,filter,span,alias,orderBy,limit,offset,useDistinct);
+		if (useDistinct)
+			return query;
+
 		const groupClause = groupBy(span);
 		return newParameterized(query.sql(), query.parameters).append(groupClause);
 	}
@@ -12768,6 +13116,11 @@ function requireNewQuery () {
 		if (keys.length === 0)
 			return '';
 		return ' GROUP BY ' + keys.map(key => span.aggregates[key].groupBy).join(',');
+	}
+
+	function canUseDistinct(span) {
+		const keys = Object.keys(span.aggregates);
+		return keys.every(key => !!span.aggregates[key].column);
 	}
 
 	newQuery_1 = newQuery;
@@ -12785,7 +13138,7 @@ function requireGroupBy () {
 	const strategyToSpan = requireStrategyToSpan();
 	const executeQueries = requireExecuteQueries();
 
-	async function groupBy(context, table, filter, strategy) {
+	async function groupBy(context, table, filter, strategy, options) {
 		filter = negotiateRawSqlFilter(context, filter, table);
 		if (strategy && strategy.where) {
 			let arg = typeof strategy.where === 'function' ? strategy.where(table) : strategy.where;
@@ -12797,7 +13150,7 @@ function requireGroupBy () {
 
 		let alias = table._dbName;
 
-		const query = newQuery(context, table, filter, span, alias);
+		const query = newQuery(context, table, filter, span, alias, options);
 		const res = await executeQueries(context, [query]);
 		return decode(context, span, await res[0]);
 	}
@@ -12933,6 +13286,10 @@ function requireTable () {
 
 		table.aggregate = function(context, ...rest) {
 			const args = [context, table, ...rest];
+			return groupBy.apply(null, args);
+		};
+		table.distinct = function(context, ...rest) {
+			const args = [context, table, ...rest, { distinct: true }];
 			return groupBy.apply(null, args);
 		};
 

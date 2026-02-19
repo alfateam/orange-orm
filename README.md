@@ -1791,6 +1791,21 @@ async function getRows() {
   });  
 }
 ```
+__Count__  
+Use <i>count</i> on a relation in a filter to compare how many related rows match a condition.
+```javascript
+import map from './map';
+const db = map.sqlite('demo.db');
+
+getRows();
+
+async function getRows() {
+  const rows = await db.order.getMany({
+    where: x => x.lines.count().le(1)
+      .and(x.lines.count(line => line.product.contains('guitar')).eq(1))
+  });
+}
+```
 
 </details>
 

@@ -1,4 +1,8 @@
 ## Changelog
+__5.2.0__  
+Distinct aggregates via `distinct()` [#119](https://github.com/alfateam/orange-orm/issues/119)  
+Column-to-column filters (incl. `contains`, `startsWith`, `endsWith`) [#150](htps://github.com/alfateam/orange-orm/issues/150)  
+Relation count filters: `x.lines.count()` with optional predicate [#151](htps://github.com/alfateam/orange-orm/issues/151)  
 __5.1.0__  
 Support for Hono [#149](https://github.com/alfateam/orange-orm/issues/149)  
 Removed dependency `glob`  
