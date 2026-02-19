@@ -79,6 +79,10 @@ function _new(tableName) {
 		const args = [context, table, ...rest];
 		return groupBy.apply(null, args);
 	};
+	table.distinct = function(context, ...rest) {
+		const args = [context, table, ...rest, { distinct: true }];
+		return groupBy.apply(null, args);
+	};
 
 	table.getMany.exclusive = function(context, ...rest) {
 		const args = [context, table, ...rest];

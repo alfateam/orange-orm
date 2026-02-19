@@ -76,7 +76,7 @@ function _executePath(context, ...rest) {
 
 	async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, request, response, readonly, disableBulkDeletes, isHttp, client }) {
 		let allowedOps = { ..._allowedOps, insert: !readonly, ...extractRelations(getMeta(table)) };
-		let ops = { ..._ops, ...getCustomFilterPaths(customFilters), getManyDto, getMany, aggregate, count, delete: _delete, cascadeDelete, update, replace };
+		let ops = { ..._ops, ...getCustomFilterPaths(customFilters), getManyDto, getMany, aggregate, distinct, count, delete: _delete, cascadeDelete, update, replace };
 
 		let res = await parseFilter(JSONFilter, table);
 		if (res === undefined)
@@ -90,9 +90,12 @@ function _executePath(context, ...rest) {
 
 				let anyAllNone = tryGetAnyAllNone(json.path, table);
 				if (anyAllNone) {
-					if (isHttp)
-						validateArgs(json.args[0]);
-					const f = anyAllNone(context, x => parseFilter(json.args[0], x));
+					const arg0 = json.args[0];
+					if (isHttp && arg0 !== undefined)
+						validateArgs(arg0);
+					const f = arg0 === undefined
+						? anyAllNone(context)
+						: anyAllNone(context, x => parseFilter(arg0, x));
 					if(!('isSafe' in f))
 						f.isSafe = isSafe;
 					return f;
@@ -111,17 +114,22 @@ function _executePath(context, ...rest) {
 				}
 				return result;
 			}
+			else if (isColumnRef(json)) {
+				return resolveColumnRef(table, json.__columnRef);
+			}
 			return json;
 
 			function tryGetAnyAllNone(path, table) {
-				path = path.split('.');
-				for (let i = 0; i < path.length; i++) {
-					table = table[path[i]];
+				const parts = path.split('.');
+				for (let i = 0; i < parts.length; i++) {
+					table = table[parts[i]];
 				}
 
 				let ops = new Set(['all', 'any', 'none', 'where', '_aggregate']);
 				// let ops = new Set(['all', 'any', 'none', 'where']);
-				let last = path.slice(-1)[0];
+				let last = parts[parts.length - 1];
+				if (last === 'count' && parts.length > 1)
+					ops.add('count');
 				if (ops.has(last) || (table && (table._primaryColumns || (table.any && table.all))))
 					return table;
 			}
@@ -154,8 +162,21 @@ function _executePath(context, ...rest) {
 					target = target[pathArray[i]];
 				}
 
-				if (!target)
+				if (!target) {
+					const left = args && args[0];
+					if (left) {
+						target = left;
+						for (let i = 0; i < pathArray.length; i++) {
+							target = target[pathArray[i]];
+						}
+						if (target) {
+							let res = target.apply(null, [context].concat(args.slice(1)));
+							setSafe(res);
+							return res;
+						}
+					}
 					throw new Error(`Method '${path}' does not exist`);
+				}
 				let res = target.apply(null, [context, ...args]);
 				setSafe(res);
 				return res;
@@ -201,7 +222,7 @@ function _executePath(context, ...rest) {
 
 		function nextTable(path, table) {
 			path = path.split('.');
-			let ops = new Set(['all', 'any', 'none']);
+			let ops = new Set(['all', 'any', 'none', 'count']);
 			let last = path.slice(-1)[0];
 			if (ops.has(last)) {
 				for (let i = 0; i < path.length - 1; i++) {
@@ -351,6 +372,17 @@ function _executePath(context, ...rest) {
 			return table.aggregate.apply(null, args);
 		}
 
+		async function distinct(filter, strategy) {
+			validateStrategy(table, strategy);
+			filter = negotiateFilter(filter);
+			const _baseFilter = await invokeBaseFilter();
+			if (_baseFilter)
+				filter = filter.and(context, _baseFilter);
+			let args = [context, filter].concat(Array.prototype.slice.call(arguments).slice(1));
+			await negotiateWhereAndAggregate(strategy);
+			return table.distinct.apply(null, args);
+		}
+
 
 
 		async function negotiateWhereAndAggregate(strategy) {
@@ -458,6 +490,27 @@ function _executePath(context, ...rest) {
 
 	function isFilter(json) {
 		return json instanceof Object && 'path' in json && 'args' in json;
+	}
+
+	function isColumnRef(json) {
+		return json instanceof Object && typeof json.__columnRef === 'string';
+	}
+
+	function resolveColumnRef(table, path) {
+		let current = table;
+		const parts = path.split('.');
+		for (let i = 0; i < parts.length; i++) {
+			if (current)
+				current = current[parts[i]];
+		}
+
+		if (!current || typeof current._toFilterArg !== 'function') {
+			let e = new Error(`Column reference '${path}' is invalid`);
+			// @ts-ignore
+			e.status = 400;
+			throw e;
+		}
+		return current;
 	}
 
 	function setSafe(o) {

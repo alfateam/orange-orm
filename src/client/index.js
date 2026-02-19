@@ -212,6 +212,7 @@ function rdbClient(options = {}) {
 			count,
 			getMany,
 			aggregate: groupBy,
+			distinct,
 			getAll,
 			getOne,
 			getById,
@@ -267,9 +268,17 @@ function rdbClient(options = {}) {
 		}
 
 		async function groupBy(strategy) {
+			return executeGroupBy('aggregate', strategy);
+		}
+
+		async function distinct(strategy) {
+			return executeGroupBy('distinct', strategy);
+		}
+
+		async function executeGroupBy(path, strategy) {
 			let args = negotiateGroupBy(null, strategy);
 			let body = stringify({
-				path: 'aggregate',
+				path,
 				args
 			});
 			let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
@@ -1064,12 +1073,20 @@ function groupByAggregate(path, arg) {
 	}
 }
 
+const isColumnProxyKey = '__isColumnProxy';
+const columnPathKey = '__columnPath';
+const columnRefKey = '__columnRef';
+
 function column(path, ...previous) {
 	function c() {
 		let args = [];
 		for (let i = 0; i < arguments.length; i++) {
-			if (typeof arguments[i] === 'function')
-				args[i] = arguments[i](tableProxy(path.split('.').slice(0, -1).join('.')));
+			if (typeof arguments[i] === 'function') {
+				if (arguments[i][isColumnProxyKey])
+					args[i] = { [columnRefKey]: arguments[i][columnPathKey] };
+				else
+					args[i] = arguments[i](tableProxy(path.split('.').slice(0, -1).join('.')));
+			}
 			else
 				args[i] = arguments[i];
 		}
@@ -1092,6 +1109,10 @@ function column(path, ...previous) {
 	}
 	let handler = {
 		get(_target, property) {
+			if (property === isColumnProxyKey)
+				return true;
+			if (property === columnPathKey)
+				return path;
 			if (property === 'toJSON')
 				return Reflect.get(...arguments);
 			else if (property === 'then')

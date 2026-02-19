@@ -3,7 +3,7 @@ const negotiateRawSqlFilter = require('./column/negotiateRawSqlFilter');
 const strategyToSpan = require('./strategyToSpan');
 const executeQueries = require('./executeQueries');
 
-async function groupBy(context, table, filter, strategy) {
+async function groupBy(context, table, filter, strategy, options) {
 	filter = negotiateRawSqlFilter(context, filter, table);
 	if (strategy && strategy.where) {
 		let arg = typeof strategy.where === 'function' ? strategy.where(table) : strategy.where;
@@ -15,7 +15,7 @@ async function groupBy(context, table, filter, strategy) {
 
 	let alias = table._dbName;
 
-	const query = newQuery(context, table, filter, span, alias);
+	const query = newQuery(context, table, filter, span, alias, options);
 	const res = await executeQueries(context, [query]);
 	return decode(context, span, await res[0]);
 }

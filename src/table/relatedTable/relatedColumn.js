@@ -2,6 +2,7 @@ var newSubFilter = require('./subFilter');
 var aggregateGroup = require('./columnAggregateGroup');
 var aggregate = require('./columnAggregate');
 var childColumn = require('./childColumn');
+var newFilterArg = require('./newFilterArg');
 
 function newRelatedColumn(column, relations, isShallow, depth) {
 	var c = {};
@@ -25,8 +26,17 @@ function newRelatedColumn(column, relations, isShallow, depth) {
 	c.max = (context, ...rest) => aggregate.apply(null, [context, 'max', column, relations, false, ...rest]);
 	c.count = (context, ...rest) => aggregate.apply(null, [context, 'count', column, relations, false, ...rest]);
 	c.self = (context, ...rest) => childColumn.apply(null, [context, column, relations, ...rest]);
+	Object.defineProperty(c, '_toFilterArg', {
+		value: toFilterArg,
+		enumerable: false,
+		writable: false
+	});
 
 	return c;
+
+	function toFilterArg(context) {
+		return newFilterArg(context, column, relations, depth);
+	}
 
 	function wrapFilter(filter) {
 		return runFilter;
