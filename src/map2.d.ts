@@ -924,12 +924,20 @@ export interface SyncPullOverrideConfig<M extends Record<string, any> = any> ext
 
 export interface SyncConfig<M extends Record<string, any> = any> extends Partial<SyncEndpointConfig> {
   tables?: SyncTableName<M>[];
+  initialReadyMaxAgeMs?: number;
   pull?: string | SyncPullOverrideConfig<M>;
   push?: string | SyncEndpointConfig;
 }
 
 export interface SyncPullOptions {
   timeoutMs?: number;
+}
+
+export interface SyncInitialReadyEvent<M extends Record<string, any> = any> {
+  tables: SyncTableName<M>[];
+  since: unknown;
+  updatedAtMs?: number;
+  source: 'persisted' | 'pull';
 }
 
 export interface SyncPullResult {
@@ -974,6 +982,10 @@ export type DBClient<M extends Record<string, TableDefinition<M>>> = {
   syncClient: {
     pull(options?: SyncPullOptions): Promise<SyncPullResult>;
     getConfig(): Promise<SyncConfig<M> | null>;
+    on(event: 'initial-ready', listener: (payload: SyncInitialReadyEvent<M>) => void): () => void;
+    off(event: 'initial-ready', listener: (payload: SyncInitialReadyEvent<M>) => void): void;
+    once(event: 'initial-ready', listener: (payload: SyncInitialReadyEvent<M>) => void): () => void;
+    waitForInitialReady(): Promise<SyncInitialReadyEvent<M>>;
   };
 
   interceptors: WithInterceptors;

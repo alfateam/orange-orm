@@ -1885,7 +1885,6 @@ describe('column to column filter', () => {
 			where: x => x.deliveryAddress.name.eq(x.customer.name),
 			orderBy: 'id'
 		});
-		console.dir(rows, {depth: Infinity});
 
 		for (let i = 0; i < rows.length; i++) {
 			rows[i].orderDate = dateToISOString(new Date(rows[i].orderDate));

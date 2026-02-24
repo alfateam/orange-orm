@@ -108,6 +108,19 @@ describe('sqlite staged pull sync', () => {
 		expect(row3.name).toBe('Ron');
 	});
 
+	test('emits initial-ready when initial staged sync has completed', async () => {
+		const readyPromise = new Promise((resolve) => {
+			localDb.syncClient.once('initial-ready', resolve);
+		});
+
+		await localDb.syncClient.pull();
+		const ready = await readyPromise;
+
+		expect(ready.source).toBe('pull');
+		expect(ready.tables).toEqual(expect.arrayContaining(['customer', 'order']));
+		expect(ready.since).not.toBeUndefined();
+	});
+
 	test('incremental sync reads PKs from change table and excludes deletes', async () => {
 		await localDb.syncClient.pull();
 
@@ -271,5 +284,21 @@ describe('sqlite staged pull sync', () => {
 
 		const row30 = await localDbReloaded.customer.getById(30);
 		expect(row30.name).toBe('Ari2');
+	});
+
+	test('waitForInitialReady resolves immediately when staged db is already valid', async () => {
+		await localDb.syncClient.pull();
+
+		const localDbReloaded = map({
+			db: (con) => con.sqlite(localName, {
+				size: 1,
+				sync: syncClientConfig
+			})
+		});
+
+		const ready = await localDbReloaded.syncClient.waitForInitialReady();
+		expect(ready.source).toBe('persisted');
+		expect(ready.tables).toEqual(expect.arrayContaining(['customer', 'order']));
+		expect(ready.since).not.toBeUndefined();
 	});
 });

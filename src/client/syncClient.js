@@ -3,10 +3,16 @@ const _axios = require('axios');
 function newSyncClient(client, getDb, axiosInterceptor) {
 	const sinceByScope = new Map();
 	const syncStateTable = 'orange_sync_state';
+	const initialReadyListeners = new Set();
+	let initialReadyEmitted = false;
 
 	return {
 		pull,
-		getConfig
+		getConfig,
+		on,
+		off,
+		once,
+		waitForInitialReady
 	};
 
 	async function getConfig() {
@@ -25,6 +31,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		const configuredTables = pullConfig.tables;
 		if (!Array.isArray(configuredTables) || configuredTables.length === 0)
 			throw new Error('Sync pull requires configured tables. Set sync.pull.tables (or sync.tables).');
+		await maybeEmitInitialReady(syncConfig, configuredTables, db, 'persisted');
 		const currentSince = await getScopeSince(configuredTables, db);
 		const requestOptions = {
 			tables: configuredTables,
@@ -42,6 +49,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		}
 		if (result && result.since !== undefined)
 			await setScopeSince(configuredTables, result.since, db);
+		await maybeEmitInitialReady(syncConfig, configuredTables, db, 'pull');
 		return result;
 	}
 
@@ -201,7 +209,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 	async function setScopeSince(tables, since, db) {
 		const scopeKey = getScopeKey(tables);
 		sinceByScope.set(scopeKey, since);
-		await writeScopeSince(scopeKey, since, db);
+		await writeScopeState(scopeKey, { since, updatedAtMs: Date.now() }, db);
 	}
 
 	function getScopeKey(tables) {
@@ -222,6 +230,11 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 	}
 
 	async function readScopeSince(scopeKey, db) {
+		const state = await readScopeState(scopeKey, db);
+		return state && state.since;
+	}
+
+	async function readScopeState(scopeKey, db) {
 		if (!db || typeof db.query !== 'function')
 			return undefined;
 		await ensureSyncStateTable(db);
@@ -235,22 +248,103 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		if (typeof raw !== 'string' || raw.length === 0)
 			return undefined;
 		try {
-			return JSON.parse(raw);
+			const parsed = JSON.parse(raw);
+			if (parsed && parsed === Object(parsed) && 'since' in parsed)
+				return {
+					since: parsed.since,
+					updatedAtMs: parsed.updatedAtMs
+				};
+			return { since: parsed, updatedAtMs: undefined };
 		}
 		catch (_e) {
-			return raw;
+			return { since: raw, updatedAtMs: undefined };
 		}
 	}
 
-	async function writeScopeSince(scopeKey, since, db) {
+	async function writeScopeState(scopeKey, state, db) {
 		if (!db || typeof db.query !== 'function')
 			return;
 		await ensureSyncStateTable(db);
-		const sinceSerialized = JSON.stringify(since);
+		const sinceSerialized = JSON.stringify(state);
 		await db.query(
 			`INSERT INTO "${syncStateTable}" ("scope", "since_value") VALUES (${sqlStringLiteral(scopeKey)}, ${sqlStringLiteral(sinceSerialized)}) `
 			+ 'ON CONFLICT("scope") DO UPDATE SET "since_value" = excluded."since_value"'
 		);
+	}
+
+	function on(event, listener) {
+		if (event !== 'initial-ready' || typeof listener !== 'function')
+			return () => {};
+		initialReadyListeners.add(listener);
+		void maybeEmitInitialReadyFromDb('persisted');
+		return () => off(event, listener);
+	}
+
+	function off(event, listener) {
+		if (event !== 'initial-ready')
+			return;
+		initialReadyListeners.delete(listener);
+	}
+
+	function once(event, listener) {
+		if (event !== 'initial-ready' || typeof listener !== 'function')
+			return () => {};
+		const unsubscribe = on(event, (payload) => {
+			unsubscribe();
+			listener(payload);
+		});
+		return unsubscribe;
+	}
+
+	async function waitForInitialReady() {
+		const existing = await maybeEmitInitialReadyFromDb('persisted');
+		if (existing)
+			return existing;
+		return new Promise((resolve) => {
+			const unsubscribe = once('initial-ready', (payload) => {
+				unsubscribe();
+				resolve(payload);
+			});
+		});
+	}
+
+	async function maybeEmitInitialReadyFromDb(source) {
+		const db = await getDb();
+		const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
+		if (!syncConfig)
+			return null;
+		const pullConfig = resolvePullConfig(syncConfig);
+		const configuredTables = pullConfig.tables;
+		if (!Array.isArray(configuredTables) || configuredTables.length === 0)
+			return null;
+		return maybeEmitInitialReady(syncConfig, configuredTables, db, source);
+	}
+
+	async function maybeEmitInitialReady(syncConfig, configuredTables, db, source) {
+		const scopeKey = getScopeKey(configuredTables);
+		const state = await readScopeState(scopeKey, db);
+		const isReady = isInitialReadyState(state, syncConfig.initialReadyMaxAgeMs);
+		if (!isReady) {
+			initialReadyEmitted = false;
+			return null;
+		}
+		const payload = {
+			tables: configuredTables.slice(),
+			since: state.since,
+			updatedAtMs: state.updatedAtMs,
+			source
+		};
+		if (!initialReadyEmitted) {
+			initialReadyEmitted = true;
+			emitInitialReady(payload);
+		}
+		return payload;
+	}
+
+	function emitInitialReady(payload) {
+		for (const listener of Array.from(initialReadyListeners)) {
+			listener(payload);
+		}
 	}
 }
 
@@ -268,10 +362,12 @@ function normalizeSyncConfig(sync) {
 
 	const endpoint = normalizeEndpoint(sync.url ? sync : undefined);
 	const tables = normalizeConfiguredTables(sync.tables);
+	const initialReadyMaxAgeMs = normalizeInitialReadyMaxAgeMs(sync.initialReadyMaxAgeMs);
 	return {
 		...endpoint,
 		pull: sync.pull === undefined ? undefined : normalizePullConfig(sync.pull, endpoint, tables),
 		tables,
+		initialReadyMaxAgeMs,
 		push: normalizeEndpoint(sync.push)
 	};
 }
@@ -307,6 +403,13 @@ function normalizeConfiguredTables(value) {
 	if (tables.length === 0)
 		return undefined;
 	return Array.from(new Set(tables));
+}
+
+function normalizeInitialReadyMaxAgeMs(value) {
+	const parsed = Number.parseInt(value, 10);
+	if (!Number.isFinite(parsed) || parsed <= 0)
+		return undefined;
+	return parsed;
 }
 
 function normalizeEndpoint(endpoint) {
@@ -677,6 +780,16 @@ function extractErrorMessage(error) {
 	if (typeof error.response?.data === 'string')
 		return error.response.data;
 	return '';
+}
+
+function isInitialReadyState(state, maxAgeMs) {
+	if (!state || state.since === undefined || state.since === null)
+		return false;
+	if (maxAgeMs === undefined)
+		return true;
+	if (!Number.isFinite(state.updatedAtMs))
+		return false;
+	return Date.now() - state.updatedAtMs <= maxAgeMs;
 }
 
 function sqlStringLiteral(value) {
