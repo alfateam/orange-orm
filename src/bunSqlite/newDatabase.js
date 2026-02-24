@@ -105,6 +105,7 @@ function newDatabase(connectionString, poolOptions) {
 
 	c.rollback = rollback;
 	c.commit = commit;
+	c.__sqliteSync = poolOptions && poolOptions.sync;
 
 	c.end = function() {
 		if (poolOptions)

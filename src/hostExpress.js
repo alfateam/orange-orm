@@ -1,6 +1,7 @@
 const getTSDefinition = require('./getTSDefinition');
 // let hostLocal = _hostLocal;
 const getMeta = require('./hostExpress/getMeta');
+const newSyncHandler = require('./hostExpress/sync');
 
 function hostExpress(hostLocal, client, options = {}) {
 	if ('db' in options && (options.db ?? undefined) === undefined || !client.db)
@@ -23,6 +24,7 @@ function hostExpress(hostLocal, client, options = {}) {
 
 		});
 	}
+	const syncHandler = newSyncHandler(client, options);
 
 	async function handler(req, res) {
 		if (req.method === 'POST')
@@ -87,6 +89,15 @@ function hostExpress(hostLocal, client, options = {}) {
 
 	async function post(request, response) {
 		try {
+			if (request.query.sync === 'pull') {
+				if (!syncHandler) {
+					const e = new Error('Sync is not enabled for this endpoint');
+					// @ts-ignore
+					e.status = 404;
+					throw e;
+				}
+				return syncHandler(request, response);
+			}
 			if (!request.query.table) {
 				let e = new Error('Table not defined');
 				// @ts-ignore

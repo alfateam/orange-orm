@@ -10,6 +10,7 @@ const map = require('./clientMap');
 const clone = require('rfdc/default');
 const createAxiosInterceptor = require('./axiosInterceptor');
 const flags = require('../flags');
+const newSyncClient = require('./syncClient');
 
 function rdbClient(options = {}) {
 	flags.useLazyDefaults = false;
@@ -67,6 +68,7 @@ function rdbClient(options = {}) {
 	client.mysql = onProvider.bind(null, 'mysql');
 	client.express = express;
 	client.hono = hono;
+	client.syncClient = newSyncClient(client, getDb, axiosInterceptor);
 	client.close = close;
 
 	function close() {

@@ -3,7 +3,7 @@ import type { PGliteOptions } from './pglite.d.ts';
 import type { ConnectionConfiguration } from 'tedious';
 import type { D1Database } from '@cloudflare/workers-types';
 import type { PoolAttributes } from 'oracledb';
-import type { DBClient } from './map2';
+import type { DBClient, SyncConfig } from './map2';
 
 export type MergeProperties<T, V> = {
 	[K in keyof T | keyof V]:
@@ -33,15 +33,15 @@ type MappedDb<T> = {
 type DbConnectable<T> = {
 	http(url: string): DBClient<SchemaFromMappedDb<T>>;
 	d1(database: D1Database): DBClient<SchemaFromMappedDb<T>>;
-	postgres(connectionString: string, options?: PoolOptions): DBClient<SchemaFromMappedDb<T>>;
-	pglite(config?: PGliteOptions| string | undefined, options?: PoolOptions): DBClient<SchemaFromMappedDb<T>>;
-	sqlite(connectionString: string, options?: PoolOptions): DBClient<SchemaFromMappedDb<T>>;
-	sap(connectionString: string, options?: PoolOptions): DBClient<SchemaFromMappedDb<T>>;
-	mssql(connectionConfig: ConnectionConfiguration, options?: PoolOptions): DBClient<SchemaFromMappedDb<T>>;
-	mssql(connectionString: string, options?: PoolOptions): DBClient<SchemaFromMappedDb<T>>;
-	mssqlNative(connectionString: string, options?: PoolOptions): DBClient<SchemaFromMappedDb<T>>;
-	mysql(connectionString: string, options?: PoolOptions): DBClient<SchemaFromMappedDb<T>>;
-	oracle(config: PoolAttributes, options?: PoolOptions): DBClient<SchemaFromMappedDb<T>>;
+	postgres(connectionString: string, options?: PoolOptions<SchemaFromMappedDb<T>>): DBClient<SchemaFromMappedDb<T>>;
+	pglite(config?: PGliteOptions| string | undefined, options?: PoolOptions<SchemaFromMappedDb<T>>): DBClient<SchemaFromMappedDb<T>>;
+	sqlite(connectionString: string, options?: PoolOptions<SchemaFromMappedDb<T>>): DBClient<SchemaFromMappedDb<T>>;
+	sap(connectionString: string, options?: PoolOptions<SchemaFromMappedDb<T>>): DBClient<SchemaFromMappedDb<T>>;
+	mssql(connectionConfig: ConnectionConfiguration, options?: PoolOptions<SchemaFromMappedDb<T>>): DBClient<SchemaFromMappedDb<T>>;
+	mssql(connectionString: string, options?: PoolOptions<SchemaFromMappedDb<T>>): DBClient<SchemaFromMappedDb<T>>;
+	mssqlNative(connectionString: string, options?: PoolOptions<SchemaFromMappedDb<T>>): DBClient<SchemaFromMappedDb<T>>;
+	mysql(connectionString: string, options?: PoolOptions<SchemaFromMappedDb<T>>): DBClient<SchemaFromMappedDb<T>>;
+	oracle(config: PoolAttributes, options?: PoolOptions<SchemaFromMappedDb<T>>): DBClient<SchemaFromMappedDb<T>>;
 };
 
 type NegotiateDbInstance<T, C> = C extends WithDb
@@ -59,27 +59,28 @@ type DbOptions<T> = {
 } & {
 	concurrency?: ConcurrencyValues;
 	readonly?: boolean;
-	db?: Pool | ((connectors: Connectors) => Pool | Promise<Pool>);
+	db?: Pool | ((connectors: Connectors<SchemaFromMappedDb<T>>) => Pool | Promise<Pool>);
 };
 
-interface Connectors {
+interface Connectors<M extends Record<string, any> = any> {
 	http(url: string): Pool;
 	d1(database: D1Database): Pool;
-	postgres(connectionString: string, options?: PoolOptions): Pool;
-	pglite(config?: PGliteOptions| string | undefined, options?: PoolOptions): Pool;
-	sqlite(connectionString: string, options?: PoolOptions): Pool;
-	sap(connectionString: string, options?: PoolOptions): Pool;
-	mssql(connectionConfig: ConnectionConfiguration, options?: PoolOptions): Pool;
-	mssql(connectionString: string, options?: PoolOptions): Pool;
-	oracle(config: PoolAttributes, options?: PoolOptions): Pool;
+	postgres(connectionString: string, options?: PoolOptions<M>): Pool;
+	pglite(config?: PGliteOptions| string | undefined, options?: PoolOptions<M>): Pool;
+	sqlite(connectionString: string, options?: PoolOptions<M>): Pool;
+	sap(connectionString: string, options?: PoolOptions<M>): Pool;
+	mssql(connectionConfig: ConnectionConfiguration, options?: PoolOptions<M>): Pool;
+	mssql(connectionString: string, options?: PoolOptions<M>): Pool;
+	oracle(config: PoolAttributes, options?: PoolOptions<M>): Pool;
 }
 
 export interface Pool {
 	end(): Promise<void>;
 }
 
-export interface PoolOptions {
+export interface PoolOptions<M extends Record<string, any> = any> {
 	size?: number;
+	sync?: string | SyncConfig<M>;
 }
 
 type JsonPatch = Array<{

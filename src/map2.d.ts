@@ -875,35 +875,73 @@ interface WithInterceptors {
 interface Connectors {
   http(url: string): Pool;
   d1(database: D1Database): Pool;
-  postgres(connectionString: string, options?: PoolOptions): Pool;
-  pglite(config?: PGliteOptions | string | undefined, options?: PoolOptions): Pool;
-  sqlite(connectionString: string, options?: PoolOptions): Pool;
-  sap(connectionString: string, options?: PoolOptions): Pool;
-  mssql(connectionConfig: ConnectionConfiguration, options?: PoolOptions): Pool;
-  mssql(connectionString: string, options?: PoolOptions): Pool;
-  oracle(config: PoolAttributes, options?: PoolOptions): Pool;
+  postgres(connectionString: string, options?: PoolOptions<any>): Pool;
+  pglite(config?: PGliteOptions | string | undefined, options?: PoolOptions<any>): Pool;
+  sqlite(connectionString: string, options?: PoolOptions<any>): Pool;
+  sap(connectionString: string, options?: PoolOptions<any>): Pool;
+  mssql(connectionConfig: ConnectionConfiguration, options?: PoolOptions<any>): Pool;
+  mssql(connectionString: string, options?: PoolOptions<any>): Pool;
+  oracle(config: PoolAttributes, options?: PoolOptions<any>): Pool;
 }
 
 type DbConnectable<M extends Record<string, TableDefinition<M>>> = {
   http(url: string): DBClient<M>;
   d1(database: D1Database): DBClient<M>;
-  postgres(connectionString: string, options?: PoolOptions): DBClient<M>;
-  pglite(config?: PGliteOptions | string | undefined, options?: PoolOptions): DBClient<M>;
-  sqlite(connectionString: string, options?: PoolOptions): DBClient<M>;
-  sap(connectionString: string, options?: PoolOptions): DBClient<M>;
-  mssql(connectionConfig: ConnectionConfiguration, options?: PoolOptions): DBClient<M>;
-  mssql(connectionString: string, options?: PoolOptions): DBClient<M>;
-  mssqlNative(connectionString: string, options?: PoolOptions): DBClient<M>;
-  mysql(connectionString: string, options?: PoolOptions): DBClient<M>;
-  oracle(config: PoolAttributes, options?: PoolOptions): DBClient<M>;
+  postgres(connectionString: string, options?: PoolOptions<M>): DBClient<M>;
+  pglite(config?: PGliteOptions | string | undefined, options?: PoolOptions<M>): DBClient<M>;
+  sqlite(connectionString: string, options?: PoolOptions<M>): DBClient<M>;
+  sap(connectionString: string, options?: PoolOptions<M>): DBClient<M>;
+  mssql(connectionConfig: ConnectionConfiguration, options?: PoolOptions<M>): DBClient<M>;
+  mssql(connectionString: string, options?: PoolOptions<M>): DBClient<M>;
+  mssqlNative(connectionString: string, options?: PoolOptions<M>): DBClient<M>;
+  mysql(connectionString: string, options?: PoolOptions<M>): DBClient<M>;
+  oracle(config: PoolAttributes, options?: PoolOptions<M>): DBClient<M>;
 };
 
 export interface Pool {
   end(): Promise<void>;
 }
 
-export interface PoolOptions {
+export interface SyncEndpointConfig {
+  url: string;
+  timeoutMs?: number;
+}
+
+type SyncTableName<M extends Record<string, any>> = Extract<keyof M, string>;
+
+export interface SyncPullConfig<M extends Record<string, any> = any> extends SyncEndpointConfig {
+  tables: SyncTableName<M>[];
+  patchOptions?: {
+    concurrency?: ConcurrencyStrategy;
+  };
+  maxKeysPerBatch?: number;
+  maxRowsPerBatch?: number;
+}
+
+export interface SyncPullOverrideConfig<M extends Record<string, any> = any> extends Omit<SyncPullConfig<M>, 'url'> {
+  url?: string;
+}
+
+export interface SyncConfig<M extends Record<string, any> = any> extends Partial<SyncEndpointConfig> {
+  tables?: SyncTableName<M>[];
+  pull?: string | SyncPullOverrideConfig<M>;
+  push?: string | SyncEndpointConfig;
+}
+
+export interface SyncPullOptions {
+  timeoutMs?: number;
+}
+
+export interface SyncPullResult {
+  applied: number;
+  tables: string[];
+  since?: unknown;
+  payload: unknown;
+}
+
+export interface PoolOptions<M extends Record<string, any> = any> {
   size?: number;
+  sync?: string | SyncConfig<M>;
 }
 
 export type DBClient<M extends Record<string, TableDefinition<M>>> = {
@@ -933,6 +971,10 @@ export type DBClient<M extends Record<string, TableDefinition<M>>> = {
   hono(): HonoHandler;
   hono(config: HonoConfig<M>): HonoHandler;
   readonly metaData: DbConcurrency<M>;
+  syncClient: {
+    pull(options?: SyncPullOptions): Promise<SyncPullResult>;
+    getConfig(): Promise<SyncConfig<M> | null>;
+  };
 
   interceptors: WithInterceptors;
 } & WithInterceptors & DbConnectable<M>;
@@ -972,6 +1014,7 @@ type ExpressConfig<M extends Record<string, TableDefinition<M>>> = {
 } & {
   db?: Pool | ((connectors: Connectors) => Pool | Promise<Pool>);
   hooks?: ExpressHooks<M>;
+  sync?: SyncServerConfig;
 }
 
 type HonoConfig<M extends Record<string, TableDefinition<M>>> = {
@@ -1007,6 +1050,21 @@ type HonoTransactionHooks<M extends Record<string, TableDefinition<M>>> = {
 
 type ExpressHooks<M extends Record<string, TableDefinition<M>>> = ExpressTransactionHooks<M> & {
   transaction?: ExpressTransactionHooks<M>;
+}
+
+type SyncServerConfig = {
+  enabled?: boolean;
+  changeTable?: string;
+  queue?: {
+    concurrency?: number;
+    maxPending?: number;
+  };
+  limits?: {
+    maxTablesPerRequest?: number;
+    maxKeysPerBatch?: number;
+    maxRowsPerBatch?: number;
+    maxChangeWindow?: number;
+  };
 }
 
 type HonoHooks<M extends Record<string, TableDefinition<M>>> = HonoTransactionHooks<M> & {
