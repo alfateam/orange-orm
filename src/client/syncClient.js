@@ -135,14 +135,14 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 			}
 			throw new Error('Sync failed: staged pull exceeded max iterations');
 
-				function requestRowsChunk(items, offset) {
-					const chunk = items.slice(offset, offset + maxRowsPerBatch);
-					return requestPayload({
-						...pullConfig,
-						body: {
-							phase: 'rows',
-							items: chunk
-						}
+			function requestRowsChunk(items, offset) {
+				const chunk = items.slice(offset, offset + maxRowsPerBatch);
+				return requestPayload({
+					...pullConfig,
+					body: {
+						phase: 'rows',
+						items: chunk
+					}
 				}, options)
 					.then(
 						(payload) => ({ payload, error: null }),
