@@ -20,7 +20,7 @@ The ultimate Object Relational Mapper for Node.js, Bun and Deno, offering seamle
 - **Active Record**: With a concise and expressive syntax, Orange enables you to interact with your database using the [*Active Record Pattern*](https://en.wikipedia.org/wiki/Active_record_pattern).
 - **No Code Generation Required**: Enjoy full IntelliSense, even in table mappings, without the need for cumbersome code generation.
 - **TypeScript and JavaScript Support**: Orange fully supports both TypeScript and JavaScript, allowing you to leverage the benefits of static typing and modern ECMAScript features.
-- **Works in the Browser**: You can securely use Orange in the browser by utilizing the Express.js plugin, which serves to safeguard sensitive database credentials from exposure at the client level and protect against SQL injection. This method mirrors a traditional REST API, augmented with advanced TypeScript tooling for enhanced functionality.
+- **Works in the Browser**: You can securely use Orange in the browser by utilizing the Express.js or Hono plugin, which serves to safeguard sensitive database credentials from exposure at the client level and protect against SQL injection. This method mirrors a traditional REST API, augmented with advanced TypeScript tooling for enhanced functionality.
 
 ## Supported Databases and Runtimes
 |               | Node | Deno | Bun |Cloudflare | Web |
