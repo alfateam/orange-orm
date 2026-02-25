@@ -34,8 +34,6 @@ The ultimate Object Relational Mapper for Node.js, Bun and Deno, offering seamle
 | SQLite        | ✅ | ✅ | ✅ | |
 | Cloudflare D1 |  |  |  | ✅|
 
-This is the _Modern Typescript Documentation_. Are you looking for the [_Classic Documentation_](https://github.com/alfateam/orange-orm/blob/master/docs/docs.md) ?
-
 ## Sponsorship <span style="font-size: larger; color: darkred;">♡</span>
 If you value the hard work behind Orange and wish to see it evolve further, consider [sponsoring](https://github.com/sponsors/lroal). Your support fuels the journey of refining and expanding this tool for our developer community.
 
