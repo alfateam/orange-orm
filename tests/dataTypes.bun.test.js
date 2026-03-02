@@ -176,11 +176,11 @@ describe('insert-get', () => {
 			isActive: true,
 			// https://github.com/oven-sh/bun/issues/17030
 			// data: {'evil': true, 'magician': false},
-			// data: ['evil', 'magician'],
+			data: ['evil', 'magician'],
 			picture: 'V/cAIibr+r/2RueTQqUiEw==',
-		}, { data: false });
+		}, { });
 		const customer2 = await db.customer2.getOne(undefined, {
-			data: false
+			// data: false
 		});
 
 		const expected = {
@@ -189,7 +189,7 @@ describe('insert-get', () => {
 			balance: -200,
 			isActive: true,
 			// data: {'evil': true, 'magician': false},
-			// data: ['evil', 'magician'],
+			data: ['evil', 'magician'],
 			picture: 'V/cAIibr+r/2RueTQqUiEw==',
 		};
 
