@@ -12,7 +12,10 @@ The ultimate Object Relational Mapper for Node.js, Bun and Deno, offering seamle
 [![Discord](https://badgen.net/discord/online-members/QjuEgvQXzd?icon=discord&label=Discord)](https://discord.gg/QjuEgvQXzd)
 [![YouTube Video Views](https://img.shields.io/youtube/views/1IwwjPr2lMs)](https://youtu.be/1IwwjPr2lMs)
 
+## MCP (Model Context Protocol)
+Orange ORM is available as an MCP resource on Context7. Use it with AI-powered tools like GitHub Copilot, Cursor, or Claude to get up-to-date documentation and code examples directly in your IDE.
 
+👉 [https://context7.com/alfateam/orange-orm](https://context7.com/alfateam/orange-orm)
 
 ## Key Features 
 
