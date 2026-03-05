@@ -19,3 +19,4 @@ publish.log
 CNAME
 .env*
 vitest.config.js
+SKILLS.md
