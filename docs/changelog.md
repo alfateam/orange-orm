@@ -1,4 +1,6 @@
 ## Changelog
+__5.2.1__  
+Bugfix: Bun Postgres fails on proxied JSON params [#158](https://github.com/alfateam/orange-orm/issues/158)  
 __5.2.0__  
 Distinct aggregates via `distinct()` [#119](https://github.com/alfateam/orange-orm/issues/119)  
 Column-to-column filters (incl. `contains`, `startsWith`, `endsWith`) [#150](htps://github.com/alfateam/orange-orm/issues/150)  
