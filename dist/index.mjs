@@ -16958,28 +16958,19 @@ function requireFormatJSONIn () {
 	return formatJSONIn_1;
 }
 
-var encodeJSON;
-var hasRequiredEncodeJSON;
+var encodeJSON$1;
+var hasRequiredEncodeJSON$1;
 
-function requireEncodeJSON () {
-	if (hasRequiredEncodeJSON) return encodeJSON;
-	hasRequiredEncodeJSON = 1;
-	function encode(arg) {
-		if (Array.isArray(arg))
-			return new JsonBArrayParam(arg);
-		else
-			return arg;
+function requireEncodeJSON$1 () {
+	if (hasRequiredEncodeJSON$1) return encodeJSON$1;
+	hasRequiredEncodeJSON$1 = 1;
+	function encode(value) {
+		// Bun SQL rejects proxied objects as PG params; normalize to plain JSON value.
+		return JSON.parse(JSON.stringify(value));
 	}
 
-	class JsonBArrayParam {
-		constructor(actualArray) { this.actualArray = actualArray; }
-		toPostgres() {
-			return JSON.stringify(this.actualArray);
-		}
-	}
-
-	encodeJSON = encode;
-	return encodeJSON;
+	encodeJSON$1 = encode;
+	return encodeJSON$1;
 }
 
 var newTransaction$9;
@@ -16998,7 +16989,7 @@ function requireNewTransaction$9 () {
 	var limitAndOffset = requireLimitAndOffset$4();
 	var formatDateOut = requireFormatDateOut$3();
 	var formatJSONIn = requireFormatJSONIn();
-	var encodeJSON = requireEncodeJSON();
+	var encodeJSON = requireEncodeJSON$1();
 	var insertSql = requireInsertSql$4();
 	var insert = requireInsert$4();
 	var quote = requireQuote$4();
@@ -17461,6 +17452,30 @@ function requireEncodeBoolean$4 () {
 
 	encodeBoolean_1$4 = encodeBoolean;
 	return encodeBoolean_1$4;
+}
+
+var encodeJSON;
+var hasRequiredEncodeJSON;
+
+function requireEncodeJSON () {
+	if (hasRequiredEncodeJSON) return encodeJSON;
+	hasRequiredEncodeJSON = 1;
+	function encode(arg) {
+		if (Array.isArray(arg))
+			return new JsonBArrayParam(arg);
+		else
+			return arg;
+	}
+
+	class JsonBArrayParam {
+		constructor(actualArray) { this.actualArray = actualArray; }
+		toPostgres() {
+			return JSON.stringify(this.actualArray);
+		}
+	}
+
+	encodeJSON = encode;
+	return encodeJSON;
 }
 
 var newTransaction$8;
