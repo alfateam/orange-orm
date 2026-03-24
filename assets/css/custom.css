@@ -1,3 +1,10 @@
+/* simple dark mode */
+@media (prefers-color-scheme: dark) {
+  html {
+    filter: invert(90%) hue-rotate(180deg);
+  }
+}
+
 body {
     margin: auto;
     width: 60%;
