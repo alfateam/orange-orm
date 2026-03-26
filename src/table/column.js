@@ -13,6 +13,10 @@ function defineColumn(column, table) {
 		return c;
 	};
 
+	c.jsonOf = function() {
+		return c.json();
+	};
+
 	c.guid = function() {
 		require('./column/guid')(column);
 		return c;

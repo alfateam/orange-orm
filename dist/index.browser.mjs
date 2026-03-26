@@ -6270,6 +6270,10 @@ function requireColumn () {
 			return c;
 		};
 
+		c.jsonOf = function() {
+			return c.json();
+		};
+
 		c.guid = function() {
 			requireGuid()(column);
 			return c;
