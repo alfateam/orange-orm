@@ -1,4 +1,6 @@
 ## Changelog
+__5.2.2__  
+Bugfix: jsonOf<T>() exists in type definitions but is missing at runtime [#166](https://github.com/alfateam/orange-orm/issues/166)  
 __5.2.1__  
 Bugfix: Bun Postgres fails on proxied JSON params [#158](https://github.com/alfateam/orange-orm/issues/158)  
 __5.2.0__  
