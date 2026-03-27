@@ -135,7 +135,7 @@ function defineColumn(column, table) {
 	c.notNullExceptInsert = function() {
 		column._notNullExceptInsert = true;
 		function validate(value, meta) {
-			if (meta?.isInsert)
+			if (meta.isInsert)
 				return;
 			if (value === undefined || value === null)
 				throw new Error(`Column ${column.alias} cannot be null or undefined`);

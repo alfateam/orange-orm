@@ -6393,7 +6393,7 @@ function requireColumn () {
 		c.notNullExceptInsert = function() {
 			column._notNullExceptInsert = true;
 			function validate(value, meta) {
-				if (meta?.isInsert)
+				if (meta.isInsert)
 					return;
 				if (value === undefined || value === null)
 					throw new Error(`Column ${column.alias} cannot be null or undefined`);
@@ -8614,7 +8614,7 @@ function requireNewDecodeDbRow () {
 					value = purify(value);
 					this._dbRow[key] = value;
 					if (column.validate)
-						column.validate(value, { table: table._dbName, column: column._dbName, property: column.alias });
+						column.validate(value, { table: table._dbName, column: column._dbName, property: column.alias, isInsert: false });
 					updateField(this._context, table, column, this);
 					let emit = this._emitColumnChanged[name];
 					if (emit)

@@ -48,7 +48,7 @@ function newDecodeDbRow(table, dbRow, filteredAliases, shouldValidate, isInsert)
 				value = purify(value);
 				this._dbRow[key] = value;
 				if (column.validate)
-					column.validate(value, { table: table._dbName, column: column._dbName, property: column.alias });
+					column.validate(value, { table: table._dbName, column: column._dbName, property: column.alias, isInsert: false });
 				updateField(this._context, table, column, this);
 				let emit = this._emitColumnChanged[name];
 				if (emit)
