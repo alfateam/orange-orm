@@ -1,4 +1,6 @@
 ## Changelog
+__5.2.4__  
+Meta parameter in validator is optional  
 __5.2.3__  
 Pass table and column and other metadata to custom validate function [#165](https://github.com/alfateam/orange-orm/issues/165)  
 __5.2.2__  

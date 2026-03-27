@@ -100,7 +100,7 @@ declare namespace r {
         date(): DateColumnDef;
     }
     export interface DateColumnDef {
-        validate(validator: (value?: Date | string, meta: ValidationMeta) => void): DateColumnDef;
+        validate(validator: (value?: Date | string, meta?: ValidationMeta) => void): DateColumnDef;
         notNull(): DateColumnNotNullDef;
         JSONSchema(schema: object, options?: Options): DateColumnDef;
         serializable(value: boolean): DateColumnDef;
@@ -110,7 +110,7 @@ declare namespace r {
     }
 
     export interface DateColumnNotNullDef {
-        validate(validator: (value: Date | string, meta: ValidationMeta) => void): DateColumnNotNullDef;
+        validate(validator: (value: Date | string, meta?: ValidationMeta) => void): DateColumnNotNullDef;
         JSONSchema(schema: object, options?: Options): DateColumnNotNullDef;
         serializable(value: boolean): DateColumnNotNullDef;
         as(dbName: string): DateColumnNotNullDef;
@@ -119,7 +119,7 @@ declare namespace r {
     }
 
     export interface BinaryColumnDef {
-        validate(validator: (value?: Buffer | string, meta: ValidationMeta) => void): BinaryColumnDef;
+        validate(validator: (value?: Buffer | string, meta?: ValidationMeta) => void): BinaryColumnDef;
         notNull(): BinaryColumnNotNullDef;
         JSONSchema(schema: object, options?: Options): BinaryColumnDef;
         serializable(value: boolean): BinaryColumnDef;
@@ -129,7 +129,7 @@ declare namespace r {
     }
 
     export interface BinaryColumnNotNullDef {
-        validate(validator: (value: Buffer | string, meta: ValidationMeta) => void): BinaryColumnNotNullDef;
+        validate(validator: (value: Buffer | string, meta?: ValidationMeta) => void): BinaryColumnNotNullDef;
         JSONSchema(schema: object, options?: Options): BinaryColumnNotNullDef;
         serializable(value: boolean): BinaryColumnNotNullDef;
         as(dbName: string): BinaryColumnNotNullDef;
@@ -138,7 +138,7 @@ declare namespace r {
     }
 
     export interface ColumnOf<T> {
-        validate(validator: (value?: T, meta: ValidationMeta) => void): ColumnOf<T>;
+        validate(validator: (value?: T, meta?: ValidationMeta) => void): ColumnOf<T>;
         notNull(): ColumnNotNullOf<T>;
         JSONSchema(schema: object, options?: Options): ColumnOf<T>;
         serializable(value: boolean): ColumnOf<T>;
@@ -148,7 +148,7 @@ declare namespace r {
     }
 
     export interface ColumnNotNullOf<T> {
-        validate(validator: (value: T, meta: ValidationMeta) => void): ColumnNotNullOf<T>;
+        validate(validator: (value: T, meta?: ValidationMeta) => void): ColumnNotNullOf<T>;
         notNull(): ColumnNotNullOf<T>;
         JSONSchema(schema: object, options?: Options): ColumnNotNullOf<T>;
         serializable(value: boolean): ColumnNotNullOf<T>;
