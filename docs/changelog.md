@@ -1,4 +1,6 @@
 ## Changelog
+__5.2.3__  
+Pass table and column and other metadata to custom validate function [#165](https://github.com/alfateam/orange-orm/issues/165)  
 __5.2.2__  
 Bugfix: jsonOf<T>() exists in type definitions but is missing at runtime [#166](https://github.com/alfateam/orange-orm/issues/166)  
 __5.2.1__  
