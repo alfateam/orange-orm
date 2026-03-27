@@ -2058,6 +2058,7 @@ export default map;
 
 <details><summary><strong>Validation</strong></summary>
 <p>In the previous sections you have already seen the <strong><i>notNull()</i></strong> validator being used on some columns. This will not only generate correct typescript mapping, but also throw an error if value is set to null or undefined. However, sometimes we do not want the notNull-validator to be run on inserts. Typically, when we have an autoincremental key or server generated uuid, it does not make sense to check for null on insert. This is where <strong><i>notNullExceptInsert()</strong></i> comes to rescue. You can also create your own custom validator as shown below. The last kind of validator, is the <a href="https://ajv.js.org/json-schema.html">ajv JSON schema validator</a>. This can be used on json columns as well as any other column type.</p>
+<p>Custom validators receive <code>value</code> and an optional metadata object with <code>table</code>, <code>column</code>, <code>property</code>, and <code>isInsert</code>.</p>
 
 <sub>📄 map.ts</sub>
 ```ts
@@ -2075,9 +2076,9 @@ let petSchema = {
     }
 };
 
-function validateName(value?: string) {
+function validateName(value?: string, meta?: { table?: string; column?: string; property?: string; isInsert?: boolean }) {
   if (value && value.length > 10)
-    throw new Error('Length cannot exceed 10 characters');
+    throw new Error(`Length cannot exceed 10 characters in ${meta?.table}.${meta?.column}`);
 }
 
 const map = orange.map(x => ({
@@ -2110,9 +2111,9 @@ let petSchema = {
     }
 };
 
-function validateName(value) {
+function validateName(value, meta) {
   if (value && value.length > 10)
-    throw new Error('Length cannot exceed 10 characters');
+    throw new Error(`Length cannot exceed 10 characters in ${meta?.table}.${meta?.column}`);
 }
 
 const map = orange.map(x => ({

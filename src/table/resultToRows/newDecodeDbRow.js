@@ -48,7 +48,7 @@ function newDecodeDbRow(table, dbRow, filteredAliases, shouldValidate, isInsert)
 				value = purify(value);
 				this._dbRow[key] = value;
 				if (column.validate)
-					column.validate(value, this._dbRow);
+					column.validate(value, { table: table._dbName, column: column._dbName, property: column.alias });
 				updateField(this._context, table, column, this);
 				let emit = this._emitColumnChanged[name];
 				if (emit)
@@ -204,7 +204,7 @@ function newDecodeDbRow(table, dbRow, filteredAliases, shouldValidate, isInsert)
 			if (row[key] !== undefined && !isInsert)
 				row[key] = columns[i].decode(context, row[key]);
 			if (shouldValidate && columns[i].validate)
-				columns[i].validate(row[key], row, isInsert);
+				columns[i].validate(row[key], { table: table._dbName, column: columns[i]._dbName, property: columns[i].alias, isInsert });
 		}
 		let target = new Row(context, row);
 		const p = new Proxy(target, {

@@ -167,6 +167,44 @@ describe('validate chained', () => {
 	}
 });
 
+describe('validate metadata', () => {
+	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
+	test('mssql', async () => await verify('mssql'));
+	test('oracle', async () => await verify('oracle'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db, init } = getDb(dbName);
+		if (dbName === 'http') {
+			const { db, init } = getDb('sqlite2');
+			await init(db);
+		}
+		else
+			await init(db);
+
+		map.__resetValidateMetaCalls();
+		await db.customerValidateMeta.insert({
+			name: 'George',
+			balance: 177,
+			isActive: true
+		});
+
+		expect(map.__getValidateMetaCalls()).toEqual([{
+			value: 'George',
+			table: 'customer',
+			column: 'name',
+			property: 'name',
+			isInsert: true
+		}]);
+	}
+});
+
 describe('validate JSONSchema', () => {
 	test('pg', async () => await verify('pg'));
 	test('pglite', async () => await verify('pglite'));

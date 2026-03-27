@@ -636,6 +636,13 @@ type JsonOf<T> = {
 	type: T;
 };
 
+interface ValidationMeta {
+	table?: string;
+	column?: string;
+	property?: string;
+	isInsert?: boolean;
+}
+
 interface ColumnType<M> {
 	string(): StringColumnTypeDef<M & StringColumnSymbol>;
 	uuid(): UuidColumnTypeDef<M & UuidColumnSymbol>;
@@ -652,90 +659,90 @@ interface ColumnType<M> {
 
 type UuidValidator<M> = M extends NotNull
 	? {
-		validate(validator: (value: string) => void): UuidColumnTypeDef<M>;
+		validate(validator: (value: string, meta?: ValidationMeta) => void): UuidColumnTypeDef<M>;
 	}
 	: {
 		validate(
-			validator: (value?: string | null) => void
+			validator: (value?: string | null, meta?: ValidationMeta) => void
 		): UuidColumnTypeDef<M>;
 	};
 type StringValidator<M> = M extends NotNull
 	? {
-		validate(validator: (value: string) => void): StringColumnTypeDef<M>;
+		validate(validator: (value: string, meta?: ValidationMeta) => void): StringColumnTypeDef<M>;
 	}
 	: {
 		validate(
-			validator: (value?: string | null) => void
+			validator: (value?: string | null, meta?: ValidationMeta) => void
 		): StringColumnTypeDef<M>;
 	};
 type NumericValidator<M> = M extends NotNull
 	? {
-		validate(validator: (value: number) => void): NumericColumnTypeDef<M>;
+		validate(validator: (value: number, meta?: ValidationMeta) => void): NumericColumnTypeDef<M>;
 	}
 	: {
 		validate(
-			validator: (value?: number | null) => void
+			validator: (value?: number | null, meta?: ValidationMeta) => void
 		): NumericColumnTypeDef<M>;
 	};
 type BigIntValidator<M> = M extends NotNull
 	? {
-		validate(validator: (value: bigint) => void): BigIntColumnTypeDef<M>;
+		validate(validator: (value: bigint, meta?: ValidationMeta) => void): BigIntColumnTypeDef<M>;
 	}
 	: {
 		validate(
-			validator: (value?: bigint | null) => void
+			validator: (value?: bigint | null, meta?: ValidationMeta) => void
 		): BigIntColumnTypeDef<M>;
 	};
 type BinaryValidator<M> = M extends NotNull
 	? {
-		validate(validator: (value: string) => void): BinaryColumnTypeDef<M>;
+		validate(validator: (value: string, meta?: ValidationMeta) => void): BinaryColumnTypeDef<M>;
 	}
 	: {
 		validate(
-			validator: (value?: string | null) => void
+			validator: (value?: string | null, meta?: ValidationMeta) => void
 		): BinaryColumnTypeDef<M>;
 	};
 type BooleanValidator<M> = M extends NotNull
 	? {
-		validate(validator: (value: boolean) => void): BooleanColumnTypeDef<M>;
+		validate(validator: (value: boolean, meta?: ValidationMeta) => void): BooleanColumnTypeDef<M>;
 	}
 	: {
 		validate(
-			validator: (value?: boolean | null) => void
+			validator: (value?: boolean | null, meta?: ValidationMeta) => void
 		): BooleanColumnTypeDef<M>;
 	};
 type JSONValidator<M> = M extends NotNull
 	? {
 		validate(
-			validator: (value: ToJsonType<M>) => void
+			validator: (value: ToJsonType<M>, meta?: ValidationMeta) => void
 		): JSONColumnTypeDef<M>;
 	}
 	: {
 		validate(
-			validator: (value?: ToJsonType<M> | null) => void
+			validator: (value?: ToJsonType<M> | null, meta?: ValidationMeta) => void
 		): JSONColumnTypeDef<M>;
 	};
 type DateValidator<M> = M extends NotNull
 	? {
 		validate(
-			validator: (value: string | Date) => void
+			validator: (value: string | Date, meta?: ValidationMeta) => void
 		): DateColumnTypeDef<M>;
 	}
 	: {
 		validate(
-			validator: (value?: string | Date | null) => void
+			validator: (value?: string | Date | null, meta?: ValidationMeta) => void
 		): DateColumnTypeDef<M>;
 	};
 
 type DateWithTimeZoneValidator<M> = M extends NotNull
 	? {
 		validate(
-			validator: (value: string | Date) => void
+			validator: (value: string | Date, meta?: ValidationMeta) => void
 		): DateWithTimeZoneColumnTypeDef<M>;
 	}
 	: {
 		validate(
-			validator: (value?: string | Date | null) => void
+			validator: (value?: string | Date | null, meta?: ValidationMeta) => void
 		): DateWithTimeZoneColumnTypeDef<M>;
 	};
 

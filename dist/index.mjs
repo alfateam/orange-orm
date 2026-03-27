@@ -6392,8 +6392,8 @@ function requireColumn () {
 
 		c.notNullExceptInsert = function() {
 			column._notNullExceptInsert = true;
-			function validate(value, _row, isInsert) {
-				if (isInsert)
+			function validate(value, meta) {
+				if (meta?.isInsert)
 					return;
 				if (value === undefined || value === null)
 					throw new Error(`Column ${column.alias} cannot be null or undefined`);
@@ -6407,12 +6407,12 @@ function requireColumn () {
 			if (previousValue)
 				column.validate = nestedValidate;
 			else
-				column.validate = value;
+				column.validate = invokeValidate;
 
 			function nestedValidate() {
 				try {
 					previousValue.apply(null, arguments);
-					value.apply(null, arguments);
+					invokeValidate.apply(null, arguments);
 				}
 				catch (e) {
 					const error = new Error(e.message || e);
@@ -6420,6 +6420,10 @@ function requireColumn () {
 					error.status = 400;
 					throw error;
 				}
+			}
+
+			function invokeValidate(inputValue, meta) {
+				value(inputValue, meta);
 			}
 			return c;
 		};
@@ -8610,7 +8614,7 @@ function requireNewDecodeDbRow () {
 					value = purify(value);
 					this._dbRow[key] = value;
 					if (column.validate)
-						column.validate(value, this._dbRow);
+						column.validate(value, { table: table._dbName, column: column._dbName, property: column.alias });
 					updateField(this._context, table, column, this);
 					let emit = this._emitColumnChanged[name];
 					if (emit)
@@ -8766,7 +8770,7 @@ function requireNewDecodeDbRow () {
 				if (row[key] !== undefined && !isInsert)
 					row[key] = columns[i].decode(context, row[key]);
 				if (shouldValidate && columns[i].validate)
-					columns[i].validate(row[key], row, isInsert);
+					columns[i].validate(row[key], { table: table._dbName, column: columns[i]._dbName, property: columns[i].alias, isInsert });
 			}
 			let target = new Row(context, row);
 			const p = new Proxy(target, {
