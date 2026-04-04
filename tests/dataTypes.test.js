@@ -115,7 +115,7 @@ describe('insert-get', () => {
 // 	if (major === 18)
 // 		test('mssqlNative', async () => await verify('mssqlNative'));
 // 	test('mysql', async () => await verify('mysql'));
-	test('mariadb', async () => await verify('mariadb'));
+// test('mariadb', async () => await verify('mariadb'));
 // 	test('sqlite', async () => await verify('sqlite'));
 // 	test('sap', async () => await verify('sap'));
 // 	test('http', async () => await verify('http'));

@@ -103,7 +103,7 @@ function newSingleCommandCore(context, table, filter, alias, concurrencyState) {
 		}
 		if (engine === 'mariadb') {
 			const jsonValue = JSON.stringify(value === undefined ? null : value);
-			return newParameterized("JSON_EXTRACT(?, '$')", [jsonValue]);
+			return newParameterized('JSON_EXTRACT(?, \'$\')', [jsonValue]);
 		}
 		if (engine === 'sqlite') {
 			if (isJsonObject(value)) {

@@ -186,7 +186,7 @@ function newUpdateCommandCore(context, table, columns, row, concurrencyState) {
 		}
 		if (engine === 'mariadb') {
 			const jsonValue = JSON.stringify(value === undefined ? null : value);
-			const sql = "JSON_SET(" + expr.sql() + ", " + jsonPath.sql + ", JSON_EXTRACT(?, '$'))";
+			const sql = 'JSON_SET(' + expr.sql() + ', ' + jsonPath.sql + ', JSON_EXTRACT(?, \'$\'))';
 			return newParameterized(sql, expr.parameters.concat(jsonPath.parameters, [jsonValue]));
 		}
 		if (engine === 'sqlite') {
@@ -318,7 +318,7 @@ function newUpdateCommandCore(context, table, columns, row, concurrencyState) {
 		}
 		if (engine === 'mariadb') {
 			const jsonValue = JSON.stringify(value === undefined ? null : value);
-			return newParameterized("JSON_EXTRACT(?, '$')", [jsonValue]);
+			return newParameterized('JSON_EXTRACT(?, \'$\')', [jsonValue]);
 		}
 		if (engine === 'sqlite') {
 			if (isJsonObject(value)) {
