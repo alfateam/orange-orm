@@ -38,6 +38,16 @@ function createProviders(index) {
 			return createPool.bind(null, 'mysql');
 		}
 	});
+	Object.defineProperty(dbMap, 'mariadb', {
+		get:  function() {
+			return createPool.bind(null, 'mariadb');
+		}
+	});
+	Object.defineProperty(dbMap, 'mariaDb', {
+		get:  function() {
+			return createPool.bind(null, 'mariadb');
+		}
+	});
 	Object.defineProperty(dbMap, 'sap', {
 		get:  function() {
 			return createPool.bind(null, 'sap');
@@ -101,6 +111,12 @@ function negotiateCachedPool(fn, providers) {
 		},
 		get mysql() {
 			return createPool.bind(null, 'mysql');
+		},
+		get mariadb() {
+			return createPool.bind(null, 'mariadb');
+		},
+		get mariaDb() {
+			return createPool.bind(null, 'mariadb');
 		},
 		get sap() {
 			return createPool.bind(null, 'sap');

@@ -41,6 +41,8 @@ type DbConnectable<T> = {
 	mssql(connectionString: string, options?: PoolOptions): DBClient<SchemaFromMappedDb<T>>;
 	mssqlNative(connectionString: string, options?: PoolOptions): DBClient<SchemaFromMappedDb<T>>;
 	mysql(connectionString: string, options?: PoolOptions): DBClient<SchemaFromMappedDb<T>>;
+	mariadb(connectionString: string, options?: PoolOptions): DBClient<SchemaFromMappedDb<T>>;
+	mariaDb(connectionString: string, options?: PoolOptions): DBClient<SchemaFromMappedDb<T>>;
 	oracle(config: PoolAttributes, options?: PoolOptions): DBClient<SchemaFromMappedDb<T>>;
 };
 
@@ -71,6 +73,9 @@ interface Connectors {
 	sap(connectionString: string, options?: PoolOptions): Pool;
 	mssql(connectionConfig: ConnectionConfiguration, options?: PoolOptions): Pool;
 	mssql(connectionString: string, options?: PoolOptions): Pool;
+	mysql(connectionString: string, options?: PoolOptions): Pool;
+	mariadb(connectionString: string, options?: PoolOptions): Pool;
+	mariaDb(connectionString: string, options?: PoolOptions): Pool;
 	oracle(config: PoolAttributes, options?: PoolOptions): Pool;
 }
 

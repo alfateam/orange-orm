@@ -6,7 +6,7 @@ function newLikeColumnArg(context, column, encodedArg, prefix, suffix) {
 	var encodedSuffix = suffix ? column.encode(context, suffix) : null;
 	var engine = getSessionSingleton(context, 'engine');
 
-	if (engine === 'mysql')
+	if (engine === 'mysql' || engine === 'mariadb')
 		return concatWithFunction(encodedPrefix, encodedArg, encodedSuffix);
 	if (engine === 'mssql' || engine === 'mssqlNative')
 		return concatWithOperator('+', encodedPrefix, encodedArg, encodedSuffix);

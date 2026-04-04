@@ -28,6 +28,8 @@ declare namespace r {
     function mssql(connectionString: string, options?: PoolOptions): Pool;
     function mssqlNative(connectionString: string, options?: PoolOptions): Pool;
     function mysql(connectionString: string, options?: PoolOptions): Pool;
+    function mariadb(connectionString: string, options?: PoolOptions): Pool;
+    function mariaDb(connectionString: string, options?: PoolOptions): Pool;
     function oracle(config: PoolAttributes, options?: PoolOptions): Pool;
     function on(type: 'query', cb: (e: QueryEvent) => void): void;
     function off(type: 'query', cb: (e: QueryEvent) => void): void;
