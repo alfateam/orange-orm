@@ -118,7 +118,7 @@ function removeTimezone(isoString) {
 function encodeDateTz(date) {
 	if (date && date.toISOString)
 		return removeTimezone(date.toISOString());
-	if (typeof date === "string" && /(Z|[+-][0-9]{2}:[0-9]{2})$/.test(date))
+	if (typeof date === 'string' && /(Z|[+-][0-9]{2}:[0-9]{2})$/.test(date))
 		return removeTimezone(new Date(date).toISOString());
 	return date;
 }

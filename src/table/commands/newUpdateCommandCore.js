@@ -242,7 +242,6 @@ function newUpdateCommandCore(context, table, columns, row, concurrencyState) {
 			return newParameterized(sql, jsonPath.parameters);
 		}
 		if (engine === 'mariadb') {
-			const fn = isJsonObject(oldValue) ? 'JSON_EXTRACT' : 'JSON_UNQUOTE(JSON_EXTRACT';
 			const sql = isJsonObject(oldValue)
 				? 'JSON_EXTRACT(' + columnSql + ', ' + jsonPath.sql + ')'
 				: 'JSON_UNQUOTE(JSON_EXTRACT(' + columnSql + ', ' + jsonPath.sql + '))';
