@@ -18,6 +18,9 @@ function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 	}
 	rdb.engine = 'mariadb';
 	rdb.encodeBoolean = encodeBoolean;
+	rdb.decodeJSON = decodeJSON;
+	rdb.encodeDate = encodeDate;
+	rdb.encodeDateTz = encodeDateTz;
 	rdb.encodeJSON = JSON.stringify;
 	rdb.deleteFromSql = deleteFromSql;
 	rdb.selectForUpdateSql = selectForUpdateSql;
@@ -95,6 +98,29 @@ function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 			}
 		}
 	};
+}
+
+function decodeJSON(value) {
+	return JSON.parse(value);
+}
+
+function encodeDate(date) {
+	date = date.toISOString ? removeTimezone(date.toISOString()) : removeTimezone(date);
+	return date;
+}
+
+function removeTimezone(isoString) {
+	let dateTimePattern = /[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(.[0-9]{3})?/;
+	let match = isoString.match(dateTimePattern);
+	return match ? match[0] : isoString;
+}
+
+function encodeDateTz(date) {
+	if (date && date.toISOString)
+		return removeTimezone(date.toISOString());
+	if (typeof date === "string" && /(Z|[+-][0-9]{2}:[0-9]{2})$/.test(date))
+		return removeTimezone(new Date(date).toISOString());
+	return date;
 }
 
 module.exports = newResolveTransaction;

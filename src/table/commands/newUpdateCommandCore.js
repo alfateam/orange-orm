@@ -237,8 +237,15 @@ function newUpdateCommandCore(context, table, columns, row, concurrencyState) {
 			const sql = columnSql + ' #> ' + buildPgPathLiteral(jsonPath.tokens);
 			return newParameterized(sql);
 		}
-		if (engine === 'mysql' || engine === 'mariadb') {
+		if (engine === 'mysql') {
 			const sql = 'JSON_EXTRACT(' + columnSql + ', ' + jsonPath.sql + ')';
+			return newParameterized(sql, jsonPath.parameters);
+		}
+		if (engine === 'mariadb') {
+			const fn = isJsonObject(oldValue) ? 'JSON_EXTRACT' : 'JSON_UNQUOTE(JSON_EXTRACT';
+			const sql = isJsonObject(oldValue)
+				? 'JSON_EXTRACT(' + columnSql + ', ' + jsonPath.sql + ')'
+				: 'JSON_UNQUOTE(JSON_EXTRACT(' + columnSql + ', ' + jsonPath.sql + '))';
 			return newParameterized(sql, jsonPath.parameters);
 		}
 		if (engine === 'sqlite') {
@@ -317,8 +324,13 @@ function newUpdateCommandCore(context, table, columns, row, concurrencyState) {
 			return newParameterized('CAST(? AS JSON)', [jsonValue]);
 		}
 		if (engine === 'mariadb') {
-			const jsonValue = JSON.stringify(value === undefined ? null : value);
-			return newParameterized('JSON_EXTRACT(?, \'$\')', [jsonValue]);
+			if (isJsonObject(value)) {
+				const jsonValue = JSON.stringify(value);
+				return newParameterized('JSON_EXTRACT(?, \'$\')', [jsonValue]);
+			}
+			if (value === null || value === undefined)
+				return newParameterized('null');
+			return newParameterized('?', [String(value)]);
 		}
 		if (engine === 'sqlite') {
 			if (isJsonObject(value)) {
