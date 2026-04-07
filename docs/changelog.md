@@ -1,4 +1,6 @@
 ## Changelog
+__5.3.0__  
+Support for MariaDB [#169](https://github.com/alfateam/orange-orm/issues/169)  
 __5.2.4__  
 Meta parameter in validator is optional  
 __5.2.3__  

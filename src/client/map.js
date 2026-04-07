@@ -46,6 +46,7 @@ function map(index, context, providers, fn) {
 	context.mssql = connect.bind(null, 'mssql');
 	context.mssqlNative = connect.bind(null, 'mssqlNative');
 	context.mysql = connect.bind(null, 'mysql');
+	context.mariadb = connect.bind(null, 'mariadb');
 	context.sap = connect.bind(null, 'sap');
 	context.oracle = connect.bind(null, 'oracle');
 	context.sqlite = connect.bind(null, 'sqlite');

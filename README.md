@@ -27,6 +27,7 @@ The ultimate Object Relational Mapper for Node.js, Bun and Deno, offering seamle
 | PGlite      | ✅ | ✅ | ✅ | ✅ | ✅
 | MS SQL        | ✅ |  | ✅ | |
 | MySQL         | ✅ | ✅ | ✅ || 
+| MariaDB       | ✅ | ✅ | ✅ ||
 | Oracle        | ✅ | ✅ | ✅ | |
 | SAP ASE       | ✅ |  |  | |
 | SQLite        | ✅ | ✅ | ✅ | |
@@ -348,6 +349,15 @@ $ npm install mysql2
 ```javascript
 import map from './map';
 const db = map.mysql('mysql://test:test@mysql/test');
+```
+
+__MariaDB__
+```bash
+$ npm install mysql2
+```  
+```javascript
+import map from './map';
+const db = map.mariadb('mariadb://test:test@mariadb/test');
 ```
 
 

@@ -37,6 +37,7 @@ function map(index, _fn) {
 	dbMap.mssql = throwDb;
 	dbMap.mssqlNative = throwDb;
 	dbMap.mysql = throwDb;
+	dbMap.mariadb = throwDb;
 	dbMap.sap = throwDb;
 	dbMap.oracle = throwDb;
 	dbMap.sqlite = throwDb;
@@ -65,6 +66,7 @@ function map(index, _fn) {
 	onFinal.mssql = () => index({ db: throwDb, providers: dbMap });
 	onFinal.mssqlNative = () => index({ db: throwDb, providers: dbMap });
 	onFinal.mysql = () => index({ db: throwDb, providers: dbMap });
+	onFinal.mariadb = () => index({ db: throwDb, providers: dbMap });
 	onFinal.sap = () => index({ db: throwDb, providers: dbMap });
 	onFinal.oracle = () => index({ db: throwDb, providers: dbMap });
 	onFinal.sqlite = () => index({ db: throwDb, providers: dbMap });

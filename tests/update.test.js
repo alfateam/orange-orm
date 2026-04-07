@@ -39,6 +39,7 @@ beforeAll(async () => {
 	if (major === 18)
 		await insertData('mssqlNative');
 	await insertData('mysql');
+	await insertData('mariadb');
 	await insertData('sap');
 	await insertData('sqlite');
 	await insertData('sqlite2');
@@ -112,6 +113,7 @@ describe('update date in array', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sap', async () => await verify('sap'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('http', async () => await verify('http'));
@@ -137,6 +139,7 @@ describe('update multiple in array', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sap', async () => await verify('sap'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('http', async () => await verify('http'));
@@ -219,6 +222,7 @@ describe('selective update with where expression', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sap', async () => await verify('sap'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('http', async () => await verify('http'));
@@ -252,6 +256,7 @@ describe('selective update with primary key filter array', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sap', async () => await verify('sap'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('http', async () => await verify('http'));
@@ -284,6 +289,7 @@ describe('delete row', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sap', async () => await verify('sap'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('http', async () => await verify('http'));
@@ -311,6 +317,7 @@ describe('update boolean', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sap', async () => await verify('sap'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('http', async () => await verify('http'));
@@ -334,6 +341,7 @@ describe('update date', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sap', async () => await verify('sap'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('http', async () => await verify('http'));
@@ -358,6 +366,7 @@ describe('update same row twice in same transaction', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	//exclude sap because it will throw instead of truncate
 	//exclude sqlite and d1 because it does not have precision
 
@@ -392,6 +401,7 @@ describe('add hasOne', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sap', async () => await verify('sap'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('http', async () => await verify('http'));
@@ -501,6 +511,10 @@ const connections = {
 		db: map({ db: (con) => con.mysql('mysql://test:test@mysql/test', { size: 1 }) }),
 		init: initMysql
 	},
+	mariadb: {
+		db: map({ db: (con) => con.mariadb('mariadb://test:test@mariadb/test', { size: 1 }) }),
+		init: initMysql
+	},
 	http: {
 		db: map.http(`http://localhost:${port}/rdb`),
 	}
@@ -528,6 +542,8 @@ function getDb(name) {
 		return connections.oracle;
 	else if (name === 'mysql')
 		return connections.mysql;
+	else if (name === 'mariadb')
+		return connections.mariadb;
 	else if (name === 'http')
 		return connections.http;
 	else

@@ -65,6 +65,7 @@ function rdbClient(options = {}) {
 	client.oracle = onProvider.bind(null, 'oracle');
 	client.http = onProvider.bind(null, 'http');//todo
 	client.mysql = onProvider.bind(null, 'mysql');
+	client.mariadb = onProvider.bind(null, 'mariadb');
 	client.express = express;
 	client.hono = hono;
 	client.close = close;

@@ -73,6 +73,15 @@ describe('output aliases for date columns', () => {
 		expect(row.brukerRolleStatusTypeId).toBe(0);
 	});
 
+	test('mariadb: insert should not shift date columns', async () => {
+		const { db, init } = getDb('mariadb');
+		await init(db);
+
+		const row = await db.brukerRolleLike.insert({ brukerRolleId: '11111111-1111-1111-1111-111111111111', brukerId: '22222222-2222-2222-2222-222222222222', rolleTypeId: 20, aktorId: '33333333-3333-3333-3333-333333333333', opprettetTid: new Date('2026-02-06T12:00:00Z'), avsluttetTid: null, brukerRolleStatusTypeId: 0, sistEndretAvBrukerId: null });
+		expect(row.avsluttetTid).toBeNull();
+		expect(row.brukerRolleStatusTypeId).toBe(0);
+	});
+
 	test('sqlite: insert should not shift date columns', async () => {
 		const { db, init } = getDb('sqlite');
 		await init(db);
@@ -142,6 +151,10 @@ const connections = {
 		db: map({ db: (con) => con.mysql('mysql://test:test@mysql/test', { size: 1 }) }),
 		init: initMysql
 	},
+	mariadb: {
+		db: map({ db: (con) => con.mariadb('mariadb://test:test@mariadb/test', { size: 1 }) }),
+		init: initMysql
+	},
 	sqlite: {
 		db: map({ db: (con) => con.sqlite(sqliteName, { size: 1 }) }),
 		init: initSqlite
@@ -176,6 +189,8 @@ function getDb(name) {
 		return connections.pglite;
 	else if (name === 'mysql')
 		return connections.mysql;
+	else if (name === 'mariadb')
+		return connections.mariadb;
 	else if (name === 'sqlite')
 		return connections.sqlite;
 	else if (name === 'sap')

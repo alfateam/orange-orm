@@ -57,6 +57,7 @@ describe('optimistic fail', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -103,6 +104,7 @@ describe('optimistic json object', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -155,6 +157,7 @@ describe('optimistic fail json object', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -217,6 +220,7 @@ describe('insert skipOnConflict with overwrite column', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -273,6 +277,7 @@ describe('savechanges overload overwrite', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -330,6 +335,7 @@ describe('savechanges overload optimistic', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -382,6 +388,7 @@ describe('insert empty skipOnConflict', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -422,6 +429,7 @@ describe('columnDiscriminator insert skipOnConflict with overwrite column', () =
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -486,6 +494,7 @@ describe('insert overwrite with skipOnConflict column', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -542,6 +551,7 @@ describe('insert overwrite with optimistic column changed', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -598,6 +608,7 @@ describe('insert overwrite with optimistic column unchanged', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -715,6 +726,10 @@ const connections = {
 		db: map({ db: (con) => con.mysql('mysql://test:test@mysql/test', { size: 1 }) }),
 		init: initMysql
 	},
+	mariadb: {
+		db: map({ db: (con) => con.mariadb('mariadb://test:test@mariadb/test', { size: 1 }) }),
+		init: initMysql
+	},
 	http: {
 		db: map.http(`http://localhost:${port}/rdb`),
 	}
@@ -742,6 +757,8 @@ function getDb(name) {
 		return connections.oracle;
 	else if (name === 'mysql')
 		return connections.mysql;
+	else if (name === 'mariadb')
+		return connections.mariadb;
 	else if (name === 'http')
 		return connections.http;
 	else

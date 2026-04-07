@@ -17,6 +17,7 @@ services:
       - postgres
       - mssql
       - mysql
+      - mariadb
       - sapase
   postgres:
     image: postgres
@@ -43,6 +44,16 @@ services:
       - MYSQL_PASSWORD=test
     ports:
       - 3306:3306
+    # restart: always
+  mariadb:
+    image: mariadb:11.4
+    environment:
+      - MARIADB_ROOT_PASSWORD=test
+      - MARIADB_DATABASE=test
+      - MARIADB_USER=test
+      - MARIADB_PASSWORD=test
+    ports:
+      - 3307:3306
     # restart: always
   sapase:
     image: larsroald/ase-server    

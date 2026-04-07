@@ -1,22 +1,22 @@
-const wrapQuery = require('./wrapQuery');
-const wrapCommand = require('./wrapCommand');
-const encodeBoolean = require('./encodeBoolean');
-const deleteFromSql = require('./deleteFromSql');
-const selectForUpdateSql = require('./selectForUpdateSql');
-const lastInsertedSql = require('./lastInsertedSql');
-const limitAndOffset = require('./limitAndOffset');
-const formatBigintOut = require('./formatBigintOut');
-const insertSql = require('./insertSql');
-const insert = require('./insert');
-const quote = require('./quote');
+const wrapQuery = require('../mySql/wrapQuery');
+const wrapCommand = require('../mySql/wrapCommand');
+const encodeBoolean = require('../mySql/encodeBoolean');
+const deleteFromSql = require('../mySql/deleteFromSql');
+const selectForUpdateSql = require('../mySql/selectForUpdateSql');
+const lastInsertedSql = require('../mySql/lastInsertedSql');
+const limitAndOffset = require('../mySql/limitAndOffset');
+const formatBigintOut = require('../mySql/formatBigintOut');
+const insertSql = require('../mySql/insertSql');
+const insert = require('../mySql/insert');
+const quote = require('../mySql/quote');
 
 function newResolveTransaction(domain, pool, { readonly = false } = {}) {
-	var rdb = {poolFactory: pool};
+	var rdb = { poolFactory: pool };
 	if (!pool.connect) {
 		pool = pool();
 		rdb.pool = pool;
 	}
-	rdb.engine = 'mysql';
+	rdb.engine = 'mariadb';
 	rdb.encodeBoolean = encodeBoolean;
 	rdb.decodeJSON = decodeJSON;
 	rdb.encodeDate = encodeDate;

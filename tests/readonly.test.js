@@ -19,6 +19,7 @@ beforeAll(async () => {
 	await insertData('oracle');
 	await insertData('mssql');
 	await insertData('mysql');
+	await insertData('mariadb');
 	await insertData('sap');
 	await insertData('sqlite');
 	await insertData('sqlite2');
@@ -96,6 +97,7 @@ describe('readonly everything', () => {
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -228,6 +230,7 @@ describe('readonly table', () => {
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -282,6 +285,7 @@ describe('readonly column', () => {
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -338,6 +342,7 @@ describe('readonly table delete', () => {
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -377,6 +382,7 @@ describe('readonly nested table delete', () => {
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -416,6 +422,7 @@ describe('readonly nested packages delete without child', () => {
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -457,6 +464,7 @@ describe('readonly nested packages delete with child', () => {
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -497,6 +505,7 @@ describe('readonly on grandChildren table delete', () => {
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -536,6 +545,7 @@ describe('readonly nested table delete override', () => {
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -570,6 +580,7 @@ describe('readonly column no change', () => {
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -617,6 +628,7 @@ describe('readonly nested column', () => {
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -661,6 +673,7 @@ describe('readonly nested table', () => {
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -700,6 +713,7 @@ describe('readonly table with column override', () => {
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -748,6 +762,7 @@ describe('readonly column delete', () => {
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -843,6 +858,10 @@ const connections = {
 		db: map({ db: (con) => con.mysql('mysql://test:test@mysql/test', { size: 1 }) }),
 		init: initMysql
 	},
+	mariadb: {
+		db: map({ db: (con) => con.mariadb('mariadb://test:test@mariadb/test', { size: 1 }) }),
+		init: initMysql
+	},
 	http: {
 		db: map.http(`http://localhost:${port}/rdb`),
 	}
@@ -870,6 +889,8 @@ function getDb(name) {
 		return connections.oracle;
 	else if (name === 'mysql')
 		return connections.mysql;
+	else if (name === 'mariadb')
+		return connections.mariadb;
 	else if (name === 'http')
 		return connections.http;
 	else
