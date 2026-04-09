@@ -37,6 +37,7 @@
         "sap",
         "sapase",
         "Oracle",
+        "MariaDB",
         "rdb",
         "Orange ORM",
         "active record"
