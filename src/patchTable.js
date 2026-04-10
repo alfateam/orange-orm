@@ -267,8 +267,6 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 			let result;
 			for (let i = 0; i < relation.columns.length; i++) {
 				let p = relation.columns[i].alias;
-				let dto = {};
-				dto[p] = row[p];
 				result = await remove({ path: ['dummy', p], oldValue: (oldValue || {})[p], op, options: options }, table, row) || result;
 			}
 			return result || {};
@@ -281,8 +279,6 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 				let p = relation.columns[i].alias;
 				let childKey = relation.childTable._primaryColumns[i].alias;
 				if (path[1] === childKey) {
-					let dto = {};
-					dto[p] = row[p];
 					result = await remove({ path: ['dummy', p], oldValue: (oldValue || {})[p], op, options: options }, table, row) || result;
 					break;
 				}

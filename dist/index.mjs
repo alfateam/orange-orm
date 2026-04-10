@@ -6293,11 +6293,6 @@ function requireColumn () {
 			return c;
 		};
 
-		c.date = function() {
-			requireDate()(column);
-			return c;
-		};
-
 		c.dateWithTimeZone = function() {
 			requireDateWithTimeZone()(column);
 			return c;
@@ -12937,7 +12932,6 @@ function requirePatchTable () {
 				let result;
 				for (let i = 0; i < relation.columns.length; i++) {
 					let p = relation.columns[i].alias;
-					row[p];
 					result = await remove({ path: ['dummy', p], oldValue: (oldValue || {})[p], op, options: options }, table, row) || result;
 				}
 				return result || {};
@@ -12950,7 +12944,6 @@ function requirePatchTable () {
 					let p = relation.columns[i].alias;
 					let childKey = relation.childTable._primaryColumns[i].alias;
 					if (path[1] === childKey) {
-						row[p];
 						result = await remove({ path: ['dummy', p], oldValue: (oldValue || {})[p], op, options: options }, table, row) || result;
 						break;
 					}
