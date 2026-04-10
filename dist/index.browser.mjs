@@ -10272,10 +10272,9 @@ function requireWhere$1 () {
 	function newWhere(_relations, _depth) {
 
 		function where(context, fn) {
-			const includeMany = false;
-			let { relations, alias } = extract(includeMany, _relations);
+			let { relations, alias } = extract(_relations);
 			const table = relations[relations.length - 1].childTable;
-			if (!relations[0].isMany || includeMany)
+			if (!relations[0].isMany)
 				table._rootAlias = alias;
 
 			try {
@@ -10291,11 +10290,11 @@ function requireWhere$1 () {
 		}
 		return where;
 
-		function extract(includeMany, relations) {
+		function extract(relations) {
 			let alias = relations[0].toLeg().table._dbName;
 			let result = [];
 			for (let i = 0; i < relations.length; i++) {
-				if (relations[i].isMany && !includeMany) {
+				if (relations[i].isMany) {
 					result = [relations[i]];
 					alias = relations[i].toLeg().table._dbName;
 				}
@@ -10322,10 +10321,9 @@ function requireAggregate$1 () {
 	function newAggregate(_relations) {
 
 		function aggregate(context, fn) {
-			const includeMany = false;
-			let { relations, alias } = extract(includeMany, _relations);
+			let { relations, alias } = extract(_relations);
 			const table = relations[relations.length - 1].childTable;
-			if (!relations[0].isMany || includeMany)
+			if (!relations[0].isMany)
 				table._rootAlias = alias;
 
 			try {
@@ -10340,11 +10338,11 @@ function requireAggregate$1 () {
 		}
 		return aggregate;
 
-		function extract(includeMany, relations) {
+		function extract(relations) {
 			let alias = relations[0].toLeg().table._dbName;
 			let result = [];
 			for (let i = 0; i < relations.length; i++) {
-				if (relations[i].isMany && !includeMany) {
+				if (relations[i].isMany) {
 					result = [relations[i]];
 					alias = relations[i].toLeg().table._dbName;
 				}
