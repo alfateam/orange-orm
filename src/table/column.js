@@ -33,8 +33,8 @@ function defineColumn(column, table) {
 		return c;
 	};
 
-	c.numeric = function(optionalPrecision,optionalScale) {
-		require('./column/numeric')(column,optionalPrecision,optionalScale);
+	c.numeric = function() {
+		require('./column/numeric')(column);
 		return c;
 	};
 

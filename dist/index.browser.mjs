@@ -6297,8 +6297,8 @@ function requireColumn () {
 			return c;
 		};
 
-		c.numeric = function(optionalPrecision,optionalScale) {
-			requireNumeric()(column,optionalPrecision,optionalScale);
+		c.numeric = function() {
+			requireNumeric()(column);
 			return c;
 		};
 
@@ -12943,7 +12943,7 @@ function requirePatchTable () {
 					let p = relation.columns[i].alias;
 					let childKey = relation.childTable._primaryColumns[i].alias;
 					if (path[1] === childKey) {
-						result = await remove({ path: ['dummy', p], oldValue: (oldValue || {})[p], op, options: options }, table, row) || result;
+						result = await remove({ path: ['dummy', p], oldValue: oldValue[p], op, options: options }, table, row) || result;
 						break;
 					}
 				}
