@@ -14,7 +14,7 @@ const fileNameWithoutExtension = lastSegment.split('.')[0];
 const sqliteName = `demo.${fileNameWithoutExtension}.db`;
 
 beforeAll(async () => {
-	await createMs('mssql');
+	await createMs();
 
 	async function createMs() {
 		const { db } = getDb('mssql');

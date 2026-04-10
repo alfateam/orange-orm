@@ -4258,7 +4258,7 @@ function requireClient () {
 					if (arguments[i][isColumnProxyKey])
 						args[i] = { [columnRefKey]: arguments[i][columnPathKey] };
 					else
-						args[i] = arguments[i](tableProxy(path.split('.').slice(0, -1).join('.')));
+						args[i] = arguments[i](tableProxy());
 				}
 				else
 					args[i] = arguments[i];
@@ -5600,7 +5600,7 @@ function requireNewEncode$5 () {
 			value = purify(value);
 			if (value == null) {
 				if (column.dbNull === null)
-					;
+					return 'null';
 				return '\'' + column.dbNull + '\'';
 			}
 			var encodeCore = getSessionSingleton(context, 'encodeDate') || encodeDate;
@@ -5735,12 +5735,12 @@ function requireNewEncode$4 () {
 					return 'null';
 				return '\'' + column.dbNull + '\'';
 			}
-			var encodeCore = getSessionSingleton(context, 'encodeDateTz') || getSessionSingleton(context, 'encodeDateTz') || getSessionSingleton(context, 'encodeDate') || encodeDate;
+			var encodeCore = getSessionSingleton(context, 'encodeDateTz') || getSessionSingleton(context, 'encodeDate') || encodeDate;
 			return encodeCore(value);
 		};
 
 		encode.direct = function(context, value) {
-			var encodeCore = getSessionSingleton(context, 'encodeDateTz') || getSessionSingleton(context, 'encodeDateTz') || getSessionSingleton(context, 'encodeDate') || encodeDate;
+			var encodeCore = getSessionSingleton(context, 'encodeDateTz') || getSessionSingleton(context, 'encodeDate') || encodeDate;
 			return encodeCore(value);
 		};
 
@@ -5944,7 +5944,7 @@ function requireNewEncode$2 () {
 			value = purify(value);
 			if (value == null) {
 				if (column.dbNull === null)
-					;
+					return 'null';
 				return '\'' + column.dbNull + '\'';
 			}
 			var encodeCore = getSessionSingleton(context, 'encodeBigint') || encodeBigint;
@@ -11011,7 +11011,7 @@ function requireNewManyCacheCore () {
 			}
 			var rows = newArray();
 			rows.push(childRow);
-			existing = cache.tryAdd(key, rows);
+			cache.tryAdd(key, rows);
 		}
 
 		function newArray() {
@@ -18002,7 +18002,7 @@ function requireNewPgPool () {
 					if (!pg) {
 						pg = await import('pg');
 						pg  = pg.default || pg;
-						let types = pg.types || pg.types;
+						let types = pg.types;
 						types.setTypeParser(1700, function(val) {
 							return parseFloat(val);
 						});

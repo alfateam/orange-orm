@@ -23,7 +23,7 @@ function newManyCache(joinRelation) {
 		}
 		var rows = newArray();
 		rows.push(childRow);
-		existing = cache.tryAdd(key, rows);
+		cache.tryAdd(key, rows);
 	}
 
 	function newArray() {

@@ -21,7 +21,7 @@ function _new(column) {
 		value = purify(value);
 		if (value == null) {
 			if (column.dbNull === null)
-				'null';
+				return 'null';
 			return '\'' + column.dbNull + '\'';
 		}
 		var encodeCore = getSessionSingleton(context, 'encodeBigint') || encodeBigint;

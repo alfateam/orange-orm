@@ -575,7 +575,6 @@ describe('insert overwrite with optimistic column changed', () => {
 			}
 		});
 
-		db.vendor.ins;
 		await db.vendor.insert({
 			id: 1,
 			name: 'John',

@@ -23,12 +23,12 @@ function _new(column) {
 				return 'null';
 			return '\'' + column.dbNull + '\'';
 		}
-		var encodeCore = getSessionSingleton(context, 'encodeDateTz') || getSessionSingleton(context, 'encodeDateTz') || getSessionSingleton(context, 'encodeDate') || encodeDate;
+		var encodeCore = getSessionSingleton(context, 'encodeDateTz') || getSessionSingleton(context, 'encodeDate') || encodeDate;
 		return encodeCore(value);
 	};
 
 	encode.direct = function(context, value) {
-		var encodeCore = getSessionSingleton(context, 'encodeDateTz') || getSessionSingleton(context, 'encodeDateTz') || getSessionSingleton(context, 'encodeDate') || encodeDate;
+		var encodeCore = getSessionSingleton(context, 'encodeDateTz') || getSessionSingleton(context, 'encodeDate') || encodeDate;
 		return encodeCore(value);
 	};
 

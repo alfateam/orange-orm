@@ -1086,7 +1086,7 @@ function column(path, ...previous) {
 				if (arguments[i][isColumnProxyKey])
 					args[i] = { [columnRefKey]: arguments[i][columnPathKey] };
 				else
-					args[i] = arguments[i](tableProxy(path.split('.').slice(0, -1).join('.')));
+					args[i] = arguments[i](tableProxy());
 			}
 			else
 				args[i] = arguments[i];

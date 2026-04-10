@@ -1,4 +1,4 @@
-import { describe, test, beforeAll, afterAll, expect, expectTypeOf } from 'vitest';
+import { describe, test, beforeAll, afterAll, expect } from 'vitest';
 import rdb from '../src/index.js';
 
 const sqliteName = 'demo.enum.test.db';
@@ -7,7 +7,6 @@ enum ValueEnum {
 	inactive = 'INACTIVE',
 }
 const statuses = ['ACTIVE', 'INACTIVE'] as const;
-const values = ['ACTIVE', 'INACTIVE'] as const;
 const Values = {
 	active: 'ACTIVE',
 	inactive: 'INACTIVE'
