@@ -126,16 +126,18 @@ async function decode(context, strategy, span, rows, keys = rows.length > 0 ? Ob
 			outRow[column.alias] = column.decode(context, row[keys[j]]);
 		}
 
-		for (let j = 0; j < aggregateKeys.length; j++) {
-			const key = aggregateKeys[j];
-			const parse = span.aggregates[key].column?.decode || ((context, arg) => Number.parseFloat(arg));
-			outRow[key] = parse(context, row[keys[j + columnsLength]]);
+		if (outRow) {
+			for (let j = 0; j < aggregateKeys.length; j++) {
+				const key = aggregateKeys[j];
+				const parse = span.aggregates[key].column?.decode || ((context, arg) => Number.parseFloat(arg));
+				outRow[key] = parse(context, row[keys[j + columnsLength]]);
+			}
 		}
 
 		outRows[i] = outRow;
 		if (updateParent)
 			updateParent(outRow, i);
-		if (shouldCreateMap) {
+		if (shouldCreateMap && outRow) {
 			fkIds[i] = getIds(outRow);
 			addToMap(rowsMap, fkIds[i], outRow);
 		}
