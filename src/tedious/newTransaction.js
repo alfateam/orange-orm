@@ -19,6 +19,7 @@ function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 		rdb.pool = pool;
 	}
 	rdb.engine = 'mssql';
+	rdb.maxParameters = 2100;
 	rdb.encodeBoolean = encodeBoolean;
 	rdb.decodeJSON = decodeJSON;
 	rdb.encodeJSON = JSON.stringify;

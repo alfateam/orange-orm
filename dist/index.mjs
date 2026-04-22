@@ -18615,6 +18615,7 @@ function requireNewTransaction$7 () {
 			rdb.pool = pool;
 		}
 		rdb.engine = 'sqlite';
+		rdb.maxParameters = 32766;
 		rdb.encodeBoolean = encodeBoolean;
 		rdb.encodeBinary = encodeBinary;
 		rdb.decodeBinary = decodeBinary;
@@ -19048,6 +19049,7 @@ function requireNewTransaction$6 () {
 			rdb.pool = pool;
 		}
 		rdb.engine = 'sqlite';
+		rdb.maxParameters = 32766;
 		rdb.encodeBoolean = encodeBoolean;
 		rdb.encodeBinary = encodeBinary;
 		rdb.decodeBinary = decodeBinary;
@@ -19484,6 +19486,7 @@ function requireNewTransaction$5 () {
 			rdb.pool = pool;
 		}
 		rdb.engine = 'sqlite';
+		rdb.maxParameters = 32766;
 		rdb.encodeBoolean = encodeBoolean;
 		rdb.decodeJSON = decodeJSON;
 		rdb.encodeJSON = JSON.stringify;
@@ -20902,6 +20905,7 @@ function requireNewTransaction$3 () {
 			rdb.pool = pool;
 		}
 		rdb.engine = 'mssqlNative';
+		rdb.maxParameters = 2100;
 		rdb.encodeBoolean = encodeBoolean;
 		rdb.decodeJSON = decodeJSON;
 		rdb.encodeJSON = JSON.stringify;
@@ -21664,6 +21668,7 @@ function requireNewTransaction$2 () {
 			rdb.pool = pool;
 		}
 		rdb.engine = 'mssql';
+		rdb.maxParameters = 2100;
 		rdb.encodeBoolean = encodeBoolean;
 		rdb.decodeJSON = decodeJSON;
 		rdb.encodeJSON = JSON.stringify;
@@ -23232,6 +23237,7 @@ function requireNewTransaction () {
 
 		rdb.begin = 'SET TRANSACTION ISOLATION LEVEL READ COMMITTED';
 		rdb.engine = 'oracle';
+		rdb.maxParameters = 32768;
 		rdb.encodeBoolean = encodeBoolean;
 		rdb.decodeJSON = decodeJSON;
 		rdb.encodeJSON = JSON.stringify;
