@@ -1,6 +1,7 @@
 ## Changelog
 __5.3.1__  
 Fixes crashes in getById/getMany when a missing relation has nested hasMany/hasOne/references in the strategy. [#177](https://github.com/alfateam/orange-orm/issues/177)  
+Added max parameter chunking for getManyDto hasMany subqueries on MSSQL, SQLite and Oracle.  
 __5.3.0__  
 Support for MariaDB [#169](https://github.com/alfateam/orange-orm/issues/169)  
 __5.2.4__  
