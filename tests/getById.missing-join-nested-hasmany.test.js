@@ -188,9 +188,9 @@ function getInitStatements(dbName) {
 
 	if (dbName === 'sap') {
 		return [
-			`IF OBJECT_ID('delivery_address_note_missing_join', 'U') IS NOT NULL DROP TABLE delivery_address_note_missing_join`,
-			`IF OBJECT_ID('delivery_address_missing_join', 'U') IS NOT NULL DROP TABLE delivery_address_missing_join`,
-			`IF OBJECT_ID('order_missing_join', 'U') IS NOT NULL DROP TABLE order_missing_join`,
+			'IF OBJECT_ID(\'delivery_address_note_missing_join\', \'U\') IS NOT NULL DROP TABLE delivery_address_note_missing_join',
+			'IF OBJECT_ID(\'delivery_address_missing_join\', \'U\') IS NOT NULL DROP TABLE delivery_address_missing_join',
+			'IF OBJECT_ID(\'order_missing_join\', \'U\') IS NOT NULL DROP TABLE order_missing_join',
 			`CREATE TABLE order_missing_join (
 				id INT PRIMARY KEY,
 				customer_id INT NOT NULL
@@ -210,9 +210,9 @@ function getInitStatements(dbName) {
 
 	if (dbName === 'oracle') {
 		return [
-			`BEGIN EXECUTE IMMEDIATE 'DROP TABLE "delivery_address_note_missing_join"'; EXCEPTION WHEN OTHERS THEN NULL; END;`,
-			`BEGIN EXECUTE IMMEDIATE 'DROP TABLE "delivery_address_missing_join"'; EXCEPTION WHEN OTHERS THEN NULL; END;`,
-			`BEGIN EXECUTE IMMEDIATE 'DROP TABLE "order_missing_join"'; EXCEPTION WHEN OTHERS THEN NULL; END;`,
+			'BEGIN EXECUTE IMMEDIATE \'DROP TABLE "delivery_address_note_missing_join"\'; EXCEPTION WHEN OTHERS THEN NULL; END;',
+			'BEGIN EXECUTE IMMEDIATE \'DROP TABLE "delivery_address_missing_join"\'; EXCEPTION WHEN OTHERS THEN NULL; END;',
+			'BEGIN EXECUTE IMMEDIATE \'DROP TABLE "order_missing_join"\'; EXCEPTION WHEN OTHERS THEN NULL; END;',
 			`CREATE TABLE "order_missing_join" (
 				"id" NUMBER(10) PRIMARY KEY,
 				"customer_id" NUMBER(10) NOT NULL
