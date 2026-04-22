@@ -188,9 +188,9 @@ function getInitStatements(dbName) {
 
 	if (dbName === 'sap') {
 		return [
-			'IF OBJECT_ID(\'delivery_address_note_missing_join\', \'U\') IS NOT NULL DROP TABLE delivery_address_note_missing_join',
-			'IF OBJECT_ID(\'delivery_address_missing_join\', \'U\') IS NOT NULL DROP TABLE delivery_address_missing_join',
-			'IF OBJECT_ID(\'order_missing_join\', \'U\') IS NOT NULL DROP TABLE order_missing_join',
+			'IF EXISTS (SELECT 1 FROM sysobjects WHERE type = \'U\' AND name = \'delivery_address_note_missing_join\') DROP TABLE delivery_address_note_missing_join',
+			'IF EXISTS (SELECT 1 FROM sysobjects WHERE type = \'U\' AND name = \'delivery_address_missing_join\') DROP TABLE delivery_address_missing_join',
+			'IF EXISTS (SELECT 1 FROM sysobjects WHERE type = \'U\' AND name = \'order_missing_join\') DROP TABLE order_missing_join',
 			`CREATE TABLE order_missing_join (
 				id INT PRIMARY KEY,
 				customer_id INT NOT NULL
