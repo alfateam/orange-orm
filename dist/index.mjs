@@ -2,7 +2,6 @@ void !function() {
 	typeof self === 'undefined' && typeof global === 'object'
 		? global.self = global : null;
 }();import * as fastJsonPatch from 'fast-json-patch';
-import * as uuid from 'uuid';
 import * as axios from 'axios';
 import * as _default from 'rfdc/default';
 import * as ajv from 'ajv';
@@ -974,7 +973,7 @@ function requireHostHono () {
 	return hostHono_1;
 }
 
-var require$$0$4 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(fastJsonPatch);
+var require$$0$3 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(fastJsonPatch);
 
 var dateToISOString_1;
 var hasRequiredDateToISOString;
@@ -1036,7 +1035,19 @@ function requireStringify () {
 	return stringify_1;
 }
 
-var require$$0$3 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(uuid);
+var newMemoryId;
+var hasRequiredNewMemoryId;
+
+function requireNewMemoryId () {
+	if (hasRequiredNewMemoryId) return newMemoryId;
+	hasRequiredNewMemoryId = 1;
+	let nextId = 1;
+
+	newMemoryId = function newMemoryId() {
+		return `tmp${nextId++}`;
+	};
+	return newMemoryId;
+}
 
 var createPatch;
 var hasRequiredCreatePatch;
@@ -1044,10 +1055,10 @@ var hasRequiredCreatePatch;
 function requireCreatePatch () {
 	if (hasRequiredCreatePatch) return createPatch;
 	hasRequiredCreatePatch = 1;
-	const jsonpatch = require$$0$4;
+	const jsonpatch = require$$0$3;
 	let dateToIsoString = requireDateToISOString();
 	let stringify = requireStringify();
-	let { v4: uuid } = require$$0$3;
+	let newMemoryId = requireNewMemoryId();
 
 	createPatch = function createPatch(original, dto, options) {
 		let subject = toCompareObject({ d: original }, options, true);
@@ -1156,7 +1167,7 @@ function requireCreatePatch () {
 
 		function negotiateTempKey(value) {
 			if (value === undefined)
-				return `~${uuid()}`;
+				return `~${newMemoryId()}`;
 			else
 				return value;
 		}
@@ -2973,7 +2984,7 @@ function requireToKeyPositionMap () {
 	if (hasRequiredToKeyPositionMap) return toKeyPositionMap_1;
 	hasRequiredToKeyPositionMap = 1;
 	const stringify = requireStringify();
-	const { v4: uuid } = require$$0$3;
+	const newMemoryId = requireNewMemoryId();
 
 	function toKeyPositionMap(rows, options) {
 		return rows.reduce((map, element, i) => {
@@ -2996,7 +3007,7 @@ function requireToKeyPositionMap () {
 
 	function negotiateTempKey(value) {
 		if (value === undefined)
-			return `~${uuid()}`;
+			return `~${newMemoryId()}`;
 		else
 			return value;
 	}
@@ -11074,8 +11085,7 @@ var hasRequiredNewId;
 function requireNewId () {
 	if (hasRequiredNewId) return newId;
 	hasRequiredNewId = 1;
-	const { v4 : uuid} = require$$0$3;
-	newId = uuid;
+	newId = requireNewMemoryId();
 	return newId;
 }
 
@@ -12461,7 +12471,7 @@ var hasRequiredApplyPatch;
 function requireApplyPatch () {
 	if (hasRequiredApplyPatch) return applyPatch_1;
 	hasRequiredApplyPatch = 1;
-	const fastjson = require$$0$4;
+	const fastjson = require$$0$3;
 	let fromCompareObject = requireFromCompareObject();
 	let toCompareObject = requireToCompareObject();
 	let getSessionSingleton = requireGetSessionSingleton();

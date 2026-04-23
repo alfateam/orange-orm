@@ -81,8 +81,7 @@
         "ajv": "^8.17.1",
         "axios": "^1.6.2",
         "fast-json-patch": "^3.1.1",
-        "rfdc": "^1.2.0",
-        "uuid": "^8.3.2 || ^9.0.0 || ^10.0.0 || ^11.1.0 || ^14.0.0"
+        "rfdc": "^1.2.0"
     },
     "peerDependencies": {
         "@electric-sql/pglite": "^0.3.0",
@@ -148,11 +147,6 @@
         "tedious": "^19.2.1",
         "typescript": "^5.4.5",
         "vitest": "^3.2.4"
-    },
-    "overrides": {
-        "@azure/msal-node": {
-            "uuid": "14.0.0"
-        }
     },
     "engines": {
         "node": ">= 8.0.0"
