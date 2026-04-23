@@ -184,9 +184,6 @@ async function decode(context, strategy, span, rows, keys = rows.length > 0 ? Ob
 
 async function decodeManyRelations(context, strategy, span) {
 	const maxParameters = getSessionSingleton(context, 'maxParameters');
-	const maxRows = maxParameters
-		? maxParameters * span.table._primaryColumns.length
-		: undefined;
 
 	const promises = [];
 	const c = {};
@@ -206,6 +203,10 @@ async function decodeManyRelations(context, strategy, span) {
 		const name = leg.name;
 		const table = span.table;
 		const relation = table._relations[name];
+		const parametersPerRow = relation.joinRelation.columns.length;
+		const maxRows = maxParameters
+			? Math.max(1, Math.floor((maxParameters - 1) / parametersPerRow))
+			: undefined;
 		const rowsMap = span._rowsMap;
 
 		const extractKey = createExtractKey(leg);

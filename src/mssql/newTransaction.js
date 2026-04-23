@@ -19,7 +19,7 @@ function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 		rdb.pool = pool;
 	}
 	rdb.engine = 'mssqlNative';
-	rdb.maxParameters = 2100;
+	rdb.maxParameters = 2098;
 	rdb.encodeBoolean = encodeBoolean;
 	rdb.decodeJSON = decodeJSON;
 	rdb.encodeJSON = JSON.stringify;

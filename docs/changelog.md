@@ -1,4 +1,6 @@
 ## Changelog
+__5.3.3__  
+MSSQL: Set `maxParameters` to `2098` because `tedious` adds extra parameters, so using `2100` can still exceed SQL Server's limit during `getMany`/`hasMany` loading.  
 __5.3.2__  
 Removed uuid dependency.  
 Upgraded to tedious@19.2.1 to reduce transitive audit vulnerabilities in the MSSQL driver chain.  
