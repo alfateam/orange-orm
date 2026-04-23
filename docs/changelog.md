@@ -1,4 +1,7 @@
 ## Changelog
+__5.3.2__  
+Updated to uuid@14.0.0  
+Upgraded to tedious@19.2.1 to reduce transitive audit vulnerabilities in the MSSQL driver chain.  
 __5.3.1__  
 Fixes crashes in getById/getMany when a missing relation has nested hasMany/hasOne/references in the strategy. [#177](https://github.com/alfateam/orange-orm/issues/177)  
 Added max parameter chunking for getManyDto hasMany subqueries on MSSQL, SQLite and Oracle.  
