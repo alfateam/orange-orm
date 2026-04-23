@@ -148,11 +148,6 @@
         "typescript": "^5.4.5",
         "vitest": "^3.2.4"
     },
-    "overrides": {
-        "@azure/msal-node": {
-            "uuid": "14.0.0"
-        }
-    },
     "engines": {
         "node": ">= 8.0.0"
     },
