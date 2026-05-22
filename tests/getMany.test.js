@@ -35,6 +35,7 @@ beforeAll(async () => {
 	if (major === 18)
 		await insertData('mssqlNative');
 	await insertData('mysql');
+	await insertData('mariadb');
 	await insertData('sqlite');
 	await insertData('sqlite2');
 	await insertData('sap');
@@ -155,6 +156,7 @@ describe('offset', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -189,6 +191,7 @@ describe('boolean filter', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -212,6 +215,7 @@ describe('boolean filter where direct', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -235,6 +239,7 @@ describe('boolean legacy filter', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -258,6 +263,7 @@ describe('getOne ', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -345,6 +351,7 @@ describe('empty array-filter legacy', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -367,6 +374,7 @@ describe('primary key filter array', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -392,6 +400,7 @@ describe('primary key filter array legacy', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -417,6 +426,7 @@ describe('empty array-filter', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -438,6 +448,7 @@ describe('AND empty-array', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -457,6 +468,7 @@ describe('AND one in array', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -476,6 +488,7 @@ describe('boolean true filter', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -497,6 +510,7 @@ describe('in filter', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -527,6 +541,7 @@ describe('in filter on string column', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -557,6 +572,7 @@ describe('in filter with OR', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -592,6 +608,7 @@ describe('in filter with AND', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -622,6 +639,7 @@ describe('in filter with NOT and combined OR/AND', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -652,6 +670,7 @@ describe('between filter', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -682,6 +701,7 @@ describe('between filter with column bound', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -711,6 +731,7 @@ describe('any-subFilter filter nested', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -746,6 +767,7 @@ describe('any-subFilter legacy filter nested', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -781,6 +803,7 @@ describe('any-subFilter filter nested where', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -818,6 +841,7 @@ describe('getMany hasOne sub filter', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -856,6 +880,7 @@ describe('getMany hasOne sub legacy filter', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -893,6 +918,7 @@ describe('bigint getMany hasOne sub filter', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -930,6 +956,7 @@ describe('getMany none sub filter', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -965,6 +992,7 @@ describe('getMany many-relation count filter', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -1001,6 +1029,7 @@ describe('getMany many-relation count filter with predicate', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -1037,6 +1066,7 @@ describe('getMany', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -1077,6 +1107,7 @@ describe('getAll orderBy array', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -1112,6 +1143,7 @@ describe('getMany with column strategy', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -1142,6 +1174,7 @@ describe('aggregate', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -1177,6 +1210,7 @@ describe('aggregate on relations', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -1224,6 +1258,7 @@ describe('aggregate each row', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -1324,6 +1359,7 @@ describe('getMany with relations', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -1400,6 +1436,7 @@ describe('getMany with references - many', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -1470,6 +1507,7 @@ describe('getMany with references to discriminator', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -1517,6 +1555,7 @@ describe('getMany with filtered relations', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -1592,6 +1631,7 @@ describe('getMany composite', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 
@@ -1642,6 +1682,7 @@ describe('getMany raw filter', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 
@@ -1677,6 +1718,7 @@ describe('getMany raw filter where', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 
@@ -1875,6 +1917,7 @@ describe('column to column filter', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -1911,6 +1954,7 @@ describe('column to column contains filter', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -1952,6 +1996,7 @@ describe('column to column startsWith filter', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -1993,6 +2038,7 @@ describe('column to column endsWith filter', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -2118,6 +2164,10 @@ const connections = {
 		db: map({ db: (con) => con.mysql('mysql://test:test@mysql/test', { size: 1 }) }),
 		init: initMysql
 	},
+	mariadb: {
+		db: map({ db: (con) => con.mariadb('mariadb://test:test@mariadb/test', { size: 1 }) }),
+		init: initMysql
+	},
 	http: {
 		db: map.http(`http://localhost:${port}/rdb`),
 	}
@@ -2145,6 +2195,8 @@ function getDb(name) {
 		return connections.oracle;
 	else if (name === 'mysql')
 		return connections.mysql;
+	else if (name === 'mariadb')
+		return connections.mariadb;
 	else if (name === 'http')
 		return connections.http;
 	else

@@ -881,6 +881,8 @@ interface Connectors {
   sap(connectionString: string, options?: PoolOptions): Pool;
   mssql(connectionConfig: ConnectionConfiguration, options?: PoolOptions): Pool;
   mssql(connectionString: string, options?: PoolOptions): Pool;
+  mysql(connectionString: string, options?: PoolOptions): Pool;
+  mariadb(connectionString: string, options?: PoolOptions): Pool;
   oracle(config: PoolAttributes, options?: PoolOptions): Pool;
 }
 
@@ -895,6 +897,7 @@ type DbConnectable<M extends Record<string, TableDefinition<M>>> = {
   mssql(connectionString: string, options?: PoolOptions): DBClient<M>;
   mssqlNative(connectionString: string, options?: PoolOptions): DBClient<M>;
   mysql(connectionString: string, options?: PoolOptions): DBClient<M>;
+  mariadb(connectionString: string, options?: PoolOptions): DBClient<M>;
   oracle(config: PoolAttributes, options?: PoolOptions): DBClient<M>;
 };
 

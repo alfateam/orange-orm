@@ -14,6 +14,15 @@ function truthy(value) {
 		throw new Error('Name must be set');
 }
 
+const validateMetaCalls = [];
+
+function validateWithMetadata(value, meta) {
+	validateMetaCalls.push({
+		value,
+		...meta
+	});
+}
+
 const map = rdb.map(x => ({
 	customer: x.table('customer').map(({ column }) => ({
 		id: column('id').numeric().primary().notNullExceptInsert(),
@@ -51,6 +60,13 @@ const map = rdb.map(x => ({
 		isActive: column('isActive').boolean(),
 		data: column('data').json(),
 		picture: column('picture').binary()
+	})),
+
+	customerValidateMeta: x.table('customer').map(({ column }) => ({
+		id: column('id').numeric().primary().notNullExceptInsert(),
+		name: column('name').string().validate(validateWithMetadata),
+		balance: column('balance').numeric(),
+		isActive: column('isActive').boolean(),
 	})),
 
 	customerDefault: x.table('customer').map(({ column }) => ({
@@ -169,5 +185,13 @@ const map = rdb.map(x => ({
 		children: hasMany(x.bigintChild).by('parentId')
 	}))
 }));
+
+map.__getValidateMetaCalls = function() {
+	return validateMetaCalls.slice();
+};
+
+map.__resetValidateMetaCalls = function() {
+	validateMetaCalls.length = 0;
+};
 
 export default map;

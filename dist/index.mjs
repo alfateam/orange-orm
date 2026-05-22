@@ -2,7 +2,6 @@ void !function() {
 	typeof self === 'undefined' && typeof global === 'object'
 		? global.self = global : null;
 }();import * as fastJsonPatch from 'fast-json-patch';
-import * as uuid from 'uuid';
 import * as axios from 'axios';
 import * as _default from 'rfdc/default';
 import * as ajv from 'ajv';
@@ -974,7 +973,7 @@ function requireHostHono () {
 	return hostHono_1;
 }
 
-var require$$0$4 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(fastJsonPatch);
+var require$$0$3 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(fastJsonPatch);
 
 var dateToISOString_1;
 var hasRequiredDateToISOString;
@@ -1036,7 +1035,19 @@ function requireStringify () {
 	return stringify_1;
 }
 
-var require$$0$3 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(uuid);
+var newMemoryId;
+var hasRequiredNewMemoryId;
+
+function requireNewMemoryId () {
+	if (hasRequiredNewMemoryId) return newMemoryId;
+	hasRequiredNewMemoryId = 1;
+	let nextId = 1;
+
+	newMemoryId = function newMemoryId() {
+		return `tmp${nextId++}`;
+	};
+	return newMemoryId;
+}
 
 var createPatch;
 var hasRequiredCreatePatch;
@@ -1044,10 +1055,10 @@ var hasRequiredCreatePatch;
 function requireCreatePatch () {
 	if (hasRequiredCreatePatch) return createPatch;
 	hasRequiredCreatePatch = 1;
-	const jsonpatch = require$$0$4;
+	const jsonpatch = require$$0$3;
 	let dateToIsoString = requireDateToISOString();
 	let stringify = requireStringify();
-	let { v4: uuid } = require$$0$3;
+	let newMemoryId = requireNewMemoryId();
 
 	createPatch = function createPatch(original, dto, options) {
 		let subject = toCompareObject({ d: original }, options, true);
@@ -1156,7 +1167,7 @@ function requireCreatePatch () {
 
 		function negotiateTempKey(value) {
 			if (value === undefined)
-				return `~${uuid()}`;
+				return `~${newMemoryId()}`;
 			else
 				return value;
 		}
@@ -2973,7 +2984,7 @@ function requireToKeyPositionMap () {
 	if (hasRequiredToKeyPositionMap) return toKeyPositionMap_1;
 	hasRequiredToKeyPositionMap = 1;
 	const stringify = requireStringify();
-	const { v4: uuid } = require$$0$3;
+	const newMemoryId = requireNewMemoryId();
 
 	function toKeyPositionMap(rows, options) {
 		return rows.reduce((map, element, i) => {
@@ -2996,7 +3007,7 @@ function requireToKeyPositionMap () {
 
 	function negotiateTempKey(value) {
 		if (value === undefined)
-			return `~${uuid()}`;
+			return `~${newMemoryId()}`;
 		else
 			return value;
 	}
@@ -3050,6 +3061,7 @@ function requireClientMap () {
 		dbMap.mssql = throwDb;
 		dbMap.mssqlNative = throwDb;
 		dbMap.mysql = throwDb;
+		dbMap.mariadb = throwDb;
 		dbMap.sap = throwDb;
 		dbMap.oracle = throwDb;
 		dbMap.sqlite = throwDb;
@@ -3078,6 +3090,7 @@ function requireClientMap () {
 		onFinal.mssql = () => index({ db: throwDb, providers: dbMap });
 		onFinal.mssqlNative = () => index({ db: throwDb, providers: dbMap });
 		onFinal.mysql = () => index({ db: throwDb, providers: dbMap });
+		onFinal.mariadb = () => index({ db: throwDb, providers: dbMap });
 		onFinal.sap = () => index({ db: throwDb, providers: dbMap });
 		onFinal.oracle = () => index({ db: throwDb, providers: dbMap });
 		onFinal.sqlite = () => index({ db: throwDb, providers: dbMap });
@@ -3235,6 +3248,7 @@ function requireClient () {
 		client.oracle = onProvider.bind(null, 'oracle');
 		client.http = onProvider.bind(null, 'http');//todo
 		client.mysql = onProvider.bind(null, 'mysql');
+		client.mariadb = onProvider.bind(null, 'mariadb');
 		client.express = express;
 		client.hono = hono;
 		client.close = close;
@@ -4255,7 +4269,7 @@ function requireClient () {
 					if (arguments[i][isColumnProxyKey])
 						args[i] = { [columnRefKey]: arguments[i][columnPathKey] };
 					else
-						args[i] = arguments[i](tableProxy(path.split('.').slice(0, -1).join('.')));
+						args[i] = arguments[i](tableProxy());
 				}
 				else
 					args[i] = arguments[i];
@@ -4973,7 +4987,7 @@ function requireNewLikeColumnArg () {
 		var encodedSuffix = suffix ? column.encode(context, suffix) : null;
 		var engine = getSessionSingleton(context, 'engine');
 
-		if (engine === 'mysql')
+		if (engine === 'mysql' || engine === 'mariadb')
 			return concatWithFunction(encodedPrefix, encodedArg, encodedSuffix);
 		if (engine === 'mssql' || engine === 'mssqlNative')
 			return concatWithOperator('+', encodedPrefix, encodedArg, encodedSuffix);
@@ -5597,7 +5611,7 @@ function requireNewEncode$5 () {
 			value = purify(value);
 			if (value == null) {
 				if (column.dbNull === null)
-					;
+					return 'null';
 				return '\'' + column.dbNull + '\'';
 			}
 			var encodeCore = getSessionSingleton(context, 'encodeDate') || encodeDate;
@@ -5709,46 +5723,50 @@ function requireNewEncode$4 () {
 	hasRequiredNewEncode$4 = 1;
 	var newPara = requireNewParameterized();
 	var purify = requirePurify$3();
+	var getSessionContext = requireGetSessionContext();
+	var getSessionSingleton = requireGetSessionSingleton();
 
 	function _new(column) {
-		var encode = function(_context, value) {
+		var encode = function(context, value) {
 			value = purify(value);
 			if (value == null) {
 				if (column.dbNull === null)
 					return newPara('null');
 				return newPara('\'' + column.dbNull + '\'');
 			}
-			return newPara('?', [encodeDate(value)]);
+			var ctx = getSessionContext(context);
+			var encodeCore = ctx.encodeDateTz || ctx.encodeDate || encodeDate;
+			return newPara('?', [encodeCore(value)]);
 		};
 
-		encode.unsafe = function(_context, value) {
+		encode.unsafe = function(context, value) {
 			value = purify(value);
 			if (value == null) {
 				if (column.dbNull === null)
 					return 'null';
 				return '\'' + column.dbNull + '\'';
 			}
-			return encodeDate(value);
+			var encodeCore = getSessionSingleton(context, 'encodeDateTz') || getSessionSingleton(context, 'encodeDate') || encodeDate;
+			return encodeCore(value);
 		};
 
-		encode.direct = function(_context, value) {
-			return encodeDate(value);
+		encode.direct = function(context, value) {
+			var encodeCore = getSessionSingleton(context, 'encodeDateTz') || getSessionSingleton(context, 'encodeDate') || encodeDate;
+			return encodeCore(value);
 		};
 
 		return encode;
-
-
 	}
+
 	function encodeDate(date) {
 		if (date.toISOString)
-			return truncate(date.toISOString(date));
+			return truncate(date.toISOString());
 		return truncate(date);
 	}
 
 	function truncate(date) {
 		return date;
 	}
-
 
 	newEncode$4 = _new;
 	return newEncode$4;
@@ -5937,7 +5955,7 @@ function requireNewEncode$2 () {
 			value = purify(value);
 			if (value == null) {
 				if (column.dbNull === null)
-					;
+					return 'null';
 				return '\'' + column.dbNull + '\'';
 			}
 			var encodeCore = getSessionSingleton(context, 'encodeBigint') || encodeBigint;
@@ -6271,6 +6289,10 @@ function requireColumn () {
 			return c;
 		};
 
+		c.jsonOf = function() {
+			return c.json();
+		};
+
 		c.guid = function() {
 			requireGuid()(column);
 			return c;
@@ -6282,18 +6304,13 @@ function requireColumn () {
 			return c;
 		};
 
-		c.date = function() {
-			requireDate()(column);
-			return c;
-		};
-
 		c.dateWithTimeZone = function() {
 			requireDateWithTimeZone()(column);
 			return c;
 		};
 
-		c.numeric = function(optionalPrecision,optionalScale) {
-			requireNumeric()(column,optionalPrecision,optionalScale);
+		c.numeric = function() {
+			requireNumeric()(column);
 			return c;
 		};
 
@@ -6388,8 +6405,8 @@ function requireColumn () {
 
 		c.notNullExceptInsert = function() {
 			column._notNullExceptInsert = true;
-			function validate(value, _row, isInsert) {
-				if (isInsert)
+			function validate(value, meta) {
+				if (meta.isInsert)
 					return;
 				if (value === undefined || value === null)
 					throw new Error(`Column ${column.alias} cannot be null or undefined`);
@@ -6403,12 +6420,12 @@ function requireColumn () {
 			if (previousValue)
 				column.validate = nestedValidate;
 			else
-				column.validate = value;
+				column.validate = invokeValidate;
 
 			function nestedValidate() {
 				try {
 					previousValue.apply(null, arguments);
-					value.apply(null, arguments);
+					invokeValidate.apply(null, arguments);
 				}
 				catch (e) {
 					const error = new Error(e.message || e);
@@ -6416,6 +6433,10 @@ function requireColumn () {
 					error.status = 400;
 					throw error;
 				}
+			}
+
+			function invokeValidate(inputValue, meta) {
+				value(inputValue, meta);
 			}
 			return c;
 		};
@@ -7163,7 +7184,7 @@ function requireIsJsonUpdateSupported () {
 	if (hasRequiredIsJsonUpdateSupported) return isJsonUpdateSupported_1;
 	hasRequiredIsJsonUpdateSupported = 1;
 	function isJsonUpdateSupported(engine) {
-		return engine === 'pg' || engine === 'mysql' || engine === 'sqlite' || engine === 'mssql' || engine === 'mssqlNative' || engine === 'oracle';
+		return engine === 'pg' || engine === 'mysql' || engine === 'mariadb' || engine === 'sqlite' || engine === 'mssql' || engine === 'mssqlNative' || engine === 'oracle';
 	}
 
 	isJsonUpdateSupported_1 = isJsonUpdateSupported;
@@ -7262,7 +7283,7 @@ function requireNewUpdateCommandCore () {
 			if (engine === 'pg') {
 				command = command.append(separator + columnSql + ' IS NOT DISTINCT FROM ').append(encoded);
 			}
-			else if (engine === 'mysql') {
+			else if (engine === 'mysql' || engine === 'mariadb') {
 				command = command.append(separator + columnSql + ' <=> ').append(encoded);
 			}
 			else if (engine === 'sqlite') {
@@ -7301,7 +7322,7 @@ function requireNewUpdateCommandCore () {
 			if (engine === 'pg') {
 				command = command.append(separator).append(columnExpr).append(' IS NOT DISTINCT FROM ').append(encoded);
 			}
-			else if (engine === 'mysql') {
+			else if (engine === 'mysql' || engine === 'mariadb') {
 				command = command.append(separator).append(columnExpr).append(' <=> ').append(encoded);
 			}
 			else if (engine === 'sqlite') {
@@ -7362,6 +7383,11 @@ function requireNewUpdateCommandCore () {
 				const sql = 'JSON_SET(' + expr.sql() + ', ' + jsonPath.sql + ', CAST(? AS JSON))';
 				return newParameterized(sql, expr.parameters.concat(jsonPath.parameters, [jsonValue]));
 			}
+			if (engine === 'mariadb') {
+				const jsonValue = JSON.stringify(value === undefined ? null : value);
+				const sql = 'JSON_SET(' + expr.sql() + ', ' + jsonPath.sql + ', JSON_EXTRACT(?, \'$\'))';
+				return newParameterized(sql, expr.parameters.concat(jsonPath.parameters, [jsonValue]));
+			}
 			if (engine === 'sqlite') {
 				const jsonValue = JSON.stringify(value === undefined ? null : value);
 				const sql = 'json_set(' + expr.sql() + ', ' + jsonPath.sql + ', json(?))';
@@ -7386,7 +7412,7 @@ function requireNewUpdateCommandCore () {
 				const sql = expr.sql() + ' #- ' + pathLiteral;
 				return newParameterized(sql, expr.parameters);
 			}
-			if (engine === 'mysql') {
+			if (engine === 'mysql' || engine === 'mariadb') {
 				const sql = 'JSON_REMOVE(' + expr.sql() + ', ' + jsonPath.sql + ')';
 				return newParameterized(sql, expr.parameters.concat(jsonPath.parameters));
 			}
@@ -7412,6 +7438,12 @@ function requireNewUpdateCommandCore () {
 			}
 			if (engine === 'mysql') {
 				const sql = 'JSON_EXTRACT(' + columnSql + ', ' + jsonPath.sql + ')';
+				return newParameterized(sql, jsonPath.parameters);
+			}
+			if (engine === 'mariadb') {
+				const sql = isJsonObject(oldValue)
+					? 'JSON_EXTRACT(' + columnSql + ', ' + jsonPath.sql + ')'
+					: 'JSON_UNQUOTE(JSON_EXTRACT(' + columnSql + ', ' + jsonPath.sql + '))';
 				return newParameterized(sql, jsonPath.parameters);
 			}
 			if (engine === 'sqlite') {
@@ -7488,6 +7520,15 @@ function requireNewUpdateCommandCore () {
 			if (engine === 'mysql') {
 				const jsonValue = JSON.stringify(value === undefined ? null : value);
 				return newParameterized('CAST(? AS JSON)', [jsonValue]);
+			}
+			if (engine === 'mariadb') {
+				if (isJsonObject(value)) {
+					const jsonValue = JSON.stringify(value);
+					return newParameterized('JSON_EXTRACT(?, \'$\')', [jsonValue]);
+				}
+				if (value === null || value === undefined)
+					return newParameterized('null');
+				return newParameterized('?', [String(value)]);
 			}
 			if (engine === 'sqlite') {
 				if (isJsonObject(value)) {
@@ -8188,7 +8229,7 @@ function requireNewSingleCommandCore () {
 			if (engine === 'pg') {
 				return newParameterized(columnSql + ' IS NOT DISTINCT FROM ' + encoded.sql(), encoded.parameters);
 			}
-			if (engine === 'mysql') {
+			if (engine === 'mysql' || engine === 'mariadb') {
 				return newParameterized(columnSql + ' <=> ' + encoded.sql(), encoded.parameters);
 			}
 			if (engine === 'sqlite') {
@@ -8228,6 +8269,10 @@ function requireNewSingleCommandCore () {
 			if (engine === 'mysql') {
 				const jsonValue = JSON.stringify(value === undefined ? null : value);
 				return newParameterized('CAST(? AS JSON)', [jsonValue]);
+			}
+			if (engine === 'mariadb') {
+				const jsonValue = JSON.stringify(value === undefined ? null : value);
+				return newParameterized('JSON_EXTRACT(?, \'$\')', [jsonValue]);
 			}
 			if (engine === 'sqlite') {
 				if (isJsonObject(value)) {
@@ -8606,7 +8651,7 @@ function requireNewDecodeDbRow () {
 					value = purify(value);
 					this._dbRow[key] = value;
 					if (column.validate)
-						column.validate(value, this._dbRow);
+						column.validate(value, { table: table._dbName, column: column._dbName, property: column.alias, isInsert: false });
 					updateField(this._context, table, column, this);
 					let emit = this._emitColumnChanged[name];
 					if (emit)
@@ -8762,7 +8807,7 @@ function requireNewDecodeDbRow () {
 				if (row[key] !== undefined && !isInsert)
 					row[key] = columns[i].decode(context, row[key]);
 				if (shouldValidate && columns[i].validate)
-					columns[i].validate(row[key], row, isInsert);
+					columns[i].validate(row[key], { table: table._dbName, column: columns[i]._dbName, property: columns[i].alias, isInsert });
 			}
 			let target = new Row(context, row);
 			const p = new Proxy(target, {
@@ -8861,6 +8906,10 @@ function requireDbRowToRow () {
 	function dbRowToRow(context, span, dbRow) {
 		var table = span.table;
 		var row = decodeDbRow(context, span, table, dbRow);
+		if (!hasPrimaryKey(row, table)) {
+			skipNestedLegs(span, dbRow);
+			return null;
+		}
 		var cache = table._cache;
 		if (!cache.tryGet(context, row)) {
 			var queryContext = span.queryContext;
@@ -8877,13 +8926,15 @@ function requireDbRowToRow () {
 		var c = {};
 
 		c.visitOne = function(leg) {
-			dbRowToRow(context, leg.span, dbRow);
-			leg.expand(row);
+			let child = dbRowToRow(context, leg.span, dbRow);
+			if (child)
+				leg.expand(row);
 		};
 
 		c.visitJoin = function(leg) {
-			dbRowToRow(context, leg.span, dbRow);
-			leg.expand(row);
+			let child = dbRowToRow(context, leg.span, dbRow);
+			if (child)
+				leg.expand(row);
 		};
 
 		c.visitMany = function() {
@@ -8896,6 +8947,33 @@ function requireDbRowToRow () {
 		}
 
 		return row;
+	}
+
+	function hasPrimaryKey(row, table) {
+		return table._primaryColumns.every((column) => {
+			let value = row[column.alias];
+			return value !== null && value !== undefined;
+		});
+	}
+
+	function skipNestedLegs(span, dbRow) {
+		span.legs.forEach((leg) => {
+			leg.accept({
+				visitOne() {
+					skipSpan(leg.span, dbRow);
+				},
+				visitJoin() {
+					skipSpan(leg.span, dbRow);
+				},
+				visitMany() {
+				}
+			});
+		});
+	}
+
+	function skipSpan(span, dbRow) {
+		decodeDbRow(undefined, span, span.table, dbRow);
+		skipNestedLegs(span, dbRow);
 	}
 
 	dbRowToRow_1 = dbRowToRow;
@@ -10239,10 +10317,9 @@ function requireWhere$1 () {
 	function newWhere(_relations, _depth) {
 
 		function where(context, fn) {
-			const includeMany = false;
-			let { relations, alias } = extract(includeMany, _relations);
+			let { relations, alias } = extract(_relations);
 			const table = relations[relations.length - 1].childTable;
-			if (!relations[0].isMany || includeMany)
+			if (!relations[0].isMany)
 				table._rootAlias = alias;
 
 			try {
@@ -10258,11 +10335,11 @@ function requireWhere$1 () {
 		}
 		return where;
 
-		function extract(includeMany, relations) {
+		function extract(relations) {
 			let alias = relations[0].toLeg().table._dbName;
 			let result = [];
 			for (let i = 0; i < relations.length; i++) {
-				if (relations[i].isMany && !includeMany) {
+				if (relations[i].isMany) {
 					result = [relations[i]];
 					alias = relations[i].toLeg().table._dbName;
 				}
@@ -10289,10 +10366,9 @@ function requireAggregate$1 () {
 	function newAggregate(_relations) {
 
 		function aggregate(context, fn) {
-			const includeMany = false;
-			let { relations, alias } = extract(includeMany, _relations);
+			let { relations, alias } = extract(_relations);
 			const table = relations[relations.length - 1].childTable;
-			if (!relations[0].isMany || includeMany)
+			if (!relations[0].isMany)
 				table._rootAlias = alias;
 
 			try {
@@ -10307,11 +10383,11 @@ function requireAggregate$1 () {
 		}
 		return aggregate;
 
-		function extract(includeMany, relations) {
+		function extract(relations) {
 			let alias = relations[0].toLeg().table._dbName;
 			let result = [];
 			for (let i = 0; i < relations.length; i++) {
-				if (relations[i].isMany && !includeMany) {
+				if (relations[i].isMany) {
 					result = [relations[i]];
 					alias = relations[i].toLeg().table._dbName;
 				}
@@ -10972,7 +11048,7 @@ function requireNewManyCacheCore () {
 			}
 			var rows = newArray();
 			rows.push(childRow);
-			existing = cache.tryAdd(key, rows);
+			cache.tryAdd(key, rows);
 		}
 
 		function newArray() {
@@ -11009,8 +11085,7 @@ var hasRequiredNewId;
 function requireNewId () {
 	if (hasRequiredNewId) return newId;
 	hasRequiredNewId = 1;
-	const { v4 : uuid} = require$$0$3;
-	newId = uuid;
+	newId = requireNewMemoryId();
 	return newId;
 }
 
@@ -11698,16 +11773,18 @@ function requireGetManyDto$1 () {
 				outRow[column.alias] = column.decode(context, row[keys[j]]);
 			}
 
-			for (let j = 0; j < aggregateKeys.length; j++) {
-				const key = aggregateKeys[j];
-				const parse = span.aggregates[key].column?.decode || ((context, arg) => Number.parseFloat(arg));
-				outRow[key] = parse(context, row[keys[j + columnsLength]]);
+			if (outRow) {
+				for (let j = 0; j < aggregateKeys.length; j++) {
+					const key = aggregateKeys[j];
+					const parse = span.aggregates[key].column?.decode || ((context, arg) => Number.parseFloat(arg));
+					outRow[key] = parse(context, row[keys[j + columnsLength]]);
+				}
 			}
 
 			outRows[i] = outRow;
 			if (updateParent)
 				updateParent(outRow, i);
-			if (shouldCreateMap) {
+			if (shouldCreateMap && outRow) {
 				fkIds[i] = getIds(outRow);
 				addToMap(rowsMap, fkIds[i], outRow);
 			}
@@ -11754,9 +11831,6 @@ function requireGetManyDto$1 () {
 
 	async function decodeManyRelations(context, strategy, span) {
 		const maxParameters = getSessionSingleton(context, 'maxParameters');
-		const maxRows = maxParameters
-			? maxParameters * span.table._primaryColumns.length
-			: undefined;
 
 		const promises = [];
 		const c = {};
@@ -11776,6 +11850,10 @@ function requireGetManyDto$1 () {
 			const name = leg.name;
 			const table = span.table;
 			const relation = table._relations[name];
+			const parametersPerRow = relation.joinRelation.columns.length;
+			const maxRows = maxParameters
+				? Math.max(1, Math.floor((maxParameters - 1) / parametersPerRow))
+				: undefined;
 			const rowsMap = span._rowsMap;
 
 			const extractKey = createExtractKey(leg);
@@ -12394,7 +12472,7 @@ var hasRequiredApplyPatch;
 function requireApplyPatch () {
 	if (hasRequiredApplyPatch) return applyPatch_1;
 	hasRequiredApplyPatch = 1;
-	const fastjson = require$$0$4;
+	const fastjson = require$$0$3;
 	let fromCompareObject = requireFromCompareObject();
 	let toCompareObject = requireToCompareObject();
 	let getSessionSingleton = requireGetSessionSingleton();
@@ -12898,7 +12976,6 @@ function requirePatchTable () {
 				let result;
 				for (let i = 0; i < relation.columns.length; i++) {
 					let p = relation.columns[i].alias;
-					row[p];
 					result = await remove({ path: ['dummy', p], oldValue: (oldValue || {})[p], op, options: options }, table, row) || result;
 				}
 				return result || {};
@@ -12911,8 +12988,7 @@ function requirePatchTable () {
 					let p = relation.columns[i].alias;
 					let childKey = relation.childTable._primaryColumns[i].alias;
 					if (path[1] === childKey) {
-						row[p];
-						result = await remove({ path: ['dummy', p], oldValue: (oldValue || {})[p], op, options: options }, table, row) || result;
+						result = await remove({ path: ['dummy', p], oldValue: oldValue[p], op, options: options }, table, row) || result;
 						break;
 					}
 				}
@@ -13502,6 +13578,11 @@ function requireCreateProviders () {
 				return createPool.bind(null, 'mysql');
 			}
 		});
+		Object.defineProperty(dbMap, 'mariadb', {
+			get:  function() {
+				return createPool.bind(null, 'mariadb');
+			}
+		});
 		Object.defineProperty(dbMap, 'sap', {
 			get:  function() {
 				return createPool.bind(null, 'sap');
@@ -13565,6 +13646,9 @@ function requireCreateProviders () {
 			},
 			get mysql() {
 				return createPool.bind(null, 'mysql');
+			},
+			get mariadb() {
+				return createPool.bind(null, 'mariadb');
 			},
 			get sap() {
 				return createPool.bind(null, 'sap');
@@ -13661,6 +13745,7 @@ function requireMap () {
 		context.mssql = connect.bind(null, 'mssql');
 		context.mssqlNative = connect.bind(null, 'mssqlNative');
 		context.mysql = connect.bind(null, 'mysql');
+		context.mariadb = connect.bind(null, 'mariadb');
 		context.sap = connect.bind(null, 'sap');
 		context.oracle = connect.bind(null, 'oracle');
 		context.sqlite = connect.bind(null, 'sqlite');
@@ -14810,12 +14895,12 @@ function requireInsert$5 () {
 	return insert$4;
 }
 
-var newTransaction$b;
-var hasRequiredNewTransaction$b;
+var newTransaction$c;
+var hasRequiredNewTransaction$c;
 
-function requireNewTransaction$b () {
-	if (hasRequiredNewTransaction$b) return newTransaction$b;
-	hasRequiredNewTransaction$b = 1;
+function requireNewTransaction$c () {
+	if (hasRequiredNewTransaction$c) return newTransaction$c;
+	hasRequiredNewTransaction$c = 1;
 	const wrapQuery = requireWrapQuery$a();
 	const wrapCommand = requireWrapCommand$a();
 	const encodeBoolean = requireEncodeBoolean$5();
@@ -14836,6 +14921,9 @@ function requireNewTransaction$b () {
 		}
 		rdb.engine = 'mysql';
 		rdb.encodeBoolean = encodeBoolean;
+		rdb.decodeJSON = decodeJSON;
+		rdb.encodeDate = encodeDate;
+		rdb.encodeDateTz = encodeDateTz;
 		rdb.encodeJSON = JSON.stringify;
 		rdb.deleteFromSql = deleteFromSql;
 		rdb.selectForUpdateSql = selectForUpdateSql;
@@ -14915,8 +15003,31 @@ function requireNewTransaction$b () {
 		};
 	}
 
-	newTransaction$b = newResolveTransaction;
-	return newTransaction$b;
+	function decodeJSON(value) {
+		return JSON.parse(value);
+	}
+
+	function encodeDate(date) {
+		date = date.toISOString ? removeTimezone(date.toISOString()) : removeTimezone(date);
+		return date;
+	}
+
+	function removeTimezone(isoString) {
+		let dateTimePattern = /[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(.[0-9]{3})?/;
+		let match = isoString.match(dateTimePattern);
+		return match ? match[0] : isoString;
+	}
+
+	function encodeDateTz(date) {
+		if (date && date.toISOString)
+			return removeTimezone(date.toISOString());
+		if (typeof date === 'string' && /(Z|[+-][0-9]{2}:[0-9]{2})$/.test(date))
+			return removeTimezone(new Date(date).toISOString());
+		return date;
+	}
+
+	newTransaction$c = newResolveTransaction;
+	return newTransaction$c;
 }
 
 var beginCommand;
@@ -15726,12 +15837,12 @@ function requireNewGenericPool$7 () {
 	return newGenericPool_1$7;
 }
 
-var newPool_1$b;
-var hasRequiredNewPool$b;
+var newPool_1$c;
+var hasRequiredNewPool$c;
 
-function requireNewPool$b () {
-	if (hasRequiredNewPool$b) return newPool_1$b;
-	hasRequiredNewPool$b = 1;
+function requireNewPool$c () {
+	if (hasRequiredNewPool$c) return newPool_1$c;
+	hasRequiredNewPool$c = 1;
 	const promisify = requirePromisify();
 	const pools = requirePools();
 	const end = requireEnd$a();
@@ -15750,22 +15861,22 @@ function requireNewPool$b () {
 		return c;
 	}
 
-	newPool_1$b = newPool;
-	return newPool_1$b;
+	newPool_1$c = newPool;
+	return newPool_1$c;
 }
 
-var newDatabase_1$b;
-var hasRequiredNewDatabase$b;
+var newDatabase_1$c;
+var hasRequiredNewDatabase$c;
 
-function requireNewDatabase$b () {
-	if (hasRequiredNewDatabase$b) return newDatabase_1$b;
-	hasRequiredNewDatabase$b = 1;
+function requireNewDatabase$c () {
+	if (hasRequiredNewDatabase$c) return newDatabase_1$c;
+	hasRequiredNewDatabase$c = 1;
 	let createDomain = requireCreateDomain();
-	let newTransaction = requireNewTransaction$b();
+	let newTransaction = requireNewTransaction$c();
 	let _begin = requireBegin();
 	let commit = requireCommit();
 	let rollback = requireRollback();
-	let newPool = requireNewPool$b();
+	let newPool = requireNewPool$c();
 	let express = requireHostExpress();
 	let hono = requireHostHono();
 	let hostLocal = requireHostLocal();
@@ -15846,6 +15957,273 @@ function requireNewDatabase$b () {
 			}
 		};
 
+
+		c.rollback = rollback;
+		c.commit = commit;
+
+		c.end = function() {
+			if (poolOptions)
+				return pool.end();
+			else
+				return Promise.resolve();
+		};
+
+		c.accept = function(caller) {
+			caller.visitMySql();
+		};
+
+		return c;
+	}
+
+	newDatabase_1$c = newDatabase;
+	return newDatabase_1$c;
+}
+
+var newTransaction$b;
+var hasRequiredNewTransaction$b;
+
+function requireNewTransaction$b () {
+	if (hasRequiredNewTransaction$b) return newTransaction$b;
+	hasRequiredNewTransaction$b = 1;
+	const wrapQuery = requireWrapQuery$a();
+	const wrapCommand = requireWrapCommand$a();
+	const encodeBoolean = requireEncodeBoolean$5();
+	const deleteFromSql = requireDeleteFromSql$5();
+	const selectForUpdateSql = requireSelectForUpdateSql$5();
+	const lastInsertedSql = requireLastInsertedSql$4();
+	const limitAndOffset = requireLimitAndOffset$5();
+	const formatBigintOut = requireFormatBigintOut$4();
+	const insertSql = requireInsertSql$5();
+	const insert = requireInsert$5();
+	const quote = requireQuote$5();
+
+	function newResolveTransaction(domain, pool, { readonly = false } = {}) {
+		var rdb = { poolFactory: pool };
+		if (!pool.connect) {
+			pool = pool();
+			rdb.pool = pool;
+		}
+		rdb.engine = 'mariadb';
+		rdb.encodeBoolean = encodeBoolean;
+		rdb.decodeJSON = decodeJSON;
+		rdb.encodeDate = encodeDate;
+		rdb.encodeDateTz = encodeDateTz;
+		rdb.encodeJSON = JSON.stringify;
+		rdb.deleteFromSql = deleteFromSql;
+		rdb.selectForUpdateSql = selectForUpdateSql;
+		rdb.lastInsertedIsSeparate = true;
+		rdb.lastInsertedSql = lastInsertedSql;
+		rdb.formatBigintOut = formatBigintOut;
+		rdb.insertSql = insertSql;
+		rdb.insert = insert;
+		rdb.multipleStatements = false;
+		rdb.limitAndOffset = limitAndOffset;
+		rdb.accept = function(caller) {
+			caller.visitMySql();
+		};
+		rdb.aggregateCount = 0;
+		rdb.quote = quote;
+		rdb.cache = {};
+		rdb.changes = [];
+
+		if (readonly) {
+			rdb.dbClient = {
+				executeQuery: function(query, callback) {
+					pool.connect((err, client, done) => {
+						if (err) {
+							return callback(err);
+						}
+						try {
+							wrapQuery(domain, client)(query, (err, res) => {
+								done();
+								callback(err, res);
+							});
+						} catch (e) {
+							done();
+							callback(e);
+						}
+					});
+				},
+				executeCommand: function(query, callback) {
+					pool.connect((err, client, done) => {
+						if (err) {
+							return callback(err);
+						}
+						try {
+							wrapCommand(domain, client)(query, (err, res) => {
+								done();
+								callback(err, res);
+							});
+						} catch (e) {
+							done();
+							callback(e);
+						}
+					});
+				}
+			};
+			domain.rdb = rdb;
+			return (onSuccess) => onSuccess();
+		}
+
+		return function(onSuccess, onError) {
+			pool.connect(onConnected);
+
+			function onConnected(err, client, done) {
+				try {
+					if (err) {
+						onError(err);
+						return;
+					}
+					client.executeQuery = wrapQuery(domain, client);
+					client.executeCommand = wrapCommand(domain, client);
+					rdb.dbClient = client;
+					rdb.dbClientDone = done;
+					domain.rdb = rdb;
+					onSuccess();
+				} catch (e) {
+					onError(e);
+				}
+			}
+		};
+	}
+
+	function decodeJSON(value) {
+		return JSON.parse(value);
+	}
+
+	function encodeDate(date) {
+		date = date.toISOString ? removeTimezone(date.toISOString()) : removeTimezone(date);
+		return date;
+	}
+
+	function removeTimezone(isoString) {
+		let dateTimePattern = /[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(.[0-9]{3})?/;
+		let match = isoString.match(dateTimePattern);
+		return match ? match[0] : isoString;
+	}
+
+	function encodeDateTz(date) {
+		if (date && date.toISOString)
+			return removeTimezone(date.toISOString());
+		if (typeof date === 'string' && /(Z|[+-][0-9]{2}:[0-9]{2})$/.test(date))
+			return removeTimezone(new Date(date).toISOString());
+		return date;
+	}
+
+	newTransaction$b = newResolveTransaction;
+	return newTransaction$b;
+}
+
+var newPool_1$b;
+var hasRequiredNewPool$b;
+
+function requireNewPool$b () {
+	if (hasRequiredNewPool$b) return newPool_1$b;
+	hasRequiredNewPool$b = 1;
+	const mySqlNewPool = requireNewPool$c();
+
+	function normalizeConnectionString(connectionString) {
+		if (typeof connectionString === 'string' && connectionString.indexOf('mariadb://') === 0)
+			return 'mysql://' + connectionString.slice('mariadb://'.length);
+		return connectionString;
+	}
+
+	function newPool(connectionString, poolOptions) {
+		return mySqlNewPool(normalizeConnectionString(connectionString), poolOptions);
+	}
+
+	newPool_1$b = newPool;
+	return newPool_1$b;
+}
+
+var newDatabase_1$b;
+var hasRequiredNewDatabase$b;
+
+function requireNewDatabase$b () {
+	if (hasRequiredNewDatabase$b) return newDatabase_1$b;
+	hasRequiredNewDatabase$b = 1;
+	let createDomain = requireCreateDomain();
+	let newTransaction = requireNewTransaction$b();
+	let _begin = requireBegin();
+	let commit = requireCommit();
+	let rollback = requireRollback();
+	let newPool = requireNewPool$b();
+	let express = requireHostExpress();
+	let hono = requireHostHono();
+	let hostLocal = requireHostLocal();
+	let doQuery = requireQuery();
+	let releaseDbClient = requireReleaseDbClient();
+
+	function newDatabase(connectionString, poolOptions) {
+		if (!connectionString)
+			throw new Error('Connection string cannot be empty');
+		poolOptions = poolOptions || { min: 1 };
+		var pool = newPool(connectionString, poolOptions);
+
+		let c = { poolFactory: pool, hostLocal, express, hono };
+
+		c.transaction = function(options, fn) {
+			if ((arguments.length === 1) && (typeof options === 'function')) {
+				fn = options;
+				options = undefined;
+			}
+			let domain = createDomain();
+
+			if (!fn)
+				throw new Error('transaction requires a function');
+			return domain.run(runInTransaction);
+
+			async function runInTransaction() {
+				let result;
+				let transaction = newTransaction(domain, pool, options);
+				await new Promise(transaction)
+					.then(begin)
+					.then(() => fn(domain))
+					.then((res) => result = res)
+					.then(() => commit(domain))
+					.then(null, (e) => rollback(domain, e));
+				return result;
+			}
+
+			function begin() {
+				return _begin(domain, options);
+			}
+		};
+
+		c.createTransaction = function(options) {
+			let domain = createDomain();
+			let transaction = newTransaction(domain, pool);
+			let p = domain.run(() => new Promise(transaction).then(begin));
+
+			function run(fn) {
+				return p.then(() => fn(domain));
+			}
+			run.rollback = rollback.bind(null, domain);
+			run.commit = commit.bind(null, domain);
+			return run;
+
+			function begin() {
+				return _begin(domain, options);
+			}
+		};
+
+		c.query = function(query) {
+			let domain = createDomain();
+			let transaction = newTransaction(domain, pool);
+			let p = domain.run(() => new Promise(transaction)
+				.then(() => doQuery(domain, query).then(onResult, onError)));
+			return p;
+
+			function onResult(result) {
+				releaseDbClient(domain);
+				return result;
+			}
+
+			function onError(e) {
+				releaseDbClient(domain);
+				throw e;
+			}
+		};
 
 		c.rollback = rollback;
 		c.commit = commit;
@@ -17661,7 +18039,7 @@ function requireNewPgPool () {
 					if (!pg) {
 						pg = await import('pg');
 						pg  = pg.default || pg;
-						let types = pg.types || pg.types;
+						let types = pg.types;
 						types.setTypeParser(1700, function(val) {
 							return parseFloat(val);
 						});
@@ -18248,6 +18626,7 @@ function requireNewTransaction$7 () {
 			rdb.pool = pool;
 		}
 		rdb.engine = 'sqlite';
+		rdb.maxParameters = 32766;
 		rdb.encodeBoolean = encodeBoolean;
 		rdb.encodeBinary = encodeBinary;
 		rdb.decodeBinary = decodeBinary;
@@ -18681,6 +19060,7 @@ function requireNewTransaction$6 () {
 			rdb.pool = pool;
 		}
 		rdb.engine = 'sqlite';
+		rdb.maxParameters = 32766;
 		rdb.encodeBoolean = encodeBoolean;
 		rdb.encodeBinary = encodeBinary;
 		rdb.decodeBinary = decodeBinary;
@@ -19117,6 +19497,7 @@ function requireNewTransaction$5 () {
 			rdb.pool = pool;
 		}
 		rdb.engine = 'sqlite';
+		rdb.maxParameters = 32766;
 		rdb.encodeBoolean = encodeBoolean;
 		rdb.decodeJSON = decodeJSON;
 		rdb.encodeJSON = JSON.stringify;
@@ -20535,6 +20916,7 @@ function requireNewTransaction$3 () {
 			rdb.pool = pool;
 		}
 		rdb.engine = 'mssqlNative';
+		rdb.maxParameters = 2098;
 		rdb.encodeBoolean = encodeBoolean;
 		rdb.decodeJSON = decodeJSON;
 		rdb.encodeJSON = JSON.stringify;
@@ -21297,6 +21679,7 @@ function requireNewTransaction$2 () {
 			rdb.pool = pool;
 		}
 		rdb.engine = 'mssql';
+		rdb.maxParameters = 2098;
 		rdb.encodeBoolean = encodeBoolean;
 		rdb.decodeJSON = decodeJSON;
 		rdb.encodeJSON = JSON.stringify;
@@ -22865,6 +23248,7 @@ function requireNewTransaction () {
 
 		rdb.begin = 'SET TRANSACTION ISOLATION LEVEL READ COMMITTED';
 		rdb.engine = 'oracle';
+		rdb.maxParameters = 32768;
 		rdb.encodeBoolean = encodeBoolean;
 		rdb.decodeJSON = decodeJSON;
 		rdb.encodeJSON = JSON.stringify;
@@ -23206,6 +23590,7 @@ function requireSrc () {
 	const runtimes = requireRuntimes();
 
 	let _mySql;
+	let _mariadb;
 	let _pg;
 	let _pglite;
 	let _sqlite;
@@ -23216,7 +23601,9 @@ function requireSrc () {
 	let _d1;
 
 	var connectViaPool = function(connectionString) {
-		if (connectionString.indexOf && connectionString.indexOf('mysql') === 0)
+		if (connectionString.indexOf && connectionString.indexOf('mariadb') === 0)
+			return connectViaPool.mariadb.apply(null, arguments);
+		else if (connectionString.indexOf && connectionString.indexOf('mysql') === 0)
 			return connectViaPool.mySql.apply(null, arguments);
 		else if (connectionString.indexOf && connectionString.indexOf('postgres') === 0)
 			connectViaPool.pg.apply(null, arguments);
@@ -23245,7 +23632,7 @@ function requireSrc () {
 	Object.defineProperty(connectViaPool, 'mysql', {
 		get: function() {
 			if (!_mySql)
-				_mySql = requireNewDatabase$b();
+				_mySql = requireNewDatabase$c();
 			return _mySql;
 		}
 	});
@@ -23253,8 +23640,15 @@ function requireSrc () {
 	Object.defineProperty(connectViaPool, 'mySql', {
 		get: function() {
 			if (!_mySql)
-				_mySql = requireNewDatabase$b();
+				_mySql = requireNewDatabase$c();
 			return _mySql;
+		}
+	});
+	Object.defineProperty(connectViaPool, 'mariadb', {
+		get: function() {
+			if (!_mariadb)
+				_mariadb = requireNewDatabase$b();
+			return _mariadb;
 		}
 	});
 	Object.defineProperty(connectViaPool, 'pglite', {

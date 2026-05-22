@@ -2,6 +2,7 @@
 FROM mcr.microsoft.com/vscode/devcontainers/javascript-node:dev-22-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive
+RUN npm install -g @openai/codex
 
 # [Optional] Uncomment this section to install additional OS packages.
 # RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \

@@ -60,7 +60,7 @@ function newSingleCommandCore(context, table, filter, alias, concurrencyState) {
 		if (engine === 'pg') {
 			return newParameterized(columnSql + ' IS NOT DISTINCT FROM ' + encoded.sql(), encoded.parameters);
 		}
-		if (engine === 'mysql') {
+		if (engine === 'mysql' || engine === 'mariadb') {
 			return newParameterized(columnSql + ' <=> ' + encoded.sql(), encoded.parameters);
 		}
 		if (engine === 'sqlite') {
@@ -100,6 +100,10 @@ function newSingleCommandCore(context, table, filter, alias, concurrencyState) {
 		if (engine === 'mysql') {
 			const jsonValue = JSON.stringify(value === undefined ? null : value);
 			return newParameterized('CAST(? AS JSON)', [jsonValue]);
+		}
+		if (engine === 'mariadb') {
+			const jsonValue = JSON.stringify(value === undefined ? null : value);
+			return newParameterized('JSON_EXTRACT(?, \'$\')', [jsonValue]);
 		}
 		if (engine === 'sqlite') {
 			if (isJsonObject(value)) {

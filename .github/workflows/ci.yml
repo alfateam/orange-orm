@@ -57,6 +57,21 @@ jobs:
           --health-timeout=5s
           --health-retries=3
 
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_DATABASE: test
+          MARIADB_USER: test
+          MARIADB_PASSWORD: test
+          MARIADB_ROOT_PASSWORD: test
+        ports:
+          - 3307:3306
+        options: >-
+          --health-cmd="mariadb-admin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+
       sapase:
         image: larsroald/ase-server
         ports:
@@ -160,6 +175,21 @@ jobs:
           --health-timeout=5s
           --health-retries=3
 
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_DATABASE: test
+          MARIADB_USER: test
+          MARIADB_PASSWORD: test
+          MARIADB_ROOT_PASSWORD: test
+        ports:
+          - 3307:3306
+        options: >-
+          --health-cmd="mariadb-admin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+
       oracle:
         image: gvenzl/oracle-xe
         env:
@@ -221,6 +251,21 @@ jobs:
           - 3306:3306
         options: >-
           --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_DATABASE: test
+          MARIADB_USER: test
+          MARIADB_PASSWORD: test
+          MARIADB_ROOT_PASSWORD: test
+        ports:
+          - 3307:3306
+        options: >-
+          --health-cmd="mariadb-admin ping --silent"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=3

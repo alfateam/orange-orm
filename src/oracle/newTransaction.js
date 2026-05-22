@@ -21,6 +21,7 @@ function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 
 	rdb.begin = 'SET TRANSACTION ISOLATION LEVEL READ COMMITTED';
 	rdb.engine = 'oracle';
+	rdb.maxParameters = 32768;
 	rdb.encodeBoolean = encodeBoolean;
 	rdb.decodeJSON = decodeJSON;
 	rdb.encodeJSON = JSON.stringify;

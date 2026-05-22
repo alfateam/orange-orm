@@ -6,6 +6,10 @@
 > Supports: PostgreSQL, SQLite, MySQL, MS SQL, Oracle, SAP ASE, PGlite, Cloudflare D1.
 > Works in the browser via Express/Hono adapters.
 
+## Repository maintenance note
+
+- Treat `dist/index.mjs` and `dist/index.browser.mjs` as generated build output from the build command, not as source files to review or edit directly unless the task explicitly targets build artifacts.
+
 ---
 
 ## Table of Contents

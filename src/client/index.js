@@ -65,6 +65,7 @@ function rdbClient(options = {}) {
 	client.oracle = onProvider.bind(null, 'oracle');
 	client.http = onProvider.bind(null, 'http');//todo
 	client.mysql = onProvider.bind(null, 'mysql');
+	client.mariadb = onProvider.bind(null, 'mariadb');
 	client.express = express;
 	client.hono = hono;
 	client.close = close;
@@ -1085,7 +1086,7 @@ function column(path, ...previous) {
 				if (arguments[i][isColumnProxyKey])
 					args[i] = { [columnRefKey]: arguments[i][columnPathKey] };
 				else
-					args[i] = arguments[i](tableProxy(path.split('.').slice(0, -1).join('.')));
+					args[i] = arguments[i](tableProxy());
 			}
 			else
 				args[i] = arguments[i];

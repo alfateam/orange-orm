@@ -16,6 +16,7 @@ beforeAll(async () => {
 	await insertData('oracle');
 	await insertData('mssql');
 	await insertData('mysql');
+	await insertData('mariadb');
 	await insertData('sap');
 	await insertData('sqlite');
 
@@ -190,6 +191,19 @@ describe('dateformat get', () => {
 
 	});
 
+	test('mariadb', async () => {
+		const { db } = getDb('mariadb');
+		const result = await db.datetestWithTz.getOne();
+		expect(result).toEqual({ id: 1, date: '2023-07-14', datetime: '2023-07-14T03:00:00', datetime_tz: '2023-07-14T20:00:00' });
+		result.date = newValue;
+		result.datetime = newValue;
+		result.datetime_tz = newValue;
+		await result.saveChanges();
+		await result.refresh();
+		expect(result).toEqual({ id: 1, date: '2023-08-05', datetime: '2023-08-05T12:00:00', datetime_tz: '2023-08-05T15:00:00' });
+
+	});
+
 	test('sqlite', async () => {
 		const { db } = getDb('sqlite');
 		const result = await db.datetestWithTz.getOne();
@@ -274,6 +288,10 @@ const connections = {
 		db: map({ db: (con) => con.mysql('mysql://test:test@mysql/test', { size: 1 }) }),
 		init: initMysql
 	},
+	mariadb: {
+		db: map({ db: (con) => con.mariadb('mariadb://test:test@mariadb/test', { size: 1 }) }),
+		init: initMysql
+	},
 	http: {
 		db: map.http(`http://localhost:${port}/rdb`),
 	}
@@ -301,6 +319,8 @@ function getDb(name) {
 		return connections.oracle;
 	else if (name === 'mysql')
 		return connections.mysql;
+	else if (name === 'mariadb')
+		return connections.mariadb;
 	else if (name === 'http')
 		return connections.http;
 	else

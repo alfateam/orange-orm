@@ -3,8 +3,8 @@ var newImmutable = require('../../newImmutable');
 var createPatch = require('../../client/createPatch');
 var createDto = require('../resultToRows/toDto/createDto');
 
-function newInsertCommand(table, row, options) {
-	return new InsertCommand(table, row, options);
+function newInsertCommand(table, row) {
+	return new InsertCommand(table, row);
 }
 
 function InsertCommand(table, row) {

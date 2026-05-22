@@ -10,6 +10,12 @@ import type { Filter as MapFilter, RawFilter as MapRawFilter, Pool as MapPool, P
 declare function r(config: r.Config): unknown;
 
 declare namespace r {
+    export interface ValidationMeta {
+        table: string;
+        column: string;
+        property: string;
+        isInsert: boolean;
+    }
 
     function table(name: string): Table;
     function close(): Promise<void>;
@@ -22,6 +28,7 @@ declare namespace r {
     function mssql(connectionString: string, options?: PoolOptions): Pool;
     function mssqlNative(connectionString: string, options?: PoolOptions): Pool;
     function mysql(connectionString: string, options?: PoolOptions): Pool;
+    function mariadb(connectionString: string, options?: PoolOptions): Pool;
     function oracle(config: PoolAttributes, options?: PoolOptions): Pool;
     function on(type: 'query', cb: (e: QueryEvent) => void): void;
     function off(type: 'query', cb: (e: QueryEvent) => void): void;
@@ -94,7 +101,7 @@ declare namespace r {
         date(): DateColumnDef;
     }
     export interface DateColumnDef {
-        validate(validator: (value?: Date | string, row?: object) => void): DateColumnDef;
+        validate(validator: (value?: Date | string, meta?: ValidationMeta) => void): DateColumnDef;
         notNull(): DateColumnNotNullDef;
         JSONSchema(schema: object, options?: Options): DateColumnDef;
         serializable(value: boolean): DateColumnDef;
@@ -104,7 +111,7 @@ declare namespace r {
     }
 
     export interface DateColumnNotNullDef {
-        validate(validator: (value: Date | string, row?: object) => void): DateColumnNotNullDef;
+        validate(validator: (value: Date | string, meta?: ValidationMeta) => void): DateColumnNotNullDef;
         JSONSchema(schema: object, options?: Options): DateColumnNotNullDef;
         serializable(value: boolean): DateColumnNotNullDef;
         as(dbName: string): DateColumnNotNullDef;
@@ -113,7 +120,7 @@ declare namespace r {
     }
 
     export interface BinaryColumnDef {
-        validate(validator: (value?: Buffer | string, row?: object) => void): BinaryColumnDef;
+        validate(validator: (value?: Buffer | string, meta?: ValidationMeta) => void): BinaryColumnDef;
         notNull(): BinaryColumnNotNullDef;
         JSONSchema(schema: object, options?: Options): BinaryColumnDef;
         serializable(value: boolean): BinaryColumnDef;
@@ -123,7 +130,7 @@ declare namespace r {
     }
 
     export interface BinaryColumnNotNullDef {
-        validate(validator: (value: Buffer | string, row?: object) => void): BinaryColumnNotNullDef;
+        validate(validator: (value: Buffer | string, meta?: ValidationMeta) => void): BinaryColumnNotNullDef;
         JSONSchema(schema: object, options?: Options): BinaryColumnNotNullDef;
         serializable(value: boolean): BinaryColumnNotNullDef;
         as(dbName: string): BinaryColumnNotNullDef;
@@ -132,7 +139,7 @@ declare namespace r {
     }
 
     export interface ColumnOf<T> {
-        validate(validator: (value?: T, row?: object) => void): ColumnOf<T>;
+        validate(validator: (value?: T, meta?: ValidationMeta) => void): ColumnOf<T>;
         notNull(): ColumnNotNullOf<T>;
         JSONSchema(schema: object, options?: Options): ColumnOf<T>;
         serializable(value: boolean): ColumnOf<T>;
@@ -142,7 +149,7 @@ declare namespace r {
     }
 
     export interface ColumnNotNullOf<T> {
-        validate(validator: (value: T, row?: object) => void): ColumnNotNullOf<T>;
+        validate(validator: (value: T, meta?: ValidationMeta) => void): ColumnNotNullOf<T>;
         notNull(): ColumnNotNullOf<T>;
         JSONSchema(schema: object, options?: Options): ColumnNotNullOf<T>;
         serializable(value: boolean): ColumnNotNullOf<T>;

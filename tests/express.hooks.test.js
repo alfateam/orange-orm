@@ -33,6 +33,13 @@ createExpressHookTests({
 });
 
 createExpressHookTests({
+	name: 'mariadb',
+	port: 3027,
+	db: map({ db: (con) => con.mariadb('mariadb://test:test@mariadb/test', { size: 1 }) }),
+	init: initMysql
+});
+
+createExpressHookTests({
 	name: 'oracle',
 	port: 3023,
 	db: map({

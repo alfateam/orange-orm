@@ -1,6 +1,6 @@
 {
     "name": "orange-orm",
-    "version": "5.2.1",
+    "version": "5.3.3",
     "publishConfig": {
         "access": "public"
     },
@@ -37,6 +37,7 @@
         "sap",
         "sapase",
         "Oracle",
+        "MariaDB",
         "rdb",
         "Orange ORM",
         "active record"
@@ -80,8 +81,7 @@
         "ajv": "^8.17.1",
         "axios": "^1.6.2",
         "fast-json-patch": "^3.1.1",
-        "rfdc": "^1.2.0",
-        "uuid": "^8.3.2 || ^9.0.0 || ^10.0.0 || ^11.1.0"
+        "rfdc": "^1.2.0"
     },
     "peerDependencies": {
         "@electric-sql/pglite": "^0.3.0",
@@ -91,7 +91,7 @@
         "oracledb": "^6.3.0",
         "pg": "^8.5.1",
         "pg-query-stream": "^3.3.2",
-        "tedious": "^15.1.2 || ^16.0.0 || ^18.1.0 || || ^19.0.0"
+        "tedious": "^15.1.2 || ^16.0.0 || ^18.1.0 || ^19.0.0"
     },
     "peerDependenciesMeta": {
         "pg": {
@@ -144,7 +144,7 @@
         "pg": "^8.5.1",
         "pg-query-stream": "^3.3.2",
         "rollup": "^2.52.7",
-        "tedious": "^19.0.0",
+        "tedious": "^19.2.1",
         "typescript": "^5.4.5",
         "vitest": "^3.2.4"
     },

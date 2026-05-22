@@ -1,4 +1,20 @@
 ## Changelog
+__5.3.3__  
+MSSQL: Set `maxParameters` to `2098` because `tedious` adds extra parameters, so using `2100` can still exceed SQL Server's limit during `getMany`/`hasMany` loading.  
+__5.3.2__  
+Removed uuid dependency.  
+Upgraded to tedious@19.2.1 to reduce transitive audit vulnerabilities in the MSSQL driver chain.  
+__5.3.1__  
+Fixes crashes in getById/getMany when a missing relation has nested hasMany/hasOne/references in the strategy. [#177](https://github.com/alfateam/orange-orm/issues/177)  
+Added max parameter chunking for getManyDto hasMany subqueries on MSSQL, SQLite and Oracle.  
+__5.3.0__  
+Support for MariaDB [#169](https://github.com/alfateam/orange-orm/issues/169)  
+__5.2.4__  
+Meta parameter in validator is optional  
+__5.2.3__  
+Pass table and column and other metadata to custom validate function [#165](https://github.com/alfateam/orange-orm/issues/165)  
+__5.2.2__  
+Bugfix: jsonOf<T>() exists in type definitions but is missing at runtime [#166](https://github.com/alfateam/orange-orm/issues/166)  
 __5.2.1__  
 Bugfix: Bun Postgres fails on proxied JSON params [#158](https://github.com/alfateam/orange-orm/issues/158)  
 __5.2.0__  
