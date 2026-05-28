@@ -1,4 +1,6 @@
 ## Changelog
+__5.3.4__  
+SAP ASE: Fix optimistic concurrency for `date()` columns when datetime values are read back without millisecond precision.  
 __5.3.3__  
 MSSQL: Set `maxParameters` to `2098` because `tedious` adds extra parameters, so using `2100` can still exceed SQL Server's limit during `getMany`/`hasMany` loading.  
 __5.3.2__  

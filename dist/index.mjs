@@ -7289,6 +7289,14 @@ function requireNewUpdateCommandCore () {
 			else if (engine === 'sqlite') {
 				command = command.append(separator + columnSql + ' IS ').append(encoded);
 			}
+			else if (engine === 'sap' && column.tsType === 'DateColumn') {
+				if (encoded.sql() === 'null') {
+					command = command.append(separator + columnSql + ' IS NULL');
+				}
+				else {
+					command = command.append(separator + column.formatOut(context) + '=').append(encoded);
+				}
+			}
 			else if (engine === 'sap' && column.tsType === 'JSONColumn') {
 				if (encoded.sql() === 'null') {
 					command = command.append(separator + columnSql + ' IS NULL');
@@ -8234,6 +8242,11 @@ function requireNewSingleCommandCore () {
 			}
 			if (engine === 'sqlite') {
 				return newParameterized(columnSql + ' IS ' + encoded.sql(), encoded.parameters);
+			}
+			if (engine === 'sap' && column.tsType === 'DateColumn') {
+				if (encoded.sql() === 'null')
+					return newParameterized(columnSql + ' IS NULL');
+				return newParameterized(column.formatOut(context) + '=' + encoded.sql(), encoded.parameters);
 			}
 			if (engine === 'sap' && column.tsType === 'JSONColumn') {
 				if (encoded.sql() === 'null')
