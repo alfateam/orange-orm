@@ -66,6 +66,11 @@ function newSingleCommandCore(context, table, filter, alias, concurrencyState) {
 		if (engine === 'sqlite') {
 			return newParameterized(columnSql + ' IS ' + encoded.sql(), encoded.parameters);
 		}
+		if (engine === 'sap' && column.tsType === 'DateColumn') {
+			if (encoded.sql() === 'null')
+				return newParameterized(columnSql + ' IS NULL');
+			return newParameterized(column.formatOut(context) + '=' + encoded.sql(), encoded.parameters);
+		}
 		if (engine === 'sap' && column.tsType === 'JSONColumn') {
 			if (encoded.sql() === 'null')
 				return newParameterized(columnSql + ' IS NULL');

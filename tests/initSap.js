@@ -129,7 +129,7 @@ CREATE TABLE datetest (
 GO
 
 INSERT INTO datetest ([date], tdatetime, tdatetime_tz)
-VALUES ('2023-07-14 12:00:00', '2023-07-14T12:00:00', '2023-07-14 12:00:00');
+VALUES ('2023-07-14 12:00:00', '2023-07-14T12:00:00.123', '2023-07-14 12:00:00.123');
 
 GO
 

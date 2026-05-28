@@ -90,6 +90,14 @@ function newUpdateCommandCore(context, table, columns, row, concurrencyState) {
 		else if (engine === 'sqlite') {
 			command = command.append(separator + columnSql + ' IS ').append(encoded);
 		}
+		else if (engine === 'sap' && column.tsType === 'DateColumn') {
+			if (encoded.sql() === 'null') {
+				command = command.append(separator + columnSql + ' IS NULL');
+			}
+			else {
+				command = command.append(separator + column.formatOut(context) + '=').append(encoded);
+			}
+		}
 		else if (engine === 'sap' && column.tsType === 'JSONColumn') {
 			if (encoded.sql() === 'null') {
 				command = command.append(separator + columnSql + ' IS NULL');
