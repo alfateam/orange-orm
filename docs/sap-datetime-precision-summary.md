@@ -51,7 +51,7 @@ Det betyr at concurrency-sjekken nå bruker samme presisjon som ble lest tilbake
 - [src/table/commands/newUpdateCommandCore.js](/workspace/src/table/commands/newUpdateCommandCore.js)
 - [src/table/commands/delete/singleCommand/newSingleCommandCore.js](/workspace/src/table/commands/delete/singleCommand/newSingleCommandCore.js)
 - [tests/initSap.js](/workspace/tests/initSap.js)
-- [tests/sap.datetime-precision.test.js](/workspace/tests/sap.datetime-precision.test.js)
+- [tests/datetime-precision.test.js](/workspace/tests/datetime-precision.test.js)
 
 ## Test Coverage
 
@@ -70,7 +70,7 @@ Det ble også lagt inn en isolert SAP-regresjonstest som verifiserer at:
 Kjørt test:
 
 ```bash
-npx vitest run tests/sap.datetime-precision.test.js --pool=forks --poolOptions.forks.singleFork
+npx vitest run tests/datetime-precision.test.js --pool=forks --poolOptions.forks.singleFork
 ```
 
 Resultat: passerte.
