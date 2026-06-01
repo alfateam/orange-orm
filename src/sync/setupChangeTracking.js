@@ -1,6 +1,10 @@
 function buildChangeTrackingSql(tables, options = {}) {
 	const changeTable = normalizeChangeTable(options.changeTable);
-	const statements = [buildCreateChangeTableSql(changeTable)];
+	const appliedMutationsTable = normalizeAppliedMutationsTable(options.appliedMutationsTable);
+	const statements = [
+		buildCreateChangeTableSql(changeTable),
+		buildCreateAppliedMutationsTableSql(appliedMutationsTable)
+	];
 	let trackedTables = 0;
 	const tableNames = tables ? Object.keys(tables) : [];
 	for (const name of tableNames) {
@@ -61,23 +65,27 @@ function buildChangeTrackingSql(tables, options = {}) {
 		trackedTables += 1;
 	}
 
-	return { statements, sql: statements.join('\n\n') + '\n', trackedTables, changeTable };
+	return { statements, sql: statements.join('\n\n') + '\n', trackedTables, changeTable, appliedMutationsTable };
 }
 
 async function setupChangeTracking(db, tables, options = {}) {
 	if (!db || typeof db.query !== 'function')
 		throw new Error('Orange: setupChangeTracking requires a connected db with a query method.');
-	const { statements, trackedTables, changeTable } = buildChangeTrackingSql(tables, options);
+	const { statements, trackedTables, changeTable, appliedMutationsTable } = buildChangeTrackingSql(tables, options);
 	for (const statement of statements) {
 		if (!statement.trim())
 			continue;
 		await db.query(statement);
 	}
-	return { trackedTables, changeTable };
+	return { trackedTables, changeTable, appliedMutationsTable };
 }
 
 function normalizeChangeTable(changeTable) {
 	return (changeTable && String(changeTable).trim()) || 'orange_changes';
+}
+
+function normalizeAppliedMutationsTable(appliedMutationsTable) {
+	return (appliedMutationsTable && String(appliedMutationsTable).trim()) || 'orange_sync_applied_mutations';
 }
 
 function buildCreateChangeTableSql(changeTable) {
@@ -89,6 +97,19 @@ function buildCreateChangeTableSql(changeTable) {
 		'\top CHAR(1) NOT NULL,',
 		'\tpk_json TEXT NOT NULL,',
 		'\tts TIMESTAMPTZ NOT NULL DEFAULT NOW()',
+		');'
+	].join('\n');
+}
+
+function buildCreateAppliedMutationsTableSql(appliedMutationsTable) {
+	const qualifiedAppliedMutationsTable = quoteQualified(appliedMutationsTable);
+	return [
+		`CREATE TABLE IF NOT EXISTS ${qualifiedAppliedMutationsTable} (`,
+		'\tclient_id TEXT NOT NULL,',
+		'\tmutation_id TEXT NOT NULL,',
+		'\tapplied_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),',
+		'\tresult_json JSONB NOT NULL,',
+		'\tPRIMARY KEY (client_id, mutation_id)',
 		');'
 	].join('\n');
 }

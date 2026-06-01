@@ -11,6 +11,8 @@ var connectViaPool = function() {
 	return client.apply(null, arguments);
 };
 connectViaPool.createPatch = client.createPatch;
+connectViaPool.createSyncWorkerClient = require('./client/syncWorkerClient');
+connectViaPool.createSyncWorkerHandler = require('./client/syncWorkerHandler');
 connectViaPool.table = require('./table');
 connectViaPool.filter = require('./emptyFilter');
 connectViaPool.commit = require('./table/commit');

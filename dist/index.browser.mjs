@@ -2,7 +2,6 @@ void !function() {
 	typeof self === 'undefined' && typeof global === 'object'
 		? global.self = global : null;
 }();import * as fastJsonPatch from 'fast-json-patch';
-import * as uuid from 'uuid';
 import * as axios from 'axios';
 import * as _default from 'rfdc/default';
 import * as ajv from 'ajv';
@@ -673,6 +672,610 @@ function requireGetMeta () {
 	return getMeta_1;
 }
 
+var dateToISOString_1;
+var hasRequiredDateToISOString;
+
+function requireDateToISOString () {
+	if (hasRequiredDateToISOString) return dateToISOString_1;
+	hasRequiredDateToISOString = 1;
+	function dateToISOString(date) {
+		let tzo = -date.getTimezoneOffset();
+		let dif = tzo >= 0 ? '+' : '-';
+
+		function pad(num) {
+			let norm = Math.floor(Math.abs(num));
+			return (norm < 10 ? '0' : '') + norm;
+		}
+
+		function padMilli(d) {
+			return (d.getMilliseconds() + '').padStart(3, '0');
+		}
+
+		return date.getFullYear() +
+			'-' + pad(date.getMonth() + 1) +
+			'-' + pad(date.getDate()) +
+			'T' + pad(date.getHours()) +
+			':' + pad(date.getMinutes()) +
+			':' + pad(date.getSeconds()) +
+			'.' + padMilli(date) +
+			dif + pad(tzo / 60) +
+			':' + pad(tzo % 60);
+	}
+
+	dateToISOString_1 = dateToISOString;
+	return dateToISOString_1;
+}
+
+var stringify_1;
+var hasRequiredStringify;
+
+function requireStringify () {
+	if (hasRequiredStringify) return stringify_1;
+	hasRequiredStringify = 1;
+	let dateToISOString = requireDateToISOString();
+
+	function stringify(value) {
+		return JSON.stringify(value, replacer);
+	}
+
+	function replacer(key, value) {
+		// @ts-ignore
+		if (typeof value === 'bigint')
+			return value.toString();
+		else if (value instanceof Date  && !isNaN(value))
+			return dateToISOString(value);
+		else
+			return value;
+	}
+
+	stringify_1 = stringify;
+	return stringify_1;
+}
+
+var sync;
+var hasRequiredSync;
+
+function requireSync () {
+	if (hasRequiredSync) return sync;
+	hasRequiredSync = 1;
+	const stringify = requireStringify();
+
+	function newSyncHandler(client, options = {}) {
+		const syncOptions = normalizeSyncOptions(options.sync);
+		if (!syncOptions || syncOptions.enabled === false)
+			return null;
+
+		const tableMeta = createTableMeta(client, syncOptions);
+		const queue = createQueue(syncOptions.queue);
+
+		return async function handleSync(request, response) {
+			try {
+				const result = await queue.run(() => execute(request.body || {}));
+				response.json(result);
+			}
+			catch (e) {
+				if (e.status === undefined)
+					response.status(500).send(e.message || e);
+				else
+					response.status(e.status).send(e.message);
+			}
+		};
+
+		async function execute(body) {
+			const phase = body.phase || body.action;
+			if (phase === 'keys')
+				return pullKeys(body);
+			if (phase === 'rows')
+				return pullRows(body);
+			const error = new Error('Invalid sync phase. Use { phase: "keys" } or { phase: "rows" }.');
+			error.status = 400;
+			throw error;
+		}
+
+		async function pullKeys(body) {
+			const requestedTables = normalizeRequestedTables(body.tables, tableMeta, syncOptions.limits.maxTablesPerRequest);
+			const limit = normalizeLimit(body.limit, syncOptions.limits.maxKeysPerBatch);
+			const token = normalizeToken(body.token, requestedTables);
+			if (token && token.mode === 'changes')
+				return pullKeysFromChanges(token, limit);
+			if (token && token.mode === 'snapshot')
+				return pullKeysFromSnapshot(token, limit);
+
+			const startCursor = normalizeCursor(body.cursor ?? body.since);
+			const bounds = await getChangeBounds(syncOptions.changeTable);
+			const fallback = shouldUseSnapshot(startCursor, bounds, syncOptions.limits.maxChangeWindow);
+			if (fallback.useSnapshot) {
+				const snapshotToken = {
+					v: 1,
+					mode: 'snapshot',
+					tables: requestedTables,
+					tableIndex: 0,
+					offset: 0,
+					watermark: bounds.max
+				};
+				const result = await pullKeysFromSnapshot(snapshotToken, limit);
+				result.reason = fallback.reason;
+				return result;
+			}
+
+			const changeToken = {
+				v: 1,
+				mode: 'changes',
+				tables: requestedTables,
+				cursor: startCursor,
+				watermark: bounds.max
+			};
+			return pullKeysFromChanges(changeToken, limit);
+		}
+
+		async function pullKeysFromSnapshot(token, limit) {
+			const items = [];
+			let tableIndex = normalizeInteger(token.tableIndex, 0);
+			let offset = normalizeInteger(token.offset, 0);
+			while (items.length < limit && tableIndex < token.tables.length) {
+				const tableName = token.tables[tableIndex];
+				const meta = tableMeta.byName.get(tableName);
+				if (!meta) {
+					tableIndex += 1;
+					offset = 0;
+					continue;
+				}
+				const remaining = limit - items.length;
+				const keys = await fetchSnapshotKeys(meta, remaining, offset);
+				for (let i = 0; i < keys.length; i++) {
+					const pk = keys[i];
+					items.push({ table: tableName, pk, key: toKeyObject(meta, pk), op: 'U' });
+				}
+				if (keys.length < remaining) {
+					tableIndex += 1;
+					offset = 0;
+				}
+				else {
+					offset += keys.length;
+				}
+			}
+			const done = tableIndex >= token.tables.length;
+			return {
+				phase: 'keys',
+				mode: 'snapshot',
+				done,
+				cursor: token.watermark,
+				token: done ? null : {
+					v: 1,
+					mode: 'snapshot',
+					tables: token.tables,
+					tableIndex,
+					offset,
+					watermark: token.watermark
+				},
+				items
+			};
+		}
+
+		async function pullKeysFromChanges(token, limit) {
+			const fromCursor = normalizeInteger(token.cursor, 0);
+			const watermark = normalizeInteger(token.watermark, 0);
+			if (fromCursor >= watermark) {
+				return {
+					phase: 'keys',
+					mode: 'changes',
+					done: true,
+					cursor: watermark,
+					token: null,
+					items: []
+				};
+			}
+			const whereTables = token.tables.length === 0
+				? ''
+				: ` AND table_name IN (${token.tables.map((name) => sqlStringLiteral(tableMeta.byName.get(name).dbName)).join(',')})`;
+			const sql = [
+				'SELECT id, table_name, op, pk_json',
+				`FROM ${quoteQualified(syncOptions.changeTable)}`,
+				`WHERE id > ${fromCursor} AND id <= ${watermark}${whereTables}`,
+				'ORDER BY id ASC',
+				`LIMIT ${limit}`
+			].join(' ');
+			const rows = await safeQuery(sql, []);
+			const dedup = new Map();
+			let nextCursor = fromCursor;
+			for (let i = 0; i < rows.length; i++) {
+				const row = rows[i];
+				const id = normalizeInteger(row.id ?? row.ID, nextCursor);
+				nextCursor = id > nextCursor ? id : nextCursor;
+				const rawTableName = row.table_name ?? row.TABLE_NAME;
+				const meta = tableMeta.byDbName.get(rawTableName);
+				if (!meta)
+					continue;
+				let keyObject;
+				try {
+					keyObject = typeof row.pk_json === 'string'
+						? JSON.parse(row.pk_json)
+						: JSON.parse(row.PK_JSON);
+				}
+				catch (_e) {
+					continue;
+				}
+				const pk = toPkArray(meta, keyObject);
+				if (!pk)
+					continue;
+				const mapKey = `${meta.name}|${stringify(pk)}`;
+				const op = normalizeOp(row.op ?? row.OP);
+				if (dedup.has(mapKey))
+					dedup.delete(mapKey);
+				dedup.set(mapKey, { table: meta.name, pk, key: toKeyObject(meta, pk), op });
+			}
+			const items = Array.from(dedup.values());
+			const done = rows.length === 0 || nextCursor >= watermark;
+			return {
+				phase: 'keys',
+				mode: 'changes',
+				done,
+				cursor: watermark,
+				token: done ? null : {
+					v: 1,
+					mode: 'changes',
+					tables: token.tables,
+					cursor: nextCursor,
+					watermark
+				},
+				items
+			};
+		}
+
+		async function pullRows(body) {
+			const rawItems = Array.isArray(body.items) ? body.items : [];
+			const limit = normalizeLimit(rawItems.length, syncOptions.limits.maxRowsPerBatch);
+			const items = rawItems.slice(0, limit);
+			const tableKeys = new Map();
+			for (let i = 0; i < items.length; i++) {
+				const item = items[i];
+				if (!item || typeof item.table !== 'string')
+					continue;
+				const meta = tableMeta.byName.get(item.table);
+				if (!meta)
+					continue;
+				if (normalizeOp(item.op) === 'D')
+					continue;
+				const pk = Array.isArray(item.pk) ? item.pk : toPkArray(meta, item.key);
+				if (!pk || pk.length !== meta.pkColumns.length)
+					continue;
+				if (!tableKeys.has(meta.name))
+					tableKeys.set(meta.name, []);
+				tableKeys.get(meta.name).push(pk);
+			}
+
+			const rowMap = new Map();
+			const tableNames = Array.from(tableKeys.keys());
+			for (let i = 0; i < tableNames.length; i++) {
+				const tableName = tableNames[i];
+				const meta = tableMeta.byName.get(tableName);
+				const keys = tableKeys.get(tableName);
+				const rows = await fetchRowsByPrimaryKeys(meta, keys);
+				const perTable = new Map();
+				for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+					const row = rows[rowIndex];
+					const pk = toPkArray(meta, row);
+					perTable.set(stringify(pk), row);
+				}
+				rowMap.set(tableName, perTable);
+			}
+
+			const resolved = [];
+			for (let i = 0; i < items.length; i++) {
+				const item = items[i];
+				if (!item || typeof item.table !== 'string')
+					continue;
+				const meta = tableMeta.byName.get(item.table);
+				if (!meta)
+					continue;
+				const pk = Array.isArray(item.pk) ? item.pk : toPkArray(meta, item.key);
+				if (!pk)
+					continue;
+				const row = rowMap.get(meta.name)?.get(stringify(pk));
+				if (row !== undefined)
+					resolved.push({ table: meta.name, pk, key: toKeyObject(meta, pk), row, op: normalizeOp(item.op) });
+			}
+
+			return {
+				phase: 'rows',
+				items: resolved
+			};
+		}
+
+		async function fetchSnapshotKeys(meta, limit, offset) {
+			const strategy = {};
+			for (let i = 0; i < meta.pkColumns.length; i++) {
+				strategy[meta.pkColumns[i].alias] = true;
+			}
+			strategy.orderBy = meta.pkColumns.map(x => x.alias);
+			strategy.limit = limit;
+			strategy.offset = offset;
+			const rows = await client.transaction(async (tx) => {
+				return tx[meta.name].getMany(undefined, strategy);
+			}, { readonly: true });
+			const result = [];
+			for (let i = 0; i < rows.length; i++) {
+				const pk = toPkArray(meta, rows[i]);
+				if (pk)
+					result.push(pk);
+			}
+			return result;
+		}
+
+		async function fetchRowsByPrimaryKeys(meta, keys) {
+			if (!Array.isArray(keys) || keys.length === 0)
+				return [];
+			const where = [];
+			const parameters = [];
+			for (let i = 0; i < keys.length; i++) {
+				const pk = keys[i];
+				if (!Array.isArray(pk) || pk.length !== meta.pkColumns.length)
+					continue;
+				const parts = [];
+				for (let colIndex = 0; colIndex < meta.pkColumns.length; colIndex++) {
+					const col = meta.pkColumns[colIndex];
+					parts.push(`${quoteIdent(col.dbName)} = ?`);
+					parameters.push(pk[colIndex]);
+				}
+				where.push(`(${parts.join(' AND ')})`);
+			}
+			if (where.length === 0)
+				return [];
+			const filter = {
+				sql: where.join(' OR '),
+				parameters
+			};
+			return client.transaction(async (tx) => {
+				return tx[meta.name].getMany(filter);
+			}, { readonly: true });
+		}
+
+		async function getChangeBounds(changeTable) {
+			try {
+				const sql = [
+					'SELECT',
+					'COALESCE(MIN(id), 0) AS min_id,',
+					'COALESCE(MAX(id), 0) AS max_id',
+					`FROM ${quoteQualified(changeTable)}`
+				].join(' ');
+				const rows = await safeQuery(sql, []);
+				const row = rows[0] || {};
+				return {
+					exists: true,
+					min: normalizeInteger(row.min_id ?? row.MIN_ID, 0),
+					max: normalizeInteger(row.max_id ?? row.MAX_ID, 0)
+				};
+			}
+			catch (_error) {
+				return { exists: false, min: 0, max: 0 };
+			}
+		}
+
+		async function safeQuery(sql, fallback) {
+			const result = await client.query(sql);
+			if (Array.isArray(result))
+				return result;
+			if (Array.isArray(result?.rows))
+				return result.rows;
+			return fallback;
+		}
+	}
+
+	function normalizeSyncOptions(sync) {
+		if (!sync)
+			return null;
+		const queueOptions = sync.queue || {};
+		const limits = sync.limits || {};
+		return {
+			enabled: sync.enabled !== false,
+			changeTable: sync.changeTable || 'orange_changes',
+			queue: {
+				concurrency: clamp(normalizeInteger(queueOptions.concurrency, 4), 1, 100),
+				maxPending: clamp(normalizeInteger(queueOptions.maxPending, 1000), 0, 100000)
+			},
+			limits: {
+				maxTablesPerRequest: clamp(normalizeInteger(limits.maxTablesPerRequest, 50), 1, 1000),
+				maxKeysPerBatch: clamp(normalizeInteger(limits.maxKeysPerBatch, 200), 1, 10000),
+				maxRowsPerBatch: clamp(normalizeInteger(limits.maxRowsPerBatch, 200), 1, 10000),
+				maxChangeWindow: clamp(normalizeInteger(limits.maxChangeWindow, 50000), 1, 100000000)
+			}
+		};
+	}
+
+	function createTableMeta(client, syncOptions) {
+		const byName = new Map();
+		const byDbName = new Map();
+		for (let tableName in client.tables) {
+			const table = client.tables[tableName];
+			const pkColumns = Array.isArray(table?._primaryColumns) ? table._primaryColumns : [];
+			if (pkColumns.length === 0)
+				continue;
+			const dbName = table._dbName;
+			if (!dbName || dbName === syncOptions.changeTable)
+				continue;
+			const meta = {
+				name: tableName,
+				dbName,
+				pkColumns: pkColumns.map((col) => ({ alias: col.alias, dbName: col._dbName || col.alias }))
+			};
+			byName.set(tableName, meta);
+			byDbName.set(dbName, meta);
+			const split = dbName.split('.');
+			byDbName.set(split[split.length - 1], meta);
+		}
+		return { byName, byDbName };
+	}
+
+	function createQueue({ concurrency, maxPending }) {
+		let running = 0;
+		const pending = [];
+		return { run };
+
+		function run(job) {
+			return new Promise((resolve, reject) => {
+				if (running >= concurrency && pending.length >= maxPending) {
+					const error = new Error('Sync queue is full. Try again later.');
+					error.status = 429;
+					reject(error);
+					return;
+				}
+				pending.push({ job, resolve, reject });
+				drain();
+			});
+		}
+
+		function drain() {
+			while (running < concurrency && pending.length > 0) {
+				const next = pending.shift();
+				running += 1;
+				Promise.resolve()
+					.then(next.job)
+					.then(next.resolve, next.reject)
+					.finally(() => {
+						running -= 1;
+						drain();
+					});
+			}
+		}
+	}
+
+	function shouldUseSnapshot(cursor, bounds, maxChangeWindow) {
+		if (!Number.isFinite(cursor))
+			return { useSnapshot: true, reason: 'first_sync' };
+		if (!bounds.exists)
+			return { useSnapshot: true, reason: 'change_table_unavailable' };
+		if (cursor < bounds.min - 1)
+			return { useSnapshot: true, reason: 'cursor_too_old' };
+		if (bounds.max - cursor > maxChangeWindow)
+			return { useSnapshot: true, reason: 'cursor_too_far_behind' };
+		return { useSnapshot: false };
+	}
+
+	function normalizeRequestedTables(rawTables, tableMeta, maxTablesPerRequest) {
+		if (!Array.isArray(rawTables) || rawTables.length === 0)
+			return Array.from(tableMeta.byName.keys());
+		const normalized = [];
+		for (let i = 0; i < rawTables.length; i++) {
+			const raw = rawTables[i];
+			if (typeof raw !== 'string')
+				continue;
+			const byName = tableMeta.byName.get(raw);
+			if (byName) {
+				normalized.push(byName.name);
+				continue;
+			}
+			const byDbName = tableMeta.byDbName.get(raw);
+			if (byDbName)
+				normalized.push(byDbName.name);
+		}
+		const deduped = Array.from(new Set(normalized));
+		return deduped.slice(0, maxTablesPerRequest);
+	}
+
+	function normalizeToken(token, requestedTables) {
+		if (!token || token !== Object(token))
+			return null;
+		if (token.v !== 1)
+			return null;
+		if (token.mode === 'changes') {
+			return {
+				v: 1,
+				mode: 'changes',
+				tables: requestedTables,
+				cursor: normalizeInteger(token.cursor, 0),
+				watermark: normalizeInteger(token.watermark, 0)
+			};
+		}
+		if (token.mode === 'snapshot') {
+			return {
+				v: 1,
+				mode: 'snapshot',
+				tables: requestedTables,
+				tableIndex: normalizeInteger(token.tableIndex, 0),
+				offset: normalizeInteger(token.offset, 0),
+				watermark: normalizeInteger(token.watermark, 0)
+			};
+		}
+		return null;
+	}
+
+	function normalizeCursor(cursor) {
+		if (cursor === null || cursor === undefined || cursor === '')
+			return NaN;
+		if (typeof cursor === 'number' && Number.isFinite(cursor))
+			return cursor;
+		if (typeof cursor === 'string') {
+			const parsed = Number.parseInt(cursor, 10);
+			return Number.isFinite(parsed) ? parsed : NaN;
+		}
+		return NaN;
+	}
+
+	function normalizeLimit(limit, max) {
+		return clamp(normalizeInteger(limit, max), 1, max);
+	}
+
+	function normalizeInteger(value, fallback) {
+		if (typeof value === 'number' && Number.isFinite(value))
+			return Math.floor(value);
+		if (typeof value === 'string') {
+			const parsed = Number.parseInt(value, 10);
+			if (Number.isFinite(parsed))
+				return parsed;
+		}
+		return fallback;
+	}
+
+	function normalizeOp(value) {
+		if (typeof value !== 'string')
+			return 'U';
+		const op = value.toUpperCase();
+		if (op === 'I' || op === 'U' || op === 'D')
+			return op;
+		return 'U';
+	}
+
+	function toPkArray(meta, row) {
+		if (!row || row !== Object(row))
+			return null;
+		const result = [];
+		for (let i = 0; i < meta.pkColumns.length; i++) {
+			const key = meta.pkColumns[i].alias;
+			if (!(key in row))
+				return null;
+			result.push(row[key]);
+		}
+		return result;
+	}
+
+	function toKeyObject(meta, pk) {
+		const key = {};
+		for (let i = 0; i < meta.pkColumns.length && i < pk.length; i++) {
+			key[meta.pkColumns[i].alias] = pk[i];
+		}
+		return key;
+	}
+
+	function clamp(value, min, max) {
+		return Math.max(min, Math.min(max, value));
+	}
+
+	function quoteQualified(name) {
+		return String(name).split('.').map(quoteIdent).join('.');
+	}
+
+	function quoteIdent(name) {
+		return `"${String(name).replace(/"/g, '""')}"`;
+	}
+
+	function sqlStringLiteral(value) {
+		return `'${String(value).replace(/'/g, '\'\'')}'`;
+	}
+
+	sync = newSyncHandler;
+	return sync;
+}
+
 var hostExpress_1;
 var hasRequiredHostExpress;
 
@@ -682,6 +1285,7 @@ function requireHostExpress () {
 	const getTSDefinition = requireGetTSDefinition();
 	// let hostLocal = _hostLocal;
 	const getMeta = requireGetMeta();
+	const newSyncHandler = requireSync();
 
 	function hostExpress(hostLocal, client, options = {}) {
 		if ('db' in options && (options.db ?? undefined) === undefined || !client.db)
@@ -704,6 +1308,7 @@ function requireHostExpress () {
 
 			});
 		}
+		const syncHandler = newSyncHandler(client, options);
 
 		async function handler(req, res) {
 			if (req.method === 'POST')
@@ -768,6 +1373,15 @@ function requireHostExpress () {
 
 		async function post(request, response) {
 			try {
+				if (request.query.sync === 'pull') {
+					if (!syncHandler) {
+						const e = new Error('Sync is not enabled for this endpoint');
+						// @ts-ignore
+						e.status = 404;
+						throw e;
+					}
+					return syncHandler(request, response);
+				}
 				if (!request.query.table) {
 					let e = new Error('Table not defined');
 					// @ts-ignore
@@ -973,69 +1587,48 @@ function requireHostHono () {
 	return hostHono_1;
 }
 
-var require$$0$3 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(fastJsonPatch);
+var require$$0$2 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(fastJsonPatch);
 
-var dateToISOString_1;
-var hasRequiredDateToISOString;
+var randomUuid_1;
+var hasRequiredRandomUuid;
 
-function requireDateToISOString () {
-	if (hasRequiredDateToISOString) return dateToISOString_1;
-	hasRequiredDateToISOString = 1;
-	function dateToISOString(date) {
-		let tzo = -date.getTimezoneOffset();
-		let dif = tzo >= 0 ? '+' : '-';
+function requireRandomUuid () {
+	if (hasRequiredRandomUuid) return randomUuid_1;
+	hasRequiredRandomUuid = 1;
+	function randomUuid() {
+		const crypto = typeof globalThis !== 'undefined' && globalThis.crypto;
+		if (crypto && typeof crypto.randomUUID === 'function')
+			return crypto.randomUUID();
 
-		function pad(num) {
-			let norm = Math.floor(Math.abs(num));
-			return (norm < 10 ? '0' : '') + norm;
+		const bytes = new Uint8Array(16);
+		if (crypto && typeof crypto.getRandomValues === 'function') {
+			crypto.getRandomValues(bytes);
+		}
+		else {
+			for (let i = 0; i < bytes.length; i++) {
+				bytes[i] = Math.floor(Math.random() * 256);
+			}
 		}
 
-		function padMilli(d) {
-			return (d.getMilliseconds() + '').padStart(3, '0');
+		bytes[6] = (bytes[6] & 0x0f) | 0x40;
+		bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+		const hex = [];
+		for (let i = 0; i < 256; i++) {
+			hex[i] = (i + 0x100).toString(16).slice(1);
 		}
-
-		return date.getFullYear() +
-			'-' + pad(date.getMonth() + 1) +
-			'-' + pad(date.getDate()) +
-			'T' + pad(date.getHours()) +
-			':' + pad(date.getMinutes()) +
-			':' + pad(date.getSeconds()) +
-			'.' + padMilli(date) +
-			dif + pad(tzo / 60) +
-			':' + pad(tzo % 60);
+		return [
+			hex[bytes[0]], hex[bytes[1]], hex[bytes[2]], hex[bytes[3]], '-',
+			hex[bytes[4]], hex[bytes[5]], '-',
+			hex[bytes[6]], hex[bytes[7]], '-',
+			hex[bytes[8]], hex[bytes[9]], '-',
+			hex[bytes[10]], hex[bytes[11]], hex[bytes[12]], hex[bytes[13]], hex[bytes[14]], hex[bytes[15]]
+		].join('');
 	}
 
-	dateToISOString_1 = dateToISOString;
-	return dateToISOString_1;
+	randomUuid_1 = randomUuid;
+	return randomUuid_1;
 }
-
-var stringify_1;
-var hasRequiredStringify;
-
-function requireStringify () {
-	if (hasRequiredStringify) return stringify_1;
-	hasRequiredStringify = 1;
-	let dateToISOString = requireDateToISOString();
-
-	function stringify(value) {
-		return JSON.stringify(value, replacer);
-	}
-
-	function replacer(key, value) {
-		// @ts-ignore
-		if (typeof value === 'bigint')
-			return value.toString();
-		else if (value instanceof Date  && !isNaN(value))
-			return dateToISOString(value);
-		else
-			return value;
-	}
-
-	stringify_1 = stringify;
-	return stringify_1;
-}
-
-var require$$0$2 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(uuid);
 
 var createPatch;
 var hasRequiredCreatePatch;
@@ -1043,10 +1636,10 @@ var hasRequiredCreatePatch;
 function requireCreatePatch () {
 	if (hasRequiredCreatePatch) return createPatch;
 	hasRequiredCreatePatch = 1;
-	const jsonpatch = require$$0$3;
+	const jsonpatch = require$$0$2;
 	let dateToIsoString = requireDateToISOString();
 	let stringify = requireStringify();
-	let { v4: uuid } = require$$0$2;
+	let randomUuid = requireRandomUuid();
 
 	createPatch = function createPatch(original, dto, options) {
 		let subject = toCompareObject({ d: original }, options, true);
@@ -1155,7 +1748,7 @@ function requireCreatePatch () {
 
 		function negotiateTempKey(value) {
 			if (value === undefined)
-				return `~${uuid()}`;
+				return `~${randomUuid()}`;
 			else
 				return value;
 		}
@@ -2972,7 +3565,7 @@ function requireToKeyPositionMap () {
 	if (hasRequiredToKeyPositionMap) return toKeyPositionMap_1;
 	hasRequiredToKeyPositionMap = 1;
 	const stringify = requireStringify();
-	const { v4: uuid } = require$$0$2;
+	const randomUuid = requireRandomUuid();
 
 	function toKeyPositionMap(rows, options) {
 		return rows.reduce((map, element, i) => {
@@ -2995,7 +3588,7 @@ function requireToKeyPositionMap () {
 
 	function negotiateTempKey(value) {
 		if (value === undefined)
-			return `~${uuid()}`;
+			return `~${randomUuid()}`;
 		else
 			return value;
 	}
@@ -3161,6 +3754,814 @@ function requireFlags () {
 	return flags_1;
 }
 
+var syncClient;
+var hasRequiredSyncClient;
+
+function requireSyncClient () {
+	if (hasRequiredSyncClient) return syncClient;
+	hasRequiredSyncClient = 1;
+	const _axios = require$$0$1;
+
+	function newSyncClient(client, getDb, axiosInterceptor) {
+		const sinceByScope = new Map();
+		const syncStateTable = 'orange_sync_state';
+		const initialReadyListeners = new Set();
+		let initialReadyEmitted = false;
+
+		return {
+			pull,
+			getConfig,
+			on,
+			off,
+			once,
+			waitForInitialReady
+		};
+
+		async function getConfig() {
+			const db = await getDb();
+			return normalizeSyncConfig(db && db.__sqliteSync);
+		}
+
+		async function pull(options = {}) {
+			const db = await getDb();
+			const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
+			if (!syncConfig)
+				throw new Error('Sync is not configured. Add sync in sqlite options: sqlite(connectionString, { sync: ... })');
+
+			const pullOptions = normalizePullOptions(options);
+			const pullConfig = resolvePullConfig(syncConfig, pullOptions);
+			const configuredTables = pullConfig.tables;
+			if (!Array.isArray(configuredTables) || configuredTables.length === 0)
+				throw new Error('Sync pull requires configured tables. Set sync.pull.tables (or sync.tables).');
+			await maybeEmitInitialReady(syncConfig, configuredTables, db, 'persisted');
+			const currentSince = await getScopeSince(configuredTables, db);
+			const requestOptions = {
+				tables: configuredTables,
+				since: currentSince,
+				_syncAxiosInterceptor: axiosInterceptor
+			};
+			let result;
+			try {
+				result = await pullStaged(pullConfig, requestOptions);
+			}
+			catch (e) {
+				if (!shouldFallbackToPatch(e))
+					throw e;
+				result = await pullPatch(pullConfig, requestOptions);
+			}
+			if (result && result.since !== undefined)
+				await setScopeSince(configuredTables, result.since, db);
+			await maybeEmitInitialReady(syncConfig, configuredTables, db, 'pull');
+			return result;
+		}
+
+		async function pullStaged(pullConfig, options) {
+			const maxKeysPerBatch = normalizeLimit(pullConfig.maxKeysPerBatch, 200);
+			const maxRowsPerBatch = normalizeLimit(pullConfig.maxRowsPerBatch, 200);
+			const defaultPatchOptions = { ...(pullConfig.patchOptions || {}), concurrency: 'overwrite' };
+			let applied = 0;
+			let stagedResult;
+			await client.transaction(async (tx) => {
+				await tryDeferForeignKeys(tx);
+				stagedResult = await iterateStagedPull(tx);
+				await validateForeignKeys(tx);
+			});
+
+			return {
+				applied,
+				tables: stagedResult.tables,
+				since: stagedResult.since,
+				payload: stagedResult.payload
+			};
+
+			async function iterateStagedPull(tx) {
+				let token = options.token;
+				let finalSince = options.since;
+				const touchedTables = new Set();
+				let reason;
+				for (let i = 0; i < 10000; i++) {
+					const keysPayload = await requestPayload({
+						...pullConfig,
+						body: {
+							phase: 'keys',
+							token,
+							since: options.since,
+							tables: options.tables,
+							limit: maxKeysPerBatch
+						}
+					}, options);
+					if (!isStagedKeysPayload(keysPayload))
+						throw new Error('Sync endpoint did not return staged keys payload');
+					if (reason === undefined && keysPayload.reason !== undefined)
+						reason = keysPayload.reason;
+					if (keysPayload.cursor !== undefined)
+						finalSince = keysPayload.cursor;
+					const keyItems = normalizeKeyItems(keysPayload.items);
+					for (let keyIndex = 0; keyIndex < keyItems.length; keyIndex++) {
+						touchedTables.add(keyItems[keyIndex].table);
+					}
+
+					const deleteItems = keyItems.filter(x => x.op === 'D');
+					const upsertItems = keyItems.filter(x => x.op !== 'D');
+					if (tx && deleteItems.length > 0)
+						applied += await applyDeleteItemsOnTx(tx, deleteItems, defaultPatchOptions);
+
+					let nextRowsOffset = 0;
+					let nextRowsPromise = upsertItems.length > 0
+						? requestRowsChunk(upsertItems, nextRowsOffset)
+						: null;
+					nextRowsOffset += maxRowsPerBatch;
+					while (nextRowsPromise) {
+						const currentRowsResult = await nextRowsPromise;
+						if (nextRowsOffset < upsertItems.length) {
+							nextRowsPromise = requestRowsChunk(upsertItems, nextRowsOffset);
+							nextRowsOffset += maxRowsPerBatch;
+						}
+						else
+							nextRowsPromise = null;
+						if (currentRowsResult.error)
+							throw currentRowsResult.error;
+						if (!isRowsPayload(currentRowsResult.payload))
+							throw new Error('Sync endpoint did not return rows payload');
+						if (tx)
+							applied += await applyRowsPayloadOnTx(tx, currentRowsResult.payload.items, defaultPatchOptions);
+					}
+					if (keysPayload.done || !keysPayload.token) {
+						return {
+							tables: Array.from(touchedTables),
+							since: finalSince,
+							payload: reason === undefined ? keysPayload : { ...keysPayload, reason }
+						};
+					}
+					token = keysPayload.token;
+				}
+				throw new Error('Sync failed: staged pull exceeded max iterations');
+
+				function requestRowsChunk(items, offset) {
+					const chunk = items.slice(offset, offset + maxRowsPerBatch);
+					return requestPayload({
+						...pullConfig,
+						body: {
+							phase: 'rows',
+							items: chunk
+						}
+					}, options)
+						.then(
+							(payload) => ({ payload, error: null }),
+							(error) => ({ payload: null, error })
+						);
+				}
+			}
+		}
+
+		async function pullPatch(pullConfig, options) {
+			const payload = await requestPayload(pullConfig, options);
+			const tablePatches = extractTablePatches(payload);
+			const defaultPatchOptions = { ...(pullConfig.patchOptions || {}), concurrency: 'overwrite' };
+			let applied = 0;
+			if (tablePatches.length > 0) {
+				await client.transaction(async (tx) => {
+					await tryDeferForeignKeys(tx);
+					for (let i = 0; i < tablePatches.length; i++) {
+						const entry = tablePatches[i];
+						if (!tx[entry.table] || typeof tx[entry.table].patch !== 'function')
+							throw new Error(`Table "${entry.table}" does not exist in this client`);
+						const patchOptions = { ...defaultPatchOptions, ...(entry.options || {}), concurrency: 'overwrite' };
+						await tx[entry.table].patch(entry.patch, patchOptions);
+						applied += entry.patch.length;
+					}
+					await validateForeignKeys(tx);
+				});
+			}
+			return {
+				applied,
+				tables: tablePatches.map(x => x.table),
+				since: payload && (payload.since ?? payload.cursor),
+				payload
+			};
+		}
+
+		function normalizePullOptions(input) {
+			if (!input || input !== Object(input))
+				return {};
+			const timeoutMs = normalizeTimeoutMs(input.timeoutMs);
+			const result = {};
+			if (timeoutMs !== undefined)
+				result.timeoutMs = timeoutMs;
+			return result;
+		}
+
+		function normalizeTimeoutMs(value) {
+			const parsed = Number.parseInt(value, 10);
+			if (!Number.isFinite(parsed) || parsed <= 0)
+				return undefined;
+			return parsed;
+		}
+
+		async function getScopeSince(tables, db) {
+			const scopeKey = getScopeKey(tables);
+			if (sinceByScope.has(scopeKey))
+				return sinceByScope.get(scopeKey);
+			const persisted = await readScopeSince(scopeKey, db);
+			if (persisted !== undefined)
+				sinceByScope.set(scopeKey, persisted);
+			return persisted;
+		}
+
+		async function setScopeSince(tables, since, db) {
+			const scopeKey = getScopeKey(tables);
+			sinceByScope.set(scopeKey, since);
+			await writeScopeState(scopeKey, { since, updatedAtMs: Date.now() }, db);
+		}
+
+		function getScopeKey(tables) {
+			if (!Array.isArray(tables) || tables.length === 0)
+				return '*';
+			const dedup = Array.from(new Set(tables.filter(x => typeof x === 'string')));
+			dedup.sort();
+			return dedup.join('|');
+		}
+
+		async function ensureSyncStateTable(db) {
+			await db.query([
+				`CREATE TABLE IF NOT EXISTS "${syncStateTable}" (`,
+				'"scope" TEXT PRIMARY KEY,',
+				'"since_value" TEXT NOT NULL',
+				');'
+			].join(' '));
+		}
+
+		async function readScopeSince(scopeKey, db) {
+			const state = await readScopeState(scopeKey, db);
+			return state && state.since;
+		}
+
+		async function readScopeState(scopeKey, db) {
+			if (!db || typeof db.query !== 'function')
+				return undefined;
+			await ensureSyncStateTable(db);
+			const rows = await db.query(
+				`SELECT "since_value" FROM "${syncStateTable}" WHERE "scope" = ${sqlStringLiteral(scopeKey)} LIMIT 1`
+			);
+			const row = Array.isArray(rows) ? rows[0] : rows?.rows?.[0];
+			if (!row)
+				return undefined;
+			const raw = row.since_value ?? row.SINCE_VALUE;
+			if (typeof raw !== 'string' || raw.length === 0)
+				return undefined;
+			try {
+				const parsed = JSON.parse(raw);
+				if (parsed && parsed === Object(parsed) && 'since' in parsed)
+					return {
+						since: parsed.since,
+						updatedAtMs: parsed.updatedAtMs
+					};
+				return { since: parsed, updatedAtMs: undefined };
+			}
+			catch (_e) {
+				return { since: raw, updatedAtMs: undefined };
+			}
+		}
+
+		async function writeScopeState(scopeKey, state, db) {
+			if (!db || typeof db.query !== 'function')
+				return;
+			await ensureSyncStateTable(db);
+			const sinceSerialized = JSON.stringify(state);
+			await db.query(
+				`INSERT INTO "${syncStateTable}" ("scope", "since_value") VALUES (${sqlStringLiteral(scopeKey)}, ${sqlStringLiteral(sinceSerialized)}) `
+				+ 'ON CONFLICT("scope") DO UPDATE SET "since_value" = excluded."since_value"'
+			);
+		}
+
+		function on(event, listener) {
+			if (event !== 'initial-ready' || typeof listener !== 'function')
+				return () => {};
+			initialReadyListeners.add(listener);
+			void maybeEmitInitialReadyFromDb('persisted');
+			return () => off(event, listener);
+		}
+
+		function off(event, listener) {
+			if (event !== 'initial-ready')
+				return;
+			initialReadyListeners.delete(listener);
+		}
+
+		function once(event, listener) {
+			if (event !== 'initial-ready' || typeof listener !== 'function')
+				return () => {};
+			const unsubscribe = on(event, (payload) => {
+				unsubscribe();
+				listener(payload);
+			});
+			return unsubscribe;
+		}
+
+		async function waitForInitialReady() {
+			const existing = await maybeEmitInitialReadyFromDb('persisted');
+			if (existing)
+				return existing;
+			return new Promise((resolve) => {
+				const unsubscribe = once('initial-ready', (payload) => {
+					unsubscribe();
+					resolve(payload);
+				});
+			});
+		}
+
+		async function maybeEmitInitialReadyFromDb(source) {
+			const db = await getDb();
+			const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
+			if (!syncConfig)
+				return null;
+			const pullConfig = resolvePullConfig(syncConfig);
+			const configuredTables = pullConfig.tables;
+			if (!Array.isArray(configuredTables) || configuredTables.length === 0)
+				return null;
+			return maybeEmitInitialReady(syncConfig, configuredTables, db, source);
+		}
+
+		async function maybeEmitInitialReady(syncConfig, configuredTables, db, source) {
+			const scopeKey = getScopeKey(configuredTables);
+			const state = await readScopeState(scopeKey, db);
+			const isReady = isInitialReadyState(state, syncConfig.initialReadyMaxAgeMs);
+			if (!isReady) {
+				initialReadyEmitted = false;
+				return null;
+			}
+			const payload = {
+				tables: configuredTables.slice(),
+				since: state.since,
+				updatedAtMs: state.updatedAtMs,
+				source
+			};
+			if (!initialReadyEmitted) {
+				initialReadyEmitted = true;
+				emitInitialReady(payload);
+			}
+			return payload;
+		}
+
+		function emitInitialReady(payload) {
+			for (const listener of Array.from(initialReadyListeners)) {
+				listener(payload);
+			}
+		}
+	}
+
+	function normalizeSyncConfig(sync) {
+		if (!sync)
+			return null;
+
+		if (typeof sync === 'string')
+			return normalizePullConfig(sync, undefined, undefined);
+
+		if (sync !== Object(sync))
+			throw new Error('Invalid sqlite sync configuration');
+		if ('endpoint' in sync)
+			throw new Error('Invalid sqlite sync configuration: use "sync.url" (not "sync.endpoint").');
+
+		const endpoint = normalizeEndpoint(sync.url ? sync : undefined);
+		const tables = normalizeConfiguredTables(sync.tables);
+		const initialReadyMaxAgeMs = normalizeInitialReadyMaxAgeMs(sync.initialReadyMaxAgeMs);
+		return {
+			...endpoint,
+			pull: sync.pull === undefined ? undefined : normalizePullConfig(sync.pull, endpoint, tables),
+			tables,
+			initialReadyMaxAgeMs,
+			push: normalizeEndpoint(sync.push)
+		};
+	}
+
+	function normalizePullConfig(config, fallbackEndpoint, fallbackTables) {
+		if (!config)
+			return undefined;
+		if (typeof config === 'string')
+			return { ...normalizeEndpoint(config), tables: fallbackTables };
+		if (config !== Object(config))
+			throw new Error('Invalid sqlite sync pull configuration');
+
+		const endpointOverrides = pickEndpointOverrides(config);
+		const endpoint = config.url
+			? normalizeEndpoint(config)
+			: mergeEndpoint(fallbackEndpoint, endpointOverrides);
+		const tables = normalizeConfiguredTables(config.tables) || fallbackTables;
+		if (!endpoint)
+			throw new Error('Sync pull endpoint requires "url" or sync.url');
+		return {
+			...endpoint,
+			tables,
+			patchOptions: config.patchOptions,
+			maxKeysPerBatch: config.maxKeysPerBatch,
+			maxRowsPerBatch: config.maxRowsPerBatch
+		};
+	}
+
+	function normalizeConfiguredTables(value) {
+		if (!Array.isArray(value))
+			return undefined;
+		const tables = value.filter(x => typeof x === 'string');
+		if (tables.length === 0)
+			return undefined;
+		return Array.from(new Set(tables));
+	}
+
+	function normalizeInitialReadyMaxAgeMs(value) {
+		const parsed = Number.parseInt(value, 10);
+		if (!Number.isFinite(parsed) || parsed <= 0)
+			return undefined;
+		return parsed;
+	}
+
+	function normalizeEndpoint(endpoint) {
+		if (!endpoint)
+			return undefined;
+		if (typeof endpoint === 'string')
+			return { url: endpoint };
+		if (endpoint !== Object(endpoint))
+			throw new Error('Invalid sqlite sync endpoint configuration');
+		if (!endpoint.url)
+			throw new Error('Sync endpoint requires "url"');
+		return {
+			url: endpoint.url,
+			timeoutMs: endpoint.timeoutMs
+		};
+	}
+
+	function mergeEndpoint(base, overrides) {
+		if (!base)
+			return undefined;
+		return {
+			...base,
+			...overrides
+		};
+	}
+
+	function pickEndpointOverrides(config) {
+		if (!config || config !== Object(config))
+			return {};
+		const result = {};
+		if (config.timeoutMs !== undefined)
+			result.timeoutMs = config.timeoutMs;
+		return result;
+	}
+
+	function resolvePullConfig(syncConfig, options = {}) {
+		const preferred = syncConfig.pull || syncConfig;
+		const pullConfig = normalizePullConfig(preferred, syncConfig, syncConfig.tables);
+		if (!pullConfig || !pullConfig.url)
+			throw new Error('No pull sync endpoint configured');
+		if (options.timeoutMs === undefined)
+			return pullConfig;
+		return {
+			...pullConfig,
+			timeoutMs: options.timeoutMs
+		};
+	}
+
+	async function requestPayload(config, options) {
+		const axiosRoot = _axios.default || _axios;
+		const axios = typeof axiosRoot.create === 'function' ? axiosRoot.create() : axiosRoot;
+		const axiosInterceptor = options && options._syncAxiosInterceptor;
+		if (axiosInterceptor && typeof axiosInterceptor.applyTo === 'function')
+			axiosInterceptor.applyTo(axios);
+		const requestBody = config.body !== undefined ? config.body : {
+			since: options.since,
+			tables: options.tables
+		};
+
+		const request = {
+			url: appendQueryParam(config.url, 'sync', 'pull'),
+			method: 'post',
+			timeout: config.timeoutMs
+		};
+		request.data = requestBody;
+
+		const response = await axios.request(request);
+		return response.data;
+	}
+
+	function appendQueryParam(url, key, value) {
+		if (typeof url !== 'string')
+			return url;
+		const encodedKey = encodeURIComponent(key);
+		const encodedValue = encodeURIComponent(value);
+		const pair = `${encodedKey}=${encodedValue}`;
+		if (url.includes(`${encodedKey}=`))
+			return url;
+		return `${url}${url.includes('?') ? '&' : '?'}${pair}`;
+	}
+
+	function isStagedKeysPayload(payload) {
+		return payload
+			&& payload === Object(payload)
+			&& payload.phase === 'keys'
+			&& Array.isArray(payload.items)
+			&& 'done' in payload;
+	}
+
+	function isRowsPayload(payload) {
+		return payload
+			&& payload === Object(payload)
+			&& payload.phase === 'rows'
+			&& Array.isArray(payload.items);
+	}
+
+	function normalizeKeyItems(items) {
+		if (!Array.isArray(items))
+			return [];
+		const result = [];
+		for (let i = 0; i < items.length; i++) {
+			const item = items[i];
+			if (!item || typeof item.table !== 'string')
+				continue;
+			if (!Array.isArray(item.pk))
+				continue;
+			result.push({
+				table: item.table,
+				pk: item.pk,
+				key: item.key,
+				op: normalizeChangeOp(item.op)
+			});
+		}
+		return result;
+	}
+
+	async function applyDeleteItemsOnTx(tx, items, patchOptions) {
+		const deletes = Array.isArray(items) ? items : [];
+		const perTable = new Map();
+		for (let i = 0; i < deletes.length; i++) {
+			const item = deletes[i];
+			if (!item || typeof item.table !== 'string' || !Array.isArray(item.pk))
+				continue;
+			if (!perTable.has(item.table))
+				perTable.set(item.table, []);
+			perTable.get(item.table).push({
+				op: 'remove',
+				path: `/${JSON.stringify(item.pk)}`
+			});
+		}
+
+		const tableNames = orderTablesByDependencies(tx, Array.from(perTable.keys())).reverse();
+		let applied = 0;
+		for (let i = 0; i < tableNames.length; i++) {
+			const table = tableNames[i];
+			if (!tx[table] || typeof tx[table].patch !== 'function')
+				throw new Error(`Table "${table}" does not exist in this client`);
+			const patch = perTable.get(table);
+			await tx[table].patch(patch, patchOptions);
+			applied += patch.length;
+		}
+		return applied;
+	}
+
+	async function applyRowsPayloadOnTx(tx, items, patchOptions) {
+		const rows = Array.isArray(items) ? items : [];
+		const perTable = new Map();
+		for (let i = 0; i < rows.length; i++) {
+			const item = rows[i];
+			if (!item || typeof item.table !== 'string' || !Array.isArray(item.pk) || item.row === undefined)
+				continue;
+			if (!perTable.has(item.table))
+				perTable.set(item.table, []);
+			perTable.get(item.table).push({
+				op: 'replace',
+				path: `/${JSON.stringify(item.pk)}`,
+				value: item.row
+			});
+		}
+		const tableNames = orderTablesByDependencies(tx, Array.from(perTable.keys()));
+		if (tableNames.length === 0)
+			return 0;
+
+		let applied = 0;
+		for (let i = 0; i < tableNames.length; i++) {
+			const table = tableNames[i];
+			if (!tx[table] || typeof tx[table].patch !== 'function')
+				throw new Error(`Table "${table}" does not exist in this client`);
+			const patch = perTable.get(table);
+			await tx[table].patch(patch, patchOptions);
+			applied += patch.length;
+		}
+		return applied;
+	}
+
+	function orderTablesByDependencies(client, tableNames) {
+		if (!Array.isArray(tableNames) || tableNames.length <= 1)
+			return tableNames || [];
+		const dependencyMap = buildDependencyMap(client);
+		const pending = new Set(tableNames);
+		const ordered = [];
+		while (pending.size > 0) {
+			let progressed = false;
+			for (let i = 0; i < tableNames.length; i++) {
+				const name = tableNames[i];
+				if (!pending.has(name))
+					continue;
+				const deps = dependencyMap.get(name) || new Set();
+				let blocked = false;
+				for (let dep of deps) {
+					if (pending.has(dep)) {
+						blocked = true;
+						break;
+					}
+				}
+				if (!blocked) {
+					pending.delete(name);
+					ordered.push(name);
+					progressed = true;
+				}
+			}
+			if (!progressed) {
+				for (let i = 0; i < tableNames.length; i++) {
+					const name = tableNames[i];
+					if (pending.has(name)) {
+						pending.delete(name);
+						ordered.push(name);
+					}
+				}
+			}
+		}
+		return ordered;
+	}
+
+	function buildDependencyMap(client) {
+		const dependencyMap = new Map();
+		const tables = client && client.tables ? client.tables : {};
+		const names = Object.keys(tables);
+		const nameByTableObject = new Map();
+		for (let i = 0; i < names.length; i++) {
+			const name = names[i];
+			const table = tables[name];
+			if (table)
+				nameByTableObject.set(table, name);
+			dependencyMap.set(name, new Set());
+		}
+
+		for (let i = 0; i < names.length; i++) {
+			const table = tables[names[i]];
+			if (!table || !table._relations)
+				continue;
+			const relations = table._relations;
+			for (let relationName in relations) {
+				const relation = relations[relationName];
+				const join = extractJoinRelation(relation);
+				if (!join)
+					continue;
+				const fromName = nameByTableObject.get(join.parentTable);
+				const toName = nameByTableObject.get(join.childTable);
+				if (!fromName || !toName || fromName === toName)
+					continue;
+				dependencyMap.get(fromName).add(toName);
+			}
+		}
+		return dependencyMap;
+	}
+
+	function extractJoinRelation(relation) {
+		if (!relation || typeof relation.accept !== 'function')
+			return;
+		let join;
+		relation.accept({
+			visitJoin: function(current) {
+				join = current;
+			},
+			visitOne: function(current) {
+				join = current && current.joinRelation;
+			},
+			visitMany: function(current) {
+				join = current && current.joinRelation;
+			}
+		});
+		return join;
+	}
+
+	function normalizeChangeOp(value) {
+		if (typeof value !== 'string')
+			return 'U';
+		const op = value.toUpperCase();
+		if (op === 'I' || op === 'U' || op === 'D')
+			return op;
+		return 'U';
+	}
+
+	async function tryDeferForeignKeys(tx) {
+		if (!tx || typeof tx.query !== 'function')
+			return;
+		try {
+			await tx.query('PRAGMA defer_foreign_keys = ON');
+		}
+		catch (_e) {
+			// Non-sqlite engines can safely ignore this pragma.
+		}
+	}
+
+	async function validateForeignKeys(tx) {
+		if (!tx || typeof tx.query !== 'function')
+			return;
+		try {
+			const rows = await tx.query('PRAGMA foreign_key_check');
+			if (Array.isArray(rows) && rows.length > 0) {
+				const first = rows[0];
+				throw new Error(`Foreign key validation failed after sync apply (${first.table || 'unknown table'})`);
+			}
+		}
+		catch (e) {
+			if (e && typeof e.message === 'string' && e.message.startsWith('Foreign key validation failed'))
+				throw e;
+			// Ignore on engines that do not support pragma.
+		}
+	}
+
+	function normalizeLimit(value, fallback) {
+		const parsed = Number.parseInt(value, 10);
+		if (!Number.isFinite(parsed) || parsed <= 0)
+			return fallback;
+		return Math.min(parsed, 10000);
+	}
+
+	function extractTablePatches(payload) {
+		if (!payload)
+			return [];
+		if (Array.isArray(payload))
+			return payload.map(normalizeTablePatch);
+		if (payload.table && payload.patch)
+			return [normalizeTablePatch(payload)];
+		if (payload.tables !== undefined)
+			return normalizeTablePatchList(payload.tables);
+		if (payload.patches !== undefined)
+			return normalizeTablePatchList(payload.patches);
+		return [];
+	}
+
+	function normalizeTablePatchList(input) {
+		if (Array.isArray(input))
+			return input.map(normalizeTablePatch);
+		if (input !== Object(input))
+			throw new Error('Invalid sync patch payload');
+		const result = [];
+		const names = Object.keys(input);
+		for (let i = 0; i < names.length; i++) {
+			const table = names[i];
+			const value = input[table];
+			if (Array.isArray(value))
+				result.push(normalizeTablePatch({ table, patch: value }));
+			else
+				result.push(normalizeTablePatch({ table, ...value }));
+		}
+		return result;
+	}
+
+	function normalizeTablePatch(entry) {
+		if (!entry || typeof entry.table !== 'string')
+			throw new Error('Each sync patch entry must contain "table"');
+		if (!Array.isArray(entry.patch))
+			throw new Error(`Sync patch entry for "${entry.table}" must contain "patch" array`);
+		return {
+			table: entry.table,
+			patch: entry.patch,
+			options: entry.options
+		};
+	}
+
+	function shouldFallbackToPatch(error) {
+		const message = extractErrorMessage(error);
+		if (!message)
+			return false;
+		return message.includes('staged keys payload')
+			|| message.includes('staged rows payload')
+			|| message.includes('Invalid sync phase');
+	}
+
+	function extractErrorMessage(error) {
+		if (!error)
+			return '';
+		if (typeof error.message === 'string' && error.message)
+			return error.message;
+		if (typeof error.response?.data === 'string')
+			return error.response.data;
+		return '';
+	}
+
+	function isInitialReadyState(state, maxAgeMs) {
+		if (!state || state.since === undefined || state.since === null)
+			return false;
+		if (maxAgeMs === undefined)
+			return true;
+		if (!Number.isFinite(state.updatedAtMs))
+			return false;
+		return Date.now() - state.updatedAtMs <= maxAgeMs;
+	}
+
+	function sqlStringLiteral(value) {
+		return `'${String(value).replace(/'/g, '\'\'')}'`;
+	}
+
+	syncClient = newSyncClient;
+	return syncClient;
+}
+
 var client;
 var hasRequiredClient;
 
@@ -3179,6 +4580,7 @@ function requireClient () {
 	const clone = require$$5;
 	const createAxiosInterceptor = requireAxiosInterceptor();
 	const flags = requireFlags();
+	const newSyncClient = requireSyncClient();
 
 	function rdbClient(options = {}) {
 		flags.useLazyDefaults = false;
@@ -3236,6 +4638,7 @@ function requireClient () {
 		client.mysql = onProvider.bind(null, 'mysql');
 		client.express = express;
 		client.hono = hono;
+		client.syncClient = newSyncClient(client, getDb, axiosInterceptor);
 		client.close = close;
 
 		function close() {
@@ -11008,8 +12411,7 @@ var hasRequiredNewId;
 function requireNewId () {
 	if (hasRequiredNewId) return newId;
 	hasRequiredNewId = 1;
-	const { v4 : uuid} = require$$0$2;
-	newId = uuid;
+	newId = requireRandomUuid();
 	return newId;
 }
 
@@ -12393,7 +13795,7 @@ var hasRequiredApplyPatch;
 function requireApplyPatch () {
 	if (hasRequiredApplyPatch) return applyPatch_1;
 	hasRequiredApplyPatch = 1;
-	const fastjson = require$$0$3;
+	const fastjson = require$$0$2;
 	let fromCompareObject = requireFromCompareObject();
 	let toCompareObject = requireToCompareObject();
 	let getSessionSingleton = requireGetSessionSingleton();
@@ -13725,6 +15127,249 @@ function requireMap () {
 
 	map_1 = mapRoot;
 	return map_1;
+}
+
+var syncWorkerClient;
+var hasRequiredSyncWorkerClient;
+
+function requireSyncWorkerClient () {
+	if (hasRequiredSyncWorkerClient) return syncWorkerClient;
+	hasRequiredSyncWorkerClient = 1;
+	function createSyncWorkerClient(worker) {
+		if (!worker || typeof worker.postMessage !== 'function')
+			throw new Error('Sync worker client requires a Worker-like object.');
+
+		let nextId = 1;
+		const pending = new Map();
+		const listeners = new Map();
+
+		worker.addEventListener('message', onMessage);
+
+		return {
+			pull: request.bind(null, 'pull'),
+			push: request.bind(null, 'push'),
+			on,
+			off,
+			close
+		};
+
+		function request(method, options) {
+			const id = nextId++;
+			worker.postMessage({
+				type: 'orange-sync-request',
+				id,
+				method,
+				options
+			});
+			return new Promise((resolve, reject) => {
+				pending.set(id, { resolve, reject });
+			});
+		}
+
+		function on(event, listener) {
+			if (typeof listener !== 'function')
+				return () => {};
+			let eventListeners = listeners.get(event);
+			if (!eventListeners) {
+				eventListeners = new Set();
+				listeners.set(event, eventListeners);
+			}
+			eventListeners.add(listener);
+			return () => off(event, listener);
+		}
+
+		function off(event, listener) {
+			const eventListeners = listeners.get(event);
+			if (!eventListeners)
+				return;
+			eventListeners.delete(listener);
+			if (eventListeners.size === 0)
+				listeners.delete(event);
+		}
+
+		function close() {
+			worker.removeEventListener('message', onMessage);
+			for (const entry of pending.values()) {
+				entry.reject(new Error('Sync worker client closed.'));
+			}
+			pending.clear();
+			listeners.clear();
+		}
+
+		function onMessage(event) {
+			const message = event && event.data;
+			if (!message || message.type === undefined)
+				return;
+			if (message.type === 'orange-sync-event') {
+				emit(message.event, message.payload);
+				return;
+			}
+			if (message.type !== 'orange-sync-response')
+				return;
+			const entry = pending.get(message.id);
+			if (!entry)
+				return;
+			pending.delete(message.id);
+			if (message.error)
+				entry.reject(toError(message.error));
+			else
+				entry.resolve(message.result);
+		}
+
+		function emit(event, payload) {
+			const eventListeners = listeners.get(event);
+			if (!eventListeners)
+				return;
+			for (const listener of Array.from(eventListeners)) {
+				listener(payload);
+			}
+		}
+	}
+
+	function toError(error) {
+		const e = new Error(error && error.message ? error.message : 'Sync worker request failed.');
+		if (error && error.name)
+			e.name = error.name;
+		if (error && error.stack)
+			e.stack = error.stack;
+		return e;
+	}
+
+	syncWorkerClient = createSyncWorkerClient;
+	return syncWorkerClient;
+}
+
+var syncWorkerHandler;
+var hasRequiredSyncWorkerHandler;
+
+function requireSyncWorkerHandler () {
+	if (hasRequiredSyncWorkerHandler) return syncWorkerHandler;
+	hasRequiredSyncWorkerHandler = 1;
+	function createSyncWorkerHandler(syncClient, options = {}) {
+		if (!syncClient)
+			throw new Error('Sync worker handler requires a sync client.');
+
+		let running = false;
+		let currentDrainPromise = null;
+		let pushRequested = false;
+		let pullRequested = false;
+		let lastPushOptions;
+		let lastPullOptions;
+		const postMessage = options.postMessage || ((message) => {
+			const target = getPostTarget();
+			if (target)
+				target.postMessage(message);
+		});
+
+		return {
+			handleMessage,
+			pull: requestPull,
+			push: requestPush
+		};
+
+		async function handleMessage(event) {
+			const message = event && event.data;
+			if (!message || message.type !== 'orange-sync-request')
+				return;
+			try {
+				let result;
+				if (message.method === 'pull')
+					result = await requestPull(message.options);
+				else if (message.method === 'push')
+					result = await requestPush(message.options);
+				else
+					throw new Error(`Unknown sync worker method "${message.method}".`);
+				postResponse(message.id, result);
+			}
+			catch (e) {
+				postResponse(message.id, undefined, e);
+			}
+		}
+
+		function requestPush(options) {
+			pushRequested = true;
+			lastPushOptions = options;
+			return drainSyncQueue();
+		}
+
+		function requestPull(options) {
+			pullRequested = true;
+			lastPullOptions = options;
+			return drainSyncQueue();
+		}
+
+		function drainSyncQueue() {
+			if (running)
+				return currentDrainPromise;
+
+			running = true;
+			currentDrainPromise = run()
+				.finally(() => {
+					running = false;
+					currentDrainPromise = null;
+				});
+			return currentDrainPromise;
+		}
+
+		async function run() {
+			let lastResult;
+			while (pushRequested || pullRequested) {
+				if (pushRequested) {
+					pushRequested = false;
+					lastResult = await callSyncMethod('push', lastPushOptions);
+					if (syncClient.pull)
+						pullRequested = true;
+					continue;
+				}
+
+				if (pullRequested) {
+					pullRequested = false;
+					if (!pushRequested)
+						lastResult = await callSyncMethod('pull', lastPullOptions);
+				}
+			}
+			return lastResult;
+		}
+
+		function callSyncMethod(method, options) {
+			const fn = syncClient && syncClient[method];
+			if (typeof fn !== 'function') {
+				return {
+					method,
+					skipped: true,
+					reason: `${method}_not_implemented`
+				};
+			}
+			return fn.call(syncClient, options);
+		}
+
+		function postResponse(id, result, error) {
+			postMessage({
+				type: 'orange-sync-response',
+				id,
+				result,
+				error: error ? serializeError(error) : undefined
+			});
+		}
+	}
+
+	function serializeError(error) {
+		return {
+			name: error && error.name,
+			message: error && error.message ? error.message : String(error),
+			stack: error && error.stack
+		};
+	}
+
+	function getPostTarget() {
+		if (typeof self !== 'undefined' && typeof self.postMessage === 'function')
+			return self;
+		if (typeof globalThis !== 'undefined' && typeof globalThis.postMessage === 'function')
+			return globalThis;
+	}
+
+	syncWorkerHandler = createSyncWorkerHandler;
+	return syncWorkerHandler;
 }
 
 var commitCommand;
@@ -17167,6 +18812,8 @@ function requireIndexBrowser () {
 		return client.apply(null, arguments);
 	};
 	connectViaPool.createPatch = client.createPatch;
+	connectViaPool.createSyncWorkerClient = requireSyncWorkerClient();
+	connectViaPool.createSyncWorkerHandler = requireSyncWorkerHandler();
 	connectViaPool.table = requireTable();
 	connectViaPool.filter = requireEmptyFilter();
 	connectViaPool.commit = requireCommit();

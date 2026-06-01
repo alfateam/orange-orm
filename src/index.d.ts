@@ -30,6 +30,8 @@ declare namespace r {
 	): MappedDbDef<MergeProperties<V, V>>;
     function createPatch(original: any[], modified: any[]): JsonPatch;
     function createPatch(original: any, modified: any): JsonPatch;
+    function createSyncWorkerClient(worker: SyncWorkerLike): SyncWorkerClient;
+    function createSyncWorkerHandler(syncClient: SyncWorkerSyncClient, options?: SyncWorkerHandlerOptions): SyncWorkerHandler;
 
     type JsonPatch = Array<{
         op: 'add' | 'remove' | 'replace' | 'copy' | 'move' | 'test';
@@ -37,6 +39,35 @@ declare namespace r {
         value?: any;
         from?: string;
     }>;
+
+    export interface SyncWorkerLike {
+        postMessage(message: unknown): void;
+        addEventListener(type: 'message', listener: (event: { data: unknown }) => void): void;
+        removeEventListener(type: 'message', listener: (event: { data: unknown }) => void): void;
+    }
+
+    export interface SyncWorkerClient {
+        pull(options?: unknown): Promise<unknown>;
+        push(options?: unknown): Promise<unknown>;
+        on(event: string, listener: (payload: unknown) => void): () => void;
+        off(event: string, listener: (payload: unknown) => void): void;
+        close(): void;
+    }
+
+    export interface SyncWorkerSyncClient {
+        pull?(options?: unknown): Promise<unknown> | unknown;
+        push?(options?: unknown): Promise<unknown> | unknown;
+    }
+
+    export interface SyncWorkerHandlerOptions {
+        postMessage?: (message: unknown) => void;
+    }
+
+    export interface SyncWorkerHandler {
+        handleMessage(event: { data: unknown }): Promise<void>;
+        pull(options?: unknown): Promise<unknown>;
+        push(options?: unknown): Promise<unknown>;
+    }
 
     export interface QueryEvent {
         sql: string,
