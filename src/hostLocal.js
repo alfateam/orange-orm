@@ -5,6 +5,10 @@ let executeQuery = require('./query');
 let executeSqliteFunction = require('./sqliteFunction');
 let hostExpress = require('./hostExpress');
 let hostHono = require('./hostHono');
+let randomUuid = require('./randomUuid');
+let stringify = require('./client/stringify');
+let getSessionSingleton = require('./table/getSessionSingleton');
+let outboxTableSql = require('./sync/outboxTableSql');
 const readonlyOps = ['getManyDto', 'getMany', 'aggregate', 'distinct', 'count'];
 // { db, table, defaultConcurrency,
 // 	concurrency,
@@ -52,6 +56,7 @@ function hostLocal() {
 		async function fn(context) {
 			setSessionSingleton(context, 'ignoreSerializable', true);
 			let patch = body.patch;
+			await captureSyncOutboxPatch(context, patch, body.options);
 			result = await table.patch(context, patch, { ..._options, ...body.options, isHttp });
 		}
 	}
@@ -173,6 +178,48 @@ function hostLocal() {
 	}
 
 	return c;
+
+	async function captureSyncOutboxPatch(context, patch, options) {
+		if (!Array.isArray(patch) || patch.length === 0)
+			return;
+		if (getSessionSingleton(context, 'suppressSyncOutbox'))
+			return;
+		const pool = getSessionSingleton(context, 'poolFactory');
+		if (!pool || !pool.__sqliteSync)
+			return;
+		const tableName = _options.syncTableName;
+		if (!tableName)
+			return;
+		let state = getSessionSingleton(context, 'syncOutboxCapture');
+		if (!state) {
+			state = { id: randomUuid(), patches: [] };
+			setSessionSingleton(context, 'syncOutboxCapture', state);
+			await querySyncOutbox(context, outboxTableSql());
+			await querySyncOutbox(context, [
+				'INSERT INTO "orange_sync_outbox" ("mutation_id", "table_name", "patch_json", "options_json", "created_at_ms")',
+				`VALUES (${sqlStringLiteral(state.id)}, '*', '[]', '{}', ${Date.now()})`,
+				'ON CONFLICT("mutation_id") DO NOTHING'
+			].join(' '));
+		}
+		state.patches.push({
+			table: tableName,
+			patch,
+			options: options || undefined
+		});
+		await querySyncOutbox(context, [
+			'UPDATE "orange_sync_outbox"',
+			`SET "patch_json" = ${sqlStringLiteral(stringify(state.patches))}`,
+			`WHERE "mutation_id" = ${sqlStringLiteral(state.id)}`
+		].join(' '));
+	}
+
+	function querySyncOutbox(context, sql) {
+		return executeQuery(context, sql);
+	}
+
+	function sqlStringLiteral(value) {
+		return `'${String(value).replace(/'/g, '\'\'')}'`;
+	}
 }
 
 module.exports = hostLocal;

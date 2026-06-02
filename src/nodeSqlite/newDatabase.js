@@ -16,6 +16,7 @@ function newDatabase(connectionString, poolOptions) {
 		throw new Error('Connection string cannot be empty');
 	poolOptions = poolOptions || { min: 1 };
 	var pool = newPool(connectionString, poolOptions);
+	pool.__sqliteSync = poolOptions && poolOptions.sync;
 
 	let c = { poolFactory: pool, hostLocal, express, hono };
 

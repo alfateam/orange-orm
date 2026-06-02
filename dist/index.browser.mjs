@@ -794,34 +794,28 @@ function requireSync () {
 			const results = [];
 			let applied = 0;
 			let duplicates = 0;
-			await client.transaction(async (tx) => {
-				for (let i = 0; i < mutations.length; i++) {
-					const mutation = mutations[i];
+			for (let i = 0; i < mutations.length; i++) {
+				const mutation = mutations[i];
+				await client.transaction(async (tx) => {
 					const claim = await claimAppliedMutation(tx, clientId, mutation.id);
 					if (!claim.claimed) {
 						duplicates += 1;
 						results.push({ id: mutation.id, table: mutation.table, ...(claim.result || {}), duplicate: true });
-						continue;
+						return;
 					}
-					const table = tx[mutation.table];
-					if (!table || typeof table.patch !== 'function') {
-						const error = new Error(`Table "${mutation.table}" is not exposed or does not exist`);
-						error.status = 400;
-						throw error;
-					}
-					const patchResult = await table.patch(mutation.patch, mutation.options || {});
+					const patchResult = await applyMutationPatches(tx, mutation);
 					const result = {
 						id: mutation.id,
 						table: mutation.table,
 						applied: true,
-						changed: Array.isArray(patchResult && patchResult.changed) ? patchResult.changed.length : 0,
+						changed: patchResult.changed,
 						result: patchResult
 					};
 					await updateAppliedMutation(tx, clientId, mutation.id, result);
 					results.push(result);
 					applied += 1;
-				}
-			});
+				});
+			}
 
 			return {
 				phase: 'push',
@@ -829,6 +823,27 @@ function requireSync () {
 				duplicates,
 				results
 			};
+		}
+
+		async function applyMutationPatches(tx, mutation) {
+			const entries = Array.isArray(mutation.patches)
+				? mutation.patches
+				: [{ table: mutation.table, patch: mutation.patch, options: mutation.options }];
+			let changed = 0;
+			const results = [];
+			for (let i = 0; i < entries.length; i++) {
+				const entry = entries[i];
+				const table = tx[entry.table];
+				if (!table || typeof table.patch !== 'function') {
+					const error = new Error(`Table "${entry.table}" is not exposed or does not exist`);
+					error.status = 400;
+					throw error;
+				}
+				const result = await table.patch(entry.patch, entry.options || mutation.options || {});
+				changed += Array.isArray(result && result.changed) ? result.changed.length : 0;
+				results.push({ table: entry.table, result });
+			}
+			return { changed, results };
 		}
 
 		async function pullKeys(body) {
@@ -1372,12 +1387,34 @@ function requireSync () {
 		const id = value.id ?? value.mutationId ?? value.mutation_id;
 		if (typeof id !== 'string' || id.length === 0)
 			return null;
+		if (Array.isArray(value.patches)) {
+			const patches = value.patches.map(normalizeMutationPatch).filter(Boolean);
+			if (patches.length === 0)
+				return null;
+			return {
+				id,
+				patches,
+				options: value.options && value.options === Object(value.options) ? value.options : undefined
+			};
+		}
+		const entry = normalizeMutationPatch(value);
+		if (!entry)
+			return null;
+		return {
+			id,
+			...entry,
+			options: value.options && value.options === Object(value.options) ? value.options : undefined
+		};
+	}
+
+	function normalizeMutationPatch(value) {
+		if (!value || value !== Object(value))
+			return null;
 		if (typeof value.table !== 'string' || value.table.length === 0)
 			return null;
 		if (!Array.isArray(value.patch))
 			return null;
 		return {
-			id,
 			table: value.table,
 			patch: value.patch,
 			options: value.options && value.options === Object(value.options) ? value.options : undefined
@@ -3308,6 +3345,34 @@ function requireSqliteFunction () {
 	return sqliteFunction;
 }
 
+var outboxTableSql_1;
+var hasRequiredOutboxTableSql;
+
+function requireOutboxTableSql () {
+	if (hasRequiredOutboxTableSql) return outboxTableSql_1;
+	hasRequiredOutboxTableSql = 1;
+	function outboxTableSql(tableName = 'orange_sync_outbox') {
+		return [
+			`CREATE TABLE IF NOT EXISTS "${tableName}" (`,
+			'"mutation_id" TEXT PRIMARY KEY,',
+			'"table_name" TEXT NOT NULL,',
+			'"patch_json" TEXT NOT NULL,',
+			'"options_json" TEXT,',
+			'"created_at_ms" INTEGER NOT NULL,',
+			'"status" TEXT NOT NULL DEFAULT \'pending\',',
+			'"last_error" TEXT,',
+			'"attempts" INTEGER NOT NULL DEFAULT 0,',
+			'"pushed_at_ms" INTEGER,',
+			'"result_json" TEXT,',
+			'CHECK ("status" IN (\'pending\', \'pushed\', \'failed\'))',
+			');'
+		].join(' ');
+	}
+
+	outboxTableSql_1 = outboxTableSql;
+	return outboxTableSql_1;
+}
+
 var hostLocal_1;
 var hasRequiredHostLocal;
 
@@ -3321,6 +3386,10 @@ function requireHostLocal () {
 	let executeSqliteFunction = requireSqliteFunction();
 	let hostExpress = requireHostExpress();
 	let hostHono = requireHostHono();
+	let randomUuid = requireRandomUuid();
+	let stringify = requireStringify();
+	let getSessionSingleton = requireGetSessionSingleton();
+	let outboxTableSql = requireOutboxTableSql();
 	const readonlyOps = ['getManyDto', 'getMany', 'aggregate', 'distinct', 'count'];
 	// { db, table, defaultConcurrency,
 	// 	concurrency,
@@ -3368,6 +3437,7 @@ function requireHostLocal () {
 			async function fn(context) {
 				setSessionSingleton(context, 'ignoreSerializable', true);
 				let patch = body.patch;
+				await captureSyncOutboxPatch(context, patch, body.options);
 				result = await table.patch(context, patch, { ..._options, ...body.options, isHttp });
 			}
 		}
@@ -3489,6 +3559,48 @@ function requireHostLocal () {
 		}
 
 		return c;
+
+		async function captureSyncOutboxPatch(context, patch, options) {
+			if (!Array.isArray(patch) || patch.length === 0)
+				return;
+			if (getSessionSingleton(context, 'suppressSyncOutbox'))
+				return;
+			const pool = getSessionSingleton(context, 'poolFactory');
+			if (!pool || !pool.__sqliteSync)
+				return;
+			const tableName = _options.syncTableName;
+			if (!tableName)
+				return;
+			let state = getSessionSingleton(context, 'syncOutboxCapture');
+			if (!state) {
+				state = { id: randomUuid(), patches: [] };
+				setSessionSingleton(context, 'syncOutboxCapture', state);
+				await querySyncOutbox(context, outboxTableSql());
+				await querySyncOutbox(context, [
+					'INSERT INTO "orange_sync_outbox" ("mutation_id", "table_name", "patch_json", "options_json", "created_at_ms")',
+					`VALUES (${sqlStringLiteral(state.id)}, '*', '[]', '{}', ${Date.now()})`,
+					'ON CONFLICT("mutation_id") DO NOTHING'
+				].join(' '));
+			}
+			state.patches.push({
+				table: tableName,
+				patch,
+				options: options || undefined
+			});
+			await querySyncOutbox(context, [
+				'UPDATE "orange_sync_outbox"',
+				`SET "patch_json" = ${sqlStringLiteral(stringify(state.patches))}`,
+				`WHERE "mutation_id" = ${sqlStringLiteral(state.id)}`
+			].join(' '));
+		}
+
+		function querySyncOutbox(context, sql) {
+			return executeQuery(context, sql);
+		}
+
+		function sqlStringLiteral(value) {
+			return `'${String(value).replace(/'/g, '\'\'')}'`;
+		}
 	}
 
 	hostLocal_1 = hostLocal;
@@ -4037,6 +4149,7 @@ function requireSyncClient () {
 	const randomUuid = requireRandomUuid();
 	const stringify = requireStringify();
 	const { createSyncAuto } = requireSyncAuto();
+	const outboxTableSql = requireOutboxTableSql();
 
 	function newSyncClient(client, getDb, axiosInterceptor) {
 		const sinceByScope = new Map();
@@ -4159,7 +4272,7 @@ function requireSyncClient () {
 				await tryDeferForeignKeys(tx);
 				stagedResult = await iterateStagedPull(tx);
 				await validateForeignKeys(tx);
-			});
+			}, { suppressSyncOutbox: true });
 
 			return {
 				applied,
@@ -4265,7 +4378,7 @@ function requireSyncClient () {
 						applied += entry.patch.length;
 					}
 					await validateForeignKeys(tx);
-				});
+				}, { suppressSyncOutbox: true });
 			}
 			return {
 				applied,
@@ -4303,12 +4416,34 @@ function requireSyncClient () {
 			const id = input.id ?? input.mutationId ?? input.mutation_id;
 			if (typeof id !== 'string' || id.length === 0)
 				return null;
+			if (Array.isArray(input.patches)) {
+				const patches = input.patches.map(normalizeMutationPatch).filter(Boolean);
+				if (patches.length === 0)
+					return null;
+				return {
+					id,
+					patches,
+					options: input.options
+				};
+			}
+			const entry = normalizeMutationPatch(input);
+			if (!entry)
+				return null;
+			return {
+				id,
+				...entry,
+				options: input.options
+			};
+		}
+
+		function normalizeMutationPatch(input) {
+			if (!input || input !== Object(input))
+				return null;
 			if (typeof input.table !== 'string' || input.table.length === 0)
 				return null;
 			if (!Array.isArray(input.patch))
 				return null;
 			return {
-				id,
 				table: input.table,
 				patch: input.patch,
 				options: input.options
@@ -4364,21 +4499,7 @@ function requireSyncClient () {
 		}
 
 		async function ensureSyncOutboxTable(db) {
-			await db.query([
-				`CREATE TABLE IF NOT EXISTS "${syncOutboxTable}" (`,
-				'"mutation_id" TEXT PRIMARY KEY,',
-				'"table_name" TEXT NOT NULL,',
-				'"patch_json" TEXT NOT NULL,',
-				'"options_json" TEXT,',
-				'"created_at_ms" INTEGER NOT NULL,',
-				'"status" TEXT NOT NULL DEFAULT \'pending\',',
-				'"last_error" TEXT,',
-				'"attempts" INTEGER NOT NULL DEFAULT 0,',
-				'"pushed_at_ms" INTEGER,',
-				'"result_json" TEXT,',
-				'CHECK ("status" IN (\'pending\', \'pushed\', \'failed\'))',
-				');'
-			].join(' '));
+			await db.query(outboxTableSql(syncOutboxTable));
 		}
 
 		async function getClientId(db) {
@@ -4420,10 +4541,18 @@ function requireSyncClient () {
 			if (typeof id !== 'string' || typeof table !== 'string' || typeof patchJson !== 'string')
 				return null;
 			try {
+				const parsedPatch = JSON.parse(patchJson);
+				if (table === '*') {
+					return {
+						id,
+						patches: parsedPatch,
+						options: optionsJson ? JSON.parse(optionsJson) : undefined
+					};
+				}
 				return {
 					id,
 					table,
-					patch: JSON.parse(patchJson),
+					patch: parsedPatch,
 					options: optionsJson ? JSON.parse(optionsJson) : undefined
 				};
 			}
@@ -5053,6 +5182,7 @@ function requireClient () {
 	const createAxiosInterceptor = requireAxiosInterceptor();
 	const flags = requireFlags();
 	const newSyncClient = requireSyncClient();
+	const setSessionSingleton = requireSetSessionSingleton();
 
 	function rdbClient(options = {}) {
 		flags.useLazyDefaults = false;
@@ -5110,7 +5240,6 @@ function requireClient () {
 		client.mysql = onProvider.bind(null, 'mysql');
 		client.express = express;
 		client.hono = hono;
-		client.syncClient = newSyncClient(client, getDb, axiosInterceptor);
 		client.close = close;
 
 		function close() {
@@ -5129,6 +5258,7 @@ function requireClient () {
 			client.tables = options.tables;
 			// return client;
 		}
+		client.syncClient = newSyncClient(client, getDb, axiosInterceptor);
 		// else {
 		let handler = {
 			get(_target, property,) {
@@ -5235,9 +5365,18 @@ function requireClient () {
 			if (!db.createTransaction)
 				throw new Error('Transaction not supported through http');
 			const transaction = db.createTransaction(_options);
+			const wrappedTransaction = async (innerFn) => {
+				return transaction(async (context) => {
+					if (_options && _options.suppressSyncOutbox)
+						setSessionSingleton(context, 'suppressSyncOutbox', true);
+					return innerFn(context);
+				});
+			};
+			wrappedTransaction.commit = transaction.commit;
+			wrappedTransaction.rollback = transaction.rollback;
 
 			try {
-				const nextClient = client({ transaction });
+				const nextClient = client({ transaction: wrappedTransaction });
 				const result = await fn(nextClient);
 				transaction.done = true;
 				await transaction(transaction.commit);
@@ -5250,7 +5389,7 @@ function requireClient () {
 
 		function table(url, tableName, tableOptions) {
 			tableOptions = tableOptions || {};
-			tableOptions = { db: baseUrl, ...tableOptions, transaction };
+			tableOptions = { db: baseUrl, ...tableOptions, transaction, syncTableName: tableName };
 			let meta;
 			let c = {
 				count,

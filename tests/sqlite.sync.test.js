@@ -345,4 +345,42 @@ describe('sqlite staged pull sync', () => {
 		expect(row.name).toBe('After');
 		expect(afterCount).toBe(beforeCount + 1);
 	});
+
+	test('captures multiple saveChanges in one local transaction as one push mutation', async () => {
+		await localDb.query('DROP TABLE IF EXISTS "orange_sync_outbox"');
+		await localDb.query('DELETE FROM customer WHERE id IN (70, 71)');
+		await remoteDb.query('DELETE FROM customer WHERE id IN (70, 71)');
+		await remoteDb.customer.insert([
+			{ id: 70, name: 'One', balance: 70, isActive: true },
+			{ id: 71, name: 'Two', balance: 71, isActive: true }
+		]);
+		await localDb.customer.insert([
+			{ id: 70, name: 'One', balance: 70, isActive: true },
+			{ id: 71, name: 'Two', balance: 71, isActive: true }
+		]);
+		await localDb.query('DROP TABLE IF EXISTS "orange_sync_outbox"');
+
+		await localDb.transaction(async (tx) => {
+			const one = await tx.customer.getById(70);
+			one.name = 'One2';
+			await one.saveChanges();
+
+			const two = await tx.customer.getById(71);
+			two.name = 'Two2';
+			await two.saveChanges();
+		});
+
+		const outboxRows = await localDb.query('SELECT mutation_id, table_name, patch_json FROM "orange_sync_outbox" WHERE status = \'pending\'');
+		expect(outboxRows).toHaveLength(1);
+		expect(outboxRows[0].table_name ?? outboxRows[0].TABLE_NAME).toBe('*');
+		expect(JSON.parse(outboxRows[0].patch_json ?? outboxRows[0].PATCH_JSON)).toHaveLength(2);
+
+		const result = await localDb.syncClient.push({ clientId: 'sqlite-sync-test-client-transaction' });
+		const oneRemote = await remoteDb.customer.getById(70);
+		const twoRemote = await remoteDb.customer.getById(71);
+
+		expect(result.applied).toBe(1);
+		expect(oneRemote.name).toBe('One2');
+		expect(twoRemote.name).toBe('Two2');
+	});
 });

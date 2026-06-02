@@ -2,6 +2,7 @@ const _axios = require('axios');
 const randomUuid = require('../randomUuid');
 const stringify = require('./stringify');
 const { createSyncAuto } = require('./syncAuto');
+const outboxTableSql = require('../sync/outboxTableSql');
 
 function newSyncClient(client, getDb, axiosInterceptor) {
 	const sinceByScope = new Map();
@@ -84,26 +85,6 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		return sendPush(pushConfig, pushOptions.clientId, pushOptions.mutations);
 	}
 
-	async function enqueue(mutation) {
-		const db = await getDb();
-		const normalized = normalizePushMutation(mutation);
-		if (!normalized)
-			throw new Error('Invalid sync mutation. Expected { id, table, patch }.');
-		await ensureSyncOutboxTable(db);
-		await db.query([
-			`INSERT INTO "${syncOutboxTable}" ("mutation_id", "table_name", "patch_json", "options_json", "created_at_ms")`,
-			`VALUES (${sqlStringLiteral(normalized.id)}, ${sqlStringLiteral(normalized.table)}, ${sqlStringLiteral(stringify(normalized.patch))}, ${sqlStringLiteral(stringify(normalized.options || {}))}, ${Date.now()})`,
-			'ON CONFLICT("mutation_id") DO NOTHING'
-		].join(' '));
-		return normalized;
-	}
-
-	async function getPending(options = {}) {
-		const db = await getDb();
-		const limit = normalizeLimit(options.limit, 100);
-		return readPendingMutations(db, limit);
-	}
-
 	async function pushPending(options = {}) {
 		const db = await getDb();
 		const syncConfig = options._syncConfig || normalizeSyncConfig(db && db.__sqliteSync);
@@ -144,7 +125,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 			await tryDeferForeignKeys(tx);
 			stagedResult = await iterateStagedPull(tx);
 			await validateForeignKeys(tx);
-		});
+		}, { suppressSyncOutbox: true });
 
 		return {
 			applied,
@@ -250,7 +231,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 					applied += entry.patch.length;
 				}
 				await validateForeignKeys(tx);
-			});
+			}, { suppressSyncOutbox: true });
 		}
 		return {
 			applied,
@@ -288,12 +269,34 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		const id = input.id ?? input.mutationId ?? input.mutation_id;
 		if (typeof id !== 'string' || id.length === 0)
 			return null;
+		if (Array.isArray(input.patches)) {
+			const patches = input.patches.map(normalizeMutationPatch).filter(Boolean);
+			if (patches.length === 0)
+				return null;
+			return {
+				id,
+				patches,
+				options: input.options
+			};
+		}
+		const entry = normalizeMutationPatch(input);
+		if (!entry)
+			return null;
+		return {
+			id,
+			...entry,
+			options: input.options
+		};
+	}
+
+	function normalizeMutationPatch(input) {
+		if (!input || input !== Object(input))
+			return null;
 		if (typeof input.table !== 'string' || input.table.length === 0)
 			return null;
 		if (!Array.isArray(input.patch))
 			return null;
 		return {
-			id,
 			table: input.table,
 			patch: input.patch,
 			options: input.options
@@ -349,21 +352,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 	}
 
 	async function ensureSyncOutboxTable(db) {
-		await db.query([
-			`CREATE TABLE IF NOT EXISTS "${syncOutboxTable}" (`,
-			'"mutation_id" TEXT PRIMARY KEY,',
-			'"table_name" TEXT NOT NULL,',
-			'"patch_json" TEXT NOT NULL,',
-			'"options_json" TEXT,',
-			'"created_at_ms" INTEGER NOT NULL,',
-			'"status" TEXT NOT NULL DEFAULT \'pending\',',
-			'"last_error" TEXT,',
-			'"attempts" INTEGER NOT NULL DEFAULT 0,',
-			'"pushed_at_ms" INTEGER,',
-			'"result_json" TEXT,',
-			'CHECK ("status" IN (\'pending\', \'pushed\', \'failed\'))',
-			');'
-		].join(' '));
+		await db.query(outboxTableSql(syncOutboxTable));
 	}
 
 	async function getClientId(db) {
@@ -405,10 +394,18 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		if (typeof id !== 'string' || typeof table !== 'string' || typeof patchJson !== 'string')
 			return null;
 		try {
+			const parsedPatch = JSON.parse(patchJson);
+			if (table === '*') {
+				return {
+					id,
+					patches: parsedPatch,
+					options: optionsJson ? JSON.parse(optionsJson) : undefined
+				};
+			}
 			return {
 				id,
 				table,
-				patch: JSON.parse(patchJson),
+				patch: parsedPatch,
 				options: optionsJson ? JSON.parse(optionsJson) : undefined
 			};
 		}

@@ -11,6 +11,7 @@ const clone = require('rfdc/default');
 const createAxiosInterceptor = require('./axiosInterceptor');
 const flags = require('../flags');
 const newSyncClient = require('./syncClient');
+const setSessionSingleton = require('../table/setSessionSingleton');
 
 function rdbClient(options = {}) {
 	flags.useLazyDefaults = false;
@@ -68,7 +69,6 @@ function rdbClient(options = {}) {
 	client.mysql = onProvider.bind(null, 'mysql');
 	client.express = express;
 	client.hono = hono;
-	client.syncClient = newSyncClient(client, getDb, axiosInterceptor);
 	client.close = close;
 
 	function close() {
@@ -87,6 +87,7 @@ function rdbClient(options = {}) {
 		client.tables = options.tables;
 		// return client;
 	}
+	client.syncClient = newSyncClient(client, getDb, axiosInterceptor);
 	// else {
 	let handler = {
 		get(_target, property,) {
@@ -193,9 +194,18 @@ function rdbClient(options = {}) {
 		if (!db.createTransaction)
 			throw new Error('Transaction not supported through http');
 		const transaction = db.createTransaction(_options);
+		const wrappedTransaction = async (innerFn) => {
+			return transaction(async (context) => {
+				if (_options && _options.suppressSyncOutbox)
+					setSessionSingleton(context, 'suppressSyncOutbox', true);
+				return innerFn(context);
+			});
+		};
+		wrappedTransaction.commit = transaction.commit;
+		wrappedTransaction.rollback = transaction.rollback;
 
 		try {
-			const nextClient = client({ transaction });
+			const nextClient = client({ transaction: wrappedTransaction });
 			const result = await fn(nextClient);
 			transaction.done = true;
 			await transaction(transaction.commit);
@@ -208,7 +218,7 @@ function rdbClient(options = {}) {
 
 	function table(url, tableName, tableOptions) {
 		tableOptions = tableOptions || {};
-		tableOptions = { db: baseUrl, ...tableOptions, transaction };
+		tableOptions = { db: baseUrl, ...tableOptions, transaction, syncTableName: tableName };
 		let meta;
 		let c = {
 			count,

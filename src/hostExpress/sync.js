@@ -54,34 +54,28 @@ function newSyncHandler(client, options = {}) {
 		const results = [];
 		let applied = 0;
 		let duplicates = 0;
-		await client.transaction(async (tx) => {
-			for (let i = 0; i < mutations.length; i++) {
-				const mutation = mutations[i];
+		for (let i = 0; i < mutations.length; i++) {
+			const mutation = mutations[i];
+			await client.transaction(async (tx) => {
 				const claim = await claimAppliedMutation(tx, clientId, mutation.id);
 				if (!claim.claimed) {
 					duplicates += 1;
 					results.push({ id: mutation.id, table: mutation.table, ...(claim.result || {}), duplicate: true });
-					continue;
+					return;
 				}
-				const table = tx[mutation.table];
-				if (!table || typeof table.patch !== 'function') {
-					const error = new Error(`Table "${mutation.table}" is not exposed or does not exist`);
-					error.status = 400;
-					throw error;
-				}
-				const patchResult = await table.patch(mutation.patch, mutation.options || {});
+				const patchResult = await applyMutationPatches(tx, mutation);
 				const result = {
 					id: mutation.id,
 					table: mutation.table,
 					applied: true,
-					changed: Array.isArray(patchResult && patchResult.changed) ? patchResult.changed.length : 0,
+					changed: patchResult.changed,
 					result: patchResult
 				};
 				await updateAppliedMutation(tx, clientId, mutation.id, result);
 				results.push(result);
 				applied += 1;
-			}
-		});
+			});
+		}
 
 		return {
 			phase: 'push',
@@ -89,6 +83,27 @@ function newSyncHandler(client, options = {}) {
 			duplicates,
 			results
 		};
+	}
+
+	async function applyMutationPatches(tx, mutation) {
+		const entries = Array.isArray(mutation.patches)
+			? mutation.patches
+			: [{ table: mutation.table, patch: mutation.patch, options: mutation.options }];
+		let changed = 0;
+		const results = [];
+		for (let i = 0; i < entries.length; i++) {
+			const entry = entries[i];
+			const table = tx[entry.table];
+			if (!table || typeof table.patch !== 'function') {
+				const error = new Error(`Table "${entry.table}" is not exposed or does not exist`);
+				error.status = 400;
+				throw error;
+			}
+			const result = await table.patch(entry.patch, entry.options || mutation.options || {});
+			changed += Array.isArray(result && result.changed) ? result.changed.length : 0;
+			results.push({ table: entry.table, result });
+		}
+		return { changed, results };
 	}
 
 	async function pullKeys(body) {
@@ -632,12 +647,34 @@ function normalizeMutation(value) {
 	const id = value.id ?? value.mutationId ?? value.mutation_id;
 	if (typeof id !== 'string' || id.length === 0)
 		return null;
+	if (Array.isArray(value.patches)) {
+		const patches = value.patches.map(normalizeMutationPatch).filter(Boolean);
+		if (patches.length === 0)
+			return null;
+		return {
+			id,
+			patches,
+			options: value.options && value.options === Object(value.options) ? value.options : undefined
+		};
+	}
+	const entry = normalizeMutationPatch(value);
+	if (!entry)
+		return null;
+	return {
+		id,
+		...entry,
+		options: value.options && value.options === Object(value.options) ? value.options : undefined
+	};
+}
+
+function normalizeMutationPatch(value) {
+	if (!value || value !== Object(value))
+		return null;
 	if (typeof value.table !== 'string' || value.table.length === 0)
 		return null;
 	if (!Array.isArray(value.patch))
 		return null;
 	return {
-		id,
 		table: value.table,
 		patch: value.patch,
 		options: value.options && value.options === Object(value.options) ? value.options : undefined

@@ -941,8 +941,16 @@ export interface SyncPullOptions {
 
 export interface SyncPushMutation {
   id: string;
-  table: string;
-  patch: JsonPatch;
+  table?: string;
+  patch?: JsonPatch;
+  patches?: Array<{
+    table: string;
+    patch: JsonPatch;
+    options?: {
+      concurrency?: ConcurrencyStrategy;
+      [key: string]: unknown;
+    };
+  }>;
   options?: {
     concurrency?: ConcurrencyStrategy;
     [key: string]: unknown;
@@ -957,7 +965,7 @@ export interface SyncPushOptions {
 
 export interface SyncPushMutationResult {
   id: string;
-  table: string;
+  table?: string;
   applied?: boolean;
   duplicate?: boolean;
   changed?: number;
