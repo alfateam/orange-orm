@@ -89,7 +89,7 @@ function hostExpress(hostLocal, client, options = {}) {
 
 	async function post(request, response) {
 		try {
-			if (request.query.sync === 'pull') {
+			if (request.query.sync) {
 				if (!syncHandler) {
 					const e = new Error('Sync is not enabled for this endpoint');
 					// @ts-ignore

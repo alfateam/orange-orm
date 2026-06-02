@@ -65,6 +65,34 @@ describe('sync worker rpc', () => {
 		});
 		client.close();
 	});
+
+	test('auto-starts sync client when worker handler is created', () => {
+		let starts = 0;
+		let stops = 0;
+		const handler = createSyncWorkerHandler({
+			start: () => {
+				starts += 1;
+			},
+			stop: () => {
+				stops += 1;
+			}
+		}, { postMessage: () => {} });
+
+		expect(starts).toBe(1);
+		handler.stop();
+		expect(stops).toBe(1);
+	});
+
+	test('can disable worker auto-start', () => {
+		let starts = 0;
+		createSyncWorkerHandler({
+			start: () => {
+				starts += 1;
+			}
+		}, { postMessage: () => {}, autoStart: false });
+
+		expect(starts).toBe(0);
+	});
 });
 
 function createBridge(syncClient) {

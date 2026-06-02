@@ -927,10 +927,48 @@ export interface SyncConfig<M extends Record<string, any> = any> extends Partial
   initialReadyMaxAgeMs?: number;
   pull?: string | SyncPullOverrideConfig<M>;
   push?: string | SyncEndpointConfig;
+  auto?: boolean | {
+    enabled?: boolean;
+    intervalMs?: number;
+    push?: boolean;
+    pull?: boolean;
+  };
 }
 
 export interface SyncPullOptions {
   timeoutMs?: number;
+}
+
+export interface SyncPushMutation {
+  id: string;
+  table: string;
+  patch: JsonPatch;
+  options?: {
+    concurrency?: ConcurrencyStrategy;
+    [key: string]: unknown;
+  };
+}
+
+export interface SyncPushOptions {
+  timeoutMs?: number;
+  clientId: string;
+  mutations: SyncPushMutation[];
+}
+
+export interface SyncPushMutationResult {
+  id: string;
+  table: string;
+  applied?: boolean;
+  duplicate?: boolean;
+  changed?: number;
+  result?: unknown;
+}
+
+export interface SyncPushResult {
+  phase: 'push';
+  applied: number;
+  duplicates: number;
+  results: SyncPushMutationResult[];
 }
 
 export interface SyncInitialReadyEvent<M extends Record<string, any> = any> {
@@ -981,6 +1019,10 @@ export type DBClient<M extends Record<string, TableDefinition<M>>> = {
   readonly metaData: DbConcurrency<M>;
   syncClient: {
     pull(options?: SyncPullOptions): Promise<SyncPullResult>;
+    push(options?: Partial<SyncPushOptions>): Promise<SyncPushResult>;
+    start(): Promise<unknown> | undefined;
+    stop(): void;
+    isRunning(): boolean;
     getConfig(): Promise<SyncConfig<M> | null>;
     on(event: 'initial-ready', listener: (payload: SyncInitialReadyEvent<M>) => void): () => void;
     off(event: 'initial-ready', listener: (payload: SyncInitialReadyEvent<M>) => void): void;

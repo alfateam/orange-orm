@@ -57,16 +57,20 @@ declare namespace r {
     export interface SyncWorkerSyncClient {
         pull?(options?: unknown): Promise<unknown> | unknown;
         push?(options?: unknown): Promise<unknown> | unknown;
+        start?(): Promise<unknown> | unknown;
+        stop?(): void;
     }
 
     export interface SyncWorkerHandlerOptions {
         postMessage?: (message: unknown) => void;
+        autoStart?: boolean;
     }
 
     export interface SyncWorkerHandler {
         handleMessage(event: { data: unknown }): Promise<void>;
         pull(options?: unknown): Promise<unknown>;
         push(options?: unknown): Promise<unknown>;
+        stop(): void;
     }
 
     export interface QueryEvent {

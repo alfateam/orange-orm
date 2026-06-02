@@ -23,13 +23,72 @@ function newSyncHandler(client, options = {}) {
 
 	async function execute(body) {
 		const phase = body.phase || body.action;
+		if (phase === 'push')
+			return pushMutations(body);
 		if (phase === 'keys')
 			return pullKeys(body);
 		if (phase === 'rows')
 			return pullRows(body);
-		const error = new Error('Invalid sync phase. Use { phase: "keys" } or { phase: "rows" }.');
+		const error = new Error('Invalid sync phase. Use { phase: "keys" }, { phase: "rows" }, or { phase: "push" }.');
 		error.status = 400;
 		throw error;
+	}
+
+	async function pushMutations(body) {
+		const clientId = normalizeClientId(body.clientId ?? body.client_id);
+		const mutations = normalizeMutations(body.mutations, syncOptions.limits.maxMutationsPerBatch);
+		if (!clientId) {
+			const error = new Error('Sync push requires "clientId".');
+			error.status = 400;
+			throw error;
+		}
+		if (mutations.length === 0) {
+			return {
+				phase: 'push',
+				applied: 0,
+				duplicates: 0,
+				results: []
+			};
+		}
+
+		const results = [];
+		let applied = 0;
+		let duplicates = 0;
+		await client.transaction(async (tx) => {
+			for (let i = 0; i < mutations.length; i++) {
+				const mutation = mutations[i];
+				const claim = await claimAppliedMutation(tx, clientId, mutation.id);
+				if (!claim.claimed) {
+					duplicates += 1;
+					results.push({ id: mutation.id, table: mutation.table, ...(claim.result || {}), duplicate: true });
+					continue;
+				}
+				const table = tx[mutation.table];
+				if (!table || typeof table.patch !== 'function') {
+					const error = new Error(`Table "${mutation.table}" is not exposed or does not exist`);
+					error.status = 400;
+					throw error;
+				}
+				const patchResult = await table.patch(mutation.patch, mutation.options || {});
+				const result = {
+					id: mutation.id,
+					table: mutation.table,
+					applied: true,
+					changed: Array.isArray(patchResult && patchResult.changed) ? patchResult.changed.length : 0,
+					result: patchResult
+				};
+				await updateAppliedMutation(tx, clientId, mutation.id, result);
+				results.push(result);
+				applied += 1;
+			}
+		});
+
+		return {
+			phase: 'push',
+			applied,
+			duplicates,
+			results
+		};
 	}
 
 	async function pullKeys(body) {
@@ -319,6 +378,58 @@ function newSyncHandler(client, options = {}) {
 			return result.rows;
 		return fallback;
 	}
+
+	async function claimAppliedMutation(tx, clientId, mutationId) {
+		const rows = await safeTxQuery(tx, [
+			`INSERT INTO ${quoteQualified(syncOptions.appliedMutationsTable)} (client_id, mutation_id, result_json)`,
+			`VALUES (${sqlStringLiteral(clientId)}, ${sqlStringLiteral(mutationId)}, ${sqlJsonLiteral({ pending: true })})`,
+			'ON CONFLICT (client_id, mutation_id) DO NOTHING',
+			'RETURNING result_json'
+		].join(' '), []);
+		if (rows.length > 0)
+			return { claimed: true };
+
+		const existingRows = await safeTxQuery(tx, [
+			'SELECT result_json',
+			`FROM ${quoteQualified(syncOptions.appliedMutationsTable)}`,
+			`WHERE client_id = ${sqlStringLiteral(clientId)} AND mutation_id = ${sqlStringLiteral(mutationId)}`,
+			'LIMIT 1'
+		].join(' '), []);
+		const result = parseResultJson(existingRows[0]);
+		return { claimed: false, result };
+	}
+
+	function parseResultJson(row) {
+		if (!row)
+			return null;
+		const raw = row.result_json ?? row.RESULT_JSON;
+		if (typeof raw === 'string') {
+			try {
+				return JSON.parse(raw);
+			}
+			catch (_e) {
+				return null;
+			}
+		}
+		return raw && raw === Object(raw) ? raw : null;
+	}
+
+	async function updateAppliedMutation(tx, clientId, mutationId, result) {
+		await tx.query([
+			`UPDATE ${quoteQualified(syncOptions.appliedMutationsTable)}`,
+			`SET result_json = ${sqlJsonLiteral(result)}, applied_at = NOW()`,
+			`WHERE client_id = ${sqlStringLiteral(clientId)} AND mutation_id = ${sqlStringLiteral(mutationId)}`
+		].join(' '));
+	}
+
+	async function safeTxQuery(tx, sql, fallback) {
+		const result = await tx.query(sql);
+		if (Array.isArray(result))
+			return result;
+		if (Array.isArray(result?.rows))
+			return result.rows;
+		return fallback;
+	}
 }
 
 function normalizeSyncOptions(sync) {
@@ -329,6 +440,7 @@ function normalizeSyncOptions(sync) {
 	return {
 		enabled: sync.enabled !== false,
 		changeTable: sync.changeTable || 'orange_changes',
+		appliedMutationsTable: sync.appliedMutationsTable || 'orange_sync_applied_mutations',
 		queue: {
 			concurrency: clamp(normalizeInteger(queueOptions.concurrency, 4), 1, 100),
 			maxPending: clamp(normalizeInteger(queueOptions.maxPending, 1000), 0, 100000)
@@ -337,6 +449,7 @@ function normalizeSyncOptions(sync) {
 			maxTablesPerRequest: clamp(normalizeInteger(limits.maxTablesPerRequest, 50), 1, 1000),
 			maxKeysPerBatch: clamp(normalizeInteger(limits.maxKeysPerBatch, 200), 1, 10000),
 			maxRowsPerBatch: clamp(normalizeInteger(limits.maxRowsPerBatch, 200), 1, 10000),
+			maxMutationsPerBatch: clamp(normalizeInteger(limits.maxMutationsPerBatch, 200), 1, 10000),
 			maxChangeWindow: clamp(normalizeInteger(limits.maxChangeWindow, 50000), 1, 100000000)
 		}
 	};
@@ -495,6 +608,42 @@ function normalizeOp(value) {
 	return 'U';
 }
 
+function normalizeClientId(value) {
+	if (typeof value !== 'string')
+		return '';
+	return value.trim();
+}
+
+function normalizeMutations(value, limit) {
+	if (!Array.isArray(value))
+		return [];
+	const result = [];
+	for (let i = 0; i < value.length && result.length < limit; i++) {
+		const mutation = normalizeMutation(value[i]);
+		if (mutation)
+			result.push(mutation);
+	}
+	return result;
+}
+
+function normalizeMutation(value) {
+	if (!value || value !== Object(value))
+		return null;
+	const id = value.id ?? value.mutationId ?? value.mutation_id;
+	if (typeof id !== 'string' || id.length === 0)
+		return null;
+	if (typeof value.table !== 'string' || value.table.length === 0)
+		return null;
+	if (!Array.isArray(value.patch))
+		return null;
+	return {
+		id,
+		table: value.table,
+		patch: value.patch,
+		options: value.options && value.options === Object(value.options) ? value.options : undefined
+	};
+}
+
 function toPkArray(meta, row) {
 	if (!row || row !== Object(row))
 		return null;
@@ -530,6 +679,10 @@ function quoteIdent(name) {
 
 function sqlStringLiteral(value) {
 	return `'${String(value).replace(/'/g, '\'\'')}'`;
+}
+
+function sqlJsonLiteral(value) {
+	return `${sqlStringLiteral(stringify(value))}::jsonb`;
 }
 
 module.exports = newSyncHandler;

@@ -301,4 +301,48 @@ describe('sqlite staged pull sync', () => {
 		expect(ready.tables).toEqual(expect.arrayContaining(['customer', 'order']));
 		expect(ready.since).not.toBeUndefined();
 	});
+
+	test('push applies json patch once and deduplicates retry', async () => {
+		await remoteDb.customer.insert({
+			id: 60,
+			name: 'Before',
+			balance: 60,
+			isActive: true
+		});
+		const beforeRows = await remoteDb.query('SELECT COUNT(*) AS count FROM orange_changes');
+		const beforeCount = Number(beforeRows[0].count ?? beforeRows[0].COUNT);
+
+		const patch = [{
+			op: 'replace',
+			path: '/[60]/name',
+			value: 'After',
+			oldValue: 'Before'
+		}];
+		const mutation = {
+			id: 'mutation-60-name',
+			table: 'customer',
+			patch
+		};
+
+		const first = await localDb.syncClient.push({
+			clientId: 'sqlite-sync-test-client',
+			mutations: [mutation]
+		});
+		const second = await localDb.syncClient.push({
+			clientId: 'sqlite-sync-test-client',
+			mutations: [mutation]
+		});
+
+		const row = await remoteDb.customer.getById(60);
+		const afterRows = await remoteDb.query('SELECT COUNT(*) AS count FROM orange_changes');
+		const afterCount = Number(afterRows[0].count ?? afterRows[0].COUNT);
+
+		expect(first.applied).toBe(1);
+		expect(first.duplicates).toBe(0);
+		expect(second.applied).toBe(0);
+		expect(second.duplicates).toBe(1);
+		expect(second.results[0].duplicate).toBe(true);
+		expect(row.name).toBe('After');
+		expect(afterCount).toBe(beforeCount + 1);
+	});
 });

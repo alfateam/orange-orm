@@ -4,6 +4,7 @@ function createSyncWorkerHandler(syncClient, options = {}) {
 
 	let running = false;
 	let currentDrainPromise = null;
+	let scheduledAgain = false;
 	let pushRequested = false;
 	let pullRequested = false;
 	let lastPushOptions;
@@ -14,10 +15,14 @@ function createSyncWorkerHandler(syncClient, options = {}) {
 			target.postMessage(message);
 	});
 
+	if (options.autoStart !== false && syncClient && typeof syncClient.start === 'function')
+		void syncClient.start();
+
 	return {
 		handleMessage,
 		pull: requestPull,
-		push: requestPush
+		push: requestPush,
+		stop
 	};
 
 	async function handleMessage(event) {
@@ -51,9 +56,16 @@ function createSyncWorkerHandler(syncClient, options = {}) {
 		return drainSyncQueue();
 	}
 
+	function stop() {
+		if (syncClient && typeof syncClient.stop === 'function')
+			syncClient.stop();
+	}
+
 	function drainSyncQueue() {
-		if (running)
+		if (running) {
+			scheduledAgain = true;
 			return currentDrainPromise;
+		}
 
 		running = true;
 		currentDrainPromise = run()
@@ -66,7 +78,8 @@ function createSyncWorkerHandler(syncClient, options = {}) {
 
 	async function run() {
 		let lastResult;
-		while (pushRequested || pullRequested) {
+		while (pushRequested || pullRequested || scheduledAgain) {
+			scheduledAgain = false;
 			if (pushRequested) {
 				pushRequested = false;
 				lastResult = await callSyncMethod('push', lastPushOptions);

@@ -763,13 +763,72 @@ function requireSync () {
 
 		async function execute(body) {
 			const phase = body.phase || body.action;
+			if (phase === 'push')
+				return pushMutations(body);
 			if (phase === 'keys')
 				return pullKeys(body);
 			if (phase === 'rows')
 				return pullRows(body);
-			const error = new Error('Invalid sync phase. Use { phase: "keys" } or { phase: "rows" }.');
+			const error = new Error('Invalid sync phase. Use { phase: "keys" }, { phase: "rows" }, or { phase: "push" }.');
 			error.status = 400;
 			throw error;
+		}
+
+		async function pushMutations(body) {
+			const clientId = normalizeClientId(body.clientId ?? body.client_id);
+			const mutations = normalizeMutations(body.mutations, syncOptions.limits.maxMutationsPerBatch);
+			if (!clientId) {
+				const error = new Error('Sync push requires "clientId".');
+				error.status = 400;
+				throw error;
+			}
+			if (mutations.length === 0) {
+				return {
+					phase: 'push',
+					applied: 0,
+					duplicates: 0,
+					results: []
+				};
+			}
+
+			const results = [];
+			let applied = 0;
+			let duplicates = 0;
+			await client.transaction(async (tx) => {
+				for (let i = 0; i < mutations.length; i++) {
+					const mutation = mutations[i];
+					const claim = await claimAppliedMutation(tx, clientId, mutation.id);
+					if (!claim.claimed) {
+						duplicates += 1;
+						results.push({ id: mutation.id, table: mutation.table, ...(claim.result || {}), duplicate: true });
+						continue;
+					}
+					const table = tx[mutation.table];
+					if (!table || typeof table.patch !== 'function') {
+						const error = new Error(`Table "${mutation.table}" is not exposed or does not exist`);
+						error.status = 400;
+						throw error;
+					}
+					const patchResult = await table.patch(mutation.patch, mutation.options || {});
+					const result = {
+						id: mutation.id,
+						table: mutation.table,
+						applied: true,
+						changed: Array.isArray(patchResult && patchResult.changed) ? patchResult.changed.length : 0,
+						result: patchResult
+					};
+					await updateAppliedMutation(tx, clientId, mutation.id, result);
+					results.push(result);
+					applied += 1;
+				}
+			});
+
+			return {
+				phase: 'push',
+				applied,
+				duplicates,
+				results
+			};
 		}
 
 		async function pullKeys(body) {
@@ -1059,6 +1118,58 @@ function requireSync () {
 				return result.rows;
 			return fallback;
 		}
+
+		async function claimAppliedMutation(tx, clientId, mutationId) {
+			const rows = await safeTxQuery(tx, [
+				`INSERT INTO ${quoteQualified(syncOptions.appliedMutationsTable)} (client_id, mutation_id, result_json)`,
+				`VALUES (${sqlStringLiteral(clientId)}, ${sqlStringLiteral(mutationId)}, ${sqlJsonLiteral({ pending: true })})`,
+				'ON CONFLICT (client_id, mutation_id) DO NOTHING',
+				'RETURNING result_json'
+			].join(' '), []);
+			if (rows.length > 0)
+				return { claimed: true };
+
+			const existingRows = await safeTxQuery(tx, [
+				'SELECT result_json',
+				`FROM ${quoteQualified(syncOptions.appliedMutationsTable)}`,
+				`WHERE client_id = ${sqlStringLiteral(clientId)} AND mutation_id = ${sqlStringLiteral(mutationId)}`,
+				'LIMIT 1'
+			].join(' '), []);
+			const result = parseResultJson(existingRows[0]);
+			return { claimed: false, result };
+		}
+
+		function parseResultJson(row) {
+			if (!row)
+				return null;
+			const raw = row.result_json ?? row.RESULT_JSON;
+			if (typeof raw === 'string') {
+				try {
+					return JSON.parse(raw);
+				}
+				catch (_e) {
+					return null;
+				}
+			}
+			return raw && raw === Object(raw) ? raw : null;
+		}
+
+		async function updateAppliedMutation(tx, clientId, mutationId, result) {
+			await tx.query([
+				`UPDATE ${quoteQualified(syncOptions.appliedMutationsTable)}`,
+				`SET result_json = ${sqlJsonLiteral(result)}, applied_at = NOW()`,
+				`WHERE client_id = ${sqlStringLiteral(clientId)} AND mutation_id = ${sqlStringLiteral(mutationId)}`
+			].join(' '));
+		}
+
+		async function safeTxQuery(tx, sql, fallback) {
+			const result = await tx.query(sql);
+			if (Array.isArray(result))
+				return result;
+			if (Array.isArray(result?.rows))
+				return result.rows;
+			return fallback;
+		}
 	}
 
 	function normalizeSyncOptions(sync) {
@@ -1069,6 +1180,7 @@ function requireSync () {
 		return {
 			enabled: sync.enabled !== false,
 			changeTable: sync.changeTable || 'orange_changes',
+			appliedMutationsTable: sync.appliedMutationsTable || 'orange_sync_applied_mutations',
 			queue: {
 				concurrency: clamp(normalizeInteger(queueOptions.concurrency, 4), 1, 100),
 				maxPending: clamp(normalizeInteger(queueOptions.maxPending, 1000), 0, 100000)
@@ -1077,6 +1189,7 @@ function requireSync () {
 				maxTablesPerRequest: clamp(normalizeInteger(limits.maxTablesPerRequest, 50), 1, 1000),
 				maxKeysPerBatch: clamp(normalizeInteger(limits.maxKeysPerBatch, 200), 1, 10000),
 				maxRowsPerBatch: clamp(normalizeInteger(limits.maxRowsPerBatch, 200), 1, 10000),
+				maxMutationsPerBatch: clamp(normalizeInteger(limits.maxMutationsPerBatch, 200), 1, 10000),
 				maxChangeWindow: clamp(normalizeInteger(limits.maxChangeWindow, 50000), 1, 100000000)
 			}
 		};
@@ -1235,6 +1348,42 @@ function requireSync () {
 		return 'U';
 	}
 
+	function normalizeClientId(value) {
+		if (typeof value !== 'string')
+			return '';
+		return value.trim();
+	}
+
+	function normalizeMutations(value, limit) {
+		if (!Array.isArray(value))
+			return [];
+		const result = [];
+		for (let i = 0; i < value.length && result.length < limit; i++) {
+			const mutation = normalizeMutation(value[i]);
+			if (mutation)
+				result.push(mutation);
+		}
+		return result;
+	}
+
+	function normalizeMutation(value) {
+		if (!value || value !== Object(value))
+			return null;
+		const id = value.id ?? value.mutationId ?? value.mutation_id;
+		if (typeof id !== 'string' || id.length === 0)
+			return null;
+		if (typeof value.table !== 'string' || value.table.length === 0)
+			return null;
+		if (!Array.isArray(value.patch))
+			return null;
+		return {
+			id,
+			table: value.table,
+			patch: value.patch,
+			options: value.options && value.options === Object(value.options) ? value.options : undefined
+		};
+	}
+
 	function toPkArray(meta, row) {
 		if (!row || row !== Object(row))
 			return null;
@@ -1270,6 +1419,10 @@ function requireSync () {
 
 	function sqlStringLiteral(value) {
 		return `'${String(value).replace(/'/g, '\'\'')}'`;
+	}
+
+	function sqlJsonLiteral(value) {
+		return `${sqlStringLiteral(stringify(value))}::jsonb`;
 	}
 
 	sync = newSyncHandler;
@@ -1373,7 +1526,7 @@ function requireHostExpress () {
 
 		async function post(request, response) {
 			try {
-				if (request.query.sync === 'pull') {
+				if (request.query.sync) {
 					if (!syncHandler) {
 						const e = new Error('Sync is not enabled for this endpoint');
 						// @ts-ignore
@@ -3754,6 +3907,126 @@ function requireFlags () {
 	return flags_1;
 }
 
+var syncAuto;
+var hasRequiredSyncAuto;
+
+function requireSyncAuto () {
+	if (hasRequiredSyncAuto) return syncAuto;
+	hasRequiredSyncAuto = 1;
+	function createSyncAuto(syncClient, getConfig, options = {}) {
+		const timers = options.timers || globalThis;
+		const onlineTarget = options.onlineTarget || (typeof globalThis !== 'undefined' ? globalThis : undefined);
+		let running = false;
+		let activeRun = null;
+		let intervalId = null;
+		let unsubscribeOnline = null;
+
+		return {
+			start,
+			stop,
+			isRunning,
+			runNow
+		};
+
+		async function start() {
+			if (running)
+				return activeRun || Promise.resolve();
+			const config = normalizeAutoConfig(await getConfig());
+			if (!config.enabled)
+				return;
+			running = true;
+			if (config.intervalMs > 0 && timers && typeof timers.setInterval === 'function') {
+				intervalId = timers.setInterval(() => {
+					void runNow();
+				}, config.intervalMs);
+			}
+			subscribeOnline();
+			return runNow();
+		}
+
+		function stop() {
+			running = false;
+			if (intervalId !== null && timers && typeof timers.clearInterval === 'function') {
+				timers.clearInterval(intervalId);
+				intervalId = null;
+			}
+			if (unsubscribeOnline) {
+				unsubscribeOnline();
+				unsubscribeOnline = null;
+			}
+		}
+
+		function isRunning() {
+			return running;
+		}
+
+		async function runNow() {
+			if (activeRun)
+				return activeRun;
+			activeRun = runCycle()
+				.finally(() => {
+					activeRun = null;
+				});
+			return activeRun;
+		}
+
+		async function runCycle() {
+			const config = normalizeAutoConfig(await getConfig());
+			let pushResult;
+			if (config.push) {
+				pushResult = await syncClient.push();
+			}
+			if (config.pull) {
+				if (config.push && pushResult && pushResult.error)
+					return pushResult;
+				return syncClient.pull();
+			}
+			return pushResult || { skipped: true };
+		}
+
+		function subscribeOnline() {
+			if (!onlineTarget || typeof onlineTarget.addEventListener !== 'function' || typeof onlineTarget.removeEventListener !== 'function')
+				return;
+			const onOnline = () => {
+				if (running)
+					void runNow();
+			};
+			onlineTarget.addEventListener('online', onOnline);
+			unsubscribeOnline = () => onlineTarget.removeEventListener('online', onOnline);
+		}
+	}
+
+	function normalizeAutoConfig(syncConfig) {
+		const auto = syncConfig && syncConfig.auto;
+		if (!syncConfig || auto === false)
+			return { enabled: false, intervalMs: 30000, push: true, pull: true };
+		if (auto === undefined || auto === true)
+			return { enabled: true, intervalMs: 30000, push: true, pull: true };
+		if (auto !== Object(auto))
+			return { enabled: true, intervalMs: 30000, push: true, pull: true };
+		const intervalMs = normalizeIntervalMs(auto.intervalMs);
+		return {
+			enabled: auto.enabled !== false,
+			intervalMs,
+			push: auto.push !== false,
+			pull: auto.pull !== false
+		};
+	}
+
+	function normalizeIntervalMs(value) {
+		const parsed = Number.parseInt(value, 10);
+		if (!Number.isFinite(parsed) || parsed < 0)
+			return 30000;
+		return parsed;
+	}
+
+	syncAuto = {
+		createSyncAuto,
+		normalizeAutoConfig
+	};
+	return syncAuto;
+}
+
 var syncClient;
 var hasRequiredSyncClient;
 
@@ -3761,15 +4034,28 @@ function requireSyncClient () {
 	if (hasRequiredSyncClient) return syncClient;
 	hasRequiredSyncClient = 1;
 	const _axios = require$$0$1;
+	const randomUuid = requireRandomUuid();
+	const stringify = requireStringify();
+	const { createSyncAuto } = requireSyncAuto();
 
 	function newSyncClient(client, getDb, axiosInterceptor) {
 		const sinceByScope = new Map();
 		const syncStateTable = 'orange_sync_state';
+		const syncClientTable = 'orange_sync_client';
+		const syncOutboxTable = 'orange_sync_outbox';
 		const initialReadyListeners = new Set();
 		let initialReadyEmitted = false;
+		const auto = createSyncAuto({
+			push,
+			pull
+		}, getConfig);
 
 		return {
 			pull,
+			push,
+			start: auto.start,
+			stop: auto.stop,
+			isRunning: auto.isRunning,
 			getConfig,
 			on,
 			off,
@@ -3813,6 +4099,54 @@ function requireSyncClient () {
 				await setScopeSince(configuredTables, result.since, db);
 			await maybeEmitInitialReady(syncConfig, configuredTables, db, 'pull');
 			return result;
+		}
+
+		async function push(options = {}) {
+			const db = await getDb();
+			const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
+			if (!syncConfig)
+				throw new Error('Sync is not configured. Add sync in sqlite options: sqlite(connectionString, { sync: ... })');
+
+			const pushConfig = resolvePushConfig(syncConfig, options);
+			const pushOptions = normalizePushOptions(options);
+			if (pushOptions.mutations.length === 0)
+				return pushPending({ ...options, _syncConfig: syncConfig, _pushConfig: pushConfig });
+			if (!pushOptions.clientId)
+				pushOptions.clientId = await getClientId(db);
+			if (pushOptions.mutations.length === 0)
+				return { phase: 'push', applied: 0, duplicates: 0, results: [] };
+
+			return sendPush(pushConfig, pushOptions.clientId, pushOptions.mutations);
+		}
+
+		async function pushPending(options = {}) {
+			const db = await getDb();
+			const syncConfig = options._syncConfig || normalizeSyncConfig(db && db.__sqliteSync);
+			if (!syncConfig)
+				throw new Error('Sync is not configured. Add sync in sqlite options: sqlite(connectionString, { sync: ... })');
+			const pushConfig = options._pushConfig || resolvePushConfig(syncConfig, options);
+			const limit = normalizeLimit(options.limit, 100);
+			const pending = await readPendingMutations(db, limit);
+			if (pending.length === 0)
+				return { phase: 'push', applied: 0, duplicates: 0, results: [] };
+			const clientId = typeof options.clientId === 'string' ? options.clientId : await getClientId(db);
+			const result = await sendPush(pushConfig, clientId, pending);
+			await markPushedMutations(db, result);
+			return result;
+		}
+
+		async function sendPush(pushConfig, clientId, mutations) {
+			return requestPayload({
+				...pushConfig,
+				syncPhase: 'push',
+				body: {
+					phase: 'push',
+					clientId,
+					mutations
+				}
+			}, {
+				_syncAxiosInterceptor: axiosInterceptor
+			});
 		}
 
 		async function pullStaged(pullConfig, options) {
@@ -3951,6 +4285,36 @@ function requireSyncClient () {
 			return result;
 		}
 
+		function normalizePushOptions(input) {
+			if (!input || input !== Object(input))
+				return { mutations: [] };
+			const mutations = Array.isArray(input.mutations)
+				? input.mutations.map(normalizePushMutation).filter(Boolean)
+				: [];
+			return {
+				clientId: typeof input.clientId === 'string' ? input.clientId : undefined,
+				mutations
+			};
+		}
+
+		function normalizePushMutation(input) {
+			if (!input || input !== Object(input))
+				return null;
+			const id = input.id ?? input.mutationId ?? input.mutation_id;
+			if (typeof id !== 'string' || id.length === 0)
+				return null;
+			if (typeof input.table !== 'string' || input.table.length === 0)
+				return null;
+			if (!Array.isArray(input.patch))
+				return null;
+			return {
+				id,
+				table: input.table,
+				patch: input.patch,
+				options: input.options
+			};
+		}
+
 		function normalizeTimeoutMs(value) {
 			const parsed = Number.parseInt(value, 10);
 			if (!Number.isFinite(parsed) || parsed <= 0)
@@ -3989,6 +4353,101 @@ function requireSyncClient () {
 				'"since_value" TEXT NOT NULL',
 				');'
 			].join(' '));
+		}
+
+		async function ensureSyncClientTable(db) {
+			await db.query([
+				`CREATE TABLE IF NOT EXISTS "${syncClientTable}" (`,
+				'"id" TEXT PRIMARY KEY',
+				');'
+			].join(' '));
+		}
+
+		async function ensureSyncOutboxTable(db) {
+			await db.query([
+				`CREATE TABLE IF NOT EXISTS "${syncOutboxTable}" (`,
+				'"mutation_id" TEXT PRIMARY KEY,',
+				'"table_name" TEXT NOT NULL,',
+				'"patch_json" TEXT NOT NULL,',
+				'"options_json" TEXT,',
+				'"created_at_ms" INTEGER NOT NULL,',
+				'"status" TEXT NOT NULL DEFAULT \'pending\',',
+				'"last_error" TEXT,',
+				'"attempts" INTEGER NOT NULL DEFAULT 0,',
+				'"pushed_at_ms" INTEGER,',
+				'"result_json" TEXT,',
+				'CHECK ("status" IN (\'pending\', \'pushed\', \'failed\'))',
+				');'
+			].join(' '));
+		}
+
+		async function getClientId(db) {
+			await ensureSyncClientTable(db);
+			const rows = await db.query(`SELECT "id" FROM "${syncClientTable}" LIMIT 1`);
+			const row = Array.isArray(rows) ? rows[0] : rows?.rows?.[0];
+			const existing = row && (row.id ?? row.ID);
+			if (typeof existing === 'string' && existing.length > 0)
+				return existing;
+			const id = randomUuid();
+			await db.query(`INSERT INTO "${syncClientTable}" ("id") VALUES (${sqlStringLiteral(id)})`);
+			return id;
+		}
+
+		async function readPendingMutations(db, limit) {
+			await ensureSyncOutboxTable(db);
+			const rows = await db.query([
+				`SELECT "mutation_id", "table_name", "patch_json", "options_json" FROM "${syncOutboxTable}"`,
+				'WHERE "status" = \'pending\'',
+				'ORDER BY "created_at_ms" ASC',
+				`LIMIT ${limit}`
+			].join(' '));
+			const list = Array.isArray(rows) ? rows : rows?.rows || [];
+			const result = [];
+			for (let i = 0; i < list.length; i++) {
+				const row = list[i];
+				const mutation = rowToMutation(row);
+				if (mutation)
+					result.push(mutation);
+			}
+			return result;
+		}
+
+		function rowToMutation(row) {
+			const id = row.mutation_id ?? row.MUTATION_ID;
+			const table = row.table_name ?? row.TABLE_NAME;
+			const patchJson = row.patch_json ?? row.PATCH_JSON;
+			const optionsJson = row.options_json ?? row.OPTIONS_JSON;
+			if (typeof id !== 'string' || typeof table !== 'string' || typeof patchJson !== 'string')
+				return null;
+			try {
+				return {
+					id,
+					table,
+					patch: JSON.parse(patchJson),
+					options: optionsJson ? JSON.parse(optionsJson) : undefined
+				};
+			}
+			catch (_e) {
+				return null;
+			}
+		}
+
+		async function markPushedMutations(db, result) {
+			const results = Array.isArray(result && result.results) ? result.results : [];
+			if (results.length === 0)
+				return;
+			await ensureSyncOutboxTable(db);
+			const now = Date.now();
+			for (let i = 0; i < results.length; i++) {
+				const item = results[i];
+				if (!item || typeof item.id !== 'string')
+					continue;
+				await db.query([
+					`UPDATE "${syncOutboxTable}"`,
+					`SET "status" = 'pushed', "pushed_at_ms" = ${now}, "result_json" = ${sqlStringLiteral(stringify(item))}`,
+					`WHERE "mutation_id" = ${sqlStringLiteral(item.id)}`
+				].join(' '));
+			}
 		}
 
 		async function readScopeSince(scopeKey, db) {
@@ -4220,6 +4679,19 @@ function requireSyncClient () {
 		};
 	}
 
+	function resolvePushConfig(syncConfig, options = {}) {
+		const preferred = syncConfig.push || syncConfig;
+		const pushConfig = normalizeEndpoint(preferred);
+		if (!pushConfig || !pushConfig.url)
+			throw new Error('No push sync endpoint configured');
+		if (options.timeoutMs === undefined)
+			return pushConfig;
+		return {
+			...pushConfig,
+			timeoutMs: options.timeoutMs
+		};
+	}
+
 	async function requestPayload(config, options) {
 		const axiosRoot = _axios.default || _axios;
 		const axios = typeof axiosRoot.create === 'function' ? axiosRoot.create() : axiosRoot;
@@ -4232,7 +4704,7 @@ function requireSyncClient () {
 		};
 
 		const request = {
-			url: appendQueryParam(config.url, 'sync', 'pull'),
+			url: appendQueryParam(config.url, 'sync', config.syncPhase || 'pull'),
 			method: 'post',
 			timeout: config.timeoutMs
 		};
@@ -15251,6 +15723,7 @@ function requireSyncWorkerHandler () {
 
 		let running = false;
 		let currentDrainPromise = null;
+		let scheduledAgain = false;
 		let pushRequested = false;
 		let pullRequested = false;
 		let lastPushOptions;
@@ -15261,10 +15734,14 @@ function requireSyncWorkerHandler () {
 				target.postMessage(message);
 		});
 
+		if (options.autoStart !== false && syncClient && typeof syncClient.start === 'function')
+			void syncClient.start();
+
 		return {
 			handleMessage,
 			pull: requestPull,
-			push: requestPush
+			push: requestPush,
+			stop
 		};
 
 		async function handleMessage(event) {
@@ -15298,9 +15775,16 @@ function requireSyncWorkerHandler () {
 			return drainSyncQueue();
 		}
 
+		function stop() {
+			if (syncClient && typeof syncClient.stop === 'function')
+				syncClient.stop();
+		}
+
 		function drainSyncQueue() {
-			if (running)
+			if (running) {
+				scheduledAgain = true;
 				return currentDrainPromise;
+			}
 
 			running = true;
 			currentDrainPromise = run()
@@ -15313,7 +15797,8 @@ function requireSyncWorkerHandler () {
 
 		async function run() {
 			let lastResult;
-			while (pushRequested || pullRequested) {
+			while (pushRequested || pullRequested || scheduledAgain) {
+				scheduledAgain = false;
 				if (pushRequested) {
 					pushRequested = false;
 					lastResult = await callSyncMethod('push', lastPushOptions);
