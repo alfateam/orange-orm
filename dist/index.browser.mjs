@@ -15856,25 +15856,27 @@ var hasRequiredSyncWorkerHandler;
 function requireSyncWorkerHandler () {
 	if (hasRequiredSyncWorkerHandler) return syncWorkerHandler;
 	hasRequiredSyncWorkerHandler = 1;
+	const { createSyncAuto } = requireSyncAuto();
+
 	function createSyncWorkerHandler(syncClient, options = {}) {
 		if (!syncClient)
 			throw new Error('Sync worker handler requires a sync client.');
 
 		let running = false;
-		let currentDrainPromise = null;
-		let scheduledAgain = false;
-		let pushRequested = false;
-		let pullRequested = false;
-		let lastPushOptions;
-		let lastPullOptions;
+		let currentDrainPromise = Promise.resolve();
+		const pending = {
+			push: [],
+			pull: []
+		};
+		let auto;
 		const postMessage = options.postMessage || ((message) => {
 			const target = getPostTarget();
 			if (target)
 				target.postMessage(message);
 		});
 
-		if (options.autoStart !== false && syncClient && typeof syncClient.start === 'function')
-			void syncClient.start();
+		if (options.autoStart !== false)
+			startAuto();
 
 		return {
 			handleMessage,
@@ -15903,56 +15905,53 @@ function requireSyncWorkerHandler () {
 		}
 
 		function requestPush(options) {
-			pushRequested = true;
-			lastPushOptions = options;
-			return drainSyncQueue();
+			return requestSync('push', options);
 		}
 
 		function requestPull(options) {
-			pullRequested = true;
-			lastPullOptions = options;
-			return drainSyncQueue();
+			return requestSync('pull', options);
 		}
 
 		function stop() {
-			if (syncClient && typeof syncClient.stop === 'function')
+			if (auto)
+				auto.stop();
+			else if (syncClient && typeof syncClient.stop === 'function')
 				syncClient.stop();
 		}
 
-		function drainSyncQueue() {
-			if (running) {
-				scheduledAgain = true;
-				return currentDrainPromise;
-			}
+		function requestSync(method, options) {
+			return new Promise((resolve, reject) => {
+				pending[method].push({ options, resolve, reject });
+				drainSyncQueue();
+			});
+		}
 
+		function drainSyncQueue() {
+			if (running)
+				return currentDrainPromise;
 			running = true;
 			currentDrainPromise = run()
 				.finally(() => {
 					running = false;
-					currentDrainPromise = null;
+					if (hasPending())
+						drainSyncQueue();
 				});
 			return currentDrainPromise;
 		}
 
 		async function run() {
-			let lastResult;
-			while (pushRequested || pullRequested || scheduledAgain) {
-				scheduledAgain = false;
-				if (pushRequested) {
-					pushRequested = false;
-					lastResult = await callSyncMethod('push', lastPushOptions);
-					if (syncClient.pull)
-						pullRequested = true;
-					continue;
+			while (hasPending()) {
+				const method = pending.push.length > 0 ? 'push' : 'pull';
+				const batch = pending[method].splice(0);
+				const options = batch[batch.length - 1].options;
+				try {
+					const result = await callSyncMethod(method, options);
+					resolveBatch(batch, result);
 				}
-
-				if (pullRequested) {
-					pullRequested = false;
-					if (!pushRequested)
-						lastResult = await callSyncMethod('pull', lastPullOptions);
+				catch (e) {
+					rejectBatch(batch, e);
 				}
 			}
-			return lastResult;
 		}
 
 		function callSyncMethod(method, options) {
@@ -15965,6 +15964,33 @@ function requireSyncWorkerHandler () {
 				};
 			}
 			return fn.call(syncClient, options);
+		}
+
+		function hasPending() {
+			return pending.push.length > 0 || pending.pull.length > 0;
+		}
+
+		function resolveBatch(batch, result) {
+			for (let i = 0; i < batch.length; i++)
+				batch[i].resolve(result);
+		}
+
+		function rejectBatch(batch, error) {
+			for (let i = 0; i < batch.length; i++)
+				batch[i].reject(error);
+		}
+
+		function startAuto() {
+			if (typeof syncClient.getConfig === 'function') {
+				auto = createSyncAuto({
+					push: requestPush,
+					pull: requestPull
+				}, () => syncClient.getConfig());
+				void auto.start();
+				return;
+			}
+			if (typeof syncClient.start === 'function')
+				void syncClient.start();
 		}
 
 		function postResponse(id, result, error) {

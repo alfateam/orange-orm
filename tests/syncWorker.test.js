@@ -4,7 +4,7 @@ const createSyncWorkerClient = require('../src/client/syncWorkerClient');
 const createSyncWorkerHandler = require('../src/client/syncWorkerHandler');
 
 describe('sync worker rpc', () => {
-	test('coalesces concurrent pulls into one extra pull round', async () => {
+	test('coalesces pull requested while pull is running into one extra pull round', async () => {
 		let pulls = 0;
 		const bridge = createBridge({
 			pull: async () => {
@@ -18,7 +18,7 @@ describe('sync worker rpc', () => {
 		const first = client.pull();
 		const second = client.pull();
 
-		expect(await first).toEqual({ pulled: 2 });
+		expect(await first).toEqual({ pulled: 1 });
 		expect(await second).toEqual({ pulled: 2 });
 		expect(pulls).toBe(2);
 		client.close();
@@ -54,6 +54,60 @@ describe('sync worker rpc', () => {
 		client.close();
 	});
 
+	test('does not pull automatically after manual push', async () => {
+		const calls = [];
+		const bridge = createBridge({
+			push: async () => {
+				calls.push('push');
+				return { pushed: true };
+			},
+			pull: async () => {
+				calls.push('pull');
+				return { pulled: true };
+			}
+		});
+
+		const client = createSyncWorkerClient(bridge.worker);
+
+		await expect(client.push()).resolves.toEqual({ pushed: true });
+
+		expect(calls).toEqual(['push']);
+		client.close();
+	});
+
+	test('prioritizes push before pull waiting behind an active pull', async () => {
+		const calls = [];
+		let releasePull;
+		const activePull = new Promise((resolve) => {
+			releasePull = resolve;
+		});
+		const bridge = createBridge({
+			push: async () => {
+				calls.push('push');
+				return { pushed: true };
+			},
+			pull: async () => {
+				calls.push('pull');
+				if (calls.length === 1)
+					await activePull;
+				return { pulled: calls.length };
+			}
+		});
+
+		const client = createSyncWorkerClient(bridge.worker);
+		const firstPull = client.pull();
+		const secondPull = client.pull();
+		const push = client.push();
+		releasePull();
+
+		await firstPull;
+		await push;
+		await secondPull;
+
+		expect(calls).toEqual(['pull', 'push', 'pull']);
+		client.close();
+	});
+
 	test('returns skipped result when pull is not implemented', async () => {
 		const bridge = createBridge({});
 		const client = createSyncWorkerClient(bridge.worker);
@@ -66,7 +120,7 @@ describe('sync worker rpc', () => {
 		client.close();
 	});
 
-	test('auto-starts sync client when worker handler is created', () => {
+	test('auto-starts sync client when worker handler is created without config support', () => {
 		let starts = 0;
 		let stops = 0;
 		const handler = createSyncWorkerHandler({
@@ -81,6 +135,29 @@ describe('sync worker rpc', () => {
 		expect(starts).toBe(1);
 		handler.stop();
 		expect(stops).toBe(1);
+	});
+
+	test('worker auto-start goes through handler queue', async () => {
+		const calls = [];
+		const handler = createSyncWorkerHandler({
+			getConfig: async () => ({ url: '/rdb', auto: { intervalMs: 0 } }),
+			push: async () => {
+				calls.push('push');
+				return { pushed: true };
+			},
+			pull: async () => {
+				calls.push('pull');
+				return { pulled: true };
+			},
+			stop: () => {
+				calls.push('stop');
+			}
+		}, { postMessage: () => {} });
+
+		await delay(0);
+		handler.stop();
+
+		expect(calls).toEqual(['push', 'pull']);
 	});
 
 	test('can disable worker auto-start', () => {
