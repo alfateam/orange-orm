@@ -1,5 +1,6 @@
 import rdb from 'orange-orm';
 import { createDemoMap, syncTables } from '../../shared/schema.js';
+import sqliteWorkerUrl from './sqlite-opfs-worker.mjs?worker&url';
 
 const syncUrl = import.meta.env.VITE_SYNC_URL || 'http://localhost:3055/rdb';
 const map = createDemoMap(rdb);
@@ -7,6 +8,7 @@ const map = createDemoMap(rdb);
 export const db = map({
   db: (con) => con.sqliteOPFS('orange-sync-demo.sqlite3', {
     busyTimeoutMs: 5000,
+    workerUrl: sqliteWorkerUrl,
     sync: {
       url: syncUrl,
       tables: syncTables,
