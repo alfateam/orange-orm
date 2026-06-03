@@ -15,7 +15,7 @@ export function createDemoMap(rdb) {
       ownerId: column('ownerId').numeric().notNullExceptInsert(),
       title: column('title').string().notNull(),
       status: column('status').string().notNull(),
-      updatedAt: column('updatedAt').date()
+      updatedAt: column('updatedAt').dateWithTimeZone()
     })),
     projectDetail: x.table('project_detail').map(({ column }) => ({
       id: column('id').numeric().primary().notNullExceptInsert(),

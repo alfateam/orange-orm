@@ -4,17 +4,12 @@ const newUpdateCommandCore = require('../src/table/commands/newUpdateCommandCore
 const newParameterized = require('../src/table/query/newParameterized');
 
 describe('date concurrency comparison', () => {
-	test('uses millisecond date comparison for postgres timestamp columns', () => {
-		const command = buildCommand({ hasTimeZone: false });
-
-		expect(command.sql()).toContain("date_trunc('milliseconds', \"updatedAt\") IS NOT DISTINCT FROM date_trunc('milliseconds', (?)::timestamp)");
-		expect(command.parameters).toContain('2026-06-03T11:00:00.123Z');
-	});
-
-	test('uses timestamptz cast for postgres dateWithTimeZone columns', () => {
+	test('uses direct pg comparison for dateWithTimeZone columns', () => {
 		const command = buildCommand({ hasTimeZone: true });
 
-		expect(command.sql()).toContain("date_trunc('milliseconds', \"updatedAt\") IS NOT DISTINCT FROM date_trunc('milliseconds', (?)::timestamptz)");
+		expect(command.sql()).toContain('"updatedAt" IS NOT DISTINCT FROM ?');
+		expect(command.sql()).not.toContain('date_trunc');
+		expect(command.parameters).toContain('2026-06-03T11:00:00.123Z');
 	});
 });
 
