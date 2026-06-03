@@ -119,7 +119,7 @@ function netAdapter(url, tableName, { axios, tableOptions }) {
 		if (typeof db === 'string') {
 			return httpAdapter(db, `?table=${tableName}`, axios);
 		}
-		else if (db && db.transaction) {
+		else if (db && db.hostLocal) {
 			return db.hostLocal({ ...tableOptions, db, table: url });
 		}
 		else

@@ -84,6 +84,7 @@
     },
     "peerDependencies": {
         "@electric-sql/pglite": "^0.3.0",
+        "@sqlite.org/sqlite-wasm": "^3.53.0-build1",
         "better-sqlite3": "^11.8.1 || ^12.6.2",
         "msnodesqlv8": "^4.1.0 || ^5.0.0",
         "mysql2": "^2.2.5 || ^3.9.4",
@@ -94,6 +95,9 @@
     },
     "peerDependenciesMeta": {
         "pg": {
+            "optional": true
+        },
+        "@sqlite.org/sqlite-wasm": {
             "optional": true
         },
         "pg-query-stream": {

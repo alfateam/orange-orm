@@ -6,11 +6,14 @@ const map = require('./client/map');
 let _d1;
 let _pg;
 let _pglite;
+let _sqliteOPFS;
 
 var connectViaPool = function() {
 	return client.apply(null, arguments);
 };
 connectViaPool.createPatch = client.createPatch;
+connectViaPool.createDbWorkerClient = require('./client/dbWorkerClient');
+connectViaPool.createDbWorkerHandler = require('./client/dbWorkerHandler');
 connectViaPool.createSyncWorkerClient = require('./client/syncWorkerClient');
 connectViaPool.createSyncWorkerHandler = require('./client/syncWorkerHandler');
 connectViaPool.table = require('./table');
@@ -45,6 +48,14 @@ Object.defineProperty(connectViaPool, 'pglite', {
 		if (!_pglite)
 			_pglite = require('./pglite/newDatabase');
 		return _pglite;
+	}
+});
+
+Object.defineProperty(connectViaPool, 'sqliteOPFS', {
+	get: function() {
+		if (!_sqliteOPFS)
+			_sqliteOPFS = require('./sqliteOPFS/newDatabase');
+		return _sqliteOPFS;
 	}
 });
 

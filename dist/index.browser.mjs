@@ -3795,7 +3795,7 @@ function requireNetAdapter () {
 			if (typeof db === 'string') {
 				return httpAdapter(db, `?table=${tableName}`, axios);
 			}
-			else if (db && db.transaction) {
+			else if (db && db.hostLocal) {
 				return db.hostLocal({ ...tableOptions, db, table: url });
 			}
 			else
@@ -5234,6 +5234,7 @@ function requireClient () {
 		client.postgres = onProvider.bind(null, 'postgres');
 		client.d1 = onProvider.bind(null, 'd1');
 		client.sqlite = onProvider.bind(null, 'sqlite');
+		client.sqliteOPFS = onProvider.bind(null, 'sqliteOPFS');
 		client.sap = onProvider.bind(null, 'sap');
 		client.oracle = onProvider.bind(null, 'oracle');
 		client.http = onProvider.bind(null, 'http');//todo
@@ -5258,7 +5259,9 @@ function requireClient () {
 			client.tables = options.tables;
 			// return client;
 		}
-		client.syncClient = newSyncClient(client, getDb, axiosInterceptor);
+		client.syncClient = baseUrl && typeof baseUrl.__createSyncClient === 'function'
+			? baseUrl.__createSyncClient(client, getDb, axiosInterceptor)
+			: newSyncClient(client, getDb, axiosInterceptor);
 		// else {
 		let handler = {
 			get(_target, property,) {
@@ -15529,6 +15532,11 @@ function requireCreateProviders () {
 				return createPool.bind(null, 'sqlite');
 			}
 		});
+		Object.defineProperty(dbMap, 'sqliteOPFS', {
+			get:  function() {
+				return createPool.bind(null, 'sqliteOPFS');
+			}
+		});
 		Object.defineProperty(dbMap, 'd1', {
 			get:  function() {
 				return createPool.bind(null, 'd1');
@@ -15587,6 +15595,9 @@ function requireCreateProviders () {
 			get sqlite() {
 				return createPool.bind(null, 'sqlite');
 			},
+			get sqliteOPFS() {
+				return createPool.bind(null, 'sqliteOPFS');
+			},
 			get d1() {
 				return createPool.bind(null, 'd1');
 			},
@@ -15597,7 +15608,7 @@ function requireCreateProviders () {
 
 		function createPool(providerName, ...args) {
 			//todo
-			if (providerName === 'd1') {
+			if (providerName === 'd1' || providerName === 'sqliteOPFS') {
 				return providers[providerName].apply(null, args);
 			}
 			const key = JSON.stringify(args);
@@ -15738,6 +15749,427 @@ function requireMap () {
 
 	map_1 = mapRoot;
 	return map_1;
+}
+
+var dbWorkerClient;
+var hasRequiredDbWorkerClient;
+
+function requireDbWorkerClient () {
+	if (hasRequiredDbWorkerClient) return dbWorkerClient;
+	hasRequiredDbWorkerClient = 1;
+	function createDbWorkerClient(worker) {
+		if (!worker || typeof worker.postMessage !== 'function')
+			throw new Error('DB worker client requires a Worker-like object.');
+
+		let nextId = 1;
+		const pending = new Map();
+		const listeners = new Map();
+
+		worker.addEventListener('message', onMessage);
+
+		const client = {
+			__orangeDbWorkerClient: true,
+			hostLocal,
+			query: request.bind(null, 'query', {}),
+			sqliteFunction: request.bind(null, 'sqliteFunction', {}),
+			createTransaction,
+			end: close,
+			close,
+			syncClient: {
+				pull: syncRequest.bind(null, 'pull'),
+				push: syncRequest.bind(null, 'push'),
+				start: syncRequest.bind(null, 'start'),
+				stop: syncRequest.bind(null, 'stop'),
+				isRunning: syncRequest.bind(null, 'isRunning'),
+				getConfig: syncRequest.bind(null, 'getConfig'),
+				on,
+				off,
+				once,
+				waitForInitialReady: syncRequest.bind(null, 'waitForInitialReady'),
+				close
+			}
+		};
+
+		return client;
+
+		function hostLocal(options = {}) {
+			const tableName = options.syncTableName;
+			return {
+				get: requestInTransaction.bind(null, options.transaction, 'get', { tableName }),
+				post: requestInTransaction.bind(null, options.transaction, 'post', { tableName }),
+				patch: requestInTransaction.bind(null, options.transaction, 'patch', { tableName }),
+				query: requestInTransaction.bind(null, options.transaction, 'query', {}),
+				sqliteFunction: requestInTransaction.bind(null, options.transaction, 'sqliteFunction', {})
+			};
+		}
+
+		function createTransaction(options) {
+			const transactionId = nextId++;
+			const begin = request('transaction.begin', { transactionId }, options);
+			const context = { __orangeDbWorkerTransactionId: transactionId };
+
+			async function transaction(fn) {
+				await begin;
+				return fn(context);
+			}
+			transaction.commit = async function(_context) {
+				await request('transaction.commit', { transactionId });
+			};
+			transaction.rollback = async function(error, _context) {
+				await request('transaction.rollback', { transactionId, error: serializeError(error) });
+			};
+			return transaction;
+		}
+
+		function syncRequest(method, options) {
+			return request(`sync.${method}`, {}, options);
+		}
+
+		function request(method, meta, ...args) {
+			const id = nextId++;
+			return new Promise((resolve, reject) => {
+				pending.set(id, { resolve, reject });
+				worker.postMessage({
+					type: 'orange-db-request',
+					id,
+					method,
+					...meta,
+					args
+				});
+			});
+		}
+
+		function requestInTransaction(transaction, method, meta, ...args) {
+			if (typeof transaction !== 'function')
+				return request(method, meta, ...args);
+			return transaction((context) => {
+				return request(method, {
+					...meta,
+					transactionId: getTransactionId(context)
+				}, ...args);
+			});
+		}
+
+		function on(event, listener) {
+			if (typeof listener !== 'function')
+				return () => {};
+			let eventListeners = listeners.get(event);
+			if (!eventListeners) {
+				eventListeners = new Set();
+				listeners.set(event, eventListeners);
+			}
+			eventListeners.add(listener);
+			request('sync.on', {}, event).catch(() => {});
+			return () => off(event, listener);
+		}
+
+		function off(event, listener) {
+			const eventListeners = listeners.get(event);
+			if (!eventListeners)
+				return;
+			eventListeners.delete(listener);
+			if (eventListeners.size === 0) {
+				listeners.delete(event);
+				request('sync.off', {}, event).catch(() => {});
+			}
+		}
+
+		function once(event, listener) {
+			if (typeof listener !== 'function')
+				return () => {};
+			const unsubscribe = on(event, (payload) => {
+				unsubscribe();
+				listener(payload);
+			});
+			return unsubscribe;
+		}
+
+		function close() {
+			worker.removeEventListener('message', onMessage);
+			for (const entry of pending.values())
+				entry.reject(new Error('DB worker client closed.'));
+			pending.clear();
+			listeners.clear();
+		}
+
+		function onMessage(event) {
+			const message = event && event.data;
+			if (!message || message.type === undefined)
+				return;
+			if (message.type === 'orange-db-event') {
+				emit(message.event, message.payload);
+				return;
+			}
+			if (message.type !== 'orange-db-response')
+				return;
+			const entry = pending.get(message.id);
+			if (!entry)
+				return;
+			pending.delete(message.id);
+			if (message.error)
+				entry.reject(toError(message.error));
+			else
+				entry.resolve(message.result);
+		}
+
+		function emit(event, payload) {
+			const eventListeners = listeners.get(event);
+			if (!eventListeners)
+				return;
+			for (const listener of Array.from(eventListeners))
+				listener(payload);
+		}
+	}
+
+	function getTransactionId(transaction) {
+		return transaction && transaction.__orangeDbWorkerTransactionId;
+	}
+
+	function serializeError(error) {
+		if (!error)
+			return undefined;
+		return {
+			name: error.name,
+			message: error.message || String(error),
+			stack: error.stack
+		};
+	}
+
+	function toError(error) {
+		const e = new Error(error && error.message ? error.message : 'DB worker request failed.');
+		if (error && error.name)
+			e.name = error.name;
+		if (error && error.stack)
+			e.stack = error.stack;
+		return e;
+	}
+
+	dbWorkerClient = createDbWorkerClient;
+	return dbWorkerClient;
+}
+
+var dbWorkerHandler;
+var hasRequiredDbWorkerHandler;
+
+function requireDbWorkerHandler () {
+	if (hasRequiredDbWorkerHandler) return dbWorkerHandler;
+	hasRequiredDbWorkerHandler = 1;
+	function createDbWorkerHandler(client, options = {}) {
+		if (!client)
+			throw new Error('DB worker handler requires a client.');
+
+		const transactions = new Map();
+		const syncEventUnsubscribers = new Map();
+		const postMessage = options.postMessage || ((message) => {
+			const target = getPostTarget();
+			if (target)
+				target.postMessage(message);
+		});
+
+		if (options.autoStart !== false && client.syncClient && typeof client.syncClient.start === 'function')
+			void client.syncClient.start();
+
+		return {
+			handleMessage,
+			stop
+		};
+
+		async function handleMessage(event) {
+			const message = event && event.data;
+			if (!message || message.type !== 'orange-db-request')
+				return;
+			try {
+				const result = await dispatch(message);
+				postResponse(message.id, result);
+			}
+			catch (e) {
+				postResponse(message.id, undefined, e);
+			}
+		}
+
+		async function dispatch(message) {
+			if (message.method === 'transaction.begin')
+				return beginTransaction(message.transactionId, message.args && message.args[0]);
+			if (message.method === 'transaction.commit')
+				return endTransaction(message.transactionId, 'commit');
+			if (message.method === 'transaction.rollback')
+				return endTransaction(message.transactionId, 'rollback', message.error);
+			if (message.method && message.method.startsWith('sync.'))
+				return dispatchSync(message.method.slice(5), message.args);
+			if (message.method === 'query')
+				return callQuery(message.transactionId, message.args);
+			if (message.method === 'sqliteFunction')
+				return callSqliteFunction(message.transactionId, message.args);
+			return callTable(message.method, message.tableName, message.transactionId, message.args);
+		}
+
+		async function beginTransaction(transactionId, txOptions) {
+			const pool = await getPool();
+			if (!pool.createTransaction)
+				throw new Error('Transaction not supported by DB worker client.');
+			if (transactions.has(transactionId))
+				return { transactionId };
+			const transaction = pool.createTransaction(txOptions);
+			transactions.set(transactionId, transaction);
+			return { transactionId };
+		}
+
+		async function endTransaction(transactionId, method, error) {
+			const transaction = transactions.get(transactionId);
+			if (!transaction)
+				return { transactionId, missing: true };
+			transactions.delete(transactionId);
+			if (method === 'commit')
+				await transaction(transaction.commit);
+			else
+				await transaction(transaction.rollback.bind(null, toError(error)));
+			return { transactionId };
+		}
+
+		function dispatchSync(method, args = []) {
+			const syncClient = client.syncClient;
+			if (!syncClient)
+				throw new Error('Sync client is not configured in DB worker.');
+			if (method === 'on')
+				return subscribeSyncEvent(args[0]);
+			if (method === 'off')
+				return unsubscribeSyncEvent(args[0]);
+			const fn = syncClient[method];
+			if (typeof fn !== 'function')
+				throw new Error(`Sync method "${method}" is not implemented.`);
+			return fn.apply(syncClient, args);
+		}
+
+		function subscribeSyncEvent(event) {
+			if (typeof event !== 'string' || syncEventUnsubscribers.has(event))
+				return;
+			if (!client.syncClient || typeof client.syncClient.on !== 'function')
+				return;
+			const unsubscribe = client.syncClient.on(event, (payload) => {
+				postMessage({
+					type: 'orange-db-event',
+					event,
+					payload
+				});
+			});
+			syncEventUnsubscribers.set(event, unsubscribe);
+		}
+
+		function unsubscribeSyncEvent(event) {
+			const unsubscribe = syncEventUnsubscribers.get(event);
+			if (!unsubscribe)
+				return;
+			unsubscribe();
+			syncEventUnsubscribers.delete(event);
+		}
+
+		async function callQuery(transactionId, args = []) {
+			const transaction = transactions.get(transactionId);
+			if (transaction)
+				return (await host(undefined, transaction)).query.apply(null, args);
+			return client.query.apply(null, args);
+		}
+
+		async function callSqliteFunction(transactionId, args = []) {
+			const transaction = transactions.get(transactionId);
+			if (transaction)
+				return (await host(undefined, transaction)).sqliteFunction.apply(null, args);
+			return client.function.apply(null, args);
+		}
+
+		async function callTable(method, tableName, transactionId, args = []) {
+			if (!tableName)
+				throw new Error('DB worker table request requires tableName.');
+			const table = client.tables && client.tables[tableName];
+			if (!table)
+				throw new Error(`Table "${tableName}" is not configured in DB worker.`);
+			const localHost = await host(table, transactions.get(transactionId));
+			const fn = localHost[method];
+			if (typeof fn !== 'function')
+				throw new Error(`DB worker method "${method}" is not implemented.`);
+			return fn.apply(null, args);
+		}
+
+		async function host(table, transaction) {
+			const pool = await getPool();
+			return pool.hostLocal({
+				db: pool,
+				table,
+				transaction,
+				client,
+				syncTableName: getTableName(table)
+			});
+		}
+
+		async function getPool() {
+			let db = client.db || client;
+			if (typeof db === 'function') {
+				db = db();
+				if (db && db.then)
+					db = await db;
+			}
+			return db;
+		}
+
+		function getTableName(table) {
+			if (!client.tables)
+				return undefined;
+			for (const name in client.tables) {
+				if (client.tables[name] === table)
+					return name;
+			}
+		}
+
+		function stop() {
+			for (const unsubscribe of syncEventUnsubscribers.values())
+				unsubscribe();
+			syncEventUnsubscribers.clear();
+			for (const [id, transaction] of transactions) {
+				transactions.delete(id);
+				void transaction(transaction.rollback);
+			}
+			if (client.syncClient && typeof client.syncClient.stop === 'function')
+				client.syncClient.stop();
+		}
+
+		function postResponse(id, result, error) {
+			postMessage({
+				type: 'orange-db-response',
+				id,
+				result,
+				error: error ? serializeError(error) : undefined
+			});
+		}
+	}
+
+	function serializeError(error) {
+		return {
+			name: error && error.name,
+			message: error && error.message ? error.message : String(error),
+			stack: error && error.stack
+		};
+	}
+
+	function toError(error) {
+		if (!error)
+			return undefined;
+		const e = new Error(error.message || 'DB worker transaction failed.');
+		if (error.name)
+			e.name = error.name;
+		if (error.stack)
+			e.stack = error.stack;
+		return e;
+	}
+
+	function getPostTarget() {
+		if (typeof self !== 'undefined' && typeof self.postMessage === 'function')
+			return self;
+		if (typeof globalThis !== 'undefined' && typeof globalThis.postMessage === 'function')
+			return globalThis;
+	}
+
+	dbWorkerHandler = createDbWorkerHandler;
+	return dbWorkerHandler;
 }
 
 var syncWorkerClient;
@@ -17091,12 +17523,12 @@ function requireInsert$1 () {
 	return insert$1;
 }
 
-var newTransaction$2;
-var hasRequiredNewTransaction$2;
+var newTransaction$3;
+var hasRequiredNewTransaction$3;
 
-function requireNewTransaction$2 () {
-	if (hasRequiredNewTransaction$2) return newTransaction$2;
-	hasRequiredNewTransaction$2 = 1;
+function requireNewTransaction$3 () {
+	if (hasRequiredNewTransaction$3) return newTransaction$3;
+	hasRequiredNewTransaction$3 = 1;
 	const wrapQuery = requireWrapQuery$2();
 	const wrapCommand = requireWrapCommand$2();
 	const encodeBoolean = requireEncodeBoolean$1();
@@ -17201,8 +17633,8 @@ function requireNewTransaction$2 () {
 		return JSON.parse(value);
 	}
 
-	newTransaction$2 = newResolveTransaction;
-	return newTransaction$2;
+	newTransaction$3 = newResolveTransaction;
+	return newTransaction$3;
 }
 
 var beginCommand;
@@ -17990,12 +18422,12 @@ function requireNewGenericPool () {
 	return newGenericPool_1;
 }
 
-var newPool_1$2;
-var hasRequiredNewPool$2;
+var newPool_1$3;
+var hasRequiredNewPool$3;
 
-function requireNewPool$2 () {
-	if (hasRequiredNewPool$2) return newPool_1$2;
-	hasRequiredNewPool$2 = 1;
+function requireNewPool$3 () {
+	if (hasRequiredNewPool$3) return newPool_1$3;
+	hasRequiredNewPool$3 = 1;
 	const promisify = requirePromisify();
 	const pools = requirePools();
 	const end = requireEnd$2();
@@ -18014,22 +18446,22 @@ function requireNewPool$2 () {
 		return c;
 	}
 
-	newPool_1$2 = newPool;
-	return newPool_1$2;
+	newPool_1$3 = newPool;
+	return newPool_1$3;
 }
 
-var newDatabase_1$2;
-var hasRequiredNewDatabase$2;
+var newDatabase_1$3;
+var hasRequiredNewDatabase$3;
 
-function requireNewDatabase$2 () {
-	if (hasRequiredNewDatabase$2) return newDatabase_1$2;
-	hasRequiredNewDatabase$2 = 1;
+function requireNewDatabase$3 () {
+	if (hasRequiredNewDatabase$3) return newDatabase_1$3;
+	hasRequiredNewDatabase$3 = 1;
 	let createDomain = requireCreateDomain();
-	let newTransaction = requireNewTransaction$2();
+	let newTransaction = requireNewTransaction$3();
 	let _begin = requireBegin();
 	let commit = requireCommit();
 	let rollback = requireRollback();
-	let newPool = requireNewPool$2();
+	let newPool = requireNewPool$3();
 	let express = requireHostExpress();
 	let hono = requireHostHono();
 	let hostLocal = requireHostLocal();
@@ -18130,8 +18562,8 @@ function requireNewDatabase$2 () {
 		return c;
 	}
 
-	newDatabase_1$2 = newDatabase;
-	return newDatabase_1$2;
+	newDatabase_1$3 = newDatabase;
+	return newDatabase_1$3;
 }
 
 var replaceParamChar_1;
@@ -18501,12 +18933,12 @@ function requireInsert () {
 	return insert;
 }
 
-var newTransaction$1;
-var hasRequiredNewTransaction$1;
+var newTransaction$2;
+var hasRequiredNewTransaction$2;
 
-function requireNewTransaction$1 () {
-	if (hasRequiredNewTransaction$1) return newTransaction$1;
-	hasRequiredNewTransaction$1 = 1;
+function requireNewTransaction$2 () {
+	if (hasRequiredNewTransaction$2) return newTransaction$2;
+	hasRequiredNewTransaction$2 = 1;
 	var wrapQuery = requireWrapQuery$1();
 	var wrapCommand = requireWrapCommand$1();
 	var encodeDate = requireEncodeDate();
@@ -18606,8 +19038,8 @@ function requireNewTransaction$1 () {
 		};
 	}
 
-	newTransaction$1 = newResolveTransaction;
-	return newTransaction$1;
+	newTransaction$2 = newResolveTransaction;
+	return newTransaction$2;
 }
 
 var end$1;
@@ -18740,12 +19172,12 @@ function requireNewPgPool$1 () {
 	return newPgPool_1$1;
 }
 
-var newPool_1$1;
-var hasRequiredNewPool$1;
+var newPool_1$2;
+var hasRequiredNewPool$2;
 
-function requireNewPool$1 () {
-	if (hasRequiredNewPool$1) return newPool_1$1;
-	hasRequiredNewPool$1 = 1;
+function requireNewPool$2 () {
+	if (hasRequiredNewPool$2) return newPool_1$2;
+	hasRequiredNewPool$2 = 1;
 	const promisify = requirePromisify();
 	const pools = requirePools();
 	const end = requireEnd$1();
@@ -18764,22 +19196,22 @@ function requireNewPool$1 () {
 		return c;
 	}
 
-	newPool_1$1 = newPool;
-	return newPool_1$1;
+	newPool_1$2 = newPool;
+	return newPool_1$2;
 }
 
-var newDatabase_1$1;
-var hasRequiredNewDatabase$1;
+var newDatabase_1$2;
+var hasRequiredNewDatabase$2;
 
-function requireNewDatabase$1 () {
-	if (hasRequiredNewDatabase$1) return newDatabase_1$1;
-	hasRequiredNewDatabase$1 = 1;
+function requireNewDatabase$2 () {
+	if (hasRequiredNewDatabase$2) return newDatabase_1$2;
+	hasRequiredNewDatabase$2 = 1;
 	let createDomain = requireCreateDomain();
-	let newTransaction = requireNewTransaction$1();
+	let newTransaction = requireNewTransaction$2();
 	let _begin = requireBegin();
 	let commit = requireCommit();
 	let rollback = requireRollback();
-	let newPool = requireNewPool$1();
+	let newPool = requireNewPool$2();
 	let lock = requireLock();
 	let executeSchema = requireSchema();
 	let express = requireHostExpress();
@@ -18890,6 +19322,470 @@ function requireNewDatabase$1 () {
 
 		c.accept = function(caller) {
 			caller.visitPg();
+		};
+
+		return c;
+	}
+
+	newDatabase_1$2 = newDatabase;
+	return newDatabase_1$2;
+}
+
+var newTransaction$1;
+var hasRequiredNewTransaction$1;
+
+function requireNewTransaction$1 () {
+	if (hasRequiredNewTransaction$1) return newTransaction$1;
+	hasRequiredNewTransaction$1 = 1;
+	const encodeBoolean = requireEncodeBoolean$1();
+	const encodeBinary = requireEncodeBinary();
+	const decodeBinary = requireDecodeBinary();
+	const deleteFromSql = requireDeleteFromSql$1();
+	const selectForUpdateSql = requireSelectForUpdateSql$1();
+	const lastInsertedSql = requireLastInsertedSql$1();
+	const limitAndOffset = requireLimitAndOffset$1();
+	const formatBigintOut = requireFormatBigintOut();
+	const insertSql = requireInsertSql$1();
+	const insert = requireInsert$1();
+	const quote = requireQuote$1();
+
+	function newResolveTransaction(domain, pool)  {
+		var rdb = { poolFactory: pool };
+		rdb.engine = 'sqlite';
+		rdb.encodeBoolean = encodeBoolean;
+		rdb.encodeBinary = encodeBinary;
+		rdb.decodeBinary = decodeBinary;
+		rdb.decodeJSON = decodeJSON;
+		rdb.encodeJSON = JSON.stringify;
+		rdb.formatBigintOut = formatBigintOut;
+		rdb.deleteFromSql = deleteFromSql;
+		rdb.selectForUpdateSql = selectForUpdateSql;
+		rdb.lastInsertedSql = lastInsertedSql;
+		rdb.insertSql = insertSql;
+		rdb.insert = insert;
+		rdb.lastInsertedIsSeparate = true;
+		rdb.multipleStatements = false;
+		rdb.limitAndOffset = limitAndOffset;
+		rdb.accept = function(caller) {
+			caller.visitSqlite();
+		};
+		rdb.aggregateCount = 0;
+		rdb.quote = quote;
+		rdb.cache = {};
+		rdb.changes = [];
+
+		return function(onSuccess, onError) {
+			pool.connect(onConnected);
+
+			function onConnected(err, client, done) {
+				try {
+					if (err) {
+						onError(err);
+						return;
+					}
+					rdb.dbClient = client;
+					rdb.dbClientDone = done;
+					domain.rdb = rdb;
+					onSuccess();
+				} catch (e) {
+					onError(e);
+				}
+			}
+		};
+	}
+
+	function decodeJSON(value) {
+		return JSON.parse(value);
+	}
+
+	newTransaction$1 = newResolveTransaction;
+	return newTransaction$1;
+}
+
+var workerClient;
+var hasRequiredWorkerClient;
+
+function requireWorkerClient () {
+	if (hasRequiredWorkerClient) return workerClient;
+	hasRequiredWorkerClient = 1;
+	const log = requireLog();
+
+	function createSqliteOPFSWorkerClient(connectionString, options = {}) {
+		const worker = options.worker || createWorker(connectionString, options);
+		let nextId = 1;
+		const pending = new Map();
+
+		worker.addEventListener('message', onMessage);
+
+		const ready = request('open', {
+			connectionString,
+			busyTimeoutMs: options.busyTimeoutMs || 5000
+		});
+
+		return {
+			executeQuery,
+			executeCommand,
+			close,
+			reset
+		};
+
+		function executeQuery(query, callback) {
+			const sql = query.sql();
+			const parameters = query.parameters || [];
+			log.emitQuery({ sql, parameters });
+			ready
+				.then(() => request('query', { sql, parameters }))
+				.then((rows) => callback(null, rows))
+				.catch(callback);
+		}
+
+		function executeCommand(query, callback) {
+			const sql = query.sql();
+			const parameters = query.parameters || [];
+			log.emitQuery({ sql, parameters });
+			ready
+				.then(() => request('command', { sql, parameters }))
+				.then((result) => callback(null, result))
+				.catch(callback);
+		}
+
+		function request(method, payload = {}) {
+			const id = nextId++;
+			return new Promise((resolve, reject) => {
+				pending.set(id, { resolve, reject });
+				worker.postMessage({
+					type: 'orange-sqlite-opfs-request',
+					id,
+					method,
+					...payload
+				});
+			});
+		}
+
+		function close() {
+			worker.removeEventListener('message', onMessage);
+			for (const entry of pending.values())
+				entry.reject(new Error('sqliteOPFS worker client closed.'));
+			pending.clear();
+			if (typeof worker.terminate === 'function')
+				worker.terminate();
+		}
+
+		function reset() {
+			// The worker serializes all requests, so there is no pooled connection state to reset.
+		}
+
+		function onMessage(event) {
+			const message = event && event.data;
+			if (!message || message.type !== 'orange-sqlite-opfs-response')
+				return;
+			const entry = pending.get(message.id);
+			if (!entry)
+				return;
+			pending.delete(message.id);
+			if (message.error)
+				entry.reject(toError(message.error));
+			else
+				entry.resolve(message.result);
+		}
+	}
+
+	function createWorker(connectionString, options) {
+		if (typeof options.createWorker === 'function')
+			return options.createWorker(connectionString, options);
+		if (options.workerUrl && typeof Worker !== 'undefined')
+			return new Worker(options.workerUrl, { type: 'module' });
+		if (typeof Worker !== 'undefined') {
+			try {
+				const source = createWorkerSource(options.sqliteModuleUrl || '@sqlite.org/sqlite-wasm');
+				const blob = new Blob([source], { type: 'text/javascript' });
+				const url = URL.createObjectURL(blob);
+				return new Worker(url, { type: 'module' });
+			}
+			catch (e) {
+				throw new Error(`sqliteOPFS could not create its worker automatically: ${e.message}`);
+			}
+		}
+		throw new Error('sqliteOPFS requires Worker support or an explicit worker/createWorker option.');
+	}
+
+	function createWorkerSource(sqliteModuleUrl) {
+		return `
+import sqlite3InitModule from ${JSON.stringify(sqliteModuleUrl)};
+
+let sqlite3Promise;
+let db;
+let queue = Promise.resolve();
+
+self.onmessage = (event) => {
+	const message = event && event.data;
+	if (!message || message.type !== 'orange-sqlite-opfs-request')
+		return;
+	queue = queue
+		.then(() => dispatch(message))
+		.then((result) => postResponse(message.id, result))
+		.catch((error) => postResponse(message.id, undefined, error));
+};
+
+async function dispatch(message) {
+	if (message.method === 'open')
+		return openDb(message.connectionString, message.busyTimeoutMs);
+	if (!db)
+		await openDb(message.connectionString || 'orange.sqlite3');
+	if (message.method === 'query')
+		return query(message.sql, message.parameters);
+	if (message.method === 'command')
+		return command(message.sql, message.parameters);
+	throw new Error('Unknown sqliteOPFS worker method "' + message.method + '".');
+}
+
+async function openDb(connectionString, busyTimeoutMs = 5000) {
+	if (db)
+		return { opened: true, reused: true };
+	const sqlite3 = await getSqlite3();
+	const filename = normalizeFilename(connectionString);
+	db = sqlite3.oo1.OpfsDb
+		? new sqlite3.oo1.OpfsDb(filename)
+		: new sqlite3.oo1.DB(filename, 'ct');
+	db.exec('PRAGMA busy_timeout=' + (Number.parseInt(busyTimeoutMs, 10) || 5000));
+	return {
+		opened: true,
+		opfs: !!sqlite3.oo1.OpfsDb,
+		filename: db.filename
+	};
+}
+
+async function getSqlite3() {
+	if (!sqlite3Promise)
+		sqlite3Promise = sqlite3InitModule();
+	return sqlite3Promise;
+}
+
+function query(sql, parameters = []) {
+	return db.exec({
+		sql,
+		bind: normalizeParameters(parameters),
+		rowMode: 'object',
+		returnValue: 'resultRows'
+	});
+}
+
+function command(sql, parameters = []) {
+	const before = Number(db.changes(true) || 0);
+	db.exec({
+		sql,
+		bind: normalizeParameters(parameters)
+	});
+	const after = Number(db.changes(true) || 0);
+	return {
+		rowsAffected: Math.max(0, after - before),
+		lastInsertRowid: Number(db.selectValue('SELECT last_insert_rowid()'))
+	};
+}
+
+function normalizeFilename(connectionString) {
+	const value = String(connectionString || 'orange.sqlite3');
+	return value.startsWith('/') ? value : '/' + value;
+}
+
+function normalizeParameters(parameters) {
+	return Array.isArray(parameters) ? parameters.map(normalizeParameter) : parameters;
+}
+
+function normalizeParameter(value) {
+	if (value instanceof ArrayBuffer)
+		return new Uint8Array(value);
+	return value;
+}
+
+function postResponse(id, result, error) {
+	self.postMessage({
+		type: 'orange-sqlite-opfs-response',
+		id,
+		result,
+		error: error ? serializeError(error) : undefined
+	});
+}
+
+function serializeError(error) {
+	return {
+		name: error && error.name,
+		message: error && error.message ? error.message : String(error),
+		stack: error && error.stack
+	};
+}
+`;
+	}
+
+	function toError(error) {
+		const e = new Error(error && error.message ? error.message : 'sqliteOPFS worker request failed.');
+		if (error && error.name)
+			e.name = error.name;
+		if (error && error.stack)
+			e.stack = error.stack;
+		return e;
+	}
+
+	workerClient = createSqliteOPFSWorkerClient;
+	return workerClient;
+}
+
+var newPool_1$1;
+var hasRequiredNewPool$1;
+
+function requireNewPool$1 () {
+	if (hasRequiredNewPool$1) return newPool_1$1;
+	hasRequiredNewPool$1 = 1;
+	const pools = requirePools();
+	const newId = requireNewId();
+	const createSqliteOPFSWorkerClient = requireWorkerClient();
+
+	function newPool(connectionString, poolOptions) {
+		let id = newId();
+		let client = createSqliteOPFSWorkerClient(connectionString, poolOptions || {});
+		let c = {};
+
+		c.connect = function(cb) {
+			cb(null, client, function(err) {
+				if (err && client.reset)
+					client.reset();
+			});
+		};
+
+		c.end = function() {
+			if (client.close)
+				client.close();
+			delete pools[id];
+			return Promise.resolve();
+		};
+
+		pools[id] = c;
+		return c;
+	}
+
+	newPool_1$1 = newPool;
+	return newPool_1$1;
+}
+
+var newDatabase_1$1;
+var hasRequiredNewDatabase$1;
+
+function requireNewDatabase$1 () {
+	if (hasRequiredNewDatabase$1) return newDatabase_1$1;
+	hasRequiredNewDatabase$1 = 1;
+	let createDomain = requireCreateDomain();
+	let newTransaction = requireNewTransaction$1();
+	let _begin = requireBegin();
+	let commit = requireCommit();
+	let rollback = requireRollback();
+	let newPool = requireNewPool$1();
+	let express = requireHostExpress();
+	let hono = requireHostHono();
+	let hostLocal = requireHostLocal();
+	let doQuery = requireQuery();
+	let doSqliteFunction = requireSqliteFunction();
+	let releaseDbClient = requireReleaseDbClient();
+
+	function newDatabase(connectionString, poolOptions) {
+		if (!connectionString)
+			throw new Error('Connection string cannot be empty');
+		poolOptions = poolOptions || { min: 1 };
+		var pool = newPool(connectionString, poolOptions);
+		pool.__sqliteSync = poolOptions && poolOptions.sync;
+
+		let c = { poolFactory: pool, hostLocal, express, hono };
+
+		c.transaction = function(options, fn) {
+			if ((arguments.length === 1) && (typeof options === 'function')) {
+				fn = options;
+				options = undefined;
+			}
+			let domain = createDomain();
+
+			if (!fn)
+				throw new Error('transaction requires a function');
+			return domain.run(runInTransaction);
+
+			function begin() {
+				return _begin(domain, options);
+			}
+
+			async function runInTransaction() {
+				let result;
+				let transaction = newTransaction(domain, pool, options);
+				await new Promise(transaction)
+					.then(begin)
+					.then(() => fn(domain))
+					.then((res) => result = res)
+					.then(() => commit(domain))
+					.then(null, (e) => rollback(domain, e));
+				return result;
+			}
+		};
+
+		c.createTransaction = function(options) {
+			let domain = createDomain();
+			let transaction = newTransaction(domain, pool);
+			let p = domain.run(() => new Promise(transaction).then(begin));
+
+			function run(fn) {
+				return p.then(() => fn(domain));
+			}
+			run.rollback = rollback.bind(null, domain);
+			run.commit = commit.bind(null, domain);
+			return run;
+
+			function begin() {
+				return _begin(domain, options);
+			}
+		};
+
+		c.query = function(query) {
+			let domain = createDomain();
+			let transaction = newTransaction(domain, pool);
+			let p = domain.run(() => new Promise(transaction)
+				.then(() => doQuery(domain, query).then(onResult, onError)));
+			return p;
+
+			function onResult(result) {
+				releaseDbClient(domain);
+				return result;
+			}
+
+			function onError(e) {
+				releaseDbClient(domain);
+				throw e;
+			}
+		};
+
+		c.sqliteFunction = function(...args) {
+			let domain = createDomain();
+			let transaction = newTransaction(domain, pool);
+			let p = domain.run(() => new Promise(transaction)
+				.then(() => doSqliteFunction(domain, ...args).then(onResult, onError)));
+			return p;
+
+			function onResult(result) {
+				releaseDbClient(domain);
+				return result;
+			}
+
+			function onError(e) {
+				releaseDbClient(domain);
+				throw e;
+			}
+		};
+
+		c.rollback = rollback;
+		c.commit = commit;
+		c.__sqliteSync = poolOptions && poolOptions.sync;
+
+		c.end = function() {
+			return pool.end ? pool.end() : Promise.resolve();
+		};
+
+		c.accept = function(caller) {
+			caller.visitSqlite();
 		};
 
 		return c;
@@ -19457,11 +20353,14 @@ function requireIndexBrowser () {
 	let _d1;
 	let _pg;
 	let _pglite;
+	let _sqliteOPFS;
 
 	var connectViaPool = function() {
 		return client.apply(null, arguments);
 	};
 	connectViaPool.createPatch = client.createPatch;
+	connectViaPool.createDbWorkerClient = requireDbWorkerClient();
+	connectViaPool.createDbWorkerHandler = requireDbWorkerHandler();
 	connectViaPool.createSyncWorkerClient = requireSyncWorkerClient();
 	connectViaPool.createSyncWorkerHandler = requireSyncWorkerHandler();
 	connectViaPool.table = requireTable();
@@ -19486,7 +20385,7 @@ function requireIndexBrowser () {
 	Object.defineProperty(connectViaPool, 'd1', {
 		get: function() {
 			if (!_d1)
-				_d1 = requireNewDatabase$2();
+				_d1 = requireNewDatabase$3();
 			return _d1;
 		}
 	});
@@ -19494,8 +20393,16 @@ function requireIndexBrowser () {
 	Object.defineProperty(connectViaPool, 'pglite', {
 		get: function() {
 			if (!_pglite)
-				_pglite = requireNewDatabase$1();
+				_pglite = requireNewDatabase$2();
 			return _pglite;
+		}
+	});
+
+	Object.defineProperty(connectViaPool, 'sqliteOPFS', {
+		get: function() {
+			if (!_sqliteOPFS)
+				_sqliteOPFS = requireNewDatabase$1();
+			return _sqliteOPFS;
 		}
 	});
 

@@ -9,6 +9,7 @@ let _mySql;
 let _pg;
 let _pglite;
 let _sqlite;
+let _sqliteOPFS;
 let _mssqlNative;
 let _sap;
 let _mssql;
@@ -24,6 +25,8 @@ var connectViaPool = function(connectionString) {
 		return client.apply(null, arguments);
 };
 connectViaPool.createPatch = client.createPatch;
+connectViaPool.createDbWorkerClient = require('./client/dbWorkerClient');
+connectViaPool.createDbWorkerHandler = require('./client/dbWorkerHandler');
 connectViaPool.createSyncWorkerClient = require('./client/syncWorkerClient');
 connectViaPool.createSyncWorkerHandler = require('./client/syncWorkerHandler');
 connectViaPool.table = require('./table');
@@ -101,6 +104,14 @@ Object.defineProperty(connectViaPool, 'sqlite', {
 				throw new Error('SQLite is not supported in this environment');
 		}
 		return _sqlite;
+	}
+});
+
+Object.defineProperty(connectViaPool, 'sqliteOPFS', {
+	get: function() {
+		if (!_sqliteOPFS)
+			_sqliteOPFS = require('./sqliteOPFS/newDatabase');
+		return _sqliteOPFS;
 	}
 });
 

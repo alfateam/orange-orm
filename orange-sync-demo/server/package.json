@@ -1,0 +1,16 @@
+{
+  "name": "orange-sync-demo-server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "body-parser": "^1.20.3",
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "orange-orm": "file:../..",
+    "pg": "^8.13.1"
+  }
+}

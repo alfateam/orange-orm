@@ -63,6 +63,7 @@ function rdbClient(options = {}) {
 	client.postgres = onProvider.bind(null, 'postgres');
 	client.d1 = onProvider.bind(null, 'd1');
 	client.sqlite = onProvider.bind(null, 'sqlite');
+	client.sqliteOPFS = onProvider.bind(null, 'sqliteOPFS');
 	client.sap = onProvider.bind(null, 'sap');
 	client.oracle = onProvider.bind(null, 'oracle');
 	client.http = onProvider.bind(null, 'http');//todo
@@ -87,7 +88,9 @@ function rdbClient(options = {}) {
 		client.tables = options.tables;
 		// return client;
 	}
-	client.syncClient = newSyncClient(client, getDb, axiosInterceptor);
+	client.syncClient = baseUrl && typeof baseUrl.__createSyncClient === 'function'
+		? baseUrl.__createSyncClient(client, getDb, axiosInterceptor)
+		: newSyncClient(client, getDb, axiosInterceptor);
 	// else {
 	let handler = {
 		get(_target, property,) {

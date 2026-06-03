@@ -53,6 +53,11 @@ function createProviders(index) {
 			return createPool.bind(null, 'sqlite');
 		}
 	});
+	Object.defineProperty(dbMap, 'sqliteOPFS', {
+		get:  function() {
+			return createPool.bind(null, 'sqliteOPFS');
+		}
+	});
 	Object.defineProperty(dbMap, 'd1', {
 		get:  function() {
 			return createPool.bind(null, 'd1');
@@ -111,6 +116,9 @@ function negotiateCachedPool(fn, providers) {
 		get sqlite() {
 			return createPool.bind(null, 'sqlite');
 		},
+		get sqliteOPFS() {
+			return createPool.bind(null, 'sqliteOPFS');
+		},
 		get d1() {
 			return createPool.bind(null, 'd1');
 		},
@@ -121,7 +129,7 @@ function negotiateCachedPool(fn, providers) {
 
 	function createPool(providerName, ...args) {
 		//todo
-		if (providerName === 'd1') {
+		if (providerName === 'd1' || providerName === 'sqliteOPFS') {
 			return providers[providerName].apply(null, args);
 		}
 		const key = JSON.stringify(args);

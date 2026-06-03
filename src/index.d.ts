@@ -17,6 +17,7 @@ declare namespace r {
     function postgres(connectionString: string, options?: PoolOptions): Pool;
     function pglite(config?: PGliteOptions | string | undefined, options?: PoolOptions): Pool;
     function sqlite(connectionString: string, options?: PoolOptions): Pool;
+    function sqliteOPFS(connectionString: string, options?: PoolOptions): Pool;
     function sap(connectionString: string, options?: PoolOptions): Pool;
     function mssql(connectionConfig: ConnectionConfiguration, options?: PoolOptions): Pool;
     function mssql(connectionString: string, options?: PoolOptions): Pool;
@@ -30,6 +31,8 @@ declare namespace r {
 	): MappedDbDef<MergeProperties<V, V>>;
     function createPatch(original: any[], modified: any[]): JsonPatch;
     function createPatch(original: any, modified: any): JsonPatch;
+    function createDbWorkerClient(worker: SyncWorkerLike): DbWorkerClient;
+    function createDbWorkerHandler(client: unknown, options?: DbWorkerHandlerOptions): DbWorkerHandler;
     function createSyncWorkerClient(worker: SyncWorkerLike): SyncWorkerClient;
     function createSyncWorkerHandler(syncClient: SyncWorkerSyncClient, options?: SyncWorkerHandlerOptions): SyncWorkerHandler;
 
@@ -52,6 +55,28 @@ declare namespace r {
         on(event: string, listener: (payload: unknown) => void): () => void;
         off(event: string, listener: (payload: unknown) => void): void;
         close(): void;
+    }
+
+    export interface DbWorkerClient extends Pool {
+        syncClient: SyncWorkerClient & {
+            start(options?: unknown): Promise<unknown>;
+            stop(options?: unknown): Promise<unknown>;
+            isRunning(options?: unknown): Promise<unknown>;
+            getConfig(options?: unknown): Promise<unknown>;
+            once(event: string, listener: (payload: unknown) => void): () => void;
+            waitForInitialReady(options?: unknown): Promise<unknown>;
+        };
+        close(): void;
+    }
+
+    export interface DbWorkerHandlerOptions {
+        postMessage?: (message: unknown) => void;
+        autoStart?: boolean;
+    }
+
+    export interface DbWorkerHandler {
+        handleMessage(event: { data: unknown }): Promise<void>;
+        stop(): void;
     }
 
     export interface SyncWorkerSyncClient {

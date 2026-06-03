@@ -1,0 +1,19 @@
+{
+  "name": "orange-sync-demo-client",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0"
+  },
+  "dependencies": {
+    "@sqlite.org/sqlite-wasm": "^3.53.0-build1",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "lucide-vue-next": "^0.468.0",
+    "orange-orm": "file:../..",
+    "vite": "^6.0.5",
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {}
+}
