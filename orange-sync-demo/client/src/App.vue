@@ -1,14 +1,4 @@
 <script setup>
-import {
-  Activity,
-  Check,
-  CloudDownload,
-  CloudUpload,
-  Plus,
-  RefreshCw,
-  Server,
-  Wifi
-} from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
 import { db, initLocalSchema } from './db.js';
 
@@ -164,7 +154,7 @@ async function run(message, fn) {
   <main class="shell">
     <aside class="sidebar">
       <div class="brand">
-        <span class="mark"><Activity :size="20" /></span>
+        <span class="mark">OS</span>
         <div>
           <h1>Orange Sync</h1>
           <p>Vue + sqliteOPFS + Postgres</p>
@@ -173,7 +163,7 @@ async function run(message, fn) {
 
       <section class="status-panel">
         <div class="status-line">
-          <Wifi :size="17" />
+          <span class="icon">~</span>
           <span>{{ status }}</span>
         </div>
         <p v-if="lastSync">Last sync {{ lastSync.toLocaleTimeString() }}</p>
@@ -181,10 +171,10 @@ async function run(message, fn) {
       </section>
 
       <div class="actions">
-        <button @click="syncBoth" :disabled="busy"><RefreshCw :size="16" /> Sync</button>
-        <button @click="push" :disabled="busy"><CloudUpload :size="16" /> Push</button>
-        <button @click="pull" :disabled="busy"><CloudDownload :size="16" /> Pull</button>
-        <button @click="createServerChange" :disabled="busy"><Server :size="16" /> Server edit</button>
+        <button @click="syncBoth" :disabled="busy"><span class="icon">R</span> Sync</button>
+        <button @click="push" :disabled="busy"><span class="icon">U</span> Push</button>
+        <button @click="pull" :disabled="busy"><span class="icon">D</span> Pull</button>
+        <button @click="createServerChange" :disabled="busy"><span class="icon">S</span> Server edit</button>
       </div>
     </aside>
 
@@ -194,7 +184,7 @@ async function run(message, fn) {
           <p class="eyebrow">Projects</p>
           <h2>Two-way sync workspace</h2>
         </div>
-        <button class="primary" @click="createProject" :disabled="busy"><Plus :size="16" /> New local project</button>
+        <button class="primary" @click="createProject" :disabled="busy"><span class="icon">+</span> New local project</button>
       </header>
 
       <div class="grid">
@@ -239,7 +229,7 @@ async function run(message, fn) {
           <section class="tasks">
             <div class="task-input">
               <input v-model="newTaskTitle" placeholder="Add a local task" @keydown.enter="addTask" />
-              <button @click="addTask" :disabled="busy || !newTaskTitle.trim()"><Plus :size="16" /></button>
+              <button @click="addTask" :disabled="busy || !newTaskTitle.trim()">+</button>
             </div>
 
             <button
@@ -248,7 +238,7 @@ async function run(message, fn) {
               class="task"
               @click="toggleTask(task)"
             >
-              <span class="check" :class="{ done: task.done }"><Check :size="14" /></span>
+              <span class="check" :class="{ done: task.done }">✓</span>
               <span>
                 <strong>{{ task.title }}</strong>
                 <small>{{ task.assignee?.name || 'Unassigned' }}</small>

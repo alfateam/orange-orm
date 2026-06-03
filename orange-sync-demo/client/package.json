@@ -9,11 +9,10 @@
   },
   "dependencies": {
     "@sqlite.org/sqlite-wasm": "^3.53.0-build1",
-    "@vitejs/plugin-vue": "^5.2.1",
-    "lucide-vue-next": "^0.468.0",
+    "@vitejs/plugin-vue": "6.0.7",
     "orange-orm": "file:../..",
-    "vite": "^6.0.5",
-    "vue": "^3.5.13"
+    "vite": "8.0.16",
+    "vue": "3.5.35"
   },
   "devDependencies": {}
 }
