@@ -10,10 +10,11 @@ const localDb = rdb.sqliteOPFS('orange-sync-demo.sqlite3', {
   sync: {
     url: syncUrl,
     tables: syncTables,
-    auto: {
-      intervalMs: 15000,
-      push: true,
-      pull: true
+    auto: 
+    {
+      intervalMs: 3000,
+      push: false,
+      pull: false
     }
   }
 });

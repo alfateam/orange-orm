@@ -7,6 +7,8 @@ import { createDemoMap, demoDbOptions, syncTables } from '../../shared/schema.js
 
 const require = createRequire(import.meta.url);
 const rdb = require('orange-orm');
+rdb.on('query',console.dir)
+
 const orangeOrmMain = require.resolve('orange-orm');
 const { setupChangeTracking } = require(path.join(path.dirname(orangeOrmMain), 'sync/setupChangeTracking.js'));
 const port = Number(process.env.PORT || 3055);
