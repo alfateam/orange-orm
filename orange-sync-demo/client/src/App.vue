@@ -20,7 +20,10 @@ onMounted(async () => {
     await initLocalSchema();
     await refreshLocal();
   });
-  await pull();
+  await db.syncClient.start();
+  await refreshLocal();
+  lastSync.value = new Date();
+  status.value = 'Idle';
 });
 
 async function refreshLocal() {

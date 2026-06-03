@@ -3,14 +3,16 @@ import { describe, expect, test } from 'vitest';
 const newSyncClient = require('../src/client/syncClient');
 
 describe('sync client auto start', () => {
-	test('starts automatically when sync auto config is enabled', async () => {
+	test('starts when start is called and stays running', async () => {
 		const client = newSyncClient({}, async () => ({
 			__sqliteSync: {
 				url: '/rdb',
-				auto: { intervalMs: 0, push: false, pull: false }
+				auto: { enabled: true, intervalMs: 0, push: false, pull: false }
 			}
 		}), {});
 
+		expect(client.isRunning()).toBe(false);
+		await client.start();
 		await new Promise((resolve) => setTimeout(resolve, 0));
 
 		expect(client.isRunning()).toBe(true);

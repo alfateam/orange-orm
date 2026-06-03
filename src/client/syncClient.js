@@ -19,10 +19,6 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		pull: observedPull
 	}, getConfig);
 
-	Promise.resolve()
-		.then(() => auto.start())
-		.catch(() => {});
-
 	return {
 		pull: observedPull,
 		push: observedPush,
@@ -616,6 +612,7 @@ function normalizeSyncConfig(sync) {
 		pull: sync.pull === undefined ? undefined : normalizePullConfig(sync.pull, endpoint, tables),
 		tables,
 		initialReadyMaxAgeMs,
+		auto: sync.auto,
 		push: normalizeEndpoint(sync.push)
 	};
 }
