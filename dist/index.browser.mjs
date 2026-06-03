@@ -4166,10 +4166,6 @@ function requireSyncClient () {
 			pull: observedPull
 		}, getConfig);
 
-		Promise.resolve()
-			.then(() => auto.start())
-			.catch(() => {});
-
 		return {
 			pull: observedPull,
 			push: observedPush,
@@ -4763,6 +4759,7 @@ function requireSyncClient () {
 			pull: sync.pull === undefined ? undefined : normalizePullConfig(sync.pull, endpoint, tables),
 			tables,
 			initialReadyMaxAgeMs,
+			auto: sync.auto,
 			push: normalizeEndpoint(sync.push)
 		};
 	}
