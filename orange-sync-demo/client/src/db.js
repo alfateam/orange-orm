@@ -1,5 +1,5 @@
 import rdb from 'orange-orm';
-import { createDemoMap, syncTables } from '../../shared/schema.js';
+import { createDemoMap, demoDbOptions, syncTables } from '../../shared/schema.js';
 import sqliteWorkerUrl from './sqlite-opfs-worker.mjs?worker&url';
 
 const syncUrl = import.meta.env.VITE_SYNC_URL || 'http://localhost:3055/rdb';
@@ -19,7 +19,8 @@ const localDb = rdb.sqliteOPFS('orange-sync-demo.sqlite3', {
 });
 
 export const db = map({
-  db: localDb
+  db: localDb,
+  ...demoDbOptions
 });
 
 export async function initLocalSchema() {

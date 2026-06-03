@@ -3,7 +3,7 @@ import cors from 'cors';
 import express from 'express';
 import { createRequire } from 'node:module';
 import path from 'node:path';
-import { createDemoMap, syncTables } from '../../shared/schema.js';
+import { createDemoMap, demoDbOptions, syncTables } from '../../shared/schema.js';
 
 const require = createRequire(import.meta.url);
 const rdb = require('orange-orm');
@@ -14,7 +14,8 @@ const connectionString = process.env.DATABASE_URL || 'postgres://orange:orange@l
 
 const map = createDemoMap(rdb);
 const db = map({
-  db: (con) => con.pg(connectionString, { size: 4 })
+  db: (con) => con.pg(connectionString, { size: 4 }),
+  ...demoDbOptions
 });
 
 const schemaSql = `

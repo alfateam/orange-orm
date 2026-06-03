@@ -53,4 +53,12 @@ export function createDemoMap(rdb) {
   }));
 }
 
+export const demoDbOptions = {
+  project: {
+    updatedAt: {
+      concurrency: 'overwrite'
+    }
+  }
+};
+
 export const syncTables = ['team', 'person', 'project', 'projectDetail', 'task'];
