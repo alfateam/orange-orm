@@ -15607,8 +15607,8 @@ function requireCreateProviders () {
 		};
 
 		function createPool(providerName, ...args) {
-			//todo
-			if (providerName === 'd1' || providerName === 'sqliteOPFS') {
+			// D1 bindings are request-scoped and should not be cached. Browser SQLite/OPFS must be cached to avoid creating a worker per query.
+			if (providerName === 'd1') {
 				return providers[providerName].apply(null, args);
 			}
 			const key = JSON.stringify(args);

@@ -4,21 +4,22 @@ import sqliteWorkerUrl from './sqlite-opfs-worker.mjs?worker&url';
 
 const syncUrl = import.meta.env.VITE_SYNC_URL || 'http://localhost:3055/rdb';
 const map = createDemoMap(rdb);
+const localDb = rdb.sqliteOPFS('orange-sync-demo.sqlite3', {
+  busyTimeoutMs: 5000,
+  workerUrl: sqliteWorkerUrl,
+  sync: {
+    url: syncUrl,
+    tables: syncTables,
+    auto: {
+      intervalMs: 15000,
+      push: true,
+      pull: true
+    }
+  }
+});
 
 export const db = map({
-  db: (con) => con.sqliteOPFS('orange-sync-demo.sqlite3', {
-    busyTimeoutMs: 5000,
-    workerUrl: sqliteWorkerUrl,
-    sync: {
-      url: syncUrl,
-      tables: syncTables,
-      auto: {
-        intervalMs: 15000,
-        push: true,
-        pull: true
-      }
-    }
-  })
+  db: localDb
 });
 
 export async function initLocalSchema() {

@@ -98,6 +98,25 @@ describe('db worker rpc', () => {
 		expect(row.name).toBe('OPFS');
 		expect(raw.name).toBe('OPFS');
 	});
+
+	test('caches sqliteOPFS provider connection across ORM operations', async () => {
+		let workers = 0;
+		const sqlBridge = createSqlBridge(sqlWorkerDb);
+		const cachedDb = map({
+			db: (con) => con.sqliteOPFS('cached-app.db', {
+				createWorker: () => {
+					workers += 1;
+					return sqlBridge.worker;
+				}
+			})
+		});
+
+		await cachedDb.customer.insert({ id: 9011, name: 'CachedOPFS', balance: 10, isActive: true });
+		const row = await cachedDb.customer.getById(9011);
+
+		expect(row.name).toBe('CachedOPFS');
+		expect(workers).toBe(1);
+	});
 });
 
 function createBridge(db) {

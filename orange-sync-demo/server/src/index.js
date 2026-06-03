@@ -64,6 +64,12 @@ app.use(cors({
 }));
 app.use(bodyParser.json({ limit: '5mb' }));
 
+app.use((req, _res, next) => {
+  console.log(new Date().toISOString() + ' ' + req.method + ' ' + req.originalUrl);
+  next();
+});
+
+
 app.get('/health', (_req, res) => {
   res.json({ ok: true });
 });
