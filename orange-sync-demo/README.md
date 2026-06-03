@@ -12,6 +12,16 @@ npm run db:up
 npm run dev
 ```
 
+Root `npm install` installs both `client` and `server`. You can also install them separately:
+
+```bash
+npm run pack:orange-orm
+cd client && npm install
+cd ../server && npm install
+```
+
+The demo generates `vendor/orange-orm-5.2.0.tgz` from the local Orange ORM repo. The tarball is ignored by git; regenerate it with `npm run pack:orange-orm` after local Orange ORM changes.
+
 Backend: http://localhost:3055
 
 Frontend: http://localhost:5173

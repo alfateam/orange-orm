@@ -10,7 +10,7 @@
   "dependencies": {
     "@sqlite.org/sqlite-wasm": "^3.53.0-build1",
     "@vitejs/plugin-vue": "6.0.7",
-    "orange-orm": "file:../..",
+    "orange-orm": "file:../vendor/orange-orm-5.2.0.tgz",
     "vite": "8.0.16",
     "vue": "3.5.35"
   },

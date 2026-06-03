@@ -3,18 +3,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n server,client -c blue,green \"npm run dev -w server\" \"npm run dev -w client\"",
-    "dev:server": "npm run dev -w server",
-    "dev:client": "npm run dev -w client",
+    "pack:orange-orm": "node scripts/pack-orange-orm.mjs",
+    "postinstall": "node scripts/install.mjs",
+    "dev": "node scripts/dev.mjs",
+    "dev:server": "npm run dev --prefix server",
+    "dev:client": "npm run dev --prefix client",
+    "build:client": "npm run build --prefix client",
     "db:up": "docker compose up -d postgres",
     "db:down": "docker compose down -v",
     "install:all": "npm install"
-  },
-  "workspaces": [
-    "server",
-    "client"
-  ],
-  "devDependencies": {
-    "concurrently": "^9.1.2"
   }
 }
