@@ -988,6 +988,11 @@ export interface SyncInitialReadyEvent<M extends Record<string, any> = any> {
   source: 'persisted' | 'pull';
 }
 
+export interface SyncErrorEvent {
+  method: 'push' | 'pull';
+  error: Error;
+}
+
 export interface SyncPullResult {
   applied: number;
   tables: string[];
@@ -1035,8 +1040,11 @@ export type DBClient<M extends Record<string, TableDefinition<M>>> = {
     isRunning(): boolean | Promise<boolean>;
     getConfig(): Promise<SyncConfig<M> | null>;
     on(event: 'initial-ready', listener: (payload: SyncInitialReadyEvent<M>) => void): () => void;
+    on(event: 'error' | 'push-error' | 'pull-error', listener: (payload: SyncErrorEvent) => void): () => void;
     off(event: 'initial-ready', listener: (payload: SyncInitialReadyEvent<M>) => void): void;
+    off(event: 'error' | 'push-error' | 'pull-error', listener: (payload: SyncErrorEvent) => void): void;
     once(event: 'initial-ready', listener: (payload: SyncInitialReadyEvent<M>) => void): () => void;
+    once(event: 'error' | 'push-error' | 'pull-error', listener: (payload: SyncErrorEvent) => void): () => void;
     waitForInitialReady(): Promise<SyncInitialReadyEvent<M>>;
   };
 

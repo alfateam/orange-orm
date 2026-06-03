@@ -10,15 +10,22 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 	const syncClientTable = 'orange_sync_client';
 	const syncOutboxTable = 'orange_sync_outbox';
 	const initialReadyListeners = new Set();
+	const eventListeners = new Map();
 	let initialReadyEmitted = false;
+	const observedPush = observeSyncMethod('push', push);
+	const observedPull = observeSyncMethod('pull', pull);
 	const auto = createSyncAuto({
-		push,
-		pull
+		push: observedPush,
+		pull: observedPull
 	}, getConfig);
 
+	Promise.resolve()
+		.then(() => auto.start())
+		.catch(() => {});
+
 	return {
-		pull,
-		push,
+		pull: observedPull,
+		push: observedPush,
 		start: auto.start,
 		stop: auto.stop,
 		isRunning: auto.isRunning,
@@ -32,6 +39,28 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 	async function getConfig() {
 		const db = await getDb();
 		return normalizeSyncConfig(db && db.__sqliteSync);
+	}
+
+	function observeSyncMethod(method, fn) {
+		return async function observedSyncMethod(options) {
+			try {
+				return await fn(options);
+			}
+			catch (error) {
+				const payload = { method, error };
+				emit(method + '-error', payload);
+				emit('error', payload);
+				throw error;
+			}
+		};
+	}
+
+	function emit(event, payload) {
+		const listeners = eventListeners.get(event);
+		if (!listeners)
+			return;
+		for (const listener of Array.from(listeners))
+			listener(payload);
 	}
 
 	async function pull(options = {}) {
@@ -476,21 +505,37 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 	}
 
 	function on(event, listener) {
-		if (event !== 'initial-ready' || typeof listener !== 'function')
+		if (typeof event !== 'string' || typeof listener !== 'function')
 			return () => {};
-		initialReadyListeners.add(listener);
-		void maybeEmitInitialReadyFromDb('persisted');
+		if (event === 'initial-ready') {
+			initialReadyListeners.add(listener);
+			void maybeEmitInitialReadyFromDb('persisted');
+			return () => off(event, listener);
+		}
+		let listeners = eventListeners.get(event);
+		if (!listeners) {
+			listeners = new Set();
+			eventListeners.set(event, listeners);
+		}
+		listeners.add(listener);
 		return () => off(event, listener);
 	}
 
 	function off(event, listener) {
-		if (event !== 'initial-ready')
+		if (event === 'initial-ready') {
+			initialReadyListeners.delete(listener);
 			return;
-		initialReadyListeners.delete(listener);
+		}
+		const listeners = eventListeners.get(event);
+		if (!listeners)
+			return;
+		listeners.delete(listener);
+		if (listeners.size === 0)
+			eventListeners.delete(event);
 	}
 
 	function once(event, listener) {
-		if (event !== 'initial-ready' || typeof listener !== 'function')
+		if (typeof event !== 'string' || typeof listener !== 'function')
 			return () => {};
 		const unsubscribe = on(event, (payload) => {
 			unsubscribe();

@@ -22,7 +22,7 @@ function createSyncAuto(syncClient, getConfig, options = {}) {
 		running = true;
 		if (config.intervalMs > 0 && timers && typeof timers.setInterval === 'function') {
 			intervalId = timers.setInterval(() => {
-				void runNow();
+				void runNow().catch(() => {});
 			}, config.intervalMs);
 		}
 		subscribeOnline();
@@ -74,7 +74,7 @@ function createSyncAuto(syncClient, getConfig, options = {}) {
 			return;
 		const onOnline = () => {
 			if (running)
-				void runNow();
+				void runNow().catch(() => {});
 		};
 		onlineTarget.addEventListener('online', onOnline);
 		unsubscribeOnline = () => onlineTarget.removeEventListener('online', onOnline);
