@@ -5,6 +5,7 @@ var purify = require('./date/purify');
 
 function _new(column) {
 	column.tsType = 'DateColumn';
+	column.hasTimeZone = true;
 	column.purify = purify;
 	column.encode = newEncode(column);
 	column.decode = newDecode(column);

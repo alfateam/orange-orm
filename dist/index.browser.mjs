@@ -7851,6 +7851,7 @@ function requireDateWithTimeZone () {
 
 	function _new(column) {
 		column.tsType = 'DateColumn';
+		column.hasTimeZone = true;
 		column.purify = purify;
 		column.encode = newEncode(column);
 		column.decode = newDecode(column);
@@ -9320,7 +9321,10 @@ function requireNewUpdateCommandCore () {
 
 		function appendNullSafeComparison(column, encoded) {
 			const columnSql = quote(column._dbName);
-			if (engine === 'pg') {
+			if (engine === 'pg' && column.tsType === 'DateColumn') {
+				command = appendPgDateComparison(column, columnSql, encoded);
+			}
+			else if (engine === 'pg') {
 				command = command.append(separator + columnSql + ' IS NOT DISTINCT FROM ').append(encoded);
 			}
 			else if (engine === 'mysql') {
@@ -9354,6 +9358,19 @@ function requireNewUpdateCommandCore () {
 				else
 					command = command.append(separator + columnSql + '=').append(encoded);
 			}
+			separator = ' AND ';
+			return command;
+		}
+
+		function appendPgDateComparison(column, columnSql, encoded) {
+			if (encoded.sql() === 'null') {
+				command = command.append(separator + columnSql + ' IS NULL');
+				separator = ' AND ';
+				return command;
+			}
+			const castType = column.hasTimeZone ? 'timestamptz' : 'timestamp';
+			const sql = separator + "date_trunc('milliseconds', " + columnSql + ") IS NOT DISTINCT FROM date_trunc('milliseconds', (" + encoded.sql() + ')::' + castType + ')';
+			command = command.append(newParameterized(sql, encoded.parameters));
 			separator = ' AND ';
 			return command;
 		}
@@ -14533,11 +14550,10 @@ function requireApplyPatch () {
 				if ((concurrency === 'optimistic') || (concurrency === 'skipOnConflict')) {
 					let oldValue = getOldValue(object, change.path);
 					try {
-						// if (column?.tsType === 'DateColumn') {
-						// 	assertDatesEqual(oldValue, expectedOldValue);
-						// }
-						// else
-						assertDeepEqual(oldValue, expectedOldValue);
+						if (column && column.tsType === 'DateColumn')
+							assertDatesEqual(oldValue, expectedOldValue);
+						else
+							assertDeepEqual(oldValue, expectedOldValue);
 					}
 					catch (e) {
 						if (concurrency === 'skipOnConflict')
@@ -14564,23 +14580,32 @@ function requireApplyPatch () {
 
 	}
 
-	// function assertDatesEqual(date1, date2) {
-	// 	if (date1 && date2) {
-	// 		const parts1 = date1.split('T');
-	// 		const time1parts = (parts1[1] || '').split(/[-+.]/);
-	// 		const parts2 = date2.split('T');
-	// 		const time2parts = (parts2[1] || '').split(/[-+.]/);
-	// 		while (time1parts.length !== time2parts.length) {
-	// 			if (time1parts.length > time2parts.length)
-	// 				time1parts.pop();
-	// 			else if (time1parts.length < time2parts.length)
-	// 				time2parts.pop();
-	// 		}
-	// 		date1 = `${parts1[0]}T${time1parts[0]}`;
-	// 		date2 = `${parts2[0]}T${time2parts[0]}`;
-	// 	}
-	// 	assertDeepEqual(date1, date2);
-	// }
+	function assertDatesEqual(a, b) {
+		const dateA = normalizeDateForCompare(a);
+		const dateB = normalizeDateForCompare(b);
+		if (dateA !== undefined && dateB !== undefined) {
+			if (dateA !== dateB)
+				throw new Error('A, b are not equal');
+			return;
+		}
+		assertDeepEqual(a, b);
+	}
+
+	function normalizeDateForCompare(value) {
+		if (value == null)
+			return value;
+		if (value instanceof Date)
+			return value.getTime();
+		if (typeof value !== 'string')
+			return undefined;
+		let normalized = value.replace(' ', 'T');
+		if (/[+-]\d{2}$/.test(normalized))
+			normalized += ':00';
+		else if (/^\d{4}-\d{2}-\d{2}T/.test(normalized) && !/(Z|[+-]\d{2}:?\d{2})$/.test(normalized))
+			normalized += 'Z';
+		const time = Date.parse(normalized);
+		return Number.isNaN(time) ? undefined : time;
+	}
 
 	function assertDeepEqual(a, b) {
 		if (JSON.stringify(a) !== JSON.stringify(b))

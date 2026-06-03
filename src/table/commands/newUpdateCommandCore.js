@@ -81,7 +81,10 @@ function newUpdateCommandCore(context, table, columns, row, concurrencyState) {
 
 	function appendNullSafeComparison(column, encoded) {
 		const columnSql = quote(column._dbName);
-		if (engine === 'pg') {
+		if (engine === 'pg' && column.tsType === 'DateColumn') {
+			command = appendPgDateComparison(column, columnSql, encoded);
+		}
+		else if (engine === 'pg') {
 			command = command.append(separator + columnSql + ' IS NOT DISTINCT FROM ').append(encoded);
 		}
 		else if (engine === 'mysql') {
@@ -115,6 +118,19 @@ function newUpdateCommandCore(context, table, columns, row, concurrencyState) {
 			else
 				command = command.append(separator + columnSql + '=').append(encoded);
 		}
+		separator = ' AND ';
+		return command;
+	}
+
+	function appendPgDateComparison(column, columnSql, encoded) {
+		if (encoded.sql() === 'null') {
+			command = command.append(separator + columnSql + ' IS NULL');
+			separator = ' AND ';
+			return command;
+		}
+		const castType = column.hasTimeZone ? 'timestamptz' : 'timestamp';
+		const sql = separator + "date_trunc('milliseconds', " + columnSql + ") IS NOT DISTINCT FROM date_trunc('milliseconds', (" + encoded.sql() + ')::' + castType + ')';
+		command = command.append(newParameterized(sql, encoded.parameters));
 		separator = ' AND ';
 		return command;
 	}
