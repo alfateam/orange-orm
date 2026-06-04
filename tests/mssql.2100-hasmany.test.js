@@ -31,12 +31,12 @@ describe('mssql getMany hasMany with more than 2100 child rows', () => {
 	beforeAll(async () => {
 		await createDemoDatabase();
 		await initMs(connections.mssql);
-		if (major === 18)
+		if (major >= 22)
 			await initMs(connections.mssqlNative);
 	}, 30000);
 
 	test('mssql', async () => await verify(connections.mssql, 9000000000000000n, 700000), 60000);
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify(connections.mssqlNative, 9000000000010000n, 800000), 60000);
 
 	async function createDemoDatabase() {

@@ -78,7 +78,7 @@ createExpressHookTests({
 	init: initMs
 });
 
-if (major === 18) {
+if (major >= 22) {
 	createExpressHookTests({
 		name: 'mssqlNative',
 		port: 3025,

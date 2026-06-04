@@ -32,7 +32,7 @@ beforeAll(async () => {
 	await insertData('pg');
 	await insertData('pglite');
 	await insertData('mssql');
-	if (major === 18)
+	if (major >= 22)
 		await insertData('mssqlNative');
 	await insertData('mysql');
 	await insertData('mariadb');
@@ -153,7 +153,7 @@ describe('offset', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -188,7 +188,7 @@ describe('boolean filter', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -212,7 +212,7 @@ describe('boolean filter where direct', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -236,7 +236,7 @@ describe('boolean legacy filter', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -260,7 +260,7 @@ describe('getOne ', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -348,7 +348,7 @@ describe('empty array-filter legacy', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -371,7 +371,7 @@ describe('primary key filter array', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -397,7 +397,7 @@ describe('primary key filter array legacy', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -423,7 +423,7 @@ describe('empty array-filter', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -445,7 +445,7 @@ describe('AND empty-array', () => {
 	test('pg', async () => await verify('pg'));
 	test('pglite', async () => await verify('pglite')); test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -465,7 +465,7 @@ describe('AND one in array', () => {
 	test('pg', async () => await verify('pg'));
 	test('pglite', async () => await verify('pglite')); test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -485,7 +485,7 @@ describe('boolean true filter', () => {
 	test('pg', async () => await verify('pg'));
 	test('pglite', async () => await verify('pglite')); test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -507,7 +507,7 @@ describe('in filter', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -538,7 +538,7 @@ describe('in filter on string column', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -569,7 +569,7 @@ describe('in filter with OR', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -605,7 +605,7 @@ describe('in filter with AND', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -636,7 +636,7 @@ describe('in filter with NOT and combined OR/AND', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -667,7 +667,7 @@ describe('between filter', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -698,7 +698,7 @@ describe('between filter with column bound', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -728,7 +728,7 @@ describe('any-subFilter filter nested', () => {
 	test('pg', async () => await verify('pg'));
 	test('pglite', async () => await verify('pglite')); test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -764,7 +764,7 @@ describe('any-subFilter legacy filter nested', () => {
 	test('pg', async () => await verify('pg'));
 	test('pglite', async () => await verify('pglite')); test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -800,7 +800,7 @@ describe('any-subFilter filter nested where', () => {
 	test('pg', async () => await verify('pg'));
 	test('pglite', async () => await verify('pglite')); test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -838,7 +838,7 @@ describe('getMany hasOne sub filter', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -877,7 +877,7 @@ describe('getMany hasOne sub legacy filter', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -915,7 +915,7 @@ describe('bigint getMany hasOne sub filter', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -953,7 +953,7 @@ describe('getMany none sub filter', () => {
 	test('pg', async () => await verify('pg'));
 	test('pglite', async () => await verify('pglite')); test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -989,7 +989,7 @@ describe('getMany many-relation count filter', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -1026,7 +1026,7 @@ describe('getMany many-relation count filter with predicate', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -1063,7 +1063,7 @@ describe('getMany', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -1104,7 +1104,7 @@ describe('getAll orderBy array', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -1140,7 +1140,7 @@ describe('getMany with column strategy', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -1171,7 +1171,7 @@ describe('aggregate', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -1207,7 +1207,7 @@ describe('aggregate on relations', () => {
 	test('pg', async () => await verify('pg'));
 	test('pglite', async () => await verify('pglite')); test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -1255,7 +1255,7 @@ describe('aggregate each row', () => {
 	test('pg', async () => await verify('pg'));
 	test('pglite', async () => await verify('pglite')); test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -1356,7 +1356,7 @@ describe('getMany with relations', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -1433,7 +1433,7 @@ describe('getMany with references - many', () => {
 	test('pg', async () => await verify('pg'));
 	test('pglite', async () => await verify('pglite')); test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -1504,7 +1504,7 @@ describe('getMany with references to discriminator', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -1552,7 +1552,7 @@ describe('getMany with filtered relations', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -1628,7 +1628,7 @@ describe('getMany composite', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -1679,7 +1679,7 @@ describe('getMany raw filter', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -1715,7 +1715,7 @@ describe('getMany raw filter where', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -1914,7 +1914,7 @@ describe('column to column filter', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -1951,7 +1951,7 @@ describe('column to column contains filter', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -1993,7 +1993,7 @@ describe('column to column startsWith filter', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -2035,7 +2035,7 @@ describe('column to column endsWith filter', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));

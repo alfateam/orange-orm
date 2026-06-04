@@ -145,7 +145,7 @@ beforeAll(async () => {
 	await insertData('pglite');
 	await insertData('oracle');
 	await insertData('mssql');
-	if (major === 18) await insertData('mssqlNative');
+	if (major >= 22) await insertData('mssqlNative');
 	await insertData('mysql');
 	await insertData('mariadb');
 	await insertData('sqlite');
@@ -207,7 +207,7 @@ describe('insert-get', () => {
 	it('pglite', async () => await verify('pglite'));
 	it('oracle', async () => await verify('oracle'));
 	it('mssql', async () => await verify('mssql'));
-	if (major === 18) it('mssqlNative', async () => await verify('mssqlNative'));
+	if (major >= 22) it('mssqlNative', async () => await verify('mssqlNative'));
 	it('mysql', async () => await verify('mysql'));
 	it('mariadb', async () => await verify('mariadb'));
 	it('sqlite', async () => await verify('sqlite'));
@@ -248,7 +248,7 @@ describe('insert-get bigint', () => {
 	it('pglite', async () => await verify('pglite'));
 	it('oracle', async () => await verify('oracle'));
 	it('mssql', async () => await verify('mssql'));
-	if (major === 18) it('mssqlNative', async () => await verify('mssqlNative'));
+	if (major >= 22) it('mssqlNative', async () => await verify('mssqlNative'));
 	it('mysql', async () => await verify('mysql'));
 	it('mariadb', async () => await verify('mariadb'));
 	it('sqlite', async () => await verify('sqlite'));

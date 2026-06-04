@@ -8,14 +8,14 @@ on:
 
 jobs:
   # ============================================================
-  # Node.js matrix (18/20/22)
+  # Node.js tests
   # ============================================================
   test-node:
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
-        container: ["node:18-bookworm", "node:20-bookworm", "node:22-bookworm"]
+        container: ["node:22-bookworm"]
 
     container:
       image: ${{ matrix.container }}
@@ -94,7 +94,7 @@ jobs:
 
       # Inside Node container already; no setup-node needed.
       - run: curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add -
-      - run: curl https://packages.microsoft.com/config/debian/11/prod.list > /etc/apt/sources.list.d/mssql-release.list
+      - run: curl https://packages.microsoft.com/config/debian/12/prod.list > /etc/apt/sources.list.d/mssql-release.list
       - run: apt-get update
       - run: ACCEPT_EULA=Y apt-get install -y msodbcsql18
       - run: apt-get install -y unixodbc-dev
@@ -105,10 +105,10 @@ jobs:
       - run: npm test
 
       # Only run coverage once (pick a single image)
-      - if: ${{ matrix.container == 'node:18-bookworm' }}
+      - if: ${{ matrix.container == 'node:22-bookworm' }}
         run: npm run coverage
 
-      - if: ${{ matrix.container == 'node:18-bookworm' && github.ref == 'refs/heads/master' }}
+      - if: ${{ matrix.container == 'node:22-bookworm' && github.ref == 'refs/heads/master' }}
         name: Get Coverage for badge
         run: |
           SUMMARY="$(npm run coverage | tail -2 | head -1)"
@@ -118,7 +118,7 @@ jobs:
           BRANCH_NAME=$(echo "$GITHUB_REF" | awk 'BEGIN { FS = "/" } ; { print $2 "_" $3 }')
           echo "BRANCH=$BRANCH_NAME" >> $GITHUB_ENV
 
-      - if: ${{ matrix.container == 'node:18-bookworm' && github.ref == 'refs/heads/master' }}
+      - if: ${{ matrix.container == 'node:22-bookworm' && github.ref == 'refs/heads/master' }}
         name: Create the Badge
         uses: schneegans/dynamic-badges-action@v1.7.0
         with:

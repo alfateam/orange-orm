@@ -54,7 +54,7 @@ describe('optimistic fail', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -101,7 +101,7 @@ describe('optimistic json object', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -154,7 +154,7 @@ describe('optimistic fail json object', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -217,7 +217,7 @@ describe('insert skipOnConflict with overwrite column', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -274,7 +274,7 @@ describe('savechanges overload overwrite', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -332,7 +332,7 @@ describe('savechanges overload optimistic', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -385,7 +385,7 @@ describe('insert empty skipOnConflict', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -426,7 +426,7 @@ describe('columnDiscriminator insert skipOnConflict with overwrite column', () =
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -491,7 +491,7 @@ describe('insert overwrite with skipOnConflict column', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -548,7 +548,7 @@ describe('insert overwrite with optimistic column changed', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -604,7 +604,7 @@ describe('insert overwrite with optimistic column unchanged', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));

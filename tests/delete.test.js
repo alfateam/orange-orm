@@ -36,7 +36,7 @@ beforeAll(async () => {
 	await insertData('pglite');
 	await insertData('oracle');
 	await insertData('mssql');
-	if (major === 18)
+	if (major >= 22)
 		await insertData('mssqlNative');
 	await insertData('mysql');
 	await insertData('mariadb');
@@ -120,7 +120,7 @@ describe('deleteCascade', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -164,7 +164,7 @@ describe('deleteCascade all should be allowed', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
@@ -187,7 +187,7 @@ describe('delete all orders', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major === 18)
+	if (major >= 22)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
