@@ -7,7 +7,7 @@ class InterceptorProxy {
 	get request() {
 		return {
 			use: (onFulfilled, onRejected) => {
-			const id = Math.random().toString(36).substring(2, 11); // unique id
+				const id = Math.random().toString(36).substring(2, 11); // unique id
 				this.requestInterceptors.push({ id, onFulfilled, onRejected });
 				return id;
 			},
@@ -20,7 +20,7 @@ class InterceptorProxy {
 	get response() {
 		return {
 			use: (onFulfilled, onRejected) => {
-			const id = Math.random().toString(36).substring(2, 11); // unique id
+				const id = Math.random().toString(36).substring(2, 11); // unique id
 				this.responseInterceptors.push({ id, onFulfilled, onRejected });
 				return id;
 			},
