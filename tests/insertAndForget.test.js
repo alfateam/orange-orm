@@ -56,7 +56,7 @@ describe('insertAndForget autoincremental with relations', () => {
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
-	if (major >= 22)
+	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));

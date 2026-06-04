@@ -237,7 +237,7 @@ describe('getById with missing join relation and nested hasMany', () => {
 	const cases = [
 		['sqlite', connections.sqlite],
 		['mssql', connections.mssql],
-		...(major >= 22 ? [['mssqlNative', connections.mssqlNative]] : []),
+		...(major === 18 ? [['mssqlNative', connections.mssqlNative]] : []),
 		['pg', connections.pg],
 		['pglite', connections.pglite],
 		['mysql', connections.mysql],

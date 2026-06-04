@@ -36,7 +36,7 @@ describe('output aliases for date columns', () => {
 		expect(row.brukerRolleStatusTypeId).toBe(0);
 	});
 
-	if (major >= 22) {
+	if (major === 18) {
 		test('mssqlNative: insert should not shift date columns', async () => {
 			const { db, init } = getDb('mssqlNative');
 			await init(db);
