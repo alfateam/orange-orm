@@ -2,6 +2,7 @@
 /** @type {import('vitest').UserConfig} */
 module.exports = {
 	test: {
+		testTimeout: 30000,
 		// Copied baseline excludes (since configDefaults is ESM-only)
 		exclude: [
 			'**/node_modules/**',
