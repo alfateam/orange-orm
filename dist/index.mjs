@@ -2,7 +2,6 @@ void !function() {
 	typeof self === 'undefined' && typeof global === 'object'
 		? global.self = global : null;
 }();import * as fastJsonPatch from 'fast-json-patch';
-import * as axios from 'axios';
 import * as _default from 'rfdc/default';
 import * as ajv from 'ajv';
 import * as onChange from '@lroal/on-change';
@@ -389,12 +388,29 @@ ${row}`;
 /* eslint-disable @typescript-eslint/no-empty-interface */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { AxiosInterceptorManager, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 import type { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Hono, Url, ColumnConcurrency, JsonPatch } from 'orange-orm';
 export { RequestHandler } from 'express';
 export { Concurrency, Filter, RawFilter, Config, TransactionOptions, Pool } from 'orange-orm';
 export = r;
 declare function r(config: Config): r.RdbClient;
+type HttpInterceptorManager<T> = {
+	use(onFulfilled?: (value: T) => T | Promise<T>, onRejected?: (error: any) => any): string;
+	eject(id: string): void;
+};
+type HttpRequestConfig = {
+	baseURL?: string;
+	url?: string;
+	method?: string;
+	headers: Record<string, string>;
+	data?: any;
+};
+type HttpResponse<T = any> = {
+	data: T;
+	status: number;
+	statusText: string;
+	headers: Record<string, string>;
+	config: HttpRequestConfig;
+};
 `;
 
 		return `
@@ -402,8 +418,25 @@ declare function r(config: Config): r.RdbClient;
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import schema from './schema';
-import type { AxiosInterceptorManager, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 import type { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Hono, Url, ColumnConcurrency, JsonPatch } from 'orange-orm';
+type HttpInterceptorManager<T> = {
+	use(onFulfilled?: (value: T) => T | Promise<T>, onRejected?: (error: any) => any): string;
+	eject(id: string): void;
+};
+type HttpRequestConfig = {
+	baseURL?: string;
+	url?: string;
+	method?: string;
+	headers: Record<string, string>;
+	data?: any;
+};
+type HttpResponse<T = any> = {
+	data: T;
+	status: number;
+	statusText: string;
+	headers: Record<string, string>;
+	config: HttpRequestConfig;
+};
 export default schema as RdbClient;`;
 	}
 
@@ -440,8 +473,8 @@ declare namespace r {${getTables(isHttp)}
 				result += `
 
 	const interceptors: {
-		request: AxiosInterceptorManager<InternalAxiosRequestConfig>;
-		response: AxiosInterceptorManager<AxiosResponse>;
+		request: HttpInterceptorManager<HttpRequestConfig>;
+		response: HttpInterceptorManager<HttpResponse>;
 	};
 	function reactive(proxyMethod: (obj: unknown) => unknown): void;	
 	function and(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
@@ -566,8 +599,8 @@ export interface HonoTables {${getHonoTables()}
 				result += `
 	(config: {db: Url}): RdbClient;
 	interceptors: {
-        request: AxiosInterceptorManager<InternalAxiosRequestConfig>;
-        response: AxiosInterceptorManager<AxiosResponse>;
+        request: HttpInterceptorManager<HttpRequestConfig>;
+        response: HttpInterceptorManager<HttpResponse>;
     };
 	reactive(proxyMethod: (obj: unknown) => unknown): void;
 	and(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
@@ -973,7 +1006,7 @@ function requireHostHono () {
 	return hostHono_1;
 }
 
-var require$$0$3 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(fastJsonPatch);
+var require$$0$2 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(fastJsonPatch);
 
 var dateToISOString_1;
 var hasRequiredDateToISOString;
@@ -1055,7 +1088,7 @@ var hasRequiredCreatePatch;
 function requireCreatePatch () {
 	if (hasRequiredCreatePatch) return createPatch;
 	hasRequiredCreatePatch = 1;
-	const jsonpatch = require$$0$3;
+	const jsonpatch = require$$0$2;
 	let dateToIsoString = requireDateToISOString();
 	let stringify = requireStringify();
 	let newMemoryId = requireNewMemoryId();
@@ -2820,21 +2853,13 @@ function requireCloneFromDb () {
 	return cloneFromDb_1;
 }
 
-var require$$0$2 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(axios);
-
 var netAdapter_1;
 var hasRequiredNetAdapter;
 
 function requireNetAdapter () {
 	if (hasRequiredNetAdapter) return netAdapter_1;
 	hasRequiredNetAdapter = 1;
-	const _axios = require$$0$2;
-
-	function httpAdapter(baseURL, path, axiosInterceptor) {
-		//@ts-ignore
-		const axios = _axios.default ? _axios.default.create({ baseURL }) : _axios.create({ baseURL });
-		axiosInterceptor.applyTo(axios);
-
+	function httpAdapter(baseURL, path, httpInterceptor) {
 		let c = {
 			get,
 			post,
@@ -2849,7 +2874,7 @@ function requireNetAdapter () {
 		async function get() {
 			try {
 				const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
-				const res = await axios.request(path, { headers, method: 'get' });
+				const res = await request({ baseURL, url: path, headers, method: 'get' });
 				return res.data;
 			}
 			catch (e) {
@@ -2865,7 +2890,7 @@ function requireNetAdapter () {
 			try {
 
 				const headers = { 'Content-Type': 'application/json' };
-				const res = await axios.request(path, { headers, method: 'patch', data: body });
+				const res = await request({ baseURL, url: path, headers, method: 'patch', data: body });
 				return res.data;
 			}
 			catch (e) {
@@ -2881,7 +2906,7 @@ function requireNetAdapter () {
 		async function post(body) {
 			try {
 				const headers = { 'Content-Type': 'application/json' };
-				const res = await axios.request(path, { headers, method: 'post', data: body });
+				const res = await request({ baseURL, url: path, headers, method: 'post', data: body });
 				return res.data;
 			}
 			catch (e) {
@@ -2903,9 +2928,73 @@ function requireNetAdapter () {
 		function express() {
 			throw new Error('Hosting in express is not supported on the client side');
 		}
+
+		async function request(config) {
+			if (typeof fetch !== 'function')
+				throw new Error('HTTP client requires fetch. Use a runtime with fetch support or provide a fetch polyfill.');
+
+			config = await httpInterceptor.applyRequest(config);
+			const response = await fetch(toUrl(config.baseURL, config.url), {
+				method: config.method?.toUpperCase(),
+				headers: config.headers,
+				body: toBody(config.data)
+			});
+			const data = await readData(response);
+			let result = {
+				data,
+				status: response.status,
+				statusText: response.statusText,
+				headers: toHeadersObject(response.headers),
+				config
+			};
+
+			if (!response.ok)
+				return httpInterceptor.applyResponseError(createHttpError(result));
+
+			result = await httpInterceptor.applyResponse(result);
+			return result;
+		}
 	}
 
-	function netAdapter(url, tableName, { axios, tableOptions }) {
+	function toBody(data) {
+		if (data === undefined)
+			return undefined;
+		if (typeof data === 'string')
+			return data;
+		return JSON.stringify(data);
+	}
+
+	function createHttpError(response) {
+		const error = new Error('Request failed with status code ' + response.status);
+		error.response = response;
+		error.config = response.config;
+		return error;
+	}
+
+	async function readData(response) {
+		const text = await response.text();
+		const contentType = response.headers.get('content-type') || '';
+		if (text && (contentType.indexOf('application/json') !== -1 || looksLikeJson(text)))
+			return JSON.parse(text);
+		return text;
+	}
+
+	function looksLikeJson(text) {
+		const value = text.trim();
+		return value[0] === '{' || value[0] === '[';
+	}
+
+	function toHeadersObject(headers) {
+		const result = {};
+		headers.forEach((value, key) => result[key] = value);
+		return result;
+	}
+
+	function toUrl(baseURL, path) {
+		return new URL(path, baseURL).toString();
+	}
+
+	function netAdapter(url, tableName, { http, tableOptions }) {
 		if (tableOptions.transaction?.done)
 			delete tableOptions.transaction;
 
@@ -2947,7 +3036,7 @@ function requireNetAdapter () {
 		async function getInnerAdapter() {
 			const db = await getDb();
 			if (typeof db === 'string') {
-				return httpAdapter(db, `?table=${tableName}`, axios);
+				return httpAdapter(db, `?table=${tableName}`, http);
 			}
 			else if (db && db.transaction) {
 				return db.hostLocal({ ...tableOptions, db, table: url });
@@ -3105,12 +3194,12 @@ function requireClientMap () {
 
 var require$$5 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(_default);
 
-var axiosInterceptor;
-var hasRequiredAxiosInterceptor;
+var httpInterceptor;
+var hasRequiredHttpInterceptor;
 
-function requireAxiosInterceptor () {
-	if (hasRequiredAxiosInterceptor) return axiosInterceptor;
-	hasRequiredAxiosInterceptor = 1;
+function requireHttpInterceptor () {
+	if (hasRequiredHttpInterceptor) return httpInterceptor;
+	hasRequiredHttpInterceptor = 1;
 	class InterceptorProxy {
 		constructor() {
 			this.requestInterceptors = [];
@@ -3120,7 +3209,7 @@ function requireAxiosInterceptor () {
 		get request() {
 			return {
 				use: (onFulfilled, onRejected) => {
-					const id = Math.random().toString(36).substr(2, 9); // unique id
+					const id = Math.random().toString(36).substring(2, 11); // unique id
 					this.requestInterceptors.push({ id, onFulfilled, onRejected });
 					return id;
 				},
@@ -3133,7 +3222,7 @@ function requireAxiosInterceptor () {
 		get response() {
 			return {
 				use: (onFulfilled, onRejected) => {
-					const id = Math.random().toString(36).substr(2, 9); // unique id
+					const id = Math.random().toString(36).substring(2, 11); // unique id
 					this.responseInterceptors.push({ id, onFulfilled, onRejected });
 					return id;
 				},
@@ -3143,21 +3232,35 @@ function requireAxiosInterceptor () {
 			};
 		}
 
-		applyTo(axiosInstance) {
+		async applyRequest(config) {
+			let result = Promise.resolve(config);
 			for (const { onFulfilled, onRejected } of this.requestInterceptors) {
-				axiosInstance.interceptors.request.use(onFulfilled, onRejected);
+				result = result.then(onFulfilled, onRejected);
 			}
+			return await result;
+		}
 
+		async applyResponse(response) {
+			let result = Promise.resolve(response);
 			for (const { onFulfilled, onRejected } of this.responseInterceptors) {
-				axiosInstance.interceptors.response.use(onFulfilled, onRejected);
+				result = result.then(onFulfilled, onRejected);
 			}
+			return await result;
+		}
+
+		async applyResponseError(error) {
+			let result = Promise.reject(error);
+			for (const { onFulfilled, onRejected } of this.responseInterceptors) {
+				result = result.then(onFulfilled, onRejected);
+			}
+			return await result;
 		}
 	}
 
-	axiosInterceptor = function create() {
+	httpInterceptor = function create() {
 		return new InterceptorProxy();
 	};
-	return axiosInterceptor;
+	return httpInterceptor;
 }
 
 var flags_1;
@@ -3191,7 +3294,7 @@ function requireClient () {
 	const targetKey = Symbol();
 	const map = requireClientMap();
 	const clone = require$$5;
-	const createAxiosInterceptor = requireAxiosInterceptor();
+	const createHttpInterceptor = requireHttpInterceptor();
 	const flags = requireFlags();
 
 	function rdbClient(options = {}) {
@@ -3204,7 +3307,7 @@ function requireClient () {
 		let baseUrl = options.db;
 		if (typeof providers === 'function')
 			baseUrl = typeof options.db === 'function' ? providers(options.db) : options.db;
-		const axiosInterceptor = createAxiosInterceptor();
+		const httpInterceptor = createHttpInterceptor();
 
 		function client(_options = {}) {
 			if (_options.pg)
@@ -3219,7 +3322,7 @@ function requireClient () {
 			enumerable: true,
 			configurable: false
 		});
-		client.interceptors = axiosInterceptor;
+		client.interceptors = httpInterceptor;
 		client.createPatch = _createPatch;
 		client.table = table;
 		client.or = column('or');
@@ -3465,7 +3568,7 @@ function requireClient () {
 					path,
 					args
 				});
-				let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 				return adapter.post(body);
 			}
 
@@ -3475,7 +3578,7 @@ function requireClient () {
 					path: 'count',
 					args
 				});
-				let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 				return adapter.post(body);
 			}
 
@@ -3567,7 +3670,7 @@ function requireClient () {
 					path: 'getManyDto',
 					args
 				});
-				let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 				return adapter.post(body);
 			}
 
@@ -3644,7 +3747,7 @@ function requireClient () {
 					path: 'delete',
 					args
 				});
-				let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 				return adapter.post(body);
 			}
 
@@ -3654,7 +3757,7 @@ function requireClient () {
 					path: 'deleteCascade',
 					args
 				});
-				let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 				return adapter.post(body);
 			}
 
@@ -3664,7 +3767,7 @@ function requireClient () {
 					path: 'update',
 					args
 				});
-				let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 				const result =  await adapter.post(body);
 				if (strategy)
 					return proxify(result, strategy);
@@ -3676,7 +3779,7 @@ function requireClient () {
 					path: 'replace',
 					args
 				});
-				let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 				const result =  await adapter.post(body);
 				if (strategy)
 					return proxify(result, strategy);
@@ -3838,7 +3941,7 @@ function requireClient () {
 			async function getMeta() {
 				if (meta)
 					return meta;
-				let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 				meta = await adapter.get();
 
 				while (hasUnresolved(meta)) {
@@ -3886,7 +3989,7 @@ function requireClient () {
 				if (patch.length === 0)
 					return;
 				let body = stringify({ patch, options: { strategy, ...tableOptions, ...concurrencyOptions, deduceStrategy } });
-				let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 				let p = adapter.patch(body);
 				if (strategy?.insertAndForget) {
 					await p;
@@ -3905,7 +4008,7 @@ function requireClient () {
 				if (patch.length === 0)
 					return;
 				let body = stringify({ patch, options: { strategy, ...tableOptions, ...concurrencyOptions, deduceStrategy } });
-				let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 				await adapter.patch(body);
 				return;
 			}
@@ -3997,7 +4100,7 @@ function requireClient () {
 				let meta = await getMeta();
 				let patch = createPatch(array, [], meta);
 				let body = stringify({ patch, options });
-				let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 				let { strategy } = await adapter.patch(body);
 				array.length = 0;
 				rootMap.set(array, { json: cloneFromDb(array), strategy });
@@ -4072,7 +4175,7 @@ function requireClient () {
 				let meta = await getMeta();
 				let patch = createPatch([row], [], meta);
 				let body = stringify({ patch, options });
-				let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 				await adapter.patch(body);
 				rootMap.set(row, { strategy });
 			}
@@ -4095,7 +4198,7 @@ function requireClient () {
 
 				let body = stringify({ patch, options: { ...tableOptions, ...concurrencyOptions, strategy, deduceStrategy } });
 
-				let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 				let { changed, strategy: newStrategy } = await adapter.patch(body);
 				copyInto(changed, [row]);
 				rootMap.set(row, { json: cloneFromDb(row), strategy: newStrategy });
@@ -12485,7 +12588,7 @@ var hasRequiredApplyPatch;
 function requireApplyPatch () {
 	if (hasRequiredApplyPatch) return applyPatch_1;
 	hasRequiredApplyPatch = 1;
-	const fastjson = require$$0$3;
+	const fastjson = require$$0$2;
 	let fromCompareObject = requireFromCompareObject();
 	let toCompareObject = requireToCompareObject();
 	let getSessionSingleton = requireGetSessionSingleton();

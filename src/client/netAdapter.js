@@ -1,10 +1,4 @@
-const _axios = require('axios');
-
-function httpAdapter(baseURL, path, axiosInterceptor) {
-	//@ts-ignore
-	const axios = _axios.default ? _axios.default.create({ baseURL }) : _axios.create({ baseURL });
-	axiosInterceptor.applyTo(axios);
-
+function httpAdapter(baseURL, path, httpInterceptor) {
 	let c = {
 		get,
 		post,
@@ -19,7 +13,7 @@ function httpAdapter(baseURL, path, axiosInterceptor) {
 	async function get() {
 		try {
 			const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
-			const res = await axios.request(path, { headers, method: 'get' });
+			const res = await request({ baseURL, url: path, headers, method: 'get' });
 			return res.data;
 		}
 		catch (e) {
@@ -35,7 +29,7 @@ function httpAdapter(baseURL, path, axiosInterceptor) {
 		try {
 
 			const headers = { 'Content-Type': 'application/json' };
-			const res = await axios.request(path, { headers, method: 'patch', data: body });
+			const res = await request({ baseURL, url: path, headers, method: 'patch', data: body });
 			return res.data;
 		}
 		catch (e) {
@@ -51,7 +45,7 @@ function httpAdapter(baseURL, path, axiosInterceptor) {
 	async function post(body) {
 		try {
 			const headers = { 'Content-Type': 'application/json' };
-			const res = await axios.request(path, { headers, method: 'post', data: body });
+			const res = await request({ baseURL, url: path, headers, method: 'post', data: body });
 			return res.data;
 		}
 		catch (e) {
@@ -73,9 +67,73 @@ function httpAdapter(baseURL, path, axiosInterceptor) {
 	function express() {
 		throw new Error('Hosting in express is not supported on the client side');
 	}
+
+	async function request(config) {
+		if (typeof fetch !== 'function')
+			throw new Error('HTTP client requires fetch. Use a runtime with fetch support or provide a fetch polyfill.');
+
+		config = await httpInterceptor.applyRequest(config);
+		const response = await fetch(toUrl(config.baseURL, config.url), {
+			method: config.method?.toUpperCase(),
+			headers: config.headers,
+			body: toBody(config.data)
+		});
+		const data = await readData(response);
+		let result = {
+			data,
+			status: response.status,
+			statusText: response.statusText,
+			headers: toHeadersObject(response.headers),
+			config
+		};
+
+		if (!response.ok)
+			return httpInterceptor.applyResponseError(createHttpError(result));
+
+		result = await httpInterceptor.applyResponse(result);
+		return result;
+	}
 }
 
-function netAdapter(url, tableName, { axios, tableOptions }) {
+function toBody(data) {
+	if (data === undefined)
+		return undefined;
+	if (typeof data === 'string')
+		return data;
+	return JSON.stringify(data);
+}
+
+function createHttpError(response) {
+	const error = new Error('Request failed with status code ' + response.status);
+	error.response = response;
+	error.config = response.config;
+	return error;
+}
+
+async function readData(response) {
+	const text = await response.text();
+	const contentType = response.headers.get('content-type') || '';
+	if (text && (contentType.indexOf('application/json') !== -1 || looksLikeJson(text)))
+		return JSON.parse(text);
+	return text;
+}
+
+function looksLikeJson(text) {
+	const value = text.trim();
+	return value[0] === '{' || value[0] === '[';
+}
+
+function toHeadersObject(headers) {
+	const result = {};
+	headers.forEach((value, key) => result[key] = value);
+	return result;
+}
+
+function toUrl(baseURL, path) {
+	return new URL(path, baseURL).toString();
+}
+
+function netAdapter(url, tableName, { http, tableOptions }) {
 	if (tableOptions.transaction?.done)
 		delete tableOptions.transaction;
 
@@ -117,7 +175,7 @@ function netAdapter(url, tableName, { axios, tableOptions }) {
 	async function getInnerAdapter() {
 		const db = await getDb();
 		if (typeof db === 'string') {
-			return httpAdapter(db, `?table=${tableName}`, axios);
+			return httpAdapter(db, `?table=${tableName}`, http);
 		}
 		else if (db && db.transaction) {
 			return db.hostLocal({ ...tableOptions, db, table: url });

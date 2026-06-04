@@ -3,11 +3,11 @@ let compile = require('./compile');
 let path = require('path');
 let fs = require('fs');
 let util = require('util');
+let http = require('http');
+let https = require('https');
 let writeFile = util.promisify(fs.writeFile);
 let ts = require('typescript');
 let getTSDefinition = require('../src/getTSDefinition');
-const _axios = require('axios');
-const axios = _axios.default ? _axios.default.create() : _axios.create();
 
 async function run(cwd) {
 	for (let schemaTs of await findSchemaJs(cwd)) {
@@ -188,12 +188,35 @@ async function download(url, isNamespace) {
 	console.log(`Orange: downloading from  ${url}`);
 	// eslint-disable-next-line no-undef
 	try {
-		let response = await axios.get(url);
-		return response.data;
+		return await downloadText(url);
 	}
 	catch(e) {
 		throw new Error('No config found at ' + url);
 	}
+}
+
+async function downloadText(url) {
+	if (typeof fetch === 'function') {
+		const response = await fetch(url);
+		if (!response.ok)
+			throw new Error('Request failed with status code ' + response.status);
+		return await response.text();
+	}
+
+	return await new Promise((resolve, reject) => {
+		const client = url.indexOf('https:') === 0 ? https : http;
+		client.get(url, response => {
+			if (response.statusCode < 200 || response.statusCode >= 300) {
+				response.resume();
+				reject(new Error('Request failed with status code ' + response.statusCode));
+				return;
+			}
+			let body = '';
+			response.setEncoding('utf8');
+			response.on('data', chunk => body += chunk);
+			response.on('end', () => resolve(body));
+		}).on('error', reject);
+	});
 }
 
 module.exports = function(cwd) {

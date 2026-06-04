@@ -1,4 +1,6 @@
 ## Changelog
+__5.3.5__  
+Removed axios dependency.  
 __5.3.4__  
 SAP ASE: Fix optimistic concurrency for `date()` columns when datetime values are read back without millisecond precision.  
 __5.3.3__  

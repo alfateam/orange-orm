@@ -8,14 +8,14 @@ on:
 
 jobs:
   # ============================================================
-  # Node.js matrix (18/20/22)
+  # Node.js tests
   # ============================================================
   test-node:
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
-        container: ["node:18-bookworm", "node:20-bookworm", "node:22-bookworm"]
+        container: ["node:22-bookworm", "node:24-bookworm"]
 
     container:
       image: ${{ matrix.container }}
@@ -93,22 +93,33 @@ jobs:
       - uses: actions/checkout@v4
 
       # Inside Node container already; no setup-node needed.
-      - run: curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add -
-      - run: curl https://packages.microsoft.com/config/debian/11/prod.list > /etc/apt/sources.list.d/mssql-release.list
-      - run: apt-get update
-      - run: ACCEPT_EULA=Y apt-get install -y msodbcsql18
-      - run: apt-get install -y unixodbc-dev
-
-      - run: npm install
-      - run: npm run lint
-      - run: npm run tscheck
+      - run: apt-get update && apt-get install -y unixodbc-dev
+      - if: ${{ matrix.container == 'node:24-bookworm' }}
+        run: apt-get install -y curl gnupg ca-certificates
+      - if: ${{ matrix.container == 'node:24-bookworm' }}
+        run: install -d -m 0755 /etc/apt/keyrings
+      - if: ${{ matrix.container == 'node:24-bookworm' }}
+        run: curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /etc/apt/keyrings/microsoft.gpg
+      - if: ${{ matrix.container == 'node:24-bookworm' }}
+        run: chmod a+r /etc/apt/keyrings/microsoft.gpg
+      - if: ${{ matrix.container == 'node:24-bookworm' }}
+        run: echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/microsoft.gpg] https://packages.microsoft.com/debian/12/prod bookworm main" > /etc/apt/sources.list.d/mssql-release.list
+      - if: ${{ matrix.container == 'node:24-bookworm' }}
+        run: apt-get update
+      - if: ${{ matrix.container == 'node:24-bookworm' }}
+        run: ACCEPT_EULA=Y apt-get install -y msodbcsql18
+      - run: npm ci
+      - if: ${{ matrix.container == 'node:22-bookworm' }}
+        run: npm run lint
+      - if: ${{ matrix.container == 'node:22-bookworm' }}
+        run: npm run tscheck
       - run: npm test
 
       # Only run coverage once (pick a single image)
-      - if: ${{ matrix.container == 'node:18-bookworm' }}
+      - if: ${{ matrix.container == 'node:22-bookworm' }}
         run: npm run coverage
 
-      - if: ${{ matrix.container == 'node:18-bookworm' && github.ref == 'refs/heads/master' }}
+      - if: ${{ matrix.container == 'node:22-bookworm' && github.ref == 'refs/heads/master' }}
         name: Get Coverage for badge
         run: |
           SUMMARY="$(npm run coverage | tail -2 | head -1)"
@@ -118,7 +129,7 @@ jobs:
           BRANCH_NAME=$(echo "$GITHUB_REF" | awk 'BEGIN { FS = "/" } ; { print $2 "_" $3 }')
           echo "BRANCH=$BRANCH_NAME" >> $GITHUB_ENV
 
-      - if: ${{ matrix.container == 'node:18-bookworm' && github.ref == 'refs/heads/master' }}
+      - if: ${{ matrix.container == 'node:22-bookworm' && github.ref == 'refs/heads/master' }}
         name: Create the Badge
         uses: schneegans/dynamic-badges-action@v1.7.0
         with:
