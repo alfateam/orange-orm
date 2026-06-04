@@ -1,4 +1,3 @@
-import rdb from '../src/index';
 import { describe, test, beforeAll, afterAll, expect } from 'vitest';
 const map = require('./db');
 import express from 'express';
