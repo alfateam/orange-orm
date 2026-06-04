@@ -3,6 +3,7 @@
 module.exports = {
 	test: {
 		testTimeout: 30000,
+		fileParallelism: false,
 		// Copied baseline excludes (since configDefaults is ESM-only)
 		exclude: [
 			'**/node_modules/**',
