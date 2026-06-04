@@ -15,7 +15,7 @@ jobs:
 
     strategy:
       matrix:
-        container: ["node:22-bookworm"]
+        container: ["node:22-bookworm", "node:24-bookworm"]
 
     container:
       image: ${{ matrix.container }}
