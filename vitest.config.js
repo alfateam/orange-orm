@@ -12,6 +12,8 @@ module.exports = {
 			'**/*.deno.test.js',
 			'**/*.bun.test.js',
 		],
-		threads: false,
+		pool: 'forks',
+		maxWorkers: 1,
+		isolate: false,
 	},
 };
