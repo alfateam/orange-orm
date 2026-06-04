@@ -3,9 +3,29 @@ import type { PGliteOptions } from './pglite.d.ts';
 import type { ConnectionConfiguration } from 'tedious';
 import type { D1Database } from '@cloudflare/workers-types';
 import type { PoolAttributes } from 'oracledb';
-import type { AxiosInterceptorManager, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 
 export type ORMColumnType = 'string' | 'bigint' | 'uuid' | 'date' | 'numeric' | 'boolean' | 'json' | 'binary';
+
+type HttpInterceptorManager<T> = {
+  use(onFulfilled?: (value: T) => T | Promise<T>, onRejected?: (error: any) => any): string;
+  eject(id: string): void;
+};
+
+type HttpRequestConfig = {
+  baseURL?: string;
+  url?: string;
+  method?: string;
+  headers: Record<string, string>;
+  data?: any;
+};
+
+type HttpResponse<T = any> = {
+  data: T;
+  status: number;
+  statusText: string;
+  headers: Record<string, string>;
+  config: HttpRequestConfig;
+};
 
 // Base column definition with space-prefixed required properties
 export type ORMColumnDefinition = {
@@ -868,8 +888,8 @@ type JsonPatch = Array<{
 }>;
 
 interface WithInterceptors {
-  request: AxiosInterceptorManager<InternalAxiosRequestConfig>;
-  response: AxiosInterceptorManager<AxiosResponse>;
+  request: HttpInterceptorManager<HttpRequestConfig>;
+  response: HttpInterceptorManager<HttpResponse>;
 }
 
 interface Connectors {

@@ -365,12 +365,29 @@ function getPrefixTs(isNamespace) {
 /* eslint-disable @typescript-eslint/no-empty-interface */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { AxiosInterceptorManager, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 import type { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Hono, Url, ColumnConcurrency, JsonPatch } from 'orange-orm';
 export { RequestHandler } from 'express';
 export { Concurrency, Filter, RawFilter, Config, TransactionOptions, Pool } from 'orange-orm';
 export = r;
 declare function r(config: Config): r.RdbClient;
+type HttpInterceptorManager<T> = {
+	use(onFulfilled?: (value: T) => T | Promise<T>, onRejected?: (error: any) => any): string;
+	eject(id: string): void;
+};
+type HttpRequestConfig = {
+	baseURL?: string;
+	url?: string;
+	method?: string;
+	headers: Record<string, string>;
+	data?: any;
+};
+type HttpResponse<T = any> = {
+	data: T;
+	status: number;
+	statusText: string;
+	headers: Record<string, string>;
+	config: HttpRequestConfig;
+};
 `;
 
 	return `
@@ -378,8 +395,25 @@ declare function r(config: Config): r.RdbClient;
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import schema from './schema';
-import type { AxiosInterceptorManager, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 import type { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Hono, Url, ColumnConcurrency, JsonPatch } from 'orange-orm';
+type HttpInterceptorManager<T> = {
+	use(onFulfilled?: (value: T) => T | Promise<T>, onRejected?: (error: any) => any): string;
+	eject(id: string): void;
+};
+type HttpRequestConfig = {
+	baseURL?: string;
+	url?: string;
+	method?: string;
+	headers: Record<string, string>;
+	data?: any;
+};
+type HttpResponse<T = any> = {
+	data: T;
+	status: number;
+	statusText: string;
+	headers: Record<string, string>;
+	config: HttpRequestConfig;
+};
 export default schema as RdbClient;`;
 }
 
@@ -416,8 +450,8 @@ declare namespace r {${getTables(isHttp)}
 			result += `
 
 	const interceptors: {
-		request: AxiosInterceptorManager<InternalAxiosRequestConfig>;
-		response: AxiosInterceptorManager<AxiosResponse>;
+		request: HttpInterceptorManager<HttpRequestConfig>;
+		response: HttpInterceptorManager<HttpResponse>;
 	};
 	function reactive(proxyMethod: (obj: unknown) => unknown): void;	
 	function and(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
@@ -542,8 +576,8 @@ export interface HonoTables {${getHonoTables()}
 			result += `
 	(config: {db: Url}): RdbClient;
 	interceptors: {
-        request: AxiosInterceptorManager<InternalAxiosRequestConfig>;
-        response: AxiosInterceptorManager<AxiosResponse>;
+        request: HttpInterceptorManager<HttpRequestConfig>;
+        response: HttpInterceptorManager<HttpResponse>;
     };
 	reactive(proxyMethod: (obj: unknown) => unknown): void;
 	and(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;

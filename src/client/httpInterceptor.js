@@ -7,7 +7,7 @@ class InterceptorProxy {
 	get request() {
 		return {
 			use: (onFulfilled, onRejected) => {
-				const id = Math.random().toString(36).substr(2, 9); // unique id
+			const id = Math.random().toString(36).substring(2, 11); // unique id
 				this.requestInterceptors.push({ id, onFulfilled, onRejected });
 				return id;
 			},
@@ -20,7 +20,7 @@ class InterceptorProxy {
 	get response() {
 		return {
 			use: (onFulfilled, onRejected) => {
-				const id = Math.random().toString(36).substr(2, 9); // unique id
+			const id = Math.random().toString(36).substring(2, 11); // unique id
 				this.responseInterceptors.push({ id, onFulfilled, onRejected });
 				return id;
 			},
@@ -30,14 +30,28 @@ class InterceptorProxy {
 		};
 	}
 
-	applyTo(axiosInstance) {
+	async applyRequest(config) {
+		let result = Promise.resolve(config);
 		for (const { onFulfilled, onRejected } of this.requestInterceptors) {
-			axiosInstance.interceptors.request.use(onFulfilled, onRejected);
+			result = result.then(onFulfilled, onRejected);
 		}
+		return await result;
+	}
 
+	async applyResponse(response) {
+		let result = Promise.resolve(response);
 		for (const { onFulfilled, onRejected } of this.responseInterceptors) {
-			axiosInstance.interceptors.response.use(onFulfilled, onRejected);
+			result = result.then(onFulfilled, onRejected);
 		}
+		return await result;
+	}
+
+	async applyResponseError(error) {
+		let result = Promise.reject(error);
+		for (const { onFulfilled, onRejected } of this.responseInterceptors) {
+			result = result.then(onFulfilled, onRejected);
+		}
+		return await result;
 	}
 }
 

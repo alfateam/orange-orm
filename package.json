@@ -1,6 +1,6 @@
 {
     "name": "orange-orm",
-    "version": "5.3.4",
+    "version": "5.3.5-beta-0",
     "publishConfig": {
         "access": "public"
     },
@@ -79,7 +79,6 @@
         "@types/oracledb": "^6.0.4",
         "@types/tedious": "^4.0.14",
         "ajv": "^8.17.1",
-        "axios": "^1.6.2",
         "fast-json-patch": "^3.1.1",
         "rfdc": "^1.2.0"
     },
