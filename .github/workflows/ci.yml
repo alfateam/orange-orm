@@ -94,6 +94,20 @@ jobs:
 
       # Inside Node container already; no setup-node needed.
       - run: apt-get update && apt-get install -y unixodbc-dev
+      - if: ${{ matrix.container == 'node:24-bookworm' }}
+        run: apt-get install -y curl gnupg ca-certificates
+      - if: ${{ matrix.container == 'node:24-bookworm' }}
+        run: install -d -m 0755 /etc/apt/keyrings
+      - if: ${{ matrix.container == 'node:24-bookworm' }}
+        run: curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /etc/apt/keyrings/microsoft.gpg
+      - if: ${{ matrix.container == 'node:24-bookworm' }}
+        run: chmod a+r /etc/apt/keyrings/microsoft.gpg
+      - if: ${{ matrix.container == 'node:24-bookworm' }}
+        run: echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/microsoft.gpg] https://packages.microsoft.com/debian/12/prod bookworm main" > /etc/apt/sources.list.d/mssql-release.list
+      - if: ${{ matrix.container == 'node:24-bookworm' }}
+        run: apt-get update
+      - if: ${{ matrix.container == 'node:24-bookworm' }}
+        run: ACCEPT_EULA=Y apt-get install -y msodbcsql18
       - run: npm ci
       - if: ${{ matrix.container == 'node:22-bookworm' }}
         run: npm run lint
