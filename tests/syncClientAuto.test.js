@@ -35,4 +35,39 @@ describe('sync client auto start', () => {
 		expect(events.map((x) => x[0])).toEqual(['push-error', 'error', 'pull-error', 'error']);
 		expect(events.map((x) => x[1])).toEqual(['push', 'push', 'pull', 'pull']);
 	});
+
+	test('uses all mapped tables when sync tables are omitted', async () => {
+		const requests = [];
+		const db = {
+			__sqliteSync: { url: '/rdb', auto: false },
+			tables: {
+				customer: {},
+				order: {}
+			},
+			query: async () => []
+		};
+		const client = newSyncClient({
+			transaction: async (fn) => fn({
+				query: async () => []
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async (request) => {
+					requests.push(request);
+					return {
+						data: {
+							phase: 'keys',
+							items: [],
+							done: true,
+							cursor: 'cursor-1'
+						}
+					};
+				};
+			}
+		});
+
+		await client.pull();
+
+		expect(requests[0].data.tables).toEqual(['customer', 'order']);
+	});
 });

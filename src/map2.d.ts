@@ -912,7 +912,7 @@ export interface SyncEndpointConfig {
 type SyncTableName<M extends Record<string, any>> = Extract<keyof M, string>;
 
 export interface SyncPullConfig<M extends Record<string, any> = any> extends SyncEndpointConfig {
-  tables: SyncTableName<M>[];
+  tables?: SyncTableName<M>[];
   patchOptions?: {
     concurrency?: ConcurrencyStrategy;
   };

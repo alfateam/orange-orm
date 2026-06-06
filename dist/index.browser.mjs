@@ -4214,9 +4214,9 @@ function requireSyncClient () {
 
 			const pullOptions = normalizePullOptions(options);
 			const pullConfig = resolvePullConfig(syncConfig, pullOptions);
-			const configuredTables = pullConfig.tables;
+			const configuredTables = resolveSyncTables(db, pullConfig.tables);
 			if (!Array.isArray(configuredTables) || configuredTables.length === 0)
-				throw new Error('Sync pull requires configured tables. Set sync.pull.tables (or sync.tables).');
+				throw new Error('Sync pull requires mapped tables or configured tables. Set sync.tables when the client has no table map.');
 			await maybeEmitInitialReady(syncConfig, configuredTables, db, 'persisted');
 			const currentSince = await getScopeSince(configuredTables, db);
 			const requestOptions = {
@@ -4705,7 +4705,7 @@ function requireSyncClient () {
 			if (!syncConfig)
 				return null;
 			const pullConfig = resolvePullConfig(syncConfig);
-			const configuredTables = pullConfig.tables;
+			const configuredTables = resolveSyncTables(db, pullConfig.tables);
 			if (!Array.isArray(configuredTables) || configuredTables.length === 0)
 				return null;
 			return maybeEmitInitialReady(syncConfig, configuredTables, db, source);
@@ -4795,6 +4795,17 @@ function requireSyncClient () {
 		if (tables.length === 0)
 			return undefined;
 		return Array.from(new Set(tables));
+	}
+
+	function resolveSyncTables(db, configuredTables) {
+		if (Array.isArray(configuredTables) && configuredTables.length > 0)
+			return configuredTables;
+		if (!db || !db.tables)
+			return configuredTables;
+		const names = Object.keys(db.tables).filter(x => typeof x === 'string');
+		if (names.length === 0)
+			return configuredTables;
+		return names;
 	}
 
 	function normalizeInitialReadyMaxAgeMs(value) {
@@ -15738,6 +15749,7 @@ function requireMap () {
 		context.sap = connect.bind(null, 'sap');
 		context.oracle = connect.bind(null, 'oracle');
 		context.sqlite = connect.bind(null, 'sqlite');
+		context.sqliteOPFS = connect.bind(null, 'sqliteOPFS');
 		context.d1 = connect.bind(null, 'd1');
 		context.http = function(url) {
 			return index({ db: url, providers});
