@@ -4188,7 +4188,11 @@ function requireSyncClient () {
 		function observeSyncMethod(method, fn) {
 			return async function observedSyncMethod(options) {
 				try {
-					return await fn(options);
+					const result = await fn(options);
+					const payload = { method, result };
+					emit(method, payload);
+					emit('sync', payload);
+					return result;
 				}
 				catch (error) {
 					const payload = { method, error };

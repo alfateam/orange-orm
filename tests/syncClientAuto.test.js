@@ -36,6 +36,43 @@ describe('sync client auto start', () => {
 		expect(events.map((x) => x[1])).toEqual(['push', 'push', 'pull', 'pull']);
 	});
 
+	test('emits push, pull and sync events on success', async () => {
+		const events = [];
+		const db = {
+			__sqliteSync: { url: '/rdb', auto: false, tables: ['customer'] },
+			query: async () => []
+		};
+		const client = newSyncClient({
+			transaction: async (fn) => fn({
+				customer: {
+					patch: async () => ({ changed: [] })
+				},
+				query: async () => []
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async (request) => ({
+					data: request.data.phase === 'keys'
+						? { phase: 'keys', items: [], done: true, cursor: 'cursor-1' }
+						: { phase: 'push', applied: 0, duplicates: 0, results: [] }
+				});
+			}
+		});
+		client.on('push', (payload) => events.push(['push', payload.method]));
+		client.on('pull', (payload) => events.push(['pull', payload.method]));
+		client.on('sync', (payload) => events.push(['sync', payload.method]));
+
+		await client.push({ mutations: [{ id: 'm1', table: 'customer', patch: [] }] });
+		await client.pull();
+
+		expect(events).toEqual([
+			['push', 'push'],
+			['sync', 'push'],
+			['pull', 'pull'],
+			['sync', 'pull']
+		]);
+	});
+
 	test('uses all mapped tables when sync tables are omitted', async () => {
 		const requests = [];
 		const db = {
