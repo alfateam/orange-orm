@@ -4085,14 +4085,20 @@ function requireSyncAuto () {
 		async function runCycle() {
 			const config = normalizeAutoConfig(await getConfig());
 			let pushResult;
+			let pushError;
 			if (config.push) {
-				pushResult = await syncClient.push();
+				try {
+					pushResult = await syncClient.push();
+				}
+				catch (e) {
+					pushError = e;
+				}
 			}
 			if (config.pull) {
-				if (config.push && pushResult && pushResult.error)
-					return pushResult;
 				return syncClient.pull();
 			}
+			if (pushError)
+				throw pushError;
 			return pushResult || { skipped: true };
 		}
 
@@ -19483,6 +19489,8 @@ function requireWorkerClient () {
 		const pending = new Map();
 
 		worker.addEventListener('message', onMessage);
+		worker.addEventListener('error', onWorkerError);
+		worker.addEventListener('messageerror', onWorkerError);
 
 		const ready = request('open', {
 			connectionString,
@@ -19520,20 +19528,26 @@ function requireWorkerClient () {
 			const id = nextId++;
 			return new Promise((resolve, reject) => {
 				pending.set(id, { resolve, reject });
-				worker.postMessage({
-					type: 'orange-sqlite-opfs-request',
-					id,
-					method,
-					...payload
-				});
+				try {
+					worker.postMessage({
+						type: 'orange-sqlite-opfs-request',
+						id,
+						method,
+						...payload
+					});
+				}
+				catch (e) {
+					pending.delete(id);
+					reject(e);
+				}
 			});
 		}
 
 		function close() {
 			worker.removeEventListener('message', onMessage);
-			for (const entry of pending.values())
-				entry.reject(new Error('sqliteOPFS worker client closed.'));
-			pending.clear();
+			worker.removeEventListener('error', onWorkerError);
+			worker.removeEventListener('messageerror', onWorkerError);
+			rejectPending(new Error('sqliteOPFS worker client closed.'));
 			if (typeof worker.terminate === 'function')
 				worker.terminate();
 		}
@@ -19554,6 +19568,16 @@ function requireWorkerClient () {
 				entry.reject(toError(message.error));
 			else
 				entry.resolve(message.result);
+		}
+
+		function onWorkerError(event) {
+			rejectPending(toWorkerError(event));
+		}
+
+		function rejectPending(error) {
+			for (const entry of pending.values())
+				entry.reject(error);
+			pending.clear();
 		}
 	}
 
@@ -19690,6 +19714,18 @@ function serializeError(error) {
 			e.name = error.name;
 		if (error && error.stack)
 			e.stack = error.stack;
+		return e;
+	}
+
+	function toWorkerError(event) {
+		if (event instanceof Error)
+			return event;
+		const message = event && event.message
+			? event.message
+			: 'sqliteOPFS worker failed before responding.';
+		const e = new Error(message);
+		if (event && event.filename)
+			e.stack = `${message}\n${event.filename}:${event.lineno || 0}:${event.colno || 0}`;
 		return e;
 	}
 

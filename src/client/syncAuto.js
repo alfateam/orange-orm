@@ -58,14 +58,20 @@ function createSyncAuto(syncClient, getConfig, options = {}) {
 	async function runCycle() {
 		const config = normalizeAutoConfig(await getConfig());
 		let pushResult;
+		let pushError;
 		if (config.push) {
-			pushResult = await syncClient.push();
+			try {
+				pushResult = await syncClient.push();
+			}
+			catch (e) {
+				pushError = e;
+			}
 		}
 		if (config.pull) {
-			if (config.push && pushResult && pushResult.error)
-				return pushResult;
 			return syncClient.pull();
 		}
+		if (pushError)
+			throw pushError;
 		return pushResult || { skipped: true };
 	}
 

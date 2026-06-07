@@ -39,6 +39,25 @@ describe('sync auto scheduler', () => {
 		expect(auto.isRunning()).toBe(false);
 	});
 
+	test('still pulls when auto push fails', async () => {
+		const calls = [];
+		const auto = createSyncAuto({
+			push: async () => {
+				calls.push('push');
+				throw new Error('push failed');
+			},
+			pull: async () => {
+				calls.push('pull');
+				return { phase: 'pull' };
+			}
+		}, async () => ({ url: '/rdb', auto: { intervalMs: 0 } }));
+
+		await auto.start();
+
+		expect(calls).toEqual(['push', 'pull']);
+		auto.stop();
+	});
+
 	test('can run only push or only pull', async () => {
 		const pushOnlyCalls = [];
 		const pushOnly = createSyncAuto({
