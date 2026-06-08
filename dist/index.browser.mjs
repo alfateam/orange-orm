@@ -6,10 +6,7 @@ import * as axios from 'axios';
 import * as _default from 'rfdc/default';
 import * as ajv from 'ajv';
 import * as onChange from '@lroal/on-change';
-
-function getDefaultExportFromCjs (x) {
-	return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, 'default') ? x['default'] : x;
-}
+import sqliteOPFSModuleUrl from '@sqlite.org/sqlite-wasm?url';
 
 function getDefaultExportFromNamespaceIfPresent (n) {
 	return n && Object.prototype.hasOwnProperty.call(n, 'default') ? n['default'] : n;
@@ -5226,11 +5223,11 @@ function requireSyncClient () {
 	return syncClient;
 }
 
-var client;
+var client$1;
 var hasRequiredClient;
 
 function requireClient () {
-	if (hasRequiredClient) return client;
+	if (hasRequiredClient) return client$1;
 	hasRequiredClient = 1;
 	const createPatch = requireCreatePatch();
 	const stringify = requireStringify();
@@ -6411,8 +6408,8 @@ function requireClient () {
 	}
 
 
-	client = rdbClient();
-	return client;
+	client$1 = rdbClient();
+	return client$1;
 }
 
 var newBoolean_1;
@@ -20450,101 +20447,88 @@ function requireNewDatabase () {
 	return newDatabase_1;
 }
 
-var indexBrowser$1;
-var hasRequiredIndexBrowser;
+const hostExpress = requireHostExpress();
+const hostHono = requireHostHono();
+const hostLocal = requireHostLocal();
+const client = requireClient();
+const map = requireMap();
+let _d1;
+let _pg;
+let _pglite;
+let _sqliteOPFS;
 
-function requireIndexBrowser () {
-	if (hasRequiredIndexBrowser) return indexBrowser$1;
-	hasRequiredIndexBrowser = 1;
-	const hostExpress = requireHostExpress();
-	const hostHono = requireHostHono();
-	const hostLocal = requireHostLocal();
-	const client = requireClient();
-	const map = requireMap();
-	let _d1;
-	let _pg;
-	let _pglite;
-	let _sqliteOPFS;
-
-	globalThis.__orangeOrmSqliteOPFSModuleUrl = new URL('../../@sqlite.org/sqlite-wasm/dist/index.mjs', import.meta.url).href;
+globalThis.__orangeOrmSqliteOPFSModuleUrl = sqliteOPFSModuleUrl;
 
 
-	var connectViaPool = function() {
-		return client.apply(null, arguments);
-	};
-	connectViaPool.createPatch = client.createPatch;
-	connectViaPool.createDbWorkerClient = requireDbWorkerClient();
-	connectViaPool.createDbWorkerHandler = requireDbWorkerHandler();
-	connectViaPool.createSyncWorkerClient = requireSyncWorkerClient();
-	connectViaPool.createSyncWorkerHandler = requireSyncWorkerHandler();
-	connectViaPool.table = requireTable();
-	connectViaPool.filter = requireEmptyFilter();
-	connectViaPool.commit = requireCommit();
-	connectViaPool.rollback = requireRollback();
-	connectViaPool.end = requirePools().end;
-	connectViaPool.close = connectViaPool.end;
-	connectViaPool.log = requireLog().registerLogger;
-	connectViaPool.on = requireLog().on;
-	connectViaPool.off = requireLog().off;
-	connectViaPool.query = requireQuery();
-	connectViaPool.lock = requireLock();
-	connectViaPool.schema = requireSchema();
-	connectViaPool.map = map.bind(null, connectViaPool);
+var connectViaPool = function() {
+	return client.apply(null, arguments);
+};
+connectViaPool.createPatch = client.createPatch;
+connectViaPool.createDbWorkerClient = requireDbWorkerClient();
+connectViaPool.createDbWorkerHandler = requireDbWorkerHandler();
+connectViaPool.createSyncWorkerClient = requireSyncWorkerClient();
+connectViaPool.createSyncWorkerHandler = requireSyncWorkerHandler();
+connectViaPool.table = requireTable();
+connectViaPool.filter = requireEmptyFilter();
+connectViaPool.commit = requireCommit();
+connectViaPool.rollback = requireRollback();
+connectViaPool.end = requirePools().end;
+connectViaPool.close = connectViaPool.end;
+connectViaPool.log = requireLog().registerLogger;
+connectViaPool.on = requireLog().on;
+connectViaPool.off = requireLog().off;
+connectViaPool.query = requireQuery();
+connectViaPool.lock = requireLock();
+connectViaPool.schema = requireSchema();
+connectViaPool.map = map.bind(null, connectViaPool);
 
-	connectViaPool.http = function(url) {
-		return url;
-	};
-
-
-	Object.defineProperty(connectViaPool, 'd1', {
-		get: function() {
-			if (!_d1)
-				_d1 = requireNewDatabase$3();
-			return _d1;
-		}
-	});
-
-	Object.defineProperty(connectViaPool, 'pglite', {
-		get: function() {
-			if (!_pglite)
-				_pglite = requireNewDatabase$2();
-			return _pglite;
-		}
-	});
-
-	Object.defineProperty(connectViaPool, 'sqliteOPFS', {
-		get: function() {
-			if (!_sqliteOPFS)
-				_sqliteOPFS = requireNewDatabase$1();
-			return _sqliteOPFS;
-		}
-	});
-
-	Object.defineProperty(connectViaPool, 'postgres', {
-		get: function() {
-			if (!_pg)
-				_pg = requireNewDatabase();
-			return _pg;
-		}
-	});
-
-	Object.defineProperty(connectViaPool, 'pg', {
-		get: function() {
-			if (!_pg)
-				_pg = requireNewDatabase();
-			return _pg;
-		}
-	});
+connectViaPool.http = function(url) {
+	return url;
+};
 
 
-	connectViaPool.express = hostExpress.bind(null, hostLocal);
-	connectViaPool.hono = hostHono.bind(null, hostLocal);
+Object.defineProperty(connectViaPool, 'd1', {
+	get: function() {
+		if (!_d1)
+			_d1 = requireNewDatabase$3();
+		return _d1;
+	}
+});
 
-	indexBrowser$1 = connectViaPool;
-	return indexBrowser$1;
-}
+Object.defineProperty(connectViaPool, 'pglite', {
+	get: function() {
+		if (!_pglite)
+			_pglite = requireNewDatabase$2();
+		return _pglite;
+	}
+});
 
-var indexBrowserExports = requireIndexBrowser();
-var indexBrowser = /*@__PURE__*/getDefaultExportFromCjs(indexBrowserExports);
+Object.defineProperty(connectViaPool, 'sqliteOPFS', {
+	get: function() {
+		if (!_sqliteOPFS)
+			_sqliteOPFS = requireNewDatabase$1();
+		return _sqliteOPFS;
+	}
+});
 
-export { indexBrowser as default };
+Object.defineProperty(connectViaPool, 'postgres', {
+	get: function() {
+		if (!_pg)
+			_pg = requireNewDatabase();
+		return _pg;
+	}
+});
+
+Object.defineProperty(connectViaPool, 'pg', {
+	get: function() {
+		if (!_pg)
+			_pg = requireNewDatabase();
+		return _pg;
+	}
+});
+
+
+connectViaPool.express = hostExpress.bind(null, hostLocal);
+connectViaPool.hono = hostHono.bind(null, hostLocal);
+
+module.exports = connectViaPool;

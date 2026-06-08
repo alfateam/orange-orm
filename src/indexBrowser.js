@@ -1,3 +1,5 @@
+import sqliteOPFSModuleUrl from '@sqlite.org/sqlite-wasm?url';
+
 const hostExpress = require('./hostExpress');
 const hostHono = require('./hostHono');
 const hostLocal = require('./hostLocal');
@@ -8,7 +10,7 @@ let _pg;
 let _pglite;
 let _sqliteOPFS;
 
-globalThis.__orangeOrmSqliteOPFSModuleUrl = new URL('../../@sqlite.org/sqlite-wasm/dist/index.mjs', import.meta.url).href;
+globalThis.__orangeOrmSqliteOPFSModuleUrl = sqliteOPFSModuleUrl;
 
 
 var connectViaPool = function() {
