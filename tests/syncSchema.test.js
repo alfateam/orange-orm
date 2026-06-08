@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
 const rdb = require('../src/index');
-const { ensureSyncSchema } = require('../src/client/syncSchema');
+const { ensureSyncSchema, buildSyncSchema, stableStringify, checksumString } = require('../src/client/syncSchema');
 
 describe('sync schema', () => {
 	test('creates local sqlite schema from mapped tables and stores checksum', async () => {
@@ -15,9 +15,21 @@ describe('sync schema', () => {
 		expect(db.statements.some(x => x.includes('"id" INTEGER PRIMARY KEY'))).toBe(true);
 		expect(db.statements.some(x => x.includes('"name" TEXT NOT NULL'))).toBe(true);
 		expect(db.statements.some(x => x.includes('CREATE TABLE IF NOT EXISTS "order"'))).toBe(true);
+		expect(db.statements.some(x => x.includes('CREATE INDEX IF NOT EXISTS "orange_idx_order_customerId" ON "order" ("customerId");'))).toBe(true);
 		expect(db.schemaStates.length).toBe(1);
 		expect(db.schemaStates[0].scope).toBe('sync:customer|order');
 		expect(db.schemaStates[0].checksum).toMatch(/^fnv1a32:/);
+	});
+
+	test('adds relation indexes to schema json', () => {
+		const map = createMap();
+		const client = toClient(map);
+		const schema = buildSyncSchema(client.tables, ['customer', 'order']);
+		const order = schema.tables.find(x => x.name === 'order');
+
+		expect(order.indexes).toHaveLength(1);
+		expect(order.indexes[0].dbName).toBe('orange_idx_order_customerId');
+		expect(order.indexes[0].columns).toEqual(['customerId']);
 	});
 
 	test('throws when stored schema checksum differs from current map', async () => {
@@ -38,6 +50,26 @@ describe('sync schema', () => {
 		await expect(ensureSyncSchema(db, toClient(changedMap), ['customer'], {}))
 			.rejects.toThrow('Local sync schema does not match current map');
 	});
+
+	test('allows existing schema state to add relation indexes', async () => {
+		const map = createMap();
+		const client = toClient(map);
+		const db = newFakeDb();
+		const schemaWithoutIndexes = buildSyncSchema(client.tables, ['customer', 'order']);
+		for (const table of schemaWithoutIndexes.tables)
+			table.indexes = [];
+		db.schemaStates.push({
+			scope: 'sync:customer|order',
+			schemaJson: stableStringify(schemaWithoutIndexes),
+			checksum: checksumString(stableStringify(schemaWithoutIndexes))
+		});
+
+		await ensureSyncSchema(db, client, ['customer', 'order'], {});
+
+		expect(db.statements.some(x => x.includes('CREATE INDEX IF NOT EXISTS "orange_idx_order_customerId"'))).toBe(true);
+		expect(db.schemaStates).toHaveLength(1);
+		expect(db.schemaStates[0].checksum).not.toBe(checksumString(stableStringify(schemaWithoutIndexes)));
+	});
 });
 
 function createMap() {
@@ -50,7 +82,15 @@ function createMap() {
 		order: x.table('order').map(({ column }) => ({
 			companyId: column('companyId').string().primary().notNullExceptInsert(),
 			orderNo: column('orderNo').numeric().primary().notNullExceptInsert(),
+			customerId: column('customerId').numeric().notNullExceptInsert(),
 			orderDate: column('orderDate').dateWithTimeZone()
+		}))
+	})).map((x) => ({
+		customer: x.customer.map(({ hasMany }) => ({
+			orders: hasMany(x.order).by('customerId')
+		})),
+		order: x.order.map(({ references }) => ({
+			customer: references(x.customer).by('customerId').notNull()
 		}))
 	}));
 }
@@ -75,14 +115,20 @@ function newFakeDb() {
 			if (sql.startsWith('SELECT "checksum"')) {
 				const scope = extractScope(sql);
 				const state = schemaStates.find(x => x.scope === scope);
-				return state ? [{ checksum: state.checksum }] : [];
+				return state ? [{ checksum: state.checksum, schema_json: state.schemaJson }] : [];
 			}
-			if (sql.startsWith('INSERT INTO "orange_schema_state"')) {
+			if (sql.startsWith('INSERT OR REPLACE INTO "orange_schema_state"')) {
 				const values = extractStringValues(sql);
-				schemaStates.push({
+				const next = {
 					scope: values[0],
+					schemaJson: values[3],
 					checksum: values[4]
-				});
+				};
+				const existingIndex = schemaStates.findIndex(x => x.scope === next.scope);
+				if (existingIndex >= 0)
+					schemaStates[existingIndex] = next;
+				else
+					schemaStates.push(next);
 			}
 			return [];
 		}

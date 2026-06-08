@@ -4173,13 +4173,14 @@ function requireSyncSchema () {
 
 		await ensureSchemaStateTable(db);
 		const existing = await readSchemaState(db, scope);
-		if (existing && existing.checksum !== checksum)
+		const shouldUpdateState = !existing || existing.checksum !== checksum;
+		if (existing && existing.checksum !== checksum && !isIndexOnlySchemaChange(existing.schemaJson, schema))
 			throw new Error('Local sync schema does not match current map. Reset the local sync database or run a migration before syncing.');
 
 		for (let i = 0; i < sql.statements.length; i++)
 			await db.query(sql.statements[i]);
 
-		if (!existing)
+		if (shouldUpdateState)
 			await writeSchemaState(db, {
 				scope,
 				dialect: 'sqlite',
@@ -4197,11 +4198,13 @@ function requireSyncSchema () {
 		const selected = Array.from(new Set(tableNames))
 			.filter(name => tables[name])
 			.sort();
-		return {
+		const schema = {
 			version: schemaVersion,
 			dialect: 'sqlite',
 			tables: selected.map(name => tableToSchema(name, tables[name]))
 		};
+		addRelationIndexes(schema, tables, selected);
+		return schema;
 	}
 
 	function tableToSchema(name, table) {
@@ -4210,6 +4213,7 @@ function requireSyncSchema () {
 			name,
 			dbName: table._dbName,
 			columns,
+			indexes: [],
 			primaryKey: (table._primaryColumns || []).map(x => x._dbName)
 		};
 	}
@@ -4247,7 +4251,7 @@ function requireSyncSchema () {
 
 	function schemaToSql(schema) {
 		return {
-			statements: schema.tables.map(tableToCreateSql)
+			statements: schema.tables.map(tableToCreateSql).concat(schema.tables.flatMap(tableToIndexSql))
 		};
 	}
 
@@ -4261,6 +4265,12 @@ function requireSyncSchema () {
 			parts.map(x => `  ${x}`).join(',\n'),
 			');'
 		].join('\n');
+	}
+
+	function tableToIndexSql(table) {
+		return (table.indexes || []).map(index => {
+			return `CREATE INDEX IF NOT EXISTS ${quoteIdent(index.dbName)} ON ${quoteIdent(table.dbName)} (${index.columns.map(quoteIdent).join(', ')});`;
+		});
 	}
 
 	function columnToSql(column, options = {}) {
@@ -4282,6 +4292,79 @@ function requireSyncSchema () {
 		return 'TEXT';
 	}
 
+	function addRelationIndexes(schema, tables, selectedNames) {
+		const tableSchemaByObject = new Map();
+		const selectedObjects = new Set();
+		for (let i = 0; i < selectedNames.length; i++) {
+			const table = tables[selectedNames[i]];
+			const tableSchema = schema.tables[i];
+			tableSchemaByObject.set(table, tableSchema);
+			selectedObjects.add(table);
+		}
+
+		const seen = new Set();
+		for (let i = 0; i < selectedNames.length; i++) {
+			const table = tables[selectedNames[i]];
+			const relations = table && table._relations;
+			if (!relations)
+				continue;
+			for (let relationName in relations) {
+				const join = extractJoinRelation(relations[relationName]);
+				if (!join || !selectedObjects.has(join.parentTable) || !selectedObjects.has(join.childTable))
+					continue;
+				const targetSchema = tableSchemaByObject.get(join.parentTable);
+				const columns = (join.columns || []).map(x => x && x._dbName).filter(Boolean);
+				if (!targetSchema || columns.length === 0 || isPrimaryKey(targetSchema, columns))
+					continue;
+				const key = `${targetSchema.dbName}:${columns.join('|')}`;
+				if (seen.has(key))
+					continue;
+				seen.add(key);
+				targetSchema.indexes.push({
+					name: `relation:${relationName}`,
+					dbName: newIndexName(targetSchema.dbName, columns),
+					columns
+				});
+			}
+		}
+
+		for (let i = 0; i < schema.tables.length; i++)
+			schema.tables[i].indexes.sort((a, b) => a.dbName.localeCompare(b.dbName));
+	}
+
+	function extractJoinRelation(relation) {
+		if (!relation || typeof relation.accept !== 'function')
+			return null;
+		let join;
+		relation.accept({
+			visitJoin: function(current) {
+				join = current;
+			},
+			visitOne: function(current) {
+				join = current && current.joinRelation;
+			},
+			visitMany: function(current) {
+				join = current && current.joinRelation;
+			}
+		});
+		return join;
+	}
+
+	function isPrimaryKey(tableSchema, columns) {
+		if (!Array.isArray(tableSchema.primaryKey) || tableSchema.primaryKey.length !== columns.length)
+			return false;
+		for (let i = 0; i < columns.length; i++) {
+			if (tableSchema.primaryKey[i] !== columns[i])
+				return false;
+		}
+		return true;
+	}
+
+	function newIndexName(tableName, columns) {
+		const raw = `orange_idx_${tableName}_${columns.join('_')}`;
+		return raw.replace(/[^A-Za-z0-9_]/g, '_');
+	}
+
 	async function ensureSchemaStateTable(db) {
 		await db.query([
 			`CREATE TABLE IF NOT EXISTS ${quoteIdent(schemaStateTable)} (`,
@@ -4297,19 +4380,20 @@ function requireSyncSchema () {
 	}
 
 	async function readSchemaState(db, scope) {
-		const rows = await db.query(`SELECT "checksum" FROM ${quoteIdent(schemaStateTable)} WHERE "scope" = ${sqlStringLiteral(scope)} LIMIT 1`);
+		const rows = await db.query(`SELECT "checksum", "schema_json" FROM ${quoteIdent(schemaStateTable)} WHERE "scope" = ${sqlStringLiteral(scope)} LIMIT 1`);
 		const list = Array.isArray(rows) ? rows : rows && rows.rows || [];
 		const row = list[0];
 		if (!row)
 			return null;
 		return {
-			checksum: row.checksum ?? row.CHECKSUM
+			checksum: row.checksum ?? row.CHECKSUM,
+			schemaJson: row.schema_json ?? row.SCHEMA_JSON
 		};
 	}
 
 	async function writeSchemaState(db, state) {
 		await db.query([
-			`INSERT INTO ${quoteIdent(schemaStateTable)} (`,
+			`INSERT OR REPLACE INTO ${quoteIdent(schemaStateTable)} (`,
 			'"scope", "dialect", "tables_json", "schema_json", "checksum", "sql_text", "updated_at_ms"',
 			') VALUES (',
 			[
@@ -4323,6 +4407,31 @@ function requireSyncSchema () {
 			].join(', '),
 			');'
 		].join(' '));
+	}
+
+	function isIndexOnlySchemaChange(existingSchemaJson, nextSchema) {
+		if (typeof existingSchemaJson !== 'string')
+			return false;
+		try {
+			const existing = JSON.parse(existingSchemaJson);
+			return stableStringify(stripIndexes(existing)) === stableStringify(stripIndexes(nextSchema));
+		}
+		catch (_e) {
+			return false;
+		}
+	}
+
+	function stripIndexes(value) {
+		if (Array.isArray(value))
+			return value.map(stripIndexes);
+		if (!value || typeof value !== 'object')
+			return value;
+		const result = {};
+		for (let key in value) {
+			if (key !== 'indexes')
+				result[key] = stripIndexes(value[key]);
+		}
+		return result;
 	}
 
 	function quoteIdent(value) {
