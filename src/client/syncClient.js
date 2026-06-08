@@ -3,6 +3,7 @@ const randomUuid = require('../randomUuid');
 const stringify = require('./stringify');
 const { createSyncAuto } = require('./syncAuto');
 const outboxTableSql = require('../sync/outboxTableSql');
+const { ensureSyncSchema } = require('./syncSchema');
 
 function newSyncClient(client, getDb, axiosInterceptor) {
 	const sinceByScope = new Map();
@@ -74,6 +75,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		const configuredTables = resolveSyncTables(db, pullConfig.tables, client);
 		if (!Array.isArray(configuredTables) || configuredTables.length === 0)
 			throw new Error('Sync pull requires mapped tables or configured tables. Set sync.tables when the client has no table map.');
+		await ensureSyncSchema(db, client, configuredTables, syncConfig.schema);
 		await maybeEmitInitialReady(syncConfig, configuredTables, db, 'persisted');
 		const currentSince = await getScopeSince(configuredTables, db);
 		const requestOptions = {
@@ -120,6 +122,8 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		if (!syncConfig)
 			throw new Error('Sync is not configured. Add sync in sqlite options: sqlite(connectionString, { sync: ... })');
 		const pushConfig = options._pushConfig || resolvePushConfig(syncConfig, options);
+		const configuredTables = resolveSyncTables(db, syncConfig.tables, client);
+		await ensureSyncSchema(db, client, configuredTables, syncConfig.schema);
 		const limit = normalizeLimit(options.limit, 100);
 		const pending = await readPendingMutations(db, limit);
 		if (pending.length === 0)
@@ -616,6 +620,7 @@ function normalizeSyncConfig(sync) {
 		pull: sync.pull === undefined ? undefined : normalizePullConfig(sync.pull, endpoint, tables),
 		tables,
 		initialReadyMaxAgeMs,
+		schema: sync.schema,
 		auto: sync.auto,
 		push: normalizeEndpoint(sync.push)
 	};
