@@ -107,4 +107,39 @@ describe('sync client auto start', () => {
 
 		expect(requests[0].data.tables).toEqual(['customer', 'order']);
 	});
+
+	test('uses client mapped tables when db object has no table map', async () => {
+		const requests = [];
+		const db = {
+			__sqliteSync: { url: '/rdb', auto: false },
+			query: async () => []
+		};
+		const client = newSyncClient({
+			tables: {
+				customer: {},
+				order: {}
+			},
+			transaction: async (fn) => fn({
+				query: async () => []
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async (request) => {
+					requests.push(request);
+					return {
+						data: {
+							phase: 'keys',
+							items: [],
+							done: true,
+							cursor: 'cursor-1'
+						}
+					};
+				};
+			}
+		});
+
+		await client.pull();
+
+		expect(requests[0].data.tables).toEqual(['customer', 'order']);
+	});
 });

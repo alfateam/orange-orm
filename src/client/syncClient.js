@@ -71,7 +71,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 
 		const pullOptions = normalizePullOptions(options);
 		const pullConfig = resolvePullConfig(syncConfig, pullOptions);
-		const configuredTables = resolveSyncTables(db, pullConfig.tables);
+		const configuredTables = resolveSyncTables(db, pullConfig.tables, client);
 		if (!Array.isArray(configuredTables) || configuredTables.length === 0)
 			throw new Error('Sync pull requires mapped tables or configured tables. Set sync.tables when the client has no table map.');
 		await maybeEmitInitialReady(syncConfig, configuredTables, db, 'persisted');
@@ -562,7 +562,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		if (!syncConfig)
 			return null;
 		const pullConfig = resolvePullConfig(syncConfig);
-		const configuredTables = resolveSyncTables(db, pullConfig.tables);
+		const configuredTables = resolveSyncTables(db, pullConfig.tables, client);
 		if (!Array.isArray(configuredTables) || configuredTables.length === 0)
 			return null;
 		return maybeEmitInitialReady(syncConfig, configuredTables, db, source);
@@ -654,12 +654,13 @@ function normalizeConfiguredTables(value) {
 	return Array.from(new Set(tables));
 }
 
-function resolveSyncTables(db, configuredTables) {
+function resolveSyncTables(db, configuredTables, client) {
 	if (Array.isArray(configuredTables) && configuredTables.length > 0)
 		return configuredTables;
-	if (!db || !db.tables)
+	const tables = db && db.tables ? db.tables : client && client.tables;
+	if (!tables)
 		return configuredTables;
-	const names = Object.keys(db.tables).filter(x => typeof x === 'string');
+	const names = Object.keys(tables).filter(x => typeof x === 'string');
 	if (names.length === 0)
 		return configuredTables;
 	return names;
