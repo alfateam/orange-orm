@@ -142,4 +142,53 @@ describe('sync client auto start', () => {
 
 		expect(requests[0].data.tables).toEqual(['customer', 'order']);
 	});
+
+	test('does not rerun internal sync table DDL after first pull', async () => {
+		const db = {
+			__sqliteSync: { url: '/rdb', auto: false },
+			queryLog: [],
+			query: async function(sql) {
+				this.queryLog.push(sql);
+				return [];
+			}
+		};
+		const client = newSyncClient({
+			tables: {
+				customer: newTable('customer')
+			},
+			transaction: async (fn) => fn({
+				query: async () => []
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async () => ({
+					data: {
+						phase: 'keys',
+						items: [],
+						done: true,
+						cursor: 'cursor-1'
+					}
+				});
+			}
+		});
+
+		await client.pull();
+		await client.pull();
+
+		const stateTableCreates = db.queryLog.filter(x => x.includes('CREATE TABLE IF NOT EXISTS "orange_sync_state"'));
+		expect(stateTableCreates).toHaveLength(1);
+	});
 });
+
+function newTable(dbName) {
+	return {
+		_dbName: dbName,
+		_columns: [
+			{ alias: 'id', _dbName: 'id', tsType: 'NumberColumn', isPrimary: true }
+		],
+		_primaryColumns: [
+			{ alias: 'id', _dbName: 'id', tsType: 'NumberColumn', isPrimary: true }
+		],
+		_relations: {}
+	};
+}

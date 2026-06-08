@@ -7,6 +7,7 @@ const { ensureSyncSchema } = require('./syncSchema');
 
 function newSyncClient(client, getDb, axiosInterceptor) {
 	const sinceByScope = new Map();
+	const ensuredInternalTables = new WeakMap();
 	const syncStateTable = 'orange_sync_state';
 	const syncClientTable = 'orange_sync_client';
 	const syncOutboxTable = 'orange_sync_outbox';
@@ -368,24 +369,47 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 	}
 
 	async function ensureSyncStateTable(db) {
+		if (isInternalTableEnsured(db, syncStateTable))
+			return;
 		await db.query([
 			`CREATE TABLE IF NOT EXISTS "${syncStateTable}" (`,
 			'"scope" TEXT PRIMARY KEY,',
 			'"since_value" TEXT NOT NULL',
 			');'
 		].join(' '));
+		markInternalTableEnsured(db, syncStateTable);
 	}
 
 	async function ensureSyncClientTable(db) {
+		if (isInternalTableEnsured(db, syncClientTable))
+			return;
 		await db.query([
 			`CREATE TABLE IF NOT EXISTS "${syncClientTable}" (`,
 			'"id" TEXT PRIMARY KEY',
 			');'
 		].join(' '));
+		markInternalTableEnsured(db, syncClientTable);
 	}
 
 	async function ensureSyncOutboxTable(db) {
+		if (isInternalTableEnsured(db, syncOutboxTable))
+			return;
 		await db.query(outboxTableSql(syncOutboxTable));
+		markInternalTableEnsured(db, syncOutboxTable);
+	}
+
+	function isInternalTableEnsured(db, tableName) {
+		const ensured = ensuredInternalTables.get(db);
+		return ensured ? ensured.has(tableName) : false;
+	}
+
+	function markInternalTableEnsured(db, tableName) {
+		let ensured = ensuredInternalTables.get(db);
+		if (!ensured) {
+			ensured = new Set();
+			ensuredInternalTables.set(db, ensured);
+		}
+		ensured.add(tableName);
 	}
 
 	async function getClientId(db) {
