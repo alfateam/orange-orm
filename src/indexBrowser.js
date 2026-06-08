@@ -8,6 +8,10 @@ let _pg;
 let _pglite;
 let _sqliteOPFS;
 
+globalThis.__orangeOrmCreateSqliteOPFSWorker = function() {
+	return new Worker(new URL('../src/sqliteOPFS/worker.mjs', import.meta.url), { type: 'module' });
+};
+
 var connectViaPool = function() {
 	return client.apply(null, arguments);
 };

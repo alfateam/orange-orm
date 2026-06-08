@@ -101,6 +101,8 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 function createWorker(connectionString, options) {
 	if (typeof options.createWorker === 'function')
 		return options.createWorker(connectionString, options);
+	if (typeof globalThis !== 'undefined' && typeof globalThis.__orangeOrmCreateSqliteOPFSWorker === 'function')
+		return globalThis.__orangeOrmCreateSqliteOPFSWorker(connectionString, options);
 	if (options.workerUrl && typeof Worker !== 'undefined')
 		return new Worker(options.workerUrl, { type: 'module' });
 	if (typeof Worker !== 'undefined') {

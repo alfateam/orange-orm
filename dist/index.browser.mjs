@@ -19584,6 +19584,8 @@ function requireWorkerClient () {
 	function createWorker(connectionString, options) {
 		if (typeof options.createWorker === 'function')
 			return options.createWorker(connectionString, options);
+		if (typeof globalThis !== 'undefined' && typeof globalThis.__orangeOrmCreateSqliteOPFSWorker === 'function')
+			return globalThis.__orangeOrmCreateSqliteOPFSWorker(connectionString, options);
 		if (options.workerUrl && typeof Worker !== 'undefined')
 			return new Worker(options.workerUrl, { type: 'module' });
 		if (typeof Worker !== 'undefined') {
@@ -20457,6 +20459,10 @@ function requireIndexBrowser () {
 	let _pg;
 	let _pglite;
 	let _sqliteOPFS;
+
+	globalThis.__orangeOrmCreateSqliteOPFSWorker = function() {
+		return new Worker(new URL('../src/sqliteOPFS/worker.mjs', import.meta.url), { type: 'module' });
+	};
 
 	var connectViaPool = function() {
 		return client.apply(null, arguments);
