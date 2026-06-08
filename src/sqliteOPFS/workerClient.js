@@ -107,7 +107,7 @@ function createWorker(connectionString, options) {
 		return new Worker(options.workerUrl, { type: 'module' });
 	if (typeof Worker !== 'undefined') {
 		try {
-			const source = createWorkerSource(options.sqliteModuleUrl || '@sqlite.org/sqlite-wasm');
+			const source = createWorkerSource(options.sqliteModuleUrl || getDefaultSqliteModuleUrl() || '@sqlite.org/sqlite-wasm');
 			const blob = new Blob([source], { type: 'text/javascript' });
 			const url = URL.createObjectURL(blob);
 			return new Worker(url, { type: 'module' });
@@ -117,6 +117,12 @@ function createWorker(connectionString, options) {
 		}
 	}
 	throw new Error('sqliteOPFS requires Worker support or an explicit worker/createWorker option.');
+}
+
+function getDefaultSqliteModuleUrl() {
+	return typeof globalThis !== 'undefined' && typeof globalThis.__orangeOrmSqliteOPFSModuleUrl === 'string'
+		? globalThis.__orangeOrmSqliteOPFSModuleUrl
+		: null;
 }
 
 function createWorkerSource(sqliteModuleUrl) {
