@@ -1,5 +1,6 @@
 const schemaStateTable = 'orange_schema_state';
 const schemaVersion = 1;
+const ensuredSchemasByDb = new WeakMap();
 
 async function ensureSyncSchema(db, client, tableNames, options = {}) {
 	if (!db || typeof db.query !== 'function')
@@ -17,12 +18,19 @@ async function ensureSyncSchema(db, client, tableNames, options = {}) {
 	const schemaJson = stableStringify(schema);
 	const checksum = checksumString(schemaJson);
 	const scope = `sync:${schema.tables.map(x => x.name).join('|')}`;
+	const ensuredKey = `${scope}:${checksum}`;
+	if (isSchemaEnsured(db, ensuredKey))
+		return { scope, schema, checksum, sql: sql.statements };
 
 	await ensureSchemaStateTable(db);
 	const existing = await readSchemaState(db, scope);
 	const shouldUpdateState = !existing || existing.checksum !== checksum;
 	if (existing && existing.checksum !== checksum && !isIndexOnlySchemaChange(existing.schemaJson, schema))
 		throw new Error('Local sync schema does not match current map. Reset the local sync database or run a migration before syncing.');
+	if (existing && existing.checksum === checksum) {
+		markSchemaEnsured(db, ensuredKey);
+		return { scope, schema, checksum, sql: sql.statements };
+	}
 
 	for (let i = 0; i < sql.statements.length; i++)
 		await db.query(sql.statements[i]);
@@ -38,7 +46,22 @@ async function ensureSyncSchema(db, client, tableNames, options = {}) {
 			updatedAtMs: Date.now()
 		});
 
+	markSchemaEnsured(db, ensuredKey);
 	return { scope, schema, checksum, sql: sql.statements };
+}
+
+function isSchemaEnsured(db, key) {
+	const ensured = ensuredSchemasByDb.get(db);
+	return ensured ? ensured.has(key) : false;
+}
+
+function markSchemaEnsured(db, key) {
+	let ensured = ensuredSchemasByDb.get(db);
+	if (!ensured) {
+		ensured = new Set();
+		ensuredSchemasByDb.set(db, ensured);
+	}
+	ensured.add(key);
 }
 
 function buildSyncSchema(tables, tableNames) {

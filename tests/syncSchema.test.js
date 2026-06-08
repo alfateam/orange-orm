@@ -70,6 +70,19 @@ describe('sync schema', () => {
 		expect(db.schemaStates).toHaveLength(1);
 		expect(db.schemaStates[0].checksum).not.toBe(checksumString(stableStringify(schemaWithoutIndexes)));
 	});
+
+	test('does not rerun schema DDL when stored checksum matches', async () => {
+		const map = createMap();
+		const client = toClient(map);
+		const db = newFakeDb();
+
+		await ensureSyncSchema(db, client, ['customer', 'order'], {});
+		const statementCount = db.statements.length;
+
+		await ensureSyncSchema(db, client, ['customer', 'order'], {});
+
+		expect(db.statements).toHaveLength(statementCount);
+	});
 });
 
 function createMap() {
