@@ -5,6 +5,7 @@ const createSqliteOPFSWorkerClient = require('./workerClient');
 function newPool(connectionString, poolOptions) {
 	let id = newId();
 	let client = createSqliteOPFSWorkerClient(connectionString, poolOptions || {});
+	let readClient;
 	let c = {};
 
 	c.connect = function(cb) {
@@ -14,9 +15,20 @@ function newPool(connectionString, poolOptions) {
 		});
 	};
 
+	c.connectRead = function(cb) {
+		if (!readClient)
+			readClient = createSqliteOPFSWorkerClient(connectionString, { ...poolOptions, readonly: true });
+		cb(null, readClient, function(err) {
+			if (err && readClient.reset)
+				readClient.reset();
+		});
+	};
+
 	c.end = function() {
 		if (client.close)
 			client.close();
+		if (readClient && readClient.close)
+			readClient.close();
 		delete pools[id];
 		return Promise.resolve();
 	};

@@ -10,7 +10,7 @@ const insertSql = require('../sqlite/insertSql');
 const insert = require('../sqlite/insert');
 const quote = require('../sqlite/quote');
 
-function newResolveTransaction(domain, pool)  {
+function newResolveTransaction(domain, pool, { readonly = false } = {})  {
 	var rdb = { poolFactory: pool };
 	rdb.engine = 'sqlite';
 	rdb.encodeBoolean = encodeBoolean;
@@ -34,6 +34,45 @@ function newResolveTransaction(domain, pool)  {
 	rdb.quote = quote;
 	rdb.cache = {};
 	rdb.changes = [];
+
+	if (readonly && typeof pool.connectRead === 'function') {
+		rdb.dbClient = {
+			executeQuery: function(query, callback) {
+				pool.connectRead((err, client, done) => {
+					if (err)
+						return callback(err);
+					try {
+						client.executeQuery(query, (err, res) => {
+							done(err);
+							callback(err, res);
+						});
+					}
+					catch (e) {
+						done(e);
+						callback(e);
+					}
+				});
+			},
+			executeCommand: function(query, callback) {
+				pool.connect((err, client, done) => {
+					if (err)
+						return callback(err);
+					try {
+						client.executeCommand(query, (err, res) => {
+							done(err);
+							callback(err, res);
+						});
+					}
+					catch (e) {
+						done(e);
+						callback(e);
+					}
+				});
+			}
+		};
+		domain.rdb = rdb;
+		return (onSuccess) => onSuccess();
+	}
 
 	return function(onSuccess, onError) {
 		pool.connect(onConnected);

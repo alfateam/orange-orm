@@ -19802,7 +19802,7 @@ function requireNewTransaction$1 () {
 	const insert = requireInsert$1();
 	const quote = requireQuote$1();
 
-	function newResolveTransaction(domain, pool)  {
+	function newResolveTransaction(domain, pool, { readonly = false } = {})  {
 		var rdb = { poolFactory: pool };
 		rdb.engine = 'sqlite';
 		rdb.encodeBoolean = encodeBoolean;
@@ -19826,6 +19826,45 @@ function requireNewTransaction$1 () {
 		rdb.quote = quote;
 		rdb.cache = {};
 		rdb.changes = [];
+
+		if (readonly && typeof pool.connectRead === 'function') {
+			rdb.dbClient = {
+				executeQuery: function(query, callback) {
+					pool.connectRead((err, client, done) => {
+						if (err)
+							return callback(err);
+						try {
+							client.executeQuery(query, (err, res) => {
+								done(err);
+								callback(err, res);
+							});
+						}
+						catch (e) {
+							done(e);
+							callback(e);
+						}
+					});
+				},
+				executeCommand: function(query, callback) {
+					pool.connect((err, client, done) => {
+						if (err)
+							return callback(err);
+						try {
+							client.executeCommand(query, (err, res) => {
+								done(err);
+								callback(err, res);
+							});
+						}
+						catch (e) {
+							done(e);
+							callback(e);
+						}
+					});
+				}
+			};
+			domain.rdb = rdb;
+			return (onSuccess) => onSuccess();
+		}
 
 		return function(onSuccess, onError) {
 			pool.connect(onConnected);
@@ -20134,6 +20173,7 @@ function requireNewPool$1 () {
 	function newPool(connectionString, poolOptions) {
 		let id = newId();
 		let client = createSqliteOPFSWorkerClient(connectionString, poolOptions || {});
+		let readClient;
 		let c = {};
 
 		c.connect = function(cb) {
@@ -20143,9 +20183,20 @@ function requireNewPool$1 () {
 			});
 		};
 
+		c.connectRead = function(cb) {
+			if (!readClient)
+				readClient = createSqliteOPFSWorkerClient(connectionString, { ...poolOptions, readonly: true });
+			cb(null, readClient, function(err) {
+				if (err && readClient.reset)
+					readClient.reset();
+			});
+		};
+
 		c.end = function() {
 			if (client.close)
 				client.close();
+			if (readClient && readClient.close)
+				readClient.close();
 			delete pools[id];
 			return Promise.resolve();
 		};
