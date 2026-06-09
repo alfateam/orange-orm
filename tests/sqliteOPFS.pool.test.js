@@ -61,6 +61,7 @@ describe('sqliteOPFS pool', () => {
 			expect(completed[0].sql).toBe('SELECT 1');
 			expect(completed[0].parameters).toEqual([]);
 			expect(completed[0].elapsedMs).toBeGreaterThanOrEqual(0);
+			expect(completed[0].workerElapsedMs).toBeGreaterThanOrEqual(0);
 		}
 		finally {
 			log.off('queryComplete', onComplete);
@@ -88,7 +89,8 @@ function newFakeWorker() {
 						data: {
 							type: 'orange-sqlite-opfs-response',
 							id: message.id,
-							result: { ok: true }
+							result: { ok: true },
+							elapsedMs: 1
 						}
 					});
 				}

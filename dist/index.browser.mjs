@@ -19950,9 +19950,9 @@ function requireWorkerClient () {
 			const startedAt = now();
 			ready
 				.then(() => request('query', { sql, parameters }))
-				.then((rows) => {
-					log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt });
-					callback(null, rows);
+				.then(({ result, workerElapsedMs }) => {
+					log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, workerElapsedMs });
+					callback(null, result);
 				})
 				.catch((error) => {
 					log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, error });
@@ -19967,8 +19967,8 @@ function requireWorkerClient () {
 			const startedAt = now();
 			ready
 				.then(() => request('command', { sql, parameters }))
-				.then((result) => {
-					log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt });
+				.then(({ result, workerElapsedMs }) => {
+					log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, workerElapsedMs });
 					callback(null, result);
 				})
 				.catch((error) => {
@@ -20020,7 +20020,10 @@ function requireWorkerClient () {
 			if (message.error)
 				entry.reject(toError(message.error));
 			else
-				entry.resolve(message.result);
+				entry.resolve({
+					result: message.result,
+					workerElapsedMs: message.elapsedMs
+				});
 		}
 
 		function onWorkerError(event) {
@@ -20080,10 +20083,19 @@ self.onmessage = (event) => {
 	if (!message || message.type !== 'orange-sqlite-opfs-request')
 		return;
 	queue = queue
-		.then(() => dispatch(message))
-		.then((result) => postResponse(message.id, result))
+		.then(() => dispatchTimed(message))
+		.then(({ result, elapsedMs }) => postResponse(message.id, result, undefined, elapsedMs))
 		.catch((error) => postResponse(message.id, undefined, error));
 };
+
+async function dispatchTimed(message) {
+	const startedAt = now();
+	const result = await dispatch(message);
+	return {
+		result,
+		elapsedMs: now() - startedAt
+	};
+}
 
 async function dispatch(message) {
 	if (message.method === 'open')
@@ -20156,11 +20168,18 @@ function normalizeParameter(value) {
 	return value;
 }
 
-function postResponse(id, result, error) {
+function now() {
+	if (typeof performance !== 'undefined' && performance.now)
+		return performance.now();
+	return Date.now();
+}
+
+function postResponse(id, result, error, elapsedMs) {
 	self.postMessage({
 		type: 'orange-sqlite-opfs-response',
 		id,
 		result,
+		elapsedMs,
 		error: error ? serializeError(error) : undefined
 	});
 }
