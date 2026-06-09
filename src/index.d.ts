@@ -25,7 +25,9 @@ declare namespace r {
     function mysql(connectionString: string, options?: PoolOptions): Pool;
     function oracle(config: PoolAttributes, options?: PoolOptions): Pool;
     function on(type: 'query', cb: (e: QueryEvent) => void): void;
+    function on(type: 'queryComplete', cb: (e: QueryCompleteEvent) => void): void;
     function off(type: 'query', cb: (e: QueryEvent) => void): void;
+    function off(type: 'queryComplete', cb: (e: QueryCompleteEvent) => void): void;
     function map<V extends AllowedDbMap<V>>(
 		fn: (mapper: DbMapper<{}>) => V
 	): MappedDbDef<MergeProperties<V, V>>;
@@ -101,6 +103,14 @@ declare namespace r {
     export interface QueryEvent {
         sql: string,
         parameters: []
+    }
+
+    export interface QueryCompleteEvent {
+        sql: string,
+        parameters: [],
+        elapsedMs: number,
+        workerElapsedMs?: number,
+        error?: Error
     }
 
     export interface QueryResult {
