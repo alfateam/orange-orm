@@ -10,6 +10,9 @@ let stringify = require('./client/stringify');
 let getSessionSingleton = require('./table/getSessionSingleton');
 let outboxTableSql = require('./sync/outboxTableSql');
 const readonlyOps = ['getManyDto', 'getMany', 'aggregate', 'distinct', 'count'];
+const syncOutboxEnsuredKey = typeof Symbol === 'function'
+	? Symbol.for('orange-orm.syncOutboxEnsured')
+	: '__orangeOrmSyncOutboxEnsured';
 // { db, table, defaultConcurrency,
 // 	concurrency,
 // 	customFilters,
@@ -194,7 +197,7 @@ function hostLocal() {
 		if (!state) {
 			state = { id: randomUuid(), patches: [] };
 			setSessionSingleton(context, 'syncOutboxCapture', state);
-			await querySyncOutbox(context, outboxTableSql());
+			await ensureSyncOutboxTable(context, pool);
 			await querySyncOutbox(context, [
 				'INSERT INTO "orange_sync_outbox" ("mutation_id", "table_name", "patch_json", "options_json", "created_at_ms")',
 				`VALUES (${sqlStringLiteral(state.id)}, '*', '[]', '{}', ${Date.now()})`,
@@ -211,6 +214,13 @@ function hostLocal() {
 			`SET "patch_json" = ${sqlStringLiteral(stringify(state.patches))}`,
 			`WHERE "mutation_id" = ${sqlStringLiteral(state.id)}`
 		].join(' '));
+	}
+
+	async function ensureSyncOutboxTable(context, pool) {
+		if (pool[syncOutboxEnsuredKey])
+			return;
+		await querySyncOutbox(context, outboxTableSql());
+		pool[syncOutboxEnsuredKey] = true;
 	}
 
 	function querySyncOutbox(context, sql) {
