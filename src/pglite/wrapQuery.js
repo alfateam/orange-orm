@@ -8,10 +8,11 @@ function wrapQuery(_context, connection) {
 	function runQuery(query, onCompleted) {
 		var params = query.parameters;
 		var sql = replaceParamChar(query, params);
-		log.emitQuery({sql, parameters: params});
+		var completeQuery = log.startQuery({sql, parameters: params});
 		runOriginalQuery.call(connection, sql, params).then((result) => onInnerCompleted(null, result), (e) => onInnerCompleted(e));
 
 		function onInnerCompleted(err, result) {
+			completeQuery(err);
 			if (err)
 				onCompleted(err);
 			else {

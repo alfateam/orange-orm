@@ -36,25 +36,28 @@ function wrapQuery(_context, connection) {
 		let currentResult = []; // Current result set being built
 		let hasResultSet = false; // Track if we're in an actual result set
 
-		log.emitQuery({ sql: query.sql(), parameters: query.parameters });
+		const completeQuery = log.startQuery({ sql: query.sql(), parameters: query.parameters });
 		const sql = replaceParamChar(query.sql(), query.parameters);
 
 		// Transaction statements
 		if (sql.length < 18 && query.parameters.length === 0) {
 			if (sql === 'BEGIN TRANSACTION') {
 				connection.beginTransaction((err) => {
+					completeQuery(extractError(err));
 					onCompleted(extractError(err), []);
 				});
 				return;
 			}
 			else if (sql === 'COMMIT') {
 				connection.commitTransaction((err) => {
+					completeQuery(extractError(err));
 					onCompleted(extractError(err), []);
 				});
 				return;
 			}
 			else if (sql === 'ROLLBACK') {
 				connection.rollbackTransaction((err) => {
+					completeQuery(extractError(err));
 					onCompleted(extractError(err), []);
 				});
 				return;
@@ -108,7 +111,9 @@ function wrapQuery(_context, connection) {
 
 		function onInnerCompleted(err) {
 			if (err) {
-				onCompleted(extractError(err));
+				const error = extractError(err);
+				completeQuery(error);
+				onCompleted(error);
 			} else {
 				// If we have any remaining result set, add it
 				if (hasResultSet) {
@@ -118,12 +123,15 @@ function wrapQuery(_context, connection) {
 				// Return based on number of actual result sets
 				if (results.length === 0) {
 					// No result sets - return empty array
+					completeQuery();
 					onCompleted(null, []);
 				} else if (results.length === 1) {
 					// Single result set - return as single-depth array (even if empty)
+					completeQuery();
 					onCompleted(null, results[0]);
 				} else {
 					// Multiple result sets - return as array of arrays
+					completeQuery();
 					onCompleted(null, results);
 				}
 			}

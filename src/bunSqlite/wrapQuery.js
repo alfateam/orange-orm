@@ -7,13 +7,16 @@ function wrapQuery(_context, connection) {
 		try {
 			var params = query.parameters;
 			var sql = query.sql();
-			log.emitQuery({ sql, parameters: params });
+			var completeQuery = log.startQuery({ sql, parameters: params });
 
 			var statement = connection.query(sql);
 			const rows = statement.all.apply(statement, params);
+			completeQuery();
 			onCompleted(null, rows);
 		}
 		catch (e) {
+			if (completeQuery)
+				completeQuery(e);
 			onCompleted(e);
 		}
 	}

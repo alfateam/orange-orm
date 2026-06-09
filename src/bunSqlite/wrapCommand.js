@@ -7,7 +7,7 @@ function wrapCommand(_context, connection) {
 		try {
 			var params = Array.isArray(query.parameters) ? query.parameters : [];
 			var sql = query.sql();
-			log.emitQuery({ sql, parameters: params });
+			var completeQuery = log.startQuery({ sql, parameters: params });
 
 			var statement = connection.query(sql);
 
@@ -19,9 +19,12 @@ function wrapCommand(_context, connection) {
 			if (info && typeof info.changes === 'number') affectedRows = info.changes;
 			else if (info && typeof info.affectedRows === 'number') affectedRows = info.affectedRows;
 
+			completeQuery();
 			onCompleted(null, { rowsAffected: affectedRows });
 		}
 		catch (e) {
+			if (completeQuery)
+				completeQuery(e);
 			onCompleted(e, { rowsAffected: 0 });
 		}
 	}

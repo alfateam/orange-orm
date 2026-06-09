@@ -23,6 +23,14 @@ log.emitQueryComplete = function({ sql, parameters, elapsedMs, error }) {
 	emitters.queryComplete.apply(null, arguments);
 };
 
+log.startQuery = function({ sql, parameters }) {
+	const startedAt = now();
+	log.emitQuery({ sql, parameters });
+	return function(error) {
+		log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, error });
+	};
+};
+
 log.registerLogger = function(cb) {
 	logger = cb;
 };
@@ -46,3 +54,9 @@ log.off = function(type, cb) {
 };
 
 module.exports = log;
+
+function now() {
+	if (typeof performance !== 'undefined' && performance.now)
+		return performance.now();
+	return Date.now();
+}

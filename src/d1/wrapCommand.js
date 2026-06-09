@@ -6,13 +6,13 @@ function wrapCommand(_context, client) {
 	function runQuery(query, onCompleted) {
 		var params = Array.isArray(query.parameters) ? query.parameters : [];
 		var sql = query.sql();
-		log.emitQuery({ sql, parameters: params });
+		var completeQuery = log.startQuery({ sql, parameters: params });
 
 		client.d1
 			.prepare(sql)
 			.bind.apply(null, params)
 			.run()
-			.then(onInnerCompleted, (e) => onCompleted(e, { rowsAffected: 0 }));
+			.then(onInnerCompleted, onError);
 
 		function onInnerCompleted(response) {
 			var affectedRows = 0;
@@ -26,7 +26,13 @@ function wrapCommand(_context, client) {
 				}
 			}
 
+			completeQuery();
 			onCompleted(null, { rowsAffected: affectedRows });
+		}
+
+		function onError(e) {
+			completeQuery(e);
+			onCompleted(e, { rowsAffected: 0 });
 		}
 	}
 }

@@ -12,7 +12,7 @@ function wrapCommand(_context, connection) {
 	function runQuery(query, onCompleted) {
 		var params = query.parameters;
 		var sql = query.sql();
-		log.emitQuery({ sql, parameters: params });
+		var completeQuery = log.startQuery({ sql, parameters: params });
 
 		try {
 			var statement = statementCache.get(sql);
@@ -24,12 +24,17 @@ function wrapCommand(_context, connection) {
 			var affected = info && typeof info.changes === 'number' ? info.changes : 0;
 			var insertId = info && typeof info.lastInsertRowid !== 'undefined' ? info.lastInsertRowid : undefined;
 			if (typeof insertId !== 'undefined')
-				onCompleted(null, { rowsAffected: affected, lastInsertRowid: insertId });
+				complete(null, { rowsAffected: affected, lastInsertRowid: insertId });
 			else
-				onCompleted(null, { rowsAffected: affected });
+				complete(null, { rowsAffected: affected });
 		}
 		catch (e) {
-			onCompleted(e);
+			complete(e);
+		}
+
+		function complete(e, result) {
+			completeQuery(e);
+			onCompleted(e, result);
 		}
 	}
 }

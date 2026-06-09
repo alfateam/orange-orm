@@ -17226,6 +17226,14 @@ function requireLog () {
 		emitters.queryComplete.apply(null, arguments);
 	};
 
+	log.startQuery = function({ sql, parameters }) {
+		const startedAt = now();
+		log.emitQuery({ sql, parameters });
+		return function(error) {
+			log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, error });
+		};
+	};
+
 	log.registerLogger = function(cb) {
 		logger = cb;
 	};
@@ -17249,6 +17257,12 @@ function requireLog () {
 	};
 
 	log_1 = log;
+
+	function now() {
+		if (typeof performance !== 'undefined' && performance.now)
+			return performance.now();
+		return Date.now();
+	}
 	return log_1;
 }
 
@@ -17386,11 +17400,17 @@ function requireWrapQuery$2 () {
 
 			var params = query.parameters;
 			var sql = query.sql();
-			log.emitQuery({sql, parameters: params});
-			client.d1.prepare(sql, params).bind(...params).all().then(onInnerCompleted, onCompleted);
+			var completeQuery = log.startQuery({sql, parameters: params});
+			client.d1.prepare(sql, params).bind(...params).all().then(onInnerCompleted, onError);
 
 			function onInnerCompleted(response) {
+				completeQuery();
 				onCompleted(null, response.results);
+			}
+
+			function onError(e) {
+				completeQuery(e);
+				onCompleted(e);
 			}
 
 		}
@@ -17415,13 +17435,13 @@ function requireWrapCommand$2 () {
 		function runQuery(query, onCompleted) {
 			var params = Array.isArray(query.parameters) ? query.parameters : [];
 			var sql = query.sql();
-			log.emitQuery({ sql, parameters: params });
+			var completeQuery = log.startQuery({ sql, parameters: params });
 
 			client.d1
 				.prepare(sql)
 				.bind.apply(null, params)
 				.run()
-				.then(onInnerCompleted, (e) => onCompleted(e, { rowsAffected: 0 }));
+				.then(onInnerCompleted, onError);
 
 			function onInnerCompleted(response) {
 				var affectedRows = 0;
@@ -17435,7 +17455,13 @@ function requireWrapCommand$2 () {
 					}
 				}
 
+				completeQuery();
 				onCompleted(null, { rowsAffected: affectedRows });
+			}
+
+			function onError(e) {
+				completeQuery(e);
+				onCompleted(e, { rowsAffected: 0 });
 			}
 		}
 	}
@@ -19077,10 +19103,11 @@ function requireWrapQuery$1 () {
 		function runQuery(query, onCompleted) {
 			var params = query.parameters;
 			var sql = replaceParamChar(query, params);
-			log.emitQuery({sql, parameters: params});
+			var completeQuery = log.startQuery({sql, parameters: params});
 			runOriginalQuery.call(connection, sql, params).then((result) => onInnerCompleted(null, result), (e) => onInnerCompleted(e));
 
 			function onInnerCompleted(err, result) {
+				completeQuery(err);
 				if (err)
 					onCompleted(err);
 				else {
@@ -19113,7 +19140,7 @@ function requireWrapCommand$1 () {
 		function runQuery(query, onCompleted) {
 			var params = query.parameters;
 			var sql = replaceParamChar(query, params);
-			log.emitQuery({ sql, parameters: params });
+			var completeQuery = log.startQuery({ sql, parameters: params });
 
 			runOriginalQuery
 				.call(connection, sql, params)
@@ -19123,6 +19150,7 @@ function requireWrapCommand$1 () {
 				);
 
 			function onInnerCompleted(err, result) {
+				completeQuery(err);
 				if (err) return onCompleted(err);
 
 				if (Array.isArray(result)) result = result[result.length - 1];
@@ -19598,8 +19626,15 @@ function requireNewPgPool$1 () {
 	async function applySearchPath(client, searchPath) {
 		if (searchPath) {
 			const sql = `SET search_path TO ${searchPath}`;
-			log.emitQuery({ sql, parameters: [] });
-			await client.exec(sql);
+			const completeQuery = log.startQuery({ sql, parameters: [] });
+			try {
+				await client.exec(sql);
+				completeQuery();
+			}
+			catch (e) {
+				completeQuery(e);
+				throw e;
+			}
 		}
 	}
 
@@ -20433,7 +20468,8 @@ function requireWrapQuery () {
 
 		function runQuery(query, onCompleted) {
 			var params = query.parameters;
-			log.emitQuery({sql: query.sql(), parameters: params});
+			var originalSql = query.sql();
+			var completeQuery = log.startQuery({ sql: originalSql, parameters: params });
 			var sql = replaceParamChar(query, params);
 			query = {
 				text: sql,
@@ -20444,6 +20480,7 @@ function requireWrapQuery () {
 			runOriginalQuery.call(connection, query, onInnerCompleted);
 
 			function onInnerCompleted(err, result) {
+				completeQuery(err);
 				if (err)
 					onCompleted(err);
 				else {
@@ -20475,7 +20512,7 @@ function requireWrapCommand () {
 
 		function runCommand(query, onCompleted) {
 			var params = query.parameters;
-			log.emitQuery({sql: query.sql(), parameters: params});
+			var completeQuery = log.startQuery({ sql: query.sql(), parameters: params });
 			var sql = replaceParamChar(query, params);
 			query = {
 				text: sql,
@@ -20486,6 +20523,7 @@ function requireWrapCommand () {
 			runOriginalQuery.call(connection, query, onInnerCompleted);
 
 			function onInnerCompleted(err, result) {
+				completeQuery(err);
 				if (err)
 					onCompleted(err);
 				else
@@ -20789,8 +20827,11 @@ function requireNewPgPool () {
 		const searchPath = parseSearchPathParam(connectionString);
 		if (searchPath) {
 			const sql = `set search_path to ${searchPath}`;
-			log.emitQuery({sql, parameters: []});
-			return client.query(sql, cb);
+			const completeQuery = log.startQuery({sql, parameters: []});
+			return client.query(sql, (err, result) => {
+				completeQuery(err);
+				cb(err, result);
+			});
 		}
 		else
 			cb();

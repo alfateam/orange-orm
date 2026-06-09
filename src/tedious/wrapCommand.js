@@ -31,25 +31,40 @@ function wrapCommand(_context, connection) {
 	}
 
 	function doQuery(query, onCompleted) {
-		log.emitQuery({ sql: query.sql(), parameters: query.parameters });
+		const completeQuery = log.startQuery({ sql: query.sql(), parameters: query.parameters });
 		const sql = replaceParamChar(query.sql(), query.parameters);
 
 		if (sql.length < 18 && query.parameters.length === 0) {
 			if (sql === 'BEGIN TRANSACTION') {
 				connection.beginTransaction((err) => {
-					if (err) return onCompleted(extractError(err), { rowsAffected: 0 });
+					if (err) {
+						const error = extractError(err);
+						completeQuery(error);
+						return onCompleted(error, { rowsAffected: 0 });
+					}
+					completeQuery();
 					return onCompleted(null, { rowsAffected: 0 });
 				});
 				return;
 			} else if (sql === 'COMMIT') {
 				connection.commitTransaction((err) => {
-					if (err) return onCompleted(extractError(err), { rowsAffected: 0 });
+					if (err) {
+						const error = extractError(err);
+						completeQuery(error);
+						return onCompleted(error, { rowsAffected: 0 });
+					}
+					completeQuery();
 					return onCompleted(null, { rowsAffected: 0 });
 				});
 				return;
 			} else if (sql === 'ROLLBACK') {
 				connection.rollbackTransaction((err) => {
-					if (err) return onCompleted(extractError(err), { rowsAffected: 0 });
+					if (err) {
+						const error = extractError(err);
+						completeQuery(error);
+						return onCompleted(error, { rowsAffected: 0 });
+					}
+					completeQuery();
 					return onCompleted(null, { rowsAffected: 0 });
 				});
 				return;
@@ -76,7 +91,12 @@ function wrapCommand(_context, connection) {
 		connection.execSql(request);
 
 		function onInnerCompleted(err) {
-			if (err) return onCompleted(extractError(err), { rowsAffected: 0 });
+			if (err) {
+				const error = extractError(err);
+				completeQuery(error);
+				return onCompleted(error, { rowsAffected: 0 });
+			}
+			completeQuery();
 			return onCompleted(null, { rowsAffected: affectedRows });
 		}
 	}

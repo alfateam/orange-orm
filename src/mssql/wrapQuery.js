@@ -8,7 +8,7 @@ function wrapQuery(_context, connection) {
 	function runQuery(query, onCompleted) {
 		var params = query.parameters;
 		var sql = query.sql();
-		log.emitQuery({ sql, parameters: params });
+		var completeQuery = log.startQuery({ sql, parameters: params });
 
 		const replacements = [];
 		const parametersToRemove = [];
@@ -106,8 +106,10 @@ function wrapQuery(_context, connection) {
 
 		function onInnerCompleted(err, rows, hasMore) {
 			if (err) {
-				if (err.code && err.code !== 3604)
+				if (err.code && err.code !== 3604) {
+					completeQuery(err);
 					onCompleted(err);
+				}
 				if (rows)
 					result.push(rows);
 				return;
@@ -115,6 +117,7 @@ function wrapQuery(_context, connection) {
 
 			result.push(rows);
 			if (!hasMore) {
+				completeQuery();
 				if (result.length === 1)
 					onCompleted(null, result[0]);
 				else

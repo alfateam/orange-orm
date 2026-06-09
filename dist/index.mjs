@@ -17260,6 +17260,14 @@ function requireLog () {
 		emitters.queryComplete.apply(null, arguments);
 	};
 
+	log.startQuery = function({ sql, parameters }) {
+		const startedAt = now();
+		log.emitQuery({ sql, parameters });
+		return function(error) {
+			log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, error });
+		};
+	};
+
 	log.registerLogger = function(cb) {
 		logger = cb;
 	};
@@ -17283,6 +17291,12 @@ function requireLog () {
 	};
 
 	log_1 = log;
+
+	function now() {
+		if (typeof performance !== 'undefined' && performance.now)
+			return performance.now();
+		return Date.now();
+	}
 	return log_1;
 }
 
@@ -17419,8 +17433,11 @@ function requireWrapQuery$a () {
 		function runQuery(query, onCompleted) {
 			var params = query.parameters;
 			var sql = query.sql();
-			log.emitQuery({sql, parameters: params});
-			return runOriginalQuery.call(connection, sql, params, onCompleted);
+			var completeQuery = log.startQuery({sql, parameters: params});
+			return runOriginalQuery.call(connection, sql, params, function(err, result) {
+				completeQuery(err);
+				onCompleted(err, result);
+			});
 		}
 
 	}
@@ -17444,10 +17461,11 @@ function requireWrapCommand$a () {
 		function runQuery(query, onCompleted) {
 			var params = query.parameters;
 			var sql = query.sql();
-			log.emitQuery({sql, parameters: params});
+			var completeQuery = log.startQuery({sql, parameters: params});
 			return runOriginalQuery.call(connection, sql, params, _onCompleted);
 
 			function _onCompleted(e, _result) {
+				completeQuery(e);
 				const result = {rowsAffected: _result?.affectedRows, ..._result};
 				onCompleted(e, result);
 
@@ -19106,10 +19124,11 @@ function requireWrapQuery$9 () {
 		function runQuery(query, onCompleted) {
 			var params = query.parameters;
 			var sql = replaceParamChar(query, params);
-			log.emitQuery({sql, parameters: params});
+			var completeQuery = log.startQuery({sql, parameters: params});
 			runOriginalQuery.call(connection, sql, params).then((result) => onInnerCompleted(null, result), (e) => onInnerCompleted(e));
 
 			function onInnerCompleted(err, result) {
+				completeQuery(err);
 				if (err)
 					onCompleted(err);
 				else {
@@ -19142,7 +19161,7 @@ function requireWrapCommand$9 () {
 		function runQuery(query, onCompleted) {
 			var params = query.parameters;
 			var sql = replaceParamChar(query, params);
-			log.emitQuery({ sql, parameters: params });
+			var completeQuery = log.startQuery({ sql, parameters: params });
 
 			runOriginalQuery
 				.call(connection, sql, params)
@@ -19152,6 +19171,7 @@ function requireWrapCommand$9 () {
 				);
 
 			function onInnerCompleted(err, result) {
+				completeQuery(err);
 				if (err) return onCompleted(err);
 
 				if (Array.isArray(result)) result = result[result.length - 1];
@@ -19627,8 +19647,15 @@ function requireNewPgPool$2 () {
 	async function applySearchPath(client, searchPath) {
 		if (searchPath) {
 			const sql = `SET search_path TO ${searchPath}`;
-			log.emitQuery({ sql, parameters: [] });
-			await client.exec(sql);
+			const completeQuery = log.startQuery({ sql, parameters: [] });
+			try {
+				await client.exec(sql);
+				completeQuery();
+			}
+			catch (e) {
+				completeQuery(e);
+				throw e;
+			}
 		}
 	}
 
@@ -19847,8 +19874,9 @@ function requireWrapQuery$8 () {
 		return runQuery;
 
 		async function runQuery(query, onCompleted) {
+			let completeQuery;
 			try {
-				log.emitQuery({ sql: query.sql(), parameters: query.parameters });
+				completeQuery = log.startQuery({ sql: query.sql(), parameters: query.parameters });
 				const sql = replaceParamChar(query, query.parameters);
 				const params = Array.isArray(query.parameters) ? query.parameters : [];
 
@@ -19860,19 +19888,19 @@ function requireWrapQuery$8 () {
 					const cmd = sql.trim().toUpperCase();
 
 					if (cmd === 'BEGIN' || cmd === 'BEGIN TRANSACTION') {
-						if (th && !th.closing) return onCompleted(new Error('Already inside a transaction'), []);
+						if (th && !th.closing) return complete(new Error('Already inside a transaction'), []);
 						beginTransaction(connection).then(
 							(_th) => {
 								rdb.transactionHandler = _th;
-								onCompleted(null, []);
+								complete(null, []);
 							},
-							(err) => onCompleted(err, [])
+							(err) => complete(err, [])
 						);
 						return;
 					}
 
 					if (cmd === 'COMMIT') {
-						if (!th) return onCompleted(new Error('Cannot commit outside transaction'), []);
+						if (!th) return complete(new Error('Cannot commit outside transaction'), []);
 						try {
 							th.closing = true;   // mark tx as closing; don’t reuse
 							th.resolve();        // resolve the *inner* control promise -> triggers commit
@@ -19880,17 +19908,17 @@ function requireWrapQuery$8 () {
 							await th.settled;
 							th.closed = true;
 							rdb.transactionHandler = undefined;
-							onCompleted(null, []);
+							complete(null, []);
 						} catch (e) {
 							th.closed = true;
 							rdb.transactionHandler = undefined;
-							onCompleted(e, []);
+							complete(e, []);
 						}
 						return;
 					}
 
 					if (cmd === 'ROLLBACK') {
-						if (!th) return onCompleted(new Error('Cannot rollback outside transaction'), []);
+						if (!th) return complete(new Error('Cannot rollback outside transaction'), []);
 						try {
 							th.closing = true;
 							th.reject(new Error('__rollback__')); // reject inner promise -> triggers rollback
@@ -19903,11 +19931,11 @@ function requireWrapQuery$8 () {
 							}
 							th.closed = true;
 							rdb.transactionHandler = undefined;
-							onCompleted(null, []);
+							complete(null, []);
 						} catch (e) {
 							th.closed = true;
 							rdb.transactionHandler = undefined;
-							onCompleted(e, []);
+							complete(e, []);
 						}
 						return;
 					}
@@ -19919,9 +19947,15 @@ function requireWrapQuery$8 () {
 					? await conn.unsafe(sql)
 					: await conn.unsafe(sql, params);
 
-				onCompleted(null, result);
+				complete(null, result);
 			} catch (e) {
-				onCompleted(e);
+				complete(e);
+			}
+
+			function complete(e, result) {
+				if (completeQuery)
+					completeQuery(e);
+				onCompleted(e, result);
 			}
 		}
 	}
@@ -20002,8 +20036,9 @@ function requireWrapCommand$8 () {
 		return runQuery;
 
 		async function runQuery(query, onCompleted) {
+			let completeQuery;
 			try {
-				log.emitQuery({ sql: query.sql(), parameters: query.parameters });
+				completeQuery = log.startQuery({ sql: query.sql(), parameters: query.parameters });
 				const sql = replaceParamChar(query, query.parameters);
 				const params = Array.isArray(query.parameters) ? query.parameters : [];
 
@@ -20015,36 +20050,36 @@ function requireWrapCommand$8 () {
 					const cmd = sql.trim().toUpperCase();
 
 					if (cmd === 'BEGIN' || cmd === 'BEGIN TRANSACTION') {
-						if (th && !th.closing) return onCompleted(new Error('Already inside a transaction'), { rowsAffected: 0 });
+						if (th && !th.closing) return complete(new Error('Already inside a transaction'), { rowsAffected: 0 });
 						beginTransaction(connection).then(
 							(_th) => {
 								rdb.transactionHandler = _th;
-								onCompleted(null, { rowsAffected: 0 });
+								complete(null, { rowsAffected: 0 });
 							},
-							(err) => onCompleted(err, { rowsAffected: 0 })
+							(err) => complete(err, { rowsAffected: 0 })
 						);
 						return;
 					}
 
 					if (cmd === 'COMMIT') {
-						if (!th) return onCompleted(new Error('Cannot commit outside transaction'), { rowsAffected: 0 });
+						if (!th) return complete(new Error('Cannot commit outside transaction'), { rowsAffected: 0 });
 						try {
 							th.closing = true;
 							th.resolve();
 							await th.settled;
 							th.closed = true;
 							rdb.transactionHandler = undefined;
-							onCompleted(null, { rowsAffected: 0 });
+							complete(null, { rowsAffected: 0 });
 						} catch (e) {
 							th.closed = true;
 							rdb.transactionHandler = undefined;
-							onCompleted(e, { rowsAffected: 0 });
+							complete(e, { rowsAffected: 0 });
 						}
 						return;
 					}
 
 					if (cmd === 'ROLLBACK') {
-						if (!th) return onCompleted(new Error('Cannot rollback outside transaction'), { rowsAffected: 0 });
+						if (!th) return complete(new Error('Cannot rollback outside transaction'), { rowsAffected: 0 });
 						try {
 							th.closing = true;
 							th.reject(new Error('__rollback__'));
@@ -20055,11 +20090,11 @@ function requireWrapCommand$8 () {
 							}
 							th.closed = true;
 							rdb.transactionHandler = undefined;
-							onCompleted(null, { rowsAffected: 0 });
+							complete(null, { rowsAffected: 0 });
 						} catch (e) {
 							th.closed = true;
 							rdb.transactionHandler = undefined;
-							onCompleted(e, { rowsAffected: 0 });
+							complete(e, { rowsAffected: 0 });
 						}
 						return;
 					}
@@ -20085,9 +20120,15 @@ function requireWrapCommand$8 () {
 					}
 				}
 
-				onCompleted(null, { rowsAffected: affectedRows });
+				complete(null, { rowsAffected: affectedRows });
 			} catch (e) {
-				onCompleted(e, { rowsAffected: 0 });
+				complete(e, { rowsAffected: 0 });
+			}
+
+			function complete(e, result) {
+				if (completeQuery)
+					completeQuery(e);
+				onCompleted(e, result);
 			}
 		}
 	}
@@ -20396,8 +20437,15 @@ function requireNewPgPool$1 () {
 	async function applySearchPath(client, searchPath) {
 		if (searchPath) {
 			const sql = `SET search_path TO ${searchPath}`;
-			log.emitQuery({ sql, parameters: [] });
-			await client.unsafe(sql);
+			const completeQuery = log.startQuery({ sql, parameters: [] });
+			try {
+				await client.unsafe(sql);
+				completeQuery();
+			}
+			catch (e) {
+				completeQuery(e);
+				throw e;
+			}
 		}
 	}
 
@@ -20581,7 +20629,8 @@ function requireWrapQuery$7 () {
 
 		function runQuery(query, onCompleted) {
 			var params = query.parameters;
-			log.emitQuery({sql: query.sql(), parameters: params});
+			var originalSql = query.sql();
+			var completeQuery = log.startQuery({ sql: originalSql, parameters: params });
 			var sql = replaceParamChar(query, params);
 			query = {
 				text: sql,
@@ -20592,6 +20641,7 @@ function requireWrapQuery$7 () {
 			runOriginalQuery.call(connection, query, onInnerCompleted);
 
 			function onInnerCompleted(err, result) {
+				completeQuery(err);
 				if (err)
 					onCompleted(err);
 				else {
@@ -20623,7 +20673,7 @@ function requireWrapCommand$7 () {
 
 		function runCommand(query, onCompleted) {
 			var params = query.parameters;
-			log.emitQuery({sql: query.sql(), parameters: params});
+			var completeQuery = log.startQuery({ sql: query.sql(), parameters: params });
 			var sql = replaceParamChar(query, params);
 			query = {
 				text: sql,
@@ -20634,6 +20684,7 @@ function requireWrapCommand$7 () {
 			runOriginalQuery.call(connection, query, onInnerCompleted);
 
 			function onInnerCompleted(err, result) {
+				completeQuery(err);
 				if (err)
 					onCompleted(err);
 				else
@@ -20913,8 +20964,11 @@ function requireNewPgPool () {
 		const searchPath = parseSearchPathParam(connectionString);
 		if (searchPath) {
 			const sql = `set search_path to ${searchPath}`;
-			log.emitQuery({sql, parameters: []});
-			return client.query(sql, cb);
+			const completeQuery = log.startQuery({sql, parameters: []});
+			return client.query(sql, (err, result) => {
+				completeQuery(err);
+				cb(err, result);
+			});
 		}
 		else
 			cb();
@@ -21108,7 +21162,7 @@ function requireWrapQuery$6 () {
 			try {
 				var params = query.parameters;
 				var sql = query.sql();
-				log.emitQuery({ sql, parameters: params });
+				var completeQuery = log.startQuery({ sql, parameters: params });
 
 				let statement = statementCache.get(sql);
 				if (!statement) {
@@ -21116,9 +21170,12 @@ function requireWrapQuery$6 () {
 					statementCache.set(sql, statement);
 				}
 				const rows = statement.all.apply(statement, params);
+				completeQuery();
 				onCompleted(null, rows);
 			}
 			catch (e) {
+				if (completeQuery)
+					completeQuery(e);
 				onCompleted(e);
 			}
 		}
@@ -21151,7 +21208,7 @@ function requireWrapCommand$6 () {
 			try {
 				var params = query.parameters;
 				var sql = query.sql();
-				log.emitQuery({ sql, parameters: params });
+				var completeQuery = log.startQuery({ sql, parameters: params });
 
 				let statement = statementCache.get(sql);
 				if (!statement) {
@@ -21159,9 +21216,12 @@ function requireWrapCommand$6 () {
 					statementCache.set(sql, statement);
 				}
 				const info = statement.run.apply(statement, params);
+				completeQuery();
 				onCompleted(null, { rowsAffected: info.changes, lastInsertRowid: info.lastInsertRowid });
 			}
 			catch (e) {
+				if (completeQuery)
+					completeQuery(e);
 				onCompleted(e);
 			}
 		}
@@ -21784,13 +21844,16 @@ function requireWrapQuery$5 () {
 			try {
 				var params = query.parameters;
 				var sql = query.sql();
-				log.emitQuery({ sql, parameters: params });
+				var completeQuery = log.startQuery({ sql, parameters: params });
 
 				var statement = connection.query(sql);
 				const rows = statement.all.apply(statement, params);
+				completeQuery();
 				onCompleted(null, rows);
 			}
 			catch (e) {
+				if (completeQuery)
+					completeQuery(e);
 				onCompleted(e);
 			}
 		}
@@ -21816,7 +21879,7 @@ function requireWrapCommand$5 () {
 			try {
 				var params = Array.isArray(query.parameters) ? query.parameters : [];
 				var sql = query.sql();
-				log.emitQuery({ sql, parameters: params });
+				var completeQuery = log.startQuery({ sql, parameters: params });
 
 				var statement = connection.query(sql);
 
@@ -21828,9 +21891,12 @@ function requireWrapCommand$5 () {
 				if (info && typeof info.changes === 'number') affectedRows = info.changes;
 				else if (info && typeof info.affectedRows === 'number') affectedRows = info.affectedRows;
 
+				completeQuery();
 				onCompleted(null, { rowsAffected: affectedRows });
 			}
 			catch (e) {
+				if (completeQuery)
+					completeQuery(e);
 				onCompleted(e, { rowsAffected: 0 });
 			}
 		}
@@ -22208,7 +22274,7 @@ function requireWrapQuery$4 () {
 			try {
 				var params = query.parameters;
 				var sql = query.sql();
-				log.emitQuery({ sql, parameters: params });
+				var completeQuery = log.startQuery({ sql, parameters: params });
 
 				let statement = statementCache.get(sql);
 				if (!statement) {
@@ -22218,13 +22284,17 @@ function requireWrapQuery$4 () {
 
 				if (statement.reader) {
 					const rows = statement.all.apply(statement, params);
+					completeQuery();
 					onCompleted(null, rows);
 				} else {
 					statement.run.apply(statement, params);
+					completeQuery();
 					onCompleted(null, []);
 				}
 			}
 			catch (e) {
+				if (completeQuery)
+					completeQuery(e);
 				onCompleted(e);
 			}
 		}
@@ -22254,7 +22324,7 @@ function requireWrapCommand$4 () {
 		function runQuery(query, onCompleted) {
 			var params = query.parameters;
 			var sql = query.sql();
-			log.emitQuery({ sql, parameters: params });
+			var completeQuery = log.startQuery({ sql, parameters: params });
 
 			try {
 				var statement = statementCache.get(sql);
@@ -22266,12 +22336,17 @@ function requireWrapCommand$4 () {
 				var affected = info && typeof info.changes === 'number' ? info.changes : 0;
 				var insertId = info && typeof info.lastInsertRowid !== 'undefined' ? info.lastInsertRowid : undefined;
 				if (typeof insertId !== 'undefined')
-					onCompleted(null, { rowsAffected: affected, lastInsertRowid: insertId });
+					complete(null, { rowsAffected: affected, lastInsertRowid: insertId });
 				else
-					onCompleted(null, { rowsAffected: affected });
+					complete(null, { rowsAffected: affected });
 			}
 			catch (e) {
-				onCompleted(e);
+				complete(e);
+			}
+
+			function complete(e, result) {
+				completeQuery(e);
+				onCompleted(e, result);
 			}
 		}
 	}
@@ -23275,11 +23350,17 @@ function requireWrapQuery$3 () {
 
 			var params = query.parameters;
 			var sql = query.sql();
-			log.emitQuery({sql, parameters: params});
-			client.d1.prepare(sql, params).bind(...params).all().then(onInnerCompleted, onCompleted);
+			var completeQuery = log.startQuery({sql, parameters: params});
+			client.d1.prepare(sql, params).bind(...params).all().then(onInnerCompleted, onError);
 
 			function onInnerCompleted(response) {
+				completeQuery();
 				onCompleted(null, response.results);
+			}
+
+			function onError(e) {
+				completeQuery(e);
+				onCompleted(e);
 			}
 
 		}
@@ -23304,13 +23385,13 @@ function requireWrapCommand$3 () {
 		function runQuery(query, onCompleted) {
 			var params = Array.isArray(query.parameters) ? query.parameters : [];
 			var sql = query.sql();
-			log.emitQuery({ sql, parameters: params });
+			var completeQuery = log.startQuery({ sql, parameters: params });
 
 			client.d1
 				.prepare(sql)
 				.bind.apply(null, params)
 				.run()
-				.then(onInnerCompleted, (e) => onCompleted(e, { rowsAffected: 0 }));
+				.then(onInnerCompleted, onError);
 
 			function onInnerCompleted(response) {
 				var affectedRows = 0;
@@ -23324,7 +23405,13 @@ function requireWrapCommand$3 () {
 					}
 				}
 
+				completeQuery();
 				onCompleted(null, { rowsAffected: affectedRows });
+			}
+
+			function onError(e) {
+				completeQuery(e);
+				onCompleted(e, { rowsAffected: 0 });
 			}
 		}
 	}
@@ -23680,7 +23767,7 @@ function requireWrapQuery$2 () {
 		function runQuery(query, onCompleted) {
 			var params = query.parameters;
 			var sql = query.sql();
-			log.emitQuery({ sql, parameters: params });
+			var completeQuery = log.startQuery({ sql, parameters: params });
 
 			const replacements = [];
 			const parametersToRemove = [];
@@ -23778,8 +23865,10 @@ function requireWrapQuery$2 () {
 
 			function onInnerCompleted(err, rows, hasMore) {
 				if (err) {
-					if (err.code && err.code !== 3604)
+					if (err.code && err.code !== 3604) {
+						completeQuery(err);
 						onCompleted(err);
+					}
 					if (rows)
 						result.push(rows);
 					return;
@@ -23787,6 +23876,7 @@ function requireWrapQuery$2 () {
 
 				result.push(rows);
 				if (!hasMore) {
+					completeQuery();
 					if (result.length === 1)
 						onCompleted(null, result[0]);
 					else
@@ -23825,7 +23915,7 @@ function requireWrapCommand$2 () {
 		function runQuery(query, onCompleted) {
 			var params = query.parameters;
 			var sql = query.sql();
-			log.emitQuery({ sql, parameters: params });
+			var completeQuery = log.startQuery({ sql, parameters: params });
 
 			const replacements = [];
 			const parametersToRemove = [];
@@ -23923,12 +24013,14 @@ function requireWrapCommand$2 () {
 			function onInnerCompleted(err, _rows, hasMore) {
 				if (err) {
 					if (err.code && err.code !== 3604) {
+						completeQuery(err);
 						onCompleted(err, { rowsAffected: 0 });
 						return;
 					}
 				}
 
 				if (!hasMore) {
+					completeQuery();
 					onCompleted(null, { rowsAffected: affectedRows });
 				}
 			}
@@ -24729,25 +24821,28 @@ function requireWrapQuery$1 () {
 			let currentResult = []; // Current result set being built
 			let hasResultSet = false; // Track if we're in an actual result set
 
-			log.emitQuery({ sql: query.sql(), parameters: query.parameters });
+			const completeQuery = log.startQuery({ sql: query.sql(), parameters: query.parameters });
 			const sql = replaceParamChar(query.sql(), query.parameters);
 
 			// Transaction statements
 			if (sql.length < 18 && query.parameters.length === 0) {
 				if (sql === 'BEGIN TRANSACTION') {
 					connection.beginTransaction((err) => {
+						completeQuery(extractError(err));
 						onCompleted(extractError(err), []);
 					});
 					return;
 				}
 				else if (sql === 'COMMIT') {
 					connection.commitTransaction((err) => {
+						completeQuery(extractError(err));
 						onCompleted(extractError(err), []);
 					});
 					return;
 				}
 				else if (sql === 'ROLLBACK') {
 					connection.rollbackTransaction((err) => {
+						completeQuery(extractError(err));
 						onCompleted(extractError(err), []);
 					});
 					return;
@@ -24801,7 +24896,9 @@ function requireWrapQuery$1 () {
 
 			function onInnerCompleted(err) {
 				if (err) {
-					onCompleted(extractError(err));
+					const error = extractError(err);
+					completeQuery(error);
+					onCompleted(error);
 				} else {
 					// If we have any remaining result set, add it
 					if (hasResultSet) {
@@ -24811,12 +24908,15 @@ function requireWrapQuery$1 () {
 					// Return based on number of actual result sets
 					if (results.length === 0) {
 						// No result sets - return empty array
+						completeQuery();
 						onCompleted(null, []);
 					} else if (results.length === 1) {
 						// Single result set - return as single-depth array (even if empty)
+						completeQuery();
 						onCompleted(null, results[0]);
 					} else {
 						// Multiple result sets - return as array of arrays
+						completeQuery();
 						onCompleted(null, results);
 					}
 				}
@@ -24938,25 +25038,40 @@ function requireWrapCommand$1 () {
 		}
 
 		function doQuery(query, onCompleted) {
-			log.emitQuery({ sql: query.sql(), parameters: query.parameters });
+			const completeQuery = log.startQuery({ sql: query.sql(), parameters: query.parameters });
 			const sql = replaceParamChar(query.sql(), query.parameters);
 
 			if (sql.length < 18 && query.parameters.length === 0) {
 				if (sql === 'BEGIN TRANSACTION') {
 					connection.beginTransaction((err) => {
-						if (err) return onCompleted(extractError(err), { rowsAffected: 0 });
+						if (err) {
+							const error = extractError(err);
+							completeQuery(error);
+							return onCompleted(error, { rowsAffected: 0 });
+						}
+						completeQuery();
 						return onCompleted(null, { rowsAffected: 0 });
 					});
 					return;
 				} else if (sql === 'COMMIT') {
 					connection.commitTransaction((err) => {
-						if (err) return onCompleted(extractError(err), { rowsAffected: 0 });
+						if (err) {
+							const error = extractError(err);
+							completeQuery(error);
+							return onCompleted(error, { rowsAffected: 0 });
+						}
+						completeQuery();
 						return onCompleted(null, { rowsAffected: 0 });
 					});
 					return;
 				} else if (sql === 'ROLLBACK') {
 					connection.rollbackTransaction((err) => {
-						if (err) return onCompleted(extractError(err), { rowsAffected: 0 });
+						if (err) {
+							const error = extractError(err);
+							completeQuery(error);
+							return onCompleted(error, { rowsAffected: 0 });
+						}
+						completeQuery();
 						return onCompleted(null, { rowsAffected: 0 });
 					});
 					return;
@@ -24983,7 +25098,12 @@ function requireWrapCommand$1 () {
 			connection.execSql(request);
 
 			function onInnerCompleted(err) {
-				if (err) return onCompleted(extractError(err), { rowsAffected: 0 });
+				if (err) {
+					const error = extractError(err);
+					completeQuery(error);
+					return onCompleted(error, { rowsAffected: 0 });
+				}
+				completeQuery();
 				return onCompleted(null, { rowsAffected: affectedRows });
 			}
 		}
@@ -26174,7 +26294,7 @@ function requireWrapQuery () {
 
 		function runQuery(query, onCompleted) {
 			var params = query.parameters;
-			log.emitQuery({sql: query.sql(), parameters: params});
+			var completeQuery = log.startQuery({sql: query.sql(), parameters: params});
 			var sql = replaceParamChar(query, params);
 
 			runOriginalQuery.call(connection, sql, params, {
@@ -26185,6 +26305,7 @@ function requireWrapQuery () {
 			}, onInnerCompleted);
 
 			function onInnerCompleted(err, rows) {
+				completeQuery(err);
 				if (err)
 					onCompleted(err);
 				else {
@@ -26218,7 +26339,7 @@ function requireWrapCommand () {
 
 		function runQuery(query, onCompleted) {
 			var params = query.parameters;
-			log.emitQuery({ sql: query.sql(), parameters: params });
+			var completeQuery = log.startQuery({ sql: query.sql(), parameters: params });
 
 			var sql = replaceParamChar(query, params);
 
@@ -26235,6 +26356,7 @@ function requireWrapCommand () {
 			);
 
 			function onInnerCompleted(err, result) {
+				completeQuery(err);
 				if (err) return onCompleted(err);
 
 				var affectedRows =

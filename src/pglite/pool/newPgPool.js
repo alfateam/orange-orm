@@ -52,8 +52,15 @@ function newPgPool(connectionString, poolOptions = {}) {
 async function applySearchPath(client, searchPath) {
 	if (searchPath) {
 		const sql = `SET search_path TO ${searchPath}`;
-		log.emitQuery({ sql, parameters: [] });
-		await client.exec(sql);
+		const completeQuery = log.startQuery({ sql, parameters: [] });
+		try {
+			await client.exec(sql);
+			completeQuery();
+		}
+		catch (e) {
+			completeQuery(e);
+			throw e;
+		}
 	}
 }
 

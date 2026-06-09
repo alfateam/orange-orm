@@ -8,7 +8,7 @@ function wrapCommand(_context, connection) {
 	function runQuery(query, onCompleted) {
 		var params = query.parameters;
 		var sql = query.sql();
-		log.emitQuery({ sql, parameters: params });
+		var completeQuery = log.startQuery({ sql, parameters: params });
 
 		const replacements = [];
 		const parametersToRemove = [];
@@ -106,12 +106,14 @@ function wrapCommand(_context, connection) {
 		function onInnerCompleted(err, _rows, hasMore) {
 			if (err) {
 				if (err.code && err.code !== 3604) {
+					completeQuery(err);
 					onCompleted(err, { rowsAffected: 0 });
 					return;
 				}
 			}
 
 			if (!hasMore) {
+				completeQuery();
 				onCompleted(null, { rowsAffected: affectedRows });
 			}
 		}

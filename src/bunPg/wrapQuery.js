@@ -8,8 +8,9 @@ function wrapQuery(context, connection) {
 	return runQuery;
 
 	async function runQuery(query, onCompleted) {
+		let completeQuery;
 		try {
-			log.emitQuery({ sql: query.sql(), parameters: query.parameters });
+			completeQuery = log.startQuery({ sql: query.sql(), parameters: query.parameters });
 			const sql = replaceParamChar(query, query.parameters);
 			const params = Array.isArray(query.parameters) ? query.parameters : [];
 
@@ -21,19 +22,19 @@ function wrapQuery(context, connection) {
 				const cmd = sql.trim().toUpperCase();
 
 				if (cmd === 'BEGIN' || cmd === 'BEGIN TRANSACTION') {
-					if (th && !th.closing) return onCompleted(new Error('Already inside a transaction'), []);
+					if (th && !th.closing) return complete(new Error('Already inside a transaction'), []);
 					beginTransaction(connection).then(
 						(_th) => {
 							rdb.transactionHandler = _th;
-							onCompleted(null, []);
+							complete(null, []);
 						},
-						(err) => onCompleted(err, [])
+						(err) => complete(err, [])
 					);
 					return;
 				}
 
 				if (cmd === 'COMMIT') {
-					if (!th) return onCompleted(new Error('Cannot commit outside transaction'), []);
+					if (!th) return complete(new Error('Cannot commit outside transaction'), []);
 					try {
 						th.closing = true;   // mark tx as closing; don’t reuse
 						th.resolve();        // resolve the *inner* control promise -> triggers commit
@@ -41,17 +42,17 @@ function wrapQuery(context, connection) {
 						await th.settled;
 						th.closed = true;
 						rdb.transactionHandler = undefined;
-						onCompleted(null, []);
+						complete(null, []);
 					} catch (e) {
 						th.closed = true;
 						rdb.transactionHandler = undefined;
-						onCompleted(e, []);
+						complete(e, []);
 					}
 					return;
 				}
 
 				if (cmd === 'ROLLBACK') {
-					if (!th) return onCompleted(new Error('Cannot rollback outside transaction'), []);
+					if (!th) return complete(new Error('Cannot rollback outside transaction'), []);
 					try {
 						th.closing = true;
 						th.reject(new Error('__rollback__')); // reject inner promise -> triggers rollback
@@ -64,11 +65,11 @@ function wrapQuery(context, connection) {
 						}
 						th.closed = true;
 						rdb.transactionHandler = undefined;
-						onCompleted(null, []);
+						complete(null, []);
 					} catch (e) {
 						th.closed = true;
 						rdb.transactionHandler = undefined;
-						onCompleted(e, []);
+						complete(e, []);
 					}
 					return;
 				}
@@ -80,9 +81,15 @@ function wrapQuery(context, connection) {
 				? await conn.unsafe(sql)
 				: await conn.unsafe(sql, params);
 
-			onCompleted(null, result);
+			complete(null, result);
 		} catch (e) {
-			onCompleted(e);
+			complete(e);
+		}
+
+		function complete(e, result) {
+			if (completeQuery)
+				completeQuery(e);
+			onCompleted(e, result);
 		}
 	}
 }

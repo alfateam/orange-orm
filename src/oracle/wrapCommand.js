@@ -7,7 +7,7 @@ function wrapCommand(_context, connection) {
 
 	function runQuery(query, onCompleted) {
 		var params = query.parameters;
-		log.emitQuery({ sql: query.sql(), parameters: params });
+		var completeQuery = log.startQuery({ sql: query.sql(), parameters: params });
 
 		var sql = replaceParamChar(query, params);
 
@@ -24,6 +24,7 @@ function wrapCommand(_context, connection) {
 		);
 
 		function onInnerCompleted(err, result) {
+			completeQuery(err);
 			if (err) return onCompleted(err);
 
 			var affectedRows =

@@ -7,10 +7,11 @@ function wrapCommand(_context, connection) {
 	function runQuery(query, onCompleted) {
 		var params = query.parameters;
 		var sql = query.sql();
-		log.emitQuery({sql, parameters: params});
+		var completeQuery = log.startQuery({sql, parameters: params});
 		return runOriginalQuery.call(connection, sql, params, _onCompleted);
 
 		function _onCompleted(e, _result) {
+			completeQuery(e);
 			const result = {rowsAffected: _result?.affectedRows, ..._result};
 			onCompleted(e, result);
 

@@ -8,7 +8,7 @@ function wrapCommand(_context, connection) {
 	function runQuery(query, onCompleted) {
 		var params = query.parameters;
 		var sql = replaceParamChar(query, params);
-		log.emitQuery({ sql, parameters: params });
+		var completeQuery = log.startQuery({ sql, parameters: params });
 
 		runOriginalQuery
 			.call(connection, sql, params)
@@ -18,6 +18,7 @@ function wrapCommand(_context, connection) {
 			);
 
 		function onInnerCompleted(err, result) {
+			completeQuery(err);
 			if (err) return onCompleted(err);
 
 			if (Array.isArray(result)) result = result[result.length - 1];

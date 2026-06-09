@@ -14,7 +14,7 @@ function wrapCommand(_context, connection) {
 		try {
 			var params = query.parameters;
 			var sql = query.sql();
-			log.emitQuery({ sql, parameters: params });
+			var completeQuery = log.startQuery({ sql, parameters: params });
 
 			let statement = statementCache.get(sql);
 			if (!statement) {
@@ -22,9 +22,12 @@ function wrapCommand(_context, connection) {
 				statementCache.set(sql, statement);
 			}
 			const info = statement.run.apply(statement, params);
+			completeQuery();
 			onCompleted(null, { rowsAffected: info.changes, lastInsertRowid: info.lastInsertRowid });
 		}
 		catch (e) {
+			if (completeQuery)
+				completeQuery(e);
 			onCompleted(e);
 		}
 	}

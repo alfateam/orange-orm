@@ -90,8 +90,11 @@ function negotiateSearchPath(client, connectionString, cb) {
 	const searchPath = parseSearchPathParam(connectionString);
 	if (searchPath) {
 		const sql = `set search_path to ${searchPath}`;
-		log.emitQuery({sql, parameters: []});
-		return client.query(sql, cb);
+		const completeQuery = log.startQuery({sql, parameters: []});
+		return client.query(sql, (err, result) => {
+			completeQuery(err);
+			cb(err, result);
+		});
 	}
 	else
 		cb();

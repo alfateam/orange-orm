@@ -14,7 +14,7 @@ function wrapQuery(_context, connection) {
 		try {
 			var params = query.parameters;
 			var sql = query.sql();
-			log.emitQuery({ sql, parameters: params });
+			var completeQuery = log.startQuery({ sql, parameters: params });
 
 			let statement = statementCache.get(sql);
 			if (!statement) {
@@ -24,13 +24,17 @@ function wrapQuery(_context, connection) {
 
 			if (statement.reader) {
 				const rows = statement.all.apply(statement, params);
+				completeQuery();
 				onCompleted(null, rows);
 			} else {
 				statement.run.apply(statement, params);
+				completeQuery();
 				onCompleted(null, []);
 			}
 		}
 		catch (e) {
+			if (completeQuery)
+				completeQuery(e);
 			onCompleted(e);
 		}
 	}
