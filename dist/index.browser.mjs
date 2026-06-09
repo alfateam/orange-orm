@@ -17204,7 +17204,8 @@ function requireLog () {
 	var newEmitEvent = requireEmitEvent();
 
 	var emitters = {
-		query: newEmitEvent()
+		query: newEmitEvent(),
+		queryComplete: newEmitEvent()
 	};
 
 	var logger = function() {
@@ -17221,6 +17222,10 @@ function requireLog () {
 
 	log.emitQuery = emitQuery;
 
+	log.emitQueryComplete = function({ sql, parameters, elapsedMs, error }) {
+		emitters.queryComplete.apply(null, arguments);
+	};
+
 	log.registerLogger = function(cb) {
 		logger = cb;
 	};
@@ -17228,6 +17233,8 @@ function requireLog () {
 	log.on = function(type, cb) {
 		if (type === 'query')
 			emitters.query.add(cb);
+		else if (type === 'queryComplete')
+			emitters.queryComplete.add(cb);
 		else
 			throw new Error('unknown event type: ' + type);
 	};
@@ -17235,6 +17242,8 @@ function requireLog () {
 	log.off = function(type, cb) {
 		if (type === 'query')
 			emitters.query.tryRemove(cb);
+		else if (type === 'queryComplete')
+			emitters.queryComplete.tryRemove(cb);
 		else
 			throw new Error('unknown event type: ' + type);
 	};
@@ -19938,20 +19947,34 @@ function requireWorkerClient () {
 			const sql = query.sql();
 			const parameters = query.parameters || [];
 			log.emitQuery({ sql, parameters });
+			const startedAt = now();
 			ready
 				.then(() => request('query', { sql, parameters }))
-				.then((rows) => callback(null, rows))
-				.catch(callback);
+				.then((rows) => {
+					log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt });
+					callback(null, rows);
+				})
+				.catch((error) => {
+					log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, error });
+					callback(error);
+				});
 		}
 
 		function executeCommand(query, callback) {
 			const sql = query.sql();
 			const parameters = query.parameters || [];
 			log.emitQuery({ sql, parameters });
+			const startedAt = now();
 			ready
 				.then(() => request('command', { sql, parameters }))
-				.then((result) => callback(null, result))
-				.catch(callback);
+				.then((result) => {
+					log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt });
+					callback(null, result);
+				})
+				.catch((error) => {
+					log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, error });
+					callback(error);
+				});
 		}
 
 		function request(method, payload = {}) {
@@ -20009,6 +20032,12 @@ function requireWorkerClient () {
 				entry.reject(error);
 			pending.clear();
 		}
+	}
+
+	function now() {
+		if (typeof performance !== 'undefined' && performance.now)
+			return performance.now();
+		return Date.now();
 	}
 
 	function createWorker(connectionString, options) {

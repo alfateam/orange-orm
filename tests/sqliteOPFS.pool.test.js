@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
 const newPool = require('../src/sqliteOPFS/newPool');
+const log = require('../src/table/log');
 
 describe('sqliteOPFS pool', () => {
 	test('prewarms read client by default', async () => {
@@ -35,6 +36,37 @@ describe('sqliteOPFS pool', () => {
 		expect(createdWorkers).toHaveLength(1);
 		pool.end();
 	});
+
+	test('emits query completion elapsed time', async () => {
+		const completed = [];
+		const onComplete = (entry) => completed.push(entry);
+		log.on('queryComplete', onComplete);
+		const pool = newPool('test.sqlite3', {
+			prewarmRead: false,
+			createWorker() {
+				return newFakeWorker();
+			}
+		});
+
+		try {
+			await new Promise((resolve, reject) => {
+				pool.connect((err, client) => {
+					if (err)
+						return reject(err);
+					client.executeQuery(newSql('SELECT 1'), (err) => err ? reject(err) : resolve());
+				});
+			});
+
+			expect(completed).toHaveLength(1);
+			expect(completed[0].sql).toBe('SELECT 1');
+			expect(completed[0].parameters).toEqual([]);
+			expect(completed[0].elapsedMs).toBeGreaterThanOrEqual(0);
+		}
+		finally {
+			log.off('queryComplete', onComplete);
+			pool.end();
+		}
+	});
 });
 
 function newFakeWorker() {
@@ -68,4 +100,11 @@ function newFakeWorker() {
 
 function wait(ms) {
 	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function newSql(sql) {
+	return {
+		sql: () => sql,
+		parameters: []
+	};
 }

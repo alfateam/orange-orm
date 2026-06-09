@@ -26,20 +26,34 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 		const sql = query.sql();
 		const parameters = query.parameters || [];
 		log.emitQuery({ sql, parameters });
+		const startedAt = now();
 		ready
 			.then(() => request('query', { sql, parameters }))
-			.then((rows) => callback(null, rows))
-			.catch(callback);
+			.then((rows) => {
+				log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt });
+				callback(null, rows);
+			})
+			.catch((error) => {
+				log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, error });
+				callback(error);
+			});
 	}
 
 	function executeCommand(query, callback) {
 		const sql = query.sql();
 		const parameters = query.parameters || [];
 		log.emitQuery({ sql, parameters });
+		const startedAt = now();
 		ready
 			.then(() => request('command', { sql, parameters }))
-			.then((result) => callback(null, result))
-			.catch(callback);
+			.then((result) => {
+				log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt });
+				callback(null, result);
+			})
+			.catch((error) => {
+				log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, error });
+				callback(error);
+			});
 	}
 
 	function request(method, payload = {}) {
@@ -97,6 +111,12 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 			entry.reject(error);
 		pending.clear();
 	}
+}
+
+function now() {
+	if (typeof performance !== 'undefined' && performance.now)
+		return performance.now();
+	return Date.now();
 }
 
 function createWorker(connectionString, options) {

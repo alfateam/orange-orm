@@ -1,7 +1,8 @@
 var newEmitEvent = require('../emitEvent');
 
 var emitters = {
-	query: newEmitEvent()
+	query: newEmitEvent(),
+	queryComplete: newEmitEvent()
 };
 
 var logger = function() {
@@ -18,6 +19,10 @@ function emitQuery({ sql, parameters }) {
 
 log.emitQuery = emitQuery;
 
+log.emitQueryComplete = function({ sql, parameters, elapsedMs, error }) {
+	emitters.queryComplete.apply(null, arguments);
+};
+
 log.registerLogger = function(cb) {
 	logger = cb;
 };
@@ -25,6 +30,8 @@ log.registerLogger = function(cb) {
 log.on = function(type, cb) {
 	if (type === 'query')
 		emitters.query.add(cb);
+	else if (type === 'queryComplete')
+		emitters.queryComplete.add(cb);
 	else
 		throw new Error('unknown event type: ' + type);
 };
@@ -32,6 +39,8 @@ log.on = function(type, cb) {
 log.off = function(type, cb) {
 	if (type === 'query')
 		emitters.query.tryRemove(cb);
+	else if (type === 'queryComplete')
+		emitters.queryComplete.tryRemove(cb);
 	else
 		throw new Error('unknown event type: ' + type);
 };
