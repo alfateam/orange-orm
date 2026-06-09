@@ -20169,21 +20169,50 @@ async function createDb(sqlite3, filename, vfs, sahPoolOptions) {
 	if (vfs === 'opfs-sahpool') {
 		if (typeof sqlite3.installOpfsSAHPoolVfs !== 'function')
 			throw new Error('sqliteOPFS vfs "opfs-sahpool" is not available in this sqlite-wasm build.');
-		const pool = await sqlite3.installOpfsSAHPoolVfs(sahPoolOptions || {});
-		const DbClass = pool.OpfsSAHPoolDb;
-		if (typeof DbClass !== 'function')
-			throw new Error('sqliteOPFS vfs "opfs-sahpool" did not expose OpfsSAHPoolDb.');
-		return {
-			db: new DbClass(filename),
-			vfs: pool.vfsName || 'opfs-sahpool'
-		};
+		try {
+			const pool = await sqlite3.installOpfsSAHPoolVfs(sahPoolOptions || {});
+			const DbClass = pool.OpfsSAHPoolDb;
+			if (typeof DbClass !== 'function')
+				throw new Error('sqliteOPFS vfs "opfs-sahpool" did not expose OpfsSAHPoolDb.');
+			return {
+				db: new DbClass(filename),
+				vfs: pool.vfsName || 'opfs-sahpool'
+			};
+		}
+		catch (e) {
+			if (sahPoolOptions && sahPoolOptions.fallbackToOpfs)
+				return createOpfsDb(sqlite3, filename);
+			throw toSahPoolError(e, sahPoolOptions);
+		}
 	}
+	return createOpfsDb(sqlite3, filename);
+}
+
+function createOpfsDb(sqlite3, filename) {
 	return {
 		db: sqlite3.oo1.OpfsDb
 		? new sqlite3.oo1.OpfsDb(filename)
 		: new sqlite3.oo1.DB(filename, 'ct'),
 		vfs: 'opfs'
 	};
+}
+
+function toSahPoolError(error, options = {}) {
+	const message = error && error.message ? error.message : String(error);
+	const isLockError = error && error.name === 'NoModificationAllowedError'
+		|| /Access Handles cannot be created|NoModificationAllowedError|modifications are not allowed/i.test(message);
+	if (!isLockError)
+		return error;
+	const directory = options && options.directory || '.opfs-sahpool';
+	const name = options && options.name || 'opfs-sahpool';
+	const e = new Error([
+		'sqliteOPFS vfs "opfs-sahpool" is locked by another tab, worker, or app instance.',
+		'Close other instances using this origin, restart the browser if a worker is stuck, or use a different sahPool.directory/name.',
+		'Current sahPool.directory=' + JSON.stringify(directory) + ', sahPool.name=' + JSON.stringify(name) + '.'
+	].join(' '));
+	e.name = 'SqliteOPFSSAHPoolLockedError';
+	e.cause = error;
+	return e;
 }
 
 async function getSqlite3() {

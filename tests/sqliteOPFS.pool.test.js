@@ -73,7 +73,7 @@ describe('sqliteOPFS pool', () => {
 		const messages = [];
 		const pool = newPool('test.sqlite3', {
 			vfs: 'opfs-sahpool',
-			sahPool: { initialCapacity: 8 },
+			sahPool: { initialCapacity: 8, fallbackToOpfs: true },
 			prewarmRead: false,
 			createWorker() {
 				return newFakeWorker(messages);
@@ -84,7 +84,7 @@ describe('sqliteOPFS pool', () => {
 
 		expect(messages[0].method).toBe('open');
 		expect(messages[0].vfs).toBe('opfs-sahpool');
-		expect(messages[0].sahPool).toEqual({ initialCapacity: 8 });
+		expect(messages[0].sahPool).toEqual({ initialCapacity: 8, fallbackToOpfs: true });
 		pool.end();
 	});
 

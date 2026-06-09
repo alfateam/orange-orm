@@ -1003,6 +1003,17 @@ export interface SyncPullResult {
 export interface PoolOptions<M extends Record<string, any> = any> {
   size?: number;
   sync?: string | SyncConfig<M>;
+  vfs?: 'opfs' | 'opfs-sahpool';
+  sahPool?: SqliteOpfsSahPoolOptions;
+  prewarmRead?: boolean;
+}
+
+export interface SqliteOpfsSahPoolOptions {
+  name?: string;
+  directory?: string;
+  initialCapacity?: number;
+  clearOnInit?: boolean;
+  fallbackToOpfs?: boolean;
 }
 
 export type DBClient<M extends Record<string, TableDefinition<M>>> = {
