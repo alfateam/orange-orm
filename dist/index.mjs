@@ -22848,7 +22848,9 @@ function requireWorkerClient () {
 
 		const ready = request('open', {
 			connectionString,
-			busyTimeoutMs: options.busyTimeoutMs || 5000
+			busyTimeoutMs: options.busyTimeoutMs || 5000,
+			vfs: options.vfs,
+			sahPool: options.sahPool
 		});
 
 		return {
@@ -23015,7 +23017,7 @@ async function dispatchTimed(message) {
 
 async function dispatch(message) {
 	if (message.method === 'open')
-		return openDb(message.connectionString, message.busyTimeoutMs);
+		return openDb(message.connectionString, message.busyTimeoutMs, message.vfs, message.sahPool);
 	if (!db)
 		await openDb(message.connectionString || 'orange.sqlite3');
 	if (message.method === 'query')
@@ -23025,19 +23027,40 @@ async function dispatch(message) {
 	throw new Error('Unknown sqliteOPFS worker method "' + message.method + '".');
 }
 
-async function openDb(connectionString, busyTimeoutMs = 5000) {
+async function openDb(connectionString, busyTimeoutMs = 5000, vfs, sahPoolOptions) {
 	if (db)
 		return { opened: true, reused: true };
 	const sqlite3 = await getSqlite3();
 	const filename = normalizeFilename(connectionString);
-	db = sqlite3.oo1.OpfsDb
-		? new sqlite3.oo1.OpfsDb(filename)
-		: new sqlite3.oo1.DB(filename, 'ct');
+	const dbInfo = await createDb(sqlite3, filename, vfs, sahPoolOptions);
+	db = dbInfo.db;
 	db.exec('PRAGMA busy_timeout=' + (Number.parseInt(busyTimeoutMs, 10) || 5000));
 	return {
 		opened: true,
-		opfs: !!sqlite3.oo1.OpfsDb,
+		opfs: dbInfo.vfs === 'opfs',
+		vfs: dbInfo.vfs,
 		filename: db.filename
+	};
+}
+
+async function createDb(sqlite3, filename, vfs, sahPoolOptions) {
+	if (vfs === 'opfs-sahpool') {
+		if (typeof sqlite3.installOpfsSAHPoolVfs !== 'function')
+			throw new Error('sqliteOPFS vfs "opfs-sahpool" is not available in this sqlite-wasm build.');
+		const pool = await sqlite3.installOpfsSAHPoolVfs(sahPoolOptions || {});
+		const DbClass = pool.OpfsSAHPoolDb;
+		if (typeof DbClass !== 'function')
+			throw new Error('sqliteOPFS vfs "opfs-sahpool" did not expose OpfsSAHPoolDb.');
+		return {
+			db: new DbClass(filename),
+			vfs: pool.vfsName || 'opfs-sahpool'
+		};
+	}
+	return {
+		db: sqlite3.oo1.OpfsDb
+		? new sqlite3.oo1.OpfsDb(filename)
+		: new sqlite3.oo1.DB(filename, 'ct'),
+		vfs: 'opfs'
 	};
 }
 

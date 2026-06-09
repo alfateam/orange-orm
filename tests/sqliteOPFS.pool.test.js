@@ -68,9 +68,28 @@ describe('sqliteOPFS pool', () => {
 			pool.end();
 		}
 	});
+
+	test('passes selected vfs to worker open request', async () => {
+		const messages = [];
+		const pool = newPool('test.sqlite3', {
+			vfs: 'opfs-sahpool',
+			sahPool: { initialCapacity: 8 },
+			prewarmRead: false,
+			createWorker() {
+				return newFakeWorker(messages);
+			}
+		});
+
+		await wait(10);
+
+		expect(messages[0].method).toBe('open');
+		expect(messages[0].vfs).toBe('opfs-sahpool');
+		expect(messages[0].sahPool).toEqual({ initialCapacity: 8 });
+		pool.end();
+	});
 });
 
-function newFakeWorker() {
+function newFakeWorker(messages = []) {
 	const listeners = new Map();
 	return {
 		addEventListener(type, listener) {
@@ -83,6 +102,7 @@ function newFakeWorker() {
 			listeners.set(type, entries.filter((entry) => entry !== listener));
 		},
 		postMessage(message) {
+			messages.push(message);
 			setTimeout(() => {
 				for (const listener of listeners.get('message') || []) {
 					listener({
