@@ -32,6 +32,22 @@ describe('sync schema', () => {
 		expect(order.indexes[0].columns).toEqual(['customerId']);
 	});
 
+	test('adds relation indexes for hasMany, hasOne and references foreign keys', () => {
+		const map = createRelationMap();
+		const client = toClient(map);
+		const schema = buildSyncSchema(client.tables, ['customer', 'order', 'orderDetail', 'invoice']);
+		const order = schema.tables.find(x => x.name === 'order');
+		const orderDetail = schema.tables.find(x => x.name === 'orderDetail');
+		const invoice = schema.tables.find(x => x.name === 'invoice');
+
+		expect(order.indexes.map(x => x.dbName)).toContain('orange_idx_order_customerId');
+		expect(order.indexes.find(x => x.dbName === 'orange_idx_order_customerId').columns).toEqual(['customerId']);
+		expect(orderDetail.indexes.map(x => x.dbName)).toContain('orange_idx_orderDetail_orderId');
+		expect(orderDetail.indexes.find(x => x.dbName === 'orange_idx_orderDetail_orderId').columns).toEqual(['orderId']);
+		expect(invoice.indexes.map(x => x.dbName)).toContain('orange_idx_invoice_orderId');
+		expect(invoice.indexes.find(x => x.dbName === 'orange_idx_invoice_orderId').columns).toEqual(['orderId']);
+	});
+
 	test('throws when stored schema checksum differs from current map', async () => {
 		const map = createMap();
 		const client = toClient(map);
@@ -104,6 +120,36 @@ function createMap() {
 		})),
 		order: x.order.map(({ references }) => ({
 			customer: references(x.customer).by('customerId').notNull()
+		}))
+	}));
+}
+
+function createRelationMap() {
+	return rdb.map((x) => ({
+		customer: x.table('customer').map(({ column }) => ({
+			id: column('id').numeric().primary().notNullExceptInsert()
+		})),
+		order: x.table('order').map(({ column }) => ({
+			id: column('id').numeric().primary().notNullExceptInsert(),
+			customerId: column('customerId').numeric()
+		})),
+		orderDetail: x.table('orderDetail').map(({ column }) => ({
+			id: column('id').numeric().primary().notNullExceptInsert(),
+			orderId: column('orderId').numeric()
+		})),
+		invoice: x.table('invoice').map(({ column }) => ({
+			id: column('id').numeric().primary().notNullExceptInsert(),
+			orderId: column('orderId').numeric()
+		}))
+	})).map((x) => ({
+		customer: x.customer.map(({ hasMany }) => ({
+			orders: hasMany(x.order).by('customerId')
+		})),
+		order: x.order.map(({ hasOne }) => ({
+			detail: hasOne(x.orderDetail).by('orderId')
+		})),
+		invoice: x.invoice.map(({ references }) => ({
+			order: references(x.order).by('orderId')
 		}))
 	}));
 }
