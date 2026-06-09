@@ -22970,7 +22970,7 @@ function requireWorkerClient () {
 			return new Worker(options.workerUrl, { type: 'module' });
 		if (typeof Worker !== 'undefined') {
 			try {
-				const source = createWorkerSource(options.sqliteModuleUrl || getDefaultSqliteModuleUrl() || '@sqlite.org/sqlite-wasm');
+		const source = createWorkerSource(options.sqliteModuleUrl || getDefaultSqliteModuleUrl() || '@sqlite.org/sqlite-wasm', options);
 				const blob = new Blob([source], { type: 'text/javascript' });
 				const url = URL.createObjectURL(blob);
 				return new Worker(url, { type: 'module' });
@@ -22988,7 +22988,10 @@ function requireWorkerClient () {
 			: null;
 	}
 
-	function createWorkerSource(sqliteModuleUrl) {
+	function createWorkerSource(sqliteModuleUrl, options = {}) {
+		const sqliteInitConfig = options.vfs === 'opfs-sahpool'
+			? { disable: { vfs: { opfs: true } } }
+			: {};
 		return `
 import sqlite3InitModule from ${JSON.stringify(sqliteModuleUrl)};
 
@@ -23066,7 +23069,7 @@ async function createDb(sqlite3, filename, vfs, sahPoolOptions) {
 
 async function getSqlite3() {
 	if (!sqlite3Promise)
-		sqlite3Promise = sqlite3InitModule();
+		sqlite3Promise = sqlite3InitModule(${JSON.stringify(sqliteInitConfig)});
 	return sqlite3Promise;
 }
 
@@ -23173,6 +23176,7 @@ function requireNewPool$5 () {
 		let client = createSqliteOPFSWorkerClient(connectionString, poolOptions || {});
 		let readClient;
 		let c = {};
+		const singleWorker = poolOptions && poolOptions.vfs === 'opfs-sahpool';
 
 		prewarmReadClient();
 
@@ -23184,6 +23188,8 @@ function requireNewPool$5 () {
 		};
 
 		c.connectRead = function(cb) {
+			if (singleWorker)
+				return c.connect(cb);
 			ensureReadClient();
 			cb(null, readClient, function(err) {
 				if (err && readClient.reset)
@@ -23204,6 +23210,8 @@ function requireNewPool$5 () {
 		return c;
 
 		function prewarmReadClient() {
+			if (singleWorker)
+				return;
 			if (poolOptions && poolOptions.prewarmRead === false)
 				return;
 			setTimeout(() => {

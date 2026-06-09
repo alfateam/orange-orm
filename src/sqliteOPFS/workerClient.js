@@ -133,7 +133,7 @@ function createWorker(connectionString, options) {
 		return new Worker(options.workerUrl, { type: 'module' });
 	if (typeof Worker !== 'undefined') {
 		try {
-			const source = createWorkerSource(options.sqliteModuleUrl || getDefaultSqliteModuleUrl() || '@sqlite.org/sqlite-wasm');
+	const source = createWorkerSource(options.sqliteModuleUrl || getDefaultSqliteModuleUrl() || '@sqlite.org/sqlite-wasm', options);
 			const blob = new Blob([source], { type: 'text/javascript' });
 			const url = URL.createObjectURL(blob);
 			return new Worker(url, { type: 'module' });
@@ -151,7 +151,10 @@ function getDefaultSqliteModuleUrl() {
 		: null;
 }
 
-function createWorkerSource(sqliteModuleUrl) {
+function createWorkerSource(sqliteModuleUrl, options = {}) {
+	const sqliteInitConfig = options.vfs === 'opfs-sahpool'
+		? { disable: { vfs: { opfs: true } } }
+		: {};
 	return `
 import sqlite3InitModule from ${JSON.stringify(sqliteModuleUrl)};
 
@@ -229,7 +232,7 @@ async function createDb(sqlite3, filename, vfs, sahPoolOptions) {
 
 async function getSqlite3() {
 	if (!sqlite3Promise)
-		sqlite3Promise = sqlite3InitModule();
+		sqlite3Promise = sqlite3InitModule(${JSON.stringify(sqliteInitConfig)});
 	return sqlite3Promise;
 }
 

@@ -7,6 +7,7 @@ function newPool(connectionString, poolOptions) {
 	let client = createSqliteOPFSWorkerClient(connectionString, poolOptions || {});
 	let readClient;
 	let c = {};
+	const singleWorker = poolOptions && poolOptions.vfs === 'opfs-sahpool';
 
 	prewarmReadClient();
 
@@ -18,6 +19,8 @@ function newPool(connectionString, poolOptions) {
 	};
 
 	c.connectRead = function(cb) {
+		if (singleWorker)
+			return c.connect(cb);
 		ensureReadClient();
 		cb(null, readClient, function(err) {
 			if (err && readClient.reset)
@@ -38,6 +41,8 @@ function newPool(connectionString, poolOptions) {
 	return c;
 
 	function prewarmReadClient() {
+		if (singleWorker)
+			return;
 		if (poolOptions && poolOptions.prewarmRead === false)
 			return;
 		setTimeout(() => {

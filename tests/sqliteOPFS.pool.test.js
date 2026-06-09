@@ -87,6 +87,23 @@ describe('sqliteOPFS pool', () => {
 		expect(messages[0].sahPool).toEqual({ initialCapacity: 8 });
 		pool.end();
 	});
+
+	test('routes SAH pool reads through write client', async () => {
+		const messages = [];
+		const pool = newPool('test.sqlite3', {
+			vfs: 'opfs-sahpool',
+			createWorker() {
+				return newFakeWorker(messages);
+			}
+		});
+
+		await wait(10);
+		pool.connectRead(() => {});
+		await wait(10);
+
+		expect(messages.filter(x => x.method === 'open')).toHaveLength(1);
+		pool.end();
+	});
 });
 
 function newFakeWorker(messages = []) {
