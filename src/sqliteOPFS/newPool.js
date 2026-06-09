@@ -8,6 +8,8 @@ function newPool(connectionString, poolOptions) {
 	let readClient;
 	let c = {};
 
+	prewarmReadClient();
+
 	c.connect = function(cb) {
 		cb(null, client, function(err) {
 			if (err && client.reset)
@@ -16,8 +18,7 @@ function newPool(connectionString, poolOptions) {
 	};
 
 	c.connectRead = function(cb) {
-		if (!readClient)
-			readClient = createSqliteOPFSWorkerClient(connectionString, { ...poolOptions, readonly: true });
+		ensureReadClient();
 		cb(null, readClient, function(err) {
 			if (err && readClient.reset)
 				readClient.reset();
@@ -35,6 +36,27 @@ function newPool(connectionString, poolOptions) {
 
 	pools[id] = c;
 	return c;
+
+	function prewarmReadClient() {
+		if (poolOptions && poolOptions.prewarmRead === false)
+			return;
+		setTimeout(() => {
+			try {
+				ensureReadClient();
+				if (readClient.ready && typeof readClient.ready.catch === 'function')
+					readClient.ready.catch(() => {});
+			}
+			catch (e) {
+				// The next readonly query will surface the same worker creation/open error.
+			}
+		}, 0);
+	}
+
+	function ensureReadClient() {
+		if (!readClient)
+			readClient = createSqliteOPFSWorkerClient(connectionString, { ...poolOptions, readonly: true });
+		return readClient;
+	}
 }
 
 module.exports = newPool;

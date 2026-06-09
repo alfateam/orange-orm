@@ -18,7 +18,8 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 		executeQuery,
 		executeCommand,
 		close,
-		reset
+		reset,
+		ready
 	};
 
 	function executeQuery(query, callback) {
