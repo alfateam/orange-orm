@@ -88,6 +88,43 @@ describe('sqliteOPFS pool', () => {
 		pool.end();
 	});
 
+	test('emits sqlite open vfs details', async () => {
+		const opened = [];
+		const onOpen = (entry) => opened.push(entry);
+		log.on('sqliteOpen', onOpen);
+		const pool = newPool('test.sqlite3', {
+			vfs: 'opfs-sahpool',
+			prewarmRead: false,
+			createWorker() {
+				return newFakeWorker([], (message) => message.method === 'open'
+					? { opened: true, filename: '/test.sqlite3', vfs: 'opfs' }
+					: { ok: true });
+			}
+		});
+
+		try {
+			await pool.connect((err) => {
+				if (err)
+					throw err;
+			});
+			await wait(10);
+
+			expect(opened).toHaveLength(1);
+			expect(opened[0]).toMatchObject({
+				connectionString: 'test.sqlite3',
+				filename: '/test.sqlite3',
+				requestedVfs: 'opfs-sahpool',
+				vfs: 'opfs',
+				fallback: true,
+				readonly: false
+			});
+		}
+		finally {
+			log.off('sqliteOpen', onOpen);
+			pool.end();
+		}
+	});
+
 	test('routes SAH pool reads through write client', async () => {
 		const messages = [];
 		const pool = newPool('test.sqlite3', {
@@ -106,7 +143,7 @@ describe('sqliteOPFS pool', () => {
 	});
 });
 
-function newFakeWorker(messages = []) {
+function newFakeWorker(messages = [], getResult = () => ({ ok: true })) {
 	const listeners = new Map();
 	return {
 		addEventListener(type, listener) {
@@ -126,7 +163,7 @@ function newFakeWorker(messages = []) {
 						data: {
 							type: 'orange-sqlite-opfs-response',
 							id: message.id,
-							result: { ok: true },
+							result: getResult(message),
 							elapsedMs: 1
 						}
 					});

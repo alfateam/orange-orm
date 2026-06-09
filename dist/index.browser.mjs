@@ -17205,7 +17205,8 @@ function requireLog () {
 
 	var emitters = {
 		query: newEmitEvent(),
-		queryComplete: newEmitEvent()
+		queryComplete: newEmitEvent(),
+		sqliteOpen: newEmitEvent()
 	};
 
 	var logger = function() {
@@ -17226,6 +17227,10 @@ function requireLog () {
 		emitters.queryComplete.apply(null, arguments);
 	};
 
+	log.emitSqliteOpen = function(event) {
+		emitters.sqliteOpen.apply(null, arguments);
+	};
+
 	log.startQuery = function({ sql, parameters }) {
 		const startedAt = now();
 		log.emitQuery({ sql, parameters });
@@ -17243,6 +17248,8 @@ function requireLog () {
 			emitters.query.add(cb);
 		else if (type === 'queryComplete')
 			emitters.queryComplete.add(cb);
+		else if (type === 'sqliteOpen')
+			emitters.sqliteOpen.add(cb);
 		else
 			throw new Error('unknown event type: ' + type);
 	};
@@ -17252,6 +17259,8 @@ function requireLog () {
 			emitters.query.tryRemove(cb);
 		else if (type === 'queryComplete')
 			emitters.queryComplete.tryRemove(cb);
+		else if (type === 'sqliteOpen')
+			emitters.sqliteOpen.tryRemove(cb);
 		else
 			throw new Error('unknown event type: ' + type);
 	};
@@ -19965,11 +19974,23 @@ function requireWorkerClient () {
 		worker.addEventListener('error', onWorkerError);
 		worker.addEventListener('messageerror', onWorkerError);
 
+		const requestedVfs = options.vfs || 'opfs';
 		const ready = request('open', {
 			connectionString,
 			busyTimeoutMs: options.busyTimeoutMs || 5000,
 			vfs: options.vfs,
 			sahPool: options.sahPool
+		}).then(({ result }) => {
+			const event = {
+				connectionString,
+				filename: result && result.filename,
+				requestedVfs,
+				vfs: result && result.vfs || requestedVfs,
+				fallback: !!(requestedVfs === 'opfs-sahpool' && result && result.vfs === 'opfs'),
+				readonly: !!options.readonly
+			};
+			log.emitSqliteOpen(event);
+			return result;
 		});
 
 		return {

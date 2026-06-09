@@ -26,8 +26,10 @@ declare namespace r {
     function oracle(config: PoolAttributes, options?: PoolOptions): Pool;
     function on(type: 'query', cb: (e: QueryEvent) => void): void;
     function on(type: 'queryComplete', cb: (e: QueryCompleteEvent) => void): void;
+    function on(type: 'sqliteOpen', cb: (e: SqliteOpenEvent) => void): void;
     function off(type: 'query', cb: (e: QueryEvent) => void): void;
     function off(type: 'queryComplete', cb: (e: QueryCompleteEvent) => void): void;
+    function off(type: 'sqliteOpen', cb: (e: SqliteOpenEvent) => void): void;
     function map<V extends AllowedDbMap<V>>(
 		fn: (mapper: DbMapper<{}>) => V
 	): MappedDbDef<MergeProperties<V, V>>;
@@ -111,6 +113,15 @@ declare namespace r {
         elapsedMs: number,
         workerElapsedMs?: number,
         error?: Error
+    }
+
+    export interface SqliteOpenEvent {
+        connectionString: string,
+        filename?: string,
+        requestedVfs: 'opfs' | 'opfs-sahpool',
+        vfs: 'opfs' | 'opfs-sahpool' | string,
+        fallback: boolean,
+        readonly: boolean
     }
 
     export interface QueryResult {

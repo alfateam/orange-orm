@@ -9,11 +9,23 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 	worker.addEventListener('error', onWorkerError);
 	worker.addEventListener('messageerror', onWorkerError);
 
+	const requestedVfs = options.vfs || 'opfs';
 	const ready = request('open', {
 		connectionString,
 		busyTimeoutMs: options.busyTimeoutMs || 5000,
 		vfs: options.vfs,
 		sahPool: options.sahPool
+	}).then(({ result }) => {
+		const event = {
+			connectionString,
+			filename: result && result.filename,
+			requestedVfs,
+			vfs: result && result.vfs || requestedVfs,
+			fallback: !!(requestedVfs === 'opfs-sahpool' && result && result.vfs === 'opfs'),
+			readonly: !!options.readonly
+		};
+		log.emitSqliteOpen(event);
+		return result;
 	});
 
 	return {
