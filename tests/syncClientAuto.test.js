@@ -179,6 +179,61 @@ describe('sync client auto start', () => {
 		expect(stateTableCreates).toHaveLength(1);
 	});
 
+	test('applies staged pull rows with json patch and skips sqlite post-insert select', async () => {
+		const patches = [];
+		const options = [];
+		const db = {
+			__sqliteSync: { url: '/rdb', auto: false, schema: false },
+			query: async () => []
+		};
+		const client = newSyncClient({
+			tables: {
+				customer: newTable('customer')
+			},
+			transaction: async (fn) => fn({
+				customer: {
+					patch: async (patch, patchOptions) => {
+						patches.push(patch);
+						options.push(patchOptions);
+						return { changed: [] };
+					}
+				},
+				query: async () => []
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async (request) => {
+					if (request.data.phase === 'keys') {
+						return {
+							data: {
+								phase: 'keys',
+								items: [{ table: 'customer', pk: [1], key: { id: 1 }, op: 'U' }],
+								done: true,
+								cursor: 'cursor-1'
+							}
+						};
+					}
+					return {
+						data: {
+							phase: 'rows',
+							items: [{ table: 'customer', pk: [1], key: { id: 1 }, row: { id: 1 }, op: 'U' }]
+						}
+					};
+				};
+			}
+		});
+
+		await client.pull();
+
+		expect(patches).toEqual([
+			[{ op: 'replace', path: '/[1]', value: { id: 1 } }]
+		]);
+		expect(options[0]).toMatchObject({
+			concurrency: 'overwrite',
+			skipSelectAfterInsert: true
+		});
+	});
+
 });
 
 function newTable(dbName) {

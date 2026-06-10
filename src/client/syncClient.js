@@ -152,7 +152,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 	async function pullStaged(pullConfig, options) {
 		const maxKeysPerBatch = normalizeLimit(pullConfig.maxKeysPerBatch, 200);
 		const maxRowsPerBatch = normalizeLimit(pullConfig.maxRowsPerBatch, 200);
-		const defaultPatchOptions = { ...(pullConfig.patchOptions || {}), concurrency: 'overwrite' };
+		const defaultPatchOptions = { ...(pullConfig.patchOptions || {}), concurrency: 'overwrite', skipSelectAfterInsert: true };
 		let applied = 0;
 		let stagedResult;
 		await client.transaction(async (tx) => {

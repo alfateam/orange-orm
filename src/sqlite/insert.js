@@ -11,6 +11,9 @@ function insertDefault(context, table, row, options) {
 	insertCmd.disallowCompress = true;
 	pushCommand(context, insertCmd);
 
+	if (options && options.skipSelectAfterInsert)
+		return executeQueries(context, []).then(() => [row]);
+
 	let selectCmd = newGetLastInsertedCommand(context, table, row, insertCmd);
 	commands.push(selectCmd);
 

@@ -4666,7 +4666,7 @@ function requireSyncClient () {
 		async function pullStaged(pullConfig, options) {
 			const maxKeysPerBatch = normalizeLimit(pullConfig.maxKeysPerBatch, 200);
 			const maxRowsPerBatch = normalizeLimit(pullConfig.maxRowsPerBatch, 200);
-			const defaultPatchOptions = { ...(pullConfig.patchOptions || {}), concurrency: 'overwrite' };
+			const defaultPatchOptions = { ...(pullConfig.patchOptions || {}), concurrency: 'overwrite', skipSelectAfterInsert: true };
 			let applied = 0;
 			let stagedResult;
 			await client.transaction(async (tx) => {
@@ -15214,7 +15214,10 @@ function requirePatchTable () {
 						}
 					}
 				}
-				let row = table.insertWithConcurrency.apply(null, [context, options, value]);
+				const insertOptions = childInserts.length === 0
+					? options
+					: withoutSkipSelectAfterInsert(options);
+				let row = table.insertWithConcurrency.apply(null, [context, insertOptions, value]);
 				row = await row;
 
 				for (let i = 0; i < childInserts.length; i++) {
@@ -15516,6 +15519,13 @@ function requirePatchTable () {
 		function cleanOptions(options) {
 			const { table, transaction, db, client, ..._options } = options;
 			return _options;
+		}
+
+		function withoutSkipSelectAfterInsert(options) {
+			if (!options || !options.skipSelectAfterInsert)
+				return options;
+			const { skipSelectAfterInsert, ...rest } = options;
+			return rest;
 		}
 	}
 
@@ -21462,6 +21472,9 @@ function requireInsert$3 () {
 		let insertCmd = newInsertCommand(newInsertCommandCore.bind(null, context), table, row, options);
 		insertCmd.disallowCompress = true;
 		pushCommand(context, insertCmd);
+
+		if (options && options.skipSelectAfterInsert)
+			return executeQueries(context, []).then(() => [row]);
 
 		let selectCmd = newGetLastInsertedCommand(context, table, row, insertCmd);
 		commands.push(selectCmd);

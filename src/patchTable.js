@@ -105,7 +105,10 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 					}
 				}
 			}
-			let row = table.insertWithConcurrency.apply(null, [context, options, value]);
+			const insertOptions = childInserts.length === 0
+				? options
+				: withoutSkipSelectAfterInsert(options);
+			let row = table.insertWithConcurrency.apply(null, [context, insertOptions, value]);
 			row = await row;
 
 			for (let i = 0; i < childInserts.length; i++) {
@@ -409,6 +412,13 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 	function cleanOptions(options) {
 		const { table, transaction, db, client, ..._options } = options;
 		return _options;
+	}
+
+	function withoutSkipSelectAfterInsert(options) {
+		if (!options || !options.skipSelectAfterInsert)
+			return options;
+		const { skipSelectAfterInsert, ...rest } = options;
+		return rest;
 	}
 }
 
