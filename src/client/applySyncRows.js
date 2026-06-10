@@ -1,5 +1,18 @@
 const newParameterized = require('../table/query/newParameterized');
 const clearCache = require('../table/clearCache');
+const encodeBoolean = require('../sqlite/encodeBoolean');
+const encodeBinary = require('../nodeSqlite/encodeBinary');
+const quoteSqlite = require('../sqlite/quote');
+
+const sqliteEncodeContext = {
+	rdb: {
+		engine: 'sqlite',
+		encodeBoolean,
+		encodeBinary,
+		encodeJSON: JSON.stringify,
+		quote: quoteSqlite
+	}
+};
 
 async function applySyncRowsOnTx(tx, items) {
 	const rows = Array.isArray(items) ? items : [];
@@ -24,7 +37,8 @@ async function applySyncRowsOnTx(tx, items) {
 			await upsertRow(tx, table, entries[rowIndex].row);
 			applied += 1;
 		}
-		clearCache(tx);
+		if (tx && tx.rdb)
+			clearCache(tx);
 	}
 	return applied;
 }
@@ -37,6 +51,7 @@ async function upsertRow(tx, table, row) {
 }
 
 function newUpsertCommand(context, table, row) {
+	const encodeContext = context && context.rdb ? context : sqliteEncodeContext;
 	const columns = table._columns || [];
 	const insertColumns = [];
 	const values = [];
@@ -46,7 +61,7 @@ function newUpsertCommand(context, table, row) {
 		const column = columns[i];
 		if (!Object.prototype.hasOwnProperty.call(row, column.alias))
 			continue;
-		const encoded = column.encode(context, row[column.alias]);
+		const encoded = column.encode(encodeContext, row[column.alias]);
 		insertColumns.push(quote(context, column._dbName));
 		values.push(encoded.sql());
 		if (encoded.parameters.length > 0)

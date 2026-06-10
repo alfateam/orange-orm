@@ -197,7 +197,6 @@ describe('sync client auto start', () => {
 				customer: table
 			},
 			transaction: async (fn) => fn({
-				rdb: { engine: 'sqlite' },
 				tables: {
 					customer: txTable
 				},

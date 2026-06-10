@@ -87,7 +87,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		};
 		let result;
 		try {
-			result = await pullStaged(pullConfig, requestOptions);
+			result = await pullStaged(pullConfig, requestOptions, syncConfig);
 		}
 		catch (e) {
 			if (!shouldFallbackToPatch(e))
@@ -150,7 +150,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		});
 	}
 
-	async function pullStaged(pullConfig, options) {
+	async function pullStaged(pullConfig, options, syncConfig) {
 		const maxKeysPerBatch = normalizeLimit(pullConfig.maxKeysPerBatch, 200);
 		const maxRowsPerBatch = normalizeLimit(pullConfig.maxRowsPerBatch, 200);
 		const defaultPatchOptions = { ...(pullConfig.patchOptions || {}), concurrency: 'overwrite' };
@@ -219,7 +219,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 					if (!isRowsPayload(currentRowsResult.payload))
 						throw new Error('Sync endpoint did not return rows payload');
 					if (tx)
-						applied += await applyRowsPayloadOnTx(tx, currentRowsResult.payload.items, defaultPatchOptions);
+						applied += await applyRowsPayloadOnTx(tx, currentRowsResult.payload.items, defaultPatchOptions, syncConfig);
 				}
 				if (keysPayload.done || !keysPayload.token) {
 					return {
@@ -858,9 +858,9 @@ async function applyDeleteItemsOnTx(tx, items, patchOptions) {
 	return applied;
 }
 
-async function applyRowsPayloadOnTx(tx, items, patchOptions) {
+async function applyRowsPayloadOnTx(tx, items, patchOptions, syncConfig) {
 	const rows = Array.isArray(items) ? items : [];
-	if (tx && tx.rdb && tx.rdb.engine === 'sqlite')
+	if (syncConfig && tx && typeof tx.query === 'function')
 		return applySyncRowsOnTx(tx, rows, patchOptions);
 	return applyRowsPayloadOnTxViaPatch(tx, rows, patchOptions);
 }
