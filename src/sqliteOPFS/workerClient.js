@@ -348,6 +348,8 @@ function serializeError(error) {
 		stack: error && error.stack
 	};
 }
+
+//# sourceURL=orange-orm-sqlite-opfs-worker.mjs
 `;
 }
 
@@ -363,6 +365,8 @@ function toError(error) {
 function toWorkerError(event) {
 	if (event instanceof Error)
 		return event;
+	if (event && event.error instanceof Error)
+		return event.error;
 	const message = event && event.message
 		? event.message
 		: 'sqliteOPFS worker failed before responding.';
