@@ -4,7 +4,6 @@ const stringify = require('./stringify');
 const { createSyncAuto } = require('./syncAuto');
 const outboxTableSql = require('../sync/outboxTableSql');
 const { ensureSyncSchema } = require('./syncSchema');
-const { applySyncRowsOnTx } = require('./applySyncRows');
 
 function newSyncClient(client, getDb, axiosInterceptor) {
 	const sinceByScope = new Map();
@@ -87,7 +86,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		};
 		let result;
 		try {
-			result = await pullStaged(pullConfig, requestOptions, syncConfig);
+			result = await pullStaged(pullConfig, requestOptions);
 		}
 		catch (e) {
 			if (!shouldFallbackToPatch(e))
@@ -150,7 +149,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		});
 	}
 
-	async function pullStaged(pullConfig, options, syncConfig) {
+	async function pullStaged(pullConfig, options) {
 		const maxKeysPerBatch = normalizeLimit(pullConfig.maxKeysPerBatch, 200);
 		const maxRowsPerBatch = normalizeLimit(pullConfig.maxRowsPerBatch, 200);
 		const defaultPatchOptions = { ...(pullConfig.patchOptions || {}), concurrency: 'overwrite' };
@@ -219,7 +218,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 					if (!isRowsPayload(currentRowsResult.payload))
 						throw new Error('Sync endpoint did not return rows payload');
 					if (tx)
-						applied += await applyRowsPayloadOnTx(tx, currentRowsResult.payload.items, defaultPatchOptions, syncConfig);
+						applied += await applyRowsPayloadOnTx(tx, currentRowsResult.payload.items, defaultPatchOptions);
 				}
 				if (keysPayload.done || !keysPayload.token) {
 					return {
@@ -858,14 +857,7 @@ async function applyDeleteItemsOnTx(tx, items, patchOptions) {
 	return applied;
 }
 
-async function applyRowsPayloadOnTx(tx, items, patchOptions, syncConfig) {
-	const rows = Array.isArray(items) ? items : [];
-	if (syncConfig && tx && typeof tx.query === 'function')
-		return applySyncRowsOnTx(tx, rows, patchOptions);
-	return applyRowsPayloadOnTxViaPatch(tx, rows, patchOptions);
-}
-
-async function applyRowsPayloadOnTxViaPatch(tx, items, patchOptions) {
+async function applyRowsPayloadOnTx(tx, items, patchOptions) {
 	const rows = Array.isArray(items) ? items : [];
 	const perTable = new Map();
 	for (let i = 0; i < rows.length; i++) {

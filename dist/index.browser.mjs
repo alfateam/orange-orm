@@ -4505,267 +4505,6 @@ function requireSyncSchema () {
 	return syncSchema;
 }
 
-var clearCache_1;
-var hasRequiredClearCache;
-
-function requireClearCache () {
-	if (hasRequiredClearCache) return clearCache_1;
-	hasRequiredClearCache = 1;
-	var setSessionSingleton = requireSetSessionSingleton();
-
-	function clearCache(context) {
-		setSessionSingleton(context, 'cache', {});
-	}
-
-	clearCache_1 = clearCache;
-	return clearCache_1;
-}
-
-var encodeBoolean_1$1;
-var hasRequiredEncodeBoolean$1;
-
-function requireEncodeBoolean$1 () {
-	if (hasRequiredEncodeBoolean$1) return encodeBoolean_1$1;
-	hasRequiredEncodeBoolean$1 = 1;
-	function encodeBoolean(bool) {
-		if (bool)
-			return 1;
-		return 0;
-	}
-
-	encodeBoolean_1$1 = encodeBoolean;
-	return encodeBoolean_1$1;
-}
-
-var encodeBinary_1;
-var hasRequiredEncodeBinary;
-
-function requireEncodeBinary () {
-	if (hasRequiredEncodeBinary) return encodeBinary_1;
-	hasRequiredEncodeBinary = 1;
-	function encodeBinary(base64) {
-		// Decode base64 to a binary string
-		const binaryString = atob(base64);
-
-		// Create a new Uint8Array with the same length as the binary string
-		const len = binaryString.length;
-		const bytes = new Uint8Array(len);
-
-		// Populate the Uint8Array with numeric character codes
-		for (let i = 0; i < len; i++) {
-			bytes[i] = binaryString.charCodeAt(i);
-		}
-
-		return bytes;
-	}
-
-	encodeBinary_1 = encodeBinary;
-	return encodeBinary_1;
-}
-
-var quote$1;
-var hasRequiredQuote$2;
-
-function requireQuote$2 () {
-	if (hasRequiredQuote$2) return quote$1;
-	hasRequiredQuote$2 = 1;
-	quote$1 = (name) => `"${name}"`;
-	return quote$1;
-}
-
-var applySyncRows;
-var hasRequiredApplySyncRows;
-
-function requireApplySyncRows () {
-	if (hasRequiredApplySyncRows) return applySyncRows;
-	hasRequiredApplySyncRows = 1;
-	const newParameterized = requireNewParameterized();
-	const clearCache = requireClearCache();
-	const encodeBoolean = requireEncodeBoolean$1();
-	const encodeBinary = requireEncodeBinary();
-	const quoteSqlite = requireQuote$2();
-
-	const sqliteEncodeContext = {
-		rdb: {
-			engine: 'sqlite',
-			encodeBoolean,
-			encodeBinary,
-			encodeJSON: JSON.stringify,
-			quote: quoteSqlite
-		}
-	};
-
-	async function applySyncRowsOnTx(tx, items) {
-		const rows = Array.isArray(items) ? items : [];
-		const perTable = new Map();
-		for (let i = 0; i < rows.length; i++) {
-			const item = rows[i];
-			if (!item || typeof item.table !== 'string' || !Array.isArray(item.pk) || item.row === undefined)
-				continue;
-			if (!perTable.has(item.table))
-				perTable.set(item.table, []);
-			perTable.get(item.table).push(item);
-		}
-		const tableNames = orderTablesByDependencies(tx, Array.from(perTable.keys()));
-		let applied = 0;
-		for (let i = 0; i < tableNames.length; i++) {
-			const tableName = tableNames[i];
-			const table = tx && tx.tables && tx.tables[tableName];
-			if (!table || !Array.isArray(table._columns))
-				throw new Error(`Table "${tableName}" does not exist in this client`);
-			const entries = perTable.get(tableName);
-			for (let rowIndex = 0; rowIndex < entries.length; rowIndex++) {
-				await upsertRow(tx, table, entries[rowIndex].row);
-				applied += 1;
-			}
-			if (hasOwnRdbContext(tx))
-				clearCache(tx);
-		}
-		return applied;
-	}
-
-	async function upsertRow(tx, table, row) {
-		const command = newUpsertCommand(tx, table, row);
-		if (!command)
-			return;
-		await tx.query(command);
-	}
-
-	function newUpsertCommand(context, table, row) {
-		const encodeContext = hasOwnRdbContext(context) ? context : sqliteEncodeContext;
-		const quoteContext = encodeContext;
-		const columns = table._columns || [];
-		const insertColumns = [];
-		const values = [];
-		const parameters = [];
-		const updateColumns = [];
-		for (let i = 0; i < columns.length; i++) {
-			const column = columns[i];
-			if (!Object.prototype.hasOwnProperty.call(row, column.alias))
-				continue;
-			const encoded = column.encode(encodeContext, row[column.alias]);
-			insertColumns.push(quote(quoteContext, column._dbName));
-			values.push(encoded.sql());
-			if (encoded.parameters.length > 0)
-				parameters.push(encoded.parameters[0]);
-			if (!column.isPrimary)
-				updateColumns.push(`${quote(quoteContext, column._dbName)}=excluded.${quote(quoteContext, column._dbName)}`);
-		}
-		if (insertColumns.length === 0)
-			return null;
-		const primaryKeys = (table._primaryColumns || []).map(column => quote(quoteContext, column._dbName));
-		const conflict = primaryKeys.length === 0
-			? ''
-			: ` ON CONFLICT(${primaryKeys.join(',')}) ${updateColumns.length > 0 ? `DO UPDATE SET ${updateColumns.join(',')}` : 'DO NOTHING'}`;
-		const sql = `INSERT INTO ${quote(quoteContext, table._dbName)} (${insertColumns.join(',')}) VALUES (${values.join(',')})${conflict}`;
-		return newParameterized(sql, parameters);
-	}
-
-	function hasOwnRdbContext(context) {
-		return !!context && Object.prototype.hasOwnProperty.call(context, 'rdb') && !!context.rdb;
-	}
-
-	function orderTablesByDependencies(client, tableNames) {
-		if (!Array.isArray(tableNames) || tableNames.length <= 1)
-			return tableNames || [];
-		const dependencyMap = buildDependencyMap(client);
-		const pending = new Set(tableNames);
-		const ordered = [];
-		while (pending.size > 0) {
-			let progressed = false;
-			for (let i = 0; i < tableNames.length; i++) {
-				const name = tableNames[i];
-				if (!pending.has(name))
-					continue;
-				const deps = dependencyMap.get(name) || new Set();
-				let blocked = false;
-				for (let dep of deps) {
-					if (pending.has(dep)) {
-						blocked = true;
-						break;
-					}
-				}
-				if (!blocked) {
-					pending.delete(name);
-					ordered.push(name);
-					progressed = true;
-				}
-			}
-			if (!progressed) {
-				for (let i = 0; i < tableNames.length; i++) {
-					const name = tableNames[i];
-					if (pending.has(name)) {
-						pending.delete(name);
-						ordered.push(name);
-					}
-				}
-			}
-		}
-		return ordered;
-	}
-
-	function buildDependencyMap(client) {
-		const dependencyMap = new Map();
-		const tables = client && client.tables ? client.tables : {};
-		const names = Object.keys(tables);
-		const nameByTableObject = new Map();
-		for (let i = 0; i < names.length; i++) {
-			const name = names[i];
-			const table = tables[name];
-			if (table)
-				nameByTableObject.set(table, name);
-			dependencyMap.set(name, new Set());
-		}
-
-		for (let i = 0; i < names.length; i++) {
-			const table = tables[names[i]];
-			if (!table || !table._relations)
-				continue;
-			const relations = table._relations;
-			for (const relationName of Object.keys(relations)) {
-				const relation = relations[relationName];
-				const join = extractJoinRelation(relation);
-				if (!join)
-					continue;
-				const fromName = nameByTableObject.get(join.parentTable);
-				const toName = nameByTableObject.get(join.childTable);
-				if (!fromName || !toName || fromName === toName)
-					continue;
-				dependencyMap.get(fromName).add(toName);
-			}
-		}
-		return dependencyMap;
-	}
-
-	function extractJoinRelation(relation) {
-		if (!relation || typeof relation.accept !== 'function')
-			return;
-		let join;
-		relation.accept({
-			visitJoin(current) {
-				join = current;
-			},
-			visitOne(current) {
-				join = current && current.joinRelation;
-			},
-			visitMany(current) {
-				join = current && current.joinRelation;
-			}
-		});
-		return join;
-	}
-
-	function quote(context, name) {
-		const rdb = context && context.rdb;
-		if (rdb && typeof rdb.quote === 'function')
-			return rdb.quote(name);
-		return `"${String(name).replace(/"/g, '""')}"`;
-	}
-
-	applySyncRows = { applySyncRowsOnTx };
-	return applySyncRows;
-}
-
 var syncClient;
 var hasRequiredSyncClient;
 
@@ -4778,7 +4517,6 @@ function requireSyncClient () {
 	const { createSyncAuto } = requireSyncAuto();
 	const outboxTableSql = requireOutboxTableSql();
 	const { ensureSyncSchema } = requireSyncSchema();
-	const { applySyncRowsOnTx } = requireApplySyncRows();
 
 	function newSyncClient(client, getDb, axiosInterceptor) {
 		const sinceByScope = new Map();
@@ -4861,7 +4599,7 @@ function requireSyncClient () {
 			};
 			let result;
 			try {
-				result = await pullStaged(pullConfig, requestOptions, syncConfig);
+				result = await pullStaged(pullConfig, requestOptions);
 			}
 			catch (e) {
 				if (!shouldFallbackToPatch(e))
@@ -4924,7 +4662,7 @@ function requireSyncClient () {
 			});
 		}
 
-		async function pullStaged(pullConfig, options, syncConfig) {
+		async function pullStaged(pullConfig, options) {
 			const maxKeysPerBatch = normalizeLimit(pullConfig.maxKeysPerBatch, 200);
 			const maxRowsPerBatch = normalizeLimit(pullConfig.maxRowsPerBatch, 200);
 			const defaultPatchOptions = { ...(pullConfig.patchOptions || {}), concurrency: 'overwrite' };
@@ -4993,7 +4731,7 @@ function requireSyncClient () {
 						if (!isRowsPayload(currentRowsResult.payload))
 							throw new Error('Sync endpoint did not return rows payload');
 						if (tx)
-							applied += await applyRowsPayloadOnTx(tx, currentRowsResult.payload.items, defaultPatchOptions, syncConfig);
+							applied += await applyRowsPayloadOnTx(tx, currentRowsResult.payload.items, defaultPatchOptions);
 					}
 					if (keysPayload.done || !keysPayload.token) {
 						return {
@@ -5632,14 +5370,7 @@ function requireSyncClient () {
 		return applied;
 	}
 
-	async function applyRowsPayloadOnTx(tx, items, patchOptions, syncConfig) {
-		const rows = Array.isArray(items) ? items : [];
-		if (syncConfig && tx && typeof tx.query === 'function')
-			return applySyncRowsOnTx(tx, rows, patchOptions);
-		return applyRowsPayloadOnTxViaPatch(tx, rows, patchOptions);
-	}
-
-	async function applyRowsPayloadOnTxViaPatch(tx, items, patchOptions) {
+	async function applyRowsPayloadOnTx(tx, items, patchOptions) {
 		const rows = Array.isArray(items) ? items : [];
 		const perTable = new Map();
 		for (let i = 0; i < rows.length; i++) {
@@ -7106,11 +6837,11 @@ function requireEncodeFilterArg () {
 }
 
 var quote_1;
-var hasRequiredQuote$1;
+var hasRequiredQuote$2;
 
-function requireQuote$1 () {
-	if (hasRequiredQuote$1) return quote_1;
-	hasRequiredQuote$1 = 1;
+function requireQuote$2 () {
+	if (hasRequiredQuote$2) return quote_1;
+	hasRequiredQuote$2 = 1;
 	let tryGetSessionContext = requireTryGetSessionContext();
 
 	function quote(context, name) {
@@ -7134,7 +6865,7 @@ function requireEqual () {
 	var newBoolean = requireNewBoolean();
 	var nullOperator = ' is ';
 	var encodeFilterArg = requireEncodeFilterArg();
-	var quote = requireQuote$1();
+	var quote = requireQuote$2();
 
 	function equal(context, column,arg,alias) {
 		var operator = '=';
@@ -7159,7 +6890,7 @@ function requireNotEqual () {
 	var newBoolean = requireNewBoolean();
 	var encodeFilterArg = requireEncodeFilterArg();
 	var nullOperator = ' is not ';
-	var quote = requireQuote$1();
+	var quote = requireQuote$2();
 
 	function notEqual(context, column,arg,alias) {
 		var operator = '<>';
@@ -7183,7 +6914,7 @@ function requireLessThan () {
 	hasRequiredLessThan = 1;
 	var newBoolean = requireNewBoolean();
 	var encodeFilterArg = requireEncodeFilterArg();
-	var quote = requireQuote$1();
+	var quote = requireQuote$2();
 
 	function lessThanOrEqual(context, column,arg,alias) {
 		var operator = '<';
@@ -7205,7 +6936,7 @@ function requireLessThanOrEqual () {
 	hasRequiredLessThanOrEqual = 1;
 	var newBoolean = requireNewBoolean();
 	var encodeFilterArg = requireEncodeFilterArg();
-	var quote = requireQuote$1();
+	var quote = requireQuote$2();
 
 	function lessThanOrEqual(context, column,arg,alias) {
 		var operator = '<=';
@@ -7227,7 +6958,7 @@ function requireGreaterThan () {
 	hasRequiredGreaterThan = 1;
 	var newBoolean = requireNewBoolean();
 	var encodeFilterArg = requireEncodeFilterArg();
-	var quote = requireQuote$1();
+	var quote = requireQuote$2();
 
 	function greaterThan(context, column,arg,alias) {
 		var operator = '>';
@@ -7249,7 +6980,7 @@ function requireGreaterThanOrEqual () {
 	hasRequiredGreaterThanOrEqual = 1;
 	var newBoolean = requireNewBoolean();
 	var encodeFilterArg = requireEncodeFilterArg();
-	var quote = requireQuote$1();
+	var quote = requireQuote$2();
 
 	function greaterThanOrEqual(context, column,arg,alias) {
 		var operator = '>=';
@@ -7271,7 +7002,7 @@ function require_in () {
 	hasRequired_in = 1;
 	const newParameterized = requireNewParameterized();
 	const newBoolean = requireNewBoolean();
-	const quote = requireQuote$1();
+	const quote = requireQuote$2();
 
 	function _in(context, column,values,alias) {
 		let filter;
@@ -7500,7 +7231,7 @@ function requireNewColumn () {
 	const greaterThanOrEqual = requireGreaterThanOrEqual();
 	const _in = require_in();
 	const _extractAlias = requireExtractAlias();
-	const quote = requireQuote$1();
+	const quote = requireQuote$2();
 	const aggregate = requireColumnAggregate$1();
 	const aggregateGroup = requireColumnAggregateGroup$1();
 	const newParameterized = requireNewParameterized();
@@ -7752,7 +7483,7 @@ function requireStartsWithCore () {
 	hasRequiredStartsWithCore = 1;
 	var newBoolean = requireNewBoolean();
 	var nullOperator = ' is ';
-	var quote = requireQuote$1();
+	var quote = requireQuote$2();
 	var encodeFilterArg = requireEncodeFilterArg();
 	var newLikeColumnArg = requireNewLikeColumnArg();
 
@@ -7792,7 +7523,7 @@ var hasRequiredEndsWithCore;
 function requireEndsWithCore () {
 	if (hasRequiredEndsWithCore) return endsWithCore_1;
 	hasRequiredEndsWithCore = 1;
-	const quote = requireQuote$1();
+	const quote = requireQuote$2();
 	var newBoolean = requireNewBoolean();
 	var nullOperator = ' is ';
 	var encodeFilterArg = requireEncodeFilterArg();
@@ -7835,7 +7566,7 @@ var hasRequiredContainsCore;
 function requireContainsCore () {
 	if (hasRequiredContainsCore) return containsCore_1;
 	hasRequiredContainsCore = 1;
-	const quote = requireQuote$1();
+	const quote = requireQuote$2();
 	var newBoolean = requireNewBoolean();
 	var nullOperator = ' is ';
 	var encodeFilterArg = requireEncodeFilterArg();
@@ -7917,7 +7648,7 @@ function requireIEqual () {
 	var newBoolean = requireNewBoolean();
 	var nullOperator = ' is ';
 	var encodeFilterArg = requireEncodeFilterArg();
-	const quote = requireQuote$1();
+	const quote = requireQuote$2();
 
 	function iEqual(context, column,arg,alias) {
 		var operator = ' ILIKE ';
@@ -8107,7 +7838,7 @@ function requireFormatOutGeneric () {
 	if (hasRequiredFormatOutGeneric) return formatOutGeneric_1;
 	hasRequiredFormatOutGeneric = 1;
 	var getSessionSingleton = requireGetSessionSingleton();
-	const quote = requireQuote$1();
+	const quote = requireQuote$2();
 
 	function formatOutGeneric(context, column, fnName, alias) {
 		var formatColumn = getSessionSingleton(context, fnName);
@@ -8400,7 +8131,7 @@ function requireFormatOut$1 () {
 	if (hasRequiredFormatOut$1) return formatOut_1$1;
 	hasRequiredFormatOut$1 = 1;
 	var getSessionSingleton = requireGetSessionSingleton();
-	const quote = requireQuote$1();
+	const quote = requireQuote$2();
 
 	function formatOut(context, column, alias) {
 		var formatColumn = getSessionSingleton(context, 'formatDateOut');
@@ -8499,7 +8230,7 @@ function requireFormatOut () {
 	if (hasRequiredFormatOut) return formatOut_1;
 	hasRequiredFormatOut = 1;
 	var getSessionSingleton = requireGetSessionSingleton();
-	const quote = requireQuote$1();
+	const quote = requireQuote$2();
 
 	function formatOut(context, column, alias) {
 		var formatColumn = getSessionSingleton(context, 'formatDateTzOut') ||  getSessionSingleton(context, 'formatDateOut');
@@ -9704,7 +9435,7 @@ function requireNewSingleQuery$1 () {
 	var negotiateLimit = requireNegotiateLimit();
 	var negotiateExclusive = requireNegotiateExclusive();
 	var newParameterized = requireNewParameterized();
-	var quote = requireQuote$1();
+	var quote = requireQuote$2();
 
 	function _new(context, table, filter, span, alias, innerJoin, orderBy, limit, offset, exclusive) {
 
@@ -10733,7 +10464,7 @@ function requireSelectSql$1 () {
 	hasRequiredSelectSql$1 = 1;
 	const newParameterized = requireNewParameterized();
 	const newBoolean = requireNewBoolean();
-	const quote = requireQuote$1();
+	const quote = requireQuote$2();
 
 	function newSelectSql(context, table, alias) {
 		const colName = quote(context, table._primaryColumns[0]._dbName);
@@ -12706,7 +12437,7 @@ function requireChildColumn () {
 	var getSessionContext = requireGetSessionContext();
 	var newJoinCore = requireNewShallowJoinSqlCore();
 	const getSessionSingleton = requireGetSessionSingleton();
-	const _quote = requireQuote$1();
+	const _quote = requireQuote$2();
 
 
 	function childColumn(context, column, relations) {
@@ -12780,7 +12511,7 @@ function requireNewFilterArg () {
 	var newJoin = requireJoinSql();
 	var newWhere = requireWhereSql();
 	var newParameterized = requireNewParameterized();
-	var quote = requireQuote$1();
+	var quote = requireQuote$2();
 
 	function newFilterArg(context, column, relations, depth = 0) {
 		var relationCount = relations.length;
@@ -14215,7 +13946,7 @@ function requireCount () {
 	const negotiateRawSqlFilter = requireNegotiateRawSqlFilter();
 	const extractFilter = requireExtractFilter();
 	const newWhereSql = requireNewWhereSql();
-	const quote = requireQuote$1();
+	const quote = requireQuote$2();
 
 	async function count(context, table, filter) {
 		let alias = table._dbName;
@@ -15350,6 +15081,22 @@ function requireValidateDeleteAllowed () {
 
 	validateDeleteAllowed_1 = validateDeleteAllowed;
 	return validateDeleteAllowed_1;
+}
+
+var clearCache_1;
+var hasRequiredClearCache;
+
+function requireClearCache () {
+	if (hasRequiredClearCache) return clearCache_1;
+	hasRequiredClearCache = 1;
+	var setSessionSingleton = requireSetSessionSingleton();
+
+	function clearCache(context) {
+		setSessionSingleton(context, 'cache', {});
+	}
+
+	clearCache_1 = clearCache;
+	return clearCache_1;
 }
 
 /* eslint-disable require-atomic-updates */
@@ -17732,13 +17479,39 @@ function requireWrapCommand$2 () {
 	return wrapCommand_1$2;
 }
 
+var encodeBoolean_1$1;
+var hasRequiredEncodeBoolean$1;
+
+function requireEncodeBoolean$1 () {
+	if (hasRequiredEncodeBoolean$1) return encodeBoolean_1$1;
+	hasRequiredEncodeBoolean$1 = 1;
+	function encodeBoolean(bool) {
+		if (bool)
+			return 1;
+		return 0;
+	}
+
+	encodeBoolean_1$1 = encodeBoolean;
+	return encodeBoolean_1$1;
+}
+
+var quote$1;
+var hasRequiredQuote$1;
+
+function requireQuote$1 () {
+	if (hasRequiredQuote$1) return quote$1;
+	hasRequiredQuote$1 = 1;
+	quote$1 = (name) => `"${name}"`;
+	return quote$1;
+}
+
 var formatBigintOut_1;
 var hasRequiredFormatBigintOut;
 
 function requireFormatBigintOut () {
 	if (hasRequiredFormatBigintOut) return formatBigintOut_1;
 	hasRequiredFormatBigintOut = 1;
-	const quote = requireQuote$2();
+	const quote = requireQuote$1();
 
 	function formatBigintOut(column, alias) {
 		const quotedCol = quote(column._dbName);
@@ -17778,7 +17551,7 @@ function requireDeleteFromSql$1 () {
 	hasRequiredDeleteFromSql$1 = 1;
 	const format = 'delete from %s where %s.rowId in (SELECT %s.rowId FROM %s %s%s)';
 	const formatString = requireFormat();
-	const quote = requireQuote$2();
+	const quote = requireQuote$1();
 
 	function deleteFromSql(table, alias, whereSql) {
 		const name = quote(table._dbName);
@@ -17795,7 +17568,7 @@ var hasRequiredSelectForUpdateSql$1;
 function requireSelectForUpdateSql$1 () {
 	if (hasRequiredSelectForUpdateSql$1) return selectForUpdateSql$1;
 	hasRequiredSelectForUpdateSql$1 = 1;
-	const quote = requireQuote$1();
+	const quote = requireQuote$2();
 
 	selectForUpdateSql$1 = function(context, alias) {
 		return ' FOR UPDATE OF ' + quote(context, alias);
@@ -17857,7 +17630,7 @@ var hasRequiredInsertSql$1;
 function requireInsertSql$1 () {
 	if (hasRequiredInsertSql$1) return insertSql_1$1;
 	hasRequiredInsertSql$1 = 1;
-	const quote = requireQuote$2();
+	const quote = requireQuote$1();
 
 	function insertSql(_context, table, row, options) {
 		let columnNames = [];
@@ -18001,7 +17774,7 @@ function requireGetSqlTemplate () {
 	if (hasRequiredGetSqlTemplate) return getSqlTemplate_1;
 	hasRequiredGetSqlTemplate = 1;
 	let getSessionContext = requireGetSessionContext();
-	let quote = requireQuote$1();
+	let quote = requireQuote$2();
 
 	function getSqlTemplate(context, _table, _row) {
 		let rdb = getSessionContext(context);
@@ -18115,7 +17888,7 @@ function requireNewGetLastInsertedCommandCore () {
 	const newParameterized = requireNewParameterized();
 	const getSessionContext = requireGetSessionContext();
 	const newDiscriminatorSql = requireNewDiscriminatorSql$1();
-	const quote = requireQuote$1();
+	const quote = requireQuote$2();
 
 	function newGetLastInsertedCommandCore(context, table, row) {
 		let parameters = [];
@@ -19416,6 +19189,32 @@ function requireEncodeDate () {
 	return encodeDate_1;
 }
 
+var encodeBinary_1;
+var hasRequiredEncodeBinary;
+
+function requireEncodeBinary () {
+	if (hasRequiredEncodeBinary) return encodeBinary_1;
+	hasRequiredEncodeBinary = 1;
+	function encodeBinary(base64) {
+		// Decode base64 to a binary string
+		const binaryString = atob(base64);
+
+		// Create a new Uint8Array with the same length as the binary string
+		const len = binaryString.length;
+		const bytes = new Uint8Array(len);
+
+		// Populate the Uint8Array with numeric character codes
+		for (let i = 0; i < len; i++) {
+			bytes[i] = binaryString.charCodeAt(i);
+		}
+
+		return bytes;
+	}
+
+	encodeBinary_1 = encodeBinary;
+	return encodeBinary_1;
+}
+
 var decodeBinary_1;
 var hasRequiredDecodeBinary;
 
@@ -19469,7 +19268,7 @@ var hasRequiredSelectForUpdateSql;
 function requireSelectForUpdateSql () {
 	if (hasRequiredSelectForUpdateSql) return selectForUpdateSql;
 	hasRequiredSelectForUpdateSql = 1;
-	const quote = requireQuote$1();
+	const quote = requireQuote$2();
 
 	selectForUpdateSql = function(alias) {
 		return ' FOR UPDATE OF ' + quote(alias);
@@ -20064,7 +19863,7 @@ function requireNewTransaction$1 () {
 	const formatBigintOut = requireFormatBigintOut();
 	const insertSql = requireInsertSql$1();
 	const insert = requireInsert$1();
-	const quote = requireQuote$2();
+	const quote = requireQuote$1();
 
 	function newResolveTransaction(domain, pool, { readonly = false } = {})  {
 		var rdb = { poolFactory: pool };
