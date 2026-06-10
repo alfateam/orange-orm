@@ -4619,7 +4619,7 @@ function requireApplySyncRows () {
 				await upsertRow(tx, table, entries[rowIndex].row);
 				applied += 1;
 			}
-			if (tx && tx.rdb)
+			if (hasOwnRdbContext(tx))
 				clearCache(tx);
 		}
 		return applied;
@@ -4633,7 +4633,8 @@ function requireApplySyncRows () {
 	}
 
 	function newUpsertCommand(context, table, row) {
-		const encodeContext = context && context.rdb ? context : sqliteEncodeContext;
+		const encodeContext = hasOwnRdbContext(context) ? context : sqliteEncodeContext;
+		const quoteContext = encodeContext;
 		const columns = table._columns || [];
 		const insertColumns = [];
 		const values = [];
@@ -4644,21 +4645,25 @@ function requireApplySyncRows () {
 			if (!Object.prototype.hasOwnProperty.call(row, column.alias))
 				continue;
 			const encoded = column.encode(encodeContext, row[column.alias]);
-			insertColumns.push(quote(context, column._dbName));
+			insertColumns.push(quote(quoteContext, column._dbName));
 			values.push(encoded.sql());
 			if (encoded.parameters.length > 0)
 				parameters.push(encoded.parameters[0]);
 			if (!column.isPrimary)
-				updateColumns.push(`${quote(context, column._dbName)}=excluded.${quote(context, column._dbName)}`);
+				updateColumns.push(`${quote(quoteContext, column._dbName)}=excluded.${quote(quoteContext, column._dbName)}`);
 		}
 		if (insertColumns.length === 0)
 			return null;
-		const primaryKeys = (table._primaryColumns || []).map(column => quote(context, column._dbName));
+		const primaryKeys = (table._primaryColumns || []).map(column => quote(quoteContext, column._dbName));
 		const conflict = primaryKeys.length === 0
 			? ''
 			: ` ON CONFLICT(${primaryKeys.join(',')}) ${updateColumns.length > 0 ? `DO UPDATE SET ${updateColumns.join(',')}` : 'DO NOTHING'}`;
-		const sql = `INSERT INTO ${quote(context, table._dbName)} (${insertColumns.join(',')}) VALUES (${values.join(',')})${conflict}`;
+		const sql = `INSERT INTO ${quote(quoteContext, table._dbName)} (${insertColumns.join(',')}) VALUES (${values.join(',')})${conflict}`;
 		return newParameterized(sql, parameters);
+	}
+
+	function hasOwnRdbContext(context) {
+		return !!context && Object.prototype.hasOwnProperty.call(context, 'rdb') && !!context.rdb;
 	}
 
 	function orderTablesByDependencies(client, tableNames) {

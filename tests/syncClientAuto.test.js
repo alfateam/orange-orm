@@ -195,7 +195,7 @@ describe('sync client auto start', () => {
 			tables: {
 				customer: table
 			},
-			transaction: async (fn) => fn({
+			transaction: async (fn) => fn(new Proxy({
 				tables: {
 					customer: table
 				},
@@ -207,7 +207,13 @@ describe('sync client auto start', () => {
 					});
 					return [];
 				}
-			})
+			}, {
+				get(target, property) {
+					if (property === 'rdb')
+						throw new Error('public transaction rdb should not be read by sync row upsert');
+					return target[property];
+				}
+			}))
 		}, async () => db, {
 			applyTo(axios) {
 				axios.request = async (request) => {
