@@ -207,7 +207,7 @@ function hostLocal() {
 		state.patches.push({
 			table: tableName,
 			patch,
-			options: options || undefined
+			options: sanitizeSyncPatchOptions(options)
 		});
 		await querySyncOutbox(context, [
 			'UPDATE "orange_sync_outbox"',
@@ -229,6 +229,20 @@ function hostLocal() {
 
 	function sqlStringLiteral(value) {
 		return `'${String(value).replace(/'/g, '\'\'')}'`;
+	}
+
+	function sanitizeSyncPatchOptions(options) {
+		if (!options || options !== Object(options))
+			return undefined;
+		const {
+			db,
+			transaction,
+			client,
+			syncTableName,
+			deduceStrategy,
+			...rest
+		} = options;
+		return Object.keys(rest).length > 0 ? rest : undefined;
 	}
 }
 

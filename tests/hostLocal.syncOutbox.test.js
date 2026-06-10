@@ -34,7 +34,12 @@ describe('hostLocal sync outbox', () => {
 		});
 		const body = JSON.stringify({
 			patch: [{ op: 'replace', path: '/[1]/name', value: 'New' }],
-			options: {}
+			options: {
+				db: { shouldNotSerialize: true },
+				syncTableName: 'project',
+				deduceStrategy: false,
+				strategy: { owner: {} }
+			}
 		});
 
 		await adapter.patch(body);
@@ -42,5 +47,10 @@ describe('hostLocal sync outbox', () => {
 
 		const ddlStatements = queryLog.filter(sql => sql.includes('CREATE TABLE IF NOT EXISTS "orange_sync_outbox"'));
 		expect(ddlStatements).toHaveLength(1);
+		const updateStatement = queryLog.find(sql => sql.includes('UPDATE "orange_sync_outbox"'));
+		expect(updateStatement).toContain('"strategy":{"owner":{}}');
+		expect(updateStatement).not.toContain('shouldNotSerialize');
+		expect(updateStatement).not.toContain('syncTableName');
+		expect(updateStatement).not.toContain('deduceStrategy');
 	});
 });
