@@ -4611,8 +4611,8 @@ function requireApplySyncRows () {
 		let applied = 0;
 		for (let i = 0; i < tableNames.length; i++) {
 			const tableName = tableNames[i];
-			const table = tx[tableName];
-			if (!table)
+			const table = tx && tx.tables && tx.tables[tableName];
+			if (!table || !Array.isArray(table._columns))
 				throw new Error(`Table "${tableName}" does not exist in this client`);
 			const entries = perTable.get(tableName);
 			for (let rowIndex = 0; rowIndex < entries.length; rowIndex++) {

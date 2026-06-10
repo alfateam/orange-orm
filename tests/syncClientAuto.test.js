@@ -182,8 +182,7 @@ describe('sync client auto start', () => {
 	test('applies staged pull rows through sqlite upsert without table patch', async () => {
 		const queries = [];
 		const table = newTable('customer');
-		const txTable = {
-			...table,
+		const publicTable = {
 			patch: async () => {
 				throw new Error('patch should not be used for sqlite staged pull rows');
 			}
@@ -198,9 +197,9 @@ describe('sync client auto start', () => {
 			},
 			transaction: async (fn) => fn({
 				tables: {
-					customer: txTable
+					customer: table
 				},
-				customer: txTable,
+				customer: publicTable,
 				query: async (query) => {
 					queries.push({
 						sql: typeof query.sql === 'function' ? query.sql() : query,
