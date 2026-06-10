@@ -67,14 +67,36 @@ async function createDb(sqlite3, filename, vfs, sahPoolOptions) {
 }
 
 function getSahPoolOptions(filename, options = {}) {
-	const dbName = String(filename || 'orange.sqlite3').replace(/^\/+/, '') || 'orange.sqlite3';
-	const baseName = dbName.replace(/\.[^/.]+$/u, '') || dbName;
-	const safeName = baseName.replace(/[^A-Za-z0-9_-]+/g, '_');
+	let dbName = String(filename || 'orange.sqlite3');
+	while (dbName.startsWith('/'))
+		dbName = dbName.slice(1);
+	if (!dbName)
+		dbName = 'orange.sqlite3';
+	const dotIndex = dbName.lastIndexOf('.');
+	const slashIndex = dbName.lastIndexOf('/');
+	const baseName = dotIndex > 0 && dotIndex > slashIndex
+		? dbName.slice(0, dotIndex)
+		: dbName;
+	const safeName = toSafeName(baseName);
 	return {
 		name: `${safeName}-sahpool`,
 		directory: `.${safeName}-sahpool`,
 		...options
 	};
+}
+
+function toSafeName(value) {
+	let result = '';
+	for (const ch of String(value || 'orange')) {
+		const code = ch.charCodeAt(0);
+		const ok = code >= 48 && code <= 57
+			|| code >= 65 && code <= 90
+			|| code >= 97 && code <= 122
+			|| ch === '_'
+			|| ch === '-';
+		result += ok ? ch : '_';
+	}
+	return result || 'orange';
 }
 
 function createOpfsDb(sqlite3, filename) {
