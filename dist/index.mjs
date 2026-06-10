@@ -18187,12 +18187,16 @@ function requireBegin () {
 	let executeQuery = requireExecuteQuery();
 	let setSessionSingleton = requireSetSessionSingleton();
 
-	function begin(context, transactionLess) {
-		if (transactionLess) {
+	function begin(context, options) {
+		if (isTransactionLess(options)) {
 			setSessionSingleton(context, 'transactionLess', true);
 			return Promise.resolve();
 		}
 		return executeQuery(context, beginCommand(context));
+	}
+
+	function isTransactionLess(options) {
+		return options === true || !!(options && options.transactionLess);
 	}
 
 	begin_1 = begin;
