@@ -68,10 +68,11 @@ async function createDb(sqlite3, filename, vfs, sahPoolOptions) {
 
 function getSahPoolOptions(filename, options = {}) {
 	const dbName = String(filename || 'orange.sqlite3').replace(/^\/+/, '') || 'orange.sqlite3';
-	const safeName = dbName.replace(/[^A-Za-z0-9._-]+/g, '_');
+	const baseName = dbName.replace(/\.[^/.]+$/u, '') || dbName;
+	const safeName = baseName.replace(/[^A-Za-z0-9_-]+/g, '_');
 	return {
-		name: `orange-orm-sahpool-${safeName}`,
-		directory: `.orange-orm-sahpool-${safeName}`,
+		name: `${safeName}-sahpool`,
+		directory: `.${safeName}-sahpool`,
 		...options
 	};
 }
