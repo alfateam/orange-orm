@@ -23014,8 +23014,8 @@ function requireWorkerClient () {
 			? { disable: { vfs: { opfs: true } } }
 			: {};
 		return `
-import sqlite3InitModule from ${JSON.stringify(sqliteModuleUrl)};
-
+const sqliteModuleUrl = ${JSON.stringify(sqliteModuleUrl)};
+const sqliteInitConfig = ${JSON.stringify(sqliteInitConfig)};
 let sqlite3Promise;
 let db;
 let queue = Promise.resolve();
@@ -23130,8 +23130,14 @@ function toSahPoolError(error, options = {}) {
 }
 
 async function getSqlite3() {
-	if (!sqlite3Promise)
-		sqlite3Promise = sqlite3InitModule(${JSON.stringify(sqliteInitConfig)});
+	if (!sqlite3Promise) {
+		sqlite3Promise = import(sqliteModuleUrl).then((module) => {
+			const sqlite3InitModule = module && module.default || module;
+			if (typeof sqlite3InitModule !== 'function')
+				throw new Error('sqliteOPFS could not load sqlite-wasm module from ' + sqliteModuleUrl + '.');
+			return sqlite3InitModule(sqliteInitConfig);
+		});
+	}
 	return sqlite3Promise;
 }
 
