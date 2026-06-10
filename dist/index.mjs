@@ -18186,17 +18186,21 @@ function requireBegin () {
 	let beginCommand = requireBeginCommand();
 	let executeQuery = requireExecuteQuery();
 	let setSessionSingleton = requireSetSessionSingleton();
+	let tryGetSessionContext = requireTryGetSessionContext();
 
 	function begin(context, options) {
-		if (isTransactionLess(options)) {
+		if (isTransactionLess(context, options)) {
 			setSessionSingleton(context, 'transactionLess', true);
 			return Promise.resolve();
 		}
 		return executeQuery(context, beginCommand(context));
 	}
 
-	function isTransactionLess(options) {
-		return options === true || !!(options && options.transactionLess);
+	function isTransactionLess(context, options) {
+		if (options === true || !!(options && options.transactionLess))
+			return true;
+		const rdb = tryGetSessionContext(context);
+		return !!(options && options.readonly && rdb && rdb.engine === 'sqlite');
 	}
 
 	begin_1 = begin;

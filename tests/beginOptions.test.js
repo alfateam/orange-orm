@@ -27,6 +27,7 @@ describe('transaction begin options', () => {
 		const queries = [];
 		const context = {
 			rdb: {
+				engine: 'sqlite',
 				begin: 'BEGIN',
 				dbClient: {
 					executeQuery(query, callback) {
@@ -38,6 +39,27 @@ describe('transaction begin options', () => {
 		};
 
 		await begin(context, { transactionLess: true });
+
+		expect(queries).toEqual([]);
+		expect(context.rdb.transactionLess).toBe(true);
+	});
+
+	test('does not begin readonly sqlite transactions', async () => {
+		const queries = [];
+		const context = {
+			rdb: {
+				engine: 'sqlite',
+				begin: 'BEGIN',
+				dbClient: {
+					executeQuery(query, callback) {
+						queries.push(typeof query.sql === 'function' ? query.sql() : query);
+						callback(null, []);
+					}
+				}
+			}
+		};
+
+		await begin(context, { readonly: true });
 
 		expect(queries).toEqual([]);
 		expect(context.rdb.transactionLess).toBe(true);
