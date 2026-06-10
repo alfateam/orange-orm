@@ -23071,8 +23071,9 @@ async function createDb(sqlite3, filename, vfs, sahPoolOptions) {
 	if (vfs === 'opfs-sahpool') {
 		if (typeof sqlite3.installOpfsSAHPoolVfs !== 'function')
 			throw new Error('sqliteOPFS vfs "opfs-sahpool" is not available in this sqlite-wasm build.');
+		const resolvedSahPoolOptions = getSahPoolOptions(filename, sahPoolOptions);
 		try {
-			const pool = await sqlite3.installOpfsSAHPoolVfs(sahPoolOptions || {});
+			const pool = await sqlite3.installOpfsSAHPoolVfs(resolvedSahPoolOptions);
 			const DbClass = pool.OpfsSAHPoolDb;
 			if (typeof DbClass !== 'function')
 				throw new Error('sqliteOPFS vfs "opfs-sahpool" did not expose OpfsSAHPoolDb.');
@@ -23082,12 +23083,22 @@ async function createDb(sqlite3, filename, vfs, sahPoolOptions) {
 			};
 		}
 		catch (e) {
-			if (sahPoolOptions && sahPoolOptions.fallbackToOpfs)
+			if (resolvedSahPoolOptions.fallbackToOpfs)
 				return createOpfsDb(sqlite3, filename);
-			throw toSahPoolError(e, sahPoolOptions);
+			throw toSahPoolError(e, resolvedSahPoolOptions);
 		}
 	}
 	return createOpfsDb(sqlite3, filename);
+}
+
+function getSahPoolOptions(filename, options = {}) {
+	const dbName = String(filename || 'orange.sqlite3').replace(/^\/+/, '') || 'orange.sqlite3';
+	const safeName = dbName.replace(/[^A-Za-z0-9._-]+/g, '_');
+	return {
+		name: 'orange-orm-sahpool-' + safeName,
+		directory: '.orange-orm-sahpool-' + safeName,
+		...options
+	};
 }
 
 function createOpfsDb(sqlite3, filename) {
