@@ -4,6 +4,7 @@ const stringify = require('./stringify');
 const { createSyncAuto } = require('./syncAuto');
 const outboxTableSql = require('../sync/outboxTableSql');
 const { ensureSyncSchema } = require('./syncSchema');
+const { applySyncRowsOnTx } = require('./applySyncRows');
 
 function newSyncClient(client, getDb, axiosInterceptor) {
 	const sinceByScope = new Map();
@@ -858,6 +859,13 @@ async function applyDeleteItemsOnTx(tx, items, patchOptions) {
 }
 
 async function applyRowsPayloadOnTx(tx, items, patchOptions) {
+	const rows = Array.isArray(items) ? items : [];
+	if (tx && tx.rdb && tx.rdb.engine === 'sqlite')
+		return applySyncRowsOnTx(tx, rows, patchOptions);
+	return applyRowsPayloadOnTxViaPatch(tx, rows, patchOptions);
+}
+
+async function applyRowsPayloadOnTxViaPatch(tx, items, patchOptions) {
 	const rows = Array.isArray(items) ? items : [];
 	const perTable = new Map();
 	for (let i = 0; i < rows.length; i++) {

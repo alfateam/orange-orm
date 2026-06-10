@@ -178,16 +178,102 @@ describe('sync client auto start', () => {
 		const stateTableCreates = db.queryLog.filter(x => x.includes('CREATE TABLE IF NOT EXISTS "orange_sync_state"'));
 		expect(stateTableCreates).toHaveLength(1);
 	});
+
+	test('applies staged pull rows through sqlite upsert without table patch', async () => {
+		const queries = [];
+		const table = newTable('customer');
+		const txTable = {
+			...table,
+			patch: async () => {
+				throw new Error('patch should not be used for sqlite staged pull rows');
+			}
+		};
+		const db = {
+			__sqliteSync: { url: '/rdb', auto: false, schema: false },
+			query: async () => []
+		};
+		const client = newSyncClient({
+			tables: {
+				customer: table
+			},
+			transaction: async (fn) => fn({
+				rdb: { engine: 'sqlite' },
+				tables: {
+					customer: txTable
+				},
+				customer: txTable,
+				query: async (query) => {
+					queries.push({
+						sql: typeof query.sql === 'function' ? query.sql() : query,
+						parameters: query.parameters || []
+					});
+					return [];
+				}
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async (request) => {
+					if (request.data.phase === 'keys') {
+						return {
+							data: {
+								phase: 'keys',
+								items: [{ table: 'customer', pk: [1], key: { id: 1 }, op: 'U' }],
+								done: true,
+								cursor: 'cursor-1'
+							}
+						};
+					}
+					return {
+						data: {
+							phase: 'rows',
+							items: [{ table: 'customer', pk: [1], key: { id: 1 }, row: { id: 1, name: 'Acme' }, op: 'U' }]
+						}
+					};
+				};
+			}
+		});
+
+		await client.pull();
+
+		expect(queries.some(x => x.sql.includes('INSERT INTO "customer"'))).toBe(true);
+		expect(queries.some(x => x.sql.includes('ON CONFLICT("id")'))).toBe(true);
+		expect(queries.some(x => x.sql.includes('DO UPDATE SET "name"=excluded."name"'))).toBe(true);
+		expect(queries.some(x => x.sql.startsWith('SELECT') && x.sql.includes('FROM "customer"'))).toBe(false);
+		expect(queries.find(x => x.sql.includes('INSERT INTO "customer"')).parameters).toEqual([1, 'Acme']);
+	});
 });
 
 function newTable(dbName) {
+	const idColumn = {
+		alias: 'id',
+		_dbName: 'id',
+		tsType: 'NumberColumn',
+		isPrimary: true,
+		encode(_context, value) {
+			return {
+				sql: () => '?',
+				parameters: [value]
+			};
+		}
+	};
 	return {
 		_dbName: dbName,
 		_columns: [
-			{ alias: 'id', _dbName: 'id', tsType: 'NumberColumn', isPrimary: true }
+			idColumn,
+			{
+				alias: 'name',
+				_dbName: 'name',
+				tsType: 'StringColumn',
+				encode(_context, value) {
+					return {
+						sql: () => '?',
+						parameters: [value]
+					};
+				}
+			}
 		],
 		_primaryColumns: [
-			{ alias: 'id', _dbName: 'id', tsType: 'NumberColumn', isPrimary: true }
+			idColumn
 		],
 		_relations: {}
 	};
