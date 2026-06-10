@@ -44,7 +44,7 @@ describe('sqlite insert skipSelectAfterInsert', () => {
 		expect(commands).toHaveLength(1);
 		expect(commands[0]).toContain('INSERT INTO "customer"');
 		expect(queries).toEqual([]);
-		expect(result).toEqual([row]);
+		expect(result).toEqual([{ id: 1, name: 'Acme' }]);
 	});
 });
 

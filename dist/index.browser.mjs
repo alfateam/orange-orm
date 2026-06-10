@@ -18030,13 +18030,23 @@ function requireInsert$1 () {
 		pushCommand(context, insertCmd);
 
 		if (options && options.skipSelectAfterInsert)
-			return executeQueries(context, []).then(() => [row]);
+			return executeQueries(context, []).then(() => [toDbRow(table, row)]);
 
 		let selectCmd = newGetLastInsertedCommand(context, table, row, insertCmd);
 		commands.push(selectCmd);
 
 		return executeQueries(context, commands).then((result) => result[result.length - 1]);
 
+	}
+
+	function toDbRow(table, row) {
+		const dbRow = {};
+		const columns = table._columns || [];
+		for (let i = 0; i < columns.length; i++) {
+			const column = columns[i];
+			dbRow[column._dbName] = row[column.alias];
+		}
+		return dbRow;
 	}
 
 	insert$1 = insertDefault;
