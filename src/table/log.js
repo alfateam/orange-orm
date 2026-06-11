@@ -20,11 +20,11 @@ function emitQuery({ sql, parameters }) {
 
 log.emitQuery = emitQuery;
 
-log.emitQueryComplete = function({ sql, parameters, elapsedMs, error }) {
+log.emitQueryComplete = function() {
 	emitters.queryComplete.apply(null, arguments);
 };
 
-log.emitSqliteOpen = function(event) {
+log.emitSqliteOpen = function() {
 	emitters.sqliteOpen.apply(null, arguments);
 };
 

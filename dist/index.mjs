@@ -17324,11 +17324,11 @@ function requireLog () {
 
 	log.emitQuery = emitQuery;
 
-	log.emitQueryComplete = function({ sql, parameters, elapsedMs, error }) {
+	log.emitQueryComplete = function() {
 		emitters.queryComplete.apply(null, arguments);
 	};
 
-	log.emitSqliteOpen = function(event) {
+	log.emitSqliteOpen = function() {
 		emitters.sqliteOpen.apply(null, arguments);
 	};
 
@@ -23079,7 +23079,7 @@ function requireWorkerClient () {
 			return new Worker(options.workerUrl, { type: 'module' });
 		if (typeof Worker !== 'undefined') {
 			try {
-		const source = createWorkerSource(options.sqliteModuleUrl || getDefaultSqliteModuleUrl() || '@sqlite.org/sqlite-wasm', options);
+				const source = createWorkerSource(options.sqliteModuleUrl || getDefaultSqliteModuleUrl() || '@sqlite.org/sqlite-wasm', options);
 				const blob = new Blob([source], { type: 'text/javascript' });
 				const url = URL.createObjectURL(blob);
 				return new Worker(url, { type: 'module' });

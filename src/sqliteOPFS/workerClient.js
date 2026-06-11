@@ -145,7 +145,7 @@ function createWorker(connectionString, options) {
 		return new Worker(options.workerUrl, { type: 'module' });
 	if (typeof Worker !== 'undefined') {
 		try {
-	const source = createWorkerSource(options.sqliteModuleUrl || getDefaultSqliteModuleUrl() || '@sqlite.org/sqlite-wasm', options);
+			const source = createWorkerSource(options.sqliteModuleUrl || getDefaultSqliteModuleUrl() || '@sqlite.org/sqlite-wasm', options);
 			const blob = new Blob([source], { type: 'text/javascript' });
 			const url = URL.createObjectURL(blob);
 			return new Worker(url, { type: 'module' });

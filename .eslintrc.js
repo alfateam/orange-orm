@@ -13,6 +13,15 @@ module.exports = {
 		'sourceType': 'module',
 		'ecmaVersion': 2018
 	},
+	'globals': {
+		'Blob': 'readonly',
+		'Worker': 'readonly',
+		'globalThis': 'readonly',
+		'performance': 'readonly',
+		'self': 'readonly',
+		'URL': 'readonly',
+		'Uint8Array': 'readonly'
+	},
 	'ignorePatterns': ['*esm.js', '*.ts'],
 	'rules': {
 		'@typescript-eslint/no-empty-function': 0,
@@ -42,4 +51,3 @@ module.exports = {
 	'plugins': [ '@typescript-eslint']
 	// 'plugins': ['jest', '@typescript-eslint']
 };
-

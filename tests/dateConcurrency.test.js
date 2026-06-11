@@ -17,7 +17,7 @@ function buildCommand({ hasTimeZone }) {
 	const context = {
 		rdb: {
 			engine: 'pg',
-			quote: (name) => '\"' + name + '\"'
+			quote: (name) => '"' + name + '"'
 		}
 	};
 	const idColumn = {
