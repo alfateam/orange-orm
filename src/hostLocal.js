@@ -239,6 +239,7 @@ function hostLocal() {
 			transaction,
 			client,
 			syncTableName,
+			strategy,
 			deduceStrategy,
 			...rest
 		} = options;

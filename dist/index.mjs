@@ -3621,6 +3621,7 @@ function requireHostLocal () {
 				transaction,
 				client,
 				syncTableName,
+				strategy,
 				deduceStrategy,
 				...rest
 			} = options;
