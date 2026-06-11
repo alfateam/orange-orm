@@ -210,6 +210,34 @@ describe('update multiple in array', () => {
 	}
 });
 
+describe('reactive row identity', () => {
+
+	test('sqlite', async () => {
+		const { db } = getDb('sqlite');
+		let reactiveCalls = 0;
+		db.reactive(value => {
+			reactiveCalls++;
+			return value;
+		});
+		let rows = await db.order.getAll({ lines: true, deliveryAddress: true, customer: true, orderBy: 'id' });
+		const row = rows[0];
+		const lines = row.lines;
+		const line = lines[1];
+
+		expect(reactiveCalls).toBeGreaterThan(0);
+		expect(row.lines).toBe(lines);
+		expect(row.lines[1]).toBe(line);
+
+		line.product = 'Reactive guitar';
+		await rows.saveChanges();
+
+		expect(rows[0]).toBe(row);
+		expect(rows[0].lines).toBe(lines);
+		expect(rows[0].lines[1]).toBe(line);
+		expect(rows[0].lines[1].product).toBe('Reactive guitar');
+	});
+});
+
 describe('selective update with where expression', () => {
 
 	test('pg', async () => await verify('pg'));

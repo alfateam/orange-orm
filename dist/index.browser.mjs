@@ -6248,6 +6248,9 @@ function requireClient () {
 			}
 
 			function proxifyRow(row, strategy, fast) {
+				let _row = row;
+				if (_reactive)
+					row = _reactive(row);
 				let handler = {
 					get(_target, property,) {
 						if (property === 'save' || property === 'saveChanges') //call server then acceptChanges
@@ -6265,7 +6268,7 @@ function requireClient () {
 								return toJSON(row);
 							};
 						else if (property === targetKey)
-							return row;
+							return _row;
 						else
 							return Reflect.get(...arguments);
 					}
@@ -6408,16 +6411,49 @@ function requireClient () {
 
 			function copyInto(from, to) {
 				for (let i = 0; i < from.length; i++) {
-					for (let p in from[i]) {
-						to[i][p] = from[i][p];
-					}
+					copyValueInto(from[i], to[i]);
 				}
 			}
 
 			function copyIntoArray(from, to, positions) {
 				for (let i = 0; i < from.length; i++) {
-					to[positions[i]] = from[i];
+					const position = positions[i];
+					if (isMergeableObject(to[position]) && isMergeableObject(from[i]))
+						copyValueInto(from[i], to[position]);
+					else
+						to[position] = from[i];
 				}
+			}
+
+			function copyValueInto(from, to) {
+				if (Array.isArray(from) && Array.isArray(to)) {
+					const length = Math.min(from.length, to.length);
+					for (let i = 0; i < length; i++) {
+						if (isMergeableObject(to[i]) && isMergeableObject(from[i]))
+							copyValueInto(from[i], to[i]);
+						else
+							to[i] = from[i];
+					}
+					if (from.length !== to.length)
+						to.splice(length, to.length - length, ...from.slice(length));
+					return;
+				}
+				if (!isMergeableObject(from) || !isMergeableObject(to))
+					return;
+				for (let p in to) {
+					if (!(p in from))
+						delete to[p];
+				}
+				for (let p in from) {
+					if (isMergeableObject(to[p]) && isMergeableObject(from[p]))
+						copyValueInto(from[p], to[p]);
+					else
+						to[p] = from[p];
+				}
+			}
+
+			function isMergeableObject(value) {
+				return value && typeof value === 'object' && !(value instanceof Date);
 			}
 
 
@@ -6784,13 +6820,19 @@ function requireClient () {
 	function onChange(target, onChange) {
 
 		let  notified = false;
+		const proxyCache = new WeakMap();
 		const handler = {
 			get(target, prop, receiver) {
 				const value = Reflect.get(target, prop, receiver);
 				if (value instanceof Date)
 					return value;
 				if (typeof value === 'object' && value !== null) {
-					return new Proxy(value, handler);
+					let proxy = proxyCache.get(value);
+					if (!proxy) {
+						proxy = new Proxy(value, handler);
+						proxyCache.set(value, proxy);
+					}
+					return proxy;
 				}
 				return value;
 			},
