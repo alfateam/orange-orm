@@ -83,6 +83,7 @@ function netAdapter(url, tableName, { axios, tableOptions }) {
 		get,
 		post,
 		patch,
+		syncCommand,
 		query,
 		sqliteFunction
 	};
@@ -102,6 +103,13 @@ function netAdapter(url, tableName, { axios, tableOptions }) {
 	async function post(_body) {
 		const adapter = await getInnerAdapter();
 		return adapter.post.apply(null, arguments);
+	}
+
+	async function syncCommand(_body) {
+		const adapter = await getInnerAdapter();
+		if (!adapter.syncCommand)
+			throw new Error('Sync commands are not supported through this adapter');
+		return adapter.syncCommand.apply(null, arguments);
 	}
 
 	async function query() {

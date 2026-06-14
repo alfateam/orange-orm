@@ -55,6 +55,14 @@ function rdbClient(options = {}) {
 	client.query = query;
 	client.function = sqliteFunction;
 	client.transaction = runInTransaction;
+	client.syncCommand = syncCommand;
+	client.commands = new Proxy({}, {
+		get(_target, property) {
+			if (typeof property !== 'string')
+				return undefined;
+			return syncCommand.bind(null, property);
+		}
+	});
 	client.db = baseUrl;
 	client.mssql = onProvider.bind(null, 'mssql');
 	client.mssqlNative = onProvider.bind(null, 'mssqlNative');
@@ -150,6 +158,31 @@ function rdbClient(options = {}) {
 	async function sqliteFunction() {
 		const adapter = netAdapter(baseUrl, undefined, { tableOptions: { db: baseUrl, transaction } });
 		return adapter.sqliteFunction.apply(null, arguments);
+	}
+
+	async function syncCommand(name) {
+		validateSyncCommandName(name);
+		const args = Array.prototype.slice.call(arguments, 1);
+		const body = stringify({
+			name,
+			args: normalizeSyncCommandArgs(args)
+		});
+		const adapter = netAdapter(baseUrl, undefined, { tableOptions: { db: baseUrl, transaction } });
+		await adapter.syncCommand(body);
+	}
+
+	function validateSyncCommandName(name) {
+		if (typeof name !== 'string' || name.length === 0)
+			throw new Error('Sync command requires a command name');
+	}
+
+	function normalizeSyncCommandArgs(args) {
+		try {
+			return JSON.parse(JSON.stringify(args));
+		}
+		catch (_e) {
+			throw new Error('Sync command arguments must be JSON serializable');
+		}
 	}
 
 	function express(arg) {

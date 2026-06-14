@@ -53,4 +53,40 @@ describe('hostLocal sync outbox', () => {
 		expect(updateStatement).not.toContain('syncTableName');
 		expect(updateStatement).not.toContain('deduceStrategy');
 	});
+
+	test('captures sync commands in the same outbox payload as patches', async () => {
+		const queryLog = [];
+		const pool = { __sqliteSync: { url: '/rdb' } };
+		const context = {
+			rdb: {
+				poolFactory: pool,
+				changes: [],
+				cache: {},
+				dbClient: {
+					executeQuery(query, callback) {
+						queryLog.push(query.sql());
+						callback(null, []);
+					}
+				}
+			}
+		};
+		const transaction = async (fn) => fn(context);
+		const table = {
+			patch: async () => ({ changed: [] })
+		};
+		const adapter = hostLocal({
+			transaction,
+			table,
+			syncTableName: 'project'
+		});
+
+		await adapter.patch({ patch: [{ op: 'replace', path: '/[1]/name', value: 'New' }], options: {} });
+		await adapter.syncCommand({ name: 'auditProject', args: [1, { source: 'test' }] });
+
+		const updateStatement = queryLog.filter(sql => sql.includes('UPDATE "orange_sync_outbox"')).pop();
+		expect(updateStatement).toContain('"patches"');
+		expect(updateStatement).toContain('"commands"');
+		expect(updateStatement).toContain('"name":"auditProject"');
+		expect(updateStatement).toContain('"args":[1,{"source":"test"}]');
+	});
 });

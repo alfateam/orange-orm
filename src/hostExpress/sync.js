@@ -64,12 +64,14 @@ function newSyncHandler(client, options = {}) {
 					return;
 				}
 				const patchResult = await applyMutationPatches(tx, mutation);
+				const commandResult = await applyMutationCommands(tx, mutation);
 				const result = {
 					id: mutation.id,
 					table: mutation.table,
 					applied: true,
 					changed: patchResult.changed,
-					result: patchResult
+					result: patchResult,
+					commands: commandResult.results
 				};
 				await updateAppliedMutation(tx, clientId, mutation.id, result);
 				results.push(result);
@@ -93,6 +95,8 @@ function newSyncHandler(client, options = {}) {
 		const results = [];
 		for (let i = 0; i < entries.length; i++) {
 			const entry = entries[i];
+			if (!entry || !Array.isArray(entry.patch))
+				continue;
 			const table = tx[entry.table];
 			if (!table || typeof table.patch !== 'function') {
 				const error = new Error(`Table "${entry.table}" is not exposed or does not exist`);
@@ -104,6 +108,34 @@ function newSyncHandler(client, options = {}) {
 			results.push({ table: entry.table, result });
 		}
 		return { changed, results };
+	}
+
+	async function applyMutationCommands(tx, mutation) {
+		const commands = Array.isArray(mutation.commands) ? mutation.commands : [];
+		const results = [];
+		for (let i = 0; i < commands.length; i++) {
+			const command = commands[i];
+			const name = command && command.name;
+			if (typeof name !== 'string' || name.length === 0)
+				continue;
+			const fn = syncOptions.commands[name];
+			if (typeof fn !== 'function') {
+				const error = new Error(`Sync command "${name}" is not registered`);
+				error.status = 400;
+				throw error;
+			}
+			const args = Array.isArray(command.args) ? command.args : [];
+			const value = await fn({
+				db: tx,
+				tx,
+				client: tx,
+				args,
+				name,
+				mutation
+			});
+			results.push({ name, result: value === undefined ? null : value });
+		}
+		return { results };
 	}
 
 	async function pullKeys(body) {
@@ -456,6 +488,7 @@ function normalizeSyncOptions(sync) {
 		enabled: sync.enabled !== false,
 		changeTable: sync.changeTable || 'orange_changes',
 		appliedMutationsTable: sync.appliedMutationsTable || 'orange_sync_applied_mutations',
+		commands: normalizeCommands(sync.commands),
 		queue: {
 			concurrency: clamp(normalizeInteger(queueOptions.concurrency, 4), 1, 100),
 			maxPending: clamp(normalizeInteger(queueOptions.maxPending, 1000), 0, 100000)
@@ -468,6 +501,12 @@ function normalizeSyncOptions(sync) {
 			maxChangeWindow: clamp(normalizeInteger(limits.maxChangeWindow, 50000), 1, 100000000)
 		}
 	};
+}
+
+function normalizeCommands(commands) {
+	if (!commands || commands !== Object(commands))
+		return {};
+	return commands;
 }
 
 function createTableMeta(client, syncOptions) {
@@ -647,23 +686,41 @@ function normalizeMutation(value) {
 	const id = value.id ?? value.mutationId ?? value.mutation_id;
 	if (typeof id !== 'string' || id.length === 0)
 		return null;
+	const commands = Array.isArray(value.commands)
+		? value.commands.map(normalizeMutationCommand).filter(Boolean)
+		: [];
 	if (Array.isArray(value.patches)) {
 		const patches = value.patches.map(normalizeMutationPatch).filter(Boolean);
-		if (patches.length === 0)
+		if (patches.length === 0 && commands.length === 0)
 			return null;
 		return {
 			id,
 			patches,
+			commands,
 			options: value.options && value.options === Object(value.options) ? value.options : undefined
 		};
 	}
 	const entry = normalizeMutationPatch(value);
-	if (!entry)
+	if (!entry && commands.length === 0)
 		return null;
 	return {
 		id,
-		...entry,
+		...(entry || {}),
+		commands,
 		options: value.options && value.options === Object(value.options) ? value.options : undefined
+	};
+}
+
+function normalizeMutationCommand(value) {
+	if (!value || value !== Object(value))
+		return null;
+	if (typeof value.name !== 'string' || value.name.length === 0)
+		return null;
+	if (value.args !== undefined && !Array.isArray(value.args))
+		return null;
+	return {
+		name: value.name,
+		args: value.args || []
 	};
 }
 

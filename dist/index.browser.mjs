@@ -804,12 +804,14 @@ function requireSync () {
 						return;
 					}
 					const patchResult = await applyMutationPatches(tx, mutation);
+					const commandResult = await applyMutationCommands(tx, mutation);
 					const result = {
 						id: mutation.id,
 						table: mutation.table,
 						applied: true,
 						changed: patchResult.changed,
-						result: patchResult
+						result: patchResult,
+						commands: commandResult.results
 					};
 					await updateAppliedMutation(tx, clientId, mutation.id, result);
 					results.push(result);
@@ -833,6 +835,8 @@ function requireSync () {
 			const results = [];
 			for (let i = 0; i < entries.length; i++) {
 				const entry = entries[i];
+				if (!entry || !Array.isArray(entry.patch))
+					continue;
 				const table = tx[entry.table];
 				if (!table || typeof table.patch !== 'function') {
 					const error = new Error(`Table "${entry.table}" is not exposed or does not exist`);
@@ -844,6 +848,34 @@ function requireSync () {
 				results.push({ table: entry.table, result });
 			}
 			return { changed, results };
+		}
+
+		async function applyMutationCommands(tx, mutation) {
+			const commands = Array.isArray(mutation.commands) ? mutation.commands : [];
+			const results = [];
+			for (let i = 0; i < commands.length; i++) {
+				const command = commands[i];
+				const name = command && command.name;
+				if (typeof name !== 'string' || name.length === 0)
+					continue;
+				const fn = syncOptions.commands[name];
+				if (typeof fn !== 'function') {
+					const error = new Error(`Sync command "${name}" is not registered`);
+					error.status = 400;
+					throw error;
+				}
+				const args = Array.isArray(command.args) ? command.args : [];
+				const value = await fn({
+					db: tx,
+					tx,
+					client: tx,
+					args,
+					name,
+					mutation
+				});
+				results.push({ name, result: value === undefined ? null : value });
+			}
+			return { results };
 		}
 
 		async function pullKeys(body) {
@@ -1196,6 +1228,7 @@ function requireSync () {
 			enabled: sync.enabled !== false,
 			changeTable: sync.changeTable || 'orange_changes',
 			appliedMutationsTable: sync.appliedMutationsTable || 'orange_sync_applied_mutations',
+			commands: normalizeCommands(sync.commands),
 			queue: {
 				concurrency: clamp(normalizeInteger(queueOptions.concurrency, 4), 1, 100),
 				maxPending: clamp(normalizeInteger(queueOptions.maxPending, 1000), 0, 100000)
@@ -1208,6 +1241,12 @@ function requireSync () {
 				maxChangeWindow: clamp(normalizeInteger(limits.maxChangeWindow, 50000), 1, 100000000)
 			}
 		};
+	}
+
+	function normalizeCommands(commands) {
+		if (!commands || commands !== Object(commands))
+			return {};
+		return commands;
 	}
 
 	function createTableMeta(client, syncOptions) {
@@ -1387,23 +1426,41 @@ function requireSync () {
 		const id = value.id ?? value.mutationId ?? value.mutation_id;
 		if (typeof id !== 'string' || id.length === 0)
 			return null;
+		const commands = Array.isArray(value.commands)
+			? value.commands.map(normalizeMutationCommand).filter(Boolean)
+			: [];
 		if (Array.isArray(value.patches)) {
 			const patches = value.patches.map(normalizeMutationPatch).filter(Boolean);
-			if (patches.length === 0)
+			if (patches.length === 0 && commands.length === 0)
 				return null;
 			return {
 				id,
 				patches,
+				commands,
 				options: value.options && value.options === Object(value.options) ? value.options : undefined
 			};
 		}
 		const entry = normalizeMutationPatch(value);
-		if (!entry)
+		if (!entry && commands.length === 0)
 			return null;
 		return {
 			id,
-			...entry,
+			...(entry || {}),
+			commands,
 			options: value.options && value.options === Object(value.options) ? value.options : undefined
+		};
+	}
+
+	function normalizeMutationCommand(value) {
+		if (!value || value !== Object(value))
+			return null;
+		if (typeof value.name !== 'string' || value.name.length === 0)
+			return null;
+		if (value.args !== undefined && !Array.isArray(value.args))
+			return null;
+		return {
+			name: value.name,
+			args: value.args || []
 		};
 	}
 
@@ -3407,7 +3464,7 @@ function requireHostLocal () {
 		const getTransactionHook = (name) =>
 			(transactionHooks && transactionHooks[name]) || (hooks && hooks[name]);
 
-		let c = { get, post, patch, query, sqliteFunction, express, hono };
+		let c = { get, post, patch, syncCommand, query, sqliteFunction, express, hono };
 
 		function get() {
 			return getMeta(table);
@@ -3442,6 +3499,32 @@ function requireHostLocal () {
 				let patch = body.patch;
 				await captureSyncOutboxPatch(context, patch, body.options);
 				result = await table.patch(context, patch, { ..._options, ...body.options, isHttp });
+			}
+		}
+
+		async function syncCommand(body) {
+			body = typeof body === 'string' ? JSON.parse(body) : body;
+			if (!body || body !== Object(body))
+				throw new Error('Invalid sync command payload');
+			let result;
+
+			if (transaction)
+				await transaction(fn);
+			else {
+				if (typeof db === 'function') {
+					let dbPromise = db();
+					if (dbPromise.then)
+						db = await dbPromise;
+					else
+						db = dbPromise;
+				}
+				await db.transaction(fn);
+			}
+			return result;
+
+			async function fn(context) {
+				await captureSyncOutboxCommand(context, body.name, body.args);
+				result = undefined;
 			}
 		}
 
@@ -3566,17 +3649,40 @@ function requireHostLocal () {
 		async function captureSyncOutboxPatch(context, patch, options) {
 			if (!Array.isArray(patch) || patch.length === 0)
 				return;
-			if (getSessionSingleton(context, 'suppressSyncOutbox'))
-				return;
-			const pool = getSessionSingleton(context, 'poolFactory');
-			if (!pool || !pool.__sqliteSync)
-				return;
 			const tableName = _options.syncTableName;
 			if (!tableName)
 				return;
+			let state = await getSyncOutboxCaptureState(context);
+			if (!state)
+				return;
+			state.patches.push({
+				table: tableName,
+				patch,
+				options: sanitizeSyncPatchOptions(options)
+			});
+			await updateSyncOutboxCaptureState(context, state);
+		}
+
+		async function captureSyncOutboxCommand(context, name, args) {
+			if (typeof name !== 'string' || name.length === 0)
+				throw new Error('Sync command requires a command name');
+			const normalizedArgs = normalizeSyncCommandArgs(args);
+			let state = await getSyncOutboxCaptureState(context);
+			if (!state)
+				return;
+			state.commands.push({ name, args: normalizedArgs });
+			await updateSyncOutboxCaptureState(context, state);
+		}
+
+		async function getSyncOutboxCaptureState(context) {
+			if (getSessionSingleton(context, 'suppressSyncOutbox'))
+				return null;
+			const pool = getSessionSingleton(context, 'poolFactory');
+			if (!pool || !pool.__sqliteSync)
+				return null;
 			let state = getSessionSingleton(context, 'syncOutboxCapture');
 			if (!state) {
-				state = { id: randomUuid(), patches: [] };
+				state = { id: randomUuid(), patches: [], commands: [] };
 				setSessionSingleton(context, 'syncOutboxCapture', state);
 				await ensureSyncOutboxTable(context, pool);
 				await querySyncOutbox(context, [
@@ -3585,16 +3691,33 @@ function requireHostLocal () {
 					'ON CONFLICT("mutation_id") DO NOTHING'
 				].join(' '));
 			}
-			state.patches.push({
-				table: tableName,
-				patch,
-				options: sanitizeSyncPatchOptions(options)
-			});
+			if (!Array.isArray(state.patches))
+				state.patches = [];
+			if (!Array.isArray(state.commands))
+				state.commands = [];
+			return state;
+		}
+
+		async function updateSyncOutboxCaptureState(context, state) {
 			await querySyncOutbox(context, [
 				'UPDATE "orange_sync_outbox"',
-				`SET "patch_json" = ${sqlStringLiteral(stringify(state.patches))}`,
+				`SET "patch_json" = ${sqlStringLiteral(stringify(serializeSyncOutboxCaptureState(state)))}`,
 				`WHERE "mutation_id" = ${sqlStringLiteral(state.id)}`
 			].join(' '));
+		}
+
+		function serializeSyncOutboxCaptureState(state) {
+			if (!Array.isArray(state.commands) || state.commands.length === 0)
+				return state.patches;
+			return {
+				patches: state.patches,
+				commands: state.commands
+			};
+		}
+
+		function normalizeSyncCommandArgs(args) {
+			const normalized = Array.isArray(args) ? args : [];
+			return JSON.parse(JSON.stringify(normalized));
 		}
 
 		async function ensureSyncOutboxTable(context, pool) {
@@ -3784,6 +3907,7 @@ function requireNetAdapter () {
 			get,
 			post,
 			patch,
+			syncCommand,
 			query,
 			sqliteFunction
 		};
@@ -3803,6 +3927,13 @@ function requireNetAdapter () {
 		async function post(_body) {
 			const adapter = await getInnerAdapter();
 			return adapter.post.apply(null, arguments);
+		}
+
+		async function syncCommand(_body) {
+			const adapter = await getInnerAdapter();
+			if (!adapter.syncCommand)
+				throw new Error('Sync commands are not supported through this adapter');
+			return adapter.syncCommand.apply(null, arguments);
 		}
 
 		async function query() {
@@ -4831,23 +4962,41 @@ function requireSyncClient () {
 			const id = input.id ?? input.mutationId ?? input.mutation_id;
 			if (typeof id !== 'string' || id.length === 0)
 				return null;
+			const commands = Array.isArray(input.commands)
+				? input.commands.map(normalizeMutationCommand).filter(Boolean)
+				: [];
 			if (Array.isArray(input.patches)) {
 				const patches = input.patches.map(normalizeMutationPatch).filter(Boolean);
-				if (patches.length === 0)
+				if (patches.length === 0 && commands.length === 0)
 					return null;
 				return {
 					id,
 					patches,
+					commands,
 					options: input.options
 				};
 			}
 			const entry = normalizeMutationPatch(input);
-			if (!entry)
+			if (!entry && commands.length === 0)
 				return null;
 			return {
 				id,
-				...entry,
+				...(entry || {}),
+				commands,
 				options: input.options
+			};
+		}
+
+		function normalizeMutationCommand(input) {
+			if (!input || input !== Object(input))
+				return null;
+			if (typeof input.name !== 'string' || input.name.length === 0)
+				return null;
+			if (input.args !== undefined && !Array.isArray(input.args))
+				return null;
+			return {
+				name: input.name,
+				args: input.args || []
 			};
 		}
 
@@ -4981,6 +5130,14 @@ function requireSyncClient () {
 			try {
 				const parsedPatch = JSON.parse(patchJson);
 				if (table === '*') {
+					if (parsedPatch && parsedPatch === Object(parsedPatch) && !Array.isArray(parsedPatch)) {
+						return {
+							id,
+							patches: Array.isArray(parsedPatch.patches) ? parsedPatch.patches : [],
+							commands: Array.isArray(parsedPatch.commands) ? parsedPatch.commands : [],
+							options: optionsJson ? JSON.parse(optionsJson) : undefined
+						};
+					}
 					return {
 						id,
 						patches: parsedPatch,
@@ -5694,6 +5851,14 @@ function requireClient () {
 		client.query = query;
 		client.function = sqliteFunction;
 		client.transaction = runInTransaction;
+		client.syncCommand = syncCommand;
+		client.commands = new Proxy({}, {
+			get(_target, property) {
+				if (typeof property !== 'string')
+					return undefined;
+				return syncCommand.bind(null, property);
+			}
+		});
 		client.db = baseUrl;
 		client.mssql = onProvider.bind(null, 'mssql');
 		client.mssqlNative = onProvider.bind(null, 'mssqlNative');
@@ -5789,6 +5954,31 @@ function requireClient () {
 		async function sqliteFunction() {
 			const adapter = netAdapter(baseUrl, undefined, { tableOptions: { db: baseUrl, transaction } });
 			return adapter.sqliteFunction.apply(null, arguments);
+		}
+
+		async function syncCommand(name) {
+			validateSyncCommandName(name);
+			const args = Array.prototype.slice.call(arguments, 1);
+			const body = stringify({
+				name,
+				args: normalizeSyncCommandArgs(args)
+			});
+			const adapter = netAdapter(baseUrl, undefined, { tableOptions: { db: baseUrl, transaction } });
+			await adapter.syncCommand(body);
+		}
+
+		function validateSyncCommandName(name) {
+			if (typeof name !== 'string' || name.length === 0)
+				throw new Error('Sync command requires a command name');
+		}
+
+		function normalizeSyncCommandArgs(args) {
+			try {
+				return JSON.parse(JSON.stringify(args));
+			}
+			catch (_e) {
+				throw new Error('Sync command arguments must be JSON serializable');
+			}
 		}
 
 		function express(arg) {

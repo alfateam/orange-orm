@@ -303,23 +303,41 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		const id = input.id ?? input.mutationId ?? input.mutation_id;
 		if (typeof id !== 'string' || id.length === 0)
 			return null;
+		const commands = Array.isArray(input.commands)
+			? input.commands.map(normalizeMutationCommand).filter(Boolean)
+			: [];
 		if (Array.isArray(input.patches)) {
 			const patches = input.patches.map(normalizeMutationPatch).filter(Boolean);
-			if (patches.length === 0)
+			if (patches.length === 0 && commands.length === 0)
 				return null;
 			return {
 				id,
 				patches,
+				commands,
 				options: input.options
 			};
 		}
 		const entry = normalizeMutationPatch(input);
-		if (!entry)
+		if (!entry && commands.length === 0)
 			return null;
 		return {
 			id,
-			...entry,
+			...(entry || {}),
+			commands,
 			options: input.options
+		};
+	}
+
+	function normalizeMutationCommand(input) {
+		if (!input || input !== Object(input))
+			return null;
+		if (typeof input.name !== 'string' || input.name.length === 0)
+			return null;
+		if (input.args !== undefined && !Array.isArray(input.args))
+			return null;
+		return {
+			name: input.name,
+			args: input.args || []
 		};
 	}
 
@@ -453,6 +471,14 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		try {
 			const parsedPatch = JSON.parse(patchJson);
 			if (table === '*') {
+				if (parsedPatch && parsedPatch === Object(parsedPatch) && !Array.isArray(parsedPatch)) {
+					return {
+						id,
+						patches: Array.isArray(parsedPatch.patches) ? parsedPatch.patches : [],
+						commands: Array.isArray(parsedPatch.commands) ? parsedPatch.commands : [],
+						options: optionsJson ? JSON.parse(optionsJson) : undefined
+					};
+				}
 				return {
 					id,
 					patches: parsedPatch,

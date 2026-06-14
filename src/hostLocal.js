@@ -26,7 +26,7 @@ function hostLocal() {
 	const getTransactionHook = (name) =>
 		(transactionHooks && transactionHooks[name]) || (hooks && hooks[name]);
 
-	let c = { get, post, patch, query, sqliteFunction, express, hono };
+	let c = { get, post, patch, syncCommand, query, sqliteFunction, express, hono };
 
 	function get() {
 		return getMeta(table);
@@ -61,6 +61,32 @@ function hostLocal() {
 			let patch = body.patch;
 			await captureSyncOutboxPatch(context, patch, body.options);
 			result = await table.patch(context, patch, { ..._options, ...body.options, isHttp });
+		}
+	}
+
+	async function syncCommand(body) {
+		body = typeof body === 'string' ? JSON.parse(body) : body;
+		if (!body || body !== Object(body))
+			throw new Error('Invalid sync command payload');
+		let result;
+
+		if (transaction)
+			await transaction(fn);
+		else {
+			if (typeof db === 'function') {
+				let dbPromise = db();
+				if (dbPromise.then)
+					db = await dbPromise;
+				else
+					db = dbPromise;
+			}
+			await db.transaction(fn);
+		}
+		return result;
+
+		async function fn(context) {
+			await captureSyncOutboxCommand(context, body.name, body.args);
+			result = undefined;
 		}
 	}
 
@@ -185,17 +211,40 @@ function hostLocal() {
 	async function captureSyncOutboxPatch(context, patch, options) {
 		if (!Array.isArray(patch) || patch.length === 0)
 			return;
-		if (getSessionSingleton(context, 'suppressSyncOutbox'))
-			return;
-		const pool = getSessionSingleton(context, 'poolFactory');
-		if (!pool || !pool.__sqliteSync)
-			return;
 		const tableName = _options.syncTableName;
 		if (!tableName)
 			return;
+		let state = await getSyncOutboxCaptureState(context);
+		if (!state)
+			return;
+		state.patches.push({
+			table: tableName,
+			patch,
+			options: sanitizeSyncPatchOptions(options)
+		});
+		await updateSyncOutboxCaptureState(context, state);
+	}
+
+	async function captureSyncOutboxCommand(context, name, args) {
+		if (typeof name !== 'string' || name.length === 0)
+			throw new Error('Sync command requires a command name');
+		const normalizedArgs = normalizeSyncCommandArgs(args);
+		let state = await getSyncOutboxCaptureState(context);
+		if (!state)
+			return;
+		state.commands.push({ name, args: normalizedArgs });
+		await updateSyncOutboxCaptureState(context, state);
+	}
+
+	async function getSyncOutboxCaptureState(context) {
+		if (getSessionSingleton(context, 'suppressSyncOutbox'))
+			return null;
+		const pool = getSessionSingleton(context, 'poolFactory');
+		if (!pool || !pool.__sqliteSync)
+			return null;
 		let state = getSessionSingleton(context, 'syncOutboxCapture');
 		if (!state) {
-			state = { id: randomUuid(), patches: [] };
+			state = { id: randomUuid(), patches: [], commands: [] };
 			setSessionSingleton(context, 'syncOutboxCapture', state);
 			await ensureSyncOutboxTable(context, pool);
 			await querySyncOutbox(context, [
@@ -204,16 +253,33 @@ function hostLocal() {
 				'ON CONFLICT("mutation_id") DO NOTHING'
 			].join(' '));
 		}
-		state.patches.push({
-			table: tableName,
-			patch,
-			options: sanitizeSyncPatchOptions(options)
-		});
+		if (!Array.isArray(state.patches))
+			state.patches = [];
+		if (!Array.isArray(state.commands))
+			state.commands = [];
+		return state;
+	}
+
+	async function updateSyncOutboxCaptureState(context, state) {
 		await querySyncOutbox(context, [
 			'UPDATE "orange_sync_outbox"',
-			`SET "patch_json" = ${sqlStringLiteral(stringify(state.patches))}`,
+			`SET "patch_json" = ${sqlStringLiteral(stringify(serializeSyncOutboxCaptureState(state)))}`,
 			`WHERE "mutation_id" = ${sqlStringLiteral(state.id)}`
 		].join(' '));
+	}
+
+	function serializeSyncOutboxCaptureState(state) {
+		if (!Array.isArray(state.commands) || state.commands.length === 0)
+			return state.patches;
+		return {
+			patches: state.patches,
+			commands: state.commands
+		};
+	}
+
+	function normalizeSyncCommandArgs(args) {
+		const normalized = Array.isArray(args) ? args : [];
+		return JSON.parse(JSON.stringify(normalized));
 	}
 
 	async function ensureSyncOutboxTable(context, pool) {
