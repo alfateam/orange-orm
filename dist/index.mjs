@@ -865,15 +865,8 @@ function requireSync () {
 					error.status = 400;
 					throw error;
 				}
-				const args = Array.isArray(command.args) ? command.args : [];
-				const value = await fn({
-					db: tx,
-					tx,
-					client: tx,
-					args,
-					name,
-					mutation
-				});
+				const args = normalizeCommandArgs(command.args);
+				const value = await fn(tx, args, { name, mutation });
 				results.push({ name, result: value === undefined ? null : value });
 			}
 			return { results };
@@ -1457,12 +1450,16 @@ function requireSync () {
 			return null;
 		if (typeof value.name !== 'string' || value.name.length === 0)
 			return null;
-		if (value.args !== undefined && !Array.isArray(value.args))
-			return null;
 		return {
 			name: value.name,
-			args: value.args || []
+			args: normalizeCommandArgs(value.args)
 		};
+	}
+
+	function normalizeCommandArgs(args) {
+		if (args === undefined)
+			return null;
+		return JSON.parse(JSON.stringify(args));
 	}
 
 	function normalizeMutationPatch(value) {
@@ -1539,6 +1536,7 @@ function requireHostExpress () {
 		if ('db' in options && (options.db ?? undefined) === undefined || !client.db)
 			throw new Error('No db specified');
 		const dbOptions = { db: options.db || client.db };
+		const commandHandlers = options.commands || client.__commands || {};
 		let c = {};
 		const readonly = { readonly: options.readonly};
 		const sharedHooks = options.hooks;
@@ -1556,7 +1554,13 @@ function requireHostExpress () {
 
 			});
 		}
-		const syncHandler = newSyncHandler(client, options);
+		const syncHandler = newSyncHandler(client, {
+			...options,
+			sync: options.sync && {
+				...options.sync,
+				commands: options.sync.commands || commandHandlers
+			}
+		});
 
 		async function handler(req, res) {
 			if (req.method === 'POST')
@@ -1630,6 +1634,8 @@ function requireHostExpress () {
 					}
 					return syncHandler(request, response);
 				}
+				if (request.query.command)
+					return runCommand(request, response);
 				if (!request.query.table) {
 					let e = new Error('Table not defined');
 					// @ts-ignore
@@ -1654,6 +1660,24 @@ function requireHostExpress () {
 
 		}
 
+		async function runCommand(request, response) {
+			const name = request.query.command;
+			const fn = typeof name === 'string' ? commandHandlers[name] : null;
+			if (typeof fn !== 'function') {
+				const e = new Error(`Command "${name}" is not registered`);
+				// @ts-ignore
+				e.status = 400;
+				throw e;
+			}
+			const body = typeof request.body === 'string' ? JSON.parse(request.body) : request.body || {};
+			const args = normalizeCommandArgs(body.args);
+			let result;
+			await client.transaction(async (tx) => {
+				result = await fn(tx, args);
+			});
+			response.json(result === undefined ? null : result);
+		}
+
 		function handleOptions(req, response) {
 			response.setHeader('Access-Control-Allow-Origin', '*'); // Adjust this as per your CORS needs
 			response.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS'); // And any other methods you support
@@ -1663,6 +1687,12 @@ function requireHostExpress () {
 		}
 
 		return handler;
+	}
+
+	function normalizeCommandArgs(args) {
+		if (args === undefined)
+			return null;
+		return JSON.parse(JSON.stringify(args));
 	}
 
 	hostExpress_1 = hostExpress;
@@ -3717,8 +3747,9 @@ function requireHostLocal () {
 		}
 
 		function normalizeSyncCommandArgs(args) {
-			const normalized = Array.isArray(args) ? args : [];
-			return JSON.parse(JSON.stringify(normalized));
+			if (args === undefined)
+				return null;
+			return JSON.parse(JSON.stringify(args));
 		}
 
 		async function ensureSyncOutboxTable(context, pool) {
@@ -3834,6 +3865,7 @@ function requireNetAdapter () {
 			get,
 			post,
 			patch,
+			syncCommand,
 			query,
 			sqliteFunction,
 			express
@@ -3877,6 +3909,27 @@ function requireNetAdapter () {
 			try {
 				const headers = { 'Content-Type': 'application/json' };
 				const res = await axios.request(path, { headers, method: 'post', data: body });
+				return res.data;
+			}
+			catch (e) {
+				if (typeof e.response?.data === 'string')
+					throw new Error(e.response.data.replace(/^Error: /, ''));
+				else throw e;
+			}
+		}
+
+		async function syncCommand(body) {
+			try {
+				const payload = typeof body === 'string' ? JSON.parse(body) : body;
+				const name = payload && payload.name;
+				if (typeof name !== 'string' || name.length === 0)
+					throw new Error('Sync command requires a command name');
+				const headers = { 'Content-Type': 'application/json' };
+				const res = await axios.request(`?command=${encodeURIComponent(name)}`, {
+					headers,
+					method: 'post',
+					data: body
+				});
 				return res.data;
 			}
 			catch (e) {
@@ -3950,7 +4003,7 @@ function requireNetAdapter () {
 		async function getInnerAdapter() {
 			const db = await getDb();
 			if (typeof db === 'string') {
-				return httpAdapter(db, `?table=${tableName}`, axios);
+				return httpAdapter(db, tableName === undefined ? '' : `?table=${tableName}`, axios);
 			}
 			else if (db && db.hostLocal) {
 				return db.hostLocal({ ...tableOptions, db, table: url });
@@ -4993,11 +5046,9 @@ function requireSyncClient () {
 				return null;
 			if (typeof input.name !== 'string' || input.name.length === 0)
 				return null;
-			if (input.args !== undefined && !Array.isArray(input.args))
-				return null;
 			return {
 				name: input.name,
-				args: input.args || []
+				args: normalizeCommandArgs(input.args)
 			};
 		}
 
@@ -5013,6 +5064,12 @@ function requireSyncClient () {
 				patch: input.patch,
 				options: input.options
 			};
+		}
+
+		function normalizeCommandArgs(args) {
+			if (args === undefined)
+				return null;
+			return JSON.parse(JSON.stringify(args));
 		}
 
 		function normalizeTimeoutMs(value) {
@@ -5818,6 +5875,7 @@ function requireClient () {
 		let _reactive = options.reactive;
 		let providers = options.providers || {};
 		let baseUrl = options.db;
+		const commandHandlers = options.commands || {};
 		if (typeof providers === 'function')
 			baseUrl = typeof options.db === 'function' ? providers(options.db) : options.db;
 		const axiosInterceptor = createAxiosInterceptor();
@@ -5853,6 +5911,7 @@ function requireClient () {
 		client.function = sqliteFunction;
 		client.transaction = runInTransaction;
 		client.syncCommand = syncCommand;
+		client.__commands = commandHandlers;
 		client.commands = new Proxy({}, {
 			get(_target, property) {
 				if (typeof property !== 'string')
@@ -5957,15 +6016,45 @@ function requireClient () {
 			return adapter.sqliteFunction.apply(null, arguments);
 		}
 
-		async function syncCommand(name) {
+		async function syncCommand(name, args) {
 			validateSyncCommandName(name);
-			const args = Array.prototype.slice.call(arguments, 1);
-			const body = stringify({
-				name,
-				args: normalizeSyncCommandArgs(args)
+			const normalizedArgs = normalizeSyncCommandArgs(args);
+			const db = await getDb();
+			if (db && db.__sqliteSync) {
+				const body = stringify({
+					name,
+					args: normalizedArgs
+				});
+				const adapter = netAdapter(baseUrl, undefined, { tableOptions: { db: baseUrl, transaction } });
+				await adapter.syncCommand(body);
+				return;
+			}
+			if (typeof db === 'string') {
+				const body = stringify({
+					name,
+					args: normalizedArgs
+				});
+				const adapter = netAdapter(baseUrl, undefined, { tableOptions: { db: baseUrl, transaction } });
+				await adapter.syncCommand(body);
+				return;
+			}
+			await executeCommand(name, normalizedArgs);
+		}
+
+		async function executeCommand(name, args) {
+			const fn = commandHandlers[name];
+			if (typeof fn !== 'function')
+				throw new Error(`Command "${name}" is not registered`);
+			if (transaction) {
+				await transaction(async (context) => {
+					const tx = client({ transaction: (innerFn) => innerFn(context) });
+					await fn(tx, args);
+				});
+				return;
+			}
+			await client.transaction(async (tx) => {
+				await fn(tx, args);
 			});
-			const adapter = netAdapter(baseUrl, undefined, { tableOptions: { db: baseUrl, transaction } });
-			await adapter.syncCommand(body);
 		}
 
 		function validateSyncCommandName(name) {
@@ -5975,6 +6064,8 @@ function requireClient () {
 
 		function normalizeSyncCommandArgs(args) {
 			try {
+				if (args === undefined)
+					return null;
 				return JSON.parse(JSON.stringify(args));
 			}
 			catch (_e) {

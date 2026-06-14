@@ -910,16 +910,26 @@ export interface SyncEndpointConfig {
 }
 
 type SyncTableName<M extends Record<string, any>> = Extract<keyof M, string>;
-type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 
-export type SyncCommandHandler<M extends Record<string, TableDefinition<M>> = any> = (context: {
-  db: DBClient<M>;
-  tx: DBClient<M>;
-  client: DBClient<M>;
-  name: string;
-  args: JsonValue[];
-  mutation: unknown;
-}) => JsonValue | void | Promise<JsonValue | void>;
+type AnyCommandMap = Record<string, (...args: any[]) => any>;
+
+type CommandArgs<F> =
+  F extends (db: any, args: infer A, ...rest: any[]) => any ? A :
+  F extends (args: infer A, ...rest: any[]) => any ? A :
+  JsonValue;
+
+type ClientCommands<C> = {
+  [K in keyof C]: (args: CommandArgs<C[K]>) => Promise<void>;
+};
+
+export type SyncCommandHandler<
+  M extends Record<string, TableDefinition<M>> = any,
+  Args extends JsonValue = JsonValue
+> = (
+  db: DBClient<M>,
+  args: Args,
+  meta?: { name: string; mutation: unknown }
+) => JsonValue | void | Promise<JsonValue | void>;
 
 export interface SyncPullConfig<M extends Record<string, any> = any> extends SyncEndpointConfig {
   tables?: SyncTableName<M>[];
@@ -972,7 +982,7 @@ export interface SyncPushMutation {
 
 export interface SyncCommandPayload {
   name: string;
-  args?: JsonValue[];
+  args?: JsonValue;
 }
 
 export interface SyncPushOptions {
@@ -1033,7 +1043,10 @@ export interface SqliteOpfsSahPoolOptions {
   fallbackToOpfs?: boolean;
 }
 
-export type DBClient<M extends Record<string, TableDefinition<M>>> = {
+export type DBClient<
+  M extends Record<string, TableDefinition<M>>,
+  Commands extends AnyCommandMap = Record<string, (args: JsonValue) => Promise<void>>
+> = {
   [TableName in keyof M]: RootTableRefs<M, TableName> & TableClient<M, TableName>;
 } & {
   close(): Promise<void>;
@@ -1047,8 +1060,8 @@ export type DBClient<M extends Record<string, TableDefinition<M>>> = {
   function(name: string, fn: (...args: any[]) => unknown): Promise<unknown> | void;
   query(filter: RawFilter | string): Promise<unknown[]>;
   query<T>(filter: RawFilter | string): Promise<T[]>;
-  syncCommand(name: string, ...args: JsonValue[]): Promise<void>;
-  commands: Record<string, (...args: JsonValue[]) => Promise<void>>;
+  syncCommand<Args extends JsonValue = JsonValue>(name: string, args?: Args): Promise<void>;
+  commands: ClientCommands<Commands>;
   createPatch(original: any[], modified: any[]): JsonPatch;
   createPatch(original: any, modified: any): JsonPatch;
   (
@@ -1157,7 +1170,7 @@ type ExpressHooks<M extends Record<string, TableDefinition<M>>> = ExpressTransac
 type SyncServerConfig = {
   enabled?: boolean;
   changeTable?: string;
-  commands?: Record<string, SyncCommandHandler<any>>;
+  commands?: Record<string, SyncCommandHandler<any, any>>;
   queue?: {
     concurrency?: number;
     maxPending?: number;

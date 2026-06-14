@@ -124,15 +124,8 @@ function newSyncHandler(client, options = {}) {
 				error.status = 400;
 				throw error;
 			}
-			const args = Array.isArray(command.args) ? command.args : [];
-			const value = await fn({
-				db: tx,
-				tx,
-				client: tx,
-				args,
-				name,
-				mutation
-			});
+			const args = normalizeCommandArgs(command.args);
+			const value = await fn(tx, args, { name, mutation });
 			results.push({ name, result: value === undefined ? null : value });
 		}
 		return { results };
@@ -716,12 +709,16 @@ function normalizeMutationCommand(value) {
 		return null;
 	if (typeof value.name !== 'string' || value.name.length === 0)
 		return null;
-	if (value.args !== undefined && !Array.isArray(value.args))
-		return null;
 	return {
 		name: value.name,
-		args: value.args || []
+		args: normalizeCommandArgs(value.args)
 	};
+}
+
+function normalizeCommandArgs(args) {
+	if (args === undefined)
+		return null;
+	return JSON.parse(JSON.stringify(args));
 }
 
 function normalizeMutationPatch(value) {

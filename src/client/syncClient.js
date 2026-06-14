@@ -333,11 +333,9 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 			return null;
 		if (typeof input.name !== 'string' || input.name.length === 0)
 			return null;
-		if (input.args !== undefined && !Array.isArray(input.args))
-			return null;
 		return {
 			name: input.name,
-			args: input.args || []
+			args: normalizeCommandArgs(input.args)
 		};
 	}
 
@@ -353,6 +351,12 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 			patch: input.patch,
 			options: input.options
 		};
+	}
+
+	function normalizeCommandArgs(args) {
+		if (args === undefined)
+			return null;
+		return JSON.parse(JSON.stringify(args));
 	}
 
 	function normalizeTimeoutMs(value) {

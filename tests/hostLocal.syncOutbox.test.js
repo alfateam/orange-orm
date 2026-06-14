@@ -81,12 +81,12 @@ describe('hostLocal sync outbox', () => {
 		});
 
 		await adapter.patch({ patch: [{ op: 'replace', path: '/[1]/name', value: 'New' }], options: {} });
-		await adapter.syncCommand({ name: 'auditProject', args: [1, { source: 'test' }] });
+		await adapter.syncCommand({ name: 'auditProject', args: { projectId: 1, source: 'test' } });
 
 		const updateStatement = queryLog.filter(sql => sql.includes('UPDATE "orange_sync_outbox"')).pop();
 		expect(updateStatement).toContain('"patches"');
 		expect(updateStatement).toContain('"commands"');
 		expect(updateStatement).toContain('"name":"auditProject"');
-		expect(updateStatement).toContain('"args":[1,{"source":"test"}]');
+		expect(updateStatement).toContain('"args":{"projectId":1,"source":"test"}');
 	});
 });

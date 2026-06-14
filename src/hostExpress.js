@@ -7,6 +7,7 @@ function hostExpress(hostLocal, client, options = {}) {
 	if ('db' in options && (options.db ?? undefined) === undefined || !client.db)
 		throw new Error('No db specified');
 	const dbOptions = { db: options.db || client.db };
+	const commandHandlers = options.commands || client.__commands || {};
 	let c = {};
 	const readonly = { readonly: options.readonly};
 	const sharedHooks = options.hooks;
@@ -24,7 +25,13 @@ function hostExpress(hostLocal, client, options = {}) {
 
 		});
 	}
-	const syncHandler = newSyncHandler(client, options);
+	const syncHandler = newSyncHandler(client, {
+		...options,
+		sync: options.sync && {
+			...options.sync,
+			commands: options.sync.commands || commandHandlers
+		}
+	});
 
 	async function handler(req, res) {
 		if (req.method === 'POST')
@@ -98,6 +105,8 @@ function hostExpress(hostLocal, client, options = {}) {
 				}
 				return syncHandler(request, response);
 			}
+			if (request.query.command)
+				return runCommand(request, response);
 			if (!request.query.table) {
 				let e = new Error('Table not defined');
 				// @ts-ignore
@@ -122,6 +131,24 @@ function hostExpress(hostLocal, client, options = {}) {
 
 	}
 
+	async function runCommand(request, response) {
+		const name = request.query.command;
+		const fn = typeof name === 'string' ? commandHandlers[name] : null;
+		if (typeof fn !== 'function') {
+			const e = new Error(`Command "${name}" is not registered`);
+			// @ts-ignore
+			e.status = 400;
+			throw e;
+		}
+		const body = typeof request.body === 'string' ? JSON.parse(request.body) : request.body || {};
+		const args = normalizeCommandArgs(body.args);
+		let result;
+		await client.transaction(async (tx) => {
+			result = await fn(tx, args);
+		});
+		response.json(result === undefined ? null : result);
+	}
+
 	function handleOptions(req, response) {
 		response.setHeader('Access-Control-Allow-Origin', '*'); // Adjust this as per your CORS needs
 		response.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS'); // And any other methods you support
@@ -131,6 +158,12 @@ function hostExpress(hostLocal, client, options = {}) {
 	}
 
 	return handler;
+}
+
+function normalizeCommandArgs(args) {
+	if (args === undefined)
+		return null;
+	return JSON.parse(JSON.stringify(args));
 }
 
 module.exports = hostExpress;

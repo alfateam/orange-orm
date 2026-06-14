@@ -9,6 +9,7 @@ function httpAdapter(baseURL, path, axiosInterceptor) {
 		get,
 		post,
 		patch,
+		syncCommand,
 		query,
 		sqliteFunction,
 		express
@@ -52,6 +53,27 @@ function httpAdapter(baseURL, path, axiosInterceptor) {
 		try {
 			const headers = { 'Content-Type': 'application/json' };
 			const res = await axios.request(path, { headers, method: 'post', data: body });
+			return res.data;
+		}
+		catch (e) {
+			if (typeof e.response?.data === 'string')
+				throw new Error(e.response.data.replace(/^Error: /, ''));
+			else throw e;
+		}
+	}
+
+	async function syncCommand(body) {
+		try {
+			const payload = typeof body === 'string' ? JSON.parse(body) : body;
+			const name = payload && payload.name;
+			if (typeof name !== 'string' || name.length === 0)
+				throw new Error('Sync command requires a command name');
+			const headers = { 'Content-Type': 'application/json' };
+			const res = await axios.request(`?command=${encodeURIComponent(name)}`, {
+				headers,
+				method: 'post',
+				data: body
+			});
 			return res.data;
 		}
 		catch (e) {
@@ -125,7 +147,7 @@ function netAdapter(url, tableName, { axios, tableOptions }) {
 	async function getInnerAdapter() {
 		const db = await getDb();
 		if (typeof db === 'string') {
-			return httpAdapter(db, `?table=${tableName}`, axios);
+			return httpAdapter(db, tableName === undefined ? '' : `?table=${tableName}`, axios);
 		}
 		else if (db && db.hostLocal) {
 			return db.hostLocal({ ...tableOptions, db, table: url });

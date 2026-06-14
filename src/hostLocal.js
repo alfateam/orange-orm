@@ -278,8 +278,9 @@ function hostLocal() {
 	}
 
 	function normalizeSyncCommandArgs(args) {
-		const normalized = Array.isArray(args) ? args : [];
-		return JSON.parse(JSON.stringify(normalized));
+		if (args === undefined)
+			return null;
+		return JSON.parse(JSON.stringify(args));
 	}
 
 	async function ensureSyncOutboxTable(context, pool) {

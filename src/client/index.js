@@ -21,6 +21,7 @@ function rdbClient(options = {}) {
 	let _reactive = options.reactive;
 	let providers = options.providers || {};
 	let baseUrl = options.db;
+	const commandHandlers = options.commands || {};
 	if (typeof providers === 'function')
 		baseUrl = typeof options.db === 'function' ? providers(options.db) : options.db;
 	const axiosInterceptor = createAxiosInterceptor();
@@ -56,6 +57,7 @@ function rdbClient(options = {}) {
 	client.function = sqliteFunction;
 	client.transaction = runInTransaction;
 	client.syncCommand = syncCommand;
+	client.__commands = commandHandlers;
 	client.commands = new Proxy({}, {
 		get(_target, property) {
 			if (typeof property !== 'string')
@@ -160,15 +162,45 @@ function rdbClient(options = {}) {
 		return adapter.sqliteFunction.apply(null, arguments);
 	}
 
-	async function syncCommand(name) {
+	async function syncCommand(name, args) {
 		validateSyncCommandName(name);
-		const args = Array.prototype.slice.call(arguments, 1);
-		const body = stringify({
-			name,
-			args: normalizeSyncCommandArgs(args)
+		const normalizedArgs = normalizeSyncCommandArgs(args);
+		const db = await getDb();
+		if (db && db.__sqliteSync) {
+			const body = stringify({
+				name,
+				args: normalizedArgs
+			});
+			const adapter = netAdapter(baseUrl, undefined, { tableOptions: { db: baseUrl, transaction } });
+			await adapter.syncCommand(body);
+			return;
+		}
+		if (typeof db === 'string') {
+			const body = stringify({
+				name,
+				args: normalizedArgs
+			});
+			const adapter = netAdapter(baseUrl, undefined, { tableOptions: { db: baseUrl, transaction } });
+			await adapter.syncCommand(body);
+			return;
+		}
+		await executeCommand(name, normalizedArgs);
+	}
+
+	async function executeCommand(name, args) {
+		const fn = commandHandlers[name];
+		if (typeof fn !== 'function')
+			throw new Error(`Command "${name}" is not registered`);
+		if (transaction) {
+			await transaction(async (context) => {
+				const tx = client({ transaction: (innerFn) => innerFn(context) });
+				await fn(tx, args);
+			});
+			return;
+		}
+		await client.transaction(async (tx) => {
+			await fn(tx, args);
 		});
-		const adapter = netAdapter(baseUrl, undefined, { tableOptions: { db: baseUrl, transaction } });
-		await adapter.syncCommand(body);
 	}
 
 	function validateSyncCommandName(name) {
@@ -178,6 +210,8 @@ function rdbClient(options = {}) {
 
 	function normalizeSyncCommandArgs(args) {
 		try {
+			if (args === undefined)
+				return null;
 			return JSON.parse(JSON.stringify(args));
 		}
 		catch (_e) {

@@ -29,9 +29,9 @@ describe('sync commands', () => {
 		const handler = newSyncHandler(client, {
 			sync: {
 				commands: {
-					auditProject: async ({ db, args }) => {
+					auditProject: async (db, args) => {
 						expect(db).toBe(tx);
-						calls.push(['command', args[0], args[1].source]);
+						calls.push(['command', args.projectId, args.source]);
 						await db.query('select 1');
 						return { ok: true };
 					}
@@ -61,7 +61,7 @@ describe('sync commands', () => {
 						table: 'project',
 						patch: [{ op: 'replace', path: '/[1]/status', value: 'active' }]
 					}],
-					commands: [{ name: 'auditProject', args: [1, { source: 'test' }] }]
+					commands: [{ name: 'auditProject', args: { projectId: 1, source: 'test' } }]
 				}]
 			}
 		}, response);

@@ -3,7 +3,7 @@ import type { PGliteOptions } from './pglite.d.ts';
 import type { ConnectionConfiguration } from 'tedious';
 import type { D1Database } from '@cloudflare/workers-types';
 import type { PoolAttributes } from 'oracledb';
-import type { DBClient, SyncConfig } from './map2';
+import type { DBClient, SyncCommandHandler, SyncConfig } from './map2';
 
 export type MergeProperties<T, V> = {
 	[K in keyof T | keyof V]:
@@ -46,7 +46,7 @@ type DbConnectable<T> = {
 };
 
 type NegotiateDbInstance<T, C> = C extends WithDb
-	? DBClient<SchemaFromMappedDb<T>>
+	? DBClient<SchemaFromMappedDb<T>, CommandsFromOptions<C>>
 	: MappedDb<T>;
 
 type WithDb = {
@@ -61,7 +61,19 @@ type DbOptions<T> = {
 	concurrency?: ConcurrencyValues;
 	readonly?: boolean;
 	db?: Pool | ((connectors: Connectors<SchemaFromMappedDb<T>>) => Pool | Promise<Pool>);
+	commands?: CommandMap<SchemaFromMappedDb<T>>;
 };
+
+type CommandMap<M extends Record<string, any>> = Record<
+	string,
+	((args: JsonValue) => unknown)
+	| SyncCommandHandler<M, any>
+>;
+
+type CommandsFromOptions<C> =
+	C extends { commands: infer Commands extends Record<string, (...args: any[]) => any> }
+	? Commands
+	: Record<string, (args: JsonValue) => Promise<void>>;
 
 interface Connectors<M extends Record<string, any> = any> {
 	http(url: string): Pool;
