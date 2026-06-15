@@ -924,6 +924,10 @@ type ClientCommands<C> = {
   [K in keyof C]: (args: CommandArgs<C[K]>) => Promise<void>;
 };
 
+type CommandApi<C> = keyof C extends never
+  ? { commands?: ClientCommands<C> }
+  : { commands: ClientCommands<C> };
+
 export type SyncCommandHandler<
   M extends Record<string, TableDefinition<M>> = any,
   Args extends JsonValue = JsonValue
@@ -1048,10 +1052,10 @@ export interface SqliteOpfsSahPoolOptions {
 
 export type DBClient<
   M extends Record<string, TableDefinition<M>>,
-  Commands extends AnyCommandMap = Record<string, (args: JsonValue) => Promise<void>>
+  Commands extends AnyCommandMap = {}
 > = {
   [TableName in keyof M]: RootTableRefs<M, TableName> & TableClient<M, TableName>;
-} & {
+} & CommandApi<Commands> & {
   close(): Promise<void>;
   filter: Filter;
   and(f: Filter | RawFilter[], ...filters: RawFilter[]): Filter;
@@ -1064,7 +1068,6 @@ export type DBClient<
   query(filter: RawFilter | string): Promise<unknown[]>;
   query<T>(filter: RawFilter | string): Promise<T[]>;
   syncCommand<Args extends JsonValue = JsonValue>(name: string, args?: Args): Promise<void>;
-  commands: ClientCommands<Commands>;
   createPatch(original: any[], modified: any[]): JsonPatch;
   createPatch(original: any, modified: any): JsonPatch;
   (

@@ -5,7 +5,7 @@ import type { D1Database } from '@cloudflare/workers-types';
 import type { ConnectionConfiguration } from 'tedious';
 import type { PoolAttributes } from 'oracledb';
 import type { AllowedDbMap, DbMapper, MappedDbDef, MergeProperties } from './map';
-import type { DBClient as MapDBClient, Filter as MapFilter, JsonValue as MapJsonValue, Pool as MapPool, PoolOptions as MapPoolOptions, RawFilter as MapRawFilter, TableDefinition as MapTableDefinition } from './map2';
+import type { DBClient as MapDBClient, Filter as MapFilter, Pool as MapPool, PoolOptions as MapPoolOptions, RawFilter as MapRawFilter, TableDefinition as MapTableDefinition } from './map2';
 
 declare function r(config: r.Config): unknown;
 
@@ -134,7 +134,7 @@ declare namespace r {
     export type  PoolOptions = MapPoolOptions;
     export type DBClient<
         M extends Record<string, MapTableDefinition<M>> = any,
-        Commands extends Record<string, (...args: any[]) => any> = Record<string, (args: MapJsonValue) => Promise<void>>
+        Commands extends Record<string, (...args: any[]) => any> = {}
     > = MapDBClient<M, Commands>;
 
     export interface Join {
