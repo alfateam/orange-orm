@@ -827,6 +827,18 @@ export type TableClient<M extends Record<string, TableDefinition<M>>, K extends 
   tsType<strategy extends FetchStrategy<M, K>>(
     strategy: strategy
   ): DeepExpand<Selection<M, K, strategy>>;
+
+  rowType(): WithActiveRecord<DeepExpand<Selection<M, K, {}>>, M, K>;
+
+  rowType<strategy extends FetchStrategy<M, K>>(
+    strategy: strategy
+  ): WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K>;
+
+  rowsType(): WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, {}>>>, M, K>;
+
+  rowsType<strategy extends FetchStrategy<M, K>>(
+    strategy: strategy
+  ): WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, strategy>>>, M, K>;
 };
 
 // Rest of the type definitions remain the same...

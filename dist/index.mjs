@@ -6161,6 +6161,9 @@ function requireClient () {
 				delete: _delete,
 				deleteCascade,
 				patch,
+				rowType,
+				rowsType,
+				tsType,
 				expand,
 			};
 
@@ -6179,6 +6182,18 @@ function requireClient () {
 
 			function expand() {
 				return c;
+			}
+
+			function tsType() {
+				return undefined;
+			}
+
+			function rowType() {
+				return undefined;
+			}
+
+			function rowsType() {
+				return undefined;
 			}
 
 			async function getAll() {
