@@ -570,13 +570,13 @@ type UpdateChangesRow<M extends Record<string, TableDefinition<M>>, K extends ke
 
 // NEW: Extended row types with relations support
 
-// Type for relation rows - only respects notNull, ignores notNullExceptInsert
+// Type for relation rows used in insert/update payloads.
 type RelationRow<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
-  // Required columns (notNull = true, ignoring notNullExceptInsert)
-  [C in keyof M[K]['columns'] as IsRequired<M[K]['columns'][C]> extends true ? C : never]: ColumnTypeToTS<M[K]['columns'][C]>;
+  // Required columns for insert payloads.
+  [C in keyof M[K]['columns'] as IsRequiredInsert<M[K]['columns'][C]> extends true ? C : never]: ColumnTypeToTS<M[K]['columns'][C]>;
 } & {
   // Optional columns (all others)
-  [C in keyof M[K]['columns'] as IsRequired<M[K]['columns'][C]> extends true ? never : C]?: ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
+  [C in keyof M[K]['columns'] as IsRequiredInsert<M[K]['columns'][C]> extends true ? never : C]?: ColumnTypeToTS<M[K]['columns'][C]> | null | undefined;
 };
 
 // Helper type to create relation data for insert/update operations
