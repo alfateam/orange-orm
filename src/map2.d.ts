@@ -1061,7 +1061,7 @@ export type DBClient<
   and(f: Filter | RawFilter[], ...filters: RawFilter[]): Filter;
   or(f: Filter | RawFilter[], ...filters: RawFilter[]): Filter;
   not(): Filter;
-  reactive(cb: <T>(value: T) => T): void;
+  reactive(cb: <T extends object>(value: T) => object): void;
   /**
    * Register a user-defined SQLite function on the connection.
    */
