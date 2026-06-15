@@ -692,6 +692,8 @@ type AggregateCustomSelectorProperties<M extends Record<string, TableDefinition<
 
 export type TableClient<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
   // Array methods - return arrays with array-level active record methods, but individual items are plain
+  getAll<strategy extends FetchStrategy<M, K>>(strategy?: strategy): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, strategy>>>, M, K>>;
+
   getMany<strategy extends FetchStrategy<M, K>>(strategy?: strategy): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, strategy>>>, M, K>>;
 
   // Aggregate methods - return plain objects (no active record methods)
