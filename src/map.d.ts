@@ -66,7 +66,7 @@ type DbOptions<T> = {
 
 type CommandMap<M extends Record<string, any>> = Record<
 	string,
-	((args: JsonValue) => unknown)
+	((...args: any[]) => unknown)
 	| SyncCommandHandler<M, any>
 >;
 
@@ -98,6 +98,7 @@ export interface PoolOptions<M extends Record<string, any> = any> {
 	vfs?: 'opfs' | 'opfs-sahpool';
 	sahPool?: SqliteOpfsSahPoolOptions;
 	prewarmRead?: boolean;
+	busyTimeoutMs?: number;
 }
 
 export interface SqliteOpfsSahPoolOptions {

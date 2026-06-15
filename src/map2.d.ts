@@ -1033,6 +1033,7 @@ export interface PoolOptions<M extends Record<string, any> = any> {
   vfs?: 'opfs' | 'opfs-sahpool';
   sahPool?: SqliteOpfsSahPoolOptions;
   prewarmRead?: boolean;
+  busyTimeoutMs?: number;
 }
 
 export interface SqliteOpfsSahPoolOptions {
