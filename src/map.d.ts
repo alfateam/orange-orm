@@ -27,6 +27,7 @@ export type DbMapper<T> = {
 } & T;
 
 type MappedDb<T> = {
+	<C extends CommandMap<SchemaFromMappedDb<T>>, O extends DbOptions<T> & { commands: C }>(concurrency: O): DBClient<SchemaFromMappedDb<T>, C>;
 	<O extends DbOptions<T>>(concurrency: O): NegotiateDbInstance<T, O>;
 } & DbConnectable<T>;
 
@@ -1121,6 +1122,7 @@ export type MappedDbDef<T> = {
   map<V extends AllowedDbMap<V>>(
     callback: (mapper: DbMapper<T>) => V
   ): MappedDbDef<MergeProperties<T, V>>;
+  <C extends CommandMap<SchemaFromMappedDb<T>>, O extends DbOptions<T> & { commands: C }>(concurrency: O): DBClient<SchemaFromMappedDb<T>, C>;
   <O extends DbOptions<T>>(concurrency: O): NegotiateDbInstance<T, O>;
 
   /**
