@@ -11,6 +11,7 @@ function createSyncWorkerClient(worker) {
 	return {
 		pull: request.bind(null, 'pull'),
 		push: request.bind(null, 'push'),
+		resetLocal: request.bind(null, 'resetLocal'),
 		on,
 		off,
 		close

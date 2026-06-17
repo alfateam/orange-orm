@@ -4427,6 +4427,11 @@ function requireSyncSchema () {
 		ensured.add(key);
 	}
 
+	function clearEnsuredSyncSchema(db) {
+		if (db)
+			ensuredSchemasByDb.delete(db);
+	}
+
 	function buildSyncSchema(tables, tableNames) {
 		const selected = Array.from(new Set(tableNames))
 			.filter(name => tables[name])
@@ -4697,6 +4702,7 @@ function requireSyncSchema () {
 
 	syncSchema = {
 		ensureSyncSchema,
+		clearEnsuredSyncSchema,
 		buildSyncSchema,
 		schemaToSql,
 		stableStringify,
@@ -4716,7 +4722,7 @@ function requireSyncClient () {
 	const stringify = requireStringify();
 	const { createSyncAuto } = requireSyncAuto();
 	const outboxTableSql = requireOutboxTableSql();
-	const { ensureSyncSchema } = requireSyncSchema();
+	const { ensureSyncSchema, clearEnsuredSyncSchema } = requireSyncSchema();
 
 	function newSyncClient(client, getDb, axiosInterceptor) {
 		const sinceByScope = new Map();
@@ -4737,6 +4743,7 @@ function requireSyncClient () {
 		return {
 			pull: observedPull,
 			push: observedPush,
+			resetLocal,
 			start: auto.start,
 			stop: auto.stop,
 			isRunning: auto.isRunning,
@@ -4828,6 +4835,28 @@ function requireSyncClient () {
 				return { phase: 'push', applied: 0, duplicates: 0, results: [] };
 
 			return sendPush(pushConfig, pushOptions.clientId, pushOptions.mutations);
+		}
+
+		async function resetLocal(options = {}) {
+			const db = await getDb();
+			const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
+			if (!syncConfig)
+				throw new Error('Sync is not configured. Add sync in sqlite options: sqlite(connectionString, { sync: ... })');
+			if (!options || options.force !== true)
+				throw new Error('resetLocal requires { force: true } because it deletes local sync data.');
+
+			const configuredTables = resolveSyncTables(db, normalizeConfiguredTables(options.tables) || syncConfig.tables, client);
+			if (!Array.isArray(configuredTables) || configuredTables.length === 0)
+				throw new Error('Sync resetLocal requires mapped tables or configured tables.');
+			const droppedTables = await dropLocalSyncTables(db, client, configuredTables);
+			sinceByScope.clear();
+			clearEnsuredSyncSchema(db);
+			initialReadyEmitted = false;
+			return {
+				reset: true,
+				tables: configuredTables,
+				droppedTables
+			};
 		}
 
 		async function pushPending(options = {}) {
@@ -5393,6 +5422,30 @@ function requireSyncClient () {
 		};
 	}
 
+	async function dropLocalSyncTables(db, client, tableNames) {
+		const tableDbNames = tableNames
+			.map(name => client && client.tables && client.tables[name])
+			.filter(Boolean)
+			.map(table => table._dbName)
+			.filter(Boolean);
+		const internalTables = [
+			'orange_schema_state',
+			'orange_sync_state',
+			'orange_sync_client',
+			'orange_sync_outbox'
+		];
+		const dropNames = Array.from(new Set(internalTables.concat(tableDbNames)));
+		await db.query('PRAGMA foreign_keys = OFF');
+		try {
+			for (let i = 0; i < dropNames.length; i++)
+				await db.query(`DROP TABLE IF EXISTS ${quoteIdent(dropNames[i])}`);
+		}
+		finally {
+			await db.query('PRAGMA foreign_keys = ON');
+		}
+		return dropNames;
+	}
+
 	function normalizePullConfig(config, fallbackEndpoint, fallbackTables) {
 		if (!config)
 			return undefined;
@@ -5424,6 +5477,10 @@ function requireSyncClient () {
 		if (tables.length === 0)
 			return undefined;
 		return Array.from(new Set(tables));
+	}
+
+	function quoteIdent(value) {
+		return `"${String(value).replace(/"/g, '""')}"`;
 	}
 
 	function resolveSyncTables(db, configuredTables, client) {
@@ -17051,6 +17108,7 @@ function requireSyncWorkerClient () {
 		return {
 			pull: request.bind(null, 'pull'),
 			push: request.bind(null, 'push'),
+			resetLocal: request.bind(null, 'resetLocal'),
 			on,
 			off,
 			close
@@ -17158,7 +17216,8 @@ function requireSyncWorkerHandler () {
 		let currentDrainPromise = Promise.resolve();
 		const pending = {
 			push: [],
-			pull: []
+			pull: [],
+			resetLocal: []
 		};
 		let auto;
 		const postMessage = options.postMessage || ((message) => {
@@ -17174,6 +17233,7 @@ function requireSyncWorkerHandler () {
 			handleMessage,
 			pull: requestPull,
 			push: requestPush,
+			resetLocal: requestResetLocal,
 			stop
 		};
 
@@ -17187,6 +17247,8 @@ function requireSyncWorkerHandler () {
 					result = await requestPull(message.options);
 				else if (message.method === 'push')
 					result = await requestPush(message.options);
+				else if (message.method === 'resetLocal')
+					result = await requestResetLocal(message.options);
 				else
 					throw new Error(`Unknown sync worker method "${message.method}".`);
 				postResponse(message.id, result);
@@ -17202,6 +17264,10 @@ function requireSyncWorkerHandler () {
 
 		function requestPull(options) {
 			return requestSync('pull', options);
+		}
+
+		function requestResetLocal(options) {
+			return requestSync('resetLocal', options);
 		}
 
 		function stop() {
@@ -17233,7 +17299,7 @@ function requireSyncWorkerHandler () {
 
 		async function run() {
 			while (hasPending()) {
-				const method = pending.push.length > 0 ? 'push' : 'pull';
+				const method = pending.resetLocal.length > 0 ? 'resetLocal' : pending.push.length > 0 ? 'push' : 'pull';
 				const batch = pending[method].splice(0);
 				const options = batch[batch.length - 1].options;
 				try {
@@ -17259,7 +17325,7 @@ function requireSyncWorkerHandler () {
 		}
 
 		function hasPending() {
-			return pending.push.length > 0 || pending.pull.length > 0;
+			return pending.resetLocal.length > 0 || pending.push.length > 0 || pending.pull.length > 0;
 		}
 
 		function resolveBatch(batch, result) {

@@ -64,6 +64,11 @@ function markSchemaEnsured(db, key) {
 	ensured.add(key);
 }
 
+function clearEnsuredSyncSchema(db) {
+	if (db)
+		ensuredSchemasByDb.delete(db);
+}
+
 function buildSyncSchema(tables, tableNames) {
 	const selected = Array.from(new Set(tableNames))
 		.filter(name => tables[name])
@@ -334,6 +339,7 @@ function checksumString(value) {
 
 module.exports = {
 	ensureSyncSchema,
+	clearEnsuredSyncSchema,
 	buildSyncSchema,
 	schemaToSql,
 	stableStringify,

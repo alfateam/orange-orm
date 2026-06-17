@@ -8,7 +8,8 @@ function createSyncWorkerHandler(syncClient, options = {}) {
 	let currentDrainPromise = Promise.resolve();
 	const pending = {
 		push: [],
-		pull: []
+		pull: [],
+		resetLocal: []
 	};
 	let auto;
 	const postMessage = options.postMessage || ((message) => {
@@ -24,6 +25,7 @@ function createSyncWorkerHandler(syncClient, options = {}) {
 		handleMessage,
 		pull: requestPull,
 		push: requestPush,
+		resetLocal: requestResetLocal,
 		stop
 	};
 
@@ -37,6 +39,8 @@ function createSyncWorkerHandler(syncClient, options = {}) {
 				result = await requestPull(message.options);
 			else if (message.method === 'push')
 				result = await requestPush(message.options);
+			else if (message.method === 'resetLocal')
+				result = await requestResetLocal(message.options);
 			else
 				throw new Error(`Unknown sync worker method "${message.method}".`);
 			postResponse(message.id, result);
@@ -52,6 +56,10 @@ function createSyncWorkerHandler(syncClient, options = {}) {
 
 	function requestPull(options) {
 		return requestSync('pull', options);
+	}
+
+	function requestResetLocal(options) {
+		return requestSync('resetLocal', options);
 	}
 
 	function stop() {
@@ -83,7 +91,7 @@ function createSyncWorkerHandler(syncClient, options = {}) {
 
 	async function run() {
 		while (hasPending()) {
-			const method = pending.push.length > 0 ? 'push' : 'pull';
+			const method = pending.resetLocal.length > 0 ? 'resetLocal' : pending.push.length > 0 ? 'push' : 'pull';
 			const batch = pending[method].splice(0);
 			const options = batch[batch.length - 1].options;
 			try {
@@ -109,7 +117,7 @@ function createSyncWorkerHandler(syncClient, options = {}) {
 	}
 
 	function hasPending() {
-		return pending.push.length > 0 || pending.pull.length > 0;
+		return pending.resetLocal.length > 0 || pending.push.length > 0 || pending.pull.length > 0;
 	}
 
 	function resolveBatch(batch, result) {

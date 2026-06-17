@@ -3,7 +3,7 @@ const randomUuid = require('../randomUuid');
 const stringify = require('./stringify');
 const { createSyncAuto } = require('./syncAuto');
 const outboxTableSql = require('../sync/outboxTableSql');
-const { ensureSyncSchema } = require('./syncSchema');
+const { ensureSyncSchema, clearEnsuredSyncSchema } = require('./syncSchema');
 
 function newSyncClient(client, getDb, axiosInterceptor) {
 	const sinceByScope = new Map();
@@ -24,6 +24,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 	return {
 		pull: observedPull,
 		push: observedPush,
+		resetLocal,
 		start: auto.start,
 		stop: auto.stop,
 		isRunning: auto.isRunning,
@@ -115,6 +116,28 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 			return { phase: 'push', applied: 0, duplicates: 0, results: [] };
 
 		return sendPush(pushConfig, pushOptions.clientId, pushOptions.mutations);
+	}
+
+	async function resetLocal(options = {}) {
+		const db = await getDb();
+		const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
+		if (!syncConfig)
+			throw new Error('Sync is not configured. Add sync in sqlite options: sqlite(connectionString, { sync: ... })');
+		if (!options || options.force !== true)
+			throw new Error('resetLocal requires { force: true } because it deletes local sync data.');
+
+		const configuredTables = resolveSyncTables(db, normalizeConfiguredTables(options.tables) || syncConfig.tables, client);
+		if (!Array.isArray(configuredTables) || configuredTables.length === 0)
+			throw new Error('Sync resetLocal requires mapped tables or configured tables.');
+		const droppedTables = await dropLocalSyncTables(db, client, configuredTables);
+		sinceByScope.clear();
+		clearEnsuredSyncSchema(db);
+		initialReadyEmitted = false;
+		return {
+			reset: true,
+			tables: configuredTables,
+			droppedTables
+		};
 	}
 
 	async function pushPending(options = {}) {
@@ -680,6 +703,30 @@ function normalizeSyncConfig(sync) {
 	};
 }
 
+async function dropLocalSyncTables(db, client, tableNames) {
+	const tableDbNames = tableNames
+		.map(name => client && client.tables && client.tables[name])
+		.filter(Boolean)
+		.map(table => table._dbName)
+		.filter(Boolean);
+	const internalTables = [
+		'orange_schema_state',
+		'orange_sync_state',
+		'orange_sync_client',
+		'orange_sync_outbox'
+	];
+	const dropNames = Array.from(new Set(internalTables.concat(tableDbNames)));
+	await db.query('PRAGMA foreign_keys = OFF');
+	try {
+		for (let i = 0; i < dropNames.length; i++)
+			await db.query(`DROP TABLE IF EXISTS ${quoteIdent(dropNames[i])}`);
+	}
+	finally {
+		await db.query('PRAGMA foreign_keys = ON');
+	}
+	return dropNames;
+}
+
 function normalizePullConfig(config, fallbackEndpoint, fallbackTables) {
 	if (!config)
 		return undefined;
@@ -711,6 +758,10 @@ function normalizeConfiguredTables(value) {
 	if (tables.length === 0)
 		return undefined;
 	return Array.from(new Set(tables));
+}
+
+function quoteIdent(value) {
+	return `"${String(value).replace(/"/g, '""')}"`;
 }
 
 function resolveSyncTables(db, configuredTables, client) {

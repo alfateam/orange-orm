@@ -1009,6 +1009,17 @@ export interface SyncPushOptions {
   mutations: SyncPushMutation[];
 }
 
+export interface SyncResetLocalOptions<M extends Record<string, any> = any> {
+  force: true;
+  tables?: SyncTableName<M>[];
+}
+
+export interface SyncResetLocalResult<M extends Record<string, any> = any> {
+  reset: true;
+  tables: SyncTableName<M>[];
+  droppedTables: string[];
+}
+
 export interface SyncPushMutationResult {
   id: string;
   table?: string;
@@ -1097,6 +1108,7 @@ export type DBClient<
   syncClient: {
     pull(options?: SyncPullOptions): Promise<SyncPullResult>;
     push(options?: Partial<SyncPushOptions>): Promise<SyncPushResult>;
+    resetLocal(options: SyncResetLocalOptions<M>): Promise<SyncResetLocalResult<M>>;
     start(): Promise<unknown> | undefined;
     stop(): void | Promise<unknown>;
     isRunning(): boolean | Promise<boolean>;
