@@ -11,7 +11,6 @@ const clone = require('rfdc/default');
 const createHttpInterceptor = require('./httpInterceptor');
 const flags = require('../flags');
 const newSyncClient = require('./syncClient');
-const setSessionSingleton = require('../table/setSessionSingleton');
 
 function rdbClient(options = {}) {
 	flags.useLazyDefaults = false;
@@ -265,18 +264,9 @@ function rdbClient(options = {}) {
 		if (!db.createTransaction)
 			throw new Error('Transaction not supported through http');
 		const transaction = db.createTransaction(_options);
-		const wrappedTransaction = async (innerFn) => {
-			return transaction(async (context) => {
-				if (_options && _options.suppressSyncOutbox)
-					setSessionSingleton(context, 'suppressSyncOutbox', true);
-				return innerFn(context);
-			});
-		};
-		wrappedTransaction.commit = transaction.commit;
-		wrappedTransaction.rollback = transaction.rollback;
 
 		try {
-			const nextClient = client({ transaction: wrappedTransaction });
+			const nextClient = client({ transaction });
 			const result = await fn(nextClient);
 			transaction.done = true;
 			await transaction(transaction.commit);

@@ -63,7 +63,9 @@ function httpAdapter(baseURL, path, httpInterceptor) {
 			if (typeof name !== 'string' || name.length === 0)
 				throw new Error('Sync command requires a command name');
 			const headers = { 'Content-Type': 'application/json' };
-			const res = await axios.request(`?command=${encodeURIComponent(name)}`, {
+			const res = await request({
+				baseURL,
+				url: `?command=${encodeURIComponent(name)}`,
 				headers,
 				method: 'post',
 				data: body

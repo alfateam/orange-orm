@@ -239,7 +239,20 @@ CREATE TABLE bigintChild (
 
 `;
 
+async function truncateMasterLog(db) {
+	try {
+		await db.query('dump transaction master with truncate_only');
+	}
+	catch (e) {
+		await db.query('dump transaction master with no_log');
+	}
+
+	await db.query('checkpoint');
+}
+
 module.exports = async function(db) {
+	await truncateMasterLog(db);
+
 	const statements = sql.split('GO');
 	for (let i = 0; i < statements.length; i++) {
 		await db.query(statements[i]);

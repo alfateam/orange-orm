@@ -1,4 +1,3 @@
-const _axios = require('axios');
 const randomUuid = require('../randomUuid');
 const stringify = require('./stringify');
 const { createSyncAuto } = require('./syncAuto');
@@ -457,6 +456,18 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		ensured.add(tableName);
 	}
 
+	function clearInternalTableEnsured(db, tableName) {
+		const ensured = ensuredInternalTables.get(db);
+		if (ensured)
+			ensured.delete(tableName);
+	}
+
+	function isMissingSqliteTableError(error, tableName) {
+		const message = error && error.message || '';
+		return message.includes(`no such table: ${tableName}`)
+			|| message.includes(`no such table: ${quoteIdent(tableName)}`);
+	}
+
 	async function getClientId(db) {
 		await ensureSyncClientTable(db);
 		const rows = await db.query(`SELECT "id" FROM "${syncClientTable}" LIMIT 1`);
@@ -550,10 +561,24 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 	async function readScopeState(scopeKey, db) {
 		if (!db || typeof db.query !== 'function')
 			return undefined;
-		await ensureSyncStateTable(db);
-		const rows = await db.query(
-			`SELECT "since_value" FROM "${syncStateTable}" WHERE "scope" = ${sqlStringLiteral(scopeKey)} LIMIT 1`
-		);
+		let rows;
+		for (let attempt = 0; attempt < 2; attempt++) {
+			await ensureSyncStateTable(db);
+			try {
+				rows = await db.query(
+					`SELECT "since_value" FROM "${syncStateTable}" WHERE "scope" = ${sqlStringLiteral(scopeKey)} LIMIT 1`
+				);
+				break;
+			}
+			catch (e) {
+				if (attempt === 0 && isMissingSqliteTableError(e, syncStateTable)) {
+					clearInternalTableEnsured(db, syncStateTable);
+					sinceByScope.clear();
+					continue;
+				}
+				throw e;
+			}
+		}
 		const row = Array.isArray(rows) ? rows[0] : rows?.rows?.[0];
 		if (!row)
 			return undefined;
@@ -577,12 +602,25 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 	async function writeScopeState(scopeKey, state, db) {
 		if (!db || typeof db.query !== 'function')
 			return;
-		await ensureSyncStateTable(db);
 		const sinceSerialized = JSON.stringify(state);
-		await db.query(
-			`INSERT INTO "${syncStateTable}" ("scope", "since_value") VALUES (${sqlStringLiteral(scopeKey)}, ${sqlStringLiteral(sinceSerialized)}) `
-			+ 'ON CONFLICT("scope") DO UPDATE SET "since_value" = excluded."since_value"'
-		);
+		for (let attempt = 0; attempt < 2; attempt++) {
+			await ensureSyncStateTable(db);
+			try {
+				await db.query(
+					`INSERT INTO "${syncStateTable}" ("scope", "since_value") VALUES (${sqlStringLiteral(scopeKey)}, ${sqlStringLiteral(sinceSerialized)}) `
+					+ 'ON CONFLICT("scope") DO UPDATE SET "since_value" = excluded."since_value"'
+				);
+				return;
+			}
+			catch (e) {
+				if (attempt === 0 && isMissingSqliteTableError(e, syncStateTable)) {
+					clearInternalTableEnsured(db, syncStateTable);
+					sinceByScope.clear();
+					continue;
+				}
+				throw e;
+			}
+		}
 	}
 
 	function on(event, listener) {
@@ -843,9 +881,8 @@ function resolvePushConfig(syncConfig, options = {}) {
 }
 
 async function requestPayload(config, options) {
-	const axiosRoot = _axios.default || _axios;
-	const axios = typeof axiosRoot.create === 'function' ? axiosRoot.create() : axiosRoot;
 	const axiosInterceptor = options && options._syncAxiosInterceptor;
+	const axios = createFetchClient();
 	if (axiosInterceptor && typeof axiosInterceptor.applyTo === 'function')
 		axiosInterceptor.applyTo(axios);
 	const requestBody = config.body !== undefined ? config.body : {
@@ -862,6 +899,64 @@ async function requestPayload(config, options) {
 
 	const response = await axios.request(request);
 	return response.data;
+}
+
+function createFetchClient() {
+	return {
+		request
+	};
+
+	async function request(config) {
+		if (typeof fetch !== 'function')
+			throw new Error('HTTP client requires fetch. Use a runtime with fetch support or provide a fetch polyfill.');
+
+		const abortController = typeof AbortController === 'function' && config.timeout
+			? new AbortController()
+			: undefined;
+		let timeout;
+		if (abortController)
+			timeout = setTimeout(() => abortController.abort(), config.timeout);
+
+		try {
+			const response = await fetch(config.url, {
+				method: config.method?.toUpperCase(),
+				headers: {
+					'Content-Type': 'application/json',
+					'Accept': 'application/json'
+				},
+				body: config.data === undefined ? undefined : JSON.stringify(config.data),
+				signal: abortController && abortController.signal
+			});
+			const data = await readPayloadResponse(response);
+			if (!response.ok) {
+				const error = new Error('Request failed with status code ' + response.status);
+				error.response = {
+					data,
+					status: response.status,
+					statusText: response.statusText
+				};
+				throw error;
+			}
+			return { data };
+		}
+		finally {
+			if (timeout)
+				clearTimeout(timeout);
+		}
+	}
+}
+
+async function readPayloadResponse(response) {
+	const text = await response.text();
+	const contentType = response.headers.get('content-type') || '';
+	if (text && (contentType.indexOf('application/json') !== -1 || looksLikeJson(text)))
+		return JSON.parse(text);
+	return text;
+}
+
+function looksLikeJson(text) {
+	const value = text.trim();
+	return value[0] === '{' || value[0] === '[';
 }
 
 function appendQueryParam(url, key, value) {

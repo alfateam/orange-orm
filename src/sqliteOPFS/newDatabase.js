@@ -15,6 +15,8 @@ function newDatabase(connectionString, poolOptions) {
 	if (!connectionString)
 		throw new Error('Connection string cannot be empty');
 	poolOptions = poolOptions || { min: 1 };
+	if ((poolOptions.worker || poolOptions.createWorker) && !('singleWorker' in poolOptions))
+		poolOptions = { ...poolOptions, singleWorker: true };
 	var pool = newPool(connectionString, poolOptions);
 	pool.__sqliteSync = poolOptions && poolOptions.sync;
 

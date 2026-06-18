@@ -1,4 +1,3 @@
-# FROM node:18-alpine
 FROM mcr.microsoft.com/vscode/devcontainers/javascript-node:dev-22-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive

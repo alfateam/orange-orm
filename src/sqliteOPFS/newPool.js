@@ -7,7 +7,10 @@ function newPool(connectionString, poolOptions) {
 	let client = createSqliteOPFSWorkerClient(connectionString, poolOptions || {});
 	let readClient;
 	let c = {};
-	const singleWorker = poolOptions && poolOptions.vfs === 'opfs-sahpool';
+	const singleWorker = poolOptions && (
+		poolOptions.vfs === 'opfs-sahpool'
+		|| poolOptions.singleWorker
+	);
 
 	prewarmReadClient();
 

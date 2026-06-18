@@ -4,6 +4,8 @@ let setSessionSingleton = require('./setSessionSingleton');
 let tryGetSessionContext = require('./tryGetSessionContext');
 
 function begin(context, options) {
+	if (options && options.suppressSyncOutbox)
+		setSessionSingleton(context, 'suppressSyncOutbox', true);
 	if (isTransactionLess(context, options)) {
 		setSessionSingleton(context, 'transactionLess', true);
 		return Promise.resolve();

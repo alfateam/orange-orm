@@ -246,18 +246,34 @@ function hostLocal() {
 		if (!state) {
 			state = { id: randomUuid(), patches: [], commands: [] };
 			setSessionSingleton(context, 'syncOutboxCapture', state);
-			await ensureSyncOutboxTable(context, pool);
-			await querySyncOutbox(context, [
-				'INSERT INTO "orange_sync_outbox" ("mutation_id", "table_name", "patch_json", "options_json", "created_at_ms")',
-				`VALUES (${sqlStringLiteral(state.id)}, '*', '[]', '{}', ${Date.now()})`,
-				'ON CONFLICT("mutation_id") DO NOTHING'
-			].join(' '));
+			await insertSyncOutboxPlaceholder(context, pool, state.id);
 		}
 		if (!Array.isArray(state.patches))
 			state.patches = [];
 		if (!Array.isArray(state.commands))
 			state.commands = [];
 		return state;
+	}
+
+	async function insertSyncOutboxPlaceholder(context, pool, id) {
+		for (let attempt = 0; attempt < 2; attempt++) {
+			await ensureSyncOutboxTable(context);
+			try {
+				await querySyncOutbox(context, [
+					'INSERT INTO "orange_sync_outbox" ("mutation_id", "table_name", "patch_json", "options_json", "created_at_ms")',
+					`VALUES (${sqlStringLiteral(id)}, '*', '[]', '{}', ${Date.now()})`,
+					'ON CONFLICT("mutation_id") DO NOTHING'
+				].join(' '));
+				return;
+			}
+			catch (e) {
+				if (attempt === 0 && isMissingSqliteTableError(e, 'orange_sync_outbox')) {
+					delete pool[syncOutboxEnsuredKey];
+					continue;
+				}
+				throw e;
+			}
+		}
 	}
 
 	async function updateSyncOutboxCaptureState(context, state) {
@@ -283,11 +299,13 @@ function hostLocal() {
 		return JSON.parse(JSON.stringify(args));
 	}
 
-	async function ensureSyncOutboxTable(context, pool) {
-		if (pool[syncOutboxEnsuredKey])
+	async function ensureSyncOutboxTable(context) {
+		const pool = getSessionSingleton(context, 'poolFactory');
+		if (pool && pool[syncOutboxEnsuredKey])
 			return;
 		await querySyncOutbox(context, outboxTableSql());
-		pool[syncOutboxEnsuredKey] = true;
+		if (pool)
+			pool[syncOutboxEnsuredKey] = true;
 	}
 
 	function querySyncOutbox(context, sql) {
@@ -296,6 +314,12 @@ function hostLocal() {
 
 	function sqlStringLiteral(value) {
 		return `'${String(value).replace(/'/g, '\'\'')}'`;
+	}
+
+	function isMissingSqliteTableError(error, tableName) {
+		const message = error && error.message || '';
+		return message.includes(`no such table: ${tableName}`)
+			|| message.includes(`no such table: "${tableName}"`);
 	}
 
 	function sanitizeSyncPatchOptions(options) {
