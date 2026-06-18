@@ -108,27 +108,35 @@ function applyPatch({ options = {}, context }, dto, changes, column) {
 
 }
 
-// function assertDatesEqual(date1, date2) {
-// 	if (date1 && date2) {
-// 		const parts1 = date1.split('T');
-// 		const time1parts = (parts1[1] || '').split(/[-+.]/);
-// 		const parts2 = date2.split('T');
-// 		const time2parts = (parts2[1] || '').split(/[-+.]/);
-// 		while (time1parts.length !== time2parts.length) {
-// 			if (time1parts.length > time2parts.length)
-// 				time1parts.pop();
-// 			else if (time1parts.length < time2parts.length)
-// 				time2parts.pop();
-// 		}
-// 		date1 = `${parts1[0]}T${time1parts[0]}`;
-// 		date2 = `${parts2[0]}T${time2parts[0]}`;
-// 	}
-// 	assertDeepEqual(date1, date2);
-// }
-
 function assertDeepEqual(a, b) {
-	if (JSON.stringify(a) !== JSON.stringify(b))
+	if (!deepEqual(a, b))
 		throw new Error('A, b are not equal');
+}
+
+function deepEqual(a, b) {
+	if (a === b) return true;
+	if (a instanceof Date && b instanceof Date) return a.getTime() === b.getTime();
+	if (a && b && typeof a === 'object' && typeof b === 'object') {
+		if (a.constructor !== b.constructor) return false;
+		if (Array.isArray(a)) {
+			if (a.length !== b.length) return false;
+			for (let i = 0; i < a.length; i++) {
+				if (!deepEqual(a[i], b[i])) return false;
+			}
+			return true;
+		}
+		const keysA = Object.keys(a);
+		const keysB = Object.keys(b);
+		if (keysA.length !== keysB.length) return false;
+		for (const key of keysA) {
+			if (!Object.prototype.hasOwnProperty.call(b, key)) return false;
+		}
+		for (const key of keysA) {
+			if (!deepEqual(a[key], b[key])) return false;
+		}
+		return true;
+	}
+	return a !== a && b !== b; // Handle NaN
 }
 
 module.exports = applyPatch;
