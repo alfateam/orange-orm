@@ -1,5 +1,5 @@
 const stringify = require('./stringify');
-const randomUuid = require('../randomUuid');
+const newMemoryId = require('../newMemoryId');
 
 function toKeyPositionMap(rows, options) {
 	return rows.reduce((map, element, i) => {
@@ -22,7 +22,7 @@ function toKeyPositionMap(rows, options) {
 
 function negotiateTempKey(value) {
 	if (value === undefined)
-		return `~${randomUuid()}`;
+		return `~${newMemoryId()}`;
 	else
 		return value;
 }

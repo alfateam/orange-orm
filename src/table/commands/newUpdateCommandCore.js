@@ -84,11 +84,19 @@ function newUpdateCommandCore(context, table, columns, row, concurrencyState) {
 		if (engine === 'pg') {
 			command = command.append(separator + columnSql + ' IS NOT DISTINCT FROM ').append(encoded);
 		}
-		else if (engine === 'mysql') {
+		else if (engine === 'mysql' || engine === 'mariadb') {
 			command = command.append(separator + columnSql + ' <=> ').append(encoded);
 		}
 		else if (engine === 'sqlite') {
 			command = command.append(separator + columnSql + ' IS ').append(encoded);
+		}
+		else if (engine === 'sap' && column.tsType === 'DateColumn') {
+			if (encoded.sql() === 'null') {
+				command = command.append(separator + columnSql + ' IS NULL');
+			}
+			else {
+				command = command.append(separator + column.formatOut(context) + '=').append(encoded);
+			}
 		}
 		else if (engine === 'sap' && column.tsType === 'JSONColumn') {
 			if (encoded.sql() === 'null') {
@@ -123,7 +131,7 @@ function newUpdateCommandCore(context, table, columns, row, concurrencyState) {
 		if (engine === 'pg') {
 			command = command.append(separator).append(columnExpr).append(' IS NOT DISTINCT FROM ').append(encoded);
 		}
-		else if (engine === 'mysql') {
+		else if (engine === 'mysql' || engine === 'mariadb') {
 			command = command.append(separator).append(columnExpr).append(' <=> ').append(encoded);
 		}
 		else if (engine === 'sqlite') {
@@ -184,6 +192,11 @@ function newUpdateCommandCore(context, table, columns, row, concurrencyState) {
 			const sql = 'JSON_SET(' + expr.sql() + ', ' + jsonPath.sql + ', CAST(? AS JSON))';
 			return newParameterized(sql, expr.parameters.concat(jsonPath.parameters, [jsonValue]));
 		}
+		if (engine === 'mariadb') {
+			const jsonValue = JSON.stringify(value === undefined ? null : value);
+			const sql = 'JSON_SET(' + expr.sql() + ', ' + jsonPath.sql + ', JSON_EXTRACT(?, \'$\'))';
+			return newParameterized(sql, expr.parameters.concat(jsonPath.parameters, [jsonValue]));
+		}
 		if (engine === 'sqlite') {
 			const jsonValue = JSON.stringify(value === undefined ? null : value);
 			const sql = 'json_set(' + expr.sql() + ', ' + jsonPath.sql + ', json(?))';
@@ -208,7 +221,7 @@ function newUpdateCommandCore(context, table, columns, row, concurrencyState) {
 			const sql = expr.sql() + ' #- ' + pathLiteral;
 			return newParameterized(sql, expr.parameters);
 		}
-		if (engine === 'mysql') {
+		if (engine === 'mysql' || engine === 'mariadb') {
 			const sql = 'JSON_REMOVE(' + expr.sql() + ', ' + jsonPath.sql + ')';
 			return newParameterized(sql, expr.parameters.concat(jsonPath.parameters));
 		}
@@ -234,6 +247,12 @@ function newUpdateCommandCore(context, table, columns, row, concurrencyState) {
 		}
 		if (engine === 'mysql') {
 			const sql = 'JSON_EXTRACT(' + columnSql + ', ' + jsonPath.sql + ')';
+			return newParameterized(sql, jsonPath.parameters);
+		}
+		if (engine === 'mariadb') {
+			const sql = isJsonObject(oldValue)
+				? 'JSON_EXTRACT(' + columnSql + ', ' + jsonPath.sql + ')'
+				: 'JSON_UNQUOTE(JSON_EXTRACT(' + columnSql + ', ' + jsonPath.sql + '))';
 			return newParameterized(sql, jsonPath.parameters);
 		}
 		if (engine === 'sqlite') {
@@ -310,6 +329,15 @@ function newUpdateCommandCore(context, table, columns, row, concurrencyState) {
 		if (engine === 'mysql') {
 			const jsonValue = JSON.stringify(value === undefined ? null : value);
 			return newParameterized('CAST(? AS JSON)', [jsonValue]);
+		}
+		if (engine === 'mariadb') {
+			if (isJsonObject(value)) {
+				const jsonValue = JSON.stringify(value);
+				return newParameterized('JSON_EXTRACT(?, \'$\')', [jsonValue]);
+			}
+			if (value === null || value === undefined)
+				return newParameterized('null');
+			return newParameterized('?', [String(value)]);
 		}
 		if (engine === 'sqlite') {
 			if (isJsonObject(value)) {

@@ -2,6 +2,7 @@
 /** @type {import('vitest').UserConfig} */
 module.exports = {
 	test: {
+		fileParallelism: false,
 		// Copied baseline excludes (since configDefaults is ESM-only)
 		exclude: [
 			'**/node_modules/**',
@@ -12,6 +13,8 @@ module.exports = {
 			'**/*.deno.test.js',
 			'**/*.bun.test.js',
 		],
-		threads: false,
+		pool: 'forks',
+		maxWorkers: 1,
+		isolate: false,
 	},
 };

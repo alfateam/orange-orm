@@ -1,10 +1,13 @@
 *Spec
 tests
+orange-sync-demo
+node_modules
 .vscode
 .devcontainer
 pglite.db*
 demo.db
 demo*.db*
+other.db
 favicon.ico
 assets
 _config.yml

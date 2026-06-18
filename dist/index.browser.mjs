@@ -2,8 +2,8 @@ void !function() {
 	typeof self === 'undefined' && typeof global === 'object'
 		? global.self = global : null;
 }();import * as fastJsonPatch from 'fast-json-patch';
-import * as axios from 'axios';
 import * as _default from 'rfdc/default';
+import * as axios$1 from 'axios';
 import * as ajv from 'ajv';
 import * as onChange from '@lroal/on-change';
 
@@ -388,12 +388,29 @@ ${row}`;
 /* eslint-disable @typescript-eslint/no-empty-interface */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { AxiosInterceptorManager, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 import type { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Hono, Url, ColumnConcurrency, JsonPatch } from 'orange-orm';
 export { RequestHandler } from 'express';
 export { Concurrency, Filter, RawFilter, Config, TransactionOptions, Pool } from 'orange-orm';
 export = r;
 declare function r(config: Config): r.RdbClient;
+type HttpInterceptorManager<T> = {
+	use(onFulfilled?: (value: T) => T | Promise<T>, onRejected?: (error: any) => any): string;
+	eject(id: string): void;
+};
+type HttpRequestConfig = {
+	baseURL?: string;
+	url?: string;
+	method?: string;
+	headers: Record<string, string>;
+	data?: any;
+};
+type HttpResponse<T = any> = {
+	data: T;
+	status: number;
+	statusText: string;
+	headers: Record<string, string>;
+	config: HttpRequestConfig;
+};
 `;
 
 		return `
@@ -401,8 +418,25 @@ declare function r(config: Config): r.RdbClient;
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import schema from './schema';
-import type { AxiosInterceptorManager, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 import type { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Hono, Url, ColumnConcurrency, JsonPatch } from 'orange-orm';
+type HttpInterceptorManager<T> = {
+	use(onFulfilled?: (value: T) => T | Promise<T>, onRejected?: (error: any) => any): string;
+	eject(id: string): void;
+};
+type HttpRequestConfig = {
+	baseURL?: string;
+	url?: string;
+	method?: string;
+	headers: Record<string, string>;
+	data?: any;
+};
+type HttpResponse<T = any> = {
+	data: T;
+	status: number;
+	statusText: string;
+	headers: Record<string, string>;
+	config: HttpRequestConfig;
+};
 export default schema as RdbClient;`;
 	}
 
@@ -439,8 +473,8 @@ declare namespace r {${getTables(isHttp)}
 				result += `
 
 	const interceptors: {
-		request: AxiosInterceptorManager<InternalAxiosRequestConfig>;
-		response: AxiosInterceptorManager<AxiosResponse>;
+		request: HttpInterceptorManager<HttpRequestConfig>;
+		response: HttpInterceptorManager<HttpResponse>;
 	};
 	function reactive(proxyMethod: (obj: unknown) => unknown): void;	
 	function and(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
@@ -565,8 +599,8 @@ export interface HonoTables {${getHonoTables()}
 				result += `
 	(config: {db: Url}): RdbClient;
 	interceptors: {
-        request: AxiosInterceptorManager<InternalAxiosRequestConfig>;
-        response: AxiosInterceptorManager<AxiosResponse>;
+        request: HttpInterceptorManager<HttpRequestConfig>;
+        response: HttpInterceptorManager<HttpResponse>;
     };
 	reactive(proxyMethod: (obj: unknown) => unknown): void;
 	and(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
@@ -1866,45 +1900,18 @@ function requireHostHono () {
 
 var require$$0$2 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(fastJsonPatch);
 
-var randomUuid_1;
-var hasRequiredRandomUuid;
+var newMemoryId;
+var hasRequiredNewMemoryId;
 
-function requireRandomUuid () {
-	if (hasRequiredRandomUuid) return randomUuid_1;
-	hasRequiredRandomUuid = 1;
-	function randomUuid() {
-		const crypto = typeof globalThis !== 'undefined' && globalThis.crypto;
-		if (crypto && typeof crypto.randomUUID === 'function')
-			return crypto.randomUUID();
+function requireNewMemoryId () {
+	if (hasRequiredNewMemoryId) return newMemoryId;
+	hasRequiredNewMemoryId = 1;
+	let nextId = 1;
 
-		const bytes = new Uint8Array(16);
-		if (crypto && typeof crypto.getRandomValues === 'function') {
-			crypto.getRandomValues(bytes);
-		}
-		else {
-			for (let i = 0; i < bytes.length; i++) {
-				bytes[i] = Math.floor(Math.random() * 256);
-			}
-		}
-
-		bytes[6] = (bytes[6] & 0x0f) | 0x40;
-		bytes[8] = (bytes[8] & 0x3f) | 0x80;
-
-		const hex = [];
-		for (let i = 0; i < 256; i++) {
-			hex[i] = (i + 0x100).toString(16).slice(1);
-		}
-		return [
-			hex[bytes[0]], hex[bytes[1]], hex[bytes[2]], hex[bytes[3]], '-',
-			hex[bytes[4]], hex[bytes[5]], '-',
-			hex[bytes[6]], hex[bytes[7]], '-',
-			hex[bytes[8]], hex[bytes[9]], '-',
-			hex[bytes[10]], hex[bytes[11]], hex[bytes[12]], hex[bytes[13]], hex[bytes[14]], hex[bytes[15]]
-		].join('');
-	}
-
-	randomUuid_1 = randomUuid;
-	return randomUuid_1;
+	newMemoryId = function newMemoryId() {
+		return `tmp${nextId++}`;
+	};
+	return newMemoryId;
 }
 
 var createPatch;
@@ -1916,7 +1923,7 @@ function requireCreatePatch () {
 	const jsonpatch = require$$0$2;
 	let dateToIsoString = requireDateToISOString();
 	let stringify = requireStringify();
-	let randomUuid = requireRandomUuid();
+	let newMemoryId = requireNewMemoryId();
 
 	createPatch = function createPatch(original, dto, options) {
 		let subject = toCompareObject({ d: original }, options, true);
@@ -2025,7 +2032,7 @@ function requireCreatePatch () {
 
 		function negotiateTempKey(value) {
 			if (value === undefined)
-				return `~${randomUuid()}`;
+				return `~${newMemoryId()}`;
 			else
 				return value;
 		}
@@ -3432,6 +3439,47 @@ function requireSqliteFunction () {
 	return sqliteFunction;
 }
 
+var randomUuid_1;
+var hasRequiredRandomUuid;
+
+function requireRandomUuid () {
+	if (hasRequiredRandomUuid) return randomUuid_1;
+	hasRequiredRandomUuid = 1;
+	function randomUuid() {
+		const crypto = typeof globalThis !== 'undefined' && globalThis.crypto;
+		if (crypto && typeof crypto.randomUUID === 'function')
+			return crypto.randomUUID();
+
+		const bytes = new Uint8Array(16);
+		if (crypto && typeof crypto.getRandomValues === 'function') {
+			crypto.getRandomValues(bytes);
+		}
+		else {
+			for (let i = 0; i < bytes.length; i++) {
+				bytes[i] = Math.floor(Math.random() * 256);
+			}
+		}
+
+		bytes[6] = (bytes[6] & 0x0f) | 0x40;
+		bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+		const hex = [];
+		for (let i = 0; i < 256; i++) {
+			hex[i] = (i + 0x100).toString(16).slice(1);
+		}
+		return [
+			hex[bytes[0]], hex[bytes[1]], hex[bytes[2]], hex[bytes[3]], '-',
+			hex[bytes[4]], hex[bytes[5]], '-',
+			hex[bytes[6]], hex[bytes[7]], '-',
+			hex[bytes[8]], hex[bytes[9]], '-',
+			hex[bytes[10]], hex[bytes[11]], hex[bytes[12]], hex[bytes[13]], hex[bytes[14]], hex[bytes[15]]
+		].join('');
+	}
+
+	randomUuid_1 = randomUuid;
+	return randomUuid_1;
+}
+
 var outboxTableSql_1;
 var hasRequiredOutboxTableSql;
 
@@ -3845,21 +3893,13 @@ function requireCloneFromDb () {
 	return cloneFromDb_1;
 }
 
-var require$$0$1 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(axios);
-
 var netAdapter_1;
 var hasRequiredNetAdapter;
 
 function requireNetAdapter () {
 	if (hasRequiredNetAdapter) return netAdapter_1;
 	hasRequiredNetAdapter = 1;
-	const _axios = require$$0$1;
-
-	function httpAdapter(baseURL, path, axiosInterceptor) {
-		//@ts-ignore
-		const axios = _axios.default ? _axios.default.create({ baseURL }) : _axios.create({ baseURL });
-		axiosInterceptor.applyTo(axios);
-
+	function httpAdapter(baseURL, path, httpInterceptor) {
 		let c = {
 			get,
 			post,
@@ -3875,7 +3915,7 @@ function requireNetAdapter () {
 		async function get() {
 			try {
 				const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
-				const res = await axios.request(path, { headers, method: 'get' });
+				const res = await request({ baseURL, url: path, headers, method: 'get' });
 				return res.data;
 			}
 			catch (e) {
@@ -3891,7 +3931,7 @@ function requireNetAdapter () {
 			try {
 
 				const headers = { 'Content-Type': 'application/json' };
-				const res = await axios.request(path, { headers, method: 'patch', data: body });
+				const res = await request({ baseURL, url: path, headers, method: 'patch', data: body });
 				return res.data;
 			}
 			catch (e) {
@@ -3907,7 +3947,7 @@ function requireNetAdapter () {
 		async function post(body) {
 			try {
 				const headers = { 'Content-Type': 'application/json' };
-				const res = await axios.request(path, { headers, method: 'post', data: body });
+				const res = await request({ baseURL, url: path, headers, method: 'post', data: body });
 				return res.data;
 			}
 			catch (e) {
@@ -3950,9 +3990,73 @@ function requireNetAdapter () {
 		function express() {
 			throw new Error('Hosting in express is not supported on the client side');
 		}
+
+		async function request(config) {
+			if (typeof fetch !== 'function')
+				throw new Error('HTTP client requires fetch. Use a runtime with fetch support or provide a fetch polyfill.');
+
+			config = await httpInterceptor.applyRequest(config);
+			const response = await fetch(toUrl(config.baseURL, config.url), {
+				method: config.method?.toUpperCase(),
+				headers: config.headers,
+				body: toBody(config.data)
+			});
+			const data = await readData(response);
+			let result = {
+				data,
+				status: response.status,
+				statusText: response.statusText,
+				headers: toHeadersObject(response.headers),
+				config
+			};
+
+			if (!response.ok)
+				return httpInterceptor.applyResponseError(createHttpError(result));
+
+			result = await httpInterceptor.applyResponse(result);
+			return result;
+		}
 	}
 
-	function netAdapter(url, tableName, { axios, tableOptions }) {
+	function toBody(data) {
+		if (data === undefined)
+			return undefined;
+		if (typeof data === 'string')
+			return data;
+		return JSON.stringify(data);
+	}
+
+	function createHttpError(response) {
+		const error = new Error('Request failed with status code ' + response.status);
+		error.response = response;
+		error.config = response.config;
+		return error;
+	}
+
+	async function readData(response) {
+		const text = await response.text();
+		const contentType = response.headers.get('content-type') || '';
+		if (text && (contentType.indexOf('application/json') !== -1 || looksLikeJson(text)))
+			return JSON.parse(text);
+		return text;
+	}
+
+	function looksLikeJson(text) {
+		const value = text.trim();
+		return value[0] === '{' || value[0] === '[';
+	}
+
+	function toHeadersObject(headers) {
+		const result = {};
+		headers.forEach((value, key) => result[key] = value);
+		return result;
+	}
+
+	function toUrl(baseURL, path) {
+		return new URL(path, baseURL).toString();
+	}
+
+	function netAdapter(url, tableName, { http, tableOptions }) {
 		if (tableOptions.transaction?.done)
 			delete tableOptions.transaction;
 
@@ -4002,7 +4106,7 @@ function requireNetAdapter () {
 		async function getInnerAdapter() {
 			const db = await getDb();
 			if (typeof db === 'string') {
-				return httpAdapter(db, tableName === undefined ? '' : `?table=${tableName}`, axios);
+				return httpAdapter(db, tableName === undefined ? '' : `?table=${tableName}`, http);
 			}
 			else if (db && db.hostLocal) {
 				return db.hostLocal({ ...tableOptions, db, table: url });
@@ -4039,7 +4143,7 @@ function requireToKeyPositionMap () {
 	if (hasRequiredToKeyPositionMap) return toKeyPositionMap_1;
 	hasRequiredToKeyPositionMap = 1;
 	const stringify = requireStringify();
-	const randomUuid = requireRandomUuid();
+	const newMemoryId = requireNewMemoryId();
 
 	function toKeyPositionMap(rows, options) {
 		return rows.reduce((map, element, i) => {
@@ -4062,7 +4166,7 @@ function requireToKeyPositionMap () {
 
 	function negotiateTempKey(value) {
 		if (value === undefined)
-			return `~${randomUuid()}`;
+			return `~${newMemoryId()}`;
 		else
 			return value;
 	}
@@ -4116,6 +4220,7 @@ function requireClientMap () {
 		dbMap.mssql = throwDb;
 		dbMap.mssqlNative = throwDb;
 		dbMap.mysql = throwDb;
+		dbMap.mariadb = throwDb;
 		dbMap.sap = throwDb;
 		dbMap.oracle = throwDb;
 		dbMap.sqlite = throwDb;
@@ -4144,6 +4249,7 @@ function requireClientMap () {
 		onFinal.mssql = () => index({ db: throwDb, providers: dbMap });
 		onFinal.mssqlNative = () => index({ db: throwDb, providers: dbMap });
 		onFinal.mysql = () => index({ db: throwDb, providers: dbMap });
+		onFinal.mariadb = () => index({ db: throwDb, providers: dbMap });
 		onFinal.sap = () => index({ db: throwDb, providers: dbMap });
 		onFinal.oracle = () => index({ db: throwDb, providers: dbMap });
 		onFinal.sqlite = () => index({ db: throwDb, providers: dbMap });
@@ -4158,12 +4264,12 @@ function requireClientMap () {
 
 var require$$5 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(_default);
 
-var axiosInterceptor;
-var hasRequiredAxiosInterceptor;
+var httpInterceptor;
+var hasRequiredHttpInterceptor;
 
-function requireAxiosInterceptor () {
-	if (hasRequiredAxiosInterceptor) return axiosInterceptor;
-	hasRequiredAxiosInterceptor = 1;
+function requireHttpInterceptor () {
+	if (hasRequiredHttpInterceptor) return httpInterceptor;
+	hasRequiredHttpInterceptor = 1;
 	class InterceptorProxy {
 		constructor() {
 			this.requestInterceptors = [];
@@ -4173,7 +4279,7 @@ function requireAxiosInterceptor () {
 		get request() {
 			return {
 				use: (onFulfilled, onRejected) => {
-					const id = Math.random().toString(36).substr(2, 9); // unique id
+					const id = Math.random().toString(36).substring(2, 11); // unique id
 					this.requestInterceptors.push({ id, onFulfilled, onRejected });
 					return id;
 				},
@@ -4186,7 +4292,7 @@ function requireAxiosInterceptor () {
 		get response() {
 			return {
 				use: (onFulfilled, onRejected) => {
-					const id = Math.random().toString(36).substr(2, 9); // unique id
+					const id = Math.random().toString(36).substring(2, 11); // unique id
 					this.responseInterceptors.push({ id, onFulfilled, onRejected });
 					return id;
 				},
@@ -4196,21 +4302,35 @@ function requireAxiosInterceptor () {
 			};
 		}
 
-		applyTo(axiosInstance) {
+		async applyRequest(config) {
+			let result = Promise.resolve(config);
 			for (const { onFulfilled, onRejected } of this.requestInterceptors) {
-				axiosInstance.interceptors.request.use(onFulfilled, onRejected);
+				result = result.then(onFulfilled, onRejected);
 			}
+			return await result;
+		}
 
+		async applyResponse(response) {
+			let result = Promise.resolve(response);
 			for (const { onFulfilled, onRejected } of this.responseInterceptors) {
-				axiosInstance.interceptors.response.use(onFulfilled, onRejected);
+				result = result.then(onFulfilled, onRejected);
 			}
+			return await result;
+		}
+
+		async applyResponseError(error) {
+			let result = Promise.reject(error);
+			for (const { onFulfilled, onRejected } of this.responseInterceptors) {
+				result = result.then(onFulfilled, onRejected);
+			}
+			return await result;
 		}
 	}
 
-	axiosInterceptor = function create() {
+	httpInterceptor = function create() {
 		return new InterceptorProxy();
 	};
-	return axiosInterceptor;
+	return httpInterceptor;
 }
 
 var flags_1;
@@ -4227,6 +4347,8 @@ function requireFlags () {
 	flags_1 = flags;
 	return flags_1;
 }
+
+var require$$0$1 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(axios$1);
 
 var syncAuto;
 var hasRequiredSyncAuto;
@@ -5918,7 +6040,7 @@ function requireClient () {
 	const targetKey = Symbol();
 	const map = requireClientMap();
 	const clone = require$$5;
-	const createAxiosInterceptor = requireAxiosInterceptor();
+	const createHttpInterceptor = requireHttpInterceptor();
 	const flags = requireFlags();
 	const newSyncClient = requireSyncClient();
 	const setSessionSingleton = requireSetSessionSingleton();
@@ -5934,7 +6056,7 @@ function requireClient () {
 		const commandHandlers = options.commands || {};
 		if (typeof providers === 'function')
 			baseUrl = typeof options.db === 'function' ? providers(options.db) : options.db;
-		const axiosInterceptor = createAxiosInterceptor();
+		const httpInterceptor = createHttpInterceptor();
 
 		function client(_options = {}) {
 			if (_options.pg)
@@ -5949,7 +6071,7 @@ function requireClient () {
 			enumerable: true,
 			configurable: false
 		});
-		client.interceptors = axiosInterceptor;
+		client.interceptors = httpInterceptor;
 		client.createPatch = _createPatch;
 		client.table = table;
 		client.or = column('or');
@@ -5988,6 +6110,7 @@ function requireClient () {
 		client.oracle = onProvider.bind(null, 'oracle');
 		client.http = onProvider.bind(null, 'http');//todo
 		client.mysql = onProvider.bind(null, 'mysql');
+		client.mariadb = onProvider.bind(null, 'mariadb');
 		client.express = express;
 		client.hono = hono;
 		client.close = close;
@@ -6009,8 +6132,8 @@ function requireClient () {
 			// return client;
 		}
 		client.syncClient = baseUrl && typeof baseUrl.__createSyncClient === 'function'
-			? baseUrl.__createSyncClient(client, getDb, axiosInterceptor)
-			: newSyncClient(client, getDb, axiosInterceptor);
+			? baseUrl.__createSyncClient(client, getDb, httpInterceptor)
+			: newSyncClient(client, getDb, httpInterceptor);
 		// else {
 		let handler = {
 			get(_target, property,) {
@@ -6288,7 +6411,7 @@ function requireClient () {
 					path,
 					args
 				});
-				let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 				return adapter.post(body);
 			}
 
@@ -6298,7 +6421,7 @@ function requireClient () {
 					path: 'count',
 					args
 				});
-				let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 				return adapter.post(body);
 			}
 
@@ -6390,7 +6513,7 @@ function requireClient () {
 					path: 'getManyDto',
 					args
 				});
-				let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 				return adapter.post(body);
 			}
 
@@ -6467,7 +6590,7 @@ function requireClient () {
 					path: 'delete',
 					args
 				});
-				let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 				return adapter.post(body);
 			}
 
@@ -6477,7 +6600,7 @@ function requireClient () {
 					path: 'deleteCascade',
 					args
 				});
-				let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 				return adapter.post(body);
 			}
 
@@ -6487,7 +6610,7 @@ function requireClient () {
 					path: 'update',
 					args
 				});
-				let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 				const result =  await adapter.post(body);
 				if (strategy)
 					return proxify(result, strategy);
@@ -6499,7 +6622,7 @@ function requireClient () {
 					path: 'replace',
 					args
 				});
-				let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 				const result =  await adapter.post(body);
 				if (strategy)
 					return proxify(result, strategy);
@@ -6664,7 +6787,7 @@ function requireClient () {
 			async function getMeta() {
 				if (meta)
 					return meta;
-				let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 				meta = await adapter.get();
 
 				while (hasUnresolved(meta)) {
@@ -6712,7 +6835,7 @@ function requireClient () {
 				if (patch.length === 0)
 					return;
 				let body = stringify({ patch, options: { strategy, ...tableOptions, ...concurrencyOptions, deduceStrategy } });
-				let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 				let p = adapter.patch(body);
 				if (strategy?.insertAndForget) {
 					await p;
@@ -6731,7 +6854,7 @@ function requireClient () {
 				if (patch.length === 0)
 					return;
 				let body = stringify({ patch, options: { strategy, ...tableOptions, ...concurrencyOptions, deduceStrategy } });
-				let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 				await adapter.patch(body);
 				return;
 			}
@@ -6856,7 +6979,7 @@ function requireClient () {
 				let meta = await getMeta();
 				let patch = createPatch(array, [], meta);
 				let body = stringify({ patch, options });
-				let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 				let { strategy } = await adapter.patch(body);
 				array.length = 0;
 				rootMap.set(array, { json: cloneFromDb(array), strategy });
@@ -6931,7 +7054,7 @@ function requireClient () {
 				let meta = await getMeta();
 				let patch = createPatch([row], [], meta);
 				let body = stringify({ patch, options });
-				let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 				await adapter.patch(body);
 				rootMap.set(row, { strategy });
 			}
@@ -6954,7 +7077,7 @@ function requireClient () {
 
 				let body = stringify({ patch, options: { ...tableOptions, ...concurrencyOptions, strategy, deduceStrategy } });
 
-				let adapter = netAdapter(url, tableName, { axios: axiosInterceptor, tableOptions });
+				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 				let { changed, strategy: newStrategy } = await adapter.patch(body);
 				copyInto(changed, [row]);
 				rootMap.set(row, { json: cloneFromDb(row), strategy: newStrategy });
@@ -7128,7 +7251,7 @@ function requireClient () {
 					if (arguments[i][isColumnProxyKey])
 						args[i] = { [columnRefKey]: arguments[i][columnPathKey] };
 					else
-						args[i] = arguments[i](tableProxy(path.split('.').slice(0, -1).join('.')));
+						args[i] = arguments[i](tableProxy());
 				}
 				else
 					args[i] = arguments[i];
@@ -7852,7 +7975,7 @@ function requireNewLikeColumnArg () {
 		var encodedSuffix = suffix ? column.encode(context, suffix) : null;
 		var engine = getSessionSingleton(context, 'engine');
 
-		if (engine === 'mysql')
+		if (engine === 'mysql' || engine === 'mariadb')
 			return concatWithFunction(encodedPrefix, encodedArg, encodedSuffix);
 		if (engine === 'mssql' || engine === 'mssqlNative')
 			return concatWithOperator('+', encodedPrefix, encodedArg, encodedSuffix);
@@ -8476,7 +8599,7 @@ function requireNewEncode$5 () {
 			value = purify(value);
 			if (value == null) {
 				if (column.dbNull === null)
-					;
+					return 'null';
 				return '\'' + column.dbNull + '\'';
 			}
 			var encodeCore = getSessionSingleton(context, 'encodeDate') || encodeDate;
@@ -8588,46 +8711,50 @@ function requireNewEncode$4 () {
 	hasRequiredNewEncode$4 = 1;
 	var newPara = requireNewParameterized();
 	var purify = requirePurify$3();
+	var getSessionContext = requireGetSessionContext();
+	var getSessionSingleton = requireGetSessionSingleton();
 
 	function _new(column) {
-		var encode = function(_context, value) {
+		var encode = function(context, value) {
 			value = purify(value);
 			if (value == null) {
 				if (column.dbNull === null)
 					return newPara('null');
 				return newPara('\'' + column.dbNull + '\'');
 			}
-			return newPara('?', [encodeDate(value)]);
+			var ctx = getSessionContext(context);
+			var encodeCore = ctx.encodeDateTz || ctx.encodeDate || encodeDate;
+			return newPara('?', [encodeCore(value)]);
 		};
 
-		encode.unsafe = function(_context, value) {
+		encode.unsafe = function(context, value) {
 			value = purify(value);
 			if (value == null) {
 				if (column.dbNull === null)
 					return 'null';
 				return '\'' + column.dbNull + '\'';
 			}
-			return encodeDate(value);
+			var encodeCore = getSessionSingleton(context, 'encodeDateTz') || getSessionSingleton(context, 'encodeDate') || encodeDate;
+			return encodeCore(value);
 		};
 
-		encode.direct = function(_context, value) {
-			return encodeDate(value);
+		encode.direct = function(context, value) {
+			var encodeCore = getSessionSingleton(context, 'encodeDateTz') || getSessionSingleton(context, 'encodeDate') || encodeDate;
+			return encodeCore(value);
 		};
 
 		return encode;
-
-
 	}
+
 	function encodeDate(date) {
 		if (date.toISOString)
-			return truncate(date.toISOString(date));
+			return truncate(date.toISOString());
 		return truncate(date);
 	}
 
 	function truncate(date) {
 		return date;
 	}
-
 
 	newEncode$4 = _new;
 	return newEncode$4;
@@ -8817,7 +8944,7 @@ function requireNewEncode$2 () {
 			value = purify(value);
 			if (value == null) {
 				if (column.dbNull === null)
-					;
+					return 'null';
 				return '\'' + column.dbNull + '\'';
 			}
 			var encodeCore = getSessionSingleton(context, 'encodeBigint') || encodeBigint;
@@ -9151,6 +9278,10 @@ function requireColumn () {
 			return c;
 		};
 
+		c.jsonOf = function() {
+			return c.json();
+		};
+
 		c.guid = function() {
 			requireGuid()(column);
 			return c;
@@ -9162,18 +9293,13 @@ function requireColumn () {
 			return c;
 		};
 
-		c.date = function() {
-			requireDate()(column);
-			return c;
-		};
-
 		c.dateWithTimeZone = function() {
 			requireDateWithTimeZone()(column);
 			return c;
 		};
 
-		c.numeric = function(optionalPrecision,optionalScale) {
-			requireNumeric()(column,optionalPrecision,optionalScale);
+		c.numeric = function() {
+			requireNumeric()(column);
 			return c;
 		};
 
@@ -9268,8 +9394,8 @@ function requireColumn () {
 
 		c.notNullExceptInsert = function() {
 			column._notNullExceptInsert = true;
-			function validate(value, _row, isInsert) {
-				if (isInsert)
+			function validate(value, meta) {
+				if (meta.isInsert)
 					return;
 				if (value === undefined || value === null)
 					throw new Error(`Column ${column.alias} cannot be null or undefined`);
@@ -9283,12 +9409,12 @@ function requireColumn () {
 			if (previousValue)
 				column.validate = nestedValidate;
 			else
-				column.validate = value;
+				column.validate = invokeValidate;
 
 			function nestedValidate() {
 				try {
 					previousValue.apply(null, arguments);
-					value.apply(null, arguments);
+					invokeValidate.apply(null, arguments);
 				}
 				catch (e) {
 					const error = new Error(e.message || e);
@@ -9296,6 +9422,10 @@ function requireColumn () {
 					error.status = 400;
 					throw error;
 				}
+			}
+
+			function invokeValidate(inputValue, meta) {
+				value(inputValue, meta);
 			}
 			return c;
 		};
@@ -10043,7 +10173,7 @@ function requireIsJsonUpdateSupported () {
 	if (hasRequiredIsJsonUpdateSupported) return isJsonUpdateSupported_1;
 	hasRequiredIsJsonUpdateSupported = 1;
 	function isJsonUpdateSupported(engine) {
-		return engine === 'pg' || engine === 'mysql' || engine === 'sqlite' || engine === 'mssql' || engine === 'mssqlNative' || engine === 'oracle';
+		return engine === 'pg' || engine === 'mysql' || engine === 'mariadb' || engine === 'sqlite' || engine === 'mssql' || engine === 'mssqlNative' || engine === 'oracle';
 	}
 
 	isJsonUpdateSupported_1 = isJsonUpdateSupported;
@@ -10142,11 +10272,19 @@ function requireNewUpdateCommandCore () {
 			if (engine === 'pg') {
 				command = command.append(separator + columnSql + ' IS NOT DISTINCT FROM ').append(encoded);
 			}
-			else if (engine === 'mysql') {
+			else if (engine === 'mysql' || engine === 'mariadb') {
 				command = command.append(separator + columnSql + ' <=> ').append(encoded);
 			}
 			else if (engine === 'sqlite') {
 				command = command.append(separator + columnSql + ' IS ').append(encoded);
+			}
+			else if (engine === 'sap' && column.tsType === 'DateColumn') {
+				if (encoded.sql() === 'null') {
+					command = command.append(separator + columnSql + ' IS NULL');
+				}
+				else {
+					command = command.append(separator + column.formatOut(context) + '=').append(encoded);
+				}
 			}
 			else if (engine === 'sap' && column.tsType === 'JSONColumn') {
 				if (encoded.sql() === 'null') {
@@ -10181,7 +10319,7 @@ function requireNewUpdateCommandCore () {
 			if (engine === 'pg') {
 				command = command.append(separator).append(columnExpr).append(' IS NOT DISTINCT FROM ').append(encoded);
 			}
-			else if (engine === 'mysql') {
+			else if (engine === 'mysql' || engine === 'mariadb') {
 				command = command.append(separator).append(columnExpr).append(' <=> ').append(encoded);
 			}
 			else if (engine === 'sqlite') {
@@ -10242,6 +10380,11 @@ function requireNewUpdateCommandCore () {
 				const sql = 'JSON_SET(' + expr.sql() + ', ' + jsonPath.sql + ', CAST(? AS JSON))';
 				return newParameterized(sql, expr.parameters.concat(jsonPath.parameters, [jsonValue]));
 			}
+			if (engine === 'mariadb') {
+				const jsonValue = JSON.stringify(value === undefined ? null : value);
+				const sql = 'JSON_SET(' + expr.sql() + ', ' + jsonPath.sql + ', JSON_EXTRACT(?, \'$\'))';
+				return newParameterized(sql, expr.parameters.concat(jsonPath.parameters, [jsonValue]));
+			}
 			if (engine === 'sqlite') {
 				const jsonValue = JSON.stringify(value === undefined ? null : value);
 				const sql = 'json_set(' + expr.sql() + ', ' + jsonPath.sql + ', json(?))';
@@ -10266,7 +10409,7 @@ function requireNewUpdateCommandCore () {
 				const sql = expr.sql() + ' #- ' + pathLiteral;
 				return newParameterized(sql, expr.parameters);
 			}
-			if (engine === 'mysql') {
+			if (engine === 'mysql' || engine === 'mariadb') {
 				const sql = 'JSON_REMOVE(' + expr.sql() + ', ' + jsonPath.sql + ')';
 				return newParameterized(sql, expr.parameters.concat(jsonPath.parameters));
 			}
@@ -10292,6 +10435,12 @@ function requireNewUpdateCommandCore () {
 			}
 			if (engine === 'mysql') {
 				const sql = 'JSON_EXTRACT(' + columnSql + ', ' + jsonPath.sql + ')';
+				return newParameterized(sql, jsonPath.parameters);
+			}
+			if (engine === 'mariadb') {
+				const sql = isJsonObject(oldValue)
+					? 'JSON_EXTRACT(' + columnSql + ', ' + jsonPath.sql + ')'
+					: 'JSON_UNQUOTE(JSON_EXTRACT(' + columnSql + ', ' + jsonPath.sql + '))';
 				return newParameterized(sql, jsonPath.parameters);
 			}
 			if (engine === 'sqlite') {
@@ -10368,6 +10517,15 @@ function requireNewUpdateCommandCore () {
 			if (engine === 'mysql') {
 				const jsonValue = JSON.stringify(value === undefined ? null : value);
 				return newParameterized('CAST(? AS JSON)', [jsonValue]);
+			}
+			if (engine === 'mariadb') {
+				if (isJsonObject(value)) {
+					const jsonValue = JSON.stringify(value);
+					return newParameterized('JSON_EXTRACT(?, \'$\')', [jsonValue]);
+				}
+				if (value === null || value === undefined)
+					return newParameterized('null');
+				return newParameterized('?', [String(value)]);
 			}
 			if (engine === 'sqlite') {
 				if (isJsonObject(value)) {
@@ -11068,11 +11226,16 @@ function requireNewSingleCommandCore () {
 			if (engine === 'pg') {
 				return newParameterized(columnSql + ' IS NOT DISTINCT FROM ' + encoded.sql(), encoded.parameters);
 			}
-			if (engine === 'mysql') {
+			if (engine === 'mysql' || engine === 'mariadb') {
 				return newParameterized(columnSql + ' <=> ' + encoded.sql(), encoded.parameters);
 			}
 			if (engine === 'sqlite') {
 				return newParameterized(columnSql + ' IS ' + encoded.sql(), encoded.parameters);
+			}
+			if (engine === 'sap' && column.tsType === 'DateColumn') {
+				if (encoded.sql() === 'null')
+					return newParameterized(columnSql + ' IS NULL');
+				return newParameterized(column.formatOut(context) + '=' + encoded.sql(), encoded.parameters);
 			}
 			if (engine === 'sap' && column.tsType === 'JSONColumn') {
 				if (encoded.sql() === 'null')
@@ -11108,6 +11271,10 @@ function requireNewSingleCommandCore () {
 			if (engine === 'mysql') {
 				const jsonValue = JSON.stringify(value === undefined ? null : value);
 				return newParameterized('CAST(? AS JSON)', [jsonValue]);
+			}
+			if (engine === 'mariadb') {
+				const jsonValue = JSON.stringify(value === undefined ? null : value);
+				return newParameterized('JSON_EXTRACT(?, \'$\')', [jsonValue]);
 			}
 			if (engine === 'sqlite') {
 				if (isJsonObject(value)) {
@@ -11486,7 +11653,7 @@ function requireNewDecodeDbRow () {
 					value = purify(value);
 					this._dbRow[key] = value;
 					if (column.validate)
-						column.validate(value, this._dbRow);
+						column.validate(value, { table: table._dbName, column: column._dbName, property: column.alias, isInsert: false });
 					updateField(this._context, table, column, this);
 					let emit = this._emitColumnChanged[name];
 					if (emit)
@@ -11642,7 +11809,7 @@ function requireNewDecodeDbRow () {
 				if (row[key] !== undefined && !isInsert)
 					row[key] = columns[i].decode(context, row[key]);
 				if (shouldValidate && columns[i].validate)
-					columns[i].validate(row[key], row, isInsert);
+					columns[i].validate(row[key], { table: table._dbName, column: columns[i]._dbName, property: columns[i].alias, isInsert });
 			}
 			let target = new Row(context, row);
 			const p = new Proxy(target, {
@@ -11741,6 +11908,10 @@ function requireDbRowToRow () {
 	function dbRowToRow(context, span, dbRow) {
 		var table = span.table;
 		var row = decodeDbRow(context, span, table, dbRow);
+		if (!hasPrimaryKey(row, table)) {
+			skipNestedLegs(span, dbRow);
+			return null;
+		}
 		var cache = table._cache;
 		if (!cache.tryGet(context, row)) {
 			var queryContext = span.queryContext;
@@ -11757,13 +11928,15 @@ function requireDbRowToRow () {
 		var c = {};
 
 		c.visitOne = function(leg) {
-			dbRowToRow(context, leg.span, dbRow);
-			leg.expand(row);
+			let child = dbRowToRow(context, leg.span, dbRow);
+			if (child)
+				leg.expand(row);
 		};
 
 		c.visitJoin = function(leg) {
-			dbRowToRow(context, leg.span, dbRow);
-			leg.expand(row);
+			let child = dbRowToRow(context, leg.span, dbRow);
+			if (child)
+				leg.expand(row);
 		};
 
 		c.visitMany = function() {
@@ -11776,6 +11949,33 @@ function requireDbRowToRow () {
 		}
 
 		return row;
+	}
+
+	function hasPrimaryKey(row, table) {
+		return table._primaryColumns.every((column) => {
+			let value = row[column.alias];
+			return value !== null && value !== undefined;
+		});
+	}
+
+	function skipNestedLegs(span, dbRow) {
+		span.legs.forEach((leg) => {
+			leg.accept({
+				visitOne() {
+					skipSpan(leg.span, dbRow);
+				},
+				visitJoin() {
+					skipSpan(leg.span, dbRow);
+				},
+				visitMany() {
+				}
+			});
+		});
+	}
+
+	function skipSpan(span, dbRow) {
+		decodeDbRow(undefined, span, span.table, dbRow);
+		skipNestedLegs(span, dbRow);
 	}
 
 	dbRowToRow_1 = dbRowToRow;
@@ -13119,10 +13319,9 @@ function requireWhere$1 () {
 	function newWhere(_relations, _depth) {
 
 		function where(context, fn) {
-			const includeMany = false;
-			let { relations, alias } = extract(includeMany, _relations);
+			let { relations, alias } = extract(_relations);
 			const table = relations[relations.length - 1].childTable;
-			if (!relations[0].isMany || includeMany)
+			if (!relations[0].isMany)
 				table._rootAlias = alias;
 
 			try {
@@ -13138,11 +13337,11 @@ function requireWhere$1 () {
 		}
 		return where;
 
-		function extract(includeMany, relations) {
+		function extract(relations) {
 			let alias = relations[0].toLeg().table._dbName;
 			let result = [];
 			for (let i = 0; i < relations.length; i++) {
-				if (relations[i].isMany && !includeMany) {
+				if (relations[i].isMany) {
 					result = [relations[i]];
 					alias = relations[i].toLeg().table._dbName;
 				}
@@ -13169,10 +13368,9 @@ function requireAggregate$1 () {
 	function newAggregate(_relations) {
 
 		function aggregate(context, fn) {
-			const includeMany = false;
-			let { relations, alias } = extract(includeMany, _relations);
+			let { relations, alias } = extract(_relations);
 			const table = relations[relations.length - 1].childTable;
-			if (!relations[0].isMany || includeMany)
+			if (!relations[0].isMany)
 				table._rootAlias = alias;
 
 			try {
@@ -13187,11 +13385,11 @@ function requireAggregate$1 () {
 		}
 		return aggregate;
 
-		function extract(includeMany, relations) {
+		function extract(relations) {
 			let alias = relations[0].toLeg().table._dbName;
 			let result = [];
 			for (let i = 0; i < relations.length; i++) {
-				if (relations[i].isMany && !includeMany) {
+				if (relations[i].isMany) {
 					result = [relations[i]];
 					alias = relations[i].toLeg().table._dbName;
 				}
@@ -13852,7 +14050,7 @@ function requireNewManyCacheCore () {
 			}
 			var rows = newArray();
 			rows.push(childRow);
-			existing = cache.tryAdd(key, rows);
+			cache.tryAdd(key, rows);
 		}
 
 		function newArray() {
@@ -13889,7 +14087,7 @@ var hasRequiredNewId;
 function requireNewId () {
 	if (hasRequiredNewId) return newId;
 	hasRequiredNewId = 1;
-	newId = requireRandomUuid();
+	newId = requireNewMemoryId();
 	return newId;
 }
 
@@ -14577,16 +14775,18 @@ function requireGetManyDto$1 () {
 				outRow[column.alias] = column.decode(context, row[keys[j]]);
 			}
 
-			for (let j = 0; j < aggregateKeys.length; j++) {
-				const key = aggregateKeys[j];
-				const parse = span.aggregates[key].column?.decode || ((context, arg) => Number.parseFloat(arg));
-				outRow[key] = parse(context, row[keys[j + columnsLength]]);
+			if (outRow) {
+				for (let j = 0; j < aggregateKeys.length; j++) {
+					const key = aggregateKeys[j];
+					const parse = span.aggregates[key].column?.decode || ((context, arg) => Number.parseFloat(arg));
+					outRow[key] = parse(context, row[keys[j + columnsLength]]);
+				}
 			}
 
 			outRows[i] = outRow;
 			if (updateParent)
 				updateParent(outRow, i);
-			if (shouldCreateMap) {
+			if (shouldCreateMap && outRow) {
 				fkIds[i] = getIds(outRow);
 				addToMap(rowsMap, fkIds[i], outRow);
 			}
@@ -14633,9 +14833,6 @@ function requireGetManyDto$1 () {
 
 	async function decodeManyRelations(context, strategy, span) {
 		const maxParameters = getSessionSingleton(context, 'maxParameters');
-		const maxRows = maxParameters
-			? maxParameters * span.table._primaryColumns.length
-			: undefined;
 
 		const promises = [];
 		const c = {};
@@ -14655,6 +14852,10 @@ function requireGetManyDto$1 () {
 			const name = leg.name;
 			const table = span.table;
 			const relation = table._relations[name];
+			const parametersPerRow = relation.joinRelation.columns.length;
+			const maxRows = maxParameters
+				? Math.max(1, Math.floor((maxParameters - 1) / parametersPerRow))
+				: undefined;
 			const rowsMap = span._rowsMap;
 
 			const extractKey = createExtractKey(leg);
@@ -15788,7 +15989,6 @@ function requirePatchTable () {
 				let result;
 				for (let i = 0; i < relation.columns.length; i++) {
 					let p = relation.columns[i].alias;
-					row[p];
 					result = await remove({ path: ['dummy', p], oldValue: (oldValue || {})[p], op, options: options }, table, row) || result;
 				}
 				return result || {};
@@ -15801,8 +16001,7 @@ function requirePatchTable () {
 					let p = relation.columns[i].alias;
 					let childKey = relation.childTable._primaryColumns[i].alias;
 					if (path[1] === childKey) {
-						row[p];
-						result = await remove({ path: ['dummy', p], oldValue: (oldValue || {})[p], op, options: options }, table, row) || result;
+						result = await remove({ path: ['dummy', p], oldValue: oldValue[p], op, options: options }, table, row) || result;
 						break;
 					}
 				}
@@ -16399,6 +16598,11 @@ function requireCreateProviders () {
 				return createPool.bind(null, 'mysql');
 			}
 		});
+		Object.defineProperty(dbMap, 'mariadb', {
+			get:  function() {
+				return createPool.bind(null, 'mariadb');
+			}
+		});
 		Object.defineProperty(dbMap, 'sap', {
 			get:  function() {
 				return createPool.bind(null, 'sap');
@@ -16467,6 +16671,9 @@ function requireCreateProviders () {
 			},
 			get mysql() {
 				return createPool.bind(null, 'mysql');
+			},
+			get mariadb() {
+				return createPool.bind(null, 'mariadb');
 			},
 			get sap() {
 				return createPool.bind(null, 'sap');
@@ -16566,6 +16773,7 @@ function requireMap () {
 		context.mssql = connect.bind(null, 'mssql');
 		context.mssqlNative = connect.bind(null, 'mssqlNative');
 		context.mysql = connect.bind(null, 'mysql');
+		context.mariadb = connect.bind(null, 'mariadb');
 		context.sap = connect.bind(null, 'sap');
 		context.oracle = connect.bind(null, 'oracle');
 		context.sqlite = connect.bind(null, 'sqlite');
@@ -21334,7 +21542,7 @@ function requireNewPgPool () {
 					if (!pg) {
 						pg = await import('pg');
 						pg  = pg.default || pg;
-						let types = pg.types || pg.types;
+						let types = pg.types;
 						types.setTypeParser(1700, function(val) {
 							return parseFloat(val);
 						});

@@ -1,1 +1,1 @@
-module.exports = require('./randomUuid');
+module.exports = require('./newMemoryId');

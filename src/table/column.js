@@ -13,6 +13,10 @@ function defineColumn(column, table) {
 		return c;
 	};
 
+	c.jsonOf = function() {
+		return c.json();
+	};
+
 	c.guid = function() {
 		require('./column/guid')(column);
 		return c;
@@ -24,18 +28,13 @@ function defineColumn(column, table) {
 		return c;
 	};
 
-	c.date = function() {
-		require('./column/date')(column);
-		return c;
-	};
-
 	c.dateWithTimeZone = function() {
 		require('./column/dateWithTimeZone')(column);
 		return c;
 	};
 
-	c.numeric = function(optionalPrecision,optionalScale) {
-		require('./column/numeric')(column,optionalPrecision,optionalScale);
+	c.numeric = function() {
+		require('./column/numeric')(column);
 		return c;
 	};
 
@@ -130,8 +129,8 @@ function defineColumn(column, table) {
 
 	c.notNullExceptInsert = function() {
 		column._notNullExceptInsert = true;
-		function validate(value, _row, isInsert) {
-			if (isInsert)
+		function validate(value, meta) {
+			if (meta.isInsert)
 				return;
 			if (value === undefined || value === null)
 				throw new Error(`Column ${column.alias} cannot be null or undefined`);
@@ -145,12 +144,12 @@ function defineColumn(column, table) {
 		if (previousValue)
 			column.validate = nestedValidate;
 		else
-			column.validate = value;
+			column.validate = invokeValidate;
 
 		function nestedValidate() {
 			try {
 				previousValue.apply(null, arguments);
-				value.apply(null, arguments);
+				invokeValidate.apply(null, arguments);
 			}
 			catch (e) {
 				const error = new Error(e.message || e);
@@ -158,6 +157,10 @@ function defineColumn(column, table) {
 				error.status = 400;
 				throw error;
 			}
+		}
+
+		function invokeValidate(inputValue, meta) {
+			value(inputValue, meta);
 		}
 		return c;
 	};

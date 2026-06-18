@@ -1,7 +1,7 @@
 const jsonpatch = require('fast-json-patch');
 let dateToIsoString = require('../dateToISOString');
 let stringify = require('./stringify');
-let randomUuid = require('../randomUuid');
+let newMemoryId = require('../newMemoryId');
 
 module.exports = function createPatch(original, dto, options) {
 	let subject = toCompareObject({ d: original }, options, true);
@@ -110,7 +110,7 @@ module.exports = function createPatch(original, dto, options) {
 
 	function negotiateTempKey(value) {
 		if (value === undefined)
-			return `~${randomUuid()}`;
+			return `~${newMemoryId()}`;
 		else
 			return value;
 	}

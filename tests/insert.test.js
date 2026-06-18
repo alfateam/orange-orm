@@ -56,6 +56,7 @@ describe('transaction', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 
@@ -98,6 +99,7 @@ describe('validate', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -138,6 +140,7 @@ describe('validate chained', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -167,6 +170,45 @@ describe('validate chained', () => {
 	}
 });
 
+describe('validate metadata', () => {
+	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
+	test('mssql', async () => await verify('mssql'));
+	test('oracle', async () => await verify('oracle'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db, init } = getDb(dbName);
+		if (dbName === 'http') {
+			const { db, init } = getDb('sqlite2');
+			await init(db);
+		}
+		else
+			await init(db);
+
+		map.__resetValidateMetaCalls();
+		await db.customerValidateMeta.insert({
+			name: 'George',
+			balance: 177,
+			isActive: true
+		});
+
+		expect(map.__getValidateMetaCalls()).toEqual([{
+			value: 'George',
+			table: 'customer',
+			column: 'name',
+			property: 'name',
+			isInsert: true
+		}]);
+	}
+});
+
 describe('validate JSONSchema', () => {
 	test('pg', async () => await verify('pg'));
 	test('pglite', async () => await verify('pglite'));
@@ -175,6 +217,7 @@ describe('validate JSONSchema', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -213,6 +256,7 @@ describe('validate notNull', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -247,6 +291,7 @@ describe('validate notNullExceptInsert', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -291,6 +336,7 @@ describe('insert autoincremental', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -332,6 +378,7 @@ describe('insert default', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -370,6 +417,7 @@ describe('insert default override', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -407,6 +455,7 @@ describe('insert dbNull', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -459,6 +508,7 @@ describe('insert autoincremental with relations', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -611,6 +661,7 @@ describe('insert autoincremental with relations and strategy', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -803,6 +854,10 @@ const connections = {
 		db: map({ db: (con) => con.mysql('mysql://test:test@mysql/test', { size: 1 }) }),
 		init: initMysql
 	},
+	mariadb: {
+		db: map({ db: (con) => con.mariadb('mariadb://test:test@mariadb/test', { size: 1 }) }),
+		init: initMysql
+	},
 	http: {
 		db: map.http(`http://localhost:${port}/rdb`),
 	}
@@ -830,6 +885,8 @@ function getDb(name) {
 		return connections.oracle;
 	else if (name === 'mysql')
 		return connections.mysql;
+	else if (name === 'mariadb')
+		return connections.mariadb;
 	else if (name === 'http')
 		return connections.http;
 	else

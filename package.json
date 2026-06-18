@@ -1,6 +1,6 @@
 {
     "name": "orange-orm",
-    "version": "5.2.0",
+    "version": "5.3.6",
     "publishConfig": {
         "access": "public"
     },
@@ -15,6 +15,16 @@
             "require": "./src/index.js"
         }
     },
+    "files": [
+        "bin/",
+        "dist/",
+        "docs/",
+        "src/",
+        "CONTRIBUTING.md",
+        "README.md",
+        "SKILL.md",
+        "SECURITY.md"
+    ],
     "bin": {
         "orange-orm": "bin/rdb.js"
     },
@@ -37,6 +47,7 @@
         "sap",
         "sapase",
         "Oracle",
+        "MariaDB",
         "rdb",
         "Orange ORM",
         "active record"
@@ -52,13 +63,13 @@
         "url": "https://github.com/sponsors/lroal"
     },
     "scripts": {
-        "test": "vitest run --pool=forks --poolOptions.forks.singleFork",
+        "test": "vitest run",
         "test:bun": "bun test --timeout=30000 ./tests/*.bun.test.js",
         "test:deno": "deno test --allow-all --no-check --unstable-detect-cjs ./tests/*.deno.test.js",
         "test:all": "echo 'Running Node.js tests...' && npm run test:node && echo 'Running Bun tests...' && npm run test:bun && echo 'Running Deno tests...' && npm run test:deno && echo 'All tests completed!'",
         "test:all:parallel": "concurrently \"npm:test:node\" \"npm:test:bun\" \"npm:test:deno\"",
-        "coverage": "vitest run --coverage.enabled --coverage.reporter='text-summary' --pool=forks --poolOptions.forks.singleFork",
-        "testw": "vitest --pool=forks --poolOptions.forks.singleFork update",
+        "coverage": "vitest run --coverage.enabled --coverage.reporter='text-summary'",
+        "testw": "vitest update",
         "tscheck": "tsc ./src/index.d.ts --module commonjs --target es2022 --noEmit true --strict true --esModuleInterop true",
         "concat-server": "node ./src/merge-server.js",
         "concat-browser": "node ./src/merge-browser.js",
@@ -79,7 +90,6 @@
         "@types/tedious": "^4.0.14",
         "@sqlite.org/sqlite-wasm": "^3.53.0-build1",
         "ajv": "^8.17.1",
-        "axios": "^1.6.2",
         "fast-json-patch": "^3.1.1",
         "rfdc": "^1.2.0"
     },
@@ -91,7 +101,7 @@
         "oracledb": "^6.3.0",
         "pg": "^8.5.1",
         "pg-query-stream": "^3.3.2",
-        "tedious": "^15.1.2 || ^16.0.0 || ^18.1.0 || || ^19.0.0"
+        "tedious": "^15.1.2 || ^16.0.0 || ^18.1.0 || ^19.0.0"
     },
     "peerDependenciesMeta": {
         "pg": {
@@ -128,13 +138,13 @@
         "@rollup/plugin-commonjs": "^28.0.2",
         "@rollup/plugin-json": "^6.1.0",
         "@rollup/plugin-node-resolve": "^13.0.0",
-        "@typescript-eslint/eslint-plugin": "^6.x",
-        "@typescript-eslint/parser": "^6.x",
-        "@vitest/coverage-v8": "^3.2.4",
+        "@typescript-eslint/eslint-plugin": "^8.56.1",
+        "@typescript-eslint/parser": "^8.56.1",
+        "@vitest/coverage-v8": "^4.1.8",
         "better-sqlite3": "^12.6.2",
         "cors": "^2.8.5",
         "eslint": "^8.57.0",
-        "eslint-plugin-jest": "^27.1.7",
+        "eslint-plugin-jest": "^29.15.0",
         "express": "^4.18.2",
         "hono": "^4.8.2",        
         "mysql2": "^3.9.4",
@@ -143,9 +153,9 @@
         "pg": "^8.5.1",
         "pg-query-stream": "^3.3.2",
         "rollup": "^2.52.7",
-        "tedious": "^19.0.0",
+        "tedious": "^19.2.1",
         "typescript": "^5.4.5",
-        "vitest": "^3.2.4"
+        "vitest": "^4.1.8"
     },
     "engines": {
         "node": ">= 8.0.0"

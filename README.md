@@ -3,7 +3,7 @@ codex resume 019e81e0-385d-7cc0-abec-34a1784b0bdb
 <img src="./docs/orange.svg" alt="Orange ORM Logo" width="250"/>
 </div>
 
-The ultimate Object Relational Mapper for Node.js, Bun and Deno, offering seamless integration with a variety of popular databases. Orange ORM supports both TypeScript and JavaScript, including both CommonJS and ECMAScript.  
+The ultimate Object Relational Mapper for Node.js, Bun and Deno, offering seamless integration with a variety of popular databases. Orange ORM supports both TypeScript and JavaScript, including both CommonJS and ECMAScript.
 
 [![npm version](https://img.shields.io/npm/v/orange-orm.svg?style=flat-square)](https://www.npmjs.org/package/orange-orm)
 [![Build status](https://github.com/alfateam/orange-orm/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/alfateam/orange-orm/actions)
@@ -13,43 +13,44 @@ The ultimate Object Relational Mapper for Node.js, Bun and Deno, offering seamle
 [![Discord](https://badgen.net/discord/online-members/QjuEgvQXzd?icon=discord&label=Discord)](https://discord.gg/QjuEgvQXzd)
 [![YouTube Video Views](https://img.shields.io/youtube/views/1IwwjPr2lMs)](https://youtu.be/1IwwjPr2lMs)
 
-
-
-## Key Features 
+## Key Features
 
 - **Rich Querying Model**: Orange provides a powerful and intuitive querying model, making it easy to retrieve, filter, and manipulate data from your databases.
 - **Active Record**: With a concise and expressive syntax, Orange enables you to interact with your database using the [*Active Record Pattern*](https://en.wikipedia.org/wiki/Active_record_pattern).
 - **No Code Generation Required**: Enjoy full IntelliSense, even in table mappings, without the need for cumbersome code generation.
 - **TypeScript and JavaScript Support**: Orange fully supports both TypeScript and JavaScript, allowing you to leverage the benefits of static typing and modern ECMAScript features.
-- **Works in the Browser**: You can securely use Orange in the browser by utilizing the Express.js plugin, which serves to safeguard sensitive database credentials from exposure at the client level and protect against SQL injection. This method mirrors a traditional REST API, augmented with advanced TypeScript tooling for enhanced functionality.
+- **Works in the Browser**: You can securely use Orange in the browser by utilizing the Express.js or Hono plugin, which serves to safeguard sensitive database credentials from exposure at the client level and protect against SQL injection. This method mirrors a traditional REST API, augmented with advanced TypeScript tooling for enhanced functionality.
 
 ## Supported Databases and Runtimes
 |               | Node | Deno | Bun |Cloudflare | Web |
-| ------------- | :-----: | :-----: | :-----: | :-----: | :-----: | 
+| ------------- | :-----: | :-----: | :-----: | :-----: | :-----: |
 | Postgres      | ✅ | ✅ | ✅ | ✅|
 | PGlite      | ✅ | ✅ | ✅ | ✅ | ✅
 | MS SQL        | ✅ |  | ✅ | |
-| MySQL         | ✅ | ✅ | ✅ || 
+| MySQL         | ✅ | ✅ | ✅ ||
+| MariaDB       | ✅ | ✅ | ✅ ||
 | Oracle        | ✅ | ✅ | ✅ | |
 | SAP ASE       | ✅ |  |  | |
 | SQLite        | ✅ | ✅ | ✅ | |
 | Cloudflare D1 |  |  |  | ✅|
 
-This is the _Modern Typescript Documentation_. Are you looking for the [_Classic Documentation_](https://github.com/alfateam/orange-orm/blob/master/docs/docs.md) ?
-
 ## Sponsorship <span style="font-size: larger; color: darkred;">♡</span>
 If you value the hard work behind Orange and wish to see it evolve further, consider [sponsoring](https://github.com/sponsors/lroal). Your support fuels the journey of refining and expanding this tool for our developer community.
+
+## MCP (Model Context Protocol)
+Orange ORM is available as an MCP resource on Context7. Use it with AI-powered tools like GitHub Copilot, Cursor, or Claude to get up-to-date documentation and code examples directly in your IDE.
+👉 [https://context7.com/alfateam/orange-orm](https://context7.com/alfateam/orange-orm)
 
 ## Installation
 
 ```bash
 npm install orange-orm
-```  
+```
 
 ## Example
 Watch the [tutorial video on YouTube](https://youtu.be/1IwwjPr2lMs)
 
-![Relations diagram](./docs/diagram.svg)  
+![Relations diagram](./docs/diagram.svg)
 
 <sub>📄 map.ts</sub>
 ```ts
@@ -104,7 +105,7 @@ const map = orange.map(x => ({
 }));
 
 export default map;
-```  
+```
 <sub>📄 update.ts</sub>
 
 ```ts
@@ -141,14 +142,14 @@ async function getRows() {
     lines: {
       packages: true
     },
-    deliveryAddress: true,    
+    deliveryAddress: true,
     customer: true
-  });  
+  });
 }
 
 ```
 
-## API 
+## API
 
 <details id="table-mapping"><summary><strong>Mapping tables</strong></summary>
 <p>To define a mapping, you employ the <strong><i>map()</i></strong> method, linking your tables and columns to corresponding object properties. You provide a callback function that engages with a parameter representing a database table.
@@ -217,7 +218,7 @@ At the start of the script, we import our database mapping from the map.ts file.
 
 Then, we define a SQL string. This string outlines the structure of our SQLite database. It first specifies to drop existing tables named 'deliveryAddress', 'package', 'orderLine', '_order', and 'customer' if they exist. This ensures we have a clean slate. Then, it dictates how to create these tables anew with the necessary columns and constraints.
 
-Because of a peculiarity in SQLite, which only allows one statement execution at a time, we split this SQL string into separate statements. We do this using the split() method, which breaks up the string at every semicolon.  
+Because of a peculiarity in SQLite, which only allows one statement execution at a time, we split this SQL string into separate statements. We do this using the split() method, which breaks up the string at every semicolon.
 
 <sub>📄 init.ts</sub>
 
@@ -260,7 +261,7 @@ CREATE TABLE package (
 CREATE TABLE deliveryAddress (
     id INTEGER PRIMARY KEY,
     orderId INTEGER REFERENCES _order,
-    name TEXT, 
+    name TEXT,
     street TEXT,
     postalCode TEXT,
     postalPlace TEXT,
@@ -282,12 +283,12 @@ In SQLite, columns with the INTEGER PRIMARY KEY attribute are designed to autoin
 
 <details><summary><strong>Connecting</strong></summary>
 
-__SQLite__  
-When running **Node.js 21 and earlier**, you need to install the `sqlite3` dependency.  
-When running Node.js 22 and later, Bun, or Deno,  you don't need it as it is built-in.  
+__SQLite__
+When running **Node.js 21 and earlier**, you need to install the `sqlite3` dependency.
+When running Node.js 22 and later, Bun, or Deno,  you don't need it as it is built-in.
 ```bash
 npm install sqlite3
-```  
+```
 
 ```javascript
 import map from './map';
@@ -300,7 +301,7 @@ await db.close();           // closes the client connection
 __With connection pool__
 ```bash
 npm install sqlite3
-```  
+```
 ```javascript
 import map from './map';
 const db = map.sqlite('demo.db', { size: 10 });
@@ -309,15 +310,15 @@ const db = map.sqlite('demo.db', { size: 10 });
 // IMPORTANT for serverless functions:
 await pool.close();         // closes all pooled connections
 ```
-__Why close ?__  
-In serverless environments (e.g. AWS Lambda, Vercel, Cloudflare Workers) execution contexts are frequently frozen and resumed. Explicitly closing the client or pool ensures that file handles are released promptly and prevents “database locked” errors between invocations.  
+__Why close ?__
+In serverless environments (e.g. AWS Lambda, Vercel, Cloudflare Workers) execution contexts are frequently frozen and resumed. Explicitly closing the client or pool ensures that file handles are released promptly and prevents “database locked” errors between invocations.
 
-__SQLite user-defined functions__  
-You can register custom SQLite functions using `db.function(name, fn)`.  
+__SQLite user-defined functions__
+You can register custom SQLite functions using `db.function(name, fn)`.
 For full behavior, runtime caveats, and examples, see [SQLite user-defined functions](#sqlite-user-defined-functions).
 
-__From the browser__  
-You can securely use Orange from the browser by utilizing the Express plugin, which serves to safeguard sensitive database credentials from exposure at the client level. This technique bypasses the need to transmit raw SQL queries directly from the client to the server. Instead, it logs method calls initiated by the client, which are later replayed and authenticated on the server. This not only reinforces security by preventing the disclosure of raw SQL queries on the client side but also facilitates a smoother operation. Essentially, this method mirrors a traditional REST API, augmented with advanced TypeScript tooling for enhanced functionality. You can read more about it in the section called [In the browser](#user-content-in-the-browser)  
+__From the browser__
+You can securely use Orange from the browser by utilizing the Express plugin, which serves to safeguard sensitive database credentials from exposure at the client level. This technique bypasses the need to transmit raw SQL queries directly from the client to the server. Instead, it logs method calls initiated by the client, which are later replayed and authenticated on the server. This not only reinforces security by preventing the disclosure of raw SQL queries on the client side but also facilitates a smoother operation. Essentially, this method mirrors a traditional REST API, augmented with advanced TypeScript tooling for enhanced functionality. You can read more about it in the section called [In the browser](#user-content-in-the-browser)
 <sub>📄 server.ts</sub>
 ```ts
 import map from './map';
@@ -345,17 +346,26 @@ const db = map.http('http://localhost:3000/orange');
 __MySQL__
 ```bash
 $ npm install mysql2
-```  
+```
 ```javascript
 import map from './map';
 const db = map.mysql('mysql://test:test@mysql/test');
+```
+
+__MariaDB__
+```bash
+$ npm install mysql2
+```
+```javascript
+import map from './map';
+const db = map.mariadb('mariadb://test:test@mariadb/test');
 ```
 
 
 __MS SQL__
 ```bash
 npm install tedious
-```  
+```
 ```javascript
 import map from './map';
 const db = map.mssql({
@@ -374,11 +384,11 @@ const db = map.mssql({
         });
 ```
 
-__PostgreSQL__  
+__PostgreSQL__
 With Bun, you don't need to install the `pg` package as PostgreSQL support is built-in.
 ```bash
 npm install pg
-```  
+```
 ```javascript
 import map from './map';
 const db = map.postgres('postgres://postgres:postgres@postgres/postgres');
@@ -388,18 +398,18 @@ With schema
 import map from './map';
 const db = map.postgres('postgres://postgres:postgres@postgres/postgres?search_path=custom');
 ```
-__PGlite__  
+__PGlite__
 ```bash
 npm install @electric-sql/pglite
-```  
-In this example we use the in-memory Postgres.  
-Read more about [PGLite connection configs](https://pglite.dev/docs/).  
+```
+In this example we use the in-memory Postgres.
+Read more about [PGLite connection configs](https://pglite.dev/docs/).
 ```javascript
 import map from './map';
 const db = map.pglite( /* config? : PGliteOptions */);
 ```
-__Cloudflare D1__  
-<sub>📄 wrangler.toml</sub>  
+__Cloudflare D1__
+<sub>📄 wrangler.toml</sub>
 ```toml
 name = "d1-tutorial"
 main = "src/index.ts"
@@ -413,12 +423,12 @@ database_name = "<your-name-for-the-database>"
 database_id = "<your-guid-for-the-database>"
 ```
 
-<sub>📄 src/index.ts</sub>  
+<sub>📄 src/index.ts</sub>
 ```ts
 import map from './map';
 
 export interface Env {
-  // Must match the binding name in wrangler.toml  
+  // Must match the binding name in wrangler.toml
   DB: D1Database;
 }
 
@@ -433,7 +443,7 @@ export default {
 __Oracle__
 ```bash
 npm install oracledb
-```  
+```
 ```javascript
 import map from './map';
 const db = map.oracle({
@@ -443,11 +453,11 @@ const db = map.oracle({
   privilege: 2
 });
 ```
-__SAP Adaptive Server__  
-Even though msnodesqlv8 was developed for MS SQL, it also works for SAP ASE as it is ODBC compliant.  
+__SAP Adaptive Server__
+Even though msnodesqlv8 was developed for MS SQL, it also works for SAP ASE as it is ODBC compliant.
 ```bash
 npm install msnodesqlv8
-```  
+```
 ```javascript
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -526,7 +536,7 @@ async function insertRows() {
 }
 ```
 
-__Conflict resolution__  
+__Conflict resolution__
 By default, the strategy for inserting rows is set to an optimistic approach. In this case, if a row is being inserted with an already existing primary key, the database raises an exception.
 
 Currently, there are three concurrency strategies:
@@ -580,7 +590,7 @@ async function insertRows() {
 </details>
 
 <details><summary><strong>Fetching rows</strong></summary>
-<p>Orange has a rich querying model. As you navigate through, you'll learn about the various methods available to retrieve data from your tables, whether you want to fetch all rows, many rows with specific criteria, or a single row based on a primary key.  
+<p>Orange has a rich querying model. As you navigate through, you'll learn about the various methods available to retrieve data from your tables, whether you want to fetch all rows, many rows with specific criteria, or a single row based on a primary key.
 
 The fetching strategy in Orange is optional, and its use is influenced by your specific needs. You can define the fetching strategy either on the table level or the column level. This granularity gives you the freedom to decide how much related data you want to pull along with your primary request.</p>
 
@@ -594,16 +604,16 @@ getRows();
 
 async function getRows() {
   const orders = await db.order.getMany({
-    customer: true, 
-    deliveryAddress: true, 
+    customer: true,
+    deliveryAddress: true,
     lines: {
       packages: true
     }
   });
 }
 ```
-__Limit, offset and order by__  
-This script demonstrates how to fetch orders with customer, lines, packages and deliveryAddress, limiting the results to 10, skipping the first row, and sorting the data based on the orderDate in descending order followed by id. The lines are sorted by product.  
+__Limit, offset and order by__
+This script demonstrates how to fetch orders with customer, lines, packages and deliveryAddress, limiting the results to 10, skipping the first row, and sorting the data based on the orderDate in descending order followed by id. The lines are sorted by product.
 
 ```javascript
 import map from './map';
@@ -616,8 +626,8 @@ async function getRows() {
     offset: 1,
     orderBy: ['orderDate desc', 'id'],
     limit: 10,
-    customer: true, 
-    deliveryAddress: true, 
+    customer: true,
+    deliveryAddress: true,
     lines: {
       packages: true,
       orderBy: 'product'
@@ -626,14 +636,14 @@ async function getRows() {
 }
 ```
 <a name="aggregate-results">  </a>
-__With aggregated results__  
-You can count records and aggregate numerical columns. 
+__With aggregated results__
+You can count records and aggregate numerical columns.
 The following operators are supported:
 - count
 - sum
-- min 
-- max  
-- avg  
+- min
+- max
+- avg
 
 You can also elevate associated data to a parent level for easier access. In the example below, <i>balance</i> of the customer is elevated to the root level.
 
@@ -664,21 +674,21 @@ async function getRows() {
   const orders = await db.order.getMany({
     where: x => x.lines.any(line => line.product.contains('i'))
       .and(x.customer.balance.greaterThan(180)),
-    customer: true, 
-    deliveryAddress: true, 
+    customer: true,
+    deliveryAddress: true,
     lines: true
   });
 }
 ```
-You can also build the `where` filter separately and pass it in via the `where` clause. This keeps the filter independent of the fetching strategy and easier to reuse.  
+You can also build the `where` filter separately and pass it in via the `where` clause. This keeps the filter independent of the fetching strategy and easier to reuse.
 ```javascript
 async function getRows() {
   const filter = db.order.lines.any(line => line.product.contains('i'))
                  .and(db.order.customer.balance.greaterThan(180));
   const orders = await db.order.getMany({
     where: filter,
-    customer: true, 
-    deliveryAddress: true, 
+    customer: true,
+    deliveryAddress: true,
     lines: true
   });
 }
@@ -696,14 +706,14 @@ async function getRows() {
   const order = await db.order.getOne({
     where: x => x.customer(customer => customer.isActive.eq(true)
                  .and(customer.startsWith('Harr'))),
-    customer: true, 
-    deliveryAddress: true, 
+    customer: true,
+    deliveryAddress: true,
     lines: true
   });
 }
 ```
-You can also build the `where` filter independently and reuse it.    
-With `getOne`, you can combine the positional `where` filter with the `where` option to compose filters.  
+You can also build the `where` filter independently and reuse it.
+With `getOne`, you can combine the positional `where` filter with the `where` option to compose filters.
 ```javascript
 async function getRows() {
   const filter = db.order.customer(customer => customer.isActive.eq(true)
@@ -712,8 +722,8 @@ async function getRows() {
                  // const filter = db.order.customer.isActive.eq(true).and(db.order.customer.startsWith('Harr'));
   const order = await db.order.getOne({
     where: filter,
-    customer: true, 
-    deliveryAddress: true, 
+    customer: true,
+    deliveryAddress: true,
     lines: true
   });
 }
@@ -729,8 +739,8 @@ getRows();
 
 async function getRows() {
   const order = await db.order.getById(1, {
-    customer: true, 
-    deliveryAddress: true, 
+    customer: true,
+    deliveryAddress: true,
     lines: true
   });
 }
@@ -748,15 +758,15 @@ async function getRows() {
   const orders = await db.order.getMany([
       {id: 1},
       {id: 2}
-    ], 
+    ],
     {
-      customer: true, 
-      deliveryAddress: true, 
+      customer: true,
+      deliveryAddress: true,
       lines: true
   });
 }
 ```
-</details>  
+</details>
 
 <details id="updating-rows"><summary><strong>Updating rows</strong></summary>
 <p>To update rows, modify the property values and invoke the method <strong><i>saveChanges()</i></strong>. The function updates only the modified columns, not the entire row. Rows in child relations can also be updated as long as the parent order <i>owns</i> the child tables. In our illustration, the <strong>order</strong> table owns both the <strong>deliveryAddress</strong> and the <strong>lines</strong> tables because they're part of a <i>hasOne/hasMany relationship</i>. Contrastingly, the <strong>customer</strong> is part of a <i>reference relationship</i> and thus can't be updated here. But you can detach the reference to the customer by assigning it to null or undefined. (Setting order.customerId to null or undefined achieves the same result.)</p>
@@ -771,8 +781,8 @@ update();
 
 async function update() {
   const order = await db.order.getById(1, {
-    customer: true, 
-    deliveryAddress: true, 
+    customer: true,
+    deliveryAddress: true,
     lines: true
   });
 
@@ -794,8 +804,8 @@ update();
 async function update() {
   let orders = await db.order.getMany({
     orderBy: 'id',
-    lines: true, 
-    deliveryAddress: true, 
+    lines: true,
+    deliveryAddress: true,
     customer: true
   });
 
@@ -811,7 +821,7 @@ async function update() {
   await orders.saveChanges();
 }
 ```
-__Selective updates__  
+__Selective updates__
 The update method is ideal for updating specific columns and relationships across one or multiple rows. You must provide a where filter to specify which rows to target. If you include a fetching strategy, the affected rows and their related data will be returned; otherwise, no data is returned.
 
 ```javascript
@@ -836,7 +846,7 @@ async function update() {
   const orders = await db.order.update(propsToBeModified, { where: x => x.id.eq(1) }, strategy);
 }
 ```
-__Replacing a row from JSON__  
+__Replacing a row from JSON__
 The replace method is suitable when a complete overwrite is required from a JSON object - typically in a REST API. However, it's important to consider that this method replaces the entire row and it's children, which might not always be desirable in a multi-user environment.
 
 ```javascript
@@ -870,7 +880,7 @@ async function replace() {
   const order = await db.order.replace(modified, {customer: true, deliveryAddress: true, lines: true});
 }
 ```
-__Partially updating from JSON__  
+__Partially updating from JSON__
  The updateChanges method applies a partial update based on difference between original and modified row. It is often preferable because it minimizes the risk of unintentionally overwriting data that may have been altered by other users in the meantime. To do so, you need to pass in the original row object before modification as well.
 
 ```javascript
@@ -908,7 +918,7 @@ async function update() {
   const order = await db.order.updateChanges(modified, original, { customer: true, deliveryAddress: true, lines: true });
 }
 ```
-__Conflict resolution__  
+__Conflict resolution__
 Rows get updated using an <i id="conflicts">optimistic</i> concurrency approach by default. This means if a property being edited was meanwhile altered, an exception is raised, indicating the row was modified by a different user. You can change the concurrency strategy either at the table or column level.
 
 Currently, there are three concurrency strategies:
@@ -926,8 +936,8 @@ update();
 
 async function update() {
   const order = await db.order.getById(1, {
-    customer: true, 
-    deliveryAddress: true, 
+    customer: true,
+    deliveryAddress: true,
     lines: true
   });
 
@@ -941,7 +951,7 @@ async function update() {
   }});
 }
 ```
-</details>  
+</details>
 
 <details id="upserting-rows"><summary><strong>Upserting rows</strong></summary>
 It is possible to perform 'upserts' by taking advantage of the 'overwrite' strategy.
@@ -1007,7 +1017,7 @@ const db = map.sqlite('demo.db');
 
 deleteRow();
 
-async function deleteRow() {    
+async function deleteRow() {
   const order = await db.order.getById(1);
 
   await order.delete();
@@ -1015,7 +1025,7 @@ async function deleteRow() {
   //but not customer
 }
 ```
-__Deleting a row in an array__  
+__Deleting a row in an array__
 A common workflow involves retrieving multiple rows, followed by the need to delete a specific row from an array. This operation is straightforward to do with Orange, which allow for the updating, inserting, and deleting of multiple rows in a single transaction. To modify the array, simply add, update, or remove elements, and then invoke the saveChanges() method on the array to persist the changes.
 
 ```javascript
@@ -1024,10 +1034,10 @@ const db = map.sqlite('demo.db');
 
 updateInsertDelete();
 
-async function updateInsertDelete() {    
+async function updateInsertDelete() {
   const orders = await db.order.getMany({
-    customer: true, 
-    deliveryAddress: true, 
+    customer: true,
+    deliveryAddress: true,
     lines: true
   });
 
@@ -1036,7 +1046,7 @@ async function updateInsertDelete() {
     product: 'secret weapon',
     amount: 355
   });
-  
+
   //will delete second row
   orders.splice(1, 1);
 
@@ -1071,7 +1081,7 @@ const db = map.sqlite('demo.db');
 
 deleteRows();
 
-async function deleteRows() {  
+async function deleteRows() {
   let orders = await db.order.getMany({
     where: x => x.customer.name.eq('George')
   });
@@ -1079,8 +1089,8 @@ async function deleteRows() {
   await orders.delete();
 }
 ```
-__Deleting with concurrency__  
-Concurrent operations can lead to conflicts. When you still want to proceed with the deletion regardless of potential interim changes, the 'overwrite' concurrency strategy can be used. This example demonstrates deleting rows even if the "delivery address" has been modified in the meantime. You can read more about concurrency strategies in <a href="#user-content-updating-rows">Updating rows</a>.   
+__Deleting with concurrency__
+Concurrent operations can lead to conflicts. When you still want to proceed with the deletion regardless of potential interim changes, the 'overwrite' concurrency strategy can be used. This example demonstrates deleting rows even if the "delivery address" has been modified in the meantime. You can read more about concurrency strategies in <a href="#user-content-updating-rows">Updating rows</a>.
 ```javascript
 import map from './map';
 const db = map.sqlite('demo.db');
@@ -1090,8 +1100,8 @@ deleteRows();
 async function deleteRows() {
   let orders = await db.order.getMany({
     where: x => x.deliveryAddress.name.eq('George'),
-    customer: true, 
-    deliveryAddress: true, 
+    customer: true,
+    deliveryAddress: true,
     lines: true
   });
 
@@ -1104,9 +1114,9 @@ async function deleteRows() {
 ```
 __Batch delete__
 
-When removing a large number of records based on a certain condition, batch deletion can be efficient.   
+When removing a large number of records based on a certain condition, batch deletion can be efficient.
 
-However, it's worth noting that batch deletes don't follow the cascade delete behavior by default. To achieve cascading in batch deletes, you must explicitly call the deleteCascade method.  
+However, it's worth noting that batch deletes don't follow the cascade delete behavior by default. To achieve cascading in batch deletes, you must explicitly call the deleteCascade method.
 
 ```javascript
 import map from './map';
@@ -1121,7 +1131,7 @@ async function deleteRows() {
 ```
 __Batch delete cascade__
 
-When deleting records, sometimes associated data in related tables also needs to be removed. This cascade delete helps maintain database integrity.  
+When deleting records, sometimes associated data in related tables also needs to be removed. This cascade delete helps maintain database integrity.
 
 ```javascript
 import map from './map';
@@ -1136,7 +1146,7 @@ async function deleteRows() {
 ```
 __Batch delete by primary key__
 
-For efficiency, you can also delete records directly if you know their primary keys.  
+For efficiency, you can also delete records directly if you know their primary keys.
 
 ```javascript
 import map from './map';
@@ -1151,7 +1161,7 @@ async function deleteRows() {
 </details>
 
 <details id="in-the-browser"><summary><strong>In the browser</strong></summary>
-<p>You can use <strong><i>Orange</i></strong> in the browser by using the adapter for Express or Hono. Instead of sending raw SQL queries from the client to the server, this approach records the method calls in the client. These method calls are then replayed at the server, ensuring a higher level of security by not exposing raw SQL on the client side.  
+<p>You can use <strong><i>Orange</i></strong> in the browser by using the adapter for Express or Hono. Instead of sending raw SQL queries from the client to the server, this approach records the method calls in the client. These method calls are then replayed at the server, ensuring a higher level of security by not exposing raw SQL on the client side.
 Raw sql queries, raw sql filters and transactions are disabled at the http client due to security reasons.  If you would like Orange to support other web frameworks, like nestJs, fastify, etc, please let me know.</p>
 
 <sub>📄 server.ts</sub>
@@ -1187,7 +1197,7 @@ async function updateRows() {
       .and(x.customer.name.startsWith('Harry'),
     lines: true
   });
-  
+
   order.lines.push({
     product: 'broomstick',
     amount: 300,
@@ -1226,8 +1236,8 @@ serve({ fetch: app.fetch, port: 3000 });
 
 __Interceptors and base filter__
 
-In the next setup, axios interceptors are employed on the client side to add an Authorization header of requests. Meanwhile, on the server side, an Express middleware (validateToken) is utilized to ensure the presence of the Authorization header, while a base filter is applied on the order table to filter incoming requests based on the customerId extracted from this header. This combined approach enhances security by ensuring that users can only access data relevant to their authorization level and that every request is accompanied by a token. In real-world applications, it's advisable to use a more comprehensive token system and expand error handling to manage a wider range of potential issues.  
-One notable side effect compared to the previous example, is that only the order table is exposed for interaction, while all other potential tables in the database remain shielded from direct client access (except for related tables). If you want to expose a table without a baseFilter, just set the tableName to an empty object.    
+In the next setup, HTTP interceptors are employed on the client side to add an Authorization header of requests. Meanwhile, on the server side, an Express middleware (validateToken) is utilized to ensure the presence of the Authorization header, while a base filter is applied on the order table to filter incoming requests based on the customerId extracted from this header. This combined approach enhances security by ensuring that users can only access data relevant to their authorization level and that every request is accompanied by a token. In real-world applications, it's advisable to use a more comprehensive token system and expand error handling to manage a wider range of potential issues.
+One notable side effect compared to the previous example, is that only the order table is exposed for interaction, while all other potential tables in the database remain shielded from direct client access (except for related tables). If you want to expose a table without a baseFilter, just set the tableName to an empty object.
 
 <sub>📄 server.ts</sub>
 
@@ -1274,7 +1284,7 @@ const db = map.http('http://localhost:3000/orange');
 updateRows();
 
 async function updateRows() {
-  
+
   db.interceptors.request.use((config) => {
     // For demo purposes, we're just adding hardcoded token
     // In a real-world scenario, use a proper JSON web token
@@ -1283,7 +1293,7 @@ async function updateRows() {
   });
 
   db.interceptors.response.use(
-    response => response, 
+    response => response,
     (error) => {
       if (error.response && error.response.status === 401) {
         console.dir('Unauthorized, dispatch a login action');
@@ -1298,7 +1308,7 @@ async function updateRows() {
       .and(db.order.customer.name.startsWith('Harry')),
     lines: true
   });
-  
+
   order.lines.push({
     product: 'broomstick',
     amount: 300
@@ -1310,8 +1320,8 @@ async function updateRows() {
 
 ```
 
-__Row Level Security__  
-You can enforce tenant isolation at the database level by combining Postgres RLS with Express hooks. The example below mirrors the “Interceptors and base filter” style by putting the tenant id in a (fake) token on the client, then extracting it on the server and setting it inside the transaction. This is convenient for a demo because we can seed data and prove rows are filtered. In a real application you must validate signatures and derive tenant id from a trusted identity source, not from arbitrary client input.  
+__Row Level Security__
+You can enforce tenant isolation at the database level by combining Postgres RLS with Express hooks. The example below mirrors the “Interceptors and base filter” style by putting the tenant id in a (fake) token on the client, then extracting it on the server and setting it inside the transaction. This is convenient for a demo because we can seed data and prove rows are filtered. In a real application you must validate signatures and derive tenant id from a trusted identity source, not from arbitrary client input.
 
 <sub>📄 setup.sql</sub>
 
@@ -1416,7 +1426,7 @@ const rows = await db.tenant_data.getMany();
 <p>Efficient data retrieval is crucial for the performance and scalability of applications. The fetching strategy gives you the freedom to decide how much related data you want to pull along with your primary request. Below are examples of common fetching strategies, including fetching entire relations and subsets of columns. When no fetching strategy is present, it will fetch all columns without its relations.<p>
 
 
-__Including a relation__  
+__Including a relation__
 This example fetches orders and their corresponding delivery addresses, including all columns from both entities.
 
 ```javascript
@@ -1427,12 +1437,12 @@ getRows();
 
 async function getRows() {
   const rows = await db.order.getMany({
-    deliveryAddress: true 
-  });  
+    deliveryAddress: true
+  });
 }
 ```
 
-__Including a subset of columns__  
+__Including a subset of columns__
 In scenarios where only specific fields are required, you can specify a subset of columns to include. In the example below, orderDate is explicitly excluded, so all other columns in the order table are included by default. For the deliveryAddress relation, only countryCode and name are included, excluding all other columns. If you have a mix of explicitly included and excluded columns, all other columns will be excluded from that table.
 
 ```javascript
@@ -1447,8 +1457,8 @@ async function getRows() {
     deliveryAddress: {
       countryCode: true,
       name: true
-    } 
-  });  
+    }
+  });
 }
 ```
 
@@ -1458,7 +1468,7 @@ async function getRows() {
 <p>Filters are a versatile tool for both data retrieval and bulk deletions. They allow for precise targeting of records based on specific criteria and can be combined with operators like <i>any</i> and <i>exists</i> and even raw sql for more nuanced control. Filters can also be nested to any depth, enabling complex queries that can efficiently manage and manipulate large datasets. This dual functionality enhances database management by ensuring data relevance and optimizing performance.</p>
 
 
-__Equal__  
+__Equal__
 ```javascript
 import map from './map';
 const db = map.sqlite('demo.db');
@@ -1471,7 +1481,7 @@ async function getRows() {
   });
 }
 ```
-__Not equal__  
+__Not equal__
 ```javascript
 import map from './map';
 const db = map.sqlite('demo.db');
@@ -1484,7 +1494,7 @@ async function getRows() {
   });
 }
 ```
-__Contains__  
+__Contains__
 ```javascript
 import map from './map';
 const db = map.sqlite('demo.db');
@@ -1497,7 +1507,7 @@ async function getRows() {
   });
 }
 ```
-__Starts with__  
+__Starts with__
 ```javascript
 import map from './map';
 const db = map.sqlite('demo.db');
@@ -1512,7 +1522,7 @@ async function getRows() {
   });
 }
 ```
-__Ends with__  
+__Ends with__
 ```javascript
 import map from './map';
 const db = map.sqlite('demo.db');
@@ -1525,7 +1535,7 @@ async function getRows() {
   });
 }
 ```
-__Greater than__  
+__Greater than__
 ```javascript
 import map from './map';
 const db = map.sqlite('demo.db');
@@ -1538,7 +1548,7 @@ async function getRows() {
   });
 }
 ```
-__Greater than or equal__  
+__Greater than or equal__
 ```javascript
 import map from './map';
 const db = map.sqlite('demo.db');
@@ -1551,7 +1561,7 @@ async function getRows() {
   });
 }
 ```
-__Less than__  
+__Less than__
 ```javascript
 import map from './map';
 const db = map.sqlite('demo.db');
@@ -1564,7 +1574,7 @@ async function getRows() {
   });
 }
 ```
-__Less than or equal__  
+__Less than or equal__
 ```javascript
 import map from './map';
 const db = map.sqlite('demo.db');
@@ -1577,7 +1587,7 @@ async function getRows() {
   });
 }
 ```
-__Between__  
+__Between__
 ```javascript
 import map from './map';
 const db = map.sqlite('demo.db');
@@ -1590,8 +1600,8 @@ async function getRows() {
   });
 }
 ```
-__Column-to-column filters__  
-You can compare one column to another column instead of comparing to a constant value.  
+__Column-to-column filters__
+You can compare one column to another column instead of comparing to a constant value.
 This works both on the same table and across relations.
 
 ```javascript
@@ -1617,7 +1627,7 @@ async function getRows() {
   });
 }
 ```
-__In__  
+__In__
 ```javascript
 import map from './map';
 const db = map.sqlite('demo.db');
@@ -1631,10 +1641,10 @@ async function getRows() {
 
 }
 ```
-__Raw sql filter__  
-You can use the raw SQL filter alone or in combination with a regular filter. 
+__Raw sql filter__
+You can use the raw SQL filter alone or in combination with a regular filter.
 Here the raw filter queries for customer with name ending with "arry". The composite filter combines the raw SQL filter and a regular filter that checks for a customer balance greater than 100. It is important to note that due to security precautions aimed at preventing SQL injection attacks, using raw SQL filters directly via browser inputs is not allowed. Attempting to do so will result in an HTTP status 403 (Forbidden) being returned.
- 
+
 ```javascript
 import map from './map';
 const db = map.sqlite('demo.db');
@@ -1645,15 +1655,15 @@ async function getRows() {
   const rawFilter = {
     sql: 'name like ?',
     parameters: ['%arry']
-  };                 
-  
+  };
+
   const rowsWithRaw = await db.customer.getMany({
     where: () => rawFilter
   });
 
   const rowsWithCombined = await db.customer.getMany({
     where: x => x.balance.greaterThan(100).and(rawFilter)
-  });  
+  });
 }
 ```
 
@@ -1683,7 +1693,7 @@ async function getRows() {
 <details id="logical-filters"><summary><strong>And, or, not, exists</strong></summary>
 <p>These operators serve as the backbone for constructing complex queries that allow for more granular control over the data fetched from the database. The examples provided below are self-explanatory for anyone familiar with basic programming concepts and database operations. The design philosophy underscores the importance of clear, readable code that doesn't sacrifice power for simplicity.</p>
 
-__And__  
+__And__
 ```javascript
 import map from './map';
 const db = map.sqlite('demo.db');
@@ -1694,10 +1704,10 @@ async function getRows() {
   const rows = await db.order.getMany({
     where: x => x.customer.name.equal('Harry')
       .and(x.orderDate.greaterThan('2023-07-14T12:00:00'))
-  });  
+  });
 }
 ```
-__Or__  
+__Or__
 ```javascript
 import map from './map';
 const db = map.sqlite('demo.db');
@@ -1709,10 +1719,10 @@ async function getRows() {
   const rows = await db.order.getMany({
     where: y => y.customer( x => x.name.equal('George')
       .or(x.name.equal('Harry')))
-  });  
+  });
 }
 ```
-__Not__  
+__Not__
 ```javascript
 import map from './map';
 const db = map.sqlite('demo.db');
@@ -1725,10 +1735,10 @@ async function getRows() {
     where: y => y.customer(x => x.name.equal('George')
         .or(x.name.equal('Harry')))
       .not()
-  });  
+  });
 }
 ```
-__Exists__  
+__Exists__
 ```javascript
 import map from './map';
 const db = map.sqlite('demo.db');
@@ -1738,7 +1748,7 @@ getRows();
 async function getRows() {
   const rows = await db.order.getMany({
     where: x => x.deliveryAddress.exists()
-  });  
+  });
 }
 ```
 
@@ -1748,7 +1758,7 @@ async function getRows() {
 <p>These operators are used in scenarios involving relationships within database records.</p>
 
 
-__Any__  
+__Any__
 The <i>any</i> operator is employed when the objective is to find records where at least one item in a collection meets the specified criteria.
 ```javascript
 import map from './map';
@@ -1761,10 +1771,10 @@ async function getRows() {
     where: y => y.lines.any(x => x.product.contains('guitar'))
     //equivalent syntax:
     //where: x => x.lines.product.contains('guitar')
-  });  
+  });
 }
 ```
-__All__  
+__All__
 Conversely, the <i>all</i> operator ensures that every item in a collection adheres to the defined condition.
 ```javascript
 import map from './map';
@@ -1775,11 +1785,11 @@ getRows();
 async function getRows() {
   const rows = await db.order.getMany({
     where: y => y.lines.all(x => x.product.contains('a'))
-  });  
+  });
 }
 ```
-__None__  
-The <i>none</i> operator, as the name suggests, is used to select records where not a single item in a collection meets the condition. 
+__None__
+The <i>none</i> operator, as the name suggests, is used to select records where not a single item in a collection meets the condition.
 ```javascript
 import map from './map';
 const db = map.sqlite('demo.db');
@@ -1789,10 +1799,10 @@ getRows();
 async function getRows() {
   const rows = await db.order.getMany({
     where: y => y.lines.none(x => x.product.equal('Magic wand'))
-  });  
+  });
 }
 ```
-__Count__  
+__Count__
 Use <i>count</i> on a relation in a filter to compare how many related rows match a condition.
 ```javascript
 import map from './map';
@@ -2036,7 +2046,7 @@ const map = orange.map(x => ({
 </details>
 
 <details id="default-values"><summary><strong>Default values</strong></summary>
-<p>Utilizing default values can be especially useful for automatically populating these fields when the underlying database doesn't offer native support for default value generation.  
+<p>Utilizing default values can be especially useful for automatically populating these fields when the underlying database doesn't offer native support for default value generation.
 
 In the provided code, the id column's default value is set to a UUID generated by crypto.randomUUID(), and the isActive column's default is set to true.</p>
 
@@ -2054,11 +2064,12 @@ const map = orange.map(x => ({
 }));
 
 export default map;
-```  
+```
 </details>
 
 <details><summary><strong>Validation</strong></summary>
 <p>In the previous sections you have already seen the <strong><i>notNull()</i></strong> validator being used on some columns. This will not only generate correct typescript mapping, but also throw an error if value is set to null or undefined. However, sometimes we do not want the notNull-validator to be run on inserts. Typically, when we have an autoincremental key or server generated uuid, it does not make sense to check for null on insert. This is where <strong><i>notNullExceptInsert()</strong></i> comes to rescue. You can also create your own custom validator as shown below. The last kind of validator, is the <a href="https://ajv.js.org/json-schema.html">ajv JSON schema validator</a>. This can be used on json columns as well as any other column type.</p>
+<p>Custom validators receive <code>value</code> and a metadata object with <code>table</code>, <code>column</code>, <code>property</code>, and <code>isInsert</code>.</p>
 
 <sub>📄 map.ts</sub>
 ```ts
@@ -2076,9 +2087,9 @@ let petSchema = {
     }
 };
 
-function validateName(value?: string) {
+function validateName(value?: string, meta: { table: string; column: string; property: string; isInsert: boolean }) {
   if (value && value.length > 10)
-    throw new Error('Length cannot exceed 10 characters');
+    throw new Error(`Length cannot exceed 10 characters in ${meta.table}.${meta.column}`);
 }
 
 const map = orange.map(x => ({
@@ -2111,9 +2122,9 @@ let petSchema = {
     }
 };
 
-function validateName(value) {
+function validateName(value, meta) {
   if (value && value.length > 10)
-    throw new Error('Length cannot exceed 10 characters');
+    throw new Error(`Length cannot exceed 10 characters in ${meta.table}.${meta.column}`);
 }
 
 const map = orange.map(x => ({
@@ -2156,7 +2167,7 @@ const map = orange.map(x => ({
 }));
 
 export default map;
-```  
+```
 </details>
 
 
@@ -2180,7 +2191,7 @@ const map = orange.map(x => ({
 }));
 
 export default map;
-```  
+```
 </details>
 
 <details id="formula-discriminators"><summary><strong>Formula discriminators</strong></summary>
@@ -2207,7 +2218,7 @@ const map = orange.map(x => ({
 }));
 
 export default map;
-```  
+```
 </details>
 
 <details><summary><strong>Raw sql queries</strong></summary>
@@ -2224,8 +2235,8 @@ async function getRows() {
     sql: 'select * from customer where name like ?',
     parameters: ['%arry']
   };
-                 
-  const rows = await db.query(query)   
+
+  const rows = await db.query(query)
 }
 ```
 </details>
@@ -2269,16 +2280,16 @@ await db.transaction(async (db) => {
 
 <details id="aggregates"><summary><strong>Aggregate functions</strong></summary>
 
-You can count records and aggregate numerical columns.  This can either be done across rows or separately for each row.  
+You can count records and aggregate numerical columns.  This can either be done across rows or separately for each row.
 Supported functions include:
 - count
 - sum
-- min 
-- max  
-- avg  
+- min
+- max
+- avg
 
-__On each row__  
-In this example, we are counting the number of lines on each order.  This is represented as the property <i>numberOfLines</i>. You can name these aggregated properties whatever you want.  
+__On each row__
+In this example, we are counting the number of lines on each order.  This is represented as the property <i>numberOfLines</i>. You can name these aggregated properties whatever you want.
 You can also elevate associated data to the a parent level for easier access. In the example below, <i>balance</i> of the customer is elevated to the root level.
 
 ```javascript
@@ -2295,9 +2306,9 @@ async function getRows() {
   });
 }
 ```
-__Across all rows__  
+__Across all rows__
 The aggregate function effeciently groups data together.
-In this particular example , for each customer, it counts the number of lines associated with their orders and calculates the total amount of these lines.  
+In this particular example , for each customer, it counts the number of lines associated with their orders and calculates the total amount of these lines.
 Under the hood, it will run an sql group by customerId and customerName.
 ```javascript
 import map from './map';
@@ -2311,12 +2322,12 @@ async function getAggregates() {
     customerId: x => x.customerId,
     customerName: x => x.customer.name,
     numberOfLines: x => x.count(x => x.lines.id),
-    totals: x => x.sum(x => lines.amount)    
+    totals: x => x.sum(x => lines.amount)
   });
 }
 ```
 
-__Count__  
+__Count__
 For convenience, you can use the <i>count</i> directly on the table instead of using the aggregated query syntax.
 ```javascript
 import map from './map';
@@ -2368,7 +2379,7 @@ async function getRows() {
     balance: 177,
     isActive: true
   });
-  
+
   console.dir(JSON.stringify(george), {depth: Infinity});
   //note that balance is excluded:
   //'{"id":1,"name":"George","isActive":true}'
@@ -2425,7 +2436,7 @@ COMMIT
 <ul>
   <li><strong>It is not about migrations</strong> <p>The allure of ORMs handling SQL migrations is undeniably attractive and sweet. However, this sweetness can become painful. Auto-generated migration scripts might not capture all nuances. Using dedicated migration tools separate from the ORM or manually managing migrations might be the less painful route in the long run.  Orange aim for database agnosticism. And when you're dealing with migrations, you might want to use features specific to a database platform. However, I might consider adding support for (non-auto-generated) migrations at a later point. But for now, it is not on the roadmap.</p></li>
   <li><strong>It is not about NoSql databases</strong> <p>Applying ORMs to NoSQL, which inherently diverges from the relational model, can lead to data representation mismatches and a loss of specialized NoSQL features. Moreover, the added ORM layer can introduce performance inefficiencies, complicate debugging, and increase maintenance concerns. Given the unique capabilities of each NoSQL system, crafting custom data access solutions tailored to specific needs often provides better results than a generalized ORM approach.</p></li>
-  <li><strong>It is not about GrapQL</strong> <p>Orange, already supports remote data operations via HTTP, eliminating the primary need for integrating GraphQL. Orange's built-in safety mechanisms and tailored optimization layers ensure secure and efficient data operations, which might be compromised by adding GraphQL. Furthermore, Orange's inherent expressivity and powerful querying capabilities could be overshadowed by the introduction of GraphQL. Integrating GraphQL could introduce unnecessary complexity, potential performance overhead, and maintenance challenges, especially as both systems continue to evolve. Therefore, considering Orange's robust features and design, supporting GraphQL might not offer sufficient advantages to warrant the associated complications. </p></li>
+  <li><strong>It is not about GraphQL</strong> <p>Orange, already supports remote data operations via HTTP, eliminating the primary need for integrating GraphQL. Orange's built-in safety mechanisms and tailored optimization layers ensure secure and efficient data operations, which might be compromised by adding GraphQL. Furthermore, Orange's inherent expressivity and powerful querying capabilities could be overshadowed by the introduction of GraphQL. Integrating GraphQL could introduce unnecessary complexity, potential performance overhead, and maintenance challenges, especially as both systems continue to evolve. Therefore, considering Orange's robust features and design, supporting GraphQL might not offer sufficient advantages to warrant the associated complications. </p></li>
 </ul>
 
 </p>
@@ -2433,7 +2444,7 @@ COMMIT
 
 ### [Changelog](https://github.com/alfateam/orange-orm/blob/master/docs/changelog.md)
 ### [Code of Conduct](https://github.com/alfateam/orange-orm/blob/master/docs/CODE_OF_CONDUCT.md)
-<!-- 
+<!--
 How to setup code coverage
 https://github.com/nystudio107/rollup-plugin-critical/blob/master/package.json
 https://dev.to/thejaredwilcurt/coverage-badge-with-github-actions-finally-59fa -->

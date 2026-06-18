@@ -3,9 +3,29 @@ import type { PGliteOptions } from './pglite.d.ts';
 import type { ConnectionConfiguration } from 'tedious';
 import type { D1Database } from '@cloudflare/workers-types';
 import type { PoolAttributes } from 'oracledb';
-import type { AxiosInterceptorManager, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 
 export type ORMColumnType = 'string' | 'bigint' | 'uuid' | 'date' | 'numeric' | 'boolean' | 'json' | 'binary';
+
+type HttpInterceptorManager<T> = {
+  use(onFulfilled?: (value: T) => T | Promise<T>, onRejected?: (error: any) => any): string;
+  eject(id: string): void;
+};
+
+type HttpRequestConfig = {
+  baseURL?: string;
+  url?: string;
+  method?: string;
+  headers: Record<string, string>;
+  data?: any;
+};
+
+type HttpResponse<T = any> = {
+  data: T;
+  status: number;
+  statusText: string;
+  headers: Record<string, string>;
+  config: HttpRequestConfig;
+};
 
 // Base column definition with space-prefixed required properties
 export type ORMColumnDefinition = {
@@ -882,8 +902,8 @@ type JsonPatch = Array<{
 }>;
 
 interface WithInterceptors {
-  request: AxiosInterceptorManager<InternalAxiosRequestConfig>;
-  response: AxiosInterceptorManager<AxiosResponse>;
+  request: HttpInterceptorManager<HttpRequestConfig>;
+  response: HttpInterceptorManager<HttpResponse>;
 }
 
 interface Connectors {
@@ -896,6 +916,8 @@ interface Connectors {
   sap(connectionString: string, options?: PoolOptions<any>): Pool;
   mssql(connectionConfig: ConnectionConfiguration, options?: PoolOptions<any>): Pool;
   mssql(connectionString: string, options?: PoolOptions<any>): Pool;
+  mysql(connectionString: string, options?: PoolOptions<any>): Pool;
+  mariadb(connectionString: string, options?: PoolOptions<any>): Pool;
   oracle(config: PoolAttributes, options?: PoolOptions<any>): Pool;
 }
 
@@ -911,6 +933,7 @@ type DbConnectable<M extends Record<string, TableDefinition<M>>> = {
   mssql(connectionString: string, options?: PoolOptions<M>): DBClient<M>;
   mssqlNative(connectionString: string, options?: PoolOptions<M>): DBClient<M>;
   mysql(connectionString: string, options?: PoolOptions<M>): DBClient<M>;
+  mariadb(connectionString: string, options?: PoolOptions<M>): DBClient<M>;
   oracle(config: PoolAttributes, options?: PoolOptions<M>): DBClient<M>;
 };
 

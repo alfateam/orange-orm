@@ -60,11 +60,16 @@ function newSingleCommandCore(context, table, filter, alias, concurrencyState) {
 		if (engine === 'pg') {
 			return newParameterized(columnSql + ' IS NOT DISTINCT FROM ' + encoded.sql(), encoded.parameters);
 		}
-		if (engine === 'mysql') {
+		if (engine === 'mysql' || engine === 'mariadb') {
 			return newParameterized(columnSql + ' <=> ' + encoded.sql(), encoded.parameters);
 		}
 		if (engine === 'sqlite') {
 			return newParameterized(columnSql + ' IS ' + encoded.sql(), encoded.parameters);
+		}
+		if (engine === 'sap' && column.tsType === 'DateColumn') {
+			if (encoded.sql() === 'null')
+				return newParameterized(columnSql + ' IS NULL');
+			return newParameterized(column.formatOut(context) + '=' + encoded.sql(), encoded.parameters);
 		}
 		if (engine === 'sap' && column.tsType === 'JSONColumn') {
 			if (encoded.sql() === 'null')
@@ -100,6 +105,10 @@ function newSingleCommandCore(context, table, filter, alias, concurrencyState) {
 		if (engine === 'mysql') {
 			const jsonValue = JSON.stringify(value === undefined ? null : value);
 			return newParameterized('CAST(? AS JSON)', [jsonValue]);
+		}
+		if (engine === 'mariadb') {
+			const jsonValue = JSON.stringify(value === undefined ? null : value);
+			return newParameterized('JSON_EXTRACT(?, \'$\')', [jsonValue]);
 		}
 		if (engine === 'sqlite') {
 			if (isJsonObject(value)) {

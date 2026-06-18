@@ -8,7 +8,7 @@ CREATE TABLE datetest (
 );
 
 INSERT INTO datetest (\`date\`, tdatetime, tdatetime_tz)
-VALUES ('2023-07-14T12:00:00+09:00', '2023-07-14T12:00:00+09:00', '2023-07-14 12:00:00-08:00');
+VALUES ('2023-07-14', '2023-07-14 03:00:00', '2023-07-14 20:00:00');
 
 CREATE TABLE bruker_rolle_like (
     bruker_rolle_id VARCHAR(36) PRIMARY KEY,
@@ -40,12 +40,12 @@ CREATE TABLE vendor (
 CREATE TABLE \`order\` (
     id INTEGER AUTO_INCREMENT PRIMARY KEY,
     orderDate TEXT,
-    customerId INTEGER REFERENCES customer
+    customerId INTEGER REFERENCES customer(id)
 );
 
 CREATE TABLE orderLine (
     id INTEGER AUTO_INCREMENT PRIMARY KEY,
-    orderId INTEGER REFERENCES \`order\`,
+    orderId INTEGER REFERENCES \`order\`(id),
     product TEXT,
     amount DECIMAL(10,2) NULL
 );
@@ -68,13 +68,13 @@ CREATE TABLE compositeOrderLine (
 
 CREATE TABLE package (
     packageId INTEGER AUTO_INCREMENT PRIMARY KEY,
-    lineId INTEGER REFERENCES orderLine,
+    lineId INTEGER REFERENCES orderLine(id),
     sscc TEXT
 );
 
 CREATE TABLE deliveryAddress (
     id INTEGER AUTO_INCREMENT PRIMARY KEY,
-    orderId INTEGER REFERENCES \`order\`,
+    orderId INTEGER REFERENCES \`order\`(id),
     name TEXT, 
     street TEXT,
     postalCode TEXT,

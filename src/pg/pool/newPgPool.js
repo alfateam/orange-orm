@@ -22,7 +22,7 @@ function newPgPool(connectionString, poolOptions) {
 				if (!pg) {
 					pg = await import('pg');
 					pg  = pg.default || pg;
-					let types = pg.types || pg.types;
+					let types = pg.types;
 					types.setTypeParser(1700, function(val) {
 						return parseFloat(val);
 					});

@@ -1,17 +1,14 @@
-var wrapQuery = require('./wrapQuery');
-var wrapCommand = require('./wrapCommand');
-var encodeDate = require('../pg/encodeDate');
-const encodeBinary = require('../nodeSqlite/encodeBinary');
-const decodeBinary = require('../nodeSqlite/decodeBinary');
-var deleteFromSql = require('../pg/deleteFromSql');
-var selectForUpdateSql = require('../pg/selectForUpdateSql');
-var limitAndOffset = require('../pg/limitAndOffset');
-var formatDateOut = require('../pg/formatDateOut');
-var formatJSONIn = require('./formatJSONIn');
-var encodeJSON = require('./encodeJSON');
-var insertSql = require('../pg/insertSql');
-var insert = require('../pg/insert');
-var quote = require('../pg/quote');
+const wrapQuery = require('../mySql/wrapQuery');
+const wrapCommand = require('../mySql/wrapCommand');
+const encodeBoolean = require('../mySql/encodeBoolean');
+const deleteFromSql = require('../mySql/deleteFromSql');
+const selectForUpdateSql = require('../mySql/selectForUpdateSql');
+const lastInsertedSql = require('../mySql/lastInsertedSql');
+const limitAndOffset = require('../mySql/limitAndOffset');
+const formatBigintOut = require('../mySql/formatBigintOut');
+const insertSql = require('../mySql/insertSql');
+const insert = require('../mySql/insert');
+const quote = require('../mySql/quote');
 
 function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 	var rdb = { poolFactory: pool };
@@ -19,23 +16,23 @@ function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 		pool = pool();
 		rdb.pool = pool;
 	}
-
-	rdb.engine = 'pg';
+	rdb.engine = 'mariadb';
+	rdb.encodeBoolean = encodeBoolean;
+	rdb.decodeJSON = decodeJSON;
 	rdb.encodeDate = encodeDate;
-	rdb.encodeBinary = encodeBinary;
-	rdb.decodeBinary = decodeBinary;
-	rdb.formatJSONIn = formatJSONIn;
-	rdb.encodeJSON = encodeJSON;
-	rdb.formatDateOut = formatDateOut;
+	rdb.encodeDateTz = encodeDateTz;
+	rdb.encodeJSON = JSON.stringify;
 	rdb.deleteFromSql = deleteFromSql;
 	rdb.selectForUpdateSql = selectForUpdateSql;
-	rdb.lastInsertedIsSeparate = false;
+	rdb.lastInsertedIsSeparate = true;
+	rdb.lastInsertedSql = lastInsertedSql;
+	rdb.formatBigintOut = formatBigintOut;
 	rdb.insertSql = insertSql;
 	rdb.insert = insert;
-	rdb.multipleStatements = true;
+	rdb.multipleStatements = false;
 	rdb.limitAndOffset = limitAndOffset;
 	rdb.accept = function(caller) {
-		caller.visitPg();
+		caller.visitMySql();
 	};
 	rdb.aggregateCount = 0;
 	rdb.quote = quote;
@@ -101,6 +98,29 @@ function newResolveTransaction(domain, pool, { readonly = false } = {}) {
 			}
 		}
 	};
+}
+
+function decodeJSON(value) {
+	return JSON.parse(value);
+}
+
+function encodeDate(date) {
+	date = date.toISOString ? removeTimezone(date.toISOString()) : removeTimezone(date);
+	return date;
+}
+
+function removeTimezone(isoString) {
+	let dateTimePattern = /[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(.[0-9]{3})?/;
+	let match = isoString.match(dateTimePattern);
+	return match ? match[0] : isoString;
+}
+
+function encodeDateTz(date) {
+	if (date && date.toISOString)
+		return removeTimezone(date.toISOString());
+	if (typeof date === 'string' && /(Z|[+-][0-9]{2}:[0-9]{2})$/.test(date))
+		return removeTimezone(new Date(date).toISOString());
+	return date;
 }
 
 module.exports = newResolveTransaction;

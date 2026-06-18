@@ -17,6 +17,7 @@ function newResolveTransaction(domain, pool, { readonly = false } = {})  {
 		rdb.pool = pool;
 	}
 	rdb.engine = 'sqlite';
+	rdb.maxParameters = 32766;
 	rdb.encodeBoolean = encodeBoolean;
 	rdb.decodeJSON = decodeJSON;
 	rdb.encodeJSON = JSON.stringify;

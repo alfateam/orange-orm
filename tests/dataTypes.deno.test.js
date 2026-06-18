@@ -122,6 +122,10 @@ const connections = {
 		db: map({ db: (con) => con.mysql('mysql://test:test@mysql/test', { size: 1 }) }),
 		init: initMysql,
 	},
+	mariadb: {
+		db: map({ db: (con) => con.mariadb('mariadb://test:test@mariadb/test', { size: 1 }) }),
+		init: initMysql,
+	},
 	http: {
 		db: map.http(`http://localhost:${port}/rdb`),
 	},
@@ -143,6 +147,7 @@ beforeAll(async () => {
 	await insertData('mssql');
 	if (major === 18) await insertData('mssqlNative');
 	await insertData('mysql');
+	await insertData('mariadb');
 	await insertData('sqlite');
 	await insertData('sqlite2');
 	hostExpress();
@@ -204,6 +209,7 @@ describe('insert-get', () => {
 	it('mssql', async () => await verify('mssql'));
 	if (major === 18) it('mssqlNative', async () => await verify('mssqlNative'));
 	it('mysql', async () => await verify('mysql'));
+	it('mariadb', async () => await verify('mariadb'));
 	it('sqlite', async () => await verify('sqlite'));
 	it('http', { sanitizeResources: false, sanitizeOps: false }, async () => await verify('http'));
 
@@ -244,6 +250,7 @@ describe('insert-get bigint', () => {
 	it('mssql', async () => await verify('mssql'));
 	if (major === 18) it('mssqlNative', async () => await verify('mssqlNative'));
 	it('mysql', async () => await verify('mysql'));
+	it('mariadb', async () => await verify('mariadb'));
 	it('sqlite', async () => await verify('sqlite'));
 	it('http', { sanitizeResources: false, sanitizeOps: false }, async () => await verify('http'));
 

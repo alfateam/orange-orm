@@ -26,9 +26,11 @@ module.exports = {
 	'rules': {
 		'@typescript-eslint/no-empty-function': 0,
 		'@typescript-eslint/no-var-requires': 0,
+		'@typescript-eslint/no-require-imports': 0,
 		'@typescript-eslint/ban-ts-comment': 0,
+		'@typescript-eslint/no-unused-expressions': 0,
 		'no-unused-vars': 'off',
-		'@typescript-eslint/no-unused-vars': [2, { 'args': 'after-used', 'ignoreRestSiblings': true, 'argsIgnorePattern': '^_' }],
+		'@typescript-eslint/no-unused-vars': [2, { 'args': 'after-used', 'ignoreRestSiblings': true, 'argsIgnorePattern': '^_', 'caughtErrors': 'none' }],
 		'indent': ['error', 'tab'],
 		// 'linebreak-style': ['error', 'unix'],
 		'quotes': ['error', 'single'],

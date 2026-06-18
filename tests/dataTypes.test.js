@@ -35,6 +35,7 @@ beforeAll(async () => {
 	if (major === 18)
 		await insertData('mssqlNative');
 	await insertData('mysql');
+	await insertData('mariadb');
 	await insertData('sqlite');
 	await insertData('sqlite2');
 	await insertData('sap');
@@ -76,6 +77,7 @@ describe('insert-get', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -113,6 +115,7 @@ describe('insert-get', () => {
 // 	if (major === 18)
 // 		test('mssqlNative', async () => await verify('mssqlNative'));
 // 	test('mysql', async () => await verify('mysql'));
+// test('mariadb', async () => await verify('mariadb'));
 // 	test('sqlite', async () => await verify('sqlite'));
 // 	test('sap', async () => await verify('sap'));
 // 	test('http', async () => await verify('http'));
@@ -153,6 +156,7 @@ describe('insert-update', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -193,6 +197,7 @@ describe('insert-update-with-null', () => {
 	if (major === 18)
 		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
 	test('sap', async () => await verify('sap'));
 	test('http', async () => await verify('http'));
@@ -295,6 +300,10 @@ const connections = {
 		db: map({ db: (con) => con.mysql('mysql://test:test@mysql/test', { size: 1 }) }),
 		init: initMysql
 	},
+	mariadb: {
+		db: map({ db: (con) => con.mariadb('mariadb://test:test@mariadb/test', { size: 1 }) }),
+		init: initMysql
+	},
 	http: {
 		db: map.http(`http://localhost:${port}/rdb`),
 	}
@@ -322,6 +331,8 @@ function getDb(name) {
 		return connections.oracle;
 	else if (name === 'mysql')
 		return connections.mysql;
+	else if (name === 'mariadb')
+		return connections.mariadb;
 	else if (name === 'http')
 		return connections.http;
 	else
