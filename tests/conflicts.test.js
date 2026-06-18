@@ -16,7 +16,11 @@ let server;
 
 
 beforeAll(async () => {
-	await createMs('mssql');
+	try {
+		await createMs('mssql');
+	} catch (e) {
+		console.warn('Could not connect to mssql, skipping mssql database setup.');
+	}
 	hostExpress();
 
 	async function createMs(dbName) {
@@ -143,6 +147,42 @@ describe('optimistic json object', () => {
 			isActive: true,
 			picture: null,
 			data: {foo: 1, bar: {baz: {bar: 'changedBy2', zeta: 'changedBy1'}}},
+		};
+
+		expect(customer).toEqual(expected);
+	}
+});
+
+describe('optimistic json object different key order', () => {
+	test('sap', async () => await verify('sap'));
+
+	async function verify(dbName) {
+		let { db, init } = getDb(dbName);
+		await init(db);
+
+		const customer = await db.customer2.insert({
+			name: 'Voldemort',
+			balance: -200,
+			isActive: true,
+			picture: null,
+			data: { a: 1, b: 2 },
+		});
+
+		const customer2 = await db.customer2.getById(customer.id);
+		customer2.data = { b: 2, a: 1 };
+		customer2.name = 'Voldemort2';
+		await customer2.saveChanges();
+
+		customer.name = 'Voldemort3';
+		await customer.saveChanges();
+
+		const expected = {
+			id: customer.id,
+			name: 'Voldemort3',
+			balance: -200,
+			isActive: true,
+			picture: null,
+			data: { b: 2, a: 1 }
 		};
 
 		expect(customer).toEqual(expected);
