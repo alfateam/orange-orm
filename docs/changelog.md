@@ -1,4 +1,6 @@
 ## Changelog
+__5.3.6__  
+Fix npm package contents by excluding the demo project and local install artifacts.  
 __5.3.5__  
 Removed axios dependency.  
 __5.3.4__  

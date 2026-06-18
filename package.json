@@ -15,6 +15,16 @@
             "require": "./src/index.js"
         }
     },
+    "files": [
+        "bin/",
+        "dist/",
+        "docs/",
+        "src/",
+        "CONTRIBUTING.md",
+        "README.md",
+        "SKILL.md",
+        "SECURITY.md"
+    ],
     "bin": {
         "orange-orm": "bin/rdb.js"
     },
