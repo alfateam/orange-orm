@@ -78,7 +78,7 @@ function buildSyncSchema(tables, tableNames) {
 		dialect: 'sqlite',
 		tables: selected.map(name => tableToSchema(name, tables[name]))
 	};
-	addRelationIndexes(schema, tables, selected);
+	addRelationMetadata(schema, tables, selected);
 	return schema;
 }
 
@@ -88,6 +88,7 @@ function tableToSchema(name, table) {
 		name,
 		dbName: table._dbName,
 		columns,
+		foreignKeys: [],
 		indexes: [],
 		primaryKey: (table._primaryColumns || []).map(x => x._dbName)
 	};
@@ -135,6 +136,8 @@ function tableToCreateSql(table) {
 	const parts = table.columns.map(column => columnToSql(column, { hasCompositePrimaryKey }));
 	if (table.primaryKey.length > 1)
 		parts.push(`PRIMARY KEY (${table.primaryKey.map(quoteIdent).join(', ')})`);
+	for (let i = 0; i < table.foreignKeys.length; i++)
+		parts.push(foreignKeyToSql(table.foreignKeys[i]));
 	return [
 		`CREATE TABLE IF NOT EXISTS ${quoteIdent(table.dbName)} (`,
 		parts.map(x => `  ${x}`).join(',\n'),
@@ -159,6 +162,13 @@ function columnToSql(column, options = {}) {
 	return parts.join(' ');
 }
 
+function foreignKeyToSql(foreignKey) {
+	return [
+		`FOREIGN KEY (${foreignKey.columns.map(quoteIdent).join(', ')})`,
+		`REFERENCES ${quoteIdent(foreignKey.referencesTable)} (${foreignKey.referencesColumns.map(quoteIdent).join(', ')})`
+	].join(' ');
+}
+
 function sqliteType(type) {
 	if (type === 'number' || type === 'boolean')
 		return 'INTEGER';
@@ -167,7 +177,7 @@ function sqliteType(type) {
 	return 'TEXT';
 }
 
-function addRelationIndexes(schema, tables, selectedNames) {
+function addRelationMetadata(schema, tables, selectedNames) {
 	const tableSchemaByObject = new Map();
 	const selectedObjects = new Set();
 	for (let i = 0; i < selectedNames.length; i++) {
@@ -178,6 +188,7 @@ function addRelationIndexes(schema, tables, selectedNames) {
 	}
 
 	const seen = new Set();
+	const seenForeignKeys = new Set();
 	for (let i = 0; i < selectedNames.length; i++) {
 		const table = tables[selectedNames[i]];
 		const relations = table && table._relations;
@@ -188,23 +199,53 @@ function addRelationIndexes(schema, tables, selectedNames) {
 			if (!join || !selectedObjects.has(join.parentTable) || !selectedObjects.has(join.childTable))
 				continue;
 			const targetSchema = tableSchemaByObject.get(join.parentTable);
+			const referencesSchema = tableSchemaByObject.get(join.childTable);
 			const columns = (join.columns || []).map(x => x && x._dbName).filter(Boolean);
-			if (!targetSchema || columns.length === 0 || isPrimaryKey(targetSchema, columns))
+			const referencesColumns = join.childTable && Array.isArray(join.childTable._primaryColumns)
+				? join.childTable._primaryColumns.map(x => x && x._dbName).filter(Boolean)
+				: [];
+			if (!targetSchema || !referencesSchema || columns.length === 0 || columns.length !== referencesColumns.length)
 				continue;
-			const key = `${targetSchema.dbName}:${columns.join('|')}`;
-			if (seen.has(key))
-				continue;
-			seen.add(key);
-			targetSchema.indexes.push({
-				name: `relation:${relationName}`,
-				dbName: newIndexName(targetSchema.dbName, columns),
-				columns
-			});
+			addRelationIndex(targetSchema, columns, relationName, seen);
+			addRelationForeignKey(targetSchema, referencesSchema, columns, referencesColumns, seenForeignKeys);
 		}
 	}
 
-	for (let i = 0; i < schema.tables.length; i++)
+	for (let i = 0; i < schema.tables.length; i++) {
 		schema.tables[i].indexes.sort((a, b) => a.dbName.localeCompare(b.dbName));
+		schema.tables[i].foreignKeys.sort((a, b) => {
+			const tableCompare = a.referencesTable.localeCompare(b.referencesTable);
+			if (tableCompare !== 0)
+				return tableCompare;
+			return a.columns.join('|').localeCompare(b.columns.join('|'));
+		});
+	}
+}
+
+function addRelationIndex(targetSchema, columns, relationName, seen) {
+	if (isPrimaryKey(targetSchema, columns))
+		return;
+	const key = `${targetSchema.dbName}:${columns.join('|')}`;
+	if (seen.has(key))
+		return;
+	seen.add(key);
+	targetSchema.indexes.push({
+		name: `relation:${relationName}`,
+		dbName: newIndexName(targetSchema.dbName, columns),
+		columns
+	});
+}
+
+function addRelationForeignKey(targetSchema, referencesSchema, columns, referencesColumns, seen) {
+	const key = `${targetSchema.dbName}:${columns.join('|')}:${referencesSchema.dbName}:${referencesColumns.join('|')}`;
+	if (seen.has(key))
+		return;
+	seen.add(key);
+	targetSchema.foreignKeys.push({
+		columns,
+		referencesTable: referencesSchema.dbName,
+		referencesColumns
+	});
 }
 
 function extractJoinRelation(relation) {

@@ -84,11 +84,11 @@
     "dependencies": {
         "@cloudflare/workers-types": "^4.20241106.0",
         "@lroal/on-change": "^4.0.2",
+        "@sqlite.org/sqlite-wasm": "^3.53.0-build1",
         "@tediousjs/connection-string": "^0.4.1",
         "@types/express": "^4.17.13",
         "@types/oracledb": "^6.0.4",
         "@types/tedious": "^4.0.14",
-        "@sqlite.org/sqlite-wasm": "^3.53.0-build1",
         "ajv": "^8.17.1",
         "fast-json-patch": "^3.1.1",
         "rfdc": "^1.2.0"
@@ -146,7 +146,8 @@
         "eslint": "^8.57.0",
         "eslint-plugin-jest": "^29.15.0",
         "express": "^4.18.2",
-        "hono": "^4.8.2",        
+        "hono": "^4.8.2",
+        "msnodesqlv8": "^5.2.0",
         "mysql2": "^3.9.4",
         "oracledb": "^6.3.0",
         "owasp-dependency-check": "^0.0.21",

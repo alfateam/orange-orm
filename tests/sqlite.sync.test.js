@@ -2,6 +2,7 @@ import { beforeAll, afterAll, beforeEach, describe, expect, test } from 'vitest'
 import { json } from 'body-parser';
 
 const express = require('express');
+const fs = require('fs');
 const map = require('./db');
 const initSqlite = require('./initSqlite');
 const initPg = require('./initPg');
@@ -36,6 +37,7 @@ const localDb = map({
 });
 
 beforeAll(async () => {
+	fs.rmSync(localName, { force: true });
 	await initPg(remoteDb);
 	await setupChangeTracking(remoteDb, {
 		customer: remoteDb.tables.customer,

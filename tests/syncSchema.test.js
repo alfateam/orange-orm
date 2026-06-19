@@ -15,13 +15,14 @@ describe('sync schema', () => {
 		expect(db.statements.some(x => x.includes('"id" INTEGER PRIMARY KEY'))).toBe(true);
 		expect(db.statements.some(x => x.includes('"name" TEXT NOT NULL'))).toBe(true);
 		expect(db.statements.some(x => x.includes('CREATE TABLE IF NOT EXISTS "order"'))).toBe(true);
+		expect(db.statements.some(x => x.includes('FOREIGN KEY ("customerId") REFERENCES "customer" ("id")'))).toBe(true);
 		expect(db.statements.some(x => x.includes('CREATE INDEX IF NOT EXISTS "orange_idx_order_customerId" ON "order" ("customerId");'))).toBe(true);
 		expect(db.schemaStates.length).toBe(1);
 		expect(db.schemaStates[0].scope).toBe('sync:customer|order');
 		expect(db.schemaStates[0].checksum).toMatch(/^fnv1a32:/);
 	});
 
-	test('adds relation indexes to schema json', () => {
+	test('adds relation indexes and foreign keys to schema json', () => {
 		const map = createMap();
 		const client = toClient(map);
 		const schema = buildSyncSchema(client.tables, ['customer', 'order']);
@@ -30,9 +31,14 @@ describe('sync schema', () => {
 		expect(order.indexes).toHaveLength(1);
 		expect(order.indexes[0].dbName).toBe('orange_idx_order_customerId');
 		expect(order.indexes[0].columns).toEqual(['customerId']);
+		expect(order.foreignKeys).toEqual([{
+			columns: ['customerId'],
+			referencesTable: 'customer',
+			referencesColumns: ['id']
+		}]);
 	});
 
-	test('adds relation indexes for hasMany, hasOne and references foreign keys', () => {
+	test('adds relation indexes and foreign keys for hasMany, hasOne and references relations', () => {
 		const map = createRelationMap();
 		const client = toClient(map);
 		const schema = buildSyncSchema(client.tables, ['customer', 'order', 'orderDetail', 'invoice']);
@@ -46,6 +52,31 @@ describe('sync schema', () => {
 		expect(orderDetail.indexes.find(x => x.dbName === 'orange_idx_orderDetail_orderId').columns).toEqual(['orderId']);
 		expect(invoice.indexes.map(x => x.dbName)).toContain('orange_idx_invoice_orderId');
 		expect(invoice.indexes.find(x => x.dbName === 'orange_idx_invoice_orderId').columns).toEqual(['orderId']);
+		expect(order.foreignKeys).toEqual([{
+			columns: ['customerId'],
+			referencesTable: 'customer',
+			referencesColumns: ['id']
+		}]);
+		expect(orderDetail.foreignKeys).toEqual([{
+			columns: ['orderId'],
+			referencesTable: 'order',
+			referencesColumns: ['id']
+		}]);
+		expect(invoice.foreignKeys).toEqual([{
+			columns: ['orderId'],
+			referencesTable: 'order',
+			referencesColumns: ['id']
+		}]);
+	});
+
+	test('creates composite foreign key SQL', async () => {
+		const map = createCompositeRelationMap();
+		const client = toClient(map);
+		const db = newFakeDb();
+
+		await ensureSyncSchema(db, client, ['compositeOrder', 'compositeOrderLine'], {});
+
+		expect(db.statements.some(x => x.includes('FOREIGN KEY ("companyId", "orderNo") REFERENCES "compositeOrder" ("companyId", "orderNo")'))).toBe(true);
 	});
 
 	test('throws when stored schema checksum differs from current map', async () => {
@@ -150,6 +181,24 @@ function createRelationMap() {
 		})),
 		invoice: x.invoice.map(({ references }) => ({
 			order: references(x.order).by('orderId')
+		}))
+	}));
+}
+
+function createCompositeRelationMap() {
+	return rdb.map((x) => ({
+		compositeOrder: x.table('compositeOrder').map(({ column }) => ({
+			companyId: column('companyId').string().primary().notNullExceptInsert(),
+			orderNo: column('orderNo').numeric().primary().notNullExceptInsert()
+		})),
+		compositeOrderLine: x.table('compositeOrderLine').map(({ column }) => ({
+			companyId: column('companyId').string().primary().notNullExceptInsert(),
+			orderNo: column('orderNo').numeric().primary().notNullExceptInsert(),
+			lineNo: column('lineNo').numeric().primary().notNullExceptInsert()
+		}))
+	})).map((x) => ({
+		compositeOrder: x.compositeOrder.map(({ hasMany }) => ({
+			lines: hasMany(x.compositeOrderLine).by('companyId', 'orderNo')
 		}))
 	}));
 }
