@@ -67,7 +67,7 @@ function newUpdateCommandCore(context, table, columns, row, concurrencyState) {
 					const encoded = encodeJsonValue(pathState.oldValue, column);
 					const jsonPath = buildJsonPath(pathState.path);
 					const columnExpr = buildJsonExtractExpression(quote(column._dbName), jsonPath, pathState.oldValue);
-					command = appendJsonPathComparison(columnExpr, encoded);
+					command = appendJsonPathComparison(columnExpr, encoded, pathState.oldValue);
 				}
 			}
 			else {
@@ -127,7 +127,12 @@ function newUpdateCommandCore(context, table, columns, row, concurrencyState) {
 		return command;
 	}
 
-	function appendJsonPathComparison(columnExpr, encoded) {
+	function appendJsonPathComparison(columnExpr, encoded, oldValue) {
+		if (oldValue === undefined) {
+			command = command.append(separator).append(columnExpr).append(' IS NULL');
+			separator = ' AND ';
+			return command;
+		}
 		if (engine === 'pg') {
 			command = command.append(separator).append(columnExpr).append(' IS NOT DISTINCT FROM ').append(encoded);
 		}
