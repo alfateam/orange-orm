@@ -1,7 +1,6 @@
 let beginCommand = require('./commands/beginCommand');
 let executeQuery = require('./executeQueries/executeQuery');
 let setSessionSingleton = require('./setSessionSingleton');
-let tryGetSessionContext = require('./tryGetSessionContext');
 
 function begin(context, options) {
 	if (options && options.suppressSyncOutbox)
@@ -16,8 +15,7 @@ function begin(context, options) {
 function isTransactionLess(context, options) {
 	if (options === true || !!(options && options.transactionLess))
 		return true;
-	const rdb = tryGetSessionContext(context);
-	return !!(options && options.readonly && rdb && rdb.engine === 'sqlite');
+	return false;
 }
 
 module.exports = begin;
