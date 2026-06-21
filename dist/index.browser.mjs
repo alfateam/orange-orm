@@ -780,10 +780,14 @@ function requireSync () {
 
 		const tableMeta = createTableMeta(client, syncOptions);
 		const queue = createQueue(syncOptions.queue);
+		const hooks = options.hooks;
+		const transactionHooks = hooks && hooks.transaction;
+		const getTransactionHook = (name) =>
+			(transactionHooks && transactionHooks[name]) || (hooks && hooks[name]);
 
 		return async function handleSync(request, response) {
 			try {
-				const result = await queue.run(() => execute(request.body || {}));
+				const result = await queue.run(() => execute(request.body || {}, request, response));
 				response.json(result);
 			}
 			catch (e) {
@@ -794,20 +798,59 @@ function requireSync () {
 			}
 		};
 
-		async function execute(body) {
+		async function execute(body, request, response) {
 			const phase = body.phase || body.action;
 			if (phase === 'push')
-				return pushMutations(body);
+				return pushMutations(body, request, response);
 			if (phase === 'keys')
-				return pullKeys(body);
+				return pullKeys(body, request, response);
 			if (phase === 'rows')
-				return pullRows(body);
+				return pullRows(body, request, response);
 			const error = new Error('Invalid sync phase. Use { phase: "keys" }, { phase: "rows" }, or { phase: "push" }.');
 			error.status = 400;
 			throw error;
 		}
 
-		async function pushMutations(body) {
+		async function runHookedTransaction(fn, transactionOptions, request, response) {
+			const beforeBegin = getTransactionHook('beforeBegin');
+			const afterBegin = getTransactionHook('afterBegin');
+			const beforeCommit = getTransactionHook('beforeCommit');
+			const afterCommit = getTransactionHook('afterCommit');
+			const afterRollback = getTransactionHook('afterRollback');
+			const hasHooks = !!(beforeBegin
+				|| afterBegin
+				|| beforeCommit
+				|| afterCommit
+				|| afterRollback);
+			if (!hasHooks)
+				return client.transaction(fn, transactionOptions);
+
+			let hookDb;
+			let result;
+			try {
+				result = await client.transaction(async (tx) => {
+					hookDb = tx;
+					if (beforeBegin)
+						await beforeBegin(hookDb, request, response);
+					if (afterBegin)
+						await afterBegin(hookDb, request, response);
+					const value = await fn(tx);
+					if (beforeCommit)
+						await beforeCommit(hookDb, request, response);
+					return value;
+				}, transactionOptions);
+			}
+			catch (e) {
+				if (afterRollback)
+					await afterRollback(hookDb, request, response, e);
+				throw e;
+			}
+			if (afterCommit)
+				await afterCommit(hookDb, request, response);
+			return result;
+		}
+
+		async function pushMutations(body, request, response) {
 			const clientId = normalizeClientId(body.clientId ?? body.client_id);
 			const mutations = normalizeMutations(body.mutations, syncOptions.limits.maxMutationsPerBatch);
 			if (!clientId) {
@@ -829,7 +872,7 @@ function requireSync () {
 			let duplicates = 0;
 			for (let i = 0; i < mutations.length; i++) {
 				const mutation = mutations[i];
-				await client.transaction(async (tx) => {
+				await runHookedTransaction(async (tx) => {
 					const claim = await claimAppliedMutation(tx, clientId, mutation.id);
 					if (!claim.claimed) {
 						duplicates += 1;
@@ -849,7 +892,7 @@ function requireSync () {
 					await updateAppliedMutation(tx, clientId, mutation.id, result);
 					results.push(result);
 					applied += 1;
-				});
+				}, undefined, request, response);
 			}
 
 			return {
@@ -904,14 +947,14 @@ function requireSync () {
 			return { results };
 		}
 
-		async function pullKeys(body) {
+		async function pullKeys(body, request, response) {
 			const requestedTables = normalizeRequestedTables(body.tables, tableMeta, syncOptions.limits.maxTablesPerRequest);
 			const limit = normalizeLimit(body.limit, syncOptions.limits.maxKeysPerBatch);
 			const token = normalizeToken(body.token, requestedTables);
 			if (token && token.mode === 'changes')
 				return pullKeysFromChanges(token, limit);
 			if (token && token.mode === 'snapshot')
-				return pullKeysFromSnapshot(token, limit);
+				return pullKeysFromSnapshot(token, limit, request, response);
 
 			const startCursor = normalizeCursor(body.cursor ?? body.since);
 			const bounds = await getChangeBounds(syncOptions.changeTable);
@@ -925,7 +968,7 @@ function requireSync () {
 					offset: 0,
 					watermark: bounds.max
 				};
-				const result = await pullKeysFromSnapshot(snapshotToken, limit);
+				const result = await pullKeysFromSnapshot(snapshotToken, limit, request, response);
 				result.reason = fallback.reason;
 				return result;
 			}
@@ -940,7 +983,7 @@ function requireSync () {
 			return pullKeysFromChanges(changeToken, limit);
 		}
 
-		async function pullKeysFromSnapshot(token, limit) {
+		async function pullKeysFromSnapshot(token, limit, request, response) {
 			const items = [];
 			let tableIndex = normalizeInteger(token.tableIndex, 0);
 			let offset = normalizeInteger(token.offset, 0);
@@ -953,7 +996,7 @@ function requireSync () {
 					continue;
 				}
 				const remaining = limit - items.length;
-				const keys = await fetchSnapshotKeys(meta, remaining, offset);
+				const keys = await fetchSnapshotKeys(meta, remaining, offset, request, response);
 				for (let i = 0; i < keys.length; i++) {
 					const pk = keys[i];
 					items.push({ table: tableName, pk, key: toKeyObject(meta, pk), op: 'U' });
@@ -1054,7 +1097,7 @@ function requireSync () {
 			};
 		}
 
-		async function pullRows(body) {
+		async function pullRows(body, request, response) {
 			const rawItems = Array.isArray(body.items) ? body.items : [];
 			const limit = normalizeLimit(rawItems.length, syncOptions.limits.maxRowsPerBatch);
 			const items = rawItems.slice(0, limit);
@@ -1082,7 +1125,7 @@ function requireSync () {
 				const tableName = tableNames[i];
 				const meta = tableMeta.byName.get(tableName);
 				const keys = tableKeys.get(tableName);
-				const rows = await fetchRowsByPrimaryKeys(meta, keys);
+				const rows = await fetchRowsByPrimaryKeys(meta, keys, request, response);
 				const perTable = new Map();
 				for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
 					const row = rows[rowIndex];
@@ -1114,7 +1157,7 @@ function requireSync () {
 			};
 		}
 
-		async function fetchSnapshotKeys(meta, limit, offset) {
+		async function fetchSnapshotKeys(meta, limit, offset, request, response) {
 			const strategy = {};
 			for (let i = 0; i < meta.pkColumns.length; i++) {
 				strategy[meta.pkColumns[i].alias] = true;
@@ -1122,9 +1165,9 @@ function requireSync () {
 			strategy.orderBy = meta.pkColumns.map(x => x.alias);
 			strategy.limit = limit;
 			strategy.offset = offset;
-			const rows = await client.transaction(async (tx) => {
+			const rows = await runHookedTransaction(async (tx) => {
 				return tx[meta.name].getMany(undefined, strategy);
-			}, { readonly: true });
+			}, { readonly: true }, request, response);
 			const result = [];
 			for (let i = 0; i < rows.length; i++) {
 				const pk = toPkArray(meta, rows[i]);
@@ -1134,7 +1177,7 @@ function requireSync () {
 			return result;
 		}
 
-		async function fetchRowsByPrimaryKeys(meta, keys) {
+		async function fetchRowsByPrimaryKeys(meta, keys, request, response) {
 			if (!Array.isArray(keys) || keys.length === 0)
 				return [];
 			const where = [];
@@ -1157,9 +1200,9 @@ function requireSync () {
 				sql: where.join(' OR '),
 				parameters
 			};
-			return client.transaction(async (tx) => {
+			return runHookedTransaction(async (tx) => {
 				return tx[meta.name].getMany(filter);
-			}, { readonly: true });
+			}, { readonly: true }, request, response);
 		}
 
 		async function getChangeBounds(changeTable) {
