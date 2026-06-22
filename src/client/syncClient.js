@@ -130,6 +130,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 			throw new Error('Sync resetLocal requires mapped tables or configured tables.');
 		const droppedTables = await dropLocalSyncTables(db, client, configuredTables);
 		sinceByScope.clear();
+		ensuredInternalTables.delete(db);
 		clearEnsuredSyncSchema(db);
 		initialReadyEmitted = false;
 		return {

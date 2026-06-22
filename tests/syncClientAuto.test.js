@@ -179,6 +179,42 @@ describe('sync client auto start', () => {
 		expect(stateTableCreates).toHaveLength(1);
 	});
 
+	test('resetLocal clears ensured internal table cache', async () => {
+		const db = {
+			__sqliteSync: { url: '/rdb', auto: false, tables: ['customer'] },
+			queryLog: [],
+			query: async function(sql) {
+				this.queryLog.push(sql);
+				if (/SELECT "id" FROM "orange_sync_client"/u.test(sql))
+					return [];
+				return [];
+			}
+		};
+		const client = newSyncClient({
+			tables: {
+				customer: newTable('customer')
+			}
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async () => ({
+					data: { phase: 'push', applied: 1, duplicates: 0, results: [] }
+				});
+			}
+		});
+
+		await client.push({ mutations: [{ id: 'm1', table: 'customer', patch: [] }] });
+		await client.resetLocal({ force: true });
+		await client.push({ mutations: [{ id: 'm2', table: 'customer', patch: [] }] });
+
+		const resetDropIndex = db.queryLog.findIndex((sql) => /DROP TABLE IF EXISTS "orange_sync_client"/u.test(sql));
+		const createClientTableIndexes = db.queryLog
+			.map((sql, index) => /CREATE TABLE IF NOT EXISTS "orange_sync_client"/u.test(sql) ? index : -1)
+			.filter((index) => index !== -1);
+
+		expect(resetDropIndex).toBeGreaterThan(-1);
+		expect(createClientTableIndexes.some((index) => index > resetDropIndex)).toBe(true);
+	});
+
 	test('applies staged pull rows with json patch and skips sqlite post-insert select', async () => {
 		const patches = [];
 		const options = [];
