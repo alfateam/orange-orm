@@ -192,7 +192,7 @@ function newSyncHandler(client, options = {}) {
 				mode: 'snapshot',
 				tables: requestedTables,
 				tableIndex: 0,
-				offset: 0,
+				lastPk: null,
 				watermark: bounds.max
 			};
 			const result = await pullKeysFromSnapshot(snapshotToken, limit, request, response);
@@ -213,27 +213,27 @@ function newSyncHandler(client, options = {}) {
 	async function pullKeysFromSnapshot(token, limit, request, response) {
 		const items = [];
 		let tableIndex = normalizeInteger(token.tableIndex, 0);
-		let offset = normalizeInteger(token.offset, 0);
+		let lastPk = normalizePrimaryKeyToken(token.lastPk);
 		while (items.length < limit && tableIndex < token.tables.length) {
 			const tableName = token.tables[tableIndex];
 			const meta = tableMeta.byName.get(tableName);
 			if (!meta) {
 				tableIndex += 1;
-				offset = 0;
+				lastPk = null;
 				continue;
 			}
 			const remaining = limit - items.length;
-			const keys = await fetchSnapshotKeys(meta, remaining, offset, request, response);
+			const keys = await fetchSnapshotKeys(meta, remaining, lastPk, request, response);
 			for (let i = 0; i < keys.length; i++) {
 				const pk = keys[i];
 				items.push({ table: tableName, pk, key: toKeyObject(meta, pk), op: 'U' });
 			}
 			if (keys.length < remaining) {
 				tableIndex += 1;
-				offset = 0;
+				lastPk = null;
 			}
 			else {
-				offset += keys.length;
+				lastPk = keys[keys.length - 1];
 			}
 		}
 		const done = tableIndex >= token.tables.length;
@@ -247,7 +247,7 @@ function newSyncHandler(client, options = {}) {
 				mode: 'snapshot',
 				tables: token.tables,
 				tableIndex,
-				offset,
+				lastPk,
 				watermark: token.watermark
 			},
 			items
@@ -384,16 +384,16 @@ function newSyncHandler(client, options = {}) {
 		};
 	}
 
-	async function fetchSnapshotKeys(meta, limit, offset, request, response) {
+	async function fetchSnapshotKeys(meta, limit, lastPk, request, response) {
 		const strategy = {};
 		for (let i = 0; i < meta.pkColumns.length; i++) {
 			strategy[meta.pkColumns[i].alias] = true;
 		}
 		strategy.orderBy = meta.pkColumns.map(x => x.alias);
 		strategy.limit = limit;
-		strategy.offset = offset;
+		const filter = buildKeysetFilter(meta, lastPk);
 		const rows = await runHookedTransaction(async (tx) => {
-			return tx[meta.name].getMany(undefined, strategy);
+			return tx[meta.name].getMany(filter, strategy);
 		}, { readonly: true }, request, response);
 		const result = [];
 		for (let i = 0; i < rows.length; i++) {
@@ -655,7 +655,7 @@ function normalizeToken(token, requestedTables) {
 			mode: 'snapshot',
 			tables: requestedTables,
 			tableIndex: normalizeInteger(token.tableIndex, 0),
-			offset: normalizeInteger(token.offset, 0),
+			lastPk: normalizePrimaryKeyToken(token.lastPk),
 			watermark: normalizeInteger(token.watermark, 0)
 		};
 	}
@@ -797,6 +797,31 @@ function toKeyObject(meta, pk) {
 		key[meta.pkColumns[i].alias] = pk[i];
 	}
 	return key;
+}
+
+function buildKeysetFilter(meta, lastPk) {
+	if (!Array.isArray(lastPk) || lastPk.length !== meta.pkColumns.length)
+		return undefined;
+	const clauses = [];
+	const parameters = [];
+	for (let i = 0; i < meta.pkColumns.length; i++) {
+		const parts = [];
+		for (let j = 0; j < i; j++) {
+			parts.push(`${quoteIdent(meta.pkColumns[j].dbName)} = ?`);
+			parameters.push(lastPk[j]);
+		}
+		parts.push(`${quoteIdent(meta.pkColumns[i].dbName)} > ?`);
+		parameters.push(lastPk[i]);
+		clauses.push(`(${parts.join(' AND ')})`);
+	}
+	return {
+		sql: clauses.join(' OR '),
+		parameters
+	};
+}
+
+function normalizePrimaryKeyToken(value) {
+	return Array.isArray(value) ? value : null;
 }
 
 function clamp(value, min, max) {

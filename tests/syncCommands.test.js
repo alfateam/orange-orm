@@ -163,6 +163,54 @@ describe('sync commands', () => {
 		]);
 	});
 
+	test('uses keyset pagination for snapshot key fetch', async () => {
+		const seen = [];
+		const tx = {
+			project: {
+				getMany: async (filter, strategy) => {
+					seen.push({ filter, strategy });
+					const after = Array.isArray(filter?.parameters) ? filter.parameters[0] : 0;
+					return [1, 2, 3]
+						.filter(id => id > after)
+						.slice(0, strategy.limit)
+						.map(id => ({ id }));
+				}
+			}
+		};
+		const client = {
+			tables: {
+				project: newTable('project')
+			},
+			transaction: async (fn) => fn(tx),
+			query: async () => [{ min_id: 1, max_id: 1 }]
+		};
+		const handler = newSyncHandler(client, {
+			sync: {
+				limits: {
+					maxKeysPerBatch: 2
+				}
+			}
+		});
+
+		const first = await callHandler(handler, {
+			phase: 'keys',
+			tables: ['project']
+		});
+		const second = await callHandler(handler, {
+			phase: 'keys',
+			tables: ['project'],
+			token: first.token
+		});
+
+		expect(first.items.map(x => x.pk)).toEqual([[1], [2]]);
+		expect(first.token.lastPk).toEqual([2]);
+		expect(second.items.map(x => x.pk)).toEqual([[3]]);
+		expect(seen[0].strategy.offset).toBeUndefined();
+		expect(seen[1].strategy.offset).toBeUndefined();
+		expect(seen[1].filter.sql).toBe('("id" > ?)');
+		expect(seen[1].filter.parameters).toEqual([2]);
+	});
+
 	test('runs transaction hooks for sync push apply', async () => {
 		const calls = [];
 		const tx = {
