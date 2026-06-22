@@ -6281,7 +6281,7 @@ function requireClient () {
 		let _reactive = options.reactive;
 		let providers = options.providers || {};
 		let baseUrl = options.db;
-		const commandHandlers = options.commands || {};
+		const commandHandlers = options.commandHandlers || options.commands || {};
 		if (typeof providers === 'function')
 			baseUrl = typeof options.db === 'function' ? providers(options.db) : options.db;
 		const httpInterceptor = createHttpInterceptor();

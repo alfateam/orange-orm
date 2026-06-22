@@ -27,7 +27,7 @@ export type DbMapper<T> = {
 } & T;
 
 type MappedDb<T> = {
-	<const C extends Record<string, (...args: any[]) => any>>(concurrency: Omit<DbOptions<T>, 'commands'> & { commands: C }): DBClient<SchemaFromMappedDb<T>, C>;
+	<const C extends AnyCommandMap>(concurrency: Omit<DbOptions<T, C>, 'commands'> & { commands: C }): DBClient<SchemaFromMappedDb<T>, C>;
 	<O extends DbOptions<T>>(concurrency: O): NegotiateDbInstance<T, O>;
 } & DbConnectable<T>;
 
@@ -55,7 +55,24 @@ type WithDb = {
 	db: Pool | ((connectors: Connectors) => Pool | Promise<Pool>)
 };
 
-type DbOptions<T> = {
+type AnyCommandMap = Record<string, (...args: any[]) => any>;
+
+type CommandArgs<F> =
+	F extends (...args: any[]) => any
+	? Parameters<F> extends [any, infer A, ...any[]] ? A :
+	Parameters<F> extends [infer A, ...any[]] ? A :
+	JsonValue
+	:
+	JsonValue;
+
+type ServerCommandHandlers<
+	M extends Record<string, any>,
+	C extends AnyCommandMap
+> = {
+	[K in keyof C]: SyncCommandHandler<M, CommandArgs<C[K]>>;
+};
+
+type DbOptions<T, C extends AnyCommandMap = AnyCommandMap> = {
 	[K in keyof T]?: T[K] extends MappedTableDef<infer U>
 	? Concurrency<U>
 	: never;
@@ -63,14 +80,9 @@ type DbOptions<T> = {
 	concurrency?: ConcurrencyValues;
 	readonly?: boolean;
 	db?: Pool | ((connectors: Connectors<SchemaFromMappedDb<T>>) => Pool | Promise<Pool>);
-	commands?: CommandMap<SchemaFromMappedDb<T>>;
+	commands?: C;
+	commandHandlers?: ServerCommandHandlers<SchemaFromMappedDb<T>, C>;
 };
-
-type CommandMap<M extends Record<string, any>> = Record<
-	string,
-	((...args: any[]) => unknown)
-	| SyncCommandHandler<M, any>
->;
 
 type CommandsFromOptions<C> =
 	C extends { commands: infer Commands extends Record<string, (...args: any[]) => any> }
@@ -1132,7 +1144,7 @@ export type MappedDbDef<T> = {
   map<V extends AllowedDbMap<V>>(
     callback: (mapper: DbMapper<T>) => V
   ): MappedDbDef<MergeProperties<T, V>>;
-  <const C extends Record<string, (...args: any[]) => any>>(concurrency: Omit<DbOptions<T>, 'commands'> & { commands: C }): DBClient<SchemaFromMappedDb<T>, C>;
+  <const C extends AnyCommandMap>(concurrency: Omit<DbOptions<T, C>, 'commands'> & { commands: C }): DBClient<SchemaFromMappedDb<T>, C>;
   <O extends DbOptions<T>>(concurrency: O): NegotiateDbInstance<T, O>;
 
   /**
