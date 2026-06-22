@@ -1141,3 +1141,10 @@ export type MappedDbDef<T> = {
    */
   toSchema: <U = T>() => SchemaFromMappedDb<U>;
 } & T & DbConnectable<T>;
+
+export type DBClientFromMap<
+  TMap extends MappedDbDef<any>,
+  Commands extends Record<string, (...args: any[]) => any> = {}
+> = TMap extends MappedDbDef<infer T>
+  ? DBClient<SchemaFromMappedDb<T>, Commands>
+  : never;

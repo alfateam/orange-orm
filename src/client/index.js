@@ -56,6 +56,7 @@ function rdbClient(options = {}) {
 	client.function = sqliteFunction;
 	client.transaction = runInTransaction;
 	client.syncCommand = syncCommand;
+	client.defineCommands = defineCommands;
 	client.__commands = commandHandlers;
 	client.commands = new Proxy({}, {
 		get(_target, property) {
@@ -201,6 +202,10 @@ function rdbClient(options = {}) {
 		await client.transaction(async (tx) => {
 			await fn(tx, args);
 		});
+	}
+
+	function defineCommands(contractOrHandlers, handlers) {
+		return handlers || contractOrHandlers;
 	}
 
 	function validateSyncCommandName(name) {

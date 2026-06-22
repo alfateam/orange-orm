@@ -951,13 +951,26 @@ type SyncTableName<M extends Record<string, any>> = Extract<keyof M, string>;
 type AnyCommandMap = Record<string, (...args: any[]) => any>;
 
 type CommandArgs<F> =
-  F extends (db: any, args: infer A, ...rest: any[]) => any ? A :
-  F extends (args: infer A, ...rest: any[]) => any ? A :
+  F extends (...args: any[]) => any
+    ? Parameters<F> extends [any, infer A, ...any[]] ? A :
+      Parameters<F> extends [infer A, ...any[]] ? A :
+      JsonValue
+    :
   JsonValue;
 
 type ClientCommands<C> = {
   [K in keyof C]: (args: CommandArgs<C[K]>) => Promise<void>;
 };
+
+type ServerCommandHandlers<
+  M extends Record<string, TableDefinition<M>>,
+  C extends AnyCommandMap
+> = {
+  [K in keyof C]: SyncCommandHandler<M, CommandArgs<C[K]>>;
+};
+
+type AnyServerCommandHandlers<M extends Record<string, TableDefinition<M>>> =
+  Record<string, SyncCommandHandler<M, any>>;
 
 type CommandApi<C> = keyof C extends never
   ? { commands?: ClientCommands<C> }
@@ -1115,6 +1128,11 @@ export type DBClient<
   query(filter: RawFilter | string): Promise<unknown[]>;
   query<T>(filter: RawFilter | string): Promise<T[]>;
   syncCommand<Args extends JsonValue = JsonValue>(name: string, args?: Args): Promise<void>;
+  defineCommands<const C extends AnyCommandMap>(
+    contract: C,
+    handlers: ServerCommandHandlers<M, C>
+  ): ServerCommandHandlers<M, C>;
+  defineCommands<const H extends AnyServerCommandHandlers<M>>(handlers: H): H;
   createPatch(original: any[], modified: any[]): JsonPatch;
   createPatch(original: any, modified: any): JsonPatch;
   (
@@ -1182,8 +1200,9 @@ type ExpressConfig<M extends Record<string, TableDefinition<M>>> = {
   [TableName in keyof M]?: ExpressTableConfig<M>;
 } & {
   db?: Pool | ((connectors: Connectors) => Pool | Promise<Pool>);
+  commands?: AnyServerCommandHandlers<M>;
   hooks?: ExpressHooks<M>;
-  sync?: SyncServerConfig;
+  sync?: SyncServerConfig<M>;
 }
 
 type HonoConfig<M extends Record<string, TableDefinition<M>>> = {
@@ -1221,10 +1240,10 @@ type ExpressHooks<M extends Record<string, TableDefinition<M>>> = ExpressTransac
   transaction?: ExpressTransactionHooks<M>;
 }
 
-type SyncServerConfig = {
+type SyncServerConfig<M extends Record<string, TableDefinition<M>>> = {
   enabled?: boolean;
   changeTable?: string;
-  commands?: Record<string, SyncCommandHandler<any, any>>;
+  commands?: AnyServerCommandHandlers<M>;
   queue?: {
     concurrency?: number;
     maxPending?: number;
