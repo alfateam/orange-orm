@@ -884,10 +884,15 @@ export type ConcurrencyConfig<M extends Record<string, TableDefinition<M>>> = {
   );
 };
 
-export type DbOptions<M extends Record<string, TableDefinition<M>>> =
+export type DbOptions<
+  M extends Record<string, TableDefinition<M>>,
+  Commands extends AnyCommandMap = AnyCommandMap
+> =
   ConcurrencyConfig<M>
   & ColumnConcurrency & {
     db?: Pool | ((connectors: Connectors) => Pool | Promise<Pool>);
+    commands?: Commands;
+    commandHandlers?: ServerCommandHandlers<M, Commands>;
   };
 
 export type DbConcurrency<M extends Record<string, TableDefinition<M>>> =
@@ -1136,8 +1141,8 @@ export type DBClient<
   createPatch(original: any[], modified: any[]): JsonPatch;
   createPatch(original: any, modified: any): JsonPatch;
   (
-    config?: DbOptions<M>
-  ): DBClient<M>;
+    config?: DbOptions<M, Commands>
+  ): DBClient<M, Commands>;
   transaction<TR = unknown>(
     fn: (db: DBClient<M>) => Promise<TR> | TR
   ): Promise<TR>;
