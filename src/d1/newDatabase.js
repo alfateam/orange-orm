@@ -42,8 +42,7 @@ function newDatabase(d1Database, poolOptions) {
 		}
 
 		function begin() {
-			const transactionLess = true;
-			return _begin(domain, transactionLess);
+			return _begin(domain, { transactionLess: true });
 		}
 
 
