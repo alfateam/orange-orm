@@ -4517,11 +4517,11 @@ function requireSyncAuto () {
 					pushError = e;
 				}
 			}
+			if (pushError)
+				throw pushError;
 			if (config.pull) {
 				return syncClient.pull();
 			}
-			if (pushError)
-				throw pushError;
 			return pushResult || { skipped: true };
 		}
 
@@ -4983,6 +4983,8 @@ function requireSyncClient () {
 		const syncStateTable = 'orange_sync_state';
 		const syncClientTable = 'orange_sync_client';
 		const syncOutboxTable = 'orange_sync_outbox';
+		const syncBaseTable = 'orange_sync_base_tables';
+		const syncBasePrefix = 'orange_sync_base_data_';
 		const initialReadyListeners = new Set();
 		const eventListeners = new Map();
 		let initialReadyEmitted = false;
@@ -5050,6 +5052,8 @@ function requireSyncClient () {
 			if (!Array.isArray(configuredTables) || configuredTables.length === 0)
 				throw new Error('Sync pull requires mapped tables or configured tables. Set sync.tables when the client has no table map.');
 			await ensureSyncSchema(db, client, configuredTables, syncConfig.schema);
+			const hadStableBase = await hasStableBase(db);
+			await pushBeforePull(db, syncConfig, hadStableBase);
 			await maybeEmitInitialReady(syncConfig, configuredTables, db, 'persisted');
 			const currentSince = await getScopeSince(configuredTables, db);
 			const requestOptions = {
@@ -5068,6 +5072,9 @@ function requireSyncClient () {
 			}
 			if (result && result.since !== undefined)
 				await setScopeSince(configuredTables, result.since, db);
+			if (!hadStableBase)
+				await clearPendingMutations(db);
+			await saveStableBase(db);
 			await maybeEmitInitialReady(syncConfig, configuredTables, db, 'pull');
 			return result;
 		}
@@ -5102,6 +5109,8 @@ function requireSyncClient () {
 			if (!Array.isArray(configuredTables) || configuredTables.length === 0)
 				throw new Error('Sync resetLocal requires mapped tables or configured tables.');
 			const droppedTables = await dropLocalSyncTables(db, client, configuredTables);
+			await dropExistingBaseTables(db);
+			await db.query(`DROP TABLE IF EXISTS "${syncBaseTable}"`);
 			sinceByScope.clear();
 			ensuredInternalTables.delete(db);
 			clearEnsuredSyncSchema(db);
@@ -5126,9 +5135,81 @@ function requireSyncClient () {
 			if (pending.length === 0)
 				return { phase: 'push', applied: 0, duplicates: 0, results: [] };
 			const clientId = typeof options.clientId === 'string' ? options.clientId : await getClientId(db);
-			const result = await sendPush(pushConfig, clientId, pending);
+			let result;
+			try {
+				result = await sendPush(pushConfig, clientId, pending);
+			}
+			catch (e) {
+				await rollbackFailedPushBatch(db, pending);
+				throw e;
+			}
 			await markPushedMutations(db, result);
 			return result;
+		}
+
+		async function pushBeforePull(db, syncConfig, hasBase) {
+			if (!hasBase)
+				return;
+			const pending = await readPendingMutations(db, 1);
+			if (pending.length === 0)
+				return;
+			await pushPending({ _syncConfig: syncConfig, _pushConfig: resolvePushConfig(syncConfig) });
+		}
+
+		async function rollbackFailedPushBatch(db, attemptedMutations) {
+			if (!await hasStableBase(db))
+				return;
+			const remaining = await readPendingMutationRows(db, 10000, mutationIdsToSet(attemptedMutations));
+			await restoreStableBase(db);
+			await ensureSyncOutboxTable(db);
+			for (let i = 0; i < remaining.length; i++) {
+				const row = remaining[i];
+				const mutation = rowToMutation(row);
+				if (!mutation)
+					continue;
+				try {
+					await replayMutation(mutation);
+					await insertOutboxRow(db, row);
+				}
+				catch (_e) {
+					// A later mutation may depend on the discarded failed batch. Keep local state
+					// consistent by not restoring mutations that cannot replay on the base.
+				}
+			}
+			sinceByScope.clear();
+			ensuredInternalTables.delete(db);
+			clearEnsuredSyncSchema(db);
+			initialReadyEmitted = false;
+		}
+
+		async function replayMutation(mutation) {
+			const patches = mutationToPatchEntries(mutation);
+			const commands = Array.isArray(mutation.commands) ? mutation.commands : [];
+			if (patches.length === 0 && commands.length === 0)
+				return;
+			await client.transaction(async (tx) => {
+				await tryDeferForeignKeys(tx);
+				for (let i = 0; i < patches.length; i++) {
+					const entry = patches[i];
+					if (!tx[entry.table] || typeof tx[entry.table].patch !== 'function')
+						throw new Error(`Table "${entry.table}" does not exist in this client`);
+					await tx[entry.table].patch(entry.patch, {
+						...(entry.options || {}),
+						concurrency: 'overwrite',
+						skipSelectAfterInsert: true
+					});
+				}
+				await validateForeignKeys(tx);
+			}, { suppressSyncOutbox: true });
+		}
+
+		function mutationToPatchEntries(mutation) {
+			if (!mutation || mutation !== Object(mutation))
+				return [];
+			if (Array.isArray(mutation.patches))
+				return mutation.patches.map(normalizeMutationPatch).filter(Boolean);
+			const entry = normalizeMutationPatch(mutation);
+			return entry ? [entry] : [];
 		}
 
 		async function sendPush(pushConfig, clientId, mutations) {
@@ -5455,22 +5536,29 @@ function requireSyncClient () {
 		}
 
 		async function readPendingMutations(db, limit) {
-			await ensureSyncOutboxTable(db);
-			const rows = await db.query([
-				`SELECT "mutation_id", "table_name", "patch_json", "options_json" FROM "${syncOutboxTable}"`,
-				'WHERE "status" = \'pending\'',
-				'ORDER BY "created_at_ms" ASC',
-				`LIMIT ${limit}`
-			].join(' '));
-			const list = Array.isArray(rows) ? rows : rows?.rows || [];
+			const rows = await readPendingMutationRows(db, limit);
 			const result = [];
-			for (let i = 0; i < list.length; i++) {
-				const row = list[i];
+			for (let i = 0; i < rows.length; i++) {
+				const row = rows[i];
 				const mutation = rowToMutation(row);
 				if (mutation)
 					result.push(mutation);
 			}
 			return result;
+		}
+
+		async function readPendingMutationRows(db, limit, excludeIds) {
+			await ensureSyncOutboxTable(db);
+			const rows = await db.query([
+				`SELECT "mutation_id", "table_name", "patch_json", "options_json", "created_at_ms", "status", "last_error", "attempts", "pushed_at_ms", "result_json" FROM "${syncOutboxTable}"`,
+				'WHERE "status" = \'pending\'',
+				'ORDER BY "created_at_ms" ASC',
+				`LIMIT ${limit}`
+			].join(' '));
+			const list = Array.isArray(rows) ? rows : rows?.rows || [];
+			if (!excludeIds || excludeIds.size === 0)
+				return list;
+			return list.filter(row => !excludeIds.has(row.mutation_id ?? row.MUTATION_ID));
 		}
 
 		function rowToMutation(row) {
@@ -5525,6 +5613,52 @@ function requireSyncClient () {
 					`WHERE "mutation_id" = ${sqlStringLiteral(item.id)}`
 				].join(' '));
 			}
+		}
+
+		async function insertOutboxRow(db, row) {
+			const mutationId = row.mutation_id ?? row.MUTATION_ID;
+			const tableName = row.table_name ?? row.TABLE_NAME;
+			const patchJson = row.patch_json ?? row.PATCH_JSON;
+			const optionsJson = row.options_json ?? row.OPTIONS_JSON;
+			const createdAtMs = Number(row.created_at_ms ?? row.CREATED_AT_MS ?? Date.now());
+			const status = row.status ?? row.STATUS ?? 'pending';
+			const lastError = row.last_error ?? row.LAST_ERROR;
+			const attempts = Number(row.attempts ?? row.ATTEMPTS ?? 0);
+			const pushedAtMs = row.pushed_at_ms ?? row.PUSHED_AT_MS;
+			const resultJson = row.result_json ?? row.RESULT_JSON;
+			if (typeof mutationId !== 'string' || typeof tableName !== 'string' || typeof patchJson !== 'string')
+				return;
+			await db.query([
+				`INSERT INTO "${syncOutboxTable}" ("mutation_id", "table_name", "patch_json", "options_json", "created_at_ms", "status", "last_error", "attempts", "pushed_at_ms", "result_json")`,
+				`VALUES (${sqlStringLiteral(mutationId)}, ${sqlStringLiteral(tableName)}, ${sqlStringLiteral(patchJson)}, ${sqlNullableStringLiteral(optionsJson)}, ${Number.isFinite(createdAtMs) ? createdAtMs : Date.now()}, ${sqlStringLiteral(status)}, ${sqlNullableStringLiteral(lastError)}, ${Number.isFinite(attempts) ? attempts : 0}, ${sqlNullableNumberLiteral(pushedAtMs)}, ${sqlNullableStringLiteral(resultJson)})`,
+				'ON CONFLICT("mutation_id") DO UPDATE SET',
+				'"table_name" = excluded."table_name",',
+				'"patch_json" = excluded."patch_json",',
+				'"options_json" = excluded."options_json",',
+				'"created_at_ms" = excluded."created_at_ms",',
+				'"status" = excluded."status",',
+				'"last_error" = excluded."last_error",',
+				'"attempts" = excluded."attempts",',
+				'"pushed_at_ms" = excluded."pushed_at_ms",',
+				'"result_json" = excluded."result_json"'
+			].join(' '));
+		}
+
+		async function clearPendingMutations(db) {
+			await ensureSyncOutboxTable(db);
+			await db.query(`DELETE FROM "${syncOutboxTable}" WHERE "status" = 'pending'`);
+		}
+
+		function mutationIdsToSet(mutations) {
+			const result = new Set();
+			if (!Array.isArray(mutations))
+				return result;
+			for (let i = 0; i < mutations.length; i++) {
+				const id = mutations[i] && mutations[i].id;
+				if (typeof id === 'string')
+					result.add(id);
+			}
+			return result;
 		}
 
 		async function readScopeSince(scopeKey, db) {
@@ -5595,6 +5729,156 @@ function requireSyncClient () {
 					throw e;
 				}
 			}
+		}
+
+		async function hasStableBase(db) {
+			if (!db || typeof db.query !== 'function')
+				return false;
+			try {
+				await ensureSyncBaseTable(db);
+				const rows = await db.query(`SELECT "name" FROM "${syncBaseTable}" LIMIT 1`);
+				const list = Array.isArray(rows) ? rows : rows?.rows || [];
+				return list.length > 0;
+			}
+			catch (_e) {
+				return false;
+			}
+		}
+
+		async function saveStableBase(db) {
+			if (!db || typeof db.query !== 'function')
+				return;
+			await client.transaction(async (tx) => {
+				await ensureSyncBaseTable(tx);
+				const tables = await readSqliteTables(tx);
+				await dropExistingBaseTables(tx);
+				await tx.query(`DELETE FROM "${syncBaseTable}"`);
+				for (let i = 0; i < tables.length; i++) {
+					const table = tables[i];
+					const baseName = toBaseTableName(table.name);
+					await tx.query(`CREATE TABLE ${quoteIdent(baseName)} AS SELECT * FROM ${quoteIdent(table.name)}`);
+					await tx.query([
+						`INSERT INTO "${syncBaseTable}" ("name", "base_name", "schema_sql", "ordinal") VALUES (`,
+						`${sqlStringLiteral(table.name)}, ${sqlStringLiteral(baseName)}, ${sqlNullableStringLiteral(table.sql)}, ${i}`,
+						')'
+					].join(' '));
+				}
+			}, { suppressSyncOutbox: true });
+		}
+
+		async function restoreStableBase(db) {
+			if (!db || typeof db.query !== 'function')
+				return;
+			await client.transaction(async (tx) => {
+				await ensureSyncBaseTable(tx);
+				const entries = await readStableBaseEntries(tx);
+				if (entries.length === 0)
+					return;
+				const entryNames = new Set(entries.map(x => x.name));
+				const currentTables = await readSqliteTables(tx);
+				await tx.query('PRAGMA foreign_keys = OFF');
+				try {
+					for (let i = 0; i < currentTables.length; i++) {
+						const table = currentTables[i];
+						if (entryNames.has(table.name))
+							continue;
+						await tx.query(`DROP TABLE IF EXISTS ${quoteIdent(table.name)}`);
+					}
+					const currentNames = new Set(currentTables.map(x => x.name));
+					for (let i = 0; i < entries.length; i++) {
+						const entry = entries[i];
+						if (!currentNames.has(entry.name) && entry.schemaSql)
+							await tx.query(entry.schemaSql);
+						await tx.query(`DELETE FROM ${quoteIdent(entry.name)}`);
+					}
+					for (let i = 0; i < entries.length; i++) {
+						const entry = entries[i];
+						await tx.query(`INSERT INTO ${quoteIdent(entry.name)} SELECT * FROM ${quoteIdent(entry.baseName)}`);
+					}
+				}
+				finally {
+					await tx.query('PRAGMA foreign_keys = ON');
+				}
+			}, { suppressSyncOutbox: true });
+		}
+
+		async function ensureSyncBaseTable(db) {
+			await db.query([
+				`CREATE TABLE IF NOT EXISTS "${syncBaseTable}" (`,
+				'"name" TEXT PRIMARY KEY,',
+				'"base_name" TEXT NOT NULL,',
+				'"schema_sql" TEXT,',
+				'"ordinal" INTEGER NOT NULL',
+				');'
+			].join(' '));
+		}
+
+		async function readStableBaseEntries(db) {
+			const rows = await db.query([
+				`SELECT "name", "base_name", "schema_sql", "ordinal" FROM "${syncBaseTable}"`,
+				'ORDER BY "ordinal" ASC'
+			].join(' '));
+			const list = Array.isArray(rows) ? rows : rows?.rows || [];
+			return list
+				.map(row => ({
+					name: row.name ?? row.NAME,
+					baseName: row.base_name ?? row.BASE_NAME,
+					schemaSql: row.schema_sql ?? row.SCHEMA_SQL,
+					ordinal: row.ordinal ?? row.ORDINAL
+				}))
+				.filter(row => typeof row.name === 'string' && typeof row.baseName === 'string');
+		}
+
+		async function readSqliteTables(db) {
+			const rows = await db.query([
+				'SELECT "name", "sql" FROM sqlite_schema',
+				'WHERE "type" = \'table\'',
+				'ORDER BY "name" ASC'
+			].join(' '));
+			const list = Array.isArray(rows) ? rows : rows?.rows || [];
+			return list
+				.map(row => ({
+					name: row.name ?? row.NAME,
+					sql: row.sql ?? row.SQL
+				}))
+				.filter(table => shouldCheckpointTable(table.name));
+		}
+
+		async function dropExistingBaseTables(db) {
+			const rows = await db.query([
+				'SELECT "name" FROM sqlite_schema',
+				'WHERE "type" = \'table\'',
+				`AND "name" LIKE ${sqlStringLiteral(syncBasePrefix + '%')}`
+			].join(' '));
+			const list = Array.isArray(rows) ? rows : rows?.rows || [];
+			for (let i = 0; i < list.length; i++) {
+				const name = list[i].name ?? list[i].NAME;
+				if (typeof name === 'string' && name.startsWith(syncBasePrefix))
+					await db.query(`DROP TABLE IF EXISTS ${quoteIdent(name)}`);
+			}
+		}
+
+		function shouldCheckpointTable(name) {
+			return typeof name === 'string'
+				&& !name.startsWith('sqlite_')
+				&& name !== syncBaseTable
+				&& !name.startsWith(syncBasePrefix);
+		}
+
+		function toBaseTableName(name) {
+			return syncBasePrefix + toHexName(name);
+		}
+
+		function toHexName(name) {
+			let result = '';
+			const value = String(name);
+			for (let i = 0; i < value.length; i++) {
+				let hex = value.charCodeAt(i).toString(16);
+				while (hex.length < 4)
+					hex = '0' + hex;
+				result += hex;
+			}
+			return result || 'empty';
 		}
 
 		function on(event, listener) {
@@ -6247,6 +6531,19 @@ function requireSyncClient () {
 
 	function sqlStringLiteral(value) {
 		return `'${String(value).replace(/'/g, '\'\'')}'`;
+	}
+
+	function sqlNullableStringLiteral(value) {
+		if (value === undefined || value === null)
+			return 'NULL';
+		return sqlStringLiteral(value);
+	}
+
+	function sqlNullableNumberLiteral(value) {
+		if (value === undefined || value === null)
+			return 'NULL';
+		const parsed = Number(value);
+		return Number.isFinite(parsed) ? String(parsed) : 'NULL';
 	}
 
 	syncClient = newSyncClient;

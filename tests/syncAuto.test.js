@@ -39,7 +39,7 @@ describe('sync auto scheduler', () => {
 		expect(auto.isRunning()).toBe(false);
 	});
 
-	test('still pulls when auto push fails', async () => {
+	test('does not pull when auto push fails', async () => {
 		const calls = [];
 		const auto = createSyncAuto({
 			push: async () => {
@@ -52,9 +52,9 @@ describe('sync auto scheduler', () => {
 			}
 		}, async () => ({ url: '/rdb', auto: { intervalMs: 0 } }));
 
-		await auto.start();
+		await expect(auto.start()).rejects.toThrow('push failed');
 
-		expect(calls).toEqual(['push', 'pull']);
+		expect(calls).toEqual(['push']);
 		auto.stop();
 	});
 

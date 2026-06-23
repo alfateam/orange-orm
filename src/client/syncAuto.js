@@ -67,11 +67,11 @@ function createSyncAuto(syncClient, getConfig, options = {}) {
 				pushError = e;
 			}
 		}
+		if (pushError)
+			throw pushError;
 		if (config.pull) {
 			return syncClient.pull();
 		}
-		if (pushError)
-			throw pushError;
 		return pushResult || { skipped: true };
 	}
 

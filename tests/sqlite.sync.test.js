@@ -16,6 +16,7 @@ const localName = `demo.${fileNameWithoutExtension}.local.db`;
 const port = 3020;
 let server;
 const syncPhases = [];
+let failNextPush = false;
 const syncClientConfig = {
 	url: `http://localhost:${port}/rdb`,
 	tables: ['customer', 'order'],
@@ -62,6 +63,14 @@ beforeAll(async () => {
 			syncPhases.push(request.body?.phase);
 		next();
 	});
+	app.use('/rdb', (request, response, next) => {
+		if (request.query.sync === 'push' && failNextPush) {
+			failNextPush = false;
+			response.status(503).json({ error: 'forced push failure' });
+			return;
+		}
+		next();
+	});
 	app.use('/rdb', remoteDb.express({
 		sync: {
 			queue: { concurrency: 1, maxPending: 100 },
@@ -81,6 +90,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
 	syncPhases.length = 0;
+	failNextPush = false;
 	await localDb.query('DROP TABLE IF EXISTS "orange_sync_state"');
 });
 
@@ -384,5 +394,75 @@ describe('sqlite staged pull sync', () => {
 		expect(result.applied).toBe(1);
 		expect(oneRemote.name).toBe('One2');
 		expect(twoRemote.name).toBe('Two2');
+	});
+
+	test('restores stable base after push failure and replays pending outside failed batch', async () => {
+		await localDb.query('PRAGMA foreign_keys = ON');
+		await localDb.query('DELETE FROM "order"');
+		await localDb.query('DELETE FROM customer');
+		await remoteDb.query('DELETE FROM "order"');
+		await remoteDb.query('DELETE FROM customer');
+
+		await remoteDb.customer.insert([
+			{ id: 80, name: 'Base80', balance: 80, isActive: true },
+			{ id: 81, name: 'Base81', balance: 81, isActive: true }
+		]);
+		await localDb.syncClient.pull();
+
+		const first = await localDb.customer.getById(80);
+		first.name = 'Fail80';
+		await first.saveChanges();
+
+		const second = await localDb.customer.getById(81);
+		second.name = 'Replay81';
+		await second.saveChanges();
+
+		failNextPush = true;
+		await expect(localDb.syncClient.push({ clientId: 'sqlite-sync-test-client-rollback', limit: 1 }))
+			.rejects.toThrow('Request failed with status code 503');
+
+		const row80 = await localDb.customer.getById(80);
+		const row81 = await localDb.customer.getById(81);
+		const remote80 = await remoteDb.customer.getById(80);
+		const pending = await localDb.query('SELECT mutation_id, patch_json FROM "orange_sync_outbox" WHERE status = \'pending\' ORDER BY created_at_ms');
+
+		expect(row80.name).toBe('Base80');
+		expect(row81.name).toBe('Replay81');
+		expect(remote80.name).toBe('Base80');
+		expect(pending).toHaveLength(1);
+		expect(pending[0].patch_json ?? pending[0].PATCH_JSON).toContain('Replay81');
+
+		await localDb.syncClient.push({ clientId: 'sqlite-sync-test-client-rollback-cleanup' });
+	});
+
+	test('pull fails before requesting remote changes when pending push fails', async () => {
+		await localDb.query('PRAGMA foreign_keys = ON');
+		await localDb.query('DELETE FROM "order"');
+		await localDb.query('DELETE FROM customer');
+		await remoteDb.query('DELETE FROM "order"');
+		await remoteDb.query('DELETE FROM customer');
+
+		await remoteDb.customer.insert({
+			id: 82,
+			name: 'Base82',
+			balance: 82,
+			isActive: true
+		});
+		await localDb.syncClient.pull();
+		syncPhases.length = 0;
+
+		const row = await localDb.customer.getById(82);
+		row.name = 'Reject82';
+		await row.saveChanges();
+
+		failNextPush = true;
+		await expect(localDb.syncClient.pull()).rejects.toThrow('Request failed with status code 503');
+
+		const restored = await localDb.customer.getById(82);
+		const pending = await localDb.query('SELECT mutation_id FROM "orange_sync_outbox" WHERE status = \'pending\'');
+
+		expect(syncPhases).toHaveLength(0);
+		expect(restored.name).toBe('Base82');
+		expect(pending).toHaveLength(0);
 	});
 });
