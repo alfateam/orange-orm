@@ -432,7 +432,7 @@ describe('sqlite staged pull sync', () => {
 		expect(twoRemote.name).toBe('Two2');
 	});
 
-	test('restores stable base after push failure and replays pending outside failed batch', async () => {
+	test('keeps pending mutations after transient push failure', async () => {
 		await localDb.query('PRAGMA foreign_keys = ON');
 		await localDb.query('DELETE FROM "order"');
 		await localDb.query('DELETE FROM customer');
@@ -462,13 +462,69 @@ describe('sqlite staged pull sync', () => {
 		const remote80 = await remoteDb.customer.getById(80);
 		const pending = await localDb.query('SELECT mutation_id, patch_json FROM "orange_sync_outbox" WHERE status = \'pending\' ORDER BY created_at_ms');
 
-		expect(row80.name).toBe('Base80');
+		expect(row80.name).toBe('Fail80');
 		expect(row81.name).toBe('Replay81');
 		expect(remote80.name).toBe('Base80');
-		expect(pending).toHaveLength(1);
-		expect(pending[0].patch_json ?? pending[0].PATCH_JSON).toContain('Replay81');
+		expect(pending).toHaveLength(2);
+		expect(pending[0].patch_json ?? pending[0].PATCH_JSON).toContain('Fail80');
+		expect(pending[1].patch_json ?? pending[1].PATCH_JSON).toContain('Replay81');
+
+		const retry = await localDb.syncClient.push({ clientId: 'sqlite-sync-test-client-rollback-cleanup' });
+		const retriedRemote80 = await remoteDb.customer.getById(80);
+		const afterRetryPending = await localDb.query('SELECT mutation_id, patch_json FROM "orange_sync_outbox" WHERE status = \'pending\' ORDER BY created_at_ms');
+
+		expect(retry.applied).toBe(1);
+		expect(retriedRemote80.name).toBe('Fail80');
+		expect(afterRetryPending).toHaveLength(1);
+		expect(afterRetryPending[0].patch_json ?? afterRetryPending[0].PATCH_JSON).toContain('Replay81');
 
 		await localDb.syncClient.push({ clientId: 'sqlite-sync-test-client-rollback-cleanup' });
+	});
+
+	test('conflict discards one pending mutation and keeps the next pending', async () => {
+		await localDb.query('PRAGMA foreign_keys = ON');
+		await localDb.query('DELETE FROM "order"');
+		await localDb.query('DELETE FROM customer');
+		await remoteDb.query('DELETE FROM "order"');
+		await remoteDb.query('DELETE FROM customer');
+
+		await remoteDb.customer.insert([
+			{ id: 83, name: 'Base83', balance: 83, isActive: true },
+			{ id: 84, name: 'Base84', balance: 84, isActive: true }
+		]);
+		await localDb.syncClient.pull();
+
+		const first = await localDb.customer.getById(83);
+		first.name = 'Conflict83';
+		await first.saveChanges();
+
+		await remoteDb.query('UPDATE customer SET name = \'Remote83\' WHERE id = 83');
+
+		const second = await localDb.customer.getById(84);
+		second.name = 'Replay84';
+		await second.saveChanges();
+
+		await expect(localDb.syncClient.push({ clientId: 'sqlite-sync-test-client-conflict-queue' }))
+			.rejects.toThrow('Request failed with status code 409');
+
+		const row83 = await localDb.customer.getById(83);
+		const row84 = await localDb.customer.getById(84);
+		const remote84 = await remoteDb.customer.getById(84);
+		const pending = await localDb.query('SELECT mutation_id, patch_json FROM "orange_sync_outbox" WHERE status = \'pending\' ORDER BY created_at_ms');
+
+		expect(row83.name).toBe('Base83');
+		expect(row84.name).toBe('Replay84');
+		expect(remote84.name).toBe('Base84');
+		expect(pending).toHaveLength(1);
+		expect(pending[0].patch_json ?? pending[0].PATCH_JSON).toContain('Replay84');
+
+		const next = await localDb.syncClient.push({ clientId: 'sqlite-sync-test-client-conflict-queue' });
+		const pushedRemote84 = await remoteDb.customer.getById(84);
+		const afterPushPending = await localDb.query('SELECT mutation_id FROM "orange_sync_outbox" WHERE status = \'pending\'');
+
+		expect(next.applied).toBe(1);
+		expect(pushedRemote84.name).toBe('Replay84');
+		expect(afterPushPending).toHaveLength(0);
 	});
 
 	test('pull fails before requesting remote changes when pending push fails', async () => {
@@ -498,7 +554,7 @@ describe('sqlite staged pull sync', () => {
 		const pending = await localDb.query('SELECT mutation_id FROM "orange_sync_outbox" WHERE status = \'pending\'');
 
 		expect(syncPhases).toHaveLength(0);
-		expect(restored.name).toBe('Base82');
-		expect(pending).toHaveLength(0);
+		expect(restored.name).toBe('Reject82');
+		expect(pending).toHaveLength(1);
 	});
 });

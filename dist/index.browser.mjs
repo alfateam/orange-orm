@@ -5129,7 +5129,7 @@ function requireSyncClient () {
 			const pushConfig = options._pushConfig || resolvePushConfig(syncConfig, options);
 			const configuredTables = resolveSyncTables(db, syncConfig.tables, client);
 			await ensureSyncSchema(db, client, configuredTables, syncConfig.schema);
-			const limit = normalizeLimit(options.limit, 100);
+			const limit = 1;
 			const pending = await readPendingMutations(db, limit);
 			if (pending.length === 0)
 				return { phase: 'push', applied: 0, duplicates: 0, results: [] };
@@ -5139,7 +5139,8 @@ function requireSyncClient () {
 				result = await sendPush(pushConfig, clientId, pending);
 			}
 			catch (e) {
-				await rollbackFailedPushBatch(db, pending);
+				if (isConflictError(e))
+					await rollbackFailedPushBatch(db, pending);
 				throw e;
 			}
 			await markPushedMutations(db, result);
@@ -5223,6 +5224,11 @@ function requireSyncClient () {
 			}, {
 				_syncAxiosInterceptor: axiosInterceptor
 			});
+		}
+
+		function isConflictError(error) {
+			return Number(error && error.response && error.response.status) === 409
+				|| Number(error && error.status) === 409;
 		}
 
 		async function pullStaged(pullConfig, options) {
