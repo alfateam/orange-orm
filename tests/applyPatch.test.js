@@ -10,7 +10,7 @@ describe('applyPatch structural equality with different key order', () => {
 		const changes = [
 			{ op: 'replace', path: '/data', value: toCompareObject({ a: 1, b: 2, c: 3 }), oldValue: toCompareObject({ b: 2, a: 1 }) }
 		];
-		
+
 		const result = applyPatch({ options: {}, context }, dto, changes, column);
 		expect(result.data).toEqual({ a: 1, b: 2, c: 3 });
 	});
@@ -22,7 +22,7 @@ describe('applyPatch structural equality with different key order', () => {
 		const changes = [
 			{ op: 'replace', path: '/data', value: toCompareObject({ a: 1, b: 2, c: 3 }), oldValue: toCompareObject({ b: 3, a: 1 }) }
 		];
-		
+
 		expect(() => {
 			applyPatch({ options: {}, context }, dto, changes, column);
 		}).toThrow('The row was changed by another user.');
