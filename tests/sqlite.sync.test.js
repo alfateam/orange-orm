@@ -358,6 +358,42 @@ describe('sqlite staged pull sync', () => {
 		expect(afterCount).toBe(beforeCount + 1);
 	});
 
+	test('push conflict returns http 409', async () => {
+		await remoteDb.customer.insert({
+			id: 61,
+			name: 'Remote',
+			balance: 61,
+			isActive: true
+		});
+
+		const patch = [{
+			op: 'replace',
+			path: '/[61]/name',
+			value: 'Local',
+			oldValue: 'Stale'
+		}];
+		const mutation = {
+			id: 'mutation-61-conflict',
+			table: 'customer',
+			patch
+		};
+
+		let error;
+		try {
+			await localDb.syncClient.push({
+				clientId: 'sqlite-sync-test-client-conflict',
+				mutations: [mutation]
+			});
+		}
+		catch (e) {
+			error = e;
+		}
+
+		expect(error?.message).toBe('Request failed with status code 409');
+		expect(error?.response?.status).toBe(409);
+		expect(error?.response?.data).toBe('The row was changed by another user.');
+	});
+
 	test('captures multiple saveChanges in one local transaction as one push mutation', async () => {
 		await localDb.query('DROP TABLE IF EXISTS "orange_sync_outbox"');
 		await localDb.query('DELETE FROM customer WHERE id IN (70, 71)');

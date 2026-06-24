@@ -2,6 +2,7 @@ const fastjson = require('fast-json-patch');
 let fromCompareObject = require('./fromCompareObject');
 let toCompareObject = require('./toCompareObject');
 let getSessionSingleton = require('./table/getSessionSingleton');
+let newConcurrencyConflictError = require('./table/newConcurrencyConflictError');
 
 function applyPatch({ options = {}, context }, dto, changes, column) {
 	let dtoCompare = toCompareObject(dto);
@@ -85,7 +86,7 @@ function applyPatch({ options = {}, context }, dto, changes, column) {
 				catch (e) {
 					if (concurrency === 'skipOnConflict')
 						return false;
-					throw new Error('The row was changed by another user.');
+					throw newConcurrencyConflictError();
 				}
 			}
 			return true;

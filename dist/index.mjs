@@ -11161,6 +11161,22 @@ function requireCreateDto () {
 	return createDto;
 }
 
+var newConcurrencyConflictError_1;
+var hasRequiredNewConcurrencyConflictError;
+
+function requireNewConcurrencyConflictError () {
+	if (hasRequiredNewConcurrencyConflictError) return newConcurrencyConflictError_1;
+	hasRequiredNewConcurrencyConflictError = 1;
+	function newConcurrencyConflictError() {
+		const error = new Error('The row was changed by another user.');
+		error.status = 409;
+		return error;
+	}
+
+	newConcurrencyConflictError_1 = newConcurrencyConflictError;
+	return newConcurrencyConflictError_1;
+}
+
 var newUpdateCommand_1;
 var hasRequiredNewUpdateCommand;
 
@@ -11172,6 +11188,7 @@ function requireNewUpdateCommand () {
 	let newColumnList = requireNewObject();
 	var createPatch = requireCreatePatch();
 	let createDto = requireCreateDto();
+	let newConcurrencyConflictError = requireNewConcurrencyConflictError();
 
 	function newUpdateCommand(context, table, column, row) {
 		return new UpdateCommand(context, table, column, row);
@@ -11245,7 +11262,7 @@ function requireNewUpdateCommand () {
 		if (rowCount === undefined)
 			return;
 		if (rowCount === 0 && this._concurrencySummary.hasOptimistic) {
-			throw new Error('The row was changed by another user.');
+			throw newConcurrencyConflictError();
 		}
 	};
 
@@ -11890,6 +11907,7 @@ function require_delete$1 () {
 	var newPrimaryKeyFilter = requireNewPrimaryKeyFilter();
 	var createPatch = requireCreatePatch();
 	var createDto = requireCreateDto();
+	var newConcurrencyConflictError = requireNewConcurrencyConflictError();
 
 	function _delete(context, row, strategy, table) {
 		var relations = [];
@@ -11915,7 +11933,7 @@ function require_delete$1 () {
 				if (rowCount === undefined)
 					return;
 				if (rowCount === 0 && concurrencySummary.hasOptimistic) {
-					throw new Error('The row was changed by another user.');
+					throw newConcurrencyConflictError();
 				}
 			};
 		}
@@ -15999,6 +16017,7 @@ function requireApplyPatch () {
 	let fromCompareObject = requireFromCompareObject();
 	let toCompareObject = requireToCompareObject();
 	let getSessionSingleton = requireGetSessionSingleton();
+	let newConcurrencyConflictError = requireNewConcurrencyConflictError();
 
 	function applyPatch({ options = {}, context }, dto, changes, column) {
 		let dtoCompare = toCompareObject(dto);
@@ -16082,7 +16101,7 @@ function requireApplyPatch () {
 					catch (e) {
 						if (concurrency === 'skipOnConflict')
 							return false;
-						throw new Error('The row was changed by another user.');
+						throw newConcurrencyConflictError();
 					}
 				}
 				return true;

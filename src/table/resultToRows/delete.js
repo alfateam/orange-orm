@@ -4,6 +4,7 @@ var newDeleteCommand = require('../commands/newDeleteCommand');
 var newPrimaryKeyFilter = require('../newPrimaryKeyFilter');
 var createPatch = require('../../client/createPatch');
 var createDto = require('./toDto/createDto');
+var newConcurrencyConflictError = require('../newConcurrencyConflictError');
 
 function _delete(context, row, strategy, table) {
 	var relations = [];
@@ -29,7 +30,7 @@ function _delete(context, row, strategy, table) {
 			if (rowCount === undefined)
 				return;
 			if (rowCount === 0 && concurrencySummary.hasOptimistic) {
-				throw new Error('The row was changed by another user.');
+				throw newConcurrencyConflictError();
 			}
 		};
 	}

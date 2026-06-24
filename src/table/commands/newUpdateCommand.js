@@ -3,6 +3,7 @@ let newImmutable = require('../../newImmutable');
 let newColumnList = require('../../newObject');
 var createPatch = require('../../client/createPatch');
 let createDto = require('../resultToRows/toDto/createDto');
+let newConcurrencyConflictError = require('../newConcurrencyConflictError');
 
 function newUpdateCommand(context, table, column, row) {
 	return new UpdateCommand(context, table, column, row);
@@ -76,7 +77,7 @@ UpdateCommand.prototype._onConcurrencyResult = function(result) {
 	if (rowCount === undefined)
 		return;
 	if (rowCount === 0 && this._concurrencySummary.hasOptimistic) {
-		throw new Error('The row was changed by another user.');
+		throw newConcurrencyConflictError();
 	}
 };
 
