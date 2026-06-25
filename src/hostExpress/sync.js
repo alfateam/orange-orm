@@ -9,8 +9,18 @@ function newSyncHandler(client, options = {}) {
 	const queue = createQueue(syncOptions.queue);
 	const hooks = options.hooks;
 	const transactionHooks = hooks && hooks.transaction;
-	const getTransactionHook = (name) =>
-		(transactionHooks && transactionHooks[name]) || (hooks && hooks[name]);
+	const transactionHookFns = {
+		beforeBegin: (transactionHooks && transactionHooks.beforeBegin) || (hooks && hooks.beforeBegin),
+		afterBegin: (transactionHooks && transactionHooks.afterBegin) || (hooks && hooks.afterBegin),
+		beforeCommit: (transactionHooks && transactionHooks.beforeCommit) || (hooks && hooks.beforeCommit),
+		afterCommit: (transactionHooks && transactionHooks.afterCommit) || (hooks && hooks.afterCommit),
+		afterRollback: (transactionHooks && transactionHooks.afterRollback) || (hooks && hooks.afterRollback)
+	};
+	const hasTransactionHooks = !!(transactionHookFns.beforeBegin
+		|| transactionHookFns.afterBegin
+		|| transactionHookFns.beforeCommit
+		|| transactionHookFns.afterCommit
+		|| transactionHookFns.afterRollback);
 
 	return async function handleSync(request, response) {
 		try {
@@ -39,17 +49,7 @@ function newSyncHandler(client, options = {}) {
 	}
 
 	async function runHookedTransaction(fn, transactionOptions, request, response) {
-		const beforeBegin = getTransactionHook('beforeBegin');
-		const afterBegin = getTransactionHook('afterBegin');
-		const beforeCommit = getTransactionHook('beforeCommit');
-		const afterCommit = getTransactionHook('afterCommit');
-		const afterRollback = getTransactionHook('afterRollback');
-		const hasHooks = !!(beforeBegin
-			|| afterBegin
-			|| beforeCommit
-			|| afterCommit
-			|| afterRollback);
-		if (!hasHooks)
+		if (!hasTransactionHooks)
 			return client.transaction(fn, transactionOptions);
 
 		let hookDb;
@@ -57,23 +57,23 @@ function newSyncHandler(client, options = {}) {
 		try {
 			result = await client.transaction(async (tx) => {
 				hookDb = tx;
-				if (beforeBegin)
-					await beforeBegin(hookDb, request, response);
-				if (afterBegin)
-					await afterBegin(hookDb, request, response);
+				if (transactionHookFns.beforeBegin)
+					await transactionHookFns.beforeBegin(hookDb, request, response);
+				if (transactionHookFns.afterBegin)
+					await transactionHookFns.afterBegin(hookDb, request, response);
 				const value = await fn(tx);
-				if (beforeCommit)
-					await beforeCommit(hookDb, request, response);
+				if (transactionHookFns.beforeCommit)
+					await transactionHookFns.beforeCommit(hookDb, request, response);
 				return value;
 			}, transactionOptions);
 		}
 		catch (e) {
-			if (afterRollback)
-				await afterRollback(hookDb, request, response, e);
+			if (transactionHookFns.afterRollback)
+				await transactionHookFns.afterRollback(hookDb, request, response, e);
 			throw e;
 		}
-		if (afterCommit)
-			await afterCommit(hookDb, request, response);
+		if (transactionHookFns.afterCommit)
+			await transactionHookFns.afterCommit(hookDb, request, response);
 		return result;
 	}
 
@@ -328,6 +328,7 @@ function newSyncHandler(client, options = {}) {
 		const rawItems = Array.isArray(body.items) ? body.items : [];
 		const limit = normalizeLimit(rawItems.length, syncOptions.limits.maxRowsPerBatch);
 		const items = rawItems.slice(0, limit);
+		const normalizedItems = [];
 		const tableKeys = new Map();
 		for (let i = 0; i < items.length; i++) {
 			const item = items[i];
@@ -341,41 +342,41 @@ function newSyncHandler(client, options = {}) {
 			const pk = Array.isArray(item.pk) ? item.pk : toPkArray(meta, item.key);
 			if (!pk || pk.length !== meta.pkColumns.length)
 				continue;
-			if (!tableKeys.has(meta.name))
-				tableKeys.set(meta.name, []);
-			tableKeys.get(meta.name).push(pk);
+			const pkKey = stringify(pk);
+			normalizedItems.push({ meta, pk, pkKey, op: normalizeOp(item.op) });
+			let tableEntry = tableKeys.get(meta.name);
+			if (!tableEntry) {
+				tableEntry = { meta, keys: [], seen: new Set() };
+				tableKeys.set(meta.name, tableEntry);
+			}
+			if (!tableEntry.seen.has(pkKey)) {
+				tableEntry.seen.add(pkKey);
+				tableEntry.keys.push(pk);
+			}
 		}
 
 		const rowMap = new Map();
 		const tableNames = Array.from(tableKeys.keys());
 		for (let i = 0; i < tableNames.length; i++) {
 			const tableName = tableNames[i];
-			const meta = tableMeta.byName.get(tableName);
-			const keys = tableKeys.get(tableName);
-			const rows = await fetchRowsByPrimaryKeys(meta, keys, request, response);
+			const tableEntry = tableKeys.get(tableName);
+			const rows = await fetchRowsByPrimaryKeys(tableEntry.meta, tableEntry.keys, request, response);
 			const perTable = new Map();
 			for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
 				const row = rows[rowIndex];
-				const pk = toPkArray(meta, row);
-				perTable.set(stringify(pk), row);
+				const pk = toPkArray(tableEntry.meta, row);
+				if (pk)
+					perTable.set(stringify(pk), row);
 			}
 			rowMap.set(tableName, perTable);
 		}
 
 		const resolved = [];
-		for (let i = 0; i < items.length; i++) {
-			const item = items[i];
-			if (!item || typeof item.table !== 'string')
-				continue;
-			const meta = tableMeta.byName.get(item.table);
-			if (!meta)
-				continue;
-			const pk = Array.isArray(item.pk) ? item.pk : toPkArray(meta, item.key);
-			if (!pk)
-				continue;
-			const row = rowMap.get(meta.name)?.get(stringify(pk));
+		for (let i = 0; i < normalizedItems.length; i++) {
+			const item = normalizedItems[i];
+			const row = rowMap.get(item.meta.name)?.get(item.pkKey);
 			if (row !== undefined)
-				resolved.push({ table: meta.name, pk, key: toKeyObject(meta, pk), row, op: normalizeOp(item.op) });
+				resolved.push({ table: item.meta.name, pk: item.pk, key: toKeyObject(item.meta, item.pk), row, op: item.op });
 		}
 
 		return {
@@ -407,28 +408,19 @@ function newSyncHandler(client, options = {}) {
 	async function fetchRowsByPrimaryKeys(meta, keys, request, response) {
 		if (!Array.isArray(keys) || keys.length === 0)
 			return [];
-		const where = [];
-		const parameters = [];
+		const keyObjects = [];
 		for (let i = 0; i < keys.length; i++) {
 			const pk = keys[i];
 			if (!Array.isArray(pk) || pk.length !== meta.pkColumns.length)
 				continue;
-			const parts = [];
-			for (let colIndex = 0; colIndex < meta.pkColumns.length; colIndex++) {
-				const col = meta.pkColumns[colIndex];
-				parts.push(`${quoteIdent(col.dbName)} = ?`);
-				parameters.push(pk[colIndex]);
-			}
-			where.push(`(${parts.join(' AND ')})`);
+			keyObjects.push(toKeyObject(meta, pk));
 		}
-		if (where.length === 0)
+		if (keyObjects.length === 0)
 			return [];
-		const filter = {
-			sql: where.join(' OR '),
-			parameters
-		};
 		return runHookedTransaction(async (tx) => {
-			return tx[meta.name].getMany(filter);
+			return tx[meta.name].getMany({
+				where: () => keyObjects
+			});
 		}, { readonly: true }, request, response);
 	}
 
@@ -572,11 +564,12 @@ function createTableMeta(client, syncOptions) {
 function createQueue({ concurrency, maxPending }) {
 	let running = 0;
 	const pending = [];
+	let pendingHead = 0;
 	return { run };
 
 	function run(job) {
 		return new Promise((resolve, reject) => {
-			if (running >= concurrency && pending.length >= maxPending) {
+			if (running >= concurrency && pending.length - pendingHead >= maxPending) {
 				const error = new Error('Sync queue is full. Try again later.');
 				error.status = 429;
 				reject(error);
@@ -588,8 +581,13 @@ function createQueue({ concurrency, maxPending }) {
 	}
 
 	function drain() {
-		while (running < concurrency && pending.length > 0) {
-			const next = pending.shift();
+		while (running < concurrency && pendingHead < pending.length) {
+			const next = pending[pendingHead];
+			pendingHead += 1;
+			if (pendingHead > 1024 && pendingHead * 2 > pending.length) {
+				pending.splice(0, pendingHead);
+				pendingHead = 0;
+			}
 			running += 1;
 			Promise.resolve()
 				.then(next.job)

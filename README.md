@@ -755,14 +755,14 @@ const db = map.sqlite('demo.db');
 getRows();
 
 async function getRows() {
-  const orders = await db.order.getMany([
+  const orders = await db.order.getMany({
+    where: () => [
       {id: 1},
       {id: 2}
     ],
-    {
-      customer: true,
-      deliveryAddress: true,
-      lines: true
+    customer: true,
+    deliveryAddress: true,
+    lines: true
   });
 }
 ```

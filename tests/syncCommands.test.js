@@ -80,7 +80,7 @@ describe('sync commands', () => {
 		const tx = {
 			project: {
 				getMany: async (filter) => {
-					calls.push(['getMany', filter.parameters[0]]);
+					calls.push(['getMany', filter.where()]);
 					return [{ id: 1, name: 'Project 1' }];
 				}
 			}
@@ -102,7 +102,10 @@ describe('sync commands', () => {
 
 		const jsonResult = await callHandler(handler, {
 			phase: 'rows',
-			items: [{ table: 'project', pk: [1], op: 'U' }]
+			items: [
+				{ table: 'project', pk: [1], op: 'U' },
+				{ table: 'project', pk: [1], op: 'U' }
+			]
 		});
 
 		expect(calls.map(x => x[0])).toEqual([
@@ -112,8 +115,10 @@ describe('sync commands', () => {
 			'beforeCommit',
 			'afterCommit'
 		]);
+		expect(calls[2][1]).toEqual([{ id: 1 }]);
 		expect(transactionOptions).toEqual([{ readonly: true }]);
 		expect(jsonResult.items).toEqual([
+			{ table: 'project', pk: [1], key: { id: 1 }, row: { id: 1, name: 'Project 1' }, op: 'U' },
 			{ table: 'project', pk: [1], key: { id: 1 }, row: { id: 1, name: 'Project 1' }, op: 'U' }
 		]);
 	});

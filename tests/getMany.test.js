@@ -392,6 +392,46 @@ describe('primary key filter array', () => {
 	}
 });
 
+describe('primary key filter array with relations', () => {
+	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+	async function verify(dbName) {
+		const { db } = getDb(dbName);
+		const rows = await db.order.getMany({
+			where: () => [
+				{ id: 1 },
+				{ id: 2 }
+			],
+			customer: true,
+			deliveryAddress: true,
+			lines: true
+		});
+
+		expect(rows.map(x => x.id)).toEqual([1, 2]);
+		expect(rows[0].customer.name).toBe('George');
+		expect(rows[0].deliveryAddress.name).toBe('George');
+		expect(rows[0].lines).toEqual([
+			{ product: 'Bicycle', id: 1, amount: 678.90, orderId: 1 },
+			{ product: 'Small guitar', id: 2, amount: 123.45, orderId: 1 }
+		]);
+		expect(rows[1].customer.name).toBe('Harry');
+		expect(rows[1].deliveryAddress.name).toBe('Harry Potter');
+		expect(rows[1].lines).toEqual([
+			{ product: 'Magic wand', id: 3, amount: 300, orderId: 2 }
+		]);
+	}
+});
+
 describe('primary key filter array legacy', () => {
 	test('pg', async () => await verify('pg'));
 	test('pglite', async () => await verify('pglite'));
