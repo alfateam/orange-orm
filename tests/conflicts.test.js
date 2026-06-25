@@ -86,6 +86,7 @@ describe('optimistic fail', () => {
 				id: 1,
 				name: 'George',
 				balance: 177,
+				isActive: true
 			});
 		}
 		catch (e) {
@@ -185,7 +186,6 @@ describe('add property to JSON', () => {
 		await customer2.saveChanges();
 
 		customer.data = {a: 1, b: 2, c: 4};
-
 		await customer.saveChanges();
 
 		const expected = {
