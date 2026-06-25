@@ -12,6 +12,7 @@ const tryGetFirst = require('./table/tryGetFirstFromDb');
 const newCache = require('./table/newRowCache');
 const newContext = require('./newObject');
 const insert = require('./table/insert');
+const insertAndForget = require('./table/insertAndForget');
 const _delete = require('./table/delete');
 const cascadeDelete = require('./table/cascadeDelete');
 const patchTable = require('./patchTable');
@@ -145,6 +146,10 @@ function _new(tableName) {
 	table.insertWithConcurrency = function(context, options, ...rows) {
 		let args = [context, {table, options}].concat([].slice.call(rows));
 		return insert.apply(null, args);
+	};
+
+	table.insertAndForget = function(context, options, values) {
+		return insertAndForget(context, { table, options }, values);
 	};
 
 	table.updateWithConcurrency = function(context, options, row, property, value, oldValue, patchInfo) {

@@ -10,6 +10,7 @@ const lastInsertedSql = require('../sqlite/lastInsertedSql');
 const limitAndOffset = require('../sqlite/limitAndOffset');
 const insertSql = require('../sqlite/insertSql');
 const insert = require('../sqlite/insert');
+const batchInsert = require('../sqlite/batchInsert');
 const quote = require('../sqlite/quote');
 
 function newResolveTransaction(domain, pool, { readonly = false } = {})  {
@@ -31,6 +32,7 @@ function newResolveTransaction(domain, pool, { readonly = false } = {})  {
 	rdb.lastInsertedSql = lastInsertedSql;
 	rdb.insertSql = insertSql;
 	rdb.insert = insert;
+	rdb.batchInsert = batchInsert;
 	rdb.lastInsertedIsSeparate = true;
 	rdb.multipleStatements = false;
 	rdb.limitAndOffset = limitAndOffset;

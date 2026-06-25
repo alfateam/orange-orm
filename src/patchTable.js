@@ -20,6 +20,8 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 	const engine = getSessionSingleton(context, 'engine');
 	options = cleanOptions(options);
 	strategy = JSON.parse(JSON.stringify(strategy || {}));
+	if (!dryrun && strategy['insertAndForget'] && await tryInsertAndForget(context, table, patches, options))
+		return { changed: [], strategy };
 	let changed = new Set();
 	for (let i = 0; i < patches.length; i++) {
 		let patch = { path: undefined, value: undefined, op: undefined };
@@ -408,6 +410,29 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 	function cleanOptions(options) {
 		const { table, transaction, db, client, ..._options } = options;
 		return _options;
+	}
+
+	async function tryInsertAndForget(context, table, patches, options) {
+		if (!table.insertAndForget || !Array.isArray(patches))
+			return false;
+		const values = [];
+		for (let i = 0; i < patches.length; i++) {
+			const patch = patches[i];
+			if (!isRootAdd(patch))
+				return false;
+			values.push(patch.value);
+		}
+		return table.insertAndForget(context, options, values);
+	}
+
+	function isRootAdd(patch) {
+		return patch && patch.op === 'add' && isRootPath(patch.path);
+	}
+
+	function isRootPath(path) {
+		if (typeof path !== 'string')
+			return false;
+		return path.split('/').slice(1).length === 1;
 	}
 
 	function withoutSkipSelectAfterInsert(options) {

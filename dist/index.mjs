@@ -15879,6 +15879,115 @@ function requireInsert$6 () {
 	return insert_1$1;
 }
 
+var fromCompareObject_1;
+var hasRequiredFromCompareObject;
+
+function requireFromCompareObject () {
+	if (hasRequiredFromCompareObject) return fromCompareObject_1;
+	hasRequiredFromCompareObject = 1;
+	function fromCompareObject(object) {
+		if (object === null || object === undefined) return object;
+		if (object.__patchType === 'Array') {
+			let copy = [];
+			let i = 0;
+			for (let id in object) {
+				if (id !== '__patchType') {
+					copy[i] = fromCompareObject(object[id]);
+					i++;
+				}
+			}
+			return copy;
+		} else if (object === Object(object)) {
+			let copy = {};
+			for (let name in object) {
+				if (name !== '__patchType')
+					copy[name] = fromCompareObject(object[name]);
+			}
+			return copy;
+		}
+		return object;
+	}
+
+	fromCompareObject_1 = fromCompareObject;
+	return fromCompareObject_1;
+}
+
+var insertAndForget_1;
+var hasRequiredInsertAndForget;
+
+function requireInsertAndForget () {
+	if (hasRequiredInsertAndForget) return insertAndForget_1;
+	hasRequiredInsertAndForget = 1;
+	const fromCompareObject = requireFromCompareObject();
+	const getSessionContext = requireGetSessionContext();
+	const newRow = requireNewRow();
+
+	async function insertAndForget(context, { table, options = {} }, values) {
+		if (!Array.isArray(values) || values.length === 0)
+			return false;
+
+		const normalizedValues = [];
+		for (let i = 0; i < values.length; i++) {
+			if (!isFlatColumnValue(values[i], table))
+				return false;
+			normalizedValues.push(normalizeValue(values[i], table));
+		}
+
+		const insertOptions = { ...options, skipSelectAfterInsert: true };
+		const rows = normalizedValues.map(value => newRow(context, { table }, value));
+		const rdb = getSessionContext(context);
+		if (rows.length > 1 && rdb.batchInsert && table._emitChanged.callbacks.length === 0) {
+			const inserted = await rdb.batchInsert(context, table, rows, insertOptions);
+			if (inserted)
+				return true;
+		}
+
+		for (let i = 0; i < normalizedValues.length; i++)
+			await table.insertWithConcurrency(context, insertOptions, normalizedValues[i]);
+		return true;
+	}
+
+	function isFlatColumnValue(value, table) {
+		if (!isPlainObject(value))
+			return false;
+		for (let name in value) {
+			if (!isColumn(name, table))
+				return false;
+		}
+		return true;
+	}
+
+	function normalizeValue(value, table) {
+		const normalized = {};
+		for (let name in value) {
+			if (isColumn(name, table))
+				normalized[name] = fromCompareObject(value[name]);
+		}
+		clearTemporaryPrimaryKeys(normalized, table);
+		return normalized;
+	}
+
+	function clearTemporaryPrimaryKeys(value, table) {
+		for (let i = 0; i < table._primaryColumns.length; i++) {
+			const pkName = table._primaryColumns[i].alias;
+			const keyValue = value[pkName];
+			if (keyValue && typeof keyValue === 'string' && keyValue.indexOf('~') === 0)
+				value[pkName] = undefined;
+		}
+	}
+
+	function isColumn(name, table) {
+		return table[name] && table[name].equal;
+	}
+
+	function isPlainObject(value) {
+		return value === Object(value) && !Array.isArray(value) && !(value instanceof Date);
+	}
+
+	insertAndForget_1 = insertAndForget;
+	return insertAndForget_1;
+}
+
 var _delete_1;
 var hasRequired_delete;
 
@@ -15926,39 +16035,6 @@ function requireCascadeDelete () {
 
 	cascadeDelete_1 = cascadeDelete;
 	return cascadeDelete_1;
-}
-
-var fromCompareObject_1;
-var hasRequiredFromCompareObject;
-
-function requireFromCompareObject () {
-	if (hasRequiredFromCompareObject) return fromCompareObject_1;
-	hasRequiredFromCompareObject = 1;
-	function fromCompareObject(object) {
-		if (object === null || object === undefined) return object;
-		if (object.__patchType === 'Array') {
-			let copy = [];
-			let i = 0;
-			for (let id in object) {
-				if (id !== '__patchType') {
-					copy[i] = fromCompareObject(object[id]);
-					i++;
-				}
-			}
-			return copy;
-		} else if (object === Object(object)) {
-			let copy = {};
-			for (let name in object) {
-				if (name !== '__patchType')
-					copy[name] = fromCompareObject(object[name]);
-			}
-			return copy;
-		}
-		return object;
-	}
-
-	fromCompareObject_1 = fromCompareObject;
-	return fromCompareObject_1;
 }
 
 var toCompareObject_1;
@@ -16283,6 +16359,8 @@ function requirePatchTable () {
 		const engine = getSessionSingleton(context, 'engine');
 		options = cleanOptions(options);
 		strategy = JSON.parse(JSON.stringify(strategy || {}));
+		if (!dryrun && strategy['insertAndForget'] && await tryInsertAndForget(context, table, patches, options))
+			return { changed: [], strategy };
 		let changed = new Set();
 		for (let i = 0; i < patches.length; i++) {
 			let patch = { path: undefined, value: undefined, op: undefined };
@@ -16673,6 +16751,29 @@ function requirePatchTable () {
 			return _options;
 		}
 
+		async function tryInsertAndForget(context, table, patches, options) {
+			if (!table.insertAndForget || !Array.isArray(patches))
+				return false;
+			const values = [];
+			for (let i = 0; i < patches.length; i++) {
+				const patch = patches[i];
+				if (!isRootAdd(patch))
+					return false;
+				values.push(patch.value);
+			}
+			return table.insertAndForget(context, options, values);
+		}
+
+		function isRootAdd(patch) {
+			return patch && patch.op === 'add' && isRootPath(patch.path);
+		}
+
+		function isRootPath(path) {
+			if (typeof path !== 'string')
+				return false;
+			return path.split('/').slice(1).length === 1;
+		}
+
 		function withoutSkipSelectAfterInsert(options) {
 			if (!options || !options.skipSelectAfterInsert)
 				return options;
@@ -16861,6 +16962,7 @@ function requireTable () {
 	const newCache = requireNewRowCache();
 	const newContext = requireNewObject();
 	const insert = requireInsert$6();
+	const insertAndForget = requireInsertAndForget();
 	const _delete = require_delete();
 	const cascadeDelete = requireCascadeDelete();
 	const patchTable = requirePatchTable();
@@ -16994,6 +17096,10 @@ function requireTable () {
 		table.insertWithConcurrency = function(context, options, ...rows) {
 			let args = [context, {table, options}].concat([].slice.call(rows));
 			return insert.apply(null, args);
+		};
+
+		table.insertAndForget = function(context, options, values) {
+			return insertAndForget(context, { table, options }, values);
 		};
 
 		table.updateWithConcurrency = function(context, options, row, property, value, oldValue, patchInfo) {
@@ -22985,6 +23091,135 @@ function requireInsert$3 () {
 	return insert$2;
 }
 
+var batchInsert_1;
+var hasRequiredBatchInsert;
+
+function requireBatchInsert () {
+	if (hasRequiredBatchInsert) return batchInsert_1;
+	hasRequiredBatchInsert = 1;
+	const executeCommand = requireExecuteCommand();
+	const newParameterized = requireNewParameterized();
+	const quote = requireQuote$3();
+
+	async function batchInsert(context, table, rows, options = {}) {
+		const groups = groupRows(table, rows);
+		for (let i = 0; i < groups.length; i++) {
+			if (groups[i].columns.length === 0)
+				return false;
+		}
+		for (let i = 0; i < groups.length; i++) {
+			const group = groups[i];
+			await executeGroup(context, table, group, options);
+		}
+		return true;
+	}
+
+	async function executeGroup(context, table, group, options) {
+		const maxParameters = context.rdb.maxParameters || 999;
+		const columns = group.columns;
+		const chunks = chunkRows(context, group.rows, columns, maxParameters);
+
+		for (let i = 0; i < chunks.length; i++)
+			await executeCommand(context, buildCommand(context, table, columns, chunks[i], options));
+	}
+
+	function buildCommand(context, table, columns, rows, options) {
+		const parameters = [];
+		const columnNames = discriminatorColumnNames(table).concat(columns.map(column => quote(column._dbName)));
+		const valueRows = rows.map(row => {
+			const values = discriminatorValues(table).concat(columns.map(column => {
+				const encoded = column.encode(context, row[column.alias]);
+				parameters.push(...encoded.parameters);
+				return encoded.sql();
+			}));
+			return '(' + values.join(',') + ')';
+		});
+
+		const sql = 'INSERT INTO ' + quote(table._dbName) + ' (' + columnNames.join(',') + ') VALUES '
+			+ valueRows.join(',') + onConflict(table, columns, options);
+		return newParameterized(sql, parameters);
+	}
+
+	function groupRows(table, rows) {
+		const groups = [];
+		const groupsByKey = {};
+		for (let i = 0; i < rows.length; i++) {
+			const row = rows[i];
+			const columns = table._columns.filter(column => row['__' + column.alias] !== undefined);
+			const key = columns.map(column => column.alias).join('\0');
+			let group = groupsByKey[key];
+			if (!group) {
+				group = { columns, rows: [] };
+				groupsByKey[key] = group;
+				groups.push(group);
+			}
+			group.rows.push(row);
+		}
+		return groups;
+	}
+
+	function countParameterColumns(context, row, columns) {
+		let count = 0;
+		for (let i = 0; i < columns.length; i++) {
+			const encoded = columns[i].encode(context, row[columns[i].alias]);
+			count += encoded.parameters.length;
+		}
+		return count;
+	}
+
+	function chunkRows(context, rows, columns, maxParameters) {
+		const chunks = [];
+		let chunk = [];
+		let parameterCount = 0;
+		for (let i = 0; i < rows.length; i++) {
+			const row = rows[i];
+			const rowParameterCount = countParameterColumns(context, row, columns);
+			if (chunk.length > 0 && parameterCount + rowParameterCount > maxParameters) {
+				chunks.push(chunk);
+				chunk = [];
+				parameterCount = 0;
+			}
+			chunk.push(row);
+			parameterCount += rowParameterCount;
+		}
+		if (chunk.length > 0)
+			chunks.push(chunk);
+		return chunks;
+	}
+
+	function discriminatorColumnNames(table) {
+		return table._columnDiscriminators.map(discriminator => quote(discriminator.split('=')[0]));
+	}
+
+	function discriminatorValues(table) {
+		return table._columnDiscriminators.map(discriminator => discriminator.split('=')[1]);
+	}
+
+	function onConflict(table, columns, options) {
+		if (options.concurrency !== 'skipOnConflict' && options.concurrency !== 'overwrite')
+			return '';
+
+		const primaryKeys = table._primaryColumns.map(x => quote(x._dbName)).join(',');
+		const updates = [];
+		for (let i = 0; i < columns.length; i++) {
+			const column = columns[i];
+			const concurrency = options[column.alias]?.concurrency || options.concurrency;
+			const columnName = quote(column._dbName);
+			if (concurrency === 'overwrite')
+				updates.push(`${columnName}=excluded.${columnName}`);
+			else if (concurrency === 'optimistic')
+				updates.push(`${columnName} = CASE WHEN ${table._dbName}.${columnName} <> excluded.${columnName} THEN '12345678-1234-1234-1234-123456789012Conflict when updating ${columnName}12345678-1234-1234-1234-123456789012' ELSE ${table._dbName}.${columnName} END`);
+		}
+
+		if (updates.length === 0)
+			return ` ON CONFLICT(${primaryKeys}) DO NOTHING`;
+		return ` ON CONFLICT(${primaryKeys}) DO UPDATE SET ${updates.join(',')}`;
+	}
+
+	batchInsert_1 = batchInsert;
+	return batchInsert_1;
+}
+
 var newTransaction$8;
 var hasRequiredNewTransaction$8;
 
@@ -23003,6 +23238,7 @@ function requireNewTransaction$8 () {
 	const formatBigintOut = requireFormatBigintOut$3();
 	const insertSql = requireInsertSql$3();
 	const insert = requireInsert$3();
+	const batchInsert = requireBatchInsert();
 	const quote = requireQuote$3();
 
 	function newResolveTransaction(domain, pool, { readonly = false } = {})  {
@@ -23024,6 +23260,7 @@ function requireNewTransaction$8 () {
 		rdb.lastInsertedSql = lastInsertedSql;
 		rdb.insertSql = insertSql;
 		rdb.insert = insert;
+		rdb.batchInsert = batchInsert;
 		rdb.lastInsertedIsSeparate = true;
 		rdb.multipleStatements = false;
 		rdb.limitAndOffset = limitAndOffset;
@@ -23445,6 +23682,7 @@ function requireNewTransaction$7 () {
 	const limitAndOffset = requireLimitAndOffset$3();
 	const insertSql = requireInsertSql$3();
 	const insert = requireInsert$3();
+	const batchInsert = requireBatchInsert();
 	const quote = requireQuote$3();
 
 	function newResolveTransaction(domain, pool, { readonly = false } = {})  {
@@ -23466,6 +23704,7 @@ function requireNewTransaction$7 () {
 		rdb.lastInsertedSql = lastInsertedSql;
 		rdb.insertSql = insertSql;
 		rdb.insert = insert;
+		rdb.batchInsert = batchInsert;
 		rdb.lastInsertedIsSeparate = true;
 		rdb.multipleStatements = false;
 		rdb.limitAndOffset = limitAndOffset;
@@ -23893,6 +24132,7 @@ function requireNewTransaction$6 () {
 	const formatBigintOut = requireFormatBigintOut$3();
 	const insertSql = requireInsertSql$3();
 	const insert = requireInsert$3();
+	const batchInsert = requireBatchInsert();
 	const quote = requireQuote$3();
 
 	function newResolveTransaction(domain, pool, { readonly = false } = {})  {
@@ -23912,6 +24152,7 @@ function requireNewTransaction$6 () {
 		rdb.formatBigintOut = formatBigintOut;
 		rdb.insertSql = insertSql;
 		rdb.insert = insert;
+		rdb.batchInsert = batchInsert;
 		rdb.lastInsertedIsSeparate = true;
 		rdb.multipleStatements = false;
 		rdb.limitAndOffset = limitAndOffset;
@@ -24258,6 +24499,7 @@ function requireNewTransaction$5 () {
 	const formatBigintOut = requireFormatBigintOut$3();
 	const insertSql = requireInsertSql$3();
 	const insert = requireInsert$3();
+	const batchInsert = requireBatchInsert();
 	const quote = requireQuote$3();
 
 	function newResolveTransaction(domain, pool, { readonly = false } = {})  {
@@ -24274,6 +24516,7 @@ function requireNewTransaction$5 () {
 		rdb.lastInsertedSql = lastInsertedSql;
 		rdb.insertSql = insertSql;
 		rdb.insert = insert;
+		rdb.batchInsert = batchInsert;
 		rdb.lastInsertedIsSeparate = true;
 		rdb.multipleStatements = false;
 		rdb.limitAndOffset = limitAndOffset;
@@ -25080,6 +25323,7 @@ function requireNewTransaction$4 () {
 	const limitAndOffset = requireLimitAndOffset$3();
 	const insertSql = requireInsertSql$3();
 	const insert = requireInsert$3();
+	const batchInsert = requireBatchInsert();
 
 	function newResolveTransaction(domain, pool, { readonly = false } = {})  {
 		var rdb = {poolFactory: pool};
@@ -25098,6 +25342,7 @@ function requireNewTransaction$4 () {
 		rdb.lastInsertedSql = lastInsertedSql;
 		rdb.insertSql = insertSql;
 		rdb.insert = insert;
+		rdb.batchInsert = batchInsert;
 		rdb.lastInsertedIsSeparate = true;
 		rdb.multipleStatements = false;
 		rdb.limitAndOffset = limitAndOffset;
