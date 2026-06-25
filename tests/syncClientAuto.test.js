@@ -215,7 +215,7 @@ describe('sync client auto start', () => {
 		expect(createClientTableIndexes.some((index) => index > resetDropIndex)).toBe(true);
 	});
 
-	test('applies staged pull rows with json patch and skips sqlite post-insert select', async () => {
+	test('applies staged pull rows through insertAndForget strategy and skips sqlite post-insert select', async () => {
 		const patches = [];
 		const options = [];
 		const db = {
@@ -243,7 +243,10 @@ describe('sync client auto start', () => {
 						return {
 							data: {
 								phase: 'keys',
-								items: [{ table: 'customer', pk: [1], key: { id: 1 }, op: 'U' }],
+								items: [
+									{ table: 'customer', pk: [1], key: { id: 1 }, op: 'U' },
+									{ table: 'customer', pk: [2], key: { id: 2 }, op: 'U' }
+								],
 								done: true,
 								cursor: 'cursor-1'
 							}
@@ -252,7 +255,13 @@ describe('sync client auto start', () => {
 					return {
 						data: {
 							phase: 'rows',
-							items: [{ table: 'customer', pk: [1], key: { id: 1 }, row: { id: 1 }, op: 'U' }]
+							items: request.data.items.map((item) => ({
+								table: item.table,
+								pk: item.pk,
+								key: item.key,
+								row: { id: item.pk[0] },
+								op: item.op
+							}))
 						}
 					};
 				};
@@ -262,11 +271,15 @@ describe('sync client auto start', () => {
 		await client.pull();
 
 		expect(patches).toEqual([
-			[{ op: 'replace', path: '/[1]', value: { id: 1 } }]
+			[
+				{ op: 'add', path: '/[1]', value: { id: 1 } },
+				{ op: 'add', path: '/[2]', value: { id: 2 } }
+			]
 		]);
 		expect(options[0]).toMatchObject({
 			concurrency: 'overwrite',
-			skipSelectAfterInsert: true
+			skipSelectAfterInsert: true,
+			strategy: { insertAndForget: true }
 		});
 	});
 

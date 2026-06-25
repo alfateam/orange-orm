@@ -1334,7 +1334,7 @@ async function applyRowsPayloadOnTx(tx, items, patchOptions) {
 		if (!perTable.has(item.table))
 			perTable.set(item.table, []);
 		perTable.get(item.table).push({
-			op: 'replace',
+			op: 'add',
 			path: `/${JSON.stringify(item.pk)}`,
 			value: item.row
 		});
@@ -1349,10 +1349,19 @@ async function applyRowsPayloadOnTx(tx, items, patchOptions) {
 		if (!tx[table] || typeof tx[table].patch !== 'function')
 			throw new Error(`Table "${table}" does not exist in this client`);
 		const patch = perTable.get(table);
-		await tx[table].patch(patch, patchOptions);
+		await tx[table].patch(patch, withInsertAndForgetStrategy(patchOptions));
 		applied += patch.length;
 	}
 	return applied;
+}
+
+function withInsertAndForgetStrategy(options) {
+	const strategy = options && options.strategy && options.strategy === Object(options.strategy)
+		? options.strategy
+		: undefined;
+	if (strategy && strategy.insertAndForget === false)
+		return options || {};
+	return { ...(options || {}), strategy: { ...(strategy || {}), insertAndForget: true } };
 }
 
 function orderTablesByDependencies(client, tableNames) {
