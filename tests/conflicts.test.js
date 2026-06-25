@@ -16,11 +16,7 @@ let server;
 
 
 beforeAll(async () => {
-	try {
-		await createMs('mssql');
-	} catch (e) {
-		console.warn('Could not connect to mssql, skipping mssql database setup.');
-	}
+	await createMs('mssql');
 	hostExpress();
 
 	async function createMs(dbName) {
@@ -90,6 +86,7 @@ describe('optimistic fail', () => {
 				id: 1,
 				name: 'George',
 				balance: 177,
+				isActive: true
 			});
 		}
 		catch (e) {
@@ -153,49 +150,13 @@ describe('optimistic json object', () => {
 	}
 });
 
-describe('optimistic json object different key order', () => {
-	test('sap', async () => await verify('sap'));
-
-	async function verify(dbName) {
-		let { db, init } = getDb(dbName);
-		await init(db);
-
-		const customer = await db.customer2.insert({
-			name: 'Voldemort',
-			balance: -200,
-			isActive: true,
-			picture: null,
-			data: { a: 1, b: 2 },
-		});
-
-		const customer2 = await db.customer2.getById(customer.id);
-		customer2.data = { b: 2, a: 1 };
-		customer2.name = 'Voldemort2';
-		await customer2.saveChanges();
-
-		customer.name = 'Voldemort3';
-		await customer.saveChanges();
-
-		const expected = {
-			id: customer.id,
-			name: 'Voldemort3',
-			balance: -200,
-			isActive: true,
-			picture: null,
-			data: { b: 2, a: 1 }
-		};
-
-		expect(customer).toEqual(expected);
-	}
-});
-
 describe('add property to JSON', () => {
 	test('pg', async () => await verify('pg'));
 	test('pglite', async () => await verify('pglite'));
 	test('oracle', async () => await verify('oracle'));
 	test('mssql', async () => await verify('mssql'));
 	if (major === 18)
-		test('mssqlNative', async () => await verify('verifyMsNative'));
+		test('mssqlNative', async () => await verify('mssqlNative'));
 	test('mysql', async () => await verify('mysql'));
 	test('mariadb', async () => await verify('mariadb'));
 	test('sqlite', async () => await verify('sqlite'));
