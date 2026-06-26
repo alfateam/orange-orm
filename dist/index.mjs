@@ -5330,6 +5330,7 @@ function requireSyncClient () {
 			await client.transaction(async (tx) => {
 				await tryDeferForeignKeys(tx);
 				const batches = await readPullJournalBatches(tx, scopeKey);
+				const hasJournalItems = batches.length > 0;
 				const touchedTables = new Set();
 				for (let i = 0; i < batches.length; i++) {
 					const batch = batches[i];
@@ -5342,10 +5343,12 @@ function requireSyncClient () {
 					if (upsertItems.length > 0)
 						applied += await applyRowsPayloadOnTx(tx, upsertItems, defaultPatchOptions);
 				}
-				await validateForeignKeys(tx);
+				if (hasJournalItems)
+					await validateForeignKeys(tx);
 				if (shouldApplyCheckpoint)
 					await writeScopeState(scopeKey, { since: session.finalSince, updatedAtMs: Date.now() }, tx);
-				await clearPullJournal(tx, scopeKey);
+				if (hasJournalItems || session.persisted)
+					await clearPullJournal(tx, scopeKey);
 				session.tables = Array.from(touchedTables);
 			}, { suppressSyncOutbox: true });
 			if (shouldApplyCheckpoint)
@@ -5362,6 +5365,8 @@ function requireSyncClient () {
 			async function stagePullJournal() {
 				let session = await readPullSession(db, scopeKey);
 				let hasPersistedSession = !!session;
+				if (session)
+					session.persisted = true;
 				if (!session)
 					session = newPullSession(scopeKey, options.since);
 				let reason = session.reason;
@@ -5383,6 +5388,22 @@ function requireSyncClient () {
 					if (reason === undefined && keysPayload.reason !== undefined)
 						reason = keysPayload.reason;
 					const keyItems = normalizeKeyItems(keysPayload.items);
+					const token = keysPayload.done || !keysPayload.token ? null : keysPayload.token;
+					const done = keysPayload.done || !keysPayload.token;
+					if (!hasPersistedSession && done && keyItems.length === 0) {
+						const finalSince = keysPayload.cursor !== undefined ? keysPayload.cursor : session.finalSince;
+						const payload = reason === undefined ? keysPayload : { ...keysPayload, reason };
+						return {
+							...session,
+							token: token || undefined,
+							done: true,
+							finalSince,
+							payload,
+							reason,
+							status: 'ready',
+							persisted: false
+						};
+					}
 					const upsertItems = keyItems.filter(x => x.op !== 'D');
 					let rowItems = [];
 					if (upsertItems.length > 0)
@@ -5706,7 +5727,8 @@ function requireSyncClient () {
 					reason,
 					status: done ? 'ready' : 'pending',
 					nextSeq: seq,
-					nextBatch: batchNo + 1
+					nextBatch: batchNo + 1,
+					persisted: true
 				};
 			}, { suppressSyncOutbox: true });
 			return nextSession;
@@ -5753,8 +5775,25 @@ function requireSyncClient () {
 		}
 
 		async function clearPullJournal(db, scopeKey) {
-			await db.query(`DELETE FROM "${syncPullItemTable}" WHERE "scope" = ${sqlStringLiteral(scopeKey)}`);
-			await db.query(`DELETE FROM "${syncPullSessionTable}" WHERE "scope" = ${sqlStringLiteral(scopeKey)}`);
+			const hasOtherSession = await hasOtherPullJournalSession(db, scopeKey);
+			if (hasOtherSession) {
+				await db.query(`DELETE FROM "${syncPullItemTable}" WHERE "scope" = ${sqlStringLiteral(scopeKey)}`);
+				await db.query(`DELETE FROM "${syncPullSessionTable}" WHERE "scope" = ${sqlStringLiteral(scopeKey)}`);
+				return;
+			}
+			await db.query(`DELETE FROM "${syncPullItemTable}"`);
+			await db.query(`DELETE FROM "${syncPullSessionTable}"`);
+		}
+
+		async function hasOtherPullJournalSession(db, scopeKey) {
+			const rows = await db.query([
+				'SELECT "scope"',
+				`FROM "${syncPullSessionTable}"`,
+				`WHERE "scope" <> ${sqlStringLiteral(scopeKey)}`,
+				'LIMIT 1'
+			].join(' '));
+			const list = Array.isArray(rows) ? rows : rows?.rows || [];
+			return list.length > 0;
 		}
 
 		function isInternalTableEnsured(db, tableName) {

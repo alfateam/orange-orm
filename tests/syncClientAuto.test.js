@@ -707,9 +707,13 @@ describe('sync client auto start', () => {
 
 		await client.sync();
 		const journalInserts = db.queryLog.filter(sql => /INSERT INTO "orange_sync_pull_item"/u.test(sql));
+		const fullJournalDeletes = db.queryLog.filter(sql => /^DELETE FROM "orange_sync_pull_item"$/u.test(sql));
+		const scopedJournalDeletes = db.queryLog.filter(sql => /^DELETE FROM "orange_sync_pull_item" WHERE/u.test(sql));
 
 		expect(journalInserts).toHaveLength(2);
 		expect(journalInserts[0]).toContain('), (');
+		expect(fullJournalDeletes).toHaveLength(1);
+		expect(scopedJournalDeletes).toHaveLength(0);
 	});
 
 	test('does not rebuild stable base when sync has no local changes', async () => {
@@ -748,6 +752,47 @@ describe('sync client auto start', () => {
 
 		const baseCopies = db.queryLog.filter(sql => /CREATE TABLE "orange_sync_base_data_/u.test(sql));
 		expect(baseCopies).toHaveLength(0);
+	});
+
+	test('skips pull journal and foreign key check for empty staged pull', async () => {
+		let foreignKeyChecks = 0;
+		const db = newJournalDb({
+			__sqliteSync: { url: '/rdb', auto: false, schema: false },
+			baseEntries: [{
+				name: 'customer',
+				base_name: 'orange_sync_base_data_customer',
+				schema_sql: 'CREATE TABLE customer (id INTEGER PRIMARY KEY)',
+				ordinal: 0
+			}],
+			foreignKeyCheck: () => {
+				foreignKeyChecks += 1;
+				return [];
+			}
+		});
+		const client = newSyncClient({
+			tables: {
+				customer: newTable('customer')
+			},
+			transaction: async (fn) => fn({
+				customer: {
+					patch: async () => ({ changed: [] })
+				},
+				query: db.query
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async () => ({
+					data: { phase: 'keys', items: [], done: true, cursor: 'cursor-1' }
+				});
+			}
+		});
+
+		await client.sync();
+
+		expect(db.queryLog.some(sql => /INSERT INTO "orange_sync_pull_session"/u.test(sql))).toBe(false);
+		expect(db.queryLog.some(sql => /UPDATE "orange_sync_pull_session"/u.test(sql))).toBe(false);
+		expect(db.queryLog.some(sql => /DELETE FROM "orange_sync_pull_item"/u.test(sql))).toBe(false);
+		expect(foreignKeyChecks).toBe(0);
 	});
 
 	test('resumes staged pull without reloading persisted batches after request failure', async () => {
@@ -1043,12 +1088,20 @@ function queryJournal(journal, sql) {
 			.filter(item => item.scope === scope)
 			.sort((a, b) => a.batch_no - b.batch_no || a.seq - b.seq);
 	}
-	if (/DELETE FROM "orange_sync_pull_item"/u.test(sql)) {
+	if (/^DELETE FROM "orange_sync_pull_item"$/u.test(sql)) {
+		journal.items = [];
+		return [];
+	}
+	if (/DELETE FROM "orange_sync_pull_item" WHERE/u.test(sql)) {
 		const scope = firstSqlString(sql);
 		journal.items = journal.items.filter(item => item.scope !== scope);
 		return [];
 	}
-	if (/DELETE FROM "orange_sync_pull_session"/u.test(sql)) {
+	if (/^DELETE FROM "orange_sync_pull_session"$/u.test(sql)) {
+		journal.session = null;
+		return [];
+	}
+	if (/DELETE FROM "orange_sync_pull_session" WHERE/u.test(sql)) {
 		journal.session = null;
 		return [];
 	}
