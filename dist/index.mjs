@@ -5052,7 +5052,6 @@ function requireSyncClient () {
 		const syncPullItemTable = 'orange_sync_pull_item';
 		const syncBaseTable = 'orange_sync_base_tables';
 		const syncBasePrefix = 'orange_sync_base_data_';
-		const maxPullJournalRowsPerInsert = 250;
 		const initialReadyListeners = new Set();
 		const eventListeners = new Map();
 		let initialReadyEmitted = false;
@@ -5082,7 +5081,8 @@ function requireSyncClient () {
 				const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
 				if (!syncConfig)
 					return fn(options);
-				return runWithCrossTabLock(resolveCrossTabLockName(db, syncConfig), syncConfig.crossTabLock, () => fn(options));
+				const lockConfig = withRuntimeCrossTabLockConfig(syncConfig.crossTabLock, options);
+				return runWithCrossTabLock(resolveCrossTabLockName(db, syncConfig), lockConfig, () => fn(options));
 			};
 		}
 
@@ -5135,7 +5135,7 @@ function requireSyncClient () {
 				throw new Error('Sync pull requires mapped tables or configured tables. Set sync.tables when the client has no table map.');
 			await ensureSyncSchema(db, client, configuredTables, syncConfig.schema);
 			const hadStableBase = await hasStableBase(db);
-			await pushBeforePull(db, syncConfig, hadStableBase);
+			const pushResult = await pushBeforePull(db, syncConfig, hadStableBase);
 			await maybeEmitInitialReady(syncConfig, configuredTables, db, 'persisted');
 			const currentSince = await getScopeSince(configuredTables, db);
 			const scopeKey = getScopeKey(configuredTables);
@@ -5159,7 +5159,8 @@ function requireSyncClient () {
 				await setScopeSince(configuredTables, result.since, db);
 			if (!hadStableBase)
 				await clearPendingMutations(db);
-			await saveStableBase(db);
+			if (shouldSaveStableBase(hadStableBase, pushResult, result))
+				await saveStableBase(db);
 			await maybeEmitInitialReady(syncConfig, configuredTables, db, 'sync');
 			return result;
 		}
@@ -5222,6 +5223,22 @@ function requireSyncClient () {
 			if (pending.length === 0)
 				return;
 			return pushPending({ _syncConfig: syncConfig, _pushConfig: resolvePushConfig(syncConfig) });
+		}
+
+		function shouldSaveStableBase(hadStableBase, pushResult, pullResult) {
+			return !hadStableBase || didPushMutations(pushResult) || didPullRows(pullResult);
+		}
+
+		function didPushMutations(result) {
+			if (!result)
+				return false;
+			if (Number(result.applied) > 0 || Number(result.duplicates) > 0)
+				return true;
+			return Array.isArray(result.results) && result.results.length > 0;
+		}
+
+		function didPullRows(result) {
+			return Number(result && result.applied) > 0;
 		}
 
 		async function rollbackFailedPushBatch(db, attemptedMutations) {
@@ -5302,6 +5319,7 @@ function requireSyncClient () {
 		async function pullStaged(pullConfig, options) {
 			const maxKeysPerBatch = normalizeLimit(pullConfig.maxKeysPerBatch, 200);
 			const maxRowsPerBatch = normalizeLimit(pullConfig.maxRowsPerBatch, 200);
+			const maxJournalRowsPerInsert = normalizeLimit(pullConfig.maxJournalRowsPerInsert, maxRowsPerBatch);
 			const defaultPatchOptions = { ...(pullConfig.patchOptions || {}), concurrency: 'overwrite', skipSelectAfterInsert: true };
 			const db = options.db;
 			const scopeKey = options.scopeKey || getScopeKey(options.tables);
@@ -5373,7 +5391,7 @@ function requireSyncClient () {
 						session = await createPullSession(db, scopeKey, session.since);
 						hasPersistedSession = true;
 					}
-					session = await persistPullJournalBatch(db, scopeKey, session, keysPayload, keyItems, rowItems, reason);
+					session = await persistPullJournalBatch(db, scopeKey, session, keysPayload, keyItems, rowItems, reason, maxJournalRowsPerInsert);
 				}
 				throw new Error('Sync failed: staged pull exceeded max iterations');
 			}
@@ -5639,7 +5657,7 @@ function requireSyncClient () {
 			};
 		}
 
-		async function persistPullJournalBatch(db, scopeKey, session, keysPayload, keyItems, rowItems, reason) {
+		async function persistPullJournalBatch(db, scopeKey, session, keysPayload, keyItems, rowItems, reason, maxJournalRowsPerInsert) {
 			let nextSession;
 			await client.transaction(async (tx) => {
 				const rowMap = rowsBySyncItemKey(rowItems);
@@ -5661,7 +5679,7 @@ function requireSyncClient () {
 					]);
 					seq += 1;
 				}
-				await insertPullJournalItems(tx, journalRows);
+				await insertPullJournalItems(tx, journalRows, maxJournalRowsPerInsert);
 				const finalSince = keysPayload.cursor !== undefined ? keysPayload.cursor : session.finalSince;
 				const payload = reason === undefined ? keysPayload : { ...keysPayload, reason };
 				const token = keysPayload.done || !keysPayload.token ? null : keysPayload.token;
@@ -5694,12 +5712,13 @@ function requireSyncClient () {
 			return nextSession;
 		}
 
-		async function insertPullJournalItems(db, rows) {
+		async function insertPullJournalItems(db, rows, maxRowsPerInsert) {
 			if (!Array.isArray(rows) || rows.length === 0)
 				return;
+			const chunkSize = normalizeLimit(maxRowsPerInsert, 200);
 			const prefix = `INSERT INTO "${syncPullItemTable}" ("scope", "batch_no", "seq", "table_name", "pk_json", "key_json", "op", "row_json") VALUES `;
-			for (let offset = 0; offset < rows.length; offset += maxPullJournalRowsPerInsert) {
-				const chunk = rows.slice(offset, offset + maxPullJournalRowsPerInsert);
+			for (let offset = 0; offset < rows.length; offset += chunkSize) {
+				const chunk = rows.slice(offset, offset + chunkSize);
 				await db.query(prefix + chunk.map(row => `(${row.join(', ')})`).join(', '));
 			}
 		}
@@ -6256,8 +6275,21 @@ function requireSyncClient () {
 			enabled: value.enabled !== false,
 			name: typeof value.name === 'string' && value.name.length > 0 ? value.name : undefined,
 			timeoutMs: normalizePositiveInteger(value.timeoutMs),
+			maxHoldMs: normalizePositiveInteger(value.maxHoldMs),
 			staleMs: normalizePositiveInteger(value.staleMs),
 			pollMs: normalizePositiveInteger(value.pollMs)
+		};
+	}
+
+	function withRuntimeCrossTabLockConfig(config, options) {
+		if (!config || !config.enabled)
+			return config;
+		const timeoutMs = normalizePositiveInteger(options && options.timeoutMs);
+		if (!timeoutMs || config.maxHoldMs)
+			return config;
+		return {
+			...config,
+			maxHoldMs: timeoutMs
 		};
 	}
 
@@ -6317,7 +6349,7 @@ function requireSyncClient () {
 					clearTimeout(timeoutId);
 					timeoutId = undefined;
 				}
-				return fn();
+				return runLockBody(name, config, fn);
 			});
 		}
 		catch (e) {
@@ -6357,12 +6389,51 @@ function requireSyncClient () {
 			}
 		}, renewIntervalMs);
 		try {
-			return await fn();
+			return await runLockBody(name, config, fn);
 		}
 		finally {
 			clearInterval(intervalId);
 			releaseLocalStorageLock(storage, lock);
 		}
+	}
+
+	async function runLockBody(name, config, fn) {
+		const operation = Promise.resolve().then(fn);
+		operation.catch(() => {});
+		const races = [operation];
+		const cleanup = [];
+		const maxHoldMs = normalizePositiveInteger(config && config.maxHoldMs);
+		if (maxHoldMs) {
+			races.push(new Promise((_resolve, reject) => {
+				const timeoutId = setTimeout(() => reject(syncLockHoldTimeoutError(name, maxHoldMs)), maxHoldMs);
+				cleanup.push(() => clearTimeout(timeoutId));
+			}));
+		}
+		const pageHide = createPageHideLockRelease(name);
+		if (pageHide) {
+			races.push(pageHide.promise);
+			cleanup.push(pageHide.cleanup);
+		}
+		try {
+			return await Promise.race(races);
+		}
+		finally {
+			for (let i = 0; i < cleanup.length; i++)
+				cleanup[i]();
+		}
+	}
+
+	function createPageHideLockRelease(name) {
+		const target = typeof globalThis !== 'undefined' ? globalThis : undefined;
+		if (!target || typeof target.addEventListener !== 'function' || typeof target.removeEventListener !== 'function')
+			return null;
+		let cleanup = () => {};
+		const promise = new Promise((_resolve, reject) => {
+			const release = () => reject(syncLockPageHiddenError(name));
+			target.addEventListener('pagehide', release, { once: true });
+			cleanup = () => target.removeEventListener('pagehide', release);
+		});
+		return { promise, cleanup };
 	}
 
 	async function acquireLocalStorageLock(storage, name, config) {
@@ -6435,6 +6506,14 @@ function requireSyncClient () {
 		return new Error(`Timed out waiting for sync lock "${name}" after ${Math.round((timeoutMs || 0) / 1000)} seconds.`);
 	}
 
+	function syncLockHoldTimeoutError(name, timeoutMs) {
+		return new Error(`Timed out while holding sync lock "${name}" after ${Math.round((timeoutMs || 0) / 1000)} seconds.`);
+	}
+
+	function syncLockPageHiddenError(name) {
+		return new Error(`Released sync lock "${name}" because the page was hidden.`);
+	}
+
 	function normalizePositiveInteger(value) {
 		const parsed = Number.parseInt(value, 10);
 		return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
@@ -6490,7 +6569,8 @@ function requireSyncClient () {
 			tables,
 			patchOptions: config.patchOptions,
 			maxKeysPerBatch: config.maxKeysPerBatch,
-			maxRowsPerBatch: config.maxRowsPerBatch
+			maxRowsPerBatch: config.maxRowsPerBatch,
+			maxJournalRowsPerInsert: config.maxJournalRowsPerInsert
 		};
 	}
 

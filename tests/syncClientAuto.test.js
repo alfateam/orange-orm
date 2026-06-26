@@ -138,6 +138,51 @@ describe('sync client auto start', () => {
 		}
 	});
 
+	test('releases sync web lock after sync timeout', async () => {
+		const restoreLocks = installFakeWebLocks();
+		const requests = [];
+		const db = {
+			__sqliteSync: {
+				url: '/rdb',
+				auto: false,
+				tables: ['customer'],
+				crossTabLock: { name: 'orange-test-timeout-lock' }
+			},
+			query: async () => []
+		};
+		const client = newSyncClient({
+			transaction: async (fn) => fn({
+				customer: {
+					patch: async () => ({ changed: [] })
+				},
+				query: async () => []
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async (request) => {
+					requests.push(request);
+					if (requests.length === 1)
+						return new Promise(() => {});
+					return {
+						data: { phase: 'keys', items: [], done: true, cursor: 'cursor-2' }
+					};
+				};
+			}
+		});
+
+		try {
+			await expect(client.sync({ timeoutMs: 5 }))
+				.rejects.toThrow('Timed out while holding sync lock');
+
+			await client.sync();
+
+			expect(requests).toHaveLength(2);
+		}
+		finally {
+			restoreLocks();
+		}
+	});
+
 	test('can disable sync cross-tab lock', async () => {
 		let lockRequests = 0;
 		const restoreLocks = installFakeWebLocks({
@@ -604,14 +649,20 @@ describe('sync client auto start', () => {
 	});
 
 	test('batches pull journal item inserts', async () => {
+		const items = Array.from({ length: 600 }, (_x, index) => ({
+			table: 'customer',
+			pk: [index + 1],
+			key: { id: index + 1 },
+			op: 'U'
+		}));
 		const db = newJournalDb({
 			__sqliteSync: {
 				url: '/rdb',
 				auto: false,
 				schema: false,
 				pull: {
-					maxKeysPerBatch: 3,
-					maxRowsPerBatch: 3
+					maxKeysPerBatch: 600,
+					maxRowsPerBatch: 500
 				}
 			}
 		});
@@ -632,11 +683,7 @@ describe('sync client auto start', () => {
 						return {
 							data: {
 								phase: 'keys',
-								items: [
-									{ table: 'customer', pk: [1], key: { id: 1 }, op: 'U' },
-									{ table: 'customer', pk: [2], key: { id: 2 }, op: 'U' },
-									{ table: 'customer', pk: [3], key: { id: 3 }, op: 'U' }
-								],
+								items,
 								done: true,
 								cursor: 'cursor-1'
 							}
@@ -661,8 +708,46 @@ describe('sync client auto start', () => {
 		await client.sync();
 		const journalInserts = db.queryLog.filter(sql => /INSERT INTO "orange_sync_pull_item"/u.test(sql));
 
-		expect(journalInserts).toHaveLength(1);
+		expect(journalInserts).toHaveLength(2);
 		expect(journalInserts[0]).toContain('), (');
+	});
+
+	test('does not rebuild stable base when sync has no local changes', async () => {
+		const db = newJournalDb({
+			__sqliteSync: { url: '/rdb', auto: false, schema: false },
+			sqliteTables: [{
+				name: 'customer',
+				sql: 'CREATE TABLE customer (id INTEGER PRIMARY KEY)'
+			}],
+			baseEntries: [{
+				name: 'customer',
+				base_name: 'orange_sync_base_data_customer',
+				schema_sql: 'CREATE TABLE customer (id INTEGER PRIMARY KEY)',
+				ordinal: 0
+			}]
+		});
+		const client = newSyncClient({
+			tables: {
+				customer: newTable('customer')
+			},
+			transaction: async (fn) => fn({
+				customer: {
+					patch: async () => ({ changed: [] })
+				},
+				query: db.query
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async () => ({
+					data: { phase: 'keys', items: [], done: true, cursor: 'cursor-1' }
+				});
+			}
+		});
+
+		await client.sync();
+
+		const baseCopies = db.queryLog.filter(sql => /CREATE TABLE "orange_sync_base_data_/u.test(sql));
+		expect(baseCopies).toHaveLength(0);
 	});
 
 	test('resumes staged pull without reloading persisted batches after request failure', async () => {
@@ -847,6 +932,8 @@ function newJournalDb(config) {
 		session: null,
 		items: [],
 		state: new Map(),
+		baseEntries: (config.baseEntries || []).slice(),
+		sqliteTables: (config.sqliteTables || []).slice(),
 		foreignKeyCheck: config.foreignKeyCheck
 	};
 	const queryLog = config.queryLog || [];
@@ -865,6 +952,28 @@ function newJournalDb(config) {
 function queryJournal(journal, sql) {
 	if (/PRAGMA foreign_key_check/u.test(sql))
 		return typeof journal.foreignKeyCheck === 'function' ? journal.foreignKeyCheck() : [];
+	if (/SELECT "name" FROM "orange_sync_base_tables" LIMIT 1/u.test(sql))
+		return journal.baseEntries.length > 0 ? [{ name: journal.baseEntries[0].name }] : [];
+	if (/SELECT "name", "base_name", "schema_sql", "ordinal" FROM "orange_sync_base_tables"/u.test(sql))
+		return journal.baseEntries;
+	if (/SELECT "name", "sql" FROM sqlite_schema/u.test(sql))
+		return journal.sqliteTables;
+	if (/DELETE FROM "orange_sync_base_tables"/u.test(sql)) {
+		journal.baseEntries = [];
+		return [];
+	}
+	if (/INSERT INTO "orange_sync_base_tables"/u.test(sql)) {
+		const values = parseSqlValues(sql);
+		journal.baseEntries.push({
+			name: values[0],
+			base_name: values[1],
+			schema_sql: values[2],
+			ordinal: Number(values[3] || 0)
+		});
+		return [];
+	}
+	if (/^(CREATE|DROP) TABLE/u.test(sql) && /orange_sync_base_data_/u.test(sql))
+		return [];
 	if (/SELECT "since_value" FROM "orange_sync_state"/u.test(sql)) {
 		const scope = firstSqlString(sql);
 		const value = journal.state.get(scope);

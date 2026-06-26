@@ -995,6 +995,7 @@ export interface SyncPullConfig<M extends Record<string, any> = any> extends Syn
   };
   maxKeysPerBatch?: number;
   maxRowsPerBatch?: number;
+  maxJournalRowsPerInsert?: number;
 }
 
 export interface SyncPullOverrideConfig<M extends Record<string, any> = any> extends Omit<SyncPullConfig<M>, 'url'> {
@@ -1017,6 +1018,7 @@ export interface SyncCrossTabLockConfig {
   enabled?: boolean;
   name?: string;
   timeoutMs?: number;
+  maxHoldMs?: number;
   staleMs?: number;
   pollMs?: number;
 }
