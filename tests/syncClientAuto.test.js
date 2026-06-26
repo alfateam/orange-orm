@@ -709,9 +709,12 @@ describe('sync client auto start', () => {
 		const journalInserts = db.queryLog.filter(sql => /INSERT INTO "orange_sync_pull_item"/u.test(sql));
 		const fullJournalDeletes = db.queryLog.filter(sql => /^DELETE FROM "orange_sync_pull_item"$/u.test(sql));
 		const scopedJournalDeletes = db.queryLog.filter(sql => /^DELETE FROM "orange_sync_pull_item" WHERE/u.test(sql));
+		const journalRows = journalInserts.flatMap(parseSqlValueRows);
 
 		expect(journalInserts).toHaveLength(2);
 		expect(journalInserts[0]).toContain('), (');
+		expect(journalRows).toHaveLength(600);
+		expect(journalRows.every(row => row[5] === null)).toBe(true);
 		expect(fullJournalDeletes).toHaveLength(1);
 		expect(scopedJournalDeletes).toHaveLength(0);
 	});
@@ -968,6 +971,8 @@ describe('sync client auto start', () => {
 
 		await expect(client.sync()).rejects.toThrow('network down');
 		expect(rowRequests).toEqual([[1]]);
+		expect(db.journal.items).toHaveLength(1);
+		expect(db.journal.items[0].key_json).toBeNull();
 
 		await client.sync();
 

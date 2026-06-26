@@ -5757,7 +5757,7 @@ function requireSyncClient () {
 						String(seq),
 						sqlStringLiteral(item.table),
 						sqlStringLiteral(stringify(item.pk)),
-						sqlNullableJsonLiteral(item.key),
+						'NULL',
 						sqlStringLiteral(item.op),
 						sqlNullableJsonLiteral(rowItem ? rowItem.row : undefined)
 					]);
