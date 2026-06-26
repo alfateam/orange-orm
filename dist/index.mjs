@@ -5370,51 +5370,114 @@ function requireSyncClient () {
 				if (!session)
 					session = newPullSession(scopeKey, options.since);
 				let reason = session.reason;
+				let pendingFetch = session.done ? null : startPullBatchFetch(session, reason);
 				for (let i = 0; i < 10000; i++) {
 					if (session.done)
 						return session;
-					const keysPayload = await requestPayload({
-						...pullConfig,
-						body: {
-							phase: 'keys',
-							token: session.token,
-							since: session.since,
-							tables: options.tables,
-							limit: maxKeysPerBatch
-						}
-					}, options);
-					if (!isStagedKeysPayload(keysPayload))
-						throw new Error('Sync endpoint did not return staged keys payload');
-					if (reason === undefined && keysPayload.reason !== undefined)
-						reason = keysPayload.reason;
-					const keyItems = normalizeKeyItems(keysPayload.items);
-					const token = keysPayload.done || !keysPayload.token ? null : keysPayload.token;
-					const done = keysPayload.done || !keysPayload.token;
-					if (!hasPersistedSession && done && keyItems.length === 0) {
-						const finalSince = keysPayload.cursor !== undefined ? keysPayload.cursor : session.finalSince;
-						const payload = reason === undefined ? keysPayload : { ...keysPayload, reason };
+					const batch = await resolvePullBatchFetch(pendingFetch);
+					pendingFetch = null;
+					reason = batch.reason;
+					const nextFetch = batch.done
+						? null
+						: startPullBatchFetch(previewPullSession(session, batch), reason);
+					if (!hasPersistedSession && batch.done && batch.keyItems.length === 0) {
+						suppressPullBatchFetch(nextFetch);
 						return {
 							...session,
-							token: token || undefined,
+							token: batch.token || undefined,
 							done: true,
-							finalSince,
-							payload,
+							finalSince: batch.finalSince,
+							payload: batch.payload,
 							reason,
 							status: 'ready',
 							persisted: false
 						};
 					}
-					const upsertItems = keyItems.filter(x => x.op !== 'D');
-					let rowItems = [];
-					if (upsertItems.length > 0)
-						rowItems = await fetchRowsItems(upsertItems);
 					if (!hasPersistedSession) {
 						session = await createPullSession(db, scopeKey, session.since);
 						hasPersistedSession = true;
 					}
-					session = await persistPullJournalBatch(db, scopeKey, session, keysPayload, keyItems, rowItems, reason, maxJournalRowsPerInsert);
+					try {
+						session = await persistPullJournalBatch(db, scopeKey, session, batch.keysPayload, batch.keyItems, batch.rowItems, reason, maxJournalRowsPerInsert);
+					}
+					catch (e) {
+						suppressPullBatchFetch(nextFetch);
+						throw e;
+					}
+					pendingFetch = nextFetch;
 				}
+				suppressPullBatchFetch(pendingFetch);
 				throw new Error('Sync failed: staged pull exceeded max iterations');
+			}
+
+			function startPullBatchFetch(session, reason) {
+				return fetchPullBatch(session, reason).then(
+					(batch) => ({ batch, error: null }),
+					(error) => ({ batch: null, error })
+				);
+			}
+
+			async function resolvePullBatchFetch(promise) {
+				if (!promise)
+					throw new Error('Sync failed: missing staged pull request');
+				const result = await promise;
+				if (result.error)
+					throw result.error;
+				return result.batch;
+			}
+
+			function suppressPullBatchFetch(promise) {
+				if (promise && typeof promise.then === 'function')
+					promise.then(() => {}, () => {});
+			}
+
+			async function fetchPullBatch(session, reason) {
+				const keysPayload = await requestPayload({
+					...pullConfig,
+					body: {
+						phase: 'keys',
+						token: session.token,
+						since: session.since,
+						tables: options.tables,
+						limit: maxKeysPerBatch
+					}
+				}, options);
+				if (!isStagedKeysPayload(keysPayload))
+					throw new Error('Sync endpoint did not return staged keys payload');
+				const nextReason = reason === undefined && keysPayload.reason !== undefined
+					? keysPayload.reason
+					: reason;
+				const keyItems = normalizeKeyItems(keysPayload.items);
+				const upsertItems = keyItems.filter(x => x.op !== 'D');
+				const rowItems = upsertItems.length > 0
+					? await fetchRowsItems(upsertItems)
+					: [];
+				const token = keysPayload.done || !keysPayload.token ? null : keysPayload.token;
+				const done = keysPayload.done || !keysPayload.token;
+				const finalSince = keysPayload.cursor !== undefined ? keysPayload.cursor : session.finalSince;
+				const payload = nextReason === undefined ? keysPayload : { ...keysPayload, reason: nextReason };
+				return {
+					keysPayload,
+					keyItems,
+					rowItems,
+					token,
+					done,
+					finalSince,
+					payload,
+					reason: nextReason
+				};
+			}
+
+			function previewPullSession(session, batch) {
+				return {
+					...session,
+					token: batch.token || undefined,
+					done: batch.done,
+					finalSince: batch.finalSince,
+					payload: batch.payload,
+					reason: batch.reason,
+					status: batch.done ? 'ready' : 'pending'
+				};
 			}
 
 			async function fetchRowsItems(items) {

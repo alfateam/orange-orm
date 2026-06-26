@@ -754,6 +754,102 @@ describe('sync client auto start', () => {
 		expect(baseCopies).toHaveLength(0);
 	});
 
+	test('prefetches next staged pull batch before journal commit completes', async () => {
+		const events = [];
+		const patches = [];
+		let firstJournalInsertRelease;
+		let blockedFirstJournalInsert = false;
+		const db = newJournalDb({
+			__sqliteSync: {
+				url: '/rdb',
+				auto: false,
+				schema: false,
+				pull: {
+					maxKeysPerBatch: 1,
+					maxRowsPerBatch: 1
+				}
+			}
+		});
+		const query = db.query;
+		db.query = async (sql) => {
+			if (!blockedFirstJournalInsert && /INSERT INTO "orange_sync_pull_item"/u.test(sql)) {
+				blockedFirstJournalInsert = true;
+				events.push('journal:start:1');
+				await new Promise((resolve) => {
+					firstJournalInsertRelease = resolve;
+				});
+				events.push('journal:end:1');
+			}
+			return query(sql);
+		};
+		const client = newSyncClient({
+			tables: {
+				customer: newTable('customer')
+			},
+			transaction: async (fn) => fn({
+				customer: {
+					patch: async (patch) => {
+						patches.push(patch);
+						return { changed: [] };
+					}
+				},
+				query: db.query
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async (request) => {
+					if (request.data.phase === 'keys') {
+						const token = request.data.token && request.data.token.page;
+						events.push(`keys:${token || 0}`);
+						return token
+							? {
+								data: {
+									phase: 'keys',
+									items: [{ table: 'customer', pk: [2], key: { id: 2 }, op: 'U' }],
+									done: true,
+									cursor: 'cursor-2'
+								}
+							}
+							: {
+								data: {
+									phase: 'keys',
+									items: [{ table: 'customer', pk: [1], key: { id: 1 }, op: 'U' }],
+									done: false,
+									cursor: 'cursor-1',
+									token: { page: 1 }
+								}
+							};
+					}
+					events.push(`rows:${request.data.items[0].pk[0]}`);
+					return {
+						data: {
+							phase: 'rows',
+							items: request.data.items.map((item) => ({
+								table: item.table,
+								pk: item.pk,
+								key: item.key,
+								row: { id: item.pk[0] },
+								op: item.op
+							}))
+						}
+					};
+				};
+			}
+		});
+
+		const syncPromise = client.sync();
+		await waitFor(() => firstJournalInsertRelease && events.includes('keys:1'));
+		expect(events).not.toContain('journal:end:1');
+		firstJournalInsertRelease();
+		await syncPromise;
+
+		expect(events.indexOf('keys:1')).toBeLessThan(events.indexOf('journal:end:1'));
+		expect(patches).toEqual([
+			[{ op: 'add', path: '/[1]', value: { id: 1 } }],
+			[{ op: 'add', path: '/[2]', value: { id: 2 } }]
+		]);
+	});
+
 	test('skips pull journal and foreign key check for empty staged pull', async () => {
 		let foreignKeyChecks = 0;
 		const db = newJournalDb({
@@ -1111,6 +1207,15 @@ function queryJournal(journal, sql) {
 function firstSqlString(sql) {
 	const match = /'((?:''|[^'])*)'/u.exec(sql);
 	return match ? match[1].replace(/''/g, '\'') : undefined;
+}
+
+async function waitFor(predicate, timeoutMs = 1000) {
+	const startedAt = Date.now();
+	while (!predicate()) {
+		if (Date.now() - startedAt > timeoutMs)
+			throw new Error('Timed out waiting for condition');
+		await new Promise((resolve) => setTimeout(resolve, 0));
+	}
 }
 
 function parseSqlValues(sql) {
