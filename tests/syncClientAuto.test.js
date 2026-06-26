@@ -4,12 +4,28 @@ const newSyncClient = require('../src/client/syncClient');
 
 describe('sync client auto start', () => {
 	test('starts when start is called and stays running', async () => {
-		const client = newSyncClient({}, async () => ({
+		const db = {
 			__sqliteSync: {
 				url: '/rdb',
-				auto: { enabled: true, intervalMs: 0, push: false, pull: false }
+				auto: { enabled: true, intervalMs: 0 },
+				tables: ['customer']
+			},
+			query: async () => []
+		};
+		const client = newSyncClient({
+			transaction: async (fn) => fn({
+				customer: {
+					patch: async () => ({ changed: [] })
+				},
+				query: async () => []
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async () => ({
+					data: { phase: 'keys', items: [], done: true, cursor: 'cursor-1' }
+				});
 			}
-		}), {});
+		});
 
 		expect(client.isRunning()).toBe(false);
 		await client.start();
@@ -19,24 +35,22 @@ describe('sync client auto start', () => {
 		client.stop();
 		expect(client.isRunning()).toBe(false);
 	});
-	test('emits push and pull errors', async () => {
+	test('emits sync errors', async () => {
 		const db = { __sqliteSync: { url: '/rdb', auto: false, tables: ['customer'] } };
 		const client = newSyncClient({}, async () => db, {});
 		await new Promise((resolve) => setTimeout(resolve, 0));
 		client.stop();
 		const events = [];
 		client.on('error', (payload) => events.push(['error', payload.method, payload.error.message]));
-		client.once('push-error', (payload) => events.push(['push-error', payload.method, payload.error.message]));
-		client.on('pull-error', (payload) => events.push(['pull-error', payload.method, payload.error.message]));
+		client.once('sync-error', (payload) => events.push(['sync-error', payload.method, payload.error.message]));
 
-		await expect(client.push({ mutations: [{ id: 'm1' }] })).rejects.toThrow();
-		await expect(client.pull()).rejects.toThrow();
+		await expect(client.sync()).rejects.toThrow();
 
-		expect(events.map((x) => x[0])).toEqual(['push-error', 'error', 'pull-error', 'error']);
-		expect(events.map((x) => x[1])).toEqual(['push', 'push', 'pull', 'pull']);
+		expect(events.map((x) => x[0])).toEqual(['sync-error', 'error']);
+		expect(events.map((x) => x[1])).toEqual(['sync', 'sync']);
 	});
 
-	test('emits push, pull and sync events on success', async () => {
+	test('emits sync event on success', async () => {
 		const events = [];
 		const db = {
 			__sqliteSync: { url: '/rdb', auto: false, tables: ['customer'] },
@@ -58,19 +72,112 @@ describe('sync client auto start', () => {
 				});
 			}
 		});
-		client.on('push', (payload) => events.push(['push', payload.method]));
-		client.on('pull', (payload) => events.push(['pull', payload.method]));
 		client.on('sync', (payload) => events.push(['sync', payload.method]));
 
-		await client.push({ mutations: [{ id: 'm1', table: 'customer', patch: [] }] });
-		await client.pull();
+		await client.sync();
 
 		expect(events).toEqual([
-			['push', 'push'],
-			['sync', 'push'],
-			['pull', 'pull'],
-			['sync', 'pull']
+			['sync', 'sync']
 		]);
+	});
+
+	test('rejects non-timeout sync options', async () => {
+		const db = { __sqliteSync: { url: '/rdb', auto: false, tables: ['customer'] } };
+		const client = newSyncClient({}, async () => db, {});
+
+		await expect(client.sync({ mutations: [] }))
+			.rejects.toThrow('Unsupported sync option "mutations"');
+	});
+
+	test('serializes sync operations with web locks', async () => {
+		const restoreLocks = installFakeWebLocks();
+		const requests = [];
+		const db = {
+			__sqliteSync: {
+				url: '/rdb',
+				auto: false,
+				tables: ['customer'],
+				crossTabLock: { name: 'orange-test-sync-lock' }
+			},
+			query: async () => []
+		};
+		const client = newSyncClient({
+			transaction: async (fn) => fn({
+				customer: {
+					patch: async () => ({ changed: [] })
+				},
+				query: async () => []
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async (request) => {
+					const deferred = newDeferred();
+					requests.push(deferred);
+					deferred.request = request;
+					return deferred.promise;
+				};
+			}
+		});
+
+		try {
+			const first = client.sync();
+			const second = client.sync();
+			await wait(0);
+
+			expect(requests).toHaveLength(1);
+			requests[0].resolve({ data: { phase: 'keys', items: [], done: true, cursor: 'cursor-1' } });
+			await first;
+			await wait(0);
+
+			expect(requests).toHaveLength(2);
+			requests[1].resolve({ data: { phase: 'keys', items: [], done: true, cursor: 'cursor-2' } });
+			await second;
+		}
+		finally {
+			restoreLocks();
+		}
+	});
+
+	test('can disable sync cross-tab lock', async () => {
+		let lockRequests = 0;
+		const restoreLocks = installFakeWebLocks({
+			request: async (_name, _options, callback) => {
+				lockRequests += 1;
+				return callback();
+			}
+		});
+		const db = {
+			__sqliteSync: {
+				url: '/rdb',
+				auto: false,
+				tables: ['customer'],
+				crossTabLock: false
+			},
+			query: async () => []
+		};
+		const client = newSyncClient({
+			transaction: async (fn) => fn({
+				customer: {
+					patch: async () => ({ changed: [] })
+				},
+				query: async () => []
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async () => ({
+					data: { phase: 'keys', items: [], done: true, cursor: 'cursor-1' }
+				});
+			}
+		});
+
+		try {
+			await client.sync();
+
+			expect(lockRequests).toBe(0);
+		}
+		finally {
+			restoreLocks();
+		}
 	});
 
 	test('uses all mapped tables when sync tables are omitted', async () => {
@@ -103,7 +210,7 @@ describe('sync client auto start', () => {
 			}
 		});
 
-		await client.pull();
+		await client.sync();
 
 		expect(requests[0].data.tables).toEqual(['customer', 'order']);
 	});
@@ -138,7 +245,7 @@ describe('sync client auto start', () => {
 			}
 		});
 
-		await client.pull();
+		await client.sync();
 
 		expect(requests[0].data.tables).toEqual(['customer', 'order']);
 	});
@@ -172,8 +279,8 @@ describe('sync client auto start', () => {
 			}
 		});
 
-		await client.pull();
-		await client.pull();
+		await client.sync();
+		await client.sync();
 
 		const stateTableCreates = db.queryLog.filter(x => x.includes('CREATE TABLE IF NOT EXISTS "orange_sync_state"'));
 		expect(stateTableCreates).toHaveLength(1);
@@ -181,38 +288,42 @@ describe('sync client auto start', () => {
 
 	test('resetLocal clears ensured internal table cache', async () => {
 		const db = {
-			__sqliteSync: { url: '/rdb', auto: false, tables: ['customer'] },
+			__sqliteSync: { url: '/rdb', auto: false, tables: ['customer'], schema: false },
 			queryLog: [],
 			query: async function(sql) {
 				this.queryLog.push(sql);
-				if (/SELECT "id" FROM "orange_sync_client"/u.test(sql))
-					return [];
 				return [];
 			}
 		};
 		const client = newSyncClient({
 			tables: {
 				customer: newTable('customer')
-			}
+			},
+			transaction: async (fn) => fn({
+				customer: {
+					patch: async () => ({ changed: [] })
+				},
+				query: db.query.bind(db)
+			})
 		}, async () => db, {
 			applyTo(axios) {
 				axios.request = async () => ({
-					data: { phase: 'push', applied: 1, duplicates: 0, results: [] }
+					data: { phase: 'keys', items: [], done: true, cursor: 'cursor-1' }
 				});
 			}
 		});
 
-		await client.push({ mutations: [{ id: 'm1', table: 'customer', patch: [] }] });
+		await client.sync();
 		await client.resetLocal({ force: true });
-		await client.push({ mutations: [{ id: 'm2', table: 'customer', patch: [] }] });
+		await client.sync();
 
-		const resetDropIndex = db.queryLog.findIndex((sql) => /DROP TABLE IF EXISTS "orange_sync_client"/u.test(sql));
-		const createClientTableIndexes = db.queryLog
-			.map((sql, index) => /CREATE TABLE IF NOT EXISTS "orange_sync_client"/u.test(sql) ? index : -1)
+		const resetDropIndex = db.queryLog.findIndex((sql) => /DROP TABLE IF EXISTS "orange_sync_state"/u.test(sql));
+		const createStateTableIndexes = db.queryLog
+			.map((sql, index) => /CREATE TABLE IF NOT EXISTS "orange_sync_state"/u.test(sql) ? index : -1)
 			.filter((index) => index !== -1);
 
 		expect(resetDropIndex).toBeGreaterThan(-1);
-		expect(createClientTableIndexes.some((index) => index > resetDropIndex)).toBe(true);
+		expect(createStateTableIndexes.some((index) => index > resetDropIndex)).toBe(true);
 	});
 
 	test('applies staged pull rows through insertAndForget strategy and skips sqlite post-insert select', async () => {
@@ -267,7 +378,7 @@ describe('sync client auto start', () => {
 			}
 		});
 
-		await client.pull();
+		await client.sync();
 
 		expect(patches).toEqual([
 			[
@@ -343,9 +454,8 @@ describe('sync client auto start', () => {
 			}
 		});
 
-		const result = await client.pull();
+		await client.sync();
 
-		expect(result.applied).toBe(2);
 		expect(rowRequests).toEqual([[1, 2], [2]]);
 		expect(patches).toEqual([
 			[
@@ -417,9 +527,8 @@ describe('sync client auto start', () => {
 			}
 		});
 
-		const result = await client.pull();
+		await client.sync();
 
-		expect(result.applied).toBe(1);
 		expect(rowRequests).toEqual([[1, 2], [2]]);
 		expect(patches).toEqual([
 			[{ op: 'add', path: '/[1]', value: { id: 1 } }]
@@ -488,10 +597,72 @@ describe('sync client auto start', () => {
 			}
 		});
 
-		await client.pull();
+		await client.sync();
 
 		expect(sawAllRowsBeforeFirstPatch).toBe(true);
 		expect(rowRequests).toEqual([[1], [2], [3]]);
+	});
+
+	test('batches pull journal item inserts', async () => {
+		const db = newJournalDb({
+			__sqliteSync: {
+				url: '/rdb',
+				auto: false,
+				schema: false,
+				pull: {
+					maxKeysPerBatch: 3,
+					maxRowsPerBatch: 3
+				}
+			}
+		});
+		const client = newSyncClient({
+			tables: {
+				customer: newTable('customer')
+			},
+			transaction: async (fn) => fn({
+				customer: {
+					patch: async () => ({ changed: [] })
+				},
+				query: db.query
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async (request) => {
+					if (request.data.phase === 'keys') {
+						return {
+							data: {
+								phase: 'keys',
+								items: [
+									{ table: 'customer', pk: [1], key: { id: 1 }, op: 'U' },
+									{ table: 'customer', pk: [2], key: { id: 2 }, op: 'U' },
+									{ table: 'customer', pk: [3], key: { id: 3 }, op: 'U' }
+								],
+								done: true,
+								cursor: 'cursor-1'
+							}
+						};
+					}
+					return {
+						data: {
+							phase: 'rows',
+							items: request.data.items.map((item) => ({
+								table: item.table,
+								pk: item.pk,
+								key: item.key,
+								row: { id: item.pk[0] },
+								op: item.op
+							}))
+						}
+					};
+				};
+			}
+		});
+
+		await client.sync();
+		const journalInserts = db.queryLog.filter(sql => /INSERT INTO "orange_sync_pull_item"/u.test(sql));
+
+		expect(journalInserts).toHaveLength(1);
+		expect(journalInserts[0]).toContain('), (');
 	});
 
 	test('resumes staged pull without reloading persisted batches after request failure', async () => {
@@ -569,12 +740,11 @@ describe('sync client auto start', () => {
 			}
 		});
 
-		await expect(client.pull()).rejects.toThrow('network down');
+		await expect(client.sync()).rejects.toThrow('network down');
 		expect(rowRequests).toEqual([[1]]);
 
-		const result = await client.pull();
+		await client.sync();
 
-		expect(result.applied).toBe(2);
 		expect(keyRequests).toEqual([null, { page: 1 }, { page: 1 }]);
 		expect(rowRequests).toEqual([[1], [2]]);
 		expect(patches).toEqual([
@@ -640,15 +810,14 @@ describe('sync client auto start', () => {
 			}
 		});
 
-		await expect(client.pull()).rejects.toThrow('Foreign key validation failed after sync apply');
+		await expect(client.sync()).rejects.toThrow('Foreign key validation failed after sync apply');
 		expect(db.journal.session).not.toBeNull();
 		expect(db.journal.items).toHaveLength(1);
 		patches.length = 0;
 		failForeignKeyCheck = false;
 
-		const result = await client.pull();
+		await client.sync();
 
-		expect(result.applied).toBe(1);
 		expect(keyRequests).toEqual([null]);
 		expect(rowRequests).toEqual([[1]]);
 		expect(patches).toEqual([
@@ -680,11 +849,17 @@ function newJournalDb(config) {
 		state: new Map(),
 		foreignKeyCheck: config.foreignKeyCheck
 	};
-	return {
+	const queryLog = config.queryLog || [];
+	const db = {
 		...config,
+		queryLog,
 		journal,
-		query: async (sql) => queryJournal(journal, sql)
+		query: async (sql) => {
+			queryLog.push(sql);
+			return queryJournal(journal, sql);
+		}
 	};
+	return db;
 }
 
 function queryJournal(journal, sql) {
@@ -720,17 +895,20 @@ function queryJournal(journal, sql) {
 		return [];
 	}
 	if (/INSERT INTO "orange_sync_pull_item"/u.test(sql)) {
-		const values = parseSqlValues(sql);
-		journal.items.push({
-			scope: values[0],
-			batch_no: Number(values[1]),
-			seq: Number(values[2]),
-			table_name: values[3],
-			pk_json: values[4],
-			key_json: values[5],
-			op: values[6],
-			row_json: values[7]
-		});
+		const rows = parseSqlValueRows(sql);
+		for (let i = 0; i < rows.length; i++) {
+			const values = rows[i];
+			journal.items.push({
+				scope: values[0],
+				batch_no: Number(values[1]),
+				seq: Number(values[2]),
+				table_name: values[3],
+				pk_json: values[4],
+				key_json: values[5],
+				op: values[6],
+				row_json: values[7]
+			});
+		}
 		return [];
 	}
 	if (/UPDATE "orange_sync_pull_session"/u.test(sql)) {
@@ -774,11 +952,36 @@ function firstSqlString(sql) {
 }
 
 function parseSqlValues(sql) {
-	const start = sql.indexOf('VALUES (');
+	return parseSqlValueRows(sql)[0] || [];
+}
+
+function parseSqlValueRows(sql) {
+	const start = sql.indexOf('VALUES ');
 	if (start === -1)
 		return [];
-	const valuesSql = sql.slice(start + 'VALUES ('.length, sql.lastIndexOf(')'));
-	return parseSqlList(valuesSql);
+	const rows = [];
+	let index = start + 'VALUES '.length;
+	while (index < sql.length) {
+		while (sql[index] === ' ' || sql[index] === ',')
+			index += 1;
+		if (sql[index] !== '(')
+			break;
+		index += 1;
+		const row = [];
+		while (index < sql.length) {
+			while (sql[index] === ' ' || sql[index] === ',')
+				index += 1;
+			if (sql[index] === ')') {
+				index += 1;
+				break;
+			}
+			const parsed = parseSqlValue(sql, index);
+			row.push(parsed.value);
+			index = parsed.next;
+		}
+		rows.push(row);
+	}
+	return rows;
 }
 
 function parseSqlAssignments(sql) {
@@ -802,19 +1005,6 @@ function parseSqlAssignments(sql) {
 	return result;
 }
 
-function parseSqlList(sql) {
-	const values = [];
-	let index = 0;
-	while (index < sql.length) {
-		while (sql[index] === ' ' || sql[index] === ',')
-			index += 1;
-		const parsed = parseSqlValue(sql, index);
-		values.push(parsed.value);
-		index = parsed.next;
-	}
-	return values;
-}
-
 function parseSqlValue(sql, index) {
 	while (sql[index] === ' ')
 		index += 1;
@@ -835,10 +1025,56 @@ function parseSqlValue(sql, index) {
 		return { value, next: index };
 	}
 	const nextComma = sql.indexOf(',', index);
-	const end = nextComma === -1 ? sql.length : nextComma;
+	const nextClose = sql.indexOf(')', index);
+	let end = sql.length;
+	if (nextComma !== -1)
+		end = Math.min(end, nextComma);
+	if (nextClose !== -1)
+		end = Math.min(end, nextClose);
 	const raw = sql.slice(index, end).trim();
 	if (/^NULL$/iu.test(raw))
 		return { value: null, next: end };
 	const number = Number(raw);
 	return { value: Number.isFinite(number) ? number : raw, next: end };
+}
+
+function installFakeWebLocks(locks) {
+	const previous = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+	const fakeLocks = locks || newSerialWebLocks();
+	Object.defineProperty(globalThis, 'navigator', {
+		configurable: true,
+		value: { locks: fakeLocks }
+	});
+	return () => {
+		if (previous)
+			Object.defineProperty(globalThis, 'navigator', previous);
+		else
+			delete globalThis.navigator;
+	};
+}
+
+function newSerialWebLocks() {
+	const queues = new Map();
+	return {
+		request(name, _options, callback) {
+			const previous = queues.get(name) || Promise.resolve();
+			const current = previous.then(() => callback());
+			queues.set(name, current.catch(() => {}));
+			return current;
+		}
+	};
+}
+
+function newDeferred() {
+	let resolve;
+	let reject;
+	const promise = new Promise((res, rej) => {
+		resolve = res;
+		reject = rej;
+	});
+	return { promise, resolve, reject };
+}
+
+function wait(ms) {
+	return new Promise((resolve) => setTimeout(resolve, ms));
 }

@@ -4,6 +4,8 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 	const worker = options.worker || createWorker(connectionString, options);
 	let nextId = 1;
 	const pending = new Map();
+	const readonly = !!options.readonly;
+	const lane = readonly ? 'reader' : 'writer';
 
 	worker.addEventListener('message', onMessage);
 	worker.addEventListener('error', onWorkerError);
@@ -22,7 +24,7 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 			requestedVfs,
 			vfs: result && result.vfs || requestedVfs,
 			fallback: !!(requestedVfs === 'opfs-sahpool' && result && result.vfs === 'opfs'),
-			readonly: !!options.readonly
+			readonly
 		};
 		log.emitSqliteOpen(event);
 		return result;
@@ -39,16 +41,16 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 	function executeQuery(query, callback) {
 		const sql = query.sql();
 		const parameters = query.parameters || [];
-		log.emitQuery({ sql, parameters });
+		log.emitQuery({ sql, parameters, readonly, lane });
 		const startedAt = now();
 		ready
 			.then(() => request('query', { sql, parameters }))
 			.then(({ result, workerElapsedMs }) => {
-				log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, workerElapsedMs });
+				log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, workerElapsedMs, readonly, lane });
 				callback(null, result);
 			})
 			.catch((error) => {
-				log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, error });
+				log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, error, readonly, lane });
 				callback(error);
 			});
 	}
@@ -56,16 +58,16 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 	function executeCommand(query, callback) {
 		const sql = query.sql();
 		const parameters = query.parameters || [];
-		log.emitQuery({ sql, parameters });
+		log.emitQuery({ sql, parameters, readonly, lane });
 		const startedAt = now();
 		ready
 			.then(() => request('command', { sql, parameters }))
 			.then(({ result, workerElapsedMs }) => {
-				log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, workerElapsedMs });
+				log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, workerElapsedMs, readonly, lane });
 				callback(null, result);
 			})
 			.catch((error) => {
-				log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, error });
+				log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, error, readonly, lane });
 				callback(error);
 			});
 	}

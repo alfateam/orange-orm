@@ -7,8 +7,7 @@ function createSyncWorkerHandler(syncClient, options = {}) {
 	let running = false;
 	let currentDrainPromise = Promise.resolve();
 	const pending = {
-		push: [],
-		pull: [],
+		sync: [],
 		resetLocal: []
 	};
 	let auto;
@@ -23,8 +22,7 @@ function createSyncWorkerHandler(syncClient, options = {}) {
 
 	return {
 		handleMessage,
-		pull: requestPull,
-		push: requestPush,
+		sync: requestSyncCycle,
 		resetLocal: requestResetLocal,
 		stop
 	};
@@ -35,10 +33,8 @@ function createSyncWorkerHandler(syncClient, options = {}) {
 			return;
 		try {
 			let result;
-			if (message.method === 'pull')
-				result = await requestPull(message.options);
-			else if (message.method === 'push')
-				result = await requestPush(message.options);
+			if (message.method === 'sync')
+				result = await requestSyncCycle(message.options);
 			else if (message.method === 'resetLocal')
 				result = await requestResetLocal(message.options);
 			else
@@ -50,12 +46,8 @@ function createSyncWorkerHandler(syncClient, options = {}) {
 		}
 	}
 
-	function requestPush(options) {
-		return requestSync('push', options);
-	}
-
-	function requestPull(options) {
-		return requestSync('pull', options);
+	function requestSyncCycle(options) {
+		return requestSync('sync', options);
 	}
 
 	function requestResetLocal(options) {
@@ -91,7 +83,7 @@ function createSyncWorkerHandler(syncClient, options = {}) {
 
 	async function run() {
 		while (hasPending()) {
-			const method = pending.resetLocal.length > 0 ? 'resetLocal' : pending.push.length > 0 ? 'push' : 'pull';
+			const method = pending.resetLocal.length > 0 ? 'resetLocal' : 'sync';
 			const batch = pending[method].splice(0);
 			const options = batch[batch.length - 1].options;
 			try {
@@ -117,7 +109,7 @@ function createSyncWorkerHandler(syncClient, options = {}) {
 	}
 
 	function hasPending() {
-		return pending.resetLocal.length > 0 || pending.push.length > 0 || pending.pull.length > 0;
+		return pending.resetLocal.length > 0 || pending.sync.length > 0;
 	}
 
 	function resolveBatch(batch, result) {
@@ -133,8 +125,7 @@ function createSyncWorkerHandler(syncClient, options = {}) {
 	function startAuto() {
 		if (typeof syncClient.getConfig === 'function') {
 			auto = createSyncAuto({
-				push: requestPush,
-				pull: requestPull
+				sync: requestSyncCycle
 			}, () => syncClient.getConfig());
 			void auto.start();
 			return;

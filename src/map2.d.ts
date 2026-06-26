@@ -1006,46 +1006,23 @@ export interface SyncConfig<M extends Record<string, any> = any> extends Partial
   initialReadyMaxAgeMs?: number;
   pull?: string | SyncPullOverrideConfig<M>;
   push?: string | SyncEndpointConfig;
+  crossTabLock?: boolean | string | SyncCrossTabLockConfig;
   auto?: boolean | {
     enabled?: boolean;
     intervalMs?: number;
-    push?: boolean;
-    pull?: boolean;
   };
 }
 
-export interface SyncPullOptions {
+export interface SyncCrossTabLockConfig {
+  enabled?: boolean;
+  name?: string;
   timeoutMs?: number;
+  staleMs?: number;
+  pollMs?: number;
 }
 
-export interface SyncPushMutation {
-  id: string;
-  table?: string;
-  patch?: JsonPatch;
-  patches?: Array<{
-    table: string;
-    patch: JsonPatch;
-    options?: {
-      concurrency?: ConcurrencyStrategy;
-      [key: string]: unknown;
-    };
-  }>;
-  commands?: SyncCommandPayload[];
-  options?: {
-    concurrency?: ConcurrencyStrategy;
-    [key: string]: unknown;
-  };
-}
-
-export interface SyncCommandPayload {
-  name: string;
-  args?: JsonValue;
-}
-
-export interface SyncPushOptions {
+export interface SyncOptions {
   timeoutMs?: number;
-  clientId: string;
-  mutations: SyncPushMutation[];
 }
 
 export interface SyncResetLocalOptions<M extends Record<string, any> = any> {
@@ -1059,40 +1036,20 @@ export interface SyncResetLocalResult<M extends Record<string, any> = any> {
   droppedTables: string[];
 }
 
-export interface SyncPushMutationResult {
-  id: string;
-  table?: string;
-  applied?: boolean;
-  duplicate?: boolean;
-  changed?: number;
-  result?: unknown;
-  commands?: Array<{ name: string; result: JsonValue | null }>;
-}
-
-export interface SyncPushResult {
-  phase: 'push';
-  applied: number;
-  duplicates: number;
-  results: SyncPushMutationResult[];
-}
-
 export interface SyncInitialReadyEvent<M extends Record<string, any> = any> {
   tables: SyncTableName<M>[];
   since: unknown;
   updatedAtMs?: number;
-  source: 'persisted' | 'pull';
+  source: 'persisted' | 'sync';
 }
 
 export interface SyncErrorEvent {
-  method: 'push' | 'pull';
+  method: 'sync';
   error: Error;
 }
 
-export interface SyncPullResult {
-  applied: number;
-  tables: string[];
-  since?: unknown;
-  payload: unknown;
+export interface SyncEvent {
+  method: 'sync';
 }
 
 export interface PoolOptions<M extends Record<string, any> = any> {
@@ -1100,6 +1057,7 @@ export interface PoolOptions<M extends Record<string, any> = any> {
   sync?: string | SyncConfig<M>;
   vfs?: 'opfs' | 'opfs-sahpool';
   sahPool?: SqliteOpfsSahPoolOptions;
+  singleWorker?: boolean;
   prewarmRead?: boolean;
   busyTimeoutMs?: number;
 }
@@ -1150,19 +1108,21 @@ export type DBClient<
   hono(config: HonoConfig<M>): HonoHandler;
   readonly metaData: DbConcurrency<M>;
   syncClient: {
-    pull(options?: SyncPullOptions): Promise<SyncPullResult>;
-    push(options?: Partial<SyncPushOptions>): Promise<SyncPushResult>;
+    sync(options?: SyncOptions): Promise<void>;
     resetLocal(options: SyncResetLocalOptions<M>): Promise<SyncResetLocalResult<M>>;
     start(): Promise<unknown> | undefined;
     stop(): void | Promise<unknown>;
     isRunning(): boolean | Promise<boolean>;
     getConfig(): Promise<SyncConfig<M> | null>;
+    on(event: 'sync', listener: (payload: SyncEvent) => void): () => void;
     on(event: 'initial-ready', listener: (payload: SyncInitialReadyEvent<M>) => void): () => void;
-    on(event: 'error' | 'push-error' | 'pull-error', listener: (payload: SyncErrorEvent) => void): () => void;
+    on(event: 'error' | 'sync-error', listener: (payload: SyncErrorEvent) => void): () => void;
+    off(event: 'sync', listener: (payload: SyncEvent) => void): void;
     off(event: 'initial-ready', listener: (payload: SyncInitialReadyEvent<M>) => void): void;
-    off(event: 'error' | 'push-error' | 'pull-error', listener: (payload: SyncErrorEvent) => void): void;
+    off(event: 'error' | 'sync-error', listener: (payload: SyncErrorEvent) => void): void;
+    once(event: 'sync', listener: (payload: SyncEvent) => void): () => void;
     once(event: 'initial-ready', listener: (payload: SyncInitialReadyEvent<M>) => void): () => void;
-    once(event: 'error' | 'push-error' | 'pull-error', listener: (payload: SyncErrorEvent) => void): () => void;
+    once(event: 'error' | 'sync-error', listener: (payload: SyncErrorEvent) => void): () => void;
     waitForInitialReady(): Promise<SyncInitialReadyEvent<M>>;
   };
 

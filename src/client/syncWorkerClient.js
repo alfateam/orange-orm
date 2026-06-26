@@ -9,8 +9,7 @@ function createSyncWorkerClient(worker) {
 	worker.addEventListener('message', onMessage);
 
 	return {
-		pull: request.bind(null, 'pull'),
-		push: request.bind(null, 'push'),
+		sync: request.bind(null, 'sync'),
 		resetLocal: request.bind(null, 'resetLocal'),
 		on,
 		off,

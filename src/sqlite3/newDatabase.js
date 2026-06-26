@@ -17,8 +17,10 @@ function newDatabase(connectionString, poolOptions) {
 	poolOptions = poolOptions || { min: 1 };
 	var pool = newPool(connectionString, poolOptions);
 	pool.__sqliteSync = poolOptions && poolOptions.sync;
+	pool.__orangeSyncIdentity = `sqlite:${connectionString}`;
 
 	let c = { poolFactory: pool, hostLocal, express, hono };
+	c.__orangeSyncIdentity = pool.__orangeSyncIdentity;
 
 	c.transaction = function(options, fn) {
 		if ((arguments.length === 1) && (typeof options === 'function')) {

@@ -17,8 +17,7 @@ function createDbWorkerClient(worker) {
 		end: close,
 		close,
 		syncClient: {
-			pull: syncRequest.bind(null, 'pull'),
-			push: syncRequest.bind(null, 'push'),
+			sync: syncRequest.bind(null, 'sync'),
 			start: syncRequest.bind(null, 'start'),
 			stop: syncRequest.bind(null, 'stop'),
 			isRunning: syncRequest.bind(null, 'isRunning'),

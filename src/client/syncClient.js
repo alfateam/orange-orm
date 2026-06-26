@@ -14,20 +14,20 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 	const syncPullItemTable = 'orange_sync_pull_item';
 	const syncBaseTable = 'orange_sync_base_tables';
 	const syncBasePrefix = 'orange_sync_base_data_';
+	const maxPullJournalRowsPerInsert = 250;
 	const initialReadyListeners = new Set();
 	const eventListeners = new Map();
 	let initialReadyEmitted = false;
-	const observedPush = observeSyncMethod('push', push);
-	const observedPull = observeSyncMethod('pull', pull);
+	const lockedSync = withCrossTabSyncLock(sync);
+	const lockedResetLocal = withCrossTabSyncLock(resetLocal);
+	const observedSync = observeSyncMethod('sync', lockedSync);
 	const auto = createSyncAuto({
-		push: observedPush,
-		pull: observedPull
+		sync: observedSync
 	}, getConfig);
 
 	return {
-		pull: observedPull,
-		push: observedPush,
-		resetLocal,
+		sync: observedSync,
+		resetLocal: lockedResetLocal,
 		start: auto.start,
 		stop: auto.stop,
 		isRunning: auto.isRunning,
@@ -38,6 +38,20 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		waitForInitialReady
 	};
 
+	function withCrossTabSyncLock(fn) {
+		return async function lockedSyncMethod(options) {
+			const db = await getDb();
+			const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
+			if (!syncConfig)
+				return fn(options);
+			return runWithCrossTabLock(resolveCrossTabLockName(db, syncConfig), syncConfig.crossTabLock, () => fn(options));
+		};
+	}
+
+	async function sync(options = {}) {
+		await pull(normalizeSyncOptions(options));
+	}
+
 	async function getConfig() {
 		const db = await getDb();
 		return normalizeSyncConfig(db && db.__sqliteSync);
@@ -47,9 +61,10 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		return async function observedSyncMethod(options) {
 			try {
 				const result = await fn(options);
-				const payload = { method, result };
+				const payload = result === undefined ? { method } : { method, result };
 				emit(method, payload);
-				emit('sync', payload);
+				if (method !== 'sync')
+					emit('sync', payload);
 				return result;
 			}
 			catch (error) {
@@ -107,26 +122,8 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		if (!hadStableBase)
 			await clearPendingMutations(db);
 		await saveStableBase(db);
-		await maybeEmitInitialReady(syncConfig, configuredTables, db, 'pull');
+		await maybeEmitInitialReady(syncConfig, configuredTables, db, 'sync');
 		return result;
-	}
-
-	async function push(options = {}) {
-		const db = await getDb();
-		const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
-		if (!syncConfig)
-			throw new Error('Sync is not configured. Add sync in sqlite options: sqlite(connectionString, { sync: ... })');
-
-		const pushConfig = resolvePushConfig(syncConfig, options);
-		const pushOptions = normalizePushOptions(options);
-		if (pushOptions.mutations.length === 0)
-			return pushPending({ ...options, _syncConfig: syncConfig, _pushConfig: pushConfig });
-		if (!pushOptions.clientId)
-			pushOptions.clientId = await getClientId(db);
-		if (pushOptions.mutations.length === 0)
-			return { phase: 'push', applied: 0, duplicates: 0, results: [] };
-
-		return sendPush(pushConfig, pushOptions.clientId, pushOptions.mutations);
 	}
 
 	async function resetLocal(options = {}) {
@@ -186,7 +183,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		const pending = await readPendingMutations(db, 1);
 		if (pending.length === 0)
 			return;
-		await pushPending({ _syncConfig: syncConfig, _pushConfig: resolvePushConfig(syncConfig) });
+		return pushPending({ _syncConfig: syncConfig, _pushConfig: resolvePushConfig(syncConfig) });
 	}
 
 	async function rollbackFailedPushBatch(db, attemptedMutations) {
@@ -444,58 +441,14 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		return result;
 	}
 
-	function normalizePushOptions(input) {
+	function normalizeSyncOptions(input) {
 		if (!input || input !== Object(input))
-			return { mutations: [] };
-		const mutations = Array.isArray(input.mutations)
-			? input.mutations.map(normalizePushMutation).filter(Boolean)
-			: [];
-		return {
-			clientId: typeof input.clientId === 'string' ? input.clientId : undefined,
-			mutations
-		};
-	}
-
-	function normalizePushMutation(input) {
-		if (!input || input !== Object(input))
-			return null;
-		const id = input.id ?? input.mutationId ?? input.mutation_id;
-		if (typeof id !== 'string' || id.length === 0)
-			return null;
-		const commands = Array.isArray(input.commands)
-			? input.commands.map(normalizeMutationCommand).filter(Boolean)
-			: [];
-		if (Array.isArray(input.patches)) {
-			const patches = input.patches.map(normalizeMutationPatch).filter(Boolean);
-			if (patches.length === 0 && commands.length === 0)
-				return null;
-			return {
-				id,
-				patches,
-				commands,
-				options: input.options
-			};
-		}
-		const entry = normalizeMutationPatch(input);
-		if (!entry && commands.length === 0)
-			return null;
-		return {
-			id,
-			...(entry || {}),
-			commands,
-			options: input.options
-		};
-	}
-
-	function normalizeMutationCommand(input) {
-		if (!input || input !== Object(input))
-			return null;
-		if (typeof input.name !== 'string' || input.name.length === 0)
-			return null;
-		return {
-			name: input.name,
-			args: normalizeCommandArgs(input.args)
-		};
+			return {};
+		const keys = Object.keys(input);
+		const invalidKeys = keys.filter(key => key !== 'timeoutMs');
+		if (invalidKeys.length > 0)
+			throw new Error(`Unsupported sync option "${invalidKeys[0]}". sync only accepts { timeoutMs }.`);
+		return normalizePullOptions(input);
 	}
 
 	function normalizeMutationPatch(input) {
@@ -510,12 +463,6 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 			patch: input.patch,
 			options: input.options
 		};
-	}
-
-	function normalizeCommandArgs(args) {
-		if (args === undefined)
-			return null;
-		return JSON.parse(JSON.stringify(args));
 	}
 
 	function normalizeTimeoutMs(value) {
@@ -660,15 +607,23 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 			const rowMap = rowsBySyncItemKey(rowItems);
 			const batchNo = session.nextBatch || 0;
 			let seq = session.nextSeq || 0;
+			const journalRows = [];
 			for (let i = 0; i < keyItems.length; i++) {
 				const item = keyItems[i];
 				const rowItem = item.op === 'D' ? undefined : rowMap.get(syncItemKey(item));
-				await tx.query([
-					`INSERT INTO "${syncPullItemTable}" ("scope", "batch_no", "seq", "table_name", "pk_json", "key_json", "op", "row_json")`,
-					`VALUES (${sqlStringLiteral(scopeKey)}, ${batchNo}, ${seq}, ${sqlStringLiteral(item.table)}, ${sqlStringLiteral(stringify(item.pk))}, ${sqlNullableJsonLiteral(item.key)}, ${sqlStringLiteral(item.op)}, ${sqlNullableJsonLiteral(rowItem && rowItem.row)})`
-				].join(' '));
+				journalRows.push([
+					sqlStringLiteral(scopeKey),
+					String(batchNo),
+					String(seq),
+					sqlStringLiteral(item.table),
+					sqlStringLiteral(stringify(item.pk)),
+					sqlNullableJsonLiteral(item.key),
+					sqlStringLiteral(item.op),
+					sqlNullableJsonLiteral(rowItem ? rowItem.row : undefined)
+				]);
 				seq += 1;
 			}
+			await insertPullJournalItems(tx, journalRows);
 			const finalSince = keysPayload.cursor !== undefined ? keysPayload.cursor : session.finalSince;
 			const payload = reason === undefined ? keysPayload : { ...keysPayload, reason };
 			const token = keysPayload.done || !keysPayload.token ? null : keysPayload.token;
@@ -699,6 +654,16 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 			};
 		}, { suppressSyncOutbox: true });
 		return nextSession;
+	}
+
+	async function insertPullJournalItems(db, rows) {
+		if (!Array.isArray(rows) || rows.length === 0)
+			return;
+		const prefix = `INSERT INTO "${syncPullItemTable}" ("scope", "batch_no", "seq", "table_name", "pk_json", "key_json", "op", "row_json") VALUES `;
+		for (let offset = 0; offset < rows.length; offset += maxPullJournalRowsPerInsert) {
+			const chunk = rows.slice(offset, offset + maxPullJournalRowsPerInsert);
+			await db.query(prefix + chunk.map(row => `(${row.join(', ')})`).join(', '));
+		}
 	}
 
 	async function readPullJournalBatches(db, scopeKey) {
@@ -1235,8 +1200,210 @@ function normalizeSyncConfig(sync) {
 		initialReadyMaxAgeMs,
 		schema: sync.schema,
 		auto: sync.auto,
-		push: normalizeEndpoint(sync.push)
+		push: normalizeEndpoint(sync.push),
+		crossTabLock: normalizeCrossTabLockConfig(sync.crossTabLock)
 	};
+}
+
+function normalizeCrossTabLockConfig(value) {
+	if (value === false)
+		return { enabled: false };
+	if (value === true || value === undefined || value === null)
+		return { enabled: true };
+	if (typeof value === 'string')
+		return { enabled: true, name: value };
+	if (value !== Object(value))
+		throw new Error('Invalid sqlite sync crossTabLock configuration');
+	return {
+		enabled: value.enabled !== false,
+		name: typeof value.name === 'string' && value.name.length > 0 ? value.name : undefined,
+		timeoutMs: normalizePositiveInteger(value.timeoutMs),
+		staleMs: normalizePositiveInteger(value.staleMs),
+		pollMs: normalizePositiveInteger(value.pollMs)
+	};
+}
+
+function resolveCrossTabLockName(db, syncConfig) {
+	const config = syncConfig && syncConfig.crossTabLock;
+	if (config && typeof config.name === 'string' && config.name.length > 0)
+		return config.name;
+	const identity = db && (
+		db.__orangeSyncLockName
+		|| db.__orangeSyncIdentity
+		|| db.poolFactory && (db.poolFactory.__orangeSyncLockName || db.poolFactory.__orangeSyncIdentity)
+	);
+	const endpoint = syncConfig && (syncConfig.url || syncConfig.pull && syncConfig.pull.url || syncConfig.push && syncConfig.push.url);
+	return `orange-orm:sync:${normalizeLockNamePart(identity || endpoint || 'default')}`;
+}
+
+async function runWithCrossTabLock(name, config, fn) {
+	const lockConfig = config || { enabled: true };
+	if (!lockConfig.enabled)
+		return fn();
+	const locks = getWebLocks();
+	if (locks)
+		return runWithWebLock(locks, name, lockConfig, fn);
+	const storage = getLocalStorage();
+	if (storage)
+		return runWithLocalStorageLock(storage, name, lockConfig, fn);
+	return fn();
+}
+
+function getWebLocks() {
+	const nav = typeof globalThis !== 'undefined' ? globalThis.navigator : undefined;
+	return nav && nav.locks && typeof nav.locks.request === 'function'
+		? nav.locks
+		: null;
+}
+
+async function runWithWebLock(locks, name, config, fn) {
+	const options = { mode: 'exclusive' };
+	const timeoutMs = config.timeoutMs;
+	let timeoutId;
+	let waiting = true;
+	let timedOut = false;
+	if (timeoutMs && typeof AbortController === 'function') {
+		const controller = new AbortController();
+		options.signal = controller.signal;
+		timeoutId = setTimeout(() => {
+			if (!waiting)
+				return;
+			timedOut = true;
+			controller.abort();
+		}, timeoutMs);
+	}
+	try {
+		return await locks.request(name, options, async () => {
+			waiting = false;
+			if (timeoutId) {
+				clearTimeout(timeoutId);
+				timeoutId = undefined;
+			}
+			return fn();
+		});
+	}
+	catch (e) {
+		if (timedOut || e && e.name === 'AbortError')
+			throw syncLockTimeoutError(name, timeoutMs);
+		throw e;
+	}
+	finally {
+		if (timeoutId)
+			clearTimeout(timeoutId);
+	}
+}
+
+function getLocalStorage() {
+	if (typeof globalThis === 'undefined' || !globalThis.localStorage)
+		return null;
+	try {
+		const key = 'orange-orm:sync-lock-probe';
+		globalThis.localStorage.setItem(key, '1');
+		globalThis.localStorage.removeItem(key);
+		return globalThis.localStorage;
+	}
+	catch (_e) {
+		return null;
+	}
+}
+
+async function runWithLocalStorageLock(storage, name, config, fn) {
+	const lock = await acquireLocalStorageLock(storage, name, config);
+	const renewIntervalMs = Math.max(250, Math.floor(lock.staleMs / 3));
+	const intervalId = setInterval(() => {
+		try {
+			renewLocalStorageLock(storage, lock);
+		}
+		catch (_e) {
+			// A failed renewal will let another tab take the lock after staleMs.
+		}
+	}, renewIntervalMs);
+	try {
+		return await fn();
+	}
+	finally {
+		clearInterval(intervalId);
+		releaseLocalStorageLock(storage, lock);
+	}
+}
+
+async function acquireLocalStorageLock(storage, name, config) {
+	const key = `orange-orm:sync-lock:${name}`;
+	const owner = randomUuid();
+	const staleMs = config.staleMs || 60000;
+	const pollMs = config.pollMs || 100;
+	const startedAt = Date.now();
+	for (;;) {
+		const now = Date.now();
+		const current = readLocalStorageLock(storage, key);
+		if (!current || current.expiresAt <= now || current.owner === owner) {
+			writeLocalStorageLock(storage, key, { owner, expiresAt: now + staleMs });
+			const next = readLocalStorageLock(storage, key);
+			if (next && next.owner === owner)
+				return { key, owner, staleMs };
+		}
+		if (config.timeoutMs && now - startedAt >= config.timeoutMs)
+			throw syncLockTimeoutError(name, config.timeoutMs);
+		await delay(pollMs);
+	}
+}
+
+function renewLocalStorageLock(storage, lock) {
+	const current = readLocalStorageLock(storage, lock.key);
+	if (!current || current.owner !== lock.owner)
+		return;
+	writeLocalStorageLock(storage, lock.key, {
+		owner: lock.owner,
+		expiresAt: Date.now() + lock.staleMs
+	});
+}
+
+function releaseLocalStorageLock(storage, lock) {
+	try {
+		const current = readLocalStorageLock(storage, lock.key);
+		if (current && current.owner === lock.owner)
+			storage.removeItem(lock.key);
+	}
+	catch (_e) {
+		// Releasing a best-effort browser lock should not hide the sync result.
+	}
+}
+
+function readLocalStorageLock(storage, key) {
+	const raw = storage.getItem(key);
+	if (!raw)
+		return null;
+	try {
+		const parsed = JSON.parse(raw);
+		if (!parsed || typeof parsed.owner !== 'string')
+			return null;
+		const expiresAt = Number(parsed.expiresAt);
+		return Number.isFinite(expiresAt) ? { owner: parsed.owner, expiresAt } : null;
+	}
+	catch (_e) {
+		return null;
+	}
+}
+
+function writeLocalStorageLock(storage, key, value) {
+	storage.setItem(key, JSON.stringify(value));
+}
+
+function delay(ms) {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function syncLockTimeoutError(name, timeoutMs) {
+	return new Error(`Timed out waiting for sync lock "${name}" after ${Math.round((timeoutMs || 0) / 1000)} seconds.`);
+}
+
+function normalizePositiveInteger(value) {
+	const parsed = Number.parseInt(value, 10);
+	return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function normalizeLockNamePart(value) {
+	return String(value).replace(/\s+/g, ' ').trim() || 'default';
 }
 
 async function dropLocalSyncTables(db, client, tableNames) {

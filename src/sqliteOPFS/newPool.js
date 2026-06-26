@@ -7,10 +7,7 @@ function newPool(connectionString, poolOptions) {
 	let client = createSqliteOPFSWorkerClient(connectionString, poolOptions || {});
 	let readClient;
 	let c = {};
-	const singleWorker = poolOptions && (
-		poolOptions.vfs === 'opfs-sahpool'
-		|| poolOptions.singleWorker
-	);
+	const singleWorker = shouldUseSingleWorker(poolOptions);
 
 	prewarmReadClient();
 
@@ -65,6 +62,17 @@ function newPool(connectionString, poolOptions) {
 			readClient = createSqliteOPFSWorkerClient(connectionString, { ...poolOptions, readonly: true });
 		return readClient;
 	}
+}
+
+function shouldUseSingleWorker(poolOptions = {}) {
+	if (poolOptions.singleWorker === true)
+		return true;
+	if (poolOptions.vfs === 'opfs-sahpool')
+		return true;
+	const vfs = poolOptions.vfs || 'opfs';
+	if (vfs === 'opfs')
+		return poolOptions.singleWorker !== false;
+	return false;
 }
 
 module.exports = newPool;

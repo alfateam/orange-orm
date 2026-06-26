@@ -61,8 +61,7 @@ declare namespace r {
     }
 
     export interface SyncWorkerClient {
-        pull(options?: unknown): Promise<unknown>;
-        push(options?: unknown): Promise<unknown>;
+        sync(options?: unknown): Promise<void>;
         resetLocal(options?: unknown): Promise<unknown>;
         on(event: string, listener: (payload: unknown) => void): () => void;
         off(event: string, listener: (payload: unknown) => void): void;
@@ -93,8 +92,7 @@ declare namespace r {
     }
 
     export interface SyncWorkerSyncClient {
-        pull?(options?: unknown): Promise<unknown> | unknown;
-        push?(options?: unknown): Promise<unknown> | unknown;
+        sync?(options?: unknown): Promise<void> | void;
         resetLocal?(options?: unknown): Promise<unknown> | unknown;
         start?(): Promise<unknown> | unknown;
         stop?(): void;
@@ -107,15 +105,16 @@ declare namespace r {
 
     export interface SyncWorkerHandler {
         handleMessage(event: { data: unknown }): Promise<void>;
-        pull(options?: unknown): Promise<unknown>;
-        push(options?: unknown): Promise<unknown>;
+        sync(options?: unknown): Promise<void>;
         resetLocal(options?: unknown): Promise<unknown>;
         stop(): void;
     }
 
     export interface QueryEvent {
         sql: string,
-        parameters: []
+        parameters: [],
+        readonly?: boolean,
+        lane?: 'reader' | 'writer'
     }
 
     export interface QueryCompleteEvent {
@@ -123,7 +122,9 @@ declare namespace r {
         parameters: [],
         elapsedMs: number,
         workerElapsedMs?: number,
-        error?: Error
+        error?: Error,
+        readonly?: boolean,
+        lane?: 'reader' | 'writer'
     }
 
     export interface SqliteOpenEvent {

@@ -105,10 +105,8 @@ afterAll(async () => {
 
 describe('sqlite staged pull sync', () => {
 	test('first sync uses snapshot and fetches in key/row batches', async () => {
-		const result = await localDb.syncClient.pull();
+		await localDb.syncClient.sync();
 
-		expect(result.payload.mode).toBe('snapshot');
-		expect(result.payload.reason).toBe('first_sync');
 		expect(syncPhases.filter(x => x === 'keys').length).toBeGreaterThan(1);
 		expect(syncPhases.filter(x => x === 'rows').length).toBeGreaterThan(1);
 
@@ -125,24 +123,24 @@ describe('sqlite staged pull sync', () => {
 			localDb.syncClient.once('initial-ready', resolve);
 		});
 
-		await localDb.syncClient.pull();
+		await localDb.syncClient.sync();
 		const ready = await readyPromise;
 
-		expect(ready.source).toBe('pull');
+		expect(ready.source).toBe('sync');
 		expect(ready.tables).toEqual(expect.arrayContaining(['customer', 'order']));
 		expect(ready.since).not.toBeUndefined();
 	});
 
 	test('incremental sync reads PKs from change table and excludes deletes', async () => {
-		await localDb.syncClient.pull();
+		await localDb.syncClient.sync();
+		syncPhases.length = 0;
 
 		await remoteDb.query('UPDATE customer SET name = \'Harald\' WHERE id = 2');
 		await remoteDb.query('INSERT INTO customer (id, name, balance, "isActive") VALUES (4, \'Neo\', 88, true)');
 		await remoteDb.query('DELETE FROM customer WHERE id = 3');
 
-		const second = await localDb.syncClient.pull();
+		await localDb.syncClient.sync();
 
-		expect(second.payload.mode).toBe('changes');
 		expect(syncPhases.filter(x => x === 'keys').length).toBeGreaterThan(0);
 		expect(syncPhases.filter(x => x === 'rows').length).toBeGreaterThan(0);
 
@@ -155,16 +153,14 @@ describe('sqlite staged pull sync', () => {
 	});
 
 	test('falls back to snapshot when cursor is too far behind', async () => {
-		await localDb.syncClient.pull();
+		await localDb.syncClient.sync();
 		await remoteDb.query('DELETE FROM orange_changes');
 		for (let i = 0; i < 10; i++) {
 			await remoteDb.query(`UPDATE customer SET balance = ${300 + i} WHERE id = 1`);
 		}
 
-		const result = await localDb.syncClient.pull();
+		await localDb.syncClient.sync();
 
-		expect(result.payload.mode).toBe('snapshot');
-		expect(['cursor_too_far_behind', 'cursor_too_old']).toContain(result.payload.reason);
 		const row1 = await localDb.customer.getById(1);
 		expect(row1.balance).toBe(309);
 	}, 15000);
@@ -189,7 +185,7 @@ describe('sqlite staged pull sync', () => {
 			customerId: 10
 		});
 
-		await localDb.syncClient.pull();
+		await localDb.syncClient.sync();
 
 		const order = await localDb.order.getById(10);
 		const customer = await localDb.customer.getById(10);
@@ -214,15 +210,15 @@ describe('sqlite staged pull sync', () => {
 			{ id: 21, orderDate: new Date(2022, 0, 11, 9, 24, 47), customerId: 21 }
 		]);
 
-		await localDb.syncClient.pull();
+		await localDb.syncClient.sync();
+		syncPhases.length = 0;
 
 		await remoteDb.query('UPDATE customer SET name = \'Ivar2\', balance = 50 WHERE id = 20');
 		await remoteDb.query('DELETE FROM "order" WHERE id = 21');
 		await remoteDb.query('DELETE FROM customer WHERE id = 21');
 
-		const second = await localDb.syncClient.pull();
+		await localDb.syncClient.sync();
 
-		expect(second.payload.mode).toBe('changes');
 		expect(syncPhases.filter(x => x === 'keys').length).toBeGreaterThan(0);
 		expect(syncPhases.filter(x => x === 'rows').length).toBeGreaterThan(0);
 
@@ -238,34 +234,12 @@ describe('sqlite staged pull sync', () => {
 		expect(customer21).toBeUndefined();
 	});
 
-	test('ignores per-pull tables override and uses configured sync tables', async () => {
+	test('rejects per-sync tables override', async () => {
 		await localDb.query('PRAGMA foreign_keys = ON');
-		await localDb.query('DELETE FROM "order"');
-		await localDb.query('DELETE FROM customer');
-		await remoteDb.query('DELETE FROM "order"');
-		await remoteDb.query('DELETE FROM customer');
 
-		await remoteDb.customer.insert({
-			id: 40,
-			name: 'Ola',
-			balance: 40,
-			isActive: true
-		});
-		await remoteDb.order.insert({
-			id: 40,
-			orderDate: new Date(2022, 0, 11, 9, 24, 47),
-			customerId: 40
-		});
-
-		await localDb.syncClient.pull({
-			// Runtime should ignore per-pull table overrides.
+		await expect(localDb.syncClient.sync({
 			tables: ['customer']
-		});
-
-		const order = await localDb.order.getById(40);
-		const customer = await localDb.customer.getById(40);
-		expect(customer.name).toBe('Ola');
-		expect(order.customerId).toBe(40);
+		})).rejects.toThrow('Unsupported sync option "tables"');
 	});
 
 	test('stores sync checkpoint in local db and resumes with a new client instance', async () => {
@@ -280,8 +254,7 @@ describe('sqlite staged pull sync', () => {
 			{ id: 31, name: 'Ben', balance: 31, isActive: true }
 		]);
 
-		const first = await localDb.syncClient.pull();
-		expect(first.payload.mode).toBe('snapshot');
+		await localDb.syncClient.sync();
 
 		await remoteDb.query('UPDATE customer SET name = \'Ari2\' WHERE id = 30');
 
@@ -291,15 +264,14 @@ describe('sqlite staged pull sync', () => {
 				sync: syncClientConfig
 			})
 		});
-		const second = await localDbReloaded.syncClient.pull();
-		expect(second.payload.mode).toBe('changes');
+		await localDbReloaded.syncClient.sync();
 
 		const row30 = await localDbReloaded.customer.getById(30);
 		expect(row30.name).toBe('Ari2');
 	});
 
 	test('waitForInitialReady resolves immediately when staged db is already valid', async () => {
-		await localDb.syncClient.pull();
+		await localDb.syncClient.sync();
 
 		const localDbReloaded = map({
 			db: (con) => con.sqlite(localName, {
@@ -314,76 +286,49 @@ describe('sqlite staged pull sync', () => {
 		expect(ready.since).not.toBeUndefined();
 	});
 
-	test('push applies json patch once and deduplicates retry', async () => {
+	test('sync pushes pending local json patch once', async () => {
 		await remoteDb.customer.insert({
 			id: 60,
 			name: 'Before',
 			balance: 60,
 			isActive: true
 		});
+		await localDb.syncClient.sync();
 		const beforeRows = await remoteDb.query('SELECT COUNT(*) AS count FROM orange_changes');
 		const beforeCount = Number(beforeRows[0].count ?? beforeRows[0].COUNT);
 
-		const patch = [{
-			op: 'replace',
-			path: '/[60]/name',
-			value: 'After',
-			oldValue: 'Before'
-		}];
-		const mutation = {
-			id: 'mutation-60-name',
-			table: 'customer',
-			patch
-		};
+		const localRow = await localDb.customer.getById(60);
+		localRow.name = 'After';
+		await localRow.saveChanges();
 
-		const first = await localDb.syncClient.push({
-			clientId: 'sqlite-sync-test-client',
-			mutations: [mutation]
-		});
-		const second = await localDb.syncClient.push({
-			clientId: 'sqlite-sync-test-client',
-			mutations: [mutation]
-		});
+		await localDb.syncClient.sync();
+		await localDb.syncClient.sync();
 
 		const row = await remoteDb.customer.getById(60);
 		const afterRows = await remoteDb.query('SELECT COUNT(*) AS count FROM orange_changes');
 		const afterCount = Number(afterRows[0].count ?? afterRows[0].COUNT);
 
-		expect(first.applied).toBe(1);
-		expect(first.duplicates).toBe(0);
-		expect(second.applied).toBe(0);
-		expect(second.duplicates).toBe(1);
-		expect(second.results[0].duplicate).toBe(true);
 		expect(row.name).toBe('After');
 		expect(afterCount).toBe(beforeCount + 1);
 	});
 
-	test('push conflict returns http 409', async () => {
+	test('sync push conflict returns http 409', async () => {
 		await remoteDb.customer.insert({
 			id: 61,
 			name: 'Remote',
 			balance: 61,
 			isActive: true
 		});
+		await localDb.syncClient.sync();
 
-		const patch = [{
-			op: 'replace',
-			path: '/[61]/name',
-			value: 'Local',
-			oldValue: 'Stale'
-		}];
-		const mutation = {
-			id: 'mutation-61-conflict',
-			table: 'customer',
-			patch
-		};
+		const localRow = await localDb.customer.getById(61);
+		localRow.name = 'Local';
+		await localRow.saveChanges();
+		await remoteDb.query('UPDATE customer SET name = \'Remote2\' WHERE id = 61');
 
 		let error;
 		try {
-			await localDb.syncClient.push({
-				clientId: 'sqlite-sync-test-client-conflict',
-				mutations: [mutation]
-			});
+			await localDb.syncClient.sync();
 		}
 		catch (e) {
 			error = e;
@@ -423,11 +368,10 @@ describe('sqlite staged pull sync', () => {
 		expect(outboxRows[0].table_name ?? outboxRows[0].TABLE_NAME).toBe('*');
 		expect(JSON.parse(outboxRows[0].patch_json ?? outboxRows[0].PATCH_JSON)).toHaveLength(2);
 
-		const result = await localDb.syncClient.push({ clientId: 'sqlite-sync-test-client-transaction' });
+		await localDb.syncClient.sync();
 		const oneRemote = await remoteDb.customer.getById(70);
 		const twoRemote = await remoteDb.customer.getById(71);
 
-		expect(result.applied).toBe(1);
 		expect(oneRemote.name).toBe('One2');
 		expect(twoRemote.name).toBe('Two2');
 	});
@@ -443,7 +387,7 @@ describe('sqlite staged pull sync', () => {
 			{ id: 80, name: 'Base80', balance: 80, isActive: true },
 			{ id: 81, name: 'Base81', balance: 81, isActive: true }
 		]);
-		await localDb.syncClient.pull();
+		await localDb.syncClient.sync();
 
 		const first = await localDb.customer.getById(80);
 		first.name = 'Fail80';
@@ -454,7 +398,7 @@ describe('sqlite staged pull sync', () => {
 		await second.saveChanges();
 
 		failNextPush = true;
-		await expect(localDb.syncClient.push({ clientId: 'sqlite-sync-test-client-rollback', limit: 1 }))
+		await expect(localDb.syncClient.sync())
 			.rejects.toThrow('Request failed with status code 503');
 
 		const row80 = await localDb.customer.getById(80);
@@ -469,16 +413,15 @@ describe('sqlite staged pull sync', () => {
 		expect(pending[0].patch_json ?? pending[0].PATCH_JSON).toContain('Fail80');
 		expect(pending[1].patch_json ?? pending[1].PATCH_JSON).toContain('Replay81');
 
-		const retry = await localDb.syncClient.push({ clientId: 'sqlite-sync-test-client-rollback-cleanup' });
+		await localDb.syncClient.sync();
 		const retriedRemote80 = await remoteDb.customer.getById(80);
 		const afterRetryPending = await localDb.query('SELECT mutation_id, patch_json FROM "orange_sync_outbox" WHERE status = \'pending\' ORDER BY created_at_ms');
 
-		expect(retry.applied).toBe(1);
 		expect(retriedRemote80.name).toBe('Fail80');
 		expect(afterRetryPending).toHaveLength(1);
 		expect(afterRetryPending[0].patch_json ?? afterRetryPending[0].PATCH_JSON).toContain('Replay81');
 
-		await localDb.syncClient.push({ clientId: 'sqlite-sync-test-client-rollback-cleanup' });
+		await localDb.syncClient.sync();
 	});
 
 	test('conflict discards one pending mutation and keeps the next pending', async () => {
@@ -492,7 +435,7 @@ describe('sqlite staged pull sync', () => {
 			{ id: 83, name: 'Base83', balance: 83, isActive: true },
 			{ id: 84, name: 'Base84', balance: 84, isActive: true }
 		]);
-		await localDb.syncClient.pull();
+		await localDb.syncClient.sync();
 
 		const first = await localDb.customer.getById(83);
 		first.name = 'Conflict83';
@@ -504,7 +447,7 @@ describe('sqlite staged pull sync', () => {
 		second.name = 'Replay84';
 		await second.saveChanges();
 
-		await expect(localDb.syncClient.push({ clientId: 'sqlite-sync-test-client-conflict-queue' }))
+		await expect(localDb.syncClient.sync())
 			.rejects.toThrow('Request failed with status code 409');
 
 		const row83 = await localDb.customer.getById(83);
@@ -518,16 +461,15 @@ describe('sqlite staged pull sync', () => {
 		expect(pending).toHaveLength(1);
 		expect(pending[0].patch_json ?? pending[0].PATCH_JSON).toContain('Replay84');
 
-		const next = await localDb.syncClient.push({ clientId: 'sqlite-sync-test-client-conflict-queue' });
+		await localDb.syncClient.sync();
 		const pushedRemote84 = await remoteDb.customer.getById(84);
 		const afterPushPending = await localDb.query('SELECT mutation_id FROM "orange_sync_outbox" WHERE status = \'pending\'');
 
-		expect(next.applied).toBe(1);
 		expect(pushedRemote84.name).toBe('Replay84');
 		expect(afterPushPending).toHaveLength(0);
 	});
 
-	test('pull fails before requesting remote changes when pending push fails', async () => {
+	test('sync fails before requesting remote changes when pending push fails', async () => {
 		await localDb.query('PRAGMA foreign_keys = ON');
 		await localDb.query('DELETE FROM "order"');
 		await localDb.query('DELETE FROM customer');
@@ -540,7 +482,7 @@ describe('sqlite staged pull sync', () => {
 			balance: 82,
 			isActive: true
 		});
-		await localDb.syncClient.pull();
+		await localDb.syncClient.sync();
 		syncPhases.length = 0;
 
 		const row = await localDb.customer.getById(82);
@@ -548,7 +490,7 @@ describe('sqlite staged pull sync', () => {
 		await row.saveChanges();
 
 		failNextPush = true;
-		await expect(localDb.syncClient.pull()).rejects.toThrow('Request failed with status code 503');
+		await expect(localDb.syncClient.sync()).rejects.toThrow('Request failed with status code 503');
 
 		const restored = await localDb.customer.getById(82);
 		const pending = await localDb.query('SELECT mutation_id FROM "orange_sync_outbox" WHERE status = \'pending\'');

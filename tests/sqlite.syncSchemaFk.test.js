@@ -75,7 +75,7 @@ describe('sqlite auto sync schema foreign keys', () => {
 		});
 		await localDb.query('PRAGMA foreign_keys = ON');
 
-		await expect(localDb.syncClient.pull())
+		await expect(localDb.syncClient.sync())
 			.rejects.toThrow('Foreign key validation failed after sync apply');
 
 		const order = await localDb.order.getById(1);

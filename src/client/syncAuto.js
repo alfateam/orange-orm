@@ -57,22 +57,9 @@ function createSyncAuto(syncClient, getConfig, options = {}) {
 
 	async function runCycle() {
 		const config = normalizeAutoConfig(await getConfig());
-		let pushResult;
-		let pushError;
-		if (config.push) {
-			try {
-				pushResult = await syncClient.push();
-			}
-			catch (e) {
-				pushError = e;
-			}
-		}
-		if (pushError)
-			throw pushError;
-		if (config.pull) {
-			return syncClient.pull();
-		}
-		return pushResult || { skipped: true };
+		if (config.enabled)
+			return syncClient.sync();
+		return { skipped: true };
 	}
 
 	function subscribeOnline() {
@@ -90,17 +77,15 @@ function createSyncAuto(syncClient, getConfig, options = {}) {
 function normalizeAutoConfig(syncConfig) {
 	const auto = syncConfig && syncConfig.auto;
 	if (!syncConfig || auto === false)
-		return { enabled: false, intervalMs: 30000, push: true, pull: true };
+		return { enabled: false, intervalMs: 30000 };
 	if (auto === undefined || auto === true)
-		return { enabled: true, intervalMs: 30000, push: true, pull: true };
+		return { enabled: true, intervalMs: 30000 };
 	if (auto !== Object(auto))
-		return { enabled: true, intervalMs: 30000, push: true, pull: true };
+		return { enabled: true, intervalMs: 30000 };
 	const intervalMs = normalizeIntervalMs(auto.intervalMs);
 	return {
 		enabled: auto.enabled !== false,
-		intervalMs,
-		push: auto.push !== false,
-		pull: auto.pull !== false
+		intervalMs
 	};
 }
 

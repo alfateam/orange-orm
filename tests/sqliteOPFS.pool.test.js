@@ -4,7 +4,7 @@ const newPool = require('../src/sqliteOPFS/newPool');
 const log = require('../src/table/log');
 
 describe('sqliteOPFS pool', () => {
-	test('prewarms read client by default', async () => {
+	test('uses a single worker for default OPFS', async () => {
 		const createdWorkers = [];
 		const pool = newPool('test.sqlite3', {
 			createWorker() {
@@ -15,14 +15,17 @@ describe('sqliteOPFS pool', () => {
 		});
 
 		await wait(10);
+		pool.connectRead(() => {});
+		await wait(10);
 
-		expect(createdWorkers).toHaveLength(2);
+		expect(createdWorkers).toHaveLength(1);
 		pool.end();
 	});
 
-	test('can disable read client prewarm', async () => {
+	test('can opt in to separate OPFS read worker without prewarm', async () => {
 		const createdWorkers = [];
 		const pool = newPool('test.sqlite3', {
+			singleWorker: false,
 			prewarmRead: false,
 			createWorker() {
 				const worker = newFakeWorker();
@@ -32,14 +35,20 @@ describe('sqliteOPFS pool', () => {
 		});
 
 		await wait(10);
-
 		expect(createdWorkers).toHaveLength(1);
+		pool.connectRead(() => {});
+		await wait(10);
+
+		expect(createdWorkers).toHaveLength(2);
 		pool.end();
 	});
 
 	test('emits query completion elapsed time', async () => {
+		const started = [];
 		const completed = [];
+		const onQuery = (entry) => started.push(entry);
 		const onComplete = (entry) => completed.push(entry);
+		log.on('query', onQuery);
 		log.on('queryComplete', onComplete);
 		const pool = newPool('test.sqlite3', {
 			prewarmRead: false,
@@ -58,12 +67,16 @@ describe('sqliteOPFS pool', () => {
 			});
 
 			expect(completed).toHaveLength(1);
+			expect(started).toHaveLength(1);
+			expect(started[0]).toMatchObject({ sql: 'SELECT 1', lane: 'writer', readonly: false });
 			expect(completed[0].sql).toBe('SELECT 1');
 			expect(completed[0].parameters).toEqual([]);
 			expect(completed[0].elapsedMs).toBeGreaterThanOrEqual(0);
 			expect(completed[0].workerElapsedMs).toBeGreaterThanOrEqual(0);
+			expect(completed[0]).toMatchObject({ lane: 'writer', readonly: false });
 		}
 		finally {
+			log.off('query', onQuery);
 			log.off('queryComplete', onComplete);
 			pool.end();
 		}
