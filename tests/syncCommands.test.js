@@ -159,9 +159,15 @@ describe('sync commands', () => {
 			'afterBegin',
 			'getMany',
 			'beforeCommit',
+			'afterCommit',
+			'beforeBegin',
+			'afterBegin',
+			'getMany',
+			'beforeCommit',
 			'afterCommit'
 		]);
-		expect(transactionOptions).toEqual([{ readonly: true }]);
+		expect(calls.filter(x => x[0] === 'getMany').map(x => x[1])).toEqual(['id desc', 'id']);
+		expect(transactionOptions).toEqual([{ readonly: true }, { readonly: true }]);
 		expect(jsonResult.mode).toBe('snapshot');
 		expect(jsonResult.items).toEqual([
 			{ table: 'project', pk: [1], key: { id: 1 }, op: 'U' }
@@ -174,9 +180,16 @@ describe('sync commands', () => {
 			project: {
 				getMany: async (filter, strategy) => {
 					seen.push({ filter, strategy });
-					const after = Array.isArray(filter?.parameters) ? filter.parameters[0] : 0;
+					if (strategy.orderBy[0] === 'id desc')
+						return [{ id: 3 }];
+					const after = Array.isArray(filter?.parameters) && filter.parameters.length > 1
+						? filter.parameters[0]
+						: 0;
+					const upper = Array.isArray(filter?.parameters)
+						? filter.parameters[filter.parameters.length - 1]
+						: Infinity;
 					return [1, 2, 3]
-						.filter(id => id > after)
+						.filter(id => id > after && id <= upper)
 						.slice(0, strategy.limit)
 						.map(id => ({ id }));
 				}
@@ -209,11 +222,109 @@ describe('sync commands', () => {
 
 		expect(first.items.map(x => x.pk)).toEqual([[1], [2]]);
 		expect(first.token.lastPk).toEqual([2]);
+		expect(first.token.upperPks.project).toEqual([3]);
 		expect(second.items.map(x => x.pk)).toEqual([[3]]);
-		expect(seen[0].strategy.offset).toBeUndefined();
-		expect(seen[1].strategy.offset).toBeUndefined();
-		expect(seen[1].filter.sql).toBe('("id" > ?)');
-		expect(seen[1].filter.parameters).toEqual([2]);
+		const keyFetches = seen.filter(x => x.strategy.orderBy[0] === 'id');
+		expect(keyFetches[0].strategy.offset).toBeUndefined();
+		expect(keyFetches[1].strategy.offset).toBeUndefined();
+		expect(keyFetches[1].filter.sql).toContain('"id" > ?');
+		expect(keyFetches[1].filter.sql).toContain('NOT');
+		expect(keyFetches[1].filter.parameters).toEqual([2, 3]);
+	});
+
+	test('snapshot key fetch ignores rows inserted after initial primary key upper bound', async () => {
+		const seen = [];
+		const sourceIds = [1, 2, 3];
+		const tx = {
+			project: {
+				getMany: async (filter, strategy) => {
+					seen.push({ filter, strategy });
+					if (strategy.orderBy[0] === 'id desc')
+						return [{ id: Math.max.apply(null, sourceIds) }];
+					const after = Array.isArray(filter?.parameters) && filter.parameters.length > 1
+						? filter.parameters[0]
+						: 0;
+					const upper = Array.isArray(filter?.parameters)
+						? filter.parameters[filter.parameters.length - 1]
+						: Infinity;
+					return sourceIds
+						.filter(id => id > after && id <= upper)
+						.slice(0, strategy.limit)
+						.map(id => ({ id }));
+				}
+			}
+		};
+		const client = {
+			tables: {
+				project: newTable('project')
+			},
+			transaction: async (fn) => fn(tx),
+			query: async () => [{ min_id: 1, max_id: 1 }]
+		};
+		const handler = newSyncHandler(client, {
+			sync: {
+				limits: {
+					maxKeysPerBatch: 2
+				}
+			}
+		});
+
+		const first = await callHandler(handler, {
+			phase: 'keys',
+			tables: ['project']
+		});
+		sourceIds.push(4, 5);
+		const second = await callHandler(handler, {
+			phase: 'keys',
+			tables: ['project'],
+			token: first.token
+		});
+
+		expect(first.items.map(x => x.pk)).toEqual([[1], [2]]);
+		expect(second.items.map(x => x.pk)).toEqual([[3]]);
+		expect(second.done).toBe(true);
+		expect(seen.filter(x => x.strategy.orderBy[0] === 'id desc')).toHaveLength(1);
+	});
+
+	test('limits snapshot keys by server row batch limit', async () => {
+		const seenStrategies = [];
+		const tx = {
+			project: {
+				getMany: async (_filter, strategy) => {
+					seenStrategies.push(strategy);
+					if (strategy.orderBy[0] === 'id desc')
+						return [{ id: 3 }];
+					return [1, 2, 3]
+						.slice(0, strategy.limit)
+						.map(id => ({ id }));
+				}
+			}
+		};
+		const client = {
+			tables: {
+				project: newTable('project')
+			},
+			transaction: async (fn) => fn(tx),
+			query: async () => [{ min_id: 1, max_id: 1 }]
+		};
+		const handler = newSyncHandler(client, {
+			sync: {
+				limits: {
+					maxKeysPerBatch: 3,
+					maxRowsPerBatch: 1
+				}
+			}
+		});
+
+		const result = await callHandler(handler, {
+			phase: 'keys',
+			tables: ['project'],
+			limit: 3
+		});
+
+		expect(seenStrategies.filter(x => x.orderBy[0] === 'id')[0].limit).toBe(1);
+		expect(result.items.map(x => x.pk)).toEqual([[1]]);
+		expect(result.done).toBe(false);
 	});
 
 	test('runs transaction hooks for sync push apply', async () => {

@@ -10,6 +10,8 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 	const syncStateTable = 'orange_sync_state';
 	const syncClientTable = 'orange_sync_client';
 	const syncOutboxTable = 'orange_sync_outbox';
+	const syncPullSessionTable = 'orange_sync_pull_session';
+	const syncPullItemTable = 'orange_sync_pull_item';
 	const syncBaseTable = 'orange_sync_base_tables';
 	const syncBasePrefix = 'orange_sync_base_data_';
 	const initialReadyListeners = new Set();
@@ -83,9 +85,12 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		await pushBeforePull(db, syncConfig, hadStableBase);
 		await maybeEmitInitialReady(syncConfig, configuredTables, db, 'persisted');
 		const currentSince = await getScopeSince(configuredTables, db);
+		const scopeKey = getScopeKey(configuredTables);
 		const requestOptions = {
 			tables: configuredTables,
 			since: currentSince,
+			db,
+			scopeKey,
 			_syncAxiosInterceptor: axiosInterceptor
 		};
 		let result;
@@ -97,7 +102,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 				throw e;
 			result = await pullPatch(pullConfig, requestOptions);
 		}
-		if (result && result.since !== undefined)
+		if (result && result.since !== undefined && result.checkpointApplied !== true)
 			await setScopeSince(configuredTables, result.since, db);
 		if (!hadStableBase)
 			await clearPendingMutations(db);
@@ -263,33 +268,59 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		const maxKeysPerBatch = normalizeLimit(pullConfig.maxKeysPerBatch, 200);
 		const maxRowsPerBatch = normalizeLimit(pullConfig.maxRowsPerBatch, 200);
 		const defaultPatchOptions = { ...(pullConfig.patchOptions || {}), concurrency: 'overwrite', skipSelectAfterInsert: true };
+		const db = options.db;
+		const scopeKey = options.scopeKey || getScopeKey(options.tables);
+		await ensurePullJournalTables(db);
+		const session = await stagePullJournal();
 		let applied = 0;
-		let stagedResult;
+		const shouldApplyCheckpoint = session.finalSince !== undefined;
 		await client.transaction(async (tx) => {
 			await tryDeferForeignKeys(tx);
-			stagedResult = await iterateStagedPull(tx);
+			const batches = await readPullJournalBatches(tx, scopeKey);
+			const touchedTables = new Set();
+			for (let i = 0; i < batches.length; i++) {
+				const batch = batches[i];
+				for (let itemIndex = 0; itemIndex < batch.length; itemIndex++)
+					touchedTables.add(batch[itemIndex].table);
+				const deleteItems = batch.filter(x => x.op === 'D');
+				const upsertItems = batch.filter(x => x.op !== 'D' && x.row !== undefined);
+				if (deleteItems.length > 0)
+					applied += await applyDeleteItemsOnTx(tx, deleteItems, defaultPatchOptions);
+				if (upsertItems.length > 0)
+					applied += await applyRowsPayloadOnTx(tx, upsertItems, defaultPatchOptions);
+			}
 			await validateForeignKeys(tx);
+			if (shouldApplyCheckpoint)
+				await writeScopeState(scopeKey, { since: session.finalSince, updatedAtMs: Date.now() }, tx);
+			await clearPullJournal(tx, scopeKey);
+			session.tables = Array.from(touchedTables);
 		}, { suppressSyncOutbox: true });
+		if (shouldApplyCheckpoint)
+			sinceByScope.set(scopeKey, session.finalSince);
 
 		return {
 			applied,
-			tables: stagedResult.tables,
-			since: stagedResult.since,
-			payload: stagedResult.payload
+			tables: session.tables || [],
+			since: session.finalSince,
+			payload: session.payload,
+			checkpointApplied: true
 		};
 
-		async function iterateStagedPull(tx) {
-			let token = options.token;
-			let finalSince = options.since;
-			const touchedTables = new Set();
-			let reason;
+		async function stagePullJournal() {
+			let session = await readPullSession(db, scopeKey);
+			let hasPersistedSession = !!session;
+			if (!session)
+				session = newPullSession(scopeKey, options.since);
+			let reason = session.reason;
 			for (let i = 0; i < 10000; i++) {
+				if (session.done)
+					return session;
 				const keysPayload = await requestPayload({
 					...pullConfig,
 					body: {
 						phase: 'keys',
-						token,
-						since: options.since,
+						token: session.token,
+						since: session.since,
 						tables: options.tables,
 						limit: maxKeysPerBatch
 					}
@@ -298,63 +329,81 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 					throw new Error('Sync endpoint did not return staged keys payload');
 				if (reason === undefined && keysPayload.reason !== undefined)
 					reason = keysPayload.reason;
-				if (keysPayload.cursor !== undefined)
-					finalSince = keysPayload.cursor;
 				const keyItems = normalizeKeyItems(keysPayload.items);
-				for (let keyIndex = 0; keyIndex < keyItems.length; keyIndex++) {
-					touchedTables.add(keyItems[keyIndex].table);
-				}
-
-				const deleteItems = keyItems.filter(x => x.op === 'D');
 				const upsertItems = keyItems.filter(x => x.op !== 'D');
-				if (tx && deleteItems.length > 0)
-					applied += await applyDeleteItemsOnTx(tx, deleteItems, defaultPatchOptions);
-
-				let nextRowsOffset = 0;
-				let nextRowsPromise = upsertItems.length > 0
-					? requestRowsChunk(upsertItems, nextRowsOffset)
-					: null;
-				nextRowsOffset += maxRowsPerBatch;
-				while (nextRowsPromise) {
-					const currentRowsResult = await nextRowsPromise;
-					if (nextRowsOffset < upsertItems.length) {
-						nextRowsPromise = requestRowsChunk(upsertItems, nextRowsOffset);
-						nextRowsOffset += maxRowsPerBatch;
-					}
-					else
-						nextRowsPromise = null;
-					if (currentRowsResult.error)
-						throw currentRowsResult.error;
-					if (!isRowsPayload(currentRowsResult.payload))
-						throw new Error('Sync endpoint did not return rows payload');
-					if (tx)
-						applied += await applyRowsPayloadOnTx(tx, currentRowsResult.payload.items, defaultPatchOptions);
+				let rowItems = [];
+				if (upsertItems.length > 0)
+					rowItems = await fetchRowsItems(upsertItems);
+				if (!hasPersistedSession) {
+					session = await createPullSession(db, scopeKey, session.since);
+					hasPersistedSession = true;
 				}
-				if (keysPayload.done || !keysPayload.token) {
-					return {
-						tables: Array.from(touchedTables),
-						since: finalSince,
-						payload: reason === undefined ? keysPayload : { ...keysPayload, reason }
-					};
-				}
-				token = keysPayload.token;
+				session = await persistPullJournalBatch(db, scopeKey, session, keysPayload, keyItems, rowItems, reason);
 			}
 			throw new Error('Sync failed: staged pull exceeded max iterations');
+		}
 
-			function requestRowsChunk(items, offset) {
-				const chunk = items.slice(offset, offset + maxRowsPerBatch);
-				return requestPayload({
-					...pullConfig,
-					body: {
-						phase: 'rows',
-						items: chunk
-					}
-				}, options)
-					.then(
-						(payload) => ({ payload, error: null }),
-						(error) => ({ payload: null, error })
-					);
+		async function fetchRowsItems(items) {
+			const queue = chunkItems(items, maxRowsPerBatch);
+			const rows = [];
+			let prefetched = null;
+			while (queue.length > 0 || prefetched) {
+				let currentItems;
+				let currentRowsResult;
+				if (prefetched) {
+					currentItems = prefetched.items;
+					currentRowsResult = await prefetched.promise;
+					prefetched = null;
+				}
+				else {
+					currentItems = queue.shift();
+					currentRowsResult = await requestRowsItems(currentItems);
+				}
+				if (!Array.isArray(currentItems) || currentItems.length === 0)
+					continue;
+				if (currentRowsResult.error)
+					throw currentRowsResult.error;
+				const payload = currentRowsResult.payload;
+				if (!isRowsPayload(payload))
+					throw new Error('Sync endpoint did not return rows payload');
+				for (let i = 0; i < payload.items.length; i++)
+					rows.push(payload.items[i]);
+				const acceptedCount = getRowsAcceptedCount(payload, currentItems.length);
+				const acceptedItems = acceptedCount < currentItems.length
+					? currentItems.slice(0, acceptedCount)
+					: currentItems;
+				const missingItems = getMissingRowItems(acceptedItems, payload.items);
+				if (acceptedCount >= currentItems.length && missingItems.length === 0 && queue.length > 0) {
+					const nextItems = queue.shift();
+					prefetched = {
+						items: nextItems,
+						promise: requestRowsItems(nextItems)
+					};
+				}
+				if (acceptedCount < currentItems.length) {
+					const deferredItems = currentItems.slice(acceptedCount);
+					enqueueMissingRows(queue, acceptedItems, missingItems);
+					if (deferredItems.length > 0)
+						queue.unshift(deferredItems);
+					continue;
+				}
+				enqueueMissingRows(queue, currentItems, missingItems);
 			}
+			return rows;
+		}
+
+		function requestRowsItems(items) {
+			return requestPayload({
+				...pullConfig,
+				body: {
+					phase: 'rows',
+					items
+				}
+			}, options)
+				.then(
+					(payload) => ({ payload, error: null }),
+					(error) => ({ payload: null, error })
+				);
 		}
 	}
 
@@ -528,6 +577,162 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 			return;
 		await db.query(outboxTableSql(syncOutboxTable));
 		markInternalTableEnsured(db, syncOutboxTable);
+	}
+
+	async function ensurePullJournalTables(db) {
+		if (isInternalTableEnsured(db, syncPullSessionTable) && isInternalTableEnsured(db, syncPullItemTable))
+			return;
+		await db.query([
+			`CREATE TABLE IF NOT EXISTS "${syncPullSessionTable}" (`,
+			'"scope" TEXT PRIMARY KEY,',
+			'"since_value" TEXT,',
+			'"token_json" TEXT,',
+			'"done" INTEGER NOT NULL DEFAULT 0,',
+			'"final_since" TEXT,',
+			'"payload_json" TEXT,',
+			'"reason" TEXT,',
+			'"status" TEXT NOT NULL,',
+			'"next_seq" INTEGER NOT NULL DEFAULT 0,',
+			'"next_batch" INTEGER NOT NULL DEFAULT 0,',
+			'"updated_at_ms" INTEGER NOT NULL',
+			');'
+		].join(' '));
+		await db.query([
+			`CREATE TABLE IF NOT EXISTS "${syncPullItemTable}" (`,
+			'"scope" TEXT NOT NULL,',
+			'"batch_no" INTEGER NOT NULL,',
+			'"seq" INTEGER NOT NULL,',
+			'"table_name" TEXT NOT NULL,',
+			'"pk_json" TEXT NOT NULL,',
+			'"key_json" TEXT,',
+			'"op" TEXT NOT NULL,',
+			'"row_json" TEXT,',
+			'PRIMARY KEY ("scope", "seq")',
+			');'
+		].join(' '));
+		await db.query(`CREATE INDEX IF NOT EXISTS "${syncPullItemTable}_batch_idx" ON "${syncPullItemTable}" ("scope", "batch_no", "seq")`);
+		markInternalTableEnsured(db, syncPullSessionTable);
+		markInternalTableEnsured(db, syncPullItemTable);
+	}
+
+	async function readPullSession(db, scopeKey) {
+		await ensurePullJournalTables(db);
+		const rows = await db.query([
+			`SELECT "scope", "since_value", "token_json", "done", "final_since", "payload_json", "reason", "status", "next_seq", "next_batch"`,
+			`FROM "${syncPullSessionTable}"`,
+			`WHERE "scope" = ${sqlStringLiteral(scopeKey)}`,
+			'LIMIT 1'
+		].join(' '));
+		const row = Array.isArray(rows) ? rows[0] : rows?.rows?.[0];
+		if (!row)
+			return null;
+		return pullSessionFromRow(row);
+	}
+
+	async function createPullSession(db, scopeKey, since) {
+		await ensurePullJournalTables(db);
+		const now = Date.now();
+		await db.query([
+			`INSERT INTO "${syncPullSessionTable}" ("scope", "since_value", "token_json", "done", "final_since", "payload_json", "reason", "status", "next_seq", "next_batch", "updated_at_ms")`,
+			`VALUES (${sqlStringLiteral(scopeKey)}, ${sqlNullableJsonLiteral(since)}, NULL, 0, ${sqlNullableJsonLiteral(since)}, NULL, NULL, 'pending', 0, 0, ${now})`
+		].join(' '));
+		return newPullSession(scopeKey, since);
+	}
+
+	function newPullSession(scopeKey, since) {
+		return {
+			scope: scopeKey,
+			since,
+			token: undefined,
+			done: false,
+			finalSince: since,
+			payload: undefined,
+			reason: undefined,
+			status: 'pending',
+			nextSeq: 0,
+			nextBatch: 0
+		};
+	}
+
+	async function persistPullJournalBatch(db, scopeKey, session, keysPayload, keyItems, rowItems, reason) {
+		let nextSession;
+		await client.transaction(async (tx) => {
+			const rowMap = rowsBySyncItemKey(rowItems);
+			const batchNo = session.nextBatch || 0;
+			let seq = session.nextSeq || 0;
+			for (let i = 0; i < keyItems.length; i++) {
+				const item = keyItems[i];
+				const rowItem = item.op === 'D' ? undefined : rowMap.get(syncItemKey(item));
+				await tx.query([
+					`INSERT INTO "${syncPullItemTable}" ("scope", "batch_no", "seq", "table_name", "pk_json", "key_json", "op", "row_json")`,
+					`VALUES (${sqlStringLiteral(scopeKey)}, ${batchNo}, ${seq}, ${sqlStringLiteral(item.table)}, ${sqlStringLiteral(stringify(item.pk))}, ${sqlNullableJsonLiteral(item.key)}, ${sqlStringLiteral(item.op)}, ${sqlNullableJsonLiteral(rowItem && rowItem.row)})`
+				].join(' '));
+				seq += 1;
+			}
+			const finalSince = keysPayload.cursor !== undefined ? keysPayload.cursor : session.finalSince;
+			const payload = reason === undefined ? keysPayload : { ...keysPayload, reason };
+			const token = keysPayload.done || !keysPayload.token ? null : keysPayload.token;
+			const done = keysPayload.done || !keysPayload.token ? 1 : 0;
+			await tx.query([
+				`UPDATE "${syncPullSessionTable}"`,
+				`SET "token_json" = ${sqlNullableJsonLiteral(token)},`,
+				`"done" = ${done},`,
+				`"final_since" = ${sqlNullableJsonLiteral(finalSince)},`,
+				`"payload_json" = ${sqlNullableJsonLiteral(payload)},`,
+				`"reason" = ${sqlNullableStringLiteral(reason)},`,
+				`"status" = ${sqlStringLiteral(done ? 'ready' : 'pending')},`,
+				`"next_seq" = ${seq},`,
+				`"next_batch" = ${batchNo + 1},`,
+				`"updated_at_ms" = ${Date.now()}`,
+				`WHERE "scope" = ${sqlStringLiteral(scopeKey)}`
+			].join(' '));
+			nextSession = {
+				...session,
+				token: token || undefined,
+				done: done === 1,
+				finalSince,
+				payload,
+				reason,
+				status: done ? 'ready' : 'pending',
+				nextSeq: seq,
+				nextBatch: batchNo + 1
+			};
+		}, { suppressSyncOutbox: true });
+		return nextSession;
+	}
+
+	async function readPullJournalBatches(db, scopeKey) {
+		await ensurePullJournalTables(db);
+		const rows = await db.query([
+			`SELECT "batch_no", "seq", "table_name", "pk_json", "key_json", "op", "row_json"`,
+			`FROM "${syncPullItemTable}"`,
+			`WHERE "scope" = ${sqlStringLiteral(scopeKey)}`,
+			'ORDER BY "batch_no" ASC, "seq" ASC'
+		].join(' '));
+		const list = Array.isArray(rows) ? rows : rows?.rows || [];
+		const batches = [];
+		let currentBatchNo;
+		let currentBatch = [];
+		for (let i = 0; i < list.length; i++) {
+			const item = pullItemFromRow(list[i]);
+			if (!item)
+				continue;
+			if (currentBatchNo !== item.batchNo) {
+				if (currentBatch.length > 0)
+					batches.push(currentBatch);
+				currentBatchNo = item.batchNo;
+				currentBatch = [];
+			}
+			currentBatch.push(item);
+		}
+		if (currentBatch.length > 0)
+			batches.push(currentBatch);
+		return batches;
+	}
+
+	async function clearPullJournal(db, scopeKey) {
+		await db.query(`DELETE FROM "${syncPullItemTable}" WHERE "scope" = ${sqlStringLiteral(scopeKey)}`);
+		await db.query(`DELETE FROM "${syncPullSessionTable}" WHERE "scope" = ${sqlStringLiteral(scopeKey)}`);
 	}
 
 	function isInternalTableEnsured(db, tableName) {
@@ -895,6 +1100,8 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		return typeof name === 'string'
 			&& !name.startsWith('sqlite_')
 			&& name !== syncBaseTable
+			&& name !== syncPullSessionTable
+			&& name !== syncPullItemTable
 			&& !name.startsWith(syncBasePrefix);
 	}
 
@@ -1042,7 +1249,9 @@ async function dropLocalSyncTables(db, client, tableNames) {
 		'orange_schema_state',
 		'orange_sync_state',
 		'orange_sync_client',
-		'orange_sync_outbox'
+		'orange_sync_outbox',
+		'orange_sync_pull_session',
+		'orange_sync_pull_item'
 	];
 	const dropNames = Array.from(new Set(internalTables.concat(tableDbNames)));
 	await db.query('PRAGMA foreign_keys = OFF');
@@ -1274,6 +1483,118 @@ function isRowsPayload(payload) {
 		&& payload === Object(payload)
 		&& payload.phase === 'rows'
 		&& Array.isArray(payload.items);
+}
+
+function chunkItems(items, chunkSize) {
+	const source = Array.isArray(items) ? items : [];
+	const size = normalizeLimit(chunkSize, 200);
+	const chunks = [];
+	for (let i = 0; i < source.length; i += size)
+		chunks.push(source.slice(i, i + size));
+	return chunks;
+}
+
+function getRowsAcceptedCount(payload, requestedCount) {
+	if (!payload || payload !== Object(payload) || payload.truncated !== true)
+		return requestedCount;
+	const limit = normalizeLimit(payload.limit, requestedCount);
+	return Math.max(0, Math.min(limit, requestedCount));
+}
+
+function getMissingRowItems(requestedItems, returnedItems) {
+	const returnedKeys = new Set();
+	const rows = Array.isArray(returnedItems) ? returnedItems : [];
+	for (let i = 0; i < rows.length; i++) {
+		const key = syncItemKey(rows[i]);
+		if (key)
+			returnedKeys.add(key);
+	}
+	const missing = [];
+	const requested = Array.isArray(requestedItems) ? requestedItems : [];
+	for (let i = 0; i < requested.length; i++) {
+		const key = syncItemKey(requested[i]);
+		if (key && !returnedKeys.has(key))
+			missing.push(requested[i]);
+	}
+	return missing;
+}
+
+function enqueueMissingRows(queue, requestedItems, missingItems) {
+	if (!Array.isArray(missingItems) || missingItems.length === 0)
+		return;
+	if (missingItems.length === 1 && requestedItems.length === 1)
+		return;
+	if (missingItems.length === requestedItems.length) {
+		const midpoint = Math.ceil(missingItems.length / 2);
+		queue.unshift(missingItems.slice(midpoint));
+		queue.unshift(missingItems.slice(0, midpoint));
+		return;
+	}
+	queue.unshift(missingItems);
+}
+
+function syncItemKey(item) {
+	if (!item || typeof item.table !== 'string' || !Array.isArray(item.pk))
+		return '';
+	return `${item.table}|${stringify(item.pk)}`;
+}
+
+function rowsBySyncItemKey(items) {
+	const result = new Map();
+	const rows = Array.isArray(items) ? items : [];
+	for (let i = 0; i < rows.length; i++) {
+		const key = syncItemKey(rows[i]);
+		if (key)
+			result.set(key, rows[i]);
+	}
+	return result;
+}
+
+function pullSessionFromRow(row) {
+	return {
+		scope: row.scope ?? row.SCOPE,
+		since: parseNullableJson(row.since_value ?? row.SINCE_VALUE),
+		token: parseNullableJson(row.token_json ?? row.TOKEN_JSON),
+		done: Number(row.done ?? row.DONE ?? 0) === 1,
+		finalSince: parseNullableJson(row.final_since ?? row.FINAL_SINCE),
+		payload: parseNullableJson(row.payload_json ?? row.PAYLOAD_JSON),
+		reason: row.reason ?? row.REASON,
+		status: row.status ?? row.STATUS,
+		nextSeq: Number(row.next_seq ?? row.NEXT_SEQ ?? 0),
+		nextBatch: Number(row.next_batch ?? row.NEXT_BATCH ?? 0)
+	};
+}
+
+function pullItemFromRow(row) {
+	const table = row.table_name ?? row.TABLE_NAME;
+	const pk = parseNullableJson(row.pk_json ?? row.PK_JSON);
+	if (typeof table !== 'string' || !Array.isArray(pk))
+		return null;
+	const rowJson = row.row_json ?? row.ROW_JSON;
+	const item = {
+		batchNo: Number(row.batch_no ?? row.BATCH_NO ?? 0),
+		seq: Number(row.seq ?? row.SEQ ?? 0),
+		table,
+		pk,
+		key: parseNullableJson(row.key_json ?? row.KEY_JSON),
+		op: normalizeChangeOp(row.op ?? row.OP)
+	};
+	if (rowJson !== null && rowJson !== undefined)
+		item.row = parseNullableJson(rowJson);
+	return item;
+}
+
+function parseNullableJson(value) {
+	if (value === null || value === undefined)
+		return undefined;
+	if (typeof value !== 'string')
+		return value;
+	try {
+		return JSON.parse(value);
+	}
+	catch (_e) {
+		return undefined;
+	}
 }
 
 function normalizeKeyItems(items) {
@@ -1579,6 +1900,12 @@ function sqlNullableStringLiteral(value) {
 	if (value === undefined || value === null)
 		return 'NULL';
 	return sqlStringLiteral(value);
+}
+
+function sqlNullableJsonLiteral(value) {
+	if (value === undefined || value === null)
+		return 'NULL';
+	return sqlStringLiteral(stringify(value));
 }
 
 function sqlNullableNumberLiteral(value) {
