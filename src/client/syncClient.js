@@ -618,7 +618,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 	async function readPullSession(db, scopeKey) {
 		await ensurePullJournalTables(db);
 		const rows = await db.query([
-			`SELECT "scope", "since_value", "token_json", "done", "final_since", "payload_json", "reason", "status", "next_seq", "next_batch"`,
+			'SELECT "scope", "since_value", "token_json", "done", "final_since", "payload_json", "reason", "status", "next_seq", "next_batch"',
 			`FROM "${syncPullSessionTable}"`,
 			`WHERE "scope" = ${sqlStringLiteral(scopeKey)}`,
 			'LIMIT 1'
@@ -704,7 +704,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 	async function readPullJournalBatches(db, scopeKey) {
 		await ensurePullJournalTables(db);
 		const rows = await db.query([
-			`SELECT "batch_no", "seq", "table_name", "pk_json", "key_json", "op", "row_json"`,
+			'SELECT "batch_no", "seq", "table_name", "pk_json", "key_json", "op", "row_json"',
 			`FROM "${syncPullItemTable}"`,
 			`WHERE "scope" = ${sqlStringLiteral(scopeKey)}`,
 			'ORDER BY "batch_no" ASC, "seq" ASC'

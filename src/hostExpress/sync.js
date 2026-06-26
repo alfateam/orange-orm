@@ -249,19 +249,19 @@ function newSyncHandler(client, options = {}) {
 			phase: 'keys',
 			mode: 'snapshot',
 			done,
-				cursor: token.watermark,
-				token: done ? null : {
-					v: 1,
-					mode: 'snapshot',
-					tables: token.tables,
-					tableIndex,
-					lastPk,
-					watermark: token.watermark,
-					upperPks: token.upperPks
-				},
-				items
-			};
-		}
+			cursor: token.watermark,
+			token: done ? null : {
+				v: 1,
+				mode: 'snapshot',
+				tables: token.tables,
+				tableIndex,
+				lastPk,
+				watermark: token.watermark,
+				upperPks: token.upperPks
+			},
+			items
+		};
+	}
 
 	async function pullKeysFromChanges(token, limit) {
 		const fromCursor = normalizeInteger(token.cursor, 0);
@@ -687,19 +687,19 @@ function normalizeToken(token, requestedTables) {
 			watermark: normalizeInteger(token.watermark, 0)
 		};
 	}
-		if (token.mode === 'snapshot') {
-			return {
-				v: 1,
-				mode: 'snapshot',
-				tables: requestedTables,
-				tableIndex: normalizeInteger(token.tableIndex, 0),
-				lastPk: normalizePrimaryKeyToken(token.lastPk),
-				watermark: normalizeInteger(token.watermark, 0),
-				upperPks: normalizeSnapshotUpperPks(token.upperPks, requestedTables)
-			};
-		}
-		return null;
+	if (token.mode === 'snapshot') {
+		return {
+			v: 1,
+			mode: 'snapshot',
+			tables: requestedTables,
+			tableIndex: normalizeInteger(token.tableIndex, 0),
+			lastPk: normalizePrimaryKeyToken(token.lastPk),
+			watermark: normalizeInteger(token.watermark, 0),
+			upperPks: normalizeSnapshotUpperPks(token.upperPks, requestedTables)
+		};
 	}
+	return null;
+}
 
 function normalizeCursor(cursor) {
 	if (cursor === null || cursor === undefined || cursor === '')
