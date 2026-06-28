@@ -176,7 +176,7 @@ function newSyncHandler(client, options = {}) {
 
 	async function pullKeys(body, request, response) {
 		const requestedTables = normalizeRequestedTables(body.tables, tableMeta);
-		const limit = normalizeLimit(body.limit, Math.min(syncOptions.limits.maxKeysPerBatch, syncOptions.limits.maxRowsPerBatch));
+		const limit = normalizeKeyBatchLimit(body.limit, syncOptions.limits);
 		const token = normalizeToken(body.token, requestedTables);
 		if (token && token.mode === 'changes')
 			return pullKeysFromChanges(token, limit);
@@ -335,7 +335,7 @@ function newSyncHandler(client, options = {}) {
 
 	async function pullRows(body, request, response) {
 		const rawItems = Array.isArray(body.items) ? body.items : [];
-		const limit = normalizeLimit(rawItems.length, syncOptions.limits.maxRowsPerBatch);
+		const limit = normalizeRowsBatchLimit(rawItems.length, syncOptions.limits);
 		const items = rawItems.slice(0, limit);
 		const truncated = rawItems.length > limit;
 		const normalizedItems = [];
@@ -547,11 +547,20 @@ function newSyncHandler(client, options = {}) {
 	}
 }
 
+const DEFAULT_SYNC_BATCH_LIMIT = 1000;
+const DEFAULT_SYNC_MUTATIONS_LIMIT = 200;
+const DEFAULT_SYNC_CHANGE_WINDOW = 100000;
+const MAX_SYNC_BATCH_LIMIT = 10000;
+
 function normalizeSyncOptions(sync) {
 	if (!sync)
 		return null;
 	const queueOptions = sync.queue || {};
 	const limits = sync.limits || {};
+	const explicitLimits = {
+		maxKeysPerBatch: isNormalizableInteger(limits.maxKeysPerBatch),
+		maxRowsPerBatch: isNormalizableInteger(limits.maxRowsPerBatch)
+	};
 	return {
 		enabled: sync.enabled !== false,
 		changeTable: sync.changeTable || 'orange_changes',
@@ -562,10 +571,11 @@ function normalizeSyncOptions(sync) {
 			maxPending: clamp(normalizeInteger(queueOptions.maxPending, 1000), 0, 100000)
 		},
 		limits: {
-			maxKeysPerBatch: clamp(normalizeInteger(limits.maxKeysPerBatch, 200), 1, 10000),
-			maxRowsPerBatch: clamp(normalizeInteger(limits.maxRowsPerBatch, 200), 1, 10000),
-			maxMutationsPerBatch: clamp(normalizeInteger(limits.maxMutationsPerBatch, 200), 1, 10000),
-			maxChangeWindow: clamp(normalizeInteger(limits.maxChangeWindow, 50000), 1, 100000000)
+			maxKeysPerBatch: clamp(normalizeInteger(limits.maxKeysPerBatch, DEFAULT_SYNC_BATCH_LIMIT), 1, MAX_SYNC_BATCH_LIMIT),
+			maxRowsPerBatch: clamp(normalizeInteger(limits.maxRowsPerBatch, DEFAULT_SYNC_BATCH_LIMIT), 1, MAX_SYNC_BATCH_LIMIT),
+			maxMutationsPerBatch: clamp(normalizeInteger(limits.maxMutationsPerBatch, DEFAULT_SYNC_MUTATIONS_LIMIT), 1, MAX_SYNC_BATCH_LIMIT),
+			maxChangeWindow: clamp(normalizeInteger(limits.maxChangeWindow, DEFAULT_SYNC_CHANGE_WINDOW), 1, 100000000),
+			explicit: explicitLimits
 		}
 	};
 }
@@ -711,8 +721,21 @@ function normalizeCursor(cursor) {
 	return NaN;
 }
 
-function normalizeLimit(limit, max) {
-	return clamp(normalizeInteger(limit, max), 1, max);
+function normalizeKeyBatchLimit(limit, limits) {
+	const max = Math.min(
+		limits.explicit.maxKeysPerBatch ? limits.maxKeysPerBatch : MAX_SYNC_BATCH_LIMIT,
+		limits.explicit.maxRowsPerBatch ? limits.maxRowsPerBatch : MAX_SYNC_BATCH_LIMIT
+	);
+	return normalizeLimit(limit, DEFAULT_SYNC_BATCH_LIMIT, max);
+}
+
+function normalizeRowsBatchLimit(limit, limits) {
+	const max = limits.explicit.maxRowsPerBatch ? limits.maxRowsPerBatch : MAX_SYNC_BATCH_LIMIT;
+	return normalizeLimit(limit, DEFAULT_SYNC_BATCH_LIMIT, max);
+}
+
+function normalizeLimit(limit, fallback, max) {
+	return clamp(normalizeInteger(limit, fallback), 1, max);
 }
 
 function normalizeInteger(value, fallback) {
@@ -724,6 +747,14 @@ function normalizeInteger(value, fallback) {
 			return parsed;
 	}
 	return fallback;
+}
+
+function isNormalizableInteger(value) {
+	if (typeof value === 'number')
+		return Number.isFinite(value);
+	if (typeof value === 'string')
+		return Number.isFinite(Number.parseInt(value, 10));
+	return false;
 }
 
 function normalizeOp(value) {

@@ -81,6 +81,38 @@ describe('sync client auto start', () => {
 		]);
 	});
 
+	test('uses 1000 as default pull key batch size', async () => {
+		const requests = [];
+		const db = {
+			__sqliteSync: { url: '/rdb', auto: false, tables: ['customer'] },
+			query: async () => []
+		};
+		const client = newSyncClient({
+			transaction: async (fn) => fn({
+				customer: {
+					patch: async () => ({ changed: [] })
+				},
+				query: async () => []
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async (request) => {
+					requests.push(request);
+					return {
+						data: request.data.phase === 'keys'
+							? { phase: 'keys', items: [], done: true, cursor: 'cursor-1' }
+							: { phase: 'push', applied: 0, duplicates: 0, results: [] }
+					};
+				};
+			}
+		});
+
+		await client.sync();
+
+		const keysRequest = requests.find(request => request.data.phase === 'keys');
+		expect(keysRequest.data.limit).toBe(1000);
+	});
+
 	test('rejects non-timeout sync options', async () => {
 		const db = { __sqliteSync: { url: '/rdb', auto: false, tables: ['customer'] } };
 		const client = newSyncClient({}, async () => db, {});

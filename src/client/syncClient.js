@@ -279,8 +279,8 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 	}
 
 	async function pullStaged(pullConfig, options) {
-		const maxKeysPerBatch = normalizeLimit(pullConfig.maxKeysPerBatch, 200);
-		const maxRowsPerBatch = normalizeLimit(pullConfig.maxRowsPerBatch, 200);
+		const maxKeysPerBatch = normalizeLimit(pullConfig.maxKeysPerBatch, 1000);
+		const maxRowsPerBatch = normalizeLimit(pullConfig.maxRowsPerBatch, 1000);
 		const maxJournalRowsPerInsert = normalizeLimit(pullConfig.maxJournalRowsPerInsert, maxRowsPerBatch);
 		const defaultPatchOptions = { ...(pullConfig.patchOptions || {}), concurrency: 'overwrite', skipSelectAfterInsert: true };
 		const db = options.db;

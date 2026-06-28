@@ -327,6 +327,103 @@ describe('sync commands', () => {
 		expect(result.done).toBe(false);
 	});
 
+	test('allows client key batch above server default when server limit is omitted', async () => {
+		const seenStrategies = [];
+		const tx = {
+			project: {
+				getMany: async (_filter, strategy) => {
+					seenStrategies.push(strategy);
+					if (strategy.orderBy[0] === 'id desc')
+						return [{ id: 1500 }];
+					return Array.from({ length: strategy.limit }, (_x, index) => ({ id: index + 1 }));
+				}
+			}
+		};
+		const client = {
+			tables: {
+				project: newTable('project')
+			},
+			transaction: async (fn) => fn(tx),
+			query: async () => [{ min_id: 1, max_id: 1 }]
+		};
+		const handler = newSyncHandler(client, {
+			sync: {}
+		});
+
+		const result = await callHandler(handler, {
+			phase: 'keys',
+			tables: ['project'],
+			limit: 1200
+		});
+
+		expect(seenStrategies.filter(x => x.orderBy[0] === 'id')[0].limit).toBe(1200);
+		expect(result.items).toHaveLength(1200);
+		expect(result.done).toBe(false);
+	});
+
+	test('allows client row batch above server default when server limit is omitted', async () => {
+		const itemCount = 1200;
+		const tx = {
+			project: {
+				getMany: async () => Array.from({ length: itemCount }, (_x, index) => ({ id: index + 1 }))
+			}
+		};
+		const client = {
+			tables: {
+				project: newTable('project')
+			},
+			transaction: async (fn) => fn(tx),
+			query: async () => []
+		};
+		const handler = newSyncHandler(client, {
+			sync: {}
+		});
+
+		const result = await callHandler(handler, {
+			phase: 'rows',
+			items: Array.from({ length: itemCount }, (_x, index) => ({
+				table: 'project',
+				pk: [index + 1],
+				op: 'U'
+			}))
+		});
+
+		expect(result.limit).toBe(itemCount);
+		expect(result.truncated).toBe(false);
+		expect(result.items).toHaveLength(itemCount);
+	});
+
+	test('uses default max change window of 100000', async () => {
+		const queries = [];
+		const client = {
+			tables: {
+				project: newTable('project')
+			},
+			transaction: async () => {
+				throw new Error('snapshot should not be used');
+			},
+			query: async (sql) => {
+				queries.push(sql);
+				if (sql.includes('MIN(id)'))
+					return [{ min_id: 1, max_id: 100000 }];
+				return [];
+			}
+		};
+		const handler = newSyncHandler(client, {
+			sync: {}
+		});
+
+		const result = await callHandler(handler, {
+			phase: 'keys',
+			tables: ['project'],
+			since: 0
+		});
+
+		expect(result.mode).toBe('changes');
+		expect(result.reason).toBeUndefined();
+		expect(queries.some(sql => sql.includes('orange_changes'))).toBe(true);
+	});
+
 	test('runs transaction hooks for sync push apply', async () => {
 		const calls = [];
 		const tx = {
