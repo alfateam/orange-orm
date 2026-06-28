@@ -75,7 +75,6 @@ beforeAll(async () => {
 		sync: {
 			queue: { concurrency: 1, maxPending: 100 },
 			limits: {
-				maxTablesPerRequest: 20,
 				maxKeysPerBatch: 1,
 				maxRowsPerBatch: 1,
 				maxChangeWindow: 3

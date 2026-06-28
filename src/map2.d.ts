@@ -1214,7 +1214,6 @@ type SyncServerConfig<M extends Record<string, TableDefinition<M>>> = {
     maxPending?: number;
   };
   limits?: {
-    maxTablesPerRequest?: number;
     maxKeysPerBatch?: number;
     maxRowsPerBatch?: number;
     maxChangeWindow?: number;

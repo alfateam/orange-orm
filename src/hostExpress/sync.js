@@ -175,7 +175,7 @@ function newSyncHandler(client, options = {}) {
 	}
 
 	async function pullKeys(body, request, response) {
-		const requestedTables = normalizeRequestedTables(body.tables, tableMeta, syncOptions.limits.maxTablesPerRequest);
+		const requestedTables = normalizeRequestedTables(body.tables, tableMeta);
 		const limit = normalizeLimit(body.limit, Math.min(syncOptions.limits.maxKeysPerBatch, syncOptions.limits.maxRowsPerBatch));
 		const token = normalizeToken(body.token, requestedTables);
 		if (token && token.mode === 'changes')
@@ -562,7 +562,6 @@ function normalizeSyncOptions(sync) {
 			maxPending: clamp(normalizeInteger(queueOptions.maxPending, 1000), 0, 100000)
 		},
 		limits: {
-			maxTablesPerRequest: clamp(normalizeInteger(limits.maxTablesPerRequest, 50), 1, 1000),
 			maxKeysPerBatch: clamp(normalizeInteger(limits.maxKeysPerBatch, 200), 1, 10000),
 			maxRowsPerBatch: clamp(normalizeInteger(limits.maxRowsPerBatch, 200), 1, 10000),
 			maxMutationsPerBatch: clamp(normalizeInteger(limits.maxMutationsPerBatch, 200), 1, 10000),
@@ -652,7 +651,7 @@ function shouldUseSnapshot(cursor, bounds, maxChangeWindow) {
 	return { useSnapshot: false };
 }
 
-function normalizeRequestedTables(rawTables, tableMeta, maxTablesPerRequest) {
+function normalizeRequestedTables(rawTables, tableMeta) {
 	if (!Array.isArray(rawTables) || rawTables.length === 0)
 		return Array.from(tableMeta.byName.keys());
 	const normalized = [];
@@ -669,8 +668,7 @@ function normalizeRequestedTables(rawTables, tableMeta, maxTablesPerRequest) {
 		if (byDbName)
 			normalized.push(byDbName.name);
 	}
-	const deduped = Array.from(new Set(normalized));
-	return deduped.slice(0, maxTablesPerRequest);
+	return Array.from(new Set(normalized));
 }
 
 function normalizeToken(token, requestedTables) {
