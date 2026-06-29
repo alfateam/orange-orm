@@ -9,6 +9,7 @@ let randomUuid = require('./randomUuid');
 let stringify = require('./client/stringify');
 let getSessionSingleton = require('./table/getSessionSingleton');
 let outboxTableSql = require('./sync/outboxTableSql');
+let { runSyncWrite } = require('./sync/writeGate');
 const readonlyOps = ['getManyDto', 'getMany', 'aggregate', 'distinct', 'count'];
 const syncOutboxEnsuredKey = typeof Symbol === 'function'
 	? Symbol.for('orange-orm.syncOutboxEnsured')
@@ -45,14 +46,8 @@ function hostLocal() {
 		if (transaction)
 			await transaction(fn);
 		else {
-			if (typeof db === 'function') {
-				let dbPromise = db();
-				if (dbPromise.then)
-					db = await dbPromise;
-				else
-					db = dbPromise;
-			}
-			await db.transaction(fn);
+			const resolvedDb = await resolveDb();
+			await runSyncWrite(resolvedDb, undefined, () => resolvedDb.transaction(fn));
 		}
 		return result;
 
@@ -73,14 +68,8 @@ function hostLocal() {
 		if (transaction)
 			await transaction(fn);
 		else {
-			if (typeof db === 'function') {
-				let dbPromise = db();
-				if (dbPromise.then)
-					db = await dbPromise;
-				else
-					db = dbPromise;
-			}
-			await db.transaction(fn);
+			const resolvedDb = await resolveDb();
+			await runSyncWrite(resolvedDb, undefined, () => resolvedDb.transaction(fn));
 		}
 		return result;
 
@@ -97,13 +86,7 @@ function hostLocal() {
 		if (transaction)
 			await transaction(fn);
 		else {
-			if (typeof db === 'function') {
-				let dbPromise = db();
-				if (dbPromise.then)
-					db = await dbPromise;
-				else
-					db = dbPromise;
-			}
+			const resolvedDb = await resolveDb();
 			const beforeBegin = getTransactionHook('beforeBegin');
 			const afterBegin = getTransactionHook('afterBegin');
 			const beforeCommit = getTransactionHook('beforeCommit');
@@ -115,12 +98,12 @@ function hostLocal() {
 				|| afterCommit
 				|| afterRollback);
 			if (!hasTransactionHooks && readonlyOps.includes(body.path))
-				await db.transaction({ readonly: true }, fn);
+				await resolvedDb.transaction({ readonly: true }, fn);
 			else {
-				await db.transaction(async (context) => {
+				await runSyncWrite(resolvedDb, undefined, () => resolvedDb.transaction(async (context) => {
 					const hookDb = typeof client === 'function'
 						? client({ transaction: (fn) => fn(context) })
-						: (client || db);
+						: (client || resolvedDb);
 					if (afterCommit)
 						setSessionSingleton(context, 'afterCommitHook', () =>
 							afterCommit(hookDb, request, response)
@@ -136,7 +119,7 @@ function hostLocal() {
 					await fn(context);
 					if (beforeCommit)
 						await beforeCommit(hookDb, request, response);
-				});
+				}));
 			}
 
 		}
@@ -155,14 +138,8 @@ function hostLocal() {
 		if (transaction)
 			await transaction(fn);
 		else {
-			if (typeof db === 'function') {
-				let dbPromise = db();
-				if (dbPromise.then)
-					db = await dbPromise;
-				else
-					db = dbPromise;
-			}
-			result = await db.query.apply(null, arguments);
+			const resolvedDb = await resolveDb();
+			result = await resolvedDb.query.apply(null, arguments);
 		}
 
 		return result;
@@ -180,14 +157,8 @@ function hostLocal() {
 		if (transaction)
 			await transaction(fn);
 		else {
-			if (typeof db === 'function') {
-				let dbPromise = db();
-				if (dbPromise.then)
-					db = await dbPromise;
-				else
-					db = dbPromise;
-			}
-			result = await db.sqliteFunction.apply(null, arguments);
+			const resolvedDb = await resolveDb();
+			result = await resolvedDb.sqliteFunction.apply(null, arguments);
 		}
 
 		return result;
@@ -207,6 +178,17 @@ function hostLocal() {
 	}
 
 	return c;
+
+	async function resolveDb() {
+		if (typeof db !== 'function')
+			return db;
+		let dbPromise = db();
+		if (dbPromise.then)
+			db = await dbPromise;
+		else
+			db = dbPromise;
+		return db;
+	}
 
 	async function captureSyncOutboxPatch(context, patch, options) {
 		if (!Array.isArray(patch) || patch.length === 0)

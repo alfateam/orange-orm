@@ -1,3 +1,5 @@
+const { acquireSyncWrite } = require('../sync/writeGate');
+
 function createDbWorkerHandler(client, options = {}) {
 	if (!client)
 		throw new Error('DB worker handler requires a client.');
@@ -53,7 +55,16 @@ function createDbWorkerHandler(client, options = {}) {
 			throw new Error('Transaction not supported by DB worker client.');
 		if (transactions.has(transactionId))
 			return { transactionId };
-		const transaction = pool.createTransaction(txOptions);
+		const releaseSyncWrite = await acquireSyncWrite(pool, txOptions);
+		let transaction;
+		try {
+			transaction = pool.createTransaction(txOptions);
+		}
+		catch (e) {
+			releaseSyncWrite();
+			throw e;
+		}
+		transaction.__orangeSyncWriteRelease = releaseSyncWrite;
 		transactions.set(transactionId, transaction);
 		return { transactionId };
 	}
@@ -63,10 +74,15 @@ function createDbWorkerHandler(client, options = {}) {
 		if (!transaction)
 			return { transactionId, missing: true };
 		transactions.delete(transactionId);
-		if (method === 'commit')
-			await transaction(transaction.commit);
-		else
-			await transaction(transaction.rollback.bind(null, toError(error)));
+		try {
+			if (method === 'commit')
+				await transaction(transaction.commit);
+			else
+				await transaction(transaction.rollback.bind(null, toError(error)));
+		}
+		finally {
+			releaseSyncWrite(transaction);
+		}
 		return { transactionId };
 	}
 
@@ -170,7 +186,7 @@ function createDbWorkerHandler(client, options = {}) {
 		syncEventUnsubscribers.clear();
 		for (const [id, transaction] of transactions) {
 			transactions.delete(id);
-			void transaction(transaction.rollback);
+			void Promise.resolve(transaction(transaction.rollback)).finally(() => releaseSyncWrite(transaction));
 		}
 		if (client.syncClient && typeof client.syncClient.stop === 'function')
 			client.syncClient.stop();
@@ -183,6 +199,14 @@ function createDbWorkerHandler(client, options = {}) {
 			result,
 			error: error ? serializeError(error) : undefined
 		});
+	}
+
+	function releaseSyncWrite(transaction) {
+		const release = transaction && transaction.__orangeSyncWriteRelease;
+		if (typeof release !== 'function')
+			return;
+		transaction.__orangeSyncWriteRelease = undefined;
+		release();
 	}
 }
 

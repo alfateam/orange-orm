@@ -1,8 +1,10 @@
 const randomUuid = require('../randomUuid');
 const stringify = require('./stringify');
 const { createSyncAuto } = require('./syncAuto');
+const createHttpInterceptor = require('./httpInterceptor');
 const outboxTableSql = require('../sync/outboxTableSql');
 const { ensureSyncSchema, clearEnsuredSyncSchema } = require('./syncSchema');
+const { runSyncMaintenance } = require('../sync/writeGate');
 
 function newSyncClient(client, getDb, axiosInterceptor) {
 	const sinceByScope = new Map();
@@ -17,6 +19,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 	const initialReadyListeners = new Set();
 	const eventListeners = new Map();
 	let initialReadyEmitted = false;
+	const interceptors = createHttpInterceptor();
 	const lockedSync = withCrossTabSyncLock(sync);
 	const lockedResetLocal = withCrossTabSyncLock(resetLocal);
 	const observedSync = observeSyncMethod('sync', lockedSync);
@@ -34,7 +37,8 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		on,
 		off,
 		once,
-		waitForInitialReady
+		waitForInitialReady,
+		interceptors
 	};
 
 	function withCrossTabSyncLock(fn) {
@@ -97,6 +101,12 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 			throw new Error('Sync pull requires mapped tables or configured tables. Set sync.tables when the client has no table map.');
 		await ensureSyncSchema(db, client, configuredTables, syncConfig.schema);
 		const hadStableBase = await hasStableBase(db);
+		if (!hadStableBase)
+			return runSyncMaintenance(db, () => pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase));
+		return pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase);
+	}
+
+	async function pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase) {
 		const pushResult = await pushBeforePull(db, syncConfig, hadStableBase);
 		await maybeEmitInitialReady(syncConfig, configuredTables, db, 'persisted');
 		const currentSince = await getScopeSince(configuredTables, db);
@@ -106,6 +116,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 			since: currentSince,
 			db,
 			scopeKey,
+			_syncInterceptors: interceptors,
 			_syncAxiosInterceptor: axiosInterceptor
 		};
 		let result;
@@ -138,18 +149,20 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		const configuredTables = resolveSyncTables(db, normalizeConfiguredTables(options.tables) || syncConfig.tables, client);
 		if (!Array.isArray(configuredTables) || configuredTables.length === 0)
 			throw new Error('Sync resetLocal requires mapped tables or configured tables.');
-		const droppedTables = await dropLocalSyncTables(db, client, configuredTables);
-		await dropExistingBaseTables(db);
-		await db.query(`DROP TABLE IF EXISTS "${syncBaseTable}"`);
-		sinceByScope.clear();
-		ensuredInternalTables.delete(db);
-		clearEnsuredSyncSchema(db);
-		initialReadyEmitted = false;
-		return {
-			reset: true,
-			tables: configuredTables,
-			droppedTables
-		};
+		return runSyncMaintenance(db, async () => {
+			const droppedTables = await dropLocalSyncTables(db, client, configuredTables);
+			await dropExistingBaseTables(db);
+			await db.query(`DROP TABLE IF EXISTS "${syncBaseTable}"`);
+			sinceByScope.clear();
+			ensuredInternalTables.delete(db);
+			clearEnsuredSyncSchema(db);
+			initialReadyEmitted = false;
+			return {
+				reset: true,
+				tables: configuredTables,
+				droppedTables
+			};
+		});
 	}
 
 	async function pushPending(options = {}) {
@@ -204,6 +217,10 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 	}
 
 	async function rollbackFailedPushBatch(db, attemptedMutations) {
+		return runSyncMaintenance(db, () => rollbackFailedPushBatchCore(db, attemptedMutations));
+	}
+
+	async function rollbackFailedPushBatchCore(db, attemptedMutations) {
 		if (!await hasStableBase(db))
 			return;
 		const remaining = await readPendingMutationRows(db, 10000, mutationIdsToSet(attemptedMutations));
@@ -269,6 +286,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 				mutations
 			}
 		}, {
+			_syncInterceptors: interceptors,
 			_syncAxiosInterceptor: axiosInterceptor
 		});
 	}
@@ -973,6 +991,11 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		await db.query(`DELETE FROM "${syncOutboxTable}" WHERE "status" = 'pending'`);
 	}
 
+	async function hasPendingMutations(db) {
+		const pending = await readPendingMutationRows(db, 1);
+		return pending.length > 0;
+	}
+
 	function mutationIdsToSet(mutations) {
 		const result = new Set();
 		if (!Array.isArray(mutations))
@@ -1072,22 +1095,27 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 	async function saveStableBase(db) {
 		if (!db || typeof db.query !== 'function')
 			return;
-		await client.transaction(async (tx) => {
-			await ensureSyncBaseTable(tx);
-			const tables = await readSqliteTables(tx);
-			await dropExistingBaseTables(tx);
-			await tx.query(`DELETE FROM "${syncBaseTable}"`);
-			for (let i = 0; i < tables.length; i++) {
-				const table = tables[i];
-				const baseName = toBaseTableName(table.name);
-				await tx.query(`CREATE TABLE ${quoteIdent(baseName)} AS SELECT * FROM ${quoteIdent(table.name)}`);
-				await tx.query([
-					`INSERT INTO "${syncBaseTable}" ("name", "base_name", "schema_sql", "ordinal") VALUES (`,
-					`${sqlStringLiteral(table.name)}, ${sqlStringLiteral(baseName)}, ${sqlNullableStringLiteral(table.sql)}, ${i}`,
-					')'
-				].join(' '));
-			}
-		}, { suppressSyncOutbox: true });
+		return runSyncMaintenance(db, async () => {
+			if (await hasPendingMutations(db))
+				return false;
+			await client.transaction(async (tx) => {
+				await ensureSyncBaseTable(tx);
+				const tables = await readSqliteTables(tx);
+				await dropExistingBaseTables(tx);
+				await tx.query(`DELETE FROM "${syncBaseTable}"`);
+				for (let i = 0; i < tables.length; i++) {
+					const table = tables[i];
+					const baseName = toBaseTableName(table.name);
+					await tx.query(`CREATE TABLE ${quoteIdent(baseName)} AS SELECT * FROM ${quoteIdent(table.name)}`);
+					await tx.query([
+						`INSERT INTO "${syncBaseTable}" ("name", "base_name", "schema_sql", "ordinal") VALUES (`,
+						`${sqlStringLiteral(table.name)}, ${sqlStringLiteral(baseName)}, ${sqlNullableStringLiteral(table.sql)}, ${i}`,
+						')'
+					].join(' '));
+				}
+			}, { suppressSyncOutbox: true });
+			return true;
+		});
 	}
 
 	async function restoreStableBase(db) {
@@ -1730,6 +1758,7 @@ function resolvePushConfig(syncConfig, options = {}) {
 }
 
 async function requestPayload(config, options) {
+	const syncInterceptors = options && options._syncInterceptors;
 	const axiosInterceptor = options && options._syncAxiosInterceptor;
 	const axios = createFetchClient();
 	if (axiosInterceptor && typeof axiosInterceptor.applyTo === 'function')
@@ -1742,11 +1771,29 @@ async function requestPayload(config, options) {
 	const request = {
 		url: appendQueryParam(config.url, 'sync', config.syncPhase || 'pull'),
 		method: 'post',
-		timeout: config.timeoutMs
+		timeout: config.timeoutMs,
+		headers: {}
 	};
 	request.data = requestBody;
 
-	const response = await axios.request(request);
+	const interceptedRequest = syncInterceptors && typeof syncInterceptors.applyRequest === 'function'
+		? await syncInterceptors.applyRequest(request)
+		: request;
+	let response;
+	try {
+		response = await axios.request(interceptedRequest);
+	}
+	catch (error) {
+		if (syncInterceptors && typeof syncInterceptors.applyResponseError === 'function') {
+			const recovered = await syncInterceptors.applyResponseError(error);
+			return recovered && recovered === Object(recovered) && 'data' in recovered
+				? recovered.data
+				: recovered;
+		}
+		throw error;
+	}
+	if (syncInterceptors && typeof syncInterceptors.applyResponse === 'function')
+		response = await syncInterceptors.applyResponse(response);
 	return response.data;
 }
 
@@ -1767,32 +1814,50 @@ function createFetchClient() {
 			timeout = setTimeout(() => abortController.abort(), config.timeout);
 
 		try {
-			const response = await fetch(config.url, {
+			const headers = {
+				'Content-Type': 'application/json',
+				'Accept': 'application/json',
+				...(config.headers || {})
+			};
+			const fetchOptions = {
 				method: config.method?.toUpperCase(),
-				headers: {
-					'Content-Type': 'application/json',
-					'Accept': 'application/json'
-				},
+				headers,
 				body: config.data === undefined ? undefined : JSON.stringify(config.data),
 				signal: abortController && abortController.signal
-			});
+			};
+			if (config.credentials !== undefined)
+				fetchOptions.credentials = config.credentials;
+			const response = await fetch(config.url, fetchOptions);
 			const data = await readPayloadResponse(response);
+			const payload = {
+				data,
+				status: response.status,
+				statusText: response.statusText,
+				headers: headersToObject(response.headers),
+				config
+			};
 			if (!response.ok) {
 				const error = new Error('Request failed with status code ' + response.status);
-				error.response = {
-					data,
-					status: response.status,
-					statusText: response.statusText
-				};
+				error.response = payload;
 				throw error;
 			}
-			return { data };
+			return payload;
 		}
 		finally {
 			if (timeout)
 				clearTimeout(timeout);
 		}
 	}
+}
+
+function headersToObject(headers) {
+	const result = {};
+	if (!headers || typeof headers.forEach !== 'function')
+		return result;
+	headers.forEach((value, key) => {
+		result[key] = value;
+	});
+	return result;
 }
 
 async function readPayloadResponse(response) {

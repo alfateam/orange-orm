@@ -68,6 +68,42 @@ declare namespace r {
         close(): void;
     }
 
+    export interface SyncRequestConfig {
+        url?: string;
+        method?: string;
+        timeout?: number;
+        headers?: Record<string, string>;
+        credentials?: RequestCredentials;
+        data?: unknown;
+    }
+
+    export interface SyncResponse {
+        data: unknown;
+        status?: number;
+        statusText?: string;
+    }
+
+    export interface SyncResponseError extends Error {
+        response?: SyncResponse;
+    }
+
+    export interface SyncInterceptors {
+        request: {
+            use(
+                onFulfilled: (config: SyncRequestConfig) => SyncRequestConfig | Promise<SyncRequestConfig>,
+                onRejected?: (error: unknown) => unknown
+            ): string | Promise<string>;
+            eject(id: string): void | Promise<void>;
+        };
+        response: {
+            use(
+                onFulfilled?: (response: SyncResponse) => SyncResponse | Promise<SyncResponse>,
+                onRejected?: (error: SyncResponseError) => unknown
+            ): string | Promise<string>;
+            eject(id: string): void | Promise<void>;
+        };
+    }
+
     export interface DbWorkerClient extends Pool {
         syncClient: SyncWorkerClient & {
             start(options?: unknown): Promise<unknown>;

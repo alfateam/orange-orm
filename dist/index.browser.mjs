@@ -3684,6 +3684,189 @@ function requireOutboxTableSql () {
 	return outboxTableSql_1;
 }
 
+var writeGate;
+var hasRequiredWriteGate;
+
+function requireWriteGate () {
+	if (hasRequiredWriteGate) return writeGate;
+	hasRequiredWriteGate = 1;
+	const gateKey = typeof Symbol === 'function'
+		? Symbol.for('orange-orm.syncWriteGate')
+		: '__orangeOrmSyncWriteGate';
+
+	function runSyncWrite(target, options, fn) {
+		if (typeof options === 'function') {
+			fn = options;
+			options = undefined;
+		}
+		if (!shouldGateWrite(target, options))
+			return Promise.resolve().then(fn);
+		return getSyncWriteGate(target).runWrite(fn);
+	}
+
+	async function acquireSyncWrite(target, options) {
+		if (!shouldGateWrite(target, options))
+			return noop;
+		return getSyncWriteGate(target).acquireWrite();
+	}
+
+	function runSyncMaintenance(target, fn) {
+		if (!resolveGateTarget(target))
+			return Promise.resolve().then(fn);
+		return getSyncWriteGate(target).runMaintenance(fn);
+	}
+
+	function shouldGateWrite(target, options) {
+		if (!resolveGateTarget(target))
+			return false;
+		if (options && (options.readonly || options.suppressSyncOutbox))
+			return false;
+		return true;
+	}
+
+	function getSyncWriteGate(target) {
+		const gateTarget = resolveGateTarget(target);
+		if (!gateTarget)
+			return noopGate;
+		if (!gateTarget[gateKey])
+			gateTarget[gateKey] = createSyncWriteGate();
+		return gateTarget[gateKey];
+	}
+
+	function resolveGateTarget(target) {
+		if (!target)
+			return null;
+		const pool = target.poolFactory || target;
+		if (pool && pool.__sqliteSync)
+			return pool;
+		if (target.__sqliteSync)
+			return target;
+		return null;
+	}
+
+	function createSyncWriteGate() {
+		let activeWrites = 0;
+		let maintenanceActive = false;
+		let pendingMaintenance = 0;
+		const writeWaiters = [];
+		const maintenanceWaiters = [];
+
+		return {
+			acquireWrite,
+			runWrite,
+			runMaintenance,
+			_isIdle
+		};
+
+		function acquireWrite() {
+			if (canStartWrite()) {
+				activeWrites += 1;
+				return Promise.resolve(newWriteRelease());
+			}
+			return new Promise((resolve) => {
+				writeWaiters.push(resolve);
+			});
+		}
+
+		async function runWrite(fn) {
+			const release = await acquireWrite();
+			try {
+				return await fn();
+			}
+			finally {
+				release();
+			}
+		}
+
+		async function runMaintenance(fn) {
+			if (maintenanceActive)
+				return fn();
+			const release = await acquireMaintenance();
+			try {
+				return await fn();
+			}
+			finally {
+				release();
+			}
+		}
+
+		function acquireMaintenance() {
+			pendingMaintenance += 1;
+			return new Promise((resolve) => {
+				maintenanceWaiters.push(() => {
+					pendingMaintenance -= 1;
+					maintenanceActive = true;
+					resolve(releaseMaintenance);
+				});
+				drain();
+			});
+		}
+
+		function releaseMaintenance() {
+			maintenanceActive = false;
+			drain();
+		}
+
+		function canStartWrite() {
+			return !maintenanceActive && pendingMaintenance === 0;
+		}
+
+		function newWriteRelease() {
+			let released = false;
+			return function releaseWrite() {
+				if (released)
+					return;
+				released = true;
+				activeWrites -= 1;
+				drain();
+			};
+		}
+
+		function drain() {
+			if (maintenanceActive)
+				return;
+			if (activeWrites > 0)
+				return;
+			if (maintenanceWaiters.length > 0) {
+				const nextMaintenance = maintenanceWaiters.shift();
+				nextMaintenance();
+				return;
+			}
+			while (writeWaiters.length > 0 && canStartWrite()) {
+				activeWrites += 1;
+				const resolve = writeWaiters.shift();
+				resolve(newWriteRelease());
+			}
+		}
+
+		function _isIdle() {
+			return activeWrites === 0
+				&& !maintenanceActive
+				&& pendingMaintenance === 0
+				&& writeWaiters.length === 0
+				&& maintenanceWaiters.length === 0;
+		}
+	}
+
+	function noop() {}
+
+	const noopGate = {
+		acquireWrite: () => Promise.resolve(noop),
+		runWrite: (fn) => Promise.resolve().then(fn),
+		runMaintenance: (fn) => Promise.resolve().then(fn),
+		_isIdle: () => true
+	};
+
+	writeGate = {
+		acquireSyncWrite,
+		getSyncWriteGate,
+		runSyncMaintenance,
+		runSyncWrite,
+		shouldGateWrite
+	};
+	return writeGate;
+}
+
 var hostLocal_1;
 var hasRequiredHostLocal;
 
@@ -3701,6 +3884,7 @@ function requireHostLocal () {
 	let stringify = requireStringify();
 	let getSessionSingleton = requireGetSessionSingleton();
 	let outboxTableSql = requireOutboxTableSql();
+	let { runSyncWrite } = requireWriteGate();
 	const readonlyOps = ['getManyDto', 'getMany', 'aggregate', 'distinct', 'count'];
 	const syncOutboxEnsuredKey = typeof Symbol === 'function'
 		? Symbol.for('orange-orm.syncOutboxEnsured')
@@ -3737,14 +3921,8 @@ function requireHostLocal () {
 			if (transaction)
 				await transaction(fn);
 			else {
-				if (typeof db === 'function') {
-					let dbPromise = db();
-					if (dbPromise.then)
-						db = await dbPromise;
-					else
-						db = dbPromise;
-				}
-				await db.transaction(fn);
+				const resolvedDb = await resolveDb();
+				await runSyncWrite(resolvedDb, undefined, () => resolvedDb.transaction(fn));
 			}
 			return result;
 
@@ -3765,14 +3943,8 @@ function requireHostLocal () {
 			if (transaction)
 				await transaction(fn);
 			else {
-				if (typeof db === 'function') {
-					let dbPromise = db();
-					if (dbPromise.then)
-						db = await dbPromise;
-					else
-						db = dbPromise;
-				}
-				await db.transaction(fn);
+				const resolvedDb = await resolveDb();
+				await runSyncWrite(resolvedDb, undefined, () => resolvedDb.transaction(fn));
 			}
 			return result;
 
@@ -3789,13 +3961,7 @@ function requireHostLocal () {
 			if (transaction)
 				await transaction(fn);
 			else {
-				if (typeof db === 'function') {
-					let dbPromise = db();
-					if (dbPromise.then)
-						db = await dbPromise;
-					else
-						db = dbPromise;
-				}
+				const resolvedDb = await resolveDb();
 				const beforeBegin = getTransactionHook('beforeBegin');
 				const afterBegin = getTransactionHook('afterBegin');
 				const beforeCommit = getTransactionHook('beforeCommit');
@@ -3807,12 +3973,12 @@ function requireHostLocal () {
 					|| afterCommit
 					|| afterRollback);
 				if (!hasTransactionHooks && readonlyOps.includes(body.path))
-					await db.transaction({ readonly: true }, fn);
+					await resolvedDb.transaction({ readonly: true }, fn);
 				else {
-					await db.transaction(async (context) => {
+					await runSyncWrite(resolvedDb, undefined, () => resolvedDb.transaction(async (context) => {
 						const hookDb = typeof client === 'function'
 							? client({ transaction: (fn) => fn(context) })
-							: (client || db);
+							: (client || resolvedDb);
 						if (afterCommit)
 							setSessionSingleton(context, 'afterCommitHook', () =>
 								afterCommit(hookDb, request, response)
@@ -3828,7 +3994,7 @@ function requireHostLocal () {
 						await fn(context);
 						if (beforeCommit)
 							await beforeCommit(hookDb, request, response);
-					});
+					}));
 				}
 
 			}
@@ -3847,14 +4013,8 @@ function requireHostLocal () {
 			if (transaction)
 				await transaction(fn);
 			else {
-				if (typeof db === 'function') {
-					let dbPromise = db();
-					if (dbPromise.then)
-						db = await dbPromise;
-					else
-						db = dbPromise;
-				}
-				result = await db.query.apply(null, arguments);
+				const resolvedDb = await resolveDb();
+				result = await resolvedDb.query.apply(null, arguments);
 			}
 
 			return result;
@@ -3872,14 +4032,8 @@ function requireHostLocal () {
 			if (transaction)
 				await transaction(fn);
 			else {
-				if (typeof db === 'function') {
-					let dbPromise = db();
-					if (dbPromise.then)
-						db = await dbPromise;
-					else
-						db = dbPromise;
-				}
-				result = await db.sqliteFunction.apply(null, arguments);
+				const resolvedDb = await resolveDb();
+				result = await resolvedDb.sqliteFunction.apply(null, arguments);
 			}
 
 			return result;
@@ -3899,6 +4053,17 @@ function requireHostLocal () {
 		}
 
 		return c;
+
+		async function resolveDb() {
+			if (typeof db !== 'function')
+				return db;
+			let dbPromise = db();
+			if (dbPromise.then)
+				db = await dbPromise;
+			else
+				db = dbPromise;
+			return db;
+		}
 
 		async function captureSyncOutboxPatch(context, patch, options) {
 			if (!Array.isArray(patch) || patch.length === 0)
@@ -5067,8 +5232,10 @@ function requireSyncClient () {
 	const randomUuid = requireRandomUuid();
 	const stringify = requireStringify();
 	const { createSyncAuto } = requireSyncAuto();
+	const createHttpInterceptor = requireHttpInterceptor();
 	const outboxTableSql = requireOutboxTableSql();
 	const { ensureSyncSchema, clearEnsuredSyncSchema } = requireSyncSchema();
+	const { runSyncMaintenance } = requireWriteGate();
 
 	function newSyncClient(client, getDb, axiosInterceptor) {
 		const sinceByScope = new Map();
@@ -5083,6 +5250,7 @@ function requireSyncClient () {
 		const initialReadyListeners = new Set();
 		const eventListeners = new Map();
 		let initialReadyEmitted = false;
+		const interceptors = createHttpInterceptor();
 		const lockedSync = withCrossTabSyncLock(sync);
 		const lockedResetLocal = withCrossTabSyncLock(resetLocal);
 		const observedSync = observeSyncMethod('sync', lockedSync);
@@ -5100,7 +5268,8 @@ function requireSyncClient () {
 			on,
 			off,
 			once,
-			waitForInitialReady
+			waitForInitialReady,
+			interceptors
 		};
 
 		function withCrossTabSyncLock(fn) {
@@ -5163,6 +5332,12 @@ function requireSyncClient () {
 				throw new Error('Sync pull requires mapped tables or configured tables. Set sync.tables when the client has no table map.');
 			await ensureSyncSchema(db, client, configuredTables, syncConfig.schema);
 			const hadStableBase = await hasStableBase(db);
+			if (!hadStableBase)
+				return runSyncMaintenance(db, () => pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase));
+			return pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase);
+		}
+
+		async function pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase) {
 			const pushResult = await pushBeforePull(db, syncConfig, hadStableBase);
 			await maybeEmitInitialReady(syncConfig, configuredTables, db, 'persisted');
 			const currentSince = await getScopeSince(configuredTables, db);
@@ -5172,6 +5347,7 @@ function requireSyncClient () {
 				since: currentSince,
 				db,
 				scopeKey,
+				_syncInterceptors: interceptors,
 				_syncAxiosInterceptor: axiosInterceptor
 			};
 			let result;
@@ -5204,18 +5380,20 @@ function requireSyncClient () {
 			const configuredTables = resolveSyncTables(db, normalizeConfiguredTables(options.tables) || syncConfig.tables, client);
 			if (!Array.isArray(configuredTables) || configuredTables.length === 0)
 				throw new Error('Sync resetLocal requires mapped tables or configured tables.');
-			const droppedTables = await dropLocalSyncTables(db, client, configuredTables);
-			await dropExistingBaseTables(db);
-			await db.query(`DROP TABLE IF EXISTS "${syncBaseTable}"`);
-			sinceByScope.clear();
-			ensuredInternalTables.delete(db);
-			clearEnsuredSyncSchema(db);
-			initialReadyEmitted = false;
-			return {
-				reset: true,
-				tables: configuredTables,
-				droppedTables
-			};
+			return runSyncMaintenance(db, async () => {
+				const droppedTables = await dropLocalSyncTables(db, client, configuredTables);
+				await dropExistingBaseTables(db);
+				await db.query(`DROP TABLE IF EXISTS "${syncBaseTable}"`);
+				sinceByScope.clear();
+				ensuredInternalTables.delete(db);
+				clearEnsuredSyncSchema(db);
+				initialReadyEmitted = false;
+				return {
+					reset: true,
+					tables: configuredTables,
+					droppedTables
+				};
+			});
 		}
 
 		async function pushPending(options = {}) {
@@ -5270,6 +5448,10 @@ function requireSyncClient () {
 		}
 
 		async function rollbackFailedPushBatch(db, attemptedMutations) {
+			return runSyncMaintenance(db, () => rollbackFailedPushBatchCore(db, attemptedMutations));
+		}
+
+		async function rollbackFailedPushBatchCore(db, attemptedMutations) {
 			if (!await hasStableBase(db))
 				return;
 			const remaining = await readPendingMutationRows(db, 10000, mutationIdsToSet(attemptedMutations));
@@ -5335,6 +5517,7 @@ function requireSyncClient () {
 					mutations
 				}
 			}, {
+				_syncInterceptors: interceptors,
 				_syncAxiosInterceptor: axiosInterceptor
 			});
 		}
@@ -6039,6 +6222,11 @@ function requireSyncClient () {
 			await db.query(`DELETE FROM "${syncOutboxTable}" WHERE "status" = 'pending'`);
 		}
 
+		async function hasPendingMutations(db) {
+			const pending = await readPendingMutationRows(db, 1);
+			return pending.length > 0;
+		}
+
 		function mutationIdsToSet(mutations) {
 			const result = new Set();
 			if (!Array.isArray(mutations))
@@ -6138,22 +6326,27 @@ function requireSyncClient () {
 		async function saveStableBase(db) {
 			if (!db || typeof db.query !== 'function')
 				return;
-			await client.transaction(async (tx) => {
-				await ensureSyncBaseTable(tx);
-				const tables = await readSqliteTables(tx);
-				await dropExistingBaseTables(tx);
-				await tx.query(`DELETE FROM "${syncBaseTable}"`);
-				for (let i = 0; i < tables.length; i++) {
-					const table = tables[i];
-					const baseName = toBaseTableName(table.name);
-					await tx.query(`CREATE TABLE ${quoteIdent(baseName)} AS SELECT * FROM ${quoteIdent(table.name)}`);
-					await tx.query([
-						`INSERT INTO "${syncBaseTable}" ("name", "base_name", "schema_sql", "ordinal") VALUES (`,
-						`${sqlStringLiteral(table.name)}, ${sqlStringLiteral(baseName)}, ${sqlNullableStringLiteral(table.sql)}, ${i}`,
-						')'
-					].join(' '));
-				}
-			}, { suppressSyncOutbox: true });
+			return runSyncMaintenance(db, async () => {
+				if (await hasPendingMutations(db))
+					return false;
+				await client.transaction(async (tx) => {
+					await ensureSyncBaseTable(tx);
+					const tables = await readSqliteTables(tx);
+					await dropExistingBaseTables(tx);
+					await tx.query(`DELETE FROM "${syncBaseTable}"`);
+					for (let i = 0; i < tables.length; i++) {
+						const table = tables[i];
+						const baseName = toBaseTableName(table.name);
+						await tx.query(`CREATE TABLE ${quoteIdent(baseName)} AS SELECT * FROM ${quoteIdent(table.name)}`);
+						await tx.query([
+							`INSERT INTO "${syncBaseTable}" ("name", "base_name", "schema_sql", "ordinal") VALUES (`,
+							`${sqlStringLiteral(table.name)}, ${sqlStringLiteral(baseName)}, ${sqlNullableStringLiteral(table.sql)}, ${i}`,
+							')'
+						].join(' '));
+					}
+				}, { suppressSyncOutbox: true });
+				return true;
+			});
 		}
 
 		async function restoreStableBase(db) {
@@ -6796,6 +6989,7 @@ function requireSyncClient () {
 	}
 
 	async function requestPayload(config, options) {
+		const syncInterceptors = options && options._syncInterceptors;
 		const axiosInterceptor = options && options._syncAxiosInterceptor;
 		const axios = createFetchClient();
 		if (axiosInterceptor && typeof axiosInterceptor.applyTo === 'function')
@@ -6808,11 +7002,29 @@ function requireSyncClient () {
 		const request = {
 			url: appendQueryParam(config.url, 'sync', config.syncPhase || 'pull'),
 			method: 'post',
-			timeout: config.timeoutMs
+			timeout: config.timeoutMs,
+			headers: {}
 		};
 		request.data = requestBody;
 
-		const response = await axios.request(request);
+		const interceptedRequest = syncInterceptors && typeof syncInterceptors.applyRequest === 'function'
+			? await syncInterceptors.applyRequest(request)
+			: request;
+		let response;
+		try {
+			response = await axios.request(interceptedRequest);
+		}
+		catch (error) {
+			if (syncInterceptors && typeof syncInterceptors.applyResponseError === 'function') {
+				const recovered = await syncInterceptors.applyResponseError(error);
+				return recovered && recovered === Object(recovered) && 'data' in recovered
+					? recovered.data
+					: recovered;
+			}
+			throw error;
+		}
+		if (syncInterceptors && typeof syncInterceptors.applyResponse === 'function')
+			response = await syncInterceptors.applyResponse(response);
 		return response.data;
 	}
 
@@ -6833,32 +7045,50 @@ function requireSyncClient () {
 				timeout = setTimeout(() => abortController.abort(), config.timeout);
 
 			try {
-				const response = await fetch(config.url, {
+				const headers = {
+					'Content-Type': 'application/json',
+					'Accept': 'application/json',
+					...(config.headers || {})
+				};
+				const fetchOptions = {
 					method: config.method?.toUpperCase(),
-					headers: {
-						'Content-Type': 'application/json',
-						'Accept': 'application/json'
-					},
+					headers,
 					body: config.data === undefined ? undefined : JSON.stringify(config.data),
 					signal: abortController && abortController.signal
-				});
+				};
+				if (config.credentials !== undefined)
+					fetchOptions.credentials = config.credentials;
+				const response = await fetch(config.url, fetchOptions);
 				const data = await readPayloadResponse(response);
+				const payload = {
+					data,
+					status: response.status,
+					statusText: response.statusText,
+					headers: headersToObject(response.headers),
+					config
+				};
 				if (!response.ok) {
 					const error = new Error('Request failed with status code ' + response.status);
-					error.response = {
-						data,
-						status: response.status,
-						statusText: response.statusText
-					};
+					error.response = payload;
 					throw error;
 				}
-				return { data };
+				return payload;
 			}
 			finally {
 				if (timeout)
 					clearTimeout(timeout);
 			}
 		}
+	}
+
+	function headersToObject(headers) {
+		const result = {};
+		if (!headers || typeof headers.forEach !== 'function')
+			return result;
+		headers.forEach((value, key) => {
+			result[key] = value;
+		});
+		return result;
 	}
 
 	async function readPayloadResponse(response) {
@@ -7353,6 +7583,7 @@ function requireClient () {
 	const createHttpInterceptor = requireHttpInterceptor();
 	const flags = requireFlags();
 	const newSyncClient = requireSyncClient();
+	const { runSyncWrite } = requireWriteGate();
 
 	function rdbClient(options = {}) {
 		flags.useLazyDefaults = false;
@@ -7610,18 +7841,20 @@ function requireClient () {
 			let db = await getDb();
 			if (!db.createTransaction)
 				throw new Error('Transaction not supported through http');
-			const transaction = db.createTransaction(_options);
+			return runSyncWrite(db, _options, async () => {
+				const transaction = db.createTransaction(_options);
 
-			try {
-				const nextClient = client({ transaction });
-				const result = await fn(nextClient);
-				transaction.done = true;
-				await transaction(transaction.commit);
-				return result;
-			}
-			catch (e) {
-				await transaction(transaction.rollback.bind(null, e));
-			}
+				try {
+					const nextClient = client({ transaction });
+					const result = await fn(nextClient);
+					transaction.done = true;
+					await transaction(transaction.commit);
+					return result;
+				}
+				catch (e) {
+					await transaction(transaction.rollback.bind(null, e));
+				}
+			});
 		}
 
 		function table(url, tableName, tableOptions) {
@@ -18474,6 +18707,8 @@ var hasRequiredDbWorkerHandler;
 function requireDbWorkerHandler () {
 	if (hasRequiredDbWorkerHandler) return dbWorkerHandler;
 	hasRequiredDbWorkerHandler = 1;
+	const { acquireSyncWrite } = requireWriteGate();
+
 	function createDbWorkerHandler(client, options = {}) {
 		if (!client)
 			throw new Error('DB worker handler requires a client.');
@@ -18529,7 +18764,16 @@ function requireDbWorkerHandler () {
 				throw new Error('Transaction not supported by DB worker client.');
 			if (transactions.has(transactionId))
 				return { transactionId };
-			const transaction = pool.createTransaction(txOptions);
+			const releaseSyncWrite = await acquireSyncWrite(pool, txOptions);
+			let transaction;
+			try {
+				transaction = pool.createTransaction(txOptions);
+			}
+			catch (e) {
+				releaseSyncWrite();
+				throw e;
+			}
+			transaction.__orangeSyncWriteRelease = releaseSyncWrite;
 			transactions.set(transactionId, transaction);
 			return { transactionId };
 		}
@@ -18539,10 +18783,15 @@ function requireDbWorkerHandler () {
 			if (!transaction)
 				return { transactionId, missing: true };
 			transactions.delete(transactionId);
-			if (method === 'commit')
-				await transaction(transaction.commit);
-			else
-				await transaction(transaction.rollback.bind(null, toError(error)));
+			try {
+				if (method === 'commit')
+					await transaction(transaction.commit);
+				else
+					await transaction(transaction.rollback.bind(null, toError(error)));
+			}
+			finally {
+				releaseSyncWrite(transaction);
+			}
 			return { transactionId };
 		}
 
@@ -18646,7 +18895,7 @@ function requireDbWorkerHandler () {
 			syncEventUnsubscribers.clear();
 			for (const [id, transaction] of transactions) {
 				transactions.delete(id);
-				void transaction(transaction.rollback);
+				void Promise.resolve(transaction(transaction.rollback)).finally(() => releaseSyncWrite(transaction));
 			}
 			if (client.syncClient && typeof client.syncClient.stop === 'function')
 				client.syncClient.stop();
@@ -18659,6 +18908,14 @@ function requireDbWorkerHandler () {
 				result,
 				error: error ? serializeError(error) : undefined
 			});
+		}
+
+		function releaseSyncWrite(transaction) {
+			const release = transaction && transaction.__orangeSyncWriteRelease;
+			if (typeof release !== 'function')
+				return;
+			transaction.__orangeSyncWriteRelease = undefined;
+			release();
 		}
 	}
 

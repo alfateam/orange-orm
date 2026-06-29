@@ -11,6 +11,7 @@ const clone = require('rfdc/default');
 const createHttpInterceptor = require('./httpInterceptor');
 const flags = require('../flags');
 const newSyncClient = require('./syncClient');
+const { runSyncWrite } = require('../sync/writeGate');
 
 function rdbClient(options = {}) {
 	flags.useLazyDefaults = false;
@@ -268,18 +269,20 @@ function rdbClient(options = {}) {
 		let db = await getDb();
 		if (!db.createTransaction)
 			throw new Error('Transaction not supported through http');
-		const transaction = db.createTransaction(_options);
+		return runSyncWrite(db, _options, async () => {
+			const transaction = db.createTransaction(_options);
 
-		try {
-			const nextClient = client({ transaction });
-			const result = await fn(nextClient);
-			transaction.done = true;
-			await transaction(transaction.commit);
-			return result;
-		}
-		catch (e) {
-			await transaction(transaction.rollback.bind(null, e));
-		}
+			try {
+				const nextClient = client({ transaction });
+				const result = await fn(nextClient);
+				transaction.done = true;
+				await transaction(transaction.commit);
+				return result;
+			}
+			catch (e) {
+				await transaction(transaction.rollback.bind(null, e));
+			}
+		});
 	}
 
 	function table(url, tableName, tableOptions) {

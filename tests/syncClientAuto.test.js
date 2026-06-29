@@ -121,6 +121,50 @@ describe('sync client auto start', () => {
 			.rejects.toThrow('Unsupported sync option "mutations"');
 	});
 
+	test('applies sync request and response error interceptors', async () => {
+		const seen = [];
+		const db = {
+			__sqliteSync: { url: '/rdb', auto: false, tables: ['customer'] },
+			query: async () => []
+		};
+		const client = newSyncClient({
+			transaction: async (fn) => fn({
+				customer: {
+					patch: async () => ({ changed: [] })
+				},
+				query: async () => []
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async (request) => {
+					seen.push(['auth', request.headers.Authorization]);
+					const error = new Error('Request failed with status code 401');
+					error.response = {
+						status: 401,
+						statusText: 'Unauthorized',
+						data: 'expired'
+					};
+					throw error;
+				};
+			}
+		});
+		client.interceptors.request.use((config) => {
+			config.headers = { ...(config.headers || {}), Authorization: 'Bearer token-1' };
+			return config;
+		});
+		client.interceptors.response.use(undefined, (error) => {
+			seen.push(['error', error.response.status]);
+			throw error;
+		});
+
+		await expect(client.sync()).rejects.toThrow('Request failed with status code 401');
+
+		expect(seen).toEqual([
+			['auth', 'Bearer token-1'],
+			['error', 401]
+		]);
+	});
+
 	test('serializes sync operations with web locks', async () => {
 		const restoreLocks = installFakeWebLocks();
 		const requests = [];

@@ -909,6 +909,16 @@ interface WithInterceptors {
   response: HttpInterceptorManager<HttpResponse>;
 }
 
+type SyncRequestConfig = HttpRequestConfig & {
+  timeout?: number;
+  credentials?: RequestCredentials;
+};
+
+interface SyncInterceptors {
+  request: HttpInterceptorManager<SyncRequestConfig>;
+  response: HttpInterceptorManager<HttpResponse>;
+}
+
 interface Connectors {
   http(url: string): Pool;
   d1(database: D1Database): Pool;
@@ -1116,6 +1126,7 @@ export type DBClient<
     stop(): void | Promise<unknown>;
     isRunning(): boolean | Promise<boolean>;
     getConfig(): Promise<SyncConfig<M> | null>;
+    interceptors: SyncInterceptors;
     on(event: 'sync', listener: (payload: SyncEvent) => void): () => void;
     on(event: 'initial-ready', listener: (payload: SyncInitialReadyEvent<M>) => void): () => void;
     on(event: 'error' | 'sync-error', listener: (payload: SyncErrorEvent) => void): () => void;
