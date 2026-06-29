@@ -5,6 +5,12 @@ const createHttpInterceptor = require('./httpInterceptor');
 const outboxTableSql = require('../sync/outboxTableSql');
 const { ensureSyncSchema, clearEnsuredSyncSchema } = require('./syncSchema');
 const { runSyncMaintenance } = require('../sync/writeGate');
+const ensureOutboxOperationColumns = require('../sync/ensureOutboxOperationColumns');
+const {
+	deleteSyncOperationMemory,
+	finalizeSyncOperationMemory,
+	withSyncOperationMemory
+} = require('../sync/operationContext');
 
 function newSyncClient(client, getDb, axiosInterceptor) {
 	const sinceByScope = new Map();
@@ -34,6 +40,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		stop: auto.stop,
 		isRunning: auto.isRunning,
 		getConfig,
+		onOperation,
 		on,
 		off,
 		once,
@@ -183,11 +190,17 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 			result = await sendPush(pushConfig, clientId, pending);
 		}
 		catch (e) {
-			if (isConflictError(e))
-				await rollbackFailedPushBatch(db, pending);
+			if (isConflictError(e)) {
+				await rollbackFailedPushBatch(db, pending, e);
+				emitOperationErrors(pending, e, false);
+			}
+			else {
+				await markPendingMutationAttempts(db, pending, e);
+				emitOperationErrors(pending, e, true);
+			}
 			throw e;
 		}
-		await markPushedMutations(db, result);
+		await markPushedMutations(db, result, pending);
 		return result;
 	}
 
@@ -216,16 +229,21 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		return Number(result && result.applied) > 0;
 	}
 
-	async function rollbackFailedPushBatch(db, attemptedMutations) {
-		return runSyncMaintenance(db, () => rollbackFailedPushBatchCore(db, attemptedMutations));
+	async function rollbackFailedPushBatch(db, attemptedMutations, error) {
+		return runSyncMaintenance(db, () => rollbackFailedPushBatchCore(db, attemptedMutations, error));
 	}
 
-	async function rollbackFailedPushBatchCore(db, attemptedMutations) {
+	async function rollbackFailedPushBatchCore(db, attemptedMutations, error) {
 		if (!await hasStableBase(db))
 			return;
 		const remaining = await readPendingMutationRows(db, 10000, mutationIdsToSet(attemptedMutations));
 		await restoreStableBase(db);
 		await ensureSyncOutboxTable(db);
+		for (let i = 0; i < attemptedMutations.length; i++) {
+			const failedRow = failedOutboxRow(attemptedMutations[i], error);
+			if (failedRow)
+				await insertOutboxRow(db, failedRow);
+		}
 		for (let i = 0; i < remaining.length; i++) {
 			const row = remaining[i];
 			const mutation = rowToMutation(row);
@@ -283,7 +301,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 			body: {
 				phase: 'push',
 				clientId,
-				mutations
+				mutations: mutations.map(stripMutationForPush)
 			}
 		}, {
 			_syncInterceptors: interceptors,
@@ -643,6 +661,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		if (isInternalTableEnsured(db, syncOutboxTable))
 			return;
 		await db.query(outboxTableSql(syncOutboxTable));
+		await ensureOutboxOperationColumns((sql) => db.query(sql), syncOutboxTable);
 		markInternalTableEnsured(db, syncOutboxTable);
 	}
 
@@ -892,7 +911,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 	async function readPendingMutationRows(db, limit, excludeIds) {
 		await ensureSyncOutboxTable(db);
 		const rows = await db.query([
-			`SELECT "mutation_id", "table_name", "patch_json", "options_json", "created_at_ms", "status", "last_error", "attempts", "pushed_at_ms", "result_json" FROM "${syncOutboxTable}"`,
+			`SELECT "mutation_id", "table_name", "patch_json", "options_json", "created_at_ms", "operation_id", "operation_name", "operation_json", "status", "last_error", "attempts", "pushed_at_ms", "result_json" FROM "${syncOutboxTable}"`,
 			'WHERE "status" = \'pending\'',
 			'ORDER BY "created_at_ms" ASC',
 			`LIMIT ${limit}`
@@ -914,37 +933,204 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 			const parsedPatch = JSON.parse(patchJson);
 			if (table === '*') {
 				if (parsedPatch && parsedPatch === Object(parsedPatch) && !Array.isArray(parsedPatch)) {
-					return {
+					return withOutboxMetadata({
 						id,
 						patches: Array.isArray(parsedPatch.patches) ? parsedPatch.patches : [],
 						commands: Array.isArray(parsedPatch.commands) ? parsedPatch.commands : [],
 						options: optionsJson ? JSON.parse(optionsJson) : undefined
-					};
+					}, row);
 				}
-				return {
+				return withOutboxMetadata({
 					id,
 					patches: parsedPatch,
 					options: optionsJson ? JSON.parse(optionsJson) : undefined
-				};
+				}, row);
 			}
-			return {
+			return withOutboxMetadata({
 				id,
 				table,
 				patch: parsedPatch,
 				options: optionsJson ? JSON.parse(optionsJson) : undefined
-			};
+			}, row);
 		}
 		catch (_e) {
 			return null;
 		}
 	}
 
-	async function markPushedMutations(db, result) {
+	function withOutboxMetadata(mutation, row) {
+		const operation = rowToOperation(row);
+		Object.defineProperty(mutation, '__operation', {
+			value: operation,
+			enumerable: false,
+			configurable: true
+		});
+		Object.defineProperty(mutation, '__outboxRow', {
+			value: row,
+			enumerable: false,
+			configurable: true
+		});
+		return mutation;
+	}
+
+	function rowToOperation(row) {
+		const mutationId = row.mutation_id ?? row.MUTATION_ID;
+		const operationId = row.operation_id ?? row.OPERATION_ID;
+		const operationName = row.operation_name ?? row.OPERATION_NAME;
+		const operationJson = row.operation_json ?? row.OPERATION_JSON;
+		if (typeof mutationId !== 'string' || typeof operationName !== 'string' || operationName.length === 0)
+			return null;
+		const context = parseOperationContext(operationJson);
+		return {
+			mutationId,
+			operationId,
+			operationName,
+			context
+		};
+	}
+
+	function parseOperationContext(operationJson) {
+		if (typeof operationJson !== 'string' || operationJson.length === 0)
+			return {};
+		try {
+			const parsed = JSON.parse(operationJson);
+			return parsed && parsed === Object(parsed) && !Array.isArray(parsed) ? parsed : {};
+		}
+		catch (_e) {
+			return {};
+		}
+	}
+
+	function stripMutationForPush(mutation) {
+		if (!mutation || mutation !== Object(mutation))
+			return mutation;
+		const result = {};
+		const keys = Object.keys(mutation);
+		for (let i = 0; i < keys.length; i++)
+			result[keys[i]] = mutation[keys[i]];
+		return result;
+	}
+
+	function mutationsById(mutations) {
+		const result = new Map();
+		if (!Array.isArray(mutations))
+			return result;
+		for (let i = 0; i < mutations.length; i++) {
+			const mutation = mutations[i];
+			if (mutation && typeof mutation.id === 'string')
+				result.set(mutation.id, mutation);
+		}
+		return result;
+	}
+
+	function failedOutboxRow(mutation, error) {
+		const row = mutation && mutation.__outboxRow;
+		if (!row)
+			return null;
+		const attempts = Number(row.attempts ?? row.ATTEMPTS ?? 0);
+		return {
+			mutation_id: row.mutation_id ?? row.MUTATION_ID,
+			table_name: row.table_name ?? row.TABLE_NAME,
+			patch_json: row.patch_json ?? row.PATCH_JSON,
+			options_json: row.options_json ?? row.OPTIONS_JSON,
+			created_at_ms: row.created_at_ms ?? row.CREATED_AT_MS,
+			operation_id: row.operation_id ?? row.OPERATION_ID,
+			operation_name: row.operation_name ?? row.OPERATION_NAME,
+			operation_json: row.operation_json ?? row.OPERATION_JSON,
+			status: 'failed',
+			last_error: syncOperationError(error).message,
+			attempts: Number.isFinite(attempts) ? attempts + 1 : 1,
+			pushed_at_ms: undefined,
+			result_json: undefined
+		};
+	}
+
+	async function markPendingMutationAttempts(db, mutations, error) {
+		await ensureSyncOutboxTable(db);
+		const message = syncOperationError(error).message;
+		for (let i = 0; i < mutations.length; i++) {
+			const id = mutations[i] && mutations[i].id;
+			if (typeof id !== 'string')
+				continue;
+			await db.query([
+				`UPDATE "${syncOutboxTable}"`,
+				`SET "attempts" = "attempts" + 1, "last_error" = ${sqlStringLiteral(message)}`,
+				`WHERE "mutation_id" = ${sqlStringLiteral(id)} AND "status" = 'pending'`
+			].join(' '));
+		}
+	}
+
+	function emitOperationSuccess(mutation, result) {
+		const operation = mutation && mutation.__operation;
+		if (!operation || !operation.operationName)
+			return;
+		emitOperationEvent({
+			ok: true,
+			operation: operation.operationName,
+			mutationId: operation.mutationId || mutation.id,
+			context: operation.context || {},
+			result,
+			retryable: false
+		});
+	}
+
+	function emitOperationErrors(mutations, error, retryable) {
+		const operationError = syncOperationError(error);
+		for (let i = 0; i < mutations.length; i++) {
+			const mutation = mutations[i];
+			const operation = mutation && mutation.__operation;
+			if (!operation || !operation.operationName)
+				continue;
+			emitOperationEvent({
+				ok: false,
+				operation: operation.operationName,
+				mutationId: operation.mutationId || mutation.id,
+				context: operation.context || {},
+				retryable,
+				error: operationError
+			});
+		}
+	}
+
+	function emitOperationEvent(event) {
+		event = withSyncOperationMemory(event);
+		emit(`operation:${event.operation}`, event);
+		finalizeSyncOperationMemory(event);
+		if (event.ok || event.retryable === false)
+			deleteSyncOperationMemory(event.mutationId);
+	}
+
+	function syncOperationError(error) {
+		const rawStatus = error && (error.status ?? (error.response && error.response.status));
+		const status = Number(rawStatus);
+		return {
+			kind: syncOperationErrorKind(status, error),
+			message: extractErrorMessage(error) || (error && error.message) || 'Sync operation failed',
+			status: Number.isFinite(status) ? status : undefined
+		};
+	}
+
+	function syncOperationErrorKind(status, error) {
+		if (status === 409)
+			return 'conflict';
+		if (status === 401 || status === 403)
+			return 'auth';
+		if (Number.isFinite(status) && status >= 500)
+			return 'server';
+		if (!Number.isFinite(status))
+			return 'network';
+		if (error && error.name === 'AbortError')
+			return 'network';
+		return 'unknown';
+	}
+
+	async function markPushedMutations(db, result, attemptedMutations) {
 		const results = Array.isArray(result && result.results) ? result.results : [];
 		if (results.length === 0)
 			return;
 		await ensureSyncOutboxTable(db);
 		const now = Date.now();
+		const attemptedById = mutationsById(attemptedMutations);
 		for (let i = 0; i < results.length; i++) {
 			const item = results[i];
 			if (!item || typeof item.id !== 'string')
@@ -954,6 +1140,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 				`SET "status" = 'pushed', "pushed_at_ms" = ${now}, "result_json" = ${sqlStringLiteral(stringify(item))}`,
 				`WHERE "mutation_id" = ${sqlStringLiteral(item.id)}`
 			].join(' '));
+			emitOperationSuccess(attemptedById.get(item.id), item);
 		}
 	}
 
@@ -963,6 +1150,9 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		const patchJson = row.patch_json ?? row.PATCH_JSON;
 		const optionsJson = row.options_json ?? row.OPTIONS_JSON;
 		const createdAtMs = Number(row.created_at_ms ?? row.CREATED_AT_MS ?? Date.now());
+		const operationId = row.operation_id ?? row.OPERATION_ID;
+		const operationName = row.operation_name ?? row.OPERATION_NAME;
+		const operationJson = row.operation_json ?? row.OPERATION_JSON;
 		const status = row.status ?? row.STATUS ?? 'pending';
 		const lastError = row.last_error ?? row.LAST_ERROR;
 		const attempts = Number(row.attempts ?? row.ATTEMPTS ?? 0);
@@ -971,13 +1161,16 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		if (typeof mutationId !== 'string' || typeof tableName !== 'string' || typeof patchJson !== 'string')
 			return;
 		await db.query([
-			`INSERT INTO "${syncOutboxTable}" ("mutation_id", "table_name", "patch_json", "options_json", "created_at_ms", "status", "last_error", "attempts", "pushed_at_ms", "result_json")`,
-			`VALUES (${sqlStringLiteral(mutationId)}, ${sqlStringLiteral(tableName)}, ${sqlStringLiteral(patchJson)}, ${sqlNullableStringLiteral(optionsJson)}, ${Number.isFinite(createdAtMs) ? createdAtMs : Date.now()}, ${sqlStringLiteral(status)}, ${sqlNullableStringLiteral(lastError)}, ${Number.isFinite(attempts) ? attempts : 0}, ${sqlNullableNumberLiteral(pushedAtMs)}, ${sqlNullableStringLiteral(resultJson)})`,
+			`INSERT INTO "${syncOutboxTable}" ("mutation_id", "table_name", "patch_json", "options_json", "created_at_ms", "operation_id", "operation_name", "operation_json", "status", "last_error", "attempts", "pushed_at_ms", "result_json")`,
+			`VALUES (${sqlStringLiteral(mutationId)}, ${sqlStringLiteral(tableName)}, ${sqlStringLiteral(patchJson)}, ${sqlNullableStringLiteral(optionsJson)}, ${Number.isFinite(createdAtMs) ? createdAtMs : Date.now()}, ${sqlNullableStringLiteral(operationId)}, ${sqlNullableStringLiteral(operationName)}, ${sqlNullableStringLiteral(operationJson)}, ${sqlStringLiteral(status)}, ${sqlNullableStringLiteral(lastError)}, ${Number.isFinite(attempts) ? attempts : 0}, ${sqlNullableNumberLiteral(pushedAtMs)}, ${sqlNullableStringLiteral(resultJson)})`,
 			'ON CONFLICT("mutation_id") DO UPDATE SET',
 			'"table_name" = excluded."table_name",',
 			'"patch_json" = excluded."patch_json",',
 			'"options_json" = excluded."options_json",',
 			'"created_at_ms" = excluded."created_at_ms",',
+			'"operation_id" = excluded."operation_id",',
+			'"operation_name" = excluded."operation_name",',
+			'"operation_json" = excluded."operation_json",',
 			'"status" = excluded."status",',
 			'"last_error" = excluded."last_error",',
 			'"attempts" = excluded."attempts",',
@@ -1250,6 +1443,12 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		}
 		listeners.add(listener);
 		return () => off(event, listener);
+	}
+
+	function onOperation(operation, listener) {
+		if (typeof operation !== 'string' || typeof listener !== 'function')
+			return () => {};
+		return on(`operation:${operation}`, listener);
 	}
 
 	function off(event, listener) {

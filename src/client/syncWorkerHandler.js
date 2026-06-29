@@ -11,6 +11,7 @@ function createSyncWorkerHandler(syncClient, options = {}) {
 		resetLocal: []
 	};
 	let auto;
+	const syncEventUnsubscribers = new Map();
 	const postMessage = options.postMessage || ((message) => {
 		const target = getPostTarget();
 		if (target)
@@ -37,6 +38,10 @@ function createSyncWorkerHandler(syncClient, options = {}) {
 				result = await requestSyncCycle(message.options);
 			else if (message.method === 'resetLocal')
 				result = await requestResetLocal(message.options);
+			else if (message.method === 'on')
+				result = subscribeSyncEvent(message.options);
+			else if (message.method === 'off')
+				result = unsubscribeSyncEvent(message.options);
 			else
 				throw new Error(`Unknown sync worker method "${message.method}".`);
 			postResponse(message.id, result);
@@ -55,6 +60,9 @@ function createSyncWorkerHandler(syncClient, options = {}) {
 	}
 
 	function stop() {
+		for (const unsubscribe of syncEventUnsubscribers.values())
+			unsubscribe();
+		syncEventUnsubscribers.clear();
 		if (auto)
 			auto.stop();
 		else if (syncClient && typeof syncClient.stop === 'function')
@@ -141,6 +149,29 @@ function createSyncWorkerHandler(syncClient, options = {}) {
 			result,
 			error: error ? serializeError(error) : undefined
 		});
+	}
+
+	function subscribeSyncEvent(event) {
+		if (typeof event !== 'string' || syncEventUnsubscribers.has(event))
+			return;
+		if (!syncClient || typeof syncClient.on !== 'function')
+			return;
+		const unsubscribe = syncClient.on(event, (payload) => {
+			postMessage({
+				type: 'orange-sync-event',
+				event,
+				payload
+			});
+		});
+		syncEventUnsubscribers.set(event, unsubscribe);
+	}
+
+	function unsubscribeSyncEvent(event) {
+		const unsubscribe = syncEventUnsubscribers.get(event);
+		if (!unsubscribe)
+			return;
+		unsubscribe();
+		syncEventUnsubscribers.delete(event);
 	}
 }
 

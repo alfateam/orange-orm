@@ -10,6 +10,8 @@ let stringify = require('./client/stringify');
 let getSessionSingleton = require('./table/getSessionSingleton');
 let outboxTableSql = require('./sync/outboxTableSql');
 let { runSyncWrite } = require('./sync/writeGate');
+let ensureOutboxOperationColumns = require('./sync/ensureOutboxOperationColumns');
+let { updateOutboxOperationFromContext } = require('./sync/operationContext');
 const readonlyOps = ['getManyDto', 'getMany', 'aggregate', 'distinct', 'count'];
 const syncOutboxEnsuredKey = typeof Symbol === 'function'
 	? Symbol.for('orange-orm.syncOutboxEnsured')
@@ -229,6 +231,7 @@ function hostLocal() {
 			state = { id: randomUuid(), patches: [], commands: [] };
 			setSessionSingleton(context, 'syncOutboxCapture', state);
 			await insertSyncOutboxPlaceholder(context, pool, state.id);
+			await updateOutboxOperationFromContext(context, state);
 		}
 		if (!Array.isArray(state.patches))
 			state.patches = [];
@@ -259,9 +262,18 @@ function hostLocal() {
 	}
 
 	async function updateSyncOutboxCaptureState(context, state) {
+		const metadata = await updateOutboxOperationFromContext(context, state);
+		const operationAssignments = metadata === null
+			? [
+				'"operation_id" = NULL',
+				'"operation_name" = NULL',
+				'"operation_json" = NULL'
+			]
+			: [];
 		await querySyncOutbox(context, [
 			'UPDATE "orange_sync_outbox"',
-			`SET "patch_json" = ${sqlStringLiteral(stringify(serializeSyncOutboxCaptureState(state)))}`,
+			`SET "patch_json" = ${sqlStringLiteral(stringify(serializeSyncOutboxCaptureState(state)))}`
+				+ (operationAssignments.length > 0 ? `, ${operationAssignments.join(', ')}` : ''),
 			`WHERE "mutation_id" = ${sqlStringLiteral(state.id)}`
 		].join(' '));
 	}
@@ -286,6 +298,7 @@ function hostLocal() {
 		if (pool && pool[syncOutboxEnsuredKey])
 			return;
 		await querySyncOutbox(context, outboxTableSql());
+		await ensureOutboxOperationColumns((sql) => querySyncOutbox(context, sql));
 		if (pool)
 			pool[syncOutboxEnsuredKey] = true;
 	}

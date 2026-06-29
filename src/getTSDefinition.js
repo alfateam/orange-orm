@@ -436,10 +436,10 @@ declare namespace r {${getTables(isHttp)}
 	function and(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
 	function or(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
 	function not(): Filter;
-	function transaction(fn: (transaction: RdbClient) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
+	function transaction(fn: (transaction: RdbClient, ctx: SyncTransactionContext) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
 	function query(filter: RawFilter | string): Promise<unknown[]>;
 	function query<T>(filter: RawFilter | string): Promise<T[]>;
-	function transaction(fn: (transaction: RdbClient) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
+	function transaction(fn: (transaction: RdbClient, ctx: SyncTransactionContext) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
 	const filter: Filter;
 	function express(): Express;
 	function express(config: ExpressConfig): Express;
@@ -523,6 +523,11 @@ export interface HonoContext {
 	client: RdbClient;
 }
 
+export interface SyncTransactionContext {
+	sync: Record<string, unknown> & { operation?: string };
+	memory: unknown;
+}
+
 export interface ExpressTransactionHooks {
 	beforeBegin?: (db: Pool, request: import('express').Request, response: import('express').Response) => void | Promise<void>;
 	afterBegin?: (db: Pool, request: import('express').Request, response: import('express').Response) => void | Promise<void>;
@@ -583,7 +588,7 @@ export interface HonoTables {${getHonoTables()}
 	and(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
 	or(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
 	not(): Filter;
-	transaction(fn: (transaction: RdbClient) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
+	transaction(fn: (transaction: RdbClient, ctx: SyncTransactionContext) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
 	filter: Filter;
     createPatch(original: any[], modified: any[]): JsonPatch;
     createPatch(original: any, modified: any): JsonPatch;`;
@@ -595,7 +600,7 @@ export interface HonoTables {${getHonoTables()}
 	not(): Filter;
 	query(filter: RawFilter | string): Promise<unknown[]>;
 	query<T>(filter: RawFilter | string): Promise<T[]>;
-	transaction(fn: (transaction: RdbClient) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
+	transaction(fn: (transaction: RdbClient, ctx: SyncTransactionContext) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
 	filter: Filter;
 	createPatch(original: any[], modified: any[]): JsonPatch;
 	createPatch(original: any, modified: any): JsonPatch;

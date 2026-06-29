@@ -5,7 +5,7 @@ import type { D1Database } from '@cloudflare/workers-types';
 import type { ConnectionConfiguration } from 'tedious';
 import type { PoolAttributes } from 'oracledb';
 import type { AllowedDbMap, DBClientFromMap as MapDBClientFromMap, DbMapper, MappedDbDef, MergeProperties } from './map';
-import type { DBClient as MapDBClient, Filter as MapFilter, Pool as MapPool, PoolOptions as MapPoolOptions, RawFilter as MapRawFilter, TableDefinition as MapTableDefinition } from './map2';
+import type { DBClient as MapDBClient, Filter as MapFilter, Pool as MapPool, PoolOptions as MapPoolOptions, RawFilter as MapRawFilter, SyncOperationEvent as MapSyncOperationEvent, TableDefinition as MapTableDefinition } from './map2';
 
 declare function r(config: r.Config): unknown;
 
@@ -44,6 +44,14 @@ declare namespace r {
     function createPatch(original: any, modified: any): JsonPatch;
     function createDbWorkerClient(worker: SyncWorkerLike): DbWorkerClient;
     function createDbWorkerHandler(client: unknown, options?: DbWorkerHandlerOptions): DbWorkerHandler;
+    function createSharedDbWorkerClient(
+        worker: SharedWorker | SharedDbWorkerLike | SyncWorkerLike | string | URL,
+        options?: SharedDbWorkerClientOptions
+    ): DbWorkerClient;
+    function createSharedDbWorkerHandler(
+        createClient: () => unknown | Promise<unknown>,
+        options?: SharedDbWorkerHandlerOptions
+    ): SharedDbWorkerHandler;
     function createSyncWorkerClient(worker: SyncWorkerLike): SyncWorkerClient;
     function createSyncWorkerHandler(syncClient: SyncWorkerSyncClient, options?: SyncWorkerHandlerOptions): SyncWorkerHandler;
 
@@ -58,13 +66,46 @@ declare namespace r {
         postMessage(message: unknown): void;
         addEventListener(type: 'message', listener: (event: { data: unknown }) => void): void;
         removeEventListener(type: 'message', listener: (event: { data: unknown }) => void): void;
+        close?(): void;
+    }
+
+    export interface SharedDbWorkerLike {
+        port: SyncWorkerLike & {
+            start?(): void;
+            close?(): void;
+        };
+    }
+
+    export interface SharedDbWorkerClientOptions {
+        name?: string;
+        type?: WorkerType;
+        credentials?: RequestCredentials;
+        workerOptions?: string | WorkerOptions;
+    }
+
+    export interface SharedDbWorkerHandlerOptions {
+        target?: unknown;
+        autoConnect?: boolean;
+        autoStart?: boolean;
+        closeOnLastPort?: boolean;
+    }
+
+    export interface SharedDbWorkerHandler {
+        handleConnect(event: { ports?: Array<SyncWorkerLike> } | { port?: SyncWorkerLike } | SyncWorkerLike): void;
+        connect(event: { ports?: Array<SyncWorkerLike> } | { port?: SyncWorkerLike } | SyncWorkerLike): void;
+        stop(): void | Promise<void>;
     }
 
     export interface SyncWorkerClient {
         sync(options?: unknown): Promise<void>;
         resetLocal(options?: unknown): Promise<unknown>;
+        onOperation<Context extends Record<string, unknown> = Record<string, unknown>, Memory = unknown, Result = unknown>(
+            operation: string,
+            listener: (event: MapSyncOperationEvent<Context, Memory, Result>) => void
+        ): () => void;
         on(event: string, listener: (payload: unknown) => void): () => void;
         off(event: string, listener: (payload: unknown) => void): void;
+        once(event: string, listener: (payload: unknown) => void): () => void;
         close(): void;
     }
 
@@ -111,6 +152,10 @@ declare namespace r {
             isRunning(options?: unknown): Promise<unknown>;
             getConfig(options?: unknown): Promise<unknown>;
             resetLocal(options?: unknown): Promise<unknown>;
+            onOperation<Context extends Record<string, unknown> = Record<string, unknown>, Memory = unknown, Result = unknown>(
+                operation: string,
+                listener: (event: MapSyncOperationEvent<Context, Memory, Result>) => void
+            ): () => void;
             once(event: string, listener: (payload: unknown) => void): () => void;
             waitForInitialReady(options?: unknown): Promise<unknown>;
         };
@@ -120,6 +165,7 @@ declare namespace r {
     export interface DbWorkerHandlerOptions {
         postMessage?: (message: unknown) => void;
         autoStart?: boolean;
+        stopSyncClient?: boolean;
     }
 
     export interface DbWorkerHandler {
@@ -132,6 +178,7 @@ declare namespace r {
         resetLocal?(options?: unknown): Promise<unknown> | unknown;
         start?(): Promise<unknown> | unknown;
         stop?(): void;
+        on?(event: string, listener: (payload: unknown) => void): () => void;
     }
 
     export interface SyncWorkerHandlerOptions {
@@ -166,8 +213,8 @@ declare namespace r {
     export interface SqliteOpenEvent {
         connectionString: string,
         filename?: string,
-        requestedVfs: 'opfs' | 'opfs-sahpool',
-        vfs: 'opfs' | 'opfs-sahpool' | string,
+        requestedVfs: 'opfs' | 'opfs-sahpool' | 'opfs-wl',
+        vfs: 'opfs' | 'opfs-sahpool' | 'opfs-wl' | string,
         fallback: boolean,
         readonly: boolean
     }

@@ -154,6 +154,28 @@ describe('sqliteOPFS pool', () => {
 		expect(messages.filter(x => x.method === 'open')).toHaveLength(1);
 		pool.end();
 	});
+
+	test('uses one worker and passes opfs-wl to worker open request', async () => {
+		const messages = [];
+		const createdWorkers = [];
+		const pool = newPool('test.sqlite3', {
+			vfs: 'opfs-wl',
+			createWorker() {
+				const worker = newFakeWorker(messages);
+				createdWorkers.push(worker);
+				return worker;
+			}
+		});
+
+		await wait(10);
+		pool.connectRead(() => {});
+		await wait(10);
+
+		expect(createdWorkers).toHaveLength(1);
+		expect(messages.filter(x => x.method === 'open')).toHaveLength(1);
+		expect(messages[0].vfs).toBe('opfs-wl');
+		pool.end();
+	});
 });
 
 function newFakeWorker(messages = [], getResult = () => ({ ok: true })) {

@@ -1,4 +1,10 @@
 const { acquireSyncWrite } = require('../sync/writeGate');
+const {
+	createSyncTransactionContext,
+	flushSyncTransactionContext,
+	serializeSyncPayload,
+	setSyncTransactionContext
+} = require('../sync/operationContext');
 
 function createDbWorkerHandler(client, options = {}) {
 	if (!client)
@@ -36,6 +42,10 @@ function createDbWorkerHandler(client, options = {}) {
 	async function dispatch(message) {
 		if (message.method === 'transaction.begin')
 			return beginTransaction(message.transactionId, message.args && message.args[0]);
+		if (message.method === 'transaction.syncContext')
+			return setTransactionSyncContext(message.transactionId, message.args && message.args[0]);
+		if (message.method === 'transaction.flushSyncContext')
+			return flushTransactionSyncContext(message.transactionId, message.args && message.args[0]);
 		if (message.method === 'transaction.commit')
 			return endTransaction(message.transactionId, 'commit');
 		if (message.method === 'transaction.rollback')
@@ -67,6 +77,31 @@ function createDbWorkerHandler(client, options = {}) {
 		transaction.__orangeSyncWriteRelease = releaseSyncWrite;
 		transactions.set(transactionId, transaction);
 		return { transactionId };
+	}
+
+	async function setTransactionSyncContext(transactionId, sync) {
+		const transaction = transactions.get(transactionId);
+		if (!transaction)
+			return { transactionId, missing: true };
+		const syncContext = createSyncTransactionContext(serializeSyncPayload(sync));
+		transaction.__orangeSyncTransactionContext = syncContext;
+		await transaction((context) => {
+			setSyncTransactionContext(context, syncContext);
+		});
+		return { transactionId };
+	}
+
+	async function flushTransactionSyncContext(transactionId, sync) {
+		const transaction = transactions.get(transactionId);
+		if (!transaction)
+			return null;
+		const syncContext = transaction.__orangeSyncTransactionContext || createSyncTransactionContext();
+		syncContext.sync = serializeSyncPayload(sync);
+		transaction.__orangeSyncTransactionContext = syncContext;
+		return transaction((context) => {
+			setSyncTransactionContext(context, syncContext);
+			return flushSyncTransactionContext(context);
+		});
 	}
 
 	async function endTransaction(transactionId, method, error) {
@@ -188,7 +223,7 @@ function createDbWorkerHandler(client, options = {}) {
 			transactions.delete(id);
 			void Promise.resolve(transaction(transaction.rollback)).finally(() => releaseSyncWrite(transaction));
 		}
-		if (client.syncClient && typeof client.syncClient.stop === 'function')
+		if (options.stopSyncClient !== false && client.syncClient && typeof client.syncClient.stop === 'function')
 			client.syncClient.stop();
 	}
 

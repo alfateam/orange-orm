@@ -458,10 +458,10 @@ declare namespace r {${getTables(isHttp)}
 	function and(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
 	function or(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
 	function not(): Filter;
-	function transaction(fn: (transaction: RdbClient) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
+	function transaction(fn: (transaction: RdbClient, ctx: SyncTransactionContext) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
 	function query(filter: RawFilter | string): Promise<unknown[]>;
 	function query<T>(filter: RawFilter | string): Promise<T[]>;
-	function transaction(fn: (transaction: RdbClient) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
+	function transaction(fn: (transaction: RdbClient, ctx: SyncTransactionContext) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
 	const filter: Filter;
 	function express(): Express;
 	function express(config: ExpressConfig): Express;
@@ -545,6 +545,11 @@ export interface HonoContext {
 	client: RdbClient;
 }
 
+export interface SyncTransactionContext {
+	sync: Record<string, unknown> & { operation?: string };
+	memory: unknown;
+}
+
 export interface ExpressTransactionHooks {
 	beforeBegin?: (db: Pool, request: import('express').Request, response: import('express').Response) => void | Promise<void>;
 	afterBegin?: (db: Pool, request: import('express').Request, response: import('express').Response) => void | Promise<void>;
@@ -605,7 +610,7 @@ export interface HonoTables {${getHonoTables()}
 	and(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
 	or(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
 	not(): Filter;
-	transaction(fn: (transaction: RdbClient) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
+	transaction(fn: (transaction: RdbClient, ctx: SyncTransactionContext) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
 	filter: Filter;
     createPatch(original: any[], modified: any[]): JsonPatch;
     createPatch(original: any, modified: any): JsonPatch;`;
@@ -617,7 +622,7 @@ export interface HonoTables {${getHonoTables()}
 	not(): Filter;
 	query(filter: RawFilter | string): Promise<unknown[]>;
 	query<T>(filter: RawFilter | string): Promise<T[]>;
-	transaction(fn: (transaction: RdbClient) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
+	transaction(fn: (transaction: RdbClient, ctx: SyncTransactionContext) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
 	filter: Filter;
 	createPatch(original: any[], modified: any[]): JsonPatch;
 	createPatch(original: any, modified: any): JsonPatch;
@@ -3670,6 +3675,9 @@ function requireOutboxTableSql () {
 			'"patch_json" TEXT NOT NULL,',
 			'"options_json" TEXT,',
 			'"created_at_ms" INTEGER NOT NULL,',
+			'"operation_id" TEXT,',
+			'"operation_name" TEXT,',
+			'"operation_json" TEXT,',
 			'"status" TEXT NOT NULL DEFAULT \'pending\',',
 			'"last_error" TEXT,',
 			'"attempts" INTEGER NOT NULL DEFAULT 0,',
@@ -3867,6 +3875,267 @@ function requireWriteGate () {
 	return writeGate;
 }
 
+var ensureOutboxOperationColumns_1;
+var hasRequiredEnsureOutboxOperationColumns;
+
+function requireEnsureOutboxOperationColumns () {
+	if (hasRequiredEnsureOutboxOperationColumns) return ensureOutboxOperationColumns_1;
+	hasRequiredEnsureOutboxOperationColumns = 1;
+	const OPERATION_COLUMNS = [
+		{ name: 'operation_id', sql: '"operation_id" TEXT' },
+		{ name: 'operation_name', sql: '"operation_name" TEXT' },
+		{ name: 'operation_json', sql: '"operation_json" TEXT' }
+	];
+
+	async function ensureOutboxOperationColumns(query, tableName = 'orange_sync_outbox') {
+		if (typeof query !== 'function')
+			return;
+		let rows;
+		try {
+			rows = await query(`PRAGMA table_info("${String(tableName).replace(/"/g, '""')}")`);
+		}
+		catch (_e) {
+			return;
+		}
+		const columns = new Set();
+		const list = Array.isArray(rows) ? rows : rows && rows.rows || [];
+		for (let i = 0; i < list.length; i++) {
+			const name = list[i] && (list[i].name ?? list[i].NAME);
+			if (typeof name === 'string')
+				columns.add(name);
+		}
+		for (let i = 0; i < OPERATION_COLUMNS.length; i++) {
+			const column = OPERATION_COLUMNS[i];
+			if (columns.has(column.name))
+				continue;
+			try {
+				await query(`ALTER TABLE "${String(tableName).replace(/"/g, '""')}" ADD COLUMN ${column.sql}`);
+			}
+			catch (e) {
+				if (!isDuplicateColumnError(e, column.name))
+					throw e;
+			}
+		}
+	}
+
+	function isDuplicateColumnError(error, columnName) {
+		const message = error && error.message || '';
+		return message.includes('duplicate column name')
+			&& message.toLowerCase().includes(columnName.toLowerCase());
+	}
+
+	ensureOutboxOperationColumns_1 = ensureOutboxOperationColumns;
+	return ensureOutboxOperationColumns_1;
+}
+
+var operationContext;
+var hasRequiredOperationContext;
+
+function requireOperationContext () {
+	if (hasRequiredOperationContext) return operationContext;
+	hasRequiredOperationContext = 1;
+	const stringify = requireStringify();
+	const executeQuery = requireQuery();
+	const getSessionSingleton = requireGetSessionSingleton();
+	const setSessionSingleton = requireSetSessionSingleton();
+
+	const sessionKey = 'syncTransactionContext';
+	const captureKey = 'syncOutboxCapture';
+	const memoryByMutationId = new Map();
+
+	function createSyncTransactionContext(sync, memory) {
+		return {
+			sync: isObject(sync) && !Array.isArray(sync) ? sync : {},
+			memory: memory === undefined ? {} : memory
+		};
+	}
+
+	function setSyncTransactionContext(context, txContext) {
+		if (!context)
+			return;
+		if (context.__orangeDbWorkerTransactionId !== undefined) {
+			context.__orangeSyncTransactionContext = txContext;
+			return;
+		}
+		setSessionSingleton(context, sessionKey, txContext);
+	}
+
+	function getSyncTransactionContext(context) {
+		if (!context)
+			return undefined;
+		if (context.__orangeSyncTransactionContext)
+			return context.__orangeSyncTransactionContext;
+		try {
+			return getSessionSingleton(context, sessionKey);
+		}
+		catch (_e) {
+			return undefined;
+		}
+	}
+
+	async function flushSyncTransactionContext(context) {
+		const txContext = getSyncTransactionContext(context);
+		if (!txContext)
+			return null;
+		const state = getOutboxCaptureState(context);
+		const metadata = toSyncOperationMetadata(txContext.sync, state && state.id);
+		if (state)
+			await updateOutboxOperationColumns(context, state, metadata);
+		return metadata;
+	}
+
+	async function updateOutboxOperationFromContext(context, state) {
+		const txContext = getSyncTransactionContext(context);
+		if (!txContext || !state)
+			return null;
+		const metadata = toSyncOperationMetadata(txContext.sync, state.id);
+		await updateOutboxOperationColumns(context, state, metadata);
+		return metadata;
+	}
+
+	function toSyncOperationMetadata(sync, mutationId) {
+		const payload = serializeSyncPayload(sync);
+		const keys = Object.keys(payload);
+		if (keys.length === 0)
+			return null;
+		const operationName = typeof payload.operation === 'string' && payload.operation.length > 0
+			? payload.operation
+			: undefined;
+		return {
+			mutationId,
+			operationId: mutationId,
+			operationName,
+			operationJson: stringify(payload),
+			context: payload
+		};
+	}
+
+	function serializeSyncPayload(sync) {
+		if (sync === undefined || sync === null)
+			return {};
+		if (!isObject(sync) || Array.isArray(sync))
+			throw new Error('ctx.sync must be a JSON serializable object.');
+		let json;
+		try {
+			json = JSON.stringify(sync);
+		}
+		catch (_e) {
+			throw new Error('ctx.sync must be JSON serializable.');
+		}
+		if (json === undefined)
+			throw new Error('ctx.sync must be a JSON serializable object.');
+		try {
+			const parsed = JSON.parse(json);
+			if (!isObject(parsed) || Array.isArray(parsed))
+				throw new Error('ctx.sync must be a JSON serializable object.');
+			return parsed;
+		}
+		catch (e) {
+			if (e && e.message && e.message.startsWith('ctx.sync'))
+				throw e;
+			throw new Error('ctx.sync must be JSON serializable.');
+		}
+	}
+
+	function registerSyncOperationMemory(mutationId, memory) {
+		if (typeof mutationId !== 'string' || mutationId.length === 0 || memory === undefined)
+			return;
+		memoryByMutationId.set(mutationId, memory);
+	}
+
+	function getSyncOperationMemory(mutationId) {
+		if (typeof mutationId !== 'string')
+			return undefined;
+		return memoryByMutationId.get(mutationId);
+	}
+
+	function deleteSyncOperationMemory(mutationId) {
+		if (typeof mutationId === 'string')
+			memoryByMutationId.delete(mutationId);
+	}
+
+	function withSyncOperationMemory(event) {
+		if (!event || !event.mutationId || event.memory !== undefined)
+			return event;
+		const memory = getSyncOperationMemory(event.mutationId);
+		if (memory === undefined)
+			return event;
+		return {
+			...event,
+			memory
+		};
+	}
+
+	function finalizeSyncOperationMemory(event) {
+		if (!event || !event.mutationId)
+			return;
+		if (event.ok || event.retryable === false)
+			deleteSyncOperationMemory(event.mutationId);
+	}
+
+	async function updateOutboxOperationColumns(context, state, metadata) {
+		const assignments = outboxOperationAssignments(metadata);
+		await executeQuery(context, [
+			'UPDATE "orange_sync_outbox"',
+			`SET ${assignments.join(', ')}`,
+			`WHERE "mutation_id" = ${sqlStringLiteral(state.id)}`
+		].join(' '));
+	}
+
+	function outboxOperationAssignments(metadata) {
+		if (!metadata) {
+			return [
+				'"operation_id" = NULL',
+				'"operation_name" = NULL',
+				'"operation_json" = NULL'
+			];
+		}
+		return [
+			`"operation_id" = ${sqlNullableStringLiteral(metadata.operationId)}`,
+			`"operation_name" = ${sqlNullableStringLiteral(metadata.operationName)}`,
+			`"operation_json" = ${sqlNullableStringLiteral(metadata.operationJson)}`
+		];
+	}
+
+	function getOutboxCaptureState(context) {
+		try {
+			return getSessionSingleton(context, captureKey);
+		}
+		catch (_e) {
+			return undefined;
+		}
+	}
+
+	function isObject(value) {
+		return value && value === Object(value);
+	}
+
+	function sqlStringLiteral(value) {
+		return `'${String(value).replace(/'/g, '\'\'')}'`;
+	}
+
+	function sqlNullableStringLiteral(value) {
+		if (value === undefined || value === null)
+			return 'NULL';
+		return sqlStringLiteral(value);
+	}
+
+	operationContext = {
+		createSyncTransactionContext,
+		deleteSyncOperationMemory,
+		finalizeSyncOperationMemory,
+		flushSyncTransactionContext,
+		getSyncOperationMemory,
+		registerSyncOperationMemory,
+		serializeSyncPayload,
+		setSyncTransactionContext,
+		toSyncOperationMetadata,
+		updateOutboxOperationFromContext,
+		withSyncOperationMemory
+	};
+	return operationContext;
+}
+
 var hostLocal_1;
 var hasRequiredHostLocal;
 
@@ -3885,6 +4154,8 @@ function requireHostLocal () {
 	let getSessionSingleton = requireGetSessionSingleton();
 	let outboxTableSql = requireOutboxTableSql();
 	let { runSyncWrite } = requireWriteGate();
+	let ensureOutboxOperationColumns = requireEnsureOutboxOperationColumns();
+	let { updateOutboxOperationFromContext } = requireOperationContext();
 	const readonlyOps = ['getManyDto', 'getMany', 'aggregate', 'distinct', 'count'];
 	const syncOutboxEnsuredKey = typeof Symbol === 'function'
 		? Symbol.for('orange-orm.syncOutboxEnsured')
@@ -4104,6 +4375,7 @@ function requireHostLocal () {
 				state = { id: randomUuid(), patches: [], commands: [] };
 				setSessionSingleton(context, 'syncOutboxCapture', state);
 				await insertSyncOutboxPlaceholder(context, pool, state.id);
+				await updateOutboxOperationFromContext(context, state);
 			}
 			if (!Array.isArray(state.patches))
 				state.patches = [];
@@ -4134,9 +4406,18 @@ function requireHostLocal () {
 		}
 
 		async function updateSyncOutboxCaptureState(context, state) {
+			const metadata = await updateOutboxOperationFromContext(context, state);
+			const operationAssignments = metadata === null
+				? [
+					'"operation_id" = NULL',
+					'"operation_name" = NULL',
+					'"operation_json" = NULL'
+				]
+				: [];
 			await querySyncOutbox(context, [
 				'UPDATE "orange_sync_outbox"',
-				`SET "patch_json" = ${sqlStringLiteral(stringify(serializeSyncOutboxCaptureState(state)))}`,
+				`SET "patch_json" = ${sqlStringLiteral(stringify(serializeSyncOutboxCaptureState(state)))}`
+					+ (operationAssignments.length > 0 ? `, ${operationAssignments.join(', ')}` : ''),
 				`WHERE "mutation_id" = ${sqlStringLiteral(state.id)}`
 			].join(' '));
 		}
@@ -4161,6 +4442,7 @@ function requireHostLocal () {
 			if (pool && pool[syncOutboxEnsuredKey])
 				return;
 			await querySyncOutbox(context, outboxTableSql());
+			await ensureOutboxOperationColumns((sql) => querySyncOutbox(context, sql));
 			if (pool)
 				pool[syncOutboxEnsuredKey] = true;
 		}
@@ -5236,6 +5518,12 @@ function requireSyncClient () {
 	const outboxTableSql = requireOutboxTableSql();
 	const { ensureSyncSchema, clearEnsuredSyncSchema } = requireSyncSchema();
 	const { runSyncMaintenance } = requireWriteGate();
+	const ensureOutboxOperationColumns = requireEnsureOutboxOperationColumns();
+	const {
+		deleteSyncOperationMemory,
+		finalizeSyncOperationMemory,
+		withSyncOperationMemory
+	} = requireOperationContext();
 
 	function newSyncClient(client, getDb, axiosInterceptor) {
 		const sinceByScope = new Map();
@@ -5265,6 +5553,7 @@ function requireSyncClient () {
 			stop: auto.stop,
 			isRunning: auto.isRunning,
 			getConfig,
+			onOperation,
 			on,
 			off,
 			once,
@@ -5414,11 +5703,17 @@ function requireSyncClient () {
 				result = await sendPush(pushConfig, clientId, pending);
 			}
 			catch (e) {
-				if (isConflictError(e))
-					await rollbackFailedPushBatch(db, pending);
+				if (isConflictError(e)) {
+					await rollbackFailedPushBatch(db, pending, e);
+					emitOperationErrors(pending, e, false);
+				}
+				else {
+					await markPendingMutationAttempts(db, pending, e);
+					emitOperationErrors(pending, e, true);
+				}
 				throw e;
 			}
-			await markPushedMutations(db, result);
+			await markPushedMutations(db, result, pending);
 			return result;
 		}
 
@@ -5447,16 +5742,21 @@ function requireSyncClient () {
 			return Number(result && result.applied) > 0;
 		}
 
-		async function rollbackFailedPushBatch(db, attemptedMutations) {
-			return runSyncMaintenance(db, () => rollbackFailedPushBatchCore(db, attemptedMutations));
+		async function rollbackFailedPushBatch(db, attemptedMutations, error) {
+			return runSyncMaintenance(db, () => rollbackFailedPushBatchCore(db, attemptedMutations, error));
 		}
 
-		async function rollbackFailedPushBatchCore(db, attemptedMutations) {
+		async function rollbackFailedPushBatchCore(db, attemptedMutations, error) {
 			if (!await hasStableBase(db))
 				return;
 			const remaining = await readPendingMutationRows(db, 10000, mutationIdsToSet(attemptedMutations));
 			await restoreStableBase(db);
 			await ensureSyncOutboxTable(db);
+			for (let i = 0; i < attemptedMutations.length; i++) {
+				const failedRow = failedOutboxRow(attemptedMutations[i], error);
+				if (failedRow)
+					await insertOutboxRow(db, failedRow);
+			}
 			for (let i = 0; i < remaining.length; i++) {
 				const row = remaining[i];
 				const mutation = rowToMutation(row);
@@ -5514,7 +5814,7 @@ function requireSyncClient () {
 				body: {
 					phase: 'push',
 					clientId,
-					mutations
+					mutations: mutations.map(stripMutationForPush)
 				}
 			}, {
 				_syncInterceptors: interceptors,
@@ -5874,6 +6174,7 @@ function requireSyncClient () {
 			if (isInternalTableEnsured(db, syncOutboxTable))
 				return;
 			await db.query(outboxTableSql(syncOutboxTable));
+			await ensureOutboxOperationColumns((sql) => db.query(sql), syncOutboxTable);
 			markInternalTableEnsured(db, syncOutboxTable);
 		}
 
@@ -6123,7 +6424,7 @@ function requireSyncClient () {
 		async function readPendingMutationRows(db, limit, excludeIds) {
 			await ensureSyncOutboxTable(db);
 			const rows = await db.query([
-				`SELECT "mutation_id", "table_name", "patch_json", "options_json", "created_at_ms", "status", "last_error", "attempts", "pushed_at_ms", "result_json" FROM "${syncOutboxTable}"`,
+				`SELECT "mutation_id", "table_name", "patch_json", "options_json", "created_at_ms", "operation_id", "operation_name", "operation_json", "status", "last_error", "attempts", "pushed_at_ms", "result_json" FROM "${syncOutboxTable}"`,
 				'WHERE "status" = \'pending\'',
 				'ORDER BY "created_at_ms" ASC',
 				`LIMIT ${limit}`
@@ -6145,37 +6446,204 @@ function requireSyncClient () {
 				const parsedPatch = JSON.parse(patchJson);
 				if (table === '*') {
 					if (parsedPatch && parsedPatch === Object(parsedPatch) && !Array.isArray(parsedPatch)) {
-						return {
+						return withOutboxMetadata({
 							id,
 							patches: Array.isArray(parsedPatch.patches) ? parsedPatch.patches : [],
 							commands: Array.isArray(parsedPatch.commands) ? parsedPatch.commands : [],
 							options: optionsJson ? JSON.parse(optionsJson) : undefined
-						};
+						}, row);
 					}
-					return {
+					return withOutboxMetadata({
 						id,
 						patches: parsedPatch,
 						options: optionsJson ? JSON.parse(optionsJson) : undefined
-					};
+					}, row);
 				}
-				return {
+				return withOutboxMetadata({
 					id,
 					table,
 					patch: parsedPatch,
 					options: optionsJson ? JSON.parse(optionsJson) : undefined
-				};
+				}, row);
 			}
 			catch (_e) {
 				return null;
 			}
 		}
 
-		async function markPushedMutations(db, result) {
+		function withOutboxMetadata(mutation, row) {
+			const operation = rowToOperation(row);
+			Object.defineProperty(mutation, '__operation', {
+				value: operation,
+				enumerable: false,
+				configurable: true
+			});
+			Object.defineProperty(mutation, '__outboxRow', {
+				value: row,
+				enumerable: false,
+				configurable: true
+			});
+			return mutation;
+		}
+
+		function rowToOperation(row) {
+			const mutationId = row.mutation_id ?? row.MUTATION_ID;
+			const operationId = row.operation_id ?? row.OPERATION_ID;
+			const operationName = row.operation_name ?? row.OPERATION_NAME;
+			const operationJson = row.operation_json ?? row.OPERATION_JSON;
+			if (typeof mutationId !== 'string' || typeof operationName !== 'string' || operationName.length === 0)
+				return null;
+			const context = parseOperationContext(operationJson);
+			return {
+				mutationId,
+				operationId,
+				operationName,
+				context
+			};
+		}
+
+		function parseOperationContext(operationJson) {
+			if (typeof operationJson !== 'string' || operationJson.length === 0)
+				return {};
+			try {
+				const parsed = JSON.parse(operationJson);
+				return parsed && parsed === Object(parsed) && !Array.isArray(parsed) ? parsed : {};
+			}
+			catch (_e) {
+				return {};
+			}
+		}
+
+		function stripMutationForPush(mutation) {
+			if (!mutation || mutation !== Object(mutation))
+				return mutation;
+			const result = {};
+			const keys = Object.keys(mutation);
+			for (let i = 0; i < keys.length; i++)
+				result[keys[i]] = mutation[keys[i]];
+			return result;
+		}
+
+		function mutationsById(mutations) {
+			const result = new Map();
+			if (!Array.isArray(mutations))
+				return result;
+			for (let i = 0; i < mutations.length; i++) {
+				const mutation = mutations[i];
+				if (mutation && typeof mutation.id === 'string')
+					result.set(mutation.id, mutation);
+			}
+			return result;
+		}
+
+		function failedOutboxRow(mutation, error) {
+			const row = mutation && mutation.__outboxRow;
+			if (!row)
+				return null;
+			const attempts = Number(row.attempts ?? row.ATTEMPTS ?? 0);
+			return {
+				mutation_id: row.mutation_id ?? row.MUTATION_ID,
+				table_name: row.table_name ?? row.TABLE_NAME,
+				patch_json: row.patch_json ?? row.PATCH_JSON,
+				options_json: row.options_json ?? row.OPTIONS_JSON,
+				created_at_ms: row.created_at_ms ?? row.CREATED_AT_MS,
+				operation_id: row.operation_id ?? row.OPERATION_ID,
+				operation_name: row.operation_name ?? row.OPERATION_NAME,
+				operation_json: row.operation_json ?? row.OPERATION_JSON,
+				status: 'failed',
+				last_error: syncOperationError(error).message,
+				attempts: Number.isFinite(attempts) ? attempts + 1 : 1,
+				pushed_at_ms: undefined,
+				result_json: undefined
+			};
+		}
+
+		async function markPendingMutationAttempts(db, mutations, error) {
+			await ensureSyncOutboxTable(db);
+			const message = syncOperationError(error).message;
+			for (let i = 0; i < mutations.length; i++) {
+				const id = mutations[i] && mutations[i].id;
+				if (typeof id !== 'string')
+					continue;
+				await db.query([
+					`UPDATE "${syncOutboxTable}"`,
+					`SET "attempts" = "attempts" + 1, "last_error" = ${sqlStringLiteral(message)}`,
+					`WHERE "mutation_id" = ${sqlStringLiteral(id)} AND "status" = 'pending'`
+				].join(' '));
+			}
+		}
+
+		function emitOperationSuccess(mutation, result) {
+			const operation = mutation && mutation.__operation;
+			if (!operation || !operation.operationName)
+				return;
+			emitOperationEvent({
+				ok: true,
+				operation: operation.operationName,
+				mutationId: operation.mutationId || mutation.id,
+				context: operation.context || {},
+				result,
+				retryable: false
+			});
+		}
+
+		function emitOperationErrors(mutations, error, retryable) {
+			const operationError = syncOperationError(error);
+			for (let i = 0; i < mutations.length; i++) {
+				const mutation = mutations[i];
+				const operation = mutation && mutation.__operation;
+				if (!operation || !operation.operationName)
+					continue;
+				emitOperationEvent({
+					ok: false,
+					operation: operation.operationName,
+					mutationId: operation.mutationId || mutation.id,
+					context: operation.context || {},
+					retryable,
+					error: operationError
+				});
+			}
+		}
+
+		function emitOperationEvent(event) {
+			event = withSyncOperationMemory(event);
+			emit(`operation:${event.operation}`, event);
+			finalizeSyncOperationMemory(event);
+			if (event.ok || event.retryable === false)
+				deleteSyncOperationMemory(event.mutationId);
+		}
+
+		function syncOperationError(error) {
+			const rawStatus = error && (error.status ?? (error.response && error.response.status));
+			const status = Number(rawStatus);
+			return {
+				kind: syncOperationErrorKind(status, error),
+				message: extractErrorMessage(error) || (error && error.message) || 'Sync operation failed',
+				status: Number.isFinite(status) ? status : undefined
+			};
+		}
+
+		function syncOperationErrorKind(status, error) {
+			if (status === 409)
+				return 'conflict';
+			if (status === 401 || status === 403)
+				return 'auth';
+			if (Number.isFinite(status) && status >= 500)
+				return 'server';
+			if (!Number.isFinite(status))
+				return 'network';
+			if (error && error.name === 'AbortError')
+				return 'network';
+			return 'unknown';
+		}
+
+		async function markPushedMutations(db, result, attemptedMutations) {
 			const results = Array.isArray(result && result.results) ? result.results : [];
 			if (results.length === 0)
 				return;
 			await ensureSyncOutboxTable(db);
 			const now = Date.now();
+			const attemptedById = mutationsById(attemptedMutations);
 			for (let i = 0; i < results.length; i++) {
 				const item = results[i];
 				if (!item || typeof item.id !== 'string')
@@ -6185,6 +6653,7 @@ function requireSyncClient () {
 					`SET "status" = 'pushed', "pushed_at_ms" = ${now}, "result_json" = ${sqlStringLiteral(stringify(item))}`,
 					`WHERE "mutation_id" = ${sqlStringLiteral(item.id)}`
 				].join(' '));
+				emitOperationSuccess(attemptedById.get(item.id), item);
 			}
 		}
 
@@ -6194,6 +6663,9 @@ function requireSyncClient () {
 			const patchJson = row.patch_json ?? row.PATCH_JSON;
 			const optionsJson = row.options_json ?? row.OPTIONS_JSON;
 			const createdAtMs = Number(row.created_at_ms ?? row.CREATED_AT_MS ?? Date.now());
+			const operationId = row.operation_id ?? row.OPERATION_ID;
+			const operationName = row.operation_name ?? row.OPERATION_NAME;
+			const operationJson = row.operation_json ?? row.OPERATION_JSON;
 			const status = row.status ?? row.STATUS ?? 'pending';
 			const lastError = row.last_error ?? row.LAST_ERROR;
 			const attempts = Number(row.attempts ?? row.ATTEMPTS ?? 0);
@@ -6202,13 +6674,16 @@ function requireSyncClient () {
 			if (typeof mutationId !== 'string' || typeof tableName !== 'string' || typeof patchJson !== 'string')
 				return;
 			await db.query([
-				`INSERT INTO "${syncOutboxTable}" ("mutation_id", "table_name", "patch_json", "options_json", "created_at_ms", "status", "last_error", "attempts", "pushed_at_ms", "result_json")`,
-				`VALUES (${sqlStringLiteral(mutationId)}, ${sqlStringLiteral(tableName)}, ${sqlStringLiteral(patchJson)}, ${sqlNullableStringLiteral(optionsJson)}, ${Number.isFinite(createdAtMs) ? createdAtMs : Date.now()}, ${sqlStringLiteral(status)}, ${sqlNullableStringLiteral(lastError)}, ${Number.isFinite(attempts) ? attempts : 0}, ${sqlNullableNumberLiteral(pushedAtMs)}, ${sqlNullableStringLiteral(resultJson)})`,
+				`INSERT INTO "${syncOutboxTable}" ("mutation_id", "table_name", "patch_json", "options_json", "created_at_ms", "operation_id", "operation_name", "operation_json", "status", "last_error", "attempts", "pushed_at_ms", "result_json")`,
+				`VALUES (${sqlStringLiteral(mutationId)}, ${sqlStringLiteral(tableName)}, ${sqlStringLiteral(patchJson)}, ${sqlNullableStringLiteral(optionsJson)}, ${Number.isFinite(createdAtMs) ? createdAtMs : Date.now()}, ${sqlNullableStringLiteral(operationId)}, ${sqlNullableStringLiteral(operationName)}, ${sqlNullableStringLiteral(operationJson)}, ${sqlStringLiteral(status)}, ${sqlNullableStringLiteral(lastError)}, ${Number.isFinite(attempts) ? attempts : 0}, ${sqlNullableNumberLiteral(pushedAtMs)}, ${sqlNullableStringLiteral(resultJson)})`,
 				'ON CONFLICT("mutation_id") DO UPDATE SET',
 				'"table_name" = excluded."table_name",',
 				'"patch_json" = excluded."patch_json",',
 				'"options_json" = excluded."options_json",',
 				'"created_at_ms" = excluded."created_at_ms",',
+				'"operation_id" = excluded."operation_id",',
+				'"operation_name" = excluded."operation_name",',
+				'"operation_json" = excluded."operation_json",',
 				'"status" = excluded."status",',
 				'"last_error" = excluded."last_error",',
 				'"attempts" = excluded."attempts",',
@@ -6481,6 +6956,12 @@ function requireSyncClient () {
 			}
 			listeners.add(listener);
 			return () => off(event, listener);
+		}
+
+		function onOperation(operation, listener) {
+			if (typeof operation !== 'string' || typeof listener !== 'function')
+				return () => {};
+			return on(`operation:${operation}`, listener);
 		}
 
 		function off(event, listener) {
@@ -7584,6 +8065,13 @@ function requireClient () {
 	const flags = requireFlags();
 	const newSyncClient = requireSyncClient();
 	const { runSyncWrite } = requireWriteGate();
+	const {
+		createSyncTransactionContext,
+		flushSyncTransactionContext,
+		registerSyncOperationMemory,
+		serializeSyncPayload,
+		setSyncTransactionContext
+	} = requireOperationContext();
 
 	function rdbClient(options = {}) {
 		flags.useLazyDefaults = false;
@@ -7843,18 +8331,40 @@ function requireClient () {
 				throw new Error('Transaction not supported through http');
 			return runSyncWrite(db, _options, async () => {
 				const transaction = db.createTransaction(_options);
+				const syncContext = createSyncTransactionContext();
+				let operationMetadata;
 
 				try {
+					await attachSyncContextToTransaction(transaction, syncContext);
 					const nextClient = client({ transaction });
-					const result = await fn(nextClient);
+					const result = await fn(nextClient, syncContext);
+					operationMetadata = await flushSyncContextOnTransaction(transaction, syncContext);
 					transaction.done = true;
 					await transaction(transaction.commit);
+					if (operationMetadata && operationMetadata.operationName)
+						registerSyncOperationMemory(operationMetadata.mutationId, syncContext.memory);
 					return result;
 				}
 				catch (e) {
 					await transaction(transaction.rollback.bind(null, e));
 				}
 			});
+		}
+
+		async function attachSyncContextToTransaction(transaction, syncContext) {
+			if (typeof transaction.setSyncContext === 'function') {
+				await transaction.setSyncContext(serializeSyncPayload(syncContext.sync));
+				return;
+			}
+			await transaction((context) => {
+				setSyncTransactionContext(context, syncContext);
+			});
+		}
+
+		async function flushSyncContextOnTransaction(transaction, syncContext) {
+			if (typeof transaction.flushSyncContext === 'function')
+				return transaction.flushSyncContext(serializeSyncPayload(syncContext.sync));
+			return transaction((context) => flushSyncTransactionContext(context));
 		}
 
 		function table(url, tableName, tableOptions) {
@@ -18511,6 +19021,12 @@ var hasRequiredDbWorkerClient;
 function requireDbWorkerClient () {
 	if (hasRequiredDbWorkerClient) return dbWorkerClient;
 	hasRequiredDbWorkerClient = 1;
+	const {
+		finalizeSyncOperationMemory,
+		serializeSyncPayload,
+		withSyncOperationMemory
+	} = requireOperationContext();
+
 	function createDbWorkerClient(worker) {
 		if (!worker || typeof worker.postMessage !== 'function')
 			throw new Error('DB worker client requires a Worker-like object.');
@@ -18535,6 +19051,7 @@ function requireDbWorkerClient () {
 				stop: syncRequest.bind(null, 'stop'),
 				isRunning: syncRequest.bind(null, 'isRunning'),
 				getConfig: syncRequest.bind(null, 'getConfig'),
+				onOperation,
 				on,
 				off,
 				once,
@@ -18570,6 +19087,12 @@ function requireDbWorkerClient () {
 			};
 			transaction.rollback = async function(error, _context) {
 				await request('transaction.rollback', { transactionId, error: serializeError(error) });
+			};
+			transaction.setSyncContext = async function(sync) {
+				await request('transaction.syncContext', { transactionId }, serializeSyncPayload(sync));
+			};
+			transaction.flushSyncContext = async function(sync) {
+				return request('transaction.flushSyncContext', { transactionId }, serializeSyncPayload(sync));
 			};
 			return transaction;
 		}
@@ -18637,12 +19160,26 @@ function requireDbWorkerClient () {
 			return unsubscribe;
 		}
 
+		function onOperation(operation, listener) {
+			if (typeof operation !== 'string' || typeof listener !== 'function')
+				return () => {};
+			return on(`operation:${operation}`, listener);
+		}
+
 		function close() {
 			worker.removeEventListener('message', onMessage);
 			for (const entry of pending.values())
 				entry.reject(new Error('DB worker client closed.'));
 			pending.clear();
 			listeners.clear();
+			if (typeof worker.close === 'function') {
+				try {
+					worker.close();
+				}
+				catch (_e) {
+					// Closing is best-effort for MessagePort-backed worker clients.
+				}
+			}
 		}
 
 		function onMessage(event) {
@@ -18666,6 +19203,10 @@ function requireDbWorkerClient () {
 		}
 
 		function emit(event, payload) {
+			if (event && event.startsWith && event.startsWith('operation:')) {
+				payload = withSyncOperationMemory(payload);
+				finalizeSyncOperationMemory(payload);
+			}
 			const eventListeners = listeners.get(event);
 			if (!eventListeners)
 				return;
@@ -18708,6 +19249,12 @@ function requireDbWorkerHandler () {
 	if (hasRequiredDbWorkerHandler) return dbWorkerHandler;
 	hasRequiredDbWorkerHandler = 1;
 	const { acquireSyncWrite } = requireWriteGate();
+	const {
+		createSyncTransactionContext,
+		flushSyncTransactionContext,
+		serializeSyncPayload,
+		setSyncTransactionContext
+	} = requireOperationContext();
 
 	function createDbWorkerHandler(client, options = {}) {
 		if (!client)
@@ -18745,6 +19292,10 @@ function requireDbWorkerHandler () {
 		async function dispatch(message) {
 			if (message.method === 'transaction.begin')
 				return beginTransaction(message.transactionId, message.args && message.args[0]);
+			if (message.method === 'transaction.syncContext')
+				return setTransactionSyncContext(message.transactionId, message.args && message.args[0]);
+			if (message.method === 'transaction.flushSyncContext')
+				return flushTransactionSyncContext(message.transactionId, message.args && message.args[0]);
 			if (message.method === 'transaction.commit')
 				return endTransaction(message.transactionId, 'commit');
 			if (message.method === 'transaction.rollback')
@@ -18776,6 +19327,31 @@ function requireDbWorkerHandler () {
 			transaction.__orangeSyncWriteRelease = releaseSyncWrite;
 			transactions.set(transactionId, transaction);
 			return { transactionId };
+		}
+
+		async function setTransactionSyncContext(transactionId, sync) {
+			const transaction = transactions.get(transactionId);
+			if (!transaction)
+				return { transactionId, missing: true };
+			const syncContext = createSyncTransactionContext(serializeSyncPayload(sync));
+			transaction.__orangeSyncTransactionContext = syncContext;
+			await transaction((context) => {
+				setSyncTransactionContext(context, syncContext);
+			});
+			return { transactionId };
+		}
+
+		async function flushTransactionSyncContext(transactionId, sync) {
+			const transaction = transactions.get(transactionId);
+			if (!transaction)
+				return null;
+			const syncContext = transaction.__orangeSyncTransactionContext || createSyncTransactionContext();
+			syncContext.sync = serializeSyncPayload(sync);
+			transaction.__orangeSyncTransactionContext = syncContext;
+			return transaction((context) => {
+				setSyncTransactionContext(context, syncContext);
+				return flushSyncTransactionContext(context);
+			});
 		}
 
 		async function endTransaction(transactionId, method, error) {
@@ -18897,7 +19473,7 @@ function requireDbWorkerHandler () {
 				transactions.delete(id);
 				void Promise.resolve(transaction(transaction.rollback)).finally(() => releaseSyncWrite(transaction));
 			}
-			if (client.syncClient && typeof client.syncClient.stop === 'function')
+			if (options.stopSyncClient !== false && client.syncClient && typeof client.syncClient.stop === 'function')
 				client.syncClient.stop();
 		}
 
@@ -18949,6 +19525,296 @@ function requireDbWorkerHandler () {
 	return dbWorkerHandler;
 }
 
+var sharedDbWorkerClient;
+var hasRequiredSharedDbWorkerClient;
+
+function requireSharedDbWorkerClient () {
+	if (hasRequiredSharedDbWorkerClient) return sharedDbWorkerClient;
+	hasRequiredSharedDbWorkerClient = 1;
+	const createDbWorkerClient = requireDbWorkerClient();
+
+	function createSharedDbWorkerClient(sharedWorkerOrUrl, options = {}) {
+		const sharedWorker = resolveSharedWorker(sharedWorkerOrUrl, options);
+		const port = sharedWorker && sharedWorker.port || sharedWorker;
+		if (!port || typeof port.postMessage !== 'function')
+			throw new Error('Shared DB worker client requires a SharedWorker, MessagePort, or worker URL.');
+		if (typeof port.start === 'function')
+			port.start();
+		return createDbWorkerClient(toWorkerLike(port));
+	}
+
+	function resolveSharedWorker(sharedWorkerOrUrl, options) {
+		if (isWorkerUrl(sharedWorkerOrUrl)) {
+			if (typeof SharedWorker === 'undefined')
+				throw new Error('Shared DB worker requires SharedWorker support or an existing SharedWorker-like object.');
+			return new SharedWorker(sharedWorkerOrUrl, getSharedWorkerOptions(options));
+		}
+		return sharedWorkerOrUrl;
+	}
+
+	function isWorkerUrl(value) {
+		return typeof value === 'string'
+			|| typeof URL !== 'undefined' && value instanceof URL;
+	}
+
+	function getSharedWorkerOptions(options = {}) {
+		if (options.workerOptions)
+			return options.workerOptions;
+		const workerOptions = {
+			type: options.type || 'module'
+		};
+		if (options.name)
+			workerOptions.name = options.name;
+		if (options.credentials)
+			workerOptions.credentials = options.credentials;
+		return workerOptions;
+	}
+
+	function toWorkerLike(port) {
+		let closed = false;
+		return {
+			postMessage(message) {
+				port.postMessage(message);
+			},
+			addEventListener(type, listener) {
+				port.addEventListener(type, listener);
+			},
+			removeEventListener(type, listener) {
+				port.removeEventListener(type, listener);
+			},
+			close() {
+				if (closed)
+					return;
+				closed = true;
+				try {
+					port.postMessage({ type: 'orange-shared-db-port-close' });
+				}
+				catch (_e) {
+					// The port may already be gone.
+				}
+				if (typeof port.close === 'function')
+					port.close();
+			}
+		};
+	}
+
+	sharedDbWorkerClient = createSharedDbWorkerClient;
+	return sharedDbWorkerClient;
+}
+
+var sharedDbWorkerHandler;
+var hasRequiredSharedDbWorkerHandler;
+
+function requireSharedDbWorkerHandler () {
+	if (hasRequiredSharedDbWorkerHandler) return sharedDbWorkerHandler;
+	hasRequiredSharedDbWorkerHandler = 1;
+	const createDbWorkerHandler = requireDbWorkerHandler();
+
+	function createSharedDbWorkerHandler(createClient, options = {}) {
+		if (typeof createClient !== 'function')
+			throw new Error('Shared DB worker handler requires a client factory.');
+
+		const ports = new Map();
+		let client;
+		let clientPromise;
+		let stoppingClientPromise;
+		let stopped = false;
+		let removeConnectListener;
+
+		if (options.autoConnect !== false)
+			removeConnectListener = attachConnectListener(options.target, handleConnect);
+
+		return {
+			handleConnect,
+			connect: handleConnect,
+			stop
+		};
+
+		function handleConnect(event) {
+			if (stopped)
+				throw new Error('Shared DB worker handler is stopped.');
+			const port = resolvePort(event);
+			if (!port)
+				throw new Error('Shared DB worker handler requires a MessagePort.');
+
+			const state = {
+				port,
+				handler: null,
+				backlog: [],
+				closed: false,
+				error: null,
+				listener: null
+			};
+			state.listener = onMessage.bind(null, state);
+			ports.set(port, state);
+			port.addEventListener('message', state.listener);
+			if (typeof port.start === 'function')
+				port.start();
+
+			ensureClient()
+				.then((resolvedClient) => {
+					if (state.closed)
+						return;
+					state.handler = createDbWorkerHandler(resolvedClient, {
+						autoStart: false,
+						stopSyncClient: false,
+						postMessage: (message) => safePostMessage(port, message)
+					});
+					drainBacklog(state);
+				})
+				.catch((error) => {
+					state.error = error;
+					failBacklog(state, error);
+				});
+		}
+
+		function onMessage(state, event) {
+			const message = event && event.data;
+			if (message && message.type === 'orange-shared-db-port-close') {
+				closePort(state);
+				return;
+			}
+			if (state.closed)
+				return;
+			if (state.error) {
+				postRequestError(state.port, message, state.error);
+				return;
+			}
+			if (!state.handler) {
+				state.backlog.push(event);
+				return;
+			}
+			void state.handler.handleMessage(event);
+		}
+
+		function drainBacklog(state) {
+			const backlog = state.backlog.splice(0);
+			for (let i = 0; i < backlog.length; i++)
+				onMessage(state, backlog[i]);
+		}
+
+		function failBacklog(state, error) {
+			const backlog = state.backlog.splice(0);
+			for (let i = 0; i < backlog.length; i++) {
+				const message = backlog[i] && backlog[i].data;
+				postRequestError(state.port, message, error);
+			}
+		}
+
+		function ensureClient() {
+			if (clientPromise)
+				return clientPromise;
+			clientPromise = Promise.resolve()
+				.then(createClient)
+				.then((resolvedClient) => {
+					client = resolvedClient;
+					if (options.autoStart !== false && client && client.syncClient && typeof client.syncClient.start === 'function')
+						void client.syncClient.start();
+					return client;
+				});
+			return clientPromise;
+		}
+
+		function closePort(state, closeMessagePort = true) {
+			if (!state || state.closed)
+				return;
+			state.closed = true;
+			if (state.port && state.listener && typeof state.port.removeEventListener === 'function')
+				state.port.removeEventListener('message', state.listener);
+			if (state.handler)
+				state.handler.stop();
+			ports.delete(state.port);
+			if (closeMessagePort && state.port && typeof state.port.close === 'function')
+				state.port.close();
+			if (ports.size === 0 && options.closeOnLastPort !== false)
+				void stopClient();
+		}
+
+		async function stop() {
+			stopped = true;
+			if (removeConnectListener) {
+				removeConnectListener();
+				removeConnectListener = undefined;
+			}
+			for (const state of Array.from(ports.values()))
+				closePort(state, true);
+			await stopClient();
+		}
+
+		async function stopClient() {
+			if (stoppingClientPromise)
+				return stoppingClientPromise;
+			stoppingClientPromise = Promise.resolve()
+				.then(async () => {
+					const resolvedClient = client || await clientPromise.catch(() => null);
+					if (resolvedClient && resolvedClient.syncClient && typeof resolvedClient.syncClient.stop === 'function')
+						resolvedClient.syncClient.stop();
+					if (resolvedClient && typeof resolvedClient.close === 'function')
+						await resolvedClient.close();
+					else if (resolvedClient && typeof resolvedClient.end === 'function')
+						await resolvedClient.end();
+					client = undefined;
+					clientPromise = undefined;
+				})
+				.finally(() => {
+					stoppingClientPromise = undefined;
+				});
+			return stoppingClientPromise;
+		}
+	}
+
+	function attachConnectListener(target, handleConnect) {
+		const connectTarget = target || (typeof globalThis !== 'undefined' ? globalThis : undefined);
+		if (!connectTarget || typeof connectTarget.addEventListener !== 'function')
+			return undefined;
+		const listener = (event) => handleConnect(event);
+		connectTarget.addEventListener('connect', listener);
+		return () => connectTarget.removeEventListener('connect', listener);
+	}
+
+	function resolvePort(event) {
+		if (!event)
+			return null;
+		if (event.ports && event.ports[0])
+			return event.ports[0];
+		if (event.port)
+			return event.port;
+		if (typeof event.postMessage === 'function')
+			return event;
+		return null;
+	}
+
+	function postRequestError(port, message, error) {
+		if (!message || message.type !== 'orange-db-request')
+			return;
+		safePostMessage(port, {
+			type: 'orange-db-response',
+			id: message.id,
+			error: serializeError(error)
+		});
+	}
+
+	function safePostMessage(port, message) {
+		try {
+			port.postMessage(message);
+		}
+		catch (_e) {
+			// The tab may have closed while a request was resolving.
+		}
+	}
+
+	function serializeError(error) {
+		return {
+			name: error && error.name,
+			message: error && error.message ? error.message : String(error),
+			stack: error && error.stack
+		};
+	}
+
+	sharedDbWorkerHandler = createSharedDbWorkerHandler;
+	return sharedDbWorkerHandler;
+}
+
 var syncWorkerClient;
 var hasRequiredSyncWorkerClient;
 
@@ -18968,8 +19834,10 @@ function requireSyncWorkerClient () {
 		return {
 			sync: request.bind(null, 'sync'),
 			resetLocal: request.bind(null, 'resetLocal'),
+			onOperation,
 			on,
 			off,
+			once,
 			close
 		};
 
@@ -18995,6 +19863,7 @@ function requireSyncWorkerClient () {
 				listeners.set(event, eventListeners);
 			}
 			eventListeners.add(listener);
+			request('on', event).catch(() => {});
 			return () => off(event, listener);
 		}
 
@@ -19003,8 +19872,26 @@ function requireSyncWorkerClient () {
 			if (!eventListeners)
 				return;
 			eventListeners.delete(listener);
-			if (eventListeners.size === 0)
+			if (eventListeners.size === 0) {
 				listeners.delete(event);
+				request('off', event).catch(() => {});
+			}
+		}
+
+		function once(event, listener) {
+			if (typeof listener !== 'function')
+				return () => {};
+			const unsubscribe = on(event, (payload) => {
+				unsubscribe();
+				listener(payload);
+			});
+			return unsubscribe;
+		}
+
+		function onOperation(operation, listener) {
+			if (typeof operation !== 'string' || typeof listener !== 'function')
+				return () => {};
+			return on(`operation:${operation}`, listener);
 		}
 
 		function close() {
@@ -19078,6 +19965,7 @@ function requireSyncWorkerHandler () {
 			resetLocal: []
 		};
 		let auto;
+		const syncEventUnsubscribers = new Map();
 		const postMessage = options.postMessage || ((message) => {
 			const target = getPostTarget();
 			if (target)
@@ -19104,6 +19992,10 @@ function requireSyncWorkerHandler () {
 					result = await requestSyncCycle(message.options);
 				else if (message.method === 'resetLocal')
 					result = await requestResetLocal(message.options);
+				else if (message.method === 'on')
+					result = subscribeSyncEvent(message.options);
+				else if (message.method === 'off')
+					result = unsubscribeSyncEvent(message.options);
 				else
 					throw new Error(`Unknown sync worker method "${message.method}".`);
 				postResponse(message.id, result);
@@ -19122,6 +20014,9 @@ function requireSyncWorkerHandler () {
 		}
 
 		function stop() {
+			for (const unsubscribe of syncEventUnsubscribers.values())
+				unsubscribe();
+			syncEventUnsubscribers.clear();
 			if (auto)
 				auto.stop();
 			else if (syncClient && typeof syncClient.stop === 'function')
@@ -19208,6 +20103,29 @@ function requireSyncWorkerHandler () {
 				result,
 				error: error ? serializeError(error) : undefined
 			});
+		}
+
+		function subscribeSyncEvent(event) {
+			if (typeof event !== 'string' || syncEventUnsubscribers.has(event))
+				return;
+			if (!syncClient || typeof syncClient.on !== 'function')
+				return;
+			const unsubscribe = syncClient.on(event, (payload) => {
+				postMessage({
+					type: 'orange-sync-event',
+					event,
+					payload
+				});
+			});
+			syncEventUnsubscribers.set(event, unsubscribe);
+		}
+
+		function unsubscribeSyncEvent(event) {
+			const unsubscribe = syncEventUnsubscribers.get(event);
+			if (!unsubscribe)
+				return;
+			unsubscribe();
+			syncEventUnsubscribers.delete(event);
 		}
 	}
 
@@ -22650,7 +23568,7 @@ async function openDb(connectionString, busyTimeoutMs = 5000, vfs, sahPoolOption
 	db.exec('PRAGMA busy_timeout=' + (Number.parseInt(busyTimeoutMs, 10) || 5000));
 	return {
 		opened: true,
-		opfs: dbInfo.vfs === 'opfs',
+		opfs: dbInfo.vfs === 'opfs' || dbInfo.vfs === 'opfs-wl',
 		vfs: dbInfo.vfs,
 		filename: db.filename
 	};
@@ -22677,6 +23595,8 @@ async function createDb(sqlite3, filename, vfs, sahPoolOptions) {
 			throw toSahPoolError(e, resolvedSahPoolOptions);
 		}
 	}
+	if (vfs === 'opfs-wl')
+		return createOpfsWlDb(sqlite3, filename);
 	return createOpfsDb(sqlite3, filename);
 }
 
@@ -22719,6 +23639,16 @@ function createOpfsDb(sqlite3, filename) {
 		? new sqlite3.oo1.OpfsDb(filename)
 		: new sqlite3.oo1.DB(filename, 'ct'),
 		vfs: 'opfs'
+	};
+}
+
+function createOpfsWlDb(sqlite3, filename) {
+	const DbClass = sqlite3.oo1 && sqlite3.oo1.OpfsWlDb;
+	if (typeof DbClass !== 'function')
+		throw new Error('sqliteOPFS vfs "opfs-wl" is not available in this sqlite-wasm build.');
+	return {
+		db: new DbClass(filename),
+		vfs: 'opfs-wl'
 	};
 }
 
@@ -22922,7 +23852,7 @@ function requireNewPool$1 () {
 		if (poolOptions.vfs === 'opfs-sahpool')
 			return true;
 		const vfs = poolOptions.vfs || 'opfs';
-		if (vfs === 'opfs')
+		if (vfs === 'opfs' || vfs === 'opfs-wl')
 			return poolOptions.singleWorker !== false;
 		return false;
 	}
@@ -23638,6 +24568,8 @@ function requireIndexBrowser () {
 	connectViaPool.createPatch = client.createPatch;
 	connectViaPool.createDbWorkerClient = requireDbWorkerClient();
 	connectViaPool.createDbWorkerHandler = requireDbWorkerHandler();
+	connectViaPool.createSharedDbWorkerClient = requireSharedDbWorkerClient();
+	connectViaPool.createSharedDbWorkerHandler = requireSharedDbWorkerHandler();
 	connectViaPool.createSyncWorkerClient = requireSyncWorkerClient();
 	connectViaPool.createSyncWorkerHandler = requireSyncWorkerHandler();
 	connectViaPool.table = requireTable();

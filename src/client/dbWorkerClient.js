@@ -1,3 +1,9 @@
+const {
+	finalizeSyncOperationMemory,
+	serializeSyncPayload,
+	withSyncOperationMemory
+} = require('../sync/operationContext');
+
 function createDbWorkerClient(worker) {
 	if (!worker || typeof worker.postMessage !== 'function')
 		throw new Error('DB worker client requires a Worker-like object.');
@@ -22,6 +28,7 @@ function createDbWorkerClient(worker) {
 			stop: syncRequest.bind(null, 'stop'),
 			isRunning: syncRequest.bind(null, 'isRunning'),
 			getConfig: syncRequest.bind(null, 'getConfig'),
+			onOperation,
 			on,
 			off,
 			once,
@@ -57,6 +64,12 @@ function createDbWorkerClient(worker) {
 		};
 		transaction.rollback = async function(error, _context) {
 			await request('transaction.rollback', { transactionId, error: serializeError(error) });
+		};
+		transaction.setSyncContext = async function(sync) {
+			await request('transaction.syncContext', { transactionId }, serializeSyncPayload(sync));
+		};
+		transaction.flushSyncContext = async function(sync) {
+			return request('transaction.flushSyncContext', { transactionId }, serializeSyncPayload(sync));
 		};
 		return transaction;
 	}
@@ -124,12 +137,26 @@ function createDbWorkerClient(worker) {
 		return unsubscribe;
 	}
 
+	function onOperation(operation, listener) {
+		if (typeof operation !== 'string' || typeof listener !== 'function')
+			return () => {};
+		return on(`operation:${operation}`, listener);
+	}
+
 	function close() {
 		worker.removeEventListener('message', onMessage);
 		for (const entry of pending.values())
 			entry.reject(new Error('DB worker client closed.'));
 		pending.clear();
 		listeners.clear();
+		if (typeof worker.close === 'function') {
+			try {
+				worker.close();
+			}
+			catch (_e) {
+				// Closing is best-effort for MessagePort-backed worker clients.
+			}
+		}
 	}
 
 	function onMessage(event) {
@@ -153,6 +180,10 @@ function createDbWorkerClient(worker) {
 	}
 
 	function emit(event, payload) {
+		if (event && event.startsWith && event.startsWith('operation:')) {
+			payload = withSyncOperationMemory(payload);
+			finalizeSyncOperationMemory(payload);
+		}
 		const eventListeners = listeners.get(event);
 		if (!eventListeners)
 			return;

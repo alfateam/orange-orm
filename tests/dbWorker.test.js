@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 const rdb = require('../src/index');
+const fs = require('fs');
 const map = require('./db');
 const initSqlite = require('./initSqlite');
 
@@ -77,6 +78,39 @@ describe('db worker rpc', () => {
 		});
 
 		expect(rows.map(x => x.name)).toEqual(['TxOne', 'TxTwo']);
+	});
+
+	test('sends transaction sync context to db worker outbox', async () => {
+		const syncFileName = 'demo.dbWorker.sync-context.test.db';
+		fs.rmSync(syncFileName, { force: true });
+		const syncWorkerDb = map({
+			db: (con) => con.sqlite(syncFileName, {
+				size: 1,
+				sync: { url: '/rdb', auto: false, tables: ['customer'] }
+			})
+		});
+		await initSqlite(syncWorkerDb);
+		const bridge = createBridge(syncWorkerDb);
+		const workerClient = rdb.createDbWorkerClient(bridge.worker);
+		const uiDb = map({
+			db: () => workerClient
+		});
+
+		await uiDb.transaction(async (tx, ctx) => {
+			ctx.sync.operation = 'worker-save';
+			ctx.sync.customerId = 9200;
+			await tx.customer.insert({ id: 9200, name: 'WorkerSync', balance: 1, isActive: true });
+		});
+
+		const outbox = await syncWorkerDb.query('SELECT operation_name, operation_json FROM "orange_sync_outbox" WHERE status = \'pending\'');
+		workerClient.close();
+
+		expect(outbox).toHaveLength(1);
+		expect(outbox[0].operation_name ?? outbox[0].OPERATION_NAME).toBe('worker-save');
+		expect(JSON.parse(outbox[0].operation_json ?? outbox[0].OPERATION_JSON)).toMatchObject({
+			operation: 'worker-save',
+			customerId: 9200
+		});
 	});
 
 	test('rolls back worker transaction on error', async () => {

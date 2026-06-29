@@ -17,6 +17,7 @@ const port = 3020;
 let server;
 const syncPhases = [];
 let failNextPush = false;
+let failNextPushStatus;
 const syncClientConfig = {
 	url: `http://localhost:${port}/rdb`,
 	tables: ['customer', 'order'],
@@ -64,9 +65,11 @@ beforeAll(async () => {
 		next();
 	});
 	app.use('/rdb', (request, response, next) => {
-		if (request.query.sync === 'push' && failNextPush) {
+		if (request.query.sync === 'push' && (failNextPush || failNextPushStatus)) {
+			const status = failNextPushStatus || 503;
 			failNextPush = false;
-			response.status(503).json({ error: 'forced push failure' });
+			failNextPushStatus = undefined;
+			response.status(status).json({ error: 'forced push failure' });
 			return;
 		}
 		next();
@@ -90,6 +93,7 @@ beforeAll(async () => {
 beforeEach(async () => {
 	syncPhases.length = 0;
 	failNextPush = false;
+	failNextPushStatus = undefined;
 	await localDb.query('DROP TABLE IF EXISTS "orange_sync_state"');
 });
 
@@ -128,6 +132,121 @@ describe('sqlite staged pull sync', () => {
 		expect(ready.source).toBe('sync');
 		expect(ready.tables).toEqual(expect.arrayContaining(['customer', 'order']));
 		expect(ready.since).not.toBeUndefined();
+	});
+
+	test('emits operation success with serialized context and in-memory context', async () => {
+		await remoteDb.customer.insert({
+			id: 9100,
+			name: 'OpBase',
+			balance: 10,
+			isActive: true
+		});
+		await localDb.syncClient.sync();
+
+		const events = [];
+		const unsubscribe = localDb.syncClient.onOperation('customer-save', event => events.push(event));
+		await localDb.transaction(async (tx, ctx) => {
+			ctx.sync.operation = 'customer-save';
+			ctx.sync.customerId = 9100;
+			ctx.memory.beforeName = 'OpBase';
+			const row = await tx.customer.getById(9100);
+			row.name = 'OpSaved';
+			await row.saveChanges();
+		});
+
+		await localDb.syncClient.sync();
+		unsubscribe();
+
+		expect(events).toHaveLength(1);
+		expect(events[0].ok).toBe(true);
+		expect(events[0].operation).toBe('customer-save');
+		expect(events[0].context).toMatchObject({ operation: 'customer-save', customerId: 9100 });
+		expect(events[0].memory).toMatchObject({ beforeName: 'OpBase' });
+
+		const remote = await remoteDb.customer.getById(9100);
+		expect(remote.name).toBe('OpSaved');
+	});
+
+	test('flushes replaced sync context set after the first transaction write', async () => {
+		await remoteDb.customer.insert({
+			id: 9101,
+			name: 'RepBase',
+			balance: 11,
+			isActive: true
+		});
+		await localDb.syncClient.sync();
+
+		const events = [];
+		const unsubscribe = localDb.syncClient.onOperation('customer-replace', event => events.push(event));
+		await localDb.transaction(async (tx, ctx) => {
+			const row = await tx.customer.getById(9101);
+			row.name = 'RepSaved';
+			await row.saveChanges();
+			ctx.sync = { operation: 'customer-replace', customerId: 9101 };
+		});
+
+		await localDb.syncClient.sync();
+		unsubscribe();
+
+		expect(events).toHaveLength(1);
+		expect(events[0].ok).toBe(true);
+		expect(events[0].context).toMatchObject({ operation: 'customer-replace', customerId: 9101 });
+	});
+
+	test('rolls back when sync context is not JSON serializable', async () => {
+		await remoteDb.customer.insert({
+			id: 9103,
+			name: 'SerBase',
+			balance: 13,
+			isActive: true
+		});
+		await localDb.syncClient.sync();
+
+		await expect(localDb.transaction(async (tx, ctx) => {
+			ctx.sync.operation = 'bad-sync';
+			ctx.sync.notJson = BigInt(1);
+			const row = await tx.customer.getById(9103);
+			row.name = 'BadSync';
+			await row.saveChanges();
+		})).rejects.toThrow('ctx.sync must be JSON serializable');
+
+		const row = await localDb.customer.getById(9103);
+		expect(row.name).toBe('SerBase');
+	});
+
+	test('emits retryable auth operation event and keeps pending outbox', async () => {
+		await remoteDb.customer.insert({
+			id: 9102,
+			name: 'AuthBase',
+			balance: 12,
+			isActive: true
+		});
+		await localDb.syncClient.sync();
+
+		const events = [];
+		const unsubscribe = localDb.syncClient.onOperation('customer-auth', event => events.push(event));
+		await localDb.transaction(async (tx, ctx) => {
+			ctx.sync.operation = 'customer-auth';
+			ctx.sync.customerId = 9102;
+			const row = await tx.customer.getById(9102);
+			row.name = 'AuthPend';
+			await row.saveChanges();
+		});
+
+		failNextPushStatus = 401;
+		await expect(localDb.syncClient.sync())
+			.rejects.toThrow('Request failed with status code 401');
+		unsubscribe();
+
+		const pending = await localDb.query('SELECT mutation_id, attempts, last_error FROM "orange_sync_outbox" WHERE status = \'pending\'');
+		expect(events).toHaveLength(1);
+		expect(events[0].ok).toBe(false);
+		expect(events[0].retryable).toBe(true);
+		expect(events[0].error.kind).toBe('auth');
+		expect(pending).toHaveLength(1);
+		expect(Number(pending[0].attempts ?? pending[0].ATTEMPTS)).toBe(1);
+
+		await localDb.syncClient.sync();
 	});
 
 	test('incremental sync reads PKs from change table and excludes deletes', async () => {
@@ -436,9 +555,15 @@ describe('sqlite staged pull sync', () => {
 		]);
 		await localDb.syncClient.sync();
 
-		const first = await localDb.customer.getById(83);
-		first.name = 'Conflict83';
-		await first.saveChanges();
+		const conflictEvents = [];
+		const unsubscribeConflict = localDb.syncClient.onOperation('customer-conflict', event => conflictEvents.push(event));
+		await localDb.transaction(async (tx, ctx) => {
+			ctx.sync.operation = 'customer-conflict';
+			ctx.sync.customerId = 83;
+			const first = await tx.customer.getById(83);
+			first.name = 'Conflict83';
+			await first.saveChanges();
+		});
 
 		await remoteDb.query('UPDATE customer SET name = \'Remote83\' WHERE id = 83');
 
@@ -448,15 +573,22 @@ describe('sqlite staged pull sync', () => {
 
 		await expect(localDb.syncClient.sync())
 			.rejects.toThrow('Request failed with status code 409');
+		unsubscribeConflict();
 
 		const row83 = await localDb.customer.getById(83);
 		const row84 = await localDb.customer.getById(84);
 		const remote84 = await remoteDb.customer.getById(84);
 		const pending = await localDb.query('SELECT mutation_id, patch_json FROM "orange_sync_outbox" WHERE status = \'pending\' ORDER BY created_at_ms');
+		const failed = await localDb.query('SELECT operation_name FROM "orange_sync_outbox" WHERE status = \'failed\' AND operation_name = \'customer-conflict\'');
 
 		expect(row83.name).toBe('Base83');
 		expect(row84.name).toBe('Replay84');
 		expect(remote84.name).toBe('Base84');
+		expect(conflictEvents).toHaveLength(1);
+		expect(conflictEvents[0].ok).toBe(false);
+		expect(conflictEvents[0].retryable).toBe(false);
+		expect(conflictEvents[0].error.kind).toBe('conflict');
+		expect(failed).toHaveLength(1);
 		expect(pending).toHaveLength(1);
 		expect(pending[0].patch_json ?? pending[0].PATCH_JSON).toContain('Replay84');
 

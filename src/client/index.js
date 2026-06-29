@@ -12,6 +12,13 @@ const createHttpInterceptor = require('./httpInterceptor');
 const flags = require('../flags');
 const newSyncClient = require('./syncClient');
 const { runSyncWrite } = require('../sync/writeGate');
+const {
+	createSyncTransactionContext,
+	flushSyncTransactionContext,
+	registerSyncOperationMemory,
+	serializeSyncPayload,
+	setSyncTransactionContext
+} = require('../sync/operationContext');
 
 function rdbClient(options = {}) {
 	flags.useLazyDefaults = false;
@@ -271,18 +278,40 @@ function rdbClient(options = {}) {
 			throw new Error('Transaction not supported through http');
 		return runSyncWrite(db, _options, async () => {
 			const transaction = db.createTransaction(_options);
+			const syncContext = createSyncTransactionContext();
+			let operationMetadata;
 
 			try {
+				await attachSyncContextToTransaction(transaction, syncContext);
 				const nextClient = client({ transaction });
-				const result = await fn(nextClient);
+				const result = await fn(nextClient, syncContext);
+				operationMetadata = await flushSyncContextOnTransaction(transaction, syncContext);
 				transaction.done = true;
 				await transaction(transaction.commit);
+				if (operationMetadata && operationMetadata.operationName)
+					registerSyncOperationMemory(operationMetadata.mutationId, syncContext.memory);
 				return result;
 			}
 			catch (e) {
 				await transaction(transaction.rollback.bind(null, e));
 			}
 		});
+	}
+
+	async function attachSyncContextToTransaction(transaction, syncContext) {
+		if (typeof transaction.setSyncContext === 'function') {
+			await transaction.setSyncContext(serializeSyncPayload(syncContext.sync));
+			return;
+		}
+		await transaction((context) => {
+			setSyncTransactionContext(context, syncContext);
+		});
+	}
+
+	async function flushSyncContextOnTransaction(transaction, syncContext) {
+		if (typeof transaction.flushSyncContext === 'function')
+			return transaction.flushSyncContext(serializeSyncPayload(syncContext.sync));
+		return transaction((context) => flushSyncTransactionContext(context));
 	}
 
 	function table(url, tableName, tableOptions) {

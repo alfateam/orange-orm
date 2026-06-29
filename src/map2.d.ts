@@ -1064,10 +1064,50 @@ export interface SyncEvent {
   method: 'sync';
 }
 
+export interface SyncTransactionContext<
+  C extends Record<string, unknown> = Record<string, unknown>,
+  M = Record<string, unknown>
+> {
+  sync: C & { operation?: string };
+  memory: M;
+}
+
+export type SyncOperationErrorKind = 'conflict' | 'auth' | 'network' | 'server' | 'unknown';
+
+export interface SyncOperationError {
+  kind: SyncOperationErrorKind;
+  message: string;
+  status?: number;
+}
+
+export type SyncOperationEvent<
+  C extends Record<string, unknown> = Record<string, unknown>,
+  M = unknown,
+  R = unknown
+> =
+  | {
+      ok: true;
+      operation: string;
+      mutationId: string;
+      context: C;
+      memory?: M;
+      result: R;
+      retryable: false;
+    }
+  | {
+      ok: false;
+      operation: string;
+      mutationId: string;
+      context: C;
+      memory?: M;
+      retryable: boolean;
+      error: SyncOperationError;
+    };
+
 export interface PoolOptions<M extends Record<string, any> = any> {
   size?: number;
   sync?: string | SyncConfig<M>;
-  vfs?: 'opfs' | 'opfs-sahpool';
+  vfs?: 'opfs' | 'opfs-sahpool' | 'opfs-wl';
   sahPool?: SqliteOpfsSahPoolOptions;
   singleWorker?: boolean;
   prewarmRead?: boolean;
@@ -1112,7 +1152,7 @@ export type DBClient<
     config?: DbOptions<M, Commands>
   ): DBClient<M, Commands>;
   transaction<TR = unknown>(
-    fn: (db: DBClient<M>) => Promise<TR> | TR
+    fn: (db: DBClient<M>, ctx: SyncTransactionContext) => Promise<TR> | TR
   ): Promise<TR>;
   express(): import('express').RequestHandler;
   express(config: ExpressConfig<M>): import('express').RequestHandler;
@@ -1127,6 +1167,10 @@ export type DBClient<
     isRunning(): boolean | Promise<boolean>;
     getConfig(): Promise<SyncConfig<M> | null>;
     interceptors: SyncInterceptors;
+    onOperation<Context extends Record<string, unknown> = Record<string, unknown>, Memory = unknown, Result = unknown>(
+      operation: string,
+      listener: (event: SyncOperationEvent<Context, Memory, Result>) => void
+    ): () => void;
     on(event: 'sync', listener: (payload: SyncEvent) => void): () => void;
     on(event: 'initial-ready', listener: (payload: SyncInitialReadyEvent<M>) => void): () => void;
     on(event: 'error' | 'sync-error', listener: (payload: SyncErrorEvent) => void): () => void;

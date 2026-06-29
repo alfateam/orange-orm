@@ -111,7 +111,7 @@ export interface Pool {
 export interface PoolOptions<M extends Record<string, any> = any> {
 	size?: number;
 	sync?: string | SyncConfig<M>;
-	vfs?: 'opfs' | 'opfs-sahpool';
+	vfs?: 'opfs' | 'opfs-sahpool' | 'opfs-wl';
 	sahPool?: SqliteOpfsSahPoolOptions;
 	singleWorker?: boolean;
 	prewarmRead?: boolean;

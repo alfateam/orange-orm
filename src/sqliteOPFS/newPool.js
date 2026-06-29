@@ -70,7 +70,7 @@ function shouldUseSingleWorker(poolOptions = {}) {
 	if (poolOptions.vfs === 'opfs-sahpool')
 		return true;
 	const vfs = poolOptions.vfs || 'opfs';
-	if (vfs === 'opfs')
+	if (vfs === 'opfs' || vfs === 'opfs-wl')
 		return poolOptions.singleWorker !== false;
 	return false;
 }

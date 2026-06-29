@@ -11,8 +11,10 @@ function createSyncWorkerClient(worker) {
 	return {
 		sync: request.bind(null, 'sync'),
 		resetLocal: request.bind(null, 'resetLocal'),
+		onOperation,
 		on,
 		off,
+		once,
 		close
 	};
 
@@ -38,6 +40,7 @@ function createSyncWorkerClient(worker) {
 			listeners.set(event, eventListeners);
 		}
 		eventListeners.add(listener);
+		request('on', event).catch(() => {});
 		return () => off(event, listener);
 	}
 
@@ -46,8 +49,26 @@ function createSyncWorkerClient(worker) {
 		if (!eventListeners)
 			return;
 		eventListeners.delete(listener);
-		if (eventListeners.size === 0)
+		if (eventListeners.size === 0) {
 			listeners.delete(event);
+			request('off', event).catch(() => {});
+		}
+	}
+
+	function once(event, listener) {
+		if (typeof listener !== 'function')
+			return () => {};
+		const unsubscribe = on(event, (payload) => {
+			unsubscribe();
+			listener(payload);
+		});
+		return unsubscribe;
+	}
+
+	function onOperation(operation, listener) {
+		if (typeof operation !== 'string' || typeof listener !== 'function')
+			return () => {};
+		return on(`operation:${operation}`, listener);
 	}
 
 	function close() {

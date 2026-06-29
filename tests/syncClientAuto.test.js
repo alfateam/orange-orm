@@ -138,6 +138,7 @@ describe('sync client auto start', () => {
 			applyTo(axios) {
 				axios.request = async (request) => {
 					seen.push(['auth', request.headers.Authorization]);
+					seen.push(['credentials', request.credentials]);
 					const error = new Error('Request failed with status code 401');
 					error.response = {
 						status: 401,
@@ -150,6 +151,7 @@ describe('sync client auto start', () => {
 		});
 		client.interceptors.request.use((config) => {
 			config.headers = { ...(config.headers || {}), Authorization: 'Bearer token-1' };
+			config.credentials = 'include';
 			return config;
 		});
 		client.interceptors.response.use(undefined, (error) => {
@@ -161,6 +163,7 @@ describe('sync client auto start', () => {
 
 		expect(seen).toEqual([
 			['auth', 'Bearer token-1'],
+			['credentials', 'include'],
 			['error', 401]
 		]);
 	});

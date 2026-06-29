@@ -114,6 +114,35 @@ describe('sync worker rpc', () => {
 
 		expect(starts).toBe(0);
 	});
+
+	test('proxies operation events from sync worker', async () => {
+		const listeners = new Map();
+		const bridge = createBridge({
+			on(event, listener) {
+				listeners.set(event, listener);
+				return () => listeners.delete(event);
+			}
+		});
+		const client = createSyncWorkerClient(bridge.worker);
+		const events = [];
+
+		client.onOperation('worker-op', event => events.push(event));
+		await delay(0);
+		listeners.get('operation:worker-op')({
+			ok: true,
+			operation: 'worker-op',
+			mutationId: 'm1',
+			context: { operation: 'worker-op' },
+			result: { id: 'm1' },
+			retryable: false
+		});
+		await delay(0);
+		client.close();
+
+		expect(events).toHaveLength(1);
+		expect(events[0].ok).toBe(true);
+		expect(events[0].operation).toBe('worker-op');
+	});
 });
 
 function createBridge(syncClient) {
