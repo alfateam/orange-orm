@@ -176,6 +176,35 @@ describe('sqliteOPFS pool', () => {
 		expect(messages[0].vfs).toBe('opfs-wl');
 		pool.end();
 	});
+
+	test('can run sahpool through an inline worker adapter', async () => {
+		const initConfigs = [];
+		const pool = newPool('inline.sqlite3', {
+			vfs: 'opfs-sahpool',
+			inlineWorker: true,
+			prewarmRead: false,
+			sqlite3InitModule(config) {
+				initConfigs.push(config);
+				return newFakeSqlite3();
+			}
+		});
+
+		try {
+			const rows = await new Promise((resolve, reject) => {
+				pool.connect((err, client) => {
+					if (err)
+						return reject(err);
+					client.executeQuery(newSql('SELECT 1'), (err, result) => err ? reject(err) : resolve(result));
+				});
+			});
+
+			expect(rows).toEqual([{ value: 1 }]);
+			expect(initConfigs).toEqual([{ disable: { vfs: { opfs: true } } }]);
+		}
+		finally {
+			pool.end();
+		}
+	});
 });
 
 function newFakeWorker(messages = [], getResult = () => ({ ok: true })) {
@@ -217,5 +246,45 @@ function newSql(sql) {
 	return {
 		sql: () => sql,
 		parameters: []
+	};
+}
+
+function newFakeSqlite3() {
+	class FakeDb {
+		constructor(filename) {
+			this.filename = filename;
+			this.changeCount = 0;
+		}
+
+		exec(options) {
+			if (typeof options === 'string')
+				return undefined;
+			if (options && options.returnValue === 'resultRows')
+				return [{ value: 1 }];
+			this.changeCount += 1;
+			return undefined;
+		}
+
+		changes() {
+			return this.changeCount;
+		}
+
+		selectValue() {
+			return 1;
+		}
+
+		close() {}
+	}
+
+	return {
+		installOpfsSAHPoolVfs: async () => ({
+			OpfsSAHPoolDb: FakeDb,
+			vfsName: 'opfs-sahpool'
+		}),
+		oo1: {
+			OpfsDb: FakeDb,
+			OpfsWlDb: FakeDb,
+			DB: FakeDb
+		}
 	};
 }

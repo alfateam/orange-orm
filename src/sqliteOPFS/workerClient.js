@@ -1,4 +1,5 @@
 const log = require('../table/log');
+const createInlineSqliteOPFSWorker = require('./inlineWorker');
 
 function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 	const worker = options.worker || createWorker(connectionString, options);
@@ -143,6 +144,8 @@ function createWorker(connectionString, options) {
 		return options.createWorker(connectionString, options);
 	if (typeof globalThis !== 'undefined' && typeof globalThis.__orangeOrmCreateSqliteOPFSWorker === 'function')
 		return globalThis.__orangeOrmCreateSqliteOPFSWorker(connectionString, options);
+	if (options.inlineWorker)
+		return createInlineSqliteOPFSWorker(options);
 	if (options.workerUrl && typeof Worker !== 'undefined')
 		return new Worker(options.workerUrl, { type: 'module' });
 	if (typeof Worker !== 'undefined') {
