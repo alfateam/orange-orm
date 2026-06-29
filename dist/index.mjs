@@ -19073,6 +19073,7 @@ function requireDbWorkerClient () {
 
 		const client = {
 			__orangeDbWorkerClient: true,
+			__createSyncClient,
 			hostLocal,
 			query: request.bind(null, 'query', {}),
 			sqliteFunction: request.bind(null, 'sqliteFunction', {}),
@@ -19081,6 +19082,7 @@ function requireDbWorkerClient () {
 			close,
 			syncClient: {
 				sync: syncRequest.bind(null, 'sync'),
+				resetLocal: syncRequest.bind(null, 'resetLocal'),
 				start: syncRequest.bind(null, 'start'),
 				stop: syncRequest.bind(null, 'stop'),
 				isRunning: syncRequest.bind(null, 'isRunning'),
@@ -19095,6 +19097,10 @@ function requireDbWorkerClient () {
 		};
 
 		return client;
+
+		function __createSyncClient() {
+			return client.syncClient;
+		}
 
 		function hostLocal(options = {}) {
 			const tableName = options.syncTableName;

@@ -93,7 +93,7 @@ describe('db worker rpc', () => {
 		const bridge = createBridge(syncWorkerDb);
 		const workerClient = rdb.createDbWorkerClient(bridge.worker);
 		const uiDb = map({
-			db: () => workerClient
+			db: workerClient
 		});
 
 		await uiDb.transaction(async (tx, ctx) => {
@@ -131,6 +131,32 @@ describe('db worker rpc', () => {
 
 		expect(row.name).toBe('OPFS');
 		expect(raw.name).toBe('OPFS');
+	});
+
+	test('mapped db worker client reuses worker sync client', async () => {
+		const syncFileName = 'demo.dbWorker.sync-client.test.db';
+		fs.rmSync(syncFileName, { force: true });
+		const syncWorkerDb = map({
+			db: (con) => con.sqlite(syncFileName, {
+				size: 1,
+				sync: { url: '/rdb', auto: false, tables: ['customer'] }
+			})
+		});
+		await initSqlite(syncWorkerDb);
+		const bridge = createBridge(syncWorkerDb);
+		const workerClient = rdb.createDbWorkerClient(bridge.worker);
+		const uiDb = map({
+			db: workerClient
+		});
+
+		const config = await uiDb.syncClient.getConfig();
+		workerClient.close();
+
+		expect(config).toMatchObject({
+			url: '/rdb',
+			auto: false,
+			tables: ['customer']
+		});
 	});
 
 	test('caches sqliteOPFS provider connection across ORM operations', async () => {

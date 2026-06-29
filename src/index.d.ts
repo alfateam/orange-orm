@@ -146,6 +146,7 @@ declare namespace r {
     }
 
     export interface DbWorkerClient extends Pool {
+        __createSyncClient(): DbWorkerClient['syncClient'];
         syncClient: SyncWorkerClient & {
             start(options?: unknown): Promise<unknown>;
             stop(options?: unknown): Promise<unknown>;
