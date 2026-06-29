@@ -24087,15 +24087,18 @@ function requireNewPool$1 () {
 		let client = createSqliteOPFSWorkerClient(connectionString, poolOptions || {});
 		let readClient;
 		let c = {};
+		let ended = false;
+		let writerBusy = false;
+		const writerQueue = [];
 		const singleWorker = shouldUseSingleWorker(poolOptions);
 
 		prewarmReadClient();
 
 		c.connect = function(cb) {
-			cb(null, client, function(err) {
-				if (err && client.reset)
-					client.reset();
-			});
+			if (ended)
+				return cb(new Error('sqliteOPFS pool is closed.'), null, noop);
+			writerQueue.push(cb);
+			drainWriterQueue();
 		};
 
 		c.connectRead = function(cb) {
@@ -24109,6 +24112,8 @@ function requireNewPool$1 () {
 		};
 
 		c.end = function() {
+			ended = true;
+			rejectQueuedWriters();
 			if (client.close)
 				client.close();
 			if (readClient && readClient.close)
@@ -24142,7 +24147,44 @@ function requireNewPool$1 () {
 				readClient = createSqliteOPFSWorkerClient(connectionString, { ...poolOptions, readonly: true });
 			return readClient;
 		}
+
+		function drainWriterQueue() {
+			if (writerBusy || ended)
+				return;
+			const cb = writerQueue.shift();
+			if (!cb)
+				return;
+			writerBusy = true;
+			let released = false;
+			try {
+				cb(null, client, done);
+			}
+			catch (e) {
+				done(e);
+				throw e;
+			}
+
+			function done(err) {
+				if (released)
+					return;
+				released = true;
+				if (err && client.reset)
+					client.reset();
+				writerBusy = false;
+				drainWriterQueue();
+			}
+		}
+
+		function rejectQueuedWriters() {
+			const error = new Error('sqliteOPFS pool is closed.');
+			while (writerQueue.length > 0) {
+				const cb = writerQueue.shift();
+				cb(error, null, noop);
+			}
+		}
 	}
+
+	function noop() {}
 
 	function shouldUseSingleWorker(poolOptions = {}) {
 		if (poolOptions.singleWorker === true)

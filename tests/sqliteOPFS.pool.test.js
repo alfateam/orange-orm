@@ -43,6 +43,73 @@ describe('sqliteOPFS pool', () => {
 		pool.end();
 	});
 
+	test('queues writer checkouts until the previous checkout is released', async () => {
+		const events = [];
+		let releaseFirst;
+		let releaseSecond;
+		const pool = newPool('test.sqlite3', {
+			createWorker() {
+				return newFakeWorker();
+			}
+		});
+
+		pool.connect((err, _client, done) => {
+			if (err)
+				throw err;
+			events.push('first');
+			releaseFirst = done;
+		});
+		pool.connect((err, _client, done) => {
+			if (err)
+				throw err;
+			events.push('second');
+			releaseSecond = done;
+		});
+		await wait(10);
+
+		expect(events).toEqual(['first']);
+		releaseFirst();
+		await wait(10);
+
+		expect(events).toEqual(['first', 'second']);
+		releaseSecond();
+		pool.end();
+	});
+
+	test('routes SAH pool reads through the writer checkout queue', async () => {
+		const events = [];
+		let releaseWriter;
+		let releaseRead;
+		const pool = newPool('test.sqlite3', {
+			vfs: 'opfs-sahpool',
+			createWorker() {
+				return newFakeWorker();
+			}
+		});
+
+		pool.connect((err, _client, done) => {
+			if (err)
+				throw err;
+			events.push('writer');
+			releaseWriter = done;
+		});
+		pool.connectRead((err, _client, done) => {
+			if (err)
+				throw err;
+			events.push('read');
+			releaseRead = done;
+		});
+		await wait(10);
+
+		expect(events).toEqual(['writer']);
+		releaseWriter();
+		await wait(10);
+
+		expect(events).toEqual(['writer', 'read']);
+		releaseRead();
+		pool.end();
+	});
+
 	test('emits query completion elapsed time', async () => {
 		const started = [];
 		const completed = [];
