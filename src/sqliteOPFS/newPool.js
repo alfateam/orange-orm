@@ -34,12 +34,13 @@ function newPool(connectionString, poolOptions) {
 	c.end = function() {
 		ended = true;
 		rejectQueuedWriters();
+		const closes = [];
 		if (client.close)
-			client.close();
+			closes.push(client.close());
 		if (readClient && readClient.close)
-			readClient.close();
+			closes.push(readClient.close());
 		delete pools[id];
-		return Promise.resolve();
+		return Promise.all(closes).then(() => undefined);
 	};
 
 	pools[id] = c;

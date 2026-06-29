@@ -22,6 +22,24 @@ describe('sqliteOPFS pool', () => {
 		pool.end();
 	});
 
+	test('closes sqlite worker db before terminating worker', async () => {
+		const messages = [];
+		let terminated = false;
+		const pool = newPool('test.sqlite3', {
+			prewarmRead: false,
+			createWorker() {
+				return newFakeWorker(messages, () => ({ ok: true }), () => {
+					terminated = true;
+				});
+			}
+		});
+
+		await pool.end();
+
+		expect(messages.map(x => x.method)).toEqual(['open', 'close']);
+		expect(terminated).toBe(true);
+	});
+
 	test('can opt in to separate OPFS read worker without prewarm', async () => {
 		const createdWorkers = [];
 		const pool = newPool('test.sqlite3', {
@@ -244,15 +262,17 @@ describe('sqliteOPFS pool', () => {
 		pool.end();
 	});
 
-	test('can run sahpool through an inline worker adapter', async () => {
+	test('keeps OPFS enabled for sahpool inline worker when fallback is allowed', async () => {
 		const initConfigs = [];
+		const closes = [];
 		const pool = newPool('inline.sqlite3', {
 			vfs: 'opfs-sahpool',
+			sahPool: { fallbackToOpfs: true },
 			inlineWorker: true,
 			prewarmRead: false,
 			sqlite3InitModule(config) {
 				initConfigs.push(config);
-				return newFakeSqlite3();
+				return newFakeSqlite3(closes);
 			}
 		});
 
@@ -266,15 +286,44 @@ describe('sqliteOPFS pool', () => {
 			});
 
 			expect(rows).toEqual([{ value: 1 }]);
+			expect(initConfigs).toEqual([{}]);
+		}
+		finally {
+			await pool.end();
+		}
+		expect(closes).toEqual(['/inline.sqlite3']);
+	});
+
+	test('disables OPFS for strict sahpool inline worker without fallback', async () => {
+		const initConfigs = [];
+		const pool = newPool('strict-inline.sqlite3', {
+			vfs: 'opfs-sahpool',
+			inlineWorker: true,
+			prewarmRead: false,
+			sqlite3InitModule(config) {
+				initConfigs.push(config);
+				return newFakeSqlite3();
+			}
+		});
+
+		try {
+			await new Promise((resolve, reject) => {
+				pool.connect((err, client) => {
+					if (err)
+						return reject(err);
+					client.executeQuery(newSql('SELECT 1'), (err) => err ? reject(err) : resolve());
+				});
+			});
+
 			expect(initConfigs).toEqual([{ disable: { vfs: { opfs: true } } }]);
 		}
 		finally {
-			pool.end();
+			await pool.end();
 		}
 	});
 });
 
-function newFakeWorker(messages = [], getResult = () => ({ ok: true })) {
+function newFakeWorker(messages = [], getResult = () => ({ ok: true }), terminate = () => {}) {
 	const listeners = new Map();
 	return {
 		addEventListener(type, listener) {
@@ -301,7 +350,7 @@ function newFakeWorker(messages = [], getResult = () => ({ ok: true })) {
 				}
 			}, 0);
 		},
-		terminate() {}
+		terminate
 	};
 }
 
@@ -316,7 +365,7 @@ function newSql(sql) {
 	};
 }
 
-function newFakeSqlite3() {
+function newFakeSqlite3(closes = []) {
 	class FakeDb {
 		constructor(filename) {
 			this.filename = filename;
@@ -340,7 +389,9 @@ function newFakeSqlite3() {
 			return 1;
 		}
 
-		close() {}
+		close() {
+			closes.push(this.filename);
+		}
 	}
 
 	return {

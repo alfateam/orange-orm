@@ -1,7 +1,7 @@
 function createInlineSqliteOPFSWorker(options = {}) {
 	const listeners = new Map();
 	const sqliteModuleUrl = options.sqliteModuleUrl || getDefaultSqliteModuleUrl() || '@sqlite.org/sqlite-wasm';
-	const sqliteInitConfig = options.vfs === 'opfs-sahpool'
+	const sqliteInitConfig = shouldDisableOpfsVfs(options)
 		? { disable: { vfs: { opfs: true } } }
 		: {};
 	let sqlite3Promise;
@@ -62,6 +62,8 @@ function createInlineSqliteOPFSWorker(options = {}) {
 	async function dispatch(message) {
 		if (message.method === 'open')
 			return openDb(message.connectionString, message.busyTimeoutMs, message.vfs, message.sahPool);
+		if (message.method === 'close')
+			return closeDb();
 		if (!db)
 			await openDb(message.connectionString || 'orange.sqlite3');
 		if (message.method === 'query')
@@ -85,6 +87,13 @@ function createInlineSqliteOPFSWorker(options = {}) {
 			vfs: dbInfo.vfs,
 			filename: db.filename
 		};
+	}
+
+	function closeDb() {
+		if (db && typeof db.close === 'function')
+			db.close();
+		db = null;
+		return { closed: true };
 	}
 
 	async function createDb(sqlite3, filename, vfs, sahPoolOptions) {
@@ -275,6 +284,11 @@ function serializeError(error) {
 		message: error && error.message ? error.message : String(error),
 		stack: error && error.stack
 	};
+}
+
+function shouldDisableOpfsVfs(options = {}) {
+	return options.vfs === 'opfs-sahpool'
+		&& !(options.sahPool && options.sahPool.fallbackToOpfs);
 }
 
 module.exports = createInlineSqliteOPFSWorker;

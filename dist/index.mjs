@@ -11193,12 +11193,18 @@ function requirePurify () {
 	function purify(value) {
 		if(value == null)
 			return null;
-		if (Buffer.isBuffer(value))
+		if (isBuffer(value))
 			return value.toString('base64');
 		else if (typeof value === 'string')
 			return value;
 		else
 			throw new Error('\'' + value + '\'' + ' is not a base64');
+	}
+
+	function isBuffer(value) {
+		return typeof Buffer !== 'undefined'
+			&& typeof Buffer.isBuffer === 'function'
+			&& Buffer.isBuffer(value);
 	}
 
 	purify_1 = purify;
@@ -11243,7 +11249,15 @@ function requireNewEncode () {
 	}
 
 	function encodeDefault(base64) {
-		return Buffer.from(base64, 'base64');
+		if (typeof Buffer !== 'undefined' && typeof Buffer.from === 'function')
+			return Buffer.from(base64, 'base64');
+		if (typeof atob !== 'function')
+			throw new Error('Binary columns require Buffer or atob support.');
+		const binary = atob(base64);
+		const bytes = new Uint8Array(binary.length);
+		for (let i = 0; i < binary.length; i++)
+			bytes[i] = binary.charCodeAt(i);
+		return bytes;
 	}
 
 	newEncode = _new;
@@ -17604,7 +17618,9 @@ function requireToCompareObject () {
 	}
 
 	function isNodeBuffer(object) {
-		return Buffer.isBuffer(object);
+		return typeof Buffer !== 'undefined'
+			&& typeof Buffer.isBuffer === 'function'
+			&& Buffer.isBuffer(object);
 	}
 
 	toCompareObject_1 = toCompareObject;
@@ -26561,7 +26577,7 @@ function requireInlineWorker () {
 	function createInlineSqliteOPFSWorker(options = {}) {
 		const listeners = new Map();
 		const sqliteModuleUrl = options.sqliteModuleUrl || getDefaultSqliteModuleUrl() || '@sqlite.org/sqlite-wasm';
-		const sqliteInitConfig = options.vfs === 'opfs-sahpool'
+		const sqliteInitConfig = shouldDisableOpfsVfs(options)
 			? { disable: { vfs: { opfs: true } } }
 			: {};
 		let sqlite3Promise;
@@ -26622,6 +26638,8 @@ function requireInlineWorker () {
 		async function dispatch(message) {
 			if (message.method === 'open')
 				return openDb(message.connectionString, message.busyTimeoutMs, message.vfs, message.sahPool);
+			if (message.method === 'close')
+				return closeDb();
 			if (!db)
 				await openDb(message.connectionString || 'orange.sqlite3');
 			if (message.method === 'query')
@@ -26645,6 +26663,13 @@ function requireInlineWorker () {
 				vfs: dbInfo.vfs,
 				filename: db.filename
 			};
+		}
+
+		function closeDb() {
+			if (db && typeof db.close === 'function')
+				db.close();
+			db = null;
+			return { closed: true };
 		}
 
 		async function createDb(sqlite3, filename, vfs, sahPoolOptions) {
@@ -26837,6 +26862,11 @@ function requireInlineWorker () {
 		};
 	}
 
+	function shouldDisableOpfsVfs(options = {}) {
+		return options.vfs === 'opfs-sahpool'
+			&& !(options.sahPool && options.sahPool.fallbackToOpfs);
+	}
+
 	inlineWorker = createInlineSqliteOPFSWorker;
 	return inlineWorker;
 }
@@ -26856,6 +26886,7 @@ function requireWorkerClient () {
 		const pending = new Map();
 		const readonly = !!options.readonly;
 		const lane = readonly ? 'reader' : 'writer';
+		let closed = false;
 
 		worker.addEventListener('message', onMessage);
 		worker.addEventListener('error', onWorkerError);
@@ -26889,6 +26920,8 @@ function requireWorkerClient () {
 		};
 
 		function executeQuery(query, callback) {
+			if (closed)
+				return callback(new Error('sqliteOPFS worker client closed.'));
 			const sql = query.sql();
 			const parameters = query.parameters || [];
 			log.emitQuery({ sql, parameters, readonly, lane });
@@ -26906,6 +26939,8 @@ function requireWorkerClient () {
 		}
 
 		function executeCommand(query, callback) {
+			if (closed)
+				return callback(new Error('sqliteOPFS worker client closed.'));
 			const sql = query.sql();
 			const parameters = query.parameters || [];
 			log.emitQuery({ sql, parameters, readonly, lane });
@@ -26923,6 +26958,8 @@ function requireWorkerClient () {
 		}
 
 		function request(method, payload = {}) {
+			if (closed && method !== 'close')
+				return Promise.reject(new Error('sqliteOPFS worker client closed.'));
 			const id = nextId++;
 			return new Promise((resolve, reject) => {
 				pending.set(id, { resolve, reject });
@@ -26942,12 +26979,18 @@ function requireWorkerClient () {
 		}
 
 		function close() {
-			worker.removeEventListener('message', onMessage);
-			worker.removeEventListener('error', onWorkerError);
-			worker.removeEventListener('messageerror', onWorkerError);
-			rejectPending(new Error('sqliteOPFS worker client closed.'));
-			if (typeof worker.terminate === 'function')
-				worker.terminate();
+			if (closed)
+				return Promise.resolve();
+			closed = true;
+			const closeRequest = withTimeout(request('close'), 1000).catch(() => {});
+			return closeRequest.finally(() => {
+				worker.removeEventListener('message', onMessage);
+				worker.removeEventListener('error', onWorkerError);
+				worker.removeEventListener('messageerror', onWorkerError);
+				rejectPending(new Error('sqliteOPFS worker client closed.'));
+				if (typeof worker.terminate === 'function')
+					worker.terminate();
+			});
 		}
 
 		function reset() {
@@ -26979,6 +27022,15 @@ function requireWorkerClient () {
 			for (const entry of pending.values())
 				entry.reject(error);
 			pending.clear();
+		}
+
+		function withTimeout(promise, timeoutMs) {
+			let timeoutId;
+			const timeout = new Promise((resolve) => {
+				timeoutId = setTimeout(resolve, timeoutMs);
+			});
+			return Promise.race([promise, timeout])
+				.finally(() => clearTimeout(timeoutId));
 		}
 	}
 
@@ -27018,7 +27070,7 @@ function requireWorkerClient () {
 	}
 
 	function createWorkerSource(sqliteModuleUrl, options = {}) {
-		const sqliteInitConfig = options.vfs === 'opfs-sahpool'
+		const sqliteInitConfig = shouldDisableOpfsVfs(options)
 			? { disable: { vfs: { opfs: true } } }
 			: {};
 		return `
@@ -27050,6 +27102,8 @@ async function dispatchTimed(message) {
 async function dispatch(message) {
 	if (message.method === 'open')
 		return openDb(message.connectionString, message.busyTimeoutMs, message.vfs, message.sahPool);
+	if (message.method === 'close')
+		return closeDb();
 	if (!db)
 		await openDb(message.connectionString || 'orange.sqlite3');
 	if (message.method === 'query')
@@ -27073,6 +27127,13 @@ async function openDb(connectionString, busyTimeoutMs = 5000, vfs, sahPoolOption
 		vfs: dbInfo.vfs,
 		filename: db.filename
 	};
+}
+
+function closeDb() {
+	if (db && typeof db.close === 'function')
+		db.close();
+	db = null;
+	return { closed: true };
 }
 
 async function createDb(sqlite3, filename, vfs, sahPoolOptions) {
@@ -27271,6 +27332,11 @@ function serializeError(error) {
 		return e;
 	}
 
+	function shouldDisableOpfsVfs(options = {}) {
+		return options.vfs === 'opfs-sahpool'
+			&& !(options.sahPool && options.sahPool.fallbackToOpfs);
+	}
+
 	workerClient = createSqliteOPFSWorkerClient;
 	return workerClient;
 }
@@ -27317,12 +27383,13 @@ function requireNewPool$5 () {
 		c.end = function() {
 			ended = true;
 			rejectQueuedWriters();
+			const closes = [];
 			if (client.close)
-				client.close();
+				closes.push(client.close());
 			if (readClient && readClient.close)
-				readClient.close();
+				closes.push(readClient.close());
 			delete pools[id];
-			return Promise.resolve();
+			return Promise.all(closes).then(() => undefined);
 		};
 
 		pools[id] = c;

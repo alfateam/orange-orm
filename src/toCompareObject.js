@@ -35,7 +35,9 @@ function toCompareObject(object) {
 }
 
 function isNodeBuffer(object) {
-	return Buffer.isBuffer(object);
+	return typeof Buffer !== 'undefined'
+		&& typeof Buffer.isBuffer === 'function'
+		&& Buffer.isBuffer(object);
 }
 
 module.exports = toCompareObject;

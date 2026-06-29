@@ -7,6 +7,7 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 	const pending = new Map();
 	const readonly = !!options.readonly;
 	const lane = readonly ? 'reader' : 'writer';
+	let closed = false;
 
 	worker.addEventListener('message', onMessage);
 	worker.addEventListener('error', onWorkerError);
@@ -40,6 +41,8 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 	};
 
 	function executeQuery(query, callback) {
+		if (closed)
+			return callback(new Error('sqliteOPFS worker client closed.'));
 		const sql = query.sql();
 		const parameters = query.parameters || [];
 		log.emitQuery({ sql, parameters, readonly, lane });
@@ -57,6 +60,8 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 	}
 
 	function executeCommand(query, callback) {
+		if (closed)
+			return callback(new Error('sqliteOPFS worker client closed.'));
 		const sql = query.sql();
 		const parameters = query.parameters || [];
 		log.emitQuery({ sql, parameters, readonly, lane });
@@ -74,6 +79,8 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 	}
 
 	function request(method, payload = {}) {
+		if (closed && method !== 'close')
+			return Promise.reject(new Error('sqliteOPFS worker client closed.'));
 		const id = nextId++;
 		return new Promise((resolve, reject) => {
 			pending.set(id, { resolve, reject });
@@ -93,12 +100,18 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 	}
 
 	function close() {
-		worker.removeEventListener('message', onMessage);
-		worker.removeEventListener('error', onWorkerError);
-		worker.removeEventListener('messageerror', onWorkerError);
-		rejectPending(new Error('sqliteOPFS worker client closed.'));
-		if (typeof worker.terminate === 'function')
-			worker.terminate();
+		if (closed)
+			return Promise.resolve();
+		closed = true;
+		const closeRequest = withTimeout(request('close'), 1000).catch(() => {});
+		return closeRequest.finally(() => {
+			worker.removeEventListener('message', onMessage);
+			worker.removeEventListener('error', onWorkerError);
+			worker.removeEventListener('messageerror', onWorkerError);
+			rejectPending(new Error('sqliteOPFS worker client closed.'));
+			if (typeof worker.terminate === 'function')
+				worker.terminate();
+		});
 	}
 
 	function reset() {
@@ -130,6 +143,15 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 		for (const entry of pending.values())
 			entry.reject(error);
 		pending.clear();
+	}
+
+	function withTimeout(promise, timeoutMs) {
+		let timeoutId;
+		const timeout = new Promise((resolve) => {
+			timeoutId = setTimeout(resolve, timeoutMs);
+		});
+		return Promise.race([promise, timeout])
+			.finally(() => clearTimeout(timeoutId));
 	}
 }
 
@@ -169,7 +191,7 @@ function getDefaultSqliteModuleUrl() {
 }
 
 function createWorkerSource(sqliteModuleUrl, options = {}) {
-	const sqliteInitConfig = options.vfs === 'opfs-sahpool'
+	const sqliteInitConfig = shouldDisableOpfsVfs(options)
 		? { disable: { vfs: { opfs: true } } }
 		: {};
 	return `
@@ -201,6 +223,8 @@ async function dispatchTimed(message) {
 async function dispatch(message) {
 	if (message.method === 'open')
 		return openDb(message.connectionString, message.busyTimeoutMs, message.vfs, message.sahPool);
+	if (message.method === 'close')
+		return closeDb();
 	if (!db)
 		await openDb(message.connectionString || 'orange.sqlite3');
 	if (message.method === 'query')
@@ -224,6 +248,13 @@ async function openDb(connectionString, busyTimeoutMs = 5000, vfs, sahPoolOption
 		vfs: dbInfo.vfs,
 		filename: db.filename
 	};
+}
+
+function closeDb() {
+	if (db && typeof db.close === 'function')
+		db.close();
+	db = null;
+	return { closed: true };
 }
 
 async function createDb(sqlite3, filename, vfs, sahPoolOptions) {
@@ -420,6 +451,11 @@ function toWorkerError(event) {
 	if (event && event.filename)
 		e.stack = `${message}\n${event.filename}:${event.lineno || 0}:${event.colno || 0}`;
 	return e;
+}
+
+function shouldDisableOpfsVfs(options = {}) {
+	return options.vfs === 'opfs-sahpool'
+		&& !(options.sahPool && options.sahPool.fallbackToOpfs);
 }
 
 module.exports = createSqliteOPFSWorkerClient;

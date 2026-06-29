@@ -17,6 +17,8 @@ self.onmessage = (event) => {
 async function dispatch(message) {
 	if (message.method === 'open')
 		return openDb(message.connectionString, message.busyTimeoutMs, message.vfs, message.sahPool);
+	if (message.method === 'close')
+		return closeDb();
 	if (!db)
 		await openDb(message.connectionString || 'orange.sqlite3');
 	if (message.method === 'query')
@@ -40,6 +42,13 @@ async function openDb(connectionString, busyTimeoutMs = 5000, vfs, sahPoolOption
 		vfs: dbInfo.vfs,
 		filename: db.filename
 	};
+}
+
+function closeDb() {
+	if (db && typeof db.close === 'function')
+		db.close();
+	db = null;
+	return { closed: true };
 }
 
 async function createDb(sqlite3, filename, vfs, sahPoolOptions) {

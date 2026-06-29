@@ -30,7 +30,15 @@ function _new(_column) {
 }
 
 function encodeDefault(base64) {
-	return Buffer.from(base64, 'base64');
+	if (typeof Buffer !== 'undefined' && typeof Buffer.from === 'function')
+		return Buffer.from(base64, 'base64');
+	if (typeof atob !== 'function')
+		throw new Error('Binary columns require Buffer or atob support.');
+	const binary = atob(base64);
+	const bytes = new Uint8Array(binary.length);
+	for (let i = 0; i < binary.length; i++)
+		bytes[i] = binary.charCodeAt(i);
+	return bytes;
 }
 
 module.exports = _new;
