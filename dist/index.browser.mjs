@@ -23859,6 +23859,7 @@ function closeDb() {
 	return { closed: true };
 }
 
+async function createDb(sqlite3, filename, vfs) {
 	if (vfs && vfs !== 'opfs')
 		throw new Error('sqliteOPFS vfs "' + vfs + '" is not supported.');
 	return createOpfsDb(sqlite3, filename);
