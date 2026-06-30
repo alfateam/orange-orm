@@ -214,8 +214,8 @@ declare namespace r {
     export interface SqliteOpenEvent {
         connectionString: string,
         filename?: string,
-        requestedVfs: 'opfs' | 'opfs-wl',
-        vfs: 'opfs' | 'opfs-wl' | string,
+        requestedVfs: 'opfs',
+        vfs: 'opfs' | string,
         fallback: boolean,
         readonly: boolean
     }

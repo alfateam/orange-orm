@@ -38,7 +38,7 @@ async function openDb(connectionString, busyTimeoutMs = 5000, vfs) {
 	db.exec(`PRAGMA busy_timeout=${Number.parseInt(busyTimeoutMs, 10) || 5000}`);
 	return {
 		opened: true,
-		opfs: dbInfo.vfs === 'opfs' || dbInfo.vfs === 'opfs-wl',
+		opfs: dbInfo.vfs === 'opfs',
 		vfs: dbInfo.vfs,
 		filename: db.filename
 	};
@@ -52,8 +52,6 @@ function closeDb() {
 }
 
 async function createDb(sqlite3, filename, vfs) {
-	if (vfs === 'opfs-wl')
-		return createOpfsWlDb(sqlite3, filename);
 	if (vfs && vfs !== 'opfs')
 		throw new Error(`sqliteOPFS vfs "${vfs}" is not supported.`);
 	return createOpfsDb(sqlite3, filename);
@@ -66,16 +64,6 @@ function createOpfsDb(sqlite3, filename) {
 	return {
 		db: new DbClass(filename),
 		vfs: 'opfs'
-	};
-}
-
-function createOpfsWlDb(sqlite3, filename) {
-	const DbClass = sqlite3.oo1 && sqlite3.oo1.OpfsWlDb;
-	if (typeof DbClass !== 'function')
-		throw new Error('sqliteOPFS vfs "opfs-wl" is not available in this sqlite-wasm build.');
-	return {
-		db: new DbClass(filename),
-		vfs: 'opfs-wl'
 	};
 }
 

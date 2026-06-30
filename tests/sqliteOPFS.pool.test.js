@@ -133,10 +133,9 @@ describe('sqliteOPFS pool', () => {
 		}
 	});
 
-	test('passes selected vfs to worker open request', async () => {
+	test('uses default OPFS worker open request', async () => {
 		const messages = [];
 		const pool = newPool('test.sqlite3', {
-			vfs: 'opfs-wl',
 			prewarmRead: false,
 			createWorker() {
 				return newFakeWorker(messages);
@@ -146,7 +145,7 @@ describe('sqliteOPFS pool', () => {
 		await wait(10);
 
 		expect(messages[0].method).toBe('open');
-		expect(messages[0].vfs).toBe('opfs-wl');
+		expect(messages[0].vfs).toBeUndefined();
 		expect(messages[0].sahPool).toBeUndefined();
 		pool.end();
 	});
@@ -156,11 +155,10 @@ describe('sqliteOPFS pool', () => {
 		const onOpen = (entry) => opened.push(entry);
 		log.on('sqliteOpen', onOpen);
 		const pool = newPool('test.sqlite3', {
-			vfs: 'opfs-wl',
 			prewarmRead: false,
 			createWorker() {
 				return newFakeWorker([], (message) => message.method === 'open'
-					? { opened: true, filename: '/test.sqlite3', vfs: 'opfs-wl' }
+					? { opened: true, filename: '/test.sqlite3', vfs: 'opfs' }
 					: { ok: true });
 			}
 		});
@@ -176,8 +174,8 @@ describe('sqliteOPFS pool', () => {
 			expect(opened[0]).toMatchObject({
 				connectionString: 'test.sqlite3',
 				filename: '/test.sqlite3',
-				requestedVfs: 'opfs-wl',
-				vfs: 'opfs-wl',
+				requestedVfs: 'opfs',
+				vfs: 'opfs',
 				fallback: false,
 				readonly: false
 			});
@@ -186,28 +184,6 @@ describe('sqliteOPFS pool', () => {
 			log.off('sqliteOpen', onOpen);
 			pool.end();
 		}
-	});
-
-	test('uses one worker and passes opfs-wl to worker open request', async () => {
-		const messages = [];
-		const createdWorkers = [];
-		const pool = newPool('test.sqlite3', {
-			vfs: 'opfs-wl',
-			createWorker() {
-				const worker = newFakeWorker(messages);
-				createdWorkers.push(worker);
-				return worker;
-			}
-		});
-
-		await wait(10);
-		pool.connectRead(() => {});
-		await wait(10);
-
-		expect(createdWorkers).toHaveLength(1);
-		expect(messages.filter(x => x.method === 'open')).toHaveLength(1);
-		expect(messages[0].vfs).toBe('opfs-wl');
-		pool.end();
 	});
 
 	test('opens inline worker with OPFS enabled', async () => {
@@ -258,6 +234,30 @@ describe('sqliteOPFS pool', () => {
 					client.executeQuery(newSql('SELECT 1'), (err) => err ? reject(err) : resolve());
 				});
 			})).rejects.toThrow('sqliteOPFS vfs "opfs-sahpool" is not supported');
+		}
+		finally {
+			await pool.end();
+		}
+	});
+
+	test('rejects unsupported opfs-wl vfs', async () => {
+		const pool = newPool('unsupported-opfs-wl.sqlite3', {
+			vfs: 'opfs-wl',
+			inlineWorker: true,
+			prewarmRead: false,
+			sqlite3InitModule() {
+				return newFakeSqlite3();
+			}
+		});
+
+		try {
+			await expect(new Promise((resolve, reject) => {
+				pool.connect((err, client) => {
+					if (err)
+						return reject(err);
+					client.executeQuery(newSql('SELECT 1'), (err) => err ? reject(err) : resolve());
+				});
+			})).rejects.toThrow('sqliteOPFS vfs "opfs-wl" is not supported');
 		}
 		finally {
 			await pool.end();
@@ -367,7 +367,6 @@ function newFakeSqlite3(closes = []) {
 	return {
 		oo1: {
 			OpfsDb: FakeDb,
-			OpfsWlDb: FakeDb,
 			DB: FakeDb
 		}
 	};

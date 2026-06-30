@@ -111,7 +111,7 @@ export interface Pool {
 export interface PoolOptions<M extends Record<string, any> = any> {
 	size?: number;
 	sync?: string | SyncConfig<M>;
-	vfs?: 'opfs' | 'opfs-wl';
+	vfs?: 'opfs';
 	singleWorker?: boolean;
 	inlineWorker?: boolean;
 	prewarmRead?: boolean;
