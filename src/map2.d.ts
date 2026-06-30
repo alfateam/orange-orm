@@ -1107,11 +1107,20 @@ export type SyncOperationEvent<
 export interface PoolOptions<M extends Record<string, any> = any> {
   size?: number;
   sync?: string | SyncConfig<M>;
-  vfs?: 'opfs';
+  vfs?: 'opfs' | 'opfs-sahpool';
+  sahPool?: SqliteOpfsSahPoolOptions;
   singleWorker?: boolean;
   inlineWorker?: boolean;
   prewarmRead?: boolean;
   busyTimeoutMs?: number;
+}
+
+export interface SqliteOpfsSahPoolOptions {
+  name?: string;
+  directory?: string;
+  initialCapacity?: number;
+  clearOnInit?: boolean;
+  fallbackToOpfs?: boolean;
 }
 
 export type DBClient<
