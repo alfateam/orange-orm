@@ -23382,9 +23382,7 @@ function requireInlineWorker () {
 	function createInlineSqliteOPFSWorker(options = {}) {
 		const listeners = new Map();
 		const sqliteModuleUrl = options.sqliteModuleUrl || getDefaultSqliteModuleUrl() || '@sqlite.org/sqlite-wasm';
-		const sqliteInitConfig = shouldDisableOpfsVfs(options)
-			? { disable: { vfs: { opfs: true } } }
-			: {};
+		const sqliteInitConfig = {};
 		let sqlite3Promise;
 		let db;
 		let queue = Promise.resolve();
@@ -23442,7 +23440,7 @@ function requireInlineWorker () {
 
 		async function dispatch(message) {
 			if (message.method === 'open')
-				return openDb(message.connectionString, message.busyTimeoutMs, message.vfs, message.sahPool);
+				return openDb(message.connectionString, message.busyTimeoutMs, message.vfs);
 			if (message.method === 'close')
 				return closeDb();
 			if (!db)
@@ -23454,12 +23452,12 @@ function requireInlineWorker () {
 			throw new Error('Unknown sqliteOPFS worker method "' + message.method + '".');
 		}
 
-		async function openDb(connectionString, busyTimeoutMs = 5000, vfs, sahPoolOptions) {
+		async function openDb(connectionString, busyTimeoutMs = 5000, vfs) {
 			if (db)
 				return { opened: true, reused: true };
 			const sqlite3 = await getSqlite3();
 			const filename = normalizeFilename(connectionString);
-			const dbInfo = await createDb(sqlite3, filename, vfs, sahPoolOptions);
+			const dbInfo = await createDb(sqlite3, filename, vfs);
 			db = dbInfo.db;
 			db.exec('PRAGMA busy_timeout=' + (Number.parseInt(busyTimeoutMs, 10) || 5000));
 			return {
@@ -23477,52 +23475,10 @@ function requireInlineWorker () {
 			return { closed: true };
 		}
 
-		async function createDb(sqlite3, filename, vfs, sahPoolOptions) {
-			if (vfs === 'opfs-sahpool')
-				return createSahPoolDb(sqlite3, filename, sahPoolOptions);
+		async function createDb(sqlite3, filename, vfs) {
 			if (vfs && vfs !== 'opfs')
 				throw new Error('sqliteOPFS vfs "' + vfs + '" is not supported.');
 			return createOpfsDb(sqlite3, filename);
-		}
-
-		async function createSahPoolDb(sqlite3, filename, sahPoolOptions) {
-			if (typeof sqlite3.installOpfsSAHPoolVfs !== 'function')
-				throw new Error('sqliteOPFS vfs "opfs-sahpool" is not available in this sqlite-wasm build.');
-			const resolvedSahPoolOptions = getSahPoolOptions(filename, sahPoolOptions);
-			try {
-				const pool = await sqlite3.installOpfsSAHPoolVfs(resolvedSahPoolOptions);
-				const DbClass = pool.OpfsSAHPoolDb;
-				if (typeof DbClass !== 'function')
-					throw new Error('sqliteOPFS vfs "opfs-sahpool" did not expose OpfsSAHPoolDb.');
-				return {
-					db: new DbClass(filename),
-					vfs: pool.vfsName || 'opfs-sahpool'
-				};
-			}
-			catch (e) {
-				if (resolvedSahPoolOptions.fallbackToOpfs)
-					return createOpfsDb(sqlite3, filename);
-				throw toSahPoolError(e, resolvedSahPoolOptions);
-			}
-		}
-
-		function getSahPoolOptions(filename, options = {}) {
-			let dbName = String(filename || 'orange.sqlite3');
-			while (dbName.startsWith('/'))
-				dbName = dbName.slice(1);
-			if (!dbName)
-				dbName = 'orange.sqlite3';
-			const dotIndex = dbName.lastIndexOf('.');
-			const slashIndex = dbName.lastIndexOf('/');
-			const baseName = dotIndex > 0 && dotIndex > slashIndex
-				? dbName.slice(0, dotIndex)
-				: dbName;
-			const safeName = toSafeName(baseName);
-			return {
-				name: safeName + '-sahpool',
-				directory: '.' + safeName + '-sahpool',
-				...options
-			};
 		}
 
 		function createOpfsDb(sqlite3, filename) {
@@ -23600,42 +23556,6 @@ function requireInlineWorker () {
 			: null;
 	}
 
-	function shouldDisableOpfsVfs(options = {}) {
-		return options.vfs === 'opfs-sahpool' && !(options.sahPool && options.sahPool.fallbackToOpfs);
-	}
-
-	function toSafeName(value) {
-		let result = '';
-		for (const ch of String(value || 'orange')) {
-			const code = ch.charCodeAt(0);
-			const ok = code >= 48 && code <= 57
-				|| code >= 65 && code <= 90
-				|| code >= 97 && code <= 122
-				|| ch === '_'
-				|| ch === '-';
-			result += ok ? ch : '_';
-		}
-		return result || 'orange';
-	}
-
-	function toSahPoolError(error, options = {}) {
-		const message = error && error.message ? error.message : String(error);
-		const isLockError = error && error.name === 'NoModificationAllowedError'
-			|| /Access Handles cannot be created|NoModificationAllowedError|modifications are not allowed/i.test(message);
-		if (!isLockError)
-			return error;
-		const directory = options && options.directory || '.opfs-sahpool';
-		const name = options && options.name || 'opfs-sahpool';
-		const e = new Error([
-			'sqliteOPFS vfs "opfs-sahpool" is locked by another tab, worker, or app instance.',
-			'Close other instances using this origin, restart the browser if a worker is stuck, or use a different sahPool.directory/name.',
-			'Current sahPool.directory=' + JSON.stringify(directory) + ', sahPool.name=' + JSON.stringify(name) + '.'
-		].join(' '));
-		e.name = 'SqliteOPFSSAHPoolLockedError';
-		e.cause = error;
-		return e;
-	}
-
 	function normalizeFilename(connectionString) {
 		const value = String(connectionString || 'orange.sqlite3');
 		return value.startsWith('/') ? value : '/' + value;
@@ -23694,15 +23614,14 @@ function requireWorkerClient () {
 		const ready = request('open', {
 			connectionString,
 			busyTimeoutMs: options.busyTimeoutMs || 5000,
-			vfs: options.vfs,
-			sahPool: options.sahPool
+			vfs: options.vfs
 		}).then(({ result }) => {
 			const event = {
 				connectionString,
 				filename: result && result.filename,
 				requestedVfs,
 				vfs: result && result.vfs || requestedVfs,
-				fallback: !!(requestedVfs === 'opfs-sahpool' && result && result.vfs === 'opfs'),
+				fallback: false,
 				readonly
 			};
 			log.emitSqliteOpen(event);
@@ -23868,9 +23787,7 @@ function requireWorkerClient () {
 	}
 
 	function createWorkerSource(sqliteModuleUrl, options = {}) {
-		const sqliteInitConfig = shouldDisableOpfsVfs(options)
-			? { disable: { vfs: { opfs: true } } }
-			: {};
+		const sqliteInitConfig = {};
 		return `
 const sqliteModuleUrl = ${JSON.stringify(sqliteModuleUrl)};
 const sqliteInitConfig = ${JSON.stringify(sqliteInitConfig)};
@@ -23899,7 +23816,7 @@ async function dispatchTimed(message) {
 
 async function dispatch(message) {
 	if (message.method === 'open')
-		return openDb(message.connectionString, message.busyTimeoutMs, message.vfs, message.sahPool);
+		return openDb(message.connectionString, message.busyTimeoutMs, message.vfs);
 	if (message.method === 'close')
 		return closeDb();
 	if (!db)
@@ -23911,17 +23828,17 @@ async function dispatch(message) {
 	throw new Error('Unknown sqliteOPFS worker method "' + message.method + '".');
 }
 
-async function openDb(connectionString, busyTimeoutMs = 5000, vfs, sahPoolOptions) {
+async function openDb(connectionString, busyTimeoutMs = 5000, vfs) {
 	if (db)
 		return { opened: true, reused: true };
 	const sqlite3 = await getSqlite3();
 	const filename = normalizeFilename(connectionString);
-	const dbInfo = await createDb(sqlite3, filename, vfs, sahPoolOptions);
+	const dbInfo = await createDb(sqlite3, filename, vfs);
 	db = dbInfo.db;
 	db.exec('PRAGMA busy_timeout=' + (Number.parseInt(busyTimeoutMs, 10) || 5000));
 	return {
 		opened: true,
-		opfs: dbInfo.vfs === 'opfs' || dbInfo.vfs === 'opfs-sahpool',
+		opfs: dbInfo.vfs === 'opfs',
 		vfs: dbInfo.vfs,
 		filename: db.filename
 	};
@@ -23934,66 +23851,9 @@ function closeDb() {
 	return { closed: true };
 }
 
-async function createDb(sqlite3, filename, vfs, sahPoolOptions) {
-	if (vfs === 'opfs-sahpool')
-		return createSahPoolDb(sqlite3, filename, sahPoolOptions);
 	if (vfs && vfs !== 'opfs')
 		throw new Error('sqliteOPFS vfs "' + vfs + '" is not supported.');
 	return createOpfsDb(sqlite3, filename);
-}
-
-async function createSahPoolDb(sqlite3, filename, sahPoolOptions) {
-	if (typeof sqlite3.installOpfsSAHPoolVfs !== 'function')
-		throw new Error('sqliteOPFS vfs "opfs-sahpool" is not available in this sqlite-wasm build.');
-	const resolvedSahPoolOptions = getSahPoolOptions(filename, sahPoolOptions);
-	try {
-		const pool = await sqlite3.installOpfsSAHPoolVfs(resolvedSahPoolOptions);
-		const DbClass = pool.OpfsSAHPoolDb;
-		if (typeof DbClass !== 'function')
-			throw new Error('sqliteOPFS vfs "opfs-sahpool" did not expose OpfsSAHPoolDb.');
-		return {
-			db: new DbClass(filename),
-			vfs: pool.vfsName || 'opfs-sahpool'
-		};
-	}
-	catch (e) {
-		if (resolvedSahPoolOptions.fallbackToOpfs)
-			return createOpfsDb(sqlite3, filename);
-		throw toSahPoolError(e, resolvedSahPoolOptions);
-	}
-}
-
-function getSahPoolOptions(filename, options = {}) {
-	let dbName = String(filename || 'orange.sqlite3');
-	while (dbName.startsWith('/'))
-		dbName = dbName.slice(1);
-	if (!dbName)
-		dbName = 'orange.sqlite3';
-	const dotIndex = dbName.lastIndexOf('.');
-	const slashIndex = dbName.lastIndexOf('/');
-	const baseName = dotIndex > 0 && dotIndex > slashIndex
-		? dbName.slice(0, dotIndex)
-		: dbName;
-	const safeName = toSafeName(baseName);
-	return {
-		name: safeName + '-sahpool',
-		directory: '.' + safeName + '-sahpool',
-		...options
-	};
-}
-
-function toSafeName(value) {
-	let result = '';
-	for (const ch of String(value || 'orange')) {
-		const code = ch.charCodeAt(0);
-		const ok = code >= 48 && code <= 57
-			|| code >= 65 && code <= 90
-			|| code >= 97 && code <= 122
-			|| ch === '_'
-			|| ch === '-';
-		result += ok ? ch : '_';
-	}
-	return result || 'orange';
 }
 
 function createOpfsDb(sqlite3, filename) {
@@ -24004,24 +23864,6 @@ function createOpfsDb(sqlite3, filename) {
 		db: new DbClass(filename),
 		vfs: 'opfs'
 	};
-}
-
-function toSahPoolError(error, options = {}) {
-	const message = error && error.message ? error.message : String(error);
-	const isLockError = error && error.name === 'NoModificationAllowedError'
-		|| /Access Handles cannot be created|NoModificationAllowedError|modifications are not allowed/i.test(message);
-	if (!isLockError)
-		return error;
-	const directory = options && options.directory || '.opfs-sahpool';
-	const name = options && options.name || 'opfs-sahpool';
-	const e = new Error([
-		'sqliteOPFS vfs "opfs-sahpool" is locked by another tab, worker, or app instance.',
-		'Close other instances using this origin, restart the browser if a worker is stuck, or use a different sahPool.directory/name.',
-		'Current sahPool.directory=' + JSON.stringify(directory) + ', sahPool.name=' + JSON.stringify(name) + '.'
-	].join(' '));
-	e.name = 'SqliteOPFSSAHPoolLockedError';
-	e.cause = error;
-	return e;
 }
 
 async function getSqlite3() {
@@ -24098,11 +23940,7 @@ function serializeError(error) {
 }
 
 //# sourceURL=orange-orm-sqlite-opfs-worker.mjs
-	`;
-	}
-
-	function shouldDisableOpfsVfs(options = {}) {
-		return options.vfs === 'opfs-sahpool' && !(options.sahPool && options.sahPool.fallbackToOpfs);
+`;
 	}
 
 	function toError(error) {
@@ -24249,8 +24087,6 @@ function requireNewPool$1 () {
 
 	function shouldUseSingleWorker(poolOptions = {}) {
 		if (poolOptions.singleWorker === true)
-			return true;
-		if (poolOptions.vfs === 'opfs-sahpool')
 			return true;
 		const vfs = poolOptions.vfs || 'opfs';
 		if (vfs === 'opfs')

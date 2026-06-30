@@ -110,8 +110,6 @@ function noop() {}
 function shouldUseSingleWorker(poolOptions = {}) {
 	if (poolOptions.singleWorker === true)
 		return true;
-	if (poolOptions.vfs === 'opfs-sahpool')
-		return true;
 	const vfs = poolOptions.vfs || 'opfs';
 	if (vfs === 'opfs')
 		return poolOptions.singleWorker !== false;
