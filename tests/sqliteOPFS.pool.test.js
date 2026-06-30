@@ -294,6 +294,33 @@ describe('sqliteOPFS pool', () => {
 		expect(closes).toEqual(['/inline.sqlite3']);
 	});
 
+	test('does not fall back to transient sqlite when OPFS is unavailable', async () => {
+		const pool = newPool('missing-opfs.sqlite3', {
+			inlineWorker: true,
+			prewarmRead: false,
+			sqlite3InitModule() {
+				return {
+					oo1: {
+						DB: class TransientDb {}
+					}
+				};
+			}
+		});
+
+		try {
+			await expect(new Promise((resolve, reject) => {
+				pool.connect((err, client) => {
+					if (err)
+						return reject(err);
+					client.executeQuery(newSql('SELECT 1'), (err) => err ? reject(err) : resolve());
+				});
+			})).rejects.toThrow('sqliteOPFS vfs "opfs" is not available');
+		}
+		finally {
+			await pool.end();
+		}
+	});
+
 	test('disables OPFS for strict sahpool inline worker without fallback', async () => {
 		const initConfigs = [];
 		const pool = newPool('strict-inline.sqlite3', {

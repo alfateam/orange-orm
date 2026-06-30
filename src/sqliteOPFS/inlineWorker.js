@@ -142,10 +142,11 @@ function createInlineSqliteOPFSWorker(options = {}) {
 	}
 
 	function createOpfsDb(sqlite3, filename) {
+		const DbClass = sqlite3.oo1 && sqlite3.oo1.OpfsDb;
+		if (typeof DbClass !== 'function')
+			throw new Error('sqliteOPFS vfs "opfs" is not available in this sqlite-wasm build.');
 		return {
-			db: sqlite3.oo1.OpfsDb
-				? new sqlite3.oo1.OpfsDb(filename)
-				: new sqlite3.oo1.DB(filename, 'ct'),
+			db: new DbClass(filename),
 			vfs: 'opfs'
 		};
 	}
