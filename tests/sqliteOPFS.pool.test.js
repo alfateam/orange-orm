@@ -22,6 +22,27 @@ describe('sqliteOPFS pool', () => {
 		pool.end();
 	});
 
+	test('uses a single worker for opfs-sahpool by default', async () => {
+		const createdWorkers = [];
+		const messages = [];
+		const pool = newPool('test.sqlite3', {
+			vfs: 'opfs-sahpool',
+			createWorker() {
+				const worker = newFakeWorker(messages);
+				createdWorkers.push(worker);
+				return worker;
+			}
+		});
+
+		await wait(10);
+		pool.connectRead(() => {});
+		await wait(10);
+
+		expect(createdWorkers).toHaveLength(1);
+		expect(messages[0].vfs).toBe('opfs-sahpool');
+		pool.end();
+	});
+
 	test('closes sqlite worker db before terminating worker', async () => {
 		const messages = [];
 		let terminated = false;
@@ -216,13 +237,43 @@ describe('sqliteOPFS pool', () => {
 		expect(closes).toEqual(['/inline.sqlite3']);
 	});
 
-	test('rejects unsupported sahpool vfs', async () => {
-		const pool = newPool('unsupported-sahpool.sqlite3', {
+	test('opens inline worker with opfs-sahpool vfs', async () => {
+		const installOptions = [];
+		const closes = [];
+		const pool = newPool('sahpool.sqlite3', {
 			vfs: 'opfs-sahpool',
 			inlineWorker: true,
 			prewarmRead: false,
 			sqlite3InitModule() {
-				return newFakeSqlite3();
+				return newFakeSqlite3(closes, installOptions);
+			}
+		});
+
+		try {
+			const rows = await new Promise((resolve, reject) => {
+				pool.connect((err, client) => {
+					if (err)
+						return reject(err);
+					client.executeQuery(newSql('SELECT 1'), (err, result) => err ? reject(err) : resolve(result));
+				});
+			});
+
+			expect(rows).toEqual([{ value: 1 }]);
+			expect(installOptions).toEqual([{}]);
+		}
+		finally {
+			await pool.end();
+		}
+		expect(closes).toEqual(['/sahpool.sqlite3']);
+	});
+
+	test('rejects opfs-sahpool when sqlite-wasm does not expose it', async () => {
+		const pool = newPool('missing-sahpool.sqlite3', {
+			vfs: 'opfs-sahpool',
+			inlineWorker: true,
+			prewarmRead: false,
+			sqlite3InitModule() {
+				return { oo1: {} };
 			}
 		});
 
@@ -233,7 +284,7 @@ describe('sqliteOPFS pool', () => {
 						return reject(err);
 					client.executeQuery(newSql('SELECT 1'), (err) => err ? reject(err) : resolve());
 				});
-			})).rejects.toThrow('sqliteOPFS vfs "opfs-sahpool" is not supported');
+			})).rejects.toThrow('sqliteOPFS vfs "opfs-sahpool" is not available');
 		}
 		finally {
 			await pool.end();
@@ -335,7 +386,7 @@ function newSql(sql) {
 	};
 }
 
-function newFakeSqlite3(closes = []) {
+function newFakeSqlite3(closes = [], installOptions = []) {
 	class FakeDb {
 		constructor(filename) {
 			this.filename = filename;
@@ -368,6 +419,13 @@ function newFakeSqlite3(closes = []) {
 		oo1: {
 			OpfsDb: FakeDb,
 			DB: FakeDb
+		},
+		async installOpfsSAHPoolVfs(options) {
+			installOptions.push(options);
+			return {
+				OpfsSAHPoolDb: FakeDb,
+				vfsName: 'opfs-sahpool'
+			};
 		}
 	};
 }

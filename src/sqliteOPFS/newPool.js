@@ -111,7 +111,7 @@ function shouldUseSingleWorker(poolOptions = {}) {
 	if (poolOptions.singleWorker === true)
 		return true;
 	const vfs = poolOptions.vfs || 'opfs';
-	if (vfs === 'opfs')
+	if (vfs === 'opfs' || vfs === 'opfs-sahpool')
 		return poolOptions.singleWorker !== false;
 	return false;
 }

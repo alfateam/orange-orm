@@ -26762,6 +26762,7 @@ function requireInlineWorker () {
 		const listeners = new Map();
 		const sqliteModuleUrl = options.sqliteModuleUrl || getDefaultSqliteModuleUrl() || '@sqlite.org/sqlite-wasm';
 		const sqliteInitConfig = {};
+		const opfsSahPoolOptions = normalizeOpfsSahPoolOptions(options);
 		let sqlite3Promise;
 		let db;
 		let queue = Promise.resolve();
@@ -26841,7 +26842,7 @@ function requireInlineWorker () {
 			db.exec('PRAGMA busy_timeout=' + (Number.parseInt(busyTimeoutMs, 10) || 5000));
 			return {
 				opened: true,
-				opfs: dbInfo.vfs === 'opfs',
+				opfs: dbInfo.opfs === true,
 				vfs: dbInfo.vfs,
 				filename: db.filename
 			};
@@ -26855,9 +26856,12 @@ function requireInlineWorker () {
 		}
 
 		async function createDb(sqlite3, filename, vfs) {
+			if (!vfs || vfs === 'opfs')
+				return createOpfsDb(sqlite3, filename);
+			if (vfs === 'opfs-sahpool')
+				return createOpfsSahPoolDb(sqlite3, filename);
 			if (vfs && vfs !== 'opfs')
 				throw new Error('sqliteOPFS vfs "' + vfs + '" is not supported.');
-			return createOpfsDb(sqlite3, filename);
 		}
 
 		function createOpfsDb(sqlite3, filename) {
@@ -26866,7 +26870,22 @@ function requireInlineWorker () {
 				throw new Error('sqliteOPFS vfs "opfs" is not available in this sqlite-wasm build.');
 			return {
 				db: new DbClass(filename),
-				vfs: 'opfs'
+				vfs: 'opfs',
+				opfs: true
+			};
+		}
+
+		async function createOpfsSahPoolDb(sqlite3, filename) {
+			if (!sqlite3 || typeof sqlite3.installOpfsSAHPoolVfs !== 'function')
+				throw new Error('sqliteOPFS vfs "opfs-sahpool" is not available in this sqlite-wasm build.');
+			const pool = await sqlite3.installOpfsSAHPoolVfs(opfsSahPoolOptions);
+			const DbClass = pool && pool.OpfsSAHPoolDb;
+			if (typeof DbClass !== 'function')
+				throw new Error('sqliteOPFS vfs "opfs-sahpool" is not available in this sqlite-wasm build.');
+			return {
+				db: new DbClass(filename),
+				vfs: pool.vfsName || 'opfs-sahpool',
+				opfs: true
 			};
 		}
 
@@ -26933,6 +26952,13 @@ function requireInlineWorker () {
 		return typeof globalThis !== 'undefined' && typeof globalThis.__orangeOrmSqliteOPFSModuleUrl === 'string'
 			? globalThis.__orangeOrmSqliteOPFSModuleUrl
 			: null;
+	}
+
+	function normalizeOpfsSahPoolOptions(options = {}) {
+		const source = options.opfsSahPool || options.opfsSAHPool || options.sahPool;
+		if (!source || source !== Object(source))
+			return {};
+		return { ...source };
 	}
 
 	function normalizeFilename(connectionString) {
@@ -27167,9 +27193,11 @@ function requireWorkerClient () {
 
 	function createWorkerSource(sqliteModuleUrl, options = {}) {
 		const sqliteInitConfig = {};
+		const opfsSahPoolOptions = normalizeOpfsSahPoolOptions(options);
 		return `
 const sqliteModuleUrl = ${JSON.stringify(sqliteModuleUrl)};
 const sqliteInitConfig = ${JSON.stringify(sqliteInitConfig)};
+const opfsSahPoolOptions = ${JSON.stringify(opfsSahPoolOptions)};
 let sqlite3Promise;
 let db;
 let queue = Promise.resolve();
@@ -27217,7 +27245,7 @@ async function openDb(connectionString, busyTimeoutMs = 5000, vfs) {
 	db.exec('PRAGMA busy_timeout=' + (Number.parseInt(busyTimeoutMs, 10) || 5000));
 	return {
 		opened: true,
-		opfs: dbInfo.vfs === 'opfs',
+		opfs: dbInfo.opfs === true,
 		vfs: dbInfo.vfs,
 		filename: db.filename
 	};
@@ -27231,9 +27259,12 @@ function closeDb() {
 }
 
 async function createDb(sqlite3, filename, vfs) {
+	if (!vfs || vfs === 'opfs')
+		return createOpfsDb(sqlite3, filename);
+	if (vfs === 'opfs-sahpool')
+		return createOpfsSahPoolDb(sqlite3, filename);
 	if (vfs && vfs !== 'opfs')
 		throw new Error('sqliteOPFS vfs "' + vfs + '" is not supported.');
-	return createOpfsDb(sqlite3, filename);
 }
 
 function createOpfsDb(sqlite3, filename) {
@@ -27242,7 +27273,22 @@ function createOpfsDb(sqlite3, filename) {
 		throw new Error('sqliteOPFS vfs "opfs" is not available in this sqlite-wasm build.');
 	return {
 		db: new DbClass(filename),
-		vfs: 'opfs'
+		vfs: 'opfs',
+		opfs: true
+	};
+}
+
+async function createOpfsSahPoolDb(sqlite3, filename) {
+	if (!sqlite3 || typeof sqlite3.installOpfsSAHPoolVfs !== 'function')
+		throw new Error('sqliteOPFS vfs "opfs-sahpool" is not available in this sqlite-wasm build.');
+	const pool = await sqlite3.installOpfsSAHPoolVfs(opfsSahPoolOptions);
+	const DbClass = pool && pool.OpfsSAHPoolDb;
+	if (typeof DbClass !== 'function')
+		throw new Error('sqliteOPFS vfs "opfs-sahpool" is not available in this sqlite-wasm build.');
+	return {
+		db: new DbClass(filename),
+		vfs: pool.vfsName || 'opfs-sahpool',
+		opfs: true
 	};
 }
 
@@ -27321,6 +27367,13 @@ function serializeError(error) {
 
 //# sourceURL=orange-orm-sqlite-opfs-worker.mjs
 `;
+	}
+
+	function normalizeOpfsSahPoolOptions(options = {}) {
+		const source = options.opfsSahPool || options.opfsSAHPool || options.sahPool;
+		if (!source || source !== Object(source))
+			return {};
+		return { ...source };
 	}
 
 	function toError(error) {
@@ -27469,7 +27522,7 @@ function requireNewPool$5 () {
 		if (poolOptions.singleWorker === true)
 			return true;
 		const vfs = poolOptions.vfs || 'opfs';
-		if (vfs === 'opfs')
+		if (vfs === 'opfs' || vfs === 'opfs-sahpool')
 			return poolOptions.singleWorker !== false;
 		return false;
 	}

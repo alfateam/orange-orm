@@ -1,5 +1,6 @@
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
 
+const opfsSahPoolOptions = {};
 let sqlite3Promise;
 let db;
 let queue = Promise.resolve();
@@ -38,7 +39,7 @@ async function openDb(connectionString, busyTimeoutMs = 5000, vfs) {
 	db.exec(`PRAGMA busy_timeout=${Number.parseInt(busyTimeoutMs, 10) || 5000}`);
 	return {
 		opened: true,
-		opfs: dbInfo.vfs === 'opfs',
+		opfs: dbInfo.opfs === true,
 		vfs: dbInfo.vfs,
 		filename: db.filename
 	};
@@ -52,9 +53,12 @@ function closeDb() {
 }
 
 async function createDb(sqlite3, filename, vfs) {
+	if (!vfs || vfs === 'opfs')
+		return createOpfsDb(sqlite3, filename);
+	if (vfs === 'opfs-sahpool')
+		return createOpfsSahPoolDb(sqlite3, filename);
 	if (vfs && vfs !== 'opfs')
 		throw new Error(`sqliteOPFS vfs "${vfs}" is not supported.`);
-	return createOpfsDb(sqlite3, filename);
 }
 
 function createOpfsDb(sqlite3, filename) {
@@ -63,7 +67,22 @@ function createOpfsDb(sqlite3, filename) {
 		throw new Error('sqliteOPFS vfs "opfs" is not available in this sqlite-wasm build.');
 	return {
 		db: new DbClass(filename),
-		vfs: 'opfs'
+		vfs: 'opfs',
+		opfs: true
+	};
+}
+
+async function createOpfsSahPoolDb(sqlite3, filename) {
+	if (!sqlite3 || typeof sqlite3.installOpfsSAHPoolVfs !== 'function')
+		throw new Error('sqliteOPFS vfs "opfs-sahpool" is not available in this sqlite-wasm build.');
+	const pool = await sqlite3.installOpfsSAHPoolVfs(opfsSahPoolOptions);
+	const DbClass = pool && pool.OpfsSAHPoolDb;
+	if (typeof DbClass !== 'function')
+		throw new Error('sqliteOPFS vfs "opfs-sahpool" is not available in this sqlite-wasm build.');
+	return {
+		db: new DbClass(filename),
+		vfs: pool.vfsName || 'opfs-sahpool',
+		opfs: true
 	};
 }
 

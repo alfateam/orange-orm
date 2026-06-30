@@ -111,7 +111,15 @@ export interface Pool {
 export interface PoolOptions<M extends Record<string, any> = any> {
 	size?: number;
 	sync?: string | SyncConfig<M>;
-	vfs?: 'opfs';
+	vfs?: 'opfs' | 'opfs-sahpool';
+	opfsSahPool?: {
+		name?: string;
+		directory?: string;
+		initialCapacity?: number;
+		clearOnInit?: boolean;
+		verbosity?: number;
+		forceReinitIfPreviouslyFailed?: boolean;
+	};
 	singleWorker?: boolean;
 	inlineWorker?: boolean;
 	prewarmRead?: boolean;
