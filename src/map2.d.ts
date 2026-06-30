@@ -1018,6 +1018,7 @@ export interface SyncConfig<M extends Record<string, any> = any> extends Partial
   pull?: string | SyncPullOverrideConfig<M>;
   push?: string | SyncEndpointConfig;
   crossTabLock?: boolean | string | SyncCrossTabLockConfig;
+  stableBase?: boolean;
   auto?: boolean | {
     enabled?: boolean;
     intervalMs?: number;

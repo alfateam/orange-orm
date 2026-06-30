@@ -836,6 +836,69 @@ describe('sync client auto start', () => {
 		expect(baseCopies).toHaveLength(0);
 	});
 
+	test('pushes pending mutations without stable base when disabled', async () => {
+		const outbox = [{
+			mutation_id: 'mutation-1',
+			table_name: 'customer',
+			patch_json: JSON.stringify([
+				{ op: 'replace', path: '/[1]/name', value: 'After', oldValue: 'Before' }
+			]),
+			options_json: '{}',
+			created_at_ms: 1,
+			status: 'pending'
+		}];
+		const requests = [];
+		const queryLog = [];
+		const db = {
+			__sqliteSync: {
+				url: '/rdb',
+				auto: false,
+				schema: false,
+				tables: ['customer'],
+				stableBase: false
+			},
+			queryLog,
+			query: async (sql) => {
+				queryLog.push(sql);
+				if (/SELECT "mutation_id".*FROM "orange_sync_outbox"/u.test(sql))
+					return outbox.filter(row => row.status === 'pending');
+				if (/UPDATE "orange_sync_outbox"/u.test(sql)) {
+					outbox[0].status = 'pushed';
+					return [];
+				}
+				if (/SELECT "since_value" FROM "orange_sync_state"/u.test(sql))
+					return [];
+				return [];
+			}
+		};
+		const client = newSyncClient({
+			tables: {
+				customer: newTable('customer')
+			},
+			transaction: async (fn) => fn({
+				query: db.query
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async (request) => {
+					requests.push(request.data.phase);
+					return {
+						data: request.data.phase === 'push'
+							? { phase: 'push', applied: 1, duplicates: 0, results: [{ id: 'mutation-1' }] }
+							: { phase: 'keys', items: [], done: true, cursor: 'cursor-1' }
+					};
+				};
+			}
+		});
+
+		await client.sync();
+
+		expect(requests).toEqual(['push', 'keys']);
+		expect(outbox[0].status).toBe('pushed');
+		expect(queryLog.some(sql => /orange_sync_base_/u.test(sql))).toBe(false);
+		expect(queryLog.some(sql => /DELETE FROM "orange_sync_outbox" WHERE "status" = 'pending'/u.test(sql))).toBe(false);
+	});
+
 	test('updates stable base incrementally after accepted local push', async () => {
 		const outbox = [{
 			mutation_id: 'mutation-1',

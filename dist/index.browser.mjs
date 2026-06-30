@@ -5620,13 +5620,15 @@ function requireSyncClient () {
 			if (!Array.isArray(configuredTables) || configuredTables.length === 0)
 				throw new Error('Sync pull requires mapped tables or configured tables. Set sync.tables when the client has no table map.');
 			await ensureSyncSchema(db, client, configuredTables, syncConfig.schema);
-			const hadStableBase = await hasStableBase(db);
-			if (!hadStableBase)
+			const stableBaseEnabled = isStableBaseEnabled(syncConfig);
+			const hadStableBase = stableBaseEnabled && await hasStableBase(db);
+			if (stableBaseEnabled && !hadStableBase)
 				return runSyncMaintenance(db, () => pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase));
 			return pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase);
 		}
 
 		async function pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase) {
+			const stableBaseEnabled = isStableBaseEnabled(syncConfig);
 			const pushResult = await pushBeforePull(db, syncConfig, hadStableBase);
 			await maybeEmitInitialReady(syncConfig, configuredTables, db, 'persisted');
 			const currentSince = await getScopeSince(configuredTables, db);
@@ -5651,11 +5653,11 @@ function requireSyncClient () {
 			if (result && result.since !== undefined && result.checkpointApplied !== true)
 				await setScopeSince(configuredTables, result.since, db);
 			let pushedBaseUpdated = false;
-			if (hadStableBase && didPushMutations(pushResult))
+			if (stableBaseEnabled && hadStableBase && didPushMutations(pushResult))
 				pushedBaseUpdated = await savePushedMutationsToStableBase(db, getAcceptedPushMutations(pushResult));
-			if (!hadStableBase)
+			if (stableBaseEnabled && !hadStableBase)
 				await clearPendingMutations(db);
-			if (shouldSaveStableBase(hadStableBase, pushResult, result, pushedBaseUpdated))
+			if (shouldSaveStableBase(stableBaseEnabled, hadStableBase, pushResult, result, pushedBaseUpdated))
 				await saveStableBase(db);
 			await maybeEmitInitialReady(syncConfig, configuredTables, db, 'sync');
 			return result;
@@ -5706,13 +5708,13 @@ function requireSyncClient () {
 				result = await sendPush(pushConfig, clientId, pending);
 			}
 			catch (e) {
-				if (isConflictError(e)) {
+				if (isConflictError(e) && isStableBaseEnabled(syncConfig)) {
 					await rollbackFailedPushBatch(db, pending, e);
 					emitOperationErrors(pending, e, false);
 				}
 				else {
 					await markPendingMutationAttempts(db, pending, e);
-					emitOperationErrors(pending, e, true);
+					emitOperationErrors(pending, e, !isConflictError(e));
 				}
 				throw e;
 			}
@@ -5722,7 +5724,7 @@ function requireSyncClient () {
 		}
 
 		async function pushBeforePull(db, syncConfig, hasBase) {
-			if (!hasBase)
+			if (isStableBaseEnabled(syncConfig) && !hasBase)
 				return;
 			const pending = await readPendingMutations(db, 1);
 			if (pending.length === 0)
@@ -5730,7 +5732,9 @@ function requireSyncClient () {
 			return pushPending({ _syncConfig: syncConfig, _pushConfig: resolvePushConfig(syncConfig) });
 		}
 
-		function shouldSaveStableBase(hadStableBase, pushResult, pullResult, pushedBaseUpdated) {
+		function shouldSaveStableBase(stableBaseEnabled, hadStableBase, pushResult, pullResult, pushedBaseUpdated) {
+			if (!stableBaseEnabled)
+				return false;
 			return !hadStableBase || didPullRows(pullResult) || didPushMutations(pushResult) && !pushedBaseUpdated;
 		}
 
@@ -7192,8 +7196,14 @@ function requireSyncClient () {
 			schema: sync.schema,
 			auto: sync.auto,
 			push: normalizeEndpoint(sync.push),
+			// Stable-base rollback is optional while browser sync is being simplified.
+			stableBase: sync.stableBase !== false,
 			crossTabLock: normalizeCrossTabLockConfig(sync.crossTabLock)
 		};
+	}
+
+	function isStableBaseEnabled(syncConfig) {
+		return !syncConfig || syncConfig.stableBase !== false;
 	}
 
 	function normalizeCrossTabLockConfig(value) {
