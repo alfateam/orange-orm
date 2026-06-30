@@ -5526,6 +5526,8 @@ function requireSyncClient () {
 		withSyncOperationMemory
 	} = requireOperationContext();
 
+	const maxPushBatchesPerSync = 1000;
+
 	function newSyncClient(client, getDb, axiosInterceptor) {
 		const sinceByScope = new Map();
 		const ensuredInternalTables = new WeakMap();
@@ -5654,12 +5656,20 @@ function requireSyncClient () {
 			if (result && result.since !== undefined && result.checkpointApplied !== true)
 				await setScopeSince(configuredTables, result.since, db);
 			let pushedBaseUpdated = false;
-			if (stableBaseEnabled && hadStableBase && didPushMutations(pushResult))
-				pushedBaseUpdated = await savePushedMutationsToStableBase(db, getAcceptedPushMutations(pushResult));
+			let needsStableBaseSnapshot = stableBaseEnabled && hadStableBase && await hasStableBaseSnapshotPending(db);
+			if (stableBaseEnabled && hadStableBase && didPushMutations(pushResult)) {
+				if (!needsStableBaseSnapshot)
+					pushedBaseUpdated = await savePushedMutationsToStableBase(db, getAcceptedPushMutations(pushResult));
+				if (!pushedBaseUpdated)
+					needsStableBaseSnapshot = true;
+			}
 			if (stableBaseEnabled && !hadStableBase)
 				await clearPendingMutations(db);
-			if (shouldSaveStableBase(stableBaseEnabled, hadStableBase, pushResult, result, pushedBaseUpdated))
-				await saveStableBase(db);
+			if (needsStableBaseSnapshot || shouldSaveStableBase(stableBaseEnabled, hadStableBase, pushResult, result, pushedBaseUpdated)) {
+				const saved = await saveStableBase(db);
+				if (saved || needsStableBaseSnapshot)
+					await setStableBaseSnapshotPending(db, !saved && needsStableBaseSnapshot);
+			}
 			await maybeEmitInitialReady(syncConfig, configuredTables, db, 'sync');
 			return result;
 		}
@@ -5727,16 +5737,34 @@ function requireSyncClient () {
 		async function pushBeforePull(db, syncConfig, hasBase) {
 			if (isStableBaseEnabled(syncConfig) && !hasBase)
 				return;
-			const pending = await readPendingMutations(db, 1);
-			if (pending.length === 0)
-				return;
-			return pushPending({ _syncConfig: syncConfig, _pushConfig: resolvePushConfig(syncConfig) });
+			const pushConfig = resolvePushConfig(syncConfig);
+			const maxBatches = resolveMaxPushBatches(syncConfig);
+			const results = [];
+			for (let i = 0; i < maxBatches; i++) {
+				const result = await pushPending({ _syncConfig: syncConfig, _pushConfig: pushConfig });
+				if (!didPushBatchAdvance(result))
+					break;
+				results.push(result);
+			}
+			return combinePushResults(results);
 		}
 
 		function shouldSaveStableBase(stableBaseEnabled, hadStableBase, pushResult, pullResult, pushedBaseUpdated) {
 			if (!stableBaseEnabled)
 				return false;
 			return !hadStableBase || didPullRows(pullResult) || didPushMutations(pushResult) && !pushedBaseUpdated;
+		}
+
+		async function hasStableBaseSnapshotPending(db) {
+			const state = await readScopeState('__orange_sync_stable_base_snapshot_pending__', db);
+			return state && state.since === true;
+		}
+
+		async function setStableBaseSnapshotPending(db, pending) {
+			await writeScopeState('__orange_sync_stable_base_snapshot_pending__', {
+				since: pending === true,
+				updatedAtMs: Date.now()
+			}, db);
 		}
 
 		function didPushMutations(result) {
@@ -5749,6 +5777,35 @@ function requireSyncClient () {
 
 		function didPullRows(result) {
 			return Number(result && result.applied) > 0;
+		}
+
+		function didPushBatchAdvance(result) {
+			return getAcceptedPushMutations(result).length > 0;
+		}
+
+		function combinePushResults(results) {
+			if (!Array.isArray(results) || results.length === 0)
+				return;
+			if (results.length === 1)
+				return results[0];
+			const combined = {
+				phase: 'push',
+				applied: 0,
+				duplicates: 0,
+				results: [],
+				batches: results.length
+			};
+			const acceptedMutations = [];
+			for (let i = 0; i < results.length; i++) {
+				const result = results[i];
+				combined.applied += Number(result && result.applied || 0);
+				combined.duplicates += Number(result && result.duplicates || 0);
+				if (Array.isArray(result && result.results))
+					combined.results.push(...result.results);
+				acceptedMutations.push(...getAcceptedPushMutations(result));
+			}
+			attachAcceptedPushMutations(combined, acceptedMutations);
+			return combined;
 		}
 
 		async function rollbackFailedPushBatch(db, attemptedMutations, error) {
@@ -7196,7 +7253,7 @@ function requireSyncClient () {
 			initialReadyMaxAgeMs,
 			schema: sync.schema,
 			auto: sync.auto,
-			push: normalizeEndpoint(sync.push),
+			push: sync.push === undefined ? undefined : normalizePushConfig(sync.push, endpoint),
 			// Stable-base rollback is optional while browser sync is being simplified.
 			stableBase: sync.stableBase !== false,
 			crossTabLock: normalizeCrossTabLockConfig(sync.crossTabLock)
@@ -7519,6 +7576,25 @@ function requireSyncClient () {
 		};
 	}
 
+	function normalizePushConfig(config, fallbackEndpoint) {
+		if (!config)
+			return undefined;
+		if (typeof config === 'string')
+			return normalizeEndpoint(config);
+		if (config !== Object(config))
+			throw new Error('Invalid sqlite sync push configuration');
+
+		const endpointOverrides = pickEndpointOverrides(config);
+		const endpoint = config.url
+			? normalizeEndpoint(config)
+			: mergeEndpoint(fallbackEndpoint, endpointOverrides);
+		if (!endpoint)
+			throw new Error('Sync push endpoint requires "url" or sync.url');
+		return {
+			...endpoint
+		};
+	}
+
 	function normalizeConfiguredTables(value) {
 		if (!Array.isArray(value))
 			return undefined;
@@ -7606,7 +7682,7 @@ function requireSyncClient () {
 
 	function resolvePushConfig(syncConfig, options = {}) {
 		const preferred = syncConfig.push || syncConfig;
-		const pushConfig = normalizeEndpoint(preferred);
+		const pushConfig = normalizePushConfig(preferred, syncConfig);
 		if (!pushConfig || !pushConfig.url)
 			throw new Error('No push sync endpoint configured');
 		if (options.timeoutMs === undefined)
@@ -7615,6 +7691,12 @@ function requireSyncClient () {
 			...pushConfig,
 			timeoutMs: options.timeoutMs
 		};
+	}
+
+	function resolveMaxPushBatches(syncConfig) {
+		if (isStableBaseEnabled(syncConfig))
+			return 1;
+		return maxPushBatchesPerSync;
 	}
 
 	async function requestPayload(config, options) {

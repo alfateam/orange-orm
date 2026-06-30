@@ -899,6 +899,185 @@ describe('sync client auto start', () => {
 		expect(queryLog.some(sql => /DELETE FROM "orange_sync_outbox" WHERE "status" = 'pending'/u.test(sql))).toBe(false);
 	});
 
+	test('drains pending mutations as separate push requests before pull', async () => {
+		const outbox = [
+			newPendingOutboxRow('mutation-1', 'First', 1),
+			newPendingOutboxRow('mutation-2', 'Second', 2)
+		];
+		const requests = [];
+		const db = newOutboxDb(outbox, {
+			url: '/rdb',
+			auto: false,
+			schema: false,
+			tables: ['customer'],
+			stableBase: false
+		});
+		const client = newSyncClient({
+			tables: {
+				customer: newTable('customer')
+			},
+			transaction: async (fn) => fn({
+				query: db.query
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async (request) => {
+					if (request.data.phase === 'push') {
+						requests.push(['push', request.data.mutations.map(mutation => mutation.id)]);
+						return {
+							data: {
+								phase: 'push',
+								applied: 1,
+								duplicates: 0,
+								results: [{ id: request.data.mutations[0].id }]
+							}
+						};
+					}
+					requests.push([request.data.phase]);
+					return { data: { phase: 'keys', items: [], done: true, cursor: 'cursor-1' } };
+				};
+			}
+		});
+
+		await client.sync();
+
+		expect(requests).toEqual([
+			['push', ['mutation-1']],
+			['push', ['mutation-2']],
+			['keys']
+		]);
+		expect(outbox.map(row => row.status)).toEqual(['pushed', 'pushed']);
+	});
+
+	test('stops push drain on first failed request before pull', async () => {
+		const outbox = [
+			newPendingOutboxRow('mutation-1', 'First', 1),
+			newPendingOutboxRow('mutation-2', 'Second', 2)
+		];
+		const requests = [];
+		const db = newOutboxDb(outbox, {
+			url: '/rdb',
+			auto: false,
+			schema: false,
+			tables: ['customer'],
+			stableBase: false
+		});
+		const client = newSyncClient({
+			tables: {
+				customer: newTable('customer')
+			},
+			transaction: async (fn) => fn({
+				query: db.query
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async (request) => {
+					if (request.data.phase === 'push') {
+						const mutationId = request.data.mutations[0].id;
+						requests.push(['push', mutationId]);
+						if (mutationId === 'mutation-2') {
+							const error = new Error('Request failed with status code 503');
+							error.response = { status: 503, data: 'forced failure' };
+							throw error;
+						}
+						return {
+							data: {
+								phase: 'push',
+								applied: 1,
+								duplicates: 0,
+								results: [{ id: mutationId }]
+							}
+						};
+					}
+					requests.push([request.data.phase]);
+					return { data: { phase: 'keys', items: [], done: true, cursor: 'cursor-1' } };
+				};
+			}
+		});
+
+		await expect(client.sync())
+			.rejects.toThrow('Request failed with status code 503');
+
+		expect(requests).toEqual([
+			['push', 'mutation-1'],
+			['push', 'mutation-2']
+		]);
+		expect(outbox.map(row => row.status)).toEqual(['pushed', 'pending']);
+		expect(outbox[1].attempts).toBe(1);
+		expect(outbox[1].last_error).toBe('Request failed with status code 503');
+	});
+
+	test('defers stable base snapshot while later pending mutations remain', async () => {
+		const outbox = [
+			newPendingOutboxRow('mutation-1', 'First', 1),
+			newPendingOutboxRow('mutation-2', 'Second', 2)
+		];
+		const requests = [];
+		const db = newOutboxDb(outbox, {
+			url: '/rdb',
+			auto: false,
+			schema: false,
+			tables: ['customer']
+		}, {
+			baseEntries: [{
+				name: 'customer',
+				base_name: 'orange_sync_base_data_customer',
+				schema_sql: 'CREATE TABLE customer (id INTEGER PRIMARY KEY, name TEXT)',
+				ordinal: 0
+			}],
+			sqliteTables: [{
+				name: 'customer',
+				sql: 'CREATE TABLE customer (id INTEGER PRIMARY KEY, name TEXT)'
+			}]
+		});
+		const client = newSyncClient({
+			tables: {
+				customer: newTable('customer')
+			},
+			transaction: async (fn) => fn({
+				query: db.query
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async (request) => {
+					if (request.data.phase === 'push') {
+						requests.push(['push', request.data.mutations.map(mutation => mutation.id)]);
+						return {
+							data: {
+								phase: 'push',
+								applied: 1,
+								duplicates: 0,
+								results: [{ id: request.data.mutations[0].id }]
+							}
+						};
+					}
+					requests.push([request.data.phase]);
+					return { data: { phase: 'keys', items: [], done: true, cursor: 'cursor-1' } };
+				};
+			}
+		});
+
+		await client.sync();
+
+		expect(requests).toEqual([
+			['push', ['mutation-1']],
+			['keys']
+		]);
+		expect(outbox.map(row => row.status)).toEqual(['pushed', 'pending']);
+		expect(db.queryLog.some(sql => /CREATE TABLE "orange_sync_base_data_/u.test(sql))).toBe(false);
+
+		await client.sync();
+
+		expect(requests).toEqual([
+			['push', ['mutation-1']],
+			['keys'],
+			['push', ['mutation-2']],
+			['keys']
+		]);
+		expect(outbox.map(row => row.status)).toEqual(['pushed', 'pushed']);
+		expect(db.queryLog.some(sql => /CREATE TABLE "orange_sync_base_data_/u.test(sql))).toBe(true);
+	});
+
 	test('updates stable base incrementally after accepted local push', async () => {
 		const outbox = [{
 			mutation_id: 'mutation-1',
@@ -1275,6 +1454,98 @@ function newTable(dbName) {
 		],
 		_relations: {}
 	};
+}
+
+function newPendingOutboxRow(id, name, createdAtMs) {
+	return {
+		mutation_id: id,
+		table_name: 'customer',
+		patch_json: JSON.stringify([
+			{ op: 'replace', path: `/[${createdAtMs}]/name`, value: name, oldValue: 'Before' }
+		]),
+		options_json: '{}',
+		created_at_ms: createdAtMs,
+		status: 'pending',
+		attempts: 0
+	};
+}
+
+function newOutboxDb(outbox, syncConfig, options = {}) {
+	const queryLog = [];
+	const state = new Map();
+	const baseEntries = (options.baseEntries || []).slice();
+	const sqliteTables = (options.sqliteTables || []).slice();
+	return {
+		__sqliteSync: syncConfig,
+		queryLog,
+		query: async (sql) => {
+			queryLog.push(sql);
+			if (/SELECT "mutation_id".*FROM "orange_sync_outbox"/u.test(sql)) {
+				return outbox
+					.filter(row => row.status === 'pending')
+					.sort((a, b) => a.created_at_ms - b.created_at_ms)
+					.slice(0, 1);
+			}
+			if (/UPDATE "orange_sync_outbox"/u.test(sql)) {
+				const row = outbox.find(item => item.mutation_id === mutationIdFromWhere(sql));
+				if (!row)
+					return [];
+				if (/SET "status" = 'pushed'/u.test(sql)) {
+					row.status = 'pushed';
+					row.pushed_at_ms = Date.now();
+					row.result_json = '{}';
+				}
+				else if (/"attempts" = "attempts" \+ 1/u.test(sql)) {
+					row.attempts = Number(row.attempts || 0) + 1;
+					row.last_error = lastErrorFromUpdate(sql);
+				}
+				return [];
+			}
+			if (/SELECT "name" FROM "orange_sync_base_tables" LIMIT 1/u.test(sql))
+				return baseEntries.length > 0 ? [{ name: baseEntries[0].name }] : [];
+			if (/SELECT "name", "base_name", "schema_sql", "ordinal" FROM "orange_sync_base_tables"/u.test(sql))
+				return baseEntries;
+			if (/SELECT "name", "sql" FROM sqlite_schema/u.test(sql))
+				return sqliteTables;
+			if (/DELETE FROM "orange_sync_base_tables"/u.test(sql)) {
+				baseEntries.length = 0;
+				return [];
+			}
+			if (/INSERT INTO "orange_sync_base_tables"/u.test(sql)) {
+				const values = parseSqlValues(sql);
+				baseEntries.push({
+					name: values[0],
+					base_name: values[1],
+					schema_sql: values[2],
+					ordinal: Number(values[3] || 0)
+				});
+				return [];
+			}
+			if (/^(CREATE|DROP) TABLE/u.test(sql) && /orange_sync_base_data_/u.test(sql))
+				return [];
+			if (/SELECT "since_value" FROM "orange_sync_state"/u.test(sql)) {
+				const scope = firstSqlString(sql);
+				const value = state.get(scope);
+				return value === undefined ? [] : [{ since_value: value }];
+			}
+			if (/INSERT INTO "orange_sync_state"/u.test(sql)) {
+				const values = parseSqlValues(sql);
+				state.set(values[0], values[1]);
+				return [];
+			}
+			return [];
+		}
+	};
+}
+
+function mutationIdFromWhere(sql) {
+	const match = /WHERE "mutation_id" = '((?:''|[^'])*)'/u.exec(sql);
+	return match ? match[1].replace(/''/g, '\'') : undefined;
+}
+
+function lastErrorFromUpdate(sql) {
+	const match = /"last_error" = '((?:''|[^'])*)'/u.exec(sql);
+	return match ? match[1].replace(/''/g, '\'') : undefined;
 }
 
 function newJournalDb(config) {
