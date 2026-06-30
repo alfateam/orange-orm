@@ -294,6 +294,7 @@ function rdbClient(options = {}) {
 			}
 			catch (e) {
 				await transaction(transaction.rollback.bind(null, e));
+				throw e;
 			}
 		});
 	}

@@ -836,6 +836,68 @@ describe('sync client auto start', () => {
 		expect(baseCopies).toHaveLength(0);
 	});
 
+	test('updates stable base incrementally after accepted local push', async () => {
+		const outbox = [{
+			mutation_id: 'mutation-1',
+			table_name: 'customer',
+			patch_json: JSON.stringify([
+				{ op: 'replace', path: '/[1]/name', value: 'After', oldValue: 'Before' }
+			]),
+			options_json: '{}',
+			created_at_ms: 1,
+			status: 'pending'
+		}];
+		const queryLog = [];
+		const db = {
+			__sqliteSync: { url: '/rdb', auto: false, schema: false, tables: ['customer'] },
+			queryLog,
+			query: async (sql) => {
+				queryLog.push(sql);
+				if (/SELECT "mutation_id".*FROM "orange_sync_outbox"/u.test(sql))
+					return outbox.filter(row => row.status === 'pending');
+				if (/UPDATE "orange_sync_outbox"/u.test(sql)) {
+					outbox[0].status = 'pushed';
+					return [];
+				}
+				if (/SELECT "name" FROM "orange_sync_base_tables" LIMIT 1/u.test(sql))
+					return [{ name: 'customer' }];
+				if (/SELECT "name", "base_name", "schema_sql", "ordinal" FROM "orange_sync_base_tables"/u.test(sql)) {
+					return [{
+						name: 'customer',
+						base_name: 'orange_sync_base_data_customer',
+						schema_sql: 'CREATE TABLE customer (id INTEGER PRIMARY KEY, name TEXT)',
+						ordinal: 0
+					}];
+				}
+				if (/SELECT "since_value" FROM "orange_sync_state"/u.test(sql))
+					return [];
+				return [];
+			}
+		};
+		const client = newSyncClient({
+			tables: {
+				customer: newTable('customer')
+			},
+			transaction: async (fn) => fn({
+				query: db.query
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async (request) => ({
+					data: request.data.phase === 'push'
+						? { phase: 'push', applied: 1, duplicates: 0, results: [{ id: 'mutation-1' }] }
+						: { phase: 'keys', items: [], done: true, cursor: 'cursor-1' }
+				});
+			}
+		});
+
+		await client.sync();
+
+		expect(queryLog).toContain('DELETE FROM "orange_sync_base_data_customer" WHERE "id" = 1');
+		expect(queryLog).toContain('INSERT INTO "orange_sync_base_data_customer" SELECT * FROM "customer" WHERE "id" = 1');
+		expect(queryLog.some(sql => /CREATE TABLE "orange_sync_base_data_/u.test(sql))).toBe(false);
+	});
+
 	test('prefetches next staged pull batch before journal commit completes', async () => {
 		const events = [];
 		const patches = [];

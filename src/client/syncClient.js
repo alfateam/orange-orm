@@ -137,9 +137,12 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		}
 		if (result && result.since !== undefined && result.checkpointApplied !== true)
 			await setScopeSince(configuredTables, result.since, db);
+		let pushedBaseUpdated = false;
+		if (hadStableBase && didPushMutations(pushResult))
+			pushedBaseUpdated = await savePushedMutationsToStableBase(db, getAcceptedPushMutations(pushResult));
 		if (!hadStableBase)
 			await clearPendingMutations(db);
-		if (shouldSaveStableBase(hadStableBase, pushResult, result))
+		if (shouldSaveStableBase(hadStableBase, pushResult, result, pushedBaseUpdated))
 			await saveStableBase(db);
 		await maybeEmitInitialReady(syncConfig, configuredTables, db, 'sync');
 		return result;
@@ -200,7 +203,8 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 			}
 			throw e;
 		}
-		await markPushedMutations(db, result, pending);
+		const acceptedMutations = await markPushedMutations(db, result, pending);
+		attachAcceptedPushMutations(result, acceptedMutations);
 		return result;
 	}
 
@@ -213,8 +217,8 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		return pushPending({ _syncConfig: syncConfig, _pushConfig: resolvePushConfig(syncConfig) });
 	}
 
-	function shouldSaveStableBase(hadStableBase, pushResult, pullResult) {
-		return !hadStableBase || didPushMutations(pushResult) || didPullRows(pullResult);
+	function shouldSaveStableBase(hadStableBase, pushResult, pullResult, pushedBaseUpdated) {
+		return !hadStableBase || didPullRows(pullResult) || didPushMutations(pushResult) && !pushedBaseUpdated;
 	}
 
 	function didPushMutations(result) {
@@ -1127,21 +1131,42 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 	async function markPushedMutations(db, result, attemptedMutations) {
 		const results = Array.isArray(result && result.results) ? result.results : [];
 		if (results.length === 0)
-			return;
+			return [];
 		await ensureSyncOutboxTable(db);
 		const now = Date.now();
 		const attemptedById = mutationsById(attemptedMutations);
+		const acceptedMutations = [];
 		for (let i = 0; i < results.length; i++) {
 			const item = results[i];
 			if (!item || typeof item.id !== 'string')
 				continue;
+			const mutation = attemptedById.get(item.id);
 			await db.query([
 				`UPDATE "${syncOutboxTable}"`,
 				`SET "status" = 'pushed', "pushed_at_ms" = ${now}, "result_json" = ${sqlStringLiteral(stringify(item))}`,
 				`WHERE "mutation_id" = ${sqlStringLiteral(item.id)}`
 			].join(' '));
-			emitOperationSuccess(attemptedById.get(item.id), item);
+			if (mutation)
+				acceptedMutations.push(mutation);
+			emitOperationSuccess(mutation, item);
 		}
+		return acceptedMutations;
+	}
+
+	function attachAcceptedPushMutations(result, mutations) {
+		if (!result || result !== Object(result))
+			return;
+		Object.defineProperty(result, '__orangeAcceptedMutations', {
+			value: Array.isArray(mutations) ? mutations : [],
+			enumerable: false,
+			configurable: true
+		});
+	}
+
+	function getAcceptedPushMutations(result) {
+		return result && Array.isArray(result.__orangeAcceptedMutations)
+			? result.__orangeAcceptedMutations
+			: [];
 	}
 
 	async function insertOutboxRow(db, row) {
@@ -1309,6 +1334,111 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 			}, { suppressSyncOutbox: true });
 			return true;
 		});
+	}
+
+	async function savePushedMutationsToStableBase(db, mutations) {
+		const entries = stableBasePatchEntries(mutations);
+		if (entries.length === 0)
+			return true;
+		return runSyncMaintenance(db, async () => {
+			if (await hasPendingMutations(db))
+				return false;
+			await client.transaction(async (tx) => {
+				await ensureSyncBaseTable(tx);
+				const baseEntries = await readStableBaseEntries(tx);
+				const baseByTable = new Map(baseEntries.map(entry => [entry.name, entry]));
+				for (let i = 0; i < entries.length; i++) {
+					const applied = await savePatchEntryToStableBase(tx, entries[i], baseByTable);
+					if (!applied)
+						throw new StableBaseIncrementalFallbackError();
+				}
+			}, { suppressSyncOutbox: true });
+			return true;
+		})
+			.catch((error) => {
+				if (error instanceof StableBaseIncrementalFallbackError)
+					return false;
+				throw error;
+			});
+	}
+
+	function stableBasePatchEntries(mutations) {
+		const source = Array.isArray(mutations) ? mutations : [];
+		const entries = [];
+		for (let i = 0; i < source.length; i++) {
+			const mutationEntries = mutationToPatchEntries(source[i]);
+			for (let j = 0; j < mutationEntries.length; j++)
+				entries.push(mutationEntries[j]);
+		}
+		return entries;
+	}
+
+	async function savePatchEntryToStableBase(tx, entry, baseByTable) {
+		const tableName = entry && entry.table;
+		const patch = entry && entry.patch;
+		if (typeof tableName !== 'string' || !Array.isArray(patch))
+			return true;
+		const baseEntry = baseByTable.get(tableName);
+		const table = client.tables && client.tables[tableName];
+		const primaryColumns = getPrimaryColumns(table);
+		if (!baseEntry || !table || primaryColumns.length === 0)
+			return false;
+		const keys = patchPrimaryKeys(patch);
+		for (let i = 0; i < keys.length; i++) {
+			const where = primaryKeyWhereSql(primaryColumns, keys[i]);
+			if (!where)
+				return false;
+			await tx.query(`DELETE FROM ${quoteIdent(baseEntry.baseName)} WHERE ${where}`);
+			await tx.query(`INSERT INTO ${quoteIdent(baseEntry.baseName)} SELECT * FROM ${quoteIdent(table._dbName || tableName)} WHERE ${where}`);
+		}
+		return true;
+	}
+
+	function getPrimaryColumns(table) {
+		if (!table || !Array.isArray(table._primaryColumns))
+			return [];
+		return table._primaryColumns
+			.map(column => column && (column._dbName || column.alias || column.name))
+			.filter(name => typeof name === 'string' && name.length > 0);
+	}
+
+	function patchPrimaryKeys(patch) {
+		const result = [];
+		const seen = new Set();
+		for (let i = 0; i < patch.length; i++) {
+			const key = patchOperationPrimaryKey(patch[i]);
+			if (!key)
+				continue;
+			const serialized = stringify(key);
+			if (seen.has(serialized))
+				continue;
+			seen.add(serialized);
+			result.push(key);
+		}
+		return result;
+	}
+
+	function patchOperationPrimaryKey(operation) {
+		if (!operation || typeof operation.path !== 'string')
+			return null;
+		const firstSegment = operation.path.split('/')[1];
+		if (firstSegment === undefined || firstSegment.length === 0)
+			return null;
+		try {
+			const parsed = JSON.parse(unescapeJsonPointerSegment(firstSegment));
+			return Array.isArray(parsed) ? parsed : [parsed];
+		}
+		catch (_e) {
+			return null;
+		}
+	}
+
+	function primaryKeyWhereSql(primaryColumns, key) {
+		if (!Array.isArray(key) || key.length !== primaryColumns.length)
+			return '';
+		return primaryColumns
+			.map((column, index) => sqlValuePredicate(quoteIdent(column), key[index]))
+			.join(' AND ');
 	}
 
 	async function restoreStableBase(db) {
@@ -1876,6 +2006,13 @@ function normalizeConfiguredTables(value) {
 
 function quoteIdent(value) {
 	return `"${String(value).replace(/"/g, '""')}"`;
+}
+
+class StableBaseIncrementalFallbackError extends Error {
+	constructor() {
+		super('Stable base incremental update needs full snapshot fallback.');
+		this.name = 'StableBaseIncrementalFallbackError';
+	}
 }
 
 function resolveSyncTables(db, configuredTables, client) {
@@ -2509,6 +2646,22 @@ function sqlStringLiteral(value) {
 	return `'${String(value).replace(/'/g, '\'\'')}'`;
 }
 
+function sqlValuePredicate(columnSql, value) {
+	if (value === null || value === undefined)
+		return `${columnSql} IS NULL`;
+	return `${columnSql} = ${sqlValueLiteral(value)}`;
+}
+
+function sqlValueLiteral(value) {
+	if (typeof value === 'number' && Number.isFinite(value))
+		return String(value);
+	if (typeof value === 'bigint')
+		return String(value);
+	if (typeof value === 'boolean')
+		return value ? '1' : '0';
+	return sqlStringLiteral(value);
+}
+
 function sqlNullableStringLiteral(value) {
 	if (value === undefined || value === null)
 		return 'NULL';
@@ -2526,6 +2679,10 @@ function sqlNullableNumberLiteral(value) {
 		return 'NULL';
 	const parsed = Number(value);
 	return Number.isFinite(parsed) ? String(parsed) : 'NULL';
+}
+
+function unescapeJsonPointerSegment(value) {
+	return String(value).replace(/~1/g, '/').replace(/~0/g, '~');
 }
 
 module.exports = newSyncClient;
