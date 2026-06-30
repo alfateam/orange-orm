@@ -30,7 +30,8 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 	const interceptors = createHttpInterceptor();
 	const lockedSync = withCrossTabSyncLock(sync);
 	const lockedResetLocal = withCrossTabSyncLock(resetLocal);
-	const observedSync = observeSyncMethod('sync', lockedSync);
+	const queuedSync = serializeAsyncMethod(lockedSync);
+	const observedSync = observeSyncMethod('sync', queuedSync);
 	const auto = createSyncAuto({
 		sync: observedSync
 	}, getConfig);
@@ -58,6 +59,15 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 				return fn(options);
 			const lockConfig = withRuntimeCrossTabLockConfig(syncConfig.crossTabLock, options);
 			return runWithCrossTabLock(resolveCrossTabLockName(db, syncConfig), lockConfig, () => fn(options));
+		};
+	}
+
+	function serializeAsyncMethod(fn) {
+		let tail = Promise.resolve();
+		return function serializedAsyncMethod(options) {
+			const run = tail.then(() => fn(options));
+			tail = run.catch(() => {});
+			return run;
 		};
 	}
 

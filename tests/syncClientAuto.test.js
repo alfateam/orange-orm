@@ -304,6 +304,49 @@ describe('sync client auto start', () => {
 		}
 	});
 
+	test('serializes explicit sync calls without cross-tab lock', async () => {
+		const requests = [];
+		const db = {
+			__sqliteSync: {
+				url: '/rdb',
+				auto: false,
+				tables: ['customer'],
+				crossTabLock: false
+			},
+			query: async () => []
+		};
+		const client = newSyncClient({
+			transaction: async (fn) => fn({
+				customer: {
+					patch: async () => ({ changed: [] })
+				},
+				query: async () => []
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async (request) => {
+					const deferred = newDeferred();
+					deferred.request = request;
+					requests.push(deferred);
+					return deferred.promise;
+				};
+			}
+		});
+
+		const first = client.sync();
+		const second = client.sync();
+		await wait(0);
+
+		expect(requests).toHaveLength(1);
+		requests[0].resolve({ data: { phase: 'keys', items: [], done: true, cursor: 'cursor-1' } });
+		await first;
+		await wait(0);
+
+		expect(requests).toHaveLength(2);
+		requests[1].resolve({ data: { phase: 'keys', items: [], done: true, cursor: 'cursor-2' } });
+		await second;
+	});
+
 	test('uses all mapped tables when sync tables are omitted', async () => {
 		const requests = [];
 		const db = {
