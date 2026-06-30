@@ -215,6 +215,27 @@ describe('db worker rpc', () => {
 		expect(row.name).toBe('CachedOPFS');
 		expect(workers).toBe(1);
 	});
+
+	test('terminates real worker on close', () => {
+		let removed = false;
+		let terminated = false;
+		const workerClient = rdb.createDbWorkerClient({
+			postMessage() {},
+			addEventListener() {},
+			removeEventListener(event) {
+				if (event === 'message')
+					removed = true;
+			},
+			terminate() {
+				terminated = true;
+			}
+		});
+
+		workerClient.close();
+
+		expect(removed).toBe(true);
+		expect(terminated).toBe(true);
+	});
 });
 
 function createBridge(db) {

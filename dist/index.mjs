@@ -19229,7 +19229,15 @@ function requireDbWorkerClient () {
 				entry.reject(new Error('DB worker client closed.'));
 			pending.clear();
 			listeners.clear();
-			if (typeof worker.close === 'function') {
+			if (typeof worker.terminate === 'function') {
+				try {
+					worker.terminate();
+				}
+				catch (_e) {
+					// Closing is best-effort for Worker-backed clients.
+				}
+			}
+			else if (typeof worker.close === 'function') {
 				try {
 					worker.close();
 				}
