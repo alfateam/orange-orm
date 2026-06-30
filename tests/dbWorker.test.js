@@ -113,6 +113,44 @@ describe('db worker rpc', () => {
 		});
 	});
 
+	test('captures transaction sync commands through db worker outbox', async () => {
+		const syncFileName = 'demo.dbWorker.sync-command.test.db';
+		fs.rmSync(syncFileName, { force: true });
+		const syncWorkerDb = map({
+			db: (con) => con.sqlite(syncFileName, {
+				size: 1,
+				sync: { url: '/rdb', auto: false, tables: ['customer'] }
+			}),
+			commands: {
+				async auditCustomer() {}
+			}
+		});
+		await initSqlite(syncWorkerDb);
+		const bridge = createBridge(syncWorkerDb);
+		const workerClient = rdb.createDbWorkerClient(bridge.worker);
+		const uiDb = map({
+			db: workerClient,
+			commands: {
+				async auditCustomer() {}
+			}
+		});
+
+		await uiDb.transaction(async (tx) => {
+			await tx.commands.auditCustomer({ id: 9300, source: 'worker' });
+			await tx.customer.insert({ id: 9300, name: 'WorkerCmd', balance: 1, isActive: true });
+		});
+
+		const outbox = await syncWorkerDb.query('SELECT patch_json FROM "orange_sync_outbox" WHERE status = \'pending\'');
+		workerClient.close();
+
+		expect(outbox).toHaveLength(1);
+		const payload = JSON.parse(outbox[0].patch_json ?? outbox[0].PATCH_JSON);
+		expect(payload.commands).toEqual([
+			{ name: 'auditCustomer', args: { id: 9300, source: 'worker' } }
+		]);
+		expect(payload.patches).toHaveLength(1);
+	});
+
 	test('rolls back worker transaction on error', async () => {
 		await expect(dbWorkerUiDb.transaction(async (tx) => {
 			await tx.customer.insert({ id: 9004, name: 'Rollback', balance: 1, isActive: true });

@@ -51,6 +51,7 @@ function createDbWorkerClient(worker) {
 			get: requestInTransaction.bind(null, options.transaction, 'get', { tableName }),
 			post: requestInTransaction.bind(null, options.transaction, 'post', { tableName }),
 			patch: requestInTransaction.bind(null, options.transaction, 'patch', { tableName }),
+			syncCommand: requestInTransaction.bind(null, options.transaction, 'syncCommand', {}),
 			query: requestInTransaction.bind(null, options.transaction, 'query', {}),
 			sqliteFunction: requestInTransaction.bind(null, options.transaction, 'sqliteFunction', {})
 		};

@@ -56,6 +56,8 @@ function createDbWorkerHandler(client, options = {}) {
 			return callQuery(message.transactionId, message.args);
 		if (message.method === 'sqliteFunction')
 			return callSqliteFunction(message.transactionId, message.args);
+		if (message.method === 'syncCommand')
+			return callSyncCommand(message.transactionId, message.args);
 		return callTable(message.method, message.tableName, message.transactionId, message.args);
 	}
 
@@ -170,6 +172,11 @@ function createDbWorkerHandler(client, options = {}) {
 		if (transaction)
 			return (await host(undefined, transaction)).sqliteFunction.apply(null, args);
 		return client.function.apply(null, args);
+	}
+
+	async function callSyncCommand(transactionId, args = []) {
+		const transaction = transactions.get(transactionId);
+		return (await host(undefined, transaction)).syncCommand.apply(null, args);
 	}
 
 	async function callTable(method, tableName, transactionId, args = []) {

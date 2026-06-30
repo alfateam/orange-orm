@@ -8228,7 +8228,7 @@ function requireClient () {
 			validateSyncCommandName(name);
 			const normalizedArgs = normalizeSyncCommandArgs(args);
 			const db = await getDb();
-			if (db && db.__sqliteSync) {
+			if (db && (db.__sqliteSync || db.__orangeDbWorkerClient)) {
 				const body = stringify({
 					name,
 					args: normalizedArgs
@@ -19090,6 +19090,7 @@ function requireDbWorkerClient () {
 				get: requestInTransaction.bind(null, options.transaction, 'get', { tableName }),
 				post: requestInTransaction.bind(null, options.transaction, 'post', { tableName }),
 				patch: requestInTransaction.bind(null, options.transaction, 'patch', { tableName }),
+				syncCommand: requestInTransaction.bind(null, options.transaction, 'syncCommand', {}),
 				query: requestInTransaction.bind(null, options.transaction, 'query', {}),
 				sqliteFunction: requestInTransaction.bind(null, options.transaction, 'sqliteFunction', {})
 			};
@@ -19328,6 +19329,8 @@ function requireDbWorkerHandler () {
 				return callQuery(message.transactionId, message.args);
 			if (message.method === 'sqliteFunction')
 				return callSqliteFunction(message.transactionId, message.args);
+			if (message.method === 'syncCommand')
+				return callSyncCommand(message.transactionId, message.args);
 			return callTable(message.method, message.tableName, message.transactionId, message.args);
 		}
 
@@ -19442,6 +19445,11 @@ function requireDbWorkerHandler () {
 			if (transaction)
 				return (await host(undefined, transaction)).sqliteFunction.apply(null, args);
 			return client.function.apply(null, args);
+		}
+
+		async function callSyncCommand(transactionId, args = []) {
+			const transaction = transactions.get(transactionId);
+			return (await host(undefined, transaction)).syncCommand.apply(null, args);
 		}
 
 		async function callTable(method, tableName, transactionId, args = []) {

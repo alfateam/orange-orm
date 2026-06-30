@@ -175,7 +175,7 @@ function rdbClient(options = {}) {
 		validateSyncCommandName(name);
 		const normalizedArgs = normalizeSyncCommandArgs(args);
 		const db = await getDb();
-		if (db && db.__sqliteSync) {
+		if (db && (db.__sqliteSync || db.__orangeDbWorkerClient)) {
 			const body = stringify({
 				name,
 				args: normalizedArgs
