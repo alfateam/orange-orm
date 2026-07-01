@@ -931,6 +931,58 @@ describe('sync client auto start', () => {
 		expect(baseCopies).toHaveLength(0);
 	});
 
+	test('cleans inactive shadow base tables and legacy base state', async () => {
+		const db = newJournalDb({
+			__sqliteSync: { url: '/rdb', auto: false, schema: false, tables: ['customer'] },
+			baseEntries: [
+				{
+					name: 'customer',
+					base_name: 'orange_sync_base_data_customer',
+					schema_sql: null,
+					ordinal: 0
+				},
+				{
+					name: 'old_customer',
+					base_name: 'orange_sync_base_data_old_customer',
+					schema_sql: null,
+					ordinal: 1
+				}
+			],
+			sqliteTables: [
+				{ name: 'orange_sync_base_data_customer', sql: 'CREATE TABLE orange_sync_base_data_customer (id INTEGER)' },
+				{ name: 'orange_sync_base_data_old_customer', sql: 'CREATE TABLE orange_sync_base_data_old_customer (id INTEGER)' },
+				{ name: 'orange_sync_base_data_orphan', sql: 'CREATE TABLE orange_sync_base_data_orphan (id INTEGER)' }
+			]
+		});
+		db.journal.state.set('__orange_sync_stable_base_snapshot_pending__', JSON.stringify({ since: true }));
+		const client = newSyncClient({
+			tables: {
+				customer: newTable('customer')
+			},
+			transaction: async (fn) => fn({
+				customer: {
+					patch: async () => ({ changed: [] })
+				},
+				query: db.query
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async () => ({
+					data: { phase: 'keys', items: [], done: true, cursor: 'cursor-1' }
+				});
+			}
+		});
+
+		await client.sync();
+
+		expect(db.journal.state.has('__orange_sync_stable_base_snapshot_pending__')).toBe(false);
+		expect(db.journal.baseEntries.map(entry => entry.name)).toEqual(['customer']);
+		expect(db.queryLog).toContain('DELETE FROM "orange_sync_base_tables" WHERE "name" = \'old_customer\'');
+		expect(db.queryLog).toContain('DROP TABLE IF EXISTS "orange_sync_base_data_old_customer"');
+		expect(db.queryLog).toContain('DROP TABLE IF EXISTS "orange_sync_base_data_orphan"');
+		expect(db.queryLog).not.toContain('DROP TABLE IF EXISTS "orange_sync_base_data_customer"');
+	});
+
 	test('waits to push pending mutations until shadow base exists', async () => {
 		const outbox = [{
 			mutation_id: 'mutation-1',
@@ -1699,10 +1751,12 @@ function newOutboxDb(outbox, syncConfig, options = {}) {
 				return baseEntries.length > 0 ? [{ name: baseEntries[0].name }] : [];
 			if (/SELECT "name", "base_name", "schema_sql", "ordinal" FROM "orange_sync_base_tables"/u.test(sql))
 				return baseEntries;
+			if (/SELECT "name" FROM sqlite_schema/u.test(sql))
+				return selectSyncBaseDataTables(sqliteTables);
 			if (/SELECT "name", "sql" FROM sqlite_schema/u.test(sql))
 				return sqliteTables;
 			if (/DELETE FROM "orange_sync_base_tables"/u.test(sql)) {
-				baseEntries.length = 0;
+				deleteSyncBaseEntry(baseEntries, sql);
 				return [];
 			}
 			if (/INSERT INTO "orange_sync_base_tables"/u.test(sql)) {
@@ -1720,12 +1774,20 @@ function newOutboxDb(outbox, syncConfig, options = {}) {
 					baseEntries.push(next);
 				return [];
 			}
-			if (/^(CREATE|DROP) TABLE/u.test(sql) && /orange_sync_base_data_/u.test(sql))
+			if (/^DROP TABLE IF EXISTS/u.test(sql) && /orange_sync_base_data_/u.test(sql)) {
+				dropSqliteTable(sqliteTables, sql);
+				return [];
+			}
+			if (/^CREATE TABLE/u.test(sql) && /orange_sync_base_data_/u.test(sql))
 				return [];
 			if (/SELECT "since_value" FROM "orange_sync_state"/u.test(sql)) {
 				const scope = firstSqlString(sql);
 				const value = state.get(scope);
 				return value === undefined ? [] : [{ since_value: value }];
+			}
+			if (/DELETE FROM "orange_sync_state"/u.test(sql)) {
+				state.delete(firstSqlString(sql));
+				return [];
 			}
 			if (/INSERT INTO "orange_sync_state"/u.test(sql)) {
 				const values = parseSqlValues(sql);
@@ -1791,10 +1853,12 @@ function queryJournal(journal, sql) {
 		return journal.baseEntries.length > 0 ? [{ name: journal.baseEntries[0].name }] : [];
 	if (/SELECT "name", "base_name", "schema_sql", "ordinal" FROM "orange_sync_base_tables"/u.test(sql))
 		return journal.baseEntries;
+	if (/SELECT "name" FROM sqlite_schema/u.test(sql))
+		return selectSyncBaseDataTables(journal.sqliteTables);
 	if (/SELECT "name", "sql" FROM sqlite_schema/u.test(sql))
 		return journal.sqliteTables;
 	if (/DELETE FROM "orange_sync_base_tables"/u.test(sql)) {
-		journal.baseEntries = [];
+		deleteSyncBaseEntry(journal.baseEntries, sql);
 		return [];
 	}
 	if (/INSERT INTO "orange_sync_base_tables"/u.test(sql)) {
@@ -1812,12 +1876,20 @@ function queryJournal(journal, sql) {
 			journal.baseEntries.push(next);
 		return [];
 	}
-	if (/^(CREATE|DROP) TABLE/u.test(sql) && /orange_sync_base_data_/u.test(sql))
+	if (/^DROP TABLE IF EXISTS/u.test(sql) && /orange_sync_base_data_/u.test(sql)) {
+		dropSqliteTable(journal.sqliteTables, sql);
+		return [];
+	}
+	if (/^CREATE TABLE/u.test(sql) && /orange_sync_base_data_/u.test(sql))
 		return [];
 	if (/SELECT "since_value" FROM "orange_sync_state"/u.test(sql)) {
 		const scope = firstSqlString(sql);
 		const value = journal.state.get(scope);
 		return value === undefined ? [] : [{ since_value: value }];
+	}
+	if (/DELETE FROM "orange_sync_state"/u.test(sql)) {
+		journal.state.delete(firstSqlString(sql));
+		return [];
 	}
 	if (/INSERT INTO "orange_sync_state"/u.test(sql)) {
 		const values = parseSqlValues(sql);
@@ -1906,6 +1978,39 @@ function queryJournal(journal, sql) {
 function firstSqlString(sql) {
 	const match = /'((?:''|[^'])*)'/u.exec(sql);
 	return match ? match[1].replace(/''/g, '\'') : undefined;
+}
+
+function selectSyncBaseDataTables(sqliteTables) {
+	return sqliteTables
+		.filter(table => typeof table.name === 'string' && table.name.startsWith('orange_sync_base_data_'))
+		.map(table => ({ name: table.name }));
+}
+
+function deleteSyncBaseEntry(entries, sql) {
+	if (!/WHERE "name" =/u.test(sql)) {
+		entries.length = 0;
+		return;
+	}
+	const name = firstSqlString(sql);
+	for (let i = entries.length - 1; i >= 0; i--) {
+		if (entries[i].name === name)
+			entries.splice(i, 1);
+	}
+}
+
+function dropSqliteTable(sqliteTables, sql) {
+	const name = dropTableName(sql);
+	if (!name)
+		return;
+	for (let i = sqliteTables.length - 1; i >= 0; i--) {
+		if (sqliteTables[i].name === name)
+			sqliteTables.splice(i, 1);
+	}
+}
+
+function dropTableName(sql) {
+	const match = /^DROP TABLE IF EXISTS "((?:""|[^"])*)"/u.exec(sql);
+	return match ? match[1].replace(/""/g, '"') : undefined;
 }
 
 async function waitFor(predicate, timeoutMs = 1000) {

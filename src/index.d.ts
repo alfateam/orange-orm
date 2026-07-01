@@ -44,16 +44,6 @@ declare namespace r {
     function createPatch(original: any, modified: any): JsonPatch;
     function createDbWorkerClient(worker: SyncWorkerLike): DbWorkerClient;
     function createDbWorkerHandler(client: unknown, options?: DbWorkerHandlerOptions): DbWorkerHandler;
-    function createSharedDbWorkerClient(
-        worker: SharedWorker | SharedDbWorkerLike | SyncWorkerLike | string | URL,
-        options?: SharedDbWorkerClientOptions
-    ): DbWorkerClient;
-    function createSharedDbWorkerHandler(
-        createClient: () => unknown | Promise<unknown>,
-        options?: SharedDbWorkerHandlerOptions
-    ): SharedDbWorkerHandler;
-    function createSyncWorkerClient(worker: SyncWorkerLike): SyncWorkerClient;
-    function createSyncWorkerHandler(syncClient: SyncWorkerSyncClient, options?: SyncWorkerHandlerOptions): SyncWorkerHandler;
 
     type JsonPatch = Array<{
         op: 'add' | 'remove' | 'replace' | 'copy' | 'move' | 'test';
@@ -67,33 +57,6 @@ declare namespace r {
         addEventListener(type: 'message', listener: (event: { data: unknown }) => void): void;
         removeEventListener(type: 'message', listener: (event: { data: unknown }) => void): void;
         close?(): void;
-    }
-
-    export interface SharedDbWorkerLike {
-        port: SyncWorkerLike & {
-            start?(): void;
-            close?(): void;
-        };
-    }
-
-    export interface SharedDbWorkerClientOptions {
-        name?: string;
-        type?: WorkerType;
-        credentials?: RequestCredentials;
-        workerOptions?: string | WorkerOptions;
-    }
-
-    export interface SharedDbWorkerHandlerOptions {
-        target?: unknown;
-        autoConnect?: boolean;
-        autoStart?: boolean;
-        closeOnLastPort?: boolean;
-    }
-
-    export interface SharedDbWorkerHandler {
-        handleConnect(event: { ports?: Array<SyncWorkerLike> } | { port?: SyncWorkerLike } | SyncWorkerLike): void;
-        connect(event: { ports?: Array<SyncWorkerLike> } | { port?: SyncWorkerLike } | SyncWorkerLike): void;
-        stop(): void | Promise<void>;
     }
 
     export interface SyncWorkerClient {
@@ -171,26 +134,6 @@ declare namespace r {
 
     export interface DbWorkerHandler {
         handleMessage(event: { data: unknown }): Promise<void>;
-        stop(): void;
-    }
-
-    export interface SyncWorkerSyncClient {
-        sync?(options?: unknown): Promise<void> | void;
-        resetLocal?(options?: unknown): Promise<unknown> | unknown;
-        start?(): Promise<unknown> | unknown;
-        stop?(): void;
-        on?(event: string, listener: (payload: unknown) => void): () => void;
-    }
-
-    export interface SyncWorkerHandlerOptions {
-        postMessage?: (message: unknown) => void;
-        autoStart?: boolean;
-    }
-
-    export interface SyncWorkerHandler {
-        handleMessage(event: { data: unknown }): Promise<void>;
-        sync(options?: unknown): Promise<void>;
-        resetLocal(options?: unknown): Promise<unknown>;
         stop(): void;
     }
 

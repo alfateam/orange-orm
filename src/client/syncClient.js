@@ -30,6 +30,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 	const syncPullItemTable = 'orange_sync_pull_item';
 	const syncBaseTable = 'orange_sync_base_tables';
 	const syncBasePrefix = 'orange_sync_base_data_';
+	const legacyStableBaseSnapshotPendingScope = '__orange_sync_stable_base_snapshot_pending__';
 	const initialReadyListeners = new Set();
 	const eventListeners = new Map();
 	let initialReadyEmitted = false;
@@ -126,6 +127,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		if (!Array.isArray(configuredTables) || configuredTables.length === 0)
 			throw new Error('Sync pull requires mapped tables or configured tables. Set sync.tables when the client has no table map.');
 		await ensureSyncSchema(db, client, configuredTables, syncConfig.schema);
+		await runSyncMaintenance(db, () => cleanupSyncStorage(db, configuredTables));
 		const hadStableBase = await hasStableBase(db, configuredTables);
 		if (!hadStableBase)
 			return runSyncMaintenance(db, () => pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase));
@@ -1402,6 +1404,69 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 			.filter(name => typeof name === 'string' && name.length > 0);
 	}
 
+	async function cleanupSyncStorage(db, tableNames) {
+		await cleanupLegacySyncState(db);
+		await cleanupInactiveStableBase(db, tableNames);
+	}
+
+	async function cleanupLegacySyncState(db) {
+		for (let attempt = 0; attempt < 2; attempt++) {
+			await ensureSyncStateTable(db);
+			try {
+				await db.query([
+					`DELETE FROM "${syncStateTable}"`,
+					`WHERE "scope" = ${sqlStringLiteral(legacyStableBaseSnapshotPendingScope)}`
+				].join(' '));
+				return;
+			}
+			catch (e) {
+				if (attempt === 0 && isMissingSqliteTableError(e, syncStateTable)) {
+					clearInternalTableEnsured(db, syncStateTable);
+					continue;
+				}
+				throw e;
+			}
+		}
+	}
+
+	async function cleanupInactiveStableBase(db, tableNames) {
+		await ensureSyncBaseTable(db);
+		const activeDbNames = stableBaseDbNames(tableNames);
+		if (activeDbNames.length === 0)
+			return;
+		const activeNameSet = new Set(activeDbNames);
+		const entries = await readStableBaseEntries(db);
+		const entriesByName = new Map(entries.map(entry => [entry.name, entry]));
+		const keepBaseNames = new Set();
+		for (let i = 0; i < activeDbNames.length; i++) {
+			const dbName = activeDbNames[i];
+			const entry = entriesByName.get(dbName);
+			keepBaseNames.add(entry && entry.baseName || toBaseTableName(dbName));
+		}
+
+		const droppedBaseNames = new Set();
+		for (let i = 0; i < entries.length; i++) {
+			const entry = entries[i];
+			if (activeNameSet.has(entry.name)) {
+				keepBaseNames.add(entry.baseName);
+				continue;
+			}
+			await db.query(`DELETE FROM "${syncBaseTable}" WHERE "name" = ${sqlStringLiteral(entry.name)}`);
+			if (isSyncBaseDataTable(entry.baseName)) {
+				await db.query(`DROP TABLE IF EXISTS ${quoteIdent(entry.baseName)}`);
+				droppedBaseNames.add(entry.baseName);
+			}
+		}
+
+		const existingBaseTables = await readExistingBaseTableNames(db);
+		for (let i = 0; i < existingBaseTables.length; i++) {
+			const baseName = existingBaseTables[i];
+			if (keepBaseNames.has(baseName) || droppedBaseNames.has(baseName))
+				continue;
+			await db.query(`DROP TABLE IF EXISTS ${quoteIdent(baseName)}`);
+		}
+	}
+
 	async function ensureStableBaseTables(db, tableNames) {
 		await ensureSyncBaseTable(db);
 		const names = orderTablesByDependencies(client, normalizeConfiguredTables(tableNames) || []);
@@ -1577,17 +1642,25 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 	}
 
 	async function dropExistingBaseTables(db) {
+		const list = await readExistingBaseTableNames(db);
+		for (let i = 0; i < list.length; i++)
+			await db.query(`DROP TABLE IF EXISTS ${quoteIdent(list[i])}`);
+	}
+
+	async function readExistingBaseTableNames(db) {
 		const rows = await db.query([
 			'SELECT "name" FROM sqlite_schema',
 			'WHERE "type" = \'table\'',
 			`AND "name" LIKE ${sqlStringLiteral(syncBasePrefix + '%')}`
 		].join(' '));
 		const list = Array.isArray(rows) ? rows : rows?.rows || [];
-		for (let i = 0; i < list.length; i++) {
-			const name = list[i].name ?? list[i].NAME;
-			if (typeof name === 'string' && name.startsWith(syncBasePrefix))
-				await db.query(`DROP TABLE IF EXISTS ${quoteIdent(name)}`);
-		}
+		return list
+			.map(row => row.name ?? row.NAME)
+			.filter(isSyncBaseDataTable);
+	}
+
+	function isSyncBaseDataTable(name) {
+		return typeof name === 'string' && name.startsWith(syncBasePrefix);
 	}
 
 	function toBaseTableName(name) {

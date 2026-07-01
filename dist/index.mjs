@@ -5915,6 +5915,7 @@ function requireSyncClient () {
 		const syncPullItemTable = 'orange_sync_pull_item';
 		const syncBaseTable = 'orange_sync_base_tables';
 		const syncBasePrefix = 'orange_sync_base_data_';
+		const legacyStableBaseSnapshotPendingScope = '__orange_sync_stable_base_snapshot_pending__';
 		const initialReadyListeners = new Set();
 		const eventListeners = new Map();
 		let initialReadyEmitted = false;
@@ -6011,6 +6012,7 @@ function requireSyncClient () {
 			if (!Array.isArray(configuredTables) || configuredTables.length === 0)
 				throw new Error('Sync pull requires mapped tables or configured tables. Set sync.tables when the client has no table map.');
 			await ensureSyncSchema(db, client, configuredTables, syncConfig.schema);
+			await runSyncMaintenance(db, () => cleanupSyncStorage(db, configuredTables));
 			const hadStableBase = await hasStableBase(db, configuredTables);
 			if (!hadStableBase)
 				return runSyncMaintenance(db, () => pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase));
@@ -7287,6 +7289,69 @@ function requireSyncClient () {
 				.filter(name => typeof name === 'string' && name.length > 0);
 		}
 
+		async function cleanupSyncStorage(db, tableNames) {
+			await cleanupLegacySyncState(db);
+			await cleanupInactiveStableBase(db, tableNames);
+		}
+
+		async function cleanupLegacySyncState(db) {
+			for (let attempt = 0; attempt < 2; attempt++) {
+				await ensureSyncStateTable(db);
+				try {
+					await db.query([
+						`DELETE FROM "${syncStateTable}"`,
+						`WHERE "scope" = ${sqlStringLiteral(legacyStableBaseSnapshotPendingScope)}`
+					].join(' '));
+					return;
+				}
+				catch (e) {
+					if (attempt === 0 && isMissingSqliteTableError(e, syncStateTable)) {
+						clearInternalTableEnsured(db, syncStateTable);
+						continue;
+					}
+					throw e;
+				}
+			}
+		}
+
+		async function cleanupInactiveStableBase(db, tableNames) {
+			await ensureSyncBaseTable(db);
+			const activeDbNames = stableBaseDbNames(tableNames);
+			if (activeDbNames.length === 0)
+				return;
+			const activeNameSet = new Set(activeDbNames);
+			const entries = await readStableBaseEntries(db);
+			const entriesByName = new Map(entries.map(entry => [entry.name, entry]));
+			const keepBaseNames = new Set();
+			for (let i = 0; i < activeDbNames.length; i++) {
+				const dbName = activeDbNames[i];
+				const entry = entriesByName.get(dbName);
+				keepBaseNames.add(entry && entry.baseName || toBaseTableName(dbName));
+			}
+
+			const droppedBaseNames = new Set();
+			for (let i = 0; i < entries.length; i++) {
+				const entry = entries[i];
+				if (activeNameSet.has(entry.name)) {
+					keepBaseNames.add(entry.baseName);
+					continue;
+				}
+				await db.query(`DELETE FROM "${syncBaseTable}" WHERE "name" = ${sqlStringLiteral(entry.name)}`);
+				if (isSyncBaseDataTable(entry.baseName)) {
+					await db.query(`DROP TABLE IF EXISTS ${quoteIdent(entry.baseName)}`);
+					droppedBaseNames.add(entry.baseName);
+				}
+			}
+
+			const existingBaseTables = await readExistingBaseTableNames(db);
+			for (let i = 0; i < existingBaseTables.length; i++) {
+				const baseName = existingBaseTables[i];
+				if (keepBaseNames.has(baseName) || droppedBaseNames.has(baseName))
+					continue;
+				await db.query(`DROP TABLE IF EXISTS ${quoteIdent(baseName)}`);
+			}
+		}
+
 		async function ensureStableBaseTables(db, tableNames) {
 			await ensureSyncBaseTable(db);
 			const names = orderTablesByDependencies(client, normalizeConfiguredTables(tableNames) || []);
@@ -7462,17 +7527,25 @@ function requireSyncClient () {
 		}
 
 		async function dropExistingBaseTables(db) {
+			const list = await readExistingBaseTableNames(db);
+			for (let i = 0; i < list.length; i++)
+				await db.query(`DROP TABLE IF EXISTS ${quoteIdent(list[i])}`);
+		}
+
+		async function readExistingBaseTableNames(db) {
 			const rows = await db.query([
 				'SELECT "name" FROM sqlite_schema',
 				'WHERE "type" = \'table\'',
 				`AND "name" LIKE ${sqlStringLiteral(syncBasePrefix + '%')}`
 			].join(' '));
 			const list = Array.isArray(rows) ? rows : rows?.rows || [];
-			for (let i = 0; i < list.length; i++) {
-				const name = list[i].name ?? list[i].NAME;
-				if (typeof name === 'string' && name.startsWith(syncBasePrefix))
-					await db.query(`DROP TABLE IF EXISTS ${quoteIdent(name)}`);
-			}
+			return list
+				.map(row => row.name ?? row.NAME)
+				.filter(isSyncBaseDataTable);
+		}
+
+		function isSyncBaseDataTable(name) {
+			return typeof name === 'string' && name.startsWith(syncBasePrefix);
 		}
 
 		function toBaseTableName(name) {
@@ -19987,630 +20060,6 @@ function requireDbWorkerHandler () {
 	return dbWorkerHandler;
 }
 
-var sharedDbWorkerClient;
-var hasRequiredSharedDbWorkerClient;
-
-function requireSharedDbWorkerClient () {
-	if (hasRequiredSharedDbWorkerClient) return sharedDbWorkerClient;
-	hasRequiredSharedDbWorkerClient = 1;
-	const createDbWorkerClient = requireDbWorkerClient();
-
-	function createSharedDbWorkerClient(sharedWorkerOrUrl, options = {}) {
-		const sharedWorker = resolveSharedWorker(sharedWorkerOrUrl, options);
-		const port = sharedWorker && sharedWorker.port || sharedWorker;
-		if (!port || typeof port.postMessage !== 'function')
-			throw new Error('Shared DB worker client requires a SharedWorker, MessagePort, or worker URL.');
-		if (typeof port.start === 'function')
-			port.start();
-		return createDbWorkerClient(toWorkerLike(port));
-	}
-
-	function resolveSharedWorker(sharedWorkerOrUrl, options) {
-		if (isWorkerUrl(sharedWorkerOrUrl)) {
-			const SharedWorkerCtor = globalThis && globalThis.SharedWorker;
-			if (typeof SharedWorkerCtor === 'undefined')
-				throw new Error('Shared DB worker requires SharedWorker support or an existing SharedWorker-like object.');
-			return new SharedWorkerCtor(sharedWorkerOrUrl, getSharedWorkerOptions(options));
-		}
-		return sharedWorkerOrUrl;
-	}
-
-	function isWorkerUrl(value) {
-		return typeof value === 'string'
-			|| typeof URL !== 'undefined' && value instanceof URL;
-	}
-
-	function getSharedWorkerOptions(options = {}) {
-		if (options.workerOptions)
-			return options.workerOptions;
-		const workerOptions = {
-			type: options.type || 'module'
-		};
-		if (options.name)
-			workerOptions.name = options.name;
-		if (options.credentials)
-			workerOptions.credentials = options.credentials;
-		return workerOptions;
-	}
-
-	function toWorkerLike(port) {
-		let closed = false;
-		return {
-			postMessage(message) {
-				port.postMessage(message);
-			},
-			addEventListener(type, listener) {
-				port.addEventListener(type, listener);
-			},
-			removeEventListener(type, listener) {
-				port.removeEventListener(type, listener);
-			},
-			close() {
-				if (closed)
-					return;
-				closed = true;
-				try {
-					port.postMessage({ type: 'orange-shared-db-port-close' });
-				}
-				catch (_e) {
-					// The port may already be gone.
-				}
-				if (typeof port.close === 'function')
-					port.close();
-			}
-		};
-	}
-
-	sharedDbWorkerClient = createSharedDbWorkerClient;
-	return sharedDbWorkerClient;
-}
-
-var sharedDbWorkerHandler;
-var hasRequiredSharedDbWorkerHandler;
-
-function requireSharedDbWorkerHandler () {
-	if (hasRequiredSharedDbWorkerHandler) return sharedDbWorkerHandler;
-	hasRequiredSharedDbWorkerHandler = 1;
-	const createDbWorkerHandler = requireDbWorkerHandler();
-
-	function createSharedDbWorkerHandler(createClient, options = {}) {
-		if (typeof createClient !== 'function')
-			throw new Error('Shared DB worker handler requires a client factory.');
-
-		const ports = new Map();
-		let client;
-		let clientPromise;
-		let stoppingClientPromise;
-		let stopped = false;
-		let removeConnectListener;
-
-		if (options.autoConnect !== false)
-			removeConnectListener = attachConnectListener(options.target, handleConnect);
-
-		return {
-			handleConnect,
-			connect: handleConnect,
-			stop
-		};
-
-		function handleConnect(event) {
-			if (stopped)
-				throw new Error('Shared DB worker handler is stopped.');
-			const port = resolvePort(event);
-			if (!port)
-				throw new Error('Shared DB worker handler requires a MessagePort.');
-
-			const state = {
-				port,
-				handler: null,
-				backlog: [],
-				closed: false,
-				error: null,
-				listener: null
-			};
-			state.listener = onMessage.bind(null, state);
-			ports.set(port, state);
-			port.addEventListener('message', state.listener);
-			if (typeof port.start === 'function')
-				port.start();
-
-			ensureClient()
-				.then((resolvedClient) => {
-					if (state.closed)
-						return;
-					state.handler = createDbWorkerHandler(resolvedClient, {
-						autoStart: false,
-						stopSyncClient: false,
-						postMessage: (message) => safePostMessage(port, message)
-					});
-					drainBacklog(state);
-				})
-				.catch((error) => {
-					state.error = error;
-					failBacklog(state, error);
-				});
-		}
-
-		function onMessage(state, event) {
-			const message = event && event.data;
-			if (message && message.type === 'orange-shared-db-port-close') {
-				closePort(state);
-				return;
-			}
-			if (state.closed)
-				return;
-			if (state.error) {
-				postRequestError(state.port, message, state.error);
-				return;
-			}
-			if (!state.handler) {
-				state.backlog.push(event);
-				return;
-			}
-			void state.handler.handleMessage(event);
-		}
-
-		function drainBacklog(state) {
-			const backlog = state.backlog.splice(0);
-			for (let i = 0; i < backlog.length; i++)
-				onMessage(state, backlog[i]);
-		}
-
-		function failBacklog(state, error) {
-			const backlog = state.backlog.splice(0);
-			for (let i = 0; i < backlog.length; i++) {
-				const message = backlog[i] && backlog[i].data;
-				postRequestError(state.port, message, error);
-			}
-		}
-
-		function ensureClient() {
-			if (clientPromise)
-				return clientPromise;
-			clientPromise = Promise.resolve()
-				.then(createClient)
-				.then((resolvedClient) => {
-					client = resolvedClient;
-					if (options.autoStart !== false && client && client.syncClient && typeof client.syncClient.start === 'function')
-						void client.syncClient.start();
-					return client;
-				});
-			return clientPromise;
-		}
-
-		function closePort(state, closeMessagePort = true) {
-			if (!state || state.closed)
-				return;
-			state.closed = true;
-			if (state.port && state.listener && typeof state.port.removeEventListener === 'function')
-				state.port.removeEventListener('message', state.listener);
-			if (state.handler)
-				state.handler.stop();
-			ports.delete(state.port);
-			if (closeMessagePort && state.port && typeof state.port.close === 'function')
-				state.port.close();
-			if (ports.size === 0 && options.closeOnLastPort !== false)
-				void stopClient();
-		}
-
-		async function stop() {
-			stopped = true;
-			if (removeConnectListener) {
-				removeConnectListener();
-				removeConnectListener = undefined;
-			}
-			for (const state of Array.from(ports.values()))
-				closePort(state, true);
-			await stopClient();
-		}
-
-		async function stopClient() {
-			if (stoppingClientPromise)
-				return stoppingClientPromise;
-			stoppingClientPromise = Promise.resolve()
-				.then(async () => {
-					const resolvedClient = client || await clientPromise.catch(() => null);
-					if (resolvedClient && resolvedClient.syncClient && typeof resolvedClient.syncClient.stop === 'function')
-						resolvedClient.syncClient.stop();
-					if (resolvedClient && typeof resolvedClient.close === 'function')
-						await resolvedClient.close();
-					else if (resolvedClient && typeof resolvedClient.end === 'function')
-						await resolvedClient.end();
-					client = undefined;
-					clientPromise = undefined;
-				})
-				.finally(() => {
-					stoppingClientPromise = undefined;
-				});
-			return stoppingClientPromise;
-		}
-	}
-
-	function attachConnectListener(target, handleConnect) {
-		const connectTarget = target || (typeof globalThis !== 'undefined' ? globalThis : undefined);
-		if (!connectTarget || typeof connectTarget.addEventListener !== 'function')
-			return undefined;
-		const listener = (event) => handleConnect(event);
-		connectTarget.addEventListener('connect', listener);
-		return () => connectTarget.removeEventListener('connect', listener);
-	}
-
-	function resolvePort(event) {
-		if (!event)
-			return null;
-		if (event.ports && event.ports[0])
-			return event.ports[0];
-		if (event.port)
-			return event.port;
-		if (typeof event.postMessage === 'function')
-			return event;
-		return null;
-	}
-
-	function postRequestError(port, message, error) {
-		if (!message || message.type !== 'orange-db-request')
-			return;
-		safePostMessage(port, {
-			type: 'orange-db-response',
-			id: message.id,
-			error: serializeError(error)
-		});
-	}
-
-	function safePostMessage(port, message) {
-		try {
-			port.postMessage(message);
-		}
-		catch (_e) {
-			// The tab may have closed while a request was resolving.
-		}
-	}
-
-	function serializeError(error) {
-		return {
-			name: error && error.name,
-			message: error && error.message ? error.message : String(error),
-			stack: error && error.stack
-		};
-	}
-
-	sharedDbWorkerHandler = createSharedDbWorkerHandler;
-	return sharedDbWorkerHandler;
-}
-
-var syncWorkerClient;
-var hasRequiredSyncWorkerClient;
-
-function requireSyncWorkerClient () {
-	if (hasRequiredSyncWorkerClient) return syncWorkerClient;
-	hasRequiredSyncWorkerClient = 1;
-	function createSyncWorkerClient(worker) {
-		if (!worker || typeof worker.postMessage !== 'function')
-			throw new Error('Sync worker client requires a Worker-like object.');
-
-		let nextId = 1;
-		const pending = new Map();
-		const listeners = new Map();
-
-		worker.addEventListener('message', onMessage);
-
-		return {
-			sync: request.bind(null, 'sync'),
-			resetLocal: request.bind(null, 'resetLocal'),
-			onOperation,
-			on,
-			off,
-			once,
-			close
-		};
-
-		function request(method, options) {
-			const id = nextId++;
-			worker.postMessage({
-				type: 'orange-sync-request',
-				id,
-				method,
-				options
-			});
-			return new Promise((resolve, reject) => {
-				pending.set(id, { resolve, reject });
-			});
-		}
-
-		function on(event, listener) {
-			if (typeof listener !== 'function')
-				return () => {};
-			let eventListeners = listeners.get(event);
-			if (!eventListeners) {
-				eventListeners = new Set();
-				listeners.set(event, eventListeners);
-			}
-			eventListeners.add(listener);
-			request('on', event).catch(() => {});
-			return () => off(event, listener);
-		}
-
-		function off(event, listener) {
-			const eventListeners = listeners.get(event);
-			if (!eventListeners)
-				return;
-			eventListeners.delete(listener);
-			if (eventListeners.size === 0) {
-				listeners.delete(event);
-				request('off', event).catch(() => {});
-			}
-		}
-
-		function once(event, listener) {
-			if (typeof listener !== 'function')
-				return () => {};
-			const unsubscribe = on(event, (payload) => {
-				unsubscribe();
-				listener(payload);
-			});
-			return unsubscribe;
-		}
-
-		function onOperation(operation, listener) {
-			if (typeof operation !== 'string' || typeof listener !== 'function')
-				return () => {};
-			return on(`operation:${operation}`, listener);
-		}
-
-		function close() {
-			worker.removeEventListener('message', onMessage);
-			for (const entry of pending.values()) {
-				entry.reject(new Error('Sync worker client closed.'));
-			}
-			pending.clear();
-			listeners.clear();
-		}
-
-		function onMessage(event) {
-			const message = event && event.data;
-			if (!message || message.type === undefined)
-				return;
-			if (message.type === 'orange-sync-event') {
-				emit(message.event, message.payload);
-				return;
-			}
-			if (message.type !== 'orange-sync-response')
-				return;
-			const entry = pending.get(message.id);
-			if (!entry)
-				return;
-			pending.delete(message.id);
-			if (message.error)
-				entry.reject(toError(message.error));
-			else
-				entry.resolve(message.result);
-		}
-
-		function emit(event, payload) {
-			const eventListeners = listeners.get(event);
-			if (!eventListeners)
-				return;
-			for (const listener of Array.from(eventListeners)) {
-				listener(payload);
-			}
-		}
-	}
-
-	function toError(error) {
-		const e = new Error(error && error.message ? error.message : 'Sync worker request failed.');
-		if (error && error.name)
-			e.name = error.name;
-		if (error && error.stack)
-			e.stack = error.stack;
-		return e;
-	}
-
-	syncWorkerClient = createSyncWorkerClient;
-	return syncWorkerClient;
-}
-
-var syncWorkerHandler;
-var hasRequiredSyncWorkerHandler;
-
-function requireSyncWorkerHandler () {
-	if (hasRequiredSyncWorkerHandler) return syncWorkerHandler;
-	hasRequiredSyncWorkerHandler = 1;
-	const { createSyncAuto } = requireSyncAuto();
-
-	function createSyncWorkerHandler(syncClient, options = {}) {
-		if (!syncClient)
-			throw new Error('Sync worker handler requires a sync client.');
-
-		let running = false;
-		let currentDrainPromise = Promise.resolve();
-		const pending = {
-			sync: [],
-			resetLocal: []
-		};
-		let auto;
-		const syncEventUnsubscribers = new Map();
-		const postMessage = options.postMessage || ((message) => {
-			const target = getPostTarget();
-			if (target)
-				target.postMessage(message);
-		});
-
-		if (options.autoStart !== false)
-			startAuto();
-
-		return {
-			handleMessage,
-			sync: requestSyncCycle,
-			resetLocal: requestResetLocal,
-			stop
-		};
-
-		async function handleMessage(event) {
-			const message = event && event.data;
-			if (!message || message.type !== 'orange-sync-request')
-				return;
-			try {
-				let result;
-				if (message.method === 'sync')
-					result = await requestSyncCycle(message.options);
-				else if (message.method === 'resetLocal')
-					result = await requestResetLocal(message.options);
-				else if (message.method === 'on')
-					result = subscribeSyncEvent(message.options);
-				else if (message.method === 'off')
-					result = unsubscribeSyncEvent(message.options);
-				else
-					throw new Error(`Unknown sync worker method "${message.method}".`);
-				postResponse(message.id, result);
-			}
-			catch (e) {
-				postResponse(message.id, undefined, e);
-			}
-		}
-
-		function requestSyncCycle(options) {
-			return requestSync('sync', options);
-		}
-
-		function requestResetLocal(options) {
-			return requestSync('resetLocal', options);
-		}
-
-		function stop() {
-			for (const unsubscribe of syncEventUnsubscribers.values())
-				unsubscribe();
-			syncEventUnsubscribers.clear();
-			if (auto)
-				auto.stop();
-			else if (syncClient && typeof syncClient.stop === 'function')
-				syncClient.stop();
-		}
-
-		function requestSync(method, options) {
-			return new Promise((resolve, reject) => {
-				pending[method].push({ options, resolve, reject });
-				drainSyncQueue();
-			});
-		}
-
-		function drainSyncQueue() {
-			if (running)
-				return currentDrainPromise;
-			running = true;
-			currentDrainPromise = run()
-				.finally(() => {
-					running = false;
-					if (hasPending())
-						drainSyncQueue();
-				});
-			return currentDrainPromise;
-		}
-
-		async function run() {
-			while (hasPending()) {
-				const method = pending.resetLocal.length > 0 ? 'resetLocal' : 'sync';
-				const batch = pending[method].splice(0);
-				const options = batch[batch.length - 1].options;
-				try {
-					const result = await callSyncMethod(method, options);
-					resolveBatch(batch, result);
-				}
-				catch (e) {
-					rejectBatch(batch, e);
-				}
-			}
-		}
-
-		function callSyncMethod(method, options) {
-			const fn = syncClient && syncClient[method];
-			if (typeof fn !== 'function') {
-				return {
-					method,
-					skipped: true,
-					reason: `${method}_not_implemented`
-				};
-			}
-			return fn.call(syncClient, options);
-		}
-
-		function hasPending() {
-			return pending.resetLocal.length > 0 || pending.sync.length > 0;
-		}
-
-		function resolveBatch(batch, result) {
-			for (let i = 0; i < batch.length; i++)
-				batch[i].resolve(result);
-		}
-
-		function rejectBatch(batch, error) {
-			for (let i = 0; i < batch.length; i++)
-				batch[i].reject(error);
-		}
-
-		function startAuto() {
-			if (typeof syncClient.getConfig === 'function') {
-				auto = createSyncAuto({
-					sync: requestSyncCycle
-				}, () => syncClient.getConfig());
-				void auto.start();
-				return;
-			}
-			if (typeof syncClient.start === 'function')
-				void syncClient.start();
-		}
-
-		function postResponse(id, result, error) {
-			postMessage({
-				type: 'orange-sync-response',
-				id,
-				result,
-				error: error ? serializeError(error) : undefined
-			});
-		}
-
-		function subscribeSyncEvent(event) {
-			if (typeof event !== 'string' || syncEventUnsubscribers.has(event))
-				return;
-			if (!syncClient || typeof syncClient.on !== 'function')
-				return;
-			const unsubscribe = syncClient.on(event, (payload) => {
-				postMessage({
-					type: 'orange-sync-event',
-					event,
-					payload
-				});
-			});
-			syncEventUnsubscribers.set(event, unsubscribe);
-		}
-
-		function unsubscribeSyncEvent(event) {
-			const unsubscribe = syncEventUnsubscribers.get(event);
-			if (!unsubscribe)
-				return;
-			unsubscribe();
-			syncEventUnsubscribers.delete(event);
-		}
-	}
-
-	function serializeError(error) {
-		return {
-			name: error && error.name,
-			message: error && error.message ? error.message : String(error),
-			stack: error && error.stack
-		};
-	}
-
-	function getPostTarget() {
-		if (typeof self !== 'undefined' && typeof self.postMessage === 'function')
-			return self;
-		if (typeof globalThis !== 'undefined' && typeof globalThis.postMessage === 'function')
-			return globalThis;
-	}
-
-	syncWorkerHandler = createSyncWorkerHandler;
-	return syncWorkerHandler;
-}
-
 var commitCommand;
 var hasRequiredCommitCommand;
 
@@ -31811,10 +31260,6 @@ function requireSrc () {
 	connectViaPool.createPatch = client.createPatch;
 	connectViaPool.createDbWorkerClient = requireDbWorkerClient();
 	connectViaPool.createDbWorkerHandler = requireDbWorkerHandler();
-	connectViaPool.createSharedDbWorkerClient = requireSharedDbWorkerClient();
-	connectViaPool.createSharedDbWorkerHandler = requireSharedDbWorkerHandler();
-	connectViaPool.createSyncWorkerClient = requireSyncWorkerClient();
-	connectViaPool.createSyncWorkerHandler = requireSyncWorkerHandler();
 	connectViaPool.table = requireTable();
 	connectViaPool.filter = requireEmptyFilter();
 	connectViaPool.commit = requireCommit();
