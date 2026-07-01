@@ -608,6 +608,8 @@ describe('sync client auto start', () => {
 			skipSelectAfterInsert: true,
 			strategy: { insertAndForget: true }
 		});
+		expect(db.queryLog.some(sql => /DELETE FROM "orange_sync_base_data_.*" WHERE "id" = 1/u.test(sql))).toBe(true);
+		expect(db.queryLog.some(sql => /INSERT INTO "orange_sync_base_data_.*" SELECT \* FROM "customer" WHERE "id" = 1/u.test(sql))).toBe(true);
 	});
 
 	test('continues staged row fetch when rows response is partial', async () => {
@@ -929,7 +931,7 @@ describe('sync client auto start', () => {
 		expect(baseCopies).toHaveLength(0);
 	});
 
-	test('pushes pending mutations without stable base when disabled', async () => {
+	test('waits to push pending mutations until shadow base exists', async () => {
 		const outbox = [{
 			mutation_id: 'mutation-1',
 			table_name: 'customer',
@@ -941,25 +943,29 @@ describe('sync client auto start', () => {
 			status: 'pending'
 		}];
 		const requests = [];
+		const patches = [];
 		const queryLog = [];
 		const db = {
 			__sqliteSync: {
 				url: '/rdb',
 				auto: false,
 				schema: false,
-				tables: ['customer'],
-				stableBase: false
+				tables: ['customer']
 			},
 			queryLog,
 			query: async (sql) => {
 				queryLog.push(sql);
-				if (/SELECT "mutation_id".*FROM "orange_sync_outbox"/u.test(sql))
-					return outbox.filter(row => row.status === 'pending');
+				if (/SELECT "mutation_id".*FROM "orange_sync_outbox"/u.test(sql)) {
+					const statuses = mutationStatusesFromSelect(sql);
+					return outbox.filter(row => statuses.has(row.status));
+				}
 				if (/UPDATE "orange_sync_outbox"/u.test(sql)) {
 					outbox[0].status = 'pushed';
 					return [];
 				}
 				if (/SELECT "since_value" FROM "orange_sync_state"/u.test(sql))
+					return [];
+				if (/SELECT "name", "base_name", "schema_sql", "ordinal" FROM "orange_sync_base_tables"/u.test(sql))
 					return [];
 				return [];
 			}
@@ -969,6 +975,12 @@ describe('sync client auto start', () => {
 				customer: newTable('customer')
 			},
 			transaction: async (fn) => fn({
+				customer: {
+					patch: async (patch) => {
+						patches.push(patch);
+						return { changed: [] };
+					}
+				},
 				query: db.query
 			})
 		}, async () => db, {
@@ -986,10 +998,14 @@ describe('sync client auto start', () => {
 
 		await client.sync();
 
-		expect(requests).toEqual(['push', 'keys']);
-		expect(outbox[0].status).toBe('pushed');
-		expect(queryLog.some(sql => /orange_sync_base_/u.test(sql))).toBe(false);
-		expect(queryLog.some(sql => /DELETE FROM "orange_sync_outbox" WHERE "status" = 'pending'/u.test(sql))).toBe(false);
+		expect(requests).toEqual(['keys']);
+		expect(outbox[0].status).toBe('pending');
+		expect(patches).toEqual([
+			[
+				{ op: 'replace', path: '/[1]/name', value: 'After', oldValue: 'Before' }
+			]
+		]);
+		expect(queryLog.some(sql => /orange_sync_base_/u.test(sql))).toBe(true);
 	});
 
 	test('drains pending mutations as separate push requests before pull', async () => {
@@ -1002,8 +1018,14 @@ describe('sync client auto start', () => {
 			url: '/rdb',
 			auto: false,
 			schema: false,
-			tables: ['customer'],
-			stableBase: false
+			tables: ['customer']
+		}, {
+			baseEntries: [{
+				name: 'customer',
+				base_name: 'orange_sync_base_data_customer',
+				schema_sql: null,
+				ordinal: 0
+			}]
 		});
 		const client = newSyncClient({
 			tables: {
@@ -1039,7 +1061,7 @@ describe('sync client auto start', () => {
 			['push', ['mutation-2']],
 			['keys']
 		]);
-		expect(outbox.map(row => row.status)).toEqual(['pushed', 'pushed']);
+		expect(outbox).toHaveLength(0);
 	});
 
 	test('stops push drain on first failed request before pull', async () => {
@@ -1052,8 +1074,14 @@ describe('sync client auto start', () => {
 			url: '/rdb',
 			auto: false,
 			schema: false,
-			tables: ['customer'],
-			stableBase: false
+			tables: ['customer']
+		}, {
+			baseEntries: [{
+				name: 'customer',
+				base_name: 'orange_sync_base_data_customer',
+				schema_sql: null,
+				ordinal: 0
+			}]
 		});
 		const client = newSyncClient({
 			tables: {
@@ -1100,7 +1128,7 @@ describe('sync client auto start', () => {
 		expect(outbox[1].last_error).toBe('Request failed with status code 503');
 	});
 
-	test('defers stable base snapshot while later pending mutations remain', async () => {
+	test('does not update shadow base while draining push batches', async () => {
 		const outbox = [
 			newPendingOutboxRow('mutation-1', 'First', 1),
 			newPendingOutboxRow('mutation-2', 'Second', 2)
@@ -1154,24 +1182,15 @@ describe('sync client auto start', () => {
 
 		expect(requests).toEqual([
 			['push', ['mutation-1']],
-			['keys']
-		]);
-		expect(outbox.map(row => row.status)).toEqual(['pushed', 'pending']);
-		expect(db.queryLog.some(sql => /CREATE TABLE "orange_sync_base_data_/u.test(sql))).toBe(false);
-
-		await client.sync();
-
-		expect(requests).toEqual([
-			['push', ['mutation-1']],
-			['keys'],
 			['push', ['mutation-2']],
 			['keys']
 		]);
-		expect(outbox.map(row => row.status)).toEqual(['pushed', 'pushed']);
-		expect(db.queryLog.some(sql => /CREATE TABLE "orange_sync_base_data_/u.test(sql))).toBe(true);
+		expect(outbox).toHaveLength(0);
+		expect(db.queryLog.some(sql => /^DELETE FROM "orange_sync_base_data_customer" WHERE/u.test(sql))).toBe(false);
+		expect(db.queryLog.some(sql => /^INSERT INTO "orange_sync_base_data_customer" SELECT \* FROM "customer" WHERE/u.test(sql))).toBe(false);
 	});
 
-	test('updates stable base incrementally after accepted local push', async () => {
+	test('updates shadow base from pull rows after accepted local push', async () => {
 		const outbox = [{
 			mutation_id: 'mutation-1',
 			table_name: 'customer',
@@ -1183,46 +1202,72 @@ describe('sync client auto start', () => {
 			status: 'pending'
 		}];
 		const queryLog = [];
-		const db = {
+		const db = newJournalDb({
 			__sqliteSync: { url: '/rdb', auto: false, schema: false, tables: ['customer'] },
 			queryLog,
-			query: async (sql) => {
-				queryLog.push(sql);
-				if (/SELECT "mutation_id".*FROM "orange_sync_outbox"/u.test(sql))
-					return outbox.filter(row => row.status === 'pending');
-				if (/UPDATE "orange_sync_outbox"/u.test(sql)) {
-					outbox[0].status = 'pushed';
-					return [];
-				}
-				if (/SELECT "name" FROM "orange_sync_base_tables" LIMIT 1/u.test(sql))
-					return [{ name: 'customer' }];
-				if (/SELECT "name", "base_name", "schema_sql", "ordinal" FROM "orange_sync_base_tables"/u.test(sql)) {
-					return [{
-						name: 'customer',
-						base_name: 'orange_sync_base_data_customer',
-						schema_sql: 'CREATE TABLE customer (id INTEGER PRIMARY KEY, name TEXT)',
-						ordinal: 0
-					}];
-				}
-				if (/SELECT "since_value" FROM "orange_sync_state"/u.test(sql))
-					return [];
+			baseEntries: [{
+				name: 'customer',
+				base_name: 'orange_sync_base_data_customer',
+				schema_sql: 'CREATE TABLE customer (id INTEGER PRIMARY KEY, name TEXT)',
+				ordinal: 0
+			}]
+		});
+		db.query = async (sql) => {
+			queryLog.push(sql);
+			if (/SELECT "mutation_id".*FROM "orange_sync_outbox"/u.test(sql))
+				return outbox.filter(row => row.status === 'pending');
+			if (/UPDATE "orange_sync_outbox"/u.test(sql)) {
+				outbox[0].status = 'pushed';
+				outbox[0].pushed_at_ms = Date.now();
 				return [];
 			}
+			if (/DELETE FROM "orange_sync_outbox"/u.test(sql) && /"status" = 'pushed'/u.test(sql)) {
+				outbox.length = 0;
+				return [];
+			}
+			return queryJournal(db.journal, sql);
 		};
 		const client = newSyncClient({
 			tables: {
 				customer: newTable('customer')
 			},
 			transaction: async (fn) => fn({
+				customer: {
+					patch: async () => ({ changed: [] })
+				},
 				query: db.query
 			})
 		}, async () => db, {
 			applyTo(axios) {
-				axios.request = async (request) => ({
-					data: request.data.phase === 'push'
-						? { phase: 'push', applied: 1, duplicates: 0, results: [{ id: 'mutation-1' }] }
-						: { phase: 'keys', items: [], done: true, cursor: 'cursor-1' }
-				});
+				axios.request = async (request) => {
+					if (request.data.phase === 'push') {
+						return {
+							data: { phase: 'push', applied: 1, duplicates: 0, results: [{ id: 'mutation-1' }] }
+						};
+					}
+					if (request.data.phase === 'keys') {
+						return {
+							data: {
+								phase: 'keys',
+								items: [{ table: 'customer', pk: [1], key: { id: 1 }, op: 'U' }],
+								done: true,
+								cursor: 'cursor-1'
+							}
+						};
+					}
+					return {
+						data: {
+							phase: 'rows',
+							items: [{
+								table: 'customer',
+								pk: [1],
+								key: { id: 1 },
+								row: { id: 1, name: 'After' },
+								op: 'U'
+							}]
+						}
+					};
+				};
 			}
 		});
 
@@ -1231,6 +1276,7 @@ describe('sync client auto start', () => {
 		expect(queryLog).toContain('DELETE FROM "orange_sync_base_data_customer" WHERE "id" = 1');
 		expect(queryLog).toContain('INSERT INTO "orange_sync_base_data_customer" SELECT * FROM "customer" WHERE "id" = 1');
 		expect(queryLog.some(sql => /CREATE TABLE "orange_sync_base_data_/u.test(sql))).toBe(false);
+		expect(outbox).toHaveLength(0);
 	});
 
 	test('prefetches next staged pull batch before journal commit completes', async () => {
@@ -1566,7 +1612,6 @@ function newSqliteOpfsSyncDb(vfs, syncOverrides = {}) {
 		url: '/rdb',
 		auto: false,
 		tables: ['customer'],
-		stableBase: false,
 		...syncOverrides
 	};
 	const pool = {
@@ -1621,10 +1666,12 @@ function newOutboxDb(outbox, syncConfig, options = {}) {
 		query: async (sql) => {
 			queryLog.push(sql);
 			if (/SELECT "mutation_id".*FROM "orange_sync_outbox"/u.test(sql)) {
+				const statuses = mutationStatusesFromSelect(sql);
+				const limit = limitFromSelect(sql);
 				return outbox
-					.filter(row => row.status === 'pending')
+					.filter(row => statuses.has(row.status))
 					.sort((a, b) => a.created_at_ms - b.created_at_ms)
-					.slice(0, 1);
+					.slice(0, limit);
 			}
 			if (/UPDATE "orange_sync_outbox"/u.test(sql)) {
 				const row = outbox.find(item => item.mutation_id === mutationIdFromWhere(sql));
@@ -1641,6 +1688,13 @@ function newOutboxDb(outbox, syncConfig, options = {}) {
 				}
 				return [];
 			}
+			if (/DELETE FROM "orange_sync_outbox"/u.test(sql) && /"status" = 'pushed'/u.test(sql)) {
+				for (let i = outbox.length - 1; i >= 0; i--) {
+					if (outbox[i].status === 'pushed')
+						outbox.splice(i, 1);
+				}
+				return [];
+			}
 			if (/SELECT "name" FROM "orange_sync_base_tables" LIMIT 1/u.test(sql))
 				return baseEntries.length > 0 ? [{ name: baseEntries[0].name }] : [];
 			if (/SELECT "name", "base_name", "schema_sql", "ordinal" FROM "orange_sync_base_tables"/u.test(sql))
@@ -1653,12 +1707,17 @@ function newOutboxDb(outbox, syncConfig, options = {}) {
 			}
 			if (/INSERT INTO "orange_sync_base_tables"/u.test(sql)) {
 				const values = parseSqlValues(sql);
-				baseEntries.push({
+				const existing = baseEntries.find(entry => entry.name === values[0]);
+				const next = {
 					name: values[0],
 					base_name: values[1],
 					schema_sql: values[2],
 					ordinal: Number(values[3] || 0)
-				});
+				};
+				if (existing)
+					Object.assign(existing, next);
+				else
+					baseEntries.push(next);
 				return [];
 			}
 			if (/^(CREATE|DROP) TABLE/u.test(sql) && /orange_sync_base_data_/u.test(sql))
@@ -1686,6 +1745,21 @@ function mutationIdFromWhere(sql) {
 function lastErrorFromUpdate(sql) {
 	const match = /"last_error" = '((?:''|[^'])*)'/u.exec(sql);
 	return match ? match[1].replace(/''/g, '\'') : undefined;
+}
+
+function mutationStatusesFromSelect(sql) {
+	if (/"status" IN \(([^)]*)\)/u.test(sql)) {
+		const values = /"status" IN \(([^)]*)\)/u.exec(sql)[1];
+		return new Set(Array.from(values.matchAll(/'((?:''|[^'])*)'/gu)).map(match => match[1].replace(/''/g, '\'')));
+	}
+	if (/"status" = 'pushed'/u.test(sql))
+		return new Set(['pushed']);
+	return new Set(['pending']);
+}
+
+function limitFromSelect(sql) {
+	const match = /LIMIT\s+(\d+)/ui.exec(sql);
+	return match ? Number(match[1]) : 10000;
 }
 
 function newJournalDb(config) {
@@ -1725,12 +1799,17 @@ function queryJournal(journal, sql) {
 	}
 	if (/INSERT INTO "orange_sync_base_tables"/u.test(sql)) {
 		const values = parseSqlValues(sql);
-		journal.baseEntries.push({
+		const existing = journal.baseEntries.find(entry => entry.name === values[0]);
+		const next = {
 			name: values[0],
 			base_name: values[1],
 			schema_sql: values[2],
 			ordinal: Number(values[3] || 0)
-		});
+		};
+		if (existing)
+			Object.assign(existing, next);
+		else
+			journal.baseEntries.push(next);
 		return [];
 	}
 	if (/^(CREATE|DROP) TABLE/u.test(sql) && /orange_sync_base_data_/u.test(sql))

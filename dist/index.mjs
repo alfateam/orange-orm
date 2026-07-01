@@ -6011,16 +6011,15 @@ function requireSyncClient () {
 			if (!Array.isArray(configuredTables) || configuredTables.length === 0)
 				throw new Error('Sync pull requires mapped tables or configured tables. Set sync.tables when the client has no table map.');
 			await ensureSyncSchema(db, client, configuredTables, syncConfig.schema);
-			const stableBaseEnabled = isStableBaseEnabled(syncConfig);
-			const hadStableBase = stableBaseEnabled && await hasStableBase(db);
-			if (stableBaseEnabled && !hadStableBase)
+			const hadStableBase = await hasStableBase(db, configuredTables);
+			if (!hadStableBase)
 				return runSyncMaintenance(db, () => pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase));
 			return pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase);
 		}
 
 		async function pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase) {
-			const stableBaseEnabled = isStableBaseEnabled(syncConfig);
-			const pushResult = await pushBeforePull(db, syncConfig, hadStableBase);
+			await pushBeforePull(db, syncConfig, hadStableBase);
+			const pullStartedAtMs = Date.now();
 			await maybeEmitInitialReady(syncConfig, configuredTables, db, 'persisted');
 			const currentSince = await getScopeSince(configuredTables, db);
 			const scopeKey = getScopeKey(configuredTables);
@@ -6043,21 +6042,9 @@ function requireSyncClient () {
 			}
 			if (result && result.since !== undefined && result.checkpointApplied !== true)
 				await setScopeSince(configuredTables, result.since, db);
-			let pushedBaseUpdated = false;
-			let needsStableBaseSnapshot = stableBaseEnabled && hadStableBase && await hasStableBaseSnapshotPending(db);
-			if (stableBaseEnabled && hadStableBase && didPushMutations(pushResult)) {
-				if (!needsStableBaseSnapshot)
-					pushedBaseUpdated = await savePushedMutationsToStableBase(db, getAcceptedPushMutations(pushResult));
-				if (!pushedBaseUpdated)
-					needsStableBaseSnapshot = true;
-			}
-			if (stableBaseEnabled && !hadStableBase)
-				await clearPendingMutations(db);
-			if (needsStableBaseSnapshot || shouldSaveStableBase(stableBaseEnabled, hadStableBase, pushResult, result, pushedBaseUpdated)) {
-				const saved = await saveStableBase(db);
-				if (saved || needsStableBaseSnapshot)
-					await setStableBaseSnapshotPending(db, !saved && needsStableBaseSnapshot);
-			}
+			await deleteConfirmedPushedMutations(db, pullStartedAtMs);
+			if (!hadStableBase)
+				await replayLocalOutbox(db);
 			await maybeEmitInitialReady(syncConfig, configuredTables, db, 'sync');
 			return result;
 		}
@@ -6107,7 +6094,7 @@ function requireSyncClient () {
 				result = await sendPush(pushConfig, clientId, pending);
 			}
 			catch (e) {
-				if (isConflictError(e) && isStableBaseEnabled(syncConfig)) {
+				if (isConflictError(e)) {
 					await rollbackFailedPushBatch(db, pending, e);
 					emitOperationErrors(pending, e, false);
 				}
@@ -6123,10 +6110,10 @@ function requireSyncClient () {
 		}
 
 		async function pushBeforePull(db, syncConfig, hasBase) {
-			if (isStableBaseEnabled(syncConfig) && !hasBase)
+			if (!hasBase)
 				return;
 			const pushConfig = resolvePushConfig(syncConfig);
-			const maxBatches = resolveMaxPushBatches(syncConfig);
+			const maxBatches = resolveMaxPushBatches();
 			const results = [];
 			for (let i = 0; i < maxBatches; i++) {
 				const result = await pushPending({ _syncConfig: syncConfig, _pushConfig: pushConfig });
@@ -6135,36 +6122,6 @@ function requireSyncClient () {
 				results.push(result);
 			}
 			return combinePushResults(results);
-		}
-
-		function shouldSaveStableBase(stableBaseEnabled, hadStableBase, pushResult, pullResult, pushedBaseUpdated) {
-			if (!stableBaseEnabled)
-				return false;
-			return !hadStableBase || didPullRows(pullResult) || didPushMutations(pushResult) && !pushedBaseUpdated;
-		}
-
-		async function hasStableBaseSnapshotPending(db) {
-			const state = await readScopeState('__orange_sync_stable_base_snapshot_pending__', db);
-			return state && state.since === true;
-		}
-
-		async function setStableBaseSnapshotPending(db, pending) {
-			await writeScopeState('__orange_sync_stable_base_snapshot_pending__', {
-				since: pending === true,
-				updatedAtMs: Date.now()
-			}, db);
-		}
-
-		function didPushMutations(result) {
-			if (!result)
-				return false;
-			if (Number(result.applied) > 0 || Number(result.duplicates) > 0)
-				return true;
-			return Array.isArray(result.results) && result.results.length > 0;
-		}
-
-		function didPullRows(result) {
-			return Number(result && result.applied) > 0;
 		}
 
 		function didPushBatchAdvance(result) {
@@ -6203,7 +6160,7 @@ function requireSyncClient () {
 		async function rollbackFailedPushBatchCore(db, attemptedMutations, error) {
 			if (!await hasStableBase(db))
 				return;
-			const remaining = await readPendingMutationRows(db, 10000, mutationIdsToSet(attemptedMutations));
+			const remaining = await readReplayMutationRows(db, 10000, mutationIdsToSet(attemptedMutations));
 			await restoreStableBase(db);
 			await ensureSyncOutboxTable(db);
 			for (let i = 0; i < attemptedMutations.length; i++) {
@@ -6229,6 +6186,15 @@ function requireSyncClient () {
 			ensuredInternalTables.delete(db);
 			clearEnsuredSyncSchema(db);
 			initialReadyEmitted = false;
+		}
+
+		async function replayLocalOutbox(db) {
+			const rows = await readReplayMutationRows(db, 10000);
+			for (let i = 0; i < rows.length; i++) {
+				const mutation = rowToMutation(rows[i]);
+				if (mutation)
+					await replayMutation(mutation);
+			}
 		}
 
 		async function replayMutation(mutation) {
@@ -6294,6 +6260,7 @@ function requireSyncClient () {
 			const shouldApplyCheckpoint = session.finalSince !== undefined;
 			await client.transaction(async (tx) => {
 				await tryDeferForeignKeys(tx);
+				await ensureStableBaseTables(tx, options.tables);
 				const batches = await readPullJournalBatches(tx, scopeKey);
 				const hasJournalItems = batches.length > 0;
 				const touchedTables = new Set();
@@ -6303,10 +6270,14 @@ function requireSyncClient () {
 						touchedTables.add(batch[itemIndex].table);
 					const deleteItems = batch.filter(x => x.op === 'D');
 					const upsertItems = batch.filter(x => x.op !== 'D' && x.row !== undefined);
-					if (deleteItems.length > 0)
+					if (deleteItems.length > 0) {
 						applied += await applyDeleteItemsOnTx(tx, deleteItems, defaultPatchOptions);
-					if (upsertItems.length > 0)
+						await applyDeleteItemsToStableBase(tx, deleteItems);
+					}
+					if (upsertItems.length > 0) {
 						applied += await applyRowsPayloadOnTx(tx, upsertItems, defaultPatchOptions);
+						await applyRowsPayloadToStableBase(tx, upsertItems);
+					}
 				}
 				if (hasJournalItems)
 					await validateForeignKeys(tx);
@@ -6526,6 +6497,7 @@ function requireSyncClient () {
 						applied += entry.patch.length;
 					}
 					await validateForeignKeys(tx);
+					await copyTablesToStableBase(tx, tablePatches.map(x => x.table));
 				}, { suppressSyncOutbox: true });
 			}
 			return {
@@ -6876,10 +6848,23 @@ function requireSyncClient () {
 		}
 
 		async function readPendingMutationRows(db, limit, excludeIds) {
+			return readMutationRowsByStatus(db, ['pending'], limit, excludeIds);
+		}
+
+		async function readReplayMutationRows(db, limit, excludeIds) {
+			return readMutationRowsByStatus(db, ['pending', 'pushed'], limit, excludeIds);
+		}
+
+		async function readMutationRowsByStatus(db, statuses, limit, excludeIds) {
 			await ensureSyncOutboxTable(db);
+			const allowedStatuses = (Array.isArray(statuses) ? statuses : [])
+				.filter(status => typeof status === 'string' && status.length > 0);
+			if (allowedStatuses.length === 0)
+				return [];
+			const statusSql = allowedStatuses.map(sqlStringLiteral).join(', ');
 			const rows = await db.query([
 				`SELECT "mutation_id", "table_name", "patch_json", "options_json", "created_at_ms", "operation_id", "operation_name", "operation_json", "status", "last_error", "attempts", "pushed_at_ms", "result_json" FROM "${syncOutboxTable}"`,
-				'WHERE "status" = \'pending\'',
+				`WHERE "status" IN (${statusSql})`,
 				'ORDER BY "created_at_ms" ASC',
 				`LIMIT ${limit}`
 			].join(' '));
@@ -6887,6 +6872,19 @@ function requireSyncClient () {
 			if (!excludeIds || excludeIds.size === 0)
 				return list;
 			return list.filter(row => !excludeIds.has(row.mutation_id ?? row.MUTATION_ID));
+		}
+
+		async function deleteConfirmedPushedMutations(db, pullStartedAtMs) {
+			await ensureSyncOutboxTable(db);
+			const threshold = Number(pullStartedAtMs);
+			if (!Number.isFinite(threshold))
+				return;
+			await db.query([
+				`DELETE FROM "${syncOutboxTable}"`,
+				'WHERE "status" = \'pushed\'',
+				'AND "pushed_at_ms" IS NOT NULL',
+				`AND "pushed_at_ms" <= ${threshold}`
+			].join(' '));
 		}
 
 		function rowToMutation(row) {
@@ -7167,16 +7165,6 @@ function requireSyncClient () {
 			].join(' '));
 		}
 
-		async function clearPendingMutations(db) {
-			await ensureSyncOutboxTable(db);
-			await db.query(`DELETE FROM "${syncOutboxTable}" WHERE "status" = 'pending'`);
-		}
-
-		async function hasPendingMutations(db) {
-			const pending = await readPendingMutationRows(db, 1);
-			return pending.length > 0;
-		}
-
 		function mutationIdsToSet(mutations) {
 			const result = new Set();
 			if (!Array.isArray(mutations))
@@ -7259,11 +7247,17 @@ function requireSyncClient () {
 			}
 		}
 
-		async function hasStableBase(db) {
+		async function hasStableBase(db, tableNames) {
 			if (!db || typeof db.query !== 'function')
 				return false;
 			try {
 				await ensureSyncBaseTable(db);
+				const requiredNames = stableBaseDbNames(tableNames);
+				if (requiredNames.length > 0) {
+					const entries = await readStableBaseEntries(db);
+					const existing = new Set(entries.map(entry => entry.name));
+					return requiredNames.every(name => existing.has(name));
+				}
 				const rows = await db.query(`SELECT "name" FROM "${syncBaseTable}" LIMIT 1`);
 				const list = Array.isArray(rows) ? rows : rows?.rows || [];
 				return list.length > 0;
@@ -7273,88 +7267,16 @@ function requireSyncClient () {
 			}
 		}
 
-		async function saveStableBase(db) {
-			if (!db || typeof db.query !== 'function')
-				return;
-			return runSyncMaintenance(db, async () => {
-				if (await hasPendingMutations(db))
-					return false;
-				await client.transaction(async (tx) => {
-					await ensureSyncBaseTable(tx);
-					const tables = await readSqliteTables(tx);
-					await dropExistingBaseTables(tx);
-					await tx.query(`DELETE FROM "${syncBaseTable}"`);
-					for (let i = 0; i < tables.length; i++) {
-						const table = tables[i];
-						const baseName = toBaseTableName(table.name);
-						await tx.query(`CREATE TABLE ${quoteIdent(baseName)} AS SELECT * FROM ${quoteIdent(table.name)}`);
-						await tx.query([
-							`INSERT INTO "${syncBaseTable}" ("name", "base_name", "schema_sql", "ordinal") VALUES (`,
-							`${sqlStringLiteral(table.name)}, ${sqlStringLiteral(baseName)}, ${sqlNullableStringLiteral(table.sql)}, ${i}`,
-							')'
-						].join(' '));
-					}
-				}, { suppressSyncOutbox: true });
-				return true;
-			});
-		}
-
-		async function savePushedMutationsToStableBase(db, mutations) {
-			const entries = stableBasePatchEntries(mutations);
-			if (entries.length === 0)
-				return true;
-			return runSyncMaintenance(db, async () => {
-				if (await hasPendingMutations(db))
-					return false;
-				await client.transaction(async (tx) => {
-					await ensureSyncBaseTable(tx);
-					const baseEntries = await readStableBaseEntries(tx);
-					const baseByTable = new Map(baseEntries.map(entry => [entry.name, entry]));
-					for (let i = 0; i < entries.length; i++) {
-						const applied = await savePatchEntryToStableBase(tx, entries[i], baseByTable);
-						if (!applied)
-							throw new StableBaseIncrementalFallbackError();
-					}
-				}, { suppressSyncOutbox: true });
-				return true;
-			})
-				.catch((error) => {
-					if (error instanceof StableBaseIncrementalFallbackError)
-						return false;
-					throw error;
-				});
-		}
-
-		function stableBasePatchEntries(mutations) {
-			const source = Array.isArray(mutations) ? mutations : [];
-			const entries = [];
-			for (let i = 0; i < source.length; i++) {
-				const mutationEntries = mutationToPatchEntries(source[i]);
-				for (let j = 0; j < mutationEntries.length; j++)
-					entries.push(mutationEntries[j]);
+		function stableBaseDbNames(tableNames) {
+			const names = normalizeConfiguredTables(tableNames) || [];
+			const result = [];
+			for (let i = 0; i < names.length; i++) {
+				const table = client.tables && client.tables[names[i]];
+				const dbName = table && (table._dbName || names[i]);
+				if (typeof dbName === 'string' && dbName.length > 0)
+					result.push(dbName);
 			}
-			return entries;
-		}
-
-		async function savePatchEntryToStableBase(tx, entry, baseByTable) {
-			const tableName = entry && entry.table;
-			const patch = entry && entry.patch;
-			if (typeof tableName !== 'string' || !Array.isArray(patch))
-				return true;
-			const baseEntry = baseByTable.get(tableName);
-			const table = client.tables && client.tables[tableName];
-			const primaryColumns = getPrimaryColumns(table);
-			if (!baseEntry || !table || primaryColumns.length === 0)
-				return false;
-			const keys = patchPrimaryKeys(patch);
-			for (let i = 0; i < keys.length; i++) {
-				const where = primaryKeyWhereSql(primaryColumns, keys[i]);
-				if (!where)
-					return false;
-				await tx.query(`DELETE FROM ${quoteIdent(baseEntry.baseName)} WHERE ${where}`);
-				await tx.query(`INSERT INTO ${quoteIdent(baseEntry.baseName)} SELECT * FROM ${quoteIdent(table._dbName || tableName)} WHERE ${where}`);
-			}
-			return true;
+			return Array.from(new Set(result));
 		}
 
 		function getPrimaryColumns(table) {
@@ -7365,35 +7287,117 @@ function requireSyncClient () {
 				.filter(name => typeof name === 'string' && name.length > 0);
 		}
 
-		function patchPrimaryKeys(patch) {
-			const result = [];
-			const seen = new Set();
-			for (let i = 0; i < patch.length; i++) {
-				const key = patchOperationPrimaryKey(patch[i]);
-				if (!key)
+		async function ensureStableBaseTables(db, tableNames) {
+			await ensureSyncBaseTable(db);
+			const names = orderTablesByDependencies(client, normalizeConfiguredTables(tableNames) || []);
+			if (names.length === 0)
+				return;
+			const existing = await readStableBaseEntries(db);
+			const existingByName = new Map(existing.map(entry => [entry.name, entry]));
+			for (let i = 0; i < names.length; i++) {
+				const tableInfo = resolveStableBaseTableInfo(names[i], existingByName);
+				if (!tableInfo)
 					continue;
-				const serialized = stringify(key);
-				if (seen.has(serialized))
-					continue;
-				seen.add(serialized);
-				result.push(key);
+				await db.query([
+					`CREATE TABLE IF NOT EXISTS ${quoteIdent(tableInfo.baseName)}`,
+					`AS SELECT * FROM ${quoteIdent(tableInfo.dbName)} WHERE 0`
+				].join(' '));
+				await db.query([
+					`INSERT INTO "${syncBaseTable}" ("name", "base_name", "schema_sql", "ordinal")`,
+					`VALUES (${sqlStringLiteral(tableInfo.dbName)}, ${sqlStringLiteral(tableInfo.baseName)}, NULL, ${i})`,
+					'ON CONFLICT("name") DO UPDATE SET',
+					'"base_name" = excluded."base_name",',
+					'"ordinal" = excluded."ordinal"'
+				].join(' '));
 			}
-			return result;
 		}
 
-		function patchOperationPrimaryKey(operation) {
-			if (!operation || typeof operation.path !== 'string')
+		function resolveStableBaseTableInfo(tableName, existingByName) {
+			if (typeof tableName !== 'string')
 				return null;
-			const firstSegment = operation.path.split('/')[1];
-			if (firstSegment === undefined || firstSegment.length === 0)
+			const table = client.tables && client.tables[tableName];
+			if (!table)
 				return null;
-			try {
-				const parsed = JSON.parse(unescapeJsonPointerSegment(firstSegment));
-				return Array.isArray(parsed) ? parsed : [parsed];
+			const dbName = table._dbName || tableName;
+			const existing = existingByName && existingByName.get(dbName);
+			return {
+				name: tableName,
+				table,
+				dbName,
+				baseName: existing && existing.baseName || toBaseTableName(dbName)
+			};
+		}
+
+		async function readStableBaseEntriesByName(db) {
+			const entries = await readStableBaseEntries(db);
+			return new Map(entries.map(entry => [entry.name, entry]));
+		}
+
+		async function applyDeleteItemsToStableBase(db, items) {
+			const deletes = Array.isArray(items) ? items : [];
+			if (deletes.length === 0)
+				return;
+			const baseByName = await readStableBaseEntriesByName(db);
+			for (let i = 0; i < deletes.length; i++)
+				await applyStableBaseDelete(db, deletes[i], baseByName);
+		}
+
+		async function applyRowsPayloadToStableBase(db, items) {
+			const rows = Array.isArray(items) ? items : [];
+			if (rows.length === 0)
+				return;
+			const baseByName = await readStableBaseEntriesByName(db);
+			for (let i = 0; i < rows.length; i++)
+				await applyStableBaseUpsertFromTable(db, rows[i], baseByName);
+		}
+
+		async function copyTablesToStableBase(db, tableNames) {
+			const names = normalizeConfiguredTables(tableNames) || [];
+			if (names.length === 0)
+				return;
+			await ensureStableBaseTables(db, names);
+			const baseByName = await readStableBaseEntriesByName(db);
+			for (let i = 0; i < names.length; i++) {
+				const tableInfo = resolveStableBaseTableInfo(names[i], baseByName);
+				if (!tableInfo)
+					continue;
+				await db.query(`DELETE FROM ${quoteIdent(tableInfo.baseName)}`);
+				await db.query(`INSERT INTO ${quoteIdent(tableInfo.baseName)} SELECT * FROM ${quoteIdent(tableInfo.dbName)}`);
 			}
-			catch (_e) {
+		}
+
+		async function applyStableBaseDelete(db, item, baseByName) {
+			const target = stableBaseTargetForItem(item, baseByName);
+			if (!target)
+				return;
+			await db.query(`DELETE FROM ${quoteIdent(target.baseName)} WHERE ${target.where}`);
+		}
+
+		async function applyStableBaseUpsertFromTable(db, item, baseByName) {
+			const target = stableBaseTargetForItem(item, baseByName);
+			if (!target)
+				return;
+			await db.query(`DELETE FROM ${quoteIdent(target.baseName)} WHERE ${target.where}`);
+			await db.query(`INSERT INTO ${quoteIdent(target.baseName)} SELECT * FROM ${quoteIdent(target.dbName)} WHERE ${target.where}`);
+		}
+
+		function stableBaseTargetForItem(item, baseByName) {
+			if (!item || typeof item.table !== 'string' || !Array.isArray(item.pk))
 				return null;
-			}
+			const table = client.tables && client.tables[item.table];
+			if (!table)
+				return null;
+			const dbName = table._dbName || item.table;
+			const baseEntry = baseByName && baseByName.get(dbName);
+			const primaryColumns = getPrimaryColumns(table);
+			const where = primaryKeyWhereSql(primaryColumns, item.pk);
+			if (!baseEntry || !where)
+				return null;
+			return {
+				dbName,
+				baseName: baseEntry.baseName,
+				where
+			};
 		}
 
 		function primaryKeyWhereSql(primaryColumns, key) {
@@ -7412,21 +7416,11 @@ function requireSyncClient () {
 				const entries = await readStableBaseEntries(tx);
 				if (entries.length === 0)
 					return;
-				const entryNames = new Set(entries.map(x => x.name));
-				const currentTables = await readSqliteTables(tx);
+				await tryDeferForeignKeys(tx);
 				await tx.query('PRAGMA foreign_keys = OFF');
 				try {
-					for (let i = 0; i < currentTables.length; i++) {
-						const table = currentTables[i];
-						if (entryNames.has(table.name))
-							continue;
-						await tx.query(`DROP TABLE IF EXISTS ${quoteIdent(table.name)}`);
-					}
-					const currentNames = new Set(currentTables.map(x => x.name));
-					for (let i = 0; i < entries.length; i++) {
+					for (let i = entries.length - 1; i >= 0; i--) {
 						const entry = entries[i];
-						if (!currentNames.has(entry.name) && entry.schemaSql)
-							await tx.query(entry.schemaSql);
 						await tx.query(`DELETE FROM ${quoteIdent(entry.name)}`);
 					}
 					for (let i = 0; i < entries.length; i++) {
@@ -7467,21 +7461,6 @@ function requireSyncClient () {
 				.filter(row => typeof row.name === 'string' && typeof row.baseName === 'string');
 		}
 
-		async function readSqliteTables(db) {
-			const rows = await db.query([
-				'SELECT "name", "sql" FROM sqlite_schema',
-				'WHERE "type" = \'table\'',
-				'ORDER BY "name" ASC'
-			].join(' '));
-			const list = Array.isArray(rows) ? rows : rows?.rows || [];
-			return list
-				.map(row => ({
-					name: row.name ?? row.NAME,
-					sql: row.sql ?? row.SQL
-				}))
-				.filter(table => shouldCheckpointTable(table.name));
-		}
-
 		async function dropExistingBaseTables(db) {
 			const rows = await db.query([
 				'SELECT "name" FROM sqlite_schema',
@@ -7494,15 +7473,6 @@ function requireSyncClient () {
 				if (typeof name === 'string' && name.startsWith(syncBasePrefix))
 					await db.query(`DROP TABLE IF EXISTS ${quoteIdent(name)}`);
 			}
-		}
-
-		function shouldCheckpointTable(name) {
-			return typeof name === 'string'
-				&& !name.startsWith('sqlite_')
-				&& name !== syncBaseTable
-				&& name !== syncPullSessionTable
-				&& name !== syncPullItemTable
-				&& !name.startsWith(syncBasePrefix);
 		}
 
 		function toBaseTableName(name) {
@@ -7642,14 +7612,8 @@ function requireSyncClient () {
 			schema: sync.schema,
 			auto: sync.auto,
 			push: sync.push === undefined ? undefined : normalizePushConfig(sync.push, endpoint),
-			// Stable-base rollback is optional while browser sync is being simplified.
-			stableBase: sync.stableBase !== false,
 			crossTabLock: normalizeCrossTabLockConfig(sync.crossTabLock)
 		};
-	}
-
-	function isStableBaseEnabled(syncConfig) {
-		return !syncConfig || syncConfig.stableBase !== false;
 	}
 
 	function withRuntimeCrossTabLockConfig(config, options) {
@@ -7797,13 +7761,6 @@ function requireSyncClient () {
 		return `"${String(value).replace(/"/g, '""')}"`;
 	}
 
-	class StableBaseIncrementalFallbackError extends Error {
-		constructor() {
-			super('Stable base incremental update needs full snapshot fallback.');
-			this.name = 'StableBaseIncrementalFallbackError';
-		}
-	}
-
 	function resolveSyncTables(db, configuredTables, client) {
 		if (Array.isArray(configuredTables) && configuredTables.length > 0)
 			return configuredTables;
@@ -7882,9 +7839,7 @@ function requireSyncClient () {
 		};
 	}
 
-	function resolveMaxPushBatches(syncConfig) {
-		if (isStableBaseEnabled(syncConfig))
-			return 1;
+	function resolveMaxPushBatches() {
 		return maxPushBatchesPerSync;
 	}
 
@@ -8474,10 +8429,6 @@ function requireSyncClient () {
 			return 'NULL';
 		const parsed = Number(value);
 		return Number.isFinite(parsed) ? String(parsed) : 'NULL';
-	}
-
-	function unescapeJsonPointerSegment(value) {
-		return String(value).replace(/~1/g, '/').replace(/~0/g, '~');
 	}
 
 	syncClient = newSyncClient;
@@ -20056,9 +20007,10 @@ function requireSharedDbWorkerClient () {
 
 	function resolveSharedWorker(sharedWorkerOrUrl, options) {
 		if (isWorkerUrl(sharedWorkerOrUrl)) {
-			if (typeof SharedWorker === 'undefined')
+			const SharedWorkerCtor = globalThis && globalThis.SharedWorker;
+			if (typeof SharedWorkerCtor === 'undefined')
 				throw new Error('Shared DB worker requires SharedWorker support or an existing SharedWorker-like object.');
-			return new SharedWorker(sharedWorkerOrUrl, getSharedWorkerOptions(options));
+			return new SharedWorkerCtor(sharedWorkerOrUrl, getSharedWorkerOptions(options));
 		}
 		return sharedWorkerOrUrl;
 	}

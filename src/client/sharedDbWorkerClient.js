@@ -12,9 +12,10 @@ function createSharedDbWorkerClient(sharedWorkerOrUrl, options = {}) {
 
 function resolveSharedWorker(sharedWorkerOrUrl, options) {
 	if (isWorkerUrl(sharedWorkerOrUrl)) {
-		if (typeof SharedWorker === 'undefined')
+		const SharedWorkerCtor = globalThis && globalThis.SharedWorker;
+		if (typeof SharedWorkerCtor === 'undefined')
 			throw new Error('Shared DB worker requires SharedWorker support or an existing SharedWorker-like object.');
-		return new SharedWorker(sharedWorkerOrUrl, getSharedWorkerOptions(options));
+		return new SharedWorkerCtor(sharedWorkerOrUrl, getSharedWorkerOptions(options));
 	}
 	return sharedWorkerOrUrl;
 }

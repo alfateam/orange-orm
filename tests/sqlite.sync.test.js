@@ -53,9 +53,7 @@ beforeAll(async () => {
 		{ id: 3, name: 'Ron', balance: 99, isActive: true }
 	]);
 
-	await localDb.customer.insert([
-		{ id: 1, name: 'Stale', balance: 1, isActive: true }
-	]);
+	await localDb.query('INSERT INTO customer (id, name, balance, isActive) VALUES (1, \'Stale\', 1, 1)');
 
 	const app = express();
 	app.use(json({ limit: '2mb' }));
@@ -533,13 +531,12 @@ describe('sqlite staged pull sync', () => {
 
 		await localDb.syncClient.sync();
 		const retriedRemote80 = await remoteDb.customer.getById(80);
+		const retriedRemote81 = await remoteDb.customer.getById(81);
 		const afterRetryPending = await localDb.query('SELECT mutation_id, patch_json FROM "orange_sync_outbox" WHERE status = \'pending\' ORDER BY created_at_ms');
 
 		expect(retriedRemote80.name).toBe('Fail80');
-		expect(afterRetryPending).toHaveLength(1);
-		expect(afterRetryPending[0].patch_json ?? afterRetryPending[0].PATCH_JSON).toContain('Replay81');
-
-		await localDb.syncClient.sync();
+		expect(retriedRemote81.name).toBe('Replay81');
+		expect(afterRetryPending).toHaveLength(0);
 	});
 
 	test('conflict discards one pending mutation and keeps the next pending', async () => {
@@ -598,6 +595,66 @@ describe('sqlite staged pull sync', () => {
 
 		expect(pushedRemote84.name).toBe('Replay84');
 		expect(afterPushPending).toHaveLength(0);
+	});
+
+	test('conflict after an accepted push replays pushed and later pending mutations', async () => {
+		await localDb.query('PRAGMA foreign_keys = ON');
+		await localDb.query('DELETE FROM "order"');
+		await localDb.query('DELETE FROM customer');
+		await localDb.query('DELETE FROM "orange_sync_outbox"');
+		await remoteDb.query('DELETE FROM "order"');
+		await remoteDb.query('DELETE FROM customer');
+
+		await remoteDb.customer.insert([
+			{ id: 85, name: 'Base85', balance: 85, isActive: true },
+			{ id: 86, name: 'Base86', balance: 86, isActive: true },
+			{ id: 87, name: 'Base87', balance: 87, isActive: true }
+		]);
+		await localDb.syncClient.sync();
+
+		const first = await localDb.customer.getById(85);
+		first.name = 'Accepted85';
+		await first.saveChanges();
+
+		await localDb.transaction(async (tx, ctx) => {
+			ctx.sync.operation = 'customer-conflict';
+			ctx.sync.customerId = 86;
+			const second = await tx.customer.getById(86);
+			second.name = 'Conflict86';
+			await second.saveChanges();
+		});
+
+		const third = await localDb.customer.getById(87);
+		third.name = 'Replay87';
+		await third.saveChanges();
+
+		await remoteDb.query('UPDATE customer SET name = \'Remote86\' WHERE id = 86');
+
+		await expect(localDb.syncClient.sync())
+			.rejects.toThrow('Request failed with status code 409');
+
+		const local85 = await localDb.customer.getById(85);
+		const local86 = await localDb.customer.getById(86);
+		const local87 = await localDb.customer.getById(87);
+		const remote85 = await remoteDb.customer.getById(85);
+		const remote87 = await remoteDb.customer.getById(87);
+		const replayRows = await localDb.query('SELECT status, patch_json FROM "orange_sync_outbox" WHERE status IN (\'pending\', \'pushed\') ORDER BY created_at_ms');
+		const failed = await localDb.query('SELECT operation_name FROM "orange_sync_outbox" WHERE status = \'failed\' AND operation_name = \'customer-conflict\'');
+
+		expect(local85.name).toBe('Accepted85');
+		expect(local86.name).toBe('Base86');
+		expect(local87.name).toBe('Replay87');
+		expect(remote85.name).toBe('Accepted85');
+		expect(remote87.name).toBe('Base87');
+		expect(failed).toHaveLength(1);
+		expect(replayRows.map(row => row.status ?? row.STATUS)).toEqual(['pushed', 'pending']);
+
+		await localDb.syncClient.sync();
+		const pushedRemote87 = await remoteDb.customer.getById(87);
+		const openRows = await localDb.query('SELECT mutation_id FROM "orange_sync_outbox" WHERE status IN (\'pending\', \'pushed\')');
+
+		expect(pushedRemote87.name).toBe('Replay87');
+		expect(openRows).toHaveLength(0);
 	});
 
 	test('sync fails before requesting remote changes when pending push fails', async () => {
