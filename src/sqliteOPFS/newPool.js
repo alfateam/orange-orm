@@ -3,14 +3,26 @@ const newId = require('../newId');
 const createSqliteOPFSWorkerClient = require('./workerClient');
 
 function newPool(connectionString, poolOptions) {
+	poolOptions = poolOptions || {};
 	let id = newId();
-	let client = createSqliteOPFSWorkerClient(connectionString, poolOptions || {});
+	let client = createSqliteOPFSWorkerClient(connectionString, poolOptions);
 	let readClient;
 	let c = {};
 	let ended = false;
 	let writerBusy = false;
 	const writerQueue = [];
 	const singleWorker = shouldUseSingleWorker(poolOptions);
+	c.__orangeSqliteOPFSConnectionString = connectionString;
+	c.__orangeSqliteOPFSRequestedVfs = poolOptions.vfs || 'opfs';
+	c.__orangeSqliteOPFSFallbackVfs = poolOptions.fallbackVfs;
+	c.__orangeCrossTabWriteLock = normalizeCrossTabWriteLockConfig(poolOptions);
+
+	if (client.ready && typeof client.ready.then === 'function') {
+		client.ready.then((result) => {
+			c.__orangeSqliteOPFSVfs = result && result.vfs || c.__orangeSqliteOPFSRequestedVfs;
+			c.__orangeSqliteOPFSFallback = !!(result && result.fallback);
+		}).catch(() => {});
+	}
 
 	prewarmReadClient();
 
@@ -111,9 +123,36 @@ function shouldUseSingleWorker(poolOptions = {}) {
 	if (poolOptions.singleWorker === true)
 		return true;
 	const vfs = poolOptions.vfs || 'opfs';
-	if (vfs === 'opfs' || vfs === 'opfs-sahpool')
+	if (vfs === 'opfs' || vfs === 'opfs-sahpool' || vfs === 'opfs-wl')
 		return poolOptions.singleWorker !== false;
 	return false;
+}
+
+function normalizeCrossTabWriteLockConfig(poolOptions = {}) {
+	const value = poolOptions.crossTabWriteLock;
+	if (value === false)
+		return { enabled: false };
+	const defaultEnabled = poolOptions.vfs === 'opfs-wl' || poolOptions.fallbackVfs === 'opfs-wl';
+	if (value === undefined || value === null)
+		return { enabled: defaultEnabled };
+	if (value === true)
+		return { enabled: true };
+	if (typeof value === 'string')
+		return { enabled: true, name: value };
+	if (value !== Object(value))
+		throw new Error('Invalid sqliteOPFS crossTabWriteLock configuration');
+	return {
+		enabled: value.enabled !== false,
+		name: typeof value.name === 'string' && value.name.length > 0 ? value.name : undefined,
+		timeoutMs: normalizePositiveInteger(value.timeoutMs),
+		staleMs: normalizePositiveInteger(value.staleMs),
+		pollMs: normalizePositiveInteger(value.pollMs)
+	};
+}
+
+function normalizePositiveInteger(value) {
+	const parsed = Number.parseInt(value, 10);
+	return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }
 
 module.exports = newPool;

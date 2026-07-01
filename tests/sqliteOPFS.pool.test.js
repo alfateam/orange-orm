@@ -291,13 +291,43 @@ describe('sqliteOPFS pool', () => {
 		}
 	});
 
-	test('rejects unsupported opfs-wl vfs', async () => {
-		const pool = newPool('unsupported-opfs-wl.sqlite3', {
+	test('opens inline worker with opfs-wl enabled', async () => {
+		const closes = [];
+		const pool = newPool('opfs-wl.sqlite3', {
 			vfs: 'opfs-wl',
 			inlineWorker: true,
 			prewarmRead: false,
 			sqlite3InitModule() {
-				return newFakeSqlite3();
+				return newFakeSqlite3(closes);
+			}
+		});
+
+		try {
+			const rows = await new Promise((resolve, reject) => {
+				pool.connect((err, client) => {
+					if (err)
+						return reject(err);
+					client.executeQuery(newSql('SELECT 1'), (err, result) => err ? reject(err) : resolve(result));
+				});
+			});
+
+			expect(rows).toEqual([{ value: 1 }]);
+		}
+		finally {
+			await pool.end();
+		}
+		expect(closes).toEqual(['/opfs-wl.sqlite3']);
+	});
+
+	test('rejects opfs-wl when sqlite-wasm does not expose it', async () => {
+		const pool = newPool('missing-opfs-wl.sqlite3', {
+			vfs: 'opfs-wl',
+			inlineWorker: true,
+			prewarmRead: false,
+			sqlite3InitModule() {
+				const sqlite3 = newFakeSqlite3();
+				delete sqlite3.oo1.OpfsWlDb;
+				return sqlite3;
 			}
 		});
 
@@ -308,11 +338,58 @@ describe('sqliteOPFS pool', () => {
 						return reject(err);
 					client.executeQuery(newSql('SELECT 1'), (err) => err ? reject(err) : resolve());
 				});
-			})).rejects.toThrow('sqliteOPFS vfs "opfs-wl" is not supported');
+			})).rejects.toThrow('sqliteOPFS vfs "opfs-wl" is not available');
 		}
 		finally {
 			await pool.end();
 		}
+	});
+
+	test('falls back from opfs-sahpool to opfs-wl', async () => {
+		const opened = [];
+		const onOpen = (entry) => opened.push(entry);
+		log.on('sqliteOpen', onOpen);
+		const closes = [];
+		const pool = newPool('fallback-opfs-wl.sqlite3', {
+			vfs: 'opfs-sahpool',
+			fallbackVfs: 'opfs-wl',
+			inlineWorker: true,
+			prewarmRead: false,
+			sqlite3InitModule() {
+				const sqlite3 = newFakeSqlite3(closes);
+				sqlite3.installOpfsSAHPoolVfs = async () => {
+					throw new Error('SAH pool is locked');
+				};
+				return sqlite3;
+			}
+		});
+
+		try {
+			const rows = await new Promise((resolve, reject) => {
+				pool.connect((err, client) => {
+					if (err)
+						return reject(err);
+					client.executeQuery(newSql('SELECT 1'), (err, result) => err ? reject(err) : resolve(result));
+				});
+			});
+
+			expect(rows).toEqual([{ value: 1 }]);
+			expect(opened).toHaveLength(1);
+			expect(opened[0]).toMatchObject({
+				connectionString: 'fallback-opfs-wl.sqlite3',
+				requestedVfs: 'opfs-sahpool',
+				vfs: 'opfs-wl',
+				fallback: true,
+				fallbackVfs: 'opfs-wl',
+				fallbackError: 'SAH pool is locked',
+				readonly: false
+			});
+		}
+		finally {
+			log.off('sqliteOpen', onOpen);
+			await pool.end();
+		}
+		expect(closes).toEqual(['/fallback-opfs-wl.sqlite3']);
 	});
 
 	test('does not fall back to transient sqlite when OPFS is unavailable', async () => {
@@ -418,6 +495,7 @@ function newFakeSqlite3(closes = [], installOptions = []) {
 	return {
 		oo1: {
 			OpfsDb: FakeDb,
+			OpfsWlDb: FakeDb,
 			DB: FakeDb
 		},
 		async installOpfsSAHPoolVfs(options) {

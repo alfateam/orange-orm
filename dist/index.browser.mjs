@@ -3692,6 +3692,305 @@ function requireOutboxTableSql () {
 	return outboxTableSql_1;
 }
 
+var crossTabLock;
+var hasRequiredCrossTabLock;
+
+function requireCrossTabLock () {
+	if (hasRequiredCrossTabLock) return crossTabLock;
+	hasRequiredCrossTabLock = 1;
+	const randomUuid = requireRandomUuid();
+
+	async function runWithCrossTabLock(name, config, fn) {
+		const lockConfig = config || { enabled: true };
+		if (!lockConfig.enabled)
+			return fn();
+		const locks = getWebLocks();
+		if (locks)
+			return runWithWebLock(locks, name, lockConfig, fn);
+		const storage = getLocalStorage();
+		if (storage)
+			return runWithLocalStorageLock(storage, name, lockConfig, fn);
+		return fn();
+	}
+
+	async function acquireCrossTabLock(name, config) {
+		const lockConfig = config || { enabled: true };
+		if (!lockConfig.enabled)
+			return noop;
+
+		let releaseHold;
+		const hold = new Promise((resolve) => {
+			releaseHold = resolve;
+		});
+		let resolveAcquired;
+		let rejectAcquired;
+		const acquired = new Promise((resolve, reject) => {
+			resolveAcquired = resolve;
+			rejectAcquired = reject;
+		});
+		const request = runWithCrossTabLock(name, {
+			...lockConfig,
+			releaseOnPageHide: false
+		}, async () => {
+			resolveAcquired();
+			await hold;
+		});
+		request.catch(rejectAcquired);
+		await acquired;
+
+		let released = false;
+		return function releaseCrossTabLock() {
+			if (released)
+				return;
+			released = true;
+			releaseHold();
+			request.catch(() => {});
+		};
+	}
+
+	function normalizeCrossTabLockConfig(value) {
+		if (value === false)
+			return { enabled: false };
+		if (value === true || value === undefined || value === null)
+			return { enabled: true };
+		if (typeof value === 'string')
+			return { enabled: true, name: value };
+		if (value !== Object(value))
+			throw new Error('Invalid sqlite sync crossTabLock configuration');
+		return {
+			enabled: value.enabled !== false,
+			name: typeof value.name === 'string' && value.name.length > 0 ? value.name : undefined,
+			timeoutMs: normalizePositiveInteger(value.timeoutMs),
+			maxHoldMs: normalizePositiveInteger(value.maxHoldMs),
+			staleMs: normalizePositiveInteger(value.staleMs),
+			pollMs: normalizePositiveInteger(value.pollMs)
+		};
+	}
+
+	function getWebLocks() {
+		const nav = typeof globalThis !== 'undefined' ? globalThis.navigator : undefined;
+		return nav && nav.locks && typeof nav.locks.request === 'function'
+			? nav.locks
+			: null;
+	}
+
+	async function runWithWebLock(locks, name, config, fn) {
+		const options = { mode: 'exclusive' };
+		const timeoutMs = config.timeoutMs;
+		let timeoutId;
+		let waiting = true;
+		let timedOut = false;
+		if (timeoutMs && typeof AbortController === 'function') {
+			const controller = new AbortController();
+			options.signal = controller.signal;
+			timeoutId = setTimeout(() => {
+				if (!waiting)
+					return;
+				timedOut = true;
+				controller.abort();
+			}, timeoutMs);
+		}
+		try {
+			return await locks.request(name, options, async () => {
+				waiting = false;
+				if (timeoutId) {
+					clearTimeout(timeoutId);
+					timeoutId = undefined;
+				}
+				return runLockBody(name, config, fn);
+			});
+		}
+		catch (e) {
+			if (timedOut || e && e.name === 'AbortError')
+				throw lockTimeoutError(name, timeoutMs, config);
+			throw e;
+		}
+		finally {
+			if (timeoutId)
+				clearTimeout(timeoutId);
+		}
+	}
+
+	function getLocalStorage() {
+		if (typeof globalThis === 'undefined' || !globalThis.localStorage)
+			return null;
+		try {
+			const key = 'orange-orm:sync-lock-probe';
+			globalThis.localStorage.setItem(key, '1');
+			globalThis.localStorage.removeItem(key);
+			return globalThis.localStorage;
+		}
+		catch (_e) {
+			return null;
+		}
+	}
+
+	async function runWithLocalStorageLock(storage, name, config, fn) {
+		const lock = await acquireLocalStorageLock(storage, name, config);
+		const renewIntervalMs = Math.max(250, Math.floor(lock.staleMs / 3));
+		const intervalId = setInterval(() => {
+			try {
+				renewLocalStorageLock(storage, lock);
+			}
+			catch (_e) {
+				// A failed renewal will let another tab take the lock after staleMs.
+			}
+		}, renewIntervalMs);
+		try {
+			return await runLockBody(name, config, fn);
+		}
+		finally {
+			clearInterval(intervalId);
+			releaseLocalStorageLock(storage, lock);
+		}
+	}
+
+	async function runLockBody(name, config, fn) {
+		const operation = Promise.resolve().then(fn);
+		operation.catch(() => {});
+		const races = [operation];
+		const cleanup = [];
+		const maxHoldMs = normalizePositiveInteger(config && config.maxHoldMs);
+		if (maxHoldMs) {
+			races.push(new Promise((_resolve, reject) => {
+				const timeoutId = setTimeout(() => reject(lockHoldTimeoutError(name, maxHoldMs, config)), maxHoldMs);
+				cleanup.push(() => clearTimeout(timeoutId));
+			}));
+		}
+		if (!config || config.releaseOnPageHide !== false) {
+			const pageHide = createPageHideLockRelease(name, config);
+			if (pageHide) {
+				races.push(pageHide.promise);
+				cleanup.push(pageHide.cleanup);
+			}
+		}
+		try {
+			return await Promise.race(races);
+		}
+		finally {
+			for (let i = 0; i < cleanup.length; i++)
+				cleanup[i]();
+		}
+	}
+
+	function createPageHideLockRelease(name, config) {
+		const target = typeof globalThis !== 'undefined' ? globalThis : undefined;
+		if (!target || typeof target.addEventListener !== 'function' || typeof target.removeEventListener !== 'function')
+			return null;
+		let cleanup = () => {};
+		const promise = new Promise((_resolve, reject) => {
+			const release = () => reject(lockPageHiddenError(name, config));
+			target.addEventListener('pagehide', release, { once: true });
+			cleanup = () => target.removeEventListener('pagehide', release);
+		});
+		return { promise, cleanup };
+	}
+
+	async function acquireLocalStorageLock(storage, name, config) {
+		const key = `orange-orm:sync-lock:${name}`;
+		const owner = randomUuid();
+		const staleMs = config.staleMs || 60000;
+		const pollMs = config.pollMs || 100;
+		const startedAt = Date.now();
+		for (;;) {
+			const now = Date.now();
+			const current = readLocalStorageLock(storage, key);
+			if (!current || current.expiresAt <= now || current.owner === owner) {
+				writeLocalStorageLock(storage, key, { owner, expiresAt: now + staleMs });
+				const next = readLocalStorageLock(storage, key);
+				if (next && next.owner === owner)
+					return { key, owner, staleMs };
+			}
+			if (config.timeoutMs && now - startedAt >= config.timeoutMs)
+				throw lockTimeoutError(name, config.timeoutMs, config);
+			await delay(pollMs);
+		}
+	}
+
+	function renewLocalStorageLock(storage, lock) {
+		const current = readLocalStorageLock(storage, lock.key);
+		if (!current || current.owner !== lock.owner)
+			return;
+		writeLocalStorageLock(storage, lock.key, {
+			owner: lock.owner,
+			expiresAt: Date.now() + lock.staleMs
+		});
+	}
+
+	function releaseLocalStorageLock(storage, lock) {
+		try {
+			const current = readLocalStorageLock(storage, lock.key);
+			if (current && current.owner === lock.owner)
+				storage.removeItem(lock.key);
+		}
+		catch (_e) {
+			// Releasing a best-effort browser lock should not hide the result.
+		}
+	}
+
+	function readLocalStorageLock(storage, key) {
+		const raw = storage.getItem(key);
+		if (!raw)
+			return null;
+		try {
+			const parsed = JSON.parse(raw);
+			if (!parsed || typeof parsed.owner !== 'string')
+				return null;
+			const expiresAt = Number(parsed.expiresAt);
+			return Number.isFinite(expiresAt) ? { owner: parsed.owner, expiresAt } : null;
+		}
+		catch (_e) {
+			return null;
+		}
+	}
+
+	function writeLocalStorageLock(storage, key, value) {
+		storage.setItem(key, JSON.stringify(value));
+	}
+
+	function delay(ms) {
+		return new Promise((resolve) => setTimeout(resolve, ms));
+	}
+
+	function lockTimeoutError(name, timeoutMs, config) {
+		return new Error(`Timed out waiting for ${lockLabel(config)} "${name}" after ${Math.round((timeoutMs || 0) / 1000)} seconds.`);
+	}
+
+	function lockHoldTimeoutError(name, timeoutMs, config) {
+		return new Error(`Timed out while holding ${lockLabel(config)} "${name}" after ${Math.round((timeoutMs || 0) / 1000)} seconds.`);
+	}
+
+	function lockPageHiddenError(name, config) {
+		return new Error(`Released ${lockLabel(config)} "${name}" because the page was hidden.`);
+	}
+
+	function lockLabel(config) {
+		return config && typeof config.label === 'string' && config.label.length > 0
+			? config.label
+			: 'sync lock';
+	}
+
+	function normalizePositiveInteger(value) {
+		const parsed = Number.parseInt(value, 10);
+		return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+	}
+
+	function normalizeLockNamePart(value) {
+		return String(value).replace(/\s+/g, ' ').trim() || 'default';
+	}
+
+	function noop() {}
+
+	crossTabLock = {
+		acquireCrossTabLock,
+		normalizeCrossTabLockConfig,
+		normalizeLockNamePart,
+		normalizePositiveInteger,
+		runWithCrossTabLock
+	};
+	return crossTabLock;
+}
+
 var writeGate;
 var hasRequiredWriteGate;
 
@@ -3701,21 +4000,48 @@ function requireWriteGate () {
 	const gateKey = typeof Symbol === 'function'
 		? Symbol.for('orange-orm.syncWriteGate')
 		: '__orangeOrmSyncWriteGate';
+	const {
+		acquireCrossTabLock,
+		normalizeLockNamePart,
+		runWithCrossTabLock
+	} = requireCrossTabLock();
 
 	function runSyncWrite(target, options, fn) {
 		if (typeof options === 'function') {
 			fn = options;
 			options = undefined;
 		}
-		if (!shouldGateWrite(target, options))
+		const gateTarget = resolveGateTarget(target);
+		if (isReadonly(options))
 			return Promise.resolve().then(fn);
-		return getSyncWriteGate(target).runWrite(fn);
+		if (!gateTarget)
+			return Promise.resolve().then(fn);
+		if (isSuppressSyncOutbox(options))
+			return runCrossTabWrite(gateTarget, fn);
+		return getSyncWriteGate(gateTarget).runWrite(() => runCrossTabWrite(gateTarget, fn));
 	}
 
 	async function acquireSyncWrite(target, options) {
-		if (!shouldGateWrite(target, options))
+		const gateTarget = resolveGateTarget(target);
+		if (isReadonly(options))
 			return noop;
-		return getSyncWriteGate(target).acquireWrite();
+		if (!gateTarget)
+			return noop;
+		if (isSuppressSyncOutbox(options))
+			return acquireCrossTabWrite(gateTarget);
+		const releaseWrite = await getSyncWriteGate(gateTarget).acquireWrite();
+		let releaseCrossTab = noop;
+		try {
+			releaseCrossTab = await acquireCrossTabWrite(gateTarget);
+		}
+		catch (e) {
+			releaseWrite();
+			throw e;
+		}
+		return function releaseSyncWrite() {
+			releaseCrossTab();
+			releaseWrite();
+		};
 	}
 
 	function runSyncMaintenance(target, fn) {
@@ -3725,11 +4051,7 @@ function requireWriteGate () {
 	}
 
 	function shouldGateWrite(target, options) {
-		if (!resolveGateTarget(target))
-			return false;
-		if (options && (options.readonly || options.suppressSyncOutbox))
-			return false;
-		return true;
+		return !!resolveWriteGateTarget(target, options);
 	}
 
 	function getSyncWriteGate(target) {
@@ -3750,6 +4072,55 @@ function requireWriteGate () {
 		if (target.__sqliteSync)
 			return target;
 		return null;
+	}
+
+	function resolveWriteGateTarget(target, options) {
+		if (isReadonly(options) || isSuppressSyncOutbox(options))
+			return null;
+		return resolveGateTarget(target);
+	}
+
+	function isReadonly(options) {
+		return !!(options && options.readonly);
+	}
+
+	function isSuppressSyncOutbox(options) {
+		return !!(options && options.suppressSyncOutbox);
+	}
+
+	function runCrossTabWrite(gateTarget, fn) {
+		const lockConfig = getCrossTabWriteLockConfig(gateTarget);
+		if (!lockConfig)
+			return fn();
+		return runWithCrossTabLock(resolveCrossTabWriteLockName(gateTarget, lockConfig), lockConfig, fn);
+	}
+
+	async function acquireCrossTabWrite(gateTarget) {
+		const lockConfig = getCrossTabWriteLockConfig(gateTarget);
+		if (!lockConfig)
+			return noop;
+		return acquireCrossTabLock(resolveCrossTabWriteLockName(gateTarget, lockConfig), lockConfig);
+	}
+
+	function getCrossTabWriteLockConfig(gateTarget) {
+		const config = gateTarget && gateTarget.__orangeCrossTabWriteLock;
+		if (!config || config.enabled === false)
+			return null;
+		return {
+			...config,
+			label: config.label || 'sqlite writer lock'
+		};
+	}
+
+	function resolveCrossTabWriteLockName(gateTarget, config) {
+		if (config && typeof config.name === 'string' && config.name.length > 0)
+			return config.name;
+		const identity = gateTarget && (
+			gateTarget.__orangeSyncLockName
+			|| gateTarget.__orangeSyncIdentity
+			|| gateTarget.__orangeSqliteOPFSConnectionString
+		);
+		return `orange-orm:sqlite-write:${normalizeLockNamePart(identity || 'default')}`;
 	}
 
 	function createSyncWriteGate() {
@@ -5518,6 +5889,12 @@ function requireSyncClient () {
 	const outboxTableSql = requireOutboxTableSql();
 	const { ensureSyncSchema, clearEnsuredSyncSchema } = requireSyncSchema();
 	const { runSyncMaintenance } = requireWriteGate();
+	const {
+		normalizeCrossTabLockConfig,
+		normalizeLockNamePart,
+		normalizePositiveInteger,
+		runWithCrossTabLock
+	} = requireCrossTabLock();
 	const ensureOutboxOperationColumns = requireEnsureOutboxOperationColumns();
 	const {
 		deleteSyncOperationMemory,
@@ -7273,25 +7650,6 @@ function requireSyncClient () {
 		return !syncConfig || syncConfig.stableBase !== false;
 	}
 
-	function normalizeCrossTabLockConfig(value) {
-		if (value === false)
-			return { enabled: false };
-		if (value === true || value === undefined || value === null)
-			return { enabled: true };
-		if (typeof value === 'string')
-			return { enabled: true, name: value };
-		if (value !== Object(value))
-			throw new Error('Invalid sqlite sync crossTabLock configuration');
-		return {
-			enabled: value.enabled !== false,
-			name: typeof value.name === 'string' && value.name.length > 0 ? value.name : undefined,
-			timeoutMs: normalizePositiveInteger(value.timeoutMs),
-			maxHoldMs: normalizePositiveInteger(value.maxHoldMs),
-			staleMs: normalizePositiveInteger(value.staleMs),
-			pollMs: normalizePositiveInteger(value.pollMs)
-		};
-	}
-
 	function withRuntimeCrossTabLockConfig(config, options) {
 		if (!config || !config.enabled)
 			return config;
@@ -7315,223 +7673,6 @@ function requireSyncClient () {
 		);
 		const endpoint = syncConfig && (syncConfig.url || syncConfig.pull && syncConfig.pull.url || syncConfig.push && syncConfig.push.url);
 		return `orange-orm:sync:${normalizeLockNamePart(identity || endpoint || 'default')}`;
-	}
-
-	async function runWithCrossTabLock(name, config, fn) {
-		const lockConfig = config || { enabled: true };
-		if (!lockConfig.enabled)
-			return fn();
-		const locks = getWebLocks();
-		if (locks)
-			return runWithWebLock(locks, name, lockConfig, fn);
-		const storage = getLocalStorage();
-		if (storage)
-			return runWithLocalStorageLock(storage, name, lockConfig, fn);
-		return fn();
-	}
-
-	function getWebLocks() {
-		const nav = typeof globalThis !== 'undefined' ? globalThis.navigator : undefined;
-		return nav && nav.locks && typeof nav.locks.request === 'function'
-			? nav.locks
-			: null;
-	}
-
-	async function runWithWebLock(locks, name, config, fn) {
-		const options = { mode: 'exclusive' };
-		const timeoutMs = config.timeoutMs;
-		let timeoutId;
-		let waiting = true;
-		let timedOut = false;
-		if (timeoutMs && typeof AbortController === 'function') {
-			const controller = new AbortController();
-			options.signal = controller.signal;
-			timeoutId = setTimeout(() => {
-				if (!waiting)
-					return;
-				timedOut = true;
-				controller.abort();
-			}, timeoutMs);
-		}
-		try {
-			return await locks.request(name, options, async () => {
-				waiting = false;
-				if (timeoutId) {
-					clearTimeout(timeoutId);
-					timeoutId = undefined;
-				}
-				return runLockBody(name, config, fn);
-			});
-		}
-		catch (e) {
-			if (timedOut || e && e.name === 'AbortError')
-				throw syncLockTimeoutError(name, timeoutMs);
-			throw e;
-		}
-		finally {
-			if (timeoutId)
-				clearTimeout(timeoutId);
-		}
-	}
-
-	function getLocalStorage() {
-		if (typeof globalThis === 'undefined' || !globalThis.localStorage)
-			return null;
-		try {
-			const key = 'orange-orm:sync-lock-probe';
-			globalThis.localStorage.setItem(key, '1');
-			globalThis.localStorage.removeItem(key);
-			return globalThis.localStorage;
-		}
-		catch (_e) {
-			return null;
-		}
-	}
-
-	async function runWithLocalStorageLock(storage, name, config, fn) {
-		const lock = await acquireLocalStorageLock(storage, name, config);
-		const renewIntervalMs = Math.max(250, Math.floor(lock.staleMs / 3));
-		const intervalId = setInterval(() => {
-			try {
-				renewLocalStorageLock(storage, lock);
-			}
-			catch (_e) {
-				// A failed renewal will let another tab take the lock after staleMs.
-			}
-		}, renewIntervalMs);
-		try {
-			return await runLockBody(name, config, fn);
-		}
-		finally {
-			clearInterval(intervalId);
-			releaseLocalStorageLock(storage, lock);
-		}
-	}
-
-	async function runLockBody(name, config, fn) {
-		const operation = Promise.resolve().then(fn);
-		operation.catch(() => {});
-		const races = [operation];
-		const cleanup = [];
-		const maxHoldMs = normalizePositiveInteger(config && config.maxHoldMs);
-		if (maxHoldMs) {
-			races.push(new Promise((_resolve, reject) => {
-				const timeoutId = setTimeout(() => reject(syncLockHoldTimeoutError(name, maxHoldMs)), maxHoldMs);
-				cleanup.push(() => clearTimeout(timeoutId));
-			}));
-		}
-		const pageHide = createPageHideLockRelease(name);
-		if (pageHide) {
-			races.push(pageHide.promise);
-			cleanup.push(pageHide.cleanup);
-		}
-		try {
-			return await Promise.race(races);
-		}
-		finally {
-			for (let i = 0; i < cleanup.length; i++)
-				cleanup[i]();
-		}
-	}
-
-	function createPageHideLockRelease(name) {
-		const target = typeof globalThis !== 'undefined' ? globalThis : undefined;
-		if (!target || typeof target.addEventListener !== 'function' || typeof target.removeEventListener !== 'function')
-			return null;
-		let cleanup = () => {};
-		const promise = new Promise((_resolve, reject) => {
-			const release = () => reject(syncLockPageHiddenError(name));
-			target.addEventListener('pagehide', release, { once: true });
-			cleanup = () => target.removeEventListener('pagehide', release);
-		});
-		return { promise, cleanup };
-	}
-
-	async function acquireLocalStorageLock(storage, name, config) {
-		const key = `orange-orm:sync-lock:${name}`;
-		const owner = randomUuid();
-		const staleMs = config.staleMs || 60000;
-		const pollMs = config.pollMs || 100;
-		const startedAt = Date.now();
-		for (;;) {
-			const now = Date.now();
-			const current = readLocalStorageLock(storage, key);
-			if (!current || current.expiresAt <= now || current.owner === owner) {
-				writeLocalStorageLock(storage, key, { owner, expiresAt: now + staleMs });
-				const next = readLocalStorageLock(storage, key);
-				if (next && next.owner === owner)
-					return { key, owner, staleMs };
-			}
-			if (config.timeoutMs && now - startedAt >= config.timeoutMs)
-				throw syncLockTimeoutError(name, config.timeoutMs);
-			await delay(pollMs);
-		}
-	}
-
-	function renewLocalStorageLock(storage, lock) {
-		const current = readLocalStorageLock(storage, lock.key);
-		if (!current || current.owner !== lock.owner)
-			return;
-		writeLocalStorageLock(storage, lock.key, {
-			owner: lock.owner,
-			expiresAt: Date.now() + lock.staleMs
-		});
-	}
-
-	function releaseLocalStorageLock(storage, lock) {
-		try {
-			const current = readLocalStorageLock(storage, lock.key);
-			if (current && current.owner === lock.owner)
-				storage.removeItem(lock.key);
-		}
-		catch (_e) {
-			// Releasing a best-effort browser lock should not hide the sync result.
-		}
-	}
-
-	function readLocalStorageLock(storage, key) {
-		const raw = storage.getItem(key);
-		if (!raw)
-			return null;
-		try {
-			const parsed = JSON.parse(raw);
-			if (!parsed || typeof parsed.owner !== 'string')
-				return null;
-			const expiresAt = Number(parsed.expiresAt);
-			return Number.isFinite(expiresAt) ? { owner: parsed.owner, expiresAt } : null;
-		}
-		catch (_e) {
-			return null;
-		}
-	}
-
-	function writeLocalStorageLock(storage, key, value) {
-		storage.setItem(key, JSON.stringify(value));
-	}
-
-	function delay(ms) {
-		return new Promise((resolve) => setTimeout(resolve, ms));
-	}
-
-	function syncLockTimeoutError(name, timeoutMs) {
-		return new Error(`Timed out waiting for sync lock "${name}" after ${Math.round((timeoutMs || 0) / 1000)} seconds.`);
-	}
-
-	function syncLockHoldTimeoutError(name, timeoutMs) {
-		return new Error(`Timed out while holding sync lock "${name}" after ${Math.round((timeoutMs || 0) / 1000)} seconds.`);
-	}
-
-	function syncLockPageHiddenError(name) {
-		return new Error(`Released sync lock "${name}" because the page was hidden.`);
-	}
-
-	function normalizePositiveInteger(value) {
-		const parsed = Number.parseInt(value, 10);
-		return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
-	}
-
-	function normalizeLockNamePart(value) {
-		return String(value).replace(/\s+/g, ' ').trim() || 'default';
 	}
 
 	async function dropLocalSyncTables(db, client, tableNames) {
@@ -23747,6 +23888,8 @@ function requireInlineWorker () {
 		async function createDb(sqlite3, filename, vfs) {
 			if (!vfs || vfs === 'opfs')
 				return createOpfsDb(sqlite3, filename);
+			if (vfs === 'opfs-wl')
+				return createOpfsWlDb(sqlite3, filename);
 			if (vfs === 'opfs-sahpool')
 				return createOpfsSahPoolDb(sqlite3, filename);
 			if (vfs && vfs !== 'opfs')
@@ -23760,6 +23903,17 @@ function requireInlineWorker () {
 			return {
 				db: new DbClass(filename),
 				vfs: 'opfs',
+				opfs: true
+			};
+		}
+
+		function createOpfsWlDb(sqlite3, filename) {
+			const DbClass = sqlite3.oo1 && sqlite3.oo1.OpfsWlDb;
+			if (typeof DbClass !== 'function')
+				throw new Error('sqliteOPFS vfs "opfs-wl" is not available in this sqlite-wasm build.');
+			return {
+				db: new DbClass(filename),
+				vfs: 'opfs-wl',
 				opfs: true
 			};
 		}
@@ -23905,21 +24059,26 @@ function requireWorkerClient () {
 		worker.addEventListener('messageerror', onWorkerError);
 
 		const requestedVfs = options.vfs || 'opfs';
-		const ready = request('open', {
-			connectionString,
-			busyTimeoutMs: options.busyTimeoutMs || 5000,
-			vfs: options.vfs
-		}).then(({ result }) => {
+		const fallbackVfs = normalizeFallbackVfs(options.fallbackVfs, requestedVfs);
+		const ready = openWorkerDb(requestedVfs, fallbackVfs).then(({ result, fallback, fallbackError }) => {
 			const event = {
 				connectionString,
 				filename: result && result.filename,
 				requestedVfs,
 				vfs: result && result.vfs || requestedVfs,
-				fallback: false,
+				fallback,
+				fallbackVfs,
+				fallbackError,
 				readonly
 			};
 			log.emitSqliteOpen(event);
-			return result;
+			return {
+				...result,
+				requestedVfs,
+				fallback,
+				fallbackVfs,
+				fallbackError
+			};
 		});
 
 		return {
@@ -23987,6 +24146,34 @@ function requireWorkerClient () {
 					reject(e);
 				}
 			});
+		}
+
+		async function openWorkerDb(vfs, fallbackVfs) {
+			try {
+				const response = await request('open', {
+					connectionString,
+					busyTimeoutMs: options.busyTimeoutMs || 5000,
+					vfs: vfs === 'opfs' ? options.vfs : vfs
+				});
+				return {
+					result: response.result,
+					fallback: false
+				};
+			}
+			catch (e) {
+				if (!fallbackVfs)
+					throw e;
+				const response = await request('open', {
+					connectionString,
+					busyTimeoutMs: options.busyTimeoutMs || 5000,
+					vfs: fallbackVfs
+				});
+				return {
+					result: response.result,
+					fallback: true,
+					fallbackError: e && e.message ? e.message : String(e)
+				};
+			}
 		}
 
 		function close() {
@@ -24150,6 +24337,8 @@ function closeDb() {
 async function createDb(sqlite3, filename, vfs) {
 	if (!vfs || vfs === 'opfs')
 		return createOpfsDb(sqlite3, filename);
+	if (vfs === 'opfs-wl')
+		return createOpfsWlDb(sqlite3, filename);
 	if (vfs === 'opfs-sahpool')
 		return createOpfsSahPoolDb(sqlite3, filename);
 	if (vfs && vfs !== 'opfs')
@@ -24163,6 +24352,17 @@ function createOpfsDb(sqlite3, filename) {
 	return {
 		db: new DbClass(filename),
 		vfs: 'opfs',
+		opfs: true
+	};
+}
+
+function createOpfsWlDb(sqlite3, filename) {
+	const DbClass = sqlite3.oo1 && sqlite3.oo1.OpfsWlDb;
+	if (typeof DbClass !== 'function')
+		throw new Error('sqliteOPFS vfs "opfs-wl" is not available in this sqlite-wasm build.');
+	return {
+		db: new DbClass(filename),
+		vfs: 'opfs-wl',
 		opfs: true
 	};
 }
@@ -24265,6 +24465,14 @@ function serializeError(error) {
 		return { ...source };
 	}
 
+	function normalizeFallbackVfs(value, requestedVfs) {
+		if (!value || value === requestedVfs)
+			return undefined;
+		if (value !== 'opfs' && value !== 'opfs-sahpool' && value !== 'opfs-wl')
+			throw new Error(`sqliteOPFS fallbackVfs "${value}" is not supported.`);
+		return value;
+	}
+
 	function toError(error) {
 		const e = new Error(error && error.message ? error.message : 'sqliteOPFS worker request failed.');
 		if (error && error.name)
@@ -24303,14 +24511,26 @@ function requireNewPool$1 () {
 	const createSqliteOPFSWorkerClient = requireWorkerClient();
 
 	function newPool(connectionString, poolOptions) {
+		poolOptions = poolOptions || {};
 		let id = newId();
-		let client = createSqliteOPFSWorkerClient(connectionString, poolOptions || {});
+		let client = createSqliteOPFSWorkerClient(connectionString, poolOptions);
 		let readClient;
 		let c = {};
 		let ended = false;
 		let writerBusy = false;
 		const writerQueue = [];
 		const singleWorker = shouldUseSingleWorker(poolOptions);
+		c.__orangeSqliteOPFSConnectionString = connectionString;
+		c.__orangeSqliteOPFSRequestedVfs = poolOptions.vfs || 'opfs';
+		c.__orangeSqliteOPFSFallbackVfs = poolOptions.fallbackVfs;
+		c.__orangeCrossTabWriteLock = normalizeCrossTabWriteLockConfig(poolOptions);
+
+		if (client.ready && typeof client.ready.then === 'function') {
+			client.ready.then((result) => {
+				c.__orangeSqliteOPFSVfs = result && result.vfs || c.__orangeSqliteOPFSRequestedVfs;
+				c.__orangeSqliteOPFSFallback = !!(result && result.fallback);
+			}).catch(() => {});
+		}
 
 		prewarmReadClient();
 
@@ -24411,9 +24631,36 @@ function requireNewPool$1 () {
 		if (poolOptions.singleWorker === true)
 			return true;
 		const vfs = poolOptions.vfs || 'opfs';
-		if (vfs === 'opfs' || vfs === 'opfs-sahpool')
+		if (vfs === 'opfs' || vfs === 'opfs-sahpool' || vfs === 'opfs-wl')
 			return poolOptions.singleWorker !== false;
 		return false;
+	}
+
+	function normalizeCrossTabWriteLockConfig(poolOptions = {}) {
+		const value = poolOptions.crossTabWriteLock;
+		if (value === false)
+			return { enabled: false };
+		const defaultEnabled = poolOptions.vfs === 'opfs-wl' || poolOptions.fallbackVfs === 'opfs-wl';
+		if (value === undefined || value === null)
+			return { enabled: defaultEnabled };
+		if (value === true)
+			return { enabled: true };
+		if (typeof value === 'string')
+			return { enabled: true, name: value };
+		if (value !== Object(value))
+			throw new Error('Invalid sqliteOPFS crossTabWriteLock configuration');
+		return {
+			enabled: value.enabled !== false,
+			name: typeof value.name === 'string' && value.name.length > 0 ? value.name : undefined,
+			timeoutMs: normalizePositiveInteger(value.timeoutMs),
+			staleMs: normalizePositiveInteger(value.staleMs),
+			pollMs: normalizePositiveInteger(value.pollMs)
+		};
+	}
+
+	function normalizePositiveInteger(value) {
+		const parsed = Number.parseInt(value, 10);
+		return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 	}
 
 	newPool_1$1 = newPool;

@@ -151,6 +151,76 @@ describe('sync write gate', () => {
 
 		expect(events).toEqual(['maintenance']);
 	});
+
+	test('cross-tab sqlite writer lock serializes separate db instances', async () => {
+		const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+		Object.defineProperty(globalThis, 'navigator', {
+			configurable: true,
+			value: { locks: createFakeWebLocks() }
+		});
+		try {
+			const firstDb = createFakeCrossTabWriteDb('shared');
+			const secondDb = createFakeCrossTabWriteDb('shared');
+			const events = [];
+			let releaseFirst;
+			const first = runSyncWrite(firstDb, {}, async () => {
+				events.push('first:start');
+				await new Promise((resolve) => {
+					releaseFirst = resolve;
+				});
+				events.push('first:end');
+			});
+			await waitUntil(() => events.includes('first:start'));
+
+			const second = runSyncWrite(secondDb, {}, async () => {
+				events.push('second');
+			});
+			await wait(0);
+			expect(events).toEqual(['first:start']);
+
+			releaseFirst();
+			await Promise.all([first, second]);
+			expect(events).toEqual(['first:start', 'first:end', 'second']);
+		}
+		finally {
+			restoreGlobalNavigator(originalNavigator);
+		}
+	});
+
+	test('cross-tab sqlite writer lock still applies to suppressSyncOutbox writes', async () => {
+		const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+		Object.defineProperty(globalThis, 'navigator', {
+			configurable: true,
+			value: { locks: createFakeWebLocks() }
+		});
+		try {
+			const firstDb = createFakeCrossTabWriteDb('shared-suppress');
+			const secondDb = createFakeCrossTabWriteDb('shared-suppress');
+			const events = [];
+			let releaseFirst;
+			const first = runSyncWrite(firstDb, { suppressSyncOutbox: true }, async () => {
+				events.push('first:start');
+				await new Promise((resolve) => {
+					releaseFirst = resolve;
+				});
+				events.push('first:end');
+			});
+			await waitUntil(() => events.includes('first:start'));
+
+			const second = runSyncWrite(secondDb, { suppressSyncOutbox: true }, async () => {
+				events.push('second');
+			});
+			await wait(0);
+			expect(events).toEqual(['first:start']);
+
+			releaseFirst();
+			await Promise.all([first, second]);
+			expect(events).toEqual(['first:start', 'first:end', 'second']);
+		}
+		finally {
+			restoreGlobalNavigator(originalNavigator);
+		}
+	});
 });
 
 function createFakeSyncDb() {
@@ -211,6 +281,52 @@ function createFakeWorkerPool() {
 			throw new Error('hostLocal should not be called in this test');
 		}
 	};
+}
+
+function createFakeCrossTabWriteDb(name) {
+	return {
+		__sqliteSync: { url: '/rdb' },
+		__orangeCrossTabWriteLock: { enabled: true, name }
+	};
+}
+
+function createFakeWebLocks() {
+	const queues = new Map();
+	const active = new Set();
+	return {
+		request(name, _options, callback) {
+			return new Promise((resolve, reject) => {
+				const queue = queues.get(name) || [];
+				queue.push({ callback, resolve, reject });
+				queues.set(name, queue);
+				drain(name);
+			});
+		}
+	};
+
+	function drain(name) {
+		if (active.has(name))
+			return;
+		const queue = queues.get(name);
+		const entry = queue && queue.shift();
+		if (!entry)
+			return;
+		active.add(name);
+		Promise.resolve()
+			.then(entry.callback)
+			.then(entry.resolve, entry.reject)
+			.finally(() => {
+				active.delete(name);
+				drain(name);
+			});
+	}
+}
+
+function restoreGlobalNavigator(descriptor) {
+	if (descriptor)
+		Object.defineProperty(globalThis, 'navigator', descriptor);
+	else
+		delete globalThis.navigator;
 }
 
 function newDeferred() {

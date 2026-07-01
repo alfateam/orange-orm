@@ -1,21 +1,48 @@
 const gateKey = typeof Symbol === 'function'
 	? Symbol.for('orange-orm.syncWriteGate')
 	: '__orangeOrmSyncWriteGate';
+const {
+	acquireCrossTabLock,
+	normalizeLockNamePart,
+	runWithCrossTabLock
+} = require('./crossTabLock');
 
 function runSyncWrite(target, options, fn) {
 	if (typeof options === 'function') {
 		fn = options;
 		options = undefined;
 	}
-	if (!shouldGateWrite(target, options))
+	const gateTarget = resolveGateTarget(target);
+	if (isReadonly(options))
 		return Promise.resolve().then(fn);
-	return getSyncWriteGate(target).runWrite(fn);
+	if (!gateTarget)
+		return Promise.resolve().then(fn);
+	if (isSuppressSyncOutbox(options))
+		return runCrossTabWrite(gateTarget, fn);
+	return getSyncWriteGate(gateTarget).runWrite(() => runCrossTabWrite(gateTarget, fn));
 }
 
 async function acquireSyncWrite(target, options) {
-	if (!shouldGateWrite(target, options))
+	const gateTarget = resolveGateTarget(target);
+	if (isReadonly(options))
 		return noop;
-	return getSyncWriteGate(target).acquireWrite();
+	if (!gateTarget)
+		return noop;
+	if (isSuppressSyncOutbox(options))
+		return acquireCrossTabWrite(gateTarget);
+	const releaseWrite = await getSyncWriteGate(gateTarget).acquireWrite();
+	let releaseCrossTab = noop;
+	try {
+		releaseCrossTab = await acquireCrossTabWrite(gateTarget);
+	}
+	catch (e) {
+		releaseWrite();
+		throw e;
+	}
+	return function releaseSyncWrite() {
+		releaseCrossTab();
+		releaseWrite();
+	};
 }
 
 function runSyncMaintenance(target, fn) {
@@ -25,11 +52,7 @@ function runSyncMaintenance(target, fn) {
 }
 
 function shouldGateWrite(target, options) {
-	if (!resolveGateTarget(target))
-		return false;
-	if (options && (options.readonly || options.suppressSyncOutbox))
-		return false;
-	return true;
+	return !!resolveWriteGateTarget(target, options);
 }
 
 function getSyncWriteGate(target) {
@@ -50,6 +73,55 @@ function resolveGateTarget(target) {
 	if (target.__sqliteSync)
 		return target;
 	return null;
+}
+
+function resolveWriteGateTarget(target, options) {
+	if (isReadonly(options) || isSuppressSyncOutbox(options))
+		return null;
+	return resolveGateTarget(target);
+}
+
+function isReadonly(options) {
+	return !!(options && options.readonly);
+}
+
+function isSuppressSyncOutbox(options) {
+	return !!(options && options.suppressSyncOutbox);
+}
+
+function runCrossTabWrite(gateTarget, fn) {
+	const lockConfig = getCrossTabWriteLockConfig(gateTarget);
+	if (!lockConfig)
+		return fn();
+	return runWithCrossTabLock(resolveCrossTabWriteLockName(gateTarget, lockConfig), lockConfig, fn);
+}
+
+async function acquireCrossTabWrite(gateTarget) {
+	const lockConfig = getCrossTabWriteLockConfig(gateTarget);
+	if (!lockConfig)
+		return noop;
+	return acquireCrossTabLock(resolveCrossTabWriteLockName(gateTarget, lockConfig), lockConfig);
+}
+
+function getCrossTabWriteLockConfig(gateTarget) {
+	const config = gateTarget && gateTarget.__orangeCrossTabWriteLock;
+	if (!config || config.enabled === false)
+		return null;
+	return {
+		...config,
+		label: config.label || 'sqlite writer lock'
+	};
+}
+
+function resolveCrossTabWriteLockName(gateTarget, config) {
+	if (config && typeof config.name === 'string' && config.name.length > 0)
+		return config.name;
+	const identity = gateTarget && (
+		gateTarget.__orangeSyncLockName
+		|| gateTarget.__orangeSyncIdentity
+		|| gateTarget.__orangeSqliteOPFSConnectionString
+	);
+	return `orange-orm:sqlite-write:${normalizeLockNamePart(identity || 'default')}`;
 }
 
 function createSyncWriteGate() {

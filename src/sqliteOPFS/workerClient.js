@@ -14,21 +14,26 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 	worker.addEventListener('messageerror', onWorkerError);
 
 	const requestedVfs = options.vfs || 'opfs';
-	const ready = request('open', {
-		connectionString,
-		busyTimeoutMs: options.busyTimeoutMs || 5000,
-		vfs: options.vfs
-	}).then(({ result }) => {
+	const fallbackVfs = normalizeFallbackVfs(options.fallbackVfs, requestedVfs);
+	const ready = openWorkerDb(requestedVfs, fallbackVfs).then(({ result, fallback, fallbackError }) => {
 		const event = {
 			connectionString,
 			filename: result && result.filename,
 			requestedVfs,
 			vfs: result && result.vfs || requestedVfs,
-			fallback: false,
+			fallback,
+			fallbackVfs,
+			fallbackError,
 			readonly
 		};
 		log.emitSqliteOpen(event);
-		return result;
+		return {
+			...result,
+			requestedVfs,
+			fallback,
+			fallbackVfs,
+			fallbackError
+		};
 	});
 
 	return {
@@ -96,6 +101,34 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 				reject(e);
 			}
 		});
+	}
+
+	async function openWorkerDb(vfs, fallbackVfs) {
+		try {
+			const response = await request('open', {
+				connectionString,
+				busyTimeoutMs: options.busyTimeoutMs || 5000,
+				vfs: vfs === 'opfs' ? options.vfs : vfs
+			});
+			return {
+				result: response.result,
+				fallback: false
+			};
+		}
+		catch (e) {
+			if (!fallbackVfs)
+				throw e;
+			const response = await request('open', {
+				connectionString,
+				busyTimeoutMs: options.busyTimeoutMs || 5000,
+				vfs: fallbackVfs
+			});
+			return {
+				result: response.result,
+				fallback: true,
+				fallbackError: e && e.message ? e.message : String(e)
+			};
+		}
 	}
 
 	function close() {
@@ -259,6 +292,8 @@ function closeDb() {
 async function createDb(sqlite3, filename, vfs) {
 	if (!vfs || vfs === 'opfs')
 		return createOpfsDb(sqlite3, filename);
+	if (vfs === 'opfs-wl')
+		return createOpfsWlDb(sqlite3, filename);
 	if (vfs === 'opfs-sahpool')
 		return createOpfsSahPoolDb(sqlite3, filename);
 	if (vfs && vfs !== 'opfs')
@@ -272,6 +307,17 @@ function createOpfsDb(sqlite3, filename) {
 	return {
 		db: new DbClass(filename),
 		vfs: 'opfs',
+		opfs: true
+	};
+}
+
+function createOpfsWlDb(sqlite3, filename) {
+	const DbClass = sqlite3.oo1 && sqlite3.oo1.OpfsWlDb;
+	if (typeof DbClass !== 'function')
+		throw new Error('sqliteOPFS vfs "opfs-wl" is not available in this sqlite-wasm build.');
+	return {
+		db: new DbClass(filename),
+		vfs: 'opfs-wl',
 		opfs: true
 	};
 }
@@ -372,6 +418,14 @@ function normalizeOpfsSahPoolOptions(options = {}) {
 	if (!source || source !== Object(source))
 		return {};
 	return { ...source };
+}
+
+function normalizeFallbackVfs(value, requestedVfs) {
+	if (!value || value === requestedVfs)
+		return undefined;
+	if (value !== 'opfs' && value !== 'opfs-sahpool' && value !== 'opfs-wl')
+		throw new Error(`sqliteOPFS fallbackVfs "${value}" is not supported.`);
+	return value;
 }
 
 function toError(error) {

@@ -55,6 +55,8 @@ function closeDb() {
 async function createDb(sqlite3, filename, vfs) {
 	if (!vfs || vfs === 'opfs')
 		return createOpfsDb(sqlite3, filename);
+	if (vfs === 'opfs-wl')
+		return createOpfsWlDb(sqlite3, filename);
 	if (vfs === 'opfs-sahpool')
 		return createOpfsSahPoolDb(sqlite3, filename);
 	if (vfs && vfs !== 'opfs')
@@ -68,6 +70,17 @@ function createOpfsDb(sqlite3, filename) {
 	return {
 		db: new DbClass(filename),
 		vfs: 'opfs',
+		opfs: true
+	};
+}
+
+function createOpfsWlDb(sqlite3, filename) {
+	const DbClass = sqlite3.oo1 && sqlite3.oo1.OpfsWlDb;
+	if (typeof DbClass !== 'function')
+		throw new Error('sqliteOPFS vfs "opfs-wl" is not available in this sqlite-wasm build.');
+	return {
+		db: new DbClass(filename),
+		vfs: 'opfs-wl',
 		opfs: true
 	};
 }
