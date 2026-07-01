@@ -1038,6 +1038,17 @@ export interface SyncResetLocalResult<M extends Record<string, any> = any> {
   droppedTables: string[];
 }
 
+export type SyncLocalSchemaResult<M extends Record<string, any> = any> = {
+  skipped: true;
+} | {
+  skipped: false;
+  tables: SyncTableName<M>[];
+  schema?: unknown;
+  checksum?: string;
+  scope?: string;
+  sql?: string[];
+};
+
 export interface SyncInitialReadyEvent<M extends Record<string, any> = any> {
   tables: SyncTableName<M>[];
   since: unknown;
@@ -1155,6 +1166,7 @@ export type DBClient<
   readonly metaData: DbConcurrency<M>;
   syncClient: {
     sync(options?: SyncOptions): Promise<void>;
+    ensureLocalSchema(options?: SyncOptions): Promise<SyncLocalSchemaResult<M>>;
     resetLocal(options: SyncResetLocalOptions<M>): Promise<SyncResetLocalResult<M>>;
     start(): Promise<unknown> | undefined;
     stop(): void | Promise<unknown>;

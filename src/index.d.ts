@@ -61,6 +61,7 @@ declare namespace r {
 
     export interface SyncWorkerClient {
         sync(options?: unknown): Promise<void>;
+        ensureLocalSchema(options?: unknown): Promise<unknown>;
         resetLocal(options?: unknown): Promise<unknown>;
         onOperation<Context extends Record<string, unknown> = Record<string, unknown>, Memory = unknown, Result = unknown>(
             operation: string,
@@ -115,6 +116,7 @@ declare namespace r {
             stop(options?: unknown): Promise<unknown>;
             isRunning(options?: unknown): Promise<unknown>;
             getConfig(options?: unknown): Promise<unknown>;
+            ensureLocalSchema(options?: unknown): Promise<unknown>;
             resetLocal(options?: unknown): Promise<unknown>;
             onOperation<Context extends Record<string, unknown> = Record<string, unknown>, Memory = unknown, Result = unknown>(
                 operation: string,

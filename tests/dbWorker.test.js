@@ -56,6 +56,26 @@ describe('db worker rpc', () => {
 		expect(stops).toBe(1);
 	});
 
+	test('routes ensureLocalSchema through worker sync client', async () => {
+		const calls = [];
+		const bridge = createBridge({
+			syncClient: {
+				ensureLocalSchema: async (options) => {
+					calls.push(options);
+					return { skipped: false, tables: ['customer'] };
+				}
+			}
+		}, { autoStart: false });
+		const workerClient = rdb.createDbWorkerClient(bridge.worker);
+
+		const result = await workerClient.syncClient.ensureLocalSchema({ timeoutMs: 123 });
+		workerClient.close();
+		bridge.handler.stop();
+
+		expect(calls).toEqual([{ timeoutMs: 123 }]);
+		expect(result).toEqual({ skipped: false, tables: ['customer'] });
+	});
+
 	test('routes table reads and writes through worker db', async () => {
 		await dbWorkerUiDb.customer.insert({ id: 9001, name: 'Worker', balance: 10, isActive: true });
 
@@ -238,9 +258,10 @@ describe('db worker rpc', () => {
 	});
 });
 
-function createBridge(db) {
+function createBridge(db, options = {}) {
 	const uiListeners = new Set();
 	const handler = rdb.createDbWorkerHandler(db, {
+		...options,
 		postMessage(message) {
 			for (const listener of Array.from(uiListeners))
 				listener({ data: message });
@@ -260,7 +281,8 @@ function createBridge(db) {
 				if (event === 'message')
 					uiListeners.delete(listener);
 			}
-		}
+		},
+		handler
 	};
 }
 

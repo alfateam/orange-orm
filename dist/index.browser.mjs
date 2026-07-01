@@ -5920,8 +5920,11 @@ function requireSyncClient () {
 		let initialReadyEmitted = false;
 		const interceptors = createHttpInterceptor();
 		const lockedSync = withCrossTabSyncLock(sync);
+		const lockedEnsureLocalSchema = withCrossTabSyncLock(ensureLocalSchema);
 		const lockedResetLocal = withCrossTabSyncLock(resetLocal);
-		const queuedSync = serializeAsyncMethod(lockedSync);
+		const serializeSyncWork = createAsyncSerializer();
+		const queuedSync = serializeSyncWork(lockedSync);
+		const queuedEnsureLocalSchema = serializeSyncWork(lockedEnsureLocalSchema);
 		const observedSync = observeSyncMethod('sync', queuedSync);
 		const auto = createSyncAuto({
 			sync: observedSync
@@ -5929,6 +5932,7 @@ function requireSyncClient () {
 
 		return {
 			sync: observedSync,
+			ensureLocalSchema: queuedEnsureLocalSchema,
 			resetLocal: lockedResetLocal,
 			start: auto.start,
 			stop: auto.stop,
@@ -5954,17 +5958,33 @@ function requireSyncClient () {
 			};
 		}
 
-		function serializeAsyncMethod(fn) {
+		function createAsyncSerializer() {
 			let tail = Promise.resolve();
-			return function serializedAsyncMethod(options) {
-				const run = tail.then(() => fn(options));
-				tail = run.catch(() => {});
-				return run;
+			return function serializeAsyncMethod(fn) {
+				return function serializedAsyncMethod(options) {
+					const run = tail.then(() => fn(options));
+					tail = run.catch(() => {});
+					return run;
+				};
 			};
 		}
 
 		async function sync(options = {}) {
 			await pull(normalizeSyncOptions(options));
+		}
+
+		async function ensureLocalSchema(options = {}) {
+			const result = await prepareLocalSyncSchema(normalizeSyncOptions(options), { allowMissingSync: true });
+			if (result.skipped)
+				return result;
+			return {
+				skipped: false,
+				tables: result.configuredTables,
+				schema: result.schemaResult && result.schemaResult.schema,
+				checksum: result.schemaResult && result.schemaResult.checksum,
+				scope: result.schemaResult && result.schemaResult.scope,
+				sql: result.schemaResult && result.schemaResult.sql
+			};
 		}
 
 		async function getConfig() {
@@ -6000,22 +6020,45 @@ function requireSyncClient () {
 		}
 
 		async function pull(options = {}) {
+			const {
+				db,
+				syncConfig,
+				pullConfig,
+				configuredTables
+			} = await prepareLocalSyncSchema(options);
+			const hadStableBase = await hasStableBase(db, configuredTables);
+			if (!hadStableBase)
+				return runSyncMaintenance(db, () => pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase));
+			return pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase);
+		}
+
+		async function prepareLocalSyncSchema(options = {}, prepareOptions = {}) {
 			const db = await getDb();
 			const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
-			if (!syncConfig)
+			if (!syncConfig) {
+				if (prepareOptions.allowMissingSync)
+					return { skipped: true };
 				throw new Error('Sync is not configured. Add sync in sqlite options: sqlite(connectionString, { sync: ... })');
+			}
 
 			const pullOptions = normalizePullOptions(options);
 			const pullConfig = resolvePullConfig(syncConfig, pullOptions);
 			const configuredTables = resolveSyncTables(db, pullConfig.tables, client);
 			if (!Array.isArray(configuredTables) || configuredTables.length === 0)
 				throw new Error('Sync pull requires mapped tables or configured tables. Set sync.tables when the client has no table map.');
-			await ensureSyncSchema(db, client, configuredTables, syncConfig.schema);
-			await runSyncMaintenance(db, () => cleanupSyncStorage(db, configuredTables));
-			const hadStableBase = await hasStableBase(db, configuredTables);
-			if (!hadStableBase)
-				return runSyncMaintenance(db, () => pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase));
-			return pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase);
+			const schemaResult = await runSyncMaintenance(db, async () => {
+				const ensuredSchema = await ensureSyncSchema(db, client, configuredTables, syncConfig.schema);
+				await cleanupSyncStorage(db, configuredTables);
+				return ensuredSchema;
+			});
+			return {
+				skipped: false,
+				db,
+				syncConfig,
+				pullConfig,
+				configuredTables,
+				schemaResult
+			};
 		}
 
 		async function pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase) {
@@ -19527,6 +19570,7 @@ function requireDbWorkerClient () {
 			close,
 			syncClient: {
 				sync: syncRequest.bind(null, 'sync'),
+				ensureLocalSchema: syncRequest.bind(null, 'ensureLocalSchema'),
 				resetLocal: syncRequest.bind(null, 'resetLocal'),
 				start: syncRequest.bind(null, 'start'),
 				stop: syncRequest.bind(null, 'stop'),

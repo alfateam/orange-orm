@@ -105,6 +105,40 @@ afterAll(async () => {
 });
 
 describe('sqlite staged pull sync', () => {
+	test('ensureLocalSchema creates local tables before first sync without remote request', async () => {
+		const ensureLocalName = `demo.${fileNameWithoutExtension}.ensure-local-schema.db`;
+		fs.rmSync(ensureLocalName, { force: true });
+		const ensureLocalDb = map({
+			db: (con) => con.sqlite(ensureLocalName, {
+				size: 1,
+				sync: {
+					url: 'http://127.0.0.1:1/rdb',
+					auto: false,
+					tables: ['customer']
+				}
+			})
+		});
+
+		try {
+			const result = await ensureLocalDb.syncClient.ensureLocalSchema();
+			const countRows = await ensureLocalDb.query('SELECT COUNT(*) AS count FROM "customer"');
+			const countRow = Array.isArray(countRows) ? countRows[0] : countRows?.rows?.[0];
+			await ensureLocalDb.customer.insert({ id: 9901, name: 'Schema', balance: 1, isActive: true });
+			const row = await ensureLocalDb.customer.getById(9901);
+
+			expect(result).toMatchObject({
+				skipped: false,
+				tables: ['customer']
+			});
+			expect(Number(countRow?.count ?? countRow?.COUNT ?? 0)).toBe(0);
+			expect(row.name).toBe('Schema');
+		}
+		finally {
+			await ensureLocalDb.close();
+			fs.rmSync(ensureLocalName, { force: true });
+		}
+	});
+
 	test('first sync uses snapshot and fetches in key/row batches', async () => {
 		await localDb.syncClient.sync();
 

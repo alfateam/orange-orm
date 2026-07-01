@@ -121,6 +121,16 @@ describe('sync client auto start', () => {
 			.rejects.toThrow('Unsupported sync option "mutations"');
 	});
 
+	test('ensureLocalSchema skips when sync is not configured', async () => {
+		const client = newSyncClient({}, async () => ({
+			query: async () => {
+				throw new Error('should not query');
+			}
+		}), {});
+
+		await expect(client.ensureLocalSchema()).resolves.toEqual({ skipped: true });
+	});
+
 	test('applies sync request and response error interceptors', async () => {
 		const seen = [];
 		const db = {
