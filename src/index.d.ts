@@ -5,7 +5,7 @@ import type { D1Database } from '@cloudflare/workers-types';
 import type { ConnectionConfiguration } from 'tedious';
 import type { PoolAttributes } from 'oracledb';
 import type { AllowedDbMap, DBClientFromMap as MapDBClientFromMap, DbMapper, MappedDbDef, MergeProperties } from './map';
-import type { DBClient as MapDBClient, Filter as MapFilter, Pool as MapPool, PoolOptions as MapPoolOptions, RawFilter as MapRawFilter, SyncOperationEvent as MapSyncOperationEvent, TableDefinition as MapTableDefinition } from './map2';
+import type { DBClient as MapDBClient, Filter as MapFilter, Pool as MapPool, PoolOptions as MapPoolOptions, RawFilter as MapRawFilter, SqliteOPFSPoolOptions as MapSqliteOPFSPoolOptions, SyncOperationEvent as MapSyncOperationEvent, TableDefinition as MapTableDefinition } from './map2';
 
 declare function r(config: r.Config): unknown;
 
@@ -23,7 +23,7 @@ declare namespace r {
     function postgres(connectionString: string, options?: PoolOptions): Pool;
     function pglite(config?: PGliteOptions | string | undefined, options?: PoolOptions): Pool;
     function sqlite(connectionString: string, options?: PoolOptions): Pool;
-    function sqliteOPFS(connectionString: string, options?: PoolOptions): Pool;
+    function sqliteOPFS(connectionString: string, options?: SqliteOPFSPoolOptions): Pool;
     function sap(connectionString: string, options?: PoolOptions): Pool;
     function mssql(connectionConfig: ConnectionConfiguration, options?: PoolOptions): Pool;
     function mssql(connectionString: string, options?: PoolOptions): Pool;
@@ -228,6 +228,7 @@ declare namespace r {
 
     export type  Pool = MapPool;
     export type  PoolOptions = MapPoolOptions;
+    export type  SqliteOPFSPoolOptions = MapSqliteOPFSPoolOptions;
     export type DBClient<
         M extends Record<string, MapTableDefinition<M>> = any,
         Commands extends Record<string, (...args: any[]) => any> = {}

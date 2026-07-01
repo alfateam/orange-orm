@@ -925,7 +925,7 @@ interface Connectors {
   postgres(connectionString: string, options?: PoolOptions<any>): Pool;
   pglite(config?: PGliteOptions | string | undefined, options?: PoolOptions<any>): Pool;
   sqlite(connectionString: string, options?: PoolOptions<any>): Pool;
-  sqliteOPFS(connectionString: string, options?: PoolOptions<any>): Pool;
+  sqliteOPFS(connectionString: string, options?: SqliteOPFSPoolOptions<any>): Pool;
   sap(connectionString: string, options?: PoolOptions<any>): Pool;
   mssql(connectionConfig: ConnectionConfiguration, options?: PoolOptions<any>): Pool;
   mssql(connectionString: string, options?: PoolOptions<any>): Pool;
@@ -940,7 +940,7 @@ type DbConnectable<M extends Record<string, TableDefinition<M>>> = {
   postgres(connectionString: string, options?: PoolOptions<M>): DBClient<M>;
   pglite(config?: PGliteOptions | string | undefined, options?: PoolOptions<M>): DBClient<M>;
   sqlite(connectionString: string, options?: PoolOptions<M>): DBClient<M>;
-  sqliteOPFS(connectionString: string, options?: PoolOptions<M>): DBClient<M>;
+  sqliteOPFS(connectionString: string, options?: SqliteOPFSPoolOptions<M>): DBClient<M>;
   sap(connectionString: string, options?: PoolOptions<M>): DBClient<M>;
   mssql(connectionConfig: ConnectionConfiguration, options?: PoolOptions<M>): DBClient<M>;
   mssql(connectionString: string, options?: PoolOptions<M>): DBClient<M>;
@@ -1097,6 +1097,9 @@ export type SyncOperationEvent<
 
 export interface PoolOptions<M extends Record<string, any> = any> {
   size?: number;
+}
+
+export interface SqliteOPFSPoolOptions<M extends Record<string, any> = any> extends PoolOptions<M> {
   sync?: string | SyncConfig<M>;
   opfsSahPool?: OpfsSahPoolOptions;
   singleWorker?: boolean;
