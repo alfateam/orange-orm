@@ -63,8 +63,9 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 			const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
 			if (!syncConfig)
 				return fn(options);
-			const lockConfig = withRuntimeCrossTabLockConfig(syncConfig.crossTabLock, options);
-			return runWithCrossTabLock(resolveCrossTabLockName(db, syncConfig), lockConfig, () => fn(options));
+			const lock = await resolveRuntimeCrossTabSyncLock(db, syncConfig);
+			const lockConfig = withRuntimeCrossTabLockConfig(lock.config, options);
+			return runWithCrossTabLock(lock.name, lockConfig, () => fn(options));
 		};
 	}
 
@@ -1778,9 +1779,42 @@ function withRuntimeCrossTabLockConfig(config, options) {
 	};
 }
 
-function resolveCrossTabLockName(db, syncConfig) {
+async function resolveRuntimeCrossTabSyncLock(db, syncConfig) {
+	const sqliteOPFS = resolveSqliteOPFSRuntime(db);
+	if (!sqliteOPFS)
+		return {
+			name: resolveCrossTabLockName(db, syncConfig),
+			config: syncConfig.crossTabLock
+		};
+	const vfs = await resolveSqliteOPFSVfs(sqliteOPFS);
+	const forceWlLock = vfs === 'opfs-wl';
+	const config = forceWlLock
+		? { ...syncConfig.crossTabLock, enabled: true }
+		: syncConfig.crossTabLock;
+	return {
+		name: resolveCrossTabLockName(db, syncConfig, vfs),
+		config
+	};
+}
+
+function resolveSqliteOPFSRuntime(db) {
+	const pool = db && (db.poolFactory || db);
+	if (!pool || typeof pool.__orangeSqliteOPFSConnectionString !== 'string')
+		return null;
+	return pool;
+}
+
+async function resolveSqliteOPFSVfs(pool) {
+	if (pool.__orangeSqliteOPFSReady && typeof pool.__orangeSqliteOPFSReady.then === 'function') {
+		const result = await pool.__orangeSqliteOPFSReady;
+		return result && result.vfs || pool.__orangeSqliteOPFSVfs || pool.__orangeSqliteOPFSRequestedVfs;
+	}
+	return pool.__orangeSqliteOPFSVfs || pool.__orangeSqliteOPFSRequestedVfs;
+}
+
+function resolveCrossTabLockName(db, syncConfig, sqliteVfs) {
 	const config = syncConfig && syncConfig.crossTabLock;
-	if (config && typeof config.name === 'string' && config.name.length > 0)
+	if (config && typeof config.name === 'string' && config.name.length > 0 && !sqliteVfs)
 		return config.name;
 	const identity = db && (
 		db.__orangeSyncLockName
@@ -1788,7 +1822,11 @@ function resolveCrossTabLockName(db, syncConfig) {
 		|| db.poolFactory && (db.poolFactory.__orangeSyncLockName || db.poolFactory.__orangeSyncIdentity)
 	);
 	const endpoint = syncConfig && (syncConfig.url || syncConfig.pull && syncConfig.pull.url || syncConfig.push && syncConfig.push.url);
-	return `orange-orm:sync:${normalizeLockNamePart(identity || endpoint || 'default')}`;
+	const base = config && typeof config.name === 'string' && config.name.length > 0
+		? config.name
+		: identity || endpoint || 'default';
+	const scoped = sqliteVfs ? `${base}:${sqliteVfs}` : base;
+	return `orange-orm:sync:${normalizeLockNamePart(scoped)}`;
 }
 
 async function dropLocalSyncTables(db, client, tableNames) {

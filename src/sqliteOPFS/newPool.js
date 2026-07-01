@@ -16,6 +16,7 @@ function newPool(connectionString, poolOptions) {
 	c.__orangeSqliteOPFSRequestedVfs = poolOptions.vfs || 'opfs';
 	c.__orangeSqliteOPFSFallbackVfs = poolOptions.fallbackVfs;
 	c.__orangeCrossTabWriteLock = normalizeCrossTabWriteLockConfig(poolOptions);
+	c.__orangeSqliteOPFSReady = client.ready;
 
 	if (client.ready && typeof client.ready.then === 'function') {
 		client.ready.then((result) => {

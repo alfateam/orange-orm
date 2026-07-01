@@ -304,6 +304,56 @@ describe('sync client auto start', () => {
 		}
 	});
 
+	test('forces sync cross-tab lock for opfs-wl even when disabled', async () => {
+		const lockNames = [];
+		const restoreLocks = installFakeWebLocks({
+			request: async (name, _options, callback) => {
+				lockNames.push(name);
+				return callback();
+			}
+		});
+		const db = newSqliteOpfsSyncDb('opfs-wl', {
+			crossTabLock: false
+		});
+		const client = newBasicSyncClient(db);
+
+		try {
+			await client.sync();
+
+			expect(lockNames).toEqual([
+				'orange-orm:sync:sqliteOPFS:sync-client.sqlite3:opfs-wl'
+			]);
+		}
+		finally {
+			restoreLocks();
+		}
+	});
+
+	test('scopes sync web locks by sqliteOPFS vfs', async () => {
+		const requests = [];
+		const restoreLocks = installFakeWebLocks();
+		const sahpoolClient = newBasicSyncClient(newSqliteOpfsSyncDb('opfs-sahpool', {
+			crossTabLock: { name: 'shared-sync-lock' }
+		}), requests);
+		const wlClient = newBasicSyncClient(newSqliteOpfsSyncDb('opfs-wl', {
+			crossTabLock: { name: 'shared-sync-lock' }
+		}), requests);
+
+		try {
+			const sahpoolSync = sahpoolClient.sync();
+			const wlSync = wlClient.sync();
+			await wait(0);
+
+			expect(requests).toHaveLength(2);
+			requests[0].resolve({ data: { phase: 'keys', items: [], done: true, cursor: 'cursor-1' } });
+			requests[1].resolve({ data: { phase: 'keys', items: [], done: true, cursor: 'cursor-2' } });
+			await Promise.all([sahpoolSync, wlSync]);
+		}
+		finally {
+			restoreLocks();
+		}
+	});
+
 	test('serializes explicit sync calls without cross-tab lock', async () => {
 		const requests = [];
 		const db = {
@@ -1485,6 +1535,53 @@ describe('sync client auto start', () => {
 	});
 
 });
+
+function newBasicSyncClient(db, requests) {
+	return newSyncClient({
+		transaction: async (fn) => fn({
+			customer: {
+				patch: async () => ({ changed: [] })
+			},
+			query: async () => []
+		})
+	}, async () => db, {
+		applyTo(axios) {
+			axios.request = async (request) => {
+				if (Array.isArray(requests)) {
+					const deferred = newDeferred();
+					deferred.request = request;
+					requests.push(deferred);
+					return deferred.promise;
+				}
+				return {
+					data: { phase: 'keys', items: [], done: true, cursor: 'cursor-1' }
+				};
+			};
+		}
+	});
+}
+
+function newSqliteOpfsSyncDb(vfs, syncOverrides = {}) {
+	const sync = {
+		url: '/rdb',
+		auto: false,
+		tables: ['customer'],
+		stableBase: false,
+		...syncOverrides
+	};
+	const pool = {
+		__sqliteSync: sync,
+		__orangeSyncIdentity: 'sqliteOPFS:sync-client.sqlite3',
+		__orangeSqliteOPFSConnectionString: 'sync-client.sqlite3',
+		__orangeSqliteOPFSRequestedVfs: 'opfs-sahpool',
+		__orangeSqliteOPFSReady: Promise.resolve({ vfs })
+	};
+	return {
+		__sqliteSync: sync,
+		poolFactory: pool,
+		query: async () => []
+	};
+}
 
 function newTable(dbName) {
 	return {
