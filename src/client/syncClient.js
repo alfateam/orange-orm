@@ -142,10 +142,11 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 			pullConfig,
 			configuredTables
 		} = await prepareLocalSyncSchema(options);
-		const hadStableBase = await hasStableBase(db, configuredTables);
-		if (!hadStableBase)
-			return runSyncMaintenance(db, () => pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase));
-		return pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase);
+		const stableBaseEnabled = isStableBaseEnabled(syncConfig);
+		const hadStableBase = stableBaseEnabled && await hasStableBase(db, configuredTables);
+		if (stableBaseEnabled && !hadStableBase)
+			return runSyncMaintenance(db, () => pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase, stableBaseEnabled));
+		return pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase, stableBaseEnabled);
 	}
 
 	async function prepareLocalSyncSchema(options = {}, prepareOptions = {}) {
@@ -164,7 +165,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 			throw new Error('Sync pull requires mapped tables or configured tables. Set sync.tables when the client has no table map.');
 		const schemaResult = await runSyncMaintenance(db, async () => {
 			const ensuredSchema = await ensureSyncSchema(db, client, configuredTables, syncConfig.schema);
-			await cleanupSyncStorage(db, configuredTables);
+			await cleanupSyncStorage(db, configuredTables, isStableBaseEnabled(syncConfig));
 			return ensuredSchema;
 		});
 		return {
@@ -177,8 +178,8 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		};
 	}
 
-	async function pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase) {
-		await pushBeforePull(db, syncConfig, hadStableBase);
+	async function pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase, stableBaseEnabled) {
+		await pushBeforePull(db, syncConfig, hadStableBase, stableBaseEnabled);
 		const pullStartedAtMs = Date.now();
 		await maybeEmitInitialReady(syncConfig, configuredTables, db, 'persisted');
 		const currentSince = await getScopeSince(configuredTables, db);
@@ -193,17 +194,17 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		};
 		let result;
 		try {
-			result = await pullStaged(pullConfig, requestOptions);
+			result = await pullStaged(pullConfig, requestOptions, stableBaseEnabled);
 		}
 		catch (e) {
 			if (!shouldFallbackToPatch(e))
 				throw e;
-			result = await pullPatch(pullConfig, requestOptions);
+			result = await pullPatch(pullConfig, requestOptions, stableBaseEnabled);
 		}
 		if (result && result.since !== undefined && result.checkpointApplied !== true)
 			await setScopeSince(configuredTables, result.since, db);
 		await deleteConfirmedPushedMutations(db, pullStartedAtMs);
-		if (!hadStableBase)
+		if (stableBaseEnabled && !hadStableBase)
 			await replayLocalOutbox(db);
 		await maybeEmitInitialReady(syncConfig, configuredTables, db, 'sync');
 		return result;
@@ -269,8 +270,8 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		return result;
 	}
 
-	async function pushBeforePull(db, syncConfig, hasBase) {
-		if (!hasBase)
+	async function pushBeforePull(db, syncConfig, hasBase, stableBaseEnabled = true) {
+		if (stableBaseEnabled && !hasBase)
 			return;
 		const pushConfig = resolvePushConfig(syncConfig);
 		const maxBatches = resolveMaxPushBatches();
@@ -407,7 +408,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 			|| Number(error && error.status) === 409;
 	}
 
-	async function pullStaged(pullConfig, options) {
+	async function pullStaged(pullConfig, options, stableBaseEnabled = true) {
 		const maxKeysPerBatch = normalizeLimit(pullConfig.maxKeysPerBatch, 1000);
 		const maxRowsPerBatch = normalizeLimit(pullConfig.maxRowsPerBatch, 1000);
 		const maxJournalRowsPerInsert = normalizeLimit(pullConfig.maxJournalRowsPerInsert, maxRowsPerBatch);
@@ -420,7 +421,8 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		const shouldApplyCheckpoint = session.finalSince !== undefined;
 		await client.transaction(async (tx) => {
 			await tryDeferForeignKeys(tx);
-			await ensureStableBaseTables(tx, options.tables);
+			if (stableBaseEnabled)
+				await ensureStableBaseTables(tx, options.tables);
 			const batches = await readPullJournalBatches(tx, scopeKey);
 			const hasJournalItems = batches.length > 0;
 			const touchedTables = new Set();
@@ -432,11 +434,13 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 				const upsertItems = batch.filter(x => x.op !== 'D' && x.row !== undefined);
 				if (deleteItems.length > 0) {
 					applied += await applyDeleteItemsOnTx(tx, deleteItems, defaultPatchOptions);
-					await applyDeleteItemsToStableBase(tx, deleteItems);
+					if (stableBaseEnabled)
+						await applyDeleteItemsToStableBase(tx, deleteItems);
 				}
 				if (upsertItems.length > 0) {
 					applied += await applyRowsPayloadOnTx(tx, upsertItems, defaultPatchOptions);
-					await applyRowsPayloadToStableBase(tx, upsertItems);
+					if (stableBaseEnabled)
+						await applyRowsPayloadToStableBase(tx, upsertItems);
 				}
 			}
 			if (hasJournalItems)
@@ -640,7 +644,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		}
 	}
 
-	async function pullPatch(pullConfig, options) {
+	async function pullPatch(pullConfig, options, stableBaseEnabled = true) {
 		const payload = await requestPayload(pullConfig, options);
 		const tablePatches = extractTablePatches(payload);
 		const defaultPatchOptions = { ...(pullConfig.patchOptions || {}), concurrency: 'overwrite' };
@@ -657,7 +661,8 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 					applied += entry.patch.length;
 				}
 				await validateForeignKeys(tx);
-				await copyTablesToStableBase(tx, tablePatches.map(x => x.table));
+				if (stableBaseEnabled)
+					await copyTablesToStableBase(tx, tablePatches.map(x => x.table));
 			}, { suppressSyncOutbox: true });
 		}
 		return {
@@ -1447,9 +1452,10 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 			.filter(name => typeof name === 'string' && name.length > 0);
 	}
 
-	async function cleanupSyncStorage(db, tableNames) {
+	async function cleanupSyncStorage(db, tableNames, stableBaseEnabled = true) {
 		await cleanupLegacySyncState(db);
-		await cleanupInactiveStableBase(db, tableNames);
+		if (stableBaseEnabled)
+			await cleanupInactiveStableBase(db, tableNames);
 	}
 
 	async function cleanupLegacySyncState(db) {
@@ -1843,8 +1849,13 @@ function normalizeSyncConfig(sync) {
 		schema: sync.schema,
 		auto: sync.auto,
 		push: sync.push === undefined ? undefined : normalizePushConfig(sync.push, endpoint),
+		stableBase: sync.stableBase !== false,
 		crossTabLock: normalizeCrossTabLockConfig(sync.crossTabLock)
 	};
+}
+
+function isStableBaseEnabled(syncConfig) {
+	return !syncConfig || syncConfig.stableBase !== false;
 }
 
 function withRuntimeCrossTabLockConfig(config, options) {

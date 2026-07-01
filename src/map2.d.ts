@@ -1017,6 +1017,7 @@ export interface SyncConfig<M extends Record<string, any> = any> extends Partial
   initialReadyMaxAgeMs?: number;
   pull?: string | SyncPullOverrideConfig<M>;
   push?: string | SyncEndpointConfig;
+  stableBase?: boolean;
   auto?: boolean | {
     enabled?: boolean;
     intervalMs?: number;
