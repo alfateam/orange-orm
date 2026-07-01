@@ -27752,7 +27752,7 @@ function requireNewPool$5 () {
 	const createSqliteOPFSWorkerClient = requireWorkerClient();
 
 	function newPool(connectionString, poolOptions) {
-		poolOptions = poolOptions || {};
+		poolOptions = normalizePoolOptions(poolOptions);
 		let id = newId();
 		let client = createSqliteOPFSWorkerClient(connectionString, poolOptions);
 		let readClient;
@@ -27879,30 +27879,21 @@ function requireNewPool$5 () {
 	}
 
 	function normalizeCrossTabWriteLockConfig(poolOptions = {}) {
-		const value = poolOptions.crossTabWriteLock;
-		if (value === false)
-			return { enabled: false };
 		const defaultEnabled = poolOptions.vfs === 'opfs-wl' || poolOptions.fallbackVfs === 'opfs-wl';
-		if (value === undefined || value === null)
-			return { enabled: defaultEnabled };
-		if (value === true)
-			return { enabled: true };
-		if (typeof value === 'string')
-			return { enabled: true, name: value };
-		if (value !== Object(value))
-			throw new Error('Invalid sqliteOPFS crossTabWriteLock configuration');
 		return {
-			enabled: value.enabled !== false,
-			name: typeof value.name === 'string' && value.name.length > 0 ? value.name : undefined,
-			timeoutMs: normalizePositiveInteger(value.timeoutMs),
-			staleMs: normalizePositiveInteger(value.staleMs),
-			pollMs: normalizePositiveInteger(value.pollMs)
+			enabled: defaultEnabled
 		};
 	}
 
-	function normalizePositiveInteger(value) {
-		const parsed = Number.parseInt(value, 10);
-		return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+	function normalizePoolOptions(poolOptions) {
+		poolOptions = poolOptions || {};
+		if (!poolOptions.sync)
+			return poolOptions;
+		return {
+			...poolOptions,
+			vfs: poolOptions.vfs || 'opfs-sahpool',
+			fallbackVfs: poolOptions.fallbackVfs || 'opfs-wl'
+		};
 	}
 
 	newPool_1$5 = newPool;

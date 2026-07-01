@@ -1017,21 +1017,11 @@ export interface SyncConfig<M extends Record<string, any> = any> extends Partial
   initialReadyMaxAgeMs?: number;
   pull?: string | SyncPullOverrideConfig<M>;
   push?: string | SyncEndpointConfig;
-  crossTabLock?: boolean | string | SyncCrossTabLockConfig;
   stableBase?: boolean;
   auto?: boolean | {
     enabled?: boolean;
     intervalMs?: number;
   };
-}
-
-export interface SyncCrossTabLockConfig {
-  enabled?: boolean;
-  name?: string;
-  timeoutMs?: number;
-  maxHoldMs?: number;
-  staleMs?: number;
-  pollMs?: number;
 }
 
 export interface SyncOptions {
@@ -1108,10 +1098,7 @@ export type SyncOperationEvent<
 export interface PoolOptions<M extends Record<string, any> = any> {
   size?: number;
   sync?: string | SyncConfig<M>;
-  vfs?: 'opfs' | 'opfs-sahpool' | 'opfs-wl';
-  fallbackVfs?: 'opfs' | 'opfs-sahpool' | 'opfs-wl';
   opfsSahPool?: OpfsSahPoolOptions;
-  crossTabWriteLock?: boolean | string | SyncCrossTabLockConfig;
   singleWorker?: boolean;
   inlineWorker?: boolean;
   prewarmRead?: boolean;

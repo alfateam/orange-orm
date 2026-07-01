@@ -392,6 +392,41 @@ describe('sqliteOPFS pool', () => {
 		expect(closes).toEqual(['/fallback-opfs-wl.sqlite3']);
 	});
 
+	test('uses sync sqliteOPFS defaults for sahpool fallback to opfs-wl', async () => {
+		const closes = [];
+		const pool = newPool('sync-default-opfs.sqlite3', {
+			sync: { url: '/rdb' },
+			inlineWorker: true,
+			prewarmRead: false,
+			sqlite3InitModule() {
+				const sqlite3 = newFakeSqlite3(closes);
+				sqlite3.installOpfsSAHPoolVfs = async () => {
+					throw new Error('SAH pool is locked');
+				};
+				return sqlite3;
+			}
+		});
+
+		try {
+			const rows = await new Promise((resolve, reject) => {
+				pool.connect((err, client) => {
+					if (err)
+						return reject(err);
+					client.executeQuery(newSql('SELECT 1'), (err, result) => err ? reject(err) : resolve(result));
+				});
+			});
+
+			expect(rows).toEqual([{ value: 1 }]);
+			expect(pool.__orangeSqliteOPFSRequestedVfs).toBe('opfs-sahpool');
+			expect(pool.__orangeSqliteOPFSFallbackVfs).toBe('opfs-wl');
+			expect(pool.__orangeCrossTabWriteLock).toEqual({ enabled: true });
+		}
+		finally {
+			await pool.end();
+		}
+		expect(closes).toEqual(['/sync-default-opfs.sqlite3']);
+	});
+
 	test('does not fall back to transient sqlite when OPFS is unavailable', async () => {
 		const pool = newPool('missing-opfs.sqlite3', {
 			inlineWorker: true,

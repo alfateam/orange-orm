@@ -3,7 +3,7 @@ import type { PGliteOptions } from './pglite.d.ts';
 import type { ConnectionConfiguration } from 'tedious';
 import type { D1Database } from '@cloudflare/workers-types';
 import type { PoolAttributes } from 'oracledb';
-import type { DBClient, SyncCommandHandler, SyncConfig, SyncCrossTabLockConfig } from './map2';
+import type { DBClient, SyncCommandHandler, SyncConfig } from './map2';
 
 export type MergeProperties<T, V> = {
 	[K in keyof T | keyof V]:
@@ -111,8 +111,6 @@ export interface Pool {
 export interface PoolOptions<M extends Record<string, any> = any> {
 	size?: number;
 	sync?: string | SyncConfig<M>;
-	vfs?: 'opfs' | 'opfs-sahpool' | 'opfs-wl';
-	fallbackVfs?: 'opfs' | 'opfs-sahpool' | 'opfs-wl';
 	opfsSahPool?: {
 		name?: string;
 		directory?: string;
@@ -121,7 +119,6 @@ export interface PoolOptions<M extends Record<string, any> = any> {
 		verbosity?: number;
 		forceReinitIfPreviouslyFailed?: boolean;
 	};
-	crossTabWriteLock?: boolean | string | SyncCrossTabLockConfig;
 	singleWorker?: boolean;
 	inlineWorker?: boolean;
 	prewarmRead?: boolean;
