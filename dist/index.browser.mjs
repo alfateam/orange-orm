@@ -5903,6 +5903,7 @@ function requireSyncClient () {
 	} = requireOperationContext();
 
 	const maxPushBatchesPerSync = 1000;
+	const maxStableBaseKeysPerStatement = 200;
 
 	function newSyncClient(client, getDb, axiosInterceptor) {
 		const sinceByScope = new Map();
@@ -5914,6 +5915,7 @@ function requireSyncClient () {
 		const syncPullItemTable = 'orange_sync_pull_item';
 		const syncBaseTable = 'orange_sync_base_tables';
 		const syncBasePrefix = 'orange_sync_base_data_';
+		const syncBaseIndexPrefix = 'orange_sync_base_idx_';
 		const legacyStableBaseSnapshotPendingScope = '__orange_sync_stable_base_snapshot_pending__';
 		const initialReadyListeners = new Set();
 		const eventListeners = new Map();
@@ -7415,6 +7417,7 @@ function requireSyncClient () {
 					`CREATE TABLE IF NOT EXISTS ${quoteIdent(tableInfo.baseName)}`,
 					`AS SELECT * FROM ${quoteIdent(tableInfo.dbName)} WHERE 0`
 				].join(' '));
+				await ensureStableBasePrimaryKeyIndex(db, tableInfo);
 				await db.query([
 					`INSERT INTO "${syncBaseTable}" ("name", "base_name", "schema_sql", "ordinal")`,
 					`VALUES (${sqlStringLiteral(tableInfo.dbName)}, ${sqlStringLiteral(tableInfo.baseName)}, NULL, ${i})`,
@@ -7423,6 +7426,16 @@ function requireSyncClient () {
 					'"ordinal" = excluded."ordinal"'
 				].join(' '));
 			}
+		}
+
+		async function ensureStableBasePrimaryKeyIndex(db, tableInfo) {
+			const primaryColumns = getPrimaryColumns(tableInfo && tableInfo.table);
+			if (!tableInfo || primaryColumns.length === 0)
+				return;
+			await db.query([
+				`CREATE INDEX IF NOT EXISTS ${quoteIdent(toBaseTableIndexName(tableInfo.dbName))}`,
+				`ON ${quoteIdent(tableInfo.baseName)} (${primaryColumns.map(quoteIdent).join(', ')})`
+			].join(' '));
 		}
 
 		function resolveStableBaseTableInfo(tableName, existingByName) {
@@ -7451,8 +7464,9 @@ function requireSyncClient () {
 			if (deletes.length === 0)
 				return;
 			const baseByName = await readStableBaseEntriesByName(db);
-			for (let i = 0; i < deletes.length; i++)
-				await applyStableBaseDelete(db, deletes[i], baseByName);
+			const groups = stableBaseTargetGroupsForItems(deletes, baseByName);
+			for (const group of groups)
+				await applyStableBaseDeleteGroup(db, group);
 		}
 
 		async function applyRowsPayloadToStableBase(db, items) {
@@ -7460,8 +7474,9 @@ function requireSyncClient () {
 			if (rows.length === 0)
 				return;
 			const baseByName = await readStableBaseEntriesByName(db);
-			for (let i = 0; i < rows.length; i++)
-				await applyStableBaseUpsertFromTable(db, rows[i], baseByName);
+			const groups = stableBaseTargetGroupsForItems(rows, baseByName);
+			for (const group of groups)
+				await applyStableBaseUpsertGroup(db, group);
 		}
 
 		async function copyTablesToStableBase(db, tableNames) {
@@ -7479,19 +7494,46 @@ function requireSyncClient () {
 			}
 		}
 
-		async function applyStableBaseDelete(db, item, baseByName) {
-			const target = stableBaseTargetForItem(item, baseByName);
-			if (!target)
-				return;
-			await db.query(`DELETE FROM ${quoteIdent(target.baseName)} WHERE ${target.where}`);
+		function stableBaseTargetGroupsForItems(items, baseByName) {
+			const groups = new Map();
+			for (let i = 0; i < items.length; i++) {
+				const target = stableBaseTargetForItem(items[i], baseByName);
+				if (!target)
+					continue;
+				const key = target.baseName;
+				let group = groups.get(key);
+				if (!group) {
+					group = {
+						dbName: target.dbName,
+						baseName: target.baseName,
+						primaryColumns: target.primaryColumns,
+						keys: []
+					};
+					groups.set(key, group);
+				}
+				group.keys.push(target.key);
+			}
+			return Array.from(groups.values());
 		}
 
-		async function applyStableBaseUpsertFromTable(db, item, baseByName) {
-			const target = stableBaseTargetForItem(item, baseByName);
-			if (!target)
-				return;
-			await db.query(`DELETE FROM ${quoteIdent(target.baseName)} WHERE ${target.where}`);
-			await db.query(`INSERT INTO ${quoteIdent(target.baseName)} SELECT * FROM ${quoteIdent(target.dbName)} WHERE ${target.where}`);
+		async function applyStableBaseDeleteGroup(db, group) {
+			for (let offset = 0; offset < group.keys.length; offset += maxStableBaseKeysPerStatement) {
+				const keys = group.keys.slice(offset, offset + maxStableBaseKeysPerStatement);
+				const where = primaryKeyWhereAnySql(group.primaryColumns, keys);
+				if (where)
+					await db.query(`DELETE FROM ${quoteIdent(group.baseName)} WHERE ${where}`);
+			}
+		}
+
+		async function applyStableBaseUpsertGroup(db, group) {
+			for (let offset = 0; offset < group.keys.length; offset += maxStableBaseKeysPerStatement) {
+				const keys = group.keys.slice(offset, offset + maxStableBaseKeysPerStatement);
+				const where = primaryKeyWhereAnySql(group.primaryColumns, keys);
+				if (!where)
+					continue;
+				await db.query(`DELETE FROM ${quoteIdent(group.baseName)} WHERE ${where}`);
+				await db.query(`INSERT INTO ${quoteIdent(group.baseName)} SELECT * FROM ${quoteIdent(group.dbName)} WHERE ${where}`);
+			}
 		}
 
 		function stableBaseTargetForItem(item, baseByName) {
@@ -7503,13 +7545,13 @@ function requireSyncClient () {
 			const dbName = table._dbName || item.table;
 			const baseEntry = baseByName && baseByName.get(dbName);
 			const primaryColumns = getPrimaryColumns(table);
-			const where = primaryKeyWhereSql(primaryColumns, item.pk);
-			if (!baseEntry || !where)
+			if (!baseEntry || primaryColumns.length === 0 || item.pk.length !== primaryColumns.length)
 				return null;
 			return {
 				dbName,
 				baseName: baseEntry.baseName,
-				where
+				primaryColumns,
+				key: item.pk
 			};
 		}
 
@@ -7519,6 +7561,18 @@ function requireSyncClient () {
 			return primaryColumns
 				.map((column, index) => sqlValuePredicate(quoteIdent(column), key[index]))
 				.join(' AND ');
+		}
+
+		function primaryKeyWhereAnySql(primaryColumns, keys) {
+			if (!Array.isArray(keys) || keys.length === 0)
+				return '';
+			const clauses = [];
+			for (let i = 0; i < keys.length; i++) {
+				const where = primaryKeyWhereSql(primaryColumns, keys[i]);
+				if (where)
+					clauses.push(primaryColumns.length > 1 ? `(${where})` : where);
+			}
+			return clauses.join(' OR ');
 		}
 
 		async function restoreStableBase(db) {
@@ -7598,6 +7652,10 @@ function requireSyncClient () {
 
 		function toBaseTableName(name) {
 			return syncBasePrefix + toHexName(name);
+		}
+
+		function toBaseTableIndexName(name) {
+			return syncBaseIndexPrefix + toHexName(name);
 		}
 
 		function toHexName(name) {
