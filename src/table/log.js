@@ -2,8 +2,7 @@ var newEmitEvent = require('../emitEvent');
 
 var emitters = {
 	query: newEmitEvent(),
-	queryComplete: newEmitEvent(),
-	sqliteOpen: newEmitEvent()
+	queryComplete: newEmitEvent()
 };
 
 var logger = function() {
@@ -24,10 +23,6 @@ log.emitQueryComplete = function() {
 	emitters.queryComplete.apply(null, arguments);
 };
 
-log.emitSqliteOpen = function() {
-	emitters.sqliteOpen.apply(null, arguments);
-};
-
 log.startQuery = function({ sql, parameters }) {
 	const startedAt = now();
 	log.emitQuery({ sql, parameters });
@@ -45,8 +40,6 @@ log.on = function(type, cb) {
 		emitters.query.add(cb);
 	else if (type === 'queryComplete')
 		emitters.queryComplete.add(cb);
-	else if (type === 'sqliteOpen')
-		emitters.sqliteOpen.add(cb);
 	else
 		throw new Error('unknown event type: ' + type);
 };
@@ -56,8 +49,6 @@ log.off = function(type, cb) {
 		emitters.query.tryRemove(cb);
 	else if (type === 'queryComplete')
 		emitters.queryComplete.tryRemove(cb);
-	else if (type === 'sqliteOpen')
-		emitters.sqliteOpen.tryRemove(cb);
 	else
 		throw new Error('unknown event type: ' + type);
 };

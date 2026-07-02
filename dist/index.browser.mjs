@@ -20443,8 +20443,7 @@ function requireLog () {
 
 	var emitters = {
 		query: newEmitEvent(),
-		queryComplete: newEmitEvent(),
-		sqliteOpen: newEmitEvent()
+		queryComplete: newEmitEvent()
 	};
 
 	var logger = function() {
@@ -20465,10 +20464,6 @@ function requireLog () {
 		emitters.queryComplete.apply(null, arguments);
 	};
 
-	log.emitSqliteOpen = function() {
-		emitters.sqliteOpen.apply(null, arguments);
-	};
-
 	log.startQuery = function({ sql, parameters }) {
 		const startedAt = now();
 		log.emitQuery({ sql, parameters });
@@ -20486,8 +20481,6 @@ function requireLog () {
 			emitters.query.add(cb);
 		else if (type === 'queryComplete')
 			emitters.queryComplete.add(cb);
-		else if (type === 'sqliteOpen')
-			emitters.sqliteOpen.add(cb);
 		else
 			throw new Error('unknown event type: ' + type);
 	};
@@ -20497,8 +20490,6 @@ function requireLog () {
 			emitters.query.tryRemove(cb);
 		else if (type === 'queryComplete')
 			emitters.queryComplete.tryRemove(cb);
-		else if (type === 'sqliteOpen')
-			emitters.sqliteOpen.tryRemove(cb);
 		else
 			throw new Error('unknown event type: ' + type);
 	};
@@ -23727,7 +23718,7 @@ function requireWorkerClient () {
 					busyTimeoutMs: options.busyTimeoutMs || 5000,
 					vfs: vfs === 'opfs' ? options.vfs : vfs
 				});
-				return onOpenResult({
+				return normalizeOpenResult({
 					result: response.result,
 					fallback: false
 				});
@@ -23740,7 +23731,7 @@ function requireWorkerClient () {
 					busyTimeoutMs: options.busyTimeoutMs || 5000,
 					vfs: fallbackVfs
 				});
-				return onOpenResult({
+				return normalizeOpenResult({
 					result: response.result,
 					fallback: true,
 					fallbackError: e && e.message ? e.message : String(e)
@@ -23748,18 +23739,7 @@ function requireWorkerClient () {
 			}
 		}
 
-		function onOpenResult({ result, fallback, fallbackError }) {
-			const event = {
-				connectionString,
-				filename: result && result.filename,
-				requestedVfs,
-				vfs: result && result.vfs || requestedVfs,
-				fallback,
-				fallbackVfs,
-				fallbackError,
-				readonly
-			};
-			log.emitSqliteOpen(event);
+		function normalizeOpenResult({ result, fallback, fallbackError }) {
 			return {
 				...result,
 				requestedVfs,

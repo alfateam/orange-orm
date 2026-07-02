@@ -114,7 +114,7 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 				busyTimeoutMs: options.busyTimeoutMs || 5000,
 				vfs: vfs === 'opfs' ? options.vfs : vfs
 			});
-			return onOpenResult({
+			return normalizeOpenResult({
 				result: response.result,
 				fallback: false
 			});
@@ -127,7 +127,7 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 				busyTimeoutMs: options.busyTimeoutMs || 5000,
 				vfs: fallbackVfs
 			});
-			return onOpenResult({
+			return normalizeOpenResult({
 				result: response.result,
 				fallback: true,
 				fallbackError: e && e.message ? e.message : String(e)
@@ -135,18 +135,7 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 		}
 	}
 
-	function onOpenResult({ result, fallback, fallbackError }) {
-		const event = {
-			connectionString,
-			filename: result && result.filename,
-			requestedVfs,
-			vfs: result && result.vfs || requestedVfs,
-			fallback,
-			fallbackVfs,
-			fallbackError,
-			readonly
-		};
-		log.emitSqliteOpen(event);
+	function normalizeOpenResult({ result, fallback, fallbackError }) {
 		return {
 			...result,
 			requestedVfs,

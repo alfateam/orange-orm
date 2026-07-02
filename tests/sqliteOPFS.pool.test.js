@@ -171,10 +171,7 @@ describe('sqliteOPFS pool', () => {
 		pool.end();
 	});
 
-	test('emits sqlite open vfs details', async () => {
-		const opened = [];
-		const onOpen = (entry) => opened.push(entry);
-		log.on('sqliteOpen', onOpen);
+	test('tracks sqlite open vfs details', async () => {
 		const pool = newPool('test.sqlite3', {
 			prewarmRead: false,
 			createWorker() {
@@ -185,24 +182,24 @@ describe('sqliteOPFS pool', () => {
 		});
 
 		try {
-			await pool.connect((err) => {
-				if (err)
-					throw err;
+			await new Promise((resolve, reject) => {
+				pool.connect((err, _client, done) => {
+					done(err);
+					if (err)
+						return reject(err);
+					resolve();
+				});
 			});
-			await wait(10);
+			const opened = await pool.__orangeSqliteOPFSReady;
 
-			expect(opened).toHaveLength(1);
-			expect(opened[0]).toMatchObject({
-				connectionString: 'test.sqlite3',
+			expect(opened).toMatchObject({
 				filename: '/test.sqlite3',
 				requestedVfs: 'opfs',
 				vfs: 'opfs',
-				fallback: false,
-				readonly: false
+				fallback: false
 			});
 		}
 		finally {
-			log.off('sqliteOpen', onOpen);
 			pool.end();
 		}
 	});
@@ -445,9 +442,6 @@ describe('sqliteOPFS pool', () => {
 	});
 
 	test('falls back from opfs-sahpool to opfs-wl', async () => {
-		const opened = [];
-		const onOpen = (entry) => opened.push(entry);
-		log.on('sqliteOpen', onOpen);
 		const closes = [];
 		const pool = newPool('fallback-opfs-wl.sqlite3', {
 			vfs: 'opfs-sahpool',
@@ -465,27 +459,22 @@ describe('sqliteOPFS pool', () => {
 
 		try {
 			const rows = await new Promise((resolve, reject) => {
-				pool.connect((err, client) => {
+				pool.connect((err, client, done) => {
 					if (err)
 						return reject(err);
-					client.executeQuery(newSql('SELECT 1'), (err, result) => err ? reject(err) : resolve(result));
+					client.executeQuery(newSql('SELECT 1'), (err, result) => {
+						done(err);
+						err ? reject(err) : resolve(result);
+					});
 				});
 			});
+			await wait(10);
 
 			expect(rows).toEqual([{ value: 1 }]);
-			expect(opened).toHaveLength(1);
-			expect(opened[0]).toMatchObject({
-				connectionString: 'fallback-opfs-wl.sqlite3',
-				requestedVfs: 'opfs-sahpool',
-				vfs: 'opfs-wl',
-				fallback: true,
-				fallbackVfs: 'opfs-wl',
-				fallbackError: 'SAH pool is locked',
-				readonly: false
-			});
+			expect(pool.__orangeSqliteOPFSVfs).toBe('opfs-wl');
+			expect(pool.__orangeSqliteOPFSFallback).toBe(true);
 		}
 		finally {
-			log.off('sqliteOpen', onOpen);
 			await pool.end();
 		}
 		expect(closes).toEqual(['/fallback-opfs-wl.sqlite3']);
