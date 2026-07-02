@@ -217,8 +217,6 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
 		if (!syncConfig)
 			throw new Error('Sync is not configured. Add sync in sqlite options: sqlite(connectionString, { sync: ... })');
-		if (!options || options.force !== true)
-			throw new Error('resetLocal requires { force: true } because it deletes local sync data.');
 
 		const configuredTables = resolveSyncTables(db, normalizeConfiguredTables(options.tables) || syncConfig.tables, client);
 		if (!Array.isArray(configuredTables) || configuredTables.length === 0)

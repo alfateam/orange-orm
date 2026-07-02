@@ -1028,7 +1028,6 @@ export interface SyncOptions {
 }
 
 export interface SyncResetLocalOptions<M extends Record<string, any> = any> {
-  force: true;
   tables?: SyncTableName<M>[];
 }
 
@@ -1149,7 +1148,7 @@ export type DBClient<
     config?: DbOptions<M, Commands>
   ): DBClient<M, Commands>;
   transaction<TR = unknown>(
-    fn: (db: DBClient<M>, ctx: SyncTransactionContext) => Promise<TR> | TR
+    fn: (db: DBClient<M, Commands>, ctx: SyncTransactionContext) => Promise<TR> | TR
   ): Promise<TR>;
   express(): import('express').RequestHandler;
   express(config: ExpressConfig<M>): import('express').RequestHandler;
@@ -1159,7 +1158,7 @@ export type DBClient<
   syncClient: {
     sync(options?: SyncOptions): Promise<void>;
     ensureLocalSchema(options?: SyncOptions): Promise<SyncLocalSchemaResult<M>>;
-    resetLocal(options: SyncResetLocalOptions<M>): Promise<SyncResetLocalResult<M>>;
+    resetLocal(options?: SyncResetLocalOptions<M>): Promise<SyncResetLocalResult<M>>;
     discardLocalChanges(): Promise<void>;
     start(): Promise<void>;
     stop(): Promise<void>;

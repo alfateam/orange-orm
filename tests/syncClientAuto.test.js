@@ -541,7 +541,7 @@ describe('sync client auto start', () => {
 		});
 
 		await client.sync();
-		await client.resetLocal({ force: true });
+		await client.resetLocal();
 		await client.sync();
 
 		const resetDropIndex = db.queryLog.findIndex((sql) => /DROP TABLE IF EXISTS "orange_sync_state"/u.test(sql));
