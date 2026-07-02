@@ -191,7 +191,7 @@ describe('db worker rpc', () => {
 		expect(raw.name).toBe('OPFS');
 	});
 
-	test('mapped db worker client reuses worker sync client', async () => {
+	test('mapped db worker client reuses worker sync client for initial sync readiness', async () => {
 		const syncFileName = 'demo.dbWorker.sync-client.test.db';
 		fs.rmSync(syncFileName, { force: true });
 		const syncWorkerDb = map({
@@ -201,20 +201,54 @@ describe('db worker rpc', () => {
 			})
 		});
 		await initSqlite(syncWorkerDb);
+		let readinessRequests = 0;
+		syncWorkerDb.syncClient.waitForInitialSync = async () => {
+			readinessRequests += 1;
+		};
 		const bridge = createBridge(syncWorkerDb);
 		const workerClient = rdb.createDbWorkerClient(bridge.worker);
 		const uiDb = map({
 			db: workerClient
 		});
 
-		const config = await uiDb.syncClient.getConfig();
+		await uiDb.syncClient.waitForInitialSync();
 		workerClient.close();
 
-		expect(config).toMatchObject({
-			url: '/rdb',
-			auto: false,
-			tables: ['customer']
+		expect(readinessRequests).toBe(1);
+	});
+
+	test('routes general operation events through worker sync client', async () => {
+		const syncListeners = new Map();
+		const bridge = createBridge({
+			syncClient: {
+				start: async () => {},
+				stop: async () => {},
+				on(event, listener) {
+					syncListeners.set(event, listener);
+					return () => syncListeners.delete(event);
+				}
+			}
+		}, { autoStart: false });
+		const workerClient = rdb.createDbWorkerClient(bridge.worker);
+		const events = [];
+
+		const unsubscribe = workerClient.syncClient.on('operation', event => events.push(event));
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		syncListeners.get('operation')({
+			ok: true,
+			operation: 'worker-op',
+			mutationId: 'mutation-1',
+			context: {},
+			retryable: false,
+			result: { ok: true }
 		});
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		unsubscribe();
+		workerClient.close();
+		bridge.handler.stop();
+
+		expect(events).toHaveLength(1);
+		expect(events[0].operation).toBe('worker-op');
 	});
 
 	test('caches sqliteOPFS provider connection across ORM operations', async () => {

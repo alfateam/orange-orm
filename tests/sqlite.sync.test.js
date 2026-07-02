@@ -159,11 +159,7 @@ describe('sqlite staged pull sync', () => {
 		});
 
 		await localDb.syncClient.sync();
-		const ready = await readyPromise;
-
-		expect(ready.source).toBe('sync');
-		expect(ready.tables).toEqual(expect.arrayContaining(['customer', 'order']));
-		expect(ready.since).not.toBeUndefined();
+		await expect(readyPromise).resolves.toBeDefined();
 	});
 
 	test('emits operation success with serialized context and in-memory context', async () => {
@@ -176,7 +172,15 @@ describe('sqlite staged pull sync', () => {
 		await localDb.syncClient.sync();
 
 		const events = [];
-		const unsubscribe = localDb.syncClient.onOperation('customer-save', event => events.push(event));
+		const allEvents = [];
+		const removedEvents = [];
+		const onceEvents = [];
+		const unsubscribe = localDb.syncClient.on('operation:customer-save', event => events.push(event));
+		const unsubscribeAll = localDb.syncClient.on('operation', event => allEvents.push(event));
+		const removedListener = event => removedEvents.push(event);
+		localDb.syncClient.on('operation', removedListener);
+		localDb.syncClient.off('operation', removedListener);
+		localDb.syncClient.once('operation:customer-save', event => onceEvents.push(event));
 		await localDb.transaction(async (tx, ctx) => {
 			ctx.sync.operation = 'customer-save';
 			ctx.sync.customerId = 9100;
@@ -188,10 +192,15 @@ describe('sqlite staged pull sync', () => {
 
 		await localDb.syncClient.sync();
 		unsubscribe();
+		unsubscribeAll();
 
 		expect(events).toHaveLength(1);
+		expect(allEvents).toHaveLength(1);
+		expect(removedEvents).toHaveLength(0);
+		expect(onceEvents).toHaveLength(1);
 		expect(events[0].ok).toBe(true);
 		expect(events[0].operation).toBe('customer-save');
+		expect(allEvents[0].operation).toBe('customer-save');
 		expect(events[0].context).toMatchObject({ operation: 'customer-save', customerId: 9100 });
 		expect(events[0].memory).toMatchObject({ beforeName: 'OpBase' });
 
@@ -209,7 +218,7 @@ describe('sqlite staged pull sync', () => {
 		await localDb.syncClient.sync();
 
 		const events = [];
-		const unsubscribe = localDb.syncClient.onOperation('customer-replace', event => events.push(event));
+		const unsubscribe = localDb.syncClient.on('operation:customer-replace', event => events.push(event));
 		await localDb.transaction(async (tx, ctx) => {
 			const row = await tx.customer.getById(9101);
 			row.name = 'RepSaved';
@@ -256,7 +265,7 @@ describe('sqlite staged pull sync', () => {
 		await localDb.syncClient.sync();
 
 		const events = [];
-		const unsubscribe = localDb.syncClient.onOperation('customer-auth', event => events.push(event));
+		const unsubscribe = localDb.syncClient.on('operation:customer-auth', event => events.push(event));
 		await localDb.transaction(async (tx, ctx) => {
 			ctx.sync.operation = 'customer-auth';
 			ctx.sync.customerId = 9102;
@@ -420,7 +429,7 @@ describe('sqlite staged pull sync', () => {
 		expect(row30.name).toBe('Ari2');
 	});
 
-	test('waitForInitialReady resolves immediately when staged db is already valid', async () => {
+	test('waitForInitialSync resolves immediately when staged db is already valid', async () => {
 		await localDb.syncClient.sync();
 
 		const localDbReloaded = map({
@@ -430,10 +439,7 @@ describe('sqlite staged pull sync', () => {
 			})
 		});
 
-		const ready = await localDbReloaded.syncClient.waitForInitialReady();
-		expect(ready.source).toBe('persisted');
-		expect(ready.tables).toEqual(expect.arrayContaining(['customer', 'order']));
-		expect(ready.since).not.toBeUndefined();
+		await expect(localDbReloaded.syncClient.waitForInitialSync()).resolves.toBeUndefined();
 	});
 
 	test('sync pushes pending local json patch once', async () => {
@@ -587,7 +593,7 @@ describe('sqlite staged pull sync', () => {
 		await localDb.syncClient.sync();
 
 		const conflictEvents = [];
-		const unsubscribeConflict = localDb.syncClient.onOperation('customer-conflict', event => conflictEvents.push(event));
+		const unsubscribeConflict = localDb.syncClient.on('operation:customer-conflict', event => conflictEvents.push(event));
 		await localDb.transaction(async (tx, ctx) => {
 			ctx.sync.operation = 'customer-conflict';
 			ctx.sync.customerId = 83;

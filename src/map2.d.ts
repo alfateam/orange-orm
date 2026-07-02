@@ -1017,7 +1017,6 @@ export interface SyncConfig<M extends Record<string, any> = any> extends Partial
   initialReadyMaxAgeMs?: number;
   pull?: string | SyncPullOverrideConfig<M>;
   push?: string | SyncEndpointConfig;
-  stableBase?: boolean;
   auto?: boolean | {
     enabled?: boolean;
     intervalMs?: number;
@@ -1050,13 +1049,6 @@ export type SyncLocalSchemaResult<M extends Record<string, any> = any> = {
   sql?: string[];
 };
 
-export interface SyncInitialReadyEvent<M extends Record<string, any> = any> {
-  tables: SyncTableName<M>[];
-  since: unknown;
-  updatedAtMs?: number;
-  source: 'persisted' | 'sync';
-}
-
 export interface SyncErrorEvent {
   method: 'sync';
   error: Error;
@@ -1084,8 +1076,7 @@ export interface SyncOperationError {
 
 export type SyncOperationEvent<
   C extends Record<string, unknown> = Record<string, unknown>,
-  M = unknown,
-  R = unknown
+  M = unknown
 > =
   | {
       ok: true;
@@ -1093,7 +1084,7 @@ export type SyncOperationEvent<
       mutationId: string;
       context: C;
       memory?: M;
-      result: R;
+      result: unknown;
       retryable: false;
     }
   | {
@@ -1169,25 +1160,32 @@ export type DBClient<
     sync(options?: SyncOptions): Promise<void>;
     ensureLocalSchema(options?: SyncOptions): Promise<SyncLocalSchemaResult<M>>;
     resetLocal(options: SyncResetLocalOptions<M>): Promise<SyncResetLocalResult<M>>;
-    start(): Promise<unknown> | undefined;
-    stop(): void | Promise<unknown>;
-    isRunning(): boolean | Promise<boolean>;
-    getConfig(): Promise<SyncConfig<M> | null>;
+    start(): Promise<void>;
+    stop(): Promise<void>;
+    isRunning(): Promise<boolean>;
     interceptors: SyncInterceptors;
-    onOperation<Context extends Record<string, unknown> = Record<string, unknown>, Memory = unknown, Result = unknown>(
-      operation: string,
-      listener: (event: SyncOperationEvent<Context, Memory, Result>) => void
-    ): () => void;
     on(event: 'sync', listener: (payload: SyncEvent) => void): () => void;
-    on(event: 'initial-ready', listener: (payload: SyncInitialReadyEvent<M>) => void): () => void;
+    on<Context extends Record<string, unknown> = Record<string, unknown>, Memory = unknown>(
+      event: 'operation' | `operation:${string}`,
+      listener: (payload: SyncOperationEvent<Context, Memory>) => void
+    ): () => void;
+    on(event: 'initial-ready', listener: () => void): () => void;
     on(event: 'error' | 'sync-error', listener: (payload: SyncErrorEvent) => void): () => void;
     off(event: 'sync', listener: (payload: SyncEvent) => void): void;
-    off(event: 'initial-ready', listener: (payload: SyncInitialReadyEvent<M>) => void): void;
+    off<Context extends Record<string, unknown> = Record<string, unknown>, Memory = unknown>(
+      event: 'operation' | `operation:${string}`,
+      listener: (payload: SyncOperationEvent<Context, Memory>) => void
+    ): void;
+    off(event: 'initial-ready', listener: () => void): void;
     off(event: 'error' | 'sync-error', listener: (payload: SyncErrorEvent) => void): void;
     once(event: 'sync', listener: (payload: SyncEvent) => void): () => void;
-    once(event: 'initial-ready', listener: (payload: SyncInitialReadyEvent<M>) => void): () => void;
+    once<Context extends Record<string, unknown> = Record<string, unknown>, Memory = unknown>(
+      event: 'operation' | `operation:${string}`,
+      listener: (payload: SyncOperationEvent<Context, Memory>) => void
+    ): () => void;
+    once(event: 'initial-ready', listener: () => void): () => void;
     once(event: 'error' | 'sync-error', listener: (payload: SyncErrorEvent) => void): () => void;
-    waitForInitialReady(): Promise<SyncInitialReadyEvent<M>>;
+    waitForInitialSync(): Promise<void>;
   };
 
   interceptors: WithInterceptors;

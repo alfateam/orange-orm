@@ -5,7 +5,7 @@ import type { D1Database } from '@cloudflare/workers-types';
 import type { ConnectionConfiguration } from 'tedious';
 import type { PoolAttributes } from 'oracledb';
 import type { AllowedDbMap, DBClientFromMap as MapDBClientFromMap, DbMapper, MappedDbDef, MergeProperties } from './map';
-import type { DBClient as MapDBClient, Filter as MapFilter, Pool as MapPool, PoolOptions as MapPoolOptions, RawFilter as MapRawFilter, SqliteOPFSPoolOptions as MapSqliteOPFSPoolOptions, SyncOperationEvent as MapSyncOperationEvent, TableDefinition as MapTableDefinition } from './map2';
+import type { DBClient as MapDBClient, Filter as MapFilter, Pool as MapPool, PoolOptions as MapPoolOptions, RawFilter as MapRawFilter, SqliteOPFSPoolOptions as MapSqliteOPFSPoolOptions, TableDefinition as MapTableDefinition } from './map2';
 
 declare function r(config: r.Config): unknown;
 
@@ -42,36 +42,12 @@ declare namespace r {
 	): MappedDbDef<MergeProperties<V, V>>;
     function createPatch(original: any[], modified: any[]): JsonPatch;
     function createPatch(original: any, modified: any): JsonPatch;
-    function createDbWorkerClient(worker: SyncWorkerLike): DbWorkerClient;
-    function createDbWorkerHandler(client: unknown, options?: DbWorkerHandlerOptions): DbWorkerHandler;
-
     type JsonPatch = Array<{
         op: 'add' | 'remove' | 'replace' | 'copy' | 'move' | 'test';
         path: string;
         value?: any;
         from?: string;
     }>;
-
-    export interface SyncWorkerLike {
-        postMessage(message: unknown): void;
-        addEventListener(type: 'message', listener: (event: { data: unknown }) => void): void;
-        removeEventListener(type: 'message', listener: (event: { data: unknown }) => void): void;
-        close?(): void;
-    }
-
-    export interface SyncWorkerClient {
-        sync(options?: unknown): Promise<void>;
-        ensureLocalSchema(options?: unknown): Promise<unknown>;
-        resetLocal(options?: unknown): Promise<unknown>;
-        onOperation<Context extends Record<string, unknown> = Record<string, unknown>, Memory = unknown, Result = unknown>(
-            operation: string,
-            listener: (event: MapSyncOperationEvent<Context, Memory, Result>) => void
-        ): () => void;
-        on(event: string, listener: (payload: unknown) => void): () => void;
-        off(event: string, listener: (payload: unknown) => void): void;
-        once(event: string, listener: (payload: unknown) => void): () => void;
-        close(): void;
-    }
 
     export interface SyncRequestConfig {
         url?: string;
@@ -97,46 +73,16 @@ declare namespace r {
             use(
                 onFulfilled: (config: SyncRequestConfig) => SyncRequestConfig | Promise<SyncRequestConfig>,
                 onRejected?: (error: unknown) => unknown
-            ): string | Promise<string>;
-            eject(id: string): void | Promise<void>;
+            ): string;
+            eject(id: string): void;
         };
         response: {
             use(
                 onFulfilled?: (response: SyncResponse) => SyncResponse | Promise<SyncResponse>,
                 onRejected?: (error: SyncResponseError) => unknown
-            ): string | Promise<string>;
-            eject(id: string): void | Promise<void>;
+            ): string;
+            eject(id: string): void;
         };
-    }
-
-    export interface DbWorkerClient extends Pool {
-        __createSyncClient(): DbWorkerClient['syncClient'];
-        syncClient: SyncWorkerClient & {
-            start(options?: unknown): Promise<unknown>;
-            stop(options?: unknown): Promise<unknown>;
-            isRunning(options?: unknown): Promise<unknown>;
-            getConfig(options?: unknown): Promise<unknown>;
-            ensureLocalSchema(options?: unknown): Promise<unknown>;
-            resetLocal(options?: unknown): Promise<unknown>;
-            onOperation<Context extends Record<string, unknown> = Record<string, unknown>, Memory = unknown, Result = unknown>(
-                operation: string,
-                listener: (event: MapSyncOperationEvent<Context, Memory, Result>) => void
-            ): () => void;
-            once(event: string, listener: (payload: unknown) => void): () => void;
-            waitForInitialReady(options?: unknown): Promise<unknown>;
-        };
-        close(): void;
-    }
-
-    export interface DbWorkerHandlerOptions {
-        postMessage?: (message: unknown) => void;
-        autoStart?: boolean;
-        stopSyncClient?: boolean;
-    }
-
-    export interface DbWorkerHandler {
-        handleMessage(event: { data: unknown }): Promise<void>;
-        stop(): void;
     }
 
     export interface QueryEvent {

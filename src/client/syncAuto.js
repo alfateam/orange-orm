@@ -14,8 +14,11 @@ function createSyncAuto(syncClient, getConfig, options = {}) {
 	};
 
 	async function start() {
-		if (running)
-			return activeRun || Promise.resolve();
+		if (running) {
+			if (activeRun)
+				await activeRun;
+			return;
+		}
 		const config = normalizeAutoConfig(await getConfig());
 		if (!config.enabled)
 			return;
@@ -26,10 +29,10 @@ function createSyncAuto(syncClient, getConfig, options = {}) {
 			}, config.intervalMs);
 		}
 		subscribeOnline();
-		return runNow();
+		await runNow();
 	}
 
-	function stop() {
+	async function stop() {
 		running = false;
 		if (intervalId !== null && timers && typeof timers.clearInterval === 'function') {
 			timers.clearInterval(intervalId);
@@ -41,7 +44,7 @@ function createSyncAuto(syncClient, getConfig, options = {}) {
 		}
 	}
 
-	function isRunning() {
+	async function isRunning() {
 		return running;
 	}
 

@@ -30,12 +30,10 @@ function createDbWorkerClient(worker) {
 			start: syncRequest.bind(null, 'start'),
 			stop: syncRequest.bind(null, 'stop'),
 			isRunning: syncRequest.bind(null, 'isRunning'),
-			getConfig: syncRequest.bind(null, 'getConfig'),
-			onOperation,
 			on,
 			off,
 			once,
-			waitForInitialReady: syncRequest.bind(null, 'waitForInitialReady'),
+			waitForInitialSync: syncRequest.bind(null, 'waitForInitialSync'),
 			close
 		}
 	};
@@ -145,12 +143,6 @@ function createDbWorkerClient(worker) {
 		return unsubscribe;
 	}
 
-	function onOperation(operation, listener) {
-		if (typeof operation !== 'string' || typeof listener !== 'function')
-			return () => {};
-		return on(`operation:${operation}`, listener);
-	}
-
 	function close() {
 		worker.removeEventListener('message', onMessage);
 		for (const entry of pending.values())
@@ -196,7 +188,7 @@ function createDbWorkerClient(worker) {
 	}
 
 	function emit(event, payload) {
-		if (event && event.startsWith && event.startsWith('operation:')) {
+		if (event === 'operation' || event && event.startsWith && event.startsWith('operation:')) {
 			payload = withSyncOperationMemory(payload);
 			finalizeSyncOperationMemory(payload);
 		}

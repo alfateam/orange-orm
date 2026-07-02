@@ -27,19 +27,19 @@ describe('sync client auto start', () => {
 			}
 		});
 
-		expect(client.isRunning()).toBe(false);
+		await expect(client.isRunning()).resolves.toBe(false);
 		await client.start();
 		await new Promise((resolve) => setTimeout(resolve, 0));
 
-		expect(client.isRunning()).toBe(true);
-		client.stop();
-		expect(client.isRunning()).toBe(false);
+		await expect(client.isRunning()).resolves.toBe(true);
+		await client.stop();
+		await expect(client.isRunning()).resolves.toBe(false);
 	});
 	test('emits sync errors', async () => {
 		const db = { __sqliteSync: { url: '/rdb', auto: false, tables: ['customer'] } };
 		const client = newSyncClient({}, async () => db, {});
 		await new Promise((resolve) => setTimeout(resolve, 0));
-		client.stop();
+		await client.stop();
 		const events = [];
 		client.on('error', (payload) => events.push(['error', payload.method, payload.error.message]));
 		client.once('sync-error', (payload) => events.push(['sync-error', payload.method, payload.error.message]));

@@ -26,9 +26,9 @@ describe('sync auto scheduler', () => {
 		await auto.start();
 
 		expect(calls).toEqual(['sync']);
-		expect(auto.isRunning()).toBe(true);
-		auto.stop();
-		expect(auto.isRunning()).toBe(false);
+		await expect(auto.isRunning()).resolves.toBe(true);
+		await auto.stop();
+		await expect(auto.isRunning()).resolves.toBe(false);
 	});
 
 	test('surfaces sync failures', async () => {
@@ -43,7 +43,7 @@ describe('sync auto scheduler', () => {
 		await expect(auto.start()).rejects.toThrow('sync failed');
 
 		expect(calls).toEqual(['sync']);
-		auto.stop();
+		await auto.stop();
 	});
 
 	test('skips when auto is disabled', async () => {
@@ -52,7 +52,7 @@ describe('sync auto scheduler', () => {
 			sync: async () => calls.push('sync')
 		}, async () => ({ url: '/rdb', auto: false }));
 		const result = await auto.start();
-		auto.stop();
+		await auto.stop();
 		expect(result).toBeUndefined();
 		expect(calls).toEqual([]);
 	});

@@ -231,7 +231,7 @@ function createDbWorkerHandler(client, options = {}) {
 			void Promise.resolve(transaction(transaction.rollback)).finally(() => releaseSyncWrite(transaction));
 		}
 		if (options.stopSyncClient !== false && client.syncClient && typeof client.syncClient.stop === 'function')
-			client.syncClient.stop();
+			void client.syncClient.stop();
 	}
 
 	function postResponse(id, result, error) {
