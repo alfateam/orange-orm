@@ -7,9 +7,9 @@ const sessionKey = 'syncTransactionContext';
 const captureKey = 'syncOutboxCapture';
 const memoryByMutationId = new Map();
 
-function createSyncTransactionContext(sync, memory) {
+function createSyncTransactionContext(context, memory) {
 	return {
-		sync: isObject(sync) && !Array.isArray(sync) ? sync : {},
+		context: isObject(context) && !Array.isArray(context) ? context : {},
 		memory: memory === undefined ? {} : memory
 	};
 }
@@ -42,7 +42,7 @@ async function flushSyncTransactionContext(context) {
 	if (!txContext)
 		return null;
 	const state = getOutboxCaptureState(context);
-	const metadata = toSyncOperationMetadata(txContext.sync, state && state.id);
+	const metadata = toSyncOperationMetadata(txContext.context, state && state.id);
 	if (state)
 		await updateOutboxOperationColumns(context, state, metadata);
 	return metadata;
@@ -52,13 +52,13 @@ async function updateOutboxOperationFromContext(context, state) {
 	const txContext = getSyncTransactionContext(context);
 	if (!txContext || !state)
 		return null;
-	const metadata = toSyncOperationMetadata(txContext.sync, state.id);
+	const metadata = toSyncOperationMetadata(txContext.context, state.id);
 	await updateOutboxOperationColumns(context, state, metadata);
 	return metadata;
 }
 
-function toSyncOperationMetadata(sync, mutationId) {
-	const payload = serializeSyncPayload(sync);
+function toSyncOperationMetadata(context, mutationId) {
+	const payload = serializeSyncPayload(context);
 	const keys = Object.keys(payload);
 	if (keys.length === 0)
 		return null;
@@ -74,30 +74,30 @@ function toSyncOperationMetadata(sync, mutationId) {
 	};
 }
 
-function serializeSyncPayload(sync) {
-	if (sync === undefined || sync === null)
+function serializeSyncPayload(context) {
+	if (context === undefined || context === null)
 		return {};
-	if (!isObject(sync) || Array.isArray(sync))
-		throw new Error('ctx.sync must be a JSON serializable object.');
+	if (!isObject(context) || Array.isArray(context))
+		throw new Error('ctx.context must be a JSON serializable object.');
 	let json;
 	try {
-		json = JSON.stringify(sync);
+		json = JSON.stringify(context);
 	}
 	catch (_e) {
-		throw new Error('ctx.sync must be JSON serializable.');
+		throw new Error('ctx.context must be JSON serializable.');
 	}
 	if (json === undefined)
-		throw new Error('ctx.sync must be a JSON serializable object.');
+		throw new Error('ctx.context must be a JSON serializable object.');
 	try {
 		const parsed = JSON.parse(json);
 		if (!isObject(parsed) || Array.isArray(parsed))
-			throw new Error('ctx.sync must be a JSON serializable object.');
+			throw new Error('ctx.context must be a JSON serializable object.');
 		return parsed;
 	}
 	catch (e) {
-		if (e && e.message && e.message.startsWith('ctx.sync'))
+		if (e && e.message && e.message.startsWith('ctx.context'))
 			throw e;
-		throw new Error('ctx.sync must be JSON serializable.');
+		throw new Error('ctx.context must be JSON serializable.');
 	}
 }
 

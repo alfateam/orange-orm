@@ -81,11 +81,11 @@ function createDbWorkerHandler(client, options = {}) {
 		return { transactionId };
 	}
 
-	async function setTransactionSyncContext(transactionId, sync) {
+	async function setTransactionSyncContext(transactionId, contextPayload) {
 		const transaction = transactions.get(transactionId);
 		if (!transaction)
 			return { transactionId, missing: true };
-		const syncContext = createSyncTransactionContext(serializeSyncPayload(sync));
+		const syncContext = createSyncTransactionContext(serializeSyncPayload(contextPayload));
 		transaction.__orangeSyncTransactionContext = syncContext;
 		await transaction((context) => {
 			setSyncTransactionContext(context, syncContext);
@@ -93,12 +93,12 @@ function createDbWorkerHandler(client, options = {}) {
 		return { transactionId };
 	}
 
-	async function flushTransactionSyncContext(transactionId, sync) {
+	async function flushTransactionSyncContext(transactionId, contextPayload) {
 		const transaction = transactions.get(transactionId);
 		if (!transaction)
 			return null;
 		const syncContext = transaction.__orangeSyncTransactionContext || createSyncTransactionContext();
-		syncContext.sync = serializeSyncPayload(sync);
+		syncContext.context = serializeSyncPayload(contextPayload);
 		transaction.__orangeSyncTransactionContext = syncContext;
 		return transaction((context) => {
 			setSyncTransactionContext(context, syncContext);

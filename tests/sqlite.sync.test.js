@@ -182,8 +182,8 @@ describe('sqlite staged pull sync', () => {
 		localDb.syncClient.off('operation', removedListener);
 		localDb.syncClient.once('operation:customer-save', event => onceEvents.push(event));
 		await localDb.transaction(async (tx, ctx) => {
-			ctx.sync.operation = 'customer-save';
-			ctx.sync.customerId = 9100;
+			ctx.context.operation = 'customer-save';
+			ctx.context.customerId = 9100;
 			ctx.memory.beforeName = 'OpBase';
 			const row = await tx.customer.getById(9100);
 			row.name = 'OpSaved';
@@ -223,7 +223,7 @@ describe('sqlite staged pull sync', () => {
 			const row = await tx.customer.getById(9101);
 			row.name = 'RepSaved';
 			await row.saveChanges();
-			ctx.sync = { operation: 'customer-replace', customerId: 9101 };
+			ctx.context = { operation: 'customer-replace', customerId: 9101 };
 		});
 
 		await localDb.syncClient.sync();
@@ -244,12 +244,12 @@ describe('sqlite staged pull sync', () => {
 		await localDb.syncClient.sync();
 
 		await expect(localDb.transaction(async (tx, ctx) => {
-			ctx.sync.operation = 'bad-sync';
-			ctx.sync.notJson = BigInt(1);
+			ctx.context.operation = 'bad-sync';
+			ctx.context.notJson = BigInt(1);
 			const row = await tx.customer.getById(9103);
 			row.name = 'BadSync';
 			await row.saveChanges();
-		})).rejects.toThrow('ctx.sync must be JSON serializable');
+		})).rejects.toThrow('ctx.context must be JSON serializable');
 
 		const row = await localDb.customer.getById(9103);
 		expect(row.name).toBe('SerBase');
@@ -267,8 +267,8 @@ describe('sqlite staged pull sync', () => {
 		const events = [];
 		const unsubscribe = localDb.syncClient.on('operation:customer-auth', event => events.push(event));
 		await localDb.transaction(async (tx, ctx) => {
-			ctx.sync.operation = 'customer-auth';
-			ctx.sync.customerId = 9102;
+			ctx.context.operation = 'customer-auth';
+			ctx.context.customerId = 9102;
 			const row = await tx.customer.getById(9102);
 			row.name = 'AuthPend';
 			await row.saveChanges();
@@ -596,8 +596,8 @@ describe('sqlite staged pull sync', () => {
 		const conflictEvents = [];
 		const unsubscribeConflict = localDb.syncClient.on('operation:customer-conflict', event => conflictEvents.push(event));
 		await localDb.transaction(async (tx, ctx) => {
-			ctx.sync.operation = 'customer-conflict';
-			ctx.sync.customerId = 83;
+			ctx.context.operation = 'customer-conflict';
+			ctx.context.customerId = 83;
 			const first = await tx.customer.getById(83);
 			first.name = 'Conflict83';
 			await first.saveChanges();
@@ -658,8 +658,8 @@ describe('sqlite staged pull sync', () => {
 		await first.saveChanges();
 
 		await localDb.transaction(async (tx, ctx) => {
-			ctx.sync.operation = 'customer-conflict';
-			ctx.sync.customerId = 86;
+			ctx.context.operation = 'customer-conflict';
+			ctx.context.customerId = 86;
 			const second = await tx.customer.getById(86);
 			second.name = 'Conflict86';
 			await second.saveChanges();

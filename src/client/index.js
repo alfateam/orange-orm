@@ -301,7 +301,7 @@ function rdbClient(options = {}) {
 
 	async function attachSyncContextToTransaction(transaction, syncContext) {
 		if (typeof transaction.setSyncContext === 'function') {
-			await transaction.setSyncContext(serializeSyncPayload(syncContext.sync));
+			await transaction.setSyncContext(serializeSyncPayload(syncContext.context));
 			return;
 		}
 		await transaction((context) => {
@@ -311,7 +311,7 @@ function rdbClient(options = {}) {
 
 	async function flushSyncContextOnTransaction(transaction, syncContext) {
 		if (typeof transaction.flushSyncContext === 'function')
-			return transaction.flushSyncContext(serializeSyncPayload(syncContext.sync));
+			return transaction.flushSyncContext(serializeSyncPayload(syncContext.context));
 		return transaction((context) => flushSyncTransactionContext(context));
 	}
 

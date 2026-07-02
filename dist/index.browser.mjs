@@ -546,7 +546,7 @@ export interface HonoContext {
 }
 
 export interface SyncTransactionContext {
-	sync: Record<string, unknown> & { operation?: string };
+	context: Record<string, unknown> & { operation?: string };
 	memory: unknown;
 }
 
@@ -4314,9 +4314,9 @@ function requireOperationContext () {
 	const captureKey = 'syncOutboxCapture';
 	const memoryByMutationId = new Map();
 
-	function createSyncTransactionContext(sync, memory) {
+	function createSyncTransactionContext(context, memory) {
 		return {
-			sync: isObject(sync) && !Array.isArray(sync) ? sync : {},
+			context: isObject(context) && !Array.isArray(context) ? context : {},
 			memory: memory === undefined ? {} : memory
 		};
 	}
@@ -4349,7 +4349,7 @@ function requireOperationContext () {
 		if (!txContext)
 			return null;
 		const state = getOutboxCaptureState(context);
-		const metadata = toSyncOperationMetadata(txContext.sync, state && state.id);
+		const metadata = toSyncOperationMetadata(txContext.context, state && state.id);
 		if (state)
 			await updateOutboxOperationColumns(context, state, metadata);
 		return metadata;
@@ -4359,13 +4359,13 @@ function requireOperationContext () {
 		const txContext = getSyncTransactionContext(context);
 		if (!txContext || !state)
 			return null;
-		const metadata = toSyncOperationMetadata(txContext.sync, state.id);
+		const metadata = toSyncOperationMetadata(txContext.context, state.id);
 		await updateOutboxOperationColumns(context, state, metadata);
 		return metadata;
 	}
 
-	function toSyncOperationMetadata(sync, mutationId) {
-		const payload = serializeSyncPayload(sync);
+	function toSyncOperationMetadata(context, mutationId) {
+		const payload = serializeSyncPayload(context);
 		const keys = Object.keys(payload);
 		if (keys.length === 0)
 			return null;
@@ -4381,30 +4381,30 @@ function requireOperationContext () {
 		};
 	}
 
-	function serializeSyncPayload(sync) {
-		if (sync === undefined || sync === null)
+	function serializeSyncPayload(context) {
+		if (context === undefined || context === null)
 			return {};
-		if (!isObject(sync) || Array.isArray(sync))
-			throw new Error('ctx.sync must be a JSON serializable object.');
+		if (!isObject(context) || Array.isArray(context))
+			throw new Error('ctx.context must be a JSON serializable object.');
 		let json;
 		try {
-			json = JSON.stringify(sync);
+			json = JSON.stringify(context);
 		}
 		catch (_e) {
-			throw new Error('ctx.sync must be JSON serializable.');
+			throw new Error('ctx.context must be JSON serializable.');
 		}
 		if (json === undefined)
-			throw new Error('ctx.sync must be a JSON serializable object.');
+			throw new Error('ctx.context must be a JSON serializable object.');
 		try {
 			const parsed = JSON.parse(json);
 			if (!isObject(parsed) || Array.isArray(parsed))
-				throw new Error('ctx.sync must be a JSON serializable object.');
+				throw new Error('ctx.context must be a JSON serializable object.');
 			return parsed;
 		}
 		catch (e) {
-			if (e && e.message && e.message.startsWith('ctx.sync'))
+			if (e && e.message && e.message.startsWith('ctx.context'))
 				throw e;
-			throw new Error('ctx.sync must be JSON serializable.');
+			throw new Error('ctx.context must be JSON serializable.');
 		}
 	}
 
@@ -8943,7 +8943,7 @@ function requireClient () {
 
 		async function attachSyncContextToTransaction(transaction, syncContext) {
 			if (typeof transaction.setSyncContext === 'function') {
-				await transaction.setSyncContext(serializeSyncPayload(syncContext.sync));
+				await transaction.setSyncContext(serializeSyncPayload(syncContext.context));
 				return;
 			}
 			await transaction((context) => {
@@ -8953,7 +8953,7 @@ function requireClient () {
 
 		async function flushSyncContextOnTransaction(transaction, syncContext) {
 			if (typeof transaction.flushSyncContext === 'function')
-				return transaction.flushSyncContext(serializeSyncPayload(syncContext.sync));
+				return transaction.flushSyncContext(serializeSyncPayload(syncContext.context));
 			return transaction((context) => flushSyncTransactionContext(context));
 		}
 
@@ -19701,11 +19701,11 @@ function requireDbWorkerClient () {
 			transaction.rollback = async function(error, _context) {
 				await request('transaction.rollback', { transactionId, error: serializeError(error) });
 			};
-			transaction.setSyncContext = async function(sync) {
-				await request('transaction.syncContext', { transactionId }, serializeSyncPayload(sync));
+			transaction.setSyncContext = async function(context) {
+				await request('transaction.syncContext', { transactionId }, serializeSyncPayload(context));
 			};
-			transaction.flushSyncContext = async function(sync) {
-				return request('transaction.flushSyncContext', { transactionId }, serializeSyncPayload(sync));
+			transaction.flushSyncContext = async function(context) {
+				return request('transaction.flushSyncContext', { transactionId }, serializeSyncPayload(context));
 			};
 			return transaction;
 		}
@@ -19946,11 +19946,11 @@ function requireDbWorkerHandler () {
 			return { transactionId };
 		}
 
-		async function setTransactionSyncContext(transactionId, sync) {
+		async function setTransactionSyncContext(transactionId, contextPayload) {
 			const transaction = transactions.get(transactionId);
 			if (!transaction)
 				return { transactionId, missing: true };
-			const syncContext = createSyncTransactionContext(serializeSyncPayload(sync));
+			const syncContext = createSyncTransactionContext(serializeSyncPayload(contextPayload));
 			transaction.__orangeSyncTransactionContext = syncContext;
 			await transaction((context) => {
 				setSyncTransactionContext(context, syncContext);
@@ -19958,12 +19958,12 @@ function requireDbWorkerHandler () {
 			return { transactionId };
 		}
 
-		async function flushTransactionSyncContext(transactionId, sync) {
+		async function flushTransactionSyncContext(transactionId, contextPayload) {
 			const transaction = transactions.get(transactionId);
 			if (!transaction)
 				return null;
 			const syncContext = transaction.__orangeSyncTransactionContext || createSyncTransactionContext();
-			syncContext.sync = serializeSyncPayload(sync);
+			syncContext.context = serializeSyncPayload(contextPayload);
 			transaction.__orangeSyncTransactionContext = syncContext;
 			return transaction((context) => {
 				setSyncTransactionContext(context, syncContext);

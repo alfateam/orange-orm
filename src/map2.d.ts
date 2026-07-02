@@ -1061,7 +1061,7 @@ export interface SyncTransactionContext<
   C extends Record<string, unknown> = Record<string, unknown>,
   M = Record<string, unknown>
 > {
-  sync: C & { operation?: string };
+  context: C & { operation?: string };
   memory: M;
 }
 

@@ -524,7 +524,7 @@ export interface HonoContext {
 }
 
 export interface SyncTransactionContext {
-	sync: Record<string, unknown> & { operation?: string };
+	context: Record<string, unknown> & { operation?: string };
 	memory: unknown;
 }
 

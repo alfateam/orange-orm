@@ -72,11 +72,11 @@ function createDbWorkerClient(worker) {
 		transaction.rollback = async function(error, _context) {
 			await request('transaction.rollback', { transactionId, error: serializeError(error) });
 		};
-		transaction.setSyncContext = async function(sync) {
-			await request('transaction.syncContext', { transactionId }, serializeSyncPayload(sync));
+		transaction.setSyncContext = async function(context) {
+			await request('transaction.syncContext', { transactionId }, serializeSyncPayload(context));
 		};
-		transaction.flushSyncContext = async function(sync) {
-			return request('transaction.flushSyncContext', { transactionId }, serializeSyncPayload(sync));
+		transaction.flushSyncContext = async function(context) {
+			return request('transaction.flushSyncContext', { transactionId }, serializeSyncPayload(context));
 		};
 		return transaction;
 	}

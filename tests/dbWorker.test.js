@@ -135,8 +135,8 @@ describe('db worker rpc', () => {
 		});
 
 		await uiDb.transaction(async (tx, ctx) => {
-			ctx.sync.operation = 'worker-save';
-			ctx.sync.customerId = 9200;
+			ctx.context.operation = 'worker-save';
+			ctx.context.customerId = 9200;
 			await tx.customer.insert({ id: 9200, name: 'WorkerSync', balance: 1, isActive: true });
 		});
 
