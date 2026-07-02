@@ -139,6 +139,42 @@ describe('sqlite staged pull sync', () => {
 		}
 	});
 
+	test('resetLocal recreates local schema before returning', async () => {
+		const resetLocalName = `demo.${fileNameWithoutExtension}.reset-local-schema.db`;
+		fs.rmSync(resetLocalName, { force: true });
+		const resetLocalDb = map({
+			db: (con) => con.sqlite(resetLocalName, {
+				size: 1,
+				sync: {
+					url: 'http://127.0.0.1:1/rdb',
+					auto: false,
+					tables: ['customer']
+				}
+			})
+		});
+
+		try {
+			await resetLocalDb.syncClient.ensureLocalSchema();
+			await resetLocalDb.customer.insert({ id: 9902, name: 'Before', balance: 2, isActive: true });
+			const result = await resetLocalDb.syncClient.resetLocal();
+			const countRows = await resetLocalDb.query('SELECT COUNT(*) AS count FROM "customer"');
+			const countRow = Array.isArray(countRows) ? countRows[0] : countRows?.rows?.[0];
+			await resetLocalDb.customer.insert({ id: 9903, name: 'After', balance: 3, isActive: true });
+			const row = await resetLocalDb.customer.getById(9903);
+
+			expect(result).toMatchObject({
+				reset: true,
+				tables: ['customer']
+			});
+			expect(Number(countRow?.count ?? countRow?.COUNT ?? 0)).toBe(0);
+			expect(row.name).toBe('After');
+		}
+		finally {
+			await resetLocalDb.close();
+			fs.rmSync(resetLocalName, { force: true });
+		}
+	});
+
 	test('first sync uses snapshot and fetches in key/row batches', async () => {
 		await localDb.syncClient.sync();
 

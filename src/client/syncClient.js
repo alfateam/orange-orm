@@ -229,10 +229,16 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 			ensuredInternalTables.delete(db);
 			clearEnsuredSyncSchema(db);
 			initialReadyEmitted = false;
+			const schemaResult = await ensureSyncSchema(db, client, configuredTables, syncConfig.schema);
+			await cleanupSyncStorage(db, configuredTables);
 			return {
 				reset: true,
 				tables: configuredTables,
-				droppedTables
+				droppedTables,
+				schema: schemaResult && schemaResult.schema,
+				checksum: schemaResult && schemaResult.checksum,
+				scope: schemaResult && schemaResult.scope,
+				sql: schemaResult && schemaResult.sql
 			};
 		});
 	}

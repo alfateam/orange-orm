@@ -1035,6 +1035,10 @@ export interface SyncResetLocalResult<M extends Record<string, any> = any> {
   reset: true;
   tables: SyncTableName<M>[];
   droppedTables: string[];
+  schema?: unknown;
+  checksum?: string;
+  scope?: string;
+  sql?: string[];
 }
 
 export type SyncLocalSchemaResult<M extends Record<string, any> = any> = {
