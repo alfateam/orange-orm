@@ -405,6 +405,7 @@ describe('sqlite staged pull sync', () => {
 		await localDb.query('PRAGMA foreign_keys = ON');
 		await localDb.query('DELETE FROM "order"');
 		await localDb.query('DELETE FROM customer');
+		await localDb.query('DELETE FROM "orange_sync_outbox"');
 		await remoteDb.query('DELETE FROM "order"');
 		await remoteDb.query('DELETE FROM customer');
 
@@ -726,5 +727,39 @@ describe('sqlite staged pull sync', () => {
 		expect(syncPhases).toHaveLength(0);
 		expect(restored.name).toBe('Reject82');
 		expect(pending).toHaveLength(1);
+	});
+
+	test('discardLocalChanges restores stable base and clears open outbox rows', async () => {
+		await localDb.query('PRAGMA foreign_keys = ON');
+		await localDb.query('DELETE FROM "order"');
+		await localDb.query('DELETE FROM customer');
+		await localDb.query('DELETE FROM "orange_sync_outbox"');
+		await remoteDb.query('DELETE FROM "order"');
+		await remoteDb.query('DELETE FROM customer');
+
+		await remoteDb.customer.insert({
+			id: 88,
+			name: 'Base88',
+			balance: 88,
+			isActive: true
+		});
+		await localDb.syncClient.sync();
+
+		const row = await localDb.customer.getById(88);
+		row.name = 'Local88';
+		await row.saveChanges();
+
+		const pendingBefore = await localDb.query('SELECT mutation_id FROM "orange_sync_outbox" WHERE status = \'pending\'');
+		expect(pendingBefore).toHaveLength(1);
+
+		await localDb.syncClient.discardLocalChanges();
+
+		const restored = await localDb.customer.getById(88);
+		const remote = await remoteDb.customer.getById(88);
+		const openRows = await localDb.query('SELECT mutation_id FROM "orange_sync_outbox" WHERE status IN (\'pending\', \'pushed\')');
+
+		expect(restored.name).toBe('Base88');
+		expect(remote.name).toBe('Base88');
+		expect(openRows).toHaveLength(0);
 	});
 });

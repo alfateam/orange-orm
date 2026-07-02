@@ -816,21 +816,21 @@ export type TableClient<M extends Record<string, TableDefinition<M>>, K extends 
   // UPDATED: Proxify methods with relations support
   proxify(
     row: UpdateChangesRowWithRelations<M, K>
-  ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, {}>>, M, K>>;
+  ): WithActiveRecord<DeepExpand<Selection<M, K, {}>>, M, K>;
 
   proxify(
     rows: Array<UpdateChangesRowWithRelations<M, K>>
-  ): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, {}>>>, M, K>>;
+  ): WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, {}>>>, M, K>;
 
   proxify<strategy extends FetchStrategy<M, K>>(
     row: UpdateChangesRowWithRelations<M, K>,
     strategy: strategy
-  ): Promise<WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K>>;
+  ): WithActiveRecord<DeepExpand<Selection<M, K, strategy>>, M, K>;
 
   proxify<strategy extends FetchStrategy<M, K>>(
     rows: Array<UpdateChangesRowWithRelations<M, K>>,
     strategy: strategy
-  ): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, strategy>>>, M, K>>;
+  ): WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, strategy>>>, M, K>;
 
   // Patch method
   patch<strategy extends FetchStrategy<M, K>>(
@@ -1160,6 +1160,7 @@ export type DBClient<
     sync(options?: SyncOptions): Promise<void>;
     ensureLocalSchema(options?: SyncOptions): Promise<SyncLocalSchemaResult<M>>;
     resetLocal(options: SyncResetLocalOptions<M>): Promise<SyncResetLocalResult<M>>;
+    discardLocalChanges(): Promise<void>;
     start(): Promise<void>;
     stop(): Promise<void>;
     isRunning(): Promise<boolean>;

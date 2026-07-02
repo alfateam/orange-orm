@@ -40,9 +40,11 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 	const lockedSync = withCrossTabSyncLock(sync);
 	const lockedEnsureLocalSchema = withCrossTabSyncLock(ensureLocalSchema);
 	const lockedResetLocal = withCrossTabSyncLock(resetLocal);
+	const lockedDiscardLocalChanges = withCrossTabSyncLock(discardLocalChanges);
 	const serializeSyncWork = createAsyncSerializer();
 	const queuedSync = serializeSyncWork(lockedSync);
 	const queuedEnsureLocalSchema = serializeSyncWork(lockedEnsureLocalSchema);
+	const queuedDiscardLocalChanges = serializeSyncWork(lockedDiscardLocalChanges);
 	const observedSync = observeSyncMethod('sync', queuedSync);
 	const auto = createSyncAuto({
 		sync: observedSync
@@ -52,6 +54,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		sync: observedSync,
 		ensureLocalSchema: queuedEnsureLocalSchema,
 		resetLocal: lockedResetLocal,
+		discardLocalChanges: queuedDiscardLocalChanges,
 		start: auto.start,
 		stop: auto.stop,
 		isRunning: auto.isRunning,
@@ -233,6 +236,26 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 				tables: configuredTables,
 				droppedTables
 			};
+		});
+	}
+
+	async function discardLocalChanges() {
+		const db = await getDb();
+		const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
+		if (!syncConfig)
+			throw new Error('Sync is not configured. Add sync in sqlite options: sqlite(connectionString, { sync: ... })');
+		const configuredTables = resolveSyncTables(db, syncConfig.tables, client);
+		if (!await hasStableBase(db, configuredTables))
+			throw new Error('Cannot discard local changes before initial sync has completed.');
+		await runSyncMaintenance(db, async () => {
+			const openRows = await readReplayMutationRows(db, 10000);
+			await restoreStableBase(db);
+			await ensureSyncOutboxTable(db);
+			await db.query([
+				`DELETE FROM "${syncOutboxTable}"`,
+				'WHERE "status" IN (\'pending\', \'pushed\')'
+			].join(' '));
+			clearOutboxOperationMemory(openRows);
 		});
 	}
 
@@ -1013,6 +1036,15 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 
 	async function readReplayMutationRows(db, limit, excludeIds) {
 		return readMutationRowsByStatus(db, ['pending', 'pushed'], limit, excludeIds);
+	}
+
+	function clearOutboxOperationMemory(rows) {
+		const list = Array.isArray(rows) ? rows : [];
+		for (let i = 0; i < list.length; i++) {
+			const id = list[i] && (list[i].mutation_id ?? list[i].MUTATION_ID);
+			if (typeof id === 'string')
+				deleteSyncOperationMemory(id);
+		}
 	}
 
 	async function readMutationRowsByStatus(db, statuses, limit, excludeIds) {
