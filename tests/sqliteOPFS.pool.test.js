@@ -319,6 +319,105 @@ describe('sqliteOPFS pool', () => {
 		expect(closes).toEqual(['/opfs-wl.sqlite3']);
 	});
 
+	test('defers opfs-wl open until checkout and closes it after checkout release', async () => {
+		const messages = [];
+		const pool = newPool('deferred-opfs-wl.sqlite3', {
+			vfs: 'opfs-wl',
+			prewarmRead: false,
+			createWorker() {
+				return newFakeWorker(messages, (message) => message.method === 'open'
+					? { opened: true, filename: '/deferred-opfs-wl.sqlite3', vfs: 'opfs-wl' }
+					: { ok: true });
+			}
+		});
+
+		await wait(10);
+		expect(messages).toHaveLength(0);
+
+		try {
+			await new Promise((resolve, reject) => {
+				pool.connect((err, client, done) => {
+					if (err)
+						return reject(err);
+					client.executeQuery(newSql('SELECT 1'), (err) => {
+						done(err);
+						err ? reject(err) : resolve();
+					});
+				});
+			});
+			await wait(10);
+
+			expect(messages.map(x => x.method)).toEqual(['open', 'query', 'close']);
+		}
+		finally {
+			await pool.end();
+		}
+	});
+
+	test('serializes opfs-wl access across pools before opening the database', async () => {
+		const restoreLocks = installFakeWebLocks();
+		const firstMessages = [];
+		const secondMessages = [];
+		const firstPool = newPool('shared-opfs-wl.sqlite3', {
+			vfs: 'opfs-wl',
+			prewarmRead: false,
+			createWorker() {
+				return newFakeWorker(firstMessages, (message) => message.method === 'open'
+					? { opened: true, filename: '/shared-opfs-wl.sqlite3', vfs: 'opfs-wl' }
+					: { ok: true });
+			}
+		});
+		const secondPool = newPool('shared-opfs-wl.sqlite3', {
+			vfs: 'opfs-wl',
+			prewarmRead: false,
+			createWorker() {
+				return newFakeWorker(secondMessages, (message) => message.method === 'open'
+					? { opened: true, filename: '/shared-opfs-wl.sqlite3', vfs: 'opfs-wl' }
+					: { ok: true });
+			}
+		});
+
+		try {
+			let releaseFirst;
+			await new Promise((resolve, reject) => {
+				firstPool.connect((err, client, done) => {
+					if (err)
+						return reject(err);
+					client.executeQuery(newSql('SELECT 1'), (err) => {
+						if (err)
+							return reject(err);
+						releaseFirst = done;
+						resolve();
+					});
+				});
+			});
+
+			const secondStarted = newDeferred();
+			secondPool.connect((err, client, done) => {
+				if (err)
+					return secondStarted.reject(err);
+				secondStarted.resolve();
+				client.executeQuery(newSql('SELECT 2'), (err) => done(err));
+			});
+			await wait(10);
+
+			expect(firstMessages.map(x => x.method)).toEqual(['open', 'query']);
+			expect(secondMessages).toHaveLength(0);
+
+			releaseFirst();
+			await secondStarted.promise;
+			await wait(10);
+
+			expect(firstMessages.map(x => x.method)).toEqual(['open', 'query', 'close']);
+			expect(secondMessages.map(x => x.method)).toEqual(['open', 'query', 'close']);
+		}
+		finally {
+			restoreLocks();
+			await firstPool.end();
+			await secondPool.end();
+		}
+	});
+
 	test('rejects opfs-wl when sqlite-wasm does not expose it', async () => {
 		const pool = newPool('missing-opfs-wl.sqlite3', {
 			vfs: 'opfs-wl',
@@ -489,6 +588,40 @@ function newFakeWorker(messages = [], getResult = () => ({ ok: true }), terminat
 
 function wait(ms) {
 	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function installFakeWebLocks() {
+	const previous = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+	const queues = new Map();
+	Object.defineProperty(globalThis, 'navigator', {
+		configurable: true,
+		value: {
+			locks: {
+				request(name, _options, callback) {
+					const previous = queues.get(name) || Promise.resolve();
+					const current = previous.then(() => callback());
+					queues.set(name, current.catch(() => {}));
+					return current;
+				}
+			}
+		}
+	});
+	return () => {
+		if (previous)
+			Object.defineProperty(globalThis, 'navigator', previous);
+		else
+			delete globalThis.navigator;
+	};
+}
+
+function newDeferred() {
+	let resolve;
+	let reject;
+	const promise = new Promise((res, rej) => {
+		resolve = res;
+		reject = rej;
+	});
+	return { promise, resolve, reject };
 }
 
 function newSql(sql) {

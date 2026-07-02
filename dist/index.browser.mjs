@@ -7857,6 +7857,8 @@ function requireSyncClient () {
 			const result = await pool.__orangeSqliteOPFSReady;
 			return result && result.vfs || pool.__orangeSqliteOPFSVfs || pool.__orangeSqliteOPFSRequestedVfs;
 		}
+		if (!pool.__orangeSqliteOPFSVfs && pool.__orangeSqliteOPFSFallbackVfs === 'opfs-wl')
+			return 'opfs-wl';
 		return pool.__orangeSqliteOPFSVfs || pool.__orangeSqliteOPFSRequestedVfs;
 	}
 
@@ -23613,6 +23615,8 @@ function requireWorkerClient () {
 		const readonly = !!options.readonly;
 		const lane = readonly ? 'reader' : 'writer';
 		let closed = false;
+		let openPromise;
+		let openInfo;
 
 		worker.addEventListener('message', onMessage);
 		worker.addEventListener('error', onWorkerError);
@@ -23620,31 +23624,14 @@ function requireWorkerClient () {
 
 		const requestedVfs = options.vfs || 'opfs';
 		const fallbackVfs = normalizeFallbackVfs(options.fallbackVfs, requestedVfs);
-		const ready = openWorkerDb(requestedVfs, fallbackVfs).then(({ result, fallback, fallbackError }) => {
-			const event = {
-				connectionString,
-				filename: result && result.filename,
-				requestedVfs,
-				vfs: result && result.vfs || requestedVfs,
-				fallback,
-				fallbackVfs,
-				fallbackError,
-				readonly
-			};
-			log.emitSqliteOpen(event);
-			return {
-				...result,
-				requestedVfs,
-				fallback,
-				fallbackVfs,
-				fallbackError
-			};
-		});
+		const ready = options.deferOpen ? null : ensureOpen();
 
 		return {
 			executeQuery,
 			executeCommand,
 			close,
+			getOpenInfo,
+			release,
 			reset,
 			ready
 		};
@@ -23656,7 +23643,7 @@ function requireWorkerClient () {
 			const parameters = query.parameters || [];
 			log.emitQuery({ sql, parameters, readonly, lane });
 			const startedAt = now();
-			ready
+			ensureOpen()
 				.then(() => request('query', { sql, parameters }))
 				.then(({ result, workerElapsedMs }) => {
 					log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, workerElapsedMs, readonly, lane });
@@ -23675,7 +23662,7 @@ function requireWorkerClient () {
 			const parameters = query.parameters || [];
 			log.emitQuery({ sql, parameters, readonly, lane });
 			const startedAt = now();
-			ready
+			ensureOpen()
 				.then(() => request('command', { sql, parameters }))
 				.then(({ result, workerElapsedMs }) => {
 					log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, workerElapsedMs, readonly, lane });
@@ -23708,6 +23695,25 @@ function requireWorkerClient () {
 			});
 		}
 
+		function ensureOpen() {
+			if (closed)
+				return Promise.reject(new Error('sqliteOPFS worker client closed.'));
+			if (!openPromise) {
+				const vfs = openInfo && openInfo.vfs || requestedVfs;
+				const fallback = openInfo && openInfo.fallback ? undefined : fallbackVfs;
+				openPromise = openWorkerDb(vfs, fallback)
+					.then((info) => {
+						openInfo = info;
+						return info;
+					})
+					.catch((error) => {
+						openPromise = null;
+						throw error;
+					});
+			}
+			return openPromise;
+		}
+
 		async function openWorkerDb(vfs, fallbackVfs) {
 			try {
 				const response = await request('open', {
@@ -23715,10 +23721,10 @@ function requireWorkerClient () {
 					busyTimeoutMs: options.busyTimeoutMs || 5000,
 					vfs: vfs === 'opfs' ? options.vfs : vfs
 				});
-				return {
+				return onOpenResult({
 					result: response.result,
 					fallback: false
-				};
+				});
 			}
 			catch (e) {
 				if (!fallbackVfs)
@@ -23728,12 +23734,47 @@ function requireWorkerClient () {
 					busyTimeoutMs: options.busyTimeoutMs || 5000,
 					vfs: fallbackVfs
 				});
-				return {
+				return onOpenResult({
 					result: response.result,
 					fallback: true,
 					fallbackError: e && e.message ? e.message : String(e)
-				};
+				});
 			}
+		}
+
+		function onOpenResult({ result, fallback, fallbackError }) {
+			const event = {
+				connectionString,
+				filename: result && result.filename,
+				requestedVfs,
+				vfs: result && result.vfs || requestedVfs,
+				fallback,
+				fallbackVfs,
+				fallbackError,
+				readonly
+			};
+			log.emitSqliteOpen(event);
+			return {
+				...result,
+				requestedVfs,
+				fallback,
+				fallbackVfs,
+				fallbackError
+			};
+		}
+
+		function getOpenInfo() {
+			return openInfo;
+		}
+
+		function release() {
+			if (closed || !openPromise)
+				return Promise.resolve();
+			return openPromise
+				.then(() => request('close'))
+				.finally(() => {
+					openPromise = null;
+				});
 		}
 
 		function close() {
@@ -24069,11 +24110,15 @@ function requireNewPool$1 () {
 	const pools = requirePools();
 	const newId = requireNewId();
 	const createSqliteOPFSWorkerClient = requireWorkerClient();
+	const {
+		acquireCrossTabLock,
+		normalizeLockNamePart
+	} = requireCrossTabLock();
 
 	function newPool(connectionString, poolOptions) {
 		poolOptions = normalizePoolOptions(poolOptions);
 		let id = newId();
-		let client = createSqliteOPFSWorkerClient(connectionString, poolOptions);
+		let client = createSqliteOPFSWorkerClient(connectionString, withOpenOptions(poolOptions));
 		let readClient;
 		let c = {};
 		let ended = false;
@@ -24146,7 +24191,7 @@ function requireNewPool$1 () {
 
 		function ensureReadClient() {
 			if (!readClient)
-				readClient = createSqliteOPFSWorkerClient(connectionString, { ...poolOptions, readonly: true });
+				readClient = createSqliteOPFSWorkerClient(connectionString, withOpenOptions({ ...poolOptions, readonly: true }));
 			return readClient;
 		}
 
@@ -24158,13 +24203,28 @@ function requireNewPool$1 () {
 				return;
 			writerBusy = true;
 			let released = false;
-			try {
-				cb(null, client, done);
-			}
-			catch (e) {
-				done(e);
-				throw e;
-			}
+			let releaseAccessLock = noop;
+			acquireOPFSAccessLock(poolOptions, connectionString)
+				.then((release) => {
+					if (ended) {
+						release();
+						done();
+						return;
+					}
+					releaseAccessLock = release;
+					try {
+						cb(null, client, done);
+					}
+					catch (e) {
+						done(e);
+						throw e;
+					}
+				}, (e) => {
+					released = true;
+					writerBusy = false;
+					cb(e, null, noop);
+					drainWriterQueue();
+				});
 
 			function done(err) {
 				if (released)
@@ -24172,8 +24232,14 @@ function requireNewPool$1 () {
 				released = true;
 				if (err && client.reset)
 					client.reset();
-				writerBusy = false;
-				drainWriterQueue();
+				updatePoolOpenInfo(c, client);
+				releaseOPFSAccessHandle(client)
+					.then(() => releaseAccessLock())
+					.catch(() => releaseAccessLock())
+					.then(() => {
+						writerBusy = false;
+						drainWriterQueue();
+					});
 			}
 		}
 
@@ -24187,6 +24253,50 @@ function requireNewPool$1 () {
 	}
 
 	function noop() {}
+
+	function withOpenOptions(poolOptions) {
+		return shouldUseOPFSAccessLock(poolOptions)
+			? { ...poolOptions, deferOpen: true }
+			: poolOptions;
+	}
+
+	function acquireOPFSAccessLock(poolOptions, connectionString) {
+		if (!shouldUseOPFSAccessLock(poolOptions))
+			return Promise.resolve(noop);
+		return acquireCrossTabLock(resolveOPFSAccessLockName(connectionString), {
+			enabled: true,
+			label: 'sqlite OPFS access lock'
+		});
+	}
+
+	function releaseOPFSAccessHandle(client) {
+		if (!client || typeof client.release !== 'function')
+			return Promise.resolve();
+		const info = typeof client.getOpenInfo === 'function'
+			? client.getOpenInfo()
+			: null;
+		if (!info || info.vfs !== 'opfs-wl')
+			return Promise.resolve();
+		return client.release();
+	}
+
+	function updatePoolOpenInfo(pool, client) {
+		if (!pool || !client || typeof client.getOpenInfo !== 'function')
+			return;
+		const info = client.getOpenInfo();
+		if (!info)
+			return;
+		pool.__orangeSqliteOPFSVfs = info.vfs || pool.__orangeSqliteOPFSVfs;
+		pool.__orangeSqliteOPFSFallback = !!info.fallback;
+	}
+
+	function shouldUseOPFSAccessLock(poolOptions = {}) {
+		return poolOptions.vfs === 'opfs-wl' || poolOptions.fallbackVfs === 'opfs-wl';
+	}
+
+	function resolveOPFSAccessLockName(connectionString) {
+		return `orange-orm:sqlite-opfs-access:${normalizeLockNamePart(connectionString || 'default')}:opfs-wl`;
+	}
 
 	function shouldUseSingleWorker(poolOptions = {}) {
 		if (poolOptions.singleWorker === true)

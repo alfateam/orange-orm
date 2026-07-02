@@ -8,6 +8,8 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 	const readonly = !!options.readonly;
 	const lane = readonly ? 'reader' : 'writer';
 	let closed = false;
+	let openPromise;
+	let openInfo;
 
 	worker.addEventListener('message', onMessage);
 	worker.addEventListener('error', onWorkerError);
@@ -15,31 +17,14 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 
 	const requestedVfs = options.vfs || 'opfs';
 	const fallbackVfs = normalizeFallbackVfs(options.fallbackVfs, requestedVfs);
-	const ready = openWorkerDb(requestedVfs, fallbackVfs).then(({ result, fallback, fallbackError }) => {
-		const event = {
-			connectionString,
-			filename: result && result.filename,
-			requestedVfs,
-			vfs: result && result.vfs || requestedVfs,
-			fallback,
-			fallbackVfs,
-			fallbackError,
-			readonly
-		};
-		log.emitSqliteOpen(event);
-		return {
-			...result,
-			requestedVfs,
-			fallback,
-			fallbackVfs,
-			fallbackError
-		};
-	});
+	const ready = options.deferOpen ? null : ensureOpen();
 
 	return {
 		executeQuery,
 		executeCommand,
 		close,
+		getOpenInfo,
+		release,
 		reset,
 		ready
 	};
@@ -51,7 +36,7 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 		const parameters = query.parameters || [];
 		log.emitQuery({ sql, parameters, readonly, lane });
 		const startedAt = now();
-		ready
+		ensureOpen()
 			.then(() => request('query', { sql, parameters }))
 			.then(({ result, workerElapsedMs }) => {
 				log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, workerElapsedMs, readonly, lane });
@@ -70,7 +55,7 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 		const parameters = query.parameters || [];
 		log.emitQuery({ sql, parameters, readonly, lane });
 		const startedAt = now();
-		ready
+		ensureOpen()
 			.then(() => request('command', { sql, parameters }))
 			.then(({ result, workerElapsedMs }) => {
 				log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, workerElapsedMs, readonly, lane });
@@ -103,6 +88,25 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 		});
 	}
 
+	function ensureOpen() {
+		if (closed)
+			return Promise.reject(new Error('sqliteOPFS worker client closed.'));
+		if (!openPromise) {
+			const vfs = openInfo && openInfo.vfs || requestedVfs;
+			const fallback = openInfo && openInfo.fallback ? undefined : fallbackVfs;
+			openPromise = openWorkerDb(vfs, fallback)
+				.then((info) => {
+					openInfo = info;
+					return info;
+				})
+				.catch((error) => {
+					openPromise = null;
+					throw error;
+				});
+		}
+		return openPromise;
+	}
+
 	async function openWorkerDb(vfs, fallbackVfs) {
 		try {
 			const response = await request('open', {
@@ -110,10 +114,10 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 				busyTimeoutMs: options.busyTimeoutMs || 5000,
 				vfs: vfs === 'opfs' ? options.vfs : vfs
 			});
-			return {
+			return onOpenResult({
 				result: response.result,
 				fallback: false
-			};
+			});
 		}
 		catch (e) {
 			if (!fallbackVfs)
@@ -123,12 +127,47 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 				busyTimeoutMs: options.busyTimeoutMs || 5000,
 				vfs: fallbackVfs
 			});
-			return {
+			return onOpenResult({
 				result: response.result,
 				fallback: true,
 				fallbackError: e && e.message ? e.message : String(e)
-			};
+			});
 		}
+	}
+
+	function onOpenResult({ result, fallback, fallbackError }) {
+		const event = {
+			connectionString,
+			filename: result && result.filename,
+			requestedVfs,
+			vfs: result && result.vfs || requestedVfs,
+			fallback,
+			fallbackVfs,
+			fallbackError,
+			readonly
+		};
+		log.emitSqliteOpen(event);
+		return {
+			...result,
+			requestedVfs,
+			fallback,
+			fallbackVfs,
+			fallbackError
+		};
+	}
+
+	function getOpenInfo() {
+		return openInfo;
+	}
+
+	function release() {
+		if (closed || !openPromise)
+			return Promise.resolve();
+		return openPromise
+			.then(() => request('close'))
+			.finally(() => {
+				openPromise = null;
+			});
 	}
 
 	function close() {

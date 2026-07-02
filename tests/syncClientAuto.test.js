@@ -339,6 +339,45 @@ describe('sync client auto start', () => {
 		}
 	});
 
+	test('uses opfs-wl sync lock for deferred sahpool fallback before opening sqliteOPFS', async () => {
+		const lockNames = [];
+		const restoreLocks = installFakeWebLocks({
+			request: async (name, _options, callback) => {
+				lockNames.push(name);
+				return callback();
+			}
+		});
+		const sync = {
+			url: '/rdb',
+			auto: false,
+			tables: ['customer'],
+			crossTabLock: false
+		};
+		const db = {
+			__sqliteSync: sync,
+			poolFactory: {
+				__sqliteSync: sync,
+				__orangeSyncIdentity: 'sqliteOPFS:sync-client.sqlite3',
+				__orangeSqliteOPFSConnectionString: 'sync-client.sqlite3',
+				__orangeSqliteOPFSRequestedVfs: 'opfs-sahpool',
+				__orangeSqliteOPFSFallbackVfs: 'opfs-wl'
+			},
+			query: async () => []
+		};
+		const client = newBasicSyncClient(db);
+
+		try {
+			await client.sync();
+
+			expect(lockNames).toEqual([
+				'orange-orm:sync:sqliteOPFS:sync-client.sqlite3:opfs-wl'
+			]);
+		}
+		finally {
+			restoreLocks();
+		}
+	});
+
 	test('scopes sync web locks by sqliteOPFS vfs', async () => {
 		const requests = [];
 		const restoreLocks = installFakeWebLocks();

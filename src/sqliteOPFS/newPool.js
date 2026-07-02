@@ -1,11 +1,15 @@
 const pools = require('../pools');
 const newId = require('../newId');
 const createSqliteOPFSWorkerClient = require('./workerClient');
+const {
+	acquireCrossTabLock,
+	normalizeLockNamePart
+} = require('../sync/crossTabLock');
 
 function newPool(connectionString, poolOptions) {
 	poolOptions = normalizePoolOptions(poolOptions);
 	let id = newId();
-	let client = createSqliteOPFSWorkerClient(connectionString, poolOptions);
+	let client = createSqliteOPFSWorkerClient(connectionString, withOpenOptions(poolOptions));
 	let readClient;
 	let c = {};
 	let ended = false;
@@ -78,7 +82,7 @@ function newPool(connectionString, poolOptions) {
 
 	function ensureReadClient() {
 		if (!readClient)
-			readClient = createSqliteOPFSWorkerClient(connectionString, { ...poolOptions, readonly: true });
+			readClient = createSqliteOPFSWorkerClient(connectionString, withOpenOptions({ ...poolOptions, readonly: true }));
 		return readClient;
 	}
 
@@ -90,13 +94,28 @@ function newPool(connectionString, poolOptions) {
 			return;
 		writerBusy = true;
 		let released = false;
-		try {
-			cb(null, client, done);
-		}
-		catch (e) {
-			done(e);
-			throw e;
-		}
+		let releaseAccessLock = noop;
+		acquireOPFSAccessLock(poolOptions, connectionString)
+			.then((release) => {
+				if (ended) {
+					release();
+					done();
+					return;
+				}
+				releaseAccessLock = release;
+				try {
+					cb(null, client, done);
+				}
+				catch (e) {
+					done(e);
+					throw e;
+				}
+			}, (e) => {
+				released = true;
+				writerBusy = false;
+				cb(e, null, noop);
+				drainWriterQueue();
+			});
 
 		function done(err) {
 			if (released)
@@ -104,8 +123,14 @@ function newPool(connectionString, poolOptions) {
 			released = true;
 			if (err && client.reset)
 				client.reset();
-			writerBusy = false;
-			drainWriterQueue();
+			updatePoolOpenInfo(c, client);
+			releaseOPFSAccessHandle(client)
+				.then(() => releaseAccessLock())
+				.catch(() => releaseAccessLock())
+				.then(() => {
+					writerBusy = false;
+					drainWriterQueue();
+				});
 		}
 	}
 
@@ -119,6 +144,50 @@ function newPool(connectionString, poolOptions) {
 }
 
 function noop() {}
+
+function withOpenOptions(poolOptions) {
+	return shouldUseOPFSAccessLock(poolOptions)
+		? { ...poolOptions, deferOpen: true }
+		: poolOptions;
+}
+
+function acquireOPFSAccessLock(poolOptions, connectionString) {
+	if (!shouldUseOPFSAccessLock(poolOptions))
+		return Promise.resolve(noop);
+	return acquireCrossTabLock(resolveOPFSAccessLockName(connectionString), {
+		enabled: true,
+		label: 'sqlite OPFS access lock'
+	});
+}
+
+function releaseOPFSAccessHandle(client) {
+	if (!client || typeof client.release !== 'function')
+		return Promise.resolve();
+	const info = typeof client.getOpenInfo === 'function'
+		? client.getOpenInfo()
+		: null;
+	if (!info || info.vfs !== 'opfs-wl')
+		return Promise.resolve();
+	return client.release();
+}
+
+function updatePoolOpenInfo(pool, client) {
+	if (!pool || !client || typeof client.getOpenInfo !== 'function')
+		return;
+	const info = client.getOpenInfo();
+	if (!info)
+		return;
+	pool.__orangeSqliteOPFSVfs = info.vfs || pool.__orangeSqliteOPFSVfs;
+	pool.__orangeSqliteOPFSFallback = !!info.fallback;
+}
+
+function shouldUseOPFSAccessLock(poolOptions = {}) {
+	return poolOptions.vfs === 'opfs-wl' || poolOptions.fallbackVfs === 'opfs-wl';
+}
+
+function resolveOPFSAccessLockName(connectionString) {
+	return `orange-orm:sqlite-opfs-access:${normalizeLockNamePart(connectionString || 'default')}:opfs-wl`;
+}
 
 function shouldUseSingleWorker(poolOptions = {}) {
 	if (poolOptions.singleWorker === true)

@@ -1970,6 +1970,8 @@ async function resolveSqliteOPFSVfs(pool) {
 		const result = await pool.__orangeSqliteOPFSReady;
 		return result && result.vfs || pool.__orangeSqliteOPFSVfs || pool.__orangeSqliteOPFSRequestedVfs;
 	}
+	if (!pool.__orangeSqliteOPFSVfs && pool.__orangeSqliteOPFSFallbackVfs === 'opfs-wl')
+		return 'opfs-wl';
 	return pool.__orangeSqliteOPFSVfs || pool.__orangeSqliteOPFSRequestedVfs;
 }
 
