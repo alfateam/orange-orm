@@ -35,6 +35,43 @@ describe('sync client auto start', () => {
 		await client.stop();
 		await expect(client.isRunning()).resolves.toBe(false);
 	});
+
+	test('explicit start runs even when sync auto is false', async () => {
+		const requests = [];
+		const db = {
+			__sqliteSync: {
+				url: '/rdb',
+				auto: false,
+				tables: ['customer']
+			},
+			query: async () => []
+		};
+		const client = newSyncClient({
+			transaction: async (fn) => fn({
+				customer: {
+					patch: async () => ({ changed: [] })
+				},
+				query: async () => []
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async (request) => {
+					requests.push(request);
+					return {
+						data: request.data.phase === 'keys'
+							? { phase: 'keys', items: [], done: true, cursor: 'cursor-1' }
+							: { phase: 'push', applied: 0, duplicates: 0, results: [] }
+					};
+				};
+			}
+		});
+
+		await client.start();
+		await client.stop();
+
+		expect(requests.some((request) => request.data.phase === 'keys')).toBe(true);
+	});
+
 	test('emits sync errors', async () => {
 		const db = { __sqliteSync: { url: '/rdb', auto: false, tables: ['customer'] } };
 		const client = newSyncClient({}, async () => db, {});

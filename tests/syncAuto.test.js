@@ -46,15 +46,41 @@ describe('sync auto scheduler', () => {
 		await auto.stop();
 	});
 
-	test('skips when auto is disabled', async () => {
+	test('explicit start runs when auto is disabled', async () => {
 		const calls = [];
 		const auto = createSyncAuto({
 			sync: async () => calls.push('sync')
 		}, async () => ({ url: '/rdb', auto: false }));
-		const result = await auto.start();
+		await auto.start();
+		await auto.stop();
+		expect(calls).toEqual(['sync']);
+	});
+
+	test('configured start skips when auto is disabled', async () => {
+		const calls = [];
+		const auto = createSyncAuto({
+			sync: async () => calls.push('sync')
+		}, async () => ({ url: '/rdb', auto: false }));
+		const result = await auto.startFromConfig();
 		await auto.stop();
 		expect(result).toBeUndefined();
 		expect(calls).toEqual([]);
+	});
+
+	test('explicit start does not force a running configured auto loop', async () => {
+		let syncConfig = { url: '/rdb', auto: { intervalMs: 0 } };
+		const calls = [];
+		const auto = createSyncAuto({
+			sync: async () => calls.push('sync')
+		}, async () => syncConfig);
+
+		await auto.startFromConfig();
+		syncConfig = { url: '/rdb', auto: false };
+		await auto.start();
+		await auto.runNow();
+		await auto.stop();
+
+		expect(calls).toEqual(['sync']);
 	});
 
 	test('coalesces overlapping run requests', async () => {

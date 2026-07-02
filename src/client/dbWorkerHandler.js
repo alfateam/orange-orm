@@ -1,4 +1,5 @@
 const { acquireSyncWrite } = require('../sync/writeGate');
+const { syncAutoStartSymbol } = require('./syncAuto');
 const {
 	createSyncTransactionContext,
 	flushSyncTransactionContext,
@@ -18,8 +19,13 @@ function createDbWorkerHandler(client, options = {}) {
 			target.postMessage(message);
 	});
 
-	if (options.autoStart !== false && client.syncClient && typeof client.syncClient.start === 'function')
-		void client.syncClient.start();
+	if (options.autoStart !== false && client.syncClient) {
+		const startAuto = typeof client.syncClient[syncAutoStartSymbol] === 'function'
+			? client.syncClient[syncAutoStartSymbol]
+			: client.syncClient.start;
+		if (typeof startAuto === 'function')
+			void startAuto.call(client.syncClient);
+	}
 
 	return {
 		handleMessage,

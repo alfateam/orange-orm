@@ -5375,31 +5375,46 @@ var hasRequiredSyncAuto;
 function requireSyncAuto () {
 	if (hasRequiredSyncAuto) return syncAuto;
 	hasRequiredSyncAuto = 1;
+	const syncAutoStartSymbol = typeof Symbol === 'function'
+		? Symbol.for('orange-orm.syncClient.autoStart')
+		: '__orangeOrmSyncClientAutoStart';
+
 	function createSyncAuto(syncClient, getConfig, options = {}) {
 		const timers = options.timers || globalThis;
 		const onlineTarget = options.onlineTarget || (typeof globalThis !== 'undefined' ? globalThis : undefined);
 		let running = false;
+		let forceRunning = false;
 		let activeRun = null;
 		let intervalId = null;
 		let unsubscribeOnline = null;
 
 		return {
 			start,
+			startFromConfig,
 			stop,
 			isRunning,
 			runNow
 		};
 
 		async function start() {
+			return startCore(true);
+		}
+
+		async function startFromConfig() {
+			return startCore(false);
+		}
+
+		async function startCore(forceEnabled) {
 			if (running) {
 				if (activeRun)
 					await activeRun;
 				return;
 			}
-			const config = normalizeAutoConfig(await getConfig());
+			const config = normalizeAutoConfig(await getConfig(), { forceEnabled });
 			if (!config.enabled)
 				return;
 			running = true;
+			forceRunning = forceEnabled;
 			if (config.intervalMs > 0 && timers && typeof timers.setInterval === 'function') {
 				intervalId = timers.setInterval(() => {
 					void runNow().catch(() => {});
@@ -5411,6 +5426,7 @@ function requireSyncAuto () {
 
 		async function stop() {
 			running = false;
+			forceRunning = false;
 			if (intervalId !== null && timers && typeof timers.clearInterval === 'function') {
 				timers.clearInterval(intervalId);
 				intervalId = null;
@@ -5436,7 +5452,7 @@ function requireSyncAuto () {
 		}
 
 		async function runCycle() {
-			const config = normalizeAutoConfig(await getConfig());
+			const config = normalizeAutoConfig(await getConfig(), { forceEnabled: forceRunning });
 			if (config.enabled)
 				return syncClient.sync();
 			return { skipped: true };
@@ -5454,17 +5470,18 @@ function requireSyncAuto () {
 		}
 	}
 
-	function normalizeAutoConfig(syncConfig) {
+	function normalizeAutoConfig(syncConfig, options = {}) {
 		const auto = syncConfig && syncConfig.auto;
+		const forceEnabled = !!options.forceEnabled;
 		if (!syncConfig || auto === false)
-			return { enabled: false, intervalMs: 30000 };
+			return { enabled: !!syncConfig && forceEnabled, intervalMs: 30000 };
 		if (auto === undefined || auto === true)
 			return { enabled: true, intervalMs: 30000 };
 		if (auto !== Object(auto))
 			return { enabled: true, intervalMs: 30000 };
 		const intervalMs = normalizeIntervalMs(auto.intervalMs);
 		return {
-			enabled: auto.enabled !== false,
+			enabled: forceEnabled || auto.enabled !== false,
 			intervalMs
 		};
 	}
@@ -5478,7 +5495,8 @@ function requireSyncAuto () {
 
 	syncAuto = {
 		createSyncAuto,
-		normalizeAutoConfig
+		normalizeAutoConfig,
+		syncAutoStartSymbol
 	};
 	return syncAuto;
 }
@@ -5888,7 +5906,7 @@ function requireSyncClient () {
 	hasRequiredSyncClient = 1;
 	const randomUuid = requireRandomUuid();
 	const stringify = requireStringify();
-	const { createSyncAuto } = requireSyncAuto();
+	const { createSyncAuto, syncAutoStartSymbol } = requireSyncAuto();
 	const createHttpInterceptor = requireHttpInterceptor();
 	const outboxTableSql = requireOutboxTableSql();
 	const { ensureSyncSchema, clearEnsuredSyncSchema } = requireSyncSchema();
@@ -5938,7 +5956,7 @@ function requireSyncClient () {
 			sync: observedSync
 		}, getConfig);
 
-		return {
+		const syncClientApi = {
 			sync: observedSync,
 			ensureLocalSchema: queuedEnsureLocalSchema,
 			resetLocal: lockedResetLocal,
@@ -5952,6 +5970,10 @@ function requireSyncClient () {
 			waitForInitialSync,
 			interceptors
 		};
+		Object.defineProperty(syncClientApi, syncAutoStartSymbol, {
+			value: auto.startFromConfig
+		});
+		return syncClientApi;
 
 		function withCrossTabSyncLock(fn) {
 			return async function lockedSyncMethod(options) {
@@ -19906,6 +19928,7 @@ function requireDbWorkerHandler () {
 	if (hasRequiredDbWorkerHandler) return dbWorkerHandler;
 	hasRequiredDbWorkerHandler = 1;
 	const { acquireSyncWrite } = requireWriteGate();
+	const { syncAutoStartSymbol } = requireSyncAuto();
 	const {
 		createSyncTransactionContext,
 		flushSyncTransactionContext,
@@ -19925,8 +19948,13 @@ function requireDbWorkerHandler () {
 				target.postMessage(message);
 		});
 
-		if (options.autoStart !== false && client.syncClient && typeof client.syncClient.start === 'function')
-			void client.syncClient.start();
+		if (options.autoStart !== false && client.syncClient) {
+			const startAuto = typeof client.syncClient[syncAutoStartSymbol] === 'function'
+				? client.syncClient[syncAutoStartSymbol]
+				: client.syncClient.start;
+			if (typeof startAuto === 'function')
+				void startAuto.call(client.syncClient);
+		}
 
 		return {
 			handleMessage,

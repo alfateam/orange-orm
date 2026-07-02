@@ -1,6 +1,6 @@
 const randomUuid = require('../randomUuid');
 const stringify = require('./stringify');
-const { createSyncAuto } = require('./syncAuto');
+const { createSyncAuto, syncAutoStartSymbol } = require('./syncAuto');
 const createHttpInterceptor = require('./httpInterceptor');
 const outboxTableSql = require('../sync/outboxTableSql');
 const { ensureSyncSchema, clearEnsuredSyncSchema } = require('./syncSchema');
@@ -50,7 +50,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		sync: observedSync
 	}, getConfig);
 
-	return {
+	const syncClientApi = {
 		sync: observedSync,
 		ensureLocalSchema: queuedEnsureLocalSchema,
 		resetLocal: lockedResetLocal,
@@ -64,6 +64,10 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		waitForInitialSync,
 		interceptors
 	};
+	Object.defineProperty(syncClientApi, syncAutoStartSymbol, {
+		value: auto.startFromConfig
+	});
+	return syncClientApi;
 
 	function withCrossTabSyncLock(fn) {
 		return async function lockedSyncMethod(options) {

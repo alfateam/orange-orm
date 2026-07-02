@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 const rdb = require('../src/index');
+const { syncAutoStartSymbol } = require('../src/client/syncAuto');
 const fs = require('fs');
 const map = require('./db');
 const initSqlite = require('./initSqlite');
@@ -39,11 +40,15 @@ afterAll(async () => {
 describe('db worker rpc', () => {
 	test('auto-starts worker sync client by default', () => {
 		let starts = 0;
+		let autoStarts = 0;
 		let stops = 0;
 		const handler = rdb.createDbWorkerHandler({
 			syncClient: {
 				start: () => {
 					starts += 1;
+				},
+				[syncAutoStartSymbol]: () => {
+					autoStarts += 1;
 				},
 				stop: () => {
 					stops += 1;
@@ -51,7 +56,8 @@ describe('db worker rpc', () => {
 			}
 		}, { postMessage: () => {} });
 
-		expect(starts).toBe(1);
+		expect(starts).toBe(0);
+		expect(autoStarts).toBe(1);
 		handler.stop();
 		expect(stops).toBe(1);
 	});
