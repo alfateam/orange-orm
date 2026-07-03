@@ -973,20 +973,14 @@ describe('sync client auto start', () => {
 		await waitFor(() => rowResponses.length === 4);
 
 		expect(rowRequests).toEqual([[1], [2], [3], [4]]);
+		resolveRowResponse(rowResponses[2]);
+		await waitFor(() => db.journal.items.length === 1);
+		expect(JSON.parse(db.journal.items[0].row_json)).toEqual({ id: 3 });
+		expect(db.journal.session.done).toBe(0);
+
 		for (let i = 0; i < rowResponses.length; i++) {
-			const { deferred, requestedItems } = rowResponses[i];
-			deferred.resolve({
-				data: {
-					phase: 'rows',
-					items: requestedItems.map((item) => ({
-						table: item.table,
-						pk: item.pk,
-						key: item.key,
-						row: { id: item.pk[0] },
-						op: item.op
-					}))
-				}
-			});
+			if (i !== 2)
+				resolveRowResponse(rowResponses[i]);
 		}
 		await syncPromise;
 
@@ -2139,7 +2133,13 @@ function queryJournal(journal, sql) {
 	}
 	if (/DELETE FROM "orange_sync_pull_item" WHERE/u.test(sql)) {
 		const scope = firstSqlString(sql);
-		journal.items = journal.items.filter(item => item.scope !== scope);
+		const batchMatch = /"batch_no" >= (\d+)/u.exec(sql);
+		if (batchMatch) {
+			const batchNo = Number(batchMatch[1]);
+			journal.items = journal.items.filter(item => item.scope !== scope || item.batch_no < batchNo);
+		}
+		else
+			journal.items = journal.items.filter(item => item.scope !== scope);
 		return [];
 	}
 	if (/^DELETE FROM "orange_sync_pull_session"$/u.test(sql)) {
@@ -2322,6 +2322,22 @@ function newDeferred() {
 		reject = rej;
 	});
 	return { promise, resolve, reject };
+}
+
+function resolveRowResponse(response) {
+	const { deferred, requestedItems } = response;
+	deferred.resolve({
+		data: {
+			phase: 'rows',
+			items: requestedItems.map((item) => ({
+				table: item.table,
+				pk: item.pk,
+				key: item.key,
+				row: { id: item.pk[0] },
+				op: item.op
+			}))
+		}
+	});
 }
 
 function wait(ms) {

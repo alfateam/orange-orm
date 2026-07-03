@@ -6399,8 +6399,11 @@ function requireSyncClient () {
 			async function stagePullJournal() {
 				let session = await readPullSession(db, scopeKey);
 				let hasPersistedSession = !!session;
-				if (session)
+				if (session) {
 					session.persisted = true;
+					if (!session.done)
+						await clearIncompletePullJournalBatch(db, scopeKey, session.nextBatch);
+				}
 				if (!session)
 					session = newPullSession(scopeKey, options.since);
 				let reason = session.reason;
@@ -6432,7 +6435,7 @@ function requireSyncClient () {
 						hasPersistedSession = true;
 					}
 					try {
-						session = await persistPullJournalBatch(db, scopeKey, session, batch.keysPayload, batch.keyItems, batch.rowItems, reason, maxJournalRowsPerInsert);
+						session = await persistPullJournalBatch(db, scopeKey, session, batch.keysPayload, batch.keyItems, reason, maxJournalRowsPerInsert, fetchRowsItems);
 					}
 					catch (e) {
 						suppressPullBatchFetch(nextFetch);
@@ -6482,10 +6485,6 @@ function requireSyncClient () {
 					? keysPayload.reason
 					: reason;
 				const keyItems = normalizeKeyItems(keysPayload.items);
-				const upsertItems = keyItems.filter(x => x.op !== 'D');
-				const rowItems = upsertItems.length > 0
-					? await fetchRowsItems(upsertItems)
-					: [];
 				const token = keysPayload.done || !keysPayload.token ? null : keysPayload.token;
 				const done = keysPayload.done || !keysPayload.token;
 				const finalSince = keysPayload.cursor !== undefined ? keysPayload.cursor : session.finalSince;
@@ -6493,7 +6492,6 @@ function requireSyncClient () {
 				return {
 					keysPayload,
 					keyItems,
-					rowItems,
 					token,
 					done,
 					finalSince,
@@ -6514,7 +6512,7 @@ function requireSyncClient () {
 				};
 			}
 
-			async function fetchRowsItems(items) {
+			async function fetchRowsItems(items, onRowItems) {
 				const queue = chunkItems(items, maxRowsPerBatch);
 				const rows = [];
 				const workers = [];
@@ -6537,8 +6535,12 @@ function requireSyncClient () {
 						const payload = currentRowsResult.payload;
 						if (!isRowsPayload(payload))
 							throw new Error('Sync endpoint did not return rows payload');
-						for (let i = 0; i < payload.items.length; i++)
-							rows.push(payload.items[i]);
+						if (typeof onRowItems === 'function')
+							await onRowItems(payload.items);
+						else {
+							for (let i = 0; i < payload.items.length; i++)
+								rows.push(payload.items[i]);
+						}
 						const acceptedCount = getRowsAcceptedCount(payload, currentItems.length);
 						const acceptedItems = acceptedCount < currentItems.length
 							? currentItems.slice(0, acceptedCount)
@@ -6770,33 +6772,38 @@ function requireSyncClient () {
 			};
 		}
 
-		async function persistPullJournalBatch(db, scopeKey, session, keysPayload, keyItems, rowItems, reason, maxJournalRowsPerInsert) {
+		async function persistPullJournalBatch(db, scopeKey, session, keysPayload, keyItems, reason, maxJournalRowsPerInsert, fetchRows) {
+			const batchNo = session.nextBatch || 0;
+			const baseSeq = session.nextSeq || 0;
+			const itemState = createPullJournalItemState(keyItems, batchNo, baseSeq);
+			let insertChain = Promise.resolve();
+
+			async function enqueueJournalRows(rows) {
+				if (!Array.isArray(rows) || rows.length === 0)
+					return insertChain;
+				insertChain = insertChain.then(() => insertPullJournalItems(db, rows, maxJournalRowsPerInsert));
+				return insertChain;
+			}
+
+			async function persistReturnedRows(rowItems) {
+				const rows = pullJournalRowsForReturnedRows(scopeKey, itemState, rowItems);
+				await enqueueJournalRows(rows);
+			}
+
+			const upsertItems = keyItems.filter(x => x.op !== 'D');
+			if (upsertItems.length > 0)
+				await fetchRows(upsertItems, persistReturnedRows);
+			await insertChain;
+
 			let nextSession;
 			await client.transaction(async (tx) => {
-				const rowMap = rowsBySyncItemKey(rowItems);
-				const batchNo = session.nextBatch || 0;
-				let seq = session.nextSeq || 0;
-				const journalRows = [];
-				for (let i = 0; i < keyItems.length; i++) {
-					const item = keyItems[i];
-					const rowItem = item.op === 'D' ? undefined : rowMap.get(syncItemKey(item));
-					journalRows.push([
-						sqlStringLiteral(scopeKey),
-						String(batchNo),
-						String(seq),
-						sqlStringLiteral(item.table),
-						sqlStringLiteral(stringify(item.pk)),
-						'NULL',
-						sqlStringLiteral(item.op),
-						sqlNullableJsonLiteral(rowItem ? rowItem.row : undefined)
-					]);
-					seq += 1;
-				}
-				await insertPullJournalItems(tx, journalRows, maxJournalRowsPerInsert);
+				const remainingRows = pullJournalRowsForRemainingItems(scopeKey, itemState);
+				await insertPullJournalItems(tx, remainingRows, maxJournalRowsPerInsert);
 				const finalSince = keysPayload.cursor !== undefined ? keysPayload.cursor : session.finalSince;
 				const payload = reason === undefined ? keysPayload : { ...keysPayload, reason };
 				const token = keysPayload.done || !keysPayload.token ? null : keysPayload.token;
 				const done = keysPayload.done || !keysPayload.token ? 1 : 0;
+				const nextSeq = baseSeq + keyItems.length;
 				await tx.query([
 					`UPDATE "${syncPullSessionTable}"`,
 					`SET "token_json" = ${sqlNullableJsonLiteral(token)},`,
@@ -6805,7 +6812,7 @@ function requireSyncClient () {
 					`"payload_json" = ${sqlNullableJsonLiteral(payload)},`,
 					`"reason" = ${sqlNullableStringLiteral(reason)},`,
 					`"status" = ${sqlStringLiteral(done ? 'ready' : 'pending')},`,
-					`"next_seq" = ${seq},`,
+					`"next_seq" = ${nextSeq},`,
 					`"next_batch" = ${batchNo + 1},`,
 					`"updated_at_ms" = ${Date.now()}`,
 					`WHERE "scope" = ${sqlStringLiteral(scopeKey)}`
@@ -6818,12 +6825,86 @@ function requireSyncClient () {
 					payload,
 					reason,
 					status: done ? 'ready' : 'pending',
-					nextSeq: seq,
+					nextSeq,
 					nextBatch: batchNo + 1,
 					persisted: true
 				};
 			}, { suppressSyncOutbox: true });
 			return nextSession;
+		}
+
+		function createPullJournalItemState(keyItems, batchNo, baseSeq) {
+			const states = [];
+			const upsertStatesByKey = new Map();
+			for (let i = 0; i < keyItems.length; i++) {
+				const item = keyItems[i];
+				const state = {
+					item,
+					batchNo,
+					seq: baseSeq + i,
+					persisted: false
+				};
+				states.push(state);
+				if (item && item.op !== 'D') {
+					const key = syncItemKey(item);
+					if (key) {
+						if (!upsertStatesByKey.has(key))
+							upsertStatesByKey.set(key, []);
+						upsertStatesByKey.get(key).push(state);
+					}
+				}
+			}
+			return { states, upsertStatesByKey };
+		}
+
+		function pullJournalRowsForReturnedRows(scopeKey, itemState, rowItems) {
+			const rows = [];
+			const seen = new Set();
+			const items = Array.isArray(rowItems) ? rowItems : [];
+			for (let i = 0; i < items.length; i++) {
+				const rowItem = items[i];
+				const key = syncItemKey(rowItem);
+				if (!key || seen.has(key))
+					continue;
+				seen.add(key);
+				const states = itemState.upsertStatesByKey.get(key);
+				if (!states)
+					continue;
+				for (let j = 0; j < states.length; j++) {
+					const state = states[j];
+					if (state.persisted)
+						continue;
+					state.persisted = true;
+					rows.push(newPullJournalRow(scopeKey, state, rowItem));
+				}
+			}
+			return rows;
+		}
+
+		function pullJournalRowsForRemainingItems(scopeKey, itemState) {
+			const rows = [];
+			for (let i = 0; i < itemState.states.length; i++) {
+				const state = itemState.states[i];
+				if (state.persisted)
+					continue;
+				state.persisted = true;
+				rows.push(newPullJournalRow(scopeKey, state, undefined));
+			}
+			return rows;
+		}
+
+		function newPullJournalRow(scopeKey, state, rowItem) {
+			const item = state.item;
+			return [
+				sqlStringLiteral(scopeKey),
+				String(state.batchNo),
+				String(state.seq),
+				sqlStringLiteral(item.table),
+				sqlStringLiteral(stringify(item.pk)),
+				'NULL',
+				sqlStringLiteral(item.op),
+				sqlNullableJsonLiteral(rowItem ? rowItem.row : undefined)
+			];
 		}
 
 		async function insertPullJournalItems(db, rows, maxRowsPerInsert) {
@@ -6877,6 +6958,15 @@ function requireSyncClient () {
 			await db.query(`DELETE FROM "${syncPullSessionTable}"`);
 		}
 
+		async function clearIncompletePullJournalBatch(db, scopeKey, nextBatch) {
+			const batchNo = Math.max(0, normalizeLimit(nextBatch, 0));
+			await db.query([
+				`DELETE FROM "${syncPullItemTable}"`,
+				`WHERE "scope" = ${sqlStringLiteral(scopeKey)}`,
+				`AND "batch_no" >= ${batchNo}`
+			].join(' '));
+		}
+
 		async function hasOtherPullJournalSession(db, scopeKey) {
 			const rows = await db.query([
 				'SELECT "scope"',
@@ -6911,7 +7001,7 @@ function requireSyncClient () {
 		function isMissingSqliteTableError(error, tableName) {
 			const message = error && error.message || '';
 			return message.includes(`no such table: ${tableName}`)
-				|| message.includes(`no such table: ${quoteIdent(tableName)}`);
+			|| message.includes(`no such table: ${quoteIdent(tableName)}`);
 		}
 
 		async function getClientId(db) {
@@ -8262,17 +8352,6 @@ function requireSyncClient () {
 		if (!item || typeof item.table !== 'string' || !Array.isArray(item.pk))
 			return '';
 		return `${item.table}|${stringify(item.pk)}`;
-	}
-
-	function rowsBySyncItemKey(items) {
-		const result = new Map();
-		const rows = Array.isArray(items) ? items : [];
-		for (let i = 0; i < rows.length; i++) {
-			const key = syncItemKey(rows[i]);
-			if (key)
-				result.set(key, rows[i]);
-		}
-		return result;
 	}
 
 	function pullSessionFromRow(row) {
