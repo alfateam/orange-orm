@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
 const newSyncClient = require('../src/client/syncClient');
+const log = require('../src/table/log');
 
 describe('sync client auto start', () => {
 	test('starts when start is called and stays running', async () => {
@@ -701,6 +702,165 @@ describe('sync client auto start', () => {
 		expect(baseDeletes[0]).toMatch(/"id" = 1 OR "id" = 2/u);
 		expect(baseInserts[0]).toMatch(/"id" = 1 OR "id" = 2/u);
 		expect(db.queryLog.some(sql => /^CREATE INDEX IF NOT EXISTS "orange_sync_base_idx_.*" ON "orange_sync_base_data_.*" \("id"\)$/u.test(sql))).toBe(true);
+	});
+
+	test('emits staged pull timing metadata', async () => {
+		const events = [];
+		const onTiming = (event) => events.push(event);
+		log.on('syncTiming', onTiming);
+		const db = newJournalDb({
+			__sqliteSync: { url: '/rdb', auto: false, schema: false },
+		});
+		const client = newSyncClient({
+			tables: {
+				customer: newTable('customer')
+			},
+			transaction: async (fn) => fn({
+				customer: {
+					patch: async () => ({ changed: [] })
+				},
+				query: db.query
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async (request) => {
+					if (request.data.phase === 'keys') {
+						return {
+							data: {
+								phase: 'keys',
+								items: [
+									{ table: 'customer', pk: [1], key: { id: 1 }, op: 'U' }
+								],
+								done: true,
+								cursor: 'cursor-1'
+							}
+						};
+					}
+					return {
+						data: {
+							phase: 'rows',
+							items: request.data.items.map((item) => ({
+								table: item.table,
+								pk: item.pk,
+								key: item.key,
+								row: { id: item.pk[0] },
+								op: item.op
+							}))
+						}
+					};
+				};
+			}
+		});
+
+		try {
+			await client.sync();
+		}
+		finally {
+			log.off('syncTiming', onTiming);
+		}
+
+		const phases = events.map(event => event.phase);
+		expect(phases).toContain('sync.pull.stage');
+		expect(phases).toContain('sync.pull.apply.total');
+		expect(phases).toContain('sync.pull.apply.ensureStableBase');
+		expect(phases).toContain('sync.pull.apply.readJournal');
+		expect(phases).toContain('sync.pull.apply.upserts');
+		expect(phases).toContain('sync.pull.apply.stableBaseUpserts');
+		expect(phases).toContain('sync.pull.apply.foreignKeyCheck');
+		expect(phases).toContain('sync.pull.apply.checkpoint');
+		expect(phases).toContain('sync.pull.apply.clearJournal');
+		expect(events.every(event => typeof event.elapsedMs === 'number' && event.elapsedMs >= 0)).toBe(true);
+		expect(events.find(event => event.phase === 'sync.pull.apply.upserts')).toMatchObject({
+			scope: 'customer',
+			itemCount: 1,
+			upsertCount: 1,
+			tableCount: 1
+		});
+	});
+
+	test('applies staged pull deletes through batch delete by primary key', async () => {
+		const deletes = [];
+		const patches = [];
+		const db = newJournalDb({
+			__sqliteSync: { url: '/rdb', auto: false, schema: false },
+		});
+		const client = newSyncClient({
+			tables: {
+				customer: newTable('customer')
+			},
+			transaction: async (fn) => fn({
+				customer: {
+					delete: async (rows) => {
+						deletes.push(rows);
+					},
+					patch: async (patch) => {
+						patches.push(patch);
+						return { changed: [] };
+					}
+				},
+				query: db.query
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async () => ({
+					data: {
+						phase: 'keys',
+						items: [
+							{ table: 'customer', pk: [1], key: { id: 1 }, op: 'D' },
+							{ table: 'customer', pk: [2], key: { id: 2 }, op: 'D' }
+						],
+						done: true,
+						cursor: 'cursor-1'
+					}
+				});
+			}
+		});
+
+		await client.sync();
+
+		expect(deletes).toEqual([[{ id: 1 }, { id: 2 }]]);
+		expect(patches).toEqual([]);
+	});
+
+	test('rejects staged pull deletes when primary key metadata is missing', async () => {
+		let deleteCalled = false;
+		const table = {
+			...newTable('customer'),
+			_primaryColumns: []
+		};
+		const db = newJournalDb({
+			__sqliteSync: { url: '/rdb', auto: false, schema: false },
+		});
+		const client = newSyncClient({
+			tables: {
+				customer: table
+			},
+			transaction: async (fn) => fn({
+				customer: {
+					delete: async () => {
+						deleteCalled = true;
+					}
+				},
+				query: db.query
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async () => ({
+					data: {
+						phase: 'keys',
+						items: [
+							{ table: 'customer', pk: [1], key: { id: 1 }, op: 'D' }
+						],
+						done: true,
+						cursor: 'cursor-1'
+					}
+				});
+			}
+		});
+
+		await expect(client.sync()).rejects.toThrow('Cannot apply sync deletes for "customer" without primary key metadata.');
+
+		expect(deleteCalled).toBe(false);
 	});
 
 	test('continues staged row fetch when rows response is partial', async () => {

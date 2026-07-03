@@ -5898,6 +5898,143 @@ function requireSyncSchema () {
 	return syncSchema;
 }
 
+var emitEvent_1;
+var hasRequiredEmitEvent;
+
+function requireEmitEvent () {
+	if (hasRequiredEmitEvent) return emitEvent_1;
+	hasRequiredEmitEvent = 1;
+	function emitEvent() {
+		var callbacks = [];
+		var emit = function() {
+
+			var copy = callbacks.slice(0, callbacks.length);
+			var result = [];
+			for (var i = 0; i < copy.length; i++) {
+				var callback = copy[i];
+				result.push(callback.apply(null, arguments));
+			}
+			return result;
+		};
+
+		emit.add = function(callback) {
+			if (!callback)
+				throw new Error('missing callback');
+			callbacks.push(callback);
+		};
+
+		emit.tryAdd = function(callback) {
+			if (callback)
+				emit.add(callback);
+		};
+
+		emit.remove = function(callback) {
+			for (var i = 0; i < callbacks.length; i++) {
+				if (callbacks[i] === callback) {
+					callbacks.splice(i, 1);
+					return;
+				}
+			}
+		};
+
+		emit.tryRemove = function(callback) {
+			if (callback)
+				emit.remove(callback);
+		};
+
+		emit.clear = function() {
+			callbacks.splice(0, callbacks.length);
+		};
+
+		emit.callbacks = callbacks;
+
+		return emit;
+	}
+
+	emitEvent_1 = emitEvent;
+	return emitEvent_1;
+}
+
+var log_1;
+var hasRequiredLog;
+
+function requireLog () {
+	if (hasRequiredLog) return log_1;
+	hasRequiredLog = 1;
+	var newEmitEvent = requireEmitEvent();
+
+	var emitters = {
+		query: newEmitEvent(),
+		queryComplete: newEmitEvent(),
+		syncTiming: newEmitEvent()
+	};
+
+	var logger = function() {
+	};
+
+	function log() {
+		logger.apply(null, arguments);
+	}
+	function emitQuery({ sql, parameters }) {
+		emitters.query.apply(null, arguments);
+		log(sql);
+		log('parameters: ' + parameters);
+	}
+
+	log.emitQuery = emitQuery;
+
+	log.emitQueryComplete = function() {
+		emitters.queryComplete.apply(null, arguments);
+	};
+
+	log.emitSyncTiming = function() {
+		emitters.syncTiming.apply(null, arguments);
+	};
+
+	log.startQuery = function({ sql, parameters }) {
+		const startedAt = now();
+		log.emitQuery({ sql, parameters });
+		return function(error) {
+			log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, error });
+		};
+	};
+
+	log.registerLogger = function(cb) {
+		logger = cb;
+	};
+
+	log.on = function(type, cb) {
+		if (type === 'query')
+			emitters.query.add(cb);
+		else if (type === 'queryComplete')
+			emitters.queryComplete.add(cb);
+		else if (type === 'syncTiming')
+			emitters.syncTiming.add(cb);
+		else
+			throw new Error('unknown event type: ' + type);
+	};
+
+	log.off = function(type, cb) {
+		if (type === 'query')
+			emitters.query.tryRemove(cb);
+		else if (type === 'queryComplete')
+			emitters.queryComplete.tryRemove(cb);
+		else if (type === 'syncTiming')
+			emitters.syncTiming.tryRemove(cb);
+		else
+			throw new Error('unknown event type: ' + type);
+	};
+
+	log_1 = log;
+
+	function now() {
+		if (typeof performance !== 'undefined' && performance.now)
+			return performance.now();
+		return Date.now();
+	}
+	return log_1;
+}
+
 var syncClient;
 var hasRequiredSyncClient;
 
@@ -5923,6 +6060,7 @@ function requireSyncClient () {
 		finalizeSyncOperationMemory,
 		withSyncOperationMemory
 	} = requireOperationContext();
+	const log = requireLog();
 
 	const maxPushBatchesPerSync = 1000;
 	const maxStableBaseKeysPerStatement = 200;
@@ -6352,13 +6490,18 @@ function requireSyncClient () {
 			const db = options.db;
 			const scopeKey = options.scopeKey || getScopeKey(options.tables);
 			await ensurePullJournalTables(db);
-			const session = await stagePullJournal();
+			const session = await measureSyncTiming('sync.pull.stage', { scope: scopeKey }, () => stagePullJournal());
 			let applied = 0;
 			const shouldApplyCheckpoint = session.finalSince !== undefined;
-			await client.transaction(async (tx) => {
+			await measureSyncTiming('sync.pull.apply.total', { scope: scopeKey }, () => client.transaction(async (tx) => {
 				await tryDeferForeignKeys(tx);
-				await ensureStableBaseTables(tx, options.tables);
-				const batches = await readPullJournalBatches(tx, scopeKey);
+				await measureSyncTiming('sync.pull.apply.ensureStableBase', {
+					scope: scopeKey,
+					tableCount: Array.isArray(options.tables) ? options.tables.length : undefined
+				}, () => ensureStableBaseTables(tx, options.tables));
+				const batches = await measureSyncTiming('sync.pull.apply.readJournal', {
+					scope: scopeKey
+				}, () => readPullJournalBatches(tx, scopeKey));
 				const hasJournalItems = batches.length > 0;
 				const touchedTables = new Set();
 				for (let i = 0; i < batches.length; i++) {
@@ -6368,22 +6511,46 @@ function requireSyncClient () {
 					const deleteItems = batch.filter(x => x.op === 'D');
 					const upsertItems = batch.filter(x => x.op !== 'D' && x.row !== undefined);
 					if (deleteItems.length > 0) {
-						applied += await applyDeleteItemsOnTx(tx, deleteItems, defaultPatchOptions);
-						await applyDeleteItemsToStableBase(tx, deleteItems);
+						applied += await measureSyncTiming('sync.pull.apply.deletes', {
+							scope: scopeKey,
+							batchCount: 1,
+							itemCount: deleteItems.length,
+							deleteCount: deleteItems.length,
+							tableCount: countDistinctTables(deleteItems)
+						}, () => applyDeleteItemsOnTx(client, tx, deleteItems));
+						await measureSyncTiming('sync.pull.apply.stableBaseDeletes', {
+							scope: scopeKey,
+							batchCount: 1,
+							itemCount: deleteItems.length,
+							deleteCount: deleteItems.length,
+							tableCount: countDistinctTables(deleteItems)
+						}, () => applyDeleteItemsToStableBase(tx, deleteItems));
 					}
 					if (upsertItems.length > 0) {
-						applied += await applyRowsPayloadOnTx(tx, upsertItems, defaultPatchOptions);
-						await applyRowsPayloadToStableBase(tx, upsertItems);
+						applied += await measureSyncTiming('sync.pull.apply.upserts', {
+							scope: scopeKey,
+							batchCount: 1,
+							itemCount: upsertItems.length,
+							upsertCount: upsertItems.length,
+							tableCount: countDistinctTables(upsertItems)
+						}, () => applyRowsPayloadOnTx(tx, upsertItems, defaultPatchOptions));
+						await measureSyncTiming('sync.pull.apply.stableBaseUpserts', {
+							scope: scopeKey,
+							batchCount: 1,
+							itemCount: upsertItems.length,
+							upsertCount: upsertItems.length,
+							tableCount: countDistinctTables(upsertItems)
+						}, () => applyRowsPayloadToStableBase(tx, upsertItems));
 					}
 				}
 				if (hasJournalItems)
-					await validateForeignKeys(tx);
+					await measureSyncTiming('sync.pull.apply.foreignKeyCheck', { scope: scopeKey }, () => validateForeignKeys(tx));
 				if (shouldApplyCheckpoint)
-					await writeScopeState(scopeKey, { since: session.finalSince, updatedAtMs: Date.now() }, tx);
+					await measureSyncTiming('sync.pull.apply.checkpoint', { scope: scopeKey }, () => writeScopeState(scopeKey, { since: session.finalSince, updatedAtMs: Date.now() }, tx));
 				if (hasJournalItems || session.persisted)
-					await clearPullJournal(tx, scopeKey);
+					await measureSyncTiming('sync.pull.apply.clearJournal', { scope: scopeKey }, () => clearPullJournal(tx, scopeKey));
 				session.tables = Array.from(touchedTables);
-			}, { suppressSyncOutbox: true });
+			}, { suppressSyncOutbox: true }));
 			if (shouldApplyCheckpoint)
 				sinceByScope.set(scopeKey, session.finalSince);
 
@@ -8347,7 +8514,7 @@ function requireSyncClient () {
 		return result;
 	}
 
-	async function applyDeleteItemsOnTx(tx, items, patchOptions) {
+	async function applyDeleteItemsOnTx(client, tx, items) {
 		const deletes = Array.isArray(items) ? items : [];
 		const perTable = new Map();
 		for (let i = 0; i < deletes.length; i++) {
@@ -8356,23 +8523,49 @@ function requireSyncClient () {
 				continue;
 			if (!perTable.has(item.table))
 				perTable.set(item.table, []);
-			perTable.get(item.table).push({
-				op: 'remove',
-				path: `/${JSON.stringify(item.pk)}`
-			});
+			perTable.get(item.table).push(item);
 		}
 
 		const tableNames = orderTablesByDependencies(tx, Array.from(perTable.keys())).reverse();
 		let applied = 0;
 		for (let i = 0; i < tableNames.length; i++) {
 			const table = tableNames[i];
-			if (!tx[table] || typeof tx[table].patch !== 'function')
+			const tableApi = tx[table];
+			if (!tableApi)
 				throw new Error(`Table "${table}" does not exist in this client`);
-			const patch = perTable.get(table);
-			await tx[table].patch(patch, patchOptions);
-			applied += patch.length;
+			const tableItems = perTable.get(table);
+			const deleteRows = deletePrimaryKeyRowsForTable(client, table, tableItems);
+			if (typeof tableApi.delete !== 'function')
+				throw new Error(`Table "${table}" does not exist in this client`);
+			await tableApi.delete(deleteRows);
+			applied += deleteRows.length;
 		}
 		return applied;
+	}
+
+	function deletePrimaryKeyRowsForTable(client, tableName, items) {
+		const table = client && client.tables && client.tables[tableName];
+		const primaryColumns = table && Array.isArray(table._primaryColumns)
+			? table._primaryColumns
+			: [];
+		if (primaryColumns.length === 0)
+			throw new Error(`Cannot apply sync deletes for "${tableName}" without primary key metadata.`);
+		const rows = [];
+		for (let i = 0; i < items.length; i++) {
+			const item = items[i];
+			if (!item || !Array.isArray(item.pk) || item.pk.length !== primaryColumns.length)
+				throw new Error(`Cannot apply sync deletes for "${tableName}" because primary key shape does not match.`);
+			const row = {};
+			for (let columnIndex = 0; columnIndex < primaryColumns.length; columnIndex++) {
+				const column = primaryColumns[columnIndex];
+				const name = column && (column.alias || column.name || column._dbName);
+				if (typeof name !== 'string' || name.length === 0)
+					throw new Error(`Cannot apply sync deletes for "${tableName}" without primary key column names.`);
+				row[name] = item.pk[columnIndex];
+			}
+			rows.push(row);
+		}
+		return rows;
 	}
 
 	async function applyRowsPayloadOnTx(tx, items, patchOptions) {
@@ -8659,6 +8852,46 @@ function requireSyncClient () {
 			return 'NULL';
 		const parsed = Number(value);
 		return Number.isFinite(parsed) ? String(parsed) : 'NULL';
+	}
+
+	async function measureSyncTiming(phase, metadata, fn) {
+		const startedAt = now();
+		try {
+			const result = await fn();
+			log.emitSyncTiming({
+				...(metadata || {}),
+				phase,
+				elapsedMs: now() - startedAt
+			});
+			return result;
+		}
+		catch (error) {
+			log.emitSyncTiming({
+				...(metadata || {}),
+				phase,
+				elapsedMs: now() - startedAt,
+				error
+			});
+			throw error;
+		}
+	}
+
+	function countDistinctTables(items) {
+		const tables = new Set();
+		if (!Array.isArray(items))
+			return 0;
+		for (let i = 0; i < items.length; i++) {
+			const table = items[i] && items[i].table;
+			if (typeof table === 'string')
+				tables.add(table);
+		}
+		return tables.size;
+	}
+
+	function now() {
+		if (typeof performance !== 'undefined' && performance.now)
+			return performance.now();
+		return Date.now();
 	}
 
 	syncClient = newSyncClient;
@@ -13535,63 +13768,6 @@ function requireUpdateField () {
 
 	updateField_1 = updateField;
 	return updateField_1;
-}
-
-var emitEvent_1;
-var hasRequiredEmitEvent;
-
-function requireEmitEvent () {
-	if (hasRequiredEmitEvent) return emitEvent_1;
-	hasRequiredEmitEvent = 1;
-	function emitEvent() {
-		var callbacks = [];
-		var emit = function() {
-
-			var copy = callbacks.slice(0, callbacks.length);
-			var result = [];
-			for (var i = 0; i < copy.length; i++) {
-				var callback = copy[i];
-				result.push(callback.apply(null, arguments));
-			}
-			return result;
-		};
-
-		emit.add = function(callback) {
-			if (!callback)
-				throw new Error('missing callback');
-			callbacks.push(callback);
-		};
-
-		emit.tryAdd = function(callback) {
-			if (callback)
-				emit.add(callback);
-		};
-
-		emit.remove = function(callback) {
-			for (var i = 0; i < callbacks.length; i++) {
-				if (callbacks[i] === callback) {
-					callbacks.splice(i, 1);
-					return;
-				}
-			}
-		};
-
-		emit.tryRemove = function(callback) {
-			if (callback)
-				emit.remove(callback);
-		};
-
-		emit.clear = function() {
-			callbacks.splice(0, callbacks.length);
-		};
-
-		emit.callbacks = callbacks;
-
-		return emit;
-	}
-
-	emitEvent_1 = emitEvent;
-	return emitEvent_1;
 }
 
 var extractStrategy_1;
@@ -20493,77 +20669,6 @@ function requirePools () {
 
 	pools_1 = pools;
 	return pools_1;
-}
-
-var log_1;
-var hasRequiredLog;
-
-function requireLog () {
-	if (hasRequiredLog) return log_1;
-	hasRequiredLog = 1;
-	var newEmitEvent = requireEmitEvent();
-
-	var emitters = {
-		query: newEmitEvent(),
-		queryComplete: newEmitEvent()
-	};
-
-	var logger = function() {
-	};
-
-	function log() {
-		logger.apply(null, arguments);
-	}
-	function emitQuery({ sql, parameters }) {
-		emitters.query.apply(null, arguments);
-		log(sql);
-		log('parameters: ' + parameters);
-	}
-
-	log.emitQuery = emitQuery;
-
-	log.emitQueryComplete = function() {
-		emitters.queryComplete.apply(null, arguments);
-	};
-
-	log.startQuery = function({ sql, parameters }) {
-		const startedAt = now();
-		log.emitQuery({ sql, parameters });
-		return function(error) {
-			log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, error });
-		};
-	};
-
-	log.registerLogger = function(cb) {
-		logger = cb;
-	};
-
-	log.on = function(type, cb) {
-		if (type === 'query')
-			emitters.query.add(cb);
-		else if (type === 'queryComplete')
-			emitters.queryComplete.add(cb);
-		else
-			throw new Error('unknown event type: ' + type);
-	};
-
-	log.off = function(type, cb) {
-		if (type === 'query')
-			emitters.query.tryRemove(cb);
-		else if (type === 'queryComplete')
-			emitters.queryComplete.tryRemove(cb);
-		else
-			throw new Error('unknown event type: ' + type);
-	};
-
-	log_1 = log;
-
-	function now() {
-		if (typeof performance !== 'undefined' && performance.now)
-			return performance.now();
-		return Date.now();
-	}
-	return log_1;
 }
 
 var toIntKey_1;
