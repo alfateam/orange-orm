@@ -913,6 +913,93 @@ describe('sync client auto start', () => {
 		expect(rowRequests).toEqual([[1], [2], [3]]);
 	});
 
+	test('fetches staged row batches concurrently when configured', async () => {
+		const patches = [];
+		const rowRequests = [];
+		const rowResponses = [];
+		const db = newJournalDb({
+			__sqliteSync: {
+				url: '/rdb',
+				auto: false,
+				schema: false,
+				pull: {
+					maxKeysPerBatch: 4,
+					maxRowsPerBatch: 1,
+					maxConcurrentRowRequests: 4
+				}
+			}
+		});
+		const client = newSyncClient({
+			tables: {
+				customer: newTable('customer')
+			},
+			transaction: async (fn) => fn({
+				customer: {
+					patch: async (patch) => {
+						patches.push(patch);
+						return { changed: [] };
+					}
+				},
+				query: db.query
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async (request) => {
+					if (request.data.phase === 'keys') {
+						return {
+							data: {
+								phase: 'keys',
+								items: [
+									{ table: 'customer', pk: [1], key: { id: 1 }, op: 'U' },
+									{ table: 'customer', pk: [2], key: { id: 2 }, op: 'U' },
+									{ table: 'customer', pk: [3], key: { id: 3 }, op: 'U' },
+									{ table: 'customer', pk: [4], key: { id: 4 }, op: 'U' }
+								],
+								done: true,
+								cursor: 'cursor-1'
+							}
+						};
+					}
+					const deferred = newDeferred();
+					const requestedItems = request.data.items;
+					rowRequests.push(requestedItems.map((item) => item.pk[0]));
+					rowResponses.push({ deferred, requestedItems });
+					return deferred.promise;
+				};
+			}
+		});
+
+		const syncPromise = client.sync();
+		await waitFor(() => rowResponses.length === 4);
+
+		expect(rowRequests).toEqual([[1], [2], [3], [4]]);
+		for (let i = 0; i < rowResponses.length; i++) {
+			const { deferred, requestedItems } = rowResponses[i];
+			deferred.resolve({
+				data: {
+					phase: 'rows',
+					items: requestedItems.map((item) => ({
+						table: item.table,
+						pk: item.pk,
+						key: item.key,
+						row: { id: item.pk[0] },
+						op: item.op
+					}))
+				}
+			});
+		}
+		await syncPromise;
+
+		expect(patches).toEqual([
+			[
+				{ op: 'add', path: '/[1]', value: { id: 1 } },
+				{ op: 'add', path: '/[2]', value: { id: 2 } },
+				{ op: 'add', path: '/[3]', value: { id: 3 } },
+				{ op: 'add', path: '/[4]', value: { id: 4 } }
+			]
+		]);
+	});
+
 	test('batches pull journal item inserts', async () => {
 		const items = Array.from({ length: 600 }, (_x, index) => ({
 			table: 'customer',

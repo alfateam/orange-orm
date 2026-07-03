@@ -442,6 +442,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		const maxKeysPerBatch = normalizeLimit(pullConfig.maxKeysPerBatch, 1000);
 		const maxRowsPerBatch = normalizeLimit(pullConfig.maxRowsPerBatch, 1000);
 		const maxJournalRowsPerInsert = normalizeLimit(pullConfig.maxJournalRowsPerInsert, maxRowsPerBatch);
+		const maxConcurrentRowRequests = normalizeConcurrency(pullConfig.maxConcurrentRowRequests, 1);
 		const defaultPatchOptions = { ...(pullConfig.patchOptions || {}), concurrency: 'overwrite', skipSelectAfterInsert: true };
 		const db = options.db;
 		const scopeKey = options.scopeKey || getScopeKey(options.tables);
@@ -610,50 +611,43 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		async function fetchRowsItems(items) {
 			const queue = chunkItems(items, maxRowsPerBatch);
 			const rows = [];
-			let prefetched = null;
-			while (queue.length > 0 || prefetched) {
-				let currentItems;
-				let currentRowsResult;
-				if (prefetched) {
-					currentItems = prefetched.items;
-					currentRowsResult = await prefetched.promise;
-					prefetched = null;
-				}
-				else {
-					currentItems = queue.shift();
-					currentRowsResult = await requestRowsItems(currentItems);
-				}
-				if (!Array.isArray(currentItems) || currentItems.length === 0)
-					continue;
-				if (currentRowsResult.error)
-					throw currentRowsResult.error;
-				const payload = currentRowsResult.payload;
-				if (!isRowsPayload(payload))
-					throw new Error('Sync endpoint did not return rows payload');
-				for (let i = 0; i < payload.items.length; i++)
-					rows.push(payload.items[i]);
-				const acceptedCount = getRowsAcceptedCount(payload, currentItems.length);
-				const acceptedItems = acceptedCount < currentItems.length
-					? currentItems.slice(0, acceptedCount)
-					: currentItems;
-				const missingItems = getMissingRowItems(acceptedItems, payload.items);
-				if (acceptedCount >= currentItems.length && missingItems.length === 0 && queue.length > 0) {
-					const nextItems = queue.shift();
-					prefetched = {
-						items: nextItems,
-						promise: requestRowsItems(nextItems)
-					};
-				}
-				if (acceptedCount < currentItems.length) {
-					const deferredItems = currentItems.slice(acceptedCount);
-					enqueueMissingRows(queue, acceptedItems, missingItems);
-					if (deferredItems.length > 0)
-						queue.unshift(deferredItems);
-					continue;
-				}
-				enqueueMissingRows(queue, currentItems, missingItems);
-			}
+			const workers = [];
+			const workerCount = Math.min(maxConcurrentRowRequests, queue.length);
+			for (let i = 0; i < workerCount; i++)
+				workers.push(fetchRowsWorker());
+			await Promise.all(workers);
 			return rows;
+
+			async function fetchRowsWorker() {
+				for (;;) {
+					const currentItems = queue.shift();
+					if (!currentItems)
+						return;
+					if (!Array.isArray(currentItems) || currentItems.length === 0)
+						continue;
+					const currentRowsResult = await requestRowsItems(currentItems);
+					if (currentRowsResult.error)
+						throw currentRowsResult.error;
+					const payload = currentRowsResult.payload;
+					if (!isRowsPayload(payload))
+						throw new Error('Sync endpoint did not return rows payload');
+					for (let i = 0; i < payload.items.length; i++)
+						rows.push(payload.items[i]);
+					const acceptedCount = getRowsAcceptedCount(payload, currentItems.length);
+					const acceptedItems = acceptedCount < currentItems.length
+						? currentItems.slice(0, acceptedCount)
+						: currentItems;
+					const missingItems = getMissingRowItems(acceptedItems, payload.items);
+					if (acceptedCount < currentItems.length) {
+						const deferredItems = currentItems.slice(acceptedCount);
+						enqueueMissingRows(queue, acceptedItems, missingItems);
+						if (deferredItems.length > 0)
+							queue.unshift(deferredItems);
+						continue;
+					}
+					enqueueMissingRows(queue, currentItems, missingItems);
+				}
+			}
 		}
 
 		function requestRowsItems(items) {
@@ -2049,6 +2043,7 @@ function normalizePullConfig(config, fallbackEndpoint, fallbackTables) {
 		patchOptions: config.patchOptions,
 		maxKeysPerBatch: config.maxKeysPerBatch,
 		maxRowsPerBatch: config.maxRowsPerBatch,
+		maxConcurrentRowRequests: config.maxConcurrentRowRequests,
 		maxJournalRowsPerInsert: config.maxJournalRowsPerInsert
 	};
 }
@@ -2641,6 +2636,10 @@ function normalizeLimit(value, fallback) {
 	if (!Number.isFinite(parsed) || parsed <= 0)
 		return fallback;
 	return Math.min(parsed, 10000);
+}
+
+function normalizeConcurrency(value, fallback) {
+	return Math.min(normalizeLimit(value, fallback), 8);
 }
 
 function extractTablePatches(payload) {

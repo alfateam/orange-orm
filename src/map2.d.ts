@@ -1005,6 +1005,7 @@ export interface SyncPullConfig<M extends Record<string, any> = any> extends Syn
   };
   maxKeysPerBatch?: number;
   maxRowsPerBatch?: number;
+  maxConcurrentRowRequests?: number;
   maxJournalRowsPerInsert?: number;
 }
 
