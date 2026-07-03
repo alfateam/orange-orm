@@ -913,7 +913,7 @@ describe('sync client auto start', () => {
 		expect(rowRequests).toEqual([[1], [2], [3]]);
 	});
 
-	test('fetches staged row batches concurrently when configured', async () => {
+	test('keeps staged row fetches full while persisting rows in order', async () => {
 		const patches = [];
 		const rowRequests = [];
 		const rowResponses = [];
@@ -923,7 +923,7 @@ describe('sync client auto start', () => {
 				auto: false,
 				schema: false,
 				pull: {
-					maxKeysPerBatch: 4,
+					maxKeysPerBatch: 6,
 					maxRowsPerBatch: 1,
 					maxConcurrentRowRequests: 4
 				}
@@ -953,7 +953,9 @@ describe('sync client auto start', () => {
 									{ table: 'customer', pk: [1], key: { id: 1 }, op: 'U' },
 									{ table: 'customer', pk: [2], key: { id: 2 }, op: 'U' },
 									{ table: 'customer', pk: [3], key: { id: 3 }, op: 'U' },
-									{ table: 'customer', pk: [4], key: { id: 4 }, op: 'U' }
+									{ table: 'customer', pk: [4], key: { id: 4 }, op: 'U' },
+									{ table: 'customer', pk: [5], key: { id: 5 }, op: 'U' },
+									{ table: 'customer', pk: [6], key: { id: 6 }, op: 'U' }
 								],
 								done: true,
 								cursor: 'cursor-1'
@@ -973,15 +975,24 @@ describe('sync client auto start', () => {
 		await waitFor(() => rowResponses.length === 4);
 
 		expect(rowRequests).toEqual([[1], [2], [3], [4]]);
-		resolveRowResponse(rowResponses[2]);
-		await waitFor(() => db.journal.items.length === 1);
-		expect(JSON.parse(db.journal.items[0].row_json)).toEqual({ id: 3 });
+		resolveRowResponse(rowResponseByPk(rowResponses, 3));
+		await waitFor(() => rowRequests.length === 5);
+		expect(rowRequests).toEqual([[1], [2], [3], [4], [5]]);
+		expect(db.journal.items).toHaveLength(0);
 		expect(db.journal.session.done).toBe(0);
 
-		for (let i = 0; i < rowResponses.length; i++) {
-			if (i !== 2)
-				resolveRowResponse(rowResponses[i]);
-		}
+		resolveRowResponse(rowResponseByPk(rowResponses, 1));
+		await waitFor(() => rowRequests.length === 6);
+		await waitFor(() => db.journal.items.length === 1);
+		expect(journalRowIds(db.journal.items)).toEqual([1]);
+
+		resolveRowResponse(rowResponseByPk(rowResponses, 2));
+		await waitFor(() => db.journal.items.length === 3);
+		expect(journalRowIds(db.journal.items)).toEqual([1, 2, 3]);
+
+		resolveRowResponse(rowResponseByPk(rowResponses, 4));
+		resolveRowResponse(rowResponseByPk(rowResponses, 5));
+		resolveRowResponse(rowResponseByPk(rowResponses, 6));
 		await syncPromise;
 
 		expect(patches).toEqual([
@@ -989,7 +1000,9 @@ describe('sync client auto start', () => {
 				{ op: 'add', path: '/[1]', value: { id: 1 } },
 				{ op: 'add', path: '/[2]', value: { id: 2 } },
 				{ op: 'add', path: '/[3]', value: { id: 3 } },
-				{ op: 'add', path: '/[4]', value: { id: 4 } }
+				{ op: 'add', path: '/[4]', value: { id: 4 } },
+				{ op: 'add', path: '/[5]', value: { id: 5 } },
+				{ op: 'add', path: '/[6]', value: { id: 6 } }
 			]
 		]);
 	});
@@ -2338,6 +2351,14 @@ function resolveRowResponse(response) {
 			}))
 		}
 	});
+}
+
+function rowResponseByPk(responses, id) {
+	return responses.find(response => response.requestedItems.some(item => item.pk[0] === id));
+}
+
+function journalRowIds(items) {
+	return items.map(item => JSON.parse(item.row_json).id);
 }
 
 function wait(ms) {

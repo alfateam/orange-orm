@@ -6535,25 +6535,36 @@ function requireSyncClient () {
 						const payload = currentRowsResult.payload;
 						if (!isRowsPayload(payload))
 							throw new Error('Sync endpoint did not return rows payload');
-						if (typeof onRowItems === 'function')
-							await onRowItems(payload.items);
-						else {
-							for (let i = 0; i < payload.items.length; i++)
-								rows.push(payload.items[i]);
-						}
 						const acceptedCount = getRowsAcceptedCount(payload, currentItems.length);
 						const acceptedItems = acceptedCount < currentItems.length
 							? currentItems.slice(0, acceptedCount)
 							: currentItems;
 						const missingItems = getMissingRowItems(acceptedItems, payload.items);
+						let finalMissingItems = [];
 						if (acceptedCount < currentItems.length) {
 							const deferredItems = currentItems.slice(acceptedCount);
-							enqueueMissingRows(queue, acceptedItems, missingItems);
+							const requeuedMissing = enqueueMissingRows(queue, acceptedItems, missingItems);
+							if (!requeuedMissing)
+								finalMissingItems = missingItems;
 							if (deferredItems.length > 0)
 								queue.unshift(deferredItems);
+							if (typeof onRowItems === 'function')
+								await onRowItems(payload.items, finalMissingItems);
+							else {
+								for (let i = 0; i < payload.items.length; i++)
+									rows.push(payload.items[i]);
+							}
 							continue;
 						}
-						enqueueMissingRows(queue, currentItems, missingItems);
+						const requeuedMissing = enqueueMissingRows(queue, currentItems, missingItems);
+						if (!requeuedMissing)
+							finalMissingItems = missingItems;
+						if (typeof onRowItems === 'function')
+							await onRowItems(payload.items, finalMissingItems);
+						else {
+							for (let i = 0; i < payload.items.length; i++)
+								rows.push(payload.items[i]);
+						}
 					}
 				}
 			}
@@ -6776,24 +6787,53 @@ function requireSyncClient () {
 			const batchNo = session.nextBatch || 0;
 			const baseSeq = session.nextSeq || 0;
 			const itemState = createPullJournalItemState(keyItems, batchNo, baseSeq);
-			let insertChain = Promise.resolve();
+			let flushChain = Promise.resolve();
+			let flushError = null;
+			let nextFlushIndex = 0;
 
-			async function enqueueJournalRows(rows) {
-				if (!Array.isArray(rows) || rows.length === 0)
-					return insertChain;
-				insertChain = insertChain.then(() => insertPullJournalItems(db, rows, maxJournalRowsPerInsert));
-				return insertChain;
+			function scheduleFlush() {
+				flushChain = flushChain.then(flushReadyRows, flushReadyRows);
+				flushChain.catch(() => {});
+				return flushChain;
 			}
 
-			async function persistReturnedRows(rowItems) {
-				const rows = pullJournalRowsForReturnedRows(scopeKey, itemState, rowItems);
-				await enqueueJournalRows(rows);
+			async function flushReadyRows() {
+				if (flushError)
+					throw flushError;
+				try {
+					const rows = [];
+					while (nextFlushIndex < itemState.states.length) {
+						const state = itemState.states[nextFlushIndex];
+						if (!state.ready)
+							break;
+						if (!state.persisted) {
+							state.persisted = true;
+							rows.push(newPullJournalRow(scopeKey, state, state.rowItem));
+						}
+						nextFlushIndex += 1;
+					}
+					await insertPullJournalItems(db, rows, maxJournalRowsPerInsert);
+				}
+				catch (e) {
+					flushError = e;
+					throw e;
+				}
 			}
 
+			function persistReturnedRows(rowItems, missingItems) {
+				markReturnedPullJournalRows(itemState, rowItems);
+				markMissingPullJournalRows(itemState, missingItems);
+				scheduleFlush();
+			}
+
+			markDeletePullJournalRowsReady(itemState);
+			scheduleFlush();
 			const upsertItems = keyItems.filter(x => x.op !== 'D');
 			if (upsertItems.length > 0)
 				await fetchRows(upsertItems, persistReturnedRows);
-			await insertChain;
+			await flushChain;
+			if (flushError)
+				throw flushError;
 
 			let nextSession;
 			await client.transaction(async (tx) => {
@@ -6836,12 +6876,14 @@ function requireSyncClient () {
 		function createPullJournalItemState(keyItems, batchNo, baseSeq) {
 			const states = [];
 			const upsertStatesByKey = new Map();
+			const remainingByKey = new Map();
 			for (let i = 0; i < keyItems.length; i++) {
 				const item = keyItems[i];
 				const state = {
 					item,
 					batchNo,
 					seq: baseSeq + i,
+					ready: false,
 					persisted: false
 				};
 				states.push(state);
@@ -6854,11 +6896,20 @@ function requireSyncClient () {
 					}
 				}
 			}
-			return { states, upsertStatesByKey };
+			for (const entry of upsertStatesByKey)
+				remainingByKey.set(entry[0], entry[1].slice());
+			return { states, upsertStatesByKey, remainingByKey };
 		}
 
-		function pullJournalRowsForReturnedRows(scopeKey, itemState, rowItems) {
-			const rows = [];
+		function markDeletePullJournalRowsReady(itemState) {
+			for (let i = 0; i < itemState.states.length; i++) {
+				const state = itemState.states[i];
+				if (state.item && state.item.op === 'D')
+					state.ready = true;
+			}
+		}
+
+		function markReturnedPullJournalRows(itemState, rowItems) {
 			const seen = new Set();
 			const items = Array.isArray(rowItems) ? rowItems : [];
 			for (let i = 0; i < items.length; i++) {
@@ -6867,18 +6918,26 @@ function requireSyncClient () {
 				if (!key || seen.has(key))
 					continue;
 				seen.add(key);
-				const states = itemState.upsertStatesByKey.get(key);
-				if (!states)
+				const states = itemState.remainingByKey.get(key);
+				if (!states || states.length === 0)
 					continue;
-				for (let j = 0; j < states.length; j++) {
-					const state = states[j];
-					if (state.persisted)
-						continue;
-					state.persisted = true;
-					rows.push(newPullJournalRow(scopeKey, state, rowItem));
-				}
+				const state = states.shift();
+				state.ready = true;
+				state.rowItem = rowItem;
 			}
-			return rows;
+		}
+
+		function markMissingPullJournalRows(itemState, missingItems) {
+			const items = Array.isArray(missingItems) ? missingItems : [];
+			for (let i = 0; i < items.length; i++) {
+				const key = syncItemKey(items[i]);
+				const states = key ? itemState.remainingByKey.get(key) : null;
+				if (!states || states.length === 0)
+					continue;
+				const state = states.shift();
+				state.ready = true;
+				state.rowItem = undefined;
+			}
 		}
 
 		function pullJournalRowsForRemainingItems(scopeKey, itemState) {
@@ -8336,16 +8395,17 @@ function requireSyncClient () {
 
 	function enqueueMissingRows(queue, requestedItems, missingItems) {
 		if (!Array.isArray(missingItems) || missingItems.length === 0)
-			return;
+			return false;
 		if (missingItems.length === 1 && requestedItems.length === 1)
-			return;
+			return false;
 		if (missingItems.length === requestedItems.length) {
 			const midpoint = Math.ceil(missingItems.length / 2);
 			queue.unshift(missingItems.slice(midpoint));
 			queue.unshift(missingItems.slice(0, midpoint));
-			return;
+			return true;
 		}
 		queue.unshift(missingItems);
+		return true;
 	}
 
 	function syncItemKey(item) {
