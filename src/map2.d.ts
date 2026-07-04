@@ -1003,8 +1003,11 @@ export interface SyncPullConfig<M extends Record<string, any> = any> extends Syn
   patchOptions?: {
     concurrency?: ConcurrencyStrategy;
   };
+  /** Max keys requested from the sync endpoint per staged key page. */
   maxKeysPerBatch?: number;
+  /** Max key items sent in each staged row request. */
   maxRowsPerBatch?: number;
+  /** Max concurrent staged row requests across the whole pull. */
   maxConcurrentRowRequests?: number;
   maxJournalRowsPerInsert?: number;
 }

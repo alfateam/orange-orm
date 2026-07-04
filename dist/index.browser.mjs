@@ -6406,65 +6406,131 @@ function requireSyncClient () {
 				if (!session)
 					session = newPullSession(scopeKey, options.since);
 				let reason = session.reason;
-				let pendingFetch = session.done ? null : startPullBatchFetch(session, reason);
-				for (let i = 0; i < 10000; i++) {
-					if (session.done)
-						return session;
-					const batch = await resolvePullBatchFetch(pendingFetch);
-					pendingFetch = null;
-					reason = batch.reason;
-					const nextFetch = batch.done
-						? null
-						: startPullBatchFetch(previewPullSession(session, batch), reason);
-					if (!hasPersistedSession && batch.done && batch.keyItems.length === 0) {
-						suppressPullBatchFetch(nextFetch);
-						return {
-							...session,
-							token: batch.token || undefined,
-							done: true,
-							finalSince: batch.finalSince,
-							payload: batch.payload,
-							reason,
-							status: 'ready',
-							persisted: false
-						};
+				let fetchSession = session;
+				let fetchDone = !!session.done;
+				let keyFetchError = null;
+				let emptySession = null;
+				let pumpRunning = false;
+				let pipelineStopped = false;
+				let fetchedBatches = 0;
+				const maxBufferedPullBatches = maxConcurrentRowRequests * 2;
+				const pendingBatches = [];
+				const waiters = [];
+				const rowScheduler = createPullRowsScheduler(onPipelineProgress);
+				startPullBatchPump();
+				try {
+					for (;;) {
+						if (emptySession) {
+							pipelineStopped = true;
+							rowScheduler.stop();
+							return emptySession;
+						}
+						const batch = pendingBatches[0];
+						if (!batch) {
+							if (keyFetchError)
+								throw keyFetchError;
+							if (fetchDone)
+								return session;
+							await waitForPipelineChange();
+							continue;
+						}
+						await batch.rowsPromise;
+						session = await persistPullJournalBatchState(db, scopeKey, session, batch, maxJournalRowsPerInsert);
+						pendingBatches.shift();
+						onPipelineProgress();
+						if (keyFetchError && pendingBatches.length === 0)
+							throw keyFetchError;
 					}
-					if (!hasPersistedSession) {
-						session = await createPullSession(db, scopeKey, session.since);
-						hasPersistedSession = true;
-					}
-					try {
-						session = await persistPullJournalBatch(db, scopeKey, session, batch.keysPayload, batch.keyItems, reason, maxJournalRowsPerInsert, fetchRowsItems);
-					}
-					catch (e) {
-						suppressPullBatchFetch(nextFetch);
-						throw e;
-					}
-					pendingFetch = nextFetch;
 				}
-				suppressPullBatchFetch(pendingFetch);
-				throw new Error('Sync failed: staged pull exceeded max iterations');
-			}
+				catch (e) {
+					pipelineStopped = true;
+					rowScheduler.stop();
+					throw e;
+				}
 
-			function startPullBatchFetch(session, reason) {
-				return fetchPullBatch(session, reason).then(
-					(batch) => ({ batch, error: null }),
-					(error) => ({ batch: null, error })
-				);
-			}
+				function startPullBatchPump() {
+					if (pumpRunning || !shouldFetchMorePullBatches())
+						return;
+					pumpRunning = true;
+					Promise.resolve()
+						.then(pumpPullBatches)
+						.catch((error) => {
+							keyFetchError = error;
+						})
+						.finally(() => {
+							pumpRunning = false;
+							notifyPipelineChange();
+							if (shouldFetchMorePullBatches())
+								startPullBatchPump();
+						});
+				}
 
-			async function resolvePullBatchFetch(promise) {
-				if (!promise)
-					throw new Error('Sync failed: missing staged pull request');
-				const result = await promise;
-				if (result.error)
-					throw result.error;
-				return result.batch;
-			}
+				async function pumpPullBatches() {
+					while (shouldFetchMorePullBatches()) {
+						fetchedBatches += 1;
+						if (fetchedBatches > 10000)
+							throw new Error('Sync failed: staged pull exceeded max iterations');
+						const batch = await fetchPullBatch(fetchSession, reason);
+						if (pipelineStopped)
+							return;
+						reason = batch.reason;
+						if (!hasPersistedSession && batch.done && batch.keyItems.length === 0) {
+							emptySession = {
+								...fetchSession,
+								token: batch.token || undefined,
+								done: true,
+								finalSince: batch.finalSince,
+								payload: batch.payload,
+								reason,
+								status: 'ready',
+								persisted: false
+							};
+							fetchDone = true;
+							return;
+						}
+						if (!hasPersistedSession) {
+							session = await createPullSession(db, scopeKey, session.since);
+							fetchSession = {
+								...fetchSession,
+								persisted: true
+							};
+							hasPersistedSession = true;
+						}
+						const batchState = createPullBatchState(fetchSession, batch);
+						pendingBatches.push(batchState);
+						rowScheduler.enqueueBatch(batchState);
+						fetchSession = previewPullSessionAfterFetch(fetchSession, batch);
+						fetchDone = batch.done;
+						notifyPipelineChange();
+					}
+				}
 
-			function suppressPullBatchFetch(promise) {
-				if (promise && typeof promise.then === 'function')
-					promise.then(() => {}, () => {});
+				function shouldFetchMorePullBatches() {
+					return !fetchDone
+						&& !pipelineStopped
+						&& !keyFetchError
+						&& !emptySession
+						&& !rowScheduler.hasFailure()
+						&& pendingBatches.length < maxBufferedPullBatches
+						&& rowScheduler.workCount() < maxConcurrentRowRequests;
+				}
+
+				function onPipelineProgress() {
+					notifyPipelineChange();
+					startPullBatchPump();
+				}
+
+				function notifyPipelineChange() {
+					const current = waiters.splice(0);
+					for (let i = 0; i < current.length; i++)
+						current[i]();
+				}
+
+				function waitForPipelineChange() {
+					return new Promise((resolve) => {
+						waiters.push(resolve);
+					});
+				}
 			}
 
 			async function fetchPullBatch(session, reason) {
@@ -6499,7 +6565,32 @@ function requireSyncClient () {
 				};
 			}
 
-			function previewPullSession(session, batch) {
+			function createPullBatchState(session, batch) {
+				const batchNo = session.nextBatch || 0;
+				const baseSeq = session.nextSeq || 0;
+				const itemState = createPullJournalItemState(batch.keyItems, batchNo, baseSeq);
+				let resolveRows;
+				let rejectRows;
+				const rowsPromise = new Promise((resolve, reject) => {
+					resolveRows = resolve;
+					rejectRows = reject;
+				});
+				rowsPromise.catch(() => {});
+				markDeletePullJournalRowsReady(itemState);
+				return {
+					...batch,
+					batchNo,
+					baseSeq,
+					itemState,
+					pendingRowJobs: 0,
+					rowsSettled: false,
+					rowsPromise,
+					resolveRows,
+					rejectRows
+				};
+			}
+
+			function previewPullSessionAfterFetch(session, batch) {
 				return {
 					...session,
 					token: batch.token || undefined,
@@ -6507,64 +6598,159 @@ function requireSyncClient () {
 					finalSince: batch.finalSince,
 					payload: batch.payload,
 					reason: batch.reason,
-					status: batch.done ? 'ready' : 'pending'
+					status: batch.done ? 'ready' : 'pending',
+					nextSeq: (session.nextSeq || 0) + batch.keyItems.length,
+					nextBatch: (session.nextBatch || 0) + 1
 				};
 			}
 
-			async function fetchRowsItems(items, onRowItems) {
-				const queue = chunkItems(items, maxRowsPerBatch);
-				const rows = [];
-				const workers = [];
-				const workerCount = Math.min(maxConcurrentRowRequests, queue.length);
-				for (let i = 0; i < workerCount; i++)
-					workers.push(fetchRowsWorker());
-				await Promise.all(workers);
-				return rows;
+			function createPullRowsScheduler(onProgress) {
+				const queue = [];
+				let active = 0;
+				let stopped = false;
+				let failedBatchNo = null;
+				return {
+					enqueueBatch,
+					workCount,
+					hasFailure,
+					stop
+				};
 
-				async function fetchRowsWorker() {
-					for (;;) {
-						const currentItems = queue.shift();
-						if (!currentItems)
+				function enqueueBatch(batchState) {
+					const upsertItems = batchState.keyItems.filter(x => x.op !== 'D');
+					const chunks = chunkItems(upsertItems, maxRowsPerBatch);
+					batchState.pendingRowJobs = chunks.length;
+					if (chunks.length === 0) {
+						resolveBatchRows(batchState);
+						onProgress();
+						return;
+					}
+					for (let i = 0; i < chunks.length; i++)
+						queue.push({ batchState, items: chunks[i] });
+					drain();
+					onProgress();
+				}
+
+				function workCount() {
+					return active + queue.length;
+				}
+
+				function hasFailure() {
+					return failedBatchNo !== null;
+				}
+
+				function stop() {
+					stopped = true;
+					queue.length = 0;
+				}
+
+				function drain() {
+					if (stopped)
+						return;
+					while (active < maxConcurrentRowRequests) {
+						const index = nextRunnableJobIndex();
+						if (index === -1)
 							return;
-						if (!Array.isArray(currentItems) || currentItems.length === 0)
-							continue;
-						const currentRowsResult = await requestRowsItems(currentItems);
+						const job = queue.splice(index, 1)[0];
+						active += 1;
+						runRowJob(job);
+					}
+				}
+
+				function nextRunnableJobIndex() {
+					for (let i = 0; i < queue.length; i++) {
+						if (failedBatchNo === null || queue[i].batchState.batchNo < failedBatchNo)
+							return i;
+					}
+					return -1;
+				}
+
+				async function runRowJob(job) {
+					try {
+						const currentRowsResult = await requestRowsItems(job.items);
 						if (currentRowsResult.error)
 							throw currentRowsResult.error;
 						const payload = currentRowsResult.payload;
 						if (!isRowsPayload(payload))
 							throw new Error('Sync endpoint did not return rows payload');
-						const acceptedCount = getRowsAcceptedCount(payload, currentItems.length);
-						const acceptedItems = acceptedCount < currentItems.length
-							? currentItems.slice(0, acceptedCount)
-							: currentItems;
-						const missingItems = getMissingRowItems(acceptedItems, payload.items);
-						let finalMissingItems = [];
-						if (acceptedCount < currentItems.length) {
-							const deferredItems = currentItems.slice(acceptedCount);
-							const requeuedMissing = enqueueMissingRows(queue, acceptedItems, missingItems);
-							if (!requeuedMissing)
-								finalMissingItems = missingItems;
-							if (deferredItems.length > 0)
-								queue.unshift(deferredItems);
-							if (typeof onRowItems === 'function')
-								await onRowItems(payload.items, finalMissingItems);
-							else {
-								for (let i = 0; i < payload.items.length; i++)
-									rows.push(payload.items[i]);
-							}
-							continue;
-						}
-						const requeuedMissing = enqueueMissingRows(queue, currentItems, missingItems);
-						if (!requeuedMissing)
-							finalMissingItems = missingItems;
-						if (typeof onRowItems === 'function')
-							await onRowItems(payload.items, finalMissingItems);
-						else {
-							for (let i = 0; i < payload.items.length; i++)
-								rows.push(payload.items[i]);
-						}
+						acceptRowsPayload(job.batchState, job.items, payload);
 					}
+					catch (e) {
+						if (failedBatchNo === null || job.batchState.batchNo < failedBatchNo)
+							failedBatchNo = job.batchState.batchNo;
+						rejectBatchRows(job.batchState, e);
+					}
+					finally {
+						active -= 1;
+						finishRowJob(job.batchState);
+						onProgress();
+						drain();
+					}
+				}
+
+				function acceptRowsPayload(batchState, currentItems, payload) {
+					const acceptedCount = getRowsAcceptedCount(payload, currentItems.length);
+					const acceptedItems = acceptedCount < currentItems.length
+						? currentItems.slice(0, acceptedCount)
+						: currentItems;
+					const missingItems = getMissingRowItems(acceptedItems, payload.items);
+					let finalMissingItems = [];
+					if (acceptedCount < currentItems.length) {
+						const deferredItems = currentItems.slice(acceptedCount);
+						const missingChunks = requeueMissingRowChunks(acceptedItems, missingItems);
+						if (!missingChunks.requeued)
+							finalMissingItems = missingItems;
+						const requeuedChunks = [];
+						if (deferredItems.length > 0)
+							requeuedChunks.push(deferredItems);
+						for (let i = 0; i < missingChunks.chunks.length; i++)
+							requeuedChunks.push(missingChunks.chunks[i]);
+						addRowJobsFront(batchState, requeuedChunks);
+					}
+					else {
+						const missingChunks = requeueMissingRowChunks(currentItems, missingItems);
+						if (!missingChunks.requeued)
+							finalMissingItems = missingItems;
+						addRowJobsFront(batchState, missingChunks.chunks);
+					}
+					markReturnedPullJournalRows(batchState.itemState, payload.items);
+					markMissingPullJournalRows(batchState.itemState, finalMissingItems);
+				}
+
+				function requeueMissingRowChunks(requestedItems, missingItems) {
+					const chunks = [];
+					const requeued = enqueueMissingRows(chunks, requestedItems, missingItems);
+					return { requeued, chunks };
+				}
+
+				function addRowJobsFront(batchState, chunks) {
+					const validChunks = chunks.filter(chunk => Array.isArray(chunk) && chunk.length > 0);
+					if (validChunks.length === 0)
+						return;
+					batchState.pendingRowJobs += validChunks.length;
+					for (let i = validChunks.length - 1; i >= 0; i--)
+						queue.unshift({ batchState, items: validChunks[i] });
+				}
+
+				function finishRowJob(batchState) {
+					if (batchState.pendingRowJobs > 0)
+						batchState.pendingRowJobs -= 1;
+					if (batchState.pendingRowJobs === 0 && !batchState.rowsSettled)
+						resolveBatchRows(batchState);
+				}
+
+				function resolveBatchRows(batchState) {
+					if (batchState.rowsSettled)
+						return;
+					batchState.rowsSettled = true;
+					batchState.resolveRows();
+				}
+
+				function rejectBatchRows(batchState, error) {
+					if (batchState.rowsSettled)
+						return;
+					batchState.rowsSettled = true;
+					batchState.rejectRows(error);
 				}
 			}
 
@@ -6782,58 +6968,14 @@ function requireSyncClient () {
 			};
 		}
 
-		async function persistPullJournalBatch(db, scopeKey, session, keysPayload, keyItems, reason, maxJournalRowsPerInsert, fetchRows) {
-			const batchNo = session.nextBatch || 0;
-			const baseSeq = session.nextSeq || 0;
-			const itemState = createPullJournalItemState(keyItems, batchNo, baseSeq);
-			let flushChain = Promise.resolve();
-			let flushError = null;
-			let nextFlushIndex = 0;
-
-			function scheduleFlush() {
-				flushChain = flushChain.then(flushReadyRows, flushReadyRows);
-				flushChain.catch(() => {});
-				return flushChain;
-			}
-
-			async function flushReadyRows() {
-				if (flushError)
-					throw flushError;
-				try {
-					const rows = [];
-					while (nextFlushIndex < itemState.states.length) {
-						const state = itemState.states[nextFlushIndex];
-						if (!state.ready)
-							break;
-						if (!state.persisted) {
-							state.persisted = true;
-							rows.push(newPullJournalRow(scopeKey, state, state.rowItem));
-						}
-						nextFlushIndex += 1;
-					}
-					await insertPullJournalItems(db, rows, maxJournalRowsPerInsert);
-				}
-				catch (e) {
-					flushError = e;
-					throw e;
-				}
-			}
-
-			function persistReturnedRows(rowItems, missingItems) {
-				markReturnedPullJournalRows(itemState, rowItems);
-				markMissingPullJournalRows(itemState, missingItems);
-				scheduleFlush();
-			}
-
-			markDeletePullJournalRowsReady(itemState);
-			scheduleFlush();
-			const upsertItems = keyItems.filter(x => x.op !== 'D');
-			if (upsertItems.length > 0)
-				await fetchRows(upsertItems, persistReturnedRows);
-			await flushChain;
-			if (flushError)
-				throw flushError;
-
+		async function persistPullJournalBatchState(db, scopeKey, session, batchState, maxJournalRowsPerInsert) {
+			await batchState.rowsPromise;
+			const batchNo = batchState.batchNo;
+			const baseSeq = batchState.baseSeq;
+			const itemState = batchState.itemState;
+			const keysPayload = batchState.keysPayload;
+			const keyItems = batchState.keyItems;
+			const reason = batchState.reason;
 			let nextSession;
 			await client.transaction(async (tx) => {
 				const remainingRows = pullJournalRowsForRemainingItems(scopeKey, itemState);
@@ -6946,7 +7088,7 @@ function requireSyncClient () {
 				if (state.persisted)
 					continue;
 				state.persisted = true;
-				rows.push(newPullJournalRow(scopeKey, state, undefined));
+				rows.push(newPullJournalRow(scopeKey, state, state.rowItem));
 			}
 			return rows;
 		}

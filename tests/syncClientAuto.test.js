@@ -983,12 +983,10 @@ describe('sync client auto start', () => {
 
 		resolveRowResponse(rowResponseByPk(rowResponses, 1));
 		await waitFor(() => rowRequests.length === 6);
-		await waitFor(() => db.journal.items.length === 1);
-		expect(journalRowIds(db.journal.items)).toEqual([1]);
+		expect(db.journal.items).toHaveLength(0);
 
 		resolveRowResponse(rowResponseByPk(rowResponses, 2));
-		await waitFor(() => db.journal.items.length === 3);
-		expect(journalRowIds(db.journal.items)).toEqual([1, 2, 3]);
+		expect(db.journal.items).toHaveLength(0);
 
 		resolveRowResponse(rowResponseByPk(rowResponses, 4));
 		resolveRowResponse(rowResponseByPk(rowResponses, 5));
@@ -1005,6 +1003,85 @@ describe('sync client auto start', () => {
 				{ op: 'add', path: '/[6]', value: { id: 6 } }
 			]
 		]);
+	});
+
+	test('keeps staged row fetches full across key batches', async () => {
+		const patches = [];
+		const keyRequests = [];
+		const rowRequests = [];
+		const rowResponses = [];
+		const db = newJournalDb({
+			__sqliteSync: {
+				url: '/rdb',
+				auto: false,
+				schema: false,
+				pull: {
+					maxKeysPerBatch: 1,
+					maxRowsPerBatch: 1,
+					maxConcurrentRowRequests: 4
+				}
+			}
+		});
+		const client = newSyncClient({
+			tables: {
+				customer: newTable('customer')
+			},
+			transaction: async (fn) => fn({
+				customer: {
+					patch: async (patch) => {
+						patches.push(patch);
+						return { changed: [] };
+					}
+				},
+				query: db.query
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async (request) => {
+					if (request.data.phase === 'keys') {
+						const page = request.data.token?.page || 0;
+						const id = page + 1;
+						keyRequests.push(page);
+						return {
+							data: {
+								phase: 'keys',
+								items: [{ table: 'customer', pk: [id], key: { id }, op: 'U' }],
+								done: id === 6,
+								cursor: `cursor-${id}`,
+								token: id === 6 ? undefined : { page: id }
+							}
+						};
+					}
+					const deferred = newDeferred();
+					const requestedItems = request.data.items;
+					rowRequests.push(requestedItems.map((item) => item.pk[0]));
+					rowResponses.push({ deferred, requestedItems });
+					return deferred.promise;
+				};
+			}
+		});
+
+		const syncPromise = client.sync();
+		await waitFor(() => rowResponses.length === 4);
+
+		expect(keyRequests).toEqual([0, 1, 2, 3]);
+		expect(rowRequests).toEqual([[1], [2], [3], [4]]);
+
+		resolveRowResponse(rowResponseByPk(rowResponses, 2));
+		await waitFor(() => rowRequests.length === 5);
+		expect(keyRequests).toEqual([0, 1, 2, 3, 4]);
+		expect(rowRequests).toEqual([[1], [2], [3], [4], [5]]);
+		expect(db.journal.items).toHaveLength(0);
+
+		resolveRowResponse(rowResponseByPk(rowResponses, 1));
+		await waitFor(() => rowRequests.length === 6);
+		resolveRowResponse(rowResponseByPk(rowResponses, 3));
+		resolveRowResponse(rowResponseByPk(rowResponses, 4));
+		resolveRowResponse(rowResponseByPk(rowResponses, 5));
+		resolveRowResponse(rowResponseByPk(rowResponses, 6));
+		await syncPromise;
+
+		expect(patches.map(patch => patch[0]?.value?.id)).toEqual([1, 2, 3, 4, 5, 6]);
 	});
 
 	test('batches pull journal item inserts', async () => {
@@ -1737,6 +1814,98 @@ describe('sync client auto start', () => {
 
 		expect(keyRequests).toEqual([null, { page: 1 }, { page: 1 }]);
 		expect(rowRequests).toEqual([[1], [2]]);
+		expect(patches).toEqual([
+			[{ op: 'add', path: '/[1]', value: { id: 1 } }],
+			[{ op: 'add', path: '/[2]', value: { id: 2 } }]
+		]);
+	});
+
+	test('resumes staged pull without reloading persisted batches after future row failure', async () => {
+		const patches = [];
+		const keyRequests = [];
+		const rowRequests = [];
+		let failSecondRow = true;
+		const db = newJournalDb({
+			__sqliteSync: {
+				url: '/rdb',
+				auto: false,
+				schema: false,
+				pull: {
+					maxKeysPerBatch: 1,
+					maxRowsPerBatch: 1,
+					maxConcurrentRowRequests: 2
+				}
+			}
+		});
+		const client = newSyncClient({
+			tables: {
+				customer: newTable('customer')
+			},
+			transaction: async (fn) => fn({
+				customer: {
+					patch: async (patch) => {
+						patches.push(patch);
+						return { changed: [] };
+					}
+				},
+				query: db.query
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async (request) => {
+					if (request.data.phase === 'keys') {
+						keyRequests.push(request.data.token || null);
+						if (!request.data.token) {
+							return {
+								data: {
+									phase: 'keys',
+									items: [{ table: 'customer', pk: [1], key: { id: 1 }, op: 'U' }],
+									done: false,
+									cursor: 'cursor-1',
+									token: { page: 1 }
+								}
+							};
+						}
+						return {
+							data: {
+								phase: 'keys',
+								items: [{ table: 'customer', pk: [2], key: { id: 2 }, op: 'U' }],
+								done: true,
+								cursor: 'cursor-2'
+							}
+						};
+					}
+					const id = request.data.items[0].pk[0];
+					rowRequests.push(request.data.items.map((item) => item.pk[0]));
+					if (id === 2 && failSecondRow) {
+						failSecondRow = false;
+						throw new Error('row down');
+					}
+					return {
+						data: {
+							phase: 'rows',
+							items: request.data.items.map((item) => ({
+								table: item.table,
+								pk: item.pk,
+								key: item.key,
+								row: { id: item.pk[0] },
+								op: item.op
+							}))
+						}
+					};
+				};
+			}
+		});
+
+		await expect(client.sync()).rejects.toThrow('row down');
+		expect(rowRequests).toEqual([[1], [2]]);
+		expect(db.journal.items).toHaveLength(1);
+		expect(journalRowIds(db.journal.items)).toEqual([1]);
+
+		await client.sync();
+
+		expect(keyRequests).toEqual([null, { page: 1 }, { page: 1 }]);
+		expect(rowRequests).toEqual([[1], [2], [2]]);
 		expect(patches).toEqual([
 			[{ op: 'add', path: '/[1]', value: { id: 1 } }],
 			[{ op: 'add', path: '/[2]', value: { id: 2 } }]
