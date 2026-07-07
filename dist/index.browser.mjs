@@ -6805,8 +6805,8 @@ function requireNewPrimaryKeyFilter () {
 		var primaryColumns = table._primaryColumns;
 		var key = arguments[2];
 		var filter = primaryColumns[0].equal(context, key);
-		for (var i = 2; i < primaryColumns.length; i++) {
-			key = arguments[i+1];
+		for (var i = 1; i < primaryColumns.length; i++) {
+			key = arguments[i + 2];
 			var colFilter = primaryColumns[i].equal(context, key);
 			filter = filter.and(context, colFilter);
 		}
@@ -9558,44 +9558,12 @@ function requireGetMany () {
 		return resultToRows(context, span,result);
 	}
 
-	getMany.exclusive = function(table,filter,strategy) {
-		return getManyCore(table,filter,strategy,true);
+	getMany.exclusive = function(context,table,filter,strategy) {
+		return getManyCore(context,table,filter,strategy,true);
 	};
 
 	getMany_1 = getMany;
 	return getMany_1;
-}
-
-var tryGetFirstFromDb;
-var hasRequiredTryGetFirstFromDb;
-
-function requireTryGetFirstFromDb () {
-	if (hasRequiredTryGetFirstFromDb) return tryGetFirstFromDb;
-	hasRequiredTryGetFirstFromDb = 1;
-	var getMany = requireGetMany();
-
-	function tryGet(context, table, filter, strategy) {
-		strategy = setLimit(strategy);
-		return getMany(context, table, filter, strategy).then(filterRows);
-	}
-
-	function filterRows(rows) {
-		if (rows.length > 0)
-			return rows[0];
-		return null;
-	}
-
-	tryGet.exclusive = function(context, table, filter, strategy) {
-		strategy = setLimit(strategy);
-		return getMany.exclusive(context, table, filter, strategy).then(filterRows);
-	};
-
-	function setLimit(strategy) {
-		return {...strategy, ...{limit: 1}};
-	}
-
-	tryGetFirstFromDb = tryGet;
-	return tryGetFirstFromDb;
 }
 
 var extractStrategy;
@@ -9622,24 +9590,30 @@ function requireTryGetFromDbById () {
 	if (hasRequiredTryGetFromDbById) return tryGetFromDbById;
 	hasRequiredTryGetFromDbById = 1;
 	var newPrimaryKeyFilter = requireNewPrimaryKeyFilter();
-	var tryGetFirstFromDb = requireTryGetFirstFromDb();
+	var getMany = requireGetMany();
 	var extractStrategy = requireExtractStrategy();
 
 	function tryGet(context) {
 		var filter = newPrimaryKeyFilter.apply(null, arguments);
 		var table = arguments[1];
 		var strategy = extractStrategy.apply(null, arguments);
-		return tryGetFirstFromDb(context, table, filter, strategy);
+		return getMany(context, table, filter, strategy).then(filterRows);
 	}
 
 	tryGet.exclusive = function tryGet(context) {
 		var filter = newPrimaryKeyFilter.apply(null, arguments);
 		var table = arguments[1];
 		var strategy = extractStrategy.apply(null, arguments);
-		return tryGetFirstFromDb.exclusive(context, table, filter, strategy);
+		return getMany.exclusive(context, table, filter, strategy).then(filterRows);
 
 
 	};
+
+	function filterRows(rows) {
+		if (rows.length > 0)
+			return rows[0];
+		return null;
+	}
 
 	tryGetFromDbById = tryGet;
 	return tryGetFromDbById;
@@ -12327,6 +12301,38 @@ function requireTryGetById () {
 	return tryGetById;
 }
 
+var tryGetFirstFromDb;
+var hasRequiredTryGetFirstFromDb;
+
+function requireTryGetFirstFromDb () {
+	if (hasRequiredTryGetFirstFromDb) return tryGetFirstFromDb;
+	hasRequiredTryGetFirstFromDb = 1;
+	var getMany = requireGetMany();
+
+	function tryGet(context, table, filter, strategy) {
+		strategy = setLimit(strategy);
+		return getMany(context, table, filter, strategy).then(filterRows);
+	}
+
+	function filterRows(rows) {
+		if (rows.length > 0)
+			return rows[0];
+		return null;
+	}
+
+	tryGet.exclusive = function(context, table, filter, strategy) {
+		strategy = setLimit(strategy);
+		return getMany.exclusive(context, table, filter, strategy).then(filterRows);
+	};
+
+	function setLimit(strategy) {
+		return {...strategy, ...{limit: 1}};
+	}
+
+	tryGetFirstFromDb = tryGet;
+	return tryGetFirstFromDb;
+}
+
 var newRowCache_1;
 var hasRequiredNewRowCache;
 
@@ -13019,14 +13025,28 @@ function requirePatchTable () {
 		}
 		if (strategy['insertAndForget'])
 			return {
-				changed: [], strategy
+				changed: [], strategy: stripLockingStrategy(strategy)
 			};
-		return { changed: await toDtos(changed), strategy };
+		return { changed: await toDtos(changed), strategy: stripLockingStrategy(strategy) };
 
 
 		async function toDtos(set) {
 			set = [...set];
-			const result = await table.getManyDto(context, set, strategy);
+			const result = await table.getManyDto(context, set, stripLockingStrategy(strategy));
+			return result;
+		}
+
+		function stripLockingStrategy(strategy) {
+			if (!strategy || typeof strategy !== 'object')
+				return strategy;
+			if (Array.isArray(strategy))
+				return strategy.map(stripLockingStrategy);
+			const result = {};
+			for (let name in strategy) {
+				if (name === 'forUpdate' || name === 'skipLocked')
+					continue;
+				result[name] = stripLockingStrategy(strategy[name]);
+			}
 			return result;
 		}
 

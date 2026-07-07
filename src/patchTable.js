@@ -40,14 +40,28 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 	}
 	if (strategy['insertAndForget'])
 		return {
-			changed: [], strategy
+			changed: [], strategy: stripLockingStrategy(strategy)
 		};
-	return { changed: await toDtos(changed), strategy };
+	return { changed: await toDtos(changed), strategy: stripLockingStrategy(strategy) };
 
 
 	async function toDtos(set) {
 		set = [...set];
-		const result = await table.getManyDto(context, set, strategy);
+		const result = await table.getManyDto(context, set, stripLockingStrategy(strategy));
+		return result;
+	}
+
+	function stripLockingStrategy(strategy) {
+		if (!strategy || typeof strategy !== 'object')
+			return strategy;
+		if (Array.isArray(strategy))
+			return strategy.map(stripLockingStrategy);
+		const result = {};
+		for (let name in strategy) {
+			if (name === 'forUpdate' || name === 'skipLocked')
+				continue;
+			result[name] = stripLockingStrategy(strategy[name]);
+		}
 		return result;
 	}
 

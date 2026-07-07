@@ -1,21 +1,27 @@
 var newPrimaryKeyFilter = require('./newPrimaryKeyFilter');
-var tryGetFirstFromDb = require('./tryGetFirstFromDb');
+var getMany = require('./getMany');
 var extractStrategy = require('./tryGetFromDbById/extractStrategy');
 
 function tryGet(context) {
 	var filter = newPrimaryKeyFilter.apply(null, arguments);
 	var table = arguments[1];
 	var strategy = extractStrategy.apply(null, arguments);
-	return tryGetFirstFromDb(context, table, filter, strategy);
+	return getMany(context, table, filter, strategy).then(filterRows);
 }
 
 tryGet.exclusive = function tryGet(context) {
 	var filter = newPrimaryKeyFilter.apply(null, arguments);
 	var table = arguments[1];
 	var strategy = extractStrategy.apply(null, arguments);
-	return tryGetFirstFromDb.exclusive(context, table, filter, strategy);
+	return getMany.exclusive(context, table, filter, strategy).then(filterRows);
 
 
 };
+
+function filterRows(rows) {
+	if (rows.length > 0)
+		return rows[0];
+	return null;
+}
 
 module.exports = tryGet;
