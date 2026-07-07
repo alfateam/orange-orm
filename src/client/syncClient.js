@@ -439,10 +439,10 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 	}
 
 	async function pullStaged(pullConfig, options) {
-		const maxKeysPerBatch = normalizeLimit(pullConfig.maxKeysPerBatch, 1000);
 		const maxRowsPerBatch = normalizeLimit(pullConfig.maxRowsPerBatch, 1000);
-		const maxJournalRowsPerInsert = normalizeLimit(pullConfig.maxJournalRowsPerInsert, maxRowsPerBatch);
 		const maxConcurrentRowRequests = normalizeConcurrency(pullConfig.maxConcurrentRowRequests, 1);
+		const maxKeysPerBatch = normalizeLimit(pullConfig.maxKeysPerBatch, maxRowsPerBatch * maxConcurrentRowRequests);
+		const maxJournalRowsPerInsert = normalizeLimit(pullConfig.maxJournalRowsPerInsert, maxRowsPerBatch);
 		const defaultPatchOptions = { ...(pullConfig.patchOptions || {}), concurrency: 'overwrite', skipSelectAfterInsert: true };
 		const db = options.db;
 		const scopeKey = options.scopeKey || getScopeKey(options.tables);
@@ -508,7 +508,8 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 			let pumpRunning = false;
 			let pipelineStopped = false;
 			let fetchedBatches = 0;
-			const maxBufferedPullBatches = maxConcurrentRowRequests * 2;
+			const maxBufferedKeyBatches = 2;
+			const maxBufferedRowJobs = maxConcurrentRowRequests * 2;
 			const pendingBatches = [];
 			const waiters = [];
 			const rowScheduler = createPullRowsScheduler(onPipelineProgress);
@@ -606,8 +607,8 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 					&& !keyFetchError
 					&& !emptySession
 					&& !rowScheduler.hasFailure()
-					&& pendingBatches.length < maxBufferedPullBatches
-					&& rowScheduler.workCount() < maxConcurrentRowRequests;
+					&& pendingBatches.length < maxBufferedKeyBatches
+					&& rowScheduler.workCount() < maxBufferedRowJobs;
 			}
 
 			function onPipelineProgress() {
