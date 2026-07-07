@@ -1,12 +1,14 @@
 var newColumnSql = require('./singleQuery/newShallowColumnSql');
 var newWhereSql = require('../../../table/query/singleQuery/newWhereSql');
 var newParameterized = require('../../../table/query/newParameterized');
+var lockSql = require('../../../table/query/singleQuery/lockSql');
 
 function _new(context, table, filter, span, alias, subQueries, orderBy, limit, offset) {
 	var columnSql = newColumnSql(context, table, alias, span);
 	var whereSql = newWhereSql(context, table, filter, alias);
 	if (limit)
 		limit = limit + ' ';
+	const tableHint = lockSql.tableHintSql(context, span);
 
 	let join = '';
 	const set = new Set();
@@ -21,7 +23,7 @@ function _new(context, table, filter, span, alias, subQueries, orderBy, limit, o
 	}
 
 
-	return newParameterized('select ' + limit + columnSql).append(subQueries).append(' from ' + `[${table._dbName}] [${alias}]` + join).append(whereSql).append(orderBy + offset);
+	return newParameterized('select ' + limit + columnSql).append(subQueries).append(' from ' + `[${table._dbName}] [${alias}]` + tableHint + join).append(whereSql).append(orderBy + offset);
 }
 
 module.exports = _new;

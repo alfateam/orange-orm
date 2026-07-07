@@ -187,7 +187,7 @@ export type OrderBy<M extends Record<string, TableDefinition<M>>, K extends keyo
     >;
 
 // Reserved property names that should not conflict with relation selectors
-type ReservedFetchStrategyProps = 'orderBy' | 'where';
+type ReservedFetchStrategyProps = 'orderBy' | 'where' | 'forUpdate' | 'skipLocked';
 
 // Base fetch strategy properties (reserved props)
 type BaseFetchStrategy<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
@@ -195,6 +195,8 @@ type BaseFetchStrategy<M extends Record<string, TableDefinition<M>>, K extends k
   limit?: number;
   offset?: number;
   where?: WhereClause<M, K>;
+  forUpdate?: boolean;
+  skipLocked?: boolean;
 };
 
 export type PrimaryKeyObject<M extends Record<string, TableDefinition<M>>, K extends keyof M> =

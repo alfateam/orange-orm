@@ -308,7 +308,7 @@ function rdbClient(options = {}) {
 				return false;
 			if (Object.keys(value).length === 0)
 				return true;
-			if ('where' in value || 'orderBy' in value || 'limit' in value || 'offset' in value)
+			if ('where' in value || 'orderBy' in value || 'limit' in value || 'offset' in value || 'forUpdate' in value || 'skipLocked' in value)
 				return true;
 			for (let key in value) {
 				const v = value[key];
@@ -558,6 +558,7 @@ function rdbClient(options = {}) {
 
 		function proxifyArray(array, strategy, fast) {
 			let _array = array;
+			const storedStrategy = toStoredFetchStrategy(strategy);
 			if (_reactive)
 				array = _reactive(array);
 			let handler = {
@@ -585,17 +586,17 @@ function rdbClient(options = {}) {
 			};
 
 			let watcher = onChange(array, () => {
-				rootMap.set(array, { json: cloneFromDb(array, fast), strategy, originalArray: [...array] });
+				rootMap.set(array, { json: cloneFromDb(array, fast), strategy: storedStrategy, originalArray: [...array] });
 			});
 			let innerProxy = new Proxy(watcher, handler);
-			if (strategy !== undefined) {
-				const { limit, ...cleanStrategy } = { ...strategy };
-				fetchingStrategyMap.set(array, cleanStrategy);
+			if (storedStrategy !== undefined) {
+				fetchingStrategyMap.set(array, storedStrategy);
 			}
 			return innerProxy;
 		}
 
 		function proxifyRow(row, strategy, fast) {
+			const storedStrategy = toStoredFetchStrategy(strategy);
 			let handler = {
 				get(_target, property,) {
 					if (property === 'save' || property === 'saveChanges') //call server then acceptChanges
@@ -620,10 +621,10 @@ function rdbClient(options = {}) {
 
 			};
 			let watcher = onChange(row, () => {
-				rootMap.set(row, { json: cloneFromDb(row, fast), strategy });
+				rootMap.set(row, { json: cloneFromDb(row, fast), strategy: storedStrategy });
 			});
 			let innerProxy = new Proxy(watcher, handler);
-			fetchingStrategyMap.set(row, strategy);
+			fetchingStrategyMap.set(row, storedStrategy);
 			return innerProxy;
 		}
 
@@ -714,7 +715,7 @@ function rdbClient(options = {}) {
 			let insertedPositions = getInsertedRowsPosition(array);
 			let { changed, strategy: newStrategy } = await p;
 			copyIntoArray(changed, array, [...insertedPositions, ...updatedPositions]);
-			rootMap.set(array, { json: cloneFromDb(array), strategy: newStrategy, originalArray: [...array] });
+			rootMap.set(array, { json: cloneFromDb(array), strategy: toStoredFetchStrategy(newStrategy), originalArray: [...array] });
 		}
 
 		async function patch(patch, concurrencyOptions, strategy) {
@@ -776,8 +777,7 @@ function rdbClient(options = {}) {
 				let context = rootMap.get(obj);
 				if (context?.strategy !== undefined) {
 					// @ts-ignore
-					let { limit, ...strategy } = { ...context.strategy };
-					return strategy;
+					return toStoredFetchStrategy(context.strategy);
 				}
 			}
 		}
@@ -787,9 +787,24 @@ function rdbClient(options = {}) {
 				return strategy;
 			else if (fetchingStrategyMap.get(obj) !== undefined) {
 				// @ts-ignore
-				const { limit, ...strategy } = { ...fetchingStrategyMap.get(obj) };
-				return strategy;
+				return toStoredFetchStrategy(fetchingStrategyMap.get(obj));
 			}
+		}
+
+		function toStoredFetchStrategy(strategy) {
+			if (strategy === undefined || strategy === null || typeof strategy !== 'object')
+				return strategy;
+			if (Array.isArray(strategy))
+				return strategy.map(toStoredFetchStrategy);
+			const cleanStrategy = { ...strategy };
+			delete cleanStrategy.limit;
+			delete cleanStrategy.forUpdate;
+			delete cleanStrategy.skipLocked;
+			for (let name in cleanStrategy) {
+				if (name !== 'where' && cleanStrategy[name] && typeof cleanStrategy[name] === 'object')
+					cleanStrategy[name] = toStoredFetchStrategy(cleanStrategy[name]);
+			}
+			return cleanStrategy;
 		}
 
 		function clearChangesArray(array) {
@@ -880,8 +895,9 @@ function rdbClient(options = {}) {
 				array.splice(i + offset, 1);
 				offset--;
 			}
-			rootMap.set(array, { json: cloneFromDb(array), strategy, originalArray: [...array] });
-			fetchingStrategyMap.set(array, strategy);
+			const storedStrategy = toStoredFetchStrategy(strategy);
+			rootMap.set(array, { json: cloneFromDb(array), strategy: storedStrategy, originalArray: [...array] });
+			fetchingStrategyMap.set(array, storedStrategy);
 		}
 
 		async function deleteRow(row, options) {
@@ -915,7 +931,7 @@ function rdbClient(options = {}) {
 			let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 			let { changed, strategy: newStrategy } = await adapter.patch(body);
 			copyInto(changed, [row]);
-			rootMap.set(row, { json: cloneFromDb(row), strategy: newStrategy });
+			rootMap.set(row, { json: cloneFromDb(row), strategy: toStoredFetchStrategy(newStrategy) });
 		}
 
 		async function refreshRow(row, strategy) {
@@ -939,8 +955,9 @@ function rdbClient(options = {}) {
 			for (let p in rows[0]) {
 				row[p] = rows[0][p];
 			}
-			rootMap.set(row, { json: cloneFromDb(row), strategy });
-			fetchingStrategyMap.set(row, strategy);
+			const storedStrategy = toStoredFetchStrategy(strategy);
+			rootMap.set(row, { json: cloneFromDb(row), strategy: storedStrategy });
+			fetchingStrategyMap.set(row, storedStrategy);
 		}
 
 		function acceptChangesRow(row) {
