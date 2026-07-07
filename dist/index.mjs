@@ -270,6 +270,8 @@ export interface ${name}Strategy {
 	offset?: number;
 	orderBy?: Array<${orderByColumns(table)}> | ${orderByColumns(table)};
 	where?: (table: ${name}TableBase) => RawFilter;
+	forUpdate?: boolean;
+	skipLocked?: boolean;
 }
 
 ${otherConcurrency}
@@ -1837,7 +1839,7 @@ function requireExecutePath () {
 
 			async function replace(subject, strategy = { insertAndForget: true }) {
 				validateStrategy(table, strategy);
-				const refinedStrategy = objectToStrategy(subject, {}, table);
+				const refinedStrategy = withLockingStrategy(objectToStrategy(subject, {}, table), strategy);
 				const JSONFilter2 = {
 					path: 'getManyDto',
 					args: [subject, refinedStrategy]
@@ -1854,7 +1856,7 @@ function requireExecutePath () {
 
 			async function update(subject, whereStrategy, strategy = { insertAndForget: true }) {
 				validateStrategy(table, strategy);
-				const refinedWhereStrategy = objectToStrategy(subject, whereStrategy, table);
+				const refinedWhereStrategy = withLockingStrategy(objectToStrategy(subject, whereStrategy, table), strategy);
 				const JSONFilter2 = {
 					path: 'getManyDto',
 					args: [null, refinedWhereStrategy]
@@ -1872,6 +1874,43 @@ function requireExecutePath () {
 				const patch = createPatch(originals, rows, meta);
 				const { changed } = await table.patch(context, patch, { strategy });
 				return changed;
+			}
+
+			function withLockingStrategy(fetchStrategy, strategy) {
+				const lockStrategy = extractLockingStrategy(strategy);
+				if (!lockStrategy)
+					return fetchStrategy;
+				return mergeLockingStrategy(fetchStrategy, lockStrategy);
+			}
+
+			function extractLockingStrategy(strategy) {
+				if (!strategy || typeof strategy !== 'object')
+					return;
+				const result = {};
+				if (strategy.forUpdate)
+					result.forUpdate = strategy.forUpdate;
+				if (strategy.skipLocked)
+					result.skipLocked = strategy.skipLocked;
+				for (let name in strategy) {
+					if (name === 'where' || name === 'orderBy' || name === 'limit' || name === 'offset' || name === 'forUpdate' || name === 'skipLocked')
+						continue;
+					const child = extractLockingStrategy(strategy[name]);
+					if (child)
+						result[name] = child;
+				}
+				return Object.keys(result).length > 0 ? result : undefined;
+			}
+
+			function mergeLockingStrategy(fetchStrategy, lockStrategy) {
+				const result = { ...fetchStrategy };
+				for (let name in lockStrategy) {
+					const value = lockStrategy[name];
+					if (name === 'forUpdate' || name === 'skipLocked')
+						result[name] = value;
+					else
+						result[name] = mergeLockingStrategy(result[name] && typeof result[name] === 'object' ? result[name] : {}, value);
+				}
+				return result;
 			}
 
 			function objectToStrategy(object, whereStrategy, table, strategy = {}) {
@@ -2695,7 +2734,7 @@ function requireHostLocal () {
 					|| beforeCommit
 					|| afterCommit
 					|| afterRollback);
-				if (!hasTransactionHooks && readonlyOps.includes(body.path))
+				if (!hasTransactionHooks && readonlyOps.includes(body.path) && !hasLockingStrategy(body))
 					await db.transaction({ readonly: true }, fn);
 				else {
 					await db.transaction(async (context) => {
@@ -2728,6 +2767,24 @@ function requireHostLocal () {
 				const options = { ..._options, ...body.options, JSONFilter: body, request, response, isHttp };
 				result = await executePath(context, options);
 			}
+		}
+
+		function hasLockingStrategy(body) {
+			if (!body || !body.args)
+				return false;
+			return hasLockingStrategyCore(body.args[1]);
+		}
+
+		function hasLockingStrategyCore(strategy) {
+			if (!strategy || typeof strategy !== 'object')
+				return false;
+			if (strategy.forUpdate || strategy.skipLocked)
+				return true;
+			for (let name in strategy) {
+				if (name !== 'where' && hasLockingStrategyCore(strategy[name]))
+					return true;
+			}
+			return false;
 		}
 		async function query() {
 			let args = arguments;
@@ -3594,7 +3651,7 @@ function requireClient () {
 					return false;
 				if (Object.keys(value).length === 0)
 					return true;
-				if ('where' in value || 'orderBy' in value || 'limit' in value || 'offset' in value)
+				if ('where' in value || 'orderBy' in value || 'limit' in value || 'offset' in value || 'forUpdate' in value || 'skipLocked' in value)
 					return true;
 				for (let key in value) {
 					const v = value[key];
@@ -3844,6 +3901,7 @@ function requireClient () {
 
 			function proxifyArray(array, strategy, fast) {
 				let _array = array;
+				const storedStrategy = toStoredFetchStrategy(strategy);
 				if (_reactive)
 					array = _reactive(array);
 				let handler = {
@@ -3871,17 +3929,17 @@ function requireClient () {
 				};
 
 				let watcher = onChange(array, () => {
-					rootMap.set(array, { json: cloneFromDb(array, fast), strategy, originalArray: [...array] });
+					rootMap.set(array, { json: cloneFromDb(array, fast), strategy: storedStrategy, originalArray: [...array] });
 				});
 				let innerProxy = new Proxy(watcher, handler);
-				if (strategy !== undefined) {
-					const { limit, ...cleanStrategy } = { ...strategy };
-					fetchingStrategyMap.set(array, cleanStrategy);
+				if (storedStrategy !== undefined) {
+					fetchingStrategyMap.set(array, storedStrategy);
 				}
 				return innerProxy;
 			}
 
 			function proxifyRow(row, strategy, fast) {
+				const storedStrategy = toStoredFetchStrategy(strategy);
 				let handler = {
 					get(_target, property,) {
 						if (property === 'save' || property === 'saveChanges') //call server then acceptChanges
@@ -3906,10 +3964,10 @@ function requireClient () {
 
 				};
 				let watcher = onChange(row, () => {
-					rootMap.set(row, { json: cloneFromDb(row, fast), strategy });
+					rootMap.set(row, { json: cloneFromDb(row, fast), strategy: storedStrategy });
 				});
 				let innerProxy = new Proxy(watcher, handler);
-				fetchingStrategyMap.set(row, strategy);
+				fetchingStrategyMap.set(row, storedStrategy);
 				return innerProxy;
 			}
 
@@ -4000,7 +4058,7 @@ function requireClient () {
 				let insertedPositions = getInsertedRowsPosition(array);
 				let { changed, strategy: newStrategy } = await p;
 				copyIntoArray(changed, array, [...insertedPositions, ...updatedPositions]);
-				rootMap.set(array, { json: cloneFromDb(array), strategy: newStrategy, originalArray: [...array] });
+				rootMap.set(array, { json: cloneFromDb(array), strategy: toStoredFetchStrategy(newStrategy), originalArray: [...array] });
 			}
 
 			async function patch(patch, concurrencyOptions, strategy) {
@@ -4062,8 +4120,7 @@ function requireClient () {
 					let context = rootMap.get(obj);
 					if (context?.strategy !== undefined) {
 						// @ts-ignore
-						let { limit, ...strategy } = { ...context.strategy };
-						return strategy;
+						return toStoredFetchStrategy(context.strategy);
 					}
 				}
 			}
@@ -4073,9 +4130,24 @@ function requireClient () {
 					return strategy;
 				else if (fetchingStrategyMap.get(obj) !== undefined) {
 					// @ts-ignore
-					const { limit, ...strategy } = { ...fetchingStrategyMap.get(obj) };
-					return strategy;
+					return toStoredFetchStrategy(fetchingStrategyMap.get(obj));
 				}
+			}
+
+			function toStoredFetchStrategy(strategy) {
+				if (strategy === undefined || strategy === null || typeof strategy !== 'object')
+					return strategy;
+				if (Array.isArray(strategy))
+					return strategy.map(toStoredFetchStrategy);
+				const cleanStrategy = { ...strategy };
+				delete cleanStrategy.limit;
+				delete cleanStrategy.forUpdate;
+				delete cleanStrategy.skipLocked;
+				for (let name in cleanStrategy) {
+					if (name !== 'where' && cleanStrategy[name] && typeof cleanStrategy[name] === 'object')
+						cleanStrategy[name] = toStoredFetchStrategy(cleanStrategy[name]);
+				}
+				return cleanStrategy;
 			}
 
 			function clearChangesArray(array) {
@@ -4166,8 +4238,9 @@ function requireClient () {
 					array.splice(i + offset, 1);
 					offset--;
 				}
-				rootMap.set(array, { json: cloneFromDb(array), strategy, originalArray: [...array] });
-				fetchingStrategyMap.set(array, strategy);
+				const storedStrategy = toStoredFetchStrategy(strategy);
+				rootMap.set(array, { json: cloneFromDb(array), strategy: storedStrategy, originalArray: [...array] });
+				fetchingStrategyMap.set(array, storedStrategy);
 			}
 
 			async function deleteRow(row, options) {
@@ -4201,7 +4274,7 @@ function requireClient () {
 				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 				let { changed, strategy: newStrategy } = await adapter.patch(body);
 				copyInto(changed, [row]);
-				rootMap.set(row, { json: cloneFromDb(row), strategy: newStrategy });
+				rootMap.set(row, { json: cloneFromDb(row), strategy: toStoredFetchStrategy(newStrategy) });
 			}
 
 			async function refreshRow(row, strategy) {
@@ -4225,8 +4298,9 @@ function requireClient () {
 				for (let p in rows[0]) {
 					row[p] = rows[0][p];
 				}
-				rootMap.set(row, { json: cloneFromDb(row), strategy });
-				fetchingStrategyMap.set(row, strategy);
+				const storedStrategy = toStoredFetchStrategy(strategy);
+				rootMap.set(row, { json: cloneFromDb(row), strategy: storedStrategy });
+				fetchingStrategyMap.set(row, storedStrategy);
 			}
 
 			function acceptChangesRow(row) {
@@ -6870,6 +6944,89 @@ function requireNewColumnSql () {
 	return newColumnSql;
 }
 
+var lockSql;
+var hasRequiredLockSql;
+
+function requireLockSql () {
+	if (hasRequiredLockSql) return lockSql;
+	hasRequiredLockSql = 1;
+	const getSessionSingleton = requireGetSessionSingleton();
+
+	function selectLockSql(context, span, alias, exclusive) {
+		const lock = collectSelectLock(span, alias, exclusive);
+		if (!hasLock(lock))
+			return '';
+		const encode = getSessionSingleton(context, 'selectForUpdateSql');
+		if (!encode)
+			return '';
+		return encode(context, lock);
+	}
+
+	function tableHintSql(context, span, exclusive) {
+		const lock = spanToLock(span, exclusive);
+		if (!hasLock(lock))
+			return '';
+		const encode = getSessionSingleton(context, 'selectForUpdateSql');
+		if (!encode || !encode.tableHint)
+			return '';
+		return encode.tableHint(context, lock);
+	}
+
+	function collectSelectLock(span, alias, exclusive) {
+		const lock = {
+			aliases: [],
+			forUpdate: Boolean(exclusive),
+			skipLocked: false
+		};
+		collect(span, alias, lock);
+		if (exclusive && lock.aliases.indexOf(alias) === -1)
+			lock.aliases.unshift(alias);
+		return lock;
+	}
+
+	function collect(span, alias, lock) {
+		if (!span)
+			return;
+		if (span.forUpdate) {
+			lock.forUpdate = true;
+			lock.aliases.push(alias);
+		}
+		if (span.skipLocked)
+			lock.skipLocked = true;
+
+		if (!span.legs)
+			return;
+		const visitor = {};
+		visitor.visitJoin = visitJoinedLeg;
+		visitor.visitOne = visitJoinedLeg;
+		visitor.visitMany = function() {};
+
+		function visitJoinedLeg(leg) {
+			collect(leg.span, alias + leg.name, lock);
+		}
+
+		span.legs.forEach(leg => leg.accept(visitor));
+	}
+
+	function spanToLock(span, exclusive) {
+		return {
+			aliases: [],
+			forUpdate: Boolean(exclusive || span?.forUpdate),
+			skipLocked: Boolean(span?.skipLocked)
+		};
+	}
+
+	function hasLock(lock) {
+		return Boolean(lock.forUpdate || lock.skipLocked);
+	}
+
+	lockSql = {
+		selectLockSql,
+		tableHintSql
+	};
+	return lockSql;
+}
+
 var newShallowJoinSql;
 var hasRequiredNewShallowJoinSql;
 
@@ -6878,10 +7035,12 @@ function requireNewShallowJoinSql () {
 	hasRequiredNewShallowJoinSql = 1;
 	const newJoinCore = requireNewShallowJoinSqlCore();
 	const getSessionSingleton = requireGetSessionSingleton();
+	const lockSql = requireLockSql();
 
-	function _new(context, rightTable, leftColumns, rightColumns, leftAlias, rightAlias, filter) {
+	function _new(context, rightTable, leftColumns, rightColumns, leftAlias, rightAlias, filter, span) {
 		const quote = getSessionSingleton(context, 'quote');
-		const sql = ' JOIN ' + quote(rightTable._dbName) + ' ' + quote(rightAlias) + ' ON (';
+		const tableHint = lockSql.tableHintSql(context, span);
+		const sql = ' JOIN ' + quote(rightTable._dbName) + ' ' + quote(rightAlias) + tableHint + ' ON (';
 		const joinCore = newJoinCore(context, rightTable, leftColumns, rightColumns, leftAlias, rightAlias, filter);
 		return joinCore.prepend(sql).append(')');
 	}
@@ -6901,7 +7060,7 @@ function requireJoinLegToShallowJoinSql () {
 	function toJoinSql(context,leg,alias,childAlias) {
 		var columns = leg.columns;
 		var childTable = leg.span.table;
-		return newShallowJoinSql(context,childTable,columns,childTable._primaryColumns,alias,childAlias,leg.span.where).prepend(' LEFT');
+		return newShallowJoinSql(context,childTable,columns,childTable._primaryColumns,alias,childAlias,leg.span.where,leg.span).prepend(' LEFT');
 	}
 
 	joinLegToShallowJoinSql = toJoinSql;
@@ -6937,7 +7096,7 @@ function requireOneLegToShallowJoinSql () {
 		var parentTable = leg.table;
 		var columns = leg.columns;
 		var childTable = leg.span.table;
-		return newShallowJoinSql(context,childTable,parentTable._primaryColumns,columns,alias,childAlias, leg.span.where).prepend(' LEFT');
+		return newShallowJoinSql(context,childTable,parentTable._primaryColumns,columns,alias,childAlias, leg.span.where,leg.span).prepend(' LEFT');
 	}
 
 	oneLegToShallowJoinSql = toJoinSql;
@@ -7057,26 +7216,6 @@ function requireNegotiateLimit () {
 	return negotiateLimit_1;
 }
 
-var negotiateExclusive_1;
-var hasRequiredNegotiateExclusive;
-
-function requireNegotiateExclusive () {
-	if (hasRequiredNegotiateExclusive) return negotiateExclusive_1;
-	hasRequiredNegotiateExclusive = 1;
-	var getSessionSingleton = requireGetSessionSingleton();
-
-	function negotiateExclusive(context, table, alias, _exclusive) {
-		if (table._exclusive || _exclusive) {
-			var encode =  getSessionSingleton(context, 'selectForUpdateSql');
-			return encode(context, alias);
-		}
-		return '';
-	}
-
-	negotiateExclusive_1 = negotiateExclusive;
-	return negotiateExclusive_1;
-}
-
 var newSingleQuery$1;
 var hasRequiredNewSingleQuery$1;
 
@@ -7087,23 +7226,25 @@ function requireNewSingleQuery$1 () {
 	var newJoinSql = requireNewJoinSql();
 	var newWhereSql = requireNewWhereSql();
 	var negotiateLimit = requireNegotiateLimit();
-	var negotiateExclusive = requireNegotiateExclusive();
+	var lockSql = requireLockSql();
 	var newParameterized = requireNewParameterized();
 	var quote = requireQuote$6();
 
 	function _new(context, table, filter, span, alias, innerJoin, orderBy, limit, offset, exclusive) {
 
 		var name = quote(context, table._dbName);
+		var quotedAlias = quote(context, alias);
 		var columnSql = newColumnSql(context, table, span, alias);
 		var joinSql = newJoinSql(context, span, alias);
 		var whereSql = newWhereSql(context, table, filter, alias);
 		var safeLimit = negotiateLimit(limit);
-		var exclusiveClause = negotiateExclusive(table, alias, exclusive);
-		return newParameterized('select' + safeLimit + ' ' + columnSql + ' from ' + name + ' ' + quote(context, alias))
+		var lockClause = lockSql.selectLockSql(context, span, alias, exclusive);
+		var tableHint = lockSql.tableHintSql(context, span, exclusive);
+		return newParameterized('select' + safeLimit + ' ' + columnSql + ' from ' + name + ' ' + quotedAlias + tableHint)
 			.append(innerJoin)
 			.append(joinSql)
 			.append(whereSql)
-			.append(orderBy + offset + exclusiveClause);
+			.append(orderBy + offset + lockClause);
 	}
 
 	newSingleQuery$1 = _new;
@@ -11714,18 +11855,22 @@ function requireNewSingleQuery () {
 	var newJoinSql = requireNewJoinSql();
 	var newParameterized = requireNewParameterized();
 	var getSessionSingleton = requireGetSessionSingleton();
+	var lockSql = requireLockSql();
 
 	function _new(context,table,filter,span, alias,orderBy,limit,offset,distinct = false) {
 		var quote = getSessionSingleton(context, 'quote');
 		var name = quote(table._dbName);
+		var quotedAlias = quote(alias);
 		var columnSql = newColumnSql(context,table,span,alias,true);
 		var joinSql = newJoinSql(context, span, alias);
 		var whereSql = newWhereSql(context,table,filter,alias);
 		if (limit)
 			limit = limit + ' ';
 		const selectClause = distinct ? 'select distinct ' : 'select ';
+		const lockClause = lockSql.selectLockSql(context, span, alias);
+		const tableHint = lockSql.tableHintSql(context, span);
 
-		return newParameterized(selectClause + limit + columnSql + ' from ' + name + ' ' + quote(alias)).append(joinSql).append(whereSql).append(orderBy + offset);
+		return newParameterized(selectClause + limit + columnSql + ' from ' + name + ' ' + quotedAlias + tableHint).append(joinSql).append(whereSql).append(orderBy + offset + lockClause);
 
 	}
 
@@ -12703,27 +12848,32 @@ function requireApplyPatch () {
 
 	}
 
-	// function assertDatesEqual(date1, date2) {
-	// 	if (date1 && date2) {
-	// 		const parts1 = date1.split('T');
-	// 		const time1parts = (parts1[1] || '').split(/[-+.]/);
-	// 		const parts2 = date2.split('T');
-	// 		const time2parts = (parts2[1] || '').split(/[-+.]/);
-	// 		while (time1parts.length !== time2parts.length) {
-	// 			if (time1parts.length > time2parts.length)
-	// 				time1parts.pop();
-	// 			else if (time1parts.length < time2parts.length)
-	// 				time2parts.pop();
-	// 		}
-	// 		date1 = `${parts1[0]}T${time1parts[0]}`;
-	// 		date2 = `${parts2[0]}T${time2parts[0]}`;
-	// 	}
-	// 	assertDeepEqual(date1, date2);
-	// }
-
 	function assertDeepEqual(a, b) {
-		if (JSON.stringify(a) !== JSON.stringify(b))
+		if (!deepEqual(a, b))
 			throw new Error('A, b are not equal');
+	}
+
+	function deepEqual(a, b) {
+		if (a === b) return true;
+		if (a && b && typeof a === 'object' && typeof b === 'object') {
+			if (Array.isArray(a)) {
+				if (!Array.isArray(b) || a.length !== b.length) return false;
+				for (let i = 0; i < a.length; i++) {
+					if (!deepEqual(a[i], b[i])) return false;
+				}
+				return true;
+			}
+			if (Array.isArray(b)) return false;
+
+			const keysA = Object.keys(a);
+			const keysB = Object.keys(b);
+			if (keysA.length !== keysB.length) return false;
+			for (const key of keysA) {
+				if (!Object.prototype.hasOwnProperty.call(b, key) || !deepEqual(a[key], b[key])) return false;
+			}
+			return true;
+		}
+		return false;
 	}
 
 	applyPatch_1 = applyPatch;
@@ -12850,6 +13000,7 @@ function requirePatchTable () {
 		const engine = getSessionSingleton(context, 'engine');
 		options = cleanOptions(options);
 		strategy = JSON.parse(JSON.stringify(strategy || {}));
+		await lockTouchedRows();
 		let changed = new Set();
 		for (let i = 0; i < patches.length; i++) {
 			let patch = { path: undefined, value: undefined, op: undefined };
@@ -12885,6 +13036,54 @@ function requirePatchTable () {
 				return JSON.parse(property);
 			else
 				return [property];
+		}
+
+		async function lockTouchedRows() {
+			if (!hasLockingStrategy(strategy))
+				return;
+			const keys = [];
+			const keySet = new Set();
+			for (let i = 0; i < patches.length; i++) {
+				const patch = patches[i];
+				const path = patch.path.split('/').slice(1);
+				if (path.length === 0)
+					continue;
+				if (patch.op === 'add' && path.length === 1)
+					continue;
+				const key = toKey(path[0]);
+				if (isTemporaryKey(key))
+					continue;
+				const keyString = JSON.stringify(key);
+				if (keySet.has(keyString))
+					continue;
+				keySet.add(keyString);
+				keys.push(key);
+			}
+			for (let i = 0; i < keys.length; i++) {
+				const row = await table.tryGetById.apply(null, [context, ...keys[i], strategy]);
+				if (!row)
+					throw new Error(`Row ${table._dbName} with id ${keys[i]} was not found.`);
+			}
+		}
+
+		function hasLockingStrategy(strategy) {
+			if (!strategy || typeof strategy !== 'object')
+				return false;
+			if (strategy.forUpdate || strategy.skipLocked)
+				return true;
+			for (let name in strategy) {
+				if (name !== 'where' && hasLockingStrategy(strategy[name]))
+					return true;
+			}
+			return false;
+		}
+
+		function isTemporaryKey(key) {
+			for (let i = 0; i < key.length; i++) {
+				if (typeof key[i] === 'string' && key[i].indexOf('~') === 0)
+					return true;
+			}
+			return false;
 		}
 
 		async function add({ path, value, op, oldValue, strategy, options }, table, row, parentRow, relation) {
@@ -14530,16 +14729,23 @@ function requireDeleteFromSql$5 () {
 	return deleteFromSql_1$5;
 }
 
-var selectForUpdateSql$5;
+var selectForUpdateSql$4;
 var hasRequiredSelectForUpdateSql$5;
 
 function requireSelectForUpdateSql$5 () {
-	if (hasRequiredSelectForUpdateSql$5) return selectForUpdateSql$5;
+	if (hasRequiredSelectForUpdateSql$5) return selectForUpdateSql$4;
 	hasRequiredSelectForUpdateSql$5 = 1;
-	selectForUpdateSql$5 = function(_alias) {
-		return ' FOR UPDATE';
+	selectForUpdateSql$4 = function(_context, lock) {
+		if (typeof lock === 'string')
+			lock = { forUpdate: true };
+		let sql = '';
+		if (lock.forUpdate)
+			sql += ' FOR UPDATE';
+		if (lock.skipLocked)
+			sql += ' SKIP LOCKED';
+		return sql;
 	};
-	return selectForUpdateSql$5;
+	return selectForUpdateSql$4;
 }
 
 var lastInsertedSql_1$4;
@@ -16554,18 +16760,28 @@ function requireDeleteFromSql$4 () {
 	return deleteFromSql_1$4;
 }
 
-var selectForUpdateSql$4;
+var selectForUpdateSql$3;
 var hasRequiredSelectForUpdateSql$4;
 
 function requireSelectForUpdateSql$4 () {
-	if (hasRequiredSelectForUpdateSql$4) return selectForUpdateSql$4;
+	if (hasRequiredSelectForUpdateSql$4) return selectForUpdateSql$3;
 	hasRequiredSelectForUpdateSql$4 = 1;
 	const quote = requireQuote$6();
 
-	selectForUpdateSql$4 = function(alias) {
-		return ' FOR UPDATE OF ' + quote(alias);
+	selectForUpdateSql$3 = function(context, lock) {
+		if (typeof lock === 'string')
+			lock = { aliases: [lock], forUpdate: true };
+		let sql = '';
+		if (lock.forUpdate) {
+			sql = ' FOR UPDATE';
+			if (lock.aliases && lock.aliases.length > 0)
+				sql += ' OF ' + lock.aliases.map(alias => quote(context, alias)).join(', ');
+		}
+		if (lock.skipLocked)
+			sql += ' SKIP LOCKED';
+		return sql;
 	};
-	return selectForUpdateSql$4;
+	return selectForUpdateSql$3;
 }
 
 var limitAndOffset_1$4;
@@ -18532,18 +18748,18 @@ function requireDeleteFromSql$3 () {
 	return deleteFromSql_1$3;
 }
 
-var selectForUpdateSql$3;
+var selectForUpdateSql$2;
 var hasRequiredSelectForUpdateSql$3;
 
 function requireSelectForUpdateSql$3 () {
-	if (hasRequiredSelectForUpdateSql$3) return selectForUpdateSql$3;
+	if (hasRequiredSelectForUpdateSql$3) return selectForUpdateSql$2;
 	hasRequiredSelectForUpdateSql$3 = 1;
-	const quote = requireQuote$6();
-
-	selectForUpdateSql$3 = function(context, alias) {
-		return ' FOR UPDATE OF ' + quote(context, alias);
+	selectForUpdateSql$2 = function(_context, lock) {
+		if (lock)
+			throw new Error('select for update is not supported by SQLite');
+		return '';
 	};
-	return selectForUpdateSql$3;
+	return selectForUpdateSql$2;
 }
 
 var lastInsertedSql_1$2;
@@ -20689,18 +20905,31 @@ function requireDeleteFromSql$2 () {
 	return deleteFromSql_1$2;
 }
 
-var selectForUpdateSql$2;
+var selectForUpdateSql_1;
 var hasRequiredSelectForUpdateSql$2;
 
 function requireSelectForUpdateSql$2 () {
-	if (hasRequiredSelectForUpdateSql$2) return selectForUpdateSql$2;
+	if (hasRequiredSelectForUpdateSql$2) return selectForUpdateSql_1;
 	hasRequiredSelectForUpdateSql$2 = 1;
-	const quote = requireQuote$6();
+	function selectForUpdateSql() {
+		return '';
+	}
 
-	selectForUpdateSql$2 = function(alias) {
-		return ' FOR UPDATE OF ' + quote(alias);
+	selectForUpdateSql.tableHint = function(_context, lock) {
+		const hints = [];
+		if (lock.forUpdate)
+			hints.push('UPDLOCK');
+		if (lock.skipLocked) {
+			hints.push('READPAST');
+			hints.push('ROWLOCK');
+		}
+		if (hints.length === 0)
+			return '';
+		return ' WITH (' + hints.join(', ') + ')';
 	};
-	return selectForUpdateSql$2;
+
+	selectForUpdateSql_1 = selectForUpdateSql;
+	return selectForUpdateSql_1;
 }
 
 var limitAndOffset_1$2;
@@ -22276,10 +22505,10 @@ var hasRequiredSelectForUpdateSql$1;
 function requireSelectForUpdateSql$1 () {
 	if (hasRequiredSelectForUpdateSql$1) return selectForUpdateSql$1;
 	hasRequiredSelectForUpdateSql$1 = 1;
-	const quote = requireQuote$6();
-
-	selectForUpdateSql$1 = function(alias) {
-		return ' FOR UPDATE OF ' + quote(alias);
+	selectForUpdateSql$1 = function(_context, lock) {
+		if (lock)
+			throw new Error('select for update is not supported by SAP ASE');
+		return '';
 	};
 	return selectForUpdateSql$1;
 }
@@ -22999,10 +23228,15 @@ var hasRequiredSelectForUpdateSql;
 function requireSelectForUpdateSql () {
 	if (hasRequiredSelectForUpdateSql) return selectForUpdateSql;
 	hasRequiredSelectForUpdateSql = 1;
-	const quote = requireQuote$6();
-
-	selectForUpdateSql = function(alias) {
-		return ' FOR UPDATE OF ' + quote(alias);
+	selectForUpdateSql = function(_context, lock) {
+		if (typeof lock === 'string')
+			lock = { forUpdate: true };
+		let sql = '';
+		if (lock.forUpdate)
+			sql = ' FOR UPDATE';
+		if (lock.skipLocked)
+			sql += ' SKIP LOCKED';
+		return sql;
 	};
 	return selectForUpdateSql;
 }
