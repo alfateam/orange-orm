@@ -1,4 +1,6 @@
 ## Changelog
+__5.4.0__  
+Support for `Select for update` and `skip locked`. [#193](https://github.com/alfateam/orange-orm/issues/193)  
 __5.3.6__  
 Fix npm package contents by excluding the demo project and local install artifacts.  
 __5.3.5__  

@@ -693,6 +693,50 @@ async function getRows() {
 }
 ```
 
+__Row locks with forUpdate and skipLocked__  
+Use `forUpdate: true` in a fetching strategy to lock selected rows for update until the current transaction completes. Add `skipLocked: true` when concurrent workers should skip rows that are already locked instead of waiting for them. This is useful for queue-like workloads where several workers pick the next available rows.
+
+`forUpdate` and `skipLocked` should be used inside a transaction. They are supported by PostgreSQL/PGlite, MySQL, MariaDB, Oracle, and MS SQL. SQLite and SAP ASE throw an error because row locking with `SELECT FOR UPDATE` is not supported there.
+
+```javascript
+import map from './map';
+const db = map.postgres('postgres://postgres:postgres@postgres/postgres');
+
+async function claimNextOrders() {
+  return await db.transaction(async tx => {
+    const orders = await tx.order.getMany({
+      where: x => x.orderDate.lessThan(new Date()),
+      orderBy: 'id',
+      limit: 10,
+      forUpdate: true,
+      skipLocked: true,
+      lines: {
+        forUpdate: true
+      }
+    });
+
+    for (const order of orders) {
+      order.orderDate = new Date();
+    }
+
+    await orders.saveChanges();
+    return orders;
+  });
+}
+```
+
+The same lock strategy can be passed to write helpers that return affected rows:
+
+```javascript
+const updated = await db.transaction(async tx => {
+  return await tx.customer.update(
+    { name: 'Updated' },
+    { where: x => x.id.eq(customerId) },
+    { forUpdate: true, skipLocked: true }
+  );
+});
+```
+
 __Single row filtered__
 
 ```javascript
