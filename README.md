@@ -33,8 +33,10 @@ The ultimate Object Relational Mapper for Node.js, Bun and Deno, offering seamle
 | SQLite        | ✅ | ✅ | ✅ | |
 | Cloudflare D1 |  |  |  | ✅|
 
-## Sponsorship <span style="font-size: larger; color: darkred;">♡</span>
-If you value the hard work behind Orange and wish to see it evolve further, consider [sponsoring](https://github.com/sponsors/lroal). Your support fuels the journey of refining and expanding this tool for our developer community.
+## Sponsorship ❤️ 
+Orange ORM is free and open source, maintained in my spare time.  
+If Orange saves you or your company time, sponsorship helps fund ongoing development, bug fixes, documentation, and long-term maintenance.  
+👉 [Sponsor Orange ORM on GitHub](https://github.com/sponsors/lroal)
 
 ## MCP (Model Context Protocol)
 Orange ORM is available as an MCP resource on Context7. Use it with AI-powered tools like GitHub Copilot, Cursor, or Claude to get up-to-date documentation and code examples directly in your IDE.  
