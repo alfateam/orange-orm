@@ -110,6 +110,37 @@ describe('db worker rpc', () => {
 		expect(raw.name).toBe('Worker');
 	});
 
+	test('auto-creates local sync schema before first worker table read', async () => {
+		const syncFileName = 'demo.dbWorker.auto-schema-read.test.db';
+		fs.rmSync(syncFileName, { force: true });
+		const syncWorkerDb = map({
+			db: (con) => con.sqlite(syncFileName, {
+				size: 1,
+				sync: { url: '/rdb', auto: false, tables: ['customer'] }
+			})
+		});
+		const bridge = createBridge(syncWorkerDb, { autoStart: false });
+		const workerClient = rdb.createDbWorkerClient(bridge.worker);
+		const uiDb = map({
+			db: workerClient
+		});
+
+		try {
+			const rows = await uiDb.customer.getMany();
+			const countRows = await syncWorkerDb.query('SELECT COUNT(*) AS count FROM "customer"');
+			const countRow = Array.isArray(countRows) ? countRows[0] : countRows?.rows?.[0];
+
+			expect(rows).toHaveLength(0);
+			expect(Number(countRow?.count ?? countRow?.COUNT ?? 0)).toBe(0);
+		}
+		finally {
+			workerClient.close();
+			bridge.handler.stop();
+			await syncWorkerDb.close();
+			fs.rmSync(syncFileName, { force: true });
+		}
+	});
+
 	test('routes transaction table writes through one worker transaction', async () => {
 		await dbWorkerUiDb.transaction(async (tx) => {
 			await tx.customer.insert({ id: 9002, name: 'TxOne', balance: 1, isActive: true });

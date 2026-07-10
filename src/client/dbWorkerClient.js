@@ -3,6 +3,7 @@ const {
 	serializeSyncPayload,
 	withSyncOperationMemory
 } = require('../sync/operationContext');
+const { ensureLocalSchemaReadySymbol } = require('./syncClient');
 
 function createDbWorkerClient(worker) {
 	if (!worker || typeof worker.postMessage !== 'function')
@@ -35,6 +36,7 @@ function createDbWorkerClient(worker) {
 			off,
 			once,
 			waitForInitialSync: syncRequest.bind(null, 'waitForInitialSync'),
+			[ensureLocalSchemaReadySymbol]: syncRequest.bind(null, 'ensureLocalSchemaReady'),
 			close
 		}
 	};

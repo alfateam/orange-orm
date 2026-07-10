@@ -5369,6 +5369,8 @@ function requireFlags () {
 	return flags_1;
 }
 
+var syncClient = {exports: {}};
+
 var syncAuto;
 var hasRequiredSyncAuto;
 
@@ -5898,11 +5900,10 @@ function requireSyncSchema () {
 	return syncSchema;
 }
 
-var syncClient;
 var hasRequiredSyncClient;
 
 function requireSyncClient () {
-	if (hasRequiredSyncClient) return syncClient;
+	if (hasRequiredSyncClient) return syncClient.exports;
 	hasRequiredSyncClient = 1;
 	const randomUuid = requireRandomUuid();
 	const stringify = requireStringify();
@@ -5926,6 +5927,9 @@ function requireSyncClient () {
 
 	const maxPushBatchesPerSync = 1000;
 	const maxStableBaseKeysPerStatement = 200;
+	const ensureLocalSchemaReadySymbol = typeof Symbol === 'function'
+		? Symbol.for('orange-orm.syncClient.ensureLocalSchemaReady')
+		: '__orangeOrmSyncClientEnsureLocalSchemaReady';
 
 	function newSyncClient(client, getDb, axiosInterceptor) {
 		const sinceByScope = new Map();
@@ -5942,6 +5946,8 @@ function requireSyncClient () {
 		const initialReadyListeners = new Set();
 		const eventListeners = new Map();
 		let initialReadyEmitted = false;
+		let localSchemaReadyPromise = null;
+		let localSchemaReadyResult = null;
 		const interceptors = createHttpInterceptor();
 		const lockedSync = withCrossTabSyncLock(sync);
 		const lockedEnsureLocalSchema = withCrossTabSyncLock(ensureLocalSchema);
@@ -5972,6 +5978,9 @@ function requireSyncClient () {
 		};
 		Object.defineProperty(syncClientApi, syncAutoStartSymbol, {
 			value: auto.startFromConfig
+		});
+		Object.defineProperty(syncClientApi, ensureLocalSchemaReadySymbol, {
+			value: ensureLocalSchemaReady
 		});
 		return syncClientApi;
 
@@ -6004,6 +6013,15 @@ function requireSyncClient () {
 
 		async function ensureLocalSchema(options = {}) {
 			const result = await prepareLocalSyncSchema(normalizeSyncOptions(options), { allowMissingSync: true });
+			return localSchemaReadyResultToPublic(result);
+		}
+
+		async function ensureLocalSchemaReady() {
+			const result = await getLocalSchemaReady({ allowMissingSync: true });
+			return localSchemaReadyResultToPublic(result);
+		}
+
+		function localSchemaReadyResultToPublic(result) {
 			if (result.skipped)
 				return result;
 			return {
@@ -6062,16 +6080,55 @@ function requireSyncClient () {
 		}
 
 		async function prepareLocalSyncSchema(options = {}, prepareOptions = {}) {
-			const db = await getDb();
-			const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
-			if (!syncConfig) {
+			const result = await getLocalSchemaReady(prepareOptions);
+			if (result.skipped) {
 				if (prepareOptions.allowMissingSync)
-					return { skipped: true };
+					return result;
 				throw new Error('Sync is not configured. Add sync in sqlite options: sqlite(connectionString, { sync: ... })');
 			}
+			return {
+				...result,
+				pullConfig: resolvePullConfig(result.syncConfig, normalizePullOptions(options))
+			};
+		}
 
-			const pullOptions = normalizePullOptions(options);
-			const pullConfig = resolvePullConfig(syncConfig, pullOptions);
+		function getLocalSchemaReady(prepareOptions = {}) {
+			if (localSchemaReadyResult)
+				return Promise.resolve(localSchemaReadyResult);
+			if (localSchemaReadyPromise) {
+				return localSchemaReadyPromise.then((result) => {
+					if (result.skipped && !prepareOptions.allowMissingSync)
+						throw new Error('Sync is not configured. Add sync in sqlite options: sqlite(connectionString, { sync: ... })');
+					return result;
+				});
+			}
+			localSchemaReadyPromise = prepareLocalSyncSchemaCore()
+				.then((result) => {
+					if (!result.skipped)
+						localSchemaReadyResult = result;
+					if (result.skipped && !prepareOptions.allowMissingSync)
+						throw new Error('Sync is not configured. Add sync in sqlite options: sqlite(connectionString, { sync: ... })');
+					return result;
+				})
+				.catch((error) => {
+					localSchemaReadyPromise = null;
+					throw error;
+				});
+			return localSchemaReadyPromise;
+		}
+
+		function clearLocalSchemaReady() {
+			localSchemaReadyPromise = null;
+			localSchemaReadyResult = null;
+		}
+
+		async function prepareLocalSyncSchemaCore() {
+			const db = await getDb();
+			const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
+			if (!syncConfig)
+				return { skipped: true };
+
+			const pullConfig = resolvePullConfig(syncConfig);
 			const configuredTables = resolveSyncTables(db, pullConfig.tables, client);
 			if (!Array.isArray(configuredTables) || configuredTables.length === 0)
 				throw new Error('Sync pull requires mapped tables or configured tables. Set sync.tables when the client has no table map.');
@@ -6084,7 +6141,6 @@ function requireSyncClient () {
 				skipped: false,
 				db,
 				syncConfig,
-				pullConfig,
 				configuredTables,
 				schemaResult
 			};
@@ -6123,6 +6179,7 @@ function requireSyncClient () {
 		}
 
 		async function resetLocal(options = {}) {
+			clearLocalSchemaReady();
 			const db = await getDb();
 			const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
 			if (!syncConfig)
@@ -8942,8 +8999,9 @@ function requireSyncClient () {
 		return Number.isFinite(parsed) ? String(parsed) : 'NULL';
 	}
 
-	syncClient = newSyncClient;
-	return syncClient;
+	syncClient.exports = newSyncClient;
+	syncClient.exports.ensureLocalSchemaReadySymbol = ensureLocalSchemaReadySymbol;
+	return syncClient.exports;
 }
 
 var client;
@@ -8965,6 +9023,7 @@ function requireClient () {
 	const createHttpInterceptor = requireHttpInterceptor();
 	const flags = requireFlags();
 	const newSyncClient = requireSyncClient();
+	const { ensureLocalSchemaReadySymbol } = newSyncClient;
 	const { runSyncWrite } = requireWriteGate();
 	const {
 		createSyncTransactionContext,
@@ -9064,6 +9123,7 @@ function requireClient () {
 		client.syncClient = baseUrl && typeof baseUrl.__createSyncClient === 'function'
 			? baseUrl.__createSyncClient(client, getDb, httpInterceptor)
 			: newSyncClient(client, getDb, httpInterceptor);
+		let localSchemaReadySkipped = false;
 		// else {
 		let handler = {
 			get(_target, property,) {
@@ -9226,7 +9286,24 @@ function requireClient () {
 			return db;
 		}
 
+		async function ensureLocalSchemaReady() {
+			if (transaction)
+				return;
+			if (localSchemaReadySkipped)
+				return;
+			const syncClient = client.syncClient;
+			const ensureReady = syncClient && syncClient[ensureLocalSchemaReadySymbol];
+			if (typeof ensureReady !== 'function') {
+				localSchemaReadySkipped = true;
+				return;
+			}
+			const result = await ensureReady.call(syncClient);
+			if (result && result.skipped)
+				localSchemaReadySkipped = true;
+		}
+
 		async function runInTransaction(fn, _options) {
+			await ensureLocalSchemaReady();
 			let db = await getDb();
 			if (!db.createTransaction)
 				throw new Error('Transaction not supported through http');
@@ -9356,6 +9433,7 @@ function requireClient () {
 			}
 
 			async function executeGroupBy(path, strategy) {
+				await ensureLocalSchemaReady();
 				let args = negotiateGroupBy(null, strategy);
 				let body = stringify({
 					path,
@@ -9366,6 +9444,7 @@ function requireClient () {
 			}
 
 			async function count(_) {
+				await ensureLocalSchemaReady();
 				let args = [_].concat(Array.prototype.slice.call(arguments).slice(1));
 				let body = stringify({
 					path: 'count',
@@ -9458,6 +9537,7 @@ function requireClient () {
 			}
 
 			async function getManyCore() {
+				await ensureLocalSchemaReady();
 				let args = negotiateWhere.apply(null, arguments);
 				let body = stringify({
 					path: 'getManyDto',
@@ -9535,6 +9615,7 @@ function requireClient () {
 
 
 			async function _delete() {
+				await ensureLocalSchemaReady();
 				let args = Array.prototype.slice.call(arguments);
 				let body = stringify({
 					path: 'delete',
@@ -9545,6 +9626,7 @@ function requireClient () {
 			}
 
 			async function deleteCascade() {
+				await ensureLocalSchemaReady();
 				let args = Array.prototype.slice.call(arguments);
 				let body = stringify({
 					path: 'deleteCascade',
@@ -9555,6 +9637,7 @@ function requireClient () {
 			}
 
 			async function update(_row, _where, strategy) {
+				await ensureLocalSchemaReady();
 				let args = [_row, negotiateWhereSingle(_where), negotiateWhereSingle(strategy)];
 				let body = stringify({
 					path: 'update',
@@ -9567,6 +9650,7 @@ function requireClient () {
 			}
 
 			async function replace(_row, strategy) {
+				await ensureLocalSchemaReady();
 				let args = [_row, negotiateWhereSingle(strategy)];
 				let body = stringify({
 					path: 'replace',
@@ -9784,6 +9868,7 @@ function requireClient () {
 				const patch = createPatch(json, array, meta);
 				if (patch.length === 0)
 					return;
+				await ensureLocalSchemaReady();
 				let body = stringify({ patch, options: { strategy, ...tableOptions, ...concurrencyOptions, deduceStrategy } });
 				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 				let p = adapter.patch(body);
@@ -9803,6 +9888,7 @@ function requireClient () {
 				let deduceStrategy = false;
 				if (patch.length === 0)
 					return;
+				await ensureLocalSchemaReady();
 				let body = stringify({ patch, options: { strategy, ...tableOptions, ...concurrencyOptions, deduceStrategy } });
 				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 				await adapter.patch(body);
@@ -9928,6 +10014,7 @@ function requireClient () {
 					return;
 				let meta = await getMeta();
 				let patch = createPatch(array, [], meta);
+				await ensureLocalSchemaReady();
 				let body = stringify({ patch, options });
 				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 				let { strategy } = await adapter.patch(body);
@@ -10003,6 +10090,7 @@ function requireClient () {
 				let strategy = extractStrategy(options, row);
 				let meta = await getMeta();
 				let patch = createPatch([row], [], meta);
+				await ensureLocalSchemaReady();
 				let body = stringify({ patch, options });
 				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 				await adapter.patch(body);
@@ -10025,6 +10113,7 @@ function requireClient () {
 				if (patch.length === 0)
 					return;
 
+				await ensureLocalSchemaReady();
 				let body = stringify({ patch, options: { ...tableOptions, ...concurrencyOptions, strategy, deduceStrategy } });
 
 				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
@@ -19977,6 +20066,7 @@ function requireDbWorkerClient () {
 		serializeSyncPayload,
 		withSyncOperationMemory
 	} = requireOperationContext();
+	const { ensureLocalSchemaReadySymbol } = requireSyncClient();
 
 	function createDbWorkerClient(worker) {
 		if (!worker || typeof worker.postMessage !== 'function')
@@ -20009,6 +20099,7 @@ function requireDbWorkerClient () {
 				off,
 				once,
 				waitForInitialSync: syncRequest.bind(null, 'waitForInitialSync'),
+				[ensureLocalSchemaReadySymbol]: syncRequest.bind(null, 'ensureLocalSchemaReady'),
 				close
 			}
 		};
@@ -20210,6 +20301,7 @@ function requireDbWorkerHandler () {
 	hasRequiredDbWorkerHandler = 1;
 	const { acquireSyncWrite } = requireWriteGate();
 	const { syncAutoStartSymbol } = requireSyncAuto();
+	const { ensureLocalSchemaReadySymbol } = requireSyncClient();
 	const {
 		createSyncTransactionContext,
 		flushSyncTransactionContext,
@@ -20278,6 +20370,7 @@ function requireDbWorkerHandler () {
 		}
 
 		async function beginTransaction(transactionId, txOptions) {
+			await ensureLocalSchemaReady();
 			const pool = await getPool();
 			if (!pool.createTransaction)
 				throw new Error('Transaction not supported by DB worker client.');
@@ -20341,16 +20434,31 @@ function requireDbWorkerHandler () {
 
 		function dispatchSync(method, args = []) {
 			const syncClient = client.syncClient;
+			if (!syncClient && method === 'ensureLocalSchemaReady')
+				return { skipped: true };
 			if (!syncClient)
 				throw new Error('Sync client is not configured in DB worker.');
 			if (method === 'on')
 				return subscribeSyncEvent(args[0]);
 			if (method === 'off')
 				return unsubscribeSyncEvent(args[0]);
+			if (method === 'ensureLocalSchemaReady') {
+				const ensureReady = syncClient[ensureLocalSchemaReadySymbol];
+				if (typeof ensureReady !== 'function')
+					return { skipped: true };
+				return ensureReady.apply(syncClient, args);
+			}
 			const fn = syncClient[method];
 			if (typeof fn !== 'function')
 				throw new Error(`Sync method "${method}" is not implemented.`);
 			return fn.apply(syncClient, args);
+		}
+
+		async function ensureLocalSchemaReady() {
+			const syncClient = client.syncClient;
+			const ensureReady = syncClient && syncClient[ensureLocalSchemaReadySymbol];
+			if (typeof ensureReady === 'function')
+				await ensureReady.call(syncClient);
 		}
 
 		function subscribeSyncEvent(event) {
@@ -20401,6 +20509,8 @@ function requireDbWorkerHandler () {
 			const table = client.tables && client.tables[tableName];
 			if (!table)
 				throw new Error(`Table "${tableName}" is not configured in DB worker.`);
+			if (!transactions.has(transactionId))
+				await ensureLocalSchemaReady();
 			const localHost = await host(table, transactions.get(transactionId));
 			const fn = localHost[method];
 			if (typeof fn !== 'function')

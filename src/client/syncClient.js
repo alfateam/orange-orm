@@ -20,6 +20,9 @@ const {
 
 const maxPushBatchesPerSync = 1000;
 const maxStableBaseKeysPerStatement = 200;
+const ensureLocalSchemaReadySymbol = typeof Symbol === 'function'
+	? Symbol.for('orange-orm.syncClient.ensureLocalSchemaReady')
+	: '__orangeOrmSyncClientEnsureLocalSchemaReady';
 
 function newSyncClient(client, getDb, axiosInterceptor) {
 	const sinceByScope = new Map();
@@ -36,6 +39,8 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 	const initialReadyListeners = new Set();
 	const eventListeners = new Map();
 	let initialReadyEmitted = false;
+	let localSchemaReadyPromise = null;
+	let localSchemaReadyResult = null;
 	const interceptors = createHttpInterceptor();
 	const lockedSync = withCrossTabSyncLock(sync);
 	const lockedEnsureLocalSchema = withCrossTabSyncLock(ensureLocalSchema);
@@ -66,6 +71,9 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 	};
 	Object.defineProperty(syncClientApi, syncAutoStartSymbol, {
 		value: auto.startFromConfig
+	});
+	Object.defineProperty(syncClientApi, ensureLocalSchemaReadySymbol, {
+		value: ensureLocalSchemaReady
 	});
 	return syncClientApi;
 
@@ -98,6 +106,15 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 
 	async function ensureLocalSchema(options = {}) {
 		const result = await prepareLocalSyncSchema(normalizeSyncOptions(options), { allowMissingSync: true });
+		return localSchemaReadyResultToPublic(result);
+	}
+
+	async function ensureLocalSchemaReady() {
+		const result = await getLocalSchemaReady({ allowMissingSync: true });
+		return localSchemaReadyResultToPublic(result);
+	}
+
+	function localSchemaReadyResultToPublic(result) {
 		if (result.skipped)
 			return result;
 		return {
@@ -156,16 +173,55 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 	}
 
 	async function prepareLocalSyncSchema(options = {}, prepareOptions = {}) {
-		const db = await getDb();
-		const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
-		if (!syncConfig) {
+		const result = await getLocalSchemaReady(prepareOptions);
+		if (result.skipped) {
 			if (prepareOptions.allowMissingSync)
-				return { skipped: true };
+				return result;
 			throw new Error('Sync is not configured. Add sync in sqlite options: sqlite(connectionString, { sync: ... })');
 		}
+		return {
+			...result,
+			pullConfig: resolvePullConfig(result.syncConfig, normalizePullOptions(options))
+		};
+	}
 
-		const pullOptions = normalizePullOptions(options);
-		const pullConfig = resolvePullConfig(syncConfig, pullOptions);
+	function getLocalSchemaReady(prepareOptions = {}) {
+		if (localSchemaReadyResult)
+			return Promise.resolve(localSchemaReadyResult);
+		if (localSchemaReadyPromise) {
+			return localSchemaReadyPromise.then((result) => {
+				if (result.skipped && !prepareOptions.allowMissingSync)
+					throw new Error('Sync is not configured. Add sync in sqlite options: sqlite(connectionString, { sync: ... })');
+				return result;
+			});
+		}
+		localSchemaReadyPromise = prepareLocalSyncSchemaCore()
+			.then((result) => {
+				if (!result.skipped)
+					localSchemaReadyResult = result;
+				if (result.skipped && !prepareOptions.allowMissingSync)
+					throw new Error('Sync is not configured. Add sync in sqlite options: sqlite(connectionString, { sync: ... })');
+				return result;
+			})
+			.catch((error) => {
+				localSchemaReadyPromise = null;
+				throw error;
+			});
+		return localSchemaReadyPromise;
+	}
+
+	function clearLocalSchemaReady() {
+		localSchemaReadyPromise = null;
+		localSchemaReadyResult = null;
+	}
+
+	async function prepareLocalSyncSchemaCore() {
+		const db = await getDb();
+		const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
+		if (!syncConfig)
+			return { skipped: true };
+
+		const pullConfig = resolvePullConfig(syncConfig);
 		const configuredTables = resolveSyncTables(db, pullConfig.tables, client);
 		if (!Array.isArray(configuredTables) || configuredTables.length === 0)
 			throw new Error('Sync pull requires mapped tables or configured tables. Set sync.tables when the client has no table map.');
@@ -178,7 +234,6 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 			skipped: false,
 			db,
 			syncConfig,
-			pullConfig,
 			configuredTables,
 			schemaResult
 		};
@@ -217,6 +272,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 	}
 
 	async function resetLocal(options = {}) {
+		clearLocalSchemaReady();
 		const db = await getDb();
 		const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
 		if (!syncConfig)
@@ -3037,3 +3093,4 @@ function sqlNullableNumberLiteral(value) {
 }
 
 module.exports = newSyncClient;
+module.exports.ensureLocalSchemaReadySymbol = ensureLocalSchemaReadySymbol;

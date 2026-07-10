@@ -139,6 +139,107 @@ describe('sqlite staged pull sync', () => {
 		}
 	});
 
+	test('first table read auto-creates local sync schema without remote request', async () => {
+		const readLocalName = `demo.${fileNameWithoutExtension}.auto-schema-read.db`;
+		fs.rmSync(readLocalName, { force: true });
+		const readLocalDb = map({
+			db: (con) => con.sqlite(readLocalName, {
+				size: 1,
+				sync: {
+					url: 'http://127.0.0.1:1/rdb',
+					auto: false,
+					tables: ['customer']
+				}
+			})
+		});
+
+		try {
+			const rows = await readLocalDb.customer.getMany();
+			const countRows = await readLocalDb.query('SELECT COUNT(*) AS count FROM "customer"');
+			const countRow = Array.isArray(countRows) ? countRows[0] : countRows?.rows?.[0];
+
+			expect(rows).toHaveLength(0);
+			expect(Number(countRow?.count ?? countRow?.COUNT ?? 0)).toBe(0);
+		}
+		finally {
+			await readLocalDb.close();
+			fs.rmSync(readLocalName, { force: true });
+		}
+	});
+
+	test('first local write and transaction auto-create local sync schema', async () => {
+		const writeLocalName = `demo.${fileNameWithoutExtension}.auto-schema-write.db`;
+		const txLocalName = `demo.${fileNameWithoutExtension}.auto-schema-tx.db`;
+		fs.rmSync(writeLocalName, { force: true });
+		fs.rmSync(txLocalName, { force: true });
+		const writeLocalDb = map({
+			db: (con) => con.sqlite(writeLocalName, {
+				size: 1,
+				sync: {
+					url: 'http://127.0.0.1:1/rdb',
+					auto: false,
+					tables: ['customer']
+				}
+			})
+		});
+		const txLocalDb = map({
+			db: (con) => con.sqlite(txLocalName, {
+				size: 1,
+				sync: {
+					url: 'http://127.0.0.1:1/rdb',
+					auto: false,
+					tables: ['customer']
+				}
+			})
+		});
+
+		try {
+			await writeLocalDb.customer.insert({ id: 9904, name: 'AutoWrite', balance: 4, isActive: true });
+			const written = await writeLocalDb.customer.getById(9904);
+
+			await txLocalDb.transaction(async (tx) => {
+				await tx.customer.insert({ id: 9905, name: 'AutoTx', balance: 5, isActive: true });
+			});
+			const txWritten = await txLocalDb.customer.getById(9905);
+
+			expect(written.name).toBe('AutoWrite');
+			expect(txWritten.name).toBe('AutoTx');
+		}
+		finally {
+			await writeLocalDb.close();
+			await txLocalDb.close();
+			fs.rmSync(writeLocalName, { force: true });
+			fs.rmSync(txLocalName, { force: true });
+		}
+	});
+
+	test('explicit sync start creates local schema before remote failure', async () => {
+		const startLocalName = `demo.${fileNameWithoutExtension}.auto-schema-start.db`;
+		fs.rmSync(startLocalName, { force: true });
+		const startLocalDb = map({
+			db: (con) => con.sqlite(startLocalName, {
+				size: 1,
+				sync: {
+					url: 'http://127.0.0.1:1/rdb',
+					auto: false,
+					tables: ['customer']
+				}
+			})
+		});
+
+		try {
+			await expect(startLocalDb.syncClient.start()).rejects.toThrow();
+			const countRows = await startLocalDb.query('SELECT COUNT(*) AS count FROM "customer"');
+			const countRow = Array.isArray(countRows) ? countRows[0] : countRows?.rows?.[0];
+			expect(Number(countRow?.count ?? countRow?.COUNT ?? 0)).toBe(0);
+		}
+		finally {
+			await startLocalDb.syncClient.stop();
+			await startLocalDb.close();
+			fs.rmSync(startLocalName, { force: true });
+		}
+	});
+
 	test('resetLocal recreates local schema before returning', async () => {
 		const resetLocalName = `demo.${fileNameWithoutExtension}.reset-local-schema.db`;
 		fs.rmSync(resetLocalName, { force: true });

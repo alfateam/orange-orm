@@ -11,6 +11,7 @@ const clone = require('rfdc/default');
 const createHttpInterceptor = require('./httpInterceptor');
 const flags = require('../flags');
 const newSyncClient = require('./syncClient');
+const { ensureLocalSchemaReadySymbol } = newSyncClient;
 const { runSyncWrite } = require('../sync/writeGate');
 const {
 	createSyncTransactionContext,
@@ -110,6 +111,7 @@ function rdbClient(options = {}) {
 	client.syncClient = baseUrl && typeof baseUrl.__createSyncClient === 'function'
 		? baseUrl.__createSyncClient(client, getDb, httpInterceptor)
 		: newSyncClient(client, getDb, httpInterceptor);
+	let localSchemaReadySkipped = false;
 	// else {
 	let handler = {
 		get(_target, property,) {
@@ -272,7 +274,24 @@ function rdbClient(options = {}) {
 		return db;
 	}
 
+	async function ensureLocalSchemaReady() {
+		if (transaction)
+			return;
+		if (localSchemaReadySkipped)
+			return;
+		const syncClient = client.syncClient;
+		const ensureReady = syncClient && syncClient[ensureLocalSchemaReadySymbol];
+		if (typeof ensureReady !== 'function') {
+			localSchemaReadySkipped = true;
+			return;
+		}
+		const result = await ensureReady.call(syncClient);
+		if (result && result.skipped)
+			localSchemaReadySkipped = true;
+	}
+
 	async function runInTransaction(fn, _options) {
+		await ensureLocalSchemaReady();
 		let db = await getDb();
 		if (!db.createTransaction)
 			throw new Error('Transaction not supported through http');
@@ -402,6 +421,7 @@ function rdbClient(options = {}) {
 		}
 
 		async function executeGroupBy(path, strategy) {
+			await ensureLocalSchemaReady();
 			let args = negotiateGroupBy(null, strategy);
 			let body = stringify({
 				path,
@@ -412,6 +432,7 @@ function rdbClient(options = {}) {
 		}
 
 		async function count(_) {
+			await ensureLocalSchemaReady();
 			let args = [_].concat(Array.prototype.slice.call(arguments).slice(1));
 			let body = stringify({
 				path: 'count',
@@ -504,6 +525,7 @@ function rdbClient(options = {}) {
 		}
 
 		async function getManyCore() {
+			await ensureLocalSchemaReady();
 			let args = negotiateWhere.apply(null, arguments);
 			let body = stringify({
 				path: 'getManyDto',
@@ -581,6 +603,7 @@ function rdbClient(options = {}) {
 
 
 		async function _delete() {
+			await ensureLocalSchemaReady();
 			let args = Array.prototype.slice.call(arguments);
 			let body = stringify({
 				path: 'delete',
@@ -591,6 +614,7 @@ function rdbClient(options = {}) {
 		}
 
 		async function deleteCascade() {
+			await ensureLocalSchemaReady();
 			let args = Array.prototype.slice.call(arguments);
 			let body = stringify({
 				path: 'deleteCascade',
@@ -601,6 +625,7 @@ function rdbClient(options = {}) {
 		}
 
 		async function update(_row, _where, strategy) {
+			await ensureLocalSchemaReady();
 			let args = [_row, negotiateWhereSingle(_where), negotiateWhereSingle(strategy)];
 			let body = stringify({
 				path: 'update',
@@ -613,6 +638,7 @@ function rdbClient(options = {}) {
 		}
 
 		async function replace(_row, strategy) {
+			await ensureLocalSchemaReady();
 			let args = [_row, negotiateWhereSingle(strategy)];
 			let body = stringify({
 				path: 'replace',
@@ -830,6 +856,7 @@ function rdbClient(options = {}) {
 			const patch = createPatch(json, array, meta);
 			if (patch.length === 0)
 				return;
+			await ensureLocalSchemaReady();
 			let body = stringify({ patch, options: { strategy, ...tableOptions, ...concurrencyOptions, deduceStrategy } });
 			let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 			let p = adapter.patch(body);
@@ -849,6 +876,7 @@ function rdbClient(options = {}) {
 			let deduceStrategy = false;
 			if (patch.length === 0)
 				return;
+			await ensureLocalSchemaReady();
 			let body = stringify({ patch, options: { strategy, ...tableOptions, ...concurrencyOptions, deduceStrategy } });
 			let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 			await adapter.patch(body);
@@ -974,6 +1002,7 @@ function rdbClient(options = {}) {
 				return;
 			let meta = await getMeta();
 			let patch = createPatch(array, [], meta);
+			await ensureLocalSchemaReady();
 			let body = stringify({ patch, options });
 			let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 			let { strategy } = await adapter.patch(body);
@@ -1049,6 +1078,7 @@ function rdbClient(options = {}) {
 			let strategy = extractStrategy(options, row);
 			let meta = await getMeta();
 			let patch = createPatch([row], [], meta);
+			await ensureLocalSchemaReady();
 			let body = stringify({ patch, options });
 			let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 			await adapter.patch(body);
@@ -1071,6 +1101,7 @@ function rdbClient(options = {}) {
 			if (patch.length === 0)
 				return;
 
+			await ensureLocalSchemaReady();
 			let body = stringify({ patch, options: { ...tableOptions, ...concurrencyOptions, strategy, deduceStrategy } });
 
 			let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });

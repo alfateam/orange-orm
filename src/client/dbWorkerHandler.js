@@ -1,5 +1,6 @@
 const { acquireSyncWrite } = require('../sync/writeGate');
 const { syncAutoStartSymbol } = require('./syncAuto');
+const { ensureLocalSchemaReadySymbol } = require('./syncClient');
 const {
 	createSyncTransactionContext,
 	flushSyncTransactionContext,
@@ -68,6 +69,7 @@ function createDbWorkerHandler(client, options = {}) {
 	}
 
 	async function beginTransaction(transactionId, txOptions) {
+		await ensureLocalSchemaReady();
 		const pool = await getPool();
 		if (!pool.createTransaction)
 			throw new Error('Transaction not supported by DB worker client.');
@@ -131,16 +133,31 @@ function createDbWorkerHandler(client, options = {}) {
 
 	function dispatchSync(method, args = []) {
 		const syncClient = client.syncClient;
+		if (!syncClient && method === 'ensureLocalSchemaReady')
+			return { skipped: true };
 		if (!syncClient)
 			throw new Error('Sync client is not configured in DB worker.');
 		if (method === 'on')
 			return subscribeSyncEvent(args[0]);
 		if (method === 'off')
 			return unsubscribeSyncEvent(args[0]);
+		if (method === 'ensureLocalSchemaReady') {
+			const ensureReady = syncClient[ensureLocalSchemaReadySymbol];
+			if (typeof ensureReady !== 'function')
+				return { skipped: true };
+			return ensureReady.apply(syncClient, args);
+		}
 		const fn = syncClient[method];
 		if (typeof fn !== 'function')
 			throw new Error(`Sync method "${method}" is not implemented.`);
 		return fn.apply(syncClient, args);
+	}
+
+	async function ensureLocalSchemaReady() {
+		const syncClient = client.syncClient;
+		const ensureReady = syncClient && syncClient[ensureLocalSchemaReadySymbol];
+		if (typeof ensureReady === 'function')
+			await ensureReady.call(syncClient);
 	}
 
 	function subscribeSyncEvent(event) {
@@ -191,6 +208,8 @@ function createDbWorkerHandler(client, options = {}) {
 		const table = client.tables && client.tables[tableName];
 		if (!table)
 			throw new Error(`Table "${tableName}" is not configured in DB worker.`);
+		if (!transactions.has(transactionId))
+			await ensureLocalSchemaReady();
 		const localHost = await host(table, transactions.get(transactionId));
 		const fn = localHost[method];
 		if (typeof fn !== 'function')
