@@ -13,12 +13,19 @@ services:
     # environment:
       # - ACCEPT_EULA=Y
       # - SA_PASSWORD=P@assword123
-    depends_on: 
-      - postgres
-      - mssql
-      - mysql
-      - mariadb
-      - sapase
+    depends_on:
+      postgres:
+        condition: service_started
+      mssql:
+        condition: service_healthy
+      mysql:
+        condition: service_started
+      mariadb:
+        condition: service_started
+      sapase:
+        condition: service_started
+      oracle:
+        condition: service_healthy
   postgres:
     image: postgres
     environment:
@@ -32,8 +39,15 @@ services:
     environment:
       - ACCEPT_EULA=Y
       - SA_PASSWORD=P@assword123
+      - MSSQL_SA_PASSWORD=P@assword123
     ports:
       - 14330:1433
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/1433'"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+      start_period: 20s
     #restart: always
   mysql:
     image: mysql:8.0.31
@@ -68,5 +82,11 @@ services:
     hostname: oracle
     ports:
       - 1521:1521
+    healthcheck:
+      test: ["CMD-SHELL", "echo 'SELECT 1 FROM DUAL;' | sqlplus -s system/P@assword123@localhost:1521/XE"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
 volumes:
   try-node-node_modules:

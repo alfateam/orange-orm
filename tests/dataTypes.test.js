@@ -230,6 +230,17 @@ describe('insert-update-with-null', () => {
 	}
 });
 
+describe('dateWithTimeZone', () => {
+	test('pg returns a Date-parseable timestamp with time zone', async () => {
+		const { db } = getDb('pg');
+		const row = await db.datetestWithTz.getOne();
+		const date = new Date(row.datetime_tz);
+
+		expect(Number.isNaN(date.getTime())).toBe(false);
+		expect(date.toISOString()).toBe('2023-07-14T20:00:00.000Z');
+	});
+});
+
 
 const pathSegments = __filename.split('/');
 const lastSegment = pathSegments[pathSegments.length - 1];
