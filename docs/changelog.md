@@ -1,4 +1,6 @@
 ## Changelog
+__5.4.1__  
+Fix dateWithTimeZone() column (PostgreSQL timestamptz) decodes to a non-standard string. [#195](https://github.com/alfateam/orange-orm/issues/195)  
 __5.4.0__  
 Support for `Select for update` and `skip locked`. [#193](https://github.com/alfateam/orange-orm/issues/193)  
 __5.3.6__  
