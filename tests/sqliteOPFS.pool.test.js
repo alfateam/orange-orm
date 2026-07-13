@@ -115,6 +115,52 @@ describe('sqliteOPFS pool', () => {
 		pool.end();
 	});
 
+	test('prioritizes normal writer checkouts over low-priority queued checkouts', async () => {
+		const events = [];
+		let releaseFirst;
+		let releaseNormal;
+		let releaseSync;
+		const pool = newPool('test.sqlite3', {
+			createWorker() {
+				return newFakeWorker();
+			}
+		});
+
+		pool.connect((err, _client, done) => {
+			if (err)
+				throw err;
+			events.push('first');
+			releaseFirst = done;
+		});
+		await wait(10);
+
+		pool.connect((err, _client, done) => {
+			if (err)
+				throw err;
+			events.push('sync');
+			releaseSync = done;
+		}, 1);
+		pool.connect((err, _client, done) => {
+			if (err)
+				throw err;
+			events.push('normal');
+			releaseNormal = done;
+		});
+		await wait(10);
+
+		expect(events).toEqual(['first']);
+		releaseFirst();
+		await wait(10);
+
+		expect(events).toEqual(['first', 'normal']);
+		releaseNormal();
+		await wait(10);
+
+		expect(events).toEqual(['first', 'normal', 'sync']);
+		releaseSync();
+		pool.end();
+	});
+
 	test('emits query completion elapsed time', async () => {
 		const started = [];
 		const completed = [];

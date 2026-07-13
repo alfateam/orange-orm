@@ -118,6 +118,23 @@ describe('sync client auto start', () => {
 		]);
 	});
 
+	test('sets low priority on direct sync database queries', async () => {
+		const queryOptions = [];
+		const db = {
+			__sqliteSync: { url: '/rdb', auto: false, tables: ['customer'] },
+			query: async (_query, options) => {
+				queryOptions.push(options);
+				return [];
+			}
+		};
+		const client = newBasicSyncClient(db);
+
+		await client.sync();
+
+		expect(queryOptions.length).toBeGreaterThan(0);
+		expect(queryOptions.every((options) => options && options.priority === 1)).toBe(true);
+	});
+
 	test('uses 1000 as default pull key batch size', async () => {
 		const requests = [];
 		const db = {

@@ -5926,6 +5926,7 @@ function requireSyncClient () {
 
 	const maxPushBatchesPerSync = 1000;
 	const maxStableBaseKeysPerStatement = 200;
+	const syncDbPriority = 1;
 	const ensureLocalSchemaReadySymbol = typeof Symbol === 'function'
 		? Symbol.for('orange-orm.syncClient.ensureLocalSchemaReady')
 		: '__orangeOrmSyncClientEnsureLocalSchemaReady';
@@ -5944,6 +5945,7 @@ function requireSyncClient () {
 		const legacyStableBaseSnapshotPendingScope = '__orange_sync_stable_base_snapshot_pending__';
 		const initialReadyListeners = new Set();
 		const eventListeners = new Map();
+		const syncDbByDb = new WeakMap();
 		let initialReadyEmitted = false;
 		let localSchemaReadyPromise = null;
 		let localSchemaReadyResult = null;
@@ -6038,6 +6040,28 @@ function requireSyncClient () {
 			return normalizeSyncConfig(db && db.__sqliteSync);
 		}
 
+		function toSyncDb(db) {
+			if (!db || (typeof db !== 'object' && typeof db !== 'function') || typeof db.query !== 'function')
+				return db;
+			let syncDb = syncDbByDb.get(db);
+			if (syncDb)
+				return syncDb;
+			syncDb = Object.create(db);
+			syncDb.query = function(query, options) {
+				return db.query.call(db, query, withSyncQueryPriority(options));
+			};
+			syncDbByDb.set(db, syncDb);
+			return syncDb;
+		}
+
+		function withSyncQueryPriority(options) {
+			if (!options || options !== Object(options))
+				return { priority: syncDbPriority };
+			if (options.priority !== undefined)
+				return options;
+			return { ...options, priority: syncDbPriority };
+		}
+
 		function observeSyncMethod(method, fn) {
 			return async function observedSyncMethod(options) {
 				try {
@@ -6122,7 +6146,7 @@ function requireSyncClient () {
 		}
 
 		async function prepareLocalSyncSchemaCore() {
-			const db = await getDb();
+			const db = toSyncDb(await getDb());
 			const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
 			if (!syncConfig)
 				return { skipped: true };
@@ -6179,7 +6203,7 @@ function requireSyncClient () {
 
 		async function resetLocal(options = {}) {
 			clearLocalSchemaReady();
-			const db = await getDb();
+			const db = toSyncDb(await getDb());
 			const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
 			if (!syncConfig)
 				throw new Error('Sync is not configured. Add sync in sqlite options: sqlite(connectionString, { sync: ... })');
@@ -6210,7 +6234,7 @@ function requireSyncClient () {
 		}
 
 		async function discardLocalChanges() {
-			const db = await getDb();
+			const db = toSyncDb(await getDb());
 			const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
 			if (!syncConfig)
 				throw new Error('Sync is not configured. Add sync in sqlite options: sqlite(connectionString, { sync: ... })');
@@ -6230,7 +6254,7 @@ function requireSyncClient () {
 		}
 
 		async function pushPending(options = {}) {
-			const db = await getDb();
+			const db = toSyncDb(await getDb());
 			const syncConfig = options._syncConfig || normalizeSyncConfig(db && db.__sqliteSync);
 			if (!syncConfig)
 				throw new Error('Sync is not configured. Add sync in sqlite options: sqlite(connectionString, { sync: ... })');
@@ -8175,7 +8199,7 @@ function requireSyncClient () {
 		}
 
 		async function maybeEmitInitialReadyFromDb(source) {
-			const db = await getDb();
+			const db = toSyncDb(await getDb());
 			const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
 			if (!syncConfig)
 				return null;
@@ -9427,6 +9451,7 @@ function requireClient () {
 
 		async function runInTransaction(fn, _options) {
 			await ensureLocalSchemaReady();
+			_options = normalizeTransactionOptions(_options);
 			let db = await getDb();
 			if (!db.createTransaction)
 				throw new Error('Transaction not supported through http');
@@ -9451,6 +9476,14 @@ function requireClient () {
 					throw e;
 				}
 			});
+		}
+
+		function normalizeTransactionOptions(options) {
+			if (!options || options !== Object(options))
+				return options;
+			if (options.suppressSyncOutbox && options.priority === undefined)
+				return { ...options, priority: 1 };
+			return options;
 		}
 
 		async function attachSyncContextToTransaction(transaction, syncContext) {
@@ -23791,7 +23824,7 @@ function requireNewTransaction$1 () {
 	const batchInsert = requireBatchInsert();
 	const quote = requireQuote$1();
 
-	function newResolveTransaction(domain, pool, { readonly = false } = {})  {
+	function newResolveTransaction(domain, pool, { readonly = false, priority } = {})  {
 		var rdb = { poolFactory: pool };
 		rdb.engine = 'sqlite';
 		rdb.encodeBoolean = encodeBoolean;
@@ -23833,7 +23866,7 @@ function requireNewTransaction$1 () {
 							done(e);
 							callback(e);
 						}
-					});
+					}, priority);
 				},
 				executeCommand: function(query, callback) {
 					pool.connect((err, client, done) => {
@@ -23849,7 +23882,7 @@ function requireNewTransaction$1 () {
 							done(e);
 							callback(e);
 						}
-					});
+					}, priority);
 				}
 			};
 			domain.rdb = rdb;
@@ -23857,7 +23890,7 @@ function requireNewTransaction$1 () {
 		}
 
 		return function(onSuccess, onError) {
-			pool.connect(onConnected);
+			pool.connect(onConnected, priority);
 
 			function onConnected(err, client, done) {
 				try {
@@ -24653,6 +24686,7 @@ function requireNewPool$1 () {
 		let ended = false;
 		let writerBusy = false;
 		const writerQueue = [];
+		let nextWriterQueueSeq = 1;
 		const singleWorker = shouldUseSingleWorker(poolOptions);
 		c.__orangeSqliteOPFSConnectionString = connectionString;
 		c.__orangeSqliteOPFSRequestedVfs = poolOptions.vfs || 'opfs';
@@ -24669,16 +24703,20 @@ function requireNewPool$1 () {
 
 		prewarmReadClient();
 
-		c.connect = function(cb) {
+		c.connect = function(cb, priority) {
 			if (ended)
 				return cb(new Error('sqliteOPFS pool is closed.'), null, noop);
-			writerQueue.push(cb);
+			writerQueue.push({
+				cb,
+				priority: normalizePriority(priority),
+				seq: nextWriterQueueSeq++
+			});
 			drainWriterQueue();
 		};
 
-		c.connectRead = function(cb) {
+		c.connectRead = function(cb, priority) {
 			if (singleWorker)
-				return c.connect(cb);
+				return c.connect(cb, priority);
 			ensureReadClient();
 			cb(null, readClient, function(err) {
 				if (err && readClient.reset)
@@ -24727,9 +24765,10 @@ function requireNewPool$1 () {
 		function drainWriterQueue() {
 			if (writerBusy || ended)
 				return;
-			const cb = writerQueue.shift();
-			if (!cb)
+			const entry = shiftNextWriter();
+			if (!entry)
 				return;
+			const cb = entry.cb;
 			writerBusy = true;
 			let released = false;
 			let releaseAccessLock = noop;
@@ -24775,13 +24814,33 @@ function requireNewPool$1 () {
 		function rejectQueuedWriters() {
 			const error = new Error('sqliteOPFS pool is closed.');
 			while (writerQueue.length > 0) {
-				const cb = writerQueue.shift();
-				cb(error, null, noop);
+				const entry = writerQueue.shift();
+				entry.cb(error, null, noop);
 			}
+		}
+
+		function shiftNextWriter() {
+			if (writerQueue.length <= 1)
+				return writerQueue.shift();
+			let bestIndex = 0;
+			for (let i = 1; i < writerQueue.length; i++) {
+				const current = writerQueue[i];
+				const best = writerQueue[bestIndex];
+				if (current.priority < best.priority || current.priority === best.priority && current.seq < best.seq)
+					bestIndex = i;
+			}
+			return writerQueue.splice(bestIndex, 1)[0];
 		}
 	}
 
 	function noop() {}
+
+	function normalizePriority(priority) {
+		if (priority === undefined || priority === null)
+			return 0;
+		const parsed = Number.parseInt(priority, 10);
+		return Number.isFinite(parsed) ? parsed : 0;
+	}
 
 	function withOpenOptions(poolOptions) {
 		return shouldUseOPFSAccessLock(poolOptions)
@@ -24920,7 +24979,7 @@ function requireNewDatabase$1 () {
 
 		c.createTransaction = function(options) {
 			let domain = createDomain();
-			let transaction = newTransaction(domain, pool);
+			let transaction = newTransaction(domain, pool, options);
 			let p = domain.run(() => new Promise(transaction).then(begin));
 
 			function run(fn) {
@@ -24935,9 +24994,9 @@ function requireNewDatabase$1 () {
 			}
 		};
 
-		c.query = function(query) {
+		c.query = function(query, options) {
 			let domain = createDomain();
-			let transaction = newTransaction(domain, pool);
+			let transaction = newTransaction(domain, pool, options);
 			let p = domain.run(() => new Promise(transaction)
 				.then(() => doQuery(domain, query).then(onResult, onError)));
 			return p;

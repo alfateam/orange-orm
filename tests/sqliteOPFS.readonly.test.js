@@ -29,6 +29,22 @@ describe('sqliteOPFS readonly lane', () => {
 		expect(result).toEqual({ rowsAffected: 1 });
 		expect(calls).toEqual(['write:command']);
 	});
+
+	test('passes priority to readonly and writer checkouts', async () => {
+		const calls = [];
+		const pool = newPriorityPool(calls);
+		const readDomain = createDomain();
+		const writeDomain = createDomain();
+
+		await readDomain.run(() => new Promise(newTransaction(readDomain, pool, { readonly: true, priority: 1 })));
+		await executeQuery(readDomain, newSql('SELECT 1'));
+		await writeDomain.run(() => new Promise(newTransaction(writeDomain, pool, { priority: 2 })));
+
+		expect(calls).toEqual([
+			['read', 1],
+			['write', 2]
+		]);
+	});
 });
 
 function newPool(calls) {
@@ -45,6 +61,27 @@ function newPool(calls) {
 			cb(null, {
 				executeQuery(_query, callback) {
 					calls.push('read:query');
+					callback(null, [{ ok: true }]);
+				}
+			}, () => {});
+		}
+	};
+}
+
+function newPriorityPool(calls) {
+	return {
+		connect(cb, priority) {
+			calls.push(['write', priority]);
+			cb(null, {
+				executeCommand(_query, callback) {
+					callback(null, { rowsAffected: 1 });
+				}
+			}, () => {});
+		},
+		connectRead(cb, priority) {
+			calls.push(['read', priority]);
+			cb(null, {
+				executeQuery(_query, callback) {
 					callback(null, [{ ok: true }]);
 				}
 			}, () => {});

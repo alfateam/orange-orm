@@ -15,6 +15,7 @@ function newPool(connectionString, poolOptions) {
 	let ended = false;
 	let writerBusy = false;
 	const writerQueue = [];
+	let nextWriterQueueSeq = 1;
 	const singleWorker = shouldUseSingleWorker(poolOptions);
 	c.__orangeSqliteOPFSConnectionString = connectionString;
 	c.__orangeSqliteOPFSRequestedVfs = poolOptions.vfs || 'opfs';
@@ -31,16 +32,20 @@ function newPool(connectionString, poolOptions) {
 
 	prewarmReadClient();
 
-	c.connect = function(cb) {
+	c.connect = function(cb, priority) {
 		if (ended)
 			return cb(new Error('sqliteOPFS pool is closed.'), null, noop);
-		writerQueue.push(cb);
+		writerQueue.push({
+			cb,
+			priority: normalizePriority(priority),
+			seq: nextWriterQueueSeq++
+		});
 		drainWriterQueue();
 	};
 
-	c.connectRead = function(cb) {
+	c.connectRead = function(cb, priority) {
 		if (singleWorker)
-			return c.connect(cb);
+			return c.connect(cb, priority);
 		ensureReadClient();
 		cb(null, readClient, function(err) {
 			if (err && readClient.reset)
@@ -89,9 +94,10 @@ function newPool(connectionString, poolOptions) {
 	function drainWriterQueue() {
 		if (writerBusy || ended)
 			return;
-		const cb = writerQueue.shift();
-		if (!cb)
+		const entry = shiftNextWriter();
+		if (!entry)
 			return;
+		const cb = entry.cb;
 		writerBusy = true;
 		let released = false;
 		let releaseAccessLock = noop;
@@ -137,13 +143,33 @@ function newPool(connectionString, poolOptions) {
 	function rejectQueuedWriters() {
 		const error = new Error('sqliteOPFS pool is closed.');
 		while (writerQueue.length > 0) {
-			const cb = writerQueue.shift();
-			cb(error, null, noop);
+			const entry = writerQueue.shift();
+			entry.cb(error, null, noop);
 		}
+	}
+
+	function shiftNextWriter() {
+		if (writerQueue.length <= 1)
+			return writerQueue.shift();
+		let bestIndex = 0;
+		for (let i = 1; i < writerQueue.length; i++) {
+			const current = writerQueue[i];
+			const best = writerQueue[bestIndex];
+			if (current.priority < best.priority || current.priority === best.priority && current.seq < best.seq)
+				bestIndex = i;
+		}
+		return writerQueue.splice(bestIndex, 1)[0];
 	}
 }
 
 function noop() {}
+
+function normalizePriority(priority) {
+	if (priority === undefined || priority === null)
+		return 0;
+	const parsed = Number.parseInt(priority, 10);
+	return Number.isFinite(parsed) ? parsed : 0;
+}
 
 function withOpenOptions(poolOptions) {
 	return shouldUseOPFSAccessLock(poolOptions)

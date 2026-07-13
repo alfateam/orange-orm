@@ -54,7 +54,7 @@ function newDatabase(connectionString, poolOptions) {
 
 	c.createTransaction = function(options) {
 		let domain = createDomain();
-		let transaction = newTransaction(domain, pool);
+		let transaction = newTransaction(domain, pool, options);
 		let p = domain.run(() => new Promise(transaction).then(begin));
 
 		function run(fn) {
@@ -69,9 +69,9 @@ function newDatabase(connectionString, poolOptions) {
 		}
 	};
 
-	c.query = function(query) {
+	c.query = function(query, options) {
 		let domain = createDomain();
-		let transaction = newTransaction(domain, pool);
+		let transaction = newTransaction(domain, pool, options);
 		let p = domain.run(() => new Promise(transaction)
 			.then(() => doQuery(domain, query).then(onResult, onError)));
 		return p;

@@ -20,6 +20,7 @@ const {
 
 const maxPushBatchesPerSync = 1000;
 const maxStableBaseKeysPerStatement = 200;
+const syncDbPriority = 1;
 const ensureLocalSchemaReadySymbol = typeof Symbol === 'function'
 	? Symbol.for('orange-orm.syncClient.ensureLocalSchemaReady')
 	: '__orangeOrmSyncClientEnsureLocalSchemaReady';
@@ -38,6 +39,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 	const legacyStableBaseSnapshotPendingScope = '__orange_sync_stable_base_snapshot_pending__';
 	const initialReadyListeners = new Set();
 	const eventListeners = new Map();
+	const syncDbByDb = new WeakMap();
 	let initialReadyEmitted = false;
 	let localSchemaReadyPromise = null;
 	let localSchemaReadyResult = null;
@@ -132,6 +134,28 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		return normalizeSyncConfig(db && db.__sqliteSync);
 	}
 
+	function toSyncDb(db) {
+		if (!db || (typeof db !== 'object' && typeof db !== 'function') || typeof db.query !== 'function')
+			return db;
+		let syncDb = syncDbByDb.get(db);
+		if (syncDb)
+			return syncDb;
+		syncDb = Object.create(db);
+		syncDb.query = function(query, options) {
+			return db.query.call(db, query, withSyncQueryPriority(options));
+		};
+		syncDbByDb.set(db, syncDb);
+		return syncDb;
+	}
+
+	function withSyncQueryPriority(options) {
+		if (!options || options !== Object(options))
+			return { priority: syncDbPriority };
+		if (options.priority !== undefined)
+			return options;
+		return { ...options, priority: syncDbPriority };
+	}
+
 	function observeSyncMethod(method, fn) {
 		return async function observedSyncMethod(options) {
 			try {
@@ -216,7 +240,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 	}
 
 	async function prepareLocalSyncSchemaCore() {
-		const db = await getDb();
+		const db = toSyncDb(await getDb());
 		const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
 		if (!syncConfig)
 			return { skipped: true };
@@ -273,7 +297,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 
 	async function resetLocal(options = {}) {
 		clearLocalSchemaReady();
-		const db = await getDb();
+		const db = toSyncDb(await getDb());
 		const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
 		if (!syncConfig)
 			throw new Error('Sync is not configured. Add sync in sqlite options: sqlite(connectionString, { sync: ... })');
@@ -304,7 +328,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 	}
 
 	async function discardLocalChanges() {
-		const db = await getDb();
+		const db = toSyncDb(await getDb());
 		const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
 		if (!syncConfig)
 			throw new Error('Sync is not configured. Add sync in sqlite options: sqlite(connectionString, { sync: ... })');
@@ -324,7 +348,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 	}
 
 	async function pushPending(options = {}) {
-		const db = await getDb();
+		const db = toSyncDb(await getDb());
 		const syncConfig = options._syncConfig || normalizeSyncConfig(db && db.__sqliteSync);
 		if (!syncConfig)
 			throw new Error('Sync is not configured. Add sync in sqlite options: sqlite(connectionString, { sync: ... })');
@@ -2269,7 +2293,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 	}
 
 	async function maybeEmitInitialReadyFromDb(source) {
-		const db = await getDb();
+		const db = toSyncDb(await getDb());
 		const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
 		if (!syncConfig)
 			return null;

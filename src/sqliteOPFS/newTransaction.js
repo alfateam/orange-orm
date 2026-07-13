@@ -11,7 +11,7 @@ const insert = require('../sqlite/insert');
 const batchInsert = require('../sqlite/batchInsert');
 const quote = require('../sqlite/quote');
 
-function newResolveTransaction(domain, pool, { readonly = false } = {})  {
+function newResolveTransaction(domain, pool, { readonly = false, priority } = {})  {
 	var rdb = { poolFactory: pool };
 	rdb.engine = 'sqlite';
 	rdb.encodeBoolean = encodeBoolean;
@@ -53,7 +53,7 @@ function newResolveTransaction(domain, pool, { readonly = false } = {})  {
 						done(e);
 						callback(e);
 					}
-				});
+				}, priority);
 			},
 			executeCommand: function(query, callback) {
 				pool.connect((err, client, done) => {
@@ -69,7 +69,7 @@ function newResolveTransaction(domain, pool, { readonly = false } = {})  {
 						done(e);
 						callback(e);
 					}
-				});
+				}, priority);
 			}
 		};
 		domain.rdb = rdb;
@@ -77,7 +77,7 @@ function newResolveTransaction(domain, pool, { readonly = false } = {})  {
 	}
 
 	return function(onSuccess, onError) {
-		pool.connect(onConnected);
+		pool.connect(onConnected, priority);
 
 		function onConnected(err, client, done) {
 			try {

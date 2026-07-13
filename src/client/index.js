@@ -292,6 +292,7 @@ function rdbClient(options = {}) {
 
 	async function runInTransaction(fn, _options) {
 		await ensureLocalSchemaReady();
+		_options = normalizeTransactionOptions(_options);
 		let db = await getDb();
 		if (!db.createTransaction)
 			throw new Error('Transaction not supported through http');
@@ -316,6 +317,14 @@ function rdbClient(options = {}) {
 				throw e;
 			}
 		});
+	}
+
+	function normalizeTransactionOptions(options) {
+		if (!options || options !== Object(options))
+			return options;
+		if (options.suppressSyncOutbox && options.priority === undefined)
+			return { ...options, priority: 1 };
+		return options;
 	}
 
 	async function attachSyncContextToTransaction(transaction, syncContext) {
