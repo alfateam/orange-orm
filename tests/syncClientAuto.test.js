@@ -1044,6 +1044,91 @@ describe('sync client auto start', () => {
 		]);
 	});
 
+	test('applies staged pull chunks in server order when configured', async () => {
+		const patches = [];
+		let transactionId = 0;
+		const db = newJournalDb({
+			__sqliteSync: {
+				url: '/rdb',
+				auto: false,
+				schema: false,
+				pull: {
+					maxKeysPerBatch: 3,
+					maxRowsPerBatch: 3,
+					apply: {
+						maxRowsPerTransaction: 1
+					}
+				}
+			}
+		});
+		const client = newSyncClient({
+			tables: {
+				customer: newTable('customer'),
+				invoice: newTable('invoice')
+			},
+			transaction: async (fn) => {
+				const txId = ++transactionId;
+				return fn({
+					customer: {
+						patch: async (patch) => {
+							patches.push({ txId, table: 'customer', patch });
+							return { changed: [] };
+						}
+					},
+					invoice: {
+						patch: async (patch) => {
+							patches.push({ txId, table: 'invoice', patch });
+							return { changed: [] };
+						}
+					},
+					query: db.query
+				});
+			}
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async (request) => {
+					if (request.data.phase === 'keys') {
+						return {
+							data: {
+								phase: 'keys',
+								items: [
+									{ table: 'customer', pk: [1], key: { id: 1 }, op: 'U' },
+									{ table: 'invoice', pk: [2], key: { id: 2 }, op: 'U' },
+									{ table: 'customer', pk: [3], key: { id: 3 }, op: 'U' }
+								],
+								done: true,
+								cursor: 'cursor-1'
+							}
+						};
+					}
+					return {
+						data: {
+							phase: 'rows',
+							items: request.data.items.map((item) => ({
+								table: item.table,
+								pk: item.pk,
+								key: item.key,
+								row: { id: item.pk[0] },
+								op: item.op
+							}))
+						}
+					};
+				};
+			}
+		});
+
+		await client.sync();
+
+		expect(patches.map(({ table, patch }) => ({ table, patch }))).toEqual([
+			{ table: 'customer', patch: [{ op: 'add', path: '/[1]', value: { id: 1 } }] },
+			{ table: 'invoice', patch: [{ op: 'add', path: '/[2]', value: { id: 2 } }] },
+			{ table: 'customer', patch: [{ op: 'add', path: '/[3]', value: { id: 3 } }] }
+		]);
+		expect(new Set(patches.map(x => x.txId)).size).toBe(3);
+		expect(db.journal.session).toBeNull();
+		expect(db.journal.items).toHaveLength(0);
+	});
+
 	test('batches pull journal item inserts', async () => {
 		const items = Array.from({ length: 600 }, (_x, index) => ({
 			table: 'customer',

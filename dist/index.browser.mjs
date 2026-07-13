@@ -6405,6 +6405,7 @@ function requireSyncClient () {
 			const maxConcurrentRowRequests = normalizeConcurrency(pullConfig.maxConcurrentRowRequests, 1);
 			const maxKeysPerBatch = normalizeLimit(pullConfig.maxKeysPerBatch, maxRowsPerBatch * maxConcurrentRowRequests);
 			const maxJournalRowsPerInsert = normalizeLimit(pullConfig.maxJournalRowsPerInsert, maxRowsPerBatch);
+			const applyConfig = normalizePullApplyConfig(pullConfig.apply);
 			const defaultPatchOptions = { ...(pullConfig.patchOptions || {}), concurrency: 'overwrite', skipSelectAfterInsert: true };
 			const db = options.db;
 			const scopeKey = options.scopeKey || getScopeKey(options.tables);
@@ -6412,35 +6413,10 @@ function requireSyncClient () {
 			const session = await stagePullJournal();
 			let applied = 0;
 			const shouldApplyCheckpoint = session.finalSince !== undefined;
-			await client.transaction(async (tx) => {
-				await tryDeferForeignKeys(tx);
-				await ensureStableBaseTables(tx, options.tables);
-				const batches = await readPullJournalBatches(tx, scopeKey);
-				const hasJournalItems = batches.length > 0;
-				const touchedTables = new Set();
-				for (let i = 0; i < batches.length; i++) {
-					const batch = batches[i];
-					for (let itemIndex = 0; itemIndex < batch.length; itemIndex++)
-						touchedTables.add(batch[itemIndex].table);
-					const deleteItems = batch.filter(x => x.op === 'D');
-					const upsertItems = batch.filter(x => x.op !== 'D' && x.row !== undefined);
-					if (deleteItems.length > 0) {
-						applied += await applyDeleteItemsOnTx(tx, deleteItems, defaultPatchOptions);
-						await applyDeleteItemsToStableBase(tx, deleteItems);
-					}
-					if (upsertItems.length > 0) {
-						applied += await applyRowsPayloadOnTx(tx, upsertItems, defaultPatchOptions);
-						await applyRowsPayloadToStableBase(tx, upsertItems);
-					}
-				}
-				if (hasJournalItems)
-					await validateForeignKeys(tx);
-				if (shouldApplyCheckpoint)
-					await writeScopeState(scopeKey, { since: session.finalSince, updatedAtMs: Date.now() }, tx);
-				if (hasJournalItems || session.persisted)
-					await clearPullJournal(tx, scopeKey);
-				session.tables = Array.from(touchedTables);
-			}, { suppressSyncOutbox: true });
+			if (applyConfig)
+				await applyPullJournalInChunks(session, applyConfig);
+			else
+				await applyPullJournalInSingleTransaction(session);
 			if (shouldApplyCheckpoint)
 				sinceByScope.set(scopeKey, session.finalSince);
 
@@ -6451,6 +6427,71 @@ function requireSyncClient () {
 				payload: session.payload,
 				checkpointApplied: true
 			};
+
+			async function applyPullJournalInSingleTransaction(session) {
+				await client.transaction(async (tx) => {
+					await tryDeferForeignKeys(tx);
+					await ensureStableBaseTables(tx, options.tables);
+					const batches = await readPullJournalBatches(tx, scopeKey);
+					const hasJournalItems = batches.length > 0;
+					const touchedTables = new Set();
+					for (let i = 0; i < batches.length; i++) {
+						const batch = batches[i];
+						for (let itemIndex = 0; itemIndex < batch.length; itemIndex++)
+							touchedTables.add(batch[itemIndex].table);
+						const deleteItems = batch.filter(x => x.op === 'D');
+						const upsertItems = batch.filter(x => x.op !== 'D' && x.row !== undefined);
+						if (deleteItems.length > 0) {
+							applied += await applyDeleteItemsOnTx(tx, deleteItems, defaultPatchOptions);
+							await applyDeleteItemsToStableBase(tx, deleteItems);
+						}
+						if (upsertItems.length > 0) {
+							applied += await applyRowsPayloadOnTx(tx, upsertItems, defaultPatchOptions);
+							await applyRowsPayloadToStableBase(tx, upsertItems);
+						}
+					}
+					if (hasJournalItems)
+						await validateForeignKeys(tx);
+					if (shouldApplyCheckpoint)
+						await writeScopeState(scopeKey, { since: session.finalSince, updatedAtMs: Date.now() }, tx);
+					if (hasJournalItems || session.persisted)
+						await clearPullJournal(tx, scopeKey);
+					session.tables = Array.from(touchedTables);
+				}, { suppressSyncOutbox: true });
+			}
+
+			async function applyPullJournalInChunks(session, applyConfig) {
+				let items = [];
+				await client.transaction(async (tx) => {
+					await ensureStableBaseTables(tx, options.tables);
+					items = flattenPullJournalBatches(await readPullJournalBatches(tx, scopeKey));
+				}, { suppressSyncOutbox: true });
+				const touchedTables = new Set();
+				for (let offset = 0; offset < items.length; offset += applyConfig.maxRowsPerTransaction) {
+					const chunk = items.slice(offset, offset + applyConfig.maxRowsPerTransaction);
+					await client.transaction(async (tx) => {
+						await tryDeferForeignKeys(tx);
+						const baseByName = await readStableBaseEntriesByName(tx);
+						for (let i = 0; i < chunk.length; i++) {
+							const item = chunk[i];
+							if (item && typeof item.table === 'string')
+								touchedTables.add(item.table);
+							applied += await applyPullJournalItemOnTx(tx, item, defaultPatchOptions);
+							await applyPullJournalItemToStableBase(tx, item, baseByName);
+						}
+						if (chunk.length > 0)
+							await validateForeignKeys(tx);
+					}, { suppressSyncOutbox: true });
+					await yieldPullApply(applyConfig);
+				}
+				await client.transaction(async (tx) => {
+					if (shouldApplyCheckpoint)
+						await writeScopeState(scopeKey, { since: session.finalSince, updatedAtMs: Date.now() }, tx);
+					if (items.length > 0 || session.persisted)
+						await clearPullJournal(tx, scopeKey);
+				}, { suppressSyncOutbox: true });
+				session.tables = Array.from(touchedTables);
+			}
 
 			async function stagePullJournal() {
 				let session = await readPullSession(db, scopeKey);
@@ -7876,6 +7917,20 @@ function requireSyncClient () {
 				await applyStableBaseUpsertGroup(db, group);
 		}
 
+		async function applyPullJournalItemToStableBase(db, item, baseByName) {
+			if (!item || typeof item.table !== 'string' || !Array.isArray(item.pk))
+				return;
+			if (item.op !== 'D' && item.row === undefined)
+				return;
+			const groups = stableBaseTargetGroupsForItems([item], baseByName);
+			for (const group of groups) {
+				if (item.op === 'D')
+					await applyStableBaseDeleteGroup(db, group);
+				else
+					await applyStableBaseUpsertGroup(db, group);
+			}
+		}
+
 		async function copyTablesToStableBase(db, tableNames) {
 			const names = normalizeConfiguredTables(tableNames) || [];
 			if (names.length === 0)
@@ -8295,10 +8350,25 @@ function requireSyncClient () {
 			...endpoint,
 			tables,
 			patchOptions: config.patchOptions,
+			apply: normalizePullApplyConfig(config.apply),
 			maxKeysPerBatch: config.maxKeysPerBatch,
 			maxRowsPerBatch: config.maxRowsPerBatch,
 			maxConcurrentRowRequests: config.maxConcurrentRowRequests,
 			maxJournalRowsPerInsert: config.maxJournalRowsPerInsert
+		};
+	}
+
+	function normalizePullApplyConfig(config) {
+		if (!config)
+			return undefined;
+		if (config !== Object(config))
+			throw new Error('Invalid sqlite sync pull apply configuration');
+		const maxRowsPerTransaction = normalizeOptionalPositiveInteger(config.maxRowsPerTransaction);
+		if (!maxRowsPerTransaction)
+			return undefined;
+		return {
+			maxRowsPerTransaction,
+			yieldMs: normalizeNonNegativeInteger(config.yieldMs, 0)
 		};
 	}
 
@@ -8708,6 +8778,28 @@ function requireSyncClient () {
 		return applied;
 	}
 
+	async function applyPullJournalItemOnTx(tx, item, patchOptions) {
+		if (!item || typeof item.table !== 'string' || !Array.isArray(item.pk))
+			return 0;
+		if (!tx[item.table] || typeof tx[item.table].patch !== 'function')
+			throw new Error(`Table "${item.table}" does not exist in this client`);
+		if (item.op === 'D') {
+			await tx[item.table].patch([{
+				op: 'remove',
+				path: `/${JSON.stringify(item.pk)}`
+			}], patchOptions);
+			return 1;
+		}
+		if (item.row === undefined)
+			return 0;
+		await tx[item.table].patch([{
+			op: 'add',
+			path: `/${JSON.stringify(item.pk)}`,
+			value: item.row
+		}], withInsertAndForgetStrategy(patchOptions));
+		return 1;
+	}
+
 	async function applyRowsPayloadOnTx(tx, items, patchOptions) {
 		const rows = Array.isArray(items) ? items : [];
 		const perTable = new Map();
@@ -8737,6 +8829,24 @@ function requireSyncClient () {
 			applied += patch.length;
 		}
 		return applied;
+	}
+
+	function flattenPullJournalBatches(batches) {
+		if (!Array.isArray(batches))
+			return [];
+		const result = [];
+		for (let i = 0; i < batches.length; i++) {
+			const batch = batches[i];
+			if (Array.isArray(batch))
+				result.push(...batch);
+		}
+		return result;
+	}
+
+	function yieldPullApply(applyConfig) {
+		return new Promise((resolve) => {
+			setTimeout(resolve, applyConfig && applyConfig.yieldMs || 0);
+		});
 	}
 
 	function withInsertAndForgetStrategy(options) {
@@ -8878,6 +8988,20 @@ function requireSyncClient () {
 	function normalizeLimit(value, fallback) {
 		const parsed = Number.parseInt(value, 10);
 		if (!Number.isFinite(parsed) || parsed <= 0)
+			return fallback;
+		return Math.min(parsed, 10000);
+	}
+
+	function normalizeOptionalPositiveInteger(value) {
+		const parsed = Number.parseInt(value, 10);
+		if (!Number.isFinite(parsed) || parsed <= 0)
+			return undefined;
+		return Math.min(parsed, 10000);
+	}
+
+	function normalizeNonNegativeInteger(value, fallback) {
+		const parsed = Number.parseInt(value, 10);
+		if (!Number.isFinite(parsed) || parsed < 0)
 			return fallback;
 		return Math.min(parsed, 10000);
 	}

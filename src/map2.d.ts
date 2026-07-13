@@ -1003,6 +1003,12 @@ export interface SyncPullConfig<M extends Record<string, any> = any> extends Syn
   patchOptions?: {
     concurrency?: ConcurrencyStrategy;
   };
+  apply?: {
+    /** Enables server-order pull apply in transactions of at most this many journal rows. */
+    maxRowsPerTransaction?: number;
+    /** Delay between apply transactions. Defaults to 0. */
+    yieldMs?: number;
+  };
   /** Max keys requested from the sync endpoint per staged key page. Defaults to maxRowsPerBatch * maxConcurrentRowRequests. */
   maxKeysPerBatch?: number;
   /** Max key items sent in each staged row request. */
