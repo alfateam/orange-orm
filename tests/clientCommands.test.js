@@ -93,4 +93,13 @@ describe('client commands', () => {
 			{ suppressSyncOutbox: true, priority: 1 }
 		]);
 	});
+
+	test('uses an injected sync client', async () => {
+		const syncClient = {
+			ensureLocalSchema: async () => ({ skipped: true })
+		};
+		const db = rdb({ db: {}, syncClient });
+
+		expect(db.syncClient).toBe(syncClient);
+	});
 });

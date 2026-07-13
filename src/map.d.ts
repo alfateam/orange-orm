@@ -80,6 +80,7 @@ type DbOptions<T, C extends AnyCommandMap = AnyCommandMap> = {
 	concurrency?: ConcurrencyValues;
 	readonly?: boolean;
 	db?: Pool | ((connectors: Connectors<SchemaFromMappedDb<T>>) => Pool | Promise<Pool>);
+	syncClient?: DBClient<SchemaFromMappedDb<T>>['syncClient'];
 	commands?: C;
 	commandHandlers?: ServerCommandHandlers<SchemaFromMappedDb<T>, C>;
 };
@@ -124,6 +125,10 @@ export interface SqliteOPFSPoolOptions<M extends Record<string, any> = any> exte
 	};
 	singleWorker?: boolean;
 	inlineWorker?: boolean;
+	worker?: Worker | MessagePort;
+	createWorker?: (connectionString: string, options: SqliteOPFSPoolOptions<M>) => Worker | MessagePort;
+	workerUrl?: string | URL;
+	closeDbOnClose?: boolean;
 	prewarmRead?: boolean;
 	busyTimeoutMs?: number;
 }

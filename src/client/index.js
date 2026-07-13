@@ -108,7 +108,9 @@ function rdbClient(options = {}) {
 		client.tables = options.tables;
 		// return client;
 	}
-	client.syncClient = baseUrl && typeof baseUrl.__createSyncClient === 'function'
+	client.syncClient = options.syncClient
+		? options.syncClient
+		: baseUrl && typeof baseUrl.__createSyncClient === 'function'
 		? baseUrl.__createSyncClient(client, getDb, httpInterceptor)
 		: newSyncClient(client, getDb, httpInterceptor);
 	let localSchemaReadySkipped = false;

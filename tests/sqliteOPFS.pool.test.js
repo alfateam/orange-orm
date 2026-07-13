@@ -390,7 +390,7 @@ describe('sqliteOPFS pool', () => {
 			});
 			await wait(10);
 
-			expect(messages.map(x => x.method)).toEqual(['open', 'query', 'close']);
+			expect(messages.map(x => x.method)).toEqual(['open', 'checkout', 'query', 'close']);
 		}
 		finally {
 			await pool.end();
@@ -444,15 +444,15 @@ describe('sqliteOPFS pool', () => {
 			});
 			await wait(10);
 
-			expect(firstMessages.map(x => x.method)).toEqual(['open', 'query']);
+			expect(firstMessages.map(x => x.method)).toEqual(['open', 'checkout', 'query']);
 			expect(secondMessages).toHaveLength(0);
 
 			releaseFirst();
 			await secondStarted.promise;
 			await wait(10);
 
-			expect(firstMessages.map(x => x.method)).toEqual(['open', 'query', 'close']);
-			expect(secondMessages.map(x => x.method)).toEqual(['open', 'query', 'close']);
+			expect(firstMessages.map(x => x.method)).toEqual(['open', 'checkout', 'query', 'close']);
+			expect(secondMessages.map(x => x.method)).toEqual(['open', 'checkout', 'query', 'close']);
 		}
 		finally {
 			restoreLocks();

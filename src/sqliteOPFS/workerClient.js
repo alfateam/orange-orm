@@ -14,6 +14,7 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 	worker.addEventListener('message', onMessage);
 	worker.addEventListener('error', onWorkerError);
 	worker.addEventListener('messageerror', onWorkerError);
+	startMessagePort(worker);
 
 	const requestedVfs = options.vfs || 'opfs';
 	const fallbackVfs = normalizeFallbackVfs(options.fallbackVfs, requestedVfs);
@@ -22,6 +23,7 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 	return {
 		executeQuery,
 		executeCommand,
+		checkout,
 		close,
 		getOpenInfo,
 		release,
@@ -30,6 +32,14 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 	};
 
 	function executeQuery(query, callback) {
+		executeQueryCore(query, callback);
+	}
+
+	function executeCommand(query, callback) {
+		executeCommandCore(query, callback);
+	}
+
+	function executeQueryCore(query, callback, leaseId) {
 		if (closed)
 			return callback(new Error('sqliteOPFS worker client closed.'));
 		const sql = query.sql();
@@ -37,7 +47,7 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 		log.emitQuery({ sql, parameters, readonly, lane });
 		const startedAt = now();
 		ensureOpen()
-			.then(() => request('query', { sql, parameters }))
+			.then(() => request('query', { sql, parameters, leaseId }))
 			.then(({ result, workerElapsedMs }) => {
 				log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, workerElapsedMs, readonly, lane });
 				callback(null, result);
@@ -48,7 +58,7 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 			});
 	}
 
-	function executeCommand(query, callback) {
+	function executeCommandCore(query, callback, leaseId) {
 		if (closed)
 			return callback(new Error('sqliteOPFS worker client closed.'));
 		const sql = query.sql();
@@ -56,7 +66,7 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 		log.emitQuery({ sql, parameters, readonly, lane });
 		const startedAt = now();
 		ensureOpen()
-			.then(() => request('command', { sql, parameters }))
+			.then(() => request('command', { sql, parameters, leaseId }))
 			.then(({ result, workerElapsedMs }) => {
 				log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, workerElapsedMs, readonly, lane });
 				callback(null, result);
@@ -65,6 +75,43 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 				log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, error, readonly, lane });
 				callback(error);
 			});
+	}
+
+	function checkout(priority) {
+		if (closed)
+			return Promise.reject(new Error('sqliteOPFS worker client closed.'));
+		return ensureOpen()
+			.then(() => request('checkout', { priority }))
+			.then(({ result }) => createLeasedClient(result && result.leaseId))
+			.catch((error) => {
+				if (isUnsupportedCheckoutError(error))
+					return createLeasedClient();
+				throw error;
+			});
+	}
+
+	function createLeasedClient(leaseId) {
+		if (leaseId === undefined || leaseId === null)
+			return {
+				executeQuery,
+				executeCommand,
+				getOpenInfo,
+				reset,
+				releaseCheckout: () => Promise.resolve()
+			};
+		return {
+			executeQuery(query, callback) {
+				executeQueryCore(query, callback, leaseId);
+			},
+			executeCommand(query, callback) {
+				executeCommandCore(query, callback, leaseId);
+			},
+			getOpenInfo,
+			reset,
+			releaseCheckout() {
+				return request('release', { leaseId }).then(() => undefined);
+			}
+		};
 	}
 
 	function request(method, payload = {}) {
@@ -163,7 +210,9 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 		if (closed)
 			return Promise.resolve();
 		closed = true;
-		const closeRequest = withTimeout(request('close'), 1000).catch(() => {});
+		const closeRequest = options.closeDbOnClose === false
+			? Promise.resolve()
+			: withTimeout(request('close'), 1000).catch(() => {});
 		return closeRequest.finally(() => {
 			worker.removeEventListener('message', onMessage);
 			worker.removeEventListener('error', onWorkerError);
@@ -171,6 +220,8 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 			rejectPending(new Error('sqliteOPFS worker client closed.'));
 			if (typeof worker.terminate === 'function')
 				worker.terminate();
+			else if (typeof worker.close === 'function')
+				worker.close();
 		});
 	}
 
@@ -221,6 +272,25 @@ function now() {
 	return Date.now();
 }
 
+function startMessagePort(port) {
+	if (port && typeof port.start === 'function') {
+		try {
+			port.start();
+		}
+		catch (_e) {
+			// MessagePort.start() is best-effort; browsers ignore repeated starts.
+		}
+	}
+}
+
+function isUnsupportedCheckoutError(error) {
+	const message = error && error.message || '';
+	return message.includes('Unknown') && (
+		message.includes('method "checkout"')
+		|| message.includes("method 'checkout'")
+	);
+}
+
 function createWorker(connectionString, options) {
 	if (typeof options.createWorker === 'function')
 		return options.createWorker(connectionString, options);
@@ -259,17 +329,100 @@ const sqliteInitConfig = ${JSON.stringify(sqliteInitConfig)};
 const opfsSahPoolOptions = ${JSON.stringify(opfsSahPoolOptions)};
 let sqlite3Promise;
 let db;
-let queue = Promise.resolve();
+let dbOpenOptions;
+let dbOpenInfo;
+let operationQueue = Promise.resolve();
+let activeLeaseId;
+let nextLeaseId = 1;
+const checkoutQueue = [];
+let nextCheckoutSeq = 1;
 
 self.onmessage = (event) => {
-	const message = event && event.data;
-	if (!message || message.type !== 'orange-sqlite-opfs-request')
-		return;
-	queue = queue
-		.then(() => dispatchTimed(message))
-		.then(({ result, elapsedMs }) => postResponse(message.id, result, undefined, elapsedMs))
-		.catch((error) => postResponse(message.id, undefined, error));
+	handleIncoming(event, self);
 };
+
+function handleIncoming(event, target) {
+	const message = event && event.data;
+	if (!message)
+		return;
+	if (message.type === 'orange-sqlite-opfs-connect') {
+		const port = event.ports && event.ports[0] || message.port;
+		if (port)
+			attachPort(port);
+		return;
+	}
+	if (message.type !== 'orange-sqlite-opfs-request')
+		return;
+	handleRequest(message, target || self);
+}
+
+function attachPort(port) {
+	port.addEventListener('message', (event) => handleIncoming(event, port));
+	if (typeof port.start === 'function')
+		port.start();
+}
+
+function handleRequest(message, target) {
+	if (message.method === 'checkout')
+		return handleCheckout(message, target);
+	if (message.method === 'release')
+		return handleRelease(message, target);
+	operationQueue = operationQueue
+		.then(() => dispatchTimed(message))
+		.then(({ result, elapsedMs }) => postResponse(target, message.id, result, undefined, elapsedMs))
+		.catch((error) => postResponse(target, message.id, undefined, error));
+}
+
+function handleCheckout(message, target) {
+	checkoutQueue.push({
+		message,
+		target,
+		priority: normalizePriority(message.priority),
+		seq: nextCheckoutSeq++
+	});
+	grantNextCheckout();
+}
+
+function handleRelease(message, target) {
+	operationQueue = operationQueue
+		.then(() => {
+			if (message.leaseId !== activeLeaseId)
+				throw new Error('Cannot release inactive sqliteOPFS checkout.');
+			activeLeaseId = undefined;
+			return { released: true };
+		})
+		.then((result) => {
+			postResponse(target, message.id, result, undefined, 0);
+			grantNextCheckout();
+		})
+		.catch((error) => postResponse(target, message.id, undefined, error));
+}
+
+function grantNextCheckout() {
+	if (activeLeaseId !== undefined)
+		return;
+	const entry = shiftNextCheckout();
+	if (!entry)
+		return;
+	const leaseId = nextLeaseId++;
+	activeLeaseId = leaseId;
+	operationQueue = operationQueue
+		.then(() => postResponse(entry.target, entry.message.id, { leaseId }, undefined, 0))
+		.catch((error) => postResponse(entry.target, entry.message.id, undefined, error));
+}
+
+function shiftNextCheckout() {
+	if (checkoutQueue.length <= 1)
+		return checkoutQueue.shift();
+	let bestIndex = 0;
+	for (let i = 1; i < checkoutQueue.length; i++) {
+		const current = checkoutQueue[i];
+		const best = checkoutQueue[bestIndex];
+		if (current.priority < best.priority || current.priority === best.priority && current.seq < best.seq)
+			bestIndex = i;
+	}
+	return checkoutQueue.splice(bestIndex, 1)[0];
+}
 
 async function dispatchTimed(message) {
 	const startedAt = now();
@@ -285,8 +438,10 @@ async function dispatch(message) {
 		return openDb(message.connectionString, message.busyTimeoutMs, message.vfs);
 	if (message.method === 'close')
 		return closeDb();
+	if (message.leaseId !== undefined && message.leaseId !== activeLeaseId)
+		throw new Error('sqliteOPFS checkout is not active.');
 	if (!db)
-		await openDb(message.connectionString || 'orange.sqlite3');
+		await openDbFromLastOptions(message.connectionString);
 	if (message.method === 'query')
 		return query(message.sql, message.parameters);
 	if (message.method === 'command')
@@ -296,18 +451,20 @@ async function dispatch(message) {
 
 async function openDb(connectionString, busyTimeoutMs = 5000, vfs) {
 	if (db)
-		return { opened: true, reused: true };
+		return { opened: true, reused: true, ...(dbOpenInfo || {}) };
+	dbOpenOptions = { connectionString, busyTimeoutMs, vfs };
 	const sqlite3 = await getSqlite3();
 	const filename = normalizeFilename(connectionString);
 	const dbInfo = await createDb(sqlite3, filename, vfs);
 	db = dbInfo.db;
 	db.exec('PRAGMA busy_timeout=' + (Number.parseInt(busyTimeoutMs, 10) || 5000));
-	return {
+	dbOpenInfo = {
 		opened: true,
 		opfs: dbInfo.opfs === true,
 		vfs: dbInfo.vfs,
 		filename: db.filename
 	};
+	return dbOpenInfo;
 }
 
 function closeDb() {
@@ -315,6 +472,11 @@ function closeDb() {
 		db.close();
 	db = null;
 	return { closed: true };
+}
+
+function openDbFromLastOptions(connectionString) {
+	const options = dbOpenOptions || { connectionString: connectionString || 'orange.sqlite3' };
+	return openDb(options.connectionString, options.busyTimeoutMs, options.vfs);
 }
 
 async function createDb(sqlite3, filename, vfs) {
@@ -419,8 +581,15 @@ function now() {
 	return Date.now();
 }
 
-function postResponse(id, result, error, elapsedMs) {
-	self.postMessage({
+function normalizePriority(priority) {
+	if (priority === undefined || priority === null)
+		return 0;
+	const parsed = Number.parseInt(priority, 10);
+	return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function postResponse(target, id, result, error, elapsedMs) {
+	target.postMessage({
 		type: 'orange-sqlite-opfs-response',
 		id,
 		result,

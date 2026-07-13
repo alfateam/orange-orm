@@ -9267,7 +9267,9 @@ function requireClient () {
 			client.tables = options.tables;
 			// return client;
 		}
-		client.syncClient = baseUrl && typeof baseUrl.__createSyncClient === 'function'
+		client.syncClient = options.syncClient
+			? options.syncClient
+			: baseUrl && typeof baseUrl.__createSyncClient === 'function'
 			? baseUrl.__createSyncClient(client, getDb, httpInterceptor)
 			: newSyncClient(client, getDb, httpInterceptor);
 		let localSchemaReadySkipped = false;
@@ -20731,6 +20733,318 @@ function requireDbWorkerHandler () {
 	return dbWorkerHandler;
 }
 
+var syncWorkerClient;
+var hasRequiredSyncWorkerClient;
+
+function requireSyncWorkerClient () {
+	if (hasRequiredSyncWorkerClient) return syncWorkerClient;
+	hasRequiredSyncWorkerClient = 1;
+	const {
+		finalizeSyncOperationMemory,
+		withSyncOperationMemory
+	} = requireOperationContext();
+	const { ensureLocalSchemaReadySymbol } = requireSyncClient();
+
+	function createSyncWorkerClient(worker) {
+		if (!worker || typeof worker.postMessage !== 'function')
+			throw new Error('Sync worker client requires a Worker-like object.');
+
+		let nextId = 1;
+		const pending = new Map();
+		const listeners = new Map();
+
+		worker.addEventListener('message', onMessage);
+		if (typeof worker.start === 'function')
+			worker.start();
+
+		const client = {
+			sync: request.bind(null, 'sync'),
+			ensureLocalSchema: request.bind(null, 'ensureLocalSchema'),
+			resetLocal: request.bind(null, 'resetLocal'),
+			discardLocalChanges: request.bind(null, 'discardLocalChanges'),
+			start: request.bind(null, 'start'),
+			stop: request.bind(null, 'stop'),
+			isRunning: request.bind(null, 'isRunning'),
+			waitForInitialSync: request.bind(null, 'waitForInitialSync'),
+			on,
+			off,
+			once,
+			close,
+			interceptors: createNoopInterceptors(),
+			[ensureLocalSchemaReadySymbol]: request.bind(null, 'ensureLocalSchemaReady')
+		};
+
+		return client;
+
+		function request(method, ...args) {
+			const id = nextId++;
+			return new Promise((resolve, reject) => {
+				pending.set(id, { resolve, reject });
+				worker.postMessage({
+					type: 'orange-sync-worker-request',
+					id,
+					method,
+					args
+				});
+			});
+		}
+
+		function on(event, listener) {
+			if (typeof event !== 'string' || typeof listener !== 'function')
+				return () => {};
+			let eventListeners = listeners.get(event);
+			if (!eventListeners) {
+				eventListeners = new Set();
+				listeners.set(event, eventListeners);
+			}
+			eventListeners.add(listener);
+			request('on', event).catch(() => {});
+			return () => off(event, listener);
+		}
+
+		function off(event, listener) {
+			const eventListeners = listeners.get(event);
+			if (!eventListeners)
+				return;
+			eventListeners.delete(listener);
+			if (eventListeners.size === 0) {
+				listeners.delete(event);
+				request('off', event).catch(() => {});
+			}
+		}
+
+		function once(event, listener) {
+			if (typeof listener !== 'function')
+				return () => {};
+			const unsubscribe = on(event, (payload) => {
+				unsubscribe();
+				listener(payload);
+			});
+			return unsubscribe;
+		}
+
+		function close() {
+			worker.removeEventListener('message', onMessage);
+			for (const entry of pending.values())
+				entry.reject(new Error('Sync worker client closed.'));
+			pending.clear();
+			listeners.clear();
+			if (typeof worker.terminate === 'function')
+				worker.terminate();
+			else if (typeof worker.close === 'function')
+				worker.close();
+		}
+
+		function onMessage(event) {
+			const message = event && event.data;
+			if (!message || message.type === undefined)
+				return;
+			if (message.type === 'orange-sync-worker-event') {
+				emit(message.event, message.payload);
+				return;
+			}
+			if (message.type !== 'orange-sync-worker-response')
+				return;
+			const entry = pending.get(message.id);
+			if (!entry)
+				return;
+			pending.delete(message.id);
+			if (message.error)
+				entry.reject(toError(message.error));
+			else
+				entry.resolve(message.result);
+		}
+
+		function emit(event, payload) {
+			if (event === 'operation' || event && event.startsWith && event.startsWith('operation:')) {
+				payload = withSyncOperationMemory(payload);
+				finalizeSyncOperationMemory(payload);
+			}
+			const eventListeners = listeners.get(event);
+			if (!eventListeners)
+				return;
+			for (const listener of Array.from(eventListeners))
+				listener(payload);
+		}
+	}
+
+	function createNoopInterceptors() {
+		return {
+			request: createNoopInterceptorManager(),
+			response: createNoopInterceptorManager()
+		};
+	}
+
+	function createNoopInterceptorManager() {
+		let nextId = 1;
+		return {
+			use() {
+				return `sync-worker-noop-${nextId++}`;
+			},
+			eject() {}
+		};
+	}
+
+	function toError(error) {
+		const e = new Error(error && error.message ? error.message : 'Sync worker request failed.');
+		if (error && error.name)
+			e.name = error.name;
+		if (error && error.stack)
+			e.stack = error.stack;
+		return e;
+	}
+
+	syncWorkerClient = createSyncWorkerClient;
+	return syncWorkerClient;
+}
+
+var syncWorkerHandler;
+var hasRequiredSyncWorkerHandler;
+
+function requireSyncWorkerHandler () {
+	if (hasRequiredSyncWorkerHandler) return syncWorkerHandler;
+	hasRequiredSyncWorkerHandler = 1;
+	const { syncAutoStartSymbol } = requireSyncAuto();
+	const { ensureLocalSchemaReadySymbol } = requireSyncClient();
+
+	function createSyncWorkerHandler(syncClient, options = {}) {
+		if (!syncClient)
+			throw new Error('Sync worker handler requires a sync client.');
+
+		const syncEventUnsubscribers = new Map();
+		const postMessage = options.postMessage || ((message) => {
+			const target = getPostTarget();
+			if (target)
+				target.postMessage(message);
+		});
+
+		if (options.autoStart !== false) {
+			const startAuto = typeof syncClient[syncAutoStartSymbol] === 'function'
+				? syncClient[syncAutoStartSymbol]
+				: syncClient.start;
+			if (typeof startAuto === 'function')
+				void startAuto.call(syncClient);
+		}
+
+		return {
+			handleMessage,
+			stop
+		};
+
+		async function handleMessage(event) {
+			const message = event && event.data;
+			if (!message || message.type !== 'orange-sync-worker-request')
+				return;
+			try {
+				const result = await dispatch(message.method, message.args || []);
+				postResponse(message.id, result);
+			}
+			catch (e) {
+				postResponse(message.id, undefined, e);
+			}
+		}
+
+		function dispatch(method, args) {
+			if (method === 'on')
+				return subscribeSyncEvent(args[0]);
+			if (method === 'off')
+				return unsubscribeSyncEvent(args[0]);
+			if (method === 'ensureLocalSchemaReady') {
+				const ensureReady = syncClient[ensureLocalSchemaReadySymbol];
+				if (typeof ensureReady !== 'function')
+					return { skipped: true };
+				return ensureReady.apply(syncClient, args);
+			}
+			const fn = syncClient[method];
+			if (typeof fn !== 'function')
+				throw new Error(`Sync worker method "${method}" is not implemented.`);
+			return fn.apply(syncClient, args);
+		}
+
+		function subscribeSyncEvent(event) {
+			if (typeof event !== 'string' || syncEventUnsubscribers.has(event))
+				return;
+			if (typeof syncClient.on !== 'function')
+				return;
+			const unsubscribe = syncClient.on(event, (payload) => {
+				postMessage({
+					type: 'orange-sync-worker-event',
+					event,
+					payload
+				});
+			});
+			syncEventUnsubscribers.set(event, unsubscribe);
+		}
+
+		function unsubscribeSyncEvent(event) {
+			const unsubscribe = syncEventUnsubscribers.get(event);
+			if (!unsubscribe)
+				return;
+			unsubscribe();
+			syncEventUnsubscribers.delete(event);
+		}
+
+		function stop() {
+			for (const unsubscribe of syncEventUnsubscribers.values())
+				unsubscribe();
+			syncEventUnsubscribers.clear();
+			if (options.stopSyncClient !== false && typeof syncClient.stop === 'function')
+				void syncClient.stop();
+		}
+
+		function postResponse(id, result, error) {
+			postMessage({
+				type: 'orange-sync-worker-response',
+				id,
+				result,
+				error: error ? serializeError(error) : undefined
+			});
+		}
+	}
+
+	function serializeError(error) {
+		return {
+			name: error && error.name,
+			message: error && error.message ? error.message : String(error),
+			stack: error && error.stack
+		};
+	}
+
+	function getPostTarget() {
+		if (typeof self !== 'undefined' && typeof self.postMessage === 'function')
+			return self;
+		if (typeof globalThis !== 'undefined' && typeof globalThis.postMessage === 'function')
+			return globalThis;
+	}
+
+	syncWorkerHandler = createSyncWorkerHandler;
+	return syncWorkerHandler;
+}
+
+var connectWorkerPort;
+var hasRequiredConnectWorkerPort;
+
+function requireConnectWorkerPort () {
+	if (hasRequiredConnectWorkerPort) return connectWorkerPort;
+	hasRequiredConnectWorkerPort = 1;
+	function connectSqliteOPFSWorker(worker) {
+		if (!worker || typeof worker.postMessage !== 'function')
+			throw new Error('sqliteOPFS worker port requires a Worker-like object.');
+		if (typeof MessageChannel === 'undefined')
+			throw new Error('sqliteOPFS worker port requires MessageChannel support.');
+		const channel = new MessageChannel();
+		worker.postMessage({
+			type: 'orange-sqlite-opfs-connect'
+		}, [channel.port2]);
+		if (typeof channel.port1.start === 'function')
+			channel.port1.start();
+		return channel.port1;
+	}
+
+	connectWorkerPort = connectSqliteOPFSWorker;
+	return connectWorkerPort;
+}
+
 var commitCommand;
 var hasRequiredCommitCommand;
 
@@ -23930,8 +24244,19 @@ function requireInlineWorker () {
 		const opfsSahPoolOptions = normalizeOpfsSahPoolOptions(options);
 		let sqlite3Promise;
 		let db;
-		let queue = Promise.resolve();
+		let dbOpenOptions;
+		let dbOpenInfo;
+		let operationQueue = Promise.resolve();
+		let activeLeaseId;
+		let nextLeaseId = 1;
+		const checkoutQueue = [];
+		let nextCheckoutSeq = 1;
 		let closed = false;
+		const rootTarget = {
+			postMessage(message) {
+				emit('message', { data: message });
+			}
+		};
 
 		return {
 			addEventListener,
@@ -23951,13 +24276,93 @@ function requireInlineWorker () {
 			listeners.set(type, entries.filter((entry) => entry !== listener));
 		}
 
-		function postMessage(message) {
+		function postMessage(message, transfer) {
 			if (closed || !message || message.type !== 'orange-sqlite-opfs-request')
+				return handleControlMessage(message, transfer);
+			handleRequest(message, rootTarget);
+		}
+
+		function handleControlMessage(message, transfer) {
+			if (closed || !message || message.type !== 'orange-sqlite-opfs-connect')
 				return;
-			queue = queue
+			const port = transfer && transfer[0] || message.port;
+			if (port)
+				attachPort(port);
+		}
+
+		function attachPort(port) {
+			port.addEventListener('message', (event) => handleIncoming(event, port));
+			if (typeof port.start === 'function')
+				port.start();
+		}
+
+		function handleIncoming(event, target) {
+			const message = event && event.data;
+			if (!message || message.type !== 'orange-sqlite-opfs-request')
+				return handleControlMessage(message);
+			handleRequest(message, target);
+		}
+
+		function handleRequest(message, target) {
+			if (message.method === 'checkout')
+				return handleCheckout(message, target);
+			if (message.method === 'release')
+				return handleRelease(message, target);
+			operationQueue = operationQueue
 				.then(() => dispatchTimed(message))
-				.then(({ result, elapsedMs }) => postResponse(message.id, result, undefined, elapsedMs))
-				.catch((error) => postResponse(message.id, undefined, error));
+				.then(({ result, elapsedMs }) => postResponse(target, message.id, result, undefined, elapsedMs))
+				.catch((error) => postResponse(target, message.id, undefined, error));
+		}
+
+		function handleCheckout(message, target) {
+			checkoutQueue.push({
+				message,
+				target,
+				priority: normalizePriority(message.priority),
+				seq: nextCheckoutSeq++
+			});
+			grantNextCheckout();
+		}
+
+		function handleRelease(message, target) {
+			operationQueue = operationQueue
+				.then(() => {
+					if (message.leaseId !== activeLeaseId)
+						throw new Error('Cannot release inactive sqliteOPFS checkout.');
+					activeLeaseId = undefined;
+					return { released: true };
+				})
+				.then((result) => {
+					postResponse(target, message.id, result, undefined, 0);
+					grantNextCheckout();
+				})
+				.catch((error) => postResponse(target, message.id, undefined, error));
+		}
+
+		function grantNextCheckout() {
+			if (activeLeaseId !== undefined)
+				return;
+			const entry = shiftNextCheckout();
+			if (!entry)
+				return;
+			const leaseId = nextLeaseId++;
+			activeLeaseId = leaseId;
+			operationQueue = operationQueue
+				.then(() => postResponse(entry.target, entry.message.id, { leaseId }, undefined, 0))
+				.catch((error) => postResponse(entry.target, entry.message.id, undefined, error));
+		}
+
+		function shiftNextCheckout() {
+			if (checkoutQueue.length <= 1)
+				return checkoutQueue.shift();
+			let bestIndex = 0;
+			for (let i = 1; i < checkoutQueue.length; i++) {
+				const current = checkoutQueue[i];
+				const best = checkoutQueue[bestIndex];
+				if (current.priority < best.priority || current.priority === best.priority && current.seq < best.seq)
+					bestIndex = i;
+			}
+			return checkoutQueue.splice(bestIndex, 1)[0];
 		}
 
 		function terminate() {
@@ -23988,8 +24393,10 @@ function requireInlineWorker () {
 				return openDb(message.connectionString, message.busyTimeoutMs, message.vfs);
 			if (message.method === 'close')
 				return closeDb();
+			if (message.leaseId !== undefined && message.leaseId !== activeLeaseId)
+				throw new Error('sqliteOPFS checkout is not active.');
 			if (!db)
-				await openDb(message.connectionString || 'orange.sqlite3');
+				await openDbFromLastOptions(message.connectionString);
 			if (message.method === 'query')
 				return query(message.sql, message.parameters);
 			if (message.method === 'command')
@@ -23999,18 +24406,20 @@ function requireInlineWorker () {
 
 		async function openDb(connectionString, busyTimeoutMs = 5000, vfs) {
 			if (db)
-				return { opened: true, reused: true };
+				return { opened: true, reused: true, ...(dbOpenInfo || {}) };
+			dbOpenOptions = { connectionString, busyTimeoutMs, vfs };
 			const sqlite3 = await getSqlite3();
 			const filename = normalizeFilename(connectionString);
 			const dbInfo = await createDb(sqlite3, filename, vfs);
 			db = dbInfo.db;
 			db.exec('PRAGMA busy_timeout=' + (Number.parseInt(busyTimeoutMs, 10) || 5000));
-			return {
+			dbOpenInfo = {
 				opened: true,
 				opfs: dbInfo.opfs === true,
 				vfs: dbInfo.vfs,
 				filename: db.filename
 			};
+			return dbOpenInfo;
 		}
 
 		function closeDb() {
@@ -24018,6 +24427,11 @@ function requireInlineWorker () {
 				db.close();
 			db = null;
 			return { closed: true };
+		}
+
+		function openDbFromLastOptions(connectionString) {
+			const options = dbOpenOptions || { connectionString: connectionString || 'orange.sqlite3' };
+			return openDb(options.connectionString, options.busyTimeoutMs, options.vfs);
 		}
 
 		async function createDb(sqlite3, filename, vfs) {
@@ -24108,15 +24522,13 @@ function requireInlineWorker () {
 			};
 		}
 
-		function postResponse(id, result, error, elapsedMs) {
-			emit('message', {
-				data: {
-					type: 'orange-sqlite-opfs-response',
-					id,
-					result,
-					elapsedMs,
-					error: error ? serializeError(error) : undefined
-				}
+		function postResponse(target, id, result, error, elapsedMs) {
+			target.postMessage({
+				type: 'orange-sqlite-opfs-response',
+				id,
+				result,
+				elapsedMs,
+				error: error ? serializeError(error) : undefined
 			});
 		}
 
@@ -24160,6 +24572,13 @@ function requireInlineWorker () {
 		return Date.now();
 	}
 
+	function normalizePriority(priority) {
+		if (priority === undefined || priority === null)
+			return 0;
+		const parsed = Number.parseInt(priority, 10);
+		return Number.isFinite(parsed) ? parsed : 0;
+	}
+
 	function serializeError(error) {
 		return {
 			name: error && error.name,
@@ -24194,6 +24613,7 @@ function requireWorkerClient () {
 		worker.addEventListener('message', onMessage);
 		worker.addEventListener('error', onWorkerError);
 		worker.addEventListener('messageerror', onWorkerError);
+		startMessagePort(worker);
 
 		const requestedVfs = options.vfs || 'opfs';
 		const fallbackVfs = normalizeFallbackVfs(options.fallbackVfs, requestedVfs);
@@ -24202,6 +24622,7 @@ function requireWorkerClient () {
 		return {
 			executeQuery,
 			executeCommand,
+			checkout,
 			close,
 			getOpenInfo,
 			release,
@@ -24210,6 +24631,14 @@ function requireWorkerClient () {
 		};
 
 		function executeQuery(query, callback) {
+			executeQueryCore(query, callback);
+		}
+
+		function executeCommand(query, callback) {
+			executeCommandCore(query, callback);
+		}
+
+		function executeQueryCore(query, callback, leaseId) {
 			if (closed)
 				return callback(new Error('sqliteOPFS worker client closed.'));
 			const sql = query.sql();
@@ -24217,7 +24646,7 @@ function requireWorkerClient () {
 			log.emitQuery({ sql, parameters, readonly, lane });
 			const startedAt = now();
 			ensureOpen()
-				.then(() => request('query', { sql, parameters }))
+				.then(() => request('query', { sql, parameters, leaseId }))
 				.then(({ result, workerElapsedMs }) => {
 					log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, workerElapsedMs, readonly, lane });
 					callback(null, result);
@@ -24228,7 +24657,7 @@ function requireWorkerClient () {
 				});
 		}
 
-		function executeCommand(query, callback) {
+		function executeCommandCore(query, callback, leaseId) {
 			if (closed)
 				return callback(new Error('sqliteOPFS worker client closed.'));
 			const sql = query.sql();
@@ -24236,7 +24665,7 @@ function requireWorkerClient () {
 			log.emitQuery({ sql, parameters, readonly, lane });
 			const startedAt = now();
 			ensureOpen()
-				.then(() => request('command', { sql, parameters }))
+				.then(() => request('command', { sql, parameters, leaseId }))
 				.then(({ result, workerElapsedMs }) => {
 					log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, workerElapsedMs, readonly, lane });
 					callback(null, result);
@@ -24245,6 +24674,43 @@ function requireWorkerClient () {
 					log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, error, readonly, lane });
 					callback(error);
 				});
+		}
+
+		function checkout(priority) {
+			if (closed)
+				return Promise.reject(new Error('sqliteOPFS worker client closed.'));
+			return ensureOpen()
+				.then(() => request('checkout', { priority }))
+				.then(({ result }) => createLeasedClient(result && result.leaseId))
+				.catch((error) => {
+					if (isUnsupportedCheckoutError(error))
+						return createLeasedClient();
+					throw error;
+				});
+		}
+
+		function createLeasedClient(leaseId) {
+			if (leaseId === undefined || leaseId === null)
+				return {
+					executeQuery,
+					executeCommand,
+					getOpenInfo,
+					reset,
+					releaseCheckout: () => Promise.resolve()
+				};
+			return {
+				executeQuery(query, callback) {
+					executeQueryCore(query, callback, leaseId);
+				},
+				executeCommand(query, callback) {
+					executeCommandCore(query, callback, leaseId);
+				},
+				getOpenInfo,
+				reset,
+				releaseCheckout() {
+					return request('release', { leaseId }).then(() => undefined);
+				}
+			};
 		}
 
 		function request(method, payload = {}) {
@@ -24343,7 +24809,9 @@ function requireWorkerClient () {
 			if (closed)
 				return Promise.resolve();
 			closed = true;
-			const closeRequest = withTimeout(request('close'), 1000).catch(() => {});
+			const closeRequest = options.closeDbOnClose === false
+				? Promise.resolve()
+				: withTimeout(request('close'), 1000).catch(() => {});
 			return closeRequest.finally(() => {
 				worker.removeEventListener('message', onMessage);
 				worker.removeEventListener('error', onWorkerError);
@@ -24351,6 +24819,8 @@ function requireWorkerClient () {
 				rejectPending(new Error('sqliteOPFS worker client closed.'));
 				if (typeof worker.terminate === 'function')
 					worker.terminate();
+				else if (typeof worker.close === 'function')
+					worker.close();
 			});
 		}
 
@@ -24401,6 +24871,25 @@ function requireWorkerClient () {
 		return Date.now();
 	}
 
+	function startMessagePort(port) {
+		if (port && typeof port.start === 'function') {
+			try {
+				port.start();
+			}
+			catch (_e) {
+				// MessagePort.start() is best-effort; browsers ignore repeated starts.
+			}
+		}
+	}
+
+	function isUnsupportedCheckoutError(error) {
+		const message = error && error.message || '';
+		return message.includes('Unknown') && (
+			message.includes('method "checkout"')
+			|| message.includes("method 'checkout'")
+		);
+	}
+
 	function createWorker(connectionString, options) {
 		if (typeof options.createWorker === 'function')
 			return options.createWorker(connectionString, options);
@@ -24439,17 +24928,100 @@ const sqliteInitConfig = ${JSON.stringify(sqliteInitConfig)};
 const opfsSahPoolOptions = ${JSON.stringify(opfsSahPoolOptions)};
 let sqlite3Promise;
 let db;
-let queue = Promise.resolve();
+let dbOpenOptions;
+let dbOpenInfo;
+let operationQueue = Promise.resolve();
+let activeLeaseId;
+let nextLeaseId = 1;
+const checkoutQueue = [];
+let nextCheckoutSeq = 1;
 
 self.onmessage = (event) => {
-	const message = event && event.data;
-	if (!message || message.type !== 'orange-sqlite-opfs-request')
-		return;
-	queue = queue
-		.then(() => dispatchTimed(message))
-		.then(({ result, elapsedMs }) => postResponse(message.id, result, undefined, elapsedMs))
-		.catch((error) => postResponse(message.id, undefined, error));
+	handleIncoming(event, self);
 };
+
+function handleIncoming(event, target) {
+	const message = event && event.data;
+	if (!message)
+		return;
+	if (message.type === 'orange-sqlite-opfs-connect') {
+		const port = event.ports && event.ports[0] || message.port;
+		if (port)
+			attachPort(port);
+		return;
+	}
+	if (message.type !== 'orange-sqlite-opfs-request')
+		return;
+	handleRequest(message, target || self);
+}
+
+function attachPort(port) {
+	port.addEventListener('message', (event) => handleIncoming(event, port));
+	if (typeof port.start === 'function')
+		port.start();
+}
+
+function handleRequest(message, target) {
+	if (message.method === 'checkout')
+		return handleCheckout(message, target);
+	if (message.method === 'release')
+		return handleRelease(message, target);
+	operationQueue = operationQueue
+		.then(() => dispatchTimed(message))
+		.then(({ result, elapsedMs }) => postResponse(target, message.id, result, undefined, elapsedMs))
+		.catch((error) => postResponse(target, message.id, undefined, error));
+}
+
+function handleCheckout(message, target) {
+	checkoutQueue.push({
+		message,
+		target,
+		priority: normalizePriority(message.priority),
+		seq: nextCheckoutSeq++
+	});
+	grantNextCheckout();
+}
+
+function handleRelease(message, target) {
+	operationQueue = operationQueue
+		.then(() => {
+			if (message.leaseId !== activeLeaseId)
+				throw new Error('Cannot release inactive sqliteOPFS checkout.');
+			activeLeaseId = undefined;
+			return { released: true };
+		})
+		.then((result) => {
+			postResponse(target, message.id, result, undefined, 0);
+			grantNextCheckout();
+		})
+		.catch((error) => postResponse(target, message.id, undefined, error));
+}
+
+function grantNextCheckout() {
+	if (activeLeaseId !== undefined)
+		return;
+	const entry = shiftNextCheckout();
+	if (!entry)
+		return;
+	const leaseId = nextLeaseId++;
+	activeLeaseId = leaseId;
+	operationQueue = operationQueue
+		.then(() => postResponse(entry.target, entry.message.id, { leaseId }, undefined, 0))
+		.catch((error) => postResponse(entry.target, entry.message.id, undefined, error));
+}
+
+function shiftNextCheckout() {
+	if (checkoutQueue.length <= 1)
+		return checkoutQueue.shift();
+	let bestIndex = 0;
+	for (let i = 1; i < checkoutQueue.length; i++) {
+		const current = checkoutQueue[i];
+		const best = checkoutQueue[bestIndex];
+		if (current.priority < best.priority || current.priority === best.priority && current.seq < best.seq)
+			bestIndex = i;
+	}
+	return checkoutQueue.splice(bestIndex, 1)[0];
+}
 
 async function dispatchTimed(message) {
 	const startedAt = now();
@@ -24465,8 +25037,10 @@ async function dispatch(message) {
 		return openDb(message.connectionString, message.busyTimeoutMs, message.vfs);
 	if (message.method === 'close')
 		return closeDb();
+	if (message.leaseId !== undefined && message.leaseId !== activeLeaseId)
+		throw new Error('sqliteOPFS checkout is not active.');
 	if (!db)
-		await openDb(message.connectionString || 'orange.sqlite3');
+		await openDbFromLastOptions(message.connectionString);
 	if (message.method === 'query')
 		return query(message.sql, message.parameters);
 	if (message.method === 'command')
@@ -24476,18 +25050,20 @@ async function dispatch(message) {
 
 async function openDb(connectionString, busyTimeoutMs = 5000, vfs) {
 	if (db)
-		return { opened: true, reused: true };
+		return { opened: true, reused: true, ...(dbOpenInfo || {}) };
+	dbOpenOptions = { connectionString, busyTimeoutMs, vfs };
 	const sqlite3 = await getSqlite3();
 	const filename = normalizeFilename(connectionString);
 	const dbInfo = await createDb(sqlite3, filename, vfs);
 	db = dbInfo.db;
 	db.exec('PRAGMA busy_timeout=' + (Number.parseInt(busyTimeoutMs, 10) || 5000));
-	return {
+	dbOpenInfo = {
 		opened: true,
 		opfs: dbInfo.opfs === true,
 		vfs: dbInfo.vfs,
 		filename: db.filename
 	};
+	return dbOpenInfo;
 }
 
 function closeDb() {
@@ -24495,6 +25071,11 @@ function closeDb() {
 		db.close();
 	db = null;
 	return { closed: true };
+}
+
+function openDbFromLastOptions(connectionString) {
+	const options = dbOpenOptions || { connectionString: connectionString || 'orange.sqlite3' };
+	return openDb(options.connectionString, options.busyTimeoutMs, options.vfs);
 }
 
 async function createDb(sqlite3, filename, vfs) {
@@ -24599,8 +25180,15 @@ function now() {
 	return Date.now();
 }
 
-function postResponse(id, result, error, elapsedMs) {
-	self.postMessage({
+function normalizePriority(priority) {
+	if (priority === undefined || priority === null)
+		return 0;
+	const parsed = Number.parseInt(priority, 10);
+	return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function postResponse(target, id, result, error, elapsedMs) {
+	target.postMessage({
 		type: 'orange-sqlite-opfs-response',
 		id,
 		result,
@@ -24780,19 +25368,30 @@ function requireNewPool$1 () {
 						return;
 					}
 					releaseAccessLock = release;
-					try {
-						cb(null, client, done);
-					}
-					catch (e) {
-						done(e);
-						throw e;
-					}
+					return checkoutWriterClient(entry.priority)
+						.then((checkoutClient) => {
+							activeClient = checkoutClient;
+							try {
+								cb(null, checkoutClient, done);
+							}
+							catch (e) {
+								done(e);
+								throw e;
+							}
+						});
 				}, (e) => {
 					released = true;
 					writerBusy = false;
 					cb(e, null, noop);
 					drainWriterQueue();
+				})
+				.catch((e) => {
+					if (released)
+						return;
+					done(e);
+					cb(e, null, noop);
 				});
+			let activeClient = client;
 
 			function done(err) {
 				if (released)
@@ -24802,6 +25401,7 @@ function requireNewPool$1 () {
 					client.reset();
 				updatePoolOpenInfo(c, client);
 				releaseOPFSAccessHandle(client)
+					.then(() => releaseWorkerCheckout(activeClient))
 					.then(() => releaseAccessLock())
 					.catch(() => releaseAccessLock())
 					.then(() => {
@@ -24831,9 +25431,21 @@ function requireNewPool$1 () {
 			}
 			return writerQueue.splice(bestIndex, 1)[0];
 		}
+
+		function checkoutWriterClient(priority) {
+			if (client && typeof client.checkout === 'function')
+				return client.checkout(priority);
+			return Promise.resolve(client);
+		}
 	}
 
 	function noop() {}
+
+	function releaseWorkerCheckout(client) {
+		if (!client || typeof client.releaseCheckout !== 'function')
+			return Promise.resolve();
+		return Promise.resolve(client.releaseCheckout()).catch(() => {});
+	}
 
 	function normalizePriority(priority) {
 		if (priority === undefined || priority === null)
@@ -25624,6 +26236,9 @@ function requireIndexBrowser () {
 	connectViaPool.createPatch = client.createPatch;
 	connectViaPool.createDbWorkerClient = requireDbWorkerClient();
 	connectViaPool.createDbWorkerHandler = requireDbWorkerHandler();
+	connectViaPool.createSyncWorkerClient = requireSyncWorkerClient();
+	connectViaPool.createSyncWorkerHandler = requireSyncWorkerHandler();
+	connectViaPool.connectSqliteOPFSWorker = requireConnectWorkerPort();
 	connectViaPool.table = requireTable();
 	connectViaPool.filter = requireEmptyFilter();
 	connectViaPool.commit = requireCommit();

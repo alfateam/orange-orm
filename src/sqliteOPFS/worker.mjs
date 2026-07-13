@@ -3,25 +3,110 @@ import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
 const opfsSahPoolOptions = {};
 let sqlite3Promise;
 let db;
-let queue = Promise.resolve();
+let dbOpenOptions;
+let dbOpenInfo;
+let operationQueue = Promise.resolve();
+let activeLeaseId;
+let nextLeaseId = 1;
+const checkoutQueue = [];
+let nextCheckoutSeq = 1;
 
 self.onmessage = (event) => {
-	const message = event && event.data;
-	if (!message || message.type !== 'orange-sqlite-opfs-request')
-		return;
-	queue = queue
-		.then(() => dispatch(message))
-		.then((result) => postResponse(message.id, result))
-		.catch((error) => postResponse(message.id, undefined, error));
+	handleIncoming(event, self);
 };
+
+function handleIncoming(event, target) {
+	const message = event && event.data;
+	if (!message)
+		return;
+	if (message.type === 'orange-sqlite-opfs-connect') {
+		const port = event.ports && event.ports[0] || message.port;
+		if (port)
+			attachPort(port);
+		return;
+	}
+	if (message.type !== 'orange-sqlite-opfs-request')
+		return;
+	handleRequest(message, target || self);
+}
+
+function attachPort(port) {
+	port.addEventListener('message', (event) => handleIncoming(event, port));
+	if (typeof port.start === 'function')
+		port.start();
+}
+
+function handleRequest(message, target) {
+	if (message.method === 'checkout')
+		return handleCheckout(message, target);
+	if (message.method === 'release')
+		return handleRelease(message, target);
+	operationQueue = operationQueue
+		.then(() => dispatch(message))
+		.then((result) => postResponse(target, message.id, result))
+		.catch((error) => postResponse(target, message.id, undefined, error));
+}
+
+function handleCheckout(message, target) {
+	checkoutQueue.push({
+		message,
+		target,
+		priority: normalizePriority(message.priority),
+		seq: nextCheckoutSeq++
+	});
+	grantNextCheckout();
+}
+
+function handleRelease(message, target) {
+	operationQueue = operationQueue
+		.then(() => {
+			if (message.leaseId !== activeLeaseId)
+				throw new Error('Cannot release inactive sqliteOPFS checkout.');
+			activeLeaseId = undefined;
+			return { released: true };
+		})
+		.then((result) => {
+			postResponse(target, message.id, result);
+			grantNextCheckout();
+		})
+		.catch((error) => postResponse(target, message.id, undefined, error));
+}
+
+function grantNextCheckout() {
+	if (activeLeaseId !== undefined)
+		return;
+	const entry = shiftNextCheckout();
+	if (!entry)
+		return;
+	const leaseId = nextLeaseId++;
+	activeLeaseId = leaseId;
+	operationQueue = operationQueue
+		.then(() => postResponse(entry.target, entry.message.id, { leaseId }))
+		.catch((error) => postResponse(entry.target, entry.message.id, undefined, error));
+}
+
+function shiftNextCheckout() {
+	if (checkoutQueue.length <= 1)
+		return checkoutQueue.shift();
+	let bestIndex = 0;
+	for (let i = 1; i < checkoutQueue.length; i++) {
+		const current = checkoutQueue[i];
+		const best = checkoutQueue[bestIndex];
+		if (current.priority < best.priority || current.priority === best.priority && current.seq < best.seq)
+			bestIndex = i;
+	}
+	return checkoutQueue.splice(bestIndex, 1)[0];
+}
 
 async function dispatch(message) {
 	if (message.method === 'open')
 		return openDb(message.connectionString, message.busyTimeoutMs, message.vfs);
 	if (message.method === 'close')
 		return closeDb();
+	if (message.leaseId !== undefined && message.leaseId !== activeLeaseId)
+		throw new Error('sqliteOPFS checkout is not active.');
 	if (!db)
-		await openDb(message.connectionString || 'orange.sqlite3');
+		await openDbFromLastOptions(message.connectionString);
 	if (message.method === 'query')
 		return query(message.sql, message.parameters);
 	if (message.method === 'command')
@@ -31,18 +116,20 @@ async function dispatch(message) {
 
 async function openDb(connectionString, busyTimeoutMs = 5000, vfs) {
 	if (db)
-		return { opened: true, reused: true };
+		return { opened: true, reused: true, ...(dbOpenInfo || {}) };
+	dbOpenOptions = { connectionString, busyTimeoutMs, vfs };
 	const sqlite3 = await getSqlite3();
 	const filename = normalizeFilename(connectionString);
 	const dbInfo = await createDb(sqlite3, filename, vfs);
 	db = dbInfo.db;
 	db.exec(`PRAGMA busy_timeout=${Number.parseInt(busyTimeoutMs, 10) || 5000}`);
-	return {
+	dbOpenInfo = {
 		opened: true,
 		opfs: dbInfo.opfs === true,
 		vfs: dbInfo.vfs,
 		filename: db.filename
 	};
+	return dbOpenInfo;
 }
 
 function closeDb() {
@@ -50,6 +137,11 @@ function closeDb() {
 		db.close();
 	db = null;
 	return { closed: true };
+}
+
+function openDbFromLastOptions(connectionString) {
+	const options = dbOpenOptions || { connectionString: connectionString || 'orange.sqlite3' };
+	return openDb(options.connectionString, options.busyTimeoutMs, options.vfs);
 }
 
 async function createDb(sqlite3, filename, vfs) {
@@ -142,8 +234,15 @@ function normalizeParameter(value) {
 	return value;
 }
 
-function postResponse(id, result, error) {
-	self.postMessage({
+function normalizePriority(priority) {
+	if (priority === undefined || priority === null)
+		return 0;
+	const parsed = Number.parseInt(priority, 10);
+	return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function postResponse(target, id, result, error) {
+	target.postMessage({
 		type: 'orange-sqlite-opfs-response',
 		id,
 		result,

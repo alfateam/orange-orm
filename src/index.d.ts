@@ -40,6 +40,16 @@ declare namespace r {
 	): MappedDbDef<MergeProperties<V, V>>;
     function createPatch(original: any[], modified: any[]): JsonPatch;
     function createPatch(original: any, modified: any): JsonPatch;
+    function connectSqliteOPFSWorker(worker: Worker): MessagePort;
+    function createSyncWorkerClient(worker: Worker | MessagePort): DBClient['syncClient'];
+    function createSyncWorkerHandler(syncClient: DBClient['syncClient'], options?: {
+        autoStart?: boolean;
+        stopSyncClient?: boolean;
+        postMessage?: (message: unknown) => void;
+    }): {
+        handleMessage(event: MessageEvent): Promise<void>;
+        stop(): void;
+    };
     type JsonPatch = Array<{
         op: 'add' | 'remove' | 'replace' | 'copy' | 'move' | 'test';
         path: string;

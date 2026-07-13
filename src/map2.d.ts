@@ -889,6 +889,7 @@ export type DbOptions<
   ConcurrencyConfig<M>
   & ColumnConcurrency & {
     db?: Pool | ((connectors: Connectors) => Pool | Promise<Pool>);
+    syncClient?: DBClient<M, Commands>['syncClient'];
     commands?: Commands;
     commandHandlers?: ServerCommandHandlers<M, Commands>;
   };
@@ -1119,6 +1120,10 @@ export interface SqliteOPFSPoolOptions<M extends Record<string, any> = any> exte
   opfsSahPool?: OpfsSahPoolOptions;
   singleWorker?: boolean;
   inlineWorker?: boolean;
+  worker?: Worker | MessagePort;
+  createWorker?: (connectionString: string, options: SqliteOPFSPoolOptions<M>) => Worker | MessagePort;
+  workerUrl?: string | URL;
+  closeDbOnClose?: boolean;
   prewarmRead?: boolean;
   busyTimeoutMs?: number;
 }

@@ -109,19 +109,30 @@ function newPool(connectionString, poolOptions) {
 					return;
 				}
 				releaseAccessLock = release;
-				try {
-					cb(null, client, done);
-				}
-				catch (e) {
-					done(e);
-					throw e;
-				}
+				return checkoutWriterClient(entry.priority)
+					.then((checkoutClient) => {
+						activeClient = checkoutClient;
+						try {
+							cb(null, checkoutClient, done);
+						}
+						catch (e) {
+							done(e);
+							throw e;
+						}
+					});
 			}, (e) => {
 				released = true;
 				writerBusy = false;
 				cb(e, null, noop);
 				drainWriterQueue();
+			})
+			.catch((e) => {
+				if (released)
+					return;
+				done(e);
+				cb(e, null, noop);
 			});
+		let activeClient = client;
 
 		function done(err) {
 			if (released)
@@ -131,6 +142,7 @@ function newPool(connectionString, poolOptions) {
 				client.reset();
 			updatePoolOpenInfo(c, client);
 			releaseOPFSAccessHandle(client)
+				.then(() => releaseWorkerCheckout(activeClient))
 				.then(() => releaseAccessLock())
 				.catch(() => releaseAccessLock())
 				.then(() => {
@@ -160,9 +172,21 @@ function newPool(connectionString, poolOptions) {
 		}
 		return writerQueue.splice(bestIndex, 1)[0];
 	}
+
+	function checkoutWriterClient(priority) {
+		if (client && typeof client.checkout === 'function')
+			return client.checkout(priority);
+		return Promise.resolve(client);
+	}
 }
 
 function noop() {}
+
+function releaseWorkerCheckout(client) {
+	if (!client || typeof client.releaseCheckout !== 'function')
+		return Promise.resolve();
+	return Promise.resolve(client.releaseCheckout()).catch(() => {});
+}
 
 function normalizePriority(priority) {
 	if (priority === undefined || priority === null)
