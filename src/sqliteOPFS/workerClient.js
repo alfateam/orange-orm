@@ -314,6 +314,8 @@ function createWorker(connectionString, options) {
 	throw new Error('sqliteOPFS requires Worker support or an explicit worker/createWorker option.');
 }
 
+createSqliteOPFSWorkerClient.createWorker = createWorker;
+
 function getDefaultSqliteModuleUrl() {
 	return typeof globalThis !== 'undefined' && typeof globalThis.__orangeOrmSqliteOPFSModuleUrl === 'string'
 		? globalThis.__orangeOrmSqliteOPFSModuleUrl

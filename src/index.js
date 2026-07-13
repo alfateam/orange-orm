@@ -32,6 +32,7 @@ connectViaPool.createDbWorkerClient = require('./client/dbWorkerClient');
 connectViaPool.createDbWorkerHandler = require('./client/dbWorkerHandler');
 connectViaPool.createSyncWorkerClient = require('./client/syncWorkerClient');
 connectViaPool.createSyncWorkerHandler = require('./client/syncWorkerHandler');
+connectViaPool.createSqliteOPFSWorker = require('./sqliteOPFS/createWorker');
 connectViaPool.connectSqliteOPFSWorker = require('./sqliteOPFS/connectWorkerPort');
 connectViaPool.table = require('./table');
 connectViaPool.filter = require('./emptyFilter');

@@ -3,8 +3,19 @@ import { describe, expect, test } from 'vitest';
 const createSqliteOPFSWorkerClient = require('../src/sqliteOPFS/workerClient');
 const createInlineSqliteOPFSWorker = require('../src/sqliteOPFS/inlineWorker');
 const connectSqliteOPFSWorker = require('../src/sqliteOPFS/connectWorkerPort');
+const rdb = require('../src/index');
 
 describe('sqliteOPFS broker worker', () => {
+	test('creates a shareable sqliteOPFS worker through the public helper', () => {
+		const worker = rdb.createSqliteOPFSWorker({
+			inlineWorker: true,
+			sqlite3InitModule: () => newFakeSqlite3()
+		});
+
+		expect(worker).toHaveProperty('postMessage');
+		worker.terminate();
+	});
+
 	test('prioritizes normal checkouts over low-priority checkouts across ports', async () => {
 		const worker = createInlineSqliteOPFSWorker({
 			sqlite3InitModule: () => newFakeSqlite3()

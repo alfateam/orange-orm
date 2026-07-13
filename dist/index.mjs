@@ -21055,6 +21055,1115 @@ function requireSyncWorkerHandler () {
 	return syncWorkerHandler;
 }
 
+var log_1;
+var hasRequiredLog;
+
+function requireLog () {
+	if (hasRequiredLog) return log_1;
+	hasRequiredLog = 1;
+	var newEmitEvent = requireEmitEvent();
+
+	var emitters = {
+		query: newEmitEvent(),
+		queryComplete: newEmitEvent()
+	};
+
+	var logger = function() {
+	};
+
+	function log() {
+		logger.apply(null, arguments);
+	}
+	function emitQuery({ sql, parameters }) {
+		emitters.query.apply(null, arguments);
+		log(sql);
+		log('parameters: ' + parameters);
+	}
+
+	log.emitQuery = emitQuery;
+
+	log.emitQueryComplete = function() {
+		emitters.queryComplete.apply(null, arguments);
+	};
+
+	log.startQuery = function({ sql, parameters }) {
+		const startedAt = now();
+		log.emitQuery({ sql, parameters });
+		return function(error) {
+			log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, error });
+		};
+	};
+
+	log.registerLogger = function(cb) {
+		logger = cb;
+	};
+
+	log.on = function(type, cb) {
+		if (type === 'query')
+			emitters.query.add(cb);
+		else if (type === 'queryComplete')
+			emitters.queryComplete.add(cb);
+		else
+			throw new Error('unknown event type: ' + type);
+	};
+
+	log.off = function(type, cb) {
+		if (type === 'query')
+			emitters.query.tryRemove(cb);
+		else if (type === 'queryComplete')
+			emitters.queryComplete.tryRemove(cb);
+		else
+			throw new Error('unknown event type: ' + type);
+	};
+
+	log_1 = log;
+
+	function now() {
+		if (typeof performance !== 'undefined' && performance.now)
+			return performance.now();
+		return Date.now();
+	}
+	return log_1;
+}
+
+var inlineWorker;
+var hasRequiredInlineWorker;
+
+function requireInlineWorker () {
+	if (hasRequiredInlineWorker) return inlineWorker;
+	hasRequiredInlineWorker = 1;
+	function createInlineSqliteOPFSWorker(options = {}) {
+		const listeners = new Map();
+		const sqliteModuleUrl = options.sqliteModuleUrl || getDefaultSqliteModuleUrl() || '@sqlite.org/sqlite-wasm';
+		const sqliteInitConfig = {};
+		const opfsSahPoolOptions = normalizeOpfsSahPoolOptions(options);
+		let sqlite3Promise;
+		let db;
+		let dbOpenOptions;
+		let dbOpenInfo;
+		let operationQueue = Promise.resolve();
+		let activeLeaseId;
+		let nextLeaseId = 1;
+		const checkoutQueue = [];
+		let nextCheckoutSeq = 1;
+		let closed = false;
+		const rootTarget = {
+			postMessage(message) {
+				emit('message', { data: message });
+			}
+		};
+
+		return {
+			addEventListener,
+			removeEventListener,
+			postMessage,
+			terminate
+		};
+
+		function addEventListener(type, listener) {
+			const entries = listeners.get(type) || [];
+			entries.push(listener);
+			listeners.set(type, entries);
+		}
+
+		function removeEventListener(type, listener) {
+			const entries = listeners.get(type) || [];
+			listeners.set(type, entries.filter((entry) => entry !== listener));
+		}
+
+		function postMessage(message, transfer) {
+			if (closed || !message || message.type !== 'orange-sqlite-opfs-request')
+				return handleControlMessage(message, transfer);
+			handleRequest(message, rootTarget);
+		}
+
+		function handleControlMessage(message, transfer) {
+			if (closed || !message || message.type !== 'orange-sqlite-opfs-connect')
+				return;
+			const port = transfer && transfer[0] || message.port;
+			if (port)
+				attachPort(port);
+		}
+
+		function attachPort(port) {
+			port.addEventListener('message', (event) => handleIncoming(event, port));
+			if (typeof port.start === 'function')
+				port.start();
+		}
+
+		function handleIncoming(event, target) {
+			const message = event && event.data;
+			if (!message || message.type !== 'orange-sqlite-opfs-request')
+				return handleControlMessage(message);
+			handleRequest(message, target);
+		}
+
+		function handleRequest(message, target) {
+			if (message.method === 'checkout')
+				return handleCheckout(message, target);
+			if (message.method === 'release')
+				return handleRelease(message, target);
+			operationQueue = operationQueue
+				.then(() => dispatchTimed(message))
+				.then(({ result, elapsedMs }) => postResponse(target, message.id, result, undefined, elapsedMs))
+				.catch((error) => postResponse(target, message.id, undefined, error));
+		}
+
+		function handleCheckout(message, target) {
+			checkoutQueue.push({
+				message,
+				target,
+				priority: normalizePriority(message.priority),
+				seq: nextCheckoutSeq++
+			});
+			grantNextCheckout();
+		}
+
+		function handleRelease(message, target) {
+			operationQueue = operationQueue
+				.then(() => {
+					if (message.leaseId !== activeLeaseId)
+						throw new Error('Cannot release inactive sqliteOPFS checkout.');
+					activeLeaseId = undefined;
+					return { released: true };
+				})
+				.then((result) => {
+					postResponse(target, message.id, result, undefined, 0);
+					grantNextCheckout();
+				})
+				.catch((error) => postResponse(target, message.id, undefined, error));
+		}
+
+		function grantNextCheckout() {
+			if (activeLeaseId !== undefined)
+				return;
+			const entry = shiftNextCheckout();
+			if (!entry)
+				return;
+			const leaseId = nextLeaseId++;
+			activeLeaseId = leaseId;
+			operationQueue = operationQueue
+				.then(() => postResponse(entry.target, entry.message.id, { leaseId }, undefined, 0))
+				.catch((error) => postResponse(entry.target, entry.message.id, undefined, error));
+		}
+
+		function shiftNextCheckout() {
+			if (checkoutQueue.length <= 1)
+				return checkoutQueue.shift();
+			let bestIndex = 0;
+			for (let i = 1; i < checkoutQueue.length; i++) {
+				const current = checkoutQueue[i];
+				const best = checkoutQueue[bestIndex];
+				if (current.priority < best.priority || current.priority === best.priority && current.seq < best.seq)
+					bestIndex = i;
+			}
+			return checkoutQueue.splice(bestIndex, 1)[0];
+		}
+
+		function terminate() {
+			closed = true;
+			listeners.clear();
+			if (db && typeof db.close === 'function') {
+				try {
+					db.close();
+				}
+				catch (_e) {
+					// Nothing useful to do during worker shutdown.
+				}
+			}
+			db = null;
+		}
+
+		async function dispatchTimed(message) {
+			const startedAt = now();
+			const result = await dispatch(message);
+			return {
+				result,
+				elapsedMs: now() - startedAt
+			};
+		}
+
+		async function dispatch(message) {
+			if (message.method === 'open')
+				return openDb(message.connectionString, message.busyTimeoutMs, message.vfs);
+			if (message.method === 'close')
+				return closeDb();
+			if (message.leaseId !== undefined && message.leaseId !== activeLeaseId)
+				throw new Error('sqliteOPFS checkout is not active.');
+			if (!db)
+				await openDbFromLastOptions(message.connectionString);
+			if (message.method === 'query')
+				return query(message.sql, message.parameters);
+			if (message.method === 'command')
+				return command(message.sql, message.parameters);
+			throw new Error('Unknown sqliteOPFS worker method "' + message.method + '".');
+		}
+
+		async function openDb(connectionString, busyTimeoutMs = 5000, vfs) {
+			if (db)
+				return { opened: true, reused: true, ...(dbOpenInfo || {}) };
+			dbOpenOptions = { connectionString, busyTimeoutMs, vfs };
+			const sqlite3 = await getSqlite3();
+			const filename = normalizeFilename(connectionString);
+			const dbInfo = await createDb(sqlite3, filename, vfs);
+			db = dbInfo.db;
+			db.exec('PRAGMA busy_timeout=' + (Number.parseInt(busyTimeoutMs, 10) || 5000));
+			dbOpenInfo = {
+				opened: true,
+				opfs: dbInfo.opfs === true,
+				vfs: dbInfo.vfs,
+				filename: db.filename
+			};
+			return dbOpenInfo;
+		}
+
+		function closeDb() {
+			if (db && typeof db.close === 'function')
+				db.close();
+			db = null;
+			return { closed: true };
+		}
+
+		function openDbFromLastOptions(connectionString) {
+			const options = dbOpenOptions || { connectionString: connectionString || 'orange.sqlite3' };
+			return openDb(options.connectionString, options.busyTimeoutMs, options.vfs);
+		}
+
+		async function createDb(sqlite3, filename, vfs) {
+			if (!vfs || vfs === 'opfs')
+				return createOpfsDb(sqlite3, filename);
+			if (vfs === 'opfs-wl')
+				return createOpfsWlDb(sqlite3, filename);
+			if (vfs === 'opfs-sahpool')
+				return createOpfsSahPoolDb(sqlite3, filename);
+			if (vfs && vfs !== 'opfs')
+				throw new Error('sqliteOPFS vfs "' + vfs + '" is not supported.');
+		}
+
+		function createOpfsDb(sqlite3, filename) {
+			const DbClass = sqlite3.oo1 && sqlite3.oo1.OpfsDb;
+			if (typeof DbClass !== 'function')
+				throw new Error('sqliteOPFS vfs "opfs" is not available in this sqlite-wasm build.');
+			return {
+				db: new DbClass(filename),
+				vfs: 'opfs',
+				opfs: true
+			};
+		}
+
+		function createOpfsWlDb(sqlite3, filename) {
+			const DbClass = sqlite3.oo1 && sqlite3.oo1.OpfsWlDb;
+			if (typeof DbClass !== 'function')
+				throw new Error('sqliteOPFS vfs "opfs-wl" is not available in this sqlite-wasm build.');
+			return {
+				db: new DbClass(filename),
+				vfs: 'opfs-wl',
+				opfs: true
+			};
+		}
+
+		async function createOpfsSahPoolDb(sqlite3, filename) {
+			if (!sqlite3 || typeof sqlite3.installOpfsSAHPoolVfs !== 'function')
+				throw new Error('sqliteOPFS vfs "opfs-sahpool" is not available in this sqlite-wasm build.');
+			const pool = await sqlite3.installOpfsSAHPoolVfs(opfsSahPoolOptions);
+			const DbClass = pool && pool.OpfsSAHPoolDb;
+			if (typeof DbClass !== 'function')
+				throw new Error('sqliteOPFS vfs "opfs-sahpool" is not available in this sqlite-wasm build.');
+			return {
+				db: new DbClass(filename),
+				vfs: pool.vfsName || 'opfs-sahpool',
+				opfs: true
+			};
+		}
+
+		async function getSqlite3() {
+			if (!sqlite3Promise) {
+				sqlite3Promise = loadSqliteModule().then((sqlite3InitModule) => {
+					if (typeof sqlite3InitModule !== 'function')
+						throw new Error('sqliteOPFS could not load sqlite-wasm module from ' + sqliteModuleUrl + '.');
+					return sqlite3InitModule(sqliteInitConfig);
+				});
+			}
+			return sqlite3Promise;
+		}
+
+		function loadSqliteModule() {
+			if (typeof options.sqlite3InitModule === 'function')
+				return Promise.resolve(options.sqlite3InitModule);
+			if (typeof options.loadSqlite3 === 'function')
+				return Promise.resolve(options.loadSqlite3(sqliteInitConfig));
+			return import(sqliteModuleUrl).then((module) => module && module.default || module);
+		}
+
+		function query(sql, parameters = []) {
+			return db.exec({
+				sql,
+				bind: normalizeParameters(parameters),
+				rowMode: 'object',
+				returnValue: 'resultRows'
+			});
+		}
+
+		function command(sql, parameters = []) {
+			const before = Number(db.changes(true) || 0);
+			db.exec({
+				sql,
+				bind: normalizeParameters(parameters)
+			});
+			const after = Number(db.changes(true) || 0);
+			return {
+				rowsAffected: Math.max(0, after - before),
+				lastInsertRowid: Number(db.selectValue('SELECT last_insert_rowid()'))
+			};
+		}
+
+		function postResponse(target, id, result, error, elapsedMs) {
+			target.postMessage({
+				type: 'orange-sqlite-opfs-response',
+				id,
+				result,
+				elapsedMs,
+				error: error ? serializeError(error) : undefined
+			});
+		}
+
+		function emit(type, event) {
+			for (const listener of listeners.get(type) || [])
+				listener(event);
+		}
+	}
+
+	function getDefaultSqliteModuleUrl() {
+		return typeof globalThis !== 'undefined' && typeof globalThis.__orangeOrmSqliteOPFSModuleUrl === 'string'
+			? globalThis.__orangeOrmSqliteOPFSModuleUrl
+			: null;
+	}
+
+	function normalizeOpfsSahPoolOptions(options = {}) {
+		const source = options.opfsSahPool || options.opfsSAHPool || options.sahPool;
+		if (!source || source !== Object(source))
+			return {};
+		return { ...source };
+	}
+
+	function normalizeFilename(connectionString) {
+		const value = String(connectionString || 'orange.sqlite3');
+		return value.startsWith('/') ? value : '/' + value;
+	}
+
+	function normalizeParameters(parameters) {
+		return Array.isArray(parameters) ? parameters.map(normalizeParameter) : parameters;
+	}
+
+	function normalizeParameter(value) {
+		if (value instanceof ArrayBuffer)
+			return new Uint8Array(value);
+		return value;
+	}
+
+	function now() {
+		if (typeof performance !== 'undefined' && performance.now)
+			return performance.now();
+		return Date.now();
+	}
+
+	function normalizePriority(priority) {
+		if (priority === undefined || priority === null)
+			return 0;
+		const parsed = Number.parseInt(priority, 10);
+		return Number.isFinite(parsed) ? parsed : 0;
+	}
+
+	function serializeError(error) {
+		return {
+			name: error && error.name,
+			message: error && error.message ? error.message : String(error),
+			stack: error && error.stack
+		};
+	}
+
+	inlineWorker = createInlineSqliteOPFSWorker;
+	return inlineWorker;
+}
+
+var workerClient;
+var hasRequiredWorkerClient;
+
+function requireWorkerClient () {
+	if (hasRequiredWorkerClient) return workerClient;
+	hasRequiredWorkerClient = 1;
+	const log = requireLog();
+	const createInlineSqliteOPFSWorker = requireInlineWorker();
+
+	function createSqliteOPFSWorkerClient(connectionString, options = {}) {
+		const worker = options.worker || createWorker(connectionString, options);
+		let nextId = 1;
+		const pending = new Map();
+		const readonly = !!options.readonly;
+		const lane = readonly ? 'reader' : 'writer';
+		let closed = false;
+		let openPromise;
+		let openInfo;
+
+		worker.addEventListener('message', onMessage);
+		worker.addEventListener('error', onWorkerError);
+		worker.addEventListener('messageerror', onWorkerError);
+		startMessagePort(worker);
+
+		const requestedVfs = options.vfs || 'opfs';
+		const fallbackVfs = normalizeFallbackVfs(options.fallbackVfs, requestedVfs);
+		const ready = options.deferOpen ? null : ensureOpen();
+
+		return {
+			executeQuery,
+			executeCommand,
+			checkout,
+			close,
+			getOpenInfo,
+			release,
+			reset,
+			ready
+		};
+
+		function executeQuery(query, callback) {
+			executeQueryCore(query, callback);
+		}
+
+		function executeCommand(query, callback) {
+			executeCommandCore(query, callback);
+		}
+
+		function executeQueryCore(query, callback, leaseId) {
+			if (closed)
+				return callback(new Error('sqliteOPFS worker client closed.'));
+			const sql = query.sql();
+			const parameters = query.parameters || [];
+			log.emitQuery({ sql, parameters, readonly, lane });
+			const startedAt = now();
+			ensureOpen()
+				.then(() => request('query', { sql, parameters, leaseId }))
+				.then(({ result, workerElapsedMs }) => {
+					log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, workerElapsedMs, readonly, lane });
+					callback(null, result);
+				})
+				.catch((error) => {
+					log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, error, readonly, lane });
+					callback(error);
+				});
+		}
+
+		function executeCommandCore(query, callback, leaseId) {
+			if (closed)
+				return callback(new Error('sqliteOPFS worker client closed.'));
+			const sql = query.sql();
+			const parameters = query.parameters || [];
+			log.emitQuery({ sql, parameters, readonly, lane });
+			const startedAt = now();
+			ensureOpen()
+				.then(() => request('command', { sql, parameters, leaseId }))
+				.then(({ result, workerElapsedMs }) => {
+					log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, workerElapsedMs, readonly, lane });
+					callback(null, result);
+				})
+				.catch((error) => {
+					log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, error, readonly, lane });
+					callback(error);
+				});
+		}
+
+		function checkout(priority) {
+			if (closed)
+				return Promise.reject(new Error('sqliteOPFS worker client closed.'));
+			return ensureOpen()
+				.then(() => request('checkout', { priority }))
+				.then(({ result }) => createLeasedClient(result && result.leaseId))
+				.catch((error) => {
+					if (isUnsupportedCheckoutError(error))
+						return createLeasedClient();
+					throw error;
+				});
+		}
+
+		function createLeasedClient(leaseId) {
+			if (leaseId === undefined || leaseId === null)
+				return {
+					executeQuery,
+					executeCommand,
+					getOpenInfo,
+					reset,
+					releaseCheckout: () => Promise.resolve()
+				};
+			return {
+				executeQuery(query, callback) {
+					executeQueryCore(query, callback, leaseId);
+				},
+				executeCommand(query, callback) {
+					executeCommandCore(query, callback, leaseId);
+				},
+				getOpenInfo,
+				reset,
+				releaseCheckout() {
+					return request('release', { leaseId }).then(() => undefined);
+				}
+			};
+		}
+
+		function request(method, payload = {}) {
+			if (closed && method !== 'close')
+				return Promise.reject(new Error('sqliteOPFS worker client closed.'));
+			const id = nextId++;
+			return new Promise((resolve, reject) => {
+				pending.set(id, { resolve, reject });
+				try {
+					worker.postMessage({
+						type: 'orange-sqlite-opfs-request',
+						id,
+						method,
+						...payload
+					});
+				}
+				catch (e) {
+					pending.delete(id);
+					reject(e);
+				}
+			});
+		}
+
+		function ensureOpen() {
+			if (closed)
+				return Promise.reject(new Error('sqliteOPFS worker client closed.'));
+			if (!openPromise) {
+				const vfs = openInfo && openInfo.vfs || requestedVfs;
+				const fallback = openInfo && openInfo.fallback ? undefined : fallbackVfs;
+				openPromise = openWorkerDb(vfs, fallback)
+					.then((info) => {
+						openInfo = info;
+						return info;
+					})
+					.catch((error) => {
+						openPromise = null;
+						throw error;
+					});
+			}
+			return openPromise;
+		}
+
+		async function openWorkerDb(vfs, fallbackVfs) {
+			try {
+				const response = await request('open', {
+					connectionString,
+					busyTimeoutMs: options.busyTimeoutMs || 5000,
+					vfs: vfs === 'opfs' ? options.vfs : vfs
+				});
+				return normalizeOpenResult({
+					result: response.result,
+					fallback: false
+				});
+			}
+			catch (e) {
+				if (!fallbackVfs)
+					throw e;
+				const response = await request('open', {
+					connectionString,
+					busyTimeoutMs: options.busyTimeoutMs || 5000,
+					vfs: fallbackVfs
+				});
+				return normalizeOpenResult({
+					result: response.result,
+					fallback: true,
+					fallbackError: e && e.message ? e.message : String(e)
+				});
+			}
+		}
+
+		function normalizeOpenResult({ result, fallback, fallbackError }) {
+			return {
+				...result,
+				requestedVfs,
+				fallback,
+				fallbackVfs,
+				fallbackError
+			};
+		}
+
+		function getOpenInfo() {
+			return openInfo;
+		}
+
+		function release() {
+			if (closed || !openPromise)
+				return Promise.resolve();
+			return openPromise
+				.then(() => request('close'))
+				.finally(() => {
+					openPromise = null;
+				});
+		}
+
+		function close() {
+			if (closed)
+				return Promise.resolve();
+			closed = true;
+			const closeRequest = options.closeDbOnClose === false
+				? Promise.resolve()
+				: withTimeout(request('close'), 1000).catch(() => {});
+			return closeRequest.finally(() => {
+				worker.removeEventListener('message', onMessage);
+				worker.removeEventListener('error', onWorkerError);
+				worker.removeEventListener('messageerror', onWorkerError);
+				rejectPending(new Error('sqliteOPFS worker client closed.'));
+				if (typeof worker.terminate === 'function')
+					worker.terminate();
+				else if (typeof worker.close === 'function')
+					worker.close();
+			});
+		}
+
+		function reset() {
+			// The worker serializes all requests, so there is no pooled connection state to reset.
+		}
+
+		function onMessage(event) {
+			const message = event && event.data;
+			if (!message || message.type !== 'orange-sqlite-opfs-response')
+				return;
+			const entry = pending.get(message.id);
+			if (!entry)
+				return;
+			pending.delete(message.id);
+			if (message.error)
+				entry.reject(toError(message.error));
+			else
+				entry.resolve({
+					result: message.result,
+					workerElapsedMs: message.elapsedMs
+				});
+		}
+
+		function onWorkerError(event) {
+			rejectPending(toWorkerError(event));
+		}
+
+		function rejectPending(error) {
+			for (const entry of pending.values())
+				entry.reject(error);
+			pending.clear();
+		}
+
+		function withTimeout(promise, timeoutMs) {
+			let timeoutId;
+			const timeout = new Promise((resolve) => {
+				timeoutId = setTimeout(resolve, timeoutMs);
+			});
+			return Promise.race([promise, timeout])
+				.finally(() => clearTimeout(timeoutId));
+		}
+	}
+
+	function now() {
+		if (typeof performance !== 'undefined' && performance.now)
+			return performance.now();
+		return Date.now();
+	}
+
+	function startMessagePort(port) {
+		if (port && typeof port.start === 'function') {
+			try {
+				port.start();
+			}
+			catch (_e) {
+				// MessagePort.start() is best-effort; browsers ignore repeated starts.
+			}
+		}
+	}
+
+	function isUnsupportedCheckoutError(error) {
+		const message = error && error.message || '';
+		return message.includes('Unknown') && (
+			message.includes('method "checkout"')
+			|| message.includes("method 'checkout'")
+		);
+	}
+
+	function createWorker(connectionString, options) {
+		if (typeof options.createWorker === 'function')
+			return options.createWorker(connectionString, options);
+		if (typeof globalThis !== 'undefined' && typeof globalThis.__orangeOrmCreateSqliteOPFSWorker === 'function')
+			return globalThis.__orangeOrmCreateSqliteOPFSWorker(connectionString, options);
+		if (options.inlineWorker)
+			return createInlineSqliteOPFSWorker(options);
+		if (options.workerUrl && typeof Worker !== 'undefined')
+			return new Worker(options.workerUrl, { type: 'module' });
+		if (typeof Worker !== 'undefined') {
+			try {
+				const source = createWorkerSource(options.sqliteModuleUrl || getDefaultSqliteModuleUrl() || '@sqlite.org/sqlite-wasm', options);
+				const blob = new Blob([source], { type: 'text/javascript' });
+				const url = URL.createObjectURL(blob);
+				return new Worker(url, { type: 'module' });
+			}
+			catch (e) {
+				throw new Error(`sqliteOPFS could not create its worker automatically: ${e.message}`);
+			}
+		}
+		throw new Error('sqliteOPFS requires Worker support or an explicit worker/createWorker option.');
+	}
+
+	createSqliteOPFSWorkerClient.createWorker = createWorker;
+
+	function getDefaultSqliteModuleUrl() {
+		return typeof globalThis !== 'undefined' && typeof globalThis.__orangeOrmSqliteOPFSModuleUrl === 'string'
+			? globalThis.__orangeOrmSqliteOPFSModuleUrl
+			: null;
+	}
+
+	function createWorkerSource(sqliteModuleUrl, options = {}) {
+		const sqliteInitConfig = {};
+		const opfsSahPoolOptions = normalizeOpfsSahPoolOptions(options);
+		return `
+const sqliteModuleUrl = ${JSON.stringify(sqliteModuleUrl)};
+const sqliteInitConfig = ${JSON.stringify(sqliteInitConfig)};
+const opfsSahPoolOptions = ${JSON.stringify(opfsSahPoolOptions)};
+let sqlite3Promise;
+let db;
+let dbOpenOptions;
+let dbOpenInfo;
+let operationQueue = Promise.resolve();
+let activeLeaseId;
+let nextLeaseId = 1;
+const checkoutQueue = [];
+let nextCheckoutSeq = 1;
+
+self.onmessage = (event) => {
+	handleIncoming(event, self);
+};
+
+function handleIncoming(event, target) {
+	const message = event && event.data;
+	if (!message)
+		return;
+	if (message.type === 'orange-sqlite-opfs-connect') {
+		const port = event.ports && event.ports[0] || message.port;
+		if (port)
+			attachPort(port);
+		return;
+	}
+	if (message.type !== 'orange-sqlite-opfs-request')
+		return;
+	handleRequest(message, target || self);
+}
+
+function attachPort(port) {
+	port.addEventListener('message', (event) => handleIncoming(event, port));
+	if (typeof port.start === 'function')
+		port.start();
+}
+
+function handleRequest(message, target) {
+	if (message.method === 'checkout')
+		return handleCheckout(message, target);
+	if (message.method === 'release')
+		return handleRelease(message, target);
+	operationQueue = operationQueue
+		.then(() => dispatchTimed(message))
+		.then(({ result, elapsedMs }) => postResponse(target, message.id, result, undefined, elapsedMs))
+		.catch((error) => postResponse(target, message.id, undefined, error));
+}
+
+function handleCheckout(message, target) {
+	checkoutQueue.push({
+		message,
+		target,
+		priority: normalizePriority(message.priority),
+		seq: nextCheckoutSeq++
+	});
+	grantNextCheckout();
+}
+
+function handleRelease(message, target) {
+	operationQueue = operationQueue
+		.then(() => {
+			if (message.leaseId !== activeLeaseId)
+				throw new Error('Cannot release inactive sqliteOPFS checkout.');
+			activeLeaseId = undefined;
+			return { released: true };
+		})
+		.then((result) => {
+			postResponse(target, message.id, result, undefined, 0);
+			grantNextCheckout();
+		})
+		.catch((error) => postResponse(target, message.id, undefined, error));
+}
+
+function grantNextCheckout() {
+	if (activeLeaseId !== undefined)
+		return;
+	const entry = shiftNextCheckout();
+	if (!entry)
+		return;
+	const leaseId = nextLeaseId++;
+	activeLeaseId = leaseId;
+	operationQueue = operationQueue
+		.then(() => postResponse(entry.target, entry.message.id, { leaseId }, undefined, 0))
+		.catch((error) => postResponse(entry.target, entry.message.id, undefined, error));
+}
+
+function shiftNextCheckout() {
+	if (checkoutQueue.length <= 1)
+		return checkoutQueue.shift();
+	let bestIndex = 0;
+	for (let i = 1; i < checkoutQueue.length; i++) {
+		const current = checkoutQueue[i];
+		const best = checkoutQueue[bestIndex];
+		if (current.priority < best.priority || current.priority === best.priority && current.seq < best.seq)
+			bestIndex = i;
+	}
+	return checkoutQueue.splice(bestIndex, 1)[0];
+}
+
+async function dispatchTimed(message) {
+	const startedAt = now();
+	const result = await dispatch(message);
+	return {
+		result,
+		elapsedMs: now() - startedAt
+	};
+}
+
+async function dispatch(message) {
+	if (message.method === 'open')
+		return openDb(message.connectionString, message.busyTimeoutMs, message.vfs);
+	if (message.method === 'close')
+		return closeDb();
+	if (message.leaseId !== undefined && message.leaseId !== activeLeaseId)
+		throw new Error('sqliteOPFS checkout is not active.');
+	if (!db)
+		await openDbFromLastOptions(message.connectionString);
+	if (message.method === 'query')
+		return query(message.sql, message.parameters);
+	if (message.method === 'command')
+		return command(message.sql, message.parameters);
+	throw new Error('Unknown sqliteOPFS worker method "' + message.method + '".');
+}
+
+async function openDb(connectionString, busyTimeoutMs = 5000, vfs) {
+	if (db)
+		return { opened: true, reused: true, ...(dbOpenInfo || {}) };
+	dbOpenOptions = { connectionString, busyTimeoutMs, vfs };
+	const sqlite3 = await getSqlite3();
+	const filename = normalizeFilename(connectionString);
+	const dbInfo = await createDb(sqlite3, filename, vfs);
+	db = dbInfo.db;
+	db.exec('PRAGMA busy_timeout=' + (Number.parseInt(busyTimeoutMs, 10) || 5000));
+	dbOpenInfo = {
+		opened: true,
+		opfs: dbInfo.opfs === true,
+		vfs: dbInfo.vfs,
+		filename: db.filename
+	};
+	return dbOpenInfo;
+}
+
+function closeDb() {
+	if (db && typeof db.close === 'function')
+		db.close();
+	db = null;
+	return { closed: true };
+}
+
+function openDbFromLastOptions(connectionString) {
+	const options = dbOpenOptions || { connectionString: connectionString || 'orange.sqlite3' };
+	return openDb(options.connectionString, options.busyTimeoutMs, options.vfs);
+}
+
+async function createDb(sqlite3, filename, vfs) {
+	if (!vfs || vfs === 'opfs')
+		return createOpfsDb(sqlite3, filename);
+	if (vfs === 'opfs-wl')
+		return createOpfsWlDb(sqlite3, filename);
+	if (vfs === 'opfs-sahpool')
+		return createOpfsSahPoolDb(sqlite3, filename);
+	if (vfs && vfs !== 'opfs')
+		throw new Error('sqliteOPFS vfs "' + vfs + '" is not supported.');
+}
+
+function createOpfsDb(sqlite3, filename) {
+	const DbClass = sqlite3.oo1 && sqlite3.oo1.OpfsDb;
+	if (typeof DbClass !== 'function')
+		throw new Error('sqliteOPFS vfs "opfs" is not available in this sqlite-wasm build.');
+	return {
+		db: new DbClass(filename),
+		vfs: 'opfs',
+		opfs: true
+	};
+}
+
+function createOpfsWlDb(sqlite3, filename) {
+	const DbClass = sqlite3.oo1 && sqlite3.oo1.OpfsWlDb;
+	if (typeof DbClass !== 'function')
+		throw new Error('sqliteOPFS vfs "opfs-wl" is not available in this sqlite-wasm build.');
+	return {
+		db: new DbClass(filename),
+		vfs: 'opfs-wl',
+		opfs: true
+	};
+}
+
+async function createOpfsSahPoolDb(sqlite3, filename) {
+	if (!sqlite3 || typeof sqlite3.installOpfsSAHPoolVfs !== 'function')
+		throw new Error('sqliteOPFS vfs "opfs-sahpool" is not available in this sqlite-wasm build.');
+	const pool = await sqlite3.installOpfsSAHPoolVfs(opfsSahPoolOptions);
+	const DbClass = pool && pool.OpfsSAHPoolDb;
+	if (typeof DbClass !== 'function')
+		throw new Error('sqliteOPFS vfs "opfs-sahpool" is not available in this sqlite-wasm build.');
+	return {
+		db: new DbClass(filename),
+		vfs: pool.vfsName || 'opfs-sahpool',
+		opfs: true
+	};
+}
+
+async function getSqlite3() {
+	if (!sqlite3Promise) {
+		sqlite3Promise = import(sqliteModuleUrl).then((module) => {
+			const sqlite3InitModule = module && module.default || module;
+			if (typeof sqlite3InitModule !== 'function')
+				throw new Error('sqliteOPFS could not load sqlite-wasm module from ' + sqliteModuleUrl + '.');
+			return sqlite3InitModule(sqliteInitConfig);
+		});
+	}
+	return sqlite3Promise;
+}
+
+function query(sql, parameters = []) {
+	return db.exec({
+		sql,
+		bind: normalizeParameters(parameters),
+		rowMode: 'object',
+		returnValue: 'resultRows'
+	});
+}
+
+function command(sql, parameters = []) {
+	const before = Number(db.changes(true) || 0);
+	db.exec({
+		sql,
+		bind: normalizeParameters(parameters)
+	});
+	const after = Number(db.changes(true) || 0);
+	return {
+		rowsAffected: Math.max(0, after - before),
+		lastInsertRowid: Number(db.selectValue('SELECT last_insert_rowid()'))
+	};
+}
+
+function normalizeFilename(connectionString) {
+	const value = String(connectionString || 'orange.sqlite3');
+	return value.startsWith('/') ? value : '/' + value;
+}
+
+function normalizeParameters(parameters) {
+	return Array.isArray(parameters) ? parameters.map(normalizeParameter) : parameters;
+}
+
+function normalizeParameter(value) {
+	if (value instanceof ArrayBuffer)
+		return new Uint8Array(value);
+	return value;
+}
+
+function now() {
+	if (typeof performance !== 'undefined' && performance.now)
+		return performance.now();
+	return Date.now();
+}
+
+function normalizePriority(priority) {
+	if (priority === undefined || priority === null)
+		return 0;
+	const parsed = Number.parseInt(priority, 10);
+	return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function postResponse(target, id, result, error, elapsedMs) {
+	target.postMessage({
+		type: 'orange-sqlite-opfs-response',
+		id,
+		result,
+		elapsedMs,
+		error: error ? serializeError(error) : undefined
+	});
+}
+
+function serializeError(error) {
+	return {
+		name: error && error.name,
+		message: error && error.message ? error.message : String(error),
+		stack: error && error.stack
+	};
+}
+
+//# sourceURL=orange-orm-sqlite-opfs-worker.mjs
+`;
+	}
+
+	function normalizeOpfsSahPoolOptions(options = {}) {
+		const source = options.opfsSahPool || options.opfsSAHPool || options.sahPool;
+		if (!source || source !== Object(source))
+			return {};
+		return { ...source };
+	}
+
+	function normalizeFallbackVfs(value, requestedVfs) {
+		if (!value || value === requestedVfs)
+			return undefined;
+		if (value !== 'opfs' && value !== 'opfs-sahpool' && value !== 'opfs-wl')
+			throw new Error(`sqliteOPFS fallbackVfs "${value}" is not supported.`);
+		return value;
+	}
+
+	function toError(error) {
+		const e = new Error(error && error.message ? error.message : 'sqliteOPFS worker request failed.');
+		if (error && error.name)
+			e.name = error.name;
+		if (error && error.stack)
+			e.stack = error.stack;
+		return e;
+	}
+
+	function toWorkerError(event) {
+		if (event instanceof Error)
+			return event;
+		if (event && event.error instanceof Error)
+			return event.error;
+		const message = event && event.message
+			? event.message
+			: 'sqliteOPFS worker failed before responding.';
+		const e = new Error(message);
+		if (event && event.filename)
+			e.stack = `${message}\n${event.filename}:${event.lineno || 0}:${event.colno || 0}`;
+		return e;
+	}
+
+	workerClient = createSqliteOPFSWorkerClient;
+	return workerClient;
+}
+
+var createWorker;
+var hasRequiredCreateWorker;
+
+function requireCreateWorker () {
+	if (hasRequiredCreateWorker) return createWorker;
+	hasRequiredCreateWorker = 1;
+	const createSqliteOPFSWorkerClient = requireWorkerClient();
+
+	function createSqliteOPFSWorker(options = {}) {
+		return createSqliteOPFSWorkerClient.createWorker(options.connectionString || 'orange.sqlite3', options);
+	}
+
+	createWorker = createSqliteOPFSWorker;
+	return createWorker;
+}
+
 var connectWorkerPort;
 var hasRequiredConnectWorkerPort;
 
@@ -21355,77 +22464,6 @@ function requirePools () {
 
 	pools_1 = pools;
 	return pools_1;
-}
-
-var log_1;
-var hasRequiredLog;
-
-function requireLog () {
-	if (hasRequiredLog) return log_1;
-	hasRequiredLog = 1;
-	var newEmitEvent = requireEmitEvent();
-
-	var emitters = {
-		query: newEmitEvent(),
-		queryComplete: newEmitEvent()
-	};
-
-	var logger = function() {
-	};
-
-	function log() {
-		logger.apply(null, arguments);
-	}
-	function emitQuery({ sql, parameters }) {
-		emitters.query.apply(null, arguments);
-		log(sql);
-		log('parameters: ' + parameters);
-	}
-
-	log.emitQuery = emitQuery;
-
-	log.emitQueryComplete = function() {
-		emitters.queryComplete.apply(null, arguments);
-	};
-
-	log.startQuery = function({ sql, parameters }) {
-		const startedAt = now();
-		log.emitQuery({ sql, parameters });
-		return function(error) {
-			log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, error });
-		};
-	};
-
-	log.registerLogger = function(cb) {
-		logger = cb;
-	};
-
-	log.on = function(type, cb) {
-		if (type === 'query')
-			emitters.query.add(cb);
-		else if (type === 'queryComplete')
-			emitters.queryComplete.add(cb);
-		else
-			throw new Error('unknown event type: ' + type);
-	};
-
-	log.off = function(type, cb) {
-		if (type === 'query')
-			emitters.query.tryRemove(cb);
-		else if (type === 'queryComplete')
-			emitters.queryComplete.tryRemove(cb);
-		else
-			throw new Error('unknown event type: ' + type);
-	};
-
-	log_1 = log;
-
-	function now() {
-		if (typeof performance !== 'undefined' && performance.now)
-			return performance.now();
-		return Date.now();
-	}
-	return log_1;
 }
 
 var toIntKey_1;
@@ -27434,1026 +28472,6 @@ function requireNewTransaction$5 () {
 	return newTransaction$5;
 }
 
-var inlineWorker;
-var hasRequiredInlineWorker;
-
-function requireInlineWorker () {
-	if (hasRequiredInlineWorker) return inlineWorker;
-	hasRequiredInlineWorker = 1;
-	function createInlineSqliteOPFSWorker(options = {}) {
-		const listeners = new Map();
-		const sqliteModuleUrl = options.sqliteModuleUrl || getDefaultSqliteModuleUrl() || '@sqlite.org/sqlite-wasm';
-		const sqliteInitConfig = {};
-		const opfsSahPoolOptions = normalizeOpfsSahPoolOptions(options);
-		let sqlite3Promise;
-		let db;
-		let dbOpenOptions;
-		let dbOpenInfo;
-		let operationQueue = Promise.resolve();
-		let activeLeaseId;
-		let nextLeaseId = 1;
-		const checkoutQueue = [];
-		let nextCheckoutSeq = 1;
-		let closed = false;
-		const rootTarget = {
-			postMessage(message) {
-				emit('message', { data: message });
-			}
-		};
-
-		return {
-			addEventListener,
-			removeEventListener,
-			postMessage,
-			terminate
-		};
-
-		function addEventListener(type, listener) {
-			const entries = listeners.get(type) || [];
-			entries.push(listener);
-			listeners.set(type, entries);
-		}
-
-		function removeEventListener(type, listener) {
-			const entries = listeners.get(type) || [];
-			listeners.set(type, entries.filter((entry) => entry !== listener));
-		}
-
-		function postMessage(message, transfer) {
-			if (closed || !message || message.type !== 'orange-sqlite-opfs-request')
-				return handleControlMessage(message, transfer);
-			handleRequest(message, rootTarget);
-		}
-
-		function handleControlMessage(message, transfer) {
-			if (closed || !message || message.type !== 'orange-sqlite-opfs-connect')
-				return;
-			const port = transfer && transfer[0] || message.port;
-			if (port)
-				attachPort(port);
-		}
-
-		function attachPort(port) {
-			port.addEventListener('message', (event) => handleIncoming(event, port));
-			if (typeof port.start === 'function')
-				port.start();
-		}
-
-		function handleIncoming(event, target) {
-			const message = event && event.data;
-			if (!message || message.type !== 'orange-sqlite-opfs-request')
-				return handleControlMessage(message);
-			handleRequest(message, target);
-		}
-
-		function handleRequest(message, target) {
-			if (message.method === 'checkout')
-				return handleCheckout(message, target);
-			if (message.method === 'release')
-				return handleRelease(message, target);
-			operationQueue = operationQueue
-				.then(() => dispatchTimed(message))
-				.then(({ result, elapsedMs }) => postResponse(target, message.id, result, undefined, elapsedMs))
-				.catch((error) => postResponse(target, message.id, undefined, error));
-		}
-
-		function handleCheckout(message, target) {
-			checkoutQueue.push({
-				message,
-				target,
-				priority: normalizePriority(message.priority),
-				seq: nextCheckoutSeq++
-			});
-			grantNextCheckout();
-		}
-
-		function handleRelease(message, target) {
-			operationQueue = operationQueue
-				.then(() => {
-					if (message.leaseId !== activeLeaseId)
-						throw new Error('Cannot release inactive sqliteOPFS checkout.');
-					activeLeaseId = undefined;
-					return { released: true };
-				})
-				.then((result) => {
-					postResponse(target, message.id, result, undefined, 0);
-					grantNextCheckout();
-				})
-				.catch((error) => postResponse(target, message.id, undefined, error));
-		}
-
-		function grantNextCheckout() {
-			if (activeLeaseId !== undefined)
-				return;
-			const entry = shiftNextCheckout();
-			if (!entry)
-				return;
-			const leaseId = nextLeaseId++;
-			activeLeaseId = leaseId;
-			operationQueue = operationQueue
-				.then(() => postResponse(entry.target, entry.message.id, { leaseId }, undefined, 0))
-				.catch((error) => postResponse(entry.target, entry.message.id, undefined, error));
-		}
-
-		function shiftNextCheckout() {
-			if (checkoutQueue.length <= 1)
-				return checkoutQueue.shift();
-			let bestIndex = 0;
-			for (let i = 1; i < checkoutQueue.length; i++) {
-				const current = checkoutQueue[i];
-				const best = checkoutQueue[bestIndex];
-				if (current.priority < best.priority || current.priority === best.priority && current.seq < best.seq)
-					bestIndex = i;
-			}
-			return checkoutQueue.splice(bestIndex, 1)[0];
-		}
-
-		function terminate() {
-			closed = true;
-			listeners.clear();
-			if (db && typeof db.close === 'function') {
-				try {
-					db.close();
-				}
-				catch (_e) {
-					// Nothing useful to do during worker shutdown.
-				}
-			}
-			db = null;
-		}
-
-		async function dispatchTimed(message) {
-			const startedAt = now();
-			const result = await dispatch(message);
-			return {
-				result,
-				elapsedMs: now() - startedAt
-			};
-		}
-
-		async function dispatch(message) {
-			if (message.method === 'open')
-				return openDb(message.connectionString, message.busyTimeoutMs, message.vfs);
-			if (message.method === 'close')
-				return closeDb();
-			if (message.leaseId !== undefined && message.leaseId !== activeLeaseId)
-				throw new Error('sqliteOPFS checkout is not active.');
-			if (!db)
-				await openDbFromLastOptions(message.connectionString);
-			if (message.method === 'query')
-				return query(message.sql, message.parameters);
-			if (message.method === 'command')
-				return command(message.sql, message.parameters);
-			throw new Error('Unknown sqliteOPFS worker method "' + message.method + '".');
-		}
-
-		async function openDb(connectionString, busyTimeoutMs = 5000, vfs) {
-			if (db)
-				return { opened: true, reused: true, ...(dbOpenInfo || {}) };
-			dbOpenOptions = { connectionString, busyTimeoutMs, vfs };
-			const sqlite3 = await getSqlite3();
-			const filename = normalizeFilename(connectionString);
-			const dbInfo = await createDb(sqlite3, filename, vfs);
-			db = dbInfo.db;
-			db.exec('PRAGMA busy_timeout=' + (Number.parseInt(busyTimeoutMs, 10) || 5000));
-			dbOpenInfo = {
-				opened: true,
-				opfs: dbInfo.opfs === true,
-				vfs: dbInfo.vfs,
-				filename: db.filename
-			};
-			return dbOpenInfo;
-		}
-
-		function closeDb() {
-			if (db && typeof db.close === 'function')
-				db.close();
-			db = null;
-			return { closed: true };
-		}
-
-		function openDbFromLastOptions(connectionString) {
-			const options = dbOpenOptions || { connectionString: connectionString || 'orange.sqlite3' };
-			return openDb(options.connectionString, options.busyTimeoutMs, options.vfs);
-		}
-
-		async function createDb(sqlite3, filename, vfs) {
-			if (!vfs || vfs === 'opfs')
-				return createOpfsDb(sqlite3, filename);
-			if (vfs === 'opfs-wl')
-				return createOpfsWlDb(sqlite3, filename);
-			if (vfs === 'opfs-sahpool')
-				return createOpfsSahPoolDb(sqlite3, filename);
-			if (vfs && vfs !== 'opfs')
-				throw new Error('sqliteOPFS vfs "' + vfs + '" is not supported.');
-		}
-
-		function createOpfsDb(sqlite3, filename) {
-			const DbClass = sqlite3.oo1 && sqlite3.oo1.OpfsDb;
-			if (typeof DbClass !== 'function')
-				throw new Error('sqliteOPFS vfs "opfs" is not available in this sqlite-wasm build.');
-			return {
-				db: new DbClass(filename),
-				vfs: 'opfs',
-				opfs: true
-			};
-		}
-
-		function createOpfsWlDb(sqlite3, filename) {
-			const DbClass = sqlite3.oo1 && sqlite3.oo1.OpfsWlDb;
-			if (typeof DbClass !== 'function')
-				throw new Error('sqliteOPFS vfs "opfs-wl" is not available in this sqlite-wasm build.');
-			return {
-				db: new DbClass(filename),
-				vfs: 'opfs-wl',
-				opfs: true
-			};
-		}
-
-		async function createOpfsSahPoolDb(sqlite3, filename) {
-			if (!sqlite3 || typeof sqlite3.installOpfsSAHPoolVfs !== 'function')
-				throw new Error('sqliteOPFS vfs "opfs-sahpool" is not available in this sqlite-wasm build.');
-			const pool = await sqlite3.installOpfsSAHPoolVfs(opfsSahPoolOptions);
-			const DbClass = pool && pool.OpfsSAHPoolDb;
-			if (typeof DbClass !== 'function')
-				throw new Error('sqliteOPFS vfs "opfs-sahpool" is not available in this sqlite-wasm build.');
-			return {
-				db: new DbClass(filename),
-				vfs: pool.vfsName || 'opfs-sahpool',
-				opfs: true
-			};
-		}
-
-		async function getSqlite3() {
-			if (!sqlite3Promise) {
-				sqlite3Promise = loadSqliteModule().then((sqlite3InitModule) => {
-					if (typeof sqlite3InitModule !== 'function')
-						throw new Error('sqliteOPFS could not load sqlite-wasm module from ' + sqliteModuleUrl + '.');
-					return sqlite3InitModule(sqliteInitConfig);
-				});
-			}
-			return sqlite3Promise;
-		}
-
-		function loadSqliteModule() {
-			if (typeof options.sqlite3InitModule === 'function')
-				return Promise.resolve(options.sqlite3InitModule);
-			if (typeof options.loadSqlite3 === 'function')
-				return Promise.resolve(options.loadSqlite3(sqliteInitConfig));
-			return import(sqliteModuleUrl).then((module) => module && module.default || module);
-		}
-
-		function query(sql, parameters = []) {
-			return db.exec({
-				sql,
-				bind: normalizeParameters(parameters),
-				rowMode: 'object',
-				returnValue: 'resultRows'
-			});
-		}
-
-		function command(sql, parameters = []) {
-			const before = Number(db.changes(true) || 0);
-			db.exec({
-				sql,
-				bind: normalizeParameters(parameters)
-			});
-			const after = Number(db.changes(true) || 0);
-			return {
-				rowsAffected: Math.max(0, after - before),
-				lastInsertRowid: Number(db.selectValue('SELECT last_insert_rowid()'))
-			};
-		}
-
-		function postResponse(target, id, result, error, elapsedMs) {
-			target.postMessage({
-				type: 'orange-sqlite-opfs-response',
-				id,
-				result,
-				elapsedMs,
-				error: error ? serializeError(error) : undefined
-			});
-		}
-
-		function emit(type, event) {
-			for (const listener of listeners.get(type) || [])
-				listener(event);
-		}
-	}
-
-	function getDefaultSqliteModuleUrl() {
-		return typeof globalThis !== 'undefined' && typeof globalThis.__orangeOrmSqliteOPFSModuleUrl === 'string'
-			? globalThis.__orangeOrmSqliteOPFSModuleUrl
-			: null;
-	}
-
-	function normalizeOpfsSahPoolOptions(options = {}) {
-		const source = options.opfsSahPool || options.opfsSAHPool || options.sahPool;
-		if (!source || source !== Object(source))
-			return {};
-		return { ...source };
-	}
-
-	function normalizeFilename(connectionString) {
-		const value = String(connectionString || 'orange.sqlite3');
-		return value.startsWith('/') ? value : '/' + value;
-	}
-
-	function normalizeParameters(parameters) {
-		return Array.isArray(parameters) ? parameters.map(normalizeParameter) : parameters;
-	}
-
-	function normalizeParameter(value) {
-		if (value instanceof ArrayBuffer)
-			return new Uint8Array(value);
-		return value;
-	}
-
-	function now() {
-		if (typeof performance !== 'undefined' && performance.now)
-			return performance.now();
-		return Date.now();
-	}
-
-	function normalizePriority(priority) {
-		if (priority === undefined || priority === null)
-			return 0;
-		const parsed = Number.parseInt(priority, 10);
-		return Number.isFinite(parsed) ? parsed : 0;
-	}
-
-	function serializeError(error) {
-		return {
-			name: error && error.name,
-			message: error && error.message ? error.message : String(error),
-			stack: error && error.stack
-		};
-	}
-
-	inlineWorker = createInlineSqliteOPFSWorker;
-	return inlineWorker;
-}
-
-var workerClient;
-var hasRequiredWorkerClient;
-
-function requireWorkerClient () {
-	if (hasRequiredWorkerClient) return workerClient;
-	hasRequiredWorkerClient = 1;
-	const log = requireLog();
-	const createInlineSqliteOPFSWorker = requireInlineWorker();
-
-	function createSqliteOPFSWorkerClient(connectionString, options = {}) {
-		const worker = options.worker || createWorker(connectionString, options);
-		let nextId = 1;
-		const pending = new Map();
-		const readonly = !!options.readonly;
-		const lane = readonly ? 'reader' : 'writer';
-		let closed = false;
-		let openPromise;
-		let openInfo;
-
-		worker.addEventListener('message', onMessage);
-		worker.addEventListener('error', onWorkerError);
-		worker.addEventListener('messageerror', onWorkerError);
-		startMessagePort(worker);
-
-		const requestedVfs = options.vfs || 'opfs';
-		const fallbackVfs = normalizeFallbackVfs(options.fallbackVfs, requestedVfs);
-		const ready = options.deferOpen ? null : ensureOpen();
-
-		return {
-			executeQuery,
-			executeCommand,
-			checkout,
-			close,
-			getOpenInfo,
-			release,
-			reset,
-			ready
-		};
-
-		function executeQuery(query, callback) {
-			executeQueryCore(query, callback);
-		}
-
-		function executeCommand(query, callback) {
-			executeCommandCore(query, callback);
-		}
-
-		function executeQueryCore(query, callback, leaseId) {
-			if (closed)
-				return callback(new Error('sqliteOPFS worker client closed.'));
-			const sql = query.sql();
-			const parameters = query.parameters || [];
-			log.emitQuery({ sql, parameters, readonly, lane });
-			const startedAt = now();
-			ensureOpen()
-				.then(() => request('query', { sql, parameters, leaseId }))
-				.then(({ result, workerElapsedMs }) => {
-					log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, workerElapsedMs, readonly, lane });
-					callback(null, result);
-				})
-				.catch((error) => {
-					log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, error, readonly, lane });
-					callback(error);
-				});
-		}
-
-		function executeCommandCore(query, callback, leaseId) {
-			if (closed)
-				return callback(new Error('sqliteOPFS worker client closed.'));
-			const sql = query.sql();
-			const parameters = query.parameters || [];
-			log.emitQuery({ sql, parameters, readonly, lane });
-			const startedAt = now();
-			ensureOpen()
-				.then(() => request('command', { sql, parameters, leaseId }))
-				.then(({ result, workerElapsedMs }) => {
-					log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, workerElapsedMs, readonly, lane });
-					callback(null, result);
-				})
-				.catch((error) => {
-					log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, error, readonly, lane });
-					callback(error);
-				});
-		}
-
-		function checkout(priority) {
-			if (closed)
-				return Promise.reject(new Error('sqliteOPFS worker client closed.'));
-			return ensureOpen()
-				.then(() => request('checkout', { priority }))
-				.then(({ result }) => createLeasedClient(result && result.leaseId))
-				.catch((error) => {
-					if (isUnsupportedCheckoutError(error))
-						return createLeasedClient();
-					throw error;
-				});
-		}
-
-		function createLeasedClient(leaseId) {
-			if (leaseId === undefined || leaseId === null)
-				return {
-					executeQuery,
-					executeCommand,
-					getOpenInfo,
-					reset,
-					releaseCheckout: () => Promise.resolve()
-				};
-			return {
-				executeQuery(query, callback) {
-					executeQueryCore(query, callback, leaseId);
-				},
-				executeCommand(query, callback) {
-					executeCommandCore(query, callback, leaseId);
-				},
-				getOpenInfo,
-				reset,
-				releaseCheckout() {
-					return request('release', { leaseId }).then(() => undefined);
-				}
-			};
-		}
-
-		function request(method, payload = {}) {
-			if (closed && method !== 'close')
-				return Promise.reject(new Error('sqliteOPFS worker client closed.'));
-			const id = nextId++;
-			return new Promise((resolve, reject) => {
-				pending.set(id, { resolve, reject });
-				try {
-					worker.postMessage({
-						type: 'orange-sqlite-opfs-request',
-						id,
-						method,
-						...payload
-					});
-				}
-				catch (e) {
-					pending.delete(id);
-					reject(e);
-				}
-			});
-		}
-
-		function ensureOpen() {
-			if (closed)
-				return Promise.reject(new Error('sqliteOPFS worker client closed.'));
-			if (!openPromise) {
-				const vfs = openInfo && openInfo.vfs || requestedVfs;
-				const fallback = openInfo && openInfo.fallback ? undefined : fallbackVfs;
-				openPromise = openWorkerDb(vfs, fallback)
-					.then((info) => {
-						openInfo = info;
-						return info;
-					})
-					.catch((error) => {
-						openPromise = null;
-						throw error;
-					});
-			}
-			return openPromise;
-		}
-
-		async function openWorkerDb(vfs, fallbackVfs) {
-			try {
-				const response = await request('open', {
-					connectionString,
-					busyTimeoutMs: options.busyTimeoutMs || 5000,
-					vfs: vfs === 'opfs' ? options.vfs : vfs
-				});
-				return normalizeOpenResult({
-					result: response.result,
-					fallback: false
-				});
-			}
-			catch (e) {
-				if (!fallbackVfs)
-					throw e;
-				const response = await request('open', {
-					connectionString,
-					busyTimeoutMs: options.busyTimeoutMs || 5000,
-					vfs: fallbackVfs
-				});
-				return normalizeOpenResult({
-					result: response.result,
-					fallback: true,
-					fallbackError: e && e.message ? e.message : String(e)
-				});
-			}
-		}
-
-		function normalizeOpenResult({ result, fallback, fallbackError }) {
-			return {
-				...result,
-				requestedVfs,
-				fallback,
-				fallbackVfs,
-				fallbackError
-			};
-		}
-
-		function getOpenInfo() {
-			return openInfo;
-		}
-
-		function release() {
-			if (closed || !openPromise)
-				return Promise.resolve();
-			return openPromise
-				.then(() => request('close'))
-				.finally(() => {
-					openPromise = null;
-				});
-		}
-
-		function close() {
-			if (closed)
-				return Promise.resolve();
-			closed = true;
-			const closeRequest = options.closeDbOnClose === false
-				? Promise.resolve()
-				: withTimeout(request('close'), 1000).catch(() => {});
-			return closeRequest.finally(() => {
-				worker.removeEventListener('message', onMessage);
-				worker.removeEventListener('error', onWorkerError);
-				worker.removeEventListener('messageerror', onWorkerError);
-				rejectPending(new Error('sqliteOPFS worker client closed.'));
-				if (typeof worker.terminate === 'function')
-					worker.terminate();
-				else if (typeof worker.close === 'function')
-					worker.close();
-			});
-		}
-
-		function reset() {
-			// The worker serializes all requests, so there is no pooled connection state to reset.
-		}
-
-		function onMessage(event) {
-			const message = event && event.data;
-			if (!message || message.type !== 'orange-sqlite-opfs-response')
-				return;
-			const entry = pending.get(message.id);
-			if (!entry)
-				return;
-			pending.delete(message.id);
-			if (message.error)
-				entry.reject(toError(message.error));
-			else
-				entry.resolve({
-					result: message.result,
-					workerElapsedMs: message.elapsedMs
-				});
-		}
-
-		function onWorkerError(event) {
-			rejectPending(toWorkerError(event));
-		}
-
-		function rejectPending(error) {
-			for (const entry of pending.values())
-				entry.reject(error);
-			pending.clear();
-		}
-
-		function withTimeout(promise, timeoutMs) {
-			let timeoutId;
-			const timeout = new Promise((resolve) => {
-				timeoutId = setTimeout(resolve, timeoutMs);
-			});
-			return Promise.race([promise, timeout])
-				.finally(() => clearTimeout(timeoutId));
-		}
-	}
-
-	function now() {
-		if (typeof performance !== 'undefined' && performance.now)
-			return performance.now();
-		return Date.now();
-	}
-
-	function startMessagePort(port) {
-		if (port && typeof port.start === 'function') {
-			try {
-				port.start();
-			}
-			catch (_e) {
-				// MessagePort.start() is best-effort; browsers ignore repeated starts.
-			}
-		}
-	}
-
-	function isUnsupportedCheckoutError(error) {
-		const message = error && error.message || '';
-		return message.includes('Unknown') && (
-			message.includes('method "checkout"')
-			|| message.includes("method 'checkout'")
-		);
-	}
-
-	function createWorker(connectionString, options) {
-		if (typeof options.createWorker === 'function')
-			return options.createWorker(connectionString, options);
-		if (typeof globalThis !== 'undefined' && typeof globalThis.__orangeOrmCreateSqliteOPFSWorker === 'function')
-			return globalThis.__orangeOrmCreateSqliteOPFSWorker(connectionString, options);
-		if (options.inlineWorker)
-			return createInlineSqliteOPFSWorker(options);
-		if (options.workerUrl && typeof Worker !== 'undefined')
-			return new Worker(options.workerUrl, { type: 'module' });
-		if (typeof Worker !== 'undefined') {
-			try {
-				const source = createWorkerSource(options.sqliteModuleUrl || getDefaultSqliteModuleUrl() || '@sqlite.org/sqlite-wasm', options);
-				const blob = new Blob([source], { type: 'text/javascript' });
-				const url = URL.createObjectURL(blob);
-				return new Worker(url, { type: 'module' });
-			}
-			catch (e) {
-				throw new Error(`sqliteOPFS could not create its worker automatically: ${e.message}`);
-			}
-		}
-		throw new Error('sqliteOPFS requires Worker support or an explicit worker/createWorker option.');
-	}
-
-	function getDefaultSqliteModuleUrl() {
-		return typeof globalThis !== 'undefined' && typeof globalThis.__orangeOrmSqliteOPFSModuleUrl === 'string'
-			? globalThis.__orangeOrmSqliteOPFSModuleUrl
-			: null;
-	}
-
-	function createWorkerSource(sqliteModuleUrl, options = {}) {
-		const sqliteInitConfig = {};
-		const opfsSahPoolOptions = normalizeOpfsSahPoolOptions(options);
-		return `
-const sqliteModuleUrl = ${JSON.stringify(sqliteModuleUrl)};
-const sqliteInitConfig = ${JSON.stringify(sqliteInitConfig)};
-const opfsSahPoolOptions = ${JSON.stringify(opfsSahPoolOptions)};
-let sqlite3Promise;
-let db;
-let dbOpenOptions;
-let dbOpenInfo;
-let operationQueue = Promise.resolve();
-let activeLeaseId;
-let nextLeaseId = 1;
-const checkoutQueue = [];
-let nextCheckoutSeq = 1;
-
-self.onmessage = (event) => {
-	handleIncoming(event, self);
-};
-
-function handleIncoming(event, target) {
-	const message = event && event.data;
-	if (!message)
-		return;
-	if (message.type === 'orange-sqlite-opfs-connect') {
-		const port = event.ports && event.ports[0] || message.port;
-		if (port)
-			attachPort(port);
-		return;
-	}
-	if (message.type !== 'orange-sqlite-opfs-request')
-		return;
-	handleRequest(message, target || self);
-}
-
-function attachPort(port) {
-	port.addEventListener('message', (event) => handleIncoming(event, port));
-	if (typeof port.start === 'function')
-		port.start();
-}
-
-function handleRequest(message, target) {
-	if (message.method === 'checkout')
-		return handleCheckout(message, target);
-	if (message.method === 'release')
-		return handleRelease(message, target);
-	operationQueue = operationQueue
-		.then(() => dispatchTimed(message))
-		.then(({ result, elapsedMs }) => postResponse(target, message.id, result, undefined, elapsedMs))
-		.catch((error) => postResponse(target, message.id, undefined, error));
-}
-
-function handleCheckout(message, target) {
-	checkoutQueue.push({
-		message,
-		target,
-		priority: normalizePriority(message.priority),
-		seq: nextCheckoutSeq++
-	});
-	grantNextCheckout();
-}
-
-function handleRelease(message, target) {
-	operationQueue = operationQueue
-		.then(() => {
-			if (message.leaseId !== activeLeaseId)
-				throw new Error('Cannot release inactive sqliteOPFS checkout.');
-			activeLeaseId = undefined;
-			return { released: true };
-		})
-		.then((result) => {
-			postResponse(target, message.id, result, undefined, 0);
-			grantNextCheckout();
-		})
-		.catch((error) => postResponse(target, message.id, undefined, error));
-}
-
-function grantNextCheckout() {
-	if (activeLeaseId !== undefined)
-		return;
-	const entry = shiftNextCheckout();
-	if (!entry)
-		return;
-	const leaseId = nextLeaseId++;
-	activeLeaseId = leaseId;
-	operationQueue = operationQueue
-		.then(() => postResponse(entry.target, entry.message.id, { leaseId }, undefined, 0))
-		.catch((error) => postResponse(entry.target, entry.message.id, undefined, error));
-}
-
-function shiftNextCheckout() {
-	if (checkoutQueue.length <= 1)
-		return checkoutQueue.shift();
-	let bestIndex = 0;
-	for (let i = 1; i < checkoutQueue.length; i++) {
-		const current = checkoutQueue[i];
-		const best = checkoutQueue[bestIndex];
-		if (current.priority < best.priority || current.priority === best.priority && current.seq < best.seq)
-			bestIndex = i;
-	}
-	return checkoutQueue.splice(bestIndex, 1)[0];
-}
-
-async function dispatchTimed(message) {
-	const startedAt = now();
-	const result = await dispatch(message);
-	return {
-		result,
-		elapsedMs: now() - startedAt
-	};
-}
-
-async function dispatch(message) {
-	if (message.method === 'open')
-		return openDb(message.connectionString, message.busyTimeoutMs, message.vfs);
-	if (message.method === 'close')
-		return closeDb();
-	if (message.leaseId !== undefined && message.leaseId !== activeLeaseId)
-		throw new Error('sqliteOPFS checkout is not active.');
-	if (!db)
-		await openDbFromLastOptions(message.connectionString);
-	if (message.method === 'query')
-		return query(message.sql, message.parameters);
-	if (message.method === 'command')
-		return command(message.sql, message.parameters);
-	throw new Error('Unknown sqliteOPFS worker method "' + message.method + '".');
-}
-
-async function openDb(connectionString, busyTimeoutMs = 5000, vfs) {
-	if (db)
-		return { opened: true, reused: true, ...(dbOpenInfo || {}) };
-	dbOpenOptions = { connectionString, busyTimeoutMs, vfs };
-	const sqlite3 = await getSqlite3();
-	const filename = normalizeFilename(connectionString);
-	const dbInfo = await createDb(sqlite3, filename, vfs);
-	db = dbInfo.db;
-	db.exec('PRAGMA busy_timeout=' + (Number.parseInt(busyTimeoutMs, 10) || 5000));
-	dbOpenInfo = {
-		opened: true,
-		opfs: dbInfo.opfs === true,
-		vfs: dbInfo.vfs,
-		filename: db.filename
-	};
-	return dbOpenInfo;
-}
-
-function closeDb() {
-	if (db && typeof db.close === 'function')
-		db.close();
-	db = null;
-	return { closed: true };
-}
-
-function openDbFromLastOptions(connectionString) {
-	const options = dbOpenOptions || { connectionString: connectionString || 'orange.sqlite3' };
-	return openDb(options.connectionString, options.busyTimeoutMs, options.vfs);
-}
-
-async function createDb(sqlite3, filename, vfs) {
-	if (!vfs || vfs === 'opfs')
-		return createOpfsDb(sqlite3, filename);
-	if (vfs === 'opfs-wl')
-		return createOpfsWlDb(sqlite3, filename);
-	if (vfs === 'opfs-sahpool')
-		return createOpfsSahPoolDb(sqlite3, filename);
-	if (vfs && vfs !== 'opfs')
-		throw new Error('sqliteOPFS vfs "' + vfs + '" is not supported.');
-}
-
-function createOpfsDb(sqlite3, filename) {
-	const DbClass = sqlite3.oo1 && sqlite3.oo1.OpfsDb;
-	if (typeof DbClass !== 'function')
-		throw new Error('sqliteOPFS vfs "opfs" is not available in this sqlite-wasm build.');
-	return {
-		db: new DbClass(filename),
-		vfs: 'opfs',
-		opfs: true
-	};
-}
-
-function createOpfsWlDb(sqlite3, filename) {
-	const DbClass = sqlite3.oo1 && sqlite3.oo1.OpfsWlDb;
-	if (typeof DbClass !== 'function')
-		throw new Error('sqliteOPFS vfs "opfs-wl" is not available in this sqlite-wasm build.');
-	return {
-		db: new DbClass(filename),
-		vfs: 'opfs-wl',
-		opfs: true
-	};
-}
-
-async function createOpfsSahPoolDb(sqlite3, filename) {
-	if (!sqlite3 || typeof sqlite3.installOpfsSAHPoolVfs !== 'function')
-		throw new Error('sqliteOPFS vfs "opfs-sahpool" is not available in this sqlite-wasm build.');
-	const pool = await sqlite3.installOpfsSAHPoolVfs(opfsSahPoolOptions);
-	const DbClass = pool && pool.OpfsSAHPoolDb;
-	if (typeof DbClass !== 'function')
-		throw new Error('sqliteOPFS vfs "opfs-sahpool" is not available in this sqlite-wasm build.');
-	return {
-		db: new DbClass(filename),
-		vfs: pool.vfsName || 'opfs-sahpool',
-		opfs: true
-	};
-}
-
-async function getSqlite3() {
-	if (!sqlite3Promise) {
-		sqlite3Promise = import(sqliteModuleUrl).then((module) => {
-			const sqlite3InitModule = module && module.default || module;
-			if (typeof sqlite3InitModule !== 'function')
-				throw new Error('sqliteOPFS could not load sqlite-wasm module from ' + sqliteModuleUrl + '.');
-			return sqlite3InitModule(sqliteInitConfig);
-		});
-	}
-	return sqlite3Promise;
-}
-
-function query(sql, parameters = []) {
-	return db.exec({
-		sql,
-		bind: normalizeParameters(parameters),
-		rowMode: 'object',
-		returnValue: 'resultRows'
-	});
-}
-
-function command(sql, parameters = []) {
-	const before = Number(db.changes(true) || 0);
-	db.exec({
-		sql,
-		bind: normalizeParameters(parameters)
-	});
-	const after = Number(db.changes(true) || 0);
-	return {
-		rowsAffected: Math.max(0, after - before),
-		lastInsertRowid: Number(db.selectValue('SELECT last_insert_rowid()'))
-	};
-}
-
-function normalizeFilename(connectionString) {
-	const value = String(connectionString || 'orange.sqlite3');
-	return value.startsWith('/') ? value : '/' + value;
-}
-
-function normalizeParameters(parameters) {
-	return Array.isArray(parameters) ? parameters.map(normalizeParameter) : parameters;
-}
-
-function normalizeParameter(value) {
-	if (value instanceof ArrayBuffer)
-		return new Uint8Array(value);
-	return value;
-}
-
-function now() {
-	if (typeof performance !== 'undefined' && performance.now)
-		return performance.now();
-	return Date.now();
-}
-
-function normalizePriority(priority) {
-	if (priority === undefined || priority === null)
-		return 0;
-	const parsed = Number.parseInt(priority, 10);
-	return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function postResponse(target, id, result, error, elapsedMs) {
-	target.postMessage({
-		type: 'orange-sqlite-opfs-response',
-		id,
-		result,
-		elapsedMs,
-		error: error ? serializeError(error) : undefined
-	});
-}
-
-function serializeError(error) {
-	return {
-		name: error && error.name,
-		message: error && error.message ? error.message : String(error),
-		stack: error && error.stack
-	};
-}
-
-//# sourceURL=orange-orm-sqlite-opfs-worker.mjs
-`;
-	}
-
-	function normalizeOpfsSahPoolOptions(options = {}) {
-		const source = options.opfsSahPool || options.opfsSAHPool || options.sahPool;
-		if (!source || source !== Object(source))
-			return {};
-		return { ...source };
-	}
-
-	function normalizeFallbackVfs(value, requestedVfs) {
-		if (!value || value === requestedVfs)
-			return undefined;
-		if (value !== 'opfs' && value !== 'opfs-sahpool' && value !== 'opfs-wl')
-			throw new Error(`sqliteOPFS fallbackVfs "${value}" is not supported.`);
-		return value;
-	}
-
-	function toError(error) {
-		const e = new Error(error && error.message ? error.message : 'sqliteOPFS worker request failed.');
-		if (error && error.name)
-			e.name = error.name;
-		if (error && error.stack)
-			e.stack = error.stack;
-		return e;
-	}
-
-	function toWorkerError(event) {
-		if (event instanceof Error)
-			return event;
-		if (event && event.error instanceof Error)
-			return event.error;
-		const message = event && event.message
-			? event.message
-			: 'sqliteOPFS worker failed before responding.';
-		const e = new Error(message);
-		if (event && event.filename)
-			e.stack = `${message}\n${event.filename}:${event.lineno || 0}:${event.colno || 0}`;
-		return e;
-	}
-
-	workerClient = createSqliteOPFSWorkerClient;
-	return workerClient;
-}
-
 var newPool_1$5;
 var hasRequiredNewPool$5;
 
@@ -32693,6 +32711,7 @@ function requireSrc () {
 	connectViaPool.createDbWorkerHandler = requireDbWorkerHandler();
 	connectViaPool.createSyncWorkerClient = requireSyncWorkerClient();
 	connectViaPool.createSyncWorkerHandler = requireSyncWorkerHandler();
+	connectViaPool.createSqliteOPFSWorker = requireCreateWorker();
 	connectViaPool.connectSqliteOPFSWorker = requireConnectWorkerPort();
 	connectViaPool.table = requireTable();
 	connectViaPool.filter = requireEmptyFilter();
