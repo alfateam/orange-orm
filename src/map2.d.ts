@@ -1009,6 +1009,8 @@ export interface SyncPullConfig<M extends Record<string, any> = any> extends Syn
     maxRowsPerTransaction?: number;
     /** Delay between apply transactions. Defaults to 0. */
     yieldMs?: number;
+    /** Manual PRAGMA foreign_key_check schedule for chunked apply. Defaults to 'final'. */
+    foreignKeyCheck?: 'final' | 'chunk' | 'none' | boolean;
   };
   /** Max keys requested from the sync endpoint per staged key page. Defaults to maxRowsPerBatch * maxConcurrentRowRequests. */
   maxKeysPerBatch?: number;

@@ -6438,6 +6438,7 @@ function requireSyncClient () {
 			const session = await stagePullJournal();
 			let applied = 0;
 			const shouldApplyCheckpoint = session.finalSince !== undefined;
+			await tryEnableForeignKeys(db);
 			if (applyConfig)
 				await applyPullJournalInChunks(session, applyConfig);
 			else
@@ -6504,12 +6505,14 @@ function requireSyncClient () {
 							applied += await applyPullJournalItemOnTx(tx, item, defaultPatchOptions);
 							await applyPullJournalItemToStableBase(tx, item, baseByName);
 						}
-						if (chunk.length > 0)
+						if (chunk.length > 0 && applyConfig.foreignKeyCheck === 'chunk')
 							await validateForeignKeys(tx);
 					}, { suppressSyncOutbox: true });
 					await yieldPullApply(applyConfig);
 				}
 				await client.transaction(async (tx) => {
+					if (items.length > 0 && applyConfig.foreignKeyCheck === 'final')
+						await validateForeignKeys(tx);
 					if (shouldApplyCheckpoint)
 						await writeScopeState(scopeKey, { since: session.finalSince, updatedAtMs: Date.now() }, tx);
 					if (items.length > 0 || session.persisted)
@@ -8393,8 +8396,21 @@ function requireSyncClient () {
 			return undefined;
 		return {
 			maxRowsPerTransaction,
-			yieldMs: normalizeNonNegativeInteger(config.yieldMs, 0)
+			yieldMs: normalizeNonNegativeInteger(config.yieldMs, 0),
+			foreignKeyCheck: normalizePullApplyForeignKeyCheck(config.foreignKeyCheck)
 		};
+	}
+
+	function normalizePullApplyForeignKeyCheck(value) {
+		if (value === undefined || value === null || value === true)
+			return 'final';
+		if (value === false || value === 'none' || value === 'off')
+			return 'none';
+		if (value === 'final' || value === 'afterApply')
+			return 'final';
+		if (value === 'chunk' || value === 'perChunk' || value === 'perTransaction')
+			return 'chunk';
+		throw new Error('Invalid sqlite sync pull apply foreignKeyCheck configuration');
 	}
 
 	function normalizePushConfig(config, fallbackEndpoint) {
@@ -8987,6 +9003,17 @@ function requireSyncClient () {
 			return;
 		try {
 			await tx.query('PRAGMA defer_foreign_keys = ON');
+		}
+		catch (_e) {
+			// Non-sqlite engines can safely ignore this pragma.
+		}
+	}
+
+	async function tryEnableForeignKeys(db) {
+		if (!db || typeof db.query !== 'function')
+			return;
+		try {
+			await db.query('PRAGMA foreign_keys = ON');
 		}
 		catch (_e) {
 			// Non-sqlite engines can safely ignore this pragma.

@@ -1064,6 +1064,7 @@ describe('sync client auto start', () => {
 	test('applies staged pull chunks in server order when configured', async () => {
 		const patches = [];
 		let transactionId = 0;
+		let foreignKeyChecks = 0;
 		const db = newJournalDb({
 			__sqliteSync: {
 				url: '/rdb',
@@ -1076,6 +1077,10 @@ describe('sync client auto start', () => {
 						maxRowsPerTransaction: 1
 					}
 				}
+			},
+			foreignKeyCheck: () => {
+				foreignKeyChecks += 1;
+				return [];
 			}
 		});
 		const client = newSyncClient({
@@ -1142,8 +1147,78 @@ describe('sync client auto start', () => {
 			{ table: 'customer', patch: [{ op: 'add', path: '/[3]', value: { id: 3 } }] }
 		]);
 		expect(new Set(patches.map(x => x.txId)).size).toBe(3);
+		expect(foreignKeyChecks).toBe(1);
 		expect(db.journal.session).toBeNull();
 		expect(db.journal.items).toHaveLength(0);
+	});
+
+	test('can validate staged pull apply chunks after each transaction', async () => {
+		let foreignKeyChecks = 0;
+		const db = newJournalDb({
+			__sqliteSync: {
+				url: '/rdb',
+				auto: false,
+				schema: false,
+				pull: {
+					maxKeysPerBatch: 3,
+					maxRowsPerBatch: 3,
+					apply: {
+						maxRowsPerTransaction: 1,
+						foreignKeyCheck: 'chunk'
+					}
+				}
+			},
+			foreignKeyCheck: () => {
+				foreignKeyChecks += 1;
+				return [];
+			}
+		});
+		const client = newSyncClient({
+			tables: {
+				customer: newTable('customer')
+			},
+			transaction: async (fn) => fn({
+				customer: {
+					patch: async () => ({ changed: [] })
+				},
+				query: db.query
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async (request) => {
+					if (request.data.phase === 'keys') {
+						return {
+							data: {
+								phase: 'keys',
+								items: [
+									{ table: 'customer', pk: [1], key: { id: 1 }, op: 'U' },
+									{ table: 'customer', pk: [2], key: { id: 2 }, op: 'U' },
+									{ table: 'customer', pk: [3], key: { id: 3 }, op: 'U' }
+								],
+								done: true,
+								cursor: 'cursor-1'
+							}
+						};
+					}
+					return {
+						data: {
+							phase: 'rows',
+							items: request.data.items.map((item) => ({
+								table: item.table,
+								pk: item.pk,
+								key: item.key,
+								row: { id: item.pk[0] },
+								op: item.op
+							}))
+						}
+					};
+				};
+			}
+		});
+
+		await client.sync();
+
+		expect(foreignKeyChecks).toBe(3);
 	});
 
 	test('batches pull journal item inserts', async () => {
