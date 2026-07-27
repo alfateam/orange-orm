@@ -44,16 +44,16 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 			return callback(new Error('sqliteOPFS worker client closed.'));
 		const sql = query.sql();
 		const parameters = query.parameters || [];
-		log.emitQuery({ sql, parameters, readonly, lane });
+		log.emitQuery({ sql, parameters, readonly, lane, connectionString });
 		const startedAt = now();
 		ensureOpen()
 			.then(() => request('query', { sql, parameters, leaseId }))
 			.then(({ result, workerElapsedMs }) => {
-				log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, workerElapsedMs, readonly, lane });
+				log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, workerElapsedMs, readonly, lane, connectionString });
 				callback(null, result);
 			})
 			.catch((error) => {
-				log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, error, readonly, lane });
+				log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, error, readonly, lane, connectionString });
 				callback(error);
 			});
 	}
@@ -63,16 +63,16 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 			return callback(new Error('sqliteOPFS worker client closed.'));
 		const sql = query.sql();
 		const parameters = query.parameters || [];
-		log.emitQuery({ sql, parameters, readonly, lane });
+		log.emitQuery({ sql, parameters, readonly, lane, connectionString });
 		const startedAt = now();
 		ensureOpen()
 			.then(() => request('command', { sql, parameters, leaseId }))
 			.then(({ result, workerElapsedMs }) => {
-				log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, workerElapsedMs, readonly, lane });
+				log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, workerElapsedMs, readonly, lane, connectionString });
 				callback(null, result);
 			})
 			.catch((error) => {
-				log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, error, readonly, lane });
+				log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, error, readonly, lane, connectionString });
 				callback(error);
 			});
 	}
@@ -287,7 +287,7 @@ function isUnsupportedCheckoutError(error) {
 	const message = error && error.message || '';
 	return message.includes('Unknown') && (
 		message.includes('method "checkout"')
-		|| message.includes("method 'checkout'")
+			|| message.includes('method \'checkout\'')
 	);
 }
 

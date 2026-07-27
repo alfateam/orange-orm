@@ -21846,16 +21846,16 @@ function requireWorkerClient () {
 				return callback(new Error('sqliteOPFS worker client closed.'));
 			const sql = query.sql();
 			const parameters = query.parameters || [];
-			log.emitQuery({ sql, parameters, readonly, lane });
+			log.emitQuery({ sql, parameters, readonly, lane, connectionString });
 			const startedAt = now();
 			ensureOpen()
 				.then(() => request('query', { sql, parameters, leaseId }))
 				.then(({ result, workerElapsedMs }) => {
-					log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, workerElapsedMs, readonly, lane });
+					log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, workerElapsedMs, readonly, lane, connectionString });
 					callback(null, result);
 				})
 				.catch((error) => {
-					log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, error, readonly, lane });
+					log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, error, readonly, lane, connectionString });
 					callback(error);
 				});
 		}
@@ -21865,16 +21865,16 @@ function requireWorkerClient () {
 				return callback(new Error('sqliteOPFS worker client closed.'));
 			const sql = query.sql();
 			const parameters = query.parameters || [];
-			log.emitQuery({ sql, parameters, readonly, lane });
+			log.emitQuery({ sql, parameters, readonly, lane, connectionString });
 			const startedAt = now();
 			ensureOpen()
 				.then(() => request('command', { sql, parameters, leaseId }))
 				.then(({ result, workerElapsedMs }) => {
-					log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, workerElapsedMs, readonly, lane });
+					log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, workerElapsedMs, readonly, lane, connectionString });
 					callback(null, result);
 				})
 				.catch((error) => {
-					log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, error, readonly, lane });
+					log.emitQueryComplete({ sql, parameters, elapsedMs: now() - startedAt, error, readonly, lane, connectionString });
 					callback(error);
 				});
 		}
@@ -22089,7 +22089,7 @@ function requireWorkerClient () {
 		const message = error && error.message || '';
 		return message.includes('Unknown') && (
 			message.includes('method "checkout"')
-			|| message.includes("method 'checkout'")
+				|| message.includes('method \'checkout\'')
 		);
 	}
 
@@ -25706,7 +25706,7 @@ function requireNewPool$1 () {
 
 		function ensureReadClient() {
 			if (!readClient)
-				readClient = createSqliteOPFSWorkerClient(connectionString, withOpenOptions({ ...poolOptions, readonly: true }));
+				readClient = createSqliteOPFSWorkerClient(connectionString, withOpenOptions(toReadPoolOptions(poolOptions)));
 			return readClient;
 		}
 
@@ -25818,6 +25818,27 @@ function requireNewPool$1 () {
 		return shouldUseOPFSAccessLock(poolOptions)
 			? { ...poolOptions, deferOpen: true }
 			: poolOptions;
+	}
+
+	function toReadPoolOptions(poolOptions) {
+		const options = { ...poolOptions, readonly: true };
+		if (poolOptions.readWorker) {
+			options.worker = poolOptions.readWorker;
+			delete options.readWorker;
+			return options;
+		}
+		if (poolOptions.createReadWorker) {
+			options.createWorker = poolOptions.createReadWorker;
+			delete options.createReadWorker;
+			delete options.worker;
+			delete options.closeDbOnClose;
+			return options;
+		}
+		if (poolOptions.worker) {
+			delete options.worker;
+			delete options.closeDbOnClose;
+		}
+		return options;
 	}
 
 	function acquireOPFSAccessLock(poolOptions, connectionString) {

@@ -1124,6 +1124,8 @@ export interface SqliteOPFSPoolOptions<M extends Record<string, any> = any> exte
   inlineWorker?: boolean;
   worker?: Worker | MessagePort;
   createWorker?: (connectionString: string, options: SqliteOPFSPoolOptions<M>) => Worker | MessagePort;
+  readWorker?: Worker | MessagePort;
+  createReadWorker?: (connectionString: string, options: SqliteOPFSPoolOptions<M>) => Worker | MessagePort;
   workerUrl?: string | URL;
   closeDbOnClose?: boolean;
   prewarmRead?: boolean;

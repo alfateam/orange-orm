@@ -87,7 +87,7 @@ function newPool(connectionString, poolOptions) {
 
 	function ensureReadClient() {
 		if (!readClient)
-			readClient = createSqliteOPFSWorkerClient(connectionString, withOpenOptions({ ...poolOptions, readonly: true }));
+			readClient = createSqliteOPFSWorkerClient(connectionString, withOpenOptions(toReadPoolOptions(poolOptions)));
 		return readClient;
 	}
 
@@ -199,6 +199,27 @@ function withOpenOptions(poolOptions) {
 	return shouldUseOPFSAccessLock(poolOptions)
 		? { ...poolOptions, deferOpen: true }
 		: poolOptions;
+}
+
+function toReadPoolOptions(poolOptions) {
+	const options = { ...poolOptions, readonly: true };
+	if (poolOptions.readWorker) {
+		options.worker = poolOptions.readWorker;
+		delete options.readWorker;
+		return options;
+	}
+	if (poolOptions.createReadWorker) {
+		options.createWorker = poolOptions.createReadWorker;
+		delete options.createReadWorker;
+		delete options.worker;
+		delete options.closeDbOnClose;
+		return options;
+	}
+	if (poolOptions.worker) {
+		delete options.worker;
+		delete options.closeDbOnClose;
+	}
+	return options;
 }
 
 function acquireOPFSAccessLock(poolOptions, connectionString) {

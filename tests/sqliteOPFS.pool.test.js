@@ -82,6 +82,33 @@ describe('sqliteOPFS pool', () => {
 		pool.end();
 	});
 
+	test('does not reuse a provided writer worker for separate read lane', async () => {
+		const writerWorker = newFakeWorker();
+		const createdWorkers = [];
+		const pool = newPool('test.sqlite3', {
+			singleWorker: false,
+			prewarmRead: false,
+			worker: writerWorker,
+			closeDbOnClose: false,
+			createWorker() {
+				const worker = newFakeWorker();
+				createdWorkers.push(worker);
+				return worker;
+			}
+		});
+
+		pool.connectRead((err, _client, done) => {
+			if (err)
+				throw err;
+			done();
+		});
+		await wait(10);
+
+		expect(createdWorkers).toHaveLength(1);
+		expect(createdWorkers[0]).not.toBe(writerWorker);
+		pool.end();
+	});
+
 	test('queues writer checkouts until the previous checkout is released', async () => {
 		const events = [];
 		let releaseFirst;
