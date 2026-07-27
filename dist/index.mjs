@@ -29120,7 +29120,8 @@ function requireDualSyncDatabase () {
 	const roleB = 'b';
 
 	function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase) {
-		const dataPoolOptions = toDataPoolOptions(poolOptions);
+		const primaryDataPoolOptions = toDataPoolOptions(poolOptions);
+		const secondaryDataPoolOptions = toSecondaryDataPoolOptions(primaryDataPoolOptions);
 		const cachePoolOptions = toCachePoolOptions(poolOptions);
 		const roleConnectionStrings = {
 			[roleA]: connectionString,
@@ -29136,7 +29137,6 @@ function requireDualSyncDatabase () {
 		let roleHttpInterceptor;
 		const syncInterceptors = createHttpInterceptor();
 		let syncTail = Promise.resolve();
-		let catchupPromise = null;
 		let initialReadyEmitted = false;
 		const eventListeners = new Map();
 		const roleEventSubscriptions = new Set();
@@ -29192,8 +29192,6 @@ function requireDualSyncDatabase () {
 		}
 
 		async function end() {
-			if (catchupPromise)
-				await catchupPromise.catch(() => {});
 			const closes = [];
 			for (const db of dbByRole.values()) {
 				if (db && typeof db.end === 'function')
@@ -29242,7 +29240,6 @@ function requireDualSyncDatabase () {
 		}
 
 		async function sync(options = {}) {
-			await waitForCatchup();
 			const manifest = await getManifest();
 			const activeRole = manifest.activeRole;
 			const stagingRole = manifest.stagingRole;
@@ -29278,8 +29275,6 @@ function requireDualSyncDatabase () {
 			});
 
 			const newActiveRole = stagingRole;
-			catchupPromise = catchupRole(activeRole, newActiveRole, deltaId)
-				.catch(error => emit('catchup-error', { error }));
 			await maybeEmitInitialReady(newActiveRole);
 			return withDualSyncResult(result, {
 				activeRole: newActiveRole,
@@ -29298,7 +29293,6 @@ function requireDualSyncDatabase () {
 		}
 
 		async function resetLocal(options = {}) {
-			await waitForCatchup();
 			const errors = [];
 			for (const role of [roleA, roleB]) {
 				try {
@@ -29321,7 +29315,6 @@ function requireDualSyncDatabase () {
 		}
 
 		async function discardLocalChanges(options = {}) {
-			await waitForCatchup();
 			const manifest = await getManifest();
 			return getRoleSyncClient(manifest.activeRole).discardLocalChanges(options);
 		}
@@ -29426,27 +29419,6 @@ function requireDualSyncDatabase () {
 			emit('initial-ready', { source: 'dual-swap', role });
 		}
 
-		async function waitForCatchup() {
-			const pending = catchupPromise;
-			if (!pending)
-				return;
-			await pending;
-			if (catchupPromise === pending)
-				catchupPromise = null;
-		}
-
-		async function catchupRole(targetRole, activeRole, deltaId) {
-			await applyPendingDeltasToRole(targetRole, deltaId);
-			const activeRows = await getRoleSyncClient(activeRole)[readOutboxRowsSymbol]({
-				statuses: ['pending']
-			});
-			await getRoleSyncClient(targetRole)[applyOutboxRowsSymbol](activeRows, {
-				replay: true,
-				replaceOpen: true,
-				ignoreReplayErrors: false
-			});
-		}
-
 		async function applyPendingDeltasToRole(role, onlyDeltaId) {
 			const deltas = await readDeltas();
 			for (let i = 0; i < deltas.length; i++) {
@@ -29470,13 +29442,13 @@ function requireDualSyncDatabase () {
 		}
 
 		async function getActiveDb() {
-			const manifest = await getManifest();
+			const manifest = await getManifest(true);
 			return getRoleDb(manifest.activeRole);
 		}
 
 		function getRoleDb(role) {
 			if (!dbByRole.has(role)) {
-				const db = createSingleDatabase(roleConnectionStrings[role], dataPoolOptions);
+				const db = createSingleDatabase(roleConnectionStrings[role], getRolePoolOptions(role));
 				db.__orangeSyncIdentity = `sqliteOPFS:${connectionString}:dual:${role}`;
 				dbByRole.set(role, db);
 			}
@@ -29502,8 +29474,8 @@ function requireDualSyncDatabase () {
 			return clientByRole.get(role);
 		}
 
-		async function getManifest() {
-			if (manifestCache)
+		async function getManifest(refresh = false) {
+			if (manifestCache && !refresh)
 				return manifestCache;
 			if (manifestPromise)
 				return manifestPromise;
@@ -29646,6 +29618,12 @@ function requireDualSyncDatabase () {
 				');'
 			].join(' '));
 		}
+
+		function getRolePoolOptions(role) {
+			return role === roleA
+				? primaryDataPoolOptions
+				: secondaryDataPoolOptions;
+		}
 	}
 
 	function withDualSyncResult(result, info) {
@@ -29667,8 +29645,15 @@ function requireDualSyncDatabase () {
 	}
 
 	function toCachePoolOptions(poolOptions = {}) {
-		const options = { ...poolOptions };
+		const options = toSecondaryDataPoolOptions(poolOptions);
 		delete options.sync;
+		return options;
+	}
+
+	function toSecondaryDataPoolOptions(poolOptions = {}) {
+		const options = { ...poolOptions };
+		delete options.worker;
+		delete options.closeDbOnClose;
 		return options;
 	}
 

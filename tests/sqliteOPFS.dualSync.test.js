@@ -59,17 +59,59 @@ describe('sqliteOPFS dual sync database', () => {
 			sql: 'SELECT 2'
 		}]);
 	});
+
+	test('refreshes the manifest before regular queries', async () => {
+		const fixture = newFixture();
+		const db = newDualSyncDatabase('app.sqlite3', {
+			sync: { url: '/rdb', dualDataDb: true }
+		}, fixture.createSingleDatabase);
+
+		await db.query('SELECT first');
+		fixture.manifest = {
+			activeRole: 'b',
+			stagingRole: 'a',
+			updatedAtMs: 456
+		};
+		const rows = await db.query('SELECT second');
+
+		expect(rows).toEqual([{
+			connectionString: 'app.__orange_sync_b.sqlite3',
+			sql: 'SELECT second'
+		}]);
+	});
+
+	test('does not reuse a provided single sqlite worker for secondary data files', async () => {
+		const worker = newIdleWorker();
+		const fixture = newFixture({
+			activeRole: 'b',
+			stagingRole: 'a',
+			updatedAtMs: 123
+		});
+		const db = newDualSyncDatabase('app.sqlite3', {
+			worker,
+			closeDbOnClose: false,
+			sync: { url: '/rdb', dualDataDb: true }
+		}, fixture.createSingleDatabase);
+
+		await db.query('SELECT 1');
+
+		expect(fixture.created.find(x => x.connectionString === 'app.__orange_sync_delta.sqlite3').options.worker).toBeUndefined();
+		expect(fixture.created.find(x => x.connectionString === 'app.__orange_sync_b.sqlite3').options.worker).toBeUndefined();
+		expect(fixture.created.find(x => x.connectionString === 'app.__orange_sync_b.sqlite3').options.closeDbOnClose).toBeUndefined();
+	});
 });
 
 function newFixture(initialManifest) {
 	const dbs = new Map();
 	const fixture = {
 		manifest: initialManifest,
+		created: [],
 		createSingleDatabase
 	};
 	return fixture;
 
 	function createSingleDatabase(connectionString, options) {
+		fixture.created.push({ connectionString, options });
 		const db = newFakeDb(connectionString, options, fixture);
 		dbs.set(connectionString, db);
 		return db;
