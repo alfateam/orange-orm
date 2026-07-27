@@ -5931,8 +5931,23 @@ function requireSyncClient () {
 	const ensureLocalSchemaReadySymbol = typeof Symbol === 'function'
 		? Symbol.for('orange-orm.syncClient.ensureLocalSchemaReady')
 		: '__orangeOrmSyncClientEnsureLocalSchemaReady';
+	const syncAndCapturePullJournalSymbol = typeof Symbol === 'function'
+		? Symbol.for('orange-orm.syncClient.syncAndCapturePullJournal')
+		: '__orangeOrmSyncClientSyncAndCapturePullJournal';
+	const readOutboxRowsSymbol = typeof Symbol === 'function'
+		? Symbol.for('orange-orm.syncClient.readOutboxRows')
+		: '__orangeOrmSyncClientReadOutboxRows';
+	const applyOutboxRowsSymbol = typeof Symbol === 'function'
+		? Symbol.for('orange-orm.syncClient.applyOutboxRows')
+		: '__orangeOrmSyncClientApplyOutboxRows';
+	const applyPullJournalSymbol = typeof Symbol === 'function'
+		? Symbol.for('orange-orm.syncClient.applyPullJournal')
+		: '__orangeOrmSyncClientApplyPullJournal';
+	const pushPendingSymbol = typeof Symbol === 'function'
+		? Symbol.for('orange-orm.syncClient.pushPending')
+		: '__orangeOrmSyncClientPushPending';
 
-	function newSyncClient(client, getDb, axiosInterceptor) {
+	function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 		const sinceByScope = new Map();
 		const ensuredInternalTables = new WeakMap();
 		const syncStateTable = 'orange_sync_state';
@@ -5950,7 +5965,7 @@ function requireSyncClient () {
 		let initialReadyEmitted = false;
 		let localSchemaReadyPromise = null;
 		let localSchemaReadyResult = null;
-		const interceptors = createHttpInterceptor();
+		const interceptors = syncInterceptors || createHttpInterceptor();
 		const lockedSync = withCrossTabSyncLock(sync);
 		const lockedEnsureLocalSchema = withCrossTabSyncLock(ensureLocalSchema);
 		const lockedResetLocal = withCrossTabSyncLock(resetLocal);
@@ -5984,6 +5999,21 @@ function requireSyncClient () {
 		Object.defineProperty(syncClientApi, ensureLocalSchemaReadySymbol, {
 			value: ensureLocalSchemaReady
 		});
+		Object.defineProperty(syncClientApi, syncAndCapturePullJournalSymbol, {
+			value: syncAndCapturePullJournal
+		});
+		Object.defineProperty(syncClientApi, readOutboxRowsSymbol, {
+			value: readOutboxRowsForReplay
+		});
+		Object.defineProperty(syncClientApi, applyOutboxRowsSymbol, {
+			value: applyOutboxRowsForReplay
+		});
+		Object.defineProperty(syncClientApi, applyPullJournalSymbol, {
+			value: applyPullJournalSnapshot
+		});
+		Object.defineProperty(syncClientApi, pushPendingSymbol, {
+			value: pushPendingOnly
+		});
 		return syncClientApi;
 
 		function withCrossTabSyncLock(fn) {
@@ -6011,6 +6041,26 @@ function requireSyncClient () {
 
 		async function sync(options = {}) {
 			await pull(normalizeSyncOptions(options));
+		}
+
+		async function syncAndCapturePullJournal(options = {}) {
+			return pull({
+				...normalizePullOptions(options),
+				_capturePullJournal: true
+			});
+		}
+
+		async function pushPendingOnly(options = {}) {
+			const db = toSyncDb(await getDb());
+			const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
+			if (!syncConfig)
+				throw new Error('Sync is not configured. Add sync in sqlite options: sqlite(connectionString, { sync: ... })');
+			const configuredTables = resolveSyncTables(db, syncConfig.tables, client);
+			const hadStableBase = await hasStableBase(db, configuredTables);
+			if (!hadStableBase)
+				return { phase: 'push', applied: 0, duplicates: 0, results: [], skipped: 'missing-stable-base' };
+			const pushConfig = resolvePushConfig(syncConfig, normalizePullOptions(options));
+			return pushBeforePull(db, syncConfig, hadStableBase, pushConfig);
 		}
 
 		async function ensureLocalSchema(options = {}) {
@@ -6091,16 +6141,19 @@ function requireSyncClient () {
 		}
 
 		async function pull(options = {}) {
+			const normalizedOptions = normalizePullOptions(options);
+			if (options && options._capturePullJournal)
+				normalizedOptions._capturePullJournal = true;
 			const {
 				db,
 				syncConfig,
 				pullConfig,
 				configuredTables
-			} = await prepareLocalSyncSchema(options);
+			} = await prepareLocalSyncSchema(normalizedOptions);
 			const hadStableBase = await hasStableBase(db, configuredTables);
 			if (!hadStableBase)
-				return runSyncMaintenance(db, () => pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase));
-			return pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase);
+				return runSyncMaintenance(db, () => pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase, normalizedOptions));
+			return pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase, normalizedOptions);
 		}
 
 		async function prepareLocalSyncSchema(options = {}, prepareOptions = {}) {
@@ -6170,7 +6223,7 @@ function requireSyncClient () {
 			};
 		}
 
-		async function pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase) {
+		async function pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase, options = {}) {
 			await pushBeforePull(db, syncConfig, hadStableBase);
 			const pullStartedAtMs = Date.now();
 			await maybeEmitInitialReady(syncConfig, configuredTables, db, 'persisted');
@@ -6181,6 +6234,7 @@ function requireSyncClient () {
 				since: currentSince,
 				db,
 				scopeKey,
+				_capturePullJournal: !!options._capturePullJournal,
 				_syncInterceptors: interceptors,
 				_syncAxiosInterceptor: axiosInterceptor
 			};
@@ -6254,6 +6308,143 @@ function requireSyncClient () {
 			});
 		}
 
+		async function readOutboxRowsForReplay(options = {}) {
+			const db = toSyncDb(await getDb());
+			const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
+			if (!syncConfig)
+				throw new Error('Sync is not configured. Add sync in sqlite options: sqlite(connectionString, { sync: ... })');
+			const replayOptions = normalizeReplayOutboxOptions(options);
+			return readMutationRowsByStatus(db, replayOptions.statuses, replayOptions.limit);
+		}
+
+		async function applyOutboxRowsForReplay(rows, options = {}) {
+			const db = toSyncDb(await getDb());
+			const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
+			if (!syncConfig)
+				throw new Error('Sync is not configured. Add sync in sqlite options: sqlite(connectionString, { sync: ... })');
+			const replayOptions = normalizeReplayOutboxOptions(options);
+			const list = normalizeOutboxReplayRows(rows);
+			await ensureSyncOutboxTable(db);
+			if (replayOptions.replaceOpen)
+				await replaceOpenOutboxRows(db, list, replayOptions.statuses);
+			let inserted = 0;
+			let replayed = 0;
+			let skipped = 0;
+			const errors = [];
+			for (let i = 0; i < list.length; i++) {
+				const row = list[i];
+				const id = outboxRowMutationId(row);
+				if (typeof id !== 'string') {
+					skipped += 1;
+					continue;
+				}
+				const exists = await hasOutboxRow(db, id);
+				if (replayOptions.replay && (!exists || replayOptions.replayExisting)) {
+					const mutation = rowToMutation(row);
+					if (mutation) {
+						try {
+							await replayMutation(mutation);
+							replayed += 1;
+						}
+						catch (e) {
+							if (!replayOptions.ignoreReplayErrors)
+								throw e;
+							errors.push({ id, message: e && e.message || String(e) });
+						}
+					}
+				}
+				else {
+					skipped += 1;
+				}
+				await insertOutboxRow(db, row);
+				inserted += exists ? 0 : 1;
+			}
+			return { inserted, replayed, skipped, errors };
+		}
+
+		async function applyPullJournalSnapshot(journal, options = {}) {
+			const db = toSyncDb(await getDb());
+			const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
+			if (!syncConfig)
+				throw new Error('Sync is not configured. Add sync in sqlite options: sqlite(connectionString, { sync: ... })');
+			const pullConfig = resolvePullConfig(syncConfig, normalizePullOptions(options));
+			const journalTables = normalizeConfiguredTables(journal && journal.tables);
+			const configuredTables = resolveSyncTables(db, journalTables || pullConfig.tables, client);
+			if (!Array.isArray(configuredTables) || configuredTables.length === 0)
+				throw new Error('Sync pull journal apply requires mapped tables or configured tables.');
+			const scopeKey = typeof (journal && journal.scopeKey) === 'string'
+				? journal.scopeKey
+				: getScopeKey(configuredTables);
+			const items = normalizePullJournalItems(journal && journal.items);
+			const applyConfig = normalizePullApplyConfig(
+				options && options.apply !== undefined ? options.apply : pullConfig.apply
+			);
+			const defaultPatchOptions = { ...(pullConfig.patchOptions || {}), concurrency: 'overwrite', skipSelectAfterInsert: true };
+			const checkpointSince = journal && journal.finalSince;
+			const shouldApplyCheckpoint = checkpointSince !== undefined;
+			let applied = 0;
+			const touchedTables = new Set();
+			await tryEnableForeignKeys(db);
+			if (applyConfig)
+				await applyPullJournalItemsInChunks();
+			else
+				await applyPullJournalItemsInSingleTransaction();
+			if (shouldApplyCheckpoint)
+				sinceByScope.set(scopeKey, checkpointSince);
+			return {
+				applied,
+				tables: Array.from(touchedTables),
+				since: checkpointSince,
+				checkpointApplied: true
+			};
+
+			async function applyPullJournalItemsInSingleTransaction() {
+				await client.transaction(async (tx) => {
+					await tryDeferForeignKeys(tx);
+					await ensureStableBaseTables(tx, configuredTables);
+					const baseByName = await readStableBaseEntriesByName(tx);
+					for (let i = 0; i < items.length; i++) {
+						const item = items[i];
+						if (item && typeof item.table === 'string')
+							touchedTables.add(item.table);
+						applied += await applyPullJournalItemOnTx(tx, item, defaultPatchOptions);
+						await applyPullJournalItemToStableBase(tx, item, baseByName);
+					}
+					if (items.length > 0)
+						await validateForeignKeys(tx);
+					if (shouldApplyCheckpoint)
+						await writeScopeState(scopeKey, { since: checkpointSince, updatedAtMs: Date.now() }, tx);
+				}, { suppressSyncOutbox: true });
+			}
+
+			async function applyPullJournalItemsInChunks() {
+				for (let offset = 0; offset < items.length; offset += applyConfig.maxRowsPerTransaction) {
+					const chunk = items.slice(offset, offset + applyConfig.maxRowsPerTransaction);
+					await client.transaction(async (tx) => {
+						await tryDeferForeignKeys(tx);
+						await ensureStableBaseTables(tx, configuredTables);
+						const baseByName = await readStableBaseEntriesByName(tx);
+						for (let i = 0; i < chunk.length; i++) {
+							const item = chunk[i];
+							if (item && typeof item.table === 'string')
+								touchedTables.add(item.table);
+							applied += await applyPullJournalItemOnTx(tx, item, defaultPatchOptions);
+							await applyPullJournalItemToStableBase(tx, item, baseByName);
+						}
+						if (chunk.length > 0 && applyConfig.foreignKeyCheck === 'chunk')
+							await validateForeignKeys(tx);
+					}, { suppressSyncOutbox: true });
+					await yieldPullApply(applyConfig);
+				}
+				await client.transaction(async (tx) => {
+					if (items.length > 0 && applyConfig.foreignKeyCheck === 'final')
+						await validateForeignKeys(tx);
+					if (shouldApplyCheckpoint)
+						await writeScopeState(scopeKey, { since: checkpointSince, updatedAtMs: Date.now() }, tx);
+				}, { suppressSyncOutbox: true });
+			}
+		}
+
 		async function pushPending(options = {}) {
 			const db = toSyncDb(await getDb());
 			const syncConfig = options._syncConfig || normalizeSyncConfig(db && db.__sqliteSync);
@@ -6287,10 +6478,10 @@ function requireSyncClient () {
 			return result;
 		}
 
-		async function pushBeforePull(db, syncConfig, hasBase) {
+		async function pushBeforePull(db, syncConfig, hasBase, resolvedPushConfig) {
 			if (!hasBase)
 				return;
-			const pushConfig = resolvePushConfig(syncConfig);
+			const pushConfig = resolvedPushConfig || resolvePushConfig(syncConfig);
 			const maxBatches = resolveMaxPushBatches();
 			const results = [];
 			for (let i = 0; i < maxBatches; i++) {
@@ -6436,6 +6627,9 @@ function requireSyncClient () {
 			const scopeKey = options.scopeKey || getScopeKey(options.tables);
 			await ensurePullJournalTables(db);
 			const session = await stagePullJournal();
+			const capturedPullJournal = options._capturePullJournal
+				? await capturePullJournalSnapshot(session)
+				: null;
 			let applied = 0;
 			const shouldApplyCheckpoint = session.finalSince !== undefined;
 			await tryEnableForeignKeys(db);
@@ -6446,13 +6640,39 @@ function requireSyncClient () {
 			if (shouldApplyCheckpoint)
 				sinceByScope.set(scopeKey, session.finalSince);
 
-			return {
+			const result = {
 				applied,
 				tables: session.tables || [],
 				since: session.finalSince,
 				payload: session.payload,
 				checkpointApplied: true
 			};
+			if (capturedPullJournal) {
+				Object.defineProperty(result, '__orangePullJournal', {
+					value: {
+						...capturedPullJournal,
+						tables: session.tables || capturedPullJournal.tables
+					},
+					enumerable: false,
+					configurable: true
+				});
+			}
+			return result;
+
+			async function capturePullJournalSnapshot(session) {
+				const batches = session && session.persisted
+					? await readPullJournalBatches(db, scopeKey)
+					: [];
+				return {
+					scopeKey,
+					tables: Array.isArray(options.tables) ? options.tables.slice() : [],
+					since: session && session.since,
+					finalSince: session && session.finalSince,
+					payload: session && session.payload,
+					reason: session && session.reason,
+					items: flattenPullJournalBatches(batches)
+				};
+			}
 
 			async function applyPullJournalInSingleTransaction(session) {
 				await client.transaction(async (tx) => {
@@ -7681,6 +7901,92 @@ function requireSyncClient () {
 				'"pushed_at_ms" = excluded."pushed_at_ms",',
 				'"result_json" = excluded."result_json"'
 			].join(' '));
+		}
+
+		function normalizeReplayOutboxOptions(options = {}) {
+			const statuses = normalizeOutboxStatuses(options.statuses);
+			return {
+				statuses,
+				limit: normalizeLimit(options.limit, 10000),
+				replay: options.replay !== false,
+				replayExisting: !!options.replayExisting,
+				replaceOpen: !!options.replaceOpen,
+				ignoreReplayErrors: !!options.ignoreReplayErrors
+			};
+		}
+
+		function normalizeOutboxStatuses(value) {
+			if (!Array.isArray(value) || value.length === 0)
+				return ['pending', 'pushed'];
+			const allowed = new Set(['pending', 'pushed', 'failed']);
+			const result = value
+				.filter(status => typeof status === 'string' && allowed.has(status));
+			return result.length > 0 ? Array.from(new Set(result)) : ['pending', 'pushed'];
+		}
+
+		function normalizeOutboxReplayRows(rows) {
+			if (!Array.isArray(rows))
+				return [];
+			return rows.filter(row => row && row === Object(row));
+		}
+
+		function normalizePullJournalItems(items) {
+			if (!Array.isArray(items))
+				return [];
+			return items
+				.map(normalizePullJournalItem)
+				.filter(Boolean);
+		}
+
+		function normalizePullJournalItem(item) {
+			if (!item || item !== Object(item))
+				return null;
+			if (typeof item.table !== 'string' || !Array.isArray(item.pk))
+				return null;
+			const normalized = {
+				batchNo: Number(item.batchNo || 0),
+				seq: Number(item.seq || 0),
+				table: item.table,
+				pk: item.pk,
+				key: item.key,
+				op: normalizeChangeOp(item.op)
+			};
+			if (item.row !== undefined)
+				normalized.row = item.row;
+			return normalized;
+		}
+
+		async function replaceOpenOutboxRows(db, rows, statuses) {
+			const ids = new Set();
+			for (let i = 0; i < rows.length; i++) {
+				const id = outboxRowMutationId(rows[i]);
+				if (typeof id === 'string' && id.length > 0)
+					ids.add(id);
+			}
+			const statusSql = normalizeOutboxStatuses(statuses).map(sqlStringLiteral).join(', ');
+			let sql = [
+				`DELETE FROM "${syncOutboxTable}"`,
+				`WHERE "status" IN (${statusSql})`
+			].join(' ');
+			if (ids.size > 0)
+				sql += ` AND "mutation_id" NOT IN (${Array.from(ids).map(sqlStringLiteral).join(', ')})`;
+			await db.query(sql);
+		}
+
+		async function hasOutboxRow(db, mutationId) {
+			const rows = await db.query([
+				`SELECT "mutation_id" FROM "${syncOutboxTable}"`,
+				`WHERE "mutation_id" = ${sqlStringLiteral(mutationId)}`,
+				'LIMIT 1'
+			].join(' '));
+			const list = Array.isArray(rows) ? rows : rows?.rows || [];
+			return list.length > 0;
+		}
+
+		function outboxRowMutationId(row) {
+			if (!row || row !== Object(row))
+				return undefined;
+			return row.mutation_id ?? row.MUTATION_ID;
 		}
 
 		function mutationIdsToSet(mutations) {
@@ -9176,6 +9482,11 @@ function requireSyncClient () {
 
 	syncClient.exports = newSyncClient;
 	syncClient.exports.ensureLocalSchemaReadySymbol = ensureLocalSchemaReadySymbol;
+	syncClient.exports.syncAndCapturePullJournalSymbol = syncAndCapturePullJournalSymbol;
+	syncClient.exports.readOutboxRowsSymbol = readOutboxRowsSymbol;
+	syncClient.exports.applyOutboxRowsSymbol = applyOutboxRowsSymbol;
+	syncClient.exports.applyPullJournalSymbol = applyPullJournalSymbol;
+	syncClient.exports.pushPendingSymbol = pushPendingSymbol;
 	return syncClient.exports;
 }
 
@@ -28777,6 +29088,669 @@ function requireNewPool$5 () {
 	return newPool_1$5;
 }
 
+var dualSyncDatabase;
+var hasRequiredDualSyncDatabase;
+
+function requireDualSyncDatabase () {
+	if (hasRequiredDualSyncDatabase) return dualSyncDatabase;
+	hasRequiredDualSyncDatabase = 1;
+	const hostLocal = requireHostLocal();
+	const express = requireHostExpress();
+	const hono = requireHostHono();
+	const randomUuid = requireRandomUuid();
+	const stringify = requireStringify();
+	const createHttpInterceptor = requireHttpInterceptor();
+	const newSyncClient = requireSyncClient();
+	const { createSyncAuto, syncAutoStartSymbol } = requireSyncAuto();
+	const { runSyncMaintenance } = requireWriteGate();
+
+	const {
+		ensureLocalSchemaReadySymbol,
+		syncAndCapturePullJournalSymbol,
+		readOutboxRowsSymbol,
+		applyOutboxRowsSymbol,
+		applyPullJournalSymbol,
+		pushPendingSymbol
+	} = newSyncClient;
+
+	const manifestTable = 'orange_sync_dual_manifest';
+	const deltaTable = 'orange_sync_dual_delta';
+	const manifestId = 'default';
+	const roleA = 'a';
+	const roleB = 'b';
+
+	function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase) {
+		const dataPoolOptions = toDataPoolOptions(poolOptions);
+		const cachePoolOptions = toCachePoolOptions(poolOptions);
+		const roleConnectionStrings = {
+			[roleA]: connectionString,
+			[roleB]: appendRoleSuffix(connectionString, 'b')
+		};
+		const cacheConnectionString = appendRoleSuffix(connectionString, 'delta');
+		const dbByRole = new Map();
+		const clientByRole = new Map();
+		let cacheDb;
+		let manifestCache;
+		let manifestPromise;
+		let roleClientFactory;
+		let roleHttpInterceptor;
+		const syncInterceptors = createHttpInterceptor();
+		let syncTail = Promise.resolve();
+		let catchupPromise = null;
+		let initialReadyEmitted = false;
+		const eventListeners = new Map();
+		const roleEventSubscriptions = new Set();
+
+		const router = {
+			poolFactory: null,
+			hostLocal,
+			express,
+			hono,
+			transaction,
+			createTransaction,
+			query,
+			sqliteFunction,
+			end,
+			accept,
+			__createSyncClient,
+			__sqliteSync: poolOptions && poolOptions.sync,
+			__orangeSyncIdentity: `sqliteOPFS:${connectionString}:dual`
+		};
+		router.poolFactory = router;
+
+		return router;
+
+		function transaction(options, fn) {
+			if ((arguments.length === 1) && (typeof options === 'function')) {
+				fn = options;
+				options = undefined;
+			}
+			return getActiveDb().then(db => db.transaction(options, fn));
+		}
+
+		function createTransaction(options) {
+			const transactionPromise = getActiveDb().then(db => db.createTransaction(options));
+
+			function run(fn) {
+				return transactionPromise.then(transaction => transaction(fn));
+			}
+			run.rollback = function(...args) {
+				return transactionPromise.then(transaction => transaction.rollback(...args));
+			};
+			run.commit = function(...args) {
+				return transactionPromise.then(transaction => transaction.commit(...args));
+			};
+			return run;
+		}
+
+		function query(sql, options) {
+			return getActiveDb().then(db => db.query(sql, options));
+		}
+
+		function sqliteFunction(...args) {
+			return getActiveDb().then(db => db.sqliteFunction(...args));
+		}
+
+		async function end() {
+			if (catchupPromise)
+				await catchupPromise.catch(() => {});
+			const closes = [];
+			for (const db of dbByRole.values()) {
+				if (db && typeof db.end === 'function')
+					closes.push(db.end());
+			}
+			if (cacheDb && typeof cacheDb.end === 'function')
+				closes.push(cacheDb.end());
+			await Promise.all(closes);
+		}
+
+		function accept(caller) {
+			caller.visitSqlite();
+		}
+
+		function __createSyncClient(rootClient, _getDb, httpInterceptor) {
+			roleClientFactory = rootClient;
+			roleHttpInterceptor = httpInterceptor;
+			const auto = createSyncAuto({ sync: syncObserved }, async () => router.__sqliteSync);
+			const syncClient = {
+				sync: syncObserved,
+				ensureLocalSchema,
+				resetLocal,
+				discardLocalChanges,
+				start: auto.start,
+				stop: auto.stop,
+				isRunning: auto.isRunning,
+				on,
+				off,
+				once,
+				waitForInitialSync,
+				interceptors: syncInterceptors
+			};
+			Object.defineProperty(syncClient, syncAutoStartSymbol, {
+				value: auto.startFromConfig
+			});
+			Object.defineProperty(syncClient, ensureLocalSchemaReadySymbol, {
+				value: ensureActiveLocalSchemaReady
+			});
+			return syncClient;
+		}
+
+		function syncObserved(options = {}) {
+			const run = syncTail.then(() => observe('sync', () => sync(normalizeSyncOptions(options))));
+			syncTail = run.catch(() => {});
+			return run;
+		}
+
+		async function sync(options = {}) {
+			await waitForCatchup();
+			const manifest = await getManifest();
+			const activeRole = manifest.activeRole;
+			const stagingRole = manifest.stagingRole;
+			const activeSync = getRoleSyncClient(activeRole);
+			const stagingSync = getRoleSyncClient(stagingRole);
+
+			await activeSync[pushPendingSymbol](options);
+			await applyPendingDeltasToRole(stagingRole);
+
+			const openRows = await activeSync[readOutboxRowsSymbol]({
+				statuses: ['pending', 'pushed']
+			});
+			await stagingSync[applyOutboxRowsSymbol](openRows, {
+				replay: false,
+				replaceOpen: true
+			});
+
+			const result = await stagingSync[syncAndCapturePullJournalSymbol](options);
+			const journal = result && result.__orangePullJournal;
+			const deltaId = journal
+				? await saveDelta(journal, stagingRole)
+				: undefined;
+
+			await runSyncMaintenance(router, async () => {
+				const finalPendingRows = await activeSync[readOutboxRowsSymbol]({
+					statuses: ['pending']
+				});
+				await stagingSync[applyOutboxRowsSymbol](finalPendingRows, {
+					replay: true,
+					replaceOpen: false
+				});
+				await publishStagingRole(activeRole, stagingRole);
+			});
+
+			const newActiveRole = stagingRole;
+			catchupPromise = catchupRole(activeRole, newActiveRole, deltaId)
+				.catch(error => emit('catchup-error', { error }));
+			await maybeEmitInitialReady(newActiveRole);
+			return withDualSyncResult(result, {
+				activeRole: newActiveRole,
+				stagingRole: activeRole,
+				deltaId
+			});
+		}
+
+		async function ensureLocalSchema(options = {}) {
+			const manifest = await getManifest();
+			return getRoleSyncClient(manifest.activeRole).ensureLocalSchema(options);
+		}
+
+		function ensureActiveLocalSchemaReady() {
+			return ensureLocalSchema();
+		}
+
+		async function resetLocal(options = {}) {
+			await waitForCatchup();
+			const errors = [];
+			for (const role of [roleA, roleB]) {
+				try {
+					await getRoleSyncClient(role).resetLocal(options);
+				}
+				catch (e) {
+					errors.push(e);
+				}
+			}
+			await resetCache();
+			manifestCache = {
+				activeRole: roleA,
+				stagingRole: roleB,
+				updatedAtMs: Date.now()
+			};
+			initialReadyEmitted = false;
+			if (errors.length > 0)
+				throw errors[0];
+			return { reset: true, activeRole: roleA, stagingRole: roleB };
+		}
+
+		async function discardLocalChanges(options = {}) {
+			await waitForCatchup();
+			const manifest = await getManifest();
+			return getRoleSyncClient(manifest.activeRole).discardLocalChanges(options);
+		}
+
+		async function waitForInitialSync() {
+			const manifest = await getManifest();
+			return getRoleSyncClient(manifest.activeRole).waitForInitialSync();
+		}
+
+		function on(event, listener) {
+			if (typeof event !== 'string' || typeof listener !== 'function')
+				return () => {};
+			let listeners = eventListeners.get(event);
+			if (!listeners) {
+				listeners = new Set();
+				eventListeners.set(event, listeners);
+				attachRoleEvent(event);
+			}
+			listeners.add(listener);
+			if (event === 'initial-ready')
+				void maybeEmitInitialReadyFromActive();
+			return () => off(event, listener);
+		}
+
+		function off(event, listener) {
+			const listeners = eventListeners.get(event);
+			if (!listeners)
+				return;
+			listeners.delete(listener);
+			if (listeners.size === 0)
+				eventListeners.delete(event);
+		}
+
+		function once(event, listener) {
+			if (typeof event !== 'string' || typeof listener !== 'function')
+				return () => {};
+			const unsubscribe = on(event, payload => {
+				unsubscribe();
+				listener(payload);
+			});
+			return unsubscribe;
+		}
+
+		async function observe(method, fn) {
+			try {
+				const result = await fn();
+				emit(method, { method, result });
+				if (method !== 'sync')
+					emit('sync', { method, result });
+				return result;
+			}
+			catch (error) {
+				emit(method + '-error', { method, error });
+				emit('error', { method, error });
+				throw error;
+			}
+		}
+
+		function emit(event, payload) {
+			const listeners = eventListeners.get(event);
+			if (!listeners)
+				return;
+			for (const listener of Array.from(listeners))
+				listener(payload);
+		}
+
+		function attachRoleEvent(event) {
+			if (!event || event.indexOf('operation') !== 0)
+				return;
+			for (const role of [roleA, roleB]) {
+				const key = role + ':' + event;
+				if (roleEventSubscriptions.has(key))
+					continue;
+				const syncClient = clientByRole.get(role)?.syncClient;
+				if (syncClient && typeof syncClient.on === 'function') {
+					syncClient.on(event, payload => emit(event, payload));
+					roleEventSubscriptions.add(key);
+				}
+			}
+		}
+
+		async function maybeEmitInitialReadyFromActive() {
+			const manifest = await getManifest();
+			await maybeEmitInitialReady(manifest.activeRole);
+		}
+
+		async function maybeEmitInitialReady(role) {
+			if (initialReadyEmitted)
+				return;
+			const syncClient = getRoleSyncClient(role);
+			if (typeof syncClient.waitForInitialSync !== 'function')
+				return;
+			try {
+				await syncClient.waitForInitialSync();
+			}
+			catch (_e) {
+				return;
+			}
+			if (initialReadyEmitted)
+				return;
+			initialReadyEmitted = true;
+			emit('initial-ready', { source: 'dual-swap', role });
+		}
+
+		async function waitForCatchup() {
+			const pending = catchupPromise;
+			if (!pending)
+				return;
+			await pending;
+			if (catchupPromise === pending)
+				catchupPromise = null;
+		}
+
+		async function catchupRole(targetRole, activeRole, deltaId) {
+			await applyPendingDeltasToRole(targetRole, deltaId);
+			const activeRows = await getRoleSyncClient(activeRole)[readOutboxRowsSymbol]({
+				statuses: ['pending']
+			});
+			await getRoleSyncClient(targetRole)[applyOutboxRowsSymbol](activeRows, {
+				replay: true,
+				replaceOpen: true,
+				ignoreReplayErrors: false
+			});
+		}
+
+		async function applyPendingDeltasToRole(role, onlyDeltaId) {
+			const deltas = await readDeltas();
+			for (let i = 0; i < deltas.length; i++) {
+				const delta = deltas[i];
+				if (onlyDeltaId && delta.id !== onlyDeltaId)
+					continue;
+				if (delta.appliedRoles.includes(role))
+					continue;
+				await getRoleSyncClient(role)[applyPullJournalSymbol](delta.journal);
+				await markDeltaApplied(delta, role);
+			}
+		}
+
+		async function publishStagingRole(activeRole, stagingRole) {
+			const now = Date.now();
+			await writeManifest({
+				activeRole: stagingRole,
+				stagingRole: activeRole,
+				updatedAtMs: now
+			});
+		}
+
+		async function getActiveDb() {
+			const manifest = await getManifest();
+			return getRoleDb(manifest.activeRole);
+		}
+
+		function getRoleDb(role) {
+			if (!dbByRole.has(role)) {
+				const db = createSingleDatabase(roleConnectionStrings[role], dataPoolOptions);
+				db.__orangeSyncIdentity = `sqliteOPFS:${connectionString}:dual:${role}`;
+				dbByRole.set(role, db);
+			}
+			return dbByRole.get(role);
+		}
+
+		function getRoleSyncClient(role) {
+			const roleClient = getRoleClient(role);
+			return roleClient.syncClient;
+		}
+
+		function getRoleClient(role) {
+			if (!roleClientFactory)
+				throw new Error('Dual sqliteOPFS sync client has not been initialized.');
+			if (!clientByRole.has(role)) {
+				const getDb = () => getRoleDb(role);
+				const roleClient = roleClientFactory({ db: getDb });
+				roleClient.syncClient = newSyncClient(roleClient, getDb, roleHttpInterceptor, syncInterceptors);
+				clientByRole.set(role, roleClient);
+				for (const event of eventListeners.keys())
+					attachRoleEvent(event);
+			}
+			return clientByRole.get(role);
+		}
+
+		async function getManifest() {
+			if (manifestCache)
+				return manifestCache;
+			if (manifestPromise)
+				return manifestPromise;
+			manifestPromise = readManifest()
+				.then(manifest => {
+					manifestCache = manifest || {
+						activeRole: roleA,
+						stagingRole: roleB,
+						updatedAtMs: Date.now()
+					};
+					return writeManifest(manifestCache).then(() => manifestCache);
+				})
+				.finally(() => {
+					manifestPromise = null;
+				});
+			return manifestPromise;
+		}
+
+		async function readManifest() {
+			const db = await getCacheDb();
+			await ensureCacheSchema(db);
+			const rows = await db.query([
+				`SELECT "active_role", "staging_role", "updated_at_ms" FROM "${manifestTable}"`,
+				`WHERE "id" = ${sqlStringLiteral(manifestId)}`,
+				'LIMIT 1'
+			].join(' '));
+			const row = firstRow(rows);
+			const activeRole = row && (row.active_role ?? row.ACTIVE_ROLE);
+			const stagingRole = row && (row.staging_role ?? row.STAGING_ROLE);
+			if (!isRole(activeRole) || !isRole(stagingRole) || activeRole === stagingRole)
+				return null;
+			return {
+				activeRole,
+				stagingRole,
+				updatedAtMs: Number(row.updated_at_ms ?? row.UPDATED_AT_MS ?? Date.now())
+			};
+		}
+
+		async function writeManifest(manifest) {
+			const db = await getCacheDb();
+			await ensureCacheSchema(db);
+			await db.query([
+				`INSERT INTO "${manifestTable}" ("id", "active_role", "staging_role", "updated_at_ms")`,
+				`VALUES (${sqlStringLiteral(manifestId)}, ${sqlStringLiteral(manifest.activeRole)}, ${sqlStringLiteral(manifest.stagingRole)}, ${Number(manifest.updatedAtMs) || Date.now()})`,
+				'ON CONFLICT("id") DO UPDATE SET',
+				'"active_role" = excluded."active_role",',
+				'"staging_role" = excluded."staging_role",',
+				'"updated_at_ms" = excluded."updated_at_ms"'
+			].join(' '));
+			manifestCache = manifest;
+			return manifest;
+		}
+
+		async function saveDelta(journal, appliedRole) {
+			if (!journal || journal !== Object(journal))
+				return undefined;
+			const db = await getCacheDb();
+			await ensureCacheSchema(db);
+			const id = randomUuid();
+			const appliedRoles = JSON.stringify([appliedRole]);
+			await db.query([
+				`INSERT INTO "${deltaTable}" ("id", "scope", "from_since", "to_since", "journal_json", "created_at_ms", "applied_roles_json")`,
+				`VALUES (${sqlStringLiteral(id)}, ${sqlStringLiteral(journal.scopeKey || '*')}, ${sqlNullableJsonLiteral(journal.since)}, ${sqlNullableJsonLiteral(journal.finalSince)}, ${sqlStringLiteral(stringify(journal))}, ${Date.now()}, ${sqlStringLiteral(appliedRoles)})`
+			].join(' '));
+			return id;
+		}
+
+		async function readDeltas() {
+			const db = await getCacheDb();
+			await ensureCacheSchema(db);
+			const rows = await db.query([
+				`SELECT "id", "journal_json", "applied_roles_json" FROM "${deltaTable}"`,
+				'ORDER BY "created_at_ms" ASC'
+			].join(' '));
+			return toRows(rows)
+				.map(row => ({
+					id: row.id ?? row.ID,
+					journal: parseJson(row.journal_json ?? row.JOURNAL_JSON),
+					appliedRoles: parseJson(row.applied_roles_json ?? row.APPLIED_ROLES_JSON) || []
+				}))
+				.filter(delta => typeof delta.id === 'string' && delta.journal && delta.journal === Object(delta.journal));
+		}
+
+		async function markDeltaApplied(delta, role) {
+			const db = await getCacheDb();
+			const roles = Array.isArray(delta.appliedRoles)
+				? delta.appliedRoles.slice()
+				: [];
+			if (!roles.includes(role))
+				roles.push(role);
+			if (roles.includes(roleA) && roles.includes(roleB)) {
+				await db.query(`DELETE FROM "${deltaTable}" WHERE "id" = ${sqlStringLiteral(delta.id)}`);
+				delta.appliedRoles = roles;
+				return;
+			}
+			await db.query([
+				`UPDATE "${deltaTable}"`,
+				`SET "applied_roles_json" = ${sqlStringLiteral(JSON.stringify(roles))}`,
+				`WHERE "id" = ${sqlStringLiteral(delta.id)}`
+			].join(' '));
+			delta.appliedRoles = roles;
+		}
+
+		async function resetCache() {
+			const db = await getCacheDb();
+			await db.query(`DROP TABLE IF EXISTS "${deltaTable}"`);
+			await db.query(`DROP TABLE IF EXISTS "${manifestTable}"`);
+			await ensureCacheSchema(db);
+			await writeManifest({
+				activeRole: roleA,
+				stagingRole: roleB,
+				updatedAtMs: Date.now()
+			});
+		}
+
+		async function getCacheDb() {
+			if (!cacheDb)
+				cacheDb = createSingleDatabase(cacheConnectionString, cachePoolOptions);
+			return cacheDb;
+		}
+
+		async function ensureCacheSchema(db) {
+			await db.query([
+				`CREATE TABLE IF NOT EXISTS "${manifestTable}" (`,
+				'"id" TEXT PRIMARY KEY,',
+				'"active_role" TEXT NOT NULL,',
+				'"staging_role" TEXT NOT NULL,',
+				'"updated_at_ms" INTEGER NOT NULL',
+				');'
+			].join(' '));
+			await db.query([
+				`CREATE TABLE IF NOT EXISTS "${deltaTable}" (`,
+				'"id" TEXT PRIMARY KEY,',
+				'"scope" TEXT NOT NULL,',
+				'"from_since" TEXT,',
+				'"to_since" TEXT,',
+				'"journal_json" TEXT NOT NULL,',
+				'"created_at_ms" INTEGER NOT NULL,',
+				'"applied_roles_json" TEXT NOT NULL',
+				');'
+			].join(' '));
+		}
+	}
+
+	function withDualSyncResult(result, info) {
+		if (!result || result !== Object(result))
+			return result;
+		Object.defineProperty(result, '__orangeDualSync', {
+			value: info,
+			enumerable: false,
+			configurable: true
+		});
+		return result;
+	}
+
+	function toDataPoolOptions(poolOptions = {}) {
+		return {
+			...poolOptions,
+			sync: stripDualSyncOption(poolOptions.sync)
+		};
+	}
+
+	function toCachePoolOptions(poolOptions = {}) {
+		const options = { ...poolOptions };
+		delete options.sync;
+		return options;
+	}
+
+	function stripDualSyncOption(sync) {
+		if (!sync || sync !== Object(sync) || Array.isArray(sync))
+			return sync;
+		const {
+			dualDataDb,
+			...rest
+		} = sync;
+		return rest;
+	}
+
+	function appendRoleSuffix(connectionString, suffix) {
+		const value = String(connectionString);
+		if (value.endsWith('.sqlite3'))
+			return value.slice(0, -8) + `.__orange_sync_${suffix}.sqlite3`;
+		if (value.endsWith('.db'))
+			return value.slice(0, -3) + `.__orange_sync_${suffix}.db`;
+		return `${value}.__orange_sync_${suffix}.sqlite3`;
+	}
+
+	function isRole(value) {
+		return value === roleA || value === roleB;
+	}
+
+	function normalizeSyncOptions(input) {
+		if (!input || input !== Object(input))
+			return {};
+		const keys = Object.keys(input);
+		const invalidKeys = keys.filter(key => key !== 'timeoutMs');
+		if (invalidKeys.length > 0)
+			throw new Error(`Unsupported sync option "${invalidKeys[0]}". sync only accepts { timeoutMs }.`);
+		const timeoutMs = normalizeTimeoutMs(input.timeoutMs);
+		return timeoutMs === undefined ? {} : { timeoutMs };
+	}
+
+	function normalizeTimeoutMs(value) {
+		const parsed = Number.parseInt(value, 10);
+		if (!Number.isFinite(parsed) || parsed <= 0)
+			return undefined;
+		return parsed;
+	}
+
+	function firstRow(rows) {
+		const list = toRows(rows);
+		return list[0];
+	}
+
+	function toRows(rows) {
+		if (Array.isArray(rows))
+			return rows;
+		return rows && Array.isArray(rows.rows) ? rows.rows : [];
+	}
+
+	function parseJson(value) {
+		if (value === null || value === undefined)
+			return undefined;
+		if (typeof value !== 'string')
+			return value;
+		try {
+			return JSON.parse(value);
+		}
+		catch (_e) {
+			return undefined;
+		}
+	}
+
+	function sqlStringLiteral(value) {
+		return `'${String(value).replace(/'/g, '\'\'')}'`;
+	}
+
+	function sqlNullableJsonLiteral(value) {
+		if (value === undefined || value === null)
+			return 'NULL';
+		return sqlStringLiteral(stringify(value));
+	}
+
+	dualSyncDatabase = newDualSyncDatabase;
+	return dualSyncDatabase;
+}
+
 var newDatabase_1$5;
 var hasRequiredNewDatabase$5;
 
@@ -28795,11 +29769,18 @@ function requireNewDatabase$5 () {
 	let doQuery = requireQuery();
 	let doSqliteFunction = requireSqliteFunction();
 	let releaseDbClient = requireReleaseDbClient();
+	let newDualSyncDatabase = requireDualSyncDatabase();
 
 	function newDatabase(connectionString, poolOptions) {
 		if (!connectionString)
 			throw new Error('Connection string cannot be empty');
 		poolOptions = poolOptions || { min: 1 };
+		if (shouldUseDualSyncDatabase(poolOptions))
+			return newDualSyncDatabase(connectionString, poolOptions, newSingleDatabase);
+		return newSingleDatabase(connectionString, poolOptions);
+	}
+
+	function newSingleDatabase(connectionString, poolOptions) {
 		if ((poolOptions.worker || poolOptions.createWorker) && !('singleWorker' in poolOptions))
 			poolOptions = { ...poolOptions, singleWorker: true };
 		var pool = newPool(connectionString, poolOptions);
@@ -28903,6 +29884,15 @@ function requireNewDatabase$5 () {
 		};
 
 		return c;
+	}
+
+	function shouldUseDualSyncDatabase(poolOptions) {
+		const sync = poolOptions && poolOptions.sync;
+		if (!sync)
+			return false;
+		if (sync === Object(sync) && sync.dualDataDb === false)
+			return false;
+		return true;
 	}
 
 	newDatabase_1$5 = newDatabase;

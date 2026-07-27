@@ -10,11 +10,18 @@ let hostLocal = require('../hostLocal');
 let doQuery = require('../query');
 let doSqliteFunction = require('../sqliteFunction');
 let releaseDbClient = require('../table/releaseDbClient');
+let newDualSyncDatabase = require('./dualSyncDatabase');
 
 function newDatabase(connectionString, poolOptions) {
 	if (!connectionString)
 		throw new Error('Connection string cannot be empty');
 	poolOptions = poolOptions || { min: 1 };
+	if (shouldUseDualSyncDatabase(poolOptions))
+		return newDualSyncDatabase(connectionString, poolOptions, newSingleDatabase);
+	return newSingleDatabase(connectionString, poolOptions);
+}
+
+function newSingleDatabase(connectionString, poolOptions) {
 	if ((poolOptions.worker || poolOptions.createWorker) && !('singleWorker' in poolOptions))
 		poolOptions = { ...poolOptions, singleWorker: true };
 	var pool = newPool(connectionString, poolOptions);
@@ -118,6 +125,15 @@ function newDatabase(connectionString, poolOptions) {
 	};
 
 	return c;
+}
+
+function shouldUseDualSyncDatabase(poolOptions) {
+	const sync = poolOptions && poolOptions.sync;
+	if (!sync)
+		return false;
+	if (sync === Object(sync) && sync.dualDataDb === false)
+		return false;
+	return true;
 }
 
 module.exports = newDatabase;

@@ -1,0 +1,138 @@
+import { describe, expect, test } from 'vitest';
+
+const newDualSyncDatabase = require('../src/sqliteOPFS/dualSyncDatabase');
+const newDatabase = require('../src/sqliteOPFS/newDatabase');
+
+describe('sqliteOPFS dual sync database', () => {
+	test('enables dual routing for sqliteOPFS sync by default', async () => {
+		const db = newDatabase('app.sqlite3', {
+			sync: { url: '/rdb' }
+		});
+
+		expect(db.__orangeSyncIdentity).toBe('sqliteOPFS:app.sqlite3:dual');
+
+		await db.end();
+	});
+
+	test('can disable dual routing for sqliteOPFS sync', async () => {
+		const db = newDatabase('app.sqlite3', {
+			sync: { url: '/rdb', dualDataDb: false },
+			createWorker() {
+				return newIdleWorker();
+			}
+		});
+
+		expect(db.__orangeSyncIdentity).toBe('sqliteOPFS:app.sqlite3');
+
+		await db.end();
+	});
+
+	test('routes regular queries to the default active role', async () => {
+		const fixture = newFixture();
+		const db = newDualSyncDatabase('app.sqlite3', {
+			sync: { url: '/rdb', dualDataDb: true }
+		}, fixture.createSingleDatabase);
+
+		const rows = await db.query('SELECT 1');
+
+		expect(rows).toEqual([{ connectionString: 'app.sqlite3', sql: 'SELECT 1' }]);
+		expect(fixture.manifest).toMatchObject({
+			activeRole: 'a',
+			stagingRole: 'b'
+		});
+	});
+
+	test('routes regular queries to the persisted active role after a reload', async () => {
+		const fixture = newFixture({
+			activeRole: 'b',
+			stagingRole: 'a',
+			updatedAtMs: 123
+		});
+		const db = newDualSyncDatabase('app.sqlite3', {
+			sync: { url: '/rdb', dualDataDb: true }
+		}, fixture.createSingleDatabase);
+
+		const rows = await db.query('SELECT 2');
+
+		expect(rows).toEqual([{
+			connectionString: 'app.__orange_sync_b.sqlite3',
+			sql: 'SELECT 2'
+		}]);
+	});
+});
+
+function newFixture(initialManifest) {
+	const dbs = new Map();
+	const fixture = {
+		manifest: initialManifest,
+		createSingleDatabase
+	};
+	return fixture;
+
+	function createSingleDatabase(connectionString, options) {
+		const db = newFakeDb(connectionString, options, fixture);
+		dbs.set(connectionString, db);
+		return db;
+	}
+}
+
+function newIdleWorker() {
+	return {
+		postMessage() {},
+		addEventListener() {},
+		removeEventListener() {},
+		terminate() {}
+	};
+}
+
+function newFakeDb(connectionString, options, fixture) {
+	return {
+		__sqliteSync: options && options.sync,
+		hostLocal: true,
+		async query(sql) {
+			if (connectionString === 'app.__orange_sync_delta.sqlite3')
+				return queryCache(sql, fixture);
+			return [{ connectionString, sql }];
+		},
+		async transaction(_options, fn) {
+			if (typeof _options === 'function')
+				fn = _options;
+			return fn(this);
+		},
+		createTransaction() {
+			async function run(fn) {
+				return fn(this);
+			}
+			run.commit = async () => {};
+			run.rollback = async () => {};
+			return run;
+		},
+		async sqliteFunction() {
+			return undefined;
+		},
+		async end() {}
+	};
+}
+
+function queryCache(sql, fixture) {
+	if (/SELECT "active_role"/u.test(sql)) {
+		if (!fixture.manifest)
+			return [];
+		return [{
+			active_role: fixture.manifest.activeRole,
+			staging_role: fixture.manifest.stagingRole,
+			updated_at_ms: fixture.manifest.updatedAtMs
+		}];
+	}
+	if (/INSERT INTO "orange_sync_dual_manifest"/u.test(sql)) {
+		if (!fixture.manifest) {
+			fixture.manifest = {
+				activeRole: 'a',
+				stagingRole: 'b',
+				updatedAtMs: Date.now()
+			};
+		}
+		return [];
+	}
+	return [];
+}

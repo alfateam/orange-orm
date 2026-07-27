@@ -24,8 +24,23 @@ const syncDbPriority = 1;
 const ensureLocalSchemaReadySymbol = typeof Symbol === 'function'
 	? Symbol.for('orange-orm.syncClient.ensureLocalSchemaReady')
 	: '__orangeOrmSyncClientEnsureLocalSchemaReady';
+const syncAndCapturePullJournalSymbol = typeof Symbol === 'function'
+	? Symbol.for('orange-orm.syncClient.syncAndCapturePullJournal')
+	: '__orangeOrmSyncClientSyncAndCapturePullJournal';
+const readOutboxRowsSymbol = typeof Symbol === 'function'
+	? Symbol.for('orange-orm.syncClient.readOutboxRows')
+	: '__orangeOrmSyncClientReadOutboxRows';
+const applyOutboxRowsSymbol = typeof Symbol === 'function'
+	? Symbol.for('orange-orm.syncClient.applyOutboxRows')
+	: '__orangeOrmSyncClientApplyOutboxRows';
+const applyPullJournalSymbol = typeof Symbol === 'function'
+	? Symbol.for('orange-orm.syncClient.applyPullJournal')
+	: '__orangeOrmSyncClientApplyPullJournal';
+const pushPendingSymbol = typeof Symbol === 'function'
+	? Symbol.for('orange-orm.syncClient.pushPending')
+	: '__orangeOrmSyncClientPushPending';
 
-function newSyncClient(client, getDb, axiosInterceptor) {
+function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 	const sinceByScope = new Map();
 	const ensuredInternalTables = new WeakMap();
 	const syncStateTable = 'orange_sync_state';
@@ -43,7 +58,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 	let initialReadyEmitted = false;
 	let localSchemaReadyPromise = null;
 	let localSchemaReadyResult = null;
-	const interceptors = createHttpInterceptor();
+	const interceptors = syncInterceptors || createHttpInterceptor();
 	const lockedSync = withCrossTabSyncLock(sync);
 	const lockedEnsureLocalSchema = withCrossTabSyncLock(ensureLocalSchema);
 	const lockedResetLocal = withCrossTabSyncLock(resetLocal);
@@ -77,6 +92,21 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 	Object.defineProperty(syncClientApi, ensureLocalSchemaReadySymbol, {
 		value: ensureLocalSchemaReady
 	});
+	Object.defineProperty(syncClientApi, syncAndCapturePullJournalSymbol, {
+		value: syncAndCapturePullJournal
+	});
+	Object.defineProperty(syncClientApi, readOutboxRowsSymbol, {
+		value: readOutboxRowsForReplay
+	});
+	Object.defineProperty(syncClientApi, applyOutboxRowsSymbol, {
+		value: applyOutboxRowsForReplay
+	});
+	Object.defineProperty(syncClientApi, applyPullJournalSymbol, {
+		value: applyPullJournalSnapshot
+	});
+	Object.defineProperty(syncClientApi, pushPendingSymbol, {
+		value: pushPendingOnly
+	});
 	return syncClientApi;
 
 	function withCrossTabSyncLock(fn) {
@@ -104,6 +134,26 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 
 	async function sync(options = {}) {
 		await pull(normalizeSyncOptions(options));
+	}
+
+	async function syncAndCapturePullJournal(options = {}) {
+		return pull({
+			...normalizePullOptions(options),
+			_capturePullJournal: true
+		});
+	}
+
+	async function pushPendingOnly(options = {}) {
+		const db = toSyncDb(await getDb());
+		const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
+		if (!syncConfig)
+			throw new Error('Sync is not configured. Add sync in sqlite options: sqlite(connectionString, { sync: ... })');
+		const configuredTables = resolveSyncTables(db, syncConfig.tables, client);
+		const hadStableBase = await hasStableBase(db, configuredTables);
+		if (!hadStableBase)
+			return { phase: 'push', applied: 0, duplicates: 0, results: [], skipped: 'missing-stable-base' };
+		const pushConfig = resolvePushConfig(syncConfig, normalizePullOptions(options));
+		return pushBeforePull(db, syncConfig, hadStableBase, pushConfig);
 	}
 
 	async function ensureLocalSchema(options = {}) {
@@ -184,16 +234,19 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 	}
 
 	async function pull(options = {}) {
+		const normalizedOptions = normalizePullOptions(options);
+		if (options && options._capturePullJournal)
+			normalizedOptions._capturePullJournal = true;
 		const {
 			db,
 			syncConfig,
 			pullConfig,
 			configuredTables
-		} = await prepareLocalSyncSchema(options);
+		} = await prepareLocalSyncSchema(normalizedOptions);
 		const hadStableBase = await hasStableBase(db, configuredTables);
 		if (!hadStableBase)
-			return runSyncMaintenance(db, () => pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase));
-		return pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase);
+			return runSyncMaintenance(db, () => pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase, normalizedOptions));
+		return pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase, normalizedOptions);
 	}
 
 	async function prepareLocalSyncSchema(options = {}, prepareOptions = {}) {
@@ -263,7 +316,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		};
 	}
 
-	async function pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase) {
+	async function pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase, options = {}) {
 		await pushBeforePull(db, syncConfig, hadStableBase);
 		const pullStartedAtMs = Date.now();
 		await maybeEmitInitialReady(syncConfig, configuredTables, db, 'persisted');
@@ -274,6 +327,7 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 			since: currentSince,
 			db,
 			scopeKey,
+			_capturePullJournal: !!options._capturePullJournal,
 			_syncInterceptors: interceptors,
 			_syncAxiosInterceptor: axiosInterceptor
 		};
@@ -347,6 +401,143 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		});
 	}
 
+	async function readOutboxRowsForReplay(options = {}) {
+		const db = toSyncDb(await getDb());
+		const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
+		if (!syncConfig)
+			throw new Error('Sync is not configured. Add sync in sqlite options: sqlite(connectionString, { sync: ... })');
+		const replayOptions = normalizeReplayOutboxOptions(options);
+		return readMutationRowsByStatus(db, replayOptions.statuses, replayOptions.limit);
+	}
+
+	async function applyOutboxRowsForReplay(rows, options = {}) {
+		const db = toSyncDb(await getDb());
+		const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
+		if (!syncConfig)
+			throw new Error('Sync is not configured. Add sync in sqlite options: sqlite(connectionString, { sync: ... })');
+		const replayOptions = normalizeReplayOutboxOptions(options);
+		const list = normalizeOutboxReplayRows(rows);
+		await ensureSyncOutboxTable(db);
+		if (replayOptions.replaceOpen)
+			await replaceOpenOutboxRows(db, list, replayOptions.statuses);
+		let inserted = 0;
+		let replayed = 0;
+		let skipped = 0;
+		const errors = [];
+		for (let i = 0; i < list.length; i++) {
+			const row = list[i];
+			const id = outboxRowMutationId(row);
+			if (typeof id !== 'string') {
+				skipped += 1;
+				continue;
+			}
+			const exists = await hasOutboxRow(db, id);
+			if (replayOptions.replay && (!exists || replayOptions.replayExisting)) {
+				const mutation = rowToMutation(row);
+				if (mutation) {
+					try {
+						await replayMutation(mutation);
+						replayed += 1;
+					}
+					catch (e) {
+						if (!replayOptions.ignoreReplayErrors)
+							throw e;
+						errors.push({ id, message: e && e.message || String(e) });
+					}
+				}
+			}
+			else {
+				skipped += 1;
+			}
+			await insertOutboxRow(db, row);
+			inserted += exists ? 0 : 1;
+		}
+		return { inserted, replayed, skipped, errors };
+	}
+
+	async function applyPullJournalSnapshot(journal, options = {}) {
+		const db = toSyncDb(await getDb());
+		const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
+		if (!syncConfig)
+			throw new Error('Sync is not configured. Add sync in sqlite options: sqlite(connectionString, { sync: ... })');
+		const pullConfig = resolvePullConfig(syncConfig, normalizePullOptions(options));
+		const journalTables = normalizeConfiguredTables(journal && journal.tables);
+		const configuredTables = resolveSyncTables(db, journalTables || pullConfig.tables, client);
+		if (!Array.isArray(configuredTables) || configuredTables.length === 0)
+			throw new Error('Sync pull journal apply requires mapped tables or configured tables.');
+		const scopeKey = typeof (journal && journal.scopeKey) === 'string'
+			? journal.scopeKey
+			: getScopeKey(configuredTables);
+		const items = normalizePullJournalItems(journal && journal.items);
+		const applyConfig = normalizePullApplyConfig(
+			options && options.apply !== undefined ? options.apply : pullConfig.apply
+		);
+		const defaultPatchOptions = { ...(pullConfig.patchOptions || {}), concurrency: 'overwrite', skipSelectAfterInsert: true };
+		const checkpointSince = journal && journal.finalSince;
+		const shouldApplyCheckpoint = checkpointSince !== undefined;
+		let applied = 0;
+		const touchedTables = new Set();
+		await tryEnableForeignKeys(db);
+		if (applyConfig)
+			await applyPullJournalItemsInChunks();
+		else
+			await applyPullJournalItemsInSingleTransaction();
+		if (shouldApplyCheckpoint)
+			sinceByScope.set(scopeKey, checkpointSince);
+		return {
+			applied,
+			tables: Array.from(touchedTables),
+			since: checkpointSince,
+			checkpointApplied: true
+		};
+
+		async function applyPullJournalItemsInSingleTransaction() {
+			await client.transaction(async (tx) => {
+				await tryDeferForeignKeys(tx);
+				await ensureStableBaseTables(tx, configuredTables);
+				const baseByName = await readStableBaseEntriesByName(tx);
+				for (let i = 0; i < items.length; i++) {
+					const item = items[i];
+					if (item && typeof item.table === 'string')
+						touchedTables.add(item.table);
+					applied += await applyPullJournalItemOnTx(tx, item, defaultPatchOptions);
+					await applyPullJournalItemToStableBase(tx, item, baseByName);
+				}
+				if (items.length > 0)
+					await validateForeignKeys(tx);
+				if (shouldApplyCheckpoint)
+					await writeScopeState(scopeKey, { since: checkpointSince, updatedAtMs: Date.now() }, tx);
+			}, { suppressSyncOutbox: true });
+		}
+
+		async function applyPullJournalItemsInChunks() {
+			for (let offset = 0; offset < items.length; offset += applyConfig.maxRowsPerTransaction) {
+				const chunk = items.slice(offset, offset + applyConfig.maxRowsPerTransaction);
+				await client.transaction(async (tx) => {
+					await tryDeferForeignKeys(tx);
+					await ensureStableBaseTables(tx, configuredTables);
+					const baseByName = await readStableBaseEntriesByName(tx);
+					for (let i = 0; i < chunk.length; i++) {
+						const item = chunk[i];
+						if (item && typeof item.table === 'string')
+							touchedTables.add(item.table);
+						applied += await applyPullJournalItemOnTx(tx, item, defaultPatchOptions);
+						await applyPullJournalItemToStableBase(tx, item, baseByName);
+					}
+					if (chunk.length > 0 && applyConfig.foreignKeyCheck === 'chunk')
+						await validateForeignKeys(tx);
+				}, { suppressSyncOutbox: true });
+				await yieldPullApply(applyConfig);
+			}
+			await client.transaction(async (tx) => {
+				if (items.length > 0 && applyConfig.foreignKeyCheck === 'final')
+					await validateForeignKeys(tx);
+				if (shouldApplyCheckpoint)
+					await writeScopeState(scopeKey, { since: checkpointSince, updatedAtMs: Date.now() }, tx);
+			}, { suppressSyncOutbox: true });
+		}
+	}
+
 	async function pushPending(options = {}) {
 		const db = toSyncDb(await getDb());
 		const syncConfig = options._syncConfig || normalizeSyncConfig(db && db.__sqliteSync);
@@ -380,10 +571,10 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		return result;
 	}
 
-	async function pushBeforePull(db, syncConfig, hasBase) {
+	async function pushBeforePull(db, syncConfig, hasBase, resolvedPushConfig) {
 		if (!hasBase)
 			return;
-		const pushConfig = resolvePushConfig(syncConfig);
+		const pushConfig = resolvedPushConfig || resolvePushConfig(syncConfig);
 		const maxBatches = resolveMaxPushBatches();
 		const results = [];
 		for (let i = 0; i < maxBatches; i++) {
@@ -529,6 +720,9 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		const scopeKey = options.scopeKey || getScopeKey(options.tables);
 		await ensurePullJournalTables(db);
 		const session = await stagePullJournal();
+		const capturedPullJournal = options._capturePullJournal
+			? await capturePullJournalSnapshot(session)
+			: null;
 		let applied = 0;
 		const shouldApplyCheckpoint = session.finalSince !== undefined;
 		await tryEnableForeignKeys(db);
@@ -539,13 +733,39 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 		if (shouldApplyCheckpoint)
 			sinceByScope.set(scopeKey, session.finalSince);
 
-		return {
+		const result = {
 			applied,
 			tables: session.tables || [],
 			since: session.finalSince,
 			payload: session.payload,
 			checkpointApplied: true
 		};
+		if (capturedPullJournal) {
+			Object.defineProperty(result, '__orangePullJournal', {
+				value: {
+					...capturedPullJournal,
+					tables: session.tables || capturedPullJournal.tables
+				},
+				enumerable: false,
+				configurable: true
+			});
+		}
+		return result;
+
+		async function capturePullJournalSnapshot(session) {
+			const batches = session && session.persisted
+				? await readPullJournalBatches(db, scopeKey)
+				: [];
+			return {
+				scopeKey,
+				tables: Array.isArray(options.tables) ? options.tables.slice() : [],
+				since: session && session.since,
+				finalSince: session && session.finalSince,
+				payload: session && session.payload,
+				reason: session && session.reason,
+				items: flattenPullJournalBatches(batches)
+			};
+		}
 
 		async function applyPullJournalInSingleTransaction(session) {
 			await client.transaction(async (tx) => {
@@ -1774,6 +1994,92 @@ function newSyncClient(client, getDb, axiosInterceptor) {
 			'"pushed_at_ms" = excluded."pushed_at_ms",',
 			'"result_json" = excluded."result_json"'
 		].join(' '));
+	}
+
+	function normalizeReplayOutboxOptions(options = {}) {
+		const statuses = normalizeOutboxStatuses(options.statuses);
+		return {
+			statuses,
+			limit: normalizeLimit(options.limit, 10000),
+			replay: options.replay !== false,
+			replayExisting: !!options.replayExisting,
+			replaceOpen: !!options.replaceOpen,
+			ignoreReplayErrors: !!options.ignoreReplayErrors
+		};
+	}
+
+	function normalizeOutboxStatuses(value) {
+		if (!Array.isArray(value) || value.length === 0)
+			return ['pending', 'pushed'];
+		const allowed = new Set(['pending', 'pushed', 'failed']);
+		const result = value
+			.filter(status => typeof status === 'string' && allowed.has(status));
+		return result.length > 0 ? Array.from(new Set(result)) : ['pending', 'pushed'];
+	}
+
+	function normalizeOutboxReplayRows(rows) {
+		if (!Array.isArray(rows))
+			return [];
+		return rows.filter(row => row && row === Object(row));
+	}
+
+	function normalizePullJournalItems(items) {
+		if (!Array.isArray(items))
+			return [];
+		return items
+			.map(normalizePullJournalItem)
+			.filter(Boolean);
+	}
+
+	function normalizePullJournalItem(item) {
+		if (!item || item !== Object(item))
+			return null;
+		if (typeof item.table !== 'string' || !Array.isArray(item.pk))
+			return null;
+		const normalized = {
+			batchNo: Number(item.batchNo || 0),
+			seq: Number(item.seq || 0),
+			table: item.table,
+			pk: item.pk,
+			key: item.key,
+			op: normalizeChangeOp(item.op)
+		};
+		if (item.row !== undefined)
+			normalized.row = item.row;
+		return normalized;
+	}
+
+	async function replaceOpenOutboxRows(db, rows, statuses) {
+		const ids = new Set();
+		for (let i = 0; i < rows.length; i++) {
+			const id = outboxRowMutationId(rows[i]);
+			if (typeof id === 'string' && id.length > 0)
+				ids.add(id);
+		}
+		const statusSql = normalizeOutboxStatuses(statuses).map(sqlStringLiteral).join(', ');
+		let sql = [
+			`DELETE FROM "${syncOutboxTable}"`,
+			`WHERE "status" IN (${statusSql})`
+		].join(' ');
+		if (ids.size > 0)
+			sql += ` AND "mutation_id" NOT IN (${Array.from(ids).map(sqlStringLiteral).join(', ')})`;
+		await db.query(sql);
+	}
+
+	async function hasOutboxRow(db, mutationId) {
+		const rows = await db.query([
+			`SELECT "mutation_id" FROM "${syncOutboxTable}"`,
+			`WHERE "mutation_id" = ${sqlStringLiteral(mutationId)}`,
+			'LIMIT 1'
+		].join(' '));
+		const list = Array.isArray(rows) ? rows : rows?.rows || [];
+		return list.length > 0;
+	}
+
+	function outboxRowMutationId(row) {
+		if (!row || row !== Object(row))
+			return undefined;
+		return row.mutation_id ?? row.MUTATION_ID;
 	}
 
 	function mutationIdsToSet(mutations) {
@@ -3269,3 +3575,8 @@ function sqlNullableNumberLiteral(value) {
 
 module.exports = newSyncClient;
 module.exports.ensureLocalSchemaReadySymbol = ensureLocalSchemaReadySymbol;
+module.exports.syncAndCapturePullJournalSymbol = syncAndCapturePullJournalSymbol;
+module.exports.readOutboxRowsSymbol = readOutboxRowsSymbol;
+module.exports.applyOutboxRowsSymbol = applyOutboxRowsSymbol;
+module.exports.applyPullJournalSymbol = applyPullJournalSymbol;
+module.exports.pushPendingSymbol = pushPendingSymbol;
