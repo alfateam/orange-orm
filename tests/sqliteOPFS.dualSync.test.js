@@ -60,18 +60,36 @@ describe('sqliteOPFS dual sync database', () => {
 		}]);
 	});
 
-	test('refreshes the manifest before regular queries', async () => {
+	test('uses the cached manifest for repeated regular queries', async () => {
 		const fixture = newFixture();
 		const db = newDualSyncDatabase('app.sqlite3', {
 			sync: { url: '/rdb', dualDataDb: true }
 		}, fixture.createSingleDatabase);
 
 		await db.query('SELECT first');
-		fixture.manifest = {
-			activeRole: 'b',
-			stagingRole: 'a',
-			updatedAtMs: 456
-		};
+		await db.query('SELECT second');
+
+		expect(fixture.cacheSql.filter(sql => /SELECT "active_role"/u.test(sql))).toHaveLength(1);
+	});
+
+	test('updates the cached manifest from an external sync event', async () => {
+		const fixture = newFixture();
+		const db = newDualSyncDatabase('app.sqlite3', {
+			sync: { url: '/rdb', dualDataDb: true }
+		}, fixture.createSingleDatabase);
+		const syncClient = newFakeSyncClient();
+
+		db.__orangeDualSyncAttachSyncClient(syncClient);
+		await db.query('SELECT first');
+		syncClient.emit('sync', {
+			result: {
+				__orangeDualSync: {
+					activeRole: 'b',
+					stagingRole: 'a',
+					updatedAtMs: Date.now() + 1
+				}
+			}
+		});
 		const rows = await db.query('SELECT second');
 
 		expect(rows).toEqual([{
@@ -105,6 +123,7 @@ function newFixture(initialManifest) {
 	const dbs = new Map();
 	const fixture = {
 		manifest: initialManifest,
+		cacheSql: [],
 		created: [],
 		createSingleDatabase
 	};
@@ -124,6 +143,21 @@ function newIdleWorker() {
 		addEventListener() {},
 		removeEventListener() {},
 		terminate() {}
+	};
+}
+
+function newFakeSyncClient() {
+	const listeners = new Map();
+	return {
+		on(event, listener) {
+			listeners.set(event, listener);
+			return () => listeners.delete(event);
+		},
+		emit(event, payload) {
+			const listener = listeners.get(event);
+			if (listener)
+				listener(payload);
+		}
 	};
 }
 
@@ -157,6 +191,7 @@ function newFakeDb(connectionString, options, fixture) {
 }
 
 function queryCache(sql, fixture) {
+	fixture.cacheSql.push(sql);
 	if (/SELECT "active_role"/u.test(sql)) {
 		if (!fixture.manifest)
 			return [];

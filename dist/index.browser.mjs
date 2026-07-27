@@ -9608,8 +9608,12 @@ function requireClient () {
 		client.syncClient = options.syncClient
 			? options.syncClient
 			: baseUrl && typeof baseUrl.__createSyncClient === 'function'
-			? baseUrl.__createSyncClient(client, getDb, httpInterceptor)
-			: newSyncClient(client, getDb, httpInterceptor);
+				? baseUrl.__createSyncClient(client, getDb, httpInterceptor)
+				: newSyncClient(client, getDb, httpInterceptor);
+		if (baseUrl && typeof baseUrl.__orangeDualSyncAttachSyncClient === 'function')
+			baseUrl.__orangeDualSyncAttachSyncClient(client.syncClient);
+		if (baseUrl && typeof baseUrl.__orangeDualSyncWarmManifest === 'function')
+			void baseUrl.__orangeDualSyncWarmManifest();
 		let localSchemaReadySkipped = false;
 		// else {
 		let handler = {
@@ -25900,6 +25904,7 @@ function requireDualSyncDatabase () {
 	const newSyncClient = requireSyncClient();
 	const { createSyncAuto, syncAutoStartSymbol } = requireSyncAuto();
 	const { runSyncMaintenance } = requireWriteGate();
+	const { normalizeLockNamePart } = requireCrossTabLock();
 
 	const {
 		ensureLocalSchemaReadySymbol,
@@ -25930,6 +25935,10 @@ function requireDualSyncDatabase () {
 		let cacheDb;
 		let manifestCache;
 		let manifestPromise;
+		let cacheSchemaReady = false;
+		let cacheSchemaPromise;
+		let externalSyncUnsubscribe;
+		const manifestChannel = createManifestChannel();
 		let roleClientFactory;
 		let roleHttpInterceptor;
 		const syncInterceptors = createHttpInterceptor();
@@ -25950,6 +25959,8 @@ function requireDualSyncDatabase () {
 			end,
 			accept,
 			__createSyncClient,
+			__orangeDualSyncAttachSyncClient: attachExternalSyncClient,
+			__orangeDualSyncWarmManifest: warmManifest,
 			__sqliteSync: poolOptions && poolOptions.sync,
 			__orangeSyncIdentity: `sqliteOPFS:${connectionString}:dual`
 		};
@@ -25996,6 +26007,10 @@ function requireDualSyncDatabase () {
 			}
 			if (cacheDb && typeof cacheDb.end === 'function')
 				closes.push(cacheDb.end());
+			if (externalSyncUnsubscribe)
+				externalSyncUnsubscribe();
+			if (manifestChannel && typeof manifestChannel.close === 'function')
+				manifestChannel.close();
 			await Promise.all(closes);
 		}
 
@@ -26239,7 +26254,7 @@ function requireDualSyncDatabase () {
 		}
 
 		async function getActiveDb() {
-			const manifest = await getManifest(true);
+			const manifest = await getManifest();
 			return getRoleDb(manifest.activeRole);
 		}
 
@@ -26271,6 +26286,20 @@ function requireDualSyncDatabase () {
 			return clientByRole.get(role);
 		}
 
+		function warmManifest() {
+			return getManifest().catch(() => {});
+		}
+
+		function attachExternalSyncClient(syncClient) {
+			if (!syncClient || typeof syncClient.on !== 'function' || externalSyncUnsubscribe)
+				return;
+			externalSyncUnsubscribe = syncClient.on('sync', payload => {
+				const info = extractDualSyncInfo(payload);
+				if (info)
+					updateManifestCache(info);
+			});
+		}
+
 		async function getManifest(refresh = false) {
 			if (manifestCache && !refresh)
 				return manifestCache;
@@ -26278,12 +26307,14 @@ function requireDualSyncDatabase () {
 				return manifestPromise;
 			manifestPromise = readManifest()
 				.then(manifest => {
-					manifestCache = manifest || {
+					if (manifest)
+						return updateManifestCache(manifest);
+					const initialManifest = {
 						activeRole: roleA,
 						stagingRole: roleB,
 						updatedAtMs: Date.now()
 					};
-					return writeManifest(manifestCache).then(() => manifestCache);
+					return writeManifest(initialManifest);
 				})
 				.finally(() => {
 					manifestPromise = null;
@@ -26322,7 +26353,8 @@ function requireDualSyncDatabase () {
 				'"staging_role" = excluded."staging_role",',
 				'"updated_at_ms" = excluded."updated_at_ms"'
 			].join(' '));
-			manifestCache = manifest;
+			updateManifestCache(manifest);
+			broadcastManifest(manifest);
 			return manifest;
 		}
 
@@ -26378,6 +26410,8 @@ function requireDualSyncDatabase () {
 
 		async function resetCache() {
 			const db = await getCacheDb();
+			cacheSchemaReady = false;
+			cacheSchemaPromise = null;
 			await db.query(`DROP TABLE IF EXISTS "${deltaTable}"`);
 			await db.query(`DROP TABLE IF EXISTS "${manifestTable}"`);
 			await ensureCacheSchema(db);
@@ -26395,31 +26429,87 @@ function requireDualSyncDatabase () {
 		}
 
 		async function ensureCacheSchema(db) {
-			await db.query([
-				`CREATE TABLE IF NOT EXISTS "${manifestTable}" (`,
-				'"id" TEXT PRIMARY KEY,',
-				'"active_role" TEXT NOT NULL,',
-				'"staging_role" TEXT NOT NULL,',
-				'"updated_at_ms" INTEGER NOT NULL',
-				');'
-			].join(' '));
-			await db.query([
-				`CREATE TABLE IF NOT EXISTS "${deltaTable}" (`,
-				'"id" TEXT PRIMARY KEY,',
-				'"scope" TEXT NOT NULL,',
-				'"from_since" TEXT,',
-				'"to_since" TEXT,',
-				'"journal_json" TEXT NOT NULL,',
-				'"created_at_ms" INTEGER NOT NULL,',
-				'"applied_roles_json" TEXT NOT NULL',
-				');'
-			].join(' '));
+			if (cacheSchemaReady)
+				return;
+			if (!cacheSchemaPromise) {
+				cacheSchemaPromise = (async () => {
+					await db.query([
+						`CREATE TABLE IF NOT EXISTS "${manifestTable}" (`,
+						'"id" TEXT PRIMARY KEY,',
+						'"active_role" TEXT NOT NULL,',
+						'"staging_role" TEXT NOT NULL,',
+						'"updated_at_ms" INTEGER NOT NULL',
+						');'
+					].join(' '));
+					await db.query([
+						`CREATE TABLE IF NOT EXISTS "${deltaTable}" (`,
+						'"id" TEXT PRIMARY KEY,',
+						'"scope" TEXT NOT NULL,',
+						'"from_since" TEXT,',
+						'"to_since" TEXT,',
+						'"journal_json" TEXT NOT NULL,',
+						'"created_at_ms" INTEGER NOT NULL,',
+						'"applied_roles_json" TEXT NOT NULL',
+						');'
+					].join(' '));
+					cacheSchemaReady = true;
+				})()
+					.finally(() => {
+						cacheSchemaPromise = null;
+					});
+			}
+			await cacheSchemaPromise;
 		}
 
 		function getRolePoolOptions(role) {
 			return role === roleA
 				? primaryDataPoolOptions
 				: secondaryDataPoolOptions;
+		}
+
+		function updateManifestCache(info) {
+			const manifest = normalizeManifestInfo(info);
+			if (!manifest)
+				return manifestCache;
+			if (manifestCache && Number(manifestCache.updatedAtMs || 0) > Number(manifest.updatedAtMs || 0))
+				return manifestCache;
+			manifestCache = manifest;
+			return manifestCache;
+		}
+
+		function createManifestChannel() {
+			if (typeof BroadcastChannel !== 'function')
+				return null;
+			try {
+				const channel = new BroadcastChannel(manifestChannelName(connectionString));
+				channel.onmessage = (event) => {
+					const message = event && event.data;
+					if (!message || message.type !== 'orange-sync-dual-manifest')
+						return;
+					if (message.connectionString !== connectionString)
+						return;
+					updateManifestCache(message.manifest);
+				};
+				return channel;
+			}
+			catch (_e) {
+				return null;
+			}
+		}
+
+		function broadcastManifest(manifest) {
+			if (!manifestChannel || typeof manifestChannel.postMessage !== 'function')
+				return;
+			try {
+				manifestChannel.postMessage({
+					type: 'orange-sync-dual-manifest',
+					connectionString,
+					manifest: normalizeManifestInfo(manifest)
+				});
+			}
+			catch (_e) {
+				// BroadcastChannel is an optimization. Persisted manifest remains the source of truth.
+			}
 		}
 	}
 
@@ -26428,10 +26518,37 @@ function requireDualSyncDatabase () {
 			return result;
 		Object.defineProperty(result, '__orangeDualSync', {
 			value: info,
-			enumerable: false,
+			enumerable: true,
 			configurable: true
 		});
 		return result;
+	}
+
+	function extractDualSyncInfo(payload) {
+		if (!payload || payload !== Object(payload))
+			return null;
+		if (payload.__orangeDualSync)
+			return payload.__orangeDualSync;
+		const result = payload.result;
+		if (result && result.__orangeDualSync)
+			return result.__orangeDualSync;
+		return null;
+	}
+
+	function normalizeManifestInfo(info) {
+		if (!info || info !== Object(info))
+			return null;
+		if (!isRole(info.activeRole) || !isRole(info.stagingRole) || info.activeRole === info.stagingRole)
+			return null;
+		return {
+			activeRole: info.activeRole,
+			stagingRole: info.stagingRole,
+			updatedAtMs: Number(info.updatedAtMs) || Date.now()
+		};
+	}
+
+	function manifestChannelName(connectionString) {
+		return `orange-orm:sqliteOPFS:dual-manifest:${normalizeLockNamePart(connectionString || 'default')}`;
 	}
 
 	function toDataPoolOptions(poolOptions = {}) {

@@ -111,8 +111,12 @@ function rdbClient(options = {}) {
 	client.syncClient = options.syncClient
 		? options.syncClient
 		: baseUrl && typeof baseUrl.__createSyncClient === 'function'
-		? baseUrl.__createSyncClient(client, getDb, httpInterceptor)
-		: newSyncClient(client, getDb, httpInterceptor);
+			? baseUrl.__createSyncClient(client, getDb, httpInterceptor)
+			: newSyncClient(client, getDb, httpInterceptor);
+	if (baseUrl && typeof baseUrl.__orangeDualSyncAttachSyncClient === 'function')
+		baseUrl.__orangeDualSyncAttachSyncClient(client.syncClient);
+	if (baseUrl && typeof baseUrl.__orangeDualSyncWarmManifest === 'function')
+		void baseUrl.__orangeDualSyncWarmManifest();
 	let localSchemaReadySkipped = false;
 	// else {
 	let handler = {
