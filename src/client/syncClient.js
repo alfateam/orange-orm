@@ -3284,8 +3284,11 @@ function flattenPullJournalBatches(batches) {
 }
 
 function yieldPullApply(applyConfig) {
+	const yieldMs = applyConfig && Number(applyConfig.yieldMs || 0);
+	if (!Number.isFinite(yieldMs) || yieldMs <= 0)
+		return Promise.resolve();
 	return new Promise((resolve) => {
-		setTimeout(resolve, applyConfig && applyConfig.yieldMs || 0);
+		setTimeout(resolve, yieldMs);
 	});
 }
 

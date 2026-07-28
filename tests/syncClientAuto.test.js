@@ -1152,6 +1152,79 @@ describe('sync client auto start', () => {
 		expect(db.journal.items).toHaveLength(0);
 	});
 
+	test('does not timer-yield staged pull chunks when yieldMs is zero', async () => {
+		let timerYields = 0;
+		const originalSetTimeout = globalThis.setTimeout;
+		const db = newJournalDb({
+			__sqliteSync: {
+				url: '/rdb',
+				auto: false,
+				schema: false,
+				pull: {
+					maxKeysPerBatch: 2,
+					maxRowsPerBatch: 2,
+					apply: {
+						maxRowsPerTransaction: 1
+					}
+				}
+			}
+		});
+		const client = newSyncClient({
+			tables: {
+				customer: newTable('customer')
+			},
+			transaction: async (fn) => fn({
+				customer: {
+					patch: async () => ({ changed: [] })
+				},
+				query: db.query
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async (request) => {
+					if (request.data.phase === 'keys') {
+						return {
+							data: {
+								phase: 'keys',
+								items: [
+									{ table: 'customer', pk: [1], key: { id: 1 }, op: 'U' },
+									{ table: 'customer', pk: [2], key: { id: 2 }, op: 'U' }
+								],
+								done: true,
+								cursor: 'cursor-1'
+							}
+						};
+					}
+					return {
+						data: {
+							phase: 'rows',
+							items: request.data.items.map((item) => ({
+								table: item.table,
+								pk: item.pk,
+								key: item.key,
+								row: { id: item.pk[0] },
+								op: item.op
+							}))
+						}
+					};
+				};
+			}
+		});
+
+		globalThis.setTimeout = function(...args) {
+			timerYields += 1;
+			return originalSetTimeout(...args);
+		};
+		try {
+			await client.sync();
+		}
+		finally {
+			globalThis.setTimeout = originalSetTimeout;
+		}
+
+		expect(timerYields).toBe(0);
+	});
+
 	test('can validate staged pull apply chunks after each transaction', async () => {
 		let foreignKeyChecks = 0;
 		const db = newJournalDb({
