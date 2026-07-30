@@ -65,6 +65,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		sqliteFunction,
 		end,
 		accept,
+		[ensureLocalSchemaReadySymbol]: ensureActiveLocalSchemaReady,
 		__createSyncClient,
 		__orangeDualSyncAttachSyncClient: attachExternalSyncClient,
 		__orangeDualSyncWarmManifest: warmManifest,

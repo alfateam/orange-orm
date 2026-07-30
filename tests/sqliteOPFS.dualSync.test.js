@@ -2,6 +2,8 @@ import { describe, expect, test } from 'vitest';
 
 const newDualSyncDatabase = require('../src/sqliteOPFS/dualSyncDatabase');
 const newDatabase = require('../src/sqliteOPFS/newDatabase');
+const rdb = require('../src/client/index');
+const count = require('../src/table/count');
 const { ensureLocalSchemaReadySymbol } = require('../src/client/syncClient');
 
 describe('sqliteOPFS dual sync database', () => {
@@ -173,6 +175,28 @@ describe('sqliteOPFS dual sync database', () => {
 		expect(fixture.externalEnsureCalls).toEqual([]);
 	});
 
+	test('client table reads prefer local dual schema readiness over external sync worker readiness', async () => {
+		const fixture = newFixture();
+		fixture.schemaReadyByConnection.set('app.sqlite3', false);
+		const db = newDualSyncDatabase('app.sqlite3', {
+			sync: { url: '/rdb', dualDataDb: true }
+		}, fixture.createSingleDatabase);
+		const syncClient = newFakeSyncClient();
+		syncClient[ensureLocalSchemaReadySymbol] = async function() {
+			throw new Error('external sync worker readiness should not be used for UI reads');
+		};
+		const client = rdb({
+			db,
+			syncClient,
+			tables: newFakeTables()
+		});
+
+		const count = await client.project.count();
+
+		expect(count).toBe(0);
+		expect(fixture.schemaReadyByConnection.get('app.sqlite3')).toBe(true);
+	});
+
 	test('does not reuse a provided single sqlite worker for secondary data files', async () => {
 		const worker = newIdleWorker();
 		const fixture = newFixture({
@@ -257,17 +281,23 @@ function newFakeTables() {
 		tsType: 'StringColumn',
 		isPrimary: true
 	};
+	const project = {
+		_dbName: 'project',
+		_columns: [idColumn],
+		_primaryColumns: [idColumn],
+		_formulaDiscriminators: [],
+		_columnDiscriminators: []
+	};
+	project.count = function(context, ...rest) {
+		return count(context, project, ...rest);
+	};
 	return {
-		project: {
-			_dbName: 'project',
-			_columns: [idColumn],
-			_primaryColumns: [idColumn]
-		}
+		project
 	};
 }
 
 function newFakeDb(connectionString, options, fixture) {
-	return {
+	const db = {
 		__sqliteSync: options && options.sync,
 		hostLocal: true,
 		async query(sql) {
@@ -280,12 +310,31 @@ function newFakeDb(connectionString, options, fixture) {
 				fixture.schemaReadyByConnection.set(connectionString, true);
 			if (/^SELECT/u.test(sqlText) && fixture.schemaReadyByConnection.get(connectionString) === false)
 				throw new Error('SQLITE_ERROR: sqlite3 result code 1: no such table: project');
+			if (/^select count\(\*\) "_count" from "project"/iu.test(sqlText))
+				return [{ _count: '0' }];
 			return [{ connectionString, sql }];
 		},
 		async transaction(_options, fn) {
 			if (typeof _options === 'function')
 				fn = _options;
-			return fn(this);
+			return fn({
+				rdb: {
+					cache: {},
+					changes: [],
+					quote: (name) => `"${name}"`,
+					dbClient: {
+						executeQuery(query, callback) {
+							const sql = String(query && typeof query.sql === 'function'
+								? query.sql()
+								: query && (query.sql || query)
+							);
+							db.query(sql)
+								.then(rows => callback(null, rows))
+								.catch(callback);
+						}
+					}
+				}
+			});
 		},
 		createTransaction() {
 			async function run(fn) {
@@ -300,6 +349,7 @@ function newFakeDb(connectionString, options, fixture) {
 		},
 		async end() {}
 	};
+	return db;
 }
 
 function queryCache(sql, fixture) {

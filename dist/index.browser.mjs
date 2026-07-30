@@ -9785,13 +9785,15 @@ function requireClient () {
 				return;
 			if (localSchemaReadySkipped)
 				return;
-			const syncClient = client.syncClient;
-			const ensureReady = syncClient && syncClient[ensureLocalSchemaReadySymbol];
+			const ensureReadyOwner = baseUrl && typeof baseUrl[ensureLocalSchemaReadySymbol] === 'function'
+				? baseUrl
+				: client.syncClient;
+			const ensureReady = ensureReadyOwner && ensureReadyOwner[ensureLocalSchemaReadySymbol];
 			if (typeof ensureReady !== 'function') {
 				localSchemaReadySkipped = true;
 				return;
 			}
-			const result = await ensureReady.call(syncClient);
+			const result = await ensureReady.call(ensureReadyOwner);
 			if (result && result.skipped)
 				localSchemaReadySkipped = true;
 		}
@@ -25988,6 +25990,7 @@ function requireDualSyncDatabase () {
 			sqliteFunction,
 			end,
 			accept,
+			[ensureLocalSchemaReadySymbol]: ensureActiveLocalSchemaReady,
 			__createSyncClient,
 			__orangeDualSyncAttachSyncClient: attachExternalSyncClient,
 			__orangeDualSyncWarmManifest: warmManifest,
