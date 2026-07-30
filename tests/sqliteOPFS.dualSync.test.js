@@ -105,7 +105,7 @@ describe('sqliteOPFS dual sync database', () => {
 		const fixture = newFixture({
 			activeRole: 'b',
 			stagingRole: 'a',
-			updatedAtMs: 123
+			updatedAtMs: Date.now() + 60000
 		});
 		const db = newDualSyncDatabase('app.sqlite3', {
 			sync: { url: '/rdb', dualDataDb: true }
@@ -116,7 +116,7 @@ describe('sqliteOPFS dual sync database', () => {
 					reset: true,
 					activeRole: 'a',
 					stagingRole: 'b',
-					updatedAtMs: Date.now() + 1
+					updatedAtMs: Date.now()
 				};
 			}
 		});

@@ -468,7 +468,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 			'"staging_role" = excluded."staging_role",',
 			'"updated_at_ms" = excluded."updated_at_ms"'
 		].join(' '));
-		updateManifestCache(manifest);
+		updateManifestCache(manifest, true);
 		broadcastManifest(manifest);
 		return manifest;
 	}
@@ -582,11 +582,11 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 			: secondaryDataPoolOptions;
 	}
 
-	function updateManifestCache(info) {
+	function updateManifestCache(info, force = false) {
 		const manifest = normalizeManifestInfo(info);
 		if (!manifest)
 			return manifestCache;
-		if (manifestCache && Number(manifestCache.updatedAtMs || 0) > Number(manifest.updatedAtMs || 0))
+		if (!force && manifestCache && Number(manifestCache.updatedAtMs || 0) > Number(manifest.updatedAtMs || 0))
 			return manifestCache;
 		const previous = manifestCache;
 		manifestCache = manifest;
@@ -643,7 +643,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 				.then(result => {
 					const info = extractDualSyncInfo(result);
 					if (info)
-						updateManifestCache(info);
+						updateManifestCache(info, method === 'resetLocal');
 					if (method === 'resetLocal')
 						clearSchemaReadyRoles();
 					return result;
