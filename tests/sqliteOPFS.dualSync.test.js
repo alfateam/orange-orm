@@ -237,6 +237,49 @@ describe('sqliteOPFS dual sync database', () => {
 		expect(fixture.created.find(x => x.connectionString === 'app.__orange_sync_b.sqlite3').options.createWorker).toBe(createWorker);
 		expect(fixture.created.find(x => x.connectionString === 'app.__orange_sync_b.sqlite3').options.closeDbOnClose).toBe(false);
 	});
+
+	test('isolates secondary and manifest SAH pools from the active database', async () => {
+		const fixture = newFixture({
+			activeRole: 'b',
+			stagingRole: 'a',
+			updatedAtMs: 123
+		});
+		const opfsSahPool = {
+			name: 'demo-pool',
+			directory: '.demo-pool',
+			initialCapacity: 8
+		};
+		const db = newDualSyncDatabase('app.sqlite3', {
+			opfsSahPool,
+			sync: { url: '/rdb', dualDataDb: true }
+		}, fixture.createSingleDatabase);
+
+		await db.query('SELECT 1');
+
+		const manifestOptions = fixture.created.find(
+			x => x.connectionString === 'app.__orange_sync_delta.sqlite3'
+		).options;
+		const secondaryOptions = fixture.created.find(
+			x => x.connectionString === 'app.__orange_sync_b.sqlite3'
+		).options;
+		expect(manifestOptions.opfsSahPool).toMatchObject({
+			initialCapacity: 8
+		});
+		expect(secondaryOptions.opfsSahPool).toMatchObject({
+			initialCapacity: 8
+		});
+		expect(manifestOptions.opfsSahPool.name).not.toBe(opfsSahPool.name);
+		expect(manifestOptions.opfsSahPool.directory).not.toBe(opfsSahPool.directory);
+		expect(secondaryOptions.opfsSahPool.name).not.toBe(opfsSahPool.name);
+		expect(secondaryOptions.opfsSahPool.directory).not.toBe(opfsSahPool.directory);
+		expect(secondaryOptions.opfsSahPool.name).not.toBe(manifestOptions.opfsSahPool.name);
+		expect(secondaryOptions.opfsSahPool.directory).not.toBe(manifestOptions.opfsSahPool.directory);
+		expect(opfsSahPool).toEqual({
+			name: 'demo-pool',
+			directory: '.demo-pool',
+			initialCapacity: 8
+		});
+	});
 });
 
 function newFixture(initialManifest) {
