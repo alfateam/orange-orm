@@ -98,6 +98,37 @@ describe('sqliteOPFS dual sync database', () => {
 		}]);
 	});
 
+	test('updates the cached manifest from an external reset result', async () => {
+		const fixture = newFixture({
+			activeRole: 'b',
+			stagingRole: 'a',
+			updatedAtMs: 123
+		});
+		const db = newDualSyncDatabase('app.sqlite3', {
+			sync: { url: '/rdb', dualDataDb: true }
+		}, fixture.createSingleDatabase);
+		const syncClient = newFakeSyncClient({
+			async resetLocal() {
+				return {
+					reset: true,
+					activeRole: 'a',
+					stagingRole: 'b',
+					updatedAtMs: Date.now() + 1
+				};
+			}
+		});
+
+		db.__orangeDualSyncAttachSyncClient(syncClient);
+		await db.query('SELECT before reset');
+		await syncClient.resetLocal();
+		const rows = await db.query('SELECT after reset');
+
+		expect(rows).toEqual([{
+			connectionString: 'app.sqlite3',
+			sql: 'SELECT after reset'
+		}]);
+	});
+
 	test('does not reuse a provided single sqlite worker for secondary data files', async () => {
 		const worker = newIdleWorker();
 		const fixture = newFixture({
@@ -146,9 +177,10 @@ function newIdleWorker() {
 	};
 }
 
-function newFakeSyncClient() {
+function newFakeSyncClient(methods = {}) {
 	const listeners = new Map();
 	return {
+		...methods,
 		on(event, listener) {
 			listeners.set(event, listener);
 			return () => listeners.delete(event);

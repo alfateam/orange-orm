@@ -217,16 +217,11 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 				errors.push(e);
 			}
 		}
-		await resetCache();
-		manifestCache = {
-			activeRole: roleA,
-			stagingRole: roleB,
-			updatedAtMs: Date.now()
-		};
+		const manifest = await resetCache();
 		initialReadyEmitted = false;
 		if (errors.length > 0)
 			throw errors[0];
-		return { reset: true, activeRole: roleA, stagingRole: roleB };
+		return { reset: true, ...manifest };
 	}
 
 	async function discardLocalChanges(options = {}) {
@@ -394,7 +389,11 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 	}
 
 	function attachExternalSyncClient(syncClient) {
-		if (!syncClient || typeof syncClient.on !== 'function' || externalSyncUnsubscribe)
+		if (!syncClient || syncClient !== Object(syncClient))
+			return;
+		wrapExternalSyncMethod(syncClient, 'sync');
+		wrapExternalSyncMethod(syncClient, 'resetLocal');
+		if (typeof syncClient.on !== 'function' || externalSyncUnsubscribe)
 			return;
 		externalSyncUnsubscribe = syncClient.on('sync', payload => {
 			const info = extractDualSyncInfo(payload);
@@ -518,7 +517,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		await db.query(`DROP TABLE IF EXISTS "${deltaTable}"`);
 		await db.query(`DROP TABLE IF EXISTS "${manifestTable}"`);
 		await ensureCacheSchema(db);
-		await writeManifest({
+		return writeManifest({
 			activeRole: roleA,
 			stagingRole: roleB,
 			updatedAtMs: Date.now()
@@ -614,6 +613,25 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 			// BroadcastChannel is an optimization. Persisted manifest remains the source of truth.
 		}
 	}
+
+	function wrapExternalSyncMethod(syncClient, method) {
+		const original = syncClient[method];
+		if (typeof original !== 'function' || original.__orangeDualSyncWrapped)
+			return;
+		function wrappedExternalSyncMethod(...args) {
+			return Promise.resolve(original.apply(this, args))
+				.then(result => {
+					const info = extractDualSyncInfo(result);
+					if (info)
+						updateManifestCache(info);
+					return result;
+				});
+		}
+		Object.defineProperty(wrappedExternalSyncMethod, '__orangeDualSyncWrapped', {
+			value: true
+		});
+		syncClient[method] = wrappedExternalSyncMethod;
+	}
 }
 
 function withDualSyncResult(result, info) {
@@ -630,6 +648,9 @@ function withDualSyncResult(result, info) {
 function extractDualSyncInfo(payload) {
 	if (!payload || payload !== Object(payload))
 		return null;
+	const direct = normalizeManifestInfo(payload);
+	if (direct)
+		return direct;
 	if (payload.__orangeDualSync)
 		return payload.__orangeDualSync;
 	const result = payload.result;
