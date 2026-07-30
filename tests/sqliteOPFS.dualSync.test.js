@@ -197,6 +197,40 @@ describe('sqliteOPFS dual sync database', () => {
 		expect(fixture.schemaReadyByConnection.get('app.sqlite3')).toBe(true);
 	});
 
+	test('attaches an external sync client through a lazy mapped database provider', async () => {
+		const fixture = newFixture();
+		const db = newDualSyncDatabase('app.sqlite3', {
+			sync: { url: '/rdb', dualDataDb: true }
+		}, fixture.createSingleDatabase);
+		const syncClient = newFakeSyncClient();
+		const mapped = rdb.map(({ table }) => ({
+			project: table('project').map(({ column }) => ({
+				id: column('id').string().primary().notNull()
+			}))
+		}));
+		mapped({
+			db: () => db,
+			syncClient
+		});
+
+		await db.query('SELECT first');
+		syncClient.emit('sync', {
+			result: {
+				__orangeDualSync: {
+					activeRole: 'b',
+					stagingRole: 'a',
+					updatedAtMs: Date.now() + 1
+				}
+			}
+		});
+		const rows = await db.query('SELECT second');
+
+		expect(rows).toEqual([{
+			connectionString: 'app.__orange_sync_b.sqlite3',
+			sql: 'SELECT second'
+		}]);
+	});
+
 	test('does not reuse a provided single sqlite worker for secondary data files', async () => {
 		const worker = newIdleWorker();
 		const fixture = newFixture({

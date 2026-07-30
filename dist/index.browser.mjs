@@ -9533,6 +9533,7 @@ function requireClient () {
 		if (typeof providers === 'function')
 			baseUrl = typeof options.db === 'function' ? providers(options.db) : options.db;
 		const httpInterceptor = createHttpInterceptor();
+		const syncOwner = resolveImmediateDb(baseUrl);
 
 		function client(_options = {}) {
 			if (_options.pg)
@@ -9610,13 +9611,13 @@ function requireClient () {
 		}
 		client.syncClient = options.syncClient
 			? options.syncClient
-			: baseUrl && typeof baseUrl.__createSyncClient === 'function'
-				? baseUrl.__createSyncClient(client, getDb, httpInterceptor)
+			: syncOwner && typeof syncOwner.__createSyncClient === 'function'
+				? syncOwner.__createSyncClient(client, getDb, httpInterceptor)
 				: newSyncClient(client, getDb, httpInterceptor);
-		if (baseUrl && typeof baseUrl.__orangeDualSyncAttachSyncClient === 'function')
-			baseUrl.__orangeDualSyncAttachSyncClient(client.syncClient, client, httpInterceptor);
-		if (baseUrl && typeof baseUrl.__orangeDualSyncWarmManifest === 'function')
-			void baseUrl.__orangeDualSyncWarmManifest();
+		if (syncOwner && typeof syncOwner.__orangeDualSyncAttachSyncClient === 'function')
+			syncOwner.__orangeDualSyncAttachSyncClient(client.syncClient, client, httpInterceptor);
+		if (syncOwner && typeof syncOwner.__orangeDualSyncWarmManifest === 'function')
+			void syncOwner.__orangeDualSyncWarmManifest();
 		let localSchemaReadySkipped = false;
 		// else {
 		let handler = {
@@ -9778,6 +9779,15 @@ function requireClient () {
 			}
 
 			return db;
+		}
+
+		function resolveImmediateDb(db) {
+			if (typeof db !== 'function')
+				return db;
+			const resolved = db();
+			return resolved && typeof resolved.then !== 'function'
+				? resolved
+				: db;
 		}
 
 		async function ensureLocalSchemaReady() {
