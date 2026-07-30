@@ -394,9 +394,13 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		return getManifest().catch(() => {});
 	}
 
-	function attachExternalSyncClient(syncClient) {
+	function attachExternalSyncClient(syncClient, rootClient, httpInterceptor) {
 		if (!syncClient || syncClient !== Object(syncClient))
 			return;
+		if (typeof rootClient === 'function')
+			roleClientFactory = rootClient;
+		if (httpInterceptor)
+			roleHttpInterceptor = httpInterceptor;
 		externalSyncClient = syncClient;
 		clearSchemaReadyRoles();
 		wrapExternalSyncMethod(syncClient, 'sync');

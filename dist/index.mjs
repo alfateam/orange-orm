@@ -9615,7 +9615,7 @@ function requireClient () {
 				? baseUrl.__createSyncClient(client, getDb, httpInterceptor)
 				: newSyncClient(client, getDb, httpInterceptor);
 		if (baseUrl && typeof baseUrl.__orangeDualSyncAttachSyncClient === 'function')
-			baseUrl.__orangeDualSyncAttachSyncClient(client.syncClient);
+			baseUrl.__orangeDualSyncAttachSyncClient(client.syncClient, client, httpInterceptor);
 		if (baseUrl && typeof baseUrl.__orangeDualSyncWarmManifest === 'function')
 			void baseUrl.__orangeDualSyncWarmManifest();
 		let localSchemaReadySkipped = false;
@@ -29520,9 +29520,13 @@ function requireDualSyncDatabase () {
 			return getManifest().catch(() => {});
 		}
 
-		function attachExternalSyncClient(syncClient) {
+		function attachExternalSyncClient(syncClient, rootClient, httpInterceptor) {
 			if (!syncClient || syncClient !== Object(syncClient))
 				return;
+			if (typeof rootClient === 'function')
+				roleClientFactory = rootClient;
+			if (httpInterceptor)
+				roleHttpInterceptor = httpInterceptor;
 			externalSyncClient = syncClient;
 			clearSchemaReadyRoles();
 			wrapExternalSyncMethod(syncClient, 'sync');
