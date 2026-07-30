@@ -25886,7 +25886,9 @@ function requireNewPool$1 () {
 		if (poolOptions.singleWorker === true)
 			return true;
 		const vfs = poolOptions.vfs || 'opfs';
-		if (vfs === 'opfs' || vfs === 'opfs-sahpool' || vfs === 'opfs-wl')
+		if (vfs === 'opfs-sahpool' || vfs === 'opfs-wl' || poolOptions.fallbackVfs === 'opfs-sahpool' || poolOptions.fallbackVfs === 'opfs-wl')
+			return true;
+		if (vfs === 'opfs')
 			return poolOptions.singleWorker !== false;
 		return false;
 	}

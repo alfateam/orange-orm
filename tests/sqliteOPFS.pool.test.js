@@ -43,6 +43,26 @@ describe('sqliteOPFS pool', () => {
 		pool.end();
 	});
 
+	test('keeps opfs-sahpool on a single worker when separate read lane is requested', async () => {
+		const createdWorkers = [];
+		const pool = newPool('test.sqlite3', {
+			vfs: 'opfs-sahpool',
+			singleWorker: false,
+			createWorker() {
+				const worker = newFakeWorker();
+				createdWorkers.push(worker);
+				return worker;
+			}
+		});
+
+		await wait(10);
+		pool.connectRead(() => {});
+		await wait(10);
+
+		expect(createdWorkers).toHaveLength(1);
+		pool.end();
+	});
+
 	test('closes sqlite worker db before terminating worker', async () => {
 		const messages = [];
 		let terminated = false;
