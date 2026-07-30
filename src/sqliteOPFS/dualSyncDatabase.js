@@ -41,6 +41,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 	let cacheSchemaReady = false;
 	let cacheSchemaPromise;
 	let externalSyncUnsubscribe;
+	let externalSyncClient;
 	const manifestChannel = createManifestChannel();
 	let roleClientFactory;
 	let roleHttpInterceptor;
@@ -49,6 +50,9 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 	let initialReadyEmitted = false;
 	const eventListeners = new Map();
 	const roleEventSubscriptions = new Set();
+	const schemaReadyRoles = new Set();
+	const schemaReadyPromises = new Map();
+	let schemaReadyGeneration = 0;
 
 	const router = {
 		poolFactory: null,
@@ -76,11 +80,11 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 			fn = options;
 			options = undefined;
 		}
-		return getActiveDb().then(db => db.transaction(options, fn));
+		return getActiveReadyDb().then(db => db.transaction(options, fn));
 	}
 
 	function createTransaction(options) {
-		const transactionPromise = getActiveDb().then(db => db.createTransaction(options));
+		const transactionPromise = getActiveReadyDb().then(db => db.createTransaction(options));
 
 		function run(fn) {
 			return transactionPromise.then(transaction => transaction(fn));
@@ -95,11 +99,11 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 	}
 
 	function query(sql, options) {
-		return getActiveDb().then(db => db.query(sql, options));
+		return getActiveReadyDb().then(db => db.query(sql, options));
 	}
 
 	function sqliteFunction(...args) {
-		return getActiveDb().then(db => db.sqliteFunction(...args));
+		return getActiveReadyDb().then(db => db.sqliteFunction(...args));
 	}
 
 	async function end() {
@@ -218,6 +222,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 			}
 		}
 		const manifest = await resetCache();
+		clearSchemaReadyRoles();
 		initialReadyEmitted = false;
 		if (errors.length > 0)
 			throw errors[0];
@@ -351,8 +356,9 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		});
 	}
 
-	async function getActiveDb() {
+	async function getActiveReadyDb() {
 		const manifest = await getManifest();
+		await ensureRoleLocalSchemaReady(manifest.activeRole);
 		return getRoleDb(manifest.activeRole);
 	}
 
@@ -391,6 +397,8 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 	function attachExternalSyncClient(syncClient) {
 		if (!syncClient || syncClient !== Object(syncClient))
 			return;
+		externalSyncClient = syncClient;
+		clearSchemaReadyRoles();
 		wrapExternalSyncMethod(syncClient, 'sync');
 		wrapExternalSyncMethod(syncClient, 'resetLocal');
 		if (typeof syncClient.on !== 'function' || externalSyncUnsubscribe)
@@ -575,7 +583,14 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 			return manifestCache;
 		if (manifestCache && Number(manifestCache.updatedAtMs || 0) > Number(manifest.updatedAtMs || 0))
 			return manifestCache;
+		const previous = manifestCache;
 		manifestCache = manifest;
+		if (!previous
+			|| previous.activeRole !== manifest.activeRole
+			|| previous.stagingRole !== manifest.stagingRole
+			|| Number(previous.updatedAtMs || 0) !== Number(manifest.updatedAtMs || 0)) {
+			clearSchemaReadyRoles();
+		}
 		return manifestCache;
 	}
 
@@ -624,6 +639,8 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 					const info = extractDualSyncInfo(result);
 					if (info)
 						updateManifestCache(info);
+					if (method === 'resetLocal')
+						clearSchemaReadyRoles();
 					return result;
 				});
 		}
@@ -631,6 +648,45 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 			value: true
 		});
 		syncClient[method] = wrappedExternalSyncMethod;
+	}
+
+	async function ensureRoleLocalSchemaReady(role) {
+		if (!isRole(role) || schemaReadyRoles.has(role))
+			return;
+		const pending = schemaReadyPromises.get(role);
+		if (pending)
+			return pending;
+		const generation = schemaReadyGeneration;
+		const promise = ensureRoleLocalSchemaReadyCore(role)
+			.then(() => {
+				if (schemaReadyGeneration === generation)
+					schemaReadyRoles.add(role);
+			})
+			.finally(() => {
+				if (schemaReadyPromises.get(role) === promise)
+					schemaReadyPromises.delete(role);
+			});
+		schemaReadyPromises.set(role, promise);
+		return promise;
+	}
+
+	async function ensureRoleLocalSchemaReadyCore(role) {
+		if (roleClientFactory) {
+			await getRoleSyncClient(role).ensureLocalSchema();
+			return;
+		}
+		const ensureExternal = externalSyncClient && (
+			externalSyncClient[ensureLocalSchemaReadySymbol]
+			|| externalSyncClient.ensureLocalSchema
+		);
+		if (typeof ensureExternal === 'function')
+			await ensureExternal.call(externalSyncClient);
+	}
+
+	function clearSchemaReadyRoles() {
+		schemaReadyGeneration++;
+		schemaReadyRoles.clear();
+		schemaReadyPromises.clear();
 	}
 }
 

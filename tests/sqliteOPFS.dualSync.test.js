@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 
 const newDualSyncDatabase = require('../src/sqliteOPFS/dualSyncDatabase');
 const newDatabase = require('../src/sqliteOPFS/newDatabase');
+const { ensureLocalSchemaReadySymbol } = require('../src/client/syncClient');
 
 describe('sqliteOPFS dual sync database', () => {
 	test('enables dual routing for sqliteOPFS sync by default', async () => {
@@ -129,6 +130,52 @@ describe('sqliteOPFS dual sync database', () => {
 		}]);
 	});
 
+	test('revalidates external local schema before querying after external reset', async () => {
+		const fixture = newFixture({
+			activeRole: 'b',
+			stagingRole: 'a',
+			updatedAtMs: 123
+		});
+		fixture.schemaReadyByConnection.set('app.sqlite3', false);
+		fixture.schemaReadyByConnection.set('app.__orange_sync_b.sqlite3', true);
+		const db = newDualSyncDatabase('app.sqlite3', {
+			sync: { url: '/rdb', dualDataDb: true }
+		}, fixture.createSingleDatabase);
+		const syncClient = newFakeSyncClient({
+			async resetLocal() {
+				fixture.manifest = {
+					activeRole: 'a',
+					stagingRole: 'b',
+					updatedAtMs: Date.now() + 1
+				};
+				fixture.schemaReadyByConnection.set('app.sqlite3', false);
+				return {
+					reset: true,
+					...fixture.manifest
+				};
+			}
+		});
+		syncClient[ensureLocalSchemaReadySymbol] = async function() {
+			const activeConnection = fixture.manifest.activeRole === 'b'
+				? 'app.__orange_sync_b.sqlite3'
+				: 'app.sqlite3';
+			fixture.ensureCalls.push(activeConnection);
+			fixture.schemaReadyByConnection.set(activeConnection, true);
+			return { skipped: false };
+		};
+
+		db.__orangeDualSyncAttachSyncClient(syncClient);
+		await db.query('SELECT before reset');
+		await syncClient.resetLocal();
+		const rows = await db.query('SELECT after reset');
+
+		expect(rows).toEqual([{
+			connectionString: 'app.sqlite3',
+			sql: 'SELECT after reset'
+		}]);
+		expect(fixture.ensureCalls).toContain('app.sqlite3');
+	});
+
 	test('does not reuse a provided single sqlite worker for secondary data files', async () => {
 		const worker = newIdleWorker();
 		const fixture = newFixture({
@@ -156,6 +203,8 @@ function newFixture(initialManifest) {
 		manifest: initialManifest,
 		cacheSql: [],
 		created: [],
+		ensureCalls: [],
+		schemaReadyByConnection: new Map(),
 		createSingleDatabase
 	};
 	return fixture;
@@ -200,6 +249,8 @@ function newFakeDb(connectionString, options, fixture) {
 		async query(sql) {
 			if (connectionString === 'app.__orange_sync_delta.sqlite3')
 				return queryCache(sql, fixture);
+			if (/^SELECT/u.test(String(sql || '')) && fixture.schemaReadyByConnection.get(connectionString) === false)
+				throw new Error('SQLITE_ERROR: sqlite3 result code 1: no such table: project');
 			return [{ connectionString, sql }];
 		},
 		async transaction(_options, fn) {
