@@ -26676,8 +26676,10 @@ function requireDualSyncDatabase () {
 
 	function toSecondaryDataPoolOptions(poolOptions = {}) {
 		const options = { ...poolOptions };
+		const hadProvidedWorker = !!options.worker;
 		delete options.worker;
-		delete options.closeDbOnClose;
+		if (hadProvidedWorker)
+			delete options.closeDbOnClose;
 		return options;
 	}
 

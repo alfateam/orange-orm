@@ -216,6 +216,27 @@ describe('sqliteOPFS dual sync database', () => {
 		expect(fixture.created.find(x => x.connectionString === 'app.__orange_sync_b.sqlite3').options.worker).toBeUndefined();
 		expect(fixture.created.find(x => x.connectionString === 'app.__orange_sync_b.sqlite3').options.closeDbOnClose).toBeUndefined();
 	});
+
+	test('keeps a connection-aware worker factory for every dual database file', async () => {
+		const createWorker = () => newIdleWorker();
+		const fixture = newFixture({
+			activeRole: 'b',
+			stagingRole: 'a',
+			updatedAtMs: 123
+		});
+		const db = newDualSyncDatabase('app.sqlite3', {
+			createWorker,
+			closeDbOnClose: false,
+			sync: { url: '/rdb', dualDataDb: true }
+		}, fixture.createSingleDatabase);
+
+		await db.query('SELECT 1');
+
+		expect(fixture.created.find(x => x.connectionString === 'app.__orange_sync_delta.sqlite3').options.createWorker).toBe(createWorker);
+		expect(fixture.created.find(x => x.connectionString === 'app.__orange_sync_delta.sqlite3').options.closeDbOnClose).toBe(false);
+		expect(fixture.created.find(x => x.connectionString === 'app.__orange_sync_b.sqlite3').options.createWorker).toBe(createWorker);
+		expect(fixture.created.find(x => x.connectionString === 'app.__orange_sync_b.sqlite3').options.closeDbOnClose).toBe(false);
+	});
 });
 
 function newFixture(initialManifest) {
