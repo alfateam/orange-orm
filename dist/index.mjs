@@ -5927,6 +5927,9 @@ function requireSyncClient () {
 
 	const maxPushBatchesPerSync = 1000;
 	const maxStableBaseKeysPerStatement = 200;
+	const pullJournalRecoveryPageSize = 1000;
+	const streamPullPendingStatus = 'stream-pending';
+	const streamPullReadyStatus = 'stream-ready';
 	const syncDbPriority = 1;
 	const ensureLocalSchemaReadySymbol = typeof Symbol === 'function'
 		? Symbol.for('orange-orm.syncClient.ensureLocalSchemaReady')
@@ -6625,15 +6628,21 @@ function requireSyncClient () {
 			const defaultPatchOptions = { ...(pullConfig.patchOptions || {}), concurrency: 'overwrite', skipSelectAfterInsert: true };
 			const db = options.db;
 			const scopeKey = options.scopeKey || getScopeKey(options.tables);
+			const capturedStreamItems = [];
+			const streamedTables = new Set();
+			let applied = 0;
 			await ensurePullJournalTables(db);
+			await tryEnableForeignKeys(db);
 			const session = await stagePullJournal();
 			const capturedPullJournal = options._capturePullJournal
 				? await capturePullJournalSnapshot(session)
 				: null;
-			let applied = 0;
 			const shouldApplyCheckpoint = session.finalSince !== undefined;
-			await tryEnableForeignKeys(db);
-			if (applyConfig)
+			if (isStreamPullSession(session)) {
+				applied = countApplicablePullJournalItems(capturedStreamItems);
+				await finalizeStreamedPullJournal(session);
+			}
+			else if (applyConfig)
 				await applyPullJournalInChunks(session, applyConfig);
 			else
 				await applyPullJournalInSingleTransaction(session);
@@ -6660,9 +6669,11 @@ function requireSyncClient () {
 			return result;
 
 			async function capturePullJournalSnapshot(session) {
-				const batches = session && session.persisted
-					? await readPullJournalBatches(db, scopeKey)
-					: [];
+				const items = isStreamPullSession(session)
+					? capturedStreamItems.slice()
+					: flattenPullJournalBatches(session && session.persisted
+						? await readPullJournalBatches(db, scopeKey)
+						: []);
 				return {
 					scopeKey,
 					tables: Array.isArray(options.tables) ? options.tables.slice() : [],
@@ -6670,8 +6681,21 @@ function requireSyncClient () {
 					finalSince: session && session.finalSince,
 					payload: session && session.payload,
 					reason: session && session.reason,
-					items: flattenPullJournalBatches(batches)
+					items
 				};
+			}
+
+			async function finalizeStreamedPullJournal(session) {
+				const hasJournalItems = capturedStreamItems.length > 0;
+				await client.transaction(async (tx) => {
+					if (hasJournalItems && (!applyConfig || applyConfig.foreignKeyCheck === 'final'))
+						await validateForeignKeys(tx);
+					if (shouldApplyCheckpoint)
+						await writeScopeState(scopeKey, { since: session.finalSince, updatedAtMs: Date.now() }, tx);
+					if (hasJournalItems || session.persisted)
+						await clearPullJournal(tx, scopeKey);
+				}, { suppressSyncOutbox: true });
+				session.tables = Array.from(streamedTables);
 			}
 
 			async function applyPullJournalInSingleTransaction(session) {
@@ -6744,13 +6768,27 @@ function requireSyncClient () {
 			async function stagePullJournal() {
 				let session = await readPullSession(db, scopeKey);
 				let hasPersistedSession = !!session;
+				const streamApply = session
+					? isStreamPullSession(session)
+					: !!options._capturePullJournal;
 				if (session) {
 					session.persisted = true;
 					if (!session.done)
 						await clearIncompletePullJournalBatch(db, scopeKey, session.nextBatch);
 				}
 				if (!session)
-					session = newPullSession(scopeKey, options.since);
+					session = newPullSession(scopeKey, options.since, streamApply);
+				if (streamApply) {
+					await client.transaction(async (tx) => {
+						await ensureStableBaseTables(tx, options.tables);
+					}, { suppressSyncOutbox: true });
+					if (hasPersistedSession) {
+						const persistedItems = await readPullJournalItemsPaged(db, scopeKey);
+						capturedStreamItems.push(...persistedItems);
+						for (let i = 0; i < persistedItems.length; i++)
+							streamedTables.add(persistedItems[i].table);
+					}
+				}
 				let reason = session.reason;
 				let fetchSession = session;
 				let fetchDone = !!session.done;
@@ -6782,7 +6820,25 @@ function requireSyncClient () {
 							continue;
 						}
 						await batch.rowsPromise;
-						session = await persistPullJournalBatchState(db, scopeKey, session, batch, maxJournalRowsPerInsert);
+						const persisted = await persistPullJournalBatchState(
+							db,
+							scopeKey,
+							session,
+							batch,
+							maxJournalRowsPerInsert,
+							streamApply ? {
+								applyConfig,
+								defaultPatchOptions,
+								onApplied(count, items) {
+									applied += count;
+									for (let i = 0; i < items.length; i++)
+										streamedTables.add(items[i].table);
+								}
+							} : undefined
+						);
+						session = persisted.session;
+						if (streamApply)
+							capturedStreamItems.push(...persisted.items);
 						pendingBatches.shift();
 						onPipelineProgress();
 						if (keyFetchError && pendingBatches.length === 0)
@@ -6836,7 +6892,7 @@ function requireSyncClient () {
 							return;
 						}
 						if (!hasPersistedSession) {
-							session = await createPullSession(db, scopeKey, session.since);
+							session = await createPullSession(db, scopeKey, session.since, streamApply);
 							fetchSession = {
 								...fetchSession,
 								persisted: true
@@ -7290,17 +7346,18 @@ function requireSyncClient () {
 			return pullSessionFromRow(row);
 		}
 
-		async function createPullSession(db, scopeKey, since) {
+		async function createPullSession(db, scopeKey, since, streamApply = false) {
 			await ensurePullJournalTables(db);
 			const now = Date.now();
+			const status = streamApply ? streamPullPendingStatus : 'pending';
 			await db.query([
 				`INSERT INTO "${syncPullSessionTable}" ("scope", "since_value", "token_json", "done", "final_since", "payload_json", "reason", "status", "next_seq", "next_batch", "updated_at_ms")`,
-				`VALUES (${sqlStringLiteral(scopeKey)}, ${sqlNullableJsonLiteral(since)}, NULL, 0, ${sqlNullableJsonLiteral(since)}, NULL, NULL, 'pending', 0, 0, ${now})`
+				`VALUES (${sqlStringLiteral(scopeKey)}, ${sqlNullableJsonLiteral(since)}, NULL, 0, ${sqlNullableJsonLiteral(since)}, NULL, NULL, ${sqlStringLiteral(status)}, 0, 0, ${now})`
 			].join(' '));
-			return newPullSession(scopeKey, since);
+			return newPullSession(scopeKey, since, streamApply);
 		}
 
-		function newPullSession(scopeKey, since) {
+		function newPullSession(scopeKey, since, streamApply = false) {
 			return {
 				scope: scopeKey,
 				since,
@@ -7309,13 +7366,13 @@ function requireSyncClient () {
 				finalSince: since,
 				payload: undefined,
 				reason: undefined,
-				status: 'pending',
+				status: streamApply ? streamPullPendingStatus : 'pending',
 				nextSeq: 0,
 				nextBatch: 0
 			};
 		}
 
-		async function persistPullJournalBatchState(db, scopeKey, session, batchState, maxJournalRowsPerInsert) {
+		async function persistPullJournalBatchState(db, scopeKey, session, batchState, maxJournalRowsPerInsert, streamOptions) {
 			await batchState.rowsPromise;
 			const batchNo = batchState.batchNo;
 			const baseSeq = batchState.baseSeq;
@@ -7323,42 +7380,80 @@ function requireSyncClient () {
 			const keysPayload = batchState.keysPayload;
 			const keyItems = batchState.keyItems;
 			const reason = batchState.reason;
+			const entries = pullJournalEntriesForRemainingItems(scopeKey, itemState);
+			const streamApply = !!streamOptions;
+			const applyConfig = streamOptions && streamOptions.applyConfig;
+			const maxRowsPerTransaction = applyConfig
+				? applyConfig.maxRowsPerTransaction
+				: Math.max(1, entries.items.length);
+			const chunks = entries.items.length === 0
+				? [{ items: [], rows: [] }]
+				: [];
+			for (let offset = 0; offset < entries.items.length; offset += maxRowsPerTransaction) {
+				chunks.push({
+					items: entries.items.slice(offset, offset + maxRowsPerTransaction),
+					rows: entries.rows.slice(offset, offset + maxRowsPerTransaction)
+				});
+			}
 			let nextSession;
-			await client.transaction(async (tx) => {
-				const remainingRows = pullJournalRowsForRemainingItems(scopeKey, itemState);
-				await insertPullJournalItems(tx, remainingRows, maxJournalRowsPerInsert);
-				const finalSince = keysPayload.cursor !== undefined ? keysPayload.cursor : session.finalSince;
-				const payload = reason === undefined ? keysPayload : { ...keysPayload, reason };
-				const token = keysPayload.done || !keysPayload.token ? null : keysPayload.token;
-				const done = keysPayload.done || !keysPayload.token ? 1 : 0;
-				const nextSeq = baseSeq + keyItems.length;
-				await tx.query([
-					`UPDATE "${syncPullSessionTable}"`,
-					`SET "token_json" = ${sqlNullableJsonLiteral(token)},`,
-					`"done" = ${done},`,
-					`"final_since" = ${sqlNullableJsonLiteral(finalSince)},`,
-					`"payload_json" = ${sqlNullableJsonLiteral(payload)},`,
-					`"reason" = ${sqlNullableStringLiteral(reason)},`,
-					`"status" = ${sqlStringLiteral(done ? 'ready' : 'pending')},`,
-					`"next_seq" = ${nextSeq},`,
-					`"next_batch" = ${batchNo + 1},`,
-					`"updated_at_ms" = ${Date.now()}`,
-					`WHERE "scope" = ${sqlStringLiteral(scopeKey)}`
-				].join(' '));
-				nextSession = {
-					...session,
-					token: token || undefined,
-					done: done === 1,
-					finalSince,
-					payload,
-					reason,
-					status: done ? 'ready' : 'pending',
-					nextSeq,
-					nextBatch: batchNo + 1,
-					persisted: true
-				};
-			}, { suppressSyncOutbox: true });
-			return nextSession;
+			for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
+				const chunk = chunks[chunkIndex];
+				const isLastChunk = chunkIndex === chunks.length - 1;
+				let chunkApplied = 0;
+				await client.transaction(async (tx) => {
+					await insertPullJournalItems(tx, chunk.rows, maxJournalRowsPerInsert);
+					if (streamApply && chunk.items.length > 0) {
+						await tryDeferForeignKeys(tx);
+						chunkApplied = await applyPullJournalBatchOnTx(
+							tx,
+							chunk.items,
+							streamOptions.defaultPatchOptions
+						);
+						if (applyConfig && applyConfig.foreignKeyCheck === 'chunk')
+							await validateForeignKeys(tx);
+					}
+					if (!isLastChunk)
+						return;
+					const finalSince = keysPayload.cursor !== undefined ? keysPayload.cursor : session.finalSince;
+					const payload = reason === undefined ? keysPayload : { ...keysPayload, reason };
+					const token = keysPayload.done || !keysPayload.token ? null : keysPayload.token;
+					const done = keysPayload.done || !keysPayload.token ? 1 : 0;
+					const nextSeq = baseSeq + keyItems.length;
+					const status = streamApply
+						? done ? streamPullReadyStatus : streamPullPendingStatus
+						: done ? 'ready' : 'pending';
+					await tx.query([
+						`UPDATE "${syncPullSessionTable}"`,
+						`SET "token_json" = ${sqlNullableJsonLiteral(token)},`,
+						`"done" = ${done},`,
+						`"final_since" = ${sqlNullableJsonLiteral(finalSince)},`,
+						`"payload_json" = ${sqlNullableJsonLiteral(payload)},`,
+						`"reason" = ${sqlNullableStringLiteral(reason)},`,
+						`"status" = ${sqlStringLiteral(status)},`,
+						`"next_seq" = ${nextSeq},`,
+						`"next_batch" = ${batchNo + 1},`,
+						`"updated_at_ms" = ${Date.now()}`,
+						`WHERE "scope" = ${sqlStringLiteral(scopeKey)}`
+					].join(' '));
+					nextSession = {
+						...session,
+						token: token || undefined,
+						done: done === 1,
+						finalSince,
+						payload,
+						reason,
+						status,
+						nextSeq,
+						nextBatch: batchNo + 1,
+						persisted: true
+					};
+				}, { suppressSyncOutbox: true });
+				if (streamApply && typeof streamOptions.onApplied === 'function')
+					streamOptions.onApplied(chunkApplied, chunk.items);
+				if (streamApply && applyConfig)
+					await yieldPullApply(applyConfig);
+			}
+			return { session: nextSession, items: entries.items };
 		}
 
 		function createPullJournalItemState(keyItems, batchNo, baseSeq) {
@@ -7428,16 +7523,33 @@ function requireSyncClient () {
 			}
 		}
 
-		function pullJournalRowsForRemainingItems(scopeKey, itemState) {
+		function pullJournalEntriesForRemainingItems(scopeKey, itemState) {
 			const rows = [];
+			const items = [];
 			for (let i = 0; i < itemState.states.length; i++) {
 				const state = itemState.states[i];
 				if (state.persisted)
 					continue;
 				state.persisted = true;
 				rows.push(newPullJournalRow(scopeKey, state, state.rowItem));
+				items.push(newPullJournalItem(state, state.rowItem));
 			}
-			return rows;
+			return { rows, items };
+		}
+
+		function newPullJournalItem(state, rowItem) {
+			const item = state.item;
+			const result = {
+				batchNo: state.batchNo,
+				seq: state.seq,
+				table: item.table,
+				pk: item.pk,
+				key: undefined,
+				op: normalizeChangeOp(item.op)
+			};
+			if (rowItem && rowItem.row !== undefined)
+				result.row = rowItem.row;
+			return result;
 		}
 
 		function newPullJournalRow(scopeKey, state, rowItem) {
@@ -7492,6 +7604,33 @@ function requireSyncClient () {
 			if (currentBatch.length > 0)
 				batches.push(currentBatch);
 			return batches;
+		}
+
+		async function readPullJournalItemsPaged(db, scopeKey) {
+			await ensurePullJournalTables(db);
+			const items = [];
+			let afterSeq = -1;
+			for (;;) {
+				const rows = await db.query([
+					'SELECT "batch_no", "seq", "table_name", "pk_json", "key_json", "op", "row_json"',
+					`FROM "${syncPullItemTable}"`,
+					`WHERE "scope" = ${sqlStringLiteral(scopeKey)} AND "seq" > ${afterSeq}`,
+					'ORDER BY "seq" ASC',
+					`LIMIT ${pullJournalRecoveryPageSize}`
+				].join(' '));
+				const list = Array.isArray(rows) ? rows : rows?.rows || [];
+				for (let i = 0; i < list.length; i++) {
+					const item = pullItemFromRow(list[i]);
+					if (item)
+						items.push(item);
+				}
+				if (list.length < pullJournalRecoveryPageSize)
+					return items;
+				const last = list[list.length - 1];
+				afterSeq = Number(last && (last.seq ?? last.SEQ));
+				if (!Number.isFinite(afterSeq))
+					return items;
+			}
 		}
 
 		async function clearPullJournal(db, scopeKey) {
@@ -8231,24 +8370,41 @@ function requireSyncClient () {
 			return new Map(entries.map(entry => [entry.name, entry]));
 		}
 
-		async function applyDeleteItemsToStableBase(db, items) {
+		async function applyDeleteItemsToStableBase(db, items, knownBaseByName) {
 			const deletes = Array.isArray(items) ? items : [];
 			if (deletes.length === 0)
 				return;
-			const baseByName = await readStableBaseEntriesByName(db);
+			const baseByName = knownBaseByName || await readStableBaseEntriesByName(db);
 			const groups = stableBaseTargetGroupsForItems(deletes, baseByName);
 			for (const group of groups)
 				await applyStableBaseDeleteGroup(db, group);
 		}
 
-		async function applyRowsPayloadToStableBase(db, items) {
+		async function applyRowsPayloadToStableBase(db, items, knownBaseByName) {
 			const rows = Array.isArray(items) ? items : [];
 			if (rows.length === 0)
 				return;
-			const baseByName = await readStableBaseEntriesByName(db);
+			const baseByName = knownBaseByName || await readStableBaseEntriesByName(db);
 			const groups = stableBaseTargetGroupsForItems(rows, baseByName);
 			for (const group of groups)
 				await applyStableBaseUpsertGroup(db, group);
+		}
+
+		async function applyPullJournalBatchOnTx(tx, items, patchOptions) {
+			const batch = Array.isArray(items) ? items : [];
+			const deleteItems = batch.filter(x => x.op === 'D');
+			const upsertItems = batch.filter(x => x.op !== 'D' && x.row !== undefined);
+			const baseByName = await readStableBaseEntriesByName(tx);
+			let applied = 0;
+			if (deleteItems.length > 0) {
+				applied += await applyDeleteItemsOnTx(tx, deleteItems, patchOptions);
+				await applyDeleteItemsToStableBase(tx, deleteItems, baseByName);
+			}
+			if (upsertItems.length > 0) {
+				applied += await applyRowsPayloadOnTx(tx, upsertItems, patchOptions);
+				await applyRowsPayloadToStableBase(tx, upsertItems, baseByName);
+			}
+			return applied;
 		}
 
 		async function applyPullJournalItemToStableBase(db, item, baseByName) {
@@ -9043,6 +9199,24 @@ function requireSyncClient () {
 			nextSeq: Number(row.next_seq ?? row.NEXT_SEQ ?? 0),
 			nextBatch: Number(row.next_batch ?? row.NEXT_BATCH ?? 0)
 		};
+	}
+
+	function isStreamPullSession(session) {
+		return !!session && (
+			session.status === streamPullPendingStatus
+			|| session.status === streamPullReadyStatus
+		);
+	}
+
+	function countApplicablePullJournalItems(items) {
+		const list = Array.isArray(items) ? items : [];
+		let count = 0;
+		for (let i = 0; i < list.length; i++) {
+			const item = list[i];
+			if (item && (item.op === 'D' || item.row !== undefined))
+				count += 1;
+		}
+		return count;
 	}
 
 	function pullItemFromRow(row) {

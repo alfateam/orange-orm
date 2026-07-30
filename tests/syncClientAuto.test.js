@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
 const newSyncClient = require('../src/client/syncClient');
+const { syncAndCapturePullJournalSymbol } = newSyncClient;
 
 describe('sync client auto start', () => {
 	test('starts when start is called and stays running', async () => {
@@ -967,6 +968,353 @@ describe('sync client auto start', () => {
 
 		expect(sawAllRowsBeforeFirstPatch).toBe(true);
 		expect(rowRequests).toEqual([[1], [2], [3]]);
+	});
+
+	test('streams captured pull batches into staging without a full journal reread', async () => {
+		const patches = [];
+		const rowRequests = [];
+		const secondRows = newDeferred();
+		const db = newJournalDb({
+			__sqliteSync: {
+				url: '/rdb',
+				auto: false,
+				schema: false,
+				pull: {
+					maxKeysPerBatch: 1,
+					maxRowsPerBatch: 1
+				}
+			}
+		});
+		const client = newSyncClient({
+			tables: {
+				customer: newTable('customer')
+			},
+			transaction: async (fn) => fn({
+				customer: {
+					patch: async (patch) => {
+						patches.push(patch);
+						return { changed: [] };
+					}
+				},
+				query: db.query
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async (request) => {
+					if (request.data.phase === 'keys') {
+						return request.data.token
+							? {
+								data: {
+									phase: 'keys',
+									items: [{ table: 'customer', pk: [2], key: { id: 2 }, op: 'U' }],
+									done: true,
+									cursor: 'cursor-2'
+								}
+							}
+							: {
+								data: {
+									phase: 'keys',
+									items: [{ table: 'customer', pk: [1], key: { id: 1 }, op: 'U' }],
+									done: false,
+									cursor: 'cursor-1',
+									token: { page: 1 }
+								}
+							};
+					}
+					const id = request.data.items[0].pk[0];
+					rowRequests.push(id);
+					if (id === 2)
+						return secondRows.promise;
+					return rowsResponse(request.data.items);
+				};
+			}
+		});
+
+		const syncPromise = client[syncAndCapturePullJournalSymbol]();
+		await waitFor(() => patches.length === 1 && rowRequests.includes(2));
+
+		expect(patches[0]).toEqual([
+			{ op: 'add', path: '/[1]', value: { id: 1 } }
+		]);
+		expect(db.journal.session.status).toBe('stream-pending');
+
+		secondRows.resolve(rowsResponse([{ table: 'customer', pk: [2], key: { id: 2 }, op: 'U' }]));
+		const result = await syncPromise;
+
+		expect(patches).toEqual([
+			[{ op: 'add', path: '/[1]', value: { id: 1 } }],
+			[{ op: 'add', path: '/[2]', value: { id: 2 } }]
+		]);
+		expect(result.applied).toBe(2);
+		expect(result.__orangePullJournal.items.map(item => item.pk[0])).toEqual([1, 2]);
+		expect(db.queryLog.some(sql =>
+			/SELECT "batch_no", "seq", "table_name"/u.test(sql)
+			&& /ORDER BY "batch_no"/u.test(sql)
+		)).toBe(false);
+	});
+
+	test('honors streamed apply transaction limits', async () => {
+		const patches = [];
+		let foreignKeyChecks = 0;
+		const db = newJournalDb({
+			__sqliteSync: {
+				url: '/rdb',
+				auto: false,
+				schema: false,
+				pull: {
+					maxKeysPerBatch: 2,
+					maxRowsPerBatch: 2,
+					apply: {
+						maxRowsPerTransaction: 1
+					}
+				}
+			},
+			foreignKeyCheck: () => {
+				foreignKeyChecks += 1;
+				return [];
+			}
+		});
+		const client = newSyncClient({
+			tables: {
+				customer: newTable('customer')
+			},
+			transaction: async (fn) => fn({
+				customer: {
+					patch: async (patch) => {
+						patches.push(patch);
+						return { changed: [] };
+					}
+				},
+				query: db.query
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async (request) => request.data.phase === 'keys'
+					? {
+						data: {
+							phase: 'keys',
+							items: [
+								{ table: 'customer', pk: [1], key: { id: 1 }, op: 'U' },
+								{ table: 'customer', pk: [2], key: { id: 2 }, op: 'U' }
+							],
+							done: true,
+							cursor: 'cursor-1'
+						}
+					}
+					: rowsResponse(request.data.items);
+			}
+		});
+
+		const result = await client[syncAndCapturePullJournalSymbol]();
+
+		expect(patches).toEqual([
+			[{ op: 'add', path: '/[1]', value: { id: 1 } }],
+			[{ op: 'add', path: '/[2]', value: { id: 2 } }]
+		]);
+		expect(db.queryLog.filter(sql => /INSERT INTO "orange_sync_pull_item"/u.test(sql))).toHaveLength(2);
+		expect(foreignKeyChecks).toBe(1);
+		expect(result.applied).toBe(2);
+	});
+
+	test('resumes streamed capture without reapplying completed batches', async () => {
+		const patches = [];
+		const keyRequests = [];
+		let failContinuation = true;
+		const db = newJournalDb({
+			__sqliteSync: {
+				url: '/rdb',
+				auto: false,
+				schema: false,
+				pull: {
+					maxKeysPerBatch: 1,
+					maxRowsPerBatch: 1
+				}
+			}
+		});
+		const client = newSyncClient({
+			tables: {
+				customer: newTable('customer')
+			},
+			transaction: async (fn) => fn({
+				customer: {
+					patch: async (patch) => {
+						patches.push(patch);
+						return { changed: [] };
+					}
+				},
+				query: db.query
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async (request) => {
+					if (request.data.phase === 'keys') {
+						keyRequests.push(request.data.token || null);
+						if (!request.data.token) {
+							return {
+								data: {
+									phase: 'keys',
+									items: [{ table: 'customer', pk: [1], key: { id: 1 }, op: 'U' }],
+									done: false,
+									cursor: 'cursor-1',
+									token: { page: 1 }
+								}
+							};
+						}
+						if (failContinuation) {
+							failContinuation = false;
+							throw new Error('network down');
+						}
+						return {
+							data: {
+								phase: 'keys',
+								items: [{ table: 'customer', pk: [2], key: { id: 2 }, op: 'U' }],
+								done: true,
+								cursor: 'cursor-2'
+							}
+						};
+					}
+					return rowsResponse(request.data.items);
+				};
+			}
+		});
+
+		await expect(client[syncAndCapturePullJournalSymbol]()).rejects.toThrow('network down');
+		expect(patches).toEqual([
+			[{ op: 'add', path: '/[1]', value: { id: 1 } }]
+		]);
+
+		const result = await client[syncAndCapturePullJournalSymbol]();
+
+		expect(keyRequests).toEqual([null, { page: 1 }, { page: 1 }]);
+		expect(patches).toEqual([
+			[{ op: 'add', path: '/[1]', value: { id: 1 } }],
+			[{ op: 'add', path: '/[2]', value: { id: 2 } }]
+		]);
+		expect(result.applied).toBe(2);
+		expect(result.__orangePullJournal.items.map(item => item.pk[0])).toEqual([1, 2]);
+		expect(db.queryLog.some(sql =>
+			/WHERE "scope" = .* AND "seq" > -1/u.test(sql)
+			&& /LIMIT 1000/u.test(sql)
+		)).toBe(true);
+	});
+
+	test('retries streamed final validation without refetching or reapplying', async () => {
+		const patches = [];
+		let keyRequests = 0;
+		let failForeignKeyCheck = true;
+		const db = newJournalDb({
+			__sqliteSync: {
+				url: '/rdb',
+				auto: false,
+				schema: false
+			},
+			foreignKeyCheck: () => failForeignKeyCheck ? [{ table: 'customer' }] : []
+		});
+		const client = newSyncClient({
+			tables: {
+				customer: newTable('customer')
+			},
+			transaction: async (fn) => fn({
+				customer: {
+					patch: async (patch) => {
+						patches.push(patch);
+						return { changed: [] };
+					}
+				},
+				query: db.query
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async (request) => {
+					if (request.data.phase === 'keys') {
+						keyRequests += 1;
+						return {
+							data: {
+								phase: 'keys',
+								items: [{ table: 'customer', pk: [1], key: { id: 1 }, op: 'U' }],
+								done: true,
+								cursor: 'cursor-1'
+							}
+						};
+					}
+					return rowsResponse(request.data.items);
+				};
+			}
+		});
+
+		await expect(client[syncAndCapturePullJournalSymbol]())
+			.rejects.toThrow('Foreign key validation failed after sync apply');
+		expect(db.journal.session.status).toBe('stream-ready');
+		expect(patches).toHaveLength(1);
+
+		failForeignKeyCheck = false;
+		const result = await client[syncAndCapturePullJournalSymbol]();
+
+		expect(keyRequests).toBe(1);
+		expect(patches).toHaveLength(1);
+		expect(result.applied).toBe(1);
+		expect(result.__orangePullJournal.items.map(item => item.pk[0])).toEqual([1]);
+		expect(db.journal.session).toBeNull();
+	});
+
+	test('finishes a legacy captured journal with the atomic apply path', async () => {
+		const patches = [];
+		const db = newJournalDb({
+			__sqliteSync: {
+				url: '/rdb',
+				auto: false,
+				schema: false
+			}
+		});
+		db.journal.session = {
+			scope: 'customer',
+			since_value: null,
+			token_json: null,
+			done: 1,
+			final_since: '"cursor-1"',
+			payload_json: null,
+			reason: null,
+			status: 'ready',
+			next_seq: 1,
+			next_batch: 1
+		};
+		db.journal.items.push({
+			scope: 'customer',
+			batch_no: 0,
+			seq: 0,
+			table_name: 'customer',
+			pk_json: '[1]',
+			key_json: null,
+			op: 'U',
+			row_json: '{"id":1}'
+		});
+		const client = newSyncClient({
+			tables: {
+				customer: newTable('customer')
+			},
+			transaction: async (fn) => fn({
+				customer: {
+					patch: async (patch) => {
+						patches.push(patch);
+						return { changed: [] };
+					}
+				},
+				query: db.query
+			})
+		}, async () => db, {
+			applyTo() {}
+		});
+
+		const result = await client[syncAndCapturePullJournalSymbol]();
+
+		expect(patches).toEqual([
+			[{ op: 'add', path: '/[1]', value: { id: 1 } }]
+		]);
+		expect(result.__orangePullJournal.items.map(item => item.pk[0])).toEqual([1]);
+		expect(db.queryLog.some(sql =>
+			/SELECT "batch_no", "seq", "table_name"/u.test(sql)
+			&& /ORDER BY "batch_no"/u.test(sql)
+		)).toBe(true);
 	});
 
 	test('keeps staged row fetches full while persisting rows in order', async () => {
@@ -2718,10 +3066,14 @@ function newDeferred() {
 
 function resolveRowResponse(response) {
 	const { deferred, requestedItems } = response;
-	deferred.resolve({
+	deferred.resolve(rowsResponse(requestedItems));
+}
+
+function rowsResponse(items) {
+	return {
 		data: {
 			phase: 'rows',
-			items: requestedItems.map((item) => ({
+			items: items.map((item) => ({
 				table: item.table,
 				pk: item.pk,
 				key: item.key,
@@ -2729,7 +3081,7 @@ function resolveRowResponse(response) {
 				op: item.op
 			}))
 		}
-	});
+	};
 }
 
 function rowResponseByPk(responses, id) {

@@ -24,7 +24,7 @@ afterEach(async () => {
 });
 
 describe('sqliteOPFS dual sync integration', () => {
-	test('bootstraps the staging role and swaps it active', async () => {
+	test('streams bootstrap batches and replays incremental deltas across roles', async () => {
 		const remoteDb = map({
 			db: con => con.pglite(undefined, { size: 1 })
 		});
@@ -50,7 +50,11 @@ describe('sqliteOPFS dual sync integration', () => {
 		const sync = {
 			url: `http://127.0.0.1:${server.address().port}/rdb`,
 			auto: false,
-			tables: ['project']
+			tables: ['project'],
+			pull: {
+				maxKeysPerBatch: 1,
+				maxRowsPerBatch: 1
+			}
 		};
 		const dualDb = newDualSyncDatabase(connectionString, { sync }, (roleConnectionString, options) =>
 			newSqliteDatabase(roleConnectionString, {
@@ -87,6 +91,33 @@ describe('sqliteOPFS dual sync integration', () => {
 		expect(afterSync).toBe(2);
 		expect(await roleA.project.count()).toBe(0);
 		expect(await roleB.project.count()).toBe(2);
+
+		await remoteDb.project.update({ title: 'Two updated' }, { where: x => x.id.eq('p2') });
+		await remoteDb.project.insert({ id: 'p3', title: 'Three' });
+		const secondSyncResult = await localDb.syncClient.sync();
+
+		expect(secondSyncResult.__orangeDualSync).toMatchObject({
+			activeRole: 'a',
+			stagingRole: 'b'
+		});
+		expect(await localDb.project.count()).toBe(3);
+		expect(await roleA.project.count()).toBe(3);
+		expect(await roleB.project.count()).toBe(2);
+
+		const thirdSyncResult = await localDb.syncClient.sync();
+		const roleARows = await roleA.query('SELECT "id", "title" FROM "project" ORDER BY "id"');
+		const roleBRows = await roleB.query('SELECT "id", "title" FROM "project" ORDER BY "id"');
+
+		expect(thirdSyncResult.__orangeDualSync).toMatchObject({
+			activeRole: 'b',
+			stagingRole: 'a'
+		});
+		expect(roleARows).toEqual(roleBRows);
+		expect(roleBRows).toEqual([
+			{ id: 'p1', title: 'One' },
+			{ id: 'p2', title: 'Two updated' },
+			{ id: 'p3', title: 'Three' }
+		]);
 	}, 30000);
 });
 
