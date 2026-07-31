@@ -70,9 +70,22 @@ describe('sqliteOPFS dual sync database', () => {
 		}, fixture.createSingleDatabase);
 
 		await db.query('SELECT first');
+		const readsAfterFirstQuery = fixture.cacheSql.filter(sql => /SELECT "active_role"/u.test(sql)).length;
 		await db.query('SELECT second');
 
-		expect(fixture.cacheSql.filter(sql => /SELECT "active_role"/u.test(sql))).toHaveLength(1);
+		expect(fixture.cacheSql.filter(sql => /SELECT "active_role"/u.test(sql))).toHaveLength(readsAfterFirstQuery);
+	});
+
+	test('uses the cross-tab-safe opfs-wl VFS for every dual database by default', async () => {
+		const fixture = newFixture();
+		const db = newDualSyncDatabase('app.sqlite3', {
+			sync: { url: '/rdb', dualDataDb: true }
+		}, fixture.createSingleDatabase);
+
+		await db.query('SELECT 1');
+
+		expect(fixture.created.find(x => x.connectionString === 'app.sqlite3').options.vfs).toBe('opfs-wl');
+		expect(fixture.created.find(x => x.connectionString === 'app.__orange_sync_delta.sqlite3').options.vfs).toBe('opfs-wl');
 	});
 
 	test('updates the cached manifest from an external sync event', async () => {
@@ -284,6 +297,7 @@ describe('sqliteOPFS dual sync database', () => {
 			initialCapacity: 8
 		};
 		const db = newDualSyncDatabase('app.sqlite3', {
+			vfs: 'opfs-sahpool',
 			opfsSahPool,
 			sync: { url: '/rdb', dualDataDb: true }
 		}, fixture.createSingleDatabase);
@@ -299,6 +313,7 @@ describe('sqliteOPFS dual sync database', () => {
 		expect(manifestOptions.opfsSahPool).toMatchObject({
 			initialCapacity: 8
 		});
+		expect(manifestOptions.vfs).toBe('opfs-sahpool');
 		expect(secondaryOptions.opfsSahPool).toMatchObject({
 			initialCapacity: 8
 		});

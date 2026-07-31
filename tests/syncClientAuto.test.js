@@ -321,9 +321,10 @@ describe('sync client auto start', () => {
 		}
 	});
 
-	test('releases sync web lock after sync timeout', async () => {
+	test('times out while waiting without releasing an active sync web lock', async () => {
 		const restoreLocks = installFakeWebLocks();
 		const requests = [];
+		const firstResponse = newDeferred();
 		const db = {
 			__sqliteSync: {
 				url: '/rdb',
@@ -333,36 +334,49 @@ describe('sync client auto start', () => {
 			},
 			query: async () => []
 		};
-		const client = newSyncClient({
-			transaction: async (fn) => fn({
-				customer: {
-					patch: async () => ({ changed: [] })
-				},
-				query: async () => []
-			})
-		}, async () => db, {
-			applyTo(axios) {
-				axios.request = async (request) => {
-					requests.push(request);
-					if (requests.length === 1)
-						return new Promise(() => {});
-					return {
-						data: { phase: 'keys', items: [], done: true, cursor: 'cursor-2' }
-					};
-				};
-			}
-		});
+		const firstClient = createClient();
+		const secondClient = createClient();
 
 		try {
-			await expect(client.sync({ timeoutMs: 5 }))
-				.rejects.toThrow('Timed out while holding sync lock');
+			const first = firstClient.sync();
+			await waitUntil(() => requests.length === 1);
+			await expect(secondClient.sync({ timeoutMs: 5 }))
+				.rejects.toThrow('Timed out waiting for sync lock');
+			expect(requests).toHaveLength(1);
 
-			await client.sync();
+			firstResponse.resolve({
+				data: { phase: 'keys', items: [], done: true, cursor: 'cursor-1' }
+			});
+			await first;
+
+			await secondClient.sync();
 
 			expect(requests).toHaveLength(2);
 		}
 		finally {
 			restoreLocks();
+		}
+
+		function createClient() {
+			return newSyncClient({
+				transaction: async (fn) => fn({
+					customer: {
+						patch: async () => ({ changed: [] })
+					},
+					query: async () => []
+				})
+			}, async () => db, {
+				applyTo(axios) {
+					axios.request = async (request) => {
+						requests.push(request);
+						if (requests.length === 1)
+							return firstResponse.promise;
+						return {
+							data: { phase: 'keys', items: [], done: true, cursor: 'cursor-2' }
+						};
+					};
+				}
+			});
 		}
 	});
 
@@ -1880,7 +1894,7 @@ describe('sync client auto start', () => {
 		expect(queryLog.some(sql => /orange_sync_base_/u.test(sql))).toBe(true);
 	});
 
-	test('drains pending mutations as separate push requests before pull', async () => {
+	test('drains pending mutations in a configured atomic push batch before pull', async () => {
 		const outbox = [
 			newPendingOutboxRow('mutation-1', 'First', 1),
 			newPendingOutboxRow('mutation-2', 'Second', 2)
@@ -1890,7 +1904,8 @@ describe('sync client auto start', () => {
 			url: '/rdb',
 			auto: false,
 			schema: false,
-			tables: ['customer']
+			tables: ['customer'],
+			push: { maxMutationsPerBatch: 10 }
 		}, {
 			baseEntries: [{
 				name: 'customer',
@@ -1914,9 +1929,9 @@ describe('sync client auto start', () => {
 						return {
 							data: {
 								phase: 'push',
-								applied: 1,
+								applied: request.data.mutations.length,
 								duplicates: 0,
-								results: [{ id: request.data.mutations[0].id }]
+								results: request.data.mutations.map(mutation => ({ id: mutation.id }))
 							}
 						};
 					}
@@ -1929,8 +1944,7 @@ describe('sync client auto start', () => {
 		await client.sync();
 
 		expect(requests).toEqual([
-			['push', ['mutation-1']],
-			['push', ['mutation-2']],
+			['push', ['mutation-1', 'mutation-2']],
 			['keys']
 		]);
 		expect(outbox).toHaveLength(0);
@@ -3043,15 +3057,59 @@ function installFakeWebLocks(locks) {
 }
 
 function newSerialWebLocks() {
-	const queues = new Map();
+	const states = new Map();
 	return {
-		request(name, _options, callback) {
-			const previous = queues.get(name) || Promise.resolve();
-			const current = previous.then(() => callback());
-			queues.set(name, current.catch(() => {}));
-			return current;
+		request(name, options, callback) {
+			return new Promise((resolve, reject) => {
+				let state = states.get(name);
+				if (!state) {
+					state = { active: false, queue: [] };
+					states.set(name, state);
+				}
+				const entry = { callback, resolve, reject, signal: options && options.signal };
+				if (entry.signal && entry.signal.aborted) {
+					reject(abortError());
+					return;
+				}
+				if (entry.signal) {
+					entry.abort = () => {
+						const index = state.queue.indexOf(entry);
+						if (index < 0)
+							return;
+						state.queue.splice(index, 1);
+						reject(abortError());
+					};
+					entry.signal.addEventListener('abort', entry.abort, { once: true });
+				}
+				state.queue.push(entry);
+				drain(state);
+			});
 		}
 	};
+
+	function drain(state) {
+		if (state.active)
+			return;
+		const entry = state.queue.shift();
+		if (!entry)
+			return;
+		if (entry.signal && entry.abort)
+			entry.signal.removeEventListener('abort', entry.abort);
+		state.active = true;
+		Promise.resolve()
+			.then(entry.callback)
+			.then(entry.resolve, entry.reject)
+			.finally(() => {
+				state.active = false;
+				drain(state);
+			});
+	}
+
+	function abortError() {
+		const error = new Error('The lock request was aborted.');
+		error.name = 'AbortError';
+		return error;
+	}
 }
 
 function newDeferred() {
@@ -3094,4 +3152,13 @@ function journalRowIds(items) {
 
 function wait(ms) {
 	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitUntil(predicate) {
+	for (let i = 0; i < 100; i++) {
+		if (predicate())
+			return;
+		await wait(1);
+	}
+	throw new Error('Timed out waiting for condition.');
 }

@@ -42,6 +42,9 @@ const applyPullJournalSymbol = typeof Symbol === 'function'
 const pushPendingSymbol = typeof Symbol === 'function'
 	? Symbol.for('orange-orm.syncClient.pushPending')
 	: '__orangeOrmSyncClientPushPending';
+const setClientIdSymbol = typeof Symbol === 'function'
+	? Symbol.for('orange-orm.syncClient.setClientId')
+	: '__orangeOrmSyncClientSetClientId';
 
 function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 	const sinceByScope = new Map();
@@ -110,6 +113,9 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 	Object.defineProperty(syncClientApi, pushPendingSymbol, {
 		value: pushPendingOnly
 	});
+	Object.defineProperty(syncClientApi, setClientIdSymbol, {
+		value: setSharedClientId
+	});
 	return syncClientApi;
 
 	function withCrossTabSyncLock(fn) {
@@ -140,10 +146,13 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 	}
 
 	async function syncAndCapturePullJournal(options = {}) {
-		return pull({
+		const pullOptions = {
 			...normalizePullOptions(options),
 			_capturePullJournal: true
-		});
+		};
+		if (typeof options._capturePullJournalChunk === 'function')
+			pullOptions._capturePullJournalChunk = options._capturePullJournalChunk;
+		return pull(pullOptions);
 	}
 
 	async function pushPendingOnly(options = {}) {
@@ -194,6 +203,8 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 		if (syncDb)
 			return syncDb;
 		syncDb = Object.create(db);
+		if (!db.poolFactory)
+			syncDb.poolFactory = db;
 		syncDb.query = function(query, options) {
 			return db.query.call(db, query, withSyncQueryPriority(options));
 		};
@@ -240,6 +251,8 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 		const normalizedOptions = normalizePullOptions(options);
 		if (options && options._capturePullJournal)
 			normalizedOptions._capturePullJournal = true;
+		if (options && typeof options._capturePullJournalChunk === 'function')
+			normalizedOptions._capturePullJournalChunk = options._capturePullJournalChunk;
 		const {
 			db,
 			syncConfig,
@@ -331,6 +344,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 			db,
 			scopeKey,
 			_capturePullJournal: !!options._capturePullJournal,
+			_capturePullJournalChunk: options._capturePullJournalChunk,
 			_syncInterceptors: interceptors,
 			_syncAxiosInterceptor: axiosInterceptor
 		};
@@ -410,7 +424,28 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 		if (!syncConfig)
 			throw new Error('Sync is not configured. Add sync in sqlite options: sqlite(connectionString, { sync: ... })');
 		const replayOptions = normalizeReplayOutboxOptions(options);
-		return readMutationRowsByStatus(db, replayOptions.statuses, replayOptions.limit);
+		return readMutationRowsByStatus(db, replayOptions.statuses, replayOptions.limit, undefined, replayOptions.after);
+	}
+
+	async function setSharedClientId(clientId) {
+		if (typeof clientId !== 'string' || clientId.length === 0)
+			throw new Error('Shared sync client id must be a non-empty string.');
+		const db = toSyncDb(await getDb());
+		await ensureSyncClientTable(db);
+		const existingRows = await db.query(`SELECT "id" FROM "${syncClientTable}" LIMIT 1`);
+		const existingRow = Array.isArray(existingRows) ? existingRows[0] : existingRows?.rows?.[0];
+		if (existingRow && (existingRow.id ?? existingRow.ID) === clientId)
+			return clientId;
+		await db.query([
+			`DELETE FROM "${syncClientTable}"`,
+			`WHERE "id" <> ${sqlStringLiteral(clientId)}`
+		].join(' '));
+		await db.query([
+			`INSERT INTO "${syncClientTable}" ("id")`,
+			`VALUES (${sqlStringLiteral(clientId)})`,
+			'ON CONFLICT("id") DO NOTHING'
+		].join(' '));
+		return clientId;
 	}
 
 	async function applyOutboxRowsForReplay(rows, options = {}) {
@@ -549,7 +584,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 		const pushConfig = options._pushConfig || resolvePushConfig(syncConfig, options);
 		const configuredTables = resolveSyncTables(db, syncConfig.tables, client);
 		await ensureSyncSchema(db, client, configuredTables, syncConfig.schema);
-		const limit = 1;
+		const limit = normalizeLimit(pushConfig.maxMutationsPerBatch, 1);
 		const pending = await readPendingMutations(db, limit);
 		if (pending.length === 0)
 			return { phase: 'push', applied: 0, duplicates: 0, results: [] };
@@ -722,6 +757,11 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 		const db = options.db;
 		const scopeKey = options.scopeKey || getScopeKey(options.tables);
 		const capturedStreamItems = [];
+		const capturePullJournalChunk = typeof options._capturePullJournalChunk === 'function'
+			? options._capturePullJournalChunk
+			: null;
+		let capturedStreamItemCount = 0;
+		let capturedApplicableItemCount = 0;
 		const streamedTables = new Set();
 		let applied = 0;
 		await ensurePullJournalTables(db);
@@ -732,7 +772,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 			: null;
 		const shouldApplyCheckpoint = session.finalSince !== undefined;
 		if (isStreamPullSession(session)) {
-			applied = countApplicablePullJournalItems(capturedStreamItems);
+			applied = capturedApplicableItemCount;
 			await finalizeStreamedPullJournal(session);
 		}
 		else if (applyConfig)
@@ -763,7 +803,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 
 		async function capturePullJournalSnapshot(session) {
 			const items = isStreamPullSession(session)
-				? capturedStreamItems.slice()
+				? capturePullJournalChunk ? [] : capturedStreamItems.slice()
 				: flattenPullJournalBatches(session && session.persisted
 					? await readPullJournalBatches(db, scopeKey)
 					: []);
@@ -774,12 +814,13 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 				finalSince: session && session.finalSince,
 				payload: session && session.payload,
 				reason: session && session.reason,
+				itemCount: isStreamPullSession(session) ? capturedStreamItemCount : items.length,
 				items
 			};
 		}
 
 		async function finalizeStreamedPullJournal(session) {
-			const hasJournalItems = capturedStreamItems.length > 0;
+			const hasJournalItems = capturedStreamItemCount > 0;
 			await client.transaction(async (tx) => {
 				if (hasJournalItems && (!applyConfig || applyConfig.foreignKeyCheck === 'final'))
 					await validateForeignKeys(tx);
@@ -877,7 +918,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 				}, { suppressSyncOutbox: true });
 				if (hasPersistedSession) {
 					const persistedItems = await readPullJournalItemsPaged(db, scopeKey);
-					capturedStreamItems.push(...persistedItems);
+					await captureStreamItems(persistedItems);
 					for (let i = 0; i < persistedItems.length; i++)
 						streamedTables.add(persistedItems[i].table);
 				}
@@ -895,6 +936,19 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 			const pendingBatches = [];
 			const waiters = [];
 			const rowScheduler = createPullRowsScheduler(onPipelineProgress);
+
+			async function captureStreamItems(items) {
+				const list = Array.isArray(items) ? items : [];
+				if (list.length === 0)
+					return;
+				capturedStreamItemCount += list.length;
+				capturedApplicableItemCount += countApplicablePullJournalItems(list);
+				if (capturePullJournalChunk)
+					await capturePullJournalChunk(list);
+				else
+					capturedStreamItems.push(...list);
+			}
+
 			startPullBatchPump();
 			try {
 				for (;;) {
@@ -931,7 +985,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 					);
 					session = persisted.session;
 					if (streamApply)
-						capturedStreamItems.push(...persisted.items);
+						await captureStreamItems(persisted.items);
 					pendingBatches.shift();
 					onPipelineProgress();
 					if (keyFetchError && pendingBatches.length === 0)
@@ -1824,17 +1878,27 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 		}
 	}
 
-	async function readMutationRowsByStatus(db, statuses, limit, excludeIds) {
+	async function readMutationRowsByStatus(db, statuses, limit, excludeIds, after) {
 		await ensureSyncOutboxTable(db);
 		const allowedStatuses = (Array.isArray(statuses) ? statuses : [])
 			.filter(status => typeof status === 'string' && status.length > 0);
 		if (allowedStatuses.length === 0)
 			return [];
 		const statusSql = allowedStatuses.map(sqlStringLiteral).join(', ');
+		const cursor = normalizeOutboxCursor(after);
+		const cursorSql = cursor
+			? [
+				'AND (',
+				`"created_at_ms" > ${cursor.createdAtMs}`,
+				`OR ("created_at_ms" = ${cursor.createdAtMs} AND "mutation_id" > ${sqlStringLiteral(cursor.mutationId)})`,
+				')'
+			].join(' ')
+			: '';
 		const rows = await db.query([
 			`SELECT "mutation_id", "table_name", "patch_json", "options_json", "created_at_ms", "operation_id", "operation_name", "operation_json", "status", "last_error", "attempts", "pushed_at_ms", "result_json" FROM "${syncOutboxTable}"`,
 			`WHERE "status" IN (${statusSql})`,
-			'ORDER BY "created_at_ms" ASC',
+			cursorSql,
+			'ORDER BY "created_at_ms" ASC, "mutation_id" ASC',
 			`LIMIT ${limit}`
 		].join(' '));
 		const list = Array.isArray(rows) ? rows : rows?.rows || [];
@@ -2140,11 +2204,22 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 		return {
 			statuses,
 			limit: normalizeLimit(options.limit, 10000),
+			after: normalizeOutboxCursor(options.after),
 			replay: options.replay !== false,
 			replayExisting: !!options.replayExisting,
 			replaceOpen: !!options.replaceOpen,
 			ignoreReplayErrors: !!options.ignoreReplayErrors
 		};
+	}
+
+	function normalizeOutboxCursor(value) {
+		if (!value || value !== Object(value))
+			return undefined;
+		const createdAtMs = Number(value.createdAtMs ?? value.created_at_ms);
+		const mutationId = value.mutationId ?? value.mutation_id;
+		if (!Number.isFinite(createdAtMs) || typeof mutationId !== 'string' || mutationId.length === 0)
+			return undefined;
+		return { createdAtMs, mutationId };
 	}
 
 	function normalizeOutboxStatuses(value) {
@@ -2189,19 +2264,11 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 	}
 
 	async function replaceOpenOutboxRows(db, rows, statuses) {
-		const ids = new Set();
-		for (let i = 0; i < rows.length; i++) {
-			const id = outboxRowMutationId(rows[i]);
-			if (typeof id === 'string' && id.length > 0)
-				ids.add(id);
-		}
 		const statusSql = normalizeOutboxStatuses(statuses).map(sqlStringLiteral).join(', ');
-		let sql = [
+		const sql = [
 			`DELETE FROM "${syncOutboxTable}"`,
 			`WHERE "status" IN (${statusSql})`
 		].join(' ');
-		if (ids.size > 0)
-			sql += ` AND "mutation_id" NOT IN (${Array.from(ids).map(sqlStringLiteral).join(', ')})`;
 		await db.query(sql);
 	}
 
@@ -2828,11 +2895,11 @@ function withRuntimeCrossTabLockConfig(config, options) {
 	if (!config || !config.enabled)
 		return config;
 	const timeoutMs = normalizePositiveInteger(options && options.timeoutMs);
-	if (!timeoutMs || config.maxHoldMs)
+	if (!timeoutMs || config.timeoutMs)
 		return config;
 	return {
 		...config,
-		maxHoldMs: timeoutMs
+		timeoutMs
 	};
 }
 
@@ -2983,7 +3050,8 @@ function normalizePushConfig(config, fallbackEndpoint) {
 	if (!endpoint)
 		throw new Error('Sync push endpoint requires "url" or sync.url');
 	return {
-		...endpoint
+		...endpoint,
+		maxMutationsPerBatch: config.maxMutationsPerBatch
 	};
 }
 
@@ -3757,3 +3825,4 @@ module.exports.readOutboxRowsSymbol = readOutboxRowsSymbol;
 module.exports.applyOutboxRowsSymbol = applyOutboxRowsSymbol;
 module.exports.applyPullJournalSymbol = applyPullJournalSymbol;
 module.exports.pushPendingSymbol = pushPendingSymbol;
+module.exports.setClientIdSymbol = setClientIdSymbol;

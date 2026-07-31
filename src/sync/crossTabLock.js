@@ -60,8 +60,7 @@ function normalizeCrossTabLockConfig(value) {
 	return {
 		enabled: value.enabled !== false,
 		name: typeof value.name === 'string' && value.name.length > 0 ? value.name : undefined,
-		timeoutMs: normalizePositiveInteger(value.timeoutMs),
-		maxHoldMs: normalizePositiveInteger(value.maxHoldMs),
+		timeoutMs: normalizePositiveInteger(value.timeoutMs) || normalizePositiveInteger(value.maxHoldMs),
 		staleMs: normalizePositiveInteger(value.staleMs),
 		pollMs: normalizePositiveInteger(value.pollMs)
 	};
@@ -145,45 +144,8 @@ async function runWithLocalStorageLock(storage, name, config, fn) {
 	}
 }
 
-async function runLockBody(name, config, fn) {
-	const operation = Promise.resolve().then(fn);
-	operation.catch(() => {});
-	const races = [operation];
-	const cleanup = [];
-	const maxHoldMs = normalizePositiveInteger(config && config.maxHoldMs);
-	if (maxHoldMs) {
-		races.push(new Promise((_resolve, reject) => {
-			const timeoutId = setTimeout(() => reject(lockHoldTimeoutError(name, maxHoldMs, config)), maxHoldMs);
-			cleanup.push(() => clearTimeout(timeoutId));
-		}));
-	}
-	if (!config || config.releaseOnPageHide !== false) {
-		const pageHide = createPageHideLockRelease(name, config);
-		if (pageHide) {
-			races.push(pageHide.promise);
-			cleanup.push(pageHide.cleanup);
-		}
-	}
-	try {
-		return await Promise.race(races);
-	}
-	finally {
-		for (let i = 0; i < cleanup.length; i++)
-			cleanup[i]();
-	}
-}
-
-function createPageHideLockRelease(name, config) {
-	const target = typeof globalThis !== 'undefined' ? globalThis : undefined;
-	if (!target || typeof target.addEventListener !== 'function' || typeof target.removeEventListener !== 'function')
-		return null;
-	let cleanup = () => {};
-	const promise = new Promise((_resolve, reject) => {
-		const release = () => reject(lockPageHiddenError(name, config));
-		target.addEventListener('pagehide', release, { once: true });
-		cleanup = () => target.removeEventListener('pagehide', release);
-	});
-	return { promise, cleanup };
+async function runLockBody(_name, _config, fn) {
+	return fn();
 }
 
 async function acquireLocalStorageLock(storage, name, config) {
@@ -254,14 +216,6 @@ function delay(ms) {
 
 function lockTimeoutError(name, timeoutMs, config) {
 	return new Error(`Timed out waiting for ${lockLabel(config)} "${name}" after ${Math.round((timeoutMs || 0) / 1000)} seconds.`);
-}
-
-function lockHoldTimeoutError(name, timeoutMs, config) {
-	return new Error(`Timed out while holding ${lockLabel(config)} "${name}" after ${Math.round((timeoutMs || 0) / 1000)} seconds.`);
-}
-
-function lockPageHiddenError(name, config) {
-	return new Error(`Released ${lockLabel(config)} "${name}" because the page was hidden.`);
 }
 
 function lockLabel(config) {

@@ -876,14 +876,14 @@ function requireSync () {
 			const results = [];
 			let applied = 0;
 			let duplicates = 0;
-			for (let i = 0; i < mutations.length; i++) {
-				const mutation = mutations[i];
-				await runHookedTransaction(async (tx) => {
+			await runHookedTransaction(async (tx) => {
+				for (let i = 0; i < mutations.length; i++) {
+					const mutation = mutations[i];
 					const claim = await claimAppliedMutation(tx, clientId, mutation.id);
 					if (!claim.claimed) {
 						duplicates += 1;
 						results.push({ id: mutation.id, table: mutation.table, ...(claim.result || {}), duplicate: true });
-						return;
+						continue;
 					}
 					const patchResult = await applyMutationPatches(tx, mutation);
 					const commandResult = await applyMutationCommands(tx, mutation);
@@ -898,8 +898,8 @@ function requireSync () {
 					await updateAppliedMutation(tx, clientId, mutation.id, result);
 					results.push(result);
 					applied += 1;
-				}, undefined, request, response);
-			}
+				}
+			}, undefined, request, response);
 
 			return {
 				phase: 'push',
@@ -1554,8 +1554,13 @@ function requireSync () {
 	function normalizeMutations(value, limit) {
 		if (!Array.isArray(value))
 			return [];
+		if (value.length > limit) {
+			const error = new Error(`Sync push accepts at most ${limit} mutations per batch.`);
+			error.status = 413;
+			throw error;
+		}
 		const result = [];
-		for (let i = 0; i < value.length && result.length < limit; i++) {
+		for (let i = 0; i < value.length; i++) {
 			const mutation = normalizeMutation(value[i]);
 			if (mutation)
 				result.push(mutation);
@@ -3761,8 +3766,7 @@ function requireCrossTabLock () {
 		return {
 			enabled: value.enabled !== false,
 			name: typeof value.name === 'string' && value.name.length > 0 ? value.name : undefined,
-			timeoutMs: normalizePositiveInteger(value.timeoutMs),
-			maxHoldMs: normalizePositiveInteger(value.maxHoldMs),
+			timeoutMs: normalizePositiveInteger(value.timeoutMs) || normalizePositiveInteger(value.maxHoldMs),
 			staleMs: normalizePositiveInteger(value.staleMs),
 			pollMs: normalizePositiveInteger(value.pollMs)
 		};
@@ -3846,45 +3850,8 @@ function requireCrossTabLock () {
 		}
 	}
 
-	async function runLockBody(name, config, fn) {
-		const operation = Promise.resolve().then(fn);
-		operation.catch(() => {});
-		const races = [operation];
-		const cleanup = [];
-		const maxHoldMs = normalizePositiveInteger(config && config.maxHoldMs);
-		if (maxHoldMs) {
-			races.push(new Promise((_resolve, reject) => {
-				const timeoutId = setTimeout(() => reject(lockHoldTimeoutError(name, maxHoldMs, config)), maxHoldMs);
-				cleanup.push(() => clearTimeout(timeoutId));
-			}));
-		}
-		if (!config || config.releaseOnPageHide !== false) {
-			const pageHide = createPageHideLockRelease(name, config);
-			if (pageHide) {
-				races.push(pageHide.promise);
-				cleanup.push(pageHide.cleanup);
-			}
-		}
-		try {
-			return await Promise.race(races);
-		}
-		finally {
-			for (let i = 0; i < cleanup.length; i++)
-				cleanup[i]();
-		}
-	}
-
-	function createPageHideLockRelease(name, config) {
-		const target = typeof globalThis !== 'undefined' ? globalThis : undefined;
-		if (!target || typeof target.addEventListener !== 'function' || typeof target.removeEventListener !== 'function')
-			return null;
-		let cleanup = () => {};
-		const promise = new Promise((_resolve, reject) => {
-			const release = () => reject(lockPageHiddenError(name, config));
-			target.addEventListener('pagehide', release, { once: true });
-			cleanup = () => target.removeEventListener('pagehide', release);
-		});
-		return { promise, cleanup };
+	async function runLockBody(_name, _config, fn) {
+		return fn();
 	}
 
 	async function acquireLocalStorageLock(storage, name, config) {
@@ -3957,14 +3924,6 @@ function requireCrossTabLock () {
 		return new Error(`Timed out waiting for ${lockLabel(config)} "${name}" after ${Math.round((timeoutMs || 0) / 1000)} seconds.`);
 	}
 
-	function lockHoldTimeoutError(name, timeoutMs, config) {
-		return new Error(`Timed out while holding ${lockLabel(config)} "${name}" after ${Math.round((timeoutMs || 0) / 1000)} seconds.`);
-	}
-
-	function lockPageHiddenError(name, config) {
-		return new Error(`Released ${lockLabel(config)} "${name}" because the page was hidden.`);
-	}
-
 	function lockLabel(config) {
 		return config && typeof config.label === 'string' && config.label.length > 0
 			? config.label
@@ -4034,8 +3993,10 @@ function requireWriteGate () {
 		let releaseCrossTab = noop;
 		try {
 			releaseCrossTab = await acquireCrossTabWrite(gateTarget);
+			await runBeforeSyncWrite(gateTarget, noop);
 		}
 		catch (e) {
+			releaseCrossTab();
 			releaseWrite();
 			throw e;
 		}
@@ -4049,6 +4010,13 @@ function requireWriteGate () {
 		if (!resolveGateTarget(target))
 			return Promise.resolve().then(fn);
 		return getSyncWriteGate(target).runMaintenance(fn);
+	}
+
+	function runSyncSwap(target, fn) {
+		const gateTarget = resolveGateTarget(target);
+		if (!gateTarget)
+			return Promise.resolve().then(fn);
+		return getSyncWriteGate(gateTarget).runMaintenance(() => runCrossTabWrite(gateTarget, fn));
 	}
 
 	function shouldGateWrite(target, options) {
@@ -4092,8 +4060,19 @@ function requireWriteGate () {
 	function runCrossTabWrite(gateTarget, fn) {
 		const lockConfig = getCrossTabWriteLockConfig(gateTarget);
 		if (!lockConfig)
+			return runBeforeSyncWrite(gateTarget, fn);
+		return runWithCrossTabLock(
+			resolveCrossTabWriteLockName(gateTarget, lockConfig),
+			lockConfig,
+			() => runBeforeSyncWrite(gateTarget, fn)
+		);
+	}
+
+	function runBeforeSyncWrite(gateTarget, fn) {
+		const beforeWrite = gateTarget && gateTarget.__orangeBeforeSyncWrite;
+		if (typeof beforeWrite !== 'function')
 			return fn();
-		return runWithCrossTabLock(resolveCrossTabWriteLockName(gateTarget, lockConfig), lockConfig, fn);
+		return Promise.resolve(beforeWrite.call(gateTarget)).then(fn);
 	}
 
 	async function acquireCrossTabWrite(gateTarget) {
@@ -4241,6 +4220,7 @@ function requireWriteGate () {
 		acquireSyncWrite,
 		getSyncWriteGate,
 		runSyncMaintenance,
+		runSyncSwap,
 		runSyncWrite,
 		shouldGateWrite
 	};
@@ -5949,6 +5929,9 @@ function requireSyncClient () {
 	const pushPendingSymbol = typeof Symbol === 'function'
 		? Symbol.for('orange-orm.syncClient.pushPending')
 		: '__orangeOrmSyncClientPushPending';
+	const setClientIdSymbol = typeof Symbol === 'function'
+		? Symbol.for('orange-orm.syncClient.setClientId')
+		: '__orangeOrmSyncClientSetClientId';
 
 	function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 		const sinceByScope = new Map();
@@ -6017,6 +6000,9 @@ function requireSyncClient () {
 		Object.defineProperty(syncClientApi, pushPendingSymbol, {
 			value: pushPendingOnly
 		});
+		Object.defineProperty(syncClientApi, setClientIdSymbol, {
+			value: setSharedClientId
+		});
 		return syncClientApi;
 
 		function withCrossTabSyncLock(fn) {
@@ -6047,10 +6033,13 @@ function requireSyncClient () {
 		}
 
 		async function syncAndCapturePullJournal(options = {}) {
-			return pull({
+			const pullOptions = {
 				...normalizePullOptions(options),
 				_capturePullJournal: true
-			});
+			};
+			if (typeof options._capturePullJournalChunk === 'function')
+				pullOptions._capturePullJournalChunk = options._capturePullJournalChunk;
+			return pull(pullOptions);
 		}
 
 		async function pushPendingOnly(options = {}) {
@@ -6101,6 +6090,8 @@ function requireSyncClient () {
 			if (syncDb)
 				return syncDb;
 			syncDb = Object.create(db);
+			if (!db.poolFactory)
+				syncDb.poolFactory = db;
 			syncDb.query = function(query, options) {
 				return db.query.call(db, query, withSyncQueryPriority(options));
 			};
@@ -6147,6 +6138,8 @@ function requireSyncClient () {
 			const normalizedOptions = normalizePullOptions(options);
 			if (options && options._capturePullJournal)
 				normalizedOptions._capturePullJournal = true;
+			if (options && typeof options._capturePullJournalChunk === 'function')
+				normalizedOptions._capturePullJournalChunk = options._capturePullJournalChunk;
 			const {
 				db,
 				syncConfig,
@@ -6238,6 +6231,7 @@ function requireSyncClient () {
 				db,
 				scopeKey,
 				_capturePullJournal: !!options._capturePullJournal,
+				_capturePullJournalChunk: options._capturePullJournalChunk,
 				_syncInterceptors: interceptors,
 				_syncAxiosInterceptor: axiosInterceptor
 			};
@@ -6317,7 +6311,28 @@ function requireSyncClient () {
 			if (!syncConfig)
 				throw new Error('Sync is not configured. Add sync in sqlite options: sqlite(connectionString, { sync: ... })');
 			const replayOptions = normalizeReplayOutboxOptions(options);
-			return readMutationRowsByStatus(db, replayOptions.statuses, replayOptions.limit);
+			return readMutationRowsByStatus(db, replayOptions.statuses, replayOptions.limit, undefined, replayOptions.after);
+		}
+
+		async function setSharedClientId(clientId) {
+			if (typeof clientId !== 'string' || clientId.length === 0)
+				throw new Error('Shared sync client id must be a non-empty string.');
+			const db = toSyncDb(await getDb());
+			await ensureSyncClientTable(db);
+			const existingRows = await db.query(`SELECT "id" FROM "${syncClientTable}" LIMIT 1`);
+			const existingRow = Array.isArray(existingRows) ? existingRows[0] : existingRows?.rows?.[0];
+			if (existingRow && (existingRow.id ?? existingRow.ID) === clientId)
+				return clientId;
+			await db.query([
+				`DELETE FROM "${syncClientTable}"`,
+				`WHERE "id" <> ${sqlStringLiteral(clientId)}`
+			].join(' '));
+			await db.query([
+				`INSERT INTO "${syncClientTable}" ("id")`,
+				`VALUES (${sqlStringLiteral(clientId)})`,
+				'ON CONFLICT("id") DO NOTHING'
+			].join(' '));
+			return clientId;
 		}
 
 		async function applyOutboxRowsForReplay(rows, options = {}) {
@@ -6456,7 +6471,7 @@ function requireSyncClient () {
 			const pushConfig = options._pushConfig || resolvePushConfig(syncConfig, options);
 			const configuredTables = resolveSyncTables(db, syncConfig.tables, client);
 			await ensureSyncSchema(db, client, configuredTables, syncConfig.schema);
-			const limit = 1;
+			const limit = normalizeLimit(pushConfig.maxMutationsPerBatch, 1);
 			const pending = await readPendingMutations(db, limit);
 			if (pending.length === 0)
 				return { phase: 'push', applied: 0, duplicates: 0, results: [] };
@@ -6629,6 +6644,11 @@ function requireSyncClient () {
 			const db = options.db;
 			const scopeKey = options.scopeKey || getScopeKey(options.tables);
 			const capturedStreamItems = [];
+			const capturePullJournalChunk = typeof options._capturePullJournalChunk === 'function'
+				? options._capturePullJournalChunk
+				: null;
+			let capturedStreamItemCount = 0;
+			let capturedApplicableItemCount = 0;
 			const streamedTables = new Set();
 			let applied = 0;
 			await ensurePullJournalTables(db);
@@ -6639,7 +6659,7 @@ function requireSyncClient () {
 				: null;
 			const shouldApplyCheckpoint = session.finalSince !== undefined;
 			if (isStreamPullSession(session)) {
-				applied = countApplicablePullJournalItems(capturedStreamItems);
+				applied = capturedApplicableItemCount;
 				await finalizeStreamedPullJournal(session);
 			}
 			else if (applyConfig)
@@ -6670,7 +6690,7 @@ function requireSyncClient () {
 
 			async function capturePullJournalSnapshot(session) {
 				const items = isStreamPullSession(session)
-					? capturedStreamItems.slice()
+					? capturePullJournalChunk ? [] : capturedStreamItems.slice()
 					: flattenPullJournalBatches(session && session.persisted
 						? await readPullJournalBatches(db, scopeKey)
 						: []);
@@ -6681,12 +6701,13 @@ function requireSyncClient () {
 					finalSince: session && session.finalSince,
 					payload: session && session.payload,
 					reason: session && session.reason,
+					itemCount: isStreamPullSession(session) ? capturedStreamItemCount : items.length,
 					items
 				};
 			}
 
 			async function finalizeStreamedPullJournal(session) {
-				const hasJournalItems = capturedStreamItems.length > 0;
+				const hasJournalItems = capturedStreamItemCount > 0;
 				await client.transaction(async (tx) => {
 					if (hasJournalItems && (!applyConfig || applyConfig.foreignKeyCheck === 'final'))
 						await validateForeignKeys(tx);
@@ -6784,7 +6805,7 @@ function requireSyncClient () {
 					}, { suppressSyncOutbox: true });
 					if (hasPersistedSession) {
 						const persistedItems = await readPullJournalItemsPaged(db, scopeKey);
-						capturedStreamItems.push(...persistedItems);
+						await captureStreamItems(persistedItems);
 						for (let i = 0; i < persistedItems.length; i++)
 							streamedTables.add(persistedItems[i].table);
 					}
@@ -6802,6 +6823,19 @@ function requireSyncClient () {
 				const pendingBatches = [];
 				const waiters = [];
 				const rowScheduler = createPullRowsScheduler(onPipelineProgress);
+
+				async function captureStreamItems(items) {
+					const list = Array.isArray(items) ? items : [];
+					if (list.length === 0)
+						return;
+					capturedStreamItemCount += list.length;
+					capturedApplicableItemCount += countApplicablePullJournalItems(list);
+					if (capturePullJournalChunk)
+						await capturePullJournalChunk(list);
+					else
+						capturedStreamItems.push(...list);
+				}
+
 				startPullBatchPump();
 				try {
 					for (;;) {
@@ -6838,7 +6872,7 @@ function requireSyncClient () {
 						);
 						session = persisted.session;
 						if (streamApply)
-							capturedStreamItems.push(...persisted.items);
+							await captureStreamItems(persisted.items);
 						pendingBatches.shift();
 						onPipelineProgress();
 						if (keyFetchError && pendingBatches.length === 0)
@@ -7731,17 +7765,27 @@ function requireSyncClient () {
 			}
 		}
 
-		async function readMutationRowsByStatus(db, statuses, limit, excludeIds) {
+		async function readMutationRowsByStatus(db, statuses, limit, excludeIds, after) {
 			await ensureSyncOutboxTable(db);
 			const allowedStatuses = (Array.isArray(statuses) ? statuses : [])
 				.filter(status => typeof status === 'string' && status.length > 0);
 			if (allowedStatuses.length === 0)
 				return [];
 			const statusSql = allowedStatuses.map(sqlStringLiteral).join(', ');
+			const cursor = normalizeOutboxCursor(after);
+			const cursorSql = cursor
+				? [
+					'AND (',
+					`"created_at_ms" > ${cursor.createdAtMs}`,
+					`OR ("created_at_ms" = ${cursor.createdAtMs} AND "mutation_id" > ${sqlStringLiteral(cursor.mutationId)})`,
+					')'
+				].join(' ')
+				: '';
 			const rows = await db.query([
 				`SELECT "mutation_id", "table_name", "patch_json", "options_json", "created_at_ms", "operation_id", "operation_name", "operation_json", "status", "last_error", "attempts", "pushed_at_ms", "result_json" FROM "${syncOutboxTable}"`,
 				`WHERE "status" IN (${statusSql})`,
-				'ORDER BY "created_at_ms" ASC',
+				cursorSql,
+				'ORDER BY "created_at_ms" ASC, "mutation_id" ASC',
 				`LIMIT ${limit}`
 			].join(' '));
 			const list = Array.isArray(rows) ? rows : rows?.rows || [];
@@ -8047,11 +8091,22 @@ function requireSyncClient () {
 			return {
 				statuses,
 				limit: normalizeLimit(options.limit, 10000),
+				after: normalizeOutboxCursor(options.after),
 				replay: options.replay !== false,
 				replayExisting: !!options.replayExisting,
 				replaceOpen: !!options.replaceOpen,
 				ignoreReplayErrors: !!options.ignoreReplayErrors
 			};
+		}
+
+		function normalizeOutboxCursor(value) {
+			if (!value || value !== Object(value))
+				return undefined;
+			const createdAtMs = Number(value.createdAtMs ?? value.created_at_ms);
+			const mutationId = value.mutationId ?? value.mutation_id;
+			if (!Number.isFinite(createdAtMs) || typeof mutationId !== 'string' || mutationId.length === 0)
+				return undefined;
+			return { createdAtMs, mutationId };
 		}
 
 		function normalizeOutboxStatuses(value) {
@@ -8096,19 +8151,11 @@ function requireSyncClient () {
 		}
 
 		async function replaceOpenOutboxRows(db, rows, statuses) {
-			const ids = new Set();
-			for (let i = 0; i < rows.length; i++) {
-				const id = outboxRowMutationId(rows[i]);
-				if (typeof id === 'string' && id.length > 0)
-					ids.add(id);
-			}
 			const statusSql = normalizeOutboxStatuses(statuses).map(sqlStringLiteral).join(', ');
-			let sql = [
+			const sql = [
 				`DELETE FROM "${syncOutboxTable}"`,
 				`WHERE "status" IN (${statusSql})`
 			].join(' ');
-			if (ids.size > 0)
-				sql += ` AND "mutation_id" NOT IN (${Array.from(ids).map(sqlStringLiteral).join(', ')})`;
 			await db.query(sql);
 		}
 
@@ -8735,11 +8782,11 @@ function requireSyncClient () {
 		if (!config || !config.enabled)
 			return config;
 		const timeoutMs = normalizePositiveInteger(options && options.timeoutMs);
-		if (!timeoutMs || config.maxHoldMs)
+		if (!timeoutMs || config.timeoutMs)
 			return config;
 		return {
 			...config,
-			maxHoldMs: timeoutMs
+			timeoutMs
 		};
 	}
 
@@ -8890,7 +8937,8 @@ function requireSyncClient () {
 		if (!endpoint)
 			throw new Error('Sync push endpoint requires "url" or sync.url');
 		return {
-			...endpoint
+			...endpoint,
+			maxMutationsPerBatch: config.maxMutationsPerBatch
 		};
 	}
 
@@ -9664,6 +9712,7 @@ function requireSyncClient () {
 	syncClient.exports.applyOutboxRowsSymbol = applyOutboxRowsSymbol;
 	syncClient.exports.applyPullJournalSymbol = applyPullJournalSymbol;
 	syncClient.exports.pushPendingSymbol = pushPendingSymbol;
+	syncClient.exports.setClientIdSymbol = setClientIdSymbol;
 	return syncClient.exports;
 }
 
@@ -21310,15 +21359,18 @@ function requireSyncWorkerClient () {
 	} = requireOperationContext();
 	const { ensureLocalSchemaReadySymbol } = requireSyncClient();
 
-	function createSyncWorkerClient(worker) {
+	function createSyncWorkerClient(worker, options = {}) {
 		if (!worker || typeof worker.postMessage !== 'function')
 			throw new Error('Sync worker client requires a Worker-like object.');
 
 		let nextId = 1;
 		const pending = new Map();
 		const listeners = new Map();
+		const lastEvents = new Map();
 
 		worker.addEventListener('message', onMessage);
+		worker.addEventListener('error', onWorkerError);
+		worker.addEventListener('messageerror', onWorkerError);
 		if (typeof worker.start === 'function')
 			worker.start();
 
@@ -21344,14 +21396,32 @@ function requireSyncWorkerClient () {
 		function request(method, ...args) {
 			const id = nextId++;
 			return new Promise((resolve, reject) => {
-				pending.set(id, { resolve, reject });
-				worker.postMessage({
-					type: 'orange-sync-worker-request',
-					id,
-					method,
-					args
-				});
+				const timeoutMs = resolveRequestTimeoutMs(method, args, options);
+				const timeoutId = timeoutMs
+					? setTimeout(() => rejectTimedOutRequest(id, method, timeoutMs), timeoutMs)
+					: undefined;
+				pending.set(id, { resolve, reject, timeoutId });
+				try {
+					worker.postMessage({
+						type: 'orange-sync-worker-request',
+						id,
+						method,
+						args
+					});
+				}
+				catch (e) {
+					clearPendingRequest(id);
+					reject(e);
+				}
 			});
+		}
+
+		function rejectTimedOutRequest(id, method, timeoutMs) {
+			const entry = pending.get(id);
+			if (!entry)
+				return;
+			pending.delete(id);
+			entry.reject(new Error(`Sync worker request "${method}" timed out after ${Math.round(timeoutMs / 1000)} seconds.`));
 		}
 
 		function on(event, listener) {
@@ -21364,6 +21434,13 @@ function requireSyncWorkerClient () {
 			}
 			eventListeners.add(listener);
 			request('on', event).catch(() => {});
+			const lastEvent = lastEvents.get(event);
+			if (lastEvent !== undefined) {
+				Promise.resolve().then(() => {
+					if (eventListeners.has(listener) && lastEvents.get(event) === lastEvent)
+						listener(lastEvent);
+				});
+			}
 			return () => off(event, listener);
 		}
 
@@ -21390,10 +21467,16 @@ function requireSyncWorkerClient () {
 
 		function close() {
 			worker.removeEventListener('message', onMessage);
-			for (const entry of pending.values())
+			worker.removeEventListener('error', onWorkerError);
+			worker.removeEventListener('messageerror', onWorkerError);
+			for (const entry of pending.values()) {
+				if (entry.timeoutId)
+					clearTimeout(entry.timeoutId);
 				entry.reject(new Error('Sync worker client closed.'));
+			}
 			pending.clear();
 			listeners.clear();
+			lastEvents.clear();
 			if (typeof worker.terminate === 'function')
 				worker.terminate();
 			else if (typeof worker.close === 'function')
@@ -21405,6 +21488,7 @@ function requireSyncWorkerClient () {
 			if (!message || message.type === undefined)
 				return;
 			if (message.type === 'orange-sync-worker-event') {
+				lastEvents.set(message.event, message.payload);
 				emit(message.event, message.payload);
 				return;
 			}
@@ -21413,11 +21497,31 @@ function requireSyncWorkerClient () {
 			const entry = pending.get(message.id);
 			if (!entry)
 				return;
-			pending.delete(message.id);
+			clearPendingRequest(message.id);
 			if (message.error)
 				entry.reject(toError(message.error));
 			else
 				entry.resolve(message.result);
+		}
+
+		function clearPendingRequest(id) {
+			const entry = pending.get(id);
+			if (!entry)
+				return;
+			pending.delete(id);
+			if (entry.timeoutId)
+				clearTimeout(entry.timeoutId);
+		}
+
+		function onWorkerError(event) {
+			const error = toWorkerError(event);
+			for (const entry of pending.values()) {
+				if (entry.timeoutId)
+					clearTimeout(entry.timeoutId);
+				entry.reject(error);
+			}
+			pending.clear();
+			emit('error', { method: 'worker', error });
 		}
 
 		function emit(event, payload) {
@@ -21431,6 +21535,35 @@ function requireSyncWorkerClient () {
 			for (const listener of Array.from(eventListeners))
 				listener(payload);
 		}
+	}
+
+	function resolveRequestTimeoutMs(method, args, options) {
+		const methodOptions = args && args[0];
+		const configured = methodOptions && methodOptions === Object(methodOptions)
+			? normalizePositiveInteger(methodOptions.timeoutMs)
+			: undefined;
+		if (configured)
+			return configured + 1000;
+		const fallback = normalizePositiveInteger(options.requestTimeoutMs);
+		if (fallback)
+			return fallback;
+		if (method === 'on' || method === 'off' || method === 'isRunning' || method === 'stop')
+			return 10000;
+		return 300000;
+	}
+
+	function normalizePositiveInteger(value) {
+		const parsed = Number.parseInt(value, 10);
+		return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+	}
+
+	function toWorkerError(event) {
+		if (event && event.error instanceof Error)
+			return event.error;
+		const message = event && event.message
+			? event.message
+			: 'Sync worker failed before completing the request.';
+		return new Error(message);
 	}
 
 	function createNoopInterceptors() {
@@ -21482,13 +21615,25 @@ function requireSyncWorkerHandler () {
 			if (target)
 				target.postMessage(message);
 		});
+		const forwardedEvents = Array.isArray(options.forwardEvents)
+			? options.forwardEvents
+			: ['sync', 'error', 'initial-ready', 'sync-progress'];
+		for (let i = 0; i < forwardedEvents.length; i++)
+			subscribeSyncEvent(forwardedEvents[i]);
 
 		if (options.autoStart !== false) {
 			const startAuto = typeof syncClient[syncAutoStartSymbol] === 'function'
 				? syncClient[syncAutoStartSymbol]
 				: syncClient.start;
-			if (typeof startAuto === 'function')
-				void startAuto.call(syncClient);
+			if (typeof startAuto === 'function') {
+				void Promise.resolve(startAuto.call(syncClient)).catch((error) => {
+					postMessage({
+						type: 'orange-sync-worker-event',
+						event: 'error',
+						payload: { method: 'auto-start', error: serializeError(error) }
+					});
+				});
+			}
 		}
 
 		return {
@@ -21549,12 +21694,12 @@ function requireSyncWorkerHandler () {
 			syncEventUnsubscribers.delete(event);
 		}
 
-		function stop() {
+		async function stop() {
 			for (const unsubscribe of syncEventUnsubscribers.values())
 				unsubscribe();
 			syncEventUnsubscribers.clear();
 			if (options.stopSyncClient !== false && typeof syncClient.stop === 'function')
-				void syncClient.stop();
+				await syncClient.stop();
 		}
 
 		function postResponse(id, result, error) {
@@ -29238,7 +29383,8 @@ function requireNewPool$5 () {
 			return Promise.resolve(noop);
 		return acquireCrossTabLock(resolveOPFSAccessLockName(connectionString), {
 			enabled: true,
-			label: 'sqlite OPFS access lock'
+			label: 'sqlite OPFS access lock',
+			timeoutMs: normalizePositiveInteger(poolOptions.opfsAccessTimeoutMs) || 300000
 		});
 	}
 
@@ -29285,8 +29431,14 @@ function requireNewPool$5 () {
 	function normalizeCrossTabWriteLockConfig(poolOptions = {}) {
 		const defaultEnabled = poolOptions.vfs === 'opfs-wl' || poolOptions.fallbackVfs === 'opfs-wl';
 		return {
-			enabled: defaultEnabled
+			enabled: defaultEnabled,
+			timeoutMs: normalizePositiveInteger(poolOptions.opfsAccessTimeoutMs) || 300000
 		};
+	}
+
+	function normalizePositiveInteger(value) {
+		const parsed = Number.parseInt(value, 10);
+		return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 	}
 
 	function normalizePoolOptions(poolOptions) {
@@ -29318,8 +29470,12 @@ function requireDualSyncDatabase () {
 	const createHttpInterceptor = requireHttpInterceptor();
 	const newSyncClient = requireSyncClient();
 	const { createSyncAuto, syncAutoStartSymbol } = requireSyncAuto();
-	const { runSyncMaintenance } = requireWriteGate();
-	const { normalizeLockNamePart } = requireCrossTabLock();
+	const { runSyncSwap } = requireWriteGate();
+	const {
+		normalizeCrossTabLockConfig,
+		normalizeLockNamePart,
+		runWithCrossTabLock
+	} = requireCrossTabLock();
 
 	const {
 		ensureLocalSchemaReadySymbol,
@@ -29327,14 +29483,19 @@ function requireDualSyncDatabase () {
 		readOutboxRowsSymbol,
 		applyOutboxRowsSymbol,
 		applyPullJournalSymbol,
-		pushPendingSymbol
+		pushPendingSymbol,
+		setClientIdSymbol
 	} = newSyncClient;
 
 	const manifestTable = 'orange_sync_dual_manifest';
 	const deltaTable = 'orange_sync_dual_delta';
+	const deltaChunkTable = 'orange_sync_dual_delta_chunk';
 	const manifestId = 'default';
 	const roleA = 'a';
 	const roleB = 'b';
+	const outboxReplayPageSize = 1000;
+	const deltaItemsPerChunk = 250;
+	const manifestCacheMaxAgeMs = 1000;
 
 	function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase) {
 		const roleConnectionStrings = {
@@ -29347,11 +29508,12 @@ function requireDualSyncDatabase () {
 			primaryDataPoolOptions,
 			roleConnectionStrings[roleB]
 		);
-		const cachePoolOptions = toCachePoolOptions(poolOptions, cacheConnectionString);
+		const cachePoolOptions = toCachePoolOptions(primaryDataPoolOptions, cacheConnectionString);
 		const dbByRole = new Map();
 		const clientByRole = new Map();
 		let cacheDb;
 		let manifestCache;
+		let manifestCacheReadAtMs = 0;
 		let manifestPromise;
 		let cacheSchemaReady = false;
 		let cacheSchemaPromise;
@@ -29362,12 +29524,16 @@ function requireDualSyncDatabase () {
 		let roleHttpInterceptor;
 		const syncInterceptors = createHttpInterceptor();
 		let syncTail = Promise.resolve();
+		let queuedSyncCount = 0;
+		let nextProgressRequestId = 1;
 		let initialReadyEmitted = false;
 		const eventListeners = new Map();
 		const roleEventSubscriptions = new Set();
 		const schemaReadyRoles = new Set();
 		const schemaReadyPromises = new Map();
 		let schemaReadyGeneration = 0;
+		const dualSyncLockName = `orange-orm:sqliteOPFS:dual-sync:${normalizeLockNamePart(connectionString)}`;
+		const dualWriteLockName = `orange-orm:sqliteOPFS:dual-write:${normalizeLockNamePart(connectionString)}`;
 
 		const router = {
 			poolFactory: null,
@@ -29385,9 +29551,12 @@ function requireDualSyncDatabase () {
 			__orangeDualSyncAttachSyncClient: attachExternalSyncClient,
 			__orangeDualSyncWarmManifest: warmManifest,
 			__sqliteSync: poolOptions && poolOptions.sync,
-			__orangeSyncIdentity: `sqliteOPFS:${connectionString}:dual`
+			__orangeSyncIdentity: `sqliteOPFS:${connectionString}:dual`,
+			__orangeCrossTabWriteLock: { enabled: true, name: dualWriteLockName, timeoutMs: 300000 },
+			__orangeBeforeSyncWrite: refreshManifestBeforeWrite
 		};
 		router.poolFactory = router;
+		installSyncProgressInterceptors();
 
 		return router;
 
@@ -29469,52 +29638,90 @@ function requireDualSyncDatabase () {
 		}
 
 		function syncObserved(options = {}) {
-			const run = syncTail.then(() => observe('sync', () => sync(normalizeSyncOptions(options))));
+			const normalizedOptions = normalizeSyncOptions(options);
+			queuedSyncCount += 1;
+			emitSyncProgress('queued', { queueDepth: queuedSyncCount });
+			const run = syncTail.then(() => {
+				queuedSyncCount = Math.max(0, queuedSyncCount - 1);
+				emitSyncProgress('waiting-for-sync-lock', { queueDepth: queuedSyncCount });
+				return observe('sync', () => runWithCrossTabLock(
+					dualSyncLockName,
+					toDualSyncLockConfig(poolOptions && poolOptions.sync, normalizedOptions),
+					() => sync(normalizedOptions)
+				));
+			});
 			syncTail = run.catch(() => {});
 			return run;
 		}
 
 		async function sync(options = {}) {
-			const manifest = await getManifest();
+			emitSyncProgress('preparing');
+			const manifest = await getManifest(true);
 			const activeRole = manifest.activeRole;
 			const stagingRole = manifest.stagingRole;
 			const activeSync = getRoleSyncClient(activeRole);
 			const stagingSync = getRoleSyncClient(stagingRole);
+			await ensureSharedClientId(manifest);
 
-			await activeSync[pushPendingSymbol](options);
+			emitSyncProgress('pushing-active', { activeRole, stagingRole });
+			const activePushResult = await activeSync[pushPendingSymbol](options);
+			const needsInitialSwap = activePushResult && activePushResult.skipped === 'missing-stable-base';
+			emitSyncProgress('updating-staging', { activeRole, stagingRole });
 			await applyPendingDeltasToRole(stagingRole);
 
-			const openRows = await activeSync[readOutboxRowsSymbol]({
-				statuses: ['pending', 'pushed']
-			});
+			const openRows = await readAllOutboxRows(activeSync, ['pending', 'pushed']);
 			await stagingSync[applyOutboxRowsSymbol](openRows, {
 				replay: false,
 				replaceOpen: true
 			});
 
-			const result = await stagingSync[syncAndCapturePullJournalSymbol](options);
-			const journal = result && result.__orangePullJournal;
-			const deltaId = journal
-				? await saveDelta(journal, stagingRole)
-				: undefined;
-
-			await runSyncMaintenance(router, async () => {
-				const finalPendingRows = await activeSync[readOutboxRowsSymbol]({
-					statuses: ['pending']
+			emitSyncProgress('pulling-staging', { activeRole, stagingRole });
+			const deltaSink = await createDeltaJournalSink(stagingRole);
+			let result;
+			let journal;
+			let deltaId;
+			try {
+				result = await stagingSync[syncAndCapturePullJournalSymbol]({
+					...options,
+					_capturePullJournalChunk: deltaSink.write
 				});
+				journal = result && result.__orangePullJournal;
+				deltaId = await deltaSink.commit(journal);
+			}
+			catch (error) {
+				await deltaSink.abort();
+				throw error;
+			}
+			let publishedManifest = manifest;
+			let swapped = false;
+
+			emitSyncProgress('waiting-for-write-barrier', { activeRole, stagingRole });
+			await runSyncSwap(router, async () => {
+				const currentManifest = await getManifest(true);
+				assertExpectedManifest(currentManifest, manifest);
+				const finalPendingRows = await readAllOutboxRows(activeSync, ['pending']);
 				await stagingSync[applyOutboxRowsSymbol](finalPendingRows, {
 					replay: true,
 					replaceOpen: false
 				});
-				await publishStagingRole(activeRole, stagingRole);
+				if (needsInitialSwap || deltaId || openRows.length > 0 || finalPendingRows.length > 0) {
+					emitSyncProgress('swapping', { activeRole, stagingRole });
+					publishedManifest = await publishStagingRole(manifest);
+					swapped = true;
+				}
 			});
 
-			const newActiveRole = stagingRole;
+			const newActiveRole = publishedManifest.activeRole;
 			await maybeEmitInitialReady(newActiveRole);
+			emitSyncProgress('complete', {
+				activeRole: publishedManifest.activeRole,
+				stagingRole: publishedManifest.stagingRole,
+				swapped
+			});
 			return withDualSyncResult(result, {
-				activeRole: newActiveRole,
-				stagingRole: activeRole,
-				deltaId
+				...publishedManifest,
+				deltaId,
+				swapped
 			});
 		}
 
@@ -29528,6 +29735,14 @@ function requireDualSyncDatabase () {
 		}
 
 		async function resetLocal(options = {}) {
+			return runWithCrossTabLock(
+				dualSyncLockName,
+				toDualSyncLockConfig(poolOptions && poolOptions.sync, options),
+				() => runSyncSwap(router, () => resetLocalCore(options))
+			);
+		}
+
+		async function resetLocalCore(options) {
 			const errors = [];
 			for (const role of [roleA, roleB]) {
 				try {
@@ -29546,8 +29761,14 @@ function requireDualSyncDatabase () {
 		}
 
 		async function discardLocalChanges(options = {}) {
-			const manifest = await getManifest();
-			return getRoleSyncClient(manifest.activeRole).discardLocalChanges(options);
+			return runWithCrossTabLock(
+				dualSyncLockName,
+				toDualSyncLockConfig(poolOptions && poolOptions.sync, options),
+				() => runSyncSwap(router, async () => {
+					const manifest = await getManifest(true);
+					return getRoleSyncClient(manifest.activeRole).discardLocalChanges(options);
+				})
+			);
 		}
 
 		async function waitForInitialSync() {
@@ -29663,12 +29884,128 @@ function requireDualSyncDatabase () {
 			}
 		}
 
-		async function publishStagingRole(activeRole, stagingRole) {
+		async function publishStagingRole(manifest) {
 			const now = Date.now();
-			await writeManifest({
-				activeRole: stagingRole,
-				stagingRole: activeRole,
-				updatedAtMs: now
+			return writeManifest({
+				activeRole: manifest.stagingRole,
+				stagingRole: manifest.activeRole,
+				updatedAtMs: now,
+				generation: manifest.generation + 1,
+				clientId: manifest.clientId
+			}, {
+				expectedGeneration: manifest.generation,
+				expectedActiveRole: manifest.activeRole,
+				expectedStagingRole: manifest.stagingRole
+			});
+		}
+
+		async function readAllOutboxRows(syncClient, statuses) {
+			const rows = [];
+			let after;
+			for (;;) {
+				const page = await syncClient[readOutboxRowsSymbol]({
+					statuses,
+					limit: outboxReplayPageSize,
+					after
+				});
+				if (!Array.isArray(page) || page.length === 0)
+					return rows;
+				rows.push(...page);
+				if (page.length < outboxReplayPageSize)
+					return rows;
+				const last = page[page.length - 1];
+				const nextAfter = {
+					createdAtMs: Number(last && (last.created_at_ms ?? last.CREATED_AT_MS)),
+					mutationId: last && (last.mutation_id ?? last.MUTATION_ID)
+				};
+				if (!Number.isFinite(nextAfter.createdAtMs) || typeof nextAfter.mutationId !== 'string')
+					throw new Error('Dual sync could not page the local outbox safely.');
+				if (after && after.createdAtMs === nextAfter.createdAtMs && after.mutationId === nextAfter.mutationId)
+					throw new Error('Dual sync outbox paging did not advance.');
+				after = nextAfter;
+			}
+		}
+
+		async function ensureSharedClientId(manifest) {
+			const clientId = manifest && manifest.clientId;
+			if (typeof clientId !== 'string' || clientId.length === 0)
+				throw new Error('Dual sync manifest does not contain a shared client id.');
+			for (const role of [roleA, roleB]) {
+				const syncClient = getRoleSyncClient(role);
+				if (typeof syncClient[setClientIdSymbol] !== 'function')
+					throw new Error('Dual sync role client cannot set the shared client id.');
+				await syncClient[setClientIdSymbol](clientId);
+			}
+		}
+
+		function hasPullJournalChanges(journal) {
+			if (!journal || journal !== Object(journal))
+				return false;
+			if (Array.isArray(journal.items) && journal.items.length > 0)
+				return true;
+			if (Number(journal.itemCount || 0) > 0)
+				return true;
+			return stringify(journal.since) !== stringify(journal.finalSince);
+		}
+
+		function assertExpectedManifest(current, expected) {
+			if (!current || !expected
+				|| current.generation !== expected.generation
+				|| current.activeRole !== expected.activeRole
+				|| current.stagingRole !== expected.stagingRole) {
+				throw new Error('Dual sync manifest changed while staging was being prepared; retry sync.');
+			}
+		}
+
+		function refreshManifestBeforeWrite() {
+			return getManifest(true);
+		}
+
+		function emitSyncProgress(phase, details = {}) {
+			emit('sync-progress', {
+				phase,
+				atMs: Date.now(),
+				...details
+			});
+		}
+
+		function installSyncProgressInterceptors() {
+			syncInterceptors.request.use(config => {
+				const body = config && config.data;
+				const requestPhase = body && (body.phase || body.action) || 'unknown';
+				const progress = {
+					requestId: nextProgressRequestId++,
+					requestPhase,
+					itemCount: Array.isArray(body && body.items)
+						? body.items.length
+						: Array.isArray(body && body.mutations) ? body.mutations.length : 0,
+					startedAtMs: Date.now()
+				};
+				config.__orangeDualSyncProgress = progress;
+				emitSyncProgress('network-start', progress);
+				return config;
+			});
+			syncInterceptors.response.use(
+				response => {
+					emitNetworkProgressEnd(response && response.config, response && response.data, false);
+					return response;
+				},
+				error => {
+					emitNetworkProgressEnd(error && error.config, undefined, true);
+					throw error;
+				}
+			);
+		}
+
+		function emitNetworkProgressEnd(config, payload, failed) {
+			const progress = config && config.__orangeDualSyncProgress;
+			if (!progress)
+				return;
+			emitSyncProgress('network-end', {
+				...progress,
+				failed,
+				elapsedMs: Math.max(0, Date.now() - progress.startedAtMs),
+				returnedItems: Array.isArray(payload && payload.items) ? payload.items.length : 0
 			});
 		}
 
@@ -29731,20 +30068,25 @@ function requireDualSyncDatabase () {
 		}
 
 		async function getManifest(refresh = false) {
-			if (manifestCache && !refresh)
+			if (manifestCache && !refresh && Date.now() - manifestCacheReadAtMs < manifestCacheMaxAgeMs)
 				return manifestCache;
 			if (manifestPromise)
 				return manifestPromise;
 			manifestPromise = readManifest()
-				.then(manifest => {
-					if (manifest)
+				.then(async manifest => {
+					if (manifest) {
+						if (!manifest.clientId)
+							manifest = await initializeManifestClientId(manifest);
 						return updateManifestCache(manifest);
+					}
 					const initialManifest = {
 						activeRole: roleA,
 						stagingRole: roleB,
-						updatedAtMs: Date.now()
+						updatedAtMs: Date.now(),
+						generation: 0,
+						clientId: randomUuid()
 					};
-					return writeManifest(initialManifest);
+					return writeManifest(initialManifest, { insertOnly: true });
 				})
 				.finally(() => {
 					manifestPromise = null;
@@ -29756,7 +30098,7 @@ function requireDualSyncDatabase () {
 			const db = await getCacheDb();
 			await ensureCacheSchema(db);
 			const rows = await db.query([
-				`SELECT "active_role", "staging_role", "updated_at_ms" FROM "${manifestTable}"`,
+				`SELECT "active_role", "staging_role", "updated_at_ms", "generation", "client_id" FROM "${manifestTable}"`,
 				`WHERE "id" = ${sqlStringLiteral(manifestId)}`,
 				'LIMIT 1'
 			].join(' '));
@@ -29768,38 +30110,145 @@ function requireDualSyncDatabase () {
 			return {
 				activeRole,
 				stagingRole,
-				updatedAtMs: Number(row.updated_at_ms ?? row.UPDATED_AT_MS ?? Date.now())
+				updatedAtMs: Number(row.updated_at_ms ?? row.UPDATED_AT_MS ?? Date.now()),
+				generation: normalizeGeneration(row.generation ?? row.GENERATION),
+				clientId: nonEmptyString(row.client_id ?? row.CLIENT_ID)
 			};
 		}
 
-		async function writeManifest(manifest) {
+		async function writeManifest(manifest, options = {}) {
 			const db = await getCacheDb();
 			await ensureCacheSchema(db);
-			await db.query([
-				`INSERT INTO "${manifestTable}" ("id", "active_role", "staging_role", "updated_at_ms")`,
-				`VALUES (${sqlStringLiteral(manifestId)}, ${sqlStringLiteral(manifest.activeRole)}, ${sqlStringLiteral(manifest.stagingRole)}, ${Number(manifest.updatedAtMs) || Date.now()})`,
-				'ON CONFLICT("id") DO UPDATE SET',
-				'"active_role" = excluded."active_role",',
-				'"staging_role" = excluded."staging_role",',
-				'"updated_at_ms" = excluded."updated_at_ms"'
-			].join(' '));
-			updateManifestCache(manifest, true);
-			broadcastManifest(manifest);
-			return manifest;
+			const normalized = normalizeManifestInfo(manifest);
+			if (!normalized || !normalized.clientId)
+				throw new Error('Cannot persist an invalid dual sync manifest.');
+			if (options.expectedGeneration !== undefined) {
+				await db.query([
+					`UPDATE "${manifestTable}" SET`,
+					`"active_role" = ${sqlStringLiteral(normalized.activeRole)},`,
+					`"staging_role" = ${sqlStringLiteral(normalized.stagingRole)},`,
+					`"updated_at_ms" = ${normalized.updatedAtMs},`,
+					`"generation" = ${normalized.generation},`,
+					`"client_id" = ${sqlStringLiteral(normalized.clientId)}`,
+					`WHERE "id" = ${sqlStringLiteral(manifestId)}`,
+					`AND "generation" = ${normalizeGeneration(options.expectedGeneration)}`,
+					`AND "active_role" = ${sqlStringLiteral(options.expectedActiveRole)}`,
+					`AND "staging_role" = ${sqlStringLiteral(options.expectedStagingRole)}`
+				].join(' '));
+			}
+			else {
+				await db.query([
+					`INSERT INTO "${manifestTable}" ("id", "active_role", "staging_role", "updated_at_ms", "generation", "client_id")`,
+					`VALUES (${sqlStringLiteral(manifestId)}, ${sqlStringLiteral(normalized.activeRole)}, ${sqlStringLiteral(normalized.stagingRole)}, ${normalized.updatedAtMs}, ${normalized.generation}, ${sqlStringLiteral(normalized.clientId)})`,
+					options.insertOnly ? 'ON CONFLICT("id") DO NOTHING' : [
+						'ON CONFLICT("id") DO UPDATE SET',
+						'"active_role" = excluded."active_role",',
+						'"staging_role" = excluded."staging_role",',
+						'"updated_at_ms" = excluded."updated_at_ms",',
+						'"generation" = excluded."generation",',
+						'"client_id" = excluded."client_id"'
+					].join(' ')
+				].join(' '));
+			}
+			const persisted = await readManifest();
+			if (!persisted)
+				throw new Error('Dual sync manifest was not persisted.');
+			if (options.expectedGeneration !== undefined
+				&& (persisted.generation !== normalized.generation
+					|| persisted.activeRole !== normalized.activeRole
+					|| persisted.stagingRole !== normalized.stagingRole)) {
+				throw new Error('Dual sync manifest compare-and-swap failed; retry sync.');
+			}
+			updateManifestCache(persisted, true);
+			broadcastManifest(persisted);
+			return persisted;
 		}
 
-		async function saveDelta(journal, appliedRole) {
-			if (!journal || journal !== Object(journal))
-				return undefined;
+		async function initializeManifestClientId(manifest) {
+			const db = await getCacheDb();
+			const clientId = randomUuid();
+			await db.query([
+				`UPDATE "${manifestTable}"`,
+				`SET "client_id" = ${sqlStringLiteral(clientId)}`,
+				`WHERE "id" = ${sqlStringLiteral(manifestId)}`,
+				'AND ("client_id" IS NULL OR "client_id" = \'\')'
+			].join(' '));
+			return await readManifest() || { ...manifest, clientId };
+		}
+
+		async function createDeltaJournalSink(appliedRole) {
 			const db = await getCacheDb();
 			await ensureCacheSchema(db);
+			await cleanupOrphanDeltaChunks(db);
 			const id = randomUuid();
-			const appliedRoles = JSON.stringify([appliedRole]);
+			let chunkIndex = 0;
+			let bufferedItems = [];
+			let finished = false;
+			let committed = false;
+			return { write, commit, abort };
+
+			async function write(items) {
+				if (finished)
+					throw new Error('Cannot write to a completed dual sync delta.');
+				if (Array.isArray(items) && items.length > 0)
+					bufferedItems.push(...items);
+				while (bufferedItems.length >= deltaItemsPerChunk)
+					await writeChunk(bufferedItems.splice(0, deltaItemsPerChunk));
+			}
+
+			async function commit(journal) {
+				if (finished)
+					throw new Error('Dual sync delta has already completed.');
+				finished = true;
+				if (!hasPullJournalChanges(journal)) {
+					await deleteChunks();
+					committed = true;
+					return undefined;
+				}
+				if (bufferedItems.length > 0)
+					await writeChunk(bufferedItems.splice(0));
+				const header = {
+					scopeKey: journal.scopeKey,
+					tables: Array.isArray(journal.tables) ? journal.tables : [],
+					since: journal.since,
+					finalSince: journal.finalSince,
+					reason: journal.reason,
+					itemCount: Number(journal.itemCount || 0)
+				};
+				const appliedRoles = JSON.stringify([appliedRole]);
+				await db.query([
+					`INSERT INTO "${deltaTable}" ("id", "scope", "from_since", "to_since", "journal_json", "created_at_ms", "applied_roles_json")`,
+					`VALUES (${sqlStringLiteral(id)}, ${sqlStringLiteral(journal.scopeKey || '*')}, ${sqlNullableJsonLiteral(journal.since)}, ${sqlNullableJsonLiteral(journal.finalSince)}, ${sqlStringLiteral(stringify(header))}, ${Date.now()}, ${sqlStringLiteral(appliedRoles)})`
+				].join(' '));
+				committed = true;
+				return id;
+			}
+
+			async function abort() {
+				if (committed)
+					return;
+				finished = true;
+				bufferedItems = [];
+				await deleteChunks();
+			}
+
+			async function writeChunk(items) {
+				await db.query([
+					`INSERT INTO "${deltaChunkTable}" ("delta_id", "chunk_index", "items_json")`,
+					`VALUES (${sqlStringLiteral(id)}, ${chunkIndex++}, ${sqlStringLiteral(stringify(items))})`
+				].join(' '));
+			}
+
+			function deleteChunks() {
+				return db.query(`DELETE FROM "${deltaChunkTable}" WHERE "delta_id" = ${sqlStringLiteral(id)}`);
+			}
+		}
+
+		async function cleanupOrphanDeltaChunks(db) {
 			await db.query([
-				`INSERT INTO "${deltaTable}" ("id", "scope", "from_since", "to_since", "journal_json", "created_at_ms", "applied_roles_json")`,
-				`VALUES (${sqlStringLiteral(id)}, ${sqlStringLiteral(journal.scopeKey || '*')}, ${sqlNullableJsonLiteral(journal.since)}, ${sqlNullableJsonLiteral(journal.finalSince)}, ${sqlStringLiteral(stringify(journal))}, ${Date.now()}, ${sqlStringLiteral(appliedRoles)})`
+				`DELETE FROM "${deltaChunkTable}"`,
+				`WHERE "delta_id" NOT IN (SELECT "id" FROM "${deltaTable}")`
 			].join(' '));
-			return id;
 		}
 
 		async function readDeltas() {
@@ -29809,12 +30258,32 @@ function requireDualSyncDatabase () {
 				`SELECT "id", "journal_json", "applied_roles_json" FROM "${deltaTable}"`,
 				'ORDER BY "created_at_ms" ASC'
 			].join(' '));
+			const chunkRows = await db.query([
+				`SELECT "delta_id", "chunk_index", "items_json" FROM "${deltaChunkTable}"`,
+				'ORDER BY "delta_id" ASC, "chunk_index" ASC'
+			].join(' '));
+			const itemsByDelta = new Map();
+			for (const row of toRows(chunkRows)) {
+				const deltaId = row.delta_id ?? row.DELTA_ID;
+				const items = parseJson(row.items_json ?? row.ITEMS_JSON);
+				if (typeof deltaId !== 'string' || !Array.isArray(items))
+					continue;
+				const current = itemsByDelta.get(deltaId) || [];
+				current.push(...items);
+				itemsByDelta.set(deltaId, current);
+			}
 			return toRows(rows)
-				.map(row => ({
-					id: row.id ?? row.ID,
-					journal: parseJson(row.journal_json ?? row.JOURNAL_JSON),
-					appliedRoles: parseJson(row.applied_roles_json ?? row.APPLIED_ROLES_JSON) || []
-				}))
+				.map(row => {
+					const id = row.id ?? row.ID;
+					const journal = parseJson(row.journal_json ?? row.JOURNAL_JSON);
+					if (journal && itemsByDelta.has(id))
+						journal.items = itemsByDelta.get(id);
+					return {
+						id,
+						journal,
+						appliedRoles: parseJson(row.applied_roles_json ?? row.APPLIED_ROLES_JSON) || []
+					};
+				})
 				.filter(delta => typeof delta.id === 'string' && delta.journal && delta.journal === Object(delta.journal));
 		}
 
@@ -29826,6 +30295,7 @@ function requireDualSyncDatabase () {
 			if (!roles.includes(role))
 				roles.push(role);
 			if (roles.includes(roleA) && roles.includes(roleB)) {
+				await db.query(`DELETE FROM "${deltaChunkTable}" WHERE "delta_id" = ${sqlStringLiteral(delta.id)}`);
 				await db.query(`DELETE FROM "${deltaTable}" WHERE "id" = ${sqlStringLiteral(delta.id)}`);
 				delta.appliedRoles = roles;
 				return;
@@ -29840,15 +30310,19 @@ function requireDualSyncDatabase () {
 
 		async function resetCache() {
 			const db = await getCacheDb();
+			const currentManifest = await getManifest().catch(() => null);
 			cacheSchemaReady = false;
 			cacheSchemaPromise = null;
+			await db.query(`DROP TABLE IF EXISTS "${deltaChunkTable}"`);
 			await db.query(`DROP TABLE IF EXISTS "${deltaTable}"`);
 			await db.query(`DROP TABLE IF EXISTS "${manifestTable}"`);
 			await ensureCacheSchema(db);
 			return writeManifest({
 				activeRole: roleA,
 				stagingRole: roleB,
-				updatedAtMs: Date.now()
+				updatedAtMs: Date.now(),
+				generation: 0,
+				clientId: currentManifest && currentManifest.clientId || randomUuid()
 			});
 		}
 
@@ -29868,9 +30342,13 @@ function requireDualSyncDatabase () {
 						'"id" TEXT PRIMARY KEY,',
 						'"active_role" TEXT NOT NULL,',
 						'"staging_role" TEXT NOT NULL,',
-						'"updated_at_ms" INTEGER NOT NULL',
+						'"updated_at_ms" INTEGER NOT NULL,',
+						'"generation" INTEGER NOT NULL DEFAULT 0,',
+						'"client_id" TEXT',
 						');'
 					].join(' '));
+					await tryAddCacheColumn(db, manifestTable, 'generation', 'INTEGER NOT NULL DEFAULT 0');
+					await tryAddCacheColumn(db, manifestTable, 'client_id', 'TEXT');
 					await db.query([
 						`CREATE TABLE IF NOT EXISTS "${deltaTable}" (`,
 						'"id" TEXT PRIMARY KEY,',
@@ -29882,6 +30360,14 @@ function requireDualSyncDatabase () {
 						'"applied_roles_json" TEXT NOT NULL',
 						');'
 					].join(' '));
+					await db.query([
+						`CREATE TABLE IF NOT EXISTS "${deltaChunkTable}" (`,
+						'"delta_id" TEXT NOT NULL,',
+						'"chunk_index" INTEGER NOT NULL,',
+						'"items_json" TEXT NOT NULL,',
+						'PRIMARY KEY ("delta_id", "chunk_index")',
+						');'
+					].join(' '));
 					cacheSchemaReady = true;
 				})()
 					.finally(() => {
@@ -29889,6 +30375,17 @@ function requireDualSyncDatabase () {
 					});
 			}
 			await cacheSchemaPromise;
+		}
+
+		async function tryAddCacheColumn(db, tableName, columnName, definition) {
+			try {
+				await db.query(`ALTER TABLE "${tableName}" ADD COLUMN "${columnName}" ${definition}`);
+			}
+			catch (error) {
+				const message = error && error.message || '';
+				if (!/duplicate column|already exists/u.test(message))
+					throw error;
+			}
 		}
 
 		function getRolePoolOptions(role) {
@@ -29901,13 +30398,20 @@ function requireDualSyncDatabase () {
 			const manifest = normalizeManifestInfo(info);
 			if (!manifest)
 				return manifestCache;
-			if (!force && manifestCache && Number(manifestCache.updatedAtMs || 0) > Number(manifest.updatedAtMs || 0))
+			if (!manifest.clientId && manifestCache && manifestCache.clientId)
+				manifest.clientId = manifestCache.clientId;
+			if (!force && manifestCache && manifestCache.generation > manifest.generation)
+				return manifestCache;
+			if (!force && manifestCache && manifestCache.generation === manifest.generation
+				&& Number(manifestCache.updatedAtMs || 0) > Number(manifest.updatedAtMs || 0))
 				return manifestCache;
 			const previous = manifestCache;
 			manifestCache = manifest;
+			manifestCacheReadAtMs = Date.now();
 			if (!previous
 				|| previous.activeRole !== manifest.activeRole
 				|| previous.stagingRole !== manifest.stagingRole
+				|| previous.generation !== manifest.generation
 				|| Number(previous.updatedAtMs || 0) !== Number(manifest.updatedAtMs || 0)) {
 				clearSchemaReadyRoles();
 			}
@@ -30043,7 +30547,9 @@ function requireDualSyncDatabase () {
 		return {
 			activeRole: info.activeRole,
 			stagingRole: info.stagingRole,
-			updatedAtMs: Number(info.updatedAtMs) || Date.now()
+			updatedAtMs: Number(info.updatedAtMs) || Date.now(),
+			generation: normalizeGeneration(info.generation),
+			clientId: nonEmptyString(info.clientId)
 		};
 	}
 
@@ -30052,10 +30558,13 @@ function requireDualSyncDatabase () {
 	}
 
 	function toDataPoolOptions(poolOptions = {}) {
-		return {
+		const options = {
 			...poolOptions,
 			sync: stripDualSyncOption(poolOptions.sync)
 		};
+		if (!options.vfs)
+			options.vfs = 'opfs-wl';
+		return options;
 	}
 
 	function toCachePoolOptions(poolOptions = {}, connectionString) {
@@ -30149,6 +30658,25 @@ function requireDualSyncDatabase () {
 		if (!Number.isFinite(parsed) || parsed <= 0)
 			return undefined;
 		return parsed;
+	}
+
+	function toDualSyncLockConfig(sync, options) {
+		const configured = sync && sync === Object(sync) && !Array.isArray(sync)
+			? sync.crossTabLock
+			: undefined;
+		const config = normalizeCrossTabLockConfig(configured);
+		const timeoutMs = normalizeTimeoutMs(options && options.timeoutMs);
+		if (!timeoutMs || config.timeoutMs)
+			return config;
+		return {
+			...config,
+			timeoutMs
+		};
+	}
+
+	function normalizeGeneration(value) {
+		const parsed = Number.parseInt(value, 10);
+		return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
 	}
 
 	function firstRow(rows) {

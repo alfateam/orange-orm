@@ -1,7 +1,9 @@
 import { describe, expect, test } from 'vitest';
 
 const {
+	acquireSyncWrite,
 	runSyncMaintenance,
+	runSyncSwap,
 	runSyncWrite
 } = require('../src/sync/writeGate');
 const newSyncClient = require('../src/client/syncClient');
@@ -216,6 +218,69 @@ describe('sync write gate', () => {
 			releaseFirst();
 			await Promise.all([first, second]);
 			expect(events).toEqual(['first:start', 'first:end', 'second']);
+		}
+		finally {
+			restoreGlobalNavigator(originalNavigator);
+		}
+	});
+
+	test('swap waits for writes in another context and refreshes routing before the next write', async () => {
+		const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+		Object.defineProperty(globalThis, 'navigator', {
+			configurable: true,
+			value: { locks: createFakeWebLocks() }
+		});
+		try {
+			const firstDb = createFakeCrossTabWriteDb('shared-swap');
+			const secondDb = createFakeCrossTabWriteDb('shared-swap');
+			const events = [];
+			let releaseWrite;
+			firstDb.__orangeBeforeSyncWrite = async () => events.push('refresh:first');
+			secondDb.__orangeBeforeSyncWrite = async () => events.push('refresh:second');
+			const write = runSyncWrite(firstDb, {}, async () => {
+				events.push('write:start');
+				await new Promise(resolve => {
+					releaseWrite = resolve;
+				});
+				events.push('write:end');
+			});
+			await waitUntil(() => events.includes('write:start'));
+
+			const swap = runSyncSwap(secondDb, async () => {
+				events.push('swap');
+			});
+			await wait(0);
+			expect(events).toEqual(['refresh:first', 'write:start']);
+
+			releaseWrite();
+			await Promise.all([write, swap]);
+			expect(events).toEqual([
+				'refresh:first',
+				'write:start',
+				'write:end',
+				'refresh:second',
+				'swap'
+			]);
+		}
+		finally {
+			restoreGlobalNavigator(originalNavigator);
+		}
+	});
+
+	test('refreshes routing after an acquired transaction writer lock', async () => {
+		const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+		Object.defineProperty(globalThis, 'navigator', {
+			configurable: true,
+			value: { locks: createFakeWebLocks() }
+		});
+		try {
+			const db = createFakeCrossTabWriteDb('shared-acquire');
+			const events = [];
+			db.__orangeBeforeSyncWrite = async () => events.push('refresh');
+			const release = await acquireSyncWrite(db, {});
+
+			expect(events).toEqual(['refresh']);
+			release();
 		}
 		finally {
 			restoreGlobalNavigator(originalNavigator);

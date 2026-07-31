@@ -11,13 +11,25 @@ function createSyncWorkerHandler(syncClient, options = {}) {
 		if (target)
 			target.postMessage(message);
 	});
+	const forwardedEvents = Array.isArray(options.forwardEvents)
+		? options.forwardEvents
+		: ['sync', 'error', 'initial-ready', 'sync-progress'];
+	for (let i = 0; i < forwardedEvents.length; i++)
+		subscribeSyncEvent(forwardedEvents[i]);
 
 	if (options.autoStart !== false) {
 		const startAuto = typeof syncClient[syncAutoStartSymbol] === 'function'
 			? syncClient[syncAutoStartSymbol]
 			: syncClient.start;
-		if (typeof startAuto === 'function')
-			void startAuto.call(syncClient);
+		if (typeof startAuto === 'function') {
+			void Promise.resolve(startAuto.call(syncClient)).catch((error) => {
+				postMessage({
+					type: 'orange-sync-worker-event',
+					event: 'error',
+					payload: { method: 'auto-start', error: serializeError(error) }
+				});
+			});
+		}
 	}
 
 	return {
@@ -78,12 +90,12 @@ function createSyncWorkerHandler(syncClient, options = {}) {
 		syncEventUnsubscribers.delete(event);
 	}
 
-	function stop() {
+	async function stop() {
 		for (const unsubscribe of syncEventUnsubscribers.values())
 			unsubscribe();
 		syncEventUnsubscribers.clear();
 		if (options.stopSyncClient !== false && typeof syncClient.stop === 'function')
-			void syncClient.stop();
+			await syncClient.stop();
 	}
 
 	function postResponse(id, result, error) {

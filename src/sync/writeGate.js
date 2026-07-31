@@ -34,8 +34,10 @@ async function acquireSyncWrite(target, options) {
 	let releaseCrossTab = noop;
 	try {
 		releaseCrossTab = await acquireCrossTabWrite(gateTarget);
+		await runBeforeSyncWrite(gateTarget, noop);
 	}
 	catch (e) {
+		releaseCrossTab();
 		releaseWrite();
 		throw e;
 	}
@@ -49,6 +51,13 @@ function runSyncMaintenance(target, fn) {
 	if (!resolveGateTarget(target))
 		return Promise.resolve().then(fn);
 	return getSyncWriteGate(target).runMaintenance(fn);
+}
+
+function runSyncSwap(target, fn) {
+	const gateTarget = resolveGateTarget(target);
+	if (!gateTarget)
+		return Promise.resolve().then(fn);
+	return getSyncWriteGate(gateTarget).runMaintenance(() => runCrossTabWrite(gateTarget, fn));
 }
 
 function shouldGateWrite(target, options) {
@@ -92,8 +101,19 @@ function isSuppressSyncOutbox(options) {
 function runCrossTabWrite(gateTarget, fn) {
 	const lockConfig = getCrossTabWriteLockConfig(gateTarget);
 	if (!lockConfig)
+		return runBeforeSyncWrite(gateTarget, fn);
+	return runWithCrossTabLock(
+		resolveCrossTabWriteLockName(gateTarget, lockConfig),
+		lockConfig,
+		() => runBeforeSyncWrite(gateTarget, fn)
+	);
+}
+
+function runBeforeSyncWrite(gateTarget, fn) {
+	const beforeWrite = gateTarget && gateTarget.__orangeBeforeSyncWrite;
+	if (typeof beforeWrite !== 'function')
 		return fn();
-	return runWithCrossTabLock(resolveCrossTabWriteLockName(gateTarget, lockConfig), lockConfig, fn);
+	return Promise.resolve(beforeWrite.call(gateTarget)).then(fn);
 }
 
 async function acquireCrossTabWrite(gateTarget) {
@@ -241,6 +261,7 @@ module.exports = {
 	acquireSyncWrite,
 	getSyncWriteGate,
 	runSyncMaintenance,
+	runSyncSwap,
 	runSyncWrite,
 	shouldGateWrite
 };

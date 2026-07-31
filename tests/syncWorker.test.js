@@ -91,6 +91,39 @@ describe('sync worker rpc', () => {
 
 		expect(events).toEqual([{ method: 'sync' }]);
 	});
+
+	test('times out a sync worker request which never responds', async () => {
+		const worker = {
+			postMessage() {},
+			addEventListener() {},
+			removeEventListener() {},
+			terminate() {}
+		};
+		const client = rdb.createSyncWorkerClient(worker, { requestTimeoutMs: 5 });
+
+		await expect(client.sync()).rejects.toThrow('timed out');
+		client.close();
+	});
+
+	test('rejects pending requests when the worker fails', async () => {
+		const listeners = new Map();
+		const worker = {
+			postMessage() {},
+			addEventListener(event, listener) {
+				listeners.set(event, listener);
+			},
+			removeEventListener(event) {
+				listeners.delete(event);
+			},
+			terminate() {}
+		};
+		const client = rdb.createSyncWorkerClient(worker);
+		const pending = client.sync();
+		listeners.get('error')({ message: 'worker crashed' });
+
+		await expect(pending).rejects.toThrow('worker crashed');
+		client.close();
+	});
 });
 
 function createBridge(syncClient, options = {}) {

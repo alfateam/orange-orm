@@ -1025,11 +1025,19 @@ export interface SyncPullOverrideConfig<M extends Record<string, any> = any> ext
   url?: string;
 }
 
+export interface SyncPushConfig extends SyncEndpointConfig {
+  maxMutationsPerBatch?: number;
+}
+
+export interface SyncPushOverrideConfig extends Omit<SyncPushConfig, 'url'> {
+  url?: string;
+}
+
 export interface SyncConfig<M extends Record<string, any> = any> extends Partial<SyncEndpointConfig> {
   tables?: SyncTableName<M>[];
   initialReadyMaxAgeMs?: number;
   pull?: string | SyncPullOverrideConfig<M>;
-  push?: string | SyncEndpointConfig;
+  push?: string | SyncPushOverrideConfig;
   auto?: boolean | {
     enabled?: boolean;
     intervalMs?: number;
@@ -1072,6 +1080,22 @@ export interface SyncErrorEvent {
 
 export interface SyncEvent {
   method: 'sync';
+  result?: any;
+}
+
+export interface SyncProgressEvent {
+  phase: string;
+  atMs: number;
+  queueDepth?: number;
+  activeRole?: 'a' | 'b';
+  stagingRole?: 'a' | 'b';
+  swapped?: boolean;
+  requestId?: number;
+  requestPhase?: string;
+  itemCount?: number;
+  returnedItems?: number;
+  elapsedMs?: number;
+  failed?: boolean;
 }
 
 export interface SyncTransactionContext<
@@ -1119,6 +1143,8 @@ export interface PoolOptions<M extends Record<string, any> = any> {
 
 export interface SqliteOPFSPoolOptions<M extends Record<string, any> = any> extends PoolOptions<M> {
   sync?: string | SyncConfig<M>;
+  vfs?: 'opfs' | 'opfs-sahpool' | 'opfs-wl';
+  fallbackVfs?: 'opfs' | 'opfs-sahpool' | 'opfs-wl';
   opfsSahPool?: OpfsSahPoolOptions;
   singleWorker?: boolean;
   inlineWorker?: boolean;
@@ -1130,6 +1156,7 @@ export interface SqliteOPFSPoolOptions<M extends Record<string, any> = any> exte
   closeDbOnClose?: boolean;
   prewarmRead?: boolean;
   busyTimeoutMs?: number;
+  opfsAccessTimeoutMs?: number;
 }
 
 export interface OpfsSahPoolOptions {
@@ -1193,6 +1220,7 @@ export type DBClient<
       listener: (payload: SyncOperationEvent<Context, Memory>) => void
     ): () => void;
     on(event: 'initial-ready', listener: () => void): () => void;
+    on(event: 'sync-progress', listener: (payload: SyncProgressEvent) => void): () => void;
     on(event: 'error' | 'sync-error', listener: (payload: SyncErrorEvent) => void): () => void;
     off(event: 'sync', listener: (payload: SyncEvent) => void): void;
     off<Context extends Record<string, unknown> = Record<string, unknown>, Memory = unknown>(
@@ -1200,6 +1228,7 @@ export type DBClient<
       listener: (payload: SyncOperationEvent<Context, Memory>) => void
     ): void;
     off(event: 'initial-ready', listener: () => void): void;
+    off(event: 'sync-progress', listener: (payload: SyncProgressEvent) => void): void;
     off(event: 'error' | 'sync-error', listener: (payload: SyncErrorEvent) => void): void;
     once(event: 'sync', listener: (payload: SyncEvent) => void): () => void;
     once<Context extends Record<string, unknown> = Record<string, unknown>, Memory = unknown>(
@@ -1207,6 +1236,7 @@ export type DBClient<
       listener: (payload: SyncOperationEvent<Context, Memory>) => void
     ): () => void;
     once(event: 'initial-ready', listener: () => void): () => void;
+    once(event: 'sync-progress', listener: (payload: SyncProgressEvent) => void): () => void;
     once(event: 'error' | 'sync-error', listener: (payload: SyncErrorEvent) => void): () => void;
     waitForInitialSync(): Promise<void>;
   };

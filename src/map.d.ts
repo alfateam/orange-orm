@@ -115,6 +115,8 @@ export interface PoolOptions<M extends Record<string, any> = any> {
 
 export interface SqliteOPFSPoolOptions<M extends Record<string, any> = any> extends PoolOptions<M> {
 	sync?: string | SyncConfig<M>;
+	vfs?: 'opfs' | 'opfs-sahpool' | 'opfs-wl';
+	fallbackVfs?: 'opfs' | 'opfs-sahpool' | 'opfs-wl';
 	opfsSahPool?: {
 		name?: string;
 		directory?: string;
@@ -133,6 +135,7 @@ export interface SqliteOPFSPoolOptions<M extends Record<string, any> = any> exte
 	closeDbOnClose?: boolean;
 	prewarmRead?: boolean;
 	busyTimeoutMs?: number;
+	opfsAccessTimeoutMs?: number;
 }
 
 type JsonPatch = Array<{

@@ -600,7 +600,7 @@ describe('sqliteOPFS pool', () => {
 			expect(rows).toEqual([{ value: 1 }]);
 			expect(pool.__orangeSqliteOPFSRequestedVfs).toBe('opfs-sahpool');
 			expect(pool.__orangeSqliteOPFSFallbackVfs).toBe('opfs-wl');
-			expect(pool.__orangeCrossTabWriteLock).toEqual({ enabled: true });
+			expect(pool.__orangeCrossTabWriteLock).toEqual({ enabled: true, timeoutMs: 300000 });
 		}
 		finally {
 			await pool.end();

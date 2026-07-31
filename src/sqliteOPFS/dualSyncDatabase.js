@@ -6,8 +6,12 @@ const stringify = require('../client/stringify');
 const createHttpInterceptor = require('../client/httpInterceptor');
 const newSyncClient = require('../client/syncClient');
 const { createSyncAuto, syncAutoStartSymbol } = require('../client/syncAuto');
-const { runSyncMaintenance } = require('../sync/writeGate');
-const { normalizeLockNamePart } = require('../sync/crossTabLock');
+const { runSyncSwap } = require('../sync/writeGate');
+const {
+	normalizeCrossTabLockConfig,
+	normalizeLockNamePart,
+	runWithCrossTabLock
+} = require('../sync/crossTabLock');
 
 const {
 	ensureLocalSchemaReadySymbol,
@@ -15,14 +19,19 @@ const {
 	readOutboxRowsSymbol,
 	applyOutboxRowsSymbol,
 	applyPullJournalSymbol,
-	pushPendingSymbol
+	pushPendingSymbol,
+	setClientIdSymbol
 } = newSyncClient;
 
 const manifestTable = 'orange_sync_dual_manifest';
 const deltaTable = 'orange_sync_dual_delta';
+const deltaChunkTable = 'orange_sync_dual_delta_chunk';
 const manifestId = 'default';
 const roleA = 'a';
 const roleB = 'b';
+const outboxReplayPageSize = 1000;
+const deltaItemsPerChunk = 250;
+const manifestCacheMaxAgeMs = 1000;
 
 function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase) {
 	const roleConnectionStrings = {
@@ -35,11 +44,12 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		primaryDataPoolOptions,
 		roleConnectionStrings[roleB]
 	);
-	const cachePoolOptions = toCachePoolOptions(poolOptions, cacheConnectionString);
+	const cachePoolOptions = toCachePoolOptions(primaryDataPoolOptions, cacheConnectionString);
 	const dbByRole = new Map();
 	const clientByRole = new Map();
 	let cacheDb;
 	let manifestCache;
+	let manifestCacheReadAtMs = 0;
 	let manifestPromise;
 	let cacheSchemaReady = false;
 	let cacheSchemaPromise;
@@ -50,12 +60,16 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 	let roleHttpInterceptor;
 	const syncInterceptors = createHttpInterceptor();
 	let syncTail = Promise.resolve();
+	let queuedSyncCount = 0;
+	let nextProgressRequestId = 1;
 	let initialReadyEmitted = false;
 	const eventListeners = new Map();
 	const roleEventSubscriptions = new Set();
 	const schemaReadyRoles = new Set();
 	const schemaReadyPromises = new Map();
 	let schemaReadyGeneration = 0;
+	const dualSyncLockName = `orange-orm:sqliteOPFS:dual-sync:${normalizeLockNamePart(connectionString)}`;
+	const dualWriteLockName = `orange-orm:sqliteOPFS:dual-write:${normalizeLockNamePart(connectionString)}`;
 
 	const router = {
 		poolFactory: null,
@@ -73,9 +87,12 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		__orangeDualSyncAttachSyncClient: attachExternalSyncClient,
 		__orangeDualSyncWarmManifest: warmManifest,
 		__sqliteSync: poolOptions && poolOptions.sync,
-		__orangeSyncIdentity: `sqliteOPFS:${connectionString}:dual`
+		__orangeSyncIdentity: `sqliteOPFS:${connectionString}:dual`,
+		__orangeCrossTabWriteLock: { enabled: true, name: dualWriteLockName, timeoutMs: 300000 },
+		__orangeBeforeSyncWrite: refreshManifestBeforeWrite
 	};
 	router.poolFactory = router;
+	installSyncProgressInterceptors();
 
 	return router;
 
@@ -157,52 +174,90 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 	}
 
 	function syncObserved(options = {}) {
-		const run = syncTail.then(() => observe('sync', () => sync(normalizeSyncOptions(options))));
+		const normalizedOptions = normalizeSyncOptions(options);
+		queuedSyncCount += 1;
+		emitSyncProgress('queued', { queueDepth: queuedSyncCount });
+		const run = syncTail.then(() => {
+			queuedSyncCount = Math.max(0, queuedSyncCount - 1);
+			emitSyncProgress('waiting-for-sync-lock', { queueDepth: queuedSyncCount });
+			return observe('sync', () => runWithCrossTabLock(
+				dualSyncLockName,
+				toDualSyncLockConfig(poolOptions && poolOptions.sync, normalizedOptions),
+				() => sync(normalizedOptions)
+			));
+		});
 		syncTail = run.catch(() => {});
 		return run;
 	}
 
 	async function sync(options = {}) {
-		const manifest = await getManifest();
+		emitSyncProgress('preparing');
+		const manifest = await getManifest(true);
 		const activeRole = manifest.activeRole;
 		const stagingRole = manifest.stagingRole;
 		const activeSync = getRoleSyncClient(activeRole);
 		const stagingSync = getRoleSyncClient(stagingRole);
+		await ensureSharedClientId(manifest);
 
-		await activeSync[pushPendingSymbol](options);
+		emitSyncProgress('pushing-active', { activeRole, stagingRole });
+		const activePushResult = await activeSync[pushPendingSymbol](options);
+		const needsInitialSwap = activePushResult && activePushResult.skipped === 'missing-stable-base';
+		emitSyncProgress('updating-staging', { activeRole, stagingRole });
 		await applyPendingDeltasToRole(stagingRole);
 
-		const openRows = await activeSync[readOutboxRowsSymbol]({
-			statuses: ['pending', 'pushed']
-		});
+		const openRows = await readAllOutboxRows(activeSync, ['pending', 'pushed']);
 		await stagingSync[applyOutboxRowsSymbol](openRows, {
 			replay: false,
 			replaceOpen: true
 		});
 
-		const result = await stagingSync[syncAndCapturePullJournalSymbol](options);
-		const journal = result && result.__orangePullJournal;
-		const deltaId = journal
-			? await saveDelta(journal, stagingRole)
-			: undefined;
-
-		await runSyncMaintenance(router, async () => {
-			const finalPendingRows = await activeSync[readOutboxRowsSymbol]({
-				statuses: ['pending']
+		emitSyncProgress('pulling-staging', { activeRole, stagingRole });
+		const deltaSink = await createDeltaJournalSink(stagingRole);
+		let result;
+		let journal;
+		let deltaId;
+		try {
+			result = await stagingSync[syncAndCapturePullJournalSymbol]({
+				...options,
+				_capturePullJournalChunk: deltaSink.write
 			});
+			journal = result && result.__orangePullJournal;
+			deltaId = await deltaSink.commit(journal);
+		}
+		catch (error) {
+			await deltaSink.abort();
+			throw error;
+		}
+		let publishedManifest = manifest;
+		let swapped = false;
+
+		emitSyncProgress('waiting-for-write-barrier', { activeRole, stagingRole });
+		await runSyncSwap(router, async () => {
+			const currentManifest = await getManifest(true);
+			assertExpectedManifest(currentManifest, manifest);
+			const finalPendingRows = await readAllOutboxRows(activeSync, ['pending']);
 			await stagingSync[applyOutboxRowsSymbol](finalPendingRows, {
 				replay: true,
 				replaceOpen: false
 			});
-			await publishStagingRole(activeRole, stagingRole);
+			if (needsInitialSwap || deltaId || openRows.length > 0 || finalPendingRows.length > 0) {
+				emitSyncProgress('swapping', { activeRole, stagingRole });
+				publishedManifest = await publishStagingRole(manifest);
+				swapped = true;
+			}
 		});
 
-		const newActiveRole = stagingRole;
+		const newActiveRole = publishedManifest.activeRole;
 		await maybeEmitInitialReady(newActiveRole);
+		emitSyncProgress('complete', {
+			activeRole: publishedManifest.activeRole,
+			stagingRole: publishedManifest.stagingRole,
+			swapped
+		});
 		return withDualSyncResult(result, {
-			activeRole: newActiveRole,
-			stagingRole: activeRole,
-			deltaId
+			...publishedManifest,
+			deltaId,
+			swapped
 		});
 	}
 
@@ -216,6 +271,14 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 	}
 
 	async function resetLocal(options = {}) {
+		return runWithCrossTabLock(
+			dualSyncLockName,
+			toDualSyncLockConfig(poolOptions && poolOptions.sync, options),
+			() => runSyncSwap(router, () => resetLocalCore(options))
+		);
+	}
+
+	async function resetLocalCore(options) {
 		const errors = [];
 		for (const role of [roleA, roleB]) {
 			try {
@@ -234,8 +297,14 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 	}
 
 	async function discardLocalChanges(options = {}) {
-		const manifest = await getManifest();
-		return getRoleSyncClient(manifest.activeRole).discardLocalChanges(options);
+		return runWithCrossTabLock(
+			dualSyncLockName,
+			toDualSyncLockConfig(poolOptions && poolOptions.sync, options),
+			() => runSyncSwap(router, async () => {
+				const manifest = await getManifest(true);
+				return getRoleSyncClient(manifest.activeRole).discardLocalChanges(options);
+			})
+		);
 	}
 
 	async function waitForInitialSync() {
@@ -351,12 +420,128 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		}
 	}
 
-	async function publishStagingRole(activeRole, stagingRole) {
+	async function publishStagingRole(manifest) {
 		const now = Date.now();
-		await writeManifest({
-			activeRole: stagingRole,
-			stagingRole: activeRole,
-			updatedAtMs: now
+		return writeManifest({
+			activeRole: manifest.stagingRole,
+			stagingRole: manifest.activeRole,
+			updatedAtMs: now,
+			generation: manifest.generation + 1,
+			clientId: manifest.clientId
+		}, {
+			expectedGeneration: manifest.generation,
+			expectedActiveRole: manifest.activeRole,
+			expectedStagingRole: manifest.stagingRole
+		});
+	}
+
+	async function readAllOutboxRows(syncClient, statuses) {
+		const rows = [];
+		let after;
+		for (;;) {
+			const page = await syncClient[readOutboxRowsSymbol]({
+				statuses,
+				limit: outboxReplayPageSize,
+				after
+			});
+			if (!Array.isArray(page) || page.length === 0)
+				return rows;
+			rows.push(...page);
+			if (page.length < outboxReplayPageSize)
+				return rows;
+			const last = page[page.length - 1];
+			const nextAfter = {
+				createdAtMs: Number(last && (last.created_at_ms ?? last.CREATED_AT_MS)),
+				mutationId: last && (last.mutation_id ?? last.MUTATION_ID)
+			};
+			if (!Number.isFinite(nextAfter.createdAtMs) || typeof nextAfter.mutationId !== 'string')
+				throw new Error('Dual sync could not page the local outbox safely.');
+			if (after && after.createdAtMs === nextAfter.createdAtMs && after.mutationId === nextAfter.mutationId)
+				throw new Error('Dual sync outbox paging did not advance.');
+			after = nextAfter;
+		}
+	}
+
+	async function ensureSharedClientId(manifest) {
+		const clientId = manifest && manifest.clientId;
+		if (typeof clientId !== 'string' || clientId.length === 0)
+			throw new Error('Dual sync manifest does not contain a shared client id.');
+		for (const role of [roleA, roleB]) {
+			const syncClient = getRoleSyncClient(role);
+			if (typeof syncClient[setClientIdSymbol] !== 'function')
+				throw new Error('Dual sync role client cannot set the shared client id.');
+			await syncClient[setClientIdSymbol](clientId);
+		}
+	}
+
+	function hasPullJournalChanges(journal) {
+		if (!journal || journal !== Object(journal))
+			return false;
+		if (Array.isArray(journal.items) && journal.items.length > 0)
+			return true;
+		if (Number(journal.itemCount || 0) > 0)
+			return true;
+		return stringify(journal.since) !== stringify(journal.finalSince);
+	}
+
+	function assertExpectedManifest(current, expected) {
+		if (!current || !expected
+			|| current.generation !== expected.generation
+			|| current.activeRole !== expected.activeRole
+			|| current.stagingRole !== expected.stagingRole) {
+			throw new Error('Dual sync manifest changed while staging was being prepared; retry sync.');
+		}
+	}
+
+	function refreshManifestBeforeWrite() {
+		return getManifest(true);
+	}
+
+	function emitSyncProgress(phase, details = {}) {
+		emit('sync-progress', {
+			phase,
+			atMs: Date.now(),
+			...details
+		});
+	}
+
+	function installSyncProgressInterceptors() {
+		syncInterceptors.request.use(config => {
+			const body = config && config.data;
+			const requestPhase = body && (body.phase || body.action) || 'unknown';
+			const progress = {
+				requestId: nextProgressRequestId++,
+				requestPhase,
+				itemCount: Array.isArray(body && body.items)
+					? body.items.length
+					: Array.isArray(body && body.mutations) ? body.mutations.length : 0,
+				startedAtMs: Date.now()
+			};
+			config.__orangeDualSyncProgress = progress;
+			emitSyncProgress('network-start', progress);
+			return config;
+		});
+		syncInterceptors.response.use(
+			response => {
+				emitNetworkProgressEnd(response && response.config, response && response.data, false);
+				return response;
+			},
+			error => {
+				emitNetworkProgressEnd(error && error.config, undefined, true);
+				throw error;
+			}
+		);
+	}
+
+	function emitNetworkProgressEnd(config, payload, failed) {
+		const progress = config && config.__orangeDualSyncProgress;
+		if (!progress)
+			return;
+		emitSyncProgress('network-end', {
+			...progress,
+			failed,
+			elapsedMs: Math.max(0, Date.now() - progress.startedAtMs),
+			returnedItems: Array.isArray(payload && payload.items) ? payload.items.length : 0
 		});
 	}
 
@@ -419,20 +604,25 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 	}
 
 	async function getManifest(refresh = false) {
-		if (manifestCache && !refresh)
+		if (manifestCache && !refresh && Date.now() - manifestCacheReadAtMs < manifestCacheMaxAgeMs)
 			return manifestCache;
 		if (manifestPromise)
 			return manifestPromise;
 		manifestPromise = readManifest()
-			.then(manifest => {
-				if (manifest)
+			.then(async manifest => {
+				if (manifest) {
+					if (!manifest.clientId)
+						manifest = await initializeManifestClientId(manifest);
 					return updateManifestCache(manifest);
+				}
 				const initialManifest = {
 					activeRole: roleA,
 					stagingRole: roleB,
-					updatedAtMs: Date.now()
+					updatedAtMs: Date.now(),
+					generation: 0,
+					clientId: randomUuid()
 				};
-				return writeManifest(initialManifest);
+				return writeManifest(initialManifest, { insertOnly: true });
 			})
 			.finally(() => {
 				manifestPromise = null;
@@ -444,7 +634,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		const db = await getCacheDb();
 		await ensureCacheSchema(db);
 		const rows = await db.query([
-			`SELECT "active_role", "staging_role", "updated_at_ms" FROM "${manifestTable}"`,
+			`SELECT "active_role", "staging_role", "updated_at_ms", "generation", "client_id" FROM "${manifestTable}"`,
 			`WHERE "id" = ${sqlStringLiteral(manifestId)}`,
 			'LIMIT 1'
 		].join(' '));
@@ -456,38 +646,145 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		return {
 			activeRole,
 			stagingRole,
-			updatedAtMs: Number(row.updated_at_ms ?? row.UPDATED_AT_MS ?? Date.now())
+			updatedAtMs: Number(row.updated_at_ms ?? row.UPDATED_AT_MS ?? Date.now()),
+			generation: normalizeGeneration(row.generation ?? row.GENERATION),
+			clientId: nonEmptyString(row.client_id ?? row.CLIENT_ID)
 		};
 	}
 
-	async function writeManifest(manifest) {
+	async function writeManifest(manifest, options = {}) {
 		const db = await getCacheDb();
 		await ensureCacheSchema(db);
-		await db.query([
-			`INSERT INTO "${manifestTable}" ("id", "active_role", "staging_role", "updated_at_ms")`,
-			`VALUES (${sqlStringLiteral(manifestId)}, ${sqlStringLiteral(manifest.activeRole)}, ${sqlStringLiteral(manifest.stagingRole)}, ${Number(manifest.updatedAtMs) || Date.now()})`,
-			'ON CONFLICT("id") DO UPDATE SET',
-			'"active_role" = excluded."active_role",',
-			'"staging_role" = excluded."staging_role",',
-			'"updated_at_ms" = excluded."updated_at_ms"'
-		].join(' '));
-		updateManifestCache(manifest, true);
-		broadcastManifest(manifest);
-		return manifest;
+		const normalized = normalizeManifestInfo(manifest);
+		if (!normalized || !normalized.clientId)
+			throw new Error('Cannot persist an invalid dual sync manifest.');
+		if (options.expectedGeneration !== undefined) {
+			await db.query([
+				`UPDATE "${manifestTable}" SET`,
+				`"active_role" = ${sqlStringLiteral(normalized.activeRole)},`,
+				`"staging_role" = ${sqlStringLiteral(normalized.stagingRole)},`,
+				`"updated_at_ms" = ${normalized.updatedAtMs},`,
+				`"generation" = ${normalized.generation},`,
+				`"client_id" = ${sqlStringLiteral(normalized.clientId)}`,
+				`WHERE "id" = ${sqlStringLiteral(manifestId)}`,
+				`AND "generation" = ${normalizeGeneration(options.expectedGeneration)}`,
+				`AND "active_role" = ${sqlStringLiteral(options.expectedActiveRole)}`,
+				`AND "staging_role" = ${sqlStringLiteral(options.expectedStagingRole)}`
+			].join(' '));
+		}
+		else {
+			await db.query([
+				`INSERT INTO "${manifestTable}" ("id", "active_role", "staging_role", "updated_at_ms", "generation", "client_id")`,
+				`VALUES (${sqlStringLiteral(manifestId)}, ${sqlStringLiteral(normalized.activeRole)}, ${sqlStringLiteral(normalized.stagingRole)}, ${normalized.updatedAtMs}, ${normalized.generation}, ${sqlStringLiteral(normalized.clientId)})`,
+				options.insertOnly ? 'ON CONFLICT("id") DO NOTHING' : [
+					'ON CONFLICT("id") DO UPDATE SET',
+					'"active_role" = excluded."active_role",',
+					'"staging_role" = excluded."staging_role",',
+					'"updated_at_ms" = excluded."updated_at_ms",',
+					'"generation" = excluded."generation",',
+					'"client_id" = excluded."client_id"'
+				].join(' ')
+			].join(' '));
+		}
+		const persisted = await readManifest();
+		if (!persisted)
+			throw new Error('Dual sync manifest was not persisted.');
+		if (options.expectedGeneration !== undefined
+			&& (persisted.generation !== normalized.generation
+				|| persisted.activeRole !== normalized.activeRole
+				|| persisted.stagingRole !== normalized.stagingRole)) {
+			throw new Error('Dual sync manifest compare-and-swap failed; retry sync.');
+		}
+		updateManifestCache(persisted, true);
+		broadcastManifest(persisted);
+		return persisted;
 	}
 
-	async function saveDelta(journal, appliedRole) {
-		if (!journal || journal !== Object(journal))
-			return undefined;
+	async function initializeManifestClientId(manifest) {
+		const db = await getCacheDb();
+		const clientId = randomUuid();
+		await db.query([
+			`UPDATE "${manifestTable}"`,
+			`SET "client_id" = ${sqlStringLiteral(clientId)}`,
+			`WHERE "id" = ${sqlStringLiteral(manifestId)}`,
+			'AND ("client_id" IS NULL OR "client_id" = \'\')'
+		].join(' '));
+		return await readManifest() || { ...manifest, clientId };
+	}
+
+	async function createDeltaJournalSink(appliedRole) {
 		const db = await getCacheDb();
 		await ensureCacheSchema(db);
+		await cleanupOrphanDeltaChunks(db);
 		const id = randomUuid();
-		const appliedRoles = JSON.stringify([appliedRole]);
+		let chunkIndex = 0;
+		let bufferedItems = [];
+		let finished = false;
+		let committed = false;
+		return { write, commit, abort };
+
+		async function write(items) {
+			if (finished)
+				throw new Error('Cannot write to a completed dual sync delta.');
+			if (Array.isArray(items) && items.length > 0)
+				bufferedItems.push(...items);
+			while (bufferedItems.length >= deltaItemsPerChunk)
+				await writeChunk(bufferedItems.splice(0, deltaItemsPerChunk));
+		}
+
+		async function commit(journal) {
+			if (finished)
+				throw new Error('Dual sync delta has already completed.');
+			finished = true;
+			if (!hasPullJournalChanges(journal)) {
+				await deleteChunks();
+				committed = true;
+				return undefined;
+			}
+			if (bufferedItems.length > 0)
+				await writeChunk(bufferedItems.splice(0));
+			const header = {
+				scopeKey: journal.scopeKey,
+				tables: Array.isArray(journal.tables) ? journal.tables : [],
+				since: journal.since,
+				finalSince: journal.finalSince,
+				reason: journal.reason,
+				itemCount: Number(journal.itemCount || 0)
+			};
+			const appliedRoles = JSON.stringify([appliedRole]);
+			await db.query([
+				`INSERT INTO "${deltaTable}" ("id", "scope", "from_since", "to_since", "journal_json", "created_at_ms", "applied_roles_json")`,
+				`VALUES (${sqlStringLiteral(id)}, ${sqlStringLiteral(journal.scopeKey || '*')}, ${sqlNullableJsonLiteral(journal.since)}, ${sqlNullableJsonLiteral(journal.finalSince)}, ${sqlStringLiteral(stringify(header))}, ${Date.now()}, ${sqlStringLiteral(appliedRoles)})`
+			].join(' '));
+			committed = true;
+			return id;
+		}
+
+		async function abort() {
+			if (committed)
+				return;
+			finished = true;
+			bufferedItems = [];
+			await deleteChunks();
+		}
+
+		async function writeChunk(items) {
+			await db.query([
+				`INSERT INTO "${deltaChunkTable}" ("delta_id", "chunk_index", "items_json")`,
+				`VALUES (${sqlStringLiteral(id)}, ${chunkIndex++}, ${sqlStringLiteral(stringify(items))})`
+			].join(' '));
+		}
+
+		function deleteChunks() {
+			return db.query(`DELETE FROM "${deltaChunkTable}" WHERE "delta_id" = ${sqlStringLiteral(id)}`);
+		}
+	}
+
+	async function cleanupOrphanDeltaChunks(db) {
 		await db.query([
-			`INSERT INTO "${deltaTable}" ("id", "scope", "from_since", "to_since", "journal_json", "created_at_ms", "applied_roles_json")`,
-			`VALUES (${sqlStringLiteral(id)}, ${sqlStringLiteral(journal.scopeKey || '*')}, ${sqlNullableJsonLiteral(journal.since)}, ${sqlNullableJsonLiteral(journal.finalSince)}, ${sqlStringLiteral(stringify(journal))}, ${Date.now()}, ${sqlStringLiteral(appliedRoles)})`
+			`DELETE FROM "${deltaChunkTable}"`,
+			`WHERE "delta_id" NOT IN (SELECT "id" FROM "${deltaTable}")`
 		].join(' '));
-		return id;
 	}
 
 	async function readDeltas() {
@@ -497,12 +794,32 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 			`SELECT "id", "journal_json", "applied_roles_json" FROM "${deltaTable}"`,
 			'ORDER BY "created_at_ms" ASC'
 		].join(' '));
+		const chunkRows = await db.query([
+			`SELECT "delta_id", "chunk_index", "items_json" FROM "${deltaChunkTable}"`,
+			'ORDER BY "delta_id" ASC, "chunk_index" ASC'
+		].join(' '));
+		const itemsByDelta = new Map();
+		for (const row of toRows(chunkRows)) {
+			const deltaId = row.delta_id ?? row.DELTA_ID;
+			const items = parseJson(row.items_json ?? row.ITEMS_JSON);
+			if (typeof deltaId !== 'string' || !Array.isArray(items))
+				continue;
+			const current = itemsByDelta.get(deltaId) || [];
+			current.push(...items);
+			itemsByDelta.set(deltaId, current);
+		}
 		return toRows(rows)
-			.map(row => ({
-				id: row.id ?? row.ID,
-				journal: parseJson(row.journal_json ?? row.JOURNAL_JSON),
-				appliedRoles: parseJson(row.applied_roles_json ?? row.APPLIED_ROLES_JSON) || []
-			}))
+			.map(row => {
+				const id = row.id ?? row.ID;
+				const journal = parseJson(row.journal_json ?? row.JOURNAL_JSON);
+				if (journal && itemsByDelta.has(id))
+					journal.items = itemsByDelta.get(id);
+				return {
+					id,
+					journal,
+					appliedRoles: parseJson(row.applied_roles_json ?? row.APPLIED_ROLES_JSON) || []
+				};
+			})
 			.filter(delta => typeof delta.id === 'string' && delta.journal && delta.journal === Object(delta.journal));
 	}
 
@@ -514,6 +831,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		if (!roles.includes(role))
 			roles.push(role);
 		if (roles.includes(roleA) && roles.includes(roleB)) {
+			await db.query(`DELETE FROM "${deltaChunkTable}" WHERE "delta_id" = ${sqlStringLiteral(delta.id)}`);
 			await db.query(`DELETE FROM "${deltaTable}" WHERE "id" = ${sqlStringLiteral(delta.id)}`);
 			delta.appliedRoles = roles;
 			return;
@@ -528,15 +846,19 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 
 	async function resetCache() {
 		const db = await getCacheDb();
+		const currentManifest = await getManifest().catch(() => null);
 		cacheSchemaReady = false;
 		cacheSchemaPromise = null;
+		await db.query(`DROP TABLE IF EXISTS "${deltaChunkTable}"`);
 		await db.query(`DROP TABLE IF EXISTS "${deltaTable}"`);
 		await db.query(`DROP TABLE IF EXISTS "${manifestTable}"`);
 		await ensureCacheSchema(db);
 		return writeManifest({
 			activeRole: roleA,
 			stagingRole: roleB,
-			updatedAtMs: Date.now()
+			updatedAtMs: Date.now(),
+			generation: 0,
+			clientId: currentManifest && currentManifest.clientId || randomUuid()
 		});
 	}
 
@@ -556,9 +878,13 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 					'"id" TEXT PRIMARY KEY,',
 					'"active_role" TEXT NOT NULL,',
 					'"staging_role" TEXT NOT NULL,',
-					'"updated_at_ms" INTEGER NOT NULL',
+					'"updated_at_ms" INTEGER NOT NULL,',
+					'"generation" INTEGER NOT NULL DEFAULT 0,',
+					'"client_id" TEXT',
 					');'
 				].join(' '));
+				await tryAddCacheColumn(db, manifestTable, 'generation', 'INTEGER NOT NULL DEFAULT 0');
+				await tryAddCacheColumn(db, manifestTable, 'client_id', 'TEXT');
 				await db.query([
 					`CREATE TABLE IF NOT EXISTS "${deltaTable}" (`,
 					'"id" TEXT PRIMARY KEY,',
@@ -570,6 +896,14 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 					'"applied_roles_json" TEXT NOT NULL',
 					');'
 				].join(' '));
+				await db.query([
+					`CREATE TABLE IF NOT EXISTS "${deltaChunkTable}" (`,
+					'"delta_id" TEXT NOT NULL,',
+					'"chunk_index" INTEGER NOT NULL,',
+					'"items_json" TEXT NOT NULL,',
+					'PRIMARY KEY ("delta_id", "chunk_index")',
+					');'
+				].join(' '));
 				cacheSchemaReady = true;
 			})()
 				.finally(() => {
@@ -577,6 +911,17 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 				});
 		}
 		await cacheSchemaPromise;
+	}
+
+	async function tryAddCacheColumn(db, tableName, columnName, definition) {
+		try {
+			await db.query(`ALTER TABLE "${tableName}" ADD COLUMN "${columnName}" ${definition}`);
+		}
+		catch (error) {
+			const message = error && error.message || '';
+			if (!/duplicate column|already exists/u.test(message))
+				throw error;
+		}
 	}
 
 	function getRolePoolOptions(role) {
@@ -589,13 +934,20 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		const manifest = normalizeManifestInfo(info);
 		if (!manifest)
 			return manifestCache;
-		if (!force && manifestCache && Number(manifestCache.updatedAtMs || 0) > Number(manifest.updatedAtMs || 0))
+		if (!manifest.clientId && manifestCache && manifestCache.clientId)
+			manifest.clientId = manifestCache.clientId;
+		if (!force && manifestCache && manifestCache.generation > manifest.generation)
+			return manifestCache;
+		if (!force && manifestCache && manifestCache.generation === manifest.generation
+			&& Number(manifestCache.updatedAtMs || 0) > Number(manifest.updatedAtMs || 0))
 			return manifestCache;
 		const previous = manifestCache;
 		manifestCache = manifest;
+		manifestCacheReadAtMs = Date.now();
 		if (!previous
 			|| previous.activeRole !== manifest.activeRole
 			|| previous.stagingRole !== manifest.stagingRole
+			|| previous.generation !== manifest.generation
 			|| Number(previous.updatedAtMs || 0) !== Number(manifest.updatedAtMs || 0)) {
 			clearSchemaReadyRoles();
 		}
@@ -731,7 +1083,9 @@ function normalizeManifestInfo(info) {
 	return {
 		activeRole: info.activeRole,
 		stagingRole: info.stagingRole,
-		updatedAtMs: Number(info.updatedAtMs) || Date.now()
+		updatedAtMs: Number(info.updatedAtMs) || Date.now(),
+		generation: normalizeGeneration(info.generation),
+		clientId: nonEmptyString(info.clientId)
 	};
 }
 
@@ -740,10 +1094,13 @@ function manifestChannelName(connectionString) {
 }
 
 function toDataPoolOptions(poolOptions = {}) {
-	return {
+	const options = {
 		...poolOptions,
 		sync: stripDualSyncOption(poolOptions.sync)
 	};
+	if (!options.vfs)
+		options.vfs = 'opfs-wl';
+	return options;
 }
 
 function toCachePoolOptions(poolOptions = {}, connectionString) {
@@ -837,6 +1194,25 @@ function normalizeTimeoutMs(value) {
 	if (!Number.isFinite(parsed) || parsed <= 0)
 		return undefined;
 	return parsed;
+}
+
+function toDualSyncLockConfig(sync, options) {
+	const configured = sync && sync === Object(sync) && !Array.isArray(sync)
+		? sync.crossTabLock
+		: undefined;
+	const config = normalizeCrossTabLockConfig(configured);
+	const timeoutMs = normalizeTimeoutMs(options && options.timeoutMs);
+	if (!timeoutMs || config.timeoutMs)
+		return config;
+	return {
+		...config,
+		timeoutMs
+	};
+}
+
+function normalizeGeneration(value) {
+	const parsed = Number.parseInt(value, 10);
+	return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
 }
 
 function firstRow(rows) {

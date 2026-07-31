@@ -42,14 +42,17 @@ declare namespace r {
     function createPatch(original: any, modified: any): JsonPatch;
     function createSqliteOPFSWorker(options?: SqliteOPFSPoolOptions & { connectionString?: string }): Worker;
     function connectSqliteOPFSWorker(worker: Worker): MessagePort;
-    function createSyncWorkerClient(worker: Worker | MessagePort): DBClient['syncClient'];
+    function createSyncWorkerClient(worker: Worker | MessagePort, options?: {
+        requestTimeoutMs?: number;
+    }): DBClient['syncClient'];
     function createSyncWorkerHandler(syncClient: DBClient['syncClient'], options?: {
         autoStart?: boolean;
         stopSyncClient?: boolean;
         postMessage?: (message: unknown) => void;
+        forwardEvents?: string[];
     }): {
         handleMessage(event: MessageEvent): Promise<void>;
-        stop(): void;
+        stop(): Promise<void>;
     };
     type JsonPatch = Array<{
         op: 'add' | 'remove' | 'replace' | 'copy' | 'move' | 'test';

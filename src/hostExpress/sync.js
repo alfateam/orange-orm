@@ -97,14 +97,14 @@ function newSyncHandler(client, options = {}) {
 		const results = [];
 		let applied = 0;
 		let duplicates = 0;
-		for (let i = 0; i < mutations.length; i++) {
-			const mutation = mutations[i];
-			await runHookedTransaction(async (tx) => {
+		await runHookedTransaction(async (tx) => {
+			for (let i = 0; i < mutations.length; i++) {
+				const mutation = mutations[i];
 				const claim = await claimAppliedMutation(tx, clientId, mutation.id);
 				if (!claim.claimed) {
 					duplicates += 1;
 					results.push({ id: mutation.id, table: mutation.table, ...(claim.result || {}), duplicate: true });
-					return;
+					continue;
 				}
 				const patchResult = await applyMutationPatches(tx, mutation);
 				const commandResult = await applyMutationCommands(tx, mutation);
@@ -119,8 +119,8 @@ function newSyncHandler(client, options = {}) {
 				await updateAppliedMutation(tx, clientId, mutation.id, result);
 				results.push(result);
 				applied += 1;
-			}, undefined, request, response);
-		}
+			}
+		}, undefined, request, response);
 
 		return {
 			phase: 'push',
@@ -775,8 +775,13 @@ function normalizeClientId(value) {
 function normalizeMutations(value, limit) {
 	if (!Array.isArray(value))
 		return [];
+	if (value.length > limit) {
+		const error = new Error(`Sync push accepts at most ${limit} mutations per batch.`);
+		error.status = 413;
+		throw error;
+	}
 	const result = [];
-	for (let i = 0; i < value.length && result.length < limit; i++) {
+	for (let i = 0; i < value.length; i++) {
 		const mutation = normalizeMutation(value[i]);
 		if (mutation)
 			result.push(mutation);

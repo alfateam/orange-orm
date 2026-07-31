@@ -227,7 +227,8 @@ function acquireOPFSAccessLock(poolOptions, connectionString) {
 		return Promise.resolve(noop);
 	return acquireCrossTabLock(resolveOPFSAccessLockName(connectionString), {
 		enabled: true,
-		label: 'sqlite OPFS access lock'
+		label: 'sqlite OPFS access lock',
+		timeoutMs: normalizePositiveInteger(poolOptions.opfsAccessTimeoutMs) || 300000
 	});
 }
 
@@ -274,8 +275,14 @@ function shouldUseSingleWorker(poolOptions = {}) {
 function normalizeCrossTabWriteLockConfig(poolOptions = {}) {
 	const defaultEnabled = poolOptions.vfs === 'opfs-wl' || poolOptions.fallbackVfs === 'opfs-wl';
 	return {
-		enabled: defaultEnabled
+		enabled: defaultEnabled,
+		timeoutMs: normalizePositiveInteger(poolOptions.opfsAccessTimeoutMs) || 300000
 	};
+}
+
+function normalizePositiveInteger(value) {
+	const parsed = Number.parseInt(value, 10);
+	return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }
 
 function normalizePoolOptions(poolOptions) {

@@ -74,6 +74,123 @@ describe('sync commands', () => {
 		]);
 	});
 
+	test('applies a push batch in one atomic transaction', async () => {
+		let transactionCount = 0;
+		const committedPaths = [];
+		const tx = {
+			project: {
+				patch: async (patch) => {
+					committedPaths.push(patch[0].path);
+					return { changed: [{ id: committedPaths.length }] };
+				}
+			},
+			query: async (sql) => sql.includes('RETURNING result_json')
+				? [{ result_json: null }]
+				: []
+		};
+		const handler = newSyncHandler({
+			tables: { project: newTable('project') },
+			transaction: async (fn) => {
+				transactionCount += 1;
+				return fn(tx);
+			},
+			query: async () => []
+		}, { sync: {} });
+
+		const result = await callHandler(handler, {
+			phase: 'push',
+			clientId: 'client-1',
+			mutations: [
+				{
+					id: 'mutation-1',
+					table: 'project',
+					patch: [{ op: 'replace', path: '/[1]/name', value: 'First' }]
+				},
+				{
+					id: 'mutation-2',
+					table: 'project',
+					patch: [{ op: 'replace', path: '/[2]/name', value: 'Second' }]
+				}
+			]
+		});
+
+		expect(transactionCount).toBe(1);
+		expect(committedPaths).toEqual(['/[1]/name', '/[2]/name']);
+		expect(result.applied).toBe(2);
+		expect(result.results.map(item => item.id)).toEqual(['mutation-1', 'mutation-2']);
+	});
+
+	test('rolls back the whole push batch when a later mutation fails', async () => {
+		let transactionCount = 0;
+		const committedPaths = [];
+		const handler = newSyncHandler({
+			tables: { project: newTable('project') },
+			transaction: async (fn) => {
+				transactionCount += 1;
+				const stagedPaths = [];
+				const tx = {
+					project: {
+						patch: async (patch) => {
+							if (patch[0].path === '/[2]/name')
+								throw new Error('second mutation failed');
+							stagedPaths.push(patch[0].path);
+							return { changed: [{ id: 1 }] };
+						}
+					},
+					query: async (sql) => sql.includes('RETURNING result_json')
+						? [{ result_json: null }]
+						: []
+				};
+				const result = await fn(tx);
+				committedPaths.push(...stagedPaths);
+				return result;
+			},
+			query: async () => []
+		}, { sync: {} });
+
+		await expect(callHandler(handler, {
+			phase: 'push',
+			clientId: 'client-1',
+			mutations: [
+				{
+					id: 'mutation-1',
+					table: 'project',
+					patch: [{ op: 'replace', path: '/[1]/name', value: 'First' }]
+				},
+				{
+					id: 'mutation-2',
+					table: 'project',
+					patch: [{ op: 'replace', path: '/[2]/name', value: 'Second' }]
+				}
+			]
+		})).rejects.toThrow('second mutation failed');
+		expect(transactionCount).toBe(1);
+		expect(committedPaths).toEqual([]);
+	});
+
+	test('rejects an oversized push batch without applying a prefix', async () => {
+		let transactionCount = 0;
+		const handler = newSyncHandler({
+			tables: { project: newTable('project') },
+			transaction: async () => {
+				transactionCount += 1;
+			},
+			query: async () => []
+		}, {
+			sync: { limits: { maxMutationsPerBatch: 1 } }
+		});
+
+		await expect(callHandler(handler, {
+			phase: 'push',
+			clientId: 'client-1',
+			mutations: [
+				{ id: 'mutation-1', table: 'project', patch: [] },
+				{ id: 'mutation-2', table: 'project', patch: [] }
+			]
+		})).rejects.toThrow('at most 1 mutation');
+		expect(transactionCount).toBe(0);
+	});
+
 	test('runs transaction hooks for sync row fetch', async () => {
 		const calls = [];
 		const transactionOptions = [];
