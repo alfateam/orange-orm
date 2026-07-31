@@ -2,8 +2,30 @@ import { describe, expect, test } from 'vitest';
 
 const rdb = require('../src/index');
 const { ensureLocalSchemaReadySymbol } = require('../src/client/syncClient');
+const { syncAutoStartSymbol } = require('../src/client/syncAuto');
 
 describe('sync worker rpc', () => {
+	test('starts sync from worker configuration when the handler is created', async () => {
+		const calls = [];
+		const bridge = createBridge({
+			[syncAutoStartSymbol]: async () => {
+				calls.push('startFromConfig');
+			},
+			start: async () => {
+				calls.push('start');
+			},
+			stop: async () => {
+				calls.push('stop');
+			}
+		});
+
+		await wait(0);
+		bridge.handler.stop();
+		await wait(0);
+
+		expect(calls).toEqual(['startFromConfig', 'stop']);
+	});
+
 	test('routes sync methods through a sync worker client', async () => {
 		const calls = [];
 		const bridge = createBridge({

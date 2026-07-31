@@ -92,29 +92,42 @@ describe('sqliteOPFS dual sync integration', () => {
 		expect(await roleA.project.count()).toBe(0);
 		expect(await roleB.project.count()).toBe(2);
 
+		const localProject = await localDb.project.getById('p1');
+		localProject.title = 'One pushed locally';
+		await localProject.saveChanges();
+		const pushSyncResult = await localDb.syncClient.sync();
+		const pushedRemoteProject = await remoteDb.project.getById('p1');
+
+		expect(pushSyncResult.__orangeDualSync).toMatchObject({
+			activeRole: 'a',
+			stagingRole: 'b'
+		});
+		expect(pushedRemoteProject.title).toBe('One pushed locally');
+		expect((await localDb.project.getById('p1')).title).toBe('One pushed locally');
+
 		await remoteDb.project.update({ title: 'Two updated' }, { where: x => x.id.eq('p2') });
 		await remoteDb.project.insert({ id: 'p3', title: 'Three' });
 		const secondSyncResult = await localDb.syncClient.sync();
 
 		expect(secondSyncResult.__orangeDualSync).toMatchObject({
-			activeRole: 'a',
-			stagingRole: 'b'
+			activeRole: 'b',
+			stagingRole: 'a'
 		});
 		expect(await localDb.project.count()).toBe(3);
-		expect(await roleA.project.count()).toBe(3);
-		expect(await roleB.project.count()).toBe(2);
+		expect(await roleA.project.count()).toBe(2);
+		expect(await roleB.project.count()).toBe(3);
 
 		const thirdSyncResult = await localDb.syncClient.sync();
 		const roleARows = await roleA.query('SELECT "id", "title" FROM "project" ORDER BY "id"');
 		const roleBRows = await roleB.query('SELECT "id", "title" FROM "project" ORDER BY "id"');
 
 		expect(thirdSyncResult.__orangeDualSync).toMatchObject({
-			activeRole: 'b',
-			stagingRole: 'a'
+			activeRole: 'a',
+			stagingRole: 'b'
 		});
 		expect(roleARows).toEqual(roleBRows);
 		expect(roleBRows).toEqual([
-			{ id: 'p1', title: 'One' },
+			{ id: 'p1', title: 'One pushed locally' },
 			{ id: 'p2', title: 'Two updated' },
 			{ id: 'p3', title: 'Three' }
 		]);
