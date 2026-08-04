@@ -1150,8 +1150,7 @@ export interface PoolOptions<M extends Record<string, any> = any> {
 
 export interface SqliteOPFSPoolOptions<M extends Record<string, any> = any> extends PoolOptions<M> {
   sync?: string | SyncConfig<M>;
-  vfs?: 'opfs' | 'opfs-sahpool' | 'opfs-wl';
-  fallbackVfs?: 'opfs' | 'opfs-sahpool' | 'opfs-wl';
+  vfs?: 'opfs-sahpool' | 'opfs-wl';
   opfsSahPool?: OpfsSahPoolOptions;
   singleWorker?: boolean;
   inlineWorker?: boolean;

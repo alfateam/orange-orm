@@ -18,15 +18,13 @@ function newPool(connectionString, poolOptions) {
 	let nextWriterQueueSeq = 1;
 	const singleWorker = shouldUseSingleWorker(poolOptions);
 	c.__orangeSqliteOPFSConnectionString = connectionString;
-	c.__orangeSqliteOPFSRequestedVfs = poolOptions.vfs || 'opfs';
-	c.__orangeSqliteOPFSFallbackVfs = poolOptions.fallbackVfs;
+	c.__orangeSqliteOPFSRequestedVfs = poolOptions.vfs;
 	c.__orangeCrossTabWriteLock = normalizeCrossTabWriteLockConfig(poolOptions);
 	c.__orangeSqliteOPFSReady = client.ready;
 
 	if (client.ready && typeof client.ready.then === 'function') {
 		client.ready.then((result) => {
 			c.__orangeSqliteOPFSVfs = result && result.vfs || c.__orangeSqliteOPFSRequestedVfs;
-			c.__orangeSqliteOPFSFallback = !!(result && result.fallback);
 		}).catch(() => {});
 	}
 
@@ -250,11 +248,10 @@ function updatePoolOpenInfo(pool, client) {
 	if (!info)
 		return;
 	pool.__orangeSqliteOPFSVfs = info.vfs || pool.__orangeSqliteOPFSVfs;
-	pool.__orangeSqliteOPFSFallback = !!info.fallback;
 }
 
 function shouldUseOPFSAccessLock(poolOptions = {}) {
-	return poolOptions.vfs === 'opfs-wl' || poolOptions.fallbackVfs === 'opfs-wl';
+	return poolOptions.vfs === 'opfs-wl';
 }
 
 function resolveOPFSAccessLockName(connectionString) {
@@ -264,16 +261,14 @@ function resolveOPFSAccessLockName(connectionString) {
 function shouldUseSingleWorker(poolOptions = {}) {
 	if (poolOptions.singleWorker === true)
 		return true;
-	const vfs = poolOptions.vfs || 'opfs';
-	if (vfs === 'opfs-sahpool' || vfs === 'opfs-wl' || poolOptions.fallbackVfs === 'opfs-sahpool' || poolOptions.fallbackVfs === 'opfs-wl')
+	const vfs = poolOptions.vfs;
+	if (vfs === 'opfs-sahpool' || vfs === 'opfs-wl')
 		return true;
-	if (vfs === 'opfs')
-		return poolOptions.singleWorker !== false;
 	return false;
 }
 
 function normalizeCrossTabWriteLockConfig(poolOptions = {}) {
-	const defaultEnabled = poolOptions.vfs === 'opfs-wl' || poolOptions.fallbackVfs === 'opfs-wl';
+	const defaultEnabled = poolOptions.vfs === 'opfs-wl';
 	return {
 		enabled: defaultEnabled,
 		timeoutMs: normalizePositiveInteger(poolOptions.opfsAccessTimeoutMs) || 300000
@@ -287,12 +282,12 @@ function normalizePositiveInteger(value) {
 
 function normalizePoolOptions(poolOptions) {
 	poolOptions = poolOptions || {};
-	if (!poolOptions.sync)
-		return poolOptions;
+	const vfs = poolOptions.vfs || 'opfs-wl';
+	if (vfs !== 'opfs-wl' && vfs !== 'opfs-sahpool')
+		throw new Error(`sqliteOPFS vfs "${vfs}" is not supported. Use "opfs-wl" or "opfs-sahpool".`);
 	return {
 		...poolOptions,
-		vfs: poolOptions.vfs || 'opfs-sahpool',
-		fallbackVfs: poolOptions.fallbackVfs || 'opfs-wl'
+		vfs
 	};
 }
 

@@ -20,10 +20,11 @@ describe('sqliteOPFS broker worker', () => {
 		const worker = createInlineSqliteOPFSWorker({
 			sqlite3InitModule: () => newFakeSqlite3()
 		});
-		const uiClient = createSqliteOPFSWorkerClient('broker.sqlite3', { worker });
+		const uiClient = createSqliteOPFSWorkerClient('broker.sqlite3', { worker, vfs: 'opfs-wl' });
 		const syncPort = connectSqliteOPFSWorker(worker);
 		const syncClient = createSqliteOPFSWorkerClient('broker.sqlite3', {
 			worker: syncPort,
+			vfs: 'opfs-wl',
 			closeDbOnClose: false
 		});
 		const events = [];
@@ -64,7 +65,7 @@ describe('sqliteOPFS broker worker', () => {
 		const worker = createInlineSqliteOPFSWorker({
 			sqlite3InitModule: () => newFakeSqlite3(executed)
 		});
-		const client = createSqliteOPFSWorkerClient('leased.sqlite3', { worker });
+		const client = createSqliteOPFSWorkerClient('leased.sqlite3', { worker, vfs: 'opfs-wl' });
 
 		try {
 			const lease = await client.checkout();
@@ -102,6 +103,24 @@ function newFakeSqlite3(executed = []) {
 				selectValue() {
 					return 0;
 				}
+				close() {}
+			},
+			OpfsWlDb: class FakeOpfsWlDb {
+				constructor(filename) {
+					this.filename = filename;
+				}
+
+				exec(options) {
+					if (typeof options === 'string')
+						return undefined;
+					executed.push(options.sql);
+					return options.returnValue === 'resultRows' ? [{ value: 1 }] : undefined;
+				}
+
+				changes() {
+					return 0;
+				}
+
 				close() {}
 			}
 		}

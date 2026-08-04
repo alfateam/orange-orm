@@ -1,7 +1,9 @@
 const log = require('../table/log');
 const createInlineSqliteOPFSWorker = require('./inlineWorker');
+const normalizeOpfsSahPoolOptions = require('./normalizeOpfsSahPoolOptions');
 
 function createSqliteOPFSWorkerClient(connectionString, options = {}) {
+	const requestedVfs = normalizeVfs(options.vfs);
 	const worker = options.worker || createWorker(connectionString, options);
 	let nextId = 1;
 	const pending = new Map();
@@ -16,8 +18,7 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 	worker.addEventListener('messageerror', onWorkerError);
 	startMessagePort(worker);
 
-	const requestedVfs = options.vfs || 'opfs';
-	const fallbackVfs = normalizeFallbackVfs(options.fallbackVfs, requestedVfs);
+	const opfsSahPoolOptions = normalizeOpfsSahPoolOptions(options, connectionString);
 	const ready = options.deferOpen ? null : ensureOpen();
 
 	return {
@@ -140,8 +141,7 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 			return Promise.reject(new Error('sqliteOPFS worker client closed.'));
 		if (!openPromise) {
 			const vfs = openInfo && openInfo.vfs || requestedVfs;
-			const fallback = openInfo && openInfo.fallback ? undefined : fallbackVfs;
-			openPromise = openWorkerDb(vfs, fallback)
+			openPromise = openWorkerDb(vfs)
 				.then((info) => {
 					openInfo = info;
 					return info;
@@ -154,41 +154,20 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 		return openPromise;
 	}
 
-	async function openWorkerDb(vfs, fallbackVfs) {
-		try {
-			const response = await request('open', {
-				connectionString,
-				busyTimeoutMs: options.busyTimeoutMs || 5000,
-				vfs: vfs === 'opfs' ? options.vfs : vfs
-			});
-			return normalizeOpenResult({
-				result: response.result,
-				fallback: false
-			});
-		}
-		catch (e) {
-			if (!fallbackVfs)
-				throw e;
-			const response = await request('open', {
-				connectionString,
-				busyTimeoutMs: options.busyTimeoutMs || 5000,
-				vfs: fallbackVfs
-			});
-			return normalizeOpenResult({
-				result: response.result,
-				fallback: true,
-				fallbackError: e && e.message ? e.message : String(e)
-			});
-		}
+	async function openWorkerDb(vfs) {
+		const response = await request('open', {
+			connectionString,
+			busyTimeoutMs: options.busyTimeoutMs || 5000,
+			vfs,
+			opfsSahPoolOptions: vfs === 'opfs-sahpool' ? opfsSahPoolOptions : undefined
+		});
+		return normalizeOpenResult(response.result);
 	}
 
-	function normalizeOpenResult({ result, fallback, fallbackError }) {
+	function normalizeOpenResult(result) {
 		return {
 			...result,
-			requestedVfs,
-			fallback,
-			fallbackVfs,
-			fallbackError
+			requestedVfs
 		};
 	}
 
@@ -297,12 +276,12 @@ function createWorker(connectionString, options) {
 	if (typeof globalThis !== 'undefined' && typeof globalThis.__orangeOrmCreateSqliteOPFSWorker === 'function')
 		return globalThis.__orangeOrmCreateSqliteOPFSWorker(connectionString, options);
 	if (options.inlineWorker)
-		return createInlineSqliteOPFSWorker(options);
+		return createInlineSqliteOPFSWorker({ ...options, connectionString });
 	if (options.workerUrl && typeof Worker !== 'undefined')
 		return new Worker(options.workerUrl, { type: 'module' });
 	if (typeof Worker !== 'undefined') {
 		try {
-			const source = createWorkerSource(options.sqliteModuleUrl || getDefaultSqliteModuleUrl() || '@sqlite.org/sqlite-wasm', options);
+			const source = createWorkerSource(options.sqliteModuleUrl || getDefaultSqliteModuleUrl() || '@sqlite.org/sqlite-wasm');
 			const blob = new Blob([source], { type: 'text/javascript' });
 			const url = URL.createObjectURL(blob);
 			return new Worker(url, { type: 'module' });
@@ -322,13 +301,18 @@ function getDefaultSqliteModuleUrl() {
 		: null;
 }
 
-function createWorkerSource(sqliteModuleUrl, options = {}) {
+function normalizeVfs(value) {
+	const vfs = value || 'opfs-wl';
+	if (vfs !== 'opfs-wl' && vfs !== 'opfs-sahpool')
+		throw new Error(`sqliteOPFS vfs "${vfs}" is not supported. Use "opfs-wl" or "opfs-sahpool".`);
+	return vfs;
+}
+
+function createWorkerSource(sqliteModuleUrl) {
 	const sqliteInitConfig = {};
-	const opfsSahPoolOptions = normalizeOpfsSahPoolOptions(options);
 	return `
 const sqliteModuleUrl = ${JSON.stringify(sqliteModuleUrl)};
 const sqliteInitConfig = ${JSON.stringify(sqliteInitConfig)};
-const opfsSahPoolOptions = ${JSON.stringify(opfsSahPoolOptions)};
 let sqlite3Promise;
 let db;
 let dbOpenOptions;
@@ -437,7 +421,7 @@ async function dispatchTimed(message) {
 
 async function dispatch(message) {
 	if (message.method === 'open')
-		return openDb(message.connectionString, message.busyTimeoutMs, message.vfs);
+		return openDb(message.connectionString, message.busyTimeoutMs, message.vfs, message.opfsSahPoolOptions);
 	if (message.method === 'close')
 		return closeDb();
 	if (message.leaseId !== undefined && message.leaseId !== activeLeaseId)
@@ -451,13 +435,13 @@ async function dispatch(message) {
 	throw new Error('Unknown sqliteOPFS worker method "' + message.method + '".');
 }
 
-async function openDb(connectionString, busyTimeoutMs = 5000, vfs) {
+async function openDb(connectionString, busyTimeoutMs = 5000, vfs, opfsSahPoolOptions) {
 	if (db)
 		return { opened: true, reused: true, ...(dbOpenInfo || {}) };
-	dbOpenOptions = { connectionString, busyTimeoutMs, vfs };
+	dbOpenOptions = { connectionString, busyTimeoutMs, vfs, opfsSahPoolOptions };
 	const sqlite3 = await getSqlite3();
 	const filename = normalizeFilename(connectionString);
-	const dbInfo = await createDb(sqlite3, filename, vfs);
+	const dbInfo = await createDb(sqlite3, filename, vfs, opfsSahPoolOptions);
 	db = dbInfo.db;
 	db.exec('PRAGMA busy_timeout=' + (Number.parseInt(busyTimeoutMs, 10) || 5000));
 	dbOpenInfo = {
@@ -478,29 +462,15 @@ function closeDb() {
 
 function openDbFromLastOptions(connectionString) {
 	const options = dbOpenOptions || { connectionString: connectionString || 'orange.sqlite3' };
-	return openDb(options.connectionString, options.busyTimeoutMs, options.vfs);
+	return openDb(options.connectionString, options.busyTimeoutMs, options.vfs, options.opfsSahPoolOptions);
 }
 
-async function createDb(sqlite3, filename, vfs) {
-	if (!vfs || vfs === 'opfs')
-		return createOpfsDb(sqlite3, filename);
-	if (vfs === 'opfs-wl')
+async function createDb(sqlite3, filename, vfs, opfsSahPoolOptions) {
+	if (!vfs || vfs === 'opfs-wl')
 		return createOpfsWlDb(sqlite3, filename);
 	if (vfs === 'opfs-sahpool')
-		return createOpfsSahPoolDb(sqlite3, filename);
-	if (vfs && vfs !== 'opfs')
-		throw new Error('sqliteOPFS vfs "' + vfs + '" is not supported.');
-}
-
-function createOpfsDb(sqlite3, filename) {
-	const DbClass = sqlite3.oo1 && sqlite3.oo1.OpfsDb;
-	if (typeof DbClass !== 'function')
-		throw new Error('sqliteOPFS vfs "opfs" is not available in this sqlite-wasm build.');
-	return {
-		db: new DbClass(filename),
-		vfs: 'opfs',
-		opfs: true
-	};
+		return createOpfsSahPoolDb(sqlite3, filename, opfsSahPoolOptions);
+	throw new Error('sqliteOPFS vfs "' + vfs + '" is not supported. Use "opfs-wl" or "opfs-sahpool".');
 }
 
 function createOpfsWlDb(sqlite3, filename) {
@@ -514,7 +484,7 @@ function createOpfsWlDb(sqlite3, filename) {
 	};
 }
 
-async function createOpfsSahPoolDb(sqlite3, filename) {
+async function createOpfsSahPoolDb(sqlite3, filename, opfsSahPoolOptions) {
 	if (!sqlite3 || typeof sqlite3.installOpfsSAHPoolVfs !== 'function')
 		throw new Error('sqliteOPFS vfs "opfs-sahpool" is not available in this sqlite-wasm build.');
 	const pool = await sqlite3.installOpfsSAHPoolVfs(opfsSahPoolOptions);
@@ -610,21 +580,6 @@ function serializeError(error) {
 
 //# sourceURL=orange-orm-sqlite-opfs-worker.mjs
 `;
-}
-
-function normalizeOpfsSahPoolOptions(options = {}) {
-	const source = options.opfsSahPool || options.opfsSAHPool || options.sahPool;
-	if (!source || source !== Object(source))
-		return {};
-	return { ...source };
-}
-
-function normalizeFallbackVfs(value, requestedVfs) {
-	if (!value || value === requestedVfs)
-		return undefined;
-	if (value !== 'opfs' && value !== 'opfs-sahpool' && value !== 'opfs-wl')
-		throw new Error(`sqliteOPFS fallbackVfs "${value}" is not supported.`);
-	return value;
 }
 
 function toError(error) {

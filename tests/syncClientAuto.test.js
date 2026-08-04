@@ -597,7 +597,7 @@ describe('sync client auto start', () => {
 		}
 	});
 
-	test('uses opfs-wl sync lock for deferred sahpool fallback before opening sqliteOPFS', async () => {
+	test('uses the requested opfs-wl sync lock before opening sqliteOPFS', async () => {
 		const lockNames = [];
 		const restoreLocks = installFakeWebLocks({
 			request: async (name, _options, callback) => {
@@ -617,8 +617,7 @@ describe('sync client auto start', () => {
 				__sqliteSync: sync,
 				__orangeSyncIdentity: 'sqliteOPFS:sync-client.sqlite3',
 				__orangeSqliteOPFSConnectionString: 'sync-client.sqlite3',
-				__orangeSqliteOPFSRequestedVfs: 'opfs-sahpool',
-				__orangeSqliteOPFSFallbackVfs: 'opfs-wl'
+				__orangeSqliteOPFSRequestedVfs: 'opfs-wl'
 			},
 			query: async () => []
 		};

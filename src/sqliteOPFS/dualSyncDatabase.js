@@ -1260,8 +1260,7 @@ function withIsolatedSahPool(poolOptions, connectionString) {
 }
 
 function usesSahPool(poolOptions) {
-	const requestedVfs = poolOptions.vfs || (poolOptions.sync ? 'opfs-sahpool' : 'opfs');
-	return requestedVfs === 'opfs-sahpool' || poolOptions.fallbackVfs === 'opfs-sahpool';
+	return poolOptions.vfs === 'opfs-sahpool';
 }
 
 function stableSahPoolToken(value) {

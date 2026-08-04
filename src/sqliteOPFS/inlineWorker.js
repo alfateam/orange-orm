@@ -2,7 +2,6 @@ function createInlineSqliteOPFSWorker(options = {}) {
 	const listeners = new Map();
 	const sqliteModuleUrl = options.sqliteModuleUrl || getDefaultSqliteModuleUrl() || '@sqlite.org/sqlite-wasm';
 	const sqliteInitConfig = {};
-	const opfsSahPoolOptions = normalizeOpfsSahPoolOptions(options);
 	let sqlite3Promise;
 	let db;
 	let dbOpenOptions;
@@ -151,7 +150,7 @@ function createInlineSqliteOPFSWorker(options = {}) {
 
 	async function dispatch(message) {
 		if (message.method === 'open')
-			return openDb(message.connectionString, message.busyTimeoutMs, message.vfs);
+			return openDb(message.connectionString, message.busyTimeoutMs, message.vfs, message.opfsSahPoolOptions);
 		if (message.method === 'close')
 			return closeDb();
 		if (message.leaseId !== undefined && message.leaseId !== activeLeaseId)
@@ -165,13 +164,13 @@ function createInlineSqliteOPFSWorker(options = {}) {
 		throw new Error('Unknown sqliteOPFS worker method "' + message.method + '".');
 	}
 
-	async function openDb(connectionString, busyTimeoutMs = 5000, vfs) {
+	async function openDb(connectionString, busyTimeoutMs = 5000, vfs, opfsSahPoolOptions) {
 		if (db)
 			return { opened: true, reused: true, ...(dbOpenInfo || {}) };
-		dbOpenOptions = { connectionString, busyTimeoutMs, vfs };
+		dbOpenOptions = { connectionString, busyTimeoutMs, vfs, opfsSahPoolOptions };
 		const sqlite3 = await getSqlite3();
 		const filename = normalizeFilename(connectionString);
-		const dbInfo = await createDb(sqlite3, filename, vfs);
+		const dbInfo = await createDb(sqlite3, filename, vfs, opfsSahPoolOptions);
 		db = dbInfo.db;
 		db.exec('PRAGMA busy_timeout=' + (Number.parseInt(busyTimeoutMs, 10) || 5000));
 		dbOpenInfo = {
@@ -192,29 +191,15 @@ function createInlineSqliteOPFSWorker(options = {}) {
 
 	function openDbFromLastOptions(connectionString) {
 		const options = dbOpenOptions || { connectionString: connectionString || 'orange.sqlite3' };
-		return openDb(options.connectionString, options.busyTimeoutMs, options.vfs);
+		return openDb(options.connectionString, options.busyTimeoutMs, options.vfs, options.opfsSahPoolOptions);
 	}
 
-	async function createDb(sqlite3, filename, vfs) {
-		if (!vfs || vfs === 'opfs')
-			return createOpfsDb(sqlite3, filename);
-		if (vfs === 'opfs-wl')
+	async function createDb(sqlite3, filename, vfs, opfsSahPoolOptions) {
+		if (!vfs || vfs === 'opfs-wl')
 			return createOpfsWlDb(sqlite3, filename);
 		if (vfs === 'opfs-sahpool')
-			return createOpfsSahPoolDb(sqlite3, filename);
-		if (vfs && vfs !== 'opfs')
-			throw new Error('sqliteOPFS vfs "' + vfs + '" is not supported.');
-	}
-
-	function createOpfsDb(sqlite3, filename) {
-		const DbClass = sqlite3.oo1 && sqlite3.oo1.OpfsDb;
-		if (typeof DbClass !== 'function')
-			throw new Error('sqliteOPFS vfs "opfs" is not available in this sqlite-wasm build.');
-		return {
-			db: new DbClass(filename),
-			vfs: 'opfs',
-			opfs: true
-		};
+			return createOpfsSahPoolDb(sqlite3, filename, opfsSahPoolOptions);
+		throw new Error('sqliteOPFS vfs "' + vfs + '" is not supported. Use "opfs-wl" or "opfs-sahpool".');
 	}
 
 	function createOpfsWlDb(sqlite3, filename) {
@@ -228,7 +213,7 @@ function createInlineSqliteOPFSWorker(options = {}) {
 		};
 	}
 
-	async function createOpfsSahPoolDb(sqlite3, filename) {
+	async function createOpfsSahPoolDb(sqlite3, filename, opfsSahPoolOptions) {
 		if (!sqlite3 || typeof sqlite3.installOpfsSAHPoolVfs !== 'function')
 			throw new Error('sqliteOPFS vfs "opfs-sahpool" is not available in this sqlite-wasm build.');
 		const pool = await sqlite3.installOpfsSAHPoolVfs(opfsSahPoolOptions);
@@ -303,13 +288,6 @@ function getDefaultSqliteModuleUrl() {
 	return typeof globalThis !== 'undefined' && typeof globalThis.__orangeOrmSqliteOPFSModuleUrl === 'string'
 		? globalThis.__orangeOrmSqliteOPFSModuleUrl
 		: null;
-}
-
-function normalizeOpfsSahPoolOptions(options = {}) {
-	const source = options.opfsSahPool || options.opfsSAHPool || options.sahPool;
-	if (!source || source !== Object(source))
-		return {};
-	return { ...source };
 }
 
 function normalizeFilename(connectionString) {

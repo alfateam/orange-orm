@@ -4,7 +4,7 @@ const newPool = require('../src/sqliteOPFS/newPool');
 const log = require('../src/table/log');
 
 describe('sqliteOPFS pool', () => {
-	test('uses a single worker for default OPFS', async () => {
+	test('uses a single worker for default opfs-wl', async () => {
 		const createdWorkers = [];
 		const pool = newPool('test.sqlite3', {
 			createWorker() {
@@ -15,7 +15,7 @@ describe('sqliteOPFS pool', () => {
 		});
 
 		await wait(10);
-		pool.connectRead(() => {});
+		pool.connectRead((err, _client, done) => done(err));
 		await wait(10);
 
 		expect(createdWorkers).toHaveLength(1);
@@ -43,6 +43,36 @@ describe('sqliteOPFS pool', () => {
 		pool.end();
 	});
 
+	test('isolates default opfs-sahpool options by connection string', async () => {
+		const firstMessages = [];
+		const secondMessages = [];
+		const firstPool = newPool('first.sqlite3', {
+			vfs: 'opfs-sahpool',
+			createWorker: () => newFakeWorker(firstMessages)
+		});
+		const secondPool = newPool('second.sqlite3', {
+			vfs: 'opfs-sahpool',
+			createWorker: () => newFakeWorker(secondMessages)
+		});
+
+		try {
+			await wait(10);
+			const firstOptions = firstMessages[0].opfsSahPoolOptions;
+			const secondOptions = secondMessages[0].opfsSahPoolOptions;
+
+			expect(firstOptions.name).not.toBe(secondOptions.name);
+			expect(firstOptions.directory).not.toBe(secondOptions.directory);
+		}
+		finally {
+			await Promise.all([firstPool.end(), secondPool.end()]);
+		}
+	});
+
+	test('rejects unsupported sqliteOPFS vfs values', () => {
+		expect(() => newPool('test.sqlite3', { vfs: 'opfs' }))
+			.toThrow('Use "opfs-wl" or "opfs-sahpool"');
+	});
+
 	test('keeps opfs-sahpool on a single worker when separate read lane is requested', async () => {
 		const createdWorkers = [];
 		const pool = newPool('test.sqlite3', {
@@ -67,6 +97,7 @@ describe('sqliteOPFS pool', () => {
 		const messages = [];
 		let terminated = false;
 		const pool = newPool('test.sqlite3', {
+			vfs: 'opfs-sahpool',
 			prewarmRead: false,
 			createWorker() {
 				return newFakeWorker(messages, () => ({ ok: true }), () => {
@@ -81,59 +112,12 @@ describe('sqliteOPFS pool', () => {
 		expect(terminated).toBe(true);
 	});
 
-	test('can opt in to separate OPFS read worker without prewarm', async () => {
-		const createdWorkers = [];
-		const pool = newPool('test.sqlite3', {
-			singleWorker: false,
-			prewarmRead: false,
-			createWorker() {
-				const worker = newFakeWorker();
-				createdWorkers.push(worker);
-				return worker;
-			}
-		});
-
-		await wait(10);
-		expect(createdWorkers).toHaveLength(1);
-		pool.connectRead(() => {});
-		await wait(10);
-
-		expect(createdWorkers).toHaveLength(2);
-		pool.end();
-	});
-
-	test('does not reuse a provided writer worker for separate read lane', async () => {
-		const writerWorker = newFakeWorker();
-		const createdWorkers = [];
-		const pool = newPool('test.sqlite3', {
-			singleWorker: false,
-			prewarmRead: false,
-			worker: writerWorker,
-			closeDbOnClose: false,
-			createWorker() {
-				const worker = newFakeWorker();
-				createdWorkers.push(worker);
-				return worker;
-			}
-		});
-
-		pool.connectRead((err, _client, done) => {
-			if (err)
-				throw err;
-			done();
-		});
-		await wait(10);
-
-		expect(createdWorkers).toHaveLength(1);
-		expect(createdWorkers[0]).not.toBe(writerWorker);
-		pool.end();
-	});
-
 	test('queues writer checkouts until the previous checkout is released', async () => {
 		const events = [];
 		let releaseFirst;
 		let releaseSecond;
 		const pool = newPool('test.sqlite3', {
+			vfs: 'opfs-sahpool',
 			createWorker() {
 				return newFakeWorker();
 			}
@@ -168,6 +152,7 @@ describe('sqliteOPFS pool', () => {
 		let releaseNormal;
 		let releaseSync;
 		const pool = newPool('test.sqlite3', {
+			vfs: 'opfs-sahpool',
 			createWorker() {
 				return newFakeWorker();
 			}
@@ -216,6 +201,7 @@ describe('sqliteOPFS pool', () => {
 		log.on('query', onQuery);
 		log.on('queryComplete', onComplete);
 		const pool = newPool('test.sqlite3', {
+			vfs: 'opfs-sahpool',
 			prewarmRead: false,
 			createWorker() {
 				return newFakeWorker();
@@ -247,7 +233,7 @@ describe('sqliteOPFS pool', () => {
 		}
 	});
 
-	test('uses default OPFS worker open request', async () => {
+	test('uses opfs-wl for the default worker open request', async () => {
 		const messages = [];
 		const pool = newPool('test.sqlite3', {
 			prewarmRead: false,
@@ -256,20 +242,25 @@ describe('sqliteOPFS pool', () => {
 			}
 		});
 
-		await wait(10);
+		await new Promise((resolve, reject) => {
+			pool.connect((err, _client, done) => {
+				done(err);
+				err ? reject(err) : resolve();
+			});
+		});
 
 		expect(messages[0].method).toBe('open');
-		expect(messages[0].vfs).toBeUndefined();
-		expect(messages[0].sahPool).toBeUndefined();
+		expect(messages[0].vfs).toBe('opfs-wl');
+		expect(messages[0].opfsSahPoolOptions).toBeUndefined();
 		pool.end();
 	});
 
-	test('tracks sqlite open vfs details', async () => {
+	test('tracks the default sqlite open vfs', async () => {
 		const pool = newPool('test.sqlite3', {
 			prewarmRead: false,
 			createWorker() {
 				return newFakeWorker([], (message) => message.method === 'open'
-					? { opened: true, filename: '/test.sqlite3', vfs: 'opfs' }
+					? { opened: true, filename: '/test.sqlite3', vfs: 'opfs-wl' }
 					: { ok: true });
 			}
 		});
@@ -283,14 +274,8 @@ describe('sqliteOPFS pool', () => {
 					resolve();
 				});
 			});
-			const opened = await pool.__orangeSqliteOPFSReady;
-
-			expect(opened).toMatchObject({
-				filename: '/test.sqlite3',
-				requestedVfs: 'opfs',
-				vfs: 'opfs',
-				fallback: false
-			});
+			expect(pool.__orangeSqliteOPFSRequestedVfs).toBe('opfs-wl');
+			expect(pool.__orangeSqliteOPFSVfs).toBe('opfs-wl');
 		}
 		finally {
 			pool.end();
@@ -311,10 +296,13 @@ describe('sqliteOPFS pool', () => {
 
 		try {
 			const rows = await new Promise((resolve, reject) => {
-				pool.connect((err, client) => {
+				pool.connect((err, client, done) => {
 					if (err)
 						return reject(err);
-					client.executeQuery(newSql('SELECT 1'), (err, result) => err ? reject(err) : resolve(result));
+					client.executeQuery(newSql('SELECT 1'), (err, result) => {
+						done(err);
+						err ? reject(err) : resolve(result);
+					});
 				});
 			});
 
@@ -341,15 +329,21 @@ describe('sqliteOPFS pool', () => {
 
 		try {
 			const rows = await new Promise((resolve, reject) => {
-				pool.connect((err, client) => {
+				pool.connect((err, client, done) => {
 					if (err)
 						return reject(err);
-					client.executeQuery(newSql('SELECT 1'), (err, result) => err ? reject(err) : resolve(result));
+					client.executeQuery(newSql('SELECT 1'), (err, result) => {
+						done(err);
+						err ? reject(err) : resolve(result);
+					});
 				});
 			});
 
 			expect(rows).toEqual([{ value: 1 }]);
-			expect(installOptions).toEqual([{}]);
+			expect(installOptions).toEqual([{
+				name: 'opfs-sahpool-orange-efa0729a',
+				directory: '.opfs-sahpool-orange-efa0729a'
+			}]);
 		}
 		finally {
 			await pool.end();
@@ -534,11 +528,10 @@ describe('sqliteOPFS pool', () => {
 		}
 	});
 
-	test('falls back from opfs-sahpool to opfs-wl', async () => {
+	test('does not fall back when opfs-sahpool is locked', async () => {
 		const closes = [];
-		const pool = newPool('fallback-opfs-wl.sqlite3', {
+		const pool = newPool('locked-sahpool.sqlite3', {
 			vfs: 'opfs-sahpool',
-			fallbackVfs: 'opfs-wl',
 			inlineWorker: true,
 			prewarmRead: false,
 			sqlite3InitModule() {
@@ -547,6 +540,34 @@ describe('sqliteOPFS pool', () => {
 					throw new Error('SAH pool is locked');
 				};
 				return sqlite3;
+			}
+		});
+
+		try {
+			await expect(new Promise((resolve, reject) => {
+				pool.connect((err, client) => {
+					if (err)
+						return reject(err);
+					client.executeQuery(newSql('SELECT 1'), (err) => err ? reject(err) : resolve());
+				});
+			})).rejects.toThrow('SAH pool is locked');
+			expect(pool.__orangeSqliteOPFSRequestedVfs).toBe('opfs-sahpool');
+			expect(pool.__orangeSqliteOPFSVfs).toBeUndefined();
+		}
+		finally {
+			await pool.end();
+		}
+		expect(closes).toEqual([]);
+	});
+
+	test('uses opfs-wl as the sync sqliteOPFS default without fallback', async () => {
+		const closes = [];
+		const pool = newPool('sync-default-opfs.sqlite3', {
+			sync: { url: '/rdb' },
+			inlineWorker: true,
+			prewarmRead: false,
+			sqlite3InitModule() {
+				return newFakeSqlite3(closes);
 			}
 		});
 
@@ -561,45 +582,10 @@ describe('sqliteOPFS pool', () => {
 					});
 				});
 			});
-			await wait(10);
 
 			expect(rows).toEqual([{ value: 1 }]);
+			expect(pool.__orangeSqliteOPFSRequestedVfs).toBe('opfs-wl');
 			expect(pool.__orangeSqliteOPFSVfs).toBe('opfs-wl');
-			expect(pool.__orangeSqliteOPFSFallback).toBe(true);
-		}
-		finally {
-			await pool.end();
-		}
-		expect(closes).toEqual(['/fallback-opfs-wl.sqlite3']);
-	});
-
-	test('uses sync sqliteOPFS defaults for sahpool fallback to opfs-wl', async () => {
-		const closes = [];
-		const pool = newPool('sync-default-opfs.sqlite3', {
-			sync: { url: '/rdb' },
-			inlineWorker: true,
-			prewarmRead: false,
-			sqlite3InitModule() {
-				const sqlite3 = newFakeSqlite3(closes);
-				sqlite3.installOpfsSAHPoolVfs = async () => {
-					throw new Error('SAH pool is locked');
-				};
-				return sqlite3;
-			}
-		});
-
-		try {
-			const rows = await new Promise((resolve, reject) => {
-				pool.connect((err, client) => {
-					if (err)
-						return reject(err);
-					client.executeQuery(newSql('SELECT 1'), (err, result) => err ? reject(err) : resolve(result));
-				});
-			});
-
-			expect(rows).toEqual([{ value: 1 }]);
-			expect(pool.__orangeSqliteOPFSRequestedVfs).toBe('opfs-sahpool');
-			expect(pool.__orangeSqliteOPFSFallbackVfs).toBe('opfs-wl');
 			expect(pool.__orangeCrossTabWriteLock).toEqual({ enabled: true, timeoutMs: 300000 });
 		}
 		finally {
@@ -628,7 +614,7 @@ describe('sqliteOPFS pool', () => {
 						return reject(err);
 					client.executeQuery(newSql('SELECT 1'), (err) => err ? reject(err) : resolve());
 				});
-			})).rejects.toThrow('sqliteOPFS vfs "opfs" is not available');
+			})).rejects.toThrow('sqliteOPFS vfs "opfs-wl" is not available');
 		}
 		finally {
 			await pool.end();
