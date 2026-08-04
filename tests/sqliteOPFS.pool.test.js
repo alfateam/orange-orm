@@ -1,9 +1,23 @@
 import { describe, expect, test } from 'vitest';
 
 const newPool = require('../src/sqliteOPFS/newPool');
+const newTransaction = require('../src/sqliteOPFS/newTransaction');
 const log = require('../src/table/log');
 
 describe('sqliteOPFS pool', () => {
+	test('uses the sqlite-wasm variable limit for batch inserts', async () => {
+		const domain = {};
+		const transaction = newTransaction(domain, {
+			connect(callback) {
+				callback(null, {}, () => {});
+			}
+		});
+
+		await new Promise(transaction);
+
+		expect(domain.rdb.maxParameters).toBe(32766);
+	});
+
 	test('uses a single worker for default opfs-wl', async () => {
 		const createdWorkers = [];
 		const pool = newPool('test.sqlite3', {

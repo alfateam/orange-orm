@@ -5907,7 +5907,7 @@ function requireSyncClient () {
 	} = requireOperationContext();
 
 	const maxPushBatchesPerSync = 1000;
-	const maxStableBaseKeysPerStatement = 200;
+	const maxStableBaseKeysPerStatement = 1000;
 	const pullJournalRecoveryPageSize = 1000;
 	const streamPullPendingStatus = 'stream-pending';
 	const streamPullReadyStatus = 'stream-ready';
@@ -8655,13 +8655,33 @@ function requireSyncClient () {
 		function primaryKeyWhereAnySql(primaryColumns, keys) {
 			if (!Array.isArray(keys) || keys.length === 0)
 				return '';
-			const clauses = [];
+			if (keys.length === 1)
+				return primaryKeyWhereSql(primaryColumns, keys[0]);
+			const validKeys = [];
 			for (let i = 0; i < keys.length; i++) {
-				const where = primaryKeyWhereSql(primaryColumns, keys[i]);
-				if (where)
-					clauses.push(primaryColumns.length > 1 ? `(${where})` : where);
+				const key = keys[i];
+				if (!Array.isArray(key) || key.length !== primaryColumns.length)
+					continue;
+				if (key.some(value => value === null || value === undefined))
+					return keys
+						.map(current => primaryKeyWhereSql(primaryColumns, current))
+						.filter(Boolean)
+						.map(where => primaryColumns.length > 1 ? `(${where})` : where)
+						.join(' OR ');
+				validKeys.push(key);
 			}
-			return clauses.join(' OR ');
+			if (validKeys.length === 0)
+				return '';
+			if (primaryColumns.length === 1) {
+				return `${quoteIdent(primaryColumns[0])} IN (${validKeys
+					.map(key => sqlValueLiteral(key[0]))
+					.join(', ')})`;
+			}
+			const columns = primaryColumns.map(quoteIdent).join(', ');
+			const values = validKeys
+				.map(key => `(${key.map(sqlValueLiteral).join(', ')})`)
+				.join(', ');
+			return `(${columns}) IN (${values})`;
 		}
 
 		async function restoreStableBase(db) {
@@ -25896,6 +25916,7 @@ function requireNewTransaction$1 () {
 	function newResolveTransaction(domain, pool, { readonly = false, priority } = {})  {
 		var rdb = { poolFactory: pool };
 		rdb.engine = 'sqlite';
+		rdb.maxParameters = 32766;
 		rdb.encodeBoolean = encodeBoolean;
 		rdb.encodeBinary = encodeBinary;
 		rdb.decodeBinary = decodeBinary;
@@ -26327,7 +26348,7 @@ function requireDualSyncDatabase () {
 	const roleA = 'a';
 	const roleB = 'b';
 	const outboxReplayPageSize = 1000;
-	const deltaItemsPerChunk = 250;
+	const deltaItemsPerChunk = 1000;
 	const deltaChunkReadPageSize = 32;
 	const manifestCacheMaxAgeMs = 1000;
 
@@ -27111,8 +27132,11 @@ function requireDualSyncDatabase () {
 					throw new Error('Cannot write to a completed dual sync delta.');
 				if (Array.isArray(items) && items.length > 0)
 					bufferedItems.push(...items);
+				const chunks = [];
 				while (bufferedItems.length >= deltaItemsPerChunk)
-					await writeChunk(bufferedItems.splice(0, deltaItemsPerChunk));
+					chunks.push(bufferedItems.splice(0, deltaItemsPerChunk));
+				if (chunks.length > 0)
+					await writeChunks(chunks);
 			}
 
 			async function commit(journal) {
@@ -27125,7 +27149,7 @@ function requireDualSyncDatabase () {
 					return undefined;
 				}
 				if (bufferedItems.length > 0)
-					await writeChunk(bufferedItems.splice(0));
+					await writeChunks([bufferedItems.splice(0)]);
 				const header = {
 					scopeKey: journal.scopeKey,
 					tables: Array.isArray(journal.tables) ? journal.tables : [],
@@ -27151,10 +27175,15 @@ function requireDualSyncDatabase () {
 				await deleteChunks();
 			}
 
-			async function writeChunk(items) {
+			async function writeChunks(chunks) {
+				const values = chunks.map(items => [
+					'(',
+					sqlStringLiteral(id), ', ', chunkIndex++, ', ', sqlStringLiteral(stringify(items)),
+					')'
+				].join(''));
 				await db.query([
-					`INSERT INTO "${deltaChunkTable}" ("delta_id", "chunk_index", "items_json")`,
-					`VALUES (${sqlStringLiteral(id)}, ${chunkIndex++}, ${sqlStringLiteral(stringify(items))})`
+					`INSERT INTO "${deltaChunkTable}" ("delta_id", "chunk_index", "items_json") VALUES`,
+					values.join(', ')
 				].join(' '));
 			}
 

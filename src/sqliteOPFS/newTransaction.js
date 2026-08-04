@@ -14,6 +14,7 @@ const quote = require('../sqlite/quote');
 function newResolveTransaction(domain, pool, { readonly = false, priority } = {})  {
 	var rdb = { poolFactory: pool };
 	rdb.engine = 'sqlite';
+	rdb.maxParameters = 32766;
 	rdb.encodeBoolean = encodeBoolean;
 	rdb.encodeBinary = encodeBinary;
 	rdb.decodeBinary = decodeBinary;

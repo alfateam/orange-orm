@@ -918,8 +918,8 @@ describe('sync client auto start', () => {
 		const baseInserts = db.queryLog.filter(sql => /^INSERT INTO "orange_sync_base_data_.*" SELECT \* FROM "customer" WHERE/u.test(sql));
 		expect(baseDeletes).toHaveLength(1);
 		expect(baseInserts).toHaveLength(1);
-		expect(baseDeletes[0]).toMatch(/"id" = 1 OR "id" = 2/u);
-		expect(baseInserts[0]).toMatch(/"id" = 1 OR "id" = 2/u);
+		expect(baseDeletes[0]).toMatch(/"id" IN \(1, 2\)/u);
+		expect(baseInserts[0]).toMatch(/"id" IN \(1, 2\)/u);
 		expect(db.queryLog.some(sql => /^CREATE INDEX IF NOT EXISTS "orange_sync_base_idx_.*" ON "orange_sync_base_data_.*" \("id"\)$/u.test(sql))).toBe(true);
 	});
 

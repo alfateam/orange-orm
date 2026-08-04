@@ -30,7 +30,7 @@ const manifestId = 'default';
 const roleA = 'a';
 const roleB = 'b';
 const outboxReplayPageSize = 1000;
-const deltaItemsPerChunk = 250;
+const deltaItemsPerChunk = 1000;
 const deltaChunkReadPageSize = 32;
 const manifestCacheMaxAgeMs = 1000;
 
@@ -814,8 +814,11 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 				throw new Error('Cannot write to a completed dual sync delta.');
 			if (Array.isArray(items) && items.length > 0)
 				bufferedItems.push(...items);
+			const chunks = [];
 			while (bufferedItems.length >= deltaItemsPerChunk)
-				await writeChunk(bufferedItems.splice(0, deltaItemsPerChunk));
+				chunks.push(bufferedItems.splice(0, deltaItemsPerChunk));
+			if (chunks.length > 0)
+				await writeChunks(chunks);
 		}
 
 		async function commit(journal) {
@@ -828,7 +831,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 				return undefined;
 			}
 			if (bufferedItems.length > 0)
-				await writeChunk(bufferedItems.splice(0));
+				await writeChunks([bufferedItems.splice(0)]);
 			const header = {
 				scopeKey: journal.scopeKey,
 				tables: Array.isArray(journal.tables) ? journal.tables : [],
@@ -854,10 +857,15 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 			await deleteChunks();
 		}
 
-		async function writeChunk(items) {
+		async function writeChunks(chunks) {
+			const values = chunks.map(items => [
+				'(',
+				sqlStringLiteral(id), ', ', chunkIndex++, ', ', sqlStringLiteral(stringify(items)),
+				')'
+			].join(''));
 			await db.query([
-				`INSERT INTO "${deltaChunkTable}" ("delta_id", "chunk_index", "items_json")`,
-				`VALUES (${sqlStringLiteral(id)}, ${chunkIndex++}, ${sqlStringLiteral(stringify(items))})`
+				`INSERT INTO "${deltaChunkTable}" ("delta_id", "chunk_index", "items_json") VALUES`,
+				values.join(', ')
 			].join(' '));
 		}
 
