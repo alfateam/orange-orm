@@ -5434,6 +5434,8 @@ function requireSyncAuto () {
 
 		async function runCycle() {
 			const config = normalizeAutoConfig(await getConfig(), { forceEnabled: forceRunning });
+			if (config.enabled && typeof options.runSync === 'function')
+				return options.runSync(config);
 			if (config.enabled)
 				return syncClient.sync();
 			return { skipped: true };
@@ -26488,7 +26490,11 @@ function requireDualSyncDatabase () {
 		function __createSyncClient(rootClient, _getDb, httpInterceptor) {
 			roleClientFactory = rootClient;
 			roleHttpInterceptor = httpInterceptor;
-			const auto = createSyncAuto({ sync: syncObserved }, async () => router.__sqliteSync);
+			const auto = createSyncAuto(
+				{ sync: syncObserved },
+				async () => router.__sqliteSync,
+				{ runSync: syncAutomatic }
+			);
 			const syncClient = {
 				sync: syncObserved,
 				ensureLocalSchema,
@@ -26513,7 +26519,16 @@ function requireDualSyncDatabase () {
 		}
 
 		function syncObserved(options = {}) {
-			const normalizedOptions = normalizeSyncOptions(options);
+			return queueSync(normalizeSyncOptions(options));
+		}
+
+		function syncAutomatic(config) {
+			return queueSync({}, {
+				minimumIntervalMs: normalizeAutoSyncIntervalMs(config && config.intervalMs)
+			});
+		}
+
+		function queueSync(normalizedOptions, schedule = {}) {
 			queuedSyncCount += 1;
 			emitSyncProgress('queued', { queueDepth: queuedSyncCount });
 			const run = syncTail.then(() => {
@@ -26522,11 +26537,40 @@ function requireDualSyncDatabase () {
 				return observe('sync', () => runWithCrossTabLock(
 					dualSyncLockName,
 					toDualSyncLockConfig(poolOptions && poolOptions.sync, normalizedOptions),
-					() => sync(normalizedOptions)
+					() => syncScheduled(normalizedOptions, schedule)
 				));
 			});
 			syncTail = run.catch(() => {});
 			return run;
+		}
+
+		async function syncScheduled(options, schedule) {
+			const minimumIntervalMs = schedule && schedule.minimumIntervalMs;
+			if (minimumIntervalMs > 0) {
+				const manifest = await getManifest(true);
+				const lastSuccessfulSyncAtMs = manifest.lastSuccessfulSyncAtMs;
+				const elapsedMs = Date.now() - lastSuccessfulSyncAtMs;
+				if (lastSuccessfulSyncAtMs > 0 && elapsedMs >= 0 && elapsedMs < minimumIntervalMs) {
+					const nextSyncAtMs = lastSuccessfulSyncAtMs + minimumIntervalMs;
+					emitSyncProgress('complete', {
+						activeRole: manifest.activeRole,
+						stagingRole: manifest.stagingRole,
+						swapped: false,
+						skipped: 'recently-synced',
+						lastSuccessfulSyncAtMs,
+						nextSyncAtMs
+					});
+					return withDualSyncResult({
+						skipped: 'recently-synced',
+						lastSuccessfulSyncAtMs,
+						nextSyncAtMs
+					}, {
+						...manifest,
+						swapped: false
+					});
+				}
+			}
+			return sync(options);
 		}
 
 		async function sync(options = {}) {
@@ -26586,6 +26630,7 @@ function requireDualSyncDatabase () {
 				}
 			});
 
+			publishedManifest = await markSuccessfulSync();
 			const newActiveRole = publishedManifest.activeRole;
 			await maybeEmitInitialReady(newActiveRole);
 			emitSyncProgress('complete', {
@@ -26995,7 +27040,7 @@ function requireDualSyncDatabase () {
 			const db = await getCacheDb();
 			await ensureCacheSchema(db);
 			const rows = await db.query([
-				`SELECT "active_role", "staging_role", "updated_at_ms", "generation", "client_id" FROM "${manifestTable}"`,
+				`SELECT "active_role", "staging_role", "updated_at_ms", "generation", "client_id", "last_successful_sync_at_ms" FROM "${manifestTable}"`,
 				`WHERE "id" = ${sqlStringLiteral(manifestId)}`,
 				'LIMIT 1'
 			].join(' '));
@@ -27009,8 +27054,28 @@ function requireDualSyncDatabase () {
 				stagingRole,
 				updatedAtMs: Number(row.updated_at_ms ?? row.UPDATED_AT_MS ?? Date.now()),
 				generation: normalizeGeneration(row.generation ?? row.GENERATION),
-				clientId: nonEmptyString(row.client_id ?? row.CLIENT_ID)
+				clientId: nonEmptyString(row.client_id ?? row.CLIENT_ID),
+				lastSuccessfulSyncAtMs: normalizeTimestamp(
+					row.last_successful_sync_at_ms ?? row.LAST_SUCCESSFUL_SYNC_AT_MS
+				)
 			};
+		}
+
+		async function markSuccessfulSync() {
+			const db = await getCacheDb();
+			const lastSuccessfulSyncAtMs = Date.now();
+			await ensureCacheSchema(db);
+			await db.query([
+				`UPDATE "${manifestTable}"`,
+				`SET "last_successful_sync_at_ms" = ${lastSuccessfulSyncAtMs}`,
+				`WHERE "id" = ${sqlStringLiteral(manifestId)}`
+			].join(' '));
+			const persisted = await readManifest();
+			if (!persisted)
+				throw new Error('Dual sync completion time was not persisted.');
+			updateManifestCache(persisted, true);
+			broadcastManifest(persisted);
+			return persisted;
 		}
 
 		async function writeManifest(manifest, options = {}) {
@@ -27275,11 +27340,13 @@ function requireDualSyncDatabase () {
 						'"staging_role" TEXT NOT NULL,',
 						'"updated_at_ms" INTEGER NOT NULL,',
 						'"generation" INTEGER NOT NULL DEFAULT 0,',
-						'"client_id" TEXT',
+						'"client_id" TEXT,',
+						'"last_successful_sync_at_ms" INTEGER',
 						');'
 					].join(' '));
 					await tryAddCacheColumn(db, manifestTable, 'generation', 'INTEGER NOT NULL DEFAULT 0');
 					await tryAddCacheColumn(db, manifestTable, 'client_id', 'TEXT');
+					await tryAddCacheColumn(db, manifestTable, 'last_successful_sync_at_ms', 'INTEGER');
 					await db.query([
 						`CREATE TABLE IF NOT EXISTS "${deltaTable}" (`,
 						'"id" TEXT PRIMARY KEY,',
@@ -27480,7 +27547,8 @@ function requireDualSyncDatabase () {
 			stagingRole: info.stagingRole,
 			updatedAtMs: Number(info.updatedAtMs) || Date.now(),
 			generation: normalizeGeneration(info.generation),
-			clientId: nonEmptyString(info.clientId)
+			clientId: nonEmptyString(info.clientId),
+			lastSuccessfulSyncAtMs: normalizeTimestamp(info.lastSuccessfulSyncAtMs)
 		};
 	}
 
@@ -27589,6 +27657,16 @@ function requireDualSyncDatabase () {
 		if (!Number.isFinite(parsed) || parsed <= 0)
 			return undefined;
 		return parsed;
+	}
+
+	function normalizeAutoSyncIntervalMs(value) {
+		const parsed = Number.parseInt(value, 10);
+		return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+	}
+
+	function normalizeTimestamp(value) {
+		const parsed = Number(value);
+		return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 	}
 
 	function toDualSyncLockConfig(sync, options) {

@@ -76,6 +76,8 @@ function createSyncAuto(syncClient, getConfig, options = {}) {
 
 	async function runCycle() {
 		const config = normalizeAutoConfig(await getConfig(), { forceEnabled: forceRunning });
+		if (config.enabled && typeof options.runSync === 'function')
+			return options.runSync(config);
 		if (config.enabled)
 			return syncClient.sync();
 		return { skipped: true };

@@ -105,6 +105,22 @@ describe('sync auto scheduler', () => {
 		expect(syncs).toBe(1);
 	});
 
+	test('passes normalized automatic sync configuration to a custom runner', async () => {
+		const configs = [];
+		const auto = createSyncAuto({
+			sync: async () => {
+				throw new Error('default sync runner should not be used');
+			}
+		}, async () => ({ url: '/rdb', auto: { intervalMs: 5000 } }), {
+			runSync: async config => configs.push(config)
+		});
+
+		await auto.start();
+		await auto.stop();
+
+		expect(configs).toEqual([{ enabled: true, intervalMs: 5000 }]);
+	});
+
 	test('restarts the interval after stop without leaving duplicate timers', async () => {
 		const intervals = new Map();
 		let nextIntervalId = 1;

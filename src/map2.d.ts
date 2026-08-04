@@ -1100,6 +1100,9 @@ export interface SyncProgressEvent {
   targetRole?: 'a' | 'b';
   processedItems?: number;
   totalItems?: number;
+  skipped?: string;
+  lastSuccessfulSyncAtMs?: number;
+  nextSyncAtMs?: number;
 }
 
 export interface SyncTransactionContext<

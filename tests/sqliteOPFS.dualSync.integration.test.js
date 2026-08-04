@@ -53,7 +53,7 @@ describe('sqliteOPFS dual sync integration', () => {
 		const connectionString = path.join(directory, 'local.sqlite3');
 		const sync = {
 			url: `http://127.0.0.1:${server.address().port}/rdb`,
-			auto: false,
+			auto: { enabled: false, intervalMs: 5000 },
 			tables: ['project'],
 			pull: {
 				maxKeysPerBatch: 100,
@@ -216,6 +216,30 @@ describe('sqliteOPFS dual sync integration', () => {
 			]);
 
 			expect(maxActiveRequests).toBe(1);
+
+			let automaticRequests = 0;
+			const countAutomaticRequest = config => {
+				automaticRequests += 1;
+				return config;
+			};
+			localDb.syncClient.interceptors.request.use(countAutomaticRequest);
+			secondLocalDb.syncClient.interceptors.request.use(countAutomaticRequest);
+
+			await Promise.all([
+				localDb.syncClient.start(),
+				secondLocalDb.syncClient.start()
+			]);
+			await localDb.syncClient.stop();
+			await secondLocalDb.syncClient.stop();
+
+			expect(automaticRequests).toBe(0);
+
+			await secondLocalDb.syncClient.sync();
+			expect(automaticRequests).toBeGreaterThan(0);
+			const completionRows = await deltaDb.query(
+				'SELECT "last_successful_sync_at_ms" FROM "orange_sync_dual_manifest" WHERE "id" = \'default\''
+			);
+			expect(Number(completionRows[0].last_successful_sync_at_ms)).toBeGreaterThan(0);
 		}
 		finally {
 			restoreLocks();
