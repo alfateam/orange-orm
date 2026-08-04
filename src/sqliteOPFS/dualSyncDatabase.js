@@ -31,6 +31,7 @@ const roleA = 'a';
 const roleB = 'b';
 const outboxReplayPageSize = 1000;
 const deltaItemsPerChunk = 250;
+const deltaChunkReadPageSize = 32;
 const manifestCacheMaxAgeMs = 1000;
 
 function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase) {
@@ -415,7 +416,29 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 				continue;
 			if (delta.appliedRoles.includes(role))
 				continue;
-			await getRoleSyncClient(role)[applyPullJournalSymbol](delta.journal);
+			const totalItems = getDeltaItemCount(delta.journal);
+			const hasInlineItems = Array.isArray(delta.journal.items);
+			const readPullJournalBatch = hasInlineItems
+				? undefined
+				: await createDeltaJournalBatchReader(delta.id);
+			emitSyncProgress('applying-delta', {
+				deltaId: delta.id,
+				targetRole: role,
+				processedItems: 0,
+				totalItems
+			});
+			await getRoleSyncClient(role)[applyPullJournalSymbol](delta.journal, {
+				_readPullJournalBatch: readPullJournalBatch,
+				_itemCount: totalItems,
+				_onPullJournalBatchApplied(progress) {
+					emitSyncProgress('applying-delta', {
+						deltaId: delta.id,
+						targetRole: role,
+						processedItems: progress.processedItems,
+						totalItems: progress.totalItems
+					});
+				}
+			});
 			await markDeltaApplied(delta, role);
 		}
 	}
@@ -794,26 +817,10 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 			`SELECT "id", "journal_json", "applied_roles_json" FROM "${deltaTable}"`,
 			'ORDER BY "created_at_ms" ASC'
 		].join(' '));
-		const chunkRows = await db.query([
-			`SELECT "delta_id", "chunk_index", "items_json" FROM "${deltaChunkTable}"`,
-			'ORDER BY "delta_id" ASC, "chunk_index" ASC'
-		].join(' '));
-		const itemsByDelta = new Map();
-		for (const row of toRows(chunkRows)) {
-			const deltaId = row.delta_id ?? row.DELTA_ID;
-			const items = parseJson(row.items_json ?? row.ITEMS_JSON);
-			if (typeof deltaId !== 'string' || !Array.isArray(items))
-				continue;
-			const current = itemsByDelta.get(deltaId) || [];
-			current.push(...items);
-			itemsByDelta.set(deltaId, current);
-		}
 		return toRows(rows)
 			.map(row => {
 				const id = row.id ?? row.ID;
 				const journal = parseJson(row.journal_json ?? row.JOURNAL_JSON);
-				if (journal && itemsByDelta.has(id))
-					journal.items = itemsByDelta.get(id);
 				return {
 					id,
 					journal,
@@ -821,6 +828,56 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 				};
 			})
 			.filter(delta => typeof delta.id === 'string' && delta.journal && delta.journal === Object(delta.journal));
+	}
+
+	async function createDeltaJournalBatchReader(deltaId) {
+		const db = await getCacheDb();
+		await ensureCacheSchema(db);
+		let pending = [];
+		let afterChunkIndex = -1;
+		let done = false;
+		return readNextBatch;
+
+		async function readNextBatch() {
+			if (pending.length === 0 && !done)
+				await readNextPage();
+			if (pending.length === 0)
+				return null;
+			return pending.shift();
+		}
+
+		async function readNextPage() {
+			const rows = toRows(await db.query([
+				`SELECT "chunk_index", "items_json" FROM "${deltaChunkTable}"`,
+				`WHERE "delta_id" = ${sqlStringLiteral(deltaId)}`,
+				`AND "chunk_index" > ${afterChunkIndex}`,
+				'ORDER BY "chunk_index" ASC',
+				`LIMIT ${deltaChunkReadPageSize}`
+			].join(' ')));
+			if (rows.length === 0) {
+				done = true;
+				return;
+			}
+			for (let i = 0; i < rows.length; i++) {
+				const row = rows[i];
+				const chunkIndex = Number(row.chunk_index ?? row.CHUNK_INDEX);
+				const items = parseJson(row.items_json ?? row.ITEMS_JSON);
+				if (!Number.isSafeInteger(chunkIndex) || chunkIndex !== afterChunkIndex + 1 || !Array.isArray(items))
+					throw new Error(`Dual sync delta "${deltaId}" contains an invalid journal chunk.`);
+				afterChunkIndex = chunkIndex;
+				pending.push(items);
+			}
+			if (rows.length < deltaChunkReadPageSize)
+				done = true;
+		}
+	}
+
+	function getDeltaItemCount(journal) {
+		const itemCount = Number(journal && journal.itemCount);
+		const inlineItemCount = Array.isArray(journal && journal.items) ? journal.items.length : 0;
+		return Number.isFinite(itemCount) && itemCount >= 0
+			? Math.max(itemCount, inlineItemCount)
+			: inlineItemCount;
 	}
 
 	async function markDeltaApplied(delta, role) {

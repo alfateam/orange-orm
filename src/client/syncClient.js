@@ -506,14 +506,24 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 		const scopeKey = typeof (journal && journal.scopeKey) === 'string'
 			? journal.scopeKey
 			: getScopeKey(configuredTables);
-		const items = normalizePullJournalItems(journal && journal.items);
+		const inlineItems = normalizePullJournalItems(journal && journal.items);
+		const readExternalBatch = typeof options._readPullJournalBatch === 'function'
+			? options._readPullJournalBatch
+			: undefined;
+		const readNextBatch = createJournalBatchReader(inlineItems, readExternalBatch);
 		const applyConfig = normalizePullApplyConfig(
 			options && options.apply !== undefined ? options.apply : pullConfig.apply
 		);
 		const defaultPatchOptions = { ...(pullConfig.patchOptions || {}), concurrency: 'overwrite', skipSelectAfterInsert: true };
 		const checkpointSince = journal && journal.finalSince;
 		const shouldApplyCheckpoint = checkpointSince !== undefined;
+		const totalItems = normalizeJournalItemCount(
+			options._itemCount,
+			journal && journal.itemCount,
+			inlineItems.length
+		);
 		let applied = 0;
+		let processedItems = 0;
 		const touchedTables = new Set();
 		await tryEnableForeignKeys(db);
 		if (applyConfig)
@@ -534,14 +544,20 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 				await tryDeferForeignKeys(tx);
 				await ensureStableBaseTables(tx, configuredTables);
 				const baseByName = await readStableBaseEntriesByName(tx);
-				for (let i = 0; i < items.length; i++) {
-					const item = items[i];
-					if (item && typeof item.table === 'string')
-						touchedTables.add(item.table);
-					applied += await applyPullJournalItemOnTx(tx, item, defaultPatchOptions);
-					await applyPullJournalItemToStableBase(tx, item, baseByName);
+				let hasItems = false;
+				for (;;) {
+					const batch = await readNextBatch();
+					if (batch === null)
+						break;
+					if (batch.length === 0)
+						continue;
+					hasItems = true;
+					trackTouchedTables(batch);
+					applied += await applyPullJournalBatchOnTx(tx, batch, defaultPatchOptions, baseByName);
+					await reportBatchApplied(batch.length);
 				}
-				if (items.length > 0)
+				assertJournalItemCountComplete();
+				if (hasItems)
 					await validateForeignKeys(tx);
 				if (shouldApplyCheckpoint)
 					await writeScopeState(scopeKey, { since: checkpointSince, updatedAtMs: Date.now() }, tx);
@@ -549,31 +565,106 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 		}
 
 		async function applyPullJournalItemsInChunks() {
-			for (let offset = 0; offset < items.length; offset += applyConfig.maxRowsPerTransaction) {
-				const chunk = items.slice(offset, offset + applyConfig.maxRowsPerTransaction);
+			const readNextChunk = createSizedJournalBatchReader(readNextBatch, applyConfig.maxRowsPerTransaction);
+			let hasItems = false;
+			for (;;) {
+				const chunk = await readNextChunk();
+				if (chunk === null)
+					break;
+				if (chunk.length === 0)
+					continue;
+				hasItems = true;
 				await client.transaction(async (tx) => {
 					await tryDeferForeignKeys(tx);
 					await ensureStableBaseTables(tx, configuredTables);
 					const baseByName = await readStableBaseEntriesByName(tx);
-					for (let i = 0; i < chunk.length; i++) {
-						const item = chunk[i];
-						if (item && typeof item.table === 'string')
-							touchedTables.add(item.table);
-						applied += await applyPullJournalItemOnTx(tx, item, defaultPatchOptions);
-						await applyPullJournalItemToStableBase(tx, item, baseByName);
-					}
+					trackTouchedTables(chunk);
+					applied += await applyPullJournalBatchOnTx(tx, chunk, defaultPatchOptions, baseByName);
 					if (chunk.length > 0 && applyConfig.foreignKeyCheck === 'chunk')
 						await validateForeignKeys(tx);
 				}, { suppressSyncOutbox: true });
+				await reportBatchApplied(chunk.length);
 				await yieldPullApply(applyConfig);
 			}
+			assertJournalItemCountComplete();
 			await client.transaction(async (tx) => {
-				if (items.length > 0 && applyConfig.foreignKeyCheck === 'final')
+				if (hasItems && applyConfig.foreignKeyCheck === 'final')
 					await validateForeignKeys(tx);
 				if (shouldApplyCheckpoint)
 					await writeScopeState(scopeKey, { since: checkpointSince, updatedAtMs: Date.now() }, tx);
 			}, { suppressSyncOutbox: true });
 		}
+
+		function trackTouchedTables(items) {
+			for (let i = 0; i < items.length; i++) {
+				const item = items[i];
+				if (item && typeof item.table === 'string')
+					touchedTables.add(item.table);
+			}
+		}
+
+		async function reportBatchApplied(itemCount) {
+			processedItems += itemCount;
+			if (typeof options._onPullJournalBatchApplied === 'function') {
+				await options._onPullJournalBatchApplied({
+					processedItems,
+					totalItems
+				});
+			}
+		}
+
+		function assertJournalItemCountComplete() {
+			if (processedItems !== totalItems) {
+				throw new Error(
+					`Sync pull journal ended after ${processedItems} of ${totalItems} expected items.`
+				);
+			}
+		}
+	}
+
+	function createJournalBatchReader(inlineItems, externalReader) {
+		let inlineRead = false;
+		return async function readNextJournalBatch() {
+			if (externalReader) {
+				const batch = await externalReader();
+				return batch === null || batch === undefined
+					? null
+					: normalizePullJournalItems(batch);
+			}
+			if (inlineRead)
+				return null;
+			inlineRead = true;
+			return inlineItems;
+		};
+	}
+
+	function createSizedJournalBatchReader(readBatch, maxRows) {
+		let pending = [];
+		let done = false;
+		return async function readNextSizedJournalBatch() {
+			while (!done && pending.length < maxRows) {
+				const batch = await readBatch();
+				if (batch === null) {
+					done = true;
+					break;
+				}
+				if (batch.length > 0)
+					pending.push(...batch);
+			}
+			if (pending.length === 0)
+				return null;
+			return pending.splice(0, maxRows);
+		};
+	}
+
+	function normalizeJournalItemCount(...values) {
+		let result = 0;
+		for (let i = 0; i < values.length; i++) {
+			const parsed = Number(values[i]);
+			if (Number.isFinite(parsed) && parsed >= 0)
+				result = Math.max(result, parsed);
+		}
+		return result;
 	}
 
 	async function pushPending(options = {}) {
@@ -880,9 +971,13 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 						const item = chunk[i];
 						if (item && typeof item.table === 'string')
 							touchedTables.add(item.table);
-						applied += await applyPullJournalItemOnTx(tx, item, defaultPatchOptions);
-						await applyPullJournalItemToStableBase(tx, item, baseByName);
 					}
+					applied += await applyPullJournalBatchOnTx(
+						tx,
+						chunk,
+						defaultPatchOptions,
+						baseByName
+					);
 					if (chunk.length > 0 && applyConfig.foreignKeyCheck === 'chunk')
 						await validateForeignKeys(tx);
 				}, { suppressSyncOutbox: true });
@@ -2550,11 +2645,29 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 			await applyStableBaseUpsertGroup(db, group);
 	}
 
-	async function applyPullJournalBatchOnTx(tx, items, patchOptions) {
+	async function applyPullJournalBatchOnTx(tx, items, patchOptions, knownBaseByName) {
 		const batch = Array.isArray(items) ? items : [];
+		const baseByName = knownBaseByName || await readStableBaseEntriesByName(tx);
+		let applied = 0;
+		for (let offset = 0; offset < batch.length;) {
+			const batchNo = Number(batch[offset] && batch[offset].batchNo || 0);
+			let end = offset + 1;
+			while (end < batch.length && Number(batch[end] && batch[end].batchNo || 0) === batchNo)
+				end += 1;
+			applied += await applyPullJournalOperationBatchOnTx(
+				tx,
+				batch.slice(offset, end),
+				patchOptions,
+				baseByName
+			);
+			offset = end;
+		}
+		return applied;
+	}
+
+	async function applyPullJournalOperationBatchOnTx(tx, batch, patchOptions, baseByName) {
 		const deleteItems = batch.filter(x => x.op === 'D');
 		const upsertItems = batch.filter(x => x.op !== 'D' && x.row !== undefined);
-		const baseByName = await readStableBaseEntriesByName(tx);
 		let applied = 0;
 		if (deleteItems.length > 0) {
 			applied += await applyDeleteItemsOnTx(tx, deleteItems, patchOptions);
@@ -2565,20 +2678,6 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 			await applyRowsPayloadToStableBase(tx, upsertItems, baseByName);
 		}
 		return applied;
-	}
-
-	async function applyPullJournalItemToStableBase(db, item, baseByName) {
-		if (!item || typeof item.table !== 'string' || !Array.isArray(item.pk))
-			return;
-		if (item.op !== 'D' && item.row === undefined)
-			return;
-		const groups = stableBaseTargetGroupsForItems([item], baseByName);
-		for (const group of groups) {
-			if (item.op === 'D')
-				await applyStableBaseDeleteGroup(db, group);
-			else
-				await applyStableBaseUpsertGroup(db, group);
-		}
 	}
 
 	async function copyTablesToStableBase(db, tableNames) {
@@ -3458,28 +3557,6 @@ async function applyDeleteItemsOnTx(tx, items, patchOptions) {
 		applied += patch.length;
 	}
 	return applied;
-}
-
-async function applyPullJournalItemOnTx(tx, item, patchOptions) {
-	if (!item || typeof item.table !== 'string' || !Array.isArray(item.pk))
-		return 0;
-	if (!tx[item.table] || typeof tx[item.table].patch !== 'function')
-		throw new Error(`Table "${item.table}" does not exist in this client`);
-	if (item.op === 'D') {
-		await tx[item.table].patch([{
-			op: 'remove',
-			path: `/${JSON.stringify(item.pk)}`
-		}], patchOptions);
-		return 1;
-	}
-	if (item.row === undefined)
-		return 0;
-	await tx[item.table].patch([{
-		op: 'add',
-		path: `/${JSON.stringify(item.pk)}`,
-		value: item.row
-	}], withInsertAndForgetStrategy(patchOptions));
-	return 1;
 }
 
 async function applyRowsPayloadOnTx(tx, items, patchOptions) {

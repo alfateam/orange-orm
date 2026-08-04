@@ -35,7 +35,11 @@ describe('sqliteOPFS dual sync integration', () => {
 		});
 		await remoteDb.project.insert([
 			{ id: 'p1', title: 'One' },
-			{ id: 'p2', title: 'Two' }
+			{ id: 'p2', title: 'Two' },
+			...Array.from({ length: 250 }, (_item, index) => ({
+				id: `bootstrap-${String(index + 1).padStart(3, '0')}`,
+				title: `Bootstrap ${index + 1}`
+			}))
 		]);
 
 		const app = express();
@@ -52,8 +56,8 @@ describe('sqliteOPFS dual sync integration', () => {
 			auto: false,
 			tables: ['project'],
 			pull: {
-				maxKeysPerBatch: 1,
-				maxRowsPerBatch: 1
+				maxKeysPerBatch: 100,
+				maxRowsPerBatch: 100
 			}
 		};
 		const dualDb = newDualSyncDatabase(connectionString, { sync }, (roleConnectionString, options) =>
@@ -64,6 +68,9 @@ describe('sqliteOPFS dual sync integration', () => {
 		);
 		const localDb = map({ db: () => dualDb });
 		closeTasks.push(() => localDb.close());
+		const progressEvents = [];
+		const offProgress = localDb.syncClient.on('sync-progress', event => progressEvents.push(event));
+		closeTasks.push(() => offProgress());
 
 		expect(await localDb.db()).toBe(dualDb);
 		const resetResult = await localDb.syncClient.resetLocal();
@@ -92,12 +99,13 @@ describe('sqliteOPFS dual sync integration', () => {
 			activeRole: 'b',
 			stagingRole: 'a'
 		});
-		expect(afterSync).toBe(2);
+		expect(afterSync).toBe(252);
 		expect(await roleA.project.count()).toBe(0);
-		expect(await roleB.project.count()).toBe(2);
+		expect(await roleB.project.count()).toBe(252);
 		const storedDeltaChunks = await deltaDb.query('SELECT "items_json" FROM "orange_sync_dual_delta_chunk" ORDER BY "chunk_index"');
-		expect(storedDeltaChunks).toHaveLength(1);
-		expect(JSON.parse(storedDeltaChunks[0].items_json)).toHaveLength(2);
+		expect(storedDeltaChunks).toHaveLength(2);
+		expect(JSON.parse(storedDeltaChunks[0].items_json)).toHaveLength(250);
+		expect(JSON.parse(storedDeltaChunks[1].items_json)).toHaveLength(2);
 
 		const localProject = await localDb.project.getById('p1');
 		localProject.title = 'One pushed locally';
@@ -109,6 +117,10 @@ describe('sqliteOPFS dual sync integration', () => {
 			activeRole: 'a',
 			stagingRole: 'b'
 		});
+		const bootstrapReplayProgress = progressEvents
+			.filter(event => event.phase === 'applying-delta' && event.targetRole === 'a' && event.totalItems === 252)
+			.map(event => event.processedItems);
+		expect(bootstrapReplayProgress).toEqual([0, 250, 252]);
 		expect(pushedRemoteProject.title).toBe('One pushed locally');
 		expect((await localDb.project.getById('p1')).title).toBe('One pushed locally');
 
@@ -120,9 +132,9 @@ describe('sqliteOPFS dual sync integration', () => {
 			activeRole: 'b',
 			stagingRole: 'a'
 		});
-		expect(await localDb.project.count()).toBe(3);
-		expect(await roleA.project.count()).toBe(2);
-		expect(await roleB.project.count()).toBe(3);
+		expect(await localDb.project.count()).toBe(253);
+		expect(await roleA.project.count()).toBe(252);
+		expect(await roleB.project.count()).toBe(253);
 
 		const pullStarted = deferred();
 		const releasePull = deferred();
@@ -172,7 +184,8 @@ describe('sqliteOPFS dual sync integration', () => {
 		const roleAClient = await roleA.query('SELECT "id" FROM "orange_sync_client" LIMIT 1');
 		const roleBClient = await roleB.query('SELECT "id" FROM "orange_sync_client" LIMIT 1');
 		expect(roleAClient[0].id).toBe(roleBClient[0].id);
-		expect(roleBRows).toEqual([
+		expect(roleBRows).toHaveLength(253);
+		expect(roleBRows.filter(row => ['p1', 'p2', 'p3'].includes(row.id))).toEqual([
 			{ id: 'p1', title: 'One pushed locally' },
 			{ id: 'p2', title: 'Two changed during swap' },
 			{ id: 'p3', title: 'Three' }

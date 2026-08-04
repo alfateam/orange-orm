@@ -1096,6 +1096,10 @@ export interface SyncProgressEvent {
   returnedItems?: number;
   elapsedMs?: number;
   failed?: boolean;
+  deltaId?: string;
+  targetRole?: 'a' | 'b';
+  processedItems?: number;
+  totalItems?: number;
 }
 
 export interface SyncTransactionContext<

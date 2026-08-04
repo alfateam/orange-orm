@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
 const newSyncClient = require('../src/client/syncClient');
-const { syncAndCapturePullJournalSymbol } = newSyncClient;
+const { applyPullJournalSymbol, syncAndCapturePullJournalSymbol } = newSyncClient;
 
 describe('sync client auto start', () => {
 	test('starts when start is called and stays running', async () => {
@@ -71,6 +71,156 @@ describe('sync client auto start', () => {
 		await client.stop();
 
 		expect(requests.some((request) => request.data.phase === 'keys')).toBe(true);
+	});
+
+	test('applies streamed pull journal batches without materializing or patching rows individually', async () => {
+		const db = newJournalDb({
+			__sqliteSync: {
+				url: '/rdb',
+				auto: false,
+				schema: false,
+				tables: ['customer']
+			},
+			baseEntries: [{
+				name: 'customer',
+				base_name: 'orange_sync_base_data_customer',
+				schema_sql: 'CREATE TABLE customer (id INTEGER PRIMARY KEY)',
+				ordinal: 0
+			}],
+			sqliteTables: [{
+				name: 'customer',
+				sql: 'CREATE TABLE customer (id INTEGER PRIMARY KEY)'
+			}]
+		});
+		const patchSizes = [];
+		const progress = [];
+		const batches = [journalItems(250, 1), journalItems(2, 251)];
+		let batchIndex = 0;
+		const client = newSyncClient({
+			tables: {
+				customer: newTable('customer')
+			},
+			transaction: async (fn) => fn({
+				customer: {
+					patch: async (patch) => {
+						patchSizes.push(patch.length);
+						return { changed: [] };
+					}
+				},
+				query: db.query
+			})
+		}, async () => db, {});
+
+		const result = await client[applyPullJournalSymbol]({
+			scopeKey: 'customer',
+			tables: ['customer'],
+			finalSince: 'cursor-252',
+			itemCount: 252
+		}, {
+			_itemCount: 252,
+			_readPullJournalBatch: async () => batches[batchIndex++] || null,
+			_onPullJournalBatchApplied: (event) => progress.push(event)
+		});
+
+		expect(result).toMatchObject({
+			applied: 252,
+			tables: ['customer'],
+			since: 'cursor-252',
+			checkpointApplied: true
+		});
+		expect(patchSizes).toEqual([250, 2]);
+		expect(progress).toEqual([
+			{ processedItems: 250, totalItems: 252 },
+			{ processedItems: 252, totalItems: 252 }
+		]);
+		expect(batchIndex).toBe(3);
+		expect(JSON.parse(db.journal.state.get('customer')).since).toBe('cursor-252');
+	});
+
+	test('does not advance a streamed journal checkpoint until every configured apply chunk succeeds', async () => {
+		const db = newJournalDb({
+			__sqliteSync: {
+				url: '/rdb',
+				auto: false,
+				schema: false,
+				tables: ['customer'],
+				pull: {
+					apply: { maxRowsPerTransaction: 2 }
+				}
+			},
+			baseEntries: [{
+				name: 'customer',
+				base_name: 'orange_sync_base_data_customer',
+				schema_sql: 'CREATE TABLE customer (id INTEGER PRIMARY KEY)',
+				ordinal: 0
+			}],
+			sqliteTables: [{
+				name: 'customer',
+				sql: 'CREATE TABLE customer (id INTEGER PRIMARY KEY)'
+			}]
+		});
+		let failSecondPatch = true;
+		let patchCall = 0;
+		const client = newSyncClient({
+			tables: {
+				customer: newTable('customer')
+			},
+			transaction: async (fn) => fn({
+				customer: {
+					patch: async () => {
+						patchCall += 1;
+						if (failSecondPatch && patchCall === 2)
+							throw new Error('apply interrupted');
+						return { changed: [] };
+					}
+				},
+				query: db.query
+			})
+		}, async () => db, {});
+		const journal = {
+			scopeKey: 'customer',
+			tables: ['customer'],
+			finalSince: 'cursor-3',
+			itemCount: 3
+		};
+
+		let batchRead = false;
+		await expect(client[applyPullJournalSymbol](journal, {
+			_readPullJournalBatch: async () => {
+				if (batchRead)
+					return null;
+				batchRead = true;
+				return journalItems(3);
+			}
+		})).rejects.toThrow('apply interrupted');
+		expect(db.journal.state.has('customer')).toBe(false);
+
+		failSecondPatch = false;
+		patchCall = 0;
+		batchRead = false;
+		await expect(client[applyPullJournalSymbol](journal, {
+			_readPullJournalBatch: async () => {
+				if (batchRead)
+					return null;
+				batchRead = true;
+				return journalItems(2);
+			}
+		})).rejects.toThrow('ended after 2 of 3 expected items');
+		expect(db.journal.state.has('customer')).toBe(false);
+
+		patchCall = 0;
+		batchRead = false;
+		await client[applyPullJournalSymbol](journal, {
+			_readPullJournalBatch: async () => {
+				if (batchRead)
+					return null;
+				batchRead = true;
+				return journalItems(3);
+			}
+		});
+
+		expect(JSON.parse(db.journal.state.get('customer')).since).toBe('cursor-3');
+		expect(patchCall).toBe(2);
 	});
 
 	test('emits sync errors', async () => {
@@ -3148,6 +3298,19 @@ function rowResponseByPk(responses, id) {
 
 function journalRowIds(items) {
 	return items.map(item => JSON.parse(item.row_json).id);
+}
+
+function journalItems(count, firstId = 1) {
+	return Array.from({ length: count }, (_item, index) => {
+		const id = firstId + index;
+		return {
+			table: 'customer',
+			pk: [id],
+			key: { id },
+			op: 'U',
+			row: { id }
+		};
+	});
 }
 
 function wait(ms) {

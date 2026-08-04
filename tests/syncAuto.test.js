@@ -104,4 +104,43 @@ describe('sync auto scheduler', () => {
 
 		expect(syncs).toBe(1);
 	});
+
+	test('restarts the interval after stop without leaving duplicate timers', async () => {
+		const intervals = new Map();
+		let nextIntervalId = 1;
+		let syncs = 0;
+		const timers = {
+			setInterval(callback) {
+				const id = nextIntervalId++;
+				intervals.set(id, callback);
+				return id;
+			},
+			clearInterval(id) {
+				intervals.delete(id);
+			}
+		};
+		const auto = createSyncAuto({
+			sync: async () => {
+				syncs += 1;
+			}
+		}, async () => ({ url: '/rdb', auto: { intervalMs: 5000 } }), { timers });
+
+		await auto.start();
+		expect(syncs).toBe(1);
+		expect(intervals.size).toBe(1);
+
+		await auto.stop();
+		expect(intervals.size).toBe(0);
+
+		await auto.start();
+		expect(syncs).toBe(2);
+		expect(intervals.size).toBe(1);
+
+		const interval = Array.from(intervals.values())[0];
+		interval();
+		await new Promise(resolve => setTimeout(resolve, 0));
+
+		expect(syncs).toBe(3);
+		await auto.stop();
+	});
 });
