@@ -249,26 +249,58 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		await applyPendingDeltasToRole(stagingRole);
 
 		const openRows = await readAllOutboxRows(activeSync, ['pending', 'pushed']);
+		const deferStableBaseUntilComplete = needsInitialSwap && openRows.length === 0;
 		await stagingSync[applyOutboxRowsSymbol](openRows, {
 			replay: false,
 			replaceOpen: true
 		});
 
 		emitSyncProgress('pulling-staging', { activeRole, stagingRole });
+		const pullStagingStartedAtMs = Date.now();
 		const deltaSink = await createDeltaJournalSink(stagingRole);
 		let result;
 		let journal;
 		let deltaId;
+		let pullStagingSummary;
 		try {
 			result = await stagingSync[syncAndCapturePullJournalSymbol]({
 				...options,
-				_capturePullJournalChunk: deltaSink.write
+				_capturePullJournalChunk: deltaSink.write,
+				_deferStableBaseUntilComplete: deferStableBaseUntilComplete,
+				_onPullBatchProgress(progress) {
+					emitSyncProgress('pull-batch-complete', {
+						activeRole,
+						stagingRole,
+						...progress
+					});
+				},
+				_onPullStagingSummary(summary) {
+					pullStagingSummary = summary;
+				}
 			});
 			journal = result && result.__orangePullJournal;
+			const deltaFinalizeStartedAtMs = Date.now();
 			deltaId = await deltaSink.commit(journal);
+			emitSyncProgress('pull-staging-summary', {
+				activeRole,
+				stagingRole,
+				...(pullStagingSummary || {}),
+				deltaFinalizeMs: Math.max(0, Date.now() - deltaFinalizeStartedAtMs),
+				elapsedMs: Math.max(0, Date.now() - pullStagingStartedAtMs),
+				deferredStableBase: deferStableBaseUntilComplete,
+				failed: false
+			});
 		}
 		catch (error) {
 			await deltaSink.abort();
+			emitSyncProgress('pull-staging-summary', {
+				activeRole,
+				stagingRole,
+				...(pullStagingSummary || {}),
+				elapsedMs: Math.max(0, Date.now() - pullStagingStartedAtMs),
+				deferredStableBase: deferStableBaseUntilComplete,
+				failed: true
+			});
 			throw error;
 		}
 		let publishedManifest = manifest;

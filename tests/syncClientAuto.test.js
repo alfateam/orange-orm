@@ -1216,6 +1216,99 @@ describe('sync client auto start', () => {
 		)).toBe(false);
 	});
 
+	test('defers stable-base maintenance until streamed bootstrap completes', async () => {
+		const patches = [];
+		const batchProgress = [];
+		const stagingSummaries = [];
+		const db = newJournalDb({
+			__sqliteSync: {
+				url: '/rdb',
+				auto: false,
+				schema: false,
+				pull: {
+					maxKeysPerBatch: 1,
+					maxRowsPerBatch: 1
+				}
+			}
+		});
+		const client = newSyncClient({
+			tables: {
+				customer: newTable('customer')
+			},
+			transaction: async (fn) => fn({
+				customer: {
+					patch: async (patch) => {
+						patches.push(patch);
+						return { changed: [] };
+					}
+				},
+				query: db.query
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async (request) => {
+					if (request.data.phase === 'keys') {
+						return request.data.token
+							? {
+								data: {
+									phase: 'keys',
+									items: [{ table: 'customer', pk: [2], key: { id: 2 }, op: 'U' }],
+									done: true,
+									cursor: 'cursor-2'
+								}
+							}
+							: {
+								data: {
+									phase: 'keys',
+									items: [{ table: 'customer', pk: [1], key: { id: 1 }, op: 'U' }],
+									done: false,
+									cursor: 'cursor-1',
+									token: { page: 1 }
+								}
+							};
+					}
+					return rowsResponse(request.data.items);
+				};
+			}
+		});
+
+		const result = await client[syncAndCapturePullJournalSymbol]({
+			_deferStableBaseUntilComplete: true,
+			_onPullBatchProgress: progress => batchProgress.push(progress),
+			_onPullStagingSummary: summary => stagingSummaries.push(summary)
+		});
+
+		expect(result.applied).toBe(2);
+		expect(patches).toHaveLength(2);
+		expect(db.queryLog.some(sql =>
+			/^DELETE FROM "orange_sync_base_data_.*" WHERE/u.test(sql)
+		)).toBe(false);
+		expect(db.queryLog.some(sql =>
+			/^INSERT INTO "orange_sync_base_data_.*" SELECT \* FROM "customer" WHERE/u.test(sql)
+		)).toBe(false);
+		expect(db.queryLog.some(sql =>
+			/^DELETE FROM "orange_sync_base_data_.*"$/u.test(sql)
+		)).toBe(true);
+		expect(db.queryLog.some(sql =>
+			/^INSERT INTO "orange_sync_base_data_.*" SELECT \* FROM "customer"$/u.test(sql)
+		)).toBe(true);
+		expect(batchProgress).toHaveLength(2);
+		expect(batchProgress.every(progress =>
+			progress.deferredStableBase === true
+			&& progress.stableBaseMs === 0
+			&& Number.isFinite(progress.transactionMs)
+		)).toBe(true);
+		expect(stagingSummaries).toHaveLength(1);
+		expect(stagingSummaries[0]).toMatchObject({
+			batchCount: 2,
+			keyCount: 2,
+			rowCount: 2,
+			applied: 2,
+			deferredStableBase: true,
+			stableBaseMs: 0
+		});
+	});
+
 	test('honors streamed apply transaction limits', async () => {
 		const patches = [];
 		let foreignKeyChecks = 0;
@@ -1341,12 +1434,13 @@ describe('sync client auto start', () => {
 			}
 		});
 
-		await expect(client[syncAndCapturePullJournalSymbol]()).rejects.toThrow('network down');
+		const bootstrapOptions = { _deferStableBaseUntilComplete: true };
+		await expect(client[syncAndCapturePullJournalSymbol](bootstrapOptions)).rejects.toThrow('network down');
 		expect(patches).toEqual([
 			[{ op: 'add', path: '/[1]', value: { id: 1 } }]
 		]);
 
-		const result = await client[syncAndCapturePullJournalSymbol]();
+		const result = await client[syncAndCapturePullJournalSymbol](bootstrapOptions);
 
 		expect(keyRequests).toEqual([null, { page: 1 }, { page: 1 }]);
 		expect(patches).toEqual([
@@ -1358,6 +1452,9 @@ describe('sync client auto start', () => {
 		expect(db.queryLog.some(sql =>
 			/WHERE "scope" = .* AND "seq" > -1/u.test(sql)
 			&& /LIMIT 1000/u.test(sql)
+		)).toBe(true);
+		expect(db.queryLog.some(sql =>
+			/^INSERT INTO "orange_sync_base_data_.*" SELECT \* FROM "customer"$/u.test(sql)
 		)).toBe(true);
 	});
 

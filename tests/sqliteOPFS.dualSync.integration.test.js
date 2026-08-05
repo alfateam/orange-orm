@@ -106,6 +106,25 @@ describe('sqliteOPFS dual sync integration', () => {
 		expect(storedDeltaChunks).toHaveLength(2);
 		expect(JSON.parse(storedDeltaChunks[0].items_json)).toHaveLength(1000);
 		expect(JSON.parse(storedDeltaChunks[1].items_json)).toHaveLength(2);
+		const bootstrapBatchProgress = progressEvents.filter(event => event.phase === 'pull-batch-complete');
+		const bootstrapStagingSummary = progressEvents.find(event => event.phase === 'pull-staging-summary');
+		expect(bootstrapBatchProgress).toHaveLength(11);
+		expect(bootstrapBatchProgress.every(event =>
+			event.deferredStableBase === true
+			&& event.stableBaseMs === 0
+			&& Number.isFinite(event.transactionMs)
+		)).toBe(true);
+		expect(bootstrapStagingSummary).toMatchObject({
+			batchCount: 11,
+			keyCount: 1002,
+			rowCount: 1002,
+			deferredStableBase: true,
+			stableBaseMs: 0,
+			failed: false
+		});
+		const baseTables = await roleB.query('SELECT "base_name" FROM "orange_sync_base_tables" WHERE "name" = \'project\'');
+		const baseRows = await roleB.query(`SELECT COUNT(*) AS "count" FROM "${baseTables[0].base_name}"`);
+		expect(Number(baseRows[0].count)).toBe(1002);
 
 		const localProject = await localDb.project.getById('p1');
 		localProject.title = 'One pushed locally';
@@ -190,6 +209,28 @@ describe('sqliteOPFS dual sync integration', () => {
 			{ id: 'p2', title: 'Two changed during swap' },
 			{ id: 'p3', title: 'Three' }
 		]);
+
+		await localDb.syncClient.resetLocal();
+		await localDb.project.insert({
+			id: 'local-before-bootstrap',
+			title: 'Local before bootstrap'
+		});
+		const fallbackProgressStart = progressEvents.length;
+		await localDb.syncClient.sync();
+		const fallbackProgress = progressEvents.slice(fallbackProgressStart);
+		const fallbackSummary = fallbackProgress.find(event => event.phase === 'pull-staging-summary');
+
+		expect(fallbackSummary).toMatchObject({
+			deferredStableBase: false,
+			failed: false
+		});
+		expect((await localDb.project.getById('local-before-bootstrap')).title).toBe('Local before bootstrap');
+		expect(await remoteDb.query(
+			'SELECT "id" FROM "project" WHERE "id" = \'local-before-bootstrap\''
+		)).toHaveLength(0);
+
+		await localDb.syncClient.sync();
+		expect((await remoteDb.project.getById('local-before-bootstrap')).title).toBe('Local before bootstrap');
 
 		const restoreLocks = installFakeWebLocks();
 		try {

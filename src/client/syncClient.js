@@ -152,6 +152,12 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 		};
 		if (typeof options._capturePullJournalChunk === 'function')
 			pullOptions._capturePullJournalChunk = options._capturePullJournalChunk;
+		if (options._deferStableBaseUntilComplete === true)
+			pullOptions._deferStableBaseUntilComplete = true;
+		if (typeof options._onPullBatchProgress === 'function')
+			pullOptions._onPullBatchProgress = options._onPullBatchProgress;
+		if (typeof options._onPullStagingSummary === 'function')
+			pullOptions._onPullStagingSummary = options._onPullStagingSummary;
 		return pull(pullOptions);
 	}
 
@@ -253,6 +259,12 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 			normalizedOptions._capturePullJournal = true;
 		if (options && typeof options._capturePullJournalChunk === 'function')
 			normalizedOptions._capturePullJournalChunk = options._capturePullJournalChunk;
+		if (options && options._deferStableBaseUntilComplete === true)
+			normalizedOptions._deferStableBaseUntilComplete = true;
+		if (options && typeof options._onPullBatchProgress === 'function')
+			normalizedOptions._onPullBatchProgress = options._onPullBatchProgress;
+		if (options && typeof options._onPullStagingSummary === 'function')
+			normalizedOptions._onPullStagingSummary = options._onPullStagingSummary;
 		const {
 			db,
 			syncConfig,
@@ -345,6 +357,9 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 			scopeKey,
 			_capturePullJournal: !!options._capturePullJournal,
 			_capturePullJournalChunk: options._capturePullJournalChunk,
+			_deferStableBaseUntilComplete: options._deferStableBaseUntilComplete === true,
+			_onPullBatchProgress: options._onPullBatchProgress,
+			_onPullStagingSummary: options._onPullStagingSummary,
 			_syncInterceptors: interceptors,
 			_syncAxiosInterceptor: axiosInterceptor
 		};
@@ -839,6 +854,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 	}
 
 	async function pullStaged(pullConfig, options) {
+		const stagingStartedAtMs = Date.now();
 		const maxRowsPerBatch = normalizeLimit(pullConfig.maxRowsPerBatch, 1000);
 		const maxConcurrentRowRequests = normalizeConcurrency(pullConfig.maxConcurrentRowRequests, 1);
 		const maxKeysPerBatch = normalizeLimit(pullConfig.maxKeysPerBatch, maxRowsPerBatch * maxConcurrentRowRequests);
@@ -851,6 +867,8 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 		const capturePullJournalChunk = typeof options._capturePullJournalChunk === 'function'
 			? options._capturePullJournalChunk
 			: null;
+		const deferStableBaseUntilComplete = options._deferStableBaseUntilComplete === true;
+		const stagingTimings = newPullStagingTimings(deferStableBaseUntilComplete);
 		let capturedStreamItemCount = 0;
 		let capturedApplicableItemCount = 0;
 		const streamedTables = new Set();
@@ -872,6 +890,9 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 			await applyPullJournalInSingleTransaction(session);
 		if (shouldApplyCheckpoint)
 			sinceByScope.set(scopeKey, session.finalSince);
+		stagingTimings.applied = applied;
+		stagingTimings.elapsedMs = elapsedMs(stagingStartedAtMs);
+		notifyPullDiagnostic(options._onPullStagingSummary, { ...stagingTimings });
 
 		const result = {
 			applied,
@@ -915,6 +936,11 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 			await client.transaction(async (tx) => {
 				if (hasJournalItems && (!applyConfig || applyConfig.foreignKeyCheck === 'final'))
 					await validateForeignKeys(tx);
+				if (deferStableBaseUntilComplete) {
+					const bulkStableBaseStartedAtMs = Date.now();
+					await copyTablesToStableBase(tx, options.tables);
+					stagingTimings.bulkStableBaseMs += elapsedMs(bulkStableBaseStartedAtMs);
+				}
 				if (shouldApplyCheckpoint)
 					await writeScopeState(scopeKey, { since: session.finalSince, updatedAtMs: Date.now() }, tx);
 				if (hasJournalItems || session.persisted)
@@ -1035,13 +1061,15 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 			async function captureStreamItems(items) {
 				const list = Array.isArray(items) ? items : [];
 				if (list.length === 0)
-					return;
+					return 0;
 				capturedStreamItemCount += list.length;
 				capturedApplicableItemCount += countApplicablePullJournalItems(list);
+				const captureStartedAtMs = Date.now();
 				if (capturePullJournalChunk)
 					await capturePullJournalChunk(list);
 				else
 					capturedStreamItems.push(...list);
+				return elapsedMs(captureStartedAtMs);
 			}
 
 			startPullBatchPump();
@@ -1061,6 +1089,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 						await waitForPipelineChange();
 						continue;
 					}
+					const batchStartedAtMs = Date.now();
 					await batch.rowsPromise;
 					const persisted = await persistPullJournalBatchState(
 						db,
@@ -1071,6 +1100,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 						streamApply ? {
 							applyConfig,
 							defaultPatchOptions,
+							deferStableBaseUntilComplete,
 							onApplied(count, items) {
 								applied += count;
 								for (let i = 0; i < items.length; i++)
@@ -1079,8 +1109,23 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 						} : undefined
 					);
 					session = persisted.session;
-					if (streamApply)
-						await captureStreamItems(persisted.items);
+					const deltaPersistMs = streamApply
+						? await captureStreamItems(persisted.items)
+						: 0;
+					const batchProgress = {
+						batchNo: batch.batchNo,
+						keyCount: batch.keyItems.length,
+						rowCount: persisted.items.length,
+						rowsElapsedMs: batch.rowsReadyAtMs === undefined
+							? 0
+							: Math.max(0, batch.rowsReadyAtMs - batch.createdAtMs),
+						deltaPersistMs,
+						elapsedMs: elapsedMs(batchStartedAtMs),
+						deferredStableBase: deferStableBaseUntilComplete,
+						...persisted.timings
+					};
+					addPullBatchTimings(stagingTimings, batchProgress);
+					notifyPullDiagnostic(options._onPullBatchProgress, batchProgress);
 					pendingBatches.shift();
 					onPipelineProgress();
 					if (keyFetchError && pendingBatches.length === 0)
@@ -1224,6 +1269,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 			markDeletePullJournalRowsReady(itemState);
 			return {
 				...batch,
+				createdAtMs: Date.now(),
 				batchNo,
 				baseSeq,
 				itemState,
@@ -1388,6 +1434,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 				if (batchState.rowsSettled)
 					return;
 				batchState.rowsSettled = true;
+				batchState.rowsReadyAtMs = Date.now();
 				batchState.resolveRows();
 			}
 
@@ -1638,24 +1685,37 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 			});
 		}
 		let nextSession;
+		const timings = newPullBatchTimings();
 		for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
 			const chunk = chunks[chunkIndex];
 			const isLastChunk = chunkIndex === chunks.length - 1;
 			let chunkApplied = 0;
+			const transactionStartedAtMs = Date.now();
+			let transactionBodyMs = 0;
 			await client.transaction(async (tx) => {
+				const transactionBodyStartedAtMs = Date.now();
+				const journalInsertStartedAtMs = Date.now();
 				await insertPullJournalItems(tx, chunk.rows, maxJournalRowsPerInsert);
+				timings.journalInsertMs += elapsedMs(journalInsertStartedAtMs);
 				if (streamApply && chunk.items.length > 0) {
 					await tryDeferForeignKeys(tx);
 					chunkApplied = await applyPullJournalBatchOnTx(
 						tx,
 						chunk.items,
-						streamOptions.defaultPatchOptions
+						streamOptions.defaultPatchOptions,
+						undefined,
+						{
+							deferStableBase: streamOptions.deferStableBaseUntilComplete === true,
+							timings
+						}
 					);
 					if (applyConfig && applyConfig.foreignKeyCheck === 'chunk')
 						await validateForeignKeys(tx);
 				}
-				if (!isLastChunk)
+				if (!isLastChunk) {
+					transactionBodyMs = elapsedMs(transactionBodyStartedAtMs);
 					return;
+				}
 				const finalSince = keysPayload.cursor !== undefined ? keysPayload.cursor : session.finalSince;
 				const payload = reason === undefined ? keysPayload : { ...keysPayload, reason };
 				const token = keysPayload.done || !keysPayload.token ? null : keysPayload.token;
@@ -1664,6 +1724,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 				const status = streamApply
 					? done ? streamPullReadyStatus : streamPullPendingStatus
 					: done ? 'ready' : 'pending';
+				const sessionUpdateStartedAtMs = Date.now();
 				await tx.query([
 					`UPDATE "${syncPullSessionTable}"`,
 					`SET "token_json" = ${sqlNullableJsonLiteral(token)},`,
@@ -1677,6 +1738,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 					`"updated_at_ms" = ${Date.now()}`,
 					`WHERE "scope" = ${sqlStringLiteral(scopeKey)}`
 				].join(' '));
+				timings.sessionUpdateMs += elapsedMs(sessionUpdateStartedAtMs);
 				nextSession = {
 					...session,
 					token: token || undefined,
@@ -1689,13 +1751,17 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 					nextBatch: batchNo + 1,
 					persisted: true
 				};
+				transactionBodyMs = elapsedMs(transactionBodyStartedAtMs);
 			}, { suppressSyncOutbox: true });
+			const transactionMs = elapsedMs(transactionStartedAtMs);
+			timings.transactionMs += transactionMs;
+			timings.transactionFinalizeMs += Math.max(0, transactionMs - transactionBodyMs);
 			if (streamApply && typeof streamOptions.onApplied === 'function')
 				streamOptions.onApplied(chunkApplied, chunk.items);
 			if (streamApply && applyConfig)
 				await yieldPullApply(applyConfig);
 		}
-		return { session: nextSession, items: entries.items };
+		return { session: nextSession, items: entries.items, timings };
 	}
 
 	function createPullJournalItemState(keyItems, batchNo, baseSeq) {
@@ -2645,9 +2711,16 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 			await applyStableBaseUpsertGroup(db, group);
 	}
 
-	async function applyPullJournalBatchOnTx(tx, items, patchOptions, knownBaseByName) {
+	async function applyPullJournalBatchOnTx(tx, items, patchOptions, knownBaseByName, applyOptions = {}) {
 		const batch = Array.isArray(items) ? items : [];
-		const baseByName = knownBaseByName || await readStableBaseEntriesByName(tx);
+		const deferStableBase = applyOptions.deferStableBase === true;
+		const timings = applyOptions.timings;
+		let baseByName = knownBaseByName;
+		if (!deferStableBase && !baseByName) {
+			const stableBaseStartedAtMs = Date.now();
+			baseByName = await readStableBaseEntriesByName(tx);
+			addPullTiming(timings, 'stableBaseMs', stableBaseStartedAtMs);
+		}
 		let applied = 0;
 		for (let offset = 0; offset < batch.length;) {
 			const batchNo = Number(batch[offset] && batch[offset].batchNo || 0);
@@ -2658,24 +2731,39 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 				tx,
 				batch.slice(offset, end),
 				patchOptions,
-				baseByName
+				baseByName,
+				applyOptions
 			);
 			offset = end;
 		}
 		return applied;
 	}
 
-	async function applyPullJournalOperationBatchOnTx(tx, batch, patchOptions, baseByName) {
+	async function applyPullJournalOperationBatchOnTx(tx, batch, patchOptions, baseByName, applyOptions = {}) {
 		const deleteItems = batch.filter(x => x.op === 'D');
 		const upsertItems = batch.filter(x => x.op !== 'D' && x.row !== undefined);
+		const deferStableBase = applyOptions.deferStableBase === true;
+		const timings = applyOptions.timings;
 		let applied = 0;
 		if (deleteItems.length > 0) {
+			const dataApplyStartedAtMs = Date.now();
 			applied += await applyDeleteItemsOnTx(tx, deleteItems, patchOptions);
-			await applyDeleteItemsToStableBase(tx, deleteItems, baseByName);
+			addPullTiming(timings, 'dataApplyMs', dataApplyStartedAtMs);
+			if (!deferStableBase) {
+				const stableBaseStartedAtMs = Date.now();
+				await applyDeleteItemsToStableBase(tx, deleteItems, baseByName);
+				addPullTiming(timings, 'stableBaseMs', stableBaseStartedAtMs);
+			}
 		}
 		if (upsertItems.length > 0) {
+			const dataApplyStartedAtMs = Date.now();
 			applied += await applyRowsPayloadOnTx(tx, upsertItems, patchOptions);
-			await applyRowsPayloadToStableBase(tx, upsertItems, baseByName);
+			addPullTiming(timings, 'dataApplyMs', dataApplyStartedAtMs);
+			if (!deferStableBase) {
+				const stableBaseStartedAtMs = Date.now();
+				await applyRowsPayloadToStableBase(tx, upsertItems, baseByName);
+				addPullTiming(timings, 'stableBaseMs', stableBaseStartedAtMs);
+			}
 		}
 		return applied;
 	}
@@ -3627,6 +3715,68 @@ function yieldPullApply(applyConfig) {
 	return new Promise((resolve) => {
 		setTimeout(resolve, yieldMs);
 	});
+}
+
+function newPullBatchTimings() {
+	return {
+		journalInsertMs: 0,
+		dataApplyMs: 0,
+		stableBaseMs: 0,
+		sessionUpdateMs: 0,
+		transactionMs: 0,
+		transactionFinalizeMs: 0
+	};
+}
+
+function newPullStagingTimings(deferredStableBase) {
+	return {
+		batchCount: 0,
+		keyCount: 0,
+		rowCount: 0,
+		rowsElapsedMs: 0,
+		deltaPersistMs: 0,
+		bulkStableBaseMs: 0,
+		applied: 0,
+		elapsedMs: 0,
+		deferredStableBase,
+		...newPullBatchTimings()
+	};
+}
+
+function addPullBatchTimings(summary, batch) {
+	if (!summary || !batch)
+		return;
+	summary.batchCount += 1;
+	summary.keyCount += Number(batch.keyCount || 0);
+	summary.rowCount += Number(batch.rowCount || 0);
+	summary.rowsElapsedMs += Number(batch.rowsElapsedMs || 0);
+	summary.deltaPersistMs += Number(batch.deltaPersistMs || 0);
+	const timingKeys = Object.keys(newPullBatchTimings());
+	for (let i = 0; i < timingKeys.length; i++) {
+		const key = timingKeys[i];
+		summary[key] += Number(batch[key] || 0);
+	}
+}
+
+function addPullTiming(timings, key, startedAtMs) {
+	if (!timings)
+		return;
+	timings[key] = Number(timings[key] || 0) + elapsedMs(startedAtMs);
+}
+
+function notifyPullDiagnostic(listener, payload) {
+	if (typeof listener !== 'function')
+		return;
+	try {
+		listener(payload);
+	}
+	catch (_e) {
+		// Diagnostics must never interrupt sync.
+	}
+}
+
+function elapsedMs(startedAtMs) {
+	return Math.max(0, Date.now() - startedAtMs);
 }
 
 function withInsertAndForgetStrategy(options) {
