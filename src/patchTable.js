@@ -4,6 +4,7 @@ let fromCompareObject = require('./fromCompareObject');
 let validateDeleteAllowed = require('./validateDeleteAllowed');
 let clearCache = require('./table/clearCache');
 const getSessionSingleton = require('./table/getSessionSingleton');
+const stringify = require('./client/stringify');
 
 
 async function patchTable() {
@@ -18,9 +19,13 @@ async function patchTable() {
 
 async function patchTableCore(context, table, patches, { strategy = undefined, deduceStrategy = false, ...options } = {}, dryrun) {
 	const engine = getSessionSingleton(context, 'engine');
+	const materializeSyncPrimaryKeys = !!getSessionSingleton(context, 'syncOutboxCapture');
+	const generatedPrimaryKeyMappings = [];
 	options = cleanOptions(options);
 	strategy = JSON.parse(JSON.stringify(strategy || {}));
-	if (!dryrun && strategy['insertAndForget'] && await tryInsertAndForget(context, table, patches, options))
+	const requiresGeneratedPrimaryKeys = materializeSyncPrimaryKeys
+		&& patches.some(patch => isRootAdd(patch) && hasMissingPrimaryKey(table, patch.value));
+	if (!dryrun && strategy['insertAndForget'] && !requiresGeneratedPrimaryKeys && await tryInsertAndForget(context, table, patches, options))
 		return { changed: [], strategy };
 	let changed = new Set();
 	for (let i = 0; i < patches.length; i++) {
@@ -29,7 +34,7 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 		patch.path = patches[i].path.split('/').slice(1);
 		let result;
 		if (patch.op === 'add' || patch.op === 'replace') {
-			result = await add({ path: patch.path, value: patch.value, op: patch.op, oldValue: patch.oldValue, strategy: deduceStrategy ? strategy : {}, options }, table);
+			result = await add({ path: patch.path, value: patch.value, op: patch.op, oldValue: patch.oldValue, strategy: deduceStrategy ? strategy : {}, options, pathFromPatch: true }, table);
 		}
 		else if (patch.op === 'remove')
 			result = await remove({ path: patch.path, op: patch.op, oldValue: patch.oldValue, options }, table);
@@ -38,6 +43,7 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 			changed.add(result.inserted);
 		else if (result.updated)
 			changed.add(result.updated);
+		applyGeneratedPrimaryKeyMappings();
 	}
 	if (strategy['insertAndForget'])
 		return {
@@ -59,7 +65,7 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 			return [property];
 	}
 
-	async function add({ path, value, op, oldValue, strategy, options }, table, row, parentRow, relation) {
+	async function add({ path, value, op, oldValue, strategy, options, pathFromPatch = false }, table, row, parentRow, relation) {
 		let property = path[0];
 		path = path.slice(1);
 		if (!row && path.length > 0) {
@@ -77,6 +83,7 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 			if (dryrun) {
 				return {};
 			}
+			const primaryKeyWasMissing = hasMissingPrimaryKey(table, value);
 			let childInserts = [];
 			for (let name in value) {
 				if (isColumn(name, table))
@@ -112,6 +119,8 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 				: withoutSkipSelectAfterInsert(options);
 			let row = table.insertWithConcurrency.apply(null, [context, insertOptions, value]);
 			row = await row;
+			if (materializeSyncPrimaryKeys && primaryKeyWasMissing)
+				materializePrimaryKey(table, row, value, property, pathFromPatch);
 
 			for (let i = 0; i < childInserts.length; i++) {
 				await childInserts[i](row);
@@ -146,7 +155,7 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 			strategy[property] = strategy[property] || {};
 			options[property] = inferOptions(options, property);
 
-			await add({ path, value, op, oldValue, strategy: strategy[property], options: options[property] }, relation.childTable, subRow, row, relation);
+			await add({ path, value, op, oldValue, strategy: strategy[property], options: options[property], pathFromPatch }, relation.childTable, subRow, row, relation);
 			return { updated: row };
 		}
 		else if (isManyRelation(property, table)) {
@@ -159,11 +168,11 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 				for (let id in value) {
 					if (id === '__patchType')
 						continue;
-					await add({ path: [id], value: value[id], op, oldValue, strategy: strategy[property], options: options[property] }, relation.childTable, undefined, row, relation);
+					await add({ path: [id], value: value[id], op, oldValue, strategy: strategy[property], options: options[property], pathFromPatch }, relation.childTable, undefined, row, relation);
 				}
 			}
 			else {
-				await add({ path: path.slice(1), value, oldValue, op, strategy: strategy[property], options: options[property] }, relation.childTable, undefined, row, relation);
+				await add({ path: path.slice(1), value, oldValue, op, strategy: strategy[property], options: options[property], pathFromPatch }, relation.childTable, undefined, row, relation);
 			}
 			return { updated: row };
 		}
@@ -440,6 +449,105 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 			return options;
 		const { skipSelectAfterInsert, ...rest } = options;
 		return rest;
+	}
+
+	function hasMissingPrimaryKey(table, value) {
+		if (!value || value !== Object(value))
+			return false;
+		for (let i = 0; i < table._primaryColumns.length; i++) {
+			const key = value[table._primaryColumns[i].alias];
+			if (key === undefined || isTemporaryKey(key))
+				return true;
+		}
+		return false;
+	}
+
+	function materializePrimaryKey(table, row, value, property, pathFromPatch) {
+		const finalKey = [];
+		for (let i = 0; i < table._primaryColumns.length; i++) {
+			const column = table._primaryColumns[i];
+			const key = row && row[column.alias];
+			if (key === undefined || key === null || isTemporaryKey(key))
+				throw new Error(`Local database did not return a final primary key for ${table._dbName}.${column._dbName}.`);
+			value[column.alias] = key;
+			finalKey.push(key);
+		}
+
+		const rawProperty = pathFromPatch ? decodeJsonPointer(property) : property;
+		if (typeof rawProperty !== 'string' || rawProperty.charAt(0) !== '[')
+			return;
+		let originalKey;
+		try {
+			originalKey = JSON.parse(rawProperty);
+		}
+		catch (_e) {
+			return;
+		}
+		if (!Array.isArray(originalKey) || !originalKey.some(isTemporaryKey))
+			return;
+		const finalProperty = stringify(finalKey);
+		generatedPrimaryKeyMappings.push({
+			oldValueKey: rawProperty,
+			newValueKey: finalProperty,
+			oldPathKey: encodeJsonPointer(rawProperty),
+			newPathKey: encodeJsonPointer(finalProperty)
+		});
+	}
+
+	function applyGeneratedPrimaryKeyMappings() {
+		if (generatedPrimaryKeyMappings.length === 0)
+			return;
+		for (let i = 0; i < patches.length; i++) {
+			const patch = patches[i];
+			if (typeof patch.path === 'string') {
+				const segments = patch.path.split('/');
+				for (let segmentIndex = 1; segmentIndex < segments.length; segmentIndex++) {
+					for (let mappingIndex = 0; mappingIndex < generatedPrimaryKeyMappings.length; mappingIndex++) {
+						const mapping = generatedPrimaryKeyMappings[mappingIndex];
+						if (segments[segmentIndex] === mapping.oldPathKey)
+							segments[segmentIndex] = mapping.newPathKey;
+					}
+				}
+				patch.path = segments.join('/');
+			}
+			rewriteGeneratedValueKeys(patch.value);
+		}
+		generatedPrimaryKeyMappings.length = 0;
+	}
+
+	function rewriteGeneratedValueKeys(value, seen = new Set()) {
+		if (!value || value !== Object(value) || seen.has(value))
+			return;
+		seen.add(value);
+		const keys = Object.keys(value);
+		for (let i = 0; i < keys.length; i++) {
+			const key = keys[i];
+			rewriteGeneratedValueKeys(value[key], seen);
+			for (let mappingIndex = 0; mappingIndex < generatedPrimaryKeyMappings.length; mappingIndex++) {
+				const mapping = generatedPrimaryKeyMappings[mappingIndex];
+				if (key !== mapping.oldValueKey)
+					continue;
+				if (Object.prototype.hasOwnProperty.call(value, mapping.newValueKey))
+					throw new Error(`Generated primary key ${mapping.newValueKey} already exists in the local patch.`);
+				value[mapping.newValueKey] = value[key];
+				delete value[key];
+				break;
+			}
+		}
+	}
+
+	function isTemporaryKey(value) {
+		return typeof value === 'string' && value.indexOf('~') === 0;
+	}
+
+	function decodeJsonPointer(value) {
+		if (typeof value !== 'string')
+			return value;
+		return value.replace(/~1/g, '/').replace(/~0/g, '~');
+	}
+
+	function encodeJsonPointer(value) {
+		return value.replace(/~/g, '~0').replace(/\//g, '~1');
 	}
 }
 

@@ -580,6 +580,38 @@ describe('sqlite staged pull sync', () => {
 		await expect(localDbReloaded.syncClient.waitForInitialSync()).resolves.toBeUndefined();
 	});
 
+	test('pushes a locally database-generated primary key as the final server key', async () => {
+		await localDb.query('PRAGMA foreign_keys = ON');
+		await localDb.query('DELETE FROM "order"');
+		await localDb.query('DELETE FROM customer');
+		const outboxTable = await localDb.query('SELECT name FROM sqlite_master WHERE type = \'table\' AND name = \'orange_sync_outbox\'');
+		if (outboxTable.length > 0)
+			await localDb.query('DELETE FROM "orange_sync_outbox"');
+		await remoteDb.query('DELETE FROM "order"');
+		await remoteDb.query('DELETE FROM customer');
+		await remoteDb.customer.insert({ id: 12000, name: 'Seed', balance: 0, isActive: true });
+		await localDb.syncClient.sync();
+
+		const inserted = await localDb.customer.insert({
+			name: 'DbGen',
+			balance: 1,
+			isActive: true
+		});
+		const pending = await localDb.query('SELECT patch_json FROM "orange_sync_outbox" WHERE status = \'pending\'');
+		const payload = JSON.parse(pending[0].patch_json ?? pending[0].PATCH_JSON);
+		const insertPatch = payload[0].patch[0];
+
+		expect(inserted.id).toBe(12001);
+		expect(insertPatch.path).toBe('/[12001]');
+		expect(insertPatch.value.id).toBe(12001);
+		expect(JSON.stringify(payload)).not.toContain('~');
+
+		await localDb.syncClient.sync();
+
+		const remote = await remoteDb.customer.getById(12001);
+		expect(remote.name).toBe('DbGen');
+	});
+
 	test('sync pushes pending local json patch once', async () => {
 		await remoteDb.customer.insert({
 			id: 60,

@@ -89,4 +89,42 @@ describe('hostLocal sync outbox', () => {
 		expect(updateStatement).toContain('"name":"auditProject"');
 		expect(updateStatement).toContain('"args":{"projectId":1,"source":"test"}');
 	});
+
+	test('captures the canonical patch after the local database write', async () => {
+		const queryLog = [];
+		const pool = { __sqliteSync: { url: '/rdb' } };
+		const context = {
+			rdb: {
+				poolFactory: pool,
+				changes: [],
+				cache: {},
+				dbClient: {
+					executeQuery(query, callback) {
+						queryLog.push(query.sql());
+						callback(null, []);
+					}
+				}
+			}
+		};
+		const transaction = async (fn) => fn(context);
+		const table = {
+			patch: async (_context, patch) => {
+				patch[0].path = '/["db-generated-id"]';
+				patch[0].value.id = 'db-generated-id';
+				return { changed: [] };
+			}
+		};
+		const adapter = hostLocal({
+			transaction,
+			table,
+			syncTableName: 'project'
+		});
+		const patch = [{ op: 'add', path: '/["~0tmp-1"]', value: { name: 'Generated' } }];
+
+		await adapter.patch({ patch, options: {} });
+
+		const updateStatement = queryLog.filter(sql => sql.includes('UPDATE "orange_sync_outbox"')).pop();
+		expect(updateStatement).toContain('db-generated-id');
+		expect(updateStatement).not.toContain('~0tmp-1');
+	});
 });

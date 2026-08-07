@@ -162,6 +162,119 @@ describe('sqlite insert skipSelectAfterInsert', () => {
 		expect(commands).toHaveLength(0);
 		expect(fallbackInserts).toBe(2);
 	});
+
+	test('materializes a database-generated primary key before sync outbox capture', async () => {
+		const commands = [];
+		const context = newContext(commands, 999);
+		context.rdb.syncOutboxCapture = {};
+		const table = newTable();
+		let fallbackInserts = 0;
+		table.insertWithConcurrency = async function(_context, _options, value) {
+			fallbackInserts++;
+			return { id: 'db-generated-id', name: value.name };
+		};
+		const patches = [
+			{ op: 'add', path: '/["~0tmp-1"]', value: { name: 'Acme' } }
+		];
+
+		await patchTable(context, table, patches, {
+			strategy: { insertAndForget: true }
+		});
+
+		expect(commands).toHaveLength(0);
+		expect(fallbackInserts).toBe(1);
+		expect(patches).toEqual([
+			{
+				op: 'add',
+				path: '/["db-generated-id"]',
+				value: { id: 'db-generated-id', name: 'Acme' }
+			}
+		]);
+	});
+
+	test('rejects a sync insert when the database does not return its primary key', async () => {
+		const commands = [];
+		const context = newContext(commands, 999);
+		context.rdb.syncOutboxCapture = {};
+		const table = newTable();
+		table.insertWithConcurrency = async function(_context, _options, value) {
+			return { id: undefined, name: value.name };
+		};
+
+		await expect(patchTable(context, table, [
+			{ op: 'add', path: '/["~0tmp-1"]', value: { name: 'Acme' } }
+		])).rejects.toThrow('Local database did not return a final primary key for customer.id');
+	});
+
+	test('materializes every component of a composite database-generated primary key', async () => {
+		const commands = [];
+		const context = newContext(commands, 999);
+		context.rdb.syncOutboxCapture = {};
+		const table = newCompositeTable();
+		table.insertWithConcurrency = async function(_context, _options, value) {
+			return { namespace: 'db', sequence: 42, name: value.name };
+		};
+		const patches = [{
+			op: 'add',
+			path: '/["~0tmp-namespace","~0tmp-sequence"]',
+			value: { name: 'Composite' }
+		}];
+
+		await patchTable(context, table, patches, {
+			strategy: { insertAndForget: true }
+		});
+
+		expect(patches).toEqual([{
+			op: 'add',
+			path: '/["db",42]',
+			value: { namespace: 'db', sequence: 42, name: 'Composite' }
+		}]);
+	});
+
+	test('rekeys nested inserted rows that receive database-generated primary keys', async () => {
+		const commands = [];
+		const context = newContext(commands, 999);
+		context.rdb.syncOutboxCapture = {};
+		const { parent, child } = newParentChildTables();
+		parent.insertWithConcurrency = async function(_context, _options, value) {
+			return { id: 'parent-db', name: value.name };
+		};
+		child.insertWithConcurrency = async function(_context, _options, value) {
+			return { id: 'child-db', parentId: value.parentId, name: value.name };
+		};
+		const patches = [{
+			op: 'add',
+			path: '/["~0tmp-parent"]',
+			value: {
+				name: 'Parent',
+				children: {
+					__patchType: 'Array',
+					'["~tmp-child"]': { name: 'Child' }
+				}
+			}
+		}];
+
+		await patchTable(context, parent, patches, {
+			strategy: { insertAndForget: true }
+		});
+
+		expect(patches).toEqual([{
+			op: 'add',
+			path: '/["parent-db"]',
+			value: {
+				id: 'parent-db',
+				name: 'Parent',
+				children: {
+					__patchType: 'Array',
+					'["child-db"]': {
+						id: 'child-db',
+						parentId: 'parent-db',
+						name: 'Child'
+					}
+				}
+			}
+		}]);
+	});
 });
 
 function newTable() {
@@ -186,6 +299,76 @@ function newTable() {
 	table.insertAndForget = function(context, options, values) {
 		return insertAndForget(context, { table, options }, values);
 	};
+	return table;
+}
+
+function newCompositeTable() {
+	const namespaceColumn = newColumn('namespace', true);
+	const sequenceColumn = newColumn('sequence', true);
+	const nameColumn = newColumn('name', false);
+	const table = {
+		_dbName: 'generatedComposite',
+		_columns: [namespaceColumn, sequenceColumn, nameColumn],
+		_primaryColumns: [namespaceColumn, sequenceColumn],
+		_columnDiscriminators: [],
+		_relations: {},
+		_aliases: new Set(['namespace', 'sequence', 'name']),
+		_cache: {
+			getInnerCache() {
+				return {};
+			}
+		},
+		_emitChanged: Object.assign(() => [], { callbacks: [] })
+	};
+	table.namespace = namespaceColumn;
+	table.sequence = sequenceColumn;
+	table.name = nameColumn;
+	table.insertAndForget = function(context, options, values) {
+		return insertAndForget(context, { table, options }, values);
+	};
+	return table;
+}
+
+function newParentChildTables() {
+	const parent = newFakeTable('parent', [
+		newColumn('id', true),
+		newColumn('name', false)
+	]);
+	const child = newFakeTable('child', [
+		newColumn('id', true),
+		newColumn('parentId', false),
+		newColumn('name', false)
+	]);
+	const relation = {
+		isMany: true,
+		childTable: child,
+		joinRelation: {
+			columns: [child.parentId],
+			childTable: parent
+		}
+	};
+	parent.children = { _relation: relation };
+	parent._relations.children = relation;
+	return { parent, child };
+}
+
+function newFakeTable(name, columns) {
+	const table = {
+		_dbName: name,
+		_columns: columns,
+		_primaryColumns: columns.filter(column => column.isPrimary),
+		_columnDiscriminators: [],
+		_relations: {},
+		_aliases: new Set(columns.map(column => column.alias)),
+		_cache: {
+			getInnerCache() {
+				return {};
+			}
+		},
+		_emitChanged: Object.assign(() => [], { callbacks: [] })
+	};
+	for (let i = 0; i < columns.length; i++)
+		table[columns[i].alias] = columns[i];
 	return table;
 }
 

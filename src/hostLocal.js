@@ -56,8 +56,9 @@ function hostLocal() {
 		async function fn(context) {
 			setSessionSingleton(context, 'ignoreSerializable', true);
 			let patch = body.patch;
-			await captureSyncOutboxPatch(context, patch, body.options);
+			await prepareSyncOutboxPatchCapture(context, patch);
 			result = await table.patch(context, patch, { ..._options, ...body.options, isHttp });
+			await captureSyncOutboxPatch(context, patch, body.options);
 		}
 	}
 
@@ -207,6 +208,12 @@ function hostLocal() {
 			options: sanitizeSyncPatchOptions(options)
 		});
 		await updateSyncOutboxCaptureState(context, state);
+	}
+
+	async function prepareSyncOutboxPatchCapture(context, patch) {
+		if (!Array.isArray(patch) || patch.length === 0 || !_options.syncTableName)
+			return;
+		await getSyncOutboxCaptureState(context);
 	}
 
 	async function captureSyncOutboxCommand(context, name, args) {
