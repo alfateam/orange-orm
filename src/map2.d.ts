@@ -387,6 +387,7 @@ type BaseAggregateStrategy<M extends Record<string, TableDefinition<M>>, K exten
   limit?: number;
   offset?: number;
   where?: WhereClause<M, K>;
+  orderBy?: string | ReadonlyArray<string>;
 };
 
 type CustomAggregateSelectors<M extends Record<string, TableDefinition<M>>, K extends keyof M> = {
@@ -397,6 +398,32 @@ type CustomAggregateSelectors<M extends Record<string, TableDefinition<M>>, K ex
   // Explicitly prevent limit/offset in selectors
   limit?: never;
   offset?: never;
+};
+
+type ReservedAggregateStrategyProps = 'where' | 'limit' | 'offset' | 'orderBy';
+
+type AggregateResultKeys<Strategy extends Record<string, unknown>> =
+  Exclude<Extract<keyof Strategy, string>, ReservedAggregateStrategyProps>;
+
+type AggregateOrderByEntry<Strategy extends Record<string, unknown>> =
+  | AggregateResultKeys<Strategy>
+  | `${AggregateResultKeys<Strategy>} asc`
+  | `${AggregateResultKeys<Strategy>} desc`;
+
+type AggregateOrderBy<Strategy extends Record<string, unknown>> =
+  | AggregateOrderByEntry<Strategy>
+  | ReadonlyArray<AggregateOrderByEntry<Strategy>>;
+
+type ValidateAggregateStrategy<
+  M extends Record<string, TableDefinition<M>>,
+  K extends keyof M,
+  Strategy extends Record<string, unknown>
+> = {
+  [P in keyof Strategy]:
+    P extends 'where' ? WhereClause<M, K> :
+    P extends 'limit' | 'offset' ? number :
+    P extends 'orderBy' ? AggregateOrderBy<Strategy> :
+    (row: RootSelectionRefs<M, K>) => ValidSelectorReturnTypes<M, K>;
 };
 
 type TrueKeys<M extends Record<string, TableDefinition<M>>, K extends keyof M, FS extends Record<string, any>> = {
@@ -677,7 +704,7 @@ type WithArrayActiveRecord<T extends Array<any>, M extends Record<string, TableD
 type AggregateCustomSelectorProperties<M extends Record<string, TableDefinition<M>>, K extends keyof M, FS extends Record<string, any>> = {
   // Required properties (count, sum, avg) - no question mark, no null/undefined
   [P in keyof FS as
-    P extends ReservedFetchStrategyProps ? never :
+    P extends ReservedAggregateStrategyProps ? never :
     P extends (M[K] extends { relations: infer R } ? keyof R : never) ? never :
     FS[P] extends (row: any) => any ?
       (FS[P] extends (row: RootSelectionRefs<M, K>) => infer ReturnType
@@ -692,7 +719,7 @@ type AggregateCustomSelectorProperties<M extends Record<string, TableDefinition<
 } & {
   // Optional properties (max, min, plain columns) - with question mark AND null/undefined
   [P in keyof FS as
-    P extends ReservedFetchStrategyProps ? never :
+    P extends ReservedAggregateStrategyProps ? never :
     P extends (M[K] extends { relations: infer R } ? keyof R : never) ? never :
     FS[P] extends (row: any) => any ?
       (FS[P] extends (row: RootSelectionRefs<M, K>) => infer ReturnType
@@ -717,8 +744,12 @@ export type TableClient<M extends Record<string, TableDefinition<M>>, K extends 
   getMany<strategy extends FetchStrategy<M, K>>(strategy?: strategy): Promise<WithArrayActiveRecord<Array<DeepExpand<Selection<M, K, strategy>>>, M, K>>;
 
   // Aggregate methods - return plain objects (no active record methods)
-  aggregate<strategy extends AggregateStrategy<M, K>>(strategy: strategy): Promise<Array<DeepExpand<AggregateCustomSelectorProperties<M, K, strategy>>>>;
-  distinct<strategy extends AggregateStrategy<M, K>>(strategy: strategy): Promise<Array<DeepExpand<AggregateCustomSelectorProperties<M, K, strategy>>>>;
+  aggregate<const strategy extends Record<string, unknown>>(
+    strategy: BaseAggregateStrategy<M, K> & strategy & ValidateAggregateStrategy<M, K, strategy>
+  ): Promise<Array<DeepExpand<AggregateCustomSelectorProperties<M, K, strategy>>>>;
+  distinct<const strategy extends Record<string, unknown>>(
+    strategy: BaseAggregateStrategy<M, K> & strategy & ValidateAggregateStrategy<M, K, strategy>
+  ): Promise<Array<DeepExpand<AggregateCustomSelectorProperties<M, K, strategy>>>>;
 
   // Single item methods - return individual objects with individual active record methods
   getOne<strategy extends FetchStrategy<M, K>>(

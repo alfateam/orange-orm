@@ -1185,18 +1185,17 @@ describe('aggregate', () => {
 		const rows = await db.orderLine.aggregate({
 			orderId: x => x.orderId,
 			count: x => x.count(x => x.id),
+			orderBy: ['count', 'orderId desc'],
 		});
-
-		rows.sort((a, b) => a.orderId - b.orderId);
 
 		const expected = [
 			{
-				orderId: 1,
-				count: 2,
-			},
-			{
 				orderId: 2,
 				count: 1,
+			},
+			{
+				orderId: 1,
+				count: 2,
 			}
 		];
 

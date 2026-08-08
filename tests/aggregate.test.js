@@ -240,6 +240,18 @@ describe('distinct', () => {
 			{ orderId: 1 },
 			{ orderId: 2 }
 		]);
+
+		const orderedRows = await db.orderLine.distinct({
+			orderId: x => x.orderId,
+			product: x => x.product,
+			orderBy: ['orderId desc', 'product'],
+			limit: 2,
+		});
+
+		expect(orderedRows).toEqual([
+			{ orderId: 2, product: 'Magic wand' },
+			{ orderId: 1, product: 'Bicycle' },
+		]);
 	}
 });
 
