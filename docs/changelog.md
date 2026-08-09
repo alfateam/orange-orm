@@ -1,6 +1,6 @@
 ## Changelog
 __5.4.2__  
-Support for limit and orderBy in `aggregate` and `distinct`    
+Support for limit and orderBy in `aggregate` and `distinct`  
 __5.4.1__  
 Fix dateWithTimeZone() column (PostgreSQL timestamptz) decodes to a non-standard string. [#195](https://github.com/alfateam/orange-orm/issues/195)  
 __5.4.0__  
