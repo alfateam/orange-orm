@@ -1,6 +1,7 @@
 const createPatch = require('../client/createPatch');
 const emptyFilter = require('../emptyFilter');
 const negotiateRawSqlFilter = require('../table/column/negotiateRawSqlFilter');
+const parseAggregateOrderBy = require('../table/groupBy/parseOrderBy');
 let getMeta = require('./getMeta');
 let isSafe = Symbol();
 
@@ -399,7 +400,7 @@ function _executePath(context, ...rest) {
 
 
 		async function aggregate(filter, strategy) {
-			validateStrategy(table, strategy);
+			validateAggregateStrategy(strategy);
 			filter = negotiateFilter(filter);
 			const _baseFilter = await invokeBaseFilter();
 			if (_baseFilter)
@@ -410,7 +411,7 @@ function _executePath(context, ...rest) {
 		}
 
 		async function distinct(filter, strategy) {
-			validateStrategy(table, strategy);
+			validateAggregateStrategy(strategy);
 			filter = negotiateFilter(filter);
 			const _baseFilter = await invokeBaseFilter();
 			if (_baseFilter)
@@ -458,6 +459,22 @@ function _executePath(context, ...rest) {
 			validateLimit(strategy);
 			validateOrderBy(table, strategy);
 			validateStrategy(table[p], strategy[p]);
+		}
+	}
+
+	function validateAggregateStrategy(strategy) {
+		if (!strategy)
+			return;
+
+		validateOffset(strategy);
+		validateLimit(strategy);
+		const reserved = new Set(['where', 'limit', 'offset', 'orderBy']);
+		const aliases = Object.keys(strategy).filter(name => !reserved.has(name));
+		try {
+			parseAggregateOrderBy(strategy.orderBy, aliases);
+		} catch (error) {
+			error.status = 400;
+			throw error;
 		}
 	}
 

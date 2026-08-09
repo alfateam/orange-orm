@@ -3,20 +3,21 @@ var extractFilter = require('../query/extractFilter');
 var extractLimit = require('../query/extractLimit');
 var newParameterized = require('../query/newParameterized');
 var extractOffset = require('../query/extractOffset');
+var extractOrderBy = require('./extractOrderBy');
 
 function newQuery(context, table,filter,span,alias,options = {}) {
 	filter = extractFilter(filter);
-	var orderBy = '';
+	var orderBy = extractOrderBy(context, span);
 	var limit = extractLimit(context, span);
 	var offset = extractOffset(context, span);
 	const useDistinct = options.distinct && canUseDistinct(span);
 
-	var query = newSingleQuery(context, table,filter,span,alias,orderBy,limit,offset,useDistinct);
-	if (useDistinct)
-		return query;
-
-	const groupClause = groupBy(span);
-	return newParameterized(query.sql(), query.parameters).append(groupClause);
+	var query = newSingleQuery(context, table,filter,span,alias,'',limit,'',useDistinct);
+	const groupClause = useDistinct ? '' : groupBy(span);
+	return newParameterized(query.sql(), query.parameters)
+		.append(groupClause)
+		.append(orderBy)
+		.append(offset);
 }
 
 function groupBy(span) {

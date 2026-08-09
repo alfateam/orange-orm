@@ -1528,6 +1528,45 @@ function requireEmptyFilter () {
 	return emptyFilter_1;
 }
 
+var parseOrderBy_1;
+var hasRequiredParseOrderBy;
+
+function requireParseOrderBy () {
+	if (hasRequiredParseOrderBy) return parseOrderBy_1;
+	hasRequiredParseOrderBy = 1;
+	function parseOrderBy(orderBy, aliases) {
+		if (!orderBy)
+			return [];
+
+		const aliasSet = aliases instanceof Set ? aliases : new Set(aliases);
+		const entries = Array.isArray(orderBy) ? orderBy : [orderBy];
+
+		return entries.map(parseEntry);
+
+		function parseEntry(entry) {
+			if (typeof entry !== 'string')
+				throw new Error(`Invalid aggregate orderBy '${entry}'`);
+
+			const value = entry.trim();
+			if (aliasSet.has(value))
+				return { alias: value, direction: '' };
+
+			const match = /^(.*)\s+(asc|desc)$/i.exec(value);
+			const alias = match ? match[1].trim() : value;
+			if (!aliasSet.has(alias))
+				throw new Error(`Unable to get aggregate result on orderBy '${entry}'`);
+
+			return {
+				alias,
+				direction: ` ${match[2].toLowerCase()}`
+			};
+		}
+	}
+
+	parseOrderBy_1 = parseOrderBy;
+	return parseOrderBy_1;
+}
+
 var executePath;
 var hasRequiredExecutePath;
 
@@ -1537,6 +1576,7 @@ function requireExecutePath () {
 	const createPatch = requireCreatePatch();
 	const emptyFilter = requireEmptyFilter();
 	const negotiateRawSqlFilter = requireNegotiateRawSqlFilter();
+	const parseAggregateOrderBy = requireParseOrderBy();
 	let getMeta = requireGetMeta();
 	let isSafe = Symbol();
 
@@ -1935,7 +1975,7 @@ function requireExecutePath () {
 
 
 			async function aggregate(filter, strategy) {
-				validateStrategy(table, strategy);
+				validateAggregateStrategy(strategy);
 				filter = negotiateFilter(filter);
 				const _baseFilter = await invokeBaseFilter();
 				if (_baseFilter)
@@ -1946,7 +1986,7 @@ function requireExecutePath () {
 			}
 
 			async function distinct(filter, strategy) {
-				validateStrategy(table, strategy);
+				validateAggregateStrategy(strategy);
 				filter = negotiateFilter(filter);
 				const _baseFilter = await invokeBaseFilter();
 				if (_baseFilter)
@@ -1994,6 +2034,22 @@ function requireExecutePath () {
 				validateLimit(strategy);
 				validateOrderBy(table, strategy);
 				validateStrategy(table[p], strategy[p]);
+			}
+		}
+
+		function validateAggregateStrategy(strategy) {
+			if (!strategy)
+				return;
+
+			validateOffset(strategy);
+			validateLimit(strategy);
+			const reserved = new Set(['where', 'limit', 'offset', 'orderBy']);
+			const aliases = Object.keys(strategy).filter(name => !reserved.has(name));
+			try {
+				parseAggregateOrderBy(strategy.orderBy, aliases);
+			} catch (error) {
+				error.status = 400;
+				throw error;
 			}
 		}
 
@@ -7271,12 +7327,12 @@ function requireExtractFilter () {
 	return extractFilter;
 }
 
-var extractOrderBy_1;
-var hasRequiredExtractOrderBy;
+var extractOrderBy_1$1;
+var hasRequiredExtractOrderBy$1;
 
-function requireExtractOrderBy () {
-	if (hasRequiredExtractOrderBy) return extractOrderBy_1;
-	hasRequiredExtractOrderBy = 1;
+function requireExtractOrderBy$1 () {
+	if (hasRequiredExtractOrderBy$1) return extractOrderBy_1$1;
+	hasRequiredExtractOrderBy$1 = 1;
 	const getSessionSingleton = requireGetSessionSingleton();
 
 	function extractOrderBy(context, table, alias, orderBy, originalOrderBy) {
@@ -7337,8 +7393,8 @@ function requireExtractOrderBy () {
 		return ' order by ' + dbNames.join(',');
 	}
 
-	extractOrderBy_1 = extractOrderBy;
-	return extractOrderBy_1;
+	extractOrderBy_1$1 = extractOrderBy;
+	return extractOrderBy_1$1;
 }
 
 var extractLimit_1;
@@ -7389,7 +7445,7 @@ function requireNewQuery$2 () {
 	hasRequiredNewQuery$2 = 1;
 	var newSingleQuery = requireNewSingleQuery$1();
 	var extractFilter = requireExtractFilter();
-	var extractOrderBy = requireExtractOrderBy();
+	var extractOrderBy = requireExtractOrderBy$1();
 	var extractLimit = requireExtractLimit();
 	var extractOffset = requireExtractOffset();
 
@@ -11862,7 +11918,7 @@ function requireNewQuery$1 () {
 	hasRequiredNewQuery$1 = 1;
 	var newSingleQuery = requireNewSingleQuery();
 	var extractFilter = requireExtractFilter();
-	var extractOrderBy = requireExtractOrderBy();
+	var extractOrderBy = requireExtractOrderBy$1();
 	var extractLimit = requireExtractLimit();
 	var newParameterized = requireNewParameterized();
 	var extractOffset = requireExtractOffset();
@@ -13502,6 +13558,30 @@ function requireAggregate () {
 	return aggregate;
 }
 
+var extractOrderBy_1;
+var hasRequiredExtractOrderBy;
+
+function requireExtractOrderBy () {
+	if (hasRequiredExtractOrderBy) return extractOrderBy_1;
+	hasRequiredExtractOrderBy = 1;
+	const getSessionSingleton = requireGetSessionSingleton();
+	const parseOrderBy = requireParseOrderBy();
+
+	function extractOrderBy(context, span) {
+		const entries = parseOrderBy(span.orderBy, Object.keys(span.aggregates));
+		if (entries.length === 0)
+			return '';
+
+		const quote = getSessionSingleton(context, 'quote');
+		return ' order by ' + entries
+			.map(({ alias, direction }) => quote(alias) + direction)
+			.join(',');
+	}
+
+	extractOrderBy_1 = extractOrderBy;
+	return extractOrderBy_1;
+}
+
 var newQuery_1;
 var hasRequiredNewQuery;
 
@@ -13513,20 +13593,21 @@ function requireNewQuery () {
 	var extractLimit = requireExtractLimit();
 	var newParameterized = requireNewParameterized();
 	var extractOffset = requireExtractOffset();
+	var extractOrderBy = requireExtractOrderBy();
 
 	function newQuery(context, table,filter,span,alias,options = {}) {
 		filter = extractFilter(filter);
-		var orderBy = '';
+		var orderBy = extractOrderBy(context, span);
 		var limit = extractLimit(context, span);
 		var offset = extractOffset(context, span);
 		const useDistinct = options.distinct && canUseDistinct(span);
 
-		var query = newSingleQuery(context, table,filter,span,alias,orderBy,limit,offset,useDistinct);
-		if (useDistinct)
-			return query;
-
-		const groupClause = groupBy(span);
-		return newParameterized(query.sql(), query.parameters).append(groupClause);
+		var query = newSingleQuery(context, table,filter,span,alias,'',limit,'',useDistinct);
+		const groupClause = useDistinct ? '' : groupBy(span);
+		return newParameterized(query.sql(), query.parameters)
+			.append(groupClause)
+			.append(orderBy)
+			.append(offset);
 	}
 
 	function groupBy(span) {
