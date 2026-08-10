@@ -27,10 +27,12 @@ services:
       oracle:
         condition: service_healthy
   postgres:
-    image: postgres
+    image: postgres:16.14-bookworm
     environment:
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=postgres
+    tmpfs:
+      - /var/lib/postgresql/data
     ports:
       - 14332:5432
     # restart: always
@@ -56,6 +58,8 @@ services:
       - MYSQL_DATABASE=test
       - MYSQL_USER=test
       - MYSQL_PASSWORD=test
+    tmpfs:
+      - /var/lib/mysql
     ports:
       - 3306:3306
     # restart: always
@@ -66,6 +70,8 @@ services:
       - MARIADB_DATABASE=test
       - MARIADB_USER=test
       - MARIADB_PASSWORD=test
+    tmpfs:
+      - /var/lib/mysql
     ports:
       - 3307:3306
     # restart: always
@@ -80,6 +86,8 @@ services:
     environment:
       - ORACLE_PASSWORD=P@assword123   
     hostname: oracle
+    tmpfs:
+      - /opt/oracle/oradata
     ports:
       - 1521:1521
     healthcheck:
