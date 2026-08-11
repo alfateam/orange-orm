@@ -133,7 +133,7 @@
     },
     "devDependencies": {
         "@electric-sql/pglite": "^0.3.0",
-        "@hono/node-server": "^1.14.4",
+        "@hono/node-server": "^2.0.10",
         "@rollup/plugin-commonjs": "^28.0.2",
         "@rollup/plugin-json": "^6.1.0",
         "@rollup/plugin-node-resolve": "^13.0.0",
