@@ -1,7 +1,8 @@
 import { describe, test, beforeAll, afterAll, expect } from 'vitest';
+import sqliteTestPath from './sqliteTestPath.mjs';
 const rdb = require('../src/index');
 
-const sqliteName = 'demo.getbyid.discriminator.hist.test.db';
+const sqliteName = sqliteTestPath('demo.getbyid.discriminator.hist.test.db');
 
 const map = rdb.map(x => ({
 	hus: x.table('hus').map(({ column }) => ({

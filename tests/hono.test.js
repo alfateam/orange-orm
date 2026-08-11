@@ -1,4 +1,5 @@
 import { describe, test, beforeAll, afterAll, expect } from 'vitest';
+import sqliteTestPath from './sqliteTestPath.mjs';
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import { cors } from 'hono/cors';
@@ -94,7 +95,7 @@ async function validateToken(c, next) {
 const pathSegments = __filename.split('/');
 const lastSegment = pathSegments[pathSegments.length - 1];
 const fileNameWithoutExtension = lastSegment.split('.')[0];
-const sqliteName = `demo.${fileNameWithoutExtension}.db`;
+const sqliteName = sqliteTestPath(`demo.${fileNameWithoutExtension}.db`);
 
 const connections = {
 	sqlite: {

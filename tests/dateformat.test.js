@@ -1,4 +1,5 @@
 import { describe, test, beforeAll, expect, afterAll } from 'vitest';
+import sqliteTestPath from './sqliteTestPath.mjs';
 const map = require('./db');
 const initPg = require('./initPg');
 const initOracle = require('./initOracle');
@@ -222,8 +223,8 @@ describe('dateformat get', () => {
 const pathSegments = __filename.split('/');
 const lastSegment = pathSegments[pathSegments.length - 1];
 const fileNameWithoutExtension = lastSegment.split('.')[0];
-const sqliteName = `demo.${fileNameWithoutExtension}.db`;
-const sqliteName2 = `demo.${fileNameWithoutExtension}2.db`;
+const sqliteName = sqliteTestPath(`demo.${fileNameWithoutExtension}.db`);
+const sqliteName2 = sqliteTestPath(`demo.${fileNameWithoutExtension}2.db`);
 
 const connections = {
 	mssql: {

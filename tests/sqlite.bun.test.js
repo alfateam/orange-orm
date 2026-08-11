@@ -1,11 +1,12 @@
 import { describe, test, expect, beforeAll } from 'bun:test';
+import sqliteTestPath from './sqliteTestPath.mjs';
 import map from './db.js';
 import initSqlite from './initSqlite.js';
 
 const pathSegments = __filename.split('/');
 const lastSegment = pathSegments[pathSegments.length - 1];
 const fileNameWithoutExtension = lastSegment.split('.')[0];
-const sqliteName = `demo.${fileNameWithoutExtension}.db`;
+const sqliteName = sqliteTestPath(`demo.${fileNameWithoutExtension}.db`);
 
 function dateToISOString(date) {
 	let tzo = -date.getTimezoneOffset();
