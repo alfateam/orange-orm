@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { afterAll, describe, expect, test } from 'vitest';
 import sqliteTestPath from './sqliteTestPath.mjs';
 const map = require('./db');
 const initPg = require('./initPg');
@@ -10,6 +10,11 @@ const initSap = require('./initSap');
 
 const fileNameWithoutExtension = __filename.substring(__dirname.length + 1).slice(0, -3);
 const sqliteName = sqliteTestPath(`demo.${fileNameWithoutExtension}.db`);
+const databases = new Set();
+
+afterAll(async () => {
+	await Promise.all([...databases].map((db) => db.close()));
+});
 
 describe('select for update and skip locked query integration', () => {
 	test('pg', async () => await verifyLockingStrategyRuns('pg'));
@@ -252,6 +257,13 @@ async function seedOrders(db) {
 }
 
 function getDbPair(name) {
+	const pair = createDbPair(name);
+	databases.add(pair.writer);
+	databases.add(pair.reader);
+	return pair;
+}
+
+function createDbPair(name) {
 	if (name === 'pg') {
 		return {
 			writer: map({ db: (con) => con.postgres('postgres://postgres:postgres@postgres/postgres', { size: 1 }) }),

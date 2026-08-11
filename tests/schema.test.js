@@ -1,4 +1,4 @@
-import { describe, test, beforeAll, expect } from 'vitest';
+import { describe, test, beforeAll, afterAll, expect } from 'vitest';
 const map = require('./db');
 
 const initPg = require('./initPg');
@@ -11,6 +11,10 @@ beforeAll(async () => {
 		const { db, init } = getDb(dbName);
 		await init(db);
 	}
+});
+
+afterAll(async () => {
+	await Promise.all(Object.values(connections).map(({ db }) => db.close()));
 });
 
 describe('search path custom', () => {

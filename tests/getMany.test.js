@@ -18,13 +18,13 @@ let server;
 
 
 afterAll(async () => {
-
-	return new Promise((res) => {
+	await new Promise((res) => {
 		if (server)
 			server.close(res);
 		else
 			res();
 	});
+	await Promise.all(Object.values(connections).map(({ db }) => typeof db.close === 'function' ? db.close() : undefined));
 });
 
 

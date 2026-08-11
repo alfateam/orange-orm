@@ -1,4 +1,4 @@
-﻿import { describe, test, beforeAll, expect } from 'vitest';
+﻿import { describe, test, beforeAll, afterAll, expect } from 'vitest';
 import sqliteTestPath from './sqliteTestPath.mjs';
 const map = require('./db');
 const initMs = require('./initMs');
@@ -26,6 +26,10 @@ beforeAll(async () => {
 		`;
 		await db.query(sql);
 	}
+});
+
+afterAll(async () => {
+	await Promise.all(Object.values(connections).map(({ db }) => db.close()));
 });
 
 describe('output aliases for date columns', () => {
@@ -201,7 +205,6 @@ function getDb(name) {
 	else
 		throw new Error('unknown');
 }
-
 
 
 

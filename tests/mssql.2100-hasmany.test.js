@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, test } from 'vitest';
+import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 const map = require('./db');
 const initMs = require('./initMs');
 
@@ -34,6 +34,10 @@ describe('mssql getMany hasMany with more than 2100 child rows', () => {
 		if (major === 18)
 			await initMs(connections.mssqlNative);
 	}, 30000);
+
+	afterAll(async () => {
+		await Promise.all(Object.values(connections).map((db) => db.close()));
+	});
 
 	test('mssql', async () => await verify(connections.mssql, 9000000000000000n, 700000), 60000);
 	if (major === 18)

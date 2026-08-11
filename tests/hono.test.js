@@ -12,12 +12,13 @@ const port = 3012;
 let server;
 
 afterAll(async () => {
-	return new Promise((res) => {
+	await new Promise((res) => {
 		if (server)
 			server.close(res);
 		else
 			res();
 	});
+	await connections.sqlite.db.close();
 });
 
 beforeAll(async () => {

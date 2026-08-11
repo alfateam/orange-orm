@@ -78,7 +78,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-
+	await Promise.all(Object.values(connections).map(({ db }) => typeof db.close === 'function' ? db.close() : undefined));
 });
 
 

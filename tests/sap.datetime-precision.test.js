@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, test } from 'vitest';
+import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 const map = require('./db');
 const initSap = require('./initSap');
 
@@ -9,6 +9,10 @@ const db = map({
 beforeAll(async () => {
 	await initSap(db);
 }, 60000);
+
+afterAll(async () => {
+	await db.close();
+});
 
 describe('sap datetime precision in optimistic concurrency', () => {
 	test('saveChanges matches old datetime values even when the stored value has milliseconds', async () => {

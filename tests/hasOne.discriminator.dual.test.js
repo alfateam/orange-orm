@@ -1,4 +1,4 @@
-import { describe, test, expect } from 'vitest';
+import { afterAll, describe, test, expect } from 'vitest';
 const rdb = require('../src/index');
 
 const sqliteName = ':memory:';
@@ -166,6 +166,10 @@ const connections = {
 		},
 	},
 };
+
+afterAll(async () => {
+	await Promise.all(Object.values(connections).map(({ db }) => db.close()));
+});
 
 async function insertData(db) {
 	const husId = 'hus-1';

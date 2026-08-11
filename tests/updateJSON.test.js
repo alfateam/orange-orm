@@ -103,6 +103,10 @@ async function globalTeardown() {
 	});
 }
 
+afterAll(async () => {
+	await Promise.all(Object.values(connections).map(({ db }) => typeof db.close === 'function' ? db.close() : undefined));
+});
+
 describe('updateChanges', () => {
 	beforeAll(async () => {
 		await globalSetup();
