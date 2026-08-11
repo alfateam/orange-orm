@@ -113,16 +113,19 @@ jobs:
         run: npm run lint
       - if: ${{ matrix.container == 'node:22-bookworm' }}
         run: npm run tscheck
-      - run: npm test
+      - if: ${{ matrix.container == 'node:24-bookworm' }}
+        run: npm test
 
-      # Only run coverage once (pick a single image)
+      # Coverage also runs the tests, so use it as the Node 22 test run.
       - if: ${{ matrix.container == 'node:22-bookworm' }}
-        run: npm run coverage
+        run: |
+          npm run coverage > coverage-output.txt
+          cat coverage-output.txt
 
       - if: ${{ matrix.container == 'node:22-bookworm' && github.ref == 'refs/heads/master' }}
         name: Get Coverage for badge
         run: |
-          SUMMARY="$(npm run coverage | tail -2 | head -1)"
+          SUMMARY="$(tail -2 coverage-output.txt | head -1)"
           echo "SUMMARY=$SUMMARY"
           COVERAGE=$(echo "$SUMMARY" | awk -F':' '{print $2}' | awk '{print $1}')
           echo "COVERAGE=$COVERAGE" >> $GITHUB_ENV

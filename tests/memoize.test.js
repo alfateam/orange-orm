@@ -1,4 +1,5 @@
 import { describe, test, beforeAll, afterAll, expect } from 'vitest';
+import sqliteTestPath from './sqliteTestPath.mjs';
 const express = require('express');
 import { json } from 'body-parser';
 import cors from 'cors';
@@ -148,8 +149,8 @@ describe('boolean filter', () => {
 });
 
 
-const sqliteName = 'demo.memoize.db';
-const sqliteName2 = 'demo.memoize2.db';
+const sqliteName = sqliteTestPath('demo.memoize.db');
+const sqliteName2 = sqliteTestPath('demo.memoize2.db');
 
 const connections = {
 	mssql: {

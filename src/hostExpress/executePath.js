@@ -1,6 +1,7 @@
 const createPatch = require('../client/createPatch');
 const emptyFilter = require('../emptyFilter');
 const negotiateRawSqlFilter = require('../table/column/negotiateRawSqlFilter');
+const parseAggregateOrderBy = require('../table/groupBy/parseOrderBy');
 let getMeta = require('./getMeta');
 let isSafe = Symbol();
 
@@ -303,7 +304,7 @@ function _executePath(context, ...rest) {
 
 		async function replace(subject, strategy = { insertAndForget: true }) {
 			validateStrategy(table, strategy);
-			const refinedStrategy = objectToStrategy(subject, {}, table);
+			const refinedStrategy = withLockingStrategy(objectToStrategy(subject, {}, table), strategy);
 			const JSONFilter2 = {
 				path: 'getManyDto',
 				args: [subject, refinedStrategy]
@@ -320,7 +321,7 @@ function _executePath(context, ...rest) {
 
 		async function update(subject, whereStrategy, strategy = { insertAndForget: true }) {
 			validateStrategy(table, strategy);
-			const refinedWhereStrategy = objectToStrategy(subject, whereStrategy, table);
+			const refinedWhereStrategy = withLockingStrategy(objectToStrategy(subject, whereStrategy, table), strategy);
 			const JSONFilter2 = {
 				path: 'getManyDto',
 				args: [null, refinedWhereStrategy]
@@ -338,6 +339,43 @@ function _executePath(context, ...rest) {
 			const patch = createPatch(originals, rows, meta);
 			const { changed } = await table.patch(context, patch, { strategy });
 			return changed;
+		}
+
+		function withLockingStrategy(fetchStrategy, strategy) {
+			const lockStrategy = extractLockingStrategy(strategy);
+			if (!lockStrategy)
+				return fetchStrategy;
+			return mergeLockingStrategy(fetchStrategy, lockStrategy);
+		}
+
+		function extractLockingStrategy(strategy) {
+			if (!strategy || typeof strategy !== 'object')
+				return;
+			const result = {};
+			if (strategy.forUpdate)
+				result.forUpdate = strategy.forUpdate;
+			if (strategy.skipLocked)
+				result.skipLocked = strategy.skipLocked;
+			for (let name in strategy) {
+				if (name === 'where' || name === 'orderBy' || name === 'limit' || name === 'offset' || name === 'forUpdate' || name === 'skipLocked')
+					continue;
+				const child = extractLockingStrategy(strategy[name]);
+				if (child)
+					result[name] = child;
+			}
+			return Object.keys(result).length > 0 ? result : undefined;
+		}
+
+		function mergeLockingStrategy(fetchStrategy, lockStrategy) {
+			const result = { ...fetchStrategy };
+			for (let name in lockStrategy) {
+				const value = lockStrategy[name];
+				if (name === 'forUpdate' || name === 'skipLocked')
+					result[name] = value;
+				else
+					result[name] = mergeLockingStrategy(result[name] && typeof result[name] === 'object' ? result[name] : {}, value);
+			}
+			return result;
 		}
 
 		function objectToStrategy(object, whereStrategy, table, strategy = {}) {
@@ -362,7 +400,7 @@ function _executePath(context, ...rest) {
 
 
 		async function aggregate(filter, strategy) {
-			validateStrategy(table, strategy);
+			validateAggregateStrategy(strategy);
 			filter = negotiateFilter(filter);
 			const _baseFilter = await invokeBaseFilter();
 			if (_baseFilter)
@@ -373,7 +411,7 @@ function _executePath(context, ...rest) {
 		}
 
 		async function distinct(filter, strategy) {
-			validateStrategy(table, strategy);
+			validateAggregateStrategy(strategy);
 			filter = negotiateFilter(filter);
 			const _baseFilter = await invokeBaseFilter();
 			if (_baseFilter)
@@ -421,6 +459,22 @@ function _executePath(context, ...rest) {
 			validateLimit(strategy);
 			validateOrderBy(table, strategy);
 			validateStrategy(table[p], strategy[p]);
+		}
+	}
+
+	function validateAggregateStrategy(strategy) {
+		if (!strategy)
+			return;
+
+		validateOffset(strategy);
+		validateLimit(strategy);
+		const reserved = new Set(['where', 'limit', 'offset', 'orderBy']);
+		const aliases = Object.keys(strategy).filter(name => !reserved.has(name));
+		try {
+			parseAggregateOrderBy(strategy.orderBy, aliases);
+		} catch (error) {
+			error.status = 400;
+			throw error;
 		}
 	}
 

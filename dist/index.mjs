@@ -270,6 +270,8 @@ export interface ${name}Strategy {
 	offset?: number;
 	orderBy?: Array<${orderByColumns(table)}> | ${orderByColumns(table)};
 	where?: (table: ${name}TableBase) => RawFilter;
+	forUpdate?: boolean;
+	skipLocked?: boolean;
 }
 
 ${otherConcurrency}
@@ -2545,6 +2547,45 @@ function requireEmptyFilter () {
 	return emptyFilter_1;
 }
 
+var parseOrderBy_1;
+var hasRequiredParseOrderBy;
+
+function requireParseOrderBy () {
+	if (hasRequiredParseOrderBy) return parseOrderBy_1;
+	hasRequiredParseOrderBy = 1;
+	function parseOrderBy(orderBy, aliases) {
+		if (!orderBy)
+			return [];
+
+		const aliasSet = aliases instanceof Set ? aliases : new Set(aliases);
+		const entries = Array.isArray(orderBy) ? orderBy : [orderBy];
+
+		return entries.map(parseEntry);
+
+		function parseEntry(entry) {
+			if (typeof entry !== 'string')
+				throw new Error(`Invalid aggregate orderBy '${entry}'`);
+
+			const value = entry.trim();
+			if (aliasSet.has(value))
+				return { alias: value, direction: '' };
+
+			const match = /^(.*)\s+(asc|desc)$/i.exec(value);
+			const alias = match ? match[1].trim() : value;
+			if (!aliasSet.has(alias))
+				throw new Error(`Unable to get aggregate result on orderBy '${entry}'`);
+
+			return {
+				alias,
+				direction: ` ${match[2].toLowerCase()}`
+			};
+		}
+	}
+
+	parseOrderBy_1 = parseOrderBy;
+	return parseOrderBy_1;
+}
+
 var executePath;
 var hasRequiredExecutePath;
 
@@ -2554,6 +2595,7 @@ function requireExecutePath () {
 	const createPatch = requireCreatePatch();
 	const emptyFilter = requireEmptyFilter();
 	const negotiateRawSqlFilter = requireNegotiateRawSqlFilter();
+	const parseAggregateOrderBy = requireParseOrderBy();
 	let getMeta = requireGetMeta();
 	let isSafe = Symbol();
 
@@ -2856,7 +2898,7 @@ function requireExecutePath () {
 
 			async function replace(subject, strategy = { insertAndForget: true }) {
 				validateStrategy(table, strategy);
-				const refinedStrategy = objectToStrategy(subject, {}, table);
+				const refinedStrategy = withLockingStrategy(objectToStrategy(subject, {}, table), strategy);
 				const JSONFilter2 = {
 					path: 'getManyDto',
 					args: [subject, refinedStrategy]
@@ -2873,7 +2915,7 @@ function requireExecutePath () {
 
 			async function update(subject, whereStrategy, strategy = { insertAndForget: true }) {
 				validateStrategy(table, strategy);
-				const refinedWhereStrategy = objectToStrategy(subject, whereStrategy, table);
+				const refinedWhereStrategy = withLockingStrategy(objectToStrategy(subject, whereStrategy, table), strategy);
 				const JSONFilter2 = {
 					path: 'getManyDto',
 					args: [null, refinedWhereStrategy]
@@ -2891,6 +2933,43 @@ function requireExecutePath () {
 				const patch = createPatch(originals, rows, meta);
 				const { changed } = await table.patch(context, patch, { strategy });
 				return changed;
+			}
+
+			function withLockingStrategy(fetchStrategy, strategy) {
+				const lockStrategy = extractLockingStrategy(strategy);
+				if (!lockStrategy)
+					return fetchStrategy;
+				return mergeLockingStrategy(fetchStrategy, lockStrategy);
+			}
+
+			function extractLockingStrategy(strategy) {
+				if (!strategy || typeof strategy !== 'object')
+					return;
+				const result = {};
+				if (strategy.forUpdate)
+					result.forUpdate = strategy.forUpdate;
+				if (strategy.skipLocked)
+					result.skipLocked = strategy.skipLocked;
+				for (let name in strategy) {
+					if (name === 'where' || name === 'orderBy' || name === 'limit' || name === 'offset' || name === 'forUpdate' || name === 'skipLocked')
+						continue;
+					const child = extractLockingStrategy(strategy[name]);
+					if (child)
+						result[name] = child;
+				}
+				return Object.keys(result).length > 0 ? result : undefined;
+			}
+
+			function mergeLockingStrategy(fetchStrategy, lockStrategy) {
+				const result = { ...fetchStrategy };
+				for (let name in lockStrategy) {
+					const value = lockStrategy[name];
+					if (name === 'forUpdate' || name === 'skipLocked')
+						result[name] = value;
+					else
+						result[name] = mergeLockingStrategy(result[name] && typeof result[name] === 'object' ? result[name] : {}, value);
+				}
+				return result;
 			}
 
 			function objectToStrategy(object, whereStrategy, table, strategy = {}) {
@@ -2915,7 +2994,7 @@ function requireExecutePath () {
 
 
 			async function aggregate(filter, strategy) {
-				validateStrategy(table, strategy);
+				validateAggregateStrategy(strategy);
 				filter = negotiateFilter(filter);
 				const _baseFilter = await invokeBaseFilter();
 				if (_baseFilter)
@@ -2926,7 +3005,7 @@ function requireExecutePath () {
 			}
 
 			async function distinct(filter, strategy) {
-				validateStrategy(table, strategy);
+				validateAggregateStrategy(strategy);
 				filter = negotiateFilter(filter);
 				const _baseFilter = await invokeBaseFilter();
 				if (_baseFilter)
@@ -2974,6 +3053,22 @@ function requireExecutePath () {
 				validateLimit(strategy);
 				validateOrderBy(table, strategy);
 				validateStrategy(table[p], strategy[p]);
+			}
+		}
+
+		function validateAggregateStrategy(strategy) {
+			if (!strategy)
+				return;
+
+			validateOffset(strategy);
+			validateLimit(strategy);
+			const reserved = new Set(['where', 'limit', 'offset', 'orderBy']);
+			const aliases = Object.keys(strategy).filter(name => !reserved.has(name));
+			try {
+				parseAggregateOrderBy(strategy.orderBy, aliases);
+			} catch (error) {
+				error.status = 400;
+				throw error;
 			}
 		}
 
@@ -4552,8 +4647,9 @@ function requireHostLocal () {
 			async function fn(context) {
 				setSessionSingleton(context, 'ignoreSerializable', true);
 				let patch = body.patch;
-				await captureSyncOutboxPatch(context, patch, body.options);
+				await prepareSyncOutboxPatchCapture(context, patch);
 				result = await table.patch(context, patch, { ..._options, ...body.options, isHttp });
+				await captureSyncOutboxPatch(context, patch, body.options);
 			}
 		}
 
@@ -4595,7 +4691,7 @@ function requireHostLocal () {
 					|| beforeCommit
 					|| afterCommit
 					|| afterRollback);
-				if (!hasTransactionHooks && readonlyOps.includes(body.path))
+				if (!hasTransactionHooks && readonlyOps.includes(body.path) && !hasLockingStrategy(body))
 					await resolvedDb.transaction({ readonly: true }, fn);
 				else {
 					await runSyncWrite(resolvedDb, undefined, () => resolvedDb.transaction(async (context) => {
@@ -4628,6 +4724,24 @@ function requireHostLocal () {
 				const options = { ..._options, ...body.options, JSONFilter: body, request, response, isHttp };
 				result = await executePath(context, options);
 			}
+		}
+
+		function hasLockingStrategy(body) {
+			if (!body || !body.args)
+				return false;
+			return hasLockingStrategyCore(body.args[1]);
+		}
+
+		function hasLockingStrategyCore(strategy) {
+			if (!strategy || typeof strategy !== 'object')
+				return false;
+			if (strategy.forUpdate || strategy.skipLocked)
+				return true;
+			for (let name in strategy) {
+				if (name !== 'where' && hasLockingStrategyCore(strategy[name]))
+					return true;
+			}
+			return false;
 		}
 		async function query() {
 			let args = arguments;
@@ -4703,6 +4817,12 @@ function requireHostLocal () {
 				options: sanitizeSyncPatchOptions(options)
 			});
 			await updateSyncOutboxCaptureState(context, state);
+		}
+
+		async function prepareSyncOutboxPatchCapture(context, patch) {
+			if (!Array.isArray(patch) || patch.length === 0 || !_options.syncTableName)
+				return;
+			await getSyncOutboxCaptureState(context);
 		}
 
 		async function captureSyncOutboxCommand(context, name, args) {
@@ -10452,7 +10572,7 @@ function requireClient () {
 					return false;
 				if (Object.keys(value).length === 0)
 					return true;
-				if ('where' in value || 'orderBy' in value || 'limit' in value || 'offset' in value)
+				if ('where' in value || 'orderBy' in value || 'limit' in value || 'offset' in value || 'forUpdate' in value || 'skipLocked' in value)
 					return true;
 				for (let key in value) {
 					const v = value[key];
@@ -10707,6 +10827,7 @@ function requireClient () {
 
 			function proxifyArray(array, strategy, fast) {
 				let _array = array;
+				const storedStrategy = toStoredFetchStrategy(strategy);
 				if (_reactive)
 					array = _reactive(array);
 				let handler = {
@@ -10734,18 +10855,18 @@ function requireClient () {
 				};
 
 				let watcher = onChange(array, () => {
-					rootMap.set(array, { json: cloneFromDb(array, fast), strategy, originalArray: [...array] });
+					rootMap.set(array, { json: cloneFromDb(array, fast), strategy: storedStrategy, originalArray: [...array] });
 				});
 				let innerProxy = new Proxy(watcher, handler);
-				if (strategy !== undefined) {
-					const { limit, ...cleanStrategy } = { ...strategy };
-					fetchingStrategyMap.set(array, cleanStrategy);
+				if (storedStrategy !== undefined) {
+					fetchingStrategyMap.set(array, storedStrategy);
 				}
 				return innerProxy;
 			}
 
 			function proxifyRow(row, strategy, fast) {
 				let _row = row;
+				const storedStrategy = toStoredFetchStrategy(strategy);
 				if (_reactive)
 					row = _reactive(row);
 				let handler = {
@@ -10772,10 +10893,10 @@ function requireClient () {
 
 				};
 				let watcher = onChange(row, () => {
-					rootMap.set(row, { json: cloneFromDb(row, fast), strategy });
+					rootMap.set(row, { json: cloneFromDb(row, fast), strategy: storedStrategy });
 				});
 				let innerProxy = new Proxy(watcher, handler);
-				fetchingStrategyMap.set(row, strategy);
+				fetchingStrategyMap.set(row, storedStrategy);
 				return innerProxy;
 			}
 
@@ -10867,7 +10988,7 @@ function requireClient () {
 				let insertedPositions = getInsertedRowsPosition(array);
 				let { changed, strategy: newStrategy } = await p;
 				copyIntoArray(changed, array, [...insertedPositions, ...updatedPositions]);
-				rootMap.set(array, { json: cloneFromDb(array), strategy: newStrategy, originalArray: [...array] });
+				rootMap.set(array, { json: cloneFromDb(array), strategy: toStoredFetchStrategy(newStrategy), originalArray: [...array] });
 			}
 
 			async function patch(patch, concurrencyOptions, strategy) {
@@ -10963,8 +11084,7 @@ function requireClient () {
 					let context = rootMap.get(obj);
 					if (context?.strategy !== undefined) {
 						// @ts-ignore
-						let { limit, ...strategy } = { ...context.strategy };
-						return strategy;
+						return toStoredFetchStrategy(context.strategy);
 					}
 				}
 			}
@@ -10974,9 +11094,24 @@ function requireClient () {
 					return strategy;
 				else if (fetchingStrategyMap.get(obj) !== undefined) {
 					// @ts-ignore
-					const { limit, ...strategy } = { ...fetchingStrategyMap.get(obj) };
-					return strategy;
+					return toStoredFetchStrategy(fetchingStrategyMap.get(obj));
 				}
+			}
+
+			function toStoredFetchStrategy(strategy) {
+				if (strategy === undefined || strategy === null || typeof strategy !== 'object')
+					return strategy;
+				if (Array.isArray(strategy))
+					return strategy.map(toStoredFetchStrategy);
+				const cleanStrategy = { ...strategy };
+				delete cleanStrategy.limit;
+				delete cleanStrategy.forUpdate;
+				delete cleanStrategy.skipLocked;
+				for (let name in cleanStrategy) {
+					if (name !== 'where' && cleanStrategy[name] && typeof cleanStrategy[name] === 'object')
+						cleanStrategy[name] = toStoredFetchStrategy(cleanStrategy[name]);
+				}
+				return cleanStrategy;
 			}
 
 			function clearChangesArray(array) {
@@ -11068,8 +11203,9 @@ function requireClient () {
 					array.splice(i + offset, 1);
 					offset--;
 				}
-				rootMap.set(array, { json: cloneFromDb(array), strategy, originalArray: [...array] });
-				fetchingStrategyMap.set(array, strategy);
+				const storedStrategy = toStoredFetchStrategy(strategy);
+				rootMap.set(array, { json: cloneFromDb(array), strategy: storedStrategy, originalArray: [...array] });
+				fetchingStrategyMap.set(array, storedStrategy);
 			}
 
 			async function deleteRow(row, options) {
@@ -11105,7 +11241,7 @@ function requireClient () {
 				let adapter = netAdapter(url, tableName, { http: httpInterceptor, tableOptions });
 				let { changed, strategy: newStrategy } = await adapter.patch(body);
 				copyInto(changed, [row]);
-				rootMap.set(row, { json: cloneFromDb(row), strategy: newStrategy });
+				rootMap.set(row, { json: cloneFromDb(row), strategy: toStoredFetchStrategy(newStrategy) });
 			}
 
 			async function refreshRow(row, strategy) {
@@ -11129,8 +11265,9 @@ function requireClient () {
 				for (let p in rows[0]) {
 					row[p] = rows[0][p];
 				}
-				rootMap.set(row, { json: cloneFromDb(row), strategy });
-				fetchingStrategyMap.set(row, strategy);
+				const storedStrategy = toStoredFetchStrategy(strategy);
+				rootMap.set(row, { json: cloneFromDb(row), strategy: storedStrategy });
+				fetchingStrategyMap.set(row, storedStrategy);
 			}
 
 			function acceptChangesRow(row) {
@@ -12672,8 +12809,10 @@ function requireNewDecode$4 () {
 			value = decodeCore(context, value);
 			if (value === null)
 				return value;
-			else if (typeof value === 'string')
-				return value.replace(' ', 'T').replace(' ', '');
+			else if (typeof value === 'string') {
+				var iso = value.replace(' ', 'T').replace(' ', '');
+				return iso.replace(/(T\d{2}:\d{2}:\d{2}(?:\.\d+)?[+-]\d{2})$/, '$1:00');
+			}
 			return dateToISOString(value);
 		};
 	}
@@ -13657,8 +13796,8 @@ function requireNewPrimaryKeyFilter () {
 		var primaryColumns = table._primaryColumns;
 		var key = arguments[2];
 		var filter = primaryColumns[0].equal(context, key);
-		for (var i = 2; i < primaryColumns.length; i++) {
-			key = arguments[i+1];
+		for (var i = 1; i < primaryColumns.length; i++) {
+			key = arguments[i + 2];
 			var colFilter = primaryColumns[i].equal(context, key);
 			filter = filter.and(context, colFilter);
 		}
@@ -13795,6 +13934,89 @@ function requireNewColumnSql () {
 	return newColumnSql;
 }
 
+var lockSql;
+var hasRequiredLockSql;
+
+function requireLockSql () {
+	if (hasRequiredLockSql) return lockSql;
+	hasRequiredLockSql = 1;
+	const getSessionSingleton = requireGetSessionSingleton();
+
+	function selectLockSql(context, span, alias, exclusive) {
+		const lock = collectSelectLock(span, alias, exclusive);
+		if (!hasLock(lock))
+			return '';
+		const encode = getSessionSingleton(context, 'selectForUpdateSql');
+		if (!encode)
+			return '';
+		return encode(context, lock);
+	}
+
+	function tableHintSql(context, span, exclusive) {
+		const lock = spanToLock(span, exclusive);
+		if (!hasLock(lock))
+			return '';
+		const encode = getSessionSingleton(context, 'selectForUpdateSql');
+		if (!encode || !encode.tableHint)
+			return '';
+		return encode.tableHint(context, lock);
+	}
+
+	function collectSelectLock(span, alias, exclusive) {
+		const lock = {
+			aliases: [],
+			forUpdate: Boolean(exclusive),
+			skipLocked: false
+		};
+		collect(span, alias, lock);
+		if (exclusive && lock.aliases.indexOf(alias) === -1)
+			lock.aliases.unshift(alias);
+		return lock;
+	}
+
+	function collect(span, alias, lock) {
+		if (!span)
+			return;
+		if (span.forUpdate) {
+			lock.forUpdate = true;
+			lock.aliases.push(alias);
+		}
+		if (span.skipLocked)
+			lock.skipLocked = true;
+
+		if (!span.legs)
+			return;
+		const visitor = {};
+		visitor.visitJoin = visitJoinedLeg;
+		visitor.visitOne = visitJoinedLeg;
+		visitor.visitMany = function() {};
+
+		function visitJoinedLeg(leg) {
+			collect(leg.span, alias + leg.name, lock);
+		}
+
+		span.legs.forEach(leg => leg.accept(visitor));
+	}
+
+	function spanToLock(span, exclusive) {
+		return {
+			aliases: [],
+			forUpdate: Boolean(exclusive || span?.forUpdate),
+			skipLocked: Boolean(span?.skipLocked)
+		};
+	}
+
+	function hasLock(lock) {
+		return Boolean(lock.forUpdate || lock.skipLocked);
+	}
+
+	lockSql = {
+		selectLockSql,
+		tableHintSql
+	};
+	return lockSql;
+}
+
 var newShallowJoinSql;
 var hasRequiredNewShallowJoinSql;
 
@@ -13803,10 +14025,12 @@ function requireNewShallowJoinSql () {
 	hasRequiredNewShallowJoinSql = 1;
 	const newJoinCore = requireNewShallowJoinSqlCore();
 	const getSessionSingleton = requireGetSessionSingleton();
+	const lockSql = requireLockSql();
 
-	function _new(context, rightTable, leftColumns, rightColumns, leftAlias, rightAlias, filter) {
+	function _new(context, rightTable, leftColumns, rightColumns, leftAlias, rightAlias, filter, span) {
 		const quote = getSessionSingleton(context, 'quote');
-		const sql = ' JOIN ' + quote(rightTable._dbName) + ' ' + quote(rightAlias) + ' ON (';
+		const tableHint = lockSql.tableHintSql(context, span);
+		const sql = ' JOIN ' + quote(rightTable._dbName) + ' ' + quote(rightAlias) + tableHint + ' ON (';
 		const joinCore = newJoinCore(context, rightTable, leftColumns, rightColumns, leftAlias, rightAlias, filter);
 		return joinCore.prepend(sql).append(')');
 	}
@@ -13826,7 +14050,7 @@ function requireJoinLegToShallowJoinSql () {
 	function toJoinSql(context,leg,alias,childAlias) {
 		var columns = leg.columns;
 		var childTable = leg.span.table;
-		return newShallowJoinSql(context,childTable,columns,childTable._primaryColumns,alias,childAlias,leg.span.where).prepend(' LEFT');
+		return newShallowJoinSql(context,childTable,columns,childTable._primaryColumns,alias,childAlias,leg.span.where,leg.span).prepend(' LEFT');
 	}
 
 	joinLegToShallowJoinSql = toJoinSql;
@@ -13862,7 +14086,7 @@ function requireOneLegToShallowJoinSql () {
 		var parentTable = leg.table;
 		var columns = leg.columns;
 		var childTable = leg.span.table;
-		return newShallowJoinSql(context,childTable,parentTable._primaryColumns,columns,alias,childAlias, leg.span.where).prepend(' LEFT');
+		return newShallowJoinSql(context,childTable,parentTable._primaryColumns,columns,alias,childAlias, leg.span.where,leg.span).prepend(' LEFT');
 	}
 
 	oneLegToShallowJoinSql = toJoinSql;
@@ -13982,26 +14206,6 @@ function requireNegotiateLimit () {
 	return negotiateLimit_1;
 }
 
-var negotiateExclusive_1;
-var hasRequiredNegotiateExclusive;
-
-function requireNegotiateExclusive () {
-	if (hasRequiredNegotiateExclusive) return negotiateExclusive_1;
-	hasRequiredNegotiateExclusive = 1;
-	var getSessionSingleton = requireGetSessionSingleton();
-
-	function negotiateExclusive(context, table, alias, _exclusive) {
-		if (table._exclusive || _exclusive) {
-			var encode =  getSessionSingleton(context, 'selectForUpdateSql');
-			return encode(context, alias);
-		}
-		return '';
-	}
-
-	negotiateExclusive_1 = negotiateExclusive;
-	return negotiateExclusive_1;
-}
-
 var newSingleQuery$1;
 var hasRequiredNewSingleQuery$1;
 
@@ -14012,23 +14216,25 @@ function requireNewSingleQuery$1 () {
 	var newJoinSql = requireNewJoinSql();
 	var newWhereSql = requireNewWhereSql();
 	var negotiateLimit = requireNegotiateLimit();
-	var negotiateExclusive = requireNegotiateExclusive();
+	var lockSql = requireLockSql();
 	var newParameterized = requireNewParameterized();
 	var quote = requireQuote$6();
 
 	function _new(context, table, filter, span, alias, innerJoin, orderBy, limit, offset, exclusive) {
 
 		var name = quote(context, table._dbName);
+		var quotedAlias = quote(context, alias);
 		var columnSql = newColumnSql(context, table, span, alias);
 		var joinSql = newJoinSql(context, span, alias);
 		var whereSql = newWhereSql(context, table, filter, alias);
 		var safeLimit = negotiateLimit(limit);
-		var exclusiveClause = negotiateExclusive(table, alias, exclusive);
-		return newParameterized('select' + safeLimit + ' ' + columnSql + ' from ' + name + ' ' + quote(context, alias))
+		var lockClause = lockSql.selectLockSql(context, span, alias, exclusive);
+		var tableHint = lockSql.tableHintSql(context, span, exclusive);
+		return newParameterized('select' + safeLimit + ' ' + columnSql + ' from ' + name + ' ' + quotedAlias + tableHint)
 			.append(innerJoin)
 			.append(joinSql)
 			.append(whereSql)
-			.append(orderBy + offset + exclusiveClause);
+			.append(orderBy + offset + lockClause);
 	}
 
 	newSingleQuery$1 = _new;
@@ -14053,12 +14259,12 @@ function requireExtractFilter () {
 	return extractFilter;
 }
 
-var extractOrderBy_1;
-var hasRequiredExtractOrderBy;
+var extractOrderBy_1$1;
+var hasRequiredExtractOrderBy$1;
 
-function requireExtractOrderBy () {
-	if (hasRequiredExtractOrderBy) return extractOrderBy_1;
-	hasRequiredExtractOrderBy = 1;
+function requireExtractOrderBy$1 () {
+	if (hasRequiredExtractOrderBy$1) return extractOrderBy_1$1;
+	hasRequiredExtractOrderBy$1 = 1;
 	const getSessionSingleton = requireGetSessionSingleton();
 
 	function extractOrderBy(context, table, alias, orderBy, originalOrderBy) {
@@ -14119,8 +14325,8 @@ function requireExtractOrderBy () {
 		return ' order by ' + dbNames.join(',');
 	}
 
-	extractOrderBy_1 = extractOrderBy;
-	return extractOrderBy_1;
+	extractOrderBy_1$1 = extractOrderBy;
+	return extractOrderBy_1$1;
 }
 
 var extractLimit_1;
@@ -14171,7 +14377,7 @@ function requireNewQuery$2 () {
 	hasRequiredNewQuery$2 = 1;
 	var newSingleQuery = requireNewSingleQuery$1();
 	var extractFilter = requireExtractFilter();
-	var extractOrderBy = requireExtractOrderBy();
+	var extractOrderBy = requireExtractOrderBy$1();
 	var extractLimit = requireExtractLimit();
 	var extractOffset = requireExtractOffset();
 
@@ -14294,7 +14500,7 @@ function requireNewUpdateCommandCore () {
 						const encoded = encodeJsonValue(pathState.oldValue, column);
 						const jsonPath = buildJsonPath(pathState.path);
 						const columnExpr = buildJsonExtractExpression(quote(column._dbName), jsonPath, pathState.oldValue);
-						command = appendJsonPathComparison(columnExpr, encoded);
+						command = appendJsonPathComparison(columnExpr, encoded, pathState.oldValue);
 					}
 				}
 				else {
@@ -14354,7 +14560,12 @@ function requireNewUpdateCommandCore () {
 			return command;
 		}
 
-		function appendJsonPathComparison(columnExpr, encoded) {
+		function appendJsonPathComparison(columnExpr, encoded, oldValue) {
+			if (oldValue === undefined) {
+				command = command.append(separator).append(columnExpr).append(' IS NULL');
+				separator = ' AND ';
+				return command;
+			}
 			if (engine === 'pg') {
 				command = command.append(separator).append(columnExpr).append(' IS NOT DISTINCT FROM ').append(encoded);
 			}
@@ -16356,44 +16567,12 @@ function requireGetMany () {
 		return resultToRows(context, span,result);
 	}
 
-	getMany.exclusive = function(table,filter,strategy) {
-		return getManyCore(table,filter,strategy,true);
+	getMany.exclusive = function(context,table,filter,strategy) {
+		return getManyCore(context,table,filter,strategy,true);
 	};
 
 	getMany_1 = getMany;
 	return getMany_1;
-}
-
-var tryGetFirstFromDb;
-var hasRequiredTryGetFirstFromDb;
-
-function requireTryGetFirstFromDb () {
-	if (hasRequiredTryGetFirstFromDb) return tryGetFirstFromDb;
-	hasRequiredTryGetFirstFromDb = 1;
-	var getMany = requireGetMany();
-
-	function tryGet(context, table, filter, strategy) {
-		strategy = setLimit(strategy);
-		return getMany(context, table, filter, strategy).then(filterRows);
-	}
-
-	function filterRows(rows) {
-		if (rows.length > 0)
-			return rows[0];
-		return null;
-	}
-
-	tryGet.exclusive = function(context, table, filter, strategy) {
-		strategy = setLimit(strategy);
-		return getMany.exclusive(context, table, filter, strategy).then(filterRows);
-	};
-
-	function setLimit(strategy) {
-		return {...strategy, ...{limit: 1}};
-	}
-
-	tryGetFirstFromDb = tryGet;
-	return tryGetFirstFromDb;
 }
 
 var extractStrategy;
@@ -16420,24 +16599,30 @@ function requireTryGetFromDbById () {
 	if (hasRequiredTryGetFromDbById) return tryGetFromDbById;
 	hasRequiredTryGetFromDbById = 1;
 	var newPrimaryKeyFilter = requireNewPrimaryKeyFilter();
-	var tryGetFirstFromDb = requireTryGetFirstFromDb();
+	var getMany = requireGetMany();
 	var extractStrategy = requireExtractStrategy();
 
 	function tryGet(context) {
 		var filter = newPrimaryKeyFilter.apply(null, arguments);
 		var table = arguments[1];
 		var strategy = extractStrategy.apply(null, arguments);
-		return tryGetFirstFromDb(context, table, filter, strategy);
+		return getMany(context, table, filter, strategy).then(filterRows);
 	}
 
 	tryGet.exclusive = function tryGet(context) {
 		var filter = newPrimaryKeyFilter.apply(null, arguments);
 		var table = arguments[1];
 		var strategy = extractStrategy.apply(null, arguments);
-		return tryGetFirstFromDb.exclusive(context, table, filter, strategy);
+		return getMany.exclusive(context, table, filter, strategy).then(filterRows);
 
 
 	};
+
+	function filterRows(rows) {
+		if (rows.length > 0)
+			return rows[0];
+		return null;
+	}
 
 	tryGetFromDbById = tryGet;
 	return tryGetFromDbById;
@@ -18652,18 +18837,22 @@ function requireNewSingleQuery () {
 	var newJoinSql = requireNewJoinSql();
 	var newParameterized = requireNewParameterized();
 	var getSessionSingleton = requireGetSessionSingleton();
+	var lockSql = requireLockSql();
 
 	function _new(context,table,filter,span, alias,orderBy,limit,offset,distinct = false) {
 		var quote = getSessionSingleton(context, 'quote');
 		var name = quote(table._dbName);
+		var quotedAlias = quote(alias);
 		var columnSql = newColumnSql(context,table,span,alias,true);
 		var joinSql = newJoinSql(context, span, alias);
 		var whereSql = newWhereSql(context,table,filter,alias);
 		if (limit)
 			limit = limit + ' ';
 		const selectClause = distinct ? 'select distinct ' : 'select ';
+		const lockClause = lockSql.selectLockSql(context, span, alias);
+		const tableHint = lockSql.tableHintSql(context, span);
 
-		return newParameterized(selectClause + limit + columnSql + ' from ' + name + ' ' + quote(alias)).append(joinSql).append(whereSql).append(orderBy + offset);
+		return newParameterized(selectClause + limit + columnSql + ' from ' + name + ' ' + quotedAlias + tableHint).append(joinSql).append(whereSql).append(orderBy + offset + lockClause);
 
 	}
 
@@ -18679,7 +18868,7 @@ function requireNewQuery$1 () {
 	hasRequiredNewQuery$1 = 1;
 	var newSingleQuery = requireNewSingleQuery();
 	var extractFilter = requireExtractFilter();
-	var extractOrderBy = requireExtractOrderBy();
+	var extractOrderBy = requireExtractOrderBy$1();
 	var extractLimit = requireExtractLimit();
 	var newParameterized = requireNewParameterized();
 	var extractOffset = requireExtractOffset();
@@ -19119,6 +19308,38 @@ function requireTryGetById () {
 
 	tryGetById = get;
 	return tryGetById;
+}
+
+var tryGetFirstFromDb;
+var hasRequiredTryGetFirstFromDb;
+
+function requireTryGetFirstFromDb () {
+	if (hasRequiredTryGetFirstFromDb) return tryGetFirstFromDb;
+	hasRequiredTryGetFirstFromDb = 1;
+	var getMany = requireGetMany();
+
+	function tryGet(context, table, filter, strategy) {
+		strategy = setLimit(strategy);
+		return getMany(context, table, filter, strategy).then(filterRows);
+	}
+
+	function filterRows(rows) {
+		if (rows.length > 0)
+			return rows[0];
+		return null;
+	}
+
+	tryGet.exclusive = function(context, table, filter, strategy) {
+		strategy = setLimit(strategy);
+		return getMany.exclusive(context, table, filter, strategy).then(filterRows);
+	};
+
+	function setLimit(strategy) {
+		return {...strategy, ...{limit: 1}};
+	}
+
+	tryGetFirstFromDb = tryGet;
+	return tryGetFirstFromDb;
 }
 
 var newRowCache_1;
@@ -19745,10 +19966,32 @@ function requireApplyPatch () {
 		const time = Date.parse(normalized);
 		return Number.isNaN(time) ? undefined : time;
 	}
-
 	function assertDeepEqual(a, b) {
-		if (JSON.stringify(a) !== JSON.stringify(b))
+		if (!deepEqual(a, b))
 			throw new Error('A, b are not equal');
+	}
+
+	function deepEqual(a, b) {
+		if (a === b) return true;
+		if (a && b && typeof a === 'object' && typeof b === 'object') {
+			if (Array.isArray(a)) {
+				if (!Array.isArray(b) || a.length !== b.length) return false;
+				for (let i = 0; i < a.length; i++) {
+					if (!deepEqual(a[i], b[i])) return false;
+				}
+				return true;
+			}
+			if (Array.isArray(b)) return false;
+
+			const keysA = Object.keys(a);
+			const keysB = Object.keys(b);
+			if (keysA.length !== keysB.length) return false;
+			for (const key of keysA) {
+				if (!Object.prototype.hasOwnProperty.call(b, key) || !deepEqual(a[key], b[key])) return false;
+			}
+			return true;
+		}
+		return false;
 	}
 
 	applyPatch_1 = applyPatch;
@@ -19859,6 +20102,7 @@ function requirePatchTable () {
 	let validateDeleteAllowed = requireValidateDeleteAllowed();
 	let clearCache = requireClearCache();
 	const getSessionSingleton = requireGetSessionSingleton();
+	const stringify = requireStringify();
 
 
 	async function patchTable() {
@@ -19873,9 +20117,14 @@ function requirePatchTable () {
 
 	async function patchTableCore(context, table, patches, { strategy = undefined, deduceStrategy = false, ...options } = {}, dryrun) {
 		const engine = getSessionSingleton(context, 'engine');
+		const materializeSyncPrimaryKeys = !!getSessionSingleton(context, 'syncOutboxCapture');
+		const generatedPrimaryKeyMappings = [];
 		options = cleanOptions(options);
 		strategy = JSON.parse(JSON.stringify(strategy || {}));
-		if (!dryrun && strategy['insertAndForget'] && await tryInsertAndForget(context, table, patches, options))
+		await lockTouchedRows();
+		const requiresGeneratedPrimaryKeys = materializeSyncPrimaryKeys
+			&& patches.some(patch => isRootAdd(patch) && hasMissingPrimaryKey(table, patch.value));
+		if (!dryrun && strategy['insertAndForget'] && !requiresGeneratedPrimaryKeys && await tryInsertAndForget(context, table, patches, options))
 			return { changed: [], strategy };
 		let changed = new Set();
 		for (let i = 0; i < patches.length; i++) {
@@ -19884,7 +20133,7 @@ function requirePatchTable () {
 			patch.path = patches[i].path.split('/').slice(1);
 			let result;
 			if (patch.op === 'add' || patch.op === 'replace') {
-				result = await add({ path: patch.path, value: patch.value, op: patch.op, oldValue: patch.oldValue, strategy: deduceStrategy ? strategy : {}, options }, table);
+				result = await add({ path: patch.path, value: patch.value, op: patch.op, oldValue: patch.oldValue, strategy: deduceStrategy ? strategy : {}, options, pathFromPatch: true }, table);
 			}
 			else if (patch.op === 'remove')
 				result = await remove({ path: patch.path, op: patch.op, oldValue: patch.oldValue, options }, table);
@@ -19893,17 +20142,32 @@ function requirePatchTable () {
 				changed.add(result.inserted);
 			else if (result.updated)
 				changed.add(result.updated);
+			applyGeneratedPrimaryKeyMappings();
 		}
 		if (strategy['insertAndForget'])
 			return {
-				changed: [], strategy
+				changed: [], strategy: stripLockingStrategy(strategy)
 			};
-		return { changed: await toDtos(changed), strategy };
+		return { changed: await toDtos(changed), strategy: stripLockingStrategy(strategy) };
 
 
 		async function toDtos(set) {
 			set = [...set];
-			const result = await table.getManyDto(context, set, strategy);
+			const result = await table.getManyDto(context, set, stripLockingStrategy(strategy));
+			return result;
+		}
+
+		function stripLockingStrategy(strategy) {
+			if (!strategy || typeof strategy !== 'object')
+				return strategy;
+			if (Array.isArray(strategy))
+				return strategy.map(stripLockingStrategy);
+			const result = {};
+			for (let name in strategy) {
+				if (name === 'forUpdate' || name === 'skipLocked')
+					continue;
+				result[name] = stripLockingStrategy(strategy[name]);
+			}
 			return result;
 		}
 
@@ -19914,7 +20178,55 @@ function requirePatchTable () {
 				return [property];
 		}
 
-		async function add({ path, value, op, oldValue, strategy, options }, table, row, parentRow, relation) {
+		async function lockTouchedRows() {
+			if (!hasLockingStrategy(strategy))
+				return;
+			const keys = [];
+			const keySet = new Set();
+			for (let i = 0; i < patches.length; i++) {
+				const patch = patches[i];
+				const path = patch.path.split('/').slice(1);
+				if (path.length === 0)
+					continue;
+				if (patch.op === 'add' && path.length === 1)
+					continue;
+				const key = toKey(path[0]);
+				if (hasTemporaryKey(key))
+					continue;
+				const keyString = JSON.stringify(key);
+				if (keySet.has(keyString))
+					continue;
+				keySet.add(keyString);
+				keys.push(key);
+			}
+			for (let i = 0; i < keys.length; i++) {
+				const row = await table.tryGetById.apply(null, [context, ...keys[i], strategy]);
+				if (!row)
+					throw new Error(`Row ${table._dbName} with id ${keys[i]} was not found.`);
+			}
+		}
+
+		function hasLockingStrategy(strategy) {
+			if (!strategy || typeof strategy !== 'object')
+				return false;
+			if (strategy.forUpdate || strategy.skipLocked)
+				return true;
+			for (let name in strategy) {
+				if (name !== 'where' && hasLockingStrategy(strategy[name]))
+					return true;
+			}
+			return false;
+		}
+
+		function hasTemporaryKey(key) {
+			for (let i = 0; i < key.length; i++) {
+				if (typeof key[i] === 'string' && key[i].indexOf('~') === 0)
+					return true;
+			}
+			return false;
+		}
+
+		async function add({ path, value, op, oldValue, strategy, options, pathFromPatch = false }, table, row, parentRow, relation) {
 			let property = path[0];
 			path = path.slice(1);
 			if (!row && path.length > 0) {
@@ -19932,6 +20244,7 @@ function requirePatchTable () {
 				if (dryrun) {
 					return {};
 				}
+				const primaryKeyWasMissing = hasMissingPrimaryKey(table, value);
 				let childInserts = [];
 				for (let name in value) {
 					if (isColumn(name, table))
@@ -19967,6 +20280,8 @@ function requirePatchTable () {
 					: withoutSkipSelectAfterInsert(options);
 				let row = table.insertWithConcurrency.apply(null, [context, insertOptions, value]);
 				row = await row;
+				if (materializeSyncPrimaryKeys && primaryKeyWasMissing)
+					materializePrimaryKey(table, row, value, property, pathFromPatch);
 
 				for (let i = 0; i < childInserts.length; i++) {
 					await childInserts[i](row);
@@ -20001,7 +20316,7 @@ function requirePatchTable () {
 				strategy[property] = strategy[property] || {};
 				options[property] = inferOptions(options, property);
 
-				await add({ path, value, op, oldValue, strategy: strategy[property], options: options[property] }, relation.childTable, subRow, row, relation);
+				await add({ path, value, op, oldValue, strategy: strategy[property], options: options[property], pathFromPatch }, relation.childTable, subRow, row, relation);
 				return { updated: row };
 			}
 			else if (isManyRelation(property, table)) {
@@ -20014,11 +20329,11 @@ function requirePatchTable () {
 					for (let id in value) {
 						if (id === '__patchType')
 							continue;
-						await add({ path: [id], value: value[id], op, oldValue, strategy: strategy[property], options: options[property] }, relation.childTable, undefined, row, relation);
+						await add({ path: [id], value: value[id], op, oldValue, strategy: strategy[property], options: options[property], pathFromPatch }, relation.childTable, undefined, row, relation);
 					}
 				}
 				else {
-					await add({ path: path.slice(1), value, oldValue, op, strategy: strategy[property], options: options[property] }, relation.childTable, undefined, row, relation);
+					await add({ path: path.slice(1), value, oldValue, op, strategy: strategy[property], options: options[property], pathFromPatch }, relation.childTable, undefined, row, relation);
 				}
 				return { updated: row };
 			}
@@ -20296,6 +20611,105 @@ function requirePatchTable () {
 			const { skipSelectAfterInsert, ...rest } = options;
 			return rest;
 		}
+
+		function hasMissingPrimaryKey(table, value) {
+			if (!value || value !== Object(value))
+				return false;
+			for (let i = 0; i < table._primaryColumns.length; i++) {
+				const key = value[table._primaryColumns[i].alias];
+				if (key === undefined || isTemporaryKey(key))
+					return true;
+			}
+			return false;
+		}
+
+		function materializePrimaryKey(table, row, value, property, pathFromPatch) {
+			const finalKey = [];
+			for (let i = 0; i < table._primaryColumns.length; i++) {
+				const column = table._primaryColumns[i];
+				const key = row && row[column.alias];
+				if (key === undefined || key === null || isTemporaryKey(key))
+					throw new Error(`Local database did not return a final primary key for ${table._dbName}.${column._dbName}.`);
+				value[column.alias] = key;
+				finalKey.push(key);
+			}
+
+			const rawProperty = pathFromPatch ? decodeJsonPointer(property) : property;
+			if (typeof rawProperty !== 'string' || rawProperty.charAt(0) !== '[')
+				return;
+			let originalKey;
+			try {
+				originalKey = JSON.parse(rawProperty);
+			}
+			catch (_e) {
+				return;
+			}
+			if (!Array.isArray(originalKey) || !originalKey.some(isTemporaryKey))
+				return;
+			const finalProperty = stringify(finalKey);
+			generatedPrimaryKeyMappings.push({
+				oldValueKey: rawProperty,
+				newValueKey: finalProperty,
+				oldPathKey: encodeJsonPointer(rawProperty),
+				newPathKey: encodeJsonPointer(finalProperty)
+			});
+		}
+
+		function applyGeneratedPrimaryKeyMappings() {
+			if (generatedPrimaryKeyMappings.length === 0)
+				return;
+			for (let i = 0; i < patches.length; i++) {
+				const patch = patches[i];
+				if (typeof patch.path === 'string') {
+					const segments = patch.path.split('/');
+					for (let segmentIndex = 1; segmentIndex < segments.length; segmentIndex++) {
+						for (let mappingIndex = 0; mappingIndex < generatedPrimaryKeyMappings.length; mappingIndex++) {
+							const mapping = generatedPrimaryKeyMappings[mappingIndex];
+							if (segments[segmentIndex] === mapping.oldPathKey)
+								segments[segmentIndex] = mapping.newPathKey;
+						}
+					}
+					patch.path = segments.join('/');
+				}
+				rewriteGeneratedValueKeys(patch.value);
+			}
+			generatedPrimaryKeyMappings.length = 0;
+		}
+
+		function rewriteGeneratedValueKeys(value, seen = new Set()) {
+			if (!value || value !== Object(value) || seen.has(value))
+				return;
+			seen.add(value);
+			const keys = Object.keys(value);
+			for (let i = 0; i < keys.length; i++) {
+				const key = keys[i];
+				rewriteGeneratedValueKeys(value[key], seen);
+				for (let mappingIndex = 0; mappingIndex < generatedPrimaryKeyMappings.length; mappingIndex++) {
+					const mapping = generatedPrimaryKeyMappings[mappingIndex];
+					if (key !== mapping.oldValueKey)
+						continue;
+					if (Object.prototype.hasOwnProperty.call(value, mapping.newValueKey))
+						throw new Error(`Generated primary key ${mapping.newValueKey} already exists in the local patch.`);
+					value[mapping.newValueKey] = value[key];
+					delete value[key];
+					break;
+				}
+			}
+		}
+
+		function isTemporaryKey(value) {
+			return typeof value === 'string' && value.indexOf('~') === 0;
+		}
+
+		function decodeJsonPointer(value) {
+			if (typeof value !== 'string')
+				return value;
+			return value.replace(/~1/g, '/').replace(/~0/g, '~');
+		}
+
+		function encodeJsonPointer(value) {
+			return value.replace(/~/g, '~0').replace(/\//g, '~1');
+		}
 	}
 
 	patchTable_1 = patchTable;
@@ -20341,6 +20755,30 @@ function requireAggregate () {
 	return aggregate;
 }
 
+var extractOrderBy_1;
+var hasRequiredExtractOrderBy;
+
+function requireExtractOrderBy () {
+	if (hasRequiredExtractOrderBy) return extractOrderBy_1;
+	hasRequiredExtractOrderBy = 1;
+	const getSessionSingleton = requireGetSessionSingleton();
+	const parseOrderBy = requireParseOrderBy();
+
+	function extractOrderBy(context, span) {
+		const entries = parseOrderBy(span.orderBy, Object.keys(span.aggregates));
+		if (entries.length === 0)
+			return '';
+
+		const quote = getSessionSingleton(context, 'quote');
+		return ' order by ' + entries
+			.map(({ alias, direction }) => quote(alias) + direction)
+			.join(',');
+	}
+
+	extractOrderBy_1 = extractOrderBy;
+	return extractOrderBy_1;
+}
+
 var newQuery_1;
 var hasRequiredNewQuery;
 
@@ -20352,20 +20790,21 @@ function requireNewQuery () {
 	var extractLimit = requireExtractLimit();
 	var newParameterized = requireNewParameterized();
 	var extractOffset = requireExtractOffset();
+	var extractOrderBy = requireExtractOrderBy();
 
 	function newQuery(context, table,filter,span,alias,options = {}) {
 		filter = extractFilter(filter);
-		var orderBy = '';
+		var orderBy = extractOrderBy(context, span);
 		var limit = extractLimit(context, span);
 		var offset = extractOffset(context, span);
 		const useDistinct = options.distinct && canUseDistinct(span);
 
-		var query = newSingleQuery(context, table,filter,span,alias,orderBy,limit,offset,useDistinct);
-		if (useDistinct)
-			return query;
-
-		const groupClause = groupBy(span);
-		return newParameterized(query.sql(), query.parameters).append(groupClause);
+		var query = newSingleQuery(context, table,filter,span,alias,'',limit,'',useDistinct);
+		const groupClause = useDistinct ? '' : groupBy(span);
+		return newParameterized(query.sql(), query.parameters)
+			.append(groupClause)
+			.append(orderBy)
+			.append(offset);
 	}
 
 	function groupBy(span) {
@@ -23594,16 +24033,23 @@ function requireDeleteFromSql$5 () {
 	return deleteFromSql_1$5;
 }
 
-var selectForUpdateSql$5;
+var selectForUpdateSql$4;
 var hasRequiredSelectForUpdateSql$5;
 
 function requireSelectForUpdateSql$5 () {
-	if (hasRequiredSelectForUpdateSql$5) return selectForUpdateSql$5;
+	if (hasRequiredSelectForUpdateSql$5) return selectForUpdateSql$4;
 	hasRequiredSelectForUpdateSql$5 = 1;
-	selectForUpdateSql$5 = function(_alias) {
-		return ' FOR UPDATE';
+	selectForUpdateSql$4 = function(_context, lock) {
+		if (typeof lock === 'string')
+			lock = { forUpdate: true };
+		let sql = '';
+		if (lock.forUpdate)
+			sql += ' FOR UPDATE';
+		if (lock.skipLocked)
+			sql += ' SKIP LOCKED';
+		return sql;
 	};
-	return selectForUpdateSql$5;
+	return selectForUpdateSql$4;
 }
 
 var lastInsertedSql_1$4;
@@ -25630,18 +26076,28 @@ function requireDeleteFromSql$4 () {
 	return deleteFromSql_1$4;
 }
 
-var selectForUpdateSql$4;
+var selectForUpdateSql$3;
 var hasRequiredSelectForUpdateSql$4;
 
 function requireSelectForUpdateSql$4 () {
-	if (hasRequiredSelectForUpdateSql$4) return selectForUpdateSql$4;
+	if (hasRequiredSelectForUpdateSql$4) return selectForUpdateSql$3;
 	hasRequiredSelectForUpdateSql$4 = 1;
 	const quote = requireQuote$6();
 
-	selectForUpdateSql$4 = function(alias) {
-		return ' FOR UPDATE OF ' + quote(alias);
+	selectForUpdateSql$3 = function(context, lock) {
+		if (typeof lock === 'string')
+			lock = { aliases: [lock], forUpdate: true };
+		let sql = '';
+		if (lock.forUpdate) {
+			sql = ' FOR UPDATE';
+			if (lock.aliases && lock.aliases.length > 0)
+				sql += ' OF ' + lock.aliases.map(alias => quote(context, alias)).join(', ');
+		}
+		if (lock.skipLocked)
+			sql += ' SKIP LOCKED';
+		return sql;
 	};
-	return selectForUpdateSql$4;
+	return selectForUpdateSql$3;
 }
 
 var limitAndOffset_1$4;
@@ -27648,18 +28104,18 @@ function requireDeleteFromSql$3 () {
 	return deleteFromSql_1$3;
 }
 
-var selectForUpdateSql$3;
+var selectForUpdateSql$2;
 var hasRequiredSelectForUpdateSql$3;
 
 function requireSelectForUpdateSql$3 () {
-	if (hasRequiredSelectForUpdateSql$3) return selectForUpdateSql$3;
+	if (hasRequiredSelectForUpdateSql$3) return selectForUpdateSql$2;
 	hasRequiredSelectForUpdateSql$3 = 1;
-	const quote = requireQuote$6();
-
-	selectForUpdateSql$3 = function(context, alias) {
-		return ' FOR UPDATE OF ' + quote(context, alias);
+	selectForUpdateSql$2 = function(_context, lock) {
+		if (lock)
+			throw new Error('select for update is not supported by SQLite');
+		return '';
 	};
-	return selectForUpdateSql$3;
+	return selectForUpdateSql$2;
 }
 
 var lastInsertedSql_1$2;
@@ -27669,12 +28125,11 @@ function requireLastInsertedSql$2 () {
 	if (hasRequiredLastInsertedSql$2) return lastInsertedSql_1$2;
 	hasRequiredLastInsertedSql$2 = 1;
 	function lastInsertedSql(context, table, keyValues) {
+		if (keyValues.some(value => value === undefined))
+			return ['rowid IN (select last_insert_rowid())'];
 		return keyValues.map((value,i) => {
 			let column = table._primaryColumns[i];
-			if (value === undefined && (column.tsType === 'NumberColumn' || column.tsType === 'BigintColumn'))
-				return 'rowid IN (select last_insert_rowid())';
-			else
-				return column.eq(context, value);
+			return column.eq(context, value);
 		});
 
 	}
@@ -31995,18 +32450,31 @@ function requireDeleteFromSql$2 () {
 	return deleteFromSql_1$2;
 }
 
-var selectForUpdateSql$2;
+var selectForUpdateSql_1;
 var hasRequiredSelectForUpdateSql$2;
 
 function requireSelectForUpdateSql$2 () {
-	if (hasRequiredSelectForUpdateSql$2) return selectForUpdateSql$2;
+	if (hasRequiredSelectForUpdateSql$2) return selectForUpdateSql_1;
 	hasRequiredSelectForUpdateSql$2 = 1;
-	const quote = requireQuote$6();
+	function selectForUpdateSql() {
+		return '';
+	}
 
-	selectForUpdateSql$2 = function(alias) {
-		return ' FOR UPDATE OF ' + quote(alias);
+	selectForUpdateSql.tableHint = function(_context, lock) {
+		const hints = [];
+		if (lock.forUpdate)
+			hints.push('UPDLOCK');
+		if (lock.skipLocked) {
+			hints.push('READPAST');
+			hints.push('ROWLOCK');
+		}
+		if (hints.length === 0)
+			return '';
+		return ' WITH (' + hints.join(', ') + ')';
 	};
-	return selectForUpdateSql$2;
+
+	selectForUpdateSql_1 = selectForUpdateSql;
+	return selectForUpdateSql_1;
 }
 
 var limitAndOffset_1$2;
@@ -33610,10 +34078,10 @@ var hasRequiredSelectForUpdateSql$1;
 function requireSelectForUpdateSql$1 () {
 	if (hasRequiredSelectForUpdateSql$1) return selectForUpdateSql$1;
 	hasRequiredSelectForUpdateSql$1 = 1;
-	const quote = requireQuote$6();
-
-	selectForUpdateSql$1 = function(alias) {
-		return ' FOR UPDATE OF ' + quote(alias);
+	selectForUpdateSql$1 = function(_context, lock) {
+		if (lock)
+			throw new Error('select for update is not supported by SAP ASE');
+		return '';
 	};
 	return selectForUpdateSql$1;
 }
@@ -34335,10 +34803,15 @@ var hasRequiredSelectForUpdateSql;
 function requireSelectForUpdateSql () {
 	if (hasRequiredSelectForUpdateSql) return selectForUpdateSql;
 	hasRequiredSelectForUpdateSql = 1;
-	const quote = requireQuote$6();
-
-	selectForUpdateSql = function(alias) {
-		return ' FOR UPDATE OF ' + quote(alias);
+	selectForUpdateSql = function(_context, lock) {
+		if (typeof lock === 'string')
+			lock = { forUpdate: true };
+		let sql = '';
+		if (lock.forUpdate)
+			sql = ' FOR UPDATE';
+		if (lock.skipLocked)
+			sql += ' SKIP LOCKED';
+		return sql;
 	};
 	return selectForUpdateSql;
 }

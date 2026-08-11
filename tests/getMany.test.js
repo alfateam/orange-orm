@@ -1,4 +1,5 @@
 import { describe, test, beforeAll, afterAll, expect } from 'vitest';
+import sqliteTestPath from './sqliteTestPath.mjs';
 const express = require('express');
 import { json } from 'body-parser';
 import cors from 'cors';
@@ -1225,18 +1226,17 @@ describe('aggregate', () => {
 		const rows = await db.orderLine.aggregate({
 			orderId: x => x.orderId,
 			count: x => x.count(x => x.id),
+			orderBy: ['count', 'orderId desc'],
 		});
-
-		rows.sort((a, b) => a.orderId - b.orderId);
 
 		const expected = [
 			{
-				orderId: 1,
-				count: 2,
-			},
-			{
 				orderId: 2,
 				count: 1,
+			},
+			{
+				orderId: 1,
+				count: 2,
 			}
 		];
 
@@ -2137,8 +2137,8 @@ describe('sqlite function in transaction', () => {
 const pathSegments = __filename.split('/');
 const lastSegment = pathSegments[pathSegments.length - 1];
 const fileNameWithoutExtension = lastSegment.split('.')[0];
-const sqliteName = `demo.${fileNameWithoutExtension}.db`;
-const sqliteName2 = `demo.${fileNameWithoutExtension}2.db`;
+const sqliteName = sqliteTestPath(`demo.${fileNameWithoutExtension}.db`);
+const sqliteName2 = sqliteTestPath(`demo.${fileNameWithoutExtension}2.db`);
 
 const connections = {
 	mssql: {

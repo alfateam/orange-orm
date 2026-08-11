@@ -23,6 +23,7 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 	const generatedPrimaryKeyMappings = [];
 	options = cleanOptions(options);
 	strategy = JSON.parse(JSON.stringify(strategy || {}));
+	await lockTouchedRows();
 	const requiresGeneratedPrimaryKeys = materializeSyncPrimaryKeys
 		&& patches.some(patch => isRootAdd(patch) && hasMissingPrimaryKey(table, patch.value));
 	if (!dryrun && strategy['insertAndForget'] && !requiresGeneratedPrimaryKeys && await tryInsertAndForget(context, table, patches, options))
@@ -47,14 +48,28 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 	}
 	if (strategy['insertAndForget'])
 		return {
-			changed: [], strategy
+			changed: [], strategy: stripLockingStrategy(strategy)
 		};
-	return { changed: await toDtos(changed), strategy };
+	return { changed: await toDtos(changed), strategy: stripLockingStrategy(strategy) };
 
 
 	async function toDtos(set) {
 		set = [...set];
-		const result = await table.getManyDto(context, set, strategy);
+		const result = await table.getManyDto(context, set, stripLockingStrategy(strategy));
+		return result;
+	}
+
+	function stripLockingStrategy(strategy) {
+		if (!strategy || typeof strategy !== 'object')
+			return strategy;
+		if (Array.isArray(strategy))
+			return strategy.map(stripLockingStrategy);
+		const result = {};
+		for (let name in strategy) {
+			if (name === 'forUpdate' || name === 'skipLocked')
+				continue;
+			result[name] = stripLockingStrategy(strategy[name]);
+		}
 		return result;
 	}
 
@@ -63,6 +78,54 @@ async function patchTableCore(context, table, patches, { strategy = undefined, d
 			return JSON.parse(property);
 		else
 			return [property];
+	}
+
+	async function lockTouchedRows() {
+		if (!hasLockingStrategy(strategy))
+			return;
+		const keys = [];
+		const keySet = new Set();
+		for (let i = 0; i < patches.length; i++) {
+			const patch = patches[i];
+			const path = patch.path.split('/').slice(1);
+			if (path.length === 0)
+				continue;
+			if (patch.op === 'add' && path.length === 1)
+				continue;
+			const key = toKey(path[0]);
+			if (hasTemporaryKey(key))
+				continue;
+			const keyString = JSON.stringify(key);
+			if (keySet.has(keyString))
+				continue;
+			keySet.add(keyString);
+			keys.push(key);
+		}
+		for (let i = 0; i < keys.length; i++) {
+			const row = await table.tryGetById.apply(null, [context, ...keys[i], strategy]);
+			if (!row)
+				throw new Error(`Row ${table._dbName} with id ${keys[i]} was not found.`);
+		}
+	}
+
+	function hasLockingStrategy(strategy) {
+		if (!strategy || typeof strategy !== 'object')
+			return false;
+		if (strategy.forUpdate || strategy.skipLocked)
+			return true;
+		for (let name in strategy) {
+			if (name !== 'where' && hasLockingStrategy(strategy[name]))
+				return true;
+		}
+		return false;
+	}
+
+	function hasTemporaryKey(key) {
+		for (let i = 0; i < key.length; i++) {
+			if (typeof key[i] === 'string' && key[i].indexOf('~') === 0)
+				return true;
+		}
+		return false;
 	}
 
 	async function add({ path, value, op, oldValue, strategy, options, pathFromPatch = false }, table, row, parentRow, relation) {

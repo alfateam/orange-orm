@@ -13,17 +13,26 @@ services:
     # environment:
       # - ACCEPT_EULA=Y
       # - SA_PASSWORD=P@assword123
-    depends_on: 
-      - postgres
-      - mssql
-      - mysql
-      - mariadb
-      - sapase
+    depends_on:
+      postgres:
+        condition: service_started
+      mssql:
+        condition: service_started
+      mysql:
+        condition: service_started
+      mariadb:
+        condition: service_started
+      sapase:
+        condition: service_started
+      oracle:
+        condition: service_healthy
   postgres:
-    image: postgres
+    image: postgres:16.14-bookworm
     environment:
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=postgres
+    tmpfs:
+      - /var/lib/postgresql/data
     ports:
       - 14332:5432
     # restart: always
@@ -32,8 +41,17 @@ services:
     environment:
       - ACCEPT_EULA=Y
       - SA_PASSWORD=P@assword123
+      - MSSQL_SA_PASSWORD=P@assword123
+    tmpfs:
+      - /var/opt/mssql/data
     ports:
       - 14330:1433
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/1433'"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+      start_period: 20s
     #restart: always
   mysql:
     image: mysql:8.0.31
@@ -42,6 +60,8 @@ services:
       - MYSQL_DATABASE=test
       - MYSQL_USER=test
       - MYSQL_PASSWORD=test
+    tmpfs:
+      - /var/lib/mysql
     ports:
       - 3306:3306
     # restart: always
@@ -52,12 +72,16 @@ services:
       - MARIADB_DATABASE=test
       - MARIADB_USER=test
       - MARIADB_PASSWORD=test
+    tmpfs:
+      - /var/lib/mysql
     ports:
       - 3307:3306
     # restart: always
   sapase:
     image: larsroald/ase-server    
     hostname: sapase
+    tmpfs:
+      - /data
     ports:
       - 50000:5000
     # restart: always
@@ -66,7 +90,15 @@ services:
     environment:
       - ORACLE_PASSWORD=P@assword123   
     hostname: oracle
+    tmpfs:
+      - /opt/oracle/oradata
     ports:
       - 1521:1521
+    healthcheck:
+      test: ["CMD-SHELL", "echo 'SELECT 1 FROM DUAL;' | sqlplus -s system/P@assword123@localhost:1521/XE"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
 volumes:
   try-node-node_modules:

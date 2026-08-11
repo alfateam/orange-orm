@@ -100,7 +100,7 @@ function hostLocal() {
 				|| beforeCommit
 				|| afterCommit
 				|| afterRollback);
-			if (!hasTransactionHooks && readonlyOps.includes(body.path))
+			if (!hasTransactionHooks && readonlyOps.includes(body.path) && !hasLockingStrategy(body))
 				await resolvedDb.transaction({ readonly: true }, fn);
 			else {
 				await runSyncWrite(resolvedDb, undefined, () => resolvedDb.transaction(async (context) => {
@@ -133,6 +133,24 @@ function hostLocal() {
 			const options = { ..._options, ...body.options, JSONFilter: body, request, response, isHttp };
 			result = await executePath(context, options);
 		}
+	}
+
+	function hasLockingStrategy(body) {
+		if (!body || !body.args)
+			return false;
+		return hasLockingStrategyCore(body.args[1]);
+	}
+
+	function hasLockingStrategyCore(strategy) {
+		if (!strategy || typeof strategy !== 'object')
+			return false;
+		if (strategy.forUpdate || strategy.skipLocked)
+			return true;
+		for (let name in strategy) {
+			if (name !== 'where' && hasLockingStrategyCore(strategy[name]))
+				return true;
+		}
+		return false;
 	}
 	async function query() {
 		let args = arguments;

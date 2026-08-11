@@ -1,4 +1,5 @@
 import { describe, test, beforeAll, expect, afterAll } from 'vitest';
+import sqliteTestPath from './sqliteTestPath.mjs';
 const map = require('./db');
 const initPg = require('./initPg');
 const initOracle = require('./initOracle');
@@ -70,7 +71,7 @@ beforeAll(async () => {
 	// 		}
 	// 	]);
 	}
-});
+}, 30000);
 
 afterAll(async () => {
 
@@ -122,25 +123,25 @@ describe('dateformat get', () => {
 	test('pg', async () => {
 		const { db } = getDb('pg');
 		const result = await db.datetestWithTz.getOne();
-		expect(result).toEqual({ id: 1, date: '2023-07-14', datetime: '2023-07-14T12:00:00', datetime_tz: '2023-07-14T20:00:00+00' });
+		expect(result).toEqual({ id: 1, date: '2023-07-14', datetime: '2023-07-14T12:00:00', datetime_tz: '2023-07-14T20:00:00+00:00' });
 		result.date = newValue;
 		result.datetime = newValue;
 		result.datetime_tz = newValue;
 		await result.saveChanges();
 		await result.refresh();
-		expect(result).toEqual({ id: 1, date: '2023-08-05', datetime: '2023-08-05T12:00:00', datetime_tz: '2023-08-05T15:00:00+00' });
+		expect(result).toEqual({ id: 1, date: '2023-08-05', datetime: '2023-08-05T12:00:00', datetime_tz: '2023-08-05T15:00:00+00:00' });
 	});
 
 	test('pglite', async () => {
 		const { db } = getDb('pglite');
 		const result = await db.datetestWithTz.getOne();
-		expect(result).toEqual({ id: 1, date: '2023-07-14', datetime: '2023-07-14T12:00:00', datetime_tz: '2023-07-14T20:00:00+00' });
+		expect(result).toEqual({ id: 1, date: '2023-07-14', datetime: '2023-07-14T12:00:00', datetime_tz: '2023-07-14T20:00:00+00:00' });
 		result.date = newValue;
 		result.datetime = newValue;
 		result.datetime_tz = newValue;
 		await result.saveChanges();
 		await result.refresh();
-		expect(result).toEqual({ id: 1, date: '2023-08-05', datetime: '2023-08-05T12:00:00', datetime_tz: '2023-08-05T15:00:00+00' });
+		expect(result).toEqual({ id: 1, date: '2023-08-05', datetime: '2023-08-05T12:00:00', datetime_tz: '2023-08-05T15:00:00+00:00' });
 	});
 
 	test('oracle', async () => {
@@ -222,8 +223,8 @@ describe('dateformat get', () => {
 const pathSegments = __filename.split('/');
 const lastSegment = pathSegments[pathSegments.length - 1];
 const fileNameWithoutExtension = lastSegment.split('.')[0];
-const sqliteName = `demo.${fileNameWithoutExtension}.db`;
-const sqliteName2 = `demo.${fileNameWithoutExtension}2.db`;
+const sqliteName = sqliteTestPath(`demo.${fileNameWithoutExtension}.db`);
+const sqliteName2 = sqliteTestPath(`demo.${fileNameWithoutExtension}2.db`);
 
 const connections = {
 	mssql: {

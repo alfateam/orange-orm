@@ -134,10 +134,32 @@ function normalizeDateForCompare(value) {
 	const time = Date.parse(normalized);
 	return Number.isNaN(time) ? undefined : time;
 }
-
 function assertDeepEqual(a, b) {
-	if (JSON.stringify(a) !== JSON.stringify(b))
+	if (!deepEqual(a, b))
 		throw new Error('A, b are not equal');
+}
+
+function deepEqual(a, b) {
+	if (a === b) return true;
+	if (a && b && typeof a === 'object' && typeof b === 'object') {
+		if (Array.isArray(a)) {
+			if (!Array.isArray(b) || a.length !== b.length) return false;
+			for (let i = 0; i < a.length; i++) {
+				if (!deepEqual(a[i], b[i])) return false;
+			}
+			return true;
+		}
+		if (Array.isArray(b)) return false;
+
+		const keysA = Object.keys(a);
+		const keysB = Object.keys(b);
+		if (keysA.length !== keysB.length) return false;
+		for (const key of keysA) {
+			if (!Object.prototype.hasOwnProperty.call(b, key) || !deepEqual(a[key], b[key])) return false;
+		}
+		return true;
+	}
+	return false;
 }
 
 module.exports = applyPatch;

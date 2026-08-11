@@ -1,4 +1,5 @@
 import { describe, test, beforeAll, afterAll, expect } from 'vitest';
+import sqliteTestPath from './sqliteTestPath.mjs';
 
 const express = require('express');
 import { json } from 'body-parser';
@@ -240,6 +241,18 @@ describe('distinct', () => {
 			{ orderId: 1 },
 			{ orderId: 2 }
 		]);
+
+		const orderedRows = await db.orderLine.distinct({
+			orderId: x => x.orderId,
+			product: x => x.product,
+			orderBy: ['orderId desc', 'product'],
+			limit: 2,
+		});
+
+		expect(orderedRows).toEqual([
+			{ orderId: 2, product: 'Magic wand' },
+			{ orderId: 1, product: 'Bicycle' },
+		]);
 	}
 });
 
@@ -276,8 +289,8 @@ describe('distinct fallback group by', () => {
 const pathSegments = __filename.split('/');
 const lastSegment = pathSegments[pathSegments.length - 1];
 const fileNameWithoutExtension = lastSegment.split('.')[0];
-const sqliteName = `demo.${fileNameWithoutExtension}.db`;
-const sqliteName2 = `demo.${fileNameWithoutExtension}2.db`;
+const sqliteName = sqliteTestPath(`demo.${fileNameWithoutExtension}.db`);
+const sqliteName2 = sqliteTestPath(`demo.${fileNameWithoutExtension}2.db`);
 
 const connections = {
 	mssql: {

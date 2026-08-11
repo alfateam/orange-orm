@@ -1,5 +1,5 @@
-const quote = require('../table/quote');
-
-module.exports = function(alias) {
-	return ' FOR UPDATE OF ' + quote(alias);
+module.exports = function(_context, lock) {
+	if (lock)
+		throw new Error('select for update is not supported by SAP ASE');
+	return '';
 };

@@ -1,7 +1,8 @@
 import { describe, test, beforeAll, afterAll, expect } from 'vitest';
+import sqliteTestPath from './sqliteTestPath.mjs';
 import rdb from '../src/index.js';
 
-const sqliteName = 'demo.enum.test.db';
+const sqliteName = sqliteTestPath('demo.enum.test.db');
 enum ValueEnum {
 	active = 'ACTIVE',
 	inactive = 'INACTIVE',

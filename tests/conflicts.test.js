@@ -1,5 +1,6 @@
 const map = require('./db');
 import { describe, test, beforeAll, afterAll, expect } from 'vitest';
+import sqliteTestPath from './sqliteTestPath.mjs';
 const express = require('express');
 import { json } from 'body-parser';
 import cors from 'cors';
@@ -86,6 +87,7 @@ describe('optimistic fail', () => {
 				id: 1,
 				name: 'George',
 				balance: 177,
+				isActive: true
 			});
 		}
 		catch (e) {
@@ -143,6 +145,57 @@ describe('optimistic json object', () => {
 			isActive: true,
 			picture: null,
 			data: {foo: 1, bar: {baz: {bar: 'changedBy2', zeta: 'changedBy1'}}},
+		};
+
+		expect(customer).toEqual(expected);
+	}
+});
+
+describe('add property to JSON', () => {
+	test('pg', async () => await verify('pg'));
+	test('pglite', async () => await verify('pglite'));
+	test('oracle', async () => await verify('oracle'));
+	test('mssql', async () => await verify('mssql'));
+	if (major === 18)
+		test('mssqlNative', async () => await verify('mssqlNative'));
+	test('mysql', async () => await verify('mysql'));
+	test('mariadb', async () => await verify('mariadb'));
+	test('sqlite', async () => await verify('sqlite'));
+	test('sap', async () => await verify('sap'));
+	test('http', async () => await verify('http'));
+
+
+	async function verify(dbName) {
+		let { db, init } = getDb(dbName);
+		if (dbName === 'http') {
+			const { db, init } = getDb('sqlite2');
+			await init(db);
+		}
+		else
+			await init(db);
+
+		const customer = await db.customer2.insert({
+			name: 'Voldemort',
+			balance: -200,
+			isActive: true,
+			picture: null,
+			data: { a: 1, b: 2 },
+		});
+
+		const customer2 = await db.customer2.getById(customer.id);
+		customer2.data = { b: 2, a: 1 };
+		await customer2.saveChanges();
+
+		customer.data = {a: 1, b: 2, c: 4};
+		await customer.saveChanges();
+
+		const expected = {
+			id: customer.id,
+			name: 'Voldemort',
+			balance: -200,
+			isActive: true,
+			picture: null,
+			data: { a: 1, b: 2, c: 4 }
 		};
 
 		expect(customer).toEqual(expected);
@@ -659,8 +712,8 @@ describe('insert overwrite with optimistic column unchanged', () => {
 const pathSegments = __filename.split('/');
 const lastSegment = pathSegments[pathSegments.length - 1];
 const fileNameWithoutExtension = lastSegment.split('.')[0];
-const sqliteName = `demo.${fileNameWithoutExtension}.db`;
-const sqliteName2 = `demo.${fileNameWithoutExtension}2.db`;
+const sqliteName = sqliteTestPath(`demo.${fileNameWithoutExtension}.db`);
+const sqliteName2 = sqliteTestPath(`demo.${fileNameWithoutExtension}2.db`);
 
 const connections = {
 	mssql: {

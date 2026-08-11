@@ -35,8 +35,10 @@ The ultimate Object Relational Mapper for Node.js, Bun and Deno, offering seamle
 | SQLite        | ✅ | ✅ | ✅ | |
 | Cloudflare D1 |  |  |  | ✅|
 
-## Sponsorship <span style="font-size: larger; color: darkred;">♡</span>
-If you value the hard work behind Orange and wish to see it evolve further, consider [sponsoring](https://github.com/sponsors/lroal). Your support fuels the journey of refining and expanding this tool for our developer community.
+## Sponsorship ❤️
+Orange ORM is free and open source, maintained in my spare time.
+If Orange saves you or your company time, sponsorship helps fund ongoing development, bug fixes, documentation, and long-term maintenance.
+👉 [Sponsor Orange ORM on GitHub](https://github.com/sponsors/lroal)
 
 ## MCP (Model Context Protocol)
 Orange ORM is available as an MCP resource on Context7. Use it with AI-powered tools like GitHub Copilot, Cursor, or Claude to get up-to-date documentation and code examples directly in your IDE.
@@ -761,8 +763,8 @@ async function getRows() {
       {id: 1},
       {id: 2}
     ],
-    customer: true,
-    deliveryAddress: true,
+	customer: true,
+	deliveryAddress: true,
     lines: true
   });
 }
@@ -847,6 +849,50 @@ async function update() {
   const orders = await db.order.update(propsToBeModified, { where: x => x.id.eq(1) }, strategy);
 }
 ```
+__Row locks with forUpdate and skipLocked__
+Use `forUpdate: true` in a fetching strategy to lock selected rows for update until the current transaction completes. Add `skipLocked: true` when concurrent workers should skip rows that are already locked instead of waiting for them. This is useful for queue-like workloads where several workers pick the next available rows.
+
+`forUpdate` and `skipLocked` should be used inside a transaction. They are supported by PostgreSQL/PGlite, MySQL, MariaDB, Oracle, and MS SQL. SQLite and SAP ASE throw an error because row locking with `SELECT FOR UPDATE` is not supported there.
+
+```javascript
+import map from './map';
+const db = map.postgres('postgres://postgres:postgres@postgres/postgres');
+
+async function claimNextOrders() {
+  return await db.transaction(async tx => {
+    const orders = await tx.order.getMany({
+      where: x => x.orderDate.lessThan(new Date()),
+      orderBy: 'id',
+      limit: 10,
+      forUpdate: true,
+      skipLocked: true,
+      lines: {
+        forUpdate: true
+      }
+    });
+
+    for (const order of orders) {
+      order.orderDate = new Date();
+    }
+
+    await orders.saveChanges();
+    return orders;
+  });
+}
+```
+
+The same lock strategy can be passed to write helpers that return affected rows:
+
+```javascript
+const updated = await db.transaction(async tx => {
+  return await tx.customer.update(
+    { name: 'Updated' },
+    { where: x => x.id.eq(customerId) },
+    { forUpdate: true, skipLocked: true }
+  );
+});
+```
+
 __Replacing a row from JSON__
 The replace method is suitable when a complete overwrite is required from a JSON object - typically in a REST API. However, it's important to consider that this method replaces the entire row and it's children, which might not always be desirable in a multi-user environment.
 

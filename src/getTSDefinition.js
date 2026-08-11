@@ -247,6 +247,8 @@ export interface ${name}Strategy {
 	offset?: number;
 	orderBy?: Array<${orderByColumns(table)}> | ${orderByColumns(table)};
 	where?: (table: ${name}TableBase) => RawFilter;
+	forUpdate?: boolean;
+	skipLocked?: boolean;
 }
 
 ${otherConcurrency}

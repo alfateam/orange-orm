@@ -19,8 +19,8 @@ async function getManyCore(context,table,filter,strategy,exclusive) {
 	return resultToRows(context, span,result);
 }
 
-getMany.exclusive = function(table,filter,strategy) {
-	return getManyCore(table,filter,strategy,true);
+getMany.exclusive = function(context,table,filter,strategy) {
+	return getManyCore(context,table,filter,strategy,true);
 };
 
 module.exports = getMany;
