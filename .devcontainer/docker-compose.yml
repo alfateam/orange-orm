@@ -17,7 +17,7 @@ services:
       postgres:
         condition: service_started
       mssql:
-        condition: service_healthy
+        condition: service_started
       mysql:
         condition: service_started
       mariadb:
@@ -42,6 +42,8 @@ services:
       - ACCEPT_EULA=Y
       - SA_PASSWORD=P@assword123
       - MSSQL_SA_PASSWORD=P@assword123
+    tmpfs:
+      - /var/opt/mssql/data
     ports:
       - 14330:1433
     healthcheck:
@@ -78,6 +80,8 @@ services:
   sapase:
     image: larsroald/ase-server    
     hostname: sapase
+    tmpfs:
+      - /data
     ports:
       - 50000:5000
     # restart: always

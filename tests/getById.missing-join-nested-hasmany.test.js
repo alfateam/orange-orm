@@ -1,9 +1,10 @@
 import { describe, test, afterAll, expect } from 'vitest';
+import sqliteTestPath from './sqliteTestPath.mjs';
 const rdb = require('../src/index');
 const versionArray = process.version.replace('v', '').split('.');
 const major = parseInt(versionArray[0]);
 
-const sqliteName = 'demo.getbyid.missing-join-nested-hasmany.test.db';
+const sqliteName = sqliteTestPath('demo.getbyid.missing-join-nested-hasmany.test.db');
 
 const map = rdb.map(x => ({
 	order: x.table('order_missing_join').map(({ column }) => ({

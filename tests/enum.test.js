@@ -1,7 +1,8 @@
 import { describe, test, beforeAll, afterAll, expect } from 'vitest';
+import sqliteTestPath from './sqliteTestPath.mjs';
 const rdb = require('../src/index');
 
-const sqliteName = 'demo.enum.test.js.db';
+const sqliteName = sqliteTestPath('demo.enum.test.js.db');
 const Values = Object.freeze({ active: 'ACTIVE', inactive: 'INACTIVE' });
 
 const map = rdb.map(x => ({

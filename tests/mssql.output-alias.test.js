@@ -1,4 +1,5 @@
 ﻿import { describe, test, beforeAll, expect } from 'vitest';
+import sqliteTestPath from './sqliteTestPath.mjs';
 const map = require('./db');
 const initMs = require('./initMs');
 const initPg = require('./initPg');
@@ -11,7 +12,7 @@ const major = parseInt(versionArray[0]);
 const pathSegments = __filename.split('/');
 const lastSegment = pathSegments[pathSegments.length - 1];
 const fileNameWithoutExtension = lastSegment.split('.')[0];
-const sqliteName = `demo.${fileNameWithoutExtension}.db`;
+const sqliteName = sqliteTestPath(`demo.${fileNameWithoutExtension}.db`);
 
 beforeAll(async () => {
 	await createMs();

@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import sqliteTestPath from './sqliteTestPath.mjs';
 const map = require('./db');
 const initPg = require('./initPg');
 const initMs = require('./initMs');
@@ -8,7 +9,7 @@ const initOracle = require('./initOracle');
 const initSap = require('./initSap');
 
 const fileNameWithoutExtension = __filename.substring(__dirname.length + 1).slice(0, -3);
-const sqliteName = `demo.${fileNameWithoutExtension}.db`;
+const sqliteName = sqliteTestPath(`demo.${fileNameWithoutExtension}.db`);
 
 describe('select for update and skip locked query integration', () => {
 	test('pg', async () => await verifyLockingStrategyRuns('pg'));

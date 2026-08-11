@@ -5,6 +5,7 @@
 // Run: deno test --allow-net --allow-read --allow-write --allow-env
 
 import rdb from '../dist/index.mjs';
+import sqliteTestPath from './sqliteTestPath.mjs';
 import { describe, it, beforeAll, afterAll } from 'jsr:@std/testing/bdd';
 import { assertObjectMatch } from 'jsr:@std/assert';
 import { dirname, fromFileUrl, join } from 'jsr:@std/path';
@@ -43,8 +44,8 @@ const fileNameWithoutExtension = (() => {
 	return dot >= 0 ? base.slice(0, dot) : base;
 })();
 
-const sqliteName = `demo.${fileNameWithoutExtension}.db`;
-const sqliteName2 = `demo.${fileNameWithoutExtension}2.db`;
+const sqliteName = sqliteTestPath(`demo.${fileNameWithoutExtension}.db`);
+const sqliteName2 = sqliteTestPath(`demo.${fileNameWithoutExtension}2.db`);
 
 // -----------------------------------------------------------------------------
 // Connection map (unchanged logic; minor Deno path fix for SAP)

@@ -1,6 +1,7 @@
 // Deno sqlite-specific tests extracted from dataTypes.deno.test.js
 
 import rdb from '../dist/index.mjs';
+import sqliteTestPath from './sqliteTestPath.mjs';
 import { describe, it, beforeAll, afterAll } from 'jsr:@std/testing/bdd';
 import { assertObjectMatch } from 'jsr:@std/assert';
 import { fromFileUrl } from 'jsr:@std/path';
@@ -17,7 +18,7 @@ const fileNameWithoutExtension = (() => {
 	return dot >= 0 ? base.slice(0, dot) : base;
 })();
 
-const sqliteName = `demo.${fileNameWithoutExtension}.db`;
+const sqliteName = sqliteTestPath(`demo.${fileNameWithoutExtension}.db`);
 
 function dateToISOString(date) {
 	let tzo = -date.getTimezoneOffset();
