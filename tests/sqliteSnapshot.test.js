@@ -66,6 +66,29 @@ describe('sqlite snapshot store', () => {
 		expect(a.id).toBe(b.id);
 		expect(reads).toBe(1);
 	});
+
+	test('supports child tables before their referenced parent table', async () => {
+		const parent = newTable('parent', [column('id', 'NumberColumn', true)]);
+		const child = newTable('child', [
+			column('id', 'NumberColumn', true),
+			column('parentId', 'NumberColumn')
+		]);
+		child._relations = {
+			parent: {
+				columns: [child._columns[1]],
+				childTable: parent,
+				childColumns: [parent._columns[0]]
+			}
+		};
+		const client = { tables: { child, parent } };
+		const store = createSqliteSnapshotStore(client, true, async fn => fn({
+			child: { getMany: async () => [{ id: 1, parentId: 7 }] },
+			parent: { getMany: async () => [{ id: 7 }] }
+		}));
+
+		const snapshot = await store.getOrBuild(['child', 'parent'], 1);
+		expect(snapshot.rowCount).toBe(2);
+	});
 });
 
 function column(name, tsType, primary = false) {

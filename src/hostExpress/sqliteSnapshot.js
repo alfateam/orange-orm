@@ -47,6 +47,7 @@ function createSqliteSnapshotStore(client, options, runReadonly) {
 			await runReadonly(async tx => {
 				database.exec('BEGIN');
 				try {
+					database.exec('PRAGMA defer_foreign_keys=ON');
 					for (const tableSchema of schema.tables) {
 						const table = tx[tableSchema.name];
 						if (!table || typeof table.getMany !== 'function') continue;
