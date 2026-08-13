@@ -27,6 +27,7 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 		checkout,
 		close,
 		getOpenInfo,
+		importSnapshot,
 		release,
 		reset,
 		ready
@@ -78,6 +79,11 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 			});
 	}
 
+	function importSnapshot(bytes, statements, expected) {
+		if (closed) return Promise.reject(new Error('sqliteOPFS worker client closed.'));
+		return ensureOpen().then(() => request('importSnapshot', { bytes, statements, expected }));
+	}
+
 	function checkout(priority) {
 		if (closed)
 			return Promise.reject(new Error('sqliteOPFS worker client closed.'));
@@ -96,6 +102,7 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 			return {
 				executeQuery,
 				executeCommand,
+				importSnapshot,
 				getOpenInfo,
 				reset,
 				releaseCheckout: () => Promise.resolve()
@@ -106,6 +113,9 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 			},
 			executeCommand(query, callback) {
 				executeCommandCore(query, callback, leaseId);
+			},
+			importSnapshot(bytes, statements, expected) {
+				return request('importSnapshot', { bytes, statements, expected, leaseId }).then(response => response.result);
 			},
 			getOpenInfo,
 			reset,
@@ -122,18 +132,30 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 		return new Promise((resolve, reject) => {
 			pending.set(id, { resolve, reject });
 			try {
-				worker.postMessage({
+				const message = {
 					type: 'orange-sqlite-opfs-request',
 					id,
 					method,
 					...payload
-				});
+				};
+				const transfer = snapshotTransferList(method, message);
+				worker.postMessage(message, transfer);
 			}
 			catch (e) {
 				pending.delete(id);
 				reject(e);
 			}
 		});
+	}
+
+	function snapshotTransferList(method, message) {
+		if (method !== 'importSnapshot' || !(message.bytes instanceof Uint8Array))
+			return undefined;
+		if (!(message.bytes.buffer instanceof ArrayBuffer))
+			return undefined;
+		if (message.bytes.byteOffset !== 0 || message.bytes.byteLength !== message.bytes.buffer.byteLength)
+			message.bytes = message.bytes.slice();
+		return [message.bytes.buffer];
 	}
 
 	function ensureOpen() {

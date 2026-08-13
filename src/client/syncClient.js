@@ -3,7 +3,7 @@ const stringify = require('./stringify');
 const { createSyncAuto, syncAutoStartSymbol } = require('./syncAuto');
 const createHttpInterceptor = require('./httpInterceptor');
 const outboxTableSql = require('../sync/outboxTableSql');
-const { ensureSyncSchema, clearEnsuredSyncSchema } = require('./syncSchema');
+const { ensureSyncSchema, clearEnsuredSyncSchema, buildSyncSchema, stableStringify, checksumString } = require('./syncSchema');
 const { runSyncMaintenance } = require('../sync/writeGate');
 const {
 	normalizeCrossTabLockConfig,
@@ -871,6 +871,8 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 		const stagingTimings = newPullStagingTimings(deferStableBaseUntilComplete);
 		let capturedStreamItemCount = 0;
 		let capturedApplicableItemCount = 0;
+		let snapshotAppliedRows = 0;
+		let snapshotApplied = false;
 		const streamedTables = new Set();
 		let applied = 0;
 		await ensurePullJournalTables(db);
@@ -881,7 +883,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 			: null;
 		const shouldApplyCheckpoint = session.finalSince !== undefined;
 		if (isStreamPullSession(session)) {
-			applied = capturedApplicableItemCount;
+			applied = snapshotAppliedRows || capturedApplicableItemCount;
 			await finalizeStreamedPullJournal(session);
 		}
 		else if (applyConfig)
@@ -936,7 +938,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 			await client.transaction(async (tx) => {
 				if (hasJournalItems && (!applyConfig || applyConfig.foreignKeyCheck === 'final'))
 					await validateForeignKeys(tx);
-				if (deferStableBaseUntilComplete) {
+				if (deferStableBaseUntilComplete && !snapshotApplied) {
 					const bulkStableBaseStartedAtMs = Date.now();
 					await copyTablesToStableBase(tx, options.tables);
 					stagingTimings.bulkStableBaseMs += elapsedMs(bulkStableBaseStartedAtMs);
@@ -1224,7 +1226,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 		}
 
 		async function fetchPullBatch(session, reason) {
-			const keysPayload = await requestPayload({
+			let keysPayload = await requestPayload({
 				...pullConfig,
 				body: {
 					phase: 'keys',
@@ -1232,9 +1234,24 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 					since: session.since,
 					tables: options.tables,
 					limit: maxKeysPerBatch,
-					inlineRows: true
+					inlineRows: true,
+					sqliteSnapshot: session.since === undefined
 				}
 			}, options);
+			if (isSqliteSnapshotPayload(keysPayload)) {
+				try {
+					const imported = await importSqliteSnapshot(keysPayload.snapshot, pullConfig, db, client.tables, options.tables, scopeKey, keysPayload.cursor, options);
+					snapshotApplied = true;
+					snapshotAppliedRows = imported.rowCount;
+					for (const tableName of options.tables || []) streamedTables.add(tableName);
+				}
+				catch (_error) {
+					keysPayload = await requestPayload({
+						...pullConfig,
+						body: { phase: 'keys', token: session.token, since: session.since, tables: options.tables, limit: maxKeysPerBatch, inlineRows: true, sqliteSnapshot: false }
+					}, options);
+				}
+			}
 			if (!isStagedKeysPayload(keysPayload))
 				throw new Error('Sync endpoint did not return staged keys payload');
 			const nextReason = reason === undefined && keysPayload.reason !== undefined
@@ -3387,7 +3404,8 @@ async function requestPayload(config, options) {
 		url: appendQueryParam(config.url, 'sync', config.syncPhase || 'pull'),
 		method: 'post',
 		timeout: config.timeoutMs,
-		headers: {}
+		headers: {},
+		responseType: config.responseType
 	};
 	request.data = requestBody;
 
@@ -3443,7 +3461,9 @@ function createFetchClient() {
 			if (config.credentials !== undefined)
 				fetchOptions.credentials = config.credentials;
 			const response = await fetch(config.url, fetchOptions);
-			const data = await readPayloadResponse(response);
+			const data = config.responseType === 'arraybuffer'
+				? new Uint8Array(await response.arrayBuffer())
+				: await readPayloadResponse(response);
 			const payload = {
 				data,
 				status: response.status,
@@ -3505,6 +3525,70 @@ function isStagedKeysPayload(payload) {
 		&& payload.phase === 'keys'
 		&& Array.isArray(payload.items)
 		&& 'done' in payload;
+}
+
+function isSqliteSnapshotPayload(payload) {
+	return isStagedKeysPayload(payload)
+		&& payload.snapshot
+		&& typeof payload.snapshot.id === 'string'
+		&& typeof payload.snapshot.schemaChecksum === 'string';
+}
+
+async function importSqliteSnapshot(descriptor, pullConfig, db, clientTables, tableNames, scopeKey, cursor, requestOptions) {
+	const importer = resolveSqliteSnapshotImporter(db);
+	if (!importer) throw new Error('SQLite snapshot import is not available for this database.');
+	const tables = Array.isArray(tableNames) ? tableNames : [];
+	const schema = buildSyncSchema(clientTables, tables);
+	const schemaChecksum = checksumString(stableStringify(schema));
+	if (schemaChecksum !== descriptor.schemaChecksum)
+		throw new Error('SQLite snapshot schema does not match the local map.');
+	const bytes = await requestPayload({
+		...pullConfig,
+		responseType: 'arraybuffer',
+		body: { phase: 'snapshot', id: descriptor.id }
+	}, requestOptions);
+	const baseEntries = await readSnapshotBaseEntries(db);
+	const baseByDbName = new Map(baseEntries.map(entry => [entry.name, entry.baseName]));
+	const statements = ['PRAGMA defer_foreign_keys=ON'];
+	for (let i = schema.tables.length - 1; i >= 0; i--)
+		statements.push(`DELETE FROM ${quoteIdent(schema.tables[i].dbName)}`);
+	for (const table of schema.tables) {
+		const columns = table.columns.map(column => quoteIdent(column.dbName)).join(', ');
+		statements.push(`INSERT INTO ${quoteIdent(table.dbName)} (${columns}) SELECT ${columns} FROM orange_snapshot.${quoteIdent(table.dbName)}`);
+		const baseName = baseByDbName.get(table.dbName);
+		if (baseName) {
+			statements.push(`DELETE FROM ${quoteIdent(baseName)}`);
+			statements.push(`INSERT INTO ${quoteIdent(baseName)} SELECT * FROM ${quoteIdent(table.dbName)}`);
+		}
+	}
+	statements.push([
+		'INSERT INTO "orange_sync_state" ("scope", "since_value") VALUES (',
+		sqlStringLiteral(scopeKey), ', ', sqlStringLiteral(JSON.stringify({ since: cursor, updatedAtMs: Date.now() })), ') ',
+		'ON CONFLICT("scope") DO UPDATE SET "since_value" = excluded."since_value"'
+	].join(''));
+	const result = await importer(bytes, statements, {
+		schemaChecksum: descriptor.schemaChecksum,
+		rowCount: descriptor.rowCount
+	});
+	return result && result.result || result;
+}
+
+function resolveSqliteSnapshotImporter(db) {
+	const pool = db && (db.poolFactory || db.pool || db);
+	return pool && typeof pool.__orangeImportSqliteSnapshot === 'function'
+		? pool.__orangeImportSqliteSnapshot.bind(pool)
+		: null;
+}
+
+async function readSnapshotBaseEntries(db) {
+	try {
+		const rows = await db.query('SELECT "name", "base_name", "schema_sql", "ordinal" FROM "orange_sync_base_tables" ORDER BY "ordinal", "name"');
+		return (Array.isArray(rows) ? rows : rows && rows.rows || []).map(row => ({
+			name: row.name ?? row.NAME,
+			baseName: row.base_name ?? row.BASE_NAME
+		}));
+	}
+	catch (_error) { return []; }
 }
 
 function isRowsPayload(payload) {

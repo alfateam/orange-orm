@@ -21,6 +21,15 @@ function newPool(connectionString, poolOptions) {
 	c.__orangeSqliteOPFSRequestedVfs = poolOptions.vfs;
 	c.__orangeCrossTabWriteLock = normalizeCrossTabWriteLockConfig(poolOptions);
 	c.__orangeSqliteOPFSReady = client.ready;
+	c.__orangeImportSqliteSnapshot = function(bytes, statements, expected) {
+		return new Promise((resolve, reject) => {
+			c.connect((error, checkout, done) => {
+				if (error) return reject(error);
+				Promise.resolve(checkout.importSnapshot(bytes, statements, expected))
+					.then(result => { done(); resolve(result); }, importError => { done(importError); reject(importError); });
+			}, 0);
+		});
+	};
 
 	if (client.ready && typeof client.ready.then === 'function') {
 		client.ready.then((result) => {

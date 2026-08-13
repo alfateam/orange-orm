@@ -1376,6 +1376,15 @@ type SyncServerConfig<M extends Record<string, TableDefinition<M>>> = {
   enabled?: boolean;
   changeTable?: string;
   commands?: AnyServerCommandHandlers<M>;
+  /**
+   * Experimental shared-scope bootstrap snapshot. Requires node:sqlite on Node.js 22.13+.
+   * Only enable when every authorized caller receives identical rows; the cache is not RLS-aware.
+   */
+  sqliteSnapshot?: boolean | {
+    enabled?: boolean;
+    maxEntries?: number;
+    rowsPerRead?: number;
+  };
   queue?: {
     concurrency?: number;
     maxPending?: number;

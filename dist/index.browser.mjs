@@ -772,6 +772,540 @@ function requireStringify () {
 	return stringify_1;
 }
 
+var syncSchema;
+var hasRequiredSyncSchema;
+
+function requireSyncSchema () {
+	if (hasRequiredSyncSchema) return syncSchema;
+	hasRequiredSyncSchema = 1;
+	const schemaStateTable = 'orange_schema_state';
+	const schemaVersion = 1;
+	const ensuredSchemasByDb = new WeakMap();
+
+	async function ensureSyncSchema(db, client, tableNames, options = {}) {
+		if (!db || typeof db.query !== 'function')
+			return null;
+		if (options === false || options && options.enabled === false)
+			return null;
+		const tables = client && client.tables;
+		if (!tables || !Array.isArray(tableNames) || tableNames.length === 0)
+			return null;
+
+		const schema = buildSyncSchema(tables, tableNames);
+		if (!schema.tables.length)
+			return null;
+		const sql = schemaToSql(schema);
+		const schemaJson = stableStringify(schema);
+		const checksum = checksumString(schemaJson);
+		const scope = `sync:${schema.tables.map(x => x.name).join('|')}`;
+		const ensuredKey = `${scope}:${checksum}`;
+		if (isSchemaEnsured(db, ensuredKey))
+			return { scope, schema, checksum, sql: sql.statements };
+
+		await ensureSchemaStateTable(db);
+		const existing = await readSchemaState(db, scope);
+		const shouldUpdateState = !existing || existing.checksum !== checksum;
+		if (existing && existing.checksum !== checksum && !isIndexOnlySchemaChange(existing.schemaJson, schema))
+			throw new Error('Local sync schema does not match current map. Reset the local sync database or run a migration before syncing.');
+		if (existing && existing.checksum === checksum) {
+			markSchemaEnsured(db, ensuredKey);
+			return { scope, schema, checksum, sql: sql.statements };
+		}
+
+		for (let i = 0; i < sql.statements.length; i++)
+			await db.query(sql.statements[i]);
+
+		if (shouldUpdateState)
+			await writeSchemaState(db, {
+				scope,
+				dialect: 'sqlite',
+				tables: schema.tables.map(x => x.name),
+				schema,
+				checksum,
+				sql: sql.statements.join('\n'),
+				updatedAtMs: Date.now()
+			});
+
+		markSchemaEnsured(db, ensuredKey);
+		return { scope, schema, checksum, sql: sql.statements };
+	}
+
+	function isSchemaEnsured(db, key) {
+		const ensured = ensuredSchemasByDb.get(db);
+		return ensured ? ensured.has(key) : false;
+	}
+
+	function markSchemaEnsured(db, key) {
+		let ensured = ensuredSchemasByDb.get(db);
+		if (!ensured) {
+			ensured = new Set();
+			ensuredSchemasByDb.set(db, ensured);
+		}
+		ensured.add(key);
+	}
+
+	function clearEnsuredSyncSchema(db) {
+		if (db)
+			ensuredSchemasByDb.delete(db);
+	}
+
+	function buildSyncSchema(tables, tableNames) {
+		const selected = Array.from(new Set(tableNames))
+			.filter(name => tables[name])
+			.sort();
+		const schema = {
+			version: schemaVersion,
+			dialect: 'sqlite',
+			tables: selected.map(name => tableToSchema(name, tables[name]))
+		};
+		addRelationMetadata(schema, tables, selected);
+		return schema;
+	}
+
+	function tableToSchema(name, table) {
+		const columns = (table._columns || []).map(columnToSchema);
+		return {
+			name,
+			dbName: table._dbName,
+			columns,
+			foreignKeys: [],
+			indexes: [],
+			primaryKey: (table._primaryColumns || []).map(x => x._dbName)
+		};
+	}
+
+	function columnToSchema(column) {
+		return {
+			name: column.alias,
+			dbName: column._dbName,
+			type: columnType(column),
+			primary: column.isPrimary === true,
+			notNull: column._notNull === true,
+			notNullExceptInsert: column._notNullExceptInsert === true
+		};
+	}
+
+	function columnType(column) {
+		if (column.tsType === 'NumberColumn')
+			return 'number';
+		if (column.tsType === 'BooleanColumn')
+			return 'boolean';
+		if (column.tsType === 'BigintColumn')
+			return 'bigint';
+		if (column.tsType === 'BinaryColumn')
+			return 'binary';
+		if (column.tsType === 'JSONColumn')
+			return 'json';
+		if (column.tsType === 'UUIDColumn')
+			return 'uuid';
+		if (column.tsType === 'DateColumn' && column.hasTimeZone)
+			return 'datetime-tz';
+		if (column.tsType === 'DateColumn')
+			return 'datetime';
+		return 'string';
+	}
+
+	function schemaToSql(schema) {
+		return {
+			statements: schema.tables.map(tableToCreateSql).concat(schema.tables.flatMap(tableToIndexSql))
+		};
+	}
+
+	function tableToCreateSql(table) {
+		const hasCompositePrimaryKey = table.primaryKey.length > 1;
+		const parts = table.columns.map(column => columnToSql(column, { hasCompositePrimaryKey }));
+		if (table.primaryKey.length > 1)
+			parts.push(`PRIMARY KEY (${table.primaryKey.map(quoteIdent).join(', ')})`);
+		for (let i = 0; i < table.foreignKeys.length; i++)
+			parts.push(foreignKeyToSql(table.foreignKeys[i]));
+		return [
+			`CREATE TABLE IF NOT EXISTS ${quoteIdent(table.dbName)} (`,
+			parts.map(x => `  ${x}`).join(',\n'),
+			');'
+		].join('\n');
+	}
+
+	function tableToIndexSql(table) {
+		return (table.indexes || []).map(index => {
+			return `CREATE INDEX IF NOT EXISTS ${quoteIdent(index.dbName)} ON ${quoteIdent(table.dbName)} (${index.columns.map(quoteIdent).join(', ')});`;
+		});
+	}
+
+	function columnToSql(column, options = {}) {
+		const parts = [quoteIdent(column.dbName), sqliteType(column.type)];
+		if (!options.hasCompositePrimaryKey && column.primary && column.type === 'number')
+			parts.push('PRIMARY KEY');
+		else if (!options.hasCompositePrimaryKey && column.primary)
+			parts.push('PRIMARY KEY');
+		if (column.notNull)
+			parts.push('NOT NULL');
+		return parts.join(' ');
+	}
+
+	function foreignKeyToSql(foreignKey) {
+		return [
+			`FOREIGN KEY (${foreignKey.columns.map(quoteIdent).join(', ')})`,
+			`REFERENCES ${quoteIdent(foreignKey.referencesTable)} (${foreignKey.referencesColumns.map(quoteIdent).join(', ')})`
+		].join(' ');
+	}
+
+	function sqliteType(type) {
+		if (type === 'number' || type === 'boolean')
+			return 'INTEGER';
+		if (type === 'binary')
+			return 'BLOB';
+		return 'TEXT';
+	}
+
+	function addRelationMetadata(schema, tables, selectedNames) {
+		const tableSchemaByObject = new Map();
+		const selectedObjects = new Set();
+		for (let i = 0; i < selectedNames.length; i++) {
+			const table = tables[selectedNames[i]];
+			const tableSchema = schema.tables[i];
+			tableSchemaByObject.set(table, tableSchema);
+			selectedObjects.add(table);
+		}
+
+		const seen = new Set();
+		const seenForeignKeys = new Set();
+		for (let i = 0; i < selectedNames.length; i++) {
+			const table = tables[selectedNames[i]];
+			const relations = table && table._relations;
+			if (!relations)
+				continue;
+			for (let relationName in relations) {
+				const join = extractJoinRelation(relations[relationName]);
+				if (!join || !selectedObjects.has(join.parentTable) || !selectedObjects.has(join.childTable))
+					continue;
+				const targetSchema = tableSchemaByObject.get(join.parentTable);
+				const referencesSchema = tableSchemaByObject.get(join.childTable);
+				const columns = (join.columns || []).map(x => x && x._dbName).filter(Boolean);
+				const referencesColumns = join.childTable && Array.isArray(join.childTable._primaryColumns)
+					? join.childTable._primaryColumns.map(x => x && x._dbName).filter(Boolean)
+					: [];
+				if (!targetSchema || !referencesSchema || columns.length === 0 || columns.length !== referencesColumns.length)
+					continue;
+				addRelationIndex(targetSchema, columns, relationName, seen);
+				addRelationForeignKey(targetSchema, referencesSchema, columns, referencesColumns, seenForeignKeys);
+			}
+		}
+
+		for (let i = 0; i < schema.tables.length; i++) {
+			schema.tables[i].indexes.sort((a, b) => a.dbName.localeCompare(b.dbName));
+			schema.tables[i].foreignKeys.sort((a, b) => {
+				const tableCompare = a.referencesTable.localeCompare(b.referencesTable);
+				if (tableCompare !== 0)
+					return tableCompare;
+				return a.columns.join('|').localeCompare(b.columns.join('|'));
+			});
+		}
+	}
+
+	function addRelationIndex(targetSchema, columns, relationName, seen) {
+		if (isPrimaryKey(targetSchema, columns))
+			return;
+		const key = `${targetSchema.dbName}:${columns.join('|')}`;
+		if (seen.has(key))
+			return;
+		seen.add(key);
+		targetSchema.indexes.push({
+			name: `relation:${relationName}`,
+			dbName: newIndexName(targetSchema.dbName, columns),
+			columns
+		});
+	}
+
+	function addRelationForeignKey(targetSchema, referencesSchema, columns, referencesColumns, seen) {
+		const key = `${targetSchema.dbName}:${columns.join('|')}:${referencesSchema.dbName}:${referencesColumns.join('|')}`;
+		if (seen.has(key))
+			return;
+		seen.add(key);
+		targetSchema.foreignKeys.push({
+			columns,
+			referencesTable: referencesSchema.dbName,
+			referencesColumns
+		});
+	}
+
+	function extractJoinRelation(relation) {
+		if (!relation || typeof relation.accept !== 'function')
+			return null;
+		let join;
+		relation.accept({
+			visitJoin: function(current) {
+				join = current;
+			},
+			visitOne: function(current) {
+				join = current && current.joinRelation;
+			},
+			visitMany: function(current) {
+				join = current && current.joinRelation;
+			}
+		});
+		return join;
+	}
+
+	function isPrimaryKey(tableSchema, columns) {
+		if (!Array.isArray(tableSchema.primaryKey) || tableSchema.primaryKey.length !== columns.length)
+			return false;
+		for (let i = 0; i < columns.length; i++) {
+			if (tableSchema.primaryKey[i] !== columns[i])
+				return false;
+		}
+		return true;
+	}
+
+	function newIndexName(tableName, columns) {
+		const raw = `orange_idx_${tableName}_${columns.join('_')}`;
+		return raw.replace(/[^A-Za-z0-9_]/g, '_');
+	}
+
+	async function ensureSchemaStateTable(db) {
+		await db.query([
+			`CREATE TABLE IF NOT EXISTS ${quoteIdent(schemaStateTable)} (`,
+			'"scope" TEXT PRIMARY KEY,',
+			'"dialect" TEXT NOT NULL,',
+			'"tables_json" TEXT NOT NULL,',
+			'"schema_json" TEXT NOT NULL,',
+			'"checksum" TEXT NOT NULL,',
+			'"sql_text" TEXT NOT NULL,',
+			'"updated_at_ms" INTEGER NOT NULL',
+			');'
+		].join(' '));
+	}
+
+	async function readSchemaState(db, scope) {
+		const rows = await db.query(`SELECT "checksum", "schema_json" FROM ${quoteIdent(schemaStateTable)} WHERE "scope" = ${sqlStringLiteral(scope)} LIMIT 1`);
+		const list = Array.isArray(rows) ? rows : rows && rows.rows || [];
+		const row = list[0];
+		if (!row)
+			return null;
+		return {
+			checksum: row.checksum ?? row.CHECKSUM,
+			schemaJson: row.schema_json ?? row.SCHEMA_JSON
+		};
+	}
+
+	async function writeSchemaState(db, state) {
+		await db.query([
+			`INSERT OR REPLACE INTO ${quoteIdent(schemaStateTable)} (`,
+			'"scope", "dialect", "tables_json", "schema_json", "checksum", "sql_text", "updated_at_ms"',
+			') VALUES (',
+			[
+				sqlStringLiteral(state.scope),
+				sqlStringLiteral(state.dialect),
+				sqlStringLiteral(JSON.stringify(state.tables)),
+				sqlStringLiteral(stableStringify(state.schema)),
+				sqlStringLiteral(state.checksum),
+				sqlStringLiteral(state.sql),
+				String(state.updatedAtMs)
+			].join(', '),
+			');'
+		].join(' '));
+	}
+
+	function isIndexOnlySchemaChange(existingSchemaJson, nextSchema) {
+		if (typeof existingSchemaJson !== 'string')
+			return false;
+		try {
+			const existing = JSON.parse(existingSchemaJson);
+			return stableStringify(stripIndexes(existing)) === stableStringify(stripIndexes(nextSchema));
+		}
+		catch (_e) {
+			return false;
+		}
+	}
+
+	function stripIndexes(value) {
+		if (Array.isArray(value))
+			return value.map(stripIndexes);
+		if (!value || typeof value !== 'object')
+			return value;
+		const result = {};
+		for (let key in value) {
+			if (key !== 'indexes')
+				result[key] = stripIndexes(value[key]);
+		}
+		return result;
+	}
+
+	function quoteIdent(value) {
+		return `"${String(value).replace(/"/g, '""')}"`;
+	}
+
+	function sqlStringLiteral(value) {
+		if (value === null || value === undefined)
+			return 'NULL';
+		return `'${String(value).replace(/'/g, '\'\'')}'`;
+	}
+
+	function stableStringify(value) {
+		if (value === null || typeof value !== 'object')
+			return JSON.stringify(value);
+		if (Array.isArray(value))
+			return `[${value.map(stableStringify).join(',')}]`;
+		const keys = Object.keys(value).sort();
+		return `{${keys.map(key => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
+	}
+
+	function checksumString(value) {
+		let hash = 2166136261;
+		for (let i = 0; i < value.length; i++) {
+			hash ^= value.charCodeAt(i);
+			hash = Math.imul(hash, 16777619);
+		}
+		return `fnv1a32:${(hash >>> 0).toString(16).padStart(8, '0')}`;
+	}
+
+	syncSchema = {
+		ensureSyncSchema,
+		clearEnsuredSyncSchema,
+		buildSyncSchema,
+		schemaToSql,
+		stableStringify,
+		checksumString
+	};
+	return syncSchema;
+}
+
+var sqliteSnapshot;
+var hasRequiredSqliteSnapshot;
+
+function requireSqliteSnapshot () {
+	if (hasRequiredSqliteSnapshot) return sqliteSnapshot;
+	hasRequiredSqliteSnapshot = 1;
+	const { buildSyncSchema, schemaToSql, stableStringify, checksumString } = requireSyncSchema();
+
+	const snapshotMimeType = 'application/vnd.sqlite3';
+
+	function createSqliteSnapshotStore(client, options, runReadonly) {
+		if (options === true) options = { enabled: true };
+		if (!options || options.enabled !== true) return null;
+		const maxEntries = positiveInteger(options.maxEntries, 1);
+		const rowsPerRead = positiveInteger(options.rowsPerRead, 1000);
+		const entries = new Map();
+		const builds = new Map();
+		return { getOrBuild, get: id => entries.get(id) || null };
+
+		async function getOrBuild(tableNames, watermark, request, response) {
+			const schema = buildSyncSchema(client.tables, tableNames);
+			const schemaJson = stableStringify(schema);
+			const schemaChecksum = checksumString(schemaJson);
+			const key = stableStringify({ tableNames, watermark, schemaChecksum });
+			const cached = Array.from(entries.values()).find(entry => entry.key === key);
+			if (cached) {
+				cached.lastUsedAtMs = Date.now();
+				return toDescriptor(cached, true);
+			}
+			if (!builds.has(key)) {
+				builds.set(key, build(key, schema, schemaJson, schemaChecksum, watermark, request, response)
+					.finally(() => builds.delete(key)));
+			}
+			return toDescriptor(await builds.get(key), false);
+		}
+
+		async function build(key, schema, schemaJson, schemaChecksum, watermark, request, response) {
+			const crypto = loadNodeBuiltin('node:crypto');
+			const fs = loadNodeBuiltin('node:fs');
+			const os = loadNodeBuiltin('node:os');
+			const path = loadNodeBuiltin('node:path');
+			const { DatabaseSync } = loadNodeSqlite();
+			const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'orange-sync-snapshot-'));
+			const filename = path.join(directory, 'snapshot.sqlite3');
+			const startedAtMs = Date.now();
+			let database;
+			try {
+				database = new DatabaseSync(filename);
+				database.exec('PRAGMA journal_mode=OFF; PRAGMA synchronous=OFF; PRAGMA temp_store=MEMORY;');
+				for (const statement of schemaToSql(schema).statements) database.exec(statement);
+				database.exec('CREATE TABLE "orange_snapshot_meta" ("format" INTEGER NOT NULL, "schema_checksum" TEXT NOT NULL, "schema_json" TEXT NOT NULL, "watermark_json" TEXT, "row_count" INTEGER NOT NULL);');
+				let rowCount = 0;
+				await runReadonly(async tx => {
+					database.exec('BEGIN');
+					try {
+						for (const tableSchema of schema.tables) {
+							const table = tx[tableSchema.name];
+							if (!table || typeof table.getMany !== 'function') continue;
+							const quoted = tableSchema.columns.map(column => quoteIdent(column.dbName));
+							const insert = database.prepare(`INSERT INTO ${quoteIdent(tableSchema.dbName)} (${quoted.join(',')}) VALUES (${quoted.map(() => '?').join(',')})`);
+							let offset = 0;
+							let rows;
+							do {
+								rows = await table.getMany(undefined, {
+									orderBy: tableSchema.primaryKey,
+									limit: rowsPerRead,
+									offset
+								});
+								for (const row of rows) {
+									insert.run(...tableSchema.columns.map(column => toSqliteValue(row[column.name], column.type)));
+									rowCount += 1;
+								}
+								offset += rows.length;
+							} while (rows.length === rowsPerRead);
+						}
+						database.prepare('INSERT INTO "orange_snapshot_meta" VALUES (?, ?, ?, ?, ?)').run(1, schemaChecksum, schemaJson, JSON.stringify(watermark), rowCount);
+						database.exec('COMMIT');
+					} catch (error) {
+						database.exec('ROLLBACK');
+						throw error;
+					}
+				}, request, response);
+				database.close();
+				database = null;
+				const entry = { id: crypto.randomUUID(), key, bytes: fs.readFileSync(filename), schemaChecksum, watermark, rowCount, buildMs: Date.now() - startedAtMs, lastUsedAtMs: Date.now() };
+				entries.set(entry.id, entry);
+				while (entries.size > maxEntries) {
+					const oldest = Array.from(entries.values()).sort((a, b) => a.lastUsedAtMs - b.lastUsedAtMs)[0];
+					entries.delete(oldest.id);
+				}
+				return entry;
+			} finally {
+				if (database) database.close();
+				fs.rmSync(directory, { recursive: true, force: true });
+			}
+		}
+	}
+
+	function toDescriptor(entry, cacheHit) {
+		return { id: entry.id, byteLength: entry.bytes.length, rowCount: entry.rowCount, schemaChecksum: entry.schemaChecksum, buildMs: entry.buildMs, cacheHit };
+	}
+
+	function loadNodeSqlite() {
+		return loadNodeBuiltin('node:sqlite');
+	}
+
+	function loadNodeBuiltin(name) {
+		const builtin = typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function'
+			? process.getBuiltinModule(name)
+			: null;
+		if (builtin) return builtin;
+		const error = new Error('SQLite snapshots require node:sqlite and process.getBuiltinModule() (Node.js 22.13 or newer).');
+		error.code = 'ORANGE_SQLITE_SNAPSHOT_UNAVAILABLE';
+		throw error;
+	}
+
+	function toSqliteValue(value, type) {
+		if (value === null || value === undefined) return null;
+		if (type === 'boolean') return value ? 1 : 0;
+		if (type === 'json') return JSON.stringify(value);
+		if (type === 'datetime' || type === 'datetime-tz') return value instanceof Date ? value.toISOString() : String(value);
+		if (type === 'bigint') return String(value);
+		if (type === 'binary') return Buffer.isBuffer(value) || value instanceof Uint8Array ? value : Buffer.from(String(value), 'base64');
+		return value;
+	}
+
+	function positiveInteger(value, fallback) {
+		const parsed = Number.parseInt(value, 10);
+		return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+	}
+
+	function quoteIdent(value) { return `"${String(value).replace(/"/g, '""')}"`; }
+
+	sqliteSnapshot = { createSqliteSnapshotStore, snapshotMimeType };
+	return sqliteSnapshot;
+}
+
 var sync;
 var hasRequiredSync;
 
@@ -779,6 +1313,7 @@ function requireSync () {
 	if (hasRequiredSync) return sync;
 	hasRequiredSync = 1;
 	const stringify = requireStringify();
+	const { createSqliteSnapshotStore, snapshotMimeType } = requireSqliteSnapshot();
 
 	function newSyncHandler(client, options = {}) {
 		const syncOptions = normalizeSyncOptions(options.sync);
@@ -801,11 +1336,17 @@ function requireSync () {
 			|| transactionHookFns.beforeCommit
 			|| transactionHookFns.afterCommit
 			|| transactionHookFns.afterRollback);
+		const snapshotStore = createSqliteSnapshotStore(client, syncOptions.sqliteSnapshot, runSnapshotReadonly);
 
 		return async function handleSync(request, response) {
 			try {
 				const result = await queue.run(() => execute(request.body || {}, request, response));
-				response.json(result);
+				if (result && result.__orangeSqliteSnapshotBytes) {
+					response.type(snapshotMimeType);
+					response.setHeader('Cache-Control', 'private, no-store');
+					response.status(200).send(result.__orangeSqliteSnapshotBytes);
+				}
+				else response.json(result);
 			}
 			catch (e) {
 				if (e.status === undefined)
@@ -823,9 +1364,30 @@ function requireSync () {
 				return pullKeys(body, request, response);
 			if (phase === 'rows')
 				return pullRows(body, request, response);
+			if (phase === 'snapshot')
+				return downloadSnapshot(body);
 			const error = new Error('Invalid sync phase. Use { phase: "keys" }, { phase: "rows" }, or { phase: "push" }.');
 			error.status = 400;
 			throw error;
+		}
+
+		function downloadSnapshot(body) {
+			if (!snapshotStore || typeof body.id !== 'string') {
+				const error = new Error('SQLite snapshot is not available.');
+				error.status = 404;
+				throw error;
+			}
+			const entry = snapshotStore.get(body.id);
+			if (!entry) {
+				const error = new Error('SQLite snapshot has expired.');
+				error.status = 404;
+				throw error;
+			}
+			return { __orangeSqliteSnapshotBytes: entry.bytes };
+		}
+
+		function runSnapshotReadonly(fn, request, response) {
+			return runHookedTransaction(fn, { readonly: true }, request, response);
 		}
 
 		async function runHookedTransaction(fn, transactionOptions, request, response) {
@@ -967,6 +1529,19 @@ function requireSync () {
 			const bounds = await getChangeBounds(syncOptions.changeTable);
 			const fallback = shouldUseSnapshot(startCursor, bounds, syncOptions.limits.maxChangeWindow);
 			if (fallback.useSnapshot) {
+				if (snapshotStore && body.sqliteSnapshot === true && body.inlineRows === true) {
+					try {
+						const snapshot = await snapshotStore.getOrBuild(requestedTables, bounds.max, request, response);
+						return {
+							phase: 'keys', mode: 'snapshot', done: true, cursor: bounds.max, token: null,
+							items: [], snapshot, reason: fallback.reason
+						};
+					}
+					catch (_error) {
+						// Snapshot transport is an optimization. Preserve the inline-row path
+						// when snapshot creation is unavailable or fails for this request.
+					}
+				}
 				const upperPks = await getSnapshotUpperPks(requestedTables, request, response);
 				const snapshotToken = {
 					v: 1,
@@ -1345,6 +1920,7 @@ function requireSync () {
 			changeTable: sync.changeTable || 'orange_changes',
 			appliedMutationsTable: sync.appliedMutationsTable || 'orange_sync_applied_mutations',
 			commands: normalizeCommands(sync.commands),
+			sqliteSnapshot: normalizeSqliteSnapshot(sync.sqliteSnapshot),
 			queue: {
 				concurrency: clamp(normalizeInteger(queueOptions.concurrency, 4), 1, 100),
 				maxPending: clamp(normalizeInteger(queueOptions.maxPending, 1000), 0, 100000)
@@ -1357,6 +1933,12 @@ function requireSync () {
 				explicit: explicitLimits
 			}
 		};
+	}
+
+	function normalizeSqliteSnapshot(value) {
+		if (value !== true && (!value || value.enabled !== true))
+			return null;
+		return value === true ? { enabled: true } : { ...value, enabled: true };
 	}
 
 	function normalizeCommands(commands) {
@@ -5604,403 +6186,6 @@ function requireSyncAuto () {
 	return syncAuto;
 }
 
-var syncSchema;
-var hasRequiredSyncSchema;
-
-function requireSyncSchema () {
-	if (hasRequiredSyncSchema) return syncSchema;
-	hasRequiredSyncSchema = 1;
-	const schemaStateTable = 'orange_schema_state';
-	const schemaVersion = 1;
-	const ensuredSchemasByDb = new WeakMap();
-
-	async function ensureSyncSchema(db, client, tableNames, options = {}) {
-		if (!db || typeof db.query !== 'function')
-			return null;
-		if (options === false || options && options.enabled === false)
-			return null;
-		const tables = client && client.tables;
-		if (!tables || !Array.isArray(tableNames) || tableNames.length === 0)
-			return null;
-
-		const schema = buildSyncSchema(tables, tableNames);
-		if (!schema.tables.length)
-			return null;
-		const sql = schemaToSql(schema);
-		const schemaJson = stableStringify(schema);
-		const checksum = checksumString(schemaJson);
-		const scope = `sync:${schema.tables.map(x => x.name).join('|')}`;
-		const ensuredKey = `${scope}:${checksum}`;
-		if (isSchemaEnsured(db, ensuredKey))
-			return { scope, schema, checksum, sql: sql.statements };
-
-		await ensureSchemaStateTable(db);
-		const existing = await readSchemaState(db, scope);
-		const shouldUpdateState = !existing || existing.checksum !== checksum;
-		if (existing && existing.checksum !== checksum && !isIndexOnlySchemaChange(existing.schemaJson, schema))
-			throw new Error('Local sync schema does not match current map. Reset the local sync database or run a migration before syncing.');
-		if (existing && existing.checksum === checksum) {
-			markSchemaEnsured(db, ensuredKey);
-			return { scope, schema, checksum, sql: sql.statements };
-		}
-
-		for (let i = 0; i < sql.statements.length; i++)
-			await db.query(sql.statements[i]);
-
-		if (shouldUpdateState)
-			await writeSchemaState(db, {
-				scope,
-				dialect: 'sqlite',
-				tables: schema.tables.map(x => x.name),
-				schema,
-				checksum,
-				sql: sql.statements.join('\n'),
-				updatedAtMs: Date.now()
-			});
-
-		markSchemaEnsured(db, ensuredKey);
-		return { scope, schema, checksum, sql: sql.statements };
-	}
-
-	function isSchemaEnsured(db, key) {
-		const ensured = ensuredSchemasByDb.get(db);
-		return ensured ? ensured.has(key) : false;
-	}
-
-	function markSchemaEnsured(db, key) {
-		let ensured = ensuredSchemasByDb.get(db);
-		if (!ensured) {
-			ensured = new Set();
-			ensuredSchemasByDb.set(db, ensured);
-		}
-		ensured.add(key);
-	}
-
-	function clearEnsuredSyncSchema(db) {
-		if (db)
-			ensuredSchemasByDb.delete(db);
-	}
-
-	function buildSyncSchema(tables, tableNames) {
-		const selected = Array.from(new Set(tableNames))
-			.filter(name => tables[name])
-			.sort();
-		const schema = {
-			version: schemaVersion,
-			dialect: 'sqlite',
-			tables: selected.map(name => tableToSchema(name, tables[name]))
-		};
-		addRelationMetadata(schema, tables, selected);
-		return schema;
-	}
-
-	function tableToSchema(name, table) {
-		const columns = (table._columns || []).map(columnToSchema);
-		return {
-			name,
-			dbName: table._dbName,
-			columns,
-			foreignKeys: [],
-			indexes: [],
-			primaryKey: (table._primaryColumns || []).map(x => x._dbName)
-		};
-	}
-
-	function columnToSchema(column) {
-		return {
-			name: column.alias,
-			dbName: column._dbName,
-			type: columnType(column),
-			primary: column.isPrimary === true,
-			notNull: column._notNull === true,
-			notNullExceptInsert: column._notNullExceptInsert === true
-		};
-	}
-
-	function columnType(column) {
-		if (column.tsType === 'NumberColumn')
-			return 'number';
-		if (column.tsType === 'BooleanColumn')
-			return 'boolean';
-		if (column.tsType === 'BigintColumn')
-			return 'bigint';
-		if (column.tsType === 'BinaryColumn')
-			return 'binary';
-		if (column.tsType === 'JSONColumn')
-			return 'json';
-		if (column.tsType === 'UUIDColumn')
-			return 'uuid';
-		if (column.tsType === 'DateColumn' && column.hasTimeZone)
-			return 'datetime-tz';
-		if (column.tsType === 'DateColumn')
-			return 'datetime';
-		return 'string';
-	}
-
-	function schemaToSql(schema) {
-		return {
-			statements: schema.tables.map(tableToCreateSql).concat(schema.tables.flatMap(tableToIndexSql))
-		};
-	}
-
-	function tableToCreateSql(table) {
-		const hasCompositePrimaryKey = table.primaryKey.length > 1;
-		const parts = table.columns.map(column => columnToSql(column, { hasCompositePrimaryKey }));
-		if (table.primaryKey.length > 1)
-			parts.push(`PRIMARY KEY (${table.primaryKey.map(quoteIdent).join(', ')})`);
-		for (let i = 0; i < table.foreignKeys.length; i++)
-			parts.push(foreignKeyToSql(table.foreignKeys[i]));
-		return [
-			`CREATE TABLE IF NOT EXISTS ${quoteIdent(table.dbName)} (`,
-			parts.map(x => `  ${x}`).join(',\n'),
-			');'
-		].join('\n');
-	}
-
-	function tableToIndexSql(table) {
-		return (table.indexes || []).map(index => {
-			return `CREATE INDEX IF NOT EXISTS ${quoteIdent(index.dbName)} ON ${quoteIdent(table.dbName)} (${index.columns.map(quoteIdent).join(', ')});`;
-		});
-	}
-
-	function columnToSql(column, options = {}) {
-		const parts = [quoteIdent(column.dbName), sqliteType(column.type)];
-		if (!options.hasCompositePrimaryKey && column.primary && column.type === 'number')
-			parts.push('PRIMARY KEY');
-		else if (!options.hasCompositePrimaryKey && column.primary)
-			parts.push('PRIMARY KEY');
-		if (column.notNull)
-			parts.push('NOT NULL');
-		return parts.join(' ');
-	}
-
-	function foreignKeyToSql(foreignKey) {
-		return [
-			`FOREIGN KEY (${foreignKey.columns.map(quoteIdent).join(', ')})`,
-			`REFERENCES ${quoteIdent(foreignKey.referencesTable)} (${foreignKey.referencesColumns.map(quoteIdent).join(', ')})`
-		].join(' ');
-	}
-
-	function sqliteType(type) {
-		if (type === 'number' || type === 'boolean')
-			return 'INTEGER';
-		if (type === 'binary')
-			return 'BLOB';
-		return 'TEXT';
-	}
-
-	function addRelationMetadata(schema, tables, selectedNames) {
-		const tableSchemaByObject = new Map();
-		const selectedObjects = new Set();
-		for (let i = 0; i < selectedNames.length; i++) {
-			const table = tables[selectedNames[i]];
-			const tableSchema = schema.tables[i];
-			tableSchemaByObject.set(table, tableSchema);
-			selectedObjects.add(table);
-		}
-
-		const seen = new Set();
-		const seenForeignKeys = new Set();
-		for (let i = 0; i < selectedNames.length; i++) {
-			const table = tables[selectedNames[i]];
-			const relations = table && table._relations;
-			if (!relations)
-				continue;
-			for (let relationName in relations) {
-				const join = extractJoinRelation(relations[relationName]);
-				if (!join || !selectedObjects.has(join.parentTable) || !selectedObjects.has(join.childTable))
-					continue;
-				const targetSchema = tableSchemaByObject.get(join.parentTable);
-				const referencesSchema = tableSchemaByObject.get(join.childTable);
-				const columns = (join.columns || []).map(x => x && x._dbName).filter(Boolean);
-				const referencesColumns = join.childTable && Array.isArray(join.childTable._primaryColumns)
-					? join.childTable._primaryColumns.map(x => x && x._dbName).filter(Boolean)
-					: [];
-				if (!targetSchema || !referencesSchema || columns.length === 0 || columns.length !== referencesColumns.length)
-					continue;
-				addRelationIndex(targetSchema, columns, relationName, seen);
-				addRelationForeignKey(targetSchema, referencesSchema, columns, referencesColumns, seenForeignKeys);
-			}
-		}
-
-		for (let i = 0; i < schema.tables.length; i++) {
-			schema.tables[i].indexes.sort((a, b) => a.dbName.localeCompare(b.dbName));
-			schema.tables[i].foreignKeys.sort((a, b) => {
-				const tableCompare = a.referencesTable.localeCompare(b.referencesTable);
-				if (tableCompare !== 0)
-					return tableCompare;
-				return a.columns.join('|').localeCompare(b.columns.join('|'));
-			});
-		}
-	}
-
-	function addRelationIndex(targetSchema, columns, relationName, seen) {
-		if (isPrimaryKey(targetSchema, columns))
-			return;
-		const key = `${targetSchema.dbName}:${columns.join('|')}`;
-		if (seen.has(key))
-			return;
-		seen.add(key);
-		targetSchema.indexes.push({
-			name: `relation:${relationName}`,
-			dbName: newIndexName(targetSchema.dbName, columns),
-			columns
-		});
-	}
-
-	function addRelationForeignKey(targetSchema, referencesSchema, columns, referencesColumns, seen) {
-		const key = `${targetSchema.dbName}:${columns.join('|')}:${referencesSchema.dbName}:${referencesColumns.join('|')}`;
-		if (seen.has(key))
-			return;
-		seen.add(key);
-		targetSchema.foreignKeys.push({
-			columns,
-			referencesTable: referencesSchema.dbName,
-			referencesColumns
-		});
-	}
-
-	function extractJoinRelation(relation) {
-		if (!relation || typeof relation.accept !== 'function')
-			return null;
-		let join;
-		relation.accept({
-			visitJoin: function(current) {
-				join = current;
-			},
-			visitOne: function(current) {
-				join = current && current.joinRelation;
-			},
-			visitMany: function(current) {
-				join = current && current.joinRelation;
-			}
-		});
-		return join;
-	}
-
-	function isPrimaryKey(tableSchema, columns) {
-		if (!Array.isArray(tableSchema.primaryKey) || tableSchema.primaryKey.length !== columns.length)
-			return false;
-		for (let i = 0; i < columns.length; i++) {
-			if (tableSchema.primaryKey[i] !== columns[i])
-				return false;
-		}
-		return true;
-	}
-
-	function newIndexName(tableName, columns) {
-		const raw = `orange_idx_${tableName}_${columns.join('_')}`;
-		return raw.replace(/[^A-Za-z0-9_]/g, '_');
-	}
-
-	async function ensureSchemaStateTable(db) {
-		await db.query([
-			`CREATE TABLE IF NOT EXISTS ${quoteIdent(schemaStateTable)} (`,
-			'"scope" TEXT PRIMARY KEY,',
-			'"dialect" TEXT NOT NULL,',
-			'"tables_json" TEXT NOT NULL,',
-			'"schema_json" TEXT NOT NULL,',
-			'"checksum" TEXT NOT NULL,',
-			'"sql_text" TEXT NOT NULL,',
-			'"updated_at_ms" INTEGER NOT NULL',
-			');'
-		].join(' '));
-	}
-
-	async function readSchemaState(db, scope) {
-		const rows = await db.query(`SELECT "checksum", "schema_json" FROM ${quoteIdent(schemaStateTable)} WHERE "scope" = ${sqlStringLiteral(scope)} LIMIT 1`);
-		const list = Array.isArray(rows) ? rows : rows && rows.rows || [];
-		const row = list[0];
-		if (!row)
-			return null;
-		return {
-			checksum: row.checksum ?? row.CHECKSUM,
-			schemaJson: row.schema_json ?? row.SCHEMA_JSON
-		};
-	}
-
-	async function writeSchemaState(db, state) {
-		await db.query([
-			`INSERT OR REPLACE INTO ${quoteIdent(schemaStateTable)} (`,
-			'"scope", "dialect", "tables_json", "schema_json", "checksum", "sql_text", "updated_at_ms"',
-			') VALUES (',
-			[
-				sqlStringLiteral(state.scope),
-				sqlStringLiteral(state.dialect),
-				sqlStringLiteral(JSON.stringify(state.tables)),
-				sqlStringLiteral(stableStringify(state.schema)),
-				sqlStringLiteral(state.checksum),
-				sqlStringLiteral(state.sql),
-				String(state.updatedAtMs)
-			].join(', '),
-			');'
-		].join(' '));
-	}
-
-	function isIndexOnlySchemaChange(existingSchemaJson, nextSchema) {
-		if (typeof existingSchemaJson !== 'string')
-			return false;
-		try {
-			const existing = JSON.parse(existingSchemaJson);
-			return stableStringify(stripIndexes(existing)) === stableStringify(stripIndexes(nextSchema));
-		}
-		catch (_e) {
-			return false;
-		}
-	}
-
-	function stripIndexes(value) {
-		if (Array.isArray(value))
-			return value.map(stripIndexes);
-		if (!value || typeof value !== 'object')
-			return value;
-		const result = {};
-		for (let key in value) {
-			if (key !== 'indexes')
-				result[key] = stripIndexes(value[key]);
-		}
-		return result;
-	}
-
-	function quoteIdent(value) {
-		return `"${String(value).replace(/"/g, '""')}"`;
-	}
-
-	function sqlStringLiteral(value) {
-		if (value === null || value === undefined)
-			return 'NULL';
-		return `'${String(value).replace(/'/g, '\'\'')}'`;
-	}
-
-	function stableStringify(value) {
-		if (value === null || typeof value !== 'object')
-			return JSON.stringify(value);
-		if (Array.isArray(value))
-			return `[${value.map(stableStringify).join(',')}]`;
-		const keys = Object.keys(value).sort();
-		return `{${keys.map(key => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
-	}
-
-	function checksumString(value) {
-		let hash = 2166136261;
-		for (let i = 0; i < value.length; i++) {
-			hash ^= value.charCodeAt(i);
-			hash = Math.imul(hash, 16777619);
-		}
-		return `fnv1a32:${(hash >>> 0).toString(16).padStart(8, '0')}`;
-	}
-
-	syncSchema = {
-		ensureSyncSchema,
-		clearEnsuredSyncSchema,
-		buildSyncSchema,
-		schemaToSql,
-		stableStringify,
-		checksumString
-	};
-	return syncSchema;
-}
-
 var hasRequiredSyncClient;
 
 function requireSyncClient () {
@@ -6011,7 +6196,7 @@ function requireSyncClient () {
 	const { createSyncAuto, syncAutoStartSymbol } = requireSyncAuto();
 	const createHttpInterceptor = requireHttpInterceptor();
 	const outboxTableSql = requireOutboxTableSql();
-	const { ensureSyncSchema, clearEnsuredSyncSchema } = requireSyncSchema();
+	const { ensureSyncSchema, clearEnsuredSyncSchema, buildSyncSchema, stableStringify, checksumString } = requireSyncSchema();
 	const { runSyncMaintenance } = requireWriteGate();
 	const {
 		normalizeCrossTabLockConfig,
@@ -6879,6 +7064,8 @@ function requireSyncClient () {
 			const stagingTimings = newPullStagingTimings(deferStableBaseUntilComplete);
 			let capturedStreamItemCount = 0;
 			let capturedApplicableItemCount = 0;
+			let snapshotAppliedRows = 0;
+			let snapshotApplied = false;
 			const streamedTables = new Set();
 			let applied = 0;
 			await ensurePullJournalTables(db);
@@ -6889,7 +7076,7 @@ function requireSyncClient () {
 				: null;
 			const shouldApplyCheckpoint = session.finalSince !== undefined;
 			if (isStreamPullSession(session)) {
-				applied = capturedApplicableItemCount;
+				applied = snapshotAppliedRows || capturedApplicableItemCount;
 				await finalizeStreamedPullJournal(session);
 			}
 			else if (applyConfig)
@@ -6944,7 +7131,7 @@ function requireSyncClient () {
 				await client.transaction(async (tx) => {
 					if (hasJournalItems && (!applyConfig || applyConfig.foreignKeyCheck === 'final'))
 						await validateForeignKeys(tx);
-					if (deferStableBaseUntilComplete) {
+					if (deferStableBaseUntilComplete && !snapshotApplied) {
 						const bulkStableBaseStartedAtMs = Date.now();
 						await copyTablesToStableBase(tx, options.tables);
 						stagingTimings.bulkStableBaseMs += elapsedMs(bulkStableBaseStartedAtMs);
@@ -7232,7 +7419,7 @@ function requireSyncClient () {
 			}
 
 			async function fetchPullBatch(session, reason) {
-				const keysPayload = await requestPayload({
+				let keysPayload = await requestPayload({
 					...pullConfig,
 					body: {
 						phase: 'keys',
@@ -7240,9 +7427,24 @@ function requireSyncClient () {
 						since: session.since,
 						tables: options.tables,
 						limit: maxKeysPerBatch,
-						inlineRows: true
+						inlineRows: true,
+						sqliteSnapshot: session.since === undefined
 					}
 				}, options);
+				if (isSqliteSnapshotPayload(keysPayload)) {
+					try {
+						const imported = await importSqliteSnapshot(keysPayload.snapshot, pullConfig, db, client.tables, options.tables, scopeKey, keysPayload.cursor, options);
+						snapshotApplied = true;
+						snapshotAppliedRows = imported.rowCount;
+						for (const tableName of options.tables || []) streamedTables.add(tableName);
+					}
+					catch (_error) {
+						keysPayload = await requestPayload({
+							...pullConfig,
+							body: { phase: 'keys', token: session.token, since: session.since, tables: options.tables, limit: maxKeysPerBatch, inlineRows: true, sqliteSnapshot: false }
+						}, options);
+					}
+				}
 				if (!isStagedKeysPayload(keysPayload))
 					throw new Error('Sync endpoint did not return staged keys payload');
 				const nextReason = reason === undefined && keysPayload.reason !== undefined
@@ -9395,7 +9597,8 @@ function requireSyncClient () {
 			url: appendQueryParam(config.url, 'sync', config.syncPhase || 'pull'),
 			method: 'post',
 			timeout: config.timeoutMs,
-			headers: {}
+			headers: {},
+			responseType: config.responseType
 		};
 		request.data = requestBody;
 
@@ -9451,7 +9654,9 @@ function requireSyncClient () {
 				if (config.credentials !== undefined)
 					fetchOptions.credentials = config.credentials;
 				const response = await fetch(config.url, fetchOptions);
-				const data = await readPayloadResponse(response);
+				const data = config.responseType === 'arraybuffer'
+					? new Uint8Array(await response.arrayBuffer())
+					: await readPayloadResponse(response);
 				const payload = {
 					data,
 					status: response.status,
@@ -9513,6 +9718,70 @@ function requireSyncClient () {
 			&& payload.phase === 'keys'
 			&& Array.isArray(payload.items)
 			&& 'done' in payload;
+	}
+
+	function isSqliteSnapshotPayload(payload) {
+		return isStagedKeysPayload(payload)
+			&& payload.snapshot
+			&& typeof payload.snapshot.id === 'string'
+			&& typeof payload.snapshot.schemaChecksum === 'string';
+	}
+
+	async function importSqliteSnapshot(descriptor, pullConfig, db, clientTables, tableNames, scopeKey, cursor, requestOptions) {
+		const importer = resolveSqliteSnapshotImporter(db);
+		if (!importer) throw new Error('SQLite snapshot import is not available for this database.');
+		const tables = Array.isArray(tableNames) ? tableNames : [];
+		const schema = buildSyncSchema(clientTables, tables);
+		const schemaChecksum = checksumString(stableStringify(schema));
+		if (schemaChecksum !== descriptor.schemaChecksum)
+			throw new Error('SQLite snapshot schema does not match the local map.');
+		const bytes = await requestPayload({
+			...pullConfig,
+			responseType: 'arraybuffer',
+			body: { phase: 'snapshot', id: descriptor.id }
+		}, requestOptions);
+		const baseEntries = await readSnapshotBaseEntries(db);
+		const baseByDbName = new Map(baseEntries.map(entry => [entry.name, entry.baseName]));
+		const statements = ['PRAGMA defer_foreign_keys=ON'];
+		for (let i = schema.tables.length - 1; i >= 0; i--)
+			statements.push(`DELETE FROM ${quoteIdent(schema.tables[i].dbName)}`);
+		for (const table of schema.tables) {
+			const columns = table.columns.map(column => quoteIdent(column.dbName)).join(', ');
+			statements.push(`INSERT INTO ${quoteIdent(table.dbName)} (${columns}) SELECT ${columns} FROM orange_snapshot.${quoteIdent(table.dbName)}`);
+			const baseName = baseByDbName.get(table.dbName);
+			if (baseName) {
+				statements.push(`DELETE FROM ${quoteIdent(baseName)}`);
+				statements.push(`INSERT INTO ${quoteIdent(baseName)} SELECT * FROM ${quoteIdent(table.dbName)}`);
+			}
+		}
+		statements.push([
+			'INSERT INTO "orange_sync_state" ("scope", "since_value") VALUES (',
+			sqlStringLiteral(scopeKey), ', ', sqlStringLiteral(JSON.stringify({ since: cursor, updatedAtMs: Date.now() })), ') ',
+			'ON CONFLICT("scope") DO UPDATE SET "since_value" = excluded."since_value"'
+		].join(''));
+		const result = await importer(bytes, statements, {
+			schemaChecksum: descriptor.schemaChecksum,
+			rowCount: descriptor.rowCount
+		});
+		return result && result.result || result;
+	}
+
+	function resolveSqliteSnapshotImporter(db) {
+		const pool = db && (db.poolFactory || db.pool || db);
+		return pool && typeof pool.__orangeImportSqliteSnapshot === 'function'
+			? pool.__orangeImportSqliteSnapshot.bind(pool)
+			: null;
+	}
+
+	async function readSnapshotBaseEntries(db) {
+		try {
+			const rows = await db.query('SELECT "name", "base_name", "schema_sql", "ordinal" FROM "orange_sync_base_tables" ORDER BY "ordinal", "name"');
+			return (Array.isArray(rows) ? rows : rows && rows.rows || []).map(row => ({
+				name: row.name ?? row.NAME,
+				baseName: row.base_name ?? row.BASE_NAME
+			}));
+		}
+		catch (_error) { return []; }
 	}
 
 	function isRowsPayload(payload) {
@@ -22655,6 +22924,8 @@ function requireInlineWorker () {
 				return query(message.sql, message.parameters);
 			if (message.method === 'command')
 				return command(message.sql, message.parameters);
+			if (message.method === 'importSnapshot')
+				return importSnapshot(message.bytes, message.statements, message.expected);
 			throw new Error('Unknown sqliteOPFS worker method "' + message.method + '".');
 		}
 
@@ -22760,6 +23031,37 @@ function requireInlineWorker () {
 				rowsAffected: Math.max(0, after - before),
 				lastInsertRowid: Number(db.selectValue('SELECT last_insert_rowid()'))
 			};
+		}
+
+		function importSnapshot(bytes, statements, expected) {
+			if (!(bytes instanceof Uint8Array))
+				bytes = new Uint8Array(bytes);
+			const pointer = db && db.pointer;
+			return getSqlite3().then(sqlite3 => {
+				if (pointer === undefined || !sqlite3.capi || typeof sqlite3.capi.sqlite3_deserialize !== 'function')
+					throw new Error('sqliteOPFS runtime cannot import SQLite snapshots.');
+				db.exec('ATTACH \':memory:\' AS orange_snapshot');
+				try {
+					const data = sqlite3.wasm.allocFromTypedArray(bytes);
+					const flags = sqlite3.capi.SQLITE_DESERIALIZE_FREEONCLOSE | sqlite3.capi.SQLITE_DESERIALIZE_READONLY;
+					const rc = sqlite3.capi.sqlite3_deserialize(pointer, 'orange_snapshot', data, bytes.length, bytes.length, flags);
+					if (rc !== 0) throw new Error('sqlite3_deserialize failed with code ' + rc + '.');
+					const meta = db.selectObject('SELECT "format", "schema_checksum", "watermark_json", "row_count" FROM orange_snapshot.orange_snapshot_meta');
+					if (!meta || Number(meta.format) !== 1 || meta.schema_checksum !== expected.schemaChecksum || Number(meta.row_count) !== Number(expected.rowCount))
+						throw new Error('SQLite snapshot metadata does not match its descriptor.');
+					db.exec('BEGIN');
+					try {
+						for (const statement of statements || []) db.exec(statement);
+						db.exec('COMMIT');
+					} catch (error) {
+						db.exec('ROLLBACK');
+						throw error;
+					}
+					return { rowCount: Number(meta.row_count), watermark: JSON.parse(meta.watermark_json) };
+				} finally {
+					db.exec('DETACH orange_snapshot');
+				}
+			});
 		}
 
 		function postResponse(target, id, result, error, elapsedMs) {
@@ -22890,6 +23192,7 @@ function requireWorkerClient () {
 			checkout,
 			close,
 			getOpenInfo,
+			importSnapshot,
 			release,
 			reset,
 			ready
@@ -22941,6 +23244,11 @@ function requireWorkerClient () {
 				});
 		}
 
+		function importSnapshot(bytes, statements, expected) {
+			if (closed) return Promise.reject(new Error('sqliteOPFS worker client closed.'));
+			return ensureOpen().then(() => request('importSnapshot', { bytes, statements, expected }));
+		}
+
 		function checkout(priority) {
 			if (closed)
 				return Promise.reject(new Error('sqliteOPFS worker client closed.'));
@@ -22959,6 +23267,7 @@ function requireWorkerClient () {
 				return {
 					executeQuery,
 					executeCommand,
+					importSnapshot,
 					getOpenInfo,
 					reset,
 					releaseCheckout: () => Promise.resolve()
@@ -22969,6 +23278,9 @@ function requireWorkerClient () {
 				},
 				executeCommand(query, callback) {
 					executeCommandCore(query, callback, leaseId);
+				},
+				importSnapshot(bytes, statements, expected) {
+					return request('importSnapshot', { bytes, statements, expected, leaseId }).then(response => response.result);
 				},
 				getOpenInfo,
 				reset,
@@ -22985,18 +23297,30 @@ function requireWorkerClient () {
 			return new Promise((resolve, reject) => {
 				pending.set(id, { resolve, reject });
 				try {
-					worker.postMessage({
+					const message = {
 						type: 'orange-sqlite-opfs-request',
 						id,
 						method,
 						...payload
-					});
+					};
+					const transfer = snapshotTransferList(method, message);
+					worker.postMessage(message, transfer);
 				}
 				catch (e) {
 					pending.delete(id);
 					reject(e);
 				}
 			});
+		}
+
+		function snapshotTransferList(method, message) {
+			if (method !== 'importSnapshot' || !(message.bytes instanceof Uint8Array))
+				return undefined;
+			if (!(message.bytes.buffer instanceof ArrayBuffer))
+				return undefined;
+			if (message.bytes.byteOffset !== 0 || message.bytes.byteLength !== message.bytes.buffer.byteLength)
+				message.bytes = message.bytes.slice();
+			return [message.bytes.buffer];
 		}
 
 		function ensureOpen() {
@@ -26666,6 +26990,15 @@ function requireNewPool$1 () {
 		c.__orangeSqliteOPFSRequestedVfs = poolOptions.vfs;
 		c.__orangeCrossTabWriteLock = normalizeCrossTabWriteLockConfig(poolOptions);
 		c.__orangeSqliteOPFSReady = client.ready;
+		c.__orangeImportSqliteSnapshot = function(bytes, statements, expected) {
+			return new Promise((resolve, reject) => {
+				c.connect((error, checkout, done) => {
+					if (error) return reject(error);
+					Promise.resolve(checkout.importSnapshot(bytes, statements, expected))
+						.then(result => { done(); resolve(result); }, importError => { done(importError); reject(importError); });
+				}, 0);
+			});
+		};
 
 		if (client.ready && typeof client.ready.then === 'function') {
 			client.ready.then((result) => {
