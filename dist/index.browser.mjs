@@ -7439,7 +7439,9 @@ function requireSyncClient () {
 						snapshotAppliedRows = imported.rowCount;
 						for (const tableName of options.tables || []) streamedTables.add(tableName);
 					}
-					catch (_error) {
+					catch (error) {
+						if (typeof console !== 'undefined' && typeof console.warn === 'function')
+							console.warn('[sqlite-snapshot] import failed; falling back to inline rows', error);
 						keysPayload = await requestPayload({
 							...pullConfig,
 							body: { phase: 'keys', token: session.token, since: session.since, tables: options.tables, limit: maxKeysPerBatch, inlineRows: true, sqliteSnapshot: false }
