@@ -613,7 +613,8 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 				itemCount: Array.isArray(body && body.items)
 					? body.items.length
 					: Array.isArray(body && body.mutations) ? body.mutations.length : 0,
-				startedAtMs: Date.now()
+				startedAtMs: Date.now(),
+				requestBytes: jsonByteLength(body)
 			};
 			config.__orangeDualSyncProgress = progress;
 			emitSyncProgress('network-start', progress);
@@ -639,8 +640,18 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 			...progress,
 			failed,
 			elapsedMs: Math.max(0, Date.now() - progress.startedAtMs),
-			returnedItems: Array.isArray(payload && payload.items) ? payload.items.length : 0
+			returnedItems: Array.isArray(payload && payload.items) ? payload.items.length : 0,
+			responseBytes: jsonByteLength(payload)
 		});
+	}
+
+	function jsonByteLength(value) {
+		if (value === undefined)
+			return 0;
+		const json = stringify(value);
+		if (typeof TextEncoder === 'function')
+			return new TextEncoder().encode(json).byteLength;
+		return json.length;
 	}
 
 	async function getActiveReadyDb() {

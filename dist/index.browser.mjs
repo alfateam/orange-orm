@@ -975,7 +975,8 @@ function requireSync () {
 					tableIndex: 0,
 					lastPk: null,
 					watermark: bounds.max,
-					upperPks
+					upperPks,
+					inlineRows: body.inlineRows === true
 				};
 				const result = await pullKeysFromSnapshot(snapshotToken, limit, request, response);
 				result.reason = fallback.reason;
@@ -1011,17 +1012,19 @@ function requireSync () {
 					continue;
 				}
 				const remaining = limit - items.length;
-				const keys = await fetchSnapshotKeys(meta, remaining, lastPk, upperPk, request, response);
-				for (let i = 0; i < keys.length; i++) {
-					const pk = keys[i];
-					items.push({ table: tableName, pk, key: toKeyObject(meta, pk), op: 'U' });
+				const rows = await fetchSnapshotRows(meta, remaining, lastPk, upperPk, token.inlineRows, request, response);
+				for (let i = 0; i < rows.length; i++) {
+					const row = rows[i];
+					const pk = toPkArray(meta, row);
+					if (pk)
+						items.push({ table: tableName, pk, key: toKeyObject(meta, pk), op: 'U', ...(token.inlineRows ? { row } : {}) });
 				}
-				if (keys.length < remaining) {
+				if (rows.length < remaining) {
 					tableIndex += 1;
 					lastPk = null;
 				}
 				else {
-					lastPk = keys[keys.length - 1];
+					lastPk = toPkArray(meta, rows[rows.length - 1]);
 				}
 			}
 			const done = tableIndex >= token.tables.length;
@@ -1037,7 +1040,8 @@ function requireSync () {
 					tableIndex,
 					lastPk,
 					watermark: token.watermark,
-					upperPks: token.upperPks
+					upperPks: token.upperPks,
+					inlineRows: token.inlineRows === true
 				},
 				items
 			};
@@ -1178,12 +1182,13 @@ function requireSync () {
 			};
 		}
 
-		async function fetchSnapshotKeys(meta, limit, lastPk, upperPk, request, response) {
+		async function fetchSnapshotRows(meta, limit, lastPk, upperPk, inlineRows, request, response) {
 			if (upperPk === null)
 				return [];
 			const strategy = {};
-			for (let i = 0; i < meta.pkColumns.length; i++) {
-				strategy[meta.pkColumns[i].alias] = true;
+			if (!inlineRows) {
+				for (let i = 0; i < meta.pkColumns.length; i++)
+					strategy[meta.pkColumns[i].alias] = true;
 			}
 			strategy.orderBy = meta.pkColumns.map(x => x.alias);
 			strategy.limit = limit;
@@ -1191,13 +1196,7 @@ function requireSync () {
 			const rows = await runHookedTransaction(async (tx) => {
 				return tx[meta.name].getMany(filter, strategy);
 			}, { readonly: true }, request, response);
-			const result = [];
-			for (let i = 0; i < rows.length; i++) {
-				const pk = toPkArray(meta, rows[i]);
-				if (pk)
-					result.push(pk);
-			}
-			return result;
+			return rows;
 		}
 
 		async function getSnapshotUpperPks(tableNames, request, response) {
@@ -1483,7 +1482,8 @@ function requireSync () {
 				tableIndex: normalizeInteger(token.tableIndex, 0),
 				lastPk: normalizePrimaryKeyToken(token.lastPk),
 				watermark: normalizeInteger(token.watermark, 0),
-				upperPks: normalizeSnapshotUpperPks(token.upperPks, requestedTables)
+				upperPks: normalizeSnapshotUpperPks(token.upperPks, requestedTables),
+				inlineRows: token.inlineRows === true
 			};
 		}
 		return null;
@@ -7239,7 +7239,8 @@ function requireSyncClient () {
 						token: session.token,
 						since: session.since,
 						tables: options.tables,
-						limit: maxKeysPerBatch
+						limit: maxKeysPerBatch,
+						inlineRows: true
 					}
 				}, options);
 				if (!isStagedKeysPayload(keysPayload))
@@ -7251,7 +7252,8 @@ function requireSyncClient () {
 				const token = keysPayload.done || !keysPayload.token ? null : keysPayload.token;
 				const done = keysPayload.done || !keysPayload.token;
 				const finalSince = keysPayload.cursor !== undefined ? keysPayload.cursor : session.finalSince;
-				const payload = nextReason === undefined ? keysPayload : { ...keysPayload, reason: nextReason };
+				const checkpointPayload = stripInlineRowsFromKeysPayload(keysPayload);
+				const payload = nextReason === undefined ? checkpointPayload : { ...checkpointPayload, reason: nextReason };
 				return {
 					keysPayload,
 					keyItems,
@@ -7275,6 +7277,7 @@ function requireSyncClient () {
 				});
 				rowsPromise.catch(() => {});
 				markDeletePullJournalRowsReady(itemState);
+				markInlinePullJournalRowsReady(itemState);
 				return {
 					...batch,
 					createdAtMs: Date.now(),
@@ -7316,7 +7319,7 @@ function requireSyncClient () {
 				};
 
 				function enqueueBatch(batchState) {
-					const upsertItems = batchState.keyItems.filter(x => x.op !== 'D');
+					const upsertItems = batchState.keyItems.filter(x => x.op !== 'D' && x.row === undefined);
 					const chunks = chunkItems(upsertItems, maxRowsPerBatch);
 					batchState.pendingRowJobs = chunks.length;
 					if (chunks.length === 0) {
@@ -7805,6 +7808,20 @@ function requireSyncClient () {
 				const state = itemState.states[i];
 				if (state.item && state.item.op === 'D')
 					state.ready = true;
+			}
+		}
+
+		function markInlinePullJournalRowsReady(itemState) {
+			for (let i = 0; i < itemState.states.length; i++) {
+				const state = itemState.states[i];
+				if (!state.item || state.item.op === 'D' || state.item.row === undefined)
+					continue;
+				state.ready = true;
+				state.rowItem = state.item;
+				const key = syncItemKey(state.item);
+				const remaining = key && itemState.remainingByKey.get(key);
+				if (remaining && remaining[0] === state)
+					remaining.shift();
 			}
 		}
 
@@ -9639,10 +9656,25 @@ function requireSyncClient () {
 				table: item.table,
 				pk: item.pk,
 				key: item.key,
-				op: normalizeChangeOp(item.op)
+				op: normalizeChangeOp(item.op),
+				...(item.row !== undefined ? { row: item.row } : {})
 			});
 		}
 		return result;
+	}
+
+	function stripInlineRowsFromKeysPayload(payload) {
+		if (!payload || !Array.isArray(payload.items) || !payload.items.some(item => item && item.row !== undefined))
+			return payload;
+		return {
+			...payload,
+			items: payload.items.map(item => {
+				if (!item || item.row === undefined)
+					return item;
+				const { row, ...keyItem } = item;
+				return keyItem;
+			})
+		};
 	}
 
 	async function applyDeleteItemsOnTx(tx, items, patchOptions) {
@@ -27529,7 +27561,8 @@ function requireDualSyncDatabase () {
 					itemCount: Array.isArray(body && body.items)
 						? body.items.length
 						: Array.isArray(body && body.mutations) ? body.mutations.length : 0,
-					startedAtMs: Date.now()
+					startedAtMs: Date.now(),
+					requestBytes: jsonByteLength(body)
 				};
 				config.__orangeDualSyncProgress = progress;
 				emitSyncProgress('network-start', progress);
@@ -27555,8 +27588,18 @@ function requireDualSyncDatabase () {
 				...progress,
 				failed,
 				elapsedMs: Math.max(0, Date.now() - progress.startedAtMs),
-				returnedItems: Array.isArray(payload && payload.items) ? payload.items.length : 0
+				returnedItems: Array.isArray(payload && payload.items) ? payload.items.length : 0,
+				responseBytes: jsonByteLength(payload)
 			});
+		}
+
+		function jsonByteLength(value) {
+			if (value === undefined)
+				return 0;
+			const json = stringify(value);
+			if (typeof TextEncoder === 'function')
+				return new TextEncoder().encode(json).byteLength;
+			return json.length;
 		}
 
 		async function getActiveReadyDb() {

@@ -1231,7 +1231,8 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 					token: session.token,
 					since: session.since,
 					tables: options.tables,
-					limit: maxKeysPerBatch
+					limit: maxKeysPerBatch,
+					inlineRows: true
 				}
 			}, options);
 			if (!isStagedKeysPayload(keysPayload))
@@ -1243,7 +1244,8 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 			const token = keysPayload.done || !keysPayload.token ? null : keysPayload.token;
 			const done = keysPayload.done || !keysPayload.token;
 			const finalSince = keysPayload.cursor !== undefined ? keysPayload.cursor : session.finalSince;
-			const payload = nextReason === undefined ? keysPayload : { ...keysPayload, reason: nextReason };
+			const checkpointPayload = stripInlineRowsFromKeysPayload(keysPayload);
+			const payload = nextReason === undefined ? checkpointPayload : { ...checkpointPayload, reason: nextReason };
 			return {
 				keysPayload,
 				keyItems,
@@ -1267,6 +1269,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 			});
 			rowsPromise.catch(() => {});
 			markDeletePullJournalRowsReady(itemState);
+			markInlinePullJournalRowsReady(itemState);
 			return {
 				...batch,
 				createdAtMs: Date.now(),
@@ -1308,7 +1311,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 			};
 
 			function enqueueBatch(batchState) {
-				const upsertItems = batchState.keyItems.filter(x => x.op !== 'D');
+				const upsertItems = batchState.keyItems.filter(x => x.op !== 'D' && x.row === undefined);
 				const chunks = chunkItems(upsertItems, maxRowsPerBatch);
 				batchState.pendingRowJobs = chunks.length;
 				if (chunks.length === 0) {
@@ -1797,6 +1800,20 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 			const state = itemState.states[i];
 			if (state.item && state.item.op === 'D')
 				state.ready = true;
+		}
+	}
+
+	function markInlinePullJournalRowsReady(itemState) {
+		for (let i = 0; i < itemState.states.length; i++) {
+			const state = itemState.states[i];
+			if (!state.item || state.item.op === 'D' || state.item.row === undefined)
+				continue;
+			state.ready = true;
+			state.rowItem = state.item;
+			const key = syncItemKey(state.item);
+			const remaining = key && itemState.remainingByKey.get(key);
+			if (remaining && remaining[0] === state)
+				remaining.shift();
 		}
 	}
 
@@ -3631,10 +3648,25 @@ function normalizeKeyItems(items) {
 			table: item.table,
 			pk: item.pk,
 			key: item.key,
-			op: normalizeChangeOp(item.op)
+			op: normalizeChangeOp(item.op),
+			...(item.row !== undefined ? { row: item.row } : {})
 		});
 	}
 	return result;
+}
+
+function stripInlineRowsFromKeysPayload(payload) {
+	if (!payload || !Array.isArray(payload.items) || !payload.items.some(item => item && item.row !== undefined))
+		return payload;
+	return {
+		...payload,
+		items: payload.items.map(item => {
+			if (!item || item.row === undefined)
+				return item;
+			const { row, ...keyItem } = item;
+			return keyItem;
+		})
+	};
 }
 
 async function applyDeleteItemsOnTx(tx, items, patchOptions) {

@@ -995,6 +995,53 @@ describe('sync client auto start', () => {
 		]);
 	});
 
+	test('applies inline snapshot rows without a rows request', async () => {
+		const patches = [];
+		const phases = [];
+		const db = newJournalDb({
+			__sqliteSync: {
+				url: '/rdb',
+				auto: false,
+				schema: false
+			}
+		});
+		const client = newSyncClient({
+			tables: { customer: newTable('customer') },
+			transaction: async (fn) => fn({
+				customer: {
+					patch: async (patch) => {
+						patches.push(patch);
+						return { changed: [] };
+					}
+				},
+				query: db.query
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async (request) => {
+					phases.push(request.data.phase);
+					expect(request.data.inlineRows).toBe(true);
+					return {
+						data: {
+							phase: 'keys',
+							mode: 'snapshot',
+							items: [{ table: 'customer', pk: [1], key: { id: 1 }, op: 'U', row: { id: 1 } }],
+							done: true,
+							cursor: 'cursor-1'
+						}
+					};
+				};
+			}
+		});
+
+		await client.sync();
+
+		expect(phases).toEqual(['keys']);
+		expect(patches).toEqual([[
+			{ op: 'add', path: '/[1]', value: { id: 1 } }
+		]]);
+	});
+
 	test('does not count missing staged rows as applied', async () => {
 		const patches = [];
 		const rowRequests = [];

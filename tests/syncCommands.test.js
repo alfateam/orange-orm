@@ -349,6 +349,43 @@ describe('sync commands', () => {
 		expect(keyFetches[1].filter.parameters).toEqual([2, 3]);
 	});
 
+	test('returns snapshot rows inline when requested and keeps the capability in the token', async () => {
+		const strategies = [];
+		const tx = {
+			project: {
+				getMany: async (_filter, strategy) => {
+					strategies.push(strategy);
+					if (strategy.orderBy[0] === 'id desc')
+						return [{ id: 2 }];
+					return [{ id: 1, title: 'One' }].slice(0, strategy.limit);
+				}
+			}
+		};
+		const handler = newSyncHandler({
+			tables: { project: newTable('project') },
+			transaction: async (fn) => fn(tx),
+			query: async () => [{ min_id: 1, max_id: 1 }]
+		}, { sync: {} });
+
+		const result = await callHandler(handler, {
+			phase: 'keys',
+			tables: ['project'],
+			limit: 1,
+			inlineRows: true
+		});
+
+		expect(result.items).toEqual([{
+			table: 'project',
+			pk: [1],
+			key: { id: 1 },
+			op: 'U',
+			row: { id: 1, title: 'One' }
+		}]);
+		expect(result.token.inlineRows).toBe(true);
+		const snapshotStrategy = strategies.find(x => x.orderBy[0] === 'id');
+		expect(snapshotStrategy.id).toBeUndefined();
+	});
+
 	test('snapshot key fetch ignores rows inserted after initial primary key upper bound', async () => {
 		const seen = [];
 		const sourceIds = [1, 2, 3];

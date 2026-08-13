@@ -195,7 +195,8 @@ function newSyncHandler(client, options = {}) {
 				tableIndex: 0,
 				lastPk: null,
 				watermark: bounds.max,
-				upperPks
+				upperPks,
+				inlineRows: body.inlineRows === true
 			};
 			const result = await pullKeysFromSnapshot(snapshotToken, limit, request, response);
 			result.reason = fallback.reason;
@@ -231,17 +232,19 @@ function newSyncHandler(client, options = {}) {
 				continue;
 			}
 			const remaining = limit - items.length;
-			const keys = await fetchSnapshotKeys(meta, remaining, lastPk, upperPk, request, response);
-			for (let i = 0; i < keys.length; i++) {
-				const pk = keys[i];
-				items.push({ table: tableName, pk, key: toKeyObject(meta, pk), op: 'U' });
+			const rows = await fetchSnapshotRows(meta, remaining, lastPk, upperPk, token.inlineRows, request, response);
+			for (let i = 0; i < rows.length; i++) {
+				const row = rows[i];
+				const pk = toPkArray(meta, row);
+				if (pk)
+					items.push({ table: tableName, pk, key: toKeyObject(meta, pk), op: 'U', ...(token.inlineRows ? { row } : {}) });
 			}
-			if (keys.length < remaining) {
+			if (rows.length < remaining) {
 				tableIndex += 1;
 				lastPk = null;
 			}
 			else {
-				lastPk = keys[keys.length - 1];
+				lastPk = toPkArray(meta, rows[rows.length - 1]);
 			}
 		}
 		const done = tableIndex >= token.tables.length;
@@ -257,7 +260,8 @@ function newSyncHandler(client, options = {}) {
 				tableIndex,
 				lastPk,
 				watermark: token.watermark,
-				upperPks: token.upperPks
+				upperPks: token.upperPks,
+				inlineRows: token.inlineRows === true
 			},
 			items
 		};
@@ -398,12 +402,13 @@ function newSyncHandler(client, options = {}) {
 		};
 	}
 
-	async function fetchSnapshotKeys(meta, limit, lastPk, upperPk, request, response) {
+	async function fetchSnapshotRows(meta, limit, lastPk, upperPk, inlineRows, request, response) {
 		if (upperPk === null)
 			return [];
 		const strategy = {};
-		for (let i = 0; i < meta.pkColumns.length; i++) {
-			strategy[meta.pkColumns[i].alias] = true;
+		if (!inlineRows) {
+			for (let i = 0; i < meta.pkColumns.length; i++)
+				strategy[meta.pkColumns[i].alias] = true;
 		}
 		strategy.orderBy = meta.pkColumns.map(x => x.alias);
 		strategy.limit = limit;
@@ -411,13 +416,7 @@ function newSyncHandler(client, options = {}) {
 		const rows = await runHookedTransaction(async (tx) => {
 			return tx[meta.name].getMany(filter, strategy);
 		}, { readonly: true }, request, response);
-		const result = [];
-		for (let i = 0; i < rows.length; i++) {
-			const pk = toPkArray(meta, rows[i]);
-			if (pk)
-				result.push(pk);
-		}
-		return result;
+		return rows;
 	}
 
 	async function getSnapshotUpperPks(tableNames, request, response) {
@@ -703,7 +702,8 @@ function normalizeToken(token, requestedTables) {
 			tableIndex: normalizeInteger(token.tableIndex, 0),
 			lastPk: normalizePrimaryKeyToken(token.lastPk),
 			watermark: normalizeInteger(token.watermark, 0),
-			upperPks: normalizeSnapshotUpperPks(token.upperPks, requestedTables)
+			upperPks: normalizeSnapshotUpperPks(token.upperPks, requestedTables),
+			inlineRows: token.inlineRows === true
 		};
 	}
 	return null;

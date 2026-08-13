@@ -276,11 +276,11 @@ describe('sqlite staged pull sync', () => {
 		}
 	});
 
-	test('first sync uses snapshot and fetches in key/row batches', async () => {
+	test('first sync uses snapshot rows inline with key batches', async () => {
 		await localDb.syncClient.sync();
 
 		expect(syncPhases.filter(x => x === 'keys').length).toBeGreaterThan(1);
-		expect(syncPhases.filter(x => x === 'rows').length).toBeGreaterThan(1);
+		expect(syncPhases.filter(x => x === 'rows')).toHaveLength(0);
 
 		const row1 = await localDb.customer.getById(1);
 		const row2 = await localDb.customer.getById(2);
