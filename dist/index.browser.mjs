@@ -27561,8 +27561,7 @@ function requireDualSyncDatabase () {
 					itemCount: Array.isArray(body && body.items)
 						? body.items.length
 						: Array.isArray(body && body.mutations) ? body.mutations.length : 0,
-					startedAtMs: Date.now(),
-					requestBytes: jsonByteLength(body)
+					startedAtMs: Date.now()
 				};
 				config.__orangeDualSyncProgress = progress;
 				emitSyncProgress('network-start', progress);
@@ -27588,18 +27587,8 @@ function requireDualSyncDatabase () {
 				...progress,
 				failed,
 				elapsedMs: Math.max(0, Date.now() - progress.startedAtMs),
-				returnedItems: Array.isArray(payload && payload.items) ? payload.items.length : 0,
-				responseBytes: jsonByteLength(payload)
+				returnedItems: Array.isArray(payload && payload.items) ? payload.items.length : 0
 			});
-		}
-
-		function jsonByteLength(value) {
-			if (value === undefined)
-				return 0;
-			const json = stringify(value);
-			if (typeof TextEncoder === 'function')
-				return new TextEncoder().encode(json).byteLength;
-			return json.length;
 		}
 
 		async function getActiveReadyDb() {

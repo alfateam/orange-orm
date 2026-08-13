@@ -1127,8 +1127,6 @@ export interface SyncProgressEvent {
   requestPhase?: string;
   itemCount?: number;
   returnedItems?: number;
-  requestBytes?: number;
-  responseBytes?: number;
   elapsedMs?: number;
   failed?: boolean;
   deltaId?: string;
