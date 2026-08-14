@@ -1262,6 +1262,7 @@ describe('sync client auto start', () => {
 	});
 
 	test('streams captured pull batches into staging without a full journal reread', async () => {
+		const keyRequests = [];
 		const patches = [];
 		const rowRequests = [];
 		const secondRows = newDeferred();
@@ -1293,6 +1294,7 @@ describe('sync client auto start', () => {
 			applyTo(axios) {
 				axios.request = async (request) => {
 					if (request.data.phase === 'keys') {
+						keyRequests.push(request.data);
 						return request.data.token
 							? {
 								data: {
@@ -1338,6 +1340,7 @@ describe('sync client auto start', () => {
 		]);
 		expect(result.applied).toBe(2);
 		expect(result.__orangePullJournal.items.map(item => item.pk[0])).toEqual([1, 2]);
+		expect(keyRequests.every(request => request.sqliteSnapshot === false)).toBe(true);
 		expect(db.queryLog.some(sql =>
 			/SELECT "batch_no", "seq", "table_name"/u.test(sql)
 			&& /ORDER BY "batch_no"/u.test(sql)

@@ -7429,7 +7429,10 @@ function requireSyncClient () {
 						tables: options.tables,
 						limit: maxKeysPerBatch,
 						inlineRows: true,
-						sqliteSnapshot: session.since === undefined
+						// A directly imported snapshot cannot currently be represented by the
+						// pull journal. Callers which capture that journal (notably dual OPFS
+						// sync) need the rows so the snapshot can be replayed to the other db.
+						sqliteSnapshot: session.since === undefined && !options._capturePullJournal
 					}
 				}, options);
 				if (isSqliteSnapshotPayload(keysPayload)) {
