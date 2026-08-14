@@ -19,6 +19,7 @@ const {
 	readOutboxRowsSymbol,
 	applyOutboxRowsSymbol,
 	applyPullJournalSymbol,
+	applySqliteSnapshotSymbol,
 	pushPendingSymbol,
 	setClientIdSymbol
 } = newSyncClient;
@@ -261,11 +262,15 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		let result;
 		let journal;
 		let deltaId;
+		let capturedSqliteSnapshot;
 		let pullStagingSummary;
 		try {
 			result = await stagingSync[syncAndCapturePullJournalSymbol]({
 				...options,
 				_capturePullJournalChunk: deltaSink.write,
+				_captureSqliteSnapshot(snapshot) {
+					capturedSqliteSnapshot = snapshot;
+				},
 				_deferStableBaseUntilComplete: deferStableBaseUntilComplete,
 				_onPullBatchProgress(progress) {
 					emitSyncProgress('pull-batch-complete', {
@@ -280,7 +285,10 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 			});
 			journal = result && result.__orangePullJournal;
 			const deltaFinalizeStartedAtMs = Date.now();
-			deltaId = await deltaSink.commit(journal);
+			if (capturedSqliteSnapshot)
+				await deltaSink.abort();
+			else
+				deltaId = await deltaSink.commit(journal);
 			emitSyncProgress('pull-staging-summary', {
 				activeRole,
 				stagingRole,
@@ -310,12 +318,27 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		await runSyncSwap(router, async () => {
 			const currentManifest = await getManifest(true);
 			assertExpectedManifest(currentManifest, manifest);
+			if (capturedSqliteSnapshot) {
+				if (typeof activeSync[applySqliteSnapshotSymbol] !== 'function')
+					throw new Error('Dual sync role client cannot apply a captured SQLite snapshot.');
+				emitSyncProgress('applying-snapshot', {
+					targetRole: activeRole,
+					rowCount: Number(capturedSqliteSnapshot.descriptor.rowCount || 0)
+				});
+				const activeOpenRows = await readAllOutboxRows(activeSync, ['pending', 'pushed']);
+				await activeSync[applySqliteSnapshotSymbol](capturedSqliteSnapshot, options);
+				await activeSync[applyOutboxRowsSymbol](activeOpenRows, {
+					replay: true,
+					replayExisting: true,
+					replaceOpen: false
+				});
+			}
 			const finalPendingRows = await readAllOutboxRows(activeSync, ['pending']);
 			await stagingSync[applyOutboxRowsSymbol](finalPendingRows, {
 				replay: true,
 				replaceOpen: false
 			});
-			if (needsInitialSwap || deltaId || openRows.length > 0 || finalPendingRows.length > 0) {
+			if (needsInitialSwap || capturedSqliteSnapshot || deltaId || openRows.length > 0 || finalPendingRows.length > 0) {
 				emitSyncProgress('swapping', { activeRole, stagingRole });
 				publishedManifest = await publishStagingRole(manifest);
 				swapped = true;

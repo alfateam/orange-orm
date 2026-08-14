@@ -1,7 +1,11 @@
 import { describe, expect, test } from 'vitest';
 
 const newSyncClient = require('../src/client/syncClient');
-const { applyPullJournalSymbol, syncAndCapturePullJournalSymbol } = newSyncClient;
+const {
+	applyPullJournalSymbol,
+	applySqliteSnapshotSymbol,
+	syncAndCapturePullJournalSymbol
+} = newSyncClient;
 
 describe('sync client auto start', () => {
 	test('starts when start is called and stays running', async () => {
@@ -1044,6 +1048,7 @@ describe('sync client auto start', () => {
 
 	test('imports a negotiated SQLite snapshot and skips row patches', async () => {
 		const imported = [];
+		const captured = [];
 		const table = newTable('customer');
 		const { buildSyncSchema, stableStringify, checksumString } = require('../src/client/syncSchema');
 		const checksum = checksumString(stableStringify(buildSyncSchema({ customer: table }, ['customer'])));
@@ -1053,7 +1058,8 @@ describe('sync client auto start', () => {
 		});
 		db.poolFactory = {
 			async __orangeImportSqliteSnapshot(bytes, statements, expected) {
-				imported.push({ bytes, statements, expected });
+				imported.push({ bytes: bytes.slice(), statements, expected });
+				structuredClone(bytes, { transfer: [bytes.buffer] });
 				return { rowCount: 2, watermark: 9 };
 			}
 		};
@@ -1072,12 +1078,47 @@ describe('sync client auto start', () => {
 			}
 		});
 
-		await client.sync();
+		await client[syncAndCapturePullJournalSymbol]({
+			_captureSqliteSnapshot(snapshot) {
+				captured.push(snapshot);
+			}
+		});
 		expect(phases).toEqual(['keys', 'snapshot']);
 		expect(imported).toHaveLength(1);
 		expect(imported[0].bytes).toEqual(new Uint8Array([1, 2, 3]));
 		expect(imported[0].statements.join('\n')).toContain('FROM orange_snapshot."customer"');
 		expect(imported[0].statements.join('\n')).toContain('orange_sync_base_data_customer');
+		expect(captured).toHaveLength(1);
+		expect(captured[0]).toMatchObject({
+			descriptor: { id: 'snapshot-1', rowCount: 2, schemaChecksum: checksum },
+			tables: ['customer'],
+			cursor: 9
+		});
+		expect(captured[0].bytes).toEqual(new Uint8Array([1, 2, 3]));
+
+		const replayImported = [];
+		const replayDb = newJournalDb({
+			__sqliteSync: { url: '/rdb', auto: false, schema: false, tables: ['customer'] },
+			baseEntries: [{ name: 'customer', base_name: 'orange_sync_base_data_customer', schema_sql: 'CREATE TABLE customer (id INTEGER PRIMARY KEY)', ordinal: 0 }]
+		});
+		replayDb.poolFactory = {
+			async __orangeImportSqliteSnapshot(bytes, statements, expected) {
+				replayImported.push({ bytes: bytes.slice(), statements, expected });
+				structuredClone(bytes, { transfer: [bytes.buffer] });
+				return { rowCount: 2, watermark: 9 };
+			}
+		};
+		const replayClient = newSyncClient({
+			tables: { customer: table },
+			transaction: async fn => fn({ query: replayDb.query })
+		}, async () => replayDb, { applyTo() {} });
+
+		const replayResult = await replayClient[applySqliteSnapshotSymbol](captured[0]);
+
+		expect(replayImported).toHaveLength(1);
+		expect(replayImported[0].bytes).toEqual(new Uint8Array([1, 2, 3]));
+		expect(replayImported[0].statements.join('\n')).toContain('FROM orange_snapshot."customer"');
+		expect(replayResult).toMatchObject({ applied: 2, tables: ['customer'], since: 9 });
 	});
 
 	test('falls back to inline rows when SQLite snapshot import fails', async () => {
@@ -1340,7 +1381,7 @@ describe('sync client auto start', () => {
 		]);
 		expect(result.applied).toBe(2);
 		expect(result.__orangePullJournal.items.map(item => item.pk[0])).toEqual([1, 2]);
-		expect(keyRequests.every(request => request.sqliteSnapshot === false)).toBe(true);
+		expect(keyRequests.every(request => request.sqliteSnapshot === true)).toBe(true);
 		expect(db.queryLog.some(sql =>
 			/SELECT "batch_no", "seq", "table_name"/u.test(sql)
 			&& /ORDER BY "batch_no"/u.test(sql)
