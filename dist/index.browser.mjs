@@ -6050,6 +6050,9 @@ function requireSyncClient () {
 	const pushPendingSymbol = typeof Symbol === 'function'
 		? Symbol.for('orange-orm.syncClient.pushPending')
 		: '__orangeOrmSyncClientPushPending';
+	const rejectPendingMutationsSymbol = typeof Symbol === 'function'
+		? Symbol.for('orange-orm.syncClient.rejectPendingMutations')
+		: '__orangeOrmSyncClientRejectPendingMutations';
 	const setClientIdSymbol = typeof Symbol === 'function'
 		? Symbol.for('orange-orm.syncClient.setClientId')
 		: '__orangeOrmSyncClientSetClientId';
@@ -6121,6 +6124,9 @@ function requireSyncClient () {
 		Object.defineProperty(syncClientApi, pushPendingSymbol, {
 			value: pushPendingOnly
 		});
+		Object.defineProperty(syncClientApi, rejectPendingMutationsSymbol, {
+			value: rejectPendingMutations
+		});
 		Object.defineProperty(syncClientApi, setClientIdSymbol, {
 			value: setSharedClientId
 		});
@@ -6166,6 +6172,8 @@ function requireSyncClient () {
 				pullOptions._onPullBatchProgress = options._onPullBatchProgress;
 			if (typeof options._onPullStagingSummary === 'function')
 				pullOptions._onPullStagingSummary = options._onPullStagingSummary;
+			if (options._skipPushBeforePull === true)
+				pullOptions._skipPushBeforePull = true;
 			return pull(pullOptions);
 		}
 
@@ -6180,6 +6188,28 @@ function requireSyncClient () {
 				return { phase: 'push', applied: 0, duplicates: 0, results: [], skipped: 'missing-stable-base' };
 			const pushConfig = resolvePushConfig(syncConfig, normalizePullOptions(options));
 			return pushBeforePull(db, syncConfig, hadStableBase, pushConfig);
+		}
+
+		async function rejectPendingMutations(mutationIds, error, options = {}) {
+			const ids = new Set((Array.isArray(mutationIds) ? mutationIds : [])
+				.filter(id => typeof id === 'string' && id.length > 0));
+			if (ids.size === 0)
+				return { failed: 0, mutationIds: [] };
+			const db = toSyncDb(await getDb());
+			const rows = await readMutationRowsByStatus(db, ['pending'], 10000);
+			const attemptedMutations = rows
+				.filter(row => ids.has(row.mutation_id ?? row.MUTATION_ID))
+				.map(rowToMutation)
+				.filter(Boolean);
+			if (attemptedMutations.length === 0)
+				return { failed: 0, mutationIds: [] };
+			await rollbackFailedPushBatch(db, attemptedMutations, error);
+			if (options.emit === true)
+				emitOperationErrors(attemptedMutations, error, false);
+			return {
+				failed: attemptedMutations.length,
+				mutationIds: attemptedMutations.map(mutation => mutation.id)
+			};
 		}
 
 		async function ensureLocalSchema(options = {}) {
@@ -6273,6 +6303,8 @@ function requireSyncClient () {
 				normalizedOptions._onPullBatchProgress = options._onPullBatchProgress;
 			if (options && typeof options._onPullStagingSummary === 'function')
 				normalizedOptions._onPullStagingSummary = options._onPullStagingSummary;
+			if (options && options._skipPushBeforePull === true)
+				normalizedOptions._skipPushBeforePull = true;
 			const {
 				db,
 				syncConfig,
@@ -6353,7 +6385,8 @@ function requireSyncClient () {
 		}
 
 		async function pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase, options = {}) {
-			await pushBeforePull(db, syncConfig, hadStableBase);
+			if (options._skipPushBeforePull !== true)
+				await pushBeforePull(db, syncConfig, hadStableBase);
 			const pullStartedAtMs = Date.now();
 			await maybeEmitInitialReady(syncConfig, configuredTables, db, 'persisted');
 			const currentSince = await getScopeSince(configuredTables, db);
@@ -10110,6 +10143,7 @@ function requireSyncClient () {
 	syncClient.exports.applyOutboxRowsSymbol = applyOutboxRowsSymbol;
 	syncClient.exports.applyPullJournalSymbol = applyPullJournalSymbol;
 	syncClient.exports.pushPendingSymbol = pushPendingSymbol;
+	syncClient.exports.rejectPendingMutationsSymbol = rejectPendingMutationsSymbol;
 	syncClient.exports.setClientIdSymbol = setClientIdSymbol;
 	return syncClient.exports;
 }
@@ -26968,6 +27002,7 @@ function requireDualSyncDatabase () {
 		applyOutboxRowsSymbol,
 		applyPullJournalSymbol,
 		pushPendingSymbol,
+		rejectPendingMutationsSymbol,
 		setClientIdSymbol
 	} = newSyncClient;
 
@@ -27190,18 +27225,29 @@ function requireDualSyncDatabase () {
 			const stagingSync = getRoleSyncClient(stagingRole);
 			await ensureSharedClientId(manifest);
 
-			emitSyncProgress('pushing-active', { activeRole, stagingRole });
-			const activePushResult = await activeSync[pushPendingSymbol](options);
-			const needsInitialSwap = activePushResult && activePushResult.skipped === 'missing-stable-base';
 			emitSyncProgress('updating-staging', { activeRole, stagingRole });
 			await applyPendingDeltasToRole(stagingRole);
 
 			const openRows = await readAllOutboxRows(activeSync, ['pending', 'pushed']);
-			const deferStableBaseUntilComplete = needsInitialSwap && openRows.length === 0;
 			await stagingSync[applyOutboxRowsSymbol](openRows, {
 				replay: false,
 				replaceOpen: true
 			});
+			emitSyncProgress('pushing-staging', { activeRole, stagingRole });
+			let stagingPushResult;
+			try {
+				stagingPushResult = await stagingSync[pushPendingSymbol](options);
+			}
+			catch (error) {
+				if (isConflictError(error))
+					await rejectActiveConflict(manifest, activeSync, stagingSync, openRows, error);
+				else
+					await mirrorActivePushAttempts(manifest, activeSync, stagingSync, openRows);
+				throw error;
+			}
+			await acknowledgeActivePushes(manifest, activeSync, stagingSync, stagingPushResult);
+			const needsInitialSwap = stagingPushResult && stagingPushResult.skipped === 'missing-stable-base';
+			const deferStableBaseUntilComplete = needsInitialSwap && openRows.length === 0;
 
 			emitSyncProgress('pulling-staging', { activeRole, stagingRole });
 			const pullStagingStartedAtMs = Date.now();
@@ -27213,6 +27259,7 @@ function requireDualSyncDatabase () {
 			try {
 				result = await stagingSync[syncAndCapturePullJournalSymbol]({
 					...options,
+					_skipPushBeforePull: true,
 					_capturePullJournalChunk: deltaSink.write,
 					_deferStableBaseUntilComplete: deferStableBaseUntilComplete,
 					_onPullBatchProgress(progress) {
@@ -27282,6 +27329,83 @@ function requireDualSyncDatabase () {
 				...publishedManifest,
 				deltaId,
 				swapped
+			});
+		}
+
+		async function acknowledgeActivePushes(manifest, activeSync, stagingSync, pushResult) {
+			const acceptedIds = pushResultMutationIds(pushResult);
+			if (acceptedIds.size === 0)
+				return;
+			const pushedRows = await readAllOutboxRows(stagingSync, ['pushed']);
+			const acknowledgedRows = pushedRows.filter(row => acceptedIds.has(outboxRowMutationId(row)));
+			if (acknowledgedRows.length === 0)
+				return;
+			emitSyncProgress('acknowledging-active-pushes', {
+				activeRole: manifest.activeRole,
+				stagingRole: manifest.stagingRole,
+				mutationCount: acknowledgedRows.length
+			});
+			await runSyncSwap(router, async () => {
+				const currentManifest = await getManifest(true);
+				assertExpectedManifest(currentManifest, manifest);
+				await activeSync[applyOutboxRowsSymbol](acknowledgedRows, {
+					replay: false,
+					replaceOpen: false
+				});
+			});
+		}
+
+		async function rejectActiveConflict(manifest, activeSync, stagingSync, openRows, error) {
+			const stagedIds = new Set(openRows
+				.filter(row => outboxRowStatus(row) === 'pending')
+				.map(outboxRowMutationId)
+				.filter(Boolean));
+			if (stagedIds.size === 0)
+				return;
+			const failedRows = await readAllOutboxRows(stagingSync, ['failed']);
+			const failedIds = failedRows
+				.map(outboxRowMutationId)
+				.filter(id => stagedIds.has(id));
+			if (failedIds.length === 0)
+				return;
+			emitSyncProgress('rejecting-active-conflict', {
+				activeRole: manifest.activeRole,
+				stagingRole: manifest.stagingRole,
+				mutationCount: failedIds.length
+			});
+			await runSyncSwap(router, async () => {
+				const currentManifest = await getManifest(true);
+				assertExpectedManifest(currentManifest, manifest);
+				await activeSync[rejectPendingMutationsSymbol](failedIds, error, { emit: false });
+			});
+		}
+
+		async function mirrorActivePushAttempts(manifest, activeSync, stagingSync, openRows) {
+			const activeAttempts = new Map(openRows
+				.filter(row => outboxRowStatus(row) === 'pending')
+				.map(row => [outboxRowMutationId(row), outboxRowAttempts(row)])
+				.filter(([id]) => !!id));
+			if (activeAttempts.size === 0)
+				return;
+			const pendingRows = await readAllOutboxRows(stagingSync, ['pending']);
+			const attemptedRows = pendingRows.filter(row => {
+				const id = outboxRowMutationId(row);
+				return activeAttempts.has(id) && outboxRowAttempts(row) > activeAttempts.get(id);
+			});
+			if (attemptedRows.length === 0)
+				return;
+			emitSyncProgress('recording-active-push-attempts', {
+				activeRole: manifest.activeRole,
+				stagingRole: manifest.stagingRole,
+				mutationCount: attemptedRows.length
+			});
+			await runSyncSwap(router, async () => {
+				const currentManifest = await getManifest(true);
+				assertExpectedManifest(currentManifest, manifest);
+				await activeSync[applyOutboxRowsSymbol](attemptedRows, {
+					replay: false,
+					replaceOpen: false
+				});
 			});
 		}
 
@@ -28169,6 +28293,41 @@ function requireDualSyncDatabase () {
 			configurable: true
 		});
 		return result;
+	}
+
+	function pushResultMutationIds(result) {
+		const ids = new Set();
+		const items = Array.isArray(result && result.results) ? result.results : [];
+		for (let i = 0; i < items.length; i++) {
+			const id = items[i] && items[i].id;
+			if (typeof id === 'string' && id.length > 0)
+				ids.add(id);
+		}
+		return ids;
+	}
+
+	function outboxRowMutationId(row) {
+		if (!row || row !== Object(row))
+			return undefined;
+		return row.mutation_id ?? row.MUTATION_ID;
+	}
+
+	function outboxRowStatus(row) {
+		if (!row || row !== Object(row))
+			return undefined;
+		return row.status ?? row.STATUS;
+	}
+
+	function outboxRowAttempts(row) {
+		if (!row || row !== Object(row))
+			return 0;
+		const attempts = Number(row.attempts ?? row.ATTEMPTS ?? 0);
+		return Number.isFinite(attempts) ? attempts : 0;
+	}
+
+	function isConflictError(error) {
+		return Number(error && error.response && error.response.status) === 409
+			|| Number(error && error.status) === 409;
 	}
 
 	function extractDualSyncInfo(payload) {

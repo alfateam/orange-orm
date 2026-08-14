@@ -69,8 +69,15 @@ describe('sqliteOPFS dual sync integration', () => {
 		const localDb = map({ db: () => dualDb });
 		closeTasks.push(() => localDb.close());
 		const progressEvents = [];
+		const pushedMutationIds = [];
 		const offProgress = localDb.syncClient.on('sync-progress', event => progressEvents.push(event));
 		closeTasks.push(() => offProgress());
+		const capturePushId = localDb.syncClient.interceptors.request.use(config => {
+			if (config?.data?.phase === 'push' && Array.isArray(config.data.mutations))
+				pushedMutationIds.push(...config.data.mutations.map(mutation => mutation.id));
+			return config;
+		});
+		closeTasks.push(() => localDb.syncClient.interceptors.request.eject(capturePushId));
 
 		expect(await localDb.db()).toBe(dualDb);
 		const resetResult = await localDb.syncClient.resetLocal();
@@ -171,6 +178,10 @@ describe('sqliteOPFS dual sync integration', () => {
 		const projectChangedDuringSync = await localDb.project.getById('p2');
 		projectChangedDuringSync.title = 'Two changed during swap';
 		await projectChangedDuringSync.saveChanges();
+		const pendingDuringSync = await localDb.query(
+			'SELECT "mutation_id" FROM "orange_sync_outbox" WHERE "status" = \'pending\''
+		);
+		const mutationCreatedDuringSync = pendingDuringSync[0].mutation_id;
 		releasePull.resolve();
 		const thirdSyncResult = await writeDuringSync;
 		localDb.syncClient.interceptors.request.eject(interceptorId);
@@ -180,6 +191,7 @@ describe('sqliteOPFS dual sync integration', () => {
 			swapped: true
 		});
 		expect((await localDb.project.getById('p2')).title).toBe('Two changed during swap');
+		expect(pushedMutationIds.filter(id => id === mutationCreatedDuringSync)).toHaveLength(0);
 
 		const fourthSyncResult = await localDb.syncClient.sync();
 		expect(fourthSyncResult.__orangeDualSync).toMatchObject({
@@ -188,6 +200,7 @@ describe('sqliteOPFS dual sync integration', () => {
 			swapped: true
 		});
 		expect((await remoteDb.project.getById('p2')).title).toBe('Two changed during swap');
+		expect(pushedMutationIds.filter(id => id === mutationCreatedDuringSync)).toHaveLength(1);
 
 		const noOpSyncResult = await localDb.syncClient.sync();
 		const roleARows = await roleA.query('SELECT "id", "title" FROM "project" ORDER BY "id"');
@@ -209,6 +222,7 @@ describe('sqliteOPFS dual sync integration', () => {
 			{ id: 'p2', title: 'Two changed during swap' },
 			{ id: 'p3', title: 'Three' }
 		]);
+		expect(pushedMutationIds.filter(id => id === mutationCreatedDuringSync)).toHaveLength(1);
 
 		await localDb.syncClient.resetLocal();
 		await localDb.project.insert({
@@ -286,6 +300,145 @@ describe('sqliteOPFS dual sync integration', () => {
 			restoreLocks();
 		}
 	}, 60000);
+
+	test('sends a conflict once from staging and rejects it in both roles', async () => {
+		const remoteDb = map({
+			db: con => con.pglite(undefined, { size: 1 })
+		});
+		closeTasks.push(() => remoteDb.close());
+		await remoteDb.query('CREATE TABLE project (id TEXT PRIMARY KEY NOT NULL, title TEXT NOT NULL)');
+		await setupChangeTracking(remoteDb, {
+			project: remoteDb.tables.project
+		});
+		await remoteDb.project.insert([
+			{ id: 'conflict', title: 'Conflict base' },
+			{ id: 'next', title: 'Next base' },
+			{ id: 'retry', title: 'Retry base' }
+		]);
+
+		const pushedMutationIds = [];
+		let failNextPush = false;
+		let failNextPull = false;
+		const app = express();
+		app.use(express.json({ limit: '2mb' }));
+		app.use('/rdb', (request, response, next) => {
+			if (request.body?.phase === 'push' && Array.isArray(request.body.mutations)) {
+				pushedMutationIds.push(...request.body.mutations.map(mutation => mutation.id));
+				if (failNextPush) {
+					failNextPush = false;
+					response.status(503).send('forced push failure');
+					return;
+				}
+			}
+			if (failNextPull && request.body?.phase === 'keys') {
+				failNextPull = false;
+				response.status(503).send('forced pull failure');
+				return;
+			}
+			next();
+		});
+		app.use('/rdb', remoteDb.express({ sync: true }));
+		const server = await listen(app);
+		closeTasks.push(() => closeServer(server));
+
+		const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'orange-dual-conflict-'));
+		closeTasks.push(async () => fs.rmSync(directory, { recursive: true, force: true }));
+		const connectionString = path.join(directory, 'local.sqlite3');
+		const sync = {
+			url: `http://127.0.0.1:${server.address().port}/rdb`,
+			auto: false,
+			tables: ['project']
+		};
+		const dualDb = newDualSyncDatabase(connectionString, { sync }, (roleConnectionString, options) =>
+			newSqliteDatabase(roleConnectionString, { ...options, size: 1 })
+		);
+		const localDb = map({ db: () => dualDb });
+		closeTasks.push(() => localDb.close());
+		await localDb.syncClient.resetLocal();
+		await localDb.syncClient.sync();
+
+		const retry = await localDb.project.getById('retry');
+		retry.title = 'Retry local';
+		await retry.saveChanges();
+		const retryPendingRows = await localDb.query(
+			'SELECT "mutation_id" FROM "orange_sync_outbox" WHERE "status" = \'pending\''
+		);
+		const retryMutationId = retryPendingRows[0].mutation_id;
+		failNextPush = true;
+		await expect(localDb.syncClient.sync())
+			.rejects.toThrow('Request failed with status code 503');
+		const attemptedRetryRows = await localDb.query([
+			'SELECT "attempts" FROM "orange_sync_outbox"',
+			`WHERE "mutation_id" = '${retryMutationId}' AND "status" = 'pending'`
+		].join(' '));
+		expect(Number(attemptedRetryRows[0].attempts)).toBe(1);
+		await localDb.syncClient.sync();
+		expect((await remoteDb.project.getById('retry')).title).toBe('Retry local');
+		expect(pushedMutationIds.filter(id => id === retryMutationId)).toHaveLength(2);
+
+		const conflictEvents = [];
+		const offConflict = localDb.syncClient.on(
+			'operation:project-conflict',
+			event => conflictEvents.push(event)
+		);
+		closeTasks.push(() => offConflict());
+		await localDb.transaction(async (tx, context) => {
+			context.context.operation = 'project-conflict';
+			const project = await tx.project.getById('conflict');
+			project.title = 'Conflict local';
+			await project.saveChanges();
+		});
+		const pendingConflictRows = await localDb.query(
+			'SELECT "mutation_id" FROM "orange_sync_outbox" WHERE "status" = \'pending\''
+		);
+		const conflictMutationId = pendingConflictRows[0].mutation_id;
+		await remoteDb.project.update(
+			{ title: 'Conflict remote' },
+			{ where: project => project.id.eq('conflict') }
+		);
+
+		await expect(localDb.syncClient.sync())
+			.rejects.toThrow('Request failed with status code 409');
+
+		expect(pushedMutationIds.filter(id => id === conflictMutationId)).toHaveLength(1);
+		expect(conflictEvents).toHaveLength(1);
+		expect((await localDb.project.getById('conflict')).title).toBe('Conflict base');
+
+		const roleA = map({
+			db: con => con.sqlite(connectionString, { size: 1 })
+		});
+		const roleB = map({
+			db: con => con.sqlite(appendRoleSuffix(connectionString, 'b'), { size: 1 })
+		});
+		closeTasks.push(() => roleA.close());
+		closeTasks.push(() => roleB.close());
+		for (const roleDb of [roleA, roleB]) {
+			const failed = await roleDb.query([
+				'SELECT "mutation_id" FROM "orange_sync_outbox"',
+				`WHERE "mutation_id" = '${conflictMutationId}' AND "status" = 'failed'`
+			].join(' '));
+			expect(failed).toHaveLength(1);
+		}
+
+		const next = await localDb.project.getById('next');
+		next.title = 'Next local';
+		await next.saveChanges();
+		const nextPendingRows = await localDb.query(
+			'SELECT "mutation_id" FROM "orange_sync_outbox" WHERE "status" = \'pending\''
+		);
+		const nextMutationId = nextPendingRows[0].mutation_id;
+		failNextPull = true;
+		await expect(localDb.syncClient.sync())
+			.rejects.toThrow('Request failed with status code 503');
+
+		expect((await remoteDb.project.getById('next')).title).toBe('Next local');
+		expect(pushedMutationIds.filter(id => id === nextMutationId)).toHaveLength(1);
+		await localDb.syncClient.sync();
+
+		expect((await remoteDb.project.getById('next')).title).toBe('Next local');
+		expect(pushedMutationIds.filter(id => id === nextMutationId)).toHaveLength(1);
+		expect(pushedMutationIds.filter(id => id === conflictMutationId)).toHaveLength(1);
+	}, 30000);
 });
 
 function listen(app) {
