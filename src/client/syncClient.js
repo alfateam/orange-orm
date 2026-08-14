@@ -42,9 +42,6 @@ const applyPullJournalSymbol = typeof Symbol === 'function'
 const pushPendingSymbol = typeof Symbol === 'function'
 	? Symbol.for('orange-orm.syncClient.pushPending')
 	: '__orangeOrmSyncClientPushPending';
-const rejectPendingMutationsSymbol = typeof Symbol === 'function'
-	? Symbol.for('orange-orm.syncClient.rejectPendingMutations')
-	: '__orangeOrmSyncClientRejectPendingMutations';
 const setClientIdSymbol = typeof Symbol === 'function'
 	? Symbol.for('orange-orm.syncClient.setClientId')
 	: '__orangeOrmSyncClientSetClientId';
@@ -116,9 +113,6 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 	Object.defineProperty(syncClientApi, pushPendingSymbol, {
 		value: pushPendingOnly
 	});
-	Object.defineProperty(syncClientApi, rejectPendingMutationsSymbol, {
-		value: rejectPendingMutations
-	});
 	Object.defineProperty(syncClientApi, setClientIdSymbol, {
 		value: setSharedClientId
 	});
@@ -180,28 +174,6 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 			return { phase: 'push', applied: 0, duplicates: 0, results: [], skipped: 'missing-stable-base' };
 		const pushConfig = resolvePushConfig(syncConfig, normalizePullOptions(options));
 		return pushBeforePull(db, syncConfig, hadStableBase, pushConfig);
-	}
-
-	async function rejectPendingMutations(mutationIds, error, options = {}) {
-		const ids = new Set((Array.isArray(mutationIds) ? mutationIds : [])
-			.filter(id => typeof id === 'string' && id.length > 0));
-		if (ids.size === 0)
-			return { failed: 0, mutationIds: [] };
-		const db = toSyncDb(await getDb());
-		const rows = await readMutationRowsByStatus(db, ['pending'], 10000);
-		const attemptedMutations = rows
-			.filter(row => ids.has(row.mutation_id ?? row.MUTATION_ID))
-			.map(rowToMutation)
-			.filter(Boolean);
-		if (attemptedMutations.length === 0)
-			return { failed: 0, mutationIds: [] };
-		await rollbackFailedPushBatch(db, attemptedMutations, error);
-		if (options.emit === true)
-			emitOperationErrors(attemptedMutations, error, false);
-		return {
-			failed: attemptedMutations.length,
-			mutationIds: attemptedMutations.map(mutation => mutation.id)
-		};
 	}
 
 	async function ensureLocalSchema(options = {}) {
@@ -4135,5 +4107,4 @@ module.exports.readOutboxRowsSymbol = readOutboxRowsSymbol;
 module.exports.applyOutboxRowsSymbol = applyOutboxRowsSymbol;
 module.exports.applyPullJournalSymbol = applyPullJournalSymbol;
 module.exports.pushPendingSymbol = pushPendingSymbol;
-module.exports.rejectPendingMutationsSymbol = rejectPendingMutationsSymbol;
 module.exports.setClientIdSymbol = setClientIdSymbol;

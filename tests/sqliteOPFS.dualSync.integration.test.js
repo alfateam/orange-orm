@@ -175,6 +175,7 @@ describe('sqliteOPFS dual sync integration', () => {
 		});
 		const writeDuringSync = localDb.syncClient.sync();
 		await pullStarted.promise;
+		const repeatedSyncs = Array.from({ length: 4 }, () => localDb.syncClient.sync());
 		const projectChangedDuringSync = await localDb.project.getById('p2');
 		projectChangedDuringSync.title = 'Two changed during swap';
 		await projectChangedDuringSync.saveChanges();
@@ -183,21 +184,29 @@ describe('sqliteOPFS dual sync integration', () => {
 		);
 		const mutationCreatedDuringSync = pendingDuringSync[0].mutation_id;
 		releasePull.resolve();
-		const thirdSyncResult = await writeDuringSync;
+		const [thirdSyncResult, nextSyncResult] = await Promise.all([writeDuringSync, ...repeatedSyncs]);
 		localDb.syncClient.interceptors.request.eject(interceptorId);
 		expect(thirdSyncResult.__orangeDualSync).toMatchObject({
 			activeRole: 'a',
 			stagingRole: 'b',
 			swapped: true
 		});
+		expect(nextSyncResult.__orangeDualSync).toMatchObject({
+			activeRole: 'b',
+			stagingRole: 'a',
+			swapped: true
+		});
+		expect(progressEvents.filter(event => event.phase === 'queued-next')).toHaveLength(1);
+		expect(progressEvents.filter(event => event.phase === 'coalesced-next')).toHaveLength(3);
 		expect((await localDb.project.getById('p2')).title).toBe('Two changed during swap');
-		expect(pushedMutationIds.filter(id => id === mutationCreatedDuringSync)).toHaveLength(0);
+		expect((await remoteDb.project.getById('p2')).title).toBe('Two changed during swap');
+		expect(pushedMutationIds.filter(id => id === mutationCreatedDuringSync)).toHaveLength(1);
 
 		const fourthSyncResult = await localDb.syncClient.sync();
 		expect(fourthSyncResult.__orangeDualSync).toMatchObject({
 			activeRole: 'b',
 			stagingRole: 'a',
-			swapped: true
+			swapped: false
 		});
 		expect((await remoteDb.project.getById('p2')).title).toBe('Two changed during swap');
 		expect(pushedMutationIds.filter(id => id === mutationCreatedDuringSync)).toHaveLength(1);
@@ -397,12 +406,22 @@ describe('sqliteOPFS dual sync integration', () => {
 			{ where: project => project.id.eq('conflict') }
 		);
 
-		await expect(localDb.syncClient.sync())
-			.rejects.toThrow('Request failed with status code 409');
+		let conflictError;
+		try {
+			await localDb.syncClient.sync();
+		}
+		catch (error) {
+			conflictError = error;
+		}
 
+		expect(conflictError?.message).toBe('Request failed with status code 409');
+		expect(conflictError?.syncRecovered).toBe(true);
+		expect(conflictError?.syncResult?.__orangeDualSync).toMatchObject({
+			swapped: true
+		});
 		expect(pushedMutationIds.filter(id => id === conflictMutationId)).toHaveLength(1);
 		expect(conflictEvents).toHaveLength(1);
-		expect((await localDb.project.getById('conflict')).title).toBe('Conflict base');
+		expect((await localDb.project.getById('conflict')).title).toBe('Conflict remote');
 
 		const roleA = map({
 			db: con => con.sqlite(connectionString, { size: 1 })

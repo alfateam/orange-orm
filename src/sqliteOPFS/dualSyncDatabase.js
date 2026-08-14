@@ -20,7 +20,6 @@ const {
 	applyOutboxRowsSymbol,
 	applyPullJournalSymbol,
 	pushPendingSymbol,
-	rejectPendingMutationsSymbol,
 	setClientIdSymbol
 } = newSyncClient;
 
@@ -62,6 +61,8 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 	let roleHttpInterceptor;
 	const syncInterceptors = createHttpInterceptor();
 	let syncTail = Promise.resolve();
+	let activeSyncRun = null;
+	let pendingSyncRequest = null;
 	let queuedSyncCount = 0;
 	let nextProgressRequestId = 1;
 	let initialReadyEmitted = false;
@@ -180,13 +181,73 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 	}
 
 	function syncObserved(options = {}) {
-		return queueSync(normalizeSyncOptions(options));
+		return coalesceSync(normalizeSyncOptions(options));
 	}
 
 	function syncAutomatic(config) {
-		return queueSync({}, {
+		return coalesceSync({}, {
 			minimumIntervalMs: normalizeAutoSyncIntervalMs(config && config.intervalMs)
 		});
+	}
+
+	function coalesceSync(normalizedOptions, schedule = {}) {
+		if (!activeSyncRun)
+			return startSyncRun(normalizedOptions, schedule);
+		if (pendingSyncRequest) {
+			mergePendingSyncRequest(pendingSyncRequest, normalizedOptions, schedule);
+			emitSyncProgress('coalesced-next', { queueDepth: 1 });
+			return pendingSyncRequest.promise;
+		}
+		pendingSyncRequest = createPendingSyncRequest(normalizedOptions, schedule);
+		emitSyncProgress('queued-next', { queueDepth: 1 });
+		return pendingSyncRequest.promise;
+	}
+
+	function startSyncRun(normalizedOptions, schedule) {
+		const run = queueSync(normalizedOptions, schedule);
+		activeSyncRun = run;
+		run.then(
+			() => finishSyncRun(run),
+			() => finishSyncRun(run)
+		);
+		return run;
+	}
+
+	function finishSyncRun(run) {
+		if (activeSyncRun !== run)
+			return;
+		activeSyncRun = null;
+		const pending = pendingSyncRequest;
+		pendingSyncRequest = null;
+		if (!pending)
+			return;
+		const nextRun = startSyncRun(pending.normalizedOptions, pending.schedule);
+		nextRun.then(pending.resolve, pending.reject);
+	}
+
+	function createPendingSyncRequest(normalizedOptions, schedule) {
+		let resolve;
+		let reject;
+		const promise = new Promise((resolvePromise, rejectPromise) => {
+			resolve = resolvePromise;
+			reject = rejectPromise;
+		});
+		return {
+			normalizedOptions,
+			schedule,
+			promise,
+			resolve,
+			reject
+		};
+	}
+
+	function mergePendingSyncRequest(pending, normalizedOptions, schedule) {
+		const pendingTimeoutMs = normalizeTimeoutMs(pending.normalizedOptions.timeoutMs);
+		const requestedTimeoutMs = normalizeTimeoutMs(normalizedOptions.timeoutMs);
+		const timeoutMs = Math.max(pendingTimeoutMs || 0, requestedTimeoutMs || 0);
+		pending.normalizedOptions = timeoutMs > 0 ? { timeoutMs } : {};
+		if (!(schedule && schedule.minimumIntervalMs > 0))
+			pending.schedule = {};
 	}
 
 	function queueSync(normalizedOptions, schedule = {}) {
@@ -253,17 +314,26 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		});
 		emitSyncProgress('pushing-staging', { activeRole, stagingRole });
 		let stagingPushResult;
+		let pushConflictError;
+		let rejectedMutationIds = new Set();
 		try {
 			stagingPushResult = await stagingSync[pushPendingSymbol](options);
 		}
 		catch (error) {
-			if (isConflictError(error))
-				await rejectActiveConflict(manifest, activeSync, stagingSync, openRows, error);
-			else
+			if (isConflictError(error)) {
+				const failedIds = await recordActiveConflict(manifest, activeSync, stagingSync, openRows);
+				if (failedIds.length === 0)
+					throw error;
+				pushConflictError = error;
+				rejectedMutationIds = new Set(failedIds);
+			}
+			else {
 				await mirrorActivePushAttempts(manifest, activeSync, stagingSync, openRows);
-			throw error;
+				throw error;
+			}
 		}
-		await acknowledgeActivePushes(manifest, activeSync, stagingSync, stagingPushResult);
+		if (!pushConflictError)
+			await acknowledgeActivePushes(manifest, activeSync, stagingSync, stagingPushResult);
 		const needsInitialSwap = stagingPushResult && stagingPushResult.skipped === 'missing-stable-base';
 		const deferStableBaseUntilComplete = needsInitialSwap && openRows.length === 0;
 
@@ -323,7 +393,8 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		await runSyncSwap(router, async () => {
 			const currentManifest = await getManifest(true);
 			assertExpectedManifest(currentManifest, manifest);
-			const finalPendingRows = await readAllOutboxRows(activeSync, ['pending']);
+			const finalPendingRows = (await readAllOutboxRows(activeSync, ['pending']))
+				.filter(row => !rejectedMutationIds.has(outboxRowMutationId(row)));
 			await stagingSync[applyOutboxRowsSymbol](finalPendingRows, {
 				replay: true,
 				replaceOpen: false
@@ -343,11 +414,16 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 			stagingRole: publishedManifest.stagingRole,
 			swapped
 		});
-		return withDualSyncResult(result, {
+		const dualResult = withDualSyncResult(result, {
 			...publishedManifest,
 			deltaId,
 			swapped
 		});
+		if (pushConflictError) {
+			attachRecoveredConflict(pushConflictError, dualResult, rejectedMutationIds);
+			throw pushConflictError;
+		}
+		return dualResult;
 	}
 
 	async function acknowledgeActivePushes(manifest, activeSync, stagingSync, pushResult) {
@@ -373,20 +449,20 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		});
 	}
 
-	async function rejectActiveConflict(manifest, activeSync, stagingSync, openRows, error) {
+	async function recordActiveConflict(manifest, activeSync, stagingSync, openRows) {
 		const stagedIds = new Set(openRows
 			.filter(row => outboxRowStatus(row) === 'pending')
 			.map(outboxRowMutationId)
 			.filter(Boolean));
 		if (stagedIds.size === 0)
-			return;
+			return [];
 		const failedRows = await readAllOutboxRows(stagingSync, ['failed']);
-		const failedIds = failedRows
-			.map(outboxRowMutationId)
-			.filter(id => stagedIds.has(id));
+		const rejectedRows = failedRows
+			.filter(row => stagedIds.has(outboxRowMutationId(row)));
+		const failedIds = rejectedRows.map(outboxRowMutationId);
 		if (failedIds.length === 0)
-			return;
-		emitSyncProgress('rejecting-active-conflict', {
+			return [];
+		emitSyncProgress('recording-active-conflict', {
 			activeRole: manifest.activeRole,
 			stagingRole: manifest.stagingRole,
 			mutationCount: failedIds.length
@@ -394,8 +470,12 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		await runSyncSwap(router, async () => {
 			const currentManifest = await getManifest(true);
 			assertExpectedManifest(currentManifest, manifest);
-			await activeSync[rejectPendingMutationsSymbol](failedIds, error, { emit: false });
+			await activeSync[applyOutboxRowsSymbol](rejectedRows, {
+				replay: false,
+				replaceOpen: false
+			});
 		});
+		return failedIds;
 	}
 
 	async function mirrorActivePushAttempts(manifest, activeSync, stagingSync, openRows) {
@@ -1311,6 +1391,34 @@ function withDualSyncResult(result, info) {
 		configurable: true
 	});
 	return result;
+}
+
+function attachRecoveredConflict(error, result, mutationIds) {
+	if (!error || error !== Object(error))
+		return;
+	const ids = Array.from(mutationIds || []);
+	try {
+		Object.defineProperties(error, {
+			syncRecovered: {
+				value: true,
+				enumerable: true,
+				configurable: true
+			},
+			syncResult: {
+				value: result,
+				enumerable: false,
+				configurable: true
+			},
+			mutationIds: {
+				value: ids,
+				enumerable: true,
+				configurable: true
+			}
+		});
+	}
+	catch (_error) {
+		// Conflict recovery is complete even if a custom error object cannot be annotated.
+	}
 }
 
 function pushResultMutationIds(result) {
