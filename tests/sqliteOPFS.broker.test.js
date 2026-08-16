@@ -81,14 +81,62 @@ describe('sqliteOPFS broker worker', () => {
 			await client.close();
 		}
 	});
+
+	test('serves rotated database files through ports from one broker', async () => {
+		const executed = [];
+		const opened = [];
+		const worker = createInlineSqliteOPFSWorker({
+			sqlite3InitModule: () => newFakeSqlite3(executed, opened)
+		});
+		const activeClient = createSqliteOPFSWorkerClient('rotation.sqlite3', {
+			worker,
+			vfs: 'opfs-wl',
+			deferOpen: true
+		});
+		const rotatedClient = createSqliteOPFSWorkerClient('rotation.__orange_sync_c.sqlite3', {
+			worker: connectSqliteOPFSWorker(worker),
+			vfs: 'opfs-wl',
+			deferOpen: true,
+			closeDbOnClose: false
+		});
+
+		try {
+			await executeWithCheckout(activeClient, 'SELECT active');
+			await executeWithCheckout(rotatedClient, 'SELECT rotated');
+
+			expect(opened).toEqual([
+				'/rotation.sqlite3',
+				'/rotation.__orange_sync_c.sqlite3'
+			]);
+			expect(executed).toEqual(['SELECT active', 'SELECT rotated']);
+		}
+		finally {
+			await rotatedClient.close();
+			await activeClient.close();
+		}
+	});
 });
 
-function newFakeSqlite3(executed = []) {
+async function executeWithCheckout(client, sql) {
+	const lease = await client.checkout();
+	try {
+		await new Promise((resolve, reject) => {
+			lease.executeQuery(newSql(sql), (error) => error ? reject(error) : resolve());
+		});
+	}
+	finally {
+		await client.release();
+		await lease.releaseCheckout();
+	}
+}
+
+function newFakeSqlite3(executed = [], opened = []) {
 	return {
 		oo1: {
 			OpfsDb: class FakeOpfsDb {
 				constructor(filename) {
 					this.filename = filename;
+					opened.push(filename);
 				}
 				exec(arg) {
 					if (typeof arg === 'string')
@@ -108,6 +156,7 @@ function newFakeSqlite3(executed = []) {
 			OpfsWlDb: class FakeOpfsWlDb {
 				constructor(filename) {
 					this.filename = filename;
+					opened.push(filename);
 				}
 
 				exec(options) {

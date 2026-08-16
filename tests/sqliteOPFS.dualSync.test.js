@@ -284,7 +284,7 @@ describe('sqliteOPFS dual sync database', () => {
 		}]);
 	});
 
-	test('does not reuse a provided single sqlite worker for secondary data files', async () => {
+	test('creates internal broker ports from a provided sqlite worker', async () => {
 		const worker = newIdleWorker();
 		const fixture = newFixture({
 			activeRole: 'b',
@@ -299,13 +299,32 @@ describe('sqliteOPFS dual sync database', () => {
 
 		await db.query('SELECT 1');
 
-		expect(fixture.created.find(x => x.connectionString === 'app.__orange_sync_delta.sqlite3').options.worker).toBeUndefined();
-		expect(fixture.created.find(x => x.connectionString === 'app.__orange_sync_b.sqlite3').options.worker).toBeUndefined();
-		expect(fixture.created.find(x => x.connectionString === 'app.__orange_sync_b.sqlite3').options.closeDbOnClose).toBeUndefined();
+		const manifestOptions = fixture.created.find(
+			x => x.connectionString === 'app.__orange_sync_delta.sqlite3'
+		).options;
+		const secondaryOptions = fixture.created.find(
+			x => x.connectionString === 'app.__orange_sync_b.sqlite3'
+		).options;
+		const manifestPort = manifestOptions.createWorker('app.__orange_sync_delta.sqlite3');
+		const secondaryPort = secondaryOptions.createWorker('app.__orange_sync_b.sqlite3');
+
+		expect(manifestOptions.worker).toBeUndefined();
+		expect(secondaryOptions.worker).toBeUndefined();
+		expect(manifestOptions.closeDbOnClose).toBe(false);
+		expect(secondaryOptions.closeDbOnClose).toBe(false);
+		expect(manifestPort).not.toBe(worker);
+		expect(secondaryPort).not.toBe(worker);
+		manifestPort.close();
+		secondaryPort.close();
 	});
 
-	test('keeps a connection-aware worker factory for every dual database file', async () => {
-		const createWorker = () => newIdleWorker();
+	test('only asks an external worker factory for the public database name', async () => {
+		const worker = newIdleWorker();
+		const requestedConnectionStrings = [];
+		const createWorker = connectionString => {
+			requestedConnectionStrings.push(connectionString);
+			return worker;
+		};
 		const fixture = newFixture({
 			activeRole: 'b',
 			stagingRole: 'a',
@@ -318,11 +337,38 @@ describe('sqliteOPFS dual sync database', () => {
 		}, fixture.createSingleDatabase);
 
 		await db.query('SELECT 1');
+		const externalSyncClient = newFakeSyncClient();
+		db.__orangeDualSyncAttachSyncClient(externalSyncClient);
+		externalSyncClient.emit('sync', {
+			result: {
+				__orangeDualSync: {
+					activeRole: 'c',
+					stagingRole: 'b',
+					stableRole: 'a',
+					stagingStatus: 'ready',
+					updatedAtMs: Date.now() + 1,
+					generation: 1
+				}
+			}
+		});
+		await db.query('SELECT 2');
 
-		expect(fixture.created.find(x => x.connectionString === 'app.__orange_sync_delta.sqlite3').options.createWorker).toBe(createWorker);
-		expect(fixture.created.find(x => x.connectionString === 'app.__orange_sync_delta.sqlite3').options.closeDbOnClose).toBe(false);
-		expect(fixture.created.find(x => x.connectionString === 'app.__orange_sync_b.sqlite3').options.createWorker).toBe(createWorker);
-		expect(fixture.created.find(x => x.connectionString === 'app.__orange_sync_b.sqlite3').options.closeDbOnClose).toBe(false);
+		const internalConnections = [
+			'app.__orange_sync_delta.sqlite3',
+			'app.__orange_sync_b.sqlite3',
+			'app.__orange_sync_c.sqlite3'
+		];
+		const ports = internalConnections.map(connectionString => {
+			const options = fixture.created.find(x => x.connectionString === connectionString).options;
+			expect(options.createWorker).not.toBe(createWorker);
+			expect(options.closeDbOnClose).toBe(false);
+			return options.createWorker(connectionString, options);
+		});
+		expect(requestedConnectionStrings).toEqual(['app.sqlite3']);
+		for (const port of ports) {
+			expect(port).not.toBe(worker);
+			port.close();
+		}
 	});
 
 	test('isolates secondary and manifest SAH pools from the active database', async () => {

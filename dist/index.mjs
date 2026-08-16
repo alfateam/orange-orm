@@ -30206,6 +30206,7 @@ function requireDualSyncDatabase () {
 	const createHttpInterceptor = requireHttpInterceptor();
 	const newSyncClient = requireSyncClient();
 	const { createSyncAuto, syncAutoStartSymbol } = requireSyncAuto();
+	const connectSqliteOPFSWorker = requireConnectWorkerPort();
 	const { runSyncSwap } = requireWriteGate();
 	const {
 		normalizeCrossTabLockConfig,
@@ -30245,7 +30246,10 @@ function requireDualSyncDatabase () {
 			[roleC]: appendRoleSuffix(connectionString, 'c')
 		};
 		const cacheConnectionString = appendRoleSuffix(connectionString, 'delta');
-		const primaryDataPoolOptions = toDataPoolOptions(poolOptions);
+		const primaryDataPoolOptions = withInternalWorkerBroker(
+			connectionString,
+			toDataPoolOptions(poolOptions)
+		);
 		const dataPoolOptionsByRole = {
 			[roleA]: primaryDataPoolOptions,
 			[roleB]: toSecondaryDataPoolOptions(primaryDataPoolOptions, roleConnectionStrings[roleB]),
@@ -31926,6 +31930,37 @@ function requireDualSyncDatabase () {
 		return options;
 	}
 
+	function withInternalWorkerBroker(connectionString, poolOptions) {
+		if (poolOptions.vfs !== 'opfs-wl')
+			return poolOptions;
+		const providedWorker = poolOptions.worker;
+		const providedFactory = poolOptions.createWorker;
+		if (!providedWorker && typeof providedFactory !== 'function')
+			return poolOptions;
+		const providedOptions = { ...poolOptions };
+		let broker = providedWorker;
+		let primaryClaimed = !!providedWorker;
+
+		function createInternalWorker(requestedConnectionString) {
+			if (!broker)
+				broker = providedFactory(connectionString, providedOptions);
+			if (!broker || typeof broker.postMessage !== 'function')
+				throw new Error('sqliteOPFS worker factory must return a Worker-like object.');
+			if (!primaryClaimed && requestedConnectionString === connectionString) {
+				primaryClaimed = true;
+				return broker;
+			}
+			return connectSqliteOPFSWorker(broker);
+		}
+		Object.defineProperty(createInternalWorker, '__orangeDualInternalWorkerBroker', {
+			value: true
+		});
+		return {
+			...poolOptions,
+			createWorker: createInternalWorker
+		};
+	}
+
 	function toCachePoolOptions(poolOptions = {}, connectionString) {
 		const options = toSecondaryDataPoolOptions(poolOptions, connectionString);
 		delete options.sync;
@@ -31938,6 +31973,8 @@ function requireDualSyncDatabase () {
 		delete options.worker;
 		if (hadProvidedWorker)
 			delete options.closeDbOnClose;
+		if (options.createWorker && options.createWorker.__orangeDualInternalWorkerBroker)
+			options.closeDbOnClose = false;
 		options = withIsolatedSahPool(options, connectionString);
 		return options;
 	}
