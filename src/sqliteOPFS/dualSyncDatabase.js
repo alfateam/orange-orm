@@ -374,7 +374,8 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		try {
 			stagingPushResult = await stagingSync[pushPendingSymbol]({
 				...options,
-				_skipConflictRestore: true
+				_skipConflictRestore: true,
+				_fileSnapshotRollback: fileSnapshotRotation
 			});
 		}
 		catch (error) {
@@ -423,7 +424,8 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		if (!fileSnapshotRotation)
 			await mirrorCandidateOutbox(stagingSync, nextStableSync, openRows);
 		const needsInitialSwap = stagingPushResult && stagingPushResult.skipped === 'missing-stable-base';
-		const deferStableBaseUntilComplete = needsInitialSwap && openRows.length === 0;
+		const deferStableBaseUntilComplete = (fileSnapshotRotation && !manifest.lastSuccessfulSyncAtMs)
+			|| (needsInitialSwap && openRows.length === 0);
 
 		emitSyncProgress('pulling-staging', { activeRole, stagingRole: stableRole, stableRole: stagingRole });
 		const pullStagingStartedAtMs = Date.now();
@@ -440,6 +442,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 				_skipPushBeforePull: true,
 				_capturePullJournalChunk: deltaSink.write,
 				_deferStableBaseUntilComplete: deferStableBaseUntilComplete,
+				_fileSnapshotRollback: fileSnapshotRotation,
 				_onPullBatchProgress(progress) {
 					emitSyncProgress('pull-batch-complete', {
 						activeRole,

@@ -133,10 +133,6 @@ describe('sqliteOPFS dual sync integration', () => {
 			stableBaseMs: 0,
 			failed: false
 		});
-		const baseTables = await roleB.query('SELECT "base_name" FROM "orange_sync_base_tables" WHERE "name" = \'project\'');
-		const baseRows = await roleB.query(`SELECT COUNT(*) AS "count" FROM "${baseTables[0].base_name}"`);
-		expect(Number(baseRows[0].count)).toBe(1002);
-
 		const localProject = await localDb.project.getById('p1');
 		localProject.title = 'One pushed locally';
 		await localProject.saveChanges();
@@ -257,13 +253,13 @@ describe('sqliteOPFS dual sync integration', () => {
 		const fallbackSummary = fallbackProgress.find(event => event.phase === 'pull-staging-summary');
 
 		expect(fallbackSummary).toMatchObject({
-			deferredStableBase: false,
+			deferredStableBase: true,
 			failed: false
 		});
 		expect((await localDb.project.getById('local-before-bootstrap')).title).toBe('Local before bootstrap');
 		expect(await remoteDb.query(
 			'SELECT "id" FROM "project" WHERE "id" = \'local-before-bootstrap\''
-		)).toHaveLength(0);
+		)).toHaveLength(1);
 
 		await localDb.syncClient.sync();
 		expect((await remoteDb.project.getById('local-before-bootstrap')).title).toBe('Local before bootstrap');
