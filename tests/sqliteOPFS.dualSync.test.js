@@ -161,6 +161,8 @@ describe('sqliteOPFS dual sync database', () => {
 				fixture.manifest = {
 					activeRole: 'b',
 					stagingRole: 'a',
+					stableRole: 'c',
+					stagingStatus: 'ready',
 					updatedAtMs: 456,
 					generation: 1
 				};
@@ -197,6 +199,8 @@ describe('sqliteOPFS dual sync database', () => {
 				fixture.manifest = {
 					activeRole: 'a',
 					stagingRole: 'b',
+					stableRole: 'c',
+					stagingStatus: 'ready',
 					updatedAtMs: Date.now() + 1
 				};
 				fixture.schemaReadyByConnection.set('app.sqlite3', false);
@@ -370,7 +374,12 @@ describe('sqliteOPFS dual sync database', () => {
 function newFixture(initialManifest) {
 	const dbs = new Map();
 	const fixture = {
-		manifest: initialManifest,
+		manifest: initialManifest && {
+			stableRole: 'c',
+			stagingStatus: 'ready',
+			generation: 0,
+			...initialManifest
+		},
 		cacheSql: [],
 		created: [],
 		externalEnsureCalls: [],
@@ -509,6 +518,8 @@ function queryCache(sql, fixture) {
 		return [{
 			active_role: fixture.manifest.activeRole,
 			staging_role: fixture.manifest.stagingRole,
+			stable_role: fixture.manifest.stableRole,
+			staging_status: fixture.manifest.stagingStatus,
 			updated_at_ms: fixture.manifest.updatedAtMs
 		}];
 	}
@@ -517,6 +528,8 @@ function queryCache(sql, fixture) {
 			fixture.manifest = {
 				activeRole: 'a',
 				stagingRole: 'b',
+				stableRole: 'c',
+				stagingStatus: 'ready',
 				updatedAtMs: Date.now()
 			};
 		}

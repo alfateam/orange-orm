@@ -173,7 +173,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 		if (!hadStableBase)
 			return { phase: 'push', applied: 0, duplicates: 0, results: [], skipped: 'missing-stable-base' };
 		const pushConfig = resolvePushConfig(syncConfig, normalizePullOptions(options));
-		return pushBeforePull(db, syncConfig, hadStableBase, pushConfig);
+		return pushBeforePull(db, syncConfig, hadStableBase, pushConfig, options);
 	}
 
 	async function ensureLocalSchema(options = {}) {
@@ -706,7 +706,10 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 		}
 		catch (e) {
 			if (isConflictError(e)) {
-				await rollbackFailedPushBatch(db, pending, e);
+				if (options._skipConflictRestore === true)
+					await markFailedPushBatch(db, pending, e);
+				else
+					await rollbackFailedPushBatch(db, pending, e);
 				emitOperationErrors(pending, e, false);
 			}
 			else {
@@ -720,14 +723,18 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 		return result;
 	}
 
-	async function pushBeforePull(db, syncConfig, hasBase, resolvedPushConfig) {
+	async function pushBeforePull(db, syncConfig, hasBase, resolvedPushConfig, pendingOptions = {}) {
 		if (!hasBase)
 			return;
 		const pushConfig = resolvedPushConfig || resolvePushConfig(syncConfig);
 		const maxBatches = resolveMaxPushBatches();
 		const results = [];
 		for (let i = 0; i < maxBatches; i++) {
-			const result = await pushPending({ _syncConfig: syncConfig, _pushConfig: pushConfig });
+			const result = await pushPending({
+				...pendingOptions,
+				_syncConfig: syncConfig,
+				_pushConfig: pushConfig
+			});
 			if (!didPushBatchAdvance(result))
 				break;
 			results.push(result);
@@ -766,6 +773,17 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 
 	async function rollbackFailedPushBatch(db, attemptedMutations, error) {
 		return runSyncMaintenance(db, () => rollbackFailedPushBatchCore(db, attemptedMutations, error));
+	}
+
+	async function markFailedPushBatch(db, attemptedMutations, error) {
+		return runSyncMaintenance(db, async () => {
+			await ensureSyncOutboxTable(db);
+			for (let i = 0; i < attemptedMutations.length; i++) {
+				const failedRow = failedOutboxRow(attemptedMutations[i], error);
+				if (failedRow)
+					await insertOutboxRow(db, failedRow);
+			}
+		});
 	}
 
 	async function rollbackFailedPushBatchCore(db, attemptedMutations, error) {

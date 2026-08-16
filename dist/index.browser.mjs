@@ -6181,7 +6181,7 @@ function requireSyncClient () {
 			if (!hadStableBase)
 				return { phase: 'push', applied: 0, duplicates: 0, results: [], skipped: 'missing-stable-base' };
 			const pushConfig = resolvePushConfig(syncConfig, normalizePullOptions(options));
-			return pushBeforePull(db, syncConfig, hadStableBase, pushConfig);
+			return pushBeforePull(db, syncConfig, hadStableBase, pushConfig, options);
 		}
 
 		async function ensureLocalSchema(options = {}) {
@@ -6714,7 +6714,10 @@ function requireSyncClient () {
 			}
 			catch (e) {
 				if (isConflictError(e)) {
-					await rollbackFailedPushBatch(db, pending, e);
+					if (options._skipConflictRestore === true)
+						await markFailedPushBatch(db, pending, e);
+					else
+						await rollbackFailedPushBatch(db, pending, e);
 					emitOperationErrors(pending, e, false);
 				}
 				else {
@@ -6728,14 +6731,18 @@ function requireSyncClient () {
 			return result;
 		}
 
-		async function pushBeforePull(db, syncConfig, hasBase, resolvedPushConfig) {
+		async function pushBeforePull(db, syncConfig, hasBase, resolvedPushConfig, pendingOptions = {}) {
 			if (!hasBase)
 				return;
 			const pushConfig = resolvedPushConfig || resolvePushConfig(syncConfig);
 			const maxBatches = resolveMaxPushBatches();
 			const results = [];
 			for (let i = 0; i < maxBatches; i++) {
-				const result = await pushPending({ _syncConfig: syncConfig, _pushConfig: pushConfig });
+				const result = await pushPending({
+					...pendingOptions,
+					_syncConfig: syncConfig,
+					_pushConfig: pushConfig
+				});
 				if (!didPushBatchAdvance(result))
 					break;
 				results.push(result);
@@ -6774,6 +6781,17 @@ function requireSyncClient () {
 
 		async function rollbackFailedPushBatch(db, attemptedMutations, error) {
 			return runSyncMaintenance(db, () => rollbackFailedPushBatchCore(db, attemptedMutations, error));
+		}
+
+		async function markFailedPushBatch(db, attemptedMutations, error) {
+			return runSyncMaintenance(db, async () => {
+				await ensureSyncOutboxTable(db);
+				for (let i = 0; i < attemptedMutations.length; i++) {
+					const failedRow = failedOutboxRow(attemptedMutations[i], error);
+					if (failedRow)
+						await insertOutboxRow(db, failedRow);
+				}
+			});
 		}
 
 		async function rollbackFailedPushBatchCore(db, attemptedMutations, error) {
@@ -27001,6 +27019,10 @@ function requireDualSyncDatabase () {
 	const manifestId = 'default';
 	const roleA = 'a';
 	const roleB = 'b';
+	const roleC = 'c';
+	const allRoles = [roleA, roleB, roleC];
+	const stagingReady = 'ready';
+	const stagingRebuilding = 'rebuilding';
 	const outboxReplayPageSize = 1000;
 	const deltaItemsPerChunk = 1000;
 	const deltaChunkReadPageSize = 32;
@@ -27009,14 +27031,16 @@ function requireDualSyncDatabase () {
 	function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase) {
 		const roleConnectionStrings = {
 			[roleA]: connectionString,
-			[roleB]: appendRoleSuffix(connectionString, 'b')
+			[roleB]: appendRoleSuffix(connectionString, 'b'),
+			[roleC]: appendRoleSuffix(connectionString, 'c')
 		};
 		const cacheConnectionString = appendRoleSuffix(connectionString, 'delta');
 		const primaryDataPoolOptions = toDataPoolOptions(poolOptions);
-		const secondaryDataPoolOptions = toSecondaryDataPoolOptions(
-			primaryDataPoolOptions,
-			roleConnectionStrings[roleB]
-		);
+		const dataPoolOptionsByRole = {
+			[roleA]: primaryDataPoolOptions,
+			[roleB]: toSecondaryDataPoolOptions(primaryDataPoolOptions, roleConnectionStrings[roleB]),
+			[roleC]: toSecondaryDataPoolOptions(primaryDataPoolOptions, roleConnectionStrings[roleC])
+		};
 		const cachePoolOptions = toCachePoolOptions(primaryDataPoolOptions, cacheConnectionString);
 		const dbByRole = new Map();
 		const clientByRole = new Map();
@@ -27035,6 +27059,10 @@ function requireDualSyncDatabase () {
 		let syncTail = Promise.resolve();
 		let activeSyncRun = null;
 		let pendingSyncRequest = null;
+		let stagingRebuildPromise = null;
+		const stagingRebuildRuns = new Set();
+		const syncAutos = new Set();
+		let ending = false;
 		let queuedSyncCount = 0;
 		let nextProgressRequestId = 1;
 		let initialReadyEmitted = false;
@@ -27044,6 +27072,7 @@ function requireDualSyncDatabase () {
 		const schemaReadyPromises = new Map();
 		let schemaReadyGeneration = 0;
 		const dualSyncLockName = `orange-orm:sqliteOPFS:dual-sync:${normalizeLockNamePart(connectionString)}`;
+		const dualRebuildLockName = `orange-orm:sqliteOPFS:dual-rebuild:${normalizeLockNamePart(connectionString)}`;
 		const dualWriteLockName = `orange-orm:sqliteOPFS:dual-write:${normalizeLockNamePart(connectionString)}`;
 
 		const router = {
@@ -27103,6 +27132,11 @@ function requireDualSyncDatabase () {
 		}
 
 		async function end() {
+			ending = true;
+			await Promise.all(Array.from(syncAutos, auto => auto.stop()));
+			await syncTail.catch(() => {});
+			while (stagingRebuildRuns.size > 0)
+				await Promise.allSettled(Array.from(stagingRebuildRuns));
 			const closes = [];
 			for (const db of dbByRole.values()) {
 				if (db && typeof db.end === 'function')
@@ -27129,6 +27163,7 @@ function requireDualSyncDatabase () {
 				async () => router.__sqliteSync,
 				{ runSync: syncAutomatic }
 			);
+			syncAutos.add(auto);
 			const syncClient = {
 				sync: syncObserved,
 				ensureLocalSchema,
@@ -27163,6 +27198,8 @@ function requireDualSyncDatabase () {
 		}
 
 		function coalesceSync(normalizedOptions, schedule = {}) {
+			if (ending)
+				return Promise.reject(new Error('Dual sqliteOPFS database is closing.'));
 			if (!activeSyncRun)
 				return startSyncRun(normalizedOptions, schedule);
 			if (pendingSyncRequest) {
@@ -27193,6 +27230,10 @@ function requireDualSyncDatabase () {
 			pendingSyncRequest = null;
 			if (!pending)
 				return;
+			if (ending) {
+				pending.reject(new Error('Dual sqliteOPFS database is closing.'));
+				return;
+			}
 			const nextRun = startSyncRun(pending.normalizedOptions, pending.schedule);
 			nextRun.then(pending.resolve, pending.reject);
 		}
@@ -27269,14 +27310,18 @@ function requireDualSyncDatabase () {
 
 		async function sync(options = {}) {
 			emitSyncProgress('preparing');
-			const manifest = await getManifest(true);
+			let manifest = await getManifest(true);
+			manifest = await waitForReadyStaging(manifest, options);
 			const activeRole = manifest.activeRole;
 			const stagingRole = manifest.stagingRole;
+			const stableRole = manifest.stableRole;
 			const activeSync = getRoleSyncClient(activeRole);
-			const stagingSync = getRoleSyncClient(stagingRole);
+			const stagingSync = getRoleSyncClient(stableRole);
+			const nextStableSync = getRoleSyncClient(stagingRole);
 			await ensureSharedClientId(manifest);
 
-			emitSyncProgress('updating-staging', { activeRole, stagingRole });
+			emitSyncProgress('updating-staging', { activeRole, stagingRole: stableRole, stableRole: stagingRole });
+			await applyPendingDeltasToRole(stableRole);
 			await applyPendingDeltasToRole(stagingRole);
 
 			const openRows = await readAllOutboxRows(activeSync, ['pending', 'pushed']);
@@ -27284,12 +27329,15 @@ function requireDualSyncDatabase () {
 				replay: false,
 				replaceOpen: true
 			});
-			emitSyncProgress('pushing-staging', { activeRole, stagingRole });
+			emitSyncProgress('pushing-staging', { activeRole, stagingRole: stableRole, stableRole: stagingRole });
 			let stagingPushResult;
 			let pushConflictError;
 			let rejectedMutationIds = new Set();
 			try {
-				stagingPushResult = await stagingSync[pushPendingSymbol](options);
+				stagingPushResult = await stagingSync[pushPendingSymbol]({
+					...options,
+					_skipConflictRestore: true
+				});
 			}
 			catch (error) {
 				if (isConflictError(error)) {
@@ -27306,12 +27354,13 @@ function requireDualSyncDatabase () {
 			}
 			if (!pushConflictError)
 				await acknowledgeActivePushes(manifest, activeSync, stagingSync, stagingPushResult);
+			await mirrorCandidateOutbox(stagingSync, nextStableSync, openRows);
 			const needsInitialSwap = stagingPushResult && stagingPushResult.skipped === 'missing-stable-base';
 			const deferStableBaseUntilComplete = needsInitialSwap && openRows.length === 0;
 
-			emitSyncProgress('pulling-staging', { activeRole, stagingRole });
+			emitSyncProgress('pulling-staging', { activeRole, stagingRole: stableRole, stableRole: stagingRole });
 			const pullStagingStartedAtMs = Date.now();
-			const deltaSink = await createDeltaJournalSink(stagingRole);
+			const deltaSink = await createDeltaJournalSink(stableRole);
 			let result;
 			let journal;
 			let deltaId;
@@ -27325,7 +27374,7 @@ function requireDualSyncDatabase () {
 					_onPullBatchProgress(progress) {
 						emitSyncProgress('pull-batch-complete', {
 							activeRole,
-							stagingRole,
+							stagingRole: stableRole,
 							...progress
 						});
 					},
@@ -27338,7 +27387,7 @@ function requireDualSyncDatabase () {
 				deltaId = await deltaSink.commit(journal);
 				emitSyncProgress('pull-staging-summary', {
 					activeRole,
-					stagingRole,
+					stagingRole: stableRole,
 					...(pullStagingSummary || {}),
 					deltaFinalizeMs: Math.max(0, Date.now() - deltaFinalizeStartedAtMs),
 					elapsedMs: Math.max(0, Date.now() - pullStagingStartedAtMs),
@@ -27350,7 +27399,7 @@ function requireDualSyncDatabase () {
 				await deltaSink.abort();
 				emitSyncProgress('pull-staging-summary', {
 					activeRole,
-					stagingRole,
+					stagingRole: stableRole,
 					...(pullStagingSummary || {}),
 					elapsedMs: Math.max(0, Date.now() - pullStagingStartedAtMs),
 					deferredStableBase: deferStableBaseUntilComplete,
@@ -27358,10 +27407,11 @@ function requireDualSyncDatabase () {
 				});
 				throw error;
 			}
-			let publishedManifest = manifest;
-			let swapped = false;
+			if (deltaId)
+				await applyPendingDeltasToRole(stagingRole, deltaId);
+			let publishedManifest;
 
-			emitSyncProgress('waiting-for-write-barrier', { activeRole, stagingRole });
+			emitSyncProgress('waiting-for-write-barrier', { activeRole, stagingRole: stableRole, stableRole: stagingRole });
 			await runSyncSwap(router, async () => {
 				const currentManifest = await getManifest(true);
 				assertExpectedManifest(currentManifest, manifest);
@@ -27371,25 +27421,28 @@ function requireDualSyncDatabase () {
 					replay: true,
 					replaceOpen: false
 				});
-				if (needsInitialSwap || deltaId || openRows.length > 0 || finalPendingRows.length > 0) {
-					emitSyncProgress('swapping', { activeRole, stagingRole });
-					publishedManifest = await publishStagingRole(manifest);
-					swapped = true;
-				}
+				await nextStableSync[applyOutboxRowsSymbol](finalPendingRows, {
+					replay: false,
+					replaceOpen: false
+				});
+				emitSyncProgress('swapping', { activeRole, stagingRole: stableRole, stableRole: stagingRole });
+				publishedManifest = await publishStableRole(manifest);
 			});
 
 			publishedManifest = await markSuccessfulSync();
 			const newActiveRole = publishedManifest.activeRole;
 			await maybeEmitInitialReady(newActiveRole);
+			scheduleStagingRebuild(publishedManifest);
 			emitSyncProgress('complete', {
 				activeRole: publishedManifest.activeRole,
 				stagingRole: publishedManifest.stagingRole,
-				swapped
+				stableRole: publishedManifest.stableRole,
+				swapped: true
 			});
 			const dualResult = withDualSyncResult(result, {
 				...publishedManifest,
 				deltaId,
-				swapped
+				swapped: true
 			});
 			if (pushConflictError) {
 				attachRecoveredConflict(pushConflictError, dualResult, rejectedMutationIds);
@@ -27418,6 +27471,18 @@ function requireDualSyncDatabase () {
 					replay: false,
 					replaceOpen: false
 				});
+			});
+		}
+
+		async function mirrorCandidateOutbox(candidateSync, nextStableSync, openRows) {
+			const openIds = new Set(openRows.map(outboxRowMutationId).filter(Boolean));
+			const candidateRows = openIds.size === 0
+				? []
+				: (await readAllOutboxRows(candidateSync, ['pending', 'pushed', 'failed']))
+					.filter(row => openIds.has(outboxRowMutationId(row)));
+			await nextStableSync[applyOutboxRowsSymbol](candidateRows, {
+				replay: false,
+				replaceOpen: true
 			});
 		}
 
@@ -27498,7 +27563,7 @@ function requireDualSyncDatabase () {
 
 		async function resetLocalCore(options) {
 			const errors = [];
-			for (const role of [roleA, roleB]) {
+			for (const role of allRoles) {
 				try {
 					await getRoleSyncClient(role).resetLocal(options);
 				}
@@ -27518,10 +27583,27 @@ function requireDualSyncDatabase () {
 			return runWithCrossTabLock(
 				dualSyncLockName,
 				toDualSyncLockConfig(poolOptions && poolOptions.sync, options),
-				() => runSyncSwap(router, async () => {
-					const manifest = await getManifest(true);
-					return getRoleSyncClient(manifest.activeRole).discardLocalChanges(options);
-				})
+				async () => {
+					let manifest = await getManifest(true);
+					manifest = await waitForReadyStaging(manifest, options);
+					const candidateSync = getRoleSyncClient(manifest.stableRole);
+					const nextStableSync = getRoleSyncClient(manifest.stagingRole);
+					await candidateSync[applyOutboxRowsSymbol]([], {
+						replay: false,
+						replaceOpen: true
+					});
+					await nextStableSync[applyOutboxRowsSymbol]([], {
+						replay: false,
+						replaceOpen: true
+					});
+					let publishedManifest;
+					await runSyncSwap(router, async () => {
+						const current = await getManifest(true);
+						assertExpectedManifest(current, manifest);
+						publishedManifest = await publishStableRole(manifest);
+					});
+					scheduleStagingRebuild(publishedManifest);
+				}
 			);
 		}
 
@@ -27590,7 +27672,7 @@ function requireDualSyncDatabase () {
 		function attachRoleEvent(event) {
 			if (!event || event.indexOf('operation') !== 0)
 				return;
-			for (const role of [roleA, roleB]) {
+			for (const role of allRoles) {
 				const key = role + ':' + event;
 				if (roleEventSubscriptions.has(key))
 					continue;
@@ -27623,6 +27705,117 @@ function requireDualSyncDatabase () {
 				return;
 			initialReadyEmitted = true;
 			emit('initial-ready', { source: 'dual-swap', role });
+		}
+
+		async function waitForReadyStaging(manifest, options = {}) {
+			if (manifest.stagingStatus === stagingReady)
+				return manifest;
+			emitSyncProgress('waiting-for-staging', {
+				activeRole: manifest.activeRole,
+				stagingRole: manifest.stagingRole,
+				stableRole: manifest.stableRole
+			});
+			await waitWithTimeout(
+				scheduleStagingRebuild(manifest),
+				normalizeTimeoutMs(options.timeoutMs),
+				'Dual sync timed out waiting for staging rebuild.'
+			);
+			const readyManifest = await getManifest(true);
+			if (readyManifest.stagingStatus !== stagingReady)
+				throw new Error('Dual sync staging rebuild did not produce a ready staging role.');
+			return readyManifest;
+		}
+
+		function scheduleStagingRebuild(manifest) {
+			if (!manifest || manifest.stagingStatus === stagingReady)
+				return Promise.resolve(manifest);
+			if (stagingRebuildPromise)
+				return stagingRebuildPromise;
+			const run = runWithCrossTabLock(
+				dualRebuildLockName,
+				toDualSyncLockConfig(poolOptions && poolOptions.sync, {}),
+				() => rebuildStaging(manifest)
+			);
+			stagingRebuildPromise = run;
+			stagingRebuildRuns.add(run);
+			run.then(
+				() => finishStagingRebuild(run),
+				() => finishStagingRebuild(run)
+			);
+			run.catch(() => {});
+			return run;
+		}
+
+		function finishStagingRebuild(run) {
+			stagingRebuildRuns.delete(run);
+			if (stagingRebuildPromise === run)
+				stagingRebuildPromise = null;
+		}
+
+		async function rebuildStaging(expectedManifest) {
+			const manifest = await getManifest(true);
+			if (manifest.stagingStatus === stagingReady)
+				return manifest;
+			if (manifest.generation !== expectedManifest.generation
+				|| manifest.activeRole !== expectedManifest.activeRole
+				|| manifest.stagingRole !== expectedManifest.stagingRole
+				|| manifest.stableRole !== expectedManifest.stableRole) {
+				throw new Error('Dual sync roles changed before staging rebuild started.');
+			}
+			const targetRole = manifest.stagingRole;
+			const stableRole = manifest.stableRole;
+			const targetSync = getRoleSyncClient(targetRole);
+			const stableSync = getRoleSyncClient(stableRole);
+			emitSyncProgress('staging-rebuild-start', {
+				activeRole: manifest.activeRole,
+				stagingRole: targetRole,
+				stableRole
+			});
+			try {
+				try {
+					await targetSync.discardLocalChanges();
+				}
+				catch (error) {
+					if (!isMissingStableBaseError(error))
+						throw error;
+					await targetSync.resetLocal();
+				}
+				await applyPendingDeltasToRole(targetRole);
+				const stableOutboxRows = await readAllOutboxRows(stableSync, ['pending', 'pushed', 'failed']);
+				await targetSync[applyOutboxRowsSymbol](stableOutboxRows, {
+					replay: false,
+					replaceOpen: true
+				});
+				await targetSync[setClientIdSymbol](manifest.clientId);
+				const current = await getManifest(true);
+				assertExpectedManifest(current, manifest);
+				const readyManifest = await writeManifest({
+					...current,
+					stagingStatus: stagingReady,
+					updatedAtMs: Date.now()
+				}, {
+					expectedGeneration: current.generation,
+					expectedActiveRole: current.activeRole,
+					expectedStagingRole: current.stagingRole,
+					expectedStableRole: current.stableRole,
+					expectedStagingStatus: stagingRebuilding
+				});
+				emitSyncProgress('staging-rebuild-complete', {
+					activeRole: readyManifest.activeRole,
+					stagingRole: readyManifest.stagingRole,
+					stableRole: readyManifest.stableRole
+				});
+				return readyManifest;
+			}
+			catch (error) {
+				emitSyncProgress('staging-rebuild-error', {
+					activeRole: manifest.activeRole,
+					stagingRole: targetRole,
+					stableRole,
+					error
+				});
+				throw error;
+			}
 		}
 
 		async function applyPendingDeltasToRole(role, onlyDeltaId) {
@@ -27660,18 +27853,21 @@ function requireDualSyncDatabase () {
 			}
 		}
 
-		async function publishStagingRole(manifest) {
+		async function publishStableRole(manifest) {
 			const now = Date.now();
 			return writeManifest({
-				activeRole: manifest.stagingRole,
+				activeRole: manifest.stableRole,
 				stagingRole: manifest.activeRole,
+				stableRole: manifest.stagingRole,
+				stagingStatus: stagingRebuilding,
 				updatedAtMs: now,
 				generation: manifest.generation + 1,
 				clientId: manifest.clientId
 			}, {
 				expectedGeneration: manifest.generation,
 				expectedActiveRole: manifest.activeRole,
-				expectedStagingRole: manifest.stagingRole
+				expectedStagingRole: manifest.stagingRole,
+				expectedStableRole: manifest.stableRole
 			});
 		}
 
@@ -27706,7 +27902,7 @@ function requireDualSyncDatabase () {
 			const clientId = manifest && manifest.clientId;
 			if (typeof clientId !== 'string' || clientId.length === 0)
 				throw new Error('Dual sync manifest does not contain a shared client id.');
-			for (const role of [roleA, roleB]) {
+			for (const role of allRoles) {
 				const syncClient = getRoleSyncClient(role);
 				if (typeof syncClient[setClientIdSymbol] !== 'function')
 					throw new Error('Dual sync role client cannot set the shared client id.');
@@ -27728,7 +27924,9 @@ function requireDualSyncDatabase () {
 			if (!current || !expected
 				|| current.generation !== expected.generation
 				|| current.activeRole !== expected.activeRole
-				|| current.stagingRole !== expected.stagingRole) {
+				|| current.stagingRole !== expected.stagingRole
+				|| current.stableRole !== expected.stableRole
+				|| current.stagingStatus !== expected.stagingStatus) {
 				throw new Error('Dual sync manifest changed while staging was being prepared; retry sync.');
 			}
 		}
@@ -27858,6 +28056,8 @@ function requireDualSyncDatabase () {
 					const initialManifest = {
 						activeRole: roleA,
 						stagingRole: roleB,
+						stableRole: roleC,
+						stagingStatus: stagingReady,
 						updatedAtMs: Date.now(),
 						generation: 0,
 						clientId: randomUuid()
@@ -27874,18 +28074,22 @@ function requireDualSyncDatabase () {
 			const db = await getCacheDb();
 			await ensureCacheSchema(db);
 			const rows = await db.query([
-				`SELECT "active_role", "staging_role", "updated_at_ms", "generation", "client_id", "last_successful_sync_at_ms" FROM "${manifestTable}"`,
+				`SELECT "active_role", "staging_role", "stable_role", "staging_status", "updated_at_ms", "generation", "client_id", "last_successful_sync_at_ms" FROM "${manifestTable}"`,
 				`WHERE "id" = ${sqlStringLiteral(manifestId)}`,
 				'LIMIT 1'
 			].join(' '));
 			const row = firstRow(rows);
 			const activeRole = row && (row.active_role ?? row.ACTIVE_ROLE);
 			const stagingRole = row && (row.staging_role ?? row.STAGING_ROLE);
-			if (!isRole(activeRole) || !isRole(stagingRole) || activeRole === stagingRole)
+			const stableRole = row && (row.stable_role ?? row.STABLE_ROLE);
+			const stagingStatus = row && (row.staging_status ?? row.STAGING_STATUS);
+			if (!areDistinctRoles(activeRole, stagingRole, stableRole))
 				return null;
 			return {
 				activeRole,
 				stagingRole,
+				stableRole,
+				stagingStatus: normalizeStagingStatus(stagingStatus),
 				updatedAtMs: Number(row.updated_at_ms ?? row.UPDATED_AT_MS ?? Date.now()),
 				generation: normalizeGeneration(row.generation ?? row.GENERATION),
 				clientId: nonEmptyString(row.client_id ?? row.CLIENT_ID),
@@ -27919,27 +28123,36 @@ function requireDualSyncDatabase () {
 			if (!normalized || !normalized.clientId)
 				throw new Error('Cannot persist an invalid dual sync manifest.');
 			if (options.expectedGeneration !== undefined) {
+				const expectedStatusSql = options.expectedStagingStatus
+					? `AND "staging_status" = ${sqlStringLiteral(options.expectedStagingStatus)}`
+					: '';
 				await db.query([
 					`UPDATE "${manifestTable}" SET`,
 					`"active_role" = ${sqlStringLiteral(normalized.activeRole)},`,
 					`"staging_role" = ${sqlStringLiteral(normalized.stagingRole)},`,
+					`"stable_role" = ${sqlStringLiteral(normalized.stableRole)},`,
+					`"staging_status" = ${sqlStringLiteral(normalized.stagingStatus)},`,
 					`"updated_at_ms" = ${normalized.updatedAtMs},`,
 					`"generation" = ${normalized.generation},`,
 					`"client_id" = ${sqlStringLiteral(normalized.clientId)}`,
 					`WHERE "id" = ${sqlStringLiteral(manifestId)}`,
 					`AND "generation" = ${normalizeGeneration(options.expectedGeneration)}`,
 					`AND "active_role" = ${sqlStringLiteral(options.expectedActiveRole)}`,
-					`AND "staging_role" = ${sqlStringLiteral(options.expectedStagingRole)}`
+					`AND "staging_role" = ${sqlStringLiteral(options.expectedStagingRole)}`,
+					`AND "stable_role" = ${sqlStringLiteral(options.expectedStableRole)}`,
+					expectedStatusSql
 				].join(' '));
 			}
 			else {
 				await db.query([
-					`INSERT INTO "${manifestTable}" ("id", "active_role", "staging_role", "updated_at_ms", "generation", "client_id")`,
-					`VALUES (${sqlStringLiteral(manifestId)}, ${sqlStringLiteral(normalized.activeRole)}, ${sqlStringLiteral(normalized.stagingRole)}, ${normalized.updatedAtMs}, ${normalized.generation}, ${sqlStringLiteral(normalized.clientId)})`,
+					`INSERT INTO "${manifestTable}" ("id", "active_role", "staging_role", "stable_role", "staging_status", "updated_at_ms", "generation", "client_id")`,
+					`VALUES (${sqlStringLiteral(manifestId)}, ${sqlStringLiteral(normalized.activeRole)}, ${sqlStringLiteral(normalized.stagingRole)}, ${sqlStringLiteral(normalized.stableRole)}, ${sqlStringLiteral(normalized.stagingStatus)}, ${normalized.updatedAtMs}, ${normalized.generation}, ${sqlStringLiteral(normalized.clientId)})`,
 					options.insertOnly ? 'ON CONFLICT("id") DO NOTHING' : [
 						'ON CONFLICT("id") DO UPDATE SET',
 						'"active_role" = excluded."active_role",',
 						'"staging_role" = excluded."staging_role",',
+						'"stable_role" = excluded."stable_role",',
+						'"staging_status" = excluded."staging_status",',
 						'"updated_at_ms" = excluded."updated_at_ms",',
 						'"generation" = excluded."generation",',
 						'"client_id" = excluded."client_id"'
@@ -27952,7 +28165,9 @@ function requireDualSyncDatabase () {
 			if (options.expectedGeneration !== undefined
 				&& (persisted.generation !== normalized.generation
 					|| persisted.activeRole !== normalized.activeRole
-					|| persisted.stagingRole !== normalized.stagingRole)) {
+					|| persisted.stagingRole !== normalized.stagingRole
+					|| persisted.stableRole !== normalized.stableRole
+					|| persisted.stagingStatus !== normalized.stagingStatus)) {
 				throw new Error('Dual sync manifest compare-and-swap failed; retry sync.');
 			}
 			updateManifestCache(persisted, true);
@@ -28132,7 +28347,7 @@ function requireDualSyncDatabase () {
 				: [];
 			if (!roles.includes(role))
 				roles.push(role);
-			if (roles.includes(roleA) && roles.includes(roleB)) {
+			if (allRoles.every(role => roles.includes(role))) {
 				await db.query(`DELETE FROM "${deltaChunkTable}" WHERE "delta_id" = ${sqlStringLiteral(delta.id)}`);
 				await db.query(`DELETE FROM "${deltaTable}" WHERE "id" = ${sqlStringLiteral(delta.id)}`);
 				delta.appliedRoles = roles;
@@ -28158,6 +28373,8 @@ function requireDualSyncDatabase () {
 			return writeManifest({
 				activeRole: roleA,
 				stagingRole: roleB,
+				stableRole: roleC,
+				stagingStatus: stagingReady,
 				updatedAtMs: Date.now(),
 				generation: 0,
 				clientId: currentManifest && currentManifest.clientId || randomUuid()
@@ -28180,6 +28397,8 @@ function requireDualSyncDatabase () {
 						'"id" TEXT PRIMARY KEY,',
 						'"active_role" TEXT NOT NULL,',
 						'"staging_role" TEXT NOT NULL,',
+						'"stable_role" TEXT NOT NULL,',
+						'"staging_status" TEXT NOT NULL DEFAULT \'ready\',',
 						'"updated_at_ms" INTEGER NOT NULL,',
 						'"generation" INTEGER NOT NULL DEFAULT 0,',
 						'"client_id" TEXT,',
@@ -28189,6 +28408,8 @@ function requireDualSyncDatabase () {
 					await tryAddCacheColumn(db, manifestTable, 'generation', 'INTEGER NOT NULL DEFAULT 0');
 					await tryAddCacheColumn(db, manifestTable, 'client_id', 'TEXT');
 					await tryAddCacheColumn(db, manifestTable, 'last_successful_sync_at_ms', 'INTEGER');
+					await tryAddCacheColumn(db, manifestTable, 'stable_role', `TEXT NOT NULL DEFAULT '${roleC}'`);
+					await tryAddCacheColumn(db, manifestTable, 'staging_status', `TEXT NOT NULL DEFAULT '${stagingReady}'`);
 					await db.query([
 						`CREATE TABLE IF NOT EXISTS "${deltaTable}" (`,
 						'"id" TEXT PRIMARY KEY,',
@@ -28229,9 +28450,7 @@ function requireDualSyncDatabase () {
 		}
 
 		function getRolePoolOptions(role) {
-			return role === roleA
-				? primaryDataPoolOptions
-				: secondaryDataPoolOptions;
+			return dataPoolOptionsByRole[role];
 		}
 
 		function updateManifestCache(info, force = false) {
@@ -28251,6 +28470,8 @@ function requireDualSyncDatabase () {
 			if (!previous
 				|| previous.activeRole !== manifest.activeRole
 				|| previous.stagingRole !== manifest.stagingRole
+				|| previous.stableRole !== manifest.stableRole
+				|| previous.stagingStatus !== manifest.stagingStatus
 				|| previous.generation !== manifest.generation
 				|| Number(previous.updatedAtMs || 0) !== Number(manifest.updatedAtMs || 0)) {
 				clearSchemaReadyRoles();
@@ -28466,11 +28687,14 @@ function requireDualSyncDatabase () {
 	function normalizeManifestInfo(info) {
 		if (!info || info !== Object(info))
 			return null;
-		if (!isRole(info.activeRole) || !isRole(info.stagingRole) || info.activeRole === info.stagingRole)
+		const stableRole = info.stableRole || allRoles.find(role => role !== info.activeRole && role !== info.stagingRole);
+		if (!areDistinctRoles(info.activeRole, info.stagingRole, stableRole))
 			return null;
 		return {
 			activeRole: info.activeRole,
 			stagingRole: info.stagingRole,
+			stableRole,
+			stagingStatus: normalizeStagingStatus(info.stagingStatus),
 			updatedAtMs: Number(info.updatedAtMs) || Date.now(),
 			generation: normalizeGeneration(info.generation),
 			clientId: nonEmptyString(info.clientId),
@@ -28563,7 +28787,18 @@ function requireDualSyncDatabase () {
 	}
 
 	function isRole(value) {
-		return value === roleA || value === roleB;
+		return value === roleA || value === roleB || value === roleC;
+	}
+
+	function areDistinctRoles(activeRole, stagingRole, stableRole) {
+		return isRole(activeRole)
+			&& isRole(stagingRole)
+			&& isRole(stableRole)
+			&& new Set([activeRole, stagingRole, stableRole]).size === allRoles.length;
+	}
+
+	function normalizeStagingStatus(value) {
+		return value === stagingRebuilding ? stagingRebuilding : stagingReady;
 	}
 
 	function normalizeSyncOptions(input) {
@@ -28582,6 +28817,21 @@ function requireDualSyncDatabase () {
 		if (!Number.isFinite(parsed) || parsed <= 0)
 			return undefined;
 		return parsed;
+	}
+
+	function waitWithTimeout(promise, timeoutMs, message) {
+		if (!timeoutMs)
+			return promise;
+		let timeoutId;
+		const timeout = new Promise((_resolve, reject) => {
+			timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs);
+		});
+		return Promise.race([promise, timeout])
+			.finally(() => clearTimeout(timeoutId));
+	}
+
+	function isMissingStableBaseError(error) {
+		return /before initial sync has completed/u.test(error && error.message || '');
 	}
 
 	function normalizeAutoSyncIntervalMs(value) {

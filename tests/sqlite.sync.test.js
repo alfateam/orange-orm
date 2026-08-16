@@ -8,6 +8,7 @@ const initSqlite = require('./initSqlite');
 const initPg = require('./initPg');
 const rdb = require('../src/index');
 const { setupChangeTracking } = require('../src/sync/setupChangeTracking');
+const { pushPendingSymbol } = require('../src/client/syncClient');
 
 const pathSegments = __filename.split('/');
 const lastSegment = pathSegments[pathSegments.length - 1];
@@ -805,6 +806,38 @@ describe('sqlite staged pull sync', () => {
 
 		expect(pushedRemote84.name).toBe('Replay84');
 		expect(afterPushPending).toHaveLength(0);
+	});
+
+	test('staging conflict records the failure without restoring the staging data', async () => {
+		await localDb.query('DELETE FROM "order"');
+		await localDb.query('DELETE FROM customer');
+		await remoteDb.query('DELETE FROM "order"');
+		await remoteDb.query('DELETE FROM customer');
+
+		await remoteDb.customer.insert({
+			id: 89,
+			name: 'Base89',
+			balance: 89,
+			isActive: true
+		});
+		await localDb.syncClient.sync();
+		await localDb.query('DELETE FROM "orange_sync_outbox"');
+
+		const local = await localDb.customer.getById(89);
+		local.name = 'Local89';
+		await local.saveChanges();
+		await remoteDb.query('UPDATE customer SET name = \'Remote89\' WHERE id = 89');
+
+		await expect(localDb.syncClient[pushPendingSymbol]({
+			_skipConflictRestore: true
+		})).rejects.toThrow('Request failed with status code 409');
+
+		const unchangedLocal = await localDb.customer.getById(89);
+		const failed = await localDb.query(
+			'SELECT "mutation_id" FROM "orange_sync_outbox" WHERE "status" = \'failed\''
+		);
+		expect(unchangedLocal.name).toBe('Local89');
+		expect(failed).toHaveLength(1);
 	});
 
 	test('conflict after an accepted push replays pushed and later pending mutations', async () => {

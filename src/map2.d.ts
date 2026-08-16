@@ -1120,8 +1120,10 @@ export interface SyncProgressEvent {
   phase: string;
   atMs: number;
   queueDepth?: number;
-  activeRole?: 'a' | 'b';
-  stagingRole?: 'a' | 'b';
+  activeRole?: 'a' | 'b' | 'c';
+  stagingRole?: 'a' | 'b' | 'c';
+  stableRole?: 'a' | 'b' | 'c';
+  stagingStatus?: 'ready' | 'rebuilding';
   swapped?: boolean;
   requestId?: number;
   requestPhase?: string;
@@ -1130,7 +1132,7 @@ export interface SyncProgressEvent {
   elapsedMs?: number;
   failed?: boolean;
   deltaId?: string;
-  targetRole?: 'a' | 'b';
+  targetRole?: 'a' | 'b' | 'c';
   processedItems?: number;
   totalItems?: number;
   batchNo?: number;
