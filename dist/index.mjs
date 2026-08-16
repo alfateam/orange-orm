@@ -30916,6 +30916,32 @@ function requireDualSyncDatabase () {
 					await restoreFileSnapshotAfterError(manifest, rollbackSnapshot, error);
 				throw error;
 			}
+			const pushedMutationCount = pushResultMutationIds(stagingPushResult).size;
+			const pendingDuringSync = fileSnapshotRotation
+				? await readAllOutboxRows(activeSync, ['pending'])
+				: [];
+			if (fileSnapshotRotation
+				&& result
+				&& Number(result.applied || 0) === 0
+				&& pushedMutationCount === 0
+				&& openRows.length === 0
+				&& pendingDuringSync.length === 0
+				&& !pushConflictError) {
+				const unchangedManifest = await markSuccessfulSync();
+				emitSyncProgress('complete', {
+					activeRole: unchangedManifest.activeRole,
+					stagingRole: unchangedManifest.stagingRole,
+					stableRole: unchangedManifest.stableRole,
+					swapped: false,
+					unchanged: true
+				});
+				return withDualSyncResult(result, {
+					...unchangedManifest,
+					deltaId: undefined,
+					swapped: false,
+					unchanged: true
+				});
+			}
 			if (fileSnapshotRotation) {
 				try {
 					emitSyncProgress('saving-base-snapshot', {

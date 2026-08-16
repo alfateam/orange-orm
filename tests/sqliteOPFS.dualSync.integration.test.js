@@ -207,10 +207,10 @@ describe('sqliteOPFS dual sync integration', () => {
 
 		const fourthSyncResult = await localDb.syncClient.sync();
 		expect(fourthSyncResult.__orangeDualSync).toMatchObject({
-			activeRole: 'a',
-			stagingRole: 'b',
-			stableRole: 'c',
-			swapped: true
+			activeRole: 'b',
+			stagingRole: 'c',
+			stableRole: 'a',
+			swapped: false
 		});
 		expect((await remoteDb.project.getById('p2')).title).toBe('Two changed during swap');
 		expect(pushedMutationIds.filter(id => id === mutationCreatedDuringSync)).toHaveLength(1);
@@ -221,10 +221,10 @@ describe('sqliteOPFS dual sync integration', () => {
 		const roleCRows = await roleC.query('SELECT "id", "title" FROM "project" ORDER BY "id"');
 
 		expect(noOpSyncResult.__orangeDualSync).toMatchObject({
-			activeRole: 'c',
-			stagingRole: 'a',
-			stableRole: 'b',
-			swapped: true
+			activeRole: 'b',
+			stagingRole: 'c',
+			stableRole: 'a',
+			swapped: false
 		});
 		expect(await deltaDb.query('SELECT "id" FROM "orange_sync_dual_delta"')).toHaveLength(0);
 		expect(roleARows).toEqual(roleBRows);
