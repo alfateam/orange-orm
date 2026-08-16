@@ -82,7 +82,7 @@ describe('sqliteOPFS broker worker', () => {
 		}
 	});
 
-	test('serves rotated database files through ports from one broker', async () => {
+	test('serves concurrent rotated SAH-pool files through ports from one broker', async () => {
 		const executed = [];
 		const opened = [];
 		const worker = createInlineSqliteOPFSWorker({
@@ -90,13 +90,11 @@ describe('sqliteOPFS broker worker', () => {
 		});
 		const activeClient = createSqliteOPFSWorkerClient('rotation.sqlite3', {
 			worker,
-			vfs: 'opfs-wl',
-			deferOpen: true
+			vfs: 'opfs-sahpool'
 		});
 		const rotatedClient = createSqliteOPFSWorkerClient('rotation.__orange_sync_c.sqlite3', {
 			worker: connectSqliteOPFSWorker(worker),
-			vfs: 'opfs-wl',
-			deferOpen: true,
+			vfs: 'opfs-sahpool',
 			closeDbOnClose: false
 		});
 
@@ -132,6 +130,30 @@ async function executeWithCheckout(client, sql) {
 
 function newFakeSqlite3(executed = [], opened = []) {
 	return {
+		async installOpfsSAHPoolVfs() {
+			return {
+				vfsName: 'opfs-sahpool',
+				OpfsSAHPoolDb: class FakeOpfsSAHPoolDb {
+					constructor(filename) {
+						this.filename = filename;
+						opened.push(filename);
+					}
+
+					exec(options) {
+						if (typeof options === 'string')
+							return undefined;
+						executed.push(options.sql);
+						return options.returnValue === 'resultRows' ? [{ value: 1 }] : undefined;
+					}
+
+					changes() {
+						return 0;
+					}
+
+					close() {}
+				}
+			};
+		},
 		oo1: {
 			OpfsDb: class FakeOpfsDb {
 				constructor(filename) {

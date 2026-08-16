@@ -333,6 +333,7 @@ describe('sqliteOPFS dual sync database', () => {
 		const db = newDualSyncDatabase('app.sqlite3', {
 			createWorker,
 			closeDbOnClose: false,
+			vfs: 'opfs-sahpool',
 			sync: { url: '/rdb', dualDataDb: true }
 		}, fixture.createSingleDatabase);
 

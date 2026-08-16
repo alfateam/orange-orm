@@ -3,9 +3,9 @@ function createInlineSqliteOPFSWorker(options = {}) {
 	const sqliteModuleUrl = options.sqliteModuleUrl || getDefaultSqliteModuleUrl() || '@sqlite.org/sqlite-wasm';
 	const sqliteInitConfig = {};
 	let sqlite3Promise;
-	let db;
-	let dbOpenOptions;
-	let dbOpenInfo;
+	const dbByConnectionString = new Map();
+	const dbOpenOptionsByConnectionString = new Map();
+	const dbOpenInfoByConnectionString = new Map();
 	let operationQueue = Promise.resolve();
 	let activeLeaseId;
 	let nextLeaseId = 1;
@@ -128,15 +128,16 @@ function createInlineSqliteOPFSWorker(options = {}) {
 	function terminate() {
 		closed = true;
 		listeners.clear();
-		if (db && typeof db.close === 'function') {
+		for (const db of dbByConnectionString.values()) {
 			try {
-				db.close();
+				if (db && typeof db.close === 'function')
+					db.close();
 			}
 			catch (_e) {
 				// Nothing useful to do during worker shutdown.
 			}
 		}
-		db = null;
+		dbByConnectionString.clear();
 	}
 
 	async function dispatchTimed(message) {
@@ -149,48 +150,56 @@ function createInlineSqliteOPFSWorker(options = {}) {
 	}
 
 	async function dispatch(message) {
+		const connectionString = normalizeConnectionString(message.connectionString);
 		if (message.method === 'open')
-			return openDb(message.connectionString, message.busyTimeoutMs, message.vfs, message.opfsSahPoolOptions);
+			return openDb(connectionString, message.busyTimeoutMs, message.vfs, message.opfsSahPoolOptions);
 		if (message.method === 'close')
-			return closeDb();
+			return closeDb(connectionString);
 		if (message.leaseId !== undefined && message.leaseId !== activeLeaseId)
 			throw new Error('sqliteOPFS checkout is not active.');
-		if (!db)
-			await openDbFromLastOptions(message.connectionString);
+		if (!dbByConnectionString.has(connectionString))
+			await openDbFromLastOptions(connectionString);
+		const db = dbByConnectionString.get(connectionString);
 		if (message.method === 'query')
-			return query(message.sql, message.parameters);
+			return query(db, message.sql, message.parameters);
 		if (message.method === 'command')
-			return command(message.sql, message.parameters);
+			return command(db, message.sql, message.parameters);
 		throw new Error('Unknown sqliteOPFS worker method "' + message.method + '".');
 	}
 
 	async function openDb(connectionString, busyTimeoutMs = 5000, vfs, opfsSahPoolOptions) {
-		if (db)
-			return { opened: true, reused: true, ...(dbOpenInfo || {}) };
-		dbOpenOptions = { connectionString, busyTimeoutMs, vfs, opfsSahPoolOptions };
+		const key = normalizeConnectionString(connectionString);
+		if (dbByConnectionString.has(key))
+			return { opened: true, reused: true, ...(dbOpenInfoByConnectionString.get(key) || {}) };
+		dbOpenOptionsByConnectionString.set(key, { connectionString: key, busyTimeoutMs, vfs, opfsSahPoolOptions });
 		const sqlite3 = await getSqlite3();
-		const filename = normalizeFilename(connectionString);
+		const filename = normalizeFilename(key);
 		const dbInfo = await createDb(sqlite3, filename, vfs, opfsSahPoolOptions);
-		db = dbInfo.db;
+		const db = dbInfo.db;
 		db.exec('PRAGMA busy_timeout=' + (Number.parseInt(busyTimeoutMs, 10) || 5000));
-		dbOpenInfo = {
+		const dbOpenInfo = {
 			opened: true,
 			opfs: dbInfo.opfs === true,
 			vfs: dbInfo.vfs,
 			filename: db.filename
 		};
+		dbByConnectionString.set(key, db);
+		dbOpenInfoByConnectionString.set(key, dbOpenInfo);
 		return dbOpenInfo;
 	}
 
-	function closeDb() {
+	function closeDb(connectionString) {
+		const key = normalizeConnectionString(connectionString);
+		const db = dbByConnectionString.get(key);
 		if (db && typeof db.close === 'function')
 			db.close();
-		db = null;
+		dbByConnectionString.delete(key);
 		return { closed: true };
 	}
 
 	function openDbFromLastOptions(connectionString) {
-		const options = dbOpenOptions || { connectionString: connectionString || 'orange.sqlite3' };
+		const key = normalizeConnectionString(connectionString);
+		const options = dbOpenOptionsByConnectionString.get(key) || { connectionString: key };
 		return openDb(options.connectionString, options.busyTimeoutMs, options.vfs, options.opfsSahPoolOptions);
 	}
 
@@ -246,7 +255,7 @@ function createInlineSqliteOPFSWorker(options = {}) {
 		return import(sqliteModuleUrl).then((module) => module && module.default || module);
 	}
 
-	function query(sql, parameters = []) {
+	function query(db, sql, parameters = []) {
 		return db.exec({
 			sql,
 			bind: normalizeParameters(parameters),
@@ -255,7 +264,7 @@ function createInlineSqliteOPFSWorker(options = {}) {
 		});
 	}
 
-	function command(sql, parameters = []) {
+	function command(db, sql, parameters = []) {
 		const before = Number(db.changes(true) || 0);
 		db.exec({
 			sql,
@@ -291,8 +300,12 @@ function getDefaultSqliteModuleUrl() {
 }
 
 function normalizeFilename(connectionString) {
-	const value = String(connectionString || 'orange.sqlite3');
+	const value = normalizeConnectionString(connectionString);
 	return value.startsWith('/') ? value : '/' + value;
+}
+
+function normalizeConnectionString(connectionString) {
+	return String(connectionString || 'orange.sqlite3');
 }
 
 function normalizeParameters(parameters) {

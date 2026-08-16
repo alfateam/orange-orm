@@ -1731,8 +1731,6 @@ function toDataPoolOptions(poolOptions = {}) {
 }
 
 function withInternalWorkerBroker(connectionString, poolOptions) {
-	if (poolOptions.vfs !== 'opfs-wl')
-		return poolOptions;
 	const providedWorker = poolOptions.worker;
 	const providedFactory = poolOptions.createWorker;
 	if (!providedWorker && typeof providedFactory !== 'function')
