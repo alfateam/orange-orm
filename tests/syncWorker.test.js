@@ -124,6 +124,46 @@ describe('sync worker rpc', () => {
 		await expect(pending).rejects.toThrow('worker crashed');
 		client.close();
 	});
+
+	test('preserves recovered sync metadata on worker errors', async () => {
+		const syncResult = {
+			__orangeDualSync: {
+				activeRole: 'b',
+				stagingRole: 'a',
+				swapped: true
+			}
+		};
+		const bridge = createBridge({
+			async sync() {
+				const error = new Error('Request failed with status code 409');
+				error.status = 409;
+				error.syncRecovered = true;
+				error.syncResult = syncResult;
+				error.mutationIds = ['mutation-1'];
+				throw error;
+			},
+			stop: async () => {}
+		}, { autoStart: false });
+		const client = rdb.createSyncWorkerClient(bridge.worker);
+
+		let conflictError;
+		try {
+			await client.sync();
+		}
+		catch (error) {
+			conflictError = error;
+		}
+
+		expect(conflictError).toMatchObject({
+			message: 'Request failed with status code 409',
+			status: 409,
+			syncRecovered: true,
+			syncResult,
+			mutationIds: ['mutation-1']
+		});
+		client.close();
+		bridge.handler.stop();
+	});
 });
 
 function createBridge(syncClient, options = {}) {

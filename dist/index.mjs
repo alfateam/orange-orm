@@ -22312,6 +22312,14 @@ function requireSyncWorkerClient () {
 			e.name = error.name;
 		if (error && error.stack)
 			e.stack = error.stack;
+		if (error && error.syncRecovered === true)
+			e.syncRecovered = true;
+		if (error && error.syncResult !== undefined)
+			e.syncResult = error.syncResult;
+		if (error && Array.isArray(error.mutationIds))
+			e.mutationIds = error.mutationIds;
+		if (error && Number.isFinite(Number(error.status)))
+			e.status = Number(error.status);
 		return e;
 	}
 
@@ -22436,11 +22444,22 @@ function requireSyncWorkerHandler () {
 	}
 
 	function serializeError(error) {
-		return {
+		const serialized = {
 			name: error && error.name,
 			message: error && error.message ? error.message : String(error),
 			stack: error && error.stack
 		};
+		if (error && error.syncRecovered === true)
+			serialized.syncRecovered = true;
+		if (error && error.syncResult !== undefined)
+			serialized.syncResult = error.syncResult;
+		if (error && Array.isArray(error.mutationIds))
+			serialized.mutationIds = error.mutationIds;
+		if (error && Number.isFinite(Number(error.status)))
+			serialized.status = Number(error.status);
+		else if (error && error.response && Number.isFinite(Number(error.response.status)))
+			serialized.status = Number(error.response.status);
+		return serialized;
 	}
 
 	function getPostTarget() {
@@ -31488,21 +31507,39 @@ function requireDualSyncDatabase () {
 			const original = syncClient[method];
 			if (typeof original !== 'function' || original.__orangeDualSyncWrapped)
 				return;
-			function wrappedExternalSyncMethod(...args) {
-				return Promise.resolve(original.apply(this, args))
-					.then(result => {
-						const info = extractDualSyncInfo(result);
-						if (info)
-							updateManifestCache(info, method === 'resetLocal');
-						if (method === 'resetLocal')
-							clearSchemaReadyRoles();
-						return result;
-					});
+			async function wrappedExternalSyncMethod(...args) {
+				try {
+					const result = await original.apply(this, args);
+					await refreshManifestAfterExternalSync(method, result);
+					return result;
+				}
+				catch (error) {
+					try {
+						await refreshManifestAfterExternalSync(method, error);
+					}
+					catch (_refreshError) {
+						// Preserve the sync error after a best-effort manifest refresh.
+					}
+					throw error;
+				}
 			}
 			Object.defineProperty(wrappedExternalSyncMethod, '__orangeDualSyncWrapped', {
 				value: true
 			});
 			syncClient[method] = wrappedExternalSyncMethod;
+		}
+
+		async function refreshManifestAfterExternalSync(method, payload) {
+			const info = extractDualSyncInfo(payload);
+			if (info)
+				updateManifestCache(info, method === 'resetLocal');
+			else {
+				const persisted = await readManifest();
+				if (persisted)
+					updateManifestCache(persisted, true);
+			}
+			if (method === 'resetLocal')
+				clearSchemaReadyRoles();
 		}
 
 		async function ensureRoleLocalSchemaReady(role) {
@@ -31627,6 +31664,9 @@ function requireDualSyncDatabase () {
 			return direct;
 		if (payload.__orangeDualSync)
 			return payload.__orangeDualSync;
+		const syncResult = payload.syncResult;
+		if (syncResult && syncResult.__orangeDualSync)
+			return syncResult.__orangeDualSync;
 		const result = payload.result;
 		if (result && result.__orangeDualSync)
 			return result.__orangeDualSync;

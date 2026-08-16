@@ -1325,21 +1325,39 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		const original = syncClient[method];
 		if (typeof original !== 'function' || original.__orangeDualSyncWrapped)
 			return;
-		function wrappedExternalSyncMethod(...args) {
-			return Promise.resolve(original.apply(this, args))
-				.then(result => {
-					const info = extractDualSyncInfo(result);
-					if (info)
-						updateManifestCache(info, method === 'resetLocal');
-					if (method === 'resetLocal')
-						clearSchemaReadyRoles();
-					return result;
-				});
+		async function wrappedExternalSyncMethod(...args) {
+			try {
+				const result = await original.apply(this, args);
+				await refreshManifestAfterExternalSync(method, result);
+				return result;
+			}
+			catch (error) {
+				try {
+					await refreshManifestAfterExternalSync(method, error);
+				}
+				catch (_refreshError) {
+					// Preserve the sync error after a best-effort manifest refresh.
+				}
+				throw error;
+			}
 		}
 		Object.defineProperty(wrappedExternalSyncMethod, '__orangeDualSyncWrapped', {
 			value: true
 		});
 		syncClient[method] = wrappedExternalSyncMethod;
+	}
+
+	async function refreshManifestAfterExternalSync(method, payload) {
+		const info = extractDualSyncInfo(payload);
+		if (info)
+			updateManifestCache(info, method === 'resetLocal');
+		else {
+			const persisted = await readManifest();
+			if (persisted)
+				updateManifestCache(persisted, true);
+		}
+		if (method === 'resetLocal')
+			clearSchemaReadyRoles();
 	}
 
 	async function ensureRoleLocalSchemaReady(role) {
@@ -1464,6 +1482,9 @@ function extractDualSyncInfo(payload) {
 		return direct;
 	if (payload.__orangeDualSync)
 		return payload.__orangeDualSync;
+	const syncResult = payload.syncResult;
+	if (syncResult && syncResult.__orangeDualSync)
+		return syncResult.__orangeDualSync;
 	const result = payload.result;
 	if (result && result.__orangeDualSync)
 		return result.__orangeDualSync;

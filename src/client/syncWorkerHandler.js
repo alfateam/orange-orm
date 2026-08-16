@@ -109,11 +109,22 @@ function createSyncWorkerHandler(syncClient, options = {}) {
 }
 
 function serializeError(error) {
-	return {
+	const serialized = {
 		name: error && error.name,
 		message: error && error.message ? error.message : String(error),
 		stack: error && error.stack
 	};
+	if (error && error.syncRecovered === true)
+		serialized.syncRecovered = true;
+	if (error && error.syncResult !== undefined)
+		serialized.syncResult = error.syncResult;
+	if (error && Array.isArray(error.mutationIds))
+		serialized.mutationIds = error.mutationIds;
+	if (error && Number.isFinite(Number(error.status)))
+		serialized.status = Number(error.status);
+	else if (error && error.response && Number.isFinite(Number(error.response.status)))
+		serialized.status = Number(error.response.status);
+	return serialized;
 }
 
 function getPostTarget() {

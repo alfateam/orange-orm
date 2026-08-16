@@ -145,6 +145,42 @@ describe('sqliteOPFS dual sync database', () => {
 		}]);
 	});
 
+	test('refreshes the active GUI role before a rejected external sync settles', async () => {
+		const fixture = newFixture({
+			activeRole: 'a',
+			stagingRole: 'b',
+			updatedAtMs: 123,
+			generation: 0
+		});
+		const db = newDualSyncDatabase('app.sqlite3', {
+			sync: { url: '/rdb', dualDataDb: true }
+		}, fixture.createSingleDatabase);
+		const conflictError = new Error('Request failed with status code 409');
+		const syncClient = newFakeSyncClient({
+			async sync() {
+				fixture.manifest = {
+					activeRole: 'b',
+					stagingRole: 'a',
+					updatedAtMs: 456,
+					generation: 1
+				};
+				throw conflictError;
+			}
+		});
+
+		db.__orangeDualSyncAttachSyncClient(syncClient);
+		expect(await db.query('SELECT before conflict')).toEqual([{
+			connectionString: 'app.sqlite3',
+			sql: 'SELECT before conflict'
+		}]);
+		await expect(syncClient.sync()).rejects.toBe(conflictError);
+
+		expect(await db.query('SELECT after conflict')).toEqual([{
+			connectionString: 'app.__orange_sync_b.sqlite3',
+			sql: 'SELECT after conflict'
+		}]);
+	});
+
 	test('revalidates local schema before querying after external reset', async () => {
 		const fixture = newFixture({
 			activeRole: 'b',

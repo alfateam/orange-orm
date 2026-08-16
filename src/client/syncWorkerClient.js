@@ -234,6 +234,14 @@ function toError(error) {
 		e.name = error.name;
 	if (error && error.stack)
 		e.stack = error.stack;
+	if (error && error.syncRecovered === true)
+		e.syncRecovered = true;
+	if (error && error.syncResult !== undefined)
+		e.syncResult = error.syncResult;
+	if (error && Array.isArray(error.mutationIds))
+		e.mutationIds = error.mutationIds;
+	if (error && Number.isFinite(Number(error.status)))
+		e.status = Number(error.status);
 	return e;
 }
 
