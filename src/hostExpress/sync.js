@@ -1,5 +1,4 @@
 const stringify = require('../client/stringify');
-const { createSqliteSnapshotStore, snapshotMimeType } = require('./sqliteSnapshot');
 
 function newSyncHandler(client, options = {}) {
 	const syncOptions = normalizeSyncOptions(options.sync);
@@ -22,17 +21,11 @@ function newSyncHandler(client, options = {}) {
 		|| transactionHookFns.beforeCommit
 		|| transactionHookFns.afterCommit
 		|| transactionHookFns.afterRollback);
-	const snapshotStore = createSqliteSnapshotStore(client, syncOptions.sqliteSnapshot, runSnapshotReadonly);
 
 	return async function handleSync(request, response) {
 		try {
 			const result = await queue.run(() => execute(request.body || {}, request, response));
-			if (result && result.__orangeSqliteSnapshotBytes) {
-				response.type(snapshotMimeType);
-				response.setHeader('Cache-Control', 'private, no-store');
-				response.status(200).send(result.__orangeSqliteSnapshotBytes);
-			}
-			else response.json(result);
+			response.json(result);
 		}
 		catch (e) {
 			if (e.status === undefined)
@@ -50,30 +43,9 @@ function newSyncHandler(client, options = {}) {
 			return pullKeys(body, request, response);
 		if (phase === 'rows')
 			return pullRows(body, request, response);
-		if (phase === 'snapshot')
-			return downloadSnapshot(body);
 		const error = new Error('Invalid sync phase. Use { phase: "keys" }, { phase: "rows" }, or { phase: "push" }.');
 		error.status = 400;
 		throw error;
-	}
-
-	function downloadSnapshot(body) {
-		if (!snapshotStore || typeof body.id !== 'string') {
-			const error = new Error('SQLite snapshot is not available.');
-			error.status = 404;
-			throw error;
-		}
-		const entry = snapshotStore.get(body.id);
-		if (!entry) {
-			const error = new Error('SQLite snapshot has expired.');
-			error.status = 404;
-			throw error;
-		}
-		return { __orangeSqliteSnapshotBytes: entry.bytes };
-	}
-
-	function runSnapshotReadonly(fn, request, response) {
-		return runHookedTransaction(fn, { readonly: true }, request, response);
 	}
 
 	async function runHookedTransaction(fn, transactionOptions, request, response) {
@@ -215,19 +187,6 @@ function newSyncHandler(client, options = {}) {
 		const bounds = await getChangeBounds(syncOptions.changeTable);
 		const fallback = shouldUseSnapshot(startCursor, bounds, syncOptions.limits.maxChangeWindow);
 		if (fallback.useSnapshot) {
-			if (snapshotStore && body.sqliteSnapshot === true && body.inlineRows === true) {
-				try {
-					const snapshot = await snapshotStore.getOrBuild(requestedTables, bounds.max, request, response);
-					return {
-						phase: 'keys', mode: 'snapshot', done: true, cursor: bounds.max, token: null,
-						items: [], snapshot, reason: fallback.reason
-					};
-				}
-				catch (_error) {
-					// Snapshot transport is an optimization. Preserve the inline-row path
-					// when snapshot creation is unavailable or fails for this request.
-				}
-			}
 			const upperPks = await getSnapshotUpperPks(requestedTables, request, response);
 			const snapshotToken = {
 				v: 1,
@@ -606,7 +565,6 @@ function normalizeSyncOptions(sync) {
 		changeTable: sync.changeTable || 'orange_changes',
 		appliedMutationsTable: sync.appliedMutationsTable || 'orange_sync_applied_mutations',
 		commands: normalizeCommands(sync.commands),
-		sqliteSnapshot: normalizeSqliteSnapshot(sync.sqliteSnapshot),
 		queue: {
 			concurrency: clamp(normalizeInteger(queueOptions.concurrency, 4), 1, 100),
 			maxPending: clamp(normalizeInteger(queueOptions.maxPending, 1000), 0, 100000)
@@ -619,12 +577,6 @@ function normalizeSyncOptions(sync) {
 			explicit: explicitLimits
 		}
 	};
-}
-
-function normalizeSqliteSnapshot(value) {
-	if (value !== true && (!value || value.enabled !== true))
-		return null;
-	return value === true ? { enabled: true } : { ...value, enabled: true };
 }
 
 function normalizeCommands(commands) {

@@ -21,14 +21,11 @@ function newPool(connectionString, poolOptions) {
 	c.__orangeSqliteOPFSRequestedVfs = poolOptions.vfs;
 	c.__orangeCrossTabWriteLock = normalizeCrossTabWriteLockConfig(poolOptions);
 	c.__orangeSqliteOPFSReady = client.ready;
-	c.__orangeImportSqliteSnapshot = function(bytes, statements, expected) {
-		return new Promise((resolve, reject) => {
-			c.connect((error, checkout, done) => {
-				if (error) return reject(error);
-				Promise.resolve(checkout.importSnapshot(bytes, statements, expected))
-					.then(result => { done(); resolve(result); }, importError => { done(importError); reject(importError); });
-			}, 0);
-		});
+	c.__orangeExportSqliteFile = function() {
+		return withWriterCheckout(checkout => checkout.exportDatabase());
+	};
+	c.__orangeReplaceSqliteFile = function(bytes) {
+		return withWriterCheckout(checkout => checkout.replaceDatabase(bytes));
 	};
 
 	if (client.ready && typeof client.ready.then === 'function') {
@@ -59,6 +56,21 @@ function newPool(connectionString, poolOptions) {
 				readClient.reset();
 		});
 	};
+
+	function withWriterCheckout(fn) {
+		return new Promise((resolve, reject) => {
+			c.connect((error, checkout, done) => {
+				if (error)
+					return reject(error);
+				Promise.resolve()
+					.then(() => fn(checkout))
+					.then(
+						result => { done(); resolve(result); },
+						checkoutError => { done(checkoutError); reject(checkoutError); }
+					);
+			}, 0);
+		});
+	}
 
 	c.end = function() {
 		ended = true;

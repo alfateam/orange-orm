@@ -3,13 +3,7 @@ const stringify = require('./stringify');
 const { createSyncAuto, syncAutoStartSymbol } = require('./syncAuto');
 const createHttpInterceptor = require('./httpInterceptor');
 const outboxTableSql = require('../sync/outboxTableSql');
-const {
-	buildSyncSchema,
-	checksumString,
-	clearEnsuredSyncSchema,
-	ensureSyncSchema,
-	stableStringify
-} = require('./syncSchema');
+const { ensureSyncSchema, clearEnsuredSyncSchema } = require('./syncSchema');
 const { runSyncMaintenance } = require('../sync/writeGate');
 const {
 	normalizeCrossTabLockConfig,
@@ -45,9 +39,6 @@ const applyOutboxRowsSymbol = typeof Symbol === 'function'
 const applyPullJournalSymbol = typeof Symbol === 'function'
 	? Symbol.for('orange-orm.syncClient.applyPullJournal')
 	: '__orangeOrmSyncClientApplyPullJournal';
-const applySqliteSnapshotSymbol = typeof Symbol === 'function'
-	? Symbol.for('orange-orm.syncClient.applySqliteSnapshot')
-	: '__orangeOrmSyncClientApplySqliteSnapshot';
 const pushPendingSymbol = typeof Symbol === 'function'
 	? Symbol.for('orange-orm.syncClient.pushPending')
 	: '__orangeOrmSyncClientPushPending';
@@ -119,9 +110,6 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 	Object.defineProperty(syncClientApi, applyPullJournalSymbol, {
 		value: applyPullJournalSnapshot
 	});
-	Object.defineProperty(syncClientApi, applySqliteSnapshotSymbol, {
-		value: applyCapturedSqliteSnapshot
-	});
 	Object.defineProperty(syncClientApi, pushPendingSymbol, {
 		value: pushPendingOnly
 	});
@@ -164,8 +152,6 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 		};
 		if (typeof options._capturePullJournalChunk === 'function')
 			pullOptions._capturePullJournalChunk = options._capturePullJournalChunk;
-		if (typeof options._stageSqliteSnapshot === 'function')
-			pullOptions._stageSqliteSnapshot = options._stageSqliteSnapshot;
 		if (options._deferStableBaseUntilComplete === true)
 			pullOptions._deferStableBaseUntilComplete = true;
 		if (typeof options._onPullBatchProgress === 'function')
@@ -275,8 +261,6 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 			normalizedOptions._capturePullJournal = true;
 		if (options && typeof options._capturePullJournalChunk === 'function')
 			normalizedOptions._capturePullJournalChunk = options._capturePullJournalChunk;
-		if (options && typeof options._stageSqliteSnapshot === 'function')
-			normalizedOptions._stageSqliteSnapshot = options._stageSqliteSnapshot;
 		if (options && options._deferStableBaseUntilComplete === true)
 			normalizedOptions._deferStableBaseUntilComplete = true;
 		if (options && typeof options._onPullBatchProgress === 'function')
@@ -378,7 +362,6 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 			scopeKey,
 			_capturePullJournal: !!options._capturePullJournal,
 			_capturePullJournalChunk: options._capturePullJournalChunk,
-			_stageSqliteSnapshot: options._stageSqliteSnapshot,
 			_deferStableBaseUntilComplete: options._deferStableBaseUntilComplete === true,
 			_onPullBatchProgress: options._onPullBatchProgress,
 			_onPullStagingSummary: options._onPullStagingSummary,
@@ -528,52 +511,6 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 			inserted += exists ? 0 : 1;
 		}
 		return { inserted, replayed, skipped, errors };
-	}
-
-	async function applyCapturedSqliteSnapshot(snapshot, options = {}) {
-		if (!snapshot || snapshot !== Object(snapshot)
-			|| !isSqliteSnapshotDescriptor(snapshot.descriptor)
-			|| !isSqliteSnapshotBytes(snapshot.bytes)) {
-			throw new Error('Invalid captured SQLite snapshot.');
-		}
-		if (snapshot.cursor === undefined)
-			throw new Error('Captured SQLite snapshot does not contain a sync cursor.');
-		const {
-			db,
-			syncConfig,
-			configuredTables
-		} = await prepareLocalSyncSchema(normalizePullOptions(options));
-		const snapshotTables = normalizeConfiguredTables(snapshot.tables);
-		const tables = snapshotTables || configuredTables;
-		if (!tables.every(table => configuredTables.includes(table)))
-			throw new Error('Captured SQLite snapshot contains tables outside the configured sync scope.');
-		const scopeKey = typeof snapshot.scopeKey === 'string'
-			? snapshot.scopeKey
-			: getScopeKey(tables);
-		const result = await runSyncMaintenance(db, async () => {
-			await ensureSyncStateTable(db);
-			await client.transaction(async (tx) => {
-				await ensureStableBaseTables(tx, tables);
-			}, { suppressSyncOutbox: true });
-			await tryEnableForeignKeys(db);
-			return importSqliteSnapshotBytes(
-				snapshot.descriptor,
-				snapshot.bytes,
-				db,
-				client.tables,
-				tables,
-				scopeKey,
-				snapshot.cursor
-			);
-		});
-		sinceByScope.set(scopeKey, snapshot.cursor);
-		await maybeEmitInitialReady(syncConfig, tables, db, 'snapshot-replay');
-		return {
-			applied: Number(result && result.rowCount || snapshot.descriptor.rowCount || 0),
-			tables: tables.slice(),
-			since: snapshot.cursor,
-			checkpointApplied: true
-		};
 	}
 
 	async function applyPullJournalSnapshot(journal, options = {}) {
@@ -957,8 +894,6 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 		const stagingTimings = newPullStagingTimings(deferStableBaseUntilComplete);
 		let capturedStreamItemCount = 0;
 		let capturedApplicableItemCount = 0;
-		let snapshotAppliedRows = 0;
-		let snapshotApplied = false;
 		const streamedTables = new Set();
 		let applied = 0;
 		await ensurePullJournalTables(db);
@@ -969,7 +904,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 			: null;
 		const shouldApplyCheckpoint = session.finalSince !== undefined;
 		if (isStreamPullSession(session)) {
-			applied = snapshotAppliedRows || capturedApplicableItemCount;
+			applied = capturedApplicableItemCount;
 			await finalizeStreamedPullJournal(session);
 		}
 		else if (applyConfig)
@@ -1024,7 +959,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 			await client.transaction(async (tx) => {
 				if (hasJournalItems && (!applyConfig || applyConfig.foreignKeyCheck === 'final'))
 					await validateForeignKeys(tx);
-				if (deferStableBaseUntilComplete && !snapshotApplied) {
+				if (deferStableBaseUntilComplete) {
 					const bulkStableBaseStartedAtMs = Date.now();
 					await copyTablesToStableBase(tx, options.tables);
 					stagingTimings.bulkStableBaseMs += elapsedMs(bulkStableBaseStartedAtMs);
@@ -1312,7 +1247,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 		}
 
 		async function fetchPullBatch(session, reason) {
-			let keysPayload = await requestPayload({
+			const keysPayload = await requestPayload({
 				...pullConfig,
 				body: {
 					phase: 'keys',
@@ -1320,45 +1255,9 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 					since: session.since,
 					tables: options.tables,
 					limit: maxKeysPerBatch,
-					inlineRows: true,
-					sqliteSnapshot: session.since === undefined
+					inlineRows: true
 				}
 			}, options);
-			if (isSqliteSnapshotPayload(keysPayload)) {
-				try {
-					const imported = await importSqliteSnapshot(
-						keysPayload.snapshot,
-						pullConfig,
-						db,
-						client.tables,
-						options.tables,
-						scopeKey,
-						keysPayload.cursor,
-						options
-					);
-					snapshotApplied = true;
-					snapshotAppliedRows = imported.rowCount;
-					for (const tableName of options.tables || []) streamedTables.add(tableName);
-				}
-				catch (error) {
-					if (error && error.__orangeSqliteSnapshotImported)
-						throw error;
-					if (typeof console !== 'undefined' && typeof console.warn === 'function')
-						console.warn('[sqlite-snapshot] import failed; falling back to inline rows', error);
-					keysPayload = await requestPayload({
-						...pullConfig,
-						body: {
-							phase: 'keys',
-							token: session.token,
-							since: session.since,
-							tables: options.tables,
-							limit: maxKeysPerBatch,
-							inlineRows: true,
-							sqliteSnapshot: false
-						}
-					}, options);
-				}
-			}
 			if (!isStagedKeysPayload(keysPayload))
 				throw new Error('Sync endpoint did not return staged keys payload');
 			const nextReason = reason === undefined && keysPayload.reason !== undefined
@@ -3511,8 +3410,7 @@ async function requestPayload(config, options) {
 		url: appendQueryParam(config.url, 'sync', config.syncPhase || 'pull'),
 		method: 'post',
 		timeout: config.timeoutMs,
-		headers: {},
-		responseType: config.responseType
+		headers: {}
 	};
 	request.data = requestBody;
 
@@ -3568,9 +3466,7 @@ function createFetchClient() {
 			if (config.credentials !== undefined)
 				fetchOptions.credentials = config.credentials;
 			const response = await fetch(config.url, fetchOptions);
-			const data = config.responseType === 'arraybuffer'
-				? new Uint8Array(await response.arrayBuffer())
-				: await readPayloadResponse(response);
+			const data = await readPayloadResponse(response);
 			const payload = {
 				data,
 				status: response.status,
@@ -3632,140 +3528,6 @@ function isStagedKeysPayload(payload) {
 		&& payload.phase === 'keys'
 		&& Array.isArray(payload.items)
 		&& 'done' in payload;
-}
-
-function isSqliteSnapshotPayload(payload) {
-	return isStagedKeysPayload(payload)
-		&& isSqliteSnapshotDescriptor(payload.snapshot);
-}
-
-async function importSqliteSnapshot(descriptor, pullConfig, db, clientTables, tableNames, scopeKey, cursor, requestOptions) {
-	const bytes = await requestPayload({
-		...pullConfig,
-		responseType: 'arraybuffer',
-		body: { phase: 'snapshot', id: descriptor.id }
-	}, requestOptions);
-	let replayHandle;
-	if (typeof requestOptions._stageSqliteSnapshot === 'function') {
-		replayHandle = await requestOptions._stageSqliteSnapshot({
-			descriptor: { ...descriptor },
-			bytes: cloneSqliteSnapshotBytes(bytes),
-			tables: Array.isArray(tableNames) ? tableNames.slice() : [],
-			scopeKey,
-			cursor
-		});
-	}
-	let result;
-	try {
-		result = await importSqliteSnapshotBytes(
-			descriptor,
-			bytes,
-			db,
-			clientTables,
-			tableNames,
-			scopeKey,
-			cursor
-		);
-	}
-	catch (error) {
-		if (replayHandle && typeof replayHandle.abort === 'function') {
-			try {
-				await replayHandle.abort();
-			}
-			catch (abortError) {
-				const fatalError = abortError instanceof Error ? abortError : new Error(String(abortError));
-				fatalError.cause = error;
-				fatalError.__orangeSqliteSnapshotImported = true;
-				throw fatalError;
-			}
-		}
-		throw error;
-	}
-	if (replayHandle && typeof replayHandle.applied === 'function') {
-		try {
-			await replayHandle.applied();
-		}
-		catch (error) {
-			const fatalError = error instanceof Error ? error : new Error(String(error));
-			fatalError.__orangeSqliteSnapshotImported = true;
-			throw fatalError;
-		}
-	}
-	return result;
-}
-
-async function importSqliteSnapshotBytes(descriptor, bytes, db, clientTables, tableNames, scopeKey, cursor) {
-	const importer = resolveSqliteSnapshotImporter(db);
-	if (!importer) throw new Error('SQLite snapshot import is not available for this database.');
-	if (!isSqliteSnapshotDescriptor(descriptor) || !isSqliteSnapshotBytes(bytes))
-		throw new Error('Invalid SQLite snapshot payload.');
-	const tables = Array.isArray(tableNames) ? tableNames : [];
-	const schema = buildSyncSchema(clientTables, tables);
-	const schemaChecksum = checksumString(stableStringify(schema));
-	if (schemaChecksum !== descriptor.schemaChecksum)
-		throw new Error('SQLite snapshot schema does not match the local map.');
-	const baseEntries = await readSnapshotBaseEntries(db);
-	const baseByDbName = new Map(baseEntries.map(entry => [entry.name, entry.baseName]));
-	const statements = ['PRAGMA defer_foreign_keys=ON'];
-	for (let i = schema.tables.length - 1; i >= 0; i--)
-		statements.push(`DELETE FROM ${quoteIdent(schema.tables[i].dbName)}`);
-	for (const table of schema.tables) {
-		const columns = table.columns.map(column => quoteIdent(column.dbName)).join(', ');
-		statements.push(`INSERT INTO ${quoteIdent(table.dbName)} (${columns}) SELECT ${columns} FROM orange_snapshot.${quoteIdent(table.dbName)}`);
-		const baseName = baseByDbName.get(table.dbName);
-		if (baseName) {
-			statements.push(`DELETE FROM ${quoteIdent(baseName)}`);
-			statements.push(`INSERT INTO ${quoteIdent(baseName)} SELECT * FROM ${quoteIdent(table.dbName)}`);
-		}
-	}
-	statements.push([
-		'INSERT INTO "orange_sync_state" ("scope", "since_value") VALUES (',
-		sqlStringLiteral(scopeKey), ', ', sqlStringLiteral(JSON.stringify({ since: cursor, updatedAtMs: Date.now() })), ') ',
-		'ON CONFLICT("scope") DO UPDATE SET "since_value" = excluded."since_value"'
-	].join(''));
-	const result = await importer(bytes, statements, {
-		schemaChecksum: descriptor.schemaChecksum,
-		rowCount: descriptor.rowCount
-	});
-	return result && result.result || result;
-}
-
-function isSqliteSnapshotDescriptor(value) {
-	return value
-		&& value === Object(value)
-		&& typeof value.id === 'string'
-		&& typeof value.schemaChecksum === 'string';
-}
-
-function isSqliteSnapshotBytes(value) {
-	return value instanceof Uint8Array
-		|| typeof ArrayBuffer === 'function' && value instanceof ArrayBuffer;
-}
-
-function cloneSqliteSnapshotBytes(value) {
-	if (value instanceof Uint8Array)
-		return value.slice();
-	if (typeof ArrayBuffer === 'function' && value instanceof ArrayBuffer)
-		return value.slice(0);
-	throw new Error('SQLite snapshot response did not contain binary data.');
-}
-
-function resolveSqliteSnapshotImporter(db) {
-	const pool = db && (db.poolFactory || db.pool || db);
-	return pool && typeof pool.__orangeImportSqliteSnapshot === 'function'
-		? pool.__orangeImportSqliteSnapshot.bind(pool)
-		: null;
-}
-
-async function readSnapshotBaseEntries(db) {
-	try {
-		const rows = await db.query('SELECT "name", "base_name", "schema_sql", "ordinal" FROM "orange_sync_base_tables" ORDER BY "ordinal", "name"');
-		return (Array.isArray(rows) ? rows : rows && rows.rows || []).map(row => ({
-			name: row.name ?? row.NAME,
-			baseName: row.base_name ?? row.BASE_NAME
-		}));
-	}
-	catch (_error) { return []; }
 }
 
 function isRowsPayload(payload) {
@@ -4362,6 +4124,5 @@ module.exports.syncAndCapturePullJournalSymbol = syncAndCapturePullJournalSymbol
 module.exports.readOutboxRowsSymbol = readOutboxRowsSymbol;
 module.exports.applyOutboxRowsSymbol = applyOutboxRowsSymbol;
 module.exports.applyPullJournalSymbol = applyPullJournalSymbol;
-module.exports.applySqliteSnapshotSymbol = applySqliteSnapshotSymbol;
 module.exports.pushPendingSymbol = pushPendingSymbol;
 module.exports.setClientIdSymbol = setClientIdSymbol;

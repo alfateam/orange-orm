@@ -114,36 +114,33 @@ describe('sqliteOPFS broker worker', () => {
 		}
 	});
 
-	test('imports a snapshot into the requested rotated database', async () => {
-		const imported = [];
+	test('copies a complete SQLite file between rotated SAH-pool databases', async () => {
+		const files = new Map([
+			['/rotation-base.sqlite3', new Uint8Array([1, 2, 3, 4])],
+			['/rotation-candidate.sqlite3', new Uint8Array([9])]
+		]);
 		const worker = createInlineSqliteOPFSWorker({
-			sqlite3InitModule: () => newFakeSnapshotSqlite3(imported)
+			sqlite3InitModule: () => newFakeFileSqlite3(files)
 		});
-		const rotatedClient = createSqliteOPFSWorkerClient('rotation.__orange_sync_c.sqlite3', {
+		const baseClient = createSqliteOPFSWorkerClient('rotation-base.sqlite3', {
+			worker,
+			vfs: 'opfs-sahpool'
+		});
+		const candidateClient = createSqliteOPFSWorkerClient('rotation-candidate.sqlite3', {
 			worker: connectSqliteOPFSWorker(worker),
-			vfs: 'opfs-wl',
+			vfs: 'opfs-sahpool',
 			closeDbOnClose: false
 		});
 
 		try {
-			const lease = await rotatedClient.checkout();
-			const result = await lease.importSnapshot(
-				new Uint8Array([1, 2, 3]),
-				['INSERT INTO project SELECT * FROM orange_snapshot.project'],
-				{ schemaChecksum: 'checksum-1', rowCount: 2 }
-			);
-			await lease.releaseCheckout();
+			const baseFile = await baseClient.exportDatabase();
+			await candidateClient.replaceDatabase(baseFile);
 
-			expect(result).toEqual({ rowCount: 2, watermark: 9 });
-			expect(imported.find(event => event.type === 'deserialize')).toMatchObject({
-				filename: '/rotation.__orange_sync_c.sqlite3',
-				bytes: [1, 2, 3]
-			});
-			expect(imported.some(event => event.statement === 'INSERT INTO project SELECT * FROM orange_snapshot.project')).toBe(true);
+			expect(Array.from(await candidateClient.exportDatabase())).toEqual([1, 2, 3, 4]);
 		}
 		finally {
-			await rotatedClient.close();
-			worker.terminate();
+			await candidateClient.close();
+			await baseClient.close();
 		}
 	});
 });
@@ -231,26 +228,21 @@ function newFakeSqlite3(executed = [], opened = []) {
 	};
 }
 
-function newFakeSnapshotSqlite3(imported) {
-	class FakeOpfsWlDb {
+function newFakeFileSqlite3(files) {
+	class FakeDb {
 		constructor(filename) {
 			this.filename = filename;
 			this.pointer = { filename };
+			if (!files.has(filename))
+				files.set(filename, new Uint8Array([0]));
 		}
 
-		exec(value) {
-			if (typeof value === 'string')
-				imported.push({ type: 'statement', filename: this.filename, statement: value });
-			return [];
-		}
-
-		selectObject() {
-			return {
-				format: 1,
-				schema_checksum: 'checksum-1',
-				watermark_json: '9',
-				row_count: 2
-			};
+		exec(options) {
+			if (typeof options === 'string')
+				return undefined;
+			if (options.sql === 'PRAGMA quick_check')
+				return [{ quick_check: 'ok' }];
+			return options.returnValue === 'resultRows' ? [] : undefined;
 		}
 
 		changes() {
@@ -266,23 +258,26 @@ function newFakeSnapshotSqlite3(imported) {
 
 	return {
 		capi: {
-			SQLITE_DESERIALIZE_FREEONCLOSE: 1,
-			SQLITE_DESERIALIZE_READONLY: 4,
-			sqlite3_deserialize(pointer, _schema, bytes) {
-				imported.push({
-					type: 'deserialize',
-					filename: pointer.filename,
-					bytes: Array.from(bytes)
-				});
-				return 0;
+			sqlite3_js_db_export(pointer) {
+				return files.get(pointer.filename).slice();
 			}
 		},
-		wasm: {
-			allocFromTypedArray(bytes) {
-				return bytes;
-			}
+		oo1: {
+			OpfsWlDb: Object.assign(FakeDb, {
+				async importDb(filename, bytes) {
+					files.set(filename, new Uint8Array(bytes).slice());
+				}
+			})
 		},
-		oo1: { OpfsWlDb: FakeOpfsWlDb }
+		async installOpfsSAHPoolVfs() {
+			return {
+				vfsName: 'opfs-sahpool',
+				OpfsSAHPoolDb: FakeDb,
+				async importDb(filename, bytes) {
+					files.set(filename, new Uint8Array(bytes).slice());
+				}
+			};
+		}
 	};
 }
 

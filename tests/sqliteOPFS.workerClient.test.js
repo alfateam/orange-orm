@@ -3,12 +3,17 @@ import { describe, expect, test } from 'vitest';
 const createSqliteOPFSWorkerClient = require('../src/sqliteOPFS/workerClient');
 
 describe('sqliteOPFS generated worker', () => {
-	test('supports importing SQLite snapshots without losing multi-database routing', () => {
+	test('contains compilable whole-file export and restore support', () => {
 		const source = createSqliteOPFSWorkerClient.createWorkerSource('@sqlite.org/sqlite-wasm');
+		const script = source.replace(
+			/^import sqlite3InitModule from [^;]+;/u,
+			'const sqlite3InitModule = async () => ({});'
+		);
 
-		expect(source).toContain('message.method === \'importSnapshot\'');
-		expect(source).toContain('async function importSnapshot(db, bytes, statements, expected)');
-		expect(source).toContain('sqlite3.capi.sqlite3_deserialize');
-		expect(source).toContain('dbByConnectionString');
+		expect(source).toContain('message.method === \'exportDatabase\'');
+		expect(source).toContain('message.method === \'replaceDatabase\'');
+		expect(source).toContain('sqlite3.capi.sqlite3_js_db_export');
+		expect(source).toContain('pool.importDb(filename, bytes)');
+		expect(() => new Function(script)).not.toThrow();
 	});
 });

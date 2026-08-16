@@ -773,543 +773,6 @@ function requireStringify () {
 	return stringify_1;
 }
 
-var syncSchema;
-var hasRequiredSyncSchema;
-
-function requireSyncSchema () {
-	if (hasRequiredSyncSchema) return syncSchema;
-	hasRequiredSyncSchema = 1;
-	const schemaStateTable = 'orange_schema_state';
-	const schemaVersion = 1;
-	const ensuredSchemasByDb = new WeakMap();
-
-	async function ensureSyncSchema(db, client, tableNames, options = {}) {
-		if (!db || typeof db.query !== 'function')
-			return null;
-		if (options === false || options && options.enabled === false)
-			return null;
-		const tables = client && client.tables;
-		if (!tables || !Array.isArray(tableNames) || tableNames.length === 0)
-			return null;
-
-		const schema = buildSyncSchema(tables, tableNames);
-		if (!schema.tables.length)
-			return null;
-		const sql = schemaToSql(schema);
-		const schemaJson = stableStringify(schema);
-		const checksum = checksumString(schemaJson);
-		const scope = `sync:${schema.tables.map(x => x.name).join('|')}`;
-		const ensuredKey = `${scope}:${checksum}`;
-		if (isSchemaEnsured(db, ensuredKey))
-			return { scope, schema, checksum, sql: sql.statements };
-
-		await ensureSchemaStateTable(db);
-		const existing = await readSchemaState(db, scope);
-		const shouldUpdateState = !existing || existing.checksum !== checksum;
-		if (existing && existing.checksum !== checksum && !isIndexOnlySchemaChange(existing.schemaJson, schema))
-			throw new Error('Local sync schema does not match current map. Reset the local sync database or run a migration before syncing.');
-		if (existing && existing.checksum === checksum) {
-			markSchemaEnsured(db, ensuredKey);
-			return { scope, schema, checksum, sql: sql.statements };
-		}
-
-		for (let i = 0; i < sql.statements.length; i++)
-			await db.query(sql.statements[i]);
-
-		if (shouldUpdateState)
-			await writeSchemaState(db, {
-				scope,
-				dialect: 'sqlite',
-				tables: schema.tables.map(x => x.name),
-				schema,
-				checksum,
-				sql: sql.statements.join('\n'),
-				updatedAtMs: Date.now()
-			});
-
-		markSchemaEnsured(db, ensuredKey);
-		return { scope, schema, checksum, sql: sql.statements };
-	}
-
-	function isSchemaEnsured(db, key) {
-		const ensured = ensuredSchemasByDb.get(db);
-		return ensured ? ensured.has(key) : false;
-	}
-
-	function markSchemaEnsured(db, key) {
-		let ensured = ensuredSchemasByDb.get(db);
-		if (!ensured) {
-			ensured = new Set();
-			ensuredSchemasByDb.set(db, ensured);
-		}
-		ensured.add(key);
-	}
-
-	function clearEnsuredSyncSchema(db) {
-		if (db)
-			ensuredSchemasByDb.delete(db);
-	}
-
-	function buildSyncSchema(tables, tableNames) {
-		const selected = Array.from(new Set(tableNames))
-			.filter(name => tables[name])
-			.sort();
-		const schema = {
-			version: schemaVersion,
-			dialect: 'sqlite',
-			tables: selected.map(name => tableToSchema(name, tables[name]))
-		};
-		addRelationMetadata(schema, tables, selected);
-		return schema;
-	}
-
-	function tableToSchema(name, table) {
-		const columns = (table._columns || []).map(columnToSchema);
-		return {
-			name,
-			dbName: table._dbName,
-			columns,
-			foreignKeys: [],
-			indexes: [],
-			primaryKey: (table._primaryColumns || []).map(x => x._dbName)
-		};
-	}
-
-	function columnToSchema(column) {
-		return {
-			name: column.alias,
-			dbName: column._dbName,
-			type: columnType(column),
-			primary: column.isPrimary === true,
-			notNull: column._notNull === true,
-			notNullExceptInsert: column._notNullExceptInsert === true
-		};
-	}
-
-	function columnType(column) {
-		if (column.tsType === 'NumberColumn')
-			return 'number';
-		if (column.tsType === 'BooleanColumn')
-			return 'boolean';
-		if (column.tsType === 'BigintColumn')
-			return 'bigint';
-		if (column.tsType === 'BinaryColumn')
-			return 'binary';
-		if (column.tsType === 'JSONColumn')
-			return 'json';
-		if (column.tsType === 'UUIDColumn')
-			return 'uuid';
-		if (column.tsType === 'DateColumn' && column.hasTimeZone)
-			return 'datetime-tz';
-		if (column.tsType === 'DateColumn')
-			return 'datetime';
-		return 'string';
-	}
-
-	function schemaToSql(schema) {
-		return {
-			statements: schema.tables.map(tableToCreateSql).concat(schema.tables.flatMap(tableToIndexSql))
-		};
-	}
-
-	function tableToCreateSql(table) {
-		const hasCompositePrimaryKey = table.primaryKey.length > 1;
-		const parts = table.columns.map(column => columnToSql(column, { hasCompositePrimaryKey }));
-		if (table.primaryKey.length > 1)
-			parts.push(`PRIMARY KEY (${table.primaryKey.map(quoteIdent).join(', ')})`);
-		for (let i = 0; i < table.foreignKeys.length; i++)
-			parts.push(foreignKeyToSql(table.foreignKeys[i]));
-		return [
-			`CREATE TABLE IF NOT EXISTS ${quoteIdent(table.dbName)} (`,
-			parts.map(x => `  ${x}`).join(',\n'),
-			');'
-		].join('\n');
-	}
-
-	function tableToIndexSql(table) {
-		return (table.indexes || []).map(index => {
-			return `CREATE INDEX IF NOT EXISTS ${quoteIdent(index.dbName)} ON ${quoteIdent(table.dbName)} (${index.columns.map(quoteIdent).join(', ')});`;
-		});
-	}
-
-	function columnToSql(column, options = {}) {
-		const parts = [quoteIdent(column.dbName), sqliteType(column.type)];
-		if (!options.hasCompositePrimaryKey && column.primary && column.type === 'number')
-			parts.push('PRIMARY KEY');
-		else if (!options.hasCompositePrimaryKey && column.primary)
-			parts.push('PRIMARY KEY');
-		if (column.notNull)
-			parts.push('NOT NULL');
-		return parts.join(' ');
-	}
-
-	function foreignKeyToSql(foreignKey) {
-		return [
-			`FOREIGN KEY (${foreignKey.columns.map(quoteIdent).join(', ')})`,
-			`REFERENCES ${quoteIdent(foreignKey.referencesTable)} (${foreignKey.referencesColumns.map(quoteIdent).join(', ')})`
-		].join(' ');
-	}
-
-	function sqliteType(type) {
-		if (type === 'number' || type === 'boolean')
-			return 'INTEGER';
-		if (type === 'binary')
-			return 'BLOB';
-		return 'TEXT';
-	}
-
-	function addRelationMetadata(schema, tables, selectedNames) {
-		const tableSchemaByObject = new Map();
-		const selectedObjects = new Set();
-		for (let i = 0; i < selectedNames.length; i++) {
-			const table = tables[selectedNames[i]];
-			const tableSchema = schema.tables[i];
-			tableSchemaByObject.set(table, tableSchema);
-			selectedObjects.add(table);
-		}
-
-		const seen = new Set();
-		const seenForeignKeys = new Set();
-		for (let i = 0; i < selectedNames.length; i++) {
-			const table = tables[selectedNames[i]];
-			const relations = table && table._relations;
-			if (!relations)
-				continue;
-			for (let relationName in relations) {
-				const join = extractJoinRelation(relations[relationName]);
-				if (!join || !selectedObjects.has(join.parentTable) || !selectedObjects.has(join.childTable))
-					continue;
-				const targetSchema = tableSchemaByObject.get(join.parentTable);
-				const referencesSchema = tableSchemaByObject.get(join.childTable);
-				const columns = (join.columns || []).map(x => x && x._dbName).filter(Boolean);
-				const referencesColumns = join.childTable && Array.isArray(join.childTable._primaryColumns)
-					? join.childTable._primaryColumns.map(x => x && x._dbName).filter(Boolean)
-					: [];
-				if (!targetSchema || !referencesSchema || columns.length === 0 || columns.length !== referencesColumns.length)
-					continue;
-				addRelationIndex(targetSchema, columns, relationName, seen);
-				addRelationForeignKey(targetSchema, referencesSchema, columns, referencesColumns, seenForeignKeys);
-			}
-		}
-
-		for (let i = 0; i < schema.tables.length; i++) {
-			schema.tables[i].indexes.sort((a, b) => a.dbName.localeCompare(b.dbName));
-			schema.tables[i].foreignKeys.sort((a, b) => {
-				const tableCompare = a.referencesTable.localeCompare(b.referencesTable);
-				if (tableCompare !== 0)
-					return tableCompare;
-				return a.columns.join('|').localeCompare(b.columns.join('|'));
-			});
-		}
-	}
-
-	function addRelationIndex(targetSchema, columns, relationName, seen) {
-		if (isPrimaryKey(targetSchema, columns))
-			return;
-		const key = `${targetSchema.dbName}:${columns.join('|')}`;
-		if (seen.has(key))
-			return;
-		seen.add(key);
-		targetSchema.indexes.push({
-			name: `relation:${relationName}`,
-			dbName: newIndexName(targetSchema.dbName, columns),
-			columns
-		});
-	}
-
-	function addRelationForeignKey(targetSchema, referencesSchema, columns, referencesColumns, seen) {
-		const key = `${targetSchema.dbName}:${columns.join('|')}:${referencesSchema.dbName}:${referencesColumns.join('|')}`;
-		if (seen.has(key))
-			return;
-		seen.add(key);
-		targetSchema.foreignKeys.push({
-			columns,
-			referencesTable: referencesSchema.dbName,
-			referencesColumns
-		});
-	}
-
-	function extractJoinRelation(relation) {
-		if (!relation || typeof relation.accept !== 'function')
-			return null;
-		let join;
-		relation.accept({
-			visitJoin: function(current) {
-				join = current;
-			},
-			visitOne: function(current) {
-				join = current && current.joinRelation;
-			},
-			visitMany: function(current) {
-				join = current && current.joinRelation;
-			}
-		});
-		return join;
-	}
-
-	function isPrimaryKey(tableSchema, columns) {
-		if (!Array.isArray(tableSchema.primaryKey) || tableSchema.primaryKey.length !== columns.length)
-			return false;
-		for (let i = 0; i < columns.length; i++) {
-			if (tableSchema.primaryKey[i] !== columns[i])
-				return false;
-		}
-		return true;
-	}
-
-	function newIndexName(tableName, columns) {
-		const raw = `orange_idx_${tableName}_${columns.join('_')}`;
-		return raw.replace(/[^A-Za-z0-9_]/g, '_');
-	}
-
-	async function ensureSchemaStateTable(db) {
-		await db.query([
-			`CREATE TABLE IF NOT EXISTS ${quoteIdent(schemaStateTable)} (`,
-			'"scope" TEXT PRIMARY KEY,',
-			'"dialect" TEXT NOT NULL,',
-			'"tables_json" TEXT NOT NULL,',
-			'"schema_json" TEXT NOT NULL,',
-			'"checksum" TEXT NOT NULL,',
-			'"sql_text" TEXT NOT NULL,',
-			'"updated_at_ms" INTEGER NOT NULL',
-			');'
-		].join(' '));
-	}
-
-	async function readSchemaState(db, scope) {
-		const rows = await db.query(`SELECT "checksum", "schema_json" FROM ${quoteIdent(schemaStateTable)} WHERE "scope" = ${sqlStringLiteral(scope)} LIMIT 1`);
-		const list = Array.isArray(rows) ? rows : rows && rows.rows || [];
-		const row = list[0];
-		if (!row)
-			return null;
-		return {
-			checksum: row.checksum ?? row.CHECKSUM,
-			schemaJson: row.schema_json ?? row.SCHEMA_JSON
-		};
-	}
-
-	async function writeSchemaState(db, state) {
-		await db.query([
-			`INSERT OR REPLACE INTO ${quoteIdent(schemaStateTable)} (`,
-			'"scope", "dialect", "tables_json", "schema_json", "checksum", "sql_text", "updated_at_ms"',
-			') VALUES (',
-			[
-				sqlStringLiteral(state.scope),
-				sqlStringLiteral(state.dialect),
-				sqlStringLiteral(JSON.stringify(state.tables)),
-				sqlStringLiteral(stableStringify(state.schema)),
-				sqlStringLiteral(state.checksum),
-				sqlStringLiteral(state.sql),
-				String(state.updatedAtMs)
-			].join(', '),
-			');'
-		].join(' '));
-	}
-
-	function isIndexOnlySchemaChange(existingSchemaJson, nextSchema) {
-		if (typeof existingSchemaJson !== 'string')
-			return false;
-		try {
-			const existing = JSON.parse(existingSchemaJson);
-			return stableStringify(stripIndexes(existing)) === stableStringify(stripIndexes(nextSchema));
-		}
-		catch (_e) {
-			return false;
-		}
-	}
-
-	function stripIndexes(value) {
-		if (Array.isArray(value))
-			return value.map(stripIndexes);
-		if (!value || typeof value !== 'object')
-			return value;
-		const result = {};
-		for (let key in value) {
-			if (key !== 'indexes')
-				result[key] = stripIndexes(value[key]);
-		}
-		return result;
-	}
-
-	function quoteIdent(value) {
-		return `"${String(value).replace(/"/g, '""')}"`;
-	}
-
-	function sqlStringLiteral(value) {
-		if (value === null || value === undefined)
-			return 'NULL';
-		return `'${String(value).replace(/'/g, '\'\'')}'`;
-	}
-
-	function stableStringify(value) {
-		if (value === null || typeof value !== 'object')
-			return JSON.stringify(value);
-		if (Array.isArray(value))
-			return `[${value.map(stableStringify).join(',')}]`;
-		const keys = Object.keys(value).sort();
-		return `{${keys.map(key => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
-	}
-
-	function checksumString(value) {
-		let hash = 2166136261;
-		for (let i = 0; i < value.length; i++) {
-			hash ^= value.charCodeAt(i);
-			hash = Math.imul(hash, 16777619);
-		}
-		return `fnv1a32:${(hash >>> 0).toString(16).padStart(8, '0')}`;
-	}
-
-	syncSchema = {
-		ensureSyncSchema,
-		clearEnsuredSyncSchema,
-		buildSyncSchema,
-		schemaToSql,
-		stableStringify,
-		checksumString
-	};
-	return syncSchema;
-}
-
-var sqliteSnapshot;
-var hasRequiredSqliteSnapshot;
-
-function requireSqliteSnapshot () {
-	if (hasRequiredSqliteSnapshot) return sqliteSnapshot;
-	hasRequiredSqliteSnapshot = 1;
-	const { buildSyncSchema, schemaToSql, stableStringify, checksumString } = requireSyncSchema();
-
-	const snapshotMimeType = 'application/vnd.sqlite3';
-
-	function createSqliteSnapshotStore(client, options, runReadonly) {
-		if (options === true) options = { enabled: true };
-		if (!options || options.enabled !== true) return null;
-		const maxEntries = positiveInteger(options.maxEntries, 1);
-		const rowsPerRead = positiveInteger(options.rowsPerRead, 1000);
-		const entries = new Map();
-		const builds = new Map();
-		return { getOrBuild, get: id => entries.get(id) || null };
-
-		async function getOrBuild(tableNames, watermark, request, response) {
-			const schema = buildSyncSchema(client.tables, tableNames);
-			const schemaJson = stableStringify(schema);
-			const schemaChecksum = checksumString(schemaJson);
-			const key = stableStringify({ tableNames, watermark, schemaChecksum });
-			const cached = Array.from(entries.values()).find(entry => entry.key === key);
-			if (cached) {
-				cached.lastUsedAtMs = Date.now();
-				return toDescriptor(cached, true);
-			}
-			if (!builds.has(key)) {
-				builds.set(key, build(key, schema, schemaJson, schemaChecksum, watermark, request, response)
-					.finally(() => builds.delete(key)));
-			}
-			return toDescriptor(await builds.get(key), false);
-		}
-
-		async function build(key, schema, schemaJson, schemaChecksum, watermark, request, response) {
-			const crypto = loadNodeBuiltin('node:crypto');
-			const fs = loadNodeBuiltin('node:fs');
-			const os = loadNodeBuiltin('node:os');
-			const path = loadNodeBuiltin('node:path');
-			const { DatabaseSync } = loadNodeSqlite();
-			const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'orange-sync-snapshot-'));
-			const filename = path.join(directory, 'snapshot.sqlite3');
-			const startedAtMs = Date.now();
-			let database;
-			try {
-				database = new DatabaseSync(filename);
-				database.exec('PRAGMA journal_mode=OFF; PRAGMA synchronous=OFF; PRAGMA temp_store=MEMORY;');
-				for (const statement of schemaToSql(schema).statements) database.exec(statement);
-				database.exec('CREATE TABLE "orange_snapshot_meta" ("format" INTEGER NOT NULL, "schema_checksum" TEXT NOT NULL, "schema_json" TEXT NOT NULL, "watermark_json" TEXT, "row_count" INTEGER NOT NULL);');
-				let rowCount = 0;
-				await runReadonly(async tx => {
-					database.exec('BEGIN');
-					try {
-						database.exec('PRAGMA defer_foreign_keys=ON');
-						for (const tableSchema of schema.tables) {
-							const table = tx[tableSchema.name];
-							if (!table || typeof table.getMany !== 'function') continue;
-							const quoted = tableSchema.columns.map(column => quoteIdent(column.dbName));
-							const insert = database.prepare(`INSERT INTO ${quoteIdent(tableSchema.dbName)} (${quoted.join(',')}) VALUES (${quoted.map(() => '?').join(',')})`);
-							let offset = 0;
-							let rows;
-							do {
-								rows = await table.getMany(undefined, {
-									orderBy: tableSchema.primaryKey,
-									limit: rowsPerRead,
-									offset
-								});
-								for (const row of rows) {
-									insert.run(...tableSchema.columns.map(column => toSqliteValue(row[column.name], column.type)));
-									rowCount += 1;
-								}
-								offset += rows.length;
-							} while (rows.length === rowsPerRead);
-						}
-						database.prepare('INSERT INTO "orange_snapshot_meta" VALUES (?, ?, ?, ?, ?)').run(1, schemaChecksum, schemaJson, JSON.stringify(watermark), rowCount);
-						database.exec('COMMIT');
-					}
-					catch (error) {
-						database.exec('ROLLBACK');
-						throw error;
-					}
-				}, request, response);
-				database.close();
-				database = null;
-				const entry = { id: crypto.randomUUID(), key, bytes: fs.readFileSync(filename), schemaChecksum, watermark, rowCount, buildMs: Date.now() - startedAtMs, lastUsedAtMs: Date.now() };
-				entries.set(entry.id, entry);
-				while (entries.size > maxEntries) {
-					const oldest = Array.from(entries.values()).sort((a, b) => a.lastUsedAtMs - b.lastUsedAtMs)[0];
-					entries.delete(oldest.id);
-				}
-				return entry;
-			}
-			finally {
-				if (database) database.close();
-				fs.rmSync(directory, { recursive: true, force: true });
-			}
-		}
-	}
-
-	function toDescriptor(entry, cacheHit) {
-		return { id: entry.id, byteLength: entry.bytes.length, rowCount: entry.rowCount, schemaChecksum: entry.schemaChecksum, buildMs: entry.buildMs, cacheHit };
-	}
-
-	function loadNodeSqlite() {
-		return loadNodeBuiltin('node:sqlite');
-	}
-
-	function loadNodeBuiltin(name) {
-		const builtin = typeof process !== 'undefined' && typeof process.getBuiltinModule === 'function'
-			? process.getBuiltinModule(name)
-			: null;
-		if (builtin) return builtin;
-		const error = new Error('SQLite snapshots require node:sqlite and process.getBuiltinModule() (Node.js 22.13 or newer).');
-		error.code = 'ORANGE_SQLITE_SNAPSHOT_UNAVAILABLE';
-		throw error;
-	}
-
-	function toSqliteValue(value, type) {
-		if (value === null || value === undefined) return null;
-		if (type === 'boolean') return value ? 1 : 0;
-		if (type === 'json') return JSON.stringify(value);
-		if (type === 'datetime' || type === 'datetime-tz') return value instanceof Date ? value.toISOString() : String(value);
-		if (type === 'bigint') return String(value);
-		if (type === 'binary') return Buffer.isBuffer(value) || value instanceof Uint8Array ? value : Buffer.from(String(value), 'base64');
-		return value;
-	}
-
-	function positiveInteger(value, fallback) {
-		const parsed = Number.parseInt(value, 10);
-		return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-	}
-
-	function quoteIdent(value) { return `"${String(value).replace(/"/g, '""')}"`; }
-
-	sqliteSnapshot = { createSqliteSnapshotStore, snapshotMimeType };
-	return sqliteSnapshot;
-}
-
 var sync;
 var hasRequiredSync;
 
@@ -1317,7 +780,6 @@ function requireSync () {
 	if (hasRequiredSync) return sync;
 	hasRequiredSync = 1;
 	const stringify = requireStringify();
-	const { createSqliteSnapshotStore, snapshotMimeType } = requireSqliteSnapshot();
 
 	function newSyncHandler(client, options = {}) {
 		const syncOptions = normalizeSyncOptions(options.sync);
@@ -1340,17 +802,11 @@ function requireSync () {
 			|| transactionHookFns.beforeCommit
 			|| transactionHookFns.afterCommit
 			|| transactionHookFns.afterRollback);
-		const snapshotStore = createSqliteSnapshotStore(client, syncOptions.sqliteSnapshot, runSnapshotReadonly);
 
 		return async function handleSync(request, response) {
 			try {
 				const result = await queue.run(() => execute(request.body || {}, request, response));
-				if (result && result.__orangeSqliteSnapshotBytes) {
-					response.type(snapshotMimeType);
-					response.setHeader('Cache-Control', 'private, no-store');
-					response.status(200).send(result.__orangeSqliteSnapshotBytes);
-				}
-				else response.json(result);
+				response.json(result);
 			}
 			catch (e) {
 				if (e.status === undefined)
@@ -1368,30 +824,9 @@ function requireSync () {
 				return pullKeys(body, request, response);
 			if (phase === 'rows')
 				return pullRows(body, request, response);
-			if (phase === 'snapshot')
-				return downloadSnapshot(body);
 			const error = new Error('Invalid sync phase. Use { phase: "keys" }, { phase: "rows" }, or { phase: "push" }.');
 			error.status = 400;
 			throw error;
-		}
-
-		function downloadSnapshot(body) {
-			if (!snapshotStore || typeof body.id !== 'string') {
-				const error = new Error('SQLite snapshot is not available.');
-				error.status = 404;
-				throw error;
-			}
-			const entry = snapshotStore.get(body.id);
-			if (!entry) {
-				const error = new Error('SQLite snapshot has expired.');
-				error.status = 404;
-				throw error;
-			}
-			return { __orangeSqliteSnapshotBytes: entry.bytes };
-		}
-
-		function runSnapshotReadonly(fn, request, response) {
-			return runHookedTransaction(fn, { readonly: true }, request, response);
 		}
 
 		async function runHookedTransaction(fn, transactionOptions, request, response) {
@@ -1533,19 +968,6 @@ function requireSync () {
 			const bounds = await getChangeBounds(syncOptions.changeTable);
 			const fallback = shouldUseSnapshot(startCursor, bounds, syncOptions.limits.maxChangeWindow);
 			if (fallback.useSnapshot) {
-				if (snapshotStore && body.sqliteSnapshot === true && body.inlineRows === true) {
-					try {
-						const snapshot = await snapshotStore.getOrBuild(requestedTables, bounds.max, request, response);
-						return {
-							phase: 'keys', mode: 'snapshot', done: true, cursor: bounds.max, token: null,
-							items: [], snapshot, reason: fallback.reason
-						};
-					}
-					catch (_error) {
-						// Snapshot transport is an optimization. Preserve the inline-row path
-						// when snapshot creation is unavailable or fails for this request.
-					}
-				}
 				const upperPks = await getSnapshotUpperPks(requestedTables, request, response);
 				const snapshotToken = {
 					v: 1,
@@ -1924,7 +1346,6 @@ function requireSync () {
 			changeTable: sync.changeTable || 'orange_changes',
 			appliedMutationsTable: sync.appliedMutationsTable || 'orange_sync_applied_mutations',
 			commands: normalizeCommands(sync.commands),
-			sqliteSnapshot: normalizeSqliteSnapshot(sync.sqliteSnapshot),
 			queue: {
 				concurrency: clamp(normalizeInteger(queueOptions.concurrency, 4), 1, 100),
 				maxPending: clamp(normalizeInteger(queueOptions.maxPending, 1000), 0, 100000)
@@ -1937,12 +1358,6 @@ function requireSync () {
 				explicit: explicitLimits
 			}
 		};
-	}
-
-	function normalizeSqliteSnapshot(value) {
-		if (value !== true && (!value || value.enabled !== true))
-			return null;
-		return value === true ? { enabled: true } : { ...value, enabled: true };
 	}
 
 	function normalizeCommands(commands) {
@@ -6190,6 +5605,403 @@ function requireSyncAuto () {
 	return syncAuto;
 }
 
+var syncSchema;
+var hasRequiredSyncSchema;
+
+function requireSyncSchema () {
+	if (hasRequiredSyncSchema) return syncSchema;
+	hasRequiredSyncSchema = 1;
+	const schemaStateTable = 'orange_schema_state';
+	const schemaVersion = 1;
+	const ensuredSchemasByDb = new WeakMap();
+
+	async function ensureSyncSchema(db, client, tableNames, options = {}) {
+		if (!db || typeof db.query !== 'function')
+			return null;
+		if (options === false || options && options.enabled === false)
+			return null;
+		const tables = client && client.tables;
+		if (!tables || !Array.isArray(tableNames) || tableNames.length === 0)
+			return null;
+
+		const schema = buildSyncSchema(tables, tableNames);
+		if (!schema.tables.length)
+			return null;
+		const sql = schemaToSql(schema);
+		const schemaJson = stableStringify(schema);
+		const checksum = checksumString(schemaJson);
+		const scope = `sync:${schema.tables.map(x => x.name).join('|')}`;
+		const ensuredKey = `${scope}:${checksum}`;
+		if (isSchemaEnsured(db, ensuredKey))
+			return { scope, schema, checksum, sql: sql.statements };
+
+		await ensureSchemaStateTable(db);
+		const existing = await readSchemaState(db, scope);
+		const shouldUpdateState = !existing || existing.checksum !== checksum;
+		if (existing && existing.checksum !== checksum && !isIndexOnlySchemaChange(existing.schemaJson, schema))
+			throw new Error('Local sync schema does not match current map. Reset the local sync database or run a migration before syncing.');
+		if (existing && existing.checksum === checksum) {
+			markSchemaEnsured(db, ensuredKey);
+			return { scope, schema, checksum, sql: sql.statements };
+		}
+
+		for (let i = 0; i < sql.statements.length; i++)
+			await db.query(sql.statements[i]);
+
+		if (shouldUpdateState)
+			await writeSchemaState(db, {
+				scope,
+				dialect: 'sqlite',
+				tables: schema.tables.map(x => x.name),
+				schema,
+				checksum,
+				sql: sql.statements.join('\n'),
+				updatedAtMs: Date.now()
+			});
+
+		markSchemaEnsured(db, ensuredKey);
+		return { scope, schema, checksum, sql: sql.statements };
+	}
+
+	function isSchemaEnsured(db, key) {
+		const ensured = ensuredSchemasByDb.get(db);
+		return ensured ? ensured.has(key) : false;
+	}
+
+	function markSchemaEnsured(db, key) {
+		let ensured = ensuredSchemasByDb.get(db);
+		if (!ensured) {
+			ensured = new Set();
+			ensuredSchemasByDb.set(db, ensured);
+		}
+		ensured.add(key);
+	}
+
+	function clearEnsuredSyncSchema(db) {
+		if (db)
+			ensuredSchemasByDb.delete(db);
+	}
+
+	function buildSyncSchema(tables, tableNames) {
+		const selected = Array.from(new Set(tableNames))
+			.filter(name => tables[name])
+			.sort();
+		const schema = {
+			version: schemaVersion,
+			dialect: 'sqlite',
+			tables: selected.map(name => tableToSchema(name, tables[name]))
+		};
+		addRelationMetadata(schema, tables, selected);
+		return schema;
+	}
+
+	function tableToSchema(name, table) {
+		const columns = (table._columns || []).map(columnToSchema);
+		return {
+			name,
+			dbName: table._dbName,
+			columns,
+			foreignKeys: [],
+			indexes: [],
+			primaryKey: (table._primaryColumns || []).map(x => x._dbName)
+		};
+	}
+
+	function columnToSchema(column) {
+		return {
+			name: column.alias,
+			dbName: column._dbName,
+			type: columnType(column),
+			primary: column.isPrimary === true,
+			notNull: column._notNull === true,
+			notNullExceptInsert: column._notNullExceptInsert === true
+		};
+	}
+
+	function columnType(column) {
+		if (column.tsType === 'NumberColumn')
+			return 'number';
+		if (column.tsType === 'BooleanColumn')
+			return 'boolean';
+		if (column.tsType === 'BigintColumn')
+			return 'bigint';
+		if (column.tsType === 'BinaryColumn')
+			return 'binary';
+		if (column.tsType === 'JSONColumn')
+			return 'json';
+		if (column.tsType === 'UUIDColumn')
+			return 'uuid';
+		if (column.tsType === 'DateColumn' && column.hasTimeZone)
+			return 'datetime-tz';
+		if (column.tsType === 'DateColumn')
+			return 'datetime';
+		return 'string';
+	}
+
+	function schemaToSql(schema) {
+		return {
+			statements: schema.tables.map(tableToCreateSql).concat(schema.tables.flatMap(tableToIndexSql))
+		};
+	}
+
+	function tableToCreateSql(table) {
+		const hasCompositePrimaryKey = table.primaryKey.length > 1;
+		const parts = table.columns.map(column => columnToSql(column, { hasCompositePrimaryKey }));
+		if (table.primaryKey.length > 1)
+			parts.push(`PRIMARY KEY (${table.primaryKey.map(quoteIdent).join(', ')})`);
+		for (let i = 0; i < table.foreignKeys.length; i++)
+			parts.push(foreignKeyToSql(table.foreignKeys[i]));
+		return [
+			`CREATE TABLE IF NOT EXISTS ${quoteIdent(table.dbName)} (`,
+			parts.map(x => `  ${x}`).join(',\n'),
+			');'
+		].join('\n');
+	}
+
+	function tableToIndexSql(table) {
+		return (table.indexes || []).map(index => {
+			return `CREATE INDEX IF NOT EXISTS ${quoteIdent(index.dbName)} ON ${quoteIdent(table.dbName)} (${index.columns.map(quoteIdent).join(', ')});`;
+		});
+	}
+
+	function columnToSql(column, options = {}) {
+		const parts = [quoteIdent(column.dbName), sqliteType(column.type)];
+		if (!options.hasCompositePrimaryKey && column.primary && column.type === 'number')
+			parts.push('PRIMARY KEY');
+		else if (!options.hasCompositePrimaryKey && column.primary)
+			parts.push('PRIMARY KEY');
+		if (column.notNull)
+			parts.push('NOT NULL');
+		return parts.join(' ');
+	}
+
+	function foreignKeyToSql(foreignKey) {
+		return [
+			`FOREIGN KEY (${foreignKey.columns.map(quoteIdent).join(', ')})`,
+			`REFERENCES ${quoteIdent(foreignKey.referencesTable)} (${foreignKey.referencesColumns.map(quoteIdent).join(', ')})`
+		].join(' ');
+	}
+
+	function sqliteType(type) {
+		if (type === 'number' || type === 'boolean')
+			return 'INTEGER';
+		if (type === 'binary')
+			return 'BLOB';
+		return 'TEXT';
+	}
+
+	function addRelationMetadata(schema, tables, selectedNames) {
+		const tableSchemaByObject = new Map();
+		const selectedObjects = new Set();
+		for (let i = 0; i < selectedNames.length; i++) {
+			const table = tables[selectedNames[i]];
+			const tableSchema = schema.tables[i];
+			tableSchemaByObject.set(table, tableSchema);
+			selectedObjects.add(table);
+		}
+
+		const seen = new Set();
+		const seenForeignKeys = new Set();
+		for (let i = 0; i < selectedNames.length; i++) {
+			const table = tables[selectedNames[i]];
+			const relations = table && table._relations;
+			if (!relations)
+				continue;
+			for (let relationName in relations) {
+				const join = extractJoinRelation(relations[relationName]);
+				if (!join || !selectedObjects.has(join.parentTable) || !selectedObjects.has(join.childTable))
+					continue;
+				const targetSchema = tableSchemaByObject.get(join.parentTable);
+				const referencesSchema = tableSchemaByObject.get(join.childTable);
+				const columns = (join.columns || []).map(x => x && x._dbName).filter(Boolean);
+				const referencesColumns = join.childTable && Array.isArray(join.childTable._primaryColumns)
+					? join.childTable._primaryColumns.map(x => x && x._dbName).filter(Boolean)
+					: [];
+				if (!targetSchema || !referencesSchema || columns.length === 0 || columns.length !== referencesColumns.length)
+					continue;
+				addRelationIndex(targetSchema, columns, relationName, seen);
+				addRelationForeignKey(targetSchema, referencesSchema, columns, referencesColumns, seenForeignKeys);
+			}
+		}
+
+		for (let i = 0; i < schema.tables.length; i++) {
+			schema.tables[i].indexes.sort((a, b) => a.dbName.localeCompare(b.dbName));
+			schema.tables[i].foreignKeys.sort((a, b) => {
+				const tableCompare = a.referencesTable.localeCompare(b.referencesTable);
+				if (tableCompare !== 0)
+					return tableCompare;
+				return a.columns.join('|').localeCompare(b.columns.join('|'));
+			});
+		}
+	}
+
+	function addRelationIndex(targetSchema, columns, relationName, seen) {
+		if (isPrimaryKey(targetSchema, columns))
+			return;
+		const key = `${targetSchema.dbName}:${columns.join('|')}`;
+		if (seen.has(key))
+			return;
+		seen.add(key);
+		targetSchema.indexes.push({
+			name: `relation:${relationName}`,
+			dbName: newIndexName(targetSchema.dbName, columns),
+			columns
+		});
+	}
+
+	function addRelationForeignKey(targetSchema, referencesSchema, columns, referencesColumns, seen) {
+		const key = `${targetSchema.dbName}:${columns.join('|')}:${referencesSchema.dbName}:${referencesColumns.join('|')}`;
+		if (seen.has(key))
+			return;
+		seen.add(key);
+		targetSchema.foreignKeys.push({
+			columns,
+			referencesTable: referencesSchema.dbName,
+			referencesColumns
+		});
+	}
+
+	function extractJoinRelation(relation) {
+		if (!relation || typeof relation.accept !== 'function')
+			return null;
+		let join;
+		relation.accept({
+			visitJoin: function(current) {
+				join = current;
+			},
+			visitOne: function(current) {
+				join = current && current.joinRelation;
+			},
+			visitMany: function(current) {
+				join = current && current.joinRelation;
+			}
+		});
+		return join;
+	}
+
+	function isPrimaryKey(tableSchema, columns) {
+		if (!Array.isArray(tableSchema.primaryKey) || tableSchema.primaryKey.length !== columns.length)
+			return false;
+		for (let i = 0; i < columns.length; i++) {
+			if (tableSchema.primaryKey[i] !== columns[i])
+				return false;
+		}
+		return true;
+	}
+
+	function newIndexName(tableName, columns) {
+		const raw = `orange_idx_${tableName}_${columns.join('_')}`;
+		return raw.replace(/[^A-Za-z0-9_]/g, '_');
+	}
+
+	async function ensureSchemaStateTable(db) {
+		await db.query([
+			`CREATE TABLE IF NOT EXISTS ${quoteIdent(schemaStateTable)} (`,
+			'"scope" TEXT PRIMARY KEY,',
+			'"dialect" TEXT NOT NULL,',
+			'"tables_json" TEXT NOT NULL,',
+			'"schema_json" TEXT NOT NULL,',
+			'"checksum" TEXT NOT NULL,',
+			'"sql_text" TEXT NOT NULL,',
+			'"updated_at_ms" INTEGER NOT NULL',
+			');'
+		].join(' '));
+	}
+
+	async function readSchemaState(db, scope) {
+		const rows = await db.query(`SELECT "checksum", "schema_json" FROM ${quoteIdent(schemaStateTable)} WHERE "scope" = ${sqlStringLiteral(scope)} LIMIT 1`);
+		const list = Array.isArray(rows) ? rows : rows && rows.rows || [];
+		const row = list[0];
+		if (!row)
+			return null;
+		return {
+			checksum: row.checksum ?? row.CHECKSUM,
+			schemaJson: row.schema_json ?? row.SCHEMA_JSON
+		};
+	}
+
+	async function writeSchemaState(db, state) {
+		await db.query([
+			`INSERT OR REPLACE INTO ${quoteIdent(schemaStateTable)} (`,
+			'"scope", "dialect", "tables_json", "schema_json", "checksum", "sql_text", "updated_at_ms"',
+			') VALUES (',
+			[
+				sqlStringLiteral(state.scope),
+				sqlStringLiteral(state.dialect),
+				sqlStringLiteral(JSON.stringify(state.tables)),
+				sqlStringLiteral(stableStringify(state.schema)),
+				sqlStringLiteral(state.checksum),
+				sqlStringLiteral(state.sql),
+				String(state.updatedAtMs)
+			].join(', '),
+			');'
+		].join(' '));
+	}
+
+	function isIndexOnlySchemaChange(existingSchemaJson, nextSchema) {
+		if (typeof existingSchemaJson !== 'string')
+			return false;
+		try {
+			const existing = JSON.parse(existingSchemaJson);
+			return stableStringify(stripIndexes(existing)) === stableStringify(stripIndexes(nextSchema));
+		}
+		catch (_e) {
+			return false;
+		}
+	}
+
+	function stripIndexes(value) {
+		if (Array.isArray(value))
+			return value.map(stripIndexes);
+		if (!value || typeof value !== 'object')
+			return value;
+		const result = {};
+		for (let key in value) {
+			if (key !== 'indexes')
+				result[key] = stripIndexes(value[key]);
+		}
+		return result;
+	}
+
+	function quoteIdent(value) {
+		return `"${String(value).replace(/"/g, '""')}"`;
+	}
+
+	function sqlStringLiteral(value) {
+		if (value === null || value === undefined)
+			return 'NULL';
+		return `'${String(value).replace(/'/g, '\'\'')}'`;
+	}
+
+	function stableStringify(value) {
+		if (value === null || typeof value !== 'object')
+			return JSON.stringify(value);
+		if (Array.isArray(value))
+			return `[${value.map(stableStringify).join(',')}]`;
+		const keys = Object.keys(value).sort();
+		return `{${keys.map(key => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
+	}
+
+	function checksumString(value) {
+		let hash = 2166136261;
+		for (let i = 0; i < value.length; i++) {
+			hash ^= value.charCodeAt(i);
+			hash = Math.imul(hash, 16777619);
+		}
+		return `fnv1a32:${(hash >>> 0).toString(16).padStart(8, '0')}`;
+	}
+
+	syncSchema = {
+		ensureSyncSchema,
+		clearEnsuredSyncSchema,
+		buildSyncSchema,
+		schemaToSql,
+		stableStringify,
+		checksumString
+	};
+	return syncSchema;
+}
+
 var hasRequiredSyncClient;
 
 function requireSyncClient () {
@@ -6200,13 +6012,7 @@ function requireSyncClient () {
 	const { createSyncAuto, syncAutoStartSymbol } = requireSyncAuto();
 	const createHttpInterceptor = requireHttpInterceptor();
 	const outboxTableSql = requireOutboxTableSql();
-	const {
-		buildSyncSchema,
-		checksumString,
-		clearEnsuredSyncSchema,
-		ensureSyncSchema,
-		stableStringify
-	} = requireSyncSchema();
+	const { ensureSyncSchema, clearEnsuredSyncSchema } = requireSyncSchema();
 	const { runSyncMaintenance } = requireWriteGate();
 	const {
 		normalizeCrossTabLockConfig,
@@ -6242,9 +6048,6 @@ function requireSyncClient () {
 	const applyPullJournalSymbol = typeof Symbol === 'function'
 		? Symbol.for('orange-orm.syncClient.applyPullJournal')
 		: '__orangeOrmSyncClientApplyPullJournal';
-	const applySqliteSnapshotSymbol = typeof Symbol === 'function'
-		? Symbol.for('orange-orm.syncClient.applySqliteSnapshot')
-		: '__orangeOrmSyncClientApplySqliteSnapshot';
 	const pushPendingSymbol = typeof Symbol === 'function'
 		? Symbol.for('orange-orm.syncClient.pushPending')
 		: '__orangeOrmSyncClientPushPending';
@@ -6316,9 +6119,6 @@ function requireSyncClient () {
 		Object.defineProperty(syncClientApi, applyPullJournalSymbol, {
 			value: applyPullJournalSnapshot
 		});
-		Object.defineProperty(syncClientApi, applySqliteSnapshotSymbol, {
-			value: applyCapturedSqliteSnapshot
-		});
 		Object.defineProperty(syncClientApi, pushPendingSymbol, {
 			value: pushPendingOnly
 		});
@@ -6361,8 +6161,6 @@ function requireSyncClient () {
 			};
 			if (typeof options._capturePullJournalChunk === 'function')
 				pullOptions._capturePullJournalChunk = options._capturePullJournalChunk;
-			if (typeof options._stageSqliteSnapshot === 'function')
-				pullOptions._stageSqliteSnapshot = options._stageSqliteSnapshot;
 			if (options._deferStableBaseUntilComplete === true)
 				pullOptions._deferStableBaseUntilComplete = true;
 			if (typeof options._onPullBatchProgress === 'function')
@@ -6472,8 +6270,6 @@ function requireSyncClient () {
 				normalizedOptions._capturePullJournal = true;
 			if (options && typeof options._capturePullJournalChunk === 'function')
 				normalizedOptions._capturePullJournalChunk = options._capturePullJournalChunk;
-			if (options && typeof options._stageSqliteSnapshot === 'function')
-				normalizedOptions._stageSqliteSnapshot = options._stageSqliteSnapshot;
 			if (options && options._deferStableBaseUntilComplete === true)
 				normalizedOptions._deferStableBaseUntilComplete = true;
 			if (options && typeof options._onPullBatchProgress === 'function')
@@ -6575,7 +6371,6 @@ function requireSyncClient () {
 				scopeKey,
 				_capturePullJournal: !!options._capturePullJournal,
 				_capturePullJournalChunk: options._capturePullJournalChunk,
-				_stageSqliteSnapshot: options._stageSqliteSnapshot,
 				_deferStableBaseUntilComplete: options._deferStableBaseUntilComplete === true,
 				_onPullBatchProgress: options._onPullBatchProgress,
 				_onPullStagingSummary: options._onPullStagingSummary,
@@ -6725,52 +6520,6 @@ function requireSyncClient () {
 				inserted += exists ? 0 : 1;
 			}
 			return { inserted, replayed, skipped, errors };
-		}
-
-		async function applyCapturedSqliteSnapshot(snapshot, options = {}) {
-			if (!snapshot || snapshot !== Object(snapshot)
-				|| !isSqliteSnapshotDescriptor(snapshot.descriptor)
-				|| !isSqliteSnapshotBytes(snapshot.bytes)) {
-				throw new Error('Invalid captured SQLite snapshot.');
-			}
-			if (snapshot.cursor === undefined)
-				throw new Error('Captured SQLite snapshot does not contain a sync cursor.');
-			const {
-				db,
-				syncConfig,
-				configuredTables
-			} = await prepareLocalSyncSchema(normalizePullOptions(options));
-			const snapshotTables = normalizeConfiguredTables(snapshot.tables);
-			const tables = snapshotTables || configuredTables;
-			if (!tables.every(table => configuredTables.includes(table)))
-				throw new Error('Captured SQLite snapshot contains tables outside the configured sync scope.');
-			const scopeKey = typeof snapshot.scopeKey === 'string'
-				? snapshot.scopeKey
-				: getScopeKey(tables);
-			const result = await runSyncMaintenance(db, async () => {
-				await ensureSyncStateTable(db);
-				await client.transaction(async (tx) => {
-					await ensureStableBaseTables(tx, tables);
-				}, { suppressSyncOutbox: true });
-				await tryEnableForeignKeys(db);
-				return importSqliteSnapshotBytes(
-					snapshot.descriptor,
-					snapshot.bytes,
-					db,
-					client.tables,
-					tables,
-					scopeKey,
-					snapshot.cursor
-				);
-			});
-			sinceByScope.set(scopeKey, snapshot.cursor);
-			await maybeEmitInitialReady(syncConfig, tables, db, 'snapshot-replay');
-			return {
-				applied: Number(result && result.rowCount || snapshot.descriptor.rowCount || 0),
-				tables: tables.slice(),
-				since: snapshot.cursor,
-				checkpointApplied: true
-			};
 		}
 
 		async function applyPullJournalSnapshot(journal, options = {}) {
@@ -7154,8 +6903,6 @@ function requireSyncClient () {
 			const stagingTimings = newPullStagingTimings(deferStableBaseUntilComplete);
 			let capturedStreamItemCount = 0;
 			let capturedApplicableItemCount = 0;
-			let snapshotAppliedRows = 0;
-			let snapshotApplied = false;
 			const streamedTables = new Set();
 			let applied = 0;
 			await ensurePullJournalTables(db);
@@ -7166,7 +6913,7 @@ function requireSyncClient () {
 				: null;
 			const shouldApplyCheckpoint = session.finalSince !== undefined;
 			if (isStreamPullSession(session)) {
-				applied = snapshotAppliedRows || capturedApplicableItemCount;
+				applied = capturedApplicableItemCount;
 				await finalizeStreamedPullJournal(session);
 			}
 			else if (applyConfig)
@@ -7221,7 +6968,7 @@ function requireSyncClient () {
 				await client.transaction(async (tx) => {
 					if (hasJournalItems && (!applyConfig || applyConfig.foreignKeyCheck === 'final'))
 						await validateForeignKeys(tx);
-					if (deferStableBaseUntilComplete && !snapshotApplied) {
+					if (deferStableBaseUntilComplete) {
 						const bulkStableBaseStartedAtMs = Date.now();
 						await copyTablesToStableBase(tx, options.tables);
 						stagingTimings.bulkStableBaseMs += elapsedMs(bulkStableBaseStartedAtMs);
@@ -7509,7 +7256,7 @@ function requireSyncClient () {
 			}
 
 			async function fetchPullBatch(session, reason) {
-				let keysPayload = await requestPayload({
+				const keysPayload = await requestPayload({
 					...pullConfig,
 					body: {
 						phase: 'keys',
@@ -7517,45 +7264,9 @@ function requireSyncClient () {
 						since: session.since,
 						tables: options.tables,
 						limit: maxKeysPerBatch,
-						inlineRows: true,
-						sqliteSnapshot: session.since === undefined
+						inlineRows: true
 					}
 				}, options);
-				if (isSqliteSnapshotPayload(keysPayload)) {
-					try {
-						const imported = await importSqliteSnapshot(
-							keysPayload.snapshot,
-							pullConfig,
-							db,
-							client.tables,
-							options.tables,
-							scopeKey,
-							keysPayload.cursor,
-							options
-						);
-						snapshotApplied = true;
-						snapshotAppliedRows = imported.rowCount;
-						for (const tableName of options.tables || []) streamedTables.add(tableName);
-					}
-					catch (error) {
-						if (error && error.__orangeSqliteSnapshotImported)
-							throw error;
-						if (typeof console !== 'undefined' && typeof console.warn === 'function')
-							console.warn('[sqlite-snapshot] import failed; falling back to inline rows', error);
-						keysPayload = await requestPayload({
-							...pullConfig,
-							body: {
-								phase: 'keys',
-								token: session.token,
-								since: session.since,
-								tables: options.tables,
-								limit: maxKeysPerBatch,
-								inlineRows: true,
-								sqliteSnapshot: false
-							}
-						}, options);
-					}
-				}
 				if (!isStagedKeysPayload(keysPayload))
 					throw new Error('Sync endpoint did not return staged keys payload');
 				const nextReason = reason === undefined && keysPayload.reason !== undefined
@@ -9708,8 +9419,7 @@ function requireSyncClient () {
 			url: appendQueryParam(config.url, 'sync', config.syncPhase || 'pull'),
 			method: 'post',
 			timeout: config.timeoutMs,
-			headers: {},
-			responseType: config.responseType
+			headers: {}
 		};
 		request.data = requestBody;
 
@@ -9765,9 +9475,7 @@ function requireSyncClient () {
 				if (config.credentials !== undefined)
 					fetchOptions.credentials = config.credentials;
 				const response = await fetch(config.url, fetchOptions);
-				const data = config.responseType === 'arraybuffer'
-					? new Uint8Array(await response.arrayBuffer())
-					: await readPayloadResponse(response);
+				const data = await readPayloadResponse(response);
 				const payload = {
 					data,
 					status: response.status,
@@ -9829,140 +9537,6 @@ function requireSyncClient () {
 			&& payload.phase === 'keys'
 			&& Array.isArray(payload.items)
 			&& 'done' in payload;
-	}
-
-	function isSqliteSnapshotPayload(payload) {
-		return isStagedKeysPayload(payload)
-			&& isSqliteSnapshotDescriptor(payload.snapshot);
-	}
-
-	async function importSqliteSnapshot(descriptor, pullConfig, db, clientTables, tableNames, scopeKey, cursor, requestOptions) {
-		const bytes = await requestPayload({
-			...pullConfig,
-			responseType: 'arraybuffer',
-			body: { phase: 'snapshot', id: descriptor.id }
-		}, requestOptions);
-		let replayHandle;
-		if (typeof requestOptions._stageSqliteSnapshot === 'function') {
-			replayHandle = await requestOptions._stageSqliteSnapshot({
-				descriptor: { ...descriptor },
-				bytes: cloneSqliteSnapshotBytes(bytes),
-				tables: Array.isArray(tableNames) ? tableNames.slice() : [],
-				scopeKey,
-				cursor
-			});
-		}
-		let result;
-		try {
-			result = await importSqliteSnapshotBytes(
-				descriptor,
-				bytes,
-				db,
-				clientTables,
-				tableNames,
-				scopeKey,
-				cursor
-			);
-		}
-		catch (error) {
-			if (replayHandle && typeof replayHandle.abort === 'function') {
-				try {
-					await replayHandle.abort();
-				}
-				catch (abortError) {
-					const fatalError = abortError instanceof Error ? abortError : new Error(String(abortError));
-					fatalError.cause = error;
-					fatalError.__orangeSqliteSnapshotImported = true;
-					throw fatalError;
-				}
-			}
-			throw error;
-		}
-		if (replayHandle && typeof replayHandle.applied === 'function') {
-			try {
-				await replayHandle.applied();
-			}
-			catch (error) {
-				const fatalError = error instanceof Error ? error : new Error(String(error));
-				fatalError.__orangeSqliteSnapshotImported = true;
-				throw fatalError;
-			}
-		}
-		return result;
-	}
-
-	async function importSqliteSnapshotBytes(descriptor, bytes, db, clientTables, tableNames, scopeKey, cursor) {
-		const importer = resolveSqliteSnapshotImporter(db);
-		if (!importer) throw new Error('SQLite snapshot import is not available for this database.');
-		if (!isSqliteSnapshotDescriptor(descriptor) || !isSqliteSnapshotBytes(bytes))
-			throw new Error('Invalid SQLite snapshot payload.');
-		const tables = Array.isArray(tableNames) ? tableNames : [];
-		const schema = buildSyncSchema(clientTables, tables);
-		const schemaChecksum = checksumString(stableStringify(schema));
-		if (schemaChecksum !== descriptor.schemaChecksum)
-			throw new Error('SQLite snapshot schema does not match the local map.');
-		const baseEntries = await readSnapshotBaseEntries(db);
-		const baseByDbName = new Map(baseEntries.map(entry => [entry.name, entry.baseName]));
-		const statements = ['PRAGMA defer_foreign_keys=ON'];
-		for (let i = schema.tables.length - 1; i >= 0; i--)
-			statements.push(`DELETE FROM ${quoteIdent(schema.tables[i].dbName)}`);
-		for (const table of schema.tables) {
-			const columns = table.columns.map(column => quoteIdent(column.dbName)).join(', ');
-			statements.push(`INSERT INTO ${quoteIdent(table.dbName)} (${columns}) SELECT ${columns} FROM orange_snapshot.${quoteIdent(table.dbName)}`);
-			const baseName = baseByDbName.get(table.dbName);
-			if (baseName) {
-				statements.push(`DELETE FROM ${quoteIdent(baseName)}`);
-				statements.push(`INSERT INTO ${quoteIdent(baseName)} SELECT * FROM ${quoteIdent(table.dbName)}`);
-			}
-		}
-		statements.push([
-			'INSERT INTO "orange_sync_state" ("scope", "since_value") VALUES (',
-			sqlStringLiteral(scopeKey), ', ', sqlStringLiteral(JSON.stringify({ since: cursor, updatedAtMs: Date.now() })), ') ',
-			'ON CONFLICT("scope") DO UPDATE SET "since_value" = excluded."since_value"'
-		].join(''));
-		const result = await importer(bytes, statements, {
-			schemaChecksum: descriptor.schemaChecksum,
-			rowCount: descriptor.rowCount
-		});
-		return result && result.result || result;
-	}
-
-	function isSqliteSnapshotDescriptor(value) {
-		return value
-			&& value === Object(value)
-			&& typeof value.id === 'string'
-			&& typeof value.schemaChecksum === 'string';
-	}
-
-	function isSqliteSnapshotBytes(value) {
-		return value instanceof Uint8Array
-			|| typeof ArrayBuffer === 'function' && value instanceof ArrayBuffer;
-	}
-
-	function cloneSqliteSnapshotBytes(value) {
-		if (value instanceof Uint8Array)
-			return value.slice();
-		if (typeof ArrayBuffer === 'function' && value instanceof ArrayBuffer)
-			return value.slice(0);
-		throw new Error('SQLite snapshot response did not contain binary data.');
-	}
-
-	function resolveSqliteSnapshotImporter(db) {
-		const pool = db && (db.poolFactory || db.pool || db);
-		return pool && typeof pool.__orangeImportSqliteSnapshot === 'function'
-			? pool.__orangeImportSqliteSnapshot.bind(pool)
-			: null;
-	}
-
-	async function readSnapshotBaseEntries(db) {
-		try {
-			const rows = await db.query('SELECT "name", "base_name", "schema_sql", "ordinal" FROM "orange_sync_base_tables" ORDER BY "ordinal", "name"');
-			return (Array.isArray(rows) ? rows : rows && rows.rows || []).map(row => ({
-				name: row.name ?? row.NAME,
-				baseName: row.base_name ?? row.BASE_NAME
-			}));
-		}
-		catch (_error) { return []; }
 	}
 
 	function isRowsPayload(payload) {
@@ -10559,7 +10133,6 @@ function requireSyncClient () {
 	syncClient.exports.readOutboxRowsSymbol = readOutboxRowsSymbol;
 	syncClient.exports.applyOutboxRowsSymbol = applyOutboxRowsSymbol;
 	syncClient.exports.applyPullJournalSymbol = applyPullJournalSymbol;
-	syncClient.exports.applySqliteSnapshotSymbol = applySqliteSnapshotSymbol;
 	syncClient.exports.pushPendingSymbol = pushPendingSymbol;
 	syncClient.exports.setClientIdSymbol = setClientIdSymbol;
 	return syncClient.exports;
@@ -23003,6 +22576,7 @@ function requireInlineWorker () {
 		const dbByConnectionString = new Map();
 		const dbOpenOptionsByConnectionString = new Map();
 		const dbOpenInfoByConnectionString = new Map();
+		const dbFileImporterByConnectionString = new Map();
 		let operationQueue = Promise.resolve();
 		let activeLeaseId;
 		let nextLeaseId = 1;
@@ -23161,8 +22735,10 @@ function requireInlineWorker () {
 				return query(db, message.sql, message.parameters);
 			if (message.method === 'command')
 				return command(db, message.sql, message.parameters);
-			if (message.method === 'importSnapshot')
-				return importSnapshot(db, message.bytes, message.statements, message.expected);
+			if (message.method === 'exportDatabase')
+				return exportDatabase(db);
+			if (message.method === 'replaceDatabase')
+				return replaceDatabase(connectionString, message.bytes);
 			throw new Error('Unknown sqliteOPFS worker method "' + message.method + '".');
 		}
 
@@ -23184,6 +22760,7 @@ function requireInlineWorker () {
 			};
 			dbByConnectionString.set(key, db);
 			dbOpenInfoByConnectionString.set(key, dbOpenInfo);
+			dbFileImporterByConnectionString.set(key, dbInfo.importDatabase);
 			return dbOpenInfo;
 		}
 
@@ -23217,7 +22794,10 @@ function requireInlineWorker () {
 			return {
 				db: new DbClass(filename),
 				vfs: 'opfs-wl',
-				opfs: true
+				opfs: true,
+				importDatabase: typeof DbClass.importDb === 'function'
+					? (bytes) => DbClass.importDb(filename, bytes)
+					: undefined
 			};
 		}
 
@@ -23231,7 +22811,10 @@ function requireInlineWorker () {
 			return {
 				db: new DbClass(filename),
 				vfs: pool.vfsName || 'opfs-sahpool',
-				opfs: true
+				opfs: true,
+				importDatabase: typeof pool.importDb === 'function'
+					? (bytes) => pool.importDb(filename, bytes)
+					: undefined
 			};
 		}
 
@@ -23276,47 +22859,55 @@ function requireInlineWorker () {
 			};
 		}
 
-		function importSnapshot(db, bytes, statements, expected) {
-			if (!(bytes instanceof Uint8Array))
-				bytes = new Uint8Array(bytes);
-			const pointer = db && db.pointer;
+		function exportDatabase(db) {
 			return getSqlite3().then(sqlite3 => {
-				if (pointer === undefined || !sqlite3.capi || typeof sqlite3.capi.sqlite3_deserialize !== 'function')
-					throw new Error('sqliteOPFS runtime cannot import SQLite snapshots.');
-				db.exec('ATTACH \':memory:\' AS orange_snapshot');
-				try {
-					const data = sqlite3.wasm.allocFromTypedArray(bytes);
-					const flags = sqlite3.capi.SQLITE_DESERIALIZE_FREEONCLOSE | sqlite3.capi.SQLITE_DESERIALIZE_READONLY;
-					const rc = sqlite3.capi.sqlite3_deserialize(pointer, 'orange_snapshot', data, bytes.length, bytes.length, flags);
-					if (rc !== 0) throw new Error('sqlite3_deserialize failed with code ' + rc + '.');
-					const meta = db.selectObject('SELECT "format", "schema_checksum", "watermark_json", "row_count" FROM orange_snapshot.orange_snapshot_meta');
-					if (!meta || Number(meta.format) !== 1 || meta.schema_checksum !== expected.schemaChecksum || Number(meta.row_count) !== Number(expected.rowCount))
-						throw new Error('SQLite snapshot metadata does not match its descriptor.');
-					db.exec('BEGIN');
-					try {
-						for (const statement of statements || []) db.exec(statement);
-						db.exec('COMMIT');
-					}
-					catch (error) {
-						db.exec('ROLLBACK');
-						throw error;
-					}
-					return { rowCount: Number(meta.row_count), watermark: JSON.parse(meta.watermark_json) };
-				}
-				finally {
-					db.exec('DETACH orange_snapshot');
-				}
+				if (!db || db.pointer === undefined || !sqlite3.capi
+					|| typeof sqlite3.capi.sqlite3_js_db_export !== 'function')
+					throw new Error('sqliteOPFS runtime cannot export a SQLite database file.');
+				return sqlite3.capi.sqlite3_js_db_export(db.pointer);
 			});
 		}
 
+		function replaceDatabase(connectionString, bytes) {
+			if (!(bytes instanceof Uint8Array))
+				bytes = new Uint8Array(bytes);
+			const key = normalizeConnectionString(connectionString);
+			const importDatabase = dbFileImporterByConnectionString.get(key);
+			if (typeof importDatabase !== 'function')
+				return Promise.reject(new Error('sqliteOPFS runtime cannot replace a SQLite database file.'));
+			const openOptions = dbOpenOptionsByConnectionString.get(key);
+			if (!openOptions)
+				return Promise.reject(new Error('sqliteOPFS database open options are unavailable.'));
+			closeDb(key);
+			return Promise.resolve(importDatabase(bytes))
+				.then(() => openDb(
+					openOptions.connectionString,
+					openOptions.busyTimeoutMs,
+					openOptions.vfs,
+					openOptions.opfsSahPoolOptions
+				))
+				.then(info => {
+					const db = dbByConnectionString.get(key);
+					const integrity = query(db, 'PRAGMA quick_check');
+					const value = integrity[0] && (integrity[0].quick_check ?? integrity[0].QUICK_CHECK);
+					if (value !== 'ok')
+						throw new Error('Restored sqliteOPFS database failed PRAGMA quick_check.');
+					return info;
+				});
+		}
+
 		function postResponse(target, id, result, error, elapsedMs) {
-			target.postMessage({
+			const message = {
 				type: 'orange-sqlite-opfs-response',
 				id,
 				result,
 				elapsedMs,
 				error: error ? serializeError(error) : undefined
-			});
+			};
+			const transfer = result instanceof Uint8Array && result.buffer instanceof ArrayBuffer
+				? [result.buffer]
+				: undefined;
+			target.postMessage(message, transfer);
 		}
 
 		function emit(type, event) {
@@ -23438,10 +23029,11 @@ function requireWorkerClient () {
 		return {
 			executeQuery,
 			executeCommand,
+			exportDatabase,
+			replaceDatabase,
 			checkout,
 			close,
 			getOpenInfo,
-			importSnapshot,
 			release,
 			reset,
 			ready
@@ -23455,12 +23047,26 @@ function requireWorkerClient () {
 			executeCommandCore(query, callback);
 		}
 
-		function importSnapshot(bytes, statements, expected) {
+		function exportDatabase() {
 			if (closed)
 				return Promise.reject(new Error('sqliteOPFS worker client closed.'));
 			return ensureOpen()
-				.then(() => request('importSnapshot', { bytes, statements, expected }))
+				.then(() => request('exportDatabase'))
 				.then(response => response.result);
+		}
+
+		function replaceDatabase(bytes) {
+			if (closed)
+				return Promise.reject(new Error('sqliteOPFS worker client closed.'));
+			if (!(bytes instanceof Uint8Array))
+				return Promise.reject(new Error('sqliteOPFS replacement requires SQLite file bytes.'));
+			return ensureOpen()
+				.then(() => request('replaceDatabase', { bytes }))
+				.then(response => {
+					openInfo = normalizeOpenResult(response.result);
+					openPromise = Promise.resolve(openInfo);
+					return openInfo;
+				});
 		}
 
 		function executeQueryCore(query, callback, leaseId) {
@@ -23519,7 +23125,8 @@ function requireWorkerClient () {
 				return {
 					executeQuery,
 					executeCommand,
-					importSnapshot,
+					exportDatabase,
+					replaceDatabase,
 					getOpenInfo,
 					reset,
 					releaseCheckout: () => Promise.resolve()
@@ -23531,9 +23138,17 @@ function requireWorkerClient () {
 				executeCommand(query, callback) {
 					executeCommandCore(query, callback, leaseId);
 				},
-				importSnapshot(bytes, statements, expected) {
-					return request('importSnapshot', { bytes, statements, expected, leaseId })
-						.then(response => response.result);
+				exportDatabase() {
+					return request('exportDatabase', { leaseId }).then(response => response.result);
+				},
+				replaceDatabase(bytes) {
+					if (!(bytes instanceof Uint8Array))
+						return Promise.reject(new Error('sqliteOPFS replacement requires SQLite file bytes.'));
+					return request('replaceDatabase', { bytes, leaseId }).then(response => {
+						openInfo = normalizeOpenResult(response.result);
+						openPromise = Promise.resolve(openInfo);
+						return openInfo;
+					});
 				},
 				getOpenInfo,
 				reset,
@@ -23557,7 +23172,7 @@ function requireWorkerClient () {
 						connectionString,
 						...payload
 					};
-					const transfer = snapshotTransferList(method, message);
+					const transfer = databaseTransferList(method, message);
 					worker.postMessage(message, transfer);
 				}
 				catch (e) {
@@ -23567,8 +23182,8 @@ function requireWorkerClient () {
 			});
 		}
 
-		function snapshotTransferList(method, message) {
-			if (method !== 'importSnapshot' || !(message.bytes instanceof Uint8Array))
+		function databaseTransferList(method, message) {
+			if (method !== 'replaceDatabase' || !(message.bytes instanceof Uint8Array))
 				return undefined;
 			if (!(message.bytes.buffer instanceof ArrayBuffer))
 				return undefined;
@@ -23759,6 +23374,7 @@ let sqlite3Promise;
 const dbByConnectionString = new Map();
 const dbOpenOptionsByConnectionString = new Map();
 const dbOpenInfoByConnectionString = new Map();
+const dbFileImporterByConnectionString = new Map();
 let operationQueue = Promise.resolve();
 let activeLeaseId;
 let nextLeaseId = 1;
@@ -23876,8 +23492,10 @@ async function dispatch(message) {
 		return query(db, message.sql, message.parameters);
 	if (message.method === 'command')
 		return command(db, message.sql, message.parameters);
-	if (message.method === 'importSnapshot')
-		return importSnapshot(db, message.bytes, message.statements, message.expected);
+	if (message.method === 'exportDatabase')
+		return exportDatabase(db);
+	if (message.method === 'replaceDatabase')
+		return replaceDatabase(connectionString, message.bytes);
 	throw new Error('Unknown sqliteOPFS worker method "' + message.method + '".');
 }
 
@@ -23899,6 +23517,7 @@ async function openDb(connectionString, busyTimeoutMs = 5000, vfs, opfsSahPoolOp
 	};
 	dbByConnectionString.set(key, db);
 	dbOpenInfoByConnectionString.set(key, dbOpenInfo);
+	dbFileImporterByConnectionString.set(key, dbInfo.importDatabase);
 	return dbOpenInfo;
 }
 
@@ -23932,7 +23551,10 @@ function createOpfsWlDb(sqlite3, filename) {
 	return {
 		db: new DbClass(filename),
 		vfs: 'opfs-wl',
-		opfs: true
+		opfs: true,
+		importDatabase: typeof DbClass.importDb === 'function'
+			? (bytes) => DbClass.importDb(filename, bytes)
+			: undefined
 	};
 }
 
@@ -23946,7 +23568,10 @@ async function createOpfsSahPoolDb(sqlite3, filename, opfsSahPoolOptions) {
 	return {
 		db: new DbClass(filename),
 		vfs: pool.vfsName || 'opfs-sahpool',
-		opfs: true
+		opfs: true,
+		importDatabase: typeof pool.importDb === 'function'
+			? (bytes) => pool.importDb(filename, bytes)
+			: undefined
 	};
 }
 
@@ -23984,35 +23609,32 @@ function command(db, sql, parameters = []) {
 	};
 }
 
-async function importSnapshot(db, bytes, statements, expected) {
-	if (!(bytes instanceof Uint8Array)) bytes = new Uint8Array(bytes);
+async function exportDatabase(db) {
 	const sqlite3 = await getSqlite3();
-	const pointer = db && db.pointer;
-	if (pointer === undefined || !sqlite3.capi || typeof sqlite3.capi.sqlite3_deserialize !== 'function')
-		throw new Error('sqliteOPFS runtime cannot import SQLite snapshots.');
-	db.exec("ATTACH ':memory:' AS orange_snapshot");
-	try {
-		const data = sqlite3.wasm.allocFromTypedArray(bytes);
-		const flags = sqlite3.capi.SQLITE_DESERIALIZE_FREEONCLOSE | sqlite3.capi.SQLITE_DESERIALIZE_READONLY;
-		const rc = sqlite3.capi.sqlite3_deserialize(pointer, 'orange_snapshot', data, bytes.length, bytes.length, flags);
-		if (rc !== 0) throw new Error('sqlite3_deserialize failed with code ' + rc + '.');
-		const meta = db.selectObject('SELECT "format", "schema_checksum", "watermark_json", "row_count" FROM orange_snapshot.orange_snapshot_meta');
-		if (!meta || Number(meta.format) !== 1 || meta.schema_checksum !== expected.schemaChecksum || Number(meta.row_count) !== Number(expected.rowCount))
-			throw new Error('SQLite snapshot metadata does not match its descriptor.');
-		db.exec('BEGIN');
-		try {
-			for (const statement of statements || []) db.exec(statement);
-			db.exec('COMMIT');
-		}
-		catch (error) {
-			db.exec('ROLLBACK');
-			throw error;
-		}
-		return { rowCount: Number(meta.row_count), watermark: JSON.parse(meta.watermark_json) };
-	}
-	finally {
-		db.exec('DETACH orange_snapshot');
-	}
+	if (!db || db.pointer === undefined || !sqlite3.capi
+		|| typeof sqlite3.capi.sqlite3_js_db_export !== 'function')
+		throw new Error('sqliteOPFS runtime cannot export a SQLite database file.');
+	return sqlite3.capi.sqlite3_js_db_export(db.pointer);
+}
+
+async function replaceDatabase(connectionString, bytes) {
+	if (!(bytes instanceof Uint8Array)) bytes = new Uint8Array(bytes);
+	const key = normalizeConnectionString(connectionString);
+	const importDatabase = dbFileImporterByConnectionString.get(key);
+	if (typeof importDatabase !== 'function')
+		throw new Error('sqliteOPFS runtime cannot replace a SQLite database file.');
+	const options = dbOpenOptionsByConnectionString.get(key);
+	if (!options)
+		throw new Error('sqliteOPFS database open options are unavailable.');
+	closeDb(key);
+	await importDatabase(bytes);
+	const info = await openDb(options.connectionString, options.busyTimeoutMs, options.vfs, options.opfsSahPoolOptions);
+	const db = dbByConnectionString.get(key);
+	const integrity = query(db, 'PRAGMA quick_check');
+	const value = integrity[0] && (integrity[0].quick_check ?? integrity[0].QUICK_CHECK);
+	if (value !== 'ok')
+		throw new Error('Restored sqliteOPFS database failed PRAGMA quick_check.');
+	return info;
 }
 
 function normalizeFilename(connectionString) {
@@ -24048,13 +23670,17 @@ function normalizePriority(priority) {
 }
 
 function postResponse(target, id, result, error, elapsedMs) {
-	target.postMessage({
+	const message = {
 		type: 'orange-sqlite-opfs-response',
 		id,
 		result,
 		elapsedMs,
 		error: error ? serializeError(error) : undefined
-	});
+	};
+	const transfer = result instanceof Uint8Array && result.buffer instanceof ArrayBuffer
+		? [result.buffer]
+		: undefined;
+	target.postMessage(message, transfer);
 }
 
 function serializeError(error) {
@@ -30466,14 +30092,11 @@ function requireNewPool$5 () {
 		c.__orangeSqliteOPFSRequestedVfs = poolOptions.vfs;
 		c.__orangeCrossTabWriteLock = normalizeCrossTabWriteLockConfig(poolOptions);
 		c.__orangeSqliteOPFSReady = client.ready;
-		c.__orangeImportSqliteSnapshot = function(bytes, statements, expected) {
-			return new Promise((resolve, reject) => {
-				c.connect((error, checkout, done) => {
-					if (error) return reject(error);
-					Promise.resolve(checkout.importSnapshot(bytes, statements, expected))
-						.then(result => { done(); resolve(result); }, importError => { done(importError); reject(importError); });
-				}, 0);
-			});
+		c.__orangeExportSqliteFile = function() {
+			return withWriterCheckout(checkout => checkout.exportDatabase());
+		};
+		c.__orangeReplaceSqliteFile = function(bytes) {
+			return withWriterCheckout(checkout => checkout.replaceDatabase(bytes));
 		};
 
 		if (client.ready && typeof client.ready.then === 'function') {
@@ -30504,6 +30127,21 @@ function requireNewPool$5 () {
 					readClient.reset();
 			});
 		};
+
+		function withWriterCheckout(fn) {
+			return new Promise((resolve, reject) => {
+				c.connect((error, checkout, done) => {
+					if (error)
+						return reject(error);
+					Promise.resolve()
+						.then(() => fn(checkout))
+						.then(
+							result => { done(); resolve(result); },
+							checkoutError => { done(checkoutError); reject(checkoutError); }
+						);
+				}, 0);
+			});
+		}
 
 		c.end = function() {
 			ended = true;
@@ -30777,7 +30415,6 @@ function requireDualSyncDatabase () {
 		readOutboxRowsSymbol,
 		applyOutboxRowsSymbol,
 		applyPullJournalSymbol,
-		applySqliteSnapshotSymbol,
 		pushPendingSymbol,
 		setClientIdSymbol
 	} = newSyncClient;
@@ -30796,8 +30433,6 @@ function requireDualSyncDatabase () {
 	const deltaItemsPerChunk = 1000;
 	const deltaChunkReadPageSize = 32;
 	const manifestCacheMaxAgeMs = 1000;
-	const journalDeltaKind = 'journal';
-	const sqliteSnapshotDeltaKind = 'sqlite-snapshot';
 
 	function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase) {
 		const roleConnectionStrings = {
@@ -31090,19 +30725,43 @@ function requireDualSyncDatabase () {
 			const stagingRole = manifest.stagingRole;
 			const stableRole = manifest.stableRole;
 			const activeSync = getRoleSyncClient(activeRole);
-			const stagingSync = getRoleSyncClient(stableRole);
-			const nextStableSync = getRoleSyncClient(stagingRole);
+			let stagingSync = getRoleSyncClient(stableRole);
+			let nextStableSync = getRoleSyncClient(stagingRole);
 			await ensureSharedClientId(manifest);
+			const fileSnapshotRotation = supportsFileSnapshotRotation();
+			let rollbackSnapshot;
 
 			emitSyncProgress('updating-staging', { activeRole, stagingRole: stableRole, stableRole: stagingRole });
-			await applyPendingDeltasToRole(stableRole);
-			await applyPendingDeltasToRole(stagingRole);
+			if (fileSnapshotRotation) {
+				emitSyncProgress('restoring-base-snapshot', {
+					activeRole,
+					baseRole: stagingRole,
+					targetRole: stableRole
+				});
+				rollbackSnapshot = await exportRoleFile(stagingRole);
+				await replaceRoleFile(stableRole, rollbackSnapshot.slice());
+				stagingSync = getRoleSyncClient(stableRole);
+				nextStableSync = getRoleSyncClient(stagingRole);
+				await clearDeltas();
+			}
+			else {
+				await applyPendingDeltasToRole(stableRole);
+				await applyPendingDeltasToRole(stagingRole);
+			}
 
-			const openRows = await readAllOutboxRows(activeSync, ['pending', 'pushed']);
-			await stagingSync[applyOutboxRowsSymbol](openRows, {
-				replay: false,
-				replaceOpen: true
-			});
+			let openRows;
+			try {
+				openRows = await readAllOutboxRows(activeSync, ['pending', 'pushed']);
+				await stagingSync[applyOutboxRowsSymbol](openRows, {
+					replay: false,
+					replaceOpen: true
+				});
+			}
+			catch (error) {
+				if (fileSnapshotRotation)
+					await restoreFileSnapshotAfterError(manifest, rollbackSnapshot, error);
+				throw error;
+			}
 			emitSyncProgress('pushing-staging', { activeRole, stagingRole: stableRole, stableRole: stagingRole });
 			let stagingPushResult;
 			let pushConflictError;
@@ -31115,50 +30774,66 @@ function requireDualSyncDatabase () {
 			}
 			catch (error) {
 				if (isConflictError(error)) {
-					const failedIds = await recordActiveConflict(manifest, activeSync, stagingSync, openRows);
-					if (failedIds.length === 0)
+					let failedIds;
+					try {
+						failedIds = await recordActiveConflict(manifest, activeSync, stagingSync, openRows);
+					}
+					catch (recordError) {
+						if (fileSnapshotRotation)
+							await restoreFileSnapshotAfterError(manifest, rollbackSnapshot, recordError);
+						throw recordError;
+					}
+					if (failedIds.length === 0) {
+						if (fileSnapshotRotation)
+							await restoreFileSnapshotAfterError(manifest, rollbackSnapshot, error);
 						throw error;
+					}
 					pushConflictError = error;
 					rejectedMutationIds = new Set(failedIds);
 				}
 				else {
-					await mirrorActivePushAttempts(manifest, activeSync, stagingSync, openRows);
+					try {
+						await mirrorActivePushAttempts(manifest, activeSync, stagingSync, openRows);
+					}
+					catch (recordError) {
+						if (fileSnapshotRotation)
+							await restoreFileSnapshotAfterError(manifest, rollbackSnapshot, recordError);
+						throw recordError;
+					}
+					if (fileSnapshotRotation)
+						await restoreFileSnapshotAfterError(manifest, rollbackSnapshot, error);
 					throw error;
 				}
 			}
-			if (!pushConflictError)
-				await acknowledgeActivePushes(manifest, activeSync, stagingSync, stagingPushResult);
-			await mirrorCandidateOutbox(stagingSync, nextStableSync, openRows);
+			if (!pushConflictError) {
+				try {
+					await acknowledgeActivePushes(manifest, activeSync, stagingSync, stagingPushResult);
+				}
+				catch (error) {
+					if (fileSnapshotRotation)
+						await restoreFileSnapshotAfterError(manifest, rollbackSnapshot, error);
+					throw error;
+				}
+			}
+			if (!fileSnapshotRotation)
+				await mirrorCandidateOutbox(stagingSync, nextStableSync, openRows);
 			const needsInitialSwap = stagingPushResult && stagingPushResult.skipped === 'missing-stable-base';
 			const deferStableBaseUntilComplete = needsInitialSwap && openRows.length === 0;
 
 			emitSyncProgress('pulling-staging', { activeRole, stagingRole: stableRole, stableRole: stagingRole });
 			const pullStagingStartedAtMs = Date.now();
-			const deltaSink = await createDeltaJournalSink(stableRole);
+			const deltaSink = fileSnapshotRotation
+				? createDiscardDeltaSink()
+				: await createDeltaJournalSink(stableRole);
 			let result;
 			let journal;
 			let deltaId;
-			let snapshotDeltaId;
 			let pullStagingSummary;
 			try {
 				result = await stagingSync[syncAndCapturePullJournalSymbol]({
 					...options,
 					_skipPushBeforePull: true,
 					_capturePullJournalChunk: deltaSink.write,
-					async _stageSqliteSnapshot(snapshot) {
-						const delta = await createSnapshotDelta(snapshot);
-						snapshotDeltaId = delta.id;
-						return {
-							async applied() {
-								await markDeltaApplied(delta, stableRole);
-							},
-							async abort() {
-								await deleteDelta(delta.id);
-								if (snapshotDeltaId === delta.id)
-									snapshotDeltaId = undefined;
-							}
-						};
-					},
 					_deferStableBaseUntilComplete: deferStableBaseUntilComplete,
 					_onPullBatchProgress(progress) {
 						emitSyncProgress('pull-batch-complete', {
@@ -31173,12 +30848,7 @@ function requireDualSyncDatabase () {
 				});
 				journal = result && result.__orangePullJournal;
 				const deltaFinalizeStartedAtMs = Date.now();
-				if (snapshotDeltaId) {
-					await deltaSink.abort();
-					deltaId = snapshotDeltaId;
-				}
-				else
-					deltaId = await deltaSink.commit(journal);
+				deltaId = await deltaSink.commit(journal);
 				emitSyncProgress('pull-staging-summary', {
 					activeRole,
 					stagingRole: stableRole,
@@ -31199,29 +30869,54 @@ function requireDualSyncDatabase () {
 					deferredStableBase: deferStableBaseUntilComplete,
 					failed: true
 				});
+				if (fileSnapshotRotation)
+					await restoreFileSnapshotAfterError(manifest, rollbackSnapshot, error);
 				throw error;
 			}
-			if (deltaId)
+			if (fileSnapshotRotation) {
+				try {
+					emitSyncProgress('saving-base-snapshot', {
+						activeRole,
+						sourceRole: stableRole,
+						baseRole: stagingRole
+					});
+					const nextBaseSnapshot = await exportRoleFile(stableRole);
+					await replaceRoleFile(stagingRole, nextBaseSnapshot);
+					nextStableSync = getRoleSyncClient(stagingRole);
+				}
+				catch (error) {
+					await restoreFileSnapshotAfterError(manifest, rollbackSnapshot, error);
+					throw error;
+				}
+			}
+			else if (deltaId)
 				await applyPendingDeltasToRole(stagingRole, deltaId);
 			let publishedManifest;
 
 			emitSyncProgress('waiting-for-write-barrier', { activeRole, stagingRole: stableRole, stableRole: stagingRole });
-			await runSyncSwap(router, async () => {
-				const currentManifest = await getManifest(true);
-				assertExpectedManifest(currentManifest, manifest);
-				const finalPendingRows = (await readAllOutboxRows(activeSync, ['pending']))
-					.filter(row => !rejectedMutationIds.has(outboxRowMutationId(row)));
-				await stagingSync[applyOutboxRowsSymbol](finalPendingRows, {
-					replay: true,
-					replaceOpen: false
+			try {
+				await runSyncSwap(router, async () => {
+					const currentManifest = await getManifest(true);
+					assertExpectedManifest(currentManifest, manifest);
+					const finalPendingRows = (await readAllOutboxRows(activeSync, ['pending']))
+						.filter(row => !rejectedMutationIds.has(outboxRowMutationId(row)));
+					await stagingSync[applyOutboxRowsSymbol](finalPendingRows, {
+						replay: true,
+						replaceOpen: false
+					});
+					await nextStableSync[applyOutboxRowsSymbol](finalPendingRows, {
+						replay: false,
+						replaceOpen: false
+					});
+					emitSyncProgress('swapping', { activeRole, stagingRole: stableRole, stableRole: stagingRole });
+					publishedManifest = await publishStableRole(manifest);
 				});
-				await nextStableSync[applyOutboxRowsSymbol](finalPendingRows, {
-					replay: false,
-					replaceOpen: false
-				});
-				emitSyncProgress('swapping', { activeRole, stagingRole: stableRole, stableRole: stagingRole });
-				publishedManifest = await publishStableRole(manifest);
-			});
+			}
+			catch (error) {
+				if (fileSnapshotRotation)
+					await restoreFileSnapshotAfterError(manifest, rollbackSnapshot, error);
+				throw error;
+			}
 
 			publishedManifest = await markSuccessfulSync();
 			const newActiveRole = publishedManifest.activeRole;
@@ -31566,21 +31261,33 @@ function requireDualSyncDatabase () {
 				stableRole
 			});
 			try {
-				try {
-					await targetSync.discardLocalChanges();
+				if (supportsFileSnapshotRotation()) {
+					emitSyncProgress('staging-rebuild-file', {
+						activeRole: manifest.activeRole,
+						sourceRole: stableRole,
+						targetRole
+					});
+					const baseSnapshot = await exportRoleFile(stableRole);
+					await replaceRoleFile(targetRole, baseSnapshot);
+					await getRoleSyncClient(targetRole)[setClientIdSymbol](manifest.clientId);
 				}
-				catch (error) {
-					if (!isMissingStableBaseError(error))
-						throw error;
-					await targetSync.resetLocal();
+				else {
+					try {
+						await targetSync.discardLocalChanges();
+					}
+					catch (error) {
+						if (!isMissingStableBaseError(error))
+							throw error;
+						await targetSync.resetLocal();
+					}
+					await applyPendingDeltasToRole(targetRole);
+					const stableOutboxRows = await readAllOutboxRows(stableSync, ['pending', 'pushed', 'failed']);
+					await targetSync[applyOutboxRowsSymbol](stableOutboxRows, {
+						replay: false,
+						replaceOpen: true
+					});
+					await targetSync[setClientIdSymbol](manifest.clientId);
 				}
-				await applyPendingDeltasToRole(targetRole);
-				const stableOutboxRows = await readAllOutboxRows(stableSync, ['pending', 'pushed', 'failed']);
-				await targetSync[applyOutboxRowsSymbol](stableOutboxRows, {
-					replay: false,
-					replaceOpen: true
-				});
-				await targetSync[setClientIdSymbol](manifest.clientId);
 				const current = await getManifest(true);
 				assertExpectedManifest(current, manifest);
 				const readyManifest = await writeManifest({
@@ -31612,6 +31319,103 @@ function requireDualSyncDatabase () {
 			}
 		}
 
+		function supportsFileSnapshotRotation() {
+			return allRoles.every(role => {
+				const pool = getRoleDb(role).poolFactory;
+				return pool
+					&& typeof pool.__orangeExportSqliteFile === 'function'
+					&& typeof pool.__orangeReplaceSqliteFile === 'function';
+			});
+		}
+
+		async function exportRoleFile(role) {
+			const pool = getRoleDb(role).poolFactory;
+			if (!pool || typeof pool.__orangeExportSqliteFile !== 'function')
+				throw new Error(`Dual sync role "${role}" cannot export its SQLite base snapshot file.`);
+			const bytes = await pool.__orangeExportSqliteFile();
+			if (bytes instanceof Uint8Array)
+				return bytes;
+			if (typeof ArrayBuffer === 'function' && bytes instanceof ArrayBuffer)
+				return new Uint8Array(bytes);
+			throw new Error(`Dual sync role "${role}" returned an invalid SQLite base snapshot file.`);
+		}
+
+		async function replaceRoleFile(role, bytes) {
+			const pool = getRoleDb(role).poolFactory;
+			if (!pool || typeof pool.__orangeReplaceSqliteFile !== 'function')
+				throw new Error(`Dual sync role "${role}" cannot restore a SQLite base snapshot file.`);
+			await pool.__orangeReplaceSqliteFile(bytes);
+			invalidateRoleClient(role);
+		}
+
+		function invalidateRoleClient(role) {
+			clientByRole.delete(role);
+			schemaReadyRoles.delete(role);
+			schemaReadyPromises.delete(role);
+			for (const key of Array.from(roleEventSubscriptions)) {
+				if (key.startsWith(role + ':'))
+					roleEventSubscriptions.delete(key);
+			}
+		}
+
+		async function restoreFileSnapshotAfterError(manifest, bytes, syncError) {
+			if (!(bytes instanceof Uint8Array))
+				return;
+			emitSyncProgress('rollback-base-snapshot', {
+				activeRole: manifest.activeRole,
+				baseRole: manifest.stagingRole,
+				targetRole: manifest.stableRole
+			});
+			const errors = [];
+			for (const role of [manifest.stagingRole, manifest.stableRole]) {
+				try {
+					await replaceRoleFile(role, bytes.slice());
+				}
+				catch (error) {
+					errors.push(error);
+				}
+			}
+			if (errors.length === 0) {
+				emitSyncProgress('rollback-base-snapshot-complete', {
+					activeRole: manifest.activeRole,
+					baseRole: manifest.stagingRole,
+					targetRole: manifest.stableRole
+				});
+				return;
+			}
+			const rollbackError = errors[0];
+			emitSyncProgress('rollback-base-snapshot-error', {
+				activeRole: manifest.activeRole,
+				baseRole: manifest.stagingRole,
+				targetRole: manifest.stableRole,
+				error: rollbackError
+			});
+			try {
+				Object.defineProperty(syncError, 'rollbackError', {
+					value: rollbackError,
+					enumerable: false,
+					configurable: true
+				});
+			}
+			catch (_error) {
+				// Preserve the original sync error even if it cannot be annotated.
+			}
+		}
+
+		function createDiscardDeltaSink() {
+			return {
+				write() {
+					return Promise.resolve();
+				},
+				commit() {
+					return Promise.resolve(undefined);
+				},
+				abort() {
+					return Promise.resolve();
+				}
+			};
+		}
+
 		async function applyPendingDeltasToRole(role, onlyDeltaId) {
 			const deltas = await readDeltas();
 			for (let i = 0; i < deltas.length; i++) {
@@ -31620,25 +31424,6 @@ function requireDualSyncDatabase () {
 					continue;
 				if (delta.appliedRoles.includes(role))
 					continue;
-				if (delta.kind === sqliteSnapshotDeltaKind) {
-					const targetSync = getRoleSyncClient(role);
-					if (typeof targetSync[applySqliteSnapshotSymbol] !== 'function')
-						throw new Error('Dual sync role client cannot apply a captured SQLite snapshot.');
-					emitSyncProgress('applying-snapshot', {
-						deltaId: delta.id,
-						targetRole: role,
-						rowCount: Number(delta.snapshot.descriptor.rowCount || 0)
-					});
-					const openRows = await readAllOutboxRows(targetSync, ['pending', 'pushed']);
-					await targetSync[applySqliteSnapshotSymbol](delta.snapshot);
-					await targetSync[applyOutboxRowsSymbol](openRows, {
-						replay: true,
-						replayExisting: true,
-						replaceOpen: false
-					});
-					await markDeltaApplied(delta, role);
-					continue;
-				}
 				const totalItems = getDeltaItemCount(delta.journal);
 				const hasInlineItems = Array.isArray(delta.journal.items);
 				const readPullJournalBatch = hasInlineItems
@@ -32076,56 +31861,6 @@ function requireDualSyncDatabase () {
 			}
 		}
 
-		async function createSnapshotDelta(snapshot) {
-			if (!snapshot || snapshot !== Object(snapshot)
-				|| !snapshot.descriptor || typeof snapshot.descriptor.id !== 'string'
-				|| typeof snapshot.descriptor.schemaChecksum !== 'string'
-				|| snapshot.cursor === undefined
-				|| !isSnapshotBytes(snapshot.bytes)) {
-				throw new Error('Cannot persist an invalid dual sync SQLite snapshot.');
-			}
-			const db = await getCacheDb();
-			await ensureCacheSchema(db);
-			const id = randomUuid();
-			const metadata = {
-				descriptor: { ...snapshot.descriptor },
-				tables: Array.isArray(snapshot.tables) ? snapshot.tables.slice() : [],
-				scopeKey: typeof snapshot.scopeKey === 'string' ? snapshot.scopeKey : '*',
-				cursor: snapshot.cursor
-			};
-			const bytes = snapshot.bytes instanceof Uint8Array
-				? snapshot.bytes.slice()
-				: new Uint8Array(snapshot.bytes.slice(0));
-			await db.query({
-				sql: [
-					`INSERT INTO "${deltaTable}" ("id", "scope", "from_since", "to_since", "journal_json", "created_at_ms", "applied_roles_json", "kind", "snapshot_bytes")`,
-					'VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?)'
-				].join(' '),
-				parameters: [
-					id,
-					metadata.scopeKey,
-					stringify(snapshot.cursor),
-					stringify(metadata),
-					Date.now(),
-					'[]',
-					sqliteSnapshotDeltaKind,
-					bytes
-				]
-			});
-			return {
-				id,
-				kind: sqliteSnapshotDeltaKind,
-				journal: metadata,
-				snapshot: { ...metadata, bytes },
-				appliedRoles: []
-			};
-		}
-
-		function isSnapshotBytes(value) {
-			return value instanceof Uint8Array
-				|| typeof ArrayBuffer === 'function' && value instanceof ArrayBuffer;
-		}
-
 		async function cleanupOrphanDeltaChunks(db) {
 			await db.query([
 				`DELETE FROM "${deltaChunkTable}"`,
@@ -32137,29 +31872,20 @@ function requireDualSyncDatabase () {
 			const db = await getCacheDb();
 			await ensureCacheSchema(db);
 			const rows = await db.query([
-				`SELECT "id", "journal_json", "applied_roles_json", "kind", "snapshot_bytes" FROM "${deltaTable}"`,
+				`SELECT "id", "journal_json", "applied_roles_json" FROM "${deltaTable}"`,
 				'ORDER BY "created_at_ms" ASC'
 			].join(' '));
 			return toRows(rows)
 				.map(row => {
 					const id = row.id ?? row.ID;
 					const journal = parseJson(row.journal_json ?? row.JOURNAL_JSON);
-					const kind = row.kind ?? row.KIND ?? journalDeltaKind;
-					const snapshotBytes = row.snapshot_bytes ?? row.SNAPSHOT_BYTES;
 					return {
 						id,
-						kind,
 						journal,
-						snapshot: kind === sqliteSnapshotDeltaKind && journal && isSnapshotBytes(snapshotBytes)
-							? { ...journal, bytes: snapshotBytes }
-							: undefined,
 						appliedRoles: parseJson(row.applied_roles_json ?? row.APPLIED_ROLES_JSON) || []
 					};
 				})
-				.filter(delta => typeof delta.id === 'string'
-					&& delta.journal && delta.journal === Object(delta.journal)
-					&& (delta.kind === journalDeltaKind
-						|| delta.kind === sqliteSnapshotDeltaKind && delta.snapshot));
+				.filter(delta => typeof delta.id === 'string' && delta.journal && delta.journal === Object(delta.journal));
 		}
 
 		async function createDeltaJournalBatchReader(deltaId) {
@@ -32233,11 +31959,11 @@ function requireDualSyncDatabase () {
 			delta.appliedRoles = roles;
 		}
 
-		async function deleteDelta(deltaId) {
+		async function clearDeltas() {
 			const db = await getCacheDb();
 			await ensureCacheSchema(db);
-			await db.query(`DELETE FROM "${deltaChunkTable}" WHERE "delta_id" = ${sqlStringLiteral(deltaId)}`);
-			await db.query(`DELETE FROM "${deltaTable}" WHERE "id" = ${sqlStringLiteral(deltaId)}`);
+			await db.query(`DELETE FROM "${deltaChunkTable}"`);
+			await db.query(`DELETE FROM "${deltaTable}"`);
 		}
 
 		async function resetCache() {
@@ -32297,13 +32023,9 @@ function requireDualSyncDatabase () {
 						'"to_since" TEXT,',
 						'"journal_json" TEXT NOT NULL,',
 						'"created_at_ms" INTEGER NOT NULL,',
-						'"applied_roles_json" TEXT NOT NULL,',
-						`"kind" TEXT NOT NULL DEFAULT '${journalDeltaKind}',`,
-						'"snapshot_bytes" BLOB',
+						'"applied_roles_json" TEXT NOT NULL',
 						');'
 					].join(' '));
-					await tryAddCacheColumn(db, deltaTable, 'kind', `TEXT NOT NULL DEFAULT '${journalDeltaKind}'`);
-					await tryAddCacheColumn(db, deltaTable, 'snapshot_bytes', 'BLOB');
 					await db.query([
 						`CREATE TABLE IF NOT EXISTS "${deltaChunkTable}" (`,
 						'"delta_id" TEXT NOT NULL,',

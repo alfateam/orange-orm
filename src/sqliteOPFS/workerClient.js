@@ -24,10 +24,11 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 	return {
 		executeQuery,
 		executeCommand,
+		exportDatabase,
+		replaceDatabase,
 		checkout,
 		close,
 		getOpenInfo,
-		importSnapshot,
 		release,
 		reset,
 		ready
@@ -41,12 +42,26 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 		executeCommandCore(query, callback);
 	}
 
-	function importSnapshot(bytes, statements, expected) {
+	function exportDatabase() {
 		if (closed)
 			return Promise.reject(new Error('sqliteOPFS worker client closed.'));
 		return ensureOpen()
-			.then(() => request('importSnapshot', { bytes, statements, expected }))
+			.then(() => request('exportDatabase'))
 			.then(response => response.result);
+	}
+
+	function replaceDatabase(bytes) {
+		if (closed)
+			return Promise.reject(new Error('sqliteOPFS worker client closed.'));
+		if (!(bytes instanceof Uint8Array))
+			return Promise.reject(new Error('sqliteOPFS replacement requires SQLite file bytes.'));
+		return ensureOpen()
+			.then(() => request('replaceDatabase', { bytes }))
+			.then(response => {
+				openInfo = normalizeOpenResult(response.result);
+				openPromise = Promise.resolve(openInfo);
+				return openInfo;
+			});
 	}
 
 	function executeQueryCore(query, callback, leaseId) {
@@ -105,7 +120,8 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 			return {
 				executeQuery,
 				executeCommand,
-				importSnapshot,
+				exportDatabase,
+				replaceDatabase,
 				getOpenInfo,
 				reset,
 				releaseCheckout: () => Promise.resolve()
@@ -117,9 +133,17 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 			executeCommand(query, callback) {
 				executeCommandCore(query, callback, leaseId);
 			},
-			importSnapshot(bytes, statements, expected) {
-				return request('importSnapshot', { bytes, statements, expected, leaseId })
-					.then(response => response.result);
+			exportDatabase() {
+				return request('exportDatabase', { leaseId }).then(response => response.result);
+			},
+			replaceDatabase(bytes) {
+				if (!(bytes instanceof Uint8Array))
+					return Promise.reject(new Error('sqliteOPFS replacement requires SQLite file bytes.'));
+				return request('replaceDatabase', { bytes, leaseId }).then(response => {
+					openInfo = normalizeOpenResult(response.result);
+					openPromise = Promise.resolve(openInfo);
+					return openInfo;
+				});
 			},
 			getOpenInfo,
 			reset,
@@ -143,7 +167,7 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 					connectionString,
 					...payload
 				};
-				const transfer = snapshotTransferList(method, message);
+				const transfer = databaseTransferList(method, message);
 				worker.postMessage(message, transfer);
 			}
 			catch (e) {
@@ -153,8 +177,8 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 		});
 	}
 
-	function snapshotTransferList(method, message) {
-		if (method !== 'importSnapshot' || !(message.bytes instanceof Uint8Array))
+	function databaseTransferList(method, message) {
+		if (method !== 'replaceDatabase' || !(message.bytes instanceof Uint8Array))
 			return undefined;
 		if (!(message.bytes.buffer instanceof ArrayBuffer))
 			return undefined;
@@ -345,6 +369,7 @@ let sqlite3Promise;
 const dbByConnectionString = new Map();
 const dbOpenOptionsByConnectionString = new Map();
 const dbOpenInfoByConnectionString = new Map();
+const dbFileImporterByConnectionString = new Map();
 let operationQueue = Promise.resolve();
 let activeLeaseId;
 let nextLeaseId = 1;
@@ -462,8 +487,10 @@ async function dispatch(message) {
 		return query(db, message.sql, message.parameters);
 	if (message.method === 'command')
 		return command(db, message.sql, message.parameters);
-	if (message.method === 'importSnapshot')
-		return importSnapshot(db, message.bytes, message.statements, message.expected);
+	if (message.method === 'exportDatabase')
+		return exportDatabase(db);
+	if (message.method === 'replaceDatabase')
+		return replaceDatabase(connectionString, message.bytes);
 	throw new Error('Unknown sqliteOPFS worker method "' + message.method + '".');
 }
 
@@ -485,6 +512,7 @@ async function openDb(connectionString, busyTimeoutMs = 5000, vfs, opfsSahPoolOp
 	};
 	dbByConnectionString.set(key, db);
 	dbOpenInfoByConnectionString.set(key, dbOpenInfo);
+	dbFileImporterByConnectionString.set(key, dbInfo.importDatabase);
 	return dbOpenInfo;
 }
 
@@ -518,7 +546,10 @@ function createOpfsWlDb(sqlite3, filename) {
 	return {
 		db: new DbClass(filename),
 		vfs: 'opfs-wl',
-		opfs: true
+		opfs: true,
+		importDatabase: typeof DbClass.importDb === 'function'
+			? (bytes) => DbClass.importDb(filename, bytes)
+			: undefined
 	};
 }
 
@@ -532,7 +563,10 @@ async function createOpfsSahPoolDb(sqlite3, filename, opfsSahPoolOptions) {
 	return {
 		db: new DbClass(filename),
 		vfs: pool.vfsName || 'opfs-sahpool',
-		opfs: true
+		opfs: true,
+		importDatabase: typeof pool.importDb === 'function'
+			? (bytes) => pool.importDb(filename, bytes)
+			: undefined
 	};
 }
 
@@ -570,35 +604,32 @@ function command(db, sql, parameters = []) {
 	};
 }
 
-async function importSnapshot(db, bytes, statements, expected) {
-	if (!(bytes instanceof Uint8Array)) bytes = new Uint8Array(bytes);
+async function exportDatabase(db) {
 	const sqlite3 = await getSqlite3();
-	const pointer = db && db.pointer;
-	if (pointer === undefined || !sqlite3.capi || typeof sqlite3.capi.sqlite3_deserialize !== 'function')
-		throw new Error('sqliteOPFS runtime cannot import SQLite snapshots.');
-	db.exec("ATTACH ':memory:' AS orange_snapshot");
-	try {
-		const data = sqlite3.wasm.allocFromTypedArray(bytes);
-		const flags = sqlite3.capi.SQLITE_DESERIALIZE_FREEONCLOSE | sqlite3.capi.SQLITE_DESERIALIZE_READONLY;
-		const rc = sqlite3.capi.sqlite3_deserialize(pointer, 'orange_snapshot', data, bytes.length, bytes.length, flags);
-		if (rc !== 0) throw new Error('sqlite3_deserialize failed with code ' + rc + '.');
-		const meta = db.selectObject('SELECT "format", "schema_checksum", "watermark_json", "row_count" FROM orange_snapshot.orange_snapshot_meta');
-		if (!meta || Number(meta.format) !== 1 || meta.schema_checksum !== expected.schemaChecksum || Number(meta.row_count) !== Number(expected.rowCount))
-			throw new Error('SQLite snapshot metadata does not match its descriptor.');
-		db.exec('BEGIN');
-		try {
-			for (const statement of statements || []) db.exec(statement);
-			db.exec('COMMIT');
-		}
-		catch (error) {
-			db.exec('ROLLBACK');
-			throw error;
-		}
-		return { rowCount: Number(meta.row_count), watermark: JSON.parse(meta.watermark_json) };
-	}
-	finally {
-		db.exec('DETACH orange_snapshot');
-	}
+	if (!db || db.pointer === undefined || !sqlite3.capi
+		|| typeof sqlite3.capi.sqlite3_js_db_export !== 'function')
+		throw new Error('sqliteOPFS runtime cannot export a SQLite database file.');
+	return sqlite3.capi.sqlite3_js_db_export(db.pointer);
+}
+
+async function replaceDatabase(connectionString, bytes) {
+	if (!(bytes instanceof Uint8Array)) bytes = new Uint8Array(bytes);
+	const key = normalizeConnectionString(connectionString);
+	const importDatabase = dbFileImporterByConnectionString.get(key);
+	if (typeof importDatabase !== 'function')
+		throw new Error('sqliteOPFS runtime cannot replace a SQLite database file.');
+	const options = dbOpenOptionsByConnectionString.get(key);
+	if (!options)
+		throw new Error('sqliteOPFS database open options are unavailable.');
+	closeDb(key);
+	await importDatabase(bytes);
+	const info = await openDb(options.connectionString, options.busyTimeoutMs, options.vfs, options.opfsSahPoolOptions);
+	const db = dbByConnectionString.get(key);
+	const integrity = query(db, 'PRAGMA quick_check');
+	const value = integrity[0] && (integrity[0].quick_check ?? integrity[0].QUICK_CHECK);
+	if (value !== 'ok')
+		throw new Error('Restored sqliteOPFS database failed PRAGMA quick_check.');
+	return info;
 }
 
 function normalizeFilename(connectionString) {
@@ -634,13 +665,17 @@ function normalizePriority(priority) {
 }
 
 function postResponse(target, id, result, error, elapsedMs) {
-	target.postMessage({
+	const message = {
 		type: 'orange-sqlite-opfs-response',
 		id,
 		result,
 		elapsedMs,
 		error: error ? serializeError(error) : undefined
-	});
+	};
+	const transfer = result instanceof Uint8Array && result.buffer instanceof ArrayBuffer
+		? [result.buffer]
+		: undefined;
+	target.postMessage(message, transfer);
 }
 
 function serializeError(error) {

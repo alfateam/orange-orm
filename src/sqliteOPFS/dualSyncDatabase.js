@@ -20,7 +20,6 @@ const {
 	readOutboxRowsSymbol,
 	applyOutboxRowsSymbol,
 	applyPullJournalSymbol,
-	applySqliteSnapshotSymbol,
 	pushPendingSymbol,
 	setClientIdSymbol
 } = newSyncClient;
@@ -39,8 +38,6 @@ const outboxReplayPageSize = 1000;
 const deltaItemsPerChunk = 1000;
 const deltaChunkReadPageSize = 32;
 const manifestCacheMaxAgeMs = 1000;
-const journalDeltaKind = 'journal';
-const sqliteSnapshotDeltaKind = 'sqlite-snapshot';
 
 function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase) {
 	const roleConnectionStrings = {
@@ -333,19 +330,43 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		const stagingRole = manifest.stagingRole;
 		const stableRole = manifest.stableRole;
 		const activeSync = getRoleSyncClient(activeRole);
-		const stagingSync = getRoleSyncClient(stableRole);
-		const nextStableSync = getRoleSyncClient(stagingRole);
+		let stagingSync = getRoleSyncClient(stableRole);
+		let nextStableSync = getRoleSyncClient(stagingRole);
 		await ensureSharedClientId(manifest);
+		const fileSnapshotRotation = supportsFileSnapshotRotation();
+		let rollbackSnapshot;
 
 		emitSyncProgress('updating-staging', { activeRole, stagingRole: stableRole, stableRole: stagingRole });
-		await applyPendingDeltasToRole(stableRole);
-		await applyPendingDeltasToRole(stagingRole);
+		if (fileSnapshotRotation) {
+			emitSyncProgress('restoring-base-snapshot', {
+				activeRole,
+				baseRole: stagingRole,
+				targetRole: stableRole
+			});
+			rollbackSnapshot = await exportRoleFile(stagingRole);
+			await replaceRoleFile(stableRole, rollbackSnapshot.slice());
+			stagingSync = getRoleSyncClient(stableRole);
+			nextStableSync = getRoleSyncClient(stagingRole);
+			await clearDeltas();
+		}
+		else {
+			await applyPendingDeltasToRole(stableRole);
+			await applyPendingDeltasToRole(stagingRole);
+		}
 
-		const openRows = await readAllOutboxRows(activeSync, ['pending', 'pushed']);
-		await stagingSync[applyOutboxRowsSymbol](openRows, {
-			replay: false,
-			replaceOpen: true
-		});
+		let openRows;
+		try {
+			openRows = await readAllOutboxRows(activeSync, ['pending', 'pushed']);
+			await stagingSync[applyOutboxRowsSymbol](openRows, {
+				replay: false,
+				replaceOpen: true
+			});
+		}
+		catch (error) {
+			if (fileSnapshotRotation)
+				await restoreFileSnapshotAfterError(manifest, rollbackSnapshot, error);
+			throw error;
+		}
 		emitSyncProgress('pushing-staging', { activeRole, stagingRole: stableRole, stableRole: stagingRole });
 		let stagingPushResult;
 		let pushConflictError;
@@ -358,50 +379,66 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		}
 		catch (error) {
 			if (isConflictError(error)) {
-				const failedIds = await recordActiveConflict(manifest, activeSync, stagingSync, openRows);
-				if (failedIds.length === 0)
+				let failedIds;
+				try {
+					failedIds = await recordActiveConflict(manifest, activeSync, stagingSync, openRows);
+				}
+				catch (recordError) {
+					if (fileSnapshotRotation)
+						await restoreFileSnapshotAfterError(manifest, rollbackSnapshot, recordError);
+					throw recordError;
+				}
+				if (failedIds.length === 0) {
+					if (fileSnapshotRotation)
+						await restoreFileSnapshotAfterError(manifest, rollbackSnapshot, error);
 					throw error;
+				}
 				pushConflictError = error;
 				rejectedMutationIds = new Set(failedIds);
 			}
 			else {
-				await mirrorActivePushAttempts(manifest, activeSync, stagingSync, openRows);
+				try {
+					await mirrorActivePushAttempts(manifest, activeSync, stagingSync, openRows);
+				}
+				catch (recordError) {
+					if (fileSnapshotRotation)
+						await restoreFileSnapshotAfterError(manifest, rollbackSnapshot, recordError);
+					throw recordError;
+				}
+				if (fileSnapshotRotation)
+					await restoreFileSnapshotAfterError(manifest, rollbackSnapshot, error);
 				throw error;
 			}
 		}
-		if (!pushConflictError)
-			await acknowledgeActivePushes(manifest, activeSync, stagingSync, stagingPushResult);
-		await mirrorCandidateOutbox(stagingSync, nextStableSync, openRows);
+		if (!pushConflictError) {
+			try {
+				await acknowledgeActivePushes(manifest, activeSync, stagingSync, stagingPushResult);
+			}
+			catch (error) {
+				if (fileSnapshotRotation)
+					await restoreFileSnapshotAfterError(manifest, rollbackSnapshot, error);
+				throw error;
+			}
+		}
+		if (!fileSnapshotRotation)
+			await mirrorCandidateOutbox(stagingSync, nextStableSync, openRows);
 		const needsInitialSwap = stagingPushResult && stagingPushResult.skipped === 'missing-stable-base';
 		const deferStableBaseUntilComplete = needsInitialSwap && openRows.length === 0;
 
 		emitSyncProgress('pulling-staging', { activeRole, stagingRole: stableRole, stableRole: stagingRole });
 		const pullStagingStartedAtMs = Date.now();
-		const deltaSink = await createDeltaJournalSink(stableRole);
+		const deltaSink = fileSnapshotRotation
+			? createDiscardDeltaSink()
+			: await createDeltaJournalSink(stableRole);
 		let result;
 		let journal;
 		let deltaId;
-		let snapshotDeltaId;
 		let pullStagingSummary;
 		try {
 			result = await stagingSync[syncAndCapturePullJournalSymbol]({
 				...options,
 				_skipPushBeforePull: true,
 				_capturePullJournalChunk: deltaSink.write,
-				async _stageSqliteSnapshot(snapshot) {
-					const delta = await createSnapshotDelta(snapshot);
-					snapshotDeltaId = delta.id;
-					return {
-						async applied() {
-							await markDeltaApplied(delta, stableRole);
-						},
-						async abort() {
-							await deleteDelta(delta.id);
-							if (snapshotDeltaId === delta.id)
-								snapshotDeltaId = undefined;
-						}
-					};
-				},
 				_deferStableBaseUntilComplete: deferStableBaseUntilComplete,
 				_onPullBatchProgress(progress) {
 					emitSyncProgress('pull-batch-complete', {
@@ -416,12 +453,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 			});
 			journal = result && result.__orangePullJournal;
 			const deltaFinalizeStartedAtMs = Date.now();
-			if (snapshotDeltaId) {
-				await deltaSink.abort();
-				deltaId = snapshotDeltaId;
-			}
-			else
-				deltaId = await deltaSink.commit(journal);
+			deltaId = await deltaSink.commit(journal);
 			emitSyncProgress('pull-staging-summary', {
 				activeRole,
 				stagingRole: stableRole,
@@ -442,29 +474,54 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 				deferredStableBase: deferStableBaseUntilComplete,
 				failed: true
 			});
+			if (fileSnapshotRotation)
+				await restoreFileSnapshotAfterError(manifest, rollbackSnapshot, error);
 			throw error;
 		}
-		if (deltaId)
+		if (fileSnapshotRotation) {
+			try {
+				emitSyncProgress('saving-base-snapshot', {
+					activeRole,
+					sourceRole: stableRole,
+					baseRole: stagingRole
+				});
+				const nextBaseSnapshot = await exportRoleFile(stableRole);
+				await replaceRoleFile(stagingRole, nextBaseSnapshot);
+				nextStableSync = getRoleSyncClient(stagingRole);
+			}
+			catch (error) {
+				await restoreFileSnapshotAfterError(manifest, rollbackSnapshot, error);
+				throw error;
+			}
+		}
+		else if (deltaId)
 			await applyPendingDeltasToRole(stagingRole, deltaId);
 		let publishedManifest;
 
 		emitSyncProgress('waiting-for-write-barrier', { activeRole, stagingRole: stableRole, stableRole: stagingRole });
-		await runSyncSwap(router, async () => {
-			const currentManifest = await getManifest(true);
-			assertExpectedManifest(currentManifest, manifest);
-			const finalPendingRows = (await readAllOutboxRows(activeSync, ['pending']))
-				.filter(row => !rejectedMutationIds.has(outboxRowMutationId(row)));
-			await stagingSync[applyOutboxRowsSymbol](finalPendingRows, {
-				replay: true,
-				replaceOpen: false
+		try {
+			await runSyncSwap(router, async () => {
+				const currentManifest = await getManifest(true);
+				assertExpectedManifest(currentManifest, manifest);
+				const finalPendingRows = (await readAllOutboxRows(activeSync, ['pending']))
+					.filter(row => !rejectedMutationIds.has(outboxRowMutationId(row)));
+				await stagingSync[applyOutboxRowsSymbol](finalPendingRows, {
+					replay: true,
+					replaceOpen: false
+				});
+				await nextStableSync[applyOutboxRowsSymbol](finalPendingRows, {
+					replay: false,
+					replaceOpen: false
+				});
+				emitSyncProgress('swapping', { activeRole, stagingRole: stableRole, stableRole: stagingRole });
+				publishedManifest = await publishStableRole(manifest);
 			});
-			await nextStableSync[applyOutboxRowsSymbol](finalPendingRows, {
-				replay: false,
-				replaceOpen: false
-			});
-			emitSyncProgress('swapping', { activeRole, stagingRole: stableRole, stableRole: stagingRole });
-			publishedManifest = await publishStableRole(manifest);
-		});
+		}
+		catch (error) {
+			if (fileSnapshotRotation)
+				await restoreFileSnapshotAfterError(manifest, rollbackSnapshot, error);
+			throw error;
+		}
 
 		publishedManifest = await markSuccessfulSync();
 		const newActiveRole = publishedManifest.activeRole;
@@ -809,21 +866,33 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 			stableRole
 		});
 		try {
-			try {
-				await targetSync.discardLocalChanges();
+			if (supportsFileSnapshotRotation()) {
+				emitSyncProgress('staging-rebuild-file', {
+					activeRole: manifest.activeRole,
+					sourceRole: stableRole,
+					targetRole
+				});
+				const baseSnapshot = await exportRoleFile(stableRole);
+				await replaceRoleFile(targetRole, baseSnapshot);
+				await getRoleSyncClient(targetRole)[setClientIdSymbol](manifest.clientId);
 			}
-			catch (error) {
-				if (!isMissingStableBaseError(error))
-					throw error;
-				await targetSync.resetLocal();
+			else {
+				try {
+					await targetSync.discardLocalChanges();
+				}
+				catch (error) {
+					if (!isMissingStableBaseError(error))
+						throw error;
+					await targetSync.resetLocal();
+				}
+				await applyPendingDeltasToRole(targetRole);
+				const stableOutboxRows = await readAllOutboxRows(stableSync, ['pending', 'pushed', 'failed']);
+				await targetSync[applyOutboxRowsSymbol](stableOutboxRows, {
+					replay: false,
+					replaceOpen: true
+				});
+				await targetSync[setClientIdSymbol](manifest.clientId);
 			}
-			await applyPendingDeltasToRole(targetRole);
-			const stableOutboxRows = await readAllOutboxRows(stableSync, ['pending', 'pushed', 'failed']);
-			await targetSync[applyOutboxRowsSymbol](stableOutboxRows, {
-				replay: false,
-				replaceOpen: true
-			});
-			await targetSync[setClientIdSymbol](manifest.clientId);
 			const current = await getManifest(true);
 			assertExpectedManifest(current, manifest);
 			const readyManifest = await writeManifest({
@@ -855,6 +924,103 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		}
 	}
 
+	function supportsFileSnapshotRotation() {
+		return allRoles.every(role => {
+			const pool = getRoleDb(role).poolFactory;
+			return pool
+				&& typeof pool.__orangeExportSqliteFile === 'function'
+				&& typeof pool.__orangeReplaceSqliteFile === 'function';
+		});
+	}
+
+	async function exportRoleFile(role) {
+		const pool = getRoleDb(role).poolFactory;
+		if (!pool || typeof pool.__orangeExportSqliteFile !== 'function')
+			throw new Error(`Dual sync role "${role}" cannot export its SQLite base snapshot file.`);
+		const bytes = await pool.__orangeExportSqliteFile();
+		if (bytes instanceof Uint8Array)
+			return bytes;
+		if (typeof ArrayBuffer === 'function' && bytes instanceof ArrayBuffer)
+			return new Uint8Array(bytes);
+		throw new Error(`Dual sync role "${role}" returned an invalid SQLite base snapshot file.`);
+	}
+
+	async function replaceRoleFile(role, bytes) {
+		const pool = getRoleDb(role).poolFactory;
+		if (!pool || typeof pool.__orangeReplaceSqliteFile !== 'function')
+			throw new Error(`Dual sync role "${role}" cannot restore a SQLite base snapshot file.`);
+		await pool.__orangeReplaceSqliteFile(bytes);
+		invalidateRoleClient(role);
+	}
+
+	function invalidateRoleClient(role) {
+		clientByRole.delete(role);
+		schemaReadyRoles.delete(role);
+		schemaReadyPromises.delete(role);
+		for (const key of Array.from(roleEventSubscriptions)) {
+			if (key.startsWith(role + ':'))
+				roleEventSubscriptions.delete(key);
+		}
+	}
+
+	async function restoreFileSnapshotAfterError(manifest, bytes, syncError) {
+		if (!(bytes instanceof Uint8Array))
+			return;
+		emitSyncProgress('rollback-base-snapshot', {
+			activeRole: manifest.activeRole,
+			baseRole: manifest.stagingRole,
+			targetRole: manifest.stableRole
+		});
+		const errors = [];
+		for (const role of [manifest.stagingRole, manifest.stableRole]) {
+			try {
+				await replaceRoleFile(role, bytes.slice());
+			}
+			catch (error) {
+				errors.push(error);
+			}
+		}
+		if (errors.length === 0) {
+			emitSyncProgress('rollback-base-snapshot-complete', {
+				activeRole: manifest.activeRole,
+				baseRole: manifest.stagingRole,
+				targetRole: manifest.stableRole
+			});
+			return;
+		}
+		const rollbackError = errors[0];
+		emitSyncProgress('rollback-base-snapshot-error', {
+			activeRole: manifest.activeRole,
+			baseRole: manifest.stagingRole,
+			targetRole: manifest.stableRole,
+			error: rollbackError
+		});
+		try {
+			Object.defineProperty(syncError, 'rollbackError', {
+				value: rollbackError,
+				enumerable: false,
+				configurable: true
+			});
+		}
+		catch (_error) {
+			// Preserve the original sync error even if it cannot be annotated.
+		}
+	}
+
+	function createDiscardDeltaSink() {
+		return {
+			write() {
+				return Promise.resolve();
+			},
+			commit() {
+				return Promise.resolve(undefined);
+			},
+			abort() {
+				return Promise.resolve();
+			}
+		};
+	}
+
 	async function applyPendingDeltasToRole(role, onlyDeltaId) {
 		const deltas = await readDeltas();
 		for (let i = 0; i < deltas.length; i++) {
@@ -863,25 +1029,6 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 				continue;
 			if (delta.appliedRoles.includes(role))
 				continue;
-			if (delta.kind === sqliteSnapshotDeltaKind) {
-				const targetSync = getRoleSyncClient(role);
-				if (typeof targetSync[applySqliteSnapshotSymbol] !== 'function')
-					throw new Error('Dual sync role client cannot apply a captured SQLite snapshot.');
-				emitSyncProgress('applying-snapshot', {
-					deltaId: delta.id,
-					targetRole: role,
-					rowCount: Number(delta.snapshot.descriptor.rowCount || 0)
-				});
-				const openRows = await readAllOutboxRows(targetSync, ['pending', 'pushed']);
-				await targetSync[applySqliteSnapshotSymbol](delta.snapshot);
-				await targetSync[applyOutboxRowsSymbol](openRows, {
-					replay: true,
-					replayExisting: true,
-					replaceOpen: false
-				});
-				await markDeltaApplied(delta, role);
-				continue;
-			}
 			const totalItems = getDeltaItemCount(delta.journal);
 			const hasInlineItems = Array.isArray(delta.journal.items);
 			const readPullJournalBatch = hasInlineItems
@@ -1319,56 +1466,6 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		}
 	}
 
-	async function createSnapshotDelta(snapshot) {
-		if (!snapshot || snapshot !== Object(snapshot)
-			|| !snapshot.descriptor || typeof snapshot.descriptor.id !== 'string'
-			|| typeof snapshot.descriptor.schemaChecksum !== 'string'
-			|| snapshot.cursor === undefined
-			|| !isSnapshotBytes(snapshot.bytes)) {
-			throw new Error('Cannot persist an invalid dual sync SQLite snapshot.');
-		}
-		const db = await getCacheDb();
-		await ensureCacheSchema(db);
-		const id = randomUuid();
-		const metadata = {
-			descriptor: { ...snapshot.descriptor },
-			tables: Array.isArray(snapshot.tables) ? snapshot.tables.slice() : [],
-			scopeKey: typeof snapshot.scopeKey === 'string' ? snapshot.scopeKey : '*',
-			cursor: snapshot.cursor
-		};
-		const bytes = snapshot.bytes instanceof Uint8Array
-			? snapshot.bytes.slice()
-			: new Uint8Array(snapshot.bytes.slice(0));
-		await db.query({
-			sql: [
-				`INSERT INTO "${deltaTable}" ("id", "scope", "from_since", "to_since", "journal_json", "created_at_ms", "applied_roles_json", "kind", "snapshot_bytes")`,
-				'VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?)'
-			].join(' '),
-			parameters: [
-				id,
-				metadata.scopeKey,
-				stringify(snapshot.cursor),
-				stringify(metadata),
-				Date.now(),
-				'[]',
-				sqliteSnapshotDeltaKind,
-				bytes
-			]
-		});
-		return {
-			id,
-			kind: sqliteSnapshotDeltaKind,
-			journal: metadata,
-			snapshot: { ...metadata, bytes },
-			appliedRoles: []
-		};
-	}
-
-	function isSnapshotBytes(value) {
-		return value instanceof Uint8Array
-			|| typeof ArrayBuffer === 'function' && value instanceof ArrayBuffer;
-	}
-
 	async function cleanupOrphanDeltaChunks(db) {
 		await db.query([
 			`DELETE FROM "${deltaChunkTable}"`,
@@ -1380,29 +1477,20 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		const db = await getCacheDb();
 		await ensureCacheSchema(db);
 		const rows = await db.query([
-			`SELECT "id", "journal_json", "applied_roles_json", "kind", "snapshot_bytes" FROM "${deltaTable}"`,
+			`SELECT "id", "journal_json", "applied_roles_json" FROM "${deltaTable}"`,
 			'ORDER BY "created_at_ms" ASC'
 		].join(' '));
 		return toRows(rows)
 			.map(row => {
 				const id = row.id ?? row.ID;
 				const journal = parseJson(row.journal_json ?? row.JOURNAL_JSON);
-				const kind = row.kind ?? row.KIND ?? journalDeltaKind;
-				const snapshotBytes = row.snapshot_bytes ?? row.SNAPSHOT_BYTES;
 				return {
 					id,
-					kind,
 					journal,
-					snapshot: kind === sqliteSnapshotDeltaKind && journal && isSnapshotBytes(snapshotBytes)
-						? { ...journal, bytes: snapshotBytes }
-						: undefined,
 					appliedRoles: parseJson(row.applied_roles_json ?? row.APPLIED_ROLES_JSON) || []
 				};
 			})
-			.filter(delta => typeof delta.id === 'string'
-				&& delta.journal && delta.journal === Object(delta.journal)
-				&& (delta.kind === journalDeltaKind
-					|| delta.kind === sqliteSnapshotDeltaKind && delta.snapshot));
+			.filter(delta => typeof delta.id === 'string' && delta.journal && delta.journal === Object(delta.journal));
 	}
 
 	async function createDeltaJournalBatchReader(deltaId) {
@@ -1476,11 +1564,11 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		delta.appliedRoles = roles;
 	}
 
-	async function deleteDelta(deltaId) {
+	async function clearDeltas() {
 		const db = await getCacheDb();
 		await ensureCacheSchema(db);
-		await db.query(`DELETE FROM "${deltaChunkTable}" WHERE "delta_id" = ${sqlStringLiteral(deltaId)}`);
-		await db.query(`DELETE FROM "${deltaTable}" WHERE "id" = ${sqlStringLiteral(deltaId)}`);
+		await db.query(`DELETE FROM "${deltaChunkTable}"`);
+		await db.query(`DELETE FROM "${deltaTable}"`);
 	}
 
 	async function resetCache() {
@@ -1540,13 +1628,9 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 					'"to_since" TEXT,',
 					'"journal_json" TEXT NOT NULL,',
 					'"created_at_ms" INTEGER NOT NULL,',
-					'"applied_roles_json" TEXT NOT NULL,',
-					`"kind" TEXT NOT NULL DEFAULT '${journalDeltaKind}',`,
-					'"snapshot_bytes" BLOB',
+					'"applied_roles_json" TEXT NOT NULL',
 					');'
 				].join(' '));
-				await tryAddCacheColumn(db, deltaTable, 'kind', `TEXT NOT NULL DEFAULT '${journalDeltaKind}'`);
-				await tryAddCacheColumn(db, deltaTable, 'snapshot_bytes', 'BLOB');
 				await db.query([
 					`CREATE TABLE IF NOT EXISTS "${deltaChunkTable}" (`,
 					'"delta_id" TEXT NOT NULL,',
