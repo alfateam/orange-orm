@@ -24,6 +24,142 @@ afterEach(async () => {
 });
 
 describe('sqliteOPFS dual sync integration', () => {
+	test('bootstraps three roles from a persisted SQLite snapshot replay', async () => {
+		const remoteDb = map({
+			db: con => con.pglite(undefined, { size: 1 })
+		});
+		closeTasks.push(() => remoteDb.close());
+		await remoteDb.query('CREATE TABLE project (id TEXT PRIMARY KEY NOT NULL, title TEXT NOT NULL)');
+		await setupChangeTracking(remoteDb, {
+			project: remoteDb.tables.project
+		});
+		await remoteDb.project.insert([
+			{ id: 'p1', title: 'One' },
+			{ id: 'p2', title: 'Two' },
+			{ id: 'p3', title: 'Three' }
+		]);
+
+		const app = express();
+		app.use(express.json({ limit: '2mb' }));
+		app.use('/rdb', remoteDb.express({ sync: { sqliteSnapshot: true } }));
+		const server = await listen(app);
+		closeTasks.push(() => closeServer(server));
+
+		const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'orange-dual-snapshot-'));
+		closeTasks.push(async () => fs.rmSync(directory, { recursive: true, force: true }));
+		const connectionString = path.join(directory, 'local.sqlite3');
+		const sync = {
+			url: `http://127.0.0.1:${server.address().port}/rdb`,
+			auto: { enabled: false },
+			tables: ['project']
+		};
+		const dualDb = newDualSyncDatabase(connectionString, { sync }, (roleConnectionString, options) =>
+			newSnapshotCapableSqliteDatabase(roleConnectionString, options, directory)
+		);
+		const localDb = map({ db: () => dualDb });
+		closeTasks.push(() => dualDb.end());
+		const progressEvents = [];
+		const requestPhases = [];
+		const offProgress = localDb.syncClient.on('sync-progress', event => progressEvents.push(event));
+		closeTasks.push(() => offProgress());
+		const requestInterceptor = localDb.syncClient.interceptors.request.use(config => {
+			if (config?.data?.phase)
+				requestPhases.push(config.data.phase);
+			return config;
+		});
+		closeTasks.push(() => localDb.syncClient.interceptors.request.eject(requestInterceptor));
+
+		await localDb.syncClient.resetLocal();
+		const syncResult = await localDb.syncClient.sync();
+
+		expect(syncResult.__orangeDualSync).toMatchObject({
+			activeRole: 'c',
+			stagingRole: 'a',
+			stableRole: 'b',
+			stagingStatus: 'rebuilding',
+			swapped: true
+		});
+		expect(await localDb.project.count()).toBe(3);
+		expect(requestPhases).toEqual(['keys', 'snapshot']);
+		expect(progressEvents.some(event => event.phase === 'applying-snapshot' && event.targetRole === 'b' && event.rowCount === 3)).toBe(true);
+		expect(progressEvents.some(event => event.phase === 'applying-delta' && event.totalItems === 3)).toBe(false);
+
+		const roleA = map({ db: con => con.sqlite(connectionString, { size: 1 }) });
+		const roleB = map({ db: con => con.sqlite(appendRoleSuffix(connectionString, 'b'), { size: 1 }) });
+		const roleC = map({ db: con => con.sqlite(appendRoleSuffix(connectionString, 'c'), { size: 1 }) });
+		const deltaDb = map({ db: con => con.sqlite(appendRoleSuffix(connectionString, 'delta'), { size: 1 }) });
+		closeTasks.push(() => roleA.close());
+		closeTasks.push(() => roleB.close());
+		closeTasks.push(() => roleC.close());
+		closeTasks.push(() => deltaDb.close());
+
+		expect(await roleB.project.count()).toBe(3);
+		expect(await roleC.project.count()).toBe(3);
+		await waitFor(async () => await roleA.project.count() === 3);
+		await waitFor(async () => (await deltaDb.query('SELECT "id" FROM "orange_sync_dual_delta"')).length === 0);
+		expect(progressEvents.some(event => event.phase === 'applying-snapshot' && event.targetRole === 'a' && event.rowCount === 3)).toBe(true);
+	});
+
+	test('resumes persisted snapshot replay after a role import failure and restart', async () => {
+		const remoteDb = map({ db: con => con.pglite(undefined, { size: 1 }) });
+		closeTasks.push(() => remoteDb.close());
+		await remoteDb.query('CREATE TABLE project (id TEXT PRIMARY KEY NOT NULL, title TEXT NOT NULL)');
+		await setupChangeTracking(remoteDb, { project: remoteDb.tables.project });
+		await remoteDb.project.insert({ id: 'p1', title: 'One' });
+
+		const app = express();
+		app.use(express.json({ limit: '2mb' }));
+		app.use('/rdb', remoteDb.express({ sync: { sqliteSnapshot: true } }));
+		const server = await listen(app);
+		closeTasks.push(() => closeServer(server));
+
+		const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'orange-dual-snapshot-restart-'));
+		closeTasks.push(async () => fs.rmSync(directory, { recursive: true, force: true }));
+		const connectionString = path.join(directory, 'local.sqlite3');
+		const sync = {
+			url: `http://127.0.0.1:${server.address().port}/rdb`,
+			auto: { enabled: false },
+			tables: ['project']
+		};
+		let failRoleB = true;
+		const firstDualDb = newDualSyncDatabase(connectionString, { sync }, (roleConnectionString, options) =>
+			newSnapshotCapableSqliteDatabase(roleConnectionString, options, directory, {
+				beforeImport() {
+					if (failRoleB && roleConnectionString === appendRoleSuffix(connectionString, 'b')) {
+						failRoleB = false;
+						throw new Error('injected role B snapshot failure');
+					}
+				}
+			})
+		);
+		const firstLocalDb = map({ db: () => firstDualDb });
+		await firstLocalDb.syncClient.resetLocal();
+		await expect(firstLocalDb.syncClient.sync()).rejects.toThrow('injected role B snapshot failure');
+		expect(await firstLocalDb.project.count()).toBe(0);
+		await firstDualDb.end();
+
+		const resumedDualDb = newDualSyncDatabase(connectionString, { sync }, (roleConnectionString, options) =>
+			newSnapshotCapableSqliteDatabase(roleConnectionString, options, directory)
+		);
+		const resumedLocalDb = map({ db: () => resumedDualDb });
+		closeTasks.push(() => resumedDualDb.end());
+		const resumedProgress = [];
+		const offProgress = resumedLocalDb.syncClient.on('sync-progress', event => resumedProgress.push(event));
+		closeTasks.push(() => offProgress());
+
+		const result = await resumedLocalDb.syncClient.sync();
+
+		expect(result.__orangeDualSync).toMatchObject({ activeRole: 'c', swapped: true });
+		expect(await resumedLocalDb.project.count()).toBe(1);
+		expect(resumedProgress.some(event => event.phase === 'applying-snapshot' && event.targetRole === 'b')).toBe(true);
+		const roleA = map({ db: con => con.sqlite(connectionString, { size: 1 }) });
+		const deltaDb = map({ db: con => con.sqlite(appendRoleSuffix(connectionString, 'delta'), { size: 1 }) });
+		closeTasks.push(() => roleA.close());
+		closeTasks.push(() => deltaDb.close());
+		await waitFor(async () => await roleA.project.count() === 1);
+		await waitFor(async () => (await deltaDb.query('SELECT "id" FROM "orange_sync_dual_delta"')).length === 0);
+	});
+
 	test('streams bootstrap batches and replays incremental deltas across roles', async () => {
 		const remoteDb = map({
 			db: con => con.pglite(undefined, { size: 1 })
@@ -495,6 +631,64 @@ function appendRoleSuffix(connectionString, suffix) {
 	if (value.endsWith('.sqlite3'))
 		return value.slice(0, -8) + `.__orange_sync_${suffix}.sqlite3`;
 	return `${value}.__orange_sync_${suffix}.sqlite3`;
+}
+
+let nextSnapshotImportId = 1;
+
+function newSnapshotCapableSqliteDatabase(connectionString, options, directory, hooks = {}) {
+	const db = newSqliteDatabase(connectionString, { ...options, size: 1 });
+	db.poolFactory.__orangeImportSqliteSnapshot = async function(bytes, statements, expected) {
+		if (typeof hooks.beforeImport === 'function')
+			await hooks.beforeImport();
+		const filename = path.join(directory, `snapshot-import-${nextSnapshotImportId++}.sqlite3`);
+		fs.writeFileSync(filename, bytes);
+		const quotedFilename = filename.replace(/'/g, '\'\'');
+		let attached = false;
+		let transactionOpen = false;
+		try {
+			await db.query(`ATTACH DATABASE '${quotedFilename}' AS orange_snapshot`);
+			attached = true;
+			const rows = await db.query('SELECT "format", "schema_checksum", "watermark_json", "row_count" FROM orange_snapshot.orange_snapshot_meta');
+			const meta = rows[0];
+			if (!meta || Number(meta.format) !== 1
+				|| meta.schema_checksum !== expected.schemaChecksum
+				|| Number(meta.row_count) !== Number(expected.rowCount)) {
+				throw new Error('SQLite snapshot metadata does not match its descriptor.');
+			}
+			await db.query('BEGIN');
+			transactionOpen = true;
+			for (const statement of statements || [])
+				await db.query(statement);
+			await db.query('COMMIT');
+			transactionOpen = false;
+			return {
+				rowCount: Number(meta.row_count),
+				watermark: JSON.parse(meta.watermark_json)
+			};
+		}
+		catch (error) {
+			if (transactionOpen)
+				await db.query('ROLLBACK').catch(() => {});
+			throw error;
+		}
+		finally {
+			if (attached)
+				await db.query('DETACH DATABASE orange_snapshot').catch(() => {});
+			fs.rmSync(filename, { force: true });
+		}
+	};
+	return db;
+}
+
+async function waitFor(predicate, timeoutMs = 5000) {
+	const startedAt = Date.now();
+	for (;;) {
+		if (await predicate())
+			return;
+		if (Date.now() - startedAt >= timeoutMs)
+			throw new Error(`Condition was not met within ${timeoutMs}ms.`);
+		await wait(10);
+	}
 }
 
 function deferred() {

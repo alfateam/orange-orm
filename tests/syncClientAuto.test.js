@@ -1,7 +1,11 @@
 import { describe, expect, test } from 'vitest';
 
 const newSyncClient = require('../src/client/syncClient');
-const { applyPullJournalSymbol, syncAndCapturePullJournalSymbol } = newSyncClient;
+const {
+	applyPullJournalSymbol,
+	applySqliteSnapshotSymbol,
+	syncAndCapturePullJournalSymbol
+} = newSyncClient;
 
 describe('sync client auto start', () => {
 	test('starts when start is called and stays running', async () => {
@@ -1040,6 +1044,139 @@ describe('sync client auto start', () => {
 		expect(patches).toEqual([[
 			{ op: 'add', path: '/[1]', value: { id: 1 } }
 		]]);
+	});
+
+	test('stages and imports a negotiated SQLite snapshot before marking it applied', async () => {
+		const imported = [];
+		const staged = [];
+		const lifecycle = [];
+		const table = newTable('customer');
+		const { buildSyncSchema, stableStringify, checksumString } = require('../src/client/syncSchema');
+		const checksum = checksumString(stableStringify(buildSyncSchema({ customer: table }, ['customer'])));
+		const db = newJournalDb({
+			__sqliteSync: { url: '/rdb', auto: false, schema: false, tables: ['customer'] },
+			baseEntries: [{ name: 'customer', base_name: 'orange_sync_base_data_customer', schema_sql: 'CREATE TABLE customer (id INTEGER PRIMARY KEY)', ordinal: 0 }]
+		});
+		db.poolFactory = {
+			async __orangeImportSqliteSnapshot(bytes, statements, expected) {
+				lifecycle.push('import');
+				imported.push({ bytes: bytes.slice(), statements, expected });
+				structuredClone(bytes, { transfer: [bytes.buffer] });
+				return { rowCount: 2, watermark: 9 };
+			}
+		};
+		const phases = [];
+		const client = newSyncClient({
+			tables: { customer: table },
+			transaction: async fn => fn({ customer: { patch: async () => { throw new Error('snapshot must not patch rows'); } }, query: db.query })
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async request => {
+					phases.push(request.data.phase);
+					if (request.data.phase === 'snapshot') return { data: new Uint8Array([1, 2, 3]) };
+					expect(request.data.sqliteSnapshot).toBe(true);
+					return { data: { phase: 'keys', mode: 'snapshot', items: [], done: true, cursor: 9, snapshot: { id: 'snapshot-1', rowCount: 2, schemaChecksum: checksum } } };
+				};
+			}
+		});
+
+		await client[syncAndCapturePullJournalSymbol]({
+			_stageSqliteSnapshot(snapshot) {
+				lifecycle.push('stage');
+				staged.push(snapshot);
+				return {
+					applied() {
+						lifecycle.push('applied');
+					}
+				};
+			}
+		});
+		expect(phases).toEqual(['keys', 'snapshot']);
+		expect(lifecycle).toEqual(['stage', 'import', 'applied']);
+		expect(imported).toHaveLength(1);
+		expect(imported[0].bytes).toEqual(new Uint8Array([1, 2, 3]));
+		expect(imported[0].statements.join('\n')).toContain('FROM orange_snapshot."customer"');
+		expect(imported[0].statements.join('\n')).toContain('orange_sync_base_data_customer');
+		expect(staged).toHaveLength(1);
+		expect(staged[0]).toMatchObject({
+			descriptor: { id: 'snapshot-1', rowCount: 2, schemaChecksum: checksum },
+			tables: ['customer'],
+			cursor: 9
+		});
+		expect(staged[0].bytes).toEqual(new Uint8Array([1, 2, 3]));
+
+		const replayImported = [];
+		const replayDb = newJournalDb({
+			__sqliteSync: { url: '/rdb', auto: false, schema: false, tables: ['customer'] },
+			baseEntries: [{ name: 'customer', base_name: 'orange_sync_base_data_customer', schema_sql: 'CREATE TABLE customer (id INTEGER PRIMARY KEY)', ordinal: 0 }]
+		});
+		replayDb.poolFactory = {
+			async __orangeImportSqliteSnapshot(bytes, statements, expected) {
+				replayImported.push({ bytes: bytes.slice(), statements, expected });
+				structuredClone(bytes, { transfer: [bytes.buffer] });
+				return { rowCount: 2, watermark: 9 };
+			}
+		};
+		const replayClient = newSyncClient({
+			tables: { customer: table },
+			transaction: async fn => fn({ query: replayDb.query })
+		}, async () => replayDb, { applyTo() {} });
+
+		const replayResult = await replayClient[applySqliteSnapshotSymbol](staged[0]);
+
+		expect(replayImported).toHaveLength(1);
+		expect(replayImported[0].bytes).toEqual(new Uint8Array([1, 2, 3]));
+		expect(replayImported[0].statements.join('\n')).toContain('FROM orange_snapshot."customer"');
+		expect(replayResult).toMatchObject({ applied: 2, tables: ['customer'], since: 9 });
+	});
+
+	test('aborts staged snapshot replay and falls back to inline rows when import fails', async () => {
+		const patches = [];
+		let aborted = 0;
+		const table = newTable('customer');
+		const { buildSyncSchema, stableStringify, checksumString } = require('../src/client/syncSchema');
+		const checksum = checksumString(stableStringify(buildSyncSchema({ customer: table }, ['customer'])));
+		const db = newJournalDb({
+			__sqliteSync: { url: '/rdb', auto: false, schema: false, tables: ['customer'] }
+		});
+		db.poolFactory = {
+			async __orangeImportSqliteSnapshot() {
+				throw new Error('snapshot runtime unavailable');
+			}
+		};
+		const phases = [];
+		const client = newSyncClient({
+			tables: { customer: table },
+			transaction: async fn => fn({
+				customer: {
+					patch: async patch => {
+						patches.push(patch);
+						return { changed: [{ id: 1 }] };
+					}
+				},
+				query: db.query
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async request => {
+					phases.push(request.data.phase);
+					if (request.data.phase === 'snapshot') return { data: new Uint8Array([1, 2, 3]) };
+					if (request.data.sqliteSnapshot) {
+						return { data: { phase: 'keys', mode: 'snapshot', items: [], done: true, cursor: 9, snapshot: { id: 'snapshot-1', rowCount: 1, schemaChecksum: checksum } } };
+					}
+					return { data: { phase: 'keys', mode: 'snapshot', items: [{ table: 'customer', pk: [1], key: { id: 1 }, op: 'U', row: { id: 1 } }], done: true, cursor: 9 } };
+				};
+			}
+		});
+
+		await client[syncAndCapturePullJournalSymbol]({
+			_stageSqliteSnapshot() {
+				return { abort() { aborted += 1; } };
+			}
+		});
+		expect(phases).toEqual(['keys', 'snapshot', 'keys']);
+		expect(aborted).toBe(1);
+		expect(patches).toEqual([[{ op: 'add', path: '/[1]', value: { id: 1 } }]]);
 	});
 
 	test('does not count missing staged rows as applied', async () => {

@@ -112,6 +112,8 @@ async function dispatch(message) {
 		return query(db, message.sql, message.parameters);
 	if (message.method === 'command')
 		return command(db, message.sql, message.parameters);
+	if (message.method === 'importSnapshot')
+		return importSnapshot(db, message.bytes, message.statements, message.expected);
 	throw new Error(`Unknown sqliteOPFS worker method "${message.method}".`);
 }
 
@@ -210,6 +212,37 @@ function command(db, sql, parameters = []) {
 		rowsAffected: Math.max(0, after - before),
 		lastInsertRowid: Number(db.selectValue('SELECT last_insert_rowid()'))
 	};
+}
+
+async function importSnapshot(db, bytes, statements, expected) {
+	if (!(bytes instanceof Uint8Array)) bytes = new Uint8Array(bytes);
+	const sqlite3 = await getSqlite3();
+	const pointer = db && db.pointer;
+	if (pointer === undefined || !sqlite3.capi || typeof sqlite3.capi.sqlite3_deserialize !== 'function')
+		throw new Error('sqliteOPFS runtime cannot import SQLite snapshots.');
+	db.exec('ATTACH \':memory:\' AS orange_snapshot');
+	try {
+		const data = sqlite3.wasm.allocFromTypedArray(bytes);
+		const flags = sqlite3.capi.SQLITE_DESERIALIZE_FREEONCLOSE | sqlite3.capi.SQLITE_DESERIALIZE_READONLY;
+		const rc = sqlite3.capi.sqlite3_deserialize(pointer, 'orange_snapshot', data, bytes.length, bytes.length, flags);
+		if (rc !== 0) throw new Error(`sqlite3_deserialize failed with code ${rc}.`);
+		const meta = db.selectObject('SELECT "format", "schema_checksum", "watermark_json", "row_count" FROM orange_snapshot.orange_snapshot_meta');
+		if (!meta || Number(meta.format) !== 1 || meta.schema_checksum !== expected.schemaChecksum || Number(meta.row_count) !== Number(expected.rowCount))
+			throw new Error('SQLite snapshot metadata does not match its descriptor.');
+		db.exec('BEGIN');
+		try {
+			for (const statement of statements || []) db.exec(statement);
+			db.exec('COMMIT');
+		}
+		catch (error) {
+			db.exec('ROLLBACK');
+			throw error;
+		}
+		return { rowCount: Number(meta.row_count), watermark: JSON.parse(meta.watermark_json) };
+	}
+	finally {
+		db.exec('DETACH orange_snapshot');
+	}
 }
 
 function normalizeFilename(connectionString) {

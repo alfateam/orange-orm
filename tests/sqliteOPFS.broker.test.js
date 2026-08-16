@@ -113,6 +113,39 @@ describe('sqliteOPFS broker worker', () => {
 			await activeClient.close();
 		}
 	});
+
+	test('imports a snapshot into the requested rotated database', async () => {
+		const imported = [];
+		const worker = createInlineSqliteOPFSWorker({
+			sqlite3InitModule: () => newFakeSnapshotSqlite3(imported)
+		});
+		const rotatedClient = createSqliteOPFSWorkerClient('rotation.__orange_sync_c.sqlite3', {
+			worker: connectSqliteOPFSWorker(worker),
+			vfs: 'opfs-wl',
+			closeDbOnClose: false
+		});
+
+		try {
+			const lease = await rotatedClient.checkout();
+			const result = await lease.importSnapshot(
+				new Uint8Array([1, 2, 3]),
+				['INSERT INTO project SELECT * FROM orange_snapshot.project'],
+				{ schemaChecksum: 'checksum-1', rowCount: 2 }
+			);
+			await lease.releaseCheckout();
+
+			expect(result).toEqual({ rowCount: 2, watermark: 9 });
+			expect(imported.find(event => event.type === 'deserialize')).toMatchObject({
+				filename: '/rotation.__orange_sync_c.sqlite3',
+				bytes: [1, 2, 3]
+			});
+			expect(imported.some(event => event.statement === 'INSERT INTO project SELECT * FROM orange_snapshot.project')).toBe(true);
+		}
+		finally {
+			await rotatedClient.close();
+			worker.terminate();
+		}
+	});
 });
 
 async function executeWithCheckout(client, sql) {
@@ -195,6 +228,61 @@ function newFakeSqlite3(executed = [], opened = []) {
 				close() {}
 			}
 		}
+	};
+}
+
+function newFakeSnapshotSqlite3(imported) {
+	class FakeOpfsWlDb {
+		constructor(filename) {
+			this.filename = filename;
+			this.pointer = { filename };
+		}
+
+		exec(value) {
+			if (typeof value === 'string')
+				imported.push({ type: 'statement', filename: this.filename, statement: value });
+			return [];
+		}
+
+		selectObject() {
+			return {
+				format: 1,
+				schema_checksum: 'checksum-1',
+				watermark_json: '9',
+				row_count: 2
+			};
+		}
+
+		changes() {
+			return 0;
+		}
+
+		selectValue() {
+			return 0;
+		}
+
+		close() {}
+	}
+
+	return {
+		capi: {
+			SQLITE_DESERIALIZE_FREEONCLOSE: 1,
+			SQLITE_DESERIALIZE_READONLY: 4,
+			sqlite3_deserialize(pointer, _schema, bytes) {
+				imported.push({
+					type: 'deserialize',
+					filename: pointer.filename,
+					bytes: Array.from(bytes)
+				});
+				return 0;
+			}
+		},
+		wasm: {
+			allocFromTypedArray(bytes) {
+				return bytes;
+			}
+		},
+		oo1: { OpfsWlDb: FakeOpfsWlDb }
 	};
 }
 

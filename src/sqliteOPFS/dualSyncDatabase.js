@@ -20,6 +20,7 @@ const {
 	readOutboxRowsSymbol,
 	applyOutboxRowsSymbol,
 	applyPullJournalSymbol,
+	applySqliteSnapshotSymbol,
 	pushPendingSymbol,
 	setClientIdSymbol
 } = newSyncClient;
@@ -38,6 +39,8 @@ const outboxReplayPageSize = 1000;
 const deltaItemsPerChunk = 1000;
 const deltaChunkReadPageSize = 32;
 const manifestCacheMaxAgeMs = 1000;
+const journalDeltaKind = 'journal';
+const sqliteSnapshotDeltaKind = 'sqlite-snapshot';
 
 function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase) {
 	const roleConnectionStrings = {
@@ -378,12 +381,27 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		let result;
 		let journal;
 		let deltaId;
+		let snapshotDeltaId;
 		let pullStagingSummary;
 		try {
 			result = await stagingSync[syncAndCapturePullJournalSymbol]({
 				...options,
 				_skipPushBeforePull: true,
 				_capturePullJournalChunk: deltaSink.write,
+				async _stageSqliteSnapshot(snapshot) {
+					const delta = await createSnapshotDelta(snapshot);
+					snapshotDeltaId = delta.id;
+					return {
+						async applied() {
+							await markDeltaApplied(delta, stableRole);
+						},
+						async abort() {
+							await deleteDelta(delta.id);
+							if (snapshotDeltaId === delta.id)
+								snapshotDeltaId = undefined;
+						}
+					};
+				},
 				_deferStableBaseUntilComplete: deferStableBaseUntilComplete,
 				_onPullBatchProgress(progress) {
 					emitSyncProgress('pull-batch-complete', {
@@ -398,7 +416,12 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 			});
 			journal = result && result.__orangePullJournal;
 			const deltaFinalizeStartedAtMs = Date.now();
-			deltaId = await deltaSink.commit(journal);
+			if (snapshotDeltaId) {
+				await deltaSink.abort();
+				deltaId = snapshotDeltaId;
+			}
+			else
+				deltaId = await deltaSink.commit(journal);
 			emitSyncProgress('pull-staging-summary', {
 				activeRole,
 				stagingRole: stableRole,
@@ -840,6 +863,25 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 				continue;
 			if (delta.appliedRoles.includes(role))
 				continue;
+			if (delta.kind === sqliteSnapshotDeltaKind) {
+				const targetSync = getRoleSyncClient(role);
+				if (typeof targetSync[applySqliteSnapshotSymbol] !== 'function')
+					throw new Error('Dual sync role client cannot apply a captured SQLite snapshot.');
+				emitSyncProgress('applying-snapshot', {
+					deltaId: delta.id,
+					targetRole: role,
+					rowCount: Number(delta.snapshot.descriptor.rowCount || 0)
+				});
+				const openRows = await readAllOutboxRows(targetSync, ['pending', 'pushed']);
+				await targetSync[applySqliteSnapshotSymbol](delta.snapshot);
+				await targetSync[applyOutboxRowsSymbol](openRows, {
+					replay: true,
+					replayExisting: true,
+					replaceOpen: false
+				});
+				await markDeltaApplied(delta, role);
+				continue;
+			}
 			const totalItems = getDeltaItemCount(delta.journal);
 			const hasInlineItems = Array.isArray(delta.journal.items);
 			const readPullJournalBatch = hasInlineItems
@@ -1277,6 +1319,56 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		}
 	}
 
+	async function createSnapshotDelta(snapshot) {
+		if (!snapshot || snapshot !== Object(snapshot)
+			|| !snapshot.descriptor || typeof snapshot.descriptor.id !== 'string'
+			|| typeof snapshot.descriptor.schemaChecksum !== 'string'
+			|| snapshot.cursor === undefined
+			|| !isSnapshotBytes(snapshot.bytes)) {
+			throw new Error('Cannot persist an invalid dual sync SQLite snapshot.');
+		}
+		const db = await getCacheDb();
+		await ensureCacheSchema(db);
+		const id = randomUuid();
+		const metadata = {
+			descriptor: { ...snapshot.descriptor },
+			tables: Array.isArray(snapshot.tables) ? snapshot.tables.slice() : [],
+			scopeKey: typeof snapshot.scopeKey === 'string' ? snapshot.scopeKey : '*',
+			cursor: snapshot.cursor
+		};
+		const bytes = snapshot.bytes instanceof Uint8Array
+			? snapshot.bytes.slice()
+			: new Uint8Array(snapshot.bytes.slice(0));
+		await db.query({
+			sql: [
+				`INSERT INTO "${deltaTable}" ("id", "scope", "from_since", "to_since", "journal_json", "created_at_ms", "applied_roles_json", "kind", "snapshot_bytes")`,
+				'VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?)'
+			].join(' '),
+			parameters: [
+				id,
+				metadata.scopeKey,
+				stringify(snapshot.cursor),
+				stringify(metadata),
+				Date.now(),
+				'[]',
+				sqliteSnapshotDeltaKind,
+				bytes
+			]
+		});
+		return {
+			id,
+			kind: sqliteSnapshotDeltaKind,
+			journal: metadata,
+			snapshot: { ...metadata, bytes },
+			appliedRoles: []
+		};
+	}
+
+	function isSnapshotBytes(value) {
+		return value instanceof Uint8Array
+			|| typeof ArrayBuffer === 'function' && value instanceof ArrayBuffer;
+	}
+
 	async function cleanupOrphanDeltaChunks(db) {
 		await db.query([
 			`DELETE FROM "${deltaChunkTable}"`,
@@ -1288,20 +1380,29 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		const db = await getCacheDb();
 		await ensureCacheSchema(db);
 		const rows = await db.query([
-			`SELECT "id", "journal_json", "applied_roles_json" FROM "${deltaTable}"`,
+			`SELECT "id", "journal_json", "applied_roles_json", "kind", "snapshot_bytes" FROM "${deltaTable}"`,
 			'ORDER BY "created_at_ms" ASC'
 		].join(' '));
 		return toRows(rows)
 			.map(row => {
 				const id = row.id ?? row.ID;
 				const journal = parseJson(row.journal_json ?? row.JOURNAL_JSON);
+				const kind = row.kind ?? row.KIND ?? journalDeltaKind;
+				const snapshotBytes = row.snapshot_bytes ?? row.SNAPSHOT_BYTES;
 				return {
 					id,
+					kind,
 					journal,
+					snapshot: kind === sqliteSnapshotDeltaKind && journal && isSnapshotBytes(snapshotBytes)
+						? { ...journal, bytes: snapshotBytes }
+						: undefined,
 					appliedRoles: parseJson(row.applied_roles_json ?? row.APPLIED_ROLES_JSON) || []
 				};
 			})
-			.filter(delta => typeof delta.id === 'string' && delta.journal && delta.journal === Object(delta.journal));
+			.filter(delta => typeof delta.id === 'string'
+				&& delta.journal && delta.journal === Object(delta.journal)
+				&& (delta.kind === journalDeltaKind
+					|| delta.kind === sqliteSnapshotDeltaKind && delta.snapshot));
 	}
 
 	async function createDeltaJournalBatchReader(deltaId) {
@@ -1375,6 +1476,13 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		delta.appliedRoles = roles;
 	}
 
+	async function deleteDelta(deltaId) {
+		const db = await getCacheDb();
+		await ensureCacheSchema(db);
+		await db.query(`DELETE FROM "${deltaChunkTable}" WHERE "delta_id" = ${sqlStringLiteral(deltaId)}`);
+		await db.query(`DELETE FROM "${deltaTable}" WHERE "id" = ${sqlStringLiteral(deltaId)}`);
+	}
+
 	async function resetCache() {
 		const db = await getCacheDb();
 		const currentManifest = await getManifest().catch(() => null);
@@ -1432,9 +1540,13 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 					'"to_since" TEXT,',
 					'"journal_json" TEXT NOT NULL,',
 					'"created_at_ms" INTEGER NOT NULL,',
-					'"applied_roles_json" TEXT NOT NULL',
+					'"applied_roles_json" TEXT NOT NULL,',
+					`"kind" TEXT NOT NULL DEFAULT '${journalDeltaKind}',`,
+					'"snapshot_bytes" BLOB',
 					');'
 				].join(' '));
+				await tryAddCacheColumn(db, deltaTable, 'kind', `TEXT NOT NULL DEFAULT '${journalDeltaKind}'`);
+				await tryAddCacheColumn(db, deltaTable, 'snapshot_bytes', 'BLOB');
 				await db.query([
 					`CREATE TABLE IF NOT EXISTS "${deltaChunkTable}" (`,
 					'"delta_id" TEXT NOT NULL,',
