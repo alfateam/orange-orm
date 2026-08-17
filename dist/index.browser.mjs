@@ -6054,7 +6054,7 @@ function requireSyncClient () {
 		? Symbol.for('orange-orm.syncClient.setClientId')
 		: '__orangeOrmSyncClientSetClientId';
 
-	function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
+	function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, internalOptions = {}) {
 		const sinceByScope = new Map();
 		const ensuredInternalTables = new WeakMap();
 		const syncStateTable = 'orange_sync_state';
@@ -6069,6 +6069,7 @@ function requireSyncClient () {
 		const initialReadyListeners = new Set();
 		const eventListeners = new Map();
 		const syncDbByDb = new WeakMap();
+		const fileSnapshotRollbackDefault = internalOptions.fileSnapshotRollback === true;
 		let initialReadyEmitted = false;
 		let localSchemaReadyPromise = null;
 		let localSchemaReadyResult = null;
@@ -6076,11 +6077,9 @@ function requireSyncClient () {
 		const lockedSync = withCrossTabSyncLock(sync);
 		const lockedEnsureLocalSchema = withCrossTabSyncLock(ensureLocalSchema);
 		const lockedResetLocal = withCrossTabSyncLock(resetLocal);
-		const lockedDiscardLocalChanges = withCrossTabSyncLock(discardLocalChanges);
 		const serializeSyncWork = createAsyncSerializer();
 		const queuedSync = serializeSyncWork(lockedSync);
 		const queuedEnsureLocalSchema = serializeSyncWork(lockedEnsureLocalSchema);
-		const queuedDiscardLocalChanges = serializeSyncWork(lockedDiscardLocalChanges);
 		const observedSync = observeSyncMethod('sync', queuedSync);
 		const auto = createSyncAuto({
 			sync: observedSync
@@ -6090,7 +6089,6 @@ function requireSyncClient () {
 			sync: observedSync,
 			ensureLocalSchema: queuedEnsureLocalSchema,
 			resetLocal: lockedResetLocal,
-			discardLocalChanges: queuedDiscardLocalChanges,
 			start: auto.start,
 			stop: auto.stop,
 			isRunning: auto.isRunning,
@@ -6168,6 +6166,8 @@ function requireSyncClient () {
 				pullOptions._onPullStagingSummary = options._onPullStagingSummary;
 			if (options._skipPushBeforePull === true)
 				pullOptions._skipPushBeforePull = true;
+			if (usesFileSnapshotRollback(options))
+				pullOptions._fileSnapshotRollback = true;
 			return pull(pullOptions);
 		}
 
@@ -6177,20 +6177,33 @@ function requireSyncClient () {
 			if (!syncConfig)
 				throw new Error('Sync is not configured. Add sync in sqlite options: sqlite(connectionString, { sync: ... })');
 			const configuredTables = resolveSyncTables(db, syncConfig.tables, client);
-			const hadStableBase = await hasStableBase(db, configuredTables);
+			const fileSnapshotRollback = usesFileSnapshotRollback(options);
+			const hadStableBase = fileSnapshotRollback || await hasStableBase(db, configuredTables);
 			if (!hadStableBase)
 				return { phase: 'push', applied: 0, duplicates: 0, results: [], skipped: 'missing-stable-base' };
-			const pushConfig = resolvePushConfig(syncConfig, normalizePullOptions(options));
-			return pushBeforePull(db, syncConfig, hadStableBase, pushConfig);
+			const pushConfig = {
+				...resolvePushConfig(syncConfig, normalizePullOptions(options)),
+				...(options._singleMutationBatch === true ? { maxMutationsPerBatch: 1 } : {})
+			};
+			return pushBeforePull(db, syncConfig, hadStableBase, pushConfig, {
+				...options,
+				_skipConflictRestore: fileSnapshotRollback || options._skipConflictRestore === true
+			});
 		}
 
 		async function ensureLocalSchema(options = {}) {
-			const result = await prepareLocalSyncSchema(normalizeSyncOptions(options), { allowMissingSync: true });
+			const result = await prepareLocalSyncSchema(normalizeSyncOptions(options), {
+				allowMissingSync: true,
+				fileSnapshotRollback: fileSnapshotRollbackDefault
+			});
 			return localSchemaReadyResultToPublic(result);
 		}
 
 		async function ensureLocalSchemaReady() {
-			const result = await getLocalSchemaReady({ allowMissingSync: true });
+			const result = await getLocalSchemaReady({
+				allowMissingSync: true,
+				fileSnapshotRollback: fileSnapshotRollbackDefault
+			});
 			return localSchemaReadyResultToPublic(result);
 		}
 
@@ -6277,20 +6290,28 @@ function requireSyncClient () {
 				normalizedOptions._onPullStagingSummary = options._onPullStagingSummary;
 			if (options && options._skipPushBeforePull === true)
 				normalizedOptions._skipPushBeforePull = true;
+			if (usesFileSnapshotRollback(options))
+				normalizedOptions._fileSnapshotRollback = true;
 			const {
 				db,
 				syncConfig,
 				pullConfig,
 				configuredTables
-			} = await prepareLocalSyncSchema(normalizedOptions);
-			const hadStableBase = await hasStableBase(db, configuredTables);
+			} = await prepareLocalSyncSchema(normalizedOptions, {
+				fileSnapshotRollback: usesFileSnapshotRollback(normalizedOptions)
+			});
+			const hadStableBase = usesFileSnapshotRollback(normalizedOptions)
+				|| await hasStableBase(db, configuredTables);
 			if (!hadStableBase)
 				return runSyncMaintenance(db, () => pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase, normalizedOptions));
 			return pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase, normalizedOptions);
 		}
 
 		async function prepareLocalSyncSchema(options = {}, prepareOptions = {}) {
-			const result = await getLocalSchemaReady(prepareOptions);
+			const result = await getLocalSchemaReady({
+				...prepareOptions,
+				fileSnapshotRollback: usesFileSnapshotRollback(options)
+			});
 			if (result.skipped) {
 				if (prepareOptions.allowMissingSync)
 					return result;
@@ -6312,7 +6333,7 @@ function requireSyncClient () {
 					return result;
 				});
 			}
-			localSchemaReadyPromise = prepareLocalSyncSchemaCore()
+			localSchemaReadyPromise = prepareLocalSyncSchemaCore(prepareOptions)
 				.then((result) => {
 					if (!result.skipped)
 						localSchemaReadyResult = result;
@@ -6332,7 +6353,11 @@ function requireSyncClient () {
 			localSchemaReadyResult = null;
 		}
 
-		async function prepareLocalSyncSchemaCore() {
+		function usesFileSnapshotRollback(options) {
+			return fileSnapshotRollbackDefault || !!(options && options._fileSnapshotRollback === true);
+		}
+
+		async function prepareLocalSyncSchemaCore(prepareOptions = {}) {
 			const db = toSyncDb(await getDb());
 			const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
 			if (!syncConfig)
@@ -6344,7 +6369,7 @@ function requireSyncClient () {
 				throw new Error('Sync pull requires mapped tables or configured tables. Set sync.tables when the client has no table map.');
 			const schemaResult = await runSyncMaintenance(db, async () => {
 				const ensuredSchema = await ensureSyncSchema(db, client, configuredTables, syncConfig.schema);
-				await cleanupSyncStorage(db, configuredTables);
+				await cleanupSyncStorage(db, configuredTables, prepareOptions.fileSnapshotRollback === true);
 				return ensuredSchema;
 			});
 			return {
@@ -6371,6 +6396,7 @@ function requireSyncClient () {
 				_capturePullJournal: !!options._capturePullJournal,
 				_capturePullJournalChunk: options._capturePullJournalChunk,
 				_deferStableBaseUntilComplete: options._deferStableBaseUntilComplete === true,
+				_fileSnapshotRollback: options._fileSnapshotRollback === true,
 				_onPullBatchProgress: options._onPullBatchProgress,
 				_onPullStagingSummary: options._onPullStagingSummary,
 				_syncInterceptors: interceptors,
@@ -6413,7 +6439,7 @@ function requireSyncClient () {
 				clearEnsuredSyncSchema(db);
 				initialReadyEmitted = false;
 				const schemaResult = await ensureSyncSchema(db, client, configuredTables, syncConfig.schema);
-				await cleanupSyncStorage(db, configuredTables);
+				await cleanupSyncStorage(db, configuredTables, fileSnapshotRollbackDefault);
 				return {
 					reset: true,
 					tables: configuredTables,
@@ -6423,26 +6449,6 @@ function requireSyncClient () {
 					scope: schemaResult && schemaResult.scope,
 					sql: schemaResult && schemaResult.sql
 				};
-			});
-		}
-
-		async function discardLocalChanges() {
-			const db = toSyncDb(await getDb());
-			const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
-			if (!syncConfig)
-				throw new Error('Sync is not configured. Add sync in sqlite options: sqlite(connectionString, { sync: ... })');
-			const configuredTables = resolveSyncTables(db, syncConfig.tables, client);
-			if (!await hasStableBase(db, configuredTables))
-				throw new Error('Cannot discard local changes before initial sync has completed.');
-			await runSyncMaintenance(db, async () => {
-				const openRows = await readReplayMutationRows(db, 10000);
-				await restoreStableBase(db);
-				await ensureSyncOutboxTable(db);
-				await db.query([
-					`DELETE FROM "${syncOutboxTable}"`,
-					'WHERE "status" IN (\'pending\', \'pushed\')'
-				].join(' '));
-				clearOutboxOperationMemory(openRows);
 			});
 		}
 
@@ -6553,6 +6559,7 @@ function requireSyncClient () {
 			let applied = 0;
 			let processedItems = 0;
 			const touchedTables = new Set();
+			const fileSnapshotRollback = usesFileSnapshotRollback(options);
 			await tryEnableForeignKeys(db);
 			if (applyConfig)
 				await applyPullJournalItemsInChunks();
@@ -6570,8 +6577,9 @@ function requireSyncClient () {
 			async function applyPullJournalItemsInSingleTransaction() {
 				await client.transaction(async (tx) => {
 					await tryDeferForeignKeys(tx);
-					await ensureStableBaseTables(tx, configuredTables);
-					const baseByName = await readStableBaseEntriesByName(tx);
+					if (!fileSnapshotRollback)
+						await ensureStableBaseTables(tx, configuredTables);
+					const baseByName = fileSnapshotRollback ? undefined : await readStableBaseEntriesByName(tx);
 					let hasItems = false;
 					for (;;) {
 						const batch = await readNextBatch();
@@ -6581,7 +6589,9 @@ function requireSyncClient () {
 							continue;
 						hasItems = true;
 						trackTouchedTables(batch);
-						applied += await applyPullJournalBatchOnTx(tx, batch, defaultPatchOptions, baseByName);
+						applied += await applyPullJournalBatchOnTx(tx, batch, defaultPatchOptions, baseByName, {
+							deferStableBase: fileSnapshotRollback
+						});
 						await reportBatchApplied(batch.length);
 					}
 					assertJournalItemCountComplete();
@@ -6604,10 +6614,13 @@ function requireSyncClient () {
 					hasItems = true;
 					await client.transaction(async (tx) => {
 						await tryDeferForeignKeys(tx);
-						await ensureStableBaseTables(tx, configuredTables);
-						const baseByName = await readStableBaseEntriesByName(tx);
+						if (!fileSnapshotRollback)
+							await ensureStableBaseTables(tx, configuredTables);
+						const baseByName = fileSnapshotRollback ? undefined : await readStableBaseEntriesByName(tx);
 						trackTouchedTables(chunk);
-						applied += await applyPullJournalBatchOnTx(tx, chunk, defaultPatchOptions, baseByName);
+						applied += await applyPullJournalBatchOnTx(tx, chunk, defaultPatchOptions, baseByName, {
+							deferStableBase: fileSnapshotRollback
+						});
 						if (chunk.length > 0 && applyConfig.foreignKeyCheck === 'chunk')
 							await validateForeignKeys(tx);
 					}, { suppressSyncOutbox: true });
@@ -6714,8 +6727,12 @@ function requireSyncClient () {
 			}
 			catch (e) {
 				if (isConflictError(e)) {
-					await rollbackFailedPushBatch(db, pending, e);
+					if (options._skipConflictRestore === true)
+						await markFailedPushBatch(db, pending, e);
+					else
+						await rollbackFailedPushBatch(db, pending, e);
 					emitOperationErrors(pending, e, false);
+					attachFailedPushMutations(e, pending);
 				}
 				else {
 					await markPendingMutationAttempts(db, pending, e);
@@ -6723,19 +6740,26 @@ function requireSyncClient () {
 				}
 				throw e;
 			}
+			const acceptedBeforeCommit = acceptedMutationsForResult(result, pending);
+			if (typeof options._onAcceptedBeforeCommit === 'function')
+				await options._onAcceptedBeforeCommit(result, acceptedBeforeCommit);
 			const acceptedMutations = await markPushedMutations(db, result, pending);
 			attachAcceptedPushMutations(result, acceptedMutations);
 			return result;
 		}
 
-		async function pushBeforePull(db, syncConfig, hasBase, resolvedPushConfig) {
+		async function pushBeforePull(db, syncConfig, hasBase, resolvedPushConfig, options = {}) {
 			if (!hasBase)
 				return;
 			const pushConfig = resolvedPushConfig || resolvePushConfig(syncConfig);
 			const maxBatches = resolveMaxPushBatches();
 			const results = [];
 			for (let i = 0; i < maxBatches; i++) {
-				const result = await pushPending({ _syncConfig: syncConfig, _pushConfig: pushConfig });
+				const result = await pushPending({
+					...options,
+					_syncConfig: syncConfig,
+					_pushConfig: pushConfig
+				});
 				if (!didPushBatchAdvance(result))
 					break;
 				results.push(result);
@@ -6774,6 +6798,15 @@ function requireSyncClient () {
 
 		async function rollbackFailedPushBatch(db, attemptedMutations, error) {
 			return runSyncMaintenance(db, () => rollbackFailedPushBatchCore(db, attemptedMutations, error));
+		}
+
+		async function markFailedPushBatch(db, attemptedMutations, error) {
+			await ensureSyncOutboxTable(db);
+			for (let i = 0; i < attemptedMutations.length; i++) {
+				const row = failedOutboxRow(attemptedMutations[i], error);
+				if (row)
+					await insertOutboxRow(db, row);
+			}
 		}
 
 		async function rollbackFailedPushBatchCore(db, attemptedMutations, error) {
@@ -6880,8 +6913,9 @@ function requireSyncClient () {
 			const capturePullJournalChunk = typeof options._capturePullJournalChunk === 'function'
 				? options._capturePullJournalChunk
 				: null;
+			const fileSnapshotRollback = usesFileSnapshotRollback(options);
 			const deferStableBaseUntilComplete = options._deferStableBaseUntilComplete === true;
-			const stagingTimings = newPullStagingTimings(deferStableBaseUntilComplete);
+			const stagingTimings = newPullStagingTimings(deferStableBaseUntilComplete || fileSnapshotRollback);
 			let capturedStreamItemCount = 0;
 			let capturedApplicableItemCount = 0;
 			const streamedTables = new Set();
@@ -6949,7 +6983,7 @@ function requireSyncClient () {
 				await client.transaction(async (tx) => {
 					if (hasJournalItems && (!applyConfig || applyConfig.foreignKeyCheck === 'final'))
 						await validateForeignKeys(tx);
-					if (deferStableBaseUntilComplete) {
+					if (deferStableBaseUntilComplete && !fileSnapshotRollback) {
 						const bulkStableBaseStartedAtMs = Date.now();
 						await copyTablesToStableBase(tx, options.tables);
 						stagingTimings.bulkStableBaseMs += elapsedMs(bulkStableBaseStartedAtMs);
@@ -6965,7 +6999,8 @@ function requireSyncClient () {
 			async function applyPullJournalInSingleTransaction(session) {
 				await client.transaction(async (tx) => {
 					await tryDeferForeignKeys(tx);
-					await ensureStableBaseTables(tx, options.tables);
+					if (!fileSnapshotRollback)
+						await ensureStableBaseTables(tx, options.tables);
 					const batches = await readPullJournalBatches(tx, scopeKey);
 					const hasJournalItems = batches.length > 0;
 					const touchedTables = new Set();
@@ -6977,11 +7012,13 @@ function requireSyncClient () {
 						const upsertItems = batch.filter(x => x.op !== 'D' && x.row !== undefined);
 						if (deleteItems.length > 0) {
 							applied += await applyDeleteItemsOnTx(tx, deleteItems, defaultPatchOptions);
-							await applyDeleteItemsToStableBase(tx, deleteItems);
+							if (!fileSnapshotRollback)
+								await applyDeleteItemsToStableBase(tx, deleteItems);
 						}
 						if (upsertItems.length > 0) {
 							applied += await applyRowsPayloadOnTx(tx, upsertItems, defaultPatchOptions);
-							await applyRowsPayloadToStableBase(tx, upsertItems);
+							if (!fileSnapshotRollback)
+								await applyRowsPayloadToStableBase(tx, upsertItems);
 						}
 					}
 					if (hasJournalItems)
@@ -6997,7 +7034,8 @@ function requireSyncClient () {
 			async function applyPullJournalInChunks(session, applyConfig) {
 				let items = [];
 				await client.transaction(async (tx) => {
-					await ensureStableBaseTables(tx, options.tables);
+					if (!fileSnapshotRollback)
+						await ensureStableBaseTables(tx, options.tables);
 					items = flattenPullJournalBatches(await readPullJournalBatches(tx, scopeKey));
 				}, { suppressSyncOutbox: true });
 				const touchedTables = new Set();
@@ -7005,7 +7043,7 @@ function requireSyncClient () {
 					const chunk = items.slice(offset, offset + applyConfig.maxRowsPerTransaction);
 					await client.transaction(async (tx) => {
 						await tryDeferForeignKeys(tx);
-						const baseByName = await readStableBaseEntriesByName(tx);
+						const baseByName = fileSnapshotRollback ? undefined : await readStableBaseEntriesByName(tx);
 						for (let i = 0; i < chunk.length; i++) {
 							const item = chunk[i];
 							if (item && typeof item.table === 'string')
@@ -7015,7 +7053,8 @@ function requireSyncClient () {
 							tx,
 							chunk,
 							defaultPatchOptions,
-							baseByName
+							baseByName,
+							{ deferStableBase: fileSnapshotRollback }
 						);
 						if (chunk.length > 0 && applyConfig.foreignKeyCheck === 'chunk')
 							await validateForeignKeys(tx);
@@ -7047,9 +7086,10 @@ function requireSyncClient () {
 				if (!session)
 					session = newPullSession(scopeKey, options.since, streamApply);
 				if (streamApply) {
-					await client.transaction(async (tx) => {
-						await ensureStableBaseTables(tx, options.tables);
-					}, { suppressSyncOutbox: true });
+					if (!fileSnapshotRollback)
+						await client.transaction(async (tx) => {
+							await ensureStableBaseTables(tx, options.tables);
+						}, { suppressSyncOutbox: true });
 					if (hasPersistedSession) {
 						const persistedItems = await readPullJournalItemsPaged(db, scopeKey);
 						await captureStreamItems(persistedItems);
@@ -7113,7 +7153,7 @@ function requireSyncClient () {
 							streamApply ? {
 								applyConfig,
 								defaultPatchOptions,
-								deferStableBaseUntilComplete,
+								deferStableBaseUntilComplete: deferStableBaseUntilComplete || fileSnapshotRollback,
 								onApplied(count, items) {
 									applied += count;
 									for (let i = 0; i < items.length; i++)
@@ -7134,7 +7174,7 @@ function requireSyncClient () {
 								: Math.max(0, batch.rowsReadyAtMs - batch.createdAtMs),
 							deltaPersistMs,
 							elapsedMs: elapsedMs(batchStartedAtMs),
-							deferredStableBase: deferStableBaseUntilComplete,
+							deferredStableBase: deferStableBaseUntilComplete || fileSnapshotRollback,
 							...persisted.timings
 						};
 						addPullBatchTimings(stagingTimings, batchProgress);
@@ -7494,7 +7534,8 @@ function requireSyncClient () {
 						applied += entry.patch.length;
 					}
 					await validateForeignKeys(tx);
-					await copyTablesToStableBase(tx, tablePatches.map(x => x.table));
+					if (!usesFileSnapshotRollback(options))
+						await copyTablesToStableBase(tx, tablePatches.map(x => x.table));
 				}, { suppressSyncOutbox: true });
 			}
 			return {
@@ -8060,15 +8101,6 @@ function requireSyncClient () {
 			return readMutationRowsByStatus(db, ['pending', 'pushed'], limit, excludeIds);
 		}
 
-		function clearOutboxOperationMemory(rows) {
-			const list = Array.isArray(rows) ? rows : [];
-			for (let i = 0; i < list.length; i++) {
-				const id = list[i] && (list[i].mutation_id ?? list[i].MUTATION_ID);
-				if (typeof id === 'string')
-					deleteSyncOperationMemory(id);
-			}
-		}
-
 		async function readMutationRowsByStatus(db, statuses, limit, excludeIds, after) {
 			await ensureSyncOutboxTable(db);
 			const allowedStatuses = (Array.isArray(statuses) ? statuses : [])
@@ -8210,6 +8242,28 @@ function requireSyncClient () {
 					result.set(mutation.id, mutation);
 			}
 			return result;
+		}
+
+		function acceptedMutationsForResult(result, attemptedMutations) {
+			const attemptedById = mutationsById(attemptedMutations);
+			const items = Array.isArray(result && result.results) ? result.results : [];
+			return items
+				.map(item => item && attemptedById.get(item.id))
+				.filter(Boolean);
+		}
+
+		function attachFailedPushMutations(error, mutations) {
+			if (!error || error !== Object(error))
+				return;
+			try {
+				Object.defineProperty(error, '__orangeFailedMutations', {
+					value: Array.isArray(mutations) ? mutations : [],
+					configurable: true
+				});
+			}
+			catch (_error) {
+				// The outbox already contains the failed status when a custom error cannot be annotated.
+			}
 		}
 
 		function failedOutboxRow(mutation, error) {
@@ -8601,8 +8655,13 @@ function requireSyncClient () {
 				.filter(name => typeof name === 'string' && name.length > 0);
 		}
 
-		async function cleanupSyncStorage(db, tableNames) {
+		async function cleanupSyncStorage(db, tableNames, fileSnapshotRollback = false) {
 			await cleanupLegacySyncState(db);
+			if (fileSnapshotRollback) {
+				await dropExistingBaseTables(db);
+				await db.query(`DROP TABLE IF EXISTS "${syncBaseTable}"`);
+				return;
+			}
 			await cleanupInactiveStableBase(db, tableNames);
 		}
 
@@ -21519,7 +21578,6 @@ function requireDbWorkerClient () {
 				sync: syncRequest.bind(null, 'sync'),
 				ensureLocalSchema: syncRequest.bind(null, 'ensureLocalSchema'),
 				resetLocal: syncRequest.bind(null, 'resetLocal'),
-				discardLocalChanges: syncRequest.bind(null, 'discardLocalChanges'),
 				start: syncRequest.bind(null, 'start'),
 				stop: syncRequest.bind(null, 'stop'),
 				isRunning: syncRequest.bind(null, 'isRunning'),
@@ -22067,7 +22125,6 @@ function requireSyncWorkerClient () {
 			sync: request.bind(null, 'sync'),
 			ensureLocalSchema: request.bind(null, 'ensureLocalSchema'),
 			resetLocal: request.bind(null, 'resetLocal'),
-			discardLocalChanges: request.bind(null, 'discardLocalChanges'),
 			start: request.bind(null, 'start'),
 			stop: request.bind(null, 'stop'),
 			isRunning: request.bind(null, 'isRunning'),
@@ -22505,6 +22562,7 @@ function requireInlineWorker () {
 		let db;
 		let dbOpenOptions;
 		let dbOpenInfo;
+		let dbVfsSuspender;
 		let operationQueue = Promise.resolve();
 		let activeLeaseId;
 		let nextLeaseId = 1;
@@ -22652,6 +22710,8 @@ function requireInlineWorker () {
 				return openDb(message.connectionString, message.busyTimeoutMs, message.vfs, message.opfsSahPoolOptions);
 			if (message.method === 'close')
 				return closeDb();
+			if (message.method === 'suspendDatabase')
+				return suspendDatabase();
 			if (message.leaseId !== undefined && message.leaseId !== activeLeaseId)
 				throw new Error('sqliteOPFS checkout is not active.');
 			if (!db)
@@ -22660,6 +22720,12 @@ function requireInlineWorker () {
 				return query(message.sql, message.parameters);
 			if (message.method === 'command')
 				return command(message.sql, message.parameters);
+			if (message.method === 'cloneDatabaseTo')
+				return cloneDatabaseTo(
+					message.targetConnectionString,
+					message.targetVfs,
+					message.targetOpfsSahPoolOptions
+				);
 			throw new Error('Unknown sqliteOPFS worker method "' + message.method + '".');
 		}
 
@@ -22671,6 +22737,7 @@ function requireInlineWorker () {
 			const filename = normalizeFilename(connectionString);
 			const dbInfo = await createDb(sqlite3, filename, vfs, opfsSahPoolOptions);
 			db = dbInfo.db;
+			dbVfsSuspender = dbInfo.suspend;
 			db.exec('PRAGMA busy_timeout=' + (Number.parseInt(busyTimeoutMs, 10) || 5000));
 			dbOpenInfo = {
 				opened: true,
@@ -22686,6 +22753,15 @@ function requireInlineWorker () {
 				db.close();
 			db = null;
 			return { closed: true };
+		}
+
+		async function suspendDatabase() {
+			closeDb();
+			const suspend = dbVfsSuspender;
+			dbVfsSuspender = undefined;
+			if (typeof suspend === 'function')
+				await suspend();
+			return { suspended: true };
 		}
 
 		function openDbFromLastOptions(connectionString) {
@@ -22708,7 +22784,10 @@ function requireInlineWorker () {
 			return {
 				db: new DbClass(filename),
 				vfs: 'opfs-wl',
-				opfs: true
+				opfs: true,
+				importDatabase: typeof DbClass.importDb === 'function'
+					? (bytes) => DbClass.importDb(filename, bytes)
+					: undefined
 			};
 		}
 
@@ -22716,13 +22795,22 @@ function requireInlineWorker () {
 			if (!sqlite3 || typeof sqlite3.installOpfsSAHPoolVfs !== 'function')
 				throw new Error('sqliteOPFS vfs "opfs-sahpool" is not available in this sqlite-wasm build.');
 			const pool = await sqlite3.installOpfsSAHPoolVfs(opfsSahPoolOptions);
+			if (pool && typeof pool.isPaused === 'function' && pool.isPaused()
+				&& typeof pool.unpauseVfs === 'function')
+				await pool.unpauseVfs();
 			const DbClass = pool && pool.OpfsSAHPoolDb;
 			if (typeof DbClass !== 'function')
 				throw new Error('sqliteOPFS vfs "opfs-sahpool" is not available in this sqlite-wasm build.');
 			return {
 				db: new DbClass(filename),
 				vfs: pool.vfsName || 'opfs-sahpool',
-				opfs: true
+				opfs: true,
+				importDatabase: typeof pool.importDb === 'function'
+					? (bytes) => pool.importDb(filename, bytes)
+					: undefined,
+				suspend: typeof pool.pauseVfs === 'function'
+					? () => pool.pauseVfs()
+					: undefined
 			};
 		}
 
@@ -22767,14 +22855,79 @@ function requireInlineWorker () {
 			};
 		}
 
+		async function cloneDatabaseTo(targetConnectionString, targetVfs, targetOpfsSahPoolOptions) {
+			if (!db || !dbOpenOptions)
+				throw new Error('sqliteOPFS source database is not open.');
+			const sqlite3 = await getSqlite3();
+			const capi = sqlite3 && sqlite3.capi;
+			const supportsPageBackup = !!capi
+				&& typeof capi.sqlite3_backup_init === 'function'
+				&& typeof capi.sqlite3_backup_step === 'function'
+				&& typeof capi.sqlite3_backup_finish === 'function';
+			const targetFilename = normalizeFilename(targetConnectionString);
+			if (targetFilename === db.filename)
+				throw new Error('sqliteOPFS clone source and target must be different databases.');
+			const targetInfo = await createDb(
+				sqlite3,
+				targetFilename,
+				targetVfs || dbOpenOptions.vfs,
+				targetOpfsSahPoolOptions
+			);
+			const targetDb = targetInfo.db;
+			if (!supportsPageBackup) {
+				if (!capi || typeof capi.sqlite3_js_db_export !== 'function'
+					|| typeof targetInfo.importDatabase !== 'function') {
+					targetDb.close();
+					throw new Error('sqliteOPFS runtime cannot clone a SQLite database.');
+				}
+				targetDb.close();
+				const bytes = capi.sqlite3_js_db_export(db.pointer);
+				try {
+					await targetInfo.importDatabase(bytes);
+					return { cloned: true, strategy: 'export-import', byteLength: bytes.byteLength };
+				}
+				finally {
+					if (typeof targetInfo.suspend === 'function')
+						await targetInfo.suspend();
+				}
+			}
+			let backup;
+			let stepResult;
+			try {
+				backup = capi.sqlite3_backup_init(targetDb.pointer, 'main', db.pointer, 'main');
+				if (!backup)
+					throw new Error('sqliteOPFS could not initialize the SQLite backup.');
+				stepResult = capi.sqlite3_backup_step(backup, -1);
+				if (stepResult !== capi.SQLITE_DONE)
+					throw new Error(`sqliteOPFS SQLite backup failed with result ${stepResult}.`);
+			}
+			finally {
+				if (backup)
+					capi.sqlite3_backup_finish(backup);
+				if (targetDb && typeof targetDb.close === 'function')
+					targetDb.close();
+				if (typeof targetInfo.suspend === 'function')
+					await targetInfo.suspend();
+			}
+			return {
+				cloned: true,
+				pageCount: Number(db.selectValue('PRAGMA page_count')) || 0,
+				pageSize: Number(db.selectValue('PRAGMA page_size')) || 0
+			};
+		}
+
 		function postResponse(target, id, result, error, elapsedMs) {
-			target.postMessage({
+			const message = {
 				type: 'orange-sqlite-opfs-response',
 				id,
 				result,
 				elapsedMs,
 				error: error ? serializeError(error) : undefined
-			});
+			};
+			const transfer = result instanceof Uint8Array && result.buffer instanceof ArrayBuffer
+				? [result.buffer]
+				: undefined;
+			target.postMessage(message, transfer);
 		}
 
 		function emit(type, event) {
@@ -22892,6 +23045,8 @@ function requireWorkerClient () {
 		return {
 			executeQuery,
 			executeCommand,
+			cloneDatabaseTo,
+			suspendDatabase,
 			checkout,
 			close,
 			getOpenInfo,
@@ -22906,6 +23061,30 @@ function requireWorkerClient () {
 
 		function executeCommand(query, callback) {
 			executeCommandCore(query, callback);
+		}
+
+		function cloneDatabaseTo(targetConnectionString, targetOptions = {}) {
+			if (closed)
+				return Promise.reject(new Error('sqliteOPFS worker client closed.'));
+			if (typeof targetConnectionString !== 'string' || targetConnectionString.length === 0)
+				return Promise.reject(new Error('sqliteOPFS clone target must be a database filename.'));
+			return ensureOpen()
+				.then(() => request('cloneDatabaseTo', {
+					targetConnectionString,
+					targetVfs: normalizeVfs(targetOptions.vfs || requestedVfs),
+					targetOpfsSahPoolOptions: targetOptions.opfsSahPoolOptions
+				}))
+				.then(response => response.result);
+		}
+
+		function suspendDatabase() {
+			if (closed || !openPromise)
+				return Promise.resolve();
+			return openPromise
+				.then(() => request('suspendDatabase'))
+				.finally(() => {
+					openPromise = null;
+				});
 		}
 
 		function executeQueryCore(query, callback, leaseId) {
@@ -22964,6 +23143,8 @@ function requireWorkerClient () {
 				return {
 					executeQuery,
 					executeCommand,
+					cloneDatabaseTo,
+					suspendDatabase,
 					getOpenInfo,
 					reset,
 					releaseCheckout: () => Promise.resolve()
@@ -22974,6 +23155,14 @@ function requireWorkerClient () {
 				},
 				executeCommand(query, callback) {
 					executeCommandCore(query, callback, leaseId);
+				},
+				cloneDatabaseTo(targetConnectionString, targetOptions = {}) {
+					return request('cloneDatabaseTo', {
+						targetConnectionString,
+						targetVfs: normalizeVfs(targetOptions.vfs || requestedVfs),
+						targetOpfsSahPoolOptions: targetOptions.opfsSahPoolOptions,
+						leaseId
+					}).then(response => response.result);
 				},
 				getOpenInfo,
 				reset,
@@ -22990,12 +23179,13 @@ function requireWorkerClient () {
 			return new Promise((resolve, reject) => {
 				pending.set(id, { resolve, reject });
 				try {
-					worker.postMessage({
+					const message = {
 						type: 'orange-sqlite-opfs-request',
 						id,
 						method,
 						...payload
-					});
+					};
+					worker.postMessage(message);
 				}
 				catch (e) {
 					pending.delete(id);
@@ -23185,6 +23375,7 @@ let sqlite3Promise;
 let db;
 let dbOpenOptions;
 let dbOpenInfo;
+let dbVfsSuspender;
 let operationQueue = Promise.resolve();
 let activeLeaseId;
 let nextLeaseId = 1;
@@ -23292,6 +23483,8 @@ async function dispatch(message) {
 		return openDb(message.connectionString, message.busyTimeoutMs, message.vfs, message.opfsSahPoolOptions);
 	if (message.method === 'close')
 		return closeDb();
+	if (message.method === 'suspendDatabase')
+		return suspendDatabase();
 	if (message.leaseId !== undefined && message.leaseId !== activeLeaseId)
 		throw new Error('sqliteOPFS checkout is not active.');
 	if (!db)
@@ -23300,6 +23493,12 @@ async function dispatch(message) {
 		return query(message.sql, message.parameters);
 	if (message.method === 'command')
 		return command(message.sql, message.parameters);
+	if (message.method === 'cloneDatabaseTo')
+		return cloneDatabaseTo(
+			message.targetConnectionString,
+			message.targetVfs,
+			message.targetOpfsSahPoolOptions
+		);
 	throw new Error('Unknown sqliteOPFS worker method "' + message.method + '".');
 }
 
@@ -23311,6 +23510,7 @@ async function openDb(connectionString, busyTimeoutMs = 5000, vfs, opfsSahPoolOp
 	const filename = normalizeFilename(connectionString);
 	const dbInfo = await createDb(sqlite3, filename, vfs, opfsSahPoolOptions);
 	db = dbInfo.db;
+	dbVfsSuspender = dbInfo.suspend;
 	db.exec('PRAGMA busy_timeout=' + (Number.parseInt(busyTimeoutMs, 10) || 5000));
 	dbOpenInfo = {
 		opened: true,
@@ -23326,6 +23526,15 @@ function closeDb() {
 		db.close();
 	db = null;
 	return { closed: true };
+}
+
+async function suspendDatabase() {
+	closeDb();
+	const suspend = dbVfsSuspender;
+	dbVfsSuspender = undefined;
+	if (typeof suspend === 'function')
+		await suspend();
+	return { suspended: true };
 }
 
 function openDbFromLastOptions(connectionString) {
@@ -23348,7 +23557,10 @@ function createOpfsWlDb(sqlite3, filename) {
 	return {
 		db: new DbClass(filename),
 		vfs: 'opfs-wl',
-		opfs: true
+		opfs: true,
+		importDatabase: typeof DbClass.importDb === 'function'
+			? (bytes) => DbClass.importDb(filename, bytes)
+			: undefined
 	};
 }
 
@@ -23356,13 +23568,22 @@ async function createOpfsSahPoolDb(sqlite3, filename, opfsSahPoolOptions) {
 	if (!sqlite3 || typeof sqlite3.installOpfsSAHPoolVfs !== 'function')
 		throw new Error('sqliteOPFS vfs "opfs-sahpool" is not available in this sqlite-wasm build.');
 	const pool = await sqlite3.installOpfsSAHPoolVfs(opfsSahPoolOptions);
+	if (pool && typeof pool.isPaused === 'function' && pool.isPaused()
+		&& typeof pool.unpauseVfs === 'function')
+		await pool.unpauseVfs();
 	const DbClass = pool && pool.OpfsSAHPoolDb;
 	if (typeof DbClass !== 'function')
 		throw new Error('sqliteOPFS vfs "opfs-sahpool" is not available in this sqlite-wasm build.');
 	return {
 		db: new DbClass(filename),
 		vfs: pool.vfsName || 'opfs-sahpool',
-		opfs: true
+		opfs: true,
+		importDatabase: typeof pool.importDb === 'function'
+			? (bytes) => pool.importDb(filename, bytes)
+			: undefined,
+		suspend: typeof pool.pauseVfs === 'function'
+			? () => pool.pauseVfs()
+			: undefined
 	};
 }
 
@@ -23400,6 +23621,67 @@ function command(sql, parameters = []) {
 	};
 }
 
+async function cloneDatabaseTo(targetConnectionString, targetVfs, targetOpfsSahPoolOptions) {
+	if (!db || !dbOpenOptions)
+		throw new Error('sqliteOPFS source database is not open.');
+	const sqlite3 = await getSqlite3();
+	const capi = sqlite3 && sqlite3.capi;
+	const supportsPageBackup = !!capi
+		&& typeof capi.sqlite3_backup_init === 'function'
+		&& typeof capi.sqlite3_backup_step === 'function'
+		&& typeof capi.sqlite3_backup_finish === 'function';
+	const targetFilename = normalizeFilename(targetConnectionString);
+	if (targetFilename === db.filename)
+		throw new Error('sqliteOPFS clone source and target must be different databases.');
+	const targetInfo = await createDb(
+		sqlite3,
+		targetFilename,
+		targetVfs || dbOpenOptions.vfs,
+		targetOpfsSahPoolOptions
+	);
+	const targetDb = targetInfo.db;
+	if (!supportsPageBackup) {
+		if (!capi || typeof capi.sqlite3_js_db_export !== 'function'
+			|| typeof targetInfo.importDatabase !== 'function') {
+			targetDb.close();
+			throw new Error('sqliteOPFS runtime cannot clone a SQLite database.');
+		}
+		targetDb.close();
+		const bytes = capi.sqlite3_js_db_export(db.pointer);
+		try {
+			await targetInfo.importDatabase(bytes);
+			return { cloned: true, strategy: 'export-import', byteLength: bytes.byteLength };
+		}
+		finally {
+			if (typeof targetInfo.suspend === 'function')
+				await targetInfo.suspend();
+		}
+	}
+	let backup;
+	let stepResult;
+	try {
+		backup = capi.sqlite3_backup_init(targetDb.pointer, 'main', db.pointer, 'main');
+		if (!backup)
+			throw new Error('sqliteOPFS could not initialize the SQLite backup.');
+		stepResult = capi.sqlite3_backup_step(backup, -1);
+		if (stepResult !== capi.SQLITE_DONE)
+			throw new Error('sqliteOPFS SQLite backup failed with result ' + stepResult + '.');
+	}
+	finally {
+		if (backup)
+			capi.sqlite3_backup_finish(backup);
+		if (targetDb && typeof targetDb.close === 'function')
+			targetDb.close();
+		if (typeof targetInfo.suspend === 'function')
+			await targetInfo.suspend();
+	}
+	return {
+		cloned: true,
+		pageCount: Number(db.selectValue('PRAGMA page_count')) || 0,
+		pageSize: Number(db.selectValue('PRAGMA page_size')) || 0
+	};
+}
+
 function normalizeFilename(connectionString) {
 	const value = String(connectionString || 'orange.sqlite3');
 	return value.startsWith('/') ? value : '/' + value;
@@ -23429,13 +23711,17 @@ function normalizePriority(priority) {
 }
 
 function postResponse(target, id, result, error, elapsedMs) {
-	target.postMessage({
+	const message = {
 		type: 'orange-sqlite-opfs-response',
 		id,
 		result,
 		elapsedMs,
 		error: error ? serializeError(error) : undefined
-	});
+	};
+	const transfer = result instanceof Uint8Array && result.buffer instanceof ArrayBuffer
+		? [result.buffer]
+		: undefined;
+	target.postMessage(message, transfer);
 }
 
 function serializeError(error) {
@@ -26651,6 +26937,7 @@ function requireNewPool$1 () {
 	const pools = requirePools();
 	const newId = requireNewId();
 	const createSqliteOPFSWorkerClient = requireWorkerClient();
+	const normalizeOpfsSahPoolOptions = requireNormalizeOpfsSahPoolOptions();
 	const {
 		acquireCrossTabLock,
 		normalizeLockNamePart
@@ -26671,6 +26958,9 @@ function requireNewPool$1 () {
 		c.__orangeSqliteOPFSRequestedVfs = poolOptions.vfs;
 		c.__orangeCrossTabWriteLock = normalizeCrossTabWriteLockConfig(poolOptions);
 		c.__orangeSqliteOPFSReady = client.ready;
+		c.__orangeAcquireDatabaseAccess = () => acquireOPFSAccessLock(poolOptions, connectionString);
+		c.__orangeSuspendDatabase = suspendDatabase;
+		c.__orangeCloneDatabaseTo = cloneDatabaseTo;
 
 		if (client.ready && typeof client.ready.then === 'function') {
 			client.ready.then((result) => {
@@ -26737,6 +27027,52 @@ function requireNewPool$1 () {
 			if (!readClient)
 				readClient = createSqliteOPFSWorkerClient(connectionString, withOpenOptions(toReadPoolOptions(poolOptions)));
 			return readClient;
+		}
+
+		function suspendDatabase() {
+			const closes = [];
+			if (client && typeof client.suspendDatabase === 'function')
+				closes.push(client.suspendDatabase());
+			else if (client && typeof client.release === 'function')
+				closes.push(client.release());
+			if (readClient && readClient !== client && typeof readClient.suspendDatabase === 'function')
+				closes.push(readClient.suspendDatabase());
+			else if (readClient && readClient !== client && typeof readClient.release === 'function')
+				closes.push(readClient.release());
+			return Promise.all(closes).then(() => undefined);
+		}
+
+		function cloneDatabaseTo(targetConnectionString, targetOptions = {}) {
+			return new Promise((resolve, reject) => {
+				c.connect((error, writer, release) => {
+					if (error)
+						return reject(error);
+					if (!writer || typeof writer.cloneDatabaseTo !== 'function') {
+						release();
+						return reject(new Error('sqliteOPFS worker cannot clone a database.'));
+					}
+					let clone;
+					try {
+						clone = writer.cloneDatabaseTo(targetConnectionString, {
+							vfs: targetOptions.vfs,
+							opfsSahPoolOptions: normalizeOpfsSahPoolOptions(targetOptions, targetConnectionString)
+						});
+					}
+					catch (cloneError) {
+						release(cloneError);
+						reject(cloneError);
+						return;
+					}
+					Promise.resolve(clone)
+						.then((result) => {
+							release();
+							resolve(result);
+						}, (cloneError) => {
+							release(cloneError);
+							reject(cloneError);
+						});
+				}, -1);
+			});
 		}
 
 		function drainWriterQueue() {
@@ -26959,7 +27295,7 @@ function requireDualSyncDatabase () {
 	const createHttpInterceptor = requireHttpInterceptor();
 	const newSyncClient = requireSyncClient();
 	const { createSyncAuto, syncAutoStartSymbol } = requireSyncAuto();
-	const { runSyncSwap } = requireWriteGate();
+	const { getSyncWriteGate, runSyncSwap } = requireWriteGate();
 	const {
 		normalizeCrossTabLockConfig,
 		normalizeLockNamePart,
@@ -26979,6 +27315,7 @@ function requireDualSyncDatabase () {
 	const manifestTable = 'orange_sync_dual_manifest';
 	const deltaTable = 'orange_sync_dual_delta';
 	const deltaChunkTable = 'orange_sync_dual_delta_chunk';
+	const replayTable = 'orange_sync_dual_replay';
 	const manifestId = 'default';
 	const roleA = 'a';
 	const roleB = 'b';
@@ -27057,30 +27394,60 @@ function requireDualSyncDatabase () {
 				fn = options;
 				options = undefined;
 			}
-			return getActiveReadyDb().then(db => db.transaction(options, fn));
+			const run = () => getActiveReadyDb().then(db => db.transaction(options, fn));
+			return options && options.readonly
+				? getSyncWriteGate(router).runWrite(run)
+				: run();
 		}
 
 		function createTransaction(options) {
-			const transactionPromise = getActiveReadyDb().then(db => db.createTransaction(options));
+			let releaseRead = () => {};
+			let readReleased = false;
+			const transactionPromise = Promise.resolve()
+				.then(async () => {
+					if (options && options.readonly)
+						releaseRead = await getSyncWriteGate(router).acquireWrite();
+					return getActiveReadyDb();
+				})
+				.then(db => db.createTransaction(options))
+				.catch((error) => {
+					releaseReadonlyTransaction();
+					throw error;
+				});
 
 			function run(fn) {
 				return transactionPromise.then(transaction => transaction(fn));
 			}
 			run.rollback = function(...args) {
-				return transactionPromise.then(transaction => transaction.rollback(...args));
+				return transactionPromise
+					.then(transaction => transaction.rollback(...args))
+					.finally(releaseReadonlyTransaction);
 			};
 			run.commit = function(...args) {
-				return transactionPromise.then(transaction => transaction.commit(...args));
+				return transactionPromise
+					.then(transaction => transaction.commit(...args))
+					.finally(releaseReadonlyTransaction);
 			};
 			return run;
+
+			function releaseReadonlyTransaction() {
+				if (readReleased)
+					return;
+				readReleased = true;
+				releaseRead();
+			}
 		}
 
 		function query(sql, options) {
-			return getActiveReadyDb().then(db => db.query(sql, options));
+			return getSyncWriteGate(router).runWrite(
+				() => getActiveReadyDb().then(db => db.query(sql, options))
+			);
 		}
 
 		function sqliteFunction(...args) {
-			return getActiveReadyDb().then(db => db.sqliteFunction(...args));
+			return getSyncWriteGate(router).runWrite(
+				() => getActiveReadyDb().then(db => db.sqliteFunction(...args))
+			);
 		}
 
 		async function end() {
@@ -27114,7 +27481,6 @@ function requireDualSyncDatabase () {
 				sync: syncObserved,
 				ensureLocalSchema,
 				resetLocal,
-				discardLocalChanges,
 				start: auto.start,
 				stop: auto.stop,
 				isRunning: auto.isRunning,
@@ -27255,40 +27621,46 @@ function requireDualSyncDatabase () {
 			const stagingRole = manifest.stagingRole;
 			const activeSync = getRoleSyncClient(activeRole);
 			const stagingSync = getRoleSyncClient(stagingRole);
+			await Promise.all([
+				activeSync.ensureLocalSchema(options),
+				stagingSync.ensureLocalSchema(options)
+			]);
 			await ensureSharedClientId(manifest);
 
 			emitSyncProgress('updating-staging', { activeRole, stagingRole });
 			await applyPendingDeltasToRole(stagingRole);
+			await recoverAcceptedReplayRows(activeRole, activeSync);
 
-			const openRows = await readAllOutboxRows(activeSync, ['pending', 'pushed']);
-			await stagingSync[applyOutboxRowsSymbol](openRows, {
-				replay: false,
-				replaceOpen: true
-			});
-			emitSyncProgress('pushing-staging', { activeRole, stagingRole });
-			let stagingPushResult;
+			emitSyncProgress('pushing-active', { activeRole, stagingRole });
 			let pushConflictError;
 			let rejectedMutationIds = new Set();
+			let acceptedMutationCount = 0;
 			try {
-				stagingPushResult = await stagingSync[pushPendingSymbol](options);
+				await activeSync[pushPendingSymbol]({
+					...options,
+					_fileSnapshotRollback: true,
+					_skipConflictRestore: true,
+					_singleMutationBatch: true,
+					async _onAcceptedBeforeCommit(pushResult, acceptedMutations) {
+						await persistAcceptedReplayRows(activeRole, pushResult, acceptedMutations);
+						acceptedMutationCount += acceptedMutations.length;
+					}
+				});
 			}
 			catch (error) {
 				if (isConflictError(error)) {
-					const failedIds = await recordActiveConflict(manifest, activeSync, stagingSync, openRows);
-					if (failedIds.length === 0)
+					const failedIds = failedMutationIds(error);
+					if (failedIds.size === 0)
 						throw error;
 					pushConflictError = error;
-					rejectedMutationIds = new Set(failedIds);
+					rejectedMutationIds = failedIds;
 				}
-				else {
-					await mirrorActivePushAttempts(manifest, activeSync, stagingSync, openRows);
+				else
 					throw error;
-				}
 			}
-			if (!pushConflictError)
-				await acknowledgeActivePushes(manifest, activeSync, stagingSync, stagingPushResult);
-			const needsInitialSwap = stagingPushResult && stagingPushResult.skipped === 'missing-stable-base';
-			const deferStableBaseUntilComplete = needsInitialSwap && openRows.length === 0;
+
+			await applyAcceptedReplayRows(stagingRole, stagingSync);
+			await mirrorFailedOutboxMetadata(activeSync, stagingSync);
 
 			emitSyncProgress('pulling-staging', { activeRole, stagingRole });
 			const pullStagingStartedAtMs = Date.now();
@@ -27301,8 +27673,8 @@ function requireDualSyncDatabase () {
 				result = await stagingSync[syncAndCapturePullJournalSymbol]({
 					...options,
 					_skipPushBeforePull: true,
+					_fileSnapshotRollback: true,
 					_capturePullJournalChunk: deltaSink.write,
-					_deferStableBaseUntilComplete: deferStableBaseUntilComplete,
 					_onPullBatchProgress(progress) {
 						emitSyncProgress('pull-batch-complete', {
 							activeRole,
@@ -27323,7 +27695,6 @@ function requireDualSyncDatabase () {
 					...(pullStagingSummary || {}),
 					deltaFinalizeMs: Math.max(0, Date.now() - deltaFinalizeStartedAtMs),
 					elapsedMs: Math.max(0, Date.now() - pullStagingStartedAtMs),
-					deferredStableBase: deferStableBaseUntilComplete,
 					failed: false
 				});
 			}
@@ -27334,13 +27705,14 @@ function requireDualSyncDatabase () {
 					stagingRole,
 					...(pullStagingSummary || {}),
 					elapsedMs: Math.max(0, Date.now() - pullStagingStartedAtMs),
-					deferredStableBase: deferStableBaseUntilComplete,
 					failed: true
 				});
 				throw error;
 			}
 			let publishedManifest = manifest;
 			let swapped = false;
+			let cloneMs = 0;
+			let deferred;
 
 			emitSyncProgress('waiting-for-write-barrier', { activeRole, stagingRole });
 			await runSyncSwap(router, async () => {
@@ -27348,11 +27720,42 @@ function requireDualSyncDatabase () {
 				assertExpectedManifest(currentManifest, manifest);
 				const finalPendingRows = (await readAllOutboxRows(activeSync, ['pending']))
 					.filter(row => !rejectedMutationIds.has(outboxRowMutationId(row)));
-				await stagingSync[applyOutboxRowsSymbol](finalPendingRows, {
-					replay: true,
-					replaceOpen: false
-				});
-				if (needsInitialSwap || deltaId || openRows.length > 0 || finalPendingRows.length > 0) {
+				if (pushConflictError) {
+					const failedRows = (await readAllOutboxRows(activeSync, ['failed']))
+						.filter(row => rejectedMutationIds.has(outboxRowMutationId(row)));
+					const promotionId = randomUuid();
+					await persistConflictReplayRows(promotionId, finalPendingRows, failedRows);
+					emitSyncProgress('cloning-clean-staging', {
+						activeRole,
+						stagingRole,
+						mutationCount: finalPendingRows.length
+					});
+					const cloneStartedAtMs = Date.now();
+					await cloneRoleDatabase(stagingRole, activeRole);
+					cloneMs = Math.max(0, Date.now() - cloneStartedAtMs);
+					emitSyncProgress('cloned-clean-staging', {
+						activeRole,
+						stagingRole,
+						cloneMs
+					});
+					await markDeltaCopiedByClone(deltaId, activeRole);
+					await applyConflictReplayRows(promotionId, activeRole, stagingRole);
+					emitSyncProgress('swapping', { activeRole, stagingRole });
+					publishedManifest = await publishStagingRole(manifest);
+					swapped = true;
+					await deleteReplayKind(conflictReplayKind(promotionId));
+					return;
+				}
+				if (finalPendingRows.length > 0) {
+					deferred = 'pending-writes';
+					emitSyncProgress('swap-deferred', {
+						activeRole,
+						stagingRole,
+						mutationCount: finalPendingRows.length
+					});
+					return;
+				}
+				if (deltaId || acceptedMutationCount > 0 || Number(result && result.applied || 0) > 0) {
 					emitSyncProgress('swapping', { activeRole, stagingRole });
 					publishedManifest = await publishStagingRole(manifest);
 					swapped = true;
@@ -27365,12 +27768,16 @@ function requireDualSyncDatabase () {
 			emitSyncProgress('complete', {
 				activeRole: publishedManifest.activeRole,
 				stagingRole: publishedManifest.stagingRole,
-				swapped
+				swapped,
+				cloneMs,
+				deferred
 			});
 			const dualResult = withDualSyncResult(result, {
 				...publishedManifest,
 				deltaId,
-				swapped
+				swapped,
+				cloneMs,
+				deferred
 			});
 			if (pushConflictError) {
 				attachRecoveredConflict(pushConflictError, dualResult, rejectedMutationIds);
@@ -27379,85 +27786,205 @@ function requireDualSyncDatabase () {
 			return dualResult;
 		}
 
-		async function acknowledgeActivePushes(manifest, activeSync, stagingSync, pushResult) {
-			const acceptedIds = pushResultMutationIds(pushResult);
-			if (acceptedIds.size === 0)
-				return;
-			const pushedRows = await readAllOutboxRows(stagingSync, ['pushed']);
-			const acknowledgedRows = pushedRows.filter(row => acceptedIds.has(outboxRowMutationId(row)));
-			if (acknowledgedRows.length === 0)
-				return;
-			emitSyncProgress('acknowledging-active-pushes', {
-				activeRole: manifest.activeRole,
-				stagingRole: manifest.stagingRole,
-				mutationCount: acknowledgedRows.length
-			});
-			await runSyncSwap(router, async () => {
-				const currentManifest = await getManifest(true);
-				assertExpectedManifest(currentManifest, manifest);
-				await activeSync[applyOutboxRowsSymbol](acknowledgedRows, {
-					replay: false,
+		async function recoverAcceptedReplayRows(activeRole, activeSync) {
+			const pushedRows = await readAllOutboxRows(activeSync, ['pushed']);
+			for (let i = 0; i < pushedRows.length; i++)
+				await persistReplayRow('accepted', pushedRows[i], true, [activeRole]);
+		}
+
+		async function persistAcceptedReplayRows(activeRole, pushResult, mutations) {
+			const resultsById = new Map((Array.isArray(pushResult && pushResult.results)
+				? pushResult.results
+				: [])
+				.filter(item => item && typeof item.id === 'string')
+				.map(item => [item.id, item]));
+			const pushedAtMs = Date.now();
+			for (let i = 0; i < mutations.length; i++) {
+				const mutation = mutations[i];
+				const row = mutation && mutation.__outboxRow;
+				const id = mutation && mutation.id;
+				const result = resultsById.get(id);
+				if (!row || !result)
+					continue;
+				await persistReplayRow('accepted', {
+					...row,
+					status: 'pushed',
+					last_error: undefined,
+					pushed_at_ms: pushedAtMs,
+					result_json: stringify(result)
+				}, true, [activeRole]);
+			}
+		}
+
+		async function applyAcceptedReplayRows(targetRole, targetSync) {
+			const entries = await readReplayRows('accepted');
+			for (let i = 0; i < entries.length; i++) {
+				const entry = entries[i];
+				if (entry.appliedRoles.includes(targetRole))
+					continue;
+				await targetSync[applyOutboxRowsSymbol]([entry.row], {
+					replay: entry.replayData,
 					replaceOpen: false
 				});
+				await markReplayRowApplied(entry, targetRole);
+			}
+		}
+
+		async function mirrorFailedOutboxMetadata(activeSync, stagingSync) {
+			const failedRows = await readAllOutboxRows(activeSync, ['failed']);
+			if (failedRows.length === 0)
+				return;
+			await stagingSync[applyOutboxRowsSymbol](failedRows, {
+				replay: false,
+				replaceOpen: false
 			});
 		}
 
-		async function recordActiveConflict(manifest, activeSync, stagingSync, openRows) {
-			const stagedIds = new Set(openRows
-				.filter(row => outboxRowStatus(row) === 'pending')
-				.map(outboxRowMutationId)
-				.filter(Boolean));
-			if (stagedIds.size === 0)
-				return [];
-			const failedRows = await readAllOutboxRows(stagingSync, ['failed']);
-			const rejectedRows = failedRows
-				.filter(row => stagedIds.has(outboxRowMutationId(row)));
-			const failedIds = rejectedRows.map(outboxRowMutationId);
-			if (failedIds.length === 0)
-				return [];
-			emitSyncProgress('recording-active-conflict', {
-				activeRole: manifest.activeRole,
-				stagingRole: manifest.stagingRole,
-				mutationCount: failedIds.length
-			});
-			await runSyncSwap(router, async () => {
-				const currentManifest = await getManifest(true);
-				assertExpectedManifest(currentManifest, manifest);
-				await activeSync[applyOutboxRowsSymbol](rejectedRows, {
-					replay: false,
-					replaceOpen: false
-				});
-			});
-			return failedIds;
+		async function persistConflictReplayRows(promotionId, pendingRows, failedRows) {
+			const kind = conflictReplayKind(promotionId);
+			for (let i = 0; i < pendingRows.length; i++)
+				await persistReplayRow(kind, pendingRows[i], true, []);
+			for (let i = 0; i < failedRows.length; i++)
+				await persistReplayRow(kind, failedRows[i], false, []);
 		}
 
-		async function mirrorActivePushAttempts(manifest, activeSync, stagingSync, openRows) {
-			const activeAttempts = new Map(openRows
-				.filter(row => outboxRowStatus(row) === 'pending')
-				.map(row => [outboxRowMutationId(row), outboxRowAttempts(row)])
-				.filter(([id]) => !!id));
-			if (activeAttempts.size === 0)
-				return;
-			const pendingRows = await readAllOutboxRows(stagingSync, ['pending']);
-			const attemptedRows = pendingRows.filter(row => {
-				const id = outboxRowMutationId(row);
-				return activeAttempts.has(id) && outboxRowAttempts(row) > activeAttempts.get(id);
-			});
-			if (attemptedRows.length === 0)
-				return;
-			emitSyncProgress('recording-active-push-attempts', {
-				activeRole: manifest.activeRole,
-				stagingRole: manifest.stagingRole,
-				mutationCount: attemptedRows.length
-			});
-			await runSyncSwap(router, async () => {
-				const currentManifest = await getManifest(true);
-				assertExpectedManifest(currentManifest, manifest);
-				await activeSync[applyOutboxRowsSymbol](attemptedRows, {
+		async function applyConflictReplayRows(promotionId, cleanRole, promotedRole) {
+			const cleanSync = getRoleSyncClient(cleanRole);
+			const promotedSync = getRoleSyncClient(promotedRole);
+			const entries = await readReplayRows(conflictReplayKind(promotionId));
+			for (let i = 0; i < entries.length; i++) {
+				const entry = entries[i];
+				if (!entry.replayData) {
+					await applyOutboxMetadataToBoth(entry.row);
+					continue;
+				}
+				try {
+					await promotedSync[applyOutboxRowsSymbol]([entry.row], {
+						replay: true,
+						replaceOpen: false
+					});
+				}
+				catch (error) {
+					await applyOutboxMetadataToBoth(toFailedReplayRow(entry.row, error));
+				}
+			}
+
+			async function applyOutboxMetadataToBoth(row) {
+				await cleanSync[applyOutboxRowsSymbol]([row], {
 					replay: false,
 					replaceOpen: false
 				});
-			});
+				await promotedSync[applyOutboxRowsSymbol]([row], {
+					replay: false,
+					replaceOpen: false
+				});
+			}
+		}
+
+		async function persistReplayRow(kind, row, replayData, appliedRoles) {
+			const mutationId = outboxRowMutationId(row);
+			if (typeof mutationId !== 'string' || mutationId.length === 0)
+				return;
+			const db = await getCacheDb();
+			await ensureCacheSchema(db);
+			const existing = firstRow(await db.query([
+				`SELECT "applied_roles_json" FROM "${replayTable}"`,
+				`WHERE "kind" = ${sqlStringLiteral(kind)}`,
+				`AND "mutation_id" = ${sqlStringLiteral(mutationId)}`,
+				'LIMIT 1'
+			].join(' ')));
+			const roles = new Set(parseJson(existing && (
+				existing.applied_roles_json ?? existing.APPLIED_ROLES_JSON
+			)) || []);
+			for (const role of appliedRoles || []) {
+				if (isRole(role))
+					roles.add(role);
+			}
+			await db.query([
+				`INSERT INTO "${replayTable}" ("kind", "mutation_id", "row_json", "replay_data", "created_at_ms", "applied_roles_json")`,
+				`VALUES (${sqlStringLiteral(kind)}, ${sqlStringLiteral(mutationId)}, ${sqlStringLiteral(stringify(row))}, ${replayData ? 1 : 0}, ${Date.now()}, ${sqlStringLiteral(JSON.stringify(Array.from(roles)))})`,
+				'ON CONFLICT("kind", "mutation_id") DO UPDATE SET',
+				'"row_json" = excluded."row_json",',
+				'"replay_data" = excluded."replay_data",',
+				'"applied_roles_json" = excluded."applied_roles_json"'
+			].join(' '));
+		}
+
+		async function readReplayRows(kind) {
+			const db = await getCacheDb();
+			await ensureCacheSchema(db);
+			return toRows(await db.query([
+				`SELECT "kind", "mutation_id", "row_json", "replay_data", "created_at_ms", "applied_roles_json" FROM "${replayTable}"`,
+				`WHERE "kind" = ${sqlStringLiteral(kind)}`,
+				'ORDER BY "created_at_ms" ASC, "mutation_id" ASC'
+			].join(' ')))
+				.map(row => ({
+					kind: row.kind ?? row.KIND,
+					mutationId: row.mutation_id ?? row.MUTATION_ID,
+					row: parseJson(row.row_json ?? row.ROW_JSON),
+					replayData: Number(row.replay_data ?? row.REPLAY_DATA) === 1,
+					appliedRoles: parseJson(row.applied_roles_json ?? row.APPLIED_ROLES_JSON) || []
+				}))
+				.filter(entry => entry.row && entry.row === Object(entry.row));
+		}
+
+		async function markReplayRowApplied(entry, role) {
+			const roles = new Set(entry.appliedRoles || []);
+			roles.add(role);
+			const db = await getCacheDb();
+			if (roles.has(roleA) && roles.has(roleB)) {
+				await db.query([
+					`DELETE FROM "${replayTable}" WHERE "kind" = ${sqlStringLiteral(entry.kind)}`,
+					`AND "mutation_id" = ${sqlStringLiteral(entry.mutationId)}`
+				].join(' '));
+				return;
+			}
+			await db.query([
+				`UPDATE "${replayTable}"`,
+				`SET "applied_roles_json" = ${sqlStringLiteral(JSON.stringify(Array.from(roles)))}`,
+				`WHERE "kind" = ${sqlStringLiteral(entry.kind)}`,
+				`AND "mutation_id" = ${sqlStringLiteral(entry.mutationId)}`
+			].join(' '));
+		}
+
+		async function deleteReplayKind(kind) {
+			const db = await getCacheDb();
+			await db.query(`DELETE FROM "${replayTable}" WHERE "kind" = ${sqlStringLiteral(kind)}`);
+		}
+
+		async function cloneRoleDatabase(sourceRole, targetRole) {
+			const sourceDb = getRoleDb(sourceRole);
+			const targetDb = getRoleDb(targetRole);
+			const sourcePool = sourceDb && sourceDb.poolFactory;
+			const targetPool = targetDb && targetDb.poolFactory;
+			if (!sourcePool || typeof sourcePool.__orangeCloneDatabaseTo !== 'function')
+				throw new Error('Dual sync requires SQLite database cloning support.');
+			const releaseTargetAccess = targetPool
+				&& typeof targetPool.__orangeAcquireDatabaseAccess === 'function'
+				? await targetPool.__orangeAcquireDatabaseAccess()
+				: () => {};
+			try {
+				if (targetPool && typeof targetPool.__orangeSuspendDatabase === 'function')
+					await targetPool.__orangeSuspendDatabase();
+				await sourcePool.__orangeCloneDatabaseTo(
+					roleConnectionStrings[targetRole],
+					getRolePoolOptions(targetRole)
+				);
+			}
+			finally {
+				releaseTargetAccess();
+			}
+			clientByRole.delete(targetRole);
+			schemaReadyRoles.delete(targetRole);
+		}
+
+		async function markDeltaCopiedByClone(deltaId, role) {
+			if (!deltaId)
+				return;
+			const deltas = await readDeltas();
+			const delta = deltas.find(item => item.id === deltaId);
+			if (delta && !delta.appliedRoles.includes(role))
+				await markDeltaApplied(delta, role);
 		}
 
 		async function ensureLocalSchema(options = {}) {
@@ -27493,17 +28020,6 @@ function requireDualSyncDatabase () {
 			if (errors.length > 0)
 				throw errors[0];
 			return { reset: true, ...manifest };
-		}
-
-		async function discardLocalChanges(options = {}) {
-			return runWithCrossTabLock(
-				dualSyncLockName,
-				toDualSyncLockConfig(poolOptions && poolOptions.sync, options),
-				() => runSyncSwap(router, async () => {
-					const manifest = await getManifest(true);
-					return getRoleSyncClient(manifest.activeRole).discardLocalChanges(options);
-				})
-			);
 		}
 
 		async function waitForInitialSync() {
@@ -27792,7 +28308,13 @@ function requireDualSyncDatabase () {
 			if (!clientByRole.has(role)) {
 				const getDb = () => getRoleDb(role);
 				const roleClient = roleClientFactory({ db: getDb });
-				roleClient.syncClient = newSyncClient(roleClient, getDb, roleHttpInterceptor, syncInterceptors);
+				roleClient.syncClient = newSyncClient(
+					roleClient,
+					getDb,
+					roleHttpInterceptor,
+					syncInterceptors,
+					{ fileSnapshotRollback: true }
+				);
 				clientByRole.set(role, roleClient);
 				for (const event of eventListeners.keys())
 					attachRoleEvent(event);
@@ -28134,6 +28656,7 @@ function requireDualSyncDatabase () {
 			cacheSchemaPromise = null;
 			await db.query(`DROP TABLE IF EXISTS "${deltaChunkTable}"`);
 			await db.query(`DROP TABLE IF EXISTS "${deltaTable}"`);
+			await db.query(`DROP TABLE IF EXISTS "${replayTable}"`);
 			await db.query(`DROP TABLE IF EXISTS "${manifestTable}"`);
 			await ensureCacheSchema(db);
 			return writeManifest({
@@ -28187,6 +28710,17 @@ function requireDualSyncDatabase () {
 						'"chunk_index" INTEGER NOT NULL,',
 						'"items_json" TEXT NOT NULL,',
 						'PRIMARY KEY ("delta_id", "chunk_index")',
+						');'
+					].join(' '));
+					await db.query([
+						`CREATE TABLE IF NOT EXISTS "${replayTable}" (`,
+						'"kind" TEXT NOT NULL,',
+						'"mutation_id" TEXT NOT NULL,',
+						'"row_json" TEXT NOT NULL,',
+						'"replay_data" INTEGER NOT NULL,',
+						'"created_at_ms" INTEGER NOT NULL,',
+						'"applied_roles_json" TEXT NOT NULL,',
+						'PRIMARY KEY ("kind", "mutation_id")',
 						');'
 					].join(' '));
 					cacheSchemaReady = true;
@@ -28374,27 +28908,35 @@ function requireDualSyncDatabase () {
 		}
 	}
 
-	function pushResultMutationIds(result) {
-		const ids = new Set();
-		const items = Array.isArray(result && result.results) ? result.results : [];
-		for (let i = 0; i < items.length; i++) {
-			const id = items[i] && items[i].id;
-			if (typeof id === 'string' && id.length > 0)
-				ids.add(id);
-		}
-		return ids;
+	function failedMutationIds(error) {
+		const mutations = Array.isArray(error && error.__orangeFailedMutations)
+			? error.__orangeFailedMutations
+			: [];
+		return new Set(mutations
+			.map(mutation => mutation && mutation.id)
+			.filter(id => typeof id === 'string' && id.length > 0));
+	}
+
+	function conflictReplayKind(promotionId) {
+		return `conflict:${promotionId}`;
+	}
+
+	function toFailedReplayRow(row, error) {
+		const attempts = outboxRowAttempts(row);
+		return {
+			...row,
+			status: 'failed',
+			last_error: error && error.message || String(error),
+			attempts: attempts + 1,
+			pushed_at_ms: undefined,
+			result_json: undefined
+		};
 	}
 
 	function outboxRowMutationId(row) {
 		if (!row || row !== Object(row))
 			return undefined;
 		return row.mutation_id ?? row.MUTATION_ID;
-	}
-
-	function outboxRowStatus(row) {
-		if (!row || row !== Object(row))
-			return undefined;
-		return row.status ?? row.STATUS;
 	}
 
 	function outboxRowAttempts(row) {
@@ -28748,11 +29290,7 @@ function requireNewDatabase$1 () {
 
 	function shouldUseDualSyncDatabase(poolOptions) {
 		const sync = poolOptions && poolOptions.sync;
-		if (!sync)
-			return false;
-		if (sync === Object(sync) && sync.dualDataDb === false)
-			return false;
-		return true;
+		return !!sync;
 	}
 
 	newDatabase_1$1 = newDatabase;

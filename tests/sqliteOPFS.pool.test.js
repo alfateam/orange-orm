@@ -296,6 +296,82 @@ describe('sqliteOPFS pool', () => {
 		}
 	});
 
+	test('clones to another OPFS database through the writer worker', async () => {
+		const messages = [];
+		const pool = newPool('source.sqlite3', {
+			vfs: 'opfs-sahpool',
+			prewarmRead: false,
+			createWorker() {
+				return newFakeWorker(messages, (message) => message.method === 'open'
+					? { opened: true, filename: '/source.sqlite3', vfs: 'opfs-sahpool' }
+					: message.method === 'checkout'
+						? { leaseId: 1 }
+						: { cloned: message.method === 'cloneDatabaseTo' });
+			}
+		});
+
+		try {
+			const result = await pool.__orangeCloneDatabaseTo('target.sqlite3', { vfs: 'opfs-sahpool' });
+			const cloneMessage = messages.find(message => message.method === 'cloneDatabaseTo');
+
+			expect(result).toEqual({ cloned: true });
+			expect(cloneMessage).toMatchObject({
+				targetConnectionString: 'target.sqlite3',
+				targetVfs: 'opfs-sahpool',
+				leaseId: 1
+			});
+		}
+		finally {
+			await pool.end();
+		}
+	});
+
+	test('clones inline OPFS databases without transferring the file through the client', async () => {
+		const imports = [];
+		const pool = newPool('source-inline.sqlite3', {
+			vfs: 'opfs-wl',
+			inlineWorker: true,
+			prewarmRead: false,
+			sqlite3InitModule: () => newFakeSqlite3([], [], imports)
+		});
+
+		try {
+			const result = await pool.__orangeCloneDatabaseTo('target-inline.sqlite3', { vfs: 'opfs-wl' });
+
+			expect(result).toMatchObject({
+				cloned: true,
+				strategy: 'export-import',
+				byteLength: 4
+			});
+			expect(imports).toEqual([{
+				filename: '/target-inline.sqlite3',
+				bytes: [1, 2, 3, 4]
+			}]);
+		}
+		finally {
+			await pool.end();
+		}
+	});
+
+	test('suspends an open SAH pool before another worker replaces its database', async () => {
+		const messages = [];
+		const pool = newPool('target.sqlite3', {
+			vfs: 'opfs-sahpool',
+			prewarmRead: false,
+			createWorker: () => newFakeWorker(messages)
+		});
+
+		try {
+			await pool.__orangeSqliteOPFSReady;
+			await pool.__orangeSuspendDatabase();
+
+			expect(messages.map(message => message.method)).toEqual(['open', 'suspendDatabase']);
+		}
+		finally {
+			await pool.end();
+		}
+	});
+
 	test('opens inline worker with OPFS enabled', async () => {
 		const initConfigs = [];
 		const closes = [];
@@ -713,11 +789,16 @@ function newSql(sql) {
 	};
 }
 
-function newFakeSqlite3(closes = [], installOptions = []) {
+function newFakeSqlite3(closes = [], installOptions = [], imports = []) {
 	class FakeDb {
 		constructor(filename) {
 			this.filename = filename;
+			this.pointer = 1;
 			this.changeCount = 0;
+		}
+
+		static async importDb(filename, bytes) {
+			imports.push({ filename, bytes: Array.from(bytes) });
 		}
 
 		exec(options) {
@@ -743,6 +824,9 @@ function newFakeSqlite3(closes = [], installOptions = []) {
 	}
 
 	return {
+		capi: {
+			sqlite3_js_db_export: () => new Uint8Array([1, 2, 3, 4])
+		},
 		oo1: {
 			OpfsDb: FakeDb,
 			OpfsWlDb: FakeDb,
@@ -752,7 +836,8 @@ function newFakeSqlite3(closes = [], installOptions = []) {
 			installOptions.push(options);
 			return {
 				OpfsSAHPoolDb: FakeDb,
-				vfsName: 'opfs-sahpool'
+				vfsName: 'opfs-sahpool',
+				importDb: FakeDb.importDb
 			};
 		}
 	};

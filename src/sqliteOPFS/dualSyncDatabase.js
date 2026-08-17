@@ -6,7 +6,7 @@ const stringify = require('../client/stringify');
 const createHttpInterceptor = require('../client/httpInterceptor');
 const newSyncClient = require('../client/syncClient');
 const { createSyncAuto, syncAutoStartSymbol } = require('../client/syncAuto');
-const { runSyncSwap } = require('../sync/writeGate');
+const { getSyncWriteGate, runSyncSwap } = require('../sync/writeGate');
 const {
 	normalizeCrossTabLockConfig,
 	normalizeLockNamePart,
@@ -26,6 +26,7 @@ const {
 const manifestTable = 'orange_sync_dual_manifest';
 const deltaTable = 'orange_sync_dual_delta';
 const deltaChunkTable = 'orange_sync_dual_delta_chunk';
+const replayTable = 'orange_sync_dual_replay';
 const manifestId = 'default';
 const roleA = 'a';
 const roleB = 'b';
@@ -104,30 +105,60 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 			fn = options;
 			options = undefined;
 		}
-		return getActiveReadyDb().then(db => db.transaction(options, fn));
+		const run = () => getActiveReadyDb().then(db => db.transaction(options, fn));
+		return options && options.readonly
+			? getSyncWriteGate(router).runWrite(run)
+			: run();
 	}
 
 	function createTransaction(options) {
-		const transactionPromise = getActiveReadyDb().then(db => db.createTransaction(options));
+		let releaseRead = () => {};
+		let readReleased = false;
+		const transactionPromise = Promise.resolve()
+			.then(async () => {
+				if (options && options.readonly)
+					releaseRead = await getSyncWriteGate(router).acquireWrite();
+				return getActiveReadyDb();
+			})
+			.then(db => db.createTransaction(options))
+			.catch((error) => {
+				releaseReadonlyTransaction();
+				throw error;
+			});
 
 		function run(fn) {
 			return transactionPromise.then(transaction => transaction(fn));
 		}
 		run.rollback = function(...args) {
-			return transactionPromise.then(transaction => transaction.rollback(...args));
+			return transactionPromise
+				.then(transaction => transaction.rollback(...args))
+				.finally(releaseReadonlyTransaction);
 		};
 		run.commit = function(...args) {
-			return transactionPromise.then(transaction => transaction.commit(...args));
+			return transactionPromise
+				.then(transaction => transaction.commit(...args))
+				.finally(releaseReadonlyTransaction);
 		};
 		return run;
+
+		function releaseReadonlyTransaction() {
+			if (readReleased)
+				return;
+			readReleased = true;
+			releaseRead();
+		}
 	}
 
 	function query(sql, options) {
-		return getActiveReadyDb().then(db => db.query(sql, options));
+		return getSyncWriteGate(router).runWrite(
+			() => getActiveReadyDb().then(db => db.query(sql, options))
+		);
 	}
 
 	function sqliteFunction(...args) {
-		return getActiveReadyDb().then(db => db.sqliteFunction(...args));
+		return getSyncWriteGate(router).runWrite(
+			() => getActiveReadyDb().then(db => db.sqliteFunction(...args))
+		);
 	}
 
 	async function end() {
@@ -161,7 +192,6 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 			sync: syncObserved,
 			ensureLocalSchema,
 			resetLocal,
-			discardLocalChanges,
 			start: auto.start,
 			stop: auto.stop,
 			isRunning: auto.isRunning,
@@ -302,40 +332,46 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		const stagingRole = manifest.stagingRole;
 		const activeSync = getRoleSyncClient(activeRole);
 		const stagingSync = getRoleSyncClient(stagingRole);
+		await Promise.all([
+			activeSync.ensureLocalSchema(options),
+			stagingSync.ensureLocalSchema(options)
+		]);
 		await ensureSharedClientId(manifest);
 
 		emitSyncProgress('updating-staging', { activeRole, stagingRole });
 		await applyPendingDeltasToRole(stagingRole);
+		await recoverAcceptedReplayRows(activeRole, activeSync);
 
-		const openRows = await readAllOutboxRows(activeSync, ['pending', 'pushed']);
-		await stagingSync[applyOutboxRowsSymbol](openRows, {
-			replay: false,
-			replaceOpen: true
-		});
-		emitSyncProgress('pushing-staging', { activeRole, stagingRole });
-		let stagingPushResult;
+		emitSyncProgress('pushing-active', { activeRole, stagingRole });
 		let pushConflictError;
 		let rejectedMutationIds = new Set();
+		let acceptedMutationCount = 0;
 		try {
-			stagingPushResult = await stagingSync[pushPendingSymbol](options);
+			await activeSync[pushPendingSymbol]({
+				...options,
+				_fileSnapshotRollback: true,
+				_skipConflictRestore: true,
+				_singleMutationBatch: true,
+				async _onAcceptedBeforeCommit(pushResult, acceptedMutations) {
+					await persistAcceptedReplayRows(activeRole, pushResult, acceptedMutations);
+					acceptedMutationCount += acceptedMutations.length;
+				}
+			});
 		}
 		catch (error) {
 			if (isConflictError(error)) {
-				const failedIds = await recordActiveConflict(manifest, activeSync, stagingSync, openRows);
-				if (failedIds.length === 0)
+				const failedIds = failedMutationIds(error);
+				if (failedIds.size === 0)
 					throw error;
 				pushConflictError = error;
-				rejectedMutationIds = new Set(failedIds);
+				rejectedMutationIds = failedIds;
 			}
-			else {
-				await mirrorActivePushAttempts(manifest, activeSync, stagingSync, openRows);
+			else
 				throw error;
-			}
 		}
-		if (!pushConflictError)
-			await acknowledgeActivePushes(manifest, activeSync, stagingSync, stagingPushResult);
-		const needsInitialSwap = stagingPushResult && stagingPushResult.skipped === 'missing-stable-base';
-		const deferStableBaseUntilComplete = needsInitialSwap && openRows.length === 0;
+
+		await applyAcceptedReplayRows(stagingRole, stagingSync);
+		await mirrorFailedOutboxMetadata(activeSync, stagingSync);
 
 		emitSyncProgress('pulling-staging', { activeRole, stagingRole });
 		const pullStagingStartedAtMs = Date.now();
@@ -348,8 +384,8 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 			result = await stagingSync[syncAndCapturePullJournalSymbol]({
 				...options,
 				_skipPushBeforePull: true,
+				_fileSnapshotRollback: true,
 				_capturePullJournalChunk: deltaSink.write,
-				_deferStableBaseUntilComplete: deferStableBaseUntilComplete,
 				_onPullBatchProgress(progress) {
 					emitSyncProgress('pull-batch-complete', {
 						activeRole,
@@ -370,7 +406,6 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 				...(pullStagingSummary || {}),
 				deltaFinalizeMs: Math.max(0, Date.now() - deltaFinalizeStartedAtMs),
 				elapsedMs: Math.max(0, Date.now() - pullStagingStartedAtMs),
-				deferredStableBase: deferStableBaseUntilComplete,
 				failed: false
 			});
 		}
@@ -381,13 +416,14 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 				stagingRole,
 				...(pullStagingSummary || {}),
 				elapsedMs: Math.max(0, Date.now() - pullStagingStartedAtMs),
-				deferredStableBase: deferStableBaseUntilComplete,
 				failed: true
 			});
 			throw error;
 		}
 		let publishedManifest = manifest;
 		let swapped = false;
+		let cloneMs = 0;
+		let deferred;
 
 		emitSyncProgress('waiting-for-write-barrier', { activeRole, stagingRole });
 		await runSyncSwap(router, async () => {
@@ -395,11 +431,42 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 			assertExpectedManifest(currentManifest, manifest);
 			const finalPendingRows = (await readAllOutboxRows(activeSync, ['pending']))
 				.filter(row => !rejectedMutationIds.has(outboxRowMutationId(row)));
-			await stagingSync[applyOutboxRowsSymbol](finalPendingRows, {
-				replay: true,
-				replaceOpen: false
-			});
-			if (needsInitialSwap || deltaId || openRows.length > 0 || finalPendingRows.length > 0) {
+			if (pushConflictError) {
+				const failedRows = (await readAllOutboxRows(activeSync, ['failed']))
+					.filter(row => rejectedMutationIds.has(outboxRowMutationId(row)));
+				const promotionId = randomUuid();
+				await persistConflictReplayRows(promotionId, finalPendingRows, failedRows);
+				emitSyncProgress('cloning-clean-staging', {
+					activeRole,
+					stagingRole,
+					mutationCount: finalPendingRows.length
+				});
+				const cloneStartedAtMs = Date.now();
+				await cloneRoleDatabase(stagingRole, activeRole);
+				cloneMs = Math.max(0, Date.now() - cloneStartedAtMs);
+				emitSyncProgress('cloned-clean-staging', {
+					activeRole,
+					stagingRole,
+					cloneMs
+				});
+				await markDeltaCopiedByClone(deltaId, activeRole);
+				await applyConflictReplayRows(promotionId, activeRole, stagingRole, activeSync, stagingSync);
+				emitSyncProgress('swapping', { activeRole, stagingRole });
+				publishedManifest = await publishStagingRole(manifest);
+				swapped = true;
+				await deleteReplayKind(conflictReplayKind(promotionId));
+				return;
+			}
+			if (finalPendingRows.length > 0) {
+				deferred = 'pending-writes';
+				emitSyncProgress('swap-deferred', {
+					activeRole,
+					stagingRole,
+					mutationCount: finalPendingRows.length
+				});
+				return;
+			}
+			if (deltaId || acceptedMutationCount > 0 || Number(result && result.applied || 0) > 0) {
 				emitSyncProgress('swapping', { activeRole, stagingRole });
 				publishedManifest = await publishStagingRole(manifest);
 				swapped = true;
@@ -412,12 +479,16 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		emitSyncProgress('complete', {
 			activeRole: publishedManifest.activeRole,
 			stagingRole: publishedManifest.stagingRole,
-			swapped
+			swapped,
+			cloneMs,
+			deferred
 		});
 		const dualResult = withDualSyncResult(result, {
 			...publishedManifest,
 			deltaId,
-			swapped
+			swapped,
+			cloneMs,
+			deferred
 		});
 		if (pushConflictError) {
 			attachRecoveredConflict(pushConflictError, dualResult, rejectedMutationIds);
@@ -426,85 +497,205 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		return dualResult;
 	}
 
-	async function acknowledgeActivePushes(manifest, activeSync, stagingSync, pushResult) {
-		const acceptedIds = pushResultMutationIds(pushResult);
-		if (acceptedIds.size === 0)
-			return;
-		const pushedRows = await readAllOutboxRows(stagingSync, ['pushed']);
-		const acknowledgedRows = pushedRows.filter(row => acceptedIds.has(outboxRowMutationId(row)));
-		if (acknowledgedRows.length === 0)
-			return;
-		emitSyncProgress('acknowledging-active-pushes', {
-			activeRole: manifest.activeRole,
-			stagingRole: manifest.stagingRole,
-			mutationCount: acknowledgedRows.length
-		});
-		await runSyncSwap(router, async () => {
-			const currentManifest = await getManifest(true);
-			assertExpectedManifest(currentManifest, manifest);
-			await activeSync[applyOutboxRowsSymbol](acknowledgedRows, {
-				replay: false,
+	async function recoverAcceptedReplayRows(activeRole, activeSync) {
+		const pushedRows = await readAllOutboxRows(activeSync, ['pushed']);
+		for (let i = 0; i < pushedRows.length; i++)
+			await persistReplayRow('accepted', pushedRows[i], true, [activeRole]);
+	}
+
+	async function persistAcceptedReplayRows(activeRole, pushResult, mutations) {
+		const resultsById = new Map((Array.isArray(pushResult && pushResult.results)
+			? pushResult.results
+			: [])
+			.filter(item => item && typeof item.id === 'string')
+			.map(item => [item.id, item]));
+		const pushedAtMs = Date.now();
+		for (let i = 0; i < mutations.length; i++) {
+			const mutation = mutations[i];
+			const row = mutation && mutation.__outboxRow;
+			const id = mutation && mutation.id;
+			const result = resultsById.get(id);
+			if (!row || !result)
+				continue;
+			await persistReplayRow('accepted', {
+				...row,
+				status: 'pushed',
+				last_error: undefined,
+				pushed_at_ms: pushedAtMs,
+				result_json: stringify(result)
+			}, true, [activeRole]);
+		}
+	}
+
+	async function applyAcceptedReplayRows(targetRole, targetSync) {
+		const entries = await readReplayRows('accepted');
+		for (let i = 0; i < entries.length; i++) {
+			const entry = entries[i];
+			if (entry.appliedRoles.includes(targetRole))
+				continue;
+			await targetSync[applyOutboxRowsSymbol]([entry.row], {
+				replay: entry.replayData,
 				replaceOpen: false
 			});
+			await markReplayRowApplied(entry, targetRole);
+		}
+	}
+
+	async function mirrorFailedOutboxMetadata(activeSync, stagingSync) {
+		const failedRows = await readAllOutboxRows(activeSync, ['failed']);
+		if (failedRows.length === 0)
+			return;
+		await stagingSync[applyOutboxRowsSymbol](failedRows, {
+			replay: false,
+			replaceOpen: false
 		});
 	}
 
-	async function recordActiveConflict(manifest, activeSync, stagingSync, openRows) {
-		const stagedIds = new Set(openRows
-			.filter(row => outboxRowStatus(row) === 'pending')
-			.map(outboxRowMutationId)
-			.filter(Boolean));
-		if (stagedIds.size === 0)
-			return [];
-		const failedRows = await readAllOutboxRows(stagingSync, ['failed']);
-		const rejectedRows = failedRows
-			.filter(row => stagedIds.has(outboxRowMutationId(row)));
-		const failedIds = rejectedRows.map(outboxRowMutationId);
-		if (failedIds.length === 0)
-			return [];
-		emitSyncProgress('recording-active-conflict', {
-			activeRole: manifest.activeRole,
-			stagingRole: manifest.stagingRole,
-			mutationCount: failedIds.length
-		});
-		await runSyncSwap(router, async () => {
-			const currentManifest = await getManifest(true);
-			assertExpectedManifest(currentManifest, manifest);
-			await activeSync[applyOutboxRowsSymbol](rejectedRows, {
-				replay: false,
-				replaceOpen: false
-			});
-		});
-		return failedIds;
+	async function persistConflictReplayRows(promotionId, pendingRows, failedRows) {
+		const kind = conflictReplayKind(promotionId);
+		for (let i = 0; i < pendingRows.length; i++)
+			await persistReplayRow(kind, pendingRows[i], true, []);
+		for (let i = 0; i < failedRows.length; i++)
+			await persistReplayRow(kind, failedRows[i], false, []);
 	}
 
-	async function mirrorActivePushAttempts(manifest, activeSync, stagingSync, openRows) {
-		const activeAttempts = new Map(openRows
-			.filter(row => outboxRowStatus(row) === 'pending')
-			.map(row => [outboxRowMutationId(row), outboxRowAttempts(row)])
-			.filter(([id]) => !!id));
-		if (activeAttempts.size === 0)
-			return;
-		const pendingRows = await readAllOutboxRows(stagingSync, ['pending']);
-		const attemptedRows = pendingRows.filter(row => {
-			const id = outboxRowMutationId(row);
-			return activeAttempts.has(id) && outboxRowAttempts(row) > activeAttempts.get(id);
-		});
-		if (attemptedRows.length === 0)
-			return;
-		emitSyncProgress('recording-active-push-attempts', {
-			activeRole: manifest.activeRole,
-			stagingRole: manifest.stagingRole,
-			mutationCount: attemptedRows.length
-		});
-		await runSyncSwap(router, async () => {
-			const currentManifest = await getManifest(true);
-			assertExpectedManifest(currentManifest, manifest);
-			await activeSync[applyOutboxRowsSymbol](attemptedRows, {
+	async function applyConflictReplayRows(promotionId, cleanRole, promotedRole) {
+		const cleanSync = getRoleSyncClient(cleanRole);
+		const promotedSync = getRoleSyncClient(promotedRole);
+		const entries = await readReplayRows(conflictReplayKind(promotionId));
+		for (let i = 0; i < entries.length; i++) {
+			const entry = entries[i];
+			if (!entry.replayData) {
+				await applyOutboxMetadataToBoth(entry.row);
+				continue;
+			}
+			try {
+				await promotedSync[applyOutboxRowsSymbol]([entry.row], {
+					replay: true,
+					replaceOpen: false
+				});
+			}
+			catch (error) {
+				await applyOutboxMetadataToBoth(toFailedReplayRow(entry.row, error));
+			}
+		}
+
+		async function applyOutboxMetadataToBoth(row) {
+			await cleanSync[applyOutboxRowsSymbol]([row], {
 				replay: false,
 				replaceOpen: false
 			});
-		});
+			await promotedSync[applyOutboxRowsSymbol]([row], {
+				replay: false,
+				replaceOpen: false
+			});
+		}
+	}
+
+	async function persistReplayRow(kind, row, replayData, appliedRoles) {
+		const mutationId = outboxRowMutationId(row);
+		if (typeof mutationId !== 'string' || mutationId.length === 0)
+			return;
+		const db = await getCacheDb();
+		await ensureCacheSchema(db);
+		const existing = firstRow(await db.query([
+			`SELECT "applied_roles_json" FROM "${replayTable}"`,
+			`WHERE "kind" = ${sqlStringLiteral(kind)}`,
+			`AND "mutation_id" = ${sqlStringLiteral(mutationId)}`,
+			'LIMIT 1'
+		].join(' ')));
+		const roles = new Set(parseJson(existing && (
+			existing.applied_roles_json ?? existing.APPLIED_ROLES_JSON
+		)) || []);
+		for (const role of appliedRoles || []) {
+			if (isRole(role))
+				roles.add(role);
+		}
+		await db.query([
+			`INSERT INTO "${replayTable}" ("kind", "mutation_id", "row_json", "replay_data", "created_at_ms", "applied_roles_json")`,
+			`VALUES (${sqlStringLiteral(kind)}, ${sqlStringLiteral(mutationId)}, ${sqlStringLiteral(stringify(row))}, ${replayData ? 1 : 0}, ${Date.now()}, ${sqlStringLiteral(JSON.stringify(Array.from(roles)))})`,
+			'ON CONFLICT("kind", "mutation_id") DO UPDATE SET',
+			'"row_json" = excluded."row_json",',
+			'"replay_data" = excluded."replay_data",',
+			'"applied_roles_json" = excluded."applied_roles_json"'
+		].join(' '));
+	}
+
+	async function readReplayRows(kind) {
+		const db = await getCacheDb();
+		await ensureCacheSchema(db);
+		return toRows(await db.query([
+			`SELECT "kind", "mutation_id", "row_json", "replay_data", "created_at_ms", "applied_roles_json" FROM "${replayTable}"`,
+			`WHERE "kind" = ${sqlStringLiteral(kind)}`,
+			'ORDER BY "created_at_ms" ASC, "mutation_id" ASC'
+		].join(' ')))
+			.map(row => ({
+				kind: row.kind ?? row.KIND,
+				mutationId: row.mutation_id ?? row.MUTATION_ID,
+				row: parseJson(row.row_json ?? row.ROW_JSON),
+				replayData: Number(row.replay_data ?? row.REPLAY_DATA) === 1,
+				appliedRoles: parseJson(row.applied_roles_json ?? row.APPLIED_ROLES_JSON) || []
+			}))
+			.filter(entry => entry.row && entry.row === Object(entry.row));
+	}
+
+	async function markReplayRowApplied(entry, role) {
+		const roles = new Set(entry.appliedRoles || []);
+		roles.add(role);
+		const db = await getCacheDb();
+		if (roles.has(roleA) && roles.has(roleB)) {
+			await db.query([
+				`DELETE FROM "${replayTable}" WHERE "kind" = ${sqlStringLiteral(entry.kind)}`,
+				`AND "mutation_id" = ${sqlStringLiteral(entry.mutationId)}`
+			].join(' '));
+			return;
+		}
+		await db.query([
+			`UPDATE "${replayTable}"`,
+			`SET "applied_roles_json" = ${sqlStringLiteral(JSON.stringify(Array.from(roles)))}`,
+			`WHERE "kind" = ${sqlStringLiteral(entry.kind)}`,
+			`AND "mutation_id" = ${sqlStringLiteral(entry.mutationId)}`
+		].join(' '));
+	}
+
+	async function deleteReplayKind(kind) {
+		const db = await getCacheDb();
+		await db.query(`DELETE FROM "${replayTable}" WHERE "kind" = ${sqlStringLiteral(kind)}`);
+	}
+
+	async function cloneRoleDatabase(sourceRole, targetRole) {
+		const sourceDb = getRoleDb(sourceRole);
+		const targetDb = getRoleDb(targetRole);
+		const sourcePool = sourceDb && sourceDb.poolFactory;
+		const targetPool = targetDb && targetDb.poolFactory;
+		if (!sourcePool || typeof sourcePool.__orangeCloneDatabaseTo !== 'function')
+			throw new Error('Dual sync requires SQLite database cloning support.');
+		const releaseTargetAccess = targetPool
+			&& typeof targetPool.__orangeAcquireDatabaseAccess === 'function'
+			? await targetPool.__orangeAcquireDatabaseAccess()
+			: () => {};
+		try {
+			if (targetPool && typeof targetPool.__orangeSuspendDatabase === 'function')
+				await targetPool.__orangeSuspendDatabase();
+			await sourcePool.__orangeCloneDatabaseTo(
+				roleConnectionStrings[targetRole],
+				getRolePoolOptions(targetRole)
+			);
+		}
+		finally {
+			releaseTargetAccess();
+		}
+		clientByRole.delete(targetRole);
+		schemaReadyRoles.delete(targetRole);
+	}
+
+	async function markDeltaCopiedByClone(deltaId, role) {
+		if (!deltaId)
+			return;
+		const deltas = await readDeltas();
+		const delta = deltas.find(item => item.id === deltaId);
+		if (delta && !delta.appliedRoles.includes(role))
+			await markDeltaApplied(delta, role);
 	}
 
 	async function ensureLocalSchema(options = {}) {
@@ -540,17 +731,6 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		if (errors.length > 0)
 			throw errors[0];
 		return { reset: true, ...manifest };
-	}
-
-	async function discardLocalChanges(options = {}) {
-		return runWithCrossTabLock(
-			dualSyncLockName,
-			toDualSyncLockConfig(poolOptions && poolOptions.sync, options),
-			() => runSyncSwap(router, async () => {
-				const manifest = await getManifest(true);
-				return getRoleSyncClient(manifest.activeRole).discardLocalChanges(options);
-			})
-		);
 	}
 
 	async function waitForInitialSync() {
@@ -839,7 +1019,13 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		if (!clientByRole.has(role)) {
 			const getDb = () => getRoleDb(role);
 			const roleClient = roleClientFactory({ db: getDb });
-			roleClient.syncClient = newSyncClient(roleClient, getDb, roleHttpInterceptor, syncInterceptors);
+			roleClient.syncClient = newSyncClient(
+				roleClient,
+				getDb,
+				roleHttpInterceptor,
+				syncInterceptors,
+				{ fileSnapshotRollback: true }
+			);
 			clientByRole.set(role, roleClient);
 			for (const event of eventListeners.keys())
 				attachRoleEvent(event);
@@ -1181,6 +1367,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		cacheSchemaPromise = null;
 		await db.query(`DROP TABLE IF EXISTS "${deltaChunkTable}"`);
 		await db.query(`DROP TABLE IF EXISTS "${deltaTable}"`);
+		await db.query(`DROP TABLE IF EXISTS "${replayTable}"`);
 		await db.query(`DROP TABLE IF EXISTS "${manifestTable}"`);
 		await ensureCacheSchema(db);
 		return writeManifest({
@@ -1234,6 +1421,17 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 					'"chunk_index" INTEGER NOT NULL,',
 					'"items_json" TEXT NOT NULL,',
 					'PRIMARY KEY ("delta_id", "chunk_index")',
+					');'
+				].join(' '));
+				await db.query([
+					`CREATE TABLE IF NOT EXISTS "${replayTable}" (`,
+					'"kind" TEXT NOT NULL,',
+					'"mutation_id" TEXT NOT NULL,',
+					'"row_json" TEXT NOT NULL,',
+					'"replay_data" INTEGER NOT NULL,',
+					'"created_at_ms" INTEGER NOT NULL,',
+					'"applied_roles_json" TEXT NOT NULL,',
+					'PRIMARY KEY ("kind", "mutation_id")',
 					');'
 				].join(' '));
 				cacheSchemaReady = true;
@@ -1421,27 +1619,35 @@ function attachRecoveredConflict(error, result, mutationIds) {
 	}
 }
 
-function pushResultMutationIds(result) {
-	const ids = new Set();
-	const items = Array.isArray(result && result.results) ? result.results : [];
-	for (let i = 0; i < items.length; i++) {
-		const id = items[i] && items[i].id;
-		if (typeof id === 'string' && id.length > 0)
-			ids.add(id);
-	}
-	return ids;
+function failedMutationIds(error) {
+	const mutations = Array.isArray(error && error.__orangeFailedMutations)
+		? error.__orangeFailedMutations
+		: [];
+	return new Set(mutations
+		.map(mutation => mutation && mutation.id)
+		.filter(id => typeof id === 'string' && id.length > 0));
+}
+
+function conflictReplayKind(promotionId) {
+	return `conflict:${promotionId}`;
+}
+
+function toFailedReplayRow(row, error) {
+	const attempts = outboxRowAttempts(row);
+	return {
+		...row,
+		status: 'failed',
+		last_error: error && error.message || String(error),
+		attempts: attempts + 1,
+		pushed_at_ms: undefined,
+		result_json: undefined
+	};
 }
 
 function outboxRowMutationId(row) {
 	if (!row || row !== Object(row))
 		return undefined;
 	return row.mutation_id ?? row.MUTATION_ID;
-}
-
-function outboxRowStatus(row) {
-	if (!row || row !== Object(row))
-		return undefined;
-	return row.status ?? row.STATUS;
 }
 
 function outboxRowAttempts(row) {

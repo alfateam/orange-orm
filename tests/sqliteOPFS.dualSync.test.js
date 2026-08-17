@@ -17,7 +17,7 @@ describe('sqliteOPFS dual sync database', () => {
 		await db.end();
 	});
 
-	test('can disable dual routing for sqliteOPFS sync', async () => {
+	test('ignores the legacy dualDataDb false option and keeps dual routing', async () => {
 		const db = newDatabase('app.sqlite3', {
 			sync: { url: '/rdb', dualDataDb: false },
 			createWorker() {
@@ -25,7 +25,7 @@ describe('sqliteOPFS dual sync database', () => {
 			}
 		});
 
-		expect(db.__orangeSyncIdentity).toBe('sqliteOPFS:app.sqlite3');
+		expect(db.__orangeSyncIdentity).toBe('sqliteOPFS:app.sqlite3:dual');
 
 		await db.end();
 	});

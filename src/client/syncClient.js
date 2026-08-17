@@ -46,7 +46,7 @@ const setClientIdSymbol = typeof Symbol === 'function'
 	? Symbol.for('orange-orm.syncClient.setClientId')
 	: '__orangeOrmSyncClientSetClientId';
 
-function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
+function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, internalOptions = {}) {
 	const sinceByScope = new Map();
 	const ensuredInternalTables = new WeakMap();
 	const syncStateTable = 'orange_sync_state';
@@ -61,6 +61,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 	const initialReadyListeners = new Set();
 	const eventListeners = new Map();
 	const syncDbByDb = new WeakMap();
+	const fileSnapshotRollbackDefault = internalOptions.fileSnapshotRollback === true;
 	let initialReadyEmitted = false;
 	let localSchemaReadyPromise = null;
 	let localSchemaReadyResult = null;
@@ -68,11 +69,9 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 	const lockedSync = withCrossTabSyncLock(sync);
 	const lockedEnsureLocalSchema = withCrossTabSyncLock(ensureLocalSchema);
 	const lockedResetLocal = withCrossTabSyncLock(resetLocal);
-	const lockedDiscardLocalChanges = withCrossTabSyncLock(discardLocalChanges);
 	const serializeSyncWork = createAsyncSerializer();
 	const queuedSync = serializeSyncWork(lockedSync);
 	const queuedEnsureLocalSchema = serializeSyncWork(lockedEnsureLocalSchema);
-	const queuedDiscardLocalChanges = serializeSyncWork(lockedDiscardLocalChanges);
 	const observedSync = observeSyncMethod('sync', queuedSync);
 	const auto = createSyncAuto({
 		sync: observedSync
@@ -82,7 +81,6 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 		sync: observedSync,
 		ensureLocalSchema: queuedEnsureLocalSchema,
 		resetLocal: lockedResetLocal,
-		discardLocalChanges: queuedDiscardLocalChanges,
 		start: auto.start,
 		stop: auto.stop,
 		isRunning: auto.isRunning,
@@ -160,6 +158,8 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 			pullOptions._onPullStagingSummary = options._onPullStagingSummary;
 		if (options._skipPushBeforePull === true)
 			pullOptions._skipPushBeforePull = true;
+		if (usesFileSnapshotRollback(options))
+			pullOptions._fileSnapshotRollback = true;
 		return pull(pullOptions);
 	}
 
@@ -169,20 +169,33 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 		if (!syncConfig)
 			throw new Error('Sync is not configured. Add sync in sqlite options: sqlite(connectionString, { sync: ... })');
 		const configuredTables = resolveSyncTables(db, syncConfig.tables, client);
-		const hadStableBase = await hasStableBase(db, configuredTables);
+		const fileSnapshotRollback = usesFileSnapshotRollback(options);
+		const hadStableBase = fileSnapshotRollback || await hasStableBase(db, configuredTables);
 		if (!hadStableBase)
 			return { phase: 'push', applied: 0, duplicates: 0, results: [], skipped: 'missing-stable-base' };
-		const pushConfig = resolvePushConfig(syncConfig, normalizePullOptions(options));
-		return pushBeforePull(db, syncConfig, hadStableBase, pushConfig);
+		const pushConfig = {
+			...resolvePushConfig(syncConfig, normalizePullOptions(options)),
+			...(options._singleMutationBatch === true ? { maxMutationsPerBatch: 1 } : {})
+		};
+		return pushBeforePull(db, syncConfig, hadStableBase, pushConfig, {
+			...options,
+			_skipConflictRestore: fileSnapshotRollback || options._skipConflictRestore === true
+		});
 	}
 
 	async function ensureLocalSchema(options = {}) {
-		const result = await prepareLocalSyncSchema(normalizeSyncOptions(options), { allowMissingSync: true });
+		const result = await prepareLocalSyncSchema(normalizeSyncOptions(options), {
+			allowMissingSync: true,
+			fileSnapshotRollback: fileSnapshotRollbackDefault
+		});
 		return localSchemaReadyResultToPublic(result);
 	}
 
 	async function ensureLocalSchemaReady() {
-		const result = await getLocalSchemaReady({ allowMissingSync: true });
+		const result = await getLocalSchemaReady({
+			allowMissingSync: true,
+			fileSnapshotRollback: fileSnapshotRollbackDefault
+		});
 		return localSchemaReadyResultToPublic(result);
 	}
 
@@ -269,20 +282,28 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 			normalizedOptions._onPullStagingSummary = options._onPullStagingSummary;
 		if (options && options._skipPushBeforePull === true)
 			normalizedOptions._skipPushBeforePull = true;
+		if (usesFileSnapshotRollback(options))
+			normalizedOptions._fileSnapshotRollback = true;
 		const {
 			db,
 			syncConfig,
 			pullConfig,
 			configuredTables
-		} = await prepareLocalSyncSchema(normalizedOptions);
-		const hadStableBase = await hasStableBase(db, configuredTables);
+		} = await prepareLocalSyncSchema(normalizedOptions, {
+			fileSnapshotRollback: usesFileSnapshotRollback(normalizedOptions)
+		});
+		const hadStableBase = usesFileSnapshotRollback(normalizedOptions)
+			|| await hasStableBase(db, configuredTables);
 		if (!hadStableBase)
 			return runSyncMaintenance(db, () => pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase, normalizedOptions));
 		return pullCore(db, syncConfig, pullConfig, configuredTables, hadStableBase, normalizedOptions);
 	}
 
 	async function prepareLocalSyncSchema(options = {}, prepareOptions = {}) {
-		const result = await getLocalSchemaReady(prepareOptions);
+		const result = await getLocalSchemaReady({
+			...prepareOptions,
+			fileSnapshotRollback: usesFileSnapshotRollback(options)
+		});
 		if (result.skipped) {
 			if (prepareOptions.allowMissingSync)
 				return result;
@@ -304,7 +325,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 				return result;
 			});
 		}
-		localSchemaReadyPromise = prepareLocalSyncSchemaCore()
+		localSchemaReadyPromise = prepareLocalSyncSchemaCore(prepareOptions)
 			.then((result) => {
 				if (!result.skipped)
 					localSchemaReadyResult = result;
@@ -324,7 +345,11 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 		localSchemaReadyResult = null;
 	}
 
-	async function prepareLocalSyncSchemaCore() {
+	function usesFileSnapshotRollback(options) {
+		return fileSnapshotRollbackDefault || !!(options && options._fileSnapshotRollback === true);
+	}
+
+	async function prepareLocalSyncSchemaCore(prepareOptions = {}) {
 		const db = toSyncDb(await getDb());
 		const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
 		if (!syncConfig)
@@ -336,7 +361,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 			throw new Error('Sync pull requires mapped tables or configured tables. Set sync.tables when the client has no table map.');
 		const schemaResult = await runSyncMaintenance(db, async () => {
 			const ensuredSchema = await ensureSyncSchema(db, client, configuredTables, syncConfig.schema);
-			await cleanupSyncStorage(db, configuredTables);
+			await cleanupSyncStorage(db, configuredTables, prepareOptions.fileSnapshotRollback === true);
 			return ensuredSchema;
 		});
 		return {
@@ -363,6 +388,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 			_capturePullJournal: !!options._capturePullJournal,
 			_capturePullJournalChunk: options._capturePullJournalChunk,
 			_deferStableBaseUntilComplete: options._deferStableBaseUntilComplete === true,
+			_fileSnapshotRollback: options._fileSnapshotRollback === true,
 			_onPullBatchProgress: options._onPullBatchProgress,
 			_onPullStagingSummary: options._onPullStagingSummary,
 			_syncInterceptors: interceptors,
@@ -405,7 +431,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 			clearEnsuredSyncSchema(db);
 			initialReadyEmitted = false;
 			const schemaResult = await ensureSyncSchema(db, client, configuredTables, syncConfig.schema);
-			await cleanupSyncStorage(db, configuredTables);
+			await cleanupSyncStorage(db, configuredTables, fileSnapshotRollbackDefault);
 			return {
 				reset: true,
 				tables: configuredTables,
@@ -415,26 +441,6 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 				scope: schemaResult && schemaResult.scope,
 				sql: schemaResult && schemaResult.sql
 			};
-		});
-	}
-
-	async function discardLocalChanges() {
-		const db = toSyncDb(await getDb());
-		const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
-		if (!syncConfig)
-			throw new Error('Sync is not configured. Add sync in sqlite options: sqlite(connectionString, { sync: ... })');
-		const configuredTables = resolveSyncTables(db, syncConfig.tables, client);
-		if (!await hasStableBase(db, configuredTables))
-			throw new Error('Cannot discard local changes before initial sync has completed.');
-		await runSyncMaintenance(db, async () => {
-			const openRows = await readReplayMutationRows(db, 10000);
-			await restoreStableBase(db);
-			await ensureSyncOutboxTable(db);
-			await db.query([
-				`DELETE FROM "${syncOutboxTable}"`,
-				'WHERE "status" IN (\'pending\', \'pushed\')'
-			].join(' '));
-			clearOutboxOperationMemory(openRows);
 		});
 	}
 
@@ -545,6 +551,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 		let applied = 0;
 		let processedItems = 0;
 		const touchedTables = new Set();
+		const fileSnapshotRollback = usesFileSnapshotRollback(options);
 		await tryEnableForeignKeys(db);
 		if (applyConfig)
 			await applyPullJournalItemsInChunks();
@@ -562,8 +569,9 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 		async function applyPullJournalItemsInSingleTransaction() {
 			await client.transaction(async (tx) => {
 				await tryDeferForeignKeys(tx);
-				await ensureStableBaseTables(tx, configuredTables);
-				const baseByName = await readStableBaseEntriesByName(tx);
+				if (!fileSnapshotRollback)
+					await ensureStableBaseTables(tx, configuredTables);
+				const baseByName = fileSnapshotRollback ? undefined : await readStableBaseEntriesByName(tx);
 				let hasItems = false;
 				for (;;) {
 					const batch = await readNextBatch();
@@ -573,7 +581,9 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 						continue;
 					hasItems = true;
 					trackTouchedTables(batch);
-					applied += await applyPullJournalBatchOnTx(tx, batch, defaultPatchOptions, baseByName);
+					applied += await applyPullJournalBatchOnTx(tx, batch, defaultPatchOptions, baseByName, {
+						deferStableBase: fileSnapshotRollback
+					});
 					await reportBatchApplied(batch.length);
 				}
 				assertJournalItemCountComplete();
@@ -596,10 +606,13 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 				hasItems = true;
 				await client.transaction(async (tx) => {
 					await tryDeferForeignKeys(tx);
-					await ensureStableBaseTables(tx, configuredTables);
-					const baseByName = await readStableBaseEntriesByName(tx);
+					if (!fileSnapshotRollback)
+						await ensureStableBaseTables(tx, configuredTables);
+					const baseByName = fileSnapshotRollback ? undefined : await readStableBaseEntriesByName(tx);
 					trackTouchedTables(chunk);
-					applied += await applyPullJournalBatchOnTx(tx, chunk, defaultPatchOptions, baseByName);
+					applied += await applyPullJournalBatchOnTx(tx, chunk, defaultPatchOptions, baseByName, {
+						deferStableBase: fileSnapshotRollback
+					});
 					if (chunk.length > 0 && applyConfig.foreignKeyCheck === 'chunk')
 						await validateForeignKeys(tx);
 				}, { suppressSyncOutbox: true });
@@ -706,8 +719,12 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 		}
 		catch (e) {
 			if (isConflictError(e)) {
-				await rollbackFailedPushBatch(db, pending, e);
+				if (options._skipConflictRestore === true)
+					await markFailedPushBatch(db, pending, e);
+				else
+					await rollbackFailedPushBatch(db, pending, e);
 				emitOperationErrors(pending, e, false);
+				attachFailedPushMutations(e, pending);
 			}
 			else {
 				await markPendingMutationAttempts(db, pending, e);
@@ -715,19 +732,26 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 			}
 			throw e;
 		}
+		const acceptedBeforeCommit = acceptedMutationsForResult(result, pending);
+		if (typeof options._onAcceptedBeforeCommit === 'function')
+			await options._onAcceptedBeforeCommit(result, acceptedBeforeCommit);
 		const acceptedMutations = await markPushedMutations(db, result, pending);
 		attachAcceptedPushMutations(result, acceptedMutations);
 		return result;
 	}
 
-	async function pushBeforePull(db, syncConfig, hasBase, resolvedPushConfig) {
+	async function pushBeforePull(db, syncConfig, hasBase, resolvedPushConfig, options = {}) {
 		if (!hasBase)
 			return;
 		const pushConfig = resolvedPushConfig || resolvePushConfig(syncConfig);
 		const maxBatches = resolveMaxPushBatches();
 		const results = [];
 		for (let i = 0; i < maxBatches; i++) {
-			const result = await pushPending({ _syncConfig: syncConfig, _pushConfig: pushConfig });
+			const result = await pushPending({
+				...options,
+				_syncConfig: syncConfig,
+				_pushConfig: pushConfig
+			});
 			if (!didPushBatchAdvance(result))
 				break;
 			results.push(result);
@@ -766,6 +790,15 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 
 	async function rollbackFailedPushBatch(db, attemptedMutations, error) {
 		return runSyncMaintenance(db, () => rollbackFailedPushBatchCore(db, attemptedMutations, error));
+	}
+
+	async function markFailedPushBatch(db, attemptedMutations, error) {
+		await ensureSyncOutboxTable(db);
+		for (let i = 0; i < attemptedMutations.length; i++) {
+			const row = failedOutboxRow(attemptedMutations[i], error);
+			if (row)
+				await insertOutboxRow(db, row);
+		}
 	}
 
 	async function rollbackFailedPushBatchCore(db, attemptedMutations, error) {
@@ -872,8 +905,9 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 		const capturePullJournalChunk = typeof options._capturePullJournalChunk === 'function'
 			? options._capturePullJournalChunk
 			: null;
+		const fileSnapshotRollback = usesFileSnapshotRollback(options);
 		const deferStableBaseUntilComplete = options._deferStableBaseUntilComplete === true;
-		const stagingTimings = newPullStagingTimings(deferStableBaseUntilComplete);
+		const stagingTimings = newPullStagingTimings(deferStableBaseUntilComplete || fileSnapshotRollback);
 		let capturedStreamItemCount = 0;
 		let capturedApplicableItemCount = 0;
 		const streamedTables = new Set();
@@ -941,7 +975,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 			await client.transaction(async (tx) => {
 				if (hasJournalItems && (!applyConfig || applyConfig.foreignKeyCheck === 'final'))
 					await validateForeignKeys(tx);
-				if (deferStableBaseUntilComplete) {
+				if (deferStableBaseUntilComplete && !fileSnapshotRollback) {
 					const bulkStableBaseStartedAtMs = Date.now();
 					await copyTablesToStableBase(tx, options.tables);
 					stagingTimings.bulkStableBaseMs += elapsedMs(bulkStableBaseStartedAtMs);
@@ -957,7 +991,8 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 		async function applyPullJournalInSingleTransaction(session) {
 			await client.transaction(async (tx) => {
 				await tryDeferForeignKeys(tx);
-				await ensureStableBaseTables(tx, options.tables);
+				if (!fileSnapshotRollback)
+					await ensureStableBaseTables(tx, options.tables);
 				const batches = await readPullJournalBatches(tx, scopeKey);
 				const hasJournalItems = batches.length > 0;
 				const touchedTables = new Set();
@@ -969,11 +1004,13 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 					const upsertItems = batch.filter(x => x.op !== 'D' && x.row !== undefined);
 					if (deleteItems.length > 0) {
 						applied += await applyDeleteItemsOnTx(tx, deleteItems, defaultPatchOptions);
-						await applyDeleteItemsToStableBase(tx, deleteItems);
+						if (!fileSnapshotRollback)
+							await applyDeleteItemsToStableBase(tx, deleteItems);
 					}
 					if (upsertItems.length > 0) {
 						applied += await applyRowsPayloadOnTx(tx, upsertItems, defaultPatchOptions);
-						await applyRowsPayloadToStableBase(tx, upsertItems);
+						if (!fileSnapshotRollback)
+							await applyRowsPayloadToStableBase(tx, upsertItems);
 					}
 				}
 				if (hasJournalItems)
@@ -989,7 +1026,8 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 		async function applyPullJournalInChunks(session, applyConfig) {
 			let items = [];
 			await client.transaction(async (tx) => {
-				await ensureStableBaseTables(tx, options.tables);
+				if (!fileSnapshotRollback)
+					await ensureStableBaseTables(tx, options.tables);
 				items = flattenPullJournalBatches(await readPullJournalBatches(tx, scopeKey));
 			}, { suppressSyncOutbox: true });
 			const touchedTables = new Set();
@@ -997,7 +1035,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 				const chunk = items.slice(offset, offset + applyConfig.maxRowsPerTransaction);
 				await client.transaction(async (tx) => {
 					await tryDeferForeignKeys(tx);
-					const baseByName = await readStableBaseEntriesByName(tx);
+					const baseByName = fileSnapshotRollback ? undefined : await readStableBaseEntriesByName(tx);
 					for (let i = 0; i < chunk.length; i++) {
 						const item = chunk[i];
 						if (item && typeof item.table === 'string')
@@ -1007,7 +1045,8 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 						tx,
 						chunk,
 						defaultPatchOptions,
-						baseByName
+						baseByName,
+						{ deferStableBase: fileSnapshotRollback }
 					);
 					if (chunk.length > 0 && applyConfig.foreignKeyCheck === 'chunk')
 						await validateForeignKeys(tx);
@@ -1039,9 +1078,10 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 			if (!session)
 				session = newPullSession(scopeKey, options.since, streamApply);
 			if (streamApply) {
-				await client.transaction(async (tx) => {
-					await ensureStableBaseTables(tx, options.tables);
-				}, { suppressSyncOutbox: true });
+				if (!fileSnapshotRollback)
+					await client.transaction(async (tx) => {
+						await ensureStableBaseTables(tx, options.tables);
+					}, { suppressSyncOutbox: true });
 				if (hasPersistedSession) {
 					const persistedItems = await readPullJournalItemsPaged(db, scopeKey);
 					await captureStreamItems(persistedItems);
@@ -1105,7 +1145,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 						streamApply ? {
 							applyConfig,
 							defaultPatchOptions,
-							deferStableBaseUntilComplete,
+							deferStableBaseUntilComplete: deferStableBaseUntilComplete || fileSnapshotRollback,
 							onApplied(count, items) {
 								applied += count;
 								for (let i = 0; i < items.length; i++)
@@ -1126,7 +1166,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 							: Math.max(0, batch.rowsReadyAtMs - batch.createdAtMs),
 						deltaPersistMs,
 						elapsedMs: elapsedMs(batchStartedAtMs),
-						deferredStableBase: deferStableBaseUntilComplete,
+						deferredStableBase: deferStableBaseUntilComplete || fileSnapshotRollback,
 						...persisted.timings
 					};
 					addPullBatchTimings(stagingTimings, batchProgress);
@@ -1486,7 +1526,8 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 					applied += entry.patch.length;
 				}
 				await validateForeignKeys(tx);
-				await copyTablesToStableBase(tx, tablePatches.map(x => x.table));
+				if (!usesFileSnapshotRollback(options))
+					await copyTablesToStableBase(tx, tablePatches.map(x => x.table));
 			}, { suppressSyncOutbox: true });
 		}
 		return {
@@ -2052,15 +2093,6 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 		return readMutationRowsByStatus(db, ['pending', 'pushed'], limit, excludeIds);
 	}
 
-	function clearOutboxOperationMemory(rows) {
-		const list = Array.isArray(rows) ? rows : [];
-		for (let i = 0; i < list.length; i++) {
-			const id = list[i] && (list[i].mutation_id ?? list[i].MUTATION_ID);
-			if (typeof id === 'string')
-				deleteSyncOperationMemory(id);
-		}
-	}
-
 	async function readMutationRowsByStatus(db, statuses, limit, excludeIds, after) {
 		await ensureSyncOutboxTable(db);
 		const allowedStatuses = (Array.isArray(statuses) ? statuses : [])
@@ -2202,6 +2234,28 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 				result.set(mutation.id, mutation);
 		}
 		return result;
+	}
+
+	function acceptedMutationsForResult(result, attemptedMutations) {
+		const attemptedById = mutationsById(attemptedMutations);
+		const items = Array.isArray(result && result.results) ? result.results : [];
+		return items
+			.map(item => item && attemptedById.get(item.id))
+			.filter(Boolean);
+	}
+
+	function attachFailedPushMutations(error, mutations) {
+		if (!error || error !== Object(error))
+			return;
+		try {
+			Object.defineProperty(error, '__orangeFailedMutations', {
+				value: Array.isArray(mutations) ? mutations : [],
+				configurable: true
+			});
+		}
+		catch (_error) {
+			// The outbox already contains the failed status when a custom error cannot be annotated.
+		}
 	}
 
 	function failedOutboxRow(mutation, error) {
@@ -2593,8 +2647,13 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors) {
 			.filter(name => typeof name === 'string' && name.length > 0);
 	}
 
-	async function cleanupSyncStorage(db, tableNames) {
+	async function cleanupSyncStorage(db, tableNames, fileSnapshotRollback = false) {
 		await cleanupLegacySyncState(db);
+		if (fileSnapshotRollback) {
+			await dropExistingBaseTables(db);
+			await db.query(`DROP TABLE IF EXISTS "${syncBaseTable}"`);
+			return;
+		}
 		await cleanupInactiveStableBase(db, tableNames);
 	}
 

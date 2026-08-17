@@ -70,9 +70,12 @@ describe('sqliteOPFS dual sync integration', () => {
 		closeTasks.push(() => localDb.close());
 		const progressEvents = [];
 		const pushedMutationIds = [];
+		const pushedBatchSizes = [];
 		const offProgress = localDb.syncClient.on('sync-progress', event => progressEvents.push(event));
 		closeTasks.push(() => offProgress());
 		const capturePushId = localDb.syncClient.interceptors.request.use(config => {
+			if (config?.data?.phase === 'push' && Array.isArray(config.data.mutations))
+				pushedBatchSizes.push(config.data.mutations.length);
 			if (config?.data?.phase === 'push' && Array.isArray(config.data.mutations))
 				pushedMutationIds.push(...config.data.mutations.map(mutation => mutation.id));
 			return config;
@@ -129,9 +132,14 @@ describe('sqliteOPFS dual sync integration', () => {
 			stableBaseMs: 0,
 			failed: false
 		});
-		const baseTables = await roleB.query('SELECT "base_name" FROM "orange_sync_base_tables" WHERE "name" = \'project\'');
-		const baseRows = await roleB.query(`SELECT COUNT(*) AS "count" FROM "${baseTables[0].base_name}"`);
-		expect(Number(baseRows[0].count)).toBe(1002);
+		for (const roleDb of [roleA, roleB]) {
+			const baseTables = await roleDb.query([
+				'SELECT "name" FROM sqlite_schema',
+				'WHERE "type" = \'table\' AND ("name" = \'orange_sync_base_tables\'',
+				'OR "name" LIKE \'orange_sync_base_data_%\')'
+			].join(' '));
+			expect(baseTables).toHaveLength(0);
+		}
 
 		const localProject = await localDb.project.getById('p1');
 		localProject.title = 'One pushed locally';
@@ -187,13 +195,14 @@ describe('sqliteOPFS dual sync integration', () => {
 		const [thirdSyncResult, nextSyncResult] = await Promise.all([writeDuringSync, ...repeatedSyncs]);
 		localDb.syncClient.interceptors.request.eject(interceptorId);
 		expect(thirdSyncResult.__orangeDualSync).toMatchObject({
-			activeRole: 'a',
-			stagingRole: 'b',
-			swapped: true
-		});
-		expect(nextSyncResult.__orangeDualSync).toMatchObject({
 			activeRole: 'b',
 			stagingRole: 'a',
+			swapped: false,
+			deferred: 'pending-writes'
+		});
+		expect(nextSyncResult.__orangeDualSync).toMatchObject({
+			activeRole: 'a',
+			stagingRole: 'b',
 			swapped: true
 		});
 		expect(progressEvents.filter(event => event.phase === 'queued-next')).toHaveLength(1);
@@ -201,11 +210,12 @@ describe('sqliteOPFS dual sync integration', () => {
 		expect((await localDb.project.getById('p2')).title).toBe('Two changed during swap');
 		expect((await remoteDb.project.getById('p2')).title).toBe('Two changed during swap');
 		expect(pushedMutationIds.filter(id => id === mutationCreatedDuringSync)).toHaveLength(1);
+		expect(pushedBatchSizes.every(size => size === 1)).toBe(true);
 
 		const fourthSyncResult = await localDb.syncClient.sync();
 		expect(fourthSyncResult.__orangeDualSync).toMatchObject({
-			activeRole: 'b',
-			stagingRole: 'a',
+			activeRole: 'a',
+			stagingRole: 'b',
 			swapped: false
 		});
 		expect((await remoteDb.project.getById('p2')).title).toBe('Two changed during swap');
@@ -216,8 +226,8 @@ describe('sqliteOPFS dual sync integration', () => {
 		const roleBRows = await roleB.query('SELECT "id", "title" FROM "project" ORDER BY "id"');
 
 		expect(noOpSyncResult.__orangeDualSync).toMatchObject({
-			activeRole: 'b',
-			stagingRole: 'a',
+			activeRole: 'a',
+			stagingRole: 'b',
 			swapped: false
 		});
 		expect(await deltaDb.query('SELECT "id" FROM "orange_sync_dual_delta"')).toHaveLength(0);
@@ -244,13 +254,11 @@ describe('sqliteOPFS dual sync integration', () => {
 		const fallbackSummary = fallbackProgress.find(event => event.phase === 'pull-staging-summary');
 
 		expect(fallbackSummary).toMatchObject({
-			deferredStableBase: false,
+			deferredStableBase: true,
 			failed: false
 		});
 		expect((await localDb.project.getById('local-before-bootstrap')).title).toBe('Local before bootstrap');
-		expect(await remoteDb.query(
-			'SELECT "id" FROM "project" WHERE "id" = \'local-before-bootstrap\''
-		)).toHaveLength(0);
+		expect((await remoteDb.project.getById('local-before-bootstrap')).title).toBe('Local before bootstrap');
 
 		await localDb.syncClient.sync();
 		expect((await remoteDb.project.getById('local-before-bootstrap')).title).toBe('Local before bootstrap');
@@ -310,7 +318,7 @@ describe('sqliteOPFS dual sync integration', () => {
 		}
 	}, 60000);
 
-	test('sends a conflict once from staging and rejects it in both roles', async () => {
+	test('sends a conflict once from active and rejects it in both roles', async () => {
 		const remoteDb = map({
 			db: con => con.pglite(undefined, { size: 1 })
 		});
@@ -326,12 +334,14 @@ describe('sqliteOPFS dual sync integration', () => {
 		]);
 
 		const pushedMutationIds = [];
+		const pushedBatchSizes = [];
 		let failNextPush = false;
 		let failNextPull = false;
 		const app = express();
 		app.use(express.json({ limit: '2mb' }));
 		app.use('/rdb', (request, response, next) => {
 			if (request.body?.phase === 'push' && Array.isArray(request.body.mutations)) {
+				pushedBatchSizes.push(request.body.mutations.length);
 				pushedMutationIds.push(...request.body.mutations.map(mutation => mutation.id));
 				if (failNextPush) {
 					failNextPush = false;
@@ -419,7 +429,9 @@ describe('sqliteOPFS dual sync integration', () => {
 		expect(conflictError?.syncResult?.__orangeDualSync).toMatchObject({
 			swapped: true
 		});
+		expect(conflictError?.syncResult?.__orangeDualSync.cloneMs).toBeGreaterThanOrEqual(0);
 		expect(pushedMutationIds.filter(id => id === conflictMutationId)).toHaveLength(1);
+		expect(pushedBatchSizes.every(size => size === 1)).toBe(true);
 		expect(conflictEvents).toHaveLength(1);
 		expect((await localDb.project.getById('conflict')).title).toBe('Conflict remote');
 
@@ -432,11 +444,18 @@ describe('sqliteOPFS dual sync integration', () => {
 		closeTasks.push(() => roleA.close());
 		closeTasks.push(() => roleB.close());
 		for (const roleDb of [roleA, roleB]) {
+			expect((await roleDb.project.getById('conflict')).title).toBe('Conflict remote');
 			const failed = await roleDb.query([
 				'SELECT "mutation_id" FROM "orange_sync_outbox"',
 				`WHERE "mutation_id" = '${conflictMutationId}' AND "status" = 'failed'`
 			].join(' '));
 			expect(failed).toHaveLength(1);
+			const stableBaseTables = await roleDb.query([
+				'SELECT "name" FROM sqlite_schema',
+				'WHERE "type" = \'table\' AND ("name" = \'orange_sync_base_tables\'',
+				'OR "name" LIKE \'orange_sync_base_data_%\')'
+			].join(' '));
+			expect(stableBaseTables).toHaveLength(0);
 		}
 
 		const next = await localDb.project.getById('next');

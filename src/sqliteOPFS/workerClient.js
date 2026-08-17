@@ -24,6 +24,8 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 	return {
 		executeQuery,
 		executeCommand,
+		cloneDatabaseTo,
+		suspendDatabase,
 		checkout,
 		close,
 		getOpenInfo,
@@ -38,6 +40,30 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 
 	function executeCommand(query, callback) {
 		executeCommandCore(query, callback);
+	}
+
+	function cloneDatabaseTo(targetConnectionString, targetOptions = {}) {
+		if (closed)
+			return Promise.reject(new Error('sqliteOPFS worker client closed.'));
+		if (typeof targetConnectionString !== 'string' || targetConnectionString.length === 0)
+			return Promise.reject(new Error('sqliteOPFS clone target must be a database filename.'));
+		return ensureOpen()
+			.then(() => request('cloneDatabaseTo', {
+				targetConnectionString,
+				targetVfs: normalizeVfs(targetOptions.vfs || requestedVfs),
+				targetOpfsSahPoolOptions: targetOptions.opfsSahPoolOptions
+			}))
+			.then(response => response.result);
+	}
+
+	function suspendDatabase() {
+		if (closed || !openPromise)
+			return Promise.resolve();
+		return openPromise
+			.then(() => request('suspendDatabase'))
+			.finally(() => {
+				openPromise = null;
+			});
 	}
 
 	function executeQueryCore(query, callback, leaseId) {
@@ -96,6 +122,8 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 			return {
 				executeQuery,
 				executeCommand,
+				cloneDatabaseTo,
+				suspendDatabase,
 				getOpenInfo,
 				reset,
 				releaseCheckout: () => Promise.resolve()
@@ -106,6 +134,14 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 			},
 			executeCommand(query, callback) {
 				executeCommandCore(query, callback, leaseId);
+			},
+			cloneDatabaseTo(targetConnectionString, targetOptions = {}) {
+				return request('cloneDatabaseTo', {
+					targetConnectionString,
+					targetVfs: normalizeVfs(targetOptions.vfs || requestedVfs),
+					targetOpfsSahPoolOptions: targetOptions.opfsSahPoolOptions,
+					leaseId
+				}).then(response => response.result);
 			},
 			getOpenInfo,
 			reset,
@@ -122,12 +158,13 @@ function createSqliteOPFSWorkerClient(connectionString, options = {}) {
 		return new Promise((resolve, reject) => {
 			pending.set(id, { resolve, reject });
 			try {
-				worker.postMessage({
+				const message = {
 					type: 'orange-sqlite-opfs-request',
 					id,
 					method,
 					...payload
-				});
+				};
+				worker.postMessage(message);
 			}
 			catch (e) {
 				pending.delete(id);
@@ -317,6 +354,7 @@ let sqlite3Promise;
 let db;
 let dbOpenOptions;
 let dbOpenInfo;
+let dbVfsSuspender;
 let operationQueue = Promise.resolve();
 let activeLeaseId;
 let nextLeaseId = 1;
@@ -424,6 +462,8 @@ async function dispatch(message) {
 		return openDb(message.connectionString, message.busyTimeoutMs, message.vfs, message.opfsSahPoolOptions);
 	if (message.method === 'close')
 		return closeDb();
+	if (message.method === 'suspendDatabase')
+		return suspendDatabase();
 	if (message.leaseId !== undefined && message.leaseId !== activeLeaseId)
 		throw new Error('sqliteOPFS checkout is not active.');
 	if (!db)
@@ -432,6 +472,12 @@ async function dispatch(message) {
 		return query(message.sql, message.parameters);
 	if (message.method === 'command')
 		return command(message.sql, message.parameters);
+	if (message.method === 'cloneDatabaseTo')
+		return cloneDatabaseTo(
+			message.targetConnectionString,
+			message.targetVfs,
+			message.targetOpfsSahPoolOptions
+		);
 	throw new Error('Unknown sqliteOPFS worker method "' + message.method + '".');
 }
 
@@ -443,6 +489,7 @@ async function openDb(connectionString, busyTimeoutMs = 5000, vfs, opfsSahPoolOp
 	const filename = normalizeFilename(connectionString);
 	const dbInfo = await createDb(sqlite3, filename, vfs, opfsSahPoolOptions);
 	db = dbInfo.db;
+	dbVfsSuspender = dbInfo.suspend;
 	db.exec('PRAGMA busy_timeout=' + (Number.parseInt(busyTimeoutMs, 10) || 5000));
 	dbOpenInfo = {
 		opened: true,
@@ -458,6 +505,15 @@ function closeDb() {
 		db.close();
 	db = null;
 	return { closed: true };
+}
+
+async function suspendDatabase() {
+	closeDb();
+	const suspend = dbVfsSuspender;
+	dbVfsSuspender = undefined;
+	if (typeof suspend === 'function')
+		await suspend();
+	return { suspended: true };
 }
 
 function openDbFromLastOptions(connectionString) {
@@ -480,7 +536,10 @@ function createOpfsWlDb(sqlite3, filename) {
 	return {
 		db: new DbClass(filename),
 		vfs: 'opfs-wl',
-		opfs: true
+		opfs: true,
+		importDatabase: typeof DbClass.importDb === 'function'
+			? (bytes) => DbClass.importDb(filename, bytes)
+			: undefined
 	};
 }
 
@@ -488,13 +547,22 @@ async function createOpfsSahPoolDb(sqlite3, filename, opfsSahPoolOptions) {
 	if (!sqlite3 || typeof sqlite3.installOpfsSAHPoolVfs !== 'function')
 		throw new Error('sqliteOPFS vfs "opfs-sahpool" is not available in this sqlite-wasm build.');
 	const pool = await sqlite3.installOpfsSAHPoolVfs(opfsSahPoolOptions);
+	if (pool && typeof pool.isPaused === 'function' && pool.isPaused()
+		&& typeof pool.unpauseVfs === 'function')
+		await pool.unpauseVfs();
 	const DbClass = pool && pool.OpfsSAHPoolDb;
 	if (typeof DbClass !== 'function')
 		throw new Error('sqliteOPFS vfs "opfs-sahpool" is not available in this sqlite-wasm build.');
 	return {
 		db: new DbClass(filename),
 		vfs: pool.vfsName || 'opfs-sahpool',
-		opfs: true
+		opfs: true,
+		importDatabase: typeof pool.importDb === 'function'
+			? (bytes) => pool.importDb(filename, bytes)
+			: undefined,
+		suspend: typeof pool.pauseVfs === 'function'
+			? () => pool.pauseVfs()
+			: undefined
 	};
 }
 
@@ -532,6 +600,67 @@ function command(sql, parameters = []) {
 	};
 }
 
+async function cloneDatabaseTo(targetConnectionString, targetVfs, targetOpfsSahPoolOptions) {
+	if (!db || !dbOpenOptions)
+		throw new Error('sqliteOPFS source database is not open.');
+	const sqlite3 = await getSqlite3();
+	const capi = sqlite3 && sqlite3.capi;
+	const supportsPageBackup = !!capi
+		&& typeof capi.sqlite3_backup_init === 'function'
+		&& typeof capi.sqlite3_backup_step === 'function'
+		&& typeof capi.sqlite3_backup_finish === 'function';
+	const targetFilename = normalizeFilename(targetConnectionString);
+	if (targetFilename === db.filename)
+		throw new Error('sqliteOPFS clone source and target must be different databases.');
+	const targetInfo = await createDb(
+		sqlite3,
+		targetFilename,
+		targetVfs || dbOpenOptions.vfs,
+		targetOpfsSahPoolOptions
+	);
+	const targetDb = targetInfo.db;
+	if (!supportsPageBackup) {
+		if (!capi || typeof capi.sqlite3_js_db_export !== 'function'
+			|| typeof targetInfo.importDatabase !== 'function') {
+			targetDb.close();
+			throw new Error('sqliteOPFS runtime cannot clone a SQLite database.');
+		}
+		targetDb.close();
+		const bytes = capi.sqlite3_js_db_export(db.pointer);
+		try {
+			await targetInfo.importDatabase(bytes);
+			return { cloned: true, strategy: 'export-import', byteLength: bytes.byteLength };
+		}
+		finally {
+			if (typeof targetInfo.suspend === 'function')
+				await targetInfo.suspend();
+		}
+	}
+	let backup;
+	let stepResult;
+	try {
+		backup = capi.sqlite3_backup_init(targetDb.pointer, 'main', db.pointer, 'main');
+		if (!backup)
+			throw new Error('sqliteOPFS could not initialize the SQLite backup.');
+		stepResult = capi.sqlite3_backup_step(backup, -1);
+		if (stepResult !== capi.SQLITE_DONE)
+			throw new Error('sqliteOPFS SQLite backup failed with result ' + stepResult + '.');
+	}
+	finally {
+		if (backup)
+			capi.sqlite3_backup_finish(backup);
+		if (targetDb && typeof targetDb.close === 'function')
+			targetDb.close();
+		if (typeof targetInfo.suspend === 'function')
+			await targetInfo.suspend();
+	}
+	return {
+		cloned: true,
+		pageCount: Number(db.selectValue('PRAGMA page_count')) || 0,
+		pageSize: Number(db.selectValue('PRAGMA page_size')) || 0
+	};
+}
+
 function normalizeFilename(connectionString) {
 	const value = String(connectionString || 'orange.sqlite3');
 	return value.startsWith('/') ? value : '/' + value;
@@ -561,13 +690,17 @@ function normalizePriority(priority) {
 }
 
 function postResponse(target, id, result, error, elapsedMs) {
-	target.postMessage({
+	const message = {
 		type: 'orange-sqlite-opfs-response',
 		id,
 		result,
 		elapsedMs,
 		error: error ? serializeError(error) : undefined
-	});
+	};
+	const transfer = result instanceof Uint8Array && result.buffer instanceof ArrayBuffer
+		? [result.buffer]
+		: undefined;
+	target.postMessage(message, transfer);
 }
 
 function serializeError(error) {

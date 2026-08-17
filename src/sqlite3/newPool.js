@@ -12,6 +12,26 @@ function newPool(connectionString, poolOptions) {
 
 	c.connect = pool.connect;
 	c.end = promisify(boundEnd);
+	c.__orangeCloneDatabaseTo = function(targetConnectionString) {
+		return new Promise((resolve, reject) => {
+			pool.connect((error, client, release) => {
+				if (error)
+					return reject(error);
+				if (!client || typeof client.backup !== 'function') {
+					release();
+					return reject(new Error('SQLite client cannot clone a database.'));
+				}
+				Promise.resolve(client.backup(targetConnectionString))
+					.then((result) => {
+						release();
+						resolve(result);
+					}, (backupError) => {
+						release(backupError);
+						reject(backupError);
+					});
+			});
+		});
+	};
 	pools[id] = c;
 	return c;
 }

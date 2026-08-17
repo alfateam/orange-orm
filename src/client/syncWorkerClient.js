@@ -23,7 +23,6 @@ function createSyncWorkerClient(worker, options = {}) {
 		sync: request.bind(null, 'sync'),
 		ensureLocalSchema: request.bind(null, 'ensureLocalSchema'),
 		resetLocal: request.bind(null, 'resetLocal'),
-		discardLocalChanges: request.bind(null, 'discardLocalChanges'),
 		start: request.bind(null, 'start'),
 		stop: request.bind(null, 'stop'),
 		isRunning: request.bind(null, 'isRunning'),

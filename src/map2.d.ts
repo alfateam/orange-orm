@@ -1263,7 +1263,6 @@ export type DBClient<
     sync(options?: SyncOptions): Promise<void>;
     ensureLocalSchema(options?: SyncOptions): Promise<SyncLocalSchemaResult<M>>;
     resetLocal(options?: SyncResetLocalOptions<M>): Promise<SyncResetLocalResult<M>>;
-    discardLocalChanges(): Promise<void>;
     start(): Promise<void>;
     stop(): Promise<void>;
     isRunning(): Promise<boolean>;

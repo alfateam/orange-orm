@@ -1,6 +1,7 @@
 const pools = require('../pools');
 const newId = require('../newId');
 const createSqliteOPFSWorkerClient = require('./workerClient');
+const normalizeOpfsSahPoolOptions = require('./normalizeOpfsSahPoolOptions');
 const {
 	acquireCrossTabLock,
 	normalizeLockNamePart
@@ -21,6 +22,9 @@ function newPool(connectionString, poolOptions) {
 	c.__orangeSqliteOPFSRequestedVfs = poolOptions.vfs;
 	c.__orangeCrossTabWriteLock = normalizeCrossTabWriteLockConfig(poolOptions);
 	c.__orangeSqliteOPFSReady = client.ready;
+	c.__orangeAcquireDatabaseAccess = () => acquireOPFSAccessLock(poolOptions, connectionString);
+	c.__orangeSuspendDatabase = suspendDatabase;
+	c.__orangeCloneDatabaseTo = cloneDatabaseTo;
 
 	if (client.ready && typeof client.ready.then === 'function') {
 		client.ready.then((result) => {
@@ -87,6 +91,52 @@ function newPool(connectionString, poolOptions) {
 		if (!readClient)
 			readClient = createSqliteOPFSWorkerClient(connectionString, withOpenOptions(toReadPoolOptions(poolOptions)));
 		return readClient;
+	}
+
+	function suspendDatabase() {
+		const closes = [];
+		if (client && typeof client.suspendDatabase === 'function')
+			closes.push(client.suspendDatabase());
+		else if (client && typeof client.release === 'function')
+			closes.push(client.release());
+		if (readClient && readClient !== client && typeof readClient.suspendDatabase === 'function')
+			closes.push(readClient.suspendDatabase());
+		else if (readClient && readClient !== client && typeof readClient.release === 'function')
+			closes.push(readClient.release());
+		return Promise.all(closes).then(() => undefined);
+	}
+
+	function cloneDatabaseTo(targetConnectionString, targetOptions = {}) {
+		return new Promise((resolve, reject) => {
+			c.connect((error, writer, release) => {
+				if (error)
+					return reject(error);
+				if (!writer || typeof writer.cloneDatabaseTo !== 'function') {
+					release();
+					return reject(new Error('sqliteOPFS worker cannot clone a database.'));
+				}
+				let clone;
+				try {
+					clone = writer.cloneDatabaseTo(targetConnectionString, {
+						vfs: targetOptions.vfs,
+						opfsSahPoolOptions: normalizeOpfsSahPoolOptions(targetOptions, targetConnectionString)
+					});
+				}
+				catch (cloneError) {
+					release(cloneError);
+					reject(cloneError);
+					return;
+				}
+				Promise.resolve(clone)
+					.then((result) => {
+						release();
+						resolve(result);
+					}, (cloneError) => {
+						release(cloneError);
+						reject(cloneError);
+					});
+			}, -1);
+		});
 	}
 
 	function drainWriterQueue() {

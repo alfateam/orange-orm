@@ -129,11 +129,7 @@ function newSingleDatabase(connectionString, poolOptions) {
 
 function shouldUseDualSyncDatabase(poolOptions) {
 	const sync = poolOptions && poolOptions.sync;
-	if (!sync)
-		return false;
-	if (sync === Object(sync) && sync.dualDataDb === false)
-		return false;
-	return true;
+	return !!sync;
 }
 
 module.exports = newDatabase;

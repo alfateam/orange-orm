@@ -82,22 +82,13 @@ describe('db worker rpc', () => {
 		expect(result).toEqual({ skipped: false, tables: ['customer'] });
 	});
 
-	test('routes discardLocalChanges through worker sync client', async () => {
-		let calls = 0;
-		const bridge = createBridge({
-			syncClient: {
-				discardLocalChanges: async () => {
-					calls += 1;
-				}
-			}
-		}, { autoStart: false });
+	test('does not expose removed discardLocalChanges through worker sync client', async () => {
+		const bridge = createBridge({ syncClient: {} }, { autoStart: false });
 		const workerClient = rdb.createDbWorkerClient(bridge.worker);
 
-		await workerClient.syncClient.discardLocalChanges();
+		expect(workerClient.syncClient.discardLocalChanges).toBeUndefined();
 		workerClient.close();
 		bridge.handler.stop();
-
-		expect(calls).toBe(1);
 	});
 
 	test('routes table reads and writes through worker db', async () => {
