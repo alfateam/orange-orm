@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 
 const {
 	acquireSyncWrite,
+	runSyncRead,
 	runSyncMaintenance,
 	runSyncSwap,
 	runSyncWrite
@@ -78,6 +79,64 @@ describe('sync write gate', () => {
 			'maintenance:end',
 			'write'
 		]);
+	});
+
+	test('cross-context swap drains shared reads and blocks later reads', async () => {
+		const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+		Object.defineProperty(globalThis, 'navigator', {
+			configurable: true,
+			value: { locks: createFakeWebLocks() }
+		});
+		try {
+			const firstDb = createFakeCrossTabWriteDb('shared-read-swap');
+			const secondDb = createFakeCrossTabWriteDb('shared-read-swap');
+			const events = [];
+			const firstRelease = newDeferred();
+			const secondRelease = newDeferred();
+			const swapRelease = newDeferred();
+			firstDb.__orangeBeforeSyncWrite = async () => events.push('refresh:read');
+			secondDb.__orangeBeforeSyncWrite = async () => events.push('refresh:swap');
+			const firstRead = runSyncRead(firstDb, async () => {
+				events.push('read:first:start');
+				await firstRelease.promise;
+				events.push('read:first:end');
+			});
+			const secondRead = runSyncRead(firstDb, async () => {
+				events.push('read:second:start');
+				await secondRelease.promise;
+				events.push('read:second:end');
+			});
+			await waitUntil(() => events.includes('read:first:start') && events.includes('read:second:start'));
+
+			const swap = runSyncSwap(secondDb, async () => {
+				events.push('swap:start');
+				await swapRelease.promise;
+				events.push('swap:end');
+			});
+			await waitUntil(() => events.includes('refresh:swap'));
+			await wait(0);
+			const thirdRead = runSyncRead(firstDb, async () => {
+				events.push('read:third');
+			});
+			await wait(0);
+
+			expect(events).not.toContain('swap:start');
+			expect(events).not.toContain('read:third');
+			firstRelease.resolve();
+			secondRelease.resolve();
+			await waitUntil(() => events.includes('swap:start'));
+			expect(events).not.toContain('read:third');
+
+			swapRelease.resolve();
+			await Promise.all([firstRead, secondRead, swap, thirdRead]);
+			expect(events.indexOf('read:first:end')).toBeLessThan(events.indexOf('swap:start'));
+			expect(events.indexOf('read:second:end')).toBeLessThan(events.indexOf('swap:start'));
+			expect(events.indexOf('swap:end')).toBeLessThan(events.indexOf('read:third'));
+			expect(events[events.indexOf('read:third') - 1]).toBe('refresh:read');
+		}
+		finally {
+			restoreGlobalNavigator(originalNavigator);
+		}
 	});
 
 	test('initial sync holds maintenance gate while bootstrap pull is in flight', async () => {
@@ -351,37 +410,52 @@ function createFakeWorkerPool() {
 function createFakeCrossTabWriteDb(name) {
 	return {
 		__sqliteSync: { url: '/rdb' },
-		__orangeCrossTabWriteLock: { enabled: true, name }
+		__orangeCrossTabWriteLock: { enabled: true, name },
+		__orangeCrossTabReadLock: { enabled: true, name: `${name}:read` }
 	};
 }
 
 function createFakeWebLocks() {
-	const queues = new Map();
-	const active = new Set();
+	const states = new Map();
 	return {
-		request(name, _options, callback) {
+		request(name, options, callback) {
 			return new Promise((resolve, reject) => {
-				const queue = queues.get(name) || [];
-				queue.push({ callback, resolve, reject });
-				queues.set(name, queue);
+				const state = states.get(name) || { active: [], queue: [] };
+				state.queue.push({
+					callback,
+					mode: options && options.mode === 'shared' ? 'shared' : 'exclusive',
+					reject,
+					resolve
+				});
+				states.set(name, state);
 				drain(name);
 			});
 		}
 	};
 
 	function drain(name) {
-		if (active.has(name))
+		const state = states.get(name);
+		if (!state || state.queue.length === 0)
 			return;
-		const queue = queues.get(name);
-		const entry = queue && queue.shift();
-		if (!entry)
+		if (state.active.some(entry => entry.mode === 'exclusive'))
 			return;
-		active.add(name);
+		const next = state.queue[0];
+		if (next.mode === 'exclusive') {
+			if (state.active.length === 0)
+				start(name, state, state.queue.shift());
+			return;
+		}
+		while (state.queue.length > 0 && state.queue[0].mode === 'shared')
+			start(name, state, state.queue.shift());
+	}
+
+	function start(name, state, entry) {
+		state.active.push(entry);
 		Promise.resolve()
 			.then(entry.callback)
 			.then(entry.resolve, entry.reject)
 			.finally(() => {
-				active.delete(name);
+				state.active = state.active.filter(activeEntry => activeEntry !== entry);
 				drain(name);
 			});
 	}

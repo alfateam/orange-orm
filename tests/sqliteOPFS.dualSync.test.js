@@ -5,6 +5,7 @@ const newDatabase = require('../src/sqliteOPFS/newDatabase');
 const rdb = require('../src/client/index');
 const count = require('../src/table/count');
 const { ensureLocalSchemaReadySymbol } = require('../src/client/syncClient');
+const { runSyncSwap } = require('../src/sync/writeGate');
 
 describe('sqliteOPFS dual sync database', () => {
 	test('enables dual routing for sqliteOPFS sync by default', async () => {
@@ -63,7 +64,104 @@ describe('sqliteOPFS dual sync database', () => {
 		}]);
 	});
 
-	test('uses the cached manifest for repeated regular queries', async () => {
+	test('waits for a cross-context swap and refreshes the active role before querying', async () => {
+		const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+		Object.defineProperty(globalThis, 'navigator', {
+			configurable: true,
+			value: { locks: createFakeWebLocks() }
+		});
+		try {
+			const fixture = newFixture({
+				activeRole: 'a',
+				stagingRole: 'b',
+				updatedAtMs: 100,
+				generation: 0,
+				clientId: 'fixture-client'
+			});
+			const db = newDualSyncDatabase('app.sqlite3', {
+				sync: { url: '/rdb', dualDataDb: true }
+			}, fixture.createSingleDatabase);
+			await db.query('SELECT before swap');
+			const swapRelease = newDeferred();
+			let swapStarted = false;
+			const syncContextDb = {
+				__sqliteSync: db.__sqliteSync,
+				__orangeCrossTabWriteLock: db.__orangeCrossTabWriteLock,
+				__orangeCrossTabReadLock: db.__orangeCrossTabReadLock
+			};
+			const swap = runSyncSwap(syncContextDb, async () => {
+				swapStarted = true;
+				await swapRelease.promise;
+				fixture.manifest = {
+					activeRole: 'b',
+					stagingRole: 'a',
+					updatedAtMs: 200,
+					generation: 1,
+					clientId: 'fixture-client'
+				};
+			});
+			await waitUntil(() => swapStarted);
+			let queryCompleted = false;
+			const query = db.query('SELECT during swap').then((rows) => {
+				queryCompleted = true;
+				return rows;
+			});
+			await wait(0);
+
+			expect(queryCompleted).toBe(false);
+			swapRelease.resolve();
+			await swap;
+			expect(await query).toEqual([{
+				connectionString: 'app.__orange_sync_b.sqlite3',
+				sql: 'SELECT during swap'
+			}]);
+		}
+		finally {
+			restoreGlobalNavigator(originalNavigator);
+		}
+	});
+
+	test('holds the cross-context read lock until a readonly transaction commits', async () => {
+		const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+		Object.defineProperty(globalThis, 'navigator', {
+			configurable: true,
+			value: { locks: createFakeWebLocks() }
+		});
+		try {
+			const fixture = newFixture({
+				activeRole: 'a',
+				stagingRole: 'b',
+				updatedAtMs: 100,
+				generation: 0,
+				clientId: 'fixture-client'
+			});
+			const db = newDualSyncDatabase('app.sqlite3', {
+				sync: { url: '/rdb', dualDataDb: true }
+			}, fixture.createSingleDatabase);
+			const transaction = db.createTransaction({ readonly: true });
+			await transaction(async () => {});
+			let swapStarted = false;
+			const syncContextDb = {
+				__sqliteSync: db.__sqliteSync,
+				__orangeCrossTabWriteLock: db.__orangeCrossTabWriteLock,
+				__orangeCrossTabReadLock: db.__orangeCrossTabReadLock
+			};
+			const swap = runSyncSwap(syncContextDb, async () => {
+				swapStarted = true;
+			});
+			await wait(0);
+
+			expect(swapStarted).toBe(false);
+			await transaction.commit();
+			await swap;
+			expect(swapStarted).toBe(true);
+		}
+		finally {
+			restoreGlobalNavigator(originalNavigator);
+		}
+	});
+
+	test('refreshes the persisted manifest before repeated regular queries', async () => {
 		const fixture = newFixture();
 		const db = newDualSyncDatabase('app.sqlite3', {
 			sync: { url: '/rdb', dualDataDb: true }
@@ -73,7 +171,8 @@ describe('sqliteOPFS dual sync database', () => {
 		const readsAfterFirstQuery = fixture.cacheSql.filter(sql => /SELECT "active_role"/u.test(sql)).length;
 		await db.query('SELECT second');
 
-		expect(fixture.cacheSql.filter(sql => /SELECT "active_role"/u.test(sql))).toHaveLength(readsAfterFirstQuery);
+		expect(fixture.cacheSql.filter(sql => /SELECT "active_role"/u.test(sql)).length)
+			.toBeGreaterThan(readsAfterFirstQuery);
 	});
 
 	test('uses the cross-tab-safe opfs-wl VFS for every dual database by default', async () => {
@@ -125,12 +224,14 @@ describe('sqliteOPFS dual sync database', () => {
 		}, fixture.createSingleDatabase);
 		const syncClient = newFakeSyncClient({
 			async resetLocal() {
-				return {
+				const manifest = {
 					reset: true,
 					activeRole: 'a',
 					stagingRole: 'b',
 					updatedAtMs: Date.now()
 				};
+				fixture.manifest = manifest;
+				return manifest;
 			}
 		});
 
@@ -473,8 +574,14 @@ function queryCache(sql, fixture) {
 		return [{
 			active_role: fixture.manifest.activeRole,
 			staging_role: fixture.manifest.stagingRole,
-			updated_at_ms: fixture.manifest.updatedAtMs
+			updated_at_ms: fixture.manifest.updatedAtMs,
+			generation: fixture.manifest.generation,
+			client_id: fixture.manifest.clientId
 		}];
+	}
+	if (/SET "client_id"/u.test(sql) && fixture.manifest) {
+		fixture.manifest.clientId = fixture.manifest.clientId || 'fixture-client';
+		return [];
 	}
 	if (/INSERT INTO "orange_sync_dual_manifest"/u.test(sql)) {
 		if (!fixture.manifest) {
@@ -487,4 +594,80 @@ function queryCache(sql, fixture) {
 		return [];
 	}
 	return [];
+}
+
+function createFakeWebLocks() {
+	const states = new Map();
+	return {
+		request(name, options, callback) {
+			return new Promise((resolve, reject) => {
+				const state = states.get(name) || { active: [], queue: [] };
+				state.queue.push({
+					callback,
+					mode: options && options.mode === 'shared' ? 'shared' : 'exclusive',
+					reject,
+					resolve
+				});
+				states.set(name, state);
+				drain(name);
+			});
+		}
+	};
+
+	function drain(name) {
+		const state = states.get(name);
+		if (!state || state.queue.length === 0)
+			return;
+		if (state.active.some(entry => entry.mode === 'exclusive'))
+			return;
+		const next = state.queue[0];
+		if (next.mode === 'exclusive') {
+			if (state.active.length === 0)
+				start(name, state, state.queue.shift());
+			return;
+		}
+		while (state.queue.length > 0 && state.queue[0].mode === 'shared')
+			start(name, state, state.queue.shift());
+	}
+
+	function start(name, state, entry) {
+		state.active.push(entry);
+		Promise.resolve()
+			.then(entry.callback)
+			.then(entry.resolve, entry.reject)
+			.finally(() => {
+				state.active = state.active.filter(activeEntry => activeEntry !== entry);
+				drain(name);
+			});
+	}
+}
+
+function restoreGlobalNavigator(descriptor) {
+	if (descriptor)
+		Object.defineProperty(globalThis, 'navigator', descriptor);
+	else
+		delete globalThis.navigator;
+}
+
+function newDeferred() {
+	let resolve;
+	let reject;
+	const promise = new Promise((res, rej) => {
+		resolve = res;
+		reject = rej;
+	});
+	return { promise, reject, resolve };
+}
+
+async function wait(ms) {
+	await new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function waitUntil(predicate) {
+	for (let i = 0; i < 50; i++) {
+		if (predicate())
+			return;
+		await wait(0);
+	}
+	throw new Error('Timed out waiting for test condition.');
 }

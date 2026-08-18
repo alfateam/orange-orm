@@ -22,7 +22,7 @@ function newPool(connectionString, poolOptions) {
 	c.__orangeSqliteOPFSRequestedVfs = poolOptions.vfs;
 	c.__orangeCrossTabWriteLock = normalizeCrossTabWriteLockConfig(poolOptions);
 	c.__orangeSqliteOPFSReady = client.ready;
-	c.__orangeAcquireDatabaseAccess = () => acquireOPFSAccessLock(poolOptions, connectionString);
+	c.__orangeAcquireDatabaseAccess = acquireDatabaseAccess;
 	c.__orangeSuspendDatabase = suspendDatabase;
 	c.__orangeCloneDatabaseTo = cloneDatabaseTo;
 
@@ -91,6 +91,32 @@ function newPool(connectionString, poolOptions) {
 		if (!readClient)
 			readClient = createSqliteOPFSWorkerClient(connectionString, withOpenOptions(toReadPoolOptions(poolOptions)));
 		return readClient;
+	}
+
+	async function acquireDatabaseAccess() {
+		const releaseAccessLock = await acquireOPFSAccessLock(poolOptions, connectionString);
+		if (poolOptions.vfs !== 'opfs-sahpool' || !client || typeof client.checkout !== 'function')
+			return releaseAccessLock;
+		let checkoutClient;
+		try {
+			checkoutClient = await client.checkout(-1);
+		}
+		catch (error) {
+			releaseAccessLock();
+			throw error;
+		}
+		let released = false;
+		return async function releaseDatabaseAccess() {
+			if (released)
+				return;
+			released = true;
+			try {
+				await releaseWorkerCheckout(checkoutClient);
+			}
+			finally {
+				releaseAccessLock();
+			}
+		};
 	}
 
 	function suspendDatabase() {

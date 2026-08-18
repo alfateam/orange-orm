@@ -53,11 +53,45 @@ function runSyncMaintenance(target, fn) {
 	return getSyncWriteGate(target).runMaintenance(fn);
 }
 
+function runSyncRead(target, fn) {
+	const gateTarget = resolveGateTarget(target);
+	if (!gateTarget)
+		return Promise.resolve().then(fn);
+	return getSyncWriteGate(gateTarget).runWrite(() => runCrossTabRead(gateTarget, fn));
+}
+
+async function acquireSyncRead(target) {
+	const gateTarget = resolveGateTarget(target);
+	if (!gateTarget)
+		return noop;
+	const releaseRead = await getSyncWriteGate(gateTarget).acquireWrite();
+	let releaseCrossTab = noop;
+	try {
+		releaseCrossTab = await acquireCrossTabRead(gateTarget);
+		await runBeforeSyncWrite(gateTarget, noop);
+	}
+	catch (e) {
+		releaseCrossTab();
+		releaseRead();
+		throw e;
+	}
+	let released = false;
+	return function releaseSyncRead() {
+		if (released)
+			return;
+		released = true;
+		releaseCrossTab();
+		releaseRead();
+	};
+}
+
 function runSyncSwap(target, fn) {
 	const gateTarget = resolveGateTarget(target);
 	if (!gateTarget)
 		return Promise.resolve().then(fn);
-	return getSyncWriteGate(gateTarget).runMaintenance(() => runCrossTabWrite(gateTarget, fn));
+	return getSyncWriteGate(gateTarget).runMaintenance(
+		() => runCrossTabWrite(gateTarget, () => runCrossTabReadBarrier(gateTarget, fn))
+	);
 }
 
 function shouldGateWrite(target, options) {
@@ -109,6 +143,28 @@ function runCrossTabWrite(gateTarget, fn) {
 	);
 }
 
+function runCrossTabRead(gateTarget, fn) {
+	const lockConfig = getCrossTabReadLockConfig(gateTarget);
+	if (!lockConfig)
+		return runBeforeSyncWrite(gateTarget, fn);
+	return runWithCrossTabLock(
+		resolveCrossTabReadLockName(gateTarget, lockConfig),
+		{ ...lockConfig, mode: 'shared' },
+		() => runBeforeSyncWrite(gateTarget, fn)
+	);
+}
+
+function runCrossTabReadBarrier(gateTarget, fn) {
+	const lockConfig = getCrossTabReadLockConfig(gateTarget);
+	if (!lockConfig)
+		return fn();
+	return runWithCrossTabLock(
+		resolveCrossTabReadLockName(gateTarget, lockConfig),
+		{ ...lockConfig, mode: 'exclusive' },
+		fn
+	);
+}
+
 function runBeforeSyncWrite(gateTarget, fn) {
 	const beforeWrite = gateTarget && gateTarget.__orangeBeforeSyncWrite;
 	if (typeof beforeWrite !== 'function')
@@ -123,6 +179,16 @@ async function acquireCrossTabWrite(gateTarget) {
 	return acquireCrossTabLock(resolveCrossTabWriteLockName(gateTarget, lockConfig), lockConfig);
 }
 
+async function acquireCrossTabRead(gateTarget) {
+	const lockConfig = getCrossTabReadLockConfig(gateTarget);
+	if (!lockConfig)
+		return noop;
+	return acquireCrossTabLock(
+		resolveCrossTabReadLockName(gateTarget, lockConfig),
+		{ ...lockConfig, mode: 'shared' }
+	);
+}
+
 function getCrossTabWriteLockConfig(gateTarget) {
 	const config = gateTarget && gateTarget.__orangeCrossTabWriteLock;
 	if (!config || config.enabled === false)
@@ -130,6 +196,16 @@ function getCrossTabWriteLockConfig(gateTarget) {
 	return {
 		...config,
 		label: config.label || 'sqlite writer lock'
+	};
+}
+
+function getCrossTabReadLockConfig(gateTarget) {
+	const config = gateTarget && gateTarget.__orangeCrossTabReadLock;
+	if (!config || config.enabled === false)
+		return null;
+	return {
+		...config,
+		label: config.label || 'sqlite read barrier'
 	};
 }
 
@@ -142,6 +218,17 @@ function resolveCrossTabWriteLockName(gateTarget, config) {
 		|| gateTarget.__orangeSqliteOPFSConnectionString
 	);
 	return `orange-orm:sqlite-write:${normalizeLockNamePart(identity || 'default')}`;
+}
+
+function resolveCrossTabReadLockName(gateTarget, config) {
+	if (config && typeof config.name === 'string' && config.name.length > 0)
+		return config.name;
+	const identity = gateTarget && (
+		gateTarget.__orangeSyncLockName
+		|| gateTarget.__orangeSyncIdentity
+		|| gateTarget.__orangeSqliteOPFSConnectionString
+	);
+	return `orange-orm:sqlite-read:${normalizeLockNamePart(identity || 'default')}`;
 }
 
 function createSyncWriteGate() {
@@ -258,8 +345,10 @@ const noopGate = {
 };
 
 module.exports = {
+	acquireSyncRead,
 	acquireSyncWrite,
 	getSyncWriteGate,
+	runSyncRead,
 	runSyncMaintenance,
 	runSyncSwap,
 	runSyncWrite,

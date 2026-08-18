@@ -398,6 +398,39 @@ describe('sqliteOPFS pool', () => {
 		}
 	});
 
+	test('holds a broker checkout while SAH database access is acquired', async () => {
+		const messages = [];
+		const pool = newPool('target-access.sqlite3', {
+			vfs: 'opfs-sahpool',
+			prewarmRead: false,
+			createWorker: () => newFakeWorker(messages, (message) => {
+				if (message.method === 'open')
+					return { opened: true, filename: '/target-access.sqlite3', vfs: 'opfs-sahpool-orange-target' };
+				if (message.method === 'checkout')
+					return { leaseId: 41 };
+				return { ok: true };
+			})
+		});
+
+		try {
+			const releaseAccess = await pool.__orangeAcquireDatabaseAccess();
+			await pool.__orangeSuspendDatabase();
+
+			expect(messages.map(message => message.method)).toEqual([
+				'open',
+				'checkout',
+				'suspendDatabase'
+			]);
+			expect(messages[1]).toMatchObject({ priority: -1 });
+
+			await releaseAccess();
+			expect(messages[3]).toMatchObject({ method: 'release', leaseId: 41 });
+		}
+		finally {
+			await pool.end();
+		}
+	});
+
 	test('opens inline worker with OPFS enabled', async () => {
 		const initConfigs = [];
 		const closes = [];

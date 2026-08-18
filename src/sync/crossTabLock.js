@@ -74,7 +74,9 @@ function getWebLocks() {
 }
 
 async function runWithWebLock(locks, name, config, fn) {
-	const options = { mode: 'exclusive' };
+	const options = {
+		mode: config.mode === 'shared' ? 'shared' : 'exclusive'
+	};
 	const timeoutMs = config.timeoutMs;
 	let timeoutId;
 	let waiting = true;

@@ -3888,7 +3888,9 @@ function requireCrossTabLock () {
 	}
 
 	async function runWithWebLock(locks, name, config, fn) {
-		const options = { mode: 'exclusive' };
+		const options = {
+			mode: config.mode === 'shared' ? 'shared' : 'exclusive'
+		};
 		const timeoutMs = config.timeoutMs;
 		let timeoutId;
 		let waiting = true;
@@ -4120,11 +4122,45 @@ function requireWriteGate () {
 		return getSyncWriteGate(target).runMaintenance(fn);
 	}
 
+	function runSyncRead(target, fn) {
+		const gateTarget = resolveGateTarget(target);
+		if (!gateTarget)
+			return Promise.resolve().then(fn);
+		return getSyncWriteGate(gateTarget).runWrite(() => runCrossTabRead(gateTarget, fn));
+	}
+
+	async function acquireSyncRead(target) {
+		const gateTarget = resolveGateTarget(target);
+		if (!gateTarget)
+			return noop;
+		const releaseRead = await getSyncWriteGate(gateTarget).acquireWrite();
+		let releaseCrossTab = noop;
+		try {
+			releaseCrossTab = await acquireCrossTabRead(gateTarget);
+			await runBeforeSyncWrite(gateTarget, noop);
+		}
+		catch (e) {
+			releaseCrossTab();
+			releaseRead();
+			throw e;
+		}
+		let released = false;
+		return function releaseSyncRead() {
+			if (released)
+				return;
+			released = true;
+			releaseCrossTab();
+			releaseRead();
+		};
+	}
+
 	function runSyncSwap(target, fn) {
 		const gateTarget = resolveGateTarget(target);
 		if (!gateTarget)
 			return Promise.resolve().then(fn);
-		return getSyncWriteGate(gateTarget).runMaintenance(() => runCrossTabWrite(gateTarget, fn));
+		return getSyncWriteGate(gateTarget).runMaintenance(
+			() => runCrossTabWrite(gateTarget, () => runCrossTabReadBarrier(gateTarget, fn))
+		);
 	}
 
 	function shouldGateWrite(target, options) {
@@ -4176,6 +4212,28 @@ function requireWriteGate () {
 		);
 	}
 
+	function runCrossTabRead(gateTarget, fn) {
+		const lockConfig = getCrossTabReadLockConfig(gateTarget);
+		if (!lockConfig)
+			return runBeforeSyncWrite(gateTarget, fn);
+		return runWithCrossTabLock(
+			resolveCrossTabReadLockName(gateTarget, lockConfig),
+			{ ...lockConfig, mode: 'shared' },
+			() => runBeforeSyncWrite(gateTarget, fn)
+		);
+	}
+
+	function runCrossTabReadBarrier(gateTarget, fn) {
+		const lockConfig = getCrossTabReadLockConfig(gateTarget);
+		if (!lockConfig)
+			return fn();
+		return runWithCrossTabLock(
+			resolveCrossTabReadLockName(gateTarget, lockConfig),
+			{ ...lockConfig, mode: 'exclusive' },
+			fn
+		);
+	}
+
 	function runBeforeSyncWrite(gateTarget, fn) {
 		const beforeWrite = gateTarget && gateTarget.__orangeBeforeSyncWrite;
 		if (typeof beforeWrite !== 'function')
@@ -4190,6 +4248,16 @@ function requireWriteGate () {
 		return acquireCrossTabLock(resolveCrossTabWriteLockName(gateTarget, lockConfig), lockConfig);
 	}
 
+	async function acquireCrossTabRead(gateTarget) {
+		const lockConfig = getCrossTabReadLockConfig(gateTarget);
+		if (!lockConfig)
+			return noop;
+		return acquireCrossTabLock(
+			resolveCrossTabReadLockName(gateTarget, lockConfig),
+			{ ...lockConfig, mode: 'shared' }
+		);
+	}
+
 	function getCrossTabWriteLockConfig(gateTarget) {
 		const config = gateTarget && gateTarget.__orangeCrossTabWriteLock;
 		if (!config || config.enabled === false)
@@ -4197,6 +4265,16 @@ function requireWriteGate () {
 		return {
 			...config,
 			label: config.label || 'sqlite writer lock'
+		};
+	}
+
+	function getCrossTabReadLockConfig(gateTarget) {
+		const config = gateTarget && gateTarget.__orangeCrossTabReadLock;
+		if (!config || config.enabled === false)
+			return null;
+		return {
+			...config,
+			label: config.label || 'sqlite read barrier'
 		};
 	}
 
@@ -4209,6 +4287,17 @@ function requireWriteGate () {
 			|| gateTarget.__orangeSqliteOPFSConnectionString
 		);
 		return `orange-orm:sqlite-write:${normalizeLockNamePart(identity || 'default')}`;
+	}
+
+	function resolveCrossTabReadLockName(gateTarget, config) {
+		if (config && typeof config.name === 'string' && config.name.length > 0)
+			return config.name;
+		const identity = gateTarget && (
+			gateTarget.__orangeSyncLockName
+			|| gateTarget.__orangeSyncIdentity
+			|| gateTarget.__orangeSqliteOPFSConnectionString
+		);
+		return `orange-orm:sqlite-read:${normalizeLockNamePart(identity || 'default')}`;
 	}
 
 	function createSyncWriteGate() {
@@ -4325,8 +4414,10 @@ function requireWriteGate () {
 	};
 
 	writeGate = {
+		acquireSyncRead,
 		acquireSyncWrite,
 		getSyncWriteGate,
+		runSyncRead,
 		runSyncMaintenance,
 		runSyncSwap,
 		runSyncWrite,
@@ -26971,7 +27062,7 @@ function requireNewPool$1 () {
 		c.__orangeSqliteOPFSRequestedVfs = poolOptions.vfs;
 		c.__orangeCrossTabWriteLock = normalizeCrossTabWriteLockConfig(poolOptions);
 		c.__orangeSqliteOPFSReady = client.ready;
-		c.__orangeAcquireDatabaseAccess = () => acquireOPFSAccessLock(poolOptions, connectionString);
+		c.__orangeAcquireDatabaseAccess = acquireDatabaseAccess;
 		c.__orangeSuspendDatabase = suspendDatabase;
 		c.__orangeCloneDatabaseTo = cloneDatabaseTo;
 
@@ -27040,6 +27131,32 @@ function requireNewPool$1 () {
 			if (!readClient)
 				readClient = createSqliteOPFSWorkerClient(connectionString, withOpenOptions(toReadPoolOptions(poolOptions)));
 			return readClient;
+		}
+
+		async function acquireDatabaseAccess() {
+			const releaseAccessLock = await acquireOPFSAccessLock(poolOptions, connectionString);
+			if (poolOptions.vfs !== 'opfs-sahpool' || !client || typeof client.checkout !== 'function')
+				return releaseAccessLock;
+			let checkoutClient;
+			try {
+				checkoutClient = await client.checkout(-1);
+			}
+			catch (error) {
+				releaseAccessLock();
+				throw error;
+			}
+			let released = false;
+			return async function releaseDatabaseAccess() {
+				if (released)
+					return;
+				released = true;
+				try {
+					await releaseWorkerCheckout(checkoutClient);
+				}
+				finally {
+					releaseAccessLock();
+				}
+			};
 		}
 
 		function suspendDatabase() {
@@ -27308,7 +27425,11 @@ function requireDualSyncDatabase () {
 	const createHttpInterceptor = requireHttpInterceptor();
 	const newSyncClient = requireSyncClient();
 	const { createSyncAuto, syncAutoStartSymbol } = requireSyncAuto();
-	const { getSyncWriteGate, runSyncSwap } = requireWriteGate();
+	const {
+		acquireSyncRead,
+		runSyncRead,
+		runSyncSwap
+	} = requireWriteGate();
 	const {
 		normalizeCrossTabLockConfig,
 		normalizeLockNamePart,
@@ -27376,6 +27497,7 @@ function requireDualSyncDatabase () {
 		let schemaReadyGeneration = 0;
 		const dualSyncLockName = `orange-orm:sqliteOPFS:dual-sync:${normalizeLockNamePart(connectionString)}`;
 		const dualWriteLockName = `orange-orm:sqliteOPFS:dual-write:${normalizeLockNamePart(connectionString)}`;
+		const dualReadLockName = `orange-orm:sqliteOPFS:dual-read:${normalizeLockNamePart(connectionString)}`;
 
 		const router = {
 			poolFactory: null,
@@ -27395,6 +27517,7 @@ function requireDualSyncDatabase () {
 			__sqliteSync: poolOptions && poolOptions.sync,
 			__orangeSyncIdentity: `sqliteOPFS:${connectionString}:dual`,
 			__orangeCrossTabWriteLock: { enabled: true, name: dualWriteLockName, timeoutMs: 300000 },
+			__orangeCrossTabReadLock: { enabled: true, name: dualReadLockName, timeoutMs: 300000 },
 			__orangeBeforeSyncWrite: refreshManifestBeforeWrite
 		};
 		router.poolFactory = router;
@@ -27409,7 +27532,7 @@ function requireDualSyncDatabase () {
 			}
 			const run = () => getActiveReadyDb().then(db => db.transaction(options, fn));
 			return options && options.readonly
-				? getSyncWriteGate(router).runWrite(run)
+				? runSyncRead(router, run)
 				: run();
 		}
 
@@ -27419,7 +27542,7 @@ function requireDualSyncDatabase () {
 			const transactionPromise = Promise.resolve()
 				.then(async () => {
 					if (options && options.readonly)
-						releaseRead = await getSyncWriteGate(router).acquireWrite();
+						releaseRead = await acquireSyncRead(router);
 					return getActiveReadyDb();
 				})
 				.then(db => db.createTransaction(options))
@@ -27452,13 +27575,13 @@ function requireDualSyncDatabase () {
 		}
 
 		function query(sql, options) {
-			return getSyncWriteGate(router).runWrite(
+			return runSyncRead(router,
 				() => getActiveReadyDb().then(db => db.query(sql, options))
 			);
 		}
 
 		function sqliteFunction(...args) {
-			return getSyncWriteGate(router).runWrite(
+			return runSyncRead(router,
 				() => getActiveReadyDb().then(db => db.sqliteFunction(...args))
 			);
 		}
@@ -27985,7 +28108,7 @@ function requireDualSyncDatabase () {
 				);
 			}
 			finally {
-				releaseTargetAccess();
+				await releaseTargetAccess();
 			}
 			clientByRole.delete(targetRole);
 			schemaReadyRoles.delete(targetRole);
@@ -28006,7 +28129,7 @@ function requireDualSyncDatabase () {
 		}
 
 		function ensureActiveLocalSchemaReady() {
-			return ensureLocalSchema();
+			return runSyncRead(router, () => ensureLocalSchema());
 		}
 
 		async function resetLocal(options = {}) {

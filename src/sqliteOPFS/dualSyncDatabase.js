@@ -6,7 +6,11 @@ const stringify = require('../client/stringify');
 const createHttpInterceptor = require('../client/httpInterceptor');
 const newSyncClient = require('../client/syncClient');
 const { createSyncAuto, syncAutoStartSymbol } = require('../client/syncAuto');
-const { getSyncWriteGate, runSyncSwap } = require('../sync/writeGate');
+const {
+	acquireSyncRead,
+	runSyncRead,
+	runSyncSwap
+} = require('../sync/writeGate');
 const {
 	normalizeCrossTabLockConfig,
 	normalizeLockNamePart,
@@ -74,6 +78,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 	let schemaReadyGeneration = 0;
 	const dualSyncLockName = `orange-orm:sqliteOPFS:dual-sync:${normalizeLockNamePart(connectionString)}`;
 	const dualWriteLockName = `orange-orm:sqliteOPFS:dual-write:${normalizeLockNamePart(connectionString)}`;
+	const dualReadLockName = `orange-orm:sqliteOPFS:dual-read:${normalizeLockNamePart(connectionString)}`;
 
 	const router = {
 		poolFactory: null,
@@ -93,6 +98,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		__sqliteSync: poolOptions && poolOptions.sync,
 		__orangeSyncIdentity: `sqliteOPFS:${connectionString}:dual`,
 		__orangeCrossTabWriteLock: { enabled: true, name: dualWriteLockName, timeoutMs: 300000 },
+		__orangeCrossTabReadLock: { enabled: true, name: dualReadLockName, timeoutMs: 300000 },
 		__orangeBeforeSyncWrite: refreshManifestBeforeWrite
 	};
 	router.poolFactory = router;
@@ -107,7 +113,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		}
 		const run = () => getActiveReadyDb().then(db => db.transaction(options, fn));
 		return options && options.readonly
-			? getSyncWriteGate(router).runWrite(run)
+			? runSyncRead(router, run)
 			: run();
 	}
 
@@ -117,7 +123,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		const transactionPromise = Promise.resolve()
 			.then(async () => {
 				if (options && options.readonly)
-					releaseRead = await getSyncWriteGate(router).acquireWrite();
+					releaseRead = await acquireSyncRead(router);
 				return getActiveReadyDb();
 			})
 			.then(db => db.createTransaction(options))
@@ -150,13 +156,13 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 	}
 
 	function query(sql, options) {
-		return getSyncWriteGate(router).runWrite(
+		return runSyncRead(router,
 			() => getActiveReadyDb().then(db => db.query(sql, options))
 		);
 	}
 
 	function sqliteFunction(...args) {
-		return getSyncWriteGate(router).runWrite(
+		return runSyncRead(router,
 			() => getActiveReadyDb().then(db => db.sqliteFunction(...args))
 		);
 	}
@@ -683,7 +689,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 			);
 		}
 		finally {
-			releaseTargetAccess();
+			await releaseTargetAccess();
 		}
 		clientByRole.delete(targetRole);
 		schemaReadyRoles.delete(targetRole);
@@ -704,7 +710,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 	}
 
 	function ensureActiveLocalSchemaReady() {
-		return ensureLocalSchema();
+		return runSyncRead(router, () => ensureLocalSchema());
 	}
 
 	async function resetLocal(options = {}) {
