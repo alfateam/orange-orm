@@ -11,6 +11,7 @@ demo*.db*
 other.db
 pglite.db*
 coverage
+/tests/.tmp/
 .env
 deno.lock
 *.db-wal
