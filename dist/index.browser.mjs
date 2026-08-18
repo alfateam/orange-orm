@@ -1757,7 +1757,11 @@ function requireHostExpress () {
 		if ('db' in options && (options.db ?? undefined) === undefined || !client.db)
 			throw new Error('No db specified');
 		const dbOptions = { db: options.db || client.db };
-		const commandHandlers = options.commands || client.__commands || {};
+		const commandHandlers = mergeCommandHandlers(
+			options.commands,
+			client.__commands,
+			options.commandHandlers
+		);
 		let c = {};
 		const readonly = { readonly: options.readonly};
 		const sharedHooks = options.hooks;
@@ -1779,7 +1783,7 @@ function requireHostExpress () {
 			...options,
 			sync: options.sync && {
 				...options.sync,
-				commands: options.sync.commands || commandHandlers
+				commands: mergeCommandHandlers(commandHandlers, options.sync.commands)
 			}
 		});
 
@@ -1914,6 +1918,16 @@ function requireHostExpress () {
 		if (args === undefined)
 			return null;
 		return JSON.parse(JSON.stringify(args));
+	}
+
+	function mergeCommandHandlers(...registries) {
+		const commandHandlers = {};
+		for (let i = 0; i < registries.length; i++) {
+			const registry = registries[i];
+			if (registry && typeof registry === 'object')
+				Object.assign(commandHandlers, registry);
+		}
+		return commandHandlers;
 	}
 
 	hostExpress_1 = hostExpress;

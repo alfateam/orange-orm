@@ -1,8 +1,124 @@
 import { describe, expect, test } from 'vitest';
 
 const newSyncHandler = require('../src/hostExpress/sync');
+const hostExpress = require('../src/hostExpress');
 
 describe('sync commands', () => {
+	test('merges Express command handlers by name with the last registration winning', async () => {
+		const calls = [];
+		const tx = {};
+		const client = {
+			db: {},
+			tables: {},
+			__commands: {
+				shared: async () => calls.push('client:shared'),
+				clientWins: async () => {
+					calls.push('client:clientWins');
+					return 'client';
+				},
+				clientOnly: async () => {
+					calls.push('clientOnly');
+					return 'client';
+				}
+			},
+			transaction: async (fn) => fn(tx),
+			query: async () => []
+		};
+		const handler = hostExpress(() => ({}), client, {
+			commands: {
+				shared: async () => calls.push('commands:shared'),
+				clientWins: async () => calls.push('commands:clientWins'),
+				commandsOnly: async () => {
+					calls.push('commandsOnly');
+					return 'commands';
+				}
+			},
+			commandHandlers: {
+				shared: async (db, args) => {
+					calls.push(['commandHandlers:shared', db, args]);
+					return 'commandHandlers';
+				},
+				handlersOnly: async () => {
+					calls.push('handlersOnly');
+					return 'handlers';
+				}
+			},
+			sync: {}
+		});
+
+		expect(await callExpressCommand(handler, 'shared', { value: 1 })).toBe('commandHandlers');
+		expect(await callExpressCommand(handler, 'clientWins')).toBe('client');
+		expect(await callExpressCommand(handler, 'commandsOnly')).toBe('commands');
+		expect(await callExpressCommand(handler, 'clientOnly')).toBe('client');
+		expect(await callExpressCommand(handler, 'handlersOnly')).toBe('handlers');
+
+		expect(calls).toEqual([
+			['commandHandlers:shared', tx, { value: 1 }],
+			'client:clientWins',
+			'commandsOnly',
+			'clientOnly',
+			'handlersOnly'
+		]);
+	});
+
+	test('lets sync handlers override Express handlers without deduplicating command calls', async () => {
+		const calls = [];
+		const tx = {
+			query: async (sql) => sql.includes('RETURNING result_json')
+				? [{ result_json: null }]
+				: []
+		};
+		const client = {
+			db: {},
+			tables: {},
+			transaction: async (fn) => fn(tx),
+			query: async () => []
+		};
+		const handler = hostExpress(() => ({}), client, {
+			commands: {
+				expressOnly: async () => {
+					calls.push('expressOnly');
+					return 'express';
+				}
+			},
+			commandHandlers: {
+				repeated: async () => calls.push('express:repeated')
+			},
+			sync: {
+				commands: {
+					repeated: async (db, args) => {
+						calls.push(['sync:repeated', db, args]);
+						return args.sequence;
+					}
+				}
+			}
+		});
+
+		const result = await callExpressSync(handler, {
+			phase: 'push',
+			clientId: 'client-1',
+			mutations: [{
+				id: 'mutation-1',
+				commands: [
+					{ name: 'repeated', args: { sequence: 1 } },
+					{ name: 'repeated', args: { sequence: 2 } },
+					{ name: 'expressOnly' }
+				]
+			}]
+		});
+
+		expect(calls).toEqual([
+			['sync:repeated', tx, { sequence: 1 }],
+			['sync:repeated', tx, { sequence: 2 }],
+			'expressOnly'
+		]);
+		expect(result.results[0].commands).toEqual([
+			{ name: 'repeated', result: 1 },
+			{ name: 'repeated', result: 2 },
+			{ name: 'expressOnly', result: 'express' }
+		]);
+	});
+
 	test('replays command handlers inside push transaction', async () => {
 		const calls = [];
 		const tx = {
@@ -681,6 +797,36 @@ async function callHandler(handler, body) {
 	};
 	await handler({
 		headers: { authorization: 'Bearer test' },
+		body
+	}, response);
+	return jsonResult;
+}
+
+async function callExpressCommand(handler, name, args) {
+	return callExpressHandler(handler, { command: name }, { args });
+}
+
+async function callExpressSync(handler, body) {
+	return callExpressHandler(handler, { sync: 'push' }, body);
+}
+
+async function callExpressHandler(handler, query, body) {
+	let jsonResult;
+	const response = {
+		json(value) {
+			jsonResult = value;
+		},
+		status() {
+			return this;
+		},
+		send(message) {
+			throw new Error(message);
+		}
+	};
+	await handler({
+		method: 'POST',
+		headers: { authorization: 'Bearer test' },
+		query,
 		body
 	}, response);
 	return jsonResult;
