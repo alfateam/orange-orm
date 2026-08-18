@@ -353,19 +353,45 @@ describe('sqliteOPFS pool', () => {
 		}
 	});
 
-	test('suspends an open SAH pool before another worker replaces its database', async () => {
+	test('reopens a suspended SAH pool using its logical vfs name', async () => {
 		const messages = [];
+		const runtimeVfs = 'opfs-sahpool-orange-86fb3e19';
 		const pool = newPool('target.sqlite3', {
 			vfs: 'opfs-sahpool',
 			prewarmRead: false,
-			createWorker: () => newFakeWorker(messages)
+			createWorker: () => newFakeWorker(messages, (message) => message.method === 'open'
+				? { opened: true, filename: '/target.sqlite3', vfs: runtimeVfs }
+				: { ok: true })
 		});
 
 		try {
 			await pool.__orangeSqliteOPFSReady;
 			await pool.__orangeSuspendDatabase();
+			await new Promise((resolve, reject) => {
+				pool.connect((err, client, done) => {
+					if (err)
+						return reject(err);
+					client.executeQuery(newSql('SELECT 1'), (queryError) => {
+						done(queryError);
+						queryError ? reject(queryError) : resolve();
+					});
+				});
+			});
 
-			expect(messages.map(message => message.method)).toEqual(['open', 'suspendDatabase']);
+			const openMessages = messages.filter(message => message.method === 'open');
+			expect(messages.map(message => message.method)).toEqual([
+				'open',
+				'suspendDatabase',
+				'open',
+				'checkout',
+				'query'
+			]);
+			expect(openMessages.map(message => message.vfs)).toEqual([
+				'opfs-sahpool',
+				'opfs-sahpool'
+			]);
+			expect(openMessages[1].opfsSahPoolOptions).toEqual(openMessages[0].opfsSahPoolOptions);
+			expect(pool.__orangeSqliteOPFSVfs).toBe(runtimeVfs);
 		}
 		finally {
 			await pool.end();

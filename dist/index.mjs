@@ -23246,8 +23246,7 @@ function requireWorkerClient () {
 			if (closed)
 				return Promise.reject(new Error('sqliteOPFS worker client closed.'));
 			if (!openPromise) {
-				const vfs = openInfo && openInfo.vfs || requestedVfs;
-				openPromise = openWorkerDb(vfs)
+				openPromise = openWorkerDb(requestedVfs)
 					.then((info) => {
 						openInfo = info;
 						return info;
