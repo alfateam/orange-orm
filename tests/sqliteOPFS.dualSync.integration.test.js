@@ -477,7 +477,188 @@ describe('sqliteOPFS dual sync integration', () => {
 		expect(pushedMutationIds.filter(id => id === nextMutationId)).toHaveLength(1);
 		expect(pushedMutationIds.filter(id => id === conflictMutationId)).toHaveLength(1);
 	}, 30000);
+
+	test('rebuilds staging before applying a fallback snapshot', async () => {
+		const fixture = await createDualIntegrationFixture('snapshot-reload', [
+			{ id: 'keep', title: 'Keep base' },
+			{ id: 'stale', title: 'Stale base' }
+		]);
+		const { localDb } = fixture.openLocal();
+		const progressEvents = [];
+		localDb.syncClient.on('sync-progress', event => progressEvents.push(event));
+		await localDb.syncClient.resetLocal();
+		await localDb.syncClient.sync();
+
+		await fixture.remoteDb.query('DELETE FROM project WHERE id = \'stale\'');
+		await fixture.remoteDb.query('DELETE FROM orange_changes');
+		await fixture.remoteDb.project.update(
+			{ title: 'Keep current' },
+			{ where: project => project.id.eq('keep') }
+		);
+		await localDb.syncClient.sync();
+
+		expect(await fixture.remoteDb.project.getById('stale')).toBeUndefined();
+		expect(progressEvents).toContainEqual(expect.objectContaining({
+			phase: 'reloading-staging',
+			reason: 'cursor_too_old'
+		}));
+		expect(await localDb.project.getById('stale')).toBeUndefined();
+		expect((await localDb.project.getById('keep')).title).toBe('Keep current');
+	}, 30000);
+
+	test('reloads after an interrupted promotion and preserves writes made during pull', async () => {
+		const fixture = await createDualIntegrationFixture('promotion-recovery', [
+			{ id: 'local', title: 'Local base' }
+		]);
+		let opened = fixture.openLocal();
+		await opened.localDb.syncClient.resetLocal();
+		await opened.localDb.syncClient.sync();
+		await fixture.remoteDb.project.insert({ id: 'remote', title: 'Remote current' });
+
+		const pullStarted = deferred();
+		const releasePull = deferred();
+		const pausePull = opened.localDb.syncClient.interceptors.request.use(async config => {
+			if (config?.data?.phase === 'keys') {
+				opened.localDb.syncClient.interceptors.request.eject(pausePull);
+				pullStarted.resolve();
+				await releasePull.promise;
+			}
+			return config;
+		});
+		const injectedCrash = new Error('injected crash before manifest swap');
+		const stopCrash = opened.localDb.syncClient.on('sync-progress', event => {
+			if (event.phase === 'waiting-for-write-barrier')
+				throw injectedCrash;
+		});
+		const interruptedSync = opened.localDb.syncClient.sync();
+		await pullStarted.promise;
+		const local = await opened.localDb.project.getById('local');
+		local.title = 'Local written during pull';
+		await local.saveChanges();
+		releasePull.resolve();
+		await expect(interruptedSync).rejects.toBe(injectedCrash);
+		stopCrash();
+		await opened.close();
+
+		opened = fixture.openLocal();
+		const recovered = await opened.localDb.syncClient.sync();
+		expect(recovered.__orangeDualSync).toMatchObject({
+			recovered: true,
+			swapped: true
+		});
+		expect((await opened.localDb.project.getById('remote')).title).toBe('Remote current');
+		expect((await opened.localDb.project.getById('local')).title).toBe('Local written during pull');
+		expect((await fixture.remoteDb.project.getById('local')).title).toBe('Local base');
+
+		await opened.localDb.syncClient.sync();
+		expect((await fixture.remoteDb.project.getById('local')).title).toBe('Local written during pull');
+	}, 30000);
+
+	test('recovers pending writes after a crash between conflict clone and replay', async () => {
+		const fixture = await createDualIntegrationFixture('conflict-recovery', [
+			{ id: 'conflict', title: 'Conflict base' },
+			{ id: 'later', title: 'Later base' }
+		]);
+		let opened = fixture.openLocal();
+		await opened.localDb.syncClient.resetLocal();
+		await opened.localDb.syncClient.sync();
+
+		const conflict = await opened.localDb.project.getById('conflict');
+		conflict.title = 'Conflict local';
+		await conflict.saveChanges();
+		await fixture.remoteDb.project.update(
+			{ title: 'Conflict remote' },
+			{ where: project => project.id.eq('conflict') }
+		);
+		const pullStarted = deferred();
+		const releasePull = deferred();
+		const pausePull = opened.localDb.syncClient.interceptors.request.use(async config => {
+			if (config?.data?.phase === 'keys') {
+				opened.localDb.syncClient.interceptors.request.eject(pausePull);
+				pullStarted.resolve();
+				await releasePull.promise;
+			}
+			return config;
+		});
+		const injectedCrash = new Error('injected crash after conflict clone');
+		const stopCrash = opened.localDb.syncClient.on('sync-progress', event => {
+			if (event.phase === 'cloned-clean-staging')
+				throw injectedCrash;
+		});
+		const interruptedSync = opened.localDb.syncClient.sync();
+		await pullStarted.promise;
+		const later = await opened.localDb.project.getById('later');
+		later.title = 'Later written during pull';
+		await later.saveChanges();
+		releasePull.resolve();
+		await expect(interruptedSync).rejects.toBe(injectedCrash);
+		stopCrash();
+		await opened.close();
+
+		opened = fixture.openLocal();
+		const recovered = await opened.localDb.syncClient.sync();
+		expect(recovered.__orangeDualSync).toMatchObject({
+			recovered: true,
+			swapped: true
+		});
+		expect((await opened.localDb.project.getById('conflict')).title).toBe('Conflict remote');
+		expect((await opened.localDb.project.getById('later')).title).toBe('Later written during pull');
+		const outbox = await opened.localDb.query(
+			'SELECT "status" FROM "orange_sync_outbox" ORDER BY "status"'
+		);
+		expect(outbox.map(row => row.status)).toEqual(['failed', 'pending']);
+
+		await opened.localDb.syncClient.sync();
+		expect((await fixture.remoteDb.project.getById('later')).title).toBe('Later written during pull');
+		expect((await fixture.remoteDb.project.getById('conflict')).title).toBe('Conflict remote');
+	}, 30000);
 });
+
+async function createDualIntegrationFixture(name, rows) {
+	const remoteDb = map({
+		db: con => con.pglite(undefined, { size: 1 })
+	});
+	closeTasks.push(() => remoteDb.close());
+	await remoteDb.query('CREATE TABLE project (id TEXT PRIMARY KEY NOT NULL, title TEXT NOT NULL)');
+	await setupChangeTracking(remoteDb, {
+		project: remoteDb.tables.project
+	});
+	await remoteDb.project.insert(rows);
+
+	const app = express();
+	app.use(express.json({ limit: '2mb' }));
+	app.use('/rdb', remoteDb.express({ sync: true }));
+	const server = await listen(app);
+	closeTasks.push(() => closeServer(server));
+	const directory = fs.mkdtempSync(path.join(os.tmpdir(), `orange-dual-${name}-`));
+	closeTasks.push(async () => fs.rmSync(directory, { recursive: true, force: true }));
+	const connectionString = path.join(directory, 'local.sqlite3');
+	const sync = {
+		url: `http://127.0.0.1:${server.address().port}/rdb`,
+		auto: false,
+		tables: ['project']
+	};
+	return { connectionString, openLocal, remoteDb, sync };
+
+	function openLocal() {
+		const dualDb = newDualSyncDatabase(connectionString, { sync }, (roleConnectionString, options) =>
+			newSqliteDatabase(roleConnectionString, { ...options, size: 1 })
+		);
+		const localDb = map({ db: () => dualDb });
+		const close = onceAsync(() => localDb.close());
+		closeTasks.push(close);
+		return { close, dualDb, localDb };
+	}
+}
+
+function onceAsync(fn) {
+	let promise;
+	return function closeOnce() {
+		if (!promise)
+			promise = Promise.resolve().then(fn);
+		return promise;
+	};
+}
 
 function listen(app) {
 	return new Promise((resolve) => {

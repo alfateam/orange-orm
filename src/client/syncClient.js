@@ -156,6 +156,8 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 			pullOptions._onPullBatchProgress = options._onPullBatchProgress;
 		if (typeof options._onPullStagingSummary === 'function')
 			pullOptions._onPullStagingSummary = options._onPullStagingSummary;
+		if (typeof options._onPullSnapshot === 'function')
+			pullOptions._onPullSnapshot = options._onPullSnapshot;
 		if (options._skipPushBeforePull === true)
 			pullOptions._skipPushBeforePull = true;
 		if (usesFileSnapshotRollback(options))
@@ -280,6 +282,8 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 			normalizedOptions._onPullBatchProgress = options._onPullBatchProgress;
 		if (options && typeof options._onPullStagingSummary === 'function')
 			normalizedOptions._onPullStagingSummary = options._onPullStagingSummary;
+		if (options && typeof options._onPullSnapshot === 'function')
+			normalizedOptions._onPullSnapshot = options._onPullSnapshot;
 		if (options && options._skipPushBeforePull === true)
 			normalizedOptions._skipPushBeforePull = true;
 		if (usesFileSnapshotRollback(options))
@@ -391,6 +395,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 			_fileSnapshotRollback: options._fileSnapshotRollback === true,
 			_onPullBatchProgress: options._onPullBatchProgress,
 			_onPullStagingSummary: options._onPullStagingSummary,
+			_onPullSnapshot: options._onPullSnapshot,
 			_syncInterceptors: interceptors,
 			_syncAxiosInterceptor: axiosInterceptor
 		};
@@ -1285,6 +1290,13 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 			const nextReason = reason === undefined && keysPayload.reason !== undefined
 				? keysPayload.reason
 				: reason;
+			if (!session.token && keysPayload.mode === 'snapshot' && typeof options._onPullSnapshot === 'function') {
+				await options._onPullSnapshot({
+					reason: nextReason,
+					cursor: keysPayload.cursor,
+					tables: Array.isArray(options.tables) ? options.tables.slice() : []
+				});
+			}
 			const keyItems = normalizeKeyItems(keysPayload.items);
 			const token = keysPayload.done || !keysPayload.token ? null : keysPayload.token;
 			const done = keysPayload.done || !keysPayload.token;

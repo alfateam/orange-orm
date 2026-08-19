@@ -2,7 +2,14 @@ const {
 	finalizeSyncOperationMemory,
 	withSyncOperationMemory
 } = require('../sync/operationContext');
+const createHttpInterceptor = require('./httpInterceptor');
 const { ensureLocalSchemaReadySymbol } = require('./syncClient');
+const {
+	deserializeError,
+	deserializeEventPayload,
+	isAlwaysForwardedEvent,
+	serializeError
+} = require('./syncWorkerProtocol');
 
 function createSyncWorkerClient(worker, options = {}) {
 	if (!worker || typeof worker.postMessage !== 'function')
@@ -11,7 +18,9 @@ function createSyncWorkerClient(worker, options = {}) {
 	let nextId = 1;
 	const pending = new Map();
 	const listeners = new Map();
-	const lastEvents = new Map();
+	const interceptors = createHttpInterceptor();
+	let hasInitialReady = false;
+	let lastInitialReady;
 
 	worker.addEventListener('message', onMessage);
 	worker.addEventListener('error', onWorkerError);
@@ -31,10 +40,11 @@ function createSyncWorkerClient(worker, options = {}) {
 		off,
 		once,
 		close,
-		interceptors: createNoopInterceptors(),
+		interceptors,
 		[ensureLocalSchemaReadySymbol]: request.bind(null, 'ensureLocalSchemaReady')
 	};
 
+	worker.postMessage({ type: 'orange-sync-worker-ready' });
 	return client;
 
 	function request(method, ...args) {
@@ -77,12 +87,13 @@ function createSyncWorkerClient(worker, options = {}) {
 			listeners.set(event, eventListeners);
 		}
 		eventListeners.add(listener);
-		request('on', event).catch(() => {});
-		const lastEvent = lastEvents.get(event);
-		if (lastEvent !== undefined) {
+		if (!isAlwaysForwardedEvent(event))
+			request('on', event).catch(() => {});
+		if (event === 'initial-ready' && hasInitialReady) {
+			const readyPayload = lastInitialReady;
 			Promise.resolve().then(() => {
-				if (eventListeners.has(listener) && lastEvents.get(event) === lastEvent)
-					listener(lastEvent);
+				if (eventListeners.has(listener) && hasInitialReady && lastInitialReady === readyPayload)
+					listener(readyPayload);
 			});
 		}
 		return () => off(event, listener);
@@ -95,7 +106,8 @@ function createSyncWorkerClient(worker, options = {}) {
 		eventListeners.delete(listener);
 		if (eventListeners.size === 0) {
 			listeners.delete(event);
-			request('off', event).catch(() => {});
+			if (!isAlwaysForwardedEvent(event))
+				request('off', event).catch(() => {});
 		}
 	}
 
@@ -120,7 +132,8 @@ function createSyncWorkerClient(worker, options = {}) {
 		}
 		pending.clear();
 		listeners.clear();
-		lastEvents.clear();
+		hasInitialReady = false;
+		lastInitialReady = undefined;
 		if (typeof worker.terminate === 'function')
 			worker.terminate();
 		else if (typeof worker.close === 'function')
@@ -131,9 +144,17 @@ function createSyncWorkerClient(worker, options = {}) {
 		const message = event && event.data;
 		if (!message || message.type === undefined)
 			return;
+		if (message.type === 'orange-sync-worker-interceptor-request') {
+			void handleInterceptorRequest(message);
+			return;
+		}
 		if (message.type === 'orange-sync-worker-event') {
-			lastEvents.set(message.event, message.payload);
-			emit(message.event, message.payload);
+			const payload = deserializeEventPayload(message.payload);
+			if (message.event === 'initial-ready') {
+				hasInitialReady = true;
+				lastInitialReady = payload;
+			}
+			emit(message.event, payload);
 			return;
 		}
 		if (message.type !== 'orange-sync-worker-response')
@@ -143,7 +164,7 @@ function createSyncWorkerClient(worker, options = {}) {
 			return;
 		clearPendingRequest(message.id);
 		if (message.error)
-			entry.reject(toError(message.error));
+			entry.reject(deserializeError(message.error));
 		else
 			entry.resolve(message.result);
 	}
@@ -169,15 +190,82 @@ function createSyncWorkerClient(worker, options = {}) {
 	}
 
 	function emit(event, payload) {
-		if (event === 'operation' || event && event.startsWith && event.startsWith('operation:')) {
+		if (event === 'operation') {
 			payload = withSyncOperationMemory(payload);
-			finalizeSyncOperationMemory(payload);
+			try {
+				emitToListeners('operation', payload);
+				if (payload && typeof payload.operation === 'string')
+					emitToListeners(`operation:${payload.operation}`, payload);
+			}
+			finally {
+				finalizeSyncOperationMemory(payload);
+			}
+			return;
 		}
+		if (event && event.startsWith && event.startsWith('operation:')) {
+			payload = withSyncOperationMemory(payload);
+			try {
+				emitToListeners(event, payload);
+			}
+			finally {
+				finalizeSyncOperationMemory(payload);
+			}
+			return;
+		}
+		emitToListeners(event, payload);
+	}
+
+	function emitToListeners(event, payload) {
 		const eventListeners = listeners.get(event);
 		if (!eventListeners)
 			return;
 		for (const listener of Array.from(eventListeners))
 			listener(payload);
+	}
+
+	async function handleInterceptorRequest(message) {
+		try {
+			const result = await applyInterceptor(message);
+			postInterceptorResponse(message.id, result);
+		}
+		catch (error) {
+			postInterceptorResponse(message.id, undefined, error);
+		}
+	}
+
+	function applyInterceptor(message) {
+		if (message.phase === 'request')
+			return interceptors.applyRequest(message.payload);
+		if (message.phase === 'response')
+			return interceptors.applyResponse(message.payload);
+		if (message.phase === 'response-error')
+			return interceptors.applyResponseError(deserializeError(message.error, 'Sync worker HTTP request failed.'));
+		throw new Error(`Unknown sync worker interceptor phase "${message.phase}".`);
+	}
+
+	function postInterceptorResponse(id, result, error) {
+		try {
+			worker.postMessage({
+				type: 'orange-sync-worker-interceptor-response',
+				id,
+				result,
+				error: error ? serializeError(error) : undefined
+			});
+		}
+		catch (postError) {
+			if (!error) {
+				try {
+					worker.postMessage({
+						type: 'orange-sync-worker-interceptor-response',
+						id,
+						error: serializeError(postError)
+					});
+				}
+				catch (_ignored) {
+					// The worker cannot be notified when even the serialized error cannot be posted.
+				}
+			}
+		}
 	}
 }
 
@@ -208,32 +296,6 @@ function toWorkerError(event) {
 		? event.message
 		: 'Sync worker failed before completing the request.';
 	return new Error(message);
-}
-
-function createNoopInterceptors() {
-	return {
-		request: createNoopInterceptorManager(),
-		response: createNoopInterceptorManager()
-	};
-}
-
-function createNoopInterceptorManager() {
-	let nextId = 1;
-	return {
-		use() {
-			return `sync-worker-noop-${nextId++}`;
-		},
-		eject() {}
-	};
-}
-
-function toError(error) {
-	const e = new Error(error && error.message ? error.message : 'Sync worker request failed.');
-	if (error && error.name)
-		e.name = error.name;
-	if (error && error.stack)
-		e.stack = error.stack;
-	return e;
 }
 
 module.exports = createSyncWorkerClient;
