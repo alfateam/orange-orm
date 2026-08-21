@@ -1,4 +1,4 @@
-const rdb = require('../indexBrowser');
+const rdb = require('./managedSyncWorkerRdb');
 const mapFromSyncSchema = require('./mapFromSyncSchema');
 
 let handler;

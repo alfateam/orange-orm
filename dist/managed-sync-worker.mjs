@@ -1,8 +1,3 @@
-import * as fastJsonPatch from 'fast-json-patch';
-import * as _default from 'rfdc/default';
-import * as ajv from 'ajv';
-import * as onChange from '@lroal/on-change';
-
 function getDefaultExportFromCjs (x) {
 	return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, 'default') ? x['default'] : x;
 }
@@ -13,703 +8,802 @@ function getDefaultExportFromNamespaceIfPresent (n) {
 
 var managedSyncWorkerEntry$1 = {};
 
-var getTSDefinition_1;
-var hasRequiredGetTSDefinition;
-
-function requireGetTSDefinition () {
-	if (hasRequiredGetTSDefinition) return getTSDefinition_1;
-	hasRequiredGetTSDefinition = 1;
-	const typeMap = {
-		StringColumn: 'string',
-		BooleanColumn: 'boolean',
-		UUIDColumn: 'string',
-		BinaryColumn: 'string',
-		JSONColumn: 'object',
-		DateColumn: 'Date | string',
-		NumberColumn: 'number',
-	};
-
-	function getTSDefinition(tableConfigs, {isNamespace = false, isHttp = false} = {}) {
-		const rootTablesAdded = new Map();
-		const tableNames = new Set();
-		const tablesAdded = new Map();
-		let src = '';
-		const defs = tableConfigs.map(getTSDefinitionTable).join('');
-		const tables = tableConfigs.reduce((tables, x) => {
-			tables[x.name] = x.table;
-			return tables;
-		}, {});
-		src += getPrefixTs(isNamespace);
-		if (isNamespace)
-			src += startNamespace(tables, isHttp);
-		src += defs;
-		src += getRdbClientTs(tables, isHttp);
-		if (isNamespace)
-			src += '}';
-		return src;
-
-
-		function getTSDefinitionTable({table, customFilters, name}) {
-			let Name = name.substr(0, 1).toUpperCase() + name.substr(1);
-			name = name.substr(0, 1).toLowerCase() + name.substr(1);
-			let result = '' + getTable(table, Name, name, customFilters);
-			return result;
-		}
-
-		function getTable(table, Name, name, customFilters) {
-			const _columns = columns(table);
-			const _tableRelations = tableRelations(table);
-			return `
-export interface ${Name}Table {
-	count(filter?: RawFilter): Promise<number>;
-	getAll(): Promise<${Name}Array>;
-	getAll(fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
-	getMany(filter?: RawFilter): Promise<${Name}Array>;
-	getMany(filter: RawFilter, fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
-	getMany(${name}s: Array<${Name}>): Promise<${Name}Array>;
-	getMany(${name}s: Array<${Name}>, fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
-	getOne(filter?: RawFilter): Promise<${Name}Row>;
-	getOne(filter?: RawFilter, fetchingStrategy?: ${Name}Strategy): Promise<${Name}Row>;
-	getOne(${name}: ${Name}): Promise<${Name}Row>;
-	getOne(${name}: ${Name}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
-	getById(${getIdArgs(table)}): Promise<${Name}Row>;
-	getById(${getIdArgs(table)}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
-
-	replace(${name}s: ${Name}[] | ${Name}): Promise<void>;
-	replace(${name}s: ${Name}[], fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
-	replace(${name}: ${Name}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
-	
-	update(${name}: ${Name}): Promise<void>;
-	update(${name}: ${Name}, whereStrategy: ${Name}Strategy): Promise<void>;
-	update(${name}: ${Name}, whereStrategy: ${Name}Strategy): Promise<void>;
-	update(${name}: ${Name}, whereStrategy: ${Name}Strategy, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row[]>;
-
-	updateChanges(${name}s: ${Name}[], old${name}s: ${Name}[]): Promise<${Name}Array>;
-	updateChanges(${name}s: ${Name}[],old${name}s: ${Name}[], fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
-	updateChanges(${name}: ${Name}, old${name}: ${Name}): Promise<${Name}Row>;
-	updateChanges(${name}: ${Name},old${name}: ${Name}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
-	
-	insert(${name}s: ${Name}[]): Promise<${Name}Array>;
-	insert(${name}s: ${Name}[], fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
-	insert(${name}: ${Name}): Promise<${Name}Row>;
-	insert(${name}: ${Name}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
-	insertAndForget(${name}s: ${Name}[]): Promise<void>;
-	insertAndForget(${name}: ${Name}): Promise<void>;
-	delete(filter?: RawFilter): Promise<void>;
-	delete(${name}s: Array<${Name}>): Promise<void>;
-	deleteCascade(filter?: RawFilter): Promise<void>;
-	deleteCascade(${name}s: Array<${Name}>): Promise<void>;
-	proxify(${name}s: ${Name}[]): ${Name}Array;
-	proxify(${name}s: ${Name}[], fetchingStrategy: ${Name}Strategy): ${Name}Array;
-	proxify(${name}: ${Name}): ${Name}Row;
-	proxify(${name}: ${Name}, fetchingStrategy: ${Name}Strategy): ${Name}Row;
-	patch(patch: JsonPatch): Promise<void>;
-	patch(patch: JsonPatch, concurrency: ${Name}Concurrency, fetchingStrategy?: ${Name}Strategy): Promise<void>;	
-	customFilters: ${Name}CustomFilters;
-	${_columns}
-	${_tableRelations}
-}
-
-export interface ${Name}ExpressConfig {
-	baseFilter?: RawFilter | ((context: ExpressContext) => RawFilter | Promise<RawFilter>);
-    customFilters?: Record<string, (context: ExpressContext,...args: any[]) => RawFilter | Promise<RawFilter>>;
-    concurrency?: ${Name}Concurrency;
-    readonly?: boolean;
-    disableBulkDeletes?: boolean;
-}
-
-export interface ${Name}HonoConfig {
-	baseFilter?: RawFilter | ((context: HonoContext) => RawFilter | Promise<RawFilter>);
-    customFilters?: Record<string, (context: HonoContext,...args: any[]) => RawFilter | Promise<RawFilter>>;
-    concurrency?: ${Name}Concurrency;
-    readonly?: boolean;
-    disableBulkDeletes?: boolean;
-}
-
-export interface ${Name}CustomFilters {
-	${getCustomFilters(customFilters)}
-}
-
-export interface ${Name}Array extends Array<${Name}> {
-	saveChanges(): Promise<void>;
-	saveChanges(concurrency: ${Name}Concurrency, fetchingStrategy?: ${Name}Strategy): Promise<void>;
-	acceptChanges(): void;
-	clearChanges(): void;
-	refresh(): Promise<void>;
-	refresh(fetchingStrategy: ${Name}Strategy): Promise<void>;
-	delete(): Promise<void>;
-	delete(options: ${Name}Concurrency): Promise<void>;
-}
-
-export interface ${Name}Row extends ${Name} {
-	saveChanges(): Promise<void>;
-	saveChanges(concurrency: ${Name}Concurrency, fetchingStrategy?: ${Name}Strategy): Promise<void>;
-	acceptChanges(): void;
-	clearChanges(): void;
-	refresh(): Promise<void>;
-	refresh(fetchingStrategy: ${Name}Strategy): Promise<void>;
-	delete(): Promise<void>;
-	delete(options: ${Name}Concurrency): Promise<void>;
-}
-
-${Concurrency(table, Name, true)}
-`;
-		}
-
-		function getIdArgs(table) {
-			let result = [];
-			for (let i = 0; i < table._primaryColumns.length; i++) {
-				let column = table._primaryColumns[i];
-				result.push(`${column.alias}: ${typeMap[column.tsType]}`);
-			}
-			return result.join(', ');
-		}
-
-
-		function tableRelations(table) {
-			let relations = table._relations;
-			let result = '';
-			for (let relationName in relations) {
-				const tableName = getTableName(relations[relationName], relationName);
-				result += `${relationName}: ${tableName}RelatedTable;`;
-			}
-			return result;
-		}
-
-
-		function columns(table) {
-			let result = '';
-			let separator = '';
-			for (let i = 0; i < table._columns.length; i++) {
-				let column = table._columns[i];
-				result += `${separator}${column.alias} : ${column.tsType};`;
-				separator = `
-	`;
-			}
-			return result;
-		}
-
-		function Concurrency(table, name, isRoot) {
-			name = pascalCase(name);
-			if (!isRoot) {
-				if (tablesAdded.has(table))
-					return '';
-				else {
-					tablesAdded.set(table, name);
-				}
-			}
-			let otherConcurrency = '';
-			let concurrencyRelations = '';
-			let strategyRelations = '';
-			let regularRelations = '';
-			let relations = table._relations;
-			let relationName;
-
-			let separator = `
-	`;
-			let visitor = {};
-			visitor.visitJoin = function(relation) {
-				const tableTypeName = getTableName(relation, relationName);
-
-				otherConcurrency += `${Concurrency(relation.childTable, tableTypeName)}`;
-				concurrencyRelations += `${relationName}?: ${tableTypeName}Concurrency;${separator}`;
-				strategyRelations += `${relationName}?: ${tableTypeName}Strategy | boolean;${separator}`;
-				regularRelations += `${relationName}?: ${tableTypeName} | null;${separator}`;
-			};
-			visitor.visitOne = visitor.visitJoin;
-			visitor.visitMany = function(relation) {
-				const tableTypeName = getTableName(relation, relationName);
-				otherConcurrency += `${Concurrency(relation.childTable, tableTypeName)}`;
-				concurrencyRelations += `${relationName}?: ${tableTypeName}Concurrency;${separator}`;
-				strategyRelations += `${relationName}?: ${tableTypeName}Strategy | boolean;${separator}`;
-				regularRelations += `${relationName}?: ${tableTypeName}[] | null;${separator}`;
-			};
-
-			for (relationName in relations) {
-				var relation = relations[relationName];
-				relation.accept(visitor);
-			}
-
-			let row = '';
-			if (!isRoot) {
-				row = `export interface ${name}RelatedTable {
-	${columns(table)}
-	${tableRelations(table)}
-	all: (selector: (table: ${name}RelatedTable) => RawFilter) => Filter;
-	any: (selector: (table: ${name}RelatedTable) => RawFilter) => Filter;
-	none: (selector: (table: ${name}RelatedTable) => RawFilter) => Filter;
-	exists: () => Filter;	
-}`;
-			}
-
-			return `
-export interface ${name}Concurrency {
-	readonly?: boolean;
-	concurrency?: Concurrency;
-	${concurrencyColumns(table)}
-	${concurrencyRelations}
-}
-
-export interface ${name} {
-	${regularColumns(table)}
-	${regularRelations}
-}
-
-export interface ${name}TableBase {	
-	${columns(table)}
-	${tableRelations(table)}
-}
-
-
-export interface ${name}Strategy {
-	${strategyColumns(table)}
-	${strategyRelations}
-	limit?: number;
-	offset?: number;
-	orderBy?: Array<${orderByColumns(table)}> | ${orderByColumns(table)};
-	where?: (table: ${name}TableBase) => RawFilter;
-	forUpdate?: boolean;
-	skipLocked?: boolean;
-}
-
-${otherConcurrency}
-
-${row}`;
-
-		}
-
-		function getTableName(relation, relationName) {
-			let name = rootTablesAdded.get(relation.childTable);
-			if (name)
-				return name;
-			else {
-				let name = pascalCase(relationName);
-				let count = 2;
-				while (tableNames.has(name)) {
-					name = name + 'x' + count;
-					count++;
-				}
-				rootTablesAdded.set(relation.childTable, name);
-				tableNames.add(name);
-				return name;
-			}
-		}
-	}
-
-	function regularColumns(table) {
-		let result = '';
-		let separator = '';
-		for (let i = 0; i < table._columns.length; i++) {
-			let column = table._columns[i];
-			if (column._notNull)
-				result += `${separator}${column.alias} : ${typeMap[column.tsType]};`;
-			else
-				result += `${separator}${column.alias}? : ${typeMap[column.tsType]} | null;`;
-			separator = `
-	`;
-		}
-		return result;
-	}
-
-	function orderByColumns(table) {
-		let result = '';
-		let separator = '';
-		for (let i = 0; i < table._columns.length; i++) {
-			let column = table._columns[i];
-			result += `${separator}'${column.alias}' | '${column.alias} desc'`;
-			separator = '| ';
-		}
-		return result;
-	}
-
-
-	function pascalCase(name) {
-		return name[0].toUpperCase() + name.substr(1);
-	}
-
-	function concurrencyColumns(table) {
-		let result = '';
-		let separator = '';
-		for (let i = 0; i < table._columns.length; i++) {
-			let column = table._columns[i];
-			result += `${separator}${column.alias}? : ColumnConcurrency;`;
-			separator = `
-	`;
-		}
-		return result;
-	}
-
-	function strategyColumns(table) {
-		let primarySet = new Set(table._primaryColumns);
-		let result = '';
-		let separator = '';
-		for (let i = 0; i < table._columns.length; i++) {
-			let column = table._columns[i];
-			if (primarySet.has(column))
-				continue;
-			result += `${separator}${column.alias}? : boolean;`;
-			separator = `
-	`;
-		}
-		return result;
-	}
-
-	function getCustomFilters(filters) {
-		return getLeafNames(filters);
-
-		function getLeafNames(obj, tabs = '\t\t\t\t\t') {
-			let result = '';
-			for (let p in obj) {
-				if (typeof obj[p] === 'object' && obj[p] !== null) {
-					result += '\n' + tabs + p + ': {' + tabs + getLeafNames(obj[p], tabs + '\t');
-					result += '\n' + tabs + '}';
-				}
-				else if (typeof obj[p] === 'function')
-					result += '\n' + tabs + p + ': (' + getParamNames(obj[p]) + ') => import(\'orange-orm\').Filter;';
-			}
-			return result;
-		}
-	}
-
-	function getParamNames(func) {
-		let STRIP_COMMENTS = /((\/\/.*$)|(\/\*[\s\S]*?\*\/))/mg;
-		let ARGUMENT_NAMES = /([^\s,]+)/g;
-
-		let fnStr = func.toString().replace(STRIP_COMMENTS, '');
-		let result = fnStr.slice(fnStr.indexOf('(') + 1, fnStr.indexOf(')')).match(ARGUMENT_NAMES);
-		if (result === null)
-			return '';
-		return result.slice(1).join(': unknown, ') + ': unknown';
-	}
-
-	function getPrefixTs(isNamespace) {
-		if (isNamespace)
-			return `
-/* eslint-disable @typescript-eslint/no-empty-interface */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import type { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Hono, Url, ColumnConcurrency, JsonPatch } from 'orange-orm';
-export { RequestHandler } from 'express';
-export { Concurrency, Filter, RawFilter, Config, TransactionOptions, Pool } from 'orange-orm';
-export = r;
-declare function r(config: Config): r.RdbClient;
-type HttpInterceptorManager<T> = {
-	use(onFulfilled?: (value: T) => T | Promise<T>, onRejected?: (error: any) => any): string;
-	eject(id: string): void;
-};
-type HttpRequestConfig = {
-	baseURL?: string;
-	url?: string;
-	method?: string;
-	headers: Record<string, string>;
-	data?: any;
-};
-type HttpResponse<T = any> = {
-	data: T;
-	status: number;
-	statusText: string;
-	headers: Record<string, string>;
-	config: HttpRequestConfig;
-};
-`;
-
-		return `
-/* eslint-disable @typescript-eslint/no-empty-interface */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import schema from './schema';
-import type { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Hono, Url, ColumnConcurrency, JsonPatch } from 'orange-orm';
-type HttpInterceptorManager<T> = {
-	use(onFulfilled?: (value: T) => T | Promise<T>, onRejected?: (error: any) => any): string;
-	eject(id: string): void;
-};
-type HttpRequestConfig = {
-	baseURL?: string;
-	url?: string;
-	method?: string;
-	headers: Record<string, string>;
-	data?: any;
-};
-type HttpResponse<T = any> = {
-	data: T;
-	status: number;
-	statusText: string;
-	headers: Record<string, string>;
-	config: HttpRequestConfig;
-};
-export default schema as RdbClient;`;
-	}
-
-	function startNamespace(tables, isHttp) {
-		return `
-declare namespace r {${getTables(isHttp)}
-`;
-
-		function getTables(isHttp) {
-			let result = '';
-			for (let name in tables) {
-				let Name = name.substring(0, 1).toUpperCase() + name.substring(1);
-				result +=
-					`
-	const ${name}: ${Name}Table;`;
-			}
-			if (!isHttp)
-				result += `
-
-	function and(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
-	function or(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
-	function not(): Filter;
-	function transaction(fn: (transaction: RdbClient, ctx: SyncTransactionContext) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
-	function query(filter: RawFilter | string): Promise<unknown[]>;
-	function query<T>(filter: RawFilter | string): Promise<T[]>;
-	function transaction(fn: (transaction: RdbClient, ctx: SyncTransactionContext) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
-	const filter: Filter;
-	function express(): Express;
-	function express(config: ExpressConfig): Express;
-	function hono(): Hono;
-	function hono(config: HonoConfig): Hono;
-`;
-			else
-				result += `
-
-	const interceptors: {
-		request: HttpInterceptorManager<HttpRequestConfig>;
-		response: HttpInterceptorManager<HttpResponse>;
-	};
-	function reactive(proxyMethod: (obj: unknown) => unknown): void;	
-	function and(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
-	function or(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
-	function not(): Filter;
-	const filter: Filter;
-`;
-			return result;
-		}
-	}
-
-	function getRdbClientTs(tables, isHttp) {
-		return `
-export interface RdbClient  {${getTables(isHttp)}
-}
-
-export interface RdbConfig {
-	db?: Pool | (() => Pool);
-    readonly?: boolean;
-    concurrency?: Concurrency;${getConcurrencyTables()}    
-}
-
-export interface MetaData {
-    readonly?: boolean;
-    concurrency?: Concurrency;${getConcurrencyTables()}
-}
-
-export interface ExpressConfig {
-	db?: Pool | (() => Pool);
-	tables?: ExpressTables;
-	concurrency?: Concurrency;
-	readonly?: boolean;
-	disableBulkDeletes?: boolean;
-	hooks?: ExpressHooks;
-}
-
-export interface HonoConfig {
-	db?: Pool | (() => Pool);
-	tables?: HonoTables;
-	concurrency?: Concurrency;
-	readonly?: boolean;
-	disableBulkDeletes?: boolean;
-	hooks?: HonoHooks;
-}
-
-export interface ExpressContext {
-	request: import('express').Request;
-	response: import('express').Response;
-	client: RdbClient;
-}		
-
-export interface HonoRequest {
-	method: string;
-	query: Record<string, string>;
-	headers: Record<string, string>;
-	json(): Promise<unknown>;
-}
-
-export interface HonoResponse {
-	status(code: number): HonoResponse;
-	setHeader(name: string, value: string): HonoResponse;
-	json(value: unknown): unknown;
-	send(value: unknown): unknown;
-}
-
-export interface HonoContext {
-	request: HonoRequest;
-	response: HonoResponse;
-	client: RdbClient;
-}
-
-export interface SyncTransactionContext {
-	context: Record<string, unknown> & { operation?: string };
-	memory: unknown;
-}
-
-export interface ExpressTransactionHooks {
-	beforeBegin?: (db: Pool, request: import('express').Request, response: import('express').Response) => void | Promise<void>;
-	afterBegin?: (db: Pool, request: import('express').Request, response: import('express').Response) => void | Promise<void>;
-	beforeCommit?: (db: Pool, request: import('express').Request, response: import('express').Response) => void | Promise<void>;
-	afterCommit?: (db: Pool, request: import('express').Request, response: import('express').Response) => void | Promise<void>;
-	afterRollback?: (db: Pool, request: import('express').Request, response: import('express').Response, error?: unknown) => void | Promise<void>;
-}
-
-export interface ExpressHooks extends ExpressTransactionHooks {
-	transaction?: ExpressTransactionHooks;
-}
-
-export interface HonoTransactionHooks {
-	beforeBegin?: (db: Pool, request: HonoRequest, response: HonoResponse) => void | Promise<void>;
-	afterBegin?: (db: Pool, request: HonoRequest, response: HonoResponse) => void | Promise<void>;
-	beforeCommit?: (db: Pool, request: HonoRequest, response: HonoResponse) => void | Promise<void>;
-	afterCommit?: (db: Pool, request: HonoRequest, response: HonoResponse) => void | Promise<void>;
-	afterRollback?: (db: Pool, request: HonoRequest, response: HonoResponse, error?: unknown) => void | Promise<void>;
-}
-
-export interface HonoHooks extends HonoTransactionHooks {
-	transaction?: HonoTransactionHooks;
-}
-
-export interface ExpressTables {${getExpressTables()}
-}
-
-export interface HonoTables {${getHonoTables()}
-}
-`;
-		function getConcurrencyTables() {
-			let result = '';
-			for (let name in tables) {
-				let Name = name.substring(0, 1).toUpperCase() + name.substring(1);
-				result +=
-				`
-	${name}?: ${Name}Concurrency;`;
-			}
-			return result;
-		}
-
-		function getTables(isHttp) {
-			let result = '';
-			for (let name in tables) {
-				let Name = name.substring(0, 1).toUpperCase() + name.substring(1);
-				result +=
-				`
-	${name}: ${Name}Table;`;
-			}
-			if (isHttp)
-				result += `
-	(config: {db: Url}): RdbClient;
-	interceptors: {
-        request: HttpInterceptorManager<HttpRequestConfig>;
-        response: HttpInterceptorManager<HttpResponse>;
+/*!
+ * https://github.com/Starcounter-Jack/JSON-Patch
+ * (c) 2017-2022 Joachim Wester
+ * MIT licensed
+ */
+var __extends = (undefined && undefined.__extends) || (function () {
+    var extendStatics = function (d, b) {
+        extendStatics = Object.setPrototypeOf ||
+            ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+            function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+        return extendStatics(d, b);
     };
-	reactive(proxyMethod: (obj: unknown) => unknown): void;
-	and(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
-	or(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
-	not(): Filter;
-	transaction(fn: (transaction: RdbClient, ctx: SyncTransactionContext) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
-	filter: Filter;
-    createPatch(original: any[], modified: any[]): JsonPatch;
-    createPatch(original: any, modified: any): JsonPatch;`;
-			else
-				result += `
-	(config: RdbConfig): RdbClient;
-	and(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
-	or(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
-	not(): Filter;
-	query(filter: RawFilter | string): Promise<unknown[]>;
-	query<T>(filter: RawFilter | string): Promise<T[]>;
-	transaction(fn: (transaction: RdbClient, ctx: SyncTransactionContext) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
-	filter: Filter;
-	createPatch(original: any[], modified: any[]): JsonPatch;
-	createPatch(original: any, modified: any): JsonPatch;
-	express(): Express;
-	express(config: ExpressConfig): Express;
-	hono(): Hono;
-	hono(config: HonoConfig): Hono;
-	readonly metaData: MetaData;`;
-			return result;
-		}
-		function getExpressTables() {
-			let result = '';
-			for (let name in tables) {
-				let Name = name.substring(0, 1).toUpperCase() + name.substring(1);
-				result +=
-					`
-	${name}?: boolean | ${Name}ExpressConfig;`;
-			}
-			return result;
-		}
-		function getHonoTables() {
-			let result = '';
-			for (let name in tables) {
-				let Name = name.substring(0, 1).toUpperCase() + name.substring(1);
-				result +=
-					`
-	${name}?: boolean | ${Name}HonoConfig;`;
-			}
-			return result;
-		}
-	}
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+var _hasOwnProperty = Object.prototype.hasOwnProperty;
+function hasOwnProperty(obj, key) {
+    return _hasOwnProperty.call(obj, key);
+}
+function _objectKeys(obj) {
+    if (Array.isArray(obj)) {
+        var keys_1 = new Array(obj.length);
+        for (var k = 0; k < keys_1.length; k++) {
+            keys_1[k] = "" + k;
+        }
+        return keys_1;
+    }
+    if (Object.keys) {
+        return Object.keys(obj);
+    }
+    var keys = [];
+    for (var i in obj) {
+        if (hasOwnProperty(obj, i)) {
+            keys.push(i);
+        }
+    }
+    return keys;
+}
+/**
+* Deeply clone the object.
+* https://jsperf.com/deep-copy-vs-json-stringify-json-parse/25 (recursiveDeepCopy)
+* @param  {any} obj value to clone
+* @return {any} cloned obj
+*/
+function _deepClone(obj) {
+    switch (typeof obj) {
+        case "object":
+            return JSON.parse(JSON.stringify(obj)); //Faster than ES5 clone - http://jsperf.com/deep-cloning-of-objects/5
+        case "undefined":
+            return null; //this is how JSON.stringify behaves for array items
+        default:
+            return obj; //no need to clone primitives
+    }
+}
+//3x faster than cached /^\d+$/.test(str)
+function isInteger(str) {
+    var i = 0;
+    var len = str.length;
+    var charCode;
+    while (i < len) {
+        charCode = str.charCodeAt(i);
+        if (charCode >= 48 && charCode <= 57) {
+            i++;
+            continue;
+        }
+        return false;
+    }
+    return true;
+}
+/**
+* Escapes a json pointer path
+* @param path The raw pointer
+* @return the Escaped path
+*/
+function escapePathComponent(path) {
+    if (path.indexOf('/') === -1 && path.indexOf('~') === -1)
+        return path;
+    return path.replace(/~/g, '~0').replace(/\//g, '~1');
+}
+/**
+ * Unescapes a json pointer path
+ * @param path The escaped pointer
+ * @return The unescaped path
+ */
+function unescapePathComponent(path) {
+    return path.replace(/~1/g, '/').replace(/~0/g, '~');
+}
+/**
+* Recursively checks whether an object has any undefined values inside.
+*/
+function hasUndefined(obj) {
+    if (obj === undefined) {
+        return true;
+    }
+    if (obj) {
+        if (Array.isArray(obj)) {
+            for (var i_1 = 0, len = obj.length; i_1 < len; i_1++) {
+                if (hasUndefined(obj[i_1])) {
+                    return true;
+                }
+            }
+        }
+        else if (typeof obj === "object") {
+            var objKeys = _objectKeys(obj);
+            var objKeysLength = objKeys.length;
+            for (var i = 0; i < objKeysLength; i++) {
+                if (hasUndefined(obj[objKeys[i]])) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+function patchErrorMessageFormatter(message, args) {
+    var messageParts = [message];
+    for (var key in args) {
+        var value = typeof args[key] === 'object' ? JSON.stringify(args[key], null, 2) : args[key]; // pretty print
+        if (typeof value !== 'undefined') {
+            messageParts.push(key + ": " + value);
+        }
+    }
+    return messageParts.join('\n');
+}
+var PatchError = /** @class */ (function (_super) {
+    __extends(PatchError, _super);
+    function PatchError(message, name, index, operation, tree) {
+        var _newTarget = this.constructor;
+        var _this = _super.call(this, patchErrorMessageFormatter(message, { name: name, index: index, operation: operation, tree: tree })) || this;
+        _this.name = name;
+        _this.index = index;
+        _this.operation = operation;
+        _this.tree = tree;
+        Object.setPrototypeOf(_this, _newTarget.prototype); // restore prototype chain, see https://stackoverflow.com/a/48342359
+        _this.message = patchErrorMessageFormatter(message, { name: name, index: index, operation: operation, tree: tree });
+        return _this;
+    }
+    return PatchError;
+}(Error));
 
-	getTSDefinition_1 = getTSDefinition;
-	return getTSDefinition_1;
+var JsonPatchError = PatchError;
+var deepClone = _deepClone;
+/* We use a Javascript hash to store each
+ function. Each hash entry (property) uses
+ the operation identifiers specified in rfc6902.
+ In this way, we can map each patch operation
+ to its dedicated function in efficient way.
+ */
+/* The operations applicable to an object */
+var objOps = {
+    add: function (obj, key, document) {
+        obj[key] = this.value;
+        return { newDocument: document };
+    },
+    remove: function (obj, key, document) {
+        var removed = obj[key];
+        delete obj[key];
+        return { newDocument: document, removed: removed };
+    },
+    replace: function (obj, key, document) {
+        var removed = obj[key];
+        obj[key] = this.value;
+        return { newDocument: document, removed: removed };
+    },
+    move: function (obj, key, document) {
+        /* in case move target overwrites an existing value,
+        return the removed value, this can be taxing performance-wise,
+        and is potentially unneeded */
+        var removed = getValueByPointer(document, this.path);
+        if (removed) {
+            removed = _deepClone(removed);
+        }
+        var originalValue = applyOperation(document, { op: "remove", path: this.from }).removed;
+        applyOperation(document, { op: "add", path: this.path, value: originalValue });
+        return { newDocument: document, removed: removed };
+    },
+    copy: function (obj, key, document) {
+        var valueToCopy = getValueByPointer(document, this.from);
+        // enforce copy by value so further operations don't affect source (see issue #177)
+        applyOperation(document, { op: "add", path: this.path, value: _deepClone(valueToCopy) });
+        return { newDocument: document };
+    },
+    test: function (obj, key, document) {
+        return { newDocument: document, test: _areEquals(obj[key], this.value) };
+    },
+    _get: function (obj, key, document) {
+        this.value = obj[key];
+        return { newDocument: document };
+    }
+};
+/* The operations applicable to an array. Many are the same as for the object */
+var arrOps = {
+    add: function (arr, i, document) {
+        if (isInteger(i)) {
+            arr.splice(i, 0, this.value);
+        }
+        else { // array props
+            arr[i] = this.value;
+        }
+        // this may be needed when using '-' in an array
+        return { newDocument: document, index: i };
+    },
+    remove: function (arr, i, document) {
+        var removedList = arr.splice(i, 1);
+        return { newDocument: document, removed: removedList[0] };
+    },
+    replace: function (arr, i, document) {
+        var removed = arr[i];
+        arr[i] = this.value;
+        return { newDocument: document, removed: removed };
+    },
+    move: objOps.move,
+    copy: objOps.copy,
+    test: objOps.test,
+    _get: objOps._get
+};
+/**
+ * Retrieves a value from a JSON document by a JSON pointer.
+ * Returns the value.
+ *
+ * @param document The document to get the value from
+ * @param pointer an escaped JSON pointer
+ * @return The retrieved value
+ */
+function getValueByPointer(document, pointer) {
+    if (pointer == '') {
+        return document;
+    }
+    var getOriginalDestination = { op: "_get", path: pointer };
+    applyOperation(document, getOriginalDestination);
+    return getOriginalDestination.value;
+}
+/**
+ * Apply a single JSON Patch Operation on a JSON document.
+ * Returns the {newDocument, result} of the operation.
+ * It modifies the `document` and `operation` objects - it gets the values by reference.
+ * If you would like to avoid touching your values, clone them:
+ * `jsonpatch.applyOperation(document, jsonpatch._deepClone(operation))`.
+ *
+ * @param document The document to patch
+ * @param operation The operation to apply
+ * @param validateOperation `false` is without validation, `true` to use default jsonpatch's validation, or you can pass a `validateOperation` callback to be used for validation.
+ * @param mutateDocument Whether to mutate the original document or clone it before applying
+ * @param banPrototypeModifications Whether to ban modifications to `__proto__`, defaults to `true`.
+ * @return `{newDocument, result}` after the operation
+ */
+function applyOperation(document, operation, validateOperation, mutateDocument, banPrototypeModifications, index) {
+    if (validateOperation === void 0) { validateOperation = false; }
+    if (mutateDocument === void 0) { mutateDocument = true; }
+    if (banPrototypeModifications === void 0) { banPrototypeModifications = true; }
+    if (index === void 0) { index = 0; }
+    if (validateOperation) {
+        if (typeof validateOperation == 'function') {
+            validateOperation(operation, 0, document, operation.path);
+        }
+        else {
+            validator(operation, 0);
+        }
+    }
+    /* ROOT OPERATIONS */
+    if (operation.path === "") {
+        var returnValue = { newDocument: document };
+        if (operation.op === 'add') {
+            returnValue.newDocument = operation.value;
+            return returnValue;
+        }
+        else if (operation.op === 'replace') {
+            returnValue.newDocument = operation.value;
+            returnValue.removed = document; //document we removed
+            return returnValue;
+        }
+        else if (operation.op === 'move' || operation.op === 'copy') { // it's a move or copy to root
+            returnValue.newDocument = getValueByPointer(document, operation.from); // get the value by json-pointer in `from` field
+            if (operation.op === 'move') { // report removed item
+                returnValue.removed = document;
+            }
+            return returnValue;
+        }
+        else if (operation.op === 'test') {
+            returnValue.test = _areEquals(document, operation.value);
+            if (returnValue.test === false) {
+                throw new JsonPatchError("Test operation failed", 'TEST_OPERATION_FAILED', index, operation, document);
+            }
+            returnValue.newDocument = document;
+            return returnValue;
+        }
+        else if (operation.op === 'remove') { // a remove on root
+            returnValue.removed = document;
+            returnValue.newDocument = null;
+            return returnValue;
+        }
+        else if (operation.op === '_get') {
+            operation.value = document;
+            return returnValue;
+        }
+        else { /* bad operation */
+            if (validateOperation) {
+                throw new JsonPatchError('Operation `op` property is not one of operations defined in RFC-6902', 'OPERATION_OP_INVALID', index, operation, document);
+            }
+            else {
+                return returnValue;
+            }
+        }
+    } /* END ROOT OPERATIONS */
+    else {
+        if (!mutateDocument) {
+            document = _deepClone(document);
+        }
+        var path = operation.path || "";
+        var keys = path.split('/');
+        var obj = document;
+        var t = 1; //skip empty element - http://jsperf.com/to-shift-or-not-to-shift
+        var len = keys.length;
+        var existingPathFragment = undefined;
+        var key = void 0;
+        var validateFunction = void 0;
+        if (typeof validateOperation == 'function') {
+            validateFunction = validateOperation;
+        }
+        else {
+            validateFunction = validator;
+        }
+        while (true) {
+            key = keys[t];
+            if (key && key.indexOf('~') != -1) {
+                key = unescapePathComponent(key);
+            }
+            if (banPrototypeModifications &&
+                (key == '__proto__' ||
+                    (key == 'prototype' && t > 0 && keys[t - 1] == 'constructor'))) {
+                throw new TypeError('JSON-Patch: modifying `__proto__` or `constructor/prototype` prop is banned for security reasons, if this was on purpose, please set `banPrototypeModifications` flag false and pass it to this function. More info in fast-json-patch README');
+            }
+            if (validateOperation) {
+                if (existingPathFragment === undefined) {
+                    if (obj[key] === undefined) {
+                        existingPathFragment = keys.slice(0, t).join('/');
+                    }
+                    else if (t == len - 1) {
+                        existingPathFragment = operation.path;
+                    }
+                    if (existingPathFragment !== undefined) {
+                        validateFunction(operation, 0, document, existingPathFragment);
+                    }
+                }
+            }
+            t++;
+            if (Array.isArray(obj)) {
+                if (key === '-') {
+                    key = obj.length;
+                }
+                else {
+                    if (validateOperation && !isInteger(key)) {
+                        throw new JsonPatchError("Expected an unsigned base-10 integer value, making the new referenced value the array element with the zero-based index", "OPERATION_PATH_ILLEGAL_ARRAY_INDEX", index, operation, document);
+                    } // only parse key when it's an integer for `arr.prop` to work
+                    else if (isInteger(key)) {
+                        key = ~~key;
+                    }
+                }
+                if (t >= len) {
+                    if (validateOperation && operation.op === "add" && key > obj.length) {
+                        throw new JsonPatchError("The specified index MUST NOT be greater than the number of elements in the array", "OPERATION_VALUE_OUT_OF_BOUNDS", index, operation, document);
+                    }
+                    var returnValue = arrOps[operation.op].call(operation, obj, key, document); // Apply patch
+                    if (returnValue.test === false) {
+                        throw new JsonPatchError("Test operation failed", 'TEST_OPERATION_FAILED', index, operation, document);
+                    }
+                    return returnValue;
+                }
+            }
+            else {
+                if (t >= len) {
+                    var returnValue = objOps[operation.op].call(operation, obj, key, document); // Apply patch
+                    if (returnValue.test === false) {
+                        throw new JsonPatchError("Test operation failed", 'TEST_OPERATION_FAILED', index, operation, document);
+                    }
+                    return returnValue;
+                }
+            }
+            obj = obj[key];
+            // If we have more keys in the path, but the next value isn't a non-null object,
+            // throw an OPERATION_PATH_UNRESOLVABLE error instead of iterating again.
+            if (validateOperation && t < len && (!obj || typeof obj !== "object")) {
+                throw new JsonPatchError('Cannot perform operation at the desired path', 'OPERATION_PATH_UNRESOLVABLE', index, operation, document);
+            }
+        }
+    }
+}
+/**
+ * Apply a full JSON Patch array on a JSON document.
+ * Returns the {newDocument, result} of the patch.
+ * It modifies the `document` object and `patch` - it gets the values by reference.
+ * If you would like to avoid touching your values, clone them:
+ * `jsonpatch.applyPatch(document, jsonpatch._deepClone(patch))`.
+ *
+ * @param document The document to patch
+ * @param patch The patch to apply
+ * @param validateOperation `false` is without validation, `true` to use default jsonpatch's validation, or you can pass a `validateOperation` callback to be used for validation.
+ * @param mutateDocument Whether to mutate the original document or clone it before applying
+ * @param banPrototypeModifications Whether to ban modifications to `__proto__`, defaults to `true`.
+ * @return An array of `{newDocument, result}` after the patch
+ */
+function applyPatch(document, patch, validateOperation, mutateDocument, banPrototypeModifications) {
+    if (mutateDocument === void 0) { mutateDocument = true; }
+    if (banPrototypeModifications === void 0) { banPrototypeModifications = true; }
+    if (validateOperation) {
+        if (!Array.isArray(patch)) {
+            throw new JsonPatchError('Patch sequence must be an array', 'SEQUENCE_NOT_AN_ARRAY');
+        }
+    }
+    if (!mutateDocument) {
+        document = _deepClone(document);
+    }
+    var results = new Array(patch.length);
+    for (var i = 0, length_1 = patch.length; i < length_1; i++) {
+        // we don't need to pass mutateDocument argument because if it was true, we already deep cloned the object, we'll just pass `true`
+        results[i] = applyOperation(document, patch[i], validateOperation, true, banPrototypeModifications, i);
+        document = results[i].newDocument; // in case root was replaced
+    }
+    results.newDocument = document;
+    return results;
+}
+/**
+ * Apply a single JSON Patch Operation on a JSON document.
+ * Returns the updated document.
+ * Suitable as a reducer.
+ *
+ * @param document The document to patch
+ * @param operation The operation to apply
+ * @return The updated document
+ */
+function applyReducer(document, operation, index) {
+    var operationResult = applyOperation(document, operation);
+    if (operationResult.test === false) { // failed test
+        throw new JsonPatchError("Test operation failed", 'TEST_OPERATION_FAILED', index, operation, document);
+    }
+    return operationResult.newDocument;
+}
+/**
+ * Validates a single operation. Called from `jsonpatch.validate`. Throws `JsonPatchError` in case of an error.
+ * @param {object} operation - operation object (patch)
+ * @param {number} index - index of operation in the sequence
+ * @param {object} [document] - object where the operation is supposed to be applied
+ * @param {string} [existingPathFragment] - comes along with `document`
+ */
+function validator(operation, index, document, existingPathFragment) {
+    if (typeof operation !== 'object' || operation === null || Array.isArray(operation)) {
+        throw new JsonPatchError('Operation is not an object', 'OPERATION_NOT_AN_OBJECT', index, operation, document);
+    }
+    else if (!objOps[operation.op]) {
+        throw new JsonPatchError('Operation `op` property is not one of operations defined in RFC-6902', 'OPERATION_OP_INVALID', index, operation, document);
+    }
+    else if (typeof operation.path !== 'string') {
+        throw new JsonPatchError('Operation `path` property is not a string', 'OPERATION_PATH_INVALID', index, operation, document);
+    }
+    else if (operation.path.indexOf('/') !== 0 && operation.path.length > 0) {
+        // paths that aren't empty string should start with "/"
+        throw new JsonPatchError('Operation `path` property must start with "/"', 'OPERATION_PATH_INVALID', index, operation, document);
+    }
+    else if ((operation.op === 'move' || operation.op === 'copy') && typeof operation.from !== 'string') {
+        throw new JsonPatchError('Operation `from` property is not present (applicable in `move` and `copy` operations)', 'OPERATION_FROM_REQUIRED', index, operation, document);
+    }
+    else if ((operation.op === 'add' || operation.op === 'replace' || operation.op === 'test') && operation.value === undefined) {
+        throw new JsonPatchError('Operation `value` property is not present (applicable in `add`, `replace` and `test` operations)', 'OPERATION_VALUE_REQUIRED', index, operation, document);
+    }
+    else if ((operation.op === 'add' || operation.op === 'replace' || operation.op === 'test') && hasUndefined(operation.value)) {
+        throw new JsonPatchError('Operation `value` property is not present (applicable in `add`, `replace` and `test` operations)', 'OPERATION_VALUE_CANNOT_CONTAIN_UNDEFINED', index, operation, document);
+    }
+    else if (document) {
+        if (operation.op == "add") {
+            var pathLen = operation.path.split("/").length;
+            var existingPathLen = existingPathFragment.split("/").length;
+            if (pathLen !== existingPathLen + 1 && pathLen !== existingPathLen) {
+                throw new JsonPatchError('Cannot perform an `add` operation at the desired path', 'OPERATION_PATH_CANNOT_ADD', index, operation, document);
+            }
+        }
+        else if (operation.op === 'replace' || operation.op === 'remove' || operation.op === '_get') {
+            if (operation.path !== existingPathFragment) {
+                throw new JsonPatchError('Cannot perform the operation at a path that does not exist', 'OPERATION_PATH_UNRESOLVABLE', index, operation, document);
+            }
+        }
+        else if (operation.op === 'move' || operation.op === 'copy') {
+            var existingValue = { op: "_get", path: operation.from, value: undefined };
+            var error = validate$1([existingValue], document);
+            if (error && error.name === 'OPERATION_PATH_UNRESOLVABLE') {
+                throw new JsonPatchError('Cannot perform the operation from a path that does not exist', 'OPERATION_FROM_UNRESOLVABLE', index, operation, document);
+            }
+        }
+    }
+}
+/**
+ * Validates a sequence of operations. If `document` parameter is provided, the sequence is additionally validated against the object document.
+ * If error is encountered, returns a JsonPatchError object
+ * @param sequence
+ * @param document
+ * @returns {JsonPatchError|undefined}
+ */
+function validate$1(sequence, document, externalValidator) {
+    try {
+        if (!Array.isArray(sequence)) {
+            throw new JsonPatchError('Patch sequence must be an array', 'SEQUENCE_NOT_AN_ARRAY');
+        }
+        if (document) {
+            //clone document and sequence so that we can safely try applying operations
+            applyPatch(_deepClone(document), _deepClone(sequence), externalValidator || true);
+        }
+        else {
+            externalValidator = externalValidator || validator;
+            for (var i = 0; i < sequence.length; i++) {
+                externalValidator(sequence[i], i, document, undefined);
+            }
+        }
+    }
+    catch (e) {
+        if (e instanceof JsonPatchError) {
+            return e;
+        }
+        else {
+            throw e;
+        }
+    }
+}
+// based on https://github.com/epoberezkin/fast-deep-equal
+// MIT License
+// Copyright (c) 2017 Evgeny Poberezkin
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+function _areEquals(a, b) {
+    if (a === b)
+        return true;
+    if (a && b && typeof a == 'object' && typeof b == 'object') {
+        var arrA = Array.isArray(a), arrB = Array.isArray(b), i, length, key;
+        if (arrA && arrB) {
+            length = a.length;
+            if (length != b.length)
+                return false;
+            for (i = length; i-- !== 0;)
+                if (!_areEquals(a[i], b[i]))
+                    return false;
+            return true;
+        }
+        if (arrA != arrB)
+            return false;
+        var keys = Object.keys(a);
+        length = keys.length;
+        if (length !== Object.keys(b).length)
+            return false;
+        for (i = length; i-- !== 0;)
+            if (!b.hasOwnProperty(keys[i]))
+                return false;
+        for (i = length; i-- !== 0;) {
+            key = keys[i];
+            if (!_areEquals(a[key], b[key]))
+                return false;
+        }
+        return true;
+    }
+    return a !== a && b !== b;
 }
 
-var getMeta_1;
-var hasRequiredGetMeta;
+var core$2 = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	JsonPatchError: JsonPatchError,
+	deepClone: deepClone,
+	getValueByPointer: getValueByPointer,
+	applyOperation: applyOperation,
+	applyPatch: applyPatch,
+	applyReducer: applyReducer,
+	validator: validator,
+	validate: validate$1,
+	_areEquals: _areEquals
+});
 
-function requireGetMeta () {
-	if (hasRequiredGetMeta) return getMeta_1;
-	hasRequiredGetMeta = 1;
-	function getMeta(table, map = new Map()) {
-		if (map.has(table))
-			return map.get(table).id;
-		let strategy = {
-			keys: table._primaryColumns.map(x => ({name: x.alias, type: x.tsType})),
-			columns: {},
-			relations: {},
-			id: map.size
-		};
-		map.set(table, strategy);
-
-		for (let i = 0; i < table._columns.length; i++) {
-			const column = table._columns[i];
-			strategy.columns[column.alias] = {};
-			if ('serializable' in column && !column.serializable)
-				strategy.columns[column.alias].serializable = false;
-			else
-				strategy.columns[column.alias].serializable = true;
-		}
-
-		let relations = table._relations;
-		let relationName;
-
-		let visitor = {};
-		visitor.visitJoin = function(relation) {
-			strategy.relations[relationName] = getMeta(relation.childTable, map);
-		};
-
-		visitor.visitMany = function(relation) {
-			strategy.relations[relationName] = getMeta(relation.childTable, map);
-		};
-
-		visitor.visitOne = visitor.visitMany;
-
-		for (relationName in relations) {
-			let relation = relations[relationName];
-			relation.accept(visitor);
-		}
-		return strategy;
-	}
-
-	getMeta_1 = getMeta;
-	return getMeta_1;
+/*!
+ * https://github.com/Starcounter-Jack/JSON-Patch
+ * (c) 2017-2021 Joachim Wester
+ * MIT license
+ */
+var beforeDict = new WeakMap();
+var Mirror = /** @class */ (function () {
+    function Mirror(obj) {
+        this.observers = new Map();
+        this.obj = obj;
+    }
+    return Mirror;
+}());
+var ObserverInfo = /** @class */ (function () {
+    function ObserverInfo(callback, observer) {
+        this.callback = callback;
+        this.observer = observer;
+    }
+    return ObserverInfo;
+}());
+function getMirror(obj) {
+    return beforeDict.get(obj);
 }
+function getObserverFromMirror(mirror, callback) {
+    return mirror.observers.get(callback);
+}
+function removeObserverFromMirror(mirror, observer) {
+    mirror.observers.delete(observer.callback);
+}
+/**
+ * Detach an observer from an object
+ */
+function unobserve(root, observer) {
+    observer.unobserve();
+}
+/**
+ * Observes changes made to an object, which can then be retrieved using generate
+ */
+function observe(obj, callback) {
+    var patches = [];
+    var observer;
+    var mirror = getMirror(obj);
+    if (!mirror) {
+        mirror = new Mirror(obj);
+        beforeDict.set(obj, mirror);
+    }
+    else {
+        var observerInfo = getObserverFromMirror(mirror, callback);
+        observer = observerInfo && observerInfo.observer;
+    }
+    if (observer) {
+        return observer;
+    }
+    observer = {};
+    mirror.value = _deepClone(obj);
+    if (callback) {
+        observer.callback = callback;
+        observer.next = null;
+        var dirtyCheck = function () {
+            generate(observer);
+        };
+        var fastCheck = function () {
+            clearTimeout(observer.next);
+            observer.next = setTimeout(dirtyCheck);
+        };
+        if (typeof window !== 'undefined') { //not Node
+            window.addEventListener('mouseup', fastCheck);
+            window.addEventListener('keyup', fastCheck);
+            window.addEventListener('mousedown', fastCheck);
+            window.addEventListener('keydown', fastCheck);
+            window.addEventListener('change', fastCheck);
+        }
+    }
+    observer.patches = patches;
+    observer.object = obj;
+    observer.unobserve = function () {
+        generate(observer);
+        clearTimeout(observer.next);
+        removeObserverFromMirror(mirror, observer);
+        if (typeof window !== 'undefined') {
+            window.removeEventListener('mouseup', fastCheck);
+            window.removeEventListener('keyup', fastCheck);
+            window.removeEventListener('mousedown', fastCheck);
+            window.removeEventListener('keydown', fastCheck);
+            window.removeEventListener('change', fastCheck);
+        }
+    };
+    mirror.observers.set(callback, new ObserverInfo(callback, observer));
+    return observer;
+}
+/**
+ * Generate an array of patches from an observer
+ */
+function generate(observer, invertible) {
+    if (invertible === void 0) { invertible = false; }
+    var mirror = beforeDict.get(observer.object);
+    _generate(mirror.value, observer.object, observer.patches, "", invertible);
+    if (observer.patches.length) {
+        applyPatch(mirror.value, observer.patches);
+    }
+    var temp = observer.patches;
+    if (temp.length > 0) {
+        observer.patches = [];
+        if (observer.callback) {
+            observer.callback(temp);
+        }
+    }
+    return temp;
+}
+// Dirty check if obj is different from mirror, generate patches and update mirror
+function _generate(mirror, obj, patches, path, invertible) {
+    if (obj === mirror) {
+        return;
+    }
+    if (typeof obj.toJSON === "function") {
+        obj = obj.toJSON();
+    }
+    var newKeys = _objectKeys(obj);
+    var oldKeys = _objectKeys(mirror);
+    var deleted = false;
+    //if ever "move" operation is implemented here, make sure this test runs OK: "should not generate the same patch twice (move)"
+    for (var t = oldKeys.length - 1; t >= 0; t--) {
+        var key = oldKeys[t];
+        var oldVal = mirror[key];
+        if (hasOwnProperty(obj, key) && !(obj[key] === undefined && oldVal !== undefined && Array.isArray(obj) === false)) {
+            var newVal = obj[key];
+            if (typeof oldVal == "object" && oldVal != null && typeof newVal == "object" && newVal != null && Array.isArray(oldVal) === Array.isArray(newVal)) {
+                _generate(oldVal, newVal, patches, path + "/" + escapePathComponent(key), invertible);
+            }
+            else {
+                if (oldVal !== newVal) {
+                    if (invertible) {
+                        patches.push({ op: "test", path: path + "/" + escapePathComponent(key), value: _deepClone(oldVal) });
+                    }
+                    patches.push({ op: "replace", path: path + "/" + escapePathComponent(key), value: _deepClone(newVal) });
+                }
+            }
+        }
+        else if (Array.isArray(mirror) === Array.isArray(obj)) {
+            if (invertible) {
+                patches.push({ op: "test", path: path + "/" + escapePathComponent(key), value: _deepClone(oldVal) });
+            }
+            patches.push({ op: "remove", path: path + "/" + escapePathComponent(key) });
+            deleted = true; // property has been deleted
+        }
+        else {
+            if (invertible) {
+                patches.push({ op: "test", path: path, value: mirror });
+            }
+            patches.push({ op: "replace", path: path, value: obj });
+        }
+    }
+    if (!deleted && newKeys.length == oldKeys.length) {
+        return;
+    }
+    for (var t = 0; t < newKeys.length; t++) {
+        var key = newKeys[t];
+        if (!hasOwnProperty(mirror, key) && obj[key] !== undefined) {
+            patches.push({ op: "add", path: path + "/" + escapePathComponent(key), value: _deepClone(obj[key]) });
+        }
+    }
+}
+/**
+ * Create an array of patches from the differences in two objects
+ */
+function compare(tree1, tree2, invertible) {
+    if (invertible === void 0) { invertible = false; }
+    var patches = [];
+    _generate(tree1, tree2, patches, '', invertible);
+    return patches;
+}
+
+var duplex = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	unobserve: unobserve,
+	observe: observe,
+	generate: generate,
+	compare: compare
+});
+
+var index = Object.assign({}, core$2, duplex, {
+    JsonPatchError: PatchError,
+    deepClone: _deepClone,
+    escapePathComponent,
+    unescapePathComponent
+});
+
+var fastJsonPatch = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	'default': index,
+	JsonPatchError: PatchError,
+	deepClone: _deepClone,
+	escapePathComponent: escapePathComponent,
+	unescapePathComponent: unescapePathComponent,
+	getValueByPointer: getValueByPointer,
+	applyOperation: applyOperation,
+	applyPatch: applyPatch,
+	applyReducer: applyReducer,
+	validator: validator,
+	validate: validate$1,
+	_areEquals: _areEquals,
+	unobserve: unobserve,
+	observe: observe,
+	generate: generate,
+	compare: compare
+});
+
+var require$$0 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(fastJsonPatch);
 
 var dateToISOString_1;
 var hasRequiredDateToISOString;
@@ -771,1336 +865,6 @@ function requireStringify () {
 	return stringify_1;
 }
 
-var sync;
-var hasRequiredSync;
-
-function requireSync () {
-	if (hasRequiredSync) return sync;
-	hasRequiredSync = 1;
-	const stringify = requireStringify();
-
-	function newSyncHandler(client, options = {}) {
-		const syncOptions = normalizeSyncOptions(options.sync);
-		if (!syncOptions || syncOptions.enabled === false)
-			return null;
-
-		const tableMeta = createTableMeta(client, syncOptions);
-		const queue = createQueue(syncOptions.queue);
-		const hooks = options.hooks;
-		const transactionHooks = hooks && hooks.transaction;
-		const transactionHookFns = {
-			beforeBegin: (transactionHooks && transactionHooks.beforeBegin) || (hooks && hooks.beforeBegin),
-			afterBegin: (transactionHooks && transactionHooks.afterBegin) || (hooks && hooks.afterBegin),
-			beforeCommit: (transactionHooks && transactionHooks.beforeCommit) || (hooks && hooks.beforeCommit),
-			afterCommit: (transactionHooks && transactionHooks.afterCommit) || (hooks && hooks.afterCommit),
-			afterRollback: (transactionHooks && transactionHooks.afterRollback) || (hooks && hooks.afterRollback)
-		};
-		const hasTransactionHooks = !!(transactionHookFns.beforeBegin
-			|| transactionHookFns.afterBegin
-			|| transactionHookFns.beforeCommit
-			|| transactionHookFns.afterCommit
-			|| transactionHookFns.afterRollback);
-
-		return async function handleSync(request, response) {
-			try {
-				const result = await queue.run(() => execute(request.body || {}, request, response));
-				response.json(result);
-			}
-			catch (e) {
-				if (e.status === undefined)
-					response.status(500).send(e.message || e);
-				else
-					response.status(e.status).send(e.message);
-			}
-		};
-
-		async function execute(body, request, response) {
-			const phase = body.phase || body.action;
-			if (phase === 'push')
-				return pushMutations(body, request, response);
-			if (phase === 'keys')
-				return pullKeys(body, request, response);
-			if (phase === 'rows')
-				return pullRows(body, request, response);
-			const error = new Error('Invalid sync phase. Use { phase: "keys" }, { phase: "rows" }, or { phase: "push" }.');
-			error.status = 400;
-			throw error;
-		}
-
-		async function runHookedTransaction(fn, transactionOptions, request, response) {
-			if (!hasTransactionHooks)
-				return client.transaction(fn, transactionOptions);
-
-			let hookDb;
-			let result;
-			try {
-				result = await client.transaction(async (tx) => {
-					hookDb = tx;
-					if (transactionHookFns.beforeBegin)
-						await transactionHookFns.beforeBegin(hookDb, request, response);
-					if (transactionHookFns.afterBegin)
-						await transactionHookFns.afterBegin(hookDb, request, response);
-					const value = await fn(tx);
-					if (transactionHookFns.beforeCommit)
-						await transactionHookFns.beforeCommit(hookDb, request, response);
-					return value;
-				}, transactionOptions);
-			}
-			catch (e) {
-				if (transactionHookFns.afterRollback)
-					await transactionHookFns.afterRollback(hookDb, request, response, e);
-				throw e;
-			}
-			if (transactionHookFns.afterCommit)
-				await transactionHookFns.afterCommit(hookDb, request, response);
-			return result;
-		}
-
-		async function pushMutations(body, request, response) {
-			const clientId = normalizeClientId(body.clientId ?? body.client_id);
-			const mutations = normalizeMutations(body.mutations, syncOptions.limits.maxMutationsPerBatch);
-			if (!clientId) {
-				const error = new Error('Sync push requires "clientId".');
-				error.status = 400;
-				throw error;
-			}
-			if (mutations.length === 0) {
-				return {
-					phase: 'push',
-					applied: 0,
-					duplicates: 0,
-					results: []
-				};
-			}
-
-			const results = [];
-			let applied = 0;
-			let duplicates = 0;
-			await runHookedTransaction(async (tx) => {
-				for (let i = 0; i < mutations.length; i++) {
-					const mutation = mutations[i];
-					const claim = await claimAppliedMutation(tx, clientId, mutation.id);
-					if (!claim.claimed) {
-						duplicates += 1;
-						results.push({ id: mutation.id, table: mutation.table, ...(claim.result || {}), duplicate: true });
-						continue;
-					}
-					const patchResult = await applyMutationPatches(tx, mutation);
-					const commandResult = await applyMutationCommands(tx, mutation);
-					const result = {
-						id: mutation.id,
-						table: mutation.table,
-						applied: true,
-						changed: patchResult.changed,
-						result: patchResult,
-						commands: commandResult.results
-					};
-					await updateAppliedMutation(tx, clientId, mutation.id, result);
-					results.push(result);
-					applied += 1;
-				}
-			}, undefined, request, response);
-
-			return {
-				phase: 'push',
-				applied,
-				duplicates,
-				results
-			};
-		}
-
-		async function applyMutationPatches(tx, mutation) {
-			const entries = Array.isArray(mutation.patches)
-				? mutation.patches
-				: [{ table: mutation.table, patch: mutation.patch, options: mutation.options }];
-			let changed = 0;
-			const results = [];
-			for (let i = 0; i < entries.length; i++) {
-				const entry = entries[i];
-				if (!entry || !Array.isArray(entry.patch))
-					continue;
-				const table = tx[entry.table];
-				if (!table || typeof table.patch !== 'function') {
-					const error = new Error(`Table "${entry.table}" is not exposed or does not exist`);
-					error.status = 400;
-					throw error;
-				}
-				const result = await table.patch(entry.patch, entry.options || mutation.options || {});
-				changed += Array.isArray(result && result.changed) ? result.changed.length : 0;
-				results.push({ table: entry.table, result });
-			}
-			return { changed, results };
-		}
-
-		async function applyMutationCommands(tx, mutation) {
-			const commands = Array.isArray(mutation.commands) ? mutation.commands : [];
-			const results = [];
-			for (let i = 0; i < commands.length; i++) {
-				const command = commands[i];
-				const name = command && command.name;
-				if (typeof name !== 'string' || name.length === 0)
-					continue;
-				const fn = syncOptions.commands[name];
-				if (typeof fn !== 'function') {
-					const error = new Error(`Sync command "${name}" is not registered`);
-					error.status = 400;
-					throw error;
-				}
-				const args = normalizeCommandArgs(command.args);
-				const value = await fn(tx, args, { name, mutation });
-				results.push({ name, result: value === undefined ? null : value });
-			}
-			return { results };
-		}
-
-		async function pullKeys(body, request, response) {
-			const requestedTables = normalizeRequestedTables(body.tables, tableMeta);
-			const limit = normalizeKeyBatchLimit(body.limit, syncOptions.limits);
-			const token = normalizeToken(body.token, requestedTables);
-			if (token && token.mode === 'changes')
-				return pullKeysFromChanges(token, limit);
-			if (token && token.mode === 'snapshot')
-				return pullKeysFromSnapshot(token, limit, request, response);
-
-			const startCursor = normalizeCursor(body.cursor ?? body.since);
-			const bounds = await getChangeBounds(syncOptions.changeTable);
-			const fallback = shouldUseSnapshot(startCursor, bounds, syncOptions.limits.maxChangeWindow);
-			if (fallback.useSnapshot) {
-				const upperPks = await getSnapshotUpperPks(requestedTables, request, response);
-				const snapshotToken = {
-					v: 1,
-					mode: 'snapshot',
-					tables: requestedTables,
-					tableIndex: 0,
-					lastPk: null,
-					watermark: bounds.max,
-					upperPks,
-					inlineRows: body.inlineRows === true
-				};
-				const result = await pullKeysFromSnapshot(snapshotToken, limit, request, response);
-				result.reason = fallback.reason;
-				return result;
-			}
-
-			const changeToken = {
-				v: 1,
-				mode: 'changes',
-				tables: requestedTables,
-				cursor: startCursor,
-				watermark: bounds.max
-			};
-			return pullKeysFromChanges(changeToken, limit);
-		}
-
-		async function pullKeysFromSnapshot(token, limit, request, response) {
-			const items = [];
-			let tableIndex = normalizeInteger(token.tableIndex, 0);
-			let lastPk = normalizePrimaryKeyToken(token.lastPk);
-			while (items.length < limit && tableIndex < token.tables.length) {
-				const tableName = token.tables[tableIndex];
-				const meta = tableMeta.byName.get(tableName);
-				if (!meta) {
-					tableIndex += 1;
-					lastPk = null;
-					continue;
-				}
-				const upperPk = getSnapshotUpperPk(token.upperPks, tableName);
-				if (token.upperPks && upperPk === null) {
-					tableIndex += 1;
-					lastPk = null;
-					continue;
-				}
-				const remaining = limit - items.length;
-				const rows = await fetchSnapshotRows(meta, remaining, lastPk, upperPk, token.inlineRows, request, response);
-				for (let i = 0; i < rows.length; i++) {
-					const row = rows[i];
-					const pk = toPkArray(meta, row);
-					if (pk)
-						items.push({ table: tableName, pk, key: toKeyObject(meta, pk), op: 'U', ...(token.inlineRows ? { row } : {}) });
-				}
-				if (rows.length < remaining) {
-					tableIndex += 1;
-					lastPk = null;
-				}
-				else {
-					lastPk = toPkArray(meta, rows[rows.length - 1]);
-				}
-			}
-			const done = tableIndex >= token.tables.length;
-			return {
-				phase: 'keys',
-				mode: 'snapshot',
-				done,
-				cursor: token.watermark,
-				token: done ? null : {
-					v: 1,
-					mode: 'snapshot',
-					tables: token.tables,
-					tableIndex,
-					lastPk,
-					watermark: token.watermark,
-					upperPks: token.upperPks,
-					inlineRows: token.inlineRows === true
-				},
-				items
-			};
-		}
-
-		async function pullKeysFromChanges(token, limit) {
-			const fromCursor = normalizeInteger(token.cursor, 0);
-			const watermark = normalizeInteger(token.watermark, 0);
-			if (fromCursor >= watermark) {
-				return {
-					phase: 'keys',
-					mode: 'changes',
-					done: true,
-					cursor: watermark,
-					token: null,
-					items: []
-				};
-			}
-			const whereTables = token.tables.length === 0
-				? ''
-				: ` AND table_name IN (${token.tables.map((name) => sqlStringLiteral(tableMeta.byName.get(name).dbName)).join(',')})`;
-			const sql = [
-				'SELECT id, table_name, op, pk_json',
-				`FROM ${quoteQualified(syncOptions.changeTable)}`,
-				`WHERE id > ${fromCursor} AND id <= ${watermark}${whereTables}`,
-				'ORDER BY id ASC',
-				`LIMIT ${limit}`
-			].join(' ');
-			const rows = await safeQuery(sql, []);
-			const dedup = new Map();
-			let nextCursor = fromCursor;
-			for (let i = 0; i < rows.length; i++) {
-				const row = rows[i];
-				const id = normalizeInteger(row.id ?? row.ID, nextCursor);
-				nextCursor = id > nextCursor ? id : nextCursor;
-				const rawTableName = row.table_name ?? row.TABLE_NAME;
-				const meta = tableMeta.byDbName.get(rawTableName);
-				if (!meta)
-					continue;
-				let keyObject;
-				try {
-					keyObject = typeof row.pk_json === 'string'
-						? JSON.parse(row.pk_json)
-						: JSON.parse(row.PK_JSON);
-				}
-				catch (_e) {
-					continue;
-				}
-				const pk = toPkArray(meta, keyObject);
-				if (!pk)
-					continue;
-				const mapKey = `${meta.name}|${stringify(pk)}`;
-				const op = normalizeOp(row.op ?? row.OP);
-				if (dedup.has(mapKey))
-					dedup.delete(mapKey);
-				dedup.set(mapKey, { table: meta.name, pk, key: toKeyObject(meta, pk), op });
-			}
-			const items = Array.from(dedup.values());
-			const done = rows.length === 0 || nextCursor >= watermark;
-			return {
-				phase: 'keys',
-				mode: 'changes',
-				done,
-				cursor: watermark,
-				token: done ? null : {
-					v: 1,
-					mode: 'changes',
-					tables: token.tables,
-					cursor: nextCursor,
-					watermark
-				},
-				items
-			};
-		}
-
-		async function pullRows(body, request, response) {
-			const rawItems = Array.isArray(body.items) ? body.items : [];
-			const limit = normalizeRowsBatchLimit(rawItems.length, syncOptions.limits);
-			const items = rawItems.slice(0, limit);
-			const truncated = rawItems.length > limit;
-			const normalizedItems = [];
-			const tableKeys = new Map();
-			for (let i = 0; i < items.length; i++) {
-				const item = items[i];
-				if (!item || typeof item.table !== 'string')
-					continue;
-				const meta = tableMeta.byName.get(item.table);
-				if (!meta)
-					continue;
-				if (normalizeOp(item.op) === 'D')
-					continue;
-				const pk = Array.isArray(item.pk) ? item.pk : toPkArray(meta, item.key);
-				if (!pk || pk.length !== meta.pkColumns.length)
-					continue;
-				const pkKey = stringify(pk);
-				normalizedItems.push({ meta, pk, pkKey, op: normalizeOp(item.op) });
-				let tableEntry = tableKeys.get(meta.name);
-				if (!tableEntry) {
-					tableEntry = { meta, keys: [], seen: new Set() };
-					tableKeys.set(meta.name, tableEntry);
-				}
-				if (!tableEntry.seen.has(pkKey)) {
-					tableEntry.seen.add(pkKey);
-					tableEntry.keys.push(pk);
-				}
-			}
-
-			const rowMap = new Map();
-			const tableNames = Array.from(tableKeys.keys());
-			for (let i = 0; i < tableNames.length; i++) {
-				const tableName = tableNames[i];
-				const tableEntry = tableKeys.get(tableName);
-				const rows = await fetchRowsByPrimaryKeys(tableEntry.meta, tableEntry.keys, request, response);
-				const perTable = new Map();
-				for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
-					const row = rows[rowIndex];
-					const pk = toPkArray(tableEntry.meta, row);
-					if (pk)
-						perTable.set(stringify(pk), row);
-				}
-				rowMap.set(tableName, perTable);
-			}
-
-			const resolved = [];
-			for (let i = 0; i < normalizedItems.length; i++) {
-				const item = normalizedItems[i];
-				const row = rowMap.get(item.meta.name)?.get(item.pkKey);
-				if (row !== undefined)
-					resolved.push({ table: item.meta.name, pk: item.pk, key: toKeyObject(item.meta, item.pk), row, op: item.op });
-			}
-
-			return {
-				phase: 'rows',
-				limit,
-				requested: rawItems.length,
-				truncated,
-				items: resolved
-			};
-		}
-
-		async function fetchSnapshotRows(meta, limit, lastPk, upperPk, inlineRows, request, response) {
-			if (upperPk === null)
-				return [];
-			const strategy = {};
-			if (!inlineRows) {
-				for (let i = 0; i < meta.pkColumns.length; i++)
-					strategy[meta.pkColumns[i].alias] = true;
-			}
-			strategy.orderBy = meta.pkColumns.map(x => x.alias);
-			strategy.limit = limit;
-			const filter = buildSnapshotKeysetFilter(meta, lastPk, upperPk);
-			const rows = await runHookedTransaction(async (tx) => {
-				return tx[meta.name].getMany(filter, strategy);
-			}, { readonly: true }, request, response);
-			return rows;
-		}
-
-		async function getSnapshotUpperPks(tableNames, request, response) {
-			const result = {};
-			for (let i = 0; i < tableNames.length; i++) {
-				const tableName = tableNames[i];
-				const meta = tableMeta.byName.get(tableName);
-				if (!meta)
-					continue;
-				result[tableName] = await fetchSnapshotUpperPk(meta, request, response);
-			}
-			return result;
-		}
-
-		async function fetchSnapshotUpperPk(meta, request, response) {
-			const strategy = {};
-			for (let i = 0; i < meta.pkColumns.length; i++) {
-				strategy[meta.pkColumns[i].alias] = true;
-			}
-			strategy.orderBy = meta.pkColumns.map(x => `${x.alias} desc`);
-			strategy.limit = 1;
-			const rows = await runHookedTransaction(async (tx) => {
-				return tx[meta.name].getMany(undefined, strategy);
-			}, { readonly: true }, request, response);
-			return rows.length > 0 ? toPkArray(meta, rows[0]) : null;
-		}
-
-		async function fetchRowsByPrimaryKeys(meta, keys, request, response) {
-			if (!Array.isArray(keys) || keys.length === 0)
-				return [];
-			const keyObjects = [];
-			for (let i = 0; i < keys.length; i++) {
-				const pk = keys[i];
-				if (!Array.isArray(pk) || pk.length !== meta.pkColumns.length)
-					continue;
-				keyObjects.push(toKeyObject(meta, pk));
-			}
-			if (keyObjects.length === 0)
-				return [];
-			return runHookedTransaction(async (tx) => {
-				return tx[meta.name].getMany({
-					where: () => keyObjects
-				});
-			}, { readonly: true }, request, response);
-		}
-
-		async function getChangeBounds(changeTable) {
-			try {
-				const sql = [
-					'SELECT',
-					'COALESCE(MIN(id), 0) AS min_id,',
-					'COALESCE(MAX(id), 0) AS max_id',
-					`FROM ${quoteQualified(changeTable)}`
-				].join(' ');
-				const rows = await safeQuery(sql, []);
-				const row = rows[0] || {};
-				return {
-					exists: true,
-					min: normalizeInteger(row.min_id ?? row.MIN_ID, 0),
-					max: normalizeInteger(row.max_id ?? row.MAX_ID, 0)
-				};
-			}
-			catch (_error) {
-				return { exists: false, min: 0, max: 0 };
-			}
-		}
-
-		async function safeQuery(sql, fallback) {
-			const result = await client.query(sql);
-			if (Array.isArray(result))
-				return result;
-			if (Array.isArray(result?.rows))
-				return result.rows;
-			return fallback;
-		}
-
-		async function claimAppliedMutation(tx, clientId, mutationId) {
-			const rows = await safeTxQuery(tx, [
-				`INSERT INTO ${quoteQualified(syncOptions.appliedMutationsTable)} (client_id, mutation_id, result_json)`,
-				`VALUES (${sqlStringLiteral(clientId)}, ${sqlStringLiteral(mutationId)}, ${sqlJsonLiteral({ pending: true })})`,
-				'ON CONFLICT (client_id, mutation_id) DO NOTHING',
-				'RETURNING result_json'
-			].join(' '), []);
-			if (rows.length > 0)
-				return { claimed: true };
-
-			const existingRows = await safeTxQuery(tx, [
-				'SELECT result_json',
-				`FROM ${quoteQualified(syncOptions.appliedMutationsTable)}`,
-				`WHERE client_id = ${sqlStringLiteral(clientId)} AND mutation_id = ${sqlStringLiteral(mutationId)}`,
-				'LIMIT 1'
-			].join(' '), []);
-			const result = parseResultJson(existingRows[0]);
-			return { claimed: false, result };
-		}
-
-		function parseResultJson(row) {
-			if (!row)
-				return null;
-			const raw = row.result_json ?? row.RESULT_JSON;
-			if (typeof raw === 'string') {
-				try {
-					return JSON.parse(raw);
-				}
-				catch (_e) {
-					return null;
-				}
-			}
-			return raw && raw === Object(raw) ? raw : null;
-		}
-
-		async function updateAppliedMutation(tx, clientId, mutationId, result) {
-			await tx.query([
-				`UPDATE ${quoteQualified(syncOptions.appliedMutationsTable)}`,
-				`SET result_json = ${sqlJsonLiteral(result)}, applied_at = NOW()`,
-				`WHERE client_id = ${sqlStringLiteral(clientId)} AND mutation_id = ${sqlStringLiteral(mutationId)}`
-			].join(' '));
-		}
-
-		async function safeTxQuery(tx, sql, fallback) {
-			const result = await tx.query(sql);
-			if (Array.isArray(result))
-				return result;
-			if (Array.isArray(result?.rows))
-				return result.rows;
-			return fallback;
-		}
-	}
-
-	const DEFAULT_SYNC_BATCH_LIMIT = 1000;
-	const DEFAULT_SYNC_MUTATIONS_LIMIT = 200;
-	const DEFAULT_SYNC_CHANGE_WINDOW = 100000;
-	const MAX_SYNC_BATCH_LIMIT = 10000;
-
-	function normalizeSyncOptions(sync) {
-		if (!sync)
-			return null;
-		const queueOptions = sync.queue || {};
-		const limits = sync.limits || {};
-		const explicitLimits = {
-			maxKeysPerBatch: isNormalizableInteger(limits.maxKeysPerBatch),
-			maxRowsPerBatch: isNormalizableInteger(limits.maxRowsPerBatch)
-		};
-		return {
-			enabled: sync.enabled !== false,
-			changeTable: sync.changeTable || 'orange_changes',
-			appliedMutationsTable: sync.appliedMutationsTable || 'orange_sync_applied_mutations',
-			commands: normalizeCommands(sync.commands),
-			queue: {
-				concurrency: clamp(normalizeInteger(queueOptions.concurrency, 4), 1, 100),
-				maxPending: clamp(normalizeInteger(queueOptions.maxPending, 1000), 0, 100000)
-			},
-			limits: {
-				maxKeysPerBatch: clamp(normalizeInteger(limits.maxKeysPerBatch, DEFAULT_SYNC_BATCH_LIMIT), 1, MAX_SYNC_BATCH_LIMIT),
-				maxRowsPerBatch: clamp(normalizeInteger(limits.maxRowsPerBatch, DEFAULT_SYNC_BATCH_LIMIT), 1, MAX_SYNC_BATCH_LIMIT),
-				maxMutationsPerBatch: clamp(normalizeInteger(limits.maxMutationsPerBatch, DEFAULT_SYNC_MUTATIONS_LIMIT), 1, MAX_SYNC_BATCH_LIMIT),
-				maxChangeWindow: clamp(normalizeInteger(limits.maxChangeWindow, DEFAULT_SYNC_CHANGE_WINDOW), 1, 100000000),
-				explicit: explicitLimits
-			}
-		};
-	}
-
-	function normalizeCommands(commands) {
-		if (!commands || commands !== Object(commands))
-			return {};
-		return commands;
-	}
-
-	function createTableMeta(client, syncOptions) {
-		const byName = new Map();
-		const byDbName = new Map();
-		for (let tableName in client.tables) {
-			const table = client.tables[tableName];
-			const pkColumns = Array.isArray(table?._primaryColumns) ? table._primaryColumns : [];
-			if (pkColumns.length === 0)
-				continue;
-			const dbName = table._dbName;
-			if (!dbName || dbName === syncOptions.changeTable)
-				continue;
-			const meta = {
-				name: tableName,
-				dbName,
-				pkColumns: pkColumns.map((col) => ({ alias: col.alias, dbName: col._dbName || col.alias }))
-			};
-			byName.set(tableName, meta);
-			byDbName.set(dbName, meta);
-			const split = dbName.split('.');
-			byDbName.set(split[split.length - 1], meta);
-		}
-		return { byName, byDbName };
-	}
-
-	function createQueue({ concurrency, maxPending }) {
-		let running = 0;
-		const pending = [];
-		let pendingHead = 0;
-		return { run };
-
-		function run(job) {
-			return new Promise((resolve, reject) => {
-				if (running >= concurrency && pending.length - pendingHead >= maxPending) {
-					const error = new Error('Sync queue is full. Try again later.');
-					error.status = 429;
-					reject(error);
-					return;
-				}
-				pending.push({ job, resolve, reject });
-				drain();
-			});
-		}
-
-		function drain() {
-			while (running < concurrency && pendingHead < pending.length) {
-				const next = pending[pendingHead];
-				pendingHead += 1;
-				if (pendingHead > 1024 && pendingHead * 2 > pending.length) {
-					pending.splice(0, pendingHead);
-					pendingHead = 0;
-				}
-				running += 1;
-				Promise.resolve()
-					.then(next.job)
-					.then(next.resolve, next.reject)
-					.finally(() => {
-						running -= 1;
-						drain();
-					});
-			}
-		}
-	}
-
-	function shouldUseSnapshot(cursor, bounds, maxChangeWindow) {
-		if (!Number.isFinite(cursor))
-			return { useSnapshot: true, reason: 'first_sync' };
-		if (!bounds.exists)
-			return { useSnapshot: true, reason: 'change_table_unavailable' };
-		if (cursor < bounds.min - 1)
-			return { useSnapshot: true, reason: 'cursor_too_old' };
-		if (bounds.max - cursor > maxChangeWindow)
-			return { useSnapshot: true, reason: 'cursor_too_far_behind' };
-		return { useSnapshot: false };
-	}
-
-	function normalizeRequestedTables(rawTables, tableMeta) {
-		if (!Array.isArray(rawTables) || rawTables.length === 0)
-			return Array.from(tableMeta.byName.keys());
-		const normalized = [];
-		for (let i = 0; i < rawTables.length; i++) {
-			const raw = rawTables[i];
-			if (typeof raw !== 'string')
-				continue;
-			const byName = tableMeta.byName.get(raw);
-			if (byName) {
-				normalized.push(byName.name);
-				continue;
-			}
-			const byDbName = tableMeta.byDbName.get(raw);
-			if (byDbName)
-				normalized.push(byDbName.name);
-		}
-		return Array.from(new Set(normalized));
-	}
-
-	function normalizeToken(token, requestedTables) {
-		if (!token || token !== Object(token))
-			return null;
-		if (token.v !== 1)
-			return null;
-		if (token.mode === 'changes') {
-			return {
-				v: 1,
-				mode: 'changes',
-				tables: requestedTables,
-				cursor: normalizeInteger(token.cursor, 0),
-				watermark: normalizeInteger(token.watermark, 0)
-			};
-		}
-		if (token.mode === 'snapshot') {
-			return {
-				v: 1,
-				mode: 'snapshot',
-				tables: requestedTables,
-				tableIndex: normalizeInteger(token.tableIndex, 0),
-				lastPk: normalizePrimaryKeyToken(token.lastPk),
-				watermark: normalizeInteger(token.watermark, 0),
-				upperPks: normalizeSnapshotUpperPks(token.upperPks, requestedTables),
-				inlineRows: token.inlineRows === true
-			};
-		}
-		return null;
-	}
-
-	function normalizeCursor(cursor) {
-		if (cursor === null || cursor === undefined || cursor === '')
-			return NaN;
-		if (typeof cursor === 'number' && Number.isFinite(cursor))
-			return cursor;
-		if (typeof cursor === 'string') {
-			const parsed = Number.parseInt(cursor, 10);
-			return Number.isFinite(parsed) ? parsed : NaN;
-		}
-		return NaN;
-	}
-
-	function normalizeKeyBatchLimit(limit, limits) {
-		const max = Math.min(
-			limits.explicit.maxKeysPerBatch ? limits.maxKeysPerBatch : MAX_SYNC_BATCH_LIMIT,
-			limits.explicit.maxRowsPerBatch ? limits.maxRowsPerBatch : MAX_SYNC_BATCH_LIMIT
-		);
-		return normalizeLimit(limit, DEFAULT_SYNC_BATCH_LIMIT, max);
-	}
-
-	function normalizeRowsBatchLimit(limit, limits) {
-		const max = limits.explicit.maxRowsPerBatch ? limits.maxRowsPerBatch : MAX_SYNC_BATCH_LIMIT;
-		return normalizeLimit(limit, DEFAULT_SYNC_BATCH_LIMIT, max);
-	}
-
-	function normalizeLimit(limit, fallback, max) {
-		return clamp(normalizeInteger(limit, fallback), 1, max);
-	}
-
-	function normalizeInteger(value, fallback) {
-		if (typeof value === 'number' && Number.isFinite(value))
-			return Math.floor(value);
-		if (typeof value === 'string') {
-			const parsed = Number.parseInt(value, 10);
-			if (Number.isFinite(parsed))
-				return parsed;
-		}
-		return fallback;
-	}
-
-	function isNormalizableInteger(value) {
-		if (typeof value === 'number')
-			return Number.isFinite(value);
-		if (typeof value === 'string')
-			return Number.isFinite(Number.parseInt(value, 10));
-		return false;
-	}
-
-	function normalizeOp(value) {
-		if (typeof value !== 'string')
-			return 'U';
-		const op = value.toUpperCase();
-		if (op === 'I' || op === 'U' || op === 'D')
-			return op;
-		return 'U';
-	}
-
-	function normalizeClientId(value) {
-		if (typeof value !== 'string')
-			return '';
-		return value.trim();
-	}
-
-	function normalizeMutations(value, limit) {
-		if (!Array.isArray(value))
-			return [];
-		if (value.length > limit) {
-			const error = new Error(`Sync push accepts at most ${limit} mutations per batch.`);
-			error.status = 413;
-			throw error;
-		}
-		const result = [];
-		for (let i = 0; i < value.length; i++) {
-			const mutation = normalizeMutation(value[i]);
-			if (mutation)
-				result.push(mutation);
-		}
-		return result;
-	}
-
-	function normalizeMutation(value) {
-		if (!value || value !== Object(value))
-			return null;
-		const id = value.id ?? value.mutationId ?? value.mutation_id;
-		if (typeof id !== 'string' || id.length === 0)
-			return null;
-		const commands = Array.isArray(value.commands)
-			? value.commands.map(normalizeMutationCommand).filter(Boolean)
-			: [];
-		if (Array.isArray(value.patches)) {
-			const patches = value.patches.map(normalizeMutationPatch).filter(Boolean);
-			if (patches.length === 0 && commands.length === 0)
-				return null;
-			return {
-				id,
-				patches,
-				commands,
-				options: value.options && value.options === Object(value.options) ? value.options : undefined
-			};
-		}
-		const entry = normalizeMutationPatch(value);
-		if (!entry && commands.length === 0)
-			return null;
-		return {
-			id,
-			...(entry || {}),
-			commands,
-			options: value.options && value.options === Object(value.options) ? value.options : undefined
-		};
-	}
-
-	function normalizeMutationCommand(value) {
-		if (!value || value !== Object(value))
-			return null;
-		if (typeof value.name !== 'string' || value.name.length === 0)
-			return null;
-		return {
-			name: value.name,
-			args: normalizeCommandArgs(value.args)
-		};
-	}
-
-	function normalizeCommandArgs(args) {
-		if (args === undefined)
-			return null;
-		return JSON.parse(JSON.stringify(args));
-	}
-
-	function normalizeMutationPatch(value) {
-		if (!value || value !== Object(value))
-			return null;
-		if (typeof value.table !== 'string' || value.table.length === 0)
-			return null;
-		if (!Array.isArray(value.patch))
-			return null;
-		return {
-			table: value.table,
-			patch: value.patch,
-			options: value.options && value.options === Object(value.options) ? value.options : undefined
-		};
-	}
-
-	function toPkArray(meta, row) {
-		if (!row || row !== Object(row))
-			return null;
-		const result = [];
-		for (let i = 0; i < meta.pkColumns.length; i++) {
-			const key = meta.pkColumns[i].alias;
-			if (!(key in row))
-				return null;
-			result.push(row[key]);
-		}
-		return result;
-	}
-
-	function toKeyObject(meta, pk) {
-		const key = {};
-		for (let i = 0; i < meta.pkColumns.length && i < pk.length; i++) {
-			key[meta.pkColumns[i].alias] = pk[i];
-		}
-		return key;
-	}
-
-	function buildSnapshotKeysetFilter(meta, lastPk, upperPk) {
-		const filters = [];
-		if (Array.isArray(lastPk) && lastPk.length === meta.pkColumns.length)
-			filters.push(buildKeysetAfterFilter(meta, lastPk));
-		if (Array.isArray(upperPk) && upperPk.length === meta.pkColumns.length) {
-			const upperFilter = buildKeysetAfterFilter(meta, upperPk);
-			filters.push({
-				sql: `NOT (${upperFilter.sql})`,
-				parameters: upperFilter.parameters
-			});
-		}
-		const validFilters = filters.filter(Boolean);
-		if (validFilters.length === 0)
-			return undefined;
-		return {
-			sql: validFilters.map(x => `(${x.sql})`).join(' AND '),
-			parameters: validFilters.reduce((all, filter) => all.concat(filter.parameters), [])
-		};
-	}
-
-	function buildKeysetAfterFilter(meta, pk) {
-		const clauses = [];
-		const parameters = [];
-		for (let i = 0; i < meta.pkColumns.length; i++) {
-			const parts = [];
-			for (let j = 0; j < i; j++) {
-				parts.push(`${quoteIdent(meta.pkColumns[j].dbName)} = ?`);
-				parameters.push(pk[j]);
-			}
-			parts.push(`${quoteIdent(meta.pkColumns[i].dbName)} > ?`);
-			parameters.push(pk[i]);
-			clauses.push(`(${parts.join(' AND ')})`);
-		}
-		return {
-			sql: clauses.join(' OR '),
-			parameters
-		};
-	}
-
-	function normalizePrimaryKeyToken(value) {
-		return Array.isArray(value) ? value : null;
-	}
-
-	function normalizeSnapshotUpperPks(value, tableNames) {
-		if (!value || value !== Object(value))
-			return null;
-		const result = {};
-		for (let i = 0; i < tableNames.length; i++) {
-			const tableName = tableNames[i];
-			if (!Object.prototype.hasOwnProperty.call(value, tableName))
-				continue;
-			result[tableName] = value[tableName] === null
-				? null
-				: normalizePrimaryKeyToken(value[tableName]);
-		}
-		return result;
-	}
-
-	function getSnapshotUpperPk(upperPks, tableName) {
-		if (!upperPks || upperPks !== Object(upperPks))
-			return undefined;
-		if (!Object.prototype.hasOwnProperty.call(upperPks, tableName))
-			return undefined;
-		return normalizePrimaryKeyToken(upperPks[tableName]);
-	}
-
-	function clamp(value, min, max) {
-		return Math.max(min, Math.min(max, value));
-	}
-
-	function quoteQualified(name) {
-		return String(name).split('.').map(quoteIdent).join('.');
-	}
-
-	function quoteIdent(name) {
-		return `"${String(name).replace(/"/g, '""')}"`;
-	}
-
-	function sqlStringLiteral(value) {
-		return `'${String(value).replace(/'/g, '\'\'')}'`;
-	}
-
-	function sqlJsonLiteral(value) {
-		return `${sqlStringLiteral(stringify(value))}::jsonb`;
-	}
-
-	sync = newSyncHandler;
-	return sync;
-}
-
-var hostExpress_1;
-var hasRequiredHostExpress;
-
-function requireHostExpress () {
-	if (hasRequiredHostExpress) return hostExpress_1;
-	hasRequiredHostExpress = 1;
-	const getTSDefinition = requireGetTSDefinition();
-	// let hostLocal = _hostLocal;
-	const getMeta = requireGetMeta();
-	const newSyncHandler = requireSync();
-
-	function hostExpress(hostLocal, client, options = {}) {
-		if ('db' in options && (options.db ?? undefined) === undefined || !client.db)
-			throw new Error('No db specified');
-		const dbOptions = { db: options.db || client.db };
-		const commandHandlers = mergeCommandHandlers(
-			options.commands,
-			client.__commands,
-			options.commandHandlers
-		);
-		let c = {};
-		const readonly = { readonly: options.readonly};
-		const sharedHooks = options.hooks;
-		for (let tableName in client.tables) {
-			const tableOptions = options[tableName] || {};
-			const hooks = tableOptions.hooks || sharedHooks;
-			c[tableName] = hostLocal({
-				...dbOptions,
-				...readonly,
-				...tableOptions,
-				table: client.tables[tableName],
-				isHttp: true,
-				client,
-				hooks
-
-			});
-		}
-		const syncHandler = newSyncHandler(client, {
-			...options,
-			sync: options.sync && {
-				...options.sync,
-				commands: mergeCommandHandlers(commandHandlers, options.sync.commands)
-			}
-		});
-
-		async function handler(req, res) {
-			if (req.method === 'POST')
-				return post.apply(null, arguments);
-			if (req.method === 'PATCH')
-				return patch.apply(null, arguments);
-			if (req.method === 'GET')
-				return get.apply(null, arguments);
-			if (req.method === 'OPTIONS')
-				return handleOptions(req, res); // assuming the second argument is `response`
-
-			else
-				res.status(405).set('Allow', 'GET, POST, PATCH, OPTIONS').send('Method Not Allowed');
-		}
-
-		handler.db = handler;
-		handler.dts = get;
-
-		function get(request, response) {
-			try {
-				if (request.query.table) {
-					if (!(request.query.table in c)) {
-						let e = new Error('Table is not exposed or does not exist');
-						// @ts-ignore
-						e.status = 400;
-						throw e;
-					}
-
-					const result = getMeta(client.tables[request.query.table]);
-					response.setHeader('content-type', 'text/plain');
-					response.status(200).send(result);
-				}
-				else {
-					const isNamespace = request.query.isNamespace === 'true';
-					let tsArg = Object.keys(c).map(x => {
-						return { table: client.tables[x], customFilters: options?.tables?.[x].customFilters, name: x };
-					});
-					response.setHeader('content-type', 'text/plain');
-					response.status(200).send(getTSDefinition(tsArg, { isNamespace, isHttp: true }));
-				}
-			}
-			catch (e) {
-				if (e.status === undefined)
-					response.status(500).send(e.message || e);
-				else
-					response.status(e.status).send(e.message);
-			}
-		}
-
-		async function patch(request, response) {
-			try {
-				response.json(await c[request.query.table].patch(request.body, request, response));
-			}
-			catch (e) {
-				if (e.status === undefined)
-					response.status(500).send(e.message || e);
-				else
-					response.status(e.status).send(e.message);
-
-			}
-		}
-
-		async function post(request, response) {
-			try {
-				if (request.query.sync) {
-					if (!syncHandler) {
-						const e = new Error('Sync is not enabled for this endpoint');
-						// @ts-ignore
-						e.status = 404;
-						throw e;
-					}
-					return syncHandler(request, response);
-				}
-				if (request.query.command)
-					return runCommand(request, response);
-				if (!request.query.table) {
-					let e = new Error('Table not defined');
-					// @ts-ignore
-					e.status = 400;
-					throw e;
-				}
-				else if (!(request.query.table in c)) {
-					let e = new Error('Table is not exposed or does not exist');
-					// @ts-ignore
-					e.status = 400;
-					throw e;
-				}
-
-				response.json(await c[request.query.table].post(request.body, request, response));
-			}
-			catch (e) {
-				if (e.status === undefined)
-					response.status(500).send(e.message || e);
-				else
-					response.status(e.status).send(e.message);
-			}
-
-		}
-
-		async function runCommand(request, response) {
-			const name = request.query.command;
-			const fn = typeof name === 'string' ? commandHandlers[name] : null;
-			if (typeof fn !== 'function') {
-				const e = new Error(`Command "${name}" is not registered`);
-				// @ts-ignore
-				e.status = 400;
-				throw e;
-			}
-			const body = typeof request.body === 'string' ? JSON.parse(request.body) : request.body || {};
-			const args = normalizeCommandArgs(body.args);
-			let result;
-			await client.transaction(async (tx) => {
-				result = await fn(tx, args);
-			});
-			response.json(result === undefined ? null : result);
-		}
-
-		function handleOptions(req, response) {
-			response.setHeader('Access-Control-Allow-Origin', '*'); // Adjust this as per your CORS needs
-			response.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS'); // And any other methods you support
-			response.setHeader('Access-Control-Allow-Headers', 'Content-Type'); // And any other headers you expect in requests
-			response.setHeader('Access-Control-Max-Age', '86400'); // Cache preflight request for a day. Adjust as you see fit
-			response.status(204).send(); // 204 No Content response for successful OPTIONS requests
-		}
-
-		return handler;
-	}
-
-	function normalizeCommandArgs(args) {
-		if (args === undefined)
-			return null;
-		return JSON.parse(JSON.stringify(args));
-	}
-
-	function mergeCommandHandlers(...registries) {
-		const commandHandlers = {};
-		for (let i = 0; i < registries.length; i++) {
-			const registry = registries[i];
-			if (registry && typeof registry === 'object')
-				Object.assign(commandHandlers, registry);
-		}
-		return commandHandlers;
-	}
-
-	hostExpress_1 = hostExpress;
-	return hostExpress_1;
-}
-
-var hostHono_1;
-var hasRequiredHostHono;
-
-function requireHostHono () {
-	if (hasRequiredHostHono) return hostHono_1;
-	hasRequiredHostHono = 1;
-	const getTSDefinition = requireGetTSDefinition();
-	const getMeta = requireGetMeta();
-
-	function hostHono(hostLocal, client, options = {}) {
-		if ('db' in options && (options.db ?? undefined) === undefined || !client.db)
-			throw new Error('No db specified');
-		const dbOptions = { db: options.db || client.db };
-		let c = {};
-		const readonly = { readonly: options.readonly };
-		const sharedHooks = options.hooks;
-		for (let tableName in client.tables) {
-			const tableOptions = options[tableName] || {};
-			const hooks = tableOptions.hooks || sharedHooks;
-			c[tableName] = hostLocal({
-				...dbOptions,
-				...readonly,
-				...tableOptions,
-				table: client.tables[tableName],
-				isHttp: true,
-				client,
-				hooks
-			});
-		}
-
-		async function handler(ctx) {
-			const request = createRequest(ctx);
-			const response = createResponse();
-
-			try {
-				if (request.method === 'POST')
-					return await post(request, response);
-				if (request.method === 'PATCH')
-					return await patch(request, response);
-				if (request.method === 'GET')
-					return get(request, response);
-				if (request.method === 'OPTIONS')
-					return handleOptions(response);
-				return response
-					.status(405)
-					.setHeader('Allow', 'GET, POST, PATCH, OPTIONS')
-					.send('Method Not Allowed');
-			}
-			catch (e) {
-				if (e.status === undefined)
-					return response.status(500).send(e.message || e);
-				return response.status(e.status).send(e.message);
-			}
-		}
-
-		handler.db = handler;
-		handler.dts = get;
-
-		function get(request, response) {
-			if (request.query.table) {
-				if (!(request.query.table in c)) {
-					let e = new Error('Table is not exposed or does not exist');
-					// @ts-ignore
-					e.status = 400;
-					throw e;
-				}
-
-				const result = getMeta(client.tables[request.query.table]);
-				response.setHeader('content-type', 'text/plain');
-				return response.status(200).send(result);
-			}
-			const isNamespace = request.query.isNamespace === 'true';
-			let tsArg = Object.keys(c).map(x => {
-				return { table: client.tables[x], customFilters: options?.tables?.[x].customFilters, name: x };
-			});
-			response.setHeader('content-type', 'text/plain');
-			return response.status(200).send(getTSDefinition(tsArg, { isNamespace, isHttp: true }));
-		}
-
-		async function patch(request, response) {
-			const table = request.query.table;
-			const body = await request.json();
-			return response.json(await c[table].patch(body, request, response));
-		}
-
-		async function post(request, response) {
-			if (!request.query.table) {
-				let e = new Error('Table not defined');
-				// @ts-ignore
-				e.status = 400;
-				throw e;
-			}
-			if (!(request.query.table in c)) {
-				let e = new Error('Table is not exposed or does not exist');
-				// @ts-ignore
-				e.status = 400;
-				throw e;
-			}
-
-			const body = await request.json();
-			return response.json(await c[request.query.table].post(body, request, response));
-		}
-
-		function handleOptions(response) {
-			response.setHeader('Access-Control-Allow-Origin', '*');
-			response.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
-			response.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-			response.setHeader('Access-Control-Max-Age', '86400');
-			return response.status(204).send('');
-		}
-
-		function createRequest(ctx) {
-			let bodyPromise;
-			const query = Object.fromEntries(new URL(ctx.req.url).searchParams.entries());
-			const headers = {};
-			for (const [name, value] of ctx.req.raw.headers.entries())
-				headers[name] = value;
-			return {
-				method: ctx.req.method,
-				query,
-				headers,
-				json: async () => {
-					if (!bodyPromise)
-						bodyPromise = ctx.req.json();
-					return bodyPromise;
-				}
-			};
-		}
-
-		function createResponse() {
-			let statusCode = 200;
-			const headers = new Headers();
-			return {
-				status(code) {
-					statusCode = code;
-					return this;
-				},
-				setHeader(name, value) {
-					headers.set(name, value);
-					return this;
-				},
-				json(value) {
-					if (!headers.has('content-type'))
-						headers.set('content-type', 'application/json');
-					return new Response(JSON.stringify(value), { status: statusCode, headers });
-				},
-				send(value) {
-					if (typeof value === 'string') {
-						if (!headers.has('content-type'))
-							headers.set('content-type', 'text/plain');
-						return new Response(value, { status: statusCode, headers });
-					}
-					if (!headers.has('content-type'))
-						headers.set('content-type', 'application/json');
-					return new Response(JSON.stringify(value), { status: statusCode, headers });
-				}
-			};
-		}
-
-		return handler;
-	}
-
-	hostHono_1 = hostHono;
-	return hostHono_1;
-}
-
-var require$$0$1 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(fastJsonPatch);
-
 var newMemoryId;
 var hasRequiredNewMemoryId;
 
@@ -2121,7 +885,7 @@ var hasRequiredCreatePatch;
 function requireCreatePatch () {
 	if (hasRequiredCreatePatch) return createPatch;
 	hasRequiredCreatePatch = 1;
-	const jsonpatch = require$$0$1;
+	const jsonpatch = require$$0;
 	let dateToIsoString = requireDateToISOString();
 	let stringify = requireStringify();
 	let newMemoryId = requireNewMemoryId();
@@ -2248,1490 +1012,747 @@ function requireCreatePatch () {
 	return createPatch;
 }
 
-var extractSql;
-var hasRequiredExtractSql;
+var cloneFromDb_1;
+var hasRequiredCloneFromDb;
 
-function requireExtractSql () {
-	if (hasRequiredExtractSql) return extractSql;
-	hasRequiredExtractSql = 1;
-	function extract(sql) {
-		if (sql && typeof(sql) === 'function')
-			return sql();
-		else if (sql === undefined)
-			return '';
-		else
-			return sql;
-	}
+function requireCloneFromDb () {
+	if (hasRequiredCloneFromDb) return cloneFromDb_1;
+	hasRequiredCloneFromDb = 1;
+	let dateToISOString = requireDateToISOString();
 
-	extractSql = extract;
-	return extractSql;
-}
-
-var extractParameters;
-var hasRequiredExtractParameters;
-
-function requireExtractParameters () {
-	if (hasRequiredExtractParameters) return extractParameters;
-	hasRequiredExtractParameters = 1;
-	function extract(parameters) {
-		if (parameters) {
-			return parameters.slice(0);
+	function cloneFromDbFast(obj) {
+		if (obj === null || typeof obj !== 'object')
+			return obj;
+		if (Array.isArray(obj)) {
+			const arrClone = [];
+			for (let i = 0; i < obj.length; i++) {
+				arrClone[i] = cloneFromDbFast(obj[i]);
+			}
+			return arrClone;
 		}
-		return [];
+		const clone = {};
+		const keys = Object.keys(obj);
+		for (let i = 0; i < keys.length; i++) {
+			const key = keys[i];
+			clone[key] = cloneFromDbFast(obj[key]);
+		}
+		return clone;
 	}
 
-	extractParameters = extract;
-	return extractParameters;
+	function cloneRegular(obj) {
+		if (obj === null || typeof obj !== 'object')
+			return obj;
+		if (Array.isArray(obj)) {
+			const arrClone = [];
+			for (let i = 0; i < obj.length; i++) {
+				arrClone[i] = cloneRegular(obj[i]);
+			}
+			return arrClone;
+		}
+		else if (obj instanceof Date  && !isNaN(obj))
+			return dateToISOString(obj);
+		const clone = {};
+		const keys = Object.keys(obj);
+		for (let i = 0; i < keys.length; i++) {
+			const key = keys[i];
+			clone[key] = cloneRegular(obj[key]);
+		}
+		return clone;
+	}
+
+	function cloneFromDb(obj, isFast) {
+		if (isFast)
+			return cloneFromDbFast(obj);
+		else
+			return cloneRegular(obj);
+	}
+
+	cloneFromDb_1 = cloneFromDb;
+	return cloneFromDb_1;
 }
 
-var newParameterized_1;
-var hasRequiredNewParameterized;
+var netAdapter_1;
+var hasRequiredNetAdapter;
 
-function requireNewParameterized () {
-	if (hasRequiredNewParameterized) return newParameterized_1;
-	hasRequiredNewParameterized = 1;
-	var extractSql = requireExtractSql();
-	var extractParameters = requireExtractParameters();
-
-	function Parameterized(text, parameters) {
-		this._text = text;
-		this.parameters = parameters;
-	}
-
-	Parameterized.prototype.sql = function() {
-		return this._text;
-	};
-
-	Parameterized.prototype.prepend = function(other) {
-		if (other.sql) {
-			var params = other.parameters.concat(this.parameters);
-			return newParameterized(other.sql() + this._text, params);
-		} else
-			return newParameterized(other + this._text, this.parameters);
-	};
-
-	Parameterized.prototype.append = function(other) {
-		if (other.sql) {
-			var params = this.parameters.concat(other.parameters);
-			return newParameterized(this._text + other.sql(), params);
-		} else
-			return newParameterized(this._text + other, this.parameters);
-	};
-
-	function newParameterized(text, parameters) {
-		text = extractSql(text);
-		parameters = extractParameters(parameters);
-		return new Parameterized(text, parameters);
-	}
-
-	newParameterized_1 = newParameterized;
-	return newParameterized_1;
-}
-
-var negotiateNextAndFilter_1;
-var hasRequiredNegotiateNextAndFilter;
-
-function requireNegotiateNextAndFilter () {
-	if (hasRequiredNegotiateNextAndFilter) return negotiateNextAndFilter_1;
-	hasRequiredNegotiateNextAndFilter = 1;
-	function negotiateNextAndFilter(filter, other) {
-		if (!other.sql())
-			return filter;
-		return filter.append(' AND ').append(other);
-	}
-
-	negotiateNextAndFilter_1 = negotiateNextAndFilter;
-	return negotiateNextAndFilter_1;
-}
-
-var negotiateNextOrFilter_1;
-var hasRequiredNegotiateNextOrFilter;
-
-function requireNegotiateNextOrFilter () {
-	if (hasRequiredNegotiateNextOrFilter) return negotiateNextOrFilter_1;
-	hasRequiredNegotiateNextOrFilter = 1;
-	function negotiateNextOrFilter(filter, other) {
-		if (!other.sql())
-			return filter;
-		return filter.prepend('(').append(' OR ').append(other).append(')');
-	}
-
-	negotiateNextOrFilter_1 = negotiateNextOrFilter;
-	return negotiateNextOrFilter_1;
-}
-
-var utils;
-var hasRequiredUtils;
-
-function requireUtils () {
-	if (hasRequiredUtils) return utils;
-	hasRequiredUtils = 1;
-	const newParameterized = requireNewParameterized();
-	const negotiateNextAndFilter = requireNegotiateNextAndFilter();
-	const negotiateNextOrFilter = requireNegotiateNextOrFilter();
-
-	function newBoolean(filter) {
-		var c = {};
-		c.sql = filter.sql.bind(filter);
-		c.parameters = filter.parameters;
-
-		c.append = function(other) {
-			var nextFilter = filter.append(other);
-			return newBoolean(nextFilter);
-		};
-
-		c.prepend = function(other) {
-			var nextFilter = filter.prepend(other);
-			return newBoolean(nextFilter);
-		};
-
-		c.and = function(context, other) {
-			if (other === undefined) {
-				other = context;
-				context = null;
-			}
-			other = negotiateRawSqlFilter(context, other);
-			var nextFilter = negotiateNextAndFilter(filter, other);
-			var next = newBoolean(nextFilter);
-			for (var i = 2; i < arguments.length; i++) {
-				next = next.and(context, arguments[i]);
-			}
-			return next;
-		};
-
-		c.or = function(context, other) {
-			if (other === undefined) {
-				other = context;
-				context = null;
-			}
-			other = negotiateRawSqlFilter(context, other);
-			var nextFilter = negotiateNextOrFilter(filter, other);
-			var next = newBoolean(nextFilter);
-			for (var i = 2; i < arguments.length; i++) {
-				next = next.or(context, arguments[i]);
-			}
-			return next;
-		};
-
-		c.not = function(_context) {
-			var nextFilter = filter.prepend('NOT (').append(')');
-			return newBoolean(nextFilter);
+function requireNetAdapter () {
+	if (hasRequiredNetAdapter) return netAdapter_1;
+	hasRequiredNetAdapter = 1;
+	function httpAdapter(baseURL, path, httpInterceptor) {
+		let c = {
+			get,
+			post,
+			patch,
+			syncCommand,
+			query,
+			sqliteFunction,
+			express
 		};
 
 		return c;
-	}
 
-
-	function negotiateRawSqlFilter(context, filter, optionalTable, emptyArrayMeansFalse) {
-		if (Array.isArray(filter) && filter.length === 0) {
-			const sql = emptyArrayMeansFalse ? '1 = 2' : '1 = 1';
-			return newBoolean(newParameterized(sql));
-		}
-		else if (Array.isArray(filter)) {
-			let curFilter;
-			let curObjectFilter;
-			for (let i = 0; i < filter.length; i++) {
-				let nextFilter = negotiateRawSqlFilter(context,filter[i], optionalTable);
-				if (nextFilter.isObjectFilter)
-					curObjectFilter = curObjectFilter ? curObjectFilter.or(context, nextFilter) : nextFilter;
-				else
-					curFilter = curFilter ? curFilter.and(context, nextFilter) : nextFilter;
-			}
-			if (curFilter && curObjectFilter)
-				return curFilter.and(context, curObjectFilter);
-			else if (curFilter)
-				return curFilter;
-			else
-				return curObjectFilter;
-		}
-		else {
-			let params = [];
-			if (filter) {
-				if (filter.and)
-					return filter;
-				if (filter.sql) {
-					let sql = filter.sql;
-					if (typeof filter.sql === 'function') {
-						sql = filter.sql();
-					}
-					params.push(sql, filter.parameters);
-				}
-				else if (isObjectFilter(filter, optionalTable)) {
-					return newObjectFilter(context, filter, optionalTable);
-				}
-				else
-					params = [filter];
-			} else {
-				params = [filter];
-			}
-
-			let parameterized = newParameterized.apply(null, params);
-			return newBoolean(parameterized);
-		}
-	}
-
-	function isObjectFilter(object, optionalTable) {
-		return optionalTable && object;
-	}
-
-	function newObjectFilter(context, object, table) {
-		let primaryColumns = table._primaryColumns;
-		let filter;
-		for (let i = 0; i < primaryColumns.length; i++) {
-			let column = primaryColumns[i];
-			let colFilter = column.equal(context, object[column.alias]);
-			filter = filter  ? filter.and(context, colFilter) : colFilter ;
-		}
-		filter.isObjectFilter = true;
-		return filter;
-	}
-
-
-	utils = { negotiateRawSqlFilter, newBoolean};
-	return utils;
-}
-
-var negotiateRawSqlFilter_1;
-var hasRequiredNegotiateRawSqlFilter;
-
-function requireNegotiateRawSqlFilter () {
-	if (hasRequiredNegotiateRawSqlFilter) return negotiateRawSqlFilter_1;
-	hasRequiredNegotiateRawSqlFilter = 1;
-	const { negotiateRawSqlFilter } = requireUtils();
-
-	negotiateRawSqlFilter_1 = negotiateRawSqlFilter;
-	return negotiateRawSqlFilter_1;
-}
-
-var emptyFilter_1;
-var hasRequiredEmptyFilter;
-
-function requireEmptyFilter () {
-	if (hasRequiredEmptyFilter) return emptyFilter_1;
-	hasRequiredEmptyFilter = 1;
-	var negotiateRawSqlFilter = requireNegotiateRawSqlFilter();
-	var parameterized = requireNewParameterized()('');
-	function emptyFilter() {
-		return emptyFilter.and.apply(null, arguments);
-	}
-
-	emptyFilter.sql = parameterized.sql.bind(parameterized);
-	emptyFilter.parameters = parameterized.parameters;
-
-	emptyFilter.and = function(context, other) {
-		if (other === undefined) {
-			other = context;
-			context = null;
-		}
-		other = negotiateRawSqlFilter(context, other);
-		for (var i = 2; i < arguments.length; i++) {
-			other = other.and(context, arguments[i]);
-		}
-		return other;
-	};
-
-	emptyFilter.or = function(context, other) {
-		if (other === undefined) {
-			other = context;
-			context = null;
-		}
-		other = negotiateRawSqlFilter(context, other);
-		for (var i = 2; i < arguments.length; i++) {
-			other = other.or(context, arguments[i]);
-		}
-		return other;
-	};
-
-	emptyFilter.not = function(context, other) {
-		if (other === undefined) {
-			other = context;
-			context = null;
-		}
-		other = negotiateRawSqlFilter(context, other).not(context);
-		for (var i = 2; i < arguments.length; i++) {
-			other = other.and(context, arguments[i]);
-		}
-		return other;
-
-	};
-
-	emptyFilter_1 = emptyFilter;
-	return emptyFilter_1;
-}
-
-var parseOrderBy_1;
-var hasRequiredParseOrderBy;
-
-function requireParseOrderBy () {
-	if (hasRequiredParseOrderBy) return parseOrderBy_1;
-	hasRequiredParseOrderBy = 1;
-	function parseOrderBy(orderBy, aliases) {
-		if (!orderBy)
-			return [];
-
-		const aliasSet = aliases instanceof Set ? aliases : new Set(aliases);
-		const entries = Array.isArray(orderBy) ? orderBy : [orderBy];
-
-		return entries.map(parseEntry);
-
-		function parseEntry(entry) {
-			if (typeof entry !== 'string')
-				throw new Error(`Invalid aggregate orderBy '${entry}'`);
-
-			const value = entry.trim();
-			if (aliasSet.has(value))
-				return { alias: value, direction: '' };
-
-			const match = /^(.*)\s+(asc|desc)$/i.exec(value);
-			const alias = match ? match[1].trim() : value;
-			if (!aliasSet.has(alias))
-				throw new Error(`Unable to get aggregate result on orderBy '${entry}'`);
-
-			return {
-				alias,
-				direction: ` ${match[2].toLowerCase()}`
-			};
-		}
-	}
-
-	parseOrderBy_1 = parseOrderBy;
-	return parseOrderBy_1;
-}
-
-var executePath;
-var hasRequiredExecutePath;
-
-function requireExecutePath () {
-	if (hasRequiredExecutePath) return executePath;
-	hasRequiredExecutePath = 1;
-	const createPatch = requireCreatePatch();
-	const emptyFilter = requireEmptyFilter();
-	const negotiateRawSqlFilter = requireNegotiateRawSqlFilter();
-	const parseAggregateOrderBy = requireParseOrderBy();
-	let getMeta = requireGetMeta();
-	let isSafe = Symbol();
-
-	let _allowedOps = {
-		and: true,
-		or: true,
-		not: true,
-		AND: true,
-		OR: true,
-		NOT: true,
-		equal: true,
-		eq: true,
-		EQ: true,
-		notEqual: true,
-		ne: true,
-		NE: true,
-		lessThan: true,
-		lt: true,
-		LT: true,
-		lessThanOrEqual: true,
-		le: true,
-		LE: true,
-		greaterThan: true,
-		gt: true,
-		GT: true,
-		greaterThanOrEqual: true,
-		ge: true,
-		GE: true,
-		between: true,
-		in: true,
-		IN: true,
-		startsWith: true,
-		iStartsWith: true,
-		endsWith: true,
-		iEndsWith: true,
-		contains: true,
-		iContains: true,
-		iEqual: true,
-		iEq: true,
-		ieq: true,
-		IEQ: true,
-		exists: true,
-		all: true,
-		any: true,
-		none: true,
-		where: true,
-		sum: true,
-		avg: true,
-		max: true,
-		min: true,
-		count: true,
-		groupSum: true,
-		groupAvg: true,
-		groupMax: true,
-		groupMin: true,
-		groupCount: true,
-		_aggregate: true,
-		self: true,
-	};
-
-	function _executePath(context, ...rest) {
-
-		const _ops = {
-			and: emptyFilter.and.bind(null, context),
-			or: emptyFilter.or.bind(null, context),
-			not: emptyFilter.not.bind(null, context),
-			AND: emptyFilter.and.bind(null, context),
-			OR: emptyFilter.or.bind(null, context),
-			NOT: emptyFilter.not.bind(null, context),
-		};
-
-		return executePath(...rest);
-
-		async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, request, response, readonly, disableBulkDeletes, isHttp, client }) {
-			let allowedOps = { ..._allowedOps, insert: !readonly, ...extractRelations(getMeta(table)) };
-			let ops = { ..._ops, ...getCustomFilterPaths(customFilters), getManyDto, getMany, aggregate, distinct, count, delete: _delete, cascadeDelete, update, replace };
-
-			let res = await parseFilter(JSONFilter, table);
-			if (res === undefined)
-				return {};
-			else
-				return res;
-
-			function parseFilter(json, table) {
-				if (isFilter(json)) {
-					let subFilters = [];
-
-					let anyAllNone = tryGetAnyAllNone(json.path, table);
-					if (anyAllNone) {
-						const arg0 = json.args[0];
-						if (isHttp && arg0 !== undefined)
-							validateArgs(arg0);
-						const f = arg0 === undefined
-							? anyAllNone(context)
-							: anyAllNone(context, x => parseFilter(arg0, x));
-						if(!('isSafe' in f))
-							f.isSafe = isSafe;
-						return f;
-					}
-					else {
-						for (let i = 0; i < json.args.length; i++) {
-							subFilters.push(parseFilter(json.args[i], nextTable(json.path, table)));
-						}
-					}
-					return executePath(json.path, subFilters);
-				}
-				else if (Array.isArray(json)) {
-					const result = [];
-					for (let i = 0; i < json.length; i++) {
-						result.push(parseFilter(json[i], table));
-					}
-					return result;
-				}
-				else if (isColumnRef(json)) {
-					return resolveColumnRef(table, json.__columnRef);
-				}
-				return json;
-
-				function tryGetAnyAllNone(path, table) {
-					const parts = path.split('.');
-					for (let i = 0; i < parts.length; i++) {
-						table = table[parts[i]];
-					}
-
-					let ops = new Set(['all', 'any', 'none', 'where', '_aggregate']);
-					// let ops = new Set(['all', 'any', 'none', 'where']);
-					let last = parts[parts.length - 1];
-					if (last === 'count' && parts.length > 1)
-						ops.add('count');
-					if (ops.has(last) || (table && (table._primaryColumns || (table.any && table.all))))
-						return table;
-				}
-
-				function executePath(path, args) {
-					if (path in ops) {
-						if (isHttp)
-							validateArgs(args);
-						let op = ops[path].apply(null, args);
-						if (op.then)
-							return op.then((o) => {
-								setSafe(o);
-								return o;
-							});
-						setSafe(op);
-						return op;
-					}
-					let pathArray = path.split('.');
-					let target = table;
-					let op = pathArray[pathArray.length - 1];
-					if (!allowedOps[op] && isHttp) {
-
-						let e = new Error('Disallowed operator ' + op);
-						// @ts-ignore
-						e.status = 403;
-						throw e;
-
-					}
-					for (let i = 0; i < pathArray.length; i++) {
-						target = target[pathArray[i]];
-					}
-
-					if (!target) {
-						const left = args && args[0];
-						if (left) {
-							target = left;
-							for (let i = 0; i < pathArray.length; i++) {
-								target = target[pathArray[i]];
-							}
-							if (target) {
-								let res = target.apply(null, [context].concat(args.slice(1)));
-								setSafe(res);
-								return res;
-							}
-						}
-						throw new Error(`Method '${path}' does not exist`);
-					}
-					let res = target.apply(null, [context, ...args]);
-					setSafe(res);
-					return res;
-				}
-			}
-
-			async function invokeBaseFilter() {
-				if (typeof baseFilter === 'function') {
-					const res = await baseFilter.apply(null, [bindDb(client), request, response]);
-					if (!res)
-						return;
-					const JSONFilter = JSON.parse(JSON.stringify(res));
-					//@ts-ignore
-					return executePath({ table, JSONFilter, request, response });
-				}
-				else
-					return;
-			}
-
-			function getCustomFilterPaths(customFilters) {
-				return getLeafNames(customFilters);
-
-				function getLeafNames(obj, result = {}, current = 'customFilters.') {
-					for (let p in obj) {
-						if (typeof obj[p] === 'object' && obj[p] !== null)
-							getLeafNames(obj[p], result, current + p + '.');
-						else
-							result[current + p] = resolveFilter.bind(null, obj[p]);
-					}
-					return result;
-				}
-
-				async function resolveFilter(fn, ...args) {
-					const context = { db: bindDb(client), request, response };
-					let res = fn.apply(null, [context, ...args]);
-					if (res.then)
-						res = await res;
-					const JSONFilter = JSON.parse(JSON.stringify(res));
-					//@ts-ignore
-					return executePath({ table, JSONFilter, request, response });
-				}
-			}
-
-			function nextTable(path, table) {
-				path = path.split('.');
-				let ops = new Set(['all', 'any', 'none', 'count']);
-				let last = path.slice(-1)[0];
-				if (ops.has(last)) {
-					for (let i = 0; i < path.length - 1; i++) {
-						table = table[path[i]];
-					}
-					return table;
-				}
-				else {
-					let lastObj = table;
-					for (let i = 0; i < path.length; i++) {
-						if (lastObj)
-							lastObj = lastObj[path[i]];
-					}
-					if (lastObj?._shallow)
-						return lastObj._shallow;
-					else return table;
-				}
-			}
-
-			async function _delete(filter) {
-				if (readonly || disableBulkDeletes) {
-					let e = new Error('Bulk deletes are not allowed. Parameter "disableBulkDeletes" must be true.');
-					// @ts-ignore
-					e.status = 403;
-					throw e;
-				}
-				filter = negotiateFilter(filter);
-				const _baseFilter = await invokeBaseFilter();
-				if (_baseFilter)
-					filter = filter.and(context, _baseFilter);
-				let args = [context, filter].concat(Array.prototype.slice.call(arguments).slice(1));
-				return table.delete.apply(null, args);
-			}
-
-			async function cascadeDelete(filter) {
-				if (readonly || disableBulkDeletes) {
-					const e = new Error('Bulk deletes are not allowed. Parameter "disableBulkDeletes" must be true.');
-					// @ts-ignore
-					e.status = 403;
-					throw e;
-
-				}
-				filter = negotiateFilter(filter);
-				const _baseFilter = await invokeBaseFilter();
-				if (_baseFilter)
-					filter = filter.and(context, _baseFilter);
-				let args = [context, filter].concat(Array.prototype.slice.call(arguments).slice(1));
-				return table.cascadeDelete.apply(null, args);
-			}
-
-			function negotiateFilter(filter) {
-				if (filter)
-					return negotiateRawSqlFilter(context, filter, table, true);
-				else
-					return emptyFilter;
-			}
-
-			async function count(filter, strategy) {
-				validateStrategy(table, strategy);
-				filter = negotiateFilter(filter);
-				const _baseFilter = await invokeBaseFilter();
-				if (_baseFilter)
-					filter = filter.and(context, _baseFilter);
-				let args = [context, filter].concat(Array.prototype.slice.call(arguments).slice(1));
-				return table.count.apply(null, args);
-			}
-
-			async function getManyDto(filter, strategy) {
-				validateStrategy(table, strategy);
-				filter = negotiateFilter(filter);
-				const _baseFilter = await invokeBaseFilter();
-				if (_baseFilter)
-					filter = filter.and(context, _baseFilter);
-				let args = [context, filter].concat(Array.prototype.slice.call(arguments).slice(1));
-				await negotiateWhereAndAggregate(strategy);
-				return table.getManyDto.apply(null, args);
-			}
-
-			async function replace(subject, strategy = { insertAndForget: true }) {
-				validateStrategy(table, strategy);
-				const refinedStrategy = withLockingStrategy(objectToStrategy(subject, {}, table), strategy);
-				const JSONFilter2 = {
-					path: 'getManyDto',
-					args: [subject, refinedStrategy]
-				};
-				const originals = await executePath({ table, JSONFilter: JSONFilter2, baseFilter, customFilters, request, response, readonly, disableBulkDeletes, isHttp, client });
-				const meta = getMeta(table);
-				const patch = createPatch(originals, Array.isArray(subject) ? subject : [subject], meta);
-				const { changed } = await table.patch(context, patch, { strategy });
-				if (Array.isArray(subject))
-					return changed;
-				else
-					return changed[0];
-			}
-
-			async function update(subject, whereStrategy, strategy = { insertAndForget: true }) {
-				validateStrategy(table, strategy);
-				const refinedWhereStrategy = withLockingStrategy(objectToStrategy(subject, whereStrategy, table), strategy);
-				const JSONFilter2 = {
-					path: 'getManyDto',
-					args: [null, refinedWhereStrategy]
-				};
-				const rows = await executePath({ table, JSONFilter: JSONFilter2, baseFilter, customFilters, request, response, readonly, disableBulkDeletes, isHttp, client });
-				const originals = new Array(rows.length);
-				for (let i = 0; i < rows.length; i++) {
-					const row = rows[i];
-					originals[i] = { ...row };
-					for (let p in subject) {
-						row[p] = subject[p];
-					}
-				}
-				const meta = getMeta(table);
-				const patch = createPatch(originals, rows, meta);
-				const { changed } = await table.patch(context, patch, { strategy });
-				return changed;
-			}
-
-			function withLockingStrategy(fetchStrategy, strategy) {
-				const lockStrategy = extractLockingStrategy(strategy);
-				if (!lockStrategy)
-					return fetchStrategy;
-				return mergeLockingStrategy(fetchStrategy, lockStrategy);
-			}
-
-			function extractLockingStrategy(strategy) {
-				if (!strategy || typeof strategy !== 'object')
-					return;
-				const result = {};
-				if (strategy.forUpdate)
-					result.forUpdate = strategy.forUpdate;
-				if (strategy.skipLocked)
-					result.skipLocked = strategy.skipLocked;
-				for (let name in strategy) {
-					if (name === 'where' || name === 'orderBy' || name === 'limit' || name === 'offset' || name === 'forUpdate' || name === 'skipLocked')
-						continue;
-					const child = extractLockingStrategy(strategy[name]);
-					if (child)
-						result[name] = child;
-				}
-				return Object.keys(result).length > 0 ? result : undefined;
-			}
-
-			function mergeLockingStrategy(fetchStrategy, lockStrategy) {
-				const result = { ...fetchStrategy };
-				for (let name in lockStrategy) {
-					const value = lockStrategy[name];
-					if (name === 'forUpdate' || name === 'skipLocked')
-						result[name] = value;
-					else
-						result[name] = mergeLockingStrategy(result[name] && typeof result[name] === 'object' ? result[name] : {}, value);
-				}
-				return result;
-			}
-
-			function objectToStrategy(object, whereStrategy, table, strategy = {}) {
-				strategy = { ...whereStrategy, ...strategy };
-				if (Array.isArray(object)) {
-					for (let i = 0; i < object.length; i++) {
-						objectToStrategy(object[i], table, strategy);
-					}
-					return;
-				}
-				for (let name in object) {
-					const relation = table[name]?._relation;
-					if (relation && !relation.columns) {//notJoin, that is one or many
-						strategy[name] = {};
-						objectToStrategy(object[name], whereStrategy?.[name], table[name], strategy[name]);
-					}
-					else
-						strategy[name] = true;
-				}
-				return strategy;
-			}
-
-
-			async function aggregate(filter, strategy) {
-				validateAggregateStrategy(strategy);
-				filter = negotiateFilter(filter);
-				const _baseFilter = await invokeBaseFilter();
-				if (_baseFilter)
-					filter = filter.and(context, _baseFilter);
-				let args = [context, filter].concat(Array.prototype.slice.call(arguments).slice(1));
-				await negotiateWhereAndAggregate(strategy);
-				return table.aggregate.apply(null, args);
-			}
-
-			async function distinct(filter, strategy) {
-				validateAggregateStrategy(strategy);
-				filter = negotiateFilter(filter);
-				const _baseFilter = await invokeBaseFilter();
-				if (_baseFilter)
-					filter = filter.and(context, _baseFilter);
-				let args = [context, filter].concat(Array.prototype.slice.call(arguments).slice(1));
-				await negotiateWhereAndAggregate(strategy);
-				return table.distinct.apply(null, args);
-			}
-
-
-
-			async function negotiateWhereAndAggregate(strategy) {
-				if (typeof strategy !== 'object')
-					return;
-
-				for (let name in strategy) {
-					const target = strategy[name];
-					if (isFilter(target))
-						strategy[name] = await parseFilter(strategy[name], table);
-					else
-						await negotiateWhereAndAggregate(strategy[name]);
-				}
-
-			}
-
-			async function getMany(filter, strategy) {
-				validateStrategy(table, strategy);
-				filter = negotiateFilter(filter);
-				const _baseFilter = await invokeBaseFilter();
-				if (_baseFilter)
-					filter = filter.and(context, _baseFilter);
-				let args = [context, filter].concat(Array.prototype.slice.call(arguments).slice(1));
-				await negotiateWhereAndAggregate(strategy);
-				return table.getMany.apply(null, args);
-			}
-
-		}
-
-		function validateStrategy(table, strategy) {
-			if (!strategy || !table)
-				return;
-
-			for (let p in strategy) {
-				validateOffset(strategy);
-				validateLimit(strategy);
-				validateOrderBy(table, strategy);
-				validateStrategy(table[p], strategy[p]);
-			}
-		}
-
-		function validateAggregateStrategy(strategy) {
-			if (!strategy)
-				return;
-
-			validateOffset(strategy);
-			validateLimit(strategy);
-			const reserved = new Set(['where', 'limit', 'offset', 'orderBy']);
-			const aliases = Object.keys(strategy).filter(name => !reserved.has(name));
+		async function get() {
 			try {
-				parseAggregateOrderBy(strategy.orderBy, aliases);
-			} catch (error) {
-				error.status = 400;
-				throw error;
+				const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
+				const res = await request({ baseURL, url: path, headers, method: 'get' });
+				return res.data;
 			}
-		}
-
-		function validateLimit(strategy) {
-			if (!('limit' in strategy) || Number.isInteger(strategy.limit))
-				return;
-			const e = new Error('Invalid limit: ' + strategy.limit);
-			// @ts-ignore
-			e.status = 400;
-		}
-
-		function validateOffset(strategy) {
-			if (!('offset' in strategy) || Number.isInteger(strategy.offset))
-				return;
-			const e = new Error('Invalid offset: ' + strategy.offset);
-			// @ts-ignore
-			e.status = 400;
-			throw e;
-		}
-
-		function validateOrderBy(table, strategy) {
-			if (!('orderBy' in strategy) || !table)
-				return;
-			let orderBy = strategy.orderBy;
-			if (!Array.isArray(orderBy))
-				orderBy = [orderBy];
-			orderBy.reduce(validate, []);
-
-			function validate(_, element) {
-				let parts = element.split(' ').filter(x => {
-					x = x.toLowerCase();
-					return (!(x === '' || x === 'asc' || x === 'desc'));
-				});
-				for (let p of parts) {
-					let col = table[p];
-					if (!(col && col.equal)) {
-						const e = new Error('Unknown column: ' + p);
-						// @ts-ignore
-						e.status = 400;
-						throw e;
-					}
-				}
-			}
-		}
-
-		function validateArgs() {
-			for (let i = 0; i < arguments.length; i++) {
-				const filter = arguments[i];
-				if (!filter)
-					continue;
-				if (filter && filter.isSafe === isSafe)
-					continue;
-				if (filter.sql || typeof (filter) === 'string') {
-					const e = new Error('Raw filters are disallowed');
-					// @ts-ignore
-					e.status = 403;
+			catch (e) {
+				if (typeof e.response?.data === 'string')
+					throw new Error(e.response.data.replace(/^Error: /, ''));
+				else
 					throw e;
-				}
-				if (Array.isArray(filter))
-					for (let i = 0; i < filter.length; i++) {
-
-						validateArgs(filter[i]);
-					}
 			}
 
 		}
 
-		function isFilter(json) {
-			return json instanceof Object && 'path' in json && 'args' in json;
-		}
+		async function patch(body) {
+			try {
 
-		function isColumnRef(json) {
-			return json instanceof Object && typeof json.__columnRef === 'string';
-		}
-
-		function resolveColumnRef(table, path) {
-			let current = table;
-			const parts = path.split('.');
-			for (let i = 0; i < parts.length; i++) {
-				if (current)
-					current = current[parts[i]];
+				const headers = { 'Content-Type': 'application/json' };
+				const res = await request({ baseURL, url: path, headers, method: 'patch', data: body });
+				return res.data;
+			}
+			catch (e) {
+				if (typeof e.response?.data === 'string')
+					throw new Error(e.response.data.replace(/^Error: /, ''));
+				else
+					throw e;
 			}
 
-			if (!current || typeof current._toFilterArg !== 'function') {
-				let e = new Error(`Column reference '${path}' is invalid`);
-				// @ts-ignore
-				e.status = 400;
-				throw e;
-			}
-			return current;
+
 		}
 
-		function setSafe(o) {
-			if (o instanceof Object)
-				Object.defineProperty(o, 'isSafe', {
-					value: isSafe,
-					enumerable: false
+		async function post(body) {
+			try {
+				const headers = { 'Content-Type': 'application/json' };
+				const res = await request({ baseURL, url: path, headers, method: 'post', data: body });
+				return res.data;
+			}
+			catch (e) {
+				if (typeof e.response?.data === 'string')
+					throw new Error(e.response.data.replace(/^Error: /, ''));
+				else throw e;
+			}
+		}
 
+		async function syncCommand(body) {
+			try {
+				const payload = typeof body === 'string' ? JSON.parse(body) : body;
+				const name = payload && payload.name;
+				if (typeof name !== 'string' || name.length === 0)
+					throw new Error('Sync command requires a command name');
+				const headers = { 'Content-Type': 'application/json' };
+				const res = await request({
+					baseURL,
+					url: `?command=${encodeURIComponent(name)}`,
+					headers,
+					method: 'post',
+					data: body
 				});
+				return res.data;
+			}
+			catch (e) {
+				if (typeof e.response?.data === 'string')
+					throw new Error(e.response.data.replace(/^Error: /, ''));
+				else throw e;
+			}
 		}
 
-		function extractRelations(obj) {
-			let flattened = {};
 
-			function helper(relations) {
-				Object.keys(relations).forEach(key => {
-
-					flattened[key] = true;
-
-					if (typeof relations[key] === 'object' && Object.keys(relations[key]?.relations)?.length > 0) {
-						helper(relations[key].relations);
-					}
-				});
-			}
-
-			helper(obj.relations);
-
-			return flattened;
+		function query() {
+			throw new Error('Queries are not supported through http');
 		}
 
-		function bindDb(client) {
-			var domain = context;
-			let p = domain.run(() => true);
-
-			function run(fn) {
-				return p.then(domain.run.bind(domain, fn));
-			}
-
-			return client({ transaction: run });
-
+		function sqliteFunction() {
+			throw new Error('Sqlite Function is not supported through http');
 		}
-	}
-	executePath = _executePath;
-	return executePath;
-}
 
-var tryGetSessionContext_1;
-var hasRequiredTryGetSessionContext;
+		function express() {
+			throw new Error('Hosting in express is not supported on the client side');
+		}
 
-function requireTryGetSessionContext () {
-	if (hasRequiredTryGetSessionContext) return tryGetSessionContext_1;
-	hasRequiredTryGetSessionContext = 1;
-	function tryGetSessionContext(context) {
-		if (context)
-			return context.rdb;
-	}
+		async function request(config) {
+			if (typeof fetch !== 'function')
+				throw new Error('HTTP client requires fetch. Use a runtime with fetch support or provide a fetch polyfill.');
 
-	tryGetSessionContext_1 = tryGetSessionContext;
-	return tryGetSessionContext_1;
-}
-
-var getSessionContext_1;
-var hasRequiredGetSessionContext;
-
-function requireGetSessionContext () {
-	if (hasRequiredGetSessionContext) return getSessionContext_1;
-	hasRequiredGetSessionContext = 1;
-	let tryGetSessionContext = requireTryGetSessionContext();
-
-	function getSessionContext(context) {
-		const rdb = tryGetSessionContext(context);
-		if (!rdb)
-			throw new Error('Rdb transaction is no longer available. Is promise chain broken ?');
-		return rdb;
-	}
-
-	getSessionContext_1 = getSessionContext;
-	return getSessionContext_1;
-}
-
-var setSessionSingleton_1;
-var hasRequiredSetSessionSingleton;
-
-function requireSetSessionSingleton () {
-	if (hasRequiredSetSessionSingleton) return setSessionSingleton_1;
-	hasRequiredSetSessionSingleton = 1;
-	const getSessionContext = requireGetSessionContext();
-
-	function setSessionSingleton(context, name, value) {
-		const rdb = getSessionContext(context);
-		rdb[name] = value;
-	}
-
-	setSessionSingleton_1 = setSessionSingleton;
-	return setSessionSingleton_1;
-}
-
-var getSessionSingleton;
-var hasRequiredGetSessionSingleton;
-
-function requireGetSessionSingleton () {
-	if (hasRequiredGetSessionSingleton) return getSessionSingleton;
-	hasRequiredGetSessionSingleton = 1;
-	var getSessionContext = requireGetSessionContext();
-
-	getSessionSingleton = function(context, name) {
-		const rdb = getSessionContext(context);
-		return rdb[name];
-	};
-	return getSessionSingleton;
-}
-
-var negotiateNullParams_1;
-var hasRequiredNegotiateNullParams;
-
-function requireNegotiateNullParams () {
-	if (hasRequiredNegotiateNullParams) return negotiateNullParams_1;
-	hasRequiredNegotiateNullParams = 1;
-	function negotiateNullParams(query) {
-		if (query && query.parameters && query.parameters.length > 0 && (query.parameters.filter(x => x === null || x === undefined).length > 0)) {
-			var splitted = query.sql().split('?');
-			var sql = '';
-			var parameters = [];
-			var lastIndex = splitted.length - 1;
-			for (var i = 0; i < lastIndex; i++) {
-				if (query.parameters[i] === null || query.parameters[i] === undefined)
-					sql += splitted[i] + 'null';
-				else {
-					sql += splitted[i] + '?';
-					parameters.push(query.parameters[i]);
-				}
-			}
-			sql += splitted[lastIndex];
-			return {
-				sql: () => sql,
-				parameters
+			config = await httpInterceptor.applyRequest(config);
+			const response = await fetch(toUrl(config.baseURL, config.url), {
+				method: config.method?.toUpperCase(),
+				headers: config.headers,
+				body: toBody(config.data)
+			});
+			const data = await readData(response);
+			let result = {
+				data,
+				status: response.status,
+				statusText: response.statusText,
+				headers: toHeadersObject(response.headers),
+				config
 			};
 
-		}
-		else
-			return query;
-	}
+			if (!response.ok)
+				return httpInterceptor.applyResponseError(createHttpError(result));
 
-	negotiateNullParams_1 = negotiateNullParams;
-	return negotiateNullParams_1;
-}
-
-var resolveExecuteCommand;
-var hasRequiredResolveExecuteCommand;
-
-function requireResolveExecuteCommand () {
-	if (hasRequiredResolveExecuteCommand) return resolveExecuteCommand;
-	hasRequiredResolveExecuteCommand = 1;
-	const getSessionSingleton = requireGetSessionSingleton();
-	const negotiateNullParams = requireNegotiateNullParams();
-
-	function resolveExecuteQuery(context, query) {
-		return resolve;
-
-		function resolve(success, failed) {
-			try {
-				var client = getSessionSingleton(context, 'dbClient');
-				query = negotiateNullParams(query);
-				client.executeCommand(query, onCompleted);
-			} catch (e) {
-				failed(e);
-			}
-
-			function onCompleted(err, rows) {
-				if (!err)
-					success(rows);
-				else
-					failed(err);
-			}
-		}
-
-	}
-
-
-
-	resolveExecuteCommand = resolveExecuteQuery;
-	return resolveExecuteCommand;
-}
-
-var executeCommand_1;
-var hasRequiredExecuteCommand;
-
-function requireExecuteCommand () {
-	if (hasRequiredExecuteCommand) return executeCommand_1;
-	hasRequiredExecuteCommand = 1;
-	var newResolver = requireResolveExecuteCommand();
-
-	function executeCommand(context, query) {
-		var resolver = newResolver(context, query);
-		return new Promise(resolver);
-	}
-
-	executeCommand_1 = executeCommand;
-	return executeCommand_1;
-}
-
-var promise;
-var hasRequiredPromise;
-
-function requirePromise () {
-	if (hasRequiredPromise) return promise;
-	hasRequiredPromise = 1;
-	function newPromise(func) {
-		if (!func)
-			return Promise.resolve.apply(Promise, arguments);
-		return new Promise(func);
-	}
-
-	newPromise.all = Promise.all;
-	promise = newPromise;
-	return promise;
-}
-
-var executeChanges_1;
-var hasRequiredExecuteChanges;
-
-function requireExecuteChanges () {
-	if (hasRequiredExecuteChanges) return executeChanges_1;
-	hasRequiredExecuteChanges = 1;
-	var executeCommand = requireExecuteCommand();
-	var newPromise = requirePromise();
-
-	function executeChanges(context, queries) {
-		if (queries.length === 0)
-			return newPromise();
-		var i = -1;
-		return execute().then(emitChanged);
-
-
-		function execute() {
-			i++;
-			if (i + 1 === queries.length)
-				return executeCommand(context, queries[i]).then(notifyListener);
-			else {
-				return executeCommand(context, queries[i]).then(notifyListener).then(execute);
-			}
-		}
-
-		function notifyListener(result) {
-			if (result && queries[i].onResult)
-				queries[i].onResult(result);
-		}
-
-		async function emitChanged() {
-			for (let i = 0; i < queries.length; i++) {
-				if (queries[i].emitChanged)
-					await Promise.all(queries[i].emitChanged());
-			}
-		}
-
-
-	}
-
-	executeChanges_1 = executeChanges;
-	return executeChanges_1;
-}
-
-var getChangeSet_1;
-var hasRequiredGetChangeSet;
-
-function requireGetChangeSet () {
-	if (hasRequiredGetChangeSet) return getChangeSet_1;
-	hasRequiredGetChangeSet = 1;
-	var getSessionSingleton = requireGetSessionSingleton();
-	function getChangeSet(context) {
-		return getSessionSingleton(context, 'changes');
-	}
-
-	getChangeSet_1 = getChangeSet;
-	return getChangeSet_1;
-}
-
-var compressChanges;
-var hasRequiredCompressChanges;
-
-function requireCompressChanges () {
-	if (hasRequiredCompressChanges) return compressChanges;
-	hasRequiredCompressChanges = 1;
-	var newParameterized = requireNewParameterized();
-	var getSessionSingleton = requireGetSessionSingleton();
-
-	function compress(context, queries) {
-		var multipleStatements = getSessionSingleton(context, 'multipleStatements');
-		var compressed = [];
-		var queryCount = queries.length;
-
-		for (var i = 0; i < queryCount; i++) {
-			var current = queries[i];
-			if (multipleStatements && current.parameters.length === 0 && !current.disallowCompress) {
-				for (var i2 = i+1; i2 < queryCount; i2++) {
-					var next = queries[i2];
-					if (next.parameters.length > 0 || ! next.disallowCompress)
-						break;
-					current = newParameterized(current.sql() + ';' + next.sql());
-					i++;
-				}
-			}
-			compressed.push(current);
-		}
-		return compressed;
-	}
-
-	compressChanges = compress;
-	return compressChanges;
-}
-
-var popChanges_1;
-var hasRequiredPopChanges;
-
-function requirePopChanges () {
-	if (hasRequiredPopChanges) return popChanges_1;
-	hasRequiredPopChanges = 1;
-	var getChangeSet = requireGetChangeSet();
-	var compressChanges = requireCompressChanges();
-
-	function popChanges(context) {
-		var changeSet = getChangeSet(context);
-		var length = changeSet.length;
-		if (length > 0) {
-			var lastCmd = changeSet[length-1];
-			if (lastCmd.endEdit)
-				lastCmd.endEdit();
-			var compressed = compressChanges(context, changeSet);
-			changeSet.length = 0;
-			return compressed;
-		}
-		return changeSet;
-
-	}
-
-	popChanges_1 = popChanges;
-	return popChanges_1;
-}
-
-var resolveExecuteQuery_1;
-var hasRequiredResolveExecuteQuery;
-
-function requireResolveExecuteQuery () {
-	if (hasRequiredResolveExecuteQuery) return resolveExecuteQuery_1;
-	hasRequiredResolveExecuteQuery = 1;
-	const getSessionSingleton = requireGetSessionSingleton();
-	const negotiateNullParams = requireNegotiateNullParams();
-
-	function resolveExecuteQuery(context, query) {
-		return resolve;
-
-		function resolve(success, failed) {
-			try {
-				var client = getSessionSingleton(context, 'dbClient');
-				query = negotiateNullParams(query);
-				client.executeQuery(query, onCompleted);
-			} catch (e) {
-				failed(e);
-			}
-
-			function onCompleted(err, rows) {
-				if (!err)
-					success(rows);
-				else
-					failed(err);
-			}
-		}
-
-	}
-
-
-
-	resolveExecuteQuery_1 = resolveExecuteQuery;
-	return resolveExecuteQuery_1;
-}
-
-var executeQuery_1;
-var hasRequiredExecuteQuery;
-
-function requireExecuteQuery () {
-	if (hasRequiredExecuteQuery) return executeQuery_1;
-	hasRequiredExecuteQuery = 1;
-	var newResolver = requireResolveExecuteQuery();
-
-	function executeQuery(context, query) {
-		var resolver = newResolver(context, query);
-		return new Promise(resolver);
-	}
-
-	executeQuery_1 = executeQuery;
-	return executeQuery_1;
-}
-
-var executeQueriesCore_1;
-var hasRequiredExecuteQueriesCore;
-
-function requireExecuteQueriesCore () {
-	if (hasRequiredExecuteQueriesCore) return executeQueriesCore_1;
-	hasRequiredExecuteQueriesCore = 1;
-	var executeQuery = requireExecuteQuery();
-
-	function executeQueriesCore(context, queries) {
-		var promises = [];
-		var chain = Promise.resolve();
-		for (var i = 0; i < queries.length; i++) {
-			// Serialize execution while still returning an array of promises
-			var q = chain.then(function(qi) {
-				return executeQuery(context, qi);
-			}.bind(null, queries[i]));
-			promises.push(q);
-			chain = q;
-		}
-		return promises;
-	}
-
-	executeQueriesCore_1 = executeQueriesCore;
-	return executeQueriesCore_1;
-}
-
-var executeQueries_1;
-var hasRequiredExecuteQueries;
-
-function requireExecuteQueries () {
-	if (hasRequiredExecuteQueries) return executeQueries_1;
-	hasRequiredExecuteQueries = 1;
-	var executeChanges = requireExecuteChanges();
-	var popChanges = requirePopChanges();
-	var executeQueriesCore = requireExecuteQueriesCore();
-
-	function executeQueries(context, queries) {
-		var changes = popChanges(context);
-
-		return executeChanges(context, changes).then(onDoneChanges);
-
-		function onDoneChanges() {
-			return executeQueriesCore(context, queries);
+			result = await httpInterceptor.applyResponse(result);
+			return result;
 		}
 	}
 
-	executeQueries_1 = executeQueries;
-	return executeQueries_1;
-}
-
-var negotiateSql_1;
-var hasRequiredNegotiateSql;
-
-function requireNegotiateSql () {
-	if (hasRequiredNegotiateSql) return negotiateSql_1;
-	hasRequiredNegotiateSql = 1;
-	function negotiateSql(query) {
-		if(typeof(query) === 'string')
-			return function() { return query; };
-
-		var sql = query.sql;
-		if(typeof(sql) === 'function')
-			return sql;
-		else if(typeof(sql) === 'string')
-			return function() { return sql; };
-		else
-			throw new Error('Query lacks sql property string or function');
+	function toBody(data) {
+		if (data === undefined)
+			return undefined;
+		if (typeof data === 'string')
+			return data;
+		return JSON.stringify(data);
 	}
 
-	negotiateSql_1 = negotiateSql;
-	return negotiateSql_1;
-}
-
-var negotiateParameters_1;
-var hasRequiredNegotiateParameters;
-
-function requireNegotiateParameters () {
-	if (hasRequiredNegotiateParameters) return negotiateParameters_1;
-	hasRequiredNegotiateParameters = 1;
-	function negotiateParameters(parameters) {
-		if(parameters === undefined)
-			return [];
-		else if(parameters.length !== undefined)
-			return parameters;
-		else
-			throw new Error('Query has invalid parameters property. Must be undefined or array');
+	function createHttpError(response) {
+		const error = new Error('Request failed with status code ' + response.status);
+		error.response = response;
+		error.config = response.config;
+		return error;
 	}
 
-	negotiateParameters_1 = negotiateParameters;
-	return negotiateParameters_1;
-}
+	async function readData(response) {
+		const text = await response.text();
+		const contentType = response.headers.get('content-type') || '';
+		if (text && (contentType.indexOf('application/json') !== -1 || looksLikeJson(text)))
+			return JSON.parse(text);
+		return text;
+	}
 
-var wrapQuery_1$3;
-var hasRequiredWrapQuery$3;
+	function looksLikeJson(text) {
+		const value = text.trim();
+		return value[0] === '{' || value[0] === '[';
+	}
 
-function requireWrapQuery$3 () {
-	if (hasRequiredWrapQuery$3) return wrapQuery_1$3;
-	hasRequiredWrapQuery$3 = 1;
-	var negotiateSql = requireNegotiateSql();
-	var negotiateParameters = requireNegotiateParameters();
+	function toHeadersObject(headers) {
+		const result = {};
+		headers.forEach((value, key) => result[key] = value);
+		return result;
+	}
 
-	function wrapQuery(query) {
-		var safeSql = negotiateSql(query);
-		var safeParameters = negotiateParameters(query.parameters);
-		let obj =  {
-			sql: safeSql,
-			parameters: safeParameters
+	function toUrl(baseURL, path) {
+		return new URL(path, baseURL).toString();
+	}
+
+	function netAdapter(url, tableName, { http, tableOptions }) {
+		if (tableOptions.transaction?.done)
+			delete tableOptions.transaction;
+
+		let c = {
+			get,
+			post,
+			patch,
+			syncCommand,
+			query,
+			sqliteFunction
 		};
-		if (query.types)
-			obj.types = query.types;
-		return obj;
+
+		return c;
+
+		async function get() {
+			const adapter = await getInnerAdapter();
+			return adapter.get.apply(null, arguments);
+		}
+
+		async function patch(_body) {
+			const adapter = await getInnerAdapter();
+			return adapter.patch.apply(null, arguments);
+		}
+
+		async function post(_body) {
+			const adapter = await getInnerAdapter();
+			return adapter.post.apply(null, arguments);
+		}
+
+		async function syncCommand(_body) {
+			const adapter = await getInnerAdapter();
+			if (!adapter.syncCommand)
+				throw new Error('Sync commands are not supported through this adapter');
+			return adapter.syncCommand.apply(null, arguments);
+		}
+
+		async function query() {
+			const adapter = await getInnerAdapter();
+			return adapter.query.apply(null, arguments);
+		}
+
+		async function sqliteFunction() {
+			const adapter = await getInnerAdapter();
+			return adapter.sqliteFunction.apply(null, arguments);
+		}
+
+		async function getInnerAdapter() {
+			const db = await getDb();
+			if (typeof db === 'string') {
+				return httpAdapter(db, tableName === undefined ? '' : `?table=${tableName}`, http);
+			}
+			else if (db && db.hostLocal) {
+				return db.hostLocal({ ...tableOptions, db, table: url });
+			}
+			else
+				throw new Error('Invalid arguments');
+		}
+
+		async function getDb() {
+			let db = tableOptions.db;
+			if (db.transaction)
+				return db;
+			if (typeof db === 'function') {
+				let dbPromise = db();
+				if (dbPromise.then)
+					db = await dbPromise;
+				else
+					db = dbPromise;
+			}
+
+			return db;
+		}
+
 	}
 
-
-	wrapQuery_1$3 = wrapQuery;
-	return wrapQuery_1$3;
+	netAdapter_1 = netAdapter;
+	return netAdapter_1;
 }
 
-var query;
-var hasRequiredQuery;
+var toKeyPositionMap_1;
+var hasRequiredToKeyPositionMap;
 
-function requireQuery () {
-	if (hasRequiredQuery) return query;
-	hasRequiredQuery = 1;
-	var executeQueries = requireExecuteQueries();
-	var wrapQuery = requireWrapQuery$3();
+function requireToKeyPositionMap () {
+	if (hasRequiredToKeyPositionMap) return toKeyPositionMap_1;
+	hasRequiredToKeyPositionMap = 1;
+	const stringify = requireStringify();
+	const newMemoryId = requireNewMemoryId();
 
-	function doQuery(context, query) {
-		var wrappedQuery = wrapQuery(query);
-		return executeQueries(context, [wrappedQuery]).then(unwrapResult);
+	function toKeyPositionMap(rows, options) {
+		return rows.reduce((map, element, i) => {
+			if (options && options.keys && element === Object(element)) {
+				let key = [];
+				for (let i = 0; i < options.keys.length; i++) {
+					let keyName = options.keys[i].name;
+					key.push(negotiateTempKey(element[keyName]));
+				}
+				map[stringify(key)] = i;
+			}
+			else if ('id' in element)
+				map[stringify(element.id)] = i;
+			else
+				map[i] = i;
+			return map;
+		}, {});
+
 	}
 
-	function unwrapResult(results) {
-		return results[0];
+	function negotiateTempKey(value) {
+		if (value === undefined)
+			return `~${newMemoryId()}`;
+		else
+			return value;
 	}
 
-	query = doQuery;
-	return query;
+	toKeyPositionMap_1 = toKeyPositionMap;
+	return toKeyPositionMap_1;
 }
 
-var sqliteFunction;
-var hasRequiredSqliteFunction;
+var clientMap;
+var hasRequiredClientMap;
 
-function requireSqliteFunction () {
-	if (hasRequiredSqliteFunction) return sqliteFunction;
-	hasRequiredSqliteFunction = 1;
-	const executeChanges = requireExecuteChanges();
-	const popChanges = requirePopChanges();
-	const getSessionSingleton = requireGetSessionSingleton();
+function requireClientMap () {
+	if (hasRequiredClientMap) return clientMap;
+	hasRequiredClientMap = 1;
+	function map(index, _fn) {
+		const handler = {
+			get(target, prop) {
+				if (prop === 'map') {
+					return () => {
+						return new Proxy(onFinal, handler);
+					};
+				} else if (typeof target[prop] !== 'undefined') {
+					return target[prop];
+				} else {
+					return () => {
+						return new Proxy({}, handler);
+					};
+				}
+			},
+			apply(target, _thisArg, argumentsList) {
+				if (target === onFinal) {
+					return target(...argumentsList);
+				} else {
+					return new Proxy({}, handler);
+				}
+			},
+			set(target, prop, value) {
+				target[prop] = value;
+				return true;
+			},
+		};
 
-	function executeQueries(context, ...rest) {
-		var changes = popChanges(context);
+		function dbMap(fn) {
+			return fn(dbMap);
+		}
 
-		return executeChanges(context, changes).then(onDoneChanges);
+		dbMap.http = (url) => url;
+		dbMap.pg = throwDb;
+		dbMap.pglite = throwDb;
+		dbMap.postgres = throwDb;
+		dbMap.mssql = throwDb;
+		dbMap.mssqlNative = throwDb;
+		dbMap.mysql = throwDb;
+		dbMap.mariadb = throwDb;
+		dbMap.sap = throwDb;
+		dbMap.oracle = throwDb;
+		dbMap.sqlite = throwDb;
+		dbMap.d1 = throwDb;
 
-		function onDoneChanges() {
-			var client = getSessionSingleton(context, 'dbClient');
-			if (client && typeof client.function === 'function')
-				return client.function.apply(client, rest);
-			if (client && typeof client.createFunction === 'function')
-				return client.createFunction.apply(client, rest);
-			throw new Error('SQLite client does not support user-defined functions');
+		function throwDb() {
+			throw new Error('Cannot create pool for database outside node');
+		}
+
+		function onFinal(arg) {
+			if (arg && arg.db && typeof arg.db === 'function') {
+				return index({
+					...arg,
+					db: dbMap(arg.db),
+					providers: dbMap
+				});
+			}
+
+			return index({ ...arg, providers: dbMap });
+		}
+
+		onFinal.http = (url) => index({ db: url, providers: dbMap });
+		onFinal.pg = () => index({ db: throwDb, providers: dbMap });
+		onFinal.pglite = () => index({ db: throwDb, providers: dbMap });
+		onFinal.postgres = () => index({ db: throwDb, providers: dbMap });
+		onFinal.mssql = () => index({ db: throwDb, providers: dbMap });
+		onFinal.mssqlNative = () => index({ db: throwDb, providers: dbMap });
+		onFinal.mysql = () => index({ db: throwDb, providers: dbMap });
+		onFinal.mariadb = () => index({ db: throwDb, providers: dbMap });
+		onFinal.sap = () => index({ db: throwDb, providers: dbMap });
+		onFinal.oracle = () => index({ db: throwDb, providers: dbMap });
+		onFinal.sqlite = () => index({ db: throwDb, providers: dbMap });
+		onFinal.d1 = () => index({ db: throwDb, providers: dbMap });
+
+		return new Proxy(onFinal, handler);
+	}
+
+	clientMap = map;
+	return clientMap;
+}
+
+var rfdc_1;
+var hasRequiredRfdc;
+
+function requireRfdc () {
+	if (hasRequiredRfdc) return rfdc_1;
+	hasRequiredRfdc = 1;
+	rfdc_1 = rfdc;
+
+	function copyBuffer (cur) {
+	  if (cur instanceof Buffer) {
+	    return Buffer.from(cur)
+	  }
+
+	  return new cur.constructor(cur.buffer.slice(), cur.byteOffset, cur.length)
+	}
+
+	function rfdc (opts) {
+	  opts = opts || {};
+	  if (opts.circles) return rfdcCircles(opts)
+
+	  const constructorHandlers = new Map();
+	  constructorHandlers.set(Date, (o) => new Date(o));
+	  constructorHandlers.set(Map, (o, fn) => new Map(cloneArray(Array.from(o), fn)));
+	  constructorHandlers.set(Set, (o, fn) => new Set(cloneArray(Array.from(o), fn)));
+	  if (opts.constructorHandlers) {
+	    for (const handler of opts.constructorHandlers) {
+	      constructorHandlers.set(handler[0], handler[1]);
+	    }
+	  }
+
+	  let handler = null;
+
+	  return opts.proto ? cloneProto : clone
+
+	  function cloneArray (a, fn) {
+	    const keys = Object.keys(a);
+	    const a2 = new Array(keys.length);
+	    for (let i = 0; i < keys.length; i++) {
+	      const k = keys[i];
+	      const cur = a[k];
+	      if (typeof cur !== 'object' || cur === null) {
+	        a2[k] = cur;
+	      } else if (cur.constructor !== Object && (handler = constructorHandlers.get(cur.constructor))) {
+	        a2[k] = handler(cur, fn);
+	      } else if (ArrayBuffer.isView(cur)) {
+	        a2[k] = copyBuffer(cur);
+	      } else {
+	        a2[k] = fn(cur);
+	      }
+	    }
+	    return a2
+	  }
+
+	  function clone (o) {
+	    if (typeof o !== 'object' || o === null) return o
+	    if (Array.isArray(o)) return cloneArray(o, clone)
+	    if (o.constructor !== Object && (handler = constructorHandlers.get(o.constructor))) {
+	      return handler(o, clone)
+	    }
+	    const o2 = {};
+	    for (const k in o) {
+	      if (Object.hasOwnProperty.call(o, k) === false) continue
+	      const cur = o[k];
+	      if (typeof cur !== 'object' || cur === null) {
+	        o2[k] = cur;
+	      } else if (cur.constructor !== Object && (handler = constructorHandlers.get(cur.constructor))) {
+	        o2[k] = handler(cur, clone);
+	      } else if (ArrayBuffer.isView(cur)) {
+	        o2[k] = copyBuffer(cur);
+	      } else {
+	        o2[k] = clone(cur);
+	      }
+	    }
+	    return o2
+	  }
+
+	  function cloneProto (o) {
+	    if (typeof o !== 'object' || o === null) return o
+	    if (Array.isArray(o)) return cloneArray(o, cloneProto)
+	    if (o.constructor !== Object && (handler = constructorHandlers.get(o.constructor))) {
+	      return handler(o, cloneProto)
+	    }
+	    const o2 = {};
+	    for (const k in o) {
+	      const cur = o[k];
+	      if (typeof cur !== 'object' || cur === null) {
+	        o2[k] = cur;
+	      } else if (cur.constructor !== Object && (handler = constructorHandlers.get(cur.constructor))) {
+	        o2[k] = handler(cur, cloneProto);
+	      } else if (ArrayBuffer.isView(cur)) {
+	        o2[k] = copyBuffer(cur);
+	      } else {
+	        o2[k] = cloneProto(cur);
+	      }
+	    }
+	    return o2
+	  }
+	}
+
+	function rfdcCircles (opts) {
+	  const refs = [];
+	  const refsNew = [];
+
+	  const constructorHandlers = new Map();
+	  constructorHandlers.set(Date, (o) => new Date(o));
+	  constructorHandlers.set(Map, (o, fn) => new Map(cloneArray(Array.from(o), fn)));
+	  constructorHandlers.set(Set, (o, fn) => new Set(cloneArray(Array.from(o), fn)));
+	  if (opts.constructorHandlers) {
+	    for (const handler of opts.constructorHandlers) {
+	      constructorHandlers.set(handler[0], handler[1]);
+	    }
+	  }
+
+	  let handler = null;
+	  return opts.proto ? cloneProto : clone
+
+	  function cloneArray (a, fn) {
+	    const keys = Object.keys(a);
+	    const a2 = new Array(keys.length);
+	    for (let i = 0; i < keys.length; i++) {
+	      const k = keys[i];
+	      const cur = a[k];
+	      if (typeof cur !== 'object' || cur === null) {
+	        a2[k] = cur;
+	      } else if (cur.constructor !== Object && (handler = constructorHandlers.get(cur.constructor))) {
+	        a2[k] = handler(cur, fn);
+	      } else if (ArrayBuffer.isView(cur)) {
+	        a2[k] = copyBuffer(cur);
+	      } else {
+	        const index = refs.indexOf(cur);
+	        if (index !== -1) {
+	          a2[k] = refsNew[index];
+	        } else {
+	          a2[k] = fn(cur);
+	        }
+	      }
+	    }
+	    return a2
+	  }
+
+	  function clone (o) {
+	    if (typeof o !== 'object' || o === null) return o
+	    if (Array.isArray(o)) return cloneArray(o, clone)
+	    if (o.constructor !== Object && (handler = constructorHandlers.get(o.constructor))) {
+	      return handler(o, clone)
+	    }
+	    const o2 = {};
+	    refs.push(o);
+	    refsNew.push(o2);
+	    for (const k in o) {
+	      if (Object.hasOwnProperty.call(o, k) === false) continue
+	      const cur = o[k];
+	      if (typeof cur !== 'object' || cur === null) {
+	        o2[k] = cur;
+	      } else if (cur.constructor !== Object && (handler = constructorHandlers.get(cur.constructor))) {
+	        o2[k] = handler(cur, clone);
+	      } else if (ArrayBuffer.isView(cur)) {
+	        o2[k] = copyBuffer(cur);
+	      } else {
+	        const i = refs.indexOf(cur);
+	        if (i !== -1) {
+	          o2[k] = refsNew[i];
+	        } else {
+	          o2[k] = clone(cur);
+	        }
+	      }
+	    }
+	    refs.pop();
+	    refsNew.pop();
+	    return o2
+	  }
+
+	  function cloneProto (o) {
+	    if (typeof o !== 'object' || o === null) return o
+	    if (Array.isArray(o)) return cloneArray(o, cloneProto)
+	    if (o.constructor !== Object && (handler = constructorHandlers.get(o.constructor))) {
+	      return handler(o, cloneProto)
+	    }
+	    const o2 = {};
+	    refs.push(o);
+	    refsNew.push(o2);
+	    for (const k in o) {
+	      const cur = o[k];
+	      if (typeof cur !== 'object' || cur === null) {
+	        o2[k] = cur;
+	      } else if (cur.constructor !== Object && (handler = constructorHandlers.get(cur.constructor))) {
+	        o2[k] = handler(cur, cloneProto);
+	      } else if (ArrayBuffer.isView(cur)) {
+	        o2[k] = copyBuffer(cur);
+	      } else {
+	        const i = refs.indexOf(cur);
+	        if (i !== -1) {
+	          o2[k] = refsNew[i];
+	        } else {
+	          o2[k] = cloneProto(cur);
+	        }
+	      }
+	    }
+	    refs.pop();
+	    refsNew.pop();
+	    return o2
+	  }
+	}
+	return rfdc_1;
+}
+
+var _default;
+var hasRequired_default;
+
+function require_default () {
+	if (hasRequired_default) return _default;
+	hasRequired_default = 1;
+
+	_default = requireRfdc()();
+	return _default;
+}
+
+var httpInterceptor;
+var hasRequiredHttpInterceptor;
+
+function requireHttpInterceptor () {
+	if (hasRequiredHttpInterceptor) return httpInterceptor;
+	hasRequiredHttpInterceptor = 1;
+	class InterceptorProxy {
+		constructor() {
+			this.requestInterceptors = [];
+			this.responseInterceptors = [];
+		}
+
+		get request() {
+			return {
+				use: (onFulfilled, onRejected) => {
+					const id = Math.random().toString(36).substring(2, 11); // unique id
+					this.requestInterceptors.push({ id, onFulfilled, onRejected });
+					return id;
+				},
+				eject: (id) => {
+					this.requestInterceptors = this.requestInterceptors.filter(interceptor => interceptor.id !== id);
+				}
+			};
+		}
+
+		get response() {
+			return {
+				use: (onFulfilled, onRejected) => {
+					const id = Math.random().toString(36).substring(2, 11); // unique id
+					this.responseInterceptors.push({ id, onFulfilled, onRejected });
+					return id;
+				},
+				eject: (id) => {
+					this.responseInterceptors = this.responseInterceptors.filter(interceptor => interceptor.id !== id);
+				}
+			};
+		}
+
+		async applyRequest(config, context) {
+			let result = Promise.resolve(config);
+			for (const { onFulfilled, onRejected } of this.requestInterceptors) {
+				result = result.then(
+					onFulfilled && ((value) => onFulfilled(value, context)),
+					onRejected && ((error) => onRejected(error, context))
+				);
+			}
+			return await result;
+		}
+
+		async applyResponse(response, context) {
+			let result = Promise.resolve(response);
+			for (const { onFulfilled, onRejected } of this.responseInterceptors) {
+				result = result.then(
+					onFulfilled && ((value) => onFulfilled(value, context)),
+					onRejected && ((error) => onRejected(error, context))
+				);
+			}
+			return await result;
+		}
+
+		async applyResponseError(error, context) {
+			let result = Promise.reject(error);
+			for (const { onFulfilled, onRejected } of this.responseInterceptors) {
+				result = result.then(
+					onFulfilled && ((value) => onFulfilled(value, context)),
+					onRejected && ((currentError) => onRejected(currentError, context))
+				);
+			}
+			return await result;
 		}
 	}
 
-	sqliteFunction = executeQueries;
-	return sqliteFunction;
+	httpInterceptor = function create() {
+		return new InterceptorProxy();
+	};
+	return httpInterceptor;
 }
+
+var flags_1;
+var hasRequiredFlags;
+
+function requireFlags () {
+	if (hasRequiredFlags) return flags_1;
+	hasRequiredFlags = 1;
+	let flags = {
+		useProxy: true,
+		useLazyDefaults: true
+	};
+
+	flags_1 = flags;
+	return flags_1;
+}
+
+var syncClient = {exports: {}};
 
 var randomUuid_1;
 var hasRequiredRandomUuid;
@@ -3774,6 +1795,324 @@ function requireRandomUuid () {
 	return randomUuid_1;
 }
 
+var syncAbort;
+var hasRequiredSyncAbort;
+
+function requireSyncAbort () {
+	if (hasRequiredSyncAbort) return syncAbort;
+	hasRequiredSyncAbort = 1;
+	const syncAbortSignalSymbol = typeof Symbol === 'function'
+		? Symbol.for('orange-orm.syncClient.abortSignal')
+		: '__orangeOrmSyncClientAbortSignal';
+	const syncAbortCode = 'ORANGE_SYNC_ABORT';
+
+	function createSyncAbortController() {
+		if (typeof AbortController === 'function')
+			return new AbortController();
+
+		const listeners = new Set();
+		const signal = {
+			aborted: false,
+			reason: undefined,
+			addEventListener(event, listener) {
+				if (event === 'abort' && typeof listener === 'function')
+					listeners.add(listener);
+			},
+			removeEventListener(event, listener) {
+				if (event === 'abort')
+					listeners.delete(listener);
+			}
+		};
+		return {
+			signal,
+			abort(reason) {
+				if (signal.aborted)
+					return;
+				signal.aborted = true;
+				signal.reason = reason;
+				for (const listener of Array.from(listeners))
+					listener.call(signal, { type: 'abort', target: signal });
+				listeners.clear();
+			}
+		};
+	}
+
+	function syncAbortError(reason, fallbackMessage = 'Sync stopped.') {
+		const error = reason instanceof Error
+			? reason
+			: new Error(typeof reason === 'string' && reason.length > 0 ? reason : fallbackMessage);
+		if (!(reason instanceof Error))
+			error.name = 'AbortError';
+		try {
+			error.code = syncAbortCode;
+		}
+		catch (_error) {
+			// Built-in error objects are writable in supported runtimes; retain the AbortError fallback otherwise.
+		}
+		return error;
+	}
+
+	function throwIfSyncAborted(signal) {
+		if (signal && signal.aborted)
+			throw syncAbortError(signal.reason);
+	}
+
+	function awaitWithSyncAbort(value, signal) {
+		if (!signal)
+			return Promise.resolve(value);
+		throwIfSyncAborted(signal);
+		return new Promise((resolve, reject) => {
+			let settled = false;
+			const finish = (callback, result) => {
+				if (settled)
+					return;
+				settled = true;
+				signal.removeEventListener('abort', onAbort);
+				callback(result);
+			};
+			const onAbort = () => finish(reject, syncAbortError(signal.reason));
+			signal.addEventListener('abort', onAbort, { once: true });
+			Promise.resolve(value).then(
+				(result) => finish(resolve, result),
+				(error) => finish(reject, error)
+			);
+		});
+	}
+
+	function isSyncAbortError(error) {
+		return !!error && error.code === syncAbortCode;
+	}
+
+	syncAbort = {
+		awaitWithSyncAbort,
+		createSyncAbortController,
+		isSyncAbortError,
+		syncAbortError,
+		syncAbortSignalSymbol,
+		throwIfSyncAborted
+	};
+	return syncAbort;
+}
+
+var syncAuto;
+var hasRequiredSyncAuto;
+
+function requireSyncAuto () {
+	if (hasRequiredSyncAuto) return syncAuto;
+	hasRequiredSyncAuto = 1;
+	const syncAutoStartSymbol = typeof Symbol === 'function'
+		? Symbol.for('orange-orm.syncClient.autoStart')
+		: '__orangeOrmSyncClientAutoStart';
+	const {
+		awaitWithSyncAbort,
+		createSyncAbortController,
+		isSyncAbortError,
+		syncAbortError,
+		syncAbortSignalSymbol,
+		throwIfSyncAborted
+	} = requireSyncAbort();
+
+	function createSyncAuto(syncClient, getConfig, options = {}) {
+		const timers = options.timers || globalThis;
+		const onlineTarget = options.onlineTarget || (typeof globalThis !== 'undefined' ? globalThis : undefined);
+		let running = false;
+		let forceRunning = false;
+		let activeRun = null;
+		let initialSyncCompleted = false;
+		let lifecycleVersion = 0;
+		const pendingStartControllers = new Set();
+		let intervalId = null;
+		let unsubscribeOnline = null;
+
+		return {
+			start,
+			startFromConfig,
+			stop,
+			isRunning,
+			runNow
+		};
+
+		async function start(options) {
+			return startCore(true, options);
+		}
+
+		async function startFromConfig(options) {
+			return startCore(false, options);
+		}
+
+		async function startCore(forceEnabled, options) {
+			const startVersion = lifecycleVersion;
+			const externalSignal = options && options[syncAbortSignalSymbol];
+			const controller = createSyncAbortController();
+			let removeExternalAbort;
+			if (externalSignal) {
+				const abort = () => controller.abort(syncAbortError(externalSignal.reason));
+				if (externalSignal.aborted)
+					abort();
+				else {
+					externalSignal.addEventListener('abort', abort, { once: true });
+					removeExternalAbort = () => externalSignal.removeEventListener('abort', abort);
+				}
+			}
+			pendingStartControllers.add(controller);
+			try {
+				const signal = controller.signal;
+				throwIfSyncAborted(signal);
+				if (running) {
+					if (activeRun)
+						await awaitWithSyncAbort(activeRun.promise, signal);
+					return;
+				}
+				const config = normalizeAutoConfig(await awaitWithSyncAbort(getConfig(), signal), { forceEnabled });
+				if (startVersion !== lifecycleVersion)
+					return;
+				if (running) {
+					if (activeRun)
+						await awaitWithSyncAbort(activeRun.promise, signal);
+					return;
+				}
+				if (!config.enabled)
+					return;
+				running = true;
+				forceRunning = forceEnabled;
+				if (config.intervalMs > 0 && timers && typeof timers.setInterval === 'function') {
+					intervalId = timers.setInterval(() => {
+						void runNow().catch(() => {});
+					}, config.intervalMs);
+				}
+				subscribeOnline();
+				await runNow(signal);
+			}
+			catch (error) {
+				if (startVersion !== lifecycleVersion && isSyncAbortError(error))
+					return;
+				throw error;
+			}
+			finally {
+				pendingStartControllers.delete(controller);
+				if (removeExternalAbort)
+					removeExternalAbort();
+			}
+		}
+
+		async function stop() {
+			lifecycleVersion += 1;
+			for (const controller of pendingStartControllers)
+				controller.abort(syncAbortError(undefined, 'Initial sync stopped.'));
+			running = false;
+			forceRunning = false;
+			if (intervalId !== null && timers && typeof timers.clearInterval === 'function') {
+				timers.clearInterval(intervalId);
+				intervalId = null;
+			}
+			if (unsubscribeOnline) {
+				unsubscribeOnline();
+				unsubscribeOnline = null;
+			}
+			const run = activeRun;
+			if (!run)
+				return;
+			if (run.initial)
+				run.controller.abort(syncAbortError(undefined, 'Initial sync stopped.'));
+			await run.promise.catch(() => {});
+		}
+
+		async function isRunning() {
+			return running;
+		}
+
+		async function runNow(externalSignal) {
+			if (activeRun)
+				return activeRun.promise;
+			const initial = !initialSyncCompleted;
+			const controller = createSyncAbortController();
+			let removeExternalAbort;
+			if (externalSignal) {
+				const abort = () => controller.abort(syncAbortError(externalSignal.reason));
+				if (externalSignal.aborted)
+					abort();
+				else {
+					externalSignal.addEventListener('abort', abort, { once: true });
+					removeExternalAbort = () => externalSignal.removeEventListener('abort', abort);
+				}
+			}
+			const run = {
+				controller,
+				initial,
+				promise: null
+			};
+			activeRun = run;
+			run.promise = runCycle(controller.signal)
+				.then((result) => {
+					if (initial)
+						initialSyncCompleted = true;
+					return result;
+				})
+				.finally(() => {
+					if (removeExternalAbort)
+						removeExternalAbort();
+					if (activeRun === run)
+						activeRun = null;
+				});
+			return run.promise;
+		}
+
+		async function runCycle(signal) {
+			throwIfSyncAborted(signal);
+			const config = normalizeAutoConfig(await awaitWithSyncAbort(getConfig(), signal), { forceEnabled: forceRunning });
+			throwIfSyncAborted(signal);
+			const syncOptions = { [syncAbortSignalSymbol]: signal };
+			if (config.enabled && typeof options.runSync === 'function')
+				return options.runSync(config, syncOptions);
+			if (config.enabled)
+				return syncClient.sync(syncOptions);
+			return { skipped: true };
+		}
+
+		function subscribeOnline() {
+			if (!onlineTarget || typeof onlineTarget.addEventListener !== 'function' || typeof onlineTarget.removeEventListener !== 'function')
+				return;
+			const onOnline = () => {
+				if (running)
+					void runNow().catch(() => {});
+			};
+			onlineTarget.addEventListener('online', onOnline);
+			unsubscribeOnline = () => onlineTarget.removeEventListener('online', onOnline);
+		}
+	}
+
+	function normalizeAutoConfig(syncConfig, options = {}) {
+		const auto = syncConfig && syncConfig.auto;
+		const forceEnabled = !!options.forceEnabled;
+		if (!syncConfig || auto === false)
+			return { enabled: !!syncConfig && forceEnabled, intervalMs: 30000 };
+		if (auto === undefined || auto === true)
+			return { enabled: true, intervalMs: 30000 };
+		if (auto !== Object(auto))
+			return { enabled: true, intervalMs: 30000 };
+		const intervalMs = normalizeIntervalMs(auto.intervalMs);
+		return {
+			enabled: forceEnabled || auto.enabled !== false,
+			intervalMs
+		};
+	}
+
+	function normalizeIntervalMs(value) {
+		const parsed = Number.parseInt(value, 10);
+		if (!Number.isFinite(parsed) || parsed < 0)
+			return 30000;
+		return parsed;
+	}
+
+	syncAuto = {
+		createSyncAuto,
+		normalizeAutoConfig,
+		syncAbortSignalSymbol,
+		syncAutoStartSymbol
+	};
+	return syncAuto;
+}
+
 var outboxTableSql_1;
 var hasRequiredOutboxTableSql;
 
@@ -3803,6 +2142,403 @@ function requireOutboxTableSql () {
 
 	outboxTableSql_1 = outboxTableSql;
 	return outboxTableSql_1;
+}
+
+var syncSchema;
+var hasRequiredSyncSchema;
+
+function requireSyncSchema () {
+	if (hasRequiredSyncSchema) return syncSchema;
+	hasRequiredSyncSchema = 1;
+	const schemaStateTable = 'orange_schema_state';
+	const schemaVersion = 1;
+	const ensuredSchemasByDb = new WeakMap();
+
+	async function ensureSyncSchema(db, client, tableNames, options = {}) {
+		if (!db || typeof db.query !== 'function')
+			return null;
+		if (options === false || options && options.enabled === false)
+			return null;
+		const tables = client && client.tables;
+		if (!tables || !Array.isArray(tableNames) || tableNames.length === 0)
+			return null;
+
+		const schema = buildSyncSchema(tables, tableNames);
+		if (!schema.tables.length)
+			return null;
+		const sql = schemaToSql(schema);
+		const schemaJson = stableStringify(schema);
+		const checksum = checksumString(schemaJson);
+		const scope = `sync:${schema.tables.map(x => x.name).join('|')}`;
+		const ensuredKey = `${scope}:${checksum}`;
+		if (isSchemaEnsured(db, ensuredKey))
+			return { scope, schema, checksum, sql: sql.statements };
+
+		await ensureSchemaStateTable(db);
+		const existing = await readSchemaState(db, scope);
+		const shouldUpdateState = !existing || existing.checksum !== checksum;
+		if (existing && existing.checksum !== checksum && !isIndexOnlySchemaChange(existing.schemaJson, schema))
+			throw new Error('Local sync schema does not match current map. Reset the local sync database or run a migration before syncing.');
+		if (existing && existing.checksum === checksum) {
+			markSchemaEnsured(db, ensuredKey);
+			return { scope, schema, checksum, sql: sql.statements };
+		}
+
+		for (let i = 0; i < sql.statements.length; i++)
+			await db.query(sql.statements[i]);
+
+		if (shouldUpdateState)
+			await writeSchemaState(db, {
+				scope,
+				dialect: 'sqlite',
+				tables: schema.tables.map(x => x.name),
+				schema,
+				checksum,
+				sql: sql.statements.join('\n'),
+				updatedAtMs: Date.now()
+			});
+
+		markSchemaEnsured(db, ensuredKey);
+		return { scope, schema, checksum, sql: sql.statements };
+	}
+
+	function isSchemaEnsured(db, key) {
+		const ensured = ensuredSchemasByDb.get(db);
+		return ensured ? ensured.has(key) : false;
+	}
+
+	function markSchemaEnsured(db, key) {
+		let ensured = ensuredSchemasByDb.get(db);
+		if (!ensured) {
+			ensured = new Set();
+			ensuredSchemasByDb.set(db, ensured);
+		}
+		ensured.add(key);
+	}
+
+	function clearEnsuredSyncSchema(db) {
+		if (db)
+			ensuredSchemasByDb.delete(db);
+	}
+
+	function buildSyncSchema(tables, tableNames) {
+		const selected = Array.from(new Set(tableNames))
+			.filter(name => tables[name])
+			.sort();
+		const schema = {
+			version: schemaVersion,
+			dialect: 'sqlite',
+			tables: selected.map(name => tableToSchema(name, tables[name]))
+		};
+		addRelationMetadata(schema, tables, selected);
+		return schema;
+	}
+
+	function tableToSchema(name, table) {
+		const columns = (table._columns || []).map(columnToSchema);
+		return {
+			name,
+			dbName: table._dbName,
+			columns,
+			foreignKeys: [],
+			indexes: [],
+			primaryKey: (table._primaryColumns || []).map(x => x._dbName)
+		};
+	}
+
+	function columnToSchema(column) {
+		return {
+			name: column.alias,
+			dbName: column._dbName,
+			type: columnType(column),
+			primary: column.isPrimary === true,
+			notNull: column._notNull === true,
+			notNullExceptInsert: column._notNullExceptInsert === true
+		};
+	}
+
+	function columnType(column) {
+		if (column.tsType === 'NumberColumn')
+			return 'number';
+		if (column.tsType === 'BooleanColumn')
+			return 'boolean';
+		if (column.tsType === 'BigintColumn')
+			return 'bigint';
+		if (column.tsType === 'BinaryColumn')
+			return 'binary';
+		if (column.tsType === 'JSONColumn')
+			return 'json';
+		if (column.tsType === 'UUIDColumn')
+			return 'uuid';
+		if (column.tsType === 'DateColumn' && column.hasTimeZone)
+			return 'datetime-tz';
+		if (column.tsType === 'DateColumn')
+			return 'datetime';
+		return 'string';
+	}
+
+	function schemaToSql(schema) {
+		return {
+			statements: schema.tables.map(tableToCreateSql).concat(schema.tables.flatMap(tableToIndexSql))
+		};
+	}
+
+	function tableToCreateSql(table) {
+		const hasCompositePrimaryKey = table.primaryKey.length > 1;
+		const parts = table.columns.map(column => columnToSql(column, { hasCompositePrimaryKey }));
+		if (table.primaryKey.length > 1)
+			parts.push(`PRIMARY KEY (${table.primaryKey.map(quoteIdent).join(', ')})`);
+		for (let i = 0; i < table.foreignKeys.length; i++)
+			parts.push(foreignKeyToSql(table.foreignKeys[i]));
+		return [
+			`CREATE TABLE IF NOT EXISTS ${quoteIdent(table.dbName)} (`,
+			parts.map(x => `  ${x}`).join(',\n'),
+			');'
+		].join('\n');
+	}
+
+	function tableToIndexSql(table) {
+		return (table.indexes || []).map(index => {
+			return `CREATE INDEX IF NOT EXISTS ${quoteIdent(index.dbName)} ON ${quoteIdent(table.dbName)} (${index.columns.map(quoteIdent).join(', ')});`;
+		});
+	}
+
+	function columnToSql(column, options = {}) {
+		const parts = [quoteIdent(column.dbName), sqliteType(column.type)];
+		if (!options.hasCompositePrimaryKey && column.primary && column.type === 'number')
+			parts.push('PRIMARY KEY');
+		else if (!options.hasCompositePrimaryKey && column.primary)
+			parts.push('PRIMARY KEY');
+		if (column.notNull)
+			parts.push('NOT NULL');
+		return parts.join(' ');
+	}
+
+	function foreignKeyToSql(foreignKey) {
+		return [
+			`FOREIGN KEY (${foreignKey.columns.map(quoteIdent).join(', ')})`,
+			`REFERENCES ${quoteIdent(foreignKey.referencesTable)} (${foreignKey.referencesColumns.map(quoteIdent).join(', ')})`
+		].join(' ');
+	}
+
+	function sqliteType(type) {
+		if (type === 'number' || type === 'boolean')
+			return 'INTEGER';
+		if (type === 'binary')
+			return 'BLOB';
+		return 'TEXT';
+	}
+
+	function addRelationMetadata(schema, tables, selectedNames) {
+		const tableSchemaByObject = new Map();
+		const selectedObjects = new Set();
+		for (let i = 0; i < selectedNames.length; i++) {
+			const table = tables[selectedNames[i]];
+			const tableSchema = schema.tables[i];
+			tableSchemaByObject.set(table, tableSchema);
+			selectedObjects.add(table);
+		}
+
+		const seen = new Set();
+		const seenForeignKeys = new Set();
+		for (let i = 0; i < selectedNames.length; i++) {
+			const table = tables[selectedNames[i]];
+			const relations = table && table._relations;
+			if (!relations)
+				continue;
+			for (let relationName in relations) {
+				const join = extractJoinRelation(relations[relationName]);
+				if (!join || !selectedObjects.has(join.parentTable) || !selectedObjects.has(join.childTable))
+					continue;
+				const targetSchema = tableSchemaByObject.get(join.parentTable);
+				const referencesSchema = tableSchemaByObject.get(join.childTable);
+				const columns = (join.columns || []).map(x => x && x._dbName).filter(Boolean);
+				const referencesColumns = join.childTable && Array.isArray(join.childTable._primaryColumns)
+					? join.childTable._primaryColumns.map(x => x && x._dbName).filter(Boolean)
+					: [];
+				if (!targetSchema || !referencesSchema || columns.length === 0 || columns.length !== referencesColumns.length)
+					continue;
+				addRelationIndex(targetSchema, columns, relationName, seen);
+				addRelationForeignKey(targetSchema, referencesSchema, columns, referencesColumns, seenForeignKeys);
+			}
+		}
+
+		for (let i = 0; i < schema.tables.length; i++) {
+			schema.tables[i].indexes.sort((a, b) => a.dbName.localeCompare(b.dbName));
+			schema.tables[i].foreignKeys.sort((a, b) => {
+				const tableCompare = a.referencesTable.localeCompare(b.referencesTable);
+				if (tableCompare !== 0)
+					return tableCompare;
+				return a.columns.join('|').localeCompare(b.columns.join('|'));
+			});
+		}
+	}
+
+	function addRelationIndex(targetSchema, columns, relationName, seen) {
+		if (isPrimaryKey(targetSchema, columns))
+			return;
+		const key = `${targetSchema.dbName}:${columns.join('|')}`;
+		if (seen.has(key))
+			return;
+		seen.add(key);
+		targetSchema.indexes.push({
+			name: `relation:${relationName}`,
+			dbName: newIndexName(targetSchema.dbName, columns),
+			columns
+		});
+	}
+
+	function addRelationForeignKey(targetSchema, referencesSchema, columns, referencesColumns, seen) {
+		const key = `${targetSchema.dbName}:${columns.join('|')}:${referencesSchema.dbName}:${referencesColumns.join('|')}`;
+		if (seen.has(key))
+			return;
+		seen.add(key);
+		targetSchema.foreignKeys.push({
+			columns,
+			referencesTable: referencesSchema.dbName,
+			referencesColumns
+		});
+	}
+
+	function extractJoinRelation(relation) {
+		if (!relation || typeof relation.accept !== 'function')
+			return null;
+		let join;
+		relation.accept({
+			visitJoin: function(current) {
+				join = current;
+			},
+			visitOne: function(current) {
+				join = current && current.joinRelation;
+			},
+			visitMany: function(current) {
+				join = current && current.joinRelation;
+			}
+		});
+		return join;
+	}
+
+	function isPrimaryKey(tableSchema, columns) {
+		if (!Array.isArray(tableSchema.primaryKey) || tableSchema.primaryKey.length !== columns.length)
+			return false;
+		for (let i = 0; i < columns.length; i++) {
+			if (tableSchema.primaryKey[i] !== columns[i])
+				return false;
+		}
+		return true;
+	}
+
+	function newIndexName(tableName, columns) {
+		const raw = `orange_idx_${tableName}_${columns.join('_')}`;
+		return raw.replace(/[^A-Za-z0-9_]/g, '_');
+	}
+
+	async function ensureSchemaStateTable(db) {
+		await db.query([
+			`CREATE TABLE IF NOT EXISTS ${quoteIdent(schemaStateTable)} (`,
+			'"scope" TEXT PRIMARY KEY,',
+			'"dialect" TEXT NOT NULL,',
+			'"tables_json" TEXT NOT NULL,',
+			'"schema_json" TEXT NOT NULL,',
+			'"checksum" TEXT NOT NULL,',
+			'"sql_text" TEXT NOT NULL,',
+			'"updated_at_ms" INTEGER NOT NULL',
+			');'
+		].join(' '));
+	}
+
+	async function readSchemaState(db, scope) {
+		const rows = await db.query(`SELECT "checksum", "schema_json" FROM ${quoteIdent(schemaStateTable)} WHERE "scope" = ${sqlStringLiteral(scope)} LIMIT 1`);
+		const list = Array.isArray(rows) ? rows : rows && rows.rows || [];
+		const row = list[0];
+		if (!row)
+			return null;
+		return {
+			checksum: row.checksum ?? row.CHECKSUM,
+			schemaJson: row.schema_json ?? row.SCHEMA_JSON
+		};
+	}
+
+	async function writeSchemaState(db, state) {
+		await db.query([
+			`INSERT OR REPLACE INTO ${quoteIdent(schemaStateTable)} (`,
+			'"scope", "dialect", "tables_json", "schema_json", "checksum", "sql_text", "updated_at_ms"',
+			') VALUES (',
+			[
+				sqlStringLiteral(state.scope),
+				sqlStringLiteral(state.dialect),
+				sqlStringLiteral(JSON.stringify(state.tables)),
+				sqlStringLiteral(stableStringify(state.schema)),
+				sqlStringLiteral(state.checksum),
+				sqlStringLiteral(state.sql),
+				String(state.updatedAtMs)
+			].join(', '),
+			');'
+		].join(' '));
+	}
+
+	function isIndexOnlySchemaChange(existingSchemaJson, nextSchema) {
+		if (typeof existingSchemaJson !== 'string')
+			return false;
+		try {
+			const existing = JSON.parse(existingSchemaJson);
+			return stableStringify(stripIndexes(existing)) === stableStringify(stripIndexes(nextSchema));
+		}
+		catch (_e) {
+			return false;
+		}
+	}
+
+	function stripIndexes(value) {
+		if (Array.isArray(value))
+			return value.map(stripIndexes);
+		if (!value || typeof value !== 'object')
+			return value;
+		const result = {};
+		for (let key in value) {
+			if (key !== 'indexes')
+				result[key] = stripIndexes(value[key]);
+		}
+		return result;
+	}
+
+	function quoteIdent(value) {
+		return `"${String(value).replace(/"/g, '""')}"`;
+	}
+
+	function sqlStringLiteral(value) {
+		if (value === null || value === undefined)
+			return 'NULL';
+		return `'${String(value).replace(/'/g, '\'\'')}'`;
+	}
+
+	function stableStringify(value) {
+		if (value === null || typeof value !== 'object')
+			return JSON.stringify(value);
+		if (Array.isArray(value))
+			return `[${value.map(stableStringify).join(',')}]`;
+		const keys = Object.keys(value).sort();
+		return `{${keys.map(key => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
+	}
+
+	function checksumString(value) {
+		let hash = 2166136261;
+		for (let i = 0; i < value.length; i++) {
+			hash ^= value.charCodeAt(i);
+			hash = Math.imul(hash, 16777619);
+		}
+		return `fnv1a32:${(hash >>> 0).toString(16).padStart(8, '0')}`;
+	}
+
+	syncSchema = {
+		ensureSyncSchema,
+		clearEnsuredSyncSchema,
+		buildSyncSchema,
+		schemaToSql,
+		stableStringify,
+		checksumString
+	};
+	return syncSchema;
 }
 
 var crossTabLock;
@@ -4478,6 +3214,573 @@ function requireEnsureOutboxOperationColumns () {
 	return ensureOutboxOperationColumns_1;
 }
 
+var tryGetSessionContext_1;
+var hasRequiredTryGetSessionContext;
+
+function requireTryGetSessionContext () {
+	if (hasRequiredTryGetSessionContext) return tryGetSessionContext_1;
+	hasRequiredTryGetSessionContext = 1;
+	function tryGetSessionContext(context) {
+		if (context)
+			return context.rdb;
+	}
+
+	tryGetSessionContext_1 = tryGetSessionContext;
+	return tryGetSessionContext_1;
+}
+
+var getSessionContext_1;
+var hasRequiredGetSessionContext;
+
+function requireGetSessionContext () {
+	if (hasRequiredGetSessionContext) return getSessionContext_1;
+	hasRequiredGetSessionContext = 1;
+	let tryGetSessionContext = requireTryGetSessionContext();
+
+	function getSessionContext(context) {
+		const rdb = tryGetSessionContext(context);
+		if (!rdb)
+			throw new Error('Rdb transaction is no longer available. Is promise chain broken ?');
+		return rdb;
+	}
+
+	getSessionContext_1 = getSessionContext;
+	return getSessionContext_1;
+}
+
+var getSessionSingleton;
+var hasRequiredGetSessionSingleton;
+
+function requireGetSessionSingleton () {
+	if (hasRequiredGetSessionSingleton) return getSessionSingleton;
+	hasRequiredGetSessionSingleton = 1;
+	var getSessionContext = requireGetSessionContext();
+
+	getSessionSingleton = function(context, name) {
+		const rdb = getSessionContext(context);
+		return rdb[name];
+	};
+	return getSessionSingleton;
+}
+
+var negotiateNullParams_1;
+var hasRequiredNegotiateNullParams;
+
+function requireNegotiateNullParams () {
+	if (hasRequiredNegotiateNullParams) return negotiateNullParams_1;
+	hasRequiredNegotiateNullParams = 1;
+	function negotiateNullParams(query) {
+		if (query && query.parameters && query.parameters.length > 0 && (query.parameters.filter(x => x === null || x === undefined).length > 0)) {
+			var splitted = query.sql().split('?');
+			var sql = '';
+			var parameters = [];
+			var lastIndex = splitted.length - 1;
+			for (var i = 0; i < lastIndex; i++) {
+				if (query.parameters[i] === null || query.parameters[i] === undefined)
+					sql += splitted[i] + 'null';
+				else {
+					sql += splitted[i] + '?';
+					parameters.push(query.parameters[i]);
+				}
+			}
+			sql += splitted[lastIndex];
+			return {
+				sql: () => sql,
+				parameters
+			};
+
+		}
+		else
+			return query;
+	}
+
+	negotiateNullParams_1 = negotiateNullParams;
+	return negotiateNullParams_1;
+}
+
+var resolveExecuteCommand;
+var hasRequiredResolveExecuteCommand;
+
+function requireResolveExecuteCommand () {
+	if (hasRequiredResolveExecuteCommand) return resolveExecuteCommand;
+	hasRequiredResolveExecuteCommand = 1;
+	const getSessionSingleton = requireGetSessionSingleton();
+	const negotiateNullParams = requireNegotiateNullParams();
+
+	function resolveExecuteQuery(context, query) {
+		return resolve;
+
+		function resolve(success, failed) {
+			try {
+				var client = getSessionSingleton(context, 'dbClient');
+				query = negotiateNullParams(query);
+				client.executeCommand(query, onCompleted);
+			} catch (e) {
+				failed(e);
+			}
+
+			function onCompleted(err, rows) {
+				if (!err)
+					success(rows);
+				else
+					failed(err);
+			}
+		}
+
+	}
+
+
+
+	resolveExecuteCommand = resolveExecuteQuery;
+	return resolveExecuteCommand;
+}
+
+var executeCommand_1;
+var hasRequiredExecuteCommand;
+
+function requireExecuteCommand () {
+	if (hasRequiredExecuteCommand) return executeCommand_1;
+	hasRequiredExecuteCommand = 1;
+	var newResolver = requireResolveExecuteCommand();
+
+	function executeCommand(context, query) {
+		var resolver = newResolver(context, query);
+		return new Promise(resolver);
+	}
+
+	executeCommand_1 = executeCommand;
+	return executeCommand_1;
+}
+
+var promise;
+var hasRequiredPromise;
+
+function requirePromise () {
+	if (hasRequiredPromise) return promise;
+	hasRequiredPromise = 1;
+	function newPromise(func) {
+		if (!func)
+			return Promise.resolve.apply(Promise, arguments);
+		return new Promise(func);
+	}
+
+	newPromise.all = Promise.all;
+	promise = newPromise;
+	return promise;
+}
+
+var executeChanges_1;
+var hasRequiredExecuteChanges;
+
+function requireExecuteChanges () {
+	if (hasRequiredExecuteChanges) return executeChanges_1;
+	hasRequiredExecuteChanges = 1;
+	var executeCommand = requireExecuteCommand();
+	var newPromise = requirePromise();
+
+	function executeChanges(context, queries) {
+		if (queries.length === 0)
+			return newPromise();
+		var i = -1;
+		return execute().then(emitChanged);
+
+
+		function execute() {
+			i++;
+			if (i + 1 === queries.length)
+				return executeCommand(context, queries[i]).then(notifyListener);
+			else {
+				return executeCommand(context, queries[i]).then(notifyListener).then(execute);
+			}
+		}
+
+		function notifyListener(result) {
+			if (result && queries[i].onResult)
+				queries[i].onResult(result);
+		}
+
+		async function emitChanged() {
+			for (let i = 0; i < queries.length; i++) {
+				if (queries[i].emitChanged)
+					await Promise.all(queries[i].emitChanged());
+			}
+		}
+
+
+	}
+
+	executeChanges_1 = executeChanges;
+	return executeChanges_1;
+}
+
+var getChangeSet_1;
+var hasRequiredGetChangeSet;
+
+function requireGetChangeSet () {
+	if (hasRequiredGetChangeSet) return getChangeSet_1;
+	hasRequiredGetChangeSet = 1;
+	var getSessionSingleton = requireGetSessionSingleton();
+	function getChangeSet(context) {
+		return getSessionSingleton(context, 'changes');
+	}
+
+	getChangeSet_1 = getChangeSet;
+	return getChangeSet_1;
+}
+
+var extractSql;
+var hasRequiredExtractSql;
+
+function requireExtractSql () {
+	if (hasRequiredExtractSql) return extractSql;
+	hasRequiredExtractSql = 1;
+	function extract(sql) {
+		if (sql && typeof(sql) === 'function')
+			return sql();
+		else if (sql === undefined)
+			return '';
+		else
+			return sql;
+	}
+
+	extractSql = extract;
+	return extractSql;
+}
+
+var extractParameters;
+var hasRequiredExtractParameters;
+
+function requireExtractParameters () {
+	if (hasRequiredExtractParameters) return extractParameters;
+	hasRequiredExtractParameters = 1;
+	function extract(parameters) {
+		if (parameters) {
+			return parameters.slice(0);
+		}
+		return [];
+	}
+
+	extractParameters = extract;
+	return extractParameters;
+}
+
+var newParameterized_1;
+var hasRequiredNewParameterized;
+
+function requireNewParameterized () {
+	if (hasRequiredNewParameterized) return newParameterized_1;
+	hasRequiredNewParameterized = 1;
+	var extractSql = requireExtractSql();
+	var extractParameters = requireExtractParameters();
+
+	function Parameterized(text, parameters) {
+		this._text = text;
+		this.parameters = parameters;
+	}
+
+	Parameterized.prototype.sql = function() {
+		return this._text;
+	};
+
+	Parameterized.prototype.prepend = function(other) {
+		if (other.sql) {
+			var params = other.parameters.concat(this.parameters);
+			return newParameterized(other.sql() + this._text, params);
+		} else
+			return newParameterized(other + this._text, this.parameters);
+	};
+
+	Parameterized.prototype.append = function(other) {
+		if (other.sql) {
+			var params = this.parameters.concat(other.parameters);
+			return newParameterized(this._text + other.sql(), params);
+		} else
+			return newParameterized(this._text + other, this.parameters);
+	};
+
+	function newParameterized(text, parameters) {
+		text = extractSql(text);
+		parameters = extractParameters(parameters);
+		return new Parameterized(text, parameters);
+	}
+
+	newParameterized_1 = newParameterized;
+	return newParameterized_1;
+}
+
+var compressChanges;
+var hasRequiredCompressChanges;
+
+function requireCompressChanges () {
+	if (hasRequiredCompressChanges) return compressChanges;
+	hasRequiredCompressChanges = 1;
+	var newParameterized = requireNewParameterized();
+	var getSessionSingleton = requireGetSessionSingleton();
+
+	function compress(context, queries) {
+		var multipleStatements = getSessionSingleton(context, 'multipleStatements');
+		var compressed = [];
+		var queryCount = queries.length;
+
+		for (var i = 0; i < queryCount; i++) {
+			var current = queries[i];
+			if (multipleStatements && current.parameters.length === 0 && !current.disallowCompress) {
+				for (var i2 = i+1; i2 < queryCount; i2++) {
+					var next = queries[i2];
+					if (next.parameters.length > 0 || ! next.disallowCompress)
+						break;
+					current = newParameterized(current.sql() + ';' + next.sql());
+					i++;
+				}
+			}
+			compressed.push(current);
+		}
+		return compressed;
+	}
+
+	compressChanges = compress;
+	return compressChanges;
+}
+
+var popChanges_1;
+var hasRequiredPopChanges;
+
+function requirePopChanges () {
+	if (hasRequiredPopChanges) return popChanges_1;
+	hasRequiredPopChanges = 1;
+	var getChangeSet = requireGetChangeSet();
+	var compressChanges = requireCompressChanges();
+
+	function popChanges(context) {
+		var changeSet = getChangeSet(context);
+		var length = changeSet.length;
+		if (length > 0) {
+			var lastCmd = changeSet[length-1];
+			if (lastCmd.endEdit)
+				lastCmd.endEdit();
+			var compressed = compressChanges(context, changeSet);
+			changeSet.length = 0;
+			return compressed;
+		}
+		return changeSet;
+
+	}
+
+	popChanges_1 = popChanges;
+	return popChanges_1;
+}
+
+var resolveExecuteQuery_1;
+var hasRequiredResolveExecuteQuery;
+
+function requireResolveExecuteQuery () {
+	if (hasRequiredResolveExecuteQuery) return resolveExecuteQuery_1;
+	hasRequiredResolveExecuteQuery = 1;
+	const getSessionSingleton = requireGetSessionSingleton();
+	const negotiateNullParams = requireNegotiateNullParams();
+
+	function resolveExecuteQuery(context, query) {
+		return resolve;
+
+		function resolve(success, failed) {
+			try {
+				var client = getSessionSingleton(context, 'dbClient');
+				query = negotiateNullParams(query);
+				client.executeQuery(query, onCompleted);
+			} catch (e) {
+				failed(e);
+			}
+
+			function onCompleted(err, rows) {
+				if (!err)
+					success(rows);
+				else
+					failed(err);
+			}
+		}
+
+	}
+
+
+
+	resolveExecuteQuery_1 = resolveExecuteQuery;
+	return resolveExecuteQuery_1;
+}
+
+var executeQuery_1;
+var hasRequiredExecuteQuery;
+
+function requireExecuteQuery () {
+	if (hasRequiredExecuteQuery) return executeQuery_1;
+	hasRequiredExecuteQuery = 1;
+	var newResolver = requireResolveExecuteQuery();
+
+	function executeQuery(context, query) {
+		var resolver = newResolver(context, query);
+		return new Promise(resolver);
+	}
+
+	executeQuery_1 = executeQuery;
+	return executeQuery_1;
+}
+
+var executeQueriesCore_1;
+var hasRequiredExecuteQueriesCore;
+
+function requireExecuteQueriesCore () {
+	if (hasRequiredExecuteQueriesCore) return executeQueriesCore_1;
+	hasRequiredExecuteQueriesCore = 1;
+	var executeQuery = requireExecuteQuery();
+
+	function executeQueriesCore(context, queries) {
+		var promises = [];
+		var chain = Promise.resolve();
+		for (var i = 0; i < queries.length; i++) {
+			// Serialize execution while still returning an array of promises
+			var q = chain.then(function(qi) {
+				return executeQuery(context, qi);
+			}.bind(null, queries[i]));
+			promises.push(q);
+			chain = q;
+		}
+		return promises;
+	}
+
+	executeQueriesCore_1 = executeQueriesCore;
+	return executeQueriesCore_1;
+}
+
+var executeQueries_1;
+var hasRequiredExecuteQueries;
+
+function requireExecuteQueries () {
+	if (hasRequiredExecuteQueries) return executeQueries_1;
+	hasRequiredExecuteQueries = 1;
+	var executeChanges = requireExecuteChanges();
+	var popChanges = requirePopChanges();
+	var executeQueriesCore = requireExecuteQueriesCore();
+
+	function executeQueries(context, queries) {
+		var changes = popChanges(context);
+
+		return executeChanges(context, changes).then(onDoneChanges);
+
+		function onDoneChanges() {
+			return executeQueriesCore(context, queries);
+		}
+	}
+
+	executeQueries_1 = executeQueries;
+	return executeQueries_1;
+}
+
+var negotiateSql_1;
+var hasRequiredNegotiateSql;
+
+function requireNegotiateSql () {
+	if (hasRequiredNegotiateSql) return negotiateSql_1;
+	hasRequiredNegotiateSql = 1;
+	function negotiateSql(query) {
+		if(typeof(query) === 'string')
+			return function() { return query; };
+
+		var sql = query.sql;
+		if(typeof(sql) === 'function')
+			return sql;
+		else if(typeof(sql) === 'string')
+			return function() { return sql; };
+		else
+			throw new Error('Query lacks sql property string or function');
+	}
+
+	negotiateSql_1 = negotiateSql;
+	return negotiateSql_1;
+}
+
+var negotiateParameters_1;
+var hasRequiredNegotiateParameters;
+
+function requireNegotiateParameters () {
+	if (hasRequiredNegotiateParameters) return negotiateParameters_1;
+	hasRequiredNegotiateParameters = 1;
+	function negotiateParameters(parameters) {
+		if(parameters === undefined)
+			return [];
+		else if(parameters.length !== undefined)
+			return parameters;
+		else
+			throw new Error('Query has invalid parameters property. Must be undefined or array');
+	}
+
+	negotiateParameters_1 = negotiateParameters;
+	return negotiateParameters_1;
+}
+
+var wrapQuery_1;
+var hasRequiredWrapQuery;
+
+function requireWrapQuery () {
+	if (hasRequiredWrapQuery) return wrapQuery_1;
+	hasRequiredWrapQuery = 1;
+	var negotiateSql = requireNegotiateSql();
+	var negotiateParameters = requireNegotiateParameters();
+
+	function wrapQuery(query) {
+		var safeSql = negotiateSql(query);
+		var safeParameters = negotiateParameters(query.parameters);
+		let obj =  {
+			sql: safeSql,
+			parameters: safeParameters
+		};
+		if (query.types)
+			obj.types = query.types;
+		return obj;
+	}
+
+
+	wrapQuery_1 = wrapQuery;
+	return wrapQuery_1;
+}
+
+var query;
+var hasRequiredQuery;
+
+function requireQuery () {
+	if (hasRequiredQuery) return query;
+	hasRequiredQuery = 1;
+	var executeQueries = requireExecuteQueries();
+	var wrapQuery = requireWrapQuery();
+
+	function doQuery(context, query) {
+		var wrappedQuery = wrapQuery(query);
+		return executeQueries(context, [wrappedQuery]).then(unwrapResult);
+	}
+
+	function unwrapResult(results) {
+		return results[0];
+	}
+
+	query = doQuery;
+	return query;
+}
+
+var setSessionSingleton_1;
+var hasRequiredSetSessionSingleton;
+
+function requireSetSessionSingleton () {
+	if (hasRequiredSetSessionSingleton) return setSessionSingleton_1;
+	hasRequiredSetSessionSingleton = 1;
+	const getSessionContext = requireGetSessionContext();
+
+	function setSessionSingleton(context, name, value) {
+		const rdb = getSessionContext(context);
+		rdb[name] = value;
+	}
+
+	setSessionSingleton_1 = setSessionSingleton;
+	return setSessionSingleton_1;
+}
+
 var operationContext;
 var hasRequiredOperationContext;
 
@@ -4684,1618 +3987,6 @@ function requireOperationContext () {
 		withSyncOperationMemory
 	};
 	return operationContext;
-}
-
-var hostLocal_1;
-var hasRequiredHostLocal;
-
-function requireHostLocal () {
-	if (hasRequiredHostLocal) return hostLocal_1;
-	hasRequiredHostLocal = 1;
-	let executePath = requireExecutePath();
-	let getMeta = requireGetMeta();
-	let setSessionSingleton = requireSetSessionSingleton();
-	let executeQuery = requireQuery();
-	let executeSqliteFunction = requireSqliteFunction();
-	let hostExpress = requireHostExpress();
-	let hostHono = requireHostHono();
-	let randomUuid = requireRandomUuid();
-	let stringify = requireStringify();
-	let getSessionSingleton = requireGetSessionSingleton();
-	let outboxTableSql = requireOutboxTableSql();
-	let { runSyncWrite } = requireWriteGate();
-	let ensureOutboxOperationColumns = requireEnsureOutboxOperationColumns();
-	let { updateOutboxOperationFromContext } = requireOperationContext();
-	const readonlyOps = ['getManyDto', 'getMany', 'aggregate', 'distinct', 'count'];
-	const syncOutboxEnsuredKey = typeof Symbol === 'function'
-		? Symbol.for('orange-orm.syncOutboxEnsured')
-		: '__orangeOrmSyncOutboxEnsured';
-	// { db, table, defaultConcurrency,
-	// 	concurrency,
-	// 	customFilters,
-	// 	baseFilter, strategy, transaction,
-	// 	readonly,
-	// 	disableBulkDeletes, isBrowser }
-	function hostLocal() {
-		const _options = arguments[0];
-		let { table, transaction, db, isHttp, hooks, client } = _options;
-		const transactionHooks = hooks && hooks.transaction;
-		const getTransactionHook = (name) =>
-			(transactionHooks && transactionHooks[name]) || (hooks && hooks[name]);
-
-		let c = { get, post, patch, syncCommand, query, sqliteFunction, express, hono };
-
-		function get() {
-			return getMeta(table);
-
-		}
-		async function patch(body, _req, _res) {
-			if (!table) {
-				const error = new Error('Table is not exposed');
-				// @ts-ignore
-				error.status = 400;
-				throw error;
-			}
-			body = typeof body === 'string' ? JSON.parse(body) : body;
-			let result;
-
-			if (transaction)
-				await transaction(fn);
-			else {
-				const resolvedDb = await resolveDb();
-				await runSyncWrite(resolvedDb, undefined, () => resolvedDb.transaction(fn));
-			}
-			return result;
-
-			async function fn(context) {
-				setSessionSingleton(context, 'ignoreSerializable', true);
-				let patch = body.patch;
-				await prepareSyncOutboxPatchCapture(context, patch);
-				result = await table.patch(context, patch, { ..._options, ...body.options, isHttp });
-				await captureSyncOutboxPatch(context, patch, body.options);
-			}
-		}
-
-		async function syncCommand(body) {
-			body = typeof body === 'string' ? JSON.parse(body) : body;
-			if (!body || body !== Object(body))
-				throw new Error('Invalid sync command payload');
-			let result;
-
-			if (transaction)
-				await transaction(fn);
-			else {
-				const resolvedDb = await resolveDb();
-				await runSyncWrite(resolvedDb, undefined, () => resolvedDb.transaction(fn));
-			}
-			return result;
-
-			async function fn(context) {
-				await captureSyncOutboxCommand(context, body.name, body.args);
-				result = undefined;
-			}
-		}
-
-		async function post(body, request, response) {
-			body = typeof body === 'string' ? JSON.parse(body) : body;
-			let result;
-
-			if (transaction)
-				await transaction(fn);
-			else {
-				const resolvedDb = await resolveDb();
-				const beforeBegin = getTransactionHook('beforeBegin');
-				const afterBegin = getTransactionHook('afterBegin');
-				const beforeCommit = getTransactionHook('beforeCommit');
-				const afterCommit = getTransactionHook('afterCommit');
-				const afterRollback = getTransactionHook('afterRollback');
-				const hasTransactionHooks = !!(beforeBegin
-					|| afterBegin
-					|| beforeCommit
-					|| afterCommit
-					|| afterRollback);
-				if (!hasTransactionHooks && readonlyOps.includes(body.path) && !hasLockingStrategy(body))
-					await resolvedDb.transaction({ readonly: true }, fn);
-				else {
-					await runSyncWrite(resolvedDb, undefined, () => resolvedDb.transaction(async (context) => {
-						const hookDb = typeof client === 'function'
-							? client({ transaction: (fn) => fn(context) })
-							: (client || resolvedDb);
-						if (afterCommit)
-							setSessionSingleton(context, 'afterCommitHook', () =>
-								afterCommit(hookDb, request, response)
-							);
-						if (afterRollback)
-							setSessionSingleton(context, 'afterRollbackHook', (error) =>
-								afterRollback(hookDb, request, response, error)
-							);
-						if (beforeBegin)
-							await beforeBegin(hookDb, request, response);
-						if (afterBegin)
-							await afterBegin(hookDb, request, response);
-						await fn(context);
-						if (beforeCommit)
-							await beforeCommit(hookDb, request, response);
-					}));
-				}
-
-			}
-			return result;
-
-			async function fn(context) {
-				setSessionSingleton(context, 'ignoreSerializable', true);
-				const options = { ..._options, ...body.options, JSONFilter: body, request, response, isHttp };
-				result = await executePath(context, options);
-			}
-		}
-
-		function hasLockingStrategy(body) {
-			if (!body || !body.args)
-				return false;
-			return hasLockingStrategyCore(body.args[1]);
-		}
-
-		function hasLockingStrategyCore(strategy) {
-			if (!strategy || typeof strategy !== 'object')
-				return false;
-			if (strategy.forUpdate || strategy.skipLocked)
-				return true;
-			for (let name in strategy) {
-				if (name !== 'where' && hasLockingStrategyCore(strategy[name]))
-					return true;
-			}
-			return false;
-		}
-		async function query() {
-			let args = arguments;
-			let result;
-
-			if (transaction)
-				await transaction(fn);
-			else {
-				const resolvedDb = await resolveDb();
-				result = await resolvedDb.query.apply(null, arguments);
-			}
-
-			return result;
-
-			async function fn(...args1) {
-				result = await executeQuery.apply(null, [...args1, ...args]);
-			}
-
-		}
-
-		async function sqliteFunction() {
-			let args = arguments;
-			let result;
-
-			if (transaction)
-				await transaction(fn);
-			else {
-				const resolvedDb = await resolveDb();
-				result = await resolvedDb.sqliteFunction.apply(null, arguments);
-			}
-
-			return result;
-
-			async function fn(...args1) {
-				result = await executeSqliteFunction.apply(null, [...args1, ...args]);
-			}
-
-		}
-
-		function express(client, options) {
-			return hostExpress(hostLocal, client, options);
-		}
-
-		function hono(client, options) {
-			return hostHono(hostLocal, client, options);
-		}
-
-		return c;
-
-		async function resolveDb() {
-			if (typeof db !== 'function')
-				return db;
-			let dbPromise = db();
-			if (dbPromise.then)
-				db = await dbPromise;
-			else
-				db = dbPromise;
-			return db;
-		}
-
-		async function captureSyncOutboxPatch(context, patch, options) {
-			if (!Array.isArray(patch) || patch.length === 0)
-				return;
-			const tableName = _options.syncTableName;
-			if (!tableName)
-				return;
-			let state = await getSyncOutboxCaptureState(context);
-			if (!state)
-				return;
-			state.patches.push({
-				table: tableName,
-				patch,
-				options: sanitizeSyncPatchOptions(options)
-			});
-			await updateSyncOutboxCaptureState(context, state);
-		}
-
-		async function prepareSyncOutboxPatchCapture(context, patch) {
-			if (!Array.isArray(patch) || patch.length === 0 || !_options.syncTableName)
-				return;
-			await getSyncOutboxCaptureState(context);
-		}
-
-		async function captureSyncOutboxCommand(context, name, args) {
-			if (typeof name !== 'string' || name.length === 0)
-				throw new Error('Sync command requires a command name');
-			const normalizedArgs = normalizeSyncCommandArgs(args);
-			let state = await getSyncOutboxCaptureState(context);
-			if (!state)
-				return;
-			state.commands.push({ name, args: normalizedArgs });
-			await updateSyncOutboxCaptureState(context, state);
-		}
-
-		async function getSyncOutboxCaptureState(context) {
-			if (getSessionSingleton(context, 'suppressSyncOutbox'))
-				return null;
-			const pool = getSessionSingleton(context, 'poolFactory');
-			if (!pool || !pool.__sqliteSync)
-				return null;
-			let state = getSessionSingleton(context, 'syncOutboxCapture');
-			if (!state) {
-				state = { id: randomUuid(), patches: [], commands: [] };
-				setSessionSingleton(context, 'syncOutboxCapture', state);
-				await insertSyncOutboxPlaceholder(context, pool, state.id);
-				await updateOutboxOperationFromContext(context, state);
-			}
-			if (!Array.isArray(state.patches))
-				state.patches = [];
-			if (!Array.isArray(state.commands))
-				state.commands = [];
-			return state;
-		}
-
-		async function insertSyncOutboxPlaceholder(context, pool, id) {
-			for (let attempt = 0; attempt < 2; attempt++) {
-				await ensureSyncOutboxTable(context);
-				try {
-					await querySyncOutbox(context, [
-						'INSERT INTO "orange_sync_outbox" ("mutation_id", "table_name", "patch_json", "options_json", "created_at_ms")',
-						`VALUES (${sqlStringLiteral(id)}, '*', '[]', '{}', ${Date.now()})`,
-						'ON CONFLICT("mutation_id") DO NOTHING'
-					].join(' '));
-					return;
-				}
-				catch (e) {
-					if (attempt === 0 && isMissingSqliteTableError(e, 'orange_sync_outbox')) {
-						delete pool[syncOutboxEnsuredKey];
-						continue;
-					}
-					throw e;
-				}
-			}
-		}
-
-		async function updateSyncOutboxCaptureState(context, state) {
-			const metadata = await updateOutboxOperationFromContext(context, state);
-			const operationAssignments = metadata === null
-				? [
-					'"operation_id" = NULL',
-					'"operation_name" = NULL',
-					'"operation_json" = NULL'
-				]
-				: [];
-			await querySyncOutbox(context, [
-				'UPDATE "orange_sync_outbox"',
-				`SET "patch_json" = ${sqlStringLiteral(stringify(serializeSyncOutboxCaptureState(state)))}`
-					+ (operationAssignments.length > 0 ? `, ${operationAssignments.join(', ')}` : ''),
-				`WHERE "mutation_id" = ${sqlStringLiteral(state.id)}`
-			].join(' '));
-		}
-
-		function serializeSyncOutboxCaptureState(state) {
-			if (!Array.isArray(state.commands) || state.commands.length === 0)
-				return state.patches;
-			return {
-				patches: state.patches,
-				commands: state.commands
-			};
-		}
-
-		function normalizeSyncCommandArgs(args) {
-			if (args === undefined)
-				return null;
-			return JSON.parse(JSON.stringify(args));
-		}
-
-		async function ensureSyncOutboxTable(context) {
-			const pool = getSessionSingleton(context, 'poolFactory');
-			if (pool && pool[syncOutboxEnsuredKey])
-				return;
-			await querySyncOutbox(context, outboxTableSql());
-			await ensureOutboxOperationColumns((sql) => querySyncOutbox(context, sql));
-			if (pool)
-				pool[syncOutboxEnsuredKey] = true;
-		}
-
-		function querySyncOutbox(context, sql) {
-			return executeQuery(context, sql);
-		}
-
-		function sqlStringLiteral(value) {
-			return `'${String(value).replace(/'/g, '\'\'')}'`;
-		}
-
-		function isMissingSqliteTableError(error, tableName) {
-			const message = error && error.message || '';
-			return message.includes(`no such table: ${tableName}`)
-				|| message.includes(`no such table: "${tableName}"`);
-		}
-
-		function sanitizeSyncPatchOptions(options) {
-			if (!options || options !== Object(options))
-				return undefined;
-			const {
-				db,
-				transaction,
-				client,
-				syncTableName,
-				strategy,
-				deduceStrategy,
-				...rest
-			} = options;
-			return Object.keys(rest).length > 0 ? rest : undefined;
-		}
-	}
-
-	hostLocal_1 = hostLocal;
-	return hostLocal_1;
-}
-
-var cloneFromDb_1;
-var hasRequiredCloneFromDb;
-
-function requireCloneFromDb () {
-	if (hasRequiredCloneFromDb) return cloneFromDb_1;
-	hasRequiredCloneFromDb = 1;
-	let dateToISOString = requireDateToISOString();
-
-	function cloneFromDbFast(obj) {
-		if (obj === null || typeof obj !== 'object')
-			return obj;
-		if (Array.isArray(obj)) {
-			const arrClone = [];
-			for (let i = 0; i < obj.length; i++) {
-				arrClone[i] = cloneFromDbFast(obj[i]);
-			}
-			return arrClone;
-		}
-		const clone = {};
-		const keys = Object.keys(obj);
-		for (let i = 0; i < keys.length; i++) {
-			const key = keys[i];
-			clone[key] = cloneFromDbFast(obj[key]);
-		}
-		return clone;
-	}
-
-	function cloneRegular(obj) {
-		if (obj === null || typeof obj !== 'object')
-			return obj;
-		if (Array.isArray(obj)) {
-			const arrClone = [];
-			for (let i = 0; i < obj.length; i++) {
-				arrClone[i] = cloneRegular(obj[i]);
-			}
-			return arrClone;
-		}
-		else if (obj instanceof Date  && !isNaN(obj))
-			return dateToISOString(obj);
-		const clone = {};
-		const keys = Object.keys(obj);
-		for (let i = 0; i < keys.length; i++) {
-			const key = keys[i];
-			clone[key] = cloneRegular(obj[key]);
-		}
-		return clone;
-	}
-
-	function cloneFromDb(obj, isFast) {
-		if (isFast)
-			return cloneFromDbFast(obj);
-		else
-			return cloneRegular(obj);
-	}
-
-	cloneFromDb_1 = cloneFromDb;
-	return cloneFromDb_1;
-}
-
-var netAdapter_1;
-var hasRequiredNetAdapter;
-
-function requireNetAdapter () {
-	if (hasRequiredNetAdapter) return netAdapter_1;
-	hasRequiredNetAdapter = 1;
-	function httpAdapter(baseURL, path, httpInterceptor) {
-		let c = {
-			get,
-			post,
-			patch,
-			syncCommand,
-			query,
-			sqliteFunction,
-			express
-		};
-
-		return c;
-
-		async function get() {
-			try {
-				const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
-				const res = await request({ baseURL, url: path, headers, method: 'get' });
-				return res.data;
-			}
-			catch (e) {
-				if (typeof e.response?.data === 'string')
-					throw new Error(e.response.data.replace(/^Error: /, ''));
-				else
-					throw e;
-			}
-
-		}
-
-		async function patch(body) {
-			try {
-
-				const headers = { 'Content-Type': 'application/json' };
-				const res = await request({ baseURL, url: path, headers, method: 'patch', data: body });
-				return res.data;
-			}
-			catch (e) {
-				if (typeof e.response?.data === 'string')
-					throw new Error(e.response.data.replace(/^Error: /, ''));
-				else
-					throw e;
-			}
-
-
-		}
-
-		async function post(body) {
-			try {
-				const headers = { 'Content-Type': 'application/json' };
-				const res = await request({ baseURL, url: path, headers, method: 'post', data: body });
-				return res.data;
-			}
-			catch (e) {
-				if (typeof e.response?.data === 'string')
-					throw new Error(e.response.data.replace(/^Error: /, ''));
-				else throw e;
-			}
-		}
-
-		async function syncCommand(body) {
-			try {
-				const payload = typeof body === 'string' ? JSON.parse(body) : body;
-				const name = payload && payload.name;
-				if (typeof name !== 'string' || name.length === 0)
-					throw new Error('Sync command requires a command name');
-				const headers = { 'Content-Type': 'application/json' };
-				const res = await request({
-					baseURL,
-					url: `?command=${encodeURIComponent(name)}`,
-					headers,
-					method: 'post',
-					data: body
-				});
-				return res.data;
-			}
-			catch (e) {
-				if (typeof e.response?.data === 'string')
-					throw new Error(e.response.data.replace(/^Error: /, ''));
-				else throw e;
-			}
-		}
-
-
-		function query() {
-			throw new Error('Queries are not supported through http');
-		}
-
-		function sqliteFunction() {
-			throw new Error('Sqlite Function is not supported through http');
-		}
-
-		function express() {
-			throw new Error('Hosting in express is not supported on the client side');
-		}
-
-		async function request(config) {
-			if (typeof fetch !== 'function')
-				throw new Error('HTTP client requires fetch. Use a runtime with fetch support or provide a fetch polyfill.');
-
-			config = await httpInterceptor.applyRequest(config);
-			const response = await fetch(toUrl(config.baseURL, config.url), {
-				method: config.method?.toUpperCase(),
-				headers: config.headers,
-				body: toBody(config.data)
-			});
-			const data = await readData(response);
-			let result = {
-				data,
-				status: response.status,
-				statusText: response.statusText,
-				headers: toHeadersObject(response.headers),
-				config
-			};
-
-			if (!response.ok)
-				return httpInterceptor.applyResponseError(createHttpError(result));
-
-			result = await httpInterceptor.applyResponse(result);
-			return result;
-		}
-	}
-
-	function toBody(data) {
-		if (data === undefined)
-			return undefined;
-		if (typeof data === 'string')
-			return data;
-		return JSON.stringify(data);
-	}
-
-	function createHttpError(response) {
-		const error = new Error('Request failed with status code ' + response.status);
-		error.response = response;
-		error.config = response.config;
-		return error;
-	}
-
-	async function readData(response) {
-		const text = await response.text();
-		const contentType = response.headers.get('content-type') || '';
-		if (text && (contentType.indexOf('application/json') !== -1 || looksLikeJson(text)))
-			return JSON.parse(text);
-		return text;
-	}
-
-	function looksLikeJson(text) {
-		const value = text.trim();
-		return value[0] === '{' || value[0] === '[';
-	}
-
-	function toHeadersObject(headers) {
-		const result = {};
-		headers.forEach((value, key) => result[key] = value);
-		return result;
-	}
-
-	function toUrl(baseURL, path) {
-		return new URL(path, baseURL).toString();
-	}
-
-	function netAdapter(url, tableName, { http, tableOptions }) {
-		if (tableOptions.transaction?.done)
-			delete tableOptions.transaction;
-
-		let c = {
-			get,
-			post,
-			patch,
-			syncCommand,
-			query,
-			sqliteFunction
-		};
-
-		return c;
-
-		async function get() {
-			const adapter = await getInnerAdapter();
-			return adapter.get.apply(null, arguments);
-		}
-
-		async function patch(_body) {
-			const adapter = await getInnerAdapter();
-			return adapter.patch.apply(null, arguments);
-		}
-
-		async function post(_body) {
-			const adapter = await getInnerAdapter();
-			return adapter.post.apply(null, arguments);
-		}
-
-		async function syncCommand(_body) {
-			const adapter = await getInnerAdapter();
-			if (!adapter.syncCommand)
-				throw new Error('Sync commands are not supported through this adapter');
-			return adapter.syncCommand.apply(null, arguments);
-		}
-
-		async function query() {
-			const adapter = await getInnerAdapter();
-			return adapter.query.apply(null, arguments);
-		}
-
-		async function sqliteFunction() {
-			const adapter = await getInnerAdapter();
-			return adapter.sqliteFunction.apply(null, arguments);
-		}
-
-		async function getInnerAdapter() {
-			const db = await getDb();
-			if (typeof db === 'string') {
-				return httpAdapter(db, tableName === undefined ? '' : `?table=${tableName}`, http);
-			}
-			else if (db && db.hostLocal) {
-				return db.hostLocal({ ...tableOptions, db, table: url });
-			}
-			else
-				throw new Error('Invalid arguments');
-		}
-
-		async function getDb() {
-			let db = tableOptions.db;
-			if (db.transaction)
-				return db;
-			if (typeof db === 'function') {
-				let dbPromise = db();
-				if (dbPromise.then)
-					db = await dbPromise;
-				else
-					db = dbPromise;
-			}
-
-			return db;
-		}
-
-	}
-
-	netAdapter_1 = netAdapter;
-	return netAdapter_1;
-}
-
-var toKeyPositionMap_1;
-var hasRequiredToKeyPositionMap;
-
-function requireToKeyPositionMap () {
-	if (hasRequiredToKeyPositionMap) return toKeyPositionMap_1;
-	hasRequiredToKeyPositionMap = 1;
-	const stringify = requireStringify();
-	const newMemoryId = requireNewMemoryId();
-
-	function toKeyPositionMap(rows, options) {
-		return rows.reduce((map, element, i) => {
-			if (options && options.keys && element === Object(element)) {
-				let key = [];
-				for (let i = 0; i < options.keys.length; i++) {
-					let keyName = options.keys[i].name;
-					key.push(negotiateTempKey(element[keyName]));
-				}
-				map[stringify(key)] = i;
-			}
-			else if ('id' in element)
-				map[stringify(element.id)] = i;
-			else
-				map[i] = i;
-			return map;
-		}, {});
-
-	}
-
-	function negotiateTempKey(value) {
-		if (value === undefined)
-			return `~${newMemoryId()}`;
-		else
-			return value;
-	}
-
-	toKeyPositionMap_1 = toKeyPositionMap;
-	return toKeyPositionMap_1;
-}
-
-var clientMap;
-var hasRequiredClientMap;
-
-function requireClientMap () {
-	if (hasRequiredClientMap) return clientMap;
-	hasRequiredClientMap = 1;
-	function map(index, _fn) {
-		const handler = {
-			get(target, prop) {
-				if (prop === 'map') {
-					return () => {
-						return new Proxy(onFinal, handler);
-					};
-				} else if (typeof target[prop] !== 'undefined') {
-					return target[prop];
-				} else {
-					return () => {
-						return new Proxy({}, handler);
-					};
-				}
-			},
-			apply(target, _thisArg, argumentsList) {
-				if (target === onFinal) {
-					return target(...argumentsList);
-				} else {
-					return new Proxy({}, handler);
-				}
-			},
-			set(target, prop, value) {
-				target[prop] = value;
-				return true;
-			},
-		};
-
-		function dbMap(fn) {
-			return fn(dbMap);
-		}
-
-		dbMap.http = (url) => url;
-		dbMap.pg = throwDb;
-		dbMap.pglite = throwDb;
-		dbMap.postgres = throwDb;
-		dbMap.mssql = throwDb;
-		dbMap.mssqlNative = throwDb;
-		dbMap.mysql = throwDb;
-		dbMap.mariadb = throwDb;
-		dbMap.sap = throwDb;
-		dbMap.oracle = throwDb;
-		dbMap.sqlite = throwDb;
-		dbMap.d1 = throwDb;
-
-		function throwDb() {
-			throw new Error('Cannot create pool for database outside node');
-		}
-
-		function onFinal(arg) {
-			if (arg && arg.db && typeof arg.db === 'function') {
-				return index({
-					...arg,
-					db: dbMap(arg.db),
-					providers: dbMap
-				});
-			}
-
-			return index({ ...arg, providers: dbMap });
-		}
-
-		onFinal.http = (url) => index({ db: url, providers: dbMap });
-		onFinal.pg = () => index({ db: throwDb, providers: dbMap });
-		onFinal.pglite = () => index({ db: throwDb, providers: dbMap });
-		onFinal.postgres = () => index({ db: throwDb, providers: dbMap });
-		onFinal.mssql = () => index({ db: throwDb, providers: dbMap });
-		onFinal.mssqlNative = () => index({ db: throwDb, providers: dbMap });
-		onFinal.mysql = () => index({ db: throwDb, providers: dbMap });
-		onFinal.mariadb = () => index({ db: throwDb, providers: dbMap });
-		onFinal.sap = () => index({ db: throwDb, providers: dbMap });
-		onFinal.oracle = () => index({ db: throwDb, providers: dbMap });
-		onFinal.sqlite = () => index({ db: throwDb, providers: dbMap });
-		onFinal.d1 = () => index({ db: throwDb, providers: dbMap });
-
-		return new Proxy(onFinal, handler);
-	}
-
-	clientMap = map;
-	return clientMap;
-}
-
-var require$$5 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(_default);
-
-var httpInterceptor;
-var hasRequiredHttpInterceptor;
-
-function requireHttpInterceptor () {
-	if (hasRequiredHttpInterceptor) return httpInterceptor;
-	hasRequiredHttpInterceptor = 1;
-	class InterceptorProxy {
-		constructor() {
-			this.requestInterceptors = [];
-			this.responseInterceptors = [];
-		}
-
-		get request() {
-			return {
-				use: (onFulfilled, onRejected) => {
-					const id = Math.random().toString(36).substring(2, 11); // unique id
-					this.requestInterceptors.push({ id, onFulfilled, onRejected });
-					return id;
-				},
-				eject: (id) => {
-					this.requestInterceptors = this.requestInterceptors.filter(interceptor => interceptor.id !== id);
-				}
-			};
-		}
-
-		get response() {
-			return {
-				use: (onFulfilled, onRejected) => {
-					const id = Math.random().toString(36).substring(2, 11); // unique id
-					this.responseInterceptors.push({ id, onFulfilled, onRejected });
-					return id;
-				},
-				eject: (id) => {
-					this.responseInterceptors = this.responseInterceptors.filter(interceptor => interceptor.id !== id);
-				}
-			};
-		}
-
-		async applyRequest(config, context) {
-			let result = Promise.resolve(config);
-			for (const { onFulfilled, onRejected } of this.requestInterceptors) {
-				result = result.then(
-					onFulfilled && ((value) => onFulfilled(value, context)),
-					onRejected && ((error) => onRejected(error, context))
-				);
-			}
-			return await result;
-		}
-
-		async applyResponse(response, context) {
-			let result = Promise.resolve(response);
-			for (const { onFulfilled, onRejected } of this.responseInterceptors) {
-				result = result.then(
-					onFulfilled && ((value) => onFulfilled(value, context)),
-					onRejected && ((error) => onRejected(error, context))
-				);
-			}
-			return await result;
-		}
-
-		async applyResponseError(error, context) {
-			let result = Promise.reject(error);
-			for (const { onFulfilled, onRejected } of this.responseInterceptors) {
-				result = result.then(
-					onFulfilled && ((value) => onFulfilled(value, context)),
-					onRejected && ((currentError) => onRejected(currentError, context))
-				);
-			}
-			return await result;
-		}
-	}
-
-	httpInterceptor = function create() {
-		return new InterceptorProxy();
-	};
-	return httpInterceptor;
-}
-
-var flags_1;
-var hasRequiredFlags;
-
-function requireFlags () {
-	if (hasRequiredFlags) return flags_1;
-	hasRequiredFlags = 1;
-	let flags = {
-		useProxy: true,
-		useLazyDefaults: true
-	};
-
-	flags_1 = flags;
-	return flags_1;
-}
-
-var syncClient = {exports: {}};
-
-var syncAbort;
-var hasRequiredSyncAbort;
-
-function requireSyncAbort () {
-	if (hasRequiredSyncAbort) return syncAbort;
-	hasRequiredSyncAbort = 1;
-	const syncAbortSignalSymbol = typeof Symbol === 'function'
-		? Symbol.for('orange-orm.syncClient.abortSignal')
-		: '__orangeOrmSyncClientAbortSignal';
-	const syncAbortCode = 'ORANGE_SYNC_ABORT';
-
-	function createSyncAbortController() {
-		if (typeof AbortController === 'function')
-			return new AbortController();
-
-		const listeners = new Set();
-		const signal = {
-			aborted: false,
-			reason: undefined,
-			addEventListener(event, listener) {
-				if (event === 'abort' && typeof listener === 'function')
-					listeners.add(listener);
-			},
-			removeEventListener(event, listener) {
-				if (event === 'abort')
-					listeners.delete(listener);
-			}
-		};
-		return {
-			signal,
-			abort(reason) {
-				if (signal.aborted)
-					return;
-				signal.aborted = true;
-				signal.reason = reason;
-				for (const listener of Array.from(listeners))
-					listener.call(signal, { type: 'abort', target: signal });
-				listeners.clear();
-			}
-		};
-	}
-
-	function syncAbortError(reason, fallbackMessage = 'Sync stopped.') {
-		const error = reason instanceof Error
-			? reason
-			: new Error(typeof reason === 'string' && reason.length > 0 ? reason : fallbackMessage);
-		if (!(reason instanceof Error))
-			error.name = 'AbortError';
-		try {
-			error.code = syncAbortCode;
-		}
-		catch (_error) {
-			// Built-in error objects are writable in supported runtimes; retain the AbortError fallback otherwise.
-		}
-		return error;
-	}
-
-	function throwIfSyncAborted(signal) {
-		if (signal && signal.aborted)
-			throw syncAbortError(signal.reason);
-	}
-
-	function awaitWithSyncAbort(value, signal) {
-		if (!signal)
-			return Promise.resolve(value);
-		throwIfSyncAborted(signal);
-		return new Promise((resolve, reject) => {
-			let settled = false;
-			const finish = (callback, result) => {
-				if (settled)
-					return;
-				settled = true;
-				signal.removeEventListener('abort', onAbort);
-				callback(result);
-			};
-			const onAbort = () => finish(reject, syncAbortError(signal.reason));
-			signal.addEventListener('abort', onAbort, { once: true });
-			Promise.resolve(value).then(
-				(result) => finish(resolve, result),
-				(error) => finish(reject, error)
-			);
-		});
-	}
-
-	function isSyncAbortError(error) {
-		return !!error && error.code === syncAbortCode;
-	}
-
-	syncAbort = {
-		awaitWithSyncAbort,
-		createSyncAbortController,
-		isSyncAbortError,
-		syncAbortError,
-		syncAbortSignalSymbol,
-		throwIfSyncAborted
-	};
-	return syncAbort;
-}
-
-var syncAuto;
-var hasRequiredSyncAuto;
-
-function requireSyncAuto () {
-	if (hasRequiredSyncAuto) return syncAuto;
-	hasRequiredSyncAuto = 1;
-	const syncAutoStartSymbol = typeof Symbol === 'function'
-		? Symbol.for('orange-orm.syncClient.autoStart')
-		: '__orangeOrmSyncClientAutoStart';
-	const {
-		awaitWithSyncAbort,
-		createSyncAbortController,
-		isSyncAbortError,
-		syncAbortError,
-		syncAbortSignalSymbol,
-		throwIfSyncAborted
-	} = requireSyncAbort();
-
-	function createSyncAuto(syncClient, getConfig, options = {}) {
-		const timers = options.timers || globalThis;
-		const onlineTarget = options.onlineTarget || (typeof globalThis !== 'undefined' ? globalThis : undefined);
-		let running = false;
-		let forceRunning = false;
-		let activeRun = null;
-		let initialSyncCompleted = false;
-		let lifecycleVersion = 0;
-		const pendingStartControllers = new Set();
-		let intervalId = null;
-		let unsubscribeOnline = null;
-
-		return {
-			start,
-			startFromConfig,
-			stop,
-			isRunning,
-			runNow
-		};
-
-		async function start(options) {
-			return startCore(true, options);
-		}
-
-		async function startFromConfig(options) {
-			return startCore(false, options);
-		}
-
-		async function startCore(forceEnabled, options) {
-			const startVersion = lifecycleVersion;
-			const externalSignal = options && options[syncAbortSignalSymbol];
-			const controller = createSyncAbortController();
-			let removeExternalAbort;
-			if (externalSignal) {
-				const abort = () => controller.abort(syncAbortError(externalSignal.reason));
-				if (externalSignal.aborted)
-					abort();
-				else {
-					externalSignal.addEventListener('abort', abort, { once: true });
-					removeExternalAbort = () => externalSignal.removeEventListener('abort', abort);
-				}
-			}
-			pendingStartControllers.add(controller);
-			try {
-				const signal = controller.signal;
-				throwIfSyncAborted(signal);
-				if (running) {
-					if (activeRun)
-						await awaitWithSyncAbort(activeRun.promise, signal);
-					return;
-				}
-				const config = normalizeAutoConfig(await awaitWithSyncAbort(getConfig(), signal), { forceEnabled });
-				if (startVersion !== lifecycleVersion)
-					return;
-				if (running) {
-					if (activeRun)
-						await awaitWithSyncAbort(activeRun.promise, signal);
-					return;
-				}
-				if (!config.enabled)
-					return;
-				running = true;
-				forceRunning = forceEnabled;
-				if (config.intervalMs > 0 && timers && typeof timers.setInterval === 'function') {
-					intervalId = timers.setInterval(() => {
-						void runNow().catch(() => {});
-					}, config.intervalMs);
-				}
-				subscribeOnline();
-				await runNow(signal);
-			}
-			catch (error) {
-				if (startVersion !== lifecycleVersion && isSyncAbortError(error))
-					return;
-				throw error;
-			}
-			finally {
-				pendingStartControllers.delete(controller);
-				if (removeExternalAbort)
-					removeExternalAbort();
-			}
-		}
-
-		async function stop() {
-			lifecycleVersion += 1;
-			for (const controller of pendingStartControllers)
-				controller.abort(syncAbortError(undefined, 'Initial sync stopped.'));
-			running = false;
-			forceRunning = false;
-			if (intervalId !== null && timers && typeof timers.clearInterval === 'function') {
-				timers.clearInterval(intervalId);
-				intervalId = null;
-			}
-			if (unsubscribeOnline) {
-				unsubscribeOnline();
-				unsubscribeOnline = null;
-			}
-			const run = activeRun;
-			if (!run)
-				return;
-			if (run.initial)
-				run.controller.abort(syncAbortError(undefined, 'Initial sync stopped.'));
-			await run.promise.catch(() => {});
-		}
-
-		async function isRunning() {
-			return running;
-		}
-
-		async function runNow(externalSignal) {
-			if (activeRun)
-				return activeRun.promise;
-			const initial = !initialSyncCompleted;
-			const controller = createSyncAbortController();
-			let removeExternalAbort;
-			if (externalSignal) {
-				const abort = () => controller.abort(syncAbortError(externalSignal.reason));
-				if (externalSignal.aborted)
-					abort();
-				else {
-					externalSignal.addEventListener('abort', abort, { once: true });
-					removeExternalAbort = () => externalSignal.removeEventListener('abort', abort);
-				}
-			}
-			const run = {
-				controller,
-				initial,
-				promise: null
-			};
-			activeRun = run;
-			run.promise = runCycle(controller.signal)
-				.then((result) => {
-					if (initial)
-						initialSyncCompleted = true;
-					return result;
-				})
-				.finally(() => {
-					if (removeExternalAbort)
-						removeExternalAbort();
-					if (activeRun === run)
-						activeRun = null;
-				});
-			return run.promise;
-		}
-
-		async function runCycle(signal) {
-			throwIfSyncAborted(signal);
-			const config = normalizeAutoConfig(await awaitWithSyncAbort(getConfig(), signal), { forceEnabled: forceRunning });
-			throwIfSyncAborted(signal);
-			const syncOptions = { [syncAbortSignalSymbol]: signal };
-			if (config.enabled && typeof options.runSync === 'function')
-				return options.runSync(config, syncOptions);
-			if (config.enabled)
-				return syncClient.sync(syncOptions);
-			return { skipped: true };
-		}
-
-		function subscribeOnline() {
-			if (!onlineTarget || typeof onlineTarget.addEventListener !== 'function' || typeof onlineTarget.removeEventListener !== 'function')
-				return;
-			const onOnline = () => {
-				if (running)
-					void runNow().catch(() => {});
-			};
-			onlineTarget.addEventListener('online', onOnline);
-			unsubscribeOnline = () => onlineTarget.removeEventListener('online', onOnline);
-		}
-	}
-
-	function normalizeAutoConfig(syncConfig, options = {}) {
-		const auto = syncConfig && syncConfig.auto;
-		const forceEnabled = !!options.forceEnabled;
-		if (!syncConfig || auto === false)
-			return { enabled: !!syncConfig && forceEnabled, intervalMs: 30000 };
-		if (auto === undefined || auto === true)
-			return { enabled: true, intervalMs: 30000 };
-		if (auto !== Object(auto))
-			return { enabled: true, intervalMs: 30000 };
-		const intervalMs = normalizeIntervalMs(auto.intervalMs);
-		return {
-			enabled: forceEnabled || auto.enabled !== false,
-			intervalMs
-		};
-	}
-
-	function normalizeIntervalMs(value) {
-		const parsed = Number.parseInt(value, 10);
-		if (!Number.isFinite(parsed) || parsed < 0)
-			return 30000;
-		return parsed;
-	}
-
-	syncAuto = {
-		createSyncAuto,
-		normalizeAutoConfig,
-		syncAbortSignalSymbol,
-		syncAutoStartSymbol
-	};
-	return syncAuto;
-}
-
-var syncSchema;
-var hasRequiredSyncSchema;
-
-function requireSyncSchema () {
-	if (hasRequiredSyncSchema) return syncSchema;
-	hasRequiredSyncSchema = 1;
-	const schemaStateTable = 'orange_schema_state';
-	const schemaVersion = 1;
-	const ensuredSchemasByDb = new WeakMap();
-
-	async function ensureSyncSchema(db, client, tableNames, options = {}) {
-		if (!db || typeof db.query !== 'function')
-			return null;
-		if (options === false || options && options.enabled === false)
-			return null;
-		const tables = client && client.tables;
-		if (!tables || !Array.isArray(tableNames) || tableNames.length === 0)
-			return null;
-
-		const schema = buildSyncSchema(tables, tableNames);
-		if (!schema.tables.length)
-			return null;
-		const sql = schemaToSql(schema);
-		const schemaJson = stableStringify(schema);
-		const checksum = checksumString(schemaJson);
-		const scope = `sync:${schema.tables.map(x => x.name).join('|')}`;
-		const ensuredKey = `${scope}:${checksum}`;
-		if (isSchemaEnsured(db, ensuredKey))
-			return { scope, schema, checksum, sql: sql.statements };
-
-		await ensureSchemaStateTable(db);
-		const existing = await readSchemaState(db, scope);
-		const shouldUpdateState = !existing || existing.checksum !== checksum;
-		if (existing && existing.checksum !== checksum && !isIndexOnlySchemaChange(existing.schemaJson, schema))
-			throw new Error('Local sync schema does not match current map. Reset the local sync database or run a migration before syncing.');
-		if (existing && existing.checksum === checksum) {
-			markSchemaEnsured(db, ensuredKey);
-			return { scope, schema, checksum, sql: sql.statements };
-		}
-
-		for (let i = 0; i < sql.statements.length; i++)
-			await db.query(sql.statements[i]);
-
-		if (shouldUpdateState)
-			await writeSchemaState(db, {
-				scope,
-				dialect: 'sqlite',
-				tables: schema.tables.map(x => x.name),
-				schema,
-				checksum,
-				sql: sql.statements.join('\n'),
-				updatedAtMs: Date.now()
-			});
-
-		markSchemaEnsured(db, ensuredKey);
-		return { scope, schema, checksum, sql: sql.statements };
-	}
-
-	function isSchemaEnsured(db, key) {
-		const ensured = ensuredSchemasByDb.get(db);
-		return ensured ? ensured.has(key) : false;
-	}
-
-	function markSchemaEnsured(db, key) {
-		let ensured = ensuredSchemasByDb.get(db);
-		if (!ensured) {
-			ensured = new Set();
-			ensuredSchemasByDb.set(db, ensured);
-		}
-		ensured.add(key);
-	}
-
-	function clearEnsuredSyncSchema(db) {
-		if (db)
-			ensuredSchemasByDb.delete(db);
-	}
-
-	function buildSyncSchema(tables, tableNames) {
-		const selected = Array.from(new Set(tableNames))
-			.filter(name => tables[name])
-			.sort();
-		const schema = {
-			version: schemaVersion,
-			dialect: 'sqlite',
-			tables: selected.map(name => tableToSchema(name, tables[name]))
-		};
-		addRelationMetadata(schema, tables, selected);
-		return schema;
-	}
-
-	function tableToSchema(name, table) {
-		const columns = (table._columns || []).map(columnToSchema);
-		return {
-			name,
-			dbName: table._dbName,
-			columns,
-			foreignKeys: [],
-			indexes: [],
-			primaryKey: (table._primaryColumns || []).map(x => x._dbName)
-		};
-	}
-
-	function columnToSchema(column) {
-		return {
-			name: column.alias,
-			dbName: column._dbName,
-			type: columnType(column),
-			primary: column.isPrimary === true,
-			notNull: column._notNull === true,
-			notNullExceptInsert: column._notNullExceptInsert === true
-		};
-	}
-
-	function columnType(column) {
-		if (column.tsType === 'NumberColumn')
-			return 'number';
-		if (column.tsType === 'BooleanColumn')
-			return 'boolean';
-		if (column.tsType === 'BigintColumn')
-			return 'bigint';
-		if (column.tsType === 'BinaryColumn')
-			return 'binary';
-		if (column.tsType === 'JSONColumn')
-			return 'json';
-		if (column.tsType === 'UUIDColumn')
-			return 'uuid';
-		if (column.tsType === 'DateColumn' && column.hasTimeZone)
-			return 'datetime-tz';
-		if (column.tsType === 'DateColumn')
-			return 'datetime';
-		return 'string';
-	}
-
-	function schemaToSql(schema) {
-		return {
-			statements: schema.tables.map(tableToCreateSql).concat(schema.tables.flatMap(tableToIndexSql))
-		};
-	}
-
-	function tableToCreateSql(table) {
-		const hasCompositePrimaryKey = table.primaryKey.length > 1;
-		const parts = table.columns.map(column => columnToSql(column, { hasCompositePrimaryKey }));
-		if (table.primaryKey.length > 1)
-			parts.push(`PRIMARY KEY (${table.primaryKey.map(quoteIdent).join(', ')})`);
-		for (let i = 0; i < table.foreignKeys.length; i++)
-			parts.push(foreignKeyToSql(table.foreignKeys[i]));
-		return [
-			`CREATE TABLE IF NOT EXISTS ${quoteIdent(table.dbName)} (`,
-			parts.map(x => `  ${x}`).join(',\n'),
-			');'
-		].join('\n');
-	}
-
-	function tableToIndexSql(table) {
-		return (table.indexes || []).map(index => {
-			return `CREATE INDEX IF NOT EXISTS ${quoteIdent(index.dbName)} ON ${quoteIdent(table.dbName)} (${index.columns.map(quoteIdent).join(', ')});`;
-		});
-	}
-
-	function columnToSql(column, options = {}) {
-		const parts = [quoteIdent(column.dbName), sqliteType(column.type)];
-		if (!options.hasCompositePrimaryKey && column.primary && column.type === 'number')
-			parts.push('PRIMARY KEY');
-		else if (!options.hasCompositePrimaryKey && column.primary)
-			parts.push('PRIMARY KEY');
-		if (column.notNull)
-			parts.push('NOT NULL');
-		return parts.join(' ');
-	}
-
-	function foreignKeyToSql(foreignKey) {
-		return [
-			`FOREIGN KEY (${foreignKey.columns.map(quoteIdent).join(', ')})`,
-			`REFERENCES ${quoteIdent(foreignKey.referencesTable)} (${foreignKey.referencesColumns.map(quoteIdent).join(', ')})`
-		].join(' ');
-	}
-
-	function sqliteType(type) {
-		if (type === 'number' || type === 'boolean')
-			return 'INTEGER';
-		if (type === 'binary')
-			return 'BLOB';
-		return 'TEXT';
-	}
-
-	function addRelationMetadata(schema, tables, selectedNames) {
-		const tableSchemaByObject = new Map();
-		const selectedObjects = new Set();
-		for (let i = 0; i < selectedNames.length; i++) {
-			const table = tables[selectedNames[i]];
-			const tableSchema = schema.tables[i];
-			tableSchemaByObject.set(table, tableSchema);
-			selectedObjects.add(table);
-		}
-
-		const seen = new Set();
-		const seenForeignKeys = new Set();
-		for (let i = 0; i < selectedNames.length; i++) {
-			const table = tables[selectedNames[i]];
-			const relations = table && table._relations;
-			if (!relations)
-				continue;
-			for (let relationName in relations) {
-				const join = extractJoinRelation(relations[relationName]);
-				if (!join || !selectedObjects.has(join.parentTable) || !selectedObjects.has(join.childTable))
-					continue;
-				const targetSchema = tableSchemaByObject.get(join.parentTable);
-				const referencesSchema = tableSchemaByObject.get(join.childTable);
-				const columns = (join.columns || []).map(x => x && x._dbName).filter(Boolean);
-				const referencesColumns = join.childTable && Array.isArray(join.childTable._primaryColumns)
-					? join.childTable._primaryColumns.map(x => x && x._dbName).filter(Boolean)
-					: [];
-				if (!targetSchema || !referencesSchema || columns.length === 0 || columns.length !== referencesColumns.length)
-					continue;
-				addRelationIndex(targetSchema, columns, relationName, seen);
-				addRelationForeignKey(targetSchema, referencesSchema, columns, referencesColumns, seenForeignKeys);
-			}
-		}
-
-		for (let i = 0; i < schema.tables.length; i++) {
-			schema.tables[i].indexes.sort((a, b) => a.dbName.localeCompare(b.dbName));
-			schema.tables[i].foreignKeys.sort((a, b) => {
-				const tableCompare = a.referencesTable.localeCompare(b.referencesTable);
-				if (tableCompare !== 0)
-					return tableCompare;
-				return a.columns.join('|').localeCompare(b.columns.join('|'));
-			});
-		}
-	}
-
-	function addRelationIndex(targetSchema, columns, relationName, seen) {
-		if (isPrimaryKey(targetSchema, columns))
-			return;
-		const key = `${targetSchema.dbName}:${columns.join('|')}`;
-		if (seen.has(key))
-			return;
-		seen.add(key);
-		targetSchema.indexes.push({
-			name: `relation:${relationName}`,
-			dbName: newIndexName(targetSchema.dbName, columns),
-			columns
-		});
-	}
-
-	function addRelationForeignKey(targetSchema, referencesSchema, columns, referencesColumns, seen) {
-		const key = `${targetSchema.dbName}:${columns.join('|')}:${referencesSchema.dbName}:${referencesColumns.join('|')}`;
-		if (seen.has(key))
-			return;
-		seen.add(key);
-		targetSchema.foreignKeys.push({
-			columns,
-			referencesTable: referencesSchema.dbName,
-			referencesColumns
-		});
-	}
-
-	function extractJoinRelation(relation) {
-		if (!relation || typeof relation.accept !== 'function')
-			return null;
-		let join;
-		relation.accept({
-			visitJoin: function(current) {
-				join = current;
-			},
-			visitOne: function(current) {
-				join = current && current.joinRelation;
-			},
-			visitMany: function(current) {
-				join = current && current.joinRelation;
-			}
-		});
-		return join;
-	}
-
-	function isPrimaryKey(tableSchema, columns) {
-		if (!Array.isArray(tableSchema.primaryKey) || tableSchema.primaryKey.length !== columns.length)
-			return false;
-		for (let i = 0; i < columns.length; i++) {
-			if (tableSchema.primaryKey[i] !== columns[i])
-				return false;
-		}
-		return true;
-	}
-
-	function newIndexName(tableName, columns) {
-		const raw = `orange_idx_${tableName}_${columns.join('_')}`;
-		return raw.replace(/[^A-Za-z0-9_]/g, '_');
-	}
-
-	async function ensureSchemaStateTable(db) {
-		await db.query([
-			`CREATE TABLE IF NOT EXISTS ${quoteIdent(schemaStateTable)} (`,
-			'"scope" TEXT PRIMARY KEY,',
-			'"dialect" TEXT NOT NULL,',
-			'"tables_json" TEXT NOT NULL,',
-			'"schema_json" TEXT NOT NULL,',
-			'"checksum" TEXT NOT NULL,',
-			'"sql_text" TEXT NOT NULL,',
-			'"updated_at_ms" INTEGER NOT NULL',
-			');'
-		].join(' '));
-	}
-
-	async function readSchemaState(db, scope) {
-		const rows = await db.query(`SELECT "checksum", "schema_json" FROM ${quoteIdent(schemaStateTable)} WHERE "scope" = ${sqlStringLiteral(scope)} LIMIT 1`);
-		const list = Array.isArray(rows) ? rows : rows && rows.rows || [];
-		const row = list[0];
-		if (!row)
-			return null;
-		return {
-			checksum: row.checksum ?? row.CHECKSUM,
-			schemaJson: row.schema_json ?? row.SCHEMA_JSON
-		};
-	}
-
-	async function writeSchemaState(db, state) {
-		await db.query([
-			`INSERT OR REPLACE INTO ${quoteIdent(schemaStateTable)} (`,
-			'"scope", "dialect", "tables_json", "schema_json", "checksum", "sql_text", "updated_at_ms"',
-			') VALUES (',
-			[
-				sqlStringLiteral(state.scope),
-				sqlStringLiteral(state.dialect),
-				sqlStringLiteral(JSON.stringify(state.tables)),
-				sqlStringLiteral(stableStringify(state.schema)),
-				sqlStringLiteral(state.checksum),
-				sqlStringLiteral(state.sql),
-				String(state.updatedAtMs)
-			].join(', '),
-			');'
-		].join(' '));
-	}
-
-	function isIndexOnlySchemaChange(existingSchemaJson, nextSchema) {
-		if (typeof existingSchemaJson !== 'string')
-			return false;
-		try {
-			const existing = JSON.parse(existingSchemaJson);
-			return stableStringify(stripIndexes(existing)) === stableStringify(stripIndexes(nextSchema));
-		}
-		catch (_e) {
-			return false;
-		}
-	}
-
-	function stripIndexes(value) {
-		if (Array.isArray(value))
-			return value.map(stripIndexes);
-		if (!value || typeof value !== 'object')
-			return value;
-		const result = {};
-		for (let key in value) {
-			if (key !== 'indexes')
-				result[key] = stripIndexes(value[key]);
-		}
-		return result;
-	}
-
-	function quoteIdent(value) {
-		return `"${String(value).replace(/"/g, '""')}"`;
-	}
-
-	function sqlStringLiteral(value) {
-		if (value === null || value === undefined)
-			return 'NULL';
-		return `'${String(value).replace(/'/g, '\'\'')}'`;
-	}
-
-	function stableStringify(value) {
-		if (value === null || typeof value !== 'object')
-			return JSON.stringify(value);
-		if (Array.isArray(value))
-			return `[${value.map(stableStringify).join(',')}]`;
-		const keys = Object.keys(value).sort();
-		return `{${keys.map(key => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
-	}
-
-	function checksumString(value) {
-		let hash = 2166136261;
-		for (let i = 0; i < value.length; i++) {
-			hash ^= value.charCodeAt(i);
-			hash = Math.imul(hash, 16777619);
-		}
-		return `fnv1a32:${(hash >>> 0).toString(16).padStart(8, '0')}`;
-	}
-
-	syncSchema = {
-		ensureSyncSchema,
-		clearEnsuredSyncSchema,
-		buildSyncSchema,
-		schemaToSql,
-		stableStringify,
-		checksumString
-	};
-	return syncSchema;
 }
 
 var hasRequiredSyncClient;
@@ -10751,7 +8442,7 @@ function requireClient () {
 	const fetchingStrategyMap = new WeakMap();
 	const targetKey = Symbol();
 	const map = requireClientMap();
-	const clone = require$$5;
+	const clone = require_default();
 	const createHttpInterceptor = requireHttpInterceptor();
 	const flags = requireFlags();
 	const newSyncClient = requireSyncClient();
@@ -12153,13 +9844,176 @@ function requireClient () {
 	return client;
 }
 
+var negotiateNextAndFilter_1;
+var hasRequiredNegotiateNextAndFilter;
+
+function requireNegotiateNextAndFilter () {
+	if (hasRequiredNegotiateNextAndFilter) return negotiateNextAndFilter_1;
+	hasRequiredNegotiateNextAndFilter = 1;
+	function negotiateNextAndFilter(filter, other) {
+		if (!other.sql())
+			return filter;
+		return filter.append(' AND ').append(other);
+	}
+
+	negotiateNextAndFilter_1 = negotiateNextAndFilter;
+	return negotiateNextAndFilter_1;
+}
+
+var negotiateNextOrFilter_1;
+var hasRequiredNegotiateNextOrFilter;
+
+function requireNegotiateNextOrFilter () {
+	if (hasRequiredNegotiateNextOrFilter) return negotiateNextOrFilter_1;
+	hasRequiredNegotiateNextOrFilter = 1;
+	function negotiateNextOrFilter(filter, other) {
+		if (!other.sql())
+			return filter;
+		return filter.prepend('(').append(' OR ').append(other).append(')');
+	}
+
+	negotiateNextOrFilter_1 = negotiateNextOrFilter;
+	return negotiateNextOrFilter_1;
+}
+
+var utils$1;
+var hasRequiredUtils$1;
+
+function requireUtils$1 () {
+	if (hasRequiredUtils$1) return utils$1;
+	hasRequiredUtils$1 = 1;
+	const newParameterized = requireNewParameterized();
+	const negotiateNextAndFilter = requireNegotiateNextAndFilter();
+	const negotiateNextOrFilter = requireNegotiateNextOrFilter();
+
+	function newBoolean(filter) {
+		var c = {};
+		c.sql = filter.sql.bind(filter);
+		c.parameters = filter.parameters;
+
+		c.append = function(other) {
+			var nextFilter = filter.append(other);
+			return newBoolean(nextFilter);
+		};
+
+		c.prepend = function(other) {
+			var nextFilter = filter.prepend(other);
+			return newBoolean(nextFilter);
+		};
+
+		c.and = function(context, other) {
+			if (other === undefined) {
+				other = context;
+				context = null;
+			}
+			other = negotiateRawSqlFilter(context, other);
+			var nextFilter = negotiateNextAndFilter(filter, other);
+			var next = newBoolean(nextFilter);
+			for (var i = 2; i < arguments.length; i++) {
+				next = next.and(context, arguments[i]);
+			}
+			return next;
+		};
+
+		c.or = function(context, other) {
+			if (other === undefined) {
+				other = context;
+				context = null;
+			}
+			other = negotiateRawSqlFilter(context, other);
+			var nextFilter = negotiateNextOrFilter(filter, other);
+			var next = newBoolean(nextFilter);
+			for (var i = 2; i < arguments.length; i++) {
+				next = next.or(context, arguments[i]);
+			}
+			return next;
+		};
+
+		c.not = function(_context) {
+			var nextFilter = filter.prepend('NOT (').append(')');
+			return newBoolean(nextFilter);
+		};
+
+		return c;
+	}
+
+
+	function negotiateRawSqlFilter(context, filter, optionalTable, emptyArrayMeansFalse) {
+		if (Array.isArray(filter) && filter.length === 0) {
+			const sql = emptyArrayMeansFalse ? '1 = 2' : '1 = 1';
+			return newBoolean(newParameterized(sql));
+		}
+		else if (Array.isArray(filter)) {
+			let curFilter;
+			let curObjectFilter;
+			for (let i = 0; i < filter.length; i++) {
+				let nextFilter = negotiateRawSqlFilter(context,filter[i], optionalTable);
+				if (nextFilter.isObjectFilter)
+					curObjectFilter = curObjectFilter ? curObjectFilter.or(context, nextFilter) : nextFilter;
+				else
+					curFilter = curFilter ? curFilter.and(context, nextFilter) : nextFilter;
+			}
+			if (curFilter && curObjectFilter)
+				return curFilter.and(context, curObjectFilter);
+			else if (curFilter)
+				return curFilter;
+			else
+				return curObjectFilter;
+		}
+		else {
+			let params = [];
+			if (filter) {
+				if (filter.and)
+					return filter;
+				if (filter.sql) {
+					let sql = filter.sql;
+					if (typeof filter.sql === 'function') {
+						sql = filter.sql();
+					}
+					params.push(sql, filter.parameters);
+				}
+				else if (isObjectFilter(filter, optionalTable)) {
+					return newObjectFilter(context, filter, optionalTable);
+				}
+				else
+					params = [filter];
+			} else {
+				params = [filter];
+			}
+
+			let parameterized = newParameterized.apply(null, params);
+			return newBoolean(parameterized);
+		}
+	}
+
+	function isObjectFilter(object, optionalTable) {
+		return optionalTable && object;
+	}
+
+	function newObjectFilter(context, object, table) {
+		let primaryColumns = table._primaryColumns;
+		let filter;
+		for (let i = 0; i < primaryColumns.length; i++) {
+			let column = primaryColumns[i];
+			let colFilter = column.equal(context, object[column.alias]);
+			filter = filter  ? filter.and(context, colFilter) : colFilter ;
+		}
+		filter.isObjectFilter = true;
+		return filter;
+	}
+
+
+	utils$1 = { negotiateRawSqlFilter, newBoolean};
+	return utils$1;
+}
+
 var newBoolean_1;
 var hasRequiredNewBoolean;
 
 function requireNewBoolean () {
 	if (hasRequiredNewBoolean) return newBoolean_1;
 	hasRequiredNewBoolean = 1;
-	const { newBoolean } = requireUtils();
+	const { newBoolean } = requireUtils$1();
 
 	newBoolean_1 = newBoolean;
 	return newBoolean_1;
@@ -12185,11 +10039,11 @@ function requireEncodeFilterArg () {
 }
 
 var quote_1;
-var hasRequiredQuote$2;
+var hasRequiredQuote$1;
 
-function requireQuote$2 () {
-	if (hasRequiredQuote$2) return quote_1;
-	hasRequiredQuote$2 = 1;
+function requireQuote$1 () {
+	if (hasRequiredQuote$1) return quote_1;
+	hasRequiredQuote$1 = 1;
 	let tryGetSessionContext = requireTryGetSessionContext();
 
 	function quote(context, name) {
@@ -12205,15 +10059,15 @@ function requireQuote$2 () {
 }
 
 var equal_1;
-var hasRequiredEqual;
+var hasRequiredEqual$1;
 
-function requireEqual () {
-	if (hasRequiredEqual) return equal_1;
-	hasRequiredEqual = 1;
+function requireEqual$1 () {
+	if (hasRequiredEqual$1) return equal_1;
+	hasRequiredEqual$1 = 1;
 	var newBoolean = requireNewBoolean();
 	var nullOperator = ' is ';
 	var encodeFilterArg = requireEncodeFilterArg();
-	var quote = requireQuote$2();
+	var quote = requireQuote$1();
 
 	function equal(context, column,arg,alias) {
 		var operator = '=';
@@ -12238,7 +10092,7 @@ function requireNotEqual () {
 	var newBoolean = requireNewBoolean();
 	var encodeFilterArg = requireEncodeFilterArg();
 	var nullOperator = ' is not ';
-	var quote = requireQuote$2();
+	var quote = requireQuote$1();
 
 	function notEqual(context, column,arg,alias) {
 		var operator = '<>';
@@ -12262,7 +10116,7 @@ function requireLessThan () {
 	hasRequiredLessThan = 1;
 	var newBoolean = requireNewBoolean();
 	var encodeFilterArg = requireEncodeFilterArg();
-	var quote = requireQuote$2();
+	var quote = requireQuote$1();
 
 	function lessThanOrEqual(context, column,arg,alias) {
 		var operator = '<';
@@ -12284,7 +10138,7 @@ function requireLessThanOrEqual () {
 	hasRequiredLessThanOrEqual = 1;
 	var newBoolean = requireNewBoolean();
 	var encodeFilterArg = requireEncodeFilterArg();
-	var quote = requireQuote$2();
+	var quote = requireQuote$1();
 
 	function lessThanOrEqual(context, column,arg,alias) {
 		var operator = '<=';
@@ -12306,7 +10160,7 @@ function requireGreaterThan () {
 	hasRequiredGreaterThan = 1;
 	var newBoolean = requireNewBoolean();
 	var encodeFilterArg = requireEncodeFilterArg();
-	var quote = requireQuote$2();
+	var quote = requireQuote$1();
 
 	function greaterThan(context, column,arg,alias) {
 		var operator = '>';
@@ -12328,7 +10182,7 @@ function requireGreaterThanOrEqual () {
 	hasRequiredGreaterThanOrEqual = 1;
 	var newBoolean = requireNewBoolean();
 	var encodeFilterArg = requireEncodeFilterArg();
-	var quote = requireQuote$2();
+	var quote = requireQuote$1();
 
 	function greaterThanOrEqual(context, column,arg,alias) {
 		var operator = '>=';
@@ -12350,7 +10204,7 @@ function require_in () {
 	hasRequired_in = 1;
 	const newParameterized = requireNewParameterized();
 	const newBoolean = requireNewBoolean();
-	const quote = requireQuote$2();
+	const quote = requireQuote$1();
 
 	function _in(context, column,values,alias) {
 		let filter;
@@ -12571,7 +10425,7 @@ var hasRequiredNewColumn;
 function requireNewColumn () {
 	if (hasRequiredNewColumn) return newColumn;
 	hasRequiredNewColumn = 1;
-	const equal = requireEqual();
+	const equal = requireEqual$1();
 	const notEqual = requireNotEqual();
 	const lessThan = requireLessThan();
 	const lessThanOrEqual = requireLessThanOrEqual();
@@ -12579,7 +10433,7 @@ function requireNewColumn () {
 	const greaterThanOrEqual = requireGreaterThanOrEqual();
 	const _in = require_in();
 	const _extractAlias = requireExtractAlias();
-	const quote = requireQuote$2();
+	const quote = requireQuote$1();
 	const aggregate = requireColumnAggregate$1();
 	const aggregateGroup = requireColumnAggregateGroup$1();
 	const newParameterized = requireNewParameterized();
@@ -12696,7 +10550,7429 @@ function requireNewColumn () {
 	return newColumn;
 }
 
-var require$$0 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(ajv);
+var ajv = {exports: {}};
+
+var core$1 = {};
+
+var validate = {};
+
+var boolSchema = {};
+
+var errors = {};
+
+var codegen = {};
+
+var code$1 = {};
+
+var hasRequiredCode$1;
+
+function requireCode$1 () {
+	if (hasRequiredCode$1) return code$1;
+	hasRequiredCode$1 = 1;
+	(function (exports) {
+		Object.defineProperty(exports, "__esModule", { value: true });
+		exports.regexpCode = exports.getEsmExportName = exports.getProperty = exports.safeStringify = exports.stringify = exports.strConcat = exports.addCodeArg = exports.str = exports._ = exports.nil = exports._Code = exports.Name = exports.IDENTIFIER = exports._CodeOrName = void 0;
+		// eslint-disable-next-line @typescript-eslint/no-extraneous-class
+		class _CodeOrName {
+		}
+		exports._CodeOrName = _CodeOrName;
+		exports.IDENTIFIER = /^[a-z$_][a-z$_0-9]*$/i;
+		class Name extends _CodeOrName {
+		    constructor(s) {
+		        super();
+		        if (!exports.IDENTIFIER.test(s))
+		            throw new Error("CodeGen: name must be a valid identifier");
+		        this.str = s;
+		    }
+		    toString() {
+		        return this.str;
+		    }
+		    emptyStr() {
+		        return false;
+		    }
+		    get names() {
+		        return { [this.str]: 1 };
+		    }
+		}
+		exports.Name = Name;
+		class _Code extends _CodeOrName {
+		    constructor(code) {
+		        super();
+		        this._items = typeof code === "string" ? [code] : code;
+		    }
+		    toString() {
+		        return this.str;
+		    }
+		    emptyStr() {
+		        if (this._items.length > 1)
+		            return false;
+		        const item = this._items[0];
+		        return item === "" || item === '""';
+		    }
+		    get str() {
+		        var _a;
+		        return ((_a = this._str) !== null && _a !== void 0 ? _a : (this._str = this._items.reduce((s, c) => `${s}${c}`, "")));
+		    }
+		    get names() {
+		        var _a;
+		        return ((_a = this._names) !== null && _a !== void 0 ? _a : (this._names = this._items.reduce((names, c) => {
+		            if (c instanceof Name)
+		                names[c.str] = (names[c.str] || 0) + 1;
+		            return names;
+		        }, {})));
+		    }
+		}
+		exports._Code = _Code;
+		exports.nil = new _Code("");
+		function _(strs, ...args) {
+		    const code = [strs[0]];
+		    let i = 0;
+		    while (i < args.length) {
+		        addCodeArg(code, args[i]);
+		        code.push(strs[++i]);
+		    }
+		    return new _Code(code);
+		}
+		exports._ = _;
+		const plus = new _Code("+");
+		function str(strs, ...args) {
+		    const expr = [safeStringify(strs[0])];
+		    let i = 0;
+		    while (i < args.length) {
+		        expr.push(plus);
+		        addCodeArg(expr, args[i]);
+		        expr.push(plus, safeStringify(strs[++i]));
+		    }
+		    optimize(expr);
+		    return new _Code(expr);
+		}
+		exports.str = str;
+		function addCodeArg(code, arg) {
+		    if (arg instanceof _Code)
+		        code.push(...arg._items);
+		    else if (arg instanceof Name)
+		        code.push(arg);
+		    else
+		        code.push(interpolate(arg));
+		}
+		exports.addCodeArg = addCodeArg;
+		function optimize(expr) {
+		    let i = 1;
+		    while (i < expr.length - 1) {
+		        if (expr[i] === plus) {
+		            const res = mergeExprItems(expr[i - 1], expr[i + 1]);
+		            if (res !== undefined) {
+		                expr.splice(i - 1, 3, res);
+		                continue;
+		            }
+		            expr[i++] = "+";
+		        }
+		        i++;
+		    }
+		}
+		function mergeExprItems(a, b) {
+		    if (b === '""')
+		        return a;
+		    if (a === '""')
+		        return b;
+		    if (typeof a == "string") {
+		        if (b instanceof Name || a[a.length - 1] !== '"')
+		            return;
+		        if (typeof b != "string")
+		            return `${a.slice(0, -1)}${b}"`;
+		        if (b[0] === '"')
+		            return a.slice(0, -1) + b.slice(1);
+		        return;
+		    }
+		    if (typeof b == "string" && b[0] === '"' && !(a instanceof Name))
+		        return `"${a}${b.slice(1)}`;
+		    return;
+		}
+		function strConcat(c1, c2) {
+		    return c2.emptyStr() ? c1 : c1.emptyStr() ? c2 : str `${c1}${c2}`;
+		}
+		exports.strConcat = strConcat;
+		// TODO do not allow arrays here
+		function interpolate(x) {
+		    return typeof x == "number" || typeof x == "boolean" || x === null
+		        ? x
+		        : safeStringify(Array.isArray(x) ? x.join(",") : x);
+		}
+		function stringify(x) {
+		    return new _Code(safeStringify(x));
+		}
+		exports.stringify = stringify;
+		function safeStringify(x) {
+		    return JSON.stringify(x)
+		        .replace(/\u2028/g, "\\u2028")
+		        .replace(/\u2029/g, "\\u2029");
+		}
+		exports.safeStringify = safeStringify;
+		function getProperty(key) {
+		    return typeof key == "string" && exports.IDENTIFIER.test(key) ? new _Code(`.${key}`) : _ `[${key}]`;
+		}
+		exports.getProperty = getProperty;
+		//Does best effort to format the name properly
+		function getEsmExportName(key) {
+		    if (typeof key == "string" && exports.IDENTIFIER.test(key)) {
+		        return new _Code(`${key}`);
+		    }
+		    throw new Error(`CodeGen: invalid export name: ${key}, use explicit $id name mapping`);
+		}
+		exports.getEsmExportName = getEsmExportName;
+		function regexpCode(rx) {
+		    return new _Code(rx.toString());
+		}
+		exports.regexpCode = regexpCode;
+		
+	} (code$1));
+	return code$1;
+}
+
+var scope = {};
+
+var hasRequiredScope;
+
+function requireScope () {
+	if (hasRequiredScope) return scope;
+	hasRequiredScope = 1;
+	(function (exports) {
+		Object.defineProperty(exports, "__esModule", { value: true });
+		exports.ValueScope = exports.ValueScopeName = exports.Scope = exports.varKinds = exports.UsedValueState = void 0;
+		const code_1 = /*@__PURE__*/ requireCode$1();
+		class ValueError extends Error {
+		    constructor(name) {
+		        super(`CodeGen: "code" for ${name} not defined`);
+		        this.value = name.value;
+		    }
+		}
+		var UsedValueState;
+		(function (UsedValueState) {
+		    UsedValueState[UsedValueState["Started"] = 0] = "Started";
+		    UsedValueState[UsedValueState["Completed"] = 1] = "Completed";
+		})(UsedValueState || (exports.UsedValueState = UsedValueState = {}));
+		exports.varKinds = {
+		    const: new code_1.Name("const"),
+		    let: new code_1.Name("let"),
+		    var: new code_1.Name("var"),
+		};
+		class Scope {
+		    constructor({ prefixes, parent } = {}) {
+		        this._names = {};
+		        this._prefixes = prefixes;
+		        this._parent = parent;
+		    }
+		    toName(nameOrPrefix) {
+		        return nameOrPrefix instanceof code_1.Name ? nameOrPrefix : this.name(nameOrPrefix);
+		    }
+		    name(prefix) {
+		        return new code_1.Name(this._newName(prefix));
+		    }
+		    _newName(prefix) {
+		        const ng = this._names[prefix] || this._nameGroup(prefix);
+		        return `${prefix}${ng.index++}`;
+		    }
+		    _nameGroup(prefix) {
+		        var _a, _b;
+		        if (((_b = (_a = this._parent) === null || _a === void 0 ? void 0 : _a._prefixes) === null || _b === void 0 ? void 0 : _b.has(prefix)) || (this._prefixes && !this._prefixes.has(prefix))) {
+		            throw new Error(`CodeGen: prefix "${prefix}" is not allowed in this scope`);
+		        }
+		        return (this._names[prefix] = { prefix, index: 0 });
+		    }
+		}
+		exports.Scope = Scope;
+		class ValueScopeName extends code_1.Name {
+		    constructor(prefix, nameStr) {
+		        super(nameStr);
+		        this.prefix = prefix;
+		    }
+		    setValue(value, { property, itemIndex }) {
+		        this.value = value;
+		        this.scopePath = (0, code_1._) `.${new code_1.Name(property)}[${itemIndex}]`;
+		    }
+		}
+		exports.ValueScopeName = ValueScopeName;
+		const line = (0, code_1._) `\n`;
+		class ValueScope extends Scope {
+		    constructor(opts) {
+		        super(opts);
+		        this._values = {};
+		        this._scope = opts.scope;
+		        this.opts = { ...opts, _n: opts.lines ? line : code_1.nil };
+		    }
+		    get() {
+		        return this._scope;
+		    }
+		    name(prefix) {
+		        return new ValueScopeName(prefix, this._newName(prefix));
+		    }
+		    value(nameOrPrefix, value) {
+		        var _a;
+		        if (value.ref === undefined)
+		            throw new Error("CodeGen: ref must be passed in value");
+		        const name = this.toName(nameOrPrefix);
+		        const { prefix } = name;
+		        const valueKey = (_a = value.key) !== null && _a !== void 0 ? _a : value.ref;
+		        let vs = this._values[prefix];
+		        if (vs) {
+		            const _name = vs.get(valueKey);
+		            if (_name)
+		                return _name;
+		        }
+		        else {
+		            vs = this._values[prefix] = new Map();
+		        }
+		        vs.set(valueKey, name);
+		        const s = this._scope[prefix] || (this._scope[prefix] = []);
+		        const itemIndex = s.length;
+		        s[itemIndex] = value.ref;
+		        name.setValue(value, { property: prefix, itemIndex });
+		        return name;
+		    }
+		    getValue(prefix, keyOrRef) {
+		        const vs = this._values[prefix];
+		        if (!vs)
+		            return;
+		        return vs.get(keyOrRef);
+		    }
+		    scopeRefs(scopeName, values = this._values) {
+		        return this._reduceValues(values, (name) => {
+		            if (name.scopePath === undefined)
+		                throw new Error(`CodeGen: name "${name}" has no value`);
+		            return (0, code_1._) `${scopeName}${name.scopePath}`;
+		        });
+		    }
+		    scopeCode(values = this._values, usedValues, getCode) {
+		        return this._reduceValues(values, (name) => {
+		            if (name.value === undefined)
+		                throw new Error(`CodeGen: name "${name}" has no value`);
+		            return name.value.code;
+		        }, usedValues, getCode);
+		    }
+		    _reduceValues(values, valueCode, usedValues = {}, getCode) {
+		        let code = code_1.nil;
+		        for (const prefix in values) {
+		            const vs = values[prefix];
+		            if (!vs)
+		                continue;
+		            const nameSet = (usedValues[prefix] = usedValues[prefix] || new Map());
+		            vs.forEach((name) => {
+		                if (nameSet.has(name))
+		                    return;
+		                nameSet.set(name, UsedValueState.Started);
+		                let c = valueCode(name);
+		                if (c) {
+		                    const def = this.opts.es5 ? exports.varKinds.var : exports.varKinds.const;
+		                    code = (0, code_1._) `${code}${def} ${name} = ${c};${this.opts._n}`;
+		                }
+		                else if ((c = getCode === null || getCode === void 0 ? void 0 : getCode(name))) {
+		                    code = (0, code_1._) `${code}${c}${this.opts._n}`;
+		                }
+		                else {
+		                    throw new ValueError(name);
+		                }
+		                nameSet.set(name, UsedValueState.Completed);
+		            });
+		        }
+		        return code;
+		    }
+		}
+		exports.ValueScope = ValueScope;
+		
+	} (scope));
+	return scope;
+}
+
+var hasRequiredCodegen;
+
+function requireCodegen () {
+	if (hasRequiredCodegen) return codegen;
+	hasRequiredCodegen = 1;
+	(function (exports) {
+		Object.defineProperty(exports, "__esModule", { value: true });
+		exports.or = exports.and = exports.not = exports.CodeGen = exports.operators = exports.varKinds = exports.ValueScopeName = exports.ValueScope = exports.Scope = exports.Name = exports.regexpCode = exports.stringify = exports.getProperty = exports.nil = exports.strConcat = exports.str = exports._ = void 0;
+		const code_1 = /*@__PURE__*/ requireCode$1();
+		const scope_1 = /*@__PURE__*/ requireScope();
+		var code_2 = /*@__PURE__*/ requireCode$1();
+		Object.defineProperty(exports, "_", { enumerable: true, get: function () { return code_2._; } });
+		Object.defineProperty(exports, "str", { enumerable: true, get: function () { return code_2.str; } });
+		Object.defineProperty(exports, "strConcat", { enumerable: true, get: function () { return code_2.strConcat; } });
+		Object.defineProperty(exports, "nil", { enumerable: true, get: function () { return code_2.nil; } });
+		Object.defineProperty(exports, "getProperty", { enumerable: true, get: function () { return code_2.getProperty; } });
+		Object.defineProperty(exports, "stringify", { enumerable: true, get: function () { return code_2.stringify; } });
+		Object.defineProperty(exports, "regexpCode", { enumerable: true, get: function () { return code_2.regexpCode; } });
+		Object.defineProperty(exports, "Name", { enumerable: true, get: function () { return code_2.Name; } });
+		var scope_2 = /*@__PURE__*/ requireScope();
+		Object.defineProperty(exports, "Scope", { enumerable: true, get: function () { return scope_2.Scope; } });
+		Object.defineProperty(exports, "ValueScope", { enumerable: true, get: function () { return scope_2.ValueScope; } });
+		Object.defineProperty(exports, "ValueScopeName", { enumerable: true, get: function () { return scope_2.ValueScopeName; } });
+		Object.defineProperty(exports, "varKinds", { enumerable: true, get: function () { return scope_2.varKinds; } });
+		exports.operators = {
+		    GT: new code_1._Code(">"),
+		    GTE: new code_1._Code(">="),
+		    LT: new code_1._Code("<"),
+		    LTE: new code_1._Code("<="),
+		    EQ: new code_1._Code("==="),
+		    NEQ: new code_1._Code("!=="),
+		    NOT: new code_1._Code("!"),
+		    OR: new code_1._Code("||"),
+		    AND: new code_1._Code("&&"),
+		    ADD: new code_1._Code("+"),
+		};
+		class Node {
+		    optimizeNodes() {
+		        return this;
+		    }
+		    optimizeNames(_names, _constants) {
+		        return this;
+		    }
+		}
+		class Def extends Node {
+		    constructor(varKind, name, rhs) {
+		        super();
+		        this.varKind = varKind;
+		        this.name = name;
+		        this.rhs = rhs;
+		    }
+		    render({ es5, _n }) {
+		        const varKind = es5 ? scope_1.varKinds.var : this.varKind;
+		        const rhs = this.rhs === undefined ? "" : ` = ${this.rhs}`;
+		        return `${varKind} ${this.name}${rhs};` + _n;
+		    }
+		    optimizeNames(names, constants) {
+		        if (!names[this.name.str])
+		            return;
+		        if (this.rhs)
+		            this.rhs = optimizeExpr(this.rhs, names, constants);
+		        return this;
+		    }
+		    get names() {
+		        return this.rhs instanceof code_1._CodeOrName ? this.rhs.names : {};
+		    }
+		}
+		class Assign extends Node {
+		    constructor(lhs, rhs, sideEffects) {
+		        super();
+		        this.lhs = lhs;
+		        this.rhs = rhs;
+		        this.sideEffects = sideEffects;
+		    }
+		    render({ _n }) {
+		        return `${this.lhs} = ${this.rhs};` + _n;
+		    }
+		    optimizeNames(names, constants) {
+		        if (this.lhs instanceof code_1.Name && !names[this.lhs.str] && !this.sideEffects)
+		            return;
+		        this.rhs = optimizeExpr(this.rhs, names, constants);
+		        return this;
+		    }
+		    get names() {
+		        const names = this.lhs instanceof code_1.Name ? {} : { ...this.lhs.names };
+		        return addExprNames(names, this.rhs);
+		    }
+		}
+		class AssignOp extends Assign {
+		    constructor(lhs, op, rhs, sideEffects) {
+		        super(lhs, rhs, sideEffects);
+		        this.op = op;
+		    }
+		    render({ _n }) {
+		        return `${this.lhs} ${this.op}= ${this.rhs};` + _n;
+		    }
+		}
+		class Label extends Node {
+		    constructor(label) {
+		        super();
+		        this.label = label;
+		        this.names = {};
+		    }
+		    render({ _n }) {
+		        return `${this.label}:` + _n;
+		    }
+		}
+		class Break extends Node {
+		    constructor(label) {
+		        super();
+		        this.label = label;
+		        this.names = {};
+		    }
+		    render({ _n }) {
+		        const label = this.label ? ` ${this.label}` : "";
+		        return `break${label};` + _n;
+		    }
+		}
+		class Throw extends Node {
+		    constructor(error) {
+		        super();
+		        this.error = error;
+		    }
+		    render({ _n }) {
+		        return `throw ${this.error};` + _n;
+		    }
+		    get names() {
+		        return this.error.names;
+		    }
+		}
+		class AnyCode extends Node {
+		    constructor(code) {
+		        super();
+		        this.code = code;
+		    }
+		    render({ _n }) {
+		        return `${this.code};` + _n;
+		    }
+		    optimizeNodes() {
+		        return `${this.code}` ? this : undefined;
+		    }
+		    optimizeNames(names, constants) {
+		        this.code = optimizeExpr(this.code, names, constants);
+		        return this;
+		    }
+		    get names() {
+		        return this.code instanceof code_1._CodeOrName ? this.code.names : {};
+		    }
+		}
+		class ParentNode extends Node {
+		    constructor(nodes = []) {
+		        super();
+		        this.nodes = nodes;
+		    }
+		    render(opts) {
+		        return this.nodes.reduce((code, n) => code + n.render(opts), "");
+		    }
+		    optimizeNodes() {
+		        const { nodes } = this;
+		        let i = nodes.length;
+		        while (i--) {
+		            const n = nodes[i].optimizeNodes();
+		            if (Array.isArray(n))
+		                nodes.splice(i, 1, ...n);
+		            else if (n)
+		                nodes[i] = n;
+		            else
+		                nodes.splice(i, 1);
+		        }
+		        return nodes.length > 0 ? this : undefined;
+		    }
+		    optimizeNames(names, constants) {
+		        const { nodes } = this;
+		        let i = nodes.length;
+		        while (i--) {
+		            // iterating backwards improves 1-pass optimization
+		            const n = nodes[i];
+		            if (n.optimizeNames(names, constants))
+		                continue;
+		            subtractNames(names, n.names);
+		            nodes.splice(i, 1);
+		        }
+		        return nodes.length > 0 ? this : undefined;
+		    }
+		    get names() {
+		        return this.nodes.reduce((names, n) => addNames(names, n.names), {});
+		    }
+		}
+		class BlockNode extends ParentNode {
+		    render(opts) {
+		        return "{" + opts._n + super.render(opts) + "}" + opts._n;
+		    }
+		}
+		class Root extends ParentNode {
+		}
+		class Else extends BlockNode {
+		}
+		Else.kind = "else";
+		class If extends BlockNode {
+		    constructor(condition, nodes) {
+		        super(nodes);
+		        this.condition = condition;
+		    }
+		    render(opts) {
+		        let code = `if(${this.condition})` + super.render(opts);
+		        if (this.else)
+		            code += "else " + this.else.render(opts);
+		        return code;
+		    }
+		    optimizeNodes() {
+		        super.optimizeNodes();
+		        const cond = this.condition;
+		        if (cond === true)
+		            return this.nodes; // else is ignored here
+		        let e = this.else;
+		        if (e) {
+		            const ns = e.optimizeNodes();
+		            e = this.else = Array.isArray(ns) ? new Else(ns) : ns;
+		        }
+		        if (e) {
+		            if (cond === false)
+		                return e instanceof If ? e : e.nodes;
+		            if (this.nodes.length)
+		                return this;
+		            return new If(not(cond), e instanceof If ? [e] : e.nodes);
+		        }
+		        if (cond === false || !this.nodes.length)
+		            return undefined;
+		        return this;
+		    }
+		    optimizeNames(names, constants) {
+		        var _a;
+		        this.else = (_a = this.else) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants);
+		        if (!(super.optimizeNames(names, constants) || this.else))
+		            return;
+		        this.condition = optimizeExpr(this.condition, names, constants);
+		        return this;
+		    }
+		    get names() {
+		        const names = super.names;
+		        addExprNames(names, this.condition);
+		        if (this.else)
+		            addNames(names, this.else.names);
+		        return names;
+		    }
+		}
+		If.kind = "if";
+		class For extends BlockNode {
+		}
+		For.kind = "for";
+		class ForLoop extends For {
+		    constructor(iteration) {
+		        super();
+		        this.iteration = iteration;
+		    }
+		    render(opts) {
+		        return `for(${this.iteration})` + super.render(opts);
+		    }
+		    optimizeNames(names, constants) {
+		        if (!super.optimizeNames(names, constants))
+		            return;
+		        this.iteration = optimizeExpr(this.iteration, names, constants);
+		        return this;
+		    }
+		    get names() {
+		        return addNames(super.names, this.iteration.names);
+		    }
+		}
+		class ForRange extends For {
+		    constructor(varKind, name, from, to) {
+		        super();
+		        this.varKind = varKind;
+		        this.name = name;
+		        this.from = from;
+		        this.to = to;
+		    }
+		    render(opts) {
+		        const varKind = opts.es5 ? scope_1.varKinds.var : this.varKind;
+		        const { name, from, to } = this;
+		        return `for(${varKind} ${name}=${from}; ${name}<${to}; ${name}++)` + super.render(opts);
+		    }
+		    get names() {
+		        const names = addExprNames(super.names, this.from);
+		        return addExprNames(names, this.to);
+		    }
+		}
+		class ForIter extends For {
+		    constructor(loop, varKind, name, iterable) {
+		        super();
+		        this.loop = loop;
+		        this.varKind = varKind;
+		        this.name = name;
+		        this.iterable = iterable;
+		    }
+		    render(opts) {
+		        return `for(${this.varKind} ${this.name} ${this.loop} ${this.iterable})` + super.render(opts);
+		    }
+		    optimizeNames(names, constants) {
+		        if (!super.optimizeNames(names, constants))
+		            return;
+		        this.iterable = optimizeExpr(this.iterable, names, constants);
+		        return this;
+		    }
+		    get names() {
+		        return addNames(super.names, this.iterable.names);
+		    }
+		}
+		class Func extends BlockNode {
+		    constructor(name, args, async) {
+		        super();
+		        this.name = name;
+		        this.args = args;
+		        this.async = async;
+		    }
+		    render(opts) {
+		        const _async = this.async ? "async " : "";
+		        return `${_async}function ${this.name}(${this.args})` + super.render(opts);
+		    }
+		}
+		Func.kind = "func";
+		class Return extends ParentNode {
+		    render(opts) {
+		        return "return " + super.render(opts);
+		    }
+		}
+		Return.kind = "return";
+		class Try extends BlockNode {
+		    render(opts) {
+		        let code = "try" + super.render(opts);
+		        if (this.catch)
+		            code += this.catch.render(opts);
+		        if (this.finally)
+		            code += this.finally.render(opts);
+		        return code;
+		    }
+		    optimizeNodes() {
+		        var _a, _b;
+		        super.optimizeNodes();
+		        (_a = this.catch) === null || _a === void 0 ? void 0 : _a.optimizeNodes();
+		        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNodes();
+		        return this;
+		    }
+		    optimizeNames(names, constants) {
+		        var _a, _b;
+		        super.optimizeNames(names, constants);
+		        (_a = this.catch) === null || _a === void 0 ? void 0 : _a.optimizeNames(names, constants);
+		        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNames(names, constants);
+		        return this;
+		    }
+		    get names() {
+		        const names = super.names;
+		        if (this.catch)
+		            addNames(names, this.catch.names);
+		        if (this.finally)
+		            addNames(names, this.finally.names);
+		        return names;
+		    }
+		}
+		class Catch extends BlockNode {
+		    constructor(error) {
+		        super();
+		        this.error = error;
+		    }
+		    render(opts) {
+		        return `catch(${this.error})` + super.render(opts);
+		    }
+		}
+		Catch.kind = "catch";
+		class Finally extends BlockNode {
+		    render(opts) {
+		        return "finally" + super.render(opts);
+		    }
+		}
+		Finally.kind = "finally";
+		class CodeGen {
+		    constructor(extScope, opts = {}) {
+		        this._values = {};
+		        this._blockStarts = [];
+		        this._constants = {};
+		        this.opts = { ...opts, _n: opts.lines ? "\n" : "" };
+		        this._extScope = extScope;
+		        this._scope = new scope_1.Scope({ parent: extScope });
+		        this._nodes = [new Root()];
+		    }
+		    toString() {
+		        return this._root.render(this.opts);
+		    }
+		    // returns unique name in the internal scope
+		    name(prefix) {
+		        return this._scope.name(prefix);
+		    }
+		    // reserves unique name in the external scope
+		    scopeName(prefix) {
+		        return this._extScope.name(prefix);
+		    }
+		    // reserves unique name in the external scope and assigns value to it
+		    scopeValue(prefixOrName, value) {
+		        const name = this._extScope.value(prefixOrName, value);
+		        const vs = this._values[name.prefix] || (this._values[name.prefix] = new Set());
+		        vs.add(name);
+		        return name;
+		    }
+		    getScopeValue(prefix, keyOrRef) {
+		        return this._extScope.getValue(prefix, keyOrRef);
+		    }
+		    // return code that assigns values in the external scope to the names that are used internally
+		    // (same names that were returned by gen.scopeName or gen.scopeValue)
+		    scopeRefs(scopeName) {
+		        return this._extScope.scopeRefs(scopeName, this._values);
+		    }
+		    scopeCode() {
+		        return this._extScope.scopeCode(this._values);
+		    }
+		    _def(varKind, nameOrPrefix, rhs, constant) {
+		        const name = this._scope.toName(nameOrPrefix);
+		        if (rhs !== undefined && constant)
+		            this._constants[name.str] = rhs;
+		        this._leafNode(new Def(varKind, name, rhs));
+		        return name;
+		    }
+		    // `const` declaration (`var` in es5 mode)
+		    const(nameOrPrefix, rhs, _constant) {
+		        return this._def(scope_1.varKinds.const, nameOrPrefix, rhs, _constant);
+		    }
+		    // `let` declaration with optional assignment (`var` in es5 mode)
+		    let(nameOrPrefix, rhs, _constant) {
+		        return this._def(scope_1.varKinds.let, nameOrPrefix, rhs, _constant);
+		    }
+		    // `var` declaration with optional assignment
+		    var(nameOrPrefix, rhs, _constant) {
+		        return this._def(scope_1.varKinds.var, nameOrPrefix, rhs, _constant);
+		    }
+		    // assignment code
+		    assign(lhs, rhs, sideEffects) {
+		        return this._leafNode(new Assign(lhs, rhs, sideEffects));
+		    }
+		    // `+=` code
+		    add(lhs, rhs) {
+		        return this._leafNode(new AssignOp(lhs, exports.operators.ADD, rhs));
+		    }
+		    // appends passed SafeExpr to code or executes Block
+		    code(c) {
+		        if (typeof c == "function")
+		            c();
+		        else if (c !== code_1.nil)
+		            this._leafNode(new AnyCode(c));
+		        return this;
+		    }
+		    // returns code for object literal for the passed argument list of key-value pairs
+		    object(...keyValues) {
+		        const code = ["{"];
+		        for (const [key, value] of keyValues) {
+		            if (code.length > 1)
+		                code.push(",");
+		            code.push(key);
+		            if (key !== value || this.opts.es5) {
+		                code.push(":");
+		                (0, code_1.addCodeArg)(code, value);
+		            }
+		        }
+		        code.push("}");
+		        return new code_1._Code(code);
+		    }
+		    // `if` clause (or statement if `thenBody` and, optionally, `elseBody` are passed)
+		    if(condition, thenBody, elseBody) {
+		        this._blockNode(new If(condition));
+		        if (thenBody && elseBody) {
+		            this.code(thenBody).else().code(elseBody).endIf();
+		        }
+		        else if (thenBody) {
+		            this.code(thenBody).endIf();
+		        }
+		        else if (elseBody) {
+		            throw new Error('CodeGen: "else" body without "then" body');
+		        }
+		        return this;
+		    }
+		    // `else if` clause - invalid without `if` or after `else` clauses
+		    elseIf(condition) {
+		        return this._elseNode(new If(condition));
+		    }
+		    // `else` clause - only valid after `if` or `else if` clauses
+		    else() {
+		        return this._elseNode(new Else());
+		    }
+		    // end `if` statement (needed if gen.if was used only with condition)
+		    endIf() {
+		        return this._endBlockNode(If, Else);
+		    }
+		    _for(node, forBody) {
+		        this._blockNode(node);
+		        if (forBody)
+		            this.code(forBody).endFor();
+		        return this;
+		    }
+		    // a generic `for` clause (or statement if `forBody` is passed)
+		    for(iteration, forBody) {
+		        return this._for(new ForLoop(iteration), forBody);
+		    }
+		    // `for` statement for a range of values
+		    forRange(nameOrPrefix, from, to, forBody, varKind = this.opts.es5 ? scope_1.varKinds.var : scope_1.varKinds.let) {
+		        const name = this._scope.toName(nameOrPrefix);
+		        return this._for(new ForRange(varKind, name, from, to), () => forBody(name));
+		    }
+		    // `for-of` statement (in es5 mode replace with a normal for loop)
+		    forOf(nameOrPrefix, iterable, forBody, varKind = scope_1.varKinds.const) {
+		        const name = this._scope.toName(nameOrPrefix);
+		        if (this.opts.es5) {
+		            const arr = iterable instanceof code_1.Name ? iterable : this.var("_arr", iterable);
+		            return this.forRange("_i", 0, (0, code_1._) `${arr}.length`, (i) => {
+		                this.var(name, (0, code_1._) `${arr}[${i}]`);
+		                forBody(name);
+		            });
+		        }
+		        return this._for(new ForIter("of", varKind, name, iterable), () => forBody(name));
+		    }
+		    // `for-in` statement.
+		    // With option `ownProperties` replaced with a `for-of` loop for object keys
+		    forIn(nameOrPrefix, obj, forBody, varKind = this.opts.es5 ? scope_1.varKinds.var : scope_1.varKinds.const) {
+		        if (this.opts.ownProperties) {
+		            return this.forOf(nameOrPrefix, (0, code_1._) `Object.keys(${obj})`, forBody);
+		        }
+		        const name = this._scope.toName(nameOrPrefix);
+		        return this._for(new ForIter("in", varKind, name, obj), () => forBody(name));
+		    }
+		    // end `for` loop
+		    endFor() {
+		        return this._endBlockNode(For);
+		    }
+		    // `label` statement
+		    label(label) {
+		        return this._leafNode(new Label(label));
+		    }
+		    // `break` statement
+		    break(label) {
+		        return this._leafNode(new Break(label));
+		    }
+		    // `return` statement
+		    return(value) {
+		        const node = new Return();
+		        this._blockNode(node);
+		        this.code(value);
+		        if (node.nodes.length !== 1)
+		            throw new Error('CodeGen: "return" should have one node');
+		        return this._endBlockNode(Return);
+		    }
+		    // `try` statement
+		    try(tryBody, catchCode, finallyCode) {
+		        if (!catchCode && !finallyCode)
+		            throw new Error('CodeGen: "try" without "catch" and "finally"');
+		        const node = new Try();
+		        this._blockNode(node);
+		        this.code(tryBody);
+		        if (catchCode) {
+		            const error = this.name("e");
+		            this._currNode = node.catch = new Catch(error);
+		            catchCode(error);
+		        }
+		        if (finallyCode) {
+		            this._currNode = node.finally = new Finally();
+		            this.code(finallyCode);
+		        }
+		        return this._endBlockNode(Catch, Finally);
+		    }
+		    // `throw` statement
+		    throw(error) {
+		        return this._leafNode(new Throw(error));
+		    }
+		    // start self-balancing block
+		    block(body, nodeCount) {
+		        this._blockStarts.push(this._nodes.length);
+		        if (body)
+		            this.code(body).endBlock(nodeCount);
+		        return this;
+		    }
+		    // end the current self-balancing block
+		    endBlock(nodeCount) {
+		        const len = this._blockStarts.pop();
+		        if (len === undefined)
+		            throw new Error("CodeGen: not in self-balancing block");
+		        const toClose = this._nodes.length - len;
+		        if (toClose < 0 || (nodeCount !== undefined && toClose !== nodeCount)) {
+		            throw new Error(`CodeGen: wrong number of nodes: ${toClose} vs ${nodeCount} expected`);
+		        }
+		        this._nodes.length = len;
+		        return this;
+		    }
+		    // `function` heading (or definition if funcBody is passed)
+		    func(name, args = code_1.nil, async, funcBody) {
+		        this._blockNode(new Func(name, args, async));
+		        if (funcBody)
+		            this.code(funcBody).endFunc();
+		        return this;
+		    }
+		    // end function definition
+		    endFunc() {
+		        return this._endBlockNode(Func);
+		    }
+		    optimize(n = 1) {
+		        while (n-- > 0) {
+		            this._root.optimizeNodes();
+		            this._root.optimizeNames(this._root.names, this._constants);
+		        }
+		    }
+		    _leafNode(node) {
+		        this._currNode.nodes.push(node);
+		        return this;
+		    }
+		    _blockNode(node) {
+		        this._currNode.nodes.push(node);
+		        this._nodes.push(node);
+		    }
+		    _endBlockNode(N1, N2) {
+		        const n = this._currNode;
+		        if (n instanceof N1 || (N2 && n instanceof N2)) {
+		            this._nodes.pop();
+		            return this;
+		        }
+		        throw new Error(`CodeGen: not in block "${N2 ? `${N1.kind}/${N2.kind}` : N1.kind}"`);
+		    }
+		    _elseNode(node) {
+		        const n = this._currNode;
+		        if (!(n instanceof If)) {
+		            throw new Error('CodeGen: "else" without "if"');
+		        }
+		        this._currNode = n.else = node;
+		        return this;
+		    }
+		    get _root() {
+		        return this._nodes[0];
+		    }
+		    get _currNode() {
+		        const ns = this._nodes;
+		        return ns[ns.length - 1];
+		    }
+		    set _currNode(node) {
+		        const ns = this._nodes;
+		        ns[ns.length - 1] = node;
+		    }
+		}
+		exports.CodeGen = CodeGen;
+		function addNames(names, from) {
+		    for (const n in from)
+		        names[n] = (names[n] || 0) + (from[n] || 0);
+		    return names;
+		}
+		function addExprNames(names, from) {
+		    return from instanceof code_1._CodeOrName ? addNames(names, from.names) : names;
+		}
+		function optimizeExpr(expr, names, constants) {
+		    if (expr instanceof code_1.Name)
+		        return replaceName(expr);
+		    if (!canOptimize(expr))
+		        return expr;
+		    return new code_1._Code(expr._items.reduce((items, c) => {
+		        if (c instanceof code_1.Name)
+		            c = replaceName(c);
+		        if (c instanceof code_1._Code)
+		            items.push(...c._items);
+		        else
+		            items.push(c);
+		        return items;
+		    }, []));
+		    function replaceName(n) {
+		        const c = constants[n.str];
+		        if (c === undefined || names[n.str] !== 1)
+		            return n;
+		        delete names[n.str];
+		        return c;
+		    }
+		    function canOptimize(e) {
+		        return (e instanceof code_1._Code &&
+		            e._items.some((c) => c instanceof code_1.Name && names[c.str] === 1 && constants[c.str] !== undefined));
+		    }
+		}
+		function subtractNames(names, from) {
+		    for (const n in from)
+		        names[n] = (names[n] || 0) - (from[n] || 0);
+		}
+		function not(x) {
+		    return typeof x == "boolean" || typeof x == "number" || x === null ? !x : (0, code_1._) `!${par(x)}`;
+		}
+		exports.not = not;
+		const andCode = mappend(exports.operators.AND);
+		// boolean AND (&&) expression with the passed arguments
+		function and(...args) {
+		    return args.reduce(andCode);
+		}
+		exports.and = and;
+		const orCode = mappend(exports.operators.OR);
+		// boolean OR (||) expression with the passed arguments
+		function or(...args) {
+		    return args.reduce(orCode);
+		}
+		exports.or = or;
+		function mappend(op) {
+		    return (x, y) => (x === code_1.nil ? y : y === code_1.nil ? x : (0, code_1._) `${par(x)} ${op} ${par(y)}`);
+		}
+		function par(x) {
+		    return x instanceof code_1.Name ? x : (0, code_1._) `(${x})`;
+		}
+		
+	} (codegen));
+	return codegen;
+}
+
+var util = {};
+
+var hasRequiredUtil;
+
+function requireUtil () {
+	if (hasRequiredUtil) return util;
+	hasRequiredUtil = 1;
+	Object.defineProperty(util, "__esModule", { value: true });
+	util.checkStrictMode = util.getErrorPath = util.Type = util.useFunc = util.setEvaluated = util.evaluatedPropsToName = util.mergeEvaluated = util.eachItem = util.unescapeJsonPointer = util.escapeJsonPointer = util.escapeFragment = util.unescapeFragment = util.schemaRefOrVal = util.schemaHasRulesButRef = util.schemaHasRules = util.checkUnknownRules = util.alwaysValidSchema = util.toHash = void 0;
+	const codegen_1 = /*@__PURE__*/ requireCodegen();
+	const code_1 = /*@__PURE__*/ requireCode$1();
+	// TODO refactor to use Set
+	function toHash(arr) {
+	    const hash = {};
+	    for (const item of arr)
+	        hash[item] = true;
+	    return hash;
+	}
+	util.toHash = toHash;
+	function alwaysValidSchema(it, schema) {
+	    if (typeof schema == "boolean")
+	        return schema;
+	    if (Object.keys(schema).length === 0)
+	        return true;
+	    checkUnknownRules(it, schema);
+	    return !schemaHasRules(schema, it.self.RULES.all);
+	}
+	util.alwaysValidSchema = alwaysValidSchema;
+	function checkUnknownRules(it, schema = it.schema) {
+	    const { opts, self } = it;
+	    if (!opts.strictSchema)
+	        return;
+	    if (typeof schema === "boolean")
+	        return;
+	    const rules = self.RULES.keywords;
+	    for (const key in schema) {
+	        if (!rules[key])
+	            checkStrictMode(it, `unknown keyword: "${key}"`);
+	    }
+	}
+	util.checkUnknownRules = checkUnknownRules;
+	function schemaHasRules(schema, rules) {
+	    if (typeof schema == "boolean")
+	        return !schema;
+	    for (const key in schema)
+	        if (rules[key])
+	            return true;
+	    return false;
+	}
+	util.schemaHasRules = schemaHasRules;
+	function schemaHasRulesButRef(schema, RULES) {
+	    if (typeof schema == "boolean")
+	        return !schema;
+	    for (const key in schema)
+	        if (key !== "$ref" && RULES.all[key])
+	            return true;
+	    return false;
+	}
+	util.schemaHasRulesButRef = schemaHasRulesButRef;
+	function schemaRefOrVal({ topSchemaRef, schemaPath }, schema, keyword, $data) {
+	    if (!$data) {
+	        if (typeof schema == "number" || typeof schema == "boolean")
+	            return schema;
+	        if (typeof schema == "string")
+	            return (0, codegen_1._) `${schema}`;
+	    }
+	    return (0, codegen_1._) `${topSchemaRef}${schemaPath}${(0, codegen_1.getProperty)(keyword)}`;
+	}
+	util.schemaRefOrVal = schemaRefOrVal;
+	function unescapeFragment(str) {
+	    return unescapeJsonPointer(decodeURIComponent(str));
+	}
+	util.unescapeFragment = unescapeFragment;
+	function escapeFragment(str) {
+	    return encodeURIComponent(escapeJsonPointer(str));
+	}
+	util.escapeFragment = escapeFragment;
+	function escapeJsonPointer(str) {
+	    if (typeof str == "number")
+	        return `${str}`;
+	    return str.replace(/~/g, "~0").replace(/\//g, "~1");
+	}
+	util.escapeJsonPointer = escapeJsonPointer;
+	function unescapeJsonPointer(str) {
+	    return str.replace(/~1/g, "/").replace(/~0/g, "~");
+	}
+	util.unescapeJsonPointer = unescapeJsonPointer;
+	function eachItem(xs, f) {
+	    if (Array.isArray(xs)) {
+	        for (const x of xs)
+	            f(x);
+	    }
+	    else {
+	        f(xs);
+	    }
+	}
+	util.eachItem = eachItem;
+	function makeMergeEvaluated({ mergeNames, mergeToName, mergeValues, resultToName, }) {
+	    return (gen, from, to, toName) => {
+	        const res = to === undefined
+	            ? from
+	            : to instanceof codegen_1.Name
+	                ? (from instanceof codegen_1.Name ? mergeNames(gen, from, to) : mergeToName(gen, from, to), to)
+	                : from instanceof codegen_1.Name
+	                    ? (mergeToName(gen, to, from), from)
+	                    : mergeValues(from, to);
+	        return toName === codegen_1.Name && !(res instanceof codegen_1.Name) ? resultToName(gen, res) : res;
+	    };
+	}
+	util.mergeEvaluated = {
+	    props: makeMergeEvaluated({
+	        mergeNames: (gen, from, to) => gen.if((0, codegen_1._) `${to} !== true && ${from} !== undefined`, () => {
+	            gen.if((0, codegen_1._) `${from} === true`, () => gen.assign(to, true), () => gen.assign(to, (0, codegen_1._) `${to} || {}`).code((0, codegen_1._) `Object.assign(${to}, ${from})`));
+	        }),
+	        mergeToName: (gen, from, to) => gen.if((0, codegen_1._) `${to} !== true`, () => {
+	            if (from === true) {
+	                gen.assign(to, true);
+	            }
+	            else {
+	                gen.assign(to, (0, codegen_1._) `${to} || {}`);
+	                setEvaluated(gen, to, from);
+	            }
+	        }),
+	        mergeValues: (from, to) => (from === true ? true : { ...from, ...to }),
+	        resultToName: evaluatedPropsToName,
+	    }),
+	    items: makeMergeEvaluated({
+	        mergeNames: (gen, from, to) => gen.if((0, codegen_1._) `${to} !== true && ${from} !== undefined`, () => gen.assign(to, (0, codegen_1._) `${from} === true ? true : ${to} > ${from} ? ${to} : ${from}`)),
+	        mergeToName: (gen, from, to) => gen.if((0, codegen_1._) `${to} !== true`, () => gen.assign(to, from === true ? true : (0, codegen_1._) `${to} > ${from} ? ${to} : ${from}`)),
+	        mergeValues: (from, to) => (from === true ? true : Math.max(from, to)),
+	        resultToName: (gen, items) => gen.var("items", items),
+	    }),
+	};
+	function evaluatedPropsToName(gen, ps) {
+	    if (ps === true)
+	        return gen.var("props", true);
+	    const props = gen.var("props", (0, codegen_1._) `{}`);
+	    if (ps !== undefined)
+	        setEvaluated(gen, props, ps);
+	    return props;
+	}
+	util.evaluatedPropsToName = evaluatedPropsToName;
+	function setEvaluated(gen, props, ps) {
+	    Object.keys(ps).forEach((p) => gen.assign((0, codegen_1._) `${props}${(0, codegen_1.getProperty)(p)}`, true));
+	}
+	util.setEvaluated = setEvaluated;
+	const snippets = {};
+	function useFunc(gen, f) {
+	    return gen.scopeValue("func", {
+	        ref: f,
+	        code: snippets[f.code] || (snippets[f.code] = new code_1._Code(f.code)),
+	    });
+	}
+	util.useFunc = useFunc;
+	var Type;
+	(function (Type) {
+	    Type[Type["Num"] = 0] = "Num";
+	    Type[Type["Str"] = 1] = "Str";
+	})(Type || (util.Type = Type = {}));
+	function getErrorPath(dataProp, dataPropType, jsPropertySyntax) {
+	    // let path
+	    if (dataProp instanceof codegen_1.Name) {
+	        const isNumber = dataPropType === Type.Num;
+	        return jsPropertySyntax
+	            ? isNumber
+	                ? (0, codegen_1._) `"[" + ${dataProp} + "]"`
+	                : (0, codegen_1._) `"['" + ${dataProp} + "']"`
+	            : isNumber
+	                ? (0, codegen_1._) `"/" + ${dataProp}`
+	                : (0, codegen_1._) `"/" + ${dataProp}.replace(/~/g, "~0").replace(/\\//g, "~1")`; // TODO maybe use global escapePointer
+	    }
+	    return jsPropertySyntax ? (0, codegen_1.getProperty)(dataProp).toString() : "/" + escapeJsonPointer(dataProp);
+	}
+	util.getErrorPath = getErrorPath;
+	function checkStrictMode(it, msg, mode = it.opts.strictSchema) {
+	    if (!mode)
+	        return;
+	    msg = `strict mode: ${msg}`;
+	    if (mode === true)
+	        throw new Error(msg);
+	    it.self.logger.warn(msg);
+	}
+	util.checkStrictMode = checkStrictMode;
+	
+	return util;
+}
+
+var names = {};
+
+var hasRequiredNames;
+
+function requireNames () {
+	if (hasRequiredNames) return names;
+	hasRequiredNames = 1;
+	Object.defineProperty(names, "__esModule", { value: true });
+	const codegen_1 = /*@__PURE__*/ requireCodegen();
+	const names$1 = {
+	    // validation function arguments
+	    data: new codegen_1.Name("data"), // data passed to validation function
+	    // args passed from referencing schema
+	    valCxt: new codegen_1.Name("valCxt"), // validation/data context - should not be used directly, it is destructured to the names below
+	    instancePath: new codegen_1.Name("instancePath"),
+	    parentData: new codegen_1.Name("parentData"),
+	    parentDataProperty: new codegen_1.Name("parentDataProperty"),
+	    rootData: new codegen_1.Name("rootData"), // root data - same as the data passed to the first/top validation function
+	    dynamicAnchors: new codegen_1.Name("dynamicAnchors"), // used to support recursiveRef and dynamicRef
+	    // function scoped variables
+	    vErrors: new codegen_1.Name("vErrors"), // null or array of validation errors
+	    errors: new codegen_1.Name("errors"), // counter of validation errors
+	    this: new codegen_1.Name("this"),
+	    // "globals"
+	    self: new codegen_1.Name("self"),
+	    scope: new codegen_1.Name("scope"),
+	    // JTD serialize/parse name for JSON string and position
+	    json: new codegen_1.Name("json"),
+	    jsonPos: new codegen_1.Name("jsonPos"),
+	    jsonLen: new codegen_1.Name("jsonLen"),
+	    jsonPart: new codegen_1.Name("jsonPart"),
+	};
+	names.default = names$1;
+	
+	return names;
+}
+
+var hasRequiredErrors;
+
+function requireErrors () {
+	if (hasRequiredErrors) return errors;
+	hasRequiredErrors = 1;
+	(function (exports) {
+		Object.defineProperty(exports, "__esModule", { value: true });
+		exports.extendErrors = exports.resetErrorsCount = exports.reportExtraError = exports.reportError = exports.keyword$DataError = exports.keywordError = void 0;
+		const codegen_1 = /*@__PURE__*/ requireCodegen();
+		const util_1 = /*@__PURE__*/ requireUtil();
+		const names_1 = /*@__PURE__*/ requireNames();
+		exports.keywordError = {
+		    message: ({ keyword }) => (0, codegen_1.str) `must pass "${keyword}" keyword validation`,
+		};
+		exports.keyword$DataError = {
+		    message: ({ keyword, schemaType }) => schemaType
+		        ? (0, codegen_1.str) `"${keyword}" keyword must be ${schemaType} ($data)`
+		        : (0, codegen_1.str) `"${keyword}" keyword is invalid ($data)`,
+		};
+		function reportError(cxt, error = exports.keywordError, errorPaths, overrideAllErrors) {
+		    const { it } = cxt;
+		    const { gen, compositeRule, allErrors } = it;
+		    const errObj = errorObjectCode(cxt, error, errorPaths);
+		    if (overrideAllErrors !== null && overrideAllErrors !== void 0 ? overrideAllErrors : (compositeRule || allErrors)) {
+		        addError(gen, errObj);
+		    }
+		    else {
+		        returnErrors(it, (0, codegen_1._) `[${errObj}]`);
+		    }
+		}
+		exports.reportError = reportError;
+		function reportExtraError(cxt, error = exports.keywordError, errorPaths) {
+		    const { it } = cxt;
+		    const { gen, compositeRule, allErrors } = it;
+		    const errObj = errorObjectCode(cxt, error, errorPaths);
+		    addError(gen, errObj);
+		    if (!(compositeRule || allErrors)) {
+		        returnErrors(it, names_1.default.vErrors);
+		    }
+		}
+		exports.reportExtraError = reportExtraError;
+		function resetErrorsCount(gen, errsCount) {
+		    gen.assign(names_1.default.errors, errsCount);
+		    gen.if((0, codegen_1._) `${names_1.default.vErrors} !== null`, () => gen.if(errsCount, () => gen.assign((0, codegen_1._) `${names_1.default.vErrors}.length`, errsCount), () => gen.assign(names_1.default.vErrors, null)));
+		}
+		exports.resetErrorsCount = resetErrorsCount;
+		function extendErrors({ gen, keyword, schemaValue, data, errsCount, it, }) {
+		    /* istanbul ignore if */
+		    if (errsCount === undefined)
+		        throw new Error("ajv implementation error");
+		    const err = gen.name("err");
+		    gen.forRange("i", errsCount, names_1.default.errors, (i) => {
+		        gen.const(err, (0, codegen_1._) `${names_1.default.vErrors}[${i}]`);
+		        gen.if((0, codegen_1._) `${err}.instancePath === undefined`, () => gen.assign((0, codegen_1._) `${err}.instancePath`, (0, codegen_1.strConcat)(names_1.default.instancePath, it.errorPath)));
+		        gen.assign((0, codegen_1._) `${err}.schemaPath`, (0, codegen_1.str) `${it.errSchemaPath}/${keyword}`);
+		        if (it.opts.verbose) {
+		            gen.assign((0, codegen_1._) `${err}.schema`, schemaValue);
+		            gen.assign((0, codegen_1._) `${err}.data`, data);
+		        }
+		    });
+		}
+		exports.extendErrors = extendErrors;
+		function addError(gen, errObj) {
+		    const err = gen.const("err", errObj);
+		    gen.if((0, codegen_1._) `${names_1.default.vErrors} === null`, () => gen.assign(names_1.default.vErrors, (0, codegen_1._) `[${err}]`), (0, codegen_1._) `${names_1.default.vErrors}.push(${err})`);
+		    gen.code((0, codegen_1._) `${names_1.default.errors}++`);
+		}
+		function returnErrors(it, errs) {
+		    const { gen, validateName, schemaEnv } = it;
+		    if (schemaEnv.$async) {
+		        gen.throw((0, codegen_1._) `new ${it.ValidationError}(${errs})`);
+		    }
+		    else {
+		        gen.assign((0, codegen_1._) `${validateName}.errors`, errs);
+		        gen.return(false);
+		    }
+		}
+		const E = {
+		    keyword: new codegen_1.Name("keyword"),
+		    schemaPath: new codegen_1.Name("schemaPath"), // also used in JTD errors
+		    params: new codegen_1.Name("params"),
+		    propertyName: new codegen_1.Name("propertyName"),
+		    message: new codegen_1.Name("message"),
+		    schema: new codegen_1.Name("schema"),
+		    parentSchema: new codegen_1.Name("parentSchema"),
+		};
+		function errorObjectCode(cxt, error, errorPaths) {
+		    const { createErrors } = cxt.it;
+		    if (createErrors === false)
+		        return (0, codegen_1._) `{}`;
+		    return errorObject(cxt, error, errorPaths);
+		}
+		function errorObject(cxt, error, errorPaths = {}) {
+		    const { gen, it } = cxt;
+		    const keyValues = [
+		        errorInstancePath(it, errorPaths),
+		        errorSchemaPath(cxt, errorPaths),
+		    ];
+		    extraErrorProps(cxt, error, keyValues);
+		    return gen.object(...keyValues);
+		}
+		function errorInstancePath({ errorPath }, { instancePath }) {
+		    const instPath = instancePath
+		        ? (0, codegen_1.str) `${errorPath}${(0, util_1.getErrorPath)(instancePath, util_1.Type.Str)}`
+		        : errorPath;
+		    return [names_1.default.instancePath, (0, codegen_1.strConcat)(names_1.default.instancePath, instPath)];
+		}
+		function errorSchemaPath({ keyword, it: { errSchemaPath } }, { schemaPath, parentSchema }) {
+		    let schPath = parentSchema ? errSchemaPath : (0, codegen_1.str) `${errSchemaPath}/${keyword}`;
+		    if (schemaPath) {
+		        schPath = (0, codegen_1.str) `${schPath}${(0, util_1.getErrorPath)(schemaPath, util_1.Type.Str)}`;
+		    }
+		    return [E.schemaPath, schPath];
+		}
+		function extraErrorProps(cxt, { params, message }, keyValues) {
+		    const { keyword, data, schemaValue, it } = cxt;
+		    const { opts, propertyName, topSchemaRef, schemaPath } = it;
+		    keyValues.push([E.keyword, keyword], [E.params, typeof params == "function" ? params(cxt) : params || (0, codegen_1._) `{}`]);
+		    if (opts.messages) {
+		        keyValues.push([E.message, typeof message == "function" ? message(cxt) : message]);
+		    }
+		    if (opts.verbose) {
+		        keyValues.push([E.schema, schemaValue], [E.parentSchema, (0, codegen_1._) `${topSchemaRef}${schemaPath}`], [names_1.default.data, data]);
+		    }
+		    if (propertyName)
+		        keyValues.push([E.propertyName, propertyName]);
+		}
+		
+	} (errors));
+	return errors;
+}
+
+var hasRequiredBoolSchema;
+
+function requireBoolSchema () {
+	if (hasRequiredBoolSchema) return boolSchema;
+	hasRequiredBoolSchema = 1;
+	Object.defineProperty(boolSchema, "__esModule", { value: true });
+	boolSchema.boolOrEmptySchema = boolSchema.topBoolOrEmptySchema = void 0;
+	const errors_1 = /*@__PURE__*/ requireErrors();
+	const codegen_1 = /*@__PURE__*/ requireCodegen();
+	const names_1 = /*@__PURE__*/ requireNames();
+	const boolError = {
+	    message: "boolean schema is false",
+	};
+	function topBoolOrEmptySchema(it) {
+	    const { gen, schema, validateName } = it;
+	    if (schema === false) {
+	        falseSchemaError(it, false);
+	    }
+	    else if (typeof schema == "object" && schema.$async === true) {
+	        gen.return(names_1.default.data);
+	    }
+	    else {
+	        gen.assign((0, codegen_1._) `${validateName}.errors`, null);
+	        gen.return(true);
+	    }
+	}
+	boolSchema.topBoolOrEmptySchema = topBoolOrEmptySchema;
+	function boolOrEmptySchema(it, valid) {
+	    const { gen, schema } = it;
+	    if (schema === false) {
+	        gen.var(valid, false); // TODO var
+	        falseSchemaError(it);
+	    }
+	    else {
+	        gen.var(valid, true); // TODO var
+	    }
+	}
+	boolSchema.boolOrEmptySchema = boolOrEmptySchema;
+	function falseSchemaError(it, overrideAllErrors) {
+	    const { gen, data } = it;
+	    // TODO maybe some other interface should be used for non-keyword validation errors...
+	    const cxt = {
+	        gen,
+	        keyword: "false schema",
+	        data,
+	        schema: false,
+	        schemaCode: false,
+	        schemaValue: false,
+	        params: {},
+	        it,
+	    };
+	    (0, errors_1.reportError)(cxt, boolError, undefined, overrideAllErrors);
+	}
+	
+	return boolSchema;
+}
+
+var dataType = {};
+
+var rules = {};
+
+var hasRequiredRules;
+
+function requireRules () {
+	if (hasRequiredRules) return rules;
+	hasRequiredRules = 1;
+	Object.defineProperty(rules, "__esModule", { value: true });
+	rules.getRules = rules.isJSONType = void 0;
+	const _jsonTypes = ["string", "number", "integer", "boolean", "null", "object", "array"];
+	const jsonTypes = new Set(_jsonTypes);
+	function isJSONType(x) {
+	    return typeof x == "string" && jsonTypes.has(x);
+	}
+	rules.isJSONType = isJSONType;
+	function getRules() {
+	    const groups = {
+	        number: { type: "number", rules: [] },
+	        string: { type: "string", rules: [] },
+	        array: { type: "array", rules: [] },
+	        object: { type: "object", rules: [] },
+	    };
+	    return {
+	        types: { ...groups, integer: true, boolean: true, null: true },
+	        rules: [{ rules: [] }, groups.number, groups.string, groups.array, groups.object],
+	        post: { rules: [] },
+	        all: {},
+	        keywords: {},
+	    };
+	}
+	rules.getRules = getRules;
+	
+	return rules;
+}
+
+var applicability = {};
+
+var hasRequiredApplicability;
+
+function requireApplicability () {
+	if (hasRequiredApplicability) return applicability;
+	hasRequiredApplicability = 1;
+	Object.defineProperty(applicability, "__esModule", { value: true });
+	applicability.shouldUseRule = applicability.shouldUseGroup = applicability.schemaHasRulesForType = void 0;
+	function schemaHasRulesForType({ schema, self }, type) {
+	    const group = self.RULES.types[type];
+	    return group && group !== true && shouldUseGroup(schema, group);
+	}
+	applicability.schemaHasRulesForType = schemaHasRulesForType;
+	function shouldUseGroup(schema, group) {
+	    return group.rules.some((rule) => shouldUseRule(schema, rule));
+	}
+	applicability.shouldUseGroup = shouldUseGroup;
+	function shouldUseRule(schema, rule) {
+	    var _a;
+	    return (schema[rule.keyword] !== undefined ||
+	        ((_a = rule.definition.implements) === null || _a === void 0 ? void 0 : _a.some((kwd) => schema[kwd] !== undefined)));
+	}
+	applicability.shouldUseRule = shouldUseRule;
+	
+	return applicability;
+}
+
+var hasRequiredDataType;
+
+function requireDataType () {
+	if (hasRequiredDataType) return dataType;
+	hasRequiredDataType = 1;
+	Object.defineProperty(dataType, "__esModule", { value: true });
+	dataType.reportTypeError = dataType.checkDataTypes = dataType.checkDataType = dataType.coerceAndCheckDataType = dataType.getJSONTypes = dataType.getSchemaTypes = dataType.DataType = void 0;
+	const rules_1 = /*@__PURE__*/ requireRules();
+	const applicability_1 = /*@__PURE__*/ requireApplicability();
+	const errors_1 = /*@__PURE__*/ requireErrors();
+	const codegen_1 = /*@__PURE__*/ requireCodegen();
+	const util_1 = /*@__PURE__*/ requireUtil();
+	var DataType;
+	(function (DataType) {
+	    DataType[DataType["Correct"] = 0] = "Correct";
+	    DataType[DataType["Wrong"] = 1] = "Wrong";
+	})(DataType || (dataType.DataType = DataType = {}));
+	function getSchemaTypes(schema) {
+	    const types = getJSONTypes(schema.type);
+	    const hasNull = types.includes("null");
+	    if (hasNull) {
+	        if (schema.nullable === false)
+	            throw new Error("type: null contradicts nullable: false");
+	    }
+	    else {
+	        if (!types.length && schema.nullable !== undefined) {
+	            throw new Error('"nullable" cannot be used without "type"');
+	        }
+	        if (schema.nullable === true)
+	            types.push("null");
+	    }
+	    return types;
+	}
+	dataType.getSchemaTypes = getSchemaTypes;
+	// eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
+	function getJSONTypes(ts) {
+	    const types = Array.isArray(ts) ? ts : ts ? [ts] : [];
+	    if (types.every(rules_1.isJSONType))
+	        return types;
+	    throw new Error("type must be JSONType or JSONType[]: " + types.join(","));
+	}
+	dataType.getJSONTypes = getJSONTypes;
+	function coerceAndCheckDataType(it, types) {
+	    const { gen, data, opts } = it;
+	    const coerceTo = coerceToTypes(types, opts.coerceTypes);
+	    const checkTypes = types.length > 0 &&
+	        !(coerceTo.length === 0 && types.length === 1 && (0, applicability_1.schemaHasRulesForType)(it, types[0]));
+	    if (checkTypes) {
+	        const wrongType = checkDataTypes(types, data, opts.strictNumbers, DataType.Wrong);
+	        gen.if(wrongType, () => {
+	            if (coerceTo.length)
+	                coerceData(it, types, coerceTo);
+	            else
+	                reportTypeError(it);
+	        });
+	    }
+	    return checkTypes;
+	}
+	dataType.coerceAndCheckDataType = coerceAndCheckDataType;
+	const COERCIBLE = new Set(["string", "number", "integer", "boolean", "null"]);
+	function coerceToTypes(types, coerceTypes) {
+	    return coerceTypes
+	        ? types.filter((t) => COERCIBLE.has(t) || (coerceTypes === "array" && t === "array"))
+	        : [];
+	}
+	function coerceData(it, types, coerceTo) {
+	    const { gen, data, opts } = it;
+	    const dataType = gen.let("dataType", (0, codegen_1._) `typeof ${data}`);
+	    const coerced = gen.let("coerced", (0, codegen_1._) `undefined`);
+	    if (opts.coerceTypes === "array") {
+	        gen.if((0, codegen_1._) `${dataType} == 'object' && Array.isArray(${data}) && ${data}.length == 1`, () => gen
+	            .assign(data, (0, codegen_1._) `${data}[0]`)
+	            .assign(dataType, (0, codegen_1._) `typeof ${data}`)
+	            .if(checkDataTypes(types, data, opts.strictNumbers), () => gen.assign(coerced, data)));
+	    }
+	    gen.if((0, codegen_1._) `${coerced} !== undefined`);
+	    for (const t of coerceTo) {
+	        if (COERCIBLE.has(t) || (t === "array" && opts.coerceTypes === "array")) {
+	            coerceSpecificType(t);
+	        }
+	    }
+	    gen.else();
+	    reportTypeError(it);
+	    gen.endIf();
+	    gen.if((0, codegen_1._) `${coerced} !== undefined`, () => {
+	        gen.assign(data, coerced);
+	        assignParentData(it, coerced);
+	    });
+	    function coerceSpecificType(t) {
+	        switch (t) {
+	            case "string":
+	                gen
+	                    .elseIf((0, codegen_1._) `${dataType} == "number" || ${dataType} == "boolean"`)
+	                    .assign(coerced, (0, codegen_1._) `"" + ${data}`)
+	                    .elseIf((0, codegen_1._) `${data} === null`)
+	                    .assign(coerced, (0, codegen_1._) `""`);
+	                return;
+	            case "number":
+	                gen
+	                    .elseIf((0, codegen_1._) `${dataType} == "boolean" || ${data} === null
+              || (${dataType} == "string" && ${data} && ${data} == +${data})`)
+	                    .assign(coerced, (0, codegen_1._) `+${data}`);
+	                return;
+	            case "integer":
+	                gen
+	                    .elseIf((0, codegen_1._) `${dataType} === "boolean" || ${data} === null
+              || (${dataType} === "string" && ${data} && ${data} == +${data} && !(${data} % 1))`)
+	                    .assign(coerced, (0, codegen_1._) `+${data}`);
+	                return;
+	            case "boolean":
+	                gen
+	                    .elseIf((0, codegen_1._) `${data} === "false" || ${data} === 0 || ${data} === null`)
+	                    .assign(coerced, false)
+	                    .elseIf((0, codegen_1._) `${data} === "true" || ${data} === 1`)
+	                    .assign(coerced, true);
+	                return;
+	            case "null":
+	                gen.elseIf((0, codegen_1._) `${data} === "" || ${data} === 0 || ${data} === false`);
+	                gen.assign(coerced, null);
+	                return;
+	            case "array":
+	                gen
+	                    .elseIf((0, codegen_1._) `${dataType} === "string" || ${dataType} === "number"
+              || ${dataType} === "boolean" || ${data} === null`)
+	                    .assign(coerced, (0, codegen_1._) `[${data}]`);
+	        }
+	    }
+	}
+	function assignParentData({ gen, parentData, parentDataProperty }, expr) {
+	    // TODO use gen.property
+	    gen.if((0, codegen_1._) `${parentData} !== undefined`, () => gen.assign((0, codegen_1._) `${parentData}[${parentDataProperty}]`, expr));
+	}
+	function checkDataType(dataType, data, strictNums, correct = DataType.Correct) {
+	    const EQ = correct === DataType.Correct ? codegen_1.operators.EQ : codegen_1.operators.NEQ;
+	    let cond;
+	    switch (dataType) {
+	        case "null":
+	            return (0, codegen_1._) `${data} ${EQ} null`;
+	        case "array":
+	            cond = (0, codegen_1._) `Array.isArray(${data})`;
+	            break;
+	        case "object":
+	            cond = (0, codegen_1._) `${data} && typeof ${data} == "object" && !Array.isArray(${data})`;
+	            break;
+	        case "integer":
+	            cond = numCond((0, codegen_1._) `!(${data} % 1) && !isNaN(${data})`);
+	            break;
+	        case "number":
+	            cond = numCond();
+	            break;
+	        default:
+	            return (0, codegen_1._) `typeof ${data} ${EQ} ${dataType}`;
+	    }
+	    return correct === DataType.Correct ? cond : (0, codegen_1.not)(cond);
+	    function numCond(_cond = codegen_1.nil) {
+	        return (0, codegen_1.and)((0, codegen_1._) `typeof ${data} == "number"`, _cond, strictNums ? (0, codegen_1._) `isFinite(${data})` : codegen_1.nil);
+	    }
+	}
+	dataType.checkDataType = checkDataType;
+	function checkDataTypes(dataTypes, data, strictNums, correct) {
+	    if (dataTypes.length === 1) {
+	        return checkDataType(dataTypes[0], data, strictNums, correct);
+	    }
+	    let cond;
+	    const types = (0, util_1.toHash)(dataTypes);
+	    if (types.array && types.object) {
+	        const notObj = (0, codegen_1._) `typeof ${data} != "object"`;
+	        cond = types.null ? notObj : (0, codegen_1._) `!${data} || ${notObj}`;
+	        delete types.null;
+	        delete types.array;
+	        delete types.object;
+	    }
+	    else {
+	        cond = codegen_1.nil;
+	    }
+	    if (types.number)
+	        delete types.integer;
+	    for (const t in types)
+	        cond = (0, codegen_1.and)(cond, checkDataType(t, data, strictNums, correct));
+	    return cond;
+	}
+	dataType.checkDataTypes = checkDataTypes;
+	const typeError = {
+	    message: ({ schema }) => `must be ${schema}`,
+	    params: ({ schema, schemaValue }) => typeof schema == "string" ? (0, codegen_1._) `{type: ${schema}}` : (0, codegen_1._) `{type: ${schemaValue}}`,
+	};
+	function reportTypeError(it) {
+	    const cxt = getTypeErrorContext(it);
+	    (0, errors_1.reportError)(cxt, typeError);
+	}
+	dataType.reportTypeError = reportTypeError;
+	function getTypeErrorContext(it) {
+	    const { gen, data, schema } = it;
+	    const schemaCode = (0, util_1.schemaRefOrVal)(it, schema, "type");
+	    return {
+	        gen,
+	        keyword: "type",
+	        data,
+	        schema: schema.type,
+	        schemaCode,
+	        schemaValue: schemaCode,
+	        parentSchema: schema,
+	        params: {},
+	        it,
+	    };
+	}
+	
+	return dataType;
+}
+
+var defaults = {};
+
+var hasRequiredDefaults;
+
+function requireDefaults () {
+	if (hasRequiredDefaults) return defaults;
+	hasRequiredDefaults = 1;
+	Object.defineProperty(defaults, "__esModule", { value: true });
+	defaults.assignDefaults = void 0;
+	const codegen_1 = /*@__PURE__*/ requireCodegen();
+	const util_1 = /*@__PURE__*/ requireUtil();
+	function assignDefaults(it, ty) {
+	    const { properties, items } = it.schema;
+	    if (ty === "object" && properties) {
+	        for (const key in properties) {
+	            assignDefault(it, key, properties[key].default);
+	        }
+	    }
+	    else if (ty === "array" && Array.isArray(items)) {
+	        items.forEach((sch, i) => assignDefault(it, i, sch.default));
+	    }
+	}
+	defaults.assignDefaults = assignDefaults;
+	function assignDefault(it, prop, defaultValue) {
+	    const { gen, compositeRule, data, opts } = it;
+	    if (defaultValue === undefined)
+	        return;
+	    const childData = (0, codegen_1._) `${data}${(0, codegen_1.getProperty)(prop)}`;
+	    if (compositeRule) {
+	        (0, util_1.checkStrictMode)(it, `default is ignored for: ${childData}`);
+	        return;
+	    }
+	    let condition = (0, codegen_1._) `${childData} === undefined`;
+	    if (opts.useDefaults === "empty") {
+	        condition = (0, codegen_1._) `${condition} || ${childData} === null || ${childData} === ""`;
+	    }
+	    // `${childData} === undefined` +
+	    // (opts.useDefaults === "empty" ? ` || ${childData} === null || ${childData} === ""` : "")
+	    gen.if(condition, (0, codegen_1._) `${childData} = ${(0, codegen_1.stringify)(defaultValue)}`);
+	}
+	
+	return defaults;
+}
+
+var keyword = {};
+
+var code = {};
+
+var hasRequiredCode;
+
+function requireCode () {
+	if (hasRequiredCode) return code;
+	hasRequiredCode = 1;
+	Object.defineProperty(code, "__esModule", { value: true });
+	code.validateUnion = code.validateArray = code.usePattern = code.callValidateCode = code.schemaProperties = code.allSchemaProperties = code.noPropertyInData = code.propertyInData = code.isOwnProperty = code.hasPropFunc = code.reportMissingProp = code.checkMissingProp = code.checkReportMissingProp = void 0;
+	const codegen_1 = /*@__PURE__*/ requireCodegen();
+	const util_1 = /*@__PURE__*/ requireUtil();
+	const names_1 = /*@__PURE__*/ requireNames();
+	const util_2 = /*@__PURE__*/ requireUtil();
+	function checkReportMissingProp(cxt, prop) {
+	    const { gen, data, it } = cxt;
+	    gen.if(noPropertyInData(gen, data, prop, it.opts.ownProperties), () => {
+	        cxt.setParams({ missingProperty: (0, codegen_1._) `${prop}` }, true);
+	        cxt.error();
+	    });
+	}
+	code.checkReportMissingProp = checkReportMissingProp;
+	function checkMissingProp({ gen, data, it: { opts } }, properties, missing) {
+	    return (0, codegen_1.or)(...properties.map((prop) => (0, codegen_1.and)(noPropertyInData(gen, data, prop, opts.ownProperties), (0, codegen_1._) `${missing} = ${prop}`)));
+	}
+	code.checkMissingProp = checkMissingProp;
+	function reportMissingProp(cxt, missing) {
+	    cxt.setParams({ missingProperty: missing }, true);
+	    cxt.error();
+	}
+	code.reportMissingProp = reportMissingProp;
+	function hasPropFunc(gen) {
+	    return gen.scopeValue("func", {
+	        // eslint-disable-next-line @typescript-eslint/unbound-method
+	        ref: Object.prototype.hasOwnProperty,
+	        code: (0, codegen_1._) `Object.prototype.hasOwnProperty`,
+	    });
+	}
+	code.hasPropFunc = hasPropFunc;
+	function isOwnProperty(gen, data, property) {
+	    return (0, codegen_1._) `${hasPropFunc(gen)}.call(${data}, ${property})`;
+	}
+	code.isOwnProperty = isOwnProperty;
+	function propertyInData(gen, data, property, ownProperties) {
+	    const cond = (0, codegen_1._) `${data}${(0, codegen_1.getProperty)(property)} !== undefined`;
+	    return ownProperties ? (0, codegen_1._) `${cond} && ${isOwnProperty(gen, data, property)}` : cond;
+	}
+	code.propertyInData = propertyInData;
+	function noPropertyInData(gen, data, property, ownProperties) {
+	    const cond = (0, codegen_1._) `${data}${(0, codegen_1.getProperty)(property)} === undefined`;
+	    return ownProperties ? (0, codegen_1.or)(cond, (0, codegen_1.not)(isOwnProperty(gen, data, property))) : cond;
+	}
+	code.noPropertyInData = noPropertyInData;
+	function allSchemaProperties(schemaMap) {
+	    return schemaMap ? Object.keys(schemaMap).filter((p) => p !== "__proto__") : [];
+	}
+	code.allSchemaProperties = allSchemaProperties;
+	function schemaProperties(it, schemaMap) {
+	    return allSchemaProperties(schemaMap).filter((p) => !(0, util_1.alwaysValidSchema)(it, schemaMap[p]));
+	}
+	code.schemaProperties = schemaProperties;
+	function callValidateCode({ schemaCode, data, it: { gen, topSchemaRef, schemaPath, errorPath }, it }, func, context, passSchema) {
+	    const dataAndSchema = passSchema ? (0, codegen_1._) `${schemaCode}, ${data}, ${topSchemaRef}${schemaPath}` : data;
+	    const valCxt = [
+	        [names_1.default.instancePath, (0, codegen_1.strConcat)(names_1.default.instancePath, errorPath)],
+	        [names_1.default.parentData, it.parentData],
+	        [names_1.default.parentDataProperty, it.parentDataProperty],
+	        [names_1.default.rootData, names_1.default.rootData],
+	    ];
+	    if (it.opts.dynamicRef)
+	        valCxt.push([names_1.default.dynamicAnchors, names_1.default.dynamicAnchors]);
+	    const args = (0, codegen_1._) `${dataAndSchema}, ${gen.object(...valCxt)}`;
+	    return context !== codegen_1.nil ? (0, codegen_1._) `${func}.call(${context}, ${args})` : (0, codegen_1._) `${func}(${args})`;
+	}
+	code.callValidateCode = callValidateCode;
+	const newRegExp = (0, codegen_1._) `new RegExp`;
+	function usePattern({ gen, it: { opts } }, pattern) {
+	    const u = opts.unicodeRegExp ? "u" : "";
+	    const { regExp } = opts.code;
+	    const rx = regExp(pattern, u);
+	    return gen.scopeValue("pattern", {
+	        key: rx.toString(),
+	        ref: rx,
+	        code: (0, codegen_1._) `${regExp.code === "new RegExp" ? newRegExp : (0, util_2.useFunc)(gen, regExp)}(${pattern}, ${u})`,
+	    });
+	}
+	code.usePattern = usePattern;
+	function validateArray(cxt) {
+	    const { gen, data, keyword, it } = cxt;
+	    const valid = gen.name("valid");
+	    if (it.allErrors) {
+	        const validArr = gen.let("valid", true);
+	        validateItems(() => gen.assign(validArr, false));
+	        return validArr;
+	    }
+	    gen.var(valid, true);
+	    validateItems(() => gen.break());
+	    return valid;
+	    function validateItems(notValid) {
+	        const len = gen.const("len", (0, codegen_1._) `${data}.length`);
+	        gen.forRange("i", 0, len, (i) => {
+	            cxt.subschema({
+	                keyword,
+	                dataProp: i,
+	                dataPropType: util_1.Type.Num,
+	            }, valid);
+	            gen.if((0, codegen_1.not)(valid), notValid);
+	        });
+	    }
+	}
+	code.validateArray = validateArray;
+	function validateUnion(cxt) {
+	    const { gen, schema, keyword, it } = cxt;
+	    /* istanbul ignore if */
+	    if (!Array.isArray(schema))
+	        throw new Error("ajv implementation error");
+	    const alwaysValid = schema.some((sch) => (0, util_1.alwaysValidSchema)(it, sch));
+	    if (alwaysValid && !it.opts.unevaluated)
+	        return;
+	    const valid = gen.let("valid", false);
+	    const schValid = gen.name("_valid");
+	    gen.block(() => schema.forEach((_sch, i) => {
+	        const schCxt = cxt.subschema({
+	            keyword,
+	            schemaProp: i,
+	            compositeRule: true,
+	        }, schValid);
+	        gen.assign(valid, (0, codegen_1._) `${valid} || ${schValid}`);
+	        const merged = cxt.mergeValidEvaluated(schCxt, schValid);
+	        // can short-circuit if `unevaluatedProperties/Items` not supported (opts.unevaluated !== true)
+	        // or if all properties and items were evaluated (it.props === true && it.items === true)
+	        if (!merged)
+	            gen.if((0, codegen_1.not)(valid));
+	    }));
+	    cxt.result(valid, () => cxt.reset(), () => cxt.error(true));
+	}
+	code.validateUnion = validateUnion;
+	
+	return code;
+}
+
+var hasRequiredKeyword;
+
+function requireKeyword () {
+	if (hasRequiredKeyword) return keyword;
+	hasRequiredKeyword = 1;
+	Object.defineProperty(keyword, "__esModule", { value: true });
+	keyword.validateKeywordUsage = keyword.validSchemaType = keyword.funcKeywordCode = keyword.macroKeywordCode = void 0;
+	const codegen_1 = /*@__PURE__*/ requireCodegen();
+	const names_1 = /*@__PURE__*/ requireNames();
+	const code_1 = /*@__PURE__*/ requireCode();
+	const errors_1 = /*@__PURE__*/ requireErrors();
+	function macroKeywordCode(cxt, def) {
+	    const { gen, keyword, schema, parentSchema, it } = cxt;
+	    const macroSchema = def.macro.call(it.self, schema, parentSchema, it);
+	    const schemaRef = useKeyword(gen, keyword, macroSchema);
+	    if (it.opts.validateSchema !== false)
+	        it.self.validateSchema(macroSchema, true);
+	    const valid = gen.name("valid");
+	    cxt.subschema({
+	        schema: macroSchema,
+	        schemaPath: codegen_1.nil,
+	        errSchemaPath: `${it.errSchemaPath}/${keyword}`,
+	        topSchemaRef: schemaRef,
+	        compositeRule: true,
+	    }, valid);
+	    cxt.pass(valid, () => cxt.error(true));
+	}
+	keyword.macroKeywordCode = macroKeywordCode;
+	function funcKeywordCode(cxt, def) {
+	    var _a;
+	    const { gen, keyword, schema, parentSchema, $data, it } = cxt;
+	    checkAsyncKeyword(it, def);
+	    const validate = !$data && def.compile ? def.compile.call(it.self, schema, parentSchema, it) : def.validate;
+	    const validateRef = useKeyword(gen, keyword, validate);
+	    const valid = gen.let("valid");
+	    cxt.block$data(valid, validateKeyword);
+	    cxt.ok((_a = def.valid) !== null && _a !== void 0 ? _a : valid);
+	    function validateKeyword() {
+	        if (def.errors === false) {
+	            assignValid();
+	            if (def.modifying)
+	                modifyData(cxt);
+	            reportErrs(() => cxt.error());
+	        }
+	        else {
+	            const ruleErrs = def.async ? validateAsync() : validateSync();
+	            if (def.modifying)
+	                modifyData(cxt);
+	            reportErrs(() => addErrs(cxt, ruleErrs));
+	        }
+	    }
+	    function validateAsync() {
+	        const ruleErrs = gen.let("ruleErrs", null);
+	        gen.try(() => assignValid((0, codegen_1._) `await `), (e) => gen.assign(valid, false).if((0, codegen_1._) `${e} instanceof ${it.ValidationError}`, () => gen.assign(ruleErrs, (0, codegen_1._) `${e}.errors`), () => gen.throw(e)));
+	        return ruleErrs;
+	    }
+	    function validateSync() {
+	        const validateErrs = (0, codegen_1._) `${validateRef}.errors`;
+	        gen.assign(validateErrs, null);
+	        assignValid(codegen_1.nil);
+	        return validateErrs;
+	    }
+	    function assignValid(_await = def.async ? (0, codegen_1._) `await ` : codegen_1.nil) {
+	        const passCxt = it.opts.passContext ? names_1.default.this : names_1.default.self;
+	        const passSchema = !(("compile" in def && !$data) || def.schema === false);
+	        gen.assign(valid, (0, codegen_1._) `${_await}${(0, code_1.callValidateCode)(cxt, validateRef, passCxt, passSchema)}`, def.modifying);
+	    }
+	    function reportErrs(errors) {
+	        var _a;
+	        gen.if((0, codegen_1.not)((_a = def.valid) !== null && _a !== void 0 ? _a : valid), errors);
+	    }
+	}
+	keyword.funcKeywordCode = funcKeywordCode;
+	function modifyData(cxt) {
+	    const { gen, data, it } = cxt;
+	    gen.if(it.parentData, () => gen.assign(data, (0, codegen_1._) `${it.parentData}[${it.parentDataProperty}]`));
+	}
+	function addErrs(cxt, errs) {
+	    const { gen } = cxt;
+	    gen.if((0, codegen_1._) `Array.isArray(${errs})`, () => {
+	        gen
+	            .assign(names_1.default.vErrors, (0, codegen_1._) `${names_1.default.vErrors} === null ? ${errs} : ${names_1.default.vErrors}.concat(${errs})`)
+	            .assign(names_1.default.errors, (0, codegen_1._) `${names_1.default.vErrors}.length`);
+	        (0, errors_1.extendErrors)(cxt);
+	    }, () => cxt.error());
+	}
+	function checkAsyncKeyword({ schemaEnv }, def) {
+	    if (def.async && !schemaEnv.$async)
+	        throw new Error("async keyword in sync schema");
+	}
+	function useKeyword(gen, keyword, result) {
+	    if (result === undefined)
+	        throw new Error(`keyword "${keyword}" failed to compile`);
+	    return gen.scopeValue("keyword", typeof result == "function" ? { ref: result } : { ref: result, code: (0, codegen_1.stringify)(result) });
+	}
+	function validSchemaType(schema, schemaType, allowUndefined = false) {
+	    // TODO add tests
+	    return (!schemaType.length ||
+	        schemaType.some((st) => st === "array"
+	            ? Array.isArray(schema)
+	            : st === "object"
+	                ? schema && typeof schema == "object" && !Array.isArray(schema)
+	                : typeof schema == st || (allowUndefined && typeof schema == "undefined")));
+	}
+	keyword.validSchemaType = validSchemaType;
+	function validateKeywordUsage({ schema, opts, self, errSchemaPath }, def, keyword) {
+	    /* istanbul ignore if */
+	    if (Array.isArray(def.keyword) ? !def.keyword.includes(keyword) : def.keyword !== keyword) {
+	        throw new Error("ajv implementation error");
+	    }
+	    const deps = def.dependencies;
+	    if (deps === null || deps === void 0 ? void 0 : deps.some((kwd) => !Object.prototype.hasOwnProperty.call(schema, kwd))) {
+	        throw new Error(`parent schema must have dependencies of ${keyword}: ${deps.join(",")}`);
+	    }
+	    if (def.validateSchema) {
+	        const valid = def.validateSchema(schema[keyword]);
+	        if (!valid) {
+	            const msg = `keyword "${keyword}" value is invalid at path "${errSchemaPath}": ` +
+	                self.errorsText(def.validateSchema.errors);
+	            if (opts.validateSchema === "log")
+	                self.logger.error(msg);
+	            else
+	                throw new Error(msg);
+	        }
+	    }
+	}
+	keyword.validateKeywordUsage = validateKeywordUsage;
+	
+	return keyword;
+}
+
+var subschema = {};
+
+var hasRequiredSubschema;
+
+function requireSubschema () {
+	if (hasRequiredSubschema) return subschema;
+	hasRequiredSubschema = 1;
+	Object.defineProperty(subschema, "__esModule", { value: true });
+	subschema.extendSubschemaMode = subschema.extendSubschemaData = subschema.getSubschema = void 0;
+	const codegen_1 = /*@__PURE__*/ requireCodegen();
+	const util_1 = /*@__PURE__*/ requireUtil();
+	function getSubschema(it, { keyword, schemaProp, schema, schemaPath, errSchemaPath, topSchemaRef }) {
+	    if (keyword !== undefined && schema !== undefined) {
+	        throw new Error('both "keyword" and "schema" passed, only one allowed');
+	    }
+	    if (keyword !== undefined) {
+	        const sch = it.schema[keyword];
+	        return schemaProp === undefined
+	            ? {
+	                schema: sch,
+	                schemaPath: (0, codegen_1._) `${it.schemaPath}${(0, codegen_1.getProperty)(keyword)}`,
+	                errSchemaPath: `${it.errSchemaPath}/${keyword}`,
+	            }
+	            : {
+	                schema: sch[schemaProp],
+	                schemaPath: (0, codegen_1._) `${it.schemaPath}${(0, codegen_1.getProperty)(keyword)}${(0, codegen_1.getProperty)(schemaProp)}`,
+	                errSchemaPath: `${it.errSchemaPath}/${keyword}/${(0, util_1.escapeFragment)(schemaProp)}`,
+	            };
+	    }
+	    if (schema !== undefined) {
+	        if (schemaPath === undefined || errSchemaPath === undefined || topSchemaRef === undefined) {
+	            throw new Error('"schemaPath", "errSchemaPath" and "topSchemaRef" are required with "schema"');
+	        }
+	        return {
+	            schema,
+	            schemaPath,
+	            topSchemaRef,
+	            errSchemaPath,
+	        };
+	    }
+	    throw new Error('either "keyword" or "schema" must be passed');
+	}
+	subschema.getSubschema = getSubschema;
+	function extendSubschemaData(subschema, it, { dataProp, dataPropType: dpType, data, dataTypes, propertyName }) {
+	    if (data !== undefined && dataProp !== undefined) {
+	        throw new Error('both "data" and "dataProp" passed, only one allowed');
+	    }
+	    const { gen } = it;
+	    if (dataProp !== undefined) {
+	        const { errorPath, dataPathArr, opts } = it;
+	        const nextData = gen.let("data", (0, codegen_1._) `${it.data}${(0, codegen_1.getProperty)(dataProp)}`, true);
+	        dataContextProps(nextData);
+	        subschema.errorPath = (0, codegen_1.str) `${errorPath}${(0, util_1.getErrorPath)(dataProp, dpType, opts.jsPropertySyntax)}`;
+	        subschema.parentDataProperty = (0, codegen_1._) `${dataProp}`;
+	        subschema.dataPathArr = [...dataPathArr, subschema.parentDataProperty];
+	    }
+	    if (data !== undefined) {
+	        const nextData = data instanceof codegen_1.Name ? data : gen.let("data", data, true); // replaceable if used once?
+	        dataContextProps(nextData);
+	        if (propertyName !== undefined)
+	            subschema.propertyName = propertyName;
+	        // TODO something is possibly wrong here with not changing parentDataProperty and not appending dataPathArr
+	    }
+	    if (dataTypes)
+	        subschema.dataTypes = dataTypes;
+	    function dataContextProps(_nextData) {
+	        subschema.data = _nextData;
+	        subschema.dataLevel = it.dataLevel + 1;
+	        subschema.dataTypes = [];
+	        it.definedProperties = new Set();
+	        subschema.parentData = it.data;
+	        subschema.dataNames = [...it.dataNames, _nextData];
+	    }
+	}
+	subschema.extendSubschemaData = extendSubschemaData;
+	function extendSubschemaMode(subschema, { jtdDiscriminator, jtdMetadata, compositeRule, createErrors, allErrors }) {
+	    if (compositeRule !== undefined)
+	        subschema.compositeRule = compositeRule;
+	    if (createErrors !== undefined)
+	        subschema.createErrors = createErrors;
+	    if (allErrors !== undefined)
+	        subschema.allErrors = allErrors;
+	    subschema.jtdDiscriminator = jtdDiscriminator; // not inherited
+	    subschema.jtdMetadata = jtdMetadata; // not inherited
+	}
+	subschema.extendSubschemaMode = extendSubschemaMode;
+	
+	return subschema;
+}
+
+var resolve = {};
+
+var fastDeepEqual;
+var hasRequiredFastDeepEqual;
+
+function requireFastDeepEqual () {
+	if (hasRequiredFastDeepEqual) return fastDeepEqual;
+	hasRequiredFastDeepEqual = 1;
+
+	// do not edit .js files directly - edit src/index.jst
+
+
+
+	fastDeepEqual = function equal(a, b) {
+	  if (a === b) return true;
+
+	  if (a && b && typeof a == 'object' && typeof b == 'object') {
+	    if (a.constructor !== b.constructor) return false;
+
+	    var length, i, keys;
+	    if (Array.isArray(a)) {
+	      length = a.length;
+	      if (length != b.length) return false;
+	      for (i = length; i-- !== 0;)
+	        if (!equal(a[i], b[i])) return false;
+	      return true;
+	    }
+
+
+
+	    if (a.constructor === RegExp) return a.source === b.source && a.flags === b.flags;
+	    if (a.valueOf !== Object.prototype.valueOf) return a.valueOf() === b.valueOf();
+	    if (a.toString !== Object.prototype.toString) return a.toString() === b.toString();
+
+	    keys = Object.keys(a);
+	    length = keys.length;
+	    if (length !== Object.keys(b).length) return false;
+
+	    for (i = length; i-- !== 0;)
+	      if (!Object.prototype.hasOwnProperty.call(b, keys[i])) return false;
+
+	    for (i = length; i-- !== 0;) {
+	      var key = keys[i];
+
+	      if (!equal(a[key], b[key])) return false;
+	    }
+
+	    return true;
+	  }
+
+	  // true if both NaN, false otherwise
+	  return a!==a && b!==b;
+	};
+	return fastDeepEqual;
+}
+
+var jsonSchemaTraverse = {exports: {}};
+
+var hasRequiredJsonSchemaTraverse;
+
+function requireJsonSchemaTraverse () {
+	if (hasRequiredJsonSchemaTraverse) return jsonSchemaTraverse.exports;
+	hasRequiredJsonSchemaTraverse = 1;
+
+	var traverse = jsonSchemaTraverse.exports = function (schema, opts, cb) {
+	  // Legacy support for v0.3.1 and earlier.
+	  if (typeof opts == 'function') {
+	    cb = opts;
+	    opts = {};
+	  }
+
+	  cb = opts.cb || cb;
+	  var pre = (typeof cb == 'function') ? cb : cb.pre || function() {};
+	  var post = cb.post || function() {};
+
+	  _traverse(opts, pre, post, schema, '', schema);
+	};
+
+
+	traverse.keywords = {
+	  additionalItems: true,
+	  items: true,
+	  contains: true,
+	  additionalProperties: true,
+	  propertyNames: true,
+	  not: true,
+	  if: true,
+	  then: true,
+	  else: true
+	};
+
+	traverse.arrayKeywords = {
+	  items: true,
+	  allOf: true,
+	  anyOf: true,
+	  oneOf: true
+	};
+
+	traverse.propsKeywords = {
+	  $defs: true,
+	  definitions: true,
+	  properties: true,
+	  patternProperties: true,
+	  dependencies: true
+	};
+
+	traverse.skipKeywords = {
+	  default: true,
+	  enum: true,
+	  const: true,
+	  required: true,
+	  maximum: true,
+	  minimum: true,
+	  exclusiveMaximum: true,
+	  exclusiveMinimum: true,
+	  multipleOf: true,
+	  maxLength: true,
+	  minLength: true,
+	  pattern: true,
+	  format: true,
+	  maxItems: true,
+	  minItems: true,
+	  uniqueItems: true,
+	  maxProperties: true,
+	  minProperties: true
+	};
+
+
+	function _traverse(opts, pre, post, schema, jsonPtr, rootSchema, parentJsonPtr, parentKeyword, parentSchema, keyIndex) {
+	  if (schema && typeof schema == 'object' && !Array.isArray(schema)) {
+	    pre(schema, jsonPtr, rootSchema, parentJsonPtr, parentKeyword, parentSchema, keyIndex);
+	    for (var key in schema) {
+	      var sch = schema[key];
+	      if (Array.isArray(sch)) {
+	        if (key in traverse.arrayKeywords) {
+	          for (var i=0; i<sch.length; i++)
+	            _traverse(opts, pre, post, sch[i], jsonPtr + '/' + key + '/' + i, rootSchema, jsonPtr, key, schema, i);
+	        }
+	      } else if (key in traverse.propsKeywords) {
+	        if (sch && typeof sch == 'object') {
+	          for (var prop in sch)
+	            _traverse(opts, pre, post, sch[prop], jsonPtr + '/' + key + '/' + escapeJsonPtr(prop), rootSchema, jsonPtr, key, schema, prop);
+	        }
+	      } else if (key in traverse.keywords || (opts.allKeys && !(key in traverse.skipKeywords))) {
+	        _traverse(opts, pre, post, sch, jsonPtr + '/' + key, rootSchema, jsonPtr, key, schema);
+	      }
+	    }
+	    post(schema, jsonPtr, rootSchema, parentJsonPtr, parentKeyword, parentSchema, keyIndex);
+	  }
+	}
+
+
+	function escapeJsonPtr(str) {
+	  return str.replace(/~/g, '~0').replace(/\//g, '~1');
+	}
+	return jsonSchemaTraverse.exports;
+}
+
+var hasRequiredResolve;
+
+function requireResolve () {
+	if (hasRequiredResolve) return resolve;
+	hasRequiredResolve = 1;
+	Object.defineProperty(resolve, "__esModule", { value: true });
+	resolve.getSchemaRefs = resolve.resolveUrl = resolve.normalizeId = resolve._getFullPath = resolve.getFullPath = resolve.inlineRef = void 0;
+	const util_1 = /*@__PURE__*/ requireUtil();
+	const equal = requireFastDeepEqual();
+	const traverse = requireJsonSchemaTraverse();
+	// TODO refactor to use keyword definitions
+	const SIMPLE_INLINED = new Set([
+	    "type",
+	    "format",
+	    "pattern",
+	    "maxLength",
+	    "minLength",
+	    "maxProperties",
+	    "minProperties",
+	    "maxItems",
+	    "minItems",
+	    "maximum",
+	    "minimum",
+	    "uniqueItems",
+	    "multipleOf",
+	    "required",
+	    "enum",
+	    "const",
+	]);
+	function inlineRef(schema, limit = true) {
+	    if (typeof schema == "boolean")
+	        return true;
+	    if (limit === true)
+	        return !hasRef(schema);
+	    if (!limit)
+	        return false;
+	    return countKeys(schema) <= limit;
+	}
+	resolve.inlineRef = inlineRef;
+	const REF_KEYWORDS = new Set([
+	    "$ref",
+	    "$recursiveRef",
+	    "$recursiveAnchor",
+	    "$dynamicRef",
+	    "$dynamicAnchor",
+	]);
+	function hasRef(schema) {
+	    for (const key in schema) {
+	        if (REF_KEYWORDS.has(key))
+	            return true;
+	        const sch = schema[key];
+	        if (Array.isArray(sch) && sch.some(hasRef))
+	            return true;
+	        if (typeof sch == "object" && hasRef(sch))
+	            return true;
+	    }
+	    return false;
+	}
+	function countKeys(schema) {
+	    let count = 0;
+	    for (const key in schema) {
+	        if (key === "$ref")
+	            return Infinity;
+	        count++;
+	        if (SIMPLE_INLINED.has(key))
+	            continue;
+	        if (typeof schema[key] == "object") {
+	            (0, util_1.eachItem)(schema[key], (sch) => (count += countKeys(sch)));
+	        }
+	        if (count === Infinity)
+	            return Infinity;
+	    }
+	    return count;
+	}
+	function getFullPath(resolver, id = "", normalize) {
+	    if (normalize !== false)
+	        id = normalizeId(id);
+	    const p = resolver.parse(id);
+	    return _getFullPath(resolver, p);
+	}
+	resolve.getFullPath = getFullPath;
+	function _getFullPath(resolver, p) {
+	    const serialized = resolver.serialize(p);
+	    return serialized.split("#")[0] + "#";
+	}
+	resolve._getFullPath = _getFullPath;
+	const TRAILING_SLASH_HASH = /#\/?$/;
+	function normalizeId(id) {
+	    return id ? id.replace(TRAILING_SLASH_HASH, "") : "";
+	}
+	resolve.normalizeId = normalizeId;
+	function resolveUrl(resolver, baseId, id) {
+	    id = normalizeId(id);
+	    return resolver.resolve(baseId, id);
+	}
+	resolve.resolveUrl = resolveUrl;
+	const ANCHOR = /^[a-z_][-a-z0-9._]*$/i;
+	function getSchemaRefs(schema, baseId) {
+	    if (typeof schema == "boolean")
+	        return {};
+	    const { schemaId, uriResolver } = this.opts;
+	    const schId = normalizeId(schema[schemaId] || baseId);
+	    const baseIds = { "": schId };
+	    const pathPrefix = getFullPath(uriResolver, schId, false);
+	    const localRefs = {};
+	    const schemaRefs = new Set();
+	    traverse(schema, { allKeys: true }, (sch, jsonPtr, _, parentJsonPtr) => {
+	        if (parentJsonPtr === undefined)
+	            return;
+	        const fullPath = pathPrefix + jsonPtr;
+	        let innerBaseId = baseIds[parentJsonPtr];
+	        if (typeof sch[schemaId] == "string")
+	            innerBaseId = addRef.call(this, sch[schemaId]);
+	        addAnchor.call(this, sch.$anchor);
+	        addAnchor.call(this, sch.$dynamicAnchor);
+	        baseIds[jsonPtr] = innerBaseId;
+	        function addRef(ref) {
+	            // eslint-disable-next-line @typescript-eslint/unbound-method
+	            const _resolve = this.opts.uriResolver.resolve;
+	            ref = normalizeId(innerBaseId ? _resolve(innerBaseId, ref) : ref);
+	            if (schemaRefs.has(ref))
+	                throw ambiguos(ref);
+	            schemaRefs.add(ref);
+	            let schOrRef = this.refs[ref];
+	            if (typeof schOrRef == "string")
+	                schOrRef = this.refs[schOrRef];
+	            if (typeof schOrRef == "object") {
+	                checkAmbiguosRef(sch, schOrRef.schema, ref);
+	            }
+	            else if (ref !== normalizeId(fullPath)) {
+	                if (ref[0] === "#") {
+	                    checkAmbiguosRef(sch, localRefs[ref], ref);
+	                    localRefs[ref] = sch;
+	                }
+	                else {
+	                    this.refs[ref] = fullPath;
+	                }
+	            }
+	            return ref;
+	        }
+	        function addAnchor(anchor) {
+	            if (typeof anchor == "string") {
+	                if (!ANCHOR.test(anchor))
+	                    throw new Error(`invalid anchor "${anchor}"`);
+	                addRef.call(this, `#${anchor}`);
+	            }
+	        }
+	    });
+	    return localRefs;
+	    function checkAmbiguosRef(sch1, sch2, ref) {
+	        if (sch2 !== undefined && !equal(sch1, sch2))
+	            throw ambiguos(ref);
+	    }
+	    function ambiguos(ref) {
+	        return new Error(`reference "${ref}" resolves to more than one schema`);
+	    }
+	}
+	resolve.getSchemaRefs = getSchemaRefs;
+	
+	return resolve;
+}
+
+var hasRequiredValidate;
+
+function requireValidate () {
+	if (hasRequiredValidate) return validate;
+	hasRequiredValidate = 1;
+	Object.defineProperty(validate, "__esModule", { value: true });
+	validate.getData = validate.KeywordCxt = validate.validateFunctionCode = void 0;
+	const boolSchema_1 = /*@__PURE__*/ requireBoolSchema();
+	const dataType_1 = /*@__PURE__*/ requireDataType();
+	const applicability_1 = /*@__PURE__*/ requireApplicability();
+	const dataType_2 = /*@__PURE__*/ requireDataType();
+	const defaults_1 = /*@__PURE__*/ requireDefaults();
+	const keyword_1 = /*@__PURE__*/ requireKeyword();
+	const subschema_1 = /*@__PURE__*/ requireSubschema();
+	const codegen_1 = /*@__PURE__*/ requireCodegen();
+	const names_1 = /*@__PURE__*/ requireNames();
+	const resolve_1 = /*@__PURE__*/ requireResolve();
+	const util_1 = /*@__PURE__*/ requireUtil();
+	const errors_1 = /*@__PURE__*/ requireErrors();
+	// schema compilation - generates validation function, subschemaCode (below) is used for subschemas
+	function validateFunctionCode(it) {
+	    if (isSchemaObj(it)) {
+	        checkKeywords(it);
+	        if (schemaCxtHasRules(it)) {
+	            topSchemaObjCode(it);
+	            return;
+	        }
+	    }
+	    validateFunction(it, () => (0, boolSchema_1.topBoolOrEmptySchema)(it));
+	}
+	validate.validateFunctionCode = validateFunctionCode;
+	function validateFunction({ gen, validateName, schema, schemaEnv, opts }, body) {
+	    if (opts.code.es5) {
+	        gen.func(validateName, (0, codegen_1._) `${names_1.default.data}, ${names_1.default.valCxt}`, schemaEnv.$async, () => {
+	            gen.code((0, codegen_1._) `"use strict"; ${funcSourceUrl(schema, opts)}`);
+	            destructureValCxtES5(gen, opts);
+	            gen.code(body);
+	        });
+	    }
+	    else {
+	        gen.func(validateName, (0, codegen_1._) `${names_1.default.data}, ${destructureValCxt(opts)}`, schemaEnv.$async, () => gen.code(funcSourceUrl(schema, opts)).code(body));
+	    }
+	}
+	function destructureValCxt(opts) {
+	    return (0, codegen_1._) `{${names_1.default.instancePath}="", ${names_1.default.parentData}, ${names_1.default.parentDataProperty}, ${names_1.default.rootData}=${names_1.default.data}${opts.dynamicRef ? (0, codegen_1._) `, ${names_1.default.dynamicAnchors}={}` : codegen_1.nil}}={}`;
+	}
+	function destructureValCxtES5(gen, opts) {
+	    gen.if(names_1.default.valCxt, () => {
+	        gen.var(names_1.default.instancePath, (0, codegen_1._) `${names_1.default.valCxt}.${names_1.default.instancePath}`);
+	        gen.var(names_1.default.parentData, (0, codegen_1._) `${names_1.default.valCxt}.${names_1.default.parentData}`);
+	        gen.var(names_1.default.parentDataProperty, (0, codegen_1._) `${names_1.default.valCxt}.${names_1.default.parentDataProperty}`);
+	        gen.var(names_1.default.rootData, (0, codegen_1._) `${names_1.default.valCxt}.${names_1.default.rootData}`);
+	        if (opts.dynamicRef)
+	            gen.var(names_1.default.dynamicAnchors, (0, codegen_1._) `${names_1.default.valCxt}.${names_1.default.dynamicAnchors}`);
+	    }, () => {
+	        gen.var(names_1.default.instancePath, (0, codegen_1._) `""`);
+	        gen.var(names_1.default.parentData, (0, codegen_1._) `undefined`);
+	        gen.var(names_1.default.parentDataProperty, (0, codegen_1._) `undefined`);
+	        gen.var(names_1.default.rootData, names_1.default.data);
+	        if (opts.dynamicRef)
+	            gen.var(names_1.default.dynamicAnchors, (0, codegen_1._) `{}`);
+	    });
+	}
+	function topSchemaObjCode(it) {
+	    const { schema, opts, gen } = it;
+	    validateFunction(it, () => {
+	        if (opts.$comment && schema.$comment)
+	            commentKeyword(it);
+	        checkNoDefault(it);
+	        gen.let(names_1.default.vErrors, null);
+	        gen.let(names_1.default.errors, 0);
+	        if (opts.unevaluated)
+	            resetEvaluated(it);
+	        typeAndKeywords(it);
+	        returnResults(it);
+	    });
+	    return;
+	}
+	function resetEvaluated(it) {
+	    // TODO maybe some hook to execute it in the end to check whether props/items are Name, as in assignEvaluated
+	    const { gen, validateName } = it;
+	    it.evaluated = gen.const("evaluated", (0, codegen_1._) `${validateName}.evaluated`);
+	    gen.if((0, codegen_1._) `${it.evaluated}.dynamicProps`, () => gen.assign((0, codegen_1._) `${it.evaluated}.props`, (0, codegen_1._) `undefined`));
+	    gen.if((0, codegen_1._) `${it.evaluated}.dynamicItems`, () => gen.assign((0, codegen_1._) `${it.evaluated}.items`, (0, codegen_1._) `undefined`));
+	}
+	function funcSourceUrl(schema, opts) {
+	    const schId = typeof schema == "object" && schema[opts.schemaId];
+	    return schId && (opts.code.source || opts.code.process) ? (0, codegen_1._) `/*# sourceURL=${schId} */` : codegen_1.nil;
+	}
+	// schema compilation - this function is used recursively to generate code for sub-schemas
+	function subschemaCode(it, valid) {
+	    if (isSchemaObj(it)) {
+	        checkKeywords(it);
+	        if (schemaCxtHasRules(it)) {
+	            subSchemaObjCode(it, valid);
+	            return;
+	        }
+	    }
+	    (0, boolSchema_1.boolOrEmptySchema)(it, valid);
+	}
+	function schemaCxtHasRules({ schema, self }) {
+	    if (typeof schema == "boolean")
+	        return !schema;
+	    for (const key in schema)
+	        if (self.RULES.all[key])
+	            return true;
+	    return false;
+	}
+	function isSchemaObj(it) {
+	    return typeof it.schema != "boolean";
+	}
+	function subSchemaObjCode(it, valid) {
+	    const { schema, gen, opts } = it;
+	    if (opts.$comment && schema.$comment)
+	        commentKeyword(it);
+	    updateContext(it);
+	    checkAsyncSchema(it);
+	    const errsCount = gen.const("_errs", names_1.default.errors);
+	    typeAndKeywords(it, errsCount);
+	    // TODO var
+	    gen.var(valid, (0, codegen_1._) `${errsCount} === ${names_1.default.errors}`);
+	}
+	function checkKeywords(it) {
+	    (0, util_1.checkUnknownRules)(it);
+	    checkRefsAndKeywords(it);
+	}
+	function typeAndKeywords(it, errsCount) {
+	    if (it.opts.jtd)
+	        return schemaKeywords(it, [], false, errsCount);
+	    const types = (0, dataType_1.getSchemaTypes)(it.schema);
+	    const checkedTypes = (0, dataType_1.coerceAndCheckDataType)(it, types);
+	    schemaKeywords(it, types, !checkedTypes, errsCount);
+	}
+	function checkRefsAndKeywords(it) {
+	    const { schema, errSchemaPath, opts, self } = it;
+	    if (schema.$ref && opts.ignoreKeywordsWithRef && (0, util_1.schemaHasRulesButRef)(schema, self.RULES)) {
+	        self.logger.warn(`$ref: keywords ignored in schema at path "${errSchemaPath}"`);
+	    }
+	}
+	function checkNoDefault(it) {
+	    const { schema, opts } = it;
+	    if (schema.default !== undefined && opts.useDefaults && opts.strictSchema) {
+	        (0, util_1.checkStrictMode)(it, "default is ignored in the schema root");
+	    }
+	}
+	function updateContext(it) {
+	    const schId = it.schema[it.opts.schemaId];
+	    if (schId)
+	        it.baseId = (0, resolve_1.resolveUrl)(it.opts.uriResolver, it.baseId, schId);
+	}
+	function checkAsyncSchema(it) {
+	    if (it.schema.$async && !it.schemaEnv.$async)
+	        throw new Error("async schema in sync schema");
+	}
+	function commentKeyword({ gen, schemaEnv, schema, errSchemaPath, opts }) {
+	    const msg = schema.$comment;
+	    if (opts.$comment === true) {
+	        gen.code((0, codegen_1._) `${names_1.default.self}.logger.log(${msg})`);
+	    }
+	    else if (typeof opts.$comment == "function") {
+	        const schemaPath = (0, codegen_1.str) `${errSchemaPath}/$comment`;
+	        const rootName = gen.scopeValue("root", { ref: schemaEnv.root });
+	        gen.code((0, codegen_1._) `${names_1.default.self}.opts.$comment(${msg}, ${schemaPath}, ${rootName}.schema)`);
+	    }
+	}
+	function returnResults(it) {
+	    const { gen, schemaEnv, validateName, ValidationError, opts } = it;
+	    if (schemaEnv.$async) {
+	        // TODO assign unevaluated
+	        gen.if((0, codegen_1._) `${names_1.default.errors} === 0`, () => gen.return(names_1.default.data), () => gen.throw((0, codegen_1._) `new ${ValidationError}(${names_1.default.vErrors})`));
+	    }
+	    else {
+	        gen.assign((0, codegen_1._) `${validateName}.errors`, names_1.default.vErrors);
+	        if (opts.unevaluated)
+	            assignEvaluated(it);
+	        gen.return((0, codegen_1._) `${names_1.default.errors} === 0`);
+	    }
+	}
+	function assignEvaluated({ gen, evaluated, props, items }) {
+	    if (props instanceof codegen_1.Name)
+	        gen.assign((0, codegen_1._) `${evaluated}.props`, props);
+	    if (items instanceof codegen_1.Name)
+	        gen.assign((0, codegen_1._) `${evaluated}.items`, items);
+	}
+	function schemaKeywords(it, types, typeErrors, errsCount) {
+	    const { gen, schema, data, allErrors, opts, self } = it;
+	    const { RULES } = self;
+	    if (schema.$ref && (opts.ignoreKeywordsWithRef || !(0, util_1.schemaHasRulesButRef)(schema, RULES))) {
+	        gen.block(() => keywordCode(it, "$ref", RULES.all.$ref.definition)); // TODO typecast
+	        return;
+	    }
+	    if (!opts.jtd)
+	        checkStrictTypes(it, types);
+	    gen.block(() => {
+	        for (const group of RULES.rules)
+	            groupKeywords(group);
+	        groupKeywords(RULES.post);
+	    });
+	    function groupKeywords(group) {
+	        if (!(0, applicability_1.shouldUseGroup)(schema, group))
+	            return;
+	        if (group.type) {
+	            gen.if((0, dataType_2.checkDataType)(group.type, data, opts.strictNumbers));
+	            iterateKeywords(it, group);
+	            if (types.length === 1 && types[0] === group.type && typeErrors) {
+	                gen.else();
+	                (0, dataType_2.reportTypeError)(it);
+	            }
+	            gen.endIf();
+	        }
+	        else {
+	            iterateKeywords(it, group);
+	        }
+	        // TODO make it "ok" call?
+	        if (!allErrors)
+	            gen.if((0, codegen_1._) `${names_1.default.errors} === ${errsCount || 0}`);
+	    }
+	}
+	function iterateKeywords(it, group) {
+	    const { gen, schema, opts: { useDefaults }, } = it;
+	    if (useDefaults)
+	        (0, defaults_1.assignDefaults)(it, group.type);
+	    gen.block(() => {
+	        for (const rule of group.rules) {
+	            if ((0, applicability_1.shouldUseRule)(schema, rule)) {
+	                keywordCode(it, rule.keyword, rule.definition, group.type);
+	            }
+	        }
+	    });
+	}
+	function checkStrictTypes(it, types) {
+	    if (it.schemaEnv.meta || !it.opts.strictTypes)
+	        return;
+	    checkContextTypes(it, types);
+	    if (!it.opts.allowUnionTypes)
+	        checkMultipleTypes(it, types);
+	    checkKeywordTypes(it, it.dataTypes);
+	}
+	function checkContextTypes(it, types) {
+	    if (!types.length)
+	        return;
+	    if (!it.dataTypes.length) {
+	        it.dataTypes = types;
+	        return;
+	    }
+	    types.forEach((t) => {
+	        if (!includesType(it.dataTypes, t)) {
+	            strictTypesError(it, `type "${t}" not allowed by context "${it.dataTypes.join(",")}"`);
+	        }
+	    });
+	    narrowSchemaTypes(it, types);
+	}
+	function checkMultipleTypes(it, ts) {
+	    if (ts.length > 1 && !(ts.length === 2 && ts.includes("null"))) {
+	        strictTypesError(it, "use allowUnionTypes to allow union type keyword");
+	    }
+	}
+	function checkKeywordTypes(it, ts) {
+	    const rules = it.self.RULES.all;
+	    for (const keyword in rules) {
+	        const rule = rules[keyword];
+	        if (typeof rule == "object" && (0, applicability_1.shouldUseRule)(it.schema, rule)) {
+	            const { type } = rule.definition;
+	            if (type.length && !type.some((t) => hasApplicableType(ts, t))) {
+	                strictTypesError(it, `missing type "${type.join(",")}" for keyword "${keyword}"`);
+	            }
+	        }
+	    }
+	}
+	function hasApplicableType(schTs, kwdT) {
+	    return schTs.includes(kwdT) || (kwdT === "number" && schTs.includes("integer"));
+	}
+	function includesType(ts, t) {
+	    return ts.includes(t) || (t === "integer" && ts.includes("number"));
+	}
+	function narrowSchemaTypes(it, withTypes) {
+	    const ts = [];
+	    for (const t of it.dataTypes) {
+	        if (includesType(withTypes, t))
+	            ts.push(t);
+	        else if (withTypes.includes("integer") && t === "number")
+	            ts.push("integer");
+	    }
+	    it.dataTypes = ts;
+	}
+	function strictTypesError(it, msg) {
+	    const schemaPath = it.schemaEnv.baseId + it.errSchemaPath;
+	    msg += ` at "${schemaPath}" (strictTypes)`;
+	    (0, util_1.checkStrictMode)(it, msg, it.opts.strictTypes);
+	}
+	class KeywordCxt {
+	    constructor(it, def, keyword) {
+	        (0, keyword_1.validateKeywordUsage)(it, def, keyword);
+	        this.gen = it.gen;
+	        this.allErrors = it.allErrors;
+	        this.keyword = keyword;
+	        this.data = it.data;
+	        this.schema = it.schema[keyword];
+	        this.$data = def.$data && it.opts.$data && this.schema && this.schema.$data;
+	        this.schemaValue = (0, util_1.schemaRefOrVal)(it, this.schema, keyword, this.$data);
+	        this.schemaType = def.schemaType;
+	        this.parentSchema = it.schema;
+	        this.params = {};
+	        this.it = it;
+	        this.def = def;
+	        if (this.$data) {
+	            this.schemaCode = it.gen.const("vSchema", getData(this.$data, it));
+	        }
+	        else {
+	            this.schemaCode = this.schemaValue;
+	            if (!(0, keyword_1.validSchemaType)(this.schema, def.schemaType, def.allowUndefined)) {
+	                throw new Error(`${keyword} value must be ${JSON.stringify(def.schemaType)}`);
+	            }
+	        }
+	        if ("code" in def ? def.trackErrors : def.errors !== false) {
+	            this.errsCount = it.gen.const("_errs", names_1.default.errors);
+	        }
+	    }
+	    result(condition, successAction, failAction) {
+	        this.failResult((0, codegen_1.not)(condition), successAction, failAction);
+	    }
+	    failResult(condition, successAction, failAction) {
+	        this.gen.if(condition);
+	        if (failAction)
+	            failAction();
+	        else
+	            this.error();
+	        if (successAction) {
+	            this.gen.else();
+	            successAction();
+	            if (this.allErrors)
+	                this.gen.endIf();
+	        }
+	        else {
+	            if (this.allErrors)
+	                this.gen.endIf();
+	            else
+	                this.gen.else();
+	        }
+	    }
+	    pass(condition, failAction) {
+	        this.failResult((0, codegen_1.not)(condition), undefined, failAction);
+	    }
+	    fail(condition) {
+	        if (condition === undefined) {
+	            this.error();
+	            if (!this.allErrors)
+	                this.gen.if(false); // this branch will be removed by gen.optimize
+	            return;
+	        }
+	        this.gen.if(condition);
+	        this.error();
+	        if (this.allErrors)
+	            this.gen.endIf();
+	        else
+	            this.gen.else();
+	    }
+	    fail$data(condition) {
+	        if (!this.$data)
+	            return this.fail(condition);
+	        const { schemaCode } = this;
+	        this.fail((0, codegen_1._) `${schemaCode} !== undefined && (${(0, codegen_1.or)(this.invalid$data(), condition)})`);
+	    }
+	    error(append, errorParams, errorPaths) {
+	        if (errorParams) {
+	            this.setParams(errorParams);
+	            this._error(append, errorPaths);
+	            this.setParams({});
+	            return;
+	        }
+	        this._error(append, errorPaths);
+	    }
+	    _error(append, errorPaths) {
+	        (append ? errors_1.reportExtraError : errors_1.reportError)(this, this.def.error, errorPaths);
+	    }
+	    $dataError() {
+	        (0, errors_1.reportError)(this, this.def.$dataError || errors_1.keyword$DataError);
+	    }
+	    reset() {
+	        if (this.errsCount === undefined)
+	            throw new Error('add "trackErrors" to keyword definition');
+	        (0, errors_1.resetErrorsCount)(this.gen, this.errsCount);
+	    }
+	    ok(cond) {
+	        if (!this.allErrors)
+	            this.gen.if(cond);
+	    }
+	    setParams(obj, assign) {
+	        if (assign)
+	            Object.assign(this.params, obj);
+	        else
+	            this.params = obj;
+	    }
+	    block$data(valid, codeBlock, $dataValid = codegen_1.nil) {
+	        this.gen.block(() => {
+	            this.check$data(valid, $dataValid);
+	            codeBlock();
+	        });
+	    }
+	    check$data(valid = codegen_1.nil, $dataValid = codegen_1.nil) {
+	        if (!this.$data)
+	            return;
+	        const { gen, schemaCode, schemaType, def } = this;
+	        gen.if((0, codegen_1.or)((0, codegen_1._) `${schemaCode} === undefined`, $dataValid));
+	        if (valid !== codegen_1.nil)
+	            gen.assign(valid, true);
+	        if (schemaType.length || def.validateSchema) {
+	            gen.elseIf(this.invalid$data());
+	            this.$dataError();
+	            if (valid !== codegen_1.nil)
+	                gen.assign(valid, false);
+	        }
+	        gen.else();
+	    }
+	    invalid$data() {
+	        const { gen, schemaCode, schemaType, def, it } = this;
+	        return (0, codegen_1.or)(wrong$DataType(), invalid$DataSchema());
+	        function wrong$DataType() {
+	            if (schemaType.length) {
+	                /* istanbul ignore if */
+	                if (!(schemaCode instanceof codegen_1.Name))
+	                    throw new Error("ajv implementation error");
+	                const st = Array.isArray(schemaType) ? schemaType : [schemaType];
+	                return (0, codegen_1._) `${(0, dataType_2.checkDataTypes)(st, schemaCode, it.opts.strictNumbers, dataType_2.DataType.Wrong)}`;
+	            }
+	            return codegen_1.nil;
+	        }
+	        function invalid$DataSchema() {
+	            if (def.validateSchema) {
+	                const validateSchemaRef = gen.scopeValue("validate$data", { ref: def.validateSchema }); // TODO value.code for standalone
+	                return (0, codegen_1._) `!${validateSchemaRef}(${schemaCode})`;
+	            }
+	            return codegen_1.nil;
+	        }
+	    }
+	    subschema(appl, valid) {
+	        const subschema = (0, subschema_1.getSubschema)(this.it, appl);
+	        (0, subschema_1.extendSubschemaData)(subschema, this.it, appl);
+	        (0, subschema_1.extendSubschemaMode)(subschema, appl);
+	        const nextContext = { ...this.it, ...subschema, items: undefined, props: undefined };
+	        subschemaCode(nextContext, valid);
+	        return nextContext;
+	    }
+	    mergeEvaluated(schemaCxt, toName) {
+	        const { it, gen } = this;
+	        if (!it.opts.unevaluated)
+	            return;
+	        if (it.props !== true && schemaCxt.props !== undefined) {
+	            it.props = util_1.mergeEvaluated.props(gen, schemaCxt.props, it.props, toName);
+	        }
+	        if (it.items !== true && schemaCxt.items !== undefined) {
+	            it.items = util_1.mergeEvaluated.items(gen, schemaCxt.items, it.items, toName);
+	        }
+	    }
+	    mergeValidEvaluated(schemaCxt, valid) {
+	        const { it, gen } = this;
+	        if (it.opts.unevaluated && (it.props !== true || it.items !== true)) {
+	            gen.if(valid, () => this.mergeEvaluated(schemaCxt, codegen_1.Name));
+	            return true;
+	        }
+	    }
+	}
+	validate.KeywordCxt = KeywordCxt;
+	function keywordCode(it, keyword, def, ruleType) {
+	    const cxt = new KeywordCxt(it, def, keyword);
+	    if ("code" in def) {
+	        def.code(cxt, ruleType);
+	    }
+	    else if (cxt.$data && def.validate) {
+	        (0, keyword_1.funcKeywordCode)(cxt, def);
+	    }
+	    else if ("macro" in def) {
+	        (0, keyword_1.macroKeywordCode)(cxt, def);
+	    }
+	    else if (def.compile || def.validate) {
+	        (0, keyword_1.funcKeywordCode)(cxt, def);
+	    }
+	}
+	const JSON_POINTER = /^\/(?:[^~]|~0|~1)*$/;
+	const RELATIVE_JSON_POINTER = /^([0-9]+)(#|\/(?:[^~]|~0|~1)*)?$/;
+	function getData($data, { dataLevel, dataNames, dataPathArr }) {
+	    let jsonPointer;
+	    let data;
+	    if ($data === "")
+	        return names_1.default.rootData;
+	    if ($data[0] === "/") {
+	        if (!JSON_POINTER.test($data))
+	            throw new Error(`Invalid JSON-pointer: ${$data}`);
+	        jsonPointer = $data;
+	        data = names_1.default.rootData;
+	    }
+	    else {
+	        const matches = RELATIVE_JSON_POINTER.exec($data);
+	        if (!matches)
+	            throw new Error(`Invalid JSON-pointer: ${$data}`);
+	        const up = +matches[1];
+	        jsonPointer = matches[2];
+	        if (jsonPointer === "#") {
+	            if (up >= dataLevel)
+	                throw new Error(errorMsg("property/index", up));
+	            return dataPathArr[dataLevel - up];
+	        }
+	        if (up > dataLevel)
+	            throw new Error(errorMsg("data", up));
+	        data = dataNames[dataLevel - up];
+	        if (!jsonPointer)
+	            return data;
+	    }
+	    let expr = data;
+	    const segments = jsonPointer.split("/");
+	    for (const segment of segments) {
+	        if (segment) {
+	            data = (0, codegen_1._) `${data}${(0, codegen_1.getProperty)((0, util_1.unescapeJsonPointer)(segment))}`;
+	            expr = (0, codegen_1._) `${expr} && ${data}`;
+	        }
+	    }
+	    return expr;
+	    function errorMsg(pointerType, up) {
+	        return `Cannot access ${pointerType} ${up} levels up, current level is ${dataLevel}`;
+	    }
+	}
+	validate.getData = getData;
+	
+	return validate;
+}
+
+var validation_error = {};
+
+var hasRequiredValidation_error;
+
+function requireValidation_error () {
+	if (hasRequiredValidation_error) return validation_error;
+	hasRequiredValidation_error = 1;
+	Object.defineProperty(validation_error, "__esModule", { value: true });
+	class ValidationError extends Error {
+	    constructor(errors) {
+	        super("validation failed");
+	        this.errors = errors;
+	        this.ajv = this.validation = true;
+	    }
+	}
+	validation_error.default = ValidationError;
+	
+	return validation_error;
+}
+
+var ref_error = {};
+
+var hasRequiredRef_error;
+
+function requireRef_error () {
+	if (hasRequiredRef_error) return ref_error;
+	hasRequiredRef_error = 1;
+	Object.defineProperty(ref_error, "__esModule", { value: true });
+	const resolve_1 = /*@__PURE__*/ requireResolve();
+	class MissingRefError extends Error {
+	    constructor(resolver, baseId, ref, msg) {
+	        super(msg || `can't resolve reference ${ref} from id ${baseId}`);
+	        this.missingRef = (0, resolve_1.resolveUrl)(resolver, baseId, ref);
+	        this.missingSchema = (0, resolve_1.normalizeId)((0, resolve_1.getFullPath)(resolver, this.missingRef));
+	    }
+	}
+	ref_error.default = MissingRefError;
+	
+	return ref_error;
+}
+
+var compile = {};
+
+var hasRequiredCompile;
+
+function requireCompile () {
+	if (hasRequiredCompile) return compile;
+	hasRequiredCompile = 1;
+	Object.defineProperty(compile, "__esModule", { value: true });
+	compile.resolveSchema = compile.getCompilingSchema = compile.resolveRef = compile.compileSchema = compile.SchemaEnv = void 0;
+	const codegen_1 = /*@__PURE__*/ requireCodegen();
+	const validation_error_1 = /*@__PURE__*/ requireValidation_error();
+	const names_1 = /*@__PURE__*/ requireNames();
+	const resolve_1 = /*@__PURE__*/ requireResolve();
+	const util_1 = /*@__PURE__*/ requireUtil();
+	const validate_1 = /*@__PURE__*/ requireValidate();
+	class SchemaEnv {
+	    constructor(env) {
+	        var _a;
+	        this.refs = {};
+	        this.dynamicAnchors = {};
+	        let schema;
+	        if (typeof env.schema == "object")
+	            schema = env.schema;
+	        this.schema = env.schema;
+	        this.schemaId = env.schemaId;
+	        this.root = env.root || this;
+	        this.baseId = (_a = env.baseId) !== null && _a !== void 0 ? _a : (0, resolve_1.normalizeId)(schema === null || schema === void 0 ? void 0 : schema[env.schemaId || "$id"]);
+	        this.schemaPath = env.schemaPath;
+	        this.localRefs = env.localRefs;
+	        this.meta = env.meta;
+	        this.$async = schema === null || schema === void 0 ? void 0 : schema.$async;
+	        this.refs = {};
+	    }
+	}
+	compile.SchemaEnv = SchemaEnv;
+	// let codeSize = 0
+	// let nodeCount = 0
+	// Compiles schema in SchemaEnv
+	function compileSchema(sch) {
+	    // TODO refactor - remove compilations
+	    const _sch = getCompilingSchema.call(this, sch);
+	    if (_sch)
+	        return _sch;
+	    const rootId = (0, resolve_1.getFullPath)(this.opts.uriResolver, sch.root.baseId); // TODO if getFullPath removed 1 tests fails
+	    const { es5, lines } = this.opts.code;
+	    const { ownProperties } = this.opts;
+	    const gen = new codegen_1.CodeGen(this.scope, { es5, lines, ownProperties });
+	    let _ValidationError;
+	    if (sch.$async) {
+	        _ValidationError = gen.scopeValue("Error", {
+	            ref: validation_error_1.default,
+	            code: (0, codegen_1._) `require("ajv/dist/runtime/validation_error").default`,
+	        });
+	    }
+	    const validateName = gen.scopeName("validate");
+	    sch.validateName = validateName;
+	    const schemaCxt = {
+	        gen,
+	        allErrors: this.opts.allErrors,
+	        data: names_1.default.data,
+	        parentData: names_1.default.parentData,
+	        parentDataProperty: names_1.default.parentDataProperty,
+	        dataNames: [names_1.default.data],
+	        dataPathArr: [codegen_1.nil], // TODO can its length be used as dataLevel if nil is removed?
+	        dataLevel: 0,
+	        dataTypes: [],
+	        definedProperties: new Set(),
+	        topSchemaRef: gen.scopeValue("schema", this.opts.code.source === true
+	            ? { ref: sch.schema, code: (0, codegen_1.stringify)(sch.schema) }
+	            : { ref: sch.schema }),
+	        validateName,
+	        ValidationError: _ValidationError,
+	        schema: sch.schema,
+	        schemaEnv: sch,
+	        rootId,
+	        baseId: sch.baseId || rootId,
+	        schemaPath: codegen_1.nil,
+	        errSchemaPath: sch.schemaPath || (this.opts.jtd ? "" : "#"),
+	        errorPath: (0, codegen_1._) `""`,
+	        opts: this.opts,
+	        self: this,
+	    };
+	    let sourceCode;
+	    try {
+	        this._compilations.add(sch);
+	        (0, validate_1.validateFunctionCode)(schemaCxt);
+	        gen.optimize(this.opts.code.optimize);
+	        // gen.optimize(1)
+	        const validateCode = gen.toString();
+	        sourceCode = `${gen.scopeRefs(names_1.default.scope)}return ${validateCode}`;
+	        // console.log((codeSize += sourceCode.length), (nodeCount += gen.nodeCount))
+	        if (this.opts.code.process)
+	            sourceCode = this.opts.code.process(sourceCode, sch);
+	        // console.log("\n\n\n *** \n", sourceCode)
+	        const makeValidate = new Function(`${names_1.default.self}`, `${names_1.default.scope}`, sourceCode);
+	        const validate = makeValidate(this, this.scope.get());
+	        this.scope.value(validateName, { ref: validate });
+	        validate.errors = null;
+	        validate.schema = sch.schema;
+	        validate.schemaEnv = sch;
+	        if (sch.$async)
+	            validate.$async = true;
+	        if (this.opts.code.source === true) {
+	            validate.source = { validateName, validateCode, scopeValues: gen._values };
+	        }
+	        if (this.opts.unevaluated) {
+	            const { props, items } = schemaCxt;
+	            validate.evaluated = {
+	                props: props instanceof codegen_1.Name ? undefined : props,
+	                items: items instanceof codegen_1.Name ? undefined : items,
+	                dynamicProps: props instanceof codegen_1.Name,
+	                dynamicItems: items instanceof codegen_1.Name,
+	            };
+	            if (validate.source)
+	                validate.source.evaluated = (0, codegen_1.stringify)(validate.evaluated);
+	        }
+	        sch.validate = validate;
+	        return sch;
+	    }
+	    catch (e) {
+	        delete sch.validate;
+	        delete sch.validateName;
+	        if (sourceCode)
+	            this.logger.error("Error compiling schema, function code:", sourceCode);
+	        // console.log("\n\n\n *** \n", sourceCode, this.opts)
+	        throw e;
+	    }
+	    finally {
+	        this._compilations.delete(sch);
+	    }
+	}
+	compile.compileSchema = compileSchema;
+	function resolveRef(root, baseId, ref) {
+	    var _a;
+	    ref = (0, resolve_1.resolveUrl)(this.opts.uriResolver, baseId, ref);
+	    const schOrFunc = root.refs[ref];
+	    if (schOrFunc)
+	        return schOrFunc;
+	    let _sch = resolve.call(this, root, ref);
+	    if (_sch === undefined) {
+	        const schema = (_a = root.localRefs) === null || _a === void 0 ? void 0 : _a[ref]; // TODO maybe localRefs should hold SchemaEnv
+	        const { schemaId } = this.opts;
+	        if (schema)
+	            _sch = new SchemaEnv({ schema, schemaId, root, baseId });
+	    }
+	    if (_sch === undefined)
+	        return;
+	    return (root.refs[ref] = inlineOrCompile.call(this, _sch));
+	}
+	compile.resolveRef = resolveRef;
+	function inlineOrCompile(sch) {
+	    if ((0, resolve_1.inlineRef)(sch.schema, this.opts.inlineRefs))
+	        return sch.schema;
+	    return sch.validate ? sch : compileSchema.call(this, sch);
+	}
+	// Index of schema compilation in the currently compiled list
+	function getCompilingSchema(schEnv) {
+	    for (const sch of this._compilations) {
+	        if (sameSchemaEnv(sch, schEnv))
+	            return sch;
+	    }
+	}
+	compile.getCompilingSchema = getCompilingSchema;
+	function sameSchemaEnv(s1, s2) {
+	    return s1.schema === s2.schema && s1.root === s2.root && s1.baseId === s2.baseId;
+	}
+	// resolve and compile the references ($ref)
+	// TODO returns AnySchemaObject (if the schema can be inlined) or validation function
+	function resolve(root, // information about the root schema for the current schema
+	ref // reference to resolve
+	) {
+	    let sch;
+	    while (typeof (sch = this.refs[ref]) == "string")
+	        ref = sch;
+	    return sch || this.schemas[ref] || resolveSchema.call(this, root, ref);
+	}
+	// Resolve schema, its root and baseId
+	function resolveSchema(root, // root object with properties schema, refs TODO below SchemaEnv is assigned to it
+	ref // reference to resolve
+	) {
+	    const p = this.opts.uriResolver.parse(ref);
+	    const refPath = (0, resolve_1._getFullPath)(this.opts.uriResolver, p);
+	    let baseId = (0, resolve_1.getFullPath)(this.opts.uriResolver, root.baseId, undefined);
+	    // TODO `Object.keys(root.schema).length > 0` should not be needed - but removing breaks 2 tests
+	    if (Object.keys(root.schema).length > 0 && refPath === baseId) {
+	        return getJsonPointer.call(this, p, root);
+	    }
+	    const id = (0, resolve_1.normalizeId)(refPath);
+	    const schOrRef = this.refs[id] || this.schemas[id];
+	    if (typeof schOrRef == "string") {
+	        const sch = resolveSchema.call(this, root, schOrRef);
+	        if (typeof (sch === null || sch === void 0 ? void 0 : sch.schema) !== "object")
+	            return;
+	        return getJsonPointer.call(this, p, sch);
+	    }
+	    if (typeof (schOrRef === null || schOrRef === void 0 ? void 0 : schOrRef.schema) !== "object")
+	        return;
+	    if (!schOrRef.validate)
+	        compileSchema.call(this, schOrRef);
+	    if (id === (0, resolve_1.normalizeId)(ref)) {
+	        const { schema } = schOrRef;
+	        const { schemaId } = this.opts;
+	        const schId = schema[schemaId];
+	        if (schId)
+	            baseId = (0, resolve_1.resolveUrl)(this.opts.uriResolver, baseId, schId);
+	        return new SchemaEnv({ schema, schemaId, root, baseId });
+	    }
+	    return getJsonPointer.call(this, p, schOrRef);
+	}
+	compile.resolveSchema = resolveSchema;
+	const PREVENT_SCOPE_CHANGE = new Set([
+	    "properties",
+	    "patternProperties",
+	    "enum",
+	    "dependencies",
+	    "definitions",
+	]);
+	function getJsonPointer(parsedRef, { baseId, schema, root }) {
+	    var _a;
+	    if (((_a = parsedRef.fragment) === null || _a === void 0 ? void 0 : _a[0]) !== "/")
+	        return;
+	    for (const part of parsedRef.fragment.slice(1).split("/")) {
+	        if (typeof schema === "boolean")
+	            return;
+	        const partSchema = schema[(0, util_1.unescapeFragment)(part)];
+	        if (partSchema === undefined)
+	            return;
+	        schema = partSchema;
+	        // TODO PREVENT_SCOPE_CHANGE could be defined in keyword def?
+	        const schId = typeof schema === "object" && schema[this.opts.schemaId];
+	        if (!PREVENT_SCOPE_CHANGE.has(part) && schId) {
+	            baseId = (0, resolve_1.resolveUrl)(this.opts.uriResolver, baseId, schId);
+	        }
+	    }
+	    let env;
+	    if (typeof schema != "boolean" && schema.$ref && !(0, util_1.schemaHasRulesButRef)(schema, this.RULES)) {
+	        const $ref = (0, resolve_1.resolveUrl)(this.opts.uriResolver, baseId, schema.$ref);
+	        env = resolveSchema.call(this, root, $ref);
+	    }
+	    // even though resolution failed we need to return SchemaEnv to throw exception
+	    // so that compileAsync loads missing schema.
+	    const { schemaId } = this.opts;
+	    env = env || new SchemaEnv({ schema, schemaId, root, baseId });
+	    if (env.schema !== env.root.schema)
+	        return env;
+	    return undefined;
+	}
+	
+	return compile;
+}
+
+var $id$1 = "https://raw.githubusercontent.com/ajv-validator/ajv/master/lib/refs/data.json#";
+var description = "Meta-schema for $data reference (JSON AnySchema extension proposal)";
+var type$1 = "object";
+var required$1 = [
+	"$data"
+];
+var properties$2 = {
+	$data: {
+		type: "string",
+		anyOf: [
+			{
+				format: "relative-json-pointer"
+			},
+			{
+				format: "json-pointer"
+			}
+		]
+	}
+};
+var additionalProperties$1 = false;
+var require$$9 = {
+	$id: $id$1,
+	description: description,
+	type: type$1,
+	required: required$1,
+	properties: properties$2,
+	additionalProperties: additionalProperties$1
+};
+
+var uri = {};
+
+var fastUri = {exports: {}};
+
+var utils;
+var hasRequiredUtils;
+
+function requireUtils () {
+	if (hasRequiredUtils) return utils;
+	hasRequiredUtils = 1;
+
+	/** @type {(value: string) => boolean} */
+	const isUUID = RegExp.prototype.test.bind(/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/iu);
+
+	/** @type {(value: string) => boolean} */
+	const isIPv4 = RegExp.prototype.test.bind(/^(?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)$/u);
+
+	/** @type {(value: string) => boolean} */
+	const isHexPair = RegExp.prototype.test.bind(/^[\da-f]{2}$/iu);
+
+	/** @type {(value: string) => boolean} */
+	const isUnreserved = RegExp.prototype.test.bind(/^[\da-z\-._~]$/iu);
+
+	/** @type {(value: string) => boolean} */
+	const isPathCharacter = RegExp.prototype.test.bind(/^[\da-z\-._~!$&'()*+,;=:@/]$/iu);
+
+	/**
+	 * @param {Array<string>} input
+	 * @returns {string}
+	 */
+	function stringArrayToHexStripped (input) {
+	  let acc = '';
+	  let code = 0;
+	  let i = 0;
+
+	  for (i = 0; i < input.length; i++) {
+	    code = input[i].charCodeAt(0);
+	    if (code === 48) {
+	      continue
+	    }
+	    if (!((code >= 48 && code <= 57) || (code >= 65 && code <= 70) || (code >= 97 && code <= 102))) {
+	      return ''
+	    }
+	    acc += input[i];
+	    break
+	  }
+
+	  for (i += 1; i < input.length; i++) {
+	    code = input[i].charCodeAt(0);
+	    if (!((code >= 48 && code <= 57) || (code >= 65 && code <= 70) || (code >= 97 && code <= 102))) {
+	      return ''
+	    }
+	    acc += input[i];
+	  }
+	  return acc
+	}
+
+	/**
+	 * @typedef {Object} GetIPV6Result
+	 * @property {boolean} error - Indicates if there was an error parsing the IPv6 address.
+	 * @property {string} address - The parsed IPv6 address.
+	 * @property {string} [zone] - The zone identifier, if present.
+	 */
+
+	/**
+	 * @param {string} value
+	 * @returns {boolean}
+	 */
+	const nonSimpleDomain = RegExp.prototype.test.bind(/[^!"$&'()*+,\-.;=_`a-z{}~]/u);
+
+	/**
+	 * @param {Array<string>} buffer
+	 * @returns {boolean}
+	 */
+	function consumeIsZone (buffer) {
+	  buffer.length = 0;
+	  return true
+	}
+
+	/**
+	 * @param {Array<string>} buffer
+	 * @param {Array<string>} address
+	 * @param {GetIPV6Result} output
+	 * @returns {boolean}
+	 */
+	function consumeHextets (buffer, address, output) {
+	  if (buffer.length) {
+	    const hex = stringArrayToHexStripped(buffer);
+	    if (hex !== '') {
+	      address.push(hex);
+	    } else {
+	      output.error = true;
+	      return false
+	    }
+	    buffer.length = 0;
+	  }
+	  return true
+	}
+
+	/**
+	 * @param {string} input
+	 * @returns {GetIPV6Result}
+	 */
+	function getIPV6 (input) {
+	  let tokenCount = 0;
+	  const output = { error: false, address: '', zone: '' };
+	  /** @type {Array<string>} */
+	  const address = [];
+	  /** @type {Array<string>} */
+	  const buffer = [];
+	  let endipv6Encountered = false;
+	  let endIpv6 = false;
+
+	  let consume = consumeHextets;
+
+	  for (let i = 0; i < input.length; i++) {
+	    const cursor = input[i];
+	    if (cursor === '[' || cursor === ']') { continue }
+	    if (cursor === ':') {
+	      if (endipv6Encountered === true) {
+	        endIpv6 = true;
+	      }
+	      if (!consume(buffer, address, output)) { break }
+	      if (++tokenCount > 7) {
+	        // not valid
+	        output.error = true;
+	        break
+	      }
+	      if (i > 0 && input[i - 1] === ':') {
+	        endipv6Encountered = true;
+	      }
+	      address.push(':');
+	      continue
+	    } else if (cursor === '%') {
+	      if (!consume(buffer, address, output)) { break }
+	      // switch to zone detection
+	      consume = consumeIsZone;
+	    } else {
+	      buffer.push(cursor);
+	      continue
+	    }
+	  }
+	  if (buffer.length) {
+	    if (consume === consumeIsZone) {
+	      output.zone = buffer.join('');
+	    } else if (endIpv6) {
+	      address.push(buffer.join(''));
+	    } else {
+	      address.push(stringArrayToHexStripped(buffer));
+	    }
+	  }
+	  output.address = address.join('');
+	  return output
+	}
+
+	/**
+	 * @typedef {Object} NormalizeIPv6Result
+	 * @property {string} host - The normalized host.
+	 * @property {string} [escapedHost] - The escaped host.
+	 * @property {boolean} isIPV6 - Indicates if the host is an IPv6 address.
+	 */
+
+	/**
+	 * @param {string} host
+	 * @returns {NormalizeIPv6Result}
+	 */
+	function normalizeIPv6 (host) {
+	  if (findToken(host, ':') < 2) { return { host, isIPV6: false } }
+	  const ipv6 = getIPV6(host);
+
+	  if (!ipv6.error) {
+	    let newHost = ipv6.address;
+	    let escapedHost = ipv6.address;
+	    if (ipv6.zone) {
+	      newHost += '%' + ipv6.zone;
+	      escapedHost += '%25' + ipv6.zone;
+	    }
+	    return { host: newHost, isIPV6: true, escapedHost }
+	  } else {
+	    return { host, isIPV6: false }
+	  }
+	}
+
+	/**
+	 * @param {string} str
+	 * @param {string} token
+	 * @returns {number}
+	 */
+	function findToken (str, token) {
+	  let ind = 0;
+	  for (let i = 0; i < str.length; i++) {
+	    if (str[i] === token) ind++;
+	  }
+	  return ind
+	}
+
+	/**
+	 * @param {string} path
+	 * @returns {string}
+	 *
+	 * @see https://datatracker.ietf.org/doc/html/rfc3986#section-5.2.4
+	 */
+	function removeDotSegments (path) {
+	  let input = path;
+	  const output = [];
+	  let nextSlash = -1;
+	  let len = 0;
+
+	  // eslint-disable-next-line no-cond-assign
+	  while (len = input.length) {
+	    if (len === 1) {
+	      if (input === '.') {
+	        break
+	      } else if (input === '/') {
+	        output.push('/');
+	        break
+	      } else {
+	        output.push(input);
+	        break
+	      }
+	    } else if (len === 2) {
+	      if (input[0] === '.') {
+	        if (input[1] === '.') {
+	          break
+	        } else if (input[1] === '/') {
+	          input = input.slice(2);
+	          continue
+	        }
+	      } else if (input[0] === '/') {
+	        if (input[1] === '.' || input[1] === '/') {
+	          output.push('/');
+	          break
+	        }
+	      }
+	    } else if (len === 3) {
+	      if (input === '/..') {
+	        if (output.length !== 0) {
+	          output.pop();
+	        }
+	        output.push('/');
+	        break
+	      }
+	    }
+	    if (input[0] === '.') {
+	      if (input[1] === '.') {
+	        if (input[2] === '/') {
+	          input = input.slice(3);
+	          continue
+	        }
+	      } else if (input[1] === '/') {
+	        input = input.slice(2);
+	        continue
+	      }
+	    } else if (input[0] === '/') {
+	      if (input[1] === '.') {
+	        if (input[2] === '/') {
+	          input = input.slice(2);
+	          continue
+	        } else if (input[2] === '.') {
+	          if (input[3] === '/') {
+	            input = input.slice(3);
+	            if (output.length !== 0) {
+	              output.pop();
+	            }
+	            continue
+	          }
+	        }
+	      }
+	    }
+
+	    // Rule 2E: Move normal path segment to output
+	    if ((nextSlash = input.indexOf('/', 1)) === -1) {
+	      output.push(input);
+	      break
+	    } else {
+	      output.push(input.slice(0, nextSlash));
+	      input = input.slice(nextSlash);
+	    }
+	  }
+
+	  return output.join('')
+	}
+
+	/**
+	 * Re-escape RFC 3986 gen-delims that must not appear literally in the host.
+	 * After the URI regex parses, these characters cannot be literal in the host
+	 * field, so any that appear after decoding came from percent-encoding and
+	 * must be restored to prevent authority structure changes.
+	 *
+	 * @param {string} host
+	 * @param {boolean} isIP - true for IPv4/IPv6 hosts (skip colon re-escaping)
+	 * @returns {string}
+	 */
+	const HOST_DELIMS = { '@': '%40', '/': '%2F', '?': '%3F', '#': '%23', ':': '%3A' };
+	const HOST_DELIM_RE = /[@/?#:]/g;
+	const HOST_DELIM_NO_COLON_RE = /[@/?#]/g;
+
+	function reescapeHostDelimiters (host, isIP) {
+	  const re = isIP ? HOST_DELIM_NO_COLON_RE : HOST_DELIM_RE;
+	  re.lastIndex = 0;
+	  return host.replace(re, (ch) => HOST_DELIMS[ch])
+	}
+
+	/**
+	 * Normalizes percent escapes and optionally decodes only unreserved ASCII bytes.
+	 * Reserved delimiters such as `%2F` and `%2E` stay escaped.
+	 *
+	 * @param {string} input
+	 * @param {boolean} [decodeUnreserved=false]
+	 * @returns {string}
+	 */
+	function normalizePercentEncoding (input, decodeUnreserved = false) {
+	  if (input.indexOf('%') === -1) {
+	    return input
+	  }
+
+	  let output = '';
+
+	  for (let i = 0; i < input.length; i++) {
+	    if (input[i] === '%' && i + 2 < input.length) {
+	      const hex = input.slice(i + 1, i + 3);
+	      if (isHexPair(hex)) {
+	        const normalizedHex = hex.toUpperCase();
+	        const decoded = String.fromCharCode(parseInt(normalizedHex, 16));
+
+	        if (decodeUnreserved && isUnreserved(decoded)) {
+	          output += decoded;
+	        } else {
+	          output += '%' + normalizedHex;
+	        }
+
+	        i += 2;
+	        continue
+	      }
+	    }
+
+	    output += input[i];
+	  }
+
+	  return output
+	}
+
+	/**
+	 * Normalizes path data without turning reserved escapes into live path syntax.
+	 * Valid escapes are uppercased, raw unsafe characters are escaped, and only
+	 * unreserved bytes that are not `.` are decoded.
+	 *
+	 * @param {string} input
+	 * @returns {string}
+	 */
+	function normalizePathEncoding (input) {
+	  let output = '';
+
+	  for (let i = 0; i < input.length; i++) {
+	    if (input[i] === '%' && i + 2 < input.length) {
+	      const hex = input.slice(i + 1, i + 3);
+	      if (isHexPair(hex)) {
+	        const normalizedHex = hex.toUpperCase();
+	        const decoded = String.fromCharCode(parseInt(normalizedHex, 16));
+
+	        if (decoded !== '.' && isUnreserved(decoded)) {
+	          output += decoded;
+	        } else {
+	          output += '%' + normalizedHex;
+	        }
+
+	        i += 2;
+	        continue
+	      }
+	    }
+
+	    if (isPathCharacter(input[i])) {
+	      output += input[i];
+	    } else {
+	      output += escape(input[i]);
+	    }
+	  }
+
+	  return output
+	}
+
+	/**
+	 * Escapes a component while preserving existing valid percent escapes.
+	 *
+	 * @param {string} input
+	 * @returns {string}
+	 */
+	function escapePreservingEscapes (input) {
+	  let output = '';
+
+	  for (let i = 0; i < input.length; i++) {
+	    if (input[i] === '%' && i + 2 < input.length) {
+	      const hex = input.slice(i + 1, i + 3);
+	      if (isHexPair(hex)) {
+	        output += '%' + hex.toUpperCase();
+	        i += 2;
+	        continue
+	      }
+	    }
+
+	    output += escape(input[i]);
+	  }
+
+	  return output
+	}
+
+	/**
+	 * @param {import('../types/index').URIComponent} component
+	 * @returns {string|undefined}
+	 */
+	function recomposeAuthority (component) {
+	  const uriTokens = [];
+
+	  if (component.userinfo !== undefined) {
+	    uriTokens.push(component.userinfo);
+	    uriTokens.push('@');
+	  }
+
+	  if (component.host !== undefined) {
+	    let host = unescape(component.host);
+	    if (!isIPv4(host)) {
+	      const ipV6res = normalizeIPv6(host);
+	      if (ipV6res.isIPV6 === true) {
+	        host = `[${ipV6res.escapedHost}]`;
+	      } else {
+	        host = reescapeHostDelimiters(host, false);
+	      }
+	    }
+	    uriTokens.push(host);
+	  }
+
+	  if (typeof component.port === 'number' || typeof component.port === 'string') {
+	    uriTokens.push(':');
+	    uriTokens.push(String(component.port));
+	  }
+
+	  return uriTokens.length ? uriTokens.join('') : undefined
+	}
+	utils = {
+	  nonSimpleDomain,
+	  recomposeAuthority,
+	  reescapeHostDelimiters,
+	  normalizePercentEncoding,
+	  normalizePathEncoding,
+	  escapePreservingEscapes,
+	  removeDotSegments,
+	  isIPv4,
+	  isUUID,
+	  normalizeIPv6,
+	  stringArrayToHexStripped
+	};
+	return utils;
+}
+
+var schemes;
+var hasRequiredSchemes;
+
+function requireSchemes () {
+	if (hasRequiredSchemes) return schemes;
+	hasRequiredSchemes = 1;
+
+	const { isUUID } = requireUtils();
+	const URN_REG = /([\da-z][\d\-a-z]{0,31}):((?:[\w!$'()*+,\-.:;=@]|%[\da-f]{2})+)/iu;
+
+	const supportedSchemeNames = /** @type {const} */ (['http', 'https', 'ws',
+	  'wss', 'urn', 'urn:uuid']);
+
+	/** @typedef {supportedSchemeNames[number]} SchemeName */
+
+	/**
+	 * @param {string} name
+	 * @returns {name is SchemeName}
+	 */
+	function isValidSchemeName (name) {
+	  return supportedSchemeNames.indexOf(/** @type {*} */ (name)) !== -1
+	}
+
+	/**
+	 * @callback SchemeFn
+	 * @param {import('../types/index').URIComponent} component
+	 * @param {import('../types/index').Options} options
+	 * @returns {import('../types/index').URIComponent}
+	 */
+
+	/**
+	 * @typedef {Object} SchemeHandler
+	 * @property {SchemeName} scheme - The scheme name.
+	 * @property {boolean} [domainHost] - Indicates if the scheme supports domain hosts.
+	 * @property {SchemeFn} parse - Function to parse the URI component for this scheme.
+	 * @property {SchemeFn} serialize - Function to serialize the URI component for this scheme.
+	 * @property {boolean} [skipNormalize] - Indicates if normalization should be skipped for this scheme.
+	 * @property {boolean} [absolutePath] - Indicates if the scheme uses absolute paths.
+	 * @property {boolean} [unicodeSupport] - Indicates if the scheme supports Unicode.
+	 */
+
+	/**
+	 * @param {import('../types/index').URIComponent} wsComponent
+	 * @returns {boolean}
+	 */
+	function wsIsSecure (wsComponent) {
+	  if (wsComponent.secure === true) {
+	    return true
+	  } else if (wsComponent.secure === false) {
+	    return false
+	  } else if (wsComponent.scheme) {
+	    return (
+	      wsComponent.scheme.length === 3 &&
+	      (wsComponent.scheme[0] === 'w' || wsComponent.scheme[0] === 'W') &&
+	      (wsComponent.scheme[1] === 's' || wsComponent.scheme[1] === 'S') &&
+	      (wsComponent.scheme[2] === 's' || wsComponent.scheme[2] === 'S')
+	    )
+	  } else {
+	    return false
+	  }
+	}
+
+	/** @type {SchemeFn} */
+	function httpParse (component) {
+	  if (!component.host) {
+	    component.error = component.error || 'HTTP URIs must have a host.';
+	  }
+
+	  return component
+	}
+
+	/** @type {SchemeFn} */
+	function httpSerialize (component) {
+	  const secure = String(component.scheme).toLowerCase() === 'https';
+
+	  // normalize the default port
+	  if (component.port === (secure ? 443 : 80) || component.port === '') {
+	    component.port = undefined;
+	  }
+
+	  // normalize the empty path
+	  if (!component.path) {
+	    component.path = '/';
+	  }
+
+	  // NOTE: We do not parse query strings for HTTP URIs
+	  // as WWW Form Url Encoded query strings are part of the HTML4+ spec,
+	  // and not the HTTP spec.
+
+	  return component
+	}
+
+	/** @type {SchemeFn} */
+	function wsParse (wsComponent) {
+	// indicate if the secure flag is set
+	  wsComponent.secure = wsIsSecure(wsComponent);
+
+	  // construct resouce name
+	  wsComponent.resourceName = (wsComponent.path || '/') + (wsComponent.query ? '?' + wsComponent.query : '');
+	  wsComponent.path = undefined;
+	  wsComponent.query = undefined;
+
+	  return wsComponent
+	}
+
+	/** @type {SchemeFn} */
+	function wsSerialize (wsComponent) {
+	// normalize the default port
+	  if (wsComponent.port === (wsIsSecure(wsComponent) ? 443 : 80) || wsComponent.port === '') {
+	    wsComponent.port = undefined;
+	  }
+
+	  // ensure scheme matches secure flag
+	  if (typeof wsComponent.secure === 'boolean') {
+	    wsComponent.scheme = (wsComponent.secure ? 'wss' : 'ws');
+	    wsComponent.secure = undefined;
+	  }
+
+	  // reconstruct path from resource name
+	  if (wsComponent.resourceName) {
+	    const [path, query] = wsComponent.resourceName.split('?');
+	    wsComponent.path = (path && path !== '/' ? path : undefined);
+	    wsComponent.query = query;
+	    wsComponent.resourceName = undefined;
+	  }
+
+	  // forbid fragment component
+	  wsComponent.fragment = undefined;
+
+	  return wsComponent
+	}
+
+	/** @type {SchemeFn} */
+	function urnParse (urnComponent, options) {
+	  if (!urnComponent.path) {
+	    urnComponent.error = 'URN can not be parsed';
+	    return urnComponent
+	  }
+	  const matches = urnComponent.path.match(URN_REG);
+	  if (matches) {
+	    const scheme = options.scheme || urnComponent.scheme || 'urn';
+	    urnComponent.nid = matches[1].toLowerCase();
+	    urnComponent.nss = matches[2];
+	    const urnScheme = `${scheme}:${options.nid || urnComponent.nid}`;
+	    const schemeHandler = getSchemeHandler(urnScheme);
+	    urnComponent.path = undefined;
+
+	    if (schemeHandler) {
+	      urnComponent = schemeHandler.parse(urnComponent, options);
+	    }
+	  } else {
+	    urnComponent.error = urnComponent.error || 'URN can not be parsed.';
+	  }
+
+	  return urnComponent
+	}
+
+	/** @type {SchemeFn} */
+	function urnSerialize (urnComponent, options) {
+	  if (urnComponent.nid === undefined) {
+	    throw new Error('URN without nid cannot be serialized')
+	  }
+	  const scheme = options.scheme || urnComponent.scheme || 'urn';
+	  const nid = urnComponent.nid.toLowerCase();
+	  const urnScheme = `${scheme}:${options.nid || nid}`;
+	  const schemeHandler = getSchemeHandler(urnScheme);
+
+	  if (schemeHandler) {
+	    urnComponent = schemeHandler.serialize(urnComponent, options);
+	  }
+
+	  const uriComponent = urnComponent;
+	  const nss = urnComponent.nss;
+	  uriComponent.path = `${nid || options.nid}:${nss}`;
+
+	  options.skipEscape = true;
+	  return uriComponent
+	}
+
+	/** @type {SchemeFn} */
+	function urnuuidParse (urnComponent, options) {
+	  const uuidComponent = urnComponent;
+	  uuidComponent.uuid = uuidComponent.nss;
+	  uuidComponent.nss = undefined;
+
+	  if (!options.tolerant && (!uuidComponent.uuid || !isUUID(uuidComponent.uuid))) {
+	    uuidComponent.error = uuidComponent.error || 'UUID is not valid.';
+	  }
+
+	  return uuidComponent
+	}
+
+	/** @type {SchemeFn} */
+	function urnuuidSerialize (uuidComponent) {
+	  const urnComponent = uuidComponent;
+	  // normalize UUID
+	  urnComponent.nss = (uuidComponent.uuid || '').toLowerCase();
+	  return urnComponent
+	}
+
+	const http = /** @type {SchemeHandler} */ ({
+	  scheme: 'http',
+	  domainHost: true,
+	  parse: httpParse,
+	  serialize: httpSerialize
+	});
+
+	const https = /** @type {SchemeHandler} */ ({
+	  scheme: 'https',
+	  domainHost: http.domainHost,
+	  parse: httpParse,
+	  serialize: httpSerialize
+	});
+
+	const ws = /** @type {SchemeHandler} */ ({
+	  scheme: 'ws',
+	  domainHost: true,
+	  parse: wsParse,
+	  serialize: wsSerialize
+	});
+
+	const wss = /** @type {SchemeHandler} */ ({
+	  scheme: 'wss',
+	  domainHost: ws.domainHost,
+	  parse: ws.parse,
+	  serialize: ws.serialize
+	});
+
+	const urn = /** @type {SchemeHandler} */ ({
+	  scheme: 'urn',
+	  parse: urnParse,
+	  serialize: urnSerialize,
+	  skipNormalize: true
+	});
+
+	const urnuuid = /** @type {SchemeHandler} */ ({
+	  scheme: 'urn:uuid',
+	  parse: urnuuidParse,
+	  serialize: urnuuidSerialize,
+	  skipNormalize: true
+	});
+
+	const SCHEMES = /** @type {Record<SchemeName, SchemeHandler>} */ ({
+	  http,
+	  https,
+	  ws,
+	  wss,
+	  urn,
+	  'urn:uuid': urnuuid
+	});
+
+	Object.setPrototypeOf(SCHEMES, null);
+
+	/**
+	 * @param {string|undefined} scheme
+	 * @returns {SchemeHandler|undefined}
+	 */
+	function getSchemeHandler (scheme) {
+	  return (
+	    scheme && (
+	      SCHEMES[/** @type {SchemeName} */ (scheme)] ||
+	      SCHEMES[/** @type {SchemeName} */(scheme.toLowerCase())])
+	  ) ||
+	    undefined
+	}
+
+	schemes = {
+	  wsIsSecure,
+	  SCHEMES,
+	  isValidSchemeName,
+	  getSchemeHandler,
+	};
+	return schemes;
+}
+
+var hasRequiredFastUri;
+
+function requireFastUri () {
+	if (hasRequiredFastUri) return fastUri.exports;
+	hasRequiredFastUri = 1;
+
+	const { normalizeIPv6, removeDotSegments, recomposeAuthority, normalizePercentEncoding, normalizePathEncoding, escapePreservingEscapes, reescapeHostDelimiters, isIPv4, nonSimpleDomain } = requireUtils();
+	const { SCHEMES, getSchemeHandler } = requireSchemes();
+
+	/**
+	 * @template {import('./types/index').URIComponent|string} T
+	 * @param {T} uri
+	 * @param {import('./types/index').Options} [options]
+	 * @returns {T}
+	 */
+	function normalize (uri, options) {
+	  if (typeof uri === 'string') {
+	    uri = /** @type {T} */ (normalizeString(uri, options));
+	  } else if (typeof uri === 'object') {
+	    uri = /** @type {T} */ (parse(serialize(uri, options), options));
+	  }
+	  return uri
+	}
+
+	/**
+	 * @param {string} baseURI
+	 * @param {string} relativeURI
+	 * @param {import('./types/index').Options} [options]
+	 * @returns {string}
+	 */
+	function resolve (baseURI, relativeURI, options) {
+	  const schemelessOptions = options ? Object.assign({ scheme: 'null' }, options) : { scheme: 'null' };
+	  const resolved = resolveComponent(parse(baseURI, schemelessOptions), parse(relativeURI, schemelessOptions), schemelessOptions, true);
+	  schemelessOptions.skipEscape = true;
+	  return serialize(resolved, schemelessOptions)
+	}
+
+	/**
+	 * @param {import ('./types/index').URIComponent} base
+	 * @param {import ('./types/index').URIComponent} relative
+	 * @param {import('./types/index').Options} [options]
+	 * @param {boolean} [skipNormalization=false]
+	 * @returns {import ('./types/index').URIComponent}
+	 */
+	function resolveComponent (base, relative, options, skipNormalization) {
+	  /** @type {import('./types/index').URIComponent} */
+	  const target = {};
+	  if (!skipNormalization) {
+	    base = parse(serialize(base, options), options); // normalize base component
+	    relative = parse(serialize(relative, options), options); // normalize relative component
+	  }
+	  options = options || {};
+
+	  if (!options.tolerant && relative.scheme) {
+	    target.scheme = relative.scheme;
+	    // target.authority = relative.authority;
+	    target.userinfo = relative.userinfo;
+	    target.host = relative.host;
+	    target.port = relative.port;
+	    target.path = removeDotSegments(relative.path || '');
+	    target.query = relative.query;
+	  } else {
+	    if (relative.userinfo !== undefined || relative.host !== undefined || relative.port !== undefined) {
+	      // target.authority = relative.authority;
+	      target.userinfo = relative.userinfo;
+	      target.host = relative.host;
+	      target.port = relative.port;
+	      target.path = removeDotSegments(relative.path || '');
+	      target.query = relative.query;
+	    } else {
+	      if (!relative.path) {
+	        target.path = base.path;
+	        if (relative.query !== undefined) {
+	          target.query = relative.query;
+	        } else {
+	          target.query = base.query;
+	        }
+	      } else {
+	        if (relative.path[0] === '/') {
+	          target.path = removeDotSegments(relative.path);
+	        } else {
+	          if ((base.userinfo !== undefined || base.host !== undefined || base.port !== undefined) && !base.path) {
+	            target.path = '/' + relative.path;
+	          } else if (!base.path) {
+	            target.path = relative.path;
+	          } else {
+	            target.path = base.path.slice(0, base.path.lastIndexOf('/') + 1) + relative.path;
+	          }
+	          target.path = removeDotSegments(target.path);
+	        }
+	        target.query = relative.query;
+	      }
+	      // target.authority = base.authority;
+	      target.userinfo = base.userinfo;
+	      target.host = base.host;
+	      target.port = base.port;
+	    }
+	    target.scheme = base.scheme;
+	  }
+
+	  target.fragment = relative.fragment;
+
+	  return target
+	}
+
+	/**
+	 * @param {import ('./types/index').URIComponent|string} uriA
+	 * @param {import ('./types/index').URIComponent|string} uriB
+	 * @param {import ('./types/index').Options} options
+	 * @returns {boolean}
+	 */
+	function equal (uriA, uriB, options) {
+	  const normalizedA = normalizeComparableURI(uriA, options);
+	  const normalizedB = normalizeComparableURI(uriB, options);
+
+	  return normalizedA !== undefined && normalizedB !== undefined && normalizedA.toLowerCase() === normalizedB.toLowerCase()
+	}
+
+	/**
+	 * @param {Readonly<import('./types/index').URIComponent>} cmpts
+	 * @param {import('./types/index').Options} [opts]
+	 * @returns {string}
+	 */
+	function serialize (cmpts, opts) {
+	  const component = {
+	    host: cmpts.host,
+	    scheme: cmpts.scheme,
+	    userinfo: cmpts.userinfo,
+	    port: cmpts.port,
+	    path: cmpts.path,
+	    query: cmpts.query,
+	    nid: cmpts.nid,
+	    nss: cmpts.nss,
+	    uuid: cmpts.uuid,
+	    fragment: cmpts.fragment,
+	    reference: cmpts.reference,
+	    resourceName: cmpts.resourceName,
+	    secure: cmpts.secure,
+	    error: ''
+	  };
+	  const options = Object.assign({}, opts);
+	  const uriTokens = [];
+
+	  // find scheme handler
+	  const schemeHandler = getSchemeHandler(options.scheme || component.scheme);
+
+	  // perform scheme specific serialization
+	  if (schemeHandler && schemeHandler.serialize) schemeHandler.serialize(component, options);
+
+	  if (component.path !== undefined) {
+	    if (!options.skipEscape) {
+	      component.path = escapePreservingEscapes(component.path);
+
+	      if (component.scheme !== undefined) {
+	        component.path = component.path.split('%3A').join(':');
+	      }
+	    } else {
+	      component.path = normalizePercentEncoding(component.path);
+	    }
+	  }
+
+	  if (options.reference !== 'suffix' && component.scheme) {
+	    uriTokens.push(component.scheme, ':');
+	  }
+
+	  const authority = recomposeAuthority(component);
+	  if (authority !== undefined) {
+	    if (options.reference !== 'suffix') {
+	      uriTokens.push('//');
+	    }
+
+	    uriTokens.push(authority);
+
+	    if (component.path && component.path[0] !== '/') {
+	      uriTokens.push('/');
+	    }
+	  }
+	  if (component.path !== undefined) {
+	    let s = component.path;
+
+	    if (!options.absolutePath && (!schemeHandler || !schemeHandler.absolutePath)) {
+	      s = removeDotSegments(s);
+	    }
+
+	    if (
+	      authority === undefined &&
+	      s[0] === '/' &&
+	      s[1] === '/'
+	    ) {
+	      // don't allow the path to start with "//"
+	      s = '/%2F' + s.slice(2);
+	    }
+
+	    uriTokens.push(s);
+	  }
+
+	  if (component.query !== undefined) {
+	    uriTokens.push('?', component.query);
+	  }
+
+	  if (component.fragment !== undefined) {
+	    uriTokens.push('#', component.fragment);
+	  }
+	  return uriTokens.join('')
+	}
+
+	const URI_PARSE = /^(?:([^#/:?]+):)?(?:\/\/((?:([^#/?@]*)@)?(\[[^#/?\]]+\]|[^#/:?]*)(?::(\d*))?))?([^#?]*)(?:\?([^#]*))?(?:#((?:.|[\n\r])*))?/u;
+
+	/**
+	 * @param {import('./types/index').URIComponent} parsed
+	 * @param {RegExpMatchArray} matches
+	 * @returns {string|undefined}
+	 */
+	function getParseError (parsed, matches) {
+	  if (matches[2] !== undefined && parsed.path && parsed.path[0] !== '/') {
+	    return 'URI path must start with "/" when authority is present.'
+	  }
+
+	  if (typeof parsed.port === 'number' && (parsed.port < 0 || parsed.port > 65535)) {
+	    return 'URI port is malformed.'
+	  }
+
+	  return undefined
+	}
+
+	/**
+	 * @param {string} uri
+	 * @param {import('./types/index').Options} [opts]
+	 * @returns {{ parsed: import('./types/index').URIComponent, malformedAuthorityOrPort: boolean }}
+	 */
+	function parseWithStatus (uri, opts) {
+	  const options = Object.assign({}, opts);
+	  /** @type {import('./types/index').URIComponent} */
+	  const parsed = {
+	    scheme: undefined,
+	    userinfo: undefined,
+	    host: '',
+	    port: undefined,
+	    path: '',
+	    query: undefined,
+	    fragment: undefined
+	  };
+
+	  let malformedAuthorityOrPort = false;
+
+	  let isIP = false;
+	  if (options.reference === 'suffix') {
+	    if (options.scheme) {
+	      uri = options.scheme + ':' + uri;
+	    } else {
+	      uri = '//' + uri;
+	    }
+	  }
+
+	  const matches = uri.match(URI_PARSE);
+
+	  if (matches) {
+	    // store each component
+	    parsed.scheme = matches[1];
+	    parsed.userinfo = matches[3];
+	    parsed.host = matches[4];
+	    parsed.port = parseInt(matches[5], 10);
+	    parsed.path = matches[6] || '';
+	    parsed.query = matches[7];
+	    parsed.fragment = matches[8];
+
+	    // fix port number
+	    if (isNaN(parsed.port)) {
+	      parsed.port = matches[5];
+	    }
+
+	    const parseError = getParseError(parsed, matches);
+	    if (parseError !== undefined) {
+	      parsed.error = parsed.error || parseError;
+	      malformedAuthorityOrPort = true;
+	    }
+
+	    if (parsed.host) {
+	      const ipv4result = isIPv4(parsed.host);
+	      if (ipv4result === false) {
+	        const ipv6result = normalizeIPv6(parsed.host);
+	        parsed.host = ipv6result.host.toLowerCase();
+	        isIP = ipv6result.isIPV6;
+	      } else {
+	        isIP = true;
+	      }
+	    }
+	    if (parsed.scheme === undefined && parsed.userinfo === undefined && parsed.host === undefined && parsed.port === undefined && parsed.query === undefined && !parsed.path) {
+	      parsed.reference = 'same-document';
+	    } else if (parsed.scheme === undefined) {
+	      parsed.reference = 'relative';
+	    } else if (parsed.fragment === undefined) {
+	      parsed.reference = 'absolute';
+	    } else {
+	      parsed.reference = 'uri';
+	    }
+
+	    // check for reference errors
+	    if (options.reference && options.reference !== 'suffix' && options.reference !== parsed.reference) {
+	      parsed.error = parsed.error || 'URI is not a ' + options.reference + ' reference.';
+	    }
+
+	    // find scheme handler
+	    const schemeHandler = getSchemeHandler(options.scheme || parsed.scheme);
+
+	    // check if scheme can't handle IRIs
+	    if (!options.unicodeSupport && (!schemeHandler || !schemeHandler.unicodeSupport)) {
+	      // if host component is a domain name
+	      if (parsed.host && (options.domainHost || (schemeHandler && schemeHandler.domainHost)) && isIP === false && nonSimpleDomain(parsed.host)) {
+	        // convert Unicode IDN -> ASCII IDN
+	        try {
+	          parsed.host = URL.domainToASCII(parsed.host.toLowerCase());
+	        } catch (e) {
+	          parsed.error = parsed.error || "Host's domain name can not be converted to ASCII: " + e;
+	        }
+	      }
+	      // convert IRI -> URI
+	    }
+
+	    if (!schemeHandler || (schemeHandler && !schemeHandler.skipNormalize)) {
+	      if (uri.indexOf('%') !== -1) {
+	        if (parsed.scheme !== undefined) {
+	          parsed.scheme = unescape(parsed.scheme);
+	        }
+	        if (parsed.host !== undefined) {
+	          parsed.host = reescapeHostDelimiters(unescape(parsed.host), isIP);
+	        }
+	      }
+	      if (parsed.path) {
+	        parsed.path = normalizePathEncoding(parsed.path);
+	      }
+	      if (parsed.fragment) {
+	        try {
+	          parsed.fragment = encodeURI(decodeURIComponent(parsed.fragment));
+	        } catch {
+	          parsed.error = parsed.error || 'URI malformed';
+	        }
+	      }
+	    }
+
+	    // perform scheme specific parsing
+	    if (schemeHandler && schemeHandler.parse) {
+	      schemeHandler.parse(parsed, options);
+	    }
+	  } else {
+	    parsed.error = parsed.error || 'URI can not be parsed.';
+	  }
+	  return { parsed, malformedAuthorityOrPort }
+	}
+
+	/**
+	 * @param {string} uri
+	 * @param {import('./types/index').Options} [opts]
+	 * @returns
+	 */
+	function parse (uri, opts) {
+	  return parseWithStatus(uri, opts).parsed
+	}
+
+	/**
+	 * @param {string} uri
+	 * @param {import('./types/index').Options} [opts]
+	 * @returns {string}
+	 */
+	function normalizeString (uri, opts) {
+	  return normalizeStringWithStatus(uri, opts).normalized
+	}
+
+	/**
+	 * @param {string} uri
+	 * @param {import('./types/index').Options} [opts]
+	 * @returns {{ normalized: string, malformedAuthorityOrPort: boolean }}
+	 */
+	function normalizeStringWithStatus (uri, opts) {
+	  const { parsed, malformedAuthorityOrPort } = parseWithStatus(uri, opts);
+	  return {
+	    normalized: malformedAuthorityOrPort ? uri : serialize(parsed, opts),
+	    malformedAuthorityOrPort
+	  }
+	}
+
+	/**
+	 * @param {import ('./types/index').URIComponent|string} uri
+	 * @param {import('./types/index').Options} [opts]
+	 * @returns {string|undefined}
+	 */
+	function normalizeComparableURI (uri, opts) {
+	  if (typeof uri === 'string') {
+	    const { normalized, malformedAuthorityOrPort } = normalizeStringWithStatus(uri, opts);
+	    return malformedAuthorityOrPort ? undefined : normalized
+	  }
+
+	  if (typeof uri === 'object') {
+	    return serialize(uri, opts)
+	  }
+	}
+
+	const fastUri$1 = {
+	  SCHEMES,
+	  normalize,
+	  resolve,
+	  resolveComponent,
+	  equal,
+	  serialize,
+	  parse
+	};
+
+	fastUri.exports = fastUri$1;
+	fastUri.exports.default = fastUri$1;
+	fastUri.exports.fastUri = fastUri$1;
+	return fastUri.exports;
+}
+
+var hasRequiredUri;
+
+function requireUri () {
+	if (hasRequiredUri) return uri;
+	hasRequiredUri = 1;
+	Object.defineProperty(uri, "__esModule", { value: true });
+	const uri$1 = requireFastUri();
+	uri$1.code = 'require("ajv/dist/runtime/uri").default';
+	uri.default = uri$1;
+	
+	return uri;
+}
+
+var hasRequiredCore$1;
+
+function requireCore$1 () {
+	if (hasRequiredCore$1) return core$1;
+	hasRequiredCore$1 = 1;
+	(function (exports) {
+		Object.defineProperty(exports, "__esModule", { value: true });
+		exports.CodeGen = exports.Name = exports.nil = exports.stringify = exports.str = exports._ = exports.KeywordCxt = void 0;
+		var validate_1 = /*@__PURE__*/ requireValidate();
+		Object.defineProperty(exports, "KeywordCxt", { enumerable: true, get: function () { return validate_1.KeywordCxt; } });
+		var codegen_1 = /*@__PURE__*/ requireCodegen();
+		Object.defineProperty(exports, "_", { enumerable: true, get: function () { return codegen_1._; } });
+		Object.defineProperty(exports, "str", { enumerable: true, get: function () { return codegen_1.str; } });
+		Object.defineProperty(exports, "stringify", { enumerable: true, get: function () { return codegen_1.stringify; } });
+		Object.defineProperty(exports, "nil", { enumerable: true, get: function () { return codegen_1.nil; } });
+		Object.defineProperty(exports, "Name", { enumerable: true, get: function () { return codegen_1.Name; } });
+		Object.defineProperty(exports, "CodeGen", { enumerable: true, get: function () { return codegen_1.CodeGen; } });
+		const validation_error_1 = /*@__PURE__*/ requireValidation_error();
+		const ref_error_1 = /*@__PURE__*/ requireRef_error();
+		const rules_1 = /*@__PURE__*/ requireRules();
+		const compile_1 = /*@__PURE__*/ requireCompile();
+		const codegen_2 = /*@__PURE__*/ requireCodegen();
+		const resolve_1 = /*@__PURE__*/ requireResolve();
+		const dataType_1 = /*@__PURE__*/ requireDataType();
+		const util_1 = /*@__PURE__*/ requireUtil();
+		const $dataRefSchema = require$$9;
+		const uri_1 = /*@__PURE__*/ requireUri();
+		const defaultRegExp = (str, flags) => new RegExp(str, flags);
+		defaultRegExp.code = "new RegExp";
+		const META_IGNORE_OPTIONS = ["removeAdditional", "useDefaults", "coerceTypes"];
+		const EXT_SCOPE_NAMES = new Set([
+		    "validate",
+		    "serialize",
+		    "parse",
+		    "wrapper",
+		    "root",
+		    "schema",
+		    "keyword",
+		    "pattern",
+		    "formats",
+		    "validate$data",
+		    "func",
+		    "obj",
+		    "Error",
+		]);
+		const removedOptions = {
+		    errorDataPath: "",
+		    format: "`validateFormats: false` can be used instead.",
+		    nullable: '"nullable" keyword is supported by default.',
+		    jsonPointers: "Deprecated jsPropertySyntax can be used instead.",
+		    extendRefs: "Deprecated ignoreKeywordsWithRef can be used instead.",
+		    missingRefs: "Pass empty schema with $id that should be ignored to ajv.addSchema.",
+		    processCode: "Use option `code: {process: (code, schemaEnv: object) => string}`",
+		    sourceCode: "Use option `code: {source: true}`",
+		    strictDefaults: "It is default now, see option `strict`.",
+		    strictKeywords: "It is default now, see option `strict`.",
+		    uniqueItems: '"uniqueItems" keyword is always validated.',
+		    unknownFormats: "Disable strict mode or pass `true` to `ajv.addFormat` (or `formats` option).",
+		    cache: "Map is used as cache, schema object as key.",
+		    serialize: "Map is used as cache, schema object as key.",
+		    ajvErrors: "It is default now.",
+		};
+		const deprecatedOptions = {
+		    ignoreKeywordsWithRef: "",
+		    jsPropertySyntax: "",
+		    unicode: '"minLength"/"maxLength" account for unicode characters by default.',
+		};
+		const MAX_EXPRESSION = 200;
+		// eslint-disable-next-line complexity
+		function requiredOptions(o) {
+		    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0;
+		    const s = o.strict;
+		    const _optz = (_a = o.code) === null || _a === void 0 ? void 0 : _a.optimize;
+		    const optimize = _optz === true || _optz === undefined ? 1 : _optz || 0;
+		    const regExp = (_c = (_b = o.code) === null || _b === void 0 ? void 0 : _b.regExp) !== null && _c !== void 0 ? _c : defaultRegExp;
+		    const uriResolver = (_d = o.uriResolver) !== null && _d !== void 0 ? _d : uri_1.default;
+		    return {
+		        strictSchema: (_f = (_e = o.strictSchema) !== null && _e !== void 0 ? _e : s) !== null && _f !== void 0 ? _f : true,
+		        strictNumbers: (_h = (_g = o.strictNumbers) !== null && _g !== void 0 ? _g : s) !== null && _h !== void 0 ? _h : true,
+		        strictTypes: (_k = (_j = o.strictTypes) !== null && _j !== void 0 ? _j : s) !== null && _k !== void 0 ? _k : "log",
+		        strictTuples: (_m = (_l = o.strictTuples) !== null && _l !== void 0 ? _l : s) !== null && _m !== void 0 ? _m : "log",
+		        strictRequired: (_p = (_o = o.strictRequired) !== null && _o !== void 0 ? _o : s) !== null && _p !== void 0 ? _p : false,
+		        code: o.code ? { ...o.code, optimize, regExp } : { optimize, regExp },
+		        loopRequired: (_q = o.loopRequired) !== null && _q !== void 0 ? _q : MAX_EXPRESSION,
+		        loopEnum: (_r = o.loopEnum) !== null && _r !== void 0 ? _r : MAX_EXPRESSION,
+		        meta: (_s = o.meta) !== null && _s !== void 0 ? _s : true,
+		        messages: (_t = o.messages) !== null && _t !== void 0 ? _t : true,
+		        inlineRefs: (_u = o.inlineRefs) !== null && _u !== void 0 ? _u : true,
+		        schemaId: (_v = o.schemaId) !== null && _v !== void 0 ? _v : "$id",
+		        addUsedSchema: (_w = o.addUsedSchema) !== null && _w !== void 0 ? _w : true,
+		        validateSchema: (_x = o.validateSchema) !== null && _x !== void 0 ? _x : true,
+		        validateFormats: (_y = o.validateFormats) !== null && _y !== void 0 ? _y : true,
+		        unicodeRegExp: (_z = o.unicodeRegExp) !== null && _z !== void 0 ? _z : true,
+		        int32range: (_0 = o.int32range) !== null && _0 !== void 0 ? _0 : true,
+		        uriResolver: uriResolver,
+		    };
+		}
+		class Ajv {
+		    constructor(opts = {}) {
+		        this.schemas = {};
+		        this.refs = {};
+		        this.formats = Object.create(null);
+		        this._compilations = new Set();
+		        this._loading = {};
+		        this._cache = new Map();
+		        opts = this.opts = { ...opts, ...requiredOptions(opts) };
+		        const { es5, lines } = this.opts.code;
+		        this.scope = new codegen_2.ValueScope({ scope: {}, prefixes: EXT_SCOPE_NAMES, es5, lines });
+		        this.logger = getLogger(opts.logger);
+		        const formatOpt = opts.validateFormats;
+		        opts.validateFormats = false;
+		        this.RULES = (0, rules_1.getRules)();
+		        checkOptions.call(this, removedOptions, opts, "NOT SUPPORTED");
+		        checkOptions.call(this, deprecatedOptions, opts, "DEPRECATED", "warn");
+		        this._metaOpts = getMetaSchemaOptions.call(this);
+		        if (opts.formats)
+		            addInitialFormats.call(this);
+		        this._addVocabularies();
+		        this._addDefaultMetaSchema();
+		        if (opts.keywords)
+		            addInitialKeywords.call(this, opts.keywords);
+		        if (typeof opts.meta == "object")
+		            this.addMetaSchema(opts.meta);
+		        addInitialSchemas.call(this);
+		        opts.validateFormats = formatOpt;
+		    }
+		    _addVocabularies() {
+		        this.addKeyword("$async");
+		    }
+		    _addDefaultMetaSchema() {
+		        const { $data, meta, schemaId } = this.opts;
+		        let _dataRefSchema = $dataRefSchema;
+		        if (schemaId === "id") {
+		            _dataRefSchema = { ...$dataRefSchema };
+		            _dataRefSchema.id = _dataRefSchema.$id;
+		            delete _dataRefSchema.$id;
+		        }
+		        if (meta && $data)
+		            this.addMetaSchema(_dataRefSchema, _dataRefSchema[schemaId], false);
+		    }
+		    defaultMeta() {
+		        const { meta, schemaId } = this.opts;
+		        return (this.opts.defaultMeta = typeof meta == "object" ? meta[schemaId] || meta : undefined);
+		    }
+		    validate(schemaKeyRef, // key, ref or schema object
+		    // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
+		    data // to be validated
+		    ) {
+		        let v;
+		        if (typeof schemaKeyRef == "string") {
+		            v = this.getSchema(schemaKeyRef);
+		            if (!v)
+		                throw new Error(`no schema with key or ref "${schemaKeyRef}"`);
+		        }
+		        else {
+		            v = this.compile(schemaKeyRef);
+		        }
+		        const valid = v(data);
+		        if (!("$async" in v))
+		            this.errors = v.errors;
+		        return valid;
+		    }
+		    compile(schema, _meta) {
+		        const sch = this._addSchema(schema, _meta);
+		        return (sch.validate || this._compileSchemaEnv(sch));
+		    }
+		    compileAsync(schema, meta) {
+		        if (typeof this.opts.loadSchema != "function") {
+		            throw new Error("options.loadSchema should be a function");
+		        }
+		        const { loadSchema } = this.opts;
+		        return runCompileAsync.call(this, schema, meta);
+		        async function runCompileAsync(_schema, _meta) {
+		            await loadMetaSchema.call(this, _schema.$schema);
+		            const sch = this._addSchema(_schema, _meta);
+		            return sch.validate || _compileAsync.call(this, sch);
+		        }
+		        async function loadMetaSchema($ref) {
+		            if ($ref && !this.getSchema($ref)) {
+		                await runCompileAsync.call(this, { $ref }, true);
+		            }
+		        }
+		        async function _compileAsync(sch) {
+		            try {
+		                return this._compileSchemaEnv(sch);
+		            }
+		            catch (e) {
+		                if (!(e instanceof ref_error_1.default))
+		                    throw e;
+		                checkLoaded.call(this, e);
+		                await loadMissingSchema.call(this, e.missingSchema);
+		                return _compileAsync.call(this, sch);
+		            }
+		        }
+		        function checkLoaded({ missingSchema: ref, missingRef }) {
+		            if (this.refs[ref]) {
+		                throw new Error(`AnySchema ${ref} is loaded but ${missingRef} cannot be resolved`);
+		            }
+		        }
+		        async function loadMissingSchema(ref) {
+		            const _schema = await _loadSchema.call(this, ref);
+		            if (!this.refs[ref])
+		                await loadMetaSchema.call(this, _schema.$schema);
+		            if (!this.refs[ref])
+		                this.addSchema(_schema, ref, meta);
+		        }
+		        async function _loadSchema(ref) {
+		            const p = this._loading[ref];
+		            if (p)
+		                return p;
+		            try {
+		                return await (this._loading[ref] = loadSchema(ref));
+		            }
+		            finally {
+		                delete this._loading[ref];
+		            }
+		        }
+		    }
+		    // Adds schema to the instance
+		    addSchema(schema, // If array is passed, `key` will be ignored
+		    key, // Optional schema key. Can be passed to `validate` method instead of schema object or id/ref. One schema per instance can have empty `id` and `key`.
+		    _meta, // true if schema is a meta-schema. Used internally, addMetaSchema should be used instead.
+		    _validateSchema = this.opts.validateSchema // false to skip schema validation. Used internally, option validateSchema should be used instead.
+		    ) {
+		        if (Array.isArray(schema)) {
+		            for (const sch of schema)
+		                this.addSchema(sch, undefined, _meta, _validateSchema);
+		            return this;
+		        }
+		        let id;
+		        if (typeof schema === "object") {
+		            const { schemaId } = this.opts;
+		            id = schema[schemaId];
+		            if (id !== undefined && typeof id != "string") {
+		                throw new Error(`schema ${schemaId} must be string`);
+		            }
+		        }
+		        key = (0, resolve_1.normalizeId)(key || id);
+		        this._checkUnique(key);
+		        this.schemas[key] = this._addSchema(schema, _meta, key, _validateSchema, true);
+		        return this;
+		    }
+		    // Add schema that will be used to validate other schemas
+		    // options in META_IGNORE_OPTIONS are alway set to false
+		    addMetaSchema(schema, key, // schema key
+		    _validateSchema = this.opts.validateSchema // false to skip schema validation, can be used to override validateSchema option for meta-schema
+		    ) {
+		        this.addSchema(schema, key, true, _validateSchema);
+		        return this;
+		    }
+		    //  Validate schema against its meta-schema
+		    validateSchema(schema, throwOrLogError) {
+		        if (typeof schema == "boolean")
+		            return true;
+		        let $schema;
+		        $schema = schema.$schema;
+		        if ($schema !== undefined && typeof $schema != "string") {
+		            throw new Error("$schema must be a string");
+		        }
+		        $schema = $schema || this.opts.defaultMeta || this.defaultMeta();
+		        if (!$schema) {
+		            this.logger.warn("meta-schema not available");
+		            this.errors = null;
+		            return true;
+		        }
+		        const valid = this.validate($schema, schema);
+		        if (!valid && throwOrLogError) {
+		            const message = "schema is invalid: " + this.errorsText();
+		            if (this.opts.validateSchema === "log")
+		                this.logger.error(message);
+		            else
+		                throw new Error(message);
+		        }
+		        return valid;
+		    }
+		    // Get compiled schema by `key` or `ref`.
+		    // (`key` that was passed to `addSchema` or full schema reference - `schema.$id` or resolved id)
+		    getSchema(keyRef) {
+		        let sch;
+		        while (typeof (sch = getSchEnv.call(this, keyRef)) == "string")
+		            keyRef = sch;
+		        if (sch === undefined) {
+		            const { schemaId } = this.opts;
+		            const root = new compile_1.SchemaEnv({ schema: {}, schemaId });
+		            sch = compile_1.resolveSchema.call(this, root, keyRef);
+		            if (!sch)
+		                return;
+		            this.refs[keyRef] = sch;
+		        }
+		        return (sch.validate || this._compileSchemaEnv(sch));
+		    }
+		    // Remove cached schema(s).
+		    // If no parameter is passed all schemas but meta-schemas are removed.
+		    // If RegExp is passed all schemas with key/id matching pattern but meta-schemas are removed.
+		    // Even if schema is referenced by other schemas it still can be removed as other schemas have local references.
+		    removeSchema(schemaKeyRef) {
+		        if (schemaKeyRef instanceof RegExp) {
+		            this._removeAllSchemas(this.schemas, schemaKeyRef);
+		            this._removeAllSchemas(this.refs, schemaKeyRef);
+		            return this;
+		        }
+		        switch (typeof schemaKeyRef) {
+		            case "undefined":
+		                this._removeAllSchemas(this.schemas);
+		                this._removeAllSchemas(this.refs);
+		                this._cache.clear();
+		                return this;
+		            case "string": {
+		                const sch = getSchEnv.call(this, schemaKeyRef);
+		                if (typeof sch == "object")
+		                    this._cache.delete(sch.schema);
+		                delete this.schemas[schemaKeyRef];
+		                delete this.refs[schemaKeyRef];
+		                return this;
+		            }
+		            case "object": {
+		                const cacheKey = schemaKeyRef;
+		                this._cache.delete(cacheKey);
+		                let id = schemaKeyRef[this.opts.schemaId];
+		                if (id) {
+		                    id = (0, resolve_1.normalizeId)(id);
+		                    delete this.schemas[id];
+		                    delete this.refs[id];
+		                }
+		                return this;
+		            }
+		            default:
+		                throw new Error("ajv.removeSchema: invalid parameter");
+		        }
+		    }
+		    // add "vocabulary" - a collection of keywords
+		    addVocabulary(definitions) {
+		        for (const def of definitions)
+		            this.addKeyword(def);
+		        return this;
+		    }
+		    addKeyword(kwdOrDef, def // deprecated
+		    ) {
+		        let keyword;
+		        if (typeof kwdOrDef == "string") {
+		            keyword = kwdOrDef;
+		            if (typeof def == "object") {
+		                this.logger.warn("these parameters are deprecated, see docs for addKeyword");
+		                def.keyword = keyword;
+		            }
+		        }
+		        else if (typeof kwdOrDef == "object" && def === undefined) {
+		            def = kwdOrDef;
+		            keyword = def.keyword;
+		            if (Array.isArray(keyword) && !keyword.length) {
+		                throw new Error("addKeywords: keyword must be string or non-empty array");
+		            }
+		        }
+		        else {
+		            throw new Error("invalid addKeywords parameters");
+		        }
+		        checkKeyword.call(this, keyword, def);
+		        if (!def) {
+		            (0, util_1.eachItem)(keyword, (kwd) => addRule.call(this, kwd));
+		            return this;
+		        }
+		        keywordMetaschema.call(this, def);
+		        const definition = {
+		            ...def,
+		            type: (0, dataType_1.getJSONTypes)(def.type),
+		            schemaType: (0, dataType_1.getJSONTypes)(def.schemaType),
+		        };
+		        (0, util_1.eachItem)(keyword, definition.type.length === 0
+		            ? (k) => addRule.call(this, k, definition)
+		            : (k) => definition.type.forEach((t) => addRule.call(this, k, definition, t)));
+		        return this;
+		    }
+		    getKeyword(keyword) {
+		        const rule = this.RULES.all[keyword];
+		        return typeof rule == "object" ? rule.definition : !!rule;
+		    }
+		    // Remove keyword
+		    removeKeyword(keyword) {
+		        // TODO return type should be Ajv
+		        const { RULES } = this;
+		        delete RULES.keywords[keyword];
+		        delete RULES.all[keyword];
+		        for (const group of RULES.rules) {
+		            const i = group.rules.findIndex((rule) => rule.keyword === keyword);
+		            if (i >= 0)
+		                group.rules.splice(i, 1);
+		        }
+		        return this;
+		    }
+		    // Add format
+		    addFormat(name, format) {
+		        if (typeof format == "string")
+		            format = new RegExp(format);
+		        this.formats[name] = format;
+		        return this;
+		    }
+		    errorsText(errors = this.errors, // optional array of validation errors
+		    { separator = ", ", dataVar = "data" } = {} // optional options with properties `separator` and `dataVar`
+		    ) {
+		        if (!errors || errors.length === 0)
+		            return "No errors";
+		        return errors
+		            .map((e) => `${dataVar}${e.instancePath} ${e.message}`)
+		            .reduce((text, msg) => text + separator + msg);
+		    }
+		    $dataMetaSchema(metaSchema, keywordsJsonPointers) {
+		        const rules = this.RULES.all;
+		        metaSchema = JSON.parse(JSON.stringify(metaSchema));
+		        for (const jsonPointer of keywordsJsonPointers) {
+		            const segments = jsonPointer.split("/").slice(1); // first segment is an empty string
+		            let keywords = metaSchema;
+		            for (const seg of segments)
+		                keywords = keywords[seg];
+		            for (const key in rules) {
+		                const rule = rules[key];
+		                if (typeof rule != "object")
+		                    continue;
+		                const { $data } = rule.definition;
+		                const schema = keywords[key];
+		                if ($data && schema)
+		                    keywords[key] = schemaOrData(schema);
+		            }
+		        }
+		        return metaSchema;
+		    }
+		    _removeAllSchemas(schemas, regex) {
+		        for (const keyRef in schemas) {
+		            const sch = schemas[keyRef];
+		            if (!regex || regex.test(keyRef)) {
+		                if (typeof sch == "string") {
+		                    delete schemas[keyRef];
+		                }
+		                else if (sch && !sch.meta) {
+		                    this._cache.delete(sch.schema);
+		                    delete schemas[keyRef];
+		                }
+		            }
+		        }
+		    }
+		    _addSchema(schema, meta, baseId, validateSchema = this.opts.validateSchema, addSchema = this.opts.addUsedSchema) {
+		        let id;
+		        const { schemaId } = this.opts;
+		        if (typeof schema == "object") {
+		            id = schema[schemaId];
+		        }
+		        else {
+		            if (this.opts.jtd)
+		                throw new Error("schema must be object");
+		            else if (typeof schema != "boolean")
+		                throw new Error("schema must be object or boolean");
+		        }
+		        let sch = this._cache.get(schema);
+		        if (sch !== undefined)
+		            return sch;
+		        baseId = (0, resolve_1.normalizeId)(id || baseId);
+		        const localRefs = resolve_1.getSchemaRefs.call(this, schema, baseId);
+		        sch = new compile_1.SchemaEnv({ schema, schemaId, meta, baseId, localRefs });
+		        this._cache.set(sch.schema, sch);
+		        if (addSchema && !baseId.startsWith("#")) {
+		            // TODO atm it is allowed to overwrite schemas without id (instead of not adding them)
+		            if (baseId)
+		                this._checkUnique(baseId);
+		            this.refs[baseId] = sch;
+		        }
+		        if (validateSchema)
+		            this.validateSchema(schema, true);
+		        return sch;
+		    }
+		    _checkUnique(id) {
+		        if (this.schemas[id] || this.refs[id]) {
+		            throw new Error(`schema with key or id "${id}" already exists`);
+		        }
+		    }
+		    _compileSchemaEnv(sch) {
+		        if (sch.meta)
+		            this._compileMetaSchema(sch);
+		        else
+		            compile_1.compileSchema.call(this, sch);
+		        /* istanbul ignore if */
+		        if (!sch.validate)
+		            throw new Error("ajv implementation error");
+		        return sch.validate;
+		    }
+		    _compileMetaSchema(sch) {
+		        const currentOpts = this.opts;
+		        this.opts = this._metaOpts;
+		        try {
+		            compile_1.compileSchema.call(this, sch);
+		        }
+		        finally {
+		            this.opts = currentOpts;
+		        }
+		    }
+		}
+		Ajv.ValidationError = validation_error_1.default;
+		Ajv.MissingRefError = ref_error_1.default;
+		exports.default = Ajv;
+		function checkOptions(checkOpts, options, msg, log = "error") {
+		    for (const key in checkOpts) {
+		        const opt = key;
+		        if (opt in options)
+		            this.logger[log](`${msg}: option ${key}. ${checkOpts[opt]}`);
+		    }
+		}
+		function getSchEnv(keyRef) {
+		    keyRef = (0, resolve_1.normalizeId)(keyRef); // TODO tests fail without this line
+		    return this.schemas[keyRef] || this.refs[keyRef];
+		}
+		function addInitialSchemas() {
+		    const optsSchemas = this.opts.schemas;
+		    if (!optsSchemas)
+		        return;
+		    if (Array.isArray(optsSchemas))
+		        this.addSchema(optsSchemas);
+		    else
+		        for (const key in optsSchemas)
+		            this.addSchema(optsSchemas[key], key);
+		}
+		function addInitialFormats() {
+		    for (const name in this.opts.formats) {
+		        const format = this.opts.formats[name];
+		        if (format)
+		            this.addFormat(name, format);
+		    }
+		}
+		function addInitialKeywords(defs) {
+		    if (Array.isArray(defs)) {
+		        this.addVocabulary(defs);
+		        return;
+		    }
+		    this.logger.warn("keywords option as map is deprecated, pass array");
+		    for (const keyword in defs) {
+		        const def = defs[keyword];
+		        if (!def.keyword)
+		            def.keyword = keyword;
+		        this.addKeyword(def);
+		    }
+		}
+		function getMetaSchemaOptions() {
+		    const metaOpts = { ...this.opts };
+		    for (const opt of META_IGNORE_OPTIONS)
+		        delete metaOpts[opt];
+		    return metaOpts;
+		}
+		const noLogs = { log() { }, warn() { }, error() { } };
+		function getLogger(logger) {
+		    if (logger === false)
+		        return noLogs;
+		    if (logger === undefined)
+		        return console;
+		    if (logger.log && logger.warn && logger.error)
+		        return logger;
+		    throw new Error("logger must implement log, warn and error methods");
+		}
+		const KEYWORD_NAME = /^[a-z_$][a-z0-9_$:-]*$/i;
+		function checkKeyword(keyword, def) {
+		    const { RULES } = this;
+		    (0, util_1.eachItem)(keyword, (kwd) => {
+		        if (RULES.keywords[kwd])
+		            throw new Error(`Keyword ${kwd} is already defined`);
+		        if (!KEYWORD_NAME.test(kwd))
+		            throw new Error(`Keyword ${kwd} has invalid name`);
+		    });
+		    if (!def)
+		        return;
+		    if (def.$data && !("code" in def || "validate" in def)) {
+		        throw new Error('$data keyword must have "code" or "validate" function');
+		    }
+		}
+		function addRule(keyword, definition, dataType) {
+		    var _a;
+		    const post = definition === null || definition === void 0 ? void 0 : definition.post;
+		    if (dataType && post)
+		        throw new Error('keyword with "post" flag cannot have "type"');
+		    const { RULES } = this;
+		    let ruleGroup = post ? RULES.post : RULES.rules.find(({ type: t }) => t === dataType);
+		    if (!ruleGroup) {
+		        ruleGroup = { type: dataType, rules: [] };
+		        RULES.rules.push(ruleGroup);
+		    }
+		    RULES.keywords[keyword] = true;
+		    if (!definition)
+		        return;
+		    const rule = {
+		        keyword,
+		        definition: {
+		            ...definition,
+		            type: (0, dataType_1.getJSONTypes)(definition.type),
+		            schemaType: (0, dataType_1.getJSONTypes)(definition.schemaType),
+		        },
+		    };
+		    if (definition.before)
+		        addBeforeRule.call(this, ruleGroup, rule, definition.before);
+		    else
+		        ruleGroup.rules.push(rule);
+		    RULES.all[keyword] = rule;
+		    (_a = definition.implements) === null || _a === void 0 ? void 0 : _a.forEach((kwd) => this.addKeyword(kwd));
+		}
+		function addBeforeRule(ruleGroup, rule, before) {
+		    const i = ruleGroup.rules.findIndex((_rule) => _rule.keyword === before);
+		    if (i >= 0) {
+		        ruleGroup.rules.splice(i, 0, rule);
+		    }
+		    else {
+		        ruleGroup.rules.push(rule);
+		        this.logger.warn(`rule ${before} is not defined`);
+		    }
+		}
+		function keywordMetaschema(def) {
+		    let { metaSchema } = def;
+		    if (metaSchema === undefined)
+		        return;
+		    if (def.$data && this.opts.$data)
+		        metaSchema = schemaOrData(metaSchema);
+		    def.validateSchema = this.compile(metaSchema, true);
+		}
+		const $dataRef = {
+		    $ref: "https://raw.githubusercontent.com/ajv-validator/ajv/master/lib/refs/data.json#",
+		};
+		function schemaOrData(schema) {
+		    return { anyOf: [schema, $dataRef] };
+		}
+		
+	} (core$1));
+	return core$1;
+}
+
+var draft7 = {};
+
+var core = {};
+
+var id = {};
+
+var hasRequiredId;
+
+function requireId () {
+	if (hasRequiredId) return id;
+	hasRequiredId = 1;
+	Object.defineProperty(id, "__esModule", { value: true });
+	const def = {
+	    keyword: "id",
+	    code() {
+	        throw new Error('NOT SUPPORTED: keyword "id", use "$id" for schema ID');
+	    },
+	};
+	id.default = def;
+	
+	return id;
+}
+
+var ref = {};
+
+var hasRequiredRef;
+
+function requireRef () {
+	if (hasRequiredRef) return ref;
+	hasRequiredRef = 1;
+	Object.defineProperty(ref, "__esModule", { value: true });
+	ref.callRef = ref.getValidate = void 0;
+	const ref_error_1 = /*@__PURE__*/ requireRef_error();
+	const code_1 = /*@__PURE__*/ requireCode();
+	const codegen_1 = /*@__PURE__*/ requireCodegen();
+	const names_1 = /*@__PURE__*/ requireNames();
+	const compile_1 = /*@__PURE__*/ requireCompile();
+	const util_1 = /*@__PURE__*/ requireUtil();
+	const def = {
+	    keyword: "$ref",
+	    schemaType: "string",
+	    code(cxt) {
+	        const { gen, schema: $ref, it } = cxt;
+	        const { baseId, schemaEnv: env, validateName, opts, self } = it;
+	        const { root } = env;
+	        if (($ref === "#" || $ref === "#/") && baseId === root.baseId)
+	            return callRootRef();
+	        const schOrEnv = compile_1.resolveRef.call(self, root, baseId, $ref);
+	        if (schOrEnv === undefined)
+	            throw new ref_error_1.default(it.opts.uriResolver, baseId, $ref);
+	        if (schOrEnv instanceof compile_1.SchemaEnv)
+	            return callValidate(schOrEnv);
+	        return inlineRefSchema(schOrEnv);
+	        function callRootRef() {
+	            if (env === root)
+	                return callRef(cxt, validateName, env, env.$async);
+	            const rootName = gen.scopeValue("root", { ref: root });
+	            return callRef(cxt, (0, codegen_1._) `${rootName}.validate`, root, root.$async);
+	        }
+	        function callValidate(sch) {
+	            const v = getValidate(cxt, sch);
+	            callRef(cxt, v, sch, sch.$async);
+	        }
+	        function inlineRefSchema(sch) {
+	            const schName = gen.scopeValue("schema", opts.code.source === true ? { ref: sch, code: (0, codegen_1.stringify)(sch) } : { ref: sch });
+	            const valid = gen.name("valid");
+	            const schCxt = cxt.subschema({
+	                schema: sch,
+	                dataTypes: [],
+	                schemaPath: codegen_1.nil,
+	                topSchemaRef: schName,
+	                errSchemaPath: $ref,
+	            }, valid);
+	            cxt.mergeEvaluated(schCxt);
+	            cxt.ok(valid);
+	        }
+	    },
+	};
+	function getValidate(cxt, sch) {
+	    const { gen } = cxt;
+	    return sch.validate
+	        ? gen.scopeValue("validate", { ref: sch.validate })
+	        : (0, codegen_1._) `${gen.scopeValue("wrapper", { ref: sch })}.validate`;
+	}
+	ref.getValidate = getValidate;
+	function callRef(cxt, v, sch, $async) {
+	    const { gen, it } = cxt;
+	    const { allErrors, schemaEnv: env, opts } = it;
+	    const passCxt = opts.passContext ? names_1.default.this : codegen_1.nil;
+	    if ($async)
+	        callAsyncRef();
+	    else
+	        callSyncRef();
+	    function callAsyncRef() {
+	        if (!env.$async)
+	            throw new Error("async schema referenced by sync schema");
+	        const valid = gen.let("valid");
+	        gen.try(() => {
+	            gen.code((0, codegen_1._) `await ${(0, code_1.callValidateCode)(cxt, v, passCxt)}`);
+	            addEvaluatedFrom(v); // TODO will not work with async, it has to be returned with the result
+	            if (!allErrors)
+	                gen.assign(valid, true);
+	        }, (e) => {
+	            gen.if((0, codegen_1._) `!(${e} instanceof ${it.ValidationError})`, () => gen.throw(e));
+	            addErrorsFrom(e);
+	            if (!allErrors)
+	                gen.assign(valid, false);
+	        });
+	        cxt.ok(valid);
+	    }
+	    function callSyncRef() {
+	        cxt.result((0, code_1.callValidateCode)(cxt, v, passCxt), () => addEvaluatedFrom(v), () => addErrorsFrom(v));
+	    }
+	    function addErrorsFrom(source) {
+	        const errs = (0, codegen_1._) `${source}.errors`;
+	        gen.assign(names_1.default.vErrors, (0, codegen_1._) `${names_1.default.vErrors} === null ? ${errs} : ${names_1.default.vErrors}.concat(${errs})`); // TODO tagged
+	        gen.assign(names_1.default.errors, (0, codegen_1._) `${names_1.default.vErrors}.length`);
+	    }
+	    function addEvaluatedFrom(source) {
+	        var _a;
+	        if (!it.opts.unevaluated)
+	            return;
+	        const schEvaluated = (_a = sch === null || sch === void 0 ? void 0 : sch.validate) === null || _a === void 0 ? void 0 : _a.evaluated;
+	        // TODO refactor
+	        if (it.props !== true) {
+	            if (schEvaluated && !schEvaluated.dynamicProps) {
+	                if (schEvaluated.props !== undefined) {
+	                    it.props = util_1.mergeEvaluated.props(gen, schEvaluated.props, it.props);
+	                }
+	            }
+	            else {
+	                const props = gen.var("props", (0, codegen_1._) `${source}.evaluated.props`);
+	                it.props = util_1.mergeEvaluated.props(gen, props, it.props, codegen_1.Name);
+	            }
+	        }
+	        if (it.items !== true) {
+	            if (schEvaluated && !schEvaluated.dynamicItems) {
+	                if (schEvaluated.items !== undefined) {
+	                    it.items = util_1.mergeEvaluated.items(gen, schEvaluated.items, it.items);
+	                }
+	            }
+	            else {
+	                const items = gen.var("items", (0, codegen_1._) `${source}.evaluated.items`);
+	                it.items = util_1.mergeEvaluated.items(gen, items, it.items, codegen_1.Name);
+	            }
+	        }
+	    }
+	}
+	ref.callRef = callRef;
+	ref.default = def;
+	
+	return ref;
+}
+
+var hasRequiredCore;
+
+function requireCore () {
+	if (hasRequiredCore) return core;
+	hasRequiredCore = 1;
+	Object.defineProperty(core, "__esModule", { value: true });
+	const id_1 = /*@__PURE__*/ requireId();
+	const ref_1 = /*@__PURE__*/ requireRef();
+	const core$1 = [
+	    "$schema",
+	    "$id",
+	    "$defs",
+	    "$vocabulary",
+	    { keyword: "$comment" },
+	    "definitions",
+	    id_1.default,
+	    ref_1.default,
+	];
+	core.default = core$1;
+	
+	return core;
+}
+
+var validation = {};
+
+var limitNumber = {};
+
+var hasRequiredLimitNumber;
+
+function requireLimitNumber () {
+	if (hasRequiredLimitNumber) return limitNumber;
+	hasRequiredLimitNumber = 1;
+	Object.defineProperty(limitNumber, "__esModule", { value: true });
+	const codegen_1 = /*@__PURE__*/ requireCodegen();
+	const ops = codegen_1.operators;
+	const KWDs = {
+	    maximum: { okStr: "<=", ok: ops.LTE, fail: ops.GT },
+	    minimum: { okStr: ">=", ok: ops.GTE, fail: ops.LT },
+	    exclusiveMaximum: { okStr: "<", ok: ops.LT, fail: ops.GTE },
+	    exclusiveMinimum: { okStr: ">", ok: ops.GT, fail: ops.LTE },
+	};
+	const error = {
+	    message: ({ keyword, schemaCode }) => (0, codegen_1.str) `must be ${KWDs[keyword].okStr} ${schemaCode}`,
+	    params: ({ keyword, schemaCode }) => (0, codegen_1._) `{comparison: ${KWDs[keyword].okStr}, limit: ${schemaCode}}`,
+	};
+	const def = {
+	    keyword: Object.keys(KWDs),
+	    type: "number",
+	    schemaType: "number",
+	    $data: true,
+	    error,
+	    code(cxt) {
+	        const { keyword, data, schemaCode } = cxt;
+	        cxt.fail$data((0, codegen_1._) `${data} ${KWDs[keyword].fail} ${schemaCode} || isNaN(${data})`);
+	    },
+	};
+	limitNumber.default = def;
+	
+	return limitNumber;
+}
+
+var multipleOf = {};
+
+var hasRequiredMultipleOf;
+
+function requireMultipleOf () {
+	if (hasRequiredMultipleOf) return multipleOf;
+	hasRequiredMultipleOf = 1;
+	Object.defineProperty(multipleOf, "__esModule", { value: true });
+	const codegen_1 = /*@__PURE__*/ requireCodegen();
+	const error = {
+	    message: ({ schemaCode }) => (0, codegen_1.str) `must be multiple of ${schemaCode}`,
+	    params: ({ schemaCode }) => (0, codegen_1._) `{multipleOf: ${schemaCode}}`,
+	};
+	const def = {
+	    keyword: "multipleOf",
+	    type: "number",
+	    schemaType: "number",
+	    $data: true,
+	    error,
+	    code(cxt) {
+	        const { gen, data, schemaCode, it } = cxt;
+	        // const bdt = bad$DataType(schemaCode, <string>def.schemaType, $data)
+	        const prec = it.opts.multipleOfPrecision;
+	        const res = gen.let("res");
+	        const invalid = prec
+	            ? (0, codegen_1._) `Math.abs(Math.round(${res}) - ${res}) > 1e-${prec}`
+	            : (0, codegen_1._) `${res} !== parseInt(${res})`;
+	        cxt.fail$data((0, codegen_1._) `(${schemaCode} === 0 || (${res} = ${data}/${schemaCode}, ${invalid}))`);
+	    },
+	};
+	multipleOf.default = def;
+	
+	return multipleOf;
+}
+
+var limitLength = {};
+
+var ucs2length = {};
+
+var hasRequiredUcs2length;
+
+function requireUcs2length () {
+	if (hasRequiredUcs2length) return ucs2length;
+	hasRequiredUcs2length = 1;
+	Object.defineProperty(ucs2length, "__esModule", { value: true });
+	// https://mathiasbynens.be/notes/javascript-encoding
+	// https://github.com/bestiejs/punycode.js - punycode.ucs2.decode
+	function ucs2length$1(str) {
+	    const len = str.length;
+	    let length = 0;
+	    let pos = 0;
+	    let value;
+	    while (pos < len) {
+	        length++;
+	        value = str.charCodeAt(pos++);
+	        if (value >= 0xd800 && value <= 0xdbff && pos < len) {
+	            // high surrogate, and there is a next character
+	            value = str.charCodeAt(pos);
+	            if ((value & 0xfc00) === 0xdc00)
+	                pos++; // low surrogate
+	        }
+	    }
+	    return length;
+	}
+	ucs2length.default = ucs2length$1;
+	ucs2length$1.code = 'require("ajv/dist/runtime/ucs2length").default';
+	
+	return ucs2length;
+}
+
+var hasRequiredLimitLength;
+
+function requireLimitLength () {
+	if (hasRequiredLimitLength) return limitLength;
+	hasRequiredLimitLength = 1;
+	Object.defineProperty(limitLength, "__esModule", { value: true });
+	const codegen_1 = /*@__PURE__*/ requireCodegen();
+	const util_1 = /*@__PURE__*/ requireUtil();
+	const ucs2length_1 = /*@__PURE__*/ requireUcs2length();
+	const error = {
+	    message({ keyword, schemaCode }) {
+	        const comp = keyword === "maxLength" ? "more" : "fewer";
+	        return (0, codegen_1.str) `must NOT have ${comp} than ${schemaCode} characters`;
+	    },
+	    params: ({ schemaCode }) => (0, codegen_1._) `{limit: ${schemaCode}}`,
+	};
+	const def = {
+	    keyword: ["maxLength", "minLength"],
+	    type: "string",
+	    schemaType: "number",
+	    $data: true,
+	    error,
+	    code(cxt) {
+	        const { keyword, data, schemaCode, it } = cxt;
+	        const op = keyword === "maxLength" ? codegen_1.operators.GT : codegen_1.operators.LT;
+	        const len = it.opts.unicode === false ? (0, codegen_1._) `${data}.length` : (0, codegen_1._) `${(0, util_1.useFunc)(cxt.gen, ucs2length_1.default)}(${data})`;
+	        cxt.fail$data((0, codegen_1._) `${len} ${op} ${schemaCode}`);
+	    },
+	};
+	limitLength.default = def;
+	
+	return limitLength;
+}
+
+var pattern = {};
+
+var hasRequiredPattern;
+
+function requirePattern () {
+	if (hasRequiredPattern) return pattern;
+	hasRequiredPattern = 1;
+	Object.defineProperty(pattern, "__esModule", { value: true });
+	const code_1 = /*@__PURE__*/ requireCode();
+	const util_1 = /*@__PURE__*/ requireUtil();
+	const codegen_1 = /*@__PURE__*/ requireCodegen();
+	const error = {
+	    message: ({ schemaCode }) => (0, codegen_1.str) `must match pattern "${schemaCode}"`,
+	    params: ({ schemaCode }) => (0, codegen_1._) `{pattern: ${schemaCode}}`,
+	};
+	const def = {
+	    keyword: "pattern",
+	    type: "string",
+	    schemaType: "string",
+	    $data: true,
+	    error,
+	    code(cxt) {
+	        const { gen, data, $data, schema, schemaCode, it } = cxt;
+	        const u = it.opts.unicodeRegExp ? "u" : "";
+	        if ($data) {
+	            const { regExp } = it.opts.code;
+	            const regExpCode = regExp.code === "new RegExp" ? (0, codegen_1._) `new RegExp` : (0, util_1.useFunc)(gen, regExp);
+	            const valid = gen.let("valid");
+	            gen.try(() => gen.assign(valid, (0, codegen_1._) `${regExpCode}(${schemaCode}, ${u}).test(${data})`), () => gen.assign(valid, false));
+	            cxt.fail$data((0, codegen_1._) `!${valid}`);
+	        }
+	        else {
+	            const regExp = (0, code_1.usePattern)(cxt, schema);
+	            cxt.fail$data((0, codegen_1._) `!${regExp}.test(${data})`);
+	        }
+	    },
+	};
+	pattern.default = def;
+	
+	return pattern;
+}
+
+var limitProperties = {};
+
+var hasRequiredLimitProperties;
+
+function requireLimitProperties () {
+	if (hasRequiredLimitProperties) return limitProperties;
+	hasRequiredLimitProperties = 1;
+	Object.defineProperty(limitProperties, "__esModule", { value: true });
+	const codegen_1 = /*@__PURE__*/ requireCodegen();
+	const error = {
+	    message({ keyword, schemaCode }) {
+	        const comp = keyword === "maxProperties" ? "more" : "fewer";
+	        return (0, codegen_1.str) `must NOT have ${comp} than ${schemaCode} properties`;
+	    },
+	    params: ({ schemaCode }) => (0, codegen_1._) `{limit: ${schemaCode}}`,
+	};
+	const def = {
+	    keyword: ["maxProperties", "minProperties"],
+	    type: "object",
+	    schemaType: "number",
+	    $data: true,
+	    error,
+	    code(cxt) {
+	        const { keyword, data, schemaCode } = cxt;
+	        const op = keyword === "maxProperties" ? codegen_1.operators.GT : codegen_1.operators.LT;
+	        cxt.fail$data((0, codegen_1._) `Object.keys(${data}).length ${op} ${schemaCode}`);
+	    },
+	};
+	limitProperties.default = def;
+	
+	return limitProperties;
+}
+
+var required = {};
+
+var hasRequiredRequired;
+
+function requireRequired () {
+	if (hasRequiredRequired) return required;
+	hasRequiredRequired = 1;
+	Object.defineProperty(required, "__esModule", { value: true });
+	const code_1 = /*@__PURE__*/ requireCode();
+	const codegen_1 = /*@__PURE__*/ requireCodegen();
+	const util_1 = /*@__PURE__*/ requireUtil();
+	const error = {
+	    message: ({ params: { missingProperty } }) => (0, codegen_1.str) `must have required property '${missingProperty}'`,
+	    params: ({ params: { missingProperty } }) => (0, codegen_1._) `{missingProperty: ${missingProperty}}`,
+	};
+	const def = {
+	    keyword: "required",
+	    type: "object",
+	    schemaType: "array",
+	    $data: true,
+	    error,
+	    code(cxt) {
+	        const { gen, schema, schemaCode, data, $data, it } = cxt;
+	        const { opts } = it;
+	        if (!$data && schema.length === 0)
+	            return;
+	        const useLoop = schema.length >= opts.loopRequired;
+	        if (it.allErrors)
+	            allErrorsMode();
+	        else
+	            exitOnErrorMode();
+	        if (opts.strictRequired) {
+	            const props = cxt.parentSchema.properties;
+	            const { definedProperties } = cxt.it;
+	            for (const requiredKey of schema) {
+	                if ((props === null || props === void 0 ? void 0 : props[requiredKey]) === undefined && !definedProperties.has(requiredKey)) {
+	                    const schemaPath = it.schemaEnv.baseId + it.errSchemaPath;
+	                    const msg = `required property "${requiredKey}" is not defined at "${schemaPath}" (strictRequired)`;
+	                    (0, util_1.checkStrictMode)(it, msg, it.opts.strictRequired);
+	                }
+	            }
+	        }
+	        function allErrorsMode() {
+	            if (useLoop || $data) {
+	                cxt.block$data(codegen_1.nil, loopAllRequired);
+	            }
+	            else {
+	                for (const prop of schema) {
+	                    (0, code_1.checkReportMissingProp)(cxt, prop);
+	                }
+	            }
+	        }
+	        function exitOnErrorMode() {
+	            const missing = gen.let("missing");
+	            if (useLoop || $data) {
+	                const valid = gen.let("valid", true);
+	                cxt.block$data(valid, () => loopUntilMissing(missing, valid));
+	                cxt.ok(valid);
+	            }
+	            else {
+	                gen.if((0, code_1.checkMissingProp)(cxt, schema, missing));
+	                (0, code_1.reportMissingProp)(cxt, missing);
+	                gen.else();
+	            }
+	        }
+	        function loopAllRequired() {
+	            gen.forOf("prop", schemaCode, (prop) => {
+	                cxt.setParams({ missingProperty: prop });
+	                gen.if((0, code_1.noPropertyInData)(gen, data, prop, opts.ownProperties), () => cxt.error());
+	            });
+	        }
+	        function loopUntilMissing(missing, valid) {
+	            cxt.setParams({ missingProperty: missing });
+	            gen.forOf(missing, schemaCode, () => {
+	                gen.assign(valid, (0, code_1.propertyInData)(gen, data, missing, opts.ownProperties));
+	                gen.if((0, codegen_1.not)(valid), () => {
+	                    cxt.error();
+	                    gen.break();
+	                });
+	            }, codegen_1.nil);
+	        }
+	    },
+	};
+	required.default = def;
+	
+	return required;
+}
+
+var limitItems = {};
+
+var hasRequiredLimitItems;
+
+function requireLimitItems () {
+	if (hasRequiredLimitItems) return limitItems;
+	hasRequiredLimitItems = 1;
+	Object.defineProperty(limitItems, "__esModule", { value: true });
+	const codegen_1 = /*@__PURE__*/ requireCodegen();
+	const error = {
+	    message({ keyword, schemaCode }) {
+	        const comp = keyword === "maxItems" ? "more" : "fewer";
+	        return (0, codegen_1.str) `must NOT have ${comp} than ${schemaCode} items`;
+	    },
+	    params: ({ schemaCode }) => (0, codegen_1._) `{limit: ${schemaCode}}`,
+	};
+	const def = {
+	    keyword: ["maxItems", "minItems"],
+	    type: "array",
+	    schemaType: "number",
+	    $data: true,
+	    error,
+	    code(cxt) {
+	        const { keyword, data, schemaCode } = cxt;
+	        const op = keyword === "maxItems" ? codegen_1.operators.GT : codegen_1.operators.LT;
+	        cxt.fail$data((0, codegen_1._) `${data}.length ${op} ${schemaCode}`);
+	    },
+	};
+	limitItems.default = def;
+	
+	return limitItems;
+}
+
+var uniqueItems = {};
+
+var equal = {};
+
+var hasRequiredEqual;
+
+function requireEqual () {
+	if (hasRequiredEqual) return equal;
+	hasRequiredEqual = 1;
+	Object.defineProperty(equal, "__esModule", { value: true });
+	// https://github.com/ajv-validator/ajv/issues/889
+	const equal$1 = requireFastDeepEqual();
+	equal$1.code = 'require("ajv/dist/runtime/equal").default';
+	equal.default = equal$1;
+	
+	return equal;
+}
+
+var hasRequiredUniqueItems;
+
+function requireUniqueItems () {
+	if (hasRequiredUniqueItems) return uniqueItems;
+	hasRequiredUniqueItems = 1;
+	Object.defineProperty(uniqueItems, "__esModule", { value: true });
+	const dataType_1 = /*@__PURE__*/ requireDataType();
+	const codegen_1 = /*@__PURE__*/ requireCodegen();
+	const util_1 = /*@__PURE__*/ requireUtil();
+	const equal_1 = /*@__PURE__*/ requireEqual();
+	const error = {
+	    message: ({ params: { i, j } }) => (0, codegen_1.str) `must NOT have duplicate items (items ## ${j} and ${i} are identical)`,
+	    params: ({ params: { i, j } }) => (0, codegen_1._) `{i: ${i}, j: ${j}}`,
+	};
+	const def = {
+	    keyword: "uniqueItems",
+	    type: "array",
+	    schemaType: "boolean",
+	    $data: true,
+	    error,
+	    code(cxt) {
+	        const { gen, data, $data, schema, parentSchema, schemaCode, it } = cxt;
+	        if (!$data && !schema)
+	            return;
+	        const valid = gen.let("valid");
+	        const itemTypes = parentSchema.items ? (0, dataType_1.getSchemaTypes)(parentSchema.items) : [];
+	        cxt.block$data(valid, validateUniqueItems, (0, codegen_1._) `${schemaCode} === false`);
+	        cxt.ok(valid);
+	        function validateUniqueItems() {
+	            const i = gen.let("i", (0, codegen_1._) `${data}.length`);
+	            const j = gen.let("j");
+	            cxt.setParams({ i, j });
+	            gen.assign(valid, true);
+	            gen.if((0, codegen_1._) `${i} > 1`, () => (canOptimize() ? loopN : loopN2)(i, j));
+	        }
+	        function canOptimize() {
+	            return itemTypes.length > 0 && !itemTypes.some((t) => t === "object" || t === "array");
+	        }
+	        function loopN(i, j) {
+	            const item = gen.name("item");
+	            const wrongType = (0, dataType_1.checkDataTypes)(itemTypes, item, it.opts.strictNumbers, dataType_1.DataType.Wrong);
+	            const indices = gen.const("indices", (0, codegen_1._) `{}`);
+	            gen.for((0, codegen_1._) `;${i}--;`, () => {
+	                gen.let(item, (0, codegen_1._) `${data}[${i}]`);
+	                gen.if(wrongType, (0, codegen_1._) `continue`);
+	                if (itemTypes.length > 1)
+	                    gen.if((0, codegen_1._) `typeof ${item} == "string"`, (0, codegen_1._) `${item} += "_"`);
+	                gen
+	                    .if((0, codegen_1._) `typeof ${indices}[${item}] == "number"`, () => {
+	                    gen.assign(j, (0, codegen_1._) `${indices}[${item}]`);
+	                    cxt.error();
+	                    gen.assign(valid, false).break();
+	                })
+	                    .code((0, codegen_1._) `${indices}[${item}] = ${i}`);
+	            });
+	        }
+	        function loopN2(i, j) {
+	            const eql = (0, util_1.useFunc)(gen, equal_1.default);
+	            const outer = gen.name("outer");
+	            gen.label(outer).for((0, codegen_1._) `;${i}--;`, () => gen.for((0, codegen_1._) `${j} = ${i}; ${j}--;`, () => gen.if((0, codegen_1._) `${eql}(${data}[${i}], ${data}[${j}])`, () => {
+	                cxt.error();
+	                gen.assign(valid, false).break(outer);
+	            })));
+	        }
+	    },
+	};
+	uniqueItems.default = def;
+	
+	return uniqueItems;
+}
+
+var _const = {};
+
+var hasRequired_const;
+
+function require_const () {
+	if (hasRequired_const) return _const;
+	hasRequired_const = 1;
+	Object.defineProperty(_const, "__esModule", { value: true });
+	const codegen_1 = /*@__PURE__*/ requireCodegen();
+	const util_1 = /*@__PURE__*/ requireUtil();
+	const equal_1 = /*@__PURE__*/ requireEqual();
+	const error = {
+	    message: "must be equal to constant",
+	    params: ({ schemaCode }) => (0, codegen_1._) `{allowedValue: ${schemaCode}}`,
+	};
+	const def = {
+	    keyword: "const",
+	    $data: true,
+	    error,
+	    code(cxt) {
+	        const { gen, data, $data, schemaCode, schema } = cxt;
+	        if ($data || (schema && typeof schema == "object")) {
+	            cxt.fail$data((0, codegen_1._) `!${(0, util_1.useFunc)(gen, equal_1.default)}(${data}, ${schemaCode})`);
+	        }
+	        else {
+	            cxt.fail((0, codegen_1._) `${schema} !== ${data}`);
+	        }
+	    },
+	};
+	_const.default = def;
+	
+	return _const;
+}
+
+var _enum = {};
+
+var hasRequired_enum;
+
+function require_enum () {
+	if (hasRequired_enum) return _enum;
+	hasRequired_enum = 1;
+	Object.defineProperty(_enum, "__esModule", { value: true });
+	const codegen_1 = /*@__PURE__*/ requireCodegen();
+	const util_1 = /*@__PURE__*/ requireUtil();
+	const equal_1 = /*@__PURE__*/ requireEqual();
+	const error = {
+	    message: "must be equal to one of the allowed values",
+	    params: ({ schemaCode }) => (0, codegen_1._) `{allowedValues: ${schemaCode}}`,
+	};
+	const def = {
+	    keyword: "enum",
+	    schemaType: "array",
+	    $data: true,
+	    error,
+	    code(cxt) {
+	        const { gen, data, $data, schema, schemaCode, it } = cxt;
+	        if (!$data && schema.length === 0)
+	            throw new Error("enum must have non-empty array");
+	        const useLoop = schema.length >= it.opts.loopEnum;
+	        let eql;
+	        const getEql = () => (eql !== null && eql !== void 0 ? eql : (eql = (0, util_1.useFunc)(gen, equal_1.default)));
+	        let valid;
+	        if (useLoop || $data) {
+	            valid = gen.let("valid");
+	            cxt.block$data(valid, loopEnum);
+	        }
+	        else {
+	            /* istanbul ignore if */
+	            if (!Array.isArray(schema))
+	                throw new Error("ajv implementation error");
+	            const vSchema = gen.const("vSchema", schemaCode);
+	            valid = (0, codegen_1.or)(...schema.map((_x, i) => equalCode(vSchema, i)));
+	        }
+	        cxt.pass(valid);
+	        function loopEnum() {
+	            gen.assign(valid, false);
+	            gen.forOf("v", schemaCode, (v) => gen.if((0, codegen_1._) `${getEql()}(${data}, ${v})`, () => gen.assign(valid, true).break()));
+	        }
+	        function equalCode(vSchema, i) {
+	            const sch = schema[i];
+	            return typeof sch === "object" && sch !== null
+	                ? (0, codegen_1._) `${getEql()}(${data}, ${vSchema}[${i}])`
+	                : (0, codegen_1._) `${data} === ${sch}`;
+	        }
+	    },
+	};
+	_enum.default = def;
+	
+	return _enum;
+}
+
+var hasRequiredValidation;
+
+function requireValidation () {
+	if (hasRequiredValidation) return validation;
+	hasRequiredValidation = 1;
+	Object.defineProperty(validation, "__esModule", { value: true });
+	const limitNumber_1 = /*@__PURE__*/ requireLimitNumber();
+	const multipleOf_1 = /*@__PURE__*/ requireMultipleOf();
+	const limitLength_1 = /*@__PURE__*/ requireLimitLength();
+	const pattern_1 = /*@__PURE__*/ requirePattern();
+	const limitProperties_1 = /*@__PURE__*/ requireLimitProperties();
+	const required_1 = /*@__PURE__*/ requireRequired();
+	const limitItems_1 = /*@__PURE__*/ requireLimitItems();
+	const uniqueItems_1 = /*@__PURE__*/ requireUniqueItems();
+	const const_1 = /*@__PURE__*/ require_const();
+	const enum_1 = /*@__PURE__*/ require_enum();
+	const validation$1 = [
+	    // number
+	    limitNumber_1.default,
+	    multipleOf_1.default,
+	    // string
+	    limitLength_1.default,
+	    pattern_1.default,
+	    // object
+	    limitProperties_1.default,
+	    required_1.default,
+	    // array
+	    limitItems_1.default,
+	    uniqueItems_1.default,
+	    // any
+	    { keyword: "type", schemaType: ["string", "array"] },
+	    { keyword: "nullable", schemaType: "boolean" },
+	    const_1.default,
+	    enum_1.default,
+	];
+	validation.default = validation$1;
+	
+	return validation;
+}
+
+var applicator = {};
+
+var additionalItems = {};
+
+var hasRequiredAdditionalItems;
+
+function requireAdditionalItems () {
+	if (hasRequiredAdditionalItems) return additionalItems;
+	hasRequiredAdditionalItems = 1;
+	Object.defineProperty(additionalItems, "__esModule", { value: true });
+	additionalItems.validateAdditionalItems = void 0;
+	const codegen_1 = /*@__PURE__*/ requireCodegen();
+	const util_1 = /*@__PURE__*/ requireUtil();
+	const error = {
+	    message: ({ params: { len } }) => (0, codegen_1.str) `must NOT have more than ${len} items`,
+	    params: ({ params: { len } }) => (0, codegen_1._) `{limit: ${len}}`,
+	};
+	const def = {
+	    keyword: "additionalItems",
+	    type: "array",
+	    schemaType: ["boolean", "object"],
+	    before: "uniqueItems",
+	    error,
+	    code(cxt) {
+	        const { parentSchema, it } = cxt;
+	        const { items } = parentSchema;
+	        if (!Array.isArray(items)) {
+	            (0, util_1.checkStrictMode)(it, '"additionalItems" is ignored when "items" is not an array of schemas');
+	            return;
+	        }
+	        validateAdditionalItems(cxt, items);
+	    },
+	};
+	function validateAdditionalItems(cxt, items) {
+	    const { gen, schema, data, keyword, it } = cxt;
+	    it.items = true;
+	    const len = gen.const("len", (0, codegen_1._) `${data}.length`);
+	    if (schema === false) {
+	        cxt.setParams({ len: items.length });
+	        cxt.pass((0, codegen_1._) `${len} <= ${items.length}`);
+	    }
+	    else if (typeof schema == "object" && !(0, util_1.alwaysValidSchema)(it, schema)) {
+	        const valid = gen.var("valid", (0, codegen_1._) `${len} <= ${items.length}`); // TODO var
+	        gen.if((0, codegen_1.not)(valid), () => validateItems(valid));
+	        cxt.ok(valid);
+	    }
+	    function validateItems(valid) {
+	        gen.forRange("i", items.length, len, (i) => {
+	            cxt.subschema({ keyword, dataProp: i, dataPropType: util_1.Type.Num }, valid);
+	            if (!it.allErrors)
+	                gen.if((0, codegen_1.not)(valid), () => gen.break());
+	        });
+	    }
+	}
+	additionalItems.validateAdditionalItems = validateAdditionalItems;
+	additionalItems.default = def;
+	
+	return additionalItems;
+}
+
+var prefixItems = {};
+
+var items = {};
+
+var hasRequiredItems;
+
+function requireItems () {
+	if (hasRequiredItems) return items;
+	hasRequiredItems = 1;
+	Object.defineProperty(items, "__esModule", { value: true });
+	items.validateTuple = void 0;
+	const codegen_1 = /*@__PURE__*/ requireCodegen();
+	const util_1 = /*@__PURE__*/ requireUtil();
+	const code_1 = /*@__PURE__*/ requireCode();
+	const def = {
+	    keyword: "items",
+	    type: "array",
+	    schemaType: ["object", "array", "boolean"],
+	    before: "uniqueItems",
+	    code(cxt) {
+	        const { schema, it } = cxt;
+	        if (Array.isArray(schema))
+	            return validateTuple(cxt, "additionalItems", schema);
+	        it.items = true;
+	        if ((0, util_1.alwaysValidSchema)(it, schema))
+	            return;
+	        cxt.ok((0, code_1.validateArray)(cxt));
+	    },
+	};
+	function validateTuple(cxt, extraItems, schArr = cxt.schema) {
+	    const { gen, parentSchema, data, keyword, it } = cxt;
+	    checkStrictTuple(parentSchema);
+	    if (it.opts.unevaluated && schArr.length && it.items !== true) {
+	        it.items = util_1.mergeEvaluated.items(gen, schArr.length, it.items);
+	    }
+	    const valid = gen.name("valid");
+	    const len = gen.const("len", (0, codegen_1._) `${data}.length`);
+	    schArr.forEach((sch, i) => {
+	        if ((0, util_1.alwaysValidSchema)(it, sch))
+	            return;
+	        gen.if((0, codegen_1._) `${len} > ${i}`, () => cxt.subschema({
+	            keyword,
+	            schemaProp: i,
+	            dataProp: i,
+	        }, valid));
+	        cxt.ok(valid);
+	    });
+	    function checkStrictTuple(sch) {
+	        const { opts, errSchemaPath } = it;
+	        const l = schArr.length;
+	        const fullTuple = l === sch.minItems && (l === sch.maxItems || sch[extraItems] === false);
+	        if (opts.strictTuples && !fullTuple) {
+	            const msg = `"${keyword}" is ${l}-tuple, but minItems or maxItems/${extraItems} are not specified or different at path "${errSchemaPath}"`;
+	            (0, util_1.checkStrictMode)(it, msg, opts.strictTuples);
+	        }
+	    }
+	}
+	items.validateTuple = validateTuple;
+	items.default = def;
+	
+	return items;
+}
+
+var hasRequiredPrefixItems;
+
+function requirePrefixItems () {
+	if (hasRequiredPrefixItems) return prefixItems;
+	hasRequiredPrefixItems = 1;
+	Object.defineProperty(prefixItems, "__esModule", { value: true });
+	const items_1 = /*@__PURE__*/ requireItems();
+	const def = {
+	    keyword: "prefixItems",
+	    type: "array",
+	    schemaType: ["array"],
+	    before: "uniqueItems",
+	    code: (cxt) => (0, items_1.validateTuple)(cxt, "items"),
+	};
+	prefixItems.default = def;
+	
+	return prefixItems;
+}
+
+var items2020 = {};
+
+var hasRequiredItems2020;
+
+function requireItems2020 () {
+	if (hasRequiredItems2020) return items2020;
+	hasRequiredItems2020 = 1;
+	Object.defineProperty(items2020, "__esModule", { value: true });
+	const codegen_1 = /*@__PURE__*/ requireCodegen();
+	const util_1 = /*@__PURE__*/ requireUtil();
+	const code_1 = /*@__PURE__*/ requireCode();
+	const additionalItems_1 = /*@__PURE__*/ requireAdditionalItems();
+	const error = {
+	    message: ({ params: { len } }) => (0, codegen_1.str) `must NOT have more than ${len} items`,
+	    params: ({ params: { len } }) => (0, codegen_1._) `{limit: ${len}}`,
+	};
+	const def = {
+	    keyword: "items",
+	    type: "array",
+	    schemaType: ["object", "boolean"],
+	    before: "uniqueItems",
+	    error,
+	    code(cxt) {
+	        const { schema, parentSchema, it } = cxt;
+	        const { prefixItems } = parentSchema;
+	        it.items = true;
+	        if ((0, util_1.alwaysValidSchema)(it, schema))
+	            return;
+	        if (prefixItems)
+	            (0, additionalItems_1.validateAdditionalItems)(cxt, prefixItems);
+	        else
+	            cxt.ok((0, code_1.validateArray)(cxt));
+	    },
+	};
+	items2020.default = def;
+	
+	return items2020;
+}
+
+var contains$1 = {};
+
+var hasRequiredContains$1;
+
+function requireContains$1 () {
+	if (hasRequiredContains$1) return contains$1;
+	hasRequiredContains$1 = 1;
+	Object.defineProperty(contains$1, "__esModule", { value: true });
+	const codegen_1 = /*@__PURE__*/ requireCodegen();
+	const util_1 = /*@__PURE__*/ requireUtil();
+	const error = {
+	    message: ({ params: { min, max } }) => max === undefined
+	        ? (0, codegen_1.str) `must contain at least ${min} valid item(s)`
+	        : (0, codegen_1.str) `must contain at least ${min} and no more than ${max} valid item(s)`,
+	    params: ({ params: { min, max } }) => max === undefined ? (0, codegen_1._) `{minContains: ${min}}` : (0, codegen_1._) `{minContains: ${min}, maxContains: ${max}}`,
+	};
+	const def = {
+	    keyword: "contains",
+	    type: "array",
+	    schemaType: ["object", "boolean"],
+	    before: "uniqueItems",
+	    trackErrors: true,
+	    error,
+	    code(cxt) {
+	        const { gen, schema, parentSchema, data, it } = cxt;
+	        let min;
+	        let max;
+	        const { minContains, maxContains } = parentSchema;
+	        if (it.opts.next) {
+	            min = minContains === undefined ? 1 : minContains;
+	            max = maxContains;
+	        }
+	        else {
+	            min = 1;
+	        }
+	        const len = gen.const("len", (0, codegen_1._) `${data}.length`);
+	        cxt.setParams({ min, max });
+	        if (max === undefined && min === 0) {
+	            (0, util_1.checkStrictMode)(it, `"minContains" == 0 without "maxContains": "contains" keyword ignored`);
+	            return;
+	        }
+	        if (max !== undefined && min > max) {
+	            (0, util_1.checkStrictMode)(it, `"minContains" > "maxContains" is always invalid`);
+	            cxt.fail();
+	            return;
+	        }
+	        if ((0, util_1.alwaysValidSchema)(it, schema)) {
+	            let cond = (0, codegen_1._) `${len} >= ${min}`;
+	            if (max !== undefined)
+	                cond = (0, codegen_1._) `${cond} && ${len} <= ${max}`;
+	            cxt.pass(cond);
+	            return;
+	        }
+	        it.items = true;
+	        const valid = gen.name("valid");
+	        if (max === undefined && min === 1) {
+	            validateItems(valid, () => gen.if(valid, () => gen.break()));
+	        }
+	        else if (min === 0) {
+	            gen.let(valid, true);
+	            if (max !== undefined)
+	                gen.if((0, codegen_1._) `${data}.length > 0`, validateItemsWithCount);
+	        }
+	        else {
+	            gen.let(valid, false);
+	            validateItemsWithCount();
+	        }
+	        cxt.result(valid, () => cxt.reset());
+	        function validateItemsWithCount() {
+	            const schValid = gen.name("_valid");
+	            const count = gen.let("count", 0);
+	            validateItems(schValid, () => gen.if(schValid, () => checkLimits(count)));
+	        }
+	        function validateItems(_valid, block) {
+	            gen.forRange("i", 0, len, (i) => {
+	                cxt.subschema({
+	                    keyword: "contains",
+	                    dataProp: i,
+	                    dataPropType: util_1.Type.Num,
+	                    compositeRule: true,
+	                }, _valid);
+	                block();
+	            });
+	        }
+	        function checkLimits(count) {
+	            gen.code((0, codegen_1._) `${count}++`);
+	            if (max === undefined) {
+	                gen.if((0, codegen_1._) `${count} >= ${min}`, () => gen.assign(valid, true).break());
+	            }
+	            else {
+	                gen.if((0, codegen_1._) `${count} > ${max}`, () => gen.assign(valid, false).break());
+	                if (min === 1)
+	                    gen.assign(valid, true);
+	                else
+	                    gen.if((0, codegen_1._) `${count} >= ${min}`, () => gen.assign(valid, true));
+	            }
+	        }
+	    },
+	};
+	contains$1.default = def;
+	
+	return contains$1;
+}
+
+var dependencies = {};
+
+var hasRequiredDependencies;
+
+function requireDependencies () {
+	if (hasRequiredDependencies) return dependencies;
+	hasRequiredDependencies = 1;
+	(function (exports) {
+		Object.defineProperty(exports, "__esModule", { value: true });
+		exports.validateSchemaDeps = exports.validatePropertyDeps = exports.error = void 0;
+		const codegen_1 = /*@__PURE__*/ requireCodegen();
+		const util_1 = /*@__PURE__*/ requireUtil();
+		const code_1 = /*@__PURE__*/ requireCode();
+		exports.error = {
+		    message: ({ params: { property, depsCount, deps } }) => {
+		        const property_ies = depsCount === 1 ? "property" : "properties";
+		        return (0, codegen_1.str) `must have ${property_ies} ${deps} when property ${property} is present`;
+		    },
+		    params: ({ params: { property, depsCount, deps, missingProperty } }) => (0, codegen_1._) `{property: ${property},
+    missingProperty: ${missingProperty},
+    depsCount: ${depsCount},
+    deps: ${deps}}`, // TODO change to reference
+		};
+		const def = {
+		    keyword: "dependencies",
+		    type: "object",
+		    schemaType: "object",
+		    error: exports.error,
+		    code(cxt) {
+		        const [propDeps, schDeps] = splitDependencies(cxt);
+		        validatePropertyDeps(cxt, propDeps);
+		        validateSchemaDeps(cxt, schDeps);
+		    },
+		};
+		function splitDependencies({ schema }) {
+		    const propertyDeps = {};
+		    const schemaDeps = {};
+		    for (const key in schema) {
+		        if (key === "__proto__")
+		            continue;
+		        const deps = Array.isArray(schema[key]) ? propertyDeps : schemaDeps;
+		        deps[key] = schema[key];
+		    }
+		    return [propertyDeps, schemaDeps];
+		}
+		function validatePropertyDeps(cxt, propertyDeps = cxt.schema) {
+		    const { gen, data, it } = cxt;
+		    if (Object.keys(propertyDeps).length === 0)
+		        return;
+		    const missing = gen.let("missing");
+		    for (const prop in propertyDeps) {
+		        const deps = propertyDeps[prop];
+		        if (deps.length === 0)
+		            continue;
+		        const hasProperty = (0, code_1.propertyInData)(gen, data, prop, it.opts.ownProperties);
+		        cxt.setParams({
+		            property: prop,
+		            depsCount: deps.length,
+		            deps: deps.join(", "),
+		        });
+		        if (it.allErrors) {
+		            gen.if(hasProperty, () => {
+		                for (const depProp of deps) {
+		                    (0, code_1.checkReportMissingProp)(cxt, depProp);
+		                }
+		            });
+		        }
+		        else {
+		            gen.if((0, codegen_1._) `${hasProperty} && (${(0, code_1.checkMissingProp)(cxt, deps, missing)})`);
+		            (0, code_1.reportMissingProp)(cxt, missing);
+		            gen.else();
+		        }
+		    }
+		}
+		exports.validatePropertyDeps = validatePropertyDeps;
+		function validateSchemaDeps(cxt, schemaDeps = cxt.schema) {
+		    const { gen, data, keyword, it } = cxt;
+		    const valid = gen.name("valid");
+		    for (const prop in schemaDeps) {
+		        if ((0, util_1.alwaysValidSchema)(it, schemaDeps[prop]))
+		            continue;
+		        gen.if((0, code_1.propertyInData)(gen, data, prop, it.opts.ownProperties), () => {
+		            const schCxt = cxt.subschema({ keyword, schemaProp: prop }, valid);
+		            cxt.mergeValidEvaluated(schCxt, valid);
+		        }, () => gen.var(valid, true) // TODO var
+		        );
+		        cxt.ok(valid);
+		    }
+		}
+		exports.validateSchemaDeps = validateSchemaDeps;
+		exports.default = def;
+		
+	} (dependencies));
+	return dependencies;
+}
+
+var propertyNames = {};
+
+var hasRequiredPropertyNames;
+
+function requirePropertyNames () {
+	if (hasRequiredPropertyNames) return propertyNames;
+	hasRequiredPropertyNames = 1;
+	Object.defineProperty(propertyNames, "__esModule", { value: true });
+	const codegen_1 = /*@__PURE__*/ requireCodegen();
+	const util_1 = /*@__PURE__*/ requireUtil();
+	const error = {
+	    message: "property name must be valid",
+	    params: ({ params }) => (0, codegen_1._) `{propertyName: ${params.propertyName}}`,
+	};
+	const def = {
+	    keyword: "propertyNames",
+	    type: "object",
+	    schemaType: ["object", "boolean"],
+	    error,
+	    code(cxt) {
+	        const { gen, schema, data, it } = cxt;
+	        if ((0, util_1.alwaysValidSchema)(it, schema))
+	            return;
+	        const valid = gen.name("valid");
+	        gen.forIn("key", data, (key) => {
+	            cxt.setParams({ propertyName: key });
+	            cxt.subschema({
+	                keyword: "propertyNames",
+	                data: key,
+	                dataTypes: ["string"],
+	                propertyName: key,
+	                compositeRule: true,
+	            }, valid);
+	            gen.if((0, codegen_1.not)(valid), () => {
+	                cxt.error(true);
+	                if (!it.allErrors)
+	                    gen.break();
+	            });
+	        });
+	        cxt.ok(valid);
+	    },
+	};
+	propertyNames.default = def;
+	
+	return propertyNames;
+}
+
+var additionalProperties = {};
+
+var hasRequiredAdditionalProperties;
+
+function requireAdditionalProperties () {
+	if (hasRequiredAdditionalProperties) return additionalProperties;
+	hasRequiredAdditionalProperties = 1;
+	Object.defineProperty(additionalProperties, "__esModule", { value: true });
+	const code_1 = /*@__PURE__*/ requireCode();
+	const codegen_1 = /*@__PURE__*/ requireCodegen();
+	const names_1 = /*@__PURE__*/ requireNames();
+	const util_1 = /*@__PURE__*/ requireUtil();
+	const error = {
+	    message: "must NOT have additional properties",
+	    params: ({ params }) => (0, codegen_1._) `{additionalProperty: ${params.additionalProperty}}`,
+	};
+	const def = {
+	    keyword: "additionalProperties",
+	    type: ["object"],
+	    schemaType: ["boolean", "object"],
+	    allowUndefined: true,
+	    trackErrors: true,
+	    error,
+	    code(cxt) {
+	        const { gen, schema, parentSchema, data, errsCount, it } = cxt;
+	        /* istanbul ignore if */
+	        if (!errsCount)
+	            throw new Error("ajv implementation error");
+	        const { allErrors, opts } = it;
+	        it.props = true;
+	        if (opts.removeAdditional !== "all" && (0, util_1.alwaysValidSchema)(it, schema))
+	            return;
+	        const props = (0, code_1.allSchemaProperties)(parentSchema.properties);
+	        const patProps = (0, code_1.allSchemaProperties)(parentSchema.patternProperties);
+	        checkAdditionalProperties();
+	        cxt.ok((0, codegen_1._) `${errsCount} === ${names_1.default.errors}`);
+	        function checkAdditionalProperties() {
+	            gen.forIn("key", data, (key) => {
+	                if (!props.length && !patProps.length)
+	                    additionalPropertyCode(key);
+	                else
+	                    gen.if(isAdditional(key), () => additionalPropertyCode(key));
+	            });
+	        }
+	        function isAdditional(key) {
+	            let definedProp;
+	            if (props.length > 8) {
+	                // TODO maybe an option instead of hard-coded 8?
+	                const propsSchema = (0, util_1.schemaRefOrVal)(it, parentSchema.properties, "properties");
+	                definedProp = (0, code_1.isOwnProperty)(gen, propsSchema, key);
+	            }
+	            else if (props.length) {
+	                definedProp = (0, codegen_1.or)(...props.map((p) => (0, codegen_1._) `${key} === ${p}`));
+	            }
+	            else {
+	                definedProp = codegen_1.nil;
+	            }
+	            if (patProps.length) {
+	                definedProp = (0, codegen_1.or)(definedProp, ...patProps.map((p) => (0, codegen_1._) `${(0, code_1.usePattern)(cxt, p)}.test(${key})`));
+	            }
+	            return (0, codegen_1.not)(definedProp);
+	        }
+	        function deleteAdditional(key) {
+	            gen.code((0, codegen_1._) `delete ${data}[${key}]`);
+	        }
+	        function additionalPropertyCode(key) {
+	            if (opts.removeAdditional === "all" || (opts.removeAdditional && schema === false)) {
+	                deleteAdditional(key);
+	                return;
+	            }
+	            if (schema === false) {
+	                cxt.setParams({ additionalProperty: key });
+	                cxt.error();
+	                if (!allErrors)
+	                    gen.break();
+	                return;
+	            }
+	            if (typeof schema == "object" && !(0, util_1.alwaysValidSchema)(it, schema)) {
+	                const valid = gen.name("valid");
+	                if (opts.removeAdditional === "failing") {
+	                    applyAdditionalSchema(key, valid, false);
+	                    gen.if((0, codegen_1.not)(valid), () => {
+	                        cxt.reset();
+	                        deleteAdditional(key);
+	                    });
+	                }
+	                else {
+	                    applyAdditionalSchema(key, valid);
+	                    if (!allErrors)
+	                        gen.if((0, codegen_1.not)(valid), () => gen.break());
+	                }
+	            }
+	        }
+	        function applyAdditionalSchema(key, valid, errors) {
+	            const subschema = {
+	                keyword: "additionalProperties",
+	                dataProp: key,
+	                dataPropType: util_1.Type.Str,
+	            };
+	            if (errors === false) {
+	                Object.assign(subschema, {
+	                    compositeRule: true,
+	                    createErrors: false,
+	                    allErrors: false,
+	                });
+	            }
+	            cxt.subschema(subschema, valid);
+	        }
+	    },
+	};
+	additionalProperties.default = def;
+	
+	return additionalProperties;
+}
+
+var properties$1 = {};
+
+var hasRequiredProperties;
+
+function requireProperties () {
+	if (hasRequiredProperties) return properties$1;
+	hasRequiredProperties = 1;
+	Object.defineProperty(properties$1, "__esModule", { value: true });
+	const validate_1 = /*@__PURE__*/ requireValidate();
+	const code_1 = /*@__PURE__*/ requireCode();
+	const util_1 = /*@__PURE__*/ requireUtil();
+	const additionalProperties_1 = /*@__PURE__*/ requireAdditionalProperties();
+	const def = {
+	    keyword: "properties",
+	    type: "object",
+	    schemaType: "object",
+	    code(cxt) {
+	        const { gen, schema, parentSchema, data, it } = cxt;
+	        if (it.opts.removeAdditional === "all" && parentSchema.additionalProperties === undefined) {
+	            additionalProperties_1.default.code(new validate_1.KeywordCxt(it, additionalProperties_1.default, "additionalProperties"));
+	        }
+	        const allProps = (0, code_1.allSchemaProperties)(schema);
+	        for (const prop of allProps) {
+	            it.definedProperties.add(prop);
+	        }
+	        if (it.opts.unevaluated && allProps.length && it.props !== true) {
+	            it.props = util_1.mergeEvaluated.props(gen, (0, util_1.toHash)(allProps), it.props);
+	        }
+	        const properties = allProps.filter((p) => !(0, util_1.alwaysValidSchema)(it, schema[p]));
+	        if (properties.length === 0)
+	            return;
+	        const valid = gen.name("valid");
+	        for (const prop of properties) {
+	            if (hasDefault(prop)) {
+	                applyPropertySchema(prop);
+	            }
+	            else {
+	                gen.if((0, code_1.propertyInData)(gen, data, prop, it.opts.ownProperties));
+	                applyPropertySchema(prop);
+	                if (!it.allErrors)
+	                    gen.else().var(valid, true);
+	                gen.endIf();
+	            }
+	            cxt.it.definedProperties.add(prop);
+	            cxt.ok(valid);
+	        }
+	        function hasDefault(prop) {
+	            return it.opts.useDefaults && !it.compositeRule && schema[prop].default !== undefined;
+	        }
+	        function applyPropertySchema(prop) {
+	            cxt.subschema({
+	                keyword: "properties",
+	                schemaProp: prop,
+	                dataProp: prop,
+	            }, valid);
+	        }
+	    },
+	};
+	properties$1.default = def;
+	
+	return properties$1;
+}
+
+var patternProperties = {};
+
+var hasRequiredPatternProperties;
+
+function requirePatternProperties () {
+	if (hasRequiredPatternProperties) return patternProperties;
+	hasRequiredPatternProperties = 1;
+	Object.defineProperty(patternProperties, "__esModule", { value: true });
+	const code_1 = /*@__PURE__*/ requireCode();
+	const codegen_1 = /*@__PURE__*/ requireCodegen();
+	const util_1 = /*@__PURE__*/ requireUtil();
+	const util_2 = /*@__PURE__*/ requireUtil();
+	const def = {
+	    keyword: "patternProperties",
+	    type: "object",
+	    schemaType: "object",
+	    code(cxt) {
+	        const { gen, schema, data, parentSchema, it } = cxt;
+	        const { opts } = it;
+	        const patterns = (0, code_1.allSchemaProperties)(schema);
+	        const alwaysValidPatterns = patterns.filter((p) => (0, util_1.alwaysValidSchema)(it, schema[p]));
+	        if (patterns.length === 0 ||
+	            (alwaysValidPatterns.length === patterns.length &&
+	                (!it.opts.unevaluated || it.props === true))) {
+	            return;
+	        }
+	        const checkProperties = opts.strictSchema && !opts.allowMatchingProperties && parentSchema.properties;
+	        const valid = gen.name("valid");
+	        if (it.props !== true && !(it.props instanceof codegen_1.Name)) {
+	            it.props = (0, util_2.evaluatedPropsToName)(gen, it.props);
+	        }
+	        const { props } = it;
+	        validatePatternProperties();
+	        function validatePatternProperties() {
+	            for (const pat of patterns) {
+	                if (checkProperties)
+	                    checkMatchingProperties(pat);
+	                if (it.allErrors) {
+	                    validateProperties(pat);
+	                }
+	                else {
+	                    gen.var(valid, true); // TODO var
+	                    validateProperties(pat);
+	                    gen.if(valid);
+	                }
+	            }
+	        }
+	        function checkMatchingProperties(pat) {
+	            for (const prop in checkProperties) {
+	                if (new RegExp(pat).test(prop)) {
+	                    (0, util_1.checkStrictMode)(it, `property ${prop} matches pattern ${pat} (use allowMatchingProperties)`);
+	                }
+	            }
+	        }
+	        function validateProperties(pat) {
+	            gen.forIn("key", data, (key) => {
+	                gen.if((0, codegen_1._) `${(0, code_1.usePattern)(cxt, pat)}.test(${key})`, () => {
+	                    const alwaysValid = alwaysValidPatterns.includes(pat);
+	                    if (!alwaysValid) {
+	                        cxt.subschema({
+	                            keyword: "patternProperties",
+	                            schemaProp: pat,
+	                            dataProp: key,
+	                            dataPropType: util_2.Type.Str,
+	                        }, valid);
+	                    }
+	                    if (it.opts.unevaluated && props !== true) {
+	                        gen.assign((0, codegen_1._) `${props}[${key}]`, true);
+	                    }
+	                    else if (!alwaysValid && !it.allErrors) {
+	                        // can short-circuit if `unevaluatedProperties` is not supported (opts.next === false)
+	                        // or if all properties were evaluated (props === true)
+	                        gen.if((0, codegen_1.not)(valid), () => gen.break());
+	                    }
+	                });
+	            });
+	        }
+	    },
+	};
+	patternProperties.default = def;
+	
+	return patternProperties;
+}
+
+var not = {};
+
+var hasRequiredNot;
+
+function requireNot () {
+	if (hasRequiredNot) return not;
+	hasRequiredNot = 1;
+	Object.defineProperty(not, "__esModule", { value: true });
+	const util_1 = /*@__PURE__*/ requireUtil();
+	const def = {
+	    keyword: "not",
+	    schemaType: ["object", "boolean"],
+	    trackErrors: true,
+	    code(cxt) {
+	        const { gen, schema, it } = cxt;
+	        if ((0, util_1.alwaysValidSchema)(it, schema)) {
+	            cxt.fail();
+	            return;
+	        }
+	        const valid = gen.name("valid");
+	        cxt.subschema({
+	            keyword: "not",
+	            compositeRule: true,
+	            createErrors: false,
+	            allErrors: false,
+	        }, valid);
+	        cxt.failResult(valid, () => cxt.reset(), () => cxt.error());
+	    },
+	    error: { message: "must NOT be valid" },
+	};
+	not.default = def;
+	
+	return not;
+}
+
+var anyOf = {};
+
+var hasRequiredAnyOf;
+
+function requireAnyOf () {
+	if (hasRequiredAnyOf) return anyOf;
+	hasRequiredAnyOf = 1;
+	Object.defineProperty(anyOf, "__esModule", { value: true });
+	const code_1 = /*@__PURE__*/ requireCode();
+	const def = {
+	    keyword: "anyOf",
+	    schemaType: "array",
+	    trackErrors: true,
+	    code: code_1.validateUnion,
+	    error: { message: "must match a schema in anyOf" },
+	};
+	anyOf.default = def;
+	
+	return anyOf;
+}
+
+var oneOf = {};
+
+var hasRequiredOneOf;
+
+function requireOneOf () {
+	if (hasRequiredOneOf) return oneOf;
+	hasRequiredOneOf = 1;
+	Object.defineProperty(oneOf, "__esModule", { value: true });
+	const codegen_1 = /*@__PURE__*/ requireCodegen();
+	const util_1 = /*@__PURE__*/ requireUtil();
+	const error = {
+	    message: "must match exactly one schema in oneOf",
+	    params: ({ params }) => (0, codegen_1._) `{passingSchemas: ${params.passing}}`,
+	};
+	const def = {
+	    keyword: "oneOf",
+	    schemaType: "array",
+	    trackErrors: true,
+	    error,
+	    code(cxt) {
+	        const { gen, schema, parentSchema, it } = cxt;
+	        /* istanbul ignore if */
+	        if (!Array.isArray(schema))
+	            throw new Error("ajv implementation error");
+	        if (it.opts.discriminator && parentSchema.discriminator)
+	            return;
+	        const schArr = schema;
+	        const valid = gen.let("valid", false);
+	        const passing = gen.let("passing", null);
+	        const schValid = gen.name("_valid");
+	        cxt.setParams({ passing });
+	        // TODO possibly fail straight away (with warning or exception) if there are two empty always valid schemas
+	        gen.block(validateOneOf);
+	        cxt.result(valid, () => cxt.reset(), () => cxt.error(true));
+	        function validateOneOf() {
+	            schArr.forEach((sch, i) => {
+	                let schCxt;
+	                if ((0, util_1.alwaysValidSchema)(it, sch)) {
+	                    gen.var(schValid, true);
+	                }
+	                else {
+	                    schCxt = cxt.subschema({
+	                        keyword: "oneOf",
+	                        schemaProp: i,
+	                        compositeRule: true,
+	                    }, schValid);
+	                }
+	                if (i > 0) {
+	                    gen
+	                        .if((0, codegen_1._) `${schValid} && ${valid}`)
+	                        .assign(valid, false)
+	                        .assign(passing, (0, codegen_1._) `[${passing}, ${i}]`)
+	                        .else();
+	                }
+	                gen.if(schValid, () => {
+	                    gen.assign(valid, true);
+	                    gen.assign(passing, i);
+	                    if (schCxt)
+	                        cxt.mergeEvaluated(schCxt, codegen_1.Name);
+	                });
+	            });
+	        }
+	    },
+	};
+	oneOf.default = def;
+	
+	return oneOf;
+}
+
+var allOf = {};
+
+var hasRequiredAllOf;
+
+function requireAllOf () {
+	if (hasRequiredAllOf) return allOf;
+	hasRequiredAllOf = 1;
+	Object.defineProperty(allOf, "__esModule", { value: true });
+	const util_1 = /*@__PURE__*/ requireUtil();
+	const def = {
+	    keyword: "allOf",
+	    schemaType: "array",
+	    code(cxt) {
+	        const { gen, schema, it } = cxt;
+	        /* istanbul ignore if */
+	        if (!Array.isArray(schema))
+	            throw new Error("ajv implementation error");
+	        const valid = gen.name("valid");
+	        schema.forEach((sch, i) => {
+	            if ((0, util_1.alwaysValidSchema)(it, sch))
+	                return;
+	            const schCxt = cxt.subschema({ keyword: "allOf", schemaProp: i }, valid);
+	            cxt.ok(valid);
+	            cxt.mergeEvaluated(schCxt);
+	        });
+	    },
+	};
+	allOf.default = def;
+	
+	return allOf;
+}
+
+var _if = {};
+
+var hasRequired_if;
+
+function require_if () {
+	if (hasRequired_if) return _if;
+	hasRequired_if = 1;
+	Object.defineProperty(_if, "__esModule", { value: true });
+	const codegen_1 = /*@__PURE__*/ requireCodegen();
+	const util_1 = /*@__PURE__*/ requireUtil();
+	const error = {
+	    message: ({ params }) => (0, codegen_1.str) `must match "${params.ifClause}" schema`,
+	    params: ({ params }) => (0, codegen_1._) `{failingKeyword: ${params.ifClause}}`,
+	};
+	const def = {
+	    keyword: "if",
+	    schemaType: ["object", "boolean"],
+	    trackErrors: true,
+	    error,
+	    code(cxt) {
+	        const { gen, parentSchema, it } = cxt;
+	        if (parentSchema.then === undefined && parentSchema.else === undefined) {
+	            (0, util_1.checkStrictMode)(it, '"if" without "then" and "else" is ignored');
+	        }
+	        const hasThen = hasSchema(it, "then");
+	        const hasElse = hasSchema(it, "else");
+	        if (!hasThen && !hasElse)
+	            return;
+	        const valid = gen.let("valid", true);
+	        const schValid = gen.name("_valid");
+	        validateIf();
+	        cxt.reset();
+	        if (hasThen && hasElse) {
+	            const ifClause = gen.let("ifClause");
+	            cxt.setParams({ ifClause });
+	            gen.if(schValid, validateClause("then", ifClause), validateClause("else", ifClause));
+	        }
+	        else if (hasThen) {
+	            gen.if(schValid, validateClause("then"));
+	        }
+	        else {
+	            gen.if((0, codegen_1.not)(schValid), validateClause("else"));
+	        }
+	        cxt.pass(valid, () => cxt.error(true));
+	        function validateIf() {
+	            const schCxt = cxt.subschema({
+	                keyword: "if",
+	                compositeRule: true,
+	                createErrors: false,
+	                allErrors: false,
+	            }, schValid);
+	            cxt.mergeEvaluated(schCxt);
+	        }
+	        function validateClause(keyword, ifClause) {
+	            return () => {
+	                const schCxt = cxt.subschema({ keyword }, schValid);
+	                gen.assign(valid, schValid);
+	                cxt.mergeValidEvaluated(schCxt, valid);
+	                if (ifClause)
+	                    gen.assign(ifClause, (0, codegen_1._) `${keyword}`);
+	                else
+	                    cxt.setParams({ ifClause: keyword });
+	            };
+	        }
+	    },
+	};
+	function hasSchema(it, keyword) {
+	    const schema = it.schema[keyword];
+	    return schema !== undefined && !(0, util_1.alwaysValidSchema)(it, schema);
+	}
+	_if.default = def;
+	
+	return _if;
+}
+
+var thenElse = {};
+
+var hasRequiredThenElse;
+
+function requireThenElse () {
+	if (hasRequiredThenElse) return thenElse;
+	hasRequiredThenElse = 1;
+	Object.defineProperty(thenElse, "__esModule", { value: true });
+	const util_1 = /*@__PURE__*/ requireUtil();
+	const def = {
+	    keyword: ["then", "else"],
+	    schemaType: ["object", "boolean"],
+	    code({ keyword, parentSchema, it }) {
+	        if (parentSchema.if === undefined)
+	            (0, util_1.checkStrictMode)(it, `"${keyword}" without "if" is ignored`);
+	    },
+	};
+	thenElse.default = def;
+	
+	return thenElse;
+}
+
+var hasRequiredApplicator;
+
+function requireApplicator () {
+	if (hasRequiredApplicator) return applicator;
+	hasRequiredApplicator = 1;
+	Object.defineProperty(applicator, "__esModule", { value: true });
+	const additionalItems_1 = /*@__PURE__*/ requireAdditionalItems();
+	const prefixItems_1 = /*@__PURE__*/ requirePrefixItems();
+	const items_1 = /*@__PURE__*/ requireItems();
+	const items2020_1 = /*@__PURE__*/ requireItems2020();
+	const contains_1 = /*@__PURE__*/ requireContains$1();
+	const dependencies_1 = /*@__PURE__*/ requireDependencies();
+	const propertyNames_1 = /*@__PURE__*/ requirePropertyNames();
+	const additionalProperties_1 = /*@__PURE__*/ requireAdditionalProperties();
+	const properties_1 = /*@__PURE__*/ requireProperties();
+	const patternProperties_1 = /*@__PURE__*/ requirePatternProperties();
+	const not_1 = /*@__PURE__*/ requireNot();
+	const anyOf_1 = /*@__PURE__*/ requireAnyOf();
+	const oneOf_1 = /*@__PURE__*/ requireOneOf();
+	const allOf_1 = /*@__PURE__*/ requireAllOf();
+	const if_1 = /*@__PURE__*/ require_if();
+	const thenElse_1 = /*@__PURE__*/ requireThenElse();
+	function getApplicator(draft2020 = false) {
+	    const applicator = [
+	        // any
+	        not_1.default,
+	        anyOf_1.default,
+	        oneOf_1.default,
+	        allOf_1.default,
+	        if_1.default,
+	        thenElse_1.default,
+	        // object
+	        propertyNames_1.default,
+	        additionalProperties_1.default,
+	        dependencies_1.default,
+	        properties_1.default,
+	        patternProperties_1.default,
+	    ];
+	    // array
+	    if (draft2020)
+	        applicator.push(prefixItems_1.default, items2020_1.default);
+	    else
+	        applicator.push(additionalItems_1.default, items_1.default);
+	    applicator.push(contains_1.default);
+	    return applicator;
+	}
+	applicator.default = getApplicator;
+	
+	return applicator;
+}
+
+var format$1 = {};
+
+var format = {};
+
+var hasRequiredFormat$2;
+
+function requireFormat$2 () {
+	if (hasRequiredFormat$2) return format;
+	hasRequiredFormat$2 = 1;
+	Object.defineProperty(format, "__esModule", { value: true });
+	const codegen_1 = /*@__PURE__*/ requireCodegen();
+	const error = {
+	    message: ({ schemaCode }) => (0, codegen_1.str) `must match format "${schemaCode}"`,
+	    params: ({ schemaCode }) => (0, codegen_1._) `{format: ${schemaCode}}`,
+	};
+	const def = {
+	    keyword: "format",
+	    type: ["number", "string"],
+	    schemaType: "string",
+	    $data: true,
+	    error,
+	    code(cxt, ruleType) {
+	        const { gen, data, $data, schema, schemaCode, it } = cxt;
+	        const { opts, errSchemaPath, schemaEnv, self } = it;
+	        if (!opts.validateFormats)
+	            return;
+	        if ($data)
+	            validate$DataFormat();
+	        else
+	            validateFormat();
+	        function validate$DataFormat() {
+	            const fmts = gen.scopeValue("formats", {
+	                ref: self.formats,
+	                code: opts.code.formats,
+	            });
+	            const fDef = gen.const("fDef", (0, codegen_1._) `${fmts}[${schemaCode}]`);
+	            const fType = gen.let("fType");
+	            const format = gen.let("format");
+	            // TODO simplify
+	            gen.if((0, codegen_1._) `typeof ${fDef} == "object" && !(${fDef} instanceof RegExp)`, () => gen.assign(fType, (0, codegen_1._) `${fDef}.type || "string"`).assign(format, (0, codegen_1._) `${fDef}.validate`), () => gen.assign(fType, (0, codegen_1._) `"string"`).assign(format, fDef));
+	            cxt.fail$data((0, codegen_1.or)(unknownFmt(), invalidFmt()));
+	            function unknownFmt() {
+	                if (opts.strictSchema === false)
+	                    return codegen_1.nil;
+	                return (0, codegen_1._) `${schemaCode} && !${format}`;
+	            }
+	            function invalidFmt() {
+	                const callFormat = schemaEnv.$async
+	                    ? (0, codegen_1._) `(${fDef}.async ? await ${format}(${data}) : ${format}(${data}))`
+	                    : (0, codegen_1._) `${format}(${data})`;
+	                const validData = (0, codegen_1._) `(typeof ${format} == "function" ? ${callFormat} : ${format}.test(${data}))`;
+	                return (0, codegen_1._) `${format} && ${format} !== true && ${fType} === ${ruleType} && !${validData}`;
+	            }
+	        }
+	        function validateFormat() {
+	            const formatDef = self.formats[schema];
+	            if (!formatDef) {
+	                unknownFormat();
+	                return;
+	            }
+	            if (formatDef === true)
+	                return;
+	            const [fmtType, format, fmtRef] = getFormat(formatDef);
+	            if (fmtType === ruleType)
+	                cxt.pass(validCondition());
+	            function unknownFormat() {
+	                if (opts.strictSchema === false) {
+	                    self.logger.warn(unknownMsg());
+	                    return;
+	                }
+	                throw new Error(unknownMsg());
+	                function unknownMsg() {
+	                    return `unknown format "${schema}" ignored in schema at path "${errSchemaPath}"`;
+	                }
+	            }
+	            function getFormat(fmtDef) {
+	                const code = fmtDef instanceof RegExp
+	                    ? (0, codegen_1.regexpCode)(fmtDef)
+	                    : opts.code.formats
+	                        ? (0, codegen_1._) `${opts.code.formats}${(0, codegen_1.getProperty)(schema)}`
+	                        : undefined;
+	                const fmt = gen.scopeValue("formats", { key: schema, ref: fmtDef, code });
+	                if (typeof fmtDef == "object" && !(fmtDef instanceof RegExp)) {
+	                    return [fmtDef.type || "string", fmtDef.validate, (0, codegen_1._) `${fmt}.validate`];
+	                }
+	                return ["string", fmtDef, fmt];
+	            }
+	            function validCondition() {
+	                if (typeof formatDef == "object" && !(formatDef instanceof RegExp) && formatDef.async) {
+	                    if (!schemaEnv.$async)
+	                        throw new Error("async format in sync schema");
+	                    return (0, codegen_1._) `await ${fmtRef}(${data})`;
+	                }
+	                return typeof format == "function" ? (0, codegen_1._) `${fmtRef}(${data})` : (0, codegen_1._) `${fmtRef}.test(${data})`;
+	            }
+	        }
+	    },
+	};
+	format.default = def;
+	
+	return format;
+}
+
+var hasRequiredFormat$1;
+
+function requireFormat$1 () {
+	if (hasRequiredFormat$1) return format$1;
+	hasRequiredFormat$1 = 1;
+	Object.defineProperty(format$1, "__esModule", { value: true });
+	const format_1 = /*@__PURE__*/ requireFormat$2();
+	const format = [format_1.default];
+	format$1.default = format;
+	
+	return format$1;
+}
+
+var metadata = {};
+
+var hasRequiredMetadata;
+
+function requireMetadata () {
+	if (hasRequiredMetadata) return metadata;
+	hasRequiredMetadata = 1;
+	Object.defineProperty(metadata, "__esModule", { value: true });
+	metadata.contentVocabulary = metadata.metadataVocabulary = void 0;
+	metadata.metadataVocabulary = [
+	    "title",
+	    "description",
+	    "default",
+	    "deprecated",
+	    "readOnly",
+	    "writeOnly",
+	    "examples",
+	];
+	metadata.contentVocabulary = [
+	    "contentMediaType",
+	    "contentEncoding",
+	    "contentSchema",
+	];
+	
+	return metadata;
+}
+
+var hasRequiredDraft7;
+
+function requireDraft7 () {
+	if (hasRequiredDraft7) return draft7;
+	hasRequiredDraft7 = 1;
+	Object.defineProperty(draft7, "__esModule", { value: true });
+	const core_1 = /*@__PURE__*/ requireCore();
+	const validation_1 = /*@__PURE__*/ requireValidation();
+	const applicator_1 = /*@__PURE__*/ requireApplicator();
+	const format_1 = /*@__PURE__*/ requireFormat$1();
+	const metadata_1 = /*@__PURE__*/ requireMetadata();
+	const draft7Vocabularies = [
+	    core_1.default,
+	    validation_1.default,
+	    (0, applicator_1.default)(),
+	    format_1.default,
+	    metadata_1.metadataVocabulary,
+	    metadata_1.contentVocabulary,
+	];
+	draft7.default = draft7Vocabularies;
+	
+	return draft7;
+}
+
+var discriminator = {};
+
+var types = {};
+
+var hasRequiredTypes;
+
+function requireTypes () {
+	if (hasRequiredTypes) return types;
+	hasRequiredTypes = 1;
+	Object.defineProperty(types, "__esModule", { value: true });
+	types.DiscrError = void 0;
+	var DiscrError;
+	(function (DiscrError) {
+	    DiscrError["Tag"] = "tag";
+	    DiscrError["Mapping"] = "mapping";
+	})(DiscrError || (types.DiscrError = DiscrError = {}));
+	
+	return types;
+}
+
+var hasRequiredDiscriminator;
+
+function requireDiscriminator () {
+	if (hasRequiredDiscriminator) return discriminator;
+	hasRequiredDiscriminator = 1;
+	Object.defineProperty(discriminator, "__esModule", { value: true });
+	const codegen_1 = /*@__PURE__*/ requireCodegen();
+	const types_1 = /*@__PURE__*/ requireTypes();
+	const compile_1 = /*@__PURE__*/ requireCompile();
+	const ref_error_1 = /*@__PURE__*/ requireRef_error();
+	const util_1 = /*@__PURE__*/ requireUtil();
+	const error = {
+	    message: ({ params: { discrError, tagName } }) => discrError === types_1.DiscrError.Tag
+	        ? `tag "${tagName}" must be string`
+	        : `value of tag "${tagName}" must be in oneOf`,
+	    params: ({ params: { discrError, tag, tagName } }) => (0, codegen_1._) `{error: ${discrError}, tag: ${tagName}, tagValue: ${tag}}`,
+	};
+	const def = {
+	    keyword: "discriminator",
+	    type: "object",
+	    schemaType: "object",
+	    error,
+	    code(cxt) {
+	        const { gen, data, schema, parentSchema, it } = cxt;
+	        const { oneOf } = parentSchema;
+	        if (!it.opts.discriminator) {
+	            throw new Error("discriminator: requires discriminator option");
+	        }
+	        const tagName = schema.propertyName;
+	        if (typeof tagName != "string")
+	            throw new Error("discriminator: requires propertyName");
+	        if (schema.mapping)
+	            throw new Error("discriminator: mapping is not supported");
+	        if (!oneOf)
+	            throw new Error("discriminator: requires oneOf keyword");
+	        const valid = gen.let("valid", false);
+	        const tag = gen.const("tag", (0, codegen_1._) `${data}${(0, codegen_1.getProperty)(tagName)}`);
+	        gen.if((0, codegen_1._) `typeof ${tag} == "string"`, () => validateMapping(), () => cxt.error(false, { discrError: types_1.DiscrError.Tag, tag, tagName }));
+	        cxt.ok(valid);
+	        function validateMapping() {
+	            const mapping = getMapping();
+	            gen.if(false);
+	            for (const tagValue in mapping) {
+	                gen.elseIf((0, codegen_1._) `${tag} === ${tagValue}`);
+	                gen.assign(valid, applyTagSchema(mapping[tagValue]));
+	            }
+	            gen.else();
+	            cxt.error(false, { discrError: types_1.DiscrError.Mapping, tag, tagName });
+	            gen.endIf();
+	        }
+	        function applyTagSchema(schemaProp) {
+	            const _valid = gen.name("valid");
+	            const schCxt = cxt.subschema({ keyword: "oneOf", schemaProp }, _valid);
+	            cxt.mergeEvaluated(schCxt, codegen_1.Name);
+	            return _valid;
+	        }
+	        function getMapping() {
+	            var _a;
+	            const oneOfMapping = {};
+	            const topRequired = hasRequired(parentSchema);
+	            let tagRequired = true;
+	            for (let i = 0; i < oneOf.length; i++) {
+	                let sch = oneOf[i];
+	                if ((sch === null || sch === void 0 ? void 0 : sch.$ref) && !(0, util_1.schemaHasRulesButRef)(sch, it.self.RULES)) {
+	                    const ref = sch.$ref;
+	                    sch = compile_1.resolveRef.call(it.self, it.schemaEnv.root, it.baseId, ref);
+	                    if (sch instanceof compile_1.SchemaEnv)
+	                        sch = sch.schema;
+	                    if (sch === undefined)
+	                        throw new ref_error_1.default(it.opts.uriResolver, it.baseId, ref);
+	                }
+	                const propSch = (_a = sch === null || sch === void 0 ? void 0 : sch.properties) === null || _a === void 0 ? void 0 : _a[tagName];
+	                if (typeof propSch != "object") {
+	                    throw new Error(`discriminator: oneOf subschemas (or referenced schemas) must have "properties/${tagName}"`);
+	                }
+	                tagRequired = tagRequired && (topRequired || hasRequired(sch));
+	                addMappings(propSch, i);
+	            }
+	            if (!tagRequired)
+	                throw new Error(`discriminator: "${tagName}" must be required`);
+	            return oneOfMapping;
+	            function hasRequired({ required }) {
+	                return Array.isArray(required) && required.includes(tagName);
+	            }
+	            function addMappings(sch, i) {
+	                if (sch.const) {
+	                    addMapping(sch.const, i);
+	                }
+	                else if (sch.enum) {
+	                    for (const tagValue of sch.enum) {
+	                        addMapping(tagValue, i);
+	                    }
+	                }
+	                else {
+	                    throw new Error(`discriminator: "properties/${tagName}" must have "const" or "enum"`);
+	                }
+	            }
+	            function addMapping(tagValue, i) {
+	                if (typeof tagValue != "string" || tagValue in oneOfMapping) {
+	                    throw new Error(`discriminator: "${tagName}" values must be unique strings`);
+	                }
+	                oneOfMapping[tagValue] = i;
+	            }
+	        }
+	    },
+	};
+	discriminator.default = def;
+	
+	return discriminator;
+}
+
+var $schema = "http://json-schema.org/draft-07/schema#";
+var $id = "http://json-schema.org/draft-07/schema#";
+var title = "Core schema meta-schema";
+var definitions = {
+	schemaArray: {
+		type: "array",
+		minItems: 1,
+		items: {
+			$ref: "#"
+		}
+	},
+	nonNegativeInteger: {
+		type: "integer",
+		minimum: 0
+	},
+	nonNegativeIntegerDefault0: {
+		allOf: [
+			{
+				$ref: "#/definitions/nonNegativeInteger"
+			},
+			{
+				"default": 0
+			}
+		]
+	},
+	simpleTypes: {
+		"enum": [
+			"array",
+			"boolean",
+			"integer",
+			"null",
+			"number",
+			"object",
+			"string"
+		]
+	},
+	stringArray: {
+		type: "array",
+		items: {
+			type: "string"
+		},
+		uniqueItems: true,
+		"default": [
+		]
+	}
+};
+var type = [
+	"object",
+	"boolean"
+];
+var properties = {
+	$id: {
+		type: "string",
+		format: "uri-reference"
+	},
+	$schema: {
+		type: "string",
+		format: "uri"
+	},
+	$ref: {
+		type: "string",
+		format: "uri-reference"
+	},
+	$comment: {
+		type: "string"
+	},
+	title: {
+		type: "string"
+	},
+	description: {
+		type: "string"
+	},
+	"default": true,
+	readOnly: {
+		type: "boolean",
+		"default": false
+	},
+	examples: {
+		type: "array",
+		items: true
+	},
+	multipleOf: {
+		type: "number",
+		exclusiveMinimum: 0
+	},
+	maximum: {
+		type: "number"
+	},
+	exclusiveMaximum: {
+		type: "number"
+	},
+	minimum: {
+		type: "number"
+	},
+	exclusiveMinimum: {
+		type: "number"
+	},
+	maxLength: {
+		$ref: "#/definitions/nonNegativeInteger"
+	},
+	minLength: {
+		$ref: "#/definitions/nonNegativeIntegerDefault0"
+	},
+	pattern: {
+		type: "string",
+		format: "regex"
+	},
+	additionalItems: {
+		$ref: "#"
+	},
+	items: {
+		anyOf: [
+			{
+				$ref: "#"
+			},
+			{
+				$ref: "#/definitions/schemaArray"
+			}
+		],
+		"default": true
+	},
+	maxItems: {
+		$ref: "#/definitions/nonNegativeInteger"
+	},
+	minItems: {
+		$ref: "#/definitions/nonNegativeIntegerDefault0"
+	},
+	uniqueItems: {
+		type: "boolean",
+		"default": false
+	},
+	contains: {
+		$ref: "#"
+	},
+	maxProperties: {
+		$ref: "#/definitions/nonNegativeInteger"
+	},
+	minProperties: {
+		$ref: "#/definitions/nonNegativeIntegerDefault0"
+	},
+	required: {
+		$ref: "#/definitions/stringArray"
+	},
+	additionalProperties: {
+		$ref: "#"
+	},
+	definitions: {
+		type: "object",
+		additionalProperties: {
+			$ref: "#"
+		},
+		"default": {
+		}
+	},
+	properties: {
+		type: "object",
+		additionalProperties: {
+			$ref: "#"
+		},
+		"default": {
+		}
+	},
+	patternProperties: {
+		type: "object",
+		additionalProperties: {
+			$ref: "#"
+		},
+		propertyNames: {
+			format: "regex"
+		},
+		"default": {
+		}
+	},
+	dependencies: {
+		type: "object",
+		additionalProperties: {
+			anyOf: [
+				{
+					$ref: "#"
+				},
+				{
+					$ref: "#/definitions/stringArray"
+				}
+			]
+		}
+	},
+	propertyNames: {
+		$ref: "#"
+	},
+	"const": true,
+	"enum": {
+		type: "array",
+		items: true,
+		minItems: 1,
+		uniqueItems: true
+	},
+	type: {
+		anyOf: [
+			{
+				$ref: "#/definitions/simpleTypes"
+			},
+			{
+				type: "array",
+				items: {
+					$ref: "#/definitions/simpleTypes"
+				},
+				minItems: 1,
+				uniqueItems: true
+			}
+		]
+	},
+	format: {
+		type: "string"
+	},
+	contentMediaType: {
+		type: "string"
+	},
+	contentEncoding: {
+		type: "string"
+	},
+	"if": {
+		$ref: "#"
+	},
+	then: {
+		$ref: "#"
+	},
+	"else": {
+		$ref: "#"
+	},
+	allOf: {
+		$ref: "#/definitions/schemaArray"
+	},
+	anyOf: {
+		$ref: "#/definitions/schemaArray"
+	},
+	oneOf: {
+		$ref: "#/definitions/schemaArray"
+	},
+	not: {
+		$ref: "#"
+	}
+};
+var require$$3 = {
+	$schema: $schema,
+	$id: $id,
+	title: title,
+	definitions: definitions,
+	type: type,
+	properties: properties,
+	"default": true
+};
+
+ajv.exports;
+
+var hasRequiredAjv;
+
+function requireAjv () {
+	if (hasRequiredAjv) return ajv.exports;
+	hasRequiredAjv = 1;
+	(function (module, exports) {
+		Object.defineProperty(exports, "__esModule", { value: true });
+		exports.MissingRefError = exports.ValidationError = exports.CodeGen = exports.Name = exports.nil = exports.stringify = exports.str = exports._ = exports.KeywordCxt = exports.Ajv = void 0;
+		const core_1 = /*@__PURE__*/ requireCore$1();
+		const draft7_1 = /*@__PURE__*/ requireDraft7();
+		const discriminator_1 = /*@__PURE__*/ requireDiscriminator();
+		const draft7MetaSchema = require$$3;
+		const META_SUPPORT_DATA = ["/properties"];
+		const META_SCHEMA_ID = "http://json-schema.org/draft-07/schema";
+		class Ajv extends core_1.default {
+		    _addVocabularies() {
+		        super._addVocabularies();
+		        draft7_1.default.forEach((v) => this.addVocabulary(v));
+		        if (this.opts.discriminator)
+		            this.addKeyword(discriminator_1.default);
+		    }
+		    _addDefaultMetaSchema() {
+		        super._addDefaultMetaSchema();
+		        if (!this.opts.meta)
+		            return;
+		        const metaSchema = this.opts.$data
+		            ? this.$dataMetaSchema(draft7MetaSchema, META_SUPPORT_DATA)
+		            : draft7MetaSchema;
+		        this.addMetaSchema(metaSchema, META_SCHEMA_ID, false);
+		        this.refs["http://json-schema.org/schema"] = META_SCHEMA_ID;
+		    }
+		    defaultMeta() {
+		        return (this.opts.defaultMeta =
+		            super.defaultMeta() || (this.getSchema(META_SCHEMA_ID) ? META_SCHEMA_ID : undefined));
+		    }
+		}
+		exports.Ajv = Ajv;
+		module.exports = exports = Ajv;
+		module.exports.Ajv = Ajv;
+		Object.defineProperty(exports, "__esModule", { value: true });
+		exports.default = Ajv;
+		var validate_1 = /*@__PURE__*/ requireValidate();
+		Object.defineProperty(exports, "KeywordCxt", { enumerable: true, get: function () { return validate_1.KeywordCxt; } });
+		var codegen_1 = /*@__PURE__*/ requireCodegen();
+		Object.defineProperty(exports, "_", { enumerable: true, get: function () { return codegen_1._; } });
+		Object.defineProperty(exports, "str", { enumerable: true, get: function () { return codegen_1.str; } });
+		Object.defineProperty(exports, "stringify", { enumerable: true, get: function () { return codegen_1.stringify; } });
+		Object.defineProperty(exports, "nil", { enumerable: true, get: function () { return codegen_1.nil; } });
+		Object.defineProperty(exports, "Name", { enumerable: true, get: function () { return codegen_1.Name; } });
+		Object.defineProperty(exports, "CodeGen", { enumerable: true, get: function () { return codegen_1.CodeGen; } });
+		var validation_error_1 = /*@__PURE__*/ requireValidation_error();
+		Object.defineProperty(exports, "ValidationError", { enumerable: true, get: function () { return validation_error_1.default; } });
+		var ref_error_1 = /*@__PURE__*/ requireRef_error();
+		Object.defineProperty(exports, "MissingRefError", { enumerable: true, get: function () { return ref_error_1.default; } });
+		
+	} (ajv, ajv.exports));
+	return ajv.exports;
+}
 
 var purify_1$5;
 var hasRequiredPurify$6;
@@ -12831,7 +18107,7 @@ function requireStartsWithCore () {
 	hasRequiredStartsWithCore = 1;
 	var newBoolean = requireNewBoolean();
 	var nullOperator = ' is ';
-	var quote = requireQuote$2();
+	var quote = requireQuote$1();
 	var encodeFilterArg = requireEncodeFilterArg();
 	var newLikeColumnArg = requireNewLikeColumnArg();
 
@@ -12871,7 +18147,7 @@ var hasRequiredEndsWithCore;
 function requireEndsWithCore () {
 	if (hasRequiredEndsWithCore) return endsWithCore_1;
 	hasRequiredEndsWithCore = 1;
-	const quote = requireQuote$2();
+	const quote = requireQuote$1();
 	var newBoolean = requireNewBoolean();
 	var nullOperator = ' is ';
 	var encodeFilterArg = requireEncodeFilterArg();
@@ -12914,7 +18190,7 @@ var hasRequiredContainsCore;
 function requireContainsCore () {
 	if (hasRequiredContainsCore) return containsCore_1;
 	hasRequiredContainsCore = 1;
-	const quote = requireQuote$2();
+	const quote = requireQuote$1();
 	var newBoolean = requireNewBoolean();
 	var nullOperator = ' is ';
 	var encodeFilterArg = requireEncodeFilterArg();
@@ -12996,7 +18272,7 @@ function requireIEqual () {
 	var newBoolean = requireNewBoolean();
 	var nullOperator = ' is ';
 	var encodeFilterArg = requireEncodeFilterArg();
-	const quote = requireQuote$2();
+	const quote = requireQuote$1();
 
 	function iEqual(context, column,arg,alias) {
 		var operator = ' ILIKE ';
@@ -13186,7 +18462,7 @@ function requireFormatOutGeneric () {
 	if (hasRequiredFormatOutGeneric) return formatOutGeneric_1;
 	hasRequiredFormatOutGeneric = 1;
 	var getSessionSingleton = requireGetSessionSingleton();
-	const quote = requireQuote$2();
+	const quote = requireQuote$1();
 
 	function formatOutGeneric(context, column, fnName, alias) {
 		var formatColumn = getSessionSingleton(context, fnName);
@@ -13202,7 +18478,1013 @@ function requireFormatOutGeneric () {
 	return formatOutGeneric_1;
 }
 
-var require$$9 = /*@__PURE__*/getDefaultExportFromNamespaceIfPresent(onChange);
+var cjs;
+var hasRequiredCjs;
+
+function requireCjs () {
+	if (hasRequiredCjs) return cjs;
+	hasRequiredCjs = 1;
+
+	const PATH_SEPARATOR = '.';
+	const TARGET = Symbol('target');
+	const UNSUBSCRIBE = Symbol('unsubscribe');
+
+	function isBuiltinWithMutableMethods(value) {
+		return value instanceof Date
+			|| value instanceof Set
+			|| value instanceof Map
+			|| value instanceof WeakSet
+			|| value instanceof WeakMap
+			|| ArrayBuffer.isView(value);
+	}
+
+	function isBuiltinWithoutMutableMethods(value) {
+		return (typeof value === 'object' ? value === null : typeof value !== 'function') || value instanceof RegExp;
+	}
+
+	var isArray = Array.isArray;
+
+	function isSymbol(value) {
+		return typeof value === 'symbol';
+	}
+
+	const path = {
+		after: (path, subPath) => {
+			if (isArray(path)) {
+				return path.slice(subPath.length);
+			}
+
+			if (subPath === '') {
+				return path;
+			}
+
+			return path.slice(subPath.length + 1);
+		},
+		concat: (path, key) => {
+			if (isArray(path)) {
+				path = [...path];
+
+				if (key) {
+					path.push(key);
+				}
+
+				return path;
+			}
+
+			if (key && key.toString !== undefined) {
+				if (path !== '') {
+					path += PATH_SEPARATOR;
+				}
+
+				if (isSymbol(key)) {
+					return path + key.toString();
+				}
+
+				return path + key;
+			}
+
+			return path;
+		},
+		initial: path => {
+			if (isArray(path)) {
+				return path.slice(0, -1);
+			}
+
+			if (path === '') {
+				return path;
+			}
+
+			const index = path.lastIndexOf(PATH_SEPARATOR);
+
+			if (index === -1) {
+				return '';
+			}
+
+			return path.slice(0, index);
+		},
+		last: path => {
+			if (isArray(path)) {
+				return path[path.length - 1] || '';
+			}
+
+			if (path === '') {
+				return path;
+			}
+
+			const index = path.lastIndexOf(PATH_SEPARATOR);
+
+			if (index === -1) {
+				return path;
+			}
+
+			return path.slice(index + 1);
+		},
+		walk: (path, callback) => {
+			if (isArray(path)) {
+				for (const key of path) {
+					callback(key);
+				}
+			} else if (path !== '') {
+				let position = 0;
+				let index = path.indexOf(PATH_SEPARATOR);
+
+				if (index === -1) {
+					callback(path);
+				} else {
+					while (position < path.length) {
+						if (index === -1) {
+							index = path.length;
+						}
+
+						callback(path.slice(position, index));
+
+						position = index + 1;
+						index = path.indexOf(PATH_SEPARATOR, position);
+					}
+				}
+			}
+		},
+		get(object, path) {
+			this.walk(path, key => {
+				if (object) {
+					object = object[key];
+				}
+			});
+
+			return object;
+		},
+	};
+
+	function isIterator(value) {
+		return typeof value === 'object' && typeof value.next === 'function';
+	}
+
+	// eslint-disable-next-line max-params
+	function wrapIterator(iterator, target, thisArg, applyPath, prepareValue) {
+		const originalNext = iterator.next;
+
+		if (target.name === 'entries') {
+			iterator.next = function () {
+				const result = originalNext.call(this);
+
+				if (result.done === false) {
+					result.value[0] = prepareValue(
+						result.value[0],
+						target,
+						result.value[0],
+						applyPath,
+					);
+					result.value[1] = prepareValue(
+						result.value[1],
+						target,
+						result.value[0],
+						applyPath,
+					);
+				}
+
+				return result;
+			};
+		} else if (target.name === 'values') {
+			const keyIterator = thisArg[TARGET].keys();
+
+			iterator.next = function () {
+				const result = originalNext.call(this);
+
+				if (result.done === false) {
+					result.value = prepareValue(
+						result.value,
+						target,
+						keyIterator.next().value,
+						applyPath,
+					);
+				}
+
+				return result;
+			};
+		} else {
+			iterator.next = function () {
+				const result = originalNext.call(this);
+
+				if (result.done === false) {
+					result.value = prepareValue(
+						result.value,
+						target,
+						result.value,
+						applyPath,
+					);
+				}
+
+				return result;
+			};
+		}
+
+		return iterator;
+	}
+
+	function ignoreProperty(cache, options, property) {
+		return cache.isUnsubscribed
+			|| (options.ignoreSymbols && isSymbol(property))
+			|| (options.ignoreUnderscores && property.charAt(0) === '_')
+			|| ('ignoreKeys' in options && options.ignoreKeys.includes(property));
+	}
+
+	/**
+	@class Cache
+	@private
+	*/
+	class Cache {
+		constructor(equals) {
+			this._equals = equals;
+			this._proxyCache = new WeakMap();
+			this._pathCache = new WeakMap();
+			this.isUnsubscribed = false;
+		}
+
+		_getDescriptorCache() {
+			if (this._descriptorCache === undefined) {
+				this._descriptorCache = new WeakMap();
+			}
+
+			return this._descriptorCache;
+		}
+
+		_getProperties(target) {
+			const descriptorCache = this._getDescriptorCache();
+			let properties = descriptorCache.get(target);
+
+			if (properties === undefined) {
+				properties = {};
+				descriptorCache.set(target, properties);
+			}
+
+			return properties;
+		}
+
+		_getOwnPropertyDescriptor(target, property) {
+			if (this.isUnsubscribed) {
+				return Reflect.getOwnPropertyDescriptor(target, property);
+			}
+
+			const properties = this._getProperties(target);
+			let descriptor = properties[property];
+
+			if (descriptor === undefined) {
+				descriptor = Reflect.getOwnPropertyDescriptor(target, property);
+				properties[property] = descriptor;
+			}
+
+			return descriptor;
+		}
+
+		getProxy(target, path, handler, proxyTarget) {
+			if (this.isUnsubscribed) {
+				return target;
+			}
+
+			const reflectTarget = target[proxyTarget];
+			const source = reflectTarget || target;
+
+			this._pathCache.set(source, path);
+
+			let proxy = this._proxyCache.get(source);
+
+			if (proxy === undefined) {
+				proxy = reflectTarget === undefined
+					? new Proxy(target, handler)
+					: target;
+
+				this._proxyCache.set(source, proxy);
+			}
+
+			return proxy;
+		}
+
+		getPath(target) {
+			return this.isUnsubscribed ? undefined : this._pathCache.get(target);
+		}
+
+		isDetached(target, object) {
+			return !Object.is(target, path.get(object, this.getPath(target)));
+		}
+
+		defineProperty(target, property, descriptor) {
+			if (!Reflect.defineProperty(target, property, descriptor)) {
+				return false;
+			}
+
+			if (!this.isUnsubscribed) {
+				this._getProperties(target)[property] = descriptor;
+			}
+
+			return true;
+		}
+
+		setProperty(target, property, value, receiver, previous) { // eslint-disable-line max-params
+			if (!this._equals(previous, value) || !(property in target)) {
+				const descriptor = this._getOwnPropertyDescriptor(target, property);
+
+				if (descriptor !== undefined && 'set' in descriptor) {
+					return Reflect.set(target, property, value, receiver);
+				}
+
+				return Reflect.set(target, property, value);
+			}
+
+			return true;
+		}
+
+		deleteProperty(target, property, previous) {
+			if (Reflect.deleteProperty(target, property)) {
+				if (!this.isUnsubscribed) {
+					const properties = this._getDescriptorCache().get(target);
+
+					if (properties) {
+						delete properties[property];
+						this._pathCache.delete(previous);
+					}
+				}
+
+				return true;
+			}
+
+			return false;
+		}
+
+		isSameDescriptor(a, target, property) {
+			const b = this._getOwnPropertyDescriptor(target, property);
+
+			return a !== undefined
+				&& b !== undefined
+				&& Object.is(a.value, b.value)
+				&& (a.writable || false) === (b.writable || false)
+				&& (a.enumerable || false) === (b.enumerable || false)
+				&& (a.configurable || false) === (b.configurable || false)
+				&& a.get === b.get
+				&& a.set === b.set;
+		}
+
+		isGetInvariant(target, property) {
+			const descriptor = this._getOwnPropertyDescriptor(target, property);
+
+			return descriptor !== undefined
+				&& descriptor.configurable !== true
+				&& descriptor.writable !== true;
+		}
+
+		unsubscribe() {
+			this._descriptorCache = null;
+			this._pathCache = null;
+			this._proxyCache = null;
+			this.isUnsubscribed = true;
+		}
+	}
+
+	function isObject(value) {
+		return toString.call(value) === '[object Object]';
+	}
+
+	function isDiffCertain() {
+		return true;
+	}
+
+	function isDiffArrays(clone, value) {
+		return clone.length !== value.length || clone.some((item, index) => value[index] !== item);
+	}
+
+	const IMMUTABLE_OBJECT_METHODS = new Set([
+		'hasOwnProperty',
+		'isPrototypeOf',
+		'propertyIsEnumerable',
+		'toLocaleString',
+		'toString',
+		'valueOf',
+	]);
+
+	const IMMUTABLE_ARRAY_METHODS = new Set([
+		'concat',
+		'includes',
+		'indexOf',
+		'join',
+		'keys',
+		'lastIndexOf',
+	]);
+
+	const MUTABLE_ARRAY_METHODS = {
+		push: isDiffCertain,
+		pop: isDiffCertain,
+		shift: isDiffCertain,
+		unshift: isDiffCertain,
+		copyWithin: isDiffArrays,
+		reverse: isDiffArrays,
+		sort: isDiffArrays,
+		splice: isDiffArrays,
+		flat: isDiffArrays,
+		fill: isDiffArrays,
+	};
+
+	const HANDLED_ARRAY_METHODS = new Set([
+		...IMMUTABLE_OBJECT_METHODS,
+		...IMMUTABLE_ARRAY_METHODS,
+		...Object.keys(MUTABLE_ARRAY_METHODS),
+	]);
+
+	function isDiffSets(clone, value) {
+		if (clone.size !== value.size) {
+			return true;
+		}
+
+		for (const element of clone) {
+			if (!value.has(element)) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	const COLLECTION_ITERATOR_METHODS = [
+		'keys',
+		'values',
+		'entries',
+	];
+
+	const IMMUTABLE_SET_METHODS = new Set([
+		'has',
+		'toString',
+	]);
+
+	const MUTABLE_SET_METHODS = {
+		add: isDiffSets,
+		clear: isDiffSets,
+		delete: isDiffSets,
+		forEach: isDiffSets,
+	};
+
+	const HANDLED_SET_METHODS = new Set([
+		...IMMUTABLE_SET_METHODS,
+		...Object.keys(MUTABLE_SET_METHODS),
+		...COLLECTION_ITERATOR_METHODS,
+	]);
+
+	function isDiffMaps(clone, value) {
+		if (clone.size !== value.size) {
+			return true;
+		}
+
+		let bValue;
+		for (const [key, aValue] of clone) {
+			bValue = value.get(key);
+
+			if (bValue !== aValue || (bValue === undefined && !value.has(key))) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	const IMMUTABLE_MAP_METHODS = new Set([...IMMUTABLE_SET_METHODS, 'get']);
+
+	const MUTABLE_MAP_METHODS = {
+		set: isDiffMaps,
+		clear: isDiffMaps,
+		delete: isDiffMaps,
+		forEach: isDiffMaps,
+	};
+
+	const HANDLED_MAP_METHODS = new Set([
+		...IMMUTABLE_MAP_METHODS,
+		...Object.keys(MUTABLE_MAP_METHODS),
+		...COLLECTION_ITERATOR_METHODS,
+	]);
+
+	class CloneObject {
+		constructor(value, path, argumentsList, hasOnValidate) {
+			this._path = path;
+			this._isChanged = false;
+			this._clonedCache = new Set();
+			this._hasOnValidate = hasOnValidate;
+			this._changes = hasOnValidate ? [] : null;
+
+			this.clone = path === undefined ? value : this._shallowClone(value);
+		}
+
+		static isHandledMethod(name) {
+			return IMMUTABLE_OBJECT_METHODS.has(name);
+		}
+
+		_shallowClone(value) {
+			let clone = value;
+
+			if (isObject(value)) {
+				clone = {...value};
+			} else if (isArray(value) || ArrayBuffer.isView(value)) {
+				clone = [...value];
+			} else if (value instanceof Date) {
+				clone = new Date(value);
+			} else if (value instanceof Set) {
+				clone = new Set([...value].map(item => this._shallowClone(item)));
+			} else if (value instanceof Map) {
+				clone = new Map();
+
+				for (const [key, item] of value.entries()) {
+					clone.set(key, this._shallowClone(item));
+				}
+			}
+
+			this._clonedCache.add(clone);
+
+			return clone;
+		}
+
+		preferredThisArg(isHandledMethod, name, thisArg, thisProxyTarget) {
+			if (isHandledMethod) {
+				if (isArray(thisProxyTarget)) {
+					this._onIsChanged = MUTABLE_ARRAY_METHODS[name];
+				} else if (thisProxyTarget instanceof Set) {
+					this._onIsChanged = MUTABLE_SET_METHODS[name];
+				} else if (thisProxyTarget instanceof Map) {
+					this._onIsChanged = MUTABLE_MAP_METHODS[name];
+				}
+
+				return thisProxyTarget;
+			}
+
+			return thisArg;
+		}
+
+		update(fullPath, property, value) {
+			const changePath = path.after(fullPath, this._path);
+
+			if (property !== 'length') {
+				let object = this.clone;
+
+				path.walk(changePath, key => {
+					if (object && object[key]) {
+						if (!this._clonedCache.has(object[key])) {
+							object[key] = this._shallowClone(object[key]);
+						}
+
+						object = object[key];
+					}
+				});
+
+				if (this._hasOnValidate) {
+					this._changes.push({
+						path: changePath,
+						property,
+						previous: value,
+					});
+				}
+
+				if (object && object[property]) {
+					object[property] = value;
+				}
+			}
+
+			this._isChanged = true;
+		}
+
+		undo(object) {
+			let change;
+
+			for (let index = this._changes.length - 1; index !== -1; index--) {
+				change = this._changes[index];
+
+				path.get(object, change.path)[change.property] = change.previous;
+			}
+		}
+
+		isChanged(value) {
+			return this._onIsChanged === undefined
+				? this._isChanged
+				: this._onIsChanged(this.clone, value);
+		}
+	}
+
+	class CloneArray extends CloneObject {
+		static isHandledMethod(name) {
+			return HANDLED_ARRAY_METHODS.has(name);
+		}
+	}
+
+	class CloneDate extends CloneObject {
+		undo(object) {
+			object.setTime(this.clone.getTime());
+		}
+
+		isChanged(value, equals) {
+			return !equals(this.clone.valueOf(), value.valueOf());
+		}
+	}
+
+	class CloneSet extends CloneObject {
+		static isHandledMethod(name) {
+			return HANDLED_SET_METHODS.has(name);
+		}
+
+		undo(object) {
+			for (const value of this.clone) {
+				object.add(value);
+			}
+
+			for (const value of object) {
+				if (!this.clone.has(value)) {
+					object.delete(value);
+				}
+			}
+		}
+	}
+
+	class CloneMap extends CloneObject {
+		static isHandledMethod(name) {
+			return HANDLED_MAP_METHODS.has(name);
+		}
+
+		undo(object) {
+			for (const [key, value] of this.clone.entries()) {
+				object.set(key, value);
+			}
+
+			for (const key of object.keys()) {
+				if (!this.clone.has(key)) {
+					object.delete(key);
+				}
+			}
+		}
+	}
+
+	class CloneWeakSet extends CloneObject {
+		constructor(value, path, argumentsList, hasOnValidate) {
+			super(undefined, path, argumentsList, hasOnValidate);
+
+			this._arg1 = argumentsList[0];
+			this._weakValue = value.has(this._arg1);
+		}
+
+		isChanged(value) {
+			return this._weakValue !== value.has(this._arg1);
+		}
+
+		undo(object) {
+			if (this._weakValue && !object.has(this._arg1)) {
+				object.add(this._arg1);
+			} else {
+				object.delete(this._arg1);
+			}
+		}
+	}
+
+	class CloneWeakMap extends CloneObject {
+		constructor(value, path, argumentsList, hasOnValidate) {
+			super(undefined, path, argumentsList, hasOnValidate);
+
+			this._weakKey = argumentsList[0];
+			this._weakHas = value.has(this._weakKey);
+			this._weakValue = value.get(this._weakKey);
+		}
+
+		isChanged(value) {
+			return this._weakValue !== value.get(this._weakKey);
+		}
+
+		undo(object) {
+			const weakHas = object.has(this._weakKey);
+
+			if (this._weakHas && !weakHas) {
+				object.set(this._weakKey, this._weakValue);
+			} else if (!this._weakHas && weakHas) {
+				object.delete(this._weakKey);
+			} else if (this._weakValue !== object.get(this._weakKey)) {
+				object.set(this._weakKey, this._weakValue);
+			}
+		}
+	}
+
+	class SmartClone {
+		constructor(hasOnValidate) {
+			this._stack = [];
+			this._hasOnValidate = hasOnValidate;
+		}
+
+		static isHandledType(value) {
+			return isObject(value)
+				|| isArray(value)
+				|| isBuiltinWithMutableMethods(value);
+		}
+
+		static isHandledMethod(target, name) {
+			if (isObject(target)) {
+				return CloneObject.isHandledMethod(name);
+			}
+
+			if (isArray(target)) {
+				return CloneArray.isHandledMethod(name);
+			}
+
+			if (target instanceof Set) {
+				return CloneSet.isHandledMethod(name);
+			}
+
+			if (target instanceof Map) {
+				return CloneMap.isHandledMethod(name);
+			}
+
+			return isBuiltinWithMutableMethods(target);
+		}
+
+		get isCloning() {
+			return this._stack.length > 0;
+		}
+
+		start(value, path, argumentsList) {
+			let CloneClass = CloneObject;
+
+			if (isArray(value)) {
+				CloneClass = CloneArray;
+			} else if (value instanceof Date) {
+				CloneClass = CloneDate;
+			} else if (value instanceof Set) {
+				CloneClass = CloneSet;
+			} else if (value instanceof Map) {
+				CloneClass = CloneMap;
+			} else if (value instanceof WeakSet) {
+				CloneClass = CloneWeakSet;
+			} else if (value instanceof WeakMap) {
+				CloneClass = CloneWeakMap;
+			}
+
+			this._stack.push(new CloneClass(value, path, argumentsList, this._hasOnValidate));
+		}
+
+		update(fullPath, property, value) {
+			this._stack[this._stack.length - 1].update(fullPath, property, value);
+		}
+
+		preferredThisArg(target, thisArg, thisProxyTarget) {
+			const {name} = target;
+			const isHandledMethod = SmartClone.isHandledMethod(thisProxyTarget, name);
+
+			return this._stack[this._stack.length - 1]
+				.preferredThisArg(isHandledMethod, name, thisArg, thisProxyTarget);
+		}
+
+		isChanged(isMutable, value, equals) {
+			return this._stack[this._stack.length - 1].isChanged(isMutable, value, equals);
+		}
+
+		undo(object) {
+			if (this._previousClone !== undefined) {
+				this._previousClone.undo(object);
+			}
+		}
+
+		stop() {
+			this._previousClone = this._stack.pop();
+
+			return this._previousClone.clone;
+		}
+	}
+
+	/* eslint-disable unicorn/prefer-spread */
+
+	const defaultOptions = {
+		equals: Object.is,
+		isShallow: false,
+		pathAsArray: false,
+		ignoreSymbols: false,
+		ignoreUnderscores: false,
+		ignoreDetached: false,
+		details: false,
+	};
+
+	const onChange = (object, onChange, options = {}) => {
+		options = {
+			...defaultOptions,
+			...options,
+		};
+
+		const proxyTarget = Symbol('ProxyTarget');
+		const {equals, isShallow, ignoreDetached, details} = options;
+		const cache = new Cache(equals);
+		const hasOnValidate = typeof options.onValidate === 'function';
+		const smartClone = new SmartClone(hasOnValidate);
+
+		// eslint-disable-next-line max-params
+		const validate = (target, property, value, previous, applyData) => !hasOnValidate
+			|| smartClone.isCloning
+			|| options.onValidate(path.concat(cache.getPath(target), property), value, previous, applyData) === true;
+
+		const handleChangeOnTarget = (target, property, value, previous) => {
+			if (
+				!ignoreProperty(cache, options, property)
+				&& !(ignoreDetached && cache.isDetached(target, object))
+			) {
+				handleChange(cache.getPath(target), property, value, previous);
+			}
+		};
+
+		// eslint-disable-next-line max-params
+		const handleChange = (changePath, property, value, previous, applyData) => {
+			if (smartClone.isCloning) {
+				smartClone.update(changePath, property, previous);
+			} else {
+				onChange(path.concat(changePath, property), value, previous, applyData);
+			}
+		};
+
+		const getProxyTarget = value => value
+			? (value[proxyTarget] || value)
+			: value;
+
+		const prepareValue = (value, target, property, basePath) => {
+			if (
+				isBuiltinWithoutMutableMethods(value)
+				|| property === 'constructor'
+				|| (isShallow && !SmartClone.isHandledMethod(target, property))
+				|| ignoreProperty(cache, options, property)
+				|| cache.isGetInvariant(target, property)
+				|| (ignoreDetached && cache.isDetached(target, object))
+			) {
+				return value;
+			}
+
+			if (basePath === undefined) {
+				basePath = cache.getPath(target);
+			}
+
+			return cache.getProxy(value, path.concat(basePath, property), handler, proxyTarget);
+		};
+
+		const handler = {
+			get(target, property, receiver) {
+				if (isSymbol(property)) {
+					if (property === proxyTarget || property === TARGET) {
+						return target;
+					}
+
+					if (
+						property === UNSUBSCRIBE
+						&& !cache.isUnsubscribed
+						&& cache.getPath(target).length === 0
+					) {
+						cache.unsubscribe();
+						return target;
+					}
+				}
+
+				const value = isBuiltinWithMutableMethods(target)
+					? Reflect.get(target, property)
+					: Reflect.get(target, property, receiver);
+
+				return prepareValue(value, target, property);
+			},
+
+			set(target, property, value, receiver) {
+				value = getProxyTarget(value);
+
+				const reflectTarget = target[proxyTarget] || target;
+				const previous = reflectTarget[property];
+
+				if (equals(previous, value) && property in target) {
+					return true;
+				}
+
+				const isValid = validate(target, property, value, previous);
+
+				if (
+					isValid
+					&& cache.setProperty(reflectTarget, property, value, receiver, previous)
+				) {
+					handleChangeOnTarget(target, property, target[property], previous);
+
+					return true;
+				}
+
+				return !isValid;
+			},
+
+			defineProperty(target, property, descriptor) {
+				if (!cache.isSameDescriptor(descriptor, target, property)) {
+					const previous = target[property];
+
+					if (
+						validate(target, property, descriptor.value, previous)
+						&& cache.defineProperty(target, property, descriptor, previous)
+					) {
+						handleChangeOnTarget(target, property, descriptor.value, previous);
+					}
+				}
+
+				return true;
+			},
+
+			deleteProperty(target, property) {
+				if (!Reflect.has(target, property)) {
+					return true;
+				}
+
+				const previous = Reflect.get(target, property);
+				const isValid = validate(target, property, undefined, previous);
+
+				if (
+					isValid
+					&& cache.deleteProperty(target, property, previous)
+				) {
+					handleChangeOnTarget(target, property, undefined, previous);
+
+					return true;
+				}
+
+				return !isValid;
+			},
+
+			apply(target, thisArg, argumentsList) {
+				const thisProxyTarget = thisArg[proxyTarget] || thisArg;
+
+				if (cache.isUnsubscribed) {
+					return Reflect.apply(target, thisProxyTarget, argumentsList);
+				}
+
+				if (
+					(details === false
+						|| (details !== true && !details.includes(target.name)))
+					&& SmartClone.isHandledType(thisProxyTarget)
+				) {
+					let applyPath = path.initial(cache.getPath(target));
+					const isHandledMethod = SmartClone.isHandledMethod(thisProxyTarget, target.name);
+
+					smartClone.start(thisProxyTarget, applyPath, argumentsList);
+
+					let result = Reflect.apply(
+						target,
+						smartClone.preferredThisArg(target, thisArg, thisProxyTarget),
+						isHandledMethod
+							? argumentsList.map(argument => getProxyTarget(argument))
+							: argumentsList,
+					);
+
+					const isChanged = smartClone.isChanged(thisProxyTarget, equals);
+					const previous = smartClone.stop();
+
+					if (SmartClone.isHandledType(result) && isHandledMethod) {
+						if (thisArg instanceof Map && target.name === 'get') {
+							applyPath = path.concat(applyPath, argumentsList[0]);
+						}
+
+						result = cache.getProxy(result, applyPath, handler);
+					}
+
+					if (isChanged) {
+						const applyData = {
+							name: target.name,
+							args: argumentsList,
+							result,
+						};
+						const changePath = smartClone.isCloning
+							? path.initial(applyPath)
+							: applyPath;
+						const property = smartClone.isCloning
+							? path.last(applyPath)
+							: '';
+
+						if (validate(path.get(object, changePath), property, thisProxyTarget, previous, applyData)) {
+							handleChange(changePath, property, thisProxyTarget, previous, applyData);
+						} else {
+							smartClone.undo(thisProxyTarget);
+						}
+					}
+
+					if (
+						(thisArg instanceof Map || thisArg instanceof Set)
+						&& isIterator(result)
+					) {
+						return wrapIterator(result, target, thisArg, applyPath, prepareValue);
+					}
+
+					return result;
+				}
+
+				return Reflect.apply(target, thisArg, argumentsList);
+			},
+		};
+
+		const proxy = cache.getProxy(object, options.pathAsArray ? [] : '', handler);
+		onChange = onChange.bind(proxy);
+
+		if (hasOnValidate) {
+			options.onValidate = options.onValidate.bind(proxy);
+		}
+
+		return proxy;
+	};
+
+	onChange.target = proxy => (proxy && proxy[TARGET]) || proxy;
+	onChange.unsubscribe = proxy => proxy[UNSUBSCRIBE] || proxy;
+
+	cjs = onChange;
+	return cjs;
+}
 
 var json;
 var hasRequiredJson;
@@ -13214,8 +19496,8 @@ function requireJson () {
 	var newDecode = requireNewDecode$6();
 	var formatOut = requireFormatOutGeneric();
 	var purify = requirePurify$5();
-	var onChange = require$$9;
-	let clone = require$$5;
+	var onChange = requireCjs();
+	let clone = require_default();
 
 	function _new(column) {
 		column.tsType = 'JSONColumn';
@@ -13481,7 +19763,7 @@ function requireFormatOut$1 () {
 	if (hasRequiredFormatOut$1) return formatOut_1$1;
 	hasRequiredFormatOut$1 = 1;
 	var getSessionSingleton = requireGetSessionSingleton();
-	const quote = requireQuote$2();
+	const quote = requireQuote$1();
 
 	function formatOut(context, column, alias) {
 		var formatColumn = getSessionSingleton(context, 'formatDateOut');
@@ -13584,7 +19866,7 @@ function requireFormatOut () {
 	if (hasRequiredFormatOut) return formatOut_1;
 	hasRequiredFormatOut = 1;
 	var getSessionSingleton = requireGetSessionSingleton();
-	const quote = requireQuote$2();
+	const quote = requireQuote$1();
 
 	function formatOut(context, column, alias) {
 		var formatColumn = getSessionSingleton(context, 'formatDateTzOut') ||  getSessionSingleton(context, 'formatDateOut');
@@ -14094,7 +20376,7 @@ var hasRequiredColumn;
 function requireColumn () {
 	if (hasRequiredColumn) return column;
 	hasRequiredColumn = 1;
-	const Ajv = require$$0;
+	const Ajv = /*@__PURE__*/ requireAjv();
 
 	function defineColumn(column, table) {
 		var c = {};
@@ -14871,7 +21153,7 @@ function requireNewSingleQuery$1 () {
 	var negotiateLimit = requireNegotiateLimit();
 	var lockSql = requireLockSql();
 	var newParameterized = requireNewParameterized();
-	var quote = requireQuote$2();
+	var quote = requireQuote$1();
 
 	function _new(context, table, filter, span, alias, innerJoin, orderBy, limit, offset, exclusive) {
 
@@ -14892,6 +21174,74 @@ function requireNewSingleQuery$1 () {
 
 	newSingleQuery$1 = _new;
 	return newSingleQuery$1;
+}
+
+var negotiateRawSqlFilter_1;
+var hasRequiredNegotiateRawSqlFilter;
+
+function requireNegotiateRawSqlFilter () {
+	if (hasRequiredNegotiateRawSqlFilter) return negotiateRawSqlFilter_1;
+	hasRequiredNegotiateRawSqlFilter = 1;
+	const { negotiateRawSqlFilter } = requireUtils$1();
+
+	negotiateRawSqlFilter_1 = negotiateRawSqlFilter;
+	return negotiateRawSqlFilter_1;
+}
+
+var emptyFilter_1;
+var hasRequiredEmptyFilter;
+
+function requireEmptyFilter () {
+	if (hasRequiredEmptyFilter) return emptyFilter_1;
+	hasRequiredEmptyFilter = 1;
+	var negotiateRawSqlFilter = requireNegotiateRawSqlFilter();
+	var parameterized = requireNewParameterized()('');
+	function emptyFilter() {
+		return emptyFilter.and.apply(null, arguments);
+	}
+
+	emptyFilter.sql = parameterized.sql.bind(parameterized);
+	emptyFilter.parameters = parameterized.parameters;
+
+	emptyFilter.and = function(context, other) {
+		if (other === undefined) {
+			other = context;
+			context = null;
+		}
+		other = negotiateRawSqlFilter(context, other);
+		for (var i = 2; i < arguments.length; i++) {
+			other = other.and(context, arguments[i]);
+		}
+		return other;
+	};
+
+	emptyFilter.or = function(context, other) {
+		if (other === undefined) {
+			other = context;
+			context = null;
+		}
+		other = negotiateRawSqlFilter(context, other);
+		for (var i = 2; i < arguments.length; i++) {
+			other = other.or(context, arguments[i]);
+		}
+		return other;
+	};
+
+	emptyFilter.not = function(context, other) {
+		if (other === undefined) {
+			other = context;
+			context = null;
+		}
+		other = negotiateRawSqlFilter(context, other).not(context);
+		for (var i = 2; i < arguments.length; i++) {
+			other = other.and(context, arguments[i]);
+		}
+		return other;
+
+	};
+
+	emptyFilter_1 = emptyFilter;
+	return emptyFilter_1;
 }
 
 var extractFilter;
@@ -15952,7 +22302,7 @@ function requireSelectSql$1 () {
 	hasRequiredSelectSql$1 = 1;
 	const newParameterized = requireNewParameterized();
 	const newBoolean = requireNewBoolean();
-	const quote = requireQuote$2();
+	const quote = requireQuote$1();
 
 	function newSelectSql(context, table, alias) {
 		const colName = quote(context, table._primaryColumns[0]._dbName);
@@ -16533,7 +22883,7 @@ function requireNewDecodeDbRow () {
 	let newObject = requireNewObject();
 	let toDto = requireToDto();
 	let createDto = requireCreateDto();
-	let onChange = require$$9;
+	let onChange = requireCjs();
 	let flags = requireFlags();
 	let tryGetSessionContext = requireTryGetSessionContext();
 	let purifyStrategy = requirePurifyStrategy();
@@ -17942,7 +24292,7 @@ function requireChildColumn () {
 	var getSessionContext = requireGetSessionContext();
 	var newJoinCore = requireNewShallowJoinSqlCore();
 	const getSessionSingleton = requireGetSessionSingleton();
-	const _quote = requireQuote$2();
+	const _quote = requireQuote$1();
 
 
 	function childColumn(context, column, relations) {
@@ -18016,7 +24366,7 @@ function requireNewFilterArg () {
 	var newJoin = requireJoinSql();
 	var newWhere = requireWhereSql();
 	var newParameterized = requireNewParameterized();
-	var quote = requireQuote$2();
+	var quote = requireQuote$1();
 
 	function newFilterArg(context, column, relations, depth = 0) {
 		var relationCount = relations.length;
@@ -19449,7 +25799,7 @@ function requireCount () {
 	const negotiateRawSqlFilter = requireNegotiateRawSqlFilter();
 	const extractFilter = requireExtractFilter();
 	const newWhereSql = requireNewWhereSql();
-	const quote = requireQuote$2();
+	const quote = requireQuote$1();
 
 	async function count(context, table, filter) {
 		let alias = table._dbName;
@@ -20171,11 +26521,11 @@ function requireNewRow () {
 }
 
 var insert_1;
-var hasRequiredInsert$2;
+var hasRequiredInsert$1;
 
-function requireInsert$2 () {
-	if (hasRequiredInsert$2) return insert_1;
-	hasRequiredInsert$2 = 1;
+function requireInsert$1 () {
+	if (hasRequiredInsert$1) return insert_1;
+	hasRequiredInsert$1 = 1;
 	let getSessionContext = requireGetSessionContext();
 	let newRow = requireNewRow();
 
@@ -20483,7 +26833,7 @@ var hasRequiredApplyPatch;
 function requireApplyPatch () {
 	if (hasRequiredApplyPatch) return applyPatch_1;
 	hasRequiredApplyPatch = 1;
-	const fastjson = require$$0$1;
+	const fastjson = require$$0;
 	let fromCompareObject = requireFromCompareObject();
 	let toCompareObject = requireToCompareObject();
 	let getSessionSingleton = requireGetSessionSingleton();
@@ -21369,6 +27719,3089 @@ function requirePatchTable () {
 	return patchTable_1;
 }
 
+var parseOrderBy_1;
+var hasRequiredParseOrderBy;
+
+function requireParseOrderBy () {
+	if (hasRequiredParseOrderBy) return parseOrderBy_1;
+	hasRequiredParseOrderBy = 1;
+	function parseOrderBy(orderBy, aliases) {
+		if (!orderBy)
+			return [];
+
+		const aliasSet = aliases instanceof Set ? aliases : new Set(aliases);
+		const entries = Array.isArray(orderBy) ? orderBy : [orderBy];
+
+		return entries.map(parseEntry);
+
+		function parseEntry(entry) {
+			if (typeof entry !== 'string')
+				throw new Error(`Invalid aggregate orderBy '${entry}'`);
+
+			const value = entry.trim();
+			if (aliasSet.has(value))
+				return { alias: value, direction: '' };
+
+			const match = /^(.*)\s+(asc|desc)$/i.exec(value);
+			const alias = match ? match[1].trim() : value;
+			if (!aliasSet.has(alias))
+				throw new Error(`Unable to get aggregate result on orderBy '${entry}'`);
+
+			return {
+				alias,
+				direction: ` ${match[2].toLowerCase()}`
+			};
+		}
+	}
+
+	parseOrderBy_1 = parseOrderBy;
+	return parseOrderBy_1;
+}
+
+var getMeta_1;
+var hasRequiredGetMeta;
+
+function requireGetMeta () {
+	if (hasRequiredGetMeta) return getMeta_1;
+	hasRequiredGetMeta = 1;
+	function getMeta(table, map = new Map()) {
+		if (map.has(table))
+			return map.get(table).id;
+		let strategy = {
+			keys: table._primaryColumns.map(x => ({name: x.alias, type: x.tsType})),
+			columns: {},
+			relations: {},
+			id: map.size
+		};
+		map.set(table, strategy);
+
+		for (let i = 0; i < table._columns.length; i++) {
+			const column = table._columns[i];
+			strategy.columns[column.alias] = {};
+			if ('serializable' in column && !column.serializable)
+				strategy.columns[column.alias].serializable = false;
+			else
+				strategy.columns[column.alias].serializable = true;
+		}
+
+		let relations = table._relations;
+		let relationName;
+
+		let visitor = {};
+		visitor.visitJoin = function(relation) {
+			strategy.relations[relationName] = getMeta(relation.childTable, map);
+		};
+
+		visitor.visitMany = function(relation) {
+			strategy.relations[relationName] = getMeta(relation.childTable, map);
+		};
+
+		visitor.visitOne = visitor.visitMany;
+
+		for (relationName in relations) {
+			let relation = relations[relationName];
+			relation.accept(visitor);
+		}
+		return strategy;
+	}
+
+	getMeta_1 = getMeta;
+	return getMeta_1;
+}
+
+var executePath;
+var hasRequiredExecutePath;
+
+function requireExecutePath () {
+	if (hasRequiredExecutePath) return executePath;
+	hasRequiredExecutePath = 1;
+	const createPatch = requireCreatePatch();
+	const emptyFilter = requireEmptyFilter();
+	const negotiateRawSqlFilter = requireNegotiateRawSqlFilter();
+	const parseAggregateOrderBy = requireParseOrderBy();
+	let getMeta = requireGetMeta();
+	let isSafe = Symbol();
+
+	let _allowedOps = {
+		and: true,
+		or: true,
+		not: true,
+		AND: true,
+		OR: true,
+		NOT: true,
+		equal: true,
+		eq: true,
+		EQ: true,
+		notEqual: true,
+		ne: true,
+		NE: true,
+		lessThan: true,
+		lt: true,
+		LT: true,
+		lessThanOrEqual: true,
+		le: true,
+		LE: true,
+		greaterThan: true,
+		gt: true,
+		GT: true,
+		greaterThanOrEqual: true,
+		ge: true,
+		GE: true,
+		between: true,
+		in: true,
+		IN: true,
+		startsWith: true,
+		iStartsWith: true,
+		endsWith: true,
+		iEndsWith: true,
+		contains: true,
+		iContains: true,
+		iEqual: true,
+		iEq: true,
+		ieq: true,
+		IEQ: true,
+		exists: true,
+		all: true,
+		any: true,
+		none: true,
+		where: true,
+		sum: true,
+		avg: true,
+		max: true,
+		min: true,
+		count: true,
+		groupSum: true,
+		groupAvg: true,
+		groupMax: true,
+		groupMin: true,
+		groupCount: true,
+		_aggregate: true,
+		self: true,
+	};
+
+	function _executePath(context, ...rest) {
+
+		const _ops = {
+			and: emptyFilter.and.bind(null, context),
+			or: emptyFilter.or.bind(null, context),
+			not: emptyFilter.not.bind(null, context),
+			AND: emptyFilter.and.bind(null, context),
+			OR: emptyFilter.or.bind(null, context),
+			NOT: emptyFilter.not.bind(null, context),
+		};
+
+		return executePath(...rest);
+
+		async function executePath({ table, JSONFilter, baseFilter, customFilters = {}, request, response, readonly, disableBulkDeletes, isHttp, client }) {
+			let allowedOps = { ..._allowedOps, insert: !readonly, ...extractRelations(getMeta(table)) };
+			let ops = { ..._ops, ...getCustomFilterPaths(customFilters), getManyDto, getMany, aggregate, distinct, count, delete: _delete, cascadeDelete, update, replace };
+
+			let res = await parseFilter(JSONFilter, table);
+			if (res === undefined)
+				return {};
+			else
+				return res;
+
+			function parseFilter(json, table) {
+				if (isFilter(json)) {
+					let subFilters = [];
+
+					let anyAllNone = tryGetAnyAllNone(json.path, table);
+					if (anyAllNone) {
+						const arg0 = json.args[0];
+						if (isHttp && arg0 !== undefined)
+							validateArgs(arg0);
+						const f = arg0 === undefined
+							? anyAllNone(context)
+							: anyAllNone(context, x => parseFilter(arg0, x));
+						if(!('isSafe' in f))
+							f.isSafe = isSafe;
+						return f;
+					}
+					else {
+						for (let i = 0; i < json.args.length; i++) {
+							subFilters.push(parseFilter(json.args[i], nextTable(json.path, table)));
+						}
+					}
+					return executePath(json.path, subFilters);
+				}
+				else if (Array.isArray(json)) {
+					const result = [];
+					for (let i = 0; i < json.length; i++) {
+						result.push(parseFilter(json[i], table));
+					}
+					return result;
+				}
+				else if (isColumnRef(json)) {
+					return resolveColumnRef(table, json.__columnRef);
+				}
+				return json;
+
+				function tryGetAnyAllNone(path, table) {
+					const parts = path.split('.');
+					for (let i = 0; i < parts.length; i++) {
+						table = table[parts[i]];
+					}
+
+					let ops = new Set(['all', 'any', 'none', 'where', '_aggregate']);
+					// let ops = new Set(['all', 'any', 'none', 'where']);
+					let last = parts[parts.length - 1];
+					if (last === 'count' && parts.length > 1)
+						ops.add('count');
+					if (ops.has(last) || (table && (table._primaryColumns || (table.any && table.all))))
+						return table;
+				}
+
+				function executePath(path, args) {
+					if (path in ops) {
+						if (isHttp)
+							validateArgs(args);
+						let op = ops[path].apply(null, args);
+						if (op.then)
+							return op.then((o) => {
+								setSafe(o);
+								return o;
+							});
+						setSafe(op);
+						return op;
+					}
+					let pathArray = path.split('.');
+					let target = table;
+					let op = pathArray[pathArray.length - 1];
+					if (!allowedOps[op] && isHttp) {
+
+						let e = new Error('Disallowed operator ' + op);
+						// @ts-ignore
+						e.status = 403;
+						throw e;
+
+					}
+					for (let i = 0; i < pathArray.length; i++) {
+						target = target[pathArray[i]];
+					}
+
+					if (!target) {
+						const left = args && args[0];
+						if (left) {
+							target = left;
+							for (let i = 0; i < pathArray.length; i++) {
+								target = target[pathArray[i]];
+							}
+							if (target) {
+								let res = target.apply(null, [context].concat(args.slice(1)));
+								setSafe(res);
+								return res;
+							}
+						}
+						throw new Error(`Method '${path}' does not exist`);
+					}
+					let res = target.apply(null, [context, ...args]);
+					setSafe(res);
+					return res;
+				}
+			}
+
+			async function invokeBaseFilter() {
+				if (typeof baseFilter === 'function') {
+					const res = await baseFilter.apply(null, [bindDb(client), request, response]);
+					if (!res)
+						return;
+					const JSONFilter = JSON.parse(JSON.stringify(res));
+					//@ts-ignore
+					return executePath({ table, JSONFilter, request, response });
+				}
+				else
+					return;
+			}
+
+			function getCustomFilterPaths(customFilters) {
+				return getLeafNames(customFilters);
+
+				function getLeafNames(obj, result = {}, current = 'customFilters.') {
+					for (let p in obj) {
+						if (typeof obj[p] === 'object' && obj[p] !== null)
+							getLeafNames(obj[p], result, current + p + '.');
+						else
+							result[current + p] = resolveFilter.bind(null, obj[p]);
+					}
+					return result;
+				}
+
+				async function resolveFilter(fn, ...args) {
+					const context = { db: bindDb(client), request, response };
+					let res = fn.apply(null, [context, ...args]);
+					if (res.then)
+						res = await res;
+					const JSONFilter = JSON.parse(JSON.stringify(res));
+					//@ts-ignore
+					return executePath({ table, JSONFilter, request, response });
+				}
+			}
+
+			function nextTable(path, table) {
+				path = path.split('.');
+				let ops = new Set(['all', 'any', 'none', 'count']);
+				let last = path.slice(-1)[0];
+				if (ops.has(last)) {
+					for (let i = 0; i < path.length - 1; i++) {
+						table = table[path[i]];
+					}
+					return table;
+				}
+				else {
+					let lastObj = table;
+					for (let i = 0; i < path.length; i++) {
+						if (lastObj)
+							lastObj = lastObj[path[i]];
+					}
+					if (lastObj?._shallow)
+						return lastObj._shallow;
+					else return table;
+				}
+			}
+
+			async function _delete(filter) {
+				if (readonly || disableBulkDeletes) {
+					let e = new Error('Bulk deletes are not allowed. Parameter "disableBulkDeletes" must be true.');
+					// @ts-ignore
+					e.status = 403;
+					throw e;
+				}
+				filter = negotiateFilter(filter);
+				const _baseFilter = await invokeBaseFilter();
+				if (_baseFilter)
+					filter = filter.and(context, _baseFilter);
+				let args = [context, filter].concat(Array.prototype.slice.call(arguments).slice(1));
+				return table.delete.apply(null, args);
+			}
+
+			async function cascadeDelete(filter) {
+				if (readonly || disableBulkDeletes) {
+					const e = new Error('Bulk deletes are not allowed. Parameter "disableBulkDeletes" must be true.');
+					// @ts-ignore
+					e.status = 403;
+					throw e;
+
+				}
+				filter = negotiateFilter(filter);
+				const _baseFilter = await invokeBaseFilter();
+				if (_baseFilter)
+					filter = filter.and(context, _baseFilter);
+				let args = [context, filter].concat(Array.prototype.slice.call(arguments).slice(1));
+				return table.cascadeDelete.apply(null, args);
+			}
+
+			function negotiateFilter(filter) {
+				if (filter)
+					return negotiateRawSqlFilter(context, filter, table, true);
+				else
+					return emptyFilter;
+			}
+
+			async function count(filter, strategy) {
+				validateStrategy(table, strategy);
+				filter = negotiateFilter(filter);
+				const _baseFilter = await invokeBaseFilter();
+				if (_baseFilter)
+					filter = filter.and(context, _baseFilter);
+				let args = [context, filter].concat(Array.prototype.slice.call(arguments).slice(1));
+				return table.count.apply(null, args);
+			}
+
+			async function getManyDto(filter, strategy) {
+				validateStrategy(table, strategy);
+				filter = negotiateFilter(filter);
+				const _baseFilter = await invokeBaseFilter();
+				if (_baseFilter)
+					filter = filter.and(context, _baseFilter);
+				let args = [context, filter].concat(Array.prototype.slice.call(arguments).slice(1));
+				await negotiateWhereAndAggregate(strategy);
+				return table.getManyDto.apply(null, args);
+			}
+
+			async function replace(subject, strategy = { insertAndForget: true }) {
+				validateStrategy(table, strategy);
+				const refinedStrategy = withLockingStrategy(objectToStrategy(subject, {}, table), strategy);
+				const JSONFilter2 = {
+					path: 'getManyDto',
+					args: [subject, refinedStrategy]
+				};
+				const originals = await executePath({ table, JSONFilter: JSONFilter2, baseFilter, customFilters, request, response, readonly, disableBulkDeletes, isHttp, client });
+				const meta = getMeta(table);
+				const patch = createPatch(originals, Array.isArray(subject) ? subject : [subject], meta);
+				const { changed } = await table.patch(context, patch, { strategy });
+				if (Array.isArray(subject))
+					return changed;
+				else
+					return changed[0];
+			}
+
+			async function update(subject, whereStrategy, strategy = { insertAndForget: true }) {
+				validateStrategy(table, strategy);
+				const refinedWhereStrategy = withLockingStrategy(objectToStrategy(subject, whereStrategy, table), strategy);
+				const JSONFilter2 = {
+					path: 'getManyDto',
+					args: [null, refinedWhereStrategy]
+				};
+				const rows = await executePath({ table, JSONFilter: JSONFilter2, baseFilter, customFilters, request, response, readonly, disableBulkDeletes, isHttp, client });
+				const originals = new Array(rows.length);
+				for (let i = 0; i < rows.length; i++) {
+					const row = rows[i];
+					originals[i] = { ...row };
+					for (let p in subject) {
+						row[p] = subject[p];
+					}
+				}
+				const meta = getMeta(table);
+				const patch = createPatch(originals, rows, meta);
+				const { changed } = await table.patch(context, patch, { strategy });
+				return changed;
+			}
+
+			function withLockingStrategy(fetchStrategy, strategy) {
+				const lockStrategy = extractLockingStrategy(strategy);
+				if (!lockStrategy)
+					return fetchStrategy;
+				return mergeLockingStrategy(fetchStrategy, lockStrategy);
+			}
+
+			function extractLockingStrategy(strategy) {
+				if (!strategy || typeof strategy !== 'object')
+					return;
+				const result = {};
+				if (strategy.forUpdate)
+					result.forUpdate = strategy.forUpdate;
+				if (strategy.skipLocked)
+					result.skipLocked = strategy.skipLocked;
+				for (let name in strategy) {
+					if (name === 'where' || name === 'orderBy' || name === 'limit' || name === 'offset' || name === 'forUpdate' || name === 'skipLocked')
+						continue;
+					const child = extractLockingStrategy(strategy[name]);
+					if (child)
+						result[name] = child;
+				}
+				return Object.keys(result).length > 0 ? result : undefined;
+			}
+
+			function mergeLockingStrategy(fetchStrategy, lockStrategy) {
+				const result = { ...fetchStrategy };
+				for (let name in lockStrategy) {
+					const value = lockStrategy[name];
+					if (name === 'forUpdate' || name === 'skipLocked')
+						result[name] = value;
+					else
+						result[name] = mergeLockingStrategy(result[name] && typeof result[name] === 'object' ? result[name] : {}, value);
+				}
+				return result;
+			}
+
+			function objectToStrategy(object, whereStrategy, table, strategy = {}) {
+				strategy = { ...whereStrategy, ...strategy };
+				if (Array.isArray(object)) {
+					for (let i = 0; i < object.length; i++) {
+						objectToStrategy(object[i], table, strategy);
+					}
+					return;
+				}
+				for (let name in object) {
+					const relation = table[name]?._relation;
+					if (relation && !relation.columns) {//notJoin, that is one or many
+						strategy[name] = {};
+						objectToStrategy(object[name], whereStrategy?.[name], table[name], strategy[name]);
+					}
+					else
+						strategy[name] = true;
+				}
+				return strategy;
+			}
+
+
+			async function aggregate(filter, strategy) {
+				validateAggregateStrategy(strategy);
+				filter = negotiateFilter(filter);
+				const _baseFilter = await invokeBaseFilter();
+				if (_baseFilter)
+					filter = filter.and(context, _baseFilter);
+				let args = [context, filter].concat(Array.prototype.slice.call(arguments).slice(1));
+				await negotiateWhereAndAggregate(strategy);
+				return table.aggregate.apply(null, args);
+			}
+
+			async function distinct(filter, strategy) {
+				validateAggregateStrategy(strategy);
+				filter = negotiateFilter(filter);
+				const _baseFilter = await invokeBaseFilter();
+				if (_baseFilter)
+					filter = filter.and(context, _baseFilter);
+				let args = [context, filter].concat(Array.prototype.slice.call(arguments).slice(1));
+				await negotiateWhereAndAggregate(strategy);
+				return table.distinct.apply(null, args);
+			}
+
+
+
+			async function negotiateWhereAndAggregate(strategy) {
+				if (typeof strategy !== 'object')
+					return;
+
+				for (let name in strategy) {
+					const target = strategy[name];
+					if (isFilter(target))
+						strategy[name] = await parseFilter(strategy[name], table);
+					else
+						await negotiateWhereAndAggregate(strategy[name]);
+				}
+
+			}
+
+			async function getMany(filter, strategy) {
+				validateStrategy(table, strategy);
+				filter = negotiateFilter(filter);
+				const _baseFilter = await invokeBaseFilter();
+				if (_baseFilter)
+					filter = filter.and(context, _baseFilter);
+				let args = [context, filter].concat(Array.prototype.slice.call(arguments).slice(1));
+				await negotiateWhereAndAggregate(strategy);
+				return table.getMany.apply(null, args);
+			}
+
+		}
+
+		function validateStrategy(table, strategy) {
+			if (!strategy || !table)
+				return;
+
+			for (let p in strategy) {
+				validateOffset(strategy);
+				validateLimit(strategy);
+				validateOrderBy(table, strategy);
+				validateStrategy(table[p], strategy[p]);
+			}
+		}
+
+		function validateAggregateStrategy(strategy) {
+			if (!strategy)
+				return;
+
+			validateOffset(strategy);
+			validateLimit(strategy);
+			const reserved = new Set(['where', 'limit', 'offset', 'orderBy']);
+			const aliases = Object.keys(strategy).filter(name => !reserved.has(name));
+			try {
+				parseAggregateOrderBy(strategy.orderBy, aliases);
+			} catch (error) {
+				error.status = 400;
+				throw error;
+			}
+		}
+
+		function validateLimit(strategy) {
+			if (!('limit' in strategy) || Number.isInteger(strategy.limit))
+				return;
+			const e = new Error('Invalid limit: ' + strategy.limit);
+			// @ts-ignore
+			e.status = 400;
+		}
+
+		function validateOffset(strategy) {
+			if (!('offset' in strategy) || Number.isInteger(strategy.offset))
+				return;
+			const e = new Error('Invalid offset: ' + strategy.offset);
+			// @ts-ignore
+			e.status = 400;
+			throw e;
+		}
+
+		function validateOrderBy(table, strategy) {
+			if (!('orderBy' in strategy) || !table)
+				return;
+			let orderBy = strategy.orderBy;
+			if (!Array.isArray(orderBy))
+				orderBy = [orderBy];
+			orderBy.reduce(validate, []);
+
+			function validate(_, element) {
+				let parts = element.split(' ').filter(x => {
+					x = x.toLowerCase();
+					return (!(x === '' || x === 'asc' || x === 'desc'));
+				});
+				for (let p of parts) {
+					let col = table[p];
+					if (!(col && col.equal)) {
+						const e = new Error('Unknown column: ' + p);
+						// @ts-ignore
+						e.status = 400;
+						throw e;
+					}
+				}
+			}
+		}
+
+		function validateArgs() {
+			for (let i = 0; i < arguments.length; i++) {
+				const filter = arguments[i];
+				if (!filter)
+					continue;
+				if (filter && filter.isSafe === isSafe)
+					continue;
+				if (filter.sql || typeof (filter) === 'string') {
+					const e = new Error('Raw filters are disallowed');
+					// @ts-ignore
+					e.status = 403;
+					throw e;
+				}
+				if (Array.isArray(filter))
+					for (let i = 0; i < filter.length; i++) {
+
+						validateArgs(filter[i]);
+					}
+			}
+
+		}
+
+		function isFilter(json) {
+			return json instanceof Object && 'path' in json && 'args' in json;
+		}
+
+		function isColumnRef(json) {
+			return json instanceof Object && typeof json.__columnRef === 'string';
+		}
+
+		function resolveColumnRef(table, path) {
+			let current = table;
+			const parts = path.split('.');
+			for (let i = 0; i < parts.length; i++) {
+				if (current)
+					current = current[parts[i]];
+			}
+
+			if (!current || typeof current._toFilterArg !== 'function') {
+				let e = new Error(`Column reference '${path}' is invalid`);
+				// @ts-ignore
+				e.status = 400;
+				throw e;
+			}
+			return current;
+		}
+
+		function setSafe(o) {
+			if (o instanceof Object)
+				Object.defineProperty(o, 'isSafe', {
+					value: isSafe,
+					enumerable: false
+
+				});
+		}
+
+		function extractRelations(obj) {
+			let flattened = {};
+
+			function helper(relations) {
+				Object.keys(relations).forEach(key => {
+
+					flattened[key] = true;
+
+					if (typeof relations[key] === 'object' && Object.keys(relations[key]?.relations)?.length > 0) {
+						helper(relations[key].relations);
+					}
+				});
+			}
+
+			helper(obj.relations);
+
+			return flattened;
+		}
+
+		function bindDb(client) {
+			var domain = context;
+			let p = domain.run(() => true);
+
+			function run(fn) {
+				return p.then(domain.run.bind(domain, fn));
+			}
+
+			return client({ transaction: run });
+
+		}
+	}
+	executePath = _executePath;
+	return executePath;
+}
+
+var sqliteFunction;
+var hasRequiredSqliteFunction;
+
+function requireSqliteFunction () {
+	if (hasRequiredSqliteFunction) return sqliteFunction;
+	hasRequiredSqliteFunction = 1;
+	const executeChanges = requireExecuteChanges();
+	const popChanges = requirePopChanges();
+	const getSessionSingleton = requireGetSessionSingleton();
+
+	function executeQueries(context, ...rest) {
+		var changes = popChanges(context);
+
+		return executeChanges(context, changes).then(onDoneChanges);
+
+		function onDoneChanges() {
+			var client = getSessionSingleton(context, 'dbClient');
+			if (client && typeof client.function === 'function')
+				return client.function.apply(client, rest);
+			if (client && typeof client.createFunction === 'function')
+				return client.createFunction.apply(client, rest);
+			throw new Error('SQLite client does not support user-defined functions');
+		}
+	}
+
+	sqliteFunction = executeQueries;
+	return sqliteFunction;
+}
+
+var getTSDefinition_1;
+var hasRequiredGetTSDefinition;
+
+function requireGetTSDefinition () {
+	if (hasRequiredGetTSDefinition) return getTSDefinition_1;
+	hasRequiredGetTSDefinition = 1;
+	const typeMap = {
+		StringColumn: 'string',
+		BooleanColumn: 'boolean',
+		UUIDColumn: 'string',
+		BinaryColumn: 'string',
+		JSONColumn: 'object',
+		DateColumn: 'Date | string',
+		NumberColumn: 'number',
+	};
+
+	function getTSDefinition(tableConfigs, {isNamespace = false, isHttp = false} = {}) {
+		const rootTablesAdded = new Map();
+		const tableNames = new Set();
+		const tablesAdded = new Map();
+		let src = '';
+		const defs = tableConfigs.map(getTSDefinitionTable).join('');
+		const tables = tableConfigs.reduce((tables, x) => {
+			tables[x.name] = x.table;
+			return tables;
+		}, {});
+		src += getPrefixTs(isNamespace);
+		if (isNamespace)
+			src += startNamespace(tables, isHttp);
+		src += defs;
+		src += getRdbClientTs(tables, isHttp);
+		if (isNamespace)
+			src += '}';
+		return src;
+
+
+		function getTSDefinitionTable({table, customFilters, name}) {
+			let Name = name.substr(0, 1).toUpperCase() + name.substr(1);
+			name = name.substr(0, 1).toLowerCase() + name.substr(1);
+			let result = '' + getTable(table, Name, name, customFilters);
+			return result;
+		}
+
+		function getTable(table, Name, name, customFilters) {
+			const _columns = columns(table);
+			const _tableRelations = tableRelations(table);
+			return `
+export interface ${Name}Table {
+	count(filter?: RawFilter): Promise<number>;
+	getAll(): Promise<${Name}Array>;
+	getAll(fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
+	getMany(filter?: RawFilter): Promise<${Name}Array>;
+	getMany(filter: RawFilter, fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
+	getMany(${name}s: Array<${Name}>): Promise<${Name}Array>;
+	getMany(${name}s: Array<${Name}>, fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
+	getOne(filter?: RawFilter): Promise<${Name}Row>;
+	getOne(filter?: RawFilter, fetchingStrategy?: ${Name}Strategy): Promise<${Name}Row>;
+	getOne(${name}: ${Name}): Promise<${Name}Row>;
+	getOne(${name}: ${Name}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
+	getById(${getIdArgs(table)}): Promise<${Name}Row>;
+	getById(${getIdArgs(table)}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
+
+	replace(${name}s: ${Name}[] | ${Name}): Promise<void>;
+	replace(${name}s: ${Name}[], fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
+	replace(${name}: ${Name}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
+	
+	update(${name}: ${Name}): Promise<void>;
+	update(${name}: ${Name}, whereStrategy: ${Name}Strategy): Promise<void>;
+	update(${name}: ${Name}, whereStrategy: ${Name}Strategy): Promise<void>;
+	update(${name}: ${Name}, whereStrategy: ${Name}Strategy, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row[]>;
+
+	updateChanges(${name}s: ${Name}[], old${name}s: ${Name}[]): Promise<${Name}Array>;
+	updateChanges(${name}s: ${Name}[],old${name}s: ${Name}[], fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
+	updateChanges(${name}: ${Name}, old${name}: ${Name}): Promise<${Name}Row>;
+	updateChanges(${name}: ${Name},old${name}: ${Name}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
+	
+	insert(${name}s: ${Name}[]): Promise<${Name}Array>;
+	insert(${name}s: ${Name}[], fetchingStrategy: ${Name}Strategy): Promise<${Name}Array>;
+	insert(${name}: ${Name}): Promise<${Name}Row>;
+	insert(${name}: ${Name}, fetchingStrategy: ${Name}Strategy): Promise<${Name}Row>;
+	insertAndForget(${name}s: ${Name}[]): Promise<void>;
+	insertAndForget(${name}: ${Name}): Promise<void>;
+	delete(filter?: RawFilter): Promise<void>;
+	delete(${name}s: Array<${Name}>): Promise<void>;
+	deleteCascade(filter?: RawFilter): Promise<void>;
+	deleteCascade(${name}s: Array<${Name}>): Promise<void>;
+	proxify(${name}s: ${Name}[]): ${Name}Array;
+	proxify(${name}s: ${Name}[], fetchingStrategy: ${Name}Strategy): ${Name}Array;
+	proxify(${name}: ${Name}): ${Name}Row;
+	proxify(${name}: ${Name}, fetchingStrategy: ${Name}Strategy): ${Name}Row;
+	patch(patch: JsonPatch): Promise<void>;
+	patch(patch: JsonPatch, concurrency: ${Name}Concurrency, fetchingStrategy?: ${Name}Strategy): Promise<void>;	
+	customFilters: ${Name}CustomFilters;
+	${_columns}
+	${_tableRelations}
+}
+
+export interface ${Name}ExpressConfig {
+	baseFilter?: RawFilter | ((context: ExpressContext) => RawFilter | Promise<RawFilter>);
+    customFilters?: Record<string, (context: ExpressContext,...args: any[]) => RawFilter | Promise<RawFilter>>;
+    concurrency?: ${Name}Concurrency;
+    readonly?: boolean;
+    disableBulkDeletes?: boolean;
+}
+
+export interface ${Name}HonoConfig {
+	baseFilter?: RawFilter | ((context: HonoContext) => RawFilter | Promise<RawFilter>);
+    customFilters?: Record<string, (context: HonoContext,...args: any[]) => RawFilter | Promise<RawFilter>>;
+    concurrency?: ${Name}Concurrency;
+    readonly?: boolean;
+    disableBulkDeletes?: boolean;
+}
+
+export interface ${Name}CustomFilters {
+	${getCustomFilters(customFilters)}
+}
+
+export interface ${Name}Array extends Array<${Name}> {
+	saveChanges(): Promise<void>;
+	saveChanges(concurrency: ${Name}Concurrency, fetchingStrategy?: ${Name}Strategy): Promise<void>;
+	acceptChanges(): void;
+	clearChanges(): void;
+	refresh(): Promise<void>;
+	refresh(fetchingStrategy: ${Name}Strategy): Promise<void>;
+	delete(): Promise<void>;
+	delete(options: ${Name}Concurrency): Promise<void>;
+}
+
+export interface ${Name}Row extends ${Name} {
+	saveChanges(): Promise<void>;
+	saveChanges(concurrency: ${Name}Concurrency, fetchingStrategy?: ${Name}Strategy): Promise<void>;
+	acceptChanges(): void;
+	clearChanges(): void;
+	refresh(): Promise<void>;
+	refresh(fetchingStrategy: ${Name}Strategy): Promise<void>;
+	delete(): Promise<void>;
+	delete(options: ${Name}Concurrency): Promise<void>;
+}
+
+${Concurrency(table, Name, true)}
+`;
+		}
+
+		function getIdArgs(table) {
+			let result = [];
+			for (let i = 0; i < table._primaryColumns.length; i++) {
+				let column = table._primaryColumns[i];
+				result.push(`${column.alias}: ${typeMap[column.tsType]}`);
+			}
+			return result.join(', ');
+		}
+
+
+		function tableRelations(table) {
+			let relations = table._relations;
+			let result = '';
+			for (let relationName in relations) {
+				const tableName = getTableName(relations[relationName], relationName);
+				result += `${relationName}: ${tableName}RelatedTable;`;
+			}
+			return result;
+		}
+
+
+		function columns(table) {
+			let result = '';
+			let separator = '';
+			for (let i = 0; i < table._columns.length; i++) {
+				let column = table._columns[i];
+				result += `${separator}${column.alias} : ${column.tsType};`;
+				separator = `
+	`;
+			}
+			return result;
+		}
+
+		function Concurrency(table, name, isRoot) {
+			name = pascalCase(name);
+			if (!isRoot) {
+				if (tablesAdded.has(table))
+					return '';
+				else {
+					tablesAdded.set(table, name);
+				}
+			}
+			let otherConcurrency = '';
+			let concurrencyRelations = '';
+			let strategyRelations = '';
+			let regularRelations = '';
+			let relations = table._relations;
+			let relationName;
+
+			let separator = `
+	`;
+			let visitor = {};
+			visitor.visitJoin = function(relation) {
+				const tableTypeName = getTableName(relation, relationName);
+
+				otherConcurrency += `${Concurrency(relation.childTable, tableTypeName)}`;
+				concurrencyRelations += `${relationName}?: ${tableTypeName}Concurrency;${separator}`;
+				strategyRelations += `${relationName}?: ${tableTypeName}Strategy | boolean;${separator}`;
+				regularRelations += `${relationName}?: ${tableTypeName} | null;${separator}`;
+			};
+			visitor.visitOne = visitor.visitJoin;
+			visitor.visitMany = function(relation) {
+				const tableTypeName = getTableName(relation, relationName);
+				otherConcurrency += `${Concurrency(relation.childTable, tableTypeName)}`;
+				concurrencyRelations += `${relationName}?: ${tableTypeName}Concurrency;${separator}`;
+				strategyRelations += `${relationName}?: ${tableTypeName}Strategy | boolean;${separator}`;
+				regularRelations += `${relationName}?: ${tableTypeName}[] | null;${separator}`;
+			};
+
+			for (relationName in relations) {
+				var relation = relations[relationName];
+				relation.accept(visitor);
+			}
+
+			let row = '';
+			if (!isRoot) {
+				row = `export interface ${name}RelatedTable {
+	${columns(table)}
+	${tableRelations(table)}
+	all: (selector: (table: ${name}RelatedTable) => RawFilter) => Filter;
+	any: (selector: (table: ${name}RelatedTable) => RawFilter) => Filter;
+	none: (selector: (table: ${name}RelatedTable) => RawFilter) => Filter;
+	exists: () => Filter;	
+}`;
+			}
+
+			return `
+export interface ${name}Concurrency {
+	readonly?: boolean;
+	concurrency?: Concurrency;
+	${concurrencyColumns(table)}
+	${concurrencyRelations}
+}
+
+export interface ${name} {
+	${regularColumns(table)}
+	${regularRelations}
+}
+
+export interface ${name}TableBase {	
+	${columns(table)}
+	${tableRelations(table)}
+}
+
+
+export interface ${name}Strategy {
+	${strategyColumns(table)}
+	${strategyRelations}
+	limit?: number;
+	offset?: number;
+	orderBy?: Array<${orderByColumns(table)}> | ${orderByColumns(table)};
+	where?: (table: ${name}TableBase) => RawFilter;
+	forUpdate?: boolean;
+	skipLocked?: boolean;
+}
+
+${otherConcurrency}
+
+${row}`;
+
+		}
+
+		function getTableName(relation, relationName) {
+			let name = rootTablesAdded.get(relation.childTable);
+			if (name)
+				return name;
+			else {
+				let name = pascalCase(relationName);
+				let count = 2;
+				while (tableNames.has(name)) {
+					name = name + 'x' + count;
+					count++;
+				}
+				rootTablesAdded.set(relation.childTable, name);
+				tableNames.add(name);
+				return name;
+			}
+		}
+	}
+
+	function regularColumns(table) {
+		let result = '';
+		let separator = '';
+		for (let i = 0; i < table._columns.length; i++) {
+			let column = table._columns[i];
+			if (column._notNull)
+				result += `${separator}${column.alias} : ${typeMap[column.tsType]};`;
+			else
+				result += `${separator}${column.alias}? : ${typeMap[column.tsType]} | null;`;
+			separator = `
+	`;
+		}
+		return result;
+	}
+
+	function orderByColumns(table) {
+		let result = '';
+		let separator = '';
+		for (let i = 0; i < table._columns.length; i++) {
+			let column = table._columns[i];
+			result += `${separator}'${column.alias}' | '${column.alias} desc'`;
+			separator = '| ';
+		}
+		return result;
+	}
+
+
+	function pascalCase(name) {
+		return name[0].toUpperCase() + name.substr(1);
+	}
+
+	function concurrencyColumns(table) {
+		let result = '';
+		let separator = '';
+		for (let i = 0; i < table._columns.length; i++) {
+			let column = table._columns[i];
+			result += `${separator}${column.alias}? : ColumnConcurrency;`;
+			separator = `
+	`;
+		}
+		return result;
+	}
+
+	function strategyColumns(table) {
+		let primarySet = new Set(table._primaryColumns);
+		let result = '';
+		let separator = '';
+		for (let i = 0; i < table._columns.length; i++) {
+			let column = table._columns[i];
+			if (primarySet.has(column))
+				continue;
+			result += `${separator}${column.alias}? : boolean;`;
+			separator = `
+	`;
+		}
+		return result;
+	}
+
+	function getCustomFilters(filters) {
+		return getLeafNames(filters);
+
+		function getLeafNames(obj, tabs = '\t\t\t\t\t') {
+			let result = '';
+			for (let p in obj) {
+				if (typeof obj[p] === 'object' && obj[p] !== null) {
+					result += '\n' + tabs + p + ': {' + tabs + getLeafNames(obj[p], tabs + '\t');
+					result += '\n' + tabs + '}';
+				}
+				else if (typeof obj[p] === 'function')
+					result += '\n' + tabs + p + ': (' + getParamNames(obj[p]) + ') => import(\'orange-orm\').Filter;';
+			}
+			return result;
+		}
+	}
+
+	function getParamNames(func) {
+		let STRIP_COMMENTS = /((\/\/.*$)|(\/\*[\s\S]*?\*\/))/mg;
+		let ARGUMENT_NAMES = /([^\s,]+)/g;
+
+		let fnStr = func.toString().replace(STRIP_COMMENTS, '');
+		let result = fnStr.slice(fnStr.indexOf('(') + 1, fnStr.indexOf(')')).match(ARGUMENT_NAMES);
+		if (result === null)
+			return '';
+		return result.slice(1).join(': unknown, ') + ': unknown';
+	}
+
+	function getPrefixTs(isNamespace) {
+		if (isNamespace)
+			return `
+/* eslint-disable @typescript-eslint/no-empty-interface */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import type { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Hono, Url, ColumnConcurrency, JsonPatch } from 'orange-orm';
+export { RequestHandler } from 'express';
+export { Concurrency, Filter, RawFilter, Config, TransactionOptions, Pool } from 'orange-orm';
+export = r;
+declare function r(config: Config): r.RdbClient;
+type HttpInterceptorManager<T> = {
+	use(onFulfilled?: (value: T) => T | Promise<T>, onRejected?: (error: any) => any): string;
+	eject(id: string): void;
+};
+type HttpRequestConfig = {
+	baseURL?: string;
+	url?: string;
+	method?: string;
+	headers: Record<string, string>;
+	data?: any;
+};
+type HttpResponse<T = any> = {
+	data: T;
+	status: number;
+	statusText: string;
+	headers: Record<string, string>;
+	config: HttpRequestConfig;
+};
+`;
+
+		return `
+/* eslint-disable @typescript-eslint/no-empty-interface */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import schema from './schema';
+import type { BooleanColumn, JSONColumn, UUIDColumn, DateColumn, NumberColumn, BinaryColumn, StringColumn, Concurrency, Filter, RawFilter, TransactionOptions, Pool, Express, Hono, Url, ColumnConcurrency, JsonPatch } from 'orange-orm';
+type HttpInterceptorManager<T> = {
+	use(onFulfilled?: (value: T) => T | Promise<T>, onRejected?: (error: any) => any): string;
+	eject(id: string): void;
+};
+type HttpRequestConfig = {
+	baseURL?: string;
+	url?: string;
+	method?: string;
+	headers: Record<string, string>;
+	data?: any;
+};
+type HttpResponse<T = any> = {
+	data: T;
+	status: number;
+	statusText: string;
+	headers: Record<string, string>;
+	config: HttpRequestConfig;
+};
+export default schema as RdbClient;`;
+	}
+
+	function startNamespace(tables, isHttp) {
+		return `
+declare namespace r {${getTables(isHttp)}
+`;
+
+		function getTables(isHttp) {
+			let result = '';
+			for (let name in tables) {
+				let Name = name.substring(0, 1).toUpperCase() + name.substring(1);
+				result +=
+					`
+	const ${name}: ${Name}Table;`;
+			}
+			if (!isHttp)
+				result += `
+
+	function and(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
+	function or(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
+	function not(): Filter;
+	function transaction(fn: (transaction: RdbClient, ctx: SyncTransactionContext) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
+	function query(filter: RawFilter | string): Promise<unknown[]>;
+	function query<T>(filter: RawFilter | string): Promise<T[]>;
+	function transaction(fn: (transaction: RdbClient, ctx: SyncTransactionContext) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
+	const filter: Filter;
+	function express(): Express;
+	function express(config: ExpressConfig): Express;
+	function hono(): Hono;
+	function hono(config: HonoConfig): Hono;
+`;
+			else
+				result += `
+
+	const interceptors: {
+		request: HttpInterceptorManager<HttpRequestConfig>;
+		response: HttpInterceptorManager<HttpResponse>;
+	};
+	function reactive(proxyMethod: (obj: unknown) => unknown): void;	
+	function and(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
+	function or(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
+	function not(): Filter;
+	const filter: Filter;
+`;
+			return result;
+		}
+	}
+
+	function getRdbClientTs(tables, isHttp) {
+		return `
+export interface RdbClient  {${getTables(isHttp)}
+}
+
+export interface RdbConfig {
+	db?: Pool | (() => Pool);
+    readonly?: boolean;
+    concurrency?: Concurrency;${getConcurrencyTables()}    
+}
+
+export interface MetaData {
+    readonly?: boolean;
+    concurrency?: Concurrency;${getConcurrencyTables()}
+}
+
+export interface ExpressConfig {
+	db?: Pool | (() => Pool);
+	tables?: ExpressTables;
+	concurrency?: Concurrency;
+	readonly?: boolean;
+	disableBulkDeletes?: boolean;
+	hooks?: ExpressHooks;
+}
+
+export interface HonoConfig {
+	db?: Pool | (() => Pool);
+	tables?: HonoTables;
+	concurrency?: Concurrency;
+	readonly?: boolean;
+	disableBulkDeletes?: boolean;
+	hooks?: HonoHooks;
+}
+
+export interface ExpressContext {
+	request: import('express').Request;
+	response: import('express').Response;
+	client: RdbClient;
+}		
+
+export interface HonoRequest {
+	method: string;
+	query: Record<string, string>;
+	headers: Record<string, string>;
+	json(): Promise<unknown>;
+}
+
+export interface HonoResponse {
+	status(code: number): HonoResponse;
+	setHeader(name: string, value: string): HonoResponse;
+	json(value: unknown): unknown;
+	send(value: unknown): unknown;
+}
+
+export interface HonoContext {
+	request: HonoRequest;
+	response: HonoResponse;
+	client: RdbClient;
+}
+
+export interface SyncTransactionContext {
+	context: Record<string, unknown> & { operation?: string };
+	memory: unknown;
+}
+
+export interface ExpressTransactionHooks {
+	beforeBegin?: (db: Pool, request: import('express').Request, response: import('express').Response) => void | Promise<void>;
+	afterBegin?: (db: Pool, request: import('express').Request, response: import('express').Response) => void | Promise<void>;
+	beforeCommit?: (db: Pool, request: import('express').Request, response: import('express').Response) => void | Promise<void>;
+	afterCommit?: (db: Pool, request: import('express').Request, response: import('express').Response) => void | Promise<void>;
+	afterRollback?: (db: Pool, request: import('express').Request, response: import('express').Response, error?: unknown) => void | Promise<void>;
+}
+
+export interface ExpressHooks extends ExpressTransactionHooks {
+	transaction?: ExpressTransactionHooks;
+}
+
+export interface HonoTransactionHooks {
+	beforeBegin?: (db: Pool, request: HonoRequest, response: HonoResponse) => void | Promise<void>;
+	afterBegin?: (db: Pool, request: HonoRequest, response: HonoResponse) => void | Promise<void>;
+	beforeCommit?: (db: Pool, request: HonoRequest, response: HonoResponse) => void | Promise<void>;
+	afterCommit?: (db: Pool, request: HonoRequest, response: HonoResponse) => void | Promise<void>;
+	afterRollback?: (db: Pool, request: HonoRequest, response: HonoResponse, error?: unknown) => void | Promise<void>;
+}
+
+export interface HonoHooks extends HonoTransactionHooks {
+	transaction?: HonoTransactionHooks;
+}
+
+export interface ExpressTables {${getExpressTables()}
+}
+
+export interface HonoTables {${getHonoTables()}
+}
+`;
+		function getConcurrencyTables() {
+			let result = '';
+			for (let name in tables) {
+				let Name = name.substring(0, 1).toUpperCase() + name.substring(1);
+				result +=
+				`
+	${name}?: ${Name}Concurrency;`;
+			}
+			return result;
+		}
+
+		function getTables(isHttp) {
+			let result = '';
+			for (let name in tables) {
+				let Name = name.substring(0, 1).toUpperCase() + name.substring(1);
+				result +=
+				`
+	${name}: ${Name}Table;`;
+			}
+			if (isHttp)
+				result += `
+	(config: {db: Url}): RdbClient;
+	interceptors: {
+        request: HttpInterceptorManager<HttpRequestConfig>;
+        response: HttpInterceptorManager<HttpResponse>;
+    };
+	reactive(proxyMethod: (obj: unknown) => unknown): void;
+	and(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
+	or(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
+	not(): Filter;
+	transaction(fn: (transaction: RdbClient, ctx: SyncTransactionContext) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
+	filter: Filter;
+    createPatch(original: any[], modified: any[]): JsonPatch;
+    createPatch(original: any, modified: any): JsonPatch;`;
+			else
+				result += `
+	(config: RdbConfig): RdbClient;
+	and(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
+	or(filter: RawFilter | RawFilter[], ...filters: RawFilter[]): Filter;
+	not(): Filter;
+	query(filter: RawFilter | string): Promise<unknown[]>;
+	query<T>(filter: RawFilter | string): Promise<T[]>;
+	transaction(fn: (transaction: RdbClient, ctx: SyncTransactionContext) => Promise<unknown>, options?: TransactionOptions): Promise<void>;
+	filter: Filter;
+	createPatch(original: any[], modified: any[]): JsonPatch;
+	createPatch(original: any, modified: any): JsonPatch;
+	express(): Express;
+	express(config: ExpressConfig): Express;
+	hono(): Hono;
+	hono(config: HonoConfig): Hono;
+	readonly metaData: MetaData;`;
+			return result;
+		}
+		function getExpressTables() {
+			let result = '';
+			for (let name in tables) {
+				let Name = name.substring(0, 1).toUpperCase() + name.substring(1);
+				result +=
+					`
+	${name}?: boolean | ${Name}ExpressConfig;`;
+			}
+			return result;
+		}
+		function getHonoTables() {
+			let result = '';
+			for (let name in tables) {
+				let Name = name.substring(0, 1).toUpperCase() + name.substring(1);
+				result +=
+					`
+	${name}?: boolean | ${Name}HonoConfig;`;
+			}
+			return result;
+		}
+	}
+
+	getTSDefinition_1 = getTSDefinition;
+	return getTSDefinition_1;
+}
+
+var sync;
+var hasRequiredSync;
+
+function requireSync () {
+	if (hasRequiredSync) return sync;
+	hasRequiredSync = 1;
+	const stringify = requireStringify();
+
+	function newSyncHandler(client, options = {}) {
+		const syncOptions = normalizeSyncOptions(options.sync);
+		if (!syncOptions || syncOptions.enabled === false)
+			return null;
+
+		const tableMeta = createTableMeta(client, syncOptions);
+		const queue = createQueue(syncOptions.queue);
+		const hooks = options.hooks;
+		const transactionHooks = hooks && hooks.transaction;
+		const transactionHookFns = {
+			beforeBegin: (transactionHooks && transactionHooks.beforeBegin) || (hooks && hooks.beforeBegin),
+			afterBegin: (transactionHooks && transactionHooks.afterBegin) || (hooks && hooks.afterBegin),
+			beforeCommit: (transactionHooks && transactionHooks.beforeCommit) || (hooks && hooks.beforeCommit),
+			afterCommit: (transactionHooks && transactionHooks.afterCommit) || (hooks && hooks.afterCommit),
+			afterRollback: (transactionHooks && transactionHooks.afterRollback) || (hooks && hooks.afterRollback)
+		};
+		const hasTransactionHooks = !!(transactionHookFns.beforeBegin
+			|| transactionHookFns.afterBegin
+			|| transactionHookFns.beforeCommit
+			|| transactionHookFns.afterCommit
+			|| transactionHookFns.afterRollback);
+
+		return async function handleSync(request, response) {
+			try {
+				const result = await queue.run(() => execute(request.body || {}, request, response));
+				response.json(result);
+			}
+			catch (e) {
+				if (e.status === undefined)
+					response.status(500).send(e.message || e);
+				else
+					response.status(e.status).send(e.message);
+			}
+		};
+
+		async function execute(body, request, response) {
+			const phase = body.phase || body.action;
+			if (phase === 'push')
+				return pushMutations(body, request, response);
+			if (phase === 'keys')
+				return pullKeys(body, request, response);
+			if (phase === 'rows')
+				return pullRows(body, request, response);
+			const error = new Error('Invalid sync phase. Use { phase: "keys" }, { phase: "rows" }, or { phase: "push" }.');
+			error.status = 400;
+			throw error;
+		}
+
+		async function runHookedTransaction(fn, transactionOptions, request, response) {
+			if (!hasTransactionHooks)
+				return client.transaction(fn, transactionOptions);
+
+			let hookDb;
+			let result;
+			try {
+				result = await client.transaction(async (tx) => {
+					hookDb = tx;
+					if (transactionHookFns.beforeBegin)
+						await transactionHookFns.beforeBegin(hookDb, request, response);
+					if (transactionHookFns.afterBegin)
+						await transactionHookFns.afterBegin(hookDb, request, response);
+					const value = await fn(tx);
+					if (transactionHookFns.beforeCommit)
+						await transactionHookFns.beforeCommit(hookDb, request, response);
+					return value;
+				}, transactionOptions);
+			}
+			catch (e) {
+				if (transactionHookFns.afterRollback)
+					await transactionHookFns.afterRollback(hookDb, request, response, e);
+				throw e;
+			}
+			if (transactionHookFns.afterCommit)
+				await transactionHookFns.afterCommit(hookDb, request, response);
+			return result;
+		}
+
+		async function pushMutations(body, request, response) {
+			const clientId = normalizeClientId(body.clientId ?? body.client_id);
+			const mutations = normalizeMutations(body.mutations, syncOptions.limits.maxMutationsPerBatch);
+			if (!clientId) {
+				const error = new Error('Sync push requires "clientId".');
+				error.status = 400;
+				throw error;
+			}
+			if (mutations.length === 0) {
+				return {
+					phase: 'push',
+					applied: 0,
+					duplicates: 0,
+					results: []
+				};
+			}
+
+			const results = [];
+			let applied = 0;
+			let duplicates = 0;
+			await runHookedTransaction(async (tx) => {
+				for (let i = 0; i < mutations.length; i++) {
+					const mutation = mutations[i];
+					const claim = await claimAppliedMutation(tx, clientId, mutation.id);
+					if (!claim.claimed) {
+						duplicates += 1;
+						results.push({ id: mutation.id, table: mutation.table, ...(claim.result || {}), duplicate: true });
+						continue;
+					}
+					const patchResult = await applyMutationPatches(tx, mutation);
+					const commandResult = await applyMutationCommands(tx, mutation);
+					const result = {
+						id: mutation.id,
+						table: mutation.table,
+						applied: true,
+						changed: patchResult.changed,
+						result: patchResult,
+						commands: commandResult.results
+					};
+					await updateAppliedMutation(tx, clientId, mutation.id, result);
+					results.push(result);
+					applied += 1;
+				}
+			}, undefined, request, response);
+
+			return {
+				phase: 'push',
+				applied,
+				duplicates,
+				results
+			};
+		}
+
+		async function applyMutationPatches(tx, mutation) {
+			const entries = Array.isArray(mutation.patches)
+				? mutation.patches
+				: [{ table: mutation.table, patch: mutation.patch, options: mutation.options }];
+			let changed = 0;
+			const results = [];
+			for (let i = 0; i < entries.length; i++) {
+				const entry = entries[i];
+				if (!entry || !Array.isArray(entry.patch))
+					continue;
+				const table = tx[entry.table];
+				if (!table || typeof table.patch !== 'function') {
+					const error = new Error(`Table "${entry.table}" is not exposed or does not exist`);
+					error.status = 400;
+					throw error;
+				}
+				const result = await table.patch(entry.patch, entry.options || mutation.options || {});
+				changed += Array.isArray(result && result.changed) ? result.changed.length : 0;
+				results.push({ table: entry.table, result });
+			}
+			return { changed, results };
+		}
+
+		async function applyMutationCommands(tx, mutation) {
+			const commands = Array.isArray(mutation.commands) ? mutation.commands : [];
+			const results = [];
+			for (let i = 0; i < commands.length; i++) {
+				const command = commands[i];
+				const name = command && command.name;
+				if (typeof name !== 'string' || name.length === 0)
+					continue;
+				const fn = syncOptions.commands[name];
+				if (typeof fn !== 'function') {
+					const error = new Error(`Sync command "${name}" is not registered`);
+					error.status = 400;
+					throw error;
+				}
+				const args = normalizeCommandArgs(command.args);
+				const value = await fn(tx, args, { name, mutation });
+				results.push({ name, result: value === undefined ? null : value });
+			}
+			return { results };
+		}
+
+		async function pullKeys(body, request, response) {
+			const requestedTables = normalizeRequestedTables(body.tables, tableMeta);
+			const limit = normalizeKeyBatchLimit(body.limit, syncOptions.limits);
+			const token = normalizeToken(body.token, requestedTables);
+			if (token && token.mode === 'changes')
+				return pullKeysFromChanges(token, limit);
+			if (token && token.mode === 'snapshot')
+				return pullKeysFromSnapshot(token, limit, request, response);
+
+			const startCursor = normalizeCursor(body.cursor ?? body.since);
+			const bounds = await getChangeBounds(syncOptions.changeTable);
+			const fallback = shouldUseSnapshot(startCursor, bounds, syncOptions.limits.maxChangeWindow);
+			if (fallback.useSnapshot) {
+				const upperPks = await getSnapshotUpperPks(requestedTables, request, response);
+				const snapshotToken = {
+					v: 1,
+					mode: 'snapshot',
+					tables: requestedTables,
+					tableIndex: 0,
+					lastPk: null,
+					watermark: bounds.max,
+					upperPks,
+					inlineRows: body.inlineRows === true
+				};
+				const result = await pullKeysFromSnapshot(snapshotToken, limit, request, response);
+				result.reason = fallback.reason;
+				return result;
+			}
+
+			const changeToken = {
+				v: 1,
+				mode: 'changes',
+				tables: requestedTables,
+				cursor: startCursor,
+				watermark: bounds.max
+			};
+			return pullKeysFromChanges(changeToken, limit);
+		}
+
+		async function pullKeysFromSnapshot(token, limit, request, response) {
+			const items = [];
+			let tableIndex = normalizeInteger(token.tableIndex, 0);
+			let lastPk = normalizePrimaryKeyToken(token.lastPk);
+			while (items.length < limit && tableIndex < token.tables.length) {
+				const tableName = token.tables[tableIndex];
+				const meta = tableMeta.byName.get(tableName);
+				if (!meta) {
+					tableIndex += 1;
+					lastPk = null;
+					continue;
+				}
+				const upperPk = getSnapshotUpperPk(token.upperPks, tableName);
+				if (token.upperPks && upperPk === null) {
+					tableIndex += 1;
+					lastPk = null;
+					continue;
+				}
+				const remaining = limit - items.length;
+				const rows = await fetchSnapshotRows(meta, remaining, lastPk, upperPk, token.inlineRows, request, response);
+				for (let i = 0; i < rows.length; i++) {
+					const row = rows[i];
+					const pk = toPkArray(meta, row);
+					if (pk)
+						items.push({ table: tableName, pk, key: toKeyObject(meta, pk), op: 'U', ...(token.inlineRows ? { row } : {}) });
+				}
+				if (rows.length < remaining) {
+					tableIndex += 1;
+					lastPk = null;
+				}
+				else {
+					lastPk = toPkArray(meta, rows[rows.length - 1]);
+				}
+			}
+			const done = tableIndex >= token.tables.length;
+			return {
+				phase: 'keys',
+				mode: 'snapshot',
+				done,
+				cursor: token.watermark,
+				token: done ? null : {
+					v: 1,
+					mode: 'snapshot',
+					tables: token.tables,
+					tableIndex,
+					lastPk,
+					watermark: token.watermark,
+					upperPks: token.upperPks,
+					inlineRows: token.inlineRows === true
+				},
+				items
+			};
+		}
+
+		async function pullKeysFromChanges(token, limit) {
+			const fromCursor = normalizeInteger(token.cursor, 0);
+			const watermark = normalizeInteger(token.watermark, 0);
+			if (fromCursor >= watermark) {
+				return {
+					phase: 'keys',
+					mode: 'changes',
+					done: true,
+					cursor: watermark,
+					token: null,
+					items: []
+				};
+			}
+			const whereTables = token.tables.length === 0
+				? ''
+				: ` AND table_name IN (${token.tables.map((name) => sqlStringLiteral(tableMeta.byName.get(name).dbName)).join(',')})`;
+			const sql = [
+				'SELECT id, table_name, op, pk_json',
+				`FROM ${quoteQualified(syncOptions.changeTable)}`,
+				`WHERE id > ${fromCursor} AND id <= ${watermark}${whereTables}`,
+				'ORDER BY id ASC',
+				`LIMIT ${limit}`
+			].join(' ');
+			const rows = await safeQuery(sql, []);
+			const dedup = new Map();
+			let nextCursor = fromCursor;
+			for (let i = 0; i < rows.length; i++) {
+				const row = rows[i];
+				const id = normalizeInteger(row.id ?? row.ID, nextCursor);
+				nextCursor = id > nextCursor ? id : nextCursor;
+				const rawTableName = row.table_name ?? row.TABLE_NAME;
+				const meta = tableMeta.byDbName.get(rawTableName);
+				if (!meta)
+					continue;
+				let keyObject;
+				try {
+					keyObject = typeof row.pk_json === 'string'
+						? JSON.parse(row.pk_json)
+						: JSON.parse(row.PK_JSON);
+				}
+				catch (_e) {
+					continue;
+				}
+				const pk = toPkArray(meta, keyObject);
+				if (!pk)
+					continue;
+				const mapKey = `${meta.name}|${stringify(pk)}`;
+				const op = normalizeOp(row.op ?? row.OP);
+				if (dedup.has(mapKey))
+					dedup.delete(mapKey);
+				dedup.set(mapKey, { table: meta.name, pk, key: toKeyObject(meta, pk), op });
+			}
+			const items = Array.from(dedup.values());
+			const done = rows.length === 0 || nextCursor >= watermark;
+			return {
+				phase: 'keys',
+				mode: 'changes',
+				done,
+				cursor: watermark,
+				token: done ? null : {
+					v: 1,
+					mode: 'changes',
+					tables: token.tables,
+					cursor: nextCursor,
+					watermark
+				},
+				items
+			};
+		}
+
+		async function pullRows(body, request, response) {
+			const rawItems = Array.isArray(body.items) ? body.items : [];
+			const limit = normalizeRowsBatchLimit(rawItems.length, syncOptions.limits);
+			const items = rawItems.slice(0, limit);
+			const truncated = rawItems.length > limit;
+			const normalizedItems = [];
+			const tableKeys = new Map();
+			for (let i = 0; i < items.length; i++) {
+				const item = items[i];
+				if (!item || typeof item.table !== 'string')
+					continue;
+				const meta = tableMeta.byName.get(item.table);
+				if (!meta)
+					continue;
+				if (normalizeOp(item.op) === 'D')
+					continue;
+				const pk = Array.isArray(item.pk) ? item.pk : toPkArray(meta, item.key);
+				if (!pk || pk.length !== meta.pkColumns.length)
+					continue;
+				const pkKey = stringify(pk);
+				normalizedItems.push({ meta, pk, pkKey, op: normalizeOp(item.op) });
+				let tableEntry = tableKeys.get(meta.name);
+				if (!tableEntry) {
+					tableEntry = { meta, keys: [], seen: new Set() };
+					tableKeys.set(meta.name, tableEntry);
+				}
+				if (!tableEntry.seen.has(pkKey)) {
+					tableEntry.seen.add(pkKey);
+					tableEntry.keys.push(pk);
+				}
+			}
+
+			const rowMap = new Map();
+			const tableNames = Array.from(tableKeys.keys());
+			for (let i = 0; i < tableNames.length; i++) {
+				const tableName = tableNames[i];
+				const tableEntry = tableKeys.get(tableName);
+				const rows = await fetchRowsByPrimaryKeys(tableEntry.meta, tableEntry.keys, request, response);
+				const perTable = new Map();
+				for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+					const row = rows[rowIndex];
+					const pk = toPkArray(tableEntry.meta, row);
+					if (pk)
+						perTable.set(stringify(pk), row);
+				}
+				rowMap.set(tableName, perTable);
+			}
+
+			const resolved = [];
+			for (let i = 0; i < normalizedItems.length; i++) {
+				const item = normalizedItems[i];
+				const row = rowMap.get(item.meta.name)?.get(item.pkKey);
+				if (row !== undefined)
+					resolved.push({ table: item.meta.name, pk: item.pk, key: toKeyObject(item.meta, item.pk), row, op: item.op });
+			}
+
+			return {
+				phase: 'rows',
+				limit,
+				requested: rawItems.length,
+				truncated,
+				items: resolved
+			};
+		}
+
+		async function fetchSnapshotRows(meta, limit, lastPk, upperPk, inlineRows, request, response) {
+			if (upperPk === null)
+				return [];
+			const strategy = {};
+			if (!inlineRows) {
+				for (let i = 0; i < meta.pkColumns.length; i++)
+					strategy[meta.pkColumns[i].alias] = true;
+			}
+			strategy.orderBy = meta.pkColumns.map(x => x.alias);
+			strategy.limit = limit;
+			const filter = buildSnapshotKeysetFilter(meta, lastPk, upperPk);
+			const rows = await runHookedTransaction(async (tx) => {
+				return tx[meta.name].getMany(filter, strategy);
+			}, { readonly: true }, request, response);
+			return rows;
+		}
+
+		async function getSnapshotUpperPks(tableNames, request, response) {
+			const result = {};
+			for (let i = 0; i < tableNames.length; i++) {
+				const tableName = tableNames[i];
+				const meta = tableMeta.byName.get(tableName);
+				if (!meta)
+					continue;
+				result[tableName] = await fetchSnapshotUpperPk(meta, request, response);
+			}
+			return result;
+		}
+
+		async function fetchSnapshotUpperPk(meta, request, response) {
+			const strategy = {};
+			for (let i = 0; i < meta.pkColumns.length; i++) {
+				strategy[meta.pkColumns[i].alias] = true;
+			}
+			strategy.orderBy = meta.pkColumns.map(x => `${x.alias} desc`);
+			strategy.limit = 1;
+			const rows = await runHookedTransaction(async (tx) => {
+				return tx[meta.name].getMany(undefined, strategy);
+			}, { readonly: true }, request, response);
+			return rows.length > 0 ? toPkArray(meta, rows[0]) : null;
+		}
+
+		async function fetchRowsByPrimaryKeys(meta, keys, request, response) {
+			if (!Array.isArray(keys) || keys.length === 0)
+				return [];
+			const keyObjects = [];
+			for (let i = 0; i < keys.length; i++) {
+				const pk = keys[i];
+				if (!Array.isArray(pk) || pk.length !== meta.pkColumns.length)
+					continue;
+				keyObjects.push(toKeyObject(meta, pk));
+			}
+			if (keyObjects.length === 0)
+				return [];
+			return runHookedTransaction(async (tx) => {
+				return tx[meta.name].getMany({
+					where: () => keyObjects
+				});
+			}, { readonly: true }, request, response);
+		}
+
+		async function getChangeBounds(changeTable) {
+			try {
+				const sql = [
+					'SELECT',
+					'COALESCE(MIN(id), 0) AS min_id,',
+					'COALESCE(MAX(id), 0) AS max_id',
+					`FROM ${quoteQualified(changeTable)}`
+				].join(' ');
+				const rows = await safeQuery(sql, []);
+				const row = rows[0] || {};
+				return {
+					exists: true,
+					min: normalizeInteger(row.min_id ?? row.MIN_ID, 0),
+					max: normalizeInteger(row.max_id ?? row.MAX_ID, 0)
+				};
+			}
+			catch (_error) {
+				return { exists: false, min: 0, max: 0 };
+			}
+		}
+
+		async function safeQuery(sql, fallback) {
+			const result = await client.query(sql);
+			if (Array.isArray(result))
+				return result;
+			if (Array.isArray(result?.rows))
+				return result.rows;
+			return fallback;
+		}
+
+		async function claimAppliedMutation(tx, clientId, mutationId) {
+			const rows = await safeTxQuery(tx, [
+				`INSERT INTO ${quoteQualified(syncOptions.appliedMutationsTable)} (client_id, mutation_id, result_json)`,
+				`VALUES (${sqlStringLiteral(clientId)}, ${sqlStringLiteral(mutationId)}, ${sqlJsonLiteral({ pending: true })})`,
+				'ON CONFLICT (client_id, mutation_id) DO NOTHING',
+				'RETURNING result_json'
+			].join(' '), []);
+			if (rows.length > 0)
+				return { claimed: true };
+
+			const existingRows = await safeTxQuery(tx, [
+				'SELECT result_json',
+				`FROM ${quoteQualified(syncOptions.appliedMutationsTable)}`,
+				`WHERE client_id = ${sqlStringLiteral(clientId)} AND mutation_id = ${sqlStringLiteral(mutationId)}`,
+				'LIMIT 1'
+			].join(' '), []);
+			const result = parseResultJson(existingRows[0]);
+			return { claimed: false, result };
+		}
+
+		function parseResultJson(row) {
+			if (!row)
+				return null;
+			const raw = row.result_json ?? row.RESULT_JSON;
+			if (typeof raw === 'string') {
+				try {
+					return JSON.parse(raw);
+				}
+				catch (_e) {
+					return null;
+				}
+			}
+			return raw && raw === Object(raw) ? raw : null;
+		}
+
+		async function updateAppliedMutation(tx, clientId, mutationId, result) {
+			await tx.query([
+				`UPDATE ${quoteQualified(syncOptions.appliedMutationsTable)}`,
+				`SET result_json = ${sqlJsonLiteral(result)}, applied_at = NOW()`,
+				`WHERE client_id = ${sqlStringLiteral(clientId)} AND mutation_id = ${sqlStringLiteral(mutationId)}`
+			].join(' '));
+		}
+
+		async function safeTxQuery(tx, sql, fallback) {
+			const result = await tx.query(sql);
+			if (Array.isArray(result))
+				return result;
+			if (Array.isArray(result?.rows))
+				return result.rows;
+			return fallback;
+		}
+	}
+
+	const DEFAULT_SYNC_BATCH_LIMIT = 1000;
+	const DEFAULT_SYNC_MUTATIONS_LIMIT = 200;
+	const DEFAULT_SYNC_CHANGE_WINDOW = 100000;
+	const MAX_SYNC_BATCH_LIMIT = 10000;
+
+	function normalizeSyncOptions(sync) {
+		if (!sync)
+			return null;
+		const queueOptions = sync.queue || {};
+		const limits = sync.limits || {};
+		const explicitLimits = {
+			maxKeysPerBatch: isNormalizableInteger(limits.maxKeysPerBatch),
+			maxRowsPerBatch: isNormalizableInteger(limits.maxRowsPerBatch)
+		};
+		return {
+			enabled: sync.enabled !== false,
+			changeTable: sync.changeTable || 'orange_changes',
+			appliedMutationsTable: sync.appliedMutationsTable || 'orange_sync_applied_mutations',
+			commands: normalizeCommands(sync.commands),
+			queue: {
+				concurrency: clamp(normalizeInteger(queueOptions.concurrency, 4), 1, 100),
+				maxPending: clamp(normalizeInteger(queueOptions.maxPending, 1000), 0, 100000)
+			},
+			limits: {
+				maxKeysPerBatch: clamp(normalizeInteger(limits.maxKeysPerBatch, DEFAULT_SYNC_BATCH_LIMIT), 1, MAX_SYNC_BATCH_LIMIT),
+				maxRowsPerBatch: clamp(normalizeInteger(limits.maxRowsPerBatch, DEFAULT_SYNC_BATCH_LIMIT), 1, MAX_SYNC_BATCH_LIMIT),
+				maxMutationsPerBatch: clamp(normalizeInteger(limits.maxMutationsPerBatch, DEFAULT_SYNC_MUTATIONS_LIMIT), 1, MAX_SYNC_BATCH_LIMIT),
+				maxChangeWindow: clamp(normalizeInteger(limits.maxChangeWindow, DEFAULT_SYNC_CHANGE_WINDOW), 1, 100000000),
+				explicit: explicitLimits
+			}
+		};
+	}
+
+	function normalizeCommands(commands) {
+		if (!commands || commands !== Object(commands))
+			return {};
+		return commands;
+	}
+
+	function createTableMeta(client, syncOptions) {
+		const byName = new Map();
+		const byDbName = new Map();
+		for (let tableName in client.tables) {
+			const table = client.tables[tableName];
+			const pkColumns = Array.isArray(table?._primaryColumns) ? table._primaryColumns : [];
+			if (pkColumns.length === 0)
+				continue;
+			const dbName = table._dbName;
+			if (!dbName || dbName === syncOptions.changeTable)
+				continue;
+			const meta = {
+				name: tableName,
+				dbName,
+				pkColumns: pkColumns.map((col) => ({ alias: col.alias, dbName: col._dbName || col.alias }))
+			};
+			byName.set(tableName, meta);
+			byDbName.set(dbName, meta);
+			const split = dbName.split('.');
+			byDbName.set(split[split.length - 1], meta);
+		}
+		return { byName, byDbName };
+	}
+
+	function createQueue({ concurrency, maxPending }) {
+		let running = 0;
+		const pending = [];
+		let pendingHead = 0;
+		return { run };
+
+		function run(job) {
+			return new Promise((resolve, reject) => {
+				if (running >= concurrency && pending.length - pendingHead >= maxPending) {
+					const error = new Error('Sync queue is full. Try again later.');
+					error.status = 429;
+					reject(error);
+					return;
+				}
+				pending.push({ job, resolve, reject });
+				drain();
+			});
+		}
+
+		function drain() {
+			while (running < concurrency && pendingHead < pending.length) {
+				const next = pending[pendingHead];
+				pendingHead += 1;
+				if (pendingHead > 1024 && pendingHead * 2 > pending.length) {
+					pending.splice(0, pendingHead);
+					pendingHead = 0;
+				}
+				running += 1;
+				Promise.resolve()
+					.then(next.job)
+					.then(next.resolve, next.reject)
+					.finally(() => {
+						running -= 1;
+						drain();
+					});
+			}
+		}
+	}
+
+	function shouldUseSnapshot(cursor, bounds, maxChangeWindow) {
+		if (!Number.isFinite(cursor))
+			return { useSnapshot: true, reason: 'first_sync' };
+		if (!bounds.exists)
+			return { useSnapshot: true, reason: 'change_table_unavailable' };
+		if (cursor < bounds.min - 1)
+			return { useSnapshot: true, reason: 'cursor_too_old' };
+		if (bounds.max - cursor > maxChangeWindow)
+			return { useSnapshot: true, reason: 'cursor_too_far_behind' };
+		return { useSnapshot: false };
+	}
+
+	function normalizeRequestedTables(rawTables, tableMeta) {
+		if (!Array.isArray(rawTables) || rawTables.length === 0)
+			return Array.from(tableMeta.byName.keys());
+		const normalized = [];
+		for (let i = 0; i < rawTables.length; i++) {
+			const raw = rawTables[i];
+			if (typeof raw !== 'string')
+				continue;
+			const byName = tableMeta.byName.get(raw);
+			if (byName) {
+				normalized.push(byName.name);
+				continue;
+			}
+			const byDbName = tableMeta.byDbName.get(raw);
+			if (byDbName)
+				normalized.push(byDbName.name);
+		}
+		return Array.from(new Set(normalized));
+	}
+
+	function normalizeToken(token, requestedTables) {
+		if (!token || token !== Object(token))
+			return null;
+		if (token.v !== 1)
+			return null;
+		if (token.mode === 'changes') {
+			return {
+				v: 1,
+				mode: 'changes',
+				tables: requestedTables,
+				cursor: normalizeInteger(token.cursor, 0),
+				watermark: normalizeInteger(token.watermark, 0)
+			};
+		}
+		if (token.mode === 'snapshot') {
+			return {
+				v: 1,
+				mode: 'snapshot',
+				tables: requestedTables,
+				tableIndex: normalizeInteger(token.tableIndex, 0),
+				lastPk: normalizePrimaryKeyToken(token.lastPk),
+				watermark: normalizeInteger(token.watermark, 0),
+				upperPks: normalizeSnapshotUpperPks(token.upperPks, requestedTables),
+				inlineRows: token.inlineRows === true
+			};
+		}
+		return null;
+	}
+
+	function normalizeCursor(cursor) {
+		if (cursor === null || cursor === undefined || cursor === '')
+			return NaN;
+		if (typeof cursor === 'number' && Number.isFinite(cursor))
+			return cursor;
+		if (typeof cursor === 'string') {
+			const parsed = Number.parseInt(cursor, 10);
+			return Number.isFinite(parsed) ? parsed : NaN;
+		}
+		return NaN;
+	}
+
+	function normalizeKeyBatchLimit(limit, limits) {
+		const max = Math.min(
+			limits.explicit.maxKeysPerBatch ? limits.maxKeysPerBatch : MAX_SYNC_BATCH_LIMIT,
+			limits.explicit.maxRowsPerBatch ? limits.maxRowsPerBatch : MAX_SYNC_BATCH_LIMIT
+		);
+		return normalizeLimit(limit, DEFAULT_SYNC_BATCH_LIMIT, max);
+	}
+
+	function normalizeRowsBatchLimit(limit, limits) {
+		const max = limits.explicit.maxRowsPerBatch ? limits.maxRowsPerBatch : MAX_SYNC_BATCH_LIMIT;
+		return normalizeLimit(limit, DEFAULT_SYNC_BATCH_LIMIT, max);
+	}
+
+	function normalizeLimit(limit, fallback, max) {
+		return clamp(normalizeInteger(limit, fallback), 1, max);
+	}
+
+	function normalizeInteger(value, fallback) {
+		if (typeof value === 'number' && Number.isFinite(value))
+			return Math.floor(value);
+		if (typeof value === 'string') {
+			const parsed = Number.parseInt(value, 10);
+			if (Number.isFinite(parsed))
+				return parsed;
+		}
+		return fallback;
+	}
+
+	function isNormalizableInteger(value) {
+		if (typeof value === 'number')
+			return Number.isFinite(value);
+		if (typeof value === 'string')
+			return Number.isFinite(Number.parseInt(value, 10));
+		return false;
+	}
+
+	function normalizeOp(value) {
+		if (typeof value !== 'string')
+			return 'U';
+		const op = value.toUpperCase();
+		if (op === 'I' || op === 'U' || op === 'D')
+			return op;
+		return 'U';
+	}
+
+	function normalizeClientId(value) {
+		if (typeof value !== 'string')
+			return '';
+		return value.trim();
+	}
+
+	function normalizeMutations(value, limit) {
+		if (!Array.isArray(value))
+			return [];
+		if (value.length > limit) {
+			const error = new Error(`Sync push accepts at most ${limit} mutations per batch.`);
+			error.status = 413;
+			throw error;
+		}
+		const result = [];
+		for (let i = 0; i < value.length; i++) {
+			const mutation = normalizeMutation(value[i]);
+			if (mutation)
+				result.push(mutation);
+		}
+		return result;
+	}
+
+	function normalizeMutation(value) {
+		if (!value || value !== Object(value))
+			return null;
+		const id = value.id ?? value.mutationId ?? value.mutation_id;
+		if (typeof id !== 'string' || id.length === 0)
+			return null;
+		const commands = Array.isArray(value.commands)
+			? value.commands.map(normalizeMutationCommand).filter(Boolean)
+			: [];
+		if (Array.isArray(value.patches)) {
+			const patches = value.patches.map(normalizeMutationPatch).filter(Boolean);
+			if (patches.length === 0 && commands.length === 0)
+				return null;
+			return {
+				id,
+				patches,
+				commands,
+				options: value.options && value.options === Object(value.options) ? value.options : undefined
+			};
+		}
+		const entry = normalizeMutationPatch(value);
+		if (!entry && commands.length === 0)
+			return null;
+		return {
+			id,
+			...(entry || {}),
+			commands,
+			options: value.options && value.options === Object(value.options) ? value.options : undefined
+		};
+	}
+
+	function normalizeMutationCommand(value) {
+		if (!value || value !== Object(value))
+			return null;
+		if (typeof value.name !== 'string' || value.name.length === 0)
+			return null;
+		return {
+			name: value.name,
+			args: normalizeCommandArgs(value.args)
+		};
+	}
+
+	function normalizeCommandArgs(args) {
+		if (args === undefined)
+			return null;
+		return JSON.parse(JSON.stringify(args));
+	}
+
+	function normalizeMutationPatch(value) {
+		if (!value || value !== Object(value))
+			return null;
+		if (typeof value.table !== 'string' || value.table.length === 0)
+			return null;
+		if (!Array.isArray(value.patch))
+			return null;
+		return {
+			table: value.table,
+			patch: value.patch,
+			options: value.options && value.options === Object(value.options) ? value.options : undefined
+		};
+	}
+
+	function toPkArray(meta, row) {
+		if (!row || row !== Object(row))
+			return null;
+		const result = [];
+		for (let i = 0; i < meta.pkColumns.length; i++) {
+			const key = meta.pkColumns[i].alias;
+			if (!(key in row))
+				return null;
+			result.push(row[key]);
+		}
+		return result;
+	}
+
+	function toKeyObject(meta, pk) {
+		const key = {};
+		for (let i = 0; i < meta.pkColumns.length && i < pk.length; i++) {
+			key[meta.pkColumns[i].alias] = pk[i];
+		}
+		return key;
+	}
+
+	function buildSnapshotKeysetFilter(meta, lastPk, upperPk) {
+		const filters = [];
+		if (Array.isArray(lastPk) && lastPk.length === meta.pkColumns.length)
+			filters.push(buildKeysetAfterFilter(meta, lastPk));
+		if (Array.isArray(upperPk) && upperPk.length === meta.pkColumns.length) {
+			const upperFilter = buildKeysetAfterFilter(meta, upperPk);
+			filters.push({
+				sql: `NOT (${upperFilter.sql})`,
+				parameters: upperFilter.parameters
+			});
+		}
+		const validFilters = filters.filter(Boolean);
+		if (validFilters.length === 0)
+			return undefined;
+		return {
+			sql: validFilters.map(x => `(${x.sql})`).join(' AND '),
+			parameters: validFilters.reduce((all, filter) => all.concat(filter.parameters), [])
+		};
+	}
+
+	function buildKeysetAfterFilter(meta, pk) {
+		const clauses = [];
+		const parameters = [];
+		for (let i = 0; i < meta.pkColumns.length; i++) {
+			const parts = [];
+			for (let j = 0; j < i; j++) {
+				parts.push(`${quoteIdent(meta.pkColumns[j].dbName)} = ?`);
+				parameters.push(pk[j]);
+			}
+			parts.push(`${quoteIdent(meta.pkColumns[i].dbName)} > ?`);
+			parameters.push(pk[i]);
+			clauses.push(`(${parts.join(' AND ')})`);
+		}
+		return {
+			sql: clauses.join(' OR '),
+			parameters
+		};
+	}
+
+	function normalizePrimaryKeyToken(value) {
+		return Array.isArray(value) ? value : null;
+	}
+
+	function normalizeSnapshotUpperPks(value, tableNames) {
+		if (!value || value !== Object(value))
+			return null;
+		const result = {};
+		for (let i = 0; i < tableNames.length; i++) {
+			const tableName = tableNames[i];
+			if (!Object.prototype.hasOwnProperty.call(value, tableName))
+				continue;
+			result[tableName] = value[tableName] === null
+				? null
+				: normalizePrimaryKeyToken(value[tableName]);
+		}
+		return result;
+	}
+
+	function getSnapshotUpperPk(upperPks, tableName) {
+		if (!upperPks || upperPks !== Object(upperPks))
+			return undefined;
+		if (!Object.prototype.hasOwnProperty.call(upperPks, tableName))
+			return undefined;
+		return normalizePrimaryKeyToken(upperPks[tableName]);
+	}
+
+	function clamp(value, min, max) {
+		return Math.max(min, Math.min(max, value));
+	}
+
+	function quoteQualified(name) {
+		return String(name).split('.').map(quoteIdent).join('.');
+	}
+
+	function quoteIdent(name) {
+		return `"${String(name).replace(/"/g, '""')}"`;
+	}
+
+	function sqlStringLiteral(value) {
+		return `'${String(value).replace(/'/g, '\'\'')}'`;
+	}
+
+	function sqlJsonLiteral(value) {
+		return `${sqlStringLiteral(stringify(value))}::jsonb`;
+	}
+
+	sync = newSyncHandler;
+	return sync;
+}
+
+var hostExpress_1;
+var hasRequiredHostExpress;
+
+function requireHostExpress () {
+	if (hasRequiredHostExpress) return hostExpress_1;
+	hasRequiredHostExpress = 1;
+	const getTSDefinition = requireGetTSDefinition();
+	// let hostLocal = _hostLocal;
+	const getMeta = requireGetMeta();
+	const newSyncHandler = requireSync();
+
+	function hostExpress(hostLocal, client, options = {}) {
+		if ('db' in options && (options.db ?? undefined) === undefined || !client.db)
+			throw new Error('No db specified');
+		const dbOptions = { db: options.db || client.db };
+		const commandHandlers = mergeCommandHandlers(
+			options.commands,
+			client.__commands,
+			options.commandHandlers
+		);
+		let c = {};
+		const readonly = { readonly: options.readonly};
+		const sharedHooks = options.hooks;
+		for (let tableName in client.tables) {
+			const tableOptions = options[tableName] || {};
+			const hooks = tableOptions.hooks || sharedHooks;
+			c[tableName] = hostLocal({
+				...dbOptions,
+				...readonly,
+				...tableOptions,
+				table: client.tables[tableName],
+				isHttp: true,
+				client,
+				hooks
+
+			});
+		}
+		const syncHandler = newSyncHandler(client, {
+			...options,
+			sync: options.sync && {
+				...options.sync,
+				commands: mergeCommandHandlers(commandHandlers, options.sync.commands)
+			}
+		});
+
+		async function handler(req, res) {
+			if (req.method === 'POST')
+				return post.apply(null, arguments);
+			if (req.method === 'PATCH')
+				return patch.apply(null, arguments);
+			if (req.method === 'GET')
+				return get.apply(null, arguments);
+			if (req.method === 'OPTIONS')
+				return handleOptions(req, res); // assuming the second argument is `response`
+
+			else
+				res.status(405).set('Allow', 'GET, POST, PATCH, OPTIONS').send('Method Not Allowed');
+		}
+
+		handler.db = handler;
+		handler.dts = get;
+
+		function get(request, response) {
+			try {
+				if (request.query.table) {
+					if (!(request.query.table in c)) {
+						let e = new Error('Table is not exposed or does not exist');
+						// @ts-ignore
+						e.status = 400;
+						throw e;
+					}
+
+					const result = getMeta(client.tables[request.query.table]);
+					response.setHeader('content-type', 'text/plain');
+					response.status(200).send(result);
+				}
+				else {
+					const isNamespace = request.query.isNamespace === 'true';
+					let tsArg = Object.keys(c).map(x => {
+						return { table: client.tables[x], customFilters: options?.tables?.[x].customFilters, name: x };
+					});
+					response.setHeader('content-type', 'text/plain');
+					response.status(200).send(getTSDefinition(tsArg, { isNamespace, isHttp: true }));
+				}
+			}
+			catch (e) {
+				if (e.status === undefined)
+					response.status(500).send(e.message || e);
+				else
+					response.status(e.status).send(e.message);
+			}
+		}
+
+		async function patch(request, response) {
+			try {
+				response.json(await c[request.query.table].patch(request.body, request, response));
+			}
+			catch (e) {
+				if (e.status === undefined)
+					response.status(500).send(e.message || e);
+				else
+					response.status(e.status).send(e.message);
+
+			}
+		}
+
+		async function post(request, response) {
+			try {
+				if (request.query.sync) {
+					if (!syncHandler) {
+						const e = new Error('Sync is not enabled for this endpoint');
+						// @ts-ignore
+						e.status = 404;
+						throw e;
+					}
+					return syncHandler(request, response);
+				}
+				if (request.query.command)
+					return runCommand(request, response);
+				if (!request.query.table) {
+					let e = new Error('Table not defined');
+					// @ts-ignore
+					e.status = 400;
+					throw e;
+				}
+				else if (!(request.query.table in c)) {
+					let e = new Error('Table is not exposed or does not exist');
+					// @ts-ignore
+					e.status = 400;
+					throw e;
+				}
+
+				response.json(await c[request.query.table].post(request.body, request, response));
+			}
+			catch (e) {
+				if (e.status === undefined)
+					response.status(500).send(e.message || e);
+				else
+					response.status(e.status).send(e.message);
+			}
+
+		}
+
+		async function runCommand(request, response) {
+			const name = request.query.command;
+			const fn = typeof name === 'string' ? commandHandlers[name] : null;
+			if (typeof fn !== 'function') {
+				const e = new Error(`Command "${name}" is not registered`);
+				// @ts-ignore
+				e.status = 400;
+				throw e;
+			}
+			const body = typeof request.body === 'string' ? JSON.parse(request.body) : request.body || {};
+			const args = normalizeCommandArgs(body.args);
+			let result;
+			await client.transaction(async (tx) => {
+				result = await fn(tx, args);
+			});
+			response.json(result === undefined ? null : result);
+		}
+
+		function handleOptions(req, response) {
+			response.setHeader('Access-Control-Allow-Origin', '*'); // Adjust this as per your CORS needs
+			response.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS'); // And any other methods you support
+			response.setHeader('Access-Control-Allow-Headers', 'Content-Type'); // And any other headers you expect in requests
+			response.setHeader('Access-Control-Max-Age', '86400'); // Cache preflight request for a day. Adjust as you see fit
+			response.status(204).send(); // 204 No Content response for successful OPTIONS requests
+		}
+
+		return handler;
+	}
+
+	function normalizeCommandArgs(args) {
+		if (args === undefined)
+			return null;
+		return JSON.parse(JSON.stringify(args));
+	}
+
+	function mergeCommandHandlers(...registries) {
+		const commandHandlers = {};
+		for (let i = 0; i < registries.length; i++) {
+			const registry = registries[i];
+			if (registry && typeof registry === 'object')
+				Object.assign(commandHandlers, registry);
+		}
+		return commandHandlers;
+	}
+
+	hostExpress_1 = hostExpress;
+	return hostExpress_1;
+}
+
+var hostHono_1;
+var hasRequiredHostHono;
+
+function requireHostHono () {
+	if (hasRequiredHostHono) return hostHono_1;
+	hasRequiredHostHono = 1;
+	const getTSDefinition = requireGetTSDefinition();
+	const getMeta = requireGetMeta();
+
+	function hostHono(hostLocal, client, options = {}) {
+		if ('db' in options && (options.db ?? undefined) === undefined || !client.db)
+			throw new Error('No db specified');
+		const dbOptions = { db: options.db || client.db };
+		let c = {};
+		const readonly = { readonly: options.readonly };
+		const sharedHooks = options.hooks;
+		for (let tableName in client.tables) {
+			const tableOptions = options[tableName] || {};
+			const hooks = tableOptions.hooks || sharedHooks;
+			c[tableName] = hostLocal({
+				...dbOptions,
+				...readonly,
+				...tableOptions,
+				table: client.tables[tableName],
+				isHttp: true,
+				client,
+				hooks
+			});
+		}
+
+		async function handler(ctx) {
+			const request = createRequest(ctx);
+			const response = createResponse();
+
+			try {
+				if (request.method === 'POST')
+					return await post(request, response);
+				if (request.method === 'PATCH')
+					return await patch(request, response);
+				if (request.method === 'GET')
+					return get(request, response);
+				if (request.method === 'OPTIONS')
+					return handleOptions(response);
+				return response
+					.status(405)
+					.setHeader('Allow', 'GET, POST, PATCH, OPTIONS')
+					.send('Method Not Allowed');
+			}
+			catch (e) {
+				if (e.status === undefined)
+					return response.status(500).send(e.message || e);
+				return response.status(e.status).send(e.message);
+			}
+		}
+
+		handler.db = handler;
+		handler.dts = get;
+
+		function get(request, response) {
+			if (request.query.table) {
+				if (!(request.query.table in c)) {
+					let e = new Error('Table is not exposed or does not exist');
+					// @ts-ignore
+					e.status = 400;
+					throw e;
+				}
+
+				const result = getMeta(client.tables[request.query.table]);
+				response.setHeader('content-type', 'text/plain');
+				return response.status(200).send(result);
+			}
+			const isNamespace = request.query.isNamespace === 'true';
+			let tsArg = Object.keys(c).map(x => {
+				return { table: client.tables[x], customFilters: options?.tables?.[x].customFilters, name: x };
+			});
+			response.setHeader('content-type', 'text/plain');
+			return response.status(200).send(getTSDefinition(tsArg, { isNamespace, isHttp: true }));
+		}
+
+		async function patch(request, response) {
+			const table = request.query.table;
+			const body = await request.json();
+			return response.json(await c[table].patch(body, request, response));
+		}
+
+		async function post(request, response) {
+			if (!request.query.table) {
+				let e = new Error('Table not defined');
+				// @ts-ignore
+				e.status = 400;
+				throw e;
+			}
+			if (!(request.query.table in c)) {
+				let e = new Error('Table is not exposed or does not exist');
+				// @ts-ignore
+				e.status = 400;
+				throw e;
+			}
+
+			const body = await request.json();
+			return response.json(await c[request.query.table].post(body, request, response));
+		}
+
+		function handleOptions(response) {
+			response.setHeader('Access-Control-Allow-Origin', '*');
+			response.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
+			response.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+			response.setHeader('Access-Control-Max-Age', '86400');
+			return response.status(204).send('');
+		}
+
+		function createRequest(ctx) {
+			let bodyPromise;
+			const query = Object.fromEntries(new URL(ctx.req.url).searchParams.entries());
+			const headers = {};
+			for (const [name, value] of ctx.req.raw.headers.entries())
+				headers[name] = value;
+			return {
+				method: ctx.req.method,
+				query,
+				headers,
+				json: async () => {
+					if (!bodyPromise)
+						bodyPromise = ctx.req.json();
+					return bodyPromise;
+				}
+			};
+		}
+
+		function createResponse() {
+			let statusCode = 200;
+			const headers = new Headers();
+			return {
+				status(code) {
+					statusCode = code;
+					return this;
+				},
+				setHeader(name, value) {
+					headers.set(name, value);
+					return this;
+				},
+				json(value) {
+					if (!headers.has('content-type'))
+						headers.set('content-type', 'application/json');
+					return new Response(JSON.stringify(value), { status: statusCode, headers });
+				},
+				send(value) {
+					if (typeof value === 'string') {
+						if (!headers.has('content-type'))
+							headers.set('content-type', 'text/plain');
+						return new Response(value, { status: statusCode, headers });
+					}
+					if (!headers.has('content-type'))
+						headers.set('content-type', 'application/json');
+					return new Response(JSON.stringify(value), { status: statusCode, headers });
+				}
+			};
+		}
+
+		return handler;
+	}
+
+	hostHono_1 = hostHono;
+	return hostHono_1;
+}
+
+var hostLocal_1;
+var hasRequiredHostLocal;
+
+function requireHostLocal () {
+	if (hasRequiredHostLocal) return hostLocal_1;
+	hasRequiredHostLocal = 1;
+	let executePath = requireExecutePath();
+	let getMeta = requireGetMeta();
+	let setSessionSingleton = requireSetSessionSingleton();
+	let executeQuery = requireQuery();
+	let executeSqliteFunction = requireSqliteFunction();
+	let hostExpress = requireHostExpress();
+	let hostHono = requireHostHono();
+	let randomUuid = requireRandomUuid();
+	let stringify = requireStringify();
+	let getSessionSingleton = requireGetSessionSingleton();
+	let outboxTableSql = requireOutboxTableSql();
+	let { runSyncWrite } = requireWriteGate();
+	let ensureOutboxOperationColumns = requireEnsureOutboxOperationColumns();
+	let { updateOutboxOperationFromContext } = requireOperationContext();
+	const readonlyOps = ['getManyDto', 'getMany', 'aggregate', 'distinct', 'count'];
+	const syncOutboxEnsuredKey = typeof Symbol === 'function'
+		? Symbol.for('orange-orm.syncOutboxEnsured')
+		: '__orangeOrmSyncOutboxEnsured';
+	// { db, table, defaultConcurrency,
+	// 	concurrency,
+	// 	customFilters,
+	// 	baseFilter, strategy, transaction,
+	// 	readonly,
+	// 	disableBulkDeletes, isBrowser }
+	function hostLocal() {
+		const _options = arguments[0];
+		let { table, transaction, db, isHttp, hooks, client } = _options;
+		const transactionHooks = hooks && hooks.transaction;
+		const getTransactionHook = (name) =>
+			(transactionHooks && transactionHooks[name]) || (hooks && hooks[name]);
+
+		let c = { get, post, patch, syncCommand, query, sqliteFunction, express, hono };
+
+		function get() {
+			return getMeta(table);
+
+		}
+		async function patch(body, _req, _res) {
+			if (!table) {
+				const error = new Error('Table is not exposed');
+				// @ts-ignore
+				error.status = 400;
+				throw error;
+			}
+			body = typeof body === 'string' ? JSON.parse(body) : body;
+			let result;
+
+			if (transaction)
+				await transaction(fn);
+			else {
+				const resolvedDb = await resolveDb();
+				await runSyncWrite(resolvedDb, undefined, () => resolvedDb.transaction(fn));
+			}
+			return result;
+
+			async function fn(context) {
+				setSessionSingleton(context, 'ignoreSerializable', true);
+				let patch = body.patch;
+				await prepareSyncOutboxPatchCapture(context, patch);
+				result = await table.patch(context, patch, { ..._options, ...body.options, isHttp });
+				await captureSyncOutboxPatch(context, patch, body.options);
+			}
+		}
+
+		async function syncCommand(body) {
+			body = typeof body === 'string' ? JSON.parse(body) : body;
+			if (!body || body !== Object(body))
+				throw new Error('Invalid sync command payload');
+			let result;
+
+			if (transaction)
+				await transaction(fn);
+			else {
+				const resolvedDb = await resolveDb();
+				await runSyncWrite(resolvedDb, undefined, () => resolvedDb.transaction(fn));
+			}
+			return result;
+
+			async function fn(context) {
+				await captureSyncOutboxCommand(context, body.name, body.args);
+				result = undefined;
+			}
+		}
+
+		async function post(body, request, response) {
+			body = typeof body === 'string' ? JSON.parse(body) : body;
+			let result;
+
+			if (transaction)
+				await transaction(fn);
+			else {
+				const resolvedDb = await resolveDb();
+				const beforeBegin = getTransactionHook('beforeBegin');
+				const afterBegin = getTransactionHook('afterBegin');
+				const beforeCommit = getTransactionHook('beforeCommit');
+				const afterCommit = getTransactionHook('afterCommit');
+				const afterRollback = getTransactionHook('afterRollback');
+				const hasTransactionHooks = !!(beforeBegin
+					|| afterBegin
+					|| beforeCommit
+					|| afterCommit
+					|| afterRollback);
+				if (!hasTransactionHooks && readonlyOps.includes(body.path) && !hasLockingStrategy(body))
+					await resolvedDb.transaction({ readonly: true }, fn);
+				else {
+					await runSyncWrite(resolvedDb, undefined, () => resolvedDb.transaction(async (context) => {
+						const hookDb = typeof client === 'function'
+							? client({ transaction: (fn) => fn(context) })
+							: (client || resolvedDb);
+						if (afterCommit)
+							setSessionSingleton(context, 'afterCommitHook', () =>
+								afterCommit(hookDb, request, response)
+							);
+						if (afterRollback)
+							setSessionSingleton(context, 'afterRollbackHook', (error) =>
+								afterRollback(hookDb, request, response, error)
+							);
+						if (beforeBegin)
+							await beforeBegin(hookDb, request, response);
+						if (afterBegin)
+							await afterBegin(hookDb, request, response);
+						await fn(context);
+						if (beforeCommit)
+							await beforeCommit(hookDb, request, response);
+					}));
+				}
+
+			}
+			return result;
+
+			async function fn(context) {
+				setSessionSingleton(context, 'ignoreSerializable', true);
+				const options = { ..._options, ...body.options, JSONFilter: body, request, response, isHttp };
+				result = await executePath(context, options);
+			}
+		}
+
+		function hasLockingStrategy(body) {
+			if (!body || !body.args)
+				return false;
+			return hasLockingStrategyCore(body.args[1]);
+		}
+
+		function hasLockingStrategyCore(strategy) {
+			if (!strategy || typeof strategy !== 'object')
+				return false;
+			if (strategy.forUpdate || strategy.skipLocked)
+				return true;
+			for (let name in strategy) {
+				if (name !== 'where' && hasLockingStrategyCore(strategy[name]))
+					return true;
+			}
+			return false;
+		}
+		async function query() {
+			let args = arguments;
+			let result;
+
+			if (transaction)
+				await transaction(fn);
+			else {
+				const resolvedDb = await resolveDb();
+				result = await resolvedDb.query.apply(null, arguments);
+			}
+
+			return result;
+
+			async function fn(...args1) {
+				result = await executeQuery.apply(null, [...args1, ...args]);
+			}
+
+		}
+
+		async function sqliteFunction() {
+			let args = arguments;
+			let result;
+
+			if (transaction)
+				await transaction(fn);
+			else {
+				const resolvedDb = await resolveDb();
+				result = await resolvedDb.sqliteFunction.apply(null, arguments);
+			}
+
+			return result;
+
+			async function fn(...args1) {
+				result = await executeSqliteFunction.apply(null, [...args1, ...args]);
+			}
+
+		}
+
+		function express(client, options) {
+			return hostExpress(hostLocal, client, options);
+		}
+
+		function hono(client, options) {
+			return hostHono(hostLocal, client, options);
+		}
+
+		return c;
+
+		async function resolveDb() {
+			if (typeof db !== 'function')
+				return db;
+			let dbPromise = db();
+			if (dbPromise.then)
+				db = await dbPromise;
+			else
+				db = dbPromise;
+			return db;
+		}
+
+		async function captureSyncOutboxPatch(context, patch, options) {
+			if (!Array.isArray(patch) || patch.length === 0)
+				return;
+			const tableName = _options.syncTableName;
+			if (!tableName)
+				return;
+			let state = await getSyncOutboxCaptureState(context);
+			if (!state)
+				return;
+			state.patches.push({
+				table: tableName,
+				patch,
+				options: sanitizeSyncPatchOptions(options)
+			});
+			await updateSyncOutboxCaptureState(context, state);
+		}
+
+		async function prepareSyncOutboxPatchCapture(context, patch) {
+			if (!Array.isArray(patch) || patch.length === 0 || !_options.syncTableName)
+				return;
+			await getSyncOutboxCaptureState(context);
+		}
+
+		async function captureSyncOutboxCommand(context, name, args) {
+			if (typeof name !== 'string' || name.length === 0)
+				throw new Error('Sync command requires a command name');
+			const normalizedArgs = normalizeSyncCommandArgs(args);
+			let state = await getSyncOutboxCaptureState(context);
+			if (!state)
+				return;
+			state.commands.push({ name, args: normalizedArgs });
+			await updateSyncOutboxCaptureState(context, state);
+		}
+
+		async function getSyncOutboxCaptureState(context) {
+			if (getSessionSingleton(context, 'suppressSyncOutbox'))
+				return null;
+			const pool = getSessionSingleton(context, 'poolFactory');
+			if (!pool || !pool.__sqliteSync)
+				return null;
+			let state = getSessionSingleton(context, 'syncOutboxCapture');
+			if (!state) {
+				state = { id: randomUuid(), patches: [], commands: [] };
+				setSessionSingleton(context, 'syncOutboxCapture', state);
+				await insertSyncOutboxPlaceholder(context, pool, state.id);
+				await updateOutboxOperationFromContext(context, state);
+			}
+			if (!Array.isArray(state.patches))
+				state.patches = [];
+			if (!Array.isArray(state.commands))
+				state.commands = [];
+			return state;
+		}
+
+		async function insertSyncOutboxPlaceholder(context, pool, id) {
+			for (let attempt = 0; attempt < 2; attempt++) {
+				await ensureSyncOutboxTable(context);
+				try {
+					await querySyncOutbox(context, [
+						'INSERT INTO "orange_sync_outbox" ("mutation_id", "table_name", "patch_json", "options_json", "created_at_ms")',
+						`VALUES (${sqlStringLiteral(id)}, '*', '[]', '{}', ${Date.now()})`,
+						'ON CONFLICT("mutation_id") DO NOTHING'
+					].join(' '));
+					return;
+				}
+				catch (e) {
+					if (attempt === 0 && isMissingSqliteTableError(e, 'orange_sync_outbox')) {
+						delete pool[syncOutboxEnsuredKey];
+						continue;
+					}
+					throw e;
+				}
+			}
+		}
+
+		async function updateSyncOutboxCaptureState(context, state) {
+			const metadata = await updateOutboxOperationFromContext(context, state);
+			const operationAssignments = metadata === null
+				? [
+					'"operation_id" = NULL',
+					'"operation_name" = NULL',
+					'"operation_json" = NULL'
+				]
+				: [];
+			await querySyncOutbox(context, [
+				'UPDATE "orange_sync_outbox"',
+				`SET "patch_json" = ${sqlStringLiteral(stringify(serializeSyncOutboxCaptureState(state)))}`
+					+ (operationAssignments.length > 0 ? `, ${operationAssignments.join(', ')}` : ''),
+				`WHERE "mutation_id" = ${sqlStringLiteral(state.id)}`
+			].join(' '));
+		}
+
+		function serializeSyncOutboxCaptureState(state) {
+			if (!Array.isArray(state.commands) || state.commands.length === 0)
+				return state.patches;
+			return {
+				patches: state.patches,
+				commands: state.commands
+			};
+		}
+
+		function normalizeSyncCommandArgs(args) {
+			if (args === undefined)
+				return null;
+			return JSON.parse(JSON.stringify(args));
+		}
+
+		async function ensureSyncOutboxTable(context) {
+			const pool = getSessionSingleton(context, 'poolFactory');
+			if (pool && pool[syncOutboxEnsuredKey])
+				return;
+			await querySyncOutbox(context, outboxTableSql());
+			await ensureOutboxOperationColumns((sql) => querySyncOutbox(context, sql));
+			if (pool)
+				pool[syncOutboxEnsuredKey] = true;
+		}
+
+		function querySyncOutbox(context, sql) {
+			return executeQuery(context, sql);
+		}
+
+		function sqlStringLiteral(value) {
+			return `'${String(value).replace(/'/g, '\'\'')}'`;
+		}
+
+		function isMissingSqliteTableError(error, tableName) {
+			const message = error && error.message || '';
+			return message.includes(`no such table: ${tableName}`)
+				|| message.includes(`no such table: "${tableName}"`);
+		}
+
+		function sanitizeSyncPatchOptions(options) {
+			if (!options || options !== Object(options))
+				return undefined;
+			const {
+				db,
+				transaction,
+				client,
+				syncTableName,
+				strategy,
+				deduceStrategy,
+				...rest
+			} = options;
+			return Object.keys(rest).length > 0 ? rest : undefined;
+		}
+	}
+
+	hostLocal_1 = hostLocal;
+	return hostLocal_1;
+}
+
 var where;
 var hasRequiredWhere;
 
@@ -21569,7 +31002,7 @@ function requireTable () {
 	const tryGetFirst = requireTryGetFirstFromDb();
 	const newCache = requireNewRowCache();
 	const newContext = requireNewObject();
-	const insert = requireInsert$2();
+	const insert = requireInsert$1();
 	const insertAndForget = requireInsertAndForget();
 	const _delete = require_delete();
 	const cascadeDelete = requireCascadeDelete();
@@ -22206,1188 +31639,6 @@ function requireSyncWorkerProtocol () {
 	return syncWorkerProtocol;
 }
 
-var dbWorkerClient;
-var hasRequiredDbWorkerClient;
-
-function requireDbWorkerClient () {
-	if (hasRequiredDbWorkerClient) return dbWorkerClient;
-	hasRequiredDbWorkerClient = 1;
-	const {
-		finalizeSyncOperationMemory,
-		serializeSyncPayload,
-		withSyncOperationMemory
-	} = requireOperationContext();
-	const createHttpInterceptor = requireHttpInterceptor();
-	const { ensureLocalSchemaReadySymbol } = requireSyncClient();
-	const {
-		deserializeError,
-		deserializeEventPayload,
-		isAlwaysForwardedEvent,
-		serializeError
-	} = requireSyncWorkerProtocol();
-
-	function createDbWorkerClient(worker) {
-		if (!worker || typeof worker.postMessage !== 'function')
-			throw new Error('DB worker client requires a Worker-like object.');
-
-		let nextId = 1;
-		const pending = new Map();
-		const listeners = new Map();
-		const interceptors = createHttpInterceptor();
-		let hasInitialReady = false;
-		let lastInitialReady;
-		let closed = false;
-		let terminalError;
-
-		worker.addEventListener('message', onMessage);
-		worker.addEventListener('error', onWorkerError);
-		worker.addEventListener('messageerror', onWorkerError);
-		if (typeof worker.start === 'function')
-			worker.start();
-
-		const client = {
-			__orangeDbWorkerClient: true,
-			__createSyncClient,
-			hostLocal,
-			query: request.bind(null, 'query', {}),
-			sqliteFunction: request.bind(null, 'sqliteFunction', {}),
-			createTransaction,
-			end: close,
-			close,
-			syncClient: {
-				sync: syncRequest.bind(null, 'sync'),
-				ensureLocalSchema: syncRequest.bind(null, 'ensureLocalSchema'),
-				resetLocal: syncRequest.bind(null, 'resetLocal'),
-				start: syncRequest.bind(null, 'start'),
-				stop: syncRequest.bind(null, 'stop'),
-				isRunning: syncRequest.bind(null, 'isRunning'),
-				on,
-				off,
-				once,
-				waitForInitialSync: syncRequest.bind(null, 'waitForInitialSync'),
-				interceptors,
-				[ensureLocalSchemaReadySymbol]: syncRequest.bind(null, 'ensureLocalSchemaReady'),
-				close
-			}
-		};
-
-		worker.postMessage({ type: 'orange-db-client-ready' });
-		return client;
-
-		function __createSyncClient() {
-			return client.syncClient;
-		}
-
-		function hostLocal(options = {}) {
-			const tableName = options.syncTableName;
-			return {
-				get: requestInTransaction.bind(null, options.transaction, 'get', { tableName }),
-				post: requestInTransaction.bind(null, options.transaction, 'post', { tableName }),
-				patch: requestInTransaction.bind(null, options.transaction, 'patch', { tableName }),
-				syncCommand: requestInTransaction.bind(null, options.transaction, 'syncCommand', {}),
-				query: requestInTransaction.bind(null, options.transaction, 'query', {}),
-				sqliteFunction: requestInTransaction.bind(null, options.transaction, 'sqliteFunction', {})
-			};
-		}
-
-		function createTransaction(options) {
-			const transactionId = nextId++;
-			const begin = request('transaction.begin', { transactionId }, options);
-			const context = { __orangeDbWorkerTransactionId: transactionId };
-
-			async function transaction(fn) {
-				await begin;
-				return fn(context);
-			}
-			transaction.commit = async function(_context) {
-				await request('transaction.commit', { transactionId });
-			};
-			transaction.rollback = async function(error, _context) {
-				await request('transaction.rollback', { transactionId, error: serializeError(error) });
-			};
-			transaction.setSyncContext = async function(context) {
-				await request('transaction.syncContext', { transactionId }, serializeSyncPayload(context));
-			};
-			transaction.flushSyncContext = async function(context) {
-				return request('transaction.flushSyncContext', { transactionId }, serializeSyncPayload(context));
-			};
-			return transaction;
-		}
-
-		function syncRequest(method, options) {
-			return request(`sync.${method}`, {}, options);
-		}
-
-		function request(method, meta, ...args) {
-			if (closed)
-				return Promise.reject(new Error('DB worker client closed.'));
-			if (terminalError)
-				return Promise.reject(terminalError);
-			const id = nextId++;
-			return new Promise((resolve, reject) => {
-				pending.set(id, { resolve, reject });
-				worker.postMessage({
-					type: 'orange-db-request',
-					id,
-					method,
-					...meta,
-					args
-				});
-			});
-		}
-
-		function requestInTransaction(transaction, method, meta, ...args) {
-			if (typeof transaction !== 'function')
-				return request(method, meta, ...args);
-			return transaction((context) => {
-				return request(method, {
-					...meta,
-					transactionId: getTransactionId(context)
-				}, ...args);
-			});
-		}
-
-		function on(event, listener) {
-			if (typeof event !== 'string' || typeof listener !== 'function')
-				return () => {};
-			let eventListeners = listeners.get(event);
-			if (!eventListeners) {
-				eventListeners = new Set();
-				listeners.set(event, eventListeners);
-			}
-			eventListeners.add(listener);
-			if (!isAlwaysForwardedEvent(event))
-				request('sync.on', {}, event).catch(() => {});
-			if (event === 'initial-ready' && hasInitialReady) {
-				const readyPayload = lastInitialReady;
-				Promise.resolve().then(() => {
-					if (eventListeners.has(listener) && hasInitialReady && lastInitialReady === readyPayload)
-						callListener(listener, readyPayload);
-				});
-			}
-			return () => off(event, listener);
-		}
-
-		function off(event, listener) {
-			const eventListeners = listeners.get(event);
-			if (!eventListeners)
-				return;
-			eventListeners.delete(listener);
-			if (eventListeners.size === 0) {
-				listeners.delete(event);
-				if (!isAlwaysForwardedEvent(event))
-					request('sync.off', {}, event).catch(() => {});
-			}
-		}
-
-		function once(event, listener) {
-			if (typeof listener !== 'function')
-				return () => {};
-			const unsubscribe = on(event, (payload) => {
-				unsubscribe();
-				listener(payload);
-			});
-			return unsubscribe;
-		}
-
-		function close() {
-			if (closed)
-				return;
-			closed = true;
-			worker.removeEventListener('message', onMessage);
-			worker.removeEventListener('error', onWorkerError);
-			worker.removeEventListener('messageerror', onWorkerError);
-			for (const entry of pending.values())
-				entry.reject(new Error('DB worker client closed.'));
-			pending.clear();
-			listeners.clear();
-			hasInitialReady = false;
-			lastInitialReady = undefined;
-			if (typeof worker.terminate === 'function') {
-				try {
-					worker.terminate();
-				}
-				catch (_e) {
-					// Closing is best-effort for Worker-backed clients.
-				}
-			}
-			else if (typeof worker.close === 'function') {
-				try {
-					worker.close();
-				}
-				catch (_e) {
-					// Closing is best-effort for MessagePort-backed worker clients.
-				}
-			}
-		}
-
-		function onMessage(event) {
-			const message = event && event.data;
-			if (!message || message.type === undefined)
-				return;
-			if (message.type === 'orange-db-interceptor-request') {
-				void handleInterceptorRequest(message);
-				return;
-			}
-			if (message.type === 'orange-db-event') {
-				const payload = deserializeEventPayload(message.payload);
-				if (message.event === 'initial-ready') {
-					hasInitialReady = true;
-					lastInitialReady = payload;
-				}
-				emit(message.event, payload);
-				return;
-			}
-			if (message.type !== 'orange-db-response')
-				return;
-			const entry = pending.get(message.id);
-			if (!entry)
-				return;
-			pending.delete(message.id);
-			if (message.error)
-				entry.reject(deserializeError(message.error, 'DB worker request failed.'));
-			else
-				entry.resolve(message.result);
-		}
-
-		function emit(event, payload) {
-			if (event === 'operation') {
-				payload = withSyncOperationMemory(payload);
-				try {
-					emitToListeners('operation', payload);
-					if (payload && typeof payload.operation === 'string')
-						emitToListeners(`operation:${payload.operation}`, payload);
-				}
-				finally {
-					finalizeSyncOperationMemory(payload);
-				}
-				return;
-			}
-			if (event && event.startsWith && event.startsWith('operation:')) {
-				payload = withSyncOperationMemory(payload);
-				try {
-					emitToListeners(event, payload);
-				}
-				finally {
-					finalizeSyncOperationMemory(payload);
-				}
-				return;
-			}
-			emitToListeners(event, payload);
-		}
-
-		function emitToListeners(event, payload) {
-			const eventListeners = listeners.get(event);
-			if (!eventListeners)
-				return;
-			for (const listener of Array.from(eventListeners))
-				callListener(listener, payload);
-		}
-
-		function callListener(listener, payload) {
-			try {
-				listener(payload);
-			}
-			catch (_error) {
-				// Notifications must never interrupt worker message handling or other listeners.
-			}
-		}
-
-		async function handleInterceptorRequest(message) {
-			try {
-				const result = await applyInterceptor(message);
-				postInterceptorResponse(message.id, result);
-			}
-			catch (error) {
-				postInterceptorResponse(message.id, undefined, error);
-			}
-		}
-
-		function applyInterceptor(message) {
-			if (message.phase === 'request')
-				return interceptors.applyRequest(message.payload);
-			if (message.phase === 'response')
-				return interceptors.applyResponse(message.payload);
-			if (message.phase === 'response-error')
-				return interceptors.applyResponseError(deserializeError(message.error, 'DB worker HTTP request failed.'));
-			throw new Error(`Unknown DB worker interceptor phase "${message.phase}".`);
-		}
-
-		function postInterceptorResponse(id, result, error) {
-			if (closed || terminalError)
-				return;
-			try {
-				worker.postMessage({
-					type: 'orange-db-interceptor-response',
-					id,
-					result,
-					error: error ? serializeError(error) : undefined
-				});
-			}
-			catch (postError) {
-				if (!error) {
-					try {
-						worker.postMessage({
-							type: 'orange-db-interceptor-response',
-							id,
-							error: serializeError(postError)
-						});
-					}
-					catch (_ignored) {
-						// The worker cannot be notified when even the serialized error cannot be posted.
-					}
-				}
-			}
-		}
-
-		function onWorkerError(event) {
-			if (closed || terminalError)
-				return;
-			terminalError = toWorkerError(event);
-			for (const entry of pending.values())
-				entry.reject(terminalError);
-			pending.clear();
-			emit('error', { method: 'worker', error: terminalError });
-		}
-	}
-
-	function getTransactionId(transaction) {
-		return transaction && transaction.__orangeDbWorkerTransactionId;
-	}
-
-	function toWorkerError(event) {
-		if (event && event.error instanceof Error)
-			return event.error;
-		return new Error(event && event.message
-			? event.message
-			: 'DB worker failed before completing the request.');
-	}
-
-	dbWorkerClient = createDbWorkerClient;
-	return dbWorkerClient;
-}
-
-var dbWorkerHandler;
-var hasRequiredDbWorkerHandler;
-
-function requireDbWorkerHandler () {
-	if (hasRequiredDbWorkerHandler) return dbWorkerHandler;
-	hasRequiredDbWorkerHandler = 1;
-	const { acquireSyncWrite } = requireWriteGate();
-	const { syncAutoStartSymbol } = requireSyncAuto();
-	const { ensureLocalSchemaReadySymbol } = requireSyncClient();
-	const { syncAbortError } = requireSyncAbort();
-	const {
-		alwaysForwardedEvents,
-		deserializeError,
-		serializeError,
-		serializeEventPayload
-	} = requireSyncWorkerProtocol();
-	const {
-		createSyncTransactionContext,
-		flushSyncTransactionContext,
-		serializeSyncPayload,
-		setSyncTransactionContext
-	} = requireOperationContext();
-
-	function createDbWorkerHandler(client, options = {}) {
-		if (!client)
-			throw new Error('DB worker handler requires a client.');
-
-		const transactions = new Map();
-		const syncEventUnsubscribers = new Map();
-		const interceptorEjectors = [];
-		const pendingInterceptorRequests = new Map();
-		let nextInterceptorRequestId = 1;
-		let autoStarted = false;
-		let clientReady = false;
-		let stopped = false;
-		let hasPendingInitialReady = false;
-		let pendingInitialReady;
-		const postMessage = options.postMessage || ((message) => {
-			const target = getPostTarget();
-			if (target)
-				target.postMessage(message);
-		});
-
-		installInterceptorBridge();
-		for (let i = 0; i < alwaysForwardedEvents.length; i++)
-			subscribeSyncEvent(alwaysForwardedEvents[i]);
-
-		return {
-			handleMessage,
-			stop
-		};
-
-		async function handleMessage(event) {
-			const message = event && event.data;
-			if (!message)
-				return;
-			if (message.type === 'orange-db-client-ready') {
-				handleClientReady();
-				return;
-			}
-			if (message.type === 'orange-db-interceptor-response') {
-				handleInterceptorResponse(message);
-				return;
-			}
-			if (message.type !== 'orange-db-request')
-				return;
-			if (message.method === 'sync.sync')
-				restartPendingRequestInterceptors();
-			try {
-				const result = await dispatch(message);
-				postResponse(message.id, result);
-			}
-			catch (e) {
-				postResponse(message.id, undefined, e);
-			}
-		}
-
-		async function dispatch(message) {
-			if (message.method === 'transaction.begin')
-				return beginTransaction(message.transactionId, message.args && message.args[0]);
-			if (message.method === 'transaction.syncContext')
-				return setTransactionSyncContext(message.transactionId, message.args && message.args[0]);
-			if (message.method === 'transaction.flushSyncContext')
-				return flushTransactionSyncContext(message.transactionId, message.args && message.args[0]);
-			if (message.method === 'transaction.commit')
-				return endTransaction(message.transactionId, 'commit');
-			if (message.method === 'transaction.rollback')
-				return endTransaction(message.transactionId, 'rollback', message.error);
-			if (message.method && message.method.startsWith('sync.'))
-				return dispatchSync(message.method.slice(5), message.args);
-			if (message.method === 'query')
-				return callQuery(message.transactionId, message.args);
-			if (message.method === 'sqliteFunction')
-				return callSqliteFunction(message.transactionId, message.args);
-			if (message.method === 'syncCommand')
-				return callSyncCommand(message.transactionId, message.args);
-			return callTable(message.method, message.tableName, message.transactionId, message.args);
-		}
-
-		async function beginTransaction(transactionId, txOptions) {
-			await ensureLocalSchemaReady();
-			const pool = await getPool();
-			if (!pool.createTransaction)
-				throw new Error('Transaction not supported by DB worker client.');
-			if (transactions.has(transactionId))
-				return { transactionId };
-			const releaseSyncWrite = await acquireSyncWrite(pool, txOptions);
-			let transaction;
-			try {
-				transaction = pool.createTransaction(txOptions);
-			}
-			catch (e) {
-				releaseSyncWrite();
-				throw e;
-			}
-			transaction.__orangeSyncWriteRelease = releaseSyncWrite;
-			transactions.set(transactionId, transaction);
-			return { transactionId };
-		}
-
-		async function setTransactionSyncContext(transactionId, contextPayload) {
-			const transaction = transactions.get(transactionId);
-			if (!transaction)
-				return { transactionId, missing: true };
-			const syncContext = createSyncTransactionContext(serializeSyncPayload(contextPayload));
-			transaction.__orangeSyncTransactionContext = syncContext;
-			await transaction((context) => {
-				setSyncTransactionContext(context, syncContext);
-			});
-			return { transactionId };
-		}
-
-		async function flushTransactionSyncContext(transactionId, contextPayload) {
-			const transaction = transactions.get(transactionId);
-			if (!transaction)
-				return null;
-			const syncContext = transaction.__orangeSyncTransactionContext || createSyncTransactionContext();
-			syncContext.context = serializeSyncPayload(contextPayload);
-			transaction.__orangeSyncTransactionContext = syncContext;
-			return transaction((context) => {
-				setSyncTransactionContext(context, syncContext);
-				return flushSyncTransactionContext(context);
-			});
-		}
-
-		async function endTransaction(transactionId, method, error) {
-			const transaction = transactions.get(transactionId);
-			if (!transaction)
-				return { transactionId, missing: true };
-			transactions.delete(transactionId);
-			try {
-				if (method === 'commit')
-					await transaction(transaction.commit);
-				else
-					await transaction(transaction.rollback.bind(null, toError(error)));
-			}
-			finally {
-				releaseSyncWrite(transaction);
-			}
-			return { transactionId };
-		}
-
-		function dispatchSync(method, args = []) {
-			const syncClient = client.syncClient;
-			if (!syncClient && method === 'ensureLocalSchemaReady')
-				return { skipped: true };
-			if (!syncClient)
-				throw new Error('Sync client is not configured in DB worker.');
-			if (method === 'on')
-				return subscribeSyncEvent(args[0]);
-			if (method === 'off')
-				return unsubscribeSyncEvent(args[0]);
-			if (method === 'ensureLocalSchemaReady') {
-				const ensureReady = syncClient[ensureLocalSchemaReadySymbol];
-				if (typeof ensureReady !== 'function')
-					return { skipped: true };
-				return ensureReady.apply(syncClient, args);
-			}
-			const fn = syncClient[method];
-			if (typeof fn !== 'function')
-				throw new Error(`Sync method "${method}" is not implemented.`);
-			return fn.apply(syncClient, args);
-		}
-
-		async function ensureLocalSchemaReady() {
-			const syncClient = client.syncClient;
-			const ensureReady = syncClient && syncClient[ensureLocalSchemaReadySymbol];
-			if (typeof ensureReady === 'function')
-				await ensureReady.call(syncClient);
-		}
-
-		function subscribeSyncEvent(event) {
-			if (typeof event !== 'string' || syncEventUnsubscribers.has(event))
-				return;
-			if (!client.syncClient || typeof client.syncClient.on !== 'function')
-				return;
-			const unsubscribe = client.syncClient.on(event, (payload) => {
-				if (event === 'initial-ready' && !clientReady) {
-					hasPendingInitialReady = true;
-					pendingInitialReady = payload;
-					return;
-				}
-				postMessage({
-					type: 'orange-db-event',
-					event,
-					payload: serializeEventPayload(payload)
-				});
-			});
-			syncEventUnsubscribers.set(event, unsubscribe);
-		}
-
-		function unsubscribeSyncEvent(event) {
-			const unsubscribe = syncEventUnsubscribers.get(event);
-			if (!unsubscribe)
-				return;
-			unsubscribe();
-			syncEventUnsubscribers.delete(event);
-		}
-
-		async function callQuery(transactionId, args = []) {
-			const transaction = transactions.get(transactionId);
-			if (transaction)
-				return (await host(undefined, transaction)).query.apply(null, args);
-			return client.query.apply(null, args);
-		}
-
-		async function callSqliteFunction(transactionId, args = []) {
-			const transaction = transactions.get(transactionId);
-			if (transaction)
-				return (await host(undefined, transaction)).sqliteFunction.apply(null, args);
-			return client.function.apply(null, args);
-		}
-
-		async function callSyncCommand(transactionId, args = []) {
-			const transaction = transactions.get(transactionId);
-			return (await host(undefined, transaction)).syncCommand.apply(null, args);
-		}
-
-		async function callTable(method, tableName, transactionId, args = []) {
-			if (!tableName)
-				throw new Error('DB worker table request requires tableName.');
-			const table = client.tables && client.tables[tableName];
-			if (!table)
-				throw new Error(`Table "${tableName}" is not configured in DB worker.`);
-			if (!transactions.has(transactionId))
-				await ensureLocalSchemaReady();
-			const localHost = await host(table, transactions.get(transactionId));
-			const fn = localHost[method];
-			if (typeof fn !== 'function')
-				throw new Error(`DB worker method "${method}" is not implemented.`);
-			return fn.apply(null, args);
-		}
-
-		async function host(table, transaction) {
-			const pool = await getPool();
-			return pool.hostLocal({
-				db: pool,
-				table,
-				transaction,
-				client,
-				syncTableName: getTableName(table)
-			});
-		}
-
-		async function getPool() {
-			let db = client.db || client;
-			if (typeof db === 'function') {
-				db = db();
-				if (db && db.then)
-					db = await db;
-			}
-			return db;
-		}
-
-		function getTableName(table) {
-			if (!client.tables)
-				return undefined;
-			for (const name in client.tables) {
-				if (client.tables[name] === table)
-					return name;
-			}
-		}
-
-		async function stop() {
-			if (stopped)
-				return;
-			stopped = true;
-			if (options.stopSyncClient !== false && client.syncClient && typeof client.syncClient.stop === 'function')
-				await client.syncClient.stop();
-			for (const eject of interceptorEjectors)
-				eject();
-			interceptorEjectors.length = 0;
-			for (const entry of new Set(pendingInterceptorRequests.values()))
-				settleInterceptorRequest(entry, entry.reject, syncAbortError(undefined, 'DB worker interceptor bridge stopped.'));
-			pendingInterceptorRequests.clear();
-			for (const unsubscribe of syncEventUnsubscribers.values())
-				unsubscribe();
-			syncEventUnsubscribers.clear();
-			for (const [id, transaction] of transactions) {
-				transactions.delete(id);
-				void Promise.resolve(transaction(transaction.rollback)).finally(() => releaseSyncWrite(transaction));
-			}
-		}
-
-		function handleClientReady() {
-			if (clientReady || stopped)
-				return;
-			clientReady = true;
-			if (hasPendingInitialReady) {
-				postMessage({
-					type: 'orange-db-event',
-					event: 'initial-ready',
-					payload: serializeEventPayload(pendingInitialReady)
-				});
-				hasPendingInitialReady = false;
-				pendingInitialReady = undefined;
-			}
-			startAutomaticSync();
-		}
-
-		function startAutomaticSync() {
-			if (autoStarted || stopped || options.autoStart === false || !client.syncClient)
-				return;
-			autoStarted = true;
-			const startAuto = typeof client.syncClient[syncAutoStartSymbol] === 'function'
-				? client.syncClient[syncAutoStartSymbol]
-				: client.syncClient.start;
-			if (typeof startAuto !== 'function')
-				return;
-			void Promise.resolve(startAuto.call(client.syncClient)).catch((error) => {
-				postMessage({
-					type: 'orange-db-event',
-					event: 'error',
-					payload: serializeEventPayload({ method: 'auto-start', error })
-				});
-			});
-		}
-
-		function installInterceptorBridge() {
-			const interceptors = client.syncClient && client.syncClient.interceptors;
-			if (!interceptors)
-				return;
-			install(interceptors.request, (config, context) => callClientInterceptor('request', config, undefined, context));
-			install(
-				interceptors.response,
-				(response, context) => callClientInterceptor('response', response, undefined, context),
-				(error, context) => callClientInterceptor('response-error', undefined, error, context)
-			);
-
-			function install(manager, onFulfilled, onRejected) {
-				if (!manager || typeof manager.use !== 'function')
-					return;
-				const id = manager.use(onFulfilled, onRejected);
-				if (typeof manager.eject === 'function')
-					interceptorEjectors.push(() => manager.eject(id));
-			}
-		}
-
-		function callClientInterceptor(phase, payload, error, context) {
-			return new Promise((resolve, reject) => {
-				const signal = context && context.signal;
-				const entry = {
-					id: undefined,
-					phase,
-					payload,
-					error,
-					resolve,
-					reject,
-					removeAbort: undefined,
-					settled: false
-				};
-				if (signal) {
-					const abort = () => {
-						settleInterceptorRequest(entry, reject, syncAbortError(signal.reason));
-					};
-					if (signal.aborted) {
-						abort();
-						return;
-					}
-					signal.addEventListener('abort', abort, { once: true });
-					entry.removeAbort = () => signal.removeEventListener('abort', abort);
-				}
-				postInterceptorRequest(entry);
-			});
-		}
-
-		function restartPendingRequestInterceptors() {
-			const entries = Array.from(new Set(pendingInterceptorRequests.values()));
-			for (const entry of entries) {
-				if (!entry.settled && entry.phase === 'request')
-					postInterceptorRequest(entry);
-			}
-		}
-
-		function postInterceptorRequest(entry) {
-			if (entry.settled)
-				return;
-			if (entry.id !== undefined)
-				pendingInterceptorRequests.delete(entry.id);
-			entry.id = nextInterceptorRequestId++;
-			pendingInterceptorRequests.set(entry.id, entry);
-			try {
-				postMessage({
-					type: 'orange-db-interceptor-request',
-					id: entry.id,
-					phase: entry.phase,
-					payload: entry.payload,
-					error: entry.error ? serializeError(entry.error) : undefined
-				});
-			}
-			catch (postError) {
-				settleInterceptorRequest(entry, entry.reject, postError);
-			}
-		}
-
-		function handleInterceptorResponse(message) {
-			const entry = pendingInterceptorRequests.get(message.id);
-			if (!entry)
-				return;
-			if (message.error)
-				settleInterceptorRequest(
-					entry,
-					entry.reject,
-					deserializeError(message.error, 'DB worker interceptor failed.')
-				);
-			else
-				settleInterceptorRequest(entry, entry.resolve, message.result);
-		}
-
-		function settleInterceptorRequest(entry, callback, value) {
-			if (entry.settled)
-				return;
-			entry.settled = true;
-			if (entry.id !== undefined)
-				pendingInterceptorRequests.delete(entry.id);
-			if (entry.removeAbort)
-				entry.removeAbort();
-			callback(value);
-		}
-
-		function postResponse(id, result, error) {
-			postMessage({
-				type: 'orange-db-response',
-				id,
-				result,
-				error: error ? serializeError(error) : undefined
-			});
-		}
-
-		function releaseSyncWrite(transaction) {
-			const release = transaction && transaction.__orangeSyncWriteRelease;
-			if (typeof release !== 'function')
-				return;
-			transaction.__orangeSyncWriteRelease = undefined;
-			release();
-		}
-	}
-
-	function toError(error) {
-		if (!error)
-			return undefined;
-		return deserializeError(error, 'DB worker transaction failed.');
-	}
-
-	function getPostTarget() {
-		if (typeof self !== 'undefined' && typeof self.postMessage === 'function')
-			return self;
-		if (typeof globalThis !== 'undefined' && typeof globalThis.postMessage === 'function')
-			return globalThis;
-	}
-
-	dbWorkerHandler = createDbWorkerHandler;
-	return dbWorkerHandler;
-}
-
-var syncWorkerClient;
-var hasRequiredSyncWorkerClient;
-
-function requireSyncWorkerClient () {
-	if (hasRequiredSyncWorkerClient) return syncWorkerClient;
-	hasRequiredSyncWorkerClient = 1;
-	const {
-		finalizeSyncOperationMemory,
-		withSyncOperationMemory
-	} = requireOperationContext();
-	const createHttpInterceptor = requireHttpInterceptor();
-	const { ensureLocalSchemaReadySymbol } = requireSyncClient();
-	const {
-		deserializeError,
-		deserializeEventPayload,
-		isAlwaysForwardedEvent,
-		serializeError
-	} = requireSyncWorkerProtocol();
-
-	function createSyncWorkerClient(worker, options = {}) {
-		if (!worker || typeof worker.postMessage !== 'function')
-			throw new Error('Sync worker client requires a Worker-like object.');
-
-		let nextId = 1;
-		const pending = new Map();
-		const listeners = new Map();
-		const interceptors = createHttpInterceptor();
-		let hasInitialReady = false;
-		let lastInitialReady;
-		let closed = false;
-		let terminalError;
-
-		worker.addEventListener('message', onMessage);
-		worker.addEventListener('error', onWorkerError);
-		worker.addEventListener('messageerror', onWorkerError);
-		if (typeof worker.start === 'function')
-			worker.start();
-
-		const client = {
-			sync: request.bind(null, 'sync'),
-			ensureLocalSchema: request.bind(null, 'ensureLocalSchema'),
-			resetLocal: request.bind(null, 'resetLocal'),
-			start: request.bind(null, 'start'),
-			stop: request.bind(null, 'stop'),
-			isRunning: request.bind(null, 'isRunning'),
-			waitForInitialSync: request.bind(null, 'waitForInitialSync'),
-			on,
-			off,
-			once,
-			close,
-			interceptors,
-			[ensureLocalSchemaReadySymbol]: request.bind(null, 'ensureLocalSchemaReady')
-		};
-
-		worker.postMessage({ type: 'orange-sync-worker-ready' });
-		return client;
-
-		function request(method, ...args) {
-			if (closed)
-				return Promise.reject(new Error('Sync worker client closed.'));
-			if (terminalError)
-				return Promise.reject(terminalError);
-			const id = nextId++;
-			return new Promise((resolve, reject) => {
-				const timeoutMs = resolveRequestTimeoutMs(method, options);
-				const timeoutId = timeoutMs
-					? setTimeout(() => rejectTimedOutRequest(id, method, timeoutMs), timeoutMs)
-					: undefined;
-				pending.set(id, { resolve, reject, timeoutId });
-				try {
-					worker.postMessage({
-						type: 'orange-sync-worker-request',
-						id,
-						method,
-						args
-					});
-				}
-				catch (e) {
-					clearPendingRequest(id);
-					reject(e);
-				}
-			});
-		}
-
-		function rejectTimedOutRequest(id, method, timeoutMs) {
-			const entry = pending.get(id);
-			if (!entry)
-				return;
-			pending.delete(id);
-			postCancel(id);
-			entry.reject(new Error(`Sync worker request "${method}" timed out after ${Math.round(timeoutMs / 1000)} seconds.`));
-		}
-
-		function on(event, listener) {
-			if (typeof event !== 'string' || typeof listener !== 'function')
-				return () => {};
-			let eventListeners = listeners.get(event);
-			if (!eventListeners) {
-				eventListeners = new Set();
-				listeners.set(event, eventListeners);
-			}
-			eventListeners.add(listener);
-			if (!isAlwaysForwardedEvent(event))
-				request('on', event).catch(() => {});
-			if (event === 'initial-ready' && hasInitialReady) {
-				const readyPayload = lastInitialReady;
-				Promise.resolve().then(() => {
-					if (eventListeners.has(listener) && hasInitialReady && lastInitialReady === readyPayload)
-						callListener(listener, readyPayload);
-				});
-			}
-			return () => off(event, listener);
-		}
-
-		function off(event, listener) {
-			const eventListeners = listeners.get(event);
-			if (!eventListeners)
-				return;
-			eventListeners.delete(listener);
-			if (eventListeners.size === 0) {
-				listeners.delete(event);
-				if (!isAlwaysForwardedEvent(event))
-					request('off', event).catch(() => {});
-			}
-		}
-
-		function once(event, listener) {
-			if (typeof listener !== 'function')
-				return () => {};
-			const unsubscribe = on(event, (payload) => {
-				unsubscribe();
-				listener(payload);
-			});
-			return unsubscribe;
-		}
-
-		function close() {
-			if (closed)
-				return;
-			closed = true;
-			const closeError = new Error('Sync worker client closed.');
-			worker.removeEventListener('message', onMessage);
-			worker.removeEventListener('error', onWorkerError);
-			worker.removeEventListener('messageerror', onWorkerError);
-			for (const [id, entry] of pending) {
-				postCancel(id);
-				if (entry.timeoutId)
-					clearTimeout(entry.timeoutId);
-				entry.reject(closeError);
-			}
-			pending.clear();
-			listeners.clear();
-			hasInitialReady = false;
-			lastInitialReady = undefined;
-			if (typeof worker.terminate === 'function')
-				worker.terminate();
-			else if (typeof worker.close === 'function')
-				worker.close();
-		}
-
-		function onMessage(event) {
-			const message = event && event.data;
-			if (!message || message.type === undefined)
-				return;
-			if (message.type === 'orange-sync-worker-interceptor-request') {
-				void handleInterceptorRequest(message);
-				return;
-			}
-			if (message.type === 'orange-sync-worker-event') {
-				const payload = deserializeEventPayload(message.payload);
-				if (message.event === 'initial-ready') {
-					hasInitialReady = true;
-					lastInitialReady = payload;
-				}
-				emit(message.event, payload);
-				return;
-			}
-			if (message.type !== 'orange-sync-worker-response')
-				return;
-			const entry = pending.get(message.id);
-			if (!entry)
-				return;
-			clearPendingRequest(message.id);
-			if (message.error)
-				entry.reject(deserializeError(message.error));
-			else
-				entry.resolve(message.result);
-		}
-
-		function clearPendingRequest(id) {
-			const entry = pending.get(id);
-			if (!entry)
-				return;
-			pending.delete(id);
-			if (entry.timeoutId)
-				clearTimeout(entry.timeoutId);
-		}
-
-		function onWorkerError(event) {
-			if (terminalError)
-				return;
-			const error = toWorkerError(event);
-			terminalError = error;
-			for (const entry of pending.values()) {
-				if (entry.timeoutId)
-					clearTimeout(entry.timeoutId);
-				entry.reject(error);
-			}
-			pending.clear();
-			emit('error', { method: 'worker', error });
-		}
-
-		function emit(event, payload) {
-			if (event === 'operation') {
-				payload = withSyncOperationMemory(payload);
-				try {
-					emitToListeners('operation', payload);
-					if (payload && typeof payload.operation === 'string')
-						emitToListeners(`operation:${payload.operation}`, payload);
-				}
-				finally {
-					finalizeSyncOperationMemory(payload);
-				}
-				return;
-			}
-			if (event && event.startsWith && event.startsWith('operation:')) {
-				payload = withSyncOperationMemory(payload);
-				try {
-					emitToListeners(event, payload);
-				}
-				finally {
-					finalizeSyncOperationMemory(payload);
-				}
-				return;
-			}
-			emitToListeners(event, payload);
-		}
-
-		function emitToListeners(event, payload) {
-			const eventListeners = listeners.get(event);
-			if (!eventListeners)
-				return;
-			for (const listener of Array.from(eventListeners))
-				callListener(listener, payload);
-		}
-
-		function callListener(listener, payload) {
-			try {
-				listener(payload);
-			}
-			catch (_error) {
-				// Notifications must never interrupt worker message handling or other listeners.
-			}
-		}
-
-		async function handleInterceptorRequest(message) {
-			try {
-				const result = await applyInterceptor(message);
-				postInterceptorResponse(message.id, result);
-			}
-			catch (error) {
-				postInterceptorResponse(message.id, undefined, error);
-			}
-		}
-
-		function applyInterceptor(message) {
-			if (message.phase === 'request')
-				return interceptors.applyRequest(message.payload);
-			if (message.phase === 'response')
-				return interceptors.applyResponse(message.payload);
-			if (message.phase === 'response-error')
-				return interceptors.applyResponseError(deserializeError(message.error, 'Sync worker HTTP request failed.'));
-			throw new Error(`Unknown sync worker interceptor phase "${message.phase}".`);
-		}
-
-		function postInterceptorResponse(id, result, error) {
-			if (closed || terminalError)
-				return;
-			try {
-				worker.postMessage({
-					type: 'orange-sync-worker-interceptor-response',
-					id,
-					result,
-					error: error ? serializeError(error) : undefined
-				});
-			}
-			catch (postError) {
-				if (!error) {
-					try {
-						worker.postMessage({
-							type: 'orange-sync-worker-interceptor-response',
-							id,
-							error: serializeError(postError)
-						});
-					}
-					catch (_ignored) {
-						// The worker cannot be notified when even the serialized error cannot be posted.
-					}
-				}
-			}
-		}
-
-		function postCancel(id) {
-			if (terminalError)
-				return;
-			try {
-				worker.postMessage({
-					type: 'orange-sync-worker-cancel',
-					id
-				});
-			}
-			catch (_error) {
-				// The original request is already being rejected locally.
-			}
-		}
-	}
-
-	function resolveRequestTimeoutMs(method, options) {
-		const fallback = normalizePositiveInteger(options.requestTimeoutMs);
-		if (fallback)
-			return fallback;
-		if (method === 'on' || method === 'off' || method === 'isRunning')
-			return 10000;
-		if (method === 'ensureLocalSchema' || method === 'ensureLocalSchemaReady' || method === 'resetLocal')
-			return 300000;
-		return undefined;
-	}
-
-	function normalizePositiveInteger(value) {
-		const parsed = Number.parseInt(value, 10);
-		return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
-	}
-
-	function toWorkerError(event) {
-		if (event && event.error instanceof Error)
-			return event.error;
-		const message = event && event.message
-			? event.message
-			: 'Sync worker failed before completing the request.';
-		return new Error(message);
-	}
-
-	syncWorkerClient = createSyncWorkerClient;
-	return syncWorkerClient;
-}
-
 var syncWorkerHandler;
 var hasRequiredSyncWorkerHandler;
 
@@ -23713,6 +31964,1206 @@ function requireSyncWorkerHandler () {
 
 	syncWorkerHandler = createSyncWorkerHandler;
 	return syncWorkerHandler;
+}
+
+var createDomain_1;
+var hasRequiredCreateDomain;
+
+function requireCreateDomain () {
+	if (hasRequiredCreateDomain) return createDomain_1;
+	hasRequiredCreateDomain = 1;
+	function createDomain() {
+		let c = {};
+		function run(fn) {
+			return fn(c);
+		}
+		c.run = run;
+		return c;
+	}
+
+	createDomain_1 = createDomain;
+	return createDomain_1;
+}
+
+var encodeBoolean_1;
+var hasRequiredEncodeBoolean;
+
+function requireEncodeBoolean () {
+	if (hasRequiredEncodeBoolean) return encodeBoolean_1;
+	hasRequiredEncodeBoolean = 1;
+	function encodeBoolean(bool) {
+		if (bool)
+			return 1;
+		return 0;
+	}
+
+	encodeBoolean_1 = encodeBoolean;
+	return encodeBoolean_1;
+}
+
+var encodeBinary_1;
+var hasRequiredEncodeBinary;
+
+function requireEncodeBinary () {
+	if (hasRequiredEncodeBinary) return encodeBinary_1;
+	hasRequiredEncodeBinary = 1;
+	function encodeBinary(base64) {
+		// Decode base64 to a binary string
+		const binaryString = atob(base64);
+
+		// Create a new Uint8Array with the same length as the binary string
+		const len = binaryString.length;
+		const bytes = new Uint8Array(len);
+
+		// Populate the Uint8Array with numeric character codes
+		for (let i = 0; i < len; i++) {
+			bytes[i] = binaryString.charCodeAt(i);
+		}
+
+		return bytes;
+	}
+
+	encodeBinary_1 = encodeBinary;
+	return encodeBinary_1;
+}
+
+var decodeBinary_1;
+var hasRequiredDecodeBinary;
+
+function requireDecodeBinary () {
+	if (hasRequiredDecodeBinary) return decodeBinary_1;
+	hasRequiredDecodeBinary = 1;
+	function decodeBinary(u8Arr) {
+		let binaryString = '';
+		for (let i = 0; i < u8Arr.length; i++) {
+			binaryString += String.fromCharCode(u8Arr[i]);
+		}
+		return btoa(binaryString);
+	}
+
+	decodeBinary_1 = decodeBinary;
+	return decodeBinary_1;
+}
+
+var format_1;
+var hasRequiredFormat;
+
+function requireFormat () {
+	if (hasRequiredFormat) return format_1;
+	hasRequiredFormat = 1;
+	function format(template, ...values) {
+		let index = 0;
+		return template.replace(/%s/g, () => {
+			// If there aren't enough values, this will insert 'undefined'
+			// for placeholders that don't have a corresponding array item.
+			return values[index++];
+		});
+	}
+	format_1 = format;
+	return format_1;
+}
+
+var quote;
+var hasRequiredQuote;
+
+function requireQuote () {
+	if (hasRequiredQuote) return quote;
+	hasRequiredQuote = 1;
+	quote = (name) => `"${name}"`;
+	return quote;
+}
+
+var deleteFromSql_1;
+var hasRequiredDeleteFromSql;
+
+function requireDeleteFromSql () {
+	if (hasRequiredDeleteFromSql) return deleteFromSql_1;
+	hasRequiredDeleteFromSql = 1;
+	const format = 'delete from %s where %s.rowId in (SELECT %s.rowId FROM %s %s%s)';
+	const formatString = requireFormat();
+	const quote = requireQuote();
+
+	function deleteFromSql(table, alias, whereSql) {
+		const name = quote(table._dbName);
+		alias = quote(alias);
+		return formatString(format, name, name, alias, name, alias, whereSql);
+	}
+	deleteFromSql_1 = deleteFromSql;
+	return deleteFromSql_1;
+}
+
+var selectForUpdateSql;
+var hasRequiredSelectForUpdateSql;
+
+function requireSelectForUpdateSql () {
+	if (hasRequiredSelectForUpdateSql) return selectForUpdateSql;
+	hasRequiredSelectForUpdateSql = 1;
+	selectForUpdateSql = function(_context, lock) {
+		if (lock)
+			throw new Error('select for update is not supported by SQLite');
+		return '';
+	};
+	return selectForUpdateSql;
+}
+
+var lastInsertedSql_1;
+var hasRequiredLastInsertedSql;
+
+function requireLastInsertedSql () {
+	if (hasRequiredLastInsertedSql) return lastInsertedSql_1;
+	hasRequiredLastInsertedSql = 1;
+	function lastInsertedSql(context, table, keyValues) {
+		if (keyValues.some(value => value === undefined))
+			return ['rowid IN (select last_insert_rowid())'];
+		return keyValues.map((value,i) => {
+			let column = table._primaryColumns[i];
+			return column.eq(context, value);
+		});
+
+	}
+
+	lastInsertedSql_1 = lastInsertedSql;
+	return lastInsertedSql_1;
+}
+
+var limitAndOffset_1;
+var hasRequiredLimitAndOffset;
+
+function requireLimitAndOffset () {
+	if (hasRequiredLimitAndOffset) return limitAndOffset_1;
+	hasRequiredLimitAndOffset = 1;
+	function limitAndOffset(span) {
+		if (span.offset)
+			return ` limit ${limit()} offset ${span.offset}`;
+		else if (span.limit || span.limit === 0)
+			return ` limit ${span.limit}`;
+		else
+			return '';
+
+		function limit() {
+			if (span.limit || span.limit === 0)
+				return span.limit;
+			else
+				return '-1';
+		}
+
+	}
+
+	limitAndOffset_1 = limitAndOffset;
+	return limitAndOffset_1;
+}
+
+var formatBigintOut_1;
+var hasRequiredFormatBigintOut;
+
+function requireFormatBigintOut () {
+	if (hasRequiredFormatBigintOut) return formatBigintOut_1;
+	hasRequiredFormatBigintOut = 1;
+	const quote = requireQuote();
+
+	function formatBigintOut(column, alias) {
+		const quotedCol = quote(column._dbName);
+		if (alias)
+			return `CAST(${alias}.${quotedCol} AS TEXT)`;
+		else
+			return `CAST(${quotedCol} AS TEXT)`;
+	}
+
+	formatBigintOut_1 = formatBigintOut;
+	return formatBigintOut_1;
+}
+
+var insertSql_1;
+var hasRequiredInsertSql;
+
+function requireInsertSql () {
+	if (hasRequiredInsertSql) return insertSql_1;
+	hasRequiredInsertSql = 1;
+	const quote = requireQuote();
+
+	function insertSql(_context, table, row, options) {
+		let columnNames = [];
+		let conflictColumnUpdateSql = '';
+		let values = [];
+
+		let sql = 'INSERT INTO ' + quote(table._dbName) + ' ';
+		addDiscriminators();
+		addColumns();
+
+		if (columnNames.length === 0) {
+			sql += 'DEFAULT VALUES';
+		} else {
+			sql = sql + '(' + columnNames.join(',') + ') ' + 'VALUES (' + values.join(',') + ')' + onConflict();
+		}
+
+		return sql;
+
+		function onConflict() {
+			if (options.concurrency === 'skipOnConflict' || options.concurrency === 'overwrite') {
+				const primaryKeys = table._primaryColumns.map(x => quote(x._dbName)).join(',');
+				return ` ON CONFLICT(${primaryKeys}) ${conflictColumnUpdateSql}`;
+			} else {
+				return '';
+			}
+		}
+
+		function addDiscriminators() {
+			let discriminators = table._columnDiscriminators;
+			for (let i = 0; i < discriminators.length; i++) {
+				let parts = discriminators[i].split('=');
+				columnNames.push(quote(parts[0]));
+				values.push(parts[1]);
+			}
+		}
+
+		function addColumns() {
+			let conflictColumnUpdates = [];
+			let columns = table._columns;
+			for (let i = 0; i < columns.length; i++) {
+				let column = columns[i];
+				const columnName = quote(column._dbName);
+				if (row['__' + column.alias] !== undefined) {
+					columnNames.push(columnName);
+					values.push('%s');
+					addConflictUpdate(column);
+				}
+			}
+			if (conflictColumnUpdates.length === 0)
+				conflictColumnUpdateSql =  'DO NOTHING';
+			else
+				conflictColumnUpdateSql = 'DO UPDATE SET ' + conflictColumnUpdates.join(',');
+
+			function addConflictUpdate(column) {
+				let concurrency = options[column.alias]?.concurrency || options.concurrency;
+				const tableName = table._dbName;
+				const columnName = quote(column._dbName);
+				if (concurrency === 'overwrite') {
+					conflictColumnUpdates.push(`${columnName}=excluded.${columnName}`);
+				} else if (concurrency === 'optimistic')
+					conflictColumnUpdates.push(`${columnName} = CASE WHEN ${tableName}.${columnName} <> excluded.${columnName} THEN '12345678-1234-1234-1234-123456789012Conflict when updating ${columnName}12345678-1234-1234-1234-123456789012' ELSE ${tableName}.${columnName} END`);
+			}
+		}
+	}
+
+	insertSql_1 = insertSql;
+	return insertSql_1;
+}
+
+var newInsertCommand_1;
+var hasRequiredNewInsertCommand;
+
+function requireNewInsertCommand () {
+	if (hasRequiredNewInsertCommand) return newInsertCommand_1;
+	hasRequiredNewInsertCommand = 1;
+	var newImmutable = requireNewImmutable();
+	var createPatch = requireCreatePatch();
+	var createDto = requireCreateDto();
+
+	function newInsertCommand(newInsertCommandCore, table, row, options) {
+		return new InsertCommand(newInsertCommandCore, table, row,  options);
+	}
+
+	function InsertCommand(newInsertCommandCore, table, row, options) {
+		this.__getCoreCommand = newImmutable(newInsertCommandCore);
+		this._table = table;
+		this._row = row;
+		this._options = options;
+	}
+
+	InsertCommand.prototype._getCoreCommand = function() {
+		return this.__getCoreCommand(this._table, this._row, this._options);
+	};
+
+	InsertCommand.prototype.sql = function() {
+		return this._getCoreCommand().sql();
+	};
+
+	InsertCommand.prototype.matches = function(otherRow) {
+		return this._row === otherRow;
+	};
+
+
+	InsertCommand.prototype.endEdit = function() {
+		this.sql();
+		var dto = createDto(this._table, this._row);
+		if (this._disallowCompress || this._table._emitChanged.callbacks.length > 0)
+			this._patch = createPatch([], [dto]);
+	};
+
+	InsertCommand.prototype.emitChanged = function() {
+		return this._table._emitChanged({row: this._row, patch: this._patch});
+	};
+
+	Object.defineProperty(InsertCommand.prototype, 'parameters', {
+		get: function() {
+			return this._getCoreCommand().parameters;
+
+		}
+	});
+
+	Object.defineProperty(InsertCommand.prototype, 'disallowCompress', {
+		get: function() {
+			return this._disallowCompress || this._table._emitChanged.callbacks.length > 0;
+
+		},
+		set: function(value) {
+			this._disallowCompress = value;
+		}
+	});
+
+
+	newInsertCommand_1 = newInsertCommand;
+	return newInsertCommand_1;
+}
+
+var getSqlTemplate_1;
+var hasRequiredGetSqlTemplate;
+
+function requireGetSqlTemplate () {
+	if (hasRequiredGetSqlTemplate) return getSqlTemplate_1;
+	hasRequiredGetSqlTemplate = 1;
+	let getSessionContext = requireGetSessionContext();
+	let quote = requireQuote$1();
+
+	function getSqlTemplate(context, _table, _row) {
+		let rdb = getSessionContext(context);
+		if (rdb.insertSql)
+			return rdb.insertSql.apply(null, arguments);
+		else
+			return getSqlTemplateDefault.apply(null, arguments);
+
+	}
+
+	function getSqlTemplateDefault(context, table, row) {
+		let columnNames = [];
+		let values = [];
+		let sql = 'INSERT INTO ' + quote(context, table._dbName) + ' ';
+		addDiscriminators();
+		addColumns();
+		if (columnNames.length === 0)
+			sql += `${outputInserted()}${defaultValues()}${lastInserted()}`;
+		else
+			sql = sql + '('+ columnNames.join(',') + ') ' + outputInserted() +  'VALUES (' + values.join(',') + ')' + lastInserted() ;
+		return sql;
+
+		function addDiscriminators() {
+			let discriminators = table._columnDiscriminators;
+			for (let i = 0; i < discriminators.length; i++) {
+				let parts = discriminators[i].split('=');
+				columnNames.push(quote(context, parts[0]));
+				values.push(parts[1]);
+			}
+		}
+
+		function addColumns() {
+			let columns = table._columns;
+			for (let i = 0; i < columns.length; i++) {
+				let column = columns[i];
+				if (row['__' + column.alias] !== undefined) {
+					columnNames.push(quote(context, column._dbName));
+					values.push('%s');
+				}
+			}
+		}
+
+		function lastInserted() {
+			let rdb = getSessionContext(context);
+			if (!rdb.lastInsertedIsSeparate && rdb.lastInsertedSql)
+				return ' ' + rdb.lastInsertedSql(table);
+			return '';
+		}
+
+		function outputInserted() {
+			let rdb = getSessionContext(context);
+			if (!rdb.lastInsertedIsSeparate && rdb.outputInsertedSql)
+				return ' ' + rdb.outputInsertedSql(table) + ' ';
+			return '';
+		}
+
+		function defaultValues() {
+			let rdb = getSessionContext(context);
+			let _default = rdb.insertDefault || 'DEFAULT VALUES';
+			return `${_default}${lastInserted()}`;
+
+		}
+	}
+
+	getSqlTemplate_1 = getSqlTemplate;
+	return getSqlTemplate_1;
+}
+
+var newInsertCommandCore_1;
+var hasRequiredNewInsertCommandCore;
+
+function requireNewInsertCommandCore () {
+	if (hasRequiredNewInsertCommandCore) return newInsertCommandCore_1;
+	hasRequiredNewInsertCommandCore = 1;
+	const newParameterized = requireNewParameterized();
+	const getSqlTemplate = requireGetSqlTemplate();
+	const formatString = requireFormat();
+
+	function newInsertCommandCore(context, table, row, options = {}) {
+		let parameters = [];
+		let values = [getSqlTemplate(context, table, row, options)];
+
+		let columns = table._columns;
+		for (let i = 0; i < columns.length; i++) {
+			let column = columns[i];
+			let alias = column.alias;
+			if (row['__' + column.alias] !== undefined) {
+				let encoded = column.encode(context, row[alias]);
+				if (encoded.parameters.length > 0) {
+					values.push(encoded.sql());
+					parameters.push(encoded.parameters[0]);
+				} else
+					values.push(encoded.sql());
+			}
+		}
+
+		let sql = formatString.apply(null, values);
+		return newParameterized(sql, parameters);
+	}
+
+	newInsertCommandCore_1 = newInsertCommandCore;
+	return newInsertCommandCore_1;
+}
+
+var newGetLastInsertedCommandCore_1;
+var hasRequiredNewGetLastInsertedCommandCore;
+
+function requireNewGetLastInsertedCommandCore () {
+	if (hasRequiredNewGetLastInsertedCommandCore) return newGetLastInsertedCommandCore_1;
+	hasRequiredNewGetLastInsertedCommandCore = 1;
+	const newParameterized = requireNewParameterized();
+	const getSessionContext = requireGetSessionContext();
+	const newDiscriminatorSql = requireNewDiscriminatorSql$1();
+	const quote = requireQuote$1();
+
+	function newGetLastInsertedCommandCore(context, table, row) {
+		let parameters = [];
+		let keyValues = table._primaryColumns.map(column => row['__' + column.alias]);
+		let sql = `SELECT ${columnNames()} FROM ${quote(context, table._dbName)} WHERE ${whereSql()}`;
+		return newParameterized(sql, parameters);
+
+		function columnNames() {
+			return table._columns.map(formatColumn).join(',');
+		}
+
+		function formatColumn(column) {
+			const formatted = column.formatOut ? column.formatOut(context)  + ' as ' + quote(context, column._dbName) :  quote(context, column._dbName);
+			if (column.dbNull === null)
+				return formatted;
+			else {
+				const encoded = column.encode.unsafe(context, column.dbNull);
+				return `CASE WHEN ${formatted}=${encoded} THEN null ELSE ${formatted} END`;
+			}
+		}
+
+		function whereSql() {
+			let parameterized;
+			let filter = getSessionContext(context).lastInsertedSql(context, table, keyValues);
+			if (Array.isArray(filter)) {
+				for (let i = 0; i < filter.length; i++) {
+					const sep = i === 0 ? '' : ' AND ';
+					if (!filter[i].sql) {
+						const sql = filter[i];
+						filter[i] = {sql : () => sql};
+					}
+					let next = newParameterized(sep + filter[i].sql(), filter[i].parameters);
+					if (parameterized)
+						parameterized = parameterized.append(next);
+					else
+						parameterized = next;
+				}
+			}
+			else
+				parameterized = newParameterized(filter);
+			parameters = parameters.concat(parameterized.parameters);
+			return [discriminators(), parameterized.sql()].filter(x => x).join(' AND ');
+		}
+
+		function discriminators() {
+			return newDiscriminatorSql(context, table, table._dbName);
+		}
+	}
+
+	newGetLastInsertedCommandCore_1 = newGetLastInsertedCommandCore;
+	return newGetLastInsertedCommandCore_1;
+}
+
+var newGetLastInsertedCommand_1;
+var hasRequiredNewGetLastInsertedCommand;
+
+function requireNewGetLastInsertedCommand () {
+	if (hasRequiredNewGetLastInsertedCommand) return newGetLastInsertedCommand_1;
+	hasRequiredNewGetLastInsertedCommand = 1;
+	var newGetLastInsertedCommandCore = requireNewGetLastInsertedCommandCore();
+	var newImmutable = requireNewImmutable();
+
+	function newGetLastInsertedCommand(context, table, row, insertCommand) {
+		let cmd =  new InsertCommand(context, table, row, insertCommand);
+		insertCommand.endEdit = () => {};
+		return cmd;
+	}
+
+	function InsertCommand(context, table, row, insertCommand) {
+		this._insertCommand = insertCommand;
+		this.__getCoreCommand = newImmutable(newGetLastInsertedCommandCore.bind(null, context));
+		this._table = table;
+		this._row = row;
+	}
+
+	InsertCommand.prototype._getCoreCommand = function() {
+		return this.__getCoreCommand(this._table, this._row);
+	};
+
+	InsertCommand.prototype.sql = function() {
+		return this._getCoreCommand().sql();
+	};
+
+	InsertCommand.prototype.matches = function(otherRow) {
+		return this._row === otherRow;
+	};
+
+
+	InsertCommand.prototype.endEdit = function() {
+		this._insertCommand.endEdit();
+		this.sql();
+	};
+
+	Object.defineProperty(InsertCommand.prototype, 'parameters', {
+		get: function() {
+			return this._getCoreCommand().parameters;
+
+		}
+	});
+
+	Object.defineProperty(InsertCommand.prototype, 'disallowCompress', {
+		get: function() {
+			return true;
+		}
+	});
+
+
+	newGetLastInsertedCommand_1 = newGetLastInsertedCommand;
+	return newGetLastInsertedCommand_1;
+}
+
+var insert;
+var hasRequiredInsert;
+
+function requireInsert () {
+	if (hasRequiredInsert) return insert;
+	hasRequiredInsert = 1;
+	let newInsertCommand = requireNewInsertCommand();
+	let newInsertCommandCore = requireNewInsertCommandCore();
+	let newGetLastInsertedCommand = requireNewGetLastInsertedCommand();
+	let executeQueries = requireExecuteQueries();
+	let pushCommand = requirePushCommand();
+
+
+	function insertDefault(context, table, row, options) {
+		let commands = [];
+		let insertCmd = newInsertCommand(newInsertCommandCore.bind(null, context), table, row, options);
+		insertCmd.disallowCompress = true;
+		pushCommand(context, insertCmd);
+
+		if (options && options.skipSelectAfterInsert)
+			return executeQueries(context, []).then(() => [toDbRow(table, row)]);
+
+		let selectCmd = newGetLastInsertedCommand(context, table, row, insertCmd);
+		commands.push(selectCmd);
+
+		return executeQueries(context, commands).then((result) => result[result.length - 1]);
+
+	}
+
+	function toDbRow(table, row) {
+		const dbRow = {};
+		const columns = table._columns || [];
+		for (let i = 0; i < columns.length; i++) {
+			const column = columns[i];
+			dbRow[column._dbName] = row[column.alias];
+		}
+		return dbRow;
+	}
+
+	insert = insertDefault;
+	return insert;
+}
+
+var batchInsert_1;
+var hasRequiredBatchInsert;
+
+function requireBatchInsert () {
+	if (hasRequiredBatchInsert) return batchInsert_1;
+	hasRequiredBatchInsert = 1;
+	const executeCommand = requireExecuteCommand();
+	const newParameterized = requireNewParameterized();
+	const quote = requireQuote();
+
+	async function batchInsert(context, table, rows, options = {}) {
+		const groups = groupRows(table, rows);
+		for (let i = 0; i < groups.length; i++) {
+			if (groups[i].columns.length === 0)
+				return false;
+		}
+		for (let i = 0; i < groups.length; i++) {
+			const group = groups[i];
+			await executeGroup(context, table, group, options);
+		}
+		return true;
+	}
+
+	async function executeGroup(context, table, group, options) {
+		const maxParameters = context.rdb.maxParameters || 999;
+		const columns = group.columns;
+		const chunks = chunkRows(context, group.rows, columns, maxParameters);
+
+		for (let i = 0; i < chunks.length; i++)
+			await executeCommand(context, buildCommand(context, table, columns, chunks[i], options));
+	}
+
+	function buildCommand(context, table, columns, rows, options) {
+		const parameters = [];
+		const columnNames = discriminatorColumnNames(table).concat(columns.map(column => quote(column._dbName)));
+		const valueRows = rows.map(row => {
+			const values = discriminatorValues(table).concat(columns.map(column => {
+				const encoded = column.encode(context, row[column.alias]);
+				parameters.push(...encoded.parameters);
+				return encoded.sql();
+			}));
+			return '(' + values.join(',') + ')';
+		});
+
+		const sql = 'INSERT INTO ' + quote(table._dbName) + ' (' + columnNames.join(',') + ') VALUES '
+			+ valueRows.join(',') + onConflict(table, columns, options);
+		return newParameterized(sql, parameters);
+	}
+
+	function groupRows(table, rows) {
+		const groups = [];
+		const groupsByKey = {};
+		for (let i = 0; i < rows.length; i++) {
+			const row = rows[i];
+			const columns = table._columns.filter(column => row['__' + column.alias] !== undefined);
+			const key = columns.map(column => column.alias).join('\0');
+			let group = groupsByKey[key];
+			if (!group) {
+				group = { columns, rows: [] };
+				groupsByKey[key] = group;
+				groups.push(group);
+			}
+			group.rows.push(row);
+		}
+		return groups;
+	}
+
+	function countParameterColumns(context, row, columns) {
+		let count = 0;
+		for (let i = 0; i < columns.length; i++) {
+			const encoded = columns[i].encode(context, row[columns[i].alias]);
+			count += encoded.parameters.length;
+		}
+		return count;
+	}
+
+	function chunkRows(context, rows, columns, maxParameters) {
+		const chunks = [];
+		let chunk = [];
+		let parameterCount = 0;
+		for (let i = 0; i < rows.length; i++) {
+			const row = rows[i];
+			const rowParameterCount = countParameterColumns(context, row, columns);
+			if (chunk.length > 0 && parameterCount + rowParameterCount > maxParameters) {
+				chunks.push(chunk);
+				chunk = [];
+				parameterCount = 0;
+			}
+			chunk.push(row);
+			parameterCount += rowParameterCount;
+		}
+		if (chunk.length > 0)
+			chunks.push(chunk);
+		return chunks;
+	}
+
+	function discriminatorColumnNames(table) {
+		return table._columnDiscriminators.map(discriminator => quote(discriminator.split('=')[0]));
+	}
+
+	function discriminatorValues(table) {
+		return table._columnDiscriminators.map(discriminator => discriminator.split('=')[1]);
+	}
+
+	function onConflict(table, columns, options) {
+		if (options.concurrency !== 'skipOnConflict' && options.concurrency !== 'overwrite')
+			return '';
+
+		const primaryKeys = table._primaryColumns.map(x => quote(x._dbName)).join(',');
+		const updates = [];
+		for (let i = 0; i < columns.length; i++) {
+			const column = columns[i];
+			const concurrency = options[column.alias]?.concurrency || options.concurrency;
+			const columnName = quote(column._dbName);
+			if (concurrency === 'overwrite')
+				updates.push(`${columnName}=excluded.${columnName}`);
+			else if (concurrency === 'optimistic')
+				updates.push(`${columnName} = CASE WHEN ${table._dbName}.${columnName} <> excluded.${columnName} THEN '12345678-1234-1234-1234-123456789012Conflict when updating ${columnName}12345678-1234-1234-1234-123456789012' ELSE ${table._dbName}.${columnName} END`);
+		}
+
+		if (updates.length === 0)
+			return ` ON CONFLICT(${primaryKeys}) DO NOTHING`;
+		return ` ON CONFLICT(${primaryKeys}) DO UPDATE SET ${updates.join(',')}`;
+	}
+
+	batchInsert_1 = batchInsert;
+	return batchInsert_1;
+}
+
+var newTransaction;
+var hasRequiredNewTransaction;
+
+function requireNewTransaction () {
+	if (hasRequiredNewTransaction) return newTransaction;
+	hasRequiredNewTransaction = 1;
+	const encodeBoolean = requireEncodeBoolean();
+	const encodeBinary = requireEncodeBinary();
+	const decodeBinary = requireDecodeBinary();
+	const deleteFromSql = requireDeleteFromSql();
+	const selectForUpdateSql = requireSelectForUpdateSql();
+	const lastInsertedSql = requireLastInsertedSql();
+	const limitAndOffset = requireLimitAndOffset();
+	const formatBigintOut = requireFormatBigintOut();
+	const insertSql = requireInsertSql();
+	const insert = requireInsert();
+	const batchInsert = requireBatchInsert();
+	const quote = requireQuote();
+
+	function newResolveTransaction(domain, pool, { readonly = false, priority } = {})  {
+		var rdb = { poolFactory: pool };
+		rdb.engine = 'sqlite';
+		rdb.maxParameters = 32766;
+		rdb.encodeBoolean = encodeBoolean;
+		rdb.encodeBinary = encodeBinary;
+		rdb.decodeBinary = decodeBinary;
+		rdb.decodeJSON = decodeJSON;
+		rdb.encodeJSON = JSON.stringify;
+		rdb.formatBigintOut = formatBigintOut;
+		rdb.deleteFromSql = deleteFromSql;
+		rdb.selectForUpdateSql = selectForUpdateSql;
+		rdb.lastInsertedSql = lastInsertedSql;
+		rdb.insertSql = insertSql;
+		rdb.insert = insert;
+		rdb.batchInsert = batchInsert;
+		rdb.lastInsertedIsSeparate = true;
+		rdb.multipleStatements = false;
+		rdb.limitAndOffset = limitAndOffset;
+		rdb.accept = function(caller) {
+			caller.visitSqlite();
+		};
+		rdb.aggregateCount = 0;
+		rdb.quote = quote;
+		rdb.cache = {};
+		rdb.changes = [];
+
+		if (readonly && typeof pool.connectRead === 'function') {
+			rdb.dbClient = {
+				executeQuery: function(query, callback) {
+					pool.connectRead((err, client, done) => {
+						if (err)
+							return callback(err);
+						try {
+							client.executeQuery(query, (err, res) => {
+								done(err);
+								callback(err, res);
+							});
+						}
+						catch (e) {
+							done(e);
+							callback(e);
+						}
+					}, priority);
+				},
+				executeCommand: function(query, callback) {
+					pool.connect((err, client, done) => {
+						if (err)
+							return callback(err);
+						try {
+							client.executeCommand(query, (err, res) => {
+								done(err);
+								callback(err, res);
+							});
+						}
+						catch (e) {
+							done(e);
+							callback(e);
+						}
+					}, priority);
+				}
+			};
+			domain.rdb = rdb;
+			return (onSuccess) => onSuccess();
+		}
+
+		return function(onSuccess, onError) {
+			pool.connect(onConnected, priority);
+
+			function onConnected(err, client, done) {
+				try {
+					if (err) {
+						onError(err);
+						return;
+					}
+					rdb.dbClient = client;
+					rdb.dbClientDone = done;
+					domain.rdb = rdb;
+					onSuccess();
+				} catch (e) {
+					onError(e);
+				}
+			}
+		};
+	}
+
+	function decodeJSON(value) {
+		return JSON.parse(value);
+	}
+
+	newTransaction = newResolveTransaction;
+	return newTransaction;
+}
+
+var beginCommand;
+var hasRequiredBeginCommand;
+
+function requireBeginCommand () {
+	if (hasRequiredBeginCommand) return beginCommand;
+	hasRequiredBeginCommand = 1;
+	let newParameterized = requireNewParameterized();
+	let getSessionContext = requireGetSessionContext();
+
+	beginCommand = function(context) {
+		let command = newParameterized(getSessionContext(context).begin || 'BEGIN');
+		command.endEdit = empty;
+		command.matches = empty;
+
+		function empty() {}
+
+		return command;
+
+	};
+	return beginCommand;
+}
+
+var begin_1;
+var hasRequiredBegin;
+
+function requireBegin () {
+	if (hasRequiredBegin) return begin_1;
+	hasRequiredBegin = 1;
+	let beginCommand = requireBeginCommand();
+	let executeQuery = requireExecuteQuery();
+	let setSessionSingleton = requireSetSessionSingleton();
+
+	function begin(context, options) {
+		if (options && options.suppressSyncOutbox)
+			setSessionSingleton(context, 'suppressSyncOutbox', true);
+		if (isTransactionLess(options)) {
+			setSessionSingleton(context, 'transactionLess', true);
+			return Promise.resolve();
+		}
+		return executeQuery(context, beginCommand(context));
+	}
+
+	function isTransactionLess(options) {
+		if (options && options.transactionLess)
+			return true;
+		if (options && options.readonly)
+			return true;
+		return false;
+	}
+
+	begin_1 = begin;
+	return begin_1;
+}
+
+var commitCommand;
+var hasRequiredCommitCommand;
+
+function requireCommitCommand () {
+	if (hasRequiredCommitCommand) return commitCommand;
+	hasRequiredCommitCommand = 1;
+	var newParameterized = requireNewParameterized();
+
+	var command = newParameterized('COMMIT');
+	function empty() {}
+
+	command.endEdit = empty;
+	command.matches = empty;
+
+	commitCommand = command;
+	return commitCommand;
+}
+
+var deleteSessionContext_1;
+var hasRequiredDeleteSessionContext;
+
+function requireDeleteSessionContext () {
+	if (hasRequiredDeleteSessionContext) return deleteSessionContext_1;
+	hasRequiredDeleteSessionContext = 1;
+	function deleteSessionContext(context) {
+		delete context.rdb;
+	}
+
+	deleteSessionContext_1 = deleteSessionContext;
+	return deleteSessionContext_1;
+}
+
+var releaseDbClient;
+var hasRequiredReleaseDbClient;
+
+function requireReleaseDbClient () {
+	if (hasRequiredReleaseDbClient) return releaseDbClient;
+	hasRequiredReleaseDbClient = 1;
+	var getSessionSingleton = requireGetSessionSingleton();
+	var deleteSessionContext = requireDeleteSessionContext();
+
+	function release(context) {
+		var done = getSessionSingleton(context, 'dbClientDone');
+		var pool = getSessionSingleton(context, 'pool');
+		deleteSessionContext(context);
+		if (done)
+			done();
+		if (pool)
+			return pool.end();
+
+	}
+
+	releaseDbClient = release;
+	return releaseDbClient;
+}
+
+var commit_1;
+var hasRequiredCommit;
+
+function requireCommit () {
+	if (hasRequiredCommit) return commit_1;
+	hasRequiredCommit = 1;
+	let commitCommand = requireCommitCommand();
+	let pushCommand = requirePushCommand();
+	let executeChanges = requireExecuteChanges();
+	let releaseDbClient = requireReleaseDbClient();
+	let popChanges = requirePopChanges();
+	const getSessionSingleton = requireGetSessionSingleton();
+
+	function _commit(context, result) {
+		let hookError;
+		return popAndPushChanges()
+			.then(callAfterCommit)
+			.then(releaseDbClient.bind(null, context))
+			.then(onReleased)
+			.then(throwHookErrorIfAny);
+
+		function onReleased() {
+			return result;
+		}
+
+		function throwHookErrorIfAny(res) {
+			if (hookError)
+				throw hookError;
+			return res;
+		}
+
+		function callAfterCommit() {
+			const hook = getSessionSingleton(context, 'afterCommitHook');
+			if (!hook)
+				return Promise.resolve();
+			return Promise.resolve()
+				.then(() => hook())
+				.catch((e) => {
+					hookError = e;
+				});
+		}
+
+		async function popAndPushChanges() {
+			let changes = popChanges(context);
+			while (changes.length > 0) {
+				await executeChanges(context, changes);
+				changes = popChanges(context);
+			}
+			if (!getSessionSingleton(context, 'transactionLess'))
+				pushCommand(context, commitCommand);
+			return executeChanges(context, popChanges(context));
+		}
+	}
+
+	function commit(context, result) {
+		return Promise.resolve()
+			.then(() => _commit(context, result));
+	}
+
+	commit_1 = commit;
+	return commit_1;
+}
+
+var rollbackCommand;
+var hasRequiredRollbackCommand;
+
+function requireRollbackCommand () {
+	if (hasRequiredRollbackCommand) return rollbackCommand;
+	hasRequiredRollbackCommand = 1;
+	var newParameterized = requireNewParameterized();
+
+	var command = newParameterized('ROLLBACK');
+	function empty() {}
+
+	// @ts-ignore
+	command.endEdit = empty;
+	// @ts-ignore
+	command.matches = empty;
+
+	rollbackCommand = command;
+	return rollbackCommand;
+}
+
+var tryReleaseDbClient_1;
+var hasRequiredTryReleaseDbClient;
+
+function requireTryReleaseDbClient () {
+	if (hasRequiredTryReleaseDbClient) return tryReleaseDbClient_1;
+	hasRequiredTryReleaseDbClient = 1;
+	var release = requireReleaseDbClient();
+
+	function tryReleaseDbClient(context) {
+		try {
+			release(context);
+		}
+		// eslint-disable-next-line no-empty
+		catch (e) {
+
+		}
+
+	}
+
+	tryReleaseDbClient_1 = tryReleaseDbClient;
+	return tryReleaseDbClient_1;
+}
+
+var newThrow_1;
+var hasRequiredNewThrow;
+
+function requireNewThrow () {
+	if (hasRequiredNewThrow) return newThrow_1;
+	hasRequiredNewThrow = 1;
+	var tryReleaseDbClient = requireTryReleaseDbClient();
+
+	function newThrow(context, e, previousPromise) {
+		return previousPromise.then(throwError, throwError);
+		function throwError() {
+			tryReleaseDbClient(context);
+			throw e;
+		}
+	}
+
+	newThrow_1 = newThrow;
+	return newThrow_1;
+}
+
+var rollback_1;
+var hasRequiredRollback;
+
+function requireRollback () {
+	if (hasRequiredRollback) return rollback_1;
+	hasRequiredRollback = 1;
+	const rollbackCommand = requireRollbackCommand();
+	const executeQuery = requireExecuteQuery();
+	const releaseDbClient = requireReleaseDbClient();
+	const popChanges = requirePopChanges();
+	const newThrow = requireNewThrow();
+	const resultToPromise = requireResultToPromise();
+	const conflictId = '12345678-1234-1234-1234-123456789012';
+	const getSessionSingleton = requireGetSessionSingleton();
+
+	function _rollback(context, e) {
+		let hookError;
+		var chain = resultToPromise()
+			.then(() => popChanges(context))
+			.then(executeRollback)
+			.then(callAfterRollback)
+			.then(() => releaseDbClient(context))
+			.then(throwHookErrorIfAny);
+
+
+		function executeRollback() {
+			const transactionLess =  getSessionSingleton(context, 'transactionLess');
+			if (transactionLess)
+				return Promise.resolve();
+			return executeQuery(context, rollbackCommand);
+		}
+
+		function callAfterRollback() {
+			const hook = getSessionSingleton(context, 'afterRollbackHook');
+			if (!hook)
+				return Promise.resolve();
+			return Promise.resolve()
+				.then(() => hook(e))
+				.catch((err) => {
+					hookError = err;
+				});
+		}
+
+		function throwHookErrorIfAny(res) {
+			if (hookError)
+				throw hookError;
+			return res;
+		}
+
+		if (e) {
+			if (e.message?.indexOf('ORA-01476: divisor is equal to zero') > -1)
+				return newThrow(context, new Error('Conflict when updating a column'), chain);
+			let errors = e.message && e.message.split(conflictId) || [];
+			if (errors.length > 1) {
+				return newThrow(context, new Error(errors[1]), chain);
+			}
+			else
+				return newThrow(context, e, chain);
+		}
+		return chain;
+	}
+
+	function rollback(context, e) {
+		return Promise.resolve().then(() => _rollback(context, e));
+	}
+
+	rollback_1 = rollback;
+	return rollback_1;
+}
+
+var pools_1;
+var hasRequiredPools;
+
+function requirePools () {
+	if (hasRequiredPools) return pools_1;
+	hasRequiredPools = 1;
+	var pools = requireNewObject()();
+
+	Object.defineProperty(pools, 'end', {
+		enumerable: false,
+		value: end
+	});
+
+	function end() {
+		var all = [];
+		for (var poolId in pools) {
+			var endPool = pools[poolId].end();
+			all.push(endPool);
+		}
+		return Promise.all(all);
+	}
+
+	pools_1 = pools;
+	return pools_1;
 }
 
 var log_1;
@@ -25032,3153 +34483,12 @@ function serializeError(error) {
 	return workerClient;
 }
 
-var createWorker;
-var hasRequiredCreateWorker;
-
-function requireCreateWorker () {
-	if (hasRequiredCreateWorker) return createWorker;
-	hasRequiredCreateWorker = 1;
-	const createSqliteOPFSWorkerClient = requireWorkerClient();
-
-	function createSqliteOPFSWorker(options = {}) {
-		return createSqliteOPFSWorkerClient.createWorker(options.connectionString || 'orange.sqlite3', options);
-	}
-
-	createWorker = createSqliteOPFSWorker;
-	return createWorker;
-}
-
-var commitCommand;
-var hasRequiredCommitCommand;
-
-function requireCommitCommand () {
-	if (hasRequiredCommitCommand) return commitCommand;
-	hasRequiredCommitCommand = 1;
-	var newParameterized = requireNewParameterized();
-
-	var command = newParameterized('COMMIT');
-	function empty() {}
-
-	command.endEdit = empty;
-	command.matches = empty;
-
-	commitCommand = command;
-	return commitCommand;
-}
-
-var deleteSessionContext_1;
-var hasRequiredDeleteSessionContext;
-
-function requireDeleteSessionContext () {
-	if (hasRequiredDeleteSessionContext) return deleteSessionContext_1;
-	hasRequiredDeleteSessionContext = 1;
-	function deleteSessionContext(context) {
-		delete context.rdb;
-	}
-
-	deleteSessionContext_1 = deleteSessionContext;
-	return deleteSessionContext_1;
-}
-
-var releaseDbClient;
-var hasRequiredReleaseDbClient;
-
-function requireReleaseDbClient () {
-	if (hasRequiredReleaseDbClient) return releaseDbClient;
-	hasRequiredReleaseDbClient = 1;
-	var getSessionSingleton = requireGetSessionSingleton();
-	var deleteSessionContext = requireDeleteSessionContext();
-
-	function release(context) {
-		var done = getSessionSingleton(context, 'dbClientDone');
-		var pool = getSessionSingleton(context, 'pool');
-		deleteSessionContext(context);
-		if (done)
-			done();
-		if (pool)
-			return pool.end();
-
-	}
-
-	releaseDbClient = release;
-	return releaseDbClient;
-}
-
-var commit_1;
-var hasRequiredCommit;
-
-function requireCommit () {
-	if (hasRequiredCommit) return commit_1;
-	hasRequiredCommit = 1;
-	let commitCommand = requireCommitCommand();
-	let pushCommand = requirePushCommand();
-	let executeChanges = requireExecuteChanges();
-	let releaseDbClient = requireReleaseDbClient();
-	let popChanges = requirePopChanges();
-	const getSessionSingleton = requireGetSessionSingleton();
-
-	function _commit(context, result) {
-		let hookError;
-		return popAndPushChanges()
-			.then(callAfterCommit)
-			.then(releaseDbClient.bind(null, context))
-			.then(onReleased)
-			.then(throwHookErrorIfAny);
-
-		function onReleased() {
-			return result;
-		}
-
-		function throwHookErrorIfAny(res) {
-			if (hookError)
-				throw hookError;
-			return res;
-		}
-
-		function callAfterCommit() {
-			const hook = getSessionSingleton(context, 'afterCommitHook');
-			if (!hook)
-				return Promise.resolve();
-			return Promise.resolve()
-				.then(() => hook())
-				.catch((e) => {
-					hookError = e;
-				});
-		}
-
-		async function popAndPushChanges() {
-			let changes = popChanges(context);
-			while (changes.length > 0) {
-				await executeChanges(context, changes);
-				changes = popChanges(context);
-			}
-			if (!getSessionSingleton(context, 'transactionLess'))
-				pushCommand(context, commitCommand);
-			return executeChanges(context, popChanges(context));
-		}
-	}
-
-	function commit(context, result) {
-		return Promise.resolve()
-			.then(() => _commit(context, result));
-	}
-
-	commit_1 = commit;
-	return commit_1;
-}
-
-var rollbackCommand;
-var hasRequiredRollbackCommand;
-
-function requireRollbackCommand () {
-	if (hasRequiredRollbackCommand) return rollbackCommand;
-	hasRequiredRollbackCommand = 1;
-	var newParameterized = requireNewParameterized();
-
-	var command = newParameterized('ROLLBACK');
-	function empty() {}
-
-	// @ts-ignore
-	command.endEdit = empty;
-	// @ts-ignore
-	command.matches = empty;
-
-	rollbackCommand = command;
-	return rollbackCommand;
-}
-
-var tryReleaseDbClient_1;
-var hasRequiredTryReleaseDbClient;
-
-function requireTryReleaseDbClient () {
-	if (hasRequiredTryReleaseDbClient) return tryReleaseDbClient_1;
-	hasRequiredTryReleaseDbClient = 1;
-	var release = requireReleaseDbClient();
-
-	function tryReleaseDbClient(context) {
-		try {
-			release(context);
-		}
-		// eslint-disable-next-line no-empty
-		catch (e) {
-
-		}
-
-	}
-
-	tryReleaseDbClient_1 = tryReleaseDbClient;
-	return tryReleaseDbClient_1;
-}
-
-var newThrow_1;
-var hasRequiredNewThrow;
-
-function requireNewThrow () {
-	if (hasRequiredNewThrow) return newThrow_1;
-	hasRequiredNewThrow = 1;
-	var tryReleaseDbClient = requireTryReleaseDbClient();
-
-	function newThrow(context, e, previousPromise) {
-		return previousPromise.then(throwError, throwError);
-		function throwError() {
-			tryReleaseDbClient(context);
-			throw e;
-		}
-	}
-
-	newThrow_1 = newThrow;
-	return newThrow_1;
-}
-
-var rollback_1;
-var hasRequiredRollback;
-
-function requireRollback () {
-	if (hasRequiredRollback) return rollback_1;
-	hasRequiredRollback = 1;
-	const rollbackCommand = requireRollbackCommand();
-	const executeQuery = requireExecuteQuery();
-	const releaseDbClient = requireReleaseDbClient();
-	const popChanges = requirePopChanges();
-	const newThrow = requireNewThrow();
-	const resultToPromise = requireResultToPromise();
-	const conflictId = '12345678-1234-1234-1234-123456789012';
-	const getSessionSingleton = requireGetSessionSingleton();
-
-	function _rollback(context, e) {
-		let hookError;
-		var chain = resultToPromise()
-			.then(() => popChanges(context))
-			.then(executeRollback)
-			.then(callAfterRollback)
-			.then(() => releaseDbClient(context))
-			.then(throwHookErrorIfAny);
-
-
-		function executeRollback() {
-			const transactionLess =  getSessionSingleton(context, 'transactionLess');
-			if (transactionLess)
-				return Promise.resolve();
-			return executeQuery(context, rollbackCommand);
-		}
-
-		function callAfterRollback() {
-			const hook = getSessionSingleton(context, 'afterRollbackHook');
-			if (!hook)
-				return Promise.resolve();
-			return Promise.resolve()
-				.then(() => hook(e))
-				.catch((err) => {
-					hookError = err;
-				});
-		}
-
-		function throwHookErrorIfAny(res) {
-			if (hookError)
-				throw hookError;
-			return res;
-		}
-
-		if (e) {
-			if (e.message?.indexOf('ORA-01476: divisor is equal to zero') > -1)
-				return newThrow(context, new Error('Conflict when updating a column'), chain);
-			let errors = e.message && e.message.split(conflictId) || [];
-			if (errors.length > 1) {
-				return newThrow(context, new Error(errors[1]), chain);
-			}
-			else
-				return newThrow(context, e, chain);
-		}
-		return chain;
-	}
-
-	function rollback(context, e) {
-		return Promise.resolve().then(() => _rollback(context, e));
-	}
-
-	rollback_1 = rollback;
-	return rollback_1;
-}
-
-var pools_1;
-var hasRequiredPools;
-
-function requirePools () {
-	if (hasRequiredPools) return pools_1;
-	hasRequiredPools = 1;
-	var pools = requireNewObject()();
-
-	Object.defineProperty(pools, 'end', {
-		enumerable: false,
-		value: end
-	});
-
-	function end() {
-		var all = [];
-		for (var poolId in pools) {
-			var endPool = pools[poolId].end();
-			all.push(endPool);
-		}
-		return Promise.all(all);
-	}
-
-	pools_1 = pools;
-	return pools_1;
-}
-
-var toIntKey_1;
-var hasRequiredToIntKey;
-
-function requireToIntKey () {
-	if (hasRequiredToIntKey) return toIntKey_1;
-	hasRequiredToIntKey = 1;
-	function toIntKey(key) {
-		if (isInteger())
-			return key;
-		if (isIntegerString())
-			return trim(key);
-		var intKey = '';
-		for (var i = 0; i < key.length; ++i) {
-			var value = key[i].toUpperCase();
-			value = parseInt(value, 16);
-			if (!isNaN(value))
-				intKey += value;
-		}
-
-		return trim(intKey);
-
-		function isIntegerString() {
-			var pattern = /^-?\d+\.?\d*$/;
-			var reg = new RegExp(pattern);
-			return (typeof key === 'string' && reg.test(key));
-		}
-
-		function isInteger() {
-			return (typeof key === 'number') && (Math.floor(key) === key);
-		}
-
-		function trim(value) {
-			var maxBigInt = '9223372036854775807';
-			value = value.substring(0, 19);
-			if (value > maxBigInt)
-				return value.substring(0,18);
-			return value;
-		}
-	}
-
-	toIntKey_1 = toIntKey;
-	return toIntKey_1;
-}
-
-var lock_1;
-var hasRequiredLock;
-
-function requireLock () {
-	if (hasRequiredLock) return lock_1;
-	hasRequiredLock = 1;
-	var query = requireQuery();
-	var toIntKey = requireToIntKey();
-
-	function lock(key, func) {
-		key = toIntKey(key);
-		if(typeof func === 'function') {
-			return inLock(key, func);
-		} else {
-			var sql = 'SELECT pg_advisory_xact_lock(' + key + ')';
-			return query(sql);
-		}
-	}
-
-	async function inLock(key, func) {
-		await query('SELECT pg_advisory_lock(' + key + ')');
-		try {
-			let result = await func();
-			await query('SELECT pg_advisory_unlock(' + key + ')');
-			return result;
-		} catch(e) {
-			await query('SELECT pg_advisory_unlock(' + key + ')');
-			throw e;
-		}
-	}
-
-	lock_1 = lock;
-	return lock_1;
-}
-
-var schema;
-var hasRequiredSchema;
-
-function requireSchema () {
-	if (hasRequiredSchema) return schema;
-	hasRequiredSchema = 1;
-	var query = requireQuery();
-
-	function executeSchema(context, schema) {
-		if (!schema)
-			throw new Error('Missing schema');
-		if (!Array.isArray(schema))
-			schema = [schema];
-		return query(context, 'SET LOCAL search_path TO ' + schema.join(','));
-	}
-
-	schema = executeSchema;
-	return schema;
-}
-
-var createDomain_1;
-var hasRequiredCreateDomain;
-
-function requireCreateDomain () {
-	if (hasRequiredCreateDomain) return createDomain_1;
-	hasRequiredCreateDomain = 1;
-	function createDomain() {
-		let c = {};
-		function run(fn) {
-			return fn(c);
-		}
-		c.run = run;
-		return c;
-	}
-
-	createDomain_1 = createDomain;
-	return createDomain_1;
-}
-
-var wrapQuery_1$2;
-var hasRequiredWrapQuery$2;
-
-function requireWrapQuery$2 () {
-	if (hasRequiredWrapQuery$2) return wrapQuery_1$2;
-	hasRequiredWrapQuery$2 = 1;
-	var log = requireLog();
-
-	function wrapQuery(_context, client) {
-
-		return runQuery;
-
-		function runQuery(query, onCompleted) {
-
-			var params = query.parameters;
-			var sql = query.sql();
-			var completeQuery = log.startQuery({sql, parameters: params});
-			client.d1.prepare(sql, params).bind(...params).all().then(onInnerCompleted, onError);
-
-			function onInnerCompleted(response) {
-				completeQuery();
-				onCompleted(null, response.results);
-			}
-
-			function onError(e) {
-				completeQuery(e);
-				onCompleted(e);
-			}
-
-		}
-
-	}
-
-	wrapQuery_1$2 = wrapQuery;
-	return wrapQuery_1$2;
-}
-
-var wrapCommand_1$2;
-var hasRequiredWrapCommand$2;
-
-function requireWrapCommand$2 () {
-	if (hasRequiredWrapCommand$2) return wrapCommand_1$2;
-	hasRequiredWrapCommand$2 = 1;
-	var log = requireLog();
-
-	function wrapCommand(_context, client) {
-		return runQuery;
-
-		function runQuery(query, onCompleted) {
-			var params = Array.isArray(query.parameters) ? query.parameters : [];
-			var sql = query.sql();
-			var completeQuery = log.startQuery({ sql, parameters: params });
-
-			client.d1
-				.prepare(sql)
-				.bind.apply(null, params)
-				.run()
-				.then(onInnerCompleted, onError);
-
-			function onInnerCompleted(response) {
-				var affectedRows = 0;
-
-				if (response) {
-					if (typeof response.changes === 'number') affectedRows = response.changes;
-					else if (typeof response.meta === 'object' && response.meta && typeof response.meta.changes === 'number') {
-						affectedRows = response.meta.changes;
-					} else if (typeof response.affectedRows === 'number') {
-						affectedRows = response.affectedRows;
-					}
-				}
-
-				completeQuery();
-				onCompleted(null, { rowsAffected: affectedRows });
-			}
-
-			function onError(e) {
-				completeQuery(e);
-				onCompleted(e, { rowsAffected: 0 });
-			}
-		}
-	}
-
-	wrapCommand_1$2 = wrapCommand;
-	return wrapCommand_1$2;
-}
-
-var encodeBoolean_1$1;
-var hasRequiredEncodeBoolean$1;
-
-function requireEncodeBoolean$1 () {
-	if (hasRequiredEncodeBoolean$1) return encodeBoolean_1$1;
-	hasRequiredEncodeBoolean$1 = 1;
-	function encodeBoolean(bool) {
-		if (bool)
-			return 1;
-		return 0;
-	}
-
-	encodeBoolean_1$1 = encodeBoolean;
-	return encodeBoolean_1$1;
-}
-
-var quote$1;
-var hasRequiredQuote$1;
-
-function requireQuote$1 () {
-	if (hasRequiredQuote$1) return quote$1;
-	hasRequiredQuote$1 = 1;
-	quote$1 = (name) => `"${name}"`;
-	return quote$1;
-}
-
-var formatBigintOut_1;
-var hasRequiredFormatBigintOut;
-
-function requireFormatBigintOut () {
-	if (hasRequiredFormatBigintOut) return formatBigintOut_1;
-	hasRequiredFormatBigintOut = 1;
-	const quote = requireQuote$1();
-
-	function formatBigintOut(column, alias) {
-		const quotedCol = quote(column._dbName);
-		if (alias)
-			return `CAST(${alias}.${quotedCol} AS TEXT)`;
-		else
-			return `CAST(${quotedCol} AS TEXT)`;
-	}
-
-	formatBigintOut_1 = formatBigintOut;
-	return formatBigintOut_1;
-}
-
-var format_1;
-var hasRequiredFormat;
-
-function requireFormat () {
-	if (hasRequiredFormat) return format_1;
-	hasRequiredFormat = 1;
-	function format(template, ...values) {
-		let index = 0;
-		return template.replace(/%s/g, () => {
-			// If there aren't enough values, this will insert 'undefined'
-			// for placeholders that don't have a corresponding array item.
-			return values[index++];
-		});
-	}
-	format_1 = format;
-	return format_1;
-}
-
-var deleteFromSql_1$1;
-var hasRequiredDeleteFromSql$1;
-
-function requireDeleteFromSql$1 () {
-	if (hasRequiredDeleteFromSql$1) return deleteFromSql_1$1;
-	hasRequiredDeleteFromSql$1 = 1;
-	const format = 'delete from %s where %s.rowId in (SELECT %s.rowId FROM %s %s%s)';
-	const formatString = requireFormat();
-	const quote = requireQuote$1();
-
-	function deleteFromSql(table, alias, whereSql) {
-		const name = quote(table._dbName);
-		alias = quote(alias);
-		return formatString(format, name, name, alias, name, alias, whereSql);
-	}
-	deleteFromSql_1$1 = deleteFromSql;
-	return deleteFromSql_1$1;
-}
-
-var selectForUpdateSql$1;
-var hasRequiredSelectForUpdateSql$1;
-
-function requireSelectForUpdateSql$1 () {
-	if (hasRequiredSelectForUpdateSql$1) return selectForUpdateSql$1;
-	hasRequiredSelectForUpdateSql$1 = 1;
-	selectForUpdateSql$1 = function(_context, lock) {
-		if (lock)
-			throw new Error('select for update is not supported by SQLite');
-		return '';
-	};
-	return selectForUpdateSql$1;
-}
-
-var lastInsertedSql_1$1;
-var hasRequiredLastInsertedSql$1;
-
-function requireLastInsertedSql$1 () {
-	if (hasRequiredLastInsertedSql$1) return lastInsertedSql_1$1;
-	hasRequiredLastInsertedSql$1 = 1;
-	function lastInsertedSql(context, table, keyValues) {
-		if (keyValues.some(value => value === undefined))
-			return ['rowid IN (select last_insert_rowid())'];
-		return keyValues.map((value,i) => {
-			let column = table._primaryColumns[i];
-			return column.eq(context, value);
-		});
-
-	}
-
-	lastInsertedSql_1$1 = lastInsertedSql;
-	return lastInsertedSql_1$1;
-}
-
-var limitAndOffset_1$1;
-var hasRequiredLimitAndOffset$1;
-
-function requireLimitAndOffset$1 () {
-	if (hasRequiredLimitAndOffset$1) return limitAndOffset_1$1;
-	hasRequiredLimitAndOffset$1 = 1;
-	function limitAndOffset(span) {
-		if (span.offset)
-			return ` limit ${limit()} offset ${span.offset}`;
-		else if (span.limit || span.limit === 0)
-			return ` limit ${span.limit}`;
-		else
-			return '';
-
-		function limit() {
-			if (span.limit || span.limit === 0)
-				return span.limit;
-			else
-				return '-1';
-		}
-
-	}
-
-	limitAndOffset_1$1 = limitAndOffset;
-	return limitAndOffset_1$1;
-}
-
-var insertSql_1$1;
-var hasRequiredInsertSql$1;
-
-function requireInsertSql$1 () {
-	if (hasRequiredInsertSql$1) return insertSql_1$1;
-	hasRequiredInsertSql$1 = 1;
-	const quote = requireQuote$1();
-
-	function insertSql(_context, table, row, options) {
-		let columnNames = [];
-		let conflictColumnUpdateSql = '';
-		let values = [];
-
-		let sql = 'INSERT INTO ' + quote(table._dbName) + ' ';
-		addDiscriminators();
-		addColumns();
-
-		if (columnNames.length === 0) {
-			sql += 'DEFAULT VALUES';
-		} else {
-			sql = sql + '(' + columnNames.join(',') + ') ' + 'VALUES (' + values.join(',') + ')' + onConflict();
-		}
-
-		return sql;
-
-		function onConflict() {
-			if (options.concurrency === 'skipOnConflict' || options.concurrency === 'overwrite') {
-				const primaryKeys = table._primaryColumns.map(x => quote(x._dbName)).join(',');
-				return ` ON CONFLICT(${primaryKeys}) ${conflictColumnUpdateSql}`;
-			} else {
-				return '';
-			}
-		}
-
-		function addDiscriminators() {
-			let discriminators = table._columnDiscriminators;
-			for (let i = 0; i < discriminators.length; i++) {
-				let parts = discriminators[i].split('=');
-				columnNames.push(quote(parts[0]));
-				values.push(parts[1]);
-			}
-		}
-
-		function addColumns() {
-			let conflictColumnUpdates = [];
-			let columns = table._columns;
-			for (let i = 0; i < columns.length; i++) {
-				let column = columns[i];
-				const columnName = quote(column._dbName);
-				if (row['__' + column.alias] !== undefined) {
-					columnNames.push(columnName);
-					values.push('%s');
-					addConflictUpdate(column);
-				}
-			}
-			if (conflictColumnUpdates.length === 0)
-				conflictColumnUpdateSql =  'DO NOTHING';
-			else
-				conflictColumnUpdateSql = 'DO UPDATE SET ' + conflictColumnUpdates.join(',');
-
-			function addConflictUpdate(column) {
-				let concurrency = options[column.alias]?.concurrency || options.concurrency;
-				const tableName = table._dbName;
-				const columnName = quote(column._dbName);
-				if (concurrency === 'overwrite') {
-					conflictColumnUpdates.push(`${columnName}=excluded.${columnName}`);
-				} else if (concurrency === 'optimistic')
-					conflictColumnUpdates.push(`${columnName} = CASE WHEN ${tableName}.${columnName} <> excluded.${columnName} THEN '12345678-1234-1234-1234-123456789012Conflict when updating ${columnName}12345678-1234-1234-1234-123456789012' ELSE ${tableName}.${columnName} END`);
-			}
-		}
-	}
-
-	insertSql_1$1 = insertSql;
-	return insertSql_1$1;
-}
-
-var newInsertCommand_1;
-var hasRequiredNewInsertCommand;
-
-function requireNewInsertCommand () {
-	if (hasRequiredNewInsertCommand) return newInsertCommand_1;
-	hasRequiredNewInsertCommand = 1;
-	var newImmutable = requireNewImmutable();
-	var createPatch = requireCreatePatch();
-	var createDto = requireCreateDto();
-
-	function newInsertCommand(newInsertCommandCore, table, row, options) {
-		return new InsertCommand(newInsertCommandCore, table, row,  options);
-	}
-
-	function InsertCommand(newInsertCommandCore, table, row, options) {
-		this.__getCoreCommand = newImmutable(newInsertCommandCore);
-		this._table = table;
-		this._row = row;
-		this._options = options;
-	}
-
-	InsertCommand.prototype._getCoreCommand = function() {
-		return this.__getCoreCommand(this._table, this._row, this._options);
-	};
-
-	InsertCommand.prototype.sql = function() {
-		return this._getCoreCommand().sql();
-	};
-
-	InsertCommand.prototype.matches = function(otherRow) {
-		return this._row === otherRow;
-	};
-
-
-	InsertCommand.prototype.endEdit = function() {
-		this.sql();
-		var dto = createDto(this._table, this._row);
-		if (this._disallowCompress || this._table._emitChanged.callbacks.length > 0)
-			this._patch = createPatch([], [dto]);
-	};
-
-	InsertCommand.prototype.emitChanged = function() {
-		return this._table._emitChanged({row: this._row, patch: this._patch});
-	};
-
-	Object.defineProperty(InsertCommand.prototype, 'parameters', {
-		get: function() {
-			return this._getCoreCommand().parameters;
-
-		}
-	});
-
-	Object.defineProperty(InsertCommand.prototype, 'disallowCompress', {
-		get: function() {
-			return this._disallowCompress || this._table._emitChanged.callbacks.length > 0;
-
-		},
-		set: function(value) {
-			this._disallowCompress = value;
-		}
-	});
-
-
-	newInsertCommand_1 = newInsertCommand;
-	return newInsertCommand_1;
-}
-
-var getSqlTemplate_1;
-var hasRequiredGetSqlTemplate;
-
-function requireGetSqlTemplate () {
-	if (hasRequiredGetSqlTemplate) return getSqlTemplate_1;
-	hasRequiredGetSqlTemplate = 1;
-	let getSessionContext = requireGetSessionContext();
-	let quote = requireQuote$2();
-
-	function getSqlTemplate(context, _table, _row) {
-		let rdb = getSessionContext(context);
-		if (rdb.insertSql)
-			return rdb.insertSql.apply(null, arguments);
-		else
-			return getSqlTemplateDefault.apply(null, arguments);
-
-	}
-
-	function getSqlTemplateDefault(context, table, row) {
-		let columnNames = [];
-		let values = [];
-		let sql = 'INSERT INTO ' + quote(context, table._dbName) + ' ';
-		addDiscriminators();
-		addColumns();
-		if (columnNames.length === 0)
-			sql += `${outputInserted()}${defaultValues()}${lastInserted()}`;
-		else
-			sql = sql + '('+ columnNames.join(',') + ') ' + outputInserted() +  'VALUES (' + values.join(',') + ')' + lastInserted() ;
-		return sql;
-
-		function addDiscriminators() {
-			let discriminators = table._columnDiscriminators;
-			for (let i = 0; i < discriminators.length; i++) {
-				let parts = discriminators[i].split('=');
-				columnNames.push(quote(context, parts[0]));
-				values.push(parts[1]);
-			}
-		}
-
-		function addColumns() {
-			let columns = table._columns;
-			for (let i = 0; i < columns.length; i++) {
-				let column = columns[i];
-				if (row['__' + column.alias] !== undefined) {
-					columnNames.push(quote(context, column._dbName));
-					values.push('%s');
-				}
-			}
-		}
-
-		function lastInserted() {
-			let rdb = getSessionContext(context);
-			if (!rdb.lastInsertedIsSeparate && rdb.lastInsertedSql)
-				return ' ' + rdb.lastInsertedSql(table);
-			return '';
-		}
-
-		function outputInserted() {
-			let rdb = getSessionContext(context);
-			if (!rdb.lastInsertedIsSeparate && rdb.outputInsertedSql)
-				return ' ' + rdb.outputInsertedSql(table) + ' ';
-			return '';
-		}
-
-		function defaultValues() {
-			let rdb = getSessionContext(context);
-			let _default = rdb.insertDefault || 'DEFAULT VALUES';
-			return `${_default}${lastInserted()}`;
-
-		}
-	}
-
-	getSqlTemplate_1 = getSqlTemplate;
-	return getSqlTemplate_1;
-}
-
-var newInsertCommandCore_1;
-var hasRequiredNewInsertCommandCore;
-
-function requireNewInsertCommandCore () {
-	if (hasRequiredNewInsertCommandCore) return newInsertCommandCore_1;
-	hasRequiredNewInsertCommandCore = 1;
-	const newParameterized = requireNewParameterized();
-	const getSqlTemplate = requireGetSqlTemplate();
-	const formatString = requireFormat();
-
-	function newInsertCommandCore(context, table, row, options = {}) {
-		let parameters = [];
-		let values = [getSqlTemplate(context, table, row, options)];
-
-		let columns = table._columns;
-		for (let i = 0; i < columns.length; i++) {
-			let column = columns[i];
-			let alias = column.alias;
-			if (row['__' + column.alias] !== undefined) {
-				let encoded = column.encode(context, row[alias]);
-				if (encoded.parameters.length > 0) {
-					values.push(encoded.sql());
-					parameters.push(encoded.parameters[0]);
-				} else
-					values.push(encoded.sql());
-			}
-		}
-
-		let sql = formatString.apply(null, values);
-		return newParameterized(sql, parameters);
-	}
-
-	newInsertCommandCore_1 = newInsertCommandCore;
-	return newInsertCommandCore_1;
-}
-
-var newGetLastInsertedCommandCore_1;
-var hasRequiredNewGetLastInsertedCommandCore;
-
-function requireNewGetLastInsertedCommandCore () {
-	if (hasRequiredNewGetLastInsertedCommandCore) return newGetLastInsertedCommandCore_1;
-	hasRequiredNewGetLastInsertedCommandCore = 1;
-	const newParameterized = requireNewParameterized();
-	const getSessionContext = requireGetSessionContext();
-	const newDiscriminatorSql = requireNewDiscriminatorSql$1();
-	const quote = requireQuote$2();
-
-	function newGetLastInsertedCommandCore(context, table, row) {
-		let parameters = [];
-		let keyValues = table._primaryColumns.map(column => row['__' + column.alias]);
-		let sql = `SELECT ${columnNames()} FROM ${quote(context, table._dbName)} WHERE ${whereSql()}`;
-		return newParameterized(sql, parameters);
-
-		function columnNames() {
-			return table._columns.map(formatColumn).join(',');
-		}
-
-		function formatColumn(column) {
-			const formatted = column.formatOut ? column.formatOut(context)  + ' as ' + quote(context, column._dbName) :  quote(context, column._dbName);
-			if (column.dbNull === null)
-				return formatted;
-			else {
-				const encoded = column.encode.unsafe(context, column.dbNull);
-				return `CASE WHEN ${formatted}=${encoded} THEN null ELSE ${formatted} END`;
-			}
-		}
-
-		function whereSql() {
-			let parameterized;
-			let filter = getSessionContext(context).lastInsertedSql(context, table, keyValues);
-			if (Array.isArray(filter)) {
-				for (let i = 0; i < filter.length; i++) {
-					const sep = i === 0 ? '' : ' AND ';
-					if (!filter[i].sql) {
-						const sql = filter[i];
-						filter[i] = {sql : () => sql};
-					}
-					let next = newParameterized(sep + filter[i].sql(), filter[i].parameters);
-					if (parameterized)
-						parameterized = parameterized.append(next);
-					else
-						parameterized = next;
-				}
-			}
-			else
-				parameterized = newParameterized(filter);
-			parameters = parameters.concat(parameterized.parameters);
-			return [discriminators(), parameterized.sql()].filter(x => x).join(' AND ');
-		}
-
-		function discriminators() {
-			return newDiscriminatorSql(context, table, table._dbName);
-		}
-	}
-
-	newGetLastInsertedCommandCore_1 = newGetLastInsertedCommandCore;
-	return newGetLastInsertedCommandCore_1;
-}
-
-var newGetLastInsertedCommand_1;
-var hasRequiredNewGetLastInsertedCommand;
-
-function requireNewGetLastInsertedCommand () {
-	if (hasRequiredNewGetLastInsertedCommand) return newGetLastInsertedCommand_1;
-	hasRequiredNewGetLastInsertedCommand = 1;
-	var newGetLastInsertedCommandCore = requireNewGetLastInsertedCommandCore();
-	var newImmutable = requireNewImmutable();
-
-	function newGetLastInsertedCommand(context, table, row, insertCommand) {
-		let cmd =  new InsertCommand(context, table, row, insertCommand);
-		insertCommand.endEdit = () => {};
-		return cmd;
-	}
-
-	function InsertCommand(context, table, row, insertCommand) {
-		this._insertCommand = insertCommand;
-		this.__getCoreCommand = newImmutable(newGetLastInsertedCommandCore.bind(null, context));
-		this._table = table;
-		this._row = row;
-	}
-
-	InsertCommand.prototype._getCoreCommand = function() {
-		return this.__getCoreCommand(this._table, this._row);
-	};
-
-	InsertCommand.prototype.sql = function() {
-		return this._getCoreCommand().sql();
-	};
-
-	InsertCommand.prototype.matches = function(otherRow) {
-		return this._row === otherRow;
-	};
-
-
-	InsertCommand.prototype.endEdit = function() {
-		this._insertCommand.endEdit();
-		this.sql();
-	};
-
-	Object.defineProperty(InsertCommand.prototype, 'parameters', {
-		get: function() {
-			return this._getCoreCommand().parameters;
-
-		}
-	});
-
-	Object.defineProperty(InsertCommand.prototype, 'disallowCompress', {
-		get: function() {
-			return true;
-		}
-	});
-
-
-	newGetLastInsertedCommand_1 = newGetLastInsertedCommand;
-	return newGetLastInsertedCommand_1;
-}
-
-var insert$1;
-var hasRequiredInsert$1;
-
-function requireInsert$1 () {
-	if (hasRequiredInsert$1) return insert$1;
-	hasRequiredInsert$1 = 1;
-	let newInsertCommand = requireNewInsertCommand();
-	let newInsertCommandCore = requireNewInsertCommandCore();
-	let newGetLastInsertedCommand = requireNewGetLastInsertedCommand();
-	let executeQueries = requireExecuteQueries();
-	let pushCommand = requirePushCommand();
-
-
-	function insertDefault(context, table, row, options) {
-		let commands = [];
-		let insertCmd = newInsertCommand(newInsertCommandCore.bind(null, context), table, row, options);
-		insertCmd.disallowCompress = true;
-		pushCommand(context, insertCmd);
-
-		if (options && options.skipSelectAfterInsert)
-			return executeQueries(context, []).then(() => [toDbRow(table, row)]);
-
-		let selectCmd = newGetLastInsertedCommand(context, table, row, insertCmd);
-		commands.push(selectCmd);
-
-		return executeQueries(context, commands).then((result) => result[result.length - 1]);
-
-	}
-
-	function toDbRow(table, row) {
-		const dbRow = {};
-		const columns = table._columns || [];
-		for (let i = 0; i < columns.length; i++) {
-			const column = columns[i];
-			dbRow[column._dbName] = row[column.alias];
-		}
-		return dbRow;
-	}
-
-	insert$1 = insertDefault;
-	return insert$1;
-}
-
-var batchInsert_1;
-var hasRequiredBatchInsert;
-
-function requireBatchInsert () {
-	if (hasRequiredBatchInsert) return batchInsert_1;
-	hasRequiredBatchInsert = 1;
-	const executeCommand = requireExecuteCommand();
-	const newParameterized = requireNewParameterized();
-	const quote = requireQuote$1();
-
-	async function batchInsert(context, table, rows, options = {}) {
-		const groups = groupRows(table, rows);
-		for (let i = 0; i < groups.length; i++) {
-			if (groups[i].columns.length === 0)
-				return false;
-		}
-		for (let i = 0; i < groups.length; i++) {
-			const group = groups[i];
-			await executeGroup(context, table, group, options);
-		}
-		return true;
-	}
-
-	async function executeGroup(context, table, group, options) {
-		const maxParameters = context.rdb.maxParameters || 999;
-		const columns = group.columns;
-		const chunks = chunkRows(context, group.rows, columns, maxParameters);
-
-		for (let i = 0; i < chunks.length; i++)
-			await executeCommand(context, buildCommand(context, table, columns, chunks[i], options));
-	}
-
-	function buildCommand(context, table, columns, rows, options) {
-		const parameters = [];
-		const columnNames = discriminatorColumnNames(table).concat(columns.map(column => quote(column._dbName)));
-		const valueRows = rows.map(row => {
-			const values = discriminatorValues(table).concat(columns.map(column => {
-				const encoded = column.encode(context, row[column.alias]);
-				parameters.push(...encoded.parameters);
-				return encoded.sql();
-			}));
-			return '(' + values.join(',') + ')';
-		});
-
-		const sql = 'INSERT INTO ' + quote(table._dbName) + ' (' + columnNames.join(',') + ') VALUES '
-			+ valueRows.join(',') + onConflict(table, columns, options);
-		return newParameterized(sql, parameters);
-	}
-
-	function groupRows(table, rows) {
-		const groups = [];
-		const groupsByKey = {};
-		for (let i = 0; i < rows.length; i++) {
-			const row = rows[i];
-			const columns = table._columns.filter(column => row['__' + column.alias] !== undefined);
-			const key = columns.map(column => column.alias).join('\0');
-			let group = groupsByKey[key];
-			if (!group) {
-				group = { columns, rows: [] };
-				groupsByKey[key] = group;
-				groups.push(group);
-			}
-			group.rows.push(row);
-		}
-		return groups;
-	}
-
-	function countParameterColumns(context, row, columns) {
-		let count = 0;
-		for (let i = 0; i < columns.length; i++) {
-			const encoded = columns[i].encode(context, row[columns[i].alias]);
-			count += encoded.parameters.length;
-		}
-		return count;
-	}
-
-	function chunkRows(context, rows, columns, maxParameters) {
-		const chunks = [];
-		let chunk = [];
-		let parameterCount = 0;
-		for (let i = 0; i < rows.length; i++) {
-			const row = rows[i];
-			const rowParameterCount = countParameterColumns(context, row, columns);
-			if (chunk.length > 0 && parameterCount + rowParameterCount > maxParameters) {
-				chunks.push(chunk);
-				chunk = [];
-				parameterCount = 0;
-			}
-			chunk.push(row);
-			parameterCount += rowParameterCount;
-		}
-		if (chunk.length > 0)
-			chunks.push(chunk);
-		return chunks;
-	}
-
-	function discriminatorColumnNames(table) {
-		return table._columnDiscriminators.map(discriminator => quote(discriminator.split('=')[0]));
-	}
-
-	function discriminatorValues(table) {
-		return table._columnDiscriminators.map(discriminator => discriminator.split('=')[1]);
-	}
-
-	function onConflict(table, columns, options) {
-		if (options.concurrency !== 'skipOnConflict' && options.concurrency !== 'overwrite')
-			return '';
-
-		const primaryKeys = table._primaryColumns.map(x => quote(x._dbName)).join(',');
-		const updates = [];
-		for (let i = 0; i < columns.length; i++) {
-			const column = columns[i];
-			const concurrency = options[column.alias]?.concurrency || options.concurrency;
-			const columnName = quote(column._dbName);
-			if (concurrency === 'overwrite')
-				updates.push(`${columnName}=excluded.${columnName}`);
-			else if (concurrency === 'optimistic')
-				updates.push(`${columnName} = CASE WHEN ${table._dbName}.${columnName} <> excluded.${columnName} THEN '12345678-1234-1234-1234-123456789012Conflict when updating ${columnName}12345678-1234-1234-1234-123456789012' ELSE ${table._dbName}.${columnName} END`);
-		}
-
-		if (updates.length === 0)
-			return ` ON CONFLICT(${primaryKeys}) DO NOTHING`;
-		return ` ON CONFLICT(${primaryKeys}) DO UPDATE SET ${updates.join(',')}`;
-	}
-
-	batchInsert_1 = batchInsert;
-	return batchInsert_1;
-}
-
-var newTransaction$3;
-var hasRequiredNewTransaction$3;
-
-function requireNewTransaction$3 () {
-	if (hasRequiredNewTransaction$3) return newTransaction$3;
-	hasRequiredNewTransaction$3 = 1;
-	const wrapQuery = requireWrapQuery$2();
-	const wrapCommand = requireWrapCommand$2();
-	const encodeBoolean = requireEncodeBoolean$1();
-	const formatBigintOut = requireFormatBigintOut();
-	const deleteFromSql = requireDeleteFromSql$1();
-	const selectForUpdateSql = requireSelectForUpdateSql$1();
-	const lastInsertedSql = requireLastInsertedSql$1();
-	const limitAndOffset = requireLimitAndOffset$1();
-	const insertSql = requireInsertSql$1();
-	const insert = requireInsert$1();
-	const batchInsert = requireBatchInsert();
-
-	function newResolveTransaction(domain, pool, { readonly = false } = {})  {
-		var rdb = {poolFactory: pool};
-		if (!pool.connect) {
-			pool = pool();
-			rdb.pool = pool;
-		}
-		rdb.engine = 'sqlite';
-		rdb.maxParameters = 100;
-		rdb.encodeBoolean = encodeBoolean;
-		rdb.decodeJSON = decodeJSON;
-		rdb.encodeJSON = JSON.stringify;
-		rdb.formatBigintOut = formatBigintOut;
-		rdb.deleteFromSql = deleteFromSql;
-		rdb.selectForUpdateSql = selectForUpdateSql;
-		rdb.lastInsertedSql = lastInsertedSql;
-		rdb.insertSql = insertSql;
-		rdb.insert = insert;
-		rdb.batchInsert = batchInsert;
-		rdb.lastInsertedIsSeparate = true;
-		rdb.multipleStatements = false;
-		rdb.limitAndOffset = limitAndOffset;
-		rdb.accept = function(caller) {
-			caller.visitSqlite();
-		};
-		rdb.aggregateCount = 0;
-		rdb.quote = (name) => `"${name}"`;
-		rdb.cache = {};
-		rdb.changes = [];
-
-		if (readonly) {
-			rdb.dbClient = {
-				executeQuery: function(query, callback) {
-					pool.connect((err, client, done) => {
-						if (err) {
-							return callback(err);
-						}
-						try {
-							wrapQuery(domain, client)(query, (err, res) => {
-								done();
-								callback(err, res);
-							});
-						} catch (e) {
-							done();
-							callback(e);
-						}
-					});
-				},
-				executeCommand: function(query, callback) {
-					pool.connect((err, client, done) => {
-						if (err) {
-							return callback(err);
-						}
-						try {
-							wrapCommand(domain, client)(query, (err, res) => {
-								done();
-								callback(err, res);
-							});
-						} catch (e) {
-							done();
-							callback(e);
-						}
-					});
-				}
-			};
-			domain.rdb = rdb;
-			return (onSuccess) => onSuccess();
-		}
-
-		return function(onSuccess, onError) {
-			pool.connect(onConnected);
-
-			function onConnected(err, client, done) {
-				try {
-					if (err) {
-						onError(err);
-						return;
-					}
-					client.executeQuery = wrapQuery(domain, client);
-					client.executeCommand = wrapCommand(domain, client);
-					rdb.dbClient = client;
-					rdb.dbClientDone = done;
-					domain.rdb = rdb;
-					onSuccess();
-				} catch (e) {
-					onError(e);
-				}
-			}
-		};
-	}
-
-	function decodeJSON(value) {
-		return JSON.parse(value);
-	}
-
-	newTransaction$3 = newResolveTransaction;
-	return newTransaction$3;
-}
-
-var beginCommand;
-var hasRequiredBeginCommand;
-
-function requireBeginCommand () {
-	if (hasRequiredBeginCommand) return beginCommand;
-	hasRequiredBeginCommand = 1;
-	let newParameterized = requireNewParameterized();
-	let getSessionContext = requireGetSessionContext();
-
-	beginCommand = function(context) {
-		let command = newParameterized(getSessionContext(context).begin || 'BEGIN');
-		command.endEdit = empty;
-		command.matches = empty;
-
-		function empty() {}
-
-		return command;
-
-	};
-	return beginCommand;
-}
-
-var begin_1;
-var hasRequiredBegin;
-
-function requireBegin () {
-	if (hasRequiredBegin) return begin_1;
-	hasRequiredBegin = 1;
-	let beginCommand = requireBeginCommand();
-	let executeQuery = requireExecuteQuery();
-	let setSessionSingleton = requireSetSessionSingleton();
-
-	function begin(context, options) {
-		if (options && options.suppressSyncOutbox)
-			setSessionSingleton(context, 'suppressSyncOutbox', true);
-		if (isTransactionLess(options)) {
-			setSessionSingleton(context, 'transactionLess', true);
-			return Promise.resolve();
-		}
-		return executeQuery(context, beginCommand(context));
-	}
-
-	function isTransactionLess(options) {
-		if (options && options.transactionLess)
-			return true;
-		if (options && options.readonly)
-			return true;
-		return false;
-	}
-
-	begin_1 = begin;
-	return begin_1;
-}
-
-var promisify_1;
-var hasRequiredPromisify;
-
-function requirePromisify () {
-	if (hasRequiredPromisify) return promisify_1;
-	hasRequiredPromisify = 1;
-	function promisify(original) {
-		if (typeof original !== 'function') {
-			throw new TypeError('The "original" argument must be of type Function');
-		}
-
-		return function(...args) {
-			return new Promise((resolve, reject) => {
-				// Add the callback that Node-style APIs expect
-				function callback(err, ...values) {
-					if (err) {
-						return reject(err);
-					}
-					// If there's exactly one success value, return it;
-					// otherwise, return all values as an array.
-					return resolve(values.length > 1 ? values : values[0]);
-				}
-
-				// Call the original function, appending our callback
-				original.call(this, ...args, callback);
-			});
-		};
-	}
-
-	promisify_1 = promisify;
-	return promisify_1;
-}
-
-var end$2;
-var hasRequiredEnd$2;
-
-function requireEnd$2 () {
-	if (hasRequiredEnd$2) return end$2;
-	hasRequiredEnd$2 = 1;
-	var pools = requirePools();
-
-	function endPool(genericPool, id, done) {
-		genericPool.drain(onDrained);
-
-		function onDrained() {
-			genericPool.destroyAllNow();
-			delete pools[id];
-			done();
-		}
-	}
-
-	end$2 = endPool;
-	return end$2;
-}
-
-var poolDefaults;
-var hasRequiredPoolDefaults;
-
-function requirePoolDefaults () {
-	if (hasRequiredPoolDefaults) return poolDefaults;
-	hasRequiredPoolDefaults = 1;
-	poolDefaults = {
-		//Connection pool options - see https://github.com/coopernurse/node-pool
-		//number of connections to use in connection pool
-		//0 will disable connection pooling
-		poolSize: 0,
-
-		//max milliseconds a client can go unused before it is removed
-		//from the pool and destroyed
-		poolIdleTimeout: 30000,
-
-		//frequeny to check for idle clients within the client pool
-		reapIntervalMillis: 1000,
-
-	};
-	return poolDefaults;
-}
-
-/* eslint-disable @typescript-eslint/no-this-alias */
-
-var genericPool;
-var hasRequiredGenericPool;
-
-function requireGenericPool () {
-	if (hasRequiredGenericPool) return genericPool;
-	hasRequiredGenericPool = 1;
-	/* @ts-nocheck */
-
-	/**
-	 * A helper function to schedule a callback in a cross-platform manner:
-	 * - Uses setImmediate if available (Node).
-	 * - Else uses queueMicrotask if available (Deno, modern browsers).
-	 * - Else falls back to setTimeout(fn, 0).
-	 */
-	function queueTask(fn) {
-		if (typeof setImmediate === 'function') {
-			setImmediate(fn);
-		}
-		else if
-		(typeof queueMicrotask === 'function') {
-			queueMicrotask(fn);
-		} else {
-			setTimeout(fn, 0);
-		}
-	}
-
-	/**
-	   * @class
-	   * @private
-	   */
-	function PriorityQueue(size) {
-		if (!(this instanceof PriorityQueue)) {
-			return new PriorityQueue(size);
-		}
-
-		this._size = Math.max(+size | 0, 1);
-		this._slots = [];
-		this._total = null;
-
-		// initialize arrays to hold queue elements
-		for (let i = 0; i < this._size; i += 1) {
-			this._slots.push([]);
-		}
-	}
-
-	PriorityQueue.prototype.size = function size() {
-		if (this._total === null) {
-			this._total = 0;
-			for (let i = 0; i < this._size; i += 1) {
-				this._total += this._slots[i].length;
-			}
-		}
-		return this._total;
-	};
-
-	PriorityQueue.prototype.enqueue = function enqueue(obj, priority) {
-		// Convert to integer with a default value of 0.
-		priority = priority && +priority | 0 || 0;
-		this._total = null;
-		if (priority < 0 || priority >= this._size) {
-			console.error(
-				'invalid priority: ' + priority + ' must be between 0 and ' + (this._size - 1)
-			);
-			priority = this._size - 1; // put obj at the end of the line
-		}
-		this._slots[priority].push(obj);
-	};
-
-	PriorityQueue.prototype.dequeue = function dequeue() {
-		let obj = null;
-		this._total = null;
-		for (let i = 0, sl = this._slots.length; i < sl; i += 1) {
-			if (this._slots[i].length) {
-				obj = this._slots[i].shift();
-				break;
-			}
-		}
-		return obj;
-	};
-
-	function doWhileAsync(conditionFn, iterateFn, callbackFn) {
-		const next = function() {
-			if (conditionFn()) {
-				iterateFn(next);
-			} else {
-				callbackFn();
-			}
-		};
-		next();
-	}
-
-	/**
-	   * Generate an Object pool with a specified `factory`.
-	   *
-	   * @class
-	   * @param {Object} factory
-	   *   Factory to be used for generating and destroying the items.
-	   * @param {String} factory.name
-	   * @param {Function} factory.create
-	   * @param {Function} factory.destroy
-	   * @param {Function} factory.validate
-	   * @param {Function} factory.validateAsync
-	   * @param {Number} factory.max
-	   * @param {Number} factory.min
-	   * @param {Number} factory.idleTimeoutMillis
-	   * @param {Number} factory.reapIntervalMillis
-	   * @param {Boolean|Function} factory.log
-	   * @param {Number} factory.priorityRange
-	   * @param {Boolean} factory.refreshIdle
-	   * @param {Boolean} [factory.returnToHead=false]
-	   */
-	function Pool(factory) {
-		if (!(this instanceof Pool)) {
-			return new Pool(factory);
-		}
-		if (factory.validate && factory.validateAsync) {
-			throw new Error('Only one of validate or validateAsync may be specified');
-		}
-
-		// defaults
-		factory.idleTimeoutMillis = factory.idleTimeoutMillis || 30000;
-		factory.returnToHead = factory.returnToHead || false;
-		factory.refreshIdle = ('refreshIdle' in factory) ? factory.refreshIdle : true;
-		factory.reapInterval = factory.reapIntervalMillis || 1000;
-		factory.priorityRange = factory.priorityRange || 1;
-		factory.validate = factory.validate || function() {
-			return true;
-		};
-
-		factory.max = parseInt(factory.max, 10);
-		factory.min = parseInt(factory.min, 10);
-		factory.max = Math.max(isNaN(factory.max) ? 1 : factory.max, 1);
-		factory.min = Math.min(isNaN(factory.min) ? 0 : factory.min, factory.max - 1);
-
-		this._factory = factory;
-		this._inUseObjects = [];
-		this._draining = false;
-		this._waitingClients = new PriorityQueue(factory.priorityRange);
-		this._availableObjects = [];
-		this._asyncTestObjects = [];
-		this._count = 0;
-		this._removeIdleTimer = null;
-		this._removeIdleScheduled = false;
-
-		// create initial resources (if factory.min > 0)
-		this._ensureMinimum();
-	}
-
-	/**
-	   * logs to console or user-defined log function
-	   * @private
-	   * @param {string} str
-	   * @param {string} level
-	   */
-	Pool.prototype._log = function _log(str, level) {
-		if (typeof this._factory.log === 'function') {
-			this._factory.log(str, level);
-		} else if (this._factory.log) {
-			console.log(level.toUpperCase() + ' pool ' + this._factory.name + ' - ' + str);
-		}
-	};
-
-	/**
-	   * Request the client to be destroyed. The factory's destroy handler
-	   * will also be called.
-	   *
-	   * This should be called within an acquire() block as an alternative to release().
-	   *
-	   * @param {Object} obj
-	   *   The acquired item to be destroyed.
-	   * @param {Function} [cb]
-	   *   Optional. Callback invoked after client is destroyed
-	   */
-	Pool.prototype.destroy = function destroy(obj, cb) {
-		this._count -= 1;
-		if (this._count < 0) this._count = 0;
-
-		this._availableObjects = this._availableObjects.filter(
-			(objWithTimeout) => objWithTimeout.obj !== obj
-		);
-		this._inUseObjects = this._inUseObjects.filter(
-			(objInUse) => objInUse !== obj
-		);
-
-		this._factory.destroy(obj, cb);
-
-		// keep compatibility with old interface
-		if (this._factory.destroy.length === 1 && cb && typeof cb === 'function') {
-			cb();
-		}
-
-		this._ensureMinimum();
-	};
-
-	/**
-	   * Checks and removes the available (idle) clients that have timed out.
-	   * @private
-	   */
-	Pool.prototype._removeIdle = function _removeIdle() {
-		const now = new Date().getTime();
-		const refreshIdle = this._factory.refreshIdle;
-		const maxRemovable = this._count - this._factory.min;
-		const toRemove = [];
-
-		this._removeIdleScheduled = false;
-
-		for (let i = 0; i < this._availableObjects.length; i++) {
-			const objWithTimeout = this._availableObjects[i];
-			if (
-				now >= objWithTimeout.timeout &&
-				(refreshIdle || toRemove.length < maxRemovable)
-			) {
-				this._log(
-					'removeIdle() destroying obj - now:' +
-					now +
-					' timeout:' +
-					objWithTimeout.timeout,
-					'verbose'
-				);
-				toRemove.push(objWithTimeout.obj);
-			}
-		}
-
-		toRemove.forEach((obj) => this.destroy(obj));
-
-		if (this._availableObjects.length > 0) {
-			this._log(
-				'this._availableObjects.length=' + this._availableObjects.length,
-				'verbose'
-			);
-			this._scheduleRemoveIdle();
-		} else {
-			this._log('removeIdle() all objects removed', 'verbose');
-		}
-	};
-
-	/**
-	   * Schedule removal of idle items in the pool.
-	   *
-	   * More schedules cannot run concurrently.
-	   */
-	Pool.prototype._scheduleRemoveIdle = function _scheduleRemoveIdle() {
-		if (!this._removeIdleScheduled) {
-			this._removeIdleScheduled = true;
-			this._removeIdleTimer = setTimeout(() => {
-				this._removeIdle();
-			}, this._factory.reapInterval);
-		}
-	};
-
-	/**
-	   * Try to get a new client to work, and clean up pool unused (idle) items.
-	   *
-	   *  - If there are available clients waiting, shift the first one out,
-	   *    and call its callback.
-	   *  - If there are no waiting clients, try to create one if it won't exceed
-	   *    the maximum number of clients.
-	   *  - If creating a new client would exceed the maximum, add the client to
-	   *    the wait list.
-	   * @private
-	   */
-	Pool.prototype._dispense = function _dispense() {
-		const waitingCount = this._waitingClients.size();
-		this._log(
-			'dispense() clients=' +
-			waitingCount +
-			' available=' +
-			this._availableObjects.length,
-			'info'
-		);
-
-		if (waitingCount < 1) {
-			return;
-		}
-
-		if (this._factory.validateAsync) {
-			doWhileAsync(
-				() => this._availableObjects.length > 0,
-				this._createAsyncValidator(),
-				() => {
-					if (this._count < this._factory.max) {
-						this._createResource();
-					}
-				}
-			);
-			return;
-		}
-
-		while (this._availableObjects.length > 0) {
-			this._log('dispense() - reusing obj', 'verbose');
-			const objWithTimeout = this._availableObjects[0];
-
-			if (!this._factory.validate(objWithTimeout.obj)) {
-				this.destroy(objWithTimeout.obj);
-				continue;
-			}
-
-			this._availableObjects.shift();
-			this._inUseObjects.push(objWithTimeout.obj);
-			const clientCb = this._waitingClients.dequeue();
-			return clientCb(null, objWithTimeout.obj);
-		}
-
-		if (this._count < this._factory.max) {
-			this._createResource();
-		}
-	};
-
-	Pool.prototype._createAsyncValidator = function _createAsyncValidator() {
-		return (next) => {
-			this._log('dispense() - reusing obj', 'verbose');
-			const objWithTimeout = this._availableObjects.shift();
-			this._asyncTestObjects.push(objWithTimeout);
-
-			this._factory.validateAsync(objWithTimeout.obj, (valid) => {
-				const pos = this._asyncTestObjects.indexOf(objWithTimeout);
-				this._asyncTestObjects.splice(pos, 1);
-
-				if (!valid) {
-					this.destroy(objWithTimeout.obj);
-					return next();
-				}
-				if (this._waitingClients.size() < 1) {
-					// no longer anyone waiting for a resource
-					this._addResourceToAvailableObjects(objWithTimeout.obj);
-					return;
-				}
-
-				this._inUseObjects.push(objWithTimeout.obj);
-				const clientCb = this._waitingClients.dequeue();
-				clientCb(null, objWithTimeout.obj);
-			});
-		};
-	};
-
-	/**
-	   * @private
-	   */
-	Pool.prototype._createResource = function _createResource() {
-		this._count += 1;
-		this._log(
-			'createResource() - creating obj - count=' +
-			this._count +
-			' min=' +
-			this._factory.min +
-			' max=' +
-			this._factory.max,
-			'verbose'
-		);
-
-		this._factory.create((...args) => {
-			let err, obj;
-			if (args.length > 1) {
-				[err, obj] = args;
-			} else {
-				err = args[0] instanceof Error ? args[0] : null;
-				obj = args[0] instanceof Error ? null : args[0];
-			}
-
-			const clientCb = this._waitingClients.dequeue();
-
-			if (err) {
-				this._count -= 1;
-				if (this._count < 0) this._count = 0;
-				if (clientCb) {
-					clientCb(err, obj);
-				}
-				// queueTask to simulate process.nextTick
-				queueTask(() => {
-					this._dispense();
-				});
-			} else {
-				this._inUseObjects.push(obj);
-				if (clientCb) {
-					clientCb(null, obj);
-				} else {
-					this._addResourceToAvailableObjects(obj);
-				}
-			}
-		});
-	};
-
-	Pool.prototype._addResourceToAvailableObjects = function(obj) {
-		const objWithTimeout = {
-			obj,
-			timeout: new Date().getTime() + this._factory.idleTimeoutMillis,
-		};
-		if (this._factory.returnToHead) {
-			this._availableObjects.unshift(objWithTimeout);
-		} else {
-			this._availableObjects.push(objWithTimeout);
-		}
-		this._dispense();
-		this._scheduleRemoveIdle();
-	};
-
-	/**
-	   * @private
-	   */
-	Pool.prototype._ensureMinimum = function _ensureMinimum() {
-		if (!this._draining && this._count < this._factory.min) {
-			const diff = this._factory.min - this._count;
-			for (let i = 0; i < diff; i++) {
-				this._createResource();
-			}
-		}
-	};
-
-	/**
-	   * Request a new client. The callback will be called
-	   * when a new client is available.
-	   *
-	   * @param {Function} callback
-	   * @param {Number} [priority]
-	   * @returns {Boolean} true if the pool is not fully utilized, false otherwise
-	   */
-	Pool.prototype.acquire = function acquire(callback, priority) {
-		if (this._draining) {
-			throw new Error('pool is draining and cannot accept work');
-		}
-		this._waitingClients.enqueue(callback, priority);
-		this._dispense();
-		return this._count < this._factory.max;
-	};
-
-	/**
-	   * @deprecated
-	   */
-	Pool.prototype.borrow = function borrow(callback, priority) {
-		this._log('borrow() is deprecated. use acquire() instead', 'warn');
-		return this.acquire(callback, priority);
-	};
-
-	/**
-	   * Return the client to the pool, indicating it is no longer needed.
-	   *
-	   * @param {Object} obj
-	   */
-	Pool.prototype.release = function release(obj) {
-		// Check whether this object has already been released
-		const alreadyReleased = this._availableObjects.some(o => o.obj === obj);
-		if (alreadyReleased) {
-			this._log(
-				'release called twice for the same resource: ' + new Error().stack,
-				'error'
-			);
-			return;
-		}
-
-		// remove from in-use list
-		const index = this._inUseObjects.indexOf(obj);
-		if (index < 0) {
-			this._log(
-				'attempt to release an invalid resource: ' + new Error().stack,
-				'error'
-			);
-			return;
-		}
-
-		this._inUseObjects.splice(index, 1);
-		this._addResourceToAvailableObjects(obj);
-	};
-
-	/**
-	   * @deprecated
-	   */
-	Pool.prototype.returnToPool = function returnToPool(obj) {
-		this._log('returnToPool() is deprecated. use release() instead', 'warn');
-		this.release(obj);
-	};
-
-	function invoke(cb) {
-		queueTask(cb);
-	}
-
-	/**
-	   * Disallow any new requests and let the request backlog dissipate.
-	   *
-	   * @param {Function} [callback]
-	   *   Callback invoked when all work is done and all clients have been released.
-	   */
-	Pool.prototype.drain = function drain(callback) {
-		this._log('draining', 'info');
-		this._draining = true;
-
-		const check = () => {
-			if (this._waitingClients.size() > 0) {
-				// wait until all client requests have been satisfied
-				return setTimeout(check, 100);
-			}
-			if (this._asyncTestObjects.length > 0) {
-				// wait until async validations are done
-				return setTimeout(check, 100);
-			}
-			if (this._availableObjects.length !== this._count) {
-				// wait until in-use objects have been released
-				return setTimeout(check, 100);
-			}
-			if (callback) {
-				invoke(callback);
-			}
-		};
-		check();
-	};
-
-	/**
-	   * Forcibly destroys all clients regardless of timeout.
-	   * Does not prevent creation of new clients from subsequent calls to acquire.
-	   *
-	   * If factory.min > 0, the pool will destroy all idle resources
-	   * but replace them with newly created resources up to factory.min.
-	   * If this is not desired, set factory.min to zero before calling.
-	   *
-	   * @param {Function} [callback]
-	   *   Invoked after all existing clients are destroyed.
-	   */
-	Pool.prototype.destroyAllNow = function destroyAllNow(callback) {
-		this._log('force destroying all objects', 'info');
-		const willDie = this._availableObjects;
-		this._availableObjects = [];
-		const todo = willDie.length;
-		let done = 0;
-
-		this._removeIdleScheduled = false;
-		clearTimeout(this._removeIdleTimer);
-
-		if (todo === 0 && callback) {
-			invoke(callback);
-			return;
-		}
-
-		while (willDie.length > 0) {
-			const { obj } = willDie.shift();
-			this.destroy(obj, () => {
-				done += 1;
-				if (done === todo && callback) {
-					invoke(callback);
-				}
-			});
-		}
-	};
-
-	/**
-	   * Decorates a function to use an acquired client from the pool when called.
-	   *
-	   * @param {Function} decorated
-	   * @param {Number} [priority]
-	   */
-	Pool.prototype.pooled = function pooled(decorated, priority) {
-		return (...args) => {
-			const callerCallback = args[args.length - 1];
-			const callerHasCallback = typeof callerCallback === 'function';
-
-			this.acquire((err, client) => {
-				if (err) {
-					if (callerHasCallback) {
-						callerCallback(err);
-					}
-					return;
-				}
-
-				// We pass everything except the user's final callback
-				const invokeArgs = [client].concat(
-					args.slice(0, callerHasCallback ? -1 : undefined)
-				);
-				// then the final callback after we release the resource
-				invokeArgs.push((...cbArgs) => {
-					this.release(client);
-					if (callerHasCallback) {
-						callerCallback(...cbArgs);
-					}
-				});
-
-				decorated(...invokeArgs);
-			}, priority);
-		};
-	};
-
-	Pool.prototype.getPoolSize = function getPoolSize() {
-		return this._count;
-	};
-
-	Pool.prototype.getName = function getName() {
-		return this._factory.name;
-	};
-
-	Pool.prototype.availableObjectsCount = function availableObjectsCount() {
-		return this._availableObjects.length;
-	};
-
-	Pool.prototype.inUseObjectsCount = function inUseObjectsCount() {
-		return this._inUseObjects.length;
-	};
-
-	Pool.prototype.waitingClientsCount = function waitingClientsCount() {
-		return this._waitingClients.size();
-	};
-
-	Pool.prototype.getMaxPoolSize = function getMaxPoolSize() {
-		return this._factory.max;
-	};
-
-	Pool.prototype.getMinPoolSize = function getMinPoolSize() {
-		return this._factory.min;
-	};
-
-	genericPool = { Pool };
-	return genericPool;
-}
-
-/* eslint-disable no-prototype-builtins */
-
-var newGenericPool_1;
-var hasRequiredNewGenericPool;
-
-function requireNewGenericPool () {
-	if (hasRequiredNewGenericPool) return newGenericPool_1;
-	hasRequiredNewGenericPool = 1;
-	var defaults = requirePoolDefaults();
-	var genericPool = requireGenericPool();
-
-	function newGenericPool(d1Database, poolOptions) {
-		poolOptions = poolOptions || {};
-		// @ts-ignore
-		var pool = genericPool.Pool({
-			min: poolOptions.min || 0,
-			max: 1,
-			idleTimeoutMillis: poolOptions.idleTimeout || defaults.poolIdleTimeout,
-			reapIntervalMillis: poolOptions.reapIntervalMillis || defaults.reapIntervalMillis,
-			log: poolOptions.log || defaults.poolLog,
-			create: function(cb) {
-				var client = {d1: d1Database, poolCount: 0};
-
-				return cb(null, client);
-			},
-
-			destroy: function() {
-			}
-		});
-		//monkey-patch with connect method
-		pool.connect = function(cb) {
-
-			pool.acquire(function(err, client) {
-				if(err)  return cb(err, null, function() {/*NOOP*/});
-				client.poolCount++;
-				cb(null, client, function(err) {
-					if(err) {
-						pool.destroy(client);
-					} else {
-						pool.release(client);
-					}
-				});
-			});
-		};
-		return pool;
-	}
-
-	newGenericPool_1 = newGenericPool;
-	return newGenericPool_1;
-}
-
-var newPool_1$3;
-var hasRequiredNewPool$3;
-
-function requireNewPool$3 () {
-	if (hasRequiredNewPool$3) return newPool_1$3;
-	hasRequiredNewPool$3 = 1;
-	const promisify = requirePromisify();
-	const pools = requirePools();
-	const end = requireEnd$2();
-	const newGenericPool = requireNewGenericPool();
-	const newId = requireNewId();
-
-	function newPool(d1Database, poolOptions) {
-		var pool = newGenericPool(d1Database, poolOptions);
-		var id = newId();
-		var boundEnd = end.bind(null, pool, id);
-		var c = {};
-
-		c.connect = pool.connect;
-		c.end = promisify(boundEnd);
-		pools[id] = c;
-		return c;
-	}
-
-	newPool_1$3 = newPool;
-	return newPool_1$3;
-}
-
-var newDatabase_1$3;
-var hasRequiredNewDatabase$3;
-
-function requireNewDatabase$3 () {
-	if (hasRequiredNewDatabase$3) return newDatabase_1$3;
-	hasRequiredNewDatabase$3 = 1;
-	let createDomain = requireCreateDomain();
-	let newTransaction = requireNewTransaction$3();
-	let _begin = requireBegin();
-	let commit = requireCommit();
-	let rollback = requireRollback();
-	let newPool = requireNewPool$3();
-	let express = requireHostExpress();
-	let hono = requireHostHono();
-	let hostLocal = requireHostLocal();
-	let doQuery = requireQuery();
-	let releaseDbClient = requireReleaseDbClient();
-
-	function newDatabase(d1Database, poolOptions) {
-		if (!d1Database)
-			throw new Error('Missing d1Database');
-		poolOptions = poolOptions || { min: 1 };
-		var pool = newPool(d1Database, poolOptions);
-
-		let c = { poolFactory: pool, hostLocal, express, hono };
-
-		c.transaction = function(options, fn) {
-			if ((arguments.length === 1) && (typeof options === 'function')) {
-				fn = options;
-				options = undefined;
-			}
-			let domain = createDomain();
-
-			if (!fn)
-				throw new Error('transaction requires a function');
-			return domain.run(runInTransaction);
-
-			async function runInTransaction() {
-				let result;
-				let transaction = newTransaction(domain, pool, options);
-				await new Promise(transaction)
-					.then(begin)
-					.then(() => fn(domain))
-					.then((res) => result = res)
-					.then(() => c.commit(domain))
-					.then(null, (e) =>  c.rollback(domain,e));
-				return result;
-			}
-
-			function begin() {
-				return _begin(domain, { transactionLess: true });
-			}
-
-
-		};
-
-		c.createTransaction = function(options) {
-			let domain = createDomain();
-			let transaction = newTransaction(domain, pool, options);
-			let p = domain.run(() => new Promise(transaction).then(begin));
-
-			function run(fn) {
-				return p.then(domain.run.bind(domain, fn));
-			}
-
-			function begin() {
-				return _begin(domain, options);
-			}
-
-			run.rollback = rollback.bind(null, domain);
-			run.commit = commit.bind(null, domain);
-
-			return run;
-
-		};
-
-		c.query = function(query) {
-			let domain = createDomain();
-			let transaction = newTransaction(domain, pool);
-			let p = domain.run(() => new Promise(transaction)
-				.then(() => doQuery(domain, query).then(onResult, onError)));
-			return p;
-
-			function onResult(result) {
-				releaseDbClient(domain);
-				return result;
-			}
-
-			function onError(e) {
-				releaseDbClient(domain);
-				throw e;
-			}
-		};
-
-		c.rollback = rollback;
-		c.commit = commit;
-
-		c.end = function() {
-			if (poolOptions)
-				return pool.end();
-			else
-				return Promise.resolve();
-		};
-
-		c.accept = function(caller) {
-			caller.visitSqlite();
-		};
-
-		return c;
-	}
-
-	newDatabase_1$3 = newDatabase;
-	return newDatabase_1$3;
-}
-
-var replaceParamChar_1;
-var hasRequiredReplaceParamChar;
-
-function requireReplaceParamChar () {
-	if (hasRequiredReplaceParamChar) return replaceParamChar_1;
-	hasRequiredReplaceParamChar = 1;
-	function replaceParamChar(query, params) {
-		if (params.length === 0)
-			return query.sql();
-		var splitted = query.sql().split('?');
-		var sql = '';
-		var lastIndex = splitted.length - 1;
-		for (var i = 0; i < lastIndex; i++) {
-			sql += splitted[i] + '$' + (i + 1);
-		}
-		sql += splitted[lastIndex];
-		return sql;
-	}
-
-	replaceParamChar_1 = replaceParamChar;
-	return replaceParamChar_1;
-}
-
-var wrapQuery_1$1;
-var hasRequiredWrapQuery$1;
-
-function requireWrapQuery$1 () {
-	if (hasRequiredWrapQuery$1) return wrapQuery_1$1;
-	hasRequiredWrapQuery$1 = 1;
-	var log = requireLog();
-	var replaceParamChar = requireReplaceParamChar();
-
-	function wrapQuery(_context, connection) {
-		var runOriginalQuery = connection.query;
-		return runQuery;
-
-		function runQuery(query, onCompleted) {
-			var params = query.parameters;
-			var sql = replaceParamChar(query, params);
-			var completeQuery = log.startQuery({sql, parameters: params});
-			runOriginalQuery.call(connection, sql, params).then((result) => onInnerCompleted(null, result), (e) => onInnerCompleted(e));
-
-			function onInnerCompleted(err, result) {
-				completeQuery(err);
-				if (err)
-					onCompleted(err);
-				else {
-					if (Array.isArray(result))
-						result = result[result.length-1];
-					onCompleted(null, result.rows);
-				}
-			}
-		}
-
-	}
-
-	wrapQuery_1$1 = wrapQuery;
-	return wrapQuery_1$1;
-}
-
-var wrapCommand_1$1;
-var hasRequiredWrapCommand$1;
-
-function requireWrapCommand$1 () {
-	if (hasRequiredWrapCommand$1) return wrapCommand_1$1;
-	hasRequiredWrapCommand$1 = 1;
-	var log = requireLog();
-	var replaceParamChar = requireReplaceParamChar();
-
-	function wrapCommand(_context, connection) {
-		var runOriginalQuery = connection.query;
-		return runQuery;
-
-		function runQuery(query, onCompleted) {
-			var params = query.parameters;
-			var sql = replaceParamChar(query, params);
-			var completeQuery = log.startQuery({ sql, parameters: params });
-
-			runOriginalQuery
-				.call(connection, sql, params)
-				.then(
-					(result) => onInnerCompleted(null, result),
-					(e) => onInnerCompleted(e)
-				);
-
-			function onInnerCompleted(err, result) {
-				completeQuery(err);
-				if (err) return onCompleted(err);
-
-				if (Array.isArray(result)) result = result[result.length - 1];
-
-				onCompleted(null, { rowsAffected: result.affectedRows });
-			}
-		}
-	}
-
-	wrapCommand_1$1 = wrapCommand;
-	return wrapCommand_1$1;
-}
-
-var encodeDate_1;
-var hasRequiredEncodeDate;
-
-function requireEncodeDate () {
-	if (hasRequiredEncodeDate) return encodeDate_1;
-	hasRequiredEncodeDate = 1;
-	function encodeDate(date) {
-		if (date.toISOString)
-			return  '\'' + date.toISOString() + '\'';
-		return '\'' + date + '\'';
-	}
-
-	encodeDate_1 = encodeDate;
-	return encodeDate_1;
-}
-
-var encodeBinary_1;
-var hasRequiredEncodeBinary;
-
-function requireEncodeBinary () {
-	if (hasRequiredEncodeBinary) return encodeBinary_1;
-	hasRequiredEncodeBinary = 1;
-	function encodeBinary(base64) {
-		// Decode base64 to a binary string
-		const binaryString = atob(base64);
-
-		// Create a new Uint8Array with the same length as the binary string
-		const len = binaryString.length;
-		const bytes = new Uint8Array(len);
-
-		// Populate the Uint8Array with numeric character codes
-		for (let i = 0; i < len; i++) {
-			bytes[i] = binaryString.charCodeAt(i);
-		}
-
-		return bytes;
-	}
-
-	encodeBinary_1 = encodeBinary;
-	return encodeBinary_1;
-}
-
-var decodeBinary_1;
-var hasRequiredDecodeBinary;
-
-function requireDecodeBinary () {
-	if (hasRequiredDecodeBinary) return decodeBinary_1;
-	hasRequiredDecodeBinary = 1;
-	function decodeBinary(u8Arr) {
-		let binaryString = '';
-		for (let i = 0; i < u8Arr.length; i++) {
-			binaryString += String.fromCharCode(u8Arr[i]);
-		}
-		return btoa(binaryString);
-	}
-
-	decodeBinary_1 = decodeBinary;
-	return decodeBinary_1;
-}
-
-var quote;
-var hasRequiredQuote;
-
-function requireQuote () {
-	if (hasRequiredQuote) return quote;
-	hasRequiredQuote = 1;
-	quote = (name) => `"${name}"`;
-	return quote;
-}
-
-var deleteFromSql_1;
-var hasRequiredDeleteFromSql;
-
-function requireDeleteFromSql () {
-	if (hasRequiredDeleteFromSql) return deleteFromSql_1;
-	hasRequiredDeleteFromSql = 1;
-	const format = 'delete from %s %s%s';
-	const formatString = requireFormat();
-	const quote = requireQuote();
-
-	function deleteFromSql(table, alias, whereSql) {
-		const name = quote(table._dbName);
-		alias = quote(alias);
-		return formatString(format, name, alias, whereSql);
-	}
-	deleteFromSql_1 = deleteFromSql;
-	return deleteFromSql_1;
-}
-
-var selectForUpdateSql;
-var hasRequiredSelectForUpdateSql;
-
-function requireSelectForUpdateSql () {
-	if (hasRequiredSelectForUpdateSql) return selectForUpdateSql;
-	hasRequiredSelectForUpdateSql = 1;
-	const quote = requireQuote$2();
-
-	selectForUpdateSql = function(context, lock) {
-		if (typeof lock === 'string')
-			lock = { aliases: [lock], forUpdate: true };
-		let sql = '';
-		if (lock.forUpdate) {
-			sql = ' FOR UPDATE';
-			if (lock.aliases && lock.aliases.length > 0)
-				sql += ' OF ' + lock.aliases.map(alias => quote(context, alias)).join(', ');
-		}
-		if (lock.skipLocked)
-			sql += ' SKIP LOCKED';
-		return sql;
-	};
-	return selectForUpdateSql;
-}
-
-var limitAndOffset_1;
-var hasRequiredLimitAndOffset;
-
-function requireLimitAndOffset () {
-	if (hasRequiredLimitAndOffset) return limitAndOffset_1;
-	hasRequiredLimitAndOffset = 1;
-	function limitAndOffset(span) {
-		if (span.offset)
-			return ` limit ${limit()} offset ${span.offset}`;
-		else if (span.limit || span.limit === 0)
-			return ` limit ${span.limit}`;
-		else
-			return '';
-
-		function limit() {
-			if (span.limit || span.limit === 0)
-				return span.limit;
-			else
-				return 'all';
-		}
-
-	}
-
-	limitAndOffset_1 = limitAndOffset;
-	return limitAndOffset_1;
-}
-
-var formatDateOut_1;
-var hasRequiredFormatDateOut;
-
-function requireFormatDateOut () {
-	if (hasRequiredFormatDateOut) return formatDateOut_1;
-	hasRequiredFormatDateOut = 1;
-	function formatDateOut(column, alias) {
-		if (alias)
-			return `${alias}."${(column._dbName)}"::text`;
-		else
-			return `"${(column._dbName)}"::text`;
-	}
-
-	formatDateOut_1 = formatDateOut;
-	return formatDateOut_1;
-}
-
-var lastInsertedSql_1;
-var hasRequiredLastInsertedSql;
-
-function requireLastInsertedSql () {
-	if (hasRequiredLastInsertedSql) return lastInsertedSql_1;
-	hasRequiredLastInsertedSql = 1;
-	const quote = requireQuote();
-
-	function lastInsertedSql(table) {
-		let separator = '';
-		let result = 'RETURNING ';
-		for (let i = 0; i < table._columns.length; i++) {
-			result += separator + quote(table._columns[i]._dbName);
-			separator = ',';
-		}
-		return result;
-	}
-
-	lastInsertedSql_1 = lastInsertedSql;
-	return lastInsertedSql_1;
-}
-
-var insertSql_1;
-var hasRequiredInsertSql;
-
-function requireInsertSql () {
-	if (hasRequiredInsertSql) return insertSql_1;
-	hasRequiredInsertSql = 1;
-	let lastInsertedSql = requireLastInsertedSql();
-	const quote = requireQuote();
-
-	function insertSql(_context, table, row, options) {
-		let columnNames = [];
-		let conflictColumnUpdateSql = '';
-		let values = [];
-		let sql = 'INSERT INTO ' + quote(table._dbName) + ' ';
-		addDiscriminators();
-		addColumns();
-		if (columnNames.length === 0)
-			sql += `${outputInserted()}DEFAULT VALUES ${lastInsertedSql(table)}`;
-		else
-			sql = sql + '(' + columnNames.join(',') + ') ' + outputInserted() + 'VALUES (' + values.join(',') + ')' + onConflict() + lastInsertedSql(table);
-		return sql;
-
-		function onConflict() {
-			if (options.concurrency === 'skipOnConflict' || options.concurrency === 'overwrite') {
-				const primaryKeys = table._primaryColumns.map(x => quote(x._dbName)).join(',');
-				return ` ON CONFLICT(${primaryKeys}) ${conflictColumnUpdateSql} `;
-			}
-			else return '';
-		}
-
-		function addDiscriminators() {
-			let discriminators = table._columnDiscriminators;
-			for (let i = 0; i < discriminators.length; i++) {
-				let parts = discriminators[i].split('=');
-				columnNames.push(quote(parts[0]));
-				values.push(parts[1]);
-			}
-		}
-
-		function addColumns() {
-			let conflictColumnUpdates = [];
-			let columns = table._columns;
-			for (let i = 0; i < columns.length; i++) {
-				let column = columns[i];
-				const columnName = quote(column._dbName);
-				if (row['__' + column.alias] !== undefined) {
-					columnNames.push(columnName);
-					values.push('%s');
-					addConflictUpdate(column);
-				}
-			}
-			if (conflictColumnUpdates.length === 0)
-				conflictColumnUpdateSql = 'DO NOTHING';
-			else
-				conflictColumnUpdateSql = 'DO UPDATE SET ' + conflictColumnUpdates.join(',');
-
-			function addConflictUpdate(column) {
-				let concurrency = options[column.alias]?.concurrency || options.concurrency;
-				const columnName = quote(column._dbName);
-				const tableName = quote(table._dbName);
-				if (concurrency === 'overwrite')
-					conflictColumnUpdates.push(`${columnName}=EXCLUDED.${columnName}`);
-				else if (concurrency === 'optimistic')
-					conflictColumnUpdates.push(`${columnName} = CASE WHEN ${tableName}.${columnName} <> EXCLUDED.${columnName} THEN CAST(random()::int || '12345678-1234-1234-1234-123456789012Conflict when updating ${columnName}12345678-1234-1234-1234-123456789012' AS INTEGER) ELSE ${tableName}.${columnName} END`);
-			}
-		}
-
-
-		function outputInserted() {
-			return '';
-		}
-	}
-
-	insertSql_1 = insertSql;
-	return insertSql_1;
-}
-
-var insert;
-var hasRequiredInsert;
-
-function requireInsert () {
-	if (hasRequiredInsert) return insert;
-	hasRequiredInsert = 1;
-	let newInsertCommand = requireNewInsertCommand();
-	let newInsertCommandCore = requireNewInsertCommandCore();
-	let executeQueries = requireExecuteQueries();
-
-
-	function insertDefault(context, table, row, options) {
-		let insertCmd = newInsertCommand(newInsertCommandCore.bind(null, context), table, row, options);
-		insertCmd.disallowCompress = true;
-
-		return executeQueries(context, [insertCmd]).then((result) => result[result.length - 1]);
-
-	}
-
-	insert = insertDefault;
-	return insert;
-}
-
-var newTransaction$2;
-var hasRequiredNewTransaction$2;
-
-function requireNewTransaction$2 () {
-	if (hasRequiredNewTransaction$2) return newTransaction$2;
-	hasRequiredNewTransaction$2 = 1;
-	var wrapQuery = requireWrapQuery$1();
-	var wrapCommand = requireWrapCommand$1();
-	var encodeDate = requireEncodeDate();
-	const encodeBinary = requireEncodeBinary();
-	const decodeBinary = requireDecodeBinary();
-	var deleteFromSql = requireDeleteFromSql();
-	var selectForUpdateSql = requireSelectForUpdateSql();
-	var limitAndOffset = requireLimitAndOffset();
-	var formatDateOut = requireFormatDateOut();
-	var insertSql = requireInsertSql();
-	var insert = requireInsert();
-	var quote = requireQuote();
-
-	function newResolveTransaction(domain, pool, { readonly = false } = {}) {
-		var rdb = { poolFactory: pool };
-		if (!pool.connect)
-			pool = pool();
-
-		rdb.engine = 'pg';
-		rdb.encodeDate = encodeDate;
-		rdb.encodeBinary = encodeBinary;
-		rdb.decodeBinary = decodeBinary;
-		rdb.formatDateOut = formatDateOut;
-		rdb.deleteFromSql = deleteFromSql;
-		rdb.selectForUpdateSql = selectForUpdateSql;
-		rdb.lastInsertedIsSeparate = false;
-		rdb.insertSql = insertSql;
-		rdb.insert = insert;
-		rdb.multipleStatements = true;
-		rdb.limitAndOffset = limitAndOffset;
-		rdb.accept = function(caller) {
-			caller.visitPg();
-		};
-		rdb.aggregateCount = 0;
-		rdb.quote = quote;
-		rdb.cache = {};
-		rdb.changes = [];
-
-		if (readonly) {
-			rdb.dbClient = {
-				executeQuery: function(query, callback) {
-					pool.connect((err, client, done) => {
-						if (err) {
-							return callback(err);
-						}
-						try {
-							wrapQuery(domain, client)(query, (err, res) => {
-								done();
-								callback(err, res);
-							});
-						} catch (e) {
-							done();
-							callback(e);
-						}
-					});
-				},
-				executeCommand: function(query, callback) {
-					pool.connect((err, client, done) => {
-						if (err) {
-							return callback(err);
-						}
-						try {
-							wrapCommand(domain, client)(query, (err, res) => {
-								done();
-								callback(err, res);
-							});
-						} catch (e) {
-							done();
-							callback(e);
-						}
-					});
-				}
-			};
-			domain.rdb = rdb;
-			return (onSuccess) => onSuccess();
-		}
-
-		return function(onSuccess, onError) {
-			pool.connect(onConnected);
-
-			function onConnected(err, client, done) {
-				try {
-					if (err) {
-						onError(err);
-						return;
-					}
-					client.executeQuery = wrapQuery(domain, client);
-					client.executeCommand = wrapCommand(domain, client);
-					rdb.dbClient = client;
-					rdb.dbClientDone = done;
-					domain.rdb = rdb;
-					onSuccess();
-				} catch (e) {
-					onError(e);
-				}
-			}
-		};
-	}
-
-	newTransaction$2 = newResolveTransaction;
-	return newTransaction$2;
-}
-
-var end$1;
-var hasRequiredEnd$1;
-
-function requireEnd$1 () {
-	if (hasRequiredEnd$1) return end$1;
-	hasRequiredEnd$1 = 1;
-	var pools = requirePools();
-
-	function endPool(pgPool, id, done) {
-		pgPool.drain(onDrained);
-
-		function onDrained() {
-			//todo await
-			pgPool.destroyAllNow();
-			delete pools[id];
-			done();
-		}
-	}
-
-	end$1 = endPool;
-	return end$1;
-}
-
-/* eslint-disable no-prototype-builtins */
-
-var newPgPool_1$1;
-var hasRequiredNewPgPool$1;
-
-function requireNewPgPool$1 () {
-	if (hasRequiredNewPgPool$1) return newPgPool_1$1;
-	hasRequiredNewPgPool$1 = 1;
-	// Simplified pool creator using URL API and handling search_path param
-
-	const log = requireLog();
-	const defaults = requirePoolDefaults();
-	const genericPool = requireGenericPool();
-	let PGlite;
-
-	function newPgPool(connectionString, poolOptions = {}) {
-		let { connStr, searchPath } = extractSearchPath(connectionString);
-
-		//@ts-ignore
-		const pool = genericPool.Pool({
-			min: poolOptions.min || 0,
-			max: poolOptions.size || poolOptions.poolSize || defaults.poolSize,
-			idleTimeoutMillis: poolOptions.idleTimeout || defaults.poolIdleTimeout,
-			reapIntervalMillis: poolOptions.reapIntervalMillis || defaults.reapIntervalMillis,
-			log: poolOptions.log,
-
-			create: async (cb) => {
-				try {
-					if (!PGlite) ({ PGlite } = await import('@electric-sql/pglite'));
-					const client = connStr === undefined ? new PGlite() : new PGlite(connStr);
-					client.poolCount = 0;
-					await applySearchPath(client, searchPath);
-					cb(null, client);
-				} catch (err) {
-					cb(err, null);
-				}
-			},
-
-			destroy: (client) => {
-				client._destroying = true;
-				client.poolCount = undefined;
-				client.close();
-			},
-		});
-
-		pool.connect = (cb) => {
-			pool.acquire((err, client) => {
-				if (err) return cb(err, null, () => { });
-				client.poolCount++;
-				cb(null, client, (releaseErr) => {
-					releaseErr ? pool.destroy(client) : pool.release(client);
-				});
-			});
-		};
-
-		return pool;
-	}
-
-	async function applySearchPath(client, searchPath) {
-		if (searchPath) {
-			const sql = `SET search_path TO ${searchPath}`;
-			const completeQuery = log.startQuery({ sql, parameters: [] });
-			try {
-				await client.exec(sql);
-				completeQuery();
-			}
-			catch (e) {
-				completeQuery(e);
-				throw e;
-			}
-		}
-	}
-
-	function extractSearchPath(connectionString) {
-		let connStr = connectionString;
-		let searchPath;
-
-		// Guard: nothing to do
-		if (typeof connectionString !== 'string' || connectionString.length === 0) {
-			return { connStr, searchPath };
-		}
-
-		// Split on the *first* "?" only
-		const qPos = connectionString.indexOf('?');
-		if (qPos === -1) {
-			// No query-string segment
-			return { connStr, searchPath };
-		}
-
-		const pathPart = connectionString.slice(0, qPos);
-		const qsPart = connectionString.slice(qPos + 1);
-
-		// Robust query-string handling via URLSearchParams
-		const params = new URLSearchParams(qsPart);
-
-		const paramName = 'search_path';
-
-		{
-			searchPath = params.get(paramName);
-			params.delete(paramName);
-		}
-
-		// Re-assemble the cleaned connection string
-		const remainingQs = params.toString();
-		connStr = remainingQs ? `${pathPart}?${remainingQs}` : pathPart;
-
-		return { connStr, searchPath };
-	}
-
-
-	newPgPool_1$1 = newPgPool;
-	return newPgPool_1$1;
-}
-
-var newPool_1$2;
-var hasRequiredNewPool$2;
-
-function requireNewPool$2 () {
-	if (hasRequiredNewPool$2) return newPool_1$2;
-	hasRequiredNewPool$2 = 1;
-	const promisify = requirePromisify();
-	const pools = requirePools();
-	const end = requireEnd$1();
-	const newPgPool = requireNewPgPool$1();
-	const newId = requireNewId();
-
-	function newPool(connectionString, poolOptions) {
-		let pool = newPgPool(connectionString, poolOptions);
-		let id = newId();
-		let boundEnd = end.bind(null, pool, id);
-		let c = {};
-
-		c.connect = pool.connect;
-		c.end = promisify(boundEnd);
-		pools[id] = c;
-		return c;
-	}
-
-	newPool_1$2 = newPool;
-	return newPool_1$2;
-}
-
-var newDatabase_1$2;
-var hasRequiredNewDatabase$2;
-
-function requireNewDatabase$2 () {
-	if (hasRequiredNewDatabase$2) return newDatabase_1$2;
-	hasRequiredNewDatabase$2 = 1;
-	let createDomain = requireCreateDomain();
-	let newTransaction = requireNewTransaction$2();
-	let _begin = requireBegin();
-	let commit = requireCommit();
-	let rollback = requireRollback();
-	let newPool = requireNewPool$2();
-	let lock = requireLock();
-	let executeSchema = requireSchema();
-	let express = requireHostExpress();
-	let hono = requireHostHono();
-	let hostLocal = requireHostLocal();
-	let doQuery = requireQuery();
-	let releaseDbClient = requireReleaseDbClient();
-
-	function newDatabase(connectionString, poolOptions) {
-		poolOptions = poolOptions || { min: 1 };
-		var pool = newPool(connectionString, poolOptions);
-
-		let c = { poolFactory: pool, hostLocal, express, hono };
-
-		c.transaction = function(options, fn) {
-			if ((arguments.length === 1) && (typeof options === 'function')) {
-				fn = options;
-				options = undefined;
-			}
-			let domain = createDomain();
-
-			if (!fn)
-				throw new Error('transaction requires a function');
-			return domain.run(runInTransaction);
-
-			async function runInTransaction() {
-				let result;
-				let transaction = newTransaction(domain, pool, options);
-				await new Promise(transaction)
-					.then(begin)
-					.then(negotiateSchema)
-					.then(() => fn(domain))
-					.then((res) => result = res)
-					.then(() => commit(domain))
-					.then(null, (e) => rollback(domain,e));
-				return result;
-			}
-
-			function begin() {
-				return _begin(domain, options);
-			}
-
-
-			function negotiateSchema(previous) {
-				let schema = options && options.schema;
-				if (!schema)
-					return previous;
-				return executeSchema(domain, schema);
-			}
-		};
-
-		c.createTransaction = function(options) {
-			let domain = createDomain();
-			let transaction = newTransaction(domain, pool, options);
-			let p = domain.run(() => new Promise(transaction)
-				.then(begin).then(negotiateSchema));
-
-			function run(fn) {
-				return p.then(domain.run.bind(domain, fn));
-			}
-
-			function begin() {
-				return _begin(domain, options);
-			}
-
-			function negotiateSchema(previous) {
-				let schema = options && options.schema;
-				if (!schema)
-					return previous;
-				return executeSchema(domain,schema);
-			}
-
-			run.rollback = rollback.bind(null, domain);
-			run.commit = commit.bind(null, domain);
-
-			return run;
-		};
-
-		c.query = function(query) {
-			let domain = createDomain();
-			let transaction = newTransaction(domain, pool);
-			let p = domain.run(() => new Promise(transaction)
-				.then(() => doQuery(domain, query).then(onResult, onError)));
-			return p;
-
-			function onResult(result) {
-				releaseDbClient(domain);
-				return result;
-			}
-
-			function onError(e) {
-				releaseDbClient(domain);
-				throw e;
-			}
-		};
-
-		c.rollback = rollback;
-		c.commit = commit;
-		c.lock = lock;
-		c.schema = executeSchema;
-
-		c.end = function() {
-			if (poolOptions)
-				return pool.end();
-			else
-				return Promise.resolve();
-		};
-
-		c.accept = function(caller) {
-			caller.visitPg();
-		};
-
-		return c;
-	}
-
-	newDatabase_1$2 = newDatabase;
-	return newDatabase_1$2;
-}
-
-var newTransaction$1;
-var hasRequiredNewTransaction$1;
-
-function requireNewTransaction$1 () {
-	if (hasRequiredNewTransaction$1) return newTransaction$1;
-	hasRequiredNewTransaction$1 = 1;
-	const encodeBoolean = requireEncodeBoolean$1();
-	const encodeBinary = requireEncodeBinary();
-	const decodeBinary = requireDecodeBinary();
-	const deleteFromSql = requireDeleteFromSql$1();
-	const selectForUpdateSql = requireSelectForUpdateSql$1();
-	const lastInsertedSql = requireLastInsertedSql$1();
-	const limitAndOffset = requireLimitAndOffset$1();
-	const formatBigintOut = requireFormatBigintOut();
-	const insertSql = requireInsertSql$1();
-	const insert = requireInsert$1();
-	const batchInsert = requireBatchInsert();
-	const quote = requireQuote$1();
-
-	function newResolveTransaction(domain, pool, { readonly = false, priority } = {})  {
-		var rdb = { poolFactory: pool };
-		rdb.engine = 'sqlite';
-		rdb.maxParameters = 32766;
-		rdb.encodeBoolean = encodeBoolean;
-		rdb.encodeBinary = encodeBinary;
-		rdb.decodeBinary = decodeBinary;
-		rdb.decodeJSON = decodeJSON;
-		rdb.encodeJSON = JSON.stringify;
-		rdb.formatBigintOut = formatBigintOut;
-		rdb.deleteFromSql = deleteFromSql;
-		rdb.selectForUpdateSql = selectForUpdateSql;
-		rdb.lastInsertedSql = lastInsertedSql;
-		rdb.insertSql = insertSql;
-		rdb.insert = insert;
-		rdb.batchInsert = batchInsert;
-		rdb.lastInsertedIsSeparate = true;
-		rdb.multipleStatements = false;
-		rdb.limitAndOffset = limitAndOffset;
-		rdb.accept = function(caller) {
-			caller.visitSqlite();
-		};
-		rdb.aggregateCount = 0;
-		rdb.quote = quote;
-		rdb.cache = {};
-		rdb.changes = [];
-
-		if (readonly && typeof pool.connectRead === 'function') {
-			rdb.dbClient = {
-				executeQuery: function(query, callback) {
-					pool.connectRead((err, client, done) => {
-						if (err)
-							return callback(err);
-						try {
-							client.executeQuery(query, (err, res) => {
-								done(err);
-								callback(err, res);
-							});
-						}
-						catch (e) {
-							done(e);
-							callback(e);
-						}
-					}, priority);
-				},
-				executeCommand: function(query, callback) {
-					pool.connect((err, client, done) => {
-						if (err)
-							return callback(err);
-						try {
-							client.executeCommand(query, (err, res) => {
-								done(err);
-								callback(err, res);
-							});
-						}
-						catch (e) {
-							done(e);
-							callback(e);
-						}
-					}, priority);
-				}
-			};
-			domain.rdb = rdb;
-			return (onSuccess) => onSuccess();
-		}
-
-		return function(onSuccess, onError) {
-			pool.connect(onConnected, priority);
-
-			function onConnected(err, client, done) {
-				try {
-					if (err) {
-						onError(err);
-						return;
-					}
-					rdb.dbClient = client;
-					rdb.dbClientDone = done;
-					domain.rdb = rdb;
-					onSuccess();
-				} catch (e) {
-					onError(e);
-				}
-			}
-		};
-	}
-
-	function decodeJSON(value) {
-		return JSON.parse(value);
-	}
-
-	newTransaction$1 = newResolveTransaction;
-	return newTransaction$1;
-}
-
-var newPool_1$1;
-var hasRequiredNewPool$1;
-
-function requireNewPool$1 () {
-	if (hasRequiredNewPool$1) return newPool_1$1;
-	hasRequiredNewPool$1 = 1;
+var newPool_1;
+var hasRequiredNewPool;
+
+function requireNewPool () {
+	if (hasRequiredNewPool) return newPool_1;
+	hasRequiredNewPool = 1;
 	const pools = requirePools();
 	const newId = requireNewId();
 	const createSqliteOPFSWorkerClient = requireWorkerClient();
@@ -28555,11 +34865,357 @@ function requireNewPool$1 () {
 		};
 	}
 
-	newPool_1$1 = newPool;
-	return newPool_1$1;
+	newPool_1 = newPool;
+	return newPool_1;
 }
 
 var dualSyncDatabase = {exports: {}};
+
+var syncWorkerClient;
+var hasRequiredSyncWorkerClient;
+
+function requireSyncWorkerClient () {
+	if (hasRequiredSyncWorkerClient) return syncWorkerClient;
+	hasRequiredSyncWorkerClient = 1;
+	const {
+		finalizeSyncOperationMemory,
+		withSyncOperationMemory
+	} = requireOperationContext();
+	const createHttpInterceptor = requireHttpInterceptor();
+	const { ensureLocalSchemaReadySymbol } = requireSyncClient();
+	const {
+		deserializeError,
+		deserializeEventPayload,
+		isAlwaysForwardedEvent,
+		serializeError
+	} = requireSyncWorkerProtocol();
+
+	function createSyncWorkerClient(worker, options = {}) {
+		if (!worker || typeof worker.postMessage !== 'function')
+			throw new Error('Sync worker client requires a Worker-like object.');
+
+		let nextId = 1;
+		const pending = new Map();
+		const listeners = new Map();
+		const interceptors = createHttpInterceptor();
+		let hasInitialReady = false;
+		let lastInitialReady;
+		let closed = false;
+		let terminalError;
+
+		worker.addEventListener('message', onMessage);
+		worker.addEventListener('error', onWorkerError);
+		worker.addEventListener('messageerror', onWorkerError);
+		if (typeof worker.start === 'function')
+			worker.start();
+
+		const client = {
+			sync: request.bind(null, 'sync'),
+			ensureLocalSchema: request.bind(null, 'ensureLocalSchema'),
+			resetLocal: request.bind(null, 'resetLocal'),
+			start: request.bind(null, 'start'),
+			stop: request.bind(null, 'stop'),
+			isRunning: request.bind(null, 'isRunning'),
+			waitForInitialSync: request.bind(null, 'waitForInitialSync'),
+			on,
+			off,
+			once,
+			close,
+			interceptors,
+			[ensureLocalSchemaReadySymbol]: request.bind(null, 'ensureLocalSchemaReady')
+		};
+
+		worker.postMessage({ type: 'orange-sync-worker-ready' });
+		return client;
+
+		function request(method, ...args) {
+			if (closed)
+				return Promise.reject(new Error('Sync worker client closed.'));
+			if (terminalError)
+				return Promise.reject(terminalError);
+			const id = nextId++;
+			return new Promise((resolve, reject) => {
+				const timeoutMs = resolveRequestTimeoutMs(method, options);
+				const timeoutId = timeoutMs
+					? setTimeout(() => rejectTimedOutRequest(id, method, timeoutMs), timeoutMs)
+					: undefined;
+				pending.set(id, { resolve, reject, timeoutId });
+				try {
+					worker.postMessage({
+						type: 'orange-sync-worker-request',
+						id,
+						method,
+						args
+					});
+				}
+				catch (e) {
+					clearPendingRequest(id);
+					reject(e);
+				}
+			});
+		}
+
+		function rejectTimedOutRequest(id, method, timeoutMs) {
+			const entry = pending.get(id);
+			if (!entry)
+				return;
+			pending.delete(id);
+			postCancel(id);
+			entry.reject(new Error(`Sync worker request "${method}" timed out after ${Math.round(timeoutMs / 1000)} seconds.`));
+		}
+
+		function on(event, listener) {
+			if (typeof event !== 'string' || typeof listener !== 'function')
+				return () => {};
+			let eventListeners = listeners.get(event);
+			if (!eventListeners) {
+				eventListeners = new Set();
+				listeners.set(event, eventListeners);
+			}
+			eventListeners.add(listener);
+			if (!isAlwaysForwardedEvent(event))
+				request('on', event).catch(() => {});
+			if (event === 'initial-ready' && hasInitialReady) {
+				const readyPayload = lastInitialReady;
+				Promise.resolve().then(() => {
+					if (eventListeners.has(listener) && hasInitialReady && lastInitialReady === readyPayload)
+						callListener(listener, readyPayload);
+				});
+			}
+			return () => off(event, listener);
+		}
+
+		function off(event, listener) {
+			const eventListeners = listeners.get(event);
+			if (!eventListeners)
+				return;
+			eventListeners.delete(listener);
+			if (eventListeners.size === 0) {
+				listeners.delete(event);
+				if (!isAlwaysForwardedEvent(event))
+					request('off', event).catch(() => {});
+			}
+		}
+
+		function once(event, listener) {
+			if (typeof listener !== 'function')
+				return () => {};
+			const unsubscribe = on(event, (payload) => {
+				unsubscribe();
+				listener(payload);
+			});
+			return unsubscribe;
+		}
+
+		function close() {
+			if (closed)
+				return;
+			closed = true;
+			const closeError = new Error('Sync worker client closed.');
+			worker.removeEventListener('message', onMessage);
+			worker.removeEventListener('error', onWorkerError);
+			worker.removeEventListener('messageerror', onWorkerError);
+			for (const [id, entry] of pending) {
+				postCancel(id);
+				if (entry.timeoutId)
+					clearTimeout(entry.timeoutId);
+				entry.reject(closeError);
+			}
+			pending.clear();
+			listeners.clear();
+			hasInitialReady = false;
+			lastInitialReady = undefined;
+			if (typeof worker.terminate === 'function')
+				worker.terminate();
+			else if (typeof worker.close === 'function')
+				worker.close();
+		}
+
+		function onMessage(event) {
+			const message = event && event.data;
+			if (!message || message.type === undefined)
+				return;
+			if (message.type === 'orange-sync-worker-interceptor-request') {
+				void handleInterceptorRequest(message);
+				return;
+			}
+			if (message.type === 'orange-sync-worker-event') {
+				const payload = deserializeEventPayload(message.payload);
+				if (message.event === 'initial-ready') {
+					hasInitialReady = true;
+					lastInitialReady = payload;
+				}
+				emit(message.event, payload);
+				return;
+			}
+			if (message.type !== 'orange-sync-worker-response')
+				return;
+			const entry = pending.get(message.id);
+			if (!entry)
+				return;
+			clearPendingRequest(message.id);
+			if (message.error)
+				entry.reject(deserializeError(message.error));
+			else
+				entry.resolve(message.result);
+		}
+
+		function clearPendingRequest(id) {
+			const entry = pending.get(id);
+			if (!entry)
+				return;
+			pending.delete(id);
+			if (entry.timeoutId)
+				clearTimeout(entry.timeoutId);
+		}
+
+		function onWorkerError(event) {
+			if (terminalError)
+				return;
+			const error = toWorkerError(event);
+			terminalError = error;
+			for (const entry of pending.values()) {
+				if (entry.timeoutId)
+					clearTimeout(entry.timeoutId);
+				entry.reject(error);
+			}
+			pending.clear();
+			emit('error', { method: 'worker', error });
+		}
+
+		function emit(event, payload) {
+			if (event === 'operation') {
+				payload = withSyncOperationMemory(payload);
+				try {
+					emitToListeners('operation', payload);
+					if (payload && typeof payload.operation === 'string')
+						emitToListeners(`operation:${payload.operation}`, payload);
+				}
+				finally {
+					finalizeSyncOperationMemory(payload);
+				}
+				return;
+			}
+			if (event && event.startsWith && event.startsWith('operation:')) {
+				payload = withSyncOperationMemory(payload);
+				try {
+					emitToListeners(event, payload);
+				}
+				finally {
+					finalizeSyncOperationMemory(payload);
+				}
+				return;
+			}
+			emitToListeners(event, payload);
+		}
+
+		function emitToListeners(event, payload) {
+			const eventListeners = listeners.get(event);
+			if (!eventListeners)
+				return;
+			for (const listener of Array.from(eventListeners))
+				callListener(listener, payload);
+		}
+
+		function callListener(listener, payload) {
+			try {
+				listener(payload);
+			}
+			catch (_error) {
+				// Notifications must never interrupt worker message handling or other listeners.
+			}
+		}
+
+		async function handleInterceptorRequest(message) {
+			try {
+				const result = await applyInterceptor(message);
+				postInterceptorResponse(message.id, result);
+			}
+			catch (error) {
+				postInterceptorResponse(message.id, undefined, error);
+			}
+		}
+
+		function applyInterceptor(message) {
+			if (message.phase === 'request')
+				return interceptors.applyRequest(message.payload);
+			if (message.phase === 'response')
+				return interceptors.applyResponse(message.payload);
+			if (message.phase === 'response-error')
+				return interceptors.applyResponseError(deserializeError(message.error, 'Sync worker HTTP request failed.'));
+			throw new Error(`Unknown sync worker interceptor phase "${message.phase}".`);
+		}
+
+		function postInterceptorResponse(id, result, error) {
+			if (closed || terminalError)
+				return;
+			try {
+				worker.postMessage({
+					type: 'orange-sync-worker-interceptor-response',
+					id,
+					result,
+					error: error ? serializeError(error) : undefined
+				});
+			}
+			catch (postError) {
+				if (!error) {
+					try {
+						worker.postMessage({
+							type: 'orange-sync-worker-interceptor-response',
+							id,
+							error: serializeError(postError)
+						});
+					}
+					catch (_ignored) {
+						// The worker cannot be notified when even the serialized error cannot be posted.
+					}
+				}
+			}
+		}
+
+		function postCancel(id) {
+			if (terminalError)
+				return;
+			try {
+				worker.postMessage({
+					type: 'orange-sync-worker-cancel',
+					id
+				});
+			}
+			catch (_error) {
+				// The original request is already being rejected locally.
+			}
+		}
+	}
+
+	function resolveRequestTimeoutMs(method, options) {
+		const fallback = normalizePositiveInteger(options.requestTimeoutMs);
+		if (fallback)
+			return fallback;
+		if (method === 'on' || method === 'off' || method === 'isRunning')
+			return 10000;
+		if (method === 'ensureLocalSchema' || method === 'ensureLocalSchemaReady' || method === 'resetLocal')
+			return 300000;
+		return undefined;
+	}
+
+	function normalizePositiveInteger(value) {
+		const parsed = Number.parseInt(value, 10);
+		return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+	}
+
+	function toWorkerError(event) {
+		if (event && event.error instanceof Error)
+			return event.error;
+		const message = event && event.message
+			? event.message
+			: 'Sync worker failed before completing the request.';
+		return new Error(message);
+	}
+
+	syncWorkerClient = createSyncWorkerClient;
+	return syncWorkerClient;
+}
 
 var managedSyncWorkerClient;
 var hasRequiredManagedSyncWorkerClient;
@@ -31521,18 +38177,18 @@ function requireDualSyncDatabase () {
 	return dualSyncDatabase.exports;
 }
 
-var newDatabase_1$1;
-var hasRequiredNewDatabase$1;
+var newDatabase_1;
+var hasRequiredNewDatabase;
 
-function requireNewDatabase$1 () {
-	if (hasRequiredNewDatabase$1) return newDatabase_1$1;
-	hasRequiredNewDatabase$1 = 1;
+function requireNewDatabase () {
+	if (hasRequiredNewDatabase) return newDatabase_1;
+	hasRequiredNewDatabase = 1;
 	let createDomain = requireCreateDomain();
-	let newTransaction = requireNewTransaction$1();
+	let newTransaction = requireNewTransaction();
 	let _begin = requireBegin();
 	let commit = requireCommit();
 	let rollback = requireRollback();
-	let newPool = requireNewPool$1();
+	let newPool = requireNewPool();
 	let express = requireHostExpress();
 	let hono = requireHostHono();
 	let hostLocal = requireHostLocal();
@@ -31661,655 +38317,31 @@ function requireNewDatabase$1 () {
 		return !!sync;
 	}
 
-	newDatabase_1$1 = newDatabase;
-	return newDatabase_1$1;
-}
-
-var wrapQuery_1;
-var hasRequiredWrapQuery;
-
-function requireWrapQuery () {
-	if (hasRequiredWrapQuery) return wrapQuery_1;
-	hasRequiredWrapQuery = 1;
-	var log = requireLog();
-	var replaceParamChar = requireReplaceParamChar();
-
-	function wrapQuery(_context, connection) {
-		var runOriginalQuery = connection.query;
-		return runQuery;
-
-		function runQuery(query, onCompleted) {
-			var params = query.parameters;
-			var originalSql = query.sql();
-			var completeQuery = log.startQuery({ sql: originalSql, parameters: params });
-			var sql = replaceParamChar(query, params);
-			query = {
-				text: sql,
-				values: params,
-				types: query.types
-			};
-
-			runOriginalQuery.call(connection, query, onInnerCompleted);
-
-			function onInnerCompleted(err, result) {
-				completeQuery(err);
-				if (err)
-					onCompleted(err);
-				else {
-					if (Array.isArray(result))
-						result = result[result.length-1];
-					onCompleted(null, result.rows);
-				}
-			}
-		}
-
-	}
-
-	wrapQuery_1 = wrapQuery;
-	return wrapQuery_1;
-}
-
-var wrapCommand_1;
-var hasRequiredWrapCommand;
-
-function requireWrapCommand () {
-	if (hasRequiredWrapCommand) return wrapCommand_1;
-	hasRequiredWrapCommand = 1;
-	var log = requireLog();
-	var replaceParamChar = requireReplaceParamChar();
-
-	function wrapCommand(_context, connection) {
-		var runOriginalQuery = connection.query;
-		return runCommand;
-
-		function runCommand(query, onCompleted) {
-			var params = query.parameters;
-			var completeQuery = log.startQuery({ sql: query.sql(), parameters: params });
-			var sql = replaceParamChar(query, params);
-			query = {
-				text: sql,
-				values: params,
-				types: query.types
-			};
-
-			runOriginalQuery.call(connection, query, onInnerCompleted);
-
-			function onInnerCompleted(err, result) {
-				completeQuery(err);
-				if (err)
-					onCompleted(err);
-				else
-					onCompleted(null, { rowsAffected: result.rowCount });
-
-			}
-		}
-
-	}
-
-	wrapCommand_1 = wrapCommand;
-	return wrapCommand_1;
-}
-
-var encodeBoolean_1;
-var hasRequiredEncodeBoolean;
-
-function requireEncodeBoolean () {
-	if (hasRequiredEncodeBoolean) return encodeBoolean_1;
-	hasRequiredEncodeBoolean = 1;
-	function encodeBoolean(bool) {
-		return bool.toString();
-	}
-
-	encodeBoolean_1 = encodeBoolean;
-	return encodeBoolean_1;
-}
-
-var encodeJSON;
-var hasRequiredEncodeJSON;
-
-function requireEncodeJSON () {
-	if (hasRequiredEncodeJSON) return encodeJSON;
-	hasRequiredEncodeJSON = 1;
-	function encode(arg) {
-		if (Array.isArray(arg))
-			return new JsonBArrayParam(arg);
-		else
-			return arg;
-	}
-
-	class JsonBArrayParam {
-		constructor(actualArray) { this.actualArray = actualArray; }
-		toPostgres() {
-			return JSON.stringify(this.actualArray);
-		}
-	}
-
-	encodeJSON = encode;
-	return encodeJSON;
-}
-
-var newTransaction;
-var hasRequiredNewTransaction;
-
-function requireNewTransaction () {
-	if (hasRequiredNewTransaction) return newTransaction;
-	hasRequiredNewTransaction = 1;
-	var wrapQuery = requireWrapQuery();
-	var wrapCommand = requireWrapCommand();
-	var encodeDate = requireEncodeDate();
-	var encodeBoolean = requireEncodeBoolean();
-	var deleteFromSql = requireDeleteFromSql();
-	var selectForUpdateSql = requireSelectForUpdateSql();
-	var limitAndOffset = requireLimitAndOffset();
-	var formatDateOut = requireFormatDateOut();
-	var encodeJSON = requireEncodeJSON();
-	var insertSql = requireInsertSql();
-	var insert = requireInsert();
-	var quote = requireQuote();
-
-	function newResolveTransaction(domain, pool, { readonly = false } = {}) {
-		var rdb = { poolFactory: pool };
-		if (!pool.connect) {
-			pool = pool();
-			rdb.pool = pool;
-		}
-
-		rdb.engine = 'pg';
-		rdb.encodeBoolean = encodeBoolean;
-		rdb.encodeDate = encodeDate;
-		rdb.encodeJSON = encodeJSON;
-		rdb.formatDateOut = formatDateOut;
-		rdb.deleteFromSql = deleteFromSql;
-		rdb.selectForUpdateSql = selectForUpdateSql;
-		rdb.lastInsertedIsSeparate = false;
-		rdb.insertSql = insertSql;
-		rdb.insert = insert;
-		rdb.multipleStatements = true;
-		rdb.limitAndOffset = limitAndOffset;
-		rdb.accept = function(caller) {
-			caller.visitPg();
-		};
-		rdb.aggregateCount = 0;
-		rdb.quote = quote;
-		rdb.cache = {};
-		rdb.changes = [];
-
-		if (readonly) {
-			rdb.dbClient = {
-				executeQuery: function(query, callback) {
-					pool.connect((err, client, done) => {
-						if (err) {
-							return callback(err);
-						}
-						try {
-							wrapQuery(domain, client)(query, (err, res) => {
-								done();
-								callback(err, res);
-							});
-						} catch (e) {
-							done();
-							callback(e);
-						}
-					});
-				},
-				executeCommand: function(query, callback) {
-					pool.connect((err, client, done) => {
-						if (err) {
-							return callback(err);
-						}
-						try {
-							wrapCommand(domain, client)(query, (err, res) => {
-								done();
-								callback(err, res);
-							});
-						} catch (e) {
-							done();
-							callback(e);
-						}
-					});
-				}
-			};
-			domain.rdb = rdb;
-			return (onSuccess) => onSuccess();
-		}
-
-		return function(onSuccess, onError) {
-			pool.connect(onConnected);
-
-			function onConnected(err, client, done) {
-				try {
-					if (err) {
-						onError(err);
-						return;
-					}
-					client.executeQuery = wrapQuery(domain, client);
-					client.executeCommand = wrapCommand(domain, client);
-					rdb.dbClient = client;
-					rdb.dbClientDone = done;
-					domain.rdb = rdb;
-					onSuccess();
-				} catch (e) {
-					onError(e);
-				}
-			}
-		};
-	}
-
-	newTransaction = newResolveTransaction;
-	return newTransaction;
-}
-
-var end;
-var hasRequiredEnd;
-
-function requireEnd () {
-	if (hasRequiredEnd) return end;
-	hasRequiredEnd = 1;
-	var pools = requirePools();
-
-	function endPool(pgPool, id, done) {
-		pgPool.drain(onDrained);
-
-		function onDrained() {
-			pgPool.destroyAllNow();
-			delete pools[id];
-			done();
-		}
-	}
-
-	end = endPool;
-	return end;
-}
-
-var parseSearchPathParam_1;
-var hasRequiredParseSearchPathParam;
-
-function requireParseSearchPathParam () {
-	if (hasRequiredParseSearchPathParam) return parseSearchPathParam_1;
-	hasRequiredParseSearchPathParam = 1;
-	function parseSearchPathParam(connectionString = '') {
-		const [, queryString] = connectionString.split('?');
-		if (!queryString)
-			return;
-		const params = new URLSearchParams(queryString);
-		const searchPath = params.get('search_path');
-		return searchPath;
-	}
-
-	parseSearchPathParam_1 = parseSearchPathParam;
-	return parseSearchPathParam_1;
-}
-
-/* eslint-disable no-prototype-builtins */
-
-var newPgPool_1;
-var hasRequiredNewPgPool;
-
-function requireNewPgPool () {
-	if (hasRequiredNewPgPool) return newPgPool_1;
-	hasRequiredNewPgPool = 1;
-	//slightly modified code from github.com/brianc/node-postgres
-	var log = requireLog();
-
-	var defaults = requirePoolDefaults();
-	var genericPool = requireGenericPool();
-	var pg;
-	var parseSearchPathParam = requireParseSearchPathParam();
-
-	function newPgPool(connectionString, poolOptions) {
-		poolOptions = poolOptions || {};
-
-		// @ts-ignore
-		var pool = genericPool.Pool({
-			min: poolOptions.min || 0,
-			max: poolOptions.size || poolOptions.poolSize || defaults.poolSize,
-			idleTimeoutMillis: poolOptions.idleTimeout || defaults.poolIdleTimeout,
-			reapIntervalMillis: poolOptions.reapIntervalMillis || defaults.reapIntervalMillis,
-			log: poolOptions.log,
-			create: async function(cb) {
-				try {
-					if (!pg) {
-						pg = await import('pg');
-						pg  = pg.default || pg;
-						let types = pg.types;
-						types.setTypeParser(1700, function(val) {
-							return parseFloat(val);
-						});
-					}
-				}
-				catch(e) {
-					return cb(e, null);
-				}
-				var client = new pg.Client(connectionString);
-				client.connect(function(err) {
-					if (err) return cb(err, null);
-
-					//handle connected client background errors by emitting event
-					//via the pg object and then removing errored client from the pool
-					client.on('error', function(e) {
-						pool.emit('error', e, client);
-
-						// If the client is already being destroyed, the error
-						// occurred during stream ending. Do not attempt to destroy
-						// the client again.
-						if (!client._destroying) {
-							pool.destroy(client);
-						}
-					});
-
-					// Remove connection from pool on disconnect
-					client.on('end', function(_e) {
-						// Do not enter infinite loop between pool.destroy
-						// and client 'end' event...
-						if (!client._destroying) {
-							pool.destroy(client);
-						}
-					});
-					client.poolCount = 0;
-					negotiateSearchPath(client, connectionString, (err) => cb(err, client));
-
-				});
-			},
-			destroy: function(client) {
-				client._destroying = true;
-				client.poolCount = undefined;
-				client.end();
-			}
-		});
-		//monkey-patch with connect method
-		pool.connect = function(cb) {
-			pool.acquire(function(err, client) {
-				if (err) return cb(err, null, function() {
-					/*NOOP*/
-				});
-				client.poolCount++;
-				cb(null, client, function(err) {
-					if (err) {
-						pool.destroy(client);
-					} else {
-						pool.release(client);
-					}
-				});
-			});
-		};
-		return pool;
-	}
-
-	function negotiateSearchPath(client, connectionString, cb) {
-		const searchPath = parseSearchPathParam(connectionString);
-		if (searchPath) {
-			const sql = `set search_path to ${searchPath}`;
-			const completeQuery = log.startQuery({sql, parameters: []});
-			return client.query(sql, (err, result) => {
-				completeQuery(err);
-				cb(err, result);
-			});
-		}
-		else
-			cb();
-
-
-	}
-
-	newPgPool_1 = newPgPool;
-	return newPgPool_1;
-}
-
-var newPool_1;
-var hasRequiredNewPool;
-
-function requireNewPool () {
-	if (hasRequiredNewPool) return newPool_1;
-	hasRequiredNewPool = 1;
-	const promisify = requirePromisify();
-	const pools = requirePools();
-	const end = requireEnd();
-	const newPgPool = requireNewPgPool();
-	const newId = requireNewId();
-
-	function newPool(connectionString, poolOptions) {
-		let pool = newPgPool(connectionString, poolOptions);
-		let id = newId();
-		let boundEnd = end.bind(null, pool, id);
-		let c = {};
-
-		c.connect = pool.connect;
-		c.end = promisify(boundEnd);
-		pools[id] = c;
-		return c;
-	}
-
-	newPool_1 = newPool;
-	return newPool_1;
-}
-
-var newDatabase_1;
-var hasRequiredNewDatabase;
-
-function requireNewDatabase () {
-	if (hasRequiredNewDatabase) return newDatabase_1;
-	hasRequiredNewDatabase = 1;
-	let createDomain = requireCreateDomain();
-	let newTransaction = requireNewTransaction();
-	let _begin = requireBegin();
-	let commit = requireCommit();
-	let rollback = requireRollback();
-	let newPool = requireNewPool();
-	let lock = requireLock();
-	let executeSchema = requireSchema();
-	let express = requireHostExpress();
-	let hono = requireHostHono();
-	let hostLocal = requireHostLocal();
-	let doQuery = requireQuery();
-	let releaseDbClient = requireReleaseDbClient();
-
-	function newDatabase(connectionString, poolOptions) {
-		if (!connectionString)
-			throw new Error('Connection string cannot be empty');
-		poolOptions = poolOptions || { min: 1 };
-		var pool = newPool(connectionString, poolOptions);
-
-		let c = { poolFactory: pool, hostLocal, express, hono };
-
-		c.transaction = function(options, fn) {
-			if ((arguments.length === 1) && (typeof options === 'function')) {
-				fn = options;
-				options = undefined;
-			}
-			let domain = createDomain();
-
-			if (!fn)
-				throw new Error('transaction requires a function');
-			return domain.run(runInTransaction);
-
-			async function runInTransaction() {
-				let result;
-				let transaction = newTransaction(domain, pool, options);
-				await new Promise(transaction)
-					.then(begin)
-					.then(negotiateSchema)
-					.then(() => fn(domain))
-					.then((res) => result = res)
-					.then(() => commit(domain))
-					.then(null, (e) => rollback(domain,e));
-				return result;
-			}
-
-			function begin() {
-				return _begin(domain, options);
-			}
-
-			function negotiateSchema(previous) {
-				let schema = options && options.schema;
-				if (!schema)
-					return previous;
-				return executeSchema(domain, schema);
-			}
-		};
-
-		c.createTransaction = function(options) {
-			let domain = createDomain();
-			let transaction = newTransaction(domain, pool, options);
-			let p = domain.run(() => new Promise(transaction)
-				.then(begin).then(negotiateSchema));
-
-			function run(fn) {
-				return p.then(domain.run.bind(domain, fn));
-			}
-
-			function begin() {
-				return _begin(domain, options);
-			}
-
-			function negotiateSchema(previous) {
-				let schema = options && options.schema;
-				if (!schema)
-					return previous;
-				return executeSchema(domain,schema);
-			}
-
-			run.rollback = rollback.bind(null, domain);
-			run.commit = commit.bind(null, domain);
-
-			return run;
-		};
-
-		c.query = function(query) {
-			let domain = createDomain();
-			let transaction = newTransaction(domain, pool);
-			let p = domain.run(() => new Promise(transaction)
-				.then(() => doQuery(domain, query).then(onResult, onError)));
-			return p;
-
-			function onResult(result) {
-				releaseDbClient(domain);
-				return result;
-			}
-
-			function onError(e) {
-				releaseDbClient(domain);
-				throw e;
-			}
-		};
-
-		c.rollback = rollback;
-		c.commit = commit;
-		c.lock = lock;
-		c.schema = executeSchema;
-
-		c.end = function() {
-			if (poolOptions)
-				return pool.end();
-			else
-				return Promise.resolve();
-		};
-
-		c.accept = function(caller) {
-			caller.visitPg();
-		};
-
-		return c;
-	}
-
 	newDatabase_1 = newDatabase;
 	return newDatabase_1;
 }
 
-var indexBrowser;
-var hasRequiredIndexBrowser;
+var managedSyncWorkerRdb_1;
+var hasRequiredManagedSyncWorkerRdb;
 
-function requireIndexBrowser () {
-	if (hasRequiredIndexBrowser) return indexBrowser;
-	hasRequiredIndexBrowser = 1;
-	const hostExpress = requireHostExpress();
-	const hostHono = requireHostHono();
-	const hostLocal = requireHostLocal();
+function requireManagedSyncWorkerRdb () {
+	if (hasRequiredManagedSyncWorkerRdb) return managedSyncWorkerRdb_1;
+	hasRequiredManagedSyncWorkerRdb = 1;
 	const client = requireClient();
 	const map = requireMap();
-	let _d1;
-	let _pg;
-	let _pglite;
-	let _sqliteOPFS;
+	const createSyncWorkerHandler = requireSyncWorkerHandler();
+	const newSqliteOPFSDatabase = requireNewDatabase();
 
-	globalThis.__orangeOrmSqliteOPFSModuleUrl = new URL('../../@sqlite.org/sqlite-wasm/dist/index.mjs?import', import.meta.url).href;
-	globalThis.__orangeOrmManagedSyncWorkerUrl = new URL('./managed-sync-worker.mjs', import.meta.url).href;
-
-
-	var connectViaPool = function() {
+	function managedSyncWorkerRdb() {
 		return client.apply(null, arguments);
-	};
-	connectViaPool.createPatch = client.createPatch;
-	connectViaPool.createDbWorkerClient = requireDbWorkerClient();
-	connectViaPool.createDbWorkerHandler = requireDbWorkerHandler();
-	connectViaPool.createSyncWorkerClient = requireSyncWorkerClient();
-	connectViaPool.createSyncWorkerHandler = requireSyncWorkerHandler();
-	connectViaPool.createSqliteOPFSWorker = requireCreateWorker();
-	connectViaPool.connectSqliteOPFSWorker = requireConnectWorkerPort();
-	connectViaPool.table = requireTable();
-	connectViaPool.filter = requireEmptyFilter();
-	connectViaPool.commit = requireCommit();
-	connectViaPool.rollback = requireRollback();
-	connectViaPool.end = requirePools().end;
-	connectViaPool.close = connectViaPool.end;
-	connectViaPool.log = requireLog().registerLogger;
-	connectViaPool.on = requireLog().on;
-	connectViaPool.off = requireLog().off;
-	connectViaPool.query = requireQuery();
-	connectViaPool.lock = requireLock();
-	connectViaPool.schema = requireSchema();
-	connectViaPool.map = map.bind(null, connectViaPool);
+	}
 
-	connectViaPool.http = function(url) {
-		return url;
-	};
+	managedSyncWorkerRdb.map = map.bind(null, managedSyncWorkerRdb);
+	managedSyncWorkerRdb.sqliteOPFS = newSqliteOPFSDatabase;
+	managedSyncWorkerRdb.createSyncWorkerHandler = createSyncWorkerHandler;
 
-
-	Object.defineProperty(connectViaPool, 'd1', {
-		get: function() {
-			if (!_d1)
-				_d1 = requireNewDatabase$3();
-			return _d1;
-		}
-	});
-
-	Object.defineProperty(connectViaPool, 'pglite', {
-		get: function() {
-			if (!_pglite)
-				_pglite = requireNewDatabase$2();
-			return _pglite;
-		}
-	});
-
-	Object.defineProperty(connectViaPool, 'sqliteOPFS', {
-		get: function() {
-			if (!_sqliteOPFS)
-				_sqliteOPFS = requireNewDatabase$1();
-			return _sqliteOPFS;
-		}
-	});
-
-	Object.defineProperty(connectViaPool, 'postgres', {
-		get: function() {
-			if (!_pg)
-				_pg = requireNewDatabase();
-			return _pg;
-		}
-	});
-
-	Object.defineProperty(connectViaPool, 'pg', {
-		get: function() {
-			if (!_pg)
-				_pg = requireNewDatabase();
-			return _pg;
-		}
-	});
-
-
-	connectViaPool.express = hostExpress.bind(null, hostLocal);
-	connectViaPool.hono = hostHono.bind(null, hostLocal);
-
-	indexBrowser = connectViaPool;
-	return indexBrowser;
+	managedSyncWorkerRdb_1 = managedSyncWorkerRdb;
+	return managedSyncWorkerRdb_1;
 }
 
 var mapFromSyncSchema_1;
@@ -32420,7 +38452,7 @@ var hasRequiredManagedSyncWorkerEntry;
 function requireManagedSyncWorkerEntry () {
 	if (hasRequiredManagedSyncWorkerEntry) return managedSyncWorkerEntry$1;
 	hasRequiredManagedSyncWorkerEntry = 1;
-	const rdb = requireIndexBrowser();
+	const rdb = requireManagedSyncWorkerRdb();
 	const mapFromSyncSchema = requireMapFromSyncSchema();
 
 	let handler;

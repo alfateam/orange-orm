@@ -4,10 +4,12 @@ import nodeResolve from '@rollup/plugin-node-resolve';
 
 export default [
 	newConfig('./src/indexBrowser.js', './dist/index.browser.mjs'),
-	newConfig('./src/client/managedSyncWorkerEntry.js', './dist/managed-sync-worker.mjs')
+	newConfig('./src/client/managedSyncWorkerEntry.js', './dist/managed-sync-worker.mjs', {
+		bundleDependencies: true
+	})
 ];
 
-function newConfig(input, file) {
+function newConfig(input, file, options = {}) {
 	return {
 		input,
 		output: {
@@ -21,7 +23,7 @@ function newConfig(input, file) {
 			requireReturnsDefault: 'preferred'
 		})],
 		external(id) {
-			return id.includes('node_modules');
+			return !options.bundleDependencies && id.includes('node_modules');
 		},
 		onwarn: (warning, warn) => {
 			if (warning.code === 'CIRCULAR_DEPENDENCY')
