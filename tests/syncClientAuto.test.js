@@ -1,7 +1,11 @@
 import { describe, expect, test } from 'vitest';
 
 const newSyncClient = require('../src/client/syncClient');
-const { applyPullJournalSymbol, syncAndCapturePullJournalSymbol } = newSyncClient;
+const {
+	applyPullJournalSymbol,
+	syncAndCapturePullJournalSymbol,
+	syncCheckpointedBootstrapSymbol
+} = newSyncClient;
 
 describe('sync client auto start', () => {
 	test('starts when start is called and stays running', async () => {
@@ -1564,6 +1568,88 @@ describe('sync client auto start', () => {
 		expect(db.queryLog.some(sql =>
 			/^INSERT INTO "orange_sync_base_data_.*" SELECT \* FROM "customer"$/u.test(sql)
 		)).toBe(true);
+	});
+
+	test('checkpoints direct bootstrap batches without persisting a pull journal', async () => {
+		const patches = [];
+		const keyRequests = [];
+		let failContinuation = true;
+		const db = newJournalDb({
+			__sqliteSync: {
+				url: '/rdb',
+				auto: false,
+				schema: false,
+				pull: {
+					maxKeysPerBatch: 1,
+					maxRowsPerBatch: 1
+				}
+			}
+		});
+		const client = newSyncClient({
+			tables: {
+				customer: newTable('customer')
+			},
+			transaction: async (fn) => fn({
+				customer: {
+					patch: async (patch) => {
+						patches.push(patch);
+						return { changed: [] };
+					}
+				},
+				query: db.query
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async (request) => {
+					if (request.data.phase === 'keys') {
+						keyRequests.push(request.data.token || null);
+						if (!request.data.token) {
+							return {
+								data: {
+									phase: 'keys',
+									items: [{ table: 'customer', pk: [1], key: { id: 1 }, op: 'U' }],
+									done: false,
+									cursor: 'cursor-1',
+									token: { page: 1 }
+								}
+							};
+						}
+						if (failContinuation) {
+							failContinuation = false;
+							throw new Error('network down');
+						}
+						return {
+							data: {
+								phase: 'keys',
+								items: [{ table: 'customer', pk: [2], key: { id: 2 }, op: 'U' }],
+								done: true,
+								cursor: 'cursor-2'
+							}
+						};
+					}
+					return rowsResponse(request.data.items);
+				};
+			}
+		});
+
+		await expect(client[syncCheckpointedBootstrapSymbol]())
+			.rejects.toThrow('network down');
+		expect(db.journal.session.status).toBe('direct-stream-pending');
+		expect(patches).toEqual([
+			[{ op: 'add', path: '/[1]', value: { id: 1 } }]
+		]);
+
+		const result = await client[syncCheckpointedBootstrapSymbol]();
+
+		expect(keyRequests).toEqual([null, { page: 1 }, { page: 1 }]);
+		expect(patches).toEqual([
+			[{ op: 'add', path: '/[1]', value: { id: 1 } }],
+			[{ op: 'add', path: '/[2]', value: { id: 2 } }]
+		]);
+		expect(result.applied).toBe(1);
+		expect(result.__orangePullJournal).toBeUndefined();
+		expect(db.queryLog.some(sql => /INSERT INTO "orange_sync_pull_item"/u.test(sql))).toBe(false);
+		expect(db.queryLog.some(sql => /^INSERT INTO "orange_sync_base_data_/u.test(sql))).toBe(false);
 	});
 
 	test('retries streamed final validation without refetching or reapplying', async () => {

@@ -30,6 +30,8 @@ const outboxReplayPageSize = 1000;
 const pullJournalRecoveryPageSize = 1000;
 const streamPullPendingStatus = 'stream-pending';
 const streamPullReadyStatus = 'stream-ready';
+const directStreamPullPendingStatus = 'direct-stream-pending';
+const directStreamPullReadyStatus = 'direct-stream-ready';
 const syncDbPriority = 1;
 const ensureLocalSchemaReadySymbol = typeof Symbol === 'function'
 	? Symbol.for('orange-orm.syncClient.ensureLocalSchemaReady')
@@ -37,6 +39,12 @@ const ensureLocalSchemaReadySymbol = typeof Symbol === 'function'
 const syncAndCapturePullJournalSymbol = typeof Symbol === 'function'
 	? Symbol.for('orange-orm.syncClient.syncAndCapturePullJournal')
 	: '__orangeOrmSyncClientSyncAndCapturePullJournal';
+const syncCheckpointedBootstrapSymbol = typeof Symbol === 'function'
+	? Symbol.for('orange-orm.syncClient.syncCheckpointedBootstrap')
+	: '__orangeOrmSyncClientSyncCheckpointedBootstrap';
+const readInitialSyncStateSymbol = typeof Symbol === 'function'
+	? Symbol.for('orange-orm.syncClient.readInitialSyncState')
+	: '__orangeOrmSyncClientReadInitialSyncState';
 const readOutboxRowsSymbol = typeof Symbol === 'function'
 	? Symbol.for('orange-orm.syncClient.readOutboxRows')
 	: '__orangeOrmSyncClientReadOutboxRows';
@@ -105,6 +113,12 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 	});
 	Object.defineProperty(syncClientApi, syncAndCapturePullJournalSymbol, {
 		value: syncAndCapturePullJournal
+	});
+	Object.defineProperty(syncClientApi, syncCheckpointedBootstrapSymbol, {
+		value: syncCheckpointedBootstrap
+	});
+	Object.defineProperty(syncClientApi, readInitialSyncStateSymbol, {
+		value: readInitialSyncState
 	});
 	Object.defineProperty(syncClientApi, readOutboxRowsSymbol, {
 		value: readOutboxRowsForReplay
@@ -183,6 +197,30 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 		if (usesFileSnapshotRollback(options))
 			pullOptions._fileSnapshotRollback = true;
 		return pull(pullOptions);
+	}
+
+	async function syncCheckpointedBootstrap(options = {}) {
+		const pullOptions = {
+			...normalizePullOptions(options),
+			_checkpointOnlyStream: true,
+			_fileSnapshotRollback: true,
+			_skipForeignKeyEnable: true
+		};
+		if (options._deferStableBaseUntilComplete === true)
+			pullOptions._deferStableBaseUntilComplete = true;
+		if (typeof options._onPullBatchProgress === 'function')
+			pullOptions._onPullBatchProgress = options._onPullBatchProgress;
+		if (typeof options._onPullStagingSummary === 'function')
+			pullOptions._onPullStagingSummary = options._onPullStagingSummary;
+		if (typeof options._onPullSnapshot === 'function')
+			pullOptions._onPullSnapshot = options._onPullSnapshot;
+		if (options._skipPushBeforePull === true)
+			pullOptions._skipPushBeforePull = true;
+		const db = toSyncDb(await getDb());
+		await db.query('PRAGMA foreign_keys = OFF');
+		const result = await pull(pullOptions);
+		await tryEnableForeignKeys(db);
+		return result;
 	}
 
 	async function pushPendingOnly(options = {}) {
@@ -307,6 +345,10 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 		throwIfSyncAborted(normalizedOptions[syncAbortSignalSymbol]);
 		if (options && options._capturePullJournal)
 			normalizedOptions._capturePullJournal = true;
+		if (options && options._checkpointOnlyStream === true)
+			normalizedOptions._checkpointOnlyStream = true;
+		if (options && options._skipForeignKeyEnable === true)
+			normalizedOptions._skipForeignKeyEnable = true;
 		if (options && typeof options._capturePullJournalChunk === 'function')
 			normalizedOptions._capturePullJournalChunk = options._capturePullJournalChunk;
 		if (options && options._deferStableBaseUntilComplete === true)
@@ -433,6 +475,8 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 			db,
 			scopeKey,
 			_capturePullJournal: !!options._capturePullJournal,
+			_checkpointOnlyStream: options._checkpointOnlyStream === true,
+			_skipForeignKeyEnable: options._skipForeignKeyEnable === true,
 			_capturePullJournalChunk: options._capturePullJournalChunk,
 			_deferStableBaseUntilComplete: options._deferStableBaseUntilComplete === true,
 			_fileSnapshotRollback: options._fileSnapshotRollback === true,
@@ -607,7 +651,8 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 		let processedItems = 0;
 		const touchedTables = new Set();
 		const fileSnapshotRollback = usesFileSnapshotRollback(options);
-		await tryEnableForeignKeys(db);
+		if (options._skipForeignKeyEnable !== true)
+			await tryEnableForeignKeys(db);
 		if (applyConfig)
 			await applyPullJournalItemsInChunks();
 		else
@@ -979,7 +1024,8 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 		const streamedTables = new Set();
 		let applied = 0;
 		await ensurePullJournalTables(db);
-		await tryEnableForeignKeys(db);
+		if (options._skipForeignKeyEnable !== true)
+			await tryEnableForeignKeys(db);
 		throwIfSyncAborted(signal);
 		const session = await stagePullJournal();
 		throwIfSyncAborted(signal);
@@ -1042,7 +1088,8 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 			throwIfSyncAborted(signal);
 			const hasJournalItems = capturedStreamItemCount > 0;
 			await client.transaction(async (tx) => {
-				if (hasJournalItems && (!applyConfig || applyConfig.foreignKeyCheck === 'final'))
+				if ((hasJournalItems || isCheckpointOnlyStreamPullSession(session))
+					&& (!applyConfig || applyConfig.foreignKeyCheck === 'final'))
 					await validateForeignKeys(tx);
 				if (deferStableBaseUntilComplete && !fileSnapshotRollback) {
 					const bulkStableBaseStartedAtMs = Date.now();
@@ -1140,22 +1187,26 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 		async function stagePullJournal() {
 			let session = await readPullSession(db, scopeKey);
 			let hasPersistedSession = !!session;
+			const requestedCheckpointOnlyStream = options._checkpointOnlyStream === true;
 			const streamApply = session
 				? isStreamPullSession(session)
-				: !!options._capturePullJournal;
+				: !!options._capturePullJournal || requestedCheckpointOnlyStream;
+			const checkpointOnlyStream = session
+				? isCheckpointOnlyStreamPullSession(session)
+				: requestedCheckpointOnlyStream;
 			if (session) {
 				session.persisted = true;
 				if (!session.done)
 					await clearIncompletePullJournalBatch(db, scopeKey, session.nextBatch);
 			}
 			if (!session)
-				session = newPullSession(scopeKey, options.since, streamApply);
+				session = newPullSession(scopeKey, options.since, streamApply, checkpointOnlyStream);
 			if (streamApply) {
 				if (!fileSnapshotRollback)
 					await client.transaction(async (tx) => {
 						await ensureStableBaseTables(tx, options.tables);
 					}, { suppressSyncOutbox: true });
-				if (hasPersistedSession) {
+				if (hasPersistedSession && !checkpointOnlyStream) {
 					const persistedItems = await readPullJournalItemsPaged(db, scopeKey);
 					await captureStreamItems(persistedItems);
 					for (let i = 0; i < persistedItems.length; i++)
@@ -1182,6 +1233,8 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 					return 0;
 				capturedStreamItemCount += list.length;
 				capturedApplicableItemCount += countApplicablePullJournalItems(list);
+				if (checkpointOnlyStream)
+					return 0;
 				const captureStartedAtMs = Date.now();
 				if (capturePullJournalChunk)
 					await capturePullJournalChunk(list);
@@ -1219,6 +1272,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 						streamApply ? {
 							applyConfig,
 							defaultPatchOptions,
+							skipJournalInsert: checkpointOnlyStream,
 							deferStableBaseUntilComplete: deferStableBaseUntilComplete || fileSnapshotRollback,
 							onApplied(count, items) {
 								applied += count;
@@ -1299,7 +1353,13 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 						return;
 					}
 					if (!hasPersistedSession) {
-						session = await createPullSession(db, scopeKey, session.since, streamApply);
+						session = await createPullSession(
+							db,
+							scopeKey,
+							session.since,
+							streamApply,
+							checkpointOnlyStream
+						);
 						fetchSession = {
 							...fetchSession,
 							persisted: true
@@ -1771,18 +1831,20 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 		return pullSessionFromRow(row);
 	}
 
-	async function createPullSession(db, scopeKey, since, streamApply = false) {
+	async function createPullSession(db, scopeKey, since, streamApply = false, checkpointOnlyStream = false) {
 		await ensurePullJournalTables(db);
 		const now = Date.now();
-		const status = streamApply ? streamPullPendingStatus : 'pending';
+		const status = checkpointOnlyStream
+			? directStreamPullPendingStatus
+			: streamApply ? streamPullPendingStatus : 'pending';
 		await db.query([
 			`INSERT INTO "${syncPullSessionTable}" ("scope", "since_value", "token_json", "done", "final_since", "payload_json", "reason", "status", "next_seq", "next_batch", "updated_at_ms")`,
 			`VALUES (${sqlStringLiteral(scopeKey)}, ${sqlNullableJsonLiteral(since)}, NULL, 0, ${sqlNullableJsonLiteral(since)}, NULL, NULL, ${sqlStringLiteral(status)}, 0, 0, ${now})`
 		].join(' '));
-		return newPullSession(scopeKey, since, streamApply);
+		return newPullSession(scopeKey, since, streamApply, checkpointOnlyStream);
 	}
 
-	function newPullSession(scopeKey, since, streamApply = false) {
+	function newPullSession(scopeKey, since, streamApply = false, checkpointOnlyStream = false) {
 		return {
 			scope: scopeKey,
 			since,
@@ -1791,7 +1853,9 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 			finalSince: since,
 			payload: undefined,
 			reason: undefined,
-			status: streamApply ? streamPullPendingStatus : 'pending',
+			status: checkpointOnlyStream
+				? directStreamPullPendingStatus
+				: streamApply ? streamPullPendingStatus : 'pending',
 			nextSeq: 0,
 			nextBatch: 0
 		};
@@ -1805,8 +1869,9 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 		const keysPayload = batchState.keysPayload;
 		const keyItems = batchState.keyItems;
 		const reason = batchState.reason;
-		const entries = pullJournalEntriesForRemainingItems(scopeKey, itemState);
 		const streamApply = !!streamOptions;
+		const skipJournalInsert = !!(streamOptions && streamOptions.skipJournalInsert);
+		const entries = pullJournalEntriesForRemainingItems(scopeKey, itemState, skipJournalInsert);
 		const applyConfig = streamOptions && streamOptions.applyConfig;
 		const maxRowsPerTransaction = applyConfig
 			? applyConfig.maxRowsPerTransaction
@@ -1831,7 +1896,8 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 			await client.transaction(async (tx) => {
 				const transactionBodyStartedAtMs = Date.now();
 				const journalInsertStartedAtMs = Date.now();
-				await insertPullJournalItems(tx, chunk.rows, maxJournalRowsPerInsert);
+				if (!skipJournalInsert)
+					await insertPullJournalItems(tx, chunk.rows, maxJournalRowsPerInsert);
 				timings.journalInsertMs += elapsedMs(journalInsertStartedAtMs);
 				if (streamApply && chunk.items.length > 0) {
 					await tryDeferForeignKeys(tx);
@@ -1857,9 +1923,11 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 				const token = keysPayload.done || !keysPayload.token ? null : keysPayload.token;
 				const done = keysPayload.done || !keysPayload.token ? 1 : 0;
 				const nextSeq = baseSeq + keyItems.length;
-				const status = streamApply
-					? done ? streamPullReadyStatus : streamPullPendingStatus
-					: done ? 'ready' : 'pending';
+				const status = skipJournalInsert
+					? done ? directStreamPullReadyStatus : directStreamPullPendingStatus
+					: streamApply
+						? done ? streamPullReadyStatus : streamPullPendingStatus
+						: done ? 'ready' : 'pending';
 				const sessionUpdateStartedAtMs = Date.now();
 				await tx.query([
 					`UPDATE "${syncPullSessionTable}"`,
@@ -1981,7 +2049,7 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 		}
 	}
 
-	function pullJournalEntriesForRemainingItems(scopeKey, itemState) {
+	function pullJournalEntriesForRemainingItems(scopeKey, itemState, skipRows = false) {
 		const rows = [];
 		const items = [];
 		for (let i = 0; i < itemState.states.length; i++) {
@@ -1989,7 +2057,8 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 			if (state.persisted)
 				continue;
 			state.persisted = true;
-			rows.push(newPullJournalRow(scopeKey, state, state.rowItem));
+			if (!skipRows)
+				rows.push(newPullJournalRow(scopeKey, state, state.rowItem));
 			items.push(newPullJournalItem(state, state.rowItem));
 		}
 		return { rows, items };
@@ -3236,6 +3305,26 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 		});
 	}
 
+	async function readInitialSyncState() {
+		const db = toSyncDb(await getDb());
+		const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
+		if (!syncConfig)
+			return null;
+		const pullConfig = resolvePullConfig(syncConfig);
+		const configuredTables = resolveSyncTables(db, pullConfig.tables, client);
+		if (!Array.isArray(configuredTables) || configuredTables.length === 0)
+			return null;
+		const state = await readScopeState(getScopeKey(configuredTables), db);
+		if (!state)
+			return null;
+		return {
+			tables: configuredTables.slice(),
+			since: state.since,
+			updatedAtMs: state.updatedAtMs,
+			ready: isInitialReadyState(state, syncConfig.initialReadyMaxAgeMs)
+		};
+	}
+
 	async function maybeEmitInitialReadyFromDb(source) {
 		const db = toSyncDb(await getDb());
 		const syncConfig = normalizeSyncConfig(db && db.__sqliteSync);
@@ -3813,6 +3902,15 @@ function isStreamPullSession(session) {
 	return !!session && (
 		session.status === streamPullPendingStatus
 		|| session.status === streamPullReadyStatus
+		|| session.status === directStreamPullPendingStatus
+		|| session.status === directStreamPullReadyStatus
+	);
+}
+
+function isCheckpointOnlyStreamPullSession(session) {
+	return !!session && (
+		session.status === directStreamPullPendingStatus
+		|| session.status === directStreamPullReadyStatus
 	);
 }
 
@@ -4323,6 +4421,8 @@ function sqlNullableNumberLiteral(value) {
 module.exports = newSyncClient;
 module.exports.ensureLocalSchemaReadySymbol = ensureLocalSchemaReadySymbol;
 module.exports.syncAndCapturePullJournalSymbol = syncAndCapturePullJournalSymbol;
+module.exports.syncCheckpointedBootstrapSymbol = syncCheckpointedBootstrapSymbol;
+module.exports.readInitialSyncStateSymbol = readInitialSyncStateSymbol;
 module.exports.readOutboxRowsSymbol = readOutboxRowsSymbol;
 module.exports.applyOutboxRowsSymbol = applyOutboxRowsSymbol;
 module.exports.applyPullJournalSymbol = applyPullJournalSymbol;

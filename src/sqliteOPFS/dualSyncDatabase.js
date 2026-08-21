@@ -26,6 +26,8 @@ const {
 const {
 	ensureLocalSchemaReadySymbol,
 	syncAndCapturePullJournalSymbol,
+	syncCheckpointedBootstrapSymbol,
+	readInitialSyncStateSymbol,
 	readOutboxRowsSymbol,
 	applyOutboxRowsSymbol,
 	applyPullJournalSymbol,
@@ -42,6 +44,10 @@ const manifestId = 'default';
 const recoveryId = 'default';
 const roleA = 'a';
 const roleB = 'b';
+const replicaReadyState = 'ready';
+const replicaPendingState = 'replica-pending';
+const dataFirstRecoveryMode = 'data-first-bootstrap';
+const replicaCopyBatchSize = 1000;
 const outboxReplayPageSize = 1000;
 const deltaItemsPerChunk = 1000;
 const deltaChunkReadPageSize = 32;
@@ -373,7 +379,16 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		throwIfSyncAborted(signal);
 		const recovery = await readRecoveryState();
 		if (recovery) {
-			if (isPublishedRecovery(manifest, recovery)) {
+			if (recovery.mode === dataFirstRecoveryMode) {
+				if (manifest.replicaState === replicaReadyState && isPublishedRecovery(manifest, recovery)) {
+					await cleanupRecoveryState(recovery);
+					manifest = await getManifest(true);
+				}
+				else {
+					return resumeDataFirstBootstrap(options, manifest, recovery);
+				}
+			}
+			else if (isPublishedRecovery(manifest, recovery)) {
 				await cleanupRecoveryState(recovery);
 				manifest = await getManifest(true);
 			}
@@ -392,6 +407,10 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		]);
 		throwIfSyncAborted(signal);
 		await ensureSharedClientId(manifest);
+		if (isDataFirstBootstrapEnabled(poolOptions && poolOptions.sync)
+			&& !await roleHasInitialState(activeRole)) {
+			return runDataFirstBootstrap(options, manifest);
+		}
 
 		emitSyncProgress('updating-staging', { activeRole, stagingRole });
 		await applyPendingDeltasToRole(stagingRole, undefined, options);
@@ -525,6 +544,274 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		return dualResult;
 	}
 
+	async function resumeDataFirstBootstrap(options, manifest, recovery) {
+		if (manifest.replicaState === replicaPendingState && isPublishedRecovery(manifest, recovery))
+			return finishDataFirstReplica(options, manifest, recovery);
+		assertExpectedRecoveryManifest(manifest, recovery);
+		return runDataFirstBootstrap(options, manifest, recovery);
+	}
+
+	async function runDataFirstBootstrap(options, manifest, recovery) {
+		const signal = options[syncAbortSignalSymbol];
+		throwIfSyncAborted(signal);
+		const activeRole = manifest.activeRole;
+		const stagingRole = manifest.stagingRole;
+		const activeSync = getRoleSyncClient(activeRole);
+		const stagingSync = getRoleSyncClient(stagingRole);
+		const schemaResults = await Promise.all([
+			activeSync.ensureLocalSchema(options),
+			stagingSync.ensureLocalSchema(options)
+		]);
+		await ensureSharedClientId(manifest);
+		const resuming = !!recovery;
+		if (!recovery) {
+			await writeRecoveryState(manifest, dataFirstRecoveryMode);
+			recovery = await readRecoveryState();
+		}
+
+		let result;
+		const readyState = resuming ? await readRoleInitialState(stagingRole) : null;
+		if (readyState) {
+			result = {
+				applied: 0,
+				tables: schemaResults[1] && schemaResults[1].tables || [],
+				since: readyState.since,
+				checkpointApplied: true,
+				resumedDataReady: true
+			};
+		}
+		else {
+			result = await pullCheckpointedBootstrap({
+				activeRole,
+				activeSync,
+				manifest,
+				options,
+				stagingRole,
+				stagingSync
+			});
+		}
+		throwIfSyncAborted(signal);
+
+		let replayKind = recovery && recovery.replayKind;
+		let publishedManifest;
+		emitSyncProgress('publishing-data-ready', { activeRole, stagingRole });
+		await awaitWithSyncAbort(runSyncSwap(router, async () => {
+			throwIfSyncAborted(signal);
+			const currentManifest = await getManifest(true);
+			assertExpectedManifest(currentManifest, manifest);
+			if (!replayKind) {
+				replayKind = `data-first:${randomUuid()}`;
+				await setRecoveryReplayKind(manifest, replayKind);
+			}
+			const pendingRows = await readAllOutboxRows(activeSync, ['pending']);
+			const failedRows = await readAllOutboxRows(activeSync, ['failed']);
+			for (let i = 0; i < pendingRows.length; i++)
+				await persistReplayRow(replayKind, pendingRows[i], true, []);
+			for (let i = 0; i < failedRows.length; i++)
+				await persistReplayRow(replayKind, failedRows[i], false, []);
+			if (pendingRows.length > 0) {
+				await stagingSync[applyOutboxRowsSymbol](pendingRows, {
+					replay: true,
+					replaceOpen: false
+				});
+			}
+			if (failedRows.length > 0)
+				await stagingSync[applyOutboxRowsSymbol](failedRows, { replaceOpen: false });
+			publishedManifest = await publishStagingRole(manifest, replicaPendingState);
+		}), signal);
+
+		await maybeEmitInitialReady(publishedManifest.activeRole);
+		emitSyncProgress('data-ready', {
+			activeRole: publishedManifest.activeRole,
+			stagingRole: publishedManifest.stagingRole,
+			replicaReady: false,
+			bootstrapMode: 'data-first'
+		});
+		return finishDataFirstReplica(options, publishedManifest, {
+			...(recovery || {}),
+			replayKind
+		}, result);
+	}
+
+	async function pullCheckpointedBootstrap(context) {
+		const {
+			activeRole,
+			activeSync,
+			manifest,
+			options,
+			stagingRole,
+			stagingSync
+		} = context;
+		let stagingFresh = await hasCheckpointedPullSession(stagingRole);
+		if (!stagingFresh) {
+			emitSyncProgress('reloading-staging', {
+				activeRole,
+				stagingRole,
+				reason: 'first_sync',
+				bootstrapMode: 'data-first'
+			});
+			await resetStagingRole(stagingSync, activeSync, manifest, options);
+			stagingFresh = true;
+		}
+		for (let attempt = 0; attempt < 2; attempt++) {
+			emitSyncProgress('pulling-staging', {
+				activeRole,
+				stagingRole,
+				stagingFresh,
+				bootstrapMode: 'data-first'
+			});
+			const startedAtMs = Date.now();
+			let pullStagingSummary;
+			try {
+				const result = await stagingSync[syncCheckpointedBootstrapSymbol]({
+					...options,
+					_skipPushBeforePull: true,
+					_fileSnapshotRollback: true,
+					_onPullBatchProgress(progress) {
+						emitSyncProgress('pull-batch-complete', {
+							activeRole,
+							stagingRole,
+							bootstrapMode: 'data-first',
+							...progress
+						});
+					},
+					_onPullSnapshot(snapshot) {
+						if (!stagingFresh)
+							throw new StagingReloadRequiredError(snapshot && snapshot.reason);
+					},
+					_onPullStagingSummary(summary) {
+						pullStagingSummary = summary;
+					}
+				});
+				emitSyncProgress('pull-staging-summary', {
+					activeRole,
+					stagingRole,
+					...(pullStagingSummary || {}),
+					elapsedMs: Math.max(0, Date.now() - startedAtMs),
+					failed: false,
+					stagingFresh,
+					bootstrapMode: 'data-first'
+				});
+				return result;
+			}
+			catch (error) {
+				if (error instanceof StagingReloadRequiredError && !stagingFresh) {
+					emitSyncProgress('reloading-staging', {
+						activeRole,
+						stagingRole,
+						reason: error.reason || 'snapshot',
+						bootstrapMode: 'data-first'
+					});
+					await resetStagingRole(stagingSync, activeSync, manifest, options);
+					stagingFresh = true;
+					continue;
+				}
+				emitSyncProgress('pull-staging-summary', {
+					activeRole,
+					stagingRole,
+					...(pullStagingSummary || {}),
+					elapsedMs: Math.max(0, Date.now() - startedAtMs),
+					failed: true,
+					stagingFresh,
+					bootstrapMode: 'data-first'
+				});
+				throw error;
+			}
+		}
+		throw new Error('Data-first bootstrap could not prepare a fresh staging database.');
+	}
+
+	async function finishDataFirstReplica(options, manifest, recovery, pullResult) {
+		const signal = options[syncAbortSignalSymbol];
+		throwIfSyncAborted(signal);
+		const activeRole = manifest.activeRole;
+		const stagingRole = manifest.stagingRole;
+		const activeSync = getRoleSyncClient(activeRole);
+		const stagingSync = getRoleSyncClient(stagingRole);
+		const schemaResults = await Promise.all([
+			activeSync.ensureLocalSchema(options),
+			stagingSync.ensureLocalSchema(options)
+		]);
+		await ensureSharedClientId(manifest);
+		const activeState = await readRoleInitialState(activeRole);
+		if (!activeState)
+			throw new Error('Data-first recovery cannot rebuild the replica before the active database is complete.');
+		const tables = schemaResults[0] && schemaResults[0].tables || [];
+		const result = pullResult || {
+			applied: 0,
+			tables,
+			since: activeState.since,
+			checkpointApplied: true,
+			resumedReplicaBuild: true
+		};
+
+		emitSyncProgress('replica-copy-start', {
+			activeRole,
+			stagingRole,
+			bootstrapMode: 'data-first'
+		});
+		await resetStagingRole(stagingSync, activeSync, manifest, options);
+		await copyRoleData(activeRole, stagingRole, tables, activeState.since, options);
+		throwIfSyncAborted(signal);
+
+		let readyManifest;
+		await awaitWithSyncAbort(runSyncSwap(router, async () => {
+			throwIfSyncAborted(signal);
+			const currentManifest = await getManifest(true);
+			if (currentManifest.activeRole !== activeRole
+				|| currentManifest.stagingRole !== stagingRole
+				|| currentManifest.generation !== manifest.generation
+				|| currentManifest.replicaState !== replicaPendingState) {
+				throw new Error('Dual sync manifest changed while the data-first replica was being built.');
+			}
+			const pendingRows = await readAllOutboxRows(activeSync, ['pending']);
+			const failedRows = await readAllOutboxRows(activeSync, ['failed']);
+			if (pendingRows.length > 0) {
+				await stagingSync[applyOutboxRowsSymbol](pendingRows, {
+					replay: true,
+					replayExisting: true,
+					replaceOpen: false
+				});
+			}
+			if (failedRows.length > 0)
+				await stagingSync[applyOutboxRowsSymbol](failedRows, { replaceOpen: false });
+			await validateRoleForeignKeys(stagingRole);
+			readyManifest = await writeManifest({
+				...currentManifest,
+				replicaState: replicaReadyState,
+				updatedAtMs: Date.now()
+			}, {
+				expectedGeneration: currentManifest.generation,
+				expectedActiveRole: currentManifest.activeRole,
+				expectedStagingRole: currentManifest.stagingRole
+			});
+			if (recovery && recovery.replayKind)
+				await deleteReplayKind(recovery.replayKind);
+			await clearRecoveryState();
+		}), signal);
+
+		readyManifest = await markSuccessfulSync();
+		emitSyncProgress('replica-ready', {
+			activeRole: readyManifest.activeRole,
+			stagingRole: readyManifest.stagingRole,
+			bootstrapMode: 'data-first',
+			replicaReady: true
+		});
+		emitSyncProgress('complete', {
+			activeRole: readyManifest.activeRole,
+			stagingRole: readyManifest.stagingRole,
+			swapped: true,
+			bootstrapMode: 'data-first',
+			replicaReady: true
+		});
+		return withDualSyncResult(result, {
+			...readyManifest,
+			swapped: true,
+			bootstrapMode: 'data-first',
+			replicaReady: true
+		});
+	}
+
 	async function pullIntoStaging(context) {
 		const {
 			activeRole,
@@ -613,6 +900,201 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		await stagingSync.ensureLocalSchema(options);
 		await ensureSharedClientId(manifest);
 		await mirrorFailedOutboxMetadata(activeSync, stagingSync);
+	}
+
+	async function copyRoleData(sourceRole, targetRole, tables, since, options) {
+		const signal = options[syncAbortSignalSymbol];
+		const sourceClient = getRoleClient(sourceRole);
+		const targetSync = getRoleSyncClient(targetRole);
+		const targetDb = getRoleDb(targetRole);
+		await targetDb.query('PRAGMA foreign_keys = OFF');
+		let processedItems = 0;
+		for (let tableIndex = 0; tableIndex < tables.length; tableIndex++) {
+			throwIfSyncAborted(signal);
+			const tableName = tables[tableIndex];
+			const sourceTable = sourceClient[tableName];
+			const tableDefinition = sourceClient.tables && sourceClient.tables[tableName];
+			if (!sourceTable || !tableDefinition)
+				throw new Error(`Data-first replica cannot copy unknown table "${tableName}".`);
+			const primaryColumns = Array.isArray(tableDefinition._primaryColumns)
+				? tableDefinition._primaryColumns
+				: [];
+			if (primaryColumns.length === 0)
+				throw new Error(`Data-first replica requires a primary key on table "${tableName}".`);
+			const primaryAliases = primaryColumns.map(column => column.alias);
+			const descendingOrder = primaryAliases.map(alias => `${alias} desc`);
+			const upperRows = await sourceTable.getMany({
+				orderBy: descendingOrder,
+				limit: 1
+			});
+			if (!Array.isArray(upperRows) || upperRows.length === 0)
+				continue;
+			const upperPk = primaryAliases.map(alias => upperRows[0][alias]);
+			let lastPk;
+			let tableProcessedItems = 0;
+			let batchNo = 0;
+			for (;;) {
+				throwIfSyncAborted(signal);
+				const rows = await sourceTable.getMany({
+					where: table => buildReplicaCopyFilter(table, primaryAliases, lastPk, upperPk),
+					orderBy: primaryAliases,
+					limit: replicaCopyBatchSize
+				});
+				if (!Array.isArray(rows) || rows.length === 0)
+					break;
+				const items = rows.map((row, index) => {
+					const plainRow = {};
+					for (let i = 0; i < tableDefinition._columns.length; i++) {
+						const alias = tableDefinition._columns[i].alias;
+						plainRow[alias] = row[alias];
+					}
+					const pk = primaryAliases.map(alias => plainRow[alias]);
+					return {
+						batchNo,
+						seq: tableProcessedItems + index,
+						table: tableName,
+						pk,
+						key: Object.fromEntries(primaryAliases.map((alias, pkIndex) => [alias, pk[pkIndex]])),
+						op: 'U',
+						row: plainRow
+					};
+				});
+				await targetSync[applyPullJournalSymbol]({
+					tables: [tableName],
+					itemCount: items.length,
+					items
+				}, {
+					[syncAbortSignalSymbol]: signal,
+					_fileSnapshotRollback: true,
+					_skipForeignKeyEnable: true,
+					apply: {
+						maxRowsPerTransaction: replicaCopyBatchSize,
+						foreignKeyCheck: 'none'
+					}
+				});
+				lastPk = primaryAliases.map(alias => rows[rows.length - 1][alias]);
+				tableProcessedItems += rows.length;
+				processedItems += rows.length;
+				emitSyncProgress('replica-copy-batch', {
+					sourceRole,
+					targetRole,
+					table: tableName,
+					tableIndex,
+					batchNo,
+					processedItems,
+					tableProcessedItems,
+					bootstrapMode: 'data-first'
+				});
+				batchNo += 1;
+				if (stringify(lastPk) === stringify(upperPk))
+					break;
+				await Promise.resolve();
+			}
+		}
+		await targetSync[applyPullJournalSymbol]({
+			tables,
+			finalSince: since,
+			itemCount: 0,
+			items: []
+		}, {
+			[syncAbortSignalSymbol]: signal,
+			_fileSnapshotRollback: true,
+			_skipForeignKeyEnable: true
+		});
+		await validateRoleForeignKeys(targetRole);
+		await targetDb.query('PRAGMA foreign_keys = ON');
+	}
+
+	function buildReplicaCopyFilter(table, primaryAliases, lastPk, upperPk) {
+		const upperFilter = buildTupleFilter(table, primaryAliases, upperPk, 'upper');
+		if (!lastPk)
+			return upperFilter;
+		return buildTupleFilter(table, primaryAliases, lastPk, 'after').and(upperFilter);
+	}
+
+	function buildTupleFilter(table, aliases, values, mode) {
+		const branches = [];
+		for (let i = 0; i < aliases.length; i++) {
+			const comparisons = [];
+			for (let equalIndex = 0; equalIndex < i; equalIndex++)
+				comparisons.push(table[aliases[equalIndex]].eq(values[equalIndex]));
+			comparisons.push(mode === 'after'
+				? table[aliases[i]].greaterThan(values[i])
+				: table[aliases[i]].lessThan(values[i]));
+			branches.push(andReplicaFilters(comparisons));
+		}
+		if (mode === 'upper') {
+			branches.push(andReplicaFilters(
+				aliases.map((alias, index) => table[alias].eq(values[index]))
+			));
+		}
+		let result = branches[0];
+		for (let i = 1; i < branches.length; i++)
+			result = result.or(branches[i]);
+		return result;
+	}
+
+	function andReplicaFilters(filters) {
+		let result = filters[0];
+		for (let i = 1; i < filters.length; i++)
+			result = result.and(filters[i]);
+		return result;
+	}
+
+	async function readRoleInitialState(role) {
+		const syncClient = getRoleSyncClient(role);
+		if (typeof syncClient[readInitialSyncStateSymbol] === 'function')
+			return syncClient[readInitialSyncStateSymbol]();
+		try {
+			const rows = toRows(await getRoleDb(role).query(
+				'SELECT "since_value" FROM "orange_sync_state" ORDER BY "scope" LIMIT 1'
+			));
+			if (rows.length === 0)
+				return null;
+			const raw = rows[0].since_value ?? rows[0].SINCE_VALUE;
+			const state = parseJson(raw);
+			if (state && state === Object(state) && state.since !== undefined && state.since !== null)
+				return state;
+			if (state !== undefined && state !== null)
+				return { since: state };
+			return null;
+		}
+		catch (error) {
+			if (/no such table/u.test(String(error && error.message || error)))
+				return null;
+			throw error;
+		}
+	}
+
+	async function roleHasInitialState(role) {
+		return !!await readRoleInitialState(role);
+	}
+
+	async function roleIsInitialReady(role) {
+		const state = await readRoleInitialState(role);
+		return !!state && state.ready !== false;
+	}
+
+	async function hasCheckpointedPullSession(role) {
+		try {
+			const rows = toRows(await getRoleDb(role).query([
+				'SELECT "status" FROM "orange_sync_pull_session"',
+				'WHERE "status" IN (\'direct-stream-pending\', \'direct-stream-ready\')',
+				'LIMIT 1'
+			].join(' ')));
+			return rows.length > 0;
+		}
+		catch (error) {
+			if (/no such table/u.test(String(error && error.message || error)))
+				return false;
+			throw error;
+		}
+	}
+
+	async function validateRoleForeignKeys(role) {
+		const violations = toRows(await getRoleDb(role).query('PRAGMA foreign_key_check'));
+		if (violations.length > 0)
+			throw new Error(`Data-first replica contains ${violations.length} foreign key violation(s).`);
 	}
 
 	async function recoverInterruptedSync(options, manifest, recovery) {
@@ -955,7 +1437,21 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 
 	async function waitForInitialSync() {
 		const manifest = await getManifest();
-		return getRoleSyncClient(manifest.activeRole).waitForInitialSync();
+		if (await roleIsInitialReady(manifest.activeRole))
+			return;
+		return new Promise((resolve) => {
+			const unsubscribe = once('initial-ready', () => {
+				unsubscribe();
+				resolve();
+			});
+			void Promise.resolve().then(async () => {
+				const current = await getManifest(true);
+				if (!await roleIsInitialReady(current.activeRole))
+					return;
+				unsubscribe();
+				resolve();
+			}).catch(() => {});
+		});
 	}
 
 	function on(event, listener) {
@@ -1047,10 +1543,17 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		if (initialReadyEmitted)
 			return;
 		const syncClient = getRoleSyncClient(role);
-		if (typeof syncClient.waitForInitialSync !== 'function')
-			return;
 		try {
-			await syncClient.waitForInitialSync();
+			if (typeof syncClient[readInitialSyncStateSymbol] === 'function') {
+				const state = await syncClient[readInitialSyncStateSymbol]();
+				if (!state || !state.ready)
+					return;
+			}
+			else {
+				if (typeof syncClient.waitForInitialSync !== 'function')
+					return;
+				await syncClient.waitForInitialSync();
+			}
 		}
 		catch (_e) {
 			return;
@@ -1099,14 +1602,15 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		}
 	}
 
-	async function publishStagingRole(manifest) {
+	async function publishStagingRole(manifest, replicaState = replicaReadyState) {
 		const now = Date.now();
 		return writeManifest({
 			activeRole: manifest.stagingRole,
 			stagingRole: manifest.activeRole,
 			updatedAtMs: now,
 			generation: manifest.generation + 1,
-			clientId: manifest.clientId
+			clientId: manifest.clientId,
+			replicaState
 		}, {
 			expectedGeneration: manifest.generation,
 			expectedActiveRole: manifest.activeRole,
@@ -1330,7 +1834,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		const db = await getCacheDb();
 		await ensureCacheSchema(db);
 		const rows = await db.query([
-			`SELECT "active_role", "staging_role", "updated_at_ms", "generation", "client_id", "last_successful_sync_at_ms" FROM "${manifestTable}"`,
+			`SELECT "active_role", "staging_role", "updated_at_ms", "generation", "client_id", "last_successful_sync_at_ms", "replica_state" FROM "${manifestTable}"`,
 			`WHERE "id" = ${sqlStringLiteral(manifestId)}`,
 			'LIMIT 1'
 		].join(' '));
@@ -1345,6 +1849,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 			updatedAtMs: Number(row.updated_at_ms ?? row.UPDATED_AT_MS ?? Date.now()),
 			generation: normalizeGeneration(row.generation ?? row.GENERATION),
 			clientId: nonEmptyString(row.client_id ?? row.CLIENT_ID),
+			replicaState: normalizeReplicaState(row.replica_state ?? row.REPLICA_STATE),
 			lastSuccessfulSyncAtMs: normalizeTimestamp(
 				row.last_successful_sync_at_ms ?? row.LAST_SUCCESSFUL_SYNC_AT_MS
 			)
@@ -1355,7 +1860,7 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		const db = await getCacheDb();
 		await ensureCacheSchema(db);
 		const row = firstRow(await db.query([
-			`SELECT "expected_generation", "active_role", "staging_role", "replay_kind", "started_at_ms" FROM "${recoveryTable}"`,
+			`SELECT "expected_generation", "active_role", "staging_role", "replay_kind", "started_at_ms", "mode" FROM "${recoveryTable}"`,
 			`WHERE "id" = ${sqlStringLiteral(recoveryId)}`,
 			'LIMIT 1'
 		].join(' ')));
@@ -1370,21 +1875,23 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 			activeRole,
 			stagingRole,
 			replayKind: nonEmptyString(row.replay_kind ?? row.REPLAY_KIND),
+			mode: nonEmptyString(row.mode ?? row.MODE),
 			startedAtMs: normalizeTimestamp(row.started_at_ms ?? row.STARTED_AT_MS)
 		};
 	}
 
-	async function writeRecoveryState(manifest) {
+	async function writeRecoveryState(manifest, mode) {
 		const db = await getCacheDb();
 		await ensureCacheSchema(db);
 		await db.query([
-			`INSERT INTO "${recoveryTable}" ("id", "expected_generation", "active_role", "staging_role", "replay_kind", "started_at_ms")`,
-			`VALUES (${sqlStringLiteral(recoveryId)}, ${manifest.generation}, ${sqlStringLiteral(manifest.activeRole)}, ${sqlStringLiteral(manifest.stagingRole)}, NULL, ${Date.now()})`,
+			`INSERT INTO "${recoveryTable}" ("id", "expected_generation", "active_role", "staging_role", "replay_kind", "started_at_ms", "mode")`,
+			`VALUES (${sqlStringLiteral(recoveryId)}, ${manifest.generation}, ${sqlStringLiteral(manifest.activeRole)}, ${sqlStringLiteral(manifest.stagingRole)}, NULL, ${Date.now()}, ${sqlNullableStringLiteral(mode)})`,
 			'ON CONFLICT("id") DO UPDATE SET',
 			'"expected_generation" = excluded."expected_generation",',
 			'"active_role" = excluded."active_role",',
 			'"staging_role" = excluded."staging_role",',
 			'"replay_kind" = NULL,',
+			'"mode" = excluded."mode",',
 			'"started_at_ms" = excluded."started_at_ms"'
 		].join(' '));
 	}
@@ -1444,7 +1951,8 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 				`"staging_role" = ${sqlStringLiteral(normalized.stagingRole)},`,
 				`"updated_at_ms" = ${normalized.updatedAtMs},`,
 				`"generation" = ${normalized.generation},`,
-				`"client_id" = ${sqlStringLiteral(normalized.clientId)}`,
+				`"client_id" = ${sqlStringLiteral(normalized.clientId)},`,
+				`"replica_state" = ${sqlStringLiteral(normalized.replicaState)}`,
 				`WHERE "id" = ${sqlStringLiteral(manifestId)}`,
 				`AND "generation" = ${normalizeGeneration(options.expectedGeneration)}`,
 				`AND "active_role" = ${sqlStringLiteral(options.expectedActiveRole)}`,
@@ -1453,15 +1961,16 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		}
 		else {
 			await db.query([
-				`INSERT INTO "${manifestTable}" ("id", "active_role", "staging_role", "updated_at_ms", "generation", "client_id")`,
-				`VALUES (${sqlStringLiteral(manifestId)}, ${sqlStringLiteral(normalized.activeRole)}, ${sqlStringLiteral(normalized.stagingRole)}, ${normalized.updatedAtMs}, ${normalized.generation}, ${sqlStringLiteral(normalized.clientId)})`,
+				`INSERT INTO "${manifestTable}" ("id", "active_role", "staging_role", "updated_at_ms", "generation", "client_id", "replica_state")`,
+				`VALUES (${sqlStringLiteral(manifestId)}, ${sqlStringLiteral(normalized.activeRole)}, ${sqlStringLiteral(normalized.stagingRole)}, ${normalized.updatedAtMs}, ${normalized.generation}, ${sqlStringLiteral(normalized.clientId)}, ${sqlStringLiteral(normalized.replicaState)})`,
 				options.insertOnly ? 'ON CONFLICT("id") DO NOTHING' : [
 					'ON CONFLICT("id") DO UPDATE SET',
 					'"active_role" = excluded."active_role",',
 					'"staging_role" = excluded."staging_role",',
 					'"updated_at_ms" = excluded."updated_at_ms",',
 					'"generation" = excluded."generation",',
-					'"client_id" = excluded."client_id"'
+					'"client_id" = excluded."client_id",',
+					'"replica_state" = excluded."replica_state"'
 				].join(' ')
 			].join(' '));
 		}
@@ -1471,7 +1980,8 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 		if (options.expectedGeneration !== undefined
 			&& (persisted.generation !== normalized.generation
 				|| persisted.activeRole !== normalized.activeRole
-				|| persisted.stagingRole !== normalized.stagingRole)) {
+				|| persisted.stagingRole !== normalized.stagingRole
+				|| persisted.replicaState !== normalized.replicaState)) {
 			throw new Error('Dual sync manifest compare-and-swap failed; retry sync.');
 		}
 		updateManifestCache(persisted, true);
@@ -1711,12 +2221,14 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 					'"updated_at_ms" INTEGER NOT NULL,',
 					'"generation" INTEGER NOT NULL DEFAULT 0,',
 					'"client_id" TEXT,',
+					`"replica_state" TEXT NOT NULL DEFAULT '${replicaReadyState}',`,
 					'"last_successful_sync_at_ms" INTEGER',
 					');'
 				].join(' '));
 				await tryAddCacheColumn(db, manifestTable, 'generation', 'INTEGER NOT NULL DEFAULT 0');
 				await tryAddCacheColumn(db, manifestTable, 'client_id', 'TEXT');
 				await tryAddCacheColumn(db, manifestTable, 'last_successful_sync_at_ms', 'INTEGER');
+				await tryAddCacheColumn(db, manifestTable, 'replica_state', `TEXT NOT NULL DEFAULT '${replicaReadyState}'`);
 				await db.query([
 					`CREATE TABLE IF NOT EXISTS "${deltaTable}" (`,
 					'"id" TEXT PRIMARY KEY,',
@@ -1754,9 +2266,11 @@ function newDualSyncDatabase(connectionString, poolOptions, createSingleDatabase
 					'"active_role" TEXT NOT NULL,',
 					'"staging_role" TEXT NOT NULL,',
 					'"replay_kind" TEXT,',
+					'"mode" TEXT,',
 					'"started_at_ms" INTEGER NOT NULL',
 					');'
 				].join(' '));
+				await tryAddCacheColumn(db, recoveryTable, 'mode', 'TEXT');
 				cacheSchemaReady = true;
 			})()
 				.finally(() => {
@@ -2042,11 +2556,16 @@ function normalizeManifestInfo(info) {
 	return {
 		activeRole: info.activeRole,
 		stagingRole: info.stagingRole,
+		replicaState: normalizeReplicaState(info.replicaState),
 		updatedAtMs: Number(info.updatedAtMs) || Date.now(),
 		generation: normalizeGeneration(info.generation),
 		clientId: nonEmptyString(info.clientId),
 		lastSuccessfulSyncAtMs: normalizeTimestamp(info.lastSuccessfulSyncAtMs)
 	};
+}
+
+function normalizeReplicaState(value) {
+	return value === replicaPendingState ? replicaPendingState : replicaReadyState;
 }
 
 function manifestChannelName(connectionString) {
@@ -2119,9 +2638,16 @@ function stripDualSyncOption(sync) {
 		return sync;
 	const {
 		dualDataDb,
+		dual,
 		...rest
 	} = sync;
 	return rest;
+}
+
+function isDataFirstBootstrapEnabled(sync) {
+	return !!sync && sync === Object(sync) && !Array.isArray(sync)
+		&& sync.dual && sync.dual === Object(sync.dual)
+		&& sync.dual.bootstrap === 'data-first';
 }
 
 function appendRoleSuffix(connectionString, suffix) {
@@ -2213,6 +2739,10 @@ function parseJson(value) {
 
 function sqlStringLiteral(value) {
 	return `'${String(value).replace(/'/g, '\'\'')}'`;
+}
+
+function sqlNullableStringLiteral(value) {
+	return value === undefined || value === null ? 'NULL' : sqlStringLiteral(value);
 }
 
 function sqlNullableJsonLiteral(value) {

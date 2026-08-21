@@ -17,6 +17,27 @@ const map = rdb.map(({ table }) => ({
 	}))
 }));
 
+const relationalMap = rdb.map((x) => ({
+	compositeOrder: x.table('compositeOrder').map(({ column }) => ({
+		companyId: column('companyId').string().primary().notNull(),
+		orderNo: column('orderNo').numeric().primary().notNull(),
+		title: column('title').string().notNull()
+	})),
+	compositeOrderLine: x.table('compositeOrderLine').map(({ column }) => ({
+		companyId: column('companyId').string().primary().notNull(),
+		orderNo: column('orderNo').numeric().primary().notNull(),
+		lineNo: column('lineNo').numeric().primary().notNull(),
+		text: column('text').string().notNull()
+	}))
+})).map((x) => ({
+	compositeOrder: x.compositeOrder.map(({ hasMany }) => ({
+		lines: hasMany(x.compositeOrderLine).by('companyId', 'orderNo')
+	})),
+	compositeOrderLine: x.compositeOrderLine.map(({ references }) => ({
+		order: references(x.compositeOrder).by('companyId', 'orderNo').notNull()
+	}))
+}));
+
 const closeTasks = [];
 
 afterEach(async () => {
@@ -25,6 +46,300 @@ afterEach(async () => {
 });
 
 describe('sqliteOPFS dual sync integration', () => {
+	test('publishes complete data before building the inactive data-first replica', async () => {
+		const rows = Array.from({ length: 1205 }, (_item, index) => ({
+			id: `data-first-${String(index + 1).padStart(4, '0')}`,
+			title: `Data first ${index + 1}`
+		}));
+		const fixture = await createDualIntegrationFixture('data-first', rows, {
+			dual: { bootstrap: 'data-first' },
+			pull: {
+				maxKeysPerBatch: 200,
+				maxRowsPerBatch: 200
+			}
+		});
+		const opened = fixture.openLocal();
+		const deltaDb = map({
+			db: con => con.sqlite(appendRoleSuffix(fixture.connectionString, 'delta'), { size: 1 })
+		});
+		closeTasks.push(() => deltaDb.close());
+		const progressEvents = [];
+		let syncSettled = false;
+		opened.localDb.syncClient.on('sync-progress', event => progressEvents.push(event));
+		const initialReady = new Promise((resolve, reject) => {
+			opened.localDb.syncClient.on('initial-ready', () => {
+				Promise.resolve().then(async () => {
+					const count = await opened.localDb.project.count();
+					const manifest = await deltaDb.query([
+						'SELECT "active_role", "staging_role", "replica_state"',
+						'FROM "orange_sync_dual_manifest" WHERE "id" = \'default\''
+					].join(' '));
+					resolve({ count, manifest: manifest[0], syncSettled });
+				}).catch(reject);
+			});
+		});
+		await opened.localDb.syncClient.resetLocal();
+		await opened.localDb.project.insert({
+			id: 'local-before-data-ready',
+			title: 'Local before data ready'
+		});
+		const syncPromise = opened.localDb.syncClient.sync().finally(() => {
+			syncSettled = true;
+		});
+
+		expect(await initialReady).toMatchObject({
+			count: rows.length + 1,
+			manifest: {
+				active_role: 'b',
+				staging_role: 'a',
+				replica_state: 'replica-pending'
+			},
+			syncSettled: false
+		});
+		const syncResult = await syncPromise;
+		const roleA = map({
+			db: con => con.sqlite(fixture.connectionString, { size: 1 })
+		});
+		const roleB = map({
+			db: con => con.sqlite(appendRoleSuffix(fixture.connectionString, 'b'), { size: 1 })
+		});
+		closeTasks.push(() => roleA.close());
+		closeTasks.push(() => roleB.close());
+
+		expect(syncResult.__orangeDualSync).toMatchObject({
+			activeRole: 'b',
+			stagingRole: 'a',
+			bootstrapMode: 'data-first',
+			replicaReady: true
+		});
+		expect(await roleA.project.count()).toBe(rows.length + 1);
+		expect(await roleB.project.count()).toBe(rows.length + 1);
+		expect((await roleA.project.getById('local-before-data-ready')).title)
+			.toBe('Local before data ready');
+		expect((await roleB.project.getById('local-before-data-ready')).title)
+			.toBe('Local before data ready');
+		expect(await fixture.remoteDb.project.getById('local-before-data-ready')).toBeUndefined();
+		expect(await deltaDb.query('SELECT "id" FROM "orange_sync_dual_delta"')).toHaveLength(0);
+		expect(await deltaDb.query('SELECT "id" FROM "orange_sync_dual_recovery"')).toHaveLength(0);
+		expect(await deltaDb.query([
+			'SELECT "replica_state" FROM "orange_sync_dual_manifest"',
+			'WHERE "id" = \'default\''
+		].join(' '))).toEqual([{ replica_state: 'ready' }]);
+		expect(progressEvents.map(event => event.phase)).toEqual(expect.arrayContaining([
+			'data-ready',
+			'replica-copy-start',
+			'replica-copy-batch',
+			'replica-ready'
+		]));
+		expect(progressEvents.findIndex(event => event.phase === 'data-ready'))
+			.toBeLessThan(progressEvents.findIndex(event => event.phase === 'replica-copy-start'));
+		expect(progressEvents.find(event => event.phase === 'pull-staging-summary')).toMatchObject({
+			bootstrapMode: 'data-first',
+			applied: rows.length,
+			journalInsertMs: 0,
+			deltaPersistMs: 0,
+			bulkStableBaseMs: 0,
+			failed: false
+		});
+		for (const roleDb of [roleA, roleB]) {
+			const pullItemTables = await roleDb.query([
+				'SELECT "name" FROM sqlite_schema',
+				'WHERE "type" = \'table\' AND "name" = \'orange_sync_pull_item\''
+			].join(' '));
+			if (pullItemTables.length > 0)
+				expect(await roleDb.query('SELECT * FROM "orange_sync_pull_item"')).toHaveLength(0);
+		}
+	}, 30000);
+
+	test('resumes a checkpointed data-first pull after reopening', async () => {
+		const rows = Array.from({ length: 405 }, (_item, index) => ({
+			id: `resume-${String(index + 1).padStart(4, '0')}`,
+			title: `Resume ${index + 1}`
+		}));
+		const fixture = await createDualIntegrationFixture('data-first-pull-resume', rows, {
+			dual: { bootstrap: 'data-first' },
+			pull: {
+				maxKeysPerBatch: 100,
+				maxRowsPerBatch: 100
+			}
+		});
+		let opened = fixture.openLocal();
+		await opened.localDb.syncClient.resetLocal();
+		const interrupted = new Error('injected data-first pull interruption');
+		let interruptedOnce = false;
+		opened.localDb.syncClient.interceptors.request.use(config => {
+			if (!interruptedOnce && config?.data?.phase === 'keys' && config.data.token) {
+				interruptedOnce = true;
+				throw interrupted;
+			}
+			return config;
+		});
+
+		await expect(opened.localDb.syncClient.sync()).rejects.toBe(interrupted);
+		await opened.close();
+		expect(fixture.keyRequests).toEqual([null]);
+
+		opened = fixture.openLocal();
+		await opened.localDb.syncClient.sync();
+		expect(fixture.keyRequests[1]).toMatchObject({
+			mode: 'snapshot',
+			tableIndex: 0
+		});
+		expect(await opened.localDb.project.count()).toBe(rows.length);
+		const roleA = map({
+			db: con => con.sqlite(fixture.connectionString, { size: 1 })
+		});
+		const roleB = map({
+			db: con => con.sqlite(appendRoleSuffix(fixture.connectionString, 'b'), { size: 1 })
+		});
+		closeTasks.push(() => roleA.close());
+		closeTasks.push(() => roleB.close());
+		expect(await roleA.project.count()).toBe(rows.length);
+		expect(await roleB.project.count()).toBe(rows.length);
+	}, 30000);
+
+	test('rebuilds a crashed replica and preserves writes on the early active database', async () => {
+		const rows = Array.from({ length: 1205 }, (_item, index) => ({
+			id: `replica-${String(index + 1).padStart(4, '0')}`,
+			title: `Replica ${index + 1}`
+		}));
+		const fixture = await createDualIntegrationFixture('data-first-replica-resume', rows, {
+			dual: { bootstrap: 'data-first' },
+			pull: {
+				maxKeysPerBatch: 200,
+				maxRowsPerBatch: 200
+			}
+		});
+		let opened = fixture.openLocal();
+		await opened.localDb.syncClient.resetLocal();
+		const interrupted = new Error('injected replica copy interruption');
+		const stopCrash = opened.dualDb[dualSyncFaultInjectorSymbol](event => {
+			if (event.phase === 'replica-copy-batch')
+				throw interrupted;
+		});
+
+		await expect(opened.localDb.syncClient.sync()).rejects.toBe(interrupted);
+		stopCrash();
+		expect(await opened.localDb.project.count()).toBe(rows.length);
+		const changed = await opened.localDb.project.getById('replica-0001');
+		changed.title = 'Written while replica pending';
+		await changed.saveChanges();
+		await opened.close();
+
+		opened = fixture.openLocal();
+		const recovered = await opened.localDb.syncClient.sync();
+		expect(recovered.__orangeDualSync).toMatchObject({
+			activeRole: 'b',
+			stagingRole: 'a',
+			bootstrapMode: 'data-first',
+			replicaReady: true
+		});
+		expect((await opened.localDb.project.getById('replica-0001')).title)
+			.toBe('Written while replica pending');
+		expect((await fixture.remoteDb.project.getById('replica-0001')).title)
+			.toBe('Replica 1');
+		const roleA = map({
+			db: con => con.sqlite(fixture.connectionString, { size: 1 })
+		});
+		const roleB = map({
+			db: con => con.sqlite(appendRoleSuffix(fixture.connectionString, 'b'), { size: 1 })
+		});
+		closeTasks.push(() => roleA.close());
+		closeTasks.push(() => roleB.close());
+		expect((await roleA.project.getById('replica-0001')).title)
+			.toBe('Written while replica pending');
+		expect((await roleB.project.getById('replica-0001')).title)
+			.toBe('Written while replica pending');
+		for (const roleDb of [roleA, roleB]) {
+			const pending = await roleDb.query(
+				'SELECT "mutation_id" FROM "orange_sync_outbox" WHERE "status" = \'pending\''
+			);
+			expect(pending).toHaveLength(1);
+		}
+
+		await opened.localDb.syncClient.sync();
+		expect((await fixture.remoteDb.project.getById('replica-0001')).title)
+			.toBe('Written while replica pending');
+	}, 30000);
+
+	test('copies composite keys and validates relations after data-first bootstrap', async () => {
+		const remoteDb = relationalMap({
+			db: con => con.pglite(undefined, { size: 1 })
+		});
+		closeTasks.push(() => remoteDb.close());
+		await remoteDb.query([
+			'CREATE TABLE "compositeOrder" (',
+			'"companyId" TEXT NOT NULL, "orderNo" INTEGER NOT NULL, "title" TEXT NOT NULL,',
+			'PRIMARY KEY ("companyId", "orderNo"));'
+		].join(' '));
+		await remoteDb.query([
+			'CREATE TABLE "compositeOrderLine" (',
+			'"companyId" TEXT NOT NULL, "orderNo" INTEGER NOT NULL,',
+			'"lineNo" INTEGER NOT NULL, "text" TEXT NOT NULL,',
+			'PRIMARY KEY ("companyId", "orderNo", "lineNo"));'
+		].join(' '));
+		await setupChangeTracking(remoteDb, {
+			compositeOrder: remoteDb.tables.compositeOrder,
+			compositeOrderLine: remoteDb.tables.compositeOrderLine
+		});
+		await remoteDb.compositeOrder.insert({
+			companyId: 'acme',
+			orderNo: 7,
+			title: 'Composite order'
+		});
+		await remoteDb.compositeOrderLine.insert(
+			Array.from({ length: 1005 }, (_item, index) => ({
+				companyId: 'acme',
+				orderNo: 7,
+				lineNo: index + 1,
+				text: `Line ${index + 1}`
+			}))
+		);
+
+		const app = express();
+		app.use(express.json({ limit: '2mb' }));
+		app.use('/rdb', remoteDb.express({ sync: true }));
+		const server = await listen(app);
+		closeTasks.push(() => closeServer(server));
+		const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'orange-dual-data-first-relations-'));
+		closeTasks.push(async () => fs.rmSync(directory, { recursive: true, force: true }));
+		const connectionString = path.join(directory, 'local.sqlite3');
+		const sync = {
+			url: `http://127.0.0.1:${server.address().port}/rdb`,
+			auto: false,
+			// Exercise child-before-parent delivery; validation is deferred until the complete snapshot exists.
+			tables: ['compositeOrderLine', 'compositeOrder'],
+			dual: { bootstrap: 'data-first' },
+			pull: {
+				maxKeysPerBatch: 200,
+				maxRowsPerBatch: 200
+			}
+		};
+		const dualDb = newDualSyncDatabase(connectionString, { sync }, (roleConnectionString, options) =>
+			newSqliteDatabase(roleConnectionString, { ...options, size: 1 })
+		);
+		const localDb = relationalMap({ db: () => dualDb });
+		closeTasks.push(() => localDb.close());
+		await localDb.syncClient.resetLocal();
+		await localDb.syncClient.sync();
+
+		expect(await localDb.compositeOrder.count()).toBe(1);
+		expect(await localDb.compositeOrderLine.count()).toBe(1005);
+		const roleA = relationalMap({
+			db: con => con.sqlite(connectionString, { size: 1 })
+		});
+		const roleB = relationalMap({
+			db: con => con.sqlite(appendRoleSuffix(connectionString, 'b'), { size: 1 })
+		});
+		closeTasks.push(() => roleA.close());
+		closeTasks.push(() => roleB.close());
+		for (const roleDb of [roleA, roleB]) {
+			expect(await roleDb.compositeOrder.count()).toBe(1);
+			expect(await roleDb.compositeOrderLine.count()).toBe(1005);
+			expect(await roleDb.query('PRAGMA foreign_key_check')).toHaveLength(0);
+		}
+	}, 30000);
+
 	test('streams bootstrap batches and replays incremental deltas across roles', async () => {
 		const remoteDb = map({
 			db: con => con.pglite(undefined, { size: 1 })
@@ -615,7 +930,7 @@ describe('sqliteOPFS dual sync integration', () => {
 	}, 30000);
 });
 
-async function createDualIntegrationFixture(name, rows) {
+async function createDualIntegrationFixture(name, rows, syncOverrides = {}) {
 	const remoteDb = map({
 		db: con => con.pglite(undefined, { size: 1 })
 	});
@@ -628,6 +943,12 @@ async function createDualIntegrationFixture(name, rows) {
 
 	const app = express();
 	app.use(express.json({ limit: '2mb' }));
+	const keyRequests = [];
+	app.use('/rdb', (request, _response, next) => {
+		if (request.body?.phase === 'keys')
+			keyRequests.push(request.body.token || null);
+		next();
+	});
 	app.use('/rdb', remoteDb.express({ sync: true }));
 	const server = await listen(app);
 	closeTasks.push(() => closeServer(server));
@@ -637,9 +958,10 @@ async function createDualIntegrationFixture(name, rows) {
 	const sync = {
 		url: `http://127.0.0.1:${server.address().port}/rdb`,
 		auto: false,
-		tables: ['project']
+		tables: ['project'],
+		...syncOverrides
 	};
-	return { connectionString, openLocal, remoteDb, sync };
+	return { connectionString, keyRequests, openLocal, remoteDb, sync };
 
 	function openLocal() {
 		const dualDb = newDualSyncDatabase(connectionString, { sync }, (roleConnectionString, options) =>

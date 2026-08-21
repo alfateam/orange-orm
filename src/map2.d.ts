@@ -1069,6 +1069,9 @@ export interface SyncPushOverrideConfig extends Omit<SyncPushConfig, 'url'> {
 export interface SyncConfig<M extends Record<string, any> = any> extends Partial<SyncEndpointConfig> {
   tables?: SyncTableName<M>[];
   initialReadyMaxAgeMs?: number;
+  dual?: {
+    bootstrap?: 'data-first';
+  };
   pull?: string | SyncPullOverrideConfig<M>;
   push?: string | SyncPushOverrideConfig;
   auto?: boolean | {
@@ -1119,9 +1122,13 @@ export interface SyncEvent {
 export interface SyncProgressEvent {
   phase: string;
   atMs: number;
+  bootstrapMode?: 'data-first';
+  replicaReady?: boolean;
   queueDepth?: number;
   activeRole?: 'a' | 'b';
   stagingRole?: 'a' | 'b';
+  sourceRole?: 'a' | 'b';
+  targetRole?: 'a' | 'b';
   swapped?: boolean;
   requestId?: number;
   requestPhase?: string;
@@ -1130,9 +1137,11 @@ export interface SyncProgressEvent {
   elapsedMs?: number;
   failed?: boolean;
   deltaId?: string;
-  targetRole?: 'a' | 'b';
   processedItems?: number;
+  tableProcessedItems?: number;
   totalItems?: number;
+  table?: string;
+  tableIndex?: number;
   batchNo?: number;
   batchCount?: number;
   keyCount?: number;

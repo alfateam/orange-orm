@@ -1,4 +1,4 @@
-import type { TableClient } from '../../src/map2';
+import type { SyncConfig, TableClient } from '../../src/map2';
 
 type Model = {
 	actorRole: {
@@ -49,6 +49,13 @@ const antall: number = aggregateRow.antall;
 void orgnr;
 void navn;
 void antall;
+
+const dataFirstSync: SyncConfig<Model> = {
+	url: '/rdb',
+	dual: { bootstrap: 'data-first' }
+};
+
+void dataFirstSync;
 
 // @ts-expect-error Query options must not be exposed on result rows.
 distinctRow.orderBy;
