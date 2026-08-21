@@ -64,10 +64,13 @@ describe('sqliteOPFS dual sync integration', () => {
 		});
 		closeTasks.push(() => deltaDb.close());
 		const progressEvents = [];
+		const readinessEvents = [];
+		let syncEventCount = 0;
 		let syncSettled = false;
 		opened.localDb.syncClient.on('sync-progress', event => progressEvents.push(event));
 		const initialReady = new Promise((resolve, reject) => {
 			opened.localDb.syncClient.on('initial-ready', () => {
+				readinessEvents.push('initial-ready');
 				Promise.resolve().then(async () => {
 					const count = await opened.localDb.project.count();
 					const manifest = await deltaDb.query([
@@ -75,6 +78,22 @@ describe('sqliteOPFS dual sync integration', () => {
 						'FROM "orange_sync_dual_manifest" WHERE "id" = \'default\''
 					].join(' '));
 					resolve({ count, manifest: manifest[0], syncSettled });
+				}).catch(reject);
+			});
+		});
+		const dataReadySync = new Promise((resolve, reject) => {
+			opened.localDb.syncClient.on('sync', event => {
+				syncEventCount += 1;
+				const info = event && event.result && event.result.__orangeDualSync;
+				if (!info || info.bootstrapMode !== 'data-first' || info.replicaReady !== false)
+					return;
+				readinessEvents.push('sync');
+				Promise.resolve().then(async () => {
+					resolve({
+						count: await opened.localDb.project.count(),
+						info,
+						syncSettled
+					});
 				}).catch(reject);
 			});
 		});
@@ -96,7 +115,19 @@ describe('sqliteOPFS dual sync integration', () => {
 			},
 			syncSettled: false
 		});
+		expect(await dataReadySync).toMatchObject({
+			count: rows.length + 1,
+			info: {
+				activeRole: 'b',
+				stagingRole: 'a',
+				bootstrapMode: 'data-first',
+				replicaReady: false
+			},
+			syncSettled: false
+		});
+		expect(readinessEvents).toEqual(['initial-ready', 'sync']);
 		const syncResult = await syncPromise;
+		expect(syncEventCount).toBe(1);
 		const roleA = map({
 			db: con => con.sqlite(fixture.connectionString, { size: 1 })
 		});

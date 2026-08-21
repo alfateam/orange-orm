@@ -31872,6 +31872,7 @@ function requireDualSyncDatabase () {
 		let queuedSyncCount = 0;
 		let nextProgressRequestId = 1;
 		let initialReadyEmitted = false;
+		const dataReadySyncResults = new WeakSet();
 		const eventListeners = new Map();
 		const roleEventSubscriptions = new Set();
 		const schemaReadyRoles = new Set();
@@ -32404,7 +32405,19 @@ function requireDualSyncDatabase () {
 				publishedManifest = await publishStagingRole(manifest, replicaPendingState);
 			}), signal);
 
-			await maybeEmitInitialReady(publishedManifest.activeRole, publishedManifest);
+			const dataReadyResult = withDualSyncResult(cloneSyncResult(result), {
+				...publishedManifest,
+				swapped: true,
+				bootstrapMode: 'data-first',
+				replicaReady: false
+			});
+			const emittedDataReadySync = await maybeEmitInitialReady(
+				publishedManifest.activeRole,
+				publishedManifest,
+				{ method: 'sync', result: dataReadyResult }
+			);
+			if (emittedDataReadySync && result && result === Object(result))
+				dataReadySyncResults.add(result);
 			emitSyncProgress('data-ready', {
 				activeRole: publishedManifest.activeRole,
 				stagingRole: publishedManifest.stagingRole,
@@ -33275,7 +33288,11 @@ function requireDualSyncDatabase () {
 		async function observe(method, fn) {
 			try {
 				const result = await fn();
-				emit(method, { method, result });
+				const dataReadySyncEmitted = method === 'sync'
+					&& result && result === Object(result)
+					&& dataReadySyncResults.delete(result);
+				if (!dataReadySyncEmitted)
+					emit(method, { method, result });
 				if (method !== 'sync')
 					emit('sync', { method, result });
 				return result;
@@ -33323,27 +33340,27 @@ function requireDualSyncDatabase () {
 			await maybeEmitInitialReady(manifest.activeRole, manifest);
 		}
 
-		async function maybeEmitInitialReady(role, manifestInfo) {
+		async function maybeEmitInitialReady(role, manifestInfo, syncPayload) {
 			if (initialReadyEmitted)
-				return;
+				return false;
 			const syncClient = getRoleSyncClient(role);
 			try {
 				if (typeof syncClient[readInitialSyncStateSymbol] === 'function') {
 					const state = await syncClient[readInitialSyncStateSymbol]();
 					if (!state || !state.ready)
-						return;
+						return false;
 				}
 				else {
 					if (typeof syncClient.waitForInitialSync !== 'function')
-						return;
+						return false;
 					await syncClient.waitForInitialSync();
 				}
 			}
 			catch (_e) {
-				return;
+				return false;
 			}
 			if (initialReadyEmitted)
-				return;
+				return false;
 			initialReadyEmitted = true;
 			const manifest = normalizeManifestInfo(manifestInfo) || await getManifest(true);
 			emit('initial-ready', {
@@ -33351,6 +33368,9 @@ function requireDualSyncDatabase () {
 				role,
 				...manifest
 			});
+			if (syncPayload)
+				emit('sync', syncPayload);
+			return true;
 		}
 
 		async function applyPendingDeltasToRole(role, onlyDeltaId, syncOptions = {}) {
@@ -34262,6 +34282,12 @@ function requireDualSyncDatabase () {
 			configurable: true
 		});
 		return result;
+	}
+
+	function cloneSyncResult(result) {
+		if (!result || result !== Object(result))
+			return {};
+		return Array.isArray(result) ? result.slice() : { ...result };
 	}
 
 	function attachRecoveredConflict(error, result, mutationIds) {
