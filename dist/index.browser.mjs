@@ -29076,7 +29076,7 @@ function requireDualSyncDatabase () {
 
 			publishedManifest = await markSuccessfulSync();
 			const newActiveRole = publishedManifest.activeRole;
-			await maybeEmitInitialReady(newActiveRole);
+			await maybeEmitInitialReady(newActiveRole, publishedManifest);
 			emitSyncProgress('complete', {
 				activeRole: publishedManifest.activeRole,
 				stagingRole: publishedManifest.stagingRole,
@@ -29174,7 +29174,7 @@ function requireDualSyncDatabase () {
 				publishedManifest = await publishStagingRole(manifest, replicaPendingState);
 			}), signal);
 
-			await maybeEmitInitialReady(publishedManifest.activeRole);
+			await maybeEmitInitialReady(publishedManifest.activeRole, publishedManifest);
 			emitSyncProgress('data-ready', {
 				activeRole: publishedManifest.activeRole,
 				stagingRole: publishedManifest.stagingRole,
@@ -29724,7 +29724,7 @@ function requireDualSyncDatabase () {
 			}), signal);
 
 			publishedManifest = await markSuccessfulSync();
-			await maybeEmitInitialReady(publishedManifest.activeRole);
+			await maybeEmitInitialReady(publishedManifest.activeRole, publishedManifest);
 			emitSyncProgress('complete', {
 				activeRole: publishedManifest.activeRole,
 				stagingRole: publishedManifest.stagingRole,
@@ -30090,10 +30090,10 @@ function requireDualSyncDatabase () {
 
 		async function maybeEmitInitialReadyFromActive() {
 			const manifest = await getManifest();
-			await maybeEmitInitialReady(manifest.activeRole);
+			await maybeEmitInitialReady(manifest.activeRole, manifest);
 		}
 
-		async function maybeEmitInitialReady(role) {
+		async function maybeEmitInitialReady(role, manifestInfo) {
 			if (initialReadyEmitted)
 				return;
 			const syncClient = getRoleSyncClient(role);
@@ -30115,7 +30115,12 @@ function requireDualSyncDatabase () {
 			if (initialReadyEmitted)
 				return;
 			initialReadyEmitted = true;
-			emit('initial-ready', { source: 'dual-swap', role });
+			const manifest = normalizeManifestInfo(manifestInfo) || await getManifest(true);
+			emit('initial-ready', {
+				source: 'dual-swap',
+				role,
+				...manifest
+			});
 		}
 
 		async function applyPendingDeltasToRole(role, onlyDeltaId, syncOptions = {}) {
@@ -30350,11 +30355,23 @@ function requireDualSyncDatabase () {
 			wrapExternalSyncMethod(syncClient, 'resetLocal');
 			if (typeof syncClient.on !== 'function' || externalSyncUnsubscribe)
 				return;
-			externalSyncUnsubscribe = syncClient.on('sync', payload => {
+			const unsubscribes = [];
+			unsubscribes.push(syncClient.on('sync', payload => {
 				const info = extractDualSyncInfo(payload);
 				if (info)
 					updateManifestCache(info);
-			});
+			}));
+			unsubscribes.push(syncClient.on('initial-ready', payload => {
+				const info = extractDualSyncInfo(payload);
+				if (info)
+					updateManifestCache(info, true);
+			}));
+			externalSyncUnsubscribe = () => {
+				for (let i = 0; i < unsubscribes.length; i++) {
+					if (typeof unsubscribes[i] === 'function')
+						unsubscribes[i]();
+				}
+			};
 		}
 
 		async function getManifest(refresh = false) {

@@ -213,6 +213,31 @@ describe('sqliteOPFS dual sync database', () => {
 		}]);
 	});
 
+	test('routes early GUI reads from manifest data in an external initial-ready event', async () => {
+		const fixture = newFixture();
+		const db = newDualSyncDatabase('app.sqlite3', {
+			sync: { url: '/rdb', dualDataDb: true }
+		}, fixture.createSingleDatabase);
+		const syncClient = newFakeSyncClient();
+
+		db.__orangeDualSyncAttachSyncClient(syncClient);
+		await db.query('SELECT before data ready');
+		syncClient.emit('initial-ready', {
+			source: 'dual-swap',
+			role: 'b',
+			activeRole: 'b',
+			stagingRole: 'a',
+			replicaState: 'replica-pending',
+			generation: 1,
+			updatedAtMs: Date.now() + 1
+		});
+
+		expect(await db.query('SELECT after data ready')).toEqual([{
+			connectionString: 'app.__orange_sync_b.sqlite3',
+			sql: 'SELECT after data ready'
+		}]);
+	});
+
 	test('updates the cached manifest from an external reset result', async () => {
 		const fixture = newFixture({
 			activeRole: 'b',
