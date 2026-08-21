@@ -194,8 +194,10 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 			pullOptions._onPullSnapshot = options._onPullSnapshot;
 		if (options._skipPushBeforePull === true)
 			pullOptions._skipPushBeforePull = true;
-		if (usesFileSnapshotRollback(options))
+		if (usesFileSnapshotRollback(options)) {
 			pullOptions._fileSnapshotRollback = true;
+			return pullWithForeignKeysSuspended(pullOptions);
+		}
 		return pull(pullOptions);
 	}
 
@@ -216,11 +218,21 @@ function newSyncClient(client, getDb, axiosInterceptor, syncInterceptors, intern
 			pullOptions._onPullSnapshot = options._onPullSnapshot;
 		if (options._skipPushBeforePull === true)
 			pullOptions._skipPushBeforePull = true;
+		return pullWithForeignKeysSuspended(pullOptions);
+	}
+
+	async function pullWithForeignKeysSuspended(pullOptions) {
 		const db = toSyncDb(await getDb());
-		await db.query('PRAGMA foreign_keys = OFF');
-		const result = await pull(pullOptions);
-		await tryEnableForeignKeys(db);
-		return result;
+		await tryDisableForeignKeys(db);
+		try {
+			return await pull({
+				...pullOptions,
+				_skipForeignKeyEnable: true
+			});
+		}
+		finally {
+			await tryEnableForeignKeys(db);
+		}
 	}
 
 	async function pushPendingOnly(options = {}) {
@@ -4258,6 +4270,17 @@ async function tryEnableForeignKeys(db) {
 		return;
 	try {
 		await db.query('PRAGMA foreign_keys = ON');
+	}
+	catch (_e) {
+		// Non-sqlite engines can safely ignore this pragma.
+	}
+}
+
+async function tryDisableForeignKeys(db) {
+	if (!db || typeof db.query !== 'function')
+		return;
+	try {
+		await db.query('PRAGMA foreign_keys = OFF');
 	}
 	catch (_e) {
 		// Non-sqlite engines can safely ignore this pragma.

@@ -1328,6 +1328,78 @@ describe('sync client auto start', () => {
 		)).toBe(false);
 	});
 
+	test('suspends foreign keys across snapshot-backed captured pull batches', async () => {
+		const patches = [];
+		const db = newJournalDb({
+			__sqliteSync: {
+				url: '/rdb',
+				auto: false,
+				schema: false,
+				pull: {
+					maxKeysPerBatch: 1,
+					maxRowsPerBatch: 1
+				}
+			}
+		});
+		const client = newSyncClient({
+			tables: {
+				child: newTable('child'),
+				parent: newTable('parent')
+			},
+			transaction: async (fn) => fn({
+				child: {
+					patch: async (patch) => {
+						patches.push(patch);
+						return { changed: [] };
+					}
+				},
+				parent: {
+					patch: async (patch) => {
+						patches.push(patch);
+						return { changed: [] };
+					}
+				},
+				query: db.query
+			})
+		}, async () => db, {
+			applyTo(axios) {
+				axios.request = async (request) => {
+					if (request.data.phase === 'keys') {
+						const parent = !!request.data.token;
+						return {
+							data: {
+								phase: 'keys',
+								items: [{
+									table: parent ? 'parent' : 'child',
+									pk: [1],
+									key: { id: 1 },
+									op: 'U'
+								}],
+								done: parent,
+								cursor: parent ? 'cursor-2' : 'cursor-1',
+								...(parent ? {} : { token: { page: 1 } })
+							}
+						};
+					}
+					return rowsResponse(request.data.items);
+				};
+			}
+		});
+
+		const result = await client[syncAndCapturePullJournalSymbol]({
+			_fileSnapshotRollback: true
+		});
+
+		const foreignKeysOff = db.queryLog.indexOf('PRAGMA foreign_keys = OFF');
+		const foreignKeyCheck = db.queryLog.indexOf('PRAGMA foreign_key_check');
+		const foreignKeysOn = db.queryLog.lastIndexOf('PRAGMA foreign_keys = ON');
+		expect(result.applied).toBe(2);
+		expect(patches).toHaveLength(2);
+		expect(foreignKeysOff).toBeGreaterThanOrEqual(0);
+		expect(foreignKeyCheck).toBeGreaterThan(foreignKeysOff);
+		expect(foreignKeysOn).toBeGreaterThan(foreignKeyCheck);
+	});
+
 	test('defers stable-base maintenance until streamed bootstrap completes', async () => {
 		const patches = [];
 		const batchProgress = [];

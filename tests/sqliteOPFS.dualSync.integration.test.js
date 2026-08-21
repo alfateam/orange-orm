@@ -371,6 +371,69 @@ describe('sqliteOPFS dual sync integration', () => {
 		}
 	}, 30000);
 
+	test('validates relations after a standard bootstrap streams children before parents', async () => {
+		const remoteDb = relationalMap({
+			db: con => con.pglite(undefined, { size: 1 })
+		});
+		closeTasks.push(() => remoteDb.close());
+		await remoteDb.query([
+			'CREATE TABLE "compositeOrder" (',
+			'"companyId" TEXT NOT NULL, "orderNo" INTEGER NOT NULL, "title" TEXT NOT NULL,',
+			'PRIMARY KEY ("companyId", "orderNo"));'
+		].join(' '));
+		await remoteDb.query([
+			'CREATE TABLE "compositeOrderLine" (',
+			'"companyId" TEXT NOT NULL, "orderNo" INTEGER NOT NULL,',
+			'"lineNo" INTEGER NOT NULL, "text" TEXT NOT NULL,',
+			'PRIMARY KEY ("companyId", "orderNo", "lineNo"));'
+		].join(' '));
+		await setupChangeTracking(remoteDb, {
+			compositeOrder: remoteDb.tables.compositeOrder,
+			compositeOrderLine: remoteDb.tables.compositeOrderLine
+		});
+		await remoteDb.compositeOrder.insert({
+			companyId: 'acme',
+			orderNo: 7,
+			title: 'Standard order'
+		});
+		await remoteDb.compositeOrderLine.insert({
+			companyId: 'acme',
+			orderNo: 7,
+			lineNo: 1,
+			text: 'Child delivered first'
+		});
+
+		const app = express();
+		app.use(express.json({ limit: '2mb' }));
+		app.use('/rdb', remoteDb.express({ sync: true }));
+		const server = await listen(app);
+		closeTasks.push(() => closeServer(server));
+		const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'orange-dual-standard-relations-'));
+		closeTasks.push(async () => fs.rmSync(directory, { recursive: true, force: true }));
+		const connectionString = path.join(directory, 'local.sqlite3');
+		const sync = {
+			url: `http://127.0.0.1:${server.address().port}/rdb`,
+			auto: false,
+			tables: ['compositeOrderLine', 'compositeOrder'],
+			pull: {
+				maxKeysPerBatch: 1,
+				maxRowsPerBatch: 1
+			}
+		};
+		const dualDb = newDualSyncDatabase(connectionString, { sync }, (roleConnectionString, options) =>
+			newSqliteDatabase(roleConnectionString, { ...options, size: 1 })
+		);
+		const localDb = relationalMap({ db: () => dualDb });
+		closeTasks.push(() => localDb.close());
+		await localDb.syncClient.resetLocal();
+
+		await localDb.syncClient.sync();
+
+		expect(await localDb.compositeOrder.count()).toBe(1);
+		expect(await localDb.compositeOrderLine.count()).toBe(1);
+		expect(await localDb.query('PRAGMA foreign_key_check')).toHaveLength(0);
+	}, 30000);
+
 	test('streams bootstrap batches and replays incremental deltas across roles', async () => {
 		const remoteDb = map({
 			db: con => con.pglite(undefined, { size: 1 })
